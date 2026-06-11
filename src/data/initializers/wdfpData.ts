@@ -64,6 +64,13 @@ export default function init(
         FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE CASCADE
     )`).run();
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS device_bindings (
+        device_id INTEGER PRIMARY KEY,
+        account_id INTEGER NOT NULL,
+        last_seen DATE NOT NULL,
+        FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE CASCADE
+    )`).run();
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_options (
         key TEXT NOT NULL,
         value INTEGER NOT NULL,

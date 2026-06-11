@@ -175,6 +175,56 @@ const routes = async (fastify: FastifyInstance) => {
             return reply.status(500).send({ error: e.message })
         }
     })
+
+    // Delete single quest progress record
+    fastify.delete("/:id/quest_progress/:section/:quest_id", async (request: FastifyRequest, reply: FastifyReply) => {
+        const { id, section, quest_id } = request.params as { id: string, section: string, quest_id: string }
+        const playerId = Number(id)
+        const sec = Number(section)
+        const qid = Number(quest_id)
+        if (isNaN(playerId) || isNaN(sec) || isNaN(qid)) return reply.status(400).send({ error: "Invalid params" })
+        try {
+            const db = getDb()
+            db.prepare(`DELETE FROM players_quest_progress WHERE player_id = ? AND section = ? AND quest_id = ?`).run(playerId, sec, qid)
+            return reply.status(200).send({ ok: true })
+        } catch (e: any) { return reply.status(500).send({ error: e.message }) }
+    })
+
+    // Delete all quest progress for a player
+    fastify.delete("/:id/quest_progress", async (request: FastifyRequest, reply: FastifyReply) => {
+        const playerId = Number((request.params as any).id)
+        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid params" })
+        try {
+            const db = getDb()
+            db.prepare(`DELETE FROM players_quest_progress WHERE player_id = ?`).run(playerId)
+            return reply.status(200).send({ ok: true })
+        } catch (e: any) { return reply.status(500).send({ error: e.message }) }
+    })
+
+    // Delete single drawn quest record
+    fastify.delete("/:id/drawn_quest/:category/:quest_id", async (request: FastifyRequest, reply: FastifyReply) => {
+        const { id, category, quest_id } = request.params as { id: string, category: string, quest_id: string }
+        const playerId = Number(id)
+        const cat = Number(category)
+        const qid = Number(quest_id)
+        if (isNaN(playerId) || isNaN(cat) || isNaN(qid)) return reply.status(400).send({ error: "Invalid params" })
+        try {
+            const db = getDb()
+            db.prepare(`DELETE FROM players_drawn_quests WHERE player_id = ? AND category_id = ? AND quest_id = ?`).run(playerId, cat, qid)
+            return reply.status(200).send({ ok: true })
+        } catch (e: any) { return reply.status(500).send({ error: e.message }) }
+    })
+
+    // Delete all drawn quests for a player
+    fastify.delete("/:id/drawn_quest", async (request: FastifyRequest, reply: FastifyReply) => {
+        const playerId = Number((request.params as any).id)
+        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid params" })
+        try {
+            const db = getDb()
+            db.prepare(`DELETE FROM players_drawn_quests WHERE player_id = ?`).run(playerId)
+            return reply.status(200).send({ ok: true })
+        } catch (e: any) { return reply.status(500).send({ error: e.message }) }
+    })
 }
 
 export default routes;

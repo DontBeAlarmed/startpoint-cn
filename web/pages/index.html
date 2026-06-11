@@ -52,38 +52,6 @@
             </a>
         </nav>
         <article class="w-full flex flex-col gap-5">
-            <!-- Account Management -->
-            <section class="flex flex-col p-5 border border-outline-variant rounded-3xl w-full gap-3">
-                <h3 class="text-xl text-on-background font-semibold">Account Switch</h3>
-                {{activeInfo}}
-                <form method="post" action="/api/server/deactivate">
-                    <button type="submit" class="text-sm text-on-surface-variant underline">取消绑定（恢复每登创建新号）</button>
-                </form>
-                <form method="post" action="/api/server/newAccount">
-                    <button type="submit"
-                        class="text-base bg-primary text-on-primary h-[40px] px-[24px] rounded-full flex items-center justify-center relative before:transition-opacity before:absolute before:w-full before:h-full before:left-0 before:top-0 before:rounded-full before:opacity-0 before:hover:bg-on-primary before:hover:opacity-[0.12] transition-opacity">
-                        新建存档
-                    </button>
-                </form>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="text-left border-b border-outline-variant">
-                                <th class="p-2">ID</th>
-                                <th class="p-2">昵称</th>
-                                <th class="p-2">Player</th>
-                                <th class="p-2">状态</th>
-                                <th class="p-2">注册</th>
-                                <th class="p-2">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {{accountRows}}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
             <!-- Time Setting -->
             <div class="flex flex-col items-center justify-center p-5 border border-outline-variant rounded-3xl w-full gap-5">
                 <h3 class="text-xl text-on-background font-semibold">Change the server's time to visit past and future content.</h3>

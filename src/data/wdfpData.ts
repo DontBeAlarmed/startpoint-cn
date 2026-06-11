@@ -347,6 +347,23 @@ export function getViewerIdSync(accountId: number): number {
 }
 
 /**
+ * Device binding: maps device_id → account_id
+ */
+export function getDeviceBindingSync(deviceId: number): { device_id: number, account_id: number } | null {
+    const row = db.prepare(`SELECT device_id, account_id FROM device_bindings WHERE device_id = ?`).get(deviceId) as any
+    return row ?? null
+}
+
+export function insertDeviceBindingSync(deviceId: number, accountId: number): void {
+    db.prepare(`INSERT OR REPLACE INTO device_bindings (device_id, account_id, last_seen) VALUES (?, ?, ?)`)
+        .run(deviceId, accountId, new Date().toISOString())
+}
+
+export function deleteDeviceBindingSync(deviceId: number): void {
+    db.prepare(`DELETE FROM device_bindings WHERE device_id = ?`).run(deviceId)
+}
+
+/**
  * Synchronously returns all of the sessions of a particular type belonging to an account.
  * 
  * @param accountId The ID of the account to get the sessions of.

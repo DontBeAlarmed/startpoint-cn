@@ -292,6 +292,7 @@ const routes = async (fastify: FastifyInstance) => {
             max_overed_mail_count: 0,
             outdated_mail_count: 0,
             total_count: getPlayerMailCountSync(playerId),
+            mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
         }
 
         if (characterList.length > 0) responseData.character_list = characterList

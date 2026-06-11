@@ -1,8 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { generateDataHeaders } from "../../utils";
-import { insertAccount, insertDefaultPlayerSync, getAccountPlayers, getPlayerSync, getAccount, insertSessionWithToken, updateAccountSync, deleteSession } from "../../data/wdfpData";
+import { insertAccount, insertDefaultPlayerSync, getPlayerSync, insertSessionWithToken, updateAccountSync, deleteSession, getDeviceBindingSync, insertDeviceBindingSync } from "../../data/wdfpData";
 import { SessionType } from "../../data/types";
-import { getActiveAccountId, setActiveAccountId } from "../../data/activeAccount";
 
 interface CnSignupBody {
     device_id: number;
@@ -57,68 +56,33 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as CnSignupBody;
         const udid = request.headers["udid"] as string || "unknown";
         const shortUdid = 0;
+        const deviceId = body.device_id
 
         const loginToken = generateLoginToken();
-
         let accountId: number;
-        let newAccount: boolean = true;
+        let newAccount = true;
 
-        const firstViewerId = body.first_viewer_id ? Number(body.first_viewer_id) : null;
-        const activeId = getActiveAccountId();
+        if (!deviceId) {
+            return reply.status(400).send({ error: "Missing device_id" })
+        }
 
-        // Priority: Web panel activeAccount > client first_viewer_id > new account
-        if (activeId !== null) {
-            const existingAccount = await getAccount(activeId);
-            if (existingAccount && existingAccount.status === 'normal') {
-                accountId = existingAccount.id;
-                newAccount = false;
-                updateAccountSync({ id: accountId, lastLoginTime: new Date() });
-                try { deleteSession(String(accountId)); } catch (_) {}
-            } else if (existingAccount) {
-                // Account exists but banned/abnormal — reject login
-                return reply.status(403).send({
-                    error: "Account unavailable",
-                    message: `Account ${activeId} has been ${existingAccount.status}.`
-                });
-            } else {
-                // Active account doesn't exist — create replacement
-                const account = await insertAccount({
-                    appId: "wf_cn", idpAlias: "", idpCode: "leiting", idpId: "", status: "normal"
-                });
-                accountId = account.id;
-                insertDefaultPlayerSync(accountId);
-                setActiveAccountId(accountId);
-            }
-        } else if (firstViewerId !== null) {
-            const existingAccount = await getAccount(firstViewerId);
-            if (existingAccount && existingAccount.status === 'normal') {
-                accountId = existingAccount.id;
-                newAccount = false;
-                updateAccountSync({ id: accountId, lastLoginTime: new Date() });
-                try { deleteSession(String(accountId)); } catch (_) {}
-            } else if (existingAccount) {
-                // Account exists but banned/abnormal — reject login, don't auto-create
-                return reply.status(403).send({
-                    error: "Account unavailable",
-                    message: `Account ${firstViewerId} has been ${existingAccount.status}.`
-                });
-            } else {
-                // Old account not found — create new
-                const account = await insertAccount({
-                    appId: "wf_cn", idpAlias: "", idpCode: "leiting", idpId: "", status: "normal"
-                });
-                accountId = account.id;
-                insertDefaultPlayerSync(accountId);
-                setActiveAccountId(accountId);
-            }
+        // Device binding: each device gets its own account
+        const binding = getDeviceBindingSync(deviceId)
+
+        if (binding) {
+            // Known device → reuse account
+            accountId = binding.account_id
+            newAccount = false
+            updateAccountSync({ id: accountId, lastLoginTime: new Date() })
+            try { deleteSession(String(accountId)) } catch (_) {}
         } else {
-            // First launch — create new account
+            // New device → create account
             const account = await insertAccount({
                 appId: "wf_cn", idpAlias: "", idpCode: "leiting", idpId: "", status: "normal"
-            });
-            accountId = account.id;
-            insertDefaultPlayerSync(accountId);
-            setActiveAccountId(accountId);
+            })
+            accountId = account.id
+            insertDefaultPlayerSync(accountId)
+            insertDeviceBindingSync(deviceId, accountId)
         }
 
         await insertSessionWithToken({

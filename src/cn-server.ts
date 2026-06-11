@@ -3,7 +3,7 @@ import { ContentTypeParserDoneFunction } from "fastify/types/content-type-parser
 import { pack, unpack } from "msgpackr";
 import fastifyStatic from "@fastify/static";
 import path from "path";
-import { getServerTime } from "./utils";
+import { getServerTime, getServerTimeForPlayer } from "./utils";
 import { restoreTimeOffset } from "./data/activeAccount";
 
 import versionCheckPlugin from "./routes/cn/versionCheck";
@@ -47,7 +47,7 @@ const fastify = Fastify({
     }
 });
 
-// Restore saved time offset from previous session
+// Restore saved time offset from active player on startup
 restoreTimeOffset();
 
 fastify.addHook("onSend", (_, reply, payload, done) => {
@@ -90,10 +90,11 @@ const apiPrefix = "/api/index.php";
 fastify.register(cnLoadPlugin, { prefix: apiPrefix });
 fastify.register(cnAssetPlugin, { prefix: `${apiPrefix}/asset` });
 
-function stubMsgpackReply(reply: any, data: any) {
+function stubMsgpackReply(reply: any, data: any, playerId?: number) {
+    const servertime = playerId ? getServerTimeForPlayer(playerId) : getServerTime()
     reply.header("content-type", "application/x-msgpack");
     reply.status(200).send({
-        data_headers: { force_update: false, asset_update: false, short_udid: 0, viewer_id: 0, servertime: getServerTime(), result_code: 1 },
+        data_headers: { force_update: false, asset_update: false, short_udid: 0, viewer_id: 0, servertime, result_code: 1 },
         data
     });
 }

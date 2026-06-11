@@ -86,6 +86,38 @@
                 </table>
             </section>
 
+            <!-- Quest Progress -->
+            <section class="p-5 border border-outline-variant rounded-3xl bg-surface-container">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-lg font-semibold">关卡进度 <span class="text-sm text-on-surface-variant">({{questProgressCount}})</span></h3>
+                    <button onclick="delAllQuestProgress()" class="text-xs border border-error text-error rounded-full px-3 py-1">删除全部</button>
+                </div>
+                <div class="overflow-x-auto max-h-64 overflow-y-auto">
+                <table class="w-full text-sm">
+                    <thead><tr class="text-left border-b border-outline-variant sticky top-0 bg-surface-container">
+                        <th class="p-1">section</th><th class="p-1">quest_id</th><th class="p-1">完成</th><th class="p-1">最高分</th><th class="p-1">评级</th><th class="p-1">最快(ms)</th><th class="p-1">操作</th>
+                    </tr></thead>
+                    <tbody>{{questProgressRows}}</tbody>
+                </table>
+                </div>
+            </section>
+
+            <!-- Drawn Quests -->
+            <section class="p-5 border border-outline-variant rounded-3xl bg-surface-container">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-lg font-semibold">抽选关卡 <span class="text-sm text-on-surface-variant">({{drawnQuestCount}})</span></h3>
+                    <button onclick="delAllDrawnQuests()" class="text-xs border border-error text-error rounded-full px-3 py-1">删除全部</button>
+                </div>
+                <div class="overflow-x-auto max-h-64 overflow-y-auto">
+                <table class="w-full text-sm">
+                    <thead><tr class="text-left border-b border-outline-variant sticky top-0 bg-surface-container">
+                        <th class="p-1">category</th><th class="p-1">quest_id</th><th class="p-1">odds_id</th><th class="p-1">操作</th>
+                    </tr></thead>
+                    <tbody>{{drawnQuestRows}}</tbody>
+                </table>
+                </div>
+            </section>
+
             <!-- Account settings -->
             <section class="p-5 border border-outline-variant rounded-3xl bg-surface-container">
                 <h3 class="text-lg font-semibold mb-3">账号设置</h3>
@@ -103,10 +135,6 @@
                     <div class="flex items-center gap-2 pt-4">
                         <input id="auto3x" type="checkbox" {{auto3x}} onchange="editField('enableAuto3x', this.checked)">
                         <label class="text-sm" for="auto3x">3x加速</label>
-                    </div>
-                    <div class="flex items-center gap-2 pt-4">
-                        <input id="tutorialSkip" type="checkbox" {{tutorialSkip}} onchange="editField('tutorialSkipFlag', this.checked)">
-                        <label class="text-sm" for="tutorialSkip">教程跳过</label>
                     </div>
                 </div>
             </section>
@@ -173,6 +201,30 @@
     async function delItem(itemId) {
         if (!confirm('删除道具 ' + itemId + '?')) return;
         const r = await fetch('/api/player/' + PID + '/item/' + itemId, { method: 'DELETE' });
+        if (r.ok) location.reload();
+    }
+
+    async function delQuestProgress(section, questId) {
+        if (!confirm('删除关卡 section=' + section + ' quest=' + questId + '?')) return;
+        const r = await fetch('/api/player/' + PID + '/quest_progress/' + section + '/' + questId, { method: 'DELETE' });
+        if (r.ok) location.reload();
+    }
+
+    async function delAllQuestProgress() {
+        if (!confirm('删除全部关卡进度?')) return;
+        const r = await fetch('/api/player/' + PID + '/quest_progress', { method: 'DELETE' });
+        if (r.ok) location.reload();
+    }
+
+    async function delDrawnQuest(catId, questId) {
+        if (!confirm('删除抽选关卡 category=' + catId + ' quest=' + questId + '?')) return;
+        const r = await fetch('/api/player/' + PID + '/drawn_quest/' + catId + '/' + questId, { method: 'DELETE' });
+        if (r.ok) location.reload();
+    }
+
+    async function delAllDrawnQuests() {
+        if (!confirm('删除全部抽选关卡?')) return;
+        const r = await fetch('/api/player/' + PID + '/drawn_quest', { method: 'DELETE' });
         if (r.ok) location.reload();
     }
     </script>
