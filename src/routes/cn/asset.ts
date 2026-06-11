@@ -11,7 +11,7 @@ const CDN_BASE = process.env.CDN_BASE_URL || `http://${HOST}:${CN_PORT}/patch/cn
 function getVersionInfo() {
     return {
         base_url: `${CDN_BASE}/EntityLists/`,
-        files_list: `${CDN_BASE}/EntityLists/empty.csv`, // 空CSV → sufficiency check 无缺失文件
+        files_list: `${CDN_BASE}/EntityLists/PathFile`,
         total_size: TOTAL_SIZE,
         delayed_assets_size: 0
     };
@@ -30,7 +30,8 @@ function buildArchiveList(cdnDir: string, subdir: string): { location: string; s
                     sha256: ""
                 };
             });
-    } catch {
+    } catch (e) {
+        console.error(`[CDN] buildArchiveList failed for ${subdir}:`, (e as Error).message);
         return [];
     }
 }
@@ -62,7 +63,9 @@ function buildDiffList(cdnDir: string): { original_version: string; version: str
                     groups.get(to)!.archive.push({ location: `${CDN_BASE}/${subdir}/${f}`, size: stats.size, sha256: "" });
                 }
             }
-        } catch {}
+        } catch (e) {
+            console.error(`[CDN] buildDiffList failed for ${subdir}:`, (e as Error).message);
+        }
     }
     return [...groups.entries()]
         .sort(([a], [b]) => compareVersion(a, b))
@@ -79,7 +82,9 @@ const TOTAL_SIZE = (() => {
         try {
             for (const f of readdirSync(path.join(cdnDir, subdir)).filter(f => f.endsWith(".zip")))
                 total += statSync(path.join(cdnDir, subdir, f)).size;
-        } catch {}
+        } catch (e) {
+            console.error(`[CDN] TOTAL_SIZE failed for ${subdir}:`, (e as Error).message);
+        }
     }
     return total;
 })();
