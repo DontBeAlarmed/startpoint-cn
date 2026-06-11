@@ -121,7 +121,6 @@ export function getAccountPlayersSync(
     SELECT id
     FROM players
     WHERE account_id = ?
-    ORDER BY id DESC
     `).all(accountId) as { id: number }[]
 
     return raw.map(player => player.id)
