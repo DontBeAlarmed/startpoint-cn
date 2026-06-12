@@ -611,8 +611,9 @@ const NPC_TEMPLATES = {
 | `TypeError #1034` | Type coercion in `commandReceived()` | character/equipment 未用 Option `[0, val]` / `[1]` 格式包裹 | 所有 party 字段使用 Option 包裹 |
 | `S1000` | `通信が終了されました` | TCP 连接意外关闭 | 正常关闭不处理 |
 | `C8601` | `指定的Key不存在。key=2023013102` | 活动面板加载时，CDN master 数据缺少 `daily_challenge_point_campaign[2023013102]` | 通行证功能暂不实现，已清空所有角色 `daily_challenge_point_list`，默认存档不再写入该数据 |
-| `H404` | `disband_room` 端点不存在 | 未实现该端点 | 已实现 `POST /multi_battle_quest/disband_room` |
-| `H404` | `event/rush/reward` + `/endless_battle` 缺失 | 未实现 | 已实现桩 — reward 返回空排名奖励，endless_battle 返回初始状态 |
+| `H404` | `event/raid/summary` + 5 个 Raid 端点 | 未实现 | 已实现全部 7 个 Raid 端点（含 summary/ranking_reward/party/ranking/ranking:party/battle:start/get_boss），battle:start 为联机桩 |
+| `H404` | `carnival_event/index` | 未实现 | 已实现 /index + /get_party |
+| `H404` | `event/rush/reward` + `/endless_battle` | 未实现 | 已实现桩 — reward 返回空，endless_battle 返回初始状态 |
 | `H400` | `story_quest/finish` → 400，外传故事/活动关卡 | 服务端 quest JSON 缺少 CN 事件组数据 | ✅ 已从 CN 源完全导入 20 个 quest 分类共 5,158 关 |
 
 ---
@@ -679,6 +680,31 @@ const NPC_TEMPLATES = {
 - `arr[85]-[88]` → rank times (seconds×1000→ms)
 - `arr[94]-[97]` → battle rewards
 - `arr[71]` → scoreRewardGroup
+
+### 已实现的活动端点（非联机）
+
+| 活动 | 端点 | 状态 | 说明 |
+|------|------|:---:|------|
+| 嘉年华 | `carnival_event/index` | ✅ | 返回 records+party |
+| 嘉年华 | `carnival_event/get_party` | ✅ | 返回 party |
+| Rush | `event/rush/reward` | ✅ 桩 | 返回空排名奖励 |
+| Rush | `event/rush/endless_battle` | ✅ 桩 | 返回初始状态 |
+| Raid | `event/raid/summary` | ✅ | Raid 主入口 |
+| Raid | `event/raid/get_boss` | ✅ | BOSS 血量状态 |
+| Raid | `event/raid/ranking_reward` | ✅ 桩 | 返回空奖励 |
+| Raid | `event/raid/party` | ✅ | 返回 Raid 队伍组 |
+| Raid | `event/raid/ranking` | ✅ 桩 | 返回空排名 |
+| Raid | `event/raid/ranking/party` | ✅ 桩 | 返回空队伍数据 |
+
+### 待完善（联机相关，Phase 2+）
+
+| 端点 | 状态 | 依赖 |
+|------|:---:|------|
+| `event/raid/battle/start` | ⚠️ 桩 | 需要完整多人战斗流程（summon→start→finish） |
+| `multi_battle_quest/summon` | ❌ | NPC mate 数据下发 |
+| `multi_battle_quest/start` | ❌ | StartBattle 流程 |
+| TCP Session Phase 2 | ❌ | NPC 加入房间 + 房主自动准备 + 完整战斗 |
+| `attention/check` 匹配 | ❌ | 真实多人匹配（当前仅返回 config） |
 
 ---
 
