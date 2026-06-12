@@ -197,10 +197,19 @@ const routes = async (fastify: FastifyInstance) => {
             }),
             "data": {
                 "user_info": {
+                    "free_vmoney": freeVmoney,
+                    "vmoney": player.vmoney,
                     "free_mana": freeMana + (rewardResult?.user_info.free_mana ?? 0),
+                    "paid_mana": player.paidMana,
+                    "stamina": player.stamina,
+                    "stamina_heal_time": getServerTime(player.staminaHealTime),
                     "exp_pool": player.expPool + (rewardResult?.user_info.exp_pool ?? 0),
                     "exp_pooled_time": getServerTime(player.expPooledTime),
-                    "bond_token": bondTokens
+                    "bond_token": bondTokens,
+                    "rank_point": player.rankPoint,
+                    "star_crumb": player.starCrumb,
+                    "boost_point": player.boostPoint,
+                    "boss_boost_point": player.bossBoostPoint
                 },
                 "joined_character_id_list": rewardResult?.joined_character_id_list ?? [],
                 "character_list": rewardResult?.character_list ?? [],
@@ -357,6 +366,48 @@ const routes = async (fastify: FastifyInstance) => {
                     "stamina_heal_time": getServerTime(),
                 }
             }
+        })
+    })
+
+    // bulk_buy — stub, returns empty (TODO: implement multi-item purchase)
+    fastify.post("/bulk_buy", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as any
+        const viewerId = body.viewer_id
+        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid request body."
+        })
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data": {}
+        })
+    })
+
+    // get_campaign_lineup_id — stub
+    fastify.post("/get_campaign_lineup_id", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as any
+        const viewerId = body.viewer_id
+        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid request body."
+        })
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data": { "lineup_id": null }
+        })
+    })
+
+    // set_campaign_lineup_id — stub
+    fastify.post("/set_campaign_lineup_id", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as any
+        const viewerId = body.viewer_id
+        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid request body."
+        })
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data": {}
         })
     })
 }

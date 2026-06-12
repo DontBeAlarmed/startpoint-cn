@@ -613,6 +613,7 @@ const NPC_TEMPLATES = {
 | `C8601` | `指定的Key不存在。key=2023013102` | 活动面板加载时，CDN master 数据缺少 `daily_challenge_point_campaign[2023013102]` | 通行证功能暂不实现，已清空所有角色 `daily_challenge_point_list`，默认存档不再写入该数据 |
 | `H404` | `disband_room` 端点不存在 | 未实现该端点 | 已实现 `POST /multi_battle_quest/disband_room` |
 | `H404` | `event/raid/summary` + 5 个 Raid 端点 | 未实现 | 已实现全部 7 个 Raid 端点（含 summary/ranking_reward/party/ranking/ranking:party/battle:start/get_boss），battle:start 为联机桩 |
+| `H404` | `shop/bulk_buy` + `get_campaign_lineup_id` + `set_campaign_lineup_id` | 未实现 | 已实现桩 — bulk_buy 返回空，两个 campaign lineup 返回 stub |
 | `H404` | `contents_guide/start` — 满玛纳板后引导弹窗 | 未实现 | 已实现 `POST /contents_guide/start`，返回 `{ data: {} }` |
 | `H404` | `carnival_event/index` | 未实现 | 已实现 /index + /get_party |
 | `H404` | `event/rush/reward` + `/endless_battle` | 未实现 | 已实现桩 — reward 返回空，endless_battle 返回初始状态 |
