@@ -134,8 +134,8 @@ export function rewardPlayerGachaDrawResultSync(
                 if (giveResult !== null) {
                     // get character rarity from CN asset data (not calculated from ID)
                     const assetData = getCharacterDataSync(characterId)
-                    let rarity = assetData !== null ? (assetData.rarity - 1) : (Math.floor(characterId / 100000) - 1)
-                    rarity = Math.max(0, Math.min(4, rarity)) // clamp to 0-4 (1★-5★)
+                    let rarity = assetData !== null ? (5 - assetData.rarity) : (5 - (Math.floor(characterId / 100000) - 1))
+                    rarity = Math.max(0, Math.min(2, rarity)) // clamp to 0-2 (rankMovieRates indices: 0=5★,1=4★,2=3★)
                     // decide on movie
                     const movieType = randomPoolItem(1, 101, rankMovieRates[rarity]) ?? GachaMovieType.NORMAL
 
