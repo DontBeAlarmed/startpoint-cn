@@ -619,7 +619,7 @@ const NPC_TEMPLATES = {
 | `H400` | `story_quest/finish` → 400，外传故事/活动关卡 | 服务端 quest JSON 缺少 CN 事件组数据 | ✅ 已从 CN 源完全导入 20 个 quest 分类共 5,158 关 |
 | `C8702` | `character_list[i].join_time:null` — mail 领取角色 | 邮件角色响应缺少 `join_time`/`update_time` 字段 | 已补齐 `clientSerializeDate` 格式 |
 | `C8707` | `user_character_mana_node_list` 格式错误 | 序列化为数字数组，CN 客户端期望 `{ mana_node_multiplied_id: N }` 对象 | 已修正序列化格式 |
-| `F1010` | TypeError #1010 — 经验卡结算崩溃 | `bondTokenStatusList` 缺少 NPC/限时队伍条目，`null.before` | 所有队伍角色（含 DB 中找不到的）均创建条目 |
+| `F1009` | TypeError #1009 — `ManaNodeTreeChartView/changeActiveManaBoard()` | `mana_board_index=2` 但 `mana_node.json` 缺少对应角色的 level 2 数据；或服务端时间早于 `mana_board2_open_condition` 的 `start_time` | ① 增量导入 CN 角色资产数据（含 level 2）② DB 重置 `mana_board_index=1` ③ 服务端时间调整到 2025-06-01 之后 |
 
 ---
 
@@ -639,6 +639,8 @@ const NPC_TEMPLATES = {
 5. **TCP 消息合并**: 多消息在同一 TCP 段到达会导致客户端 commandReceived 解析失败（不分割 null 终止符）。当前通过延迟发送（800ms/1100ms）缓解。
 
 6. **默认存档对齐**: 默认玩家数据的初始值已按 CN 客户端 `PlayerSaveDataTools.createDummy()` 对齐（vmoney=100, name=冒险者 等）。角色 ID 使用 business code，CN 客户端中阿尔克=1、白=10，k_id 映射表当前不需要。
+
+7. **玛纳板（Mana Board）适配**: CN 角色的玛纳板二版受 `mana_board2_open_condition.json` 的时间窗口控制。CN 角色如 151165 的 `start_time=2025-04-03`，默认服务端时间 2024-08-14 早于此时间 → `canManaBoard2Open()` 返回 false → 仅显示板一。解决方法：将服务端时间调整到 2025-06-01 之后。
 
 7. **外传故事 quest 数据**: 已从 CN 源 `wf-assets-cn/orderedmap/quest/` 完全导入全部 20 个 quest 分类，共 5,158 关，覆盖所有 CN 事件组。
 
