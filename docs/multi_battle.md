@@ -617,6 +617,7 @@ const NPC_TEMPLATES = {
 | `H404` | `carnival_event/index` | 未实现 | 已实现 /index + /get_party |
 | `H404` | `event/rush/reward` + `/endless_battle` | 未实现 | 已实现桩 — reward 返回空，endless_battle 返回初始状态 |
 | `H400` | `ranking_event/get_summary` → 400（云水试炼等） | `rankingEventIdQuestMap` 缺少 CN 事件 ID 1000/1001 | 新增映射 `1000→1000001`, `1001→1001001` |
+| `H400` | `character/receive_bond_token` → 400 — 玛纳板完成后领羁绊之证 | bond token status 残留为 2（上次 CN 导入期间领取），DB 重置后服务端拒绝 | ⚠️ 待排查 — DB 已重置为 1，暂不影响流程 |
 | `H400` | `story_quest/finish` → 400，外传故事/活动关卡 | 服务端 quest JSON 缺少 CN 事件组数据 | ✅ 已从 CN 源完全导入 20 个 quest 分类共 5,158 关 |
 | `C8702` | `character_list[i].join_time:null` — mail 领取角色 | 邮件角色响应缺少 `join_time`/`update_time` 字段 | 已补齐 `clientSerializeDate` 格式 |
 | `C8707` | `user_character_mana_node_list` 格式错误 | 序列化为数字数组，CN 客户端期望 `{ mana_node_multiplied_id: N }` 对象 | 已修正序列化格式 |
