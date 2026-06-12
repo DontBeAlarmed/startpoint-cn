@@ -9,7 +9,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2015-12-31 23:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -27,7 +27,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2015-12-31 23:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -45,7 +45,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2020-12-18 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -63,7 +63,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2020-12-18 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -81,7 +81,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-05-27 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -99,7 +99,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-05-27 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -117,7 +117,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-07-11 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -135,7 +135,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-07-11 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -153,7 +153,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2015-12-31 23:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -171,7 +171,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2015-12-31 23:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -189,7 +189,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2015-12-31 23:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -207,7 +207,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2015-12-31 23:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -225,7 +225,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2020-11-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -243,7 +243,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2020-11-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -261,7 +261,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2020-12-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -279,7 +279,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-01-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -297,7 +297,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-02-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -315,7 +315,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-03-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -333,7 +333,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-04-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -351,7 +351,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-05-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -369,7 +369,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-06-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -387,7 +387,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-07-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -405,7 +405,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-08-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -423,7 +423,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-09-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -441,7 +441,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-10-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -459,7 +459,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-11-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -477,7 +477,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-12-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -495,7 +495,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-01-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -513,7 +513,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-02-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -531,7 +531,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-03-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -549,7 +549,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-04-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -567,7 +567,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-05-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -585,7 +585,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-06-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -603,7 +603,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-07-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -621,7 +621,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-08-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -639,7 +639,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-09-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -657,7 +657,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-10-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -675,7 +675,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-11-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -693,7 +693,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-12-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -711,7 +711,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-01-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -729,7 +729,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-01-01 05:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -747,7 +747,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-10-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -765,7 +765,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-11-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -783,7 +783,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-12-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -801,7 +801,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-01-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -819,7 +819,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-02-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -837,7 +837,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-03-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -855,7 +855,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-04-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -873,7 +873,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-05-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -891,7 +891,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-06-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -909,7 +909,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-07-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -927,7 +927,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-08-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -945,7 +945,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-09-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -963,7 +963,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-09-01 05:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -981,7 +981,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-02-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -999,7 +999,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-03-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1017,7 +1017,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-04-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1035,7 +1035,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-05-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1053,7 +1053,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-06-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1071,7 +1071,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-07-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1089,7 +1089,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-08-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1107,7 +1107,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-09-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1125,7 +1125,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-10-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1143,7 +1143,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-11-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1161,7 +1161,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2022-12-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1179,7 +1179,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-01-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1197,7 +1197,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-02-01 04:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1215,7 +1215,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-02-01 05:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1233,7 +1233,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2020-10-31 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1251,7 +1251,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2020-10-31 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1269,7 +1269,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2020-10-31 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1287,7 +1287,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2020-10-31 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1305,7 +1305,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2020-10-31 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1323,7 +1323,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2020-10-31 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1341,7 +1341,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-01-31 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1359,7 +1359,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-01-31 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1377,7 +1377,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-01-31 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1395,7 +1395,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-01-31 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1413,7 +1413,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-01-31 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1431,7 +1431,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-01-31 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1449,7 +1449,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-01-31 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1467,7 +1467,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-04-28 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1485,7 +1485,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-04-28 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1503,7 +1503,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-04-28 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1521,7 +1521,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-04-28 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1539,7 +1539,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-04-28 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1557,7 +1557,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-04-28 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1575,7 +1575,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-04-28 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1593,7 +1593,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-04-28 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1611,7 +1611,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-07-16 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1629,7 +1629,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-07-16 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1647,7 +1647,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-07-16 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1665,7 +1665,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-07-16 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1683,7 +1683,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-07-16 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1701,7 +1701,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-07-16 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1719,7 +1719,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-07-16 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1737,7 +1737,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-07-16 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1755,7 +1755,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-07-16 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1773,7 +1773,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-11-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1791,7 +1791,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-11-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1809,7 +1809,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-11-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1827,7 +1827,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-11-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1845,7 +1845,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-11-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1863,7 +1863,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-11-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1881,7 +1881,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-11-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1899,7 +1899,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-11-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1917,7 +1917,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-11-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1935,7 +1935,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2021-11-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1953,7 +1953,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-11-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1971,7 +1971,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-11-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -1989,7 +1989,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-11-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2007,7 +2007,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-11-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2025,7 +2025,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-11-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2043,7 +2043,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-11-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2061,7 +2061,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-11-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2079,7 +2079,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-11-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2097,7 +2097,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-11-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2115,7 +2115,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-11-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2133,7 +2133,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-11-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2151,7 +2151,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-12-07 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2169,7 +2169,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-12-07 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2187,7 +2187,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-12-07 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2205,7 +2205,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-12-07 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2223,7 +2223,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-12-07 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2241,7 +2241,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-12-07 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2259,7 +2259,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-12-07 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2277,7 +2277,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-12-07 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2295,7 +2295,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-12-07 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2313,7 +2313,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-12-07 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2331,7 +2331,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2023-12-07 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2349,7 +2349,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-01-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2367,7 +2367,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-01-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2385,7 +2385,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-01-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2403,7 +2403,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-01-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2421,7 +2421,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-01-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2439,7 +2439,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-01-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2457,7 +2457,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-01-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2475,7 +2475,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-01-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2493,7 +2493,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-01-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2511,7 +2511,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-01-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2529,7 +2529,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-01-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2547,7 +2547,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-04-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2565,7 +2565,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-04-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2583,7 +2583,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-04-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2601,7 +2601,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-04-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2619,7 +2619,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-04-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2637,7 +2637,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-04-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2655,7 +2655,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-04-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2673,7 +2673,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-04-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2691,7 +2691,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-04-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2709,7 +2709,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-04-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2727,7 +2727,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-04-25 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2745,7 +2745,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-05-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2763,7 +2763,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-05-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2781,7 +2781,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-05-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2799,7 +2799,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-05-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2817,7 +2817,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-05-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2835,7 +2835,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-05-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2853,7 +2853,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-05-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2871,7 +2871,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-05-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2889,7 +2889,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-05-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2907,7 +2907,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-05-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2925,7 +2925,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-05-23 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2943,7 +2943,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2961,7 +2961,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2979,7 +2979,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -2997,7 +2997,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3015,7 +3015,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3033,7 +3033,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3051,7 +3051,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3069,7 +3069,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3087,7 +3087,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3105,7 +3105,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3123,7 +3123,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3141,7 +3141,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3159,7 +3159,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-12-05 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3177,7 +3177,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-12-05 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3195,7 +3195,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-12-05 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3213,7 +3213,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-12-05 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3231,7 +3231,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-12-05 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3249,7 +3249,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-12-05 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3267,7 +3267,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-12-05 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3285,7 +3285,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-12-05 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3303,7 +3303,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-12-05 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3321,7 +3321,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-12-05 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3339,7 +3339,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-12-05 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3357,7 +3357,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-12-05 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3375,7 +3375,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-16 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3393,7 +3393,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-16 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3411,7 +3411,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-16 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3429,7 +3429,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-10-11 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3447,7 +3447,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-10-11 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3465,7 +3465,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-10-11 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3483,7 +3483,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-10-11 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3501,7 +3501,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-11-07 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3519,7 +3519,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-11-07 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3537,7 +3537,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-11-07 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3555,7 +3555,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-11-07 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3573,7 +3573,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-01-02 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3591,7 +3591,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-01-02 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3609,7 +3609,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-01-02 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3627,7 +3627,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-01-02 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3645,7 +3645,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-03-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3663,7 +3663,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-15 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3681,7 +3681,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-15 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3699,7 +3699,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-15 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3717,7 +3717,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-15 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3735,7 +3735,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-15 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3753,7 +3753,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-15 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3771,7 +3771,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-15 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3789,7 +3789,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-15 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3807,7 +3807,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-15 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3825,7 +3825,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-15 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3843,7 +3843,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-15 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3861,7 +3861,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-15 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3879,7 +3879,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3897,7 +3897,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3915,7 +3915,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3933,7 +3933,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3951,7 +3951,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3969,7 +3969,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -3987,7 +3987,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4005,7 +4005,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4023,7 +4023,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4041,7 +4041,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4059,7 +4059,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4077,7 +4077,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4095,7 +4095,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4113,7 +4113,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4131,7 +4131,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4149,7 +4149,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4167,7 +4167,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4185,7 +4185,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4203,7 +4203,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4221,7 +4221,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4239,7 +4239,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4257,7 +4257,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4275,7 +4275,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4293,7 +4293,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4311,7 +4311,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-26 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4329,7 +4329,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4347,7 +4347,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4365,7 +4365,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4383,7 +4383,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4401,7 +4401,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4419,7 +4419,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4437,7 +4437,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4455,7 +4455,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4473,7 +4473,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4491,7 +4491,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4509,7 +4509,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4527,7 +4527,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-05-29 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4545,7 +4545,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-02-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4563,7 +4563,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-02-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4581,7 +4581,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-02-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4599,7 +4599,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-02-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4617,7 +4617,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-02-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4635,7 +4635,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-02-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4653,7 +4653,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-02-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4671,7 +4671,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-02-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4689,7 +4689,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-02-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4707,7 +4707,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-02-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4725,7 +4725,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-02-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4743,7 +4743,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-02-27 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4761,7 +4761,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-07-04 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4779,7 +4779,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-07-04 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4797,7 +4797,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-07-04 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4815,7 +4815,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-07-04 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4833,7 +4833,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-07-04 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4851,7 +4851,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-07-04 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4869,7 +4869,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-07-04 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4887,7 +4887,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-07-04 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4905,7 +4905,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-07-04 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4923,7 +4923,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-07-04 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4941,7 +4941,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-07-04 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4959,7 +4959,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-07-04 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4977,7 +4977,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-03-27 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -4995,7 +4995,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-03-27 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -5013,7 +5013,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-03-27 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -5031,7 +5031,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-19 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -5049,7 +5049,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-19 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -5067,7 +5067,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-19 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -5085,7 +5085,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2025-06-19 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -5103,7 +5103,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2050-11-30 11:59:59",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -5121,7 +5121,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-20 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -5139,7 +5139,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-20 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -5157,7 +5157,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-20 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -5175,7 +5175,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-20 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -5193,7 +5193,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-20 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
@@ -5211,7 +5211,7 @@
       }
     ],
     "availableFrom": "2015-01-01 00:00:00",
-    "availableUntil": null,
+    "availableUntil": "2024-08-20 12:00:00",
     "stock": 99,
     "userCost": {
       "type": 1,
