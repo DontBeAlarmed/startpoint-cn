@@ -31,8 +31,8 @@
         "count": 1
       }
     ],
-    "availableFrom": "2016-10-26 15:00:00",
-    "availableUntil": null,
+    "availableFrom": "2022-04-19 12:00:00",
+    "availableUntil": "2022-05-19 11:59:59",
     "stock": 7
   },
   "100002": {
@@ -49,8 +49,8 @@
         "count": 1
       }
     ],
-    "availableFrom": "2016-10-26 15:00:00",
-    "availableUntil": null,
+    "availableFrom": "2022-04-19 12:00:00",
+    "availableUntil": "2022-05-19 11:59:59",
     "stock": 9
   },
   "100004": {
@@ -67,8 +67,8 @@
         "count": 1
       }
     ],
-    "availableFrom": "2016-10-26 15:00:00",
-    "availableUntil": null,
+    "availableFrom": "2022-04-19 12:00:00",
+    "availableUntil": "2022-05-19 11:59:59",
     "stock": 5
   },
   "100005": {
@@ -85,8 +85,8 @@
         "count": 1
       }
     ],
-    "availableFrom": "2016-10-26 15:00:00",
-    "availableUntil": null,
+    "availableFrom": "2022-04-19 12:00:00",
+    "availableUntil": "2022-05-19 11:59:59",
     "stock": 5
   },
   "100006": {
@@ -103,8 +103,8 @@
         "count": 1
       }
     ],
-    "availableFrom": "2016-10-26 15:00:00",
-    "availableUntil": null,
+    "availableFrom": "2022-04-19 12:00:00",
+    "availableUntil": "2022-05-19 11:59:59",
     "stock": 5
   },
   "100007": {
@@ -121,8 +121,8 @@
         "count": 1
       }
     ],
-    "availableFrom": "2016-10-26 15:00:00",
-    "availableUntil": null,
+    "availableFrom": "2022-04-19 12:00:00",
+    "availableUntil": "2022-05-19 11:59:59",
     "stock": 5
   },
   "100008": {
@@ -409,8 +409,8 @@
         "count": 1
       }
     ],
-    "availableFrom": "2016-10-26 15:00:00",
-    "availableUntil": null,
+    "availableFrom": "2015-03-01 15:00:00",
+    "availableUntil": "2021-12-31 23:59:59",
     "stock": 10
   },
   "100037": {
@@ -427,8 +427,8 @@
         "count": 1
       }
     ],
-    "availableFrom": "2016-10-26 15:00:00",
-    "availableUntil": null,
+    "availableFrom": "2015-03-01 15:00:00",
+    "availableUntil": "2021-12-31 23:59:59",
     "stock": 5
   },
   "100038": {
@@ -470,8 +470,8 @@
         "count": 25
       }
     ],
-    "availableFrom": "2016-10-26 15:00:00",
-    "availableUntil": null,
+    "availableFrom": "2015-03-01 15:00:00",
+    "availableUntil": "2021-12-31 23:59:59",
     "stock": 3
   },
   "100039": {
@@ -513,8 +513,8 @@
         "count": 25
       }
     ],
-    "availableFrom": "2016-10-26 15:00:00",
-    "availableUntil": null,
+    "availableFrom": "2015-03-01 15:00:00",
+    "availableUntil": "2021-12-31 23:59:59",
     "stock": 3
   },
   "100040": {
@@ -556,8 +556,8 @@
         "count": 25
       }
     ],
-    "availableFrom": "2016-10-26 15:00:00",
-    "availableUntil": null,
+    "availableFrom": "2015-03-01 15:00:00",
+    "availableUntil": "2021-12-31 23:59:59",
     "stock": 3
   },
   "100041": {
@@ -599,8 +599,8 @@
         "count": 25
       }
     ],
-    "availableFrom": "2016-10-26 15:00:00",
-    "availableUntil": null,
+    "availableFrom": "2015-03-01 15:00:00",
+    "availableUntil": "2021-12-31 23:59:59",
     "stock": 3
   },
   "100042": {
@@ -642,8 +642,8 @@
         "count": 25
       }
     ],
-    "availableFrom": "2016-10-26 15:00:00",
-    "availableUntil": null,
+    "availableFrom": "2015-03-01 15:00:00",
+    "availableUntil": "2021-12-31 23:59:59",
     "stock": 3
   },
   "100043": {
@@ -685,8 +685,8 @@
         "count": 25
       }
     ],
-    "availableFrom": "2016-10-26 15:00:00",
-    "availableUntil": null,
+    "availableFrom": "2015-03-01 15:00:00",
+    "availableUntil": "2021-12-31 23:59:59",
     "stock": 3
   },
   "100044": {
