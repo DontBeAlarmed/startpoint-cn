@@ -620,7 +620,7 @@ const NPC_TEMPLATES = {
 | `H400` | `ranking_event/get_summary` → 400（云水试炼等） | `rankingEventIdQuestMap` 缺少 CN 事件 ID 1000/1001 | 新增映射 `1000→1000001`, `1001→1001001` |
 | `H500` | `shop/get_sales_list` → 500 | CN 导入的 shop 条目缺少 `availableUntil` 字段 | 已补充 `null` |
 | `H400` | `character/receive_bond_token` → 400 — 玛纳板完成后领羁绊之证 | bond token status 残留为 2（上次 CN 导入期间领取），DB 重置后服务端拒绝 | ⚠️ 待排查 — DB 已重置为 1，暂不影响流程 |
-| `C3032` | ガチャ結果レア度不一致 — 抽卡动画稀有度与角色稀有度不匹配 | 国际服 `gacha_movie_seeds.json` 种子池（★3: 162 seeds）混入 ★4 seeds | ⚠️ 修复路径见 §7.9 |
+| `C3032` | 抽卡动画稀有度不匹配（非必现） | 国际服种子池在国服物理配置下产生不同稀有度 | ⚠️ 已知不修复 — 详见 `docs/C3032_gacha_seeds.md` |
 | `H400` | `story_quest/finish` → 400，外传故事/活动关卡 | 服务端 quest JSON 缺少 CN 事件组数据 | ✅ 已从 CN 源完全导入 20 个 quest 分类共 5,158 关 |
 | `C8702` | `character_list[i].join_time:null` — mail 领取角色 | 邮件角色响应缺少 `join_time`/`update_time` 字段 | 已补齐 `clientSerializeDate` 格式 |
 | `C8707` | `user_character_mana_node_list` 格式错误 | 序列化为数字数组，CN 客户端期望 `{ mana_node_multiplied_id: N }` 对象 | 已修正序列化格式 |
@@ -650,17 +650,7 @@ const NPC_TEMPLATES = {
 
 8. **EX Boost（增幅）感叹号**: 客户端 `canExBoost()` 不检查 `ex_boost` 字段（已强化状态），只检查角色满级 + 元素匹配 + 道具足够。即使 Tier 3 强化完毕，只要背包还有 EX 道具，感叹号就显示。属正常游戏行为。
 
-9. **抽卡动画种子表（C3032）**: 
-   - **根因**: `gacha_movie_seeds.json` 和 `gacha_rate_up_movie_seeds.json` 是国际服数据，★3 种子池（162 seeds）混入产生 ★4 球效果的种子。CN 客户端用 `verifyResultBallRarity()` 校验 `ball.rarity+3 == character.rarity` → 不匹配 → C3032。
-   - **临时方案**: `seed = characterId * 1000`（确定性种子，绕开随机种子池，永不触发 C3032）。
-   - **永久修复（从 CN CDN 重建种子表，5 步）**:
-     1. **提取物理配置**: 从 CN CDN 二进制存档 `.cdn/cn/archive-*/` 提取 `gacha/{movie_id}.json`（如 `gacha/fes.json`、`gacha/normal.json`），定义 `threshold.ballStar4`、`amulet` 位置、重力参数等
-     2. **定位 AS3 源码**: `FixedFallingField.as`(183行) + `FallingField.as`(435行) + `Ball.as` + `Amulet.as`（位于 `wf-2.1.125-cn-decompiled/scripts/scripts/pinball/gacha/ballMovie/`）
-     3. **翻译物理引擎**: AS3 逻辑 → Python 确定性函数 `simulate_seed(seed, config) → ball_rarity`（含 MersenneTwister、Haxe 数据结构翻译）
-     4. **批量运行**: ~10000 个种子按稀有度分类到 `{"3":{"0":[...]}, "2":{"0":[...],"1":[...]}, "1":{...}}`
-     5. **写入**: 替换 `assets/gacha_movie_seeds.json` 和 `assets/gacha_rate_up_movie_seeds.json`
-   - **预估**: 2-4h，关键卡点在 CN 物理配置文件的提取（CDN 中可能是二进制 orderedmap 格式）。
-   - **辅助工具**: 已有 `scripts/extract_seeds.py` 可从 mitmproxy 流量文件提取种子（需国服官方抓包，已不可用）
+9. **抽卡动画种子表（C3032）**: 详见 [`docs/C3032_gacha_seeds.md`](./C3032_gacha_seeds.md) — 完整的前因后果、源码位置、修复路径
 
 7. **外传故事 quest 数据**: 已从 CN 源 `wf-assets-cn/orderedmap/quest/` 完全导入全部 20 个 quest 分类，共 5,158 关，覆盖所有 CN 事件组。
 
