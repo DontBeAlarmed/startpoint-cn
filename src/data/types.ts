@@ -580,7 +580,7 @@ export interface UserCharacter {
 }
 
 export type UserCharacterList = Record<string, UserCharacter>
-export type UserCharacterManaNodeList = Record<string, number[]>
+export type UserCharacterManaNodeList = Record<string, { mana_node_multiplied_id: number }[]>
 
 export interface UserPartyGroupTeam {
     name: string,

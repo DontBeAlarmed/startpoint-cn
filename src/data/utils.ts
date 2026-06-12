@@ -305,7 +305,13 @@ export function serializePlayerData(
         "tutorial_gacha": null,
         "cleared_regular_mission_list": toSerialize.clearedRegularMissionList,
         "user_character_list": userCharacterList,
-        "user_character_mana_node_list": toSerialize.characterManaNodeList,
+        "user_character_mana_node_list": (() => {
+                const list: Record<string, { mana_node_multiplied_id: number }[]> = {}
+                for (const [charId, nodeIds] of Object.entries(toSerialize.characterManaNodeList)) {
+                    list[charId] = nodeIds.map(id => ({ mana_node_multiplied_id: id }))
+                }
+                return list
+            })(),
         "user_party_group_list": userPartyGroupList,
         "item_list": toSerialize.itemList,
         "user_equipment_list": userEquipmentList,
@@ -624,9 +630,13 @@ export function deserializePlayerData(
             characterList[kIdKey] = converted_character
         }
 
-        // deserialize mana node list
-        const characterManaNodeList = toDeserialize['user_character_mana_node_list']
-        if (characterManaNodeList === undefined) throw new Error("Missing 'user_character_mana_node_list' field.");
+        // deserialize mana node list (convert from client object format { mana_node_multiplied_id } to internal number[])
+        const rawCharacterManaNodeList = toDeserialize['user_character_mana_node_list']
+        if (rawCharacterManaNodeList === undefined) throw new Error("Missing 'user_character_mana_node_list' field.");
+        const characterManaNodeList: Record<string, number[]> = {}
+        for (const [charId, nodes] of Object.entries(rawCharacterManaNodeList)) {
+            characterManaNodeList[charId] = (nodes as { mana_node_multiplied_id: number }[]).map(n => n.mana_node_multiplied_id)
+        }
 
         // deserialize party list
         const userPartyGroupList = toDeserialize['user_party_group_list']

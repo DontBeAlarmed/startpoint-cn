@@ -8,6 +8,9 @@ import { getBossCoinShopItemsSync, getEventShopItemsSync, getGenericShopItemsSyn
 import { CharacterReward, CharacterShopItemReward, CurrencyReward, CurrencyShopItemReward, EquipmentItemReward, EquipmentItemShopItemReward, Reward, RewardType, ShopItemRewardType, ShopItems, ShopItemUserCostType, ShopType } from "../../lib/types";
 import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
 import { givePlayerRewardsSync } from "../../lib/quest";
+import CDN_GENERAL_SHOP_WHITELIST from "../../../assets/cdn_general_shop_whitelist.json";
+
+const GENERAL_SHOP_CDN_KEYS: Set<number> = new Set(CDN_GENERAL_SHOP_WHITELIST);
 
 interface GetSalesListBody {
     equipment_enhancement_shop_category_ids: number[],
@@ -266,11 +269,18 @@ const routes = async (fastify: FastifyInstance) => {
         // parse shop items
         const salesList: Object[] = []
 
+        let filteredCdnCount = 0
         const now: number = getServerDate().getTime()
         for (const [shopType, items] of Object.entries(toParseShopItems)) {
+            const shopTypeNum = Number(shopType)
             for (const [itemId, item] of Object.entries(items)) {
                 const from = deserializeClientDate(item.availableFrom)
                 const until = item.availableUntil === null ? null : deserializeClientDate(item.availableUntil)
+
+                if (shopTypeNum === ShopType.GENERAL && !GENERAL_SHOP_CDN_KEYS.has(Number(itemId))) {
+                    filteredCdnCount++
+                    continue
+                }
 
                 if ((now >= from.getTime()) && (until === null || (until.getTime() > now))) {
                     salesList.push({
@@ -288,6 +298,10 @@ const routes = async (fastify: FastifyInstance) => {
                     })
                 }
             }
+        }
+
+        if (filteredCdnCount > 0) {
+            console.log(`[shop] Filtered ${filteredCdnCount} general shop items not in CDN master data`)
         }
 
         reply.header("content-type", "application/x-msgpack")
