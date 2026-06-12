@@ -3,6 +3,7 @@ import { getPlayerSync, getSession, getPlayerMailsSync, getPlayerMailCountSync, 
 import { getPlayerItemSync, givePlayerItemSync } from "../../data/wdfpData";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
+import { clientSerializeDate } from "../../data/utils";
 
 interface IndexBody {
     api_count: number
@@ -74,7 +75,13 @@ function applyMailReward(playerId: number, mail: RawPlayerMail): {
         case MailType.CHARACTER: {
             if (mail.type_id === null) break
             insertDefaultPlayerCharacterSync(playerId, mail.type_id)
-            characterList.push({ character_id: mail.type_id, entry_count: 1 })
+            const now = clientSerializeDate(new Date())
+            characterList.push({
+                character_id: mail.type_id,
+                entry_count: 1,
+                join_time: now,
+                update_time: now
+            })
             break
         }
         case MailType.EQUIPMENT: {
