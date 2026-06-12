@@ -133,10 +133,13 @@ const routes = async (fastify: FastifyInstance) => {
         const questCategory = activeQuestData.category
         const questId = activeQuestData.questId
         const questData = getQuestFromCategorySync(questCategory, questId) as BattleQuest | null
-        if (questData === null || !('rankPointReward' in questData)) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Quest doesn't exist."
-        })
+        if (questData === null || !('rankPointReward' in questData)) {
+            console.log(`[BATTLE] finish failed: category=${questCategory} questId=${questId} found=${!!questData} hasRankReward=${questData ? ('rankPointReward' in questData) : 'N/A'}`)
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Quest doesn't exist."
+            })
+        }
 
         // delete the active quest data from global record
         delete activeQuests[playerId]

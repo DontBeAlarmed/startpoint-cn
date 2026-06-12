@@ -300,6 +300,42 @@ const routes = async (fastify: FastifyInstance) => {
             }
         })
     })
+
+    fastify.post("/recover_stamina", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as { viewer_id: number, api_count: number }
+        const viewerId = body.viewer_id
+        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid request body."
+        })
+
+        const session = await getSession(viewerId.toString())
+        if (!session) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid viewer id."
+        })
+
+        const playerId = resolvePlayerIdSync(session.accountId)!
+        if (playerId === null) return reply.status(500).send({
+            "error": "Internal Server Error", "message": "No player bound to account."
+        })
+
+        const player = getPlayerSync(playerId)
+        if (!player) return reply.status(500).send({
+            "error": "Internal Server Error", "message": "Player not found."
+        })
+
+        updatePlayerSync({ id: playerId, stamina: 20, staminaHealTime: getServerDate() })
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data": {
+                "user_info": {
+                    "stamina": 20,
+                    "stamina_heal_time": getServerTime(),
+                }
+            }
+        })
+    })
 }
 
 export default routes;
