@@ -240,6 +240,8 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No players bound to account."
         })
 
+        console.log(`[shop:req] viewer=${viewerId} types=${JSON.stringify(shopTypes)} bossCats=${JSON.stringify(bossCoinShopCategoryIds)} events=${eventList.length}`)
+
         let toParseShopItems: Record<number, ShopItems> = {}
 
         // shop types
@@ -303,6 +305,13 @@ const routes = async (fastify: FastifyInstance) => {
         if (filteredCdnCount > 0) {
             console.log(`[shop] Filtered ${filteredCdnCount} general shop items not in CDN master data`)
         }
+
+        const salesByType: Record<number, number> = {}
+        for (const item of salesList) {
+            const t = (item as any).shop_type
+            salesByType[t] = (salesByType[t] || 0) + 1
+        }
+        console.log(`[shop:res] totalSales=${salesList.length} byType=${JSON.stringify(salesByType)} toParseItems=${JSON.stringify(Object.fromEntries(Object.entries(toParseShopItems).map(([k,v]) => [k, Object.keys(v).length])))}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
