@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerSync, getSession, getPlayerMailsSync, getPlayerMailCountSync, receiveMailSync, receiveAllMailsSync, insertDefaultPlayerCharacterSync, updatePlayerSync, insertPlayerEquipmentSync, insertReceiveHistorySync, MailType, RawPlayerMail } from "../../data/wdfpData";
-import { getPlayerItemSync, givePlayerItemSync } from "../../data/wdfpData";
+import { getPlayerItemSync, givePlayerItemSync, getPlayerCharacterSync, updatePlayerCharacterSync } from "../../data/wdfpData";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { clientSerializeDate } from "../../data/utils";
@@ -74,11 +74,18 @@ function applyMailReward(playerId: number, mail: RawPlayerMail): {
         }
         case MailType.CHARACTER: {
             if (mail.type_id === null) break
-            insertDefaultPlayerCharacterSync(playerId, mail.type_id)
+            const existing = getPlayerCharacterSync(playerId, mail.type_id)
+            if (existing) {
+                updatePlayerCharacterSync(playerId, mail.type_id, {
+                    entryCount: existing.entryCount + 1
+                })
+            } else {
+                insertDefaultPlayerCharacterSync(playerId, mail.type_id)
+            }
             const now = clientSerializeDate(new Date())
             characterList.push({
                 character_id: mail.type_id,
-                entry_count: 1,
+                entry_count: existing ? existing.entryCount + 1 : 1,
                 join_time: now,
                 update_time: now
             })
