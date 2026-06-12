@@ -266,6 +266,16 @@ export function givePlayerCharactersExpSync(
                 add_exp_pool: 0
             } as AddExpListItem)
         }
+
+        // Always create bondTokenStatusList entry for every party character
+        // (F1010: client accesses bondTokenStatusVariations.h[id] in experience card)
+        if (!(characterId in bondTokenStatusList)) {
+            const fallbackBond: ClientReturnBondTokenStatus[] = []
+            bondTokenStatusList[characterId] = {
+                before: fallbackBond,
+                after: fallbackBond
+            }
+        }
     }
 
     // get player data
