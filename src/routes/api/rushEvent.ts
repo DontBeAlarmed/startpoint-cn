@@ -516,6 +516,46 @@ const routes = async (fastify: FastifyInstance) => {
             "data": []
         })
     })
+
+    // ---- reward ----
+    fastify.post("/reward", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as { event_id: number, viewer_id: number, api_count: number };
+        const viewerId = body.viewer_id;
+        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid request body."
+        });
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data": {
+                "rank_number": null,
+                "ranking_reward": {
+                    "reward_list": [],
+                    "status": 0
+                }
+            }
+        });
+    })
+
+    // ---- endless_battle ----
+    fastify.post("/endless_battle", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as { event_id: number, viewer_id: number, api_count: number };
+        const viewerId = body.viewer_id;
+        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid request body."
+        });
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data": {
+                "endless_battle_max_round": 10,
+                "endless_battle_next_round": 1,
+                "endless_battle_played_party_list": null
+            }
+        });
+    })
 }
 
 export default routes;
