@@ -642,6 +642,8 @@ const NPC_TEMPLATES = {
 
 7. **玛纳板（Mana Board）适配**: CN 角色的玛纳板二版受 `mana_board2_open_condition.json` 的时间窗口控制。CN 角色如 151165 的 `start_time=2025-04-03`，默认服务端时间 2024-08-14 早于此时间 → `canManaBoard2Open()` 返回 false → 仅显示板一。解决方法：将服务端时间调整到 2025-06-01 之后。
 
+8. **CN 资产数据补齐**: 从 `wf-assets-cn/orderedmap/` 增量导入（只补不删）以下文件：`character.json` (475→478), `mana_node.json` (465→468), `score_reward.json` (1237→1532), `rare_score_reward.json` (2208→2768), `clear_reward.json` (230→238), `general_shop.json` (275→362), `treasure_shop.json` (69→108), `box_gacha.json` (32→48), `box_reward.json` (32→48), `rush_event_quest_folder.json` (5→14 events)。存量国际服数据未受影响。
+
 7. **外传故事 quest 数据**: 已从 CN 源 `wf-assets-cn/orderedmap/quest/` 完全导入全部 20 个 quest 分类，共 5,158 关，覆盖所有 CN 事件组。
 
 ### quest 数据导入详情
