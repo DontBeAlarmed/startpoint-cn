@@ -175,8 +175,8 @@ export function serializePlayerData(
             "evolution_level": character.evolutionLevel,
             "over_limit_step": character.overLimitStep,
             "protection": character.protection,
-            "join_time": getServerTime(character.joinTime),
-            "update_time": getServerTime(character.updateTime),
+            "join_time": clientSerializeDate(character.joinTime),
+            "update_time": clientSerializeDate(character.updateTime),
             "exp": character.exp,
             "stack": character.stack,
             "bond_token_list": serializeBondTokenStatuses(character.bondTokenList),
@@ -577,7 +577,7 @@ export function deserializePlayerData(
             const manaBoardIndex = character['mana_board_index']
 
             if (isNaN(entryCount) || isNaN(evolutionLevel) || isNaN(overLimitStep) || protection === undefined
-                || isNaN(joinTime) || isNaN(updateTime) || isNaN(exp) || isNaN(stack) || bondTokenList === undefined
+                || !joinTime || !updateTime || isNaN(exp) || isNaN(stack) || bondTokenList === undefined
                 || isNaN(manaBoardIndex)) throw new Error(`Invalid user_character_list value for character with id "${characterId}".`);
 
             // convert bond tokens
@@ -586,8 +586,8 @@ export function deserializePlayerData(
                 evolutionLevel: evolutionLevel,
                 overLimitStep: overLimitStep,
                 protection: protection,
-                joinTime: getDateFromServerTime(joinTime),
-                updateTime: getDateFromServerTime(updateTime),
+                joinTime: deserializeClientDate(joinTime),
+                updateTime: deserializeClientDate(updateTime),
                 exp: exp,
                 stack: stack,
                 manaBoardIndex: manaBoardIndex,

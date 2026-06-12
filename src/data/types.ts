@@ -569,8 +569,8 @@ export interface UserCharacter {
     evolution_level: number
     over_limit_step: number
     protection: boolean
-    join_time: number
-    update_time: number
+    join_time: string
+    update_time: string
     exp: number
     stack: number
     bond_token_list: UserCharacterBondTokenStatus[]
