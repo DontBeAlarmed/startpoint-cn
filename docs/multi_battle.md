@@ -615,6 +615,7 @@ const NPC_TEMPLATES = {
 | `H404` | `event/raid/summary` + 5 个 Raid 端点 | 未实现 | 已实现全部 7 个 Raid 端点（含 summary/ranking_reward/party/ranking/ranking:party/battle:start/get_boss），battle:start 为联机桩 |
 | `H404` | `carnival_event/index` | 未实现 | 已实现 /index + /get_party |
 | `H404` | `event/rush/reward` + `/endless_battle` | 未实现 | 已实现桩 — reward 返回空，endless_battle 返回初始状态 |
+| `H400` | `ranking_event/get_summary` → 400（云水试炼等） | `rankingEventIdQuestMap` 缺少 CN 事件 ID 1000/1001 | 新增映射 `1000→1000001`, `1001→1001001` |
 | `H400` | `story_quest/finish` → 400，外传故事/活动关卡 | 服务端 quest JSON 缺少 CN 事件组数据 | ✅ 已从 CN 源完全导入 20 个 quest 分类共 5,158 关 |
 
 ---

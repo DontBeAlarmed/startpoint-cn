@@ -448,10 +448,13 @@ const routes = async (fastify: FastifyInstance) => {
 
         // get quest data
         const questData = getQuestFromCategorySync(category, questId) as BattleQuest | null
-        if (questData === null || !('rankPointReward' in questData)) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Quest doesn't exist."
-        })
+        if (questData === null || !('rankPointReward' in questData)) {
+            console.log(`[BATTLE] start failed: category=${category} questId=${questId} found=${!!questData} hasRankReward=${questData ? ('rankPointReward' in questData) : 'N/A'}`)
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Quest doesn't exist."
+            })
+        }
 
 
         // add to active quests table

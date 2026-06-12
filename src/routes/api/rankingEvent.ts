@@ -24,7 +24,9 @@ const rankingEventIdQuestMap: Record<number, number> = {
     [2]: 2001,
     [3]: 3001,
     [4]: 4001,
-    [5]: 5001
+    [5]: 5001,
+    [1000]: 1000001,
+    [1001]: 1001001
 }
 
 const rankingEventTopTimesMs: Record<number, number> = {
