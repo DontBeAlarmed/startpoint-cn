@@ -27,7 +27,7 @@ function processStoryQuestFinish(playerId: number, viewerId: number, questSectio
     if (playerData === null) return null
 
     const questData = getQuestFromCategorySync(questSection, questId)
-    if (questData === null || ("sPlusReward" in questData)) return null
+    if (questData === null) return null
 
     const questProgress = getPlayerSingleQuestProgressSync(playerId, questSection, questId);
     const finished = questProgress !== null ? questProgress.finished : false

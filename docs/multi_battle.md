@@ -612,6 +612,7 @@ const NPC_TEMPLATES = {
 | `S1000` | `通信が終了されました` | TCP 连接意外关闭 | 正常关闭不处理 |
 | `C8601` | `指定的Key不存在。key=2023013102` | 活动面板加载时，CDN master 数据缺少 `daily_challenge_point_campaign[2023013102]` | 通行证功能暂不实现，已清空所有角色 `daily_challenge_point_list`，默认存档不再写入该数据 |
 | `H404` | `disband_room` 端点不存在 | 未实现该端点 | 已实现 `POST /multi_battle_quest/disband_room` |
+| `H400` | `story_quest/finish` → 400 | `getQuestSync` 将 battle 关卡的 `sPlusRewardId` 转为 `sPlusReward` 后触发拒绝逻辑 | 移除 `processStoryQuestFinish` 中 `sPlusReward` 检查 |
 
 ---
 
