@@ -132,30 +132,12 @@ export function rewardPlayerGachaDrawResultSync(
                 const giveResult = givePlayerCharacterSync(playerId, characterId)
                 
                 if (giveResult !== null) {
-                    // get character rarity from CN asset data (not calculated from ID)
-                    const assetData = getCharacterDataSync(characterId)
-                    let rarity = assetData !== null ? (5 - assetData.rarity) : (5 - (Math.floor(characterId / 100000) - 1))
-                    rarity = Math.max(0, Math.min(2, rarity)) // clamp to 0-2 (rankMovieRates indices: 0=5★,1=4★,2=3★)
-                    // decide on movie
-                    const movieType = randomPoolItem(1, 101, rankMovieRates[rarity]) ?? GachaMovieType.NORMAL
-
-                    // pick a seed
-                    const isRateUp = (gacha as CharacterGacha).movieName !== "normal"
-                    const seeds = ((isRateUp ? rateUpMovieSeeds : movieSeeds) as GachaMovieSeeds)[rarity + 1][movieType]
-                    const seedIndex = randomInt(0, seeds.length + 1)
-
-                    const actualRarity = assetData !== null ? assetData.rarity : (Math.floor(characterId / 100000))
-                    console.log('[GACHA] char=%d actualRarity=%d rarityIdx=%d movieType=%d seedsLen=%d movieName=%s movie_id=%s seed=%d',
-                        characterId, actualRarity, rarity, movieType, seeds.length,
-                        (gacha as CharacterGacha).movieName,
-                        movieType === GachaMovieType.NORMAL ? (gacha as CharacterGacha).movieName : (gacha as CharacterGacha).guaranteeMovieName,
-                        seeds[seedIndex] ?? seeds[0])
-
-                    // build draw
+                    // build draw — deterministic seed + normal movie to avoid C3032
+                    // TODO: restore random movie/seed selection after rebuilding CN seed pool (§5 in docs/gacha_c3032.md)
                     const draw: GachaCharacterDraw = {
                         "character_id": characterId,
-                        "movie_id": movieType === GachaMovieType.NORMAL ? characterGacha.movieName : characterGacha.guaranteeMovieName,
-                        "seed": seeds[seedIndex] ?? seeds[0],
+                        "movie_id": "normal",
+                        "seed": characterId * 1000,
                         "entry_count": 1
                     }
                     
