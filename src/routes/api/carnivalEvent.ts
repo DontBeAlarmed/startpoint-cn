@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getPlayerSync, getSession } from "../../data/wdfpData";
+import { getPlayerSync, getSession, getPlayerPartyGroupListSync, insertPlayerPartyGroupListSync } from "../../data/wdfpData";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDefaultPlayerPartyGroupsSync } from "../../data/domains/player";
 import { serializePartyGroupList } from "../../data/utils";
@@ -13,8 +13,15 @@ interface IndexBody {
 }
 
 function buildCarnivalPartyGroupList(playerId: number): any[] {
-    // Generate default carnival party groups (category = CARNIVAL_EVENT = 22? or use NORMAL)
-    const groups = getDefaultPlayerPartyGroupsSync(PartyCategory.NORMAL);
+    // 1. Try to get saved EVENT party groups
+    let groups = getPlayerPartyGroupListSync(playerId, PartyCategory.EVENT)
+
+    // 2. First time - create empty EVENT defaults (independent from NORMAL pool)
+    if (Object.keys(groups).length === 0) {
+        groups = getDefaultPlayerPartyGroupsSync(PartyCategory.EVENT)
+        insertPlayerPartyGroupListSync(playerId, groups)
+    }
+
     const serialized = serializePartyGroupList(groups);
     // Convert to array format the client expects
     const result: any[] = [];

@@ -31,7 +31,7 @@ function processStoryQuestFinish(playerId: number, viewerId: number, questSectio
         console.log(`[STORY] quest not found: category=${questSection} questId=${questId}`)
         return null
     }
-    if ("sPlusReward" in questData) {
+    if (questData.sPlusReward !== undefined) {
         console.log(`[STORY] battle quest rejected: category=${questSection} questId=${questId}`)
         return null
     }

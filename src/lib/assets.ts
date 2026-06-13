@@ -90,35 +90,32 @@ export function getScoreRewardGroup(
 function getQuestSync(
     quests: RawQuests,
     questId: string | number
-): BattleQuest | StoryQuest | null {
+): BattleQuest | null {
     const quest = quests[String(questId)]
 
     // return null if the quest doesn't exist
     if (!quest) return null;
 
-    // return either a story quest or a battle quest depending on the keys present
-    return 'manaReward' in quest ? {
+    // always return BattleQuest; missing fields default to 0
+    return {
         name: quest.name,
         clearReward: quest.clearRewardId === undefined ? undefined : getClearRewardSync(quest.clearRewardId),
         sPlusReward: quest.sPlusRewardId === undefined ? undefined : getClearRewardSync(quest.sPlusRewardId),
         scoreRewardGroupId: quest.scoreRewardGroup ?? undefined,
         scoreRewardGroup: quest.scoreRewardGroup != null ? getScoreRewardGroup(quest.scoreRewardGroup) : undefined,
-        bRankTime: quest.bRankTime,
-        aRankTime: quest.aRankTime,
-        sRankTime: quest.sRankTime,
-        sPlusRankTime: quest.sPlusRankTime,
-        rankPointReward: quest.rankPointReward,
-        characterExpReward: quest.characterExpReward,
-        manaReward: quest.manaReward,
-        poolExpReward: quest.poolExpReward,
+        bRankTime: quest.bRankTime ?? 0,
+        aRankTime: quest.aRankTime ?? 0,
+        sRankTime: quest.sRankTime ?? 0,
+        sPlusRankTime: quest.sPlusRankTime ?? 0,
+        rankPointReward: quest.rankPointReward ?? 0,
+        characterExpReward: quest.characterExpReward ?? 0,
+        manaReward: quest.manaReward ?? 0,
+        poolExpReward: quest.poolExpReward ?? 0,
         fixedParty: quest.fixedParty,
         rushEventId: quest.rushEventId,
         rushEventFolderId: quest.rushEventFolderId,
         rushEventRound: quest.rushEventRound
-    } as BattleQuest : {
-        name: quest.name,
-        clearReward: quest.clearRewardId === undefined ? undefined : getClearRewardSync(quest.clearRewardId),
-    } as StoryQuest
+    } as BattleQuest
 }
 
 /**
@@ -129,7 +126,7 @@ function getQuestSync(
  */
 export function getMainQuestSync(
     questId: string | number
-): BattleQuest | StoryQuest | null {
+): BattleQuest | null {
     return getQuestSync((mainQuests as RawQuests), questId)
 }
 
@@ -177,8 +174,8 @@ export function getBossBattleQuestSync(
  */
 export function getCharacterQuestSync(
     questId: string | number
-): StoryQuest | null {
-    return getQuestSync((characterQuests as any as RawQuests), questId) as StoryQuest | null
+): BattleQuest | null {
+    return getQuestSync((characterQuests as any as RawQuests), questId)
 }
 
 /**
@@ -189,8 +186,8 @@ export function getCharacterQuestSync(
  */
 export function getWorldStoryEventQuestSync(
     questId: string | number
-): StoryQuest | null {
-    return getQuestSync((worldStoryEventQuests as RawQuests), questId) as StoryQuest | null
+): BattleQuest | null {
+    return getQuestSync((worldStoryEventQuests as RawQuests), questId)
 }
 
 /**
@@ -201,8 +198,8 @@ export function getWorldStoryEventQuestSync(
  */
 export function getWorldStoryEventBossBattleQuestSync(
     questId: string | number
-): StoryQuest | null {
-    return getQuestSync((worldStoryEventBossBattleQuests as RawQuests), questId) as StoryQuest | null
+): BattleQuest | null {
+    return getQuestSync((worldStoryEventBossBattleQuests as RawQuests), questId)
 }
 
 /**
@@ -213,8 +210,8 @@ export function getWorldStoryEventBossBattleQuestSync(
  */
 export function getAdventEventQuest(
     questId: string | number
-): StoryQuest | null {
-    return getQuestSync((adventEventQuests as RawQuests), questId) as StoryQuest | null
+): BattleQuest | null {
+    return getQuestSync((adventEventQuests as RawQuests), questId)
 }
 
 /**
@@ -239,7 +236,7 @@ export function getHardMultiEventQuest(
 export function getQuestFromCategorySync(
     category: QuestCategory,
     questId: string | number
-): BattleQuest | StoryQuest | null {
+): BattleQuest | null {
     switch (category) {
         case QuestCategory.MAIN:
             return getMainQuestSync(questId)

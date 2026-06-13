@@ -6,17 +6,17 @@
 
 | # | 活动名称 | quest JSON | 关数 | 进入 | 结算 | 备注 |
 |---|------|------|:---:|:---:|:---:|------|
-| 1 | 嘉年华 | `carnival_event_quest` | 171 | ✅ | ⬜ | carnival_event/index + /get_party 已实现 |
-| 2 | 战阵之宴（Rush） | `rush_event_quest` | 110 | ✅ | ⬜ | reward + endless_battle 端点已实现；Raid 7 端点已实现 |
-| 3 | Raid 活动 | `raid_event_quest` | 50 | ✅ | ⬜ | summary/get_boss/party/ranking 等 7 端点已实现 |
-| 4 | 练习战 | `practice_quest` | 21 | ✅ | ✅ | 结算 scoreRewardGroup null 修复 + 邮件装备已拥有 UNIQUE 修复 |
+| 1 | 嘉年华 | `carnival_event_quest` | 171 | ✅ | ✅ | 配队独立存储 EVENT category=4；getQuestSync 统一 BattleQuest |
+| 2 | 战阵之宴（Rush） | `rush_event_quest` | 110 | ✅ | ⬜ | ⏸️ 涉及联机，延后测试 |
+| 3 | Raid 活动 | `raid_event_quest` | 50 | ✅ | ⬜ | ⏸️ 联机多人，battle/start stub |
+| 4 | 练习战 | `practice_quest` | 21 | 🔧 | 🔧 | 云水试炼进入+结算通过；余下 4 试炼待测（共 5 试炼，复用同一网络请求） |
 | 5 | 分数挑战 | `score_attack_event_quest` | 123 | ⬜ | ⬜ | 含 BOSS 63 关；history/score_attack_event_battle 已实现 |
 | 6 | 剧情活动 | `story_event_single_quest` | 348 | ⬜ | ⬜ | 需活动开放期 |
-| 7 | 排名战 | `ranking_event_single_quest` | 7 | ✅ | ⬜ | event ID 1000/1001 映射已修复 |
+| 7 | 排名战 | `ranking_event_single_quest` | 7 | ✅ | ✅ | 测 2 个通过，走 single_battle_quest 通用流程 |
 | 8 | 专家挑战 | `expert_single_event_quest` | 28 | ⬜ | ⬜ | 高难单人 |
 | 9 | 主线关卡 | `main_quest` | 419 | ✅ | ✅ | 最常测试，稳定 |
 | 10 | 高难关卡（EX） | `ex_quest` | 221 | ⬜ | ⬜ | |
-| 11 | 角色剧情 | `character_quest` | 1,318 | ✅ | ⬜ | story_quest/finish + /finish_with_skip 已实现 |
+| 11 | 角色剧情 | `character_quest` | 1,318 | ✅ | ✅ | story_quest/finish 通过；⚠️ 阅读后不记录已读状态（紫色标记不消除），待实现 episode_trial/save |
 | 12 | 主线 BOSS 战 | `boss_battle_quest` | 232 | ⬜ | ⬜ | |
 | 13 | 降临讨伐 | `advent_event_quest` | 459 | ⬜ | ⬜ | 需活动开放期 |
 | 14 | 外传故事 | `world_story_event_quest` | 913 | ✅ | ⬜ | H400 修复 + 913 关 CN 源全量导入 |
@@ -46,3 +46,4 @@
 | F1015 scoreRewardGroup null 不可遍历 | `assets.ts:105` + `quest.ts:36` null 守卫，练习战结算不再崩溃 |
 | F1016 邮件 EQUIPMENT 已有装备 UNIQUE 冲突 | `mail.ts` 改用 `givePlayerEquipmentSync`，已有则加 stack |
 | F1017 邮件 type_id 超 Int 范围 C8700 | `web_api/mail.ts` 加 1~2^31-1 校验，`formatMailResponse` null 安全 |
+| F1018 episode_trial_reading/finish 404 | `cn-server.ts` 新增 stub 端点 |

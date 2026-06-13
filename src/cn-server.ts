@@ -143,6 +143,11 @@ fastify.post(`${apiPrefix}/Pass_card/receive_all`, async (_request, reply) => {
     stubMsgpackReply(reply, { all_received_record: [] });
 });
 
+// Episode trial reading: finish stub (character story trial)
+fastify.post(`${apiPrefix}/episode_trial_reading/finish`, async (_request, reply) => {
+    stubMsgpackReply(reply, {});
+});
+
 fastify.get("/debug", async (request, reply) => {
     const ts = new Date().toISOString();
     const loc = (request.query as any)?.loc || "unknown";
