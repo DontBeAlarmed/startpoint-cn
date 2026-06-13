@@ -265,7 +265,7 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No players bound to account."
         })
 
-        console.log(`[shop:req] viewer=${viewerId} types=${JSON.stringify(shopTypes)} bossCats=${JSON.stringify(bossCoinShopCategoryIds)} events=${eventList.length}`)
+        console.log(`[shop:req] viewer=${viewerId} types=${JSON.stringify(shopTypes)} bossCats=${JSON.stringify(bossCoinShopCategoryIds)} events=${eventList.length} eventList=${JSON.stringify(eventList)}`)
 
         let toParseShopItems: Record<number, ShopItems> = {}
 
