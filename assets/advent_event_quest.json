@@ -5,7 +5,8 @@
   },
   "1002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2717
   },
   "1003": {
     "name": "",
@@ -13,43 +14,53 @@
   },
   "1004": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2718
   },
   "1005": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2719
   },
   "17001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2869
   },
   "17002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2870
   },
   "17003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2871
   },
   "17004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2872
   },
   "11001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2837
   },
   "11002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2838
   },
   "11003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2839
   },
   "11004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2840
   },
   "13001": {
     "name": "",
@@ -57,19 +68,23 @@
   },
   "13002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2845
   },
   "13003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2846
   },
   "13004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2847
   },
   "13005": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2848
   },
   "12001": {
     "name": "",
@@ -77,19 +92,23 @@
   },
   "12002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2841
   },
   "12003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2842
   },
   "12004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2843
   },
   "12005": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2844
   },
   "5001": {
     "name": "",
@@ -97,19 +116,22 @@
   },
   "5002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2925
   },
   "5003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2926
   },
   "5004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2927
   },
   "100009001": {
     "name": "",
-    "clearRewardId": 100301
+    "clearRewardId": 1
   },
   "100009002": {
     "name": "",
@@ -117,7 +139,8 @@
   },
   "100009003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 14000
   },
   "100009004": {
     "name": "",
@@ -125,19 +148,22 @@
   },
   "100009005": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 14001
   },
   "100009006": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 14002
   },
   "100009007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 14003
   },
   "300005001": {
     "name": "",
-    "clearRewardId": 100301
+    "clearRewardId": 1
   },
   "300005002": {
     "name": "",
@@ -145,7 +171,8 @@
   },
   "300005003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 14200
   },
   "300005004": {
     "name": "",
@@ -153,15 +180,18 @@
   },
   "300005005": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 14201
   },
   "300005006": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 14202
   },
   "300005007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 14203
   },
   "10001": {
     "name": "",
@@ -169,167 +199,207 @@
   },
   "10002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2833
   },
   "10003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2834
   },
   "10004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2835
   },
   "10005": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2836
   },
   "15001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2861
   },
   "15002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2862
   },
   "15003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2863
   },
   "15004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2864
   },
   "3002001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 10012
   },
   "3002002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 10013
   },
   "3002003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 10014
   },
   "3002004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 10015
   },
   "21001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2929
   },
   "21002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2930
   },
   "21003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2931
   },
   "21004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2932
   },
   "14001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2853
   },
   "14002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2854
   },
   "14003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2855
   },
   "14004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2856
   },
   "100008001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2853
   },
   "100008002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2854
   },
   "100008003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2855
   },
   "100008004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2856
   },
   "22001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2881
   },
   "22002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2882
   },
   "22003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2883
   },
   "22004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2884
   },
   "20001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2877
   },
   "20002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2878
   },
   "20003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2879
   },
   "20004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2880
   },
   "19001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2873
   },
   "19002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2874
   },
   "19003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2875
   },
   "19004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2876
   },
   "23001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2885
   },
   "23002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2886
   },
   "23003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2887
   },
   "23004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2888
   },
   "200006001": {
     "name": "",
-    "clearRewardId": 100101
+    "clearRewardId": 1
   },
   "200006002": {
     "name": "",
@@ -337,7 +407,8 @@
   },
   "200006003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 13000
   },
   "200006004": {
     "name": "",
@@ -345,15 +416,18 @@
   },
   "200006005": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 13001
   },
   "200006006": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 13002
   },
   "200006007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 13003
   },
   "3001": {
     "name": "",
@@ -361,7 +435,8 @@
   },
   "3002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2917
   },
   "3003": {
     "name": "",
@@ -369,11 +444,13 @@
   },
   "3004": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2918
   },
   "3005": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2919
   },
   "3001001": {
     "name": "",
@@ -381,7 +458,8 @@
   },
   "3001002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2917
   },
   "3001003": {
     "name": "",
@@ -389,11 +467,13 @@
   },
   "3001004": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2918
   },
   "3001005": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2919
   },
   "100007001": {
     "name": "",
@@ -401,7 +481,8 @@
   },
   "100007002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 20000
   },
   "100007003": {
     "name": "",
@@ -409,159 +490,197 @@
   },
   "100007004": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 20001
   },
   "100007005": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 20002
   },
   "100007006": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 20003
   },
   "200080001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000502
   },
   "200080002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000503
   },
   "200080003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000504
   },
   "200080004": {
     "name": "",
-    "clearRewardId": 11500000
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000505
   },
   "200080005": {
     "name": "",
-    "clearRewardId": 11500001
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000506
   },
   "200055001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000346
   },
   "200055002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000347
   },
   "200055003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000348
   },
   "200055004": {
     "name": "",
-    "clearRewardId": 11500000
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000349
   },
   "200055005": {
     "name": "",
-    "clearRewardId": 11500001
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000350
   },
   "200028001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000198
   },
   "200028002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000199
   },
   "200028003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000200
   },
   "200028004": {
     "name": "",
-    "clearRewardId": 11500000
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000201
   },
   "200028005": {
     "name": "",
-    "clearRewardId": 11500001
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000202
   },
   "200063001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000411
   },
   "200063002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000412
   },
   "200063003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000413
   },
   "200063004": {
     "name": "",
-    "clearRewardId": 11500000
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000414
   },
   "200063005": {
     "name": "",
-    "clearRewardId": 11500001
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000415
   },
   "200068001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000440
   },
   "200068002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000441
   },
   "200068003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000442
   },
   "200068004": {
     "name": "",
-    "clearRewardId": 11500000
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000443
   },
   "200068005": {
     "name": "",
-    "clearRewardId": 11500001
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000444
   },
   "200075001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000478
   },
   "200075002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000479
   },
   "200075003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000480
   },
   "200075004": {
     "name": "",
-    "clearRewardId": 11500000
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000481
   },
   "200075005": {
     "name": "",
-    "clearRewardId": 11500001
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000482
   },
   "200037001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000248
   },
   "200037002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000249
   },
   "200037003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000250
   },
   "200037004": {
     "name": "",
-    "clearRewardId": 11500000
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000251
   },
   "200037005": {
     "name": "",
-    "clearRewardId": 11500001
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000252
   },
   "300000001": {
     "name": "",
-    "clearRewardId": 100501
+    "clearRewardId": 1
   },
   "300000002": {
     "name": "",
@@ -569,7 +688,8 @@
   },
   "300000003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 15000
   },
   "300000004": {
     "name": "",
@@ -577,15 +697,18 @@
   },
   "300000005": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 15001
   },
   "300000006": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 15002
   },
   "300000007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 15003
   },
   "16001": {
     "name": "",
@@ -597,7 +720,8 @@
   },
   "16003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2865
   },
   "16004": {
     "name": "",
@@ -605,7 +729,8 @@
   },
   "16005": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2866
   },
   "16006": {
     "name": "",
@@ -613,11 +738,13 @@
   },
   "16007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2867
   },
   "16008": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2868
   },
   "9001": {
     "name": "",
@@ -629,7 +756,8 @@
   },
   "9003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2829
   },
   "9004": {
     "name": "",
@@ -637,7 +765,8 @@
   },
   "9005": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2830
   },
   "9006": {
     "name": "",
@@ -645,11 +774,13 @@
   },
   "9007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2831
   },
   "9008": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2832
   },
   "6001": {
     "name": "",
@@ -657,19 +788,23 @@
   },
   "6002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2821
   },
   "6003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2822
   },
   "6004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2823
   },
   "6005": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2824
   },
   "3000001": {
     "name": "",
@@ -677,19 +812,23 @@
   },
   "3000002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2821
   },
   "3000003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2822
   },
   "3000004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2823
   },
   "3000005": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2824
   },
   "100005001": {
     "name": "",
@@ -697,19 +836,23 @@
   },
   "100005002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2821
   },
   "100005003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2822
   },
   "100005004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2823
   },
   "100005005": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2824
   },
   "2001": {
     "name": "",
@@ -717,7 +860,8 @@
   },
   "2002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2817
   },
   "2003": {
     "name": "",
@@ -725,11 +869,13 @@
   },
   "2004": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2818
   },
   "2005": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2819
   },
   "4001": {
     "name": "",
@@ -737,7 +883,8 @@
   },
   "4002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2921
   },
   "4003": {
     "name": "",
@@ -745,11 +892,13 @@
   },
   "4004": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2922
   },
   "4005": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2923
   },
   "7001": {
     "name": "",
@@ -757,19 +906,23 @@
   },
   "7002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2825
   },
   "7003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2826
   },
   "7004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2827
   },
   "7005": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2828
   },
   "18001": {
     "name": "",
@@ -777,19 +930,23 @@
   },
   "18002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2825
   },
   "18003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2826
   },
   "18004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2827
   },
   "18005": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2828
   },
   "200021001": {
     "name": "",
@@ -797,7 +954,8 @@
   },
   "200021002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000169
   },
   "200021003": {
     "name": "",
@@ -809,11 +967,13 @@
   },
   "200021005": {
     "name": "",
-    "clearRewardId": 71
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000170
   },
   "200021006": {
     "name": "",
-    "clearRewardId": 71
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000171
   },
   "200021007": {
     "name": "",
@@ -825,7 +985,8 @@
   },
   "200021009": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000172
   },
   "200013001": {
     "name": "",
@@ -833,7 +994,8 @@
   },
   "200013002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000109
   },
   "200013003": {
     "name": "",
@@ -845,11 +1007,13 @@
   },
   "200013005": {
     "name": "",
-    "clearRewardId": 71
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000110
   },
   "200013006": {
     "name": "",
-    "clearRewardId": 71
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000111
   },
   "200013007": {
     "name": "",
@@ -861,11 +1025,12 @@
   },
   "200013009": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000112
   },
   "300001001": {
     "name": "",
-    "clearRewardId": 100601
+    "clearRewardId": 1
   },
   "300001002": {
     "name": "",
@@ -877,7 +1042,8 @@
   },
   "300001004": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 16000
   },
   "300001005": {
     "name": "",
@@ -885,575 +1051,718 @@
   },
   "300001006": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 16001
   },
   "300001007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 16002
   },
   "300001008": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 16003
   },
   "200015001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000121
   },
   "200015002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000122
   },
   "200015003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000123
   },
   "200015004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000124
   },
   "200015005": {
     "name": "",
-    "clearRewardId": 11000000
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000133
   },
   "200072001": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000459
   },
   "200072002": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000460
   },
   "200072003": {
     "name": "",
-    "clearRewardId": 32
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000461
   },
   "200072004": {
     "name": "",
-    "clearRewardId": 11000001
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000462
   },
   "200072005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000463
   },
   "200069001": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000445
   },
   "200069002": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000446
   },
   "200069003": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000447
   },
   "200069004": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000448
   },
   "200069005": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000449
   },
   "200070001": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000450
   },
   "200070002": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000451
   },
   "200070003": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000452
   },
   "200070004": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000453
   },
   "200070005": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000454
   },
   "200062001": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000406
   },
   "200062002": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000407
   },
   "200062003": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000408
   },
   "200062004": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000409
   },
   "200062005": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000410
   },
   "200079001": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000497
   },
   "200079002": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000498
   },
   "200079003": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000499
   },
   "200079004": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000500
   },
   "200079005": {
     "name": "",
-    "clearRewardId": 3
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000501
   },
   "200017001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000143
   },
   "200017002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000144
   },
   "200017003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000145
   },
   "200017004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000146
   },
   "200018001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000203
   },
   "200018002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000204
   },
   "200018003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000205
   },
   "200018004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000206
   },
   "200064001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000416
   },
   "200064002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000417
   },
   "200064003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000418
   },
   "200064004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000419
   },
   "200053001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000338
   },
   "200053002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000339
   },
   "200053003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000340
   },
   "200053004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000341
   },
   "200014001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000134
   },
   "200014002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000135
   },
   "200014003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000136
   },
   "200014004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000137
   },
   "200077001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000488
   },
   "200077002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000489
   },
   "200077003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000490
   },
   "200077004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000491
   },
   "200081001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000507
   },
   "200081002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000508
   },
   "200081003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000509
   },
   "200081004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000510
   },
   "200081005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000511
   },
   "200059001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000364
   },
   "200059002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000365
   },
   "200059003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000366
   },
   "200059004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000367
   },
   "200059005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000368
   },
   "200012001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000113
   },
   "200012002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000114
   },
   "200012003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000115
   },
   "200012004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000116
   },
   "200012005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000117
   },
   "200004001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000049
   },
   "200004002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000050
   },
   "200004003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000051
   },
   "200004004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000052
   },
   "200025001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000185
   },
   "200025002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000186
   },
   "200025003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000187
   },
   "200025004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000188
   },
   "200025005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000189
   },
   "200009001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000093
   },
   "200009002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000094
   },
   "200009003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000095
   },
   "200009004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000096
   },
   "200052001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000333
   },
   "200052002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000334
   },
   "200052003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000335
   },
   "200052004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000336
   },
   "200052005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000337
   },
   "200002001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000027
   },
   "200002002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000028
   },
   "200002003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000029
   },
   "200002004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000030
   },
   "200056001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000351
   },
   "200056002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000352
   },
   "200056003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000353
   },
   "200056004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000354
   },
   "200056005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000355
   },
   "200038001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000253
   },
   "200038002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000254
   },
   "200038003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000255
   },
   "200038004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000256
   },
   "200038005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000257
   },
   "200020001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000157
   },
   "200020002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000158
   },
   "200020003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000159
   },
   "200020004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000160
   },
   "200020005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000161
   },
   "200011001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000101
   },
   "200011002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000102
   },
   "200011003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000103
   },
   "200011004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000104
   },
   "200011005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000105
   },
   "200065001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000425
   },
   "200065002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000426
   },
   "200065003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000427
   },
   "200065004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000428
   },
   "200065005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000429
   },
   "200051001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000328
   },
   "200051002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000329
   },
   "200051003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000330
   },
   "200051004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000331
   },
   "200051005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000332
   },
   "200019001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000193
   },
   "200019002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000194
   },
   "200019003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000195
   },
   "200019004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000196
   },
   "200019005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000197
   },
   "200005001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000053
   },
   "200005002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000054
   },
   "200005003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000055
   },
   "200005004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000056
   },
   "200074001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000469
   },
   "200074002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000470
   },
   "200074003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000471
   },
   "200074004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000472
   },
   "200074005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000473
   },
   "200016001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000125
   },
   "200016002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000126
   },
   "200016003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000127
   },
   "200016004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000128
   },
   "200016005": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000129
   },
   "200010001": {
     "name": "",
@@ -1465,7 +1774,8 @@
   },
   "200010003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000097
   },
   "200010004": {
     "name": "",
@@ -1473,7 +1783,8 @@
   },
   "200010005": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000098
   },
   "200010006": {
     "name": "",
@@ -1481,11 +1792,13 @@
   },
   "200010007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000099
   },
   "200010008": {
     "name": "",
-    "clearRewardId": 10042500
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000100
   },
   "300002001": {
     "name": "",
@@ -1497,7 +1810,8 @@
   },
   "300002003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000377
   },
   "300002004": {
     "name": "",
@@ -1505,7 +1819,8 @@
   },
   "300002005": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000378
   },
   "300002006": {
     "name": "",
@@ -1513,43 +1828,53 @@
   },
   "300002007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000379
   },
   "300002008": {
     "name": "",
-    "clearRewardId": 11000001
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000380
   },
   "100010001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 12853
   },
   "100010002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 12854
   },
   "100010003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 12855
   },
   "100010004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 12856
   },
   "300003001": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 10056
   },
   "300003002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 10057
   },
   "300003003": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 10058
   },
   "300003004": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 10059
   },
   "200076001": {
     "name": "",
@@ -1557,7 +1882,8 @@
   },
   "200076002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000483
   },
   "200076003": {
     "name": "",
@@ -1569,11 +1895,13 @@
   },
   "200076005": {
     "name": "",
-    "clearRewardId": 71
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000484
   },
   "200076006": {
     "name": "",
-    "clearRewardId": 71
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000485
   },
   "200076007": {
     "name": "",
@@ -1585,7 +1913,8 @@
   },
   "200076009": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000486
   },
   "200071001": {
     "name": "",
@@ -1593,7 +1922,8 @@
   },
   "200071002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000455
   },
   "200071003": {
     "name": "",
@@ -1605,11 +1935,13 @@
   },
   "200071005": {
     "name": "",
-    "clearRewardId": 71
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000456
   },
   "200071006": {
     "name": "",
-    "clearRewardId": 71
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000457
   },
   "200071007": {
     "name": "",
@@ -1621,7 +1953,8 @@
   },
   "200071009": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000458
   },
   "200050001": {
     "name": "",
@@ -1629,7 +1962,8 @@
   },
   "200050002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000324
   },
   "200050003": {
     "name": "",
@@ -1641,11 +1975,13 @@
   },
   "200050005": {
     "name": "",
-    "clearRewardId": 71
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000325
   },
   "200050006": {
     "name": "",
-    "clearRewardId": 71
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000326
   },
   "200050007": {
     "name": "",
@@ -1657,11 +1993,12 @@
   },
   "200050009": {
     "name": "",
-    "clearRewardId": 34
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000327
   },
   "100003001": {
     "name": "",
-    "clearRewardId": 100001
+    "clearRewardId": 1
   },
   "100003002": {
     "name": "",
@@ -1673,7 +2010,8 @@
   },
   "100003004": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11100
   },
   "100003005": {
     "name": "",
@@ -1681,19 +2019,22 @@
   },
   "100003006": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11101
   },
   "100003007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11102
   },
   "100003008": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11103
   },
   "100001001": {
     "name": "",
-    "clearRewardId": 100001
+    "clearRewardId": 1
   },
   "100001002": {
     "name": "",
@@ -1705,7 +2046,8 @@
   },
   "100001004": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11000
   },
   "100001005": {
     "name": "",
@@ -1713,23 +2055,27 @@
   },
   "100001006": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11001
   },
   "100001007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11002
   },
   "100001008": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 11003
   },
   "100006001": {
     "name": "",
-    "clearRewardId": 100201
+    "clearRewardId": 1
   },
   "100006002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2857
   },
   "100006003": {
     "name": "",
@@ -1737,7 +2083,8 @@
   },
   "100006004": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2858
   },
   "100006005": {
     "name": "",
@@ -1745,15 +2092,17 @@
   },
   "100006006": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2859
   },
   "100006007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2860
   },
   "100002001": {
     "name": "",
-    "clearRewardId": 100101
+    "clearRewardId": 1
   },
   "100002002": {
     "name": "",
@@ -1761,7 +2110,8 @@
   },
   "100002003": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 12000
   },
   "100002004": {
     "name": "",
@@ -1769,15 +2119,18 @@
   },
   "100002005": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 12001
   },
   "100002006": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 12002
   },
   "100002007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 12003
   },
   "100004001": {
     "name": "",
@@ -1785,7 +2138,8 @@
   },
   "100004002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2849
   },
   "100004003": {
     "name": "",
@@ -1793,7 +2147,8 @@
   },
   "100004004": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2850
   },
   "100004005": {
     "name": "",
@@ -1801,11 +2156,13 @@
   },
   "100004006": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2851
   },
   "100004007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 2852
   },
   "300004001": {
     "name": "",
@@ -1813,7 +2170,8 @@
   },
   "300004002": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 5849
   },
   "300004003": {
     "name": "",
@@ -1821,7 +2179,8 @@
   },
   "300004004": {
     "name": "",
-    "clearRewardId": 1
+    "clearRewardId": 1,
+    "scoreRewardGroup": 5850
   },
   "300004005": {
     "name": "",
@@ -1829,10 +2188,12 @@
   },
   "300004006": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 5851
   },
   "300004007": {
     "name": "",
-    "clearRewardId": 31
+    "clearRewardId": 1,
+    "scoreRewardGroup": 5852
   }
 }

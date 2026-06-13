@@ -156,7 +156,7 @@ def convert_advent_quest(obj):
                     "name": "", #chapter[2],
                     "clearRewardId": int(chapter[4]),
                     "sPlusRewardId": 1,
-                    "scoreRewardGroup": int(chapter[70]),
+                    "scoreRewardGroup": int(chapter[76]),
                     "bRankTime": floor(float(chapter[88]) * 1000),
                     "aRankTime": floor(float(chapter[89]) * 1000),
                     "sRankTime": floor(float(chapter[90]) * 1000),

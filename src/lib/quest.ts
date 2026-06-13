@@ -35,6 +35,7 @@ export function givePlayerScoreRewardsSync(
 
     if (scoreRewards != null && groupId != null) {
         const dropMultiplier = parseFloat(process.env.DROP_MULTIPLIER || '1')
+        console.log(`[QUEST] givePlayerScoreRewards group=${groupId} items=${scoreRewards.length} pid=${playerId}`)
         let rewardIndex = 0
         for (const scoreReward of scoreRewards) {
             rewardIndex += 1;
@@ -92,6 +93,7 @@ export function givePlayerScoreRewardsSync(
                         // TODO: implement RareScoreReward rarity using .rarity field instead of having an even chance between all items in pool
                         const rareGroupId = reward.id
                         const group = getRareScoreRewardGroup(rareGroupId)
+                        console.log(`[QUEST] RARE_POOL rareGroup=${rareGroupId} found=${group !== null} items=${group?.length ?? 0}`)
                         if (group !== null) {
                             const random_index = 1 >= group.length ? 0 : randomInt(group.length)
                             const reward = group[random_index]

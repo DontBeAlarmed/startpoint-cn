@@ -18,7 +18,7 @@
 | 10 | 高难关卡（EX） | `ex_quest` | 221 | ⬜ | ⬜ | |
 | 11 | 角色剧情 | `character_quest` | 1,318 | ✅ | ✅ | story_quest/finish 通过；⚠️ 阅读后不记录已读状态（紫色标记不消除），待实现 episode_trial/save |
 | 12 | 主线 BOSS 战 | `boss_battle_quest` | 232 | ⬜ | ⬜ | |
-| 13 | 降临讨伐 | `advent_event_quest` | 459 | ⬜ | ⬜ | 需活动开放期 |
+| 13 | 降临讨伐 | `advent_event_quest` | 459 | ✅ | ✅ | 暗机兵 Boss 币掉落正常到账；361/459 关有掉落组 |
 | 14 | 外传故事 | `world_story_event_quest` | 913 | ✅ | ✅ | 剧情关 S+ 金冠 + Boss 战正常评级；C3212 彻底修复（见底部详解） |
 | 15 | 外传 BOSS（多人） | `world_story_event_boss_battle_quest` | 96 | ⬜ | ⬜ | 联机 Phase 2 |
 | 16 | 挑战迷宫 | `challenge_dungeon_event_quest` | 46 | ⬜ | ⬜ | |
@@ -59,7 +59,9 @@
 | F1028 score_attack_event_quest 字段修复 | 转换脚本重写，rankTime/reward 字段正确提取，移除不存在的 scoreRewardGroup |
 | F1029 event_item_shop 57 事件缺失 | 从 `orderedmap/shop/event_item_shop.json` 原始数据补全 3595 个商品 |
 | F1030 BOSS 币稀有掉落修复 | 生成 55 个合成稀有组（offset=15），覆盖全部 17 个 BOSS 事件的银/金/紫币掉落 + 武器直掉 |
-| ⚠️ 已知缺口 — rare_score_reward | probability/数量需 CDN 原始数据校验；id=0 条目暂不处理 |
+| F1031 advent_event_quest 掉落修复 | 转换脚本 `col[70]`→`col[76]` + 再生 JSON，361/459 关有掉落组；稀有组 ID = BOSS 币 ID（非 offset=15）|
+| ⚠️ C8601 | BOSS 币物品定义在 CDN Bundle 中缺失，客户端不显示图标但 BOSS 币已正确发放进背包 |
+| ⚠️ 已知缺口 — score_reward id=0 | 5148 个 id=0 条目无法匹配任何稀有组，掉率/武器直掉待补 |
 
 ## BOSS 币稀有掉落映射表
 
@@ -90,6 +92,19 @@
 **武器组**：稀有组 = 紫币稀有组 + 1，条目 = `{type:1, id:equip_id, count:1, rarity:0.05}`
 
 **已验证**：Event 200077（机兵）和 Event 200080（前鬼后鬼）的映射与用户数据一致。
+
+## Advent 活动掉落映射
+
+Advent 活动的 `scoreRewardGroup` 从 CDN `col[76]` 提取（之前错误使用了 col[70]）。**稀有组 ID = BOSS 币 ID**（自身映射）。
+
+| Quest ID | scoreRewardGroup | 稀有组（=币 ID） | 掉落 |
+|------|:---:|------|------|
+| 200077001 | 11000488 | 10000076 ×2 | 暗机兵银币 ×2 |
+| 200077002 | 11000489 | 10000076 ×2 + 10000077 | 银×2 + 金 |
+| 200077003 | 11000490 | 10000076 ×2 + 10000077 ×2 + 10000078 | 银×2 + 金×2 + 紫 |
+| 200077004 | 11000491 | 10000076 ×2 + 10000077 ×2 + 10000078 | 银×2 + 金×2 + 紫 |
+
+**已验证**：暗机兵中级（200077001）BOSS 币已正确发放到背包。
 
 ## C3212 修复详解
 
