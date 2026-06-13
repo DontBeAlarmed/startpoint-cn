@@ -79,8 +79,8 @@ const routes = async (fastify: FastifyInstance) => {
         const dbRecords = getPlayerCarnivalEventRecordsSync(playerId, eventId)
         const records = dbRecords.map(r => ({
             folder_id: r.folderId,
-            best_score: r.bestScore != null ? Math.min(r.bestScore, 65535) : null,
-            previous_score: r.previousScore != null ? Math.min(r.previousScore, 65535) : null,
+            best_score: r.bestScore,
+            previous_score: r.previousScore,
             previous_character_ids: r.previousCharacterIds ?? [null, null, null],
             previous_unison_character_ids: r.previousUnisonCharacterIds ?? [null, null, null],
         }))

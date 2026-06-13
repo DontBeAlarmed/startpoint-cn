@@ -19,7 +19,7 @@
 | 11 | 角色剧情 | `character_quest` | 1,318 | ✅ | ✅ | story_quest/finish 通过；⚠️ 阅读后不记录已读状态（紫色标记不消除），待实现 episode_trial/save |
 | 12 | 主线 BOSS 战 | `boss_battle_quest` | 232 | ⬜ | ⬜ | |
 | 13 | 降临讨伐 | `advent_event_quest` | 459 | ⬜ | ⬜ | 需活动开放期 |
-| 14 | 外传故事 | `world_story_event_quest` | 913 | ✅ | ⬜ | H400 修复 + 913 关 CN 源全量导入 |
+| 14 | 外传故事 | `world_story_event_quest` | 913 | ✅ | ✅ | 剧情关+ Boss 战均通过；C3212 clearRank null→0 修复 |
 | 15 | 外传 BOSS（多人） | `world_story_event_boss_battle_quest` | 96 | ⬜ | ⬜ | 联机 Phase 2 |
 | 16 | 挑战迷宫 | `challenge_dungeon_event_quest` | 46 | ⬜ | ⬜ | |
 | 17 | 每日经验玛纳 | `daily_exp_mana_event_quest` | 6 | ⬜ | ⬜ | |
@@ -46,4 +46,8 @@
 | F1015 scoreRewardGroup null 不可遍历 | `assets.ts:105` + `quest.ts:36` null 守卫，练习战结算不再崩溃 |
 | F1016 邮件 EQUIPMENT 已有装备 UNIQUE 冲突 | `mail.ts` 改用 `givePlayerEquipmentSync`，已有则加 stack |
 | F1017 邮件 type_id 超 Int 范围 C8700 | `web_api/mail.ts` 加 1~2^31-1 校验，`formatMailResponse` null 安全 |
-| F1019 carnival score + party display | 分数通过，清理存档后新嘉年华正常显示 |
+| F1018 episode_trial_reading/finish 404 | `cn-server.ts` 新增 stub 端点 |
+| F1019 getQuestSync 统一 BattleQuest | 缺失字段默认 0，嘉年华关卡不再 400 |
+| F1020 C3212 story_quest clear_rank 缺失 | `storyQuest.ts:processStoryQuestFinish` 保存 `clearRank: 0` |
+| F1021 carnival score + party display | DB 表 + CDN 打分数据 + `single_battle_quest/finish` carnival_event 字段 |
+| F1022 party_slot 3000 → F1009 崩溃 | `party_slot` 无效值导致 HomeScene null pointer；修复为 1 |

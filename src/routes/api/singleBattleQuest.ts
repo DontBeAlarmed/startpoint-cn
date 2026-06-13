@@ -369,11 +369,11 @@ const routes = async (fastify: FastifyInstance) => {
                     is_record_valid: true,
                     leader_character_id: leaderCharId,
                     new_degree_ids: [] as number[],
-                    previous_total_best_score: Math.min(previousTotalBest, 65535),
+                    previous_total_best_score: previousTotalBest,
                     reward_ids: [] as number[],
                     score: {
-                        difficulty_bonus: Math.min(difficultyBonus, 65535),
-                        time_bonus: Math.min(timeBonus, 65535)
+                        difficulty_bonus: difficultyBonus,
+                        time_bonus: timeBonus
                     }
                 }
             }
