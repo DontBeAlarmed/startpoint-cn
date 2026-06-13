@@ -64,9 +64,9 @@
 | F1033 gacha_campaign 修复 | CN CDN 重新生成 145 条映射（旧版全球数据仅 50 条） |
 | F1034 gacha.json CDN odds 重建 | 从 926 个 CDN `gacha_odds/` 有序映射文件完整重建 490 卡池：CDN 权重 + `odds_up` UP 标记 + `is_limited`/`is_exchangeable` |
 | F1035 C8024/C3032 卡池动画修复 | `gacha.ts`：`movie_id` 从硬编码→读取 `gacha.movieName`；`seed` 从 `characterId*1000`→预验证种子池随机选取 |
+| F1036 装备卡池 CDN 赔率重建 | 91 个装备卡池（type=1）从 CDN `equipment_odds_rarity` 赔率文件构建，含权重/UP/限定 |
 | ⚠️ 种子池 | 当前种子来自抓包数据，可能不全，与国服数据有差距 |
-| F1036 装备卡池 CDN 赔率重建 | 91 个装备卡池（type=1）从 CDN `equipment_odds_rarity` 赔率文件构建 |
-| ⚠️ 复刻卡池 UP 标记 | 281 个复刻卡池（col[0] `_1`/`_2` 后缀）共享原版赔率文件含 `odds_up=true`，客户端不应展示 UP；需在生成脚本中根据 col[0] 后缀过滤 |
+| ⚠️ 复刻卡池 UP 标记 | 复刻版（col[0] 带 `_1`/`_2`）共享原版赔率含 `odds_up=true`，客户端可能不应展示 UP；待验证
 
 ## C3212 修复详解
 
