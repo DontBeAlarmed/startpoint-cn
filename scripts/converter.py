@@ -28,6 +28,7 @@ def convert_main_ex_quests(obj):
     for _, chapter_stages in obj.items():
         for _, sub_stages in chapter_stages.items():
             for _, chapter in sub_stages.items():
+                chapter = chapter[0]  # extract inner array
                 # determine whether the quest is a story or not
                 if chapter[84] == "":
                     # is story
