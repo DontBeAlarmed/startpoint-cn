@@ -217,6 +217,7 @@ export interface RawPlayerQuestProgress {
     section: number
     quest_id: number
     finished: number
+    unlocked: number
     high_score?: number
     clear_rank?: number
     best_elapsed_time_ms?: number
@@ -228,6 +229,7 @@ export interface PlayerQuestProgress {
     highScore?: number
     clearRank?: number
     bestElapsedTimeMs?: number
+    unlocked: boolean
 }
 
 export interface RawPlayerGachaInfo {
@@ -609,6 +611,7 @@ export interface UserEquipment {
 export interface UserQuestProgress {
     quest_id: number
     finished: boolean
+    unlocked?: boolean
     high_score?: number
     best_elapsed_time_ms?: number
     clear_rank?: number

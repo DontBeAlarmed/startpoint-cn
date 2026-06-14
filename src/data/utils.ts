@@ -222,7 +222,8 @@ export function serializePlayerData(
                 "clear_rank": progress.clearRank,
                 "finished": progress.finished,
                 "high_score": progress.highScore,
-                "quest_id": progress.questId
+                "quest_id": progress.questId,
+                "unlocked": progress.unlocked
             })
         }
         userQuestProgress[section] = list

@@ -14,6 +14,7 @@ function buildPlayerQuestProgress(
     return {
         questId: raw.quest_id,
         finished: deserializeBoolean(raw.finished),
+        unlocked: deserializeBoolean(raw.unlocked),
         highScore: raw.high_score,
         clearRank: raw.clear_rank,
         bestElapsedTimeMs: raw.best_elapsed_time_ms
@@ -31,7 +32,7 @@ export function getPlayerQuestProgressSync(
 ): Record<string, PlayerQuestProgress[]> {
 
     const rawProgress = getDb().prepare(`
-    SELECT section, quest_id, finished, high_score, clear_rank, best_elapsed_time_ms
+    SELECT section, quest_id, finished, unlocked, high_score, clear_rank, best_elapsed_time_ms
     FROM players_quest_progress
     WHERE player_id = ?
     `).all(playerId) as RawPlayerQuestProgress[]
@@ -66,7 +67,7 @@ export function getPlayerSingleQuestProgressSync(
 ): PlayerQuestProgress | null {
 
     const rawProgress = getDb().prepare(`
-    SELECT section, quest_id, finished, high_score, clear_rank, best_elapsed_time_ms
+    SELECT section, quest_id, finished, unlocked, high_score, clear_rank, best_elapsed_time_ms
     FROM players_quest_progress
     WHERE player_id = ? AND section = ? AND quest_id = ?
     `).get(playerId, Number(section), Number(questId)) as RawPlayerQuestProgress
@@ -89,12 +90,13 @@ export function insertPlayerQuestProgressSync(
     data: PlayerQuestProgress
 ) {
     getDb().prepare(`
-    INSERT INTO players_quest_progress (section, quest_id, finished, high_score, clear_rank, best_elapsed_time_ms, player_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO players_quest_progress (section, quest_id, finished, unlocked, high_score, clear_rank, best_elapsed_time_ms, player_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         Number(section),
         data.questId,
         serializeBoolean(data.finished),
+        serializeBoolean(data.unlocked ?? false),
         data.highScore ?? null,
         data.clearRank ?? null,
         data.bestElapsedTimeMs ?? null,
@@ -135,6 +137,7 @@ export function updatePlayerQuestProgressSync(
 ) {
     const fieldMap: Record<string, string> = {
         'finished': 'finished',
+        'unlocked': 'unlocked',
         'highScore': 'high_score',
         'clearRank': 'clear_rank',
         'bestElapsedTimeMs': 'best_elapsed_time_ms'

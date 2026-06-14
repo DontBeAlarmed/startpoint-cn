@@ -244,6 +244,7 @@ export default function init(
         section INTEGER NOT NULL,
         quest_id INTEGER NOT NULL,
         finished INTEGER NOT NULL,
+        unlocked INTEGER NOT NULL DEFAULT 0,
         high_score INTEGER,
         clear_rank INTEGER,
         best_elapsed_time_ms INTEGER,
