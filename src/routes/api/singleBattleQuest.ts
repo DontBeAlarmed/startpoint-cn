@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { deletePlayerRushEventPlayedPartyListSync, getPlayerItemSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, getPlayerSingleQuestProgressSync, getPlayerSync, getSession, givePlayerItemSync, insertPlayerQuestProgressSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerEquipmentSync, updatePlayerItemSync, updatePlayerQuestProgressSync, updatePlayerRushEventSync, updatePlayerSync, upsertPlayerCarnivalEventRecordSync } from "../../data/wdfpData";
+import { deletePlayerRushEventPlayedPartyListSync, getPlayerDailyChallengePointListSync, getPlayerItemSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, getPlayerSingleQuestProgressSync, getPlayerSync, getSession, givePlayerItemSync, insertPlayerQuestProgressSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerDailyChallengePointSync, updatePlayerEquipmentSync, updatePlayerItemSync, updatePlayerQuestProgressSync, updatePlayerRushEventSync, updatePlayerSync, upsertPlayerCarnivalEventRecordSync } from "../../data/wdfpData";
 import { getQuestFromCategorySync, getRushEventFolderClearRewards } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
@@ -12,6 +12,7 @@ import { readFileSync, existsSync } from "fs";
 import path from "path";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
 import scoreAttackBorderRewards from "../../../assets/score_attack_border_reward.json";
+import eventChallengePointMap from "../../../assets/event_challenge_point_map.json";
 
 // Load carnival quest score data
 let carnivalScoreLookup: Record<string, { difficulty_score: number, time_limit_ms: number, folder_id: number, event_id: number }> = {}
@@ -240,6 +241,30 @@ const routes = async (fastify: FastifyInstance) => {
             boostPoint: newBoostPoint,
             bossBoostPoint: newBossBoostPoint
         })
+
+        // Consume daily challenge point
+        let dailyChallengePointList: Object[] | null = null
+        if (questCategory === QuestCategory.EXPERT_SINGLE_EVENT && questData.eventId) {
+            const cpKey = `expert_${questData.eventId}`
+            const challengePointId = (eventChallengePointMap as Record<string, number>)[cpKey]
+            if (challengePointId) {
+                const entries = getPlayerDailyChallengePointListSync(playerId)
+                const entry = entries.find(e => e.id === challengePointId)
+                if (entry && entry.point > 0) {
+                    updatePlayerDailyChallengePointSync(playerId, challengePointId, entry.point - 1)
+                    console.log(`[BATTLE] challengePoint consumed: id=${challengePointId} old=${entry.point} new=${entry.point - 1}`)
+                }
+                // Serialize for response
+                dailyChallengePointList = entries.map(e => ({
+                    "id": e.id,
+                    "point": e.id === challengePointId ? Math.max(0, e.point - 1) : e.point,
+                    "campaign_list": e.campaignList.map(c => ({
+                        "campaign_id": c.campaignId,
+                        "additional_point": c.additionalPoint
+                    }))
+                }))
+            }
+        }
 
         // reward score rewards
         if (questCategory === QuestCategory.SCORE_ATTACK_EVENT) {
@@ -512,6 +537,7 @@ const routes = async (fastify: FastifyInstance) => {
                 },
                 "rush_event": rushEventData,
                 "carnival_event": carnivalEventData,
+                "user_daily_challenge_point_list": dailyChallengePointList ?? [],
                 "presigned_quest_category": []
             }
         })

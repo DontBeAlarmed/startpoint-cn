@@ -328,11 +328,12 @@ def convert_tower_dungeon_event_quest(obj):
 
 def convert_expert_single_event_quest(obj):
     converted = {}
-    for _, quests in obj.items():
+    for event_id, quests in obj.items():
         for _, quest in quests.items():
             quest = quest[0]  # extract inner array
             converted[quest[0]] = {
                 "name": "",
+                "eventId": int(event_id),
                 "clearRewardId": int(quest[6]),
                 "scoreRewardGroupId": int(quest[73]),
                 "sPlusRewardId": 1,

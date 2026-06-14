@@ -1,6 +1,7 @@
 {
     "1001": {
         "name": "",
+        "eventId": 1,
         "clearRewardId": 34,
         "scoreRewardGroupId": 5001,
         "sPlusRewardId": 1,
@@ -15,6 +16,7 @@
     },
     "1002": {
         "name": "",
+        "eventId": 1,
         "clearRewardId": 34,
         "scoreRewardGroupId": 5002,
         "sPlusRewardId": 1,
@@ -29,6 +31,7 @@
     },
     "1003": {
         "name": "",
+        "eventId": 1,
         "clearRewardId": 34,
         "scoreRewardGroupId": 5003,
         "sPlusRewardId": 1,
@@ -43,6 +46,7 @@
     },
     "1004": {
         "name": "",
+        "eventId": 1,
         "clearRewardId": 34,
         "scoreRewardGroupId": 5004,
         "sPlusRewardId": 1,
@@ -57,6 +61,7 @@
     },
     "1005": {
         "name": "",
+        "eventId": 1,
         "clearRewardId": 34,
         "scoreRewardGroupId": 5005,
         "sPlusRewardId": 1,
@@ -71,6 +76,7 @@
     },
     "1006": {
         "name": "",
+        "eventId": 1,
         "clearRewardId": 34,
         "scoreRewardGroupId": 5006,
         "sPlusRewardId": 1,
@@ -85,6 +91,7 @@
     },
     "1007": {
         "name": "",
+        "eventId": 1,
         "clearRewardId": 34,
         "scoreRewardGroupId": 5009,
         "sPlusRewardId": 1,
@@ -99,6 +106,7 @@
     },
     "1008": {
         "name": "",
+        "eventId": 1,
         "clearRewardId": 34,
         "scoreRewardGroupId": 5010,
         "sPlusRewardId": 1,
@@ -113,6 +121,7 @@
     },
     "1009": {
         "name": "",
+        "eventId": 1,
         "clearRewardId": 34,
         "scoreRewardGroupId": 5007,
         "sPlusRewardId": 1,
@@ -127,6 +136,7 @@
     },
     "1010": {
         "name": "",
+        "eventId": 1,
         "clearRewardId": 34,
         "scoreRewardGroupId": 5008,
         "sPlusRewardId": 1,
@@ -141,6 +151,7 @@
     },
     "1011": {
         "name": "",
+        "eventId": 1,
         "clearRewardId": 34,
         "scoreRewardGroupId": 5011,
         "sPlusRewardId": 1,
@@ -155,6 +166,7 @@
     },
     "1012": {
         "name": "",
+        "eventId": 1,
         "clearRewardId": 34,
         "scoreRewardGroupId": 5012,
         "sPlusRewardId": 1,
@@ -169,6 +181,7 @@
     },
     "2001": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 64,
         "scoreRewardGroupId": 5013,
         "sPlusRewardId": 1,
@@ -183,6 +196,7 @@
     },
     "2002": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 64,
         "scoreRewardGroupId": 5013,
         "sPlusRewardId": 1,
@@ -197,6 +211,7 @@
     },
     "2003": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 64,
         "scoreRewardGroupId": 5013,
         "sPlusRewardId": 1,
@@ -211,6 +226,7 @@
     },
     "2004": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 65,
         "scoreRewardGroupId": 5014,
         "sPlusRewardId": 1,
@@ -225,6 +241,7 @@
     },
     "2005": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 66,
         "scoreRewardGroupId": 5015,
         "sPlusRewardId": 1,
@@ -239,6 +256,7 @@
     },
     "2006": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 66,
         "scoreRewardGroupId": 5015,
         "sPlusRewardId": 1,
@@ -253,6 +271,7 @@
     },
     "2007": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 67,
         "scoreRewardGroupId": 5016,
         "sPlusRewardId": 1,
@@ -267,6 +286,7 @@
     },
     "2008": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 69,
         "scoreRewardGroupId": 5017,
         "sPlusRewardId": 1,
@@ -281,6 +301,7 @@
     },
     "2009": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 69,
         "scoreRewardGroupId": 5017,
         "sPlusRewardId": 1,
@@ -295,6 +316,7 @@
     },
     "2010": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 64,
         "scoreRewardGroupId": 5013,
         "sPlusRewardId": 1,
@@ -309,6 +331,7 @@
     },
     "2011": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 68,
         "scoreRewardGroupId": 5018,
         "sPlusRewardId": 1,
@@ -323,6 +346,7 @@
     },
     "2012": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 64,
         "scoreRewardGroupId": 5013,
         "sPlusRewardId": 1,
@@ -337,6 +361,7 @@
     },
     "2013": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 65,
         "scoreRewardGroupId": 5014,
         "sPlusRewardId": 1,
@@ -351,6 +376,7 @@
     },
     "2014": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 67,
         "scoreRewardGroupId": 5016,
         "sPlusRewardId": 1,
@@ -365,6 +391,7 @@
     },
     "2015": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 69,
         "scoreRewardGroupId": 5017,
         "sPlusRewardId": 1,
@@ -379,6 +406,7 @@
     },
     "2016": {
         "name": "",
+        "eventId": 2,
         "clearRewardId": 69,
         "scoreRewardGroupId": 5017,
         "sPlusRewardId": 1,
