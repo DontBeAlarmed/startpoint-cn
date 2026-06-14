@@ -598,6 +598,33 @@ const routes = async (fastify: FastifyInstance) => {
             }
         })
     })
+
+    fastify.post("/add_character_from_town", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as { character_id: number, viewer_id: number, api_count: number }
+        const viewerId = body.viewer_id
+        const characterId = body.character_id
+        if (!viewerId || isNaN(viewerId) || !characterId || isNaN(characterId)) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid request body."
+        })
+
+        const viewerIdSession = await getSession(viewerId.toString())
+        if (!viewerIdSession) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid viewer id."
+        })
+
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null) return reply.status(500).send({
+            "error": "Internal Server Error", "message": "No player bound to account."
+        })
+
+        givePlayerCharacterSync(playerId, characterId)
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data": {}
+        })
+    })
 }
 
 export default routes;
