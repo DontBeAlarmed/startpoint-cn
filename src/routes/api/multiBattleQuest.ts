@@ -521,6 +521,8 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as MultiStartBody
         const { viewer_id, quest_id, category, party_id, use_boost_point, use_boss_boost_point, is_auto_start_mode, room_number, mate_player_ids } = body
         console.log(`[MULTI] start: viewer=${viewer_id} quest=${quest_id} category=${category} party=${party_id} room=${room_number}`)
+        console.log(`[MULTI] start mate_player_ids=${JSON.stringify(mate_player_ids)}`)
+        console.log(`[MULTI] start mate_party_ids=${JSON.stringify(body.mate_party_ids)}`)
 
         if (isNaN(viewer_id) || isNaN(party_id) || isNaN(quest_id) || isNaN(category) || use_boost_point === undefined || use_boss_boost_point === undefined || is_auto_start_mode === undefined) {
             return reply.status(400).send({

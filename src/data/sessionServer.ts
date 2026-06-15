@@ -17,7 +17,7 @@
 import * as net from "net";
 import { MultiRoom } from "../lib/types";
 import { disbandRoom } from "./multiRoom";
-import { getSession, getAccountPlayers, getPlayerSync, getPlayerPartyGroupListSync, getPlayerCharacterSync, getPlayerEquipmentSync, getPlayerCharactersManaNodesSync } from "./wdfpData";
+import { getSession, getAccountPlayers, getPlayerSync, getPlayerPartyGroupListSync, getPlayerCharacterSync, getPlayerEquipmentSync } from "./wdfpData";
 import { PartyCategory, PlayerParty, PlayerCharacter, PlayerEquipment } from "./types";
 
 interface SessionClient {
@@ -29,6 +29,7 @@ interface SessionClient {
     mates: any[];
     enterData: any;
     playerId: number | null;
+    isBattle: boolean;
 }
 
 const clients = new Map<string, SessionClient>();
@@ -78,7 +79,13 @@ function sendJson(socket: net.Socket, obj: any) {
     const json = JSON.stringify(obj);
     socket.write(json + "\0");
     const tag = Array.isArray(obj) && Array.isArray(obj[1]) && Array.isArray(obj[1][1]) ? ` [1][${obj[1][0]}][N=${obj[1][1].length}]` : '';
-    console.log(`[SESSION] sent to ${(socket as any).remoteAddress}:${(socket as any).remotePort}${tag}:`, json.substring(0, 200));
+    // Log full JSON for Start messages to debug F1009
+    const isStart = Array.isArray(obj) && obj[1] && obj[1][0] === 5
+    if (isStart) {
+        console.log(`[SESSION] START full: ${json}`)
+    } else {
+        console.log(`[SESSION] sent to ${(socket as any).remoteAddress}:${(socket as any).remotePort}${tag}:`, json.substring(0, 200));
+    }
 }
 
 function handleMessage(client: SessionClient, data: string) {
@@ -103,8 +110,12 @@ function handleClient2Server(client: SessionClient, msg: any[]) {
         case 0: // Notify
             if (msg.length > 1 && Array.isArray(msg[1])) {
                 const notifyTag = msg[1][0]
-                console.log(`[SESSION] Notify tag=${notifyTag} from viewer=${client.viewerId}`)
-                handleNotify(client, msg[1]);
+                console.log(`[SESSION] Notify tag=${notifyTag} from viewer=${client.viewerId} ${client.isBattle ? '[BATTLE]' : ''}`)
+                if (client.isBattle) {
+                    handleBattleNotify(client, msg[1]);
+                } else {
+                    handleNotify(client, msg[1]);
+                }
             }
             break;
         case 1: // Broadcast
@@ -124,6 +135,22 @@ function handleNotify(client: SessionClient, msg: any[]) {
         case 0: // Enter
             client.enterData = msg[1];
             console.log(`[SESSION] client ${client.viewerId} entered room ${client.roomNumber}`);
+            // Sync host mate with client's actual settings from Enter data
+            if (client.mates[0] && msg[1]) {
+                const host = client.mates[0]
+                const ed = msg[1]
+                if (ed.autoplayMode !== undefined) host.autoplayMode = ed.autoplayMode
+                if (ed.autoskillMode !== undefined) host.autoskillMode = ed.autoskillMode
+                if (ed.autoSpeedLevel !== undefined) host.autoSpeedLevel = ed.autoSpeedLevel
+                if (ed.autoStart !== undefined) host.autoStart = ed.autoStart
+                if (ed.skillAbilityBehaviorMode !== undefined) host.skillAbilityBehaviorMode = ed.skillAbilityBehaviorMode
+                if (ed.dashBehaviorMode !== undefined) host.dashBehaviorMode = ed.dashBehaviorMode
+                if (ed.allowHealFromOtherPlayers !== undefined) host.allowHealFromOtherPlayers = ed.allowHealFromOtherPlayers
+                if (ed.currentPartyId !== undefined) host.currentPartyId = ed.currentPartyId
+                console.log(`[SESSION] host synced: auto=${host.autoplayMode} speed=${host.autoSpeedLevel} allowHeal=${host.allowHealFromOtherPlayers} partyId=${host.currentPartyId}`)
+                // Push updated mate data to client
+                sendJson(client.socket, [1, [1, client.mates]])
+            }
             break;
 
         case 4: // Heartbeat
@@ -184,6 +211,26 @@ function disconnectClient(client: SessionClient) {
     try { client.socket.destroy(); } catch (e) {}
 }
 
+// Battle protocol (cooperation_battle socklet)
+// BattleNotifyMessage: SceneReady=4?, Heartbeat=?, Finalize=?
+// BattleServerMessage: BattleStart=1
+function handleBattleNotify(client: SessionClient, msg: any[]) {
+    const tag = msg[0];
+    switch (tag) {
+        case 4: // Heartbeat (battle)
+            sendJson(client.socket, [1, [10, String(client.roomNumber)]]);
+            break;
+        case 5: // SceneReady → respond with BattleStart
+            console.log(`[SESSION] battle SceneReady: room=${client.roomNumber}`)
+            // MeetingServer2Client.Message(BattleServerMessage.BattleStart)
+            // BattleStart index=1, parameterless → [1]
+            sendJson(client.socket, [1, [1]]);
+            break;
+        default:
+            console.log(`[SESSION] battle unhandled Notify: ${tag}`, JSON.stringify(msg).substring(0, 100));
+    }
+}
+
 function handleEnterComs(client: SessionClient, coms: any[]) {
     // Get host mate (already built from real data)
     const host = client.mates[0]
@@ -220,7 +267,7 @@ function handleEnterComs(client: SessionClient, coms: any[]) {
         const party = npcParties[i] ?? (npcParties[0] ?? hostParty)
         const comId = i + 1
         const mate = {
-            viewerId: -comId,
+            viewerId: 900000000 + comId,  // dummy positive IDs for NPC finish validation
             comId: comId,
             name: coms[i]?.name ?? `NPC${comId}`,
             rank: coms[i]?.rank ?? 80,
@@ -355,16 +402,9 @@ function buildRealParty(playerId: number, party: PlayerParty): any {
         if (!charId) return [1]  // Option None
         const dbChar = getPlayerCharacterSync(playerId, charId)
         if (!dbChar) return [1]
-        // get mana nodes
-        let manaNodeIds: number[] = []
-        try {
-            const allManaNodes = getPlayerCharactersManaNodesSync(playerId)
-            const nodes = allManaNodes[String(charId)]
-            if (nodes && nodes.length > 0) {
-                manaNodeIds = nodes
-            }
-        } catch { }
-        // ex boost
+        // mana nodes: keep empty for TCP mate — client reads from /load response
+        const manaNodeIds: number[] = []
+        // ex boost from DB
         let exBoost: any = [1]
         if (dbChar.exBoost && dbChar.exBoost.abilityIdList && dbChar.exBoost.abilityIdList.length > 0) {
             exBoost = [0, { ability_id_list: dbChar.exBoost.abilityIdList, status_id: dbChar.exBoost.statusId }]
@@ -428,7 +468,8 @@ async function handleHandshake(socket: net.Socket, data: string, remoteAddr: str
             buffer: "",
             mates: [],
             enterData: null,
-            playerId: null
+            playerId: null,
+            isBattle: true
         }
         addClient(battleClient)
         sendJson(socket, [0, battleRoomNumber, ""])
@@ -456,7 +497,7 @@ async function handleHandshake(socket: net.Socket, data: string, remoteAddr: str
                 const player = getPlayerSync(playerIds[0]);
                 if (player) {
                     playerName = player.name || playerName;
-                    playerRank = player.rankPoint || playerRank;
+					playerRank = 1;  // TODO: CN rank level calculation from CDN thresholds
                     playerDegreeId = player.degreeId || playerDegreeId;
                     playerRoleKind = player.role || playerRoleKind;
                     playerIsNewbie = !!player.tutorialStep;
@@ -477,17 +518,18 @@ async function handleHandshake(socket: net.Socket, data: string, remoteAddr: str
         buffer: "",
         mates: [],
         enterData: null,
-        playerId: actualPlayerId
+        playerId: actualPlayerId,
+        isBattle: false
     };
 
     addClient(client);
     console.log(`[SESSION] client added: viewer=${viewerId} room=${roomNumber} (room total=${roomClients.get(roomNumber)?.size ?? 0})`);
 
-    // Send Accept (roomId, roomNumber) — client uses params[1] as roomNumber
-    console.log(`[SESSION] handshake OK viewer=${viewerId} room=${roomNumber} name=${playerName}`)
-    sendJson(socket, [0, roomNumber, roomNumber]);
-
     const hostConnectionId = `${roomNumber}-host`;
+
+    // Send Accept (roomId, roomNumber) — client uses params[0] as myConnectionId
+    console.log(`[SESSION] handshake OK viewer=${viewerId} room=${roomNumber} name=${playerName}`)
+    sendJson(socket, [0, hostConnectionId, roomNumber]);
 
     // Build host party from real DB data (player's current party slot)
     let hostParty = buildDefaultParty()
