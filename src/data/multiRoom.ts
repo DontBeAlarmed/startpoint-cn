@@ -222,8 +222,7 @@ export function serializeRoom(room: MultiRoom): Record<string, any> {
 
 // Build select_room/prepare response data
 export function serializeRoomConnection(room: MultiRoom): Record<string, any> {
-    const sessionHost = process.env.CN_LISTEN_HOST || "0.0.0.0";
-    const displayHost = sessionHost === "0.0.0.0" ? "<PII_REMOVED>" : sessionHost;
+    const displayHost = process.env.CN_LISTEN_HOST || "<PII_REMOVED>";
     const sessionPort = parseInt(process.env.SESSION_PORT || "8003");
     return {
         application_update_url: "",
