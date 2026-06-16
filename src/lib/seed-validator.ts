@@ -161,23 +161,27 @@ export class SeedValidator {
     // 测试种子
     // ========================================================================
 
-    /** 设置某个稀有度的测试种子（热血/普通 tag 才能设为测试） */
+    /** 设置测试种子 — 自动开启强制动画 */
     setTestSeed(rarity: 3|4|5, seed: number): boolean {
         const entry = this.purified.get(seed);
         if (!entry || entry.tag === '冷血躲避球') return false;
         if (entry.r !== rarity - 3) return false;
         this.testSeeds[rarity - 3] = seed;
         this.testSeedTimestamps[rarity - 3] = Date.now();
+        this.forceAnimation = true; // 设测试种子 → 自动开
         this.saveTestSeeds();
+        this.saveConfig();
         return true;
     }
 
-    /** 清除某个稀有度的测试种子 */
+    /** 清除测试种子 — 无测试种子+净化池 → 自动关 */
     clearTestSeed(rarity: 3|4|5): boolean {
         if (this.testSeeds[rarity - 3] === null) return false;
         this.testSeeds[rarity - 3] = null;
         this.testSeedTimestamps[rarity - 3] = null;
+        if (!this.hasActiveTestSeeds() && this.mode === 'purified') this.forceAnimation = false;
         this.saveTestSeeds();
+        this.saveConfig();
         return true;
     }
 
@@ -189,10 +193,28 @@ export class SeedValidator {
 
     getMode(): PoolMode { return this.mode; }
     getPriority(): TestPriority { return this.priority; }
-    setMode(mode: PoolMode): void { this.mode = mode; this.saveConfig(); console.log(`[SEED] Mode → ${mode}`); }
+
+    setMode(mode: PoolMode): void {
+        this.mode = mode;
+        // 净化池 + 无测试种子 → 自动关
+        if (mode === 'purified' && !this.hasActiveTestSeeds()) this.forceAnimation = false;
+        // 测试池 → 自动开
+        if (mode === 'unknown') this.forceAnimation = true;
+        this.saveConfig();
+        console.log(`[SEED] Mode → ${mode}, ForceAnim → ${this.forceAnimation}`);
+    }
+
     setPriority(priority: TestPriority): void { this.priority = priority; this.saveConfig(); console.log(`[SEED] Priority → ${priority}`); }
     setForceAnimation(v: boolean): void { this.forceAnimation = v; this.saveConfig(); console.log(`[SEED] ForceAnimation → ${v}`); }
     getForceAnimation(): boolean { return this.forceAnimation; }
+
+    private hasActiveTestSeeds(): boolean {
+        const now = Date.now();
+        for (let i = 0; i < 3; i++) {
+            if (this.testSeeds[i] !== null && (this.testSeedTimestamps[i] === null || now - this.testSeedTimestamps[i]! < TEST_SEED_TIMEOUT_MS)) return true;
+        }
+        return false;
+    }
 
     // ========================================================================
     // 跨池搜索
