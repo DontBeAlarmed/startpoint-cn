@@ -271,9 +271,19 @@ export class SeedValidator {
             }
         }
 
-        // 测试种子优先于 forceAnimation 过滤
+        // 测试种子：forceAnimation ON 时跳过低动画触发率的种子
         const ts = this.testSeeds[ri];
-        if (ts !== null) return ts;
+        if (ts !== null) {
+            if (this.forceAnimation) {
+                const sim = new GachaSimulator(ts);
+                if (sim.getPlayProbability() >= 0.8995) {
+                    return ts;
+                }
+                console.log(`[SEED] Test seed ${ts} playProbability < 0.9, skipping (forceAnimation ON)`);
+            } else {
+                return ts;
+            }
+        }
 
         // 强制动画过滤（所有模式生效，采样前500个满足条件的种子）
         let effectivePool = pool;
