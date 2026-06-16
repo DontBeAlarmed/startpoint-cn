@@ -300,14 +300,7 @@ export class SeedValidator {
             });
             if (same.length > 0) return same[Math.floor(Math.random() * same.length)];
 
-            // ③ 复用（任意非冷血 purified, 已确认安全）
-            const any = effectivePool.filter(s => {
-                const e = this.purified.get(s);
-                return e && e.tag !== '冷血躲避球';
-            });
-            if (any.length > 0) return any[Math.floor(Math.random() * any.length)];
-
-            console.log(`[SEED] No available purified for ★${rarity}, this should not happen`);
+            console.log(`[SEED] No purified ★${rarity} seeds, check Web page`);
         }
 
         // 测试池：UNKNOWN > PENDING·N > VERIFIED > PURIFIED

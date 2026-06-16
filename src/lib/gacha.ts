@@ -151,7 +151,7 @@ export function rewardPlayerGachaDrawResultSync(
                     const basePool = seedPool.length > 0 ? seedPool : fallbackPool
                     // Inject cross-pool purified seeds (SIM may classify seed in wrong pool)
                     const purifiedSeeds = seedValidator.getPurifiedForRarity(rarity)
-                    const pool = Array.from(new Set([...basePool, ...purifiedSeeds]))
+                    const pool = Array.from(new Set([...purifiedSeeds, ...basePool]))
                     // Use seed validator with pool mode support
                     const seed = pool.length > 0
                         ? seedValidator.getSeed(rarity, pool, characterId)
