@@ -1,14 +1,14 @@
 /**
- * Seed Validator — 抽卡种子自动验证 + 惊险净化系统 + Tag + 测试种子
+ * Seed Validator — 抽卡种子自动验证 + 惊险净化 + Tag + 测试种子 + 动画强制
  *
- * Tags: 热血躲避球 / 普通躲避球 / 冷血躲避球
- * 冷血 = 从池中排除
- *
- * 持久化格式自动迁移: {seed: rarity} → {seed: {r, tag}}
+ * Tags: 未测试 / 热血躲避球 / 普通躲避球 / 冷血躲避球
+ * 冷血 = 从池中排除。新 purified 默认为 未测试。
+ * 测试种子 10 分钟超时自动清除。
  */
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
+import { GachaSimulator } from "./gacha-physics";
 
 const ASSETS_DIR = join(__dirname, "..", "..", "assets");
 const BLOCKED_FILE = join(ASSETS_DIR, "blocked_seeds.json");
@@ -23,9 +23,11 @@ const VERIFY_THRESHOLD = 10;
 
 export type PoolMode = 'unknown' | 'purified';
 export type TestPriority = 'all' | '3' | '4' | '5';
-export type SeedTag = '热血躲避球' | '普通躲避球' | '冷血躲避球';
+export type SeedTag = '未测试' | '热血躲避球' | '普通躲避球' | '冷血躲避球';
 
 interface PurifiedEntry { r: number; tag: SeedTag }
+
+const TEST_SEED_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 export class SeedValidator {
     private blocked: Set<number> = new Set();
@@ -33,7 +35,9 @@ export class SeedValidator {
     private sendCount: Map<number, number> = new Map();
     private purified: Map<number, PurifiedEntry> = new Map();
     private deviceData: Map<number, { ballRarity: number; charRarity: number }> = new Map();
-    private testSeeds: (number | null)[] = [null, null, null]; // ★3, ★4, ★5
+    private testSeeds: (number | null)[] = [null, null, null];
+    private testSeedTimestamps: (number | null)[] = [null, null, null];
+    private forceAnimation: boolean = false; // ★3, ★4, ★5
 
     private mode: PoolMode = 'unknown';
     private priority: TestPriority = 'all';
@@ -50,8 +54,8 @@ export class SeedValidator {
         try { if (existsSync(PENDING_FILE)) { const o = JSON.parse(readFileSync(PENDING_FILE,"utf-8")); for (const [k,v] of Object.entries(o)) this.sendCount.set(Number(k), v as number); console.log(`[SEED] Pending: ${this.sendCount.size}`); } } catch (e) { console.error(`[SEED] pending:`, (e as Error).message); }
         try { if (existsSync(PURIFIED_FILE)) { this.loadPurified(); } } catch (e) { console.error(`[SEED] purified:`, (e as Error).message); }
         try { if (existsSync(DEVICE_FILE)) { const o = JSON.parse(readFileSync(DEVICE_FILE,"utf-8")); for (const [k,v] of Object.entries(o)) this.deviceData.set(Number(k), {ballRarity: v as number, charRarity: 0}); console.log(`[SEED] Device data: ${this.deviceData.size}`); } } catch (e) { console.error(`[SEED] device:`, (e as Error).message); }
-        try { if (existsSync(CONFIG_FILE)) { const c = JSON.parse(readFileSync(CONFIG_FILE,"utf-8")); if (c.mode) this.mode=c.mode; if (c.priority) this.priority=c.priority; console.log(`[SEED] Mode: ${this.mode} Priority: ${this.priority}`); } } catch (e) { console.error(`[SEED] config:`, (e as Error).message); }
-        try { if (existsSync(TEST_SEEDS_FILE)) { const a = JSON.parse(readFileSync(TEST_SEEDS_FILE,"utf-8")); if (Array.isArray(a)) this.testSeeds = a; console.log(`[SEED] Test seeds: ★3=${this.testSeeds[0]} ★4=${this.testSeeds[1]} ★5=${this.testSeeds[2]}`); } } catch (e) { console.error(`[SEED] testSeeds:`, (e as Error).message); }
+        try { if (existsSync(CONFIG_FILE)) { const c = JSON.parse(readFileSync(CONFIG_FILE,"utf-8")); if (c.mode) this.mode=c.mode; if (c.priority) this.priority=c.priority; if (c.forceAnimation !== undefined) this.forceAnimation=c.forceAnimation; console.log(`[SEED] Mode: ${this.mode} Priority: ${this.priority} ForceAnim: ${this.forceAnimation}`); } } catch (e) { console.error(`[SEED] config:`, (e as Error).message); }
+        try { if (existsSync(TEST_SEEDS_FILE)) { const a = JSON.parse(readFileSync(TEST_SEEDS_FILE,"utf-8")); if (Array.isArray(a)) this.testSeeds = a.slice(0,3); if (a.length > 3 && Array.isArray(a[3])) this.testSeedTimestamps = a[3]; console.log(`[SEED] Test seeds: ${this.testSeeds} ts:${this.testSeedTimestamps}`); } } catch (e) { console.error(`[SEED] testSeeds:`, (e as Error).message); }
     }
 
     /** 加载 purified，自动迁移旧格式 {seed: rarity} → {seed: {r, tag}} */
@@ -60,10 +64,10 @@ export class SeedValidator {
         let migrated = false;
         for (const [k, v] of Object.entries(obj)) {
             if (typeof v === 'number') {
-                this.purified.set(Number(k), { r: v, tag: '普通躲避球' });
+                this.purified.set(Number(k), { r: v, tag: '未测试' });
                 migrated = true;
             } else if (typeof v === 'object' && v !== null) {
-                this.purified.set(Number(k), { r: (v as any).r ?? 0, tag: (v as any).tag || '普通躲避球' });
+                this.purified.set(Number(k), { r: (v as any).r ?? 0, tag: (v as any).tag || '未测试' });
             }
         }
         if (migrated) { this.savePurified(); console.log('[SEED] Migrated purified to new format'); }
@@ -80,8 +84,8 @@ export class SeedValidator {
     private saveVerified(): void { writeFileSync(VERIFIED_FILE, JSON.stringify(Array.from(this.verified).sort((a,b)=>a-b), null, 2), "utf-8"); }
     private savePending(): void { writeFileSync(PENDING_FILE, JSON.stringify(Object.fromEntries(this.sendCount), null, 2), "utf-8"); }
     private saveDeviceData(): void { writeFileSync(DEVICE_FILE, JSON.stringify(Object.fromEntries(Array.from(this.deviceData.entries()).map(([k,v])=>[k,v.ballRarity])), null, 2), "utf-8"); }
-    private saveConfig(): void { writeFileSync(CONFIG_FILE, JSON.stringify({mode:this.mode, priority:this.priority}, null, 2), "utf-8"); }
-    private saveTestSeeds(): void { writeFileSync(TEST_SEEDS_FILE, JSON.stringify(this.testSeeds, null, 2), "utf-8"); }
+    private saveConfig(): void { writeFileSync(CONFIG_FILE, JSON.stringify({mode:this.mode, priority:this.priority, forceAnimation:this.forceAnimation}, null, 2), "utf-8"); }
+    private saveTestSeeds(): void { writeFileSync(TEST_SEEDS_FILE, JSON.stringify([...this.testSeeds, this.testSeedTimestamps], null, 2), "utf-8"); }
 
     // ========================================================================
     // C3032 回调
@@ -107,10 +111,10 @@ export class SeedValidator {
         for (const seed of this.blocked) {
             const dd = this.deviceData.get(seed);
             if (dd) {
-                this.purified.set(seed, { r: dd.ballRarity - 3, tag: '普通躲避球' });
+                this.purified.set(seed, { r: dd.ballRarity - 3, tag: '未测试' });
                 toDelete.push(seed);
                 count++;
-                console.log(`[SEED] PURIFIED seed ${seed}: ★${dd.ballRarity} (普通躲避球)`);
+                console.log(`[SEED] PURIFIED seed ${seed}: ★${dd.ballRarity} (未测试)`);
             }
         }
         for (const s of toDelete) this.blocked.delete(s);
@@ -157,12 +161,13 @@ export class SeedValidator {
     // 测试种子
     // ========================================================================
 
-    /** 设置某个稀有度的测试种子（检查非冷血） */
+    /** 设置某个稀有度的测试种子（热血/普通 tag 才能设为测试） */
     setTestSeed(rarity: 3|4|5, seed: number): boolean {
         const entry = this.purified.get(seed);
         if (!entry || entry.tag === '冷血躲避球') return false;
         if (entry.r !== rarity - 3) return false;
         this.testSeeds[rarity - 3] = seed;
+        this.testSeedTimestamps[rarity - 3] = Date.now();
         this.saveTestSeeds();
         return true;
     }
@@ -171,6 +176,7 @@ export class SeedValidator {
     clearTestSeed(rarity: 3|4|5): boolean {
         if (this.testSeeds[rarity - 3] === null) return false;
         this.testSeeds[rarity - 3] = null;
+        this.testSeedTimestamps[rarity - 3] = null;
         this.saveTestSeeds();
         return true;
     }
@@ -185,6 +191,8 @@ export class SeedValidator {
     getPriority(): TestPriority { return this.priority; }
     setMode(mode: PoolMode): void { this.mode = mode; this.saveConfig(); console.log(`[SEED] Mode → ${mode}`); }
     setPriority(priority: TestPriority): void { this.priority = priority; this.saveConfig(); console.log(`[SEED] Priority → ${priority}`); }
+    setForceAnimation(v: boolean): void { this.forceAnimation = v; this.saveConfig(); console.log(`[SEED] ForceAnimation → ${v}`); }
+    getForceAnimation(): boolean { return this.forceAnimation; }
 
     // ========================================================================
     // 跨池搜索
@@ -206,8 +214,19 @@ export class SeedValidator {
     getSeed(rarity: number, pool: number[], characterId: number): number {
         const ri = rarity - 3;
 
+        // 惰性清理过期 testSeeds
+        const now = Date.now();
+        for (let i = 0; i < 3; i++) {
+            const ts = this.testSeedTimestamps[i];
+            if (ts && now - ts > TEST_SEED_TIMEOUT_MS) {
+                this.testSeeds[i] = null;
+                this.testSeedTimestamps[i] = null;
+                console.log(`[SEED] Test seed ★${i+3} expired (10min timeout)`);
+            }
+        }
+
         if (this.mode === 'purified') {
-            // ① 测试种子（同稀有度）
+            // ① 测试种子（同稀有度，未过期）
             const ts = this.testSeeds[ri];
             if (ts !== null) return ts;
 
@@ -225,25 +244,35 @@ export class SeedValidator {
             });
             if (any.length > 0) return any[Math.floor(Math.random() * any.length)];
 
-            // ④ 不降级！该稀有度无可用 purified
             console.log(`[SEED] No available purified for ★${rarity}, this should not happen`);
         }
 
+        // 测试池：动画强制过滤
+        let effectivePool = pool;
+        if (this.forceAnimation && this.mode === 'unknown') {
+            effectivePool = pool.filter(s => {
+                const sim = new GachaSimulator(s);
+                const pp = sim.getPlayProbability();
+                return pp >= 0.9; // playMovie threshold
+            });
+            if (effectivePool.length === 0) effectivePool = pool; // fallback
+        }
+
         // 测试池：UNKNOWN > PENDING·N > VERIFIED > PURIFIED
-        const unknown = pool.filter(s =>
+        const unknown = effectivePool.filter(s =>
             !this.blocked.has(s) && !this.verified.has(s) && !this.sendCount.has(s) && !this.purified.has(s)
         );
         if (unknown.length > 0) return unknown[Math.floor(Math.random() * unknown.length)];
 
         for (let tc = 1; tc < VERIFY_THRESHOLD; tc++) {
-            const pending = pool.filter(s => this.sendCount.get(s) === tc);
+            const pending = effectivePool.filter(s => this.sendCount.get(s) === tc);
             if (pending.length > 0) return pending[Math.floor(Math.random() * pending.length)];
         }
 
-        const ver = pool.filter(s => this.verified.has(s));
+        const ver = effectivePool.filter(s => this.verified.has(s));
         if (ver.length > 0) return ver[Math.floor(Math.random() * ver.length)];
 
-        const pur = pool.filter(s => {
+        const pur = effectivePool.filter(s => {
             const e = this.purified.get(s);
             return e && e.r === ri && e.tag !== '冷血躲避球';
         });
@@ -269,6 +298,7 @@ export class SeedValidator {
             purified_total: this.purified.size,
             test_seeds: this.testSeeds,
             mode: this.mode, priority: this.priority,
+            forceAnimation: this.forceAnimation,
         };
     }
 

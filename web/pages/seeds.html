@@ -11,7 +11,7 @@
         .unk{color:#6e7681} .p1{color:#d29922} .ok{color:#3fb950} .pur{color:#a371f7}
         .progress { height: 8px; background: var(--color-surface-container-high); border-radius: 4px; overflow: hidden; max-width: 500px; margin: 0.5rem 0; }
         .progress div { height: 100%; float: left; transition: width 0.5s; }
-        .bar-ok{background:#3fb950} .bar-p1{background:#d29922} .bar-unk{background:#6e7681}
+        .bar-ok{background:#d29922} .bar-p1{background:#d29922} .bar-unk{background:#6e7681}
         .mode-btn { padding: 0.5rem 1rem; border-radius: 2rem; border: 1px solid var(--color-outline-variant); cursor: pointer; font-size: 0.9rem; background: transparent; color: var(--color-on-surface); }
         .mode-btn.active { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); font-weight: bold; }
         .prio-btn { padding: 0.25rem 0.75rem; border-radius: 1rem; border: 1px solid var(--color-outline-variant); cursor: pointer; font-size: 0.8rem; background: transparent; color: var(--color-on-surface); }
@@ -21,15 +21,18 @@
         .seed-row { padding: 0.25rem 0; border-bottom: 1px solid var(--color-outline-variant); font-size: 0.8rem; display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
         .seed-row.cold { opacity: 0.4; text-decoration: line-through; }
         .tag-btn { padding: 0.1rem 0.4rem; border-radius: 0.75rem; border: 1px solid var(--color-outline-variant); cursor: pointer; font-size: 0.7rem; background: transparent; color: var(--color-on-surface); }
-        .tag-btn.active-hot { background: #f85149; color: #fff; border-color: #f85149; }
-        .tag-btn.active-normal { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); }
-        .tag-btn.active-cold { background: #6e7681; color: #fff; border-color: #6e7681; }
+        .tag-btn.active-0 { background: #6e7681; color: #fff; border-color: #6e7681; }
+        .tag-btn.active-1 { background: #f85149; color: #fff; border-color: #f85149; }
+        .tag-btn.active-2 { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); }
+        .tag-btn.active-3 { background: #6e7681; color: #fff; border-color: #6e7681; }
         .test-btn { padding: 0.1rem 0.5rem; border-radius: 0.75rem; border: 1px solid var(--color-outline-variant); cursor: pointer; font-size: 0.7rem; background: transparent; color: var(--color-on-surface); }
         .test-btn.active { background: #a371f7; color: #fff; border-color: #a371f7; }
         .test-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.5rem 0; font-size: 0.85rem; }
         .test-bar .clear { cursor: pointer; color: #f85149; font-size: 0.8rem; }
         .col3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
         @media(max-width:900px){.col3{grid-template-columns:1fr}}
+        .anim-toggle { display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; font-size: 0.8rem; color: var(--color-on-surface-variant); }
+        .anim-toggle input { margin: 0; }
     </style>
 </head>
 <body class="bg-background text-on-surface relative mt-16 m-auto max-w-screen-2xl min-h-screen box-border flex flex-col items-start px-3 pb-3">
@@ -45,7 +48,6 @@
             <h1 class="text-4xl font-bold text-on-background">种子验证器</h1>
             <button class="refresh-btn" onclick="load()">刷新</button>
 
-            <!-- Mode -->
             <div class="flex flex-wrap gap-3 items-center">
                 <span class="text-sm text-on-surface-variant">模式:</span>
                 <button id="btnUnknown" class="mode-btn active" onclick="setMode('unknown')">测试池</button>
@@ -62,6 +64,10 @@
                     <button id="prio4" class="prio-btn" onclick="setPrio('4')">★4</button>
                     <button id="prio3" class="prio-btn" onclick="setPrio('3')">★3</button>
                 </div>
+                <label class="anim-toggle mb-2" id="animLabel">
+                    <input type="checkbox" id="animCheck" onchange="toggleAnim(this.checked)">
+                    强制动画触发（100%，仅测试池）
+                </label>
                 <div class="progress"><div class="bar-ok" id="barOk" style="width:0"></div><div class="bar-p1" id="barP1" style="width:0"></div><div class="bar-unk" id="barUnk" style="width:0"></div></div>
                 <div id="testStats"></div><p id="testSummary" class="text-xs text-on-surface-variant mt-1"></p>
             </div>
@@ -69,14 +75,8 @@
             <!-- Purified Pool -->
             <div class="card" id="purifiedSection">
                 <h2 class="text-lg font-semibold text-on-surface-variant mb-2">惊险池</h2>
-
-                <!-- Stats -->
                 <div id="purifiedCards" class="flex flex-wrap gap-3 mb-3"></div>
-
-                <!-- Test seed bar -->
                 <div id="testBar" class="test-bar mb-3"></div>
-
-                <!-- Three-column list -->
                 <div class="col3" id="purifiedColumns">
                     <div><h3 class="text-sm font-semibold mb-1" style="color:#f85149">★3 惊险 <span id="col3Count">(0)</span></h3><div id="col3"></div></div>
                     <div><h3 class="text-sm font-semibold mb-1" style="color:#d29922">★4 惊险 <span id="col4Count">(0)</span></h3><div id="col4"></div></div>
@@ -89,35 +89,24 @@
     function fmt(n) { return n.toLocaleString(); }
     async function setMode(m) { await fetch('/api/seeds/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:m})});load(); }
     async function setPrio(p) { await fetch('/api/seeds/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priority:p})});load(); }
+    async function toggleAnim(v) { await fetch('/api/seeds/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forceAnimation:v})});load(); }
+    async function setTag(seed,tag) { await fetch('/api/seeds/tag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed,tag})});load(); }
+    async function setTestSeed(seed,rarity) { await fetch('/api/seeds/test-seed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed,rarity})});load(); }
+    async function clearTestSeed(rarity) { await fetch('/api/seeds/test-seed',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({rarity})});load(); }
 
-    async function setTag(seed, tag) {
-        await fetch('/api/seeds/tag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed,tag})});
-        load();
-    }
-
-    async function setTestSeed(seed, rarity) {
-        await fetch('/api/seeds/test-seed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed,rarity})});
-        load();
-    }
-
-    async function clearTestSeed(rarity) {
-        await fetch('/api/seeds/test-seed',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({rarity})});
-        load();
-    }
-
-    function tagName(t) { return { '热血躲避球': '热血', '普通躲避球': '普通', '冷血躲避球': '冷血' }[t] || t; }
-    function tagClass(t) { return { '热血躲避球': 'active-hot', '普通躲避球': 'active-normal', '冷血躲避球': 'active-cold' }[t] || ''; }
+    const TAG_NAMES = {'未测试':'未','热血躲避球':'热','普通躲避球':'普','冷血躲避球':'冷'};
+    const TAG_KEYS = ['未测试','热血躲避球','普通躲避球','冷血躲避球'];
+    const TAG_CLASSES = ['active-0','active-1','active-2','active-3'];
 
     function renderSeedRow(p, rarity, isTestSeed) {
-        const tag = p.tag || '普通躲避球';
-        const cold = tag === '冷血躲避球';
+        const tag = p.tag||'未测试';
+        const cold = tag==='冷血躲避球';
+        const canTest = !cold && tag!=='未测试';
         return `<div class="seed-row${cold?' cold':''}">
             <span class="${cold?'':'pur'}" style="width:70px">${p.seed}</span>
-            <span class="text-on-surface-variant" style="font-size:0.7rem;width:32px">${tagName(tag)}</span>
-            <button class="tag-btn ${tagClass('热血躲避球')}" onclick="setTag(${p.seed},'热血躲避球')">热</button>
-            <button class="tag-btn ${tagClass('普通躲避球')}" onclick="setTag(${p.seed},'普通躲避球')">普</button>
-            <button class="tag-btn ${tagClass('冷血躲避球')}" onclick="setTag(${p.seed},'冷血躲避球')">冷</button>
-            <button class="test-btn ${isTestSeed?'active':''}" onclick="setTestSeed(${p.seed},${rarity})" ${cold?'disabled':''}>★${rarity}测试</button>
+            <span class="text-on-surface-variant" style="font-size:0.7rem;width:16px">${TAG_NAMES[tag]}</span>
+            ${TAG_KEYS.map((t,i)=>`<button class="tag-btn ${tag===t?TAG_CLASSES[i]:''}" onclick="setTag(${p.seed},'${t}')">${TAG_NAMES[t]}</button>`).join('')}
+            <button class="test-btn ${isTestSeed?'active':''}" onclick="setTestSeed(${p.seed},${rarity})" ${canTest?'':'disabled'}>★${rarity}测试</button>
         </div>`;
     }
 
@@ -130,13 +119,17 @@
         document.getElementById('btnPurified').className = 'mode-btn'+(s.mode==='purified'?' active':'');
 
         // Priority
-        ['All','5','4','3'].forEach(p => { const el=document.getElementById('prio'+p); if(el)el.className='prio-btn'+(s.priority===p.toLowerCase()?' active':''); });
+        ['All','5','4','3'].forEach(p=>{const el=document.getElementById('prio'+p);if(el)el.className='prio-btn'+(s.priority===p.toLowerCase()?' active':'');});
+
+        // Animation toggle
+        document.getElementById('animCheck').checked = s.forceAnimation;
+        document.getElementById('animLabel').style.display = s.mode==='unknown'?'':'none';
 
         // Test pool
         document.getElementById('testStats').innerHTML = `
             <span class="stat"><span class="label unk">UNKNOWN</span><br><span class="value unk">${fmt(s.unknown)}</span></span>
             <span class="stat"><span class="label p1">PENDING</span><br><span class="value p1">${fmt(s.pending)}</span></span>
-            <span class="stat"><span class="label ok">VERIFIED</span><br><span class="value ok">${fmt(s.verified)}</span></span>
+            <span class="stat"><span class="label ok">已测×10</span><br><span class="value ok">${fmt(s.verified)}</span></span>
         `;
         document.getElementById('testSummary').textContent = `安全率 ${s.accuracy}% | 已测 ${fmt(s.tested)} | 覆盖率 ${s.coverage}%`;
         const t = s.total;
@@ -153,19 +146,22 @@
             <span class="text-sm text-on-surface-variant self-center">共 <b class="pur">${total}</b> 个</span>
         ` : `<span class="text-sm text-on-surface-variant">暂无惊险种子</span>`;
 
-        // Test seed bar
+        // Test seed bar with tag buttons
         const tsArr = s.test_seeds || [null,null,null];
         const purified = data.purified || [];
         const purifyMap = {};
-        purified.forEach(p => purifyMap[p.seed] = p);
+        purified.forEach(p=>purifyMap[p.seed]=p);
 
         let tsHtml = '<span class="text-sm text-on-surface-variant">测试种子:</span> ';
-        [3,4,5].forEach(r => {
+        [3,4,5].forEach(r=>{
             const ts = tsArr[r-3];
-            const tag = ts && purifyMap[ts] ? purifyMap[ts].tag : '普通躲避球';
+            const entry = ts && purifyMap[ts] ? purifyMap[ts] : null;
+            const tag = entry ? entry.tag : '未测试';
             tsHtml += `★${r}=`;
             if (ts) {
-                tsHtml += `<span class="pur">seed:${ts}</span> <span style="color:#888;font-size:0.7rem">${tagName(tag)}</span> <span class="clear" onclick="clearTestSeed(${r})">✕</span> `;
+                tsHtml += `<span class="pur">seed:${ts}</span> <span style="color:#888;font-size:0.7rem">[${TAG_NAMES[tag]}]</span> `;
+                TAG_KEYS.forEach((t,i)=>tsHtml+=`<button class="tag-btn ${tag===t?TAG_CLASSES[i]:''}" onclick="setTag(${ts},'${t}')" style="font-size:0.65rem;padding:0 0.3rem">${TAG_NAMES[t]}</button>`);
+                tsHtml += ` <span class="clear" onclick="clearTestSeed(${r})">✕</span> `;
             } else {
                 tsHtml += `[无] `;
             }
@@ -173,15 +169,14 @@
         document.getElementById('testBar').innerHTML = tsHtml;
 
         // Three columns
-        for (const r of [3,4,5]) {
-            const items = purified.filter(p => p.rarity === r);
-            document.getElementById('col'+r+'Count').textContent = `(${items.length})`;
-            document.getElementById('col'+r).innerHTML = items.length > 0
-                ? items.map(p => renderSeedRow(p, r, tsArr[r-3] === p.seed)).join('')
+        for(const r of [3,4,5]) {
+            const items = purified.filter(p=>p.rarity===r);
+            document.getElementById('col'+r+'Count').textContent=`(${items.length})`;
+            document.getElementById('col'+r).innerHTML = items.length>0
+                ? items.map(p=>renderSeedRow(p, r, tsArr[r-3]===p.seed)).join('')
                 : '<div class="text-xs text-on-surface-variant" style="padding:0.25rem 0">暂无</div>';
         }
     }
-
     load();
     </script>
 </body>
