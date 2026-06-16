@@ -17,7 +17,7 @@
 import * as net from "net";
 import { MultiRoom } from "../lib/types";
 import { disbandRoom } from "./multiRoom";
-import { getSession, getAccountPlayers, getPlayerSync, getPlayerPartyGroupListSync, getPlayerCharacterSync, getPlayerEquipmentSync } from "./wdfpData";
+import { getSession, getAccountPlayers, getPlayerSync, getPlayerPartyGroupListSync, getPlayerCharacterSync, getPlayerCharacterManaNodesSync, getPlayerEquipmentSync } from "./wdfpData";
 import { PartyCategory, PlayerParty, PlayerCharacter, PlayerEquipment } from "./types";
 import playerRankTable from "../../../wf-assets-cn/orderedmap/player/player_rank.json";
 
@@ -441,8 +441,7 @@ function buildRealParty(playerId: number, party: PlayerParty): any {
         if (!charId) return [1]  // Option None
         const dbChar = getPlayerCharacterSync(playerId, charId)
         if (!dbChar) return [1]
-        // mana nodes: intentionally empty — CN client GeneralManaNodeLogic CDN lookup incompatible
-        const manaNodeIds: number[] = []
+        const manaNodeIds = getPlayerCharacterManaNodesSync(playerId, charId)
         // ex boost from DB
         let exBoost: any = [1]
         if (dbChar.exBoost && dbChar.exBoost.abilityIdList && dbChar.exBoost.abilityIdList.length > 0) {
