@@ -46,7 +46,6 @@ import historyApiPlugin from "./routes/api/history";
 import comicApiPlugin from "./routes/api/comic";
 import questUnlockApiPlugin from "./routes/api/questUnlock";
 import { startSessionServer } from "./data/sessionServer";
-import { getDisplayHost } from "./data/multiRoom";
 
 const fastify = Fastify({
     logger: {
@@ -274,6 +273,5 @@ fastify.listen({ port, host }, (err, address) => {
     if (purified > 0) console.log(`[SEED] Startup: purified ${purified} seeds`);
 
     // Start multi battle TCP session server
-    console.log(`[MULTI] TCP display host: ${getDisplayHost()}:${parseInt(process.env.SESSION_PORT || "8003")}`);
     startSessionServer();
 });

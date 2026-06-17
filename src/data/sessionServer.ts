@@ -441,7 +441,7 @@ function buildRealParty(playerId: number, party: PlayerParty): any {
         if (!charId) return [1]  // Option None
         const dbChar = getPlayerCharacterSync(playerId, charId)
         if (!dbChar) return [1]
-        // TEST: empty mana nodes to verify C8601 goes away
+        // mana_node_ids must stay empty — CN client ManaNodeTable lookup crashes (C8601 key=0) in multi-battle
         const manaNodeIds: number[] = []
         // ex boost from DB
         let exBoost: any = [1]

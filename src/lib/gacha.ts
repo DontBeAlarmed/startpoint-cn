@@ -4,8 +4,6 @@
  */
 
 import { randomInt } from "crypto";
-import movieSeeds from "../../assets/gacha_movie_seeds.json";
-import rateUpMovieSeeds from "../../assets/gacha_rate_up_movie_seeds.json";
 import seedValidator from "./seed-validator";
 import { PlayerBoxGachaDrawnReward } from "../data/types";
 import { givePlayerCharacterSync } from "./character";
@@ -13,6 +11,20 @@ import { givePlayerEquipmentSync } from "./equipment";
 import { givePlayerRewardsSync } from "./quest";
 import { getCharacterDataSync } from "./assets";
 import { BoxGachaBox, BoxGachaDrawResult, BoxGachaIdReward, BoxGachaRewardTier, BoxGachaRewardType, CharacterGacha, CharacterReward, CurrencyReward, EquipmentItemReward, Gacha, GachaCharacterDraw, GachaDrawResult, GachaDraws, GachaMovieSeeds, GachaMovieType, GachaType, PlayerRewardResult, Reward, RewardPlayerGachaDrawResult, RewardType } from "./types";
+
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
+
+const ASSETS_DIR = join(__dirname, "..", "..", "assets");
+
+/** Load movie-specific seed pool, fall back to default pool. */
+function loadMovieSeeds(movieId: string): any {
+    const specific = join(ASSETS_DIR, `gacha_movie_seeds_${movieId}.json`);
+    if (existsSync(specific)) return JSON.parse(readFileSync(specific, "utf-8"));
+    const fallback = join(ASSETS_DIR, "gacha_movie_seeds.json");
+    if (existsSync(fallback)) return JSON.parse(readFileSync(fallback, "utf-8"));
+    return {};
+}
 
 const characterGachaRankRates = {
     normal: [
@@ -144,8 +156,10 @@ export function rewardPlayerGachaDrawResultSync(
                     const movieType = randomPoolItem(1, 101, rankMovieRates[rarityIndex])
                         ?? GachaMovieType.NORMAL
 
+                    // Load movie-specific seed pool (e.g., gacha_movie_seeds_fes.json)
                     // seed pool key: "1"=★5, "2"=★4, "3"=★3
                     const seedKey = String(6 - rarity)
+                    const movieSeeds = loadMovieSeeds(characterGacha.movieName || "normal")
                     const seedPool: number[] = (movieSeeds as any)[seedKey]?.[String(movieType)] || []
                     const fallbackPool: number[] = (movieSeeds as any)[seedKey]?.["0"] || []
                     const basePool = seedPool.length > 0 ? seedPool : fallbackPool
@@ -163,6 +177,8 @@ export function rewardPlayerGachaDrawResultSync(
                     const movieName = movieType === GachaMovieType.GUARANTEE
                         ? (characterGacha.guaranteeMovieName || characterGacha.movieName)
                         : (characterGacha.movieName || "normal")
+
+                    console.log(`[GACHA] rarity=${rarity}★ seed=${seed} movie=${movieName} charId=${characterId}`)
 
                     const draw: GachaCharacterDraw = {
                         "character_id": characterId,

@@ -19,7 +19,8 @@ interface CnLoadBody {
 }
 
 function wrapOptionFields(d: any, resVer?: string) {
-    d.available_asset_version = resVer ?? "1.4.0";
+    // Align with CN CDN version from client res_ver header, fallback to .env CN_RES_VERSION
+    d.available_asset_version = resVer || process.env.CN_RES_VERSION || "1.4.54";
 
     if (d.user_info) {
         if (typeof d.user_info.last_login_time === 'number') {
@@ -111,6 +112,7 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         const resVer = request.headers['res_ver'] as string | undefined;
+        console.log(`[CN-LOAD] res_ver=${resVer || '(not sent)'} account=${accountId}`);
         wrapOptionFields(clientData, resVer);
 
         reply.header("content-type", "application/x-msgpack");

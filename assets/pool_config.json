@@ -1,5 +1,4 @@
 {
-  "mode": "unknown",
-  "priority": "3",
-  "forceAnimation": true
+  "mode": "purified",
+  "priority": "all"
 }

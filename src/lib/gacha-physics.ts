@@ -274,6 +274,33 @@ export const CN_GACHA_PHYSICS_CONFIG: Omit<GachaPhysicsConfig, 'seed'> = {
     },
 };
 
+/**
+ * Movie-specific config overrides for different gacha animation types.
+ * Extracted from CN CDN AMF3 files.
+ */
+export const MOVIE_CONFIGS: Record<string, Partial<Omit<GachaPhysicsConfig, 'seed'>>> = {
+    normal: {
+        amulet: { totalCount: 5 },
+        threshold: { ballStar4: 0.7582740783691406, amuletTwoUp: 0.8148193359375, playMovie: 0.8995208740234375, amulets: CN_GACHA_PHYSICS_CONFIG.threshold.amulets },
+    },
+    fes: {
+        amulet: { totalCount: 7 },
+        threshold: { ballStar4: 0.7429313659667969, amuletTwoUp: 0.475677490234375, playMovie: 0.8994979858398438, amulets: CN_GACHA_PHYSICS_CONFIG.threshold.amulets },
+    },
+    normal_guarantee: {
+        amulet: { totalCount: 5 },
+        threshold: { ballStar4: 3.8e-05, amuletTwoUp: 0.5, playMovie: 0.9299392700195312, amulets: CN_GACHA_PHYSICS_CONFIG.threshold.amulets },
+    },
+    fes_guarantee: {
+        amulet: { totalCount: 7 },
+        threshold: { ballStar4: 3.8e-05, amuletTwoUp: 0.5, playMovie: 0.8994979858398438, amulets: CN_GACHA_PHYSICS_CONFIG.threshold.amulets },
+    },
+    rarity_5_guarantee: {
+        amulet: { totalCount: 5 },
+        threshold: { ballStar4: CN_GACHA_PHYSICS_CONFIG.threshold.ballStar4, amuletTwoUp: CN_GACHA_PHYSICS_CONFIG.threshold.amuletTwoUp, playMovie: CN_GACHA_PHYSICS_CONFIG.threshold.playMovie, amulets: CN_GACHA_PHYSICS_CONFIG.threshold.amulets },
+    },
+};
+
 // ============================================================================
 // Gacha Physics Simulator
 // ============================================================================
@@ -703,6 +730,17 @@ export class GachaSimulator {
         }
 
         return this.ballRarity;
+    }
+
+    /**
+     * Get play probability without running the physics step loop.
+     * Runs initField() (RNG only), then returns playProbability.
+     * Used to pre-filter seeds that will trigger the movie animation.
+     * playProbability >= playMovie(0.8995) → movie plays.
+     */
+    getPlayProbability(): number {
+        this.initField();
+        return this.playProbability;
     }
 }
 
