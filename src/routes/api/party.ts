@@ -16,6 +16,8 @@ interface PartyInfoListItem {
     options: {
         allow_other_players_to_heal_me: boolean
     }
+    current_battle_power?: number
+    before_battle_power?: number
 }
 
 interface EditBody {
@@ -428,7 +430,14 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No players bound to account."
         })
 
-        // update main party id if required
+        // parse global PartyId: (groupIndex * 10 + slot), groupIndex 0-based
+        const parsePartyId = (partyId: number) => {
+            const gIdx = Math.floor((partyId - 1) / 10)
+            const s = ((partyId - 1) % 10) + 1
+            return { groupIndex: gIdx, groupId: gIdx + 1, slot: s }
+        }
+
+        // store full global PartyId so /load returns the correct group+slot combo
         if (player.partySlot !== body.main_party_id) {
             updatePlayerSync({
                 id: playerId,
@@ -466,9 +475,10 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         for (const updateInfo of body.party_info_list) {
+                const parsed = parsePartyId(updateInfo.party_id)
             updatePlayerPartySync(
                 playerId,
-                updateInfo.party_id,
+                parsed.slot,
                 {
                     name: updateInfo.party_name,
                     unisonCharacterIds: updateInfo.unison_character_ids.map(mapOwnedCharacters),
@@ -477,8 +487,11 @@ const routes = async (fastify: FastifyInstance) => {
                     abilitySoulIds: updateInfo.ability_soul_ids,
                     options: { allowOtherPlayersToHealMe: updateInfo.options.allow_other_players_to_heal_me },
                     edited: updateInfo.party_edited,
-                    category: updateInfo.party_category === 3 ? 4 : updateInfo.party_category
-                }
+                    category: updateInfo.party_category === 3 ? 4 : updateInfo.party_category,
+                    currentBattlePower: updateInfo.current_battle_power ?? 0,
+                    beforeBattlePower: updateInfo.before_battle_power ?? 0
+                },
+                parsed.groupId
             )
         }
 

@@ -78,11 +78,13 @@
 | F1047 forceAnimation 移除 | playProbability 由客户端 RNG 决定不可服务端控制，删除 filterPlayable/getPlayProbability/Web toggle |
 | F1048 MersenneTwister int32 修复 | `Math.imul` + `|0` 替代 `>>>0`，匹配 AS3 有符号 int32 溢出行为，精度从 0%→31.9% |
 | F1049 AMF3 解码器修复 | 空字符串不写入 string table，class name 用 `rbytes`，`getPurifiedForRarity` 跨池注入 |
-| F1050 种子池完全重置 | 清空 purified/verified/pending/blocked，干净状态从头测试，新种子池 ★3:19K ★4:60K ★5:121K |
-| ✅ 种子池 | 验证器等待设备反馈，当前精度 31.9%，28/32 错误为 SIM 高估（amulet 参数偏差 1-2 像素） |
+| F1050 种子池完全重置 | 清空 purified/verified/pending/blocked，干净状态从头测试 |
+| F1051 MoviePool 重构 | 每 movie_id 独立 MoviePool(purified/verified/pending)，testSeeds 全局跨 movie 生效，三卡池隔离 |
+| F1052 种子选取优先级 | testSeed(全局) > purified(同稀有度) > testPool(UNKNOWN/PENDING/VERIFIED)，删除跨稀有度兜底 |
+| F1053 gacha.ts movieId 修复 | `movieId` 计算提到 `loadMovieSeeds` 之前，GUARANTEE 抽卡正确加载对应池 |
+| F1054 多卡池种子池 | 5 个 movie_id 各独立过滤池 + CDN 阈值提取（normal/fes/fes_guarantee/normal_guarantee/rarity_5_guarantee） |
+| ✅ 种子池 | MoviePool 独立管理，testSeeds 全局不区分 movie，purified 按卡池隔离，零跨池污染 |
 | ⚠️ 复刻卡池 UP 标记 | 复刻版（col[0] 带 `_1`/`_2`）共享原版赔率含 `odds_up=true`，客户端可能不应展示 UP；待验证 |
-| ⚠️ AMF3 配置解码 | 护符参数已验证字段存在性，key 名偏移 1 位已手工纠正，barAmulet 5 参数确认，pin.radius 24 确认 |
-| ⚠️ MT19937 精度 | AS3 版有 624 次构造器 burn-in（非标准），仿真输出序列正确，31.9% 剩余误差在 amulet 参数 |
 
 ## C3212 修复详解
 

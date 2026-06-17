@@ -156,33 +156,34 @@ export function rewardPlayerGachaDrawResultSync(
                     const movieType = randomPoolItem(1, 101, rankMovieRates[rarityIndex])
                         ?? GachaMovieType.NORMAL
 
+                    // movieName determines which physics config the CLIENT uses
+                    const movieId = movieType === GachaMovieType.GUARANTEE
+                        ? (characterGacha.guaranteeMovieName || characterGacha.movieName || "normal")
+                        : (characterGacha.movieName || "normal")
+
                     // Load movie-specific seed pool (e.g., gacha_movie_seeds_fes.json)
                     // seed pool key: "1"=★5, "2"=★4, "3"=★3
                     const seedKey = String(6 - rarity)
-                    const movieSeeds = loadMovieSeeds(characterGacha.movieName || "normal")
+                    const movieSeeds = loadMovieSeeds(movieId)
                     const seedPool: number[] = (movieSeeds as any)[seedKey]?.[String(movieType)] || []
                     const fallbackPool: number[] = (movieSeeds as any)[seedKey]?.["0"] || []
                     const basePool = seedPool.length > 0 ? seedPool : fallbackPool
                     // Inject cross-pool purified seeds (SIM may classify seed in wrong pool)
-                    const purifiedSeeds = seedValidator.getPurifiedForRarity(rarity)
+                    const purifiedSeeds = seedValidator.getPurifiedForRarity(movieId, rarity)
                     const pool = Array.from(new Set([...purifiedSeeds, ...basePool]))
                     // Use seed validator with pool mode support
                     const seed = pool.length > 0
-                        ? seedValidator.getSeed(rarity, pool, characterId)
+                        ? seedValidator.getSeed(movieId, rarity, pool, characterId)
                         : characterId * 1000
 
                     // Mark seed as TESTING (pending verification)
-                    seedValidator.markSent(seed)
+                    seedValidator.markSent(movieId, seed)
 
-                    const movieName = movieType === GachaMovieType.GUARANTEE
-                        ? (characterGacha.guaranteeMovieName || characterGacha.movieName)
-                        : (characterGacha.movieName || "normal")
-
-                    console.log(`[GACHA] rarity=${rarity}★ seed=${seed} movie=${movieName} charId=${characterId}`)
+                    console.log(`[GACHA] rarity=${rarity}★ seed=${seed} movie=${movieId} charId=${characterId}`)
 
                     const draw: GachaCharacterDraw = {
                         "character_id": characterId,
-                        "movie_id": movieName,
+                        "movie_id": movieId,
                         "seed": seed,
                         "entry_count": 1
                     }

@@ -16,8 +16,8 @@
 
 import * as net from "net";
 import { MultiRoom } from "../lib/types";
-import { disbandRoom } from "./multiRoom";
-import { getSession, getAccountPlayers, getPlayerSync, getPlayerPartyGroupListSync, getPlayerCharacterSync, getPlayerCharacterManaNodesSync, getPlayerEquipmentSync } from "./wdfpData";
+import { disbandRoom, getRoom } from "./multiRoom";
+import { getSession, getAccountPlayers, getPlayerSync, getPlayerPartyGroupListSync, getPlayerCharacterSync, getPlayerCharacterManaNodesSync, getPlayerEquipmentSync, updatePlayerSync } from "./wdfpData";
 import { PartyCategory, PlayerParty, PlayerCharacter, PlayerEquipment } from "./types";
 import playerRankTable from "../../../wf-assets-cn/orderedmap/player/player_rank.json";
 
@@ -195,7 +195,19 @@ function handleNotify(client: SessionClient, msg: any[]) {
                 }
                 host.party = buildRealParty(client.playerId!, newParty)
                 host.currentPartyId = pd.currentPartyId
-                console.log(`[SESSION] party changed: partyId=${pd.currentPartyId} chars=${charIds.filter(Boolean)}`)
+                // Sync party slot to DB + room so re-entry uses correct party
+                if (client.playerId) {
+                    try {
+                        updatePlayerSync({ id: client.playerId, partySlot: pd.currentPartyId })
+                    } catch (e) {
+                        console.log(`[SESSION] failed to sync partySlot to DB:`, (e as Error).message)
+                    }
+                }
+                const room = getRoom(client.roomNumber)
+                if (room) room.host_party_id = pd.currentPartyId
+                const gIdx = Math.floor((pd.currentPartyId - 1) / 10)
+                const s = ((pd.currentPartyId - 1) % 10) + 1
+                console.log(`[SESSION] party changed: partyId=${pd.currentPartyId} group=${gIdx+1} slot=${s} chars=${charIds.filter(Boolean)}`)
                 sendJson(client.socket, [1, [1, client.mates]])
             }
             break;
@@ -570,17 +582,24 @@ async function handleHandshake(socket: net.Socket, data: string, remoteAddr: str
     console.log(`[SESSION] handshake OK viewer=${viewerId} room=${roomNumber} name=${playerName}`)
     sendJson(socket, [0, hostConnectionId, roomNumber]);
 
-    // Build host party from real DB data (player's current party slot)
+    // Build host party from real DB data (use room host_party_id from create_room, fallback to DB playerPartySlot)
+    // party_id is a global PartyId: (groupIndex * 10 + slot), where groupIndex is 0-based
     let hostParty = buildDefaultParty()
+    const rawPartyId = getRoom(roomNumber)?.host_party_id ?? playerPartySlot
+    const groupIndex = Math.floor((rawPartyId - 1) / 10)
+    const slot = ((rawPartyId - 1) % 10) + 1
+    console.log(`[SESSION] host party: player=${actualPlayerId} partyId=${rawPartyId} groupIdx=${groupIndex} slot=${slot}`)
     if (actualPlayerId) {
         try {
             const partyGroups = getPlayerPartyGroupListSync(actualPlayerId, PartyCategory.NORMAL)
-            const group = partyGroups[1] ?? partyGroups[Object.keys(partyGroups)[0]]
+            const group = partyGroups[groupIndex + 1] ?? partyGroups[Object.keys(partyGroups)[0]]
             if (group) {
-                const party = group.list[playerPartySlot] ?? group.list[Object.keys(group.list)[0]]
+                const party = group.list[slot] ?? group.list[Object.keys(group.list)[0]]
                 if (party) {
                     hostParty = buildRealParty(actualPlayerId, party)
-                    console.log(`[SESSION] host party: player=${actualPlayerId} slot=${playerPartySlot} chars=${party.characterIds.filter(Boolean).length}`)
+                    console.log(`[SESSION] host party: loaded group=${groupIndex+1} slot=${slot} chars=${party.characterIds.filter(Boolean).length}`)
+                } else {
+                    console.log(`[SESSION] host party: NO party found for group=${groupIndex+1} slot=${slot}`)
                 }
             }
         } catch (e) {

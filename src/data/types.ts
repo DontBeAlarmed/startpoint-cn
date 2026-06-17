@@ -173,6 +173,8 @@ export interface RawPlayerParty {
     edited: number
     group_id: number
     category: PartyCategory
+    current_battle_power?: number
+    before_battle_power?: number
 }
 
 export interface PlayerParty {
@@ -184,6 +186,8 @@ export interface PlayerParty {
     edited: boolean
     options: PlayerPartyOptions
     category: PartyCategory
+    currentBattlePower?: number
+    beforeBattlePower?: number
 }
 
 export interface RawPlayerPartyGroup {
@@ -594,6 +598,8 @@ export interface UserPartyGroupTeam {
     options: {
         allow_other_players_to_heal_me: boolean
     }
+    current_battle_power?: number
+    before_battle_power?: number
 }
 
 export interface UserPartyGroup {

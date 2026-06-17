@@ -118,7 +118,9 @@ export function serializePartyGroupList(
                 "edited": party.edited,
                 "options": {
                     "allow_other_players_to_heal_me": party.options.allowOtherPlayersToHealMe
-                }
+                },
+                "current_battle_power": party.currentBattlePower ?? 0,
+                "before_battle_power": party.beforeBattlePower ?? 0
             }
         }
         serialized[groupId] = {
@@ -677,7 +679,9 @@ export function deserializePlayerData(
                     options: {
                         allowOtherPlayersToHealMe: options?.allow_other_players_to_heal_me === undefined ? true : options.allow_other_players_to_heal_me
                     },
-                    category: PartyCategory.NORMAL
+                    category: PartyCategory.NORMAL,
+                    currentBattlePower: party['current_battle_power'] ?? 0,
+                    beforeBattlePower: party['before_battle_power'] ?? 0
                 }
             }
             partyGroupList[groupId] = {

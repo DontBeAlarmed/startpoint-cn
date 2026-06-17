@@ -188,8 +188,11 @@ fastify.post("/crash", async (request, reply) => {
 
             if (ballRarity > 0) seedValidator.recordDeviceData(badSeed, ballRarity, charRarity);
             seedValidator.blockSeed(badSeed);
-            seedValidator.autoPurify();
-            console.log(`[CRASH] seed ${badSeed} device★${ballRarity} char★${charRarity}`);
+            // Extract movie_id from crash (e.g., "movie_id=fes" or "movie_id=fes_guarantee")
+            const movieMatch = bodyStr.match(/movie_id=(\w+)/);
+            const movieId = movieMatch ? movieMatch[1] : "normal";
+            seedValidator.autoPurify(movieId);
+            console.log(`[CRASH] seed ${badSeed} device★${ballRarity} char★${charRarity} movie=${movieId}`);
         }
     } catch (e) {}
 
@@ -268,9 +271,11 @@ fastify.listen({ port, host }, (err, address) => {
     }
     console.log(`CN StarPoint listening on http://${host}:${port}`);
 
-    // Auto-purify blocked seeds that have device data
-    const purified = seedValidator.autoPurify();
-    if (purified > 0) console.log(`[SEED] Startup: purified ${purified} seeds`);
+    // Auto-purify blocked seeds (uses 'normal' as fallback, per-crash movieId is preferred)
+    try {
+        const purified = seedValidator.autoPurify('normal');
+        if (purified > 0) console.log(`[SEED] Startup: purified ${purified} seeds`);
+    } catch (_) {}
 
     // Start multi battle TCP session server
     startSessionServer();

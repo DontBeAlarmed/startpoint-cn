@@ -16,7 +16,8 @@ export function getPlayerPartyGroupListSync(
     const rawParties = db.prepare(`
     SELECT slot, name, character_id_1, character_id_2, character_id_3, unison_character_1,
         unison_character_2, unison_character_3, equipment_1, equipment_2, equipment_3,
-        ability_soul_1, ability_soul_2, ability_soul_3, edited, group_id, category
+        ability_soul_1, ability_soul_2, ability_soul_3, edited, group_id, category,
+        current_battle_power, before_battle_power
     FROM players_parties
     WHERE player_id = ? AND category = ?
     `).all(playerId, category) as RawPlayerParty[]
@@ -39,7 +40,9 @@ export function getPlayerPartyGroupListSync(
             options: {
                 allowOtherPlayersToHealMe: true
             },
-            category: rawParty.category
+            category: rawParty.category,
+            currentBattlePower: rawParty.current_battle_power ?? 0,
+            beforeBattlePower: rawParty.before_battle_power ?? 0
         }
     }
 
@@ -60,15 +63,17 @@ function insertPlayerPartySync(playerId: number, slot: number | string, groupId:
     db.prepare(`
     INSERT INTO players_parties (slot, name, character_id_1, character_id_2, character_id_3, 
         unison_character_1, unison_character_2, unison_character_3, equipment_1, equipment_2,
-        equipment_3, ability_soul_1, ability_soul_2, ability_soul_3, edited, player_id, group_id, category)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        equipment_3, ability_soul_1, ability_soul_2, ability_soul_3, edited, player_id, group_id, category,
+        current_battle_power, before_battle_power)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         Number(slot), party.name,
         party.characterIds[0] || null, party.characterIds[1] || null, party.characterIds[2] || null,
         party.unisonCharacterIds[0] || null, party.unisonCharacterIds[1] || null, party.unisonCharacterIds[2] || null,
         party.equipmentIds[0] || null, party.equipmentIds[1] || null, party.equipmentIds[2] || null,
         party.abilitySoulIds[0] || null, party.abilitySoulIds[1] || null, party.abilitySoulIds[2] || null,
-        serializeBoolean(party.edited), playerId, Number(groupId), party.category
+        serializeBoolean(party.edited), playerId, Number(groupId), party.category,
+        party.currentBattlePower ?? 0, party.beforeBattlePower ?? 0
     )
 }
 
@@ -93,22 +98,34 @@ export function insertPlayerPartyGroupListSync(playerId: number, groups: Record<
     })()
 }
 
-export function updatePlayerPartySync(playerId: number, slot: number, party: PlayerParty) {
+export function updatePlayerPartySync(playerId: number, slot: number, party: PlayerParty, groupId: number = 1) {
     const db = getDb();
-    db.prepare(`
+    // Upsert: try update first, insert if not exists
+    const result = db.prepare(`
     UPDATE players_parties SET name = ?, character_id_1 = ?, character_id_2 = ?, character_id_3 = ?,
         unison_character_1 = ?, unison_character_2 = ?, unison_character_3 = ?,
         equipment_1 = ?, equipment_2 = ?, equipment_3 = ?,
-        ability_soul_1 = ?, ability_soul_2 = ?, ability_soul_3 = ?, edited = ?
-    WHERE slot = ? AND player_id = ? AND category = ?
+        ability_soul_1 = ?, ability_soul_2 = ?, ability_soul_3 = ?, edited = ?,
+        current_battle_power = ?, before_battle_power = ?
+    WHERE slot = ? AND player_id = ? AND group_id = ? AND category = ?
     `).run(
         party.name,
         party.characterIds[0], party.characterIds[1], party.characterIds[2],
         party.unisonCharacterIds[0], party.unisonCharacterIds[1], party.unisonCharacterIds[2],
         party.equipmentIds[0], party.equipmentIds[1], party.equipmentIds[2],
         party.abilitySoulIds[0], party.abilitySoulIds[1], party.abilitySoulIds[2],
-        serializeBoolean(party.edited), slot, playerId, party.category
+        serializeBoolean(party.edited),
+        party.currentBattlePower ?? 0, party.beforeBattlePower ?? 0,
+        slot, playerId, groupId, party.category
     )
+    if (result.changes === 0) {
+        // Ensure group exists
+        const groupExists = db.prepare('SELECT id FROM players_party_groups WHERE id = ? AND player_id = ? AND category = ?').get(groupId, playerId, party.category)
+        if (!groupExists) {
+            db.prepare('INSERT INTO players_party_groups (id, color_id, player_id, category) VALUES (?, ?, ?, ?)').run(groupId, 0, playerId, party.category)
+        }
+        insertPlayerPartySync(playerId, slot, groupId, party)
+    }
 }
 
 export function updatePlayerPartyGroupSync(

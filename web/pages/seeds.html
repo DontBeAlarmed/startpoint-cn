@@ -8,12 +8,11 @@
         .stat { padding: 0.5rem 1rem; border: 1px solid var(--color-outline-variant); border-radius: 0.75rem; display: inline-block; margin: 0.25rem; }
         .stat .label { color: var(--color-on-surface-variant); font-size: 0.7rem; text-transform: uppercase; }
         .stat .value { font-size: 1.2rem; font-weight: bold; }
-        .unk{color:#6e7681} .p1{color:#d29922} .ok{color:#3fb950} .pur{color:#a371f7}
-        .progress { height: 8px; background: var(--color-surface-container-high); border-radius: 4px; overflow: hidden; max-width: 500px; margin: 0.5rem 0; }
-        .progress div { height: 100%; float: left; transition: width 0.5s; }
-        .bar-ok{background:#d29922} .bar-p1{background:#d29922} .bar-unk{background:#6e7681}
+        .unk{color:#6e7681} .p1{color:#d29922} .ok{color:#3fb950} .pur{color:#a371f7} .hot{color:#f85149}
         .mode-btn { padding: 0.5rem 1rem; border-radius: 2rem; border: 1px solid var(--color-outline-variant); cursor: pointer; font-size: 0.9rem; background: transparent; color: var(--color-on-surface); }
         .mode-btn.active { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); font-weight: bold; }
+        .cfg-btn { padding: 0.25rem 0.75rem; border-radius: 1rem; border: 1px solid var(--color-outline-variant); cursor: pointer; font-size: 0.8rem; background: transparent; color: var(--color-on-surface); }
+        .cfg-btn.active { background: #a371f7; color: #fff; border-color: #a371f7; }
         .prio-btn { padding: 0.25rem 0.75rem; border-radius: 1rem; border: 1px solid var(--color-outline-variant); cursor: pointer; font-size: 0.8rem; background: transparent; color: var(--color-on-surface); }
         .prio-btn.active { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); }
         .refresh-btn { padding: 0.5rem 1rem; border-radius: 2rem; border: 1px solid var(--color-outline-variant); cursor: pointer; background: transparent; color: var(--color-on-surface); font-size: 0.9rem; }
@@ -21,18 +20,16 @@
         .seed-row { padding: 0.25rem 0; border-bottom: 1px solid var(--color-outline-variant); font-size: 0.8rem; display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
         .seed-row.cold { opacity: 0.4; text-decoration: line-through; }
         .tag-btn { padding: 0.1rem 0.4rem; border-radius: 0.75rem; border: 1px solid var(--color-outline-variant); cursor: pointer; font-size: 0.7rem; background: transparent; color: var(--color-on-surface); }
-        .tag-btn.active-0 { background: #6e7681; color: #fff; border-color: #6e7681; }
-        .tag-btn.active-1 { background: #f85149; color: #fff; border-color: #f85149; }
-        .tag-btn.active-2 { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); }
-        .tag-btn.active-3 { background: #6e7681; color: #fff; border-color: #6e7681; }
+        .tag-btn.t0 { background: #6e7681; color: #fff; border-color: #6e7681; } .tag-btn.t1 { background: #f85149; color: #fff; border-color: #f85149; }
+        .tag-btn.t2 { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); } .tag-btn.t3 { background: #6e7681; color: #fff; border-color: #6e7681; }
         .test-btn { padding: 0.1rem 0.5rem; border-radius: 0.75rem; border: 1px solid var(--color-outline-variant); cursor: pointer; font-size: 0.7rem; background: transparent; color: var(--color-on-surface); }
         .test-btn.active { background: #a371f7; color: #fff; border-color: #a371f7; }
-        .test-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.5rem 0; font-size: 0.85rem; }
-        .test-bar .clear { cursor: pointer; color: #f85149; font-size: 0.8rem; }
+        .clear-btn { cursor: pointer; color: #f85149; font-size: 0.8rem; }
         .col3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
         @media(max-width:900px){.col3{grid-template-columns:1fr}}
-        .anim-toggle { display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; font-size: 0.8rem; color: var(--color-on-surface-variant); }
-        .anim-toggle input { margin: 0; }
+        .progress { height: 6px; background: var(--color-surface-container-high); border-radius: 3px; overflow: hidden; max-width: 400px; margin: 0.25rem 0; }
+        .progress div { height: 100%; float: left; }
+        .bar-ok{background:#d29922} .bar-p1{background:#d29922} .bar-unk{background:#6e7681}
     </style>
 </head>
 <body class="bg-background text-on-surface relative mt-16 m-auto max-w-screen-2xl min-h-screen box-border flex flex-col items-start px-3 pb-3">
@@ -48,15 +45,40 @@
             <h1 class="text-4xl font-bold text-on-background">种子验证器</h1>
             <button class="refresh-btn" onclick="load()">刷新</button>
 
+            <!-- Mode -->
             <div class="flex flex-wrap gap-3 items-center">
                 <span class="text-sm text-on-surface-variant">模式:</span>
                 <button id="btnUnknown" class="mode-btn active" onclick="setMode('unknown')">测试池</button>
                 <button id="btnPurified" class="mode-btn" onclick="setMode('purified')">净化池</button>
             </div>
 
-            <!-- Test Pool -->
+            <!-- ====== 卡池选择 ====== -->
+            <div class="card">
+                <h2 class="text-lg font-semibold text-on-surface-variant mb-2">卡池</h2>
+                <div class="flex flex-wrap gap-2 items-center mb-3" id="cfgSelector"></div>
+                <div id="cfgSummary" class="flex flex-wrap gap-3"></div>
+            </div>
+
+            <!-- ====== 净化测试种子 ====== -->
+            <div class="card" id="testSeedSection">
+                <h2 class="text-lg font-semibold text-on-surface-variant mb-2">净化池测试种子 <span class="text-xs" style="color:#888">（最高优先级，10min 超时）</span></h2>
+                <div id="testSeedBar" class="flex flex-wrap gap-3 items-center"></div>
+            </div>
+
+            <!-- ====== 净化池 ====== -->
+            <div class="card" id="purifiedSection">
+                <h2 class="text-lg font-semibold text-on-surface-variant mb-2">净化池 <span class="text-xs" style="color:#888">（设备验证安全，仅同稀有度选取）</span></h2>
+                <div class="col3" id="purifiedColumns" style="display:none">
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#f85149">★3 <span id="col3Count">(0)</span></h3><div id="col3"></div></div>
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#d29922">★4 <span id="col4Count">(0)</span></h3><div id="col4"></div></div>
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#3fb950">★5 <span id="col5Count">(0)</span></h3><div id="col5"></div></div>
+                </div>
+                <div id="purifiedEmpty" class="text-xs text-on-surface-variant">暂无净化种子</div>
+            </div>
+
+            <!-- ====== 测试池 ====== -->
             <div class="card" id="testSection">
-                <h2 class="text-lg font-semibold text-on-surface-variant mb-2">测试池</h2>
+                <h2 class="text-lg font-semibold text-on-surface-variant mb-2">测试池 <span class="text-xs" style="color:#888">（第三优先级，用于发现新净化种子）</span></h2>
                 <div class="flex flex-wrap gap-2 items-center mb-2">
                     <span class="text-xs text-on-surface-variant">优先级:</span>
                     <button id="prioAll" class="prio-btn active" onclick="setPrio('all')">全部</button>
@@ -67,107 +89,121 @@
                 <div class="progress"><div class="bar-ok" id="barOk" style="width:0"></div><div class="bar-p1" id="barP1" style="width:0"></div><div class="bar-unk" id="barUnk" style="width:0"></div></div>
                 <div id="testStats"></div><p id="testSummary" class="text-xs text-on-surface-variant mt-1"></p>
             </div>
-
-            <!-- Purified Pool -->
-            <div class="card" id="purifiedSection">
-                <h2 class="text-lg font-semibold text-on-surface-variant mb-2">惊险池</h2>
-                <div id="purifiedCards" class="flex flex-wrap gap-3 mb-3"></div>
-                <div id="testBar" class="test-bar mb-3"></div>
-                <div class="col3" id="purifiedColumns">
-                    <div><h3 class="text-sm font-semibold mb-1" style="color:#f85149">★3 惊险 <span id="col3Count">(0)</span></h3><div id="col3"></div></div>
-                    <div><h3 class="text-sm font-semibold mb-1" style="color:#d29922">★4 惊险 <span id="col4Count">(0)</span></h3><div id="col4"></div></div>
-                    <div><h3 class="text-sm font-semibold mb-1" style="color:#3fb950">★5 惊险 <span id="col5Count">(0)</span></h3><div id="col5"></div></div>
-                </div>
-            </div>
         </article>
     </div>
     <script>
+    var currentMovieId = null;
     function fmt(n) { return n.toLocaleString(); }
     async function setMode(m) { await fetch('/api/seeds/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:m})});load(); }
     async function setPrio(p) { await fetch('/api/seeds/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priority:p})});load(); }
-    async function setTag(seed,tag) { await fetch('/api/seeds/tag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed,tag})});load(); }
+    async function selectCfg(id) { await fetch('/api/seeds/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({selectedMovieId:id})});currentMovieId=id;load(); }
+    async function setTag(seed,tag,movieId) { await fetch('/api/seeds/tag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed,tag,movieId:movieId||currentMovieId})});load(); }
     async function setTestSeed(seed,rarity) { await fetch('/api/seeds/test-seed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed,rarity})});load(); }
     async function clearTestSeed(rarity) { await fetch('/api/seeds/test-seed',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({rarity})});load(); }
 
-    const TAG_NAMES = {'未测试':'未','热血躲避球':'热','普通躲避球':'普','冷血躲避球':'冷'};
-    const TAG_KEYS = ['未测试','热血躲避球','普通躲避球','冷血躲避球'];
-    const TAG_CLASSES = ['active-0','active-1','active-2','active-3'];
+    var TAG = ['未测试','热血躲避球','普通躲避球','冷血躲避球'];
+    var TAG_S = ['未','热','普','冷'];
+    var TAG_C = ['t0','t1','t2','t3'];
+    var C_NAMES = {fes:'流星祭',fes_guarantee:'流星祭·保底',normal:'普通',normal_guarantee:'普通·保底',rarity_5_guarantee:'★5必得'};
+    var ALL_CFG = ['fes','fes_guarantee','normal','normal_guarantee','rarity_5_guarantee'];
+
+    function tagBtns(seed, currentTag) {
+        var h = '';
+        TAG.forEach(function(t,i){
+            h += '<button class="tag-btn '+(t===currentTag?TAG_C[i]:'')+'" onclick="setTag('+seed+',\''+t+'\',\''+currentMovieId+'\')">'+TAG_S[i]+'</button>';
+        });
+        return h;
+    }
 
     function renderSeedRow(p, rarity, isTestSeed) {
-        const tag = p.tag||'未测试';
-        const cold = tag==='冷血躲避球';
-        const canTest = !cold;
-        return `<div class="seed-row${cold?' cold':''}">
-            <span class="${cold?'':'pur'}" style="width:70px">${p.seed}</span>
-            <span class="text-on-surface-variant" style="font-size:0.7rem;width:16px">${TAG_NAMES[tag]}</span>
-            ${TAG_KEYS.map((t,i)=>`<button class="tag-btn ${tag===t?TAG_CLASSES[i]:''}" onclick="setTag(${p.seed},'${t}')">${TAG_NAMES[t]}</button>`).join('')}
-            <button class="test-btn ${isTestSeed?'active':''}" onclick="setTestSeed(${p.seed},${rarity})" ${canTest?'':'disabled'}>★${rarity}测试</button>
-        </div>`;
+        var tag = p.tag||'未测试', cold = tag==='冷血躲避球';
+        return '<div class="seed-row'+(cold?' cold':'')+'">'
+            + '<span class="'+(cold?'':'pur')+'" style="width:70px">'+p.seed+'</span>'
+            + '<span class="text-on-surface-variant" style="font-size:0.7rem;width:16px">'+TAG_S[TAG.indexOf(tag)]+'</span>'
+            + tagBtns(p.seed, tag)
+            + '<button class="test-btn '+(isTestSeed?'active':'')+'" onclick="setTestSeed('+p.seed+','+rarity+')" '+(cold?'disabled':'')+'>★'+rarity+'测试</button>'
+            + '</div>';
     }
 
     async function load() {
-        const res = await fetch('/api/seeds/stats'); const s = await res.json();
-        const res2 = await fetch('/api/seeds/list'); const data = await res2.json();
+        var mid = currentMovieId || '';
+        var qs = mid ? '?movieId='+mid : '';
+        var res = await fetch('/api/seeds/stats'+qs); var s = await res.json();
+        if (!currentMovieId) currentMovieId = s.selectedMovieId || 'fes';
+        if (!s.movieIds.includes(currentMovieId) && s.movieIds.length > 0) currentMovieId = s.movieIds[0];
+        qs = '?movieId=' + currentMovieId;
+        res = await fetch('/api/seeds/stats'+qs); s = await res.json();
 
         // Mode
         document.getElementById('btnUnknown').className = 'mode-btn'+(s.mode==='unknown'?' active':'');
         document.getElementById('btnPurified').className = 'mode-btn'+(s.mode==='purified'?' active':'');
 
         // Priority
-        ['All','5','4','3'].forEach(p=>{const el=document.getElementById('prio'+p);if(el)el.className='prio-btn'+(s.priority===p.toLowerCase()?' active':'');});
+        ['All','5','4','3'].forEach(function(p){var el=document.getElementById('prio'+p);if(el)el.className='prio-btn'+(s.priority===p.toLowerCase()?' active':'');});
 
-        // Test pool
-        document.getElementById('testStats').innerHTML = `
-            <span class="stat"><span class="label unk">UNKNOWN</span><br><span class="value unk">${fmt(s.unknown)}</span></span>
-            <span class="stat"><span class="label p1">PENDING</span><br><span class="value p1">${fmt(s.pending)}</span></span>
-            <span class="stat"><span class="label ok">已测×10</span><br><span class="value ok">${fmt(s.verified)}</span></span>
-        `;
-        document.getElementById('testSummary').textContent = `安全率 ${s.accuracy}% | 已测 ${fmt(s.tested)} | 覆盖率 ${s.coverage}%`;
-        const t = s.total;
-        document.getElementById('barOk').style.width=(s.verified/t*100)+'%';
-        document.getElementById('barP1').style.width=(s.pending/t*100)+'%';
-        document.getElementById('barUnk').style.width=(s.unknown/t*100)+'%';
-
-        // Purified stats
-        const total = s.purified_total;
-        document.getElementById('purifiedCards').innerHTML = total > 0 ? `
-            <div class="stat"><span class="label pur">★3 惊险</span><br><span class="value pur">${s.purified_r3}</span><span class="text-xs text-on-surface-variant ml-1">${Math.round(s.purified_r3/total*100)}%</span></div>
-            <div class="stat"><span class="label pur">★4 惊险</span><br><span class="value pur">${s.purified_r4}</span><span class="text-xs text-on-surface-variant ml-1">${Math.round(s.purified_r4/total*100)}%</span></div>
-            <div class="stat"><span class="label pur">★5 惊险</span><br><span class="value pur">${s.purified_r5}</span><span class="text-xs text-on-surface-variant ml-1">${Math.round(s.purified_r5/total*100)}%</span></div>
-            <span class="text-sm text-on-surface-variant self-center">共 <b class="pur">${total}</b> 个</span>
-        ` : `<span class="text-sm text-on-surface-variant">暂无惊险种子</span>`;
-
-        // Test seed bar with tag buttons
-        const tsArr = s.test_seeds || [null,null,null];
-        const purified = data.purified || [];
-        const purifyMap = {};
-        purified.forEach(p=>purifyMap[p.seed]=p);
-
-        let tsHtml = '<span class="text-sm text-on-surface-variant">测试种子:</span> ';
-        [3,4,5].forEach(r=>{
-            const ts = tsArr[r-3];
-            const entry = ts && purifyMap[ts] ? purifyMap[ts] : null;
-            const tag = entry ? entry.tag : '未测试';
-            tsHtml += `★${r}=`;
-            if (ts) {
-                tsHtml += `<span class="pur">seed:${ts}</span> <span style="color:#888;font-size:0.7rem">[${TAG_NAMES[tag]}]</span> `;
-                TAG_KEYS.forEach((t,i)=>tsHtml+=`<button class="tag-btn ${tag===t?TAG_CLASSES[i]:''}" onclick="setTag(${ts},'${t}')" style="font-size:0.65rem;padding:0 0.3rem">${TAG_NAMES[t]}</button>`);
-                tsHtml += ` <span class="clear" onclick="clearTestSeed(${r})">✕</span> `;
-            } else {
-                tsHtml += `[无] `;
-            }
+        // ==== 卡池选择 ====
+        var ch = '';
+        ALL_CFG.forEach(function(id){
+            ch += '<button class="cfg-btn'+(id===currentMovieId?' active':'')+'" onclick="selectCfg(\''+id+'\')">'+(C_NAMES[id]||id)+'</button> ';
         });
-        document.getElementById('testBar').innerHTML = tsHtml;
+        document.getElementById('cfgSelector').innerHTML = ch;
 
-        // Three columns
-        for(const r of [3,4,5]) {
-            const items = purified.filter(p=>p.rarity===r);
-            document.getElementById('col'+r+'Count').textContent=`(${items.length})`;
-            document.getElementById('col'+r).innerHTML = items.length>0
-                ? items.map(p=>renderSeedRow(p, r, tsArr[r-3]===p.seed)).join('')
-                : '<div class="text-xs text-on-surface-variant" style="padding:0.25rem 0">暂无</div>';
+        // 卡池总数
+        var t = s.mov_total;
+        document.getElementById('cfgSummary').innerHTML =
+            '<span class="stat"><span class="label hot">热血</span><br><span class="value hot">'+s.mov_hot+'</span></span>'
+            + '<span class="stat"><span class="label ok">普通</span><br><span class="value ok">'+s.mov_normal+'</span></span>'
+            + '<span class="stat"><span class="label pur">净化总</span><br><span class="value pur">'+t+'</span></span>'
+            + (s.purified_total > t ? '<span class="stat"><span class="label" style="color:#888">全部净化</span><br><span class="value" style="color:#888">'+s.purified_total+'</span></span>' : '');
+
+        // ==== 净化测试种子 ====
+        var tsArr = s.test_seeds || [null,null,null];
+        var listRes = await fetch('/api/seeds/list'+qs); var data = await listRes.json();
+        var purified = data.purified || [];
+        var pMap = {}; purified.forEach(function(p){pMap[p.seed]=p;});
+
+        var tsH = '';
+        [3,4,5].forEach(function(r){
+            var ts = tsArr[r-3];
+            var e = ts && pMap[ts] ? pMap[ts] : null;
+            var tag = e ? e.tag : '未测试';
+            tsH += '<span class="text-sm">★'+r+'=</span>';
+            if (ts) {
+                tsH += '<span class="pur">'+ts+'</span> <span style="font-size:0.7rem;color:#888">['+TAG_S[TAG.indexOf(tag)]+']</span> ';
+                tsH += tagBtns(ts, tag);
+                tsH += ' <span class="clear-btn" onclick="clearTestSeed('+r+')">✕</span> ';
+            } else { tsH += '<span style="color:#888">[无]</span> ';}
+        });
+        document.getElementById('testSeedBar').innerHTML = tsH;
+
+        // ==== 净化池 ====
+        if (t > 0) {
+            document.getElementById('purifiedColumns').style.display = '';
+            document.getElementById('purifiedEmpty').style.display = 'none';
+            [3,4,5].forEach(function(r){
+                var items = purified.filter(function(p){return p.rarity===r;});
+                document.getElementById('col'+r+'Count').textContent = '('+items.length+')';
+                document.getElementById('col'+r).innerHTML = items.length>0
+                    ? items.map(function(p){return renderSeedRow(p, r, tsArr[r-3]===p.seed);}).join('')
+                    : '<div class="text-xs text-on-surface-variant" style="padding:0.25rem 0">暂无</div>';
+            });
+        } else {
+            document.getElementById('purifiedColumns').style.display = 'none';
+            document.getElementById('purifiedEmpty').style.display = '';
         }
+
+        // ==== 测试池 ====
+        document.getElementById('testStats').innerHTML =
+            '<span class="stat"><span class="label unk">UNKNOWN</span><br><span class="value unk">'+fmt(s.unknown)+'</span></span>'
+            + '<span class="stat"><span class="label p1">PENDING</span><br><span class="value p1">'+fmt(s.mov_pending)+'</span></span>'
+            + '<span class="stat"><span class="label ok">VERIFIED</span><br><span class="value ok">'+fmt(s.mov_verified)+'</span></span>';
+        document.getElementById('testSummary').textContent = '安全率 '+s.accuracy+'% | 已测 '+fmt(s.tested)+' | 覆盖率 '+s.coverage+'%';
+        var tt = s.total;
+        document.getElementById('barOk').style.width=(s.mov_verified/tt*100)+'%';
+        document.getElementById('barP1').style.width=(s.mov_pending/tt*100)+'%';
+        document.getElementById('barUnk').style.width=(s.unknown/tt*100)+'%';
     }
+
     load();
     </script>
 </body>
