@@ -46,6 +46,7 @@ import historyApiPlugin from "./routes/api/history";
 import comicApiPlugin from "./routes/api/comic";
 import questUnlockApiPlugin from "./routes/api/questUnlock";
 import { startSessionServer } from "./data/sessionServer";
+import { getDisplayHost } from "./data/multiRoom";
 
 const fastify = Fastify({
     logger: {
@@ -59,7 +60,13 @@ restoreTimeOffset();
 fastify.addHook("onSend", (_, reply, payload, done) => {
     try {
         if (reply.getHeader("content-type") === "application/x-msgpack") {
-            done(null, pack(payload).toString("base64"));
+            const packed = pack(payload);
+            // Replace uint32 (0xCE) with int32 (0xD2) to test CN client compatibility
+            // uint32(ce) → int32(d2) data bytes are identical (4-byte big-endian)
+            for (let i = 0; i < packed.length; i++) {
+                if (packed[i] === 0xCE) packed[i] = 0xD2;
+            }
+            done(null, packed.toString("base64"));
             return;
         }
     } catch {}
@@ -267,5 +274,6 @@ fastify.listen({ port, host }, (err, address) => {
     if (purified > 0) console.log(`[SEED] Startup: purified ${purified} seeds`);
 
     // Start multi battle TCP session server
+    console.log(`[MULTI] TCP display host: ${getDisplayHost()}:${parseInt(process.env.SESSION_PORT || "8003")}`);
     startSessionServer();
 });

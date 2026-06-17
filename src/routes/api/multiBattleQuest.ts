@@ -5,7 +5,7 @@ import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "..
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
 import { BattleQuest, EquipmentItemReward, MultiMate, MultiMateParty, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { createRoom, disbandRoom, getNpcMates, getRoom, getRoomByToken, getRooms, serializeRoom, serializeRoomConnection, updateHostEntryTime, updateRoomState } from "../../data/multiRoom";
+import { createRoom, disbandRoom, getDisplayHost, getNpcMates, getRoom, getRoomByToken, getRooms, serializeRoom, serializeRoomConnection, updateHostEntryTime, updateRoomState } from "../../data/multiRoom";
 import { insertActiveQuest, activeQuests } from "./singleBattleQuest";
 import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -401,7 +401,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         const room = getRoom(body.room_number)
-        const displayHost = process.env.CN_LISTEN_HOST || "<PII_REMOVED>"
+        const displayHost = getDisplayHost()
         const sessionPort = parseInt(process.env.SESSION_PORT || "8003")
 
         reply.header("content-type", "application/x-msgpack")

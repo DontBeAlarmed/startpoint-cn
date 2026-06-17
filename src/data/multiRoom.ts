@@ -1,6 +1,26 @@
 import { randomInt } from "crypto";
+import * as os from "os";
 import { MultiRoom, MultiMate, MultiMateParty, MultiMatePartyCharacter, MultiMateEquipment, NpcMateTemplate, QuestCategory } from "../lib/types";
 import { getServerTime } from "../utils";
+
+/** Resolve display host for TCP session. If CN_LISTEN_HOST is 0.0.0.0, auto-detect LAN IP. */
+export function getDisplayHost(): string {
+    const raw = process.env.CN_LISTEN_HOST || "<PII_REMOVED>";
+    if (raw !== "0.0.0.0") return raw;
+    const nets = os.networkInterfaces();
+    for (const name of Object.keys(nets)) {
+        const addrs = nets[name];
+        if (!addrs) continue;
+        for (const addr of addrs) {
+            if (addr.family === "IPv4" && !addr.internal) {
+                console.log(`[MULTI] getDisplayHost: resolved 0.0.0.0 → ${addr.address}`);
+                return addr.address;
+            }
+        }
+    }
+    console.log(`[MULTI] getDisplayHost: no LAN IP found, fallback to <PII_REMOVED>`);
+    return "<PII_REMOVED>";
+}
 
 // In-memory room storage (rooms are transient, no DB persistence)
 const rooms = new Map<string, MultiRoom>();
@@ -222,9 +242,9 @@ export function serializeRoom(room: MultiRoom): Record<string, any> {
 
 // Build select_room/prepare response data
 export function serializeRoomConnection(room: MultiRoom): Record<string, any> {
-    const displayHost = process.env.CN_LISTEN_HOST || "<PII_REMOVED>";
+    const displayHost = getDisplayHost();
     const sessionPort = parseInt(process.env.SESSION_PORT || "8003");
-    return {
+    const result = {
         application_update_url: "",
         category_id: room.category,
         host_entry_time: room.host_entry_time,
@@ -237,4 +257,6 @@ export function serializeRoomConnection(room: MultiRoom): Record<string, any> {
         share_room_options: room.share_room_options,
         is_pickup: null
     };
+    console.log(`[MULTI] serializeRoomConnection: room=${room.room_number} ip=${displayHost} port=${sessionPort}`);
+    return result;
 }

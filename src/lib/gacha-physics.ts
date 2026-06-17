@@ -36,17 +36,19 @@ class MersenneTwister {
     private index: number;
 
     constructor(seed: number) {
-        // Force Uint32 range (Flash uint semantics)
-        this.seed = seed >>> 0;
+        // Force int32 range (Flash int semantics — signed 32-bit)
+        this.seed = seed | 0;
         this.index = 0;
         this.mt = new Array(MT_LENGTH);
 
-        // Initialize state array
-        this.mt[0] = seed >>> 0;
-        let v = seed >>> 0;
+        // Initialize state array using int32 arithmetic
+        // AS3: _loc2_ = 1812433253 * (_loc2_ ^ _loc2_ >>> 30) + _loc4_;
+        // Use |0 to mimic AS3 signed int32 overflow behavior
+        this.mt[0] = seed | 0;
+        let v = seed | 0;
         for (let i = 1; i < MT_LENGTH; i++) {
-            // 1812433253 * (v ^ (v >>> 30)) + i
-            v = ((1812433253 * (v ^ (v >>> 30)) + i) >>> 0);
+            // 1812433253 * (v ^ (v >>> 30)) + i  (int32)
+            v = (Math.imul(1812433253, v ^ (v >>> 30)) + i) | 0;
             this.mt[i] = v;
         }
 
@@ -61,7 +63,8 @@ class MersenneTwister {
         const i = this.index;
         const mt = this.mt;
 
-        let y = mt[i] >>> 0;
+        // Read as signed int32 (matches AS3 int(mt[i]))
+        let y = mt[i] | 0;
         this.index = (i + 1) % MT_LENGTH;
 
         // Twister: y & UPPER_MASK | mt[index] & LOWER_MASK
@@ -69,11 +72,12 @@ class MersenneTwister {
         const y2 = (y & 0x80000000) | (mt[this.index] & 0x7FFFFFFF);
 
         // mt[i] = mt[(i + 397) % 624] ^ (y2 >>> 1) ^ magic
+        // Use |0 to match AS3 signed int32 storage
         const magic = -1727483681; // 0x9908B0DF
-        mt[i] = (mt[(i + 397) % MT_LENGTH] ^ (y2 >>> 1) ^ (((y2 & 1) !== 0 ? magic : 0) >>> 0)) >>> 0;
+        mt[i] = (mt[(i + 397) % MT_LENGTH] ^ (y2 >>> 1) ^ (y2 & 1 ? magic : 0)) | 0;
 
         // Tempering
-        y = mt[i] >>> 0;
+        y = mt[i] | 0;
         y ^= y >>> 11;
         y ^= (y << 7) & 0x9D2C5680; // -1658038656
         y ^= (y << 15) & 0xEFC60000; // -272236544
@@ -240,7 +244,7 @@ export const CN_GACHA_PHYSICS_CONFIG: Omit<GachaPhysicsConfig, 'seed'> = {
         horizontalRestitution: 0.7,
         totalCountMin: 30,
         totalCountMax: 35,
-        radius: 18, // inferred from hex: 0x18 = 24? Actually from amf3 int
+        radius: 24, // AMF3 verified: pin U29 int at position 8
     },
     amulet: {
         countPerLine: 3,
@@ -256,11 +260,11 @@ export const CN_GACHA_PHYSICS_CONFIG: Omit<GachaPhysicsConfig, 'seed'> = {
         decideTwoUpWhenAppear: false,
     },
     barAmulet: {
-        lineCount: 40,
-        firstLineY: 3025,
-        lineDistance: 165,
-        height: 0,
-        totalCount: 5,
+        totalCount: 5,      // AMF3 verified: chooseNumbers range
+        lineCount: 40,      // AMF3 verified: grid slot count
+        firstLineY: 3025,   // AMF3 verified
+        lineDistance: 165,  // AMF3 verified
+        height: 1,          // AMF3 verified (was 0 incorrectly)
     },
     threshold: {
         ballStar4: 0.7582740783691406,
