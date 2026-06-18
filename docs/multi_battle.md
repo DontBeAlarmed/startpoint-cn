@@ -611,7 +611,7 @@ const NPC_TEMPLATES = {
 | `TypeError #1034` | Type coercion in `commandReceived()` | character/equipment 未用 Option `[0, val]` / `[1]` 格式包裹 | 所有 party 字段使用 Option 包裹 |
 | `S1000` | `通信が終了されました` | TCP 连接意外关闭 | 正常关闭不处理 |
 | `C8601` | `指定的Key不存在。key=2023013102` | 活动面板加载时，CDN master 数据缺少 `daily_challenge_point_campaign[2023013102]` | 通行证功能暂不实现，已清空所有角色 `daily_challenge_point_list`，默认存档不再写入该数据 |
-| `C8601` | `key=0, ManaNodeTable` — 联机战斗玛那板 | `getAwakeLevelByManaNodes` 内联函数绕过缓存，以 `characterId=0` 查 CDN | `mana_node_ids: []` 规避，详见 [§13](#13-联机玛那板-c8601-深度分析) |
+| `C8601` | `key=0, ManaNodeTable` — 联机战斗玛那板 | `getAwakeLevelByManaNodes` 内联函数绕过缓存；**relay 模式（客户端 party 中转）可使房主玛那板生效**，NPC 独立配队待修复 | relay 模式已实施（房主✅），NPC 回退 hostParty 可用，详见 [§13](#13-联机玛那板-c8601-深度分析) |
 | `H404` | `disband_room` 端点不存在 | 未实现该端点 | 已实现 `POST /multi_battle_quest/disband_room` |
 | `H404` | `event/raid/summary` + 5 个 Raid 端点 | 未实现 | 已实现全部 7 个 Raid 端点（含 summary/ranking_reward/party/ranking/ranking:party/battle:start/get_boss），battle:start 为联机桩 |
 | `H404` | `shop/bulk_buy` + `get_campaign_lineup_id` + `set_campaign_lineup_id` | 未实现 | 已实现桩 — bulk_buy 返回空，两个 campaign lineup 返回 stub |
@@ -950,11 +950,13 @@ is_initial = !resVer  // 无 RES_VER 头 = 首次下载 = 弹出模式选择
 
 ### 13.1 现象
 
-联机战斗中，TCP party 数据的 `mana_node_ids` 字段**必须为 `[]`**。任何非空值（`[0]`、`[2201]`、真实解锁节点列表等）都会触发 C8601：
+联机战斗中，**服务端 `buildRealParty()` 构造的** party 数据中 `mana_node_ids` 必须为 `[]`。任何非空值触发 C8601：
 
 ```
 ERR:C8601|指定的Key不存在。key=0, app-storage:/asset/.../upload/1d/222e5126...
 ```
+
+**关键突破（2026-06-18）**：客户端 relay 模式（`OwnedCharacterLogic` 序列化的 party）传入的 `mana_node_ids` **不触发 C8601**。详见 §13.5。
 
 ### 13.2 崩溃堆栈
 
@@ -965,28 +967,27 @@ MasterBinaryMap.getIndex(key=0)
       → get_kind()
         → _getAbility()
           → get_ability()
-            → getPlusValueByManaNodes()
-              → get_actionSkillEvolution()
-                → resolvePathCollection()
+            → GeneralCharacterLogic/getAwakeLevelByManaNodes  ← 内联函数
+              → _getActionSkillEvolution()
+                → get_actionSkillEvolution()
+                  → resolvePathCollection()
 ```
 
-### 13.3 根因
+`getAwakeLevelByManaNodes` 存在于运行时堆栈中但**不存在于任何 `.as` 或 `.pcode` 文件**——Haxe 编译器内联。
 
-**`getAwakeLevelByManaNodes`** —— 一个 Haxe 编译器内联函数，存在于运行时堆栈中但**不存在于任何 `.as` 或 `.pcode` 文件**中。
+### 13.3 根因——数据来源决定缓存行为
 
-v2.1.125 反编译代码中，`getPlusValueByManaNodes` 正确设置了 `manaNodeMasterTable` 缓存：
-```as3
-// GeneralCharacterLogic.as:381
-manaNodeMasterTable = ManaNodeTable.get_data().get(id);  // 设缓存
+**不是客户端字节码问题，是 party 数据来源问题。**
 
-// 循环内调用 get_ability()
-while(...) {
-    node.get_ability() → get_values()
-        → generalCharacter.manaNodeMasterTable  // 命中了缓存，不走 CDN ✅
-}
-```
+| party 数据来源 | `BattleCharacterLogic` 创建方式 | mana_node缓存 | C8601？ |
+|--------------|-------------------------------|:---:|:---:|
+| 客户端 `OwnedCharacterLogic` → `getBattleCharacter()` → relay | 同（纯数据构造） | ✅ 缓存正确 | ❌ **不崩** |
+| 服务端 `buildRealParty()` 从 DB 构造 | 同（纯数据构造） | ❌ 缓存缺失 | ✅ **崩溃** |
 
-但手机实际字节码中，`getAwakeLevelByManaNodes` 内联代码**绕过了缓存**，固定传入 `characterId=0` 查 CDN → `ManaNodeTable.get(0)` → key=0 不存在 → C8601。
+两边的数据格式完全相同（`{id, mana_node_ids: [multiplied_id, ...], ...}`），但客户端 relay 数据能使缓存正常工作，服务端构造数据不能。具体差异仍在排查中（§13.9），但已确认：
+
+- **房主 relay 模式 + mana_node_ids 非空 → 联机战斗玛那板生效 ✅**
+- **NPC 用 `buildRealParty()` + mana_node_ids 非空 → C8601 ❌**
 
 ### 13.4 CDN 表确认
 
@@ -995,41 +996,38 @@ while(...) {
 | `mana_node.json` | 495 | 1 ~ 999999 | ❌ |
 | `character.json` | 505 | 1 ~ 999999 | ❌ |
 
-两个表的 CDN 源数据都**没有 key=0 条目**，任何 `get(0)` 调用都会崩。
+崩溃时访问的 CDN 文件 `1d/222e5126fc7ebe3f22c7efe87325f73742eb4f` 遍历未匹配任何已知表名。
 
-崩溃时访问的 CDN 文件 `1d/222e5126fc7ebe3f22c7efe87325f73742eb4f` 通过 `SHA1(path+salt)` 遍历了 `wf-assets-cn/orderedmap/` 下全部 2115 个文件，未匹配到任何已知表名。
+### 13.5 官方 relay 模式突破（AB 对照确认）
 
-### 13.5 官方 vs 私服——为什么官方不崩
+**官方流程**：服务端只做 TCP 中转，不构造 party。房主客户端 `getMate()` → `getBattleParty()` → `OwnedCharacterLogic.getBattleCharacter()` 序列化后发 Enter，服务端 relay 到 Welcome。
 
-官方游戏中，房主的 party 数据由**客户端** `PlayerLogic.getMate()` → `getBattleParty()` → `getBattleCharacter()` 序列化后经 TCP 发送。私服中由**服务端** `buildRealParty()` 直接从 DB 构造后注入 TCP Welcome/Mates。
+**私服 relay 模式**（已实施）：握手后**不立即发 Welcome**，等待客户端 Enter → 提取 `ed.party` → 放入 Welcome/Mates。
 
-| 对比维度 | 官方 | 私服 |
-|----------|------|------|
-| 房主 party 数据来源 | 客户端 `OwnedCharacterLogic` | 服务端 `buildRealParty()` |
-| NPC party 数据来源 | 服务端构造 | 服务端 `buildRealParty()`（相同） |
-| `mana_node_ids` 格式 | `abilities` (multiplied_id 数组) | `manaNodeIds` (multiplied_id 数组) |
-| 格式一致性 | — | ✅ 与 `getBattleCharacter()` 一致 |
-| 联机中角色类型 | `BattleCharacterLogic`（从 mate 数据创建） | `BattleCharacterLogic`（从 mate 数据创建） |
-| 在联机中是否走 `OwnedCharacterLogic` | ❌ 不走 | ❌ 不走 |
+**AB 测试**：
 
-官方 NPC 大概率发送 `mana_node_ids: []`。官方房主自身角色在联机中也走 `BattleCharacterLogic`（非 `OwnedCharacterLogic`），处于同一个 bug 的影响范围内。官方如何规避尚无法确认。
+| 测试 | 房主 party | NPC party | 结果 |
+|------|----------|-----------|:---:|
+| A | relay (客户端 Enter) | hostParty 回退 | ✅ 成功，玛那板生效 |
+| B | relay (客户端 Enter) | `buildRealParty()` 独立配队 | ❌ C8601 |
 
-### 13.6 已排除的修复方向
+栈追踪确认：`GeneralCharacterLogic/getAwakeLevelByManaNodes` → `get_values()` → `getIndex(0)`。
+
+### 13.6 修复方向状态
 
 | 方向 | 结果 |
 |------|------|
-| 服务端修改数据格式 | ❌ 格式与 `getBattleCharacter()` 一致，AB 对照无误 |
-| CDN ManaNodeTable 加 key=0 dummy | ❌ 无法确认文件对应关系，可能影响单机 |
+| **relay 模式（客户端 party 中转）** | ✅ **房主玛那板生效** |
+| 服务端数据格式修改 | ⏳ 待排查 relay vs buildRealParty 差异（§13.9） |
+| CDN ManaNodeTable 加 key=0 dummy | ❌ 无法确认文件对应关系 |
 | 战斗协议注入 | ❌ 战斗 TCP 协议无角色能力消息 |
-| APK 补丁分析 | ✅ 确认补丁不涉及玛那板逻辑（仅 DevConfig + bundle stub + beacon） |
-| `buildDefaultParty()` id=0 修复 | ✅ 防御性修复已实施（空位改 `[1]`），但不解决主问题 |
-| `GeneralCharacterLogic` 构造函数崩溃 | ❌ 堆栈确认崩在 `get_values()`，非构造函数 |
-| `get_values()` pcode 验证 | ✅ 与 .as 源码完全一致，理论不应崩 |
-| 仅恢复房主 mana_node、NPC 设 `[]` | ❌ 房主在联机中也走 `BattleCharacterLogic`，同受影响 |
-| 纯服务端缓存注入 | ❌ `/load` 无缓存字段，TCP 无能力消息，缓存 per-call 不跨场景持久 |
-| 恢复流程（Resume）绕过 | ❌ Select 和 Resume 在 `mana_node_ids` 处理上完全一致 |
+| APK 补丁分析 | ✅ 确认补丁不涉及玛那板逻辑 |
+| `buildDefaultParty()` id=0 修复 | ✅ 防御性修复已实施 |
+| 仅恢复房主 mana_node、NPC 设 `[]` | ⏳ relay 模式使房主可行，NPC 待修复 |
+| 纯服务端缓存注入 | ❌ 无对应机制 |
+| 恢复流程（Resume）绕过 | ❌ Select 和 Resume 一致 |
 
-### 13.7 房间入口路径：7 条合 1
+### 13.7 房间入口路径与 relay 时序
 
 所有进入联机房间的方式最终汇聚到同一代码路径：
 
@@ -1084,3 +1082,43 @@ App恢复房间 (restore_room)  │         ↓
 | `CooperationRoomSocketContact.as` | 249-264 | `startBattle` — 传递 continuationData |
 | `MultiQuestStartLoadingTask.as` | 116-204 | `run()` — 找自己 party + 发 quest_start |
 | `MultiQuestStartLoadingTask.as` | 252-264 | `remoteFinishedHandler` → BattleSource 创建 |
+
+### 13.8 relay 模式详解
+
+**时序**：
+
+```
+旧模式（已弃用）:
+  握手 → Accept → 立即发 Welcome (buildRealParty构造) → 客户端 Enter → 丢弃
+
+新模式（relay）:
+  握手 → Accept → 等客户端 Enter → 提取 ed.party → 发 Welcome (客户端 party 中转)
+```
+
+**实现位置** (`sessionServer.ts`):
+
+| 行 | 改动 |
+|:---|------|
+| 563 | `yourself` 存入 `client.yourself`，不立即发 Welcome |
+| 148-168 | `case 0` (Enter)：`yours.party = ed.party` → 发 Welcome + Mates |
+
+**NPC 回退机制**：
+
+当 `handleEnterComs()` 找不到 DB 中的 NPC 配队（`npcParties=0`）时：
+```typescript
+const party = npcParties[i] ?? (npcParties[0] ?? hostParty)
+```
+NPC 继承 hostParty（此时已是 relay 数据），玛那板同样生效。NPC 独立配队需 `buildRealParty()` → 触发 C8601。
+
+### 13.9 待排查——relay vs buildRealParty 数据差异
+
+| 方向 | 状态 |
+|------|:---:|
+| 字段名差异（camelCase vs snake_case） | 待 diff |
+| Option 包裹层级差异 | 待 diff |
+| 额外/缺失字段 | 待 diff |
+| `action_skill` 等非 party 字段 | `BattleCharacterLogic` 从 CDN 读取，非 party 数据 |
+
+下一步：服务端加详细日志，输出 relay party 和 buildRealParty party 的完整 JSON → 字段级对比。
+
+### 13.10 相关代码位置
