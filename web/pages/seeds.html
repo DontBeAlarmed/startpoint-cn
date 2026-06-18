@@ -78,16 +78,20 @@
     var currentMovieId = null;
     function fmt(n) { return n.toLocaleString(); }
     async function setMode(m) { await fetch('/api/seeds/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:m})});load(); }
-    async function selectCfg(id) { await fetch('/api/seeds/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({selectedMovieId:id})});currentMovieId=id;load(); }
-    async function setTag(seed,tag,movieId) { await fetch('/api/seeds/tag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed,tag,movieId:movieId||currentMovieId})});load(); }
+    async function selectCfg(id) { currentGroup = GROUPS.find(g => g.id === id) || GROUPS[0]; load(); }
+    async function setTag(seed,tag,movieId) { await fetch('/api/seeds/tag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed,tag,movieId:movieId||currentGroup.movies[0]})});load(); }
     async function setTestSeed(seed,rarity) { await fetch('/api/seeds/test-seed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seed,rarity})});load(); }
     async function clearTestSeed(rarity) { await fetch('/api/seeds/test-seed?rarity='+rarity,{method:'DELETE'});load(); }
 
     var TAG = ['未测试','热血躲避球','普通躲避球','冷血躲避球'];
     var TAG_S = ['未','热','普','冷'];
     var TAG_C = ['t0','t1','t2','t3'];
-    var C_NAMES = {fes:'流星祭',fes_guarantee:'流星祭·保底',normal:'普通',normal_guarantee:'普通·保底',rarity_5_guarantee:'★5必得'};
-    var ALL_CFG = ['fes','fes_guarantee','normal','normal_guarantee','rarity_5_guarantee'];
+    var C_NAMES = {fes:'流星祭',normal:'普通'};
+    var GROUPS = [
+        { id: 'fes', name: '流星祭', movies: ['fes', 'fes_guarantee'], poolSize: 200000 },
+        { id: 'normal', name: '普通', movies: ['normal', 'normal_guarantee'], poolSize: 200000 }
+    ];
+    var currentGroup = null;
 
     function tagBtns(seed, currentTag) {
         var h = '';
@@ -106,20 +110,45 @@
     }
 
     async function load() {
-        var mid = currentMovieId;
-        var qs = mid ? '?movieId='+mid : '';
-        var res = await fetch('/api/seeds/stats'+qs); var s = await res.json();
-        if (!currentMovieId) currentMovieId = s.selectedMovieId || 'fes';
-        if (!s.movieIds.includes(currentMovieId) && s.movieIds.length > 0) currentMovieId = s.movieIds[0];
-        qs = '?movieId=' + currentMovieId;
-        res = await fetch('/api/seeds/stats'+qs); s = await res.json();
+        if (!currentGroup) currentGroup = GROUPS[0];
+        var group = currentGroup;
+
+        // Fetch stats for each movie in group and aggregate
+        var allStats = [];
+        for (var m of group.movies) {
+            var res = await fetch('/api/seeds/stats?movieId=' + m);
+            allStats.push(await res.json());
+        }
+
+        // Aggregate stats
+        var s = {
+            mode: allStats[0].mode,
+            test_seeds: allStats[0].test_seeds,
+            movieIds: allStats[0].movieIds,
+            confirmed: 0, confirmed_play: 0, unknown: 0, mov_total: 0,
+            purified_total: 0, purified_r3: 0, purified_r4: 0, purified_r5: 0,
+            total: 0, tested: 0, coverage: 0
+        };
+        for (var st of allStats) {
+            s.confirmed += st.confirmed || 0;
+            s.confirmed_play += st.confirmed_play || 0;
+            s.unknown += st.unknown || 0;
+            s.mov_total += st.mov_total || 0;
+            s.purified_total += st.purified_total || 0;
+            s.purified_r3 += st.purified_r3 || 0;
+            s.purified_r4 += st.purified_r4 || 0;
+            s.purified_r5 += st.purified_r5 || 0;
+            s.total += st.movie_total || st.total || 0;
+            s.tested += st.tested || 0;
+        }
+        s.coverage = s.total > 0 ? Math.round(s.tested / s.total * 100) : 0;
 
         document.getElementById('btnUnknown').className = 'mode-btn'+(s.mode==='unknown'?' active':'');
         document.getElementById('btnPurified').className = 'mode-btn'+(s.mode==='purified'?' active':'');
 
         // Config selector
         var ch = '';
-        ALL_CFG.forEach(function(id){ ch += '<button class="cfg-btn'+(id===currentMovieId?' active':'')+'" onclick="selectCfg(\''+id+'\')">'+(C_NAMES[id]||id)+'</button> '; });
+        GROUPS.forEach(function(g){ ch += '<button class="cfg-btn'+(g.id===group.id?' active':'')+'" onclick="selectCfg(\''+g.id+'\')">'+g.name+'</button> '; });
         document.getElementById('cfgSelector').innerHTML = ch;
 
         var t = s.mov_total;
@@ -128,10 +157,15 @@
             + '<span class="stat"><span class="label ok">确认</span><br><span class="value ok">'+s.confirmed+'</span></span>'
             + (s.purified_total > t ? '<span class="stat"><span class="label" style="color:#888">全部净化</span><br><span class="value" style="color:#888">'+s.purified_total+'</span></span>' : '');
 
-        // Test seed bar (inside purified section)
+        // Test seed bar
         var tsArr = s.test_seeds || [null,null,null];
-        var listRes = await fetch('/api/seeds/list'+qs); var data = await listRes.json();
-        var purified = data.purified || [];
+        var allPurified = [];
+        for (var m of group.movies) {
+            var listRes = await fetch('/api/seeds/list?movieId=' + m);
+            var data = await listRes.json();
+            allPurified = allPurified.concat(data.purified || []);
+        }
+        var purified = allPurified;
         var pMap = {}; purified.forEach(function(p){pMap[p.seed]=p;});
 
         var tsH = '<span class="text-xs text-on-surface-variant">testSeed:</span> ';

@@ -19,6 +19,16 @@ function countAllSeeds(): number {
     return total > 0 ? total : 19941;
 }
 
+function countMovieSeeds(movieId: string): number {
+    const f = `gacha_movie_seeds_${movieId}.json`;
+    try {
+        const data = JSON.parse(readFileSync(join(ASSETS_DIR, f), "utf-8"));
+        let total = 0;
+        for (const key of Object.keys(data)) { const t = data[key]; for (const mt of Object.keys(t)) total += (t[mt] as number[]).length; }
+        return total;
+    } catch (_) { return 0; }
+}
+
 interface ModeBody { mode: PoolMode; selectedMovieId?: string; }
 interface TagBody { seed: number; tag: SeedTag; movieId: string; }
 
@@ -27,9 +37,13 @@ const routes = async (fastify: FastifyInstance) => {
         const mid = (request.query as any).movieId || seedValidator.getSelectedMovieId();
         const s = seedValidator.stats(mid);
         const totalSeeds = countAllSeeds();
+        const movieTotal = mid ? countMovieSeeds(mid) : 0;
         const known = s.confirmed_total + s.purified_total;
+        const perMovieKnown = (s.confirmed || 0) + (s.mov_total || 0);
         reply.status(200).send({
-            unknown: totalSeeds - known, confirmed: s.confirmed, confirmed_play: s.confirmed_play, confirmed_total: s.confirmed_total,
+            unknown: mid ? Math.max(0, movieTotal - perMovieKnown) : totalSeeds - known,
+            movie_total: movieTotal,
+            confirmed: s.confirmed, confirmed_play: s.confirmed_play, confirmed_total: s.confirmed_total,
             purified_r3: s.purified_r3, purified_r4: s.purified_r4, purified_r5: s.purified_r5, purified_total: s.purified_total,
             mov_r3: s.mov_r3, mov_r4: s.mov_r4, mov_r5: s.mov_r5, mov_total: s.mov_total,
             test_seeds: s.test_seeds,
