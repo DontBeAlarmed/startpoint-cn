@@ -165,13 +165,6 @@ fastify.get("/debug", async (request, reply) => {
     reply.status(200).send("OK");
 });
 
-// PLAY beacon — every draw reports play=1|0 (APK 04e Patch 5)
-fastify.get("/play", async (request, reply) => {
-    const loc = (request.query as any)?.loc || "unknown";
-    try { parsePlayBeacon(loc); } catch (_) {}
-    reply.status(200).send("OK");
-});
-
 // Parse C3032 from beacon loc string — ★ garbled to â, extract digits via garbled pattern
 function parseC3032Beacon(loc: string): void {
     if (!loc.includes("C3032")) return;
