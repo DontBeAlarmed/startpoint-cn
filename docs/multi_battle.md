@@ -611,7 +611,7 @@ const NPC_TEMPLATES = {
 | `TypeError #1034` | Type coercion in `commandReceived()` | character/equipment 未用 Option `[0, val]` / `[1]` 格式包裹 | 所有 party 字段使用 Option 包裹 |
 | `S1000` | `通信が終了されました` | TCP 连接意外关闭 | 正常关闭不处理 |
 | `C8601` | `指定的Key不存在。key=2023013102` | 活动面板加载时，CDN master 数据缺少 `daily_challenge_point_campaign[2023013102]` | 通行证功能暂不实现，已清空所有角色 `daily_challenge_point_list`，默认存档不再写入该数据 |
-| `C8601` | `key=0, ManaNodeTable` — 联机战斗玛那板 | `getAwakeLevelByManaNodes` 内联函数绕过缓存；**relay 模式（客户端 party 中转）可使房主玛那板生效**，NPC 独立配队待修复 | relay 模式已实施（房主✅），NPC 回退 hostParty 可用，详见 [§13](#13-联机玛那板-c8601-深度分析) |
+| `C8601` | `key=0, ManaNodeTable` — 联机战斗玛那板 | `mana_node_ids` Array 格式触发 `getLearnedManaNodes()` 遍历 → `get_ability()` → CDN 查 key=0 | ✅ 已修复 — 改为 IntMap `{id:0}` 格式，详见 [§13](#13-联机玛那板-c8601-深度分析) |
 | `H404` | `disband_room` 端点不存在 | 未实现该端点 | 已实现 `POST /multi_battle_quest/disband_room` |
 | `H404` | `event/raid/summary` + 5 个 Raid 端点 | 未实现 | 已实现全部 7 个 Raid 端点（含 summary/ranking_reward/party/ranking/ranking:party/battle:start/get_boss），battle:start 为联机桩 |
 | `H404` | `shop/bulk_buy` + `get_campaign_lineup_id` + `set_campaign_lineup_id` | 未实现 | 已实现桩 — bulk_buy 返回空，两个 campaign lineup 返回 stub |
@@ -975,19 +975,34 @@ MasterBinaryMap.getIndex(key=0)
 
 `getAwakeLevelByManaNodes` 存在于运行时堆栈中但**不存在于任何 `.as` 或 `.pcode` 文件**——Haxe 编译器内联。
 
-### 13.3 根因——数据来源决定缓存行为
+### 13.3 根因——`mana_node_ids` Array vs IntMap 格式（已确认 2026-06-18）
 
-**不是客户端字节码问题，是 party 数据来源问题。**
+**`mana_node_ids` 的数据格式决定是否触发 C8601。**
 
-| party 数据来源 | `BattleCharacterLogic` 创建方式 | mana_node缓存 | C8601？ |
-|--------------|-------------------------------|:---:|:---:|
-| 客户端 `OwnedCharacterLogic` → `getBattleCharacter()` → relay | 同（纯数据构造） | ✅ 缓存正确 | ❌ **不崩** |
-| 服务端 `buildRealParty()` 从 DB 构造 | 同（纯数据构造） | ❌ 缓存缺失 | ✅ **崩溃** |
+客户端 `OwnedCharacterLogic.getBattleCharacter()` 输出 `mana_node_ids` 为 **IntMap** 格式：
+```json
+{"2201": 0, "2207": 0, "2208": 0}      // IntMap {multiplied_id: awake_level}
+```
 
-两边的数据格式完全相同（`{id, mana_node_ids: [multiplied_id, ...], ...}`），但客户端 relay 数据能使缓存正常工作，服务端构造数据不能。具体差异仍在排查中（§13.9），但已确认：
+服务端 `buildRealParty()` 之前输出为 **Array** 格式：
+```json
+[2201, 2207, 2208]                       // Array 数字数组
+```
 
-- **房主 relay 模式 + mana_node_ids 非空 → 联机战斗玛那板生效 ✅**
-- **NPC 用 `buildRealParty()` + mana_node_ids 非空 → C8601 ❌**
+`getLearnedManaNodes()` 通过 `.length` 判断是否遍历：
+- **IntMap** `{}` → `.length = undefined → int(undefined) = 0 → 跳过循环 → 不调 `get_ability()` → ❌ 不崩**
+- **Array** `[2201,...]` → `.length = 6 → 遍历 → 逐元素调 `get_ability()` → `get_values()` → CDN 查 `characterId=0` → ✅ 崩**
+
+**修复**：`buildRealParty()` 将 `mana_node_ids` 从 `number[]` 改为 IntMap `{multiplied_id: 0}`，对齐客户端序列化格式。
+
+**AB 确认测试（同一角色 Alk id=1，已解锁 6 个节点）**：
+
+| 测试 | 格式 | SceneReady | C8601 |
+|------|------|:---:|:---:|
+| 修复前 (Array) | `[2201,2207,2208,2209,2212,2210]` | ❌ | ✅ 崩溃 |
+| 修复后 (IntMap) | `{"2201":0,"2207":0,"2208":0,"2209":0,"2210":0,"2212":0}` | ✅ | ❌ 不崩 |
+
+**NPC 独立配队 + 真实 mana_node_ids → 联机战斗成功！**
 
 ### 13.4 CDN 表确认
 
@@ -1017,15 +1032,13 @@ MasterBinaryMap.getIndex(key=0)
 
 | 方向 | 结果 |
 |------|------|
-| **relay 模式（客户端 party 中转）** | ✅ **房主玛那板生效** |
-| 服务端数据格式修改 | ⏳ 待排查 relay vs buildRealParty 差异（§13.9） |
-| CDN ManaNodeTable 加 key=0 dummy | ❌ 无法确认文件对应关系 |
+| **IntMap 格式修复（将 Array 改为 `{id:0}` 对象）** | ✅ **已修复，NPC 独立配队联机战斗成功** |
+| relay 模式（客户端 party 中转） | ✅ 房主玛那板生效；本质也是 IntMap 格式 |
+| CDN ManaNodeTable 加 key=0 dummy | ❌ 无需（根因是格式，非 CDN 缺失） |
 | 战斗协议注入 | ❌ 战斗 TCP 协议无角色能力消息 |
 | APK 补丁分析 | ✅ 确认补丁不涉及玛那板逻辑 |
-| `buildDefaultParty()` id=0 修复 | ✅ 防御性修复已实施 |
-| 仅恢复房主 mana_node、NPC 设 `[]` | ⏳ relay 模式使房主可行，NPC 待修复 |
+| `buildDefaultParty()` id=0 | ✅ 防御性修复 |
 | 纯服务端缓存注入 | ❌ 无对应机制 |
-| 恢复流程（Resume）绕过 | ❌ Select 和 Resume 一致 |
 
 ### 13.7 房间入口路径与 relay 时序
 
@@ -1110,15 +1123,24 @@ const party = npcParties[i] ?? (npcParties[0] ?? hostParty)
 ```
 NPC 继承 hostParty（此时已是 relay 数据），玛那板同样生效。NPC 独立配队需 `buildRealParty()` → 触发 C8601。
 
-### 13.9 待排查——relay vs buildRealParty 数据差异
+### 13.9 最终解决方案（IntMap 格式）
 
-| 方向 | 状态 |
-|------|:---:|
-| 字段名差异（camelCase vs snake_case） | 待 diff |
-| Option 包裹层级差异 | 待 diff |
-| 额外/缺失字段 | 待 diff |
-| `action_skill` 等非 party 字段 | `BattleCharacterLogic` 从 CDN 读取，非 party 数据 |
+**问题**：`buildRealParty()` 输出 `mana_node_ids: [2201, 2207, ...]` (Array)
 
-下一步：服务端加详细日志，输出 relay party 和 buildRealParty party 的完整 JSON → 字段级对比。
+**修复** (`sessionServer.ts:490-493`)：
+```typescript
+const rawNodes = getPlayerCharacterManaNodesSync(playerId, charId)
+const manaNodeMap: Record<string, number> = {}
+for (const id of rawNodes) manaNodeMap[String(id)] = 0
+// 输出: mana_node_ids: {"2201": 0, "2207": 0, ...}
+```
+
+**客户端 AB 确认**（日志 `[RELAY-DIFF]` vs `[BUILD-DIFF]`）：
+- relay 数据（客户端 OwnedCharacterLogic）：`{"2201": 0, ...}` IntMap
+- buildRealParty（修复后）：`{"2201": 0, ...}` IntMap → 格式一致 ✅
+
+**NPC 独立配队 + 真实 mana_node_ids → 联机战斗 SceneReady → 无 C8601 ✅**
+
+### 13.10 relay vs buildRealParty 排查（已完成）
 
 ### 13.10 相关代码位置
