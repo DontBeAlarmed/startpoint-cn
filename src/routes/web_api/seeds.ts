@@ -71,7 +71,7 @@ const routes = async (fastify: FastifyInstance) => {
         const rarity = Number((request.query as any).rarity);
         const mid = seedValidator.getSelectedMovieId() || 'fes';
         if (![3,4,5].includes(rarity)) return reply.status(400).send({ error: "Invalid" });
-        reply.status(200).send({ ok: seedValidator.clearTestSeed(mid, rarity) });
+        reply.status(200).send({ ok: seedValidator.clearTestSeed(rarity) });
     });
 };
 
