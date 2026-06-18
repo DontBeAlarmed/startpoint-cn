@@ -27,18 +27,15 @@ const routes = async (fastify: FastifyInstance) => {
         const mid = (request.query as any).movieId || seedValidator.getSelectedMovieId();
         const s = seedValidator.stats(mid);
         const totalSeeds = countAllSeeds();
-        const known = s.verified + s.pending + s.purified_total;
+        const known = s.confirmed_total + s.purified_total;
         reply.status(200).send({
-            unknown: totalSeeds - known, pending: s.mov_pending, verified: s.mov_verified,
+            unknown: totalSeeds - known, confirmed: s.confirmed, confirmed_total: s.confirmed_total,
             purified_r3: s.purified_r3, purified_r4: s.purified_r4, purified_r5: s.purified_r5, purified_total: s.purified_total,
             mov_r3: s.mov_r3, mov_r4: s.mov_r4, mov_r5: s.mov_r5, mov_total: s.mov_total,
-            mov_hot: s.mov_hot, mov_normal: s.mov_normal,
-            hot: s.hot, normal: s.normal,
             test_seeds: s.test_seeds,
-            mode: s.mode, priority: s.priority,
+            mode: s.mode,
             selectedMovieId: s.selectedMovieId, movieIds: s.movieIds,
             total: totalSeeds,
-            accuracy: totalSeeds > 0 ? Math.round((totalSeeds - s.blocked) / totalSeeds * 100) : 0,
             tested: known, coverage: totalSeeds > 0 ? Math.round(known / totalSeeds * 100) : 0,
         });
     });

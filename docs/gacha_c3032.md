@@ -377,13 +377,17 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 | 项目 | 状态 |
 |------|:---:|
 | C3032 报错 | ✅ 自动净化系统 |
-| 种子表 | ✅ CN 物理引擎生成 ★3:19K ★4:60K ★5:121K |
+| 种子表 | ✅ 5 movie × 100K 种子（unkown/confirmed/purified 三池模型） |
 | 物理配置 | ✅ 从 CN CDN 提取 5 个 AMF3 二进制，`threshold.amulets`/`ballStar4`/`isRarity5` 已重新验证 |
 | 物理引擎 | ✅ MT19937 AS3 兼容 + MathCompat cos/sin 移植 + Box2D 半隐式欧拉积分 |
-| 物理仿真精度 | ✅ normal 81%, fes 85% — ★3 ~95%, ★4 ~90%, ★5 ~0%。fes_guarantee 90%（越界修复后） |
+| 物理仿真精度 | ✅ normal 81%, fes 85% — ★3 95%, ★4 90%, ★5 0%。fes_guarantee 90%（越界修复后） |
 | RNG tempering | ✅ 修复：pre-twist 值 tempering（2026-06-18，从 17% → 85%） |
+| 惊险种子 | ✅ C3032→beacon→purified(play=1) 或 confirmed(play=0)。1 次无 C3032→confirmed |
+| 自动净化 | ✅ 简化模型：unknown→confirmed（1 次无 crash）→purified（play=1 beacon） |
+| Web 管理 | ✅ `/seeds` 模式切换 + CONFIRMED/UNKNOWN 进度 + purified 标签管理 |
+| playMovie 预测 | ✅ play=1 beacon → purified 100% 准确（客户端实测） |
 | gacha.ts | ✅ 池模式 + 优先级 + 惊险种子 + 跨池注入 |
-| 惊险种子 | 🔄 清空重置，从头测试（201 个 ground truth） |
+| 惊险种子 | 🔄 从头测试（500K 种子，play= beacon 已部署） |
 | 自动净化 | ✅ C3032 → recordDeviceData → autoPurify |
 | Web 管理 | ✅ `/seeds` 模式切换 + 三栏比例 + 标签管理 |
 | playMovie 预测 | 🔄 依赖仿真精度，客户端 beacon 上报是可靠替代方案 |

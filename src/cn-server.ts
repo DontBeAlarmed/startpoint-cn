@@ -174,20 +174,18 @@ function parseC3032Beacon(loc: string): void {
     const badSeed = parseInt(seedMatch[1], 10);
     const movieMatch = loc.match(/movie_id=(\w+)/);
     const movieId = movieMatch ? movieMatch[1] : "normal";
-    // ★ character is garbled to â in URL encoding, but digits survive.
-    // Pattern: 結果レア度=â5 → first match = ball rarity
-    //         キャラクターレア度=â4 → second match = char rarity
     const starDigits = [...loc.matchAll(/â(\d)/g)];
+    // first match = ball rarity (結果レア度), second = char rarity (キャラクターレア度)
     const ballRarity = starDigits.length > 0 ? parseInt(starDigits[0][1], 10) : 3;
-    const charRarity = starDigits.length > 1 ? parseInt(starDigits[1][1], 10) : 3;
     // Extract play= field (0=no animation, 1=played) — APK 04e patch v2
     const playMatch = loc.match(/play=(\d)/);
     const didPlay = playMatch ? playMatch[1] === '1' : null;
-    seedValidator.recordDeviceData(badSeed, ballRarity, charRarity, didPlay);
-    seedValidator.blockSeed(badSeed);
-    seedValidator.autoPurify(movieId);
+    const r = ballRarity - 3; // 0=★3, 1=★4, 2=★5
+    // purify only if play=1 (both rarity correct + confirmed playable)
+    // otherwise → confirmed (rarity known correct, but not playable or play unknown)
+    seedValidator.purify(movieId, badSeed, r, didPlay === true);
     const playStr = didPlay === true ? ' play=1' : didPlay === false ? ' play=0' : '';
-    console.log(`[BEACON] C3032 → purified seed ${badSeed} ★${ballRarity}${playStr} [${movieId}]`);
+    console.log(`[BEACON] C3032 → ${didPlay === true ? 'purified' : 'confirmed'} seed ${badSeed} ★${ballRarity}${playStr} [${movieId}]`);
 }
 
 fastify.post("/debug", async (request, reply) => {
@@ -212,17 +210,13 @@ fastify.post("/crash", async (request, reply) => {
         if (seedMatch && bodyStr.includes("C3032")) {
             const badSeed = parseInt(seedMatch[1], 10);
             const ballMatch = bodyStr.match(/結果レア度=★(\d)/);
-            const charMatch = bodyStr.match(/キャラクターレア度=★(\d)/);
             const ballRarity = ballMatch ? parseInt(ballMatch[1], 10) : 0;
-            const charRarity = charMatch ? parseInt(charMatch[1], 10) : 0;
-
-            if (ballRarity > 0) seedValidator.recordDeviceData(badSeed, ballRarity, charRarity);
-            seedValidator.blockSeed(badSeed);
-            // Extract movie_id from crash (e.g., "movie_id=fes" or "movie_id=fes_guarantee")
+            const r = ballRarity - 3;
             const movieMatch = bodyStr.match(/movie_id=(\w+)/);
             const movieId = movieMatch ? movieMatch[1] : "normal";
-            seedValidator.autoPurify(movieId);
-            console.log(`[CRASH] seed ${badSeed} device★${ballRarity} char★${charRarity} movie=${movieId}`);
+            // Crash path: no play= info → confirm only (rarity correct, play unknown)
+            if (r >= 0 && r <= 2) seedValidator.purify(movieId, badSeed, r, false);
+            console.log(`[CRASH] seed ${badSeed} device★${ballRarity} movie=${movieId}`);
         }
     } catch (e) {}
 
@@ -300,12 +294,6 @@ fastify.listen({ port, host }, (err, address) => {
         process.exit(1);
     }
     console.log(`CN StarPoint listening on http://${host}:${port}`);
-
-    // Auto-purify blocked seeds (uses 'normal' as fallback, per-crash movieId is preferred)
-    try {
-        const purified = seedValidator.autoPurify('normal');
-        if (purified > 0) console.log(`[SEED] Startup: purified ${purified} seeds`);
-    } catch (_) {}
 
     // Start multi battle TCP session server
     startSessionServer();

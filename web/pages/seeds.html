@@ -68,8 +68,8 @@
 
             <!-- ====== 测试池 ====== -->
             <div class="card" id="testSection">
-                <h2 class="text-lg font-semibold text-on-surface-variant mb-2">测试池 <span class="text-xs" style="color:#888">（UNKNOWN > PENDING > VERIFIED）</span></h2>
-                <div class="progress"><div class="bar-ok" id="barOk" style="width:0"></div><div class="bar-p1" id="barP1" style="width:0"></div><div class="bar-unk" id="barUnk" style="width:0"></div></div>
+                <h2 class="text-lg font-semibold text-on-surface-variant mb-2">测试池 <span class="text-xs" style="color:#888">（CONFIRMED > UNKNOWN）</span></h2>
+                <div class="progress"><div class="bar-ok" id="barOk" style="width:0"></div><div class="bar-unk" id="barUnk" style="width:0"></div></div>
                 <div id="testStats"></div><p id="testSummary" class="text-xs text-on-surface-variant mt-1"></p>
             </div>
         </article>
@@ -124,10 +124,9 @@
 
         var t = s.mov_total;
         document.getElementById('cfgSummary').innerHTML =
-            '<span class="stat"><span class="label hot">热血</span><br><span class="value hot">'+s.mov_hot+'</span></span>'
-            + '<span class="stat"><span class="label ok">普通</span><br><span class="value ok">'+s.mov_normal+'</span></span>'
-            + '<span class="stat"><span class="label pur">净化</span><br><span class="value pur">'+t+'</span></span>'
-            + (s.purified_total > t ? '<span class="stat"><span class="label" style="color:#888">全部</span><br><span class="value" style="color:#888">'+s.purified_total+'</span></span>' : '');
+            '<span class="stat"><span class="label pur">净化</span><br><span class="value pur">'+t+'</span></span>'
+            + '<span class="stat"><span class="label ok">确认</span><br><span class="value ok">'+s.confirmed+'</span></span>'
+            + (s.purified_total > t ? '<span class="stat"><span class="label" style="color:#888">全部净化</span><br><span class="value" style="color:#888">'+s.purified_total+'</span></span>' : '');
 
         // Test seed bar (inside purified section)
         var tsArr = s.test_seeds || [null,null,null];
@@ -167,13 +166,11 @@
 
         // Test pool
         document.getElementById('testStats').innerHTML =
-            '<span class="stat"><span class="label unk">UNKNOWN</span><br><span class="value unk">'+fmt(s.unknown)+'</span></span>'
-            + '<span class="stat"><span class="label p1">PENDING</span><br><span class="value p1">'+fmt(s.pending)+'</span></span>'
-            + '<span class="stat"><span class="label ok">VERIFIED</span><br><span class="value ok">'+fmt(s.verified)+'</span></span>';
-        document.getElementById('testSummary').textContent = '安全率 '+s.accuracy+'% | 已测 '+fmt(s.tested)+' | 覆盖率 '+s.coverage+'%';
+            '<span class="stat"><span class="label ok">CONFIRMED</span><br><span class="value ok">'+fmt(s.confirmed)+'</span></span>'
+            + '<span class="stat"><span class="label unk">UNKNOWN</span><br><span class="value unk">'+fmt(s.unknown)+'</span></span>';
+        document.getElementById('testSummary').textContent = '已测 '+fmt(s.tested)+' | 覆盖率 '+s.coverage+'%';
         var tt = s.total;
-        document.getElementById('barOk').style.width=(s.verified/tt*100)+'%';
-        document.getElementById('barP1').style.width=(s.pending/tt*100)+'%';
+        document.getElementById('barOk').style.width=(s.confirmed/tt*100)+'%';
         document.getElementById('barUnk').style.width=(s.unknown/tt*100)+'%';
     }
 

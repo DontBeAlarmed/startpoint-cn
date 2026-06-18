@@ -92,8 +92,12 @@
 | ⚠️ Beacon 日语乱码 | ⚠️→✅ `CrashUtil.debugBeacon` ★→â，用 `/â(\d)/g` regex 从 garbled 字符提取数字 |
 | F1059 gacha-physics 完善 | MathCompat cos/sin 移植 + 配置深度合并 + moviePlayable=false 跳帧 + AMF3 阈值提取 |
 | ✅ gacha-physics 精度 | normal 81%, fes 85% — ★3 95%, ★4 90%, ★5 0%。fes_guarantee 90%（越界修复后） |
+| F1064 种子池简化 | 删除 pending/verified/blocked，引入 confirmed（1 次无 C3032）。purified 仅接受 play=1。三池: unknown→confirmed→purified |
 | F1060 RNG tempering 修复 | `randomUInt()` tempering 从 post-twist 值改为 pre-twist 值（匹配 AS3），精度 17% → 85% |
 | F1061 threshold.amulets 越界 | `?? 0` → `!== undefined`（匹配 AS3 Number(undefined)=NaN），fes_guarantee 37% → 90% |
+| F1062 play= beacon 字段 | APK patch: C3032 beacon 加入 `play=1|0`（client moviePlayable），服务端解析存储 |
+| F1063 种子池重建 | 清空全部池子，5 movie × 100K 种子重新生成（无 playMovie 过滤），500K 种子总池 |
+| F1064 种子池简化 | 删除 pending/verified/blocked，引入 confirmed（1 次无 C3032）。purified 仅接受 play=1。三池: unknown→confirmed→purified |
 
 ## C3212 修复详解
 
