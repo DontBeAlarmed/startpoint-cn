@@ -267,6 +267,7 @@ export interface GachaPhysicsConfig {
         amuletTwoUp: number;
         amulets: (number | null)[];
         playMovie: number;
+        isRarity5?: boolean;
     };
 }
 
@@ -341,23 +342,49 @@ export const CN_GACHA_PHYSICS_CONFIG: Omit<GachaPhysicsConfig, 'seed'> = {
 export const MOVIE_CONFIGS: Record<string, Partial<Omit<GachaPhysicsConfig, 'seed'>>> = {
     normal: {
         amulet: { totalCount: 5 },
-        threshold: { ballStar4: 0.7582740783691406, amuletTwoUp: 0.8148193359375, playMovie: 0.8995208740234375, amulets: CN_GACHA_PHYSICS_CONFIG.threshold.amulets },
+        threshold: {
+            amulets: [0, 0, 0, 0, 0, 0.9022216796875],
+            ballStar4: 0.7582740783691406,
+            amuletTwoUp: 0.8148193359375,
+            playMovie: 0.8995208740234375,
+        },
     },
     fes: {
         amulet: { totalCount: 7 },
-        threshold: { ballStar4: 0.7429313659667969, amuletTwoUp: 0.475677490234375, playMovie: 0.8994979858398438, amulets: CN_GACHA_PHYSICS_CONFIG.threshold.amulets },
+        threshold: {
+            amulets: [0, 0, 0, 0, 0, 0, 0, 0.7190780639648438],
+            ballStar4: 0.7429313659667969,
+            amuletTwoUp: 0.475677490234375,
+            playMovie: 0.8994979858398438,
+        },
     },
     normal_guarantee: {
         amulet: { totalCount: 5 },
-        threshold: { ballStar4: 3.8e-05, amuletTwoUp: 0.5, playMovie: 0.9299392700195312, amulets: CN_GACHA_PHYSICS_CONFIG.threshold.amulets },
+        threshold: {
+            amulets: [0, 0, 0, 0, 0.18988037109375, 1],
+            ballStar4: 3.814697265625e-05,
+            amuletTwoUp: 0.5,
+            playMovie: 0.9299392700195312,
+        },
     },
     fes_guarantee: {
         amulet: { totalCount: 7 },
-        threshold: { ballStar4: 3.8e-05, amuletTwoUp: 0.5, playMovie: 0.8994979858398438, amulets: CN_GACHA_PHYSICS_CONFIG.threshold.amulets },
+        threshold: {
+            amulets: [0, 0, 0, 0, 0, 0.6259765625, 0.999114990234375, 1],
+            ballStar4: 3.814697265625e-05,
+            amuletTwoUp: 0.5,
+            playMovie: 0.8994979858398438,
+        },
     },
     rarity_5_guarantee: {
         amulet: { totalCount: 5 },
-        threshold: { ballStar4: CN_GACHA_PHYSICS_CONFIG.threshold.ballStar4, amuletTwoUp: CN_GACHA_PHYSICS_CONFIG.threshold.amuletTwoUp, playMovie: CN_GACHA_PHYSICS_CONFIG.threshold.playMovie, amulets: CN_GACHA_PHYSICS_CONFIG.threshold.amulets },
+        threshold: {
+            amulets: [0, 0, 0, 0, 0, 0],
+            ballStar4: 0,
+            amuletTwoUp: 0,
+            playMovie: 0,
+            isRarity5: true,
+        },
     },
 };
 
@@ -519,6 +546,12 @@ export class GachaSimulator {
         // Determine if movie should play
         const threshold = this.config.threshold;
         this.moviePlayable = this.playProbability >= threshold.playMovie;
+
+        // FixedFallingField constructor lines 37-39: ★5 guarantee override
+        if (threshold.isRarity5) {
+            this.ballRarity = 2; // force ★5
+            this.moviePlayable = false; // skip animation
+        }
 
         this.frameCount = 0;
         this.finished = false;
