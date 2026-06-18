@@ -385,7 +385,8 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 | 惊险种子 | ✅ C3032→beacon→purified(play=1) 或 confirmed(play=0)。1 次无 C3032→confirmed |
 | 自动净化 | ✅ 简化模型：unknown→confirmed（1 次无 crash）→purified（play=1 beacon） |
 | Web 管理 | ✅ `/seeds` 模式切换 + CONFIRMED/UNKNOWN 进度 + purified 标签管理 |
-| playMovie 预测 | ✅ play=1 beacon → purified 100% 准确（客户端实测） |
+| playMovie 预测 | ✅ play=1 beacon → purified 100% 准确（客户端实测）。仿真 ~5%（不可靠——playProbability 被 RNG 重试次数偏移） |
+| gacha 抽卡去重 | ✅ 2026-06-19：flat array 按原始随机顺序，不再 group 同一角色 |
 | gacha.ts | ✅ 池模式 + 优先级 + 惊险种子 + 跨池注入 |
 | 惊险种子 | 🔄 从头测试（500K 种子，play= beacon 已部署） |
 | 自动净化 | ✅ C3032 → recordDeviceData → autoPurify |
