@@ -26,6 +26,7 @@ interface PurifiedEntry { r: number; tag: SeedTag; play?: boolean }
 /** 每个卡池独立的状态 */
 class MoviePool {
     confirmed: Set<number> = new Set();
+    confirmedPlay: Set<number> = new Set();
     purified: Map<number, PurifiedEntry> = new Map();
 
     purifiedStats(): { r3: number; r4: number; r5: number } {
@@ -50,7 +51,7 @@ export class SeedValidator {
     private pool(m: string): MoviePool { if (!this.pools.has(m)) this.pools.set(m, new MoviePool()); return this.pools.get(m)!; }
 
     private load(): void {
-        try { if (existsSync(CONFIRMED_FILE)) { const o = JSON.parse(readFileSync(CONFIRMED_FILE, "utf-8")); for (const [mid, seeds] of Object.entries(o)) { const p = this.pool(mid); for (const s of seeds as any[]) p.confirmed.add(Number(s)); } } } catch (_) {}
+        try { if (existsSync(CONFIRMED_FILE)) { const o = JSON.parse(readFileSync(CONFIRMED_FILE, "utf-8")); for (const [mid, seeds] of Object.entries(o)) { if (mid.endsWith("_play")) { const mid2 = mid.replace("_play", ""); for (const s of seeds as any[]) this.pool(mid2).confirmedPlay.add(Number(s)); } else { const p = this.pool(mid); for (const s of seeds as any[]) p.confirmed.add(Number(s)); } } } } catch (_) {}
         try { if (existsSync(PURIFIED_FILE)) { const o = JSON.parse(readFileSync(PURIFIED_FILE, "utf-8")); for (const [mid, seeds] of Object.entries(o)) { if (typeof seeds !== 'object' || seeds === null) continue; for (const [s, e] of Object.entries(seeds as any)) this.pool(mid).purified.set(Number(s), { r: (e as any).r ?? 0, tag: (e as any).tag || '未测试', play: (e as any).play }); } } } catch (_) {}
         try { if (existsSync(TEST_SEEDS_FILE)) { const a = JSON.parse(readFileSync(TEST_SEEDS_FILE, "utf-8")); if (Array.isArray(a)) { this.testSeeds = [null, null, null]; for (let i = 0; i < 3; i++) if (typeof a[i] === 'number') this.testSeeds[i] = a[i]; } } } catch (_) {}
         try { if (existsSync(CONFIG_FILE)) { const c = JSON.parse(readFileSync(CONFIG_FILE, "utf-8")); if (c.mode) this.mode = c.mode; if (c.selectedMovieId) this.selectedMovieId = c.selectedMovieId; } } catch (_) {}
@@ -59,7 +60,7 @@ export class SeedValidator {
         console.log(`[SEED] Confirmed:${c} Purified:${t} Mode:${this.mode}`);
     }
 
-    private saveConfirmed(): void { const o: any = {}; for (const [mid, p] of this.pools) o[mid] = Array.from(p.confirmed); writeFileSync(CONFIRMED_FILE, JSON.stringify(o, null, 2), "utf-8"); }
+    private saveConfirmed(): void { const o: any = {}; for (const [mid, p] of this.pools) { o[mid] = Array.from(p.confirmed); o[mid + "_play"] = Array.from(p.confirmedPlay); } writeFileSync(CONFIRMED_FILE, JSON.stringify(o, null, 2), "utf-8"); }
     private savePurified(): void { const o: any = {}; for (const [mid, p] of this.pools) { o[mid] = {}; for (const [s, e] of p.purified) o[mid][String(s)] = e; } writeFileSync(PURIFIED_FILE, JSON.stringify(o, null, 2), "utf-8"); }
     private saveConfig(): void { writeFileSync(CONFIG_FILE, JSON.stringify({ mode: this.mode, selectedMovieId: this.selectedMovieId }, null, 2), "utf-8"); }
     private saveTestSeeds(): void { writeFileSync(TEST_SEEDS_FILE, JSON.stringify(this.testSeeds, null, 2), "utf-8"); }
@@ -71,6 +72,15 @@ export class SeedValidator {
         // Remove from other pools if present
         for (const [, other] of this.pools) other.confirmed.delete(seed);
         p.confirmed.add(seed);
+        this.saveConfirmed();
+    }
+
+    // 确认种子可播放（PLAY beacon: seed confirmed + play=1）
+    confirmPlay(movieId: string, seed: number): void {
+        const p = this.pool(movieId);
+        if (p.purified.has(seed)) return;
+        p.confirmedPlay.add(seed);
+        if (!p.confirmed.has(seed)) p.confirmed.add(seed);
         this.saveConfirmed();
     }
 
@@ -131,11 +141,15 @@ export class SeedValidator {
             console.log(`[SEED] No purified ★${rarity} play=1 in [${movieId}]`);
         }
 
-        // ③ 未测试种子（优先发送，扩展 confirmed 池）
+        // ③ 已确认可播放的种子（PLAY beacon: play=1 known）
+        const confPlay = pool.find(s => p.confirmedPlay.has(s));
+        if (confPlay !== undefined) return confPlay;
+
+        // ④ 未测试种子（优先发送，扩展 confirmed 池）
         const unknown = pool.find(s => !p.confirmed.has(s) && !p.purified.has(s));
         if (unknown !== undefined) return unknown;
 
-        // ④ 已确认种子（兜底：unknown 耗尽时复用）
+        // ⑤ 已确认种子（兜底：unknown 耗尽时复用）
         const conf = pool.find(s => p.confirmed.has(s));
         if (conf !== undefined) return conf;
 
@@ -156,14 +170,16 @@ export class SeedValidator {
         const mid = movieId || this.selectedMovieId || 'fes';
         const p = this.pool(mid); const ps = p.purifiedStats();
         let all = { r3: 0, r4: 0, r5: 0, total: 0 };
-        let allConfirmed = 0;
+        let allConfirmed = 0, allConfirmedPlay = 0;
         for (const [, pool] of this.pools) {
             const s = pool.purifiedStats(); all.r3 += s.r3; all.r4 += s.r4; all.r5 += s.r5;
             all.total += pool.purified.size;
             allConfirmed += pool.confirmed.size;
+            allConfirmedPlay += pool.confirmedPlay.size;
         }
         return {
             confirmed: p.confirmed.size, confirmed_total: allConfirmed,
+            confirmed_play: p.confirmedPlay.size, confirmed_play_total: allConfirmedPlay,
             purified_r3: all.r3, purified_r4: all.r4, purified_r5: all.r5, purified_total: all.total,
             mov_r3: ps.r3, mov_r4: ps.r4, mov_r5: ps.r5, mov_total: p.purified.size,
             test_seeds: this.testSeeds,
