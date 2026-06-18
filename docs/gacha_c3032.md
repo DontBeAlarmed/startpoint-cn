@@ -343,44 +343,32 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 | fes_guarantee | 5, 6 | 0.626, 0.999 | 第 6、7 个护符 |
 | rarity_5_guarantee | 无 | 全 0 | isRarity5=true 直接跳过物理 |
 
-### 6b. 物理引擎逻辑（AS3 源码移植）
+### 6c. 物理引擎移植验证
 
 所有移植代码位于 `src/lib/gacha-physics.ts`。
 
 | 模块 | AS3 源文件（行号） | 移植行号 | 验证 |
 |------|-------------------|---------|:---:|
 | MersenneTwister 初始化 | `MersenneTwister.as:21-44` | `gacha-physics.ts:98-118` | ✅ |
-| randomUInt (增量扭转) | `MersenneTwister.as:62-73` | `gacha-physics.ts:122-146` | ✅ |
-| randomRangeFloat | `MersenneTwister.as:76-78` | `gacha-physics.ts:154-156` | ✅ |
-| randomRange | `MersenneTwister.as:81-83` | `gacha-physics.ts:159-161` | ✅ |
-| toFloat (uint→[0,1)) | `MersenneTwister.as:47-49` | `gacha-physics.ts:149-151` | ✅ |
-| MathCompat.cos | `MathCompat.as:141-188` | `gacha-physics.ts:65-81` | ✅ |
-| MathCompat.sin | `MathCompat.as:91-139` | `gacha-physics.ts:84-86` | ✅ |
-| MathCompat._cos 核心 | `MathCompat.as:407-416` | `gacha-physics.ts:45-54` | ✅ |
-| MathCompat._sin 核心 | `MathCompat.as:399-405` | `gacha-physics.ts:57-64` | ✅ |
+| randomUInt (增量扭转+pre-twist temper) | `MersenneTwister.as:62-73` | `gacha-physics.ts:122-146` | ✅ 2026-06-18 修复 |
+| MathCompat.cos/sin | `MathCompat.as:141-188` | `gacha-physics.ts:39-86` | ✅ |
 | initBallRarity | `FixedFallingField.as:126` | `gacha-physics.ts:558-560` | ✅ |
 | initAmuletRarity | `FixedFallingField.as:129-180` | `gacha-physics.ts:544-587` | ✅ |
 | ★5 级联 + forceContacted | `FixedFallingField.as:74-122` | `gacha-physics.ts:683-704` | ✅ |
 | isRarity5 强制★5 | `FixedFallingField.as:37-39` | `gacha-physics.ts:549-552` | ✅ |
-| createBall (RNG #1-3) | `FallingField.as:392-401` | `gacha-physics.ts:415-421` | ✅ |
-| createAmulet (RNG per amulet) | `FallingField.as:409-416` | `gacha-physics.ts:458-486` | ✅ |
-| createBarAmulet (RNG per bar) | `FallingField.as:384-390` | `gacha-physics.ts:514-533` | ✅ |
-| initField (RNG 顺序) | `FallingField.as:301-333` | `gacha-physics.ts:405-550` | ✅ |
-| chooseNumbers | `FallingField.as:419-432` | `gacha-physics.ts:830-840` | ✅ |
-| moviePlayable 判断 | `FixedFallingField.as:35` | `gacha-physics.ts:547` | ✅ |
-| precalculateFieldResult | `BallMovie.as:1130-1152` | `gacha-physics.ts:788-801` | ✅ |
+| createBall/Amulet/BarAmulet | `FallingField.as:301-333` | `gacha-physics.ts:405-550` | ✅ |
+| step() 运动前护符检测 | `World.step() Phase A` | `gacha-physics.ts:634-674` | ✅ |
 
-### 6c. 未完整移植的部分（== 误差来源 ==）
+### 6d. 未完整移植的部分（== 剩余 15% 误差来源 ==）
 
 | 客户端组件 | AS3 源文件 | 当前简化 | 影响 |
 |-----------|-----------|---------|:---:|
-| Box2D CCD 碰撞检测 | `gacha_physics.World` CCD phase | 帧末距离检测 | 🔴 主要误差源 |
-| 球连续运动积分 | `gacha_physics.Body.integrate()` | 半隐式欧拉 + 逐帧位移 | 🟡 |
-| 约束求解器 (10 iter) | `gacha_physics.Contact.solve()` | 串行 pin 检测（sensor 无需求解） | 🟢 |
-| 完整 Ball.as 类 | `Ball.as`（未反编译） | 简化为坐标+速度变量 | 🟡 |
-| camera / slowFrame | `camera` AMF3 段 | 不需要（仅动画层） | 🟢 |
+| Box2D BroadPhase 选择性扫描 | `BroadPhaseSelectiveSweep.as` | 无（逐个遍历） | 🟡 ★5 接触检测 |
+| 接触持久化管理 | `ContactManager.as` | `contacted` flag | 🟡 |
+| ContactEventManager | `ContactEventManager.as` | 无 | 🟢 |
+| 约束求解器 | `Contact.solve()` | 不需要（sensor 无需求解） | 🟢 |
 
-**精度现状**：经过以上全部移植修复，仿真精度为 normal ~51%、fes ~17%。未移植的 CCD 模块是剩余误差主因。当前透过 purified 池 ground truth 绕过仿真限制。
+**精度现状**：经过 RNG tempering 修复，仿真精度 **normal 81%, fes 85%**。★3/★4 预测 ~93%，★5 预测 ~4%。未移植的 contact persistence/broadphase 是 ★5 漏检的剩余主因。
 
 ---
 
@@ -392,7 +380,8 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 | 种子表 | ✅ CN 物理引擎生成 ★3:19K ★4:60K ★5:121K |
 | 物理配置 | ✅ 从 CN CDN 提取 5 个 AMF3 二进制，`threshold.amulets`/`ballStar4`/`isRarity5` 已重新验证 |
 | 物理引擎 | ✅ MT19937 AS3 兼容 + MathCompat cos/sin 移植 + Box2D 半隐式欧拉积分 |
-| 物理仿真精度 | ⚠️ normal 51%, fes 17% — AMF3 配置值正确，但逐帧 CCD/物理与客户端 Box2D 引擎仍有系统偏差 |
+| 物理仿真精度 | ✅ normal 81%, fes 85% — ★3/★4 预测 ~93%, ★5 预测 ~4%（护符接触检测仍有差异） |
+| RNG tempering | ✅ 修复：pre-twist 值 tempering（2026-06-18，从 17% → 85%） |
 | gacha.ts | ✅ 池模式 + 优先级 + 惊险种子 + 跨池注入 |
 | 惊险种子 | 🔄 清空重置，从头测试（201 个 ground truth） |
 | 自动净化 | ✅ C3032 → recordDeviceData → autoPurify |
@@ -401,17 +390,15 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 
 ### 8a. 剩余误差来源分析
 
-基于 seed=10000008 诊断（client★3, server★5）：
+经过 RNG tempering 修复后，整体精度从 17% → 85%。剩余 15% 误差分布：
 
-| 差异 | 占比估计 | 说明 |
-|------|:---:|------|
-| **护符接触检测** | 70%+ | 帧末距离检测 vs Box2D 完整 CCD。服务端检测到 3 个物理接触 → ★5，客户端无接触 → ★3 |
-| **球轨迹** | 15-20% | 简化半隐式欧拉 vs Box2D `Body.integrate()` |
-| **多护符同时接触** | 5-10% | Box2D 10 次约束迭代 vs 顺序遍历 |
-| RNG | ~0% | MT19937 已验证正确（增量扭转+取模） |
-| AMF3 配置 | ~0% | 已逐字节提取 + 5 文件交叉比对 |
+| 误差源 | 占比 | 具体表现 |
+|--------|:---:|------|
+| ★5 护符接触漏检 | ~12% | 仿真检测不到足够护符接触 → 球停留 ★3/★4，客户端实际 ★5 |
+| ★5 受污染数据 | ~2% | 部分 purified r=5 可能来自旧 beacon 解析 |
+| ★4 边缘种子 | ~1% | ballStar4 阈值边界附近的种子 |
 
-要突破精度天花板，需完整移植 `gacha_physics.World` CCD 阶段（`gacha_physics/dynamics/World.as` 和 `Contact.as`）。
+RNG temering bug（2026-06-18 修复）：`randomUInt()` 对 POST-TWIST 值做 tempering，AS3 用 PRE-TWIST 值。修复后精度飞跃 17% → 85%。
 
 ## 9. 自动净化流程（2026-06-15 新增，2026-06-18 修复稀有度解析）
 
