@@ -622,14 +622,14 @@ export class GachaSimulator {
     /**
      * Main update loop — one physics frame.
      *
-     * FallingField.update() via World.step():
-     *   1. Gravity: v += g (Box2D semi-implicit Euler)
-     *   2. Integrate: pos += v (v already includes g, so pos += v_old + g)
-     *   3. Pin/amulet contacts (end-of-frame distance check)
+     * FallingField.update() flow:
+     *   1. Gravity + integrate (Box2D semi-implicit Euler)
+     *   2. Pin contacts (sensor — no bounce, just marked contacted)
+     *   3. Amulet contacts (end-of-frame distance, sensor → rarity upgrade)
      *   4. Exit detection
      *
-     * Note: Box2D uses semi-implicit Euler, adding g*dt² to position (not ½g*dt²).
-     * This must match the client exactly for trajectory alignment.
+     * Ball ShapeCircle.sensor=true → constraint solver skips contact resolution.
+     * Ball passes through pins without bouncing. Pin detection is contact logging only.
      */
     step(): void {
         if (this.finished) return;
@@ -647,8 +647,10 @@ export class GachaSimulator {
 
         this.frameCount++;
 
-        // ---- Phase 3: Pin contact detection ----
-        const pinHR = cfg.pin.horizontalRestitution / cfg.pin.verticalRestitution;
+        // ---- Phase 3: Pin contact detection (sensor → no bounce) ----
+        // Ball has sensor=true → constraint solver skips contact resolution.
+        // Pins are marked contacted but do NOT affect ball trajectory.
+        // FallingField.update(): Vx *= pinHR where pinHR = 0.7/0.7 = 1.0 (no-op).
         for (const pin of this.pins) {
             if (pin.contacted) continue;
             const dx = this.ballX - pin.x;
@@ -656,7 +658,6 @@ export class GachaSimulator {
             const minDist = cb.radius + pin.radius;
             if (dx * dx + dy * dy < minDist * minDist) {
                 pin.contacted = true;
-                this.ballVx *= pinHR;
             }
         }
 
