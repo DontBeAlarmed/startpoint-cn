@@ -131,13 +131,13 @@ export class SeedValidator {
             console.log(`[SEED] No purified ★${rarity} play=1 in [${movieId}]`);
         }
 
-        // ③ 已确认种子（rarity 正确但播放未知）
-        const conf = pool.find(s => p.confirmed.has(s));
-        if (conf !== undefined) return conf;
-
-        // ④ 未测试种子
+        // ③ 未测试种子（优先发送，扩展 confirmed 池）
         const unknown = pool.find(s => !p.confirmed.has(s) && !p.purified.has(s));
         if (unknown !== undefined) return unknown;
+
+        // ④ 已确认种子（兜底：unknown 耗尽时复用）
+        const conf = pool.find(s => p.confirmed.has(s));
+        if (conf !== undefined) return conf;
 
         // ⑤ 兜底
         return characterId * 1000;
