@@ -251,7 +251,140 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 - CN 种子池随机选取对应稀有度的 seed
 - `movie_id` 按动画类型选择 `movieName` 或 `guaranteeMovieName`
 
-## 7. 当前状态
+## 7. 参数来源
+
+### 6a. 物理配置参数（AMF3 二进制提取）
+
+5 个元文件位于 `assets/gacha_movie_configs/`，从 CN CDN `archive-common-full` 中的 `gacha/{movie}.gacha.amf3.deflate` zlib 解压后提取。
+
+#### field（物理世界边界）
+
+| 参数 | AMF3 值 | 源文件 | AS3 引用 | 跨 movie |
+|------|------|---------|---------|:---:|
+| `width` | 1080 | `normal.amf3` | `FallingField.initWall:271` | 🟢 无差异 |
+| `height` | 3840 | ↑ | ↑ | 🟢 |
+| `gravityX` | 0 | ↑ | `FallingField.initField:306` | 🟢 |
+| `gravityY` | 0.9 (double) | ↑ | ↑ | 🟢 |
+| `wallRestitution` | 1 | ↑ | `FallingField.initWall:277` | 🟢 |
+
+#### ball（球创建参数）
+
+| 参数 | AMF3 值 | 源文件 | AS3 引用 | 跨 movie |
+|------|------|---------|---------|:---:|
+| `initialXMin` | 100 | `normal.amf3` | `FallingField.createBall:394` | 🟢 |
+| `initialXMax` | 880 | ↑ | ↑ | 🟢 |
+| `initialY` | 200 | ↑ | `createBall:395` | 🟢 |
+| `ejectionVelocity` | 15 | ↑ | `createBall:397-398` | 🟢 |
+| `ejectionAngleMin` | 40 | ↑ | `createBall:396` | 🟢 |
+| `ejectionAngleMax` | 140 | ↑ | ↑ | 🟢 |
+| `radius` | 48 | ↑ | `createBall:401` | 🟢 |
+| `maxSpeed` | 35 | ↑ | `createBall:399`（仅记录，不强制） | 🟢 |
+
+#### pin（弹射钉子）
+
+| 参数 | AMF3 值 | 源文件 | AS3 引用 | 跨 movie |
+|------|------|---------|---------|:---:|
+| `countPerLine` | 4 | `normal.amf3` | `FallingField.initPins:286` | 🟢 |
+| `lineCount` | 12 | ↑ | ↑ | 🟢 |
+| `firstLineY` | 1070 | ↑ | `createPin:378` | 🟢 |
+| `evenLineOffsetRatio` | 0.25 (double) | ↑ | `createPin:376` | 🟢 |
+| `oddLineOffsetRatio` | -0.25 (double) | ↑ | `createPin:376` | 🟢 |
+| `distanceHorizontal` | 290 | ↑ | `createPin:377` | 🟢 |
+| `lineDistance` | 165 | ↑ | `createPin:380` | 🟢 |
+| `verticalRestitution` | 0.7 (double) | ↑ | `createPin:381` | 🟢 |
+| `horizontalRestitution` | 0.7 (double) | ↑ | `createPin:381` | 🟢 |
+| `totalCountMin` | 30 | ↑ | `initPins:287` | 🟢 |
+| `totalCountMax` | 35 | ↑ | `initPins:287` | 🟢 |
+| `radius` | 24 | ↑ | `Pin.as:26` | 🟢 |
+
+#### amulet（圆形护符 — 稀有度升级道具）
+
+| 参数 | AMF3 值 | 源文件 | AS3 引用 | 跨 movie |
+|------|------|---------|---------|:---:|
+| `countPerLine` | 3 | `normal.amf3` | `FallingField.initAmulets:344` | 🟢 |
+| `lineCount` | 14 | ↑ | ↑ | 🟢 |
+| `firstLineY` | 1630 | ↑ | `createAmulet:412` | 🟢 |
+| `evenLineOffsetRatio` | -0.25 (double) | ↑ | `createAmulet:409` | 🟢 |
+| `oddLineOffsetRatio` | 0.25 (double) | ↑ | `createAmulet:409` | 🟢 |
+| `distanceHorizontal` | 290 | ↑ | `createAmulet:410` | 🟢 |
+| `lineDistance` | 165 | ↑ | `createAmulet:413` | 🟢 |
+| `radius` | 40 | ↑ | `createAmulet:416` | 🟢 |
+| `totalCount` | 5 / **7** | ↑ | `initAmulets:345` | 🔴 fes/fes_guar 不同 |
+| `limitTotalCount` | false | ↑ | `FixedFallingField:150` | 🟢 |
+| `decideTwoUpWhenAppear` | false | ↑ | `FixedFallingField:152` | 🟢 |
+
+#### barAmulet（横向条形护符）
+
+| 参数 | AMF3 值 | 源文件 | AS3 引用 | 跨 movie |
+|------|------|---------|---------|:---:|
+| `totalCount` | 5 | `normal.amf3` | `FallingField.initAmulets:357` | 🟢 |
+| `lineCount` | 40 | ↑ | `initAmulets:356` | 🟢 |
+| `firstLineY` | 3025 | ↑ | `createBarAmulet:387` | 🟢 |
+| `lineDistance` | 165 | ↑ | `createBarAmulet:387` | 🟢 |
+| `height` | 1 | ↑ | `createBarAmulet:389` | 🟢 |
+
+#### threshold（稀有度阈值 — 每 movie 不同）
+
+| 参数 | normal | fes | normal_guarantee | fes_guarantee | rarity_5_guar | 源引用 |
+|------|--------|-----|:---:|:---:|:---:|------|
+| `ballStar4` | 0.7582740783691406 | 0.7429313659667969 | 3.814697265625e-05 | 3.814697265625e-05 | 0 | `FixedFallingField:126` |
+| `amuletTwoUp` | 0.8148193359375 | 0.475677490234375 | 0.5 | 0.5 | 0 | `FixedFallingField:147` |
+| `playMovie` | 0.8995208740234375 | 0.8994979858398438 | 0.9299392700195312 | 0.8994979858398438 | 0 | `FixedFallingField:35` |
+| `isRarity5` | - | - | - | - | true | `FixedFallingField:37-39` |
+| `amulets[]` | [0,0,0,0,0,0.9022] | [0,0,0,0,0,0,0,0.7191] | [0,0,0,0,0.1899,1] | [0,0,0,0,0,0.626,0.999,1] | [0,0,0,0,0,0] | `FixedFallingField:148` |
+
+`threshold.amulets[]` 有效阈值索引（AS3: `amulet.probability > Number(threshold.amulets[i])`）：
+
+| Movie | 有门槛的索引 | 阈值 | 适用于 |
+|-------|:---:|------|------|
+| normal | 5 | 0.9022 | 第 6 个护符（5 圆圈后第 1 个条形） |
+| fes | 7 | 0.7191 | 第 8 个护符（7 圆圈后第 1 个条形） |
+| normal_guarantee | 4 | 0.1899 | 第 5 个护符（5 圆圈最后 1 个） |
+| fes_guarantee | 5, 6 | 0.626, 0.999 | 第 6、7 个护符 |
+| rarity_5_guarantee | 无 | 全 0 | isRarity5=true 直接跳过物理 |
+
+### 6b. 物理引擎逻辑（AS3 源码移植）
+
+所有移植代码位于 `src/lib/gacha-physics.ts`。
+
+| 模块 | AS3 源文件（行号） | 移植行号 | 验证 |
+|------|-------------------|---------|:---:|
+| MersenneTwister 初始化 | `MersenneTwister.as:21-44` | `gacha-physics.ts:98-118` | ✅ |
+| randomUInt (增量扭转) | `MersenneTwister.as:62-73` | `gacha-physics.ts:122-146` | ✅ |
+| randomRangeFloat | `MersenneTwister.as:76-78` | `gacha-physics.ts:154-156` | ✅ |
+| randomRange | `MersenneTwister.as:81-83` | `gacha-physics.ts:159-161` | ✅ |
+| toFloat (uint→[0,1)) | `MersenneTwister.as:47-49` | `gacha-physics.ts:149-151` | ✅ |
+| MathCompat.cos | `MathCompat.as:141-188` | `gacha-physics.ts:65-81` | ✅ |
+| MathCompat.sin | `MathCompat.as:91-139` | `gacha-physics.ts:84-86` | ✅ |
+| MathCompat._cos 核心 | `MathCompat.as:407-416` | `gacha-physics.ts:45-54` | ✅ |
+| MathCompat._sin 核心 | `MathCompat.as:399-405` | `gacha-physics.ts:57-64` | ✅ |
+| initBallRarity | `FixedFallingField.as:126` | `gacha-physics.ts:558-560` | ✅ |
+| initAmuletRarity | `FixedFallingField.as:129-180` | `gacha-physics.ts:544-587` | ✅ |
+| ★5 级联 + forceContacted | `FixedFallingField.as:74-122` | `gacha-physics.ts:683-704` | ✅ |
+| isRarity5 强制★5 | `FixedFallingField.as:37-39` | `gacha-physics.ts:549-552` | ✅ |
+| createBall (RNG #1-3) | `FallingField.as:392-401` | `gacha-physics.ts:415-421` | ✅ |
+| createAmulet (RNG per amulet) | `FallingField.as:409-416` | `gacha-physics.ts:458-486` | ✅ |
+| createBarAmulet (RNG per bar) | `FallingField.as:384-390` | `gacha-physics.ts:514-533` | ✅ |
+| initField (RNG 顺序) | `FallingField.as:301-333` | `gacha-physics.ts:405-550` | ✅ |
+| chooseNumbers | `FallingField.as:419-432` | `gacha-physics.ts:830-840` | ✅ |
+| moviePlayable 判断 | `FixedFallingField.as:35` | `gacha-physics.ts:547` | ✅ |
+| precalculateFieldResult | `BallMovie.as:1130-1152` | `gacha-physics.ts:788-801` | ✅ |
+
+### 6c. 未完整移植的部分（== 误差来源 ==）
+
+| 客户端组件 | AS3 源文件 | 当前简化 | 影响 |
+|-----------|-----------|---------|:---:|
+| Box2D CCD 碰撞检测 | `gacha_physics.World` CCD phase | 帧末距离检测 | 🔴 主要误差源 |
+| 球连续运动积分 | `gacha_physics.Body.integrate()` | 半隐式欧拉 + 逐帧位移 | 🟡 |
+| 约束求解器 (10 iter) | `gacha_physics.Contact.solve()` | 串行 pin 检测（sensor 无需求解） | 🟢 |
+| 完整 Ball.as 类 | `Ball.as`（未反编译） | 简化为坐标+速度变量 | 🟡 |
+| camera / slowFrame | `camera` AMF3 段 | 不需要（仅动画层） | 🟢 |
+
+**精度现状**：经过以上全部移植修复，仿真精度为 normal ~51%、fes ~17%。未移植的 CCD 模块是剩余误差主因。当前透过 purified 池 ground truth 绕过仿真限制。
+
+---
+
+## 8. 当前状态
 
 | 项目 | 状态 |
 |------|:---:|
@@ -266,7 +399,21 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 | Web 管理 | ✅ `/seeds` 模式切换 + 三栏比例 + 标签管理 |
 | playMovie 预测 | 🔄 依赖仿真精度，客户端 beacon 上报是可靠替代方案 |
 
-## 8. 自动净化流程（2026-06-15 新增，2026-06-18 修复稀有度解析）
+### 8a. 剩余误差来源分析
+
+基于 seed=10000008 诊断（client★3, server★5）：
+
+| 差异 | 占比估计 | 说明 |
+|------|:---:|------|
+| **护符接触检测** | 70%+ | 帧末距离检测 vs Box2D 完整 CCD。服务端检测到 3 个物理接触 → ★5，客户端无接触 → ★3 |
+| **球轨迹** | 15-20% | 简化半隐式欧拉 vs Box2D `Body.integrate()` |
+| **多护符同时接触** | 5-10% | Box2D 10 次约束迭代 vs 顺序遍历 |
+| RNG | ~0% | MT19937 已验证正确（增量扭转+取模） |
+| AMF3 配置 | ~0% | 已逐字节提取 + 5 文件交叉比对 |
+
+要突破精度天花板，需完整移植 `gacha_physics.World` CCD 阶段（`gacha_physics/dynamics/World.as` 和 `Contact.as`）。
+
+## 9. 自动净化流程（2026-06-15 新增，2026-06-18 修复稀有度解析）
 
 ```
 手机抽卡 → C3032 crash
@@ -279,7 +426,7 @@ Scanned 200001 seeds in 14s (~15K seeds/sec)
 
 惊险种子在净化池模式下优先选取，**零 C3032 抽卡**。
 
-## 8. 相关 commit
+## 10. 相关 commit
 
 | commit | 说明 |
 |------|------|
