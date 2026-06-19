@@ -1,5 +1,5 @@
 {
-    "_comment": "TODO: 所有值待从CDN二进制 config.orderedmap 提取真实数据。当前为已知参考值。",
+    "_comment": "TODO: 从 CDN 二进制 master/config/config.orderedmap 提取。盐值 K6R9T9Hz22OpeIGEWB0ui6c6PYFQnJGy 计算的 hash 在 entity list 中未命中，可能 CN/GF 版使用不同盐值或路径格式。当前为已知参考值，体力恢复核心参数(恢复秒数/费用/恢复量/溢出上限)已验证与客户端行为一致。",
     "continue_virtual_money": 50,
     "stamina_recovery_virtual_money": 50,
     "stamina_recovery_seconds": 300,
