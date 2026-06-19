@@ -118,23 +118,12 @@ export class SeedValidator {
         this.saveConfirm();
     }
 
-    // 种子已发送（暂存 sentSeeds，等客户端反馈后再确认）
+    // 种子已发送（暂存 sentSeeds，仅防同一 10 连重复选取）
     markSent(movieId: string, seed: number, rarity?: number): void {
         const p = this.pool(movieId);
         const r = rarity !== undefined ? rarity - 3 : null;
         p.sentSeeds.set(seed, r);
         console.log(`[SEED] SENT [${movieId}] seed=${seed} r=${r !== null ? '★'+(r+3) : 'null'}`);
-    }
-    
-    // 10 连结束后清理 sentSeeds（等待中的种子转确认——客户端无 crash 即正确）
-    clearSent(movieId: string): void {
-        const p = this.pool(movieId);
-        for (const [seed, r] of p.sentSeeds) {
-            if (!p.playPool.has(seed) && !p.pendingPool.has(seed)) {
-                this.confirm(movieId, seed, r);
-            }
-        }
-        p.sentSeeds.clear();
     }
 
     // Tag
