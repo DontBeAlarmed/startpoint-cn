@@ -38,14 +38,15 @@ const routes = async (fastify: FastifyInstance) => {
         const s = seedValidator.stats(mid);
         const totalSeeds = countAllSeeds();
         const movieTotal = mid ? countMovieSeeds(mid) : 0;
-        const known = s.confirm_total + s.play_total;
-        const perMovieKnown = (s.confirm || 0) + (s.mov_play || 0);
+        const known = s.confirm_total + s.play_total + (s.verified_total || 0);
+        const perMovieKnown = (s.confirm || 0) + (s.mov_play || 0) + (s.verified || 0);
         reply.status(200).send({
             unknown: mid ? Math.max(0, movieTotal - perMovieKnown) : totalSeeds - known,
             movie_total: movieTotal,
             confirm: s.confirm, confirm_total: s.confirm_total,
             play_r3: s.play_r3, play_r4: s.play_r4, play_r5: s.play_r5, play_total: s.play_total,
             mov_play: s.mov_play,
+            verified: s.verified || 0, verified_total: s.verified_total || 0,
             pending: s.pending || 0, pending_total: s.pending_total || 0,
             test_seeds: s.test_seeds,
             mode: s.mode,

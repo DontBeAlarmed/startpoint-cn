@@ -129,7 +129,7 @@
             mode: allStats[0].mode,
             test_seeds: allStats[0].test_seeds,
             movieIds: allStats[0].movieIds,
-            confirm: 0, play_total: 0, unknown: 0, mov_play: 0, pending: 0,
+            confirm: 0, play_total: 0, unknown: 0, mov_play: 0, pending: 0, verified: 0,
             total: 0, tested: 0, coverage: 0,
             play_r3: 0, play_r4: 0, play_r5: 0
         };
@@ -139,6 +139,7 @@
             s.unknown += st.unknown || 0;
             s.mov_play += st.mov_play || 0;
             s.pending += st.pending || 0;
+            s.verified += st.verified || 0;
             s.play_r3 += st.play_r3 || 0;
             s.play_r4 += st.play_r4 || 0;
             s.play_r5 += st.play_r5 || 0;
@@ -157,6 +158,7 @@
         document.getElementById('cfgSelector').innerHTML = ch;
 
         var t = s.mov_play;
+        var v = s.verified || 0;
         // Fetch individual movie stats for base/guarantee breakdown
         var baseConfirm = 0, gtConfirm = 0;
         for (var m of group.movies) {
@@ -166,7 +168,8 @@
             gtConfirm += (m.endsWith('_guarantee') ? (sd.confirm || 0) : 0);
         }
         document.getElementById('cfgSummary').innerHTML =
-            '<span class="stat"><span class="label pur">播放池</span><br><span class="value pur">'+t+'</span></span>'
+            '<span class="stat"><span class="label" style="color:#a371f7">验证池</span><br><span class="value" style="color:#a371f7">'+v+'</span></span>'
+            + '<span class="stat"><span class="label pur">播放池</span><br><span class="value pur">'+t+'</span></span>'
             + '<span class="stat"><span class="label ok">确认·非保底</span><br><span class="value ok">'+baseConfirm+'</span></span>'
             + '<span class="stat"><span class="label" style="color:#b0882c">确认·保底</span><br><span class="value" style="color:#b0882c">'+gtConfirm+'</span></span>';
 
@@ -213,7 +216,8 @@
 
         // Test pool
         document.getElementById('testStats').innerHTML =
-            '<span class="stat"><span class="label ok">确认池</span><br><span class="value ok">'+fmt(s.confirm)+'</span></span>'
+            '<span class="stat"><span class="label" style="color:#a371f7">验证池</span><br><span class="value" style="color:#a371f7">'+fmt(v)+'</span></span>'
+            + '<span class="stat"><span class="label ok">确认池</span><br><span class="value ok">'+fmt(s.confirm)+'</span></span>'
             + '<span class="stat"><span class="label" style="color:#3fb950">等待校验</span><br><span class="value" style="color:#3fb950">'+fmt(s.pending||0)+'</span></span>'
             + '<span class="stat"><span class="label unk">测试池</span><br><span class="value unk">'+fmt(s.unknown)+'</span></span>';
         document.getElementById('testSummary').textContent = '已测 '+fmt(s.tested)+' | 覆盖率 '+s.coverage+'%';

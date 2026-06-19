@@ -190,11 +190,14 @@ function parseC3032Beacon(loc: string): void {
     const playMatch = loc.match(/play=(\d)/);
     const didPlay = playMatch ? playMatch[1] === '1' : null;
     const r = ballRarity - 3; // 0=★3, 1=★4, 2=★5
-    // purify only if play=1 (both rarity correct + confirmed playable)
-    // otherwise → confirmed (rarity known correct, but not playable or play unknown)
-    seedValidator.addPlay(movieId, badSeed, r, didPlay === true);
+    // C3032 = client-verified rarity → verifiedPool (superset of playPool/confirmPool)
+    seedValidator.moveToVerified(movieId, badSeed, r);
+    if (didPlay === false) {
+        seedValidator.confirm(movieId, badSeed, r);  // play=0 → confirmPool
+    }
     const playStr = didPlay === true ? ' play=1' : didPlay === false ? ' play=0' : '';
     console.log(`[BEACON] C3032 → ${didPlay === true ? 'play' : 'confirm'} seed ${badSeed} ★${ballRarity}${playStr} [${movieId}]`);
+    if (didPlay === null) { seedValidator.addPending(movieId, badSeed, r); }
 }
 
 // PLAY beacon — every draw reports play=1|0 (APK 04e Patch 5)
@@ -210,8 +213,13 @@ function parsePlayBeacon(loc: string): void {
         const didPlay = playMatch ? playMatch[1] === '1' : false;
         if (didPlay) {
             const r = seedValidator.getSentR(movieId, seed);
-            seedValidator.addPlay(movieId, seed, r ?? 0, true);
-            console.log(`[PLAY] playPool seed=${seed} movie=${movieId}`);
+            if (r !== undefined && r !== null) {
+                seedValidator.addPlay(movieId, seed, r, true);
+                seedValidator.moveToVerified(movieId, seed, r);  // PLAY beacon confirm: rarity correct (no C3032) or will be corrected
+                console.log(`[PLAY] playPool seed=${seed} movie=${movieId}`);
+            } else {
+                console.log(`[PLAY] play=1 skipped seed=${seed} getSentR=${r === null ? 'null' : 'undefined'} (already cleaned up by prior beacon)`);
+            }
         } else {
             const r = seedValidator.getSentR(movieId, seed);
             console.log(`[TRACE] PLAY|play=0 seed=${seed} getSentR=${r !== undefined && r !== null ? '★'+(r+3) : r === null ? 'null' : 'undefined'}`);
