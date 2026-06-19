@@ -209,7 +209,8 @@ function parsePlayBeacon(loc: string): void {
         const playMatch = loc.match(/play=(\d)/);
         const didPlay = playMatch ? playMatch[1] === '1' : false;
         if (didPlay) {
-            seedValidator.addPlay(movieId, seed, 0, true);
+            const r = seedValidator.getSentR(movieId, seed);
+            seedValidator.addPlay(movieId, seed, r ?? 0, true);
             console.log(`[PLAY] playPool seed=${seed} movie=${movieId}`);
         } else {
             const r = seedValidator.getSentR(movieId, seed);

@@ -133,6 +133,11 @@ export class SeedValidator {
         console.log(`[SEED] SENT [${movieId}] seed=${seed} r=${r !== null ? '★'+(r+3) : 'null'}`);
     }
 
+    // 10 连结束后清理 sentSeeds（种子已被客户端测试）
+    clearSent(movieId: string): void {
+        this.pool(movieId).sentSeeds.clear();
+    }
+
     getSentR(movieId: string, seed: number): number | null | undefined {
         return this.pool(movieId).sentSeeds.get(seed);
     }
@@ -185,9 +190,13 @@ export class SeedValidator {
             return rand(candidates);
         };
 
-        // ② 优先测试队列（FIFO——跳过已发送的种子）
-        const cur = p.seedBacklog.find(s => pool.includes(s) && !p.sentSeeds.has(s));
-        if (cur !== undefined) return cur;
+        // ② 优先测试队列（FIFO——跳过已发送的种子，消耗后立即移除）
+        const backlogIdx = p.seedBacklog.findIndex(s => pool.includes(s) && !p.sentSeeds.has(s));
+        if (backlogIdx >= 0) {
+            const cur = p.seedBacklog.splice(backlogIdx, 1)[0];
+            console.log(`[TRACE] ★${rarity} mode=${this.mode} pool=backlog seed=${cur} remaining=${p.seedBacklog.length}`);
+            return cur;
+        }
         // Clean up seeds not in current pool
         p.seedBacklog = p.seedBacklog.filter(s => pool.includes(s));
 
