@@ -98,7 +98,13 @@ export class SeedValidator {
     // 未校验（/crash 路径，无 patch APK）
     addPending(movieId: string, seed: number, r: number | null): void {
         const p = this.pool(movieId);
-        if (p.playPool.has(seed)) return;
+        // If seed is in playPool, fix its r value (from C3032 ground truth)
+        const e = p.playPool.get(seed);
+        if (e) {
+            e.r = r !== null ? r : e.r;
+            this.savePlay();
+            return;
+        }
         p.confirmPool.delete(seed);
         p.pendingPool.set(seed, r);
         this.saveConfirm();
