@@ -1,12 +1,15 @@
 /**
  * Seed Validator — 简化版种子验证系统
  *
- * 三个池:
+ * 池:
  *   unknown — 仿真生成，未测试
- *   confirmed — 发送 1 次无 C3032（或 C3032 但 play=false），rarity 正确
- *   purified — C3032 beacon + play=1，rarity 正确 + 确认播放动画
+ *   confirmed — markSent 无 crash，rarity 正确
+ *   confirmedPlay — PLAY beacon play=1，可播放
+ *   pendingPlay — /crash 已知 r，待重测
+ *   purified — C3032 + play=1，rarity 正确 + 可播放
  *
- * 选择优先级: testSeed > purified > confirmed > unknown
+ * 自然模式优先级: testSeed > purified(10%) > confirmedPlay > confirmed > pendingPlay > unknown > fallback
+ *   优先保证零 C3032（confirmed 已验证），降低崩溃风险
  */
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
@@ -165,29 +168,29 @@ export class SeedValidator {
         }
 
         if (this.mode === 'natural') {
-            // 自然模式：10% 用 purified 播放种子，90% 用不播放种子（模拟真实客户端）
+            // 自然模式：10% 用 purified 播放种子，优先保证不崩溃
             const pur = pool.find(s => { const e = p.purified.get(s); return e && e.r === ri && e.tag !== '冷血躲避球'; });
             if (pur !== undefined && Math.random() < PURIFIED_PLAY_RATE) return pur;
         }
 
-        // 待测播放池（无 patch APK 测试结果，等后续重测）→ 优先级高于 unknown
+        // 已确认可播放种子（PLAY beacon: play=1 → 零 C3032）
+        const play = pool.find(s => p.confirmedPlay.has(s));
+        if (play !== undefined) return play;
+
+        // 已确认不播放种子（markSent 无 crash → 已验证 1 次，极低 C3032 风险）
+        const conf = pool.find(s => p.confirmed.has(s));
+        if (conf !== undefined) return conf;
+
+        // 待测播放池（/crash 已知 r，特意重测）
         const pend = pool.find(s => {
             const r = p.pendingPlay.get(s);
             return r !== undefined && (r === null || r === ri);
         });
         if (pend !== undefined) return pend;
 
-        // 未知种子（所有模式兜底）
+        // 未知种子（仿真生成，~1% C3032 风险）
         const unknown = pool.find(s => !p.confirmed.has(s) && !p.purified.has(s) && !p.pendingPlay.has(s));
         if (unknown !== undefined) return unknown;
-
-        // 已确认可播放种子
-        const play = pool.find(s => p.confirmedPlay.has(s));
-        if (play !== undefined) return play;
-
-        // 已确认不播放种子
-        const conf = pool.find(s => p.confirmed.has(s));
-        if (conf !== undefined) return conf;
 
         // 兜底
         return characterId * 1000;
