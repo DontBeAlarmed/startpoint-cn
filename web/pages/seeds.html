@@ -24,7 +24,8 @@
         .test-btn.active { background: #a371f7; color: #fff; border-color: #a371f7; }
         .clear { cursor: pointer; color: #f85149; font-size: 0.8rem; }
         .col3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
-        @media(max-width:900px){.col3{grid-template-columns:1fr}}
+        .col5 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 1rem; }
+        @media(max-width:900px){.col3{grid-template-columns:1fr} .col5{grid-template-columns:1fr}}
         .progress { height: 6px; background: var(--color-surface-container-high); border-radius: 3px; overflow: hidden; max-width: 400px; margin: 0.25rem 0; }
         .progress div { height: 100%; float: left; }
         .bar-ok{background:#d29922} .bar-p1{background:#d29922} .bar-unk{background:#6e7681} .bar-play{background:#3fb950}
@@ -59,10 +60,12 @@
             <div class="card" id="purifiedSection">
                 <h2 class="text-lg font-semibold text-on-surface-variant mb-2">净化池 <span class="text-xs" style="color:#888">（testSeed > 同稀有度）</span></h2>
                 <div id="testSeedBar" class="flex flex-wrap gap-3 items-center mb-3" style="font-size:0.85rem"></div>
-                <div class="col3" id="purifiedColumns" style="display:none">
+                <div class="col5" id="purifiedColumns" style="display:none">
                     <div><h3 class="text-sm font-semibold mb-1" style="color:#f85149">★3 <span id="col3Count">(0)</span></h3><div id="col3"></div></div>
                     <div><h3 class="text-sm font-semibold mb-1" style="color:#d29922">★4 <span id="col4Count">(0)</span></h3><div id="col4"></div></div>
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#b0882c">★4保底 <span id="col4bCount">(0)</span></h3><div id="col4b"></div></div>
                     <div><h3 class="text-sm font-semibold mb-1" style="color:#3fb950">★5 <span id="col5Count">(0)</span></h3><div id="col5"></div></div>
+                    <div><h3 class="text-sm font-semibold mb-1" style="color:#2ea043">★5保底 <span id="col5bCount">(0)</span></h3><div id="col5b"></div></div>
                 </div>
                 <div id="purifiedEmpty" class="text-xs text-on-surface-variant">暂无净化种子</div>
             </div>
@@ -164,7 +167,7 @@
         for (var m of group.movies) {
             var listRes = await fetch('/api/seeds/list?movieId=' + m);
             var data = await listRes.json();
-            allPurified = allPurified.concat(data.purified || []);
+            (data.purified || []).forEach(function(p){ p._movie = m; allPurified.push(p); });
         }
         var purified = allPurified;
         var pMap = {}; purified.forEach(function(p){pMap[p.seed]=p;});
@@ -183,15 +186,15 @@
         });
         document.getElementById('testSeedBar').innerHTML = tsH;
 
-        // Purified columns
+        // Purified columns (5 columns: ★3 ★4 ★4保底 ★5 ★5保底)
         if (t > 0) {
             document.getElementById('purifiedColumns').style.display = '';
             document.getElementById('purifiedEmpty').style.display = 'none';
-            [3,4,5].forEach(function(r){
-                var items = purified.filter(function(p){return p.rarity===r;});
-                document.getElementById('col'+r+'Count').textContent = '('+items.length+')';
-                document.getElementById('col'+r).innerHTML = items.length>0
-                    ? items.map(function(p){return renderSeedRow(p, r, tsArr[r-3]===p.seed);}).join('')
+            [{col:'col3',r:3,g:false},{col:'col4',r:4,g:false},{col:'col4b',r:4,g:true},{col:'col5',r:5,g:false},{col:'col5b',r:5,g:true}].forEach(function(cfg){
+                var items = purified.filter(function(p){ return p.rarity===cfg.r && p._movie.endsWith('_guarantee')===cfg.g; });
+                document.getElementById(cfg.col+'Count').textContent = '('+items.length+')';
+                document.getElementById(cfg.col).innerHTML = items.length>0
+                    ? items.map(function(p){return renderSeedRow(p, cfg.r, tsArr[cfg.r-3]===p.seed);}).join('')
                     : '<div class="text-xs text-on-surface-variant" style="padding:0.25rem 0">暂无</div>';
             });
         } else {
