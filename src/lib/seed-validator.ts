@@ -70,7 +70,12 @@ export class SeedValidator {
     // 确认（play=0 或无 C3032，rarity 已修正）
     confirm(movieId: string, seed: number, r?: number | null): void {
         const p = this.pool(movieId);
-        if (p.confirmPool.has(seed) || p.playPool.has(seed)) return;
+        if (p.playPool.has(seed)) return;
+        if (p.confirmPool.has(seed)) {
+            // If seed already confirmed with null r, update with known r
+            if (r !== undefined && r !== null) p.confirmPool.set(seed, r);
+            return;
+        }
         p.pendingPool.delete(seed);
         for (const [, other] of this.pools) other.confirmPool.delete(seed);
         p.confirmPool.set(seed, r !== undefined ? r : null);

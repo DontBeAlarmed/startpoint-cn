@@ -10311,7 +10311,6 @@
   "fes_guarantee_play": [],
   "fes_guarantee_pend": {},
   "normal": {
-    "10000000": null,
     "10000002": null,
     "10000003": null,
     "10000004": null,
@@ -12390,7 +12389,9 @@
   "normal_pend": {
     "10000007": 0
   },
-  "normal_guarantee": {},
+  "normal_guarantee": {
+    "10000000": null
+  },
   "normal_guarantee_play": [],
   "normal_guarantee_pend": {}
 }
