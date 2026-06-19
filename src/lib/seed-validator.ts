@@ -167,6 +167,20 @@ export class SeedValidator {
             if (play !== undefined) return play;
         }
 
+        if (this.mode === 'test') {
+            // 测试模式：跳过已验证种子，优先发现新种子 + 重测 pending
+            const pend = pool.find(s => {
+                const r = p.pendingPlay.get(s);
+                return r !== undefined && (r === null || r === ri);
+            });
+            if (pend !== undefined) return pend;
+
+            const unknown = pool.find(s => !p.confirmed.has(s) && !p.purified.has(s) && !p.pendingPlay.has(s));
+            if (unknown !== undefined) return unknown;
+
+            return characterId * 1000;
+        }
+
         if (this.mode === 'natural') {
             // 自然模式：10% 用 purified 播放种子，优先保证不崩溃
             const pur = pool.find(s => { const e = p.purified.get(s); return e && e.r === ri && e.tag !== '冷血躲避球'; });
