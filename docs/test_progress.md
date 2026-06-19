@@ -102,7 +102,11 @@
 | F1071 净化池 5 列 | ★3 / ★4 / ★4保底 / ★5 / ★5保底——按 movie 来源 (_guarantee 后缀) 分列 |
 | F1072 自然模式优先级 | playPool(10%) > confirmPool > testPool。优先保证零 C3032 |
 | F1074 drawIndex=0 对齐 | 第 1 抽强制 playPool（客户端 drawIndex=0 永远播动画）。normal_guarantee ~7% 未对齐 |
-| ⚠️ R1 连接问题 | 服务端 `0.0.0.0` 绑定正常、手机 APK 硬编码 `<PII_REMOVED>` 也能解析，但有时 R1。删除存档重建可恢复。未解决 |
+| F1075 sentSeeds 隔离 | markSent → sentSeeds（不立即确认），clearSent 在 10 连结束后批量确认，避免同 10 连内交叉复用 |
+| F1076 addPending → confirm | /crash 种子修正后立即进入确认池，不再堆积 pendingPool |
+| F1077 pendingPool 清理 | 移除 addPending 中冗余的 pendingPool.set，/crash 直接 confirm，pending 不再残留 |
+| F1078 getSeed 重构 | 提取 pickPlay/confirmR/playHas/pendR/isUnknown helpers，_guarantee 回退统一，68→40 行 |
+| ⚠️ R1 连接问题 | 服务端 0.0.0.0 绑定正常，有时 R1。删除存档重建可恢复。未解决 |
 | F1060 RNG tempering 修复 | `randomUInt()` tempering 从 post-twist 值改为 pre-twist 值（匹配 AS3），精度 17% → 85% |
 | F1061 threshold.amulets 越界 | `?? 0` → `!== undefined`（匹配 AS3 Number(undefined)=NaN），fes_guarantee 37% → 90% |
 | F1062 play= beacon 字段 | APK patch: C3032 beacon 加入 `play=1|0`（client moviePlayable），服务端解析存储 |
