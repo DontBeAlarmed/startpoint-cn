@@ -1,4 +1,12 @@
 {
+  "fes": {
+    "10000606": {
+      "r": 0,
+      "tag": "未测试",
+      "play": true
+    }
+  },
   "fes_guarantee": {},
+  "normal": {},
   "normal_guarantee": {}
 }
