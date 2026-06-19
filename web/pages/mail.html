@@ -114,7 +114,7 @@
                 const errMsg = params.get('error')
                 const result = document.getElementById('result')
                 if (okMsg) { result.textContent = okMsg; result.className = 'text-sm mt-2 text-green-600' }
-                if (errMsg) { result.textContent = errMsg; result.className = 'text-sm mt-2 text-red-600' }
+                if (errMsg) { result.textContent = errMsg; result.className = 'text-sm mt-2 text-error' }
 
                 const typeSelect = document.querySelector('select[name="type"]');
                 const typeIdGroup = document.getElementById('typeIdGroup');

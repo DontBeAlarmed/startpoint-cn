@@ -1,5 +1,11 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
 import { getAllAccountsSync, getAccountPlayersSync, insertMailSync } from "../../data/wdfpData"
+import characterData from "../../../assets/character.json"
+import itemData from "../../../assets/item_data.json"
+
+// Pre-built CDN validation sets
+const CDN_CHAR_IDS: Set<number> = new Set(Object.keys(characterData).map(Number))
+const CDN_ITEM_IDS: Set<number> = new Set(Object.keys(itemData).map(Number))
 
 interface SendMailBody {
     type: string
@@ -19,6 +25,16 @@ const routes = async (fastify: FastifyInstance) => {
         // Validate type_id fits in 32-bit signed integer (client Int limit)
         if (typeId !== null && (isNaN(typeId) || typeId > 2147483647 || typeId < 1)) {
             return reply.redirect("/mail?error=" + encodeURIComponent("附件 ID 无效（需为 1-2147483647 之间的整数）"))
+        }
+
+        // Validate type_id against CDN data
+        if (typeId !== null) {
+            if (mailType === 5 && !CDN_CHAR_IDS.has(typeId)) {
+                return reply.redirect("/mail?error=" + encodeURIComponent(`角色 ID ${typeId} 不存在于 CDN 数据中`))
+            }
+            if (mailType === 1 && !CDN_ITEM_IDS.has(typeId)) {
+                return reply.redirect("/mail?error=" + encodeURIComponent(`道具 ID ${typeId} 不存在于 CDN 数据中`))
+            }
         }
         const count = parseInt(body.number || "1")
         const subject = body.subject && body.subject.trim() ? body.subject.trim() : null
