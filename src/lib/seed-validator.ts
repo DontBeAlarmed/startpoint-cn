@@ -132,9 +132,10 @@ export class SeedValidator {
     getMovieIds(): string[] { return Array.from(this.pools.keys()); }
 
     // 种子选取
-    getSeed(movieId: string, rarity: number, pool: number[], characterId: number): number {
+    getSeed(movieId: string, rarity: number, pool: number[], characterId: number, drawIndex?: number): number {
         const ri = rarity - 3;
         const PURIFIED_PLAY_RATE = 0.10;
+        const isFirstDraw = drawIndex !== undefined && drawIndex === 0;
 
         // ① 全局测试种子
         const ts = this.testSeeds[ri];
@@ -160,7 +161,13 @@ export class SeedValidator {
         }
 
         if (this.mode === 'natural') {
-            // 自然模式：10% 用播放池种子，模拟真实播放率
+            // First draw (drawIndex=0): always pick playPool
+            // Client BallMovie.run(): drawIndex==0 always plays animation regardless of moviePlayable
+            if (isFirstDraw) {
+                const pur = pool.find(s => { const e = p.playPool.get(s); return e && e.r === ri && e.tag !== '冷血躲避球'; });
+                if (pur !== undefined) return pur;
+            }
+            // Subsequent draws: 10% playPool, 90% confirmPool/testPool
             const pur = pool.find(s => { const e = p.playPool.get(s); return e && e.r === ri && e.tag !== '冷血躲避球'; });
             if (pur !== undefined && Math.random() < PURIFIED_PLAY_RATE) return pur;
         }

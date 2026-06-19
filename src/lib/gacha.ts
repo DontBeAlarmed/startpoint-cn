@@ -138,6 +138,7 @@ export function rewardPlayerGachaDrawResultSync(
 
     if (gacha.type == GachaType.CHARACTER) {
         const characterGacha = gacha as CharacterGacha
+        var drawIndex = 0
         // reward characters (flat array, no grouping)
         for (const characterId of gachaDrawResult) {
             const giveResult = givePlayerCharacterSync(playerId, characterId)
@@ -187,8 +188,10 @@ export function rewardPlayerGachaDrawResultSync(
                     const pool = Array.from(new Set([...playSeeds, ...basePool]))
                 // Use seed validator with pool mode support
                 const seed = pool.length > 0
-                    ? seedValidator.getSeed(movieId, rarity, pool, characterId)
+                    ? seedValidator.getSeed(movieId, rarity, pool, characterId, drawIndex)
                     : characterId * 1000
+
+                drawIndex += 1
 
                 // Mark seed as TESTING (pending verification)
                 seedValidator.markSent(movieId, seed)
