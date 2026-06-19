@@ -139,7 +139,6 @@ export function rewardPlayerGachaDrawResultSync(
     if (gacha.type == GachaType.CHARACTER) {
         const characterGacha = gacha as CharacterGacha
         var drawIndex = 0
-        const movieIds = new Set<string>()
         // reward characters (flat array, no grouping)
         for (const characterId of gachaDrawResult) {
             const giveResult = givePlayerCharacterSync(playerId, characterId)
@@ -160,8 +159,6 @@ export function rewardPlayerGachaDrawResultSync(
                 const movieId = movieType === GachaMovieType.GUARANTEE
                     ? (characterGacha.guaranteeMovieName || characterGacha.movieName || "normal")
                     : (characterGacha.movieName || "normal")
-
-                movieIds.add(movieId)
 
                 // rarity_5_guarantee: isRarity5=true → ball.rarity forced to 2, moviePlayable=false
                 // Client skips ALL physics. Seed is irrelevant — use characterId*1000.
@@ -224,8 +221,6 @@ export function rewardPlayerGachaDrawResultSync(
                     draws.push(draw)
             }
         }
-        // Clear sent seeds — client received all draws
-        for (const mid of movieIds) seedValidator.clearSent(mid);
     } else {
         for (const equipmentId of gachaDrawResult) {
             const giveResult = givePlayerEquipmentSync(playerId, equipmentId, 1);

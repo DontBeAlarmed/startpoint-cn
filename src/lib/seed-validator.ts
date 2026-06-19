@@ -135,13 +135,6 @@ export class SeedValidator {
         console.log(`[SEED] SENT [${movieId}] seed=${seed} r=${r !== null ? '★'+(r+3) : 'null'}`);
     }
 
-    /** 10 连结束后清理 sentSeeds（保留 backlog 的 sentSeeds——等 PLAY beacon 反馈） */
-    clearSent(movieId: string): void {
-        const p = this.pool(movieId);
-        const backlogSet = new Set(p.seedBacklog);
-        for (const s of p.sentSeeds.keys()) { if (!backlogSet.has(s)) p.sentSeeds.delete(s); }
-    }
-
     getSentR(movieId: string, seed: number): number | null | undefined {
         return this.pool(movieId).sentSeeds.get(seed);
     }
