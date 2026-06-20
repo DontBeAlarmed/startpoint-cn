@@ -122,7 +122,7 @@ wfax fetch dump \
 
 ```bash
 cd starpoint-cn/scripts
-cp ../../wf-assets-cn/orderedmap/reward/rare_score_reward.json in/
+# 此文件需从本地 CDN 源数据(wf-assets-cn)获取,不随本仓库分发;请根据实际情况调整路径
 python3 converter.py
 cp out/rare_score_reward.json ../assets/
 ```

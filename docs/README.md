@@ -1,6 +1,6 @@
 # StarPoint CN 文档索引
 
-> tracked 持久知识库。环境/敏感(搭建、连接、APK)见本地 ../../docs/README.md。
+> tracked 持久知识库。环境/敏感(搭建、连接、APK)见本地环境文档(需自行准备,不随本仓库分发)。
 
 ## 架构与协议
 - [架构](./architecture.md)
@@ -19,7 +19,7 @@
 ## 贡献流程
 
 ### 实现一个端点
-1. 用 mitmproxy 抓取游戏客户端与官方服务器之间的流量(连接方式见本地 ../../docs/README.md)。
+1. 用 mitmproxy 抓取游戏客户端与官方服务器之间的流量(连接方式需自行搭建)。
 2. 用 [msgpack-converter](https://ref45638.github.io/msgpack-converter/) 解码 MsgPack 请求/响应体。CN 主 API(`*.wdfp.*`)走 base64(msgpack);其余端点走纯 JSON。
 3. 在 `src/routes/cn/`(CN 专属)或 `src/routes/api/`(双服共享)实现端点。
 4. 更新 [端点实现状态](./reference/routes-status.md),并在 [路由抓包索引](./routes/README.md) 补充对应抓包记录。

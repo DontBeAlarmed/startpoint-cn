@@ -82,7 +82,7 @@ CLOCK:checkClockState stateIdx=X avail=Y — 时钟状态检查
 
 ### APK 构建
 
-详见 [CDN_ARCH.md](../cdn/overview.md) 第六章。构建脚本位于 `starview/scripts/`。
+详见 [CDN 文档](../cdn/overview.md) 第六章。构建脚本位于 [starview](https://github.com/duosii/starview)(单独仓库,需自备)。
 
 - `build-debug.sh` — 全量构建（含信标）
 - `build-quick.sh` — 增量构建（复用 SWF 补丁）
