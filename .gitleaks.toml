@@ -1,0 +1,17 @@
+title = "starpoint-cn gitleaks config"
+
+[extend]
+useDefault = true
+
+# 误报加白:抓包协议文档里的游戏侧参数(如 whiteKey)、游戏数据资源、stub token —— 均非本仓库持有的密钥。
+[allowlist]
+description = "Non-secrets: captured game-API params in route docs, game data assets, stub tokens"
+paths = [
+    '''docs/routes/.*''',
+    '''assets/.*\.json''',
+    '''data/.*\.json''',
+]
+regexes = [
+    '''whiteKey=[A-Za-z0-9_\-]+''',
+    '''multi_access_token''',
+]
