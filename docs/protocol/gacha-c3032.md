@@ -1,4 +1,5 @@
 # 抽卡动画 C3032 错误 — 完整分析报告
+> 状态: 已修复(2026-06-15)   关键文件: src/lib/gacha.ts, src/lib/seed-validator.ts   相关端点: /gacha/exec
 
 ## 1. 现象
 
@@ -48,6 +49,70 @@ if (_loc6_ != _loc7_) throw C3032;      // 不匹配则报错
 ```
 
 `movie_id="fes"` 是节日限定动画。客户端 `FixedFallingField` 对 `fes` 动画使用独立的物理配置（`gacha/fes.json`），其 `threshold.ballStar4` 阈值与国际服"normal"动画不同——同样种子在 `fes` 配置下更容易产生 ★4 球 → C3032 概率更高。
+
+### 2.4 数据流与相关源码位置（汇总）
+
+> 本小节合并自简版 `C3032_gacha_seeds.md`，补充完整版缺失的端到端数据流与精确源码行号。
+
+错误信息（客户端原文，`ClientError` 形式）：
+
+```
+ClientError 3032: ガチャ結果レア度不一致
+結果レア度=★4, キャラクターレア度=★3
+character_id=361009, seed=10006358, movie_id=fes
+```
+
+#### 数据流
+
+```
+服务端:
+  gacha_movie_seeds.json["3"]["0"] → 随机选 seed=10006358
+  → movie_id=fes (卡池 movieName="fes")
+  → 发送给客户端
+
+客户端:
+  seed=10006358 → MersenneTwister(10006358) → 物理模拟
+  → ball.rarity=1 (★4) → verifyResultBallRarity()
+  → ball.rarity+3(4) != character.rarity(3) → C3032
+```
+
+#### 服务端 — 种子选择和发送
+
+**文件**: `src/lib/gacha.ts:129-152`
+```typescript
+// 抽卡结果生成
+const assetData = getCharacterDataSync(characterId)         // 从 CN character.json 查稀有度
+let rarity = 5 - assetData.rarity                            // → rankMovieRates 索引
+const movieType = randomPoolItem(1, 101, rankMovieRates[rarity]) // → 动画类型
+const seeds = movieSeeds[rarity + 1][movieType]              // → 种子池
+const seed = seeds[randomIndex]                              // → 选种子
+{
+    "character_id": characterId,
+    "movie_id": movieType === NORMAL ? movieName : guaranteeName, // → "fes" 等
+    "seed": seed
+}
+```
+
+**数据文件**: `assets/gacha_movie_seeds.json`, `assets/gacha_rate_up_movie_seeds.json`
+```
+{"3": {"0": [162个★3种子]}, "2": {"0": [...], "1": [...]}, "1": {...}}
+  ↑ ★3 NORMAL种子池，部分在国服物理配置下实际产生★4
+```
+
+#### 客户端 — 物理模拟和校验
+
+**文件**: `wf-2.1.125-cn-decompiled/scripts/scripts/pinball/gacha/ballMovie/fallingField/FallingField.as`
+- Line 63-72: `seed → MersenneTwister(seed)` 初始化 RNG
+- Line 311: `playProbability = random.randomRangeFloat(0,1)` 第1次消费
+- Line 392-401: `createBall()`: X, angle, **probability** 第2-4次消费
+- Line 404-416: `createAmulet()`: position, **probability × 2** 每个护符消费3次
+
+**文件**: `wf-2.1.125-cn-decompiled/scripts/scripts/pinball/gacha/ballMovie/fallingField/FixedFallingField.as`
+- Line 124-127: `initBallRarity()`: `ball.rarity = ball.probability > threshold.ballStar4 ? 1 : 0`
+- Line 129-179: `initAmuletRarity()`: 护符概率 → 升级球稀有度
+
+**文件**: `wf-2.1.125-cn-decompiled/scripts/scripts/pinball/scene/characterGet/ballMovie/BallMovie.as`
+- Line 189-196: `verifyResultBallRarity()`: `ball.rarity + 3 == character.rarity` → 不匹配 → C3032
 
 ## 3. 服务端动画选择逻辑（完整链路）
 
@@ -428,18 +493,9 @@ moviePlayable=false (90%) → 球停在 ★3 → 但 play=0 → 进入 confirmed
 - RNG temering bug（2026-06-18）：`randomUInt()` 对 POST-TWIST 值做 tempering，AS3 用 PRE-TWIST 值。修复后精度飞跃 17% → 85%。
 - threshold.amulets 越界（2026-06-18）：JS `?? 0` 让越界索引激活，AS3 `Number(undefined)=NaN` 永不激活。修复后 fes_guarantee 从 37% → 90%。
 
-## 9. 自动净化流程（2026-06-15 新增，2026-06-18 修复稀有度解析）
+## 9. 自动净化流程
 
-```
-手机抽卡 → C3032 crash
-    → CrashUtil.debugBeacon GET → /debug 有 loc=...&C3032...&seed=...&movie_id=...
-    → parseC3032Beacon() 用 /â(\d)/g 从乱码提取 ball★ 和 char★（★→â）
-    → recordDeviceData(seed, ballRarity, charRarity)
-    → blockSeed(seed)
-    → autoPurify() → r = ball-3 → 移入正确稀有度净化池
-```
-
-惊险种子在净化池模式下优先选取，**零 C3032 抽卡**。
+> 种子净化/验证详见 ./seed-verification.md
 
 ## 10. 相关 commit
 

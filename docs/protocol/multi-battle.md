@@ -1,4 +1,5 @@
 # 多人战斗（Multi Battle Quest）联机系统文档
+> 状态: 已实现(Phase 2)   关键文件: src/routes/cn/multiRoom.ts, src/lib/sessionServer.ts   相关端点: /api/index.php/multi_battle_quest/*
 
 ## 1. API 端点规范
 
@@ -651,7 +652,7 @@ const NPC_TEMPLATES = {
 
 8. **EX Boost（增幅）感叹号**: 客户端 `canExBoost()` 不检查 `ex_boost` 字段（已强化状态），只检查角色满级 + 元素匹配 + 道具足够。即使 Tier 3 强化完毕，只要背包还有 EX 道具，感叹号就显示。属正常游戏行为。
 
-9. **抽卡动画种子表（C3032）**: 详见 [`docs/C3032_gacha_seeds.md`](./C3032_gacha_seeds.md) — 完整的前因后果、源码位置、修复路径
+9. **抽卡动画种子表（C3032）**: 详见 [`gacha-c3032.md`](./gacha-c3032.md) — 完整的前因后果、源码位置、修复路径
 
 10. **联机战斗玛那板（C8601 key=0）—— 已确认无法修复**: 详见 [§13 联机玛那板 C8601 深度分析](#13-联机玛那板-c8601-深度分析)。联机战斗中所有角色（含房主自身）的 `mana_node_ids` **必须为 `[]`**，任何非空值都触发 C8601。官方游戏大概率也发送 `[]` 给 NPC，而房主的 party 在联机中走 `BattleCharacterLogic`（非 `OwnedCharacterLogic`），也受同一 bug 影响。
 
@@ -745,7 +746,7 @@ const NPC_TEMPLATES = {
 
 ## 9. 关卡/活动测试清单
 
-详见 [`docs/test_progress.md`](./test_progress.md) — 21 项关卡进入+结算双重测试进度。
+详见 [`test-progress.md`](../status/test-progress.md) — 21 项关卡进入+结算双重测试进度。
 
 ---
 
