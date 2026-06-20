@@ -112,7 +112,7 @@ wfax fetch dump \
   --version 1.4.54
 ```
 
-**路径**：`<PII_REMOVED>/Documents/ProjectFolder/worldflipper/cdn/cn_cdn_new/WF__CN2/`
+**路径**：`<PROJECT_ROOT>/cdn/cn_cdn_new/WF__CN2/`
 
 ### 4.3 converter.py — JSON 格式转换
 
@@ -359,11 +359,11 @@ adb devices
 # 2. 检查服务端
 lsof -i :8001
 # 3. 查看当前 info.json 状态
-adb -s <PII_REMOVED>:5667 shell "cat '.../dummy/info.json'"
+adb -s <DEVICE_IP>:5667 shell "cat '.../dummy/info.json'"
 # 4. 删除残留的进行中标记
-adb -s <PII_REMOVED>:5667 shell "rm '.../dummy/partial_downloaded.json' '.../dummy/partial_downloaded.platform'"
+adb -s <DEVICE_IP>:5667 shell "rm '.../dummy/partial_downloaded.json' '.../dummy/partial_downloaded.platform'"
 # 5. 复制 CharacterTable 覆盖 bundle stub
-adb -s <PII_REMOVED>:5667 shell "cp \
+adb -s <DEVICE_IP>:5667 shell "cp \
   '.../download/production/upload/2d/5cb9b28d18f984a51b345a4d7aab03d77bddfc' \
   '.../bundle/production/android_bundle/db/69828cac33bfcdd1d4c65e8b354adf0e815e26'"
 # 6. 重启游戏，监控信标
@@ -374,11 +374,11 @@ tail -f /tmp/cn-server.log | grep BEACON
 ```bash
 # 1-2. 同方案 A
 # 3. 从 Mac 推送 CharacterTable 二进制到手机
-adb -s <PII_REMOVED>:5667 push /tmp/ct_505.bin \
+adb -s <DEVICE_IP>:5667 push /tmp/ct_505.bin \
   '/data/data/com.leiting.wf/.../upload/2d/5cb9b28d18f984a51b345a4d7aab03d77bddfc'
 # 4. 复制到 bundle stub 路径（同方案 A 步骤 5）
 # 5. 手动写入 info.json
-adb -s <PII_REMOVED>:5667 shell "cat > '.../dummy/info.json' << 'EOF'
+adb -s <DEVICE_IP>:5667 shell "cat > '.../dummy/info.json' << 'EOF'
 {\"assetSizeKind\":\"fulfill\",\"assetRecoveryInfo\":[],\"totalSize\":10000000000,\"version\":\"1.4.0\"}
 EOF"
 # 6. 修改服务端 files_list → empty.csv（跳过 sufficiency check）
@@ -400,10 +400,10 @@ EOF"
 
 ```bash
 # 1. 删除手动复制的文件
-adb -s <PII_REMOVED>:5667 shell "rm '.../bundle/.../db/69828cac33bfcdd1d4c65e8b354adf0e815e26'"
+adb -s <DEVICE_IP>:5667 shell "rm '.../bundle/.../db/69828cac33bfcdd1d4c65e8b354adf0e815e26'"
 # 2. 恢复原始 bundle stub（从 APK bundle.zip）：方式 A 手机重新解压 bundle.zip；方式 B adb push 原始 stub
 # 3. 删除 info.json（触发重新下载）
-adb -s <PII_REMOVED>:5667 shell "rm '.../dummy/info.json'"
+adb -s <DEVICE_IP>:5667 shell "rm '.../dummy/info.json'"
 ```
 
 ### 5.7 注意事项 ⭐
@@ -480,10 +480,10 @@ grep -c "archive-common-full" /tmp/cn-server.log
 adb shell su -c "ls -la /data/user/0/com.leiting.wf/files/asset/asset_download/dummy/production/upload/93/35d17430d2d157ea5e2b573b6ba4f210232664"
 
 # 查看 info.json（本地版本记录）
-adb -s <PII_REMOVED>:5667 shell cat '.../dummy/info.json'
+adb -s <DEVICE_IP>:5667 shell cat '.../dummy/info.json'
 
 # 查看 CDN 下载目录
-adb -s <PII_REMOVED>:5667 shell ls '.../download/production/'
+adb -s <DEVICE_IP>:5667 shell ls '.../download/production/'
 
 # 查看编译数据库内容 / compiled version
 adb shell su -c "sqlite3 /data/user/0/com.leiting.wf/files/asset/bundle/production/android_bundle/db/69828cac33bfcdd1d4c65e8b354adf0e815e26 '.tables'"
@@ -493,13 +493,13 @@ adb shell su -c "sqlite3 .../db/69828cac... 'SELECT sql FROM sqlite_master WHERE
 adb shell su -c "find /data/user/0/com.leiting.wf/files/asset/ -name '*.db' -o -name '*.sqlite'"
 
 # 清除缓存（不丢 CDN 数据）
-adb -s <PII_REMOVED>:5667 shell rm -rf '.../cache/'
+adb -s <DEVICE_IP>:5667 shell rm -rf '.../cache/'
 
 # 清除 info.json（重新触发下载判断）
-adb -s <PII_REMOVED>:5667 shell rm '.../dummy/info.json'
+adb -s <DEVICE_IP>:5667 shell rm '.../dummy/info.json'
 
 # 安装 APK
-adb -s <PII_REMOVED>:5667 install -r wf-patched.apk
+adb -s <DEVICE_IP>:5667 install -r wf-patched.apk
 ```
 
 ---
@@ -668,9 +668,9 @@ var _loc2_ = _loc1_.getMasterTable(AttentionConfigTable).get_data().get(1);
 
 **症状**：游戏提示"未能联网"。
 
-**根因**：拆分后的 `01-patch-swf.sh` 中 `sed` 将 `shijtswygamegf.leiting.com` 替换为 `http://<PII_REMOVED>:8001`（含 `http://` 前缀），导致 `ApiServerKind.Custom("http","http://<PII_REMOVED>:8001")` 双 `http://` 无效 URL。
+**根因**：拆分后的 `01-patch-swf.sh` 中 `sed` 将 `shijtswygamegf.leiting.com` 替换为 `http://<LAN_IP>:8001`（含 `http://` 前缀），导致 `ApiServerKind.Custom("http","http://<LAN_IP>:8001")` 双 `http://` 无效 URL。
 
-**修复**：`sed` 先剥离 `http://` 前缀再替换 hostname。已通过 SWF 导出验证（`ApiServerKind.Custom("http","<PII_REMOVED>:8001")`）。
+**修复**：`sed` 先剥离 `http://` 前缀再替换 hostname。已通过 SWF 导出验证（`ApiServerKind.Custom("http","<LAN_IP>:8001")`）。
 
 ### 问题 5：enableAssetSufficiencyCheck 误设为 false
 
@@ -915,14 +915,14 @@ Android AIR 应用首次启动时将 SWF 从 APK 提取到私有缓存 `/data/da
 - **必须**设置 `ANDROID_SERIAL` 环境变量，否则构建跳过安装。
 ```bash
 # 指定设备后构建并安装
-ANDROID_SERIAL=<PII_REMOVED>:5667 bash scripts/build-debug.sh
+ANDROID_SERIAL=<DEVICE_IP>:5667 bash scripts/build-debug.sh
 # 或构建后手动安装
 bash scripts/build-debug.sh
-adb -s <PII_REMOVED>:5667 install -r wf-patched.apk
+adb -s <DEVICE_IP>:5667 install -r wf-patched.apk
 # 增量构建（修改 beacon 后）
-ANDROID_SERIAL=<PII_REMOVED>:5667 bash scripts/build-quick.sh
+ANDROID_SERIAL=<DEVICE_IP>:5667 bash scripts/build-quick.sh
 # 生产构建（无信标）
-ANDROID_SERIAL=<PII_REMOVED>:5667 bash scripts/build-release.sh
+ANDROID_SERIAL=<DEVICE_IP>:5667 bash scripts/build-release.sh
 ```
 
 ### 12.6 信标系统（11 个）
@@ -959,7 +959,7 @@ ANDROID_SERIAL=<PII_REMOVED>:5667 bash scripts/build-release.sh
 | 补丁 | 目标 | 方式 |
 |------|------|------|
 | `sdkDummy = true` | `DevConfig.as` | sed |
-| `apiServer` → `<PII_REMOVED>:8001` | `DevConfig_gf_android.as` | sed（去除 `http://` 前缀） |
+| `apiServer` → `<LAN_IP>:8001` | `DevConfig_gf_android.as` | sed（去除 `http://` 前缀） |
 
 **信标（Step 3）**：11 个信标注入 5 个目标类。**未注入**：`enableAssetSufficiencyCheck = false`（已移除）。
 **Bundle（Step 1b）**：默认不修改，需手动在 `build-debug.sh` 中启用。
@@ -1014,7 +1014,7 @@ src/cn-server.ts:
   /channels/channel_leiting_pay/query_unfinish_order stub ✅
 
 .env:
-  CDN_BASE_URL = http://<PII_REMOVED>:8001/patch/cn
+  CDN_BASE_URL = http://<LAN_IP>:8001/patch/cn
   CN_LISTEN_HOST = 0.0.0.0
   CN_LISTEN_PORT = 8001
 ```

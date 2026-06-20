@@ -18,7 +18,7 @@
 
 **功能：**
 - 首号自动绑定：第一次建号后自动设为活跃账号
-- Web 面板 `http://<PII_REMOVED>:8001/` 可切换/改名/删除账号
+- Web 面板 `http://<LAN_IP>:8001/` 可切换/改名/删除账号
 - 状态持久化，重启不丢失
 - 改名直接修改 `players.name` 字段（游戏内显示名）
 
@@ -111,9 +111,9 @@ query_unfinish_order → servertime=2026 (Date.now) ← BUG!
 
 ## 五、TCP/IP 别名
 
-**问题：** Mac DHCP 换 IP 后 APK 连不上 `<PII_REMOVED>`
+**问题：** Mac DHCP 换 IP 后 APK 连不上 `<LAN_IP>`
 
-**修复：** `sudo ifconfig en0 alias <PII_REMOVED> 255.255.255.0`（重启后失效）
+**修复：** `sudo ifconfig en0 alias <LAN_IP> 255.255.255.0`（重启后失效）
 
 ---
 
@@ -200,7 +200,7 @@ query_unfinish_order → servertime=2026 (Date.now) ← BUG!
 
 ```bash
 # 1. 设时间（2023-2024 区间安全）
-curl "http://<PII_REMOVED>:8001/api/server/time?time=2024-06-01"
+curl "http://<LAN_IP>:8001/api/server/time?time=2024-06-01"
 
 # 2. 清应用数据 + 进游戏
 

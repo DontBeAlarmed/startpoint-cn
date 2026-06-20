@@ -5,7 +5,7 @@ import { getServerTime } from "../utils";
 
 /** Resolve display host for TCP session. If CN_LISTEN_HOST is 0.0.0.0, auto-detect LAN IP. */
 export function getDisplayHost(): string {
-    const raw = process.env.CN_LISTEN_HOST || "<PII_REMOVED>";
+    const raw = process.env.CN_LISTEN_HOST || "127.0.0.1";
     if (raw !== "0.0.0.0") return raw;
     const nets = os.networkInterfaces();
     for (const name of Object.keys(nets)) {
@@ -17,7 +17,7 @@ export function getDisplayHost(): string {
             }
         }
     }
-    return "<PII_REMOVED>";
+    return "127.0.0.1";
 }
 
 // In-memory room storage (rooms are transient, no DB persistence)

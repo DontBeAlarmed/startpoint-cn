@@ -3,6 +3,7 @@ import { generateDataHeaders, getServerTime, getServerDate } from "../../utils";
 import { getPlayerSync, dailyResetPlayerDataSync, collectPlayerDataPooledExpSync, updatePlayerSync } from "../../data/wdfpData";
 import { getClientSerializedData } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
+import { getDisplayHost } from "../../data/multiRoom";
 
 interface CnLoadBody {
     device_id: number;
@@ -47,7 +48,7 @@ function wrapOptionFields(d: any, resVer?: string) {
         d.user_option.stamina ??= false;
     }
 
-    d.cn_crash_url = "http://<PII_REMOVED>:8001/crash";
+    d.cn_crash_url = `http://${getDisplayHost()}:${process.env.CN_LISTEN_PORT || "8001"}/crash`;
     d.survey_url = "";
     d.qq_group_url = "";
     d.bug_report_url = "";

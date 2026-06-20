@@ -18,7 +18,7 @@ def load_json(path):
     with open(path) as f:
         return json.load(f)
 
-ROOT = "<PII_REMOVED>/Documents/ProjectFolder/worldflipper"
+ROOT = os.path.dirname(PROJECT_ROOT)
 print("Loading data sources...")
 cn_gacha = load_json(os.path.join(ROOT, "wf-assets-cn", "orderedmap", "gacha", "gacha.json"))
 cn_fc = load_json(os.path.join(ROOT, "wf-assets-cn", "orderedmap", "gacha", "gacha_feature_content.json"))

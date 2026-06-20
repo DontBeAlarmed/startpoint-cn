@@ -130,7 +130,7 @@
 | `application_update_url` | String | 硬编码 | `""` | |
 | `category_id` | Int | `room.category` | `8` | |
 | `host_entry_time` | Float | `room.host_entry_time` | `1723648978` | 房主最后进入时间 |
-| `ip_address` | String | 环境变量 | `"<PII_REMOVED>"` | TCP 会话服务器 IP |
+| `ip_address` | String | 环境变量 | `"<LAN_IP>"` | TCP 会话服务器 IP |
 | `port` | Int | 环境变量 | `8003` | TCP 会话服务器端口 |
 | `quest_id` | Int | `room.quest_id` | `1002` | |
 | `raising_state` | Int | `room.raising_state` | `1` | |

@@ -17,7 +17,7 @@
     "debug:cn": "tsnd -- src/cn-server.ts"
   },
   "author": "",
-  "license": "ISC",
+  "license": "GPL-3.0-or-later",
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",
     "@types/better-sqlite3": "^7.6.10",

@@ -114,6 +114,8 @@ const routes = async (fastify: FastifyInstance) => {
         const start = pageIndex * perPage
         const items = comics.slice(start, start + perPage)
 
+        const base = `http://${request.headers.host || `127.0.0.1:${process.env.CN_LISTEN_PORT || "8001"}`}`
+
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
@@ -122,9 +124,9 @@ const routes = async (fastify: FastifyInstance) => {
                     episode: c.episode,
                     title: c.title,
                     media_image: {
-                        main: `http://<PII_REMOVED>:8001/api/index.php/comic/image?kind=${kind}&episode=${c.episode}`,
-                        thumbnail_l: `http://<PII_REMOVED>:8001/api/index.php/comic/image?kind=${kind}&episode=${c.episode}&size=l`,
-                        thumbnail_s: `http://<PII_REMOVED>:8001/api/index.php/comic/image?kind=${kind}&episode=${c.episode}&size=s`,
+                        main: `${base}/api/index.php/comic/image?kind=${kind}&episode=${c.episode}`,
+                        thumbnail_l: `${base}/api/index.php/comic/image?kind=${kind}&episode=${c.episode}&size=l`,
+                        thumbnail_s: `${base}/api/index.php/comic/image?kind=${kind}&episode=${c.episode}&size=s`,
                     }
                 })),
                 current_page_index: pageIndex,
