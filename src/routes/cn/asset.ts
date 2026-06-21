@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { generateDataHeaders } from "../../utils";
-import { readdirSync, statSync } from "fs";
+import { readdirSync, statSync, existsSync } from "fs";
 import path from "path";
 
 const CN_PORT = process.env.CN_LISTEN_PORT || "8001";
@@ -13,10 +13,18 @@ function getCdnBase(request: FastifyRequest): string {
     return `http://${host}/patch/cn`;
 }
 
+/** Detect CDN path-list dir name: `EntityLists` (cn_cdn) or `entities` (cn_cdn_new). */
+function entityListsDirName(): string {
+    if (existsSync(path.join(cdnDir, "EntityLists"))) return "EntityLists";
+    if (existsSync(path.join(cdnDir, "entities"))) return "entities";
+    return "EntityLists";
+}
+
 function getVersionInfo(baseUrl: string) {
+    const el = entityListsDirName();
     return {
-        base_url: `${baseUrl}/EntityLists/`,
-        files_list: `${baseUrl}/EntityLists/10939-android_medium.csv`,
+        base_url: `${baseUrl}/${el}/`,
+        files_list: `${baseUrl}/${el}/10939-android_medium.csv`,
         total_size: TOTAL_SIZE,
         delayed_assets_size: 0
     };
@@ -143,3 +151,4 @@ const routes = async (fastify: FastifyInstance) => {
 export default routes;
 
 export const CDN_TOTAL_SIZE = TOTAL_SIZE;
+export const ENTITY_LISTS_DIR = entityListsDirName();

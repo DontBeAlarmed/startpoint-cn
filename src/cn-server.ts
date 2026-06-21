@@ -113,10 +113,10 @@ function stubMsgpackReply(reply: any, data: any, playerId?: number) {
 }
 
 fastify.post(`${apiPrefix}/assetintitle/version_info_in_title`, async (_request, reply) => {
-    const { CDN_TOTAL_SIZE } = require("./routes/cn/asset");
+    const { CDN_TOTAL_SIZE, ENTITY_LISTS_DIR } = require("./routes/cn/asset");
     stubMsgpackReply(reply, {
-        base_url: `${CDN_BASE_URL}/EntityLists/`,
-        files_list: `${CDN_BASE_URL}/EntityLists/10939-android_medium.csv`,
+        base_url: `${CDN_BASE_URL}/${ENTITY_LISTS_DIR}/`,
+        files_list: `${CDN_BASE_URL}/${ENTITY_LISTS_DIR}/10939-android_medium.csv`,
         total_size: CDN_TOTAL_SIZE,
         delayed_assets_size: 0
     });
