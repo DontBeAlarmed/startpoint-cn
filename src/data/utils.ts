@@ -231,7 +231,7 @@ export function serializePlayerData(
                 "best_elapsed_time_ms": progress.bestElapsedTimeMs,
                 "clear_rank": progress.clearRank,
                 "finished": progress.finished,
-                "high_score": progress.highScore,
+                "high_score": progress.highScore !== null && progress.highScore !== undefined ? [0, progress.highScore] : [1],
                 "quest_id": progress.questId,
                 "unlocked": progress.unlocked
             })
@@ -743,7 +743,7 @@ export function deserializePlayerData(
                     bestElapsedTimeMs: progress['best_elapsed_time_ms'],
                     clearRank: progress['clear_rank'],
                     finished: finished,
-                    highScore: progress['high_score'],
+                    highScore: (Array.isArray(progress['high_score']) ? progress['high_score'][1] : progress['high_score']),
                     questId: questId
                 })
             }

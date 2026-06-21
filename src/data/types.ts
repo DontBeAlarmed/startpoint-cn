@@ -620,7 +620,7 @@ export interface UserQuestProgress {
     quest_id: number
     finished: boolean
     unlocked?: boolean
-    high_score?: number
+    high_score?: number | [0, number] | [1]
     best_elapsed_time_ms?: number
     clear_rank?: number
 }
