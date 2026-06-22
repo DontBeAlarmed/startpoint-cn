@@ -1,0 +1,4042 @@
+[
+  {
+    "id": 1,
+    "name": "阿尔克",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 10,
+    "name": "白",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 111001,
+    "name": "瓦格纳",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Dragon"
+  },
+  {
+    "id": 111002,
+    "name": "玛丽娜",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 111003,
+    "name": "克拉莉丝",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 111004,
+    "name": "玛丽安",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 111005,
+    "name": "诺埃妮",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 111006,
+    "name": "菊野",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "男性",
+    "race": "Human,Mystery"
+  },
+  {
+    "id": 111007,
+    "name": "罗尔夫",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 111009,
+    "name": "米娅",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 111015,
+    "name": "花火",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 111021,
+    "name": "碧安卡",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human,Dragon"
+  },
+  {
+    "id": 111027,
+    "name": "托莉亚",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 111033,
+    "name": "燎",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 111039,
+    "name": "水善",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human,Mystery"
+  },
+  {
+    "id": 111045,
+    "name": "克亚雷",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 111051,
+    "name": "塞达",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 111057,
+    "name": "蕾缇希娅",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 111063,
+    "name": "艾可莉儿",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 111069,
+    "name": "凉宫春日",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 111081,
+    "name": "琉农",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 111087,
+    "name": "玛丽娜",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 111093,
+    "name": "未奏希",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 111099,
+    "name": "蕾缇希娅",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 111105,
+    "name": "魏虎",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 111111,
+    "name": "托莉亚",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 111117,
+    "name": "惠惠",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 111123,
+    "name": "帕尔菲",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 111129,
+    "name": "玛格诺斯",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 111135,
+    "name": "黛妲莉亚",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 111141,
+    "name": "米娅",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 111147,
+    "name": "丝缇涅尔",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 111153,
+    "name": "露涅塔",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 111159,
+    "name": "佩妮萝涅",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "4",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 111165,
+    "name": "莉莉丝",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 111171,
+    "name": "珂艾特",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 111177,
+    "name": "威尔弗雷德",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "男性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 111183,
+    "name": "瓦格纳",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Dragon"
+  },
+  {
+    "id": 113001,
+    "name": "黄金船",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "男性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 121001,
+    "name": "索妮雅",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 121002,
+    "name": "水善",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human,Mystery"
+  },
+  {
+    "id": 121003,
+    "name": "艾莉亚",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 121004,
+    "name": "赛法",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 121005,
+    "name": "希丽奴",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 121006,
+    "name": "里姆尼斯",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 121007,
+    "name": "拉绮夏",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 121008,
+    "name": "拉杰尔特",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 121009,
+    "name": "源樱",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "男性",
+    "race": "Human,Undead"
+  },
+  {
+    "id": 121015,
+    "name": "雷拉斯",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 121021,
+    "name": "爱蜜莉雅",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 121027,
+    "name": "雷姆",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "男性",
+    "race": "Human,Mystery"
+  },
+  {
+    "id": 121033,
+    "name": "谢胧",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 121039,
+    "name": "哈里达尔",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 121045,
+    "name": "亚美莉亚",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human,Aquatic"
+  },
+  {
+    "id": 121051,
+    "name": "玛姆娜莉亚",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 121057,
+    "name": "长门有希",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 121069,
+    "name": "谢胧",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 121070,
+    "name": "见岛勇希",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 121075,
+    "name": "芙拉克西斯",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 121081,
+    "name": "赛法",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 121087,
+    "name": "雷拉斯",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 121093,
+    "name": "特拉埃蒂",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "4",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 121099,
+    "name": "镜华",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 121105,
+    "name": "安巴赫",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "4",
+    "race": "Dragon"
+  },
+  {
+    "id": 121111,
+    "name": "贾斯媞",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 121117,
+    "name": "蒂亚",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "4",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 121123,
+    "name": "阿克娅",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 121129,
+    "name": "卢卡",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 121135,
+    "name": "塞利米尔",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 121141,
+    "name": "夏尔",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 121147,
+    "name": "见岛勇希",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 121153,
+    "name": "索媞艾丝",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 121159,
+    "name": "妮丝艾丝",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 121165,
+    "name": "岚梅",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 121171,
+    "name": "影丘龙一",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 121177,
+    "name": "索维",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 121183,
+    "name": "普·莉莉艾",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 121189,
+    "name": "茶露亚",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Plants,Element"
+  },
+  {
+    "id": 123001,
+    "name": "ノエル・シルヴァ",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 131001,
+    "name": "稻穗",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Mystery"
+  },
+  {
+    "id": 131002,
+    "name": "卡莉奥丝特罗",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 131003,
+    "name": "宗士郎",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 131004,
+    "name": "梅媞斯",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 131005,
+    "name": "巴拉克",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 131011,
+    "name": "塞拉",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131012,
+    "name": "牡丹",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 131013,
+    "name": "伊路米",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 131014,
+    "name": "贝尔赛蒂亚",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 131020,
+    "name": "雷吉斯",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131026,
+    "name": "布茜",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 131032,
+    "name": "洛蒂",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131038,
+    "name": "兹茵可",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131044,
+    "name": "斩铁",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131050,
+    "name": "玛奇斯",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 131056,
+    "name": "塞拉",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131062,
+    "name": "丝特莱纳",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131068,
+    "name": "梅姆拉姆",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 131074,
+    "name": "赫尔加",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 131080,
+    "name": "千岳十织",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 131086,
+    "name": "白",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 131092,
+    "name": "特克托",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131098,
+    "name": "茧月",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 131104,
+    "name": "贝瑞塔",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131110,
+    "name": "拉普缇娜",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131116,
+    "name": "露米拉卡",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Human,Undead"
+  },
+  {
+    "id": 131122,
+    "name": "绮拉",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 131128,
+    "name": "兹茵可",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131134,
+    "name": "卡西瓦尔斯",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131140,
+    "name": "蒂妮",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 131146,
+    "name": "里布拉姆",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 131152,
+    "name": "约翰逊王",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131158,
+    "name": "天羽凪莉",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 131164,
+    "name": "提欧",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 131170,
+    "name": "塔吉斯",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131176,
+    "name": "夏琳",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 131182,
+    "name": "莱特",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 141001,
+    "name": "希尔媞",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 141002,
+    "name": "菲莉亚",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 141003,
+    "name": "丛云",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Undead,Element"
+  },
+  {
+    "id": 141004,
+    "name": "雷恩",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 141005,
+    "name": "西微",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 141006,
+    "name": "米格里",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 141007,
+    "name": "可可萝",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 141008,
+    "name": "休尔特",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Dragon"
+  },
+  {
+    "id": 141009,
+    "name": "二阶堂咲",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Human,Undead"
+  },
+  {
+    "id": 141015,
+    "name": "艾丝缇莉艾尔",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 141021,
+    "name": "希尔媞",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 141027,
+    "name": "凉风",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 141033,
+    "name": "芙拉菲",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 141039,
+    "name": "索妮雅",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 141045,
+    "name": "涅维亚",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 141051,
+    "name": "艾丝缇莉艾尔",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 141057,
+    "name": "豪岚",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Mystery"
+  },
+  {
+    "id": 141063,
+    "name": "西微",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 141069,
+    "name": "雷恩",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 141081,
+    "name": "芙拉菲",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 141087,
+    "name": "美美",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 141093,
+    "name": "玛露琪亚",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 141099,
+    "name": "休尔特",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "4",
+    "race": "Dragon"
+  },
+  {
+    "id": 141105,
+    "name": "艾尔玛露",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 141111,
+    "name": "无声铃鹿",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 141117,
+    "name": "伊野里翔太",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 141123,
+    "name": "真乃香",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Undead,Element"
+  },
+  {
+    "id": 141129,
+    "name": "ユノ",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 141135,
+    "name": "泽菲尔",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 141141,
+    "name": "希尔科哈雷",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "4",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 141147,
+    "name": "布茜",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "4",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 141153,
+    "name": "朝户八重",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 141159,
+    "name": "罗尔夫",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 141165,
+    "name": "菲莉亚",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 141171,
+    "name": "夕日野太一",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 141177,
+    "name": "操里缘子",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 141183,
+    "name": "芙拉菲",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 141189,
+    "name": "画狂老人Z",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 141201,
+    "name": "希尔媞",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 151001,
+    "name": "奈芙提姆",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 151002,
+    "name": "拉杰尔特",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 151003,
+    "name": "艾可莉儿",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 151004,
+    "name": "稻穗",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "4",
+    "race": "Mystery"
+  },
+  {
+    "id": 151005,
+    "name": "塔吉斯",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 151006,
+    "name": "贝瑞塔",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "女性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 151007,
+    "name": "里布拉姆",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 151009,
+    "name": "奈芙提姆",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 151011,
+    "name": "佩可莉姆",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 151012,
+    "name": "莉菈",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 151013,
+    "name": "奥薇尔",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 151014,
+    "name": "菲拉梅里亚",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 151015,
+    "name": "星川莉莉",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "4",
+    "race": "Human,Undead"
+  },
+  {
+    "id": 151021,
+    "name": "菲莉亚",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 151027,
+    "name": "艾莉亚",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 151033,
+    "name": "塞里奥尔",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 151039,
+    "name": "莲月",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 151045,
+    "name": "莉莉丝",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 151051,
+    "name": "稻穗",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "女性",
+    "race": "Mystery"
+  },
+  {
+    "id": 151057,
+    "name": "朝比奈实玖琉",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 151063,
+    "name": "奈芙提姆",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 151069,
+    "name": "泽赫尔",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 151075,
+    "name": "莉菈",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 151081,
+    "name": "奥薇尔",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 151087,
+    "name": "涅特",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "男性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 151093,
+    "name": "丝缇涅尔",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "4",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 151099,
+    "name": "奎茵薇德",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "4",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 151105,
+    "name": "特别周",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 151111,
+    "name": "达克妮丝",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 151117,
+    "name": "斩铁",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 151123,
+    "name": "伊莉诺雅",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 151129,
+    "name": "尤维尔",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 151141,
+    "name": "菊野",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "4",
+    "race": "Human,Mystery"
+  },
+  {
+    "id": 151147,
+    "name": "史黛拉",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Dragon"
+  },
+  {
+    "id": 151153,
+    "name": "莱特",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Dragon"
+  },
+  {
+    "id": 151159,
+    "name": "拉夫马诺",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "4",
+    "race": "Dragon"
+  },
+  {
+    "id": 151165,
+    "name": "阿尔克",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Undead,Dragon"
+  },
+  {
+    "id": 151171,
+    "name": "玉子",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Undead,Element"
+  },
+  {
+    "id": 151182,
+    "name": "诺瓦",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 153001,
+    "name": "凪原直",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 161001,
+    "name": "贝尔赛蒂亚",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161002,
+    "name": "威隆",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 161004,
+    "name": "莫弥亚",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161005,
+    "name": "卡菈",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "男性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161006,
+    "name": "奥莉维尔",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161007,
+    "name": "凯露",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 161008,
+    "name": "爱丽丝",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "男性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161009,
+    "name": "绀野纯子",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human,Undead"
+  },
+  {
+    "id": 161015,
+    "name": "蒂亚",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 161021,
+    "name": "蒂妮",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161027,
+    "name": "艾迪凯斯",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Devil"
+  },
+  {
+    "id": 161033,
+    "name": "阿露姆",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "男性",
+    "race": "Devil"
+  },
+  {
+    "id": 161039,
+    "name": "珂艾特",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 161045,
+    "name": "梅尔维奥拉",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161051,
+    "name": "蒂妮",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161057,
+    "name": "贝阿朵丽丝",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 161063,
+    "name": "赛吉尔",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 161069,
+    "name": "普莉姆拉",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161081,
+    "name": "拉芙",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 161082,
+    "name": "伊野里翔太",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 161087,
+    "name": "珂艾特",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 161093,
+    "name": "贝尔赛蒂亚",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161099,
+    "name": "丛云",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Undead,Element"
+  },
+  {
+    "id": 161105,
+    "name": "希尔狄嘉德",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 161111,
+    "name": "路易莉兹",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161117,
+    "name": "里昂",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161123,
+    "name": "普莉姆拉",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161129,
+    "name": "操里缘子",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 161135,
+    "name": "希尔媞",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 161141,
+    "name": "アスタ",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 161147,
+    "name": "埃尔摩尔",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 161153,
+    "name": "威隆",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 161159,
+    "name": "尼尔娅娜",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161165,
+    "name": "塔娜奇埃拉",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 161171,
+    "name": "伊奥雷斯",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 161177,
+    "name": "奈芙提姆",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 161183,
+    "name": "澄波响",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 161189,
+    "name": "玛登",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 161195,
+    "name": "查特丽娜",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 161201,
+    "name": "蕾薇",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 163001,
+    "name": "八云",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 211001,
+    "name": "阿赛尔",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 211002,
+    "name": "碧安卡",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 211003,
+    "name": "花火",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 211004,
+    "name": "阿须桐丸",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "男性",
+    "race": "Human,Mystery"
+  },
+  {
+    "id": 211005,
+    "name": "格莱德",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 211006,
+    "name": "卡农",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 211007,
+    "name": "璐璐卡",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 211008,
+    "name": "蕾维",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 211009,
+    "name": "琪丽",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 211010,
+    "name": "贝伊斯",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 211011,
+    "name": "米尔米娜",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 211012,
+    "name": "娜希尔",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 211013,
+    "name": "仓丸",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 211014,
+    "name": "夕雾",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "男性",
+    "race": "Human,Undead"
+  },
+  {
+    "id": 211020,
+    "name": "妮可拉",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 211026,
+    "name": "特蕾涅",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 211032,
+    "name": "舞姬",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 211038,
+    "name": "阿赛尔",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 211044,
+    "name": "绯河凛音",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 211050,
+    "name": "皮西卡",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 211056,
+    "name": "蕾维",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 211062,
+    "name": "陈诗",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 213001,
+    "name": "阿尔克",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 213007,
+    "name": "阿虚",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 213013,
+    "name": "凪原直",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 221001,
+    "name": "尤维尔",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 221002,
+    "name": "莉洁儿",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 221003,
+    "name": "亚美莉亚",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human,Aquatic"
+  },
+  {
+    "id": 221004,
+    "name": "爱丽丝",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "男性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 221006,
+    "name": "夏农",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 221007,
+    "name": "萨尔",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "4",
+    "race": "Human,Aquatic"
+  },
+  {
+    "id": 221008,
+    "name": "莫迪亚迦",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "男性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 221009,
+    "name": "蛟",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "4",
+    "race": "Human,Mystery"
+  },
+  {
+    "id": 221010,
+    "name": "索维",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 221011,
+    "name": "杰拉尔",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 221017,
+    "name": "薇薇",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 221022,
+    "name": "崔丝塔",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 221028,
+    "name": "珐颂",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 221034,
+    "name": "艾芙琳",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 221040,
+    "name": "白乃",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "4",
+    "race": "Mystery"
+  },
+  {
+    "id": 221053,
+    "name": "拉纳",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 221054,
+    "name": "鹰森诚司",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 221060,
+    "name": "珐洛洛",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 221066,
+    "name": "皮西卡",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 221072,
+    "name": "法拉",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 221078,
+    "name": "菲妮",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 222001,
+    "name": "拉纳",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 223001,
+    "name": "玛丽娜",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 223007,
+    "name": "索媞艾丝",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 223013,
+    "name": "涅特",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 223019,
+    "name": "露西娅妲",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 231001,
+    "name": "拉姆斯",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Dragon"
+  },
+  {
+    "id": 231002,
+    "name": "露娜露",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 231003,
+    "name": "雷吉斯",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 231004,
+    "name": "艾琳诺儿",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 231005,
+    "name": "杰",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 231006,
+    "name": "米诺",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 231007,
+    "name": "欧雷欧",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 231008,
+    "name": "阿德尼",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 231009,
+    "name": "露迪",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 231012,
+    "name": "奈丝卡",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 231013,
+    "name": "罗塞莉亚",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 231014,
+    "name": "水野爱",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Undead"
+  },
+  {
+    "id": 231020,
+    "name": "露娜露",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 231032,
+    "name": "阿德尼",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 231038,
+    "name": "托·蕾蕾妮",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 231044,
+    "name": "艾蒂塔",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 231050,
+    "name": "特尔娜",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 231056,
+    "name": "吉泽尔",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 231063,
+    "name": "阿福",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Mystery"
+  },
+  {
+    "id": 231069,
+    "name": "黑",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 231075,
+    "name": "艾蕾吉娅",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 231081,
+    "name": "琳卡莉娜",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 231087,
+    "name": "奥涅斯特",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 231093,
+    "name": "艾尔梅丽莎",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 231099,
+    "name": "英维特拉",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 233001,
+    "name": "普莉卡",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 233007,
+    "name": "提欧",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 233013,
+    "name": "艾可",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 241001,
+    "name": "米娅",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 241002,
+    "name": "奥罗尔",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 241003,
+    "name": "宗士郎",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 241004,
+    "name": "梅露希儿",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 241005,
+    "name": "赫尔加",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 241006,
+    "name": "蕾贝卡",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 241007,
+    "name": "露",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 241008,
+    "name": "凉风",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 241009,
+    "name": "小羽",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 241015,
+    "name": "哈奥",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 241021,
+    "name": "拉姆",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "女性",
+    "race": "Human,Mystery"
+  },
+  {
+    "id": 241027,
+    "name": "里卡尔德",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 241033,
+    "name": "米迪",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "女性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 241039,
+    "name": "皮亚莫",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 241045,
+    "name": "路马尔克",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 241051,
+    "name": "玛卡妮",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 241057,
+    "name": "米尔米娜",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 241063,
+    "name": "凉月",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 241069,
+    "name": "芙兰",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 243001,
+    "name": "亚里莎",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 243007,
+    "name": "鹄",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 243013,
+    "name": "白",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 243019,
+    "name": "梅莉安娜",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 251001,
+    "name": "蒂亚",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 251002,
+    "name": "杰拉尔",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 251003,
+    "name": "艾莉亚",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 251004,
+    "name": "芬",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 251005,
+    "name": "绮拉",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 251006,
+    "name": "莱亚",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 251007,
+    "name": "霍普",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "女性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 251008,
+    "name": "伊路米",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 251009,
+    "name": "芙洛丽塔",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 251010,
+    "name": "莉洁儿",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 251011,
+    "name": "琪亚娜",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 251017,
+    "name": "莉莉丝",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 251023,
+    "name": "梅克",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 251029,
+    "name": "赛希莉亚",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 251035,
+    "name": "蒂蕾特",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 251041,
+    "name": "芙洛丽塔",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 251047,
+    "name": "菲妮",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 251053,
+    "name": "萨莉哈",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 251059,
+    "name": "菲勒斯",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "4",
+    "race": "Devil"
+  },
+  {
+    "id": 251065,
+    "name": "卡菈薇娜",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "女性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 251071,
+    "name": "克拉尔缇",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 251077,
+    "name": "优娜",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 253001,
+    "name": "帕尔菲",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 253007,
+    "name": "索维",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 253013,
+    "name": "史黛拉",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Dragon"
+  },
+  {
+    "id": 253019,
+    "name": "瓦雷因",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 261001,
+    "name": "阿露姆",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "男性",
+    "race": "Devil"
+  },
+  {
+    "id": 261003,
+    "name": "玛丽安",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 261004,
+    "name": "安迪",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human,Undead"
+  },
+  {
+    "id": 261005,
+    "name": "里昂",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "女性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 261006,
+    "name": "尤维尔",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 261007,
+    "name": "赛吉尔",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 261008,
+    "name": "露娜",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human,Undead"
+  },
+  {
+    "id": 261009,
+    "name": "玛格丽特",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 261010,
+    "name": "格里格",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 261011,
+    "name": "布莱斯",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 261017,
+    "name": "法露伽",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 261023,
+    "name": "塞尔玛",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 261029,
+    "name": "厄莉",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "男性",
+    "race": "Devil"
+  },
+  {
+    "id": 261035,
+    "name": "爱德华",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 261041,
+    "name": "伦达尔",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 261047,
+    "name": "塔维尔",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 261053,
+    "name": "古泉一树",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 261059,
+    "name": "薇尔吉娅",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 261065,
+    "name": "影丘龙一",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 261071,
+    "name": "紫苑",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 261077,
+    "name": "绯河凛音",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 261083,
+    "name": "荷莉",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 261089,
+    "name": "阿鲁玛德乌斯",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Dragon"
+  },
+  {
+    "id": 263001,
+    "name": "葵泽",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 263002,
+    "name": "拉芙",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 263003,
+    "name": "山田多惠",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "男性",
+    "race": "Human,Undead"
+  },
+  {
+    "id": 263009,
+    "name": "菜月·昴",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 263015,
+    "name": "和真",
+    "rarity": "4★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 311001,
+    "name": "莉莉露",
+    "rarity": "3★",
+    "element": "火",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 311002,
+    "name": "梅米",
+    "rarity": "3★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 311003,
+    "name": "伊莉斯",
+    "rarity": "3★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 311004,
+    "name": "哈修",
+    "rarity": "3★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 311005,
+    "name": "仁",
+    "rarity": "3★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 311006,
+    "name": "特蕾涅",
+    "rarity": "3★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 311008,
+    "name": "吉斯拉多",
+    "rarity": "3★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 311009,
+    "name": "恩妮",
+    "rarity": "3★",
+    "element": "火",
+    "gender": "4",
+    "race": "Human,Element"
+  },
+  {
+    "id": 311010,
+    "name": "杰克",
+    "rarity": "3★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 311011,
+    "name": "可兰",
+    "rarity": "3★",
+    "element": "火",
+    "gender": "女性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 311012,
+    "name": "哈丽莎",
+    "rarity": "3★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 311013,
+    "name": "斯文",
+    "rarity": "3★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 311019,
+    "name": "莉莉安",
+    "rarity": "3★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 311025,
+    "name": "克劳斯",
+    "rarity": "3★",
+    "element": "火",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 321001,
+    "name": "凯洛斯",
+    "rarity": "3★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 321002,
+    "name": "崔丝塔",
+    "rarity": "3★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 321003,
+    "name": "瓦尔塔",
+    "rarity": "3★",
+    "element": "水",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 321004,
+    "name": "艾尔莎",
+    "rarity": "3★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 321005,
+    "name": "克劳斯",
+    "rarity": "3★",
+    "element": "水",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 321006,
+    "name": "白乃",
+    "rarity": "3★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Mystery"
+  },
+  {
+    "id": 321007,
+    "name": "诲谕",
+    "rarity": "3★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 321008,
+    "name": "拉蒂",
+    "rarity": "3★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 321009,
+    "name": "法夫",
+    "rarity": "3★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Dragon"
+  },
+  {
+    "id": 321010,
+    "name": "莉可",
+    "rarity": "3★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 321011,
+    "name": "克菈菈",
+    "rarity": "3★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 321012,
+    "name": "纱玛莎",
+    "rarity": "3★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 321013,
+    "name": "莉塔",
+    "rarity": "3★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 323001,
+    "name": "茶露亚",
+    "rarity": "3★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Plants,Element"
+  },
+  {
+    "id": 331001,
+    "name": "优娜",
+    "rarity": "3★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 331002,
+    "name": "赫妮",
+    "rarity": "3★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Beast"
+  },
+  {
+    "id": 331003,
+    "name": "泰加",
+    "rarity": "3★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Element"
+  },
+  {
+    "id": 331004,
+    "name": "黑",
+    "rarity": "3★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 331005,
+    "name": "阿尔伯特",
+    "rarity": "3★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 331006,
+    "name": "加津知",
+    "rarity": "3★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Mystery"
+  },
+  {
+    "id": 331007,
+    "name": "泰奇安娜",
+    "rarity": "3★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 331010,
+    "name": "科特",
+    "rarity": "3★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 331011,
+    "name": "夏·丝丝",
+    "rarity": "3★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 331012,
+    "name": "芙拉",
+    "rarity": "3★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 331013,
+    "name": "卑尔根",
+    "rarity": "3★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 331014,
+    "name": "芙拉娜",
+    "rarity": "3★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 331020,
+    "name": "菲·诺诺亚",
+    "rarity": "3★",
+    "element": "雷",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 333001,
+    "name": "缪",
+    "rarity": "3★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 341001,
+    "name": "伊凡",
+    "rarity": "3★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 341002,
+    "name": "茶露亚",
+    "rarity": "3★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Plants,Element"
+  },
+  {
+    "id": 341003,
+    "name": "瑞西塔尔",
+    "rarity": "3★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Undead"
+  },
+  {
+    "id": 341004,
+    "name": "奈丝卡",
+    "rarity": "3★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 341005,
+    "name": "缪",
+    "rarity": "3★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 341006,
+    "name": "菲勒斯",
+    "rarity": "3★",
+    "element": "风",
+    "gender": "女性",
+    "race": "Devil"
+  },
+  {
+    "id": 341007,
+    "name": "荷莉",
+    "rarity": "3★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 341008,
+    "name": "科那",
+    "rarity": "3★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 341009,
+    "name": "贾斯塔",
+    "rarity": "3★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 341010,
+    "name": "凯特",
+    "rarity": "3★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 341011,
+    "name": "涅迪",
+    "rarity": "3★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 341017,
+    "name": "米蕾特",
+    "rarity": "3★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 351001,
+    "name": "可莉娜",
+    "rarity": "3★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 351002,
+    "name": "玛格丽特",
+    "rarity": "3★",
+    "element": "光",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 351003,
+    "name": "赛希莉亚",
+    "rarity": "3★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 351004,
+    "name": "欧雷欧",
+    "rarity": "3★",
+    "element": "光",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 351005,
+    "name": "劳尔",
+    "rarity": "3★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 351006,
+    "name": "米雷斯",
+    "rarity": "3★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 351007,
+    "name": "璐璐卡",
+    "rarity": "3★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 351008,
+    "name": "加萝",
+    "rarity": "3★",
+    "element": "光",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 351009,
+    "name": "摩菈",
+    "rarity": "3★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Beast"
+  },
+  {
+    "id": 351015,
+    "name": "可莉娜",
+    "rarity": "3★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 351021,
+    "name": "可莎",
+    "rarity": "3★",
+    "element": "光",
+    "gender": "女性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 351027,
+    "name": "阿克塞姆",
+    "rarity": "3★",
+    "element": "光",
+    "gender": "男性",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 351033,
+    "name": "鲁·鲁特",
+    "rarity": "3★",
+    "element": "光",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 361001,
+    "name": "法露伽",
+    "rarity": "3★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 361002,
+    "name": "札里尔",
+    "rarity": "3★",
+    "element": "暗",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 361003,
+    "name": "厄莉",
+    "rarity": "3★",
+    "element": "暗",
+    "gender": "男性",
+    "race": "Devil"
+  },
+  {
+    "id": 361004,
+    "name": "紫苑",
+    "rarity": "3★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 361005,
+    "name": "阿迪尔",
+    "rarity": "3★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 361006,
+    "name": "桃乐西亚",
+    "rarity": "3★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 361007,
+    "name": "蕾贝卡",
+    "rarity": "3★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 361008,
+    "name": "诺塞尔",
+    "rarity": "3★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 361009,
+    "name": "梅利露",
+    "rarity": "3★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 361015,
+    "name": "梅利露",
+    "rarity": "3★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 361021,
+    "name": "塔尔哈",
+    "rarity": "3★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human,Undead"
+  },
+  {
+    "id": 361027,
+    "name": "科迪",
+    "rarity": "3★",
+    "element": "暗",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 361033,
+    "name": "露西尔",
+    "rarity": "3★",
+    "element": "暗",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 412004,
+    "name": "魔像",
+    "rarity": "2★",
+    "element": "火",
+    "gender": "男性",
+    "race": "Machine"
+  },
+  {
+    "id": 442004,
+    "name": "波吉特",
+    "rarity": "2★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Beast"
+  },
+  {
+    "id": 442006,
+    "name": "镰鼬",
+    "rarity": "2★",
+    "element": "风",
+    "gender": "女性",
+    "race": "Beast,Mystery"
+  },
+  {
+    "id": 443001,
+    "name": "C·F·奇迹",
+    "rarity": "2★",
+    "element": "风",
+    "gender": "女性",
+    "race": "Machine"
+  },
+  {
+    "id": 443002,
+    "name": "斗和奇迹",
+    "rarity": "2★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Human"
+  },
+  {
+    "id": 512001,
+    "name": "蘑仔",
+    "rarity": "1★",
+    "element": "火",
+    "gender": "男性",
+    "race": "Plants,Element"
+  },
+  {
+    "id": 512002,
+    "name": "红波露",
+    "rarity": "1★",
+    "element": "火",
+    "gender": "男性",
+    "race": "Element"
+  },
+  {
+    "id": 512004,
+    "name": "火精",
+    "rarity": "1★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Element"
+  },
+  {
+    "id": 522001,
+    "name": "蓝波露",
+    "rarity": "1★",
+    "element": "水",
+    "gender": "男性",
+    "race": "Element"
+  },
+  {
+    "id": 532001,
+    "name": "黄波露",
+    "rarity": "1★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Element"
+  },
+  {
+    "id": 532004,
+    "name": "帕拉鼠",
+    "rarity": "1★",
+    "element": "雷",
+    "gender": "女性",
+    "race": "Beast"
+  },
+  {
+    "id": 542001,
+    "name": "绿波露",
+    "rarity": "1★",
+    "element": "风",
+    "gender": "男性",
+    "race": "Element"
+  },
+  {
+    "id": 700000,
+    "name": "鹄",
+    "rarity": "4★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 700001,
+    "name": "アシストキャラ",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 700002,
+    "name": "アシストキャラ",
+    "rarity": "5★",
+    "element": "风",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 700003,
+    "name": "アシストキャラ",
+    "rarity": "4★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 700004,
+    "name": "アシストキャラ",
+    "rarity": "4★",
+    "element": "雷",
+    "gender": "不明",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 700005,
+    "name": "アシストキャラ",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 700006,
+    "name": "ハーリダル",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 700007,
+    "name": "索媞艾丝",
+    "rarity": "4★",
+    "element": "水",
+    "gender": "女性",
+    "race": "Human"
+  },
+  {
+    "id": 700008,
+    "name": "アシストキャラ",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human,Machine"
+  },
+  {
+    "id": 700009,
+    "name": "阿尔克",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 700010,
+    "name": "阿尔克",
+    "rarity": "4★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 700011,
+    "name": "见岛勇希",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 700012,
+    "name": "伊野里翔太",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 700013,
+    "name": "白",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 700014,
+    "name": "赛法",
+    "rarity": "5★",
+    "element": "水",
+    "gender": "不明",
+    "race": "Human,Element"
+  },
+  {
+    "id": 700015,
+    "name": "白",
+    "rarity": "5★",
+    "element": "雷",
+    "gender": "男性",
+    "race": "Human,Beast"
+  },
+  {
+    "id": 700016,
+    "name": "莱特",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "不明",
+    "race": "Human"
+  },
+  {
+    "id": 700017,
+    "name": "阿尔克",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "不明",
+    "race": "Human,Devil"
+  },
+  {
+    "id": 700018,
+    "name": "史黛拉",
+    "rarity": "5★",
+    "element": "光",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 700019,
+    "name": "蕾薇",
+    "rarity": "5★",
+    "element": "暗",
+    "gender": "4",
+    "race": "Human"
+  },
+  {
+    "id": 999999,
+    "name": "夏可缇",
+    "rarity": "5★",
+    "element": "火",
+    "gender": "不明",
+    "race": "Human"
+  }
+]
