@@ -1,7 +1,7 @@
 // Handles the insertion of mana into characters.
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getAccountPlayers, getPlayerCharacterManaNodesSync, getPlayerCharacterSync, getPlayerCharactersManaNodesSync, getPlayerItemSync, getPlayerSync, getSession, givePlayerItemSync, hasPlayerUnlockedCharacterManaNodeSync, insertPlayerCharacterBondTokenSync, insertPlayerCharacterManaNodesSync, updatePlayerCharacterBondTokenSync, updatePlayerCharacterSync, updatePlayerItemSync, updatePlayerSync } from "../../data/wdfpData";
+import { getAccountPlayers, getPlayerCharacterManaNodesSync, getPlayerCharacterSync, getPlayerCharactersManaNodesSync, getPlayerCharactersSync, getPlayerItemSync, getPlayerSync, getSession, givePlayerItemSync, hasPlayerUnlockedCharacterManaNodeSync, insertPlayerCharacterBondTokenSync, insertPlayerCharacterManaNodesSync, updatePlayerCharacterBondTokenSync, updatePlayerCharacterSync, updatePlayerItemSync, updatePlayerSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
 import { getCharacterDataSync, getCharacterManaBoardCountSync, getCharacterManaNodeSync, getCharacterManaNodesSync } from "../../lib/assets";
 import { characterExpCaps, givePlayerCharacterSync } from "../../lib/character";
@@ -610,6 +610,73 @@ const routes = async (fastify: FastifyInstance) => {
                 "item_list": item_list,
                 "mail_arrived": false
             }
+        })
+    })
+
+    fastify.post("/bulk_over_limit", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as { viewer_id: number; api_count?: number }
+
+        const viewerId = body.viewer_id
+        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+            error: "Bad Request", message: "Invalid request body.",
+        })
+
+        const viewerIdSession = await getSession(viewerId.toString())
+        if (!viewerIdSession) return reply.status(400).send({
+            error: "Bad Request", message: "Invalid viewer id.",
+        })
+
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        const player = playerId !== null ? getPlayerSync(playerId) : null
+        if (player === null) return reply.status(500).send({
+            error: "Internal Server Error", message: "No players bound to account.",
+        })
+
+        const characters = getPlayerCharactersSync(playerId)
+        console.log(`[bulk_over_limit] player=${playerId} totalChars=${Object.keys(characters).length}`)
+
+        const characterList: any[] = []
+
+        for (const [charId, charData] of Object.entries(characters)) {
+            if (charData.stack <= 0) continue
+
+            const assetData = getCharacterDataSync(Number(charId))
+            if (!assetData) continue
+
+            const maxOver = characterMaxOverLimits[assetData.rarity]
+            if (maxOver === undefined) continue
+
+            const rest = maxOver - charData.overLimitStep
+            if (rest <= 0) continue
+
+            const count = Math.min(charData.stack, rest)
+            const newOverLimit = charData.overLimitStep + count
+            const newStack = charData.stack - count
+
+            updatePlayerCharacterSync(playerId, Number(charId), {
+                overLimitStep: newOverLimit,
+                stack: newStack,
+            })
+
+            characterList.push({
+                character_id: Number(charId),
+                over_limit_step: newOverLimit,
+                stack: newStack,
+                create_time: clientSerializeDate(charData.joinTime),
+                update_time: clientSerializeDate(new Date()),
+                join_time: clientSerializeDate(charData.joinTime),
+            })
+        }
+
+        console.log(`[bulk_over_limit] done: ${characterList.length} characters modified`)
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            data_headers: generateDataHeaders({ viewer_id: viewerId }),
+            data: {
+                character_list: characterList,
+                mail_arrived: false,
+            },
         })
     })
 
