@@ -392,4 +392,16 @@ Player 页面 `/player/:id` → 「恢复挑战次数」按钮：
 
 ---
 
-**最后更新：2026-06-23**（详细变更见 [CHANGELOG.md](./CHANGELOG.md)）
+**最后更新：2026-06-23**
+
+## 参考文档
+
+| 文件 | 说明 |
+|------|------|
+| `docs/generated/gacha_timeline.csv` | 581 条卡池时间线（含 UP 角色） |
+| `docs/generated/character_table.csv` | 505 条角色对照表（元素已修正） |
+| `docs/generated/quest_timeline.csv` | 17,014 条副本活动期 |
+
+生成脚本：`scripts/gen_gacha_timeline.js`, `scripts/gen_character_table.js`, `scripts/gen_quest_timeline.js`
+
+（详细变更见 [CHANGELOG.md](./CHANGELOG.md)）
