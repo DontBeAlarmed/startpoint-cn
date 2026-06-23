@@ -57,21 +57,33 @@ function poolCopy(abilities: AbilityInfo[], group: 'A' | 'B', rarity: number): n
     return abilities.filter(a => a.group === group && a.rarity === rarity).map(a => a.id)
 }
 
-// ---- Material gold rate table ----
+// ---- Official material probability table (6 rarities × 3 colors) ----
 
-// Official A/B gold rates per material (破星结晶 / 崇高辉石)
-const MATERIAL_GOLD_RATES: Record<number, { aGold: number, bGold: number }> = {}
+interface MaterialProbs { a1: number, b1: number, a2: number, b2: number, a3: number, b3: number }
+
+// 破星结晶 (universal): 10001(tier1) 10002(tier2) 10003(tier3)
+// 崇高辉石 (element): 14001-14018, element order 0,1,2,3,5,4
+const STONE_ELEMENT_ORDER = [0, 1, 2, 3, 5, 4]
+
+const MATERIAL_PROBS: Record<number, MaterialProbs> = {}
 {
-    const crystalA = [1.50, 2.08, 9.00]
-    const crystalB = [1.36, 1.89, 8.18]
-    const stoneA   = [2.00, 2.67, 10.0]
-    const stoneB   = [1.82, 2.43, 9.09]
+    // Tier 1 (3★): 破星 [1.88,1.70,4.13,3.75,1.50,1.36]  崇高 [2.00,1.82,4.00,3.64,2.00,1.82]
+    // Tier 2 (4★): 破星 [1.66,1.51,4.57,4.15,2.08,1.89]  崇高 [1.78,1.62,4.45,4.05,2.67,2.43]
+    // Tier 3 (5★): 破星 [0,0,1.00,0.91,9.00,8.18]          崇高 [0,0,0,0,10.0,9.09]
+    const probs: [number, number, number, number, number, number][][] = [
+        [[1.88, 1.70, 4.13, 3.75, 1.50, 1.36], [2.00, 1.82, 4.00, 3.64, 2.00, 1.82]],
+        [[1.66, 1.51, 4.57, 4.15, 2.08, 1.89], [1.78, 1.62, 4.45, 4.05, 2.67, 2.43]],
+        [[0, 0, 1.00, 0.91, 9.00, 8.18],         [0, 0, 0, 0, 10.0, 9.09]],
+    ]
     for (let tier = 1; tier <= 3; tier++) {
         const ti = tier - 1
-        MATERIAL_GOLD_RATES[10000 + tier] = { aGold: crystalA[ti], bGold: crystalB[ti] }
-        for (let elem = 0; elem <= 5; elem++) {
-            const id = 14001 + ti * 6 + elem
-            MATERIAL_GOLD_RATES[id] = { aGold: stoneA[ti], bGold: stoneB[ti] }
+        // 破星结晶
+        const cp = probs[ti][0]
+        MATERIAL_PROBS[10000 + tier] = { a1: cp[0], b1: cp[1], a2: cp[2], b2: cp[3], a3: cp[4], b3: cp[5] }
+        const sp = probs[ti][1]
+        for (let ei = 0; ei < STONE_ELEMENT_ORDER.length; ei++) {
+            const id = 14001 + STONE_ELEMENT_ORDER[ei] * 3 + ti
+            MATERIAL_PROBS[id] = { a1: sp[0], b1: sp[1], a2: sp[2], b2: sp[3], a3: sp[4], b3: sp[5] }
         }
     }
 }
@@ -89,30 +101,17 @@ const playerDraws: Record<number, ExBoostDrawResult> = {}
 
 // ---- Draw logic ----
 
-function pickFromPools(groupPools: Record<number, number[]>, drawTier: number, goldRate: number): number | null {
-    const roll = randomInt(1, 10001) / 100 // 0.01% precision
-
-    if (roll <= goldRate * 100) {
-        // Gold: try rarity 3, fallback 2, 1
-        for (const r of [3, 2, 1]) {
-            if (groupPools[r].length > 0) {
-                const idx = randomInt(groupPools[r].length)
-                return groupPools[r].splice(idx, 1)[0]
-            }
-        }
-    } else if (drawTier >= 2) {
-        // Silver: for tier 3 (5★) skip brown; for tier 2 try 2 then 1
-        const rarities = drawTier >= 3 ? [2] : [2, 1]
-        for (const r of rarities) {
-            if (groupPools[r].length > 0) {
-                const idx = randomInt(groupPools[r].length)
-                return groupPools[r].splice(idx, 1)[0]
-            }
-        }
-    }
-    // Brown/default: try 1, 2, 3
-    for (const r of [1, 2, 3]) {
-        if (groupPools[r].length > 0) {
+function drawOneAbility(groupPools: Record<number, number[]>, probs: MaterialProbs, group: 'A' | 'B'): number | null {
+    const rates = group === 'A' ? [probs.a1, probs.a2, probs.a3] : [probs.b1, probs.b2, probs.b3]
+    // Table values are rarity weights per material. Weighted random: pick rarity by proportion.
+    const totalWeight = rates[0] + rates[1] + rates[2]
+    if (totalWeight <= 0) return null
+    const roll = randomInt(1, Math.round(totalWeight * 100) + 1) / 100 // [0.01, totalWeight+0.01]
+    let cumulative = 0
+    // Check from gold to brown
+    for (let r = 3; r >= 1; r--) {
+        cumulative += rates[r - 1]
+        if (roll <= cumulative && groupPools[r].length > 0) {
             const idx = randomInt(groupPools[r].length)
             return groupPools[r].splice(idx, 1)[0]
         }
@@ -121,35 +120,25 @@ function pickFromPools(groupPools: Record<number, number[]>, drawTier: number, g
 }
 
 function drawExBoostAbilities(
-    drawTier: number,
     materialId: number,
     exStatusPool: number[],
 ): { statusId: number, abilityIdList: number[] } {
     // Always get 1 status
     const statusId = exStatusPool[randomInt(exStatusPool.length)]
 
-    const goldRate = MATERIAL_GOLD_RATES[materialId]
-    if (!goldRate) return { statusId, abilityIdList: [] }
+    const probs = MATERIAL_PROBS[materialId]
+    if (!probs) return { statusId, abilityIdList: [] }
 
     const pools = freshPools()
     const abilityIdList: number[] = []
 
-    // Ability count: tier 1-2: 0-2 random, tier 3: always 2 (A+B)
-    const maxCount = drawTier >= 3 ? 2 : randomInt(0, 3)
+    // Independent A-group draw
+    const aid = drawOneAbility(pools.A, probs, 'A')
+    if (aid !== null) abilityIdList.push(aid)
 
-    // Independent A/B draws
-    let aDone = false, bDone = false
-    for (let i = 0; i < maxCount; i++) {
-        if (!aDone && (i === 0 || !bDone)) {
-            const aid = pickFromPools(pools.A, drawTier, goldRate.aGold)
-            if (aid !== null) abilityIdList.push(aid)
-            aDone = true
-        } else if (!bDone) {
-            const bid = pickFromPools(pools.B, drawTier, goldRate.bGold)
-            if (bid !== null) abilityIdList.push(bid)
-            bDone = true
-        }
-    }
+    // Independent B-group draw
+    const bid = drawOneAbility(pools.B, probs, 'B')
+    if (bid !== null) abilityIdList.push(bid)
 
     return { statusId, abilityIdList }
 }
@@ -220,7 +209,7 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
     // deduct
     updatePlayerItemSync(playerId, costItemId, afterCostItemAmount)
 
-    const draw = drawExBoostAbilities(drawTier, costItemId, exStatusPool)
+    const draw = drawExBoostAbilities(costItemId, exStatusPool)
     const drawResult: ExBoostDrawResult = {
         characterId, statusId: draw.statusId, abilityIdList: draw.abilityIdList
     }

@@ -52,17 +52,22 @@
             <h1 class="text-4xl font-bold text-on-background">Player "{{playerName}}"</h1>
             <h2 class="text-2xl text-on-surface-variant">"{{playerComment}}"</h2>
 
-            <!-- Refill -->
-            <section class="p-5 border border-outline-variant rounded-3xl bg-surface-container">
-                <h3 class="text-lg font-semibold mb-3">自动补充资源</h3>
-                <div class="flex flex-wrap gap-3 items-center text-sm">
-                    <span class="text-on-surface-variant">免费星导石低于</span>
-                    <input id="refillThreshold" value="2000" size="6" class="bg-surface-container rounded border border-outline-variant p-1 text-sm">
-                    <span class="text-on-surface-variant">恢复至</span>
-                    <input id="refillAmount" value="999999" size="8" class="bg-surface-container rounded border border-outline-variant p-1 text-sm">
-                    <button id="btnRefill" class="text-sm bg-primary text-on-primary px-4 py-2 rounded-full font-bold" onclick="refillResources()">手动补充</button>
-                    <button id="btnAuto" class="text-sm border border-primary text-primary px-4 py-2 rounded-full" onclick="toggleAuto()">自动: 关</button>
-                    <span id="autoStatus" class="text-xs text-on-surface-variant"></span>
+            <!-- Utility Actions -->
+            <section class="p-5 border border-outline-variant rounded-3xl bg-surface-container" id="actions">
+                <h3 class="text-lg font-semibold mb-3">工具操作</h3>
+                <div class="flex flex-wrap gap-2">
+                    <form method="post" action="/api/player/{{playerId}}/clear_ex_boost" style="display:inline" onsubmit="return confirm('清空所有角色的 EX 能力值？')">
+                        <button type="submit" class="text-sm border border-outline-variant px-3 py-1 rounded-full hover:bg-surface-container-low">清空 EX 能力</button>
+                    </form>
+                    <form method="post" action="/api/player/{{playerId}}/reset_parties" style="display:inline" onsubmit="return confirm('删除所有编队并重置为默认？')">
+                        <button type="submit" class="text-sm border border-outline-variant px-3 py-1 rounded-full hover:bg-surface-container-low">重置编队</button>
+                    </form>
+                    <form method="post" action="/api/player/{{playerId}}/clear_mail" style="display:inline" onsubmit="return confirm('清空所有邮件？')">
+                        <button type="submit" class="text-sm border border-outline-variant px-3 py-1 rounded-full hover:bg-surface-container-low">清空邮件</button>
+                    </form>
+                    <form method="post" action="/api/player/{{playerId}}/clear_receive_history" style="display:inline" onsubmit="return confirm('清空获取记录？')">
+                        <button type="submit" class="text-sm border border-outline-variant px-3 py-1 rounded-full hover:bg-surface-container-low">清空记录</button>
+                    </form>
                 </div>
             </section>
 
@@ -277,46 +282,6 @@
         const d = await r.json().catch(() => ({}));
         if (r.ok) { alert('已清空 ' + (d.deleted ?? 0) + ' 封邮件'); location.reload(); }
         else { alert('清空失败：' + (d.error || r.status)); }
-    }
-
-    let autoTimer = null;
-
-    async function refillResources() {
-        const threshold = document.getElementById('refillThreshold').value;
-        const amount = document.getElementById('refillAmount').value;
-        if (!autoTimer) { if (!confirm(`免费星导石低于 ${threshold} 时恢复至 ${amount}？`)) return; }
-        const r = await fetch('/api/player/' + PID + '/refill_resources', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: 'threshold=' + threshold + '&amount=' + amount
-        });
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) { if (!autoTimer) alert('恢复失败：' + (d.error || r.status)); return; }
-        const ts = new Date().toLocaleTimeString();
-        if (d.refilled) {
-            document.getElementById('autoStatus').textContent = ts + ' 已恢复 ' + (d.previous||0).toLocaleString() + ' → ' + d.freeVmoney.toLocaleString();
-            location.reload();
-        } else if (!autoTimer) {
-            alert('当前 ' + d.freeVmoney.toLocaleString() + '，无需恢复');
-        } else {
-            document.getElementById('autoStatus').textContent = ts + ' 当前 ' + d.freeVmoney.toLocaleString() + '，无需恢复';
-        }
-    }
-
-    function toggleAuto() {
-        const btn = document.getElementById('btnAuto');
-        if (autoTimer) {
-            clearInterval(autoTimer); autoTimer = null;
-            btn.textContent = '自动: 关';
-            btn.className = 'text-sm border border-primary text-primary px-4 py-2 rounded-full';
-            document.getElementById('autoStatus').textContent = '';
-        } else {
-            autoTimer = setInterval(refillResources, 30000);
-            btn.textContent = '自动: 开';
-            btn.className = 'text-sm bg-primary text-on-primary px-4 py-2 rounded-full font-bold';
-            refillResources();
-        }
-    }
     </script>
 </body>
 

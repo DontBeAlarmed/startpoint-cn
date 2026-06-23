@@ -1,7 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getMergedPlayerDataSync, reviveMergedPlayerDates } from "../../data/utils";
 import { validatePlayerField, VALID_CHARACTER_IDS, VALID_ITEM_IDS, MAX_INT } from "./validation";
-import { getAllPlayersSync, replacePlayerDataSync, getPlayerSync, updatePlayerSync, getPlayerCharactersSync, getPlayerItemsSync, getPlayerEquipmentListSync, insertPlayerCharacterSync, insertDefaultPlayerCharacterSync, updatePlayerItemSync, getPlayerDailyChallengePointListSync, insertPlayerDailyChallengePointListSync, updatePlayerDailyChallengePointSync, deleteAllPlayerMailSync, getDb } from "../../data/wdfpData";
+import { getAllPlayersSync, replacePlayerDataSync, getPlayerSync, updatePlayerSync, getPlayerCharactersSync, getPlayerItemsSync, getPlayerEquipmentListSync, insertPlayerCharacterSync, insertDefaultPlayerCharacterSync, updatePlayerItemSync, getPlayerDailyChallengePointListSync, insertPlayerDailyChallengePointListSync, updatePlayerDailyChallengePointSync, deleteAllPlayerMailSync, getDb, getDefaultPlayerPartyGroupsSync, insertPlayerPartyGroupListSync } from "../../data/wdfpData";
+import { PartyCategory } from "../../data/types";
 import dailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 
 interface SaveQuery {
@@ -114,26 +115,38 @@ const routes = async (fastify: FastifyInstance) => {
         }
     })
 
-    // Refill resources for AFK gacha pulling
-    fastify.post("/:id/refill_resources", async (request: FastifyRequest, reply: FastifyReply) => {
+    // Clear all EX boost data for all characters
+    fastify.post("/:id/clear_ex_boost", async (request: FastifyRequest, reply: FastifyReply) => {
         const playerId = Number((request.params as any).id)
         if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
-        const threshold = Number((request.body as any).threshold) || 2000
-        const amount = Number((request.body as any).amount) || 999999
-        if (!Number.isFinite(amount) || amount < 0 || amount > 99999999) {
-            return reply.status(400).send({ error: "amount 超出范围（需 0 ~ 99999999）" })
-        }
+        const result = getDb().prepare(`UPDATE players_characters SET ex_boost_status_id = NULL, ex_boost_ability_id_list = NULL WHERE player_id = ?`).run(playerId)
+        return reply.redirect(`/player/${playerId}#actions`)
+    })
 
-        const player = getPlayerSync(playerId)
-        if (!player) return reply.status(404).send({ error: "Player not found" })
+    // Reset parties to defaults
+    fastify.post("/:id/reset_parties", async (request: FastifyRequest, reply: FastifyReply) => {
+        const playerId = Number((request.params as any).id)
+        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
+        getDb().prepare(`DELETE FROM players_parties WHERE player_id = ?`).run(playerId)
+        getDb().prepare(`DELETE FROM players_party_groups WHERE player_id = ?`).run(playerId)
+        insertPlayerPartyGroupListSync(playerId, getDefaultPlayerPartyGroupsSync(PartyCategory.NORMAL))
+        return reply.redirect(`/player/${playerId}#actions`)
+    })
 
-        const current = player.freeVmoney
-        if (current >= threshold) {
-            return reply.status(200).send({ ok: true, freeVmoney: current, refilled: false })
-        }
+    // Clear all mails
+    fastify.post("/:id/clear_mail", async (request: FastifyRequest, reply: FastifyReply) => {
+        const playerId = Number((request.params as any).id)
+        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
+        deleteAllPlayerMailSync(playerId)
+        return reply.redirect(`/player/${playerId}#actions`)
+    })
 
-        updatePlayerSync({ id: playerId, freeVmoney: amount })
-        return reply.status(200).send({ ok: true, freeVmoney: amount, refilled: true, previous: current })
+    // Clear receive history
+    fastify.post("/:id/clear_receive_history", async (request: FastifyRequest, reply: FastifyReply) => {
+        const playerId = Number((request.params as any).id)
+        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
+        getDb().prepare(`DELETE FROM players_receive_history WHERE player_id = ?`).run(playerId)
+        return reply.redirect(`/player/${playerId}#actions`)
     })
 
     // Add character
