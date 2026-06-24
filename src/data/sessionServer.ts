@@ -300,7 +300,8 @@ function handleNotify(client: SessionClient, msg: any[]) {
             break;
         case 6: // StartBattle
             console.log(`[SESSION] client ${client.viewerId} StartBattle, mates=${client.mates.length}`)
-            battleExpectedCount.set(client.roomNumber, client.mates.length)
+            const room = getRoom(client.roomNumber)
+            battleExpectedCount.set(client.roomNumber, room?.is_npc_mode ? 1 : client.mates.length)
             broadcastToRoom(client.roomNumber, [1, [5, client.mates]])
             break;
         case 5: case 7: case 8: case 9:
