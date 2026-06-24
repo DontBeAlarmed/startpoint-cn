@@ -901,6 +901,11 @@ state=1 (Ready: 可加入/可招募)
 | `search_room` 类型修复 | ✅ | `establisher_follow: false→0` |
 | 战斗帧同步 | ✅ | Broadcast 帧命令双向 relay，typepacker 格式对齐 |
 | NPC/真人模式解耦 | ✅ | NPC: battleExpectedCount=1, 真人: mates.length |
+| Bye 广播 Mates | ✅ | 玩家离开→移除→广播更新给剩余客户端 |
+| Disband 广播 Disbanded(6) | ✅ | `notifyRoomDisbanded` → 解散通知全员 |
+| 房主返回同步 | ✅ | 房主 Enter→合并已有客端 mates→广播更新 |
+| Finish 同步 | ✅ | 各玩家独立 finish HTTP，房主管理 room state |
+| Abort 同步 | ✅ | G10+G11 覆盖，房主 abort→Disbanded，客端→Mates 广播 |
 
 ### 9.7.6 帧 relay 架构
 
@@ -921,6 +926,15 @@ Client B → Broadcast(frameCmd) → Server → relayToBattleRoom → BattleServ
 | 消息 TCP 合并 | ⚠️ | 100ms/200ms 延迟规避 |
 | `get_rooms` 返回无 TCP 客户端的房间 | ✅ 已修复 | `hasRoomClients` 防御过滤 |
 | 战斗恢复 UI（RestoreState.Battle） | 待测 | DB 层已就绪，客户端恢复弹窗流程待验证 |
+| battle TCP 退出弹窗 | 待解决 | 客户端本地行为，服务端无法干预 |
+
+### 9.9 下一步 — Phase 4 匹配系统
+
+| # | 功能 | 说明 |
+|---|------|------|
+| G15 | `attention/action` 真实匹配 | 维护待匹配队列，按 quest 组合 |
+| G16 | `attention/check` 返回匹配结果 | 轮询返回已找到的房间号 |
+| G17 | `summon` 真实玩家数据 | 从 DB 读取真实玩家 party 替代 NPC |
 
 ---
 
