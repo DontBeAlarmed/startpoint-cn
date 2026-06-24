@@ -11,6 +11,11 @@ function formatTime(offset: number | null): string {
     return d.toISOString().replace("T", " ").substring(0, 19)
 }
 
+function htmlEscape(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+           .replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 const routes = async (fastify: FastifyInstance) => {
     fastify.get("/", async (request: FastifyRequest, reply: FastifyReply) => {
         let html = readFileSync(path.join(__dirname, staticPagesDir, "players.html")).toString("utf-8")
@@ -28,7 +33,7 @@ const routes = async (fastify: FastifyInstance) => {
             const saveCount = pids.length
             // Use per-account default player instead of global activePlayerId
             const defaultPid = getAccountDefaultPlayer(acc.id)
-            const activeName = defaultPid ? (getPlayerSync(defaultPid)?.name || '-') : '-'
+            const activeName = defaultPid ? (htmlEscape(getPlayerSync(defaultPid)?.name || '-')) : '-'
             accountRows += `<tr>
                 <td>${acc.id}</td>
                 <td>${saveCount}</td>
@@ -60,7 +65,7 @@ const routes = async (fastify: FastifyInstance) => {
             for (const pid of pids) {
                 const player = getPlayerSync(pid)
                 if (!player) continue
-                const name = player.name || `Player${pid}`
+                const name = htmlEscape(player.name || `Player${pid}`)
                 const level = player.degreeId || 1
                 const charCount = Object.keys(getPlayerCharactersSync(pid)).length
                 const isActive = activePid === pid
@@ -76,7 +81,7 @@ const routes = async (fastify: FastifyInstance) => {
                         </form>
                         <form method="post" action="/api/server/renameSave" style="display:inline">
                             <input type="hidden" name="playerId" value="${pid}">
-                            <input type="text" name="name" placeholder="${name}" class="text-xs w-20 px-1 py-0.5 rounded border border-outline-variant">
+                            <input type="text" name="name" placeholder="${htmlEscape(player.name || '')}" class="text-xs w-20 px-1 py-0.5 rounded border border-outline-variant">
                             <button type="submit" class="text-xs border border-outline-variant px-2 py-1 rounded-full">改名</button>
                         </form>
                         <form method="post" action="/api/server/cloneSave?playerId=${pid}&accountId=${selectedAccountId}" style="display:inline">
@@ -106,7 +111,7 @@ const routes = async (fastify: FastifyInstance) => {
                 playerList += `<li class="w-full">
                     <a href="/player/${player.id}" class="p-5 h-full text-on-surface hover:text-primary items-center flex gap-3 border-outline-variant transition-colors border rounded-3xl hover:bg-surface-container-low">
                         <section class="flex flex-col gap-2 flex-1">
-                            <h4 class="text-xl font-bold">${player.name}</h4>
+                            <h4 class="text-xl font-bold">${htmlEscape(player.name)}</h4>
                             <h4 class="text-base font-bold text-on-surface-variant">Last Login: ${player.lastLoginTime.toDateString()}</h4>
                         </section>
                         <section class="flex gap-3 items-center">
@@ -139,10 +144,10 @@ const routes = async (fastify: FastifyInstance) => {
         let html = readFileSync(path.join(__dirname, staticPagesDir, "player.html")).toString("utf-8")
 
         // Basic info
-        html = html.replace(/{{playerName}}/g, player.name)
-            .replace(/{{playerComment}}/g, player.comment)
+        html = html.replace(/{{playerName}}/g, htmlEscape(player.name))
+            .replace(/{{playerComment}}/g, htmlEscape(player.comment))
             .replace(/{{playerId}}/g, String(parsedPlayerId))
-            .replace("{{uploadError}}", error === undefined ? '' : `<h3 class="text-xl text-error font-semibold mt-2">${error}</h3>`);
+            .replace("{{uploadError}}", error === undefined ? '' : `<h3 class="text-xl text-error font-semibold mt-2">${htmlEscape(error)}</h3>`);
 
         // Resource fields
         const resourceFields = [
