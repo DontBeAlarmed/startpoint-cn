@@ -1,5 +1,5 @@
 # 多人战斗（Multi Battle Quest）联机系统文档
-> 状态: NPC共斗完善 + 战斗恢复数据层就绪   关键文件: src/data/sessionServer.ts, src/data/multiRoom.ts, src/routes/api/multiBattleQuest.ts   相关端点: /api/index.php/multi_battle_quest/*
+> 状态: NPC共斗完善 + 真人联机 Phase 1-3 基础就绪 + 战斗恢复数据层   关键文件: src/data/sessionServer.ts, src/data/multiRoom.ts, src/routes/api/multiBattleQuest.ts   相关端点: /api/index.php/multi_battle_quest/*
 
 ## 1. API 端点规范
 
@@ -883,6 +883,23 @@ state=1 (Ready: 可加入/可招募)
 | `play_id` / `continue_count` 追踪 | ✅ | start 写入，play_continue 递增 |
 | `/load` 返回 `unfinished_quest_list` | ✅ | 客户端启动时检测未完成战斗 |
 | `unfinished_multi_quest_list` | ✅ | 多人战斗独立列表 |
+
+### 9.7.5 真人联机 Phase 1-3 ✅
+
+| 功能 | 状态 | 说明 |
+|------|:---:|------|
+| `broadcastToRoom()` | ✅ | 消息广播给房间所有客户端 |
+| `relayToBattleRoom()` | ✅ | 战斗帧命令中继 |
+| Guest Enter 通知 | ✅ | 新玩家加入时广播 Mates 给已有客户端 |
+| Ready 广播 | ✅ | StateChanged 发给所有客户端 |
+| ChangeParty 广播 | ✅ | 队伍变更通知 |
+| StartBattle 广播 | ✅ | Start(members) 发给所有客户端 |
+| 房主自动准备 | ✅ | `checkHostAutoReady`: 全员 Ready→房主 Ready, 新人加入→取消 |
+| SceneReady 全员等待 | ✅ | 所有 battle client SceneReady 后才广播 BattleStart |
+| Battle TCP 握手注册 | ✅ | `cidToBattleClient` + `battleExpectedCount` |
+| `get_rooms` 可见性 | ✅ | `host_viewer_id === viewerId` 过滤 |
+| `search_room` 类型修复 | ✅ | `establisher_follow: false→0` |
+| 战斗帧同步 | ⚠️ | 帧命令 relay 已实现，但客户端还未真正同步战斗 |
 
 ### 9.8 已知限制
 
