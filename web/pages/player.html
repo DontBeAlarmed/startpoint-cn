@@ -58,12 +58,12 @@
                 <div class="flex flex-wrap gap-2">
                     <a href="/api/player/save?id={{playerId}}"
                         class="text-sm bg-primary text-on-primary px-3 py-1 rounded-full flex items-center justify-center">
-                        下载 JSON
+                        导出存档
                     </a>
                     <form method="post" action="/api/player/save?id={{playerId}}" enctype="multipart/form-data" class="flex items-center gap-2">
                         <input name="save-data" type="file" accept=".json,.txt" class="text-xs">
                         {{uploadError}}
-                        <button type="submit" class="text-sm bg-primary text-on-primary px-3 py-1 rounded-full">上传 JSON</button>
+                        <button type="submit" class="text-sm bg-primary text-on-primary px-3 py-1 rounded-full">导入存档</button>
                     </form>
                     <button class="js-action text-sm border border-primary text-primary px-3 py-1 rounded-full hover:bg-primary hover:text-on-primary transition-colors" data-action="resetChallenge">
                         恢复挑战次数
