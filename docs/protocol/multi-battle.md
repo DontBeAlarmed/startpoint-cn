@@ -928,13 +928,67 @@ Client B → Broadcast(frameCmd) → Server → relayToBattleRoom → BattleServ
 | 战斗恢复 UI（RestoreState.Battle） | 待测 | DB 层已就绪，客户端恢复弹窗流程待验证 |
 | battle TCP 退出弹窗 | 待解决 | 客户端本地行为，服务端无法干预 |
 
-### 9.9 下一步 — Phase 4 匹配系统
+### 9.9 下一步 — Phase 4 匹配系统 ⏳ 暂缓
 
-| # | 功能 | 说明 |
+> **暂缓原因**：随机招募按钮已被 NPC 模式（`is_npc_mode`）占用。房主点"随机招募"→ `EnterComs` → 自动 NPC。真实匹配需要房主不进入 NPC 流程而加入匹配队列。两者共用同一 UI 入口，需先实现入口区分。
+
+#### 9.9.1 匹配流程（协议已确认）
+
+```
+房主: share_room(type=3) → 入队 pendingQueue[category]
+客端: attention/check (每10-15s轮询)
+  → 服务端匹配: quest相同 + host_viewerId != viewerId
+  → 匹配成功: 返回 data.multi[{attention_key, quest_info: {room_number,...}}]
+  → 无匹配: 返回 data.multi: null（自己入队等待）
+客端: 铃铛通知 → accept → select_room(room_number, accepted_type=2) → TCP → co-op
+```
+
+#### 9.9.2 关键协议格式
+
+```json
+// attention/check 响应 (无匹配)
+{ "config": { ... }, "multi": null }              // ← 必须 null，不能是空数组
+
+// attention/check 响应 (匹配成功)
+{ "config": { ... }, "multi": [{
+    "attention_key": "uuid",
+    "quest_info": {
+      "room_number": "123456",
+      "quest_id": 1060001,
+      "category_id": 2,
+      "estabilisher_character": 151165,
+      "estabilisher_character_evolution_img_level": 0,
+      "estabilisher_follow": 0,
+      "estabilisher_rank": 80,
+      "host_entry_time": 1723648978,
+      "is_newbie": false
+    }
+  }]
+}
+
+// summon 真人数据
+// mate 从 DB 读取玩家 party，com_id/viewerId 标识真实玩家，不足 2 人用 NPC 补充
+```
+
+#### 9.9.3 实现前提
+
+| 条件 | 说明 |
+|------|------|
+| 区分 NPC/真人招募入口 | 随机招募按钮被 NPC 占用，需单独 UI 或开关 |
+| 匹配队列模块 | 新建 `src/data/attentionQueue.ts`，维护 pendingQueue + activeMatches |
+| action 评分 | 需存储玩家行为评分（Decline/Expire/Neglect 等） |
+| summon 真人数据 | `getPlayerPartyGroupListSync` → 构建 MultiMate |
+
+#### 9.9.4 实施子任务
+
+| # | 功能 | 文件 |
 |---|------|------|
-| G15 | `attention/action` 真实匹配 | 维护待匹配队列，按 quest 组合 |
-| G16 | `attention/check` 返回匹配结果 | 轮询返回已找到的房间号 |
-| G17 | `summon` 真实玩家数据 | 从 DB 读取真实玩家 party 替代 NPC |
+| 4-1 | 新建匹配队列模块 | `src/data/attentionQueue.ts`（新建） |
+| 4-2 | `share_room`(type=3) → 入队 | `multiBattleQuest.ts` |
+| 4-3 | `attention/check` 返回 `data.multi` | `attention.ts` |
+| 4-4 | `attention/action` 真实评分 | `attention.ts` |
+| 4-5 | `summon` 真实玩家 party | `multiBattleQuest.ts` |
+| 4-6 | TCP 多玩家验证 | `sessionServer.ts`（已支持） |
 
 ---
 
