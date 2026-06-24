@@ -101,6 +101,7 @@ function removeClient(client: SessionClient) {
                     const timer = setTimeout(() => {
                         roomDisbandTimers.delete(client.roomNumber)
                         if (getRoom(client.roomNumber)) {
+                            notifyRoomDisbanded(client.roomNumber);
                             disbandRoom(client.roomNumber)
                             console.log(`[SESSION] room ${client.roomNumber} disbanded (return window expired)`)
                         }
@@ -110,6 +111,7 @@ function removeClient(client: SessionClient) {
                     console.log(`[SESSION] battle disconnected from room ${client.roomNumber} (room kept, state=${room?.raising_state})`)
                 }
             } else {
+                notifyRoomDisbanded(client.roomNumber);
                 disbandRoom(client.roomNumber);
                 console.log(`[SESSION] room ${client.roomNumber} disbanded (all clients disconnected)`);
             }
@@ -134,6 +136,12 @@ function broadcastToRoom(roomNumber: string, obj: any, exceptViewerId?: number) 
         const c = clients.get(addr)
         if (c && c.viewerId !== exceptViewerId) sendJson(c.socket, obj)
     }
+}
+
+// Notify all room TCP clients that the room is disbanded
+export function notifyRoomDisbanded(roomNumber: string) {
+    broadcastToRoom(roomNumber, [1, [6, "disbanded"]])
+    console.log(`[SESSION] notified disbanded to room ${roomNumber}`)
 }
 
 function relayToBattleRoom(roomNumber: string, fromCid: string, obj: any) {
@@ -259,10 +267,26 @@ function handleNotify(client: SessionClient, msg: any[]) {
                         checkHostAutoReady(client.roomNumber)
                     }
                 } else {
+                    // Host entering (or guest with no host client)
                     client.mates = [yours]
+                    // Merge existing guest mates if any
+                    const set = roomClients.get(client.roomNumber)
+                    if (set) {
+                        for (const addr of set) {
+                            const c = clients.get(addr)
+                            if (c && c !== client && !c.isBattle && c.mates[0]) {
+                                const gm = c.mates.find(m => m.viewerId === c.viewerId)
+                                if (gm) client.mates.push(gm)
+                            }
+                        }
+                    }
                     console.log(`[SESSION] host party from client Enter: chars=${ed.party?.characters?.map((c: any) => c?.[0] === 0 ? c[1]?.id : 'none')?.join(',')}`);
                     sendJson(client.socket, [1, [0, yours, [yours]]]);
-                    setTimeout(() => sendJson(client.socket, [1, [1, [yours]]]), 100);
+                    setTimeout(() => sendJson(client.socket, [1, [1, client.mates]]), 100);
+                    // Notify existing guests of updated mates
+                    if (client.mates.length > 1) {
+                        broadcastToRoom(client.roomNumber, [1, [1, client.mates]], client.viewerId)
+                    }
                     if (room?.is_npc_mode && client.mates.length === 1) {
                         setTimeout(() => handleEnterComs(client, [{ name: "开心超人" }, { name: "名字真难取" }]), 500)
                     }
@@ -301,8 +325,18 @@ function handleNotify(client: SessionClient, msg: any[]) {
             }
             break;
         }
-        case 1: // Bye
+        case 1: // Bye → remove from mates, broadcast to remaining
             console.log(`[SESSION] client ${client.viewerId} leaving room ${client.roomNumber}`);
+            const byeSet = roomClients.get(client.roomNumber)
+            if (byeSet) {
+                for (const addr of byeSet) {
+                    const c = clients.get(addr)
+                    if (c && c !== client && !c.isBattle) {
+                        c.mates = c.mates.filter(m => m.viewerId !== client.viewerId)
+                    }
+                }
+                broadcastToRoom(client.roomNumber, [1, [1, getHostClient(client.roomNumber)?.mates ?? []]])
+            }
             disconnectClient(client);
             break;
         case 6: // StartBattle
