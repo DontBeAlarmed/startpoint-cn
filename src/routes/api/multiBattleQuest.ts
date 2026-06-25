@@ -6,7 +6,7 @@ import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync
 import { BattleQuest, EquipmentItemReward, MultiMate, MultiMateParty, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { createRoom, disbandRoom, getDisplayHost, getNpcMates, getRoom, getRoomByToken, getRooms, serializeRoom, serializeRoomConnection, updateHostEntryTime, updateRoomState } from "../../data/multiRoom";
-import { hasRoomClients, notifyRoomDisbanded, isHostOnline } from "../../data/sessionServer";
+import { hasRoomClients, isHostOnline } from "../../data/sessionServer";
 import { insertActiveQuest, activeQuests } from "./singleBattleQuest";
 import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/stamina";
 import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
@@ -554,7 +554,6 @@ const routes = async (fastify: FastifyInstance) => {
         });
 
         if (body.room_number) {
-            notifyRoomDisbanded(body.room_number);
             disbandRoom(body.room_number);
             console.log(`[MULTI] room ${body.room_number} disbanded by viewer ${viewerId}`);
         }
@@ -990,7 +989,6 @@ const routes = async (fastify: FastifyInstance) => {
             if (activeQuestData.roomNumber) {
                 const room = getRoom(activeQuestData.roomNumber)
                 if (room && room.host_player_id === ctx.playerId) {
-                    notifyRoomDisbanded(activeQuestData.roomNumber);
                     disbandRoom(activeQuestData.roomNumber)
                     console.log(`[MULTI] abort: room ${activeQuestData.roomNumber} disbanded (host abandoned)`)
                 }
