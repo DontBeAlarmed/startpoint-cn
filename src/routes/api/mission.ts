@@ -1,7 +1,7 @@
-// Mission progress endpoints — get, update, and receive mission rewards
+// Mission progress endpoints — get and update
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getPlayerActiveMissionsSync, getSession, updatePlayerActiveMissionSync, updatePlayerActiveMissionStageSync } from "../../data/wdfpData";
+import { getPlayerActiveMissionsSync, getSession, updatePlayerActiveMissionSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
 import { getCurrentStage, getMissionIdsByCategory, getMissionsByPattern } from "../../lib/mission";
 import { resolvePlayerIdSync } from "../../data/activeAccount";

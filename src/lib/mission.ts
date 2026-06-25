@@ -13,6 +13,7 @@ import eventDefs from "../../assets/mission_event.json";
 import degreeDefs from "../../assets/mission_degree.json";
 import collectItemDefs from "../../assets/mission_collect_item.json";
 import weeklyDefs from "../../assets/mission_weekly_def.json";
+import activeRewards from "../../assets/mission_active_reward.json";
 
 // Category mapping (client API category → reward table + stage data)
 // 1=Regular, 2=Daily, 3=Event, 4=CollectItemEvent, 5=Degree
@@ -72,6 +73,49 @@ indexPatterns(weeklyDefs as any, 10);
 
 export function getMissionsByPattern(pattern: string): PatternMatch[] {
     return patternIndex[pattern] || [];
+}
+
+// Active mission reward types (from CDN active_mission_reward.json)
+// kind: 1=Item, 2=Equipment, 3=Mana, 4=Character, 5=Exp, 6=Degree, 7=PassCardPoint
+export interface ActiveMissionReward {
+    kind: number;
+    amount: number;
+    itemId?: number;
+    characterId?: number;
+    equipmentId?: number;
+}
+
+/**
+ * Get all rewards for a given active mission stage.
+ * Returns empty array if mission or stage not found.
+ */
+export function getActiveMissionRewards(missionId: number, stage: number): ActiveMissionReward[] {
+    const mission = (activeRewards as Record<string, Record<string, any[]>>)[String(missionId)];
+    if (!mission) return [];
+    const stageData = mission[String(stage)];
+    if (!stageData || !stageData[0]) return [];
+    const row = stageData[0];
+
+    const result: ActiveMissionReward[] = [];
+    for (let slot = 0; slot < 4; slot++) {
+        const base = 7 + slot * 6;
+        const kind = parseInt(row[base]) || 0;
+        if (kind === 0) continue;
+        const amount = parseInt(row[base + 1]) || 0;
+        if (amount === 0) continue;
+
+        const reward: ActiveMissionReward = { kind, amount };
+        const itemId = row[base + 2] ? parseInt(row[base + 2]) : undefined;
+        const charId = row[base + 3] ? parseInt(row[base + 3]) : undefined;
+        const equipId = row[base + 4] ? parseInt(row[base + 4]) : undefined;
+
+        if (itemId) reward.itemId = itemId;
+        if (charId) reward.characterId = charId;
+        if (equipId) reward.equipmentId = equipId;
+
+        result.push(reward);
+    }
+    return result;
 }
 
 /**

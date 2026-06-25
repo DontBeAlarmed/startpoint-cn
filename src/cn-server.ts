@@ -36,6 +36,7 @@ import encyclopediaApiPlugin from "./routes/api/encyclopedia";
 import mailApiPlugin from "./routes/api/mail";
 import rankingEventApiPlugin from "./routes/api/rankingEvent";
 import missionApiPlugin from "./routes/api/mission";
+import activeMissionApiPlugin from "./routes/api/activeMission";
 import paymentApiPlugin from "./routes/api/payment";
 import newsApiPlugin from "./routes/api/news";
 import raidEventApiPlugin from "./routes/api/raidEvent";
@@ -463,6 +464,7 @@ fastify.register(encyclopediaApiPlugin, { prefix: `${apiPrefix}/encyclopedia` })
 fastify.register(mailApiPlugin, { prefix: `${apiPrefix}/mail` });
 fastify.register(rankingEventApiPlugin, { prefix: `${apiPrefix}/ranking_event` });
 fastify.register(missionApiPlugin, { prefix: `${apiPrefix}/mission` });
+fastify.register(activeMissionApiPlugin, { prefix: `${apiPrefix}/active_mission` });
 fastify.register(paymentApiPlugin, { prefix: `${apiPrefix}/payment` });
 fastify.register(newsApiPlugin, { prefix: `${apiPrefix}/news` });
 fastify.register(raidEventApiPlugin, { prefix: `${apiPrefix}/event/raid` });
