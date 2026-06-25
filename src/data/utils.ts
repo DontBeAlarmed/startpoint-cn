@@ -5,7 +5,7 @@ import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, Party
 import { availableAssetVersion } from "../routes/api/asset"
 import { deserializePlayerRushEventPlayedParty, deserializeRushEvent, getPlayerActiveMissionsSync, getPlayerBoxGachasSync, getPlayerCharactersManaNodesSync, getPlayerCharactersSync, getPlayerClearedRegularMissionListSync, getPlayerDailyChallengePointListSync, getPlayerDrawnQuestsSync, getPlayerEquipmentListSync, getPlayerGachaCampaignListSync, getPlayerGachaInfoListSync, getPlayerItemsSync, getPlayerMailCountSync, getPlayerMultiSpecialExchangeCampaignsSync, getPlayerOptionsSync, getPlayerPartyGroupListSync, getPlayerPeriodicRewardPointsSync, getPlayerQuestProgressSync, getPlayerRushEventListClearedFoldersSync, getPlayerRushEventListPlayedPartiesSync, getPlayerRushEventListSync, getPlayerStartDashExchangeCampaignsSync, getPlayerSync, getPlayerTriggeredTutorialsSync, serializePlayerRushEventPlayedParty, updatePlayerSync } from "./wdfpData"
 import { kIdToBusinessCode, businessCodeToKId } from "./codeMap"
-import { computeRealTimeStamina } from "../lib/stamina"
+import { computeRealTimeStamina, getRankDegree } from "../lib/stamina"
 
 export interface SerializePlayerDataOptions {
     viewerId?: number
@@ -268,6 +268,13 @@ export function serializePlayerData(
     if (realTimeStamina !== playerData.stamina) {
         updatePlayerSync({ id: playerData.id, stamina: realTimeStamina, staminaHealTime: new Date() })
         playerData.stamina = realTimeStamina
+    }
+
+    // Sync degree_id from rankPoint if outdated (retroactive fix)
+    const expectedDegreeId = getRankDegree(playerData.rankPoint)
+    if (expectedDegreeId > playerData.degreeId) {
+        updatePlayerSync({ id: playerData.id, degreeId: expectedDegreeId })
+        playerData.degreeId = expectedDegreeId
     }
 
     const clientData: ClientPlayerData = {
