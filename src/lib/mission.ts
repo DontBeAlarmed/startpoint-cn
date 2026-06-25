@@ -103,7 +103,10 @@ const computablePatterns: Set<string> = new Set([
 ]);
 
 export function isComputablePattern(pattern: string): boolean {
-    return computablePatterns.has(pattern);
+    if (!pattern) return false;
+    if (pattern.startsWith('single_battle_play') || pattern.startsWith('single_battle_clear_count')) return true;
+    if (pattern.startsWith('used_stamina_count') || pattern.includes('stamina_use')) return true;
+    return pattern.startsWith('rank_ss') || pattern.startsWith('rank_s') || pattern.startsWith('rank_a') || pattern.startsWith('rank_b');
 }
 
 /**

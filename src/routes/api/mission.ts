@@ -72,7 +72,7 @@ const routes = async (fastify: FastifyInstance) => {
             }
         }
 
-        const rankCounts: Record<string, number> = {
+    const rankCounts: Record<string, number> = {
             'rank_ss': ssClears,
             'rank_s': sClears,
             'rank_a': aClears,
@@ -99,12 +99,12 @@ const routes = async (fastify: FastifyInstance) => {
                 // Computable patterns for categories 1,2 (Regular + Daily)
                 if (!computed && (category === 1 || category === 2)) {
                     const pattern = getMissionPattern(category, missionId)
-                    if (isComputablePattern(pattern)) {
-                        if (pattern === 'single_battle_play' || pattern === 'single_battle_clear_count') {
+                    if (pattern && isComputablePattern(pattern)) {
+                        if (pattern.startsWith('single_battle_play') || pattern.startsWith('single_battle_clear_count')) {
                             progress = totalQuestClears
-                        } else if (pattern === 'used_stamina_count') {
+                        } else if (pattern.includes('stamina_use')) {
                             progress = player.totalStaminaUsed ?? 0
-                        } else if (pattern in rankCounts) {
+                        } else if (rankCounts[pattern] !== undefined) {
                             progress = rankCounts[pattern]
                         }
                     }
