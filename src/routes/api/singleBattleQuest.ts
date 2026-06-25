@@ -552,7 +552,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "exp_pooled_time": getServerTime(playerData.expPooledTime),
                     "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney,
                     "rank_point": newRankPoint,
-                    "degree_id": newDegreeId,
+                    "degree_id": 1,
                     "stamina": computeRealTimeStamina(playerData),
                     "stamina_heal_time": getServerTime(),
                     "boost_point": newBoostPoint,
