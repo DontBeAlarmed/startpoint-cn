@@ -266,10 +266,10 @@ const routes = async (fastify: FastifyInstance) => {
             boostPoint: newBoostPoint,
             bossBoostPoint: newBossBoostPoint,
             degreeId: newDegreeId,
-            ...(didLevelUp ? { stamina: getMaxStamina(newDegreeId), staminaHealTime: new Date() } : {}),
+            ...(didLevelUp ? { stamina: playerData.stamina + getMaxStamina(newDegreeId), staminaHealTime: new Date() } : {}),
         })
         if (didLevelUp) {
-            playerData.stamina = getMaxStamina(newDegreeId)
+            playerData.stamina = playerData.stamina + getMaxStamina(newDegreeId)
             playerData.staminaHealTime = new Date()
             console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${playerData.degreeId} -> ${newDegreeId}, stamina refilled`)
         }
@@ -552,6 +552,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "exp_pooled_time": getServerTime(playerData.expPooledTime),
                     "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney,
                     "rank_point": newRankPoint,
+                    "degree_id": newDegreeId,
                     "stamina": computeRealTimeStamina(playerData),
                     "stamina_heal_time": getServerTime(),
                     "boost_point": newBoostPoint,
