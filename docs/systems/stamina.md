@@ -1,19 +1,27 @@
 # 体力系统(Stamina)
-> 状态: 已实现   关键文件: assets/config.json, assets/quest_entry_costs.json, src/routes/api/item.ts   相关端点: /shop/recover_stamina, /item/use_item
+> 状态: 已实现   关键文件: assets/config.json, assets/quest_entry_costs.json, src/lib/stamina.ts, src/routes/api/shop.ts   相关端点: /shop/recover_stamina, /item/use_item
 
-本文档描述体力系统(2026-06-19)的实现:恢复/消耗流程、体力配置、关卡进入消耗、道具使用、DB 路径修复、支付与遗留问题,以及关卡进入消耗 key 格式。
+本文档描述体力系统(2026-06-25 updated)的实现:恢复/消耗流程、体力配置、关卡进入消耗、道具使用、等级提升、遗留问题,以及关卡进入消耗 key 格式。
 
-## Stamina system (2026-06-19)
+## Stamina system (2026-06-25)
 
 ### Recovery/consumption flow
-Stamina is stored as `players.stamina` + `players.stamina_heal_time` (real time epoch). Server-side computes recovery using `Date.now()` (real time), but sends `stamina_heal_time: getServerTime()` (virtual time aligned with `servertime` header) to the client so client-side calculation yields `elapsed=0` and displays the server-computed value directly.
+Stamina is stored as `players.stamina` + `players.stamina_heal_time`. Server computes real-time recovery using `Date.now()`, but sends `stamina_heal_time: getServerTime()` to the client so client-side calculation yields `elapsed=0` and displays the server-computed value directly.
+
+### Fix: real-time recovery on /load (2026-06-25)
+Previously `/load` sent the raw DB `stamina` value without computing elapsed recovery, causing all offline stamina regen to be lost. Now `src/lib/stamina.ts:computeRealTimeStamina()` is called in `/load` (`src/data/utils.ts`) before building the response, and the computed value is persisted back to DB.
+
+### Rank level-up system (2026-06-25)
+- `degreeId` was previously never updated from `rankPoint` (stuck at 1). Now `getRankDegree(rankPoint)` queries `assets/cdndata/player_rank.json` to find the appropriate degree ID at `/finish`.
+- On level up, stamina is refilled to 999 (max overflow).
+- Multi battle: stamina deduction and level-up NOT implemented yet — deferred until co-op system is stable.
 
 Affected endpoints and their response `stamina_heal_time` format:
 | Endpoint | Format |
 |----------|--------|
-| `/load` | `getServerTime()` (virtual) |
-| `/single_battle_quest/start` | `getServerTime()` (virtual) + `stamina: afterStamina` |
-| `/single_battle_quest/finish` | `getServerTime()` (virtual) |
+| `/load` | `computeRealTimeStamina()` + `getServerTime()` (virtual) |
+| `/single_battle_quest/start` | `computeRealTimeStamina()` → deduction + `getServerTime()` (virtual) |
+| `/single_battle_quest/finish` | `computeRealTimeStamina()` + `getServerTime()` (virtual) + degree update |
 | `/shop/recover_stamina` | `getServerTime()` (virtual) |
 | `/item/use_item` | `getServerTime()` (virtual) |
 
@@ -50,6 +58,8 @@ New endpoint `/item/use_item` (`src/routes/api/item.ts`). Handles `StaminaFixed(
 ### Remaining issues
 1. Config values from CDN binary — need to find correct salt/path for GF version
 2. Mission system — 3 endpoints return empty (deferred)
+3. Multi battle stamina deduction + level-up — deferred until co-op stable (see `multiBattleQuest.ts`)
+4. `staminaHealTime` time base mismatch: DB uses `new Date()` (real time), response uses `getServerTime()` (virtual with offset). Invisible when `timeOffset=null`, but may show desync when server time is overridden via dashboard.
 
 ## Quest entry cost key format
 `quest_entry_costs.json` uses `{category}_{questId}` compound keys to avoid collisions between main story quests (category=1) and EX quests (category=4) that share the same questId (e.g., `1_1001001` = 0 stamina, `4_1001001` = 12 stamina).

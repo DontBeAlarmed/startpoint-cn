@@ -8,6 +8,7 @@ import { generateDataHeaders, getServerTime } from "../../utils";
 import { rushEventFolderMaxRounds } from "./rushEvent";
 import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
+import { computeRealTimeStamina, getRankDegree } from "../../lib/stamina";
 import { readFileSync, existsSync } from "fs";
 import path from "path";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
@@ -255,14 +256,24 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         // update player
+        const newDegreeId = getRankDegree(newRankPoint)
+        const didLevelUp = newDegreeId > playerData.degreeId
         updatePlayerSync({
             id: playerId,
             freeMana: newMana,
             expPool: newExpPool,
             rankPoint: newRankPoint,
             boostPoint: newBoostPoint,
-            bossBoostPoint: newBossBoostPoint
+            bossBoostPoint: newBossBoostPoint,
+            degreeId: newDegreeId,
+            ...(didLevelUp ? { stamina: 999, staminaHealTime: new Date() } : {}),
         })
+        if (didLevelUp) {
+            playerData.stamina = 999
+            playerData.staminaHealTime = new Date()
+            console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${playerData.degreeId} -> ${newDegreeId}, stamina refilled`)
+        }
+        playerData.degreeId = newDegreeId
 
         // Consume daily challenge point
         let dailyChallengePointList: Object[] | null = null
@@ -541,7 +552,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "exp_pooled_time": getServerTime(playerData.expPooledTime),
                     "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney,
                     "rank_point": newRankPoint,
-                    "stamina": playerData.stamina,
+                    "stamina": computeRealTimeStamina(playerData),
                     "stamina_heal_time": getServerTime(),
                     "boost_point": newBoostPoint,
                     "boss_boost_point": newBossBoostPoint
@@ -705,7 +716,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "message": "Player not found."
                 })
             }
-            const currentStamina = player.stamina
+            const currentStamina = computeRealTimeStamina(player)
             if (currentStamina < staminaCost) {
                 console.warn(`[BATTLE-START] player ${playerId} stamina insufficient: ${currentStamina} < ${staminaCost}`)
                 return reply.status(400).send({
