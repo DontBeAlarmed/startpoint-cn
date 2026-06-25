@@ -133,7 +133,7 @@ const routes = async (fastify: FastifyInstance) => {
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
-                degree_ids: [degreeId],
+                degree_ids: [1, degreeId],  // default title + current
             }
         })
     })
@@ -175,7 +175,9 @@ const routes = async (fastify: FastifyInstance) => {
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
-            data: {}
+            data: {
+                user_info: { degree_id: Number(degreeId) }
+            }
         })
     })
 
