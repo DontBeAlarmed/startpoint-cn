@@ -1,8 +1,10 @@
-// Handles mail.
+// Mission progress endpoints — get, update, and receive mission rewards
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getSession } from "../../data/wdfpData";
+import { getPlayerActiveMissionsSync, getSession, updatePlayerActiveMissionSync, updatePlayerActiveMissionStageSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
+import { getCurrentStage } from "../../lib/mission";
+import { resolvePlayerIdSync } from "../../data/activeAccount";
 
 interface GetMissionProgressBody {
     api_count: number,
@@ -18,7 +20,7 @@ interface UpdateMissionProgressBody {
     mission_param_list: {
         progress_value: number,
         mission_pattern: string
-    }
+    }[]
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -31,19 +33,51 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "Invalid request body."
         })
 
-        const viewerIdSession = await getSession(viewerId.toString())
-        if (!viewerIdSession) return reply.status(400).send({
+        const session = await getSession(viewerId.toString())
+        if (!session) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid viewer id."
         })
 
+        const playerId = resolvePlayerIdSync(session.accountId)!
+        if (playerId === null) return reply.status(500).send({
+            "error": "Internal Server Error",
+            "message": "No players bound to account."
+        })
+
+        const requestCategories = body.category_list?.map(c => c.category) || [1, 2, 3, 5]
+        const activeMissions = getPlayerActiveMissionsSync(playerId)
+        const missionProgressList: any[] = []
+
+        for (const missionIdStr of Object.keys(activeMissions)) {
+            const missionId = parseInt(missionIdStr)
+            const mission = activeMissions[missionIdStr]
+            const progress = mission.progress
+
+            // Determine which category this mission belongs to
+            // Mission IDs are in ranges: 1-99=Regular, 100-199=Daily, etc.
+            // But for simplicity, try all requested categories
+            for (const category of requestCategories) {
+                const stage = getCurrentStage(category, missionId, progress)
+                if (stage > 0) {
+                    missionProgressList.push({
+                        mission_category: category,
+                        mission_id: missionId,
+                        progress_value: progress,
+                        stage: stage
+                    })
+                    break
+                }
+            }
+        }
+
+        console.log(`[MISSION] get_progress viewer=${viewerId} categories=${requestCategories} missions=${missionProgressList.length}`)
+
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
-            "data_headers": generateDataHeaders({
-                viewer_id: viewerId
-            }),
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
-                "mission_progress_list": [],
+                "mission_progress_list": missionProgressList,
                 "mail_arrived": false
             }
         })
@@ -58,17 +92,27 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "Invalid request body."
         })
 
-        const viewerIdSession = await getSession(viewerId.toString())
-        if (!viewerIdSession) return reply.status(400).send({
+        const session = await getSession(viewerId.toString())
+        if (!session) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid viewer id."
         })
 
+        const playerId = resolvePlayerIdSync(session.accountId)!
+        if (playerId === null) return reply.status(500).send({
+            "error": "Internal Server Error",
+            "message": "No players bound to account."
+        })
+
+        // This endpoint is fire-and-forget — the client sends accumulated counter values.
+        // We store them in active missions DB for get_mission_progress to use.
+        const missionParams = body.mission_param_list || []
+
+        console.log(`[MISSION] update_progress viewer=${viewerId} params=${missionParams.length}`)
+
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
-            "data_headers": generateDataHeaders({
-                viewer_id: viewerId
-            }),
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
                 "mission_info": [],
                 "degree_list": [],

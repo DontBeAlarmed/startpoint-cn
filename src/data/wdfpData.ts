@@ -34,7 +34,7 @@ export { getPlayerCarnivalEventRecordsSync, getPlayerCarnivalEventRecordSync, up
 export { getPlayerGachaInfoListSync, getPlayerGachaInfoSync, insertPlayerGachaInfoSync, insertPlayerGachaInfoListSync, updatePlayerGachaInfoSync, getPlayerGachaCampaignSync, getPlayerGachaCampaignListSync, insertPlayerGachaCampaignSync, insertPlayerGachaCampaignListSync, updatePlayerGachaCampaignSync } from "./domains/gacha";
 import { insertPlayerGachaInfoListSync, insertPlayerGachaCampaignListSync } from "./domains/gacha";
 import { getPlayerGachaInfoListSync, updatePlayerGachaInfoSync, getPlayerGachaCampaignListSync, updatePlayerGachaCampaignSync } from "./domains/gacha";
-export { getPlayerClearedRegularMissionListSync, insertPlayerClearedRegularMissionListSync, getPlayerActiveMissionsSync, insertPlayerActiveMissionsSync } from "./domains/mission";
+export { getPlayerClearedRegularMissionListSync, insertPlayerClearedRegularMissionListSync, getPlayerActiveMissionsSync, insertPlayerActiveMissionsSync, updatePlayerActiveMissionSync, updatePlayerActiveMissionStageSync } from "./domains/mission";
 import { insertPlayerClearedRegularMissionListSync, insertPlayerActiveMissionsSync } from "./domains/mission";
 export { getPlayerBoxGachaSync, getPlayerBoxGachasSync, insertPlayerBoxGachaSync, insertPlayerBoxGachasSync, updatePlayerBoxGachaSync, getPlayerBoxGachaDrawnRewardsSync, insertPlayerBoxGachaDrawnRewardSync, updatePlayerBoxGachaDrawnRewardSync } from "./domains/boxGacha";
 import { insertPlayerBoxGachasSync } from "./domains/boxGacha";

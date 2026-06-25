@@ -215,3 +215,37 @@ export function insertPlayerActiveMissionsSync(
         }
     })()
 }
+
+/**
+ * Updates the progress value of a single active mission.
+ */
+export function updatePlayerActiveMissionSync(
+    playerId: number,
+    missionId: number | string,
+    progress: number
+) {
+    getDb().prepare(`
+    UPDATE players_active_missions SET progress = ?
+    WHERE player_id = ? AND id = ?
+    `).run(progress, playerId, Number(missionId))
+}
+
+/**
+ * Updates the status of a single active mission stage (claimed/unclaimed).
+ */
+export function updatePlayerActiveMissionStageSync(
+    playerId: number,
+    stageId: number | string,
+    missionId: number | string,
+    status: boolean
+) {
+    getDb().prepare(`
+    UPDATE players_active_missions_stages SET status = ?
+    WHERE player_id = ? AND id = ? AND mission_id = ?
+    `).run(
+        serializeBoolean(status),
+        playerId,
+        Number(stageId),
+        Number(missionId)
+    )
+}
