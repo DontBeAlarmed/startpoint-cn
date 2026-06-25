@@ -62,12 +62,11 @@ const routes = async (fastify: FastifyInstance) => {
             for (const missionId of allIds) {
                 const mission = activeMissions[String(missionId)]
                 // Compute server-side progress for degree missions
-                let progress = mission?.progress ?? 0
+                let progress: number = mission?.progress ?? 0
                 if (category === 5) {
                     const targetDeg = getTargetDegree(missionId)
                     if (targetDeg !== undefined) {
-                        const rkDegree = getRankDegree(player.rankPoint)
-                        progress = rkDegree >= targetDeg ? 1 : 0
+                        progress = getRankDegree(player.rankPoint)
                     }
                 }
                 const stage = getCurrentStage(category, missionId, progress)

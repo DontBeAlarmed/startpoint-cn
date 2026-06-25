@@ -30,7 +30,7 @@ function buildLookup(rewardTable: Record<string, Record<string, any>>): Record<s
         const list: MissionStage[] = [];
         for (const [stageStr, rows] of Object.entries(stages)) {
             const row = (rows as any[])[0];
-            const targetProgress = parseInt(row[5]) || 1;  // fallback to 1 for binary missions
+            const targetProgress = parseInt(row[5] || row[1] || "0");
             const stage = parseInt(stageStr);
             list.push({ stage, targetProgress });
         }
