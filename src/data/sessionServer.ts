@@ -256,11 +256,11 @@ function handleNotify(client: SessionClient, msg: any[]) {
                 if (room && !isHost) {
                     const hostClient = getHostClient(client.roomNumber)
                     if (hostClient && hostClient.mates[0]) {
-                        const hostMate = hostClient.mates[0]
-                        client.mates = [hostMate, yours]
+                        // Append to existing mates (supports 3+ players)
+                        client.mates = [...hostClient.mates, yours]
                         sendJson(client.socket, [1, [0, yours, [yours]]])
                         setTimeout(() => sendJson(client.socket, [1, [1, client.mates]]), 100)
-                        hostClient.mates = [hostMate, yours]
+                        hostClient.mates.push(yours)
                         broadcastToRoom(client.roomNumber, [1, [1, hostClient.mates]], client.viewerId)
                         room.is_npc_mode = false
                         console.log(`[SESSION] guest ${client.viewerId} joined room ${client.roomNumber}, mates=${client.mates.length} is_npc_mode=false`)
