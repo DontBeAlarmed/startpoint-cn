@@ -16,7 +16,7 @@ Symbol | Meaning
 ### ``na.wdfp.kakaogames.com/latest/api/index.php``
 Endpoint | Status
 :------- | :-------
-[/active_mission/receive](../routes/active_mission_receive.md) | :no_entry:
+[/active_mission/receive](../routes/active_mission_receive.md) | :white_check_mark:
 [/asset/get_path](../routes/asset_get_path.md) | :warning:
 [/asset/version_info](../routes/asset_version_info.md) | :warning:
 [/attention/check](../routes/attention_check.md) | :white_check_mark:
@@ -63,8 +63,8 @@ Endpoint | Status
 [/mail/index](../routes/mail_index.md) | :warning:
 [/mail/receive](../routes/mail_receive.md) | :no_entry:
 [/mail/receive_all](../routes/mail_receive_all.md) | :no_entry:
-[/mission/get_mission_progress](../routes/mission_get_mission_progress.md) | :warning:
-[/mission/update_mission_progress](../routes/mission_update_mission_progress.md) | :warning:
+[/mission/get_mission_progress](../routes/mission_get_mission_progress.md) | :white_check_mark:
+[/mission/update_mission_progress](../routes/mission_update_mission_progress.md) | :white_check_mark:
 [/multi_battle_quest/abort](../routes/multi_battle_quest_abort.md) | :no_entry:
 [/multi_battle_quest/create_room](../routes/multi_battle_quest_create_room.md) | :no_entry:
 [/multi_battle_quest/disband_room](../routes/multi_battle_quest_disband_room.md) | :no_entry:
@@ -83,11 +83,14 @@ Endpoint | Status
 [/party_group/edit](../routes/party_group_edit.md) | :white_check_mark:
 [/payment/item_list](../routes/payment_item_list.md) | :white_check_mark:
 [/profile/get_my_profile](../routes/profile_get_my_profile.md) | :no_entry:
+[/profile/get_degree_list](../routes/profile_get_degree_list.md) | :white_check_mark:
+[/profile/update_degree](../routes/profile_update_degree.md) | :white_check_mark:
 ``/ranking_event/get_summary`` | :white_check_mark:
 ``/ranking_event/receive_reward`` | :white_check_mark:
 [/reproduce/post](../routes/reproduce_post.md) | :white_check_mark:
 [/shop/buy](../routes/shop_buy.md) | :white_check_mark:
 [/shop/get_sales_list](../routes/shop_get_sales_list.md) | :warning:
+``/shop/recover_stamina`` | :white_check_mark:
 [/single_battle_quest/abort](../routes/single_battle_quest_abort.md) | :white_check_mark:
 [/single_battle_quest/finish](../routes/single_battle_quest_finish.md) | :white_check_mark:
 [/single_battle_quest/play_continue](../routes/single_battle_quest_play_continue.md) | :white_check_mark:
