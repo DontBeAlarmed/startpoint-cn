@@ -3,7 +3,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerActiveMissionsSync, getSession, updatePlayerActiveMissionSync, updatePlayerActiveMissionStageSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
-import { getCurrentStage, getAllMissionIds } from "../../lib/mission";
+import { getCurrentStage, getMissionIdsByCategory } from "../../lib/mission";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 
 interface GetMissionProgressBody {
@@ -49,9 +49,9 @@ const routes = async (fastify: FastifyInstance) => {
         const activeMissions = getPlayerActiveMissionsSync(playerId)
         const missionProgressList: any[] = []
 
-        // Iterate CDN mission definitions for each requested category
+        // Iterate CDN reward tables for each requested category — aligns with DummyMissionRepository.createDummyData()
         for (const category of requestCategories) {
-            const allIds = getAllMissionIds(category)
+            const allIds = getMissionIdsByCategory(category)
             for (const missionId of allIds) {
                 const mission = activeMissions[String(missionId)]
                 const progress = mission?.progress ?? 0
@@ -59,7 +59,7 @@ const routes = async (fastify: FastifyInstance) => {
                 missionProgressList.push({
                     mission_category: category,
                     mission_id: missionId,
-                    progress_value: progress,
+                    progress_value: Number(progress),  // Float type required by client (Std.is Number)
                     stage: stage
                 })
             }
