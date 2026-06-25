@@ -81,5 +81,29 @@ New endpoint `/item/use_item` (`src/routes/api/item.ts`). Handles `StaminaFixed(
 3. Multi battle stamina deduction + level-up — deferred until co-op stable (see `multiBattleQuest.ts`)
 4. `staminaHealTime` time base mismatch: DB uses `new Date()` (real time), response uses `getServerTime()` (virtual with offset). Invisible when `timeOffset=null`, but may show desync when server time is overridden via dashboard.
 
+## Mission progress system (2026-06-25)
+
+### Server-side computation
+Mission progress is fully computed server-side in `get_mission_progress`, aligned with official behavior:
+- **Degree missions** (8 rank growth): `progress = getRankDegree(rankPoint)`, target from CDN descriptions
+- **Quest clear missions**: progress = count of `finished=true` quests in `players_quest_progress`
+- **Stamina use missions**: progress = `players.total_stamina_used` (accumulated on `/start`)
+- **Rank evaluation missions** (SS/S/A/B): progress = count of quests with matching `clear_rank`
+- **Prefix matching**: covers all daily/event variants (`single_battle_play_2`, `single_battle_play_xm19`, etc.)
+
+### Pattern coverage
+| Category | Missions | Computable | Notes |
+|----------|----------|------------|-------|
+| Regular (1) | 120 | ~5 (quest clear + rank) | |
+| Daily (2) | 656 | ~20 (quest clear + stamina) | Includes `_2`, `_3`, event-specific variants |
+| Event (3) | 2512 | 0 | Event missions depend on CDN event table |
+| Degree (5) | 1288 | 8 (rank growth) | Remaining 1280 are character/event-specific |
+| Weekly (10) | 2 | 0 | |
+
+### Known limitations
+- **No daily reset**: `totalQuestClears` and `totalStaminaUsed` are absolute totals, not daily counters. Daily missions appear permanently completed after first login.
+- **Event missions**: 4800+ event-specific missions cannot be computed without CDN event→quest mapping.
+- **heal_rate**: 1-100 levels set to `0.0` (server pre-computes recovery, client-side rate unused).
+
 ## Quest entry cost key format
 `quest_entry_costs.json` uses `{category}_{questId}` compound keys to avoid collisions between main story quests (category=1) and EX quests (category=4) that share the same questId (e.g., `1_1001001` = 0 stamina, `4_1001001` = 12 stamina).
