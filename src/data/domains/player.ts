@@ -400,11 +400,11 @@ export function insertPlayerSync(
         player.freeMana,
         player.paidMana,
         serializeBoolean(player.enableAuto3x),
+        player.totalStaminaUsed ?? 0,
         accountId,
         player.tutorialStep === null ? null : player.tutorialStep,
         player.tutorialSkipFlag === null ? null : serializeBoolean(player.tutorialSkipFlag),
-        player.tutorialGachaCharacterId === undefined ? null : player.tutorialGachaCharacterId,
-        player.totalStaminaUsed ?? 0
+        player.tutorialGachaCharacterId === undefined ? null : player.tutorialGachaCharacterId        
     ]
 
     if (playerIdGiven)
@@ -416,7 +416,7 @@ export function insertPlayerSync(
         rank_point, star_crumb, bond_token, exp_pool, exp_pooled_time, leader_character_id,
         party_slot, degree_id, birth, free_mana, paid_mana, enable_auto_3x, total_stamina_used, account_id, 
         tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id${playerIdGiven ? ', id' : ''})
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${playerIdGiven ? ', ?' : ''})
+    VALUES (${values.map(() => '?').join(', ')})
     `).run(values)
 
     // return
