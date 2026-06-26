@@ -74,11 +74,14 @@ function computeProgress(category: number, missionId: number, ctx: ComputeContex
         const lastDigit = missionId % 10
 
         if (lastDigit === 1) {
-            // Story reading: count finished stories for this character
+            // Story reading OR party member clears (14 simple chars have no story quests)
+            const storyIds = getCharacterStoryQuestIds(charId)
+            if (storyIds.length === 0) {
+                return clears.clear_count  // "队伍中编有X通关" type missions
+            }
             let count = 0
-            for (const qid of storyQuestIds) {
-                const qp = ctx.questProgress['3']?.find(q => q.questId === qid)
-                if (qp?.finished) count++
+            for (const qid of storyIds) {
+                if (ctx.questProgress['3']?.find(q => q.questId === qid)?.finished) count++
             }
             return count
         }
