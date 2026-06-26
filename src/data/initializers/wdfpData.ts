@@ -72,6 +72,15 @@ export default function init(
     // migration: add total_stamina_used for mission progress tracking
     try { database.prepare(`ALTER TABLE players ADD COLUMN total_stamina_used INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_character_quest_clears (
+        player_id INTEGER NOT NULL,
+        character_id INTEGER NOT NULL,
+        clear_count INTEGER NOT NULL DEFAULT 0,
+        multi_count INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, character_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run();
+
     database.prepare(`CREATE TABLE IF NOT EXISTS device_bindings (
         device_id INTEGER PRIMARY KEY,
         account_id INTEGER NOT NULL,

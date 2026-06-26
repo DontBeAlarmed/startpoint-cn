@@ -35,6 +35,7 @@ export { getPlayerGachaInfoListSync, getPlayerGachaInfoSync, insertPlayerGachaIn
 import { insertPlayerGachaInfoListSync, insertPlayerGachaCampaignListSync } from "./domains/gacha";
 import { getPlayerGachaInfoListSync, updatePlayerGachaInfoSync, getPlayerGachaCampaignListSync, updatePlayerGachaCampaignSync } from "./domains/gacha";
 export { getPlayerClearedRegularMissionListSync, insertPlayerClearedRegularMissionListSync, getPlayerActiveMissionsSync, insertPlayerActiveMissionsSync, updatePlayerActiveMissionSync, updatePlayerActiveMissionStageSync } from "./domains/mission";
+export { getPlayerCharacterClearSync, incrementPlayerCharacterClearSync } from "./domains/character_clear";
 import { insertPlayerClearedRegularMissionListSync, insertPlayerActiveMissionsSync } from "./domains/mission";
 export { getPlayerBoxGachaSync, getPlayerBoxGachasSync, insertPlayerBoxGachaSync, insertPlayerBoxGachasSync, updatePlayerBoxGachaSync, getPlayerBoxGachaDrawnRewardsSync, insertPlayerBoxGachaDrawnRewardSync, updatePlayerBoxGachaDrawnRewardSync } from "./domains/boxGacha";
 import { insertPlayerBoxGachasSync } from "./domains/boxGacha";
