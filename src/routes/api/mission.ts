@@ -171,6 +171,7 @@ const routes = async (fastify: FastifyInstance) => {
                 const isRecord = existingStages && !Array.isArray(existingStages)
                 for (const s of completedStages) {
                     if (isRecord && (existingStages as Record<string, boolean>)[String(s)]) continue
+                    updatePlayerActiveMissionSync(playerId, missionId, progress)  // ensure parent row exists
                     updatePlayerActiveMissionStageSync(playerId, s, missionId, true)
                     const rewards = getActiveMissionRewards(missionId, s)
                     for (const r of rewards) {
