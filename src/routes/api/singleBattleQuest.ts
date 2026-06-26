@@ -274,12 +274,6 @@ const routes = async (fastify: FastifyInstance) => {
             console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldRkDegree} -> ${newDegreeId}, stamina refilled`)
         }
 
-        // Track leader character quest clears for awakening missions
-        const leaderCharId = bodyPartyStatistics.characters[0]?.id
-        if (leaderCharId) {
-            incrementPlayerCharacterClearSync(playerId, leaderCharId, false)
-        }
-
         // Consume daily challenge point
         let dailyChallengePointList: Object[] | null = null
         if (questCategory === QuestCategory.EXPERT_SINGLE_EVENT && questData.eventId) {
@@ -345,6 +339,12 @@ const routes = async (fastify: FastifyInstance) => {
         // reward character exp
         const bodyPartyStatistics = body.statistics.party
         const partyCharacterIds = [...bodyPartyStatistics.characters, ...bodyPartyStatistics.unison_characters]
+
+        // Track leader character quest clears for awakening missions
+        const leaderCharId = bodyPartyStatistics.characters[0]?.id
+        if (leaderCharId) {
+            incrementPlayerCharacterClearSync(playerId, leaderCharId, false)
+        }
         const partyCharacterIdsArray: number[] = []
         for (const value of partyCharacterIds.values()) {
             if (value !== null && value.id !== null) partyCharacterIdsArray.push(value.id);

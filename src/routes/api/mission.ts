@@ -1,7 +1,7 @@
 // Mission progress endpoints — get and update
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getPlayerActiveMissionsSync, getSession, getPlayerSync, getPlayerQuestProgressSync, updatePlayerActiveMissionSync } from "../../data/wdfpData";
+import { getPlayerActiveMissionsSync, getSession, getPlayerSync, getPlayerQuestProgressSync, getPlayerCharacterClearSync, updatePlayerActiveMissionSync } from "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
 import { getCurrentStage, getMissionIdsByCategory, getMissionsByPattern, getTargetDegree, getMissionPattern, isComputablePattern, getCharacterStoryQuestId, getCharacterIdFromMission } from "../../lib/mission";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -112,16 +112,36 @@ const routes = async (fastify: FastifyInstance) => {
                     }
                 }
 
-                // Character awakening story missions
+                // Character awakening missions
                 if (!computed && category === 9) {
                     const awakeCharId = getCharacterIdFromMission(missionId)
                     const questId = getCharacterStoryQuestId(awakeCharId)
-                    if (questId !== undefined) {
-                        const section = '3'  // character quests
+                    const clears = getPlayerCharacterClearSync(playerId, Number(awakeCharId))
+                    const lastDigit = missionId % 10
+
+                    if (lastDigit === 1) {
+                        // Type _1: story reading
+                        const section = '3'
                         const qpEntry = questProgress[section]?.find(q => q.questId === questId)
                         progress = qpEntry?.finished ? 1 : 0
-                        computed = true
+                    } else if (lastDigit === 2) {
+                        // Type _2: leader quest clears
+                        progress = clears.clear_count
+                    } else if (lastDigit === 3) {
+                        // Type _3: co-op clears
+                        progress = clears.multi_count
+                    } else if (lastDigit === 4) {
+                        // Type _all: check story + leader + co-op
+                        const baseId = missionId - 4
+                        const storyEntry = missionProgressList.find(e => e.mission_id === (baseId + 1))
+                        const leadEntry = missionProgressList.find(e => e.mission_id === (baseId + 2))
+                        const coopEntry = missionProgressList.find(e => e.mission_id === (baseId + 3))
+                        const storyDone = storyEntry ? storyEntry.progress_value >= 1 : false
+                        const leadDone = leadEntry ? leadEntry.progress_value >= 1 : false
+                        const coopDone = coopEntry ? coopEntry.progress_value >= 1 : false
+                        progress = (storyDone && leadDone && coopDone) ? 1 : 0
                     }
+                    computed = true
                 }
 
                 // Computable patterns for categories 1,2 (Regular + Daily)
