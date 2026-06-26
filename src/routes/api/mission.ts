@@ -70,10 +70,6 @@ function computeProgress(category: number, missionId: number, ctx: ComputeContex
     if (category === 9) {
         const charId = getCharacterIdFromMission(missionId)
         const clears = getPlayerCharacterClearSync(ctx.player.id, Number(charId))
-        // DEBUG
-        if (missionId % 10 === 3 && charId === '1') {
-            console.log(`[DEBUG] totalPowerflips=${ctx.player.totalPowerflips} playerId=${ctx.player.id} missionId=${missionId}`)
-        }
         const storyQuestIds = getCharacterStoryQuestIds(charId)
         const lastDigit = missionId % 10
 

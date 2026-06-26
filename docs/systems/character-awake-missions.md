@@ -37,7 +37,10 @@
 
 Alk type_3 (强化弹射 97 次) 之前为 ❌ → `return 0`。
 现在 ✅ → `player.totalPowerflips`，数据从 `/finish` 的 `statistics.zones[].use_power_flip_count` 采集。
-累计到 `players.total_powerflips` 字段，DB 已验证正常写入。
+累计到 `players.total_powerflips` 字段。
+
+修复：`getPlayerSync`/`getAllPlayersSync` 的 SQL SELECT 需包含 `total_stamina_used, total_powerflips, total_dashes` 三个新列。
+即使 `buildPlayer` 正确映射，SQL 未查询则 `raw` 值始终为 `undefined` → `|| 0` 兜底为 0。
 
 ### 弹射/冲刺数据源（2026-06-26）
 
