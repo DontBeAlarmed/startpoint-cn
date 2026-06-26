@@ -105,7 +105,7 @@ export function getCharacterStoryQuestId(characterId: number | string): number |
  */
 export function getCharacterIdFromMission(missionId: number): string {
     const s = String(missionId);
-    return s.length >= 7 ? s.substring(0, s.length - 1) : s;
+    return s.length > 1 ? s.substring(0, s.length - 1) : s;
 }
 
 // Degree mission target lookup (extracted from definition descriptions)
