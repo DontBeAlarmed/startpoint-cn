@@ -33,9 +33,11 @@
 | ⚠️ | 40 条（28%） | clear_count 近似 |
 | ❌ | 12 条（8%） | 条件部署示 |
 
-### Alk 类型 3（强化弹射）暂不计算（2026-06-26）
+### Alk 类型 3 修复（2026-06-26）✅
 
-Alk type_3 (强化弹射 97 次) 当前 `return 0`。弹射数据采集已实现（`/finish` 中 `zones[].use_power_flip_count` → `totalPowerflips`），但 type_3 计算逻辑暂未连线。待补全后从 ❌ 变 ✅。
+Alk type_3 (强化弹射 97 次) 之前为 ❌ → `return 0`。
+现在 ✅ → `player.totalPowerflips`，数据从 `/finish` 的 `statistics.zones[].use_power_flip_count` 采集。
+累计到 `players.total_powerflips` 字段，DB 已验证正常写入。
 
 ### 弹射/冲刺数据源（2026-06-26）
 

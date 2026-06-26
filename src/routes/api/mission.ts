@@ -90,7 +90,7 @@ function computeProgress(category: number, missionId: number, ctx: ComputeContex
             return clears.clear_count                       // Others: party member clears
         }
         if (lastDigit === 3) {
-            if (charId === '1') return 0  // Alk: power flips (pending complete implementation)
+            if (charId === '1') return ctx.player.totalPowerflips ?? 0  // Alk: power flips
             return clears.clear_count      // Others: party member clears
         }
         if (lastDigit === 4) {
