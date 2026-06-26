@@ -14,6 +14,9 @@ import degreeDefs from "../../assets/mission_degree.json";
 import collectItemDefs from "../../assets/mission_collect_item.json";
 import weeklyDefs from "../../assets/mission_weekly_def.json";
 import activeRewards from "../../assets/mission_active_reward.json";
+import charAwakeDefs from "../../assets/mission_char_awake.json";
+import charAwakeRewards from "../../assets/mission_char_awake_reward.json";
+import charQuests from "../../assets/character_quest_lookup.json";
 
 // Category mapping (client API category → reward table + stage data)
 // 1=Regular, 2=Daily, 3=Event, 4=CollectItemEvent, 5=Degree
@@ -47,6 +50,7 @@ const missionStageLookup: Record<number, Record<string, MissionStage[]>> = {
     4: buildLookup(collectItemRewards as any),
     5: buildLookup(degreeRewards as any),
     10: buildLookup(weeklyRewards as any),  // CN-specific: Weekly missions
+    9:  buildLookup(charAwakeRewards as any),  // Character awakening missions
 };
 
 // Pattern → mission_id reverse index (for update_mission_progress)
@@ -72,6 +76,37 @@ indexPatterns(eventDefs as any, 3);
 indexPatterns(collectItemDefs as any, 4);
 indexPatterns(degreeDefs as any, 5);
 indexPatterns(weeklyDefs as any, 10);
+indexPatterns(charAwakeDefs as any, 9);
+
+// Character → quest_id mapping for story-reading missions
+const charQuestMap: Record<string, number> = {};
+for (const [key, rows] of Object.entries(charQuests as Record<string, any[]>)) {
+    const row = rows[0];
+    if (!row || !Array.isArray(row)) continue;
+    const questId = parseInt(row[0]);
+    if (questId) {
+        // key format: {character_id}{story_number} (e.g., 15100601 → char 151006)
+        // Extract 6-digit character ID from key
+        const charId = key.length >= 6 ? key.substring(0, 6) : key;
+        if (!charQuestMap[charId]) charQuestMap[charId] = questId;
+    }
+}
+
+/**
+ * Get the quest_id for a character's story quests.
+ */
+export function getCharacterStoryQuestId(characterId: number | string): number | undefined {
+    return charQuestMap[String(characterId)];
+}
+
+/**
+ * Get the character ID embedded in an awakening mission ID.
+ * Mission ID format: {character_id}{suffix} (e.g., 1510061 → character=151006)
+ */
+export function getCharacterIdFromMission(missionId: number): string {
+    const s = String(missionId);
+    return s.length >= 7 ? s.substring(0, s.length - 1) : s;
+}
 
 // Degree mission target lookup (extracted from definition descriptions)
 // mission_id → target degree level (e.g., 1000→50, 1010→100)
