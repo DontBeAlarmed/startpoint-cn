@@ -3,10 +3,13 @@ import * as os from "os";
 import { MultiRoom, MultiMate, MultiMateParty, MultiMatePartyCharacter, MultiMateEquipment, NpcMateTemplate, QuestCategory } from "../lib/types";
 import { getServerTime } from "../utils";
 
-/** Resolve display host for TCP session. If CN_LISTEN_HOST is 0.0.0.0, auto-detect LAN IP. */
+/** Resolve display host for TCP session. If CN_LISTEN_HOST is 0.0.0.0, auto-detect LAN IP. Configure SESSION_PUBLIC_HOST="your.server.public.ip.or.domain" in .env so the client receives a reachable TCP session host */
 export function getDisplayHost(): string {
-    const raw = process.env.CN_LISTEN_HOST || "127.0.0.1";
-    if (raw !== "0.0.0.0") return raw;
+    const publicHost = (process.env.SESSION_PUBLIC_HOST || process.env.CN_PUBLIC_HOST || "").trim();
+    if (publicHost.length > 0) return publicHost;
+
+    const raw = (process.env.CN_LISTEN_HOST || "127.0.0.1").trim();
+    if (raw !== "0.0.0.0" && raw !== "::") return raw;
     const nets = os.networkInterfaces();
     for (const name of Object.keys(nets)) {
         const addrs = nets[name];
