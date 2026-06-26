@@ -87,7 +87,8 @@ function computeProgress(category: number, missionId: number, ctx: ComputeContex
             return clears.clear_count                       // Others: party member clears
         }
         if (lastDigit === 3) {
-            return clears.clear_count  // Party member clears (works for most non-Alk type_3)
+            if (charId === '1') return 0  // Alk: power flips, not computable
+            return clears.clear_count      // Others: party member clears
         }
         if (lastDigit === 4) {
             // All complete: check directly via recursive calls for types 1-3
