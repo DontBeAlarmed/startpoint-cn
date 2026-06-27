@@ -199,6 +199,9 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
         if (client.mates.length > 1) {
             sessionManager.broadcastToRoom(client.roomNumber, [1, [1, client.mates]], `${client.viewerId}@${client.roomNumber}`)
         }
+        if (room?.is_npc_mode && countRealPlayers(client.mates) < 3) {
+            setTimeout(() => handleEnterComs(client, [{ name: "开心超人" }, { name: "名字真难取" }]), 500)
+        }
     } else {
         if (hostClient && client.yourself) {
             hostClient.mates.push(client.yourself)
@@ -222,10 +225,6 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     if (!isHost) {
         const mates = hostClient?.mates ?? client.mates
         sessionManager.broadcastToRoom(client.roomNumber, [1, [1, mates]], undefined)
-    }
-
-    if (room?.is_npc_mode && countRealPlayers(client.mates) < 3) {
-        setTimeout(() => handleEnterComs(client, [{ name: "开心超人" }, { name: "名字真难取" }]), 500)
     }
 
     console.log(`[LOBBY] ${isHost ? "host" : "guest"} ${client.viewerId} entered room ${client.roomNumber}`)

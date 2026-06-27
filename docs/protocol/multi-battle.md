@@ -1,5 +1,5 @@
 # 多人战斗（Multi Battle Quest）联机系统文档
-> 状态: NPC共斗完善 + 真人联机 Phase 1-3 基础就绪 + 战斗恢复数据层   关键文件: src/data/sessionServer.ts, src/data/multiRoom.ts, src/routes/api/multiBattleQuest.ts   相关端点: /api/index.php/multi_battle_quest/*
+> 状态: NPC共斗完善 + 真人联机 Phase 1-3 基础就绪 + 战斗恢复数据层   关键文件: src/multi/（20模块重构）  旧文件: src/legacy/sessionServer.ts.bak   相关端点: /api/index.php/multi_battle_quest/*
 
 ## 1. API 端点规范
 
@@ -53,7 +53,7 @@
 | 10 | `mates` | **Int** | `room.mates.length` | `2` | ⚠️ 是 Int 计数，不是对象数组 |
 | 11 | `raising_state` | Int | `room.raising_state` | `1` | 1=Ready, 2=Recruiting, 3=Filled, 4=Battle |
 
-**实现位置**: `src/data/multiRoom.ts:196-209` `serializeRoom()`
+**实现位置**: `src/multi/room/serializer.ts` `serializeRoom()`
 
 ---
 
@@ -79,7 +79,7 @@
 
 **数据库操作**: 从 `getViewerIdAndPlayer()` → DB 查 `player.leaderCharacterId` → 存入 `room.host_main_character_id`
 
-**实现位置**: `src/routes/api/multiBattleQuest.ts:224-249` `create_room`, `src/data/multiRoom.ts:112-141` `createRoom()`
+**实现位置**: `src/multi/http/lobby.ts` `create_room`, `src/multi/room/manager.ts` `createRoom()`
 
 ---
 
@@ -104,7 +104,7 @@
 | `establisher_viewer_id` | number | 房间或 0 | `5` | |
 | `establisher_follow` | bool | 硬编码 | `false` | |
 
-**实现位置**: `src/routes/api/multiBattleQuest.ts:252-277` `search_room`
+**实现位置**: `src/multi/http/lobby.ts` `search_room`
 
 ---
 
@@ -139,7 +139,7 @@
 | `share_room_options` | Int | 硬编码 | `0` | |
 | `is_pickup` | Option\<Bool\> | 硬编码 | `null` | null = None |
 
-**实现位置**: `src/routes/api/multiBattleQuest.ts:279-303` `select_room`, `src/data/multiRoom.ts:222-235` `serializeRoomConnection()`
+**实现位置**: `src/multi/http/lobby.ts` `select_room`, `src/multi/room/serializer.ts` `serializeRoomConnection()`
 
 ---
 
@@ -159,7 +159,7 @@
 
 **响应体**: 与 `select_room` 完全相同。
 
-**实现位置**: `src/routes/api/multiBattleQuest.ts:305-331` `prepare`
+**实现位置**: `src/multi/http/room.ts` `prepare`
 
 ---
 
@@ -202,7 +202,7 @@
 | `equipments[i].enhancement_level` | number | 强化等级 |
 | `party.ability_soul_ids[]` | (number \| null)[] | 能力魂 ID（3 个空位） |
 
-**实现位置**: `src/data/multiRoom.ts:55-102` `buildNpcMate()`, `src/routes/api/multiBattleQuest.ts:332-365` `summon`
+**实现位置**: `src/multi/npc/builder.ts` `buildNpcMate()`, `src/multi/http/room.ts` `summon`
 
 ---
 
@@ -221,7 +221,7 @@
 
 **响应体**: 与 single 版类似，`is_multi: "multi"`。
 
-**实现位置**: `src/routes/api/multiBattleQuest.ts:466-526` `start`
+**实现位置**: `src/multi/http/battle.ts` `start`
 
 ---
 
@@ -256,7 +256,7 @@
 | `user_notice_list` | [] | |
 | `user_periodic_reward_point_list` | [] | |
 
-**实现位置**: `src/routes/api/multiBattleQuest.ts:532-780` `finish`
+**实现位置**: `src/multi/http/battle.ts` `finish`
 
 ---
 
@@ -280,7 +280,7 @@
 | `party_info` | null | |
 | `presigned_url` | null | |
 
-**实现位置**: `src/routes/api/multiBattleQuest.ts:785-822` `abort`
+**实现位置**: `src/multi/http/battle.ts` `abort`
 
 ---
 
@@ -305,7 +305,7 @@
 | `user_info.vmoney` | number | 续关后剩余付费星导石 |
 | `mail_arrived` | boolean | `false` |
 
-**实现位置**: `src/routes/api/multiBattleQuest.ts:828-870` `play_continue`
+**实现位置**: `src/multi/http/battle.ts` `play_continue`
 
 ---
 
@@ -733,13 +733,18 @@ const NPC_TEMPLATES = {
 
 | 文件 | 模块 | 职责 |
 |------|------|------|
-| `src/routes/api/multiBattleQuest.ts` | HTTP API | 14 个 REST 端点 |
-| `src/data/multiRoom.ts` | 房间管理 | 房间 CRUD、NPC 生成、序列化 |
-| `src/data/sessionServer.ts` | TCP 会话 (Phase 1) | 握手、心跳、Clean Room（无 NPC） |
-| `src/lib/types.ts` | 类型 | `MultiRoom`, `MultiMate`, `MultiMateParty` 等 |
+| `src/multi/http/` | HTTP API | 15 个 REST 端点（5 文件） |
+| `src/multi/tcp/` | TCP 会话 | 握手 + 大厅协议 + 战斗协议 + 中继（5 文件） |
+| `src/multi/room/` | 房间管理 | 房间 CRUD + serializer（2 文件） |
+| `src/multi/npc/` | NPC 系统 | 模板 + builder + MateProvider（3 文件） |
+| `src/multi/state/` | 状态管理 | 3 个状态机 + SessionManager（3 文件） |
+| `src/multi/index.ts` | 入口 | barrel + cn-server.ts 对接 |
+| `src/multi/types.ts` | 类型 | 所有联机类型定义 |
+| `src/lib/types.ts` | 类型 | `MultiRoom`, `MultiMate`, `MultiMateParty` 等基础类型 |
 | `src/lib/assets.ts` | 资产 | `HARD_MULTI_EVENT` quest 查找 |
 | `src/assets/hard_multi_event_quest.json` | 资产 | 12 个 hard_multi 关卡数据 |
-| `src/cn-server.ts` | 入口 | 启动 sessionServer |
+| `src/cn-server.ts` | 入口 | 注册路由 + 启动 sessionServer |
+| `src/legacy/` | 归档 | 旧代码：`multiBattleQuest.ts.bak`, `sessionServer.ts.bak`, `multiRoom.ts.bak` |
 | `src/routes/api/singleBattleQuest.ts` | 公用 | `activeQuests` 导出供 multi 共用 |
 
 ---
