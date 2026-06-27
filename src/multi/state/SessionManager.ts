@@ -103,7 +103,7 @@ export class SessionManager {
                         const { getRoom, disbandRoom } = require("../room/manager")
                         const room = getRoom(client.roomNumber)
                         if (room && room.raising_state !== 4) {
-                            this.broadcastToRoom(client.roomNumber, [1, [6, "disbanded"]])
+                            this.broadcastToRoom(client.roomNumber, [1, [6, "multibattle_room_dismissed"]])
                             disbandRoom(client.roomNumber)
                         }
                     }

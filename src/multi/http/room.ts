@@ -46,6 +46,12 @@ export function registerRoomRoutes(fastify: FastifyInstance): void {
 
         updateHostEntryTime(room.room_number);
         const data = serializeRoomConnection(room);
+        if (viewerId === room.host_viewer_id) {
+            data.raising_state = 1
+        } else if (!sessionManager.isHostOnline(room.host_viewer_id, room.room_number)) {
+            data.raising_state = 2
+            console.log(`[MULTI] prepare: host offline, guest polls raising_state → 2`)
+        }
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
@@ -120,6 +126,12 @@ export function registerRoomRoutes(fastify: FastifyInstance): void {
         }
 
         const data = { ...serializeRoomConnection(room), is_same_room: true };
+        if (viewerId === room.host_viewer_id) {
+            data.raising_state = 1
+        } else if (!sessionManager.isHostOnline(room.host_viewer_id, room.room_number)) {
+            data.raising_state = 2
+            console.log(`[MULTI] restore_room: host offline, guest polls raising_state → 2`)
+        }
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
@@ -160,7 +172,7 @@ export function registerRoomRoutes(fastify: FastifyInstance): void {
         }
 
         if (body.room_number) {
-            sessionManager.broadcastToRoom(body.room_number, [1, [3, body.room_number]]);
+            sessionManager.broadcastToRoom(body.room_number, [1, [6, "multibattle_room_dismissed"]]);
             disbandRoom(body.room_number);
             console.log(`[MULTI] room ${body.room_number} disbanded by viewer ${viewerId}`);
         }

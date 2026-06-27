@@ -907,7 +907,7 @@ state=1 (Ready: 可加入/可招募)
 | 战斗帧同步 | ✅ | Broadcast 帧命令双向 relay，typepacker 格式对齐 |
 | NPC/真人模式解耦 | ✅ | NPC: battleExpectedCount=1, 真人: mates.length |
 | Bye 广播 Mates | ✅ | 玩家离开→移除→广播更新给剩余客户端 |
-| Disband 广播 Disbanded(6) | ✅ | `notifyRoomDisbanded` → 解散通知全员 |
+| Disband 广播 Disbanded(6) | ✅ | `notifyRoomDisbanded` → `multibattle_room_dismissed`（CN 客户端本地化 key） |
 | 房主返回同步 | ✅ | 房主 Enter→合并已有客端 mates→广播更新 |
 | Finish 同步 | ✅ | 各玩家独立 finish HTTP，房主管理 room state |
 | Abort 同步 | ✅ | G10+G11 覆盖，房主 abort→Disbanded，客端→Mates 广播 |

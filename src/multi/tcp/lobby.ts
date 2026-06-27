@@ -62,7 +62,7 @@ export function checkHostAutoReady(roomNumber: string): void {
 }
 
 export function notifyRoomDisbanded(roomNumber: string): void {
-    sessionManager.broadcastToRoom(roomNumber, [1, [6, "disbanded"]])
+    sessionManager.broadcastToRoom(roomNumber, [1, [6, "multibattle_room_dismissed"]])
 }
 
 async function handleEnterComs(client: SessionClient, coms: { name: string }[]): Promise<void> {
@@ -160,16 +160,16 @@ async function handleEnterComs(client: SessionClient, coms: { name: string }[]):
 
 function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): void {
     const ed = data[1]
-    if (ed?.party && client.yourself) {
-        client.yourself.party = ed.party
-        if (ed.autoplayMode !== undefined) client.yourself.autoplayMode = ed.autoplayMode;
-        if (ed.autoskillMode !== undefined) client.yourself.autoskillMode = ed.autoskillMode;
-        if (ed.autoSpeedLevel !== undefined) client.yourself.autoSpeedLevel = ed.autoSpeedLevel;
-        if (ed.autoStart !== undefined) client.yourself.autoStart = ed.autoStart;
-        if (ed.skillAbilityBehaviorMode !== undefined) client.yourself.skillAbilityBehaviorMode = ed.skillAbilityBehaviorMode;
-        if (ed.dashBehaviorMode !== undefined) client.yourself.dashBehaviorMode = ed.dashBehaviorMode;
-        if (ed.allowHealFromOtherPlayers !== undefined) client.yourself.allowHealFromOtherPlayers = ed.allowHealFromOtherPlayers;
-    }
+    if (!ed?.party || !client.yourself) return
+
+    client.yourself.party = ed.party
+    if (ed.autoplayMode !== undefined) client.yourself.autoplayMode = ed.autoplayMode;
+    if (ed.autoskillMode !== undefined) client.yourself.autoskillMode = ed.autoskillMode;
+    if (ed.autoSpeedLevel !== undefined) client.yourself.autoSpeedLevel = ed.autoSpeedLevel;
+    if (ed.autoStart !== undefined) client.yourself.autoStart = ed.autoStart;
+    if (ed.skillAbilityBehaviorMode !== undefined) client.yourself.skillAbilityBehaviorMode = ed.skillAbilityBehaviorMode;
+    if (ed.dashBehaviorMode !== undefined) client.yourself.dashBehaviorMode = ed.dashBehaviorMode;
+    if (ed.allowHealFromOtherPlayers !== undefined) client.yourself.allowHealFromOtherPlayers = ed.allowHealFromOtherPlayers;
     client.enterData = ed
 
     const room = getRoom(client.roomNumber)
@@ -180,6 +180,15 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     }
 
     const hostClient = findHostClient(client.roomNumber)
+
+    // Guest entered before host (or host connected but hasn't entered) → wait with Welcome
+    if (!isHost && (!hostClient || !hostClient.mates[0])) {
+        client.mates = [client.yourself!]
+        sessionManager.sendJson(client.socket, [1, [0, client.yourself, [client.yourself]]])
+        console.log(`[LOBBY] guest ${client.viewerId} entered alone, waiting for host in room ${client.roomNumber}`)
+        return
+    }
+
     if (isHost) {
         client.mates = [client.yourself!]
         const set = (sessionManager as any).roomClients?.get?.(client.roomNumber) as Set<string> | undefined

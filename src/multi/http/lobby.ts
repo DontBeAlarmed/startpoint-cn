@@ -140,6 +140,10 @@ export function registerLobbyRoutes(fastify: FastifyInstance): void {
         const selectData = serializeRoomConnection(room)
         if (viewerId === room.host_viewer_id) {
             selectData.raising_state = 1
+            console.log(`[MULTI] select_room: host override raising_state → 1`)
+        } else if (!sessionManager.isHostOnline(room.host_viewer_id, room.room_number)) {
+            selectData.raising_state = 2
+            console.log(`[MULTI] select_room: host offline, guest polls raising_state → 2`)
         }
 
         reply.header("content-type", "application/x-msgpack")
