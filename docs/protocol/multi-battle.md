@@ -929,6 +929,23 @@ Client B → Broadcast(frameCmd) → Server → relayToBattleRoom → BattleServ
 | 战斗恢复 UI（RestoreState.Battle） | 待测 | DB 层已就绪，客户端恢复弹窗流程待验证 |
 | 空房间"6秒后挑战合作任务"浮字 | ⚠️ 客户端本地 UI | ReadyCounter 倒计时，非服务端 TCP 消息 |
 | state=3 (Filled) | 待恢复 | `handleEnterComs` 中 `updateRoomState(3)` 被 F1 修复误删 |
+| 空房间浮字"秒后将挑战合作战斗" | ⚠️ 客户端生成路径未知 | 见 9.8.2 专题研究 |
+
+### 9.8.2 空房间浮字专题研究
+
+**现象**：NPC 模式创房后，房间仅房主 1 人、未准备，每 5 秒出现 "N秒后将挑战合作战斗" 浮字。
+
+**排查过程**：
+
+| 排查项 | 结论 |
+|------|------|
+| 服务端是否发送 `StartRemainingTime(9,N)`？ | ❌ 不发送。`sendJson` 全量 tag 日志确认仅发送 tag=0(Welcome) + tag=10(AckHeartbeat) |
+| 客户端是否自己生成？ | ❌ 源码确认 3 个场景仅接收、不生成 |
+| `mates.length` 误导满员？ | ❌ Welcome/Mates 返回 1 人 |
+| `autoStart:false` 未生效？ | ❌ yourself mate 中 `autoStart:false` + `state:[0]` |
+| heartbeat 修复影响？ | ✅ `connectionId` 修复后浮字从 6s 变 1s，不再超时 30s Bye。浮字 5s 周期对应 `heartBeatInMeetingInterval=5000ms` |
+
+**当前状态**：浮字来源无法通过服务端代码确定。客户端可能存在 ReadyCounter / autoStart 相关的内部路径未被反编译工具捕获。不影响功能——浮字纯 visual，不改变房间状态。
 
 ### 9.8.1 结算画面 60s 定时器
 

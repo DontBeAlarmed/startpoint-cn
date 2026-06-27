@@ -172,10 +172,7 @@ export function createRoom(
         raising_state: 2, // Waiting for host to enter TCP
         room_sequence: nextRoomSequence(),
         host_entry_time: getServerTime(),
-        mates: [
-            { viewer_id: null, com_id: 1 },
-            { viewer_id: null, com_id: 2 }
-        ],
+        mates: [],
         share_room_options: 0,
         is_npc_mode: false
     };
