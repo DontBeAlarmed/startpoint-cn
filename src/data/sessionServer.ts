@@ -285,7 +285,7 @@ function handleNotify(client: SessionClient, msg: any[]) {
                         sendJson(client.socket, [1, [0, yours, [yours]]])
                         setTimeout(() => sendJson(client.socket, [1, [1, client.mates]]), 100)
                         broadcastToRoom(client.roomNumber, [1, [1, hostClient.mates]], client.viewerId)
-                        console.log(`[SESSION] guest ${client.viewerId} joined room ${client.roomNumber}, mates=${client.mates.length}`)
+                        room.mates = hostClient.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
                         checkHostAutoReady(client.roomNumber)
                     } else {
                         // Host not yet online — guest enters alone, waits for host
@@ -477,6 +477,7 @@ function handleEnterComs(client: SessionClient, coms: any[]) {
     // Sync host client's mates if relevant
     const hostClient = getHostClient(client.roomNumber)
     if (hostClient) hostClient.mates = client.mates
+    room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
     console.log(`[SESSION] EnterComs: room=${client.roomNumber} real=${realMates.length} npc=${needNPCs} total=${client.mates.length}`)
 
     // Broadcast Mates + NPC Ready to all room clients
