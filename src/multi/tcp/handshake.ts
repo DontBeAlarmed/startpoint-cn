@@ -31,7 +31,7 @@ function getRankLevel(rankPoint: number): number {
     return level
 }
 
-function buildRealParty(playerId: number): any {
+export function buildRealParty(playerId: number, targetParty?: PlayerParty): any {
     const emptyChar = [1]
     const filledChars: any[] = []
     const filledUnison: any[] = []
@@ -39,8 +39,9 @@ function buildRealParty(playerId: number): any {
     const filledSouls: any[] = []
 
     // Search for an NPC-named party across NORMAL and EVENT categories
-    let selectedParty: PlayerParty | null = null
-    for (const category of [PartyCategory.NORMAL, PartyCategory.EVENT]) {
+    let selectedParty: PlayerParty | null = targetParty ?? null
+    if (!selectedParty) {
+        for (const category of [PartyCategory.NORMAL, PartyCategory.EVENT]) {
         const groups = getPlayerPartyGroupListSync(playerId, category)
         for (const g of Object.values(groups)) {
             for (const party of Object.values(g.list)) {
@@ -52,6 +53,7 @@ function buildRealParty(playerId: number): any {
             if (selectedParty) break
         }
         if (selectedParty) break
+    }
     }
 
     for (let i = 0; i < 3; i++) {
@@ -148,41 +150,15 @@ export async function handleHandshake(socket: net.Socket, data: any): Promise<vo
     const connectionId = data.connection_id || data.connectionId || `${socket.remoteAddress}:${socket.remotePort}`
 
     if (socklet === "cooperation_battle") {
-        const viewerId = data.viewerId
-        if (!viewerId || !roomNumber) {
+        if (!roomNumber) {
             sessionManager.sendJson(socket, [3, "HANDSHAKE_DENIED"])
             socket.end()
             return
         }
 
-        const session = await getSession(String(viewerId))
-        if (!session) {
-            sessionManager.sendJson(socket, [3, "HANDSHAKE_DENIED"])
-            socket.end()
-            return
-        }
-
-        const playerIds = await getAccountPlayers(session.accountId)
-        if (!playerIds || playerIds.length === 0 || isNaN(playerIds[0])) {
-            sessionManager.sendJson(socket, [3, "HANDSHAKE_DENIED"])
-            socket.end()
-            return
-        }
-
-        const player = getPlayerSync(playerIds[0])
-        if (!player) {
-            sessionManager.sendJson(socket, [3, "HANDSHAKE_DENIED"])
-            socket.end()
-            return
-        }
-
-        // Find existing battle client or create new one
-        let client = sessionManager.getBattleClient(String(connectionId))
-        if (!client) {
-            client = sessionManager.createClient(socket, Number(viewerId), String(roomNumber), String(connectionId), playerIds[0])
-            client.isBattle = true
-        }
-        sessionManager.addBattleClient(String(connectionId), client)
+        const battleClient = sessionManager.createClient(socket, 0, String(roomNumber), String(connectionId), null)
+        battleClient.isBattle = true
+        sessionManager.addBattleClient(String(connectionId), battleClient)
         sessionManager.sendJson(socket, [0, roomNumber, ""])
         return
     }
@@ -221,16 +197,30 @@ export async function handleHandshake(socket: net.Socket, data: any): Promise<vo
         client.clientState.tryTransition(ClientState.Handshaking)
 
         const party = buildRealParty(playerId)
-        const yourself = {
-            viewer_id: Number(viewerId),
-            player_id: playerId,
+        const yourSelf = {
+            viewerId: Number(viewerId),
+            playerId: playerId,
             name: player.name,
             rank: getRankLevel(player.rankPoint || 0),
-            degree_id: player.degreeId || 1,
-            main_character_id: player.leaderCharacterId,
+            degreeId: player.degreeId || 1,
+            mainCharacterId: player.leaderCharacterId,
             party,
+            connectionId,
+            playerRoleKind: player.role || 1,
+            isNewbie: !!player.tutorialStep,
+            isHost: true,
+            entryTime: Date.now(),
+            currentPartyId: player.partySlot || 1,
+            autoplayMode: false,
+            autoskillMode: 1,
+            autoSpeedLevel: 1,
+            autoStart: false,
+            skillAbilityBehaviorMode: 1,
+            dashBehaviorMode: 1,
+            allowHealFromOtherPlayers: true,
+            state: [0],
         }
-        client.yourself = yourself
+        client.yourself = yourSelf
 
         sessionManager.addClientToRoom(client)
         sessionManager.sendJson(socket, [0, connectionId, roomNumber])

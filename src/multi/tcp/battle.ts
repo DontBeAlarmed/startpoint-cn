@@ -32,13 +32,20 @@ function handleBattleNotify(socket: net.Socket, data: unknown): void {
             break
         }
         case 1: { // Finalize
-            if (client) sessionManager.sendJson(client.socket, [1, [2, client.connectionId]])
+            if (client) sessionManager.sendJson(client.socket, [1, [2]])
             break
         }
-        case 2: // Measurement
+        case 2: { // Measurement
+            if (client) {
+                const params = data[1]
+                const frame = params?.[0] ?? 0
+                const clientTime = params?.[1] ?? 0
+                sessionManager.sendJson(client.socket, [1, [3, frame, clientTime, Date.now()]])
+            }
             break
+        }
         case 4: // Heartbeat
-            if (client) sessionManager.sendJson(client.socket, [1, [10]])
+            if (client) sessionManager.sendJson(client.socket, [1, [3, 0, 0, Date.now()]])
             break
         default:
             break
@@ -53,15 +60,26 @@ export function handleBattleMessage(socket: net.Socket, data: unknown): void {
         case 0: // Notify
             handleBattleNotify(socket, data[1])
             break
-        case 1: { // Broadcast
-            const bcData = data[1]
-            if (Array.isArray(bcData) && bcData.length >= 2) {
-                relayToBattleRoom(String(bcData[0]), String(bcData[1]), [1, [2, bcData[1], bcData[2]]])
+        case 1: { // Broadcast → relay as BattleServer2Client.Messages(2, senderId, array)
+            const client = findBattleClientBySocket(socket)
+            if (client) {
+                const bcData = data[1]
+                relayToBattleRoom(String(client.roomNumber), String(client.connectionId), [2, client.connectionId, bcData])
+                sessionManager.sendJson(socket, [1, [3, 0, 0, Date.now()]])
             }
             break
         }
-        case 2: // Send
+        case 2: { // Send → relay as BattleServer2Client.Send(3, senderId, message)
+            const client = findBattleClientBySocket(socket)
+            if (client) {
+                const sendMsg = data[2]
+                if (sendMsg) {
+                    relayToBattleRoom(String(client.roomNumber), String(client.connectionId), [3, client.connectionId, sendMsg])
+                }
+                sessionManager.sendJson(socket, [1, [3, 0, 0, Date.now()]])
+            }
             break
+        }
         default:
             break
     }

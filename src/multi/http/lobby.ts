@@ -65,8 +65,7 @@ export function registerLobbyRoutes(fastify: FastifyInstance): void {
             category,
             quest_id,
             0,
-            ctx.player?.leaderCharacterId || 1,
-            true
+            ctx.player?.leaderCharacterId || 1
         )
 
         reply.header("content-type", "application/x-msgpack")

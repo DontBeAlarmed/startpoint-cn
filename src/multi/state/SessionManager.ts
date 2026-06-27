@@ -93,7 +93,30 @@ export class SessionManager {
         const set = this.roomClients.get(client.roomNumber)
         if (set) {
             set.delete(addr)
-            if (set.size === 0) this.roomClients.delete(client.roomNumber)
+            if (set.size === 0) {
+                this.roomClients.delete(client.roomNumber)
+                // OLD: auto-disband empty non-battle rooms
+                // But check if battle clients still exist first
+                const bSet = this.battleClients.get(client.roomNumber)
+                if (!bSet || bSet.size === 0) {
+                    if (!client.isBattle) {
+                        const { getRoom, disbandRoom } = require("../room/manager")
+                        const room = getRoom(client.roomNumber)
+                        if (room && room.raising_state !== 4) {
+                            this.broadcastToRoom(client.roomNumber, [1, [6, "disbanded"]])
+                            disbandRoom(client.roomNumber)
+                        }
+                    }
+                }
+            } else {
+                // OLD: if room still has clients, re-evaluate host auto-ready
+                if (!client.isBattle) {
+                    try {
+                        const lobby = require("../tcp/lobby")
+                        if (lobby.checkHostAutoReady) lobby.checkHostAutoReady(client.roomNumber)
+                    } catch (e) {}
+                }
+            }
         }
         return { ok: true, value: undefined }
     }
@@ -157,7 +180,11 @@ export class SessionManager {
         }
         readySet.add(connectionId)
         const connected = this.battleClients.get(roomNumber)?.size ?? 0
-        return readySet.size >= expected && readySet.size >= connected
+        if (readySet.size >= expected && readySet.size >= connected) {
+            this.battleExpectedCount.set(roomNumber, 0)
+            return true
+        }
+        return false
     }
 
     clearSceneReady(roomNumber: string): void {

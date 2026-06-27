@@ -1,6 +1,5 @@
 import type {
     MultiMate,
-    MultiMateParty,
     MultiMatePartyCharacter,
     MultiMateEquipment,
     NpcMateTemplate,
@@ -27,35 +26,34 @@ function buildMateEquipment(id: number): MultiMateEquipment {
 }
 
 function buildNpcMate(template: NpcMateTemplate): MultiMate {
-    const characters: (MultiMatePartyCharacter | null)[] = template.characters.map(id => buildMateCharacter(id))
+    const characters: (MultiMatePartyCharacter | null)[] = template.characters.map(buildMateCharacter)
     while (characters.length < 3) characters.push(null)
 
-    const unisonCharacters: (MultiMatePartyCharacter | null)[] = template.unison_characters.map(id => buildMateCharacter(id))
+    const unisonCharacters: (MultiMatePartyCharacter | null)[] = template.unison_characters.map(buildMateCharacter)
     while (unisonCharacters.length < 3) unisonCharacters.push(null)
 
-    const equipments: (MultiMateEquipment | null)[] = template.equipments.map(id => buildMateEquipment(id))
+    const equipments: (MultiMateEquipment | null)[] = template.equipments.map(buildMateEquipment)
     while (equipments.length < 3) equipments.push(null)
 
     const abilitySoulIds: (number | null)[] = [...template.ability_soul_ids]
     while (abilitySoulIds.length < 3) abilitySoulIds.push(null)
 
-    const party: MultiMateParty = {
-        characters,
-        unison_characters: unisonCharacters,
-        equipments,
-        ability_soul_ids: abilitySoulIds,
-    }
-
     return {
         com_id: template.com_id,
         degree_id: template.degree_id,
         rank: template.rank,
-        party,
+        party: {
+            characters,
+            unison_characters: unisonCharacters,
+            equipments,
+            ability_soul_ids: abilitySoulIds,
+        },
     }
 }
 
-export function buildNpcMates(questId?: number, category?: number): { mate1: MultiMate | null, mate2: MultiMate | null } {
-    const [t1, t2] = NPC_TEMPLATES
+export function buildNpcMates(_questId?: number, _category?: number): { mate1: MultiMate | null, mate2: MultiMate | null } {
+    const t1 = NPC_TEMPLATES[0]
+    const t2 = NPC_TEMPLATES[1]
     return {
         mate1: t1 ? buildNpcMate(t1) : null,
         mate2: t2 ? buildNpcMate(t2) : null,

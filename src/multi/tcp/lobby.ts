@@ -2,6 +2,9 @@ import * as net from "net"
 import { sessionManager, SessionClient } from "../state/SessionManager"
 import { getRoom, updateRoomState } from "../room/manager"
 import { NpcMateProvider } from "../npc/controller"
+import { buildRealParty } from "./handshake"
+import { PartyCategory } from "../../data/types"
+import { getPlayerPartyGroupListSync } from "../../data/wdfpData"
 
 const NPC_JOIN_DELAY_MS = parseInt(process.env.NPC_JOIN_DELAY_MS || "2000")
 const NPC_READY_DELAY_MS = parseInt(process.env.NPC_READY_DELAY_MS || "500")
@@ -59,7 +62,7 @@ export function checkHostAutoReady(roomNumber: string): void {
 }
 
 export function notifyRoomDisbanded(roomNumber: string): void {
-    sessionManager.broadcastToRoom(roomNumber, [1, [3, roomNumber]])
+    sessionManager.broadcastToRoom(roomNumber, [1, [6, "disbanded"]])
 }
 
 async function handleEnterComs(client: SessionClient, coms: { name: string }[]): Promise<void> {
@@ -78,23 +81,40 @@ async function handleEnterComs(client: SessionClient, coms: { name: string }[]):
 
     const npcProvider = new NpcMateProvider()
     const recruitResult = await npcProvider.onRecruit(client.roomNumber, String(room?.host_viewer_id ?? 0))
-    const npcMatesData = npcProvider.getMates(client.roomNumber)
+
+    // Fetch NPC party data from player's DB (uses real equipment/character IDs)
+    const npcParties: any[] = []
+    if (client.playerId) {
+        try {
+            for (const category of [PartyCategory.NORMAL, PartyCategory.EVENT]) {
+                const groups = getPlayerPartyGroupListSync(client.playerId, category)
+                for (const g of Object.values(groups)) {
+                    for (const party of Object.values(g.list)) {
+                        if (party.name && party.name.includes("NPC")) {
+                            npcParties.push(buildRealParty(client.playerId, party))
+                        }
+                    }
+                }
+            }
+        } catch (e) { }
+    }
 
     const npcMates: any[] = []
-    for (let i = 0; i < Math.min(needNPCs, recruitResult.recruitedMates.length); i++) {
-        const recruited = recruitResult.recruitedMates[i]
-        const template = npcMatesData[i]
-        const party = template?.party ?? hostMate.party
+    for (let i = 0; i < needNPCs; i++) {
+        const recruited = recruitResult.recruitedMates[i] ?? null
+        const comId = recruited?.com_id ?? (i + 1)
+        const viewerId = recruited?.viewer_id ?? (900000000 + i + 1)
+        const party = npcParties[i] ?? npcParties[0] ?? hostMate.party
 
         npcMates.push({
-            viewerId: recruited.viewer_id,
-            comId: recruited.com_id,
-            name: coms[i]?.name ?? `NPC${recruited.com_id}`,
+            viewerId: viewerId,
+            comId: comId,
+            name: coms[i]?.name ?? `NPC${comId}`,
             rank: hostMate.rank,
             degreeId: hostMate.degreeId,
             playerRoleKind: 99,
             party,
-            connectionId: `${client.roomNumber}-npc-${recruited.com_id}`,
+            connectionId: `${client.roomNumber}-npc-${comId}`,
             autoplayMode: false,
             autoskillMode: 1,
             autoSpeedLevel: 1,
@@ -142,6 +162,13 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     const ed = data[1]
     if (ed?.party && client.yourself) {
         client.yourself.party = ed.party
+        if (ed.autoplayMode !== undefined) client.yourself.autoplayMode = ed.autoplayMode;
+        if (ed.autoskillMode !== undefined) client.yourself.autoskillMode = ed.autoskillMode;
+        if (ed.autoSpeedLevel !== undefined) client.yourself.autoSpeedLevel = ed.autoSpeedLevel;
+        if (ed.autoStart !== undefined) client.yourself.autoStart = ed.autoStart;
+        if (ed.skillAbilityBehaviorMode !== undefined) client.yourself.skillAbilityBehaviorMode = ed.skillAbilityBehaviorMode;
+        if (ed.dashBehaviorMode !== undefined) client.yourself.dashBehaviorMode = ed.dashBehaviorMode;
+        if (ed.allowHealFromOtherPlayers !== undefined) client.yourself.allowHealFromOtherPlayers = ed.allowHealFromOtherPlayers;
     }
     client.enterData = ed
 
@@ -169,6 +196,9 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
             }
         }
         if (room) room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
+        if (client.mates.length > 1) {
+            sessionManager.broadcastToRoom(client.roomNumber, [1, [1, client.mates]], `${client.viewerId}@${client.roomNumber}`)
+        }
     } else {
         if (hostClient && client.yourself) {
             hostClient.mates.push(client.yourself)
@@ -217,6 +247,7 @@ function handleBye(_socket: net.Socket, client: SessionClient, _data: any[]): vo
     const hostClient = findHostClient(client.roomNumber)
     sessionManager.broadcastToRoom(client.roomNumber, [1, [1, hostClient?.mates ?? []]])
     sessionManager.removeClient(client)
+    try { client.socket.destroy(); } catch (e) {}
     console.log(`[LOBBY] client ${client.viewerId} left room ${client.roomNumber}`)
 }
 
@@ -230,7 +261,9 @@ function handleChangeParty(_socket: net.Socket, client: SessionClient, data: any
     }
     const mate = client.mates.find(m => m.viewerId === client.viewerId)
     if (mate) {
-        sessionManager.broadcastToRoom(client.roomNumber, [1, [2, mate.connectionId, mate.state ?? [0]]])
+        if (client.playerId && pd.currentPartyId !== undefined) { try { const up = require("../../data/wdfpData").updatePlayerSync; up({ id: client.playerId, partySlot: pd.currentPartyId }); } catch(e) {} }
+        const room = getRoom(client.roomNumber); if (room) { room.host_party_id = pd.currentPartyId; }
+        sessionManager.broadcastToRoom(client.roomNumber, [1, [1, client.mates]])
     }
     console.log(`[LOBBY] client ${client.viewerId} changed party`)
 }
@@ -249,14 +282,14 @@ function handleReady(_socket: net.Socket, client: SessionClient, data: any[]): v
     console.log(`[LOBBY] client ${client.viewerId} ready: ${client.isReady}`)
 }
 
-function handleHeartbeat(socket: net.Socket, _client: SessionClient, _data: any[]): void {
-    sessionManager.sendJson(socket, [1, [10, 0]])
+function handleHeartbeat(socket: net.Socket, client: SessionClient, _data: any[]): void {
+    sessionManager.sendJson(socket, [1, [10, client.connectionId]])
 }
 
 function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: any[]): void {
     if ((sessionManager as any).battleExpectedCount?.has?.(client.roomNumber)) return
 
-    const expectedCount = countRealPlayers(client.mates) + 1
+    const expectedCount = countRealPlayers(client.mates)
     sessionManager.setBattleExpectedCount(client.roomNumber, expectedCount)
     updateRoomState(client.roomNumber, 4)
 

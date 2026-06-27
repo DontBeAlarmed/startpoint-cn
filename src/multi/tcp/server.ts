@@ -5,6 +5,8 @@
 
 import * as net from "net"
 import { handleHandshake } from "./handshake"
+import { handleBattleMessage } from "./battle"
+import { sessionManager } from "../state/SessionManager"
 
 export const SESSION_PORT = parseInt(process.env.SESSION_PORT || "8003")
 export const SESSION_HOST = process.env.SESSION_HOST || "0.0.0.0"
@@ -24,6 +26,7 @@ export function startSessionServer(): Promise<void> {
             socket.setEncoding("utf8")
             let buffer = ""
             let handshakeDone = false
+            let isBattleSocket = false
 
             socket.on("data", (chunk: string) => {
                 buffer += chunk
@@ -37,13 +40,18 @@ export function startSessionServer(): Promise<void> {
                         const data = JSON.parse(raw)
                         if (!handshakeDone && data.socklet) {
                             handshakeDone = true
+                            isBattleSocket = data.socklet === "cooperation_battle"
                             handleHandshake(socket, data).catch((err) => {
                                 console.log(`[TCP] handshake failed:`, err)
                                 socket.destroy()
                             })
                         } else if (handshakeDone) {
-                            const lobby = require("./lobby")
-                            lobby.handleMessage(socket, data)
+                            if (isBattleSocket) {
+                                handleBattleMessage(socket, data)
+                            } else {
+                                const lobby = require("./lobby")
+                                lobby.handleMessage(socket, data)
+                            }
                         }
                     } catch (e) {
                         console.log(`[TCP] parse error from ${remoteAddr}:`, (e as Error).message)
@@ -53,10 +61,52 @@ export function startSessionServer(): Promise<void> {
 
             socket.on("close", () => {
                 console.log(`[TCP] connection closed: ${remoteAddr}`)
+                // OLD: remove client on socket close to prevent zombies
+                try {
+                    const clientsMap = (sessionManager as any).clients as Map<string, any> | undefined
+                    if (clientsMap) {
+                        for (const [, client] of clientsMap) {
+                            if (client.socket === socket) {
+                                sessionManager.removeClient(client)
+                                break
+                            }
+                        }
+                    }
+                    const c2b = (sessionManager as any).cidToBattleClient as Map<string, any> | undefined
+                    if (c2b) {
+                        for (const [, client] of c2b) {
+                            if (client.socket === socket) {
+                                sessionManager.removeClient(client)
+                                break
+                            }
+                        }
+                    }
+                } catch (e) {}
             })
 
             socket.on("error", (err) => {
                 console.log(`[TCP] socket error from ${remoteAddr}:`, err.message)
+                // OLD: remove client on error to prevent zombies
+                try {
+                    const clientsMap = (sessionManager as any).clients as Map<string, any> | undefined
+                    if (clientsMap) {
+                        for (const [, client] of clientsMap) {
+                            if (client.socket === socket) {
+                                sessionManager.removeClient(client)
+                                break
+                            }
+                        }
+                    }
+                    const c2b = (sessionManager as any).cidToBattleClient as Map<string, any> | undefined
+                    if (c2b) {
+                        for (const [, client] of c2b) {
+                            if (client.socket === socket) {
+                                sessionManager.removeClient(client)
+                                break
+                            }
+                        }
+                    }
+                } catch (e) {}
             })
         })
 

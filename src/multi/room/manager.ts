@@ -48,7 +48,7 @@ export function createRoom(
     questId: number,
     acceptedType: number,
     hostMainCharacterId: number,
-    isNpcMode: boolean = true
+    isNpcMode: boolean = false
 ): MultiRoom {
     const roomNumber = generateRoomNumber();
     const room: MultiRoom = {

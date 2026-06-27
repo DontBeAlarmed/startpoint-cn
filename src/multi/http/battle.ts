@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { MultiStartBody, MultiFinishBody, MultiAbortBody, PlayContinueBody } from "../types";
-import { generateDataHeaders } from "../../utils";
-import { getRoom, setRoomBattle, disbandRoom } from "../room/manager";
+import { generateDataHeaders, getServerTime } from "../../utils";
+import { getRoom, setRoomBattle, disbandRoom, updateRoomState } from "../room/manager";
 import { sessionManager } from "../state/SessionManager";
 import { insertActiveQuest, activeQuests } from "../../routes/api/singleBattleQuest";
 import {
@@ -15,10 +15,11 @@ import {
     getSession,
 } from "../../data/wdfpData";
 import { getQuestFromCategorySync } from "../../lib/assets";
-import { givePlayerCharactersExpSync } from "../../lib/character";
+import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
+import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
 import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/stamina";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { BattleQuest } from "../../lib/types";
+import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import type { Player } from "../../data/types";
 
 interface PlayerContext { playerId: number; player: Player }
@@ -145,27 +146,65 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
 
         if (activeQuestData.roomNumber) {
             const room = getRoom(activeQuestData.roomNumber);
-            if (room) {
-                room.raising_state = 1;
+            if (room && room.host_player_id === playerId) {
+                updateRoomState(room.room_number, 1);
                 console.log(`[MULTI] finish: room ${activeQuestData.roomNumber} reset to raising_state=1`);
             }
         }
 
-        const beforeExp = player.expPool;
-        const beforeMana = player.freeMana;
-        const beforeRankPoint = player.rankPoint;
+        // calculate clear rank
+        const clearTime = (body as any).elapsed_time_ms || 0;
+        const hasRankThresholds = questData.bRankTime > 0;
+        const clearRank = hasRankThresholds ? (
+            questData.sPlusRankTime >= clearTime ? 5
+                : questData.sRankTime >= clearTime ? 4
+                    : questData.aRankTime >= clearTime ? 3
+                        : questData.bRankTime >= clearTime ? 2
+                            : 1
+        ) : null;
 
-        const newExpPool = beforeExp + questData.poolExpReward;
+        const beforeRankPoint = player.rankPoint;
         const newRankPoint = beforeRankPoint + questData.rankPointReward;
-        const newMana = beforeMana + questData.manaReward;
+        const newMana = player.freeMana + questData.manaReward + ((body as any).add_mana || 0);
+        const newExpPool = player.expPool + questData.poolExpReward;
 
         let newBoostPoint = player.boostPoint - (activeQuestData.useBoostPoint ? 1 : 0);
         let newBossBoostPoint = player.bossBoostPoint - (activeQuestData.useBossBoostPoint ? 1 : 0);
+        const useBoostPoint = (activeQuestData.useBoostPoint && (newBoostPoint >= 0)) || (activeQuestData.useBossBoostPoint && (newBossBoostPoint >= 0));
+
+        // quest progress
+        const questProgress = getPlayerSingleQuestProgressSync(playerId, questCategory, questId);
+        const questPreviouslyCompleted = questProgress !== null;
+        const questAccomplished = (body as any).is_accomplished;
+
+        const clearReward = !questPreviouslyCompleted && (questData as any).clearReward !== undefined ? givePlayerRewardSync(playerId, (questData as any).clearReward) : null;
+        const sPlusClearReward = (clearRank === 5) && (questProgress?.clearRank !== 5) && ((questData as any).sPlusReward !== undefined) ? givePlayerRewardSync(playerId, (questData as any).sPlusReward) : null;
+        if (questAccomplished) {
+            if (questPreviouslyCompleted) {
+                const updateData: any = {
+                    questId: questId,
+                    finished: true,
+                    bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
+                    highScore: questProgress.highScore === undefined ? ((body as any).score || 0) : Math.max((body as any).score || 0, questProgress.highScore)
+                };
+                if (clearRank !== null) {
+                    updateData.clearRank = questProgress.clearRank === undefined ? clearRank : Math.max(clearRank, questProgress.clearRank);
+                }
+                updatePlayerQuestProgressSync(playerId, questCategory, updateData);
+            } else {
+                insertPlayerQuestProgressSync(playerId, questCategory, {
+                    questId: questId,
+                    finished: true,
+                    bestElapsedTimeMs: clearTime,
+                    highScore: (body as any).score || 0,
+                    clearRank: clearRank ?? 5
+                });
+            }
+        }
 
         const oldRkDegree = getRankDegree(beforeRankPoint);
         const newDegreeId = getRankDegree(newRankPoint);
         const didLevelUp = newDegreeId > oldRkDegree;
-
         updatePlayerSync({
             id: playerId,
             freeMana: newMana,
@@ -175,63 +214,84 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             bossBoostPoint: newBossBoostPoint,
             ...(didLevelUp ? { stamina: player.stamina + getMaxStamina(newDegreeId), staminaHealTime: new Date() } : {}),
         });
-
+        const playerData = player;
         if (didLevelUp) {
-            player.stamina = player.stamina + getMaxStamina(newDegreeId);
-            player.staminaHealTime = new Date();
-            console.log(`[MULTI-FINISH] player ${playerId} leveled up: ${oldRkDegree} -> ${newDegreeId}, stamina refilled`);
+            playerData.stamina = playerData.stamina + getMaxStamina(newDegreeId);
+            playerData.staminaHealTime = new Date();
         }
 
-        const clearTime = body.battle_time;
-        const questProgress = getPlayerSingleQuestProgressSync(playerId, questCategory, questId);
-        const questPreviouslyCompleted = questProgress !== null;
+        const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, (questData as any).scoreRewardGroupId || 0, (questData as any).scoreRewardGroup, useBoostPoint, (questData as any).element);
 
-        if (questPreviouslyCompleted) {
-            updatePlayerQuestProgressSync(playerId, questCategory, {
-                questId,
-                finished: true,
-                bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null
-                    ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
-                highScore: questProgress.highScore === undefined
-                    ? body.clear_phase : Math.max(body.clear_phase, questProgress.highScore),
-            });
-        } else {
-            insertPlayerQuestProgressSync(playerId, questCategory, {
-                questId,
-                finished: true,
-                bestElapsedTimeMs: clearTime,
-                highScore: body.clear_phase,
-                clearRank: 5,
-            });
+        const bodyPartyStatistics = (body as any).statistics?.party || body.quest_statistics?.party || { characters: [], unison_characters: [] };
+        const partyCharacterIdsArray: number[] = [];
+        for (const value of [...(bodyPartyStatistics.characters || []), ...(bodyPartyStatistics.unison_characters || [])]) {
+            if (value !== null && (value as any).id !== null && (value as any).id !== undefined) partyCharacterIdsArray.push((value as any).id);
         }
-
-        const partyStats = body.quest_statistics.party;
-        const characterIds: number[] = [];
-        for (const c of partyStats.characters) {
-            if (c !== null && c.id !== null) characterIds.push(c.id);
-        }
-        for (const c of partyStats.unison_characters) {
-            if (c !== null && c.id !== null) characterIds.push(c.id);
-        }
-
         const rewardCharacterExpResult = givePlayerCharactersExpSync(
-            playerId, characterIds, questData.characterExpReward,
+            playerId, partyCharacterIdsArray, questData.characterExpReward || 0,
             questData.fixedParty !== undefined
         );
 
-        const stamina = computeRealTimeStamina(player);
+        const dataHeaders = generateDataHeaders({ viewer_id: viewerId });
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
-            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data_headers": dataHeaders,
             "data": {
-                player_exp: { before: beforeExp, after: rewardCharacterExpResult.exp_pool },
-                player_mana: { before: beforeMana, after: newMana },
-                rank_point: { before: beforeRankPoint, after: newRankPoint },
-                contribution_score: 1000,
-                mate_player_result: (body.mate_player_ids || []).map(id => ({ viewer_id: id, score: 1000 })),
-                stamina,
-                rank: newDegreeId,
+                "user_info": {
+                    "free_mana": newMana + (clearReward?.user_info.free_mana || 0) + (sPlusClearReward?.user_info.free_mana || 0) + scoreRewardsResult.user_info.free_mana,
+                    "exp_pool": rewardCharacterExpResult.exp_pool + (clearReward?.user_info.exp_pool || 0) + scoreRewardsResult.user_info.exp_pool,
+                    "exp_pooled_time": getServerTime(playerData.expPooledTime),
+                    "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney,
+                    "rank_point": newRankPoint,
+                    "degree_id": 1,
+                    "stamina": computeRealTimeStamina(playerData),
+                    "stamina_heal_time": getServerTime(),
+                    "boost_point": newBoostPoint,
+                    "boss_boost_point": newBossBoostPoint
+                },
+                "add_exp_list": rewardCharacterExpResult.add_exp_list,
+                "character_list": [
+                    ...rewardCharacterExpResult.character_list,
+                    ...(clearReward?.character_list || []),
+                    ...(sPlusClearReward?.character_list || []),
+                    ...scoreRewardsResult.character_list
+                ],
+                "bond_token_status_list": rewardCharacterExpResult.bond_token_status_list,
+                "rewards": {
+                    "overflow_pool_exp": 0,
+                    "converted_pool_exp": 0,
+                    "reward_pool_exp": questData.poolExpReward,
+                    "reward_mana": questData.manaReward,
+                    "field_mana": (body as any).add_mana || 0
+                },
+                "old_high_score": questProgress === null ? 0 : questProgress.highScore || 0,
+                "joined_character_id_list": [
+                    ...(clearReward?.joined_character_id_list || []),
+                    ...(sPlusClearReward?.joined_character_id_list || []),
+                    ...scoreRewardsResult.joined_character_id_list
+                ],
+                "before_rank_point": beforeRankPoint,
+                "clear_rank": clearRank ?? 5,
+                "drop_score_reward_ids": scoreRewardsResult.drop_score_reward_ids,
+                "drop_rare_reward_ids": scoreRewardsResult.drop_rare_reward_ids,
+                "drop_additional_reward_ids": [],
+                "drop_periodic_reward_ids": [],
+                "equipment_list": [
+                    ...scoreRewardsResult.equipment_list,
+                    ...(clearReward?.equipment_list || []),
+                    ...(sPlusClearReward?.equipment_list || [])
+                ],
+                "category_id": questCategory,
+                "start_time": dataHeaders['servertime'],
+                "is_multi": "multi",
+                "quest_name": "",
+                "item_list": scoreRewardsResult.items,
+                "presigned_quest_category": [],
+                "mate_player_result": (body as any).mate_player_result || [],
+                "contribution_score": (body as any).contribution_score ?? 0,
+                "host_finished": true,
+                "aborted_play_id": null,
             }
         });
     });
@@ -259,6 +319,13 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         const activeQuestData = activeQuests[playerId];
 
         if (activeQuestData) {
+            if (activeQuestData.roomNumber) {
+                const room = getRoom(activeQuestData.roomNumber);
+                if (room && room.host_player_id === playerId) {
+                    disbandRoom(activeQuestData.roomNumber);
+                    console.log(`[MULTI] abort: room ${activeQuestData.roomNumber} disbanded (host abandoned)`);
+                }
+            }
             delete activeQuests[playerId];
             deletePlayerActiveQuestSync(playerId);
             if (activeQuestData.roomNumber) {
@@ -266,29 +333,21 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             }
         }
 
-        if (body.room_number) {
-            const room = getRoom(body.room_number);
-            if (room) {
-                sessionManager.broadcastToRoom(body.room_number, [1, [3, body.room_number]]);
-                disbandRoom(body.room_number);
-                console.log(`[MULTI] abort: room ${body.room_number} disbanded`);
-            }
-        }
-
-        const stamina = computeRealTimeStamina(player);
-        const rank = getRankDegree(player.rankPoint);
-
+        const headers = generateDataHeaders({ viewer_id: viewerId });
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
-            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data_headers": headers,
             "data": {
-                player_exp: { before: player.expPool, after: player.expPool },
-                player_mana: { before: player.freeMana, after: player.freeMana },
-                rank_point: { before: player.rankPoint, after: player.rankPoint },
-                contribution_score: 0,
-                mate_player_result: [],
-                stamina,
-                rank,
+                "user_info": {},
+                "category_id": body.category,
+                "is_multi": "multi",
+                "start_time": headers['servertime'],
+                "quest_name": "",
+                "aborted_play_id": body.play_id,
+                "unfinished_play_id": null,
+                "drawn_quest": null,
+                "party_info": null,
+                "presigned_url": null
             }
         });
     });
