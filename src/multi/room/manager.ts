@@ -1,7 +1,7 @@
 import { randomInt } from "crypto";
 import { MultiRoom, QuestCategory, RoomState } from "../types";
 import { getServerTime } from "../../utils";
-import sessionManager from "../state/SessionManager";
+import { sessionManager } from "../state/SessionManager";
 
 const rooms = new Map<string, MultiRoom>();
 

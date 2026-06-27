@@ -1,6 +1,6 @@
 import { MultiRoom } from "../types";
 import { getDisplayHost } from "../../data/multiRoom";
-import sessionManager from "../state/SessionManager";
+import { sessionManager } from "../state/SessionManager";
 
 export interface SerializedRoom {
     access_token: string;
