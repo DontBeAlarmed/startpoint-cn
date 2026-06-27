@@ -927,25 +927,50 @@ Client B → Broadcast(frameCmd) → Server → relayToBattleRoom → BattleServ
 | C5602 Disband NPE | ✅ 已修复 | `notifyRoomDisbanded` 仅用于 TCP 断线通知 |
 | 消息 TCP 合并 | ⚠️ | 100ms/200ms 延迟规避 |
 | 战斗恢复 UI（RestoreState.Battle） | 待测 | DB 层已就绪，客户端恢复弹窗流程待验证 |
-| 空房间"6秒后挑战合作任务"浮字 | ⚠️ 客户端本地 UI | ReadyCounter 倒计时，非服务端 TCP 消息 |
 | state=3 (Filled) | 待恢复 | `handleEnterComs` 中 `updateRoomState(3)` 被 F1 修复误删 |
-| 空房间浮字"秒后将挑战合作战斗" | ⚠️ 客户端生成路径未知 | 见 9.8.2 专题研究 |
+| 空房间浮字 + 快速解散 | ⚠️ 服务端已排查完毕，待客户端日志确认 | 见 9.8.2 专题研究 |
 
-### 9.8.2 空房间浮字专题研究
+### 9.8.2 空房间浮字 + 快速解散专题研究
 
-**现象**：NPC 模式创房后，房间仅房主 1 人、未准备，每 5 秒出现 "N秒后将挑战合作战斗" 浮字。
+**现象**：
+- NPC 模式创房后，房间仅房主 1 人、未准备，每 5s 出现 "N秒后将挑战合作战斗" 浮字
+- 房间在短时间内被客户端主动 `Bye` → 服务端 `disbandRoom`
+- Heartbeat `connectionId` 修复后浮字从 6s 变 1s，不再 30s 超时但仍快速解散
 
-**排查过程**：
+**已尝试修复（均未解决）**：
+
+| 修复 | 效果 |
+|------|------|
+| AckHeartbeat `viewerId→connectionId` | 浮字 6s→1s |
+| 删除 60s return window 定时器 | 仍解散 |
+| `removeClient` state=4 guard | 仍解散 |
+| `createRoom` `mates` 初始化为 [] | 仍解散 |
+| Welcome/Mates 合并为一条消息 | 待测试 |
+| `room.mates` 同步为实际人数 | 修复 get_rooms 显示 |
+
+**客户端 Bye 可能来源**：
+
+| 路径 | 排除？ |
+|------|:---:|
+| 用户手动退出 | ❓ 待确认 |
+| 场景切换（进战斗） | ❌ 未进战斗 |
+| Heartbeat 30s 超时 | ✅ 已修复 |
+| 服务器 Disbanded(6) | ✅ 不发送 |
+
+**浮字来源排查**：
 
 | 排查项 | 结论 |
 |------|------|
-| 服务端是否发送 `StartRemainingTime(9,N)`？ | ❌ 不发送。`sendJson` 全量 tag 日志确认仅发送 tag=0(Welcome) + tag=10(AckHeartbeat) |
-| 客户端是否自己生成？ | ❌ 源码确认 3 个场景仅接收、不生成 |
-| `mates.length` 误导满员？ | ❌ Welcome/Mates 返回 1 人 |
-| `autoStart:false` 未生效？ | ❌ yourself mate 中 `autoStart:false` + `state:[0]` |
-| heartbeat 修复影响？ | ✅ `connectionId` 修复后浮字从 6s 变 1s，不再超时 30s Bye。浮字 5s 周期对应 `heartBeatInMeetingInterval=5000ms` |
+| 服务端发送 `StartRemainingTime(9,N)` | ❌ `sendJson` 全量 tag 日志确认仅发送 Welcome(0)+AckHeartbeat(10) |
+| 客户端生成此消息 | ❌ 源码确认 3 个场景仅接收 `case 9`，不构造 `MeetingServerMessage.StartRemainingTime` |
+| `mates.length` 误导满员 | ❌ Welcome/Mates 返回 1 人，`canAutoStartBattle()` 要求 ≥3 |
+| `autoStart:false` | ❌ Welcome 中明确传 false，Enter 后覆盖为客户端值 |
+| `state:[0]` (Preparation) | ❌ 所有 mate 未准备 |
+| 占位槽导致 room.mates 显示为 0 | ❌ 客户端无占位概念，且 `get_rooms` 中 `mates` 字段不影响房主自身流程 |
 
-**当前状态**：浮字来源无法通过服务端代码确定。客户端可能存在 ReadyCounter / autoStart 相关的内部路径未被反编译工具捕获。不影响功能——浮字纯 visual，不改变房间状态。
+**核心矛盾**：浮字文本确认为 `multibattle_room_start_remaining_notify`（"N秒后将挑战合作战斗"），该文本**仅在客户端收到服务端 TCP 消息 `StartRemainingTime(9,N)` 时显示**。但服务端不发送此消息，客户端源码也不生成此消息。唯一变化点是 Heartbeat 修复影响了浮字倒计时值（6s→1s），暗示与客户端 ReadyCounter 计时器状态有关。
+
+**当前状态**：服务端所有可排查点已排查完毕。需客户端日志（`ERR:`/`RD:`/`GL:` tag）确认浮字触发时刻的代码路径。不影响功能——浮字纯 visual，不改变房间状态。
 
 ### 9.8.1 结算画面 60s 定时器
 
