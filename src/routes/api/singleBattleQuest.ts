@@ -352,7 +352,7 @@ const routes = async (fastify: FastifyInstance) => {
         // Leader (position 0) tracked separately for "以X为队长" tasks
         const leaderId = bodyPartyStatistics.characters[0]?.id
         if (leaderId) {
-            incrementPlayerCharacterClearSync(playerId, leaderId, false)
+            incrementPlayerCharacterClearSync(playerId, leaderId, false, true)  // isLeader=true for "以X为队长" missions
         }
         // Other party members for "队伍中编有X" tasks
         const seen = new Set<number>([leaderId].filter(Boolean) as number[])

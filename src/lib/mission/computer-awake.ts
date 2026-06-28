@@ -9,10 +9,11 @@ import type { PlayerCharacter } from "../../data/types"
 
 interface AwakeContext extends CategoryContext {
     charClears: Map<string, number>
+    leaderClears: Map<string, number>
     charData: Map<string, PlayerCharacter>
 }
 
-// ─── Special mission tables (converged from ad-hoc conditionals) ───
+// ─── Special mission tables ───
 
 interface QuestClearTarget {
     category: number
@@ -21,7 +22,7 @@ interface QuestClearTarget {
 
 const QUEST_CLEAR_MAP: Map<number, QuestClearTarget> = new Map([
     [1110013, { category: 2, questIds: [1028004] }],
-    [1310052, { category: 15, questIds: [96] }],                               // 结实假人·水
+    [1310052, { category: 15, questIds: [96] }],
     [1410032, { category: 2, questIds: [1020003] }],
     [2110013, { category: 2, questIds: [1028004] }],
     [2510032, { category: 13, questIds: [1020, 1023, 1026, 1029, 1032, 1035, 1038] }],
@@ -29,6 +30,9 @@ const QUEST_CLEAR_MAP: Map<number, QuestClearTarget> = new Map([
 ])
 
 const BOND_TOKEN_MISSION_IDS = new Set([1410033, 2210043, 2510043, 2610073])
+
+/** Missions that require the character as party LEADER (not just a member) */
+const LEADER_REQUIRED_IDS = new Set([1510062, 1610022, 1610023, 2310012, 2610072])
 
 // ─── Computer ───
 
@@ -56,12 +60,15 @@ function buildAwakeContext(playerId: number): AwakeContext {
         questProgress[section] = list
     }
 
-    // Pre-fetch character clear counts and data
+    // Pre-fetch character clear counts (batch: one DB call per owned character)
     const charClears = new Map<string, number>()
+    const leaderClears = new Map<string, number>()
     const charData = new Map<string, PlayerCharacter>()
     for (const [cid, char] of Object.entries(allChars)) {
         charData.set(cid, char)
-        charClears.set(cid, getPlayerCharacterClearSync(playerId, Number(cid)).clear_count)
+        const row = getPlayerCharacterClearSync(playerId, Number(cid))
+        charClears.set(cid, row.clear_count)
+        leaderClears.set(cid, row.leader_clear_count)
     }
 
     return {
@@ -72,6 +79,7 @@ function buildAwakeContext(playerId: number): AwakeContext {
         totalStories,
         rankCounts: { rank_ss: ssClears, rank_s: sClears, rank_a: aClears, rank_b: bClears },
         charClears,
+        leaderClears,
         charData,
     }
 }
@@ -96,6 +104,9 @@ export const AwakeComputer: MissionComputer = {
             return progress.some(q => qc.questIds.includes(q.questId) && q.finished) ? 1 : 0
         }
 
+        // Leader-required missions: use leader_clear_count
+        const isLeaderRequired = LEADER_REQUIRED_IDS.has(missionId)
+
         // Dispatch by lastDigit
         switch (lastDigit) {
             case AwakeType.STORY_READ:
@@ -104,7 +115,9 @@ export const AwakeComputer: MissionComputer = {
             case AwakeType.PARTY_OR_SPECIAL:
                 if (charId === '1') return ctx.totalStories
                 if (charId === '263002') return ctx.player.totalManaObtained ?? 0
-                return actx.charClears.get(charId) ?? 0
+                return isLeaderRequired
+                    ? actx.leaderClears.get(charId) ?? 0
+                    : actx.charClears.get(charId) ?? 0
 
             case AwakeType.SPECIAL:
                 if (charId === '1') return ctx.player.totalPowerflips ?? 0
@@ -112,7 +125,9 @@ export const AwakeComputer: MissionComputer = {
                     const char = actx.charData.get(charId)
                     return char?.bondTokenList.every(bt => bt.status >= 2) ? 1 : 0
                 }
-                return actx.charClears.get(charId) ?? 0
+                return isLeaderRequired
+                    ? actx.leaderClears.get(charId) ?? 0
+                    : actx.charClears.get(charId) ?? 0
 
             case AwakeType.ALL_COMPLETE: {
                 const s1 = AwakeComputer.compute(missionId - 3, ctx, dbProgress)

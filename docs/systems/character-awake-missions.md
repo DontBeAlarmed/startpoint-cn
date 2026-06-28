@@ -21,8 +21,8 @@
 
 | 正确度 | 数量 |
 |:---:|------|
-| ✅ | 84 条（58%） |
-| ⚠️ | 54 条（37%） |
+| ✅ | 85 条（59%） |
+| ⚠️ | 53 条（37%） |
 | ❌ | 6 条（4%）
 
 ### ❌ 剩余不可计算
@@ -90,6 +90,14 @@
 
 映射常量 `QUEST_CLEAR_MISSIONS` 在 `mission.ts` 中定义，
 `computeProgress` 在 lastDigit 分支之前优先检测。
+
+### 队长追踪（2026-06-28）✅
+
+`players_character_quest_clears` 新增 `leader_clear_count` 列，`/finish` 中 `characters[0]` 传 `isLeader=true`。
+
+- `LEADER_REQUIRED_IDS` 集合：`{1510062, 1610022, 1610023, 2310012, 2610072}`
+- leader-required 任务使用 `leader_clear_count`（纯队长出场），非 leader 任务使用 `clear_count`（任意位置）
+- 1610023（威隆队长通关）⚠️→✅
 
 ### 架构重构（2026-06-28）✅
 

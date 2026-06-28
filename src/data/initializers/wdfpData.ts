@@ -87,9 +87,13 @@ export default function init(
         character_id INTEGER NOT NULL,
         clear_count INTEGER NOT NULL DEFAULT 0,
         multi_count INTEGER NOT NULL DEFAULT 0,
+        leader_clear_count INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (player_id, character_id),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
+
+    // migration: add leader_clear_count for leader-specific awakening missions
+    try { database.prepare(`ALTER TABLE players_character_quest_clears ADD COLUMN leader_clear_count INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
 
     database.prepare(`CREATE TABLE IF NOT EXISTS device_bindings (
         device_id INTEGER PRIMARY KEY,
