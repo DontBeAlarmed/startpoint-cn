@@ -10,6 +10,7 @@ import {
 import { generateDataHeaders } from "../../utils";
 import { clientSerializeEquipment } from "../../lib/equipment";
 import { getEquipmentDissolveSync } from "../../lib/assets";
+import { AccountId, PlayerId } from "../../lib/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 
 interface SetProtectionBody {
@@ -123,7 +124,8 @@ const routes = async (fastify: FastifyInstance) => {
         const session = await getSession(viewerId.toString())
         if (!session) return reply.status(400).send({ "error": "Bad Request", "message": "Invalid viewer id." })
 
-        const playerId = resolvePlayerIdSync(session.accountId)!
+        const accountId = session.accountId as AccountId
+        const playerId = resolvePlayerIdSync(accountId)! as PlayerId
         if (playerId === null) return reply.status(500).send({ "error": "Internal Server Error", "message": "No players bound to account." })
 
         const player = getPlayerSync(playerId)
@@ -179,7 +181,7 @@ const routes = async (fastify: FastifyInstance) => {
         updatePlayerItemSync(playerId, wrightpieceItemId, newCraftPoints)
         returnItemList[wrightpieceItemId] = newCraftPoints
 
-        console.log(`[BULK_UPGRADE] player ${playerId}: ${upgrades.length} equipment upgraded, craft points ${currentCraftPoints} -> ${newCraftPoints}`)
+        console.log(`[BULK_UPGRADE] account=${accountId} player=${playerId}: ${upgrades.length} equipment upgraded, craft points ${currentCraftPoints} -> ${newCraftPoints}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

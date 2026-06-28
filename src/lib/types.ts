@@ -1,5 +1,17 @@
 import { PlayerBoxGachaDrawnReward, UserRushEventPlayedParty } from "../data/types"
 
+// ─── Branded types ──────────────────────────────────────────────────────
+// Compile-time tags to distinguish accountId vs playerId in function signatures.
+// Zero runtime cost — erased to plain `number` in emitted JavaScript.
+
+declare const AccountIdBrand: unique symbol
+declare const PlayerIdBrand: unique symbol
+export type AccountId = number & { [AccountIdBrand]: never }
+export type PlayerId = number & { [PlayerIdBrand]: never }
+
+export function asAccountId(id: number): AccountId { return id as AccountId }
+export function asPlayerId(id: number): PlayerId { return id as PlayerId }
+
 // enums
 export enum RewardType {
     ITEM,

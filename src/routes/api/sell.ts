@@ -9,6 +9,7 @@ import {
 import { generateDataHeaders } from "../../utils";
 import { clientSerializeEquipment } from "../../lib/equipment";
 import { calculateDissolveRewards } from "../../lib/equipment-dissolve";
+import { asAccountId, asPlayerId, AccountId, PlayerId } from "../../lib/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 
 interface SellEquipmentListItem {
@@ -49,7 +50,8 @@ const routes = async (fastify: FastifyInstance) => {
         const session = await getSession(viewerId.toString())
         if (!session) return reply.status(400).send({ "error": "Bad Request", "message": "Invalid viewer id." })
 
-        const playerId = resolvePlayerIdSync(session.accountId)!
+        const accountId = session.accountId as AccountId
+        const playerId = resolvePlayerIdSync(accountId)! as PlayerId
         if (playerId === null) return reply.status(500).send({ "error": "Internal Server Error", "message": "No players bound to account." })
 
         let totalCraftPoints = 0
@@ -100,7 +102,7 @@ const routes = async (fastify: FastifyInstance) => {
         const starLog = totalStarGrains > 0 ? `star +${totalStarGrains} ` : ""
         const soulTypes = Object.keys(totalAbilitySouls).length
         const soulDetail = Object.entries(totalAbilitySouls).map(([id, c]) => `${id}×${c}`).join(' ')
-        console.log(`[SELL_EQUIP] player ${playerId}: ${soldIds.length} equipment sold (${soldIds.join(',')}), ${craftLog}${starLog}ability souls: ${soulTypes} types [${soulDetail}]`)
+        console.log(`[SELL_EQUIP] account=${accountId} player=${playerId}: ${soldIds.length} equipment sold (${soldIds.join(',')}), ${craftLog}${starLog}ability souls: ${soulTypes} types [${soulDetail}]`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -126,7 +128,8 @@ const routes = async (fastify: FastifyInstance) => {
         const session = await getSession(viewerId.toString())
         if (!session) return reply.status(400).send({ "error": "Bad Request", "message": "Invalid viewer id." })
 
-        const playerId = resolvePlayerIdSync(session.accountId)!
+        const accountId = session.accountId as AccountId
+        const playerId = resolvePlayerIdSync(accountId)! as PlayerId
         if (playerId === null) return reply.status(500).send({ "error": "Internal Server Error", "message": "No players bound to account." })
 
         let totalCraftPoints = 0
@@ -176,7 +179,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         const soulTypes = Object.keys(totalAbilitySouls).length
         const soulDetail = Object.entries(totalAbilitySouls).map(([id, c]) => `${id}×${c}`).join(' ')
-        console.log(`[SELL_STACK] player ${playerId}: ${toSellEquipmentList.length} equipment stack sold, craft +${totalCraftPoints} star +${totalStarGrains} ability souls: ${soulTypes} types [${soulDetail}]`)
+        console.log(`[SELL_STACK] account=${accountId} player=${playerId}: ${toSellEquipmentList.length} equipment stack sold, craft +${totalCraftPoints} star +${totalStarGrains} ability souls: ${soulTypes} types [${soulDetail}]`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -202,7 +205,8 @@ const routes = async (fastify: FastifyInstance) => {
         const session = await getSession(viewerId.toString())
         if (!session) return reply.status(400).send({ "error": "Bad Request", "message": "Invalid viewer id." })
 
-        const playerId = resolvePlayerIdSync(session.accountId)!
+        const accountId = session.accountId as AccountId
+        const playerId = resolvePlayerIdSync(accountId)! as PlayerId
         if (playerId === null) return reply.status(500).send({ "error": "Internal Server Error", "message": "No players bound to account." })
 
         // Phase 1: calculate rewards per equipment
@@ -228,7 +232,7 @@ const routes = async (fastify: FastifyInstance) => {
             for (const [soulId, count] of Object.entries(rewards.abilitySouls)) {
                 totalAbilitySouls[parseInt(soulId)] = (totalAbilitySouls[parseInt(soulId)] ?? 0) + count
             }
-            console.log(`[BULK_SELL]   -> eid=${equipmentId} stack=${stack} rarity=${Math.floor(equipmentId/1000000)-1} craft=${rewards.craftPoints} star=${rewards.starGrains} souls=${JSON.stringify(rewards.abilitySouls)}`)
+            console.log(`[BULK_SELL] account=${accountId} player=${playerId}  -> eid=${equipmentId} stack=${stack} rarity=${Math.floor(equipmentId/1000000)-1} craft=${rewards.craftPoints} star=${rewards.starGrains} souls=${JSON.stringify(rewards.abilitySouls)}`)
             toSell.push(equipmentId)
         }
 
@@ -266,7 +270,7 @@ const routes = async (fastify: FastifyInstance) => {
         const starLog = totalStarGrains > 0 ? `star +${totalStarGrains} ` : ""
         const soulTypes = Object.keys(totalAbilitySouls).length
         const soulDetail = Object.entries(totalAbilitySouls).map(([id, c]) => `${id}×${c}`).join(' ')
-        console.log(`[BULK_SELL] player ${playerId}: ${toSell.length} equipment dissolved (${toSell.join(',')}), ${craftLog}${starLog}ability souls: ${soulTypes} types [${soulDetail}]`)
+        console.log(`[BULK_SELL] account=${accountId} player=${playerId}: ${toSell.length} equipment dissolved (${toSell.join(',')}), ${craftLog}${starLog}ability souls: ${soulTypes} types [${soulDetail}]`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
