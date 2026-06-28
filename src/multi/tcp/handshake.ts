@@ -193,7 +193,7 @@ export async function handleHandshake(socket: net.Socket, data: any): Promise<vo
         }
 
         const playerId = playerIds[0]
-        const connectionId = String(roomNumber)
+        const connectionId = data.connection_id || data.connectionId || `${socket.remoteAddress}:${socket.remotePort}`
         const client = sessionManager.createClient(socket, Number(viewerId), String(roomNumber), String(connectionId), playerId)
         client.clientState.tryTransition(ClientState.Handshaking)
 
