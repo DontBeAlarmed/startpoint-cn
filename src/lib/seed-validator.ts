@@ -111,7 +111,6 @@ export class SeedValidator {
     private inAnyPool(p: MoviePool, s: number, base: MoviePool | null): boolean {
         const has = p.confirmPool.has(s) || p.playPool.has(s) || p.verifiedPool.has(s) || p.pendingPool.has(s);
         if (base) return has || base.confirmPool.has(s) || base.playPool.has(s) || base.verifiedPool.has(s) || base.pendingPool.has(s);
-        if (!has) console.log(`[DBG] inAnyPool seed=${s} NOT in any pool (confirm/pending/play/verified all empty)`);
         return has;
     }
 

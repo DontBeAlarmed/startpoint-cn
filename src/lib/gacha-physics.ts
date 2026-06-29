@@ -321,11 +321,11 @@ export const CN_GACHA_PHYSICS_CONFIG: Omit<GachaPhysicsConfig, 'seed'> = {
         decideTwoUpWhenAppear: false,
     },
     barAmulet: {
-        totalCount: 5,      // AMF3 verified: chooseNumbers range
-        lineCount: 40,      // AMF3 verified: grid slot count
+        totalCount: 1,      // FIX: decoded from real client AMF3 (was 5 — wrong, mis-aligned the MT stream)
+        lineCount: 5,       // FIX: real client AMF3 (was 40)
         firstLineY: 3025,   // AMF3 verified
         lineDistance: 165,  // AMF3 verified
-        height: 1,          // AMF3 verified (was 0 incorrectly)
+        height: 40,         // FIX: real client AMF3 (was 1)
     },
     threshold: {
         ballStar4: 0.7582740783691406,
