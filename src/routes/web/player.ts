@@ -73,12 +73,14 @@ const routes = async (fastify: FastifyInstance) => {
         listContent += `<section class="flex flex-col p-5 border border-outline-variant rounded-3xl w-full gap-3">
             <h3 class="text-xl text-on-background font-semibold">设备绑定 / 账号管理</h3>
             <table class="w-full text-sm"><thead><tr class="text-left border-b border-outline-variant">
-                <th class="p-1">设备 ID</th><th class="p-1">ID</th><th class="p-1">名称</th><th class="p-1">存档数</th><th class="p-1">生效存档</th><th class="p-1">操作</th>
+                <th class="p-1">设备 ID</th><th class="p-1">账号ID</th><th class="p-1">名称</th><th class="p-1">存档数</th><th class="p-1">生效存档</th><th class="p-1">操作</th>
             </tr></thead><tbody>${deviceRows || '<tr><td colspan="6" class="text-on-surface-variant p-2">暂无设备绑定</td></tr>'}</tbody></table>
         </section>`
 
         // Save management table (for selected account)
         if (selectedAccountId !== null) {
+            const devName = htmlEscape(deviceBindings.find(d => d.account_id === selectedAccountId)?.name || '')
+            const accountLabel = devName ? `${selectedAccountId}（${devName}）` : `${selectedAccountId}`
             const pids = getAccountPlayersSync(selectedAccountId)
             let saveRows = ''
             for (const pid of pids) {
@@ -113,9 +115,9 @@ const routes = async (fastify: FastifyInstance) => {
                 </tr>`
             }
             listContent += `<section class="flex flex-col p-5 border border-outline-variant rounded-3xl w-full gap-3">
-                <h3 class="text-xl text-on-background font-semibold">account ${selectedAccountId} 的存档</h3>
+                <h3 class="text-xl text-on-background font-semibold">账号 ${accountLabel} 的存档</h3>
                 <table class="w-full text-sm"><thead><tr class="text-left border-b border-outline-variant">
-                    <th class="p-1">ID</th><th class="p-1">名字</th><th class="p-1">等级</th><th class="p-1">角色数</th><th class="p-1">存档时间</th><th class="p-1">操作</th>
+                    <th class="p-1">存档ID</th><th class="p-1">名字</th><th class="p-1">等级</th><th class="p-1">角色数</th><th class="p-1">存档时间</th><th class="p-1">操作</th>
                 </tr></thead><tbody>${saveRows || '<tr><td colspan="6" class="text-on-surface-variant p-2">暂无存档</td></tr>'}</tbody></table>
             </section>`
         }
