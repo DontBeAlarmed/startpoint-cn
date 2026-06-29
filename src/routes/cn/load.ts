@@ -1,9 +1,10 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { generateDataHeaders, getServerTime, getServerDate } from "../../utils";
-import { getPlayerSync, dailyResetPlayerDataSync, collectPlayerDataPooledExpSync, updatePlayerSync, getPlayerActiveQuestSync, getSession } from "../../data/wdfpData";
+import { getPlayerSync, dailyResetPlayerDataSync, collectPlayerDataPooledExpSync, updatePlayerSync, getPlayerActiveQuestSync, deletePlayerActiveQuestSync, getSession } from "../../data/wdfpData";
 import { getClientSerializedData } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDisplayHost } from "../../multi/room/serializer";
+import { getRoom } from "../../multi/room/manager";
 import { runPermanentValidators } from "../../lib/validate";
 
 interface CnLoadBody {
@@ -125,13 +126,22 @@ const routes = async (fastify: FastifyInstance) => {
         // Inject unfinished quest lists for battle recovery
         const activeQuest = getPlayerActiveQuestSync(playerId);
         if (activeQuest) {
-            const entry = { play_id: activeQuest.playId, continue_count: activeQuest.continueCount };
-            if (activeQuest.isMulti) {
+            // Verify room still exists (survives server restart)
+            const roomExists = activeQuest.roomNumber ? getRoom(activeQuest.roomNumber) : true;
+            if (!roomExists) {
+                console.log(`[CN-LOAD] active quest room ${activeQuest.roomNumber} not found, clearing`);
+                deletePlayerActiveQuestSync(playerId);
                 clientData.unfinished_quest_list = [];
-                clientData.unfinished_multi_quest_list = [entry];
-            } else {
-                clientData.unfinished_quest_list = [entry];
                 clientData.unfinished_multi_quest_list = [];
+            } else {
+                const entry = { play_id: activeQuest.playId, continue_count: activeQuest.continueCount };
+                if (activeQuest.isMulti) {
+                    clientData.unfinished_quest_list = [];
+                    clientData.unfinished_multi_quest_list = [entry];
+                } else {
+                    clientData.unfinished_quest_list = [entry];
+                    clientData.unfinished_multi_quest_list = [];
+                }
             }
         } else {
             clientData.unfinished_quest_list = [];
