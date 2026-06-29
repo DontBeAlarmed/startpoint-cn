@@ -62,6 +62,7 @@ const routes = async (fastify: FastifyInstance) => {
         const loginToken = generateLoginToken();
         let accountId: number;
         let newAccount = true;
+        let viewerId: number | undefined;   // set when reusing existing session
 
         if (!deviceId) {
             return reply.status(400).send({ error: "Missing device_id" })
@@ -81,6 +82,7 @@ const routes = async (fastify: FastifyInstance) => {
                 const existingSession = getSessionByAccountIdSync(accountId, SessionType.VIEWER)
                 if (existingSession) {
                     deleteSessionSync(existingSession.token)
+                    viewerId = parseInt(existingSession.token)
                 }
             } else {
                 // Account was deleted — clean up stale binding and create new account
@@ -104,9 +106,9 @@ const routes = async (fastify: FastifyInstance) => {
             insertDeviceBindingSync(deviceId, accountId)
         }
 
-        const viewerId = getSessionByAccountIdSync(accountId, SessionType.VIEWER)?.token
-            ? parseInt(getSessionByAccountIdSync(accountId, SessionType.VIEWER)!.token)
-            : generateViewerId()
+        if (!viewerId) {
+            viewerId = generateViewerId()
+        }
         await insertSessionWithToken({
             token: String(viewerId),
             accountId: accountId,
