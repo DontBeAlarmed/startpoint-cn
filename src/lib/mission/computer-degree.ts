@@ -38,7 +38,7 @@ function buildStats(playerId: number): CategoryContext {
 export const DegreeComputer: MissionComputer = {
     name: "Degree",
 
-    buildContext(playerId: number): CategoryContext {
+    buildContext(playerId: number, _category: number): CategoryContext {
         return buildStats(playerId)
     },
 

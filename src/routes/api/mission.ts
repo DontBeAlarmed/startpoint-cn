@@ -54,7 +54,7 @@ const routes = async (fastify: FastifyInstance) => {
             let entry = computerCache.get(category)
             if (!entry) {
                 const computer = getComputer(category)
-                const ctx = computer.buildContext(playerId) as CategoryContext
+                const ctx = computer.buildContext(playerId, category) as CategoryContext
                 entry = { ctx }
                 computerCache.set(category, entry)
             }
@@ -90,15 +90,16 @@ const routes = async (fastify: FastifyInstance) => {
                 const progress = computer.compute(missionId, ctx, dbProgress)
                 const stage = getCurrentStage(category, missionId, progress)
 
-                // Auto-grant rewards for newly completed stages
+                // Auto-grant rewards for newly completed stages (skip periodic categories)
                 const completedStages = getCompletedStageNumbers(category, missionId, progress)
                 const existingStages = activeMissions[String(missionId)]?.stages
                 const isRecord = existingStages && !Array.isArray(existingStages)
+                const skipAutoGrant = category === 2 || category === 10
 
                 let localMana = ctx.player.freeMana
                 let localExp = ctx.player.expPool
 
-                for (const s of completedStages) {
+                if (!skipAutoGrant) for (const s of completedStages) {
                     if (isRecord && (existingStages as Record<string, boolean>)[String(s)]) continue
                     updatePlayerActiveMissionSync(playerId, missionId, progress)
                     updatePlayerActiveMissionStageSync(playerId, s, missionId, true)

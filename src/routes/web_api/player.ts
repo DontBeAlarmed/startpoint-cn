@@ -1,8 +1,10 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getMergedPlayerDataSync, reviveMergedPlayerDates } from "../../data/utils";
 import { validatePlayerField, VALID_CHARACTER_IDS, VALID_ITEM_IDS, MAX_INT } from "./validation";
-import { getAllPlayersSync, replacePlayerDataSync, getPlayerSync, updatePlayerSync, getPlayerCharactersSync, getPlayerItemsSync, getPlayerEquipmentListSync, insertPlayerCharacterSync, insertDefaultPlayerCharacterSync, updatePlayerItemSync, getPlayerDailyChallengePointListSync, insertPlayerDailyChallengePointListSync, updatePlayerDailyChallengePointSync, deleteAllPlayerMailSync, getDb, getDefaultPlayerPartyGroupsSync, insertPlayerPartyGroupListSync } from "../../data/wdfpData";
+import { getAllPlayersSync, replacePlayerDataSync, getPlayerSync, updatePlayerSync, getPlayerCharactersSync, getPlayerItemsSync, getPlayerEquipmentListSync, insertPlayerCharacterSync, insertDefaultPlayerCharacterSync, updatePlayerItemSync, getPlayerDailyChallengePointListSync, insertPlayerDailyChallengePointListSync, updatePlayerDailyChallengePointSync, deleteAllPlayerMailSync, getDb, getDefaultPlayerPartyGroupsSync, insertPlayerPartyGroupListSync, dailyResetPlayerDataSync, getPlayerQuestProgressSync } from "../../data/wdfpData";
 import { PartyCategory } from "../../data/types";
+import { takeSnapshot } from "../../lib/mission/snapshot";
+import { getServerDate } from "../../utils";
 import dailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 
 interface SaveQuery {
@@ -323,6 +325,66 @@ const routes = async (fastify: FastifyInstance) => {
         } catch (e: any) {
             return reply.status(500).send({ error: e.message })
         }
+    })
+
+    // Admin: force daily mission reset (snapshot + wipe cache)
+    fastify.post("/:id/daily_reset", async (request: FastifyRequest, reply: FastifyReply) => {
+        const playerId = Number((request.params as any).id)
+        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
+        const player = getPlayerSync(playerId)
+        if (!player) return reply.status(404).send({ error: "Player not found" })
+        try {
+            const questProgress = getPlayerQuestProgressSync(playerId)
+            let totalClears = 0, ss = 0, s = 0, a = 0, b = 0
+            for (const [, quests] of Object.entries(questProgress)) {
+                for (const qp of quests) {
+                    if (qp.finished) {
+                        totalClears++
+                        if (qp.clearRank === 6) ss++
+                        else if (qp.clearRank === 5) s++
+                        else if (qp.clearRank === 4) a++
+                        else if (qp.clearRank === 3) b++
+                    }
+                }
+            }
+            takeSnapshot(playerId, 'daily', {
+                questClears: totalClears, staminaUsed: player.totalStaminaUsed,
+                rankSs: ss, rankS: s, rankA: a, rankB: b,
+            })
+            getDb().prepare(`DELETE FROM players_active_missions WHERE player_id = ?`).run(playerId)
+            getDb().prepare(`DELETE FROM players_active_missions_stages WHERE player_id = ?`).run(playerId)
+            return reply.status(200).send({ ok: true })
+        } catch (e: any) { return reply.status(500).send({ error: e.message }) }
+    })
+
+    // Admin: force weekly mission reset (snapshot + wipe cache)
+    fastify.post("/:id/weekly_reset", async (request: FastifyRequest, reply: FastifyReply) => {
+        const playerId = Number((request.params as any).id)
+        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
+        const player = getPlayerSync(playerId)
+        if (!player) return reply.status(404).send({ error: "Player not found" })
+        try {
+            const questProgress = getPlayerQuestProgressSync(playerId)
+            let totalClears = 0, ss = 0, s = 0, a = 0, b = 0
+            for (const [, quests] of Object.entries(questProgress)) {
+                for (const qp of quests) {
+                    if (qp.finished) {
+                        totalClears++
+                        if (qp.clearRank === 6) ss++
+                        else if (qp.clearRank === 5) s++
+                        else if (qp.clearRank === 4) a++
+                        else if (qp.clearRank === 3) b++
+                    }
+                }
+            }
+            takeSnapshot(playerId, 'weekly', {
+                questClears: totalClears, staminaUsed: player.totalStaminaUsed,
+                rankSs: ss, rankS: s, rankA: a, rankB: b,
+            })
+            getDb().prepare(`DELETE FROM players_active_missions WHERE player_id = ?`).run(playerId)
+            getDb().prepare(`DELETE FROM players_active_missions_stages WHERE player_id = ?`).run(playerId)
+            return reply.status(200).send({ ok: true })
+        } catch (e: any) { return reply.status(500).send({ error: e.message }) }
     })
 }
 

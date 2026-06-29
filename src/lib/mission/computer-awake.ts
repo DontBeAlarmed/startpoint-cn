@@ -104,7 +104,7 @@ function buildAwakeContext(playerId: number): AwakeContext {
 export const AwakeComputer: MissionComputer = {
     name: "Awake",
 
-    buildContext(playerId: number): AwakeContext {
+    buildContext(playerId: number, _category: number): AwakeContext {
         return buildAwakeContext(playerId)
     },
 

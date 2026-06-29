@@ -106,6 +106,20 @@ export default function init(
     // migration: add max_combo_achieved for combo mission tracking
     try { database.prepare(`ALTER TABLE players ADD COLUMN max_combo_achieved INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_periodic_snapshots (
+        player_id INTEGER NOT NULL,
+        period_type TEXT NOT NULL,
+        quest_clears INTEGER NOT NULL DEFAULT 0,
+        stamina_used INTEGER NOT NULL DEFAULT 0,
+        rank_ss INTEGER NOT NULL DEFAULT 0,
+        rank_s INTEGER NOT NULL DEFAULT 0,
+        rank_a INTEGER NOT NULL DEFAULT 0,
+        rank_b INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (player_id, period_type),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run();
+
     database.prepare(`CREATE TABLE IF NOT EXISTS device_bindings (
         device_id INTEGER PRIMARY KEY,
         account_id INTEGER NOT NULL,

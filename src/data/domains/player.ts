@@ -3,6 +3,9 @@ import { Player, RawPlayer, MergedPlayerData, PartyCategory, PlayerPartyGroup, A
 import { getServerTime, getServerDate } from "../../utils";
 import { getDefaultPlayerData, deserializeBoolean, serializeBoolean } from "../utils";
 import { getAccountSync } from "./account";
+import { getPlayerQuestProgressSync } from "./quest";
+import { isNewDay, isNewWeek } from "../../lib/time-utils";
+import { takeSnapshot } from "../../lib/mission/snapshot";
 import dailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 
 type DailyChallengePointLookup = Record<string, { maxPoint: number, isRecovery: boolean, name: string }>
@@ -1176,8 +1179,10 @@ export function dailyResetPlayerDataSync(
 ): boolean {
     const lastLoginTime = player.lastLoginTime
     const playerId = player.id
-    if ((loginDate.getUTCFullYear() > lastLoginTime.getUTCFullYear()) || (loginDate.getUTCMonth() > lastLoginTime.getUTCMonth()) || (loginDate.getUTCDate() > lastLoginTime.getUTCDate())) {
-        // TODO: daily reset logic.
+    const crossedDay = isNewDay(loginDate, lastLoginTime)
+    const crossedWeek = isNewWeek(loginDate, lastLoginTime)
+
+    if (crossedDay) {
         updatePlayerSync({
             id: playerId,
             lastLoginTime: loginDate,
@@ -1220,14 +1225,35 @@ export function dailyResetPlayerDataSync(
             updatePlayerGachaCampaignSync(playerId, campaign.gachaId, campaign.campaignId, 1)
         }
 
-        // weekly reset
-        if (loginDate.getUTCDay() === 0) {
-
+        // Daily mission reset: take snapshot + wipe cache
+        const questProgress = getPlayerQuestProgressSync(playerId)
+        let totalClears = 0, ss = 0, s = 0, a = 0, b = 0
+        for (const [section, quests] of Object.entries(questProgress)) {
+            for (const qp of quests) {
+                if (qp.finished) {
+                    totalClears++
+                    if (qp.clearRank === 6) ss++
+                    else if (qp.clearRank === 5) s++
+                    else if (qp.clearRank === 4) a++
+                    else if (qp.clearRank === 3) b++
+                }
+            }
         }
+        takeSnapshot(playerId, 'daily', {
+            questClears: totalClears,
+            staminaUsed: player.totalStaminaUsed,
+            rankSs: ss, rankS: s, rankA: a, rankB: b,
+        })
+        getDb().prepare(`DELETE FROM players_active_missions_stages WHERE player_id = ? AND mission_id IN (SELECT id FROM players_active_missions WHERE player_id = ? AND progress >= 0)`).run(playerId, playerId)
+        getDb().prepare(`DELETE FROM players_active_missions WHERE player_id = ?`).run(playerId)
 
-        // monthly reset
-        if (loginDate.getUTCDate() === 1) {
-
+        // weekly reset
+        if (crossedWeek) {
+            takeSnapshot(playerId, 'weekly', {
+                questClears: totalClears,
+                staminaUsed: player.totalStaminaUsed,
+                rankSs: ss, rankS: s, rankA: a, rankB: b,
+            })
         }
 
         return true

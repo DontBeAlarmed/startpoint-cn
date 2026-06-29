@@ -80,6 +80,12 @@
                     <form method="post" action="/api/player/{{playerId}}/clear_receive_history" style="display:inline" onsubmit="return confirm('清空获取记录？')">
                         <button type="submit" class="text-sm border border-outline-variant px-3 py-1 rounded-full hover:bg-surface-container-low">清空获取记录</button>
                     </form>
+                    <form method="post" action="/api/player/{{playerId}}/daily_reset" style="display:inline" onsubmit="return confirm('重置每日任务进度（拍快照+清缓存）？')">
+                        <button type="submit" class="text-sm border border-accent text-accent px-3 py-1 rounded-full hover:bg-accent hover:text-on-accent transition-colors">每日重置</button>
+                    </form>
+                    <form method="post" action="/api/player/{{playerId}}/weekly_reset" style="display:inline" onsubmit="return confirm('重置每周任务进度（拍快照+清缓存）？')">
+                        <button type="submit" class="text-sm border border-accent text-accent px-3 py-1 rounded-full hover:bg-accent hover:text-on-accent transition-colors">每周重置</button>
+                    </form>
                 </div>
             </section>
 

@@ -18,7 +18,7 @@ function buildMinimal(playerId: number): CategoryContext {
 export const FallbackComputer: MissionComputer = {
     name: "Fallback",
 
-    buildContext(playerId: number): CategoryContext {
+    buildContext(playerId: number, _category: number): CategoryContext {
         return buildMinimal(playerId)
     },
 
