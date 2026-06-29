@@ -47,12 +47,9 @@ const routes = async (fastify: FastifyInstance) => {
             deviceRows += `<tr>
                 <td class="text-xs text-on-surface-variant">${dev.device_id}</td>
                 <td>
-                    <form method="post" action="/api/server/device/rename" style="display:inline-flex;gap:4px">
-                        <input type="hidden" name="device_id" value="${dev.device_id}">
-                        <input name="name" value="${devName}" placeholder="名称"
-                               class="text-xs border border-outline-variant rounded px-1 py-0.5 w-24 bg-background text-on-background">
-                        <button type="submit" class="text-xs bg-primary text-on-primary px-1.5 py-0.5 rounded">保存</button>
-                    </form>
+                    <input value="${devName}" placeholder="名称"
+                           class="edit-field text-xs border border-outline-variant rounded px-1 py-0.5 w-24 bg-background text-on-background"
+                           data-device="${dev.device_id}" data-field="name">
                 </td>
                 <td>${saveCount}</td>
                 <td>${activeName}</td>

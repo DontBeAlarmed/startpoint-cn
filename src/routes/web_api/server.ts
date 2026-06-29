@@ -202,7 +202,7 @@ const routes = async (fastify: FastifyInstance) => {
         if (!deviceId) return reply.status(400).send({ error: "Missing device_id" })
 
         updateDeviceBindingNameSync(deviceId, body.name || null)
-        return reply.redirect('/player')
+        return reply.status(200).send({ ok: true })
     })
 }
 

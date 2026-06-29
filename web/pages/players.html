@@ -52,6 +52,38 @@
         </nav>
         <ul class="w-full flex flex-col gap-5">{{listContent}}</ul>
     </div>
+    <script>
+    function showToast(msg, type) {
+        const toast = document.createElement('div');
+        toast.textContent = msg;
+        Object.assign(toast.style, {
+            position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999,
+            padding: '8px 20px', borderRadius: '9999px', fontSize: '14px',
+            color: '#fff', transition: 'opacity 0.3s', opacity: '1',
+            background: type === 'error' ? '#dc2626' : '#2563eb'
+        });
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 2000);
+    }
+
+    document.addEventListener('change', async function(e) {
+        const el = e.target;
+        if (!el.classList.contains('edit-field')) return;
+        const deviceId = el.dataset.device;
+        const name = el.value;
+        try {
+            const r = await fetch('/api/server/device/rename', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'device_id=' + encodeURIComponent(deviceId) + '&name=' + encodeURIComponent(name)
+            });
+            if (!r.ok) throw new Error('保存失败');
+            showToast('名称已保存');
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    });
+    </script>
 </body>
 
 </html>
