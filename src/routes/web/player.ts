@@ -80,7 +80,9 @@ const routes = async (fastify: FastifyInstance) => {
         // Save management table (for selected account)
         if (selectedAccountId !== null) {
             const devName = htmlEscape(deviceBindings.find(d => d.account_id === selectedAccountId)?.name || '')
-            const accountLabel = devName ? `${selectedAccountId}（${devName}）` : `${selectedAccountId}`
+            const session = getSessionByAccountIdSync(selectedAccountId, SessionType.VIEWER)
+            const viewerId = session?.token || String(selectedAccountId)
+            const accountLabel = devName ? `${viewerId}（${devName}）` : viewerId
             const pids = getAccountPlayersSync(selectedAccountId)
             let saveRows = ''
             for (const pid of pids) {
