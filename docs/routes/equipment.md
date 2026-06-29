@@ -39,11 +39,11 @@ assets/
 
 ### 溶解奖励计算
 
-统一由 `calculateDissolveRewards()` 处理，三端点复用：
+统一由 `calculateDissolveRewards()` 处理（`src/lib/equipment-dissolve.ts`），三端点复用。所有数值来自 CDN `assets/equipment_craft.json` + `assets/equipment_dissolve.json`：
 
 ```
-锻造石 = dissolvingCraftPoints[rarity] × count
-星之粒 = (obtain_source == 0) ? dissolvingStarGrains[rarity] × count : 0
+锻造石 = getEquipmentCraftSync(rarity).dissolve_craft × count
+星之粒 = (obtain_source == 0) ? getEquipmentCraftSync(rarity).dissolve_star × count : 0
 能力魂 = (generate_ability_soul) ? { ability_soul_id: count } : {}
 ```
 
@@ -51,15 +51,18 @@ assets/
 
 | 字段 | 来源 | 说明 |
 |------|------|------|
-| `ability_soul_id` | `assets/equipment_dissolve.json` [10] | 魂珠 item ID |
-| `obtain_source` | `assets/equipment_dissolve.json` [15] | 仅 source=0 得星之粒 |
-| `generate_ability_soul` | `assets/equipment_dissolve.json` [9] | 仅 true 得能力魂 |
+| `ability_soul_id` | `assets/equipment_dissolve.json` | 魂珠 item ID |
+| `obtain_source` | `assets/equipment_dissolve.json` | 仅 source=0 得星之粒 |
+| `generate_ability_soul` | `assets/equipment_dissolve.json` | 仅 true 得能力魂 |
+| `dissolve_craft` | `assets/equipment_craft.json` | 每级溶解锻造石 |
+| `dissolve_star` | `assets/equipment_craft.json` | 每级溶解星之粒 |
+| `awakening_craft` | `assets/equipment_craft.json` | 每级觉醒锻造石消耗 |
 
 影响范围：
 - `obtain_source ≠ 0`：366 件装备分解无星之粒
 - `generate_ability_soul = false`：15 件装备分解/觉醒无能力魂
 
-### 觉醒锻造石费用
+### 觉醒锻造石费用（来自 CDN）
 
 | 稀有度 | 1★ | 2★ | 3★ | 4★ | 5★ |
 |--------|----|----|----|----|----|
@@ -155,8 +158,10 @@ assets/
 | `src/routes/api/equipment.ts` | 觉醒 + 保护 |
 | `src/routes/api/sell.ts` | 分解/出售 |
 | `src/routes/api/item.ts` | `/item/sell` 魂珠出售 |
+| `src/lib/equipment.ts` | `buildFullEquipmentList()` 全量装备列表 |
 | `src/lib/equipment-dissolve.ts` | 溶解奖励计算 |
 | `src/lib/item-sell.ts` | 魂珠出售逻辑 |
 | `scripts/gen_cdn_data.ts` | CDN 数据提取 |
 | `assets/equipment_dissolve.json` | 装备溶解 CDN 数据 |
 | `assets/item_sale.json` | 道具售价 CDN 数据 |
+| `assets/equipment_craft.json` | 锻造/溶解/觉醒常量（按稀有度） |

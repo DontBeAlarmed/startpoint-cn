@@ -45,8 +45,8 @@ calculateDissolveRewards(equipmentId, stack) → { craftPoints, starGrains, abil
 
 | 奖励 | 条件 | 公式 |
 |------|------|------|
-| 锻造石 | 总是 | `dissolvingCraftPoints[rarity] × stack` |
-| 星之粒 | `obtain_source == 0` | `dissolvingStarGrains[rarity] × stack` |
+| 锻造石 | 总是 | `getEquipmentCraftSync(rarity).dissolve_craft × stack` |
+| 星之粒 | `obtain_source == 0` | `getEquipmentCraftSync(rarity).dissolve_star × stack` |
 | 能力魂 | `generate_ability_soul == true` | `{ ability_soul_id: stack }` |
 
 ### 操作
@@ -56,22 +56,22 @@ calculateDissolveRewards(equipmentId, stack) → { craftPoints, starGrains, abil
 3. 发放锻造石、星之粒、能力魂
 4. 获取全部剩余装备 → 完整快照返回
 
-### 常量
+### 常量（来源：CDN `assets/equipment_craft.json`）
 
-| 稀有度 | dissolvingCraftPoints | dissolvingStarGrains |
-|--------|----------------------|---------------------|
-| 1★ | 1 | 0 |
-| 2★ | 2 | 0 |
-| 3★ | 3 | 1 |
-| 4★ | 4 | 5 |
-| 5★ | 5 | 15 |
+| 稀有度 | dissolve_craft | dissolve_star | awakening_craft |
+|--------|:---:|:---:|:---:|
+| 1★ | 1 | 0 | 5 |
+| 2★ | 2 | 0 | 10 |
+| 3★ | 3 | 1 | 15 |
+| 4★ | 4 | 5 | 20 |
+| 5★ | 5 | 15 | 25 |
 
-- `craft_point_item_id`: `100000`（锻造石）
-- `star_grain_item_id`: `990008`（星之粒）
+- `craft_point_item_id`: 来自 `getConfigSync()` CDN config
+- `star_grain_item_id`: 来自 `getConfigSync()` CDN config
 
 ### 相关文件
 
 - 实现：`src/routes/api/sell.ts`
-- 奖励计算：`src/lib/equipment-dissolve.ts`
-- CDN 数据：`assets/equipment_dissolve.json`
+- 奖励计算：`src/lib/equipment-dissolve.ts` + `src/lib/equipment-dissolve.ts`
+- CDN 数据：`assets/equipment_dissolve.json` + `assets/equipment_craft.json`
 - 客户端：`EquipmentBulkSellStackRealRemote.as` / `EquipmentBulkSellStackDummyRemote.as`
