@@ -1,10 +1,12 @@
 import { RushEventBattleType } from "../../../data/types"
-import type { PlayerRewardResult } from "../../types"
+import type { UserRushEventPlayedParty } from "../../../data/types"
+import type { PlayerRewardResult, EquipmentItemReward, RushEventFolder } from "../../types"
+import { QuestCategory } from "../../types"
 
 interface ReturnRushEvent {
     rush_battle_reward_list: { kind: number, kind_id: number, number: number }[]
-    rush_battle_played_party_list: Record<number, any> | null
-    endless_battle_played_party_list: Record<number, any> | null
+    rush_battle_played_party_list: Record<number, UserRushEventPlayedParty> | null
+    endless_battle_played_party_list: Record<number, UserRushEventPlayedParty> | null
     is_out_of_period: boolean
     endless_battle_next_round: number | null
     endless_battle_max_round: number | null
@@ -18,7 +20,7 @@ interface RushHandlerParams {
     questCategory: number
     questData: {
         rushEventId?: number
-        rushEventFolderId?: number
+        rushEventFolderId?: RushEventFolder
         rushEventRound?: number
     }
     clearTime: number
@@ -50,7 +52,6 @@ export function handleRushEventFinish(params: RushHandlerParams): {
         getEvoLevels, folderMaxRounds, getRushEvent, updateRushEvent,
         insertParty, insertClearedFolder, deletePartyList,
         getSerializedParties, getFolderRewards, giveRewards } = params
-    const QuestCategory = { RUSH_EVENT: 24 } as Record<string, number>
 
     let rushEventData: ReturnRushEvent | null = null
     let rushEventRewardsResult: PlayerRewardResult | null = null
@@ -151,7 +152,7 @@ export function handleRushEventFinish(params: RushHandlerParams): {
         const rewards = getFolderRewards(rushEventId, rushEventFolderId) ?? []
         rushEventRewardsResult = giveRewards(playerId, rewards)
         rushEventData.rush_battle_reward_list = rewards.map(reward => {
-            const itemReward = reward as any
+            const itemReward = reward as EquipmentItemReward
             return { "kind": 1, "kind_id": itemReward.id, "number": itemReward.count }
         })
     }

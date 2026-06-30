@@ -1,4 +1,5 @@
 import { RushEventBattleType } from "../../../data/types"
+import { QuestCategory } from "../../types"
 
 export function handleRaidEventFinish(params: {
     questCategory: number
@@ -7,10 +8,18 @@ export function handleRaidEventFinish(params: {
     playerId: number
     questId: number
     getEvoLevelsFn: (playerId: number, charIds: (number | null)[]) => (number | null)[]
-    insertPartyFn: (playerId: number, eventId: number, partyData: any) => void
+    insertPartyFn: (playerId: number, eventId: number, partyData: {
+        characterIds: (number | null)[]
+        unisonCharacterIds: (number | null)[]
+        equipmentIds: (number | null)[]
+        abilitySoulIds: (number | null)[]
+        evolutionImgLevels: (number | null)[]
+        unisonEvolutionImgLevels: (number | null)[]
+        battleType: RushEventBattleType
+        round: number
+    }) => void
 }): void {
     const { questCategory, activeEventId, party, playerId, questId, getEvoLevelsFn, insertPartyFn } = params
-    const QuestCategory = { RAID_EVENT: 23 } as Record<string, number>
 
     if (questCategory !== QuestCategory.RAID_EVENT || !activeEventId) return
 
