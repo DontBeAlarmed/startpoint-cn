@@ -15,6 +15,7 @@ import { handleRushEventFinish } from "../../lib/quest/finish/rush-handler";
 import { handleRaidEventFinish } from "../../lib/quest/finish/raid-handler";
 import { calculateClearRank } from "../../lib/quest/finish/quest-calc";
 import { validateSessionAndPlayer } from "../../lib/quest/finish/session-validator";
+import { handleDailyChallengePoint } from "../../lib/quest/finish/challenge-point";
 import { readFileSync, existsSync } from "fs";
 import path from "path";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
@@ -276,28 +277,14 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         // Consume daily challenge point
-        let dailyChallengePointList: Object[] | null = null
-        if (questCategory === QuestCategory.EXPERT_SINGLE_EVENT && questData.eventId) {
-            const cpKey = `expert_${questData.eventId}`
-            const challengePointId = (eventChallengePointMap as Record<string, number>)[cpKey]
-            if (challengePointId) {
-                const entries = getPlayerDailyChallengePointListSync(playerId)
-                const entry = entries.find(e => e.id === challengePointId)
-                if (entry && entry.point > 0) {
-                    updatePlayerDailyChallengePointSync(playerId, challengePointId, entry.point - 1)
-                    console.log(`[BATTLE] challengePoint consumed: id=${challengePointId} old=${entry.point} new=${entry.point - 1}`)
-                }
-                // Serialize for response
-                dailyChallengePointList = entries.map(e => ({
-                    "id": e.id,
-                    "point": e.id === challengePointId ? Math.max(0, e.point - 1) : e.point,
-                    "campaign_list": e.campaignList.map(c => ({
-                        "campaign_id": c.campaignId,
-                        "additional_point": c.additionalPoint
-                    }))
-                }))
-            }
-        }
+        const dailyChallengePointList = handleDailyChallengePoint({
+            questCategory,
+            eventId: questData.eventId,
+            playerId,
+            challengePointMap: eventChallengePointMap as Record<string, number>,
+            getEntries: (pid) => getPlayerDailyChallengePointListSync(pid),
+            updatePoint: (pid, id, pt) => updatePlayerDailyChallengePointSync(pid, id, pt),
+        })
 
         // reward score rewards
         if (questCategory === QuestCategory.SCORE_ATTACK_EVENT) {
