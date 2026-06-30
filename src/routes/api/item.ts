@@ -6,6 +6,7 @@ import { getConfigSync } from "../../lib/assets";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { sellItemSync } from "../../lib/item-sell";
 import { AccountId, PlayerId } from "../../lib/types";
+import { computeRealTimeStamina } from "../../lib/stamina";
 import itemData from "../../../assets/item_data.json";
 
 interface ItemEffectInfo {
@@ -39,7 +40,6 @@ const routes = async (fastify: FastifyInstance) => {
         if (!player) return reply.status(500).send({ "error": "Internal Server Error", "message": "Player not found." })
 
         const config = getConfigSync()
-        const recoverySeconds = config.stamina_recovery_seconds
         const maxOverflow = config.max_stamina_overflow
 
         let totalStaminaRecovery = 0
@@ -110,11 +110,7 @@ const routes = async (fastify: FastifyInstance) => {
             return reply.status(400).send({ "error": "Bad Request", "message": "Zero recovery." })
         }
 
-        // Compute real-time stamina
-        const staminaHealTimeSec = player.staminaHealTime.getTime() / 1000
-        const nowSec = Math.floor(Date.now() / 1000)
-        const elapsed = (nowSec - staminaHealTimeSec) / recoverySeconds
-        const currentStamina = Math.min(Math.max(0, player.stamina + Math.floor(elapsed)), maxOverflow)
+        const currentStamina = computeRealTimeStamina(player)
 
         if (currentStamina >= maxOverflow) {
             console.log(`[ITEM-USE] player ${playerId} already at max stamina (${currentStamina} >= ${maxOverflow})`)

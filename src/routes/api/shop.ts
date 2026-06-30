@@ -7,6 +7,7 @@ import { getBossCoinShopItemsSync, getConfigSync, getEventShopItemsSync, getGene
 import { CharacterReward, CharacterShopItemReward, CurrencyReward, CurrencyShopItemReward, EquipmentItemReward, EquipmentItemShopItemReward, Reward, RewardType, ShopItem, ShopItemRewardType, ShopItems, ShopItemUserCostType, ShopType } from "../../lib/types";
 import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
 import { givePlayerRewardsSync } from "../../lib/quest";
+import { computeRealTimeStamina } from "../../lib/stamina";
 import { clientSerializeEquipment } from "../../lib/equipment";
 import CDN_GENERAL_SHOP_WHITELIST from "../../../assets/cdn_general_shop_whitelist.json";
 
@@ -541,14 +542,9 @@ const routes = async (fastify: FastifyInstance) => {
         const config = getConfigSync()
         const recoveryCost = config.stamina_recovery_virtual_money
         const recoveryValue = config.stamina_recovery_value
-        const recoverySeconds = config.stamina_recovery_seconds
         const maxOverflow = config.max_stamina_overflow
 
-        // Compute real-time stamina using client formula
-        const staminaHealTimeSec = player.staminaHealTime.getTime() / 1000
-        const nowSec = Math.floor(Date.now() / 1000)
-        const elapsed = (nowSec - staminaHealTimeSec) / recoverySeconds
-        const currentStamina = Math.min(Math.max(0, player.stamina + Math.floor(elapsed)), maxOverflow)
+        const currentStamina = computeRealTimeStamina(player)
 
         // Already at max
         if (currentStamina >= maxOverflow) {

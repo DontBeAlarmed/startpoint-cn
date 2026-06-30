@@ -3,7 +3,7 @@ import { getConfigSync } from "./assets";
 
 const STAMINA_OVERFLOW_MAX = 999;
 
-interface RankEntry { degree: number; stamina: number; threshold: number }
+interface RankEntry { degree: number; stamina: number; threshold: number; healRate: number }
 const rankData: RankEntry[] = [];
 const staminaByDegree: Map<number, number> = new Map();
 
@@ -12,7 +12,8 @@ for (const [degreeStr, rows] of Object.entries(playerRankTable)) {
     const row = (rows as any[])[0];
     const stamina = parseInt(row[0]);
     const threshold = parseInt(row[1]);
-    rankData.push({ degree, stamina, threshold });
+    const healRate = parseFloat(row[2]) || 0;
+    rankData.push({ degree, stamina, threshold, healRate });
     staminaByDegree.set(degree, stamina);
 }
 rankData.sort((a, b) => a.degree - b.degree);
@@ -30,17 +31,28 @@ export function getMaxStamina(degreeId: number): number {
 
 /**
  * Compute real-time stamina recovery from staminaHealTime to now.
+ * Uses per-degree heal_rate for client-aligned recovery speed.
  * Caps at getMaxStamina(degreeId), with absolute hard cap at 999.
  */
 export function computeRealTimeStamina(player: { stamina: number; staminaHealTime: Date; rankPoint: number }): number {
     const config = getConfigSync();
-    const recoverySeconds = config.stamina_recovery_seconds; // 300 = 5 min/pt
+    const degree = getRankDegree(player.rankPoint);
+    const healRate = getHealRate(degree);
+    const recoverySeconds = config.stamina_recovery_seconds * (1 - healRate);
     const healSec = player.staminaHealTime.getTime() / 1000;
     const nowSec = Math.floor(Date.now() / 1000);
     const elapsed = (nowSec - healSec) / recoverySeconds;
-    const realDegree = getRankDegree(player.rankPoint);
-    const maxStamina = Math.max(getMaxStamina(realDegree), player.stamina);
+    const maxStamina = Math.max(getMaxStamina(degree), player.stamina);
     return Math.min(Math.max(0, player.stamina + Math.floor(elapsed)), maxStamina, STAMINA_OVERFLOW_MAX);
+}
+
+/**
+ * Look up the heal_rate for a given degree from rank data.
+ * Returns 0 for degrees where heal_rate is not defined.
+ */
+export function getHealRate(degree: number): number {
+    const row = rankData.find(r => r.degree === degree);
+    return row?.healRate ?? 0;
 }
 
 /**
