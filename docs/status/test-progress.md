@@ -98,6 +98,7 @@
 | F1066 PLAY beacon 接入 | parsePlayBeacon 在 /debug handler 中运行，confirmed_play 积累 play=1 ground truth |
 | F1067 gacha 抽卡去重 | drawGachaSync 返回 number[]（flat array，按原始随机顺序），不再 group 同一角色 |
 | F1068 种子池扩容 | fes 400K, normal 400K, guarantee 各 100K。总计 1,000,000 种子 |
+| F1069 RARE_POOL item_list 双倍累加 | `lib/quest.ts`：ITEM 和 RARE_POOL 路径的 `givePlayerItemSync` 返回值均为 DB 总计，merge 时误将两个总计相加导致 item_list 膨胀。修复为直接用最新 DB 总计覆盖 |
 | F1069 三模式 | natural(默认, 10%播放率) / play(100%播放) / test(全unknown)。模式不持久化 |
 | F1070 pendingPlay 池 | 无 patch APK 测试缓存：/crash(r已知)+markSent(r=null)。换 patch 后重测得 play 状态 |
 | F1071 净化池 5 列 | ★3 / ★4 / ★4保底 / ★5 / ★5保底——按 movie 来源 (_guarantee 后缀) 分列 |
