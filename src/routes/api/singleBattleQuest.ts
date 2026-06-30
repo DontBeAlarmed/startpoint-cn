@@ -4,7 +4,7 @@ import { getQuestFromCategorySync, getRushEventFolderClearRewards } from "../../
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
-import { generateDataHeaders, getServerTime } from "../../utils";
+import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
 import { rushEventFolderMaxRounds } from "./rushEvent";
 import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -600,8 +600,8 @@ const routes = async (fastify: FastifyInstance) => {
                     "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney,
                     "rank_point": newRankPoint,
                     "degree_id": 1,
-                    "stamina": computeRealTimeStamina(playerData),
-                    "stamina_heal_time": getServerTime(),
+                    "stamina": playerData.stamina,
+                    "stamina_heal_time": realToVirtual(playerData.staminaHealTime),
                     "boost_point": newBoostPoint,
                     "boss_boost_point": newBossBoostPoint
                 },
@@ -820,7 +820,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "user_info": {
                     "last_main_quest_id": body.quest_id,
                     "stamina": afterStamina,
-                    "stamina_heal_time": getServerTime()
+                    "stamina_heal_time": realToVirtual(new Date())
                 },
                 "category_id": body.category,
                 "is_multi": "single",

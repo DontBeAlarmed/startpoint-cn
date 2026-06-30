@@ -5,7 +5,7 @@ import { getAccountPlayers, getPlayerEquipmentSync, getPlayerItemSync, getPlayer
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getBossCoinShopItemsSync, getConfigSync, getEventShopItemsSync, getGenericShopItemsSync, getShopItemSync } from "../../lib/assets";
 import { CharacterReward, CharacterShopItemReward, CurrencyReward, CurrencyShopItemReward, EquipmentItemReward, EquipmentItemShopItemReward, Reward, RewardType, ShopItem, ShopItemRewardType, ShopItems, ShopItemUserCostType, ShopType } from "../../lib/types";
-import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
+import { generateDataHeaders, getServerDate, getServerTime, realToVirtual } from "../../utils";
 import { givePlayerRewardsSync } from "../../lib/quest";
 import { computeRealTimeStamina } from "../../lib/stamina";
 import { clientSerializeEquipment } from "../../lib/equipment";
@@ -586,7 +586,7 @@ const routes = async (fastify: FastifyInstance) => {
             "data": {
                 "user_info": {
                     "stamina": afterStamina,
-                    "stamina_heal_time": getServerTime(),
+                    "stamina_heal_time": realToVirtual(new Date()),
                     "free_vmoney": freeVmoney - recoveryCost
                 }
             }

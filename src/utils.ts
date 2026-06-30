@@ -31,6 +31,11 @@ export function getServerDate(): Date {
     return timeOffset !== null ? new Date(Date.now() + timeOffset) : new Date();
 }
 
+/** Convert a real Date (as stored in DB) to virtual epoch seconds for client. */
+export function realToVirtual(date: Date): number {
+    return Math.floor((date.getTime() + (timeOffset ?? 0)) / 1000);
+}
+
 /**
  * Sets a custom server time from an absolute date.
  * The offset (target - real time) is computed and stored.

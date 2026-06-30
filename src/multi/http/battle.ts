@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { MultiStartBody, MultiFinishBody, MultiAbortBody, PlayContinueBody } from "../types";
-import { generateDataHeaders, getServerTime } from "../../utils";
+import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
 import { getRoom, setRoomBattle, disbandRoom, updateRoomState } from "../room/manager";
 import { sessionManager } from "../state/SessionManager";
 import { insertActiveQuest, activeQuests } from "../../routes/api/singleBattleQuest";
@@ -270,8 +270,8 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                     "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney,
                     "rank_point": newRankPoint,
                     "degree_id": 1,
-                    "stamina": computeRealTimeStamina(playerData),
-                    "stamina_heal_time": getServerTime(),
+                    "stamina": playerData.stamina,
+                    "stamina_heal_time": realToVirtual(playerData.staminaHealTime),
                     "boost_point": newBoostPoint,
                     "boss_boost_point": newBossBoostPoint
                 },

@@ -1,5 +1,5 @@
 import { getCharacterDataSync } from "../lib/assets"
-import { getDateFromServerTime, getServerTime, getServerDate } from "../utils"
+import { getDateFromServerTime, getServerTime, getServerDate, realToVirtual } from "../utils"
 import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, Player, PlayerBoxGacha, PlayerCharacter, PlayerCharacterBondToken, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserCharacterBondTokenStatus, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "./types"
 
 import { availableAssetVersion } from "../routes/api/asset"
@@ -274,7 +274,7 @@ export function serializePlayerData(
     const clientData: ClientPlayerData = {
         "user_info": {
             "stamina": playerData.stamina,
-            "stamina_heal_time": getServerTime(),
+            "stamina_heal_time": realToVirtual(playerData.staminaHealTime),
             "boost_point": playerData.boostPoint,
             "boss_boost_point": playerData.bossBoostPoint,
             "transition_state": playerData.transitionState,
