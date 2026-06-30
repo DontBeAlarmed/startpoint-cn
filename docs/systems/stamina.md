@@ -56,24 +56,33 @@ Key stamina config values:
 - Min stamina: 0, Max: 999 (overflow), Natural cap: rank-based
 
 ### Quest entry costs
-`assets/quest_entry_costs.json` — regenerated from CDN JSON with correct per-type stamina index:
-- main/ex/boss/world_story_boss: `chapter[69]`
-- advent: `chapter[75]`
-- daily_week: `chapter[64]`
-- daily_exp_mana: `chapter[65]`
-- rush: `chapter[67]`
-- tower_dungeon: `chapter[68]`
-- solo_time_attack/hard_multi: `chapter[70]`
-- 2018 quests total, 1629 with stamina > 0
+`assets/quest_entry_costs.json` — CDN 原值（无折扣），`scripts/gen_entry_costs.js` 自动校准索引生成。2018 quests total, 1629 with stamina > 0。
 
 ### Stamina campaign discounts (2026-06-30)
-`assets/stamina_campaign.json` — 从 CN CDN 复制，453 条 campaign 记录。`lib/stamina-campaign.ts` 运行时匹配：
-- **quest_type 映射**：服务端 `QuestCategory` → CDN quest_type 码（0=Main, 1=Ex, 2=BossBattle, 3=DailyWeek, 4=DailyExpMana, 5=Advent, 6=StorySingle, 7=Challenge, 8=Ranking, 9=WorldStory, 10=WorldStoryBoss, 11=Practice, 13=Tower, 14=Expert, 15=Carnival, 16=Raid, 17=Rush, 18=SoloTimeAttack, 19=HardMulti）
-- **quest_id 匹配**：`"(None)"`→全部关卡，具体 ID 按逗号分隔
-- **时间判断**：`serverDate` 在 `[startTime, endTime]` 区间内 → 生效
-- **折扣率**：`stamina_consumption_rate`（0.25=2.5折, 0.5=半价），多 campaign 同时命中取最小（最大折扣）
-- **折后体力**：`Math.max(1, Math.floor(baseCost * rate))`，不低于 1
-- 调用入口：`lib/stamina-cost.ts:getStaminaCost()` → `/single_battle_quest/start` 扣除体力
+
+**数据流**：
+```
+/startsingle_battle_quest
+  → getStaminaCost(questKey)
+    → getActiveCampaignRate(category, questId, getServerDate())
+      → 遍历 stamina_campaign.json 453 条
+        → quest_type 匹配 category
+        → quest_ids 匹配 questId
+        → serverDate 在 [start, end] 内
+        → 多命中取 min(rate)
+    → cost = max(1, floor(baseCost × rate))
+  → 扣除 cost 体力
+```
+
+**关键文件**：
+
+| 文件 | 作用 |
+|------|------|
+| `assets/stamina_campaign.json` | CN CDN 453 条 campaign，含 quest_type / quest_ids / start / end / rate |
+| `lib/stamina-campaign.ts` | 加载 campaign 数据，quest_type 映射（20 种），时间有效性 + quest_id 匹配 |
+| `lib/stamina-cost.ts` | `getStaminaCost()` 封装：baseCost 来自 `entry_costs.json`，rate 来自 campaign，折后 ≥ 1 |
+
+**折扣率**：`stamina_consumption_rate`（0.25=1/4, 0.5=半价）。无匹配 → rate=1 → 原价。
 
 ### Item usage
 New endpoint `/item/use_item` (`src/routes/api/item.ts`). Handles `StaminaFixed(2)` and `StaminaRate(3)` effect items. CDN item data extracted to `assets/item_data.json` (100 items with effect info). Response `item_list` uses `IntMap<int>` format (`{itemId: count}`).
@@ -87,8 +96,8 @@ New endpoint `/item/use_item` (`src/routes/api/item.ts`). Handles `StaminaFixed(
 ### Remaining issues
 1. Config values from CDN binary — need to find correct salt/path for GF version
 2. Mission system — 3 endpoints return empty (deferred)
-3. Multi battle stamina deduction + level-up — deferred until co-op stable (see `multiBattleQuest.ts`)
-4. `staminaHealTime` time base mismatch: DB uses `new Date()` (real time), response uses `getServerTime()` (virtual with offset). Invisible when `timeOffset=null`, but may show desync when server time is overridden via dashboard.
+3. Multi battle stamina deduction + level-up — deferred until co-op stable
+4. Auto-repeat H400: 自动连战不检查体力，体力耗尽时客户端连续发 /start 被服务端 H400 拒绝 → 崩溃。需服务端对 `is_auto_start_mode=true` 返回非致命响应（待修复）
 
 ## Mission progress system (2026-06-25)
 
