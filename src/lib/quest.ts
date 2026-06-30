@@ -1,5 +1,4 @@
 import { randomInt } from "crypto";
-import { clientSerializeDate } from "../data/utils";
 import { getPlayerCharacterSync, getPlayerSync, givePlayerItemSync, updatePlayerSync } from "../data/wdfpData";
 import { getRareScoreRewardGroup } from "./assets";
 import { givePlayerCharacterSync } from "./character";
