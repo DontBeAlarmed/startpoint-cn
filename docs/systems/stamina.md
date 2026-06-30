@@ -66,6 +66,15 @@ Key stamina config values:
 - solo_time_attack/hard_multi: `chapter[70]`
 - 2018 quests total, 1629 with stamina > 0
 
+### Stamina campaign discounts (2026-06-30)
+`assets/stamina_campaign.json` — 从 CN CDN 复制，453 条 campaign 记录。`lib/stamina-campaign.ts` 运行时匹配：
+- **quest_type 映射**：服务端 `QuestCategory` → CDN quest_type 码（0=Main, 1=Ex, 2=BossBattle, 3=DailyWeek, 4=DailyExpMana, 5=Advent, 6=StorySingle, 7=Challenge, 8=Ranking, 9=WorldStory, 10=WorldStoryBoss, 11=Practice, 13=Tower, 14=Expert, 15=Carnival, 16=Raid, 17=Rush, 18=SoloTimeAttack, 19=HardMulti）
+- **quest_id 匹配**：`"(None)"`→全部关卡，具体 ID 按逗号分隔
+- **时间判断**：`serverDate` 在 `[startTime, endTime]` 区间内 → 生效
+- **折扣率**：`stamina_consumption_rate`（0.25=2.5折, 0.5=半价），多 campaign 同时命中取最小（最大折扣）
+- **折后体力**：`Math.max(1, Math.floor(baseCost * rate))`，不低于 1
+- 调用入口：`lib/stamina-cost.ts:getStaminaCost()` → `/single_battle_quest/start` 扣除体力
+
 ### Item usage
 New endpoint `/item/use_item` (`src/routes/api/item.ts`). Handles `StaminaFixed(2)` and `StaminaRate(3)` effect items. CDN item data extracted to `assets/item_data.json` (100 items with effect info). Response `item_list` uses `IntMap<int>` format (`{itemId: count}`).
 

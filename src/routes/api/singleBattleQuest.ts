@@ -14,6 +14,7 @@ import path from "path";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
 import scoreAttackBorderRewards from "../../../assets/score_attack_border_reward.json";
 import eventChallengePointMap from "../../../assets/event_challenge_point_map.json";
+import { getStaminaCost } from "../../lib/stamina-cost";
 
 // Load carnival quest score data
 let carnivalScoreLookup: Record<string, { difficulty_score: number, time_limit_ms: number, folder_id: number, event_id: number }> = {}
@@ -739,7 +740,8 @@ const routes = async (fastify: FastifyInstance) => {
         // Deduct entry cost (ticket/item)
         const questKey = `${category}_${questId}`
         const entryCost = (questEntryCosts as Record<string, {itemId: number, itemCount: number, stamina: number}>)[questKey]
-        console.log(`[BATTLE] start entry: questId=${questId} questKey=${questKey} entryCost=${JSON.stringify(entryCost)}`)
+        const staminaInfo = getStaminaCost(questKey)
+        console.log(`[BATTLE] start entry: questId=${questId} questKey=${questKey} entryCost=${JSON.stringify(entryCost)} discountRate=${staminaInfo.rate} baseStamina=${staminaInfo.baseCost}→${staminaInfo.cost}`)
         if (entryCost && entryCost.itemId > 0) {
             const playerItemCount = getPlayerItemSync(playerId, entryCost.itemId) ?? 0
             console.log(`[BATTLE] start deduct: itemId=${entryCost.itemId} playerHas=${playerItemCount} need=${entryCost.itemCount}`)
@@ -753,7 +755,7 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         // Deduct stamina cost
-        const staminaCost = entryCost?.stamina ?? 0
+        const staminaCost = staminaInfo.cost
         let afterStamina = 0
         if (staminaCost > 0) {
             const player = getPlayerSync(playerId)
@@ -780,7 +782,7 @@ const routes = async (fastify: FastifyInstance) => {
                 totalStaminaUsed: (player.totalStaminaUsed ?? 0) + staminaCost
             })
             afterStamina = newStamina
-            console.log(`[BATTLE-START] stamina: ${currentStamina} -> ${newStamina} (cost: ${staminaCost})`)
+            console.log(`[BATTLE-START] stamina: ${currentStamina} -> ${newStamina} (cost: ${staminaCost}, rate: ${staminaInfo.rate})`)
         } else {
             // No stamina deduction, read current stamina for response
             const player = getPlayerSync(playerId)
