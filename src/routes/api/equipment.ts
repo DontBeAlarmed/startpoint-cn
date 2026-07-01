@@ -73,7 +73,7 @@ const routes = async (fastify: FastifyInstance) => {
         const newStack = useStack ? equipment.stack - upgradeCount : equipment.stack
         if (newStack < 0) return reply.status(400).send({ "error": "Bad Request", "message": "Not enough stack." })
 
-        const equipmentRarity = Math.floor(equipmentId / 1000000) - 1
+        const equipmentRarity = Math.floor(equipmentId / 1000000)  // 1-indexed
         const wrightPieces = getPlayerItemSync(playerId, wrightpieceItemId()) ?? 0
         const upgradeCost = getUpgradeCost(equipmentRarity)
         const newWrightPieces = wrightPieces - (upgradeCost * upgradeCount)
@@ -105,7 +105,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         const returnEquipmentList = buildFullEquipmentList(playerId)
 
-        console.log(`[UPGRADE] account=${accountId} player=${playerId}: eid=${equipmentId} rarity=${equipmentRarity+1} level ${equipment.level-upgradeCount}->${equipment.level} stack ${equipment.stack+upgradeCount}->${equipment.stack} craft -${upgradeCost*upgradeCount}`)
+        console.log(`[UPGRADE] account=${accountId} player=${playerId}: eid=${equipmentId} rarity=${equipmentRarity} level ${equipment.level-upgradeCount}->${equipment.level} stack ${equipment.stack+upgradeCount}->${equipment.stack} craft -${upgradeCost*upgradeCount}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -152,7 +152,7 @@ const routes = async (fastify: FastifyInstance) => {
             const upgradeCount = Math.min(maxLvl - equipment.level, equipment.stack)
             if (upgradeCount <= 0) continue
 
-            const rarity = Math.floor(equipmentId / 1000000) - 1
+            const rarity = Math.floor(equipmentId / 1000000)  // 1-indexed
             totalCraftPointCost += getUpgradeCost(rarity) * upgradeCount
             upgrades.push({ equipmentId, upgradeCount })
         }

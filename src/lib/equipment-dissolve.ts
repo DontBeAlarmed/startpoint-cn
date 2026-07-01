@@ -24,7 +24,7 @@ export function calculateDissolveRewards(
     equipmentId: number,
     count: number
 ): DissolveRewards {
-    const rarity = Math.floor(equipmentId / 1000000) - 1;
+    const rarity = Math.floor(equipmentId / 1000000);  // 1-indexed, matches CDN keys
     const craftEntry = getEquipmentCraftSync(rarity);
     const craftPoints = (craftEntry?.dissolve_craft ?? (rarity + 1)) * count;
 
