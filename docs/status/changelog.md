@@ -1,7 +1,36 @@
 # 近期修改与发现
 > 状态: 变更时间线   关键文件: -   相关端点: -
 
-## 一、账号系统 (2026-06-08)
+## 一、星粒商店数据修正 (2026-07-01)
+
+### 1.1 问题
+
+星粒商店购买装备后客户端不显示（提示成功但背包内无装备）。排查过程：
+
+1. 排除服务端响应格式、MsgPack 编码、客户端 `earlySuccessHandler` 格式校验问题
+2. 通过 MsgPack hex dump 对比正常商店和星粒商店的响应二进制，确认字节级编码完全正确
+3. 最终发现根因：服务端 `star_grain_shop.json` 数据与客户端 CDN 数据不匹配
+
+### 1.2 根因
+
+`assets/star_grain_shop.json` 中的 reward ID 整体错位——39 条数据中有 33 条 reward ID 与 CDN 源数据不符（85% 错误率），35 条缺失。例如：
+- 商品 `100011` 服务端返回装备 `5090003`，客户端 CDN 期望 `5010020`
+
+客户端根据 `ProductIdKind` 校验响应中的 `equipment_list`，ID 不匹配时静默丢弃，导致装备未入库。
+
+### 1.3 修复
+
+从 `wf-assets-cn/orderedmap/shop/star_grain_shop.json` CDN 源数据重建 `assets/star_grain_shop.json`：
+
+**新增文件：**
+- `tools/rebuild_star_grain_shop.ts` — 从 CDN 源数据重建脚本，保留手动展开的套装/素材箱 rewards
+
+**修改文件：**
+- `assets/star_grain_shop.json` — 从 39 条扩展至 74 条，21 条 reward/cost 修正
+
+---
+
+## 二、账号系统 (2026-06-08)
 
 ### 1.1 账号切换功能
 
