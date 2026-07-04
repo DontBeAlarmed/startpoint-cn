@@ -29,6 +29,7 @@ function cell(row: any[] | undefined, index: number): string {
 }
 
 function isIntrinsicDefinitionCell(kind: number, index: number): boolean {
+    if (kind === 23) return index === 5
     return kind === 28 && (index === 3 || index === 5)
 }
 
