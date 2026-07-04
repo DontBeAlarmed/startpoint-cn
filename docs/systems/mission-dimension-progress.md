@@ -71,8 +71,7 @@ battle finish 结算现在会双写角色出场、战斗次数、协力通关、
 
 ## 下一步实现建议
 
-1. 先做统一 `MissionProgressEvent` 和维度计数表，不直接扩展更多硬编码 missionId。
-2. 把 battle finish 事件拆出维度：quest clear、multi clear、host/guest、party character、leader character、battle statistics。
-3. 继续把带 quest/event/filter 的 daily battle/stat 行从 DB progress/client fallback 迁移到更细的服务端维度查询。
-4. 再处理 weekly 和 achievements，因为它们主要是 scope 和覆盖面问题，不是奖励管线问题。
-5. 最后补 Degree/PassCardPoint 等非物品奖励 side effect。
+1. 在现有 `MissionProgressEvent`、维度计数和 battle finish 双写基础上，继续补充更细的 scope 与查询条件，避免回到按 missionId 硬编码扩展。
+2. 扩展服务端 evaluator，把带 quest/event/filter 的 daily battle/stat 行逐步迁移到更细的维度查询；未覆盖前继续保留 DB progress/client fallback。
+3. 后续再处理 weekly 和 achievements 的 scope、重置与发奖策略，它们仍不属于当前第一批覆盖。
+4. 最后补 Degree/PassCardPoint 等非物品奖励 side effect。
