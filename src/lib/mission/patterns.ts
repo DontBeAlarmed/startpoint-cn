@@ -1,4 +1,4 @@
-// Pattern → mission_id reverse index (for update_mission_progress)
+// Pattern to mission_id reverse index (for update_mission_progress)
 
 import regularDefs from "../../../assets/mission_regular.json"
 import dailyDefs from "../../../assets/mission_daily.json"
@@ -15,6 +15,7 @@ export interface PatternMatch {
 
 const patternIndex: Record<string, PatternMatch[]> = {}
 const missionPatternLookup: Record<string, string> = {}
+const missionDefinitionLookup: Record<string, any[]> = {}
 
 function indexPatterns(defs: Record<string, any>, category: number) {
     for (const [missionId, rows] of Object.entries(defs)) {
@@ -25,6 +26,7 @@ function indexPatterns(defs: Record<string, any>, category: number) {
         if (!patternIndex[pattern]) patternIndex[pattern] = []
         patternIndex[pattern].push({ missionId: parseInt(missionId), category })
         missionPatternLookup[`${category}_${missionId}`] = pattern
+        missionDefinitionLookup[`${category}_${missionId}`] = row
     }
 }
 
@@ -42,6 +44,10 @@ export function getMissionsByPattern(pattern: string): PatternMatch[] {
 
 export function getMissionPattern(category: number, missionId: number): string {
     return missionPatternLookup[`${category}_${missionId}`] || ''
+}
+
+export function getMissionDefinition(category: number, missionId: number): any[] | undefined {
+    return missionDefinitionLookup[`${category}_${missionId}`]
 }
 
 export function isComputablePattern(pattern: string): boolean {

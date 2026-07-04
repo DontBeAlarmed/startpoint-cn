@@ -13,13 +13,13 @@ interface MissionStage {
     targetProgress: number
 }
 
-function buildLookup(rewardTable: Record<string, Record<string, any>>): Record<string, MissionStage[]> {
+function buildLookup(rewardTable: Record<string, Record<string, any>>, targetProgressColumn: number): Record<string, MissionStage[]> {
     const result: Record<string, MissionStage[]> = {}
     for (const [missionId, stages] of Object.entries(rewardTable)) {
         const list: MissionStage[] = []
         for (const [stageStr, rows] of Object.entries(stages)) {
             const row = (rows as any[])[0]
-            const targetProgress = parseInt(row[5] || row[1] || "0")
+            const targetProgress = parseInt(row[targetProgressColumn] || "0")
             const stage = parseInt(stageStr)
             list.push({ stage, targetProgress })
         }
@@ -30,13 +30,13 @@ function buildLookup(rewardTable: Record<string, Record<string, any>>): Record<s
 }
 
 const missionStageLookup: Record<number, Record<string, MissionStage[]>> = {
-    1: buildLookup(regularRewards as any),
-    2: buildLookup(dailyRewards as any),
-    3: buildLookup(eventRewards as any),
-    4: buildLookup(collectItemRewards as any),
-    5: buildLookup(degreeRewards as any),
-    9: buildLookup(charAwakeRewards as any),
-    10: buildLookup(weeklyRewards as any),
+    1: buildLookup(regularRewards as any, 1),
+    2: buildLookup(dailyRewards as any, 1),
+    3: buildLookup(eventRewards as any, 1),
+    4: buildLookup(collectItemRewards as any, 2),
+    5: buildLookup(degreeRewards as any, 1),
+    9: buildLookup(charAwakeRewards as any, 5),
+    10: buildLookup(weeklyRewards as any, 1),
 }
 
 export function getMissionIdsByCategory(category: number): number[] {
