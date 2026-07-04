@@ -1,4 +1,5 @@
 import adventEventQuests from "../../assets/advent_event_quest.json";
+import adventEventQuestFull from "../../assets/advent_event_quest_full.json";
 import bossBattleQuests from "../../assets/boss_battle_quest.json";
 import boxGacha from "../../assets/box_gacha.json";
 import boxReward from "../../assets/box_reward.json";
@@ -221,6 +222,58 @@ export function getWorldStoryEventBossBattleQuestSync(
 export function getAdventEventQuest(
     questId: string | number
 ): BattleQuest | null {
+    const fullQuest = (adventEventQuestFull as Record<string, any>)[String(questId)]
+    if (fullQuest) {
+        if (fullQuest.kind === "story") {
+            return {
+                name: fullQuest.name,
+                clearReward: fullQuest.firstTimeClearRewardId === undefined || fullQuest.firstTimeClearRewardId === null
+                    ? undefined
+                    : getClearRewardSync(fullQuest.firstTimeClearRewardId),
+                eventId: fullQuest.eventId,
+                viewableNeedQuest: fullQuest.viewableNeedQuest ?? null,
+                viewableNeedQuests: fullQuest.viewableNeedQuests ?? [],
+                selectableNeedQuest: fullQuest.selectableNeedQuest ?? null,
+                selectableNeedQuests: fullQuest.selectableNeedQuests ?? [],
+            } as any
+        }
+
+        const battle = fullQuest.battle
+        return {
+            name: fullQuest.name,
+            clearReward: fullQuest.firstTimeClearRewardId === undefined || fullQuest.firstTimeClearRewardId === null
+                ? undefined
+                : getClearRewardSync(fullQuest.firstTimeClearRewardId),
+            sPlusReward: battle.rankSsRewardId === undefined || battle.rankSsRewardId === null
+                ? undefined
+                : getClearRewardSync(battle.rankSsRewardId),
+            scoreRewardGroupId: battle.scoreRewardGroupId ?? undefined,
+            scoreRewardGroup: battle.scoreRewardGroupId != null ? getScoreRewardGroup(battle.scoreRewardGroupId) : undefined,
+            element: battle.recommendedElement ?? undefined,
+            eventId: fullQuest.eventId,
+            bRankTime: battle.rankTimesMs?.b ?? 0,
+            aRankTime: battle.rankTimesMs?.a ?? 0,
+            sRankTime: battle.rankTimesMs?.s ?? 0,
+            sPlusRankTime: battle.rankTimesMs?.ss ?? 0,
+            rankPointReward: battle.rewards?.rankPoint ?? 0,
+            characterExpReward: battle.rewards?.characterExp ?? 0,
+            manaReward: battle.rewards?.mana ?? 0,
+            poolExpReward: battle.rewards?.poolExp ?? 0,
+            fixedParty: battle.fixedParty ?? undefined,
+            staminaCost: battle.staminaCost ?? undefined,
+            availablePlayKind: battle.availablePlayKind ?? null,
+            startableUseItemMode: battle.startableUseItemMode ?? null,
+            startableItemIds: battle.startableItemIds ?? [],
+            startableItemCounts: battle.startableItemCounts ?? [],
+            maxContinueCount: battle.maxContinueCount ?? null,
+            rankItemCounts: battle.rankItemCounts,
+            viewableNeedQuest: fullQuest.viewableNeedQuest ?? null,
+            viewableNeedQuests: fullQuest.viewableNeedQuests ?? [],
+            selectableNeedQuest: fullQuest.selectableNeedQuest ?? null,
+            selectableNeedQuests: fullQuest.selectableNeedQuests ?? []
+        } as BattleQuest
+    }
+
     return getQuestSync((adventEventQuests as RawQuests), questId)
 }
 

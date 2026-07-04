@@ -64,12 +64,36 @@ export interface RawQuest {
     rushEventFolderId?: number
     rushEventRound?: number
     element?: number
+    viewableNeedQuest?: QuestReference | null
+    selectableNeedQuest?: QuestReference | null
+}
+
+
+export interface QuestReference {
+    kind: number | null
+    id: number | null
+    category?: number | null
+    values?: Array<number | null>
 }
 
 
 export interface StoryQuest {
     name: string,
     clearReward?: Reward
+    eventId?: number
+    viewableNeedQuest?: QuestReference | null
+    viewableNeedQuests?: QuestReference[]
+    selectableNeedQuest?: QuestReference | null
+    selectableNeedQuests?: QuestReference[]
+}
+
+
+export interface RankItemCounts {
+    c: number
+    b: number
+    a: number
+    s: number
+    ss: number
 }
 
 
@@ -94,8 +118,18 @@ export interface BattleQuest {
     rushEventFolderId?: RushEventFolder
     rushEventRound?: number
     element?: number
+    staminaCost?: number
+    availablePlayKind?: number | null
+    startableUseItemMode?: number | null
+    startableItemIds?: number[]
+    startableItemCounts?: number[]
+    maxContinueCount?: number | null
+    rankItemCounts?: RankItemCounts
+    viewableNeedQuest?: QuestReference | null
+    viewableNeedQuests?: QuestReference[]
+    selectableNeedQuest?: QuestReference | null
+    selectableNeedQuests?: QuestReference[]
 }
 
 
 export type RawQuests = Record<string, RawQuest>
-

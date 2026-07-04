@@ -28,6 +28,7 @@ import { trackCharacterClears } from "../../lib/quest/finish/character-clear-tra
 import { trackPowerflip } from "../../lib/quest/finish/powerflip-tracker";
 import { trackLeaderPowerflip } from "../../lib/quest/finish/leader-powerflip-tracker";
 import { trackPartyCoClears } from "../../lib/quest/finish/party-co-clear-tracker";
+import { canContinueBattle, canStartQuestByPrerequisites, hasClearedQuestPrerequisiteForCategory, resolveBattleStartEntryCost, resolveBattleStartStaminaCost } from "../../lib/quest/start-handler";
 import type { FinishContext } from "../../lib/quest/finish/types";
 import { readFileSync, existsSync } from "fs";
 import path from "path";
@@ -305,7 +306,10 @@ const routes = async (fastify: FastifyInstance) => {
             console.log(`[SCORE_ATTACK] questData={groupId:${questData.scoreRewardGroupId}, groupLen:${questData.scoreRewardGroup?.length ?? 'null'}, bRank:${questData.bRankTime}, aRank:${questData.aRankTime}, sRank:${questData.sRankTime}, sPlus:${questData.sPlusRankTime}, rankPt:${questData.rankPointReward}, charExp:${questData.characterExpReward}, mana:${questData.manaReward}, poolExp:${questData.poolExpReward}, clearReward:${questData.clearReward?.id ?? 'none'}}`)
         }
         console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${questData.scoreRewardGroup?.length ?? 'null'} questId=${questId} category=${questCategory}`)
-        const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element)
+        const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element, {
+            clearRank,
+            rankItemCounts: questData.rankItemCounts,
+        })
         let scoreAttackRewardIds: number[] = []
         if (questCategory === QuestCategory.SCORE_ATTACK_EVENT) {
             // Look up border rewards for score attack events
@@ -549,10 +553,23 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
+        const prerequisiteCheck = canStartQuestByPrerequisites(questData, (requiredQuestId) =>
+            hasClearedQuestPrerequisiteForCategory(category, requiredQuestId, (section, id) =>
+                getPlayerSingleQuestProgressSync(playerId, section, id)
+            )
+        )
+        if (!prerequisiteCheck.ok) {
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": prerequisiteCheck.message
+            })
+        }
+
         // Deduct entry cost (ticket/item)
         const questKey = `${category}_${questId}`
-        const entryCost = (questEntryCosts as Record<string, {itemId: number, itemCount: number, stamina: number}>)[questKey]
+        const configuredEntryCost = (questEntryCosts as Record<string, {itemId: number, itemCount: number, stamina: number}>)[questKey]
         const staminaInfo = getStaminaCost(questKey)
+        const entryCost = resolveBattleStartEntryCost(questData, configuredEntryCost)
         console.log(`[BATTLE] start entry: questId=${questId} questKey=${questKey} entryCost=${JSON.stringify(entryCost)} discountRate=${staminaInfo.rate} baseStamina=${staminaInfo.baseCost}→${staminaInfo.cost}`)
         if (entryCost && entryCost.itemId > 0) {
             const playerItemCount = getPlayerItemSync(playerId, entryCost.itemId) ?? 0
@@ -567,7 +584,7 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         // Deduct stamina cost
-        const staminaCost = staminaInfo.cost
+        const staminaCost = resolveBattleStartStaminaCost(questData, staminaInfo)
         let afterStamina = 0
         if (staminaCost > 0) {
             const currentStamina = computeRealTimeStamina(player)
@@ -655,6 +672,18 @@ const routes = async (fastify: FastifyInstance) => {
         if (activeQuestData === undefined) return reply.status(400).send({
             "error": "Bad Request",
             "message": "No active quest to continue."
+        })
+
+        const questData = getQuestFromCategorySync(activeQuestData.category, activeQuestData.questId) as BattleQuest | null
+        if (questData === null || !('rankPointReward' in questData)) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Quest doesn't exist."
+        })
+
+        const continueCheck = canContinueBattle(questData, activeQuestData.continueCount)
+        if (!continueCheck.ok) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": continueCheck.message
         })
 
         const freeVmoney = player.freeVmoney

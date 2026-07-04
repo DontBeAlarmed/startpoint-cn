@@ -2,8 +2,10 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
 import { GetRoomsBody, CreateRoomBody, SearchRoomBody, SelectRoomBody } from "../types"
 import { getAccountPlayers } from "../../data/domains/account"
 import { getPlayerSync } from "../../data/domains/player"
+import { getPlayerSingleQuestProgressSync } from "../../data/domains/quest"
 import { getSession } from "../../data/domains/session"
 import { getQuestFromCategorySync } from "../../lib/assets"
+import { canStartQuestByPrerequisites, hasClearedQuestPrerequisiteForCategory } from "../../lib/quest/start-handler"
 import { generateDataHeaders } from "../../utils"
 import { createRoom, getRoom, getRoomByToken, getRooms } from "../room/manager"
 import { serializeRoom, serializeRoomConnection } from "../room/serializer"
@@ -33,7 +35,6 @@ export function registerLobbyRoutes(fastify: FastifyInstance): void {
         })
 
         const rooms = getRooms(body.category_id, body.event_id)
-            .filter(r => r.host_viewer_id === viewerId)
             .filter(r => sessionManager.hasRoomClients(r.room_number))
             .map(serializeRoom)
 
@@ -58,6 +59,15 @@ export function registerLobbyRoutes(fastify: FastifyInstance): void {
         const quest = getQuestFromCategorySync(category, quest_id)
         if (!quest) return reply.status(400).send({
             "error": "Bad Request", "message": "Quest doesn't exist."
+        })
+
+        const prerequisiteCheck = canStartQuestByPrerequisites(quest, (requiredQuestId) =>
+            hasClearedQuestPrerequisiteForCategory(category, requiredQuestId, (section, id) =>
+                getPlayerSingleQuestProgressSync(ctx.playerId, section, id)
+            )
+        )
+        if (!prerequisiteCheck.ok) return reply.status(400).send({
+            "error": "Bad Request", "message": prerequisiteCheck.message
         })
 
         const room = createRoom(
