@@ -4,9 +4,9 @@
 
 ## 当前结论
 
-任务系统已经有可用的基础框架：按分类构建 `MissionComputer`，按奖励表计算阶段阈值，`mission/get_mission_progress` 能返回进度并发放奖励。每日任务和角色觉醒任务的主流程已经可跑，但“所有任务按维度监听并自动统计”还没有完成。
+任务系统已经有可用的基础框架：按分类构建 `MissionComputer`，按奖励表计算阶段阈值，`mission/get_mission_progress` 能返回进度并发放奖励。每日任务和角色觉醒任务的主流程已经可跑，第一批维度化切片也已经实现；但“所有任务按维度监听并自动统计”还没有完成，成就任务和周常任务仍是后续范围。
 
-如果按维度实现，方向是正确的，但不能只靠一个大维度表直接适配所有任务。原因是同一个维度在不同任务分类下有不同的作用域、过滤条件和重置周期，例如每日任务需要按天归零，角色觉醒任务是角色维度的长期累计，活动任务还需要按 event/stage_group/quest_category 过滤。
+如果按维度实现，方向是正确的，但不能只靠一个大维度表直接适配所有任务。原因是同一个维度在不同任务分类下有不同的作用域、过滤条件和重置周期，例如每日任务需要按天归零，角色觉醒任务是角色维度的长期累计，活动任务还需要按 event/stage_group/quest_category 过滤。本轮先把未带过滤条件的 daily battle/stat 行接到服务端 counter evaluator；unsupported 或带过滤条件的行继续保留 DB/client fallback。
 
 ## 已完成的管线
 
@@ -16,18 +16,18 @@
 | 奖励解析 | 基本可用 | active/regular/daily/event/degree/collect/weekly/awake 都有分类入口，`Stone(kind=0)` 不再被跳过 |
 | 每日任务发奖 | 已修复 | 每日任务通过 `get_mission_progress` 自动标记阶段并返回 `user_info/item_list` |
 | 角色觉醒发奖 | 已修复主要缺口 | 角色觉醒奖励按客户端 4 槽结构解析，仍走进度接口自动完成 |
-| 分类计算器 | 部分完成 | regular/daily/event/degree/awake 有计算器，collect/weekly 仍主要依赖 DB progress |
-| 客户端回传进度 | 已保留 | `mission/update_mission_progress` 仍能按 pattern 写入 DB，适合暂时承接未服务端化的维度 |
+| 分类计算器 | 第一批已接入 | regular/daily/event/degree/awake 有计算器；daily 的 single/multi/battle clear 与 dash/powerflip/skill 可由服务端 counter evaluator 读取，collect/weekly 仍主要依赖 DB progress |
+| 客户端回传进度 | 已保留 | `mission/update_mission_progress` 仍能按 pattern 写入 DB；unsupported 或 filtered 行继续走 DB/client fallback，适合暂时承接未服务端化的维度 |
 
 ## 维度覆盖现状
 
 | 维度 | 当前覆盖 | 缺口 |
 | --- | --- | --- |
-| 完成普通战斗/单人战斗次数 | 部分完成 | daily/regular 使用总通关差值，未完整使用 battle kind、quest category、具体 quest filter |
-| 通关协力战斗 | 部分完成 | multi finish 会累加 `multi_clear_count`，event 任务可读；daily 多人任务多数仍依赖客户端 pattern 回传或 DB progress |
+| 完成普通战斗/单人战斗次数 | 第一批已接入 | daily 无过滤 single/battle clear 行可读服务端 counter delta；带 battle kind、quest category、具体 quest filter 的行仍回退到 DB/client progress |
+| 通关协力战斗 | 第一批已接入 | daily 无过滤 multi clear 行可读服务端 counter delta；带活动或关卡过滤的多人任务仍回退到 DB/client progress |
 | 通关指定活动/降临/讨伐任务 | 部分完成 | event 任务有 `mission_event_quest_map.json`；daily/awake 仍有硬编码或未通用化的指定关卡映射 |
 | 使用 X 角色/队长/队伍组合 | 角色觉醒部分完成 | awake 有角色出场、队长、共斗、同队 pair、种族组合追踪；尚未抽象为通用 battle-client-check 维度 |
-| 使用冲刺/强化弹射/技能等战斗统计 | 部分完成 | powerflip/dash 全局计数存在，awake 使用部分 powerflip；daily `use_dash/use_skill` 尚未完全服务端计算 |
+| 使用冲刺/强化弹射/技能等战斗统计 | 第一批已接入 | daily 无过滤 `use_dash/use_power_flip/use_skill` 行可读服务端 counter delta；filtered 行保留 DB/client fallback |
 | 每日 all-clear 依赖任务 | 已完成当前范围 | daily `target_mission_clear` 会按依赖任务完成数量计算，并过滤自依赖 |
 | 体力消耗 | 已完成当前范围 | daily/weekly 可基于 snapshot 计算周期差值；weekly 发奖仍未启用 |
 | 玩家等级/称号等级 | 部分完成 | degree 计算器可按 rankPoint 计算等级；称号奖励类型 `Degree(kind=6)` 仍未完整落库 |
@@ -36,7 +36,7 @@
 
 ### 角色觉醒计数迁移保护
 
-battle finish 结算现在会双写角色出场、战斗次数、协力通关、种族组合等计数器，但角色觉醒任务暂时仍以 legacy progress 表为权威来源。原因是这些新计数器只会从部署时间点开始累计，而旧存档已经在 legacy 表里保留了历史觉醒进度；如果直接把用户可见进度切到计数器，会让既有玩家倒退。迁移前需要先做历史回填，或在评估时加入 legacy-floor，把 legacy 历史值作为新计数器的最低进度。
+battle finish 结算现在会双写角色出场、战斗次数、协力通关、种族组合等计数器，这些计数对后续 awake 迁移有用，但角色觉醒任务的用户可见进度暂时仍以 legacy progress 表为权威来源。原因是这些新计数器只会从部署时间点开始累计，而旧存档已经在 legacy 表里保留了历史觉醒进度；如果直接把用户可见进度切到计数器，会让既有玩家倒退。迁移前需要先做历史回填，或在评估时加入 legacy-floor，把 legacy 历史值作为新计数器的最低进度。
 
 ## 是否能靠“维度化”适配所有任务
 
@@ -73,6 +73,6 @@ battle finish 结算现在会双写角色出场、战斗次数、协力通关、
 
 1. 先做统一 `MissionProgressEvent` 和维度计数表，不直接扩展更多硬编码 missionId。
 2. 把 battle finish 事件拆出维度：quest clear、multi clear、host/guest、party character、leader character、battle statistics。
-3. 把 daily 的 `use_dash/use_skill/multi_battle_play` 从 DB progress/client 回传迁移到服务端维度计数。
+3. 继续把带 quest/event/filter 的 daily battle/stat 行从 DB progress/client fallback 迁移到更细的服务端维度查询。
 4. 再处理 weekly 和 achievements，因为它们主要是 scope 和覆盖面问题，不是奖励管线问题。
 5. 最后补 Degree/PassCardPoint 等非物品奖励 side effect。
