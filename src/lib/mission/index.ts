@@ -37,3 +37,23 @@ export { getTargetDegree } from "./computer-degree"
 
 // Filter (active mission ID filtering, C8601 prevention)
 export { isActiveMissionId, filterToActiveMissions } from "./filter"
+
+// Mission counters
+export type {
+    MissionCounterPeriod,
+    MissionCounterQualifierValue,
+    MissionCounterQuery,
+    MissionCounterRow,
+    MissionCounterScopeType,
+} from "./counters"
+export {
+    addMissionCounterSync,
+    getMissionCounterDeltaSync,
+    getMissionCounterSnapshotValueSync,
+    getMissionCounterValueSync,
+    makeMissionCounterKey,
+    normalizeMissionCounterQualifier,
+    serializeMissionCounterQualifier,
+    setMissionCounterMaxSync,
+    snapshotAllMissionCountersSync,
+} from "./counters"
