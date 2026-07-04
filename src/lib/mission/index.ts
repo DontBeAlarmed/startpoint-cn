@@ -57,3 +57,8 @@ export {
     setMissionCounterMaxSync,
     snapshotAllMissionCountersSync,
 } from "./counters"
+
+// Mission events and battle dimension writer
+export type { BattleFinishMissionEvent, BattleStatisticsSummary, MissionProgressEvent } from "./events"
+export { collectPartyCharacterIds, summarizeBattleStatistics } from "./events"
+export { recordBattleMissionDimensions } from "./battle-dimensions"
