@@ -3,7 +3,7 @@
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerActiveMissionsSync } from "../../data/domains/mission"
-import { evaluateMissionCounterProgress } from "./evaluator"
+import { evaluateMissionCounterProgress, isFilteredMissionUnsupported } from "./evaluator"
 import { isComputablePattern, getMissionDefinition, getMissionPattern } from "./patterns"
 import { getSnapshot } from "./snapshot"
 import { getCompletedStageNumbers } from "./stages"
@@ -108,6 +108,7 @@ function computeProgress(missionId: number, ctx: CategoryContext, dbProgress: nu
             evaluatedProgress = Math.max(evaluated.progress, dbProgress)
             if (!isComputablePattern(pattern)) return evaluatedProgress
         }
+        if (isFilteredMissionUnsupported(evaluated)) return dbProgress
     }
 
     if (pattern && isComputablePattern(pattern)) {
