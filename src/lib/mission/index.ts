@@ -65,4 +65,4 @@ export {
 // Mission events and battle dimension writer
 export type { BattleFinishMissionEvent, BattleStatisticsSummary, MissionProgressEvent } from "./events"
 export { collectPartyCharacterIds, summarizeBattleStatistics } from "./events"
-export { recordBattleMissionDimensions } from "./battle-dimensions"
+export { recordBattleMissionDimensions, recordBattleMissionDimensionsSafe } from "./battle-dimensions"
