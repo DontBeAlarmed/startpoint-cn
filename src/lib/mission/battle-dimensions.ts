@@ -1,3 +1,4 @@
+import { getDb } from "../../data/db"
 import { getCharacterRaces, getRaceKeyString } from "../quest/finish/race-utils"
 import { addMissionCounterSync, setMissionCounterMaxSync } from "./counters"
 import type { BattleFinishMissionEvent } from "./events"
@@ -51,9 +52,7 @@ function recordCharacterCounters(event: BattleFinishMissionEvent): void {
     }
 }
 
-export function recordBattleMissionDimensions(event: BattleFinishMissionEvent): void {
-    if (!event.accomplished) return
-
+function recordBattleMissionDimensionWrites(event: BattleFinishMissionEvent): void {
     add(event.playerId, {
         dimension: "battle.clear",
         scopeType: "lifetime",
@@ -131,4 +130,12 @@ export function recordBattleMissionDimensions(event: BattleFinishMissionEvent): 
     }
 
     recordCharacterCounters(event)
+}
+
+export function recordBattleMissionDimensions(event: BattleFinishMissionEvent): void {
+    if (!event.accomplished) return
+
+    getDb().transaction(() => {
+        recordBattleMissionDimensionWrites(event)
+    })()
 }
