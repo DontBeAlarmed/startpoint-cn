@@ -17,7 +17,7 @@ const STORY_MISSION_IDS = new Set<number>(
         .map(([mid]) => Number(mid))
 )
 
-// ─── Awake-specific context (extends base) ───
+// Awake-specific context (extends base)
 
 interface AwakeContext extends CategoryContext {
     charClears: Map<string, number>
@@ -30,7 +30,7 @@ interface AwakeContext extends CategoryContext {
     charData: Map<string, PlayerCharacter>
 }
 
-// ─── Special mission tables ───
+// Special mission tables
 
 interface QuestClearTarget {
     category: number
@@ -56,12 +56,12 @@ const COOP_MISSION_IDS = new Set([1310053, 1510063])
 const COMBO_MISSION_IDS = new Set([1210013])
 const POWERFLIP_CHAR_IDS = new Set([1210012])
 
-/** Mission 2310012: 人+龙+魔 race composition */
+/** Mission 2310012: race composition */
 const RACE_MISSION_IDS: Map<number, string> = new Map([
-    [2310012, "Beast+Dragon+Human"],  // 人(Human)+龙(Dragon)+魔(Beast) — tentative mapping
+    [2310012, "Beast+Dragon+Human"],  // Tentative mapping.
 ])
 
-// Multi-character party missions: mission_id → required character IDs (from col[24])
+// Multi-character party missions: mission_id to required character IDs (from col[24])
 const MULTI_CHAR_MISSIONS: Map<number, number[]> = new Map([
     [2110012, [211001, 231001]],
     [2210042, [10, 221004]],
@@ -72,13 +72,13 @@ const MULTI_CHAR_MISSIONS: Map<number, number[]> = new Map([
     [3310033, [331003, 10]],
 ])
 
-// ─── Computer ───
+// Computer
 
 function coClearKey(a: number, b: number): string {
     return a < b ? `${a}_${b}` : `${b}_${a}`
 }
 
-function buildAwakeContext(playerId: number): AwakeContext {
+function buildAwakeContext(playerId: number, category: number): AwakeContext {
     const player = getPlayerSync(playerId)!
     const questProgressRaw = getPlayerQuestProgressSync(playerId)
     const allChars = getPlayerCharactersSync(playerId)
@@ -143,7 +143,7 @@ function buildAwakeContext(playerId: number): AwakeContext {
     }
 
     return {
-        playerId, player, questProgress,
+        playerId, category, player, questProgress,
         totalQuestClears, totalStories,
         rankCounts: { rank_ss: ssClears, rank_s: sClears, rank_a: aClears, rank_b: bClears },
         charClears, leaderClears, multiClears, leaderMultiClears,
@@ -154,8 +154,8 @@ function buildAwakeContext(playerId: number): AwakeContext {
 export const AwakeComputer: MissionComputer = {
     name: "Awake",
 
-    buildContext(playerId: number, _category: number): AwakeContext {
-        return buildAwakeContext(playerId)
+    buildContext(playerId: number, category: number): AwakeContext {
+        return buildAwakeContext(playerId, category)
     },
 
     compute(missionId: number, ctx: CategoryContext, dbProgress: number): number {
@@ -180,7 +180,7 @@ export const AwakeComputer: MissionComputer = {
             return 1
         }
 
-        // Race-composition missions (e.g., 人+龙+魔)
+        // Race-composition missions
         const raceKey = RACE_MISSION_IDS.get(missionId)
         if (raceKey) {
             return actx.raceClears.get(raceKey) ?? 0

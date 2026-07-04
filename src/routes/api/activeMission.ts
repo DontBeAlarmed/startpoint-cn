@@ -44,6 +44,7 @@ const routes = async (fastify: FastifyInstance) => {
         const activeMissions = getPlayerActiveMissionsSync(playerId)
         const resultList: any[] = []
         const itemRewards: Record<number, number> = {}
+        let freeVmoney = player.freeVmoney
         let freeMana = player.freeMana
         let expPool = player.expPool
         let totalManaGained = 0
@@ -72,6 +73,9 @@ const routes = async (fastify: FastifyInstance) => {
                     : getActiveMissionRewards(missionId, stage)
                 for (const r of rewards) {
                     switch (r.kind) {
+                        case 0: // Stone
+                            freeVmoney += r.amount
+                            break
                         case 1: // Item
                             if (r.itemId) {
                                 const newTotal = givePlayerItemSync(playerId, r.itemId, r.amount)
@@ -113,9 +117,9 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
-        // Apply mana and exp changes
-        if (freeMana !== player.freeMana || expPool !== player.expPool) {
-            updatePlayerSync({ id: playerId, freeMana, expPool, totalManaObtained: (player.totalManaObtained ?? 0) + totalManaGained })
+        // Apply player currency and exp changes
+        if (freeVmoney !== player.freeVmoney || freeMana !== player.freeMana || expPool !== player.expPool) {
+            updatePlayerSync({ id: playerId, freeVmoney, freeMana, expPool, totalManaObtained: (player.totalManaObtained ?? 0) + totalManaGained })
         }
 
         console.log(`[ACTIVE_MISSION] receive viewer=${viewerId} missions=${requestList.length} items=${Object.keys(itemRewards).length}`)
@@ -126,6 +130,7 @@ const routes = async (fastify: FastifyInstance) => {
             "data": {
                 "active_mission_list": resultList,
                 "user_info": {
+                    "free_vmoney": freeVmoney,
                     "free_mana": freeMana,
                     "exp_pool": expPool,
                     "exp_pooled_time": getServerTime(player.expPooledTime)

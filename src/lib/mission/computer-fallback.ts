@@ -3,10 +3,11 @@
 import { getPlayerSync } from "../../data/domains/player"
 import type { MissionComputer, CategoryContext } from "./types"
 
-function buildMinimal(playerId: number): CategoryContext {
+function buildMinimal(playerId: number, category: number): CategoryContext {
     const player = getPlayerSync(playerId)!
     return {
         playerId,
+        category,
         player,
         questProgress: {},
         totalQuestClears: 0,
@@ -18,8 +19,8 @@ function buildMinimal(playerId: number): CategoryContext {
 export const FallbackComputer: MissionComputer = {
     name: "Fallback",
 
-    buildContext(playerId: number, _category: number): CategoryContext {
-        return buildMinimal(playerId)
+    buildContext(playerId: number, category: number): CategoryContext {
+        return buildMinimal(playerId, category)
     },
 
     compute(_missionId: number, _ctx: CategoryContext, dbProgress: number): number {

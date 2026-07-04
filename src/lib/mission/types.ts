@@ -15,11 +15,13 @@ export interface PlayerQuestProgressEntry {
 /** Per-category pre-computed context — built once, read many times */
 export interface CategoryContext {
     playerId: number
+    category: number
     player: Player
     questProgress: Record<string, PlayerQuestProgressEntry[]>
     totalQuestClears: number
     totalStories: number
     rankCounts: Record<string, number>
+    activeMissionProgress?: Record<string, number>
     snapshot?: SnapshotData | null
 }
 
