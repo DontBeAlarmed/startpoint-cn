@@ -8,6 +8,12 @@
 
 如果按维度实现，方向是正确的，但不能只靠一个大维度表直接适配所有任务。原因是同一个维度在不同任务分类下有不同的作用域、过滤条件和重置周期，例如每日任务需要按天归零，角色觉醒任务是角色维度的长期累计，活动任务还需要按 event/stage_group/quest_category 过滤。本轮先把未带过滤条件的 daily battle/stat 行接到服务端 counter evaluator；unsupported 或带过滤条件的行继续保留 DB/client fallback。
 
+## 本 PR 落地边界
+
+任务专用分支 `codex/mission-dimension-progress` 只落地第一批安全维度化切片：战斗结算双写 counter、每日无过滤 battle/stat 行读 counter、周期 snapshot、以及文档化的 awake 迁移保护。新 counter 写入采用 fail-open 包装，不会因为维度计数失败而中断旧战斗结算；已支持的 daily counter 行不再混用旧的总通关差值，避免单人任务被非单人通关误推进。
+
+未覆盖的 filtered daily 行、指定 quest/event 条件、weekly/achievements 发奖策略、awake 正式切 counter、以及 Degree/PassCardPoint 等特殊奖励 side effect 仍保持后续范围。
+
 ## 已完成的管线
 
 | 管线 | 状态 | 说明 |

@@ -10,6 +10,31 @@
 
 ---
 
+## Execution Result
+
+Status: completed on task branch `codex/mission-dimension-progress`; this branch is intended to be reviewed as a dedicated mission PR, not merged directly during implementation.
+
+Implemented tasks:
+
+- Counter storage and snapshot primitives are in place under `src/lib/mission/counters.ts` and `players_mission_counters` / `players_mission_counter_snapshots`.
+- Battle finish now builds mission events and double-writes safe dimensions for battle clear, battle stats, party characters, leaders, pairs, and race composition.
+- Single and multi battle finish routes call a fail-open counter writer so dimension writes cannot break the legacy battle finish response.
+- Daily unfiltered single/multi/battle clear and `use_dash/use_power_flip/use_skill` rows are evaluated from server counters.
+- Filtered or unsupported daily rows preserve DB/client fallback instead of being guessed from generic clear counts.
+- Daily all-clear dependencies continue to resolve through `RegularComputer`, including counter-backed dependencies.
+- Daily and weekly counter snapshots run through both admin reset routes and normal login reset.
+- Awake progress remains legacy-authoritative until a backfill or legacy-floor migration is implemented.
+
+Final verification:
+
+- `npm run typecheck`
+- reward/stage smoke for regular, daily, awake, collect, and daily stage completion
+- rollback counter regression for key stability, daily counter deltas, filtered fallback, all-clear dependencies, and fail-open write errors
+- illegal reference scan for local/decompile/plugin references
+- final code review result: ready to merge
+
+Note: this project does not define an `npm test` script, so verification uses the checks above.
+
 ## Scope
 
 This plan implements Phases 1-4 from `docs/superpowers/specs/2026-07-05-mission-dimension-design.md` only where behavior can be kept safe:
