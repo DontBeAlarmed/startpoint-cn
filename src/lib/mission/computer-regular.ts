@@ -94,7 +94,6 @@ function computeProgress(missionId: number, ctx: CategoryContext, dbProgress: nu
         return completedDeps
     }
 
-    let evaluatedProgress: number | undefined
     if (category === 2) {
         const evaluated = evaluateMissionCounterProgress({
             playerId: ctx.playerId,
@@ -104,30 +103,23 @@ function computeProgress(missionId: number, ctx: CategoryContext, dbProgress: nu
             definition,
             period: "daily",
         })
-        if (evaluated.supported) {
-            evaluatedProgress = Math.max(evaluated.progress, dbProgress)
-            if (!isComputablePattern(pattern)) return evaluatedProgress
-        }
+        if (evaluated.supported) return Math.max(evaluated.progress, dbProgress)
         if (isFilteredMissionUnsupported(evaluated)) return dbProgress
     }
 
     if (pattern && isComputablePattern(pattern)) {
         if (pattern.startsWith('single_battle_play') || pattern.startsWith('single_battle_clear_count'))
-            return withEvaluatedProgress(evaluatedProgress, baseClears)
+            return baseClears
         if (pattern.includes('stamina_use'))
-            return withEvaluatedProgress(evaluatedProgress, baseStamina)
+            return baseStamina
         if (ctx.rankCounts[pattern] !== undefined) {
             const baseRank = snapshot
                 ? (ctx.rankCounts[pattern] - ((snapshot as any)[rankToSnapshotKey(pattern)] ?? 0))
                 : ctx.rankCounts[pattern]
-            return withEvaluatedProgress(evaluatedProgress, baseRank)
+            return baseRank
         }
     }
-    return evaluatedProgress ?? dbProgress
-}
-
-function withEvaluatedProgress(evaluatedProgress: number | undefined, computedProgress: number): number {
-    return evaluatedProgress === undefined ? computedProgress : Math.max(evaluatedProgress, computedProgress)
+    return dbProgress
 }
 
 function rankToSnapshotKey(pattern: string): string {

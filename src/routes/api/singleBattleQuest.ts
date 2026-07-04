@@ -28,7 +28,7 @@ import { trackCharacterClears } from "../../lib/quest/finish/character-clear-tra
 import { trackPowerflip } from "../../lib/quest/finish/powerflip-tracker";
 import { trackLeaderPowerflip } from "../../lib/quest/finish/leader-powerflip-tracker";
 import { trackPartyCoClears } from "../../lib/quest/finish/party-co-clear-tracker";
-import { collectPartyCharacterIds, recordBattleMissionDimensions, summarizeBattleStatistics } from "../../lib/mission"
+import { collectPartyCharacterIds, recordBattleMissionDimensionsSafe, summarizeBattleStatistics } from "../../lib/mission"
 import type { FinishContext } from "../../lib/quest/finish/types";
 import { readFileSync, existsSync } from "fs";
 import path from "path";
@@ -361,7 +361,7 @@ const routes = async (fastify: FastifyInstance) => {
         trackPartyCoClears(finishCtx)
         trackPowerflip(finishCtx)
         const singleBattleParty = collectPartyCharacterIds(finishCtx.party)
-        recordBattleMissionDimensions({
+        recordBattleMissionDimensionsSafe({
             type: "battle_finish",
             playerId,
             questCategory,

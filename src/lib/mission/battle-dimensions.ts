@@ -139,3 +139,11 @@ export function recordBattleMissionDimensions(event: BattleFinishMissionEvent): 
         recordBattleMissionDimensionWrites(event)
     })()
 }
+
+export function recordBattleMissionDimensionsSafe(event: BattleFinishMissionEvent): void {
+    try {
+        recordBattleMissionDimensions(event)
+    } catch (error) {
+        console.warn("[MISSION] battle dimension counter write failed", error)
+    }
+}
