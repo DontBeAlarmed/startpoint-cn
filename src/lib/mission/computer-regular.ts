@@ -3,6 +3,7 @@
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerActiveMissionsSync } from "../../data/domains/mission"
+import { evaluateMissionCounterProgress } from "./evaluator"
 import { isComputablePattern, getMissionDefinition, getMissionPattern } from "./patterns"
 import { getSnapshot } from "./snapshot"
 import { getCompletedStageNumbers } from "./stages"
@@ -93,19 +94,39 @@ function computeProgress(missionId: number, ctx: CategoryContext, dbProgress: nu
         return completedDeps
     }
 
+    let evaluatedProgress: number | undefined
+    if (category === 2) {
+        const evaluated = evaluateMissionCounterProgress({
+            playerId: ctx.playerId,
+            category,
+            missionId,
+            pattern,
+            definition,
+            period: "daily",
+        })
+        if (evaluated.supported) {
+            evaluatedProgress = Math.max(evaluated.progress, dbProgress)
+            if (!isComputablePattern(pattern)) return evaluatedProgress
+        }
+    }
+
     if (pattern && isComputablePattern(pattern)) {
         if (pattern.startsWith('single_battle_play') || pattern.startsWith('single_battle_clear_count'))
-            return baseClears
+            return withEvaluatedProgress(evaluatedProgress, baseClears)
         if (pattern.includes('stamina_use'))
-            return baseStamina
+            return withEvaluatedProgress(evaluatedProgress, baseStamina)
         if (ctx.rankCounts[pattern] !== undefined) {
             const baseRank = snapshot
                 ? (ctx.rankCounts[pattern] - ((snapshot as any)[rankToSnapshotKey(pattern)] ?? 0))
                 : ctx.rankCounts[pattern]
-            return baseRank
+            return withEvaluatedProgress(evaluatedProgress, baseRank)
         }
     }
-    return dbProgress
+    return evaluatedProgress ?? dbProgress
+}
+
+function withEvaluatedProgress(evaluatedProgress: number | undefined, computedProgress: number): number {
+    return evaluatedProgress === undefined ? computedProgress : Math.max(evaluatedProgress, computedProgress)
 }
 
 function rankToSnapshotKey(pattern: string): string {
