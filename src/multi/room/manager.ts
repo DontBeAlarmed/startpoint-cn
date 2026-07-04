@@ -1,7 +1,8 @@
 import { randomInt } from "crypto";
-import { MultiRoom, QuestCategory, RoomState } from "../types";
+import { MultiRoom, QuestCategory } from "../types";
 import { getServerTime } from "../../utils";
 import { sessionManager } from "../state/SessionManager";
+import { filterRoomsForList } from "./listing";
 
 const rooms = new Map<string, MultiRoom>();
 
@@ -100,13 +101,7 @@ export function getRoomByToken(token: string): MultiRoom | undefined {
 }
 
 export function getRooms(categoryId: number, eventId?: number): MultiRoom[] {
-    const result: MultiRoom[] = [];
-    for (const room of rooms.values()) {
-        if (room.category === categoryId) {
-            result.push(room);
-        }
-    }
-    return result;
+    return filterRoomsForList(Array.from(rooms.values()), categoryId, eventId);
 }
 
 export function updateRoomState(roomNumber: string, state: number): boolean {

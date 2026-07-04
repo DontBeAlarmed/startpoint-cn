@@ -5,6 +5,7 @@ import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getQuestFromCategorySync } from "../../lib/assets";
 import { givePlayerRewardSync } from "../../lib/quest";
+import { canStartQuestByPrerequisites, hasClearedQuestPrerequisiteForCategory } from "../../lib/quest/start-handler";
 import { generateDataHeaders } from "../../utils";
 import { QuestCategory } from "../../lib/types";
 
@@ -35,6 +36,16 @@ function processStoryQuestFinish(playerId: number, viewerId: number, questSectio
     }
     if (questData.sPlusReward !== undefined) {
         console.log(`[STORY] battle quest rejected: category=${questSection} questId=${questId}`)
+        return null
+    }
+
+    const prerequisiteCheck = canStartQuestByPrerequisites(questData, (requiredQuestId) =>
+        hasClearedQuestPrerequisiteForCategory(questSection, requiredQuestId, (section, id) =>
+            getPlayerSingleQuestProgressSync(playerId, section, id)
+        )
+    )
+    if (!prerequisiteCheck.ok) {
+        console.log(`[STORY] prerequisite rejected: category=${questSection} questId=${questId} message=${prerequisiteCheck.message}`)
         return null
     }
 

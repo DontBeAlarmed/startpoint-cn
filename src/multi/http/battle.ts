@@ -32,6 +32,7 @@ import { trackPowerflip } from "../../lib/quest/finish/powerflip-tracker";
 import { trackLeaderPowerflip } from "../../lib/quest/finish/leader-powerflip-tracker";
 import { trackPartyCoClears } from "../../lib/quest/finish/party-co-clear-tracker";
 import type { FinishContext } from "../../lib/quest/finish/types";
+import { canStartQuestByPrerequisites, hasClearedQuestPrerequisiteForCategory } from "../../lib/quest/start-handler";
 
 interface PlayerContext { playerId: number; player: Player }
 
@@ -109,6 +110,17 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         if (questData === null || !('rankPointReward' in questData)) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Quest doesn't exist."
+            });
+        }
+
+        const prerequisiteCheck = canStartQuestByPrerequisites(questData, (requiredQuestId) =>
+            hasClearedQuestPrerequisiteForCategory(category, requiredQuestId, (section, id) =>
+                getPlayerSingleQuestProgressSync(ctx.playerId, section, id)
+            )
+        );
+        if (!prerequisiteCheck.ok) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": prerequisiteCheck.message
             });
         }
 
@@ -282,7 +294,10 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             playerData.staminaHealTime = new Date();
         }
 
-        const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, (questData as any).scoreRewardGroupId || 0, (questData as any).scoreRewardGroup, useBoostPoint, (questData as any).element);
+        const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, (questData as any).scoreRewardGroupId || 0, (questData as any).scoreRewardGroup, useBoostPoint, (questData as any).element, {
+            clearRank,
+            rankItemCounts: (questData as any).rankItemCounts,
+        });
 
         const bodyPartyStatistics = (body as any).statistics?.party || body.quest_statistics?.party || { characters: [], unison_characters: [] };
         const partyCharacterIdsArray: number[] = [];
