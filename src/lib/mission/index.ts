@@ -26,6 +26,10 @@ export {
 export type { PatternMatch } from "./patterns"
 export { getMissionsByPattern, getMissionDefinition, getMissionPattern, isComputablePattern } from "./patterns"
 
+// Evaluator
+export type { MissionEvaluationInput, MissionEvaluationResult } from "./evaluator"
+export { evaluateMissionCounterProgress } from "./evaluator"
+
 // Character queries
 export { getCharacterStoryQuestIds, getCharacterIdFromMission } from "./character-queries"
 
