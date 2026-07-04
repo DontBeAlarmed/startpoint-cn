@@ -38,6 +38,54 @@ Content-Length: 100
 }
 ```
 
+## Implementation Notes
+
+### Execution Plan Boundary
+
+The route keeps database reads/writes and response serialization, while
+`src/lib/gacha-exec-plan.ts` owns the request-to-plan decision:
+
+- validates the basic page-kind/payment/exec-type combination;
+- calculates the final pull count;
+- calculates free/paid bead balances after the draw;
+- returns ticket item consumption when `payment_type = 3`;
+- returns gacha campaign consumption when `payment_type = 4`.
+
+This is a preparation layer for future official parity work. It preserves the
+current behavior and gives Star Heroes, lucky-bag, crazy-ticket, and other
+special page-kind branches a single place to grow before side effects are
+applied by the route.
+
+### Ticket Payment Mapping
+
+For CN ticket draws, `payment_type = 3` means the item consumed is selected from
+the gacha exec `type`, not from the banner kind alone.
+
+| `type` | Ticket item | Pull count |
+| --- | --- | ---: |
+| `9` | `999001` character 10-pull ticket | 10 |
+| `10` | `999003` character single ticket | 1 |
+| `12` | `999005` equipment single ticket | 1 |
+| `13` | `999004` equipment 10-pull ticket | 10 |
+
+The equipment single-ticket path is `type = 12`. Older code only treated
+`type = 13` as an equipment ticket, so `payment_type = 3` with `type = 12`
+looked up `999003` instead of `999005` and returned `400 Not enough tickets`
+when a save only had equipment single tickets.
+
+### Equipment Movie Fields
+
+Equipment draws return `draw_equipment[i].treasure_up_type` and top-level
+`is_erupt`. These are generated from `equipmentMovieProbabilityId` and
+`assets/equipment_gacha_movie_probability.json`, matching the decompiled
+`GachaExecDummyRemote` flow:
+
+- roll `is_erupt` only when at least one drawn equipment is rank 5;
+- if `is_erupt` is true, every equipment result uses `treasure_up_type = 0`;
+- otherwise rank 4/5 equipment rolls treasure-up type in official order
+  `[1, 2, 3]`;
+- the 10th draw in each group of 10 uses guarantee treasure-up probabilities.
+
 ## Response
 ### Headers
 ```
@@ -379,4 +427,3 @@ param: b9d1972176320927dee87a97bc6b1d19fbe7669b
   }
 }
 ```
-

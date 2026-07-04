@@ -1,0 +1,12 @@
+{
+  "1": {
+    "stringId": "normal",
+    "probabilityEruption": 0.22,
+    "probabilityTreasureUp3To5": 0.2,
+    "probabilityTreasureUp4To5": 0.35,
+    "probabilityTreasureUp3To4": 0.25,
+    "guaranteeProbabilityTreasureUp3To5": 0,
+    "guaranteeProbabilityTreasureUp4To5": 0.35,
+    "guaranteeProbabilityTreasureUp3To4": 0
+  }
+}

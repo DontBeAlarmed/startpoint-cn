@@ -1,6 +1,5 @@
 /**
  * Handles gacha summoning.
- * Right now all characters in a gacha's pool have an equal chance of being summoned.
  */
 
 import { randomInt } from "crypto";
@@ -12,6 +11,7 @@ import { givePlayerEquipmentSync } from "./equipment";
 import { givePlayerRewardsSync } from "./quest";
 import { getCharacterDataSync } from "./assets";
 import { BoxGachaBox, BoxGachaDrawResult, BoxGachaIdReward, BoxGachaRewardTier, BoxGachaRewardType, CharacterGacha, CharacterReward, CurrencyReward, EquipmentItemReward, Gacha, GachaCharacterDraw, GachaDrawResult, GachaDraws, GachaMovieSeeds, GachaMovieType, GachaType, PlayerRewardResult, Reward, RewardPlayerGachaDrawResult, RewardType } from "./types";
+import { computeEquipmentGachaMovieEffectsForGacha, EquipmentMovieDrawInput } from "./gacha-equipment-movie";
 
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
@@ -65,6 +65,35 @@ const rankMovieRates = [
     ]
 ]
 
+function positiveWeight(weight: number): number {
+    return Number.isFinite(weight) && weight > 0 ? weight : 0
+}
+
+function totalPositiveWeight(pool: number[]): number {
+    return pool.reduce((sum, weight) => sum + positiveWeight(weight), 0)
+}
+
+export function selectWeightedIndexByRoll(
+    pool: number[],
+    roll: number
+): number | null {
+    const total = totalPositiveWeight(pool)
+    if (total <= 0 || roll < 1 || roll > total) return null
+
+    let offset = 0
+    for (let index = 0; index < pool.length; index += 1) {
+        offset += positiveWeight(pool[index])
+        if (roll <= offset) return index
+    }
+    return null
+}
+
+function randomWeightedIndex(pool: number[]): number | null {
+    const total = totalPositiveWeight(pool)
+    if (total <= 0) return null
+    return selectWeightedIndexByRoll(pool, randomInt(1, Math.floor(total) + 1))
+}
+
 export interface GachaResult {
     characterId: number,
     movieId: string,
@@ -76,6 +105,12 @@ export interface SummonResult {
     freeVmoney: number,
     vmoney: number,
     pulls: GachaResult[],
+}
+
+export interface GachaDrawMetadata {
+    id: number,
+    rank: number,
+    isGuarantee: boolean
 }
 
 /**
@@ -103,32 +138,49 @@ export function randomPoolItem(
     return null;
 }
 
-export function drawGachaSync(
+export function drawGachaWithMetadataSync(
     gacha: Gacha,
     drawAmount: number
-): number[] {
+): GachaDrawMetadata[] {
     const isCharacterGacha = gacha.type === GachaType.CHARACTER
-    const rankRates = isCharacterGacha ? characterGachaRankRates : equipmentGachaRankRates
+    const fallbackRankRates = isCharacterGacha ? characterGachaRankRates : equipmentGachaRankRates
+    const rankRates = gacha.rankRates ?? fallbackRankRates
 
-    const pulls: number[] = []
+    const pulls: GachaDrawMetadata[] = []
 
     for (let drawNumber = 0; drawNumber < drawAmount; drawNumber++) {
-        const drawRankRates = (drawNumber !== 0) && ((drawNumber % 9) === 0) ? rankRates.multiGuarantee : rankRates.normal
-        
-        const ratePool = gacha.pool[(randomPoolItem(0, 1001, drawRankRates) ?? 0) + 1]
+        const isGuarantee = ((drawNumber + 1) % 10) === 0
+        const drawRankRates = isGuarantee ? rankRates.multiGuarantee : rankRates.normal
+        const rankIndex = randomWeightedIndex(drawRankRates) ?? 0
+        const ratePool = gacha.pool[String(rankIndex + 1)]
+        if (!ratePool || ratePool.length === 0) {
+            throw new Error(`gacha pool is empty for rank key ${rankIndex + 1}`)
+        }
 
         // pick item from pool
-        const selectedItem = ratePool[randomPoolItem(0, 1001, ratePool.map(item => item.rarity)) ?? 0]
-        pulls.push(selectedItem.id)
+        const selectedItem = ratePool[randomWeightedIndex(ratePool.map(item => item.odds)) ?? 0]
+        pulls.push({
+            id: selectedItem.id,
+            rank: selectedItem.rank,
+            isGuarantee,
+        })
     }
 
     return pulls
 }
 
+export function drawGachaSync(
+    gacha: Gacha,
+    drawAmount: number
+): number[] {
+    return drawGachaWithMetadataSync(gacha, drawAmount).map((draw) => draw.id)
+}
+
 export function rewardPlayerGachaDrawResultSync(
     playerId: number,
     gacha: Gacha,
-    gachaDrawResult: number[]
+    gachaDrawResult: number[],
+    gachaDrawMetadata?: GachaDrawMetadata[]
 ): RewardPlayerGachaDrawResult {
 
     seedValidator.flushAll();  // Clean up stale sentSeeds from previous draws
@@ -224,14 +276,33 @@ export function rewardPlayerGachaDrawResultSync(
             }
         }
     } else {
-        for (const equipmentId of gachaDrawResult) {
+        const equipmentMovieInputs: EquipmentMovieDrawInput[] = gachaDrawResult.map((equipmentId, index) => {
+            const metadata = gachaDrawMetadata?.[index]
+            return {
+                id: equipmentId,
+                rank: metadata?.rank ?? 0,
+                isGuarantee: metadata?.isGuarantee ?? false,
+            }
+        })
+        const equipmentMovieEffects = computeEquipmentGachaMovieEffectsForGacha(gacha, equipmentMovieInputs)
+
+        for (let index = 0; index < gachaDrawResult.length; index += 1) {
+            const equipmentId = gachaDrawResult[index]
             const giveResult = givePlayerEquipmentSync(playerId, equipmentId, 1);
 
             equipment.set(equipmentId, giveResult)
             draws.push({
                 "equipment_id": equipmentId,
-                "treasure_up_type": 0    
+                "treasure_up_type": equipmentMovieEffects.draws[index]?.treasureUpType ?? 0
             })
+        }
+
+        return {
+            draw: draws,
+            characters: [],
+            equipment: Array.from(equipment.values()),
+            items: Object.fromEntries(items),
+            isErupt: equipmentMovieEffects.isErupt,
         }
     }
     
