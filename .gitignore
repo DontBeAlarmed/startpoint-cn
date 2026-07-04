@@ -27,3 +27,4 @@ tsconfig.tsbuildinfo
 assets/gacha_odds/
 .cdn/zip_index.json
 tmp/
+.worktrees/
