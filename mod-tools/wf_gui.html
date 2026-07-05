@@ -113,6 +113,32 @@ textarea{width:100%;height:140px;font:11.5px Consolas,monospace}
 @keyframes tin{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
 .empty{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--faint);padding:56px 0;font-size:12.5px}
 .empty::before{content:"⬡";font-size:34px;opacity:.4}
+/* ---------- 行级中文描述 / 模式切换 / 词条速查 ---------- */
+td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;line-height:1.5;vertical-align:top}
+#modebar{display:flex;gap:4px;margin:8px 8px 0}
+#modebar button{flex:1;background:var(--panel3);color:var(--dim);border:1px solid var(--border2);padding:4px 0}
+#modebar button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.findkey{color:var(--acc);cursor:pointer;font-family:Consolas,monospace;font-size:11.5px;white-space:nowrap}
+.findkey:hover{text-decoration:underline}
+.share{color:var(--gold);cursor:pointer;white-space:nowrap;font-size:11px}
+.share.solo{color:var(--faint);cursor:default}
+.sharebox{background:var(--panel);border:1px solid var(--border);border-radius:var(--rs);padding:4px 8px;margin:2px 0;font-size:11.5px}
+.awk-h{color:var(--gold);font-size:11.5px;margin:8px 0 2px;padding:3px 10px;border-left:2px solid var(--gold);background:#2a241533;border-radius:4px;user-select:none}
+.ldr-sep{color:var(--accent,#7aa2f7);font-size:11px;letter-spacing:1px;text-align:center;margin:16px 0 2px;opacity:.8;user-select:none}
+.ldr-h{border-left:3px solid var(--accent,#7aa2f7)}
+#assetBox{display:flex;flex-wrap:wrap;gap:10px}
+.acard{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:9px;width:236px;display:flex;flex-direction:column;gap:5px}
+.acard img{max-width:218px;max-height:170px;object-fit:contain;background:#0c0e13;border-radius:5px;align-self:center}
+.acard .an{font-size:12px;font-weight:600}
+.acard .am{color:var(--faint);font-size:10.5px}
+.acard .areq{color:var(--warn);font-size:10.5px;line-height:1.4}
+.acard audio{width:100%;height:30px}
+.wgrp{color:var(--faint);font-size:10.5px;padding:6px 8px 2px;letter-spacing:1px;user-select:none;border-bottom:1px dashed var(--border);margin-bottom:2px}
+.addform{background:var(--panel2);border:1px dashed var(--border2);border-radius:var(--rs);padding:7px 11px;margin:6px 0}
+.addform .row{margin:4px 0}
+#wpnInfo{display:none;gap:10px;align-items:center;padding:7px 11px;margin:4px 0 8px;background:var(--panel2);border:1px solid var(--border);border-radius:var(--rs);font-size:12.5px}
+#wpnInfo .wname{font-weight:600;font-size:13.5px}
+#wpnInfo .rar{color:var(--gold);letter-spacing:-1px}
 </style>
 </head>
 <body>
@@ -120,17 +146,26 @@ textarea{width:100%;height:140px;font:11.5px Consolas,monospace}
   <h1>WF 修改器</h1>
   <span class="badge" id="profBadge">版本 ?</span>
   <span class="path" id="storePath"></span>
-  <span class="badge" id="pendBadge">待同步 0</span>
+  <span class="badge" id="pendBadge">待发布 0</span>
   <span class="badge" id="adbBadge">adb ?</span>
-  <button id="btnSync">同步到模拟器并重启</button>
+  <button class="sec" id="btnSync" title="adb 直推数据包(备用手段;② 层正道是「发布」走 CDN)">adb 同步(备用)</button>
+  <button id="btnPublish" title="把待发布的改动打成增量包发到 CDN,并重启游戏拉取">发布并重启游戏</button>
 </header>
 <main>
   <div id="left">
+    <div id="modebar">
+      <button id="modeChar" class="on">角色</button>
+      <button id="modeWpn">武器</button>
+    </div>
     <input id="search" placeholder="搜索角色 / ID / 代号">
-    <div style="display:flex;gap:4px;margin:0 5px 5px">
+    <div id="charFilters" style="display:flex;gap:4px;margin:0 5px 5px">
       <select id="fltRarity" style="flex:1"><option value="">星级</option><option value="5">5★</option><option value="4">4★</option><option value="3">3★</option><option value="2">2★</option><option value="1">1★</option></select>
       <select id="fltElement" style="flex:1"><option value="">属性</option><option>火</option><option>水</option><option>雷</option><option>风</option><option>光</option><option>暗</option></select>
       <select id="fltRace" style="flex:1"><option value="">种族</option></select>
+    </div>
+    <div id="wpnFilters" style="display:none;gap:4px;margin:0 5px 5px;align-items:center">
+      <select id="fltWpnElem" style="flex:1"><option value="">全部属性</option><option>火</option><option>水</option><option>雷</option><option>风</option><option>光</option><option>暗</option><option value="通用">通用</option></select>
+      <label style="white-space:nowrap"><input type="checkbox" id="fltWpnEnh"> 有强化词条</label>
     </div>
     <div id="charlist"></div>
   </div>
@@ -138,11 +173,15 @@ textarea{width:100%;height:140px;font:11.5px Consolas,monospace}
     <nav>
       <div class="tab sel" data-t="edit">词条编辑</div>
       <div class="tab" data-t="profile">角色资料</div>
+      <div class="tab" data-t="assets">角色资产</div>
       <div class="tab" data-t="stat">基础数值</div>
-      <div class="tab" data-t="soul">能力魂</div>
-      <div class="tab" data-t="scale">倍率调整</div>
+      <div class="tab" data-t="energy">技能·倍率</div>
+      <div class="tab" data-t="weapon">武器·魂珠</div>
       <div class="tab" data-t="port">词条移植</div>
+      <div class="tab" data-t="finder">词条速查</div>
+      <div class="tab" data-t="newchar">新建角色</div>
       <div class="tab" data-t="recipe">配方</div>
+      <div class="tab" data-t="history">改动日志</div>
       <div class="tab" data-t="backup">备份</div>
     </nav>
     <div id="content">
@@ -166,6 +205,24 @@ textarea{width:100%;height:140px;font:11.5px Consolas,monospace}
         </div>
         <div class="hint">① 层数据(服务端 <b>assets/cdndata</b>,非模拟器数据包):名字 / 称号 / 技能名·描述 / 稀有度 / 元素 / 定位 / 声优。保存后需<b>重启服务端</b>生效,不走右上角同步。</div>
         <div id="profForm"><div class="empty">选择左侧角色以加载资料</div></div>
+        <div id="snapSec" style="display:none">
+          <h3 style="margin-top:16px">整角色 · 一键快照 / 还原</h3>
+          <div class="hint">快照打包该角色的<b>全部</b>:②层表行(角色/词条×6/队长技/数值/觉醒/文本/技能) + ①层资料 + 立绘/图标/像素/语音/技能DSL 文件(实测约 7MB/角色)。魔改前先拍一张,改崩了一键回到快照时点。</div>
+          <div class="row">
+            <input id="snapNote" placeholder="备注(可选,如:魔改前)" style="width:220px">
+            <button id="btnSnapMake">一键备份该角色</button>
+          </div>
+          <div id="snapList"></div>
+          <div class="hint" style="margin-top:8px">要把本角色克隆成全新角色 → 用「<b>新建角色</b>」页签。</div>
+        </div>
+      </section>
+      <section data-t="assets">
+        <div class="row" id="assetBtns" style="display:none">
+          <b id="assetTitle"></b>
+          <button class="sec" id="btnAssetReload">刷新</button>
+        </div>
+        <div class="hint"><b>替换要求</b>:PNG=标准 PNG 文件;<b>sprite sheet/图标合集必须与原图同尺寸同布局</b>(配套 atlas 按坐标切图);立绘/cut-in 建议同尺寸,勾「强制」可绕过尺寸校验(游戏按原 pivot 摆放,尺寸差会偏移)。MP3=<b>CBR·Layer3</b>(VBR 不支持)。替换走 预览→确认→自动备份,大图(medium 根)发布时自动打进 medium 增量包。</div>
+        <div id="assetBox"><div class="empty">选择左侧角色以加载立绘 / 图标 / 语音</div></div>
       </section>
       <section data-t="stat">
         <div class="row" id="statBtns" style="display:none">
@@ -176,27 +233,34 @@ textarea{width:100%;height:140px;font:11.5px Consolas,monospace}
           <span style="flex:1"></span>
           <button id="btnSaveStat">保存修改</button>
         </div>
-        <div class="hint">基础数值(character_status,② 层手机包):HP / ATK 按等级断点存储,游戏内其余等级由客户端<b>线性插值</b>。断点等级不可增删;改后点右上角<b>同步到模拟器</b>。</div>
+        <div class="hint">基础数值(character_status,② 层手机包):HP / ATK 按等级断点存储,游戏内其余等级由客户端<b>线性插值</b>。断点等级不可增删;改后点右上角<b>发布</b>。</div>
         <div id="statBox"><div class="empty">选择左侧角色以加载基础数值</div></div>
       </section>
-      <section data-t="soul">
-        <div class="row">
-          <input id="soulSearch" placeholder="搜索能力魂 ID / 标识" style="width:200px">
-          <b id="soulTitle" style="margin-left:6px"></b>
+      <section data-t="energy">
+        <div class="row" id="energyBtns" style="display:none">
+          <b id="energyTitle"></b>
+          <button class="sec" id="btnEnergyReload">刷新</button>
           <span style="flex:1"></span>
-          <span id="soulBtns" style="display:none">
-            <label><input type="checkbox" id="soulShowAll"> 全部字段</label>
-            <button id="btnSaveSoul">保存修改</button>
-          </span>
+          <button id="btnSaveEnergy">保存修改</button>
         </div>
-        <div class="hint">能力魂(ability_soul,与角色词条同结构):数值规律同词条(1000=1%)。属手机数据包,改后点右上角<b>同步到模拟器</b>。</div>
-        <div style="display:flex;gap:8px">
-          <div id="soulList" style="width:190px;max-height:64vh;overflow:auto;border:1px solid var(--border);border-radius:5px;flex-shrink:0"></div>
-          <div id="soulRows" style="flex:1;overflow:auto"><div class="empty">选择左侧能力魂以加载词条</div></div>
+        <div class="hint">技能(action_skill,② 层手机包):<b>名称/效果描述</b>是游戏内显示文本,可直接改;<b>技能能量</b>面板显示满级值,<b>改小=更快攒满</b>。技能实际效果在 ActionDsl 里(不可编辑),但可以把别的角色的技能<b>整段移植</b>过来。改后点右上角<b>发布</b>。</div>
+        <div id="energyBox"><div class="empty">选择左侧角色以加载技能</div></div>
+        <div id="skillOps" style="display:none">
+          <h3 style="margin-top:14px">技能级别 移植 / 整技能替换</h3>
+          <div class="hint"><b>级别移植</b>:把来源角色某一段技能(名称/描述/能量/动作效果)复制为本角色某段——本角色已有该段=替换,没有=新增(比如给没有＋＋的角色加第 3 段)。<b>整技能替换</b>:来源的全部技能段原样搬来(字节级复制,最稳)。技能动画/效果会变成来源角色的。</div>
+          <div class="row">
+            <label>来源角色</label><input id="skFrom" list="charOpts" placeholder="名字或ID" style="width:180px">
+            <label>来源级别</label><select id="skFromLv"><option>1</option><option>2</option><option>3</option></select>
+            <label>→ 本角色级别</label><select id="skToLv"><option>1</option><option>2</option><option selected>3</option></select>
+            <button class="sec" id="btnSkLvPrev">预览</button>
+            <button id="btnSkLvGo">级别移植</button>
+            <span style="width:14px"></span>
+            <button class="sec" id="btnSkAllPrev">预览整技能</button>
+            <button id="btnSkAllGo">整技能替换</button>
+          </div>
         </div>
-      </section>
-      <section data-t="scale">
-        <h3>技能 / 词条数值倍率</h3>
+        <h3 style="margin-top:14px">技能 / 词条数值倍率</h3>
+        <div class="hint">对本角色(或指定词条 ID)的数值列整体乘倍率——快速全面强化/削弱。作用在<b>词条表</b>上(技能威力字段组等)。</div>
         <div class="row">
           <label>对象</label><span id="scaleTarget" class="badge">未选角色</span>
           <label>或 ability ID</label><input id="scaleAbility" placeholder="1110021" style="width:110px">
@@ -211,11 +275,23 @@ textarea{width:100%;height:140px;font:11.5px Consolas,monospace}
           </select>
           <label>倍率</label><input type="number" id="scaleFactor" value="1.5" step="0.1">
           <select id="scaleRound"><option value="int">四舍五入</option><option value="floor">向下</option><option value="ceil">向上</option><option value="keep">保留小数</option></select>
-        </div>
-        <div class="row">
           <button class="sec" id="btnScalePrev">预览</button>
           <button id="btnScaleApply">应用</button>
         </div>
+      </section>
+      <section data-t="weapon">
+        <div class="row">
+          <b id="wpnTitle"></b>
+          <span style="flex:1"></span>
+          <span id="wpnBtns" style="display:none">
+            <label><input type="checkbox" id="wpnShowAll"> 全部字段</label>
+            <button id="btnSaveWpn">保存修改</button>
+          </span>
+        </div>
+        <div id="wpnInfo"></div>
+        <div class="hint">武器强化词条(equipment_enhancement_ability,与角色词条同 126 列结构,表头含义不同:<b>c0=槽位 c1=解锁强化等级</b>,数值块基址同词条,1000=1%)。每把武器有同 ID 的<b>对应魂珠</b>(ability_soul),用上面按钮直达编辑。② 层手机包,改后点右上角<b>发布</b>。</div>
+        <div id="wpnRows"><div class="empty">左侧选择武器以加载强化词条</div></div>
+        <datalist id="wpnOpts"></datalist>
       </section>
       <section data-t="port">
         <h3>词条移植(A → B)</h3>
@@ -254,6 +330,62 @@ textarea{width:100%;height:140px;font:11.5px Consolas,monospace}
           <button class="sec" id="btnLdrPrev">预览</button>
           <button id="btnLdrApply">写入</button>
         </div>
+        <h3 style="margin-top:14px">队长技 → 队长技(整段替换)</h3>
+        <div class="hint">把 A 的队长技整段复制为 B 的队长技(leader_ability 表整键覆盖)。默认<b>连描述文本一并移植</b>;勾选「保留目标文本」则 B 的队长技描述不变。</div>
+        <div class="row">
+          <label>来源</label><input id="l2lFrom" list="charOpts" placeholder="名字或ID" style="width:180px">
+          <label>目标</label><input id="l2lTo" list="charOpts" placeholder="默认=选中角色" style="width:180px">
+          <label><input type="checkbox" id="l2lKeepSid"> 保留目标文本</label>
+          <button class="sec" id="btnL2lPrev">预览</button>
+          <button id="btnL2lApply">移植</button>
+        </div>
+      </section>
+      <section data-t="finder">
+        <div class="row">
+          <input id="findQ" placeholder="关键字:效果中文 / 角色名 / 词条ID / string_id" style="width:320px">
+          <select id="findKind" title="按来源表筛选:角色能力和队长技分开查">
+            <option value="">全部来源</option>
+            <option value="ability">角色能力</option>
+            <option value="leader_ability">队长技</option>
+            <option value="equipment_enhancement_ability">武器词条</option>
+            <option value="ability_soul">能力魂</option>
+          </select>
+          <button id="btnFind">搜索</button>
+          <span class="hint" id="findCount"></span>
+        </div>
+        <div class="hint">搜全部四表(角色词条 / 队长技 / 武器词条 / 能力魂)的<b>行级中文描述</b>。<b>共用N</b> = 全游戏效果完全相同的词条共 N 条(点击展开成员,可看哪些角色共用);<b>专属</b> = 只此一条。键前缀:<b>L:</b>队长技 <b>W:</b>武器 <b>S:</b>能力魂。点词条键直接跳转编辑。</div>
+        <div id="findBox"><div class="empty">输入关键字开始搜索,如「冲刺」「技能伤害」「贯通」或角色名</div></div>
+      </section>
+      <section data-t="newchar">
+        <h3>新建角色(克隆模板 → 全新 ID)· 实验功能</h3>
+        <div class="hint" style="border:1px solid #b4484899;background:#3a1d1d55;color:#e8a0a0;padding:8px 11px;border-radius:6px">
+          ⚠ <b>坏档风险</b>:全新 ID 角色属于高危实验,曾多次导致<b>客户端反复闪退与存档损坏</b>
+          (服务端把存档里"客户端造不出的角色"通告给 /load → 进不去游戏;删除角色后存档里的残留引用同样会崩)。
+          务必:①创建前先在「角色资料」页给模板角色<b>拍快照</b>;②发放进存档前先在 admin 导出一份<b>存档备份</b>;
+          ③金丝雀验证(列表→详情→编队→战斗)任何一步不对,立即「删除角色」回滚 + admin 从存档移除;
+          ④实验角色<b>不要留在日常使用的存档</b>里。
+        </div>
+        <div class="hint"><b>流程</b>:①填模板与新 ID → 预览 → 创建(写入 ②层 <b>16 张按角色索引的表</b> + ①层,含写入后校验,自动备份) → ②右上角<b>发布</b> → ③<b>重启服务端</b>(start-cn.bat) → ④admin 后台把新 ID 加进存档(邮件/发放,跳过扭蛋) → ⑤进游戏<b>金丝雀验证</b>:角色列表→详情页(立绘/玛纳板)→编队→战斗,有问题就下面「删除角色」回滚 + admin 从存档移除。</div>
+        <div class="hint">已覆盖客户端全部 16 张按 character_id 索引的表(角色/词条×6/队长技/文本/数值/觉醒/语音/技能预览/站位/立绘定位/立绘属性/玛纳板/玛纳节点/开板条件/技能升级/抽卡音效)。<b>扭蛋不影响</b>:新角色只是不在任何卡池,用官方邮件/admin 直接发放即可(抽卡音效表已一并克隆,真去抽也不缺)。称号/剧情/任务等进度类表未克隆(不影响显示与战斗,缺了只是没有称号任务)。</div>
+        <div class="row">
+          <label>模板角色</label><input id="ncSrc" list="charOpts" placeholder="默认=左侧选中角色" style="width:190px">
+          <label>新 ID</label><input id="ncId" placeholder="119999(4-8位数字)" style="width:130px">
+          <label>新名字</label><input id="ncName" placeholder="如:测试角色" style="width:150px">
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="ncOwnAssets"> 资产独立</label>
+          <label>新 code_name</label><input id="ncCode" placeholder="如 my_hero(小写字母开头)" style="width:210px" disabled>
+          <button class="sec" id="btnNcPrev">预览</button>
+          <button id="btnNcGo">创建角色</button>
+        </div>
+        <div class="hint"><b>资产独立</b> = 新 code_name + 把模板的立绘/图标/像素/语音/配套数据全套(约 32 个文件)复制到新路径 + action_skill 独立键 —— 改这个新角色<b>不影响模板</b>。不勾 = 与模板共用资产与技能(轻量金丝雀)。</div>
+        <h3 style="margin-top:16px">删除角色(回滚金丝雀)</h3>
+        <div class="hint">把某个克隆出来的角色 ID 从 ②层全表 + ①层彻底删除(自动备份)。删完发布 + 重启服务端;若已 admin 发放,也去存档移除。<b>只删克隆的实验角色,别删原始角色!</b></div>
+        <div class="row">
+          <label>要删的 ID</label><input id="ncDelId" placeholder="119999" style="width:110px">
+          <button class="sec" id="btnNcDelPrev">预览</button>
+          <button class="danger" id="btnNcDelGo">删除角色</button>
+        </div>
       </section>
       <section data-t="recipe">
         <div class="row">
@@ -273,8 +405,14 @@ textarea{width:100%;height:140px;font:11.5px Consolas,monospace}
           <button id="btnRecipeApply">应用</button>
         </div>
       </section>
+      <section data-t="history">
+        <div class="row"><h3 style="margin:0">改动日志 / 一键回溯</h3><button class="sec" id="btnHistRefresh">刷新</button></div>
+        <div class="hint">每次写入自动记一条,发布时回填版本号。<b>回溯</b> = 把该表还原到此条改动<b>之前</b>的状态(该表此后所有改动一并撤销)+ 自动重新发布 + 重启游戏。只想还原不发布,用「备份」页签。</div>
+        <div id="histList"></div>
+      </section>
       <section data-t="backup">
         <div class="row"><h3 style="margin:0">备份 / 还原</h3><button class="sec" id="btnBkRefresh">刷新</button></div>
+        <div class="hint">「还原」只写回本地表(并加入待发布),不自动发布;要让游戏拉回改动,还原后点右上角<b>发布</b>,或直接用「改动日志」页签的一键回溯。</div>
         <div id="bkList"></div>
       </section>
     </div>
@@ -284,7 +422,7 @@ textarea{width:100%;height:140px;font:11.5px Consolas,monospace}
     <button class="mini" id="btnLogClear">清空</button>
     <button class="mini" id="btnLogToggle">折叠</button>
   </div>
-  <div id="log">就绪。操作先「预览」确认改动,再「应用」写入(自动备份);之后点右上角同步。</div>
+  <div id="log">就绪。操作先「预览」确认改动,再「应用」写入(自动备份);之后点右上角「发布并重启游戏」进游戏。改错了去「改动日志」页签一键回溯。</div>
 </div>
   </div>
 </main>
@@ -341,7 +479,7 @@ async function api(path,body){
 function showResult(r){
   if(r.log)log(r.log.trim());
   log((r.dry_run?'[预览] ':'[已写入] ')+'改动数: '+r.changes);
-  if(!r.dry_run&&r.changes>0){toast('已写入 '+r.changes+' 处修改,记得同步到模拟器');refreshStatus();}
+  if(!r.dry_run&&r.changes>0){toast('已写入 '+r.changes+' 处修改,记得点右上角「发布」进游戏');refreshStatus();}
 }
 // 预览内嵌确认:把 dry-run 改动明细放进确认框,看清楚再写
 function confirmWithPreview(msg,prev){
@@ -351,8 +489,9 @@ function confirmWithPreview(msg,prev){
 }
 // 未保存修改守卫
 function dirtyCount(){
-  return Object.keys(edits).length+Object.keys(soulEdits).length
-    +$$('.profInp.mod').length+$$('.statInp.mod').length;
+  return Object.keys(edits).length+Object.keys(soulEdits).length+Object.keys(wpnEdits).length
+    +$$('.profInp.mod').length+$$('.statInp.mod').length+$$('.energyInp.mod').length
+    +$$('.dslInp.mod').length;
 }
 function guardDirty(){
   const n=dirtyCount();
@@ -365,7 +504,7 @@ async function refreshStatus(){
   const pb=$('#profBadge');
   if(s.profile){pb.textContent=s.profile+(s.res_version?' '+s.res_version:'');pb.className='badge ok';}
   else{pb.textContent='无版本档案';pb.className='badge warn';}
-  const p=$('#pendBadge');p.textContent='待同步 '+s.pending.length;p.className='badge '+(s.pending.length?'warn':'');
+  const p=$('#pendBadge');p.textContent='待发布 '+s.pending.length;p.className='badge '+(s.pending.length?'warn':'');
   const a=$('#adbBadge');
   if(!s.adb){a.textContent='adb 未找到';a.className='badge err';}
   else{a.textContent=s.connected?'模拟器已连接':'模拟器未连接';a.className='badge '+(s.connected?'ok':'warn');}
@@ -393,7 +532,7 @@ function renderChars(){
       d.className='char'+(sel&&sel.id===c.id?' sel':'')+(c.in_store?'':' off');
       const stars=parseInt(c.rarity)>0?'★'.repeat(parseInt(c.rarity)):'';
       d.innerHTML=`<span class="el ${c.element}">${c.element}</span><span class="nm">${c.name}</span><span class="rar">${stars}</span><span class="id">${c.id}</span>`;
-      d.onclick=()=>{if(sel&&sel.id!==c.id&&!guardDirty())return;sel=c;renderChars();loadRows();if(curTab()==='profile')loadProfile();if(curTab()==='stat')loadStat();$('#scaleTarget').textContent=c.name+' ('+c.id+')';};
+      d.onclick=()=>{if(sel&&sel.id!==c.id&&!guardDirty())return;sel=c;renderChars();loadRows();if(curTab()==='profile')loadProfile();if(curTab()==='stat')loadStat();if(curTab()==='energy')loadEnergy();if(curTab()==='assets')loadAssets();$('#scaleTarget').textContent=c.name+' ('+c.id+')';};
       box.appendChild(d);
     });
 }
@@ -406,35 +545,51 @@ async function loadRows(){
   colNames=data.columns;
   const box=$('#rowsBox');box.innerHTML='';
   const showAll=$('#showAll').checked;
-  data.abilities.forEach((ab,slotIdx)=>{
-    const h=document.createElement('div');h.className='abil-h';
-    const label=ab.leader?('队长技'+(data.leader_title?' · '+data.leader_title:'')):('槽位 '+(slotIdx+1));
-    h.innerHTML=`<span class="tri">▾</span>${label} · <b>${ab.ability}</b>`+(ab.missing?' <span class="miss">数据包中不存在</span>':` <span class="hint">${ab.lines.length} 行</span>`)+(ab.desc?` <span class="desc">${ab.desc}</span>`:'');
-    box.appendChild(h);
-    if(ab.missing)return;
-    // 转置表:字段做行,line 做列
+  // 转置表构建:entries=[{l:行对象, desc:中文描述}],字段做行、line 做列
+  function buildAbTable(ab,entries){
     let idxSet=new Set();
     if(showAll){colNames.forEach((_,i)=>idxSet.add(i));}
-    else ab.lines.forEach(l=>Object.keys(l.values).forEach(k=>idxSet.add(+k)));
+    else entries.forEach(e=>Object.keys(e.l.values).forEach(k=>idxSet.add(+k)));
     const idxs=[...idxSet].sort((a,b)=>a-b);
-    // 两行=面板 1级/满级 两端值:按威力字段大小猜测方向
-    const lvTags=ab.lines.map(()=>'');
-    if(ab.lines.length===2){
-      const mag=l=>[50,52,54,56,58].reduce((s,i)=>s+Math.abs(parseInt(l.values[String(i)]||0)||0),0);
-      const a=mag(ab.lines[0]), b=mag(ab.lines[1]);
-      if(a!==b){lvTags[0]=a>b?' · 满级':' · 1级';lvTags[1]=a>b?' · 1级':' · 满级';}
-    }
+    const uniIdx=colNames.indexOf('unisonable');
     const tbl=document.createElement('table');
     const thead=document.createElement('tr');
-    thead.innerHTML='<th>字段</th>'+ab.lines.map((l,i)=>`<th>行 ${l.line}${lvTags[i]}</th>`).join('');
+    const th0=document.createElement('th');th0.textContent='字段';thead.appendChild(th0);
+    entries.forEach(e=>{
+      const l=e.l;
+      const th=document.createElement('th');
+      th.append('行 '+l.line+' ');
+      if(!ab.leader&&uniIdx>=0){ // 单行主位开关(仅 ability 表;leader 表无 unisonable)
+        const isMain=(l.values[String(uniIdx)]||'')==='false';
+        const mb=document.createElement('button');mb.className='mini';
+        mb.textContent=isMain?'解主位':'限主位';
+        mb.title=isMain?'当前=仅主位生效(Ⓜ),点击解除限制(unisonable→true,前置202→0)':'当前=协力位也生效,点击改为仅主位(unisonable→false)';
+        mb.onclick=ev=>{ev.stopPropagation();mainposOne(ab.ability,l.line,isMain?'off':'on');};
+        th.appendChild(mb);
+      }
+      if(ab.lines.length>1){
+        const db=document.createElement('button');db.className='mini';db.textContent='删行';
+        db.title='删除这一行效果(自动备份,可从「备份」页签还原)';
+        db.onclick=ev=>{ev.stopPropagation();deleteLine(ab.ability,l.line);};
+        th.appendChild(db);
+      }
+      thead.appendChild(th);
+    });
     tbl.appendChild(thead);
+    if(entries.some(e=>e.desc)){
+      const dr=document.createElement('tr');
+      const td0=document.createElement('td');td0.className='fname';td0.innerHTML='<b>游戏效果</b>';dr.appendChild(td0);
+      entries.forEach(e=>{const td=document.createElement('td');td.className='ldesc';td.textContent=e.desc||'';dr.appendChild(td);});
+      tbl.appendChild(dr);
+    }
     idxs.forEach(i=>{
       const tr=document.createElement('tr');
       const nm=colNames[i]||'';
       const td=document.createElement('td');td.className='fname';td.title=i+': '+nm;
       td.innerHTML=`${i} <b>${cnCol(nm)}</b>`;
       tr.appendChild(td);
-      ab.lines.forEach(line=>{
+      entries.forEach(e=>{
+        const line=e.l;
         const cell=document.createElement('td');
         const inp=document.createElement('input');
         const v=line.values[String(i)]||'';
@@ -454,8 +609,82 @@ async function loadRows(){
       });
       tbl.appendChild(tr);
     });
-    box.appendChild(tbl);
-    h.onclick=()=>{const hide=tbl.style.display!=='none';tbl.style.display=hide?'none':'';h.querySelector('.tri').textContent=hide?'▸':'▾';};
+    return tbl;
+  }
+  data.abilities.forEach((ab,slotIdx)=>{
+    // 基础行/觉醒行分区:kind=1(Switch)且 level≥1,或 kind=2(Addition)归觉醒
+    // (ability 表 c3/c4;leader 表 c1/c2)
+    const kIdx=ab.leader?1:3, lvIdx=ab.leader?2:4;
+    const parts={base:[],awake:[]};
+    ab.lines.forEach((l,i)=>{
+      const k=(l.values[String(kIdx)]||'').trim(), lv=(l.values[String(lvIdx)]||'').trim();
+      const isAwk=(k==='1'&&lv!==''&&lv!=='0')||k==='2';
+      parts[isAwk?'awake':'base'].push({l,desc:(ab.line_descs||[])[i]});
+    });
+    if(ab.leader){ // 队长技与角色能力分区:不同表(124列,无主位开关),视觉隔开防混淆
+      const sep=document.createElement('div');sep.className='ldr-sep';
+      sep.innerHTML='━━ 队长技(leader_ability 表,与上方角色能力分表存储)━━';
+      box.appendChild(sep);
+    }
+    const h=document.createElement('div');h.className='abil-h'+(ab.leader?' ldr-h':'');
+    const label=ab.leader?('队长技'+(data.leader_title?' · '+data.leader_title:'')):('能力 '+(slotIdx+1));
+    const cnt=ab.missing?'':` <span class="hint">${parts.base.length} 行${parts.awake.length?' + 觉醒 '+parts.awake.length+' 行':''}</span>`;
+    h.innerHTML=`<span class="tri">▾</span>${label} · <b>${ab.ability}</b>`+(ab.missing?' <span class="miss">数据包中不存在</span>':cnt)+(ab.desc?` <span class="desc">${ab.desc}</span>`:'');
+    box.appendChild(h);
+    if(ab.missing)return;
+    const wrap=document.createElement('div');
+    if(parts.base.length)wrap.appendChild(buildAbTable(ab,parts.base));
+    if(parts.awake.length){
+      const ah=document.createElement('div');ah.className='awk-h';
+      ah.textContent='⟡ 觉醒行 · 点亮觉醒板后生效:[觉醒N替换]顶替上面的基础行,[觉醒N追加]额外新增(与基础行分开编辑)';
+      wrap.appendChild(ah);
+      wrap.appendChild(buildAbTable(ab,parts.awake));
+    }
+    // ＋添加行:从其他角色复制词条行,自动适配本角色(属性/文本/觉醒门槛)
+    const addBtn=document.createElement('button');addBtn.className='mini';addBtn.textContent='＋添加行';
+    addBtn.title='从其他角色的'+(ab.leader?'队长技':'词条')+'复制一行到这里,自动换成本角色属性、统一描述文本、清除觉醒门槛(防跨属性崩溃)';
+    h.appendChild(addBtn);
+    const isLdr=!!ab.leader;
+    const af=document.createElement('div');af.className='addform';af.style.display='none';
+    af.innerHTML='<div class="row"><label>来源角色</label><input class="afSrc" list="charOpts" placeholder="名字(选列表) 或直接填词条键" style="width:210px">'
+      +'<label>槽位</label><select class="afSlot">'+(isLdr?'<option value="L">队长技</option>'
+        :'<option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option>')+'</select>'
+      +'<label>行</label><input type="number" class="afLine" value="1" style="width:55px">'
+      +'<label><input type="checkbox" class="afAdapt" checked> 自动适配</label>'
+      +'<button class="sec afPrev">预览</button><button class="afGo">添加</button></div>'
+      +'<div class="hint">'+(isLdr?'目标是队长技,来源也必须是队长技(同表);':'目标是词条槽,来源须是角色词条(1-6 槽);要拿队长技当词条用请去「词条移植」页;')
+      +'自动适配 = 元素条件换成本角色属性 + 描述文本统一 + 觉醒门槛清零。效果枚举自带属性(如“状态抗性火”)时会提醒手动换枚举。</div>';
+    addBtn.onclick=ev=>{ev.stopPropagation();af.style.display=af.style.display==='none'?'':'none';};
+    wrap.appendChild(af);
+    const srcOf=()=>{
+      const t=af.querySelector('.afSrc').value.trim();
+      const slot=af.querySelector('.afSlot').value;
+      const m=t.match(/\((\d+)\)\s*$/);
+      if(m){
+        const cid=m[1];
+        if(slot==='L')return 'L:'+cid;
+        const c=chars.find(x=>x.id===cid);
+        return (c&&c.abilities&&c.abilities[parseInt(slot)-1])||null;
+      }
+      return t||null;
+    };
+    const afBody=dry=>{
+      const k=srcOf();if(!k){log('请填来源(角色+槽位,或直接词条键)',true);return null;}
+      const ad=af.querySelector('.afAdapt').checked;
+      return {src_key:k,src_line:parseInt(af.querySelector('.afLine').value)||1,dst_key:ab.ability,
+              element:ad?'auto':'',adapt_sid:ad,clear_awake:ad,dry_run:dry};
+    };
+    af.querySelector('.afPrev').onclick=async()=>{const b=afBody(true);if(b)showResult(await api('/append_line_adapted',b));};
+    af.querySelector('.afGo').onclick=async()=>{
+      const b=afBody(true);if(!b)return;
+      if(Object.keys(edits).length&&!confirm('有未保存的词条修改,添加后会刷新并丢弃。继续?'))return;
+      const prev=await api('/append_line_adapted',b);showResult(prev);
+      if(confirmWithPreview('确认把 '+b.src_key+' 行'+b.src_line+' 添加到 '+ab.ability+'?(自动备份)',prev)){
+        showResult(await api('/append_line_adapted',{...b,dry_run:false}));loadRows();
+      }
+    };
+    box.appendChild(wrap);
+    h.onclick=()=>{const hide=wrap.style.display!=='none';wrap.style.display=hide?'none':'';h.querySelector('.tri').textContent=hide?'▸':'▾';};
   });
   $('#btnSaveRows').textContent='保存修改';
 }
@@ -481,9 +710,10 @@ const PROF_FIELDS=[
 ];
 function curTab(){const t=$$('nav .tab').find(x=>x.classList.contains('sel'));return t?t.dataset.t:'';}
 async function loadProfile(){
-  if(!sel){$('#profForm').innerHTML='<div class="empty">选择左侧角色以加载资料</div>';return;}
+  if(!sel){$('#profForm').innerHTML='<div class="empty">选择左侧角色以加载资料</div>';$('#snapSec').style.display='none';return;}
   $('#profTitle').textContent=sel.name+' ('+sel.id+') 角色资料';
   $('#profBtns').style.display='flex';
+  loadSnapList();
   const data=await api('/char_fields?character='+encodeURIComponent(sel.id));
   const f=data.fields, box=$('#profForm'); box.innerHTML='';
   PROF_FIELDS.forEach(fd=>{
@@ -524,6 +754,146 @@ async function saveProf(){
 }
 $('#btnSaveProf').onclick=saveProf;
 $('#btnProfReload').onclick=loadProfile;
+
+// ---- 整角色快照/还原/克隆 ----
+async function loadSnapList(){
+  if(!sel)return;
+  $('#snapSec').style.display='';
+  const list=await api('/char_snapshots?character='+encodeURIComponent(sel.id));
+  const box=$('#snapList');box.innerHTML='';
+  if(!list.length){box.innerHTML='<div class="hint">该角色暂无快照。</div>';return;}
+  list.forEach(s=>{
+    const d=document.createElement('div');d.className='bk';
+    d.innerHTML=`<span class="badge">${s.ts}</span><span class="n">${s.note||'(无备注)'} · ${s.assets}个资产 · ${(s.size/1048576).toFixed(1)}MB</span>`;
+    const btn=document.createElement('button');btn.className='danger';btn.textContent='还原';
+    btn.onclick=async()=>{
+      const prev=await api('/char_restore',{file:s.file,dry_run:true});
+      if(!prev.changes)return log('当前状态与快照一致,无需还原');
+      showResult(prev);
+      if(confirmWithPreview('把 '+sel.name+' 整体还原到 '+s.ts+' 快照?(数据+文本+资产全部回退,自动备份)',prev)){
+        const r=await api('/char_restore',{file:s.file,dry_run:false});
+        showResult(r);log(r.note||'');
+        loadProfile();if(curTab()==='edit')loadRows();
+      }
+    };
+    d.appendChild(btn);box.appendChild(d);
+  });
+}
+$('#btnSnapMake').onclick=async()=>{
+  if(!sel)return;
+  const r=await api('/char_snapshot',{character:sel.id,note:$('#snapNote').value.trim()});
+  log('已快照 '+sel.name+': '+r.file+' ('+(r.size/1048576).toFixed(1)+'MB, 资产'+r.assets+'个)');
+  toast('已备份 '+sel.name);
+  $('#snapNote').value='';loadSnapList();
+};
+// ---- 新建角色(克隆模板 → 全新 ID,可选资产独立) ----
+$('#ncOwnAssets').onchange=()=>{$('#ncCode').disabled=!$('#ncOwnAssets').checked;};
+function ncBody(dry){
+  const src=parseChar($('#ncSrc').value)||(sel&&sel.id);
+  if(!src){log('请选模板角色(左侧选中或填名字)',true);return null;}
+  const nid=$('#ncId').value.trim();
+  if(!nid){log('请填新角色 ID(4-8 位数字)',true);return null;}
+  const own=$('#ncOwnAssets').checked;
+  const code=$('#ncCode').value.trim();
+  if(own&&!code){log('勾了资产独立就要填新 code_name',true);return null;}
+  return {src,new_id:nid,new_name:$('#ncName').value.trim(),
+          new_code:own?code:'',dry_run:dry};
+}
+$('#btnNcPrev').onclick=async()=>{const b=ncBody(true);if(b)showResult(await api('/char_clone',b));};
+$('#btnNcGo').onclick=async()=>{
+  const b=ncBody(true);if(!b)return;
+  let prev;try{prev=await api('/char_clone',b);}catch(e){return;}
+  showResult(prev);
+  if(confirmWithPreview('确认创建新角色 '+b.new_id+'?(写入 16 张表与①层'+(b.new_code?'+复制全套资产':'')+',自动备份)',prev)){
+    let r;try{r=await api('/char_clone',{...b,dry_run:false});}catch(e){return;}
+    showResult(r);log(r.note||'');
+    toast('已创建,按页面流程:发布→重启服务端→admin 发放→金丝雀');
+    chars=await api('/characters');renderChars();
+  }
+};
+$('#btnNcDelPrev').onclick=async()=>{
+  const id=$('#ncDelId').value.trim();if(!id)return log('填要删的 ID',true);
+  showResult(await api('/char_delete',{cid:id,dry_run:true}));
+};
+$('#btnNcDelGo').onclick=async()=>{
+  const id=$('#ncDelId').value.trim();if(!id)return log('填要删的 ID',true);
+  const prev=await api('/char_delete',{cid:id,dry_run:true});showResult(prev);
+  if(!prev.changes)return log('该 ID 没有可删的数据');
+  if(confirmWithPreview('确认彻底删除角色 '+id+'?(②层全表+①层,自动备份)',prev)){
+    showResult(await api('/char_delete',{cid:id,dry_run:false}));
+    toast('已删除,记得发布+重启服务端+admin 从存档移除');
+    chars=await api('/characters');renderChars();
+  }
+};
+
+// ---- 角色资产:立绘/图标/语音 预览与上传替换 ----
+async function loadAssets(){
+  if(!sel){$('#assetBox').innerHTML='<div class="empty">选择左侧角色以加载立绘 / 图标 / 语音</div>';return;}
+  $('#assetTitle').textContent=sel.name+' ('+sel.id+') 资产';
+  $('#assetBtns').style.display='flex';
+  let data;
+  try{data=await api('/char_assets?character='+encodeURIComponent(sel.id));}
+  catch(e){$('#assetBox').innerHTML='<div class="hint">加载失败(见日志)。</div>';return;}
+  const box=$('#assetBox');box.innerHTML='';
+  const ts=Date.now();
+  data.assets.forEach(a=>{
+    const card=document.createElement('div');card.className='acard';
+    const an=document.createElement('div');an.className='an';an.textContent=a.kind+' · '+a.logical.split('/').slice(-1)[0];
+    an.title=a.logical;card.appendChild(an);
+    if(!a.exists){
+      const m=document.createElement('div');m.className='am';m.textContent='(不存在)';card.appendChild(m);box.appendChild(card);return;
+    }
+    const url='/api/mod/asset?logical='+encodeURIComponent(a.logical)+'&t='+ts;
+    if(a.logical.endsWith('.png')){
+      const img=document.createElement('img');img.src=url;card.appendChild(img);
+    }else if(a.logical.endsWith('.mp3')){
+      const au=document.createElement('audio');au.controls=true;au.preload='none';au.src=url;card.appendChild(au);
+    }
+    if(a.text){
+      const tx=document.createElement('div');tx.className='am';
+      tx.style.cssText='white-space:normal;max-height:46px;overflow:hidden;color:#9fb3d8';
+      tx.textContent=a.text;tx.title=a.text;card.appendChild(tx);
+    }
+    const meta=document.createElement('div');meta.className='am';
+    meta.textContent=(a.dims?a.dims[0]+'x'+a.dims[1]+' · ':'')+(a.size/1024).toFixed(0)+'KB · '+a.root+' 根';
+    card.appendChild(meta);
+    const req=document.createElement('div');req.className='areq';req.textContent=a.req;card.appendChild(req);
+    const row=document.createElement('div');row.className='row';row.style.margin='2px 0 0';
+    const fi=document.createElement('input');fi.type='file';
+    fi.accept=a.logical.endsWith('.png')?'image/png':(a.logical.endsWith('.mp3')?'audio/mpeg':'');
+    fi.style.cssText='font-size:10.5px;width:130px';
+    const fc=document.createElement('label');fc.innerHTML='<input type="checkbox"> 强制';fc.title='绕过尺寸校验(仅立绘/cut-in 建议)';
+    const bu=document.createElement('button');bu.className='mini';bu.textContent='替换';
+    bu.onclick=()=>replaceAsset(a.logical,fi,fc.querySelector('input').checked);
+    row.appendChild(fi);row.appendChild(fc);row.appendChild(bu);
+    card.appendChild(row);
+    box.appendChild(card);
+  });
+  const note=document.createElement('div');note.className='hint';note.style.width='100%';note.textContent=data.note+' · 语音清单来自路径采集,未采集到的语音文件不在列表(可用逻辑路径规律自行推)';
+  box.appendChild(note);
+}
+function fileToB64(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(String(r.result).split(',')[1]);
+    r.onerror=rej;r.readAsDataURL(file);
+  });
+}
+async function replaceAsset(logical,fileInput,force){
+  const f=fileInput.files&&fileInput.files[0];
+  if(!f)return log('先选择要上传的文件',true);
+  log('读取 '+f.name+' ('+(f.size/1024).toFixed(0)+'KB)...');
+  const b64=await fileToB64(f);
+  let prev;
+  try{prev=await api('/asset/replace',{logical,data_b64:b64,force,dry_run:true});}
+  catch(e){return;}
+  showResult(prev);
+  if(confirmWithPreview('确认替换资产?\n'+logical+'\n(自动备份原文件)',prev)){
+    showResult(await api('/asset/replace',{logical,data_b64:b64,force,dry_run:false}));
+    loadAssets();
+  }
+}
+$('#btnAssetReload').onclick=loadAssets;
 
 // ---- 基础数值 character_status ----
 let statEntries=[];
@@ -597,77 +967,465 @@ $('#btnStatScale').onclick=()=>{
   log('已按 ×'+f+' 填入(未保存,点「保存修改」生效)');
 };
 
-// ---- 能力魂 ability_soul ----
-let soulSel=null, soulEdits={}, soulCols=[];
-async function loadSouls(){
-  const list=await api('/souls');
-  const q=$('#soulSearch').value.trim().toLowerCase();
-  const box=$('#soulList'); box.innerHTML='';
-  list.filter(s=>!q||s.id.includes(q)||(s.string_id||'').toLowerCase().includes(q)).slice(0,600).forEach(s=>{
-    const d=document.createElement('div');d.className='char'+(soulSel===s.id?' sel':'');
-    d.innerHTML=`<span class="nm">${s.string_id||s.id}</span><span class="id">R${s.rarity}·${s.id}</span>`;
-    d.onclick=()=>{if(soulSel&&soulSel!==s.id&&Object.keys(soulEdits).length&&!confirm('能力魂有未保存修改,切换将丢失。确定?'))return;soulSel=s.id;loadSouls();loadSoulRows();};
-    box.appendChild(d);
+// ---- 魂珠编辑状态(编辑器嵌在武器页内,装备与魂同键) ----
+let soulEdits={};
+
+// ---- 技能(action_skill):名称/描述/能量 编辑 + 级别增删移植 + 倍率 ----
+async function loadEnergy(){
+  if(!sel){$('#energyBox').innerHTML='<div class="empty">选择左侧角色以加载技能</div>';$('#skillOps').style.display='none';return;}
+  $('#energyTitle').textContent=sel.name+' ('+sel.id+') 技能';
+  $('#energyBtns').style.display='flex';
+  let data;
+  try{data=await api('/skill_energy?character='+encodeURIComponent(sel.id));}
+  catch(e){$('#energyBox').innerHTML='<div class="hint">该角色不在 action_skill 表(见日志)。</div>';$('#skillOps').style.display='none';return;}
+  $('#skillOps').style.display='';
+  const box=$('#energyBox');box.innerHTML='';
+  const tbl=document.createElement('table');
+  tbl.innerHTML='<tr><th>技能段</th><th>名称</th><th>效果描述(游戏内显示)</th><th>SLv1 能量</th><th>满级能量(面板)</th><th></th></tr>';
+  data.skills.forEach(s=>{
+    const tr=document.createElement('tr');
+    const td0=document.createElement('td');td0.className='fname';td0.innerHTML='<b></b>';td0.querySelector('b').textContent=s.label;tr.appendChild(td0);
+    [['name',s.name,150],['description',s.description,360],['min_skill_weight',s.min_skill_weight,0],['max_skill_weight',s.max_skill_weight,0]].forEach(([f,v,w])=>{
+      const td=document.createElement('td');const inp=document.createElement('input');
+      inp.value=v;inp.dataset.orig=v;inp.dataset.level=s.level;inp.dataset.f=f;inp.className='energyInp';
+      if(w)inp.style.width=w+'px';
+      inp.title=f==='description'?v:'';
+      inp.oninput=()=>inp.classList.toggle('mod',inp.value!==inp.dataset.orig);
+      td.appendChild(inp);tr.appendChild(td);
+    });
+    const tdd=document.createElement('td');
+    const eb=document.createElement('button');eb.className='mini';eb.textContent='效果参数';
+    eb.title='打开这段技能的效果命令树数值(判定范围/帧/强度等),可原地修改';
+    eb.onclick=()=>loadDsl(s.level,s.label);
+    tdd.appendChild(eb);
+    if(data.skills.length>1){
+      const db=document.createElement('button');db.className='mini';db.textContent='删除级别';
+      db.title='删除这一段技能(至少留 1 段;删＋段会影响已进化的存档,慎用)';
+      db.onclick=()=>skillLevelDelete(s.level,s.label);
+      tdd.appendChild(db);
+    }
+    tr.appendChild(tdd);
+    tbl.appendChild(tr);
   });
+  box.appendChild(tbl);
+  const note=document.createElement('div');note.className='hint';note.textContent='表键: '+data.skill_key+' · '+data.note;
+  box.appendChild(note);
+  const dsl=document.createElement('div');dsl.id='dslBox';box.appendChild(dsl);
 }
-async function loadSoulRows(){
-  if(!soulSel)return;
-  soulEdits={};
-  const data=await api('/soul_rows?soul='+encodeURIComponent(soulSel));
-  soulCols=data.columns;
-  $('#soulTitle').textContent='能力魂 '+soulSel+(data.desc?' · '+data.desc:'');
-  $('#soulBtns').style.display='inline';
-  const box=$('#soulRows'); box.innerHTML='';
-  const showAll=$('#soulShowAll').checked;
+// ---- 技能效果 DSL 数值(ActionDsl 命令树,原地补丁) ----
+async function loadDsl(level,label){
+  const box=$('#dslBox');box.innerHTML='<div class="hint">解析效果命令树...</div>';
+  let d;
+  try{d=await api('/skill_dsl?character='+encodeURIComponent(sel.id)+'&level='+encodeURIComponent(level));}
+  catch(e){box.innerHTML='';return;}
+  box.innerHTML='';
+  const h=document.createElement('h3');h.style.marginTop='12px';h.textContent='['+label+'] 技能效果参数';box.appendChild(h);
+  const hint=document.createElement('div');hint.className='hint';hint.textContent=d.program_path+' · '+d.note;box.appendChild(hint);
+  const tbl=document.createElement('table');
+  tbl.innerHTML='<tr><th>#</th><th>命令树位置</th><th>类型</th><th>值</th></tr>';
+  d.numbers.forEach((n,i)=>{
+    const tr=document.createElement('tr');
+    const td0=document.createElement('td');td0.className='fname';td0.textContent=i;tr.appendChild(td0);
+    const tdc=document.createElement('td');tdc.className='fname';tdc.style.maxWidth='420px';tdc.textContent=n.ctx||'(根)';tr.appendChild(tdc);
+    const tdt=document.createElement('td');tdt.textContent=n.type;tr.appendChild(tdt);
+    const tdv=document.createElement('td');const inp=document.createElement('input');
+    inp.value=n.value;inp.dataset.orig=String(n.value);
+    inp.dataset.offset=n.offset;inp.dataset.len=n.len;inp.dataset.type=n.type;
+    inp.className='dslInp';
+    inp.oninput=()=>inp.classList.toggle('mod',inp.value!==inp.dataset.orig);
+    tdv.appendChild(inp);tr.appendChild(tdv);
+    tbl.appendChild(tr);
+  });
+  box.appendChild(tbl);
+  const row=document.createElement('div');row.className='row';
+  const bs=document.createElement('button');bs.textContent='保存效果参数';
+  bs.onclick=async()=>{
+    const edits=$$('.dslInp').filter(x=>x.value!==x.dataset.orig).map(x=>({
+      offset:+x.dataset.offset,len:+x.dataset.len,type:x.dataset.type,
+      value:x.dataset.type==='double'?parseFloat(x.value):parseInt(x.value)}));
+    if(!edits.length)return log('没有修改');
+    const b={character:sel.id,level,edits,dry_run:true};
+    let prev;try{prev=await api('/skill_dsl/save',b);}catch(e){return;}
+    showResult(prev);
+    if(prev.changes&&confirmWithPreview('确认写入技能效果参数?(自动备份 DSL 文件)',prev)){
+      showResult(await api('/skill_dsl/save',{...b,dry_run:false}));loadDsl(level,label);
+    }
+  };
+  row.appendChild(bs);
+  const cl=document.createElement('button');cl.className='sec';cl.textContent='收起';
+  cl.onclick=()=>{box.innerHTML='';};
+  row.appendChild(cl);
+  box.appendChild(row);
+}
+async function saveEnergy(){
+  if(!sel)return;
+  const by={};
+  $$('.energyInp').forEach(inp=>{
+    if(inp.value!==inp.dataset.orig)
+      (by[inp.dataset.level]=by[inp.dataset.level]||{level:inp.dataset.level})[inp.dataset.f]=inp.value;
+  });
+  const list=Object.values(by);
+  if(!list.length)return log('没有修改');
+  const prev=await api('/skill_energy/save',{character:sel.id,edits:list,dry_run:true});showResult(prev);
+  if(prev.changes&&confirmWithPreview('确认写入技能修改?(自动备份)',prev)){
+    showResult(await api('/skill_energy/save',{character:sel.id,edits:list,dry_run:false}));loadEnergy();
+  }
+}
+$('#btnSaveEnergy').onclick=saveEnergy;
+$('#btnEnergyReload').onclick=()=>{if($$('.energyInp.mod').length&&!confirm('刷新将丢弃未保存的技能修改,确定?'))return;loadEnergy();};
+async function skillLevelDelete(level,label){
+  if($$('.energyInp.mod').length&&!confirm('有未保存的技能修改,操作会刷新并丢弃。继续?'))return;
+  const prev=await api('/skill_level_delete',{character:sel.id,level,dry_run:true});showResult(prev);
+  if(confirmWithPreview('删除 '+sel.name+' 的 ['+label+']?(自动备份)',prev)){
+    showResult(await api('/skill_level_delete',{character:sel.id,level,dry_run:false}));loadEnergy();
+  }
+}
+function skBody(dry){
+  const from=parseChar($('#skFrom').value);
+  if(!from){log('请填来源角色',true);return null;}
+  return {from_character:from,from_level:$('#skFromLv').value,
+          to_character:sel.id,to_level:$('#skToLv').value,dry_run:dry};
+}
+$('#btnSkLvPrev').onclick=async()=>{if(!sel)return log('先选角色',true);const b=skBody(true);if(b)showResult(await api('/skill_level_copy',b));};
+$('#btnSkLvGo').onclick=async()=>{
+  if(!sel)return log('先选角色',true);
+  const b=skBody(true);if(!b)return;
+  if($$('.energyInp.mod').length&&!confirm('有未保存的技能修改,操作会刷新并丢弃。继续?'))return;
+  const prev=await api('/skill_level_copy',b);showResult(prev);
+  if(confirmWithPreview('确认把 '+b.from_character+' 的技能级别'+b.from_level+' 移植为 '+sel.name+' 的级别'+b.to_level+'?(自动备份)',prev)){
+    showResult(await api('/skill_level_copy',{...b,dry_run:false}));loadEnergy();
+  }
+};
+$('#btnSkAllPrev').onclick=async()=>{
+  if(!sel)return log('先选角色',true);
+  const from=parseChar($('#skFrom').value);if(!from)return log('请填来源角色',true);
+  showResult(await api('/skill_copy',{from_character:from,to_character:sel.id,dry_run:true}));
+};
+$('#btnSkAllGo').onclick=async()=>{
+  if(!sel)return log('先选角色',true);
+  const from=parseChar($('#skFrom').value);if(!from)return log('请填来源角色',true);
+  if($$('.energyInp.mod').length&&!confirm('有未保存的技能修改,操作会刷新并丢弃。继续?'))return;
+  const b={from_character:from,to_character:sel.id,dry_run:true};
+  const prev=await api('/skill_copy',b);showResult(prev);
+  if(confirmWithPreview('确认把 '+from+' 的整套技能替换给 '+sel.name+'?(自动备份,动画/效果随来源)',prev)){
+    showResult(await api('/skill_copy',{...b,dry_run:false}));loadEnergy();
+  }
+};
+
+// ---- 武器词条 equipment_enhancement_ability ----
+// 表头前几列与角色词条含义不同(逆向:c0=槽位 c1=解锁强化等级 c2=最大强化等级 c3/c4=威力两端值 c5=触发器)
+const WPN_COL_CN={0:'槽位',1:'解锁强化等级',2:'最大强化等级',3:'威力·SLv1',4:'威力·满级',5:'触发器'};
+let wpnSel=null, wpnEdits={}, wpnCache=null;
+async function loadWeapons(){
+  if(!wpnCache){
+    wpnCache=await api('/weapons');
+    const dl=$('#wpnOpts');
+    if(dl&&!dl.children.length)wpnCache.filter(w=>w.has_enh).forEach(w=>{
+      const o=document.createElement('option');o.value=(w.enh_name||w.name||w.id)+' ('+w.id+')';dl.appendChild(o);});
+  }
+  if(mode==='wpn')renderWeaponsLeft();
+}
+async function loadWpnRows(){
+  if(!wpnSel)return;
+  wpnEdits={};
+  const data=await api('/weapon_ability?wid='+encodeURIComponent(wpnSel));
+  const ei=data.info||{};
+  $('#wpnTitle').textContent=(ei.enh_name||ei.name||'装备')+(data.no_enh?' · 魂珠':' · 强化词条 + 魂珠');
+  $('#wpnBtns').style.display='inline';
+  // 信息栏:名字(改造名) · 品质 · ID · 对应魂珠直达
+  const inf=$('#wpnInfo');inf.innerHTML='';inf.style.display='flex';
+  const wn=document.createElement('span');wn.className='wname';wn.textContent=ei.enh_name||ei.name||wpnSel;
+  if(ei.enh_name&&ei.name&&ei.enh_name!==ei.name)wn.title='原名: '+ei.name;
+  inf.appendChild(wn);
+  if(ei.rarity){const rr=document.createElement('span');rr.className='rar';rr.textContent='★'.repeat(parseInt(ei.rarity)||0);inf.appendChild(rr);}
+  const idb=document.createElement('span');idb.className='badge';idb.textContent='ID '+wpnSel;inf.appendChild(idb);
+  if(ei.desc){const ds=document.createElement('span');ds.className='hint';ds.style.cssText='flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis';ds.textContent=ei.desc;ds.title=ei.desc;inf.appendChild(ds);}
+  else{const sp=document.createElement('span');sp.style.flex='1';inf.appendChild(sp);}
+  const box=$('#wpnRows'); box.innerHTML='';
+  if(data.no_enh){
+    box.innerHTML='<div class="hint" style="margin-top:8px">该装备没有强化词条(仅 29 把「改造」武器有);它的全部效果就在下面的<b>魂珠效果</b>里,直接改。</div>';
+    buildWpnSoul(box,data);
+    $('#btnSaveWpn').textContent='保存修改';
+    return;
+  }
+  const showAll=$('#wpnShowAll').checked;
   let idxSet=new Set();
-  if(showAll)soulCols.forEach((_,i)=>idxSet.add(i));
+  if(showAll)data.columns.forEach((_,i)=>idxSet.add(i));
   else data.lines.forEach(l=>Object.keys(l.values).forEach(k=>idxSet.add(+k)));
   const idxs=[...idxSet].sort((a,b)=>a-b);
   const tbl=document.createElement('table');
   const thead=document.createElement('tr');
-  thead.innerHTML='<th>字段</th>'+data.lines.map(l=>`<th>行 ${l.line}</th>`).join('');
+  const th0=document.createElement('th');th0.textContent='字段';thead.appendChild(th0);
+  data.lines.forEach(l=>{
+    const th=document.createElement('th');
+    th.append('行 '+l.line+' ');
+    if(data.lines.length>1){
+      const db=document.createElement('button');db.className='mini';db.textContent='删行';
+      db.title='删除这一行效果(自动备份)';
+      db.onclick=()=>wpnDeleteLine(l.line);
+      th.appendChild(db);
+    }
+    const cb=document.createElement('button');cb.className='mini';cb.textContent='复制追加';
+    cb.title='把这一行复制为本武器词条的新行(之后可改成别的效果/条件)';
+    cb.onclick=()=>wpnCopyAppend(l.line);
+    th.appendChild(cb);
+    thead.appendChild(th);
+  });
   tbl.appendChild(thead);
+  if(data.line_descs&&data.line_descs.some(d=>d)){
+    const dr=document.createElement('tr');
+    const td0=document.createElement('td');td0.className='fname';td0.innerHTML='<b>游戏效果</b>';dr.appendChild(td0);
+    data.lines.forEach((l,i)=>{const td=document.createElement('td');td.className='ldesc';td.textContent=data.line_descs[i]||'';dr.appendChild(td);});
+    tbl.appendChild(dr);
+  }
   idxs.forEach(i=>{
     const tr=document.createElement('tr');
-    const nm=soulCols[i]||'';
-    const td=document.createElement('td');td.className='fname';td.title=i+': '+nm;td.innerHTML=`${i} <b>${cnCol(nm)}</b>`;tr.appendChild(td);
+    const nm=data.columns[i]||'';
+    const td=document.createElement('td');td.className='fname';td.title=i+': '+nm;td.innerHTML=`${i} <b>${WPN_COL_CN[i]||cnCol(nm)}</b>`;tr.appendChild(td);
     data.lines.forEach(line=>{
       const cell=document.createElement('td');const inp=document.createElement('input');
       const v=line.values[String(i)]||''; inp.value=v; inp.dataset.orig=v;
       if(v.length>14)inp.classList.add('wide');
+      const en=document.createElement('span');en.className='enm';
+      const setEnum=val=>{en.textContent=(enums[String(i)]||{})[val]||'';};
+      setEnum(v);
       inp.oninput=()=>{const key=line.line+'|'+i;
-        if(inp.value!==inp.dataset.orig){soulEdits[key]={key:soulSel,line:line.line,index:i,value:inp.value};inp.classList.add('mod');}
-        else{delete soulEdits[key];inp.classList.remove('mod');}
-        $('#btnSaveSoul').textContent='保存修改 ('+Object.keys(soulEdits).length+')';};
-      cell.appendChild(inp);tr.appendChild(cell);
+        if(inp.value!==inp.dataset.orig){wpnEdits[key]={key:wpnSel,line:line.line,index:i,value:inp.value};inp.classList.add('mod');}
+        else{delete wpnEdits[key];inp.classList.remove('mod');}
+        setEnum(inp.value);
+        $('#btnSaveWpn').textContent='保存修改 ('+Object.keys(wpnEdits).length+')';};
+      cell.appendChild(inp);cell.appendChild(en);tr.appendChild(cell);
     });
     tbl.appendChild(tr);
   });
   box.appendChild(tbl);
-  $('#btnSaveSoul').textContent='保存修改';
+  // ＋添加词条行(从其他武器复制,自动适配本武器属性/解锁等级)
+  const af=document.createElement('div');af.className='addform';
+  af.innerHTML='<div class="row"><b style="font-size:12px">＋添加词条行</b><span class="hint">从其他武器复制一行,自动换成本武器属性并对齐解锁等级</span></div>'
+    +'<div class="row"><label>来源武器</label><input id="wpnAddSrc" list="wpnOpts" placeholder="武器名或ID(带改造词条的 29 把)" style="width:240px">'
+    +'<label>行</label><input type="number" id="wpnAddLine" value="1" style="width:55px">'
+    +'<label><input type="checkbox" id="wpnAddAdapt" checked> 自动适配</label>'
+    +'<button class="sec" id="btnWpnAddPrev">预览</button><button id="btnWpnAddGo">添加</button></div>';
+  box.appendChild(af);
+  const wpnSrcOf=()=>{
+    const t=$('#wpnAddSrc').value.trim();
+    const m=t.match(/\((\d+)\)\s*$/);
+    const id=m?m[1]:t.replace(/^W:/,'');
+    return id?('W:'+id):null;
+  };
+  const wpnAddBody=dry=>{
+    const k=wpnSrcOf();if(!k){log('请填来源武器',true);return null;}
+    const ad=$('#wpnAddAdapt').checked;
+    return {src_key:k,src_line:parseInt($('#wpnAddLine').value)||1,dst_key:'W:'+wpnSel,
+            element:ad?'auto':'',adapt_sid:ad,clear_awake:ad,dry_run:dry};
+  };
+  $('#btnWpnAddPrev').onclick=async()=>{const b=wpnAddBody(true);if(b)showResult(await api('/append_line_adapted',b));};
+  $('#btnWpnAddGo').onclick=async()=>{
+    const b=wpnAddBody(true);if(!b)return;
+    if(Object.keys(wpnEdits).length&&!confirm('有未保存的武器词条修改,添加后会刷新并丢弃。继续?'))return;
+    const prev=await api('/append_line_adapted',b);showResult(prev);
+    if(confirmWithPreview('确认把 '+b.src_key+' 行'+b.src_line+' 添加到本武器?(自动备份)',prev)){
+      showResult(await api('/append_line_adapted',{...b,dry_run:false}));wpnRefreshAfterRowChange();
+    }
+  };
+  buildWpnSoul(box,data);
+  $('#btnSaveWpn').textContent='保存修改';
 }
-async function saveSoulRows(){
-  const list=Object.values(soulEdits);
-  if(!list.length)return log('没有修改');
-  const prev=await api('/soul_rows/save',{edits:list,dry_run:true}); showResult(prev);
-  if(prev.changes&&confirmWithPreview('确认写入能力魂修改?(自动备份)',prev)){
-    showResult(await api('/soul_rows/save',{edits:list,dry_run:false})); loadSoulRows();
+// ---- 武器页内嵌魂珠编辑器(装备与 ability_soul 同键) ----
+function buildWpnSoul(box,data){
+  soulEdits={};
+  const sd=data.soul;
+  const h=document.createElement('h3');h.style.marginTop='16px';h.textContent='魂珠效果(ability_soul '+wpnSel+')';box.appendChild(h);
+  if(!sd||!sd.lines||!sd.lines.length){
+    const no=document.createElement('div');no.className='hint';no.textContent='该装备没有对应魂珠行。';box.appendChild(no);return;
+  }
+  const showAll=$('#wpnShowAll').checked;
+  let idxSet=new Set();
+  if(showAll)sd.columns.forEach((_,i)=>idxSet.add(i));
+  else sd.lines.forEach(l=>Object.keys(l.values).forEach(k=>idxSet.add(+k)));
+  const idxs=[...idxSet].sort((a,b)=>a-b);
+  const tbl=document.createElement('table');
+  const thead=document.createElement('tr');
+  const th0=document.createElement('th');th0.textContent='字段';thead.appendChild(th0);
+  sd.lines.forEach(l=>{
+    const th=document.createElement('th');th.append('行 '+l.line+' ');
+    if(sd.lines.length>1){
+      const db=document.createElement('button');db.className='mini';db.textContent='删行';
+      db.onclick=()=>wpnSoulDelete(l.line);th.appendChild(db);
+    }
+    const cb=document.createElement('button');cb.className='mini';cb.textContent='复制追加';
+    cb.title='把这一行魂珠效果复制为新行(之后可改成别的效果)';
+    cb.onclick=()=>wpnSoulAppend(l.line);th.appendChild(cb);
+    thead.appendChild(th);
+  });
+  tbl.appendChild(thead);
+  if(sd.line_descs&&sd.line_descs.some(d=>d)){
+    const dr=document.createElement('tr');
+    const td0=document.createElement('td');td0.className='fname';td0.innerHTML='<b>游戏效果</b>';dr.appendChild(td0);
+    sd.lines.forEach((l,i)=>{const td=document.createElement('td');td.className='ldesc';td.textContent=sd.line_descs[i]||'';dr.appendChild(td);});
+    tbl.appendChild(dr);
+  }
+  idxs.forEach(i=>{
+    const tr=document.createElement('tr');
+    const nm=sd.columns[i]||'';
+    const td=document.createElement('td');td.className='fname';td.title=i+': '+nm;td.innerHTML=`${i} <b>${cnCol(nm)}</b>`;tr.appendChild(td);
+    sd.lines.forEach(line=>{
+      const cell=document.createElement('td');const inp=document.createElement('input');
+      const v=line.values[String(i)]||''; inp.value=v; inp.dataset.orig=v;
+      if(v.length>14)inp.classList.add('wide');
+      const en=document.createElement('span');en.className='enm';
+      const setEnum=val=>{en.textContent=(enums[String(i)]||{})[val]||'';};
+      setEnum(v);
+      inp.oninput=()=>{const key=line.line+'|'+i;
+        if(inp.value!==inp.dataset.orig){soulEdits[key]={key:wpnSel,line:line.line,index:i,value:inp.value};inp.classList.add('mod');}
+        else{delete soulEdits[key];inp.classList.remove('mod');}
+        setEnum(inp.value);
+        const b=$('#btnSaveWpnSoul');if(b)b.textContent='保存魂珠修改 ('+Object.keys(soulEdits).length+')';};
+      cell.appendChild(inp);cell.appendChild(en);tr.appendChild(cell);
+    });
+    tbl.appendChild(tr);
+  });
+  box.appendChild(tbl);
+  const row=document.createElement('div');row.className='row';
+  const bs=document.createElement('button');bs.id='btnSaveWpnSoul';bs.textContent='保存魂珠修改';
+  bs.onclick=async()=>{
+    const list=Object.values(soulEdits);
+    if(!list.length)return log('没有修改');
+    const prev=await api('/soul_rows/save',{edits:list,dry_run:true});showResult(prev);
+    if(prev.changes&&confirmWithPreview('确认写入魂珠修改?(自动备份)',prev)){
+      showResult(await api('/soul_rows/save',{edits:list,dry_run:false}));loadWpnRows();
+    }
+  };
+  row.appendChild(bs);box.appendChild(row);
+}
+async function wpnSoulDelete(line){
+  if((Object.keys(wpnEdits).length||Object.keys(soulEdits).length)&&!confirm('有未保存的修改,操作会刷新并丢弃。继续?'))return;
+  const key='S:'+wpnSel;
+  const prev=await api('/delete_line',{key,line,dry_run:true});showResult(prev);
+  if(confirmWithPreview('删除魂珠 '+key+' 第 '+line+' 行?(自动备份)',prev)){
+    showResult(await api('/delete_line',{key,line,dry_run:false}));loadWpnRows();
   }
 }
-$('#soulSearch').oninput=loadSouls;
-$('#soulShowAll').onchange=loadSoulRows;
-$('#btnSaveSoul').onclick=saveSoulRows;
+async function wpnSoulAppend(line){
+  if((Object.keys(wpnEdits).length||Object.keys(soulEdits).length)&&!confirm('有未保存的修改,操作会刷新并丢弃。继续?'))return;
+  const key='S:'+wpnSel;
+  const b={src:{key,line},dst:{key,line:'append'},preserve_string_id:false};
+  const prev=await api('/copy_row',{...b,dry_run:true});showResult(prev);
+  if(confirmWithPreview('把魂珠行 '+line+' 复制追加为新行?(自动备份)',prev)){
+    showResult(await api('/copy_row',{...b,dry_run:false}));loadWpnRows();
+  }
+}
+async function wpnRefreshAfterRowChange(){
+  wpnCache=await api('/weapons');
+  if(mode==='wpn')renderWeaponsLeft();
+  loadWpnRows();
+}
+async function wpnDeleteLine(line){
+  if(Object.keys(wpnEdits).length&&!confirm('有未保存的武器词条修改,此操作会刷新并丢弃。继续?'))return;
+  const key='W:'+wpnSel;
+  const prev=await api('/delete_line',{key,line,dry_run:true});showResult(prev);
+  if(confirmWithPreview('删除 '+key+' 第 '+line+' 行效果?(自动备份)',prev)){
+    showResult(await api('/delete_line',{key,line,dry_run:false}));wpnRefreshAfterRowChange();
+  }
+}
+async function wpnCopyAppend(line){
+  if(Object.keys(wpnEdits).length&&!confirm('有未保存的武器词条修改,此操作会刷新并丢弃。继续?'))return;
+  const key='W:'+wpnSel;
+  const b={src:{key,line},dst:{key,line:'append'},preserve_string_id:false};
+  const prev=await api('/copy_row',{...b,dry_run:true});showResult(prev);
+  if(confirmWithPreview('把 '+key+' 第 '+line+' 行复制追加为新行?(自动备份)',prev)){
+    showResult(await api('/copy_row',{...b,dry_run:false}));wpnRefreshAfterRowChange();
+  }
+}
+async function saveWpnRows(){
+  const list=Object.values(wpnEdits);
+  if(!list.length)return log('没有修改');
+  const prev=await api('/weapon_ability/save',{edits:list,dry_run:true}); showResult(prev);
+  if(prev.changes&&confirmWithPreview('确认写入武器词条修改?(自动备份)',prev)){
+    showResult(await api('/weapon_ability/save',{edits:list,dry_run:false})); loadWpnRows();
+  }
+}
+$('#wpnShowAll').onchange=loadWpnRows;
+$('#btnSaveWpn').onclick=saveWpnRows;
 
-$$('nav .tab').forEach(t=>t.onclick=()=>{
-  $$('nav .tab').forEach(x=>x.classList.remove('sel'));t.classList.add('sel');
-  $$('#content > section').forEach(s=>s.classList.toggle('sel',s.dataset.t===t.dataset.t));
-  if(t.dataset.t==='backup')refreshBackups();
-  if(t.dataset.t==='recipe')refreshMainpos();
-  if(t.dataset.t==='profile')loadProfile();
-  if(t.dataset.t==='stat')loadStat();
-  if(t.dataset.t==='soul')loadSouls();
-});
-$('#search').oninput=renderChars;
+function switchTab(name){
+  $$('nav .tab').forEach(x=>x.classList.toggle('sel',x.dataset.t===name));
+  $$('#content > section').forEach(s=>s.classList.toggle('sel',s.dataset.t===name));
+  if(name==='backup')refreshBackups();
+  if(name==='recipe')refreshMainpos();
+  if(name==='profile')loadProfile();
+  if(name==='stat')loadStat();
+  if(name==='energy')loadEnergy();
+  if(name==='weapon')loadWeapons();
+  if(name==='history')loadHistory();
+  if(name==='assets')loadAssets();
+}
+$$('nav .tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.t));
+
+// ---- 角色/武器 模式切换:左栏列表整体换成武器,不相干页签隐藏 ----
+let mode='char';
+const WPN_HIDE_TABS=['edit','profile','assets','stat','energy','port','newchar'];
+const CHAR_HIDE_TABS=['weapon'];  // 角色模式不显示武器·魂珠页(魂珠改动统一在武器页)
+function applyTabVisibility(){
+  $$('nav .tab').forEach(t=>{
+    const hide=mode==='wpn'?WPN_HIDE_TABS.includes(t.dataset.t):CHAR_HIDE_TABS.includes(t.dataset.t);
+    t.style.display=hide?'none':'';
+  });
+}
+function renderLeft(){mode==='char'?renderChars():renderWeaponsLeft();}
+function renderWeaponsLeft(){
+  const q=$('#search').value.trim().toLowerCase();
+  const fe=$('#fltWpnElem').value, onlyEnh=$('#fltWpnEnh').checked;
+  const box=$('#charlist');box.innerHTML='';
+  const list=(wpnCache||[])
+    .filter(w=>!q||w.id.includes(q)||(w.name||'').toLowerCase().includes(q)||(w.enh_name||'').toLowerCase().includes(q))
+    .filter(w=>!fe||(fe==='通用'?!w.element:w.element===fe))
+    .filter(w=>!onlyEnh||w.has_enh)
+    .slice(0,600);
+  let curGrp=null;
+  list.forEach(w=>{
+    const grp=w.kind==='1'?'主线魂珠':(w.element?w.element+'属性武器':'通用武器');
+    if(grp!==curGrp){
+      curGrp=grp;
+      const g=document.createElement('div');g.className='wgrp';
+      g.textContent='— '+grp+' —';
+      box.appendChild(g);
+    }
+    const d=document.createElement('div');d.className='char'+(wpnSel===w.id?' sel':'');
+    d.innerHTML='<span class="el"></span><span class="nm"></span><span class="rar"></span><span class="id"></span>';
+    const el=d.querySelector('.el');
+    if(w.element){el.textContent=w.element;el.classList.add(w.element);}
+    else{el.textContent='通';el.style.background='#4a5163';}
+    d.querySelector('.nm').textContent=(w.enh_name||w.name||w.id)+(w.has_enh?'':' ·仅魂珠');
+    d.querySelector('.rar').textContent='★'.repeat(parseInt(w.rarity)||0);
+    d.querySelector('.id').textContent=w.id;
+    d.title=(w.name||'')+(w.has_enh?' · 槽'+w.slot+' · 解锁Lv'+w.learn_level+' · '+w.lines+'行强化词条':' · 无强化词条(点击后可直达魂珠)');
+    d.onclick=()=>{if(wpnSel!==w.id&&Object.keys(wpnEdits).length&&!confirm('武器词条有未保存修改,切换将丢失。确定?'))return;wpnSel=w.id;renderWeaponsLeft();loadWpnRows();};
+    box.appendChild(d);
+  });
+}
+$('#fltWpnElem').onchange=$('#fltWpnEnh').onchange=renderWeaponsLeft;
+async function setMode(m){
+  if(m===mode)return;
+  if(!guardDirty())return;
+  mode=m;
+  $('#modeChar').classList.toggle('on',m==='char');
+  $('#modeWpn').classList.toggle('on',m==='wpn');
+  $('#charFilters').style.display=m==='char'?'flex':'none';
+  $('#wpnFilters').style.display=m==='wpn'?'flex':'none';
+  $('#search').placeholder=m==='char'?'搜索角色 / ID / 代号':'搜索武器名 / ID';
+  applyTabVisibility();
+  if(m==='wpn'){
+    await loadWeapons();
+    switchTab('weapon');
+  }else{
+    switchTab('edit');
+  }
+  renderLeft();
+}
+$('#modeChar').onclick=()=>setMode('char');
+$('#modeWpn').onclick=()=>setMode('wpn');
+$('#search').oninput=renderLeft;
 $('#fltRarity').onchange=$('#fltElement').onchange=$('#fltRace').onchange=renderChars;
 $('#showAll').onchange=loadRows;
 $('#btnReload').onclick=()=>{if(Object.keys(edits).length&&!confirm('刷新将丢弃未保存的词条修改,确定?'))return;loadRows();};
@@ -679,6 +1437,22 @@ $('#btnSaveRows').onclick=async()=>{
     showResult(await api('/rows/save',{edits:list,dry_run:false}));loadRows();
   }
 };
+// ---- 行级操作:单条主位开关 / 删词条行(操作后刷新词条,会丢弃未保存修改,先守卫)----
+async function mainposOne(ability,line,action){
+  if(Object.keys(edits).length&&!confirm('有未保存的词条修改,此操作会刷新并丢弃。继续?'))return;
+  const prev=await api('/mainpos_one',{ability,line,action,dry_run:true});showResult(prev);
+  if(!prev.changes)return log('已是目标状态,无需修改');
+  if(confirmWithPreview((action==='off'?'解除':'加上')+' '+ability+' 第 '+line+' 行的主位限制?(自动备份)',prev)){
+    showResult(await api('/mainpos_one',{ability,line,action,dry_run:false}));loadRows();
+  }
+}
+async function deleteLine(key,line){
+  if(Object.keys(edits).length&&!confirm('有未保存的词条修改,此操作会刷新并丢弃。继续?'))return;
+  const prev=await api('/delete_line',{key,line,dry_run:true});showResult(prev);
+  if(confirmWithPreview('删除 '+key+' 第 '+line+' 行效果?(自动备份,可从「备份」页签还原)',prev)){
+    showResult(await api('/delete_line',{key,line,dry_run:false}));loadRows();
+  }
+}
 function scaleBody(dry){
   const b={fields:$('#scaleFields').value,factor:parseFloat($('#scaleFactor').value),rounding:$('#scaleRound').value,dry_run:dry};
   const aid=$('#scaleAbility').value.trim();
@@ -720,6 +1494,19 @@ $('#btnLdrApply').onclick=async()=>{
   if(!prev.changes)return log('没有可应用的改动');
   if(confirmWithPreview('确认把 '+b.from_character+' 的队长技写入 '+b.to_character+' 槽位 '+b.slot+'?(自动备份)',prev))
     {showResult(await api('/copy_leader',b));if(sel)loadRows();}
+};
+function l2lBody(dry){
+  const from=parseChar($('#l2lFrom').value), to=parseChar($('#l2lTo').value)||(sel&&sel.id);
+  if(!from||!to){log('请填来源与目标角色',true);return null;}
+  return {from_character:from,to_character:to,preserve_string_id:$('#l2lKeepSid').checked,dry_run:dry};
+}
+$('#btnL2lPrev').onclick=async()=>{const b=l2lBody(true);if(b)showResult(await api('/copy_leader_to_leader',b));};
+$('#btnL2lApply').onclick=async()=>{
+  const b=l2lBody(false);if(!b)return;
+  const prev=await api('/copy_leader_to_leader',{...b,dry_run:true});showResult(prev);
+  if(!prev.changes)return log('没有可应用的改动');
+  if(confirmWithPreview('确认把 '+b.from_character+' 的队长技整段替换到 '+b.to_character+'?(自动备份)',prev))
+    {showResult(await api('/copy_leader_to_leader',b));if(sel)loadRows();}
 };
 function rowBody(dry){
   const from=$('#rowFrom').value.trim(), to=$('#rowTo').value.trim();
@@ -773,17 +1560,155 @@ async function refreshBackups(){
   });
 }
 $('#btnBkRefresh').onclick=refreshBackups;
+// ---- 改动日志 / 一键回溯 ----
+async function loadHistory(){
+  const data=await api('/history');
+  const box=$('#histList');box.innerHTML='';
+  if(!data.entries.length){box.innerHTML='<div class="hint">暂无改动记录,首次「应用」时自动记录。</div>';return;}
+  const tbl=document.createElement('table');
+  tbl.innerHTML='<tr><th>时间</th><th>表</th><th>改动</th><th>发布版本</th><th></th></tr>';
+  data.entries.forEach(e=>{
+    const tr=document.createElement('tr');
+    const td0=document.createElement('td');td0.className='fname';td0.textContent=e.ts||'';tr.appendChild(td0);
+    const td1=document.createElement('td');const bd=document.createElement('span');bd.className='badge';bd.textContent=e.table||'';td1.appendChild(bd);tr.appendChild(td1);
+    const summ=(e.summary||'').split('\n').filter(Boolean);
+    const td2=document.createElement('td');td2.title=e.summary||'';td2.textContent=summ[0]||'';
+    if(summ.length>1){const more=document.createElement('span');more.className='hint';more.textContent=' (+'+(summ.length-1)+' 行,悬停看全部)';td2.appendChild(more);}
+    tr.appendChild(td2);
+    const td3=document.createElement('td');td3.textContent=e.version||'(未发布)';if(!e.version)td3.className='fname';tr.appendChild(td3);
+    const td4=document.createElement('td');
+    if(e.backup){
+      const bn=String(e.backup).split(/[\\/]/).pop();
+      const btn=document.createElement('button');btn.className='mini';btn.textContent='回溯到此前';
+      btn.title='把 '+e.table+' 表还原到这次改动之前,自动重新发布并重启游戏';
+      btn.onclick=async()=>{
+        if(!confirm('把 '+e.table+' 表还原到 '+e.ts+' 这次改动【之前】的状态?\n该表此后的所有改动都会被撤销,并自动重新发布 + 重启游戏。'))return;
+        btn.disabled=true;log('回溯中(还原备份 + 发布)...');
+        try{
+          const r=await api('/rollback',{name:bn});
+          log('已还原: '+r.restored+(r.publish_log?'\n'+r.publish_log:''));
+          if(r.restart_log)log(r.restart_log);
+          const bad=r.ok===false;
+          toast(bad?'还原成功但发布失败,看日志':'已回溯并发布,游戏重启中',bad);
+          refreshStatus();loadHistory();if(sel)loadRows();
+        }finally{btn.disabled=false;}
+      };
+      td4.appendChild(btn);
+    }
+    tr.appendChild(td4);tbl.appendChild(tr);
+  });
+  box.appendChild(tbl);
+}
+$('#btnHistRefresh').onclick=loadHistory;
+// ---- 词条速查:四表关键字搜索 + 共用/专属分组 + 跳转 ----
+async function doFind(){
+  const q=$('#findQ').value.trim();
+  if(!q)return;
+  $('#findCount').textContent='搜索中...';
+  let r;
+  try{r=await api('/search_abilities?q='+encodeURIComponent(q));}
+  catch(e){$('#findCount').textContent='';return;}
+  const kindSel=$('#findKind').value;
+  const KIND_CN={ability:'角色能力',leader_ability:'队长技',equipment_enhancement_ability:'武器',ability_soul:'能力魂'};
+  const shown=kindSel?r.results.filter(e=>e.kind===kindSel):r.results;
+  $('#findCount').textContent='命中 '+shown.length+(kindSel?('/'+r.count+'(已按「'+KIND_CN[kindSel]+'」筛选)'):'')
+    +(r.count>=150?'(已截断,换更精确的关键字)':'');
+  const box=$('#findBox');box.innerHTML='';
+  if(!shown.length){box.innerHTML='<div class="empty">没有命中'+(kindSel?',试试切回「全部来源」':',试试更短的关键字')+'</div>';return;}
+  const tbl=document.createElement('table');
+  tbl.innerHTML='<tr><th>词条键</th><th>归属</th><th>游戏效果(全部行)</th><th>共用</th></tr>';
+  shown.forEach(e=>{
+    const tr=document.createElement('tr');
+    const td0=document.createElement('td');
+    const a=document.createElement('span');a.className='findkey';a.textContent=e.key;a.title='点击跳转编辑';
+    a.onclick=()=>goKey(e.key);
+    td0.appendChild(a);
+    const cp=document.createElement('button');cp.className='mini';cp.textContent='⧉';cp.title='复制键(可粘贴到「＋添加行」的来源)';
+    cp.style.marginLeft='4px';
+    cp.onclick=()=>{navigator.clipboard.writeText(e.key).then(()=>toast('已复制 '+e.key),()=>log(e.key));};
+    td0.appendChild(cp);
+    if(e.sid){const s=document.createElement('div');s.className='hint';s.textContent=e.sid;td0.appendChild(s);}
+    tr.appendChild(td0);
+    const td1=document.createElement('td');td1.className='fname';
+    td1.textContent=(KIND_CN[e.kind]?'['+KIND_CN[e.kind]+'] ':'')+e.owner+(e.slot?('·槽'+e.slot):'');tr.appendChild(td1);
+    const td2=document.createElement('td');td2.className='ldesc';td2.style.maxWidth='560px';td2.textContent=e.desc;tr.appendChild(td2);
+    const td3=document.createElement('td');
+    const sh=document.createElement('span');
+    if(e.shared_count>1){
+      sh.className='share';sh.textContent='共用'+e.shared_count+' ▾';sh.title='全游戏有 '+e.shared_count+' 条效果完全相同的词条,点击展开';
+      const sub=document.createElement('div');sub.style.display='none';
+      e.shared.forEach(s=>{
+        const d=document.createElement('div');d.className='sharebox';
+        const k=document.createElement('span');k.className='findkey';k.textContent=s.key;k.onclick=()=>goKey(s.key);
+        d.appendChild(k);d.append(' '+s.owner+(s.slot?('·槽'+s.slot):''));
+        sub.appendChild(d);
+      });
+      sh.onclick=()=>{sub.style.display=sub.style.display==='none'?'':'none';};
+      td3.appendChild(sh);td3.appendChild(sub);
+    }else{
+      sh.className='share solo';sh.textContent='专属';sh.title='全游戏只有这一条,是该归属的专属词条';td3.appendChild(sh);
+    }
+    tr.appendChild(td3);
+    tbl.appendChild(tr);
+  });
+  box.appendChild(tbl);
+}
+$('#btnFind').onclick=doFind;
+$('#findQ').onkeydown=e=>{if(e.key==='Enter')doFind();};
+$('#findKind').onchange=()=>{if($('#findQ').value.trim())doFind();};
+async function goKey(key){
+  if(!guardDirty())return;
+  if(key.startsWith('W:')){
+    const wid=key.slice(2);
+    await setMode('wpn');
+    wpnSel=wid;if(mode==='wpn')renderWeaponsLeft();switchTab('weapon');loadWpnRows();
+  }else if(key.startsWith('S:')){
+    // 魂珠编辑并入武器页:切武器模式并选中同 ID 装备
+    const sid=key.slice(2);
+    await setMode('wpn');
+    wpnSel=sid;if(mode==='wpn')renderWeaponsLeft();switchTab('weapon');loadWpnRows();
+  }else{
+    if(mode!=='char')await setMode('char');
+    const cid=key.startsWith('L:')?key.slice(2):null;
+    const c=cid?chars.find(x=>x.id===cid):chars.find(x=>(x.abilities||[]).includes(key));
+    if(!c)return log('没找到词条 '+key+' 的归属角色(可能未被任何角色引用)',true);
+    sel=c;renderChars();switchTab('edit');loadRows();
+    $('#scaleTarget').textContent=c.name+' ('+c.id+')';
+  }
+}
 $('#btnLogClear').onclick=()=>{$('#log').innerHTML='';};
 $('#btnLogToggle').onclick=()=>{
   const w=$('#logwrap');w.classList.toggle('min');
   $('#btnLogToggle').textContent=w.classList.contains('min')?'展开':'折叠';
 };
 $('#btnSync').onclick=async()=>{
+  if(!guardUnsavedBeforeShip())return;
   $('#btnSync').disabled=true;log('同步中...');
   try{const r=await api('/sync',{restart:true});log(r.log);log(r.ok?'同步完成,游戏已重启':'同步失败',!r.ok);toast(r.ok?'同步完成,游戏已重启':'同步失败',!r.ok);}
   finally{$('#btnSync').disabled=false;refreshStatus();}
 };
+// ---- 一键发布:预检(--list) → 确认 → 打增量包发 CDN + 重启游戏 ----
+// 未保存守卫:输入框里的修改(橙色高亮)还没写进表,发布不会带上它们
+function guardUnsavedBeforeShip(){
+  const n=dirtyCount();
+  return !n||confirm('注意:有 '+n+' 处修改还没点「保存修改」,它们【不会】被发布!\n\n点「取消」回去先保存,点「确定」则只发布已保存的内容。');
+}
+$('#btnPublish').onclick=async()=>{
+  if(!guardUnsavedBeforeShip())return;
+  const btn=$('#btnPublish');btn.disabled=true;
+  try{
+    const prev=await api('/publish',{list_only:true});
+    log(prev.log);
+    if(!prev.ok){toast('没有可发布的内容(或预检失败),看日志',true);return;}
+    if(!confirm('确认发布到 CDN 并重启游戏?\n────\n'+prev.log.split('\n').slice(0,10).join('\n')))return;
+    log('发布中...');
+    const r=await api('/publish',{restart:true});
+    log(r.log);if(r.restart_log)log(r.restart_log);
+    toast(r.ok?'已发布,游戏重启中,更新完成即生效':'发布失败,看日志',!r.ok);
+  }finally{btn.disabled=false;refreshStatus();}
+};
 (async function init(){
+  applyTabVisibility();
   await refreshStatus();
   try{const sc=await api('/schema');enums=sc.enums||{};}catch(e){}
   chars=await api('/characters');

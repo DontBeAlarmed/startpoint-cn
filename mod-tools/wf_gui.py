@@ -3,12 +3,12 @@
 r"""
 WF 单机版 · 本地网页修改器 (GUI)
 
-在浏览器中修改 WorldFlipper/dummy 数据包:
-  * 角色技能倍率缩放(基于 wf_mod_tool 的 scale 配方)
-  * 词条(ability)逐字段编辑
-  * 词条移植(copy_ability,角色 A -> 角色 B)
-  * 备份 / 还原
-  * 一键同步到 MuMu 模拟器(adb push 增量 + 重启游戏)
+在浏览器中修改 WorldFlipper/dummy 数据包,11 个页签全程点鼠标:
+  * 词条编辑(逐字段 + 单条主位开关 + 删行) / 角色资料(① 层) / 基础数值+觉醒
+  * 技能能量(action_skill) / 能力魂 / 武器词条(equipment_enhancement_ability)
+  * 倍率调整 / 词条移植(A→B / 行级 / 队长技→词条槽 / 队长技→队长技整段) / 配方
+  * 改动日志(每次写入自动记录) + 一键回溯(还原备份+重新发布+重启游戏)
+  * 备份 / 还原;右上角「发布并重启游戏」= wf_publish 打增量包到 CDN + 重启客户端
 
 启动:  python mod-tools/wf_gui.py   (或 mod-tools\wf-gui.bat)
 浏览器: http://127.0.0.1:8765/
@@ -37,6 +37,9 @@ from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import wf_mod_tool as core  # noqa: E402
+import wf_describe  # noqa: E402  行级中文描述器(逆向布局+枚举直译)
+import wf_assets  # noqa: E402    角色资产(立绘/图标/语音)编解码与清单
+import wf_dsl  # noqa: E402       技能 ActionDsl 数值编辑
 
 ROOT = Path(__file__).resolve().parent.parent
 _PROFILE = core.resolve_profile(os.environ.get("WF_PROFILE"))
@@ -146,7 +149,18 @@ def read_pending() -> list[str]:
 
 
 def add_pending(target: Path) -> None:
-    rel = target.relative_to(TARGET_STORE).as_posix()
+    """支持三根:upload=裸 rel;medium_upload/android_upload 加前缀(发布器按前缀分包)。"""
+    rel = None
+    for prefix, root in (("", TARGET_STORE),
+                         ("medium:", TARGET_STORE.parent / "medium_upload"),
+                         ("android:", TARGET_STORE.parent / "android_upload")):
+        try:
+            rel = prefix + target.relative_to(root).as_posix()
+            break
+        except ValueError:
+            continue
+    if rel is None:
+        raise ValueError(f"文件不在任何数据根下: {target}")
     items = read_pending()
     if rel not in items:
         items.append(rel)
@@ -157,6 +171,98 @@ def add_pending(target: Path) -> None:
 def clear_pending() -> None:
     if PENDING_FILE.exists():
         PENDING_FILE.write_text("[]", encoding="utf-8")
+
+
+# ---------------------------------------------------------------- 改动日志 + 回溯
+# 每次写 ② 层数据自动记一条(append-only jsonl):时间/表/键/摘要/备份文件/发布版本。
+# 发布时(wf_publish.py)回填 version 并渲染 changelog.md 一并"公布"到 CDN。
+# 回溯:按日志条目或备份文件一键还原某表 + 重新发布。
+
+CHANGELOG_FILE = WORK_DIR / "changelog.jsonl"
+CHANGELOG_MD = WORK_DIR / "changelog.md"
+
+# 逻辑路径 -> 表别名(与 wf_publish.TABLE_ALIASES 同步,用于日志可读)
+_LOGICAL_ALIAS = {
+    core.ABILITY_LOGICAL: "ability",
+    core.CHARACTER_LOGICAL: "character",
+    core.STATUS_LOGICAL: "character_status",
+    "master/ability/leader_ability.orderedmap": "leader_ability",
+    "master/ability/ability_soul.orderedmap": "ability_soul",
+    "master/character/character_awake_status.orderedmap": "character_awake_status",
+    "master/skill/action_skill.orderedmap": "action_skill",
+    "master/equipment_enhancement/equipment_enhancement_ability.orderedmap": "weapon_ability",
+    "master/character/character_text.orderedmap": "character_text",
+    "master/character/character_speech.orderedmap": "character_speech",
+    "master/skill_preview/skill_preview_character.orderedmap": "skill_preview_character",
+    "master/mana_board/mana_board2_open_condition.orderedmap": "mana_board2_open_condition",
+    "master/mana_board/upskill.orderedmap": "upskill",
+    "master/stance_detail/character_stance_detail.orderedmap": "character_stance_detail",
+    "master/generated/character_image.orderedmap": "character_image",
+    "master/character/full_shot_image_attribute.orderedmap": "full_shot_image_attribute",
+    "master/generated/mana_board.orderedmap": "mana_board",
+    "master/mana_board/mana_node.orderedmap": "mana_node",
+    "master/character/character_gacha_sound.orderedmap": "character_gacha_sound",
+}
+
+
+def _keys_from_summary(summary: str) -> list[str]:
+    """从摘要里粗略抽出受影响的键(每行首 token,形如 1411592 / L:141159 / black_wolf_knight)。"""
+    keys = []
+    for line in (summary or "").splitlines():
+        tok = line.strip().split(" ", 1)[0].strip(":")
+        if tok and tok not in keys and (tok[0].isalnum() or tok.startswith("L:")):
+            keys.append(tok)
+    return keys[:8]
+
+
+def record_change(logical: str, summary: str, backup: "Path | str | None") -> None:
+    """追加一条改动日志。失败不影响主流程(日志是旁路)。"""
+    try:
+        WORK_DIR.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "table": _LOGICAL_ALIAS.get(logical, logical),
+            "logical": logical,
+            "keys": _keys_from_summary(summary),
+            "summary": (summary or "").strip(),
+            "backup": (str(backup) if backup else None),
+            "version": None,
+        }
+        with CHANGELOG_FILE.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def read_changelog() -> list[dict]:
+    if not CHANGELOG_FILE.exists():
+        return []
+    out = []
+    for line in CHANGELOG_FILE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line:
+            try:
+                out.append(json.loads(line))
+            except Exception:
+                pass
+    return out
+
+
+def render_changelog_md() -> Path:
+    """渲染人类可读的 changelog.md(最新在上)。"""
+    rows = read_changelog()
+    lines = ["# WF Mod 改动日志", "",
+             "| 时间 | 表 | 键 | 改动 | 发布版本 | 备份(回溯用) |",
+             "|---|---|---|---|---|---|"]
+    for e in reversed(rows):
+        keys = ",".join(e.get("keys") or []) or "-"
+        summ = (e.get("summary") or "").replace("\n", " / ").replace("|", "/")
+        ver = e.get("version") or "(未发布)"
+        bak = Path(e["backup"]).name if e.get("backup") else "-"
+        lines.append(f"| {e.get('ts','')} | {e.get('table','')} | {keys} | {summ} | {ver} | {bak} |")
+    WORK_DIR.mkdir(parents=True, exist_ok=True)
+    CHANGELOG_MD.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return CHANGELOG_MD
 
 
 # ---------------------------------------------------------------- operations
@@ -175,6 +281,8 @@ def run_recipe(recipe: dict, dry_run: bool) -> dict:
             written = core.write_table(table, TARGET_STORE, suffix, no_backup=False)
     if written:
         add_pending(written)
+        record_change(core.ABILITY_LOGICAL, buf.getvalue(),
+                      written.with_name(written.name + suffix))
     return {
         "changes": changes,
         "log": buf.getvalue(),
@@ -282,7 +390,8 @@ def get_rows_for_character(character: str) -> dict:
             continue
         lines = make_lines(text)
         rows.append({"ability": aid, "missing": False, "lines": lines,
-                     "desc": describe_ability(lines, idx_by)})
+                     "desc": describe_ability(lines, idx_by),
+                     "line_descs": wf_describe.describe_rows(core.read_csv_lines(text), "ability")})
 
     # 队长技(leader_ability 表,键=角色ID),伪槽 "L:<id>"
     try:
@@ -291,7 +400,8 @@ def get_rows_for_character(character: str) -> dict:
         if lt is not None:
             lines = make_lines(lt)
             rows.append({"ability": f"L:{character}", "missing": False, "leader": True,
-                         "lines": lines, "desc": describe_ability(lines, idx_by)})
+                         "lines": lines, "desc": describe_ability(lines, idx_by),
+                         "line_descs": wf_describe.describe_rows(core.read_csv_lines(lt), "leader_ability")})
         else:
             rows.append({"ability": f"L:{character}", "missing": True, "leader": True,
                          "lines": [], "desc": ""})
@@ -310,7 +420,47 @@ def _write_with_backup(table: core.OrderedMap, parsed: dict, log_lines: list[str
         written = core.write_table(table, TARGET_STORE, suffix, no_backup=False)
     log_lines.append(buf.getvalue().strip())
     add_pending(written)
+    summary = "\n".join(l for l in log_lines if l and not l.startswith("backup"))
+    record_change(table.logical_path, summary, written.with_name(written.name + suffix))
     return written
+
+
+def _table_row_width(parsed: dict, fallback: int) -> int:
+    """表真实行宽 = 现有行宽度的众数(leader=124 / ability=126)。
+    勿用 schema 的 125:对 leader 多一列、对 ability 少一列,客户端 CSV 解析器
+    要求整表等宽,差一列即 InvalidRowWidth 崩溃(2026-07-06 实锤)。"""
+    cnt: dict[int, int] = {}
+    for rows in parsed.values():
+        for r in rows:
+            cnt[len(r)] = cnt.get(len(r), 0) + 1
+    return max(cnt, key=cnt.get) if cnt else fallback
+
+
+def _fit_row_width(row: list, width: int) -> list:
+    """行宽对齐:短则补空;长且多余尾列全空则裁掉(非空尾列保留并由调用方自查)。"""
+    row = core.normalize_row_length(list(row), width)
+    if len(row) > width and all(x == "" for x in row[width:]):
+        row = row[:width]
+    return row
+
+
+def _remap_cross_table(row: list, src_logical: str, dst_logical: str, dst_rows: list) -> tuple[list, str]:
+    """角色词条(126列)↔队长技(124列)跨表列重排(全表 md §2 铁律):
+    leader = ability 去掉 c1(unisonable)/c2(类别串),其余整体 -2。
+    leader→ability 补 c1=true、c2=目标首行类别(缺省 attack_common);ability→leader 去掉这两列。
+    不重排直接跨表写入会整行错位 2 列 → 客户端 U0000(2026-07-05 实测)。"""
+    if src_logical == dst_logical:
+        return list(row), ""
+    if {src_logical, dst_logical} != {core.ABILITY_LOGICAL, LEADER_LOGICAL}:
+        raise ValueError("跨表列重排仅支持 角色词条<->队长技(武器/魂列图不同,禁止跨表)")
+    if src_logical == LEADER_LOGICAL:
+        cat = ""
+        if dst_rows:
+            r0 = list(dst_rows[0])
+            cat = r0[2] if len(r0) > 2 else ""
+        cat = cat or "attack_common"
+        return [row[0], "true", cat] + list(row[1:]), f"跨表重排 leader→ability(+2 列,补 c1=true c2={cat!r})"
+    return [row[0]] + list(row[3:]), "跨表重排 ability→leader(-2 列,去掉 unisonable/类别串)"
 
 
 def save_row_edits(edits: list[dict], dry_run: bool) -> dict:
@@ -321,6 +471,8 @@ def save_row_edits(edits: list[dict], dry_run: bool) -> dict:
     leader = core.load_table(LEADER_LOGICAL, TARGET_STORE, SOURCE_STORE)
     parsed_a = {k: core.read_csv_lines(t) for k, t in table.text_rows().items()}
     parsed_l = {k: core.read_csv_lines(t) for k, t in leader.text_rows().items()}
+    width_a = _table_row_width(parsed_a, len(names))
+    width_l = _table_row_width(parsed_l, len(names))
     log_lines = []
     changes = {"a": 0, "l": 0}
     for e in edits:
@@ -333,7 +485,7 @@ def save_row_edits(edits: list[dict], dry_run: bool) -> dict:
             raise ValueError(f"键不存在: {aid}")
         if line < 1 or line > len(parsed[key]):
             raise ValueError(f"行号越界: {aid} line {line}")
-        row = core.normalize_row_length(parsed[key][line - 1], len(names))
+        row = _fit_row_width(parsed[key][line - 1], width_l if tag == "l" else width_a)
         old = row[idx]
         if old == value:
             continue
@@ -355,34 +507,43 @@ def save_row_edits(edits: list[dict], dry_run: bool) -> dict:
 
 
 def copy_row(src: dict, dst: dict, preserve_string_id: bool, dry_run: bool) -> dict:
-    """单个效果(行)级移植。src/dst: {key, line};key 前缀 "L:" 表示队长技表。
-    dst mode: line=N 覆盖该行 / "append" 追加 / "all" 整键替换为这一行。"""
+    """单个效果(行)级移植。src/dst: {key, line};键前缀 L:=队长技 W:=武器词条 S:=能力魂。
+    dst mode: line=N 覆盖该行 / "append" 追加 / "all" 整键替换为这一行。
+    只放行 同表移植 + 角色词条<->队长技(历史行为,列图差 2 列需自行按 §5 重排);
+    其余跨表组合拒绝——列图不同,盲拷必造成客户端 U0000 崩溃。"""
     schema = load_schema()
     names = core.schema_names(schema)
     idx_by = core.schema_index(schema)
-    table = load_ability_table()
-    leader = core.load_table(LEADER_LOGICAL, TARGET_STORE, SOURCE_STORE)
-    parsed_a = {k: core.read_csv_lines(t) for k, t in table.text_rows().items()}
-    parsed_l = {k: core.read_csv_lines(t) for k, t in leader.text_rows().items()}
+    loaded: dict[str, tuple] = {}
 
     def pick(keystr):
-        if str(keystr).startswith("L:"):
-            return parsed_l, "l", str(keystr)[2:]
-        return parsed_a, "a", str(keystr)
+        logical, key = _table_for_key(keystr)
+        if logical not in loaded:
+            tobj = core.load_table(logical, TARGET_STORE, SOURCE_STORE)
+            loaded[logical] = (tobj, {k: core.read_csv_lines(t) for k, t in tobj.text_rows().items()})
+        return loaded[logical][1], logical, key
 
-    sp, stag, skey = pick(src["key"])
-    dp, dtag, dkey = pick(dst["key"])
+    sp, slog, skey = pick(src["key"])
+    dp, dlog, dkey = pick(dst["key"])
+    if slog != dlog and {slog, dlog} != {core.ABILITY_LOGICAL, LEADER_LOGICAL}:
+        raise ValueError("跨表移植仅支持 角色词条<->队长技;武器词条/能力魂只能同表移植(列图不同)")
     if skey not in sp:
         raise ValueError(f"来源不存在: {src['key']}")
     if dkey not in dp:
         raise ValueError(f"目标不存在: {dst['key']}")
-    srow = core.normalize_row_length(list(sp[skey][int(src.get("line", 1)) - 1]), len(names))
+    dst_width = _table_row_width(dp, len(names))
+    srow = list(sp[skey][int(src.get("line", 1)) - 1])
+    remap_note = ""
+    if slog != dlog:
+        srow, remap_note = _remap_cross_table(srow, slog, dlog, dp[dkey])
+    srow = _fit_row_width(srow, dst_width)
     sid_idx = idx_by.get("string_id", 0)
     uni_idx = idx_by.get("unisonable", 1)
-    if srow[uni_idx] in ("0", "1", "false", ""):
+    # 仅 ability 目标有 unisonable 列(c1);其余表 c1 含义不同,强设 true 会毁坏该行
+    if dlog == core.ABILITY_LOGICAL and srow[uni_idx] in ("0", "1", "false", ""):
         srow[uni_idx] = "true"
     mode = dst.get("line", "all")
-    old_rows = [core.normalize_row_length(list(r), len(names)) for r in dp[dkey]]
+    old_rows = [_fit_row_width(r, dst_width) for r in dp[dkey]]
     keep_sid = old_rows[0][sid_idx] if (preserve_string_id and old_rows) else None
     new_row = list(srow)
     if keep_sid is not None:
@@ -400,15 +561,289 @@ def copy_row(src: dict, dst: dict, preserve_string_id: bool, dry_run: bool) -> d
         old_rows[li - 1] = new_row
         action = f"覆盖第 {li} 行"
     log_lines = [f"{src['key']} 行{src.get('line', 1)} -> {dst['key']} ({action})"]
+    if remap_note:
+        log_lines.append("  " + remap_note)
     written = []
     if not dry_run:
         dp[dkey] = old_rows
-        if dtag == "a":
-            written.append(str(_write_with_backup(table, parsed_a, log_lines)))
-        else:
-            written.append(str(_write_with_backup(leader, parsed_l, log_lines)))
+        written.append(str(_write_with_backup(loaded[dlog][0], dp, log_lines)))
     return {"changes": 1, "log": "\n".join(log_lines),
             "written": "; ".join(written) or None, "dry_run": dry_run}
+
+
+def append_line_adapted(src_key: str, src_line: int, dst_key: str, element: str = "auto",
+                        adapt_sid: bool = True, clear_awake: bool = True,
+                        dry_run: bool = False) -> dict:
+    """跨键复制一行词条并自动适配目标(同表限定)。
+    适配 = 手工移植铁律的自动化(防跨属性 U0000 崩溃):
+      1) 元素:行内元素 token(character_groups 等)与元素枚举列 → 目标属性
+         (element="auto":角色词条/队长技按目标角色属性,武器/魂按目标现有词条检测;
+          也可传 火/水/雷/风/光/暗 强制;"" = 不改)
+      2) string_id 统一为目标首行(角色词条/队长技,描述文本随目标)
+      3) 觉醒门槛清零(复制行常驻生效);ability 目标 unisonable=true
+      4) 武器目标:解锁强化等级(c1)对齐目标首行"""
+    slog, skey = _table_for_key(src_key)
+    dlog, dkey = _table_for_key(dst_key)
+    if slog != dlog:
+        raise ValueError("添加词条行只支持同表复制(角色词条←角色词条 / 武器←武器 / 队长技←队长技 / 魂←魂)")
+    kind = {core.ABILITY_LOGICAL: "ability", LEADER_LOGICAL: "leader_ability",
+            WEAPON_LOGICAL: "equipment_enhancement_ability", SOUL_LOGICAL: "ability_soul"}[dlog]
+    lay = wf_describe.layout(kind)
+    table = core.load_table(dlog, TARGET_STORE, SOURCE_STORE)
+    parsed = {k: core.read_csv_lines(t) for k, t in table.text_rows().items()}
+    if skey not in parsed:
+        raise ValueError(f"来源不存在: {src_key}")
+    if dkey not in parsed:
+        raise ValueError(f"目标不存在: {dst_key}")
+    srows = parsed[skey]
+    if not (1 <= int(src_line) <= len(srows)):
+        raise ValueError(f"来源行号越界: {src_key} 共 {len(srows)} 行")
+    ncols = _table_row_width(parsed, int(lay["ncols"]))
+    row = _fit_row_width(srows[int(src_line) - 1], ncols)
+    log = [f"复制 {src_key} 行{src_line} → {dst_key}(追加为第 {len(parsed[dkey]) + 1} 行)"]
+
+    # ---- 目标属性解析 + 元素适配
+    elem_cn = ""
+    if element == "auto":
+        if kind == "ability":
+            o = ability_owner_index().get(dkey)
+            cid = o[1] if o else ""
+            elem_cn = next((c["element"] for c in load_characters() if c["id"] == cid), "")
+        elif kind == "leader_ability":
+            elem_cn = next((c["element"] for c in load_characters() if c["id"] == dkey), "")
+        else:
+            elem_cn = _detect_element(parsed[dkey])
+    elif element in _CN_ELEM_TOKEN:
+        elem_cn = element
+    if elem_cn:
+        tok = _CN_ELEM_TOKEN[elem_cn]
+        for i, v in enumerate(row):
+            parts = [p for p in str(v).split("/") if p]
+            if parts and all(p in _ELEM_TOKEN_CN for p in parts) and v != tok:
+                log.append(f"c{i} 元素组 {v} -> {tok}({elem_cn})")
+                row[i] = tok
+        for blk, off in (("instant_content", 26), ("during_content", 10)):
+            ci = lay["blocks"][blk] + off
+            want = _ELEM_TOKEN_NUM[tok]
+            if ci < len(row) and row[ci] in ("1", "2", "3", "4", "5", "6") and row[ci] != want:
+                log.append(f"c{ci} 元素枚举 {row[ci]} -> {want}({elem_cn})")
+                row[ci] = want
+
+    # ---- string_id 统一(c0 是 string_id 的表)
+    if adapt_sid and kind in ("ability", "leader_ability"):
+        sid = (parsed[dkey][0][0] if parsed[dkey] and parsed[dkey][0] else "")
+        if sid and row[0] != sid:
+            log.append(f"string_id {row[0]!r} -> {sid!r}(描述文本随目标)")
+            row[0] = sid
+
+    # ---- 觉醒门槛 / unisonable / 武器头部
+    if kind == "ability":
+        if row[1] in ("", "0", "1", "false"):
+            row[1] = "true"
+        if clear_awake and (row[3] not in ("", "0") or row[4] not in ("", "0")):
+            log.append(f"觉醒门槛清零(c3 {row[3]!r}->0, c4 {row[4]!r}->空):复制行常驻生效")
+            row[3], row[4] = "0", ""
+    elif kind == "leader_ability" and clear_awake:
+        if row[1] == "2" or row[2] not in ("", "0"):
+            log.append(f"觉醒门槛清零(c1 {row[1]!r}->1, c2 {row[2]!r}->0)")
+            row[1], row[2] = "1", "0"
+    elif kind == "equipment_enhancement_ability" and parsed[dkey]:
+        d0 = core.normalize_row_length(list(parsed[dkey][0]), ncols)
+        if row[1] != d0[1]:
+            log.append(f"解锁强化等级 c1 {row[1]!r} -> {d0[1]!r}(对齐目标武器)")
+            row[1] = d0[1]
+
+    new_desc = wf_describe.describe_line(row, kind)
+    log.append("适配后效果: " + (new_desc or "(空)"))
+    # 元素 token 替换改不了"枚举自带属性"的效果(如 状态抗性火)→ 提醒手动换枚举
+    if elem_cn:
+        others = {e for e in "火水雷风光暗" if e in new_desc and e != elem_cn}
+        if others:
+            log.append(f"⚠ 效果描述仍含[{'/'.join(sorted(others))}]:该效果枚举本身是属性变体,"
+                       f"要彻底换属性需手动改效果枚举值(查词条速查或全表 §6)")
+
+    written = None
+    if not dry_run:
+        parsed[dkey].append(row)
+        written = str(_write_with_backup(table, parsed, log))
+    return {"changes": 1, "log": "\n".join(log), "written": written,
+            "dry_run": dry_run, "adapted_desc": new_desc}
+
+
+def append_ability_lines(src_key: str, dst_key: str, preserve_string_id: bool,
+                         dry_run: bool) -> dict:
+    """整词条追加移植:把 src_key 的**所有效果行**追加到 dst_key 之后(不覆盖原有行)。
+    key 前缀 "L:" 表示 leader_ability 表。用于「把 A 的能力 N 添加到 B 的能力 M」。
+    每条追加行统一 unisonable=true(避免入队/主位限制);preserve_string_id=True 时
+    追加行沿用 dst 首行的 string_id(否则保留来源自己的描述键)。"""
+    schema = load_schema()
+    names = core.schema_names(schema)
+    idx_by = core.schema_index(schema)
+    table = load_ability_table()
+    leader = core.load_table(LEADER_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    parsed_a = {k: core.read_csv_lines(t) for k, t in table.text_rows().items()}
+    parsed_l = {k: core.read_csv_lines(t) for k, t in leader.text_rows().items()}
+
+    def pick(keystr):
+        if str(keystr).startswith("L:"):
+            return parsed_l, "l", str(keystr)[2:]
+        return parsed_a, "a", str(keystr)
+
+    sp, _, skey = pick(src_key)
+    dp, dtag, dkey = pick(dst_key)
+    if skey not in sp:
+        raise ValueError(f"来源不存在: {src_key}")
+    if dkey not in dp:
+        raise ValueError(f"目标不存在: {dst_key}")
+    sid_idx = idx_by.get("string_id", 0)
+    uni_idx = idx_by.get("unisonable", 1)
+    stag = "l" if str(src_key).startswith("L:") else "a"
+    slog_t = LEADER_LOGICAL if stag == "l" else core.ABILITY_LOGICAL
+    dlog_t = LEADER_LOGICAL if dtag == "l" else core.ABILITY_LOGICAL
+    dst_width = _table_row_width(parsed_l if dtag == "l" else parsed_a, len(names))
+    dst_rows = [_fit_row_width(r, dst_width) for r in dp[dkey]]
+    keep_sid = dst_rows[0][sid_idx] if (preserve_string_id and dst_rows) else None
+    added = []
+    remap_note = ""
+    for r in sp[skey]:
+        row = list(r)
+        if slog_t != dlog_t:
+            row, remap_note = _remap_cross_table(row, slog_t, dlog_t, dp[dkey])
+        row = _fit_row_width(row, dst_width)
+        # 仅 ability 目标有 unisonable 列(c1);leader 表 c1=awake_kind,强设 true 会毁坏该行
+        if dtag == "a" and row[uni_idx] in ("0", "1", "false", ""):
+            row[uni_idx] = "true"
+        if keep_sid is not None:
+            row[sid_idx] = keep_sid
+        added.append(row)
+    new_rows = dst_rows + added
+    log_lines = [f"{src_key} 全部 {len(added)} 行 -> 追加到 {dst_key}"
+                 f"(原 {len(dst_rows)} 行 → 共 {len(new_rows)} 行)"]
+    if remap_note:
+        log_lines.append("  " + remap_note)
+    written = None
+    if not dry_run:
+        dp[dkey] = new_rows
+        if dtag == "a":
+            written = str(_write_with_backup(table, parsed_a, log_lines))
+        else:
+            written = str(_write_with_backup(leader, parsed_l, log_lines))
+    return {"changes": len(added), "log": "\n".join(log_lines),
+            "written": written, "dry_run": dry_run}
+
+
+# 前置块基址 precondition1/2/3(词条条件代码全表.md §2;leader 头部少 2 列故整体 -2)
+_PRECON_BASES = {"a": (6, 13, 20), "l": (4, 11, 18)}
+
+# 前置块内相对偏移 → 字段名(全表 §3)
+_PRECON_OFF_NAMES = {0: "kind", 1: "trigger_puller", 2: "trigger_puller.character_groups",
+                     3: "threshold.power1", 4: "threshold.first_max",
+                     5: "character_groups", 6: "unique_condition_id"}
+
+# 常用可清除的前置条件列组,按"块序号 + 块内相对偏移"定义(全表 §3:
+# +0=kind, +3/+4=threshold 对, +5=character_groups),由 transplant_line 按
+# 目标表类型换算成绝对列号;zero_kind=True 时把块内 kind 列写回 0(Always),
+# 避免 Member 等条件挂着空阈值
+STRIP_PRESETS = {
+    # 属性共鸣前置:清前置1块的 threshold 对 + 角色组,kind 回 Always(去掉共鸣门槛)
+    "element_resonance": {"block": 0, "offsets": [3, 4, 5], "zero_kind": True},
+    # 第二/第三前置(整块保守清除:kind 回 Always,其余 6 列清空)
+    "precondition2": {"block": 1, "offsets": [1, 2, 3, 4, 5, 6], "zero_kind": True},
+    "precondition3": {"block": 2, "offsets": [1, 2, 3, 4, 5, 6], "zero_kind": True},
+}
+
+
+def transplant_line(src_key: str, src_line: int, dst_key: str, mode: str,
+                    strip_cols: list[int] | str | None, preserve_string_id: bool,
+                    dry_run: bool) -> dict:
+    """行级移植 + 可选清除前置条件列。
+    src_key/dst_key 前缀 "L:" = leader_ability 表。
+    mode: "append" 追加 / "N" 覆盖第 N 行 / "all" 整键替换。
+    strip_cols: STRIP_PRESETS 预设名(按目标表类型换算列号)或显式绝对列号列表。"""
+    schema = load_schema()
+    names = core.schema_names(schema)
+    idx_by = core.schema_index(schema)
+    table = load_ability_table()
+    leader = core.load_table(LEADER_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    parsed_a = {k: core.read_csv_lines(t) for k, t in table.text_rows().items()}
+    parsed_l = {k: core.read_csv_lines(t) for k, t in leader.text_rows().items()}
+
+    def pick(keystr):
+        if str(keystr).startswith("L:"):
+            return parsed_l, "l", str(keystr)[2:]
+        return parsed_a, "a", str(keystr)
+
+    sp, stag, skey = pick(src_key)
+    dp, dtag, dkey = pick(dst_key)
+    if skey not in sp:
+        raise ValueError(f"来源不存在: {src_key}")
+    if dkey not in dp:
+        raise ValueError(f"目标不存在: {dst_key}")
+    if not (1 <= int(src_line) <= len(sp[skey])):
+        raise ValueError(f"来源行越界: {src_key} 共 {len(sp[skey])} 行")
+    sid_idx = idx_by.get("string_id", 0)
+    uni_idx = idx_by.get("unisonable", 1)
+    dst_width = _table_row_width(parsed_l if dtag == "l" else parsed_a, len(names))
+    new_row = list(sp[skey][int(src_line) - 1])
+    remap_note = ""
+    if stag != dtag:
+        new_row, remap_note = _remap_cross_table(
+            new_row, LEADER_LOGICAL if stag == "l" else core.ABILITY_LOGICAL,
+            LEADER_LOGICAL if dtag == "l" else core.ABILITY_LOGICAL, dp[dkey])
+    new_row = _fit_row_width(new_row, dst_width)
+    # 仅 ability 目标有 unisonable 列(c1);leader 表 c1=awake_kind,强设 true 会毁坏该行
+    if dtag == "a" and new_row[uni_idx] in ("0", "1", "false", ""):
+        new_row[uni_idx] = "true"
+    dst_rows = [_fit_row_width(r, dst_width) for r in dp[dkey]]
+    if preserve_string_id and dst_rows:
+        new_row[sid_idx] = dst_rows[0][sid_idx]
+    strip_pairs: list[tuple[int, str]] = []  # (绝对列号, 日志用字段名)
+    zero_pairs: list[tuple[int, str]] = []
+    if isinstance(strip_cols, str):
+        preset = STRIP_PRESETS.get(strip_cols)
+        if preset is None:
+            raise ValueError(f"未知 strip 预设: {strip_cols}")
+        base = _PRECON_BASES[dtag][preset["block"]]
+        blk = f"前置{preset['block'] + 1}"
+        # 标签按全表 §3 偏移名生成(schema 列名已知错位,不可用于日志)
+        strip_pairs = [(base + off, f"{blk}.{_PRECON_OFF_NAMES[off]}")
+                       for off in preset["offsets"]]
+        if preset["zero_kind"]:
+            zero_pairs = [(base, f"{blk}.kind")]
+    else:
+        strip_pairs = [(c, names[c].split(".")[-1]) for c in (strip_cols or [])]
+    stripped = []
+    for c, lab in strip_pairs:
+        if new_row[c] not in ("", "(None)"):
+            stripped.append(f"c{c}({lab})={new_row[c]}->空")
+            new_row[c] = ""
+    for c, lab in zero_pairs:
+        if new_row[c] not in ("", "0"):
+            stripped.append(f"c{c}({lab})={new_row[c]}->0")
+        new_row[c] = "0"
+    if mode == "append":
+        dst_rows.append(new_row); action = f"追加为第 {len(dst_rows)} 行"
+    elif mode == "all":
+        dst_rows = [new_row]; action = "整键替换"
+    else:
+        li = int(mode)
+        if not (1 <= li <= len(dst_rows)):
+            raise ValueError(f"目标行越界: {li}")
+        dst_rows[li - 1] = new_row; action = f"覆盖第 {li} 行"
+    log_lines = [f"{src_key} 行{src_line} -> {dst_key} ({action})"]
+    if remap_note:
+        log_lines.append("  " + remap_note)
+    if stripped:
+        log_lines.append("  清除前置: " + ", ".join(stripped))
+    written = None
+    if not dry_run:
+        dp[dkey] = dst_rows
+        if dtag == "a":
+            written = str(_write_with_backup(table, parsed_a, log_lines))
+        else:
+            written = str(_write_with_backup(leader, parsed_l, log_lines))
+    return {"changes": 1, "stripped": stripped, "log": "\n".join(log_lines),
+            "written": written, "dry_run": dry_run}
 
 
 def mainpos(action: str) -> dict:
@@ -458,7 +893,11 @@ LEADER_LOGICAL = "master/ability/leader_ability.orderedmap"
 
 def copy_leader_to_slot(from_character: str, to_character: str, slot: int,
                         preserve_string_id: bool, dry_run: bool) -> dict:
-    """把 from_character 的队长技(leader_ability 表)复制为 to_character 的第 slot 个词条。"""
+    """把 from_character 的队长技(leader_ability 表)复制为 to_character 的第 slot 个词条。
+
+    ⚠️ 不安全:leader 表 124 列、ability 表 126 列,头部与块基址不同(全表 §2)。
+    2026-07-06 起已内置 leader→ability 列重排(+2 列,补 c1=true/c2=类别串)+行宽对齐,
+    不再产生错位 2 列的 U0000。仍建议优先 copy_leader_to_leader(同表语义更直观)。"""
     schema = load_schema()
     names = core.schema_names(schema)
     index_by_name = core.schema_index(schema)
@@ -470,8 +909,7 @@ def copy_leader_to_slot(from_character: str, to_character: str, slot: int,
     src_text = leader.text_rows().get(from_character)
     if src_text is None:
         raise ValueError(f"leader_ability 表中没有角色 {from_character}")
-    src_rows = [core.normalize_row_length(r, len(names))
-                for r in core.read_csv_lines(src_text)]
+    src_rows = [list(r) for r in core.read_csv_lines(src_text)]
 
     target_ids = core.ability_ids_for_character(to_character, char_table)
     if not (1 <= int(slot) <= len(target_ids)):
@@ -481,18 +919,24 @@ def copy_leader_to_slot(from_character: str, to_character: str, slot: int,
     if dst_key not in parsed:
         raise ValueError(f"目标词条不存在于数据包: {dst_key}")
 
-    old_rows = [core.normalize_row_length(list(r), len(names)) for r in parsed[dst_key]]
+    dst_width = _table_row_width(parsed, len(names))
+    old_rows = [_fit_row_width(r, dst_width) for r in parsed[dst_key]]
     sid_idx = index_by_name.get("string_id", 0)
     uni_idx = index_by_name.get("unisonable", 1)
-    new_rows = [list(r) for r in src_rows]
     log_lines = []
+    new_rows = []
+    remap_note = ""
+    for r in src_rows:
+        nr, remap_note = _remap_cross_table(r, LEADER_LOGICAL, core.ABILITY_LOGICAL, parsed[dst_key])
+        new_rows.append(_fit_row_width(nr, dst_width))
     for i, row in enumerate(new_rows):
         if preserve_string_id and i < len(old_rows):
             row[sid_idx] = old_rows[i][sid_idx]
-        # leader 表的 unisonable 是 0/1,统一为 true 以免主位限制
         if row[uni_idx] in ("0", "1", "false", ""):
             row[uni_idx] = "true"
     log_lines.append(f"{from_character} 队长技 ({len(new_rows)} 行) -> {dst_key} (槽位 {slot})")
+    if remap_note:
+        log_lines.append("  " + remap_note)
 
     written = None
     if not dry_run:
@@ -506,6 +950,40 @@ def copy_leader_to_slot(from_character: str, to_character: str, slot: int,
         add_pending(written)
     return {"changes": len(new_rows), "log": "\n".join(log_lines),
             "written": str(written) if written else None, "dry_run": dry_run}
+
+
+def copy_leader_to_leader(from_character: str, to_character: str,
+                          preserve_string_id: bool, dry_run: bool) -> dict:
+    """队长技移植:把 from_character 的队长技整行复制为 to_character 的队长技
+    (leader_ability 表内 行=角色ID,直接整键覆盖)。
+    preserve_string_id=False 时连 string_id 一并复制 → 目标角色队长技描述也换成来源的。"""
+    schema = load_schema()
+    names = core.schema_names(schema)
+    index_by_name = core.schema_index(schema)
+    leader = core.load_table(LEADER_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    parsed = {k: core.read_csv_lines(t) for k, t in leader.text_rows().items()}
+    from_character, to_character = str(from_character), str(to_character)
+    if from_character not in parsed:
+        raise ValueError(f"leader_ability 表中没有来源角色 {from_character}")
+    if to_character not in parsed:
+        raise ValueError(f"leader_ability 表中没有目标角色 {to_character}")
+    sid_idx = index_by_name.get("string_id", 0)
+    lw = _table_row_width(parsed, len(names))
+    src_rows = [_fit_row_width(r, lw) for r in parsed[from_character]]
+    old_rows = [_fit_row_width(r, lw) for r in parsed[to_character]]
+    old_sid = old_rows[0][sid_idx] if old_rows else None
+    new_rows = [list(r) for r in src_rows]
+    if preserve_string_id and old_sid is not None:
+        for r in new_rows:
+            r[sid_idx] = old_sid
+    log_lines = [f"{from_character} 队长技 ({len(new_rows)} 行) -> {to_character} 队长技 (整行替换"
+                 + ("，保留原 string_id)" if preserve_string_id else "，连描述一并移植)")]
+    written = None
+    if not dry_run:
+        parsed[to_character] = new_rows
+        written = str(_write_with_backup(leader, parsed, log_lines))
+    return {"changes": len(new_rows), "log": "\n".join(log_lines),
+            "written": written, "dry_run": dry_run}
 
 
 def schema_enums(schema) -> dict[int, dict[str, str]]:
@@ -595,6 +1073,93 @@ def export_all_abilities() -> dict:
             "hint": "编辑后用命令写回: python mod-tools/wf_mod_tool.py import --edited <文件> [--dry-run]"}
 
 
+# ---------------------------------------------------------------- 词条速查(关键字搜索 + 共用/专属分组)
+# 扫 ability / leader_ability / weapon_ability / ability_soul 四表,每键生成行级中文描述,
+# 按"从 trigger 列起的 body 内容"做签名分组 → 同签名 = 效果完全相同的共用词条。
+# 索引带表文件 mtime 缓存,写入后自动失效重建。
+
+_SEARCH_CACHE: dict = {"stamp": None, "entries": None, "groups": None}
+# 各表 body 起始列(=trigger 列):五表 body 同构,从这里起的内容可跨表比较
+_KIND_BODY_COL = {"ability": 5, "leader_ability": 3, "ability_soul": 2,
+                  "equipment_enhancement_ability": 5}
+
+
+def _search_stamp() -> str:
+    parts = []
+    for logical in (core.ABILITY_LOGICAL, LEADER_LOGICAL, WEAPON_LOGICAL, SOUL_LOGICAL):
+        try:
+            parts.append(str(core.table_path(TARGET_STORE, logical).stat().st_mtime_ns))
+        except Exception:
+            parts.append("0")
+    return "|".join(parts)
+
+
+def _build_search_index() -> tuple[list[dict], dict]:
+    stamp = _search_stamp()
+    if _SEARCH_CACHE["stamp"] == stamp:
+        return _SEARCH_CACHE["entries"], _SEARCH_CACHE["groups"]
+    owners = ability_owner_index()
+    id2name = {c["id"]: c["name"] for c in load_characters()}
+    entries: list[dict] = []
+
+    def add(logical: str, kind: str, prefix: str, owner_fn) -> None:
+        table = core.load_table(logical, TARGET_STORE, SOURCE_STORE)
+        body_col = _KIND_BODY_COL[kind]
+        for k, t in table.text_rows().items():
+            rows = core.read_csv_lines(t)
+            descs = [d for d in wf_describe.describe_rows(rows, kind) if d]
+            body = "\n".join(",".join(r[body_col:]) for r in rows)
+            owner, slot = owner_fn(k)
+            sid = rows[0][0] if rows and kind in ("ability", "leader_ability") else ""
+            entries.append({"key": prefix + k, "kind": kind, "owner": owner, "slot": slot,
+                            "desc": " ┃ ".join(descs), "sid": sid,
+                            "sig": hash(body), "lines": len(rows)})
+
+    def char_owner(k: str):
+        o = owners.get(k)
+        return (o[0], o[2]) if o else ("(未被角色引用)", 0)
+
+    eqinfo = equipment_info()
+
+    def eq_owner(prefix_cn):
+        def fn(k):
+            ei = eqinfo.get(k, {})
+            return (prefix_cn + "·" + (ei.get("enh_name") or ei.get("name") or k), 0)
+        return fn
+
+    add(core.ABILITY_LOGICAL, "ability", "", char_owner)
+    add(LEADER_LOGICAL, "leader_ability", "L:", lambda k: (id2name.get(k, k) + "·队长技", 0))
+    add(WEAPON_LOGICAL, "equipment_enhancement_ability", "W:", eq_owner("武器"))
+    add(SOUL_LOGICAL, "ability_soul", "S:", eq_owner("魂珠"))
+
+    groups: dict = {}
+    for e in entries:
+        groups.setdefault(e["sig"], []).append(e)
+    _SEARCH_CACHE.update(stamp=stamp, entries=entries, groups=groups)
+    return entries, groups
+
+
+def search_abilities(q: str, limit: int = 150) -> dict:
+    """关键字搜四表词条(中文描述/归属角色/键/string_id),命中项带同效果分组。"""
+    entries, groups = _build_search_index()
+    ql = q.strip().lower()
+    if not ql:
+        raise ValueError("请输入关键字(效果中文/角色名/词条ID/string_id 均可)")
+    hits = []
+    for e in entries:
+        hay = (e["desc"] + " " + e["owner"] + " " + e["key"] + " " + e["sid"]).lower()
+        if ql in hay:
+            share = groups[e["sig"]]
+            hits.append({"key": e["key"], "kind": e["kind"], "owner": e["owner"],
+                         "slot": e["slot"], "desc": e["desc"], "sid": e["sid"],
+                         "lines": e["lines"], "shared_count": len(share),
+                         "shared": [{"key": s["key"], "owner": s["owner"], "slot": s["slot"]}
+                                    for s in share[:24] if s["key"] != e["key"]]})
+            if len(hits) >= limit:
+                break
+    return {"query": q, "count": len(hits), "results": hits}
+
+
 # ---------------------------------------------------------------- 能力魂 ability_soul
 # ability_soul.orderedmap 与 ability 同 schema(键=能力魂 ID,如 2020001);
 # 属 ② 层手机包数据,改后走 adb 同步(加入 pending)。
@@ -608,13 +1173,17 @@ def list_souls() -> list[dict]:
     idx_by = core.schema_index(schema)
     rarity_idx = idx_by.get("rarity", 2)
     table = core.load_table(SOUL_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    info = equipment_info()  # 魂珠与装备同键:借装备表拿中文名/品质/类型
     out = []
     for k, t in table.text_rows().items():
         rows = core.read_csv_lines(t)
         r0 = core.normalize_row_length(rows[0], len(names)) if rows else []
+        ei = info.get(k, {})
         out.append({"id": k, "string_id": r0[0] if r0 else "",
-                    "rarity": r0[rarity_idx] if r0 else "", "lines": len(rows)})
-    out.sort(key=lambda s: s["id"])
+                    "rarity": r0[rarity_idx] if r0 else "", "lines": len(rows),
+                    "name": ei.get("name", ""), "eq_rarity": ei.get("rarity", ""),
+                    "kind": ei.get("kind", "")})
+    out.sort(key=lambda s: (-int(s["eq_rarity"] or 0), s["id"]))
     return out
 
 
@@ -631,7 +1200,9 @@ def get_soul_rows(soul_id: str) -> dict:
         row = core.normalize_row_length(row, len(names))
         lines.append({"line": li, "values": {str(i): v for i, v in enumerate(row) if v != ""}})
     return {"soul": str(soul_id), "columns": names, "lines": lines,
-            "desc": describe_ability(lines, idx_by)}
+            "desc": describe_ability(lines, idx_by),
+            "line_descs": wf_describe.describe_rows(core.read_csv_lines(text), "ability_soul"),
+            "info": equipment_info().get(str(soul_id), {})}
 
 
 def _save_single_table_edits(logical: str, edits: list[dict], dry_run: bool, bak_tag: str) -> dict:
@@ -640,6 +1211,7 @@ def _save_single_table_edits(logical: str, edits: list[dict], dry_run: bool, bak
     names = core.schema_names(schema)
     table = core.load_table(logical, TARGET_STORE, SOURCE_STORE)
     parsed = {k: core.read_csv_lines(t) for k, t in table.text_rows().items()}
+    width = _table_row_width(parsed, len(names))
     log_lines = []
     changes = 0
     for e in edits:
@@ -648,7 +1220,7 @@ def _save_single_table_edits(logical: str, edits: list[dict], dry_run: bool, bak
             raise ValueError(f"键不存在: {key}")
         if line < 1 or line > len(parsed[key]):
             raise ValueError(f"行号越界: {key} line {line}")
-        row = core.normalize_row_length(parsed[key][line - 1], len(names))
+        row = _fit_row_width(parsed[key][line - 1], width)
         if row[idx] == value:
             continue
         col = names[idx] if idx < len(names) else str(idx)
@@ -664,12 +1236,216 @@ def _save_single_table_edits(logical: str, edits: list[dict], dry_run: bool, bak
         with redirect_stdout(buf):
             written = core.write_table(table, TARGET_STORE, suffix, no_backup=False)
         add_pending(written)
+        record_change(logical, "\n".join(log_lines),
+                      written.with_name(written.name + suffix))
     return {"changes": changes, "log": "\n".join(log_lines),
             "written": str(written) if written else None, "dry_run": dry_run}
 
 
 def save_soul_rows(edits: list[dict], dry_run: bool) -> dict:
     return _save_single_table_edits(SOUL_LOGICAL, edits, dry_run, ".bak-wfmod-soul-")
+
+
+# ---------------------------------------------------------------- 词条删行(增删改的"删")
+
+
+def _table_for_key(key: str) -> tuple[str, str]:
+    """键前缀 -> (逻辑路径, 真实键)。L:=队长技 W:=武器词条 S:=能力魂,无前缀=角色词条。"""
+    ks = str(key)
+    if ks.startswith("L:"):
+        return LEADER_LOGICAL, ks[2:]
+    if ks.startswith("W:"):
+        return WEAPON_LOGICAL, ks[2:]
+    if ks.startswith("S:"):
+        return SOUL_LOGICAL, ks[2:]
+    return core.ABILITY_LOGICAL, ks
+
+
+def delete_line(key: str, line: int, dry_run: bool) -> dict:
+    """删除某键的第 line 行(1 起)。key 前缀:L:=队长技 W:=武器词条 S:=能力魂。"""
+    logical, real_key = _table_for_key(key)
+    table = core.load_table(logical, TARGET_STORE, SOURCE_STORE)
+    parsed = {k: core.read_csv_lines(t) for k, t in table.text_rows().items()}
+    if real_key not in parsed:
+        raise ValueError(f"键不存在: {key}")
+    rows = parsed[real_key]
+    if not (1 <= int(line) <= len(rows)):
+        raise ValueError(f"行号越界: {key} 共 {len(rows)} 行")
+    if len(rows) <= 1:
+        raise ValueError("该词条只剩 1 行,删除会清空整键;如需清空请改用其它方式")
+    removed = rows.pop(int(line) - 1)
+    log = f"{key} 删除第 {line} 行(剩 {len(rows)} 行)"
+    written = None
+    if not dry_run:
+        written = str(_write_with_backup(table, parsed, [log]))
+    return {"changes": 1, "log": log, "written": written, "dry_run": dry_run}
+
+
+def mainpos_one(ability: str, line: int, action: str, dry_run: bool) -> dict:
+    """单条词条的主位限制开关。action: on(加限制=仅主位)/ off(解除)。
+    on: c1 unisonable→false;off: c1→true 且把前置里的 202(OwnerIsMain)→0。"""
+    schema = load_schema()
+    names = core.schema_names(schema)
+    idx = core.schema_index(schema)
+    uni = idx.get("unisonable", 1)
+    table = load_ability_table()
+    parsed = {k: core.read_csv_lines(t) for k, t in table.text_rows().items()}
+    if str(ability) not in parsed:
+        raise ValueError(f"词条不存在: {ability}")
+    rows = parsed[str(ability)]
+    if not (1 <= int(line) <= len(rows)):
+        raise ValueError(f"行号越界: {ability} 共 {len(rows)} 行")
+    row = _fit_row_width(rows[int(line) - 1], _table_row_width(parsed, len(names)))
+    log = []
+    if action == "on":
+        if row[uni] != "false":
+            log.append(f"{ability} line{line}: unisonable {row[uni]!r}->false(仅主位)")
+            row[uni] = "false"
+    elif action == "off":
+        if row[uni] == "false":
+            log.append(f"{ability} line{line}: unisonable false->true")
+            row[uni] = "true"
+        for i, v in enumerate(row):
+            if v == "202":
+                log.append(f"{ability} line{line}: c{i} OwnerIsMain(202)->0")
+                row[i] = "0"
+    else:
+        raise ValueError("action 只能是 on / off")
+    rows[int(line) - 1] = row
+    written = None
+    if log and not dry_run:
+        written = str(_write_with_backup(table, parsed, log))
+    return {"changes": len(log), "log": "\n".join(log), "written": written, "dry_run": dry_run}
+
+
+# ---------------------------------------------------------------- 装备/魂珠 equipment
+# master/item/equipment.orderedmap:武器与魂珠共表(436 键,c2 kind 0=武器 1=魂珠orb),
+# c1=中文名 c7=描述 c8=品质 c10=ability_soul_id(实测 436/436 与自身键一致 → 每件装备
+# 都有同键的 ability_soul 行 = 对应魂珠效果)。equipment_enhancement.orderedmap(29 键)
+# 是武器改造层:c2=改造名(·改) c7=最大强化等级。
+
+EQUIP_LOGICAL = "master/item/equipment.orderedmap"
+ENH_LOGICAL = "master/equipment_enhancement/equipment_enhancement.orderedmap"
+_EQUIP_CACHE: dict = {"stamp": None, "info": None}
+
+
+def equipment_info() -> dict[str, dict]:
+    """装备表快照:id -> {string_id, name, enh_name?, kind, rarity, desc, soul_id}。"""
+    try:
+        stamp = str(core.table_path(TARGET_STORE, EQUIP_LOGICAL).stat().st_mtime_ns)
+    except Exception:
+        stamp = "0"
+    if _EQUIP_CACHE["stamp"] == stamp:
+        return _EQUIP_CACHE["info"]
+    info: dict[str, dict] = {}
+    try:
+        eq = core.load_table(EQUIP_LOGICAL, TARGET_STORE, SOURCE_STORE)
+        for k, t in eq.text_rows().items():
+            r = core.read_csv_lines(t)[0]
+            def g(i):
+                return r[i] if i < len(r) else ""
+            info[k] = {"string_id": g(0), "name": g(1), "kind": g(2),
+                       "rarity": g(8), "desc": g(7), "soul_id": g(10)}
+    except Exception:
+        pass
+    try:
+        en = core.load_table(ENH_LOGICAL, TARGET_STORE, SOURCE_STORE)
+        for k, t in en.text_rows().items():
+            r = core.read_csv_lines(t)[0]
+            if k in info and len(r) > 2 and r[2]:
+                info[k]["enh_name"] = r[2]
+    except Exception:
+        pass
+    _EQUIP_CACHE.update(stamp=stamp, info=info)
+    return info
+
+
+# ---------------------------------------------------------------- 武器词条 weapon_ability
+# equipment_enhancement_ability.orderedmap:武器强化词条,与角色 ability 同 126 列 schema
+# (表头不同:c0=slot c1=learn_level c2=max_power_level c3/c4=power c5=trigger,块基址同 ability)。
+# 属 ② 层手机包,改后走发布/adb 同步。
+
+WEAPON_LOGICAL = "master/equipment_enhancement/equipment_enhancement_ability.orderedmap"
+
+
+_ELEM_TOKEN_CN = {"Red": "火", "Blue": "水", "Yellow": "雷", "Green": "风", "White": "光", "Black": "暗"}
+_CN_ELEM_TOKEN = {v: k for k, v in _ELEM_TOKEN_CN.items()}
+_ELEM_TOKEN_NUM = {"Red": "1", "Blue": "2", "Yellow": "3", "Green": "4", "White": "5", "Black": "6"}
+
+
+def _detect_element(rows: list[list[str]]) -> str:
+    """数词条行里的元素 token(character_groups 等),返回中文元素;无 = ''(通用)。"""
+    from collections import Counter
+    cnt: Counter = Counter()
+    for r in rows:
+        for cell in r:
+            for tok in str(cell).split("/"):
+                if tok in _ELEM_TOKEN_CN:
+                    cnt[tok] += 1
+    return _ELEM_TOKEN_CN[cnt.most_common(1)[0][0]] if cnt else ""
+
+
+def list_weapons() -> list[dict]:
+    """全部武器 = equipment 表 kind=0(424 把),不止有强化词条的 29 把。
+    element 按词条内容检测(强化词条 + 同键魂珠):无元素 token = 通用。"""
+    table = core.load_table(WEAPON_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    enh_rows = {k: core.read_csv_lines(t) for k, t in table.text_rows().items()}
+    soul = core.load_table(SOUL_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    soul_rows = soul.text_rows()
+    info = equipment_info()
+    out = []
+    for k, ei in info.items():
+        er = enh_rows.get(k) or []
+        rows = list(er)
+        if k in soul_rows:
+            rows = rows + core.read_csv_lines(soul_rows[k])
+        r0 = er[0] if er else []
+        out.append({"id": k, "slot": r0[0] if r0 else "",
+                    "learn_level": r0[1] if len(r0) > 1 else "",
+                    "lines": len(er), "has_enh": bool(er),
+                    "kind": ei.get("kind", "0"),  # 0=武器 1=魂珠(主线orb)
+                    "name": ei.get("name", ""), "enh_name": ei.get("enh_name", ""),
+                    "rarity": ei.get("rarity", ""), "soul_id": ei.get("soul_id", "") or k,
+                    "element": _detect_element(rows)})
+    elem_order = {"火": 0, "水": 1, "雷": 2, "风": 3, "光": 4, "暗": 5, "": 6}
+    out.sort(key=lambda w: (w["kind"], elem_order.get(w["element"], 6),
+                            -int(w["rarity"] or 0), not w["has_enh"], w["id"]))
+    return out
+
+
+def get_weapon_rows(wid: str) -> dict:
+    schema = load_schema()
+    names = core.schema_names(schema)
+    idx_by = core.schema_index(schema)
+    table = core.load_table(WEAPON_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    text = table.text_rows().get(str(wid))
+    if text is None:
+        # 大部分装备没有强化词条,只有同键魂珠 → 页面只显示魂珠效果区
+        soul = None
+        try:
+            soul = get_soul_rows(str(wid))
+        except Exception:
+            pass
+        return {"weapon": str(wid), "columns": names, "lines": [], "no_enh": True,
+                "desc": "", "line_descs": [],
+                "info": equipment_info().get(str(wid), {}), "soul": soul}
+    lines = []
+    for li, row in enumerate(core.read_csv_lines(text), start=1):
+        row = core.normalize_row_length(row, len(names))
+        lines.append({"line": li, "values": {str(i): v for i, v in enumerate(row) if v != ""}})
+    soul = None
+    try:
+        soul = get_soul_rows(str(wid))  # 装备与魂同键:武器页一并展示/编辑
+    except Exception:
+        pass
+    return {"weapon": str(wid), "columns": names, "lines": lines,
+            "desc": describe_ability(lines, idx_by),
+            "line_descs": wf_describe.describe_rows(core.read_csv_lines(text), "equipment_enhancement_ability"),
+            "info": equipment_info().get(str(wid), {}), "soul": soul}
+
+
+def save_weapon_rows(edits: list[dict], dry_run: bool) -> dict:
+    return _save_single_table_edits(WEAPON_LOGICAL, edits, dry_run, ".bak-wfmod-weapon-")
 
 
 # ---------------------------------------------------------------- 基础数值 character_status
@@ -722,6 +1498,8 @@ def save_awake_values(cid: str, atk_plus: int, hp_plus: int, dry_run: bool) -> d
             written = core.write_table(table, TARGET_STORE, suffix, no_backup=False)
         log_lines.append(buf.getvalue().strip())
         add_pending(written)
+        record_change(AWAKE_LOGICAL, "\n".join(l for l in log_lines if l),
+                      written.with_name(written.name + suffix))
     return {"changes": changes, "log": "\n".join(l for l in log_lines if l),
             "written": str(written) if written else None, "dry_run": dry_run}
 
@@ -769,8 +1547,193 @@ def save_status_values(cid: str, entries: list[dict], dry_run: bool) -> dict:
             written = core.write_status_table(table, TARGET_STORE, suffix)
         log_lines.append(buf.getvalue().strip())
         add_pending(written)
+        record_change(core.STATUS_LOGICAL, "\n".join(l for l in log_lines if l),
+                      written.with_name(written.name + suffix))
     return {"changes": changes, "log": "\n".join(l for l in log_lines if l),
             "written": str(written) if written else None, "dry_run": dry_run}
+
+
+# ---------------------------------------------------------------- 技能能量 action_skill
+# 嵌套 orderedmap(外层键=角色 code_name,内层键 "1"基础技/"2"＋进化技,行=CSV)。
+# 逆向依据见 wf_mod_tool.py ACTION_SKILL_* 注释;属 ② 层手机包,改后走 adb 同步。
+# 面板"技能能量" = 内层列5(max_skill_weight,满级值);列4 = min_skill_weight(SLv1)。
+
+SKILL_LEVEL_LABEL = {"1": "基础技", "2": "＋进化技", "3": "＋＋进化技"}
+
+
+def _action_skill_key(character: str) -> str:
+    """角色 ID -> action_skill 表键(code_name)。col8=action_skill,回退 col0=code_name。"""
+    character = str(character)
+    ct = load_char_table()
+    if ct:
+        for text in ct.text_rows().values():
+            row = core.read_csv_lines(text)
+            if not row:
+                continue
+            r = core.normalize_row_length(row[0], 37)
+            if r[17] == character or r[0] == character:
+                return r[8] or r[0]
+    # 回退:直接从 ① 层 character.json 取 code_name
+    for c in load_characters():
+        if c["id"] == character:
+            return c["code_name"]
+    return character
+
+
+def get_skill_energy(character: str) -> dict:
+    key = _action_skill_key(character)
+    table = core.load_action_skill_table(TARGET_STORE, SOURCE_STORE)
+    if key not in table.keys:
+        raise ValueError(f"action_skill 表中没有 {key}(角色 {character})")
+    entries = core.decode_action_skill_row(table.rows[table.keys.index(key)])
+    C = core.ACTION_SKILL_COLUMNS
+    skills = []
+    for lv, fields in entries:
+        fields = core.normalize_row_length(fields, C["max_skill_weight"] + 1)
+        skills.append({
+            "level": lv,
+            "label": SKILL_LEVEL_LABEL.get(lv, lv),
+            "name": fields[C["name"]],
+            "description": fields[C["description"]],   # 游戏内技能效果描述(内层 c1)
+            "min_skill_weight": fields[C["min_skill_weight"]],   # SLv1 技能能量
+            "max_skill_weight": fields[C["max_skill_weight"]],   # 满级技能能量(面板显示)
+        })
+    return {"character": str(character), "skill_key": key, "skills": skills,
+            "note": "面板技能能量=满级值(max_skill_weight);名称/描述只是显示文本,技能实际效果在 ActionDsl(不可改,可整段移植别人的技能)"}
+
+
+def _write_action_skill(table, log_lines: list[str]) -> str:
+    """action_skill 写盘 + 备份 + pending + 改动日志(公共出口)。"""
+    suffix = ".bak-wfmod-actionskill-" + time.strftime("%Y%m%d-%H%M%S")
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        written = core.write_action_skill_table(table, TARGET_STORE, suffix)
+    log_lines.append(buf.getvalue().strip())
+    add_pending(written)
+    record_change(core.ACTION_SKILL_LOGICAL, "\n".join(l for l in log_lines if l),
+                  written.with_name(written.name + suffix))
+    return str(written)
+
+
+def _skill_text_clean(v: str) -> str:
+    """名称/描述写入内层 CSV 前清洗:半角逗号/换行会破坏 CSV 行结构。"""
+    return str(v).replace(",", "，").replace("\r", "").replace("\n", " ")
+
+
+def save_skill_energy(character: str, edits: list[dict], dry_run: bool) -> dict:
+    """edits: [{level, min_skill_weight?, max_skill_weight?, name?, description?}]。缺省字段不改。"""
+    key = _action_skill_key(character)
+    table = core.load_action_skill_table(TARGET_STORE, SOURCE_STORE)
+    if key not in table.keys:
+        raise ValueError(f"action_skill 表中没有 {key}(角色 {character})")
+    ki = table.keys.index(key)
+    entries = core.decode_action_skill_row(table.rows[ki])
+    C = core.ACTION_SKILL_COLUMNS
+    by_level = {str(e["level"]): e for e in edits}
+    log_lines = []
+    new_entries: list[tuple[str, list[str]]] = []
+    for lv, fields in entries:
+        fields = core.normalize_row_length(list(fields), C["max_skill_weight"] + 1)
+        e = by_level.get(lv)
+        if e:
+            tag = SKILL_LEVEL_LABEL.get(lv, lv)
+            for colname in ("min_skill_weight", "max_skill_weight"):
+                if colname in e and e[colname] is not None and str(e[colname]) != "":
+                    val = int(e[colname])
+                    if not (0 <= val < 2**31):
+                        raise ValueError("技能能量必须是 0 ~ 2^31-1 的整数")
+                    if str(val) != fields[C[colname]]:
+                        log_lines.append(f"{key} [{tag}] {colname} {fields[C[colname]]}->{val}")
+                        fields[C[colname]] = str(val)
+            for colname in ("name", "description"):
+                if colname in e and e[colname] is not None:
+                    val = _skill_text_clean(e[colname])
+                    if val and val != fields[C[colname]]:
+                        log_lines.append(f"{key} [{tag}] {colname} {fields[C[colname]]!r}->{val!r}")
+                        fields[C[colname]] = val
+        new_entries.append((lv, fields))
+    changes = len(log_lines)
+    written = None
+    if not dry_run and changes:
+        table.rows[ki] = core.encode_action_skill_row(new_entries)
+        written = _write_action_skill(table, log_lines)
+    return {"changes": changes, "log": "\n".join(l for l in log_lines if l),
+            "written": written, "dry_run": dry_run}
+
+
+def skill_copy(from_character: str, to_character: str, dry_run: bool) -> dict:
+    """整技能移植:外层行原样字节复制(from 的全部技能级别 → to,含名称/描述/能量/动作路径)。
+    不重编码内层 → 零结构风险;目标原技能整段被替换(备份可回)。"""
+    fkey = _action_skill_key(from_character)
+    tkey = _action_skill_key(to_character)
+    table = core.load_action_skill_table(TARGET_STORE, SOURCE_STORE)
+    for k, who in ((fkey, from_character), (tkey, to_character)):
+        if k not in table.keys:
+            raise ValueError(f"action_skill 表中没有 {k}(角色 {who})")
+    fi, ti = table.keys.index(fkey), table.keys.index(tkey)
+    src_names = [f"[{SKILL_LEVEL_LABEL.get(lv, lv)}]{fields[0]}"
+                 for lv, fields in core.decode_action_skill_row(table.rows[fi])]
+    log_lines = [f"{fkey} 整技能 -> {tkey}(外层原样字节替换): " + " ".join(src_names),
+                 "⚠ 技能动画/效果走来源的 ActionDsl;名称/描述/能量一并变成来源的"]
+    written = None
+    if not dry_run:
+        table.rows[ti] = bytes(table.rows[fi])
+        written = _write_action_skill(table, log_lines)
+    return {"changes": 1, "log": "\n".join(log_lines), "written": written, "dry_run": dry_run}
+
+
+def skill_level_copy(from_character: str, from_level: str, to_character: str,
+                     to_level: str, dry_run: bool) -> dict:
+    """单个技能级别移植:from 的级别 N → to 的级别 M(已存在=替换,不存在=新增到末尾)。"""
+    fkey = _action_skill_key(from_character)
+    tkey = _action_skill_key(to_character)
+    table = core.load_action_skill_table(TARGET_STORE, SOURCE_STORE)
+    for k, who in ((fkey, from_character), (tkey, to_character)):
+        if k not in table.keys:
+            raise ValueError(f"action_skill 表中没有 {k}(角色 {who})")
+    src = dict(core.decode_action_skill_row(table.rows[table.keys.index(fkey)]))
+    if str(from_level) not in src:
+        raise ValueError(f"{fkey} 没有技能级别 {from_level}(现有: {'/'.join(src)})")
+    ti = table.keys.index(tkey)
+    entries = core.decode_action_skill_row(table.rows[ti])
+    fields = list(src[str(from_level)])
+    tag_f = SKILL_LEVEL_LABEL.get(str(from_level), from_level)
+    tag_t = SKILL_LEVEL_LABEL.get(str(to_level), to_level)
+    keys_now = [lv for lv, _ in entries]
+    if str(to_level) in keys_now:
+        new_entries = [(lv, fields if lv == str(to_level) else fl) for lv, fl in entries]
+        action = f"替换 {tkey} 的 [{tag_t}]"
+    else:
+        new_entries = entries + [(str(to_level), fields)]
+        action = f"新增 {tkey} 的 [{tag_t}](追加到内层末尾)"
+    log_lines = [f"{fkey} [{tag_f}]{fields[0]} -> {action}"]
+    written = None
+    if not dry_run:
+        table.rows[ti] = core.encode_action_skill_row(new_entries)
+        written = _write_action_skill(table, log_lines)
+    return {"changes": 1, "log": "\n".join(log_lines), "written": written, "dry_run": dry_run}
+
+
+def skill_level_delete(character: str, level: str, dry_run: bool) -> dict:
+    """删除技能级别(至少保留 1 个;删"2"会影响已进化角色,慎用)。"""
+    key = _action_skill_key(character)
+    table = core.load_action_skill_table(TARGET_STORE, SOURCE_STORE)
+    if key not in table.keys:
+        raise ValueError(f"action_skill 表中没有 {key}(角色 {character})")
+    ki = table.keys.index(key)
+    entries = core.decode_action_skill_row(table.rows[ki])
+    keys_now = [lv for lv, _ in entries]
+    if str(level) not in keys_now:
+        raise ValueError(f"{key} 没有技能级别 {level}(现有: {'/'.join(keys_now)})")
+    if len(entries) <= 1:
+        raise ValueError("只剩 1 个技能级别,不允许删空")
+    new_entries = [(lv, fl) for lv, fl in entries if lv != str(level)]
+    log_lines = [f"{key} 删除技能级别 [{SKILL_LEVEL_LABEL.get(str(level), level)}](剩 {len(new_entries)} 个)"]
+    written = None
+    if not dry_run:
+        table.rows[ki] = core.encode_action_skill_row(new_entries)
+        written = _write_action_skill(table, log_lines)
+    return {"changes": 1, "log": "\n".join(log_lines), "written": written, "dry_run": dry_run}
 
 
 # ---------------------------------------------------------------- ① 层角色资料
@@ -849,14 +1812,640 @@ def save_char_fields(cid: str, edits: dict, dry_run: bool) -> dict:
             "note": "① 层已改;重启服务端后客户端 /load 生效(此改动不走模拟器同步)"}
 
 
+# ---------------------------------------------------------------- 角色资产(立绘/图标/语音)
+
+
+def char_assets(character: str) -> dict:
+    c = next((x for x in load_characters() if x["id"] == str(character)), None)
+    if not c:
+        raise ValueError(f"角色不存在: {character}")
+    code = c["code_name"]
+    return {"character": str(character), "code_name": code,
+            "assets": wf_assets.char_asset_manifest(TARGET_STORE, code),
+            "note": "PNG/MP3 存储态有混淆,预览与替换自动转换;替换自动备份+进待发布"
+                    "(medium 根资产发布时自动走 medium diff 包)"}
+
+
+def get_asset_bytes(logical: str) -> tuple[bytes, str]:
+    loc = wf_assets.locate(TARGET_STORE, logical)
+    if not loc:
+        raise ValueError(f"资产不存在: {logical}")
+    data = loc[1].read_bytes()
+    if logical.endswith(".png"):
+        return wf_assets.png_decode(data), "image/png"
+    if logical.endswith(".mp3"):
+        return wf_assets.mp3_decode(data), "audio/mpeg"
+    return data, "application/octet-stream"
+
+
+def replace_asset(logical: str, data: bytes, force: bool, dry_run: bool) -> dict:
+    loc = wf_assets.locate(TARGET_STORE, logical)
+    if not loc:
+        raise ValueError(f"资产不存在(暂不支持新增全新路径,先替换现有): {logical}")
+    root_name, fp = loc
+    old = fp.read_bytes()
+    log = []
+    if logical.endswith(".png"):
+        if data[:8] != wf_assets.PNG_REAL:
+            raise ValueError("上传的不是标准 PNG 文件(魔数不对)")
+        nd = wf_assets.png_dims(data)
+        od = wf_assets.png_dims(old)
+        if od and nd != od and not force:
+            raise ValueError(f"尺寸不匹配:原图 {od[0]}x{od[1]},上传 {nd[0]}x{nd[1]}。"
+                             f"sprite sheet/图集类必须同尺寸同布局;立绘可勾选「强制」替换"
+                             f"(游戏按原 pivot/缩放摆放,尺寸差异会导致偏移)")
+        enc = wf_assets.png_encode(data)
+        log.append(f"{logical}: PNG {od[0]}x{od[1]}→{nd[0]}x{nd[1]}, {len(old)}B→{len(enc)}B [{root_name}]")
+    elif logical.endswith(".mp3"):
+        enc = wf_assets.mp3_encode(data)
+        log.append(f"{logical}: MP3 {len(old)}B→{len(enc)}B [{root_name}]")
+    else:
+        enc = data
+        log.append(f"{logical}: RAW {len(old)}B→{len(enc)}B [{root_name}]")
+    written = None
+    if not dry_run:
+        bak = fp.with_name(fp.name + ".bak-wfmod-asset-" + time.strftime("%Y%m%d-%H%M%S"))
+        if not bak.exists():
+            shutil.copy2(fp, bak)
+        fp.write_bytes(enc)
+        add_pending(fp)
+        record_change(logical, "\n".join(log), bak)
+        written = str(fp)
+    return {"changes": 1, "log": "\n".join(log), "written": written,
+            "dry_run": dry_run, "root": root_name}
+
+
+# ---------------------------------------------------------------- 技能效果 DSL 数值
+
+
+def _skill_program_path(character: str, level: str) -> str:
+    key = _action_skill_key(character)
+    table = core.load_action_skill_table(TARGET_STORE, SOURCE_STORE)
+    if key not in table.keys:
+        raise ValueError(f"action_skill 表中没有 {key}(角色 {character})")
+    entries = dict(core.decode_action_skill_row(table.rows[table.keys.index(key)]))
+    if str(level) not in entries:
+        raise ValueError(f"没有技能级别 {level}(现有: {'/'.join(entries)})")
+    pp = entries[str(level)][core.ACTION_SKILL_COLUMNS["program_path"]]
+    if not pp or pp == "(None)":
+        raise ValueError("该技能级别没有 program_path")
+    return pp
+
+
+def get_skill_dsl(character: str, level: str) -> dict:
+    pp = _skill_program_path(character, level)
+    fp, data = wf_dsl.load_dsl_file(TARGET_STORE, pp)
+    r = wf_dsl.parse_dsl(data)
+    nums = [{"offset": n["offset"], "len": n["len"], "type": n["type"],
+             "value": n["value"], "ctx": wf_dsl.cn_ctx(n["ctx"])} for n in r["numbers"]]
+    return {"character": str(character), "level": str(level), "program_path": pp,
+            "numbers": nums,
+            "note": "技能效果命令树全部数值(判定范围/帧/强度…,单位随命令不同,小步改+实测);"
+                    "整数受原字段字节数限制,放不下会拒绝(此时用整技能替换换模板)"}
+
+
+def save_skill_dsl(character: str, level: str, edits: list[dict], dry_run: bool) -> dict:
+    pp = _skill_program_path(character, level)
+    fp, data = wf_dsl.load_dsl_file(TARGET_STORE, pp)
+    patched, plog = wf_dsl.patch_numbers(data, edits)
+    log = [f"{pp} 技能效果 DSL 补丁 {len(edits)} 处"] + plog
+    written = None
+    if not dry_run and patched != data:
+        suffix = ".bak-wfmod-dsl-" + time.strftime("%Y%m%d-%H%M%S")
+        wf_dsl.save_dsl_file(fp, patched, suffix)
+        add_pending(fp)
+        record_change(wf_dsl.dsl_logical(pp), "\n".join(log), fp.with_name(fp.name + suffix))
+        written = str(fp)
+    return {"changes": len(plog), "log": "\n".join(log), "written": written, "dry_run": dry_run}
+
+
+# ---------------------------------------------------------------- 单角色快照/还原 + 克隆
+# 快照 = 一个 zip:②层全部表行(平表存解码文本/嵌套表存外层原样字节) + ①层两 json 条目
+#        + 全部资产文件(存储态原样) + 技能 DSL 文件。还原 = 逐项写回(自动备份+进待发布)。
+
+SNAP_DIR = WORK_DIR / "char_snapshots"
+CHAR_TEXT2_LOGICAL = "master/character/character_text.orderedmap"
+# 新角色额外要复制的按 character_id 索引的外围表(标准 orderedmap,已验证 111001 为键)。
+# 缺这些客户端会在 box/详情/技能预览/玛纳板 崩溃。generated/character_image 与
+# generated/mana_board 用别的格式(现读取器读不了),是完整新角色的已知硬缺口(见方案文档)。
+CLONE_EXTRA_TABLES = [
+    "master/character/character_speech.orderedmap",
+    "master/skill_preview/skill_preview_character.orderedmap",
+    "master/mana_board/mana_board2_open_condition.orderedmap",
+    "master/mana_board/upskill.orderedmap",
+    "master/stance_detail/character_stance_detail.orderedmap",
+]
+# 嵌套表(外层键=character_id,行=原样内层 orderedmap 字节):克隆=原样复制外层行,
+# 不解内层(和 character_status 同法)。character_image=立绘定位、mana_board/mana_node=
+# 玛纳板、full_shot_image_attribute=立绘属性、character_gacha_sound=抽卡音效。
+CLONE_NESTED_TABLES = [
+    "master/generated/character_image.orderedmap",
+    "master/character/full_shot_image_attribute.orderedmap",
+    "master/generated/mana_board.orderedmap",
+    "master/mana_board/mana_node.orderedmap",
+    "master/character/character_gacha_sound.orderedmap",
+]
+
+
+def _load_nested(logical: str) -> core.OrderedMap:
+    return core.read_orderedmap_file_raw_rows(core.table_path(TARGET_STORE, logical), logical)
+
+
+def _write_nested(om: core.OrderedMap, logical: str, tag: str) -> str:
+    """嵌套表写盘(外层原样字节)+ 备份 + pending + 改动日志。"""
+    p = core.table_path(TARGET_STORE, logical)
+    suffix = ".bak-wfmod-nested-" + time.strftime("%Y%m%d-%H%M%S")
+    if p.exists():
+        bak = p.with_name(p.name + suffix)
+        if not bak.exists():
+            shutil.copy2(p, bak)
+    p.write_bytes(core.build_orderedmap_raw_rows(om))
+    add_pending(p)
+    record_change(logical, tag, p.with_name(p.name + suffix))
+    return str(p)
+
+
+def _char_row(cid: str) -> list[str]:
+    ct = core.load_table(core.CHARACTER_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    t = ct.text_rows().get(str(cid))
+    if t is None:
+        raise ValueError(f"② character 表中没有角色 {cid}")
+    return core.normalize_row_length(core.read_csv_lines(t)[0], 37)
+
+
+def _char_flat_parts(cid: str, row: list[str]) -> list[tuple[str, str, list[str]]]:
+    abilities = [v for v in row[19:25] if v and v != "(None)"]
+    return [
+        (core.CHARACTER_LOGICAL, "character", [cid]),
+        (CHAR_TEXT2_LOGICAL, "character_text", [cid]),
+        (core.ABILITY_LOGICAL, "ability", abilities),
+        (LEADER_LOGICAL, "leader_ability", [cid]),
+        (AWAKE_LOGICAL, "character_awake_status", [cid]),
+    ]
+
+
+def char_snapshot(cid: str, note: str = "") -> dict:
+    import zipfile as _zf
+    cid = str(cid)
+    row = _char_row(cid)
+    code = row[0]
+    skey = row[8] or code
+    SNAP_DIR.mkdir(parents=True, exist_ok=True)
+    ts = time.strftime("%Y%m%d-%H%M%S")
+    zpath = SNAP_DIR / f"{cid}-{ts}.zip"
+    meta = {"id": cid, "code_name": code, "ts": ts, "note": note,
+            "tables": {}, "raw": {}, "assets": []}
+    with _zf.ZipFile(zpath, "w", _zf.ZIP_DEFLATED) as z:
+        for logical, alias, keys in _char_flat_parts(cid, row):
+            try:
+                tr = core.load_table(logical, TARGET_STORE, SOURCE_STORE).text_rows()
+            except Exception:
+                continue
+            got = [k for k in keys if k in tr]
+            for k in got:
+                z.writestr(f"tables/{alias}/{k}", tr[k])
+            if got:
+                meta["tables"][alias] = {"logical": logical, "keys": got}
+        try:
+            st = core.load_status_table(TARGET_STORE, SOURCE_STORE)
+            if cid in st.keys:
+                z.writestr(f"raw/character_status/{cid}", bytes(st.rows[st.keys.index(cid)]))
+                meta["raw"]["character_status"] = [cid]
+        except Exception:
+            pass
+        dsl_logicals = []
+        try:
+            ak = core.load_action_skill_table(TARGET_STORE, SOURCE_STORE)
+            if skey in ak.keys:
+                blob = bytes(ak.rows[ak.keys.index(skey)])
+                z.writestr(f"raw/action_skill/{skey}", blob)
+                meta["raw"]["action_skill"] = [skey]
+                for lv, f in core.decode_action_skill_row(blob):
+                    pp = f[core.ACTION_SKILL_COLUMNS["program_path"]] if len(f) > 7 else ""
+                    if pp and pp != "(None)":
+                        dsl_logicals.append(wf_dsl.dsl_logical(pp))
+        except Exception:
+            pass
+        mp, tp = _char_json_paths()
+        master = json.loads(mp.read_text(encoding="utf-8"))
+        text = json.loads(tp.read_text(encoding="utf-8"))
+        z.writestr("layer1.json", json.dumps(
+            {"master": master.get(cid), "text": text.get(cid)}, ensure_ascii=False))
+        logicals = [a["logical"] for a in wf_assets.char_asset_manifest(TARGET_STORE, code)
+                    if a["exists"]] + dsl_logicals
+        for lg in logicals:
+            loc = wf_assets.locate(TARGET_STORE, lg)
+            if not loc:
+                continue
+            root_name, fp = loc
+            z.writestr(f"assets/{root_name}/{fp.parent.name}/{fp.name}", fp.read_bytes())
+            meta["assets"].append({"logical": lg, "root": root_name,
+                                   "rel": f"{fp.parent.name}/{fp.name}"})
+        z.writestr("meta.json", json.dumps(meta, ensure_ascii=False, indent=1))
+    return {"file": zpath.name, "size": zpath.stat().st_size,
+            "tables": {k: len(v["keys"]) for k, v in meta["tables"].items()},
+            "raw": {k: len(v) for k, v in meta["raw"].items()},
+            "assets": len(meta["assets"]),
+            "note": "快照 = ②层表行 + ①层条目 + 全部资产 + 技能DSL,一键还原用同名文件"}
+
+
+def list_char_snapshots(cid: str = "") -> list[dict]:
+    import zipfile as _zf
+    out = []
+    if SNAP_DIR.exists():
+        for p in sorted(SNAP_DIR.glob("*.zip"), reverse=True):
+            try:
+                meta = json.loads(_zf.ZipFile(p).read("meta.json"))
+            except Exception:
+                continue
+            if cid and meta.get("id") != str(cid):
+                continue
+            out.append({"file": p.name, "id": meta.get("id"), "code_name": meta.get("code_name"),
+                        "ts": meta.get("ts"), "note": meta.get("note", ""),
+                        "size": p.stat().st_size, "assets": len(meta.get("assets", []))})
+    return out
+
+
+def char_restore(fname: str, dry_run: bool) -> dict:
+    import zipfile as _zf
+    p = SNAP_DIR / Path(fname).name
+    if not p.exists():
+        raise ValueError(f"快照不存在: {fname}")
+    z = _zf.ZipFile(p)
+    meta = json.loads(z.read("meta.json"))
+    cid = meta["id"]
+    log = [f"还原角色 {cid}({meta.get('code_name')}) 快照 {meta.get('ts')}"]
+    written = []
+    for alias, info in meta.get("tables", {}).items():
+        table = core.load_table(info["logical"], TARGET_STORE, SOURCE_STORE)
+        cur = table.text_rows()
+        parsed = {k: core.read_csv_lines(t) for k, t in cur.items()}
+        changed = 0
+        for k in info["keys"]:
+            snap_text = z.read(f"tables/{alias}/{k}").decode("utf-8")
+            if cur.get(k) != snap_text:
+                parsed[k] = core.read_csv_lines(snap_text)
+                changed += 1
+        if changed:
+            log.append(f"{alias}: 还原 {changed} 键")
+            if not dry_run:
+                written.append(str(_write_with_backup(table, parsed,
+                                                      [f"角色快照还原 {alias}({cid})"])))
+    for k in meta.get("raw", {}).get("character_status", []):
+        st = core.load_status_table(TARGET_STORE, SOURCE_STORE)
+        snap = z.read(f"raw/character_status/{k}")
+        if k in st.keys and bytes(st.rows[st.keys.index(k)]) != snap:
+            log.append(f"character_status: 还原 {k}")
+            if not dry_run:
+                st.rows[st.keys.index(k)] = snap
+                suffix = ".bak-wfmod-status-" + time.strftime("%Y%m%d-%H%M%S")
+                buf = io.StringIO()
+                with redirect_stdout(buf):
+                    w = core.write_status_table(st, TARGET_STORE, suffix)
+                add_pending(w)
+                record_change(core.STATUS_LOGICAL, f"角色快照还原 character_status {k}",
+                              w.with_name(w.name + suffix))
+                written.append(str(w))
+    for k in meta.get("raw", {}).get("action_skill", []):
+        ak = core.load_action_skill_table(TARGET_STORE, SOURCE_STORE)
+        snap = z.read(f"raw/action_skill/{k}")
+        if k in ak.keys and bytes(ak.rows[ak.keys.index(k)]) != snap:
+            log.append(f"action_skill: 还原 {k}")
+            if not dry_run:
+                ak.rows[ak.keys.index(k)] = snap
+                written.append(_write_action_skill(ak, [f"角色快照还原 action_skill {k}"]))
+    l1 = json.loads(z.read("layer1.json"))
+    mp, tp = _char_json_paths()
+    master = json.loads(mp.read_text(encoding="utf-8"))
+    text = json.loads(tp.read_text(encoding="utf-8"))
+    if master.get(cid) != l1.get("master") or text.get(cid) != l1.get("text"):
+        log.append("①层 character/character_text.json: 条目还原(重启服务端生效)")
+        if not dry_run:
+            global _char_cache
+            suffix = ".bak-charfields-" + time.strftime("%Y%m%d-%H%M%S")
+            for f in (mp, tp):
+                shutil.copy2(f, f.with_name(f.name + suffix))
+            if l1.get("master") is not None:
+                master[cid] = l1["master"]
+            if l1.get("text") is not None:
+                text[cid] = l1["text"]
+            mp.write_text(json.dumps(master, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+            tp.write_text(json.dumps(text, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+            _char_cache = None
+            written.append(str(mp))
+    n_assets = 0
+    for a in meta.get("assets", []):
+        snap = z.read(f"assets/{a['root']}/{a['rel']}")
+        fp = wf_assets.roots(TARGET_STORE)[a["root"]] / a["rel"]
+        if fp.exists() and fp.read_bytes() == snap:
+            continue
+        n_assets += 1
+        if not dry_run:
+            if fp.exists():
+                bak = fp.with_name(fp.name + ".bak-wfmod-asset-" + time.strftime("%Y%m%d-%H%M%S"))
+                if not bak.exists():
+                    shutil.copy2(fp, bak)
+            fp.parent.mkdir(parents=True, exist_ok=True)
+            fp.write_bytes(snap)
+            add_pending(fp)
+    if n_assets:
+        log.append(f"资产: 还原 {n_assets} 个文件")
+        if not dry_run:
+            record_change("char_assets", f"角色快照还原 {cid} 资产 {n_assets} 个", None)
+    changes = len(log) - 1
+    return {"changes": changes, "log": "\n".join(log),
+            "written": "; ".join(written) or None, "dry_run": dry_run,
+            "note": "②层+资产进待发布(点发布进游戏);①层改动需重启服务端"}
+
+
+def clone_character(src_id: str, new_id: str, new_name: str, dry_run: bool,
+                    new_code: str = "") -> dict:
+    """克隆整套数据为新角色(全新角色·金丝雀)。词条 6 键复制为 <new_id>1..6 独立可改。
+    new_code 为空:code_name/技能/资产共用来源(改技能会互相影响,零拷贝);
+    new_code 非空:**资产独立** —— 新 code_name,action_skill 原样字节复制为新键,
+    模板的立绘/图标/像素/语音/配套数据全套复制到新 code 路径(之后可独立换皮)。
+    获得途径:服务端 admin 后台/邮件把 new_id 发进存档。客户端容错未验证,先单个实验。"""
+    import copy as _copy
+    import re as _re
+    src_id, new_id = str(src_id), str(new_id)
+    new_code = str(new_code or "").strip()
+    if not (new_id.isdigit() and 4 <= len(new_id) <= 8):
+        raise ValueError("新角色 ID 必须是 4-8 位纯数字(建议 6 位,如 119999)")
+    if new_code and not _re.fullmatch(r"[a-z][a-z0-9_]{2,40}", new_code):
+        raise ValueError("新 code_name 须为小写字母开头的 [a-z0-9_](3-41 位)")
+    row = _char_row(src_id)
+    src_code = row[0]
+    ct = core.load_table(core.CHARACTER_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    if new_id in ct.text_rows():
+        raise ValueError(f"② character 表已存在 ID {new_id}")
+    if new_code:
+        used_codes = {core.read_csv_lines(t)[0][0] for t in ct.text_rows().values()}
+        if new_code in used_codes:
+            raise ValueError(f"code_name 已被占用: {new_code}")
+    mp, tp = _char_json_paths()
+    master = json.loads(mp.read_text(encoding="utf-8"))
+    text = json.loads(tp.read_text(encoding="utf-8"))
+    if new_id in master:
+        raise ValueError(f"①层 character.json 已存在 {new_id}")
+    new_abilities = [f"{new_id}{n}" for n in range(1, 7)]
+    ab = core.load_table(core.ABILITY_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    ab_rows = ab.text_rows()
+    for aid in new_abilities:
+        if aid in ab_rows:
+            raise ValueError(f"词条键已存在: {aid}")
+    src_abilities = row[19:25]
+    asset_logicals = wf_assets.all_asset_logicals(TARGET_STORE, src_code) if new_code else []
+    log = [f"克隆 {src_id}({src_code}) -> 新角色 {new_id}" + (f"「{new_name}」" if new_name else ""),
+           f"新词条键 {new_abilities[0]}..{new_abilities[-1]}(独立可改)"]
+    if new_code:
+        log.append(f"资产独立:code_name={new_code},复制 {len(asset_logicals)} 个资产文件 + action_skill 新键")
+    else:
+        log.append("code_name/技能/资产共用来源(改技能会互相影响)")
+    log.append("获得途径:发布 + 重启服务端后,用 admin 后台/邮件把该 ID 发进存档;先金丝雀验证客户端不崩")
+    written = []
+    if not dry_run:
+        # ② character:整行复制,改 id/词条引用(/code_name)
+        new_row = list(row)
+        new_row[17] = new_id
+        new_row[27] = new_id
+        for i, aid in enumerate(new_abilities):
+            new_row[19 + i] = aid
+        if new_code:
+            new_row[0] = new_code
+            new_row[8] = new_code
+        parsed = {k: core.read_csv_lines(t) for k, t in ct.text_rows().items()}
+        parsed[new_id] = [new_row]
+        written.append(str(_write_with_backup(ct, parsed, [f"新增角色 {new_id}(克隆自 {src_id})"])))
+        # ability ×6
+        parsed_a = {k: core.read_csv_lines(t) for k, t in ab_rows.items()}
+        n_ab = 0
+        for old, new in zip(src_abilities, new_abilities):
+            if old in parsed_a:
+                parsed_a[new] = [list(r) for r in parsed_a[old]]
+                n_ab += 1
+        written.append(str(_write_with_backup(ab, parsed_a, [f"新增词条 {n_ab} 键(克隆自 {src_id})"])))
+        # leader_ability
+        ld = core.load_table(LEADER_LOGICAL, TARGET_STORE, SOURCE_STORE)
+        pl = {k: core.read_csv_lines(t) for k, t in ld.text_rows().items()}
+        if src_id in pl:
+            pl[new_id] = [list(r) for r in pl[src_id]]
+            written.append(str(_write_with_backup(ld, pl, [f"新增队长技 {new_id}(克隆自 {src_id})"])))
+        # ② character_text
+        try:
+            t2 = core.load_table(CHAR_TEXT2_LOGICAL, TARGET_STORE, SOURCE_STORE)
+            p2 = {k: core.read_csv_lines(t) for k, t in t2.text_rows().items()}
+            if src_id in p2:
+                p2[new_id] = [list(r) for r in p2[src_id]]
+                if new_name and p2[new_id] and p2[new_id][0]:
+                    p2[new_id][0][0] = _skill_text_clean(new_name)
+                written.append(str(_write_with_backup(t2, p2, [f"新增角色文本 {new_id}"])))
+        except Exception as exc:
+            log.append(f"② character_text 跳过: {exc}")
+        # 其它按 character_id 索引的外围表(客户端 box/详情/技能预览会查,缺则崩)。
+        # 整键复制来源行;词条 ID 相关的表(upskill 引用 ability 键)需替换引用。
+        for logical in CLONE_EXTRA_TABLES:
+            try:
+                et = core.load_table(logical, TARGET_STORE, SOURCE_STORE)
+                ep = {k: core.read_csv_lines(t) for k, t in et.text_rows().items()}
+                if src_id not in ep:
+                    continue
+                new_rows = [list(r) for r in ep[src_id]]
+                for r in new_rows:  # 行内出现的来源 id/词条键 → 新的(保持自引用一致)
+                    for i, v in enumerate(r):
+                        if v == src_id:
+                            r[i] = new_id
+                        elif v in src_abilities:
+                            r[i] = new_abilities[list(src_abilities).index(v)]
+                ep[new_id] = new_rows
+                written.append(str(_write_with_backup(et, ep,
+                               [f"新增 {_LOGICAL_ALIAS.get(logical, logical)} {new_id}"])))
+            except Exception as exc:
+                log.append(f"{logical.split('/')[-1]} 跳过: {exc}")
+        # 其它嵌套表(立绘定位/玛纳板/立绘属性/抽卡音效):外层原样字节复制
+        for logical in CLONE_NESTED_TABLES:
+            try:
+                om = _load_nested(logical)
+            except Exception as exc:
+                log.append(f"{logical.split('/')[-1]} 跳过: {exc}")
+                continue
+            if src_id in om.keys and new_id not in om.keys:
+                om.keys.append(new_id)
+                om.rows.append(bytes(om.rows[om.keys.index(src_id)]))
+                written.append(_write_nested(om, logical, f"新增 {logical.split('/')[-1]} {new_id}"))
+        # character_status(嵌套,外层原样字节追加)
+        st = core.load_status_table(TARGET_STORE, SOURCE_STORE)
+        if src_id in st.keys and new_id not in st.keys:
+            blob = bytes(st.rows[st.keys.index(src_id)])
+            st.keys.append(new_id)
+            st.rows.append(blob)
+            suffix = ".bak-wfmod-status-" + time.strftime("%Y%m%d-%H%M%S")
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                w = core.write_status_table(st, TARGET_STORE, suffix)
+            add_pending(w)
+            record_change(core.STATUS_LOGICAL, f"新增 character_status {new_id}(克隆自 {src_id})",
+                          w.with_name(w.name + suffix))
+            written.append(str(w))
+        # awake(有觉醒板才有)
+        aw = core.load_table(AWAKE_LOGICAL, TARGET_STORE, SOURCE_STORE)
+        pw = {k: core.read_csv_lines(t) for k, t in aw.text_rows().items()}
+        if src_id in pw:
+            pw[new_id] = [list(r) for r in pw[src_id]]
+            written.append(str(_write_with_backup(aw, pw, [f"新增觉醒加成 {new_id}"])))
+        if new_code:
+            # action_skill:来源外层行原样字节复制为新键(技能独立,互不影响)
+            ak = core.load_action_skill_table(TARGET_STORE, SOURCE_STORE)
+            skey = row[8] or src_code
+            if skey in ak.keys and new_code not in ak.keys:
+                blob = bytes(ak.rows[ak.keys.index(skey)])
+                ak.keys.append(new_code)
+                ak.rows.append(blob)
+                written.append(_write_action_skill(ak, [f"新增 action_skill {new_code}(克隆自 {skey})"]))
+            # 资产全套复制到新 code 路径(同根,新哈希文件,进待发布)
+            n_copied = 0
+            for lg in asset_logicals:
+                loc = wf_assets.locate(TARGET_STORE, lg)
+                if not loc:
+                    continue
+                root_name, fp = loc
+                new_lg = lg.replace(f"character/{src_code}/", f"character/{new_code}/", 1)
+                nfp = wf_assets.path_in_root(TARGET_STORE, root_name, new_lg)
+                nfp.parent.mkdir(parents=True, exist_ok=True)
+                nfp.write_bytes(fp.read_bytes())
+                add_pending(nfp)
+                n_copied += 1
+            record_change("char_assets", f"克隆资产 {src_code}->{new_code} 共 {n_copied} 个", None)
+            log.append(f"已复制资产 {n_copied} 个到 character/{new_code}/*")
+        # ① 层两 json
+        global _char_cache
+        master[new_id] = _copy.deepcopy(master[src_id])
+        m0 = master[new_id][0]
+        m0[17] = new_id
+        m0[27] = new_id
+        for i, aid in enumerate(new_abilities):
+            m0[19 + i] = aid
+        if new_code:
+            m0[0] = new_code
+            m0[8] = new_code
+        text[new_id] = _copy.deepcopy(text.get(src_id) or [[""]])
+        if new_name and text[new_id] and text[new_id][0]:
+            text[new_id][0][0] = new_name
+        suffix = ".bak-charfields-" + time.strftime("%Y%m%d-%H%M%S")
+        for f in (mp, tp):
+            shutil.copy2(f, f.with_name(f.name + suffix))
+        mp.write_text(json.dumps(master, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        tp.write_text(json.dumps(text, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        _char_cache = None
+        written.append(str(mp))
+        # 写入后校验:确认 ②层新键真的落盘(防历史 set_text_rows 静默丢键的坑复发)
+        verify = core.load_table(core.CHARACTER_LOGICAL, TARGET_STORE, None)
+        va = core.load_table(core.ABILITY_LOGICAL, TARGET_STORE, None)
+        miss = []
+        if new_id not in verify.text_rows():
+            miss.append(f"② character 缺 {new_id}")
+        for aid in new_abilities:
+            if aid not in va.text_rows():
+                miss.append(f"② ability 缺 {aid}")
+                break
+        for logical in CLONE_NESTED_TABLES:  # 立绘/玛纳板等嵌套表也校验
+            try:
+                if new_id not in _load_nested(logical).keys:
+                    miss.append(f"{logical.split('/')[-1]} 缺 {new_id}")
+            except Exception:
+                pass
+        if miss:
+            raise RuntimeError("克隆写入校验失败(数据不一致,勿发布!): " + "; ".join(miss))
+        log.append(f"已写入并校验 {len(CLONE_EXTRA_TABLES) + len(CLONE_NESTED_TABLES) + 6} 张按角色索引的表")
+    return {"changes": 1, "log": "\n".join(log),
+            "written": "; ".join(written) or None, "dry_run": dry_run,
+            "note": "⚠ 坏档风险:全新 ID 角色曾导致客户端反复闪退/存档损坏,发放前先备份存档,"
+                    "金丝雀验证不过立即删除角色并从存档移除。"
+                    "写入后:点「发布并重启游戏」推 ②层 → 重启服务端推 ①层 → admin 发放角色 → 进游戏金丝雀验证"}
+
+
+def delete_character(cid: str, dry_run: bool) -> dict:
+    """整键删除一个(克隆出来的)角色:②层全部表 + ①层两 json。用于回滚失败的金丝雀。
+    只允许删非原始角色(保护:cid 必须此前由克隆产生,即词条键=<cid>1..6 存在或 ①有而②残缺)。"""
+    cid = str(cid)
+    new_abilities = [f"{cid}{n}" for n in range(1, 7)]
+    log = [f"删除角色 {cid}(②层全表 + ①层)"]
+    written = []
+    # ② 平表:character / ability×6 / leader / character_text / awake / 外围 id 表
+    flat = [(core.CHARACTER_LOGICAL, [cid]),
+            (core.ABILITY_LOGICAL, new_abilities),
+            (LEADER_LOGICAL, [cid]),
+            (CHAR_TEXT2_LOGICAL, [cid]),
+            (AWAKE_LOGICAL, [cid])] + [(lg, [cid]) for lg in CLONE_EXTRA_TABLES]
+    for logical, keys in flat:
+        table = core.load_table(logical, TARGET_STORE, SOURCE_STORE)
+        present = [k for k in keys if k in table.text_rows()]
+        if present:
+            log.append(f"{_LOGICAL_ALIAS.get(logical, logical)}: 删 {present}")
+            if not dry_run:
+                table.delete_keys(set(present))
+                suffix = ".bak-wfmod-delchar-" + time.strftime("%Y%m%d-%H%M%S")
+                buf = io.StringIO()
+                with redirect_stdout(buf):
+                    w = core.write_table(table, TARGET_STORE, suffix, no_backup=False)
+                add_pending(w)
+                record_change(logical, f"删除角色 {cid}: {present}", w.with_name(w.name + suffix))
+                written.append(str(w))
+    # ② 嵌套表(立绘/玛纳板/立绘属性/抽卡音效):整键删除
+    for logical in CLONE_NESTED_TABLES:
+        try:
+            om = _load_nested(logical)
+        except Exception:
+            continue
+        if cid in om.keys:
+            log.append(f"{logical.split('/')[-1]}: 删 {cid}")
+            if not dry_run:
+                om.delete_keys({cid})
+                written.append(_write_nested(om, logical, f"删除角色 {cid}: {logical.split('/')[-1]}"))
+    # ② 嵌套:character_status / action_skill(键=code_name,慎删——可能与来源共用)
+    st = core.load_status_table(TARGET_STORE, SOURCE_STORE)
+    if cid in st.keys:
+        log.append(f"character_status: 删 {cid}")
+        if not dry_run:
+            i = st.keys.index(cid)
+            del st.keys[i]
+            del st.rows[i]
+            suffix = ".bak-wfmod-status-" + time.strftime("%Y%m%d-%H%M%S")
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                w = core.write_status_table(st, TARGET_STORE, suffix)
+            add_pending(w)
+            record_change(core.STATUS_LOGICAL, f"删除 character_status {cid}",
+                          w.with_name(w.name + suffix))
+            written.append(str(w))
+    # ① 两 json
+    mp, tp = _char_json_paths()
+    master = json.loads(mp.read_text(encoding="utf-8"))
+    text = json.loads(tp.read_text(encoding="utf-8"))
+    if cid in master or cid in text:
+        log.append("①层 character/character_text.json: 删条目(重启服务端生效)")
+        if not dry_run:
+            global _char_cache
+            suffix = ".bak-charfields-" + time.strftime("%Y%m%d-%H%M%S")
+            for f in (mp, tp):
+                shutil.copy2(f, f.with_name(f.name + suffix))
+            master.pop(cid, None)
+            text.pop(cid, None)
+            mp.write_text(json.dumps(master, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+            tp.write_text(json.dumps(text, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+            _char_cache = None
+            written.append(str(mp))
+    return {"changes": len(log) - 1, "log": "\n".join(log),
+            "written": "; ".join(written) or None, "dry_run": dry_run,
+            "note": "回滚完成:发布推 ②层 + 重启服务端推 ①层;若已 admin 发放该角色,也去存档里移除避免残留引用"}
+
+
 # ---------------------------------------------------------------- backups
 
 
 def tracked_tables() -> list[tuple[str, Path]]:
-    return [
-        ("ability", core.table_path(TARGET_STORE, core.ABILITY_LOGICAL)),
-        ("character", core.table_path(TARGET_STORE, core.CHARACTER_LOGICAL)),
-    ]
+    """回溯覆盖全部 ② 层表(含直接脚本改过的),别名 -> 表文件路径。"""
+    return [(alias, core.table_path(TARGET_STORE, logical))
+            for logical, alias in _LOGICAL_ALIAS.items()]
 
 
 def list_backups() -> list[dict]:
@@ -880,10 +2469,62 @@ def restore_backup(name: str) -> dict:
     for label, table in tracked_tables():
         cand = table.parent / name
         if cand.exists() and cand.name.startswith(table.name + ".bak"):
+            # 回溯前先给"当前状态"存一份 pre-rollback 备份,回溯本身也可再回溯
+            pre = table.with_name(table.name + ".bak-prerollback-" + time.strftime("%Y%m%d-%H%M%S"))
+            if table.exists() and not pre.exists():
+                shutil.copy2(table, pre)
             shutil.copy2(cand, table)
             add_pending(table)
-            return {"restored": name, "table": label, "target": str(table)}
+            logical = next((lg for lg, al in _LOGICAL_ALIAS.items() if al == label), label)
+            record_change(logical, f"回溯 {label} -> 还原备份 {name}", pre)
+            return {"restored": name, "table": label, "target": str(table),
+                    "note": "已还原并加入待发布;运行 wf_publish.py 让客户端拉回改动"}
     raise ValueError(f"未找到备份: {name}")
+
+
+def _remove_pending_tables(tables: str) -> None:
+    """发布成功后把已发布的表从 pending 列表移除(pending 存 'xx/hash' 相对路径)。"""
+    alias_to_logical = {al: lg for lg, al in _LOGICAL_ALIAS.items()}
+    rels = set()
+    for t in tables.split(","):
+        logical = alias_to_logical.get(t.strip(), t.strip())
+        try:
+            digest = core.sha1_path(logical)
+        except Exception:
+            continue
+        rels.add(f"{digest[:2]}/{digest[2:]}")
+    items = [r for r in read_pending() if r not in rels]
+    WORK_DIR.mkdir(parents=True, exist_ok=True)
+    PENDING_FILE.write_text(json.dumps(items, indent=2), encoding="utf-8")
+
+
+def run_publish(tables: str | None = None, list_only: bool = False) -> dict:
+    """子进程调 wf_publish.py:打增量包发到 CDN(② 层生效的唯一正道)。
+    tables=None 时发布 pending 列表;list_only=True 走 --list 只预览不打包。"""
+    cmd = [sys.executable, str(Path(__file__).resolve().parent / "wf_publish.py")]
+    if tables:
+        cmd += ["--tables", tables]
+    if list_only:
+        cmd.append("--list")
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", env={**os.environ, "PYTHONUTF8": "1"})
+    ok = r.returncode == 0
+    if ok and not list_only:
+        if tables:
+            _remove_pending_tables(tables)
+        else:
+            clear_pending()
+    return {"ok": ok, "log": ((r.stdout or "") + (r.stderr or "")).strip(),
+            "list_only": list_only}
+
+
+def rollback_and_publish(name: str) -> dict:
+    """一键回溯:还原备份 + 自动发布(客户端重启即拉回)。"""
+    res = restore_backup(name)
+    pub = run_publish(res["table"])
+    res["ok"] = pub["ok"]
+    res["publish_log"] = pub["log"]
+    return res
 
 
 # ---------------------------------------------------------------- adb sync
@@ -935,11 +2576,18 @@ def sync_to_emulator(restart: bool = True) -> dict:
     if not pending:
         log.append("没有待同步的修改文件")
     for rel in pending:
-        local = TARGET_STORE / rel
+        root, rbase, r = TARGET_STORE, REMOTE_UPLOAD, rel
+        if rel.startswith("medium:"):
+            root, r = TARGET_STORE.parent / "medium_upload", rel[7:]
+            rbase = REMOTE_UPLOAD.replace("/upload", "/medium_upload")
+        elif rel.startswith("android:"):
+            root, r = TARGET_STORE.parent / "android_upload", rel[8:]
+            rbase = REMOTE_UPLOAD.replace("/upload", "/android_upload")
+        local = root / r
         if not local.exists():
             log.append(f"跳过(本地缺失): {rel}")
             continue
-        remote = f"{REMOTE_UPLOAD}/{rel}"
+        remote = f"{rbase}/{r}"
         code, out = adb_run(adb, "-s", DEVICE, "push", str(local), remote)
         log.append(f"push {rel}: {out}")
         if code != 0:
@@ -961,6 +2609,26 @@ def sync_to_emulator(restart: bool = True) -> dict:
         clear_pending()
         log.append(f"已同步 {len(pending)} 个文件,清空待同步列表")
     return {"ok": True, "log": "\n".join(log)}
+
+
+def restart_game() -> str:
+    """force-stop + 拉起游戏(发布后让客户端立刻拉增量包)。"""
+    adb = find_adb()
+    if not adb:
+        return "未找到 adb,请手动重启游戏拉取更新"
+    log = []
+    _, out = adb_run(adb, "connect", DEVICE, timeout=15)
+    log.append(f"connect {DEVICE}: {out}")
+    adb_run(adb, "-s", DEVICE, "shell", "am", "force-stop", PKG, timeout=20)
+    log.append(f"force-stop {PKG}")
+    code, out = adb_run(adb, "-s", DEVICE, "shell", "am", "start", "-n", f"{PKG}/.AppEntry", timeout=20)
+    if code != 0 or "Error" in out:
+        _, out2 = adb_run(adb, "-s", DEVICE, "shell", "monkey", "-p", PKG,
+                          "-c", "android.intent.category.LAUNCHER", "1", timeout=20)
+        log.append(f"start(monkey): {out2}")
+    else:
+        log.append(f"start: {out}")
+    return "\n".join(log)
 
 
 def adb_status() -> dict:
@@ -1091,8 +2759,54 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 self._json(get_soul_rows(soul))
                 return
+            if path == "/weapons":
+                self._json(list_weapons())
+                return
+            if path == "/weapon_ability":
+                wid = (qs.get("wid") or [""])[0]
+                if not wid:
+                    self._json({"error": "缺少 wid 参数"}, 400)
+                    return
+                self._json(get_weapon_rows(wid))
+                return
+            if path == "/skill_energy":
+                character = (qs.get("character") or [""])[0]
+                if not character:
+                    self._json({"error": "缺少 character 参数"}, 400)
+                    return
+                self._json(get_skill_energy(character))
+                return
+            if path == "/skill_dsl":
+                self._json(get_skill_dsl((qs.get("character") or [""])[0],
+                                         (qs.get("level") or ["1"])[0]))
+                return
+            if path == "/char_assets":
+                self._json(char_assets((qs.get("character") or [""])[0]))
+                return
+            if path == "/char_snapshots":
+                self._json(list_char_snapshots((qs.get("character") or [""])[0]))
+                return
+            if path == "/asset":
+                logical = (qs.get("logical") or [""])[0]
+                data, ctype = get_asset_bytes(logical)
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
+                return
             if path == "/backups":
                 self._json(list_backups())
+                return
+            if path == "/search_abilities":
+                q = (qs.get("q") or [""])[0]
+                self._json(search_abilities(q))
+                return
+            if path == "/history":
+                md = render_changelog_md()
+                self._json({"entries": list(reversed(read_changelog())),
+                            "changelog_md": str(md)})
                 return
             if path == "/mainpos":
                 self._json(mainpos("status"))
@@ -1143,6 +2857,36 @@ class Handler(BaseHTTPRequestHandler):
                                     bool(body.get("preserve_string_id", True)),
                                     bool(body.get("dry_run"))))
                 return
+            if path == "/append_line_adapted":
+                self._json(append_line_adapted(
+                    str(body.get("src_key", "")), int(body.get("src_line", 1)),
+                    str(body.get("dst_key", "")), str(body.get("element", "auto")),
+                    bool(body.get("adapt_sid", True)), bool(body.get("clear_awake", True)),
+                    bool(body.get("dry_run")),
+                ))
+                return
+            if path == "/append_ability":
+                self._json(append_ability_lines(
+                    str(body.get("src_key", "")),
+                    str(body.get("dst_key", "")),
+                    bool(body.get("preserve_string_id", False)),
+                    bool(body.get("dry_run")),
+                ))
+                return
+            if path == "/transplant_line":
+                strip = body.get("strip_cols")
+                if not isinstance(strip, str):
+                    strip = [int(c) for c in (strip or [])]
+                self._json(transplant_line(
+                    str(body.get("src_key", "")),
+                    int(body.get("src_line", 1)),
+                    str(body.get("dst_key", "")),
+                    str(body.get("mode", "append")),
+                    strip,
+                    bool(body.get("preserve_string_id", False)),
+                    bool(body.get("dry_run")),
+                ))
+                return
             if path == "/mainpos":
                 self._json(mainpos(str(body.get("action", "status"))))
                 return
@@ -1152,6 +2896,14 @@ class Handler(BaseHTTPRequestHandler):
                     str(body.get("to_character", "")),
                     int(body.get("slot", 6)),
                     bool(body.get("preserve_string_id", True)),
+                    bool(body.get("dry_run")),
+                ))
+                return
+            if path == "/copy_leader_to_leader":
+                self._json(copy_leader_to_leader(
+                    str(body.get("from_character", "")),
+                    str(body.get("to_character", "")),
+                    bool(body.get("preserve_string_id", False)),
                     bool(body.get("dry_run")),
                 ))
                 return
@@ -1176,6 +2928,20 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/restore":
                 self._json(restore_backup(str(body.get("name", ""))))
                 return
+            if path == "/rollback":
+                # 回溯 = 还原备份 + 自动发布 + 重启游戏(客户端立刻拉回改动)
+                res = rollback_and_publish(str(body.get("name", "")))
+                if res.get("ok") and body.get("restart", True):
+                    res["restart_log"] = restart_game()
+                self._json(res)
+                return
+            if path == "/publish":
+                # 一键发布:pending(或指定表)打增量包到 CDN;list_only 只预览
+                res = run_publish(body.get("tables") or None, bool(body.get("list_only")))
+                if res["ok"] and not res["list_only"] and body.get("restart", True):
+                    res["restart_log"] = restart_game()
+                self._json(res)
+                return
             if path == "/sync":
                 self._json(sync_to_emulator(restart=bool(body.get("restart", True))))
                 return
@@ -1188,6 +2954,68 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/soul_rows/save":
                 self._json(save_soul_rows(body.get("edits") or [], bool(body.get("dry_run"))))
+                return
+            if path == "/skill_energy/save":
+                self._json(save_skill_energy(
+                    str(body.get("character", "")),
+                    body.get("edits") or [],
+                    bool(body.get("dry_run")),
+                ))
+                return
+            if path == "/skill_copy":
+                self._json(skill_copy(str(body.get("from_character", "")),
+                                      str(body.get("to_character", "")),
+                                      bool(body.get("dry_run"))))
+                return
+            if path == "/skill_level_copy":
+                self._json(skill_level_copy(
+                    str(body.get("from_character", "")), str(body.get("from_level", "1")),
+                    str(body.get("to_character", "")), str(body.get("to_level", "1")),
+                    bool(body.get("dry_run"))))
+                return
+            if path == "/skill_level_delete":
+                self._json(skill_level_delete(str(body.get("character", "")),
+                                              str(body.get("level", "")),
+                                              bool(body.get("dry_run"))))
+                return
+            if path == "/skill_dsl/save":
+                self._json(save_skill_dsl(str(body.get("character", "")),
+                                          str(body.get("level", "1")),
+                                          body.get("edits") or [],
+                                          bool(body.get("dry_run"))))
+                return
+            if path == "/char_snapshot":
+                self._json(char_snapshot(str(body.get("character", "")),
+                                         str(body.get("note", ""))))
+                return
+            if path == "/char_restore":
+                self._json(char_restore(str(body.get("file", "")), bool(body.get("dry_run"))))
+                return
+            if path == "/char_clone":
+                self._json(clone_character(str(body.get("src", "")), str(body.get("new_id", "")),
+                                           str(body.get("new_name", "")), bool(body.get("dry_run")),
+                                           str(body.get("new_code", ""))))
+                return
+            if path == "/char_delete":
+                self._json(delete_character(str(body.get("cid", "")), bool(body.get("dry_run"))))
+                return
+            if path == "/asset/replace":
+                import base64
+                self._json(replace_asset(str(body.get("logical", "")),
+                                         base64.b64decode(str(body.get("data_b64", ""))),
+                                         bool(body.get("force")),
+                                         bool(body.get("dry_run"))))
+                return
+            if path == "/delete_line":
+                self._json(delete_line(str(body.get("key", "")), int(body.get("line", 0)),
+                                       bool(body.get("dry_run"))))
+                return
+            if path == "/mainpos_one":
+                self._json(mainpos_one(str(body.get("ability", "")), int(body.get("line", 1)),
+                                       str(body.get("action", "off")), bool(body.get("dry_run"))))
+                return
+            if path == "/weapon_ability/save":
+                self._json(save_weapon_rows(body.get("edits") or [], bool(body.get("dry_run"))))
                 return
             if path == "/status_values/save":
                 self._json(save_status_values(

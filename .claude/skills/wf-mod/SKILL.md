@@ -7,7 +7,7 @@ description: >-
   角色资料(名字/稀有度/元素/描述)、解除主位限制——或想把改动发布到客户端、管理 startpoint-cn
   服务端、同步到 MuMu 模拟器、排查"改了没生效/客户端没更新/全量重下"时,都用这个 skill。
   即使用户只说"改一下火龙的攻击力""把某角色技能改强""发个 mod 包"而没提具体工具,也要用它。
-  项目根:D:\WF\startpoint-cn-new。
+  项目根:D:\WF\startpoint-cn。
 ---
 
 # 世界弹射物语(CN)Mod 工作流
@@ -19,7 +19,7 @@ description: >-
 
 | 项 | 值 |
 |---|---|
-| 项目根 | `D:\WF\startpoint-cn-new` |
+| 项目根 | `D:\WF\startpoint-cn` |
 | 数据包 store | 由 `mod-tools/profiles.json` 的 active 档案决定(当前锁 `cn` = `弹国服/.../upload`) |
 | 服务端 | `http://192.168.0.130:8001`(LAN IP,见 `.env`),启动用 `start-cn.bat` |
 | 模拟器 | MuMu 12,adb=`D:\WF\MuMuPlayer\nx_main\adb.exe`,device=`127.0.0.1:16384`,包名=`com.leiting.wf` |
@@ -46,17 +46,38 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   → 用户重启 start-cn.bat + 重启游戏                  # 客户端增量下载生效
 ```
 
+(GUI 里等价一键:右上角「发布并重启游戏」= 发布 pending + adb 重启游戏,POST `/publish`。)
+
 **改数据的三种方式**,按场景选:
 
 - **网页修改器(交互式,推荐给用户自己用)**:`python mod-tools/wf_gui.py` → 浏览器
-  `http://127.0.0.1:8765`。8 个 tab:词条编辑 / 角色资料 / 基础数值 / 能力魂 / 倍率调整 /
-  词条移植 / 配方 / 备份。写操作都先 dry-run 预览再确认,自动备份 + 加入 pending。
+  `http://127.0.0.1:8765`。角色模式 11 tab:词条编辑(单条主位开关/删行,**基础行与觉醒行
+  分区**) / 角色资料(底部有**单角色一键快照/还原**=②层7表+①层+资产+DSL 打包 zip) /
+  **角色资产**(立绘/觉醒立绘/cut-in/图标合集/像素图/**语音全量三分类 ally·battle·home
+  带台词文本**(清单来自 D:\WF\角色语音 datamine)/配套数据,预览+上传替换+尺寸校验) /
+  基础数值 / **技能·倍率**(名称+游戏内效果描述+能量直改,级别移植/删除,整技能替换,
+  「效果参数」=ActionDsl 数值原地补丁) / 词条移植 / 词条速查 / **新建角色**(克隆模板→
+  全新 ID,可勾「资产独立」=新 code_name+全套资产复制+独立 action_skill,金丝雀流程见页内) /
+  配方 / 改动日志(一键回溯) / 备份。武器模式:**武器·魂珠**(436 件装备含 12 主线魂珠,
+  强化词条+同键魂珠效果一页编辑,均可增删改) / 速查 / 配方 / 日志 / 备份。
+  魂珠独立页签已删除;S: 键跳转自动进武器模式。
+  左栏**角色/武器模式切换**:角色模式隐藏武器词条页,武器模式只留武器/魂珠/速查/配方/日志/备份;
+  武器列表 = **全部 424 把**(按属性检测分组:六属性+通用,可筛选),无强化词条的引导去同键魂珠。
+  装备映射:`master/item/equipment.orderedmap` 436 键(c1=中文名 c2=kind 0武器1魂珠 c8=品质
+  c10=soul_id)与 ability_soul **同键一一对应**;`equipment_enhancement` 29 键 c2=改造名。
+  **添加词条行**:词条编辑/武器页每组「＋添加行」= `POST /append_line_adapted`,复制其他键的行并
+  **自动适配目标**(元素→目标属性、sid 统一、觉醒门槛清零、武器解锁等级对齐 = U0000 铁律自动化)。
+  词条/队长技/魂珠/武器每行都带**行级中文描述**(`wf_describe.py` 按逆向布局+枚举直译生成,
+  语义等价非游戏原文——原文由客户端 3.9 万行 AS3 动态拼,离线不可复刻);
+  **词条速查** tab 搜四表中文描述/角色名/武器名/键,按效果签名分组显示共用N/专属。
+  右上角「发布并重启游戏」按钮 = 第 4 节发布链路一键完成,用户全程不用碰命令行。
+  写操作都先 dry-run 预览再确认,自动备份 + 加入 pending。
   API 契约见 `references/api.md`(并入服务端后台时用)。
 - **命令行 recipe(批量/可复现)**:`python mod-tools/wf_mod_tool.py apply --recipe <json>`。
   操作:`scale`(倍率)/ `set`(设值)/ `copy_ability`(移植)/ `remove_main_position`。
   用法见 `mod-tools/WF_mod_tool_usage.md`。
-- **临时脚本(GUI 未覆盖的表,如 leader_ability / action_skill)**:用 `wf_mod_tool` 的
-  底层函数写针对性脚本。嵌套表读写见第 3 节。
+- **临时脚本(GUI 未覆盖的边角场景)**:用 `wf_mod_tool` 的底层函数写针对性脚本。
+  嵌套表读写见第 3 节。
 
 改完**务必发布**(第 4 节),否则游戏内看不到。
 
@@ -131,7 +152,12 @@ python mod-tools/wf_publish.py --tables ability,character_status   # 或用 pend
 - `references/api.md` — GUI 的 HTTP API 契约(GET/POST 端点,并入服务端后台时对接用)。
 - `mod-tools/wf_mod_tool.py` — 核心引擎(orderedmap 读写 / 嵌套 / AMF3 schema / recipe / profile)。
 - `mod-tools/wf_gui.py` + `wf_gui.html` — 网页修改器(前后端)。
-- `mod-tools/wf_publish.py` — CDN 增量发布器。
+- `mod-tools/wf_describe.py` — 行级中文描述器(布局吃 ability_enum_map.json,枚举中文吃全表 md §6)。
+- `mod-tools/wf_assets.py` — 角色资产编解码(PNG 魔数/MP3 帧头混淆)+三根定位+清单。
+- `mod-tools/wf_dsl.py` — 技能 ActionDsl 数值编辑(AMF3 偏移解析+U29 等长原地补丁)。
+- `mod-tools/角色资产与全角色替换方案.md` — 资产体系逆向结论、路径模板/尺寸要求、
+  整角色替换(code_name 重定向 / 逐项替换)与全新角色可行性分析。
+- `mod-tools/wf_publish.py` — CDN 增量发布器(pending 支持 medium:/android: 前缀,自动分包到对应 diff 目录)。
 - `mod-tools/wf_char_editor.py` — ① 层角色资料编辑。
 - `mod-tools/角色数据逆向与修改指南.md` — 两层逆向过程 + HP/ATK / 觉醒破解结论。
 - `mod-tools/版本切换设计.md` — profile 版本档案设计(CN/global 切换)。

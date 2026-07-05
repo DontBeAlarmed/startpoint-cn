@@ -125,6 +125,19 @@ class OrderedMap:
             else:
                 out.append(old)
         self.rows = out
+        # 追加 row_map 里真正新增的键(克隆/新增角色依赖此;历史 bug:曾静默丢弃新键)
+        existing = set(self.keys)
+        for key, val in row_map.items():
+            if key not in existing:
+                self.keys.append(key)
+                self.rows.append(val.encode("utf-8") if val else b"")
+                existing.add(key)
+
+    def delete_keys(self, keys: set[str]) -> None:
+        """整键删除(用于回滚克隆/新增角色)。"""
+        pairs = [(k, r) for k, r in zip(self.keys, self.rows) if k not in keys]
+        self.keys = [k for k, _ in pairs]
+        self.rows = [r for _, r in pairs]
 
 
 class AMF3Reader:
@@ -482,6 +495,77 @@ def load_status_table(target_store: Path, source_store: Path | None = None) -> O
 
 def write_status_table(ordered: OrderedMap, target_store: Path, backup_suffix: str) -> Path:
     target = table_path(target_store, STATUS_LOGICAL)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        backup = target.with_name(target.name + backup_suffix)
+        if not backup.exists():
+            shutil.copy2(target, backup)
+            print(f"backup: {backup}")
+    target.write_bytes(build_orderedmap_raw_rows(ordered))
+    return target
+
+
+# ---------------------------------------------------------------------------
+# 嵌套 orderedmap(action_skill 主动技表 · 技能能量/名称/描述)
+# 逆向结论(2026-07-05,对照 decompile ActionSkillLogic.get_skillWeight):
+#   外层:键=角色 code_name(如 black_wolf_knight),行=**原样存储**的内层 orderedmap 二进制
+#   内层:键="1"(基础技)/"2"(＋进化技),行=zlib CSV(下列 ACTION_SKILL_COLUMNS)
+#   技能能量(面板"技能能量")= 客户端 skillWeight:按 SLv 在 min/max 间线性插值
+#     skillWeight(SLv)=floor((SLv-1)*(max-min)/(MAX_SLV-1)+min);SLv1=min,SLvMAX=max
+#     ∴ 满级(常见展示)技能能量 = max_skill_weight = 内层列5;SLv1 = min_skill_weight = 列4
+#   maxLevelSkillWeightShorten = min - max(满级相对 SLv1 少消耗的能量)
+#   与 character_status 同为"外层 raw / 内层 zlib CSV",复用相同读写原语。
+# ---------------------------------------------------------------------------
+
+ACTION_SKILL_LOGICAL = "master/skill/action_skill.orderedmap"
+
+# 内层 CSV 列(已确认列;其余列语义未逐一确认,写回原样保留)
+ACTION_SKILL_COLUMNS = {
+    "name": 0,               # 技能名(＋进化技带"＋")
+    "description": 1,        # 技能描述
+    "action_path": 2,        # 动作路径(dynamic/skill/...)
+    "min_skill_weight": 4,   # SLv1 技能能量
+    "max_skill_weight": 5,   # SLv满级 技能能量(面板显示值)
+    "program_path": 7,       # 技能程序路径
+}
+
+
+def decode_action_skill_row(chunk: bytes) -> list[tuple[str, list[str]]]:
+    """内层解码:嵌套 orderedmap 字节 -> [(内层键, CSV 列表)],保持原键序。
+    一个内层键理论上一行 CSV;按行拆分后取首行(与游戏一致)。"""
+    inner = read_orderedmap_file_from_bytes(chunk)
+    out: list[tuple[str, list[str]]] = []
+    for key, text in inner.items():
+        rows = read_csv_lines(text)
+        out.append((key, rows[0] if rows else []))
+    return out
+
+
+def encode_action_skill_row(entries: list[tuple[str, list[str]]]) -> bytes:
+    """内层编码:[(内层键, CSV 列表)] -> 嵌套 orderedmap 字节(行 zlib,键序按传入)。"""
+    om = OrderedMap(
+        "<action-skill-inner>",
+        [str(key) for key, _ in entries],
+        [write_csv_lines([fields]).encode("utf-8") for _, fields in entries],
+        Path("."),
+    )
+    return build_orderedmap(om)
+
+
+def load_action_skill_table(target_store: Path, source_store: Path | None = None) -> OrderedMap:
+    """读 action_skill(外层 raw-rows)。与 load_status_table 同风格。"""
+    target = table_path(target_store, ACTION_SKILL_LOGICAL)
+    if target.exists():
+        return read_orderedmap_file_raw_rows(target, ACTION_SKILL_LOGICAL)
+    if source_store:
+        source = table_path(source_store, ACTION_SKILL_LOGICAL)
+        if source.exists():
+            return read_orderedmap_file_raw_rows(source, ACTION_SKILL_LOGICAL)
+    raise FileNotFoundError(f"cannot read {ACTION_SKILL_LOGICAL} from target/source stores")
+
+
+def write_action_skill_table(ordered: OrderedMap, target_store: Path, backup_suffix: str) -> Path:
+    target = table_path(target_store, ACTION_SKILL_LOGICAL)
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists():
         backup = target.with_name(target.name + backup_suffix)

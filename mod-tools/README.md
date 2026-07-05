@@ -45,8 +45,17 @@ python mod-tools/wf_publish.py --tables ability,character_status
 | `wf_char_editor.py` | ① 层角色资料(名字 / 描述 / 稀有度 / 元素…)编辑 |
 | `wf_scan_masterdata.py` / `wf_extract_paths.py` / `wf_harvest_paths.py` | 数据定位 / 路径逆向 |
 
+## 能力总览(② 层可改项)
+
+技能能量(action_skill) · 队长技移植/修改(leader_ability) · 角色词条增删改(ability) ·
+词条主位限制开关(全局 + 单条) · 能力魂(ability_soul) · **武器词条(equipment_enhancement_ability)** ·
+基础数值/觉醒/倍率 · 一键发布到 CDN(客户端只下增量)· **自动改动日志 + 一键回溯**。**移植不崩的规律见下方规律方案。**
+端点清单见 [角色改动规律方案.md §7](角色改动规律方案.md) 或 [API.md](API.md)。
+
 ## 文档
 
+- **[角色改动规律方案.md](角色改动规律方案.md)** — 改动规律总纲:五表列图、五类改动标准做法、**移植铁律(同属性/别去共鸣/统一sid/跨表重排)**、做不到的边界、效果代码速查、工具能力矩阵。
+- **[词条条件代码全表.md](词条条件代码全表.md)** — 真实列图 + 全枚举名(配 `ability_enum_map.json`)。
 - **[CN-Mod字段手册.md](CN-Mod字段手册.md)** — 最重要:全字段语义、枚举、单位、各表结构、CN/global 差异、安全规则。
 - [角色数据逆向与修改指南.md](角色数据逆向与修改指南.md) — 两层数据架构 + HP/ATK / 觉醒破解过程。
 - [版本切换设计.md](版本切换设计.md) — 多版本档案(profile)设计。
