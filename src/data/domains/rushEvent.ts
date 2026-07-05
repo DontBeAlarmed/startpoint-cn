@@ -185,6 +185,10 @@ export function insertPlayerRushEventSync(
 ) {
     getDb().prepare(`
     INSERT INTO players_rush_events
+    (player_id, event_id, active_rush_battle_folder_id,
+     endless_battle_max_round, endless_battle_max_round_time,
+     endless_battle_max_round_character_id_1, endless_battle_max_round_character_id_2, endless_battle_max_round_character_id_3,
+     endless_battle_max_round_character_evolution_img_lvl_1, endless_battle_max_round_character_evolution_img_lvl_2, endless_battle_max_round_character_evolution_img_lvl_3)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         playerId,
