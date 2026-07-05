@@ -98,8 +98,12 @@
 |---|---|---|
 | `WF_GUI_PORT` | 8765 | 监听端口(Windows 保留段时自动换备用端口) |
 | `WF_PROFILE` | profiles.json 的 active | 版本档案(当前锁 cn) |
-| `WF_TARGET_STORE` | 由 profile 决定 | 覆盖目标数据包路径 |
-| `WF_ADB` / `WF_ADB_PORT` / `WF_PKG` | 自动探测 / 16384 / air.com.leiting.wf | 模拟器同步 |
+| `WF_TARGET_STORE` | 由 profile 决定 | 覆盖目标数据包路径(②层 upload 目录) |
+| `WF_CDNDATA` | 按仓库根布局推导 | 服务端 `assets/cdndata`(①层;独立部署必配) |
+| `WF_CDN_DIR` | 按仓库根布局推导 | 服务端 `.cdn/cn`(发布目标;独立部署必配) |
+| `WF_ADB` / `WF_ADB_PORT` / `WF_PKG` | 自动探测 / 16384 / **com.leiting.wf**(雷霆国服,不是 air.开头的旧包名) | 模拟器同步 |
+
+写接口防护:请求体上限 64MB(超限返回 400);服务仅绑定 127.0.0.1,无鉴权——**不要暴露到局域网/公网**,并入服务端后台前必须补鉴权与审计。
 
 ## React 迁移备注
 

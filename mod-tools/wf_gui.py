@@ -10,14 +10,16 @@ WF 单机版 · 本地网页修改器 (GUI)
   * 改动日志(每次写入自动记录) + 一键回溯(还原备份+重新发布+重启游戏)
   * 备份 / 还原;右上角「发布并重启游戏」= wf_publish 打增量包到 CDN + 重启客户端
 
-启动:  python mod-tools/wf_gui.py   (或 mod-tools\wf-gui.bat)
+启动:  python wf_gui.py   (或双击同目录 wf-gui.bat;放在 startpoint-cn/mod-tools/ 内亦可)
 浏览器: http://127.0.0.1:8765/
 
 环境变量(可选):
-  WF_TARGET_STORE  目标 upload 目录(默认自动在项目根目录查找)
+  WF_TARGET_STORE  目标 upload 目录(默认按 profiles.json / 项目根目录查找)
+  WF_CDNDATA       服务端 assets/cdndata 目录(①层;独立部署必配,默认取仓库根布局)
+  WF_CDN_DIR       服务端 .cdn/cn 目录(发布目标;独立部署必配,默认取仓库根布局)
   WF_ADB           adb.exe 完整路径
   WF_ADB_PORT      模拟器 adb 端口(默认 16384 = MuMu 12)
-  WF_PKG           游戏包名(默认 air.com.leiting.wf)
+  WF_PKG           游戏包名(默认 com.leiting.wf,雷霆国服)
   WF_GUI_PORT      本工具监听端口(默认 8765)
 """
 
@@ -43,7 +45,11 @@ import wf_dsl  # noqa: E402       技能 ActionDsl 数值编辑
 
 ROOT = Path(__file__).resolve().parent.parent
 _PROFILE = core.resolve_profile(os.environ.get("WF_PROFILE"))
-CDNDATA = (_PROFILE.cdndata if _PROFILE and _PROFILE.cdndata else ROOT / "assets" / "cdndata")
+# ①层 cdndata:独立部署时用 WF_CDNDATA 指向服务端 assets/cdndata
+_ENV_CDNDATA = os.environ.get("WF_CDNDATA")
+CDNDATA = (Path(_ENV_CDNDATA) if _ENV_CDNDATA
+           else _PROFILE.cdndata if _PROFILE and _PROFILE.cdndata
+           else ROOT / "assets" / "cdndata")
 WORK_DIR = Path(__file__).resolve().parent / "work"
 PENDING_FILE = WORK_DIR / "sync_pending.json"
 
@@ -2670,10 +2676,14 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    MAX_BODY = 64 * 1024 * 1024  # 请求体上限:最大合法载荷是 /asset/replace 的 base64 立绘(≈10MB),64MB 足够
+
     def _read_body(self) -> dict:
         length = int(self.headers.get("Content-Length") or 0)
         if not length:
             return {}
+        if length > self.MAX_BODY:
+            raise ValueError(f"请求体过大: {length} 字节(上限 {self.MAX_BODY})")
         return json.loads(self.rfile.read(length).decode("utf-8"))
 
     @staticmethod
