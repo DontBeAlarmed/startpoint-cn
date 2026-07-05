@@ -1,0 +1,13 @@
+{
+  "_comment": "复制为 profiles.json 并按你的目录改路径。store=手机数据包 production/upload 目录;cdndata=服务端 assets/cdndata;路径相对仓库根或写绝对路径。可加多个版本档案,active 指定当前使用哪个。",
+  "active": "cn",
+  "profiles": {
+    "cn": {
+      "label": "国服(雷霆)",
+      "store": "path/to/WorldFlipper/dummy/download/production/upload",
+      "cdndata": "assets/cdndata",
+      "res_version": "1.4.54",
+      "fallback": null
+    }
+  }
+}

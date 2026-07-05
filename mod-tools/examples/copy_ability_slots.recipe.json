@@ -1,0 +1,11 @@
+{
+  "operations": [
+    {
+      "op": "copy_ability",
+      "from_character": "111002",
+      "to_character": "111003",
+      "slots": [2, 3],
+      "preserve_fields": ["string_id"]
+    }
+  ]
+}

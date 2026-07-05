@@ -1,0 +1,13 @@
+{
+  "operations": [
+    {
+      "op": "scale",
+      "match": {
+        "character": "111002"
+      },
+      "fields": "skill_strength",
+      "factor": 1.5,
+      "rounding": "int"
+    }
+  ]
+}

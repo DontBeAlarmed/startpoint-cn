@@ -1,0 +1,146 @@
+---
+name: wf-mod
+description: >-
+  世界弹射物语(World Flipper)CN 国服(雷霆)私服的数据修改 + 发布 + 生效全流程工具链。
+  当用户想改任何 WF/世界弹射角色数据——词条(ability)、技能倍率、基础数值(HP/ATK)、
+  觉醒加成、能力魂(ability_soul)、队长技(leader_ability)、技能能量(action_skill)、
+  角色资料(名字/稀有度/元素/描述)、解除主位限制——或想把改动发布到客户端、管理 startpoint-cn
+  服务端、同步到 MuMu 模拟器、排查"改了没生效/客户端没更新/全量重下"时,都用这个 skill。
+  即使用户只说"改一下火龙的攻击力""把某角色技能改强""发个 mod 包"而没提具体工具,也要用它。
+  项目根:D:\WF\startpoint-cn-new。
+---
+
+# 世界弹射物语(CN)Mod 工作流
+
+把「改数据 → 发布 → 客户端生效」固化成可复用流程。所有工具已就位于 `mod-tools/`,
+字段语义已完整逆向(见字段手册)。你的任务是根据用户诉求走完整链路,而不是重新摸索。
+
+## 0. 项目常量(硬记)
+
+| 项 | 值 |
+|---|---|
+| 项目根 | `D:\WF\startpoint-cn-new` |
+| 数据包 store | 由 `mod-tools/profiles.json` 的 active 档案决定(当前锁 `cn` = `弹国服/.../upload`) |
+| 服务端 | `http://192.168.0.130:8001`(LAN IP,见 `.env`),启动用 `start-cn.bat` |
+| 模拟器 | MuMu 12,adb=`D:\WF\MuMuPlayer\nx_main\adb.exe`,device=`127.0.0.1:16384`,包名=`com.leiting.wf` |
+| CDN mod 目录 | `.cdn/cn/archive-common-diff/`(发布的 diff 包落这里) |
+
+Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出中文时终端可能乱码,
+用 `python -c "import sys,io; sys.stdout=io.TextIOWrapper(sys.stdout.buffer,encoding='utf-8',errors='replace')"` 包一下即可,路径实际正确。
+
+## 1. 两层数据架构(决定改哪、怎么生效)
+
+| 层 | 位置 | 改后生效 |
+|---|---|---|
+| **① 服务端层** | `assets/cdndata/*.json`(character.json / character_text.json…) | 重启服务端,客户端 `/load` 拉取。**不走 CDN、不走 adb** |
+| **② 客户端层** | 手机包 `弹国服/.../upload/<xx>/<hash>`(ability / status / skill 等 orderedmap) | **必须经 CDN 下发**(见第 4 节)才在游戏内生效 |
+
+战斗数值、词条、HP/ATK、技能全在 ② 层;名字/描述/稀有度显示在 ① 层。
+**关键教训**:② 层直接 adb push 到 sdcard **不生效**——客户端只认服务端 CDN 下发的版本。改 ② 层一律走 `wf_publish.py`。
+
+## 2. 核心工作流(改 ② 层数据的标准三步)
+
+```
+改数据(dry-run 预览 → 写入 + 自动备份)
+  → python mod-tools/wf_publish.py --tables <表名>   # 打增量包到 CDN
+  → 用户重启 start-cn.bat + 重启游戏                  # 客户端增量下载生效
+```
+
+**改数据的三种方式**,按场景选:
+
+- **网页修改器(交互式,推荐给用户自己用)**:`python mod-tools/wf_gui.py` → 浏览器
+  `http://127.0.0.1:8765`。8 个 tab:词条编辑 / 角色资料 / 基础数值 / 能力魂 / 倍率调整 /
+  词条移植 / 配方 / 备份。写操作都先 dry-run 预览再确认,自动备份 + 加入 pending。
+  API 契约见 `references/api.md`(并入服务端后台时用)。
+- **命令行 recipe(批量/可复现)**:`python mod-tools/wf_mod_tool.py apply --recipe <json>`。
+  操作:`scale`(倍率)/ `set`(设值)/ `copy_ability`(移植)/ `remove_main_position`。
+  用法见 `mod-tools/WF_mod_tool_usage.md`。
+- **临时脚本(GUI 未覆盖的表,如 leader_ability / action_skill)**:用 `wf_mod_tool` 的
+  底层函数写针对性脚本。嵌套表读写见第 3 节。
+
+改完**务必发布**(第 4 节),否则游戏内看不到。
+
+## 3. 三类数据结构的读写(定位后按类处理)
+
+数据表格式不统一,读写前先判断属于哪类。详细字节布局见 `references/字段手册.md` 第二章。
+
+1. **普通 orderedmap**(ability / leader_ability / ability_soul / character):
+   每行 = zlib(CSV)。用 `core.read_orderedmap_file` / `write_table`。
+2. **嵌套 orderedmap**(character_status / action_skill):外层行 = 原样内层 orderedmap 字节
+   (不再 zlib),内层才是 zlib CSV。用 `core.read_orderedmap_file_raw_rows` 读外层、
+   `read_orderedmap_file_from_bytes` 解内层、`build_orderedmap`(内层)+
+   `build_orderedmap_raw_rows`(外层)写回。**内层键序必须保持原样**。
+3. **① 层 JSON**(character.json / character_text.json):直接 `json.loads`,按下标改,
+   `wf_char_editor.py` 已封装(FIELD_MAP)。
+
+**列语义 / 枚举 / 单位**:一律查 `references/字段手册.md`。核心速记:
+- 强度类 `1000 = 1%`;帧 `60 = 1秒`;threshold `100000 = 1次`。
+- 每个数值字段有一对列:`power1`=技能 SLv1 值,`first_max`=SLv 满级值,游戏按当前等级线性插值。
+- **主位限制**在 `unisonable` 列(`false`=仅主位=Ⓜ图标)+ 前置条件枚举 `202`(OwnerIsMain)。
+  解除 = `unisonable→true` 且 `202→0`。`wf_gui.py` 的 mainpos 或
+  `wf_patch_ability_main_position.py` 批量处理。
+- **列序陷阱**:CN 实际 126 列,AMF3 schema 只记 125 列(觉醒 col3/4 未计入),
+  col3 起 schema 列名整体偏一位。**按列名解析要以生成类 `AbilityValues.as` 为准,不要盲信 schema 下标**。
+  安全做法:改数值列时用字段手册核对真实语义,数值列(power1/first_max)本身可信。
+- **列序反例**:`character_status` 内层是 `hp,atk`;`character_awake_status` 是 `atk,hp`(相反!)。
+
+## 4. 发布链路(② 层生效的唯一正道)
+
+```bash
+python mod-tools/wf_publish.py --tables ability,character_status   # 或用 pending 列表(不带 --tables)
+```
+
+原理(与官方增量更新同构):
+- 打包结构 `production/upload/<xx>/<hash>`,**原样字节复制**(不重编码,不破坏觉醒列顺序)。
+- 版本自动 +0.0.1(扫 CDN 现有最高版本),生成 `pinball-<from>-<to>-1-<tag>.zip`。
+- 服务端 `src/routes/cn/asset.ts` **动态扫描** diff 目录,放入即生效,**不用重启服务端**
+  (但改了服务端 .ts 代码才需要 `npx tsc` + 重启)。
+
+**触发客户端更新的两个开关**(都已修好,排查时先看这里):
+- `load` 端点 `available_asset_version` 必须 > 客户端 res_ver → 客户端才进更新流程。
+  (曾经回显客户端版本导致永不更新)
+- `get_path` 端点 `is_initial`:客户端报了版本 → `false` → **增量只下小包**;
+  不报 → `true` → 全量重下。(曾经硬编码 true 导致每次全量)
+
+服务端两行关键日志(排查用):`[CN-LOAD] res_ver=...` 和 `[CDN] get_path ... initial=false`。
+
+`--tables` 别名:`ability` `character` `character_status` `leader_ability` `ability_soul`
+`character_awake_status` `action_skill`。新表加别名到 `wf_publish.py` 的 `TABLE_ALIASES`。
+
+## 5. 服务端 / 模拟器管理
+
+- **启动服务端**:双击 `start-cn.bat`(自带端口自检:释放 8001 占用)。或
+  `node --env-file=.env out/cn-server.js`。改了 `src/*.ts` 要先 `npx tsc`。
+- **不要用 preview 面板长期跑服务端**——会随会话回收进程,导致"服务端悄悄退了"。
+- **模拟器操作**(adb 路径见第 0 节,Windows 下 shell 命令加 `MSYS_NO_PATHCONV=1` 防路径转换):
+  重启游戏 = `am force-stop com.leiting.wf` 然后 `monkey -p com.leiting.wf -c android.intent.category.LAUNCHER 1`。
+- **验证服务端在线**:`curl http://192.168.0.130:8001/api/server/currentTime`(本机 + 模拟器内都可达才算通)。
+
+## 6. 排查"改了没生效"(按此顺序)
+
+1. **数据真的改了?** 读回目标表核对值(不是看 dry-run,看写入后 `read_orderedmap_file`)。
+2. **发布了吗?** `.cdn/cn/archive-common-diff/` 有没有新 `pinball-*-mod*.zip`。
+3. **客户端触发更新了吗?** 看服务端日志有无 `[CDN] get_path`。没有 = `available_asset_version` 没推进。
+4. **服务端在线吗?** 端口 8001 有没有监听,模拟器内能否 curl 到。
+5. **游戏真重启了吗?** 用正确包名 `com.leiting.wf`(不是 `air.com.leiting.wf`)force-stop + 启动。
+6. **金丝雀验证**:改一个显眼数值(如某角色 Lv100 HP=9999),生效则链路通,再排查具体字段。
+
+## 7. 资产索引(需要细节时读)
+
+- `references/字段手册.md` — **最重要**。125/126 列全表、枚举、单位、各表结构、CN/global 差异、安全规则。
+- `references/api.md` — GUI 的 HTTP API 契约(GET/POST 端点,并入服务端后台时对接用)。
+- `mod-tools/wf_mod_tool.py` — 核心引擎(orderedmap 读写 / 嵌套 / AMF3 schema / recipe / profile)。
+- `mod-tools/wf_gui.py` + `wf_gui.html` — 网页修改器(前后端)。
+- `mod-tools/wf_publish.py` — CDN 增量发布器。
+- `mod-tools/wf_char_editor.py` — ① 层角色资料编辑。
+- `mod-tools/角色数据逆向与修改指南.md` — 两层逆向过程 + HP/ATK / 觉醒破解结论。
+- `mod-tools/版本切换设计.md` — profile 版本档案设计(CN/global 切换)。
+
+## 8. 安全规则(写入前必守)
+
+1. **先 dry-run 预览再写**;写入自动生成 `.bak-wfmod-*` 备份。
+2. **还原用备份取原值**,不要凭记忆填(如队长技原值从 `.bak-wfmod-leader-*` 取)。
+3. **嵌套表内层键序不可重排**;`build_orderedmap_raw_rows` 保持外层原序。
+4. **数值范围** 0 ~ 2³¹-1;千分比语义确认后再改;断点/键白名单(不新增不存在的键)。
+5. **① 层改动不发 CDN**(重启服务端生效);**② 层改动必发 CDN**(不走 adb 手推)。
+6. 破坏性操作(改 store、删备份)前先确认目标,别动未跟踪的逆向工作区。
