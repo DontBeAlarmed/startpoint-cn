@@ -5,11 +5,11 @@
 <title>WF 单机版修改器</title>
 <style>
 :root{
-  --bg:#101218;--panel:#181b23;--panel2:#20242f;--panel3:#272c39;
+  --bg:#0e1016;--panel:#161923;--panel2:#1e222e;--panel3:#262b3a;
   --fg:#e8eaf1;--dim:#8b91a5;--faint:#5d6375;
-  --acc:#5b9dff;--acc-soft:#5b9dff22;--ok:#46c97247;--okfg:#4fd07c;--warn:#e8a33d;--err:#e05555;
-  --border:#2c313f;--border2:#373d4e;--gold:#e7bb54;
-  --r:8px;--rs:6px;
+  --acc:#5b9dff;--acc2:#3d7ad4;--acc-soft:#5b9dff22;--ok:#46c97247;--okfg:#4fd07c;--warn:#e8a33d;--err:#e05555;
+  --border:#2a2f3d;--border2:#373d4e;--gold:#e7bb54;
+  --r:9px;--rs:6px;
 }
 *{box-sizing:border-box}
 ::-webkit-scrollbar{width:9px;height:9px}
@@ -29,7 +29,7 @@ header .path{color:var(--faint);font-size:11px;flex:1;overflow:hidden;white-spac
 .badge.warn{color:var(--warn);border-color:#4a3f2c}
 
 /* ---------- buttons / inputs ---------- */
-button{background:var(--acc);border:0;color:#fff;padding:5px 13px;border-radius:var(--rs);cursor:pointer;font-size:12.5px;transition:filter .1s,transform .05s}
+button{background:linear-gradient(180deg,var(--acc),var(--acc2));border:0;color:#fff;padding:5px 13px;border-radius:var(--rs);cursor:pointer;font-size:12.5px;transition:filter .1s,transform .05s;box-shadow:0 1px 2px rgba(0,0,0,.3)}
 button:hover{filter:brightness(1.15)}
 button:active{transform:translateY(1px)}
 button.sec{background:var(--panel3);color:var(--fg);border:1px solid var(--border2)}
@@ -58,11 +58,22 @@ main{flex:1;display:flex;min-height:0}
 .char.off{opacity:.38}
 .el{width:17px;height:17px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex-shrink:0;box-shadow:inset 0 -2px 3px rgba(0,0,0,.25)}
 .el.火{background:#d24a2e}.el.水{background:#2e7bd2}.el.雷{background:#c9a72c;color:#222}.el.风{background:#3aa855}.el.光{background:#c9c06a;color:#222}.el.暗{background:#7a4ad2}
+/* 左栏头像:懒加载小图 + 元素角标;图缺失时回退成元素圆点 */
+.avwrap{position:relative;width:27px;height:27px;flex-shrink:0}
+.avwrap img.av{width:27px;height:27px;border-radius:7px;display:block;background:#0c0e13;object-fit:cover}
+.avwrap .el{position:absolute;right:-4px;bottom:-3px;width:12px;height:12px;font-size:0;border:2px solid var(--panel)}
+.char.sel .avwrap .el{border-color:#1d2735}
+.avwrap.miss img{display:none}
+.avwrap.miss{display:inline-flex;align-items:center;justify-content:center}
+.avwrap.miss .el{position:static;width:17px;height:17px;font-size:10px;border:0}
 
-/* ---------- tabs ---------- */
+/* ---------- tabs(分组导航) ---------- */
 #right{flex:1;display:flex;flex-direction:column;min-width:0}
-nav{display:flex;gap:14px;padding:0 14px;background:var(--panel);border-bottom:1px solid var(--border)}
-nav .tab{padding:8px 2px 6px;cursor:pointer;color:var(--dim);font-size:12.8px;border-bottom:2px solid transparent;margin-bottom:-1px;user-select:none;transition:color .12s}
+nav{display:flex;gap:0;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--border);overflow-x:auto}
+.navgrp{display:flex;gap:10px;align-items:stretch;padding:0 12px;position:relative}
+.navgrp+.navgrp{border-left:1px solid var(--border)}
+.navgrp .ngl{align-self:center;color:var(--faint);font-size:10px;letter-spacing:2px;margin-right:2px;user-select:none;writing-mode:horizontal-tb;white-space:nowrap}
+nav .tab{padding:9px 2px 7px;cursor:pointer;color:var(--dim);font-size:12.8px;border-bottom:2px solid transparent;margin-bottom:-1px;user-select:none;transition:color .12s;white-space:nowrap}
 nav .tab:hover{color:var(--fg)}
 nav .tab.sel{color:var(--fg);border-bottom-color:var(--acc);font-weight:600}
 #content{flex:1;overflow:auto;padding:12px 14px}
@@ -77,6 +88,7 @@ table{border-collapse:separate;border-spacing:0;font-size:12px;margin:4px 0 12px
 th,td{border:0;border-bottom:1px solid var(--border);padding:3px 9px;text-align:left}
 th{background:var(--panel3);position:sticky;top:-12px;font-weight:600;color:#c6cce0;z-index:1}
 tr:last-child td{border-bottom:0}
+table tr:nth-child(even) td{background:rgba(255,255,255,.014)}
 tbody tr:hover td,table tr:hover td{background:#1c2029}
 td.fname{color:var(--dim);white-space:nowrap;max-width:360px;overflow:hidden;text-overflow:ellipsis;background:rgba(255,255,255,.015);border-right:1px solid var(--border)}
 td.fname b{color:var(--fg);font-weight:400}
@@ -139,6 +151,18 @@ td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;lin
 #wpnInfo{display:none;gap:10px;align-items:center;padding:7px 11px;margin:4px 0 8px;background:var(--panel2);border:1px solid var(--border);border-radius:var(--rs);font-size:12.5px}
 #wpnInfo .wname{font-weight:600;font-size:13.5px}
 #wpnInfo .rar{color:var(--gold);letter-spacing:-1px}
+/* ---------- 工具箱 ---------- */
+.tbgrid{display:flex;flex-direction:column;gap:10px;max-width:860px}
+.tbcard{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:10px 13px}
+.tbcard .tbt{font-size:13px;font-weight:600;margin-bottom:3px}
+.tbcard.off{opacity:.45}
+.tbava{font-size:10.5px;color:var(--err);font-weight:400}
+#tbStatus{max-width:860px;margin-top:14px}
+.tbbar{height:8px;background:var(--panel3);border-radius:99px;overflow:hidden;margin:6px 0}
+.tbbar>div{height:100%;background:var(--acc);border-radius:99px;transition:width .5s;min-width:2px}
+.tbbar.busy>div{background:repeating-linear-gradient(45deg,var(--acc),var(--acc) 8px,#3d7ad4 8px,#3d7ad4 16px);animation:tbmove 1s linear infinite;width:100%!important}
+@keyframes tbmove{from{background-position:0 0}to{background-position:23px 0}}
+#tbLog{background:#0c0e13;border:1px solid var(--border);border-radius:var(--rs);padding:7px 10px;font:11px/1.5 Consolas,monospace;white-space:pre-wrap;max-height:260px;overflow:auto;color:#9fb4d8}
 </style>
 </head>
 <body>
@@ -171,18 +195,32 @@ td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;lin
   </div>
   <div id="right">
     <nav>
-      <div class="tab sel" data-t="edit">词条编辑</div>
-      <div class="tab" data-t="profile">角色资料</div>
-      <div class="tab" data-t="assets">角色资产</div>
-      <div class="tab" data-t="stat">基础数值</div>
-      <div class="tab" data-t="energy">技能·倍率</div>
-      <div class="tab" data-t="weapon">武器·魂珠</div>
-      <div class="tab" data-t="port">词条移植</div>
-      <div class="tab" data-t="finder">词条速查</div>
-      <div class="tab" data-t="newchar">新建角色</div>
-      <div class="tab" data-t="recipe">配方</div>
-      <div class="tab" data-t="history">改动日志</div>
-      <div class="tab" data-t="backup">备份</div>
+      <div class="navgrp">
+        <span class="ngl">角色</span>
+        <div class="tab sel" data-t="edit">词条</div>
+        <div class="tab" data-t="stat">数值</div>
+        <div class="tab" data-t="energy">技能·倍率</div>
+        <div class="tab" data-t="profile">资料</div>
+        <div class="tab" data-t="assets">资产</div>
+        <div class="tab" data-t="newchar">新建</div>
+      </div>
+      <div class="navgrp">
+        <span class="ngl">武器</span>
+        <div class="tab" data-t="weapon">武器·魂珠</div>
+      </div>
+      <div class="navgrp">
+        <span class="ngl">全局</span>
+        <div class="tab" data-t="boss">Boss·副本</div>
+        <div class="tab" data-t="finder">词条速查</div>
+        <div class="tab" data-t="port">词条移植</div>
+        <div class="tab" data-t="recipe">配方</div>
+      </div>
+      <div class="navgrp">
+        <span class="ngl">系统</span>
+        <div class="tab" data-t="toolbox">工具箱</div>
+        <div class="tab" data-t="history">日志</div>
+        <div class="tab" data-t="backup">备份</div>
+      </div>
     </nav>
     <div id="content">
       <section data-t="edit" class="sel">
@@ -222,7 +260,33 @@ td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;lin
           <button class="sec" id="btnAssetReload">刷新</button>
         </div>
         <div class="hint"><b>替换要求</b>:PNG=标准 PNG 文件;<b>sprite sheet/图标合集必须与原图同尺寸同布局</b>(配套 atlas 按坐标切图);立绘/cut-in 建议同尺寸,勾「强制」可绕过尺寸校验(游戏按原 pivot 摆放,尺寸差会偏移)。MP3=<b>CBR·Layer3</b>(VBR 不支持)。替换走 预览→确认→自动备份,大图(medium 根)发布时自动打进 medium 增量包。</div>
+        <div class="row" style="align-items:center">
+          <b>资产包导入</b>
+          <input id="packDir" placeholder="datamine 解包目录(如 D:\...\pirates_girl;相对路径 = character/&lt;code&gt;/ 下逻辑路径)" style="flex:1;min-width:320px">
+          <label style="white-space:nowrap"><input type="checkbox" id="packForce"> 强制</label>
+          <button class="sec" id="btnPackImport">预览导入</button>
+        </div>
+        <div class="hint">把全资产包一比一替换给<b>当前选中角色</b>:命中 store 的文件全部替换(逐文件备份+进待发布),提取器切片/GIF/JSON 自动跳过。套给<b>其他角色</b>时尺寸多半不同,需勾「强制」;图集类(illustration/pixelart sprite sheet)强制替换会错位,慎用。</div>
         <div id="assetBox"><div class="empty">选择左侧角色以加载立绘 / 图标 / 语音</div></div>
+      </section>
+      <section data-t="boss">
+        <div class="row" style="align-items:center">
+          <b>Boss 数值</b>
+          <input id="bossSearch" placeholder="搜 boss 名 / 键(如 精灵兽 / owl)" style="width:220px">
+          <button class="sec" id="btnBossReload">刷新</button>
+          <span class="hint" style="margin:0">共 <span id="bossCount">-</span> 条,最多显示 150 条</span>
+        </div>
+        <div class="hint">HP = 基础值 × 等级曲线 × 修正曲线:<b>改「HP基础」即等比调血</b>(Hit 模式基础值≈打点数,减半=血量减半,0.5倍=输入原值一半);ATK打点/修正、TP 同理。保存自动备份+进待发布,点右上角「发布并重启游戏」生效。</div>
+        <div id="bossList"><div class="empty">点「刷新」加载 boss 列表</div></div>
+        <div class="row" style="align-items:center;margin-top:14px">
+          <b>副本列表</b>
+          <select id="questCat"></select>
+          <input id="questSearch" placeholder="搜名字 / ID" style="width:180px">
+          <button class="sec" id="btnQuestLoad">加载</button>
+          <span class="hint" style="margin:0" id="questCount"></span>
+        </div>
+        <div class="hint">22 类全副本(告别版全解锁),boss 列 = quest→field_data→zone 自动解析;点 boss 名可定位到上方编辑血量。列表只读,换怪/改奖励后续再加。</div>
+        <div id="questList"></div>
       </section>
       <section data-t="stat">
         <div class="row" id="statBtns" style="display:none">
@@ -257,6 +321,21 @@ td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;lin
             <span style="width:14px"></span>
             <button class="sec" id="btnSkAllPrev">预览整技能</button>
             <button id="btnSkAllGo">整技能替换</button>
+          </div>
+        </div>
+        <div id="switchOps" style="display:none">
+          <h3 style="margin-top:14px">技能形态切换(条件变身)</h3>
+          <div class="hint">条件满足时技能自动变成另一形态(全库 6 个角色自带:惠惠=有状态时、塔吉斯=HP≥50% 等)。条件存在 <b>character 表 col9-16</b>,切换后技能本体在 switched_action_skill 表——<b>目前只能选已有 6 键</b>(借用=技能变成对方的切换形态)。改「条件/阈值」对自带切换的角色即改即用;条件选「无切换」=清掉。发布后生效。</div>
+          <div class="row" style="align-items:center">
+            <label>条件</label><select id="swKind"></select>
+            <label>阈值</label><input id="swThr" style="width:64px" placeholder="0.5" title="HP条件=比例0-1;多球条件=球数">
+            <label>状态枚举</label><input id="swCond" style="width:56px" placeholder="28" title="条件=存在指定状态 时用">
+            <label>多球</label><input id="swMb" style="width:130px" placeholder="1611291,1611292" title="条件=多球数量 时的球ID列表">
+            <label>切换后技能</label><select id="swSkill"></select>
+            <label title="切换形态释放时不播技能语音"><input type="checkbox" id="swNoVoice"> 静音</label>
+            <label title="切换形态就绪时不播就绪语音"><input type="checkbox" id="swNoReady"> 就绪静音</label>
+            <button class="sec" id="btnSwPrev">预览</button>
+            <button id="btnSwSave">保存</button>
           </div>
         </div>
         <h3 style="margin-top:14px">技能 / 词条数值倍率</h3>
@@ -386,6 +465,52 @@ td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;lin
           <button class="sec" id="btnNcDelPrev">预览</button>
           <button class="danger" id="btnNcDelGo">删除角色</button>
         </div>
+      </section>
+      <section data-t="toolbox">
+        <h3>工具箱 · 离线长任务</h3>
+        <div class="hint">重型工具在<b>后台子进程</b>运行,本页实时看进度/日志;同一时间只跑一个。输出目录都在游戏包之外,<b>不写 store、不进待发布</b>,随便跑。参数留空 = 用工具默认值。</div>
+        <div class="tbgrid">
+          <div class="tbcard" data-tool="export_assets">
+            <div class="tbt">全量解密导出 <span class="tbava"></span></div>
+            <div class="hint">解密下载包+bundle 全部哈希文件,按逻辑路径建目录树:表→CSV · 图→PNG · 音→MP3 · AMF3→JSON。默认跳过已存在文件 = <b>可断点续跑</b>。</div>
+            <div class="row">
+              <label>输出目录</label><input data-a="out" placeholder="D:\WF\wf-decrypted(默认)" style="flex:1;min-width:200px">
+            </div>
+            <div class="row">
+              <label>limit</label><input data-a="limit" type="number" placeholder="0=全部" style="width:90px" title="只处理前 N 个文件,小样验证用">
+              <label>线程</label><input data-a="workers" type="number" placeholder="8" style="width:60px">
+              <label title="只导 APK bundle 包"><input type="checkbox" data-a="only-bundle"> 只 bundle</label>
+              <label title="重新解密并覆盖已存在的输出文件"><input type="checkbox" data-a="no-skip"> 覆盖重跑</label>
+              <span style="flex:1"></span>
+              <button class="tbrun">开始</button>
+            </div>
+          </div>
+          <div class="tbcard" data-tool="recover_pathlist">
+            <div class="tbt">路径表复原 <span class="tbava"></span></div>
+            <div class="hint">重建 <b>WF_PATHLIST_recovered.csv/txt</b>(哈希→逻辑路径,SHA1 校验零误报)。资产页的 story 表情/words 语音枚举、全量导出的文件命名都吃这张表;数据包更新后跑一次。</div>
+            <div class="row">
+              <label>输出目录</label><input data-a="out" placeholder="mod-tools/(默认,直接生效)" style="flex:1;min-width:200px">
+              <span style="flex:1"></span>
+              <button class="tbrun">开始</button>
+            </div>
+          </div>
+          <div class="tbcard" data-tool="restore_package">
+            <div class="tbt">数据包还原 <span class="tbava"></span></div>
+            <div class="hint">不依赖 pathlist,从反编译源码+主表<b>自举复原</b>路径并还原原始内容(路径覆盖率约 75%)。重型任务(模板展开几千万次哈希);勾「只出清单」最快,不写文件。</div>
+            <div class="row">
+              <label>输出目录</label><input data-a="out" placeholder="弹国服/restored(默认)" style="flex:1;min-width:200px">
+            </div>
+            <div class="row">
+              <label>limit</label><input data-a="limit" type="number" placeholder="0=全部" style="width:90px">
+              <label>线程</label><input data-a="workers" type="number" placeholder="12" style="width:60px">
+              <label title="只复原路径生成清单,不写还原文件"><input type="checkbox" data-a="only-recover"> 只出清单</label>
+              <label title="输出可读目录树(按内容解码)"><input type="checkbox" data-a="readable"> 可读版</label>
+              <span style="flex:1"></span>
+              <button class="tbrun">开始</button>
+            </div>
+          </div>
+        </div>
+        <div id="tbStatus"></div>
       </section>
       <section data-t="recipe">
         <div class="row">
@@ -531,7 +656,8 @@ function renderChars(){
       const d=document.createElement('div');
       d.className='char'+(sel&&sel.id===c.id?' sel':'')+(c.in_store?'':' off');
       const stars=parseInt(c.rarity)>0?'★'.repeat(parseInt(c.rarity)):'';
-      d.innerHTML=`<span class="el ${c.element}">${c.element}</span><span class="nm">${c.name}</span><span class="rar">${stars}</span><span class="id">${c.id}</span>`;
+      const av=API+'/asset?logical='+encodeURIComponent(`character/${c.code_name}/ui/square_round_95_95_0.png`);
+      d.innerHTML=`<span class="avwrap"><img class="av" loading="lazy" src="${av}" onerror="this.parentNode.classList.add('miss')"><span class="el ${c.element}">${c.element}</span></span><span class="nm">${c.name}</span><span class="rar">${stars}</span><span class="id">${c.id}</span>`;
       d.onclick=()=>{if(sel&&sel.id!==c.id&&!guardDirty())return;sel=c;renderChars();loadRows();if(curTab()==='profile')loadProfile();if(curTab()==='stat')loadStat();if(curTab()==='energy')loadEnergy();if(curTab()==='assets')loadAssets();$('#scaleTarget').textContent=c.name+' ('+c.id+')';};
       box.appendChild(d);
     });
@@ -894,6 +1020,27 @@ async function replaceAsset(logical,fileInput,force){
   }
 }
 $('#btnAssetReload').onclick=loadAssets;
+async function importPack(){
+  if(!sel)return log('先选择左侧角色',true);
+  const dir=$('#packDir').value.trim();
+  if(!dir)return log('先填写资产包解包目录路径',true);
+  const force=$('#packForce').checked;
+  let prev;
+  try{prev=await api('/asset/import_pack',{character:sel.id,dir,force,dry_run:true});}
+  catch(e){return;}
+  showResult(prev);
+  if(prev.bad&&prev.bad.length)log('导入失败项 '+prev.bad.length+' 个:\n'+prev.bad.join('\n'),true);
+  if(prev.missing&&prev.missing.length)log('store 无对应路径 '+prev.missing.length+' 个:\n'+prev.missing.join('\n'));
+  if(!prev.replaced)return log('没有可替换的文件(检查目录层级:应直接指向含 ui/ pixelart/ voice/ 的角色目录)',true);
+  if(confirmWithPreview('确认导入资产包到 '+sel.name+' ('+prev.code_name+')?\n替换 '+prev.replaced+' 个文件(逐文件自动备份)'
+      +(prev.bad&&prev.bad.length?('\n注意:'+prev.bad.length+' 个文件将跳过(尺寸/格式不符,详见日志)'):''),prev)){
+    const r=await api('/asset/import_pack',{character:sel.id,dir,force,dry_run:false});
+    showResult(r);
+    if(r.bad&&r.bad.length)log('跳过 '+r.bad.length+' 个:\n'+r.bad.join('\n'),true);
+    loadAssets();
+  }
+}
+$('#btnPackImport').onclick=importPack;
 
 // ---- 基础数值 character_status ----
 let statEntries=[];
@@ -971,10 +1118,53 @@ $('#btnStatScale').onclick=()=>{
 let soulEdits={};
 
 // ---- 技能(action_skill):名称/描述/能量 编辑 + 级别增删移植 + 倍率 ----
+// ---- 技能形态切换(character 表 col9-16) ----
+async function loadSkillSwitch(){
+  if(!sel){$('#switchOps').style.display='none';return;}
+  let d;
+  try{d=await api('/skill_switch?character='+encodeURIComponent(sel.id));}
+  catch(e){$('#switchOps').style.display='none';return;}
+  $('#switchOps').style.display='';
+  const kindSel=$('#swKind');kindSel.innerHTML='';
+  Object.entries(d.kinds).forEach(([v,cn])=>{const o=document.createElement('option');o.value=v;o.textContent=cn;kindSel.appendChild(o);});
+  kindSel.value=d.fields.kind&&d.kinds[d.fields.kind]?d.fields.kind:'(None)';
+  const sk=$('#swSkill');sk.innerHTML='';
+  const opts=[...(d.targets||[])];
+  if(d.fields.skill&&!opts.includes(d.fields.skill))opts.unshift(d.fields.skill);
+  opts.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;sk.appendChild(o);});
+  if(d.fields.skill)sk.value=d.fields.skill;
+  $('#swThr').value=d.fields.threshold||'';
+  $('#swCond').value=d.fields.condition||'';
+  $('#swMb').value=d.fields.multiballs||'';
+  $('#swNoVoice').checked=d.fields.no_voice==='true';
+  $('#swNoReady').checked=d.fields.no_ready_voice==='true';
+}
+async function saveSkillSwitch(dryOnly){
+  if(!sel)return;
+  const edits={kind:$('#swKind').value,threshold:$('#swThr').value.trim(),
+    condition:$('#swCond').value.trim(),multiballs:$('#swMb').value.trim(),
+    skill:$('#swSkill').value,
+    no_voice:$('#swNoVoice').checked?'true':'false',
+    no_ready_voice:$('#swNoReady').checked?'true':'false'};
+  let prev;
+  try{prev=await api('/skill_switch/save',{character:sel.id,edits,dry_run:true});}
+  catch(e){return;}
+  if(!prev.changes)return log('形态切换:没有变化');
+  showResult(prev);
+  if(dryOnly)return;
+  if(confirmWithPreview('确认修改 '+sel.name+' 的技能形态切换?(自动备份,发布后生效)',prev)){
+    showResult(await api('/skill_switch/save',{character:sel.id,edits,dry_run:false}));
+    loadSkillSwitch();
+  }
+}
+$('#btnSwPrev').onclick=()=>saveSkillSwitch(true);
+$('#btnSwSave').onclick=()=>saveSkillSwitch(false);
+
 async function loadEnergy(){
   if(!sel){$('#energyBox').innerHTML='<div class="empty">选择左侧角色以加载技能</div>';$('#skillOps').style.display='none';return;}
   $('#energyTitle').textContent=sel.name+' ('+sel.id+') 技能';
   $('#energyBtns').style.display='flex';
+  loadSkillSwitch();
   let data;
   try{data=await api('/skill_energy?character='+encodeURIComponent(sel.id));}
   catch(e){$('#energyBox').innerHTML='<div class="hint">该角色不在 action_skill 表(见日志)。</div>';$('#skillOps').style.display='none';return;}
@@ -998,6 +1188,14 @@ async function loadEnergy(){
     eb.title='打开这段技能的效果命令树数值(判定范围/帧/强度等),可原地修改';
     eb.onclick=()=>loadDsl(s.level,s.label);
     tdd.appendChild(eb);
+    const jb=document.createElement('button');jb.className='mini';jb.textContent='JSON';
+    jb.title='整棵命令树导出为 JSON 直接编辑(可增删效果命令),保存时自检+备份';
+    jb.onclick=()=>loadDslJson(s.level,s.label);
+    tdd.appendChild(jb);
+    if(s.dsl_unavailable){
+      eb.disabled=jb.disabled=true;
+      eb.title=jb.title=s.dsl_unavailable+';可用下方「整技能替换」换成其他角色的技能';
+    }
     if(data.skills.length>1){
       const db=document.createElement('button');db.className='mini';db.textContent='删除级别';
       db.title='删除这一段技能(至少留 1 段;删＋段会影响已进化的存档,慎用)';
@@ -1049,6 +1247,39 @@ async function loadDsl(level,label){
     showResult(prev);
     if(prev.changes&&confirmWithPreview('确认写入技能效果参数?(自动备份 DSL 文件)',prev)){
       showResult(await api('/skill_dsl/save',{...b,dry_run:false}));loadDsl(level,label);
+    }
+  };
+  row.appendChild(bs);
+  const cl=document.createElement('button');cl.className='sec';cl.textContent='收起';
+  cl.onclick=()=>{box.innerHTML='';};
+  row.appendChild(cl);
+  box.appendChild(row);
+}
+// ---- 技能 DSL 整树 JSON 编辑(AMF3 序列化器,全库 1035 文件字节级往返已验证) ----
+async function loadDslJson(level,label){
+  const box=$('#dslBox');box.innerHTML='<div class="hint">导出命令树 JSON...</div>';
+  let d;
+  try{d=await api('/skill_dsl_json?character='+encodeURIComponent(sel.id)+'&level='+encodeURIComponent(level));}
+  catch(e){box.innerHTML='';return;}
+  box.innerHTML='';
+  const h=document.createElement('h3');h.style.marginTop='12px';h.textContent='['+label+'] 技能 JSON(整树编辑)';box.appendChild(h);
+  const hint=document.createElement('div');hint.className='hint';
+  hint.textContent=d.program_path+' ('+d.bytes+'B) · '+d.note;box.appendChild(hint);
+  const ta=document.createElement('textarea');
+  ta.value=d.json_text;ta.spellcheck=false;
+  ta.style.cssText='width:100%;height:420px;font:12px/1.5 Consolas,monospace;background:#0d1420;color:#cfe0ff;border:1px solid var(--border);border-radius:6px;padding:8px;box-sizing:border-box';
+  box.appendChild(ta);
+  const row=document.createElement('div');row.className='row';
+  const bs=document.createElement('button');bs.textContent='保存 JSON';
+  bs.onclick=async()=>{
+    const b={character:sel.id,level,json_text:ta.value,dry_run:true};
+    let prev;try{prev=await api('/skill_dsl_json/save',b);}catch(e){return;}
+    showResult(prev);
+    if(!prev.changes)return;
+    const share=(d.sharers&&d.sharers.length>1)?('\n注意:'+d.sharers.length+' 个技能键共享此文件('+d.sharers.join('/')+'),全部一起变!'):'';
+    if(confirmWithPreview('确认整树替换技能 DSL?(自动备份)'+share,prev)){
+      showResult(await api('/skill_dsl_json/save',{...b,dry_run:false}));
+      loadDslJson(level,label);
     }
   };
   row.appendChild(bs);
@@ -1359,7 +1590,152 @@ function switchTab(name){
   if(name==='weapon')loadWeapons();
   if(name==='history')loadHistory();
   if(name==='assets')loadAssets();
+  if(name==='boss')loadBoss();
+  if(name==='toolbox')loadToolbox();
 }
+
+// ---- 工具箱:长任务后台子进程 + 状态轮询 ----
+let tbTimer=null;
+const TB_STATE_CN={idle:'空闲',running:'运行中',cancelling:'正在终止',done:'完成',failed:'失败',cancelled:'已终止'};
+async function loadToolbox(){
+  let s;try{s=await api('/toolbox/status');}catch(e){return;}
+  renderToolbox(s);
+  if((s.state==='running'||s.state==='cancelling')&&!tbTimer){
+    tbTimer=setInterval(async()=>{
+      if(curTab()!=='toolbox'){clearInterval(tbTimer);tbTimer=null;return;}
+      let st;try{st=await api('/toolbox/status');}catch(e){return;}
+      renderToolbox(st);
+      if(st.state!=='running'&&st.state!=='cancelling'){clearInterval(tbTimer);tbTimer=null;}
+    },1500);
+  }
+}
+function renderToolbox(s){
+  $$('.tbcard').forEach(c=>{
+    const t=s.tools&&s.tools[c.dataset.tool];
+    const ava=c.querySelector('.tbava');
+    if(t&&!t.available){c.classList.add('off');ava.textContent='(脚本缺失)';c.querySelector('.tbrun').disabled=true;}
+    else{c.classList.remove('off');ava.textContent='';c.querySelector('.tbrun').disabled=(s.state==='running'||s.state==='cancelling');}
+  });
+  const box=$('#tbStatus');
+  if(s.state==='idle'&&!s.tool){box.innerHTML='';return;}
+  const busy=s.state==='running'||s.state==='cancelling';
+  const p=s.progress||{done:0,total:0};
+  const pct=p.total?Math.min(100,Math.round(p.done*100/p.total)):0;
+  const dur=s.started?Math.round(((s.ended||Date.now()/1000)-s.started)):0;
+  box.innerHTML='';
+  const h=document.createElement('div');h.className='row';
+  const b=document.createElement('span');b.className='badge '+(s.state==='done'?'ok':(s.state==='failed'?'err':(busy?'warn':'')));
+  b.textContent=(s.title||'')+' · '+(TB_STATE_CN[s.state]||s.state)+(s.rc!==null&&s.state==='failed'?' rc='+s.rc:'');
+  h.appendChild(b);
+  const meta=document.createElement('span');meta.className='hint';meta.style.margin='0';
+  meta.textContent=(p.total?`${p.done}/${p.total} (${pct}%) · `:'')+`${dur}s · ${s.cmd||''}`;
+  h.appendChild(meta);
+  if(busy){const cb=document.createElement('button');cb.className='danger';cb.textContent='终止';
+    cb.onclick=async()=>{showResult(await api('/toolbox/cancel',{}));};
+    h.appendChild(cb);}
+  box.appendChild(h);
+  const bar=document.createElement('div');bar.className='tbbar'+(busy&&!p.total?' busy':'');
+  bar.innerHTML='<div style="width:'+(busy&&!p.total?100:pct)+'%"></div>';
+  box.appendChild(bar);
+  const lg=document.createElement('div');lg.id='tbLog';
+  lg.textContent=(s.log||[]).join('\n')||'(暂无输出)';
+  box.appendChild(lg);
+  lg.scrollTop=lg.scrollHeight;
+}
+$$('.tbcard .tbrun').forEach(btn=>btn.onclick=async()=>{
+  const card=btn.closest('.tbcard');
+  const tool=card.dataset.tool;
+  const args={};
+  card.querySelectorAll('[data-a]').forEach(i=>{
+    if(i.type==='checkbox'){if(i.checked)args[i.dataset.a]=true;}
+    else if(i.value.trim()!=='')args[i.dataset.a]=i.value.trim();
+  });
+  let r;try{r=await api('/toolbox/run',{tool,args});}catch(e){return;}
+  log('工具箱启动: '+r.title+'  '+r.cmd);
+  loadToolbox();
+});
+
+// ---- Boss·副本:boss_level 数值编辑 + 全副本列表 ----
+let bossData=null;
+async function loadBoss(force){
+  if(force||!bossData){
+    try{bossData=await api('/boss/list');}catch(e){return;}
+    $('#bossCount').textContent=bossData.bosses.length;
+  }
+  renderBossList();
+  if(!$('#questCat').options.length){
+    try{const c=await api('/quest/cats');
+      c.cats.filter(x=>x.exists).forEach(x=>{const o=document.createElement('option');o.value=x.alias;o.textContent=x.cn;$('#questCat').appendChild(o);});
+    }catch(e){}
+  }
+}
+function renderBossList(){
+  if(!bossData)return;
+  const s=($('#bossSearch').value||'').trim().toLowerCase();
+  const list=bossData.bosses.filter(b=>!s||b.key.toLowerCase().includes(s)||(b.name||'').toLowerCase().includes(s));
+  const box=$('#bossList');box.innerHTML='';
+  if(!list.length){box.innerHTML='<div class="empty">无匹配 boss</div>';return;}
+  const tb=document.createElement('table');
+  const hd=document.createElement('tr');
+  hd.innerHTML='<th>键</th><th>名称</th><th>HP模式</th><th>HP基础</th><th>HP系数</th><th>ATK打点</th><th>ATK修正</th><th>TP</th><th>等级档</th><th></th>';
+  tb.appendChild(hd);
+  list.slice(0,150).forEach(b=>{
+    const tr=document.createElement('tr');
+    const kd=document.createElement('td');kd.textContent=b.key.length>30?b.key.slice(0,28)+'…':b.key;kd.title=b.key+(b.hp_curve?'\nHP曲线:'+b.hp_curve:'')+(b.atk_curve?'\nATK曲线:'+b.atk_curve:'');tr.appendChild(kd);
+    const nd=document.createElement('td');nd.textContent=b.name||'';nd.title=b.name||'';nd.style.maxWidth='150px';nd.style.overflow='hidden';tr.appendChild(nd);
+    const md=document.createElement('td');md.textContent=b.kind;tr.appendChild(md);
+    ['hp_value','hp_coef','atk_hits','atk_corr','tp_value'].forEach(f=>{
+      const td=document.createElement('td');
+      const i=document.createElement('input');i.value=b[f];i.dataset.f=f;i.style.width='58px';
+      td.appendChild(i);tr.appendChild(td);
+    });
+    const lv=document.createElement('td');lv.textContent=(b.levels||[]).join('/');tr.appendChild(lv);
+    const act=document.createElement('td');
+    const bu=document.createElement('button');bu.className='mini';bu.textContent='保存';
+    bu.onclick=()=>saveBoss(b.key,tr);act.appendChild(bu);tr.appendChild(act);
+    tb.appendChild(tr);
+  });
+  box.appendChild(tb);
+  if(list.length>150){const m=document.createElement('div');m.className='hint';m.textContent='匹配 '+list.length+' 条,仅显示前 150,请用搜索缩小范围';box.appendChild(m);}
+}
+async function saveBoss(key,tr){
+  const edits={};tr.querySelectorAll('input').forEach(i=>edits[i.dataset.f]=i.value.trim());
+  let prev;
+  try{prev=await api('/boss/save',{key,edits,dry_run:true});}catch(e){return;}
+  if(!prev.changes)return log('没有变化');
+  showResult(prev);
+  if(confirmWithPreview('确认修改 boss 数值?\n'+key+'\n(自动备份,发布后生效)',prev)){
+    showResult(await api('/boss/save',{key,edits,dry_run:false}));
+    loadBoss(true);
+  }
+}
+async function loadQuests(){
+  const cat=$('#questCat').value;if(!cat)return;
+  const q=($('#questSearch').value||'').trim();
+  let d;
+  try{d=await api('/quest/list?cat='+encodeURIComponent(cat)+'&q='+encodeURIComponent(q));}catch(e){return;}
+  $('#questCount').textContent='显示 '+d.shown+' / '+d.total+' 条';
+  const box=$('#questList');box.innerHTML='';
+  const tb=document.createElement('table');
+  const hd=document.createElement('tr');hd.innerHTML='<th>路径</th><th>ID</th><th>名称</th><th>Boss(点击定位编辑)</th>';tb.appendChild(hd);
+  d.rows.forEach(r=>{
+    const tr=document.createElement('tr');
+    [r.path,r.id,r.name||''].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td);});
+    const td=document.createElement('td');
+    (r.bosses||[]).forEach(b=>{
+      const a=document.createElement('a');a.href='javascript:void(0)';
+      a.textContent=b.name||b.key;a.title=b.key;
+      a.onclick=()=>{$('#bossSearch').value=b.key;renderBossList();$('#bossList').scrollIntoView({behavior:'smooth'});};
+      td.appendChild(a);td.appendChild(document.createTextNode(' '));
+    });
+    tr.appendChild(td);tb.appendChild(tr);
+  });
+  box.appendChild(tb);
+}
+$('#btnBossReload').onclick=()=>loadBoss(true);
+$('#bossSearch').oninput=()=>renderBossList();
+$('#btnQuestLoad').onclick=loadQuests;
+$('#questSearch').onkeydown=e=>{if(e.key==='Enter')loadQuests();};
 $$('nav .tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.t));
 
 // ---- 角色/武器 模式切换:左栏列表整体换成武器,不相干页签隐藏 ----
@@ -1370,6 +1746,10 @@ function applyTabVisibility(){
   $$('nav .tab').forEach(t=>{
     const hide=mode==='wpn'?WPN_HIDE_TABS.includes(t.dataset.t):CHAR_HIDE_TABS.includes(t.dataset.t);
     t.style.display=hide?'none':'';
+  });
+  $$('nav .navgrp').forEach(g=>{
+    const any=[...g.querySelectorAll('.tab')].some(t=>t.style.display!=='none');
+    g.style.display=any?'flex':'none';
   });
 }
 function renderLeft(){mode==='char'?renderChars():renderWeaponsLeft();}
@@ -1707,6 +2087,9 @@ $('#btnPublish').onclick=async()=>{
     toast(r.ok?'已发布,游戏重启中,更新完成即生效':'发布失败,看日志',!r.ok);
   }finally{btn.disabled=false;refreshStatus();}
 };
+document.addEventListener('keydown',e=>{
+  if(e.key==='/'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){e.preventDefault();$('#search').focus();}
+});
 (async function init(){
   applyTabVisibility();
   await refreshStatus();

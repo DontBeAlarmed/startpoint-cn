@@ -42,6 +42,7 @@ import wf_mod_tool as core  # noqa: E402
 import wf_describe  # noqa: E402  行级中文描述器(逆向布局+枚举直译)
 import wf_assets  # noqa: E402    角色资产(立绘/图标/语音)编解码与清单
 import wf_dsl  # noqa: E402       技能 ActionDsl 数值编辑
+import wf_boss  # noqa: E402      Boss 数值 + 副本列表(Boss·副本页)
 
 ROOT = Path(__file__).resolve().parent.parent
 _PROFILE = core.resolve_profile(os.environ.get("WF_PROFILE"))
@@ -1594,8 +1595,17 @@ def get_skill_energy(character: str) -> dict:
     entries = core.decode_action_skill_row(table.rows[table.keys.index(key)])
     C = core.ACTION_SKILL_COLUMNS
     skills = []
-    for lv, fields in entries:
-        fields = core.normalize_row_length(fields, C["max_skill_weight"] + 1)
+    for lv, raw_fields in entries:
+        fields = core.normalize_row_length(raw_fields, C["max_skill_weight"] + 1)
+        pp = raw_fields[C["program_path"]] if len(raw_fields) > C["program_path"] else ""
+        dsl_state = ""   # "" = 可编辑;否则为不可编辑原因(前端置灰按钮)
+        if not pp or pp == "(None)":
+            dsl_state = "官方数据无效果文件引用(短行)" if len(raw_fields) <= C["program_path"] \
+                else "该级别未引用效果文件"
+        else:
+            d = core.sha1_path(wf_dsl.dsl_logical(pp))
+            if not (TARGET_STORE / d[:2] / d[2:]).exists():
+                dsl_state = "效果文件不在本地数据包(官方未下发)"
         skills.append({
             "level": lv,
             "label": SKILL_LEVEL_LABEL.get(lv, lv),
@@ -1603,6 +1613,7 @@ def get_skill_energy(character: str) -> dict:
             "description": fields[C["description"]],   # 游戏内技能效果描述(内层 c1)
             "min_skill_weight": fields[C["min_skill_weight"]],   # SLv1 技能能量
             "max_skill_weight": fields[C["max_skill_weight"]],   # 满级技能能量(面板显示)
+            "dsl_unavailable": dsl_state,
         })
     return {"character": str(character), "skill_key": key, "skills": skills,
             "note": "面板技能能量=满级值(max_skill_weight);名称/描述只是显示文本,技能实际效果在 ActionDsl(不可改,可整段移植别人的技能)"}
@@ -1776,7 +1787,17 @@ def get_char_fields(cid: str) -> dict:
             "element_name": ELEMENTS.get(str(fields.get("element", "")), fields.get("element", ""))}
 
 
+def _server_char_json_path() -> Path:
+    """服务端逻辑用的简化表 assets/character.json(邮件发放/admin 校验),cdndata 的兄弟文件。"""
+    return CDNDATA.parent / "character.json"
+
+
 def save_char_fields(cid: str, edits: dict, dry_run: bool) -> dict:
+    """三层同步保存角色资料(2026-07-06 起):
+    ①层 cdndata 两 json(GUI 名录 + 服务端目录镜像);
+    ②层 character / character_text 表(客户端真正读的:星级/属性/名字/描述,发布后生效);
+    服务端简化表 assets/character.json(name/rarity/element,邮件/校验用,重启服务端生效)。
+    """
     mp, tp = _char_json_paths()
     master = json.loads(mp.read_text(encoding="utf-8"))
     text = json.loads(tp.read_text(encoding="utf-8"))
@@ -1792,9 +1813,10 @@ def save_char_fields(cid: str, edits: dict, dry_run: bool) -> dict:
         while len(arr) <= idx:
             arr.append("")
         if arr[idx] != val:
-            log.append(f"{src}[{idx}] {arr[idx]!r} -> {val!r}")
+            log.append(f"①{src}[{idx}] {arr[idx]!r} -> {val!r}")
             arr[idx] = val
 
+    norm = {}  # 归一化后的编辑值(element 已转 0-5),②层/服务端复用
     for f, val in edits.items():
         if f not in CHAR_FIELD_MAP:
             continue
@@ -1802,20 +1824,215 @@ def save_char_fields(cid: str, edits: dict, dry_run: bool) -> dict:
         val = str(val)
         if f == "element":
             val = rev_el.get(val, val)  # 中文名 -> 0-5
+        norm[f] = val
         write(src, idx, val)
+
+    # ---- ②层:同列写 character / character_text(客户端显示与战斗读这里) ----
+    l2 = {"master": None, "text": None}   # 有变更的表对象,写盘阶段用
+    l2_parsed = {}
+    for src_kind, logical in (("master", core.CHARACTER_LOGICAL), ("text", CHAR_TEXT2_LOGICAL)):
+        fields = {f: v for f, v in norm.items() if CHAR_FIELD_MAP[f][0] == src_kind}
+        if not fields:
+            continue
+        try:
+            table = core.load_table(logical, TARGET_STORE, SOURCE_STORE)
+        except Exception as e:
+            log.append(f"②{src_kind} 表读取失败,跳过同步: {e}")
+            continue
+        parsed = {k: core.read_csv_lines(t) for k, t in table.text_rows().items()}
+        if cid not in parsed:
+            log.append(f"②{src_kind} 表中没有角色 {cid},跳过同步")
+            continue
+        row = parsed[cid][0]
+        changed = False
+        for f, val in fields.items():
+            idx = CHAR_FIELD_MAP[f][1]
+            while len(row) <= idx:
+                row.append("")
+            if row[idx] != val:
+                log.append(f"②{src_kind}[{idx}] {row[idx]!r} -> {val!r}")
+                row[idx] = val
+                changed = True
+        if changed:
+            l2[src_kind] = table
+            l2_parsed[src_kind] = parsed
+
+    # ---- 服务端简化表 assets/character.json(name/rarity/element) ----
+    sp = _server_char_json_path()
+    server = None
+    if sp.exists() and any(f in norm for f in ("name", "rarity", "element")):
+        try:
+            server = json.loads(sp.read_text(encoding="utf-8"))
+        except Exception as e:
+            log.append(f"服务端 character.json 读取失败,跳过同步: {e}")
+            server = None
+        if server is not None:
+            ent = server.get(cid)
+            if ent is None:
+                log.append(f"服务端 character.json 中没有角色 {cid},跳过同步")
+                server = None
+            else:
+                dirty = False
+                for f in ("rarity", "element"):
+                    if f in norm:
+                        try:
+                            nv = int(norm[f])
+                        except ValueError:
+                            continue
+                        if ent.get(f) != nv:
+                            log.append(f"服务端[{f}] {ent.get(f)!r} -> {nv!r}")
+                            ent[f] = nv
+                            dirty = True
+                if "name" in norm and ent.get("name") != norm["name"]:
+                    log.append(f"服务端[name] {ent.get('name')!r} -> {norm['name']!r}")
+                    ent["name"] = norm["name"]
+                    dirty = True
+                if not dirty:
+                    server = None
 
     written = None
     if not dry_run and log:
         global _char_cache
         suffix = ".bak-charfields-" + time.strftime("%Y%m%d-%H%M%S")
         for p in (mp, tp):
-            shutil.copy2(p, p.with_name(p.name + suffix))
+            bak = p.with_name(p.name + suffix)
+            if not bak.exists():  # 同秒连写不覆盖更早的备份
+                shutil.copy2(p, bak)
         mp.write_text(json.dumps(master, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         tp.write_text(json.dumps(text, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         written = str(mp)
+        for src_kind, logical in (("master", core.CHARACTER_LOGICAL), ("text", CHAR_TEXT2_LOGICAL)):
+            table = l2[src_kind]
+            if table is None:
+                continue
+            table.set_text_rows({k: core.write_csv_lines(r) for k, r in l2_parsed[src_kind].items()})
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                w = core.write_table(table, TARGET_STORE, suffix, no_backup=False)
+            add_pending(w)
+            record_change(logical, f"{cid} 资料同步: " + "; ".join(
+                l for l in log if l.startswith(f"②{src_kind}")), w.with_name(w.name + suffix))
+        if server is not None:
+            sbak = sp.with_name(sp.name + suffix)
+            if not sbak.exists():
+                shutil.copy2(sp, sbak)
+            sp.write_text(json.dumps(server, ensure_ascii=False, indent=2), encoding="utf-8")
         _char_cache = None  # 名录已变,清缓存使左侧列表刷新
+    synced2 = any(t is not None for t in l2.values())
+    note = "①层已改(重启服务端生效)"
+    if synced2:
+        note += ";②层已同步进待发布(点「发布并重启游戏」后游戏内生效)"
+    if server is not None:
+        note += ";服务端简化表已同步(重启服务端生效)"
     return {"changes": len(log), "log": "\n".join(log), "written": written, "dry_run": dry_run,
-            "note": "① 层已改;重启服务端后客户端 /load 生效(此改动不走模拟器同步)"}
+            "note": note}
+
+
+# ---------------------------------------------------------------- 技能形态切换
+# 机制(CharacterValues.as 逆向,见 技能形态切换与资产包导入结论.md):
+# ② character 表 col9=条件种类 col10=状态枚举 col12=多球列表 col13=阈值
+# col14=切换后技能键(→ switched_action_skill 表,嵌套,键=code_name)
+# col15/16=切换时静音(技能音/就绪音)。①层 cdndata character.json 同列镜像。
+
+SWITCH_KINDS = {"(None)": "无切换", "0": "HP≥阈值时", "1": "存在指定状态时",
+                "2": "多球数≥阈值时", "3": "技能变化标志触发", "4": "处于副位时"}
+SWITCHED_SKILL_LOGICAL = "master/skill/switched_action_skill.orderedmap"
+_SWITCH_COLS = {"kind": 9, "condition": 10, "multiballs": 12, "threshold": 13,
+                "skill": 14, "no_voice": 15, "no_ready_voice": 16}
+
+
+def _switched_skill_targets() -> list[str]:
+    try:
+        return list(wf_boss.qlib.load_table(SWITCHED_SKILL_LOGICAL))
+    except Exception:
+        return []
+
+
+def get_skill_switch(cid: str) -> dict:
+    row = _char_row(str(cid))
+    fields = {f: (row[i] if i < len(row) else "") for f, i in _SWITCH_COLS.items()}
+    return {"character": str(cid), "fields": fields, "kinds": SWITCH_KINDS,
+            "targets": _switched_skill_targets(),
+            "note": "切换后技能必须是 switched_action_skill 表已有键(全库 6 个);"
+                    "给新角色加形态需先给该表加键(未支持,可先借用现有键试玩)。"
+                    "改条件参数(如 HP 阈值 0.5→0.9)对已带切换的角色即改即用"}
+
+
+def save_skill_switch(cid: str, edits: dict, dry_run: bool) -> dict:
+    cid = str(cid)
+    kind = str(edits.get("kind", "")).strip() or "(None)"
+    if kind not in SWITCH_KINDS:
+        raise ValueError(f"条件种类必须是 {'/'.join(SWITCH_KINDS)}: {kind!r}")
+    vals = {"kind": kind}
+    if kind == "(None)":
+        for f in ("condition", "multiballs", "threshold", "skill", "no_voice", "no_ready_voice"):
+            vals[f] = ""
+    else:
+        skill = str(edits.get("skill", "")).strip()
+        targets = _switched_skill_targets()
+        if skill not in targets:
+            raise ValueError(f"切换后技能 {skill!r} 不在 switched_action_skill 表(现有: {'/'.join(targets)})")
+        vals["skill"] = skill
+        thr = str(edits.get("threshold", "")).strip()
+        if kind in ("0", "2"):
+            try:
+                float(thr)
+            except ValueError:
+                raise ValueError(f"阈值必须是数值(HP 比例 0-1 / 球数): {thr!r}")
+        vals["threshold"] = thr
+        cond = str(edits.get("condition", "")).strip()
+        if kind == "1" and not cond.isdigit():
+            raise ValueError(f"状态枚举必须是数字(如 28): {cond!r}")
+        vals["condition"] = cond
+        vals["multiballs"] = str(edits.get("multiballs", "")).strip()
+        for f in ("no_voice", "no_ready_voice"):
+            v = str(edits.get(f, "")).strip().lower()
+            if v not in ("", "true", "false"):
+                raise ValueError(f"{f} 必须是 true/false/空: {v!r}")
+            vals[f] = v
+    # ② character 表
+    table = core.load_table(core.CHARACTER_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    parsed = {k: core.read_csv_lines(t) for k, t in table.text_rows().items()}
+    if cid not in parsed:
+        raise ValueError(f"② character 表中没有角色 {cid}")
+    row = parsed[cid][0]
+    log = []
+    for f, val in vals.items():
+        i = _SWITCH_COLS[f]
+        while len(row) <= i:
+            row.append("")
+        if row[i] != val:
+            log.append(f"②character[{i}]{f} {row[i]!r} -> {val!r}")
+            row[i] = val
+    # ① cdndata 镜像同列
+    mp, _tp = _char_json_paths()
+    master = json.loads(mp.read_text(encoding="utf-8"))
+    m_arr = master.get(cid, [[]])[0] if cid in master else None
+    if m_arr is not None:
+        for f, val in vals.items():
+            i = _SWITCH_COLS[f]
+            while len(m_arr) <= i:
+                m_arr.append("")
+            if m_arr[i] != val:
+                log.append(f"①master[{i}]{f} {m_arr[i]!r} -> {val!r}")
+                m_arr[i] = val
+    written = None
+    if log and not dry_run:
+        table.set_text_rows({k: core.write_csv_lines(r) for k, r in parsed.items()})
+        suffix = ".bak-wfmod-switch-" + time.strftime("%Y%m%d-%H%M%S")
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            w = core.write_table(table, TARGET_STORE, suffix, no_backup=False)
+        add_pending(w)
+        record_change(core.CHARACTER_LOGICAL, f"{cid} 形态切换: " + "; ".join(log), w.with_name(w.name + suffix))
+        if m_arr is not None:
+            bak = mp.with_name(mp.name + suffix)
+            if not bak.exists():
+                shutil.copy2(mp, bak)
+            mp.write_text(json.dumps(master, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        written = str(w)
+    return {"changes": len(log), "log": "\n".join(log), "written": written, "dry_run": dry_run,
+            "note": "②层已进待发布(发布后游戏内生效);①层镜像已同步"}
 
 
 # ---------------------------------------------------------------- 角色资产(立绘/图标/语音)
@@ -1881,6 +2098,52 @@ def replace_asset(logical: str, data: bytes, force: bool, dry_run: bool) -> dict
             "dry_run": dry_run, "root": root_name}
 
 
+# 提取器自产物(datamine 工具切帧/转GIF/解码JSON/缩放图),游戏 store 无对应文件,导入时静默跳过
+_PACK_ARTIFACT_DIRS = ("/animated/", "/sprite_sheet/", "/special_sprite_sheet/")
+_PACK_ARTIFACT_SUFFIX = (".gif", ".json")
+
+
+def import_asset_pack(character: str, src_dir: str, force: bool, dry_run: bool) -> dict:
+    """全资产包批量导入:datamine 解包目录(相对路径 = character/<code>/ 下的逻辑路径)
+    一比一替换到 store。逐文件走 replace_asset(校验/混淆编码/备份/进 pending/改动日志),
+    命不中 store 的路径跳过并报告。"""
+    c = next((x for x in load_characters() if x["id"] == str(character)), None)
+    if not c:
+        raise ValueError(f"角色不存在: {character}")
+    code = c["code_name"]
+    base = Path(src_dir).expanduser()
+    if not base.is_dir():
+        raise ValueError(f"目录不存在: {src_dir}")
+    replaced, artifacts, missing, bad = [], [], [], []
+    log = []
+    for root, _, files in os.walk(base):
+        for fn in sorted(files):
+            fp = Path(root) / fn
+            rel = fp.relative_to(base).as_posix()
+            marked = "/" + rel
+            if (rel.lower().endswith(_PACK_ARTIFACT_SUFFIX)
+                    or "_resized." in rel
+                    or any(m in marked for m in _PACK_ARTIFACT_DIRS)):
+                artifacts.append(rel)
+                continue
+            logical = f"character/{code}/{rel}"
+            if not wf_assets.locate(TARGET_STORE, logical):
+                missing.append(rel)
+                continue
+            try:
+                r = replace_asset(logical, fp.read_bytes(), force, dry_run)
+                replaced.append(rel)
+                log.append(r["log"])
+            except ValueError as e:
+                bad.append(f"{rel}: {e}")
+    return {"changes": len(replaced), "dry_run": dry_run, "code_name": code,
+            "replaced": len(replaced), "artifacts": len(artifacts),
+            "missing": missing, "bad": bad, "log": "\n".join(log),
+            "note": f"替换 {len(replaced)},跳过提取器产物 {len(artifacts)},"
+                    f"store 无对应 {len(missing)},失败 {len(bad)}"
+                    + ("(dry-run 预览,未写入)" if dry_run else ";已备份+进待发布,点「发布并重启游戏」生效")}
+
+
 # ---------------------------------------------------------------- 技能效果 DSL 数值
 
 
@@ -1892,9 +2155,13 @@ def _skill_program_path(character: str, level: str) -> str:
     entries = dict(core.decode_action_skill_row(table.rows[table.keys.index(key)]))
     if str(level) not in entries:
         raise ValueError(f"没有技能级别 {level}(现有: {'/'.join(entries)})")
-    pp = entries[str(level)][core.ACTION_SKILL_COLUMNS["program_path"]]
+    fields = entries[str(level)]
+    pi = core.ACTION_SKILL_COLUMNS["program_path"]
+    pp = fields[pi] if len(fields) > pi else ""
     if not pp or pp == "(None)":
-        raise ValueError("该技能级别没有 program_path")
+        why = "官方数据即为短行(仅名称/描述)" if len(fields) <= pi else "该级别未引用效果文件"
+        raise ValueError(f"{key} 级别{level} 没有效果文件(program_path):{why};"
+                         "无法编辑效果参数,可用「整技能替换」换成其他角色的技能")
     return pp
 
 
@@ -1923,6 +2190,60 @@ def save_skill_dsl(character: str, level: str, edits: list[dict], dry_run: bool)
         record_change(wf_dsl.dsl_logical(pp), "\n".join(log), fp.with_name(fp.name + suffix))
         written = str(fp)
     return {"changes": len(plog), "log": "\n".join(log), "written": written, "dry_run": dry_run}
+
+
+def _dsl_sharers(pp: str) -> list[str]:
+    """引用同一 program_path 的 action_skill 键(共享技能改一处全变,提示用)。"""
+    out = []
+    try:
+        table = core.load_action_skill_table(TARGET_STORE, SOURCE_STORE)
+        pi = core.ACTION_SKILL_COLUMNS["program_path"]
+        for key, row in zip(table.keys, table.rows):
+            try:
+                for _lv, f in core.decode_action_skill_row(bytes(row)):
+                    if len(f) > pi and f[pi] == pp:
+                        out.append(key)
+                        break
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return out
+
+
+def get_skill_dsl_json(character: str, level: str) -> dict:
+    """整棵技能 DSL 命令树导出为 JSON 文本(AMF3 序列化器已全库 1035 文件字节级往返验证)。"""
+    pp = _skill_program_path(character, level)
+    fp, data = wf_dsl.load_dsl_file(TARGET_STORE, pp)
+    byte_ok, sem_ok = wf_dsl.roundtrip_ok(data)
+    if not (byte_ok or sem_ok):
+        raise ValueError("该 DSL 文件往返自检失败,禁止 JSON 编辑(可用「效果参数」原地补丁)")
+    sharers = _dsl_sharers(pp)
+    return {"character": str(character), "level": str(level), "program_path": pp,
+            "json_text": wf_dsl.dsl_to_json_text(data), "bytes": len(data),
+            "sharers": sharers,
+            "note": "整树可改:数值/字符串/增删命令数组均可;3 与 3.0 类型不同勿混"
+                    "(整数=int,带小数点=double);结构错了保存时会被自检拦下。"
+                    + (f"共享提醒:{len(sharers)} 个技能键引用此文件,改动全部生效" if len(sharers) > 1 else "")}
+
+
+def save_skill_dsl_json(character: str, level: str, json_text: str, dry_run: bool) -> dict:
+    pp = _skill_program_path(character, level)
+    fp, data = wf_dsl.load_dsl_file(TARGET_STORE, pp)
+    new = wf_dsl.json_text_to_dsl(json_text)  # 含 encode→parse 自校验
+    if new == data:
+        return {"changes": 0, "log": "内容与当前文件一致,无需写入", "written": None, "dry_run": dry_run}
+    o = len(wf_dsl.parse_dsl(data)["numbers"])
+    n = len(wf_dsl.parse_dsl(new)["numbers"])
+    log = [f"{pp} JSON 整树替换: {len(data)}B -> {len(new)}B,数值叶子 {o} -> {n}"]
+    written = None
+    if not dry_run:
+        suffix = ".bak-wfmod-dsljson-" + time.strftime("%Y%m%d-%H%M%S")
+        wf_dsl.save_dsl_file(fp, new, suffix)
+        add_pending(fp)
+        record_change(wf_dsl.dsl_logical(pp), "\n".join(log), fp.with_name(fp.name + suffix))
+        written = str(fp)
+    return {"changes": 1, "log": "\n".join(log), "written": written, "dry_run": dry_run}
 
 
 # ---------------------------------------------------------------- 单角色快照/还原 + 克隆
@@ -2650,6 +2971,135 @@ def adb_status() -> dict:
     return {"adb": adb, "connected": connected}
 
 
+# ---------------------------------------------------------------- 工具箱(长任务子进程 + 状态轮询)
+# 把独立命令行工具(全量解密导出/路径表复原/数据包还原)并入 GUI:
+# 子进程跑(不 import,零耦合),stdout 逐行进环形日志,前端轮询 /toolbox/status。
+# 同一时间只允许一个任务(都是重 IO,并行只会互相拖慢)。
+
+import re as _re
+import threading
+
+MOD_DIR = Path(__file__).resolve().parent
+
+TOOLBOX_TOOLS = {
+    "export_assets": {
+        "title": "全量解密导出",
+        "script": MOD_DIR / "wf_export_assets.py",
+        "desc": "解密下载包+bundle 全部哈希文件,按逻辑路径建目录树(PNG/MP3/CSV/JSON)",
+    },
+    "recover_pathlist": {
+        "title": "路径表复原",
+        "script": MOD_DIR / "wf_recover_pathlist.py",
+        "desc": "重建 WF_PATHLIST_recovered.csv/txt(资产页 story/words 语音枚举靠它)",
+    },
+    "restore_package": {
+        "title": "数据包还原",
+        "script": ROOT / "弹国服" / "wf_restore_package.py",
+        "desc": "不依赖 pathlist 自举复原路径并还原原始内容(重型,可只出清单)",
+    },
+}
+# 各工具允许透传的 CLI 参数(白名单;flag 型值为 True 时加开关)
+TOOLBOX_ARG_WHITELIST = {
+    "export_assets": {"out": str, "limit": int, "workers": int,
+                      "only-bundle": bool, "no-skip": bool},
+    "recover_pathlist": {"out": str},
+    "restore_package": {"out": str, "limit": int, "workers": int,
+                        "only-recover": bool, "no-skip": bool, "readable": bool},
+}
+
+_TB_LOCK = threading.Lock()
+_TB_PROC: subprocess.Popen | None = None
+_TB: dict = {"seq": 0, "tool": "", "title": "", "state": "idle", "log": [],
+             "rc": None, "started": 0.0, "ended": 0.0, "cmd": ""}
+_TB_PROGRESS = _re.compile(r"(\d+)\s*/\s*(\d+)")
+
+
+def _toolbox_reader(proc: subprocess.Popen, seq: int) -> None:
+    """后台线程:逐行收集子进程输出(限存最近 500 行),进程结束回填状态。"""
+    assert proc.stdout is not None
+    for raw in proc.stdout:
+        line = raw.rstrip("\r\n")
+        with _TB_LOCK:
+            if _TB["seq"] != seq:
+                break
+            _TB["log"].append(line)
+            if len(_TB["log"]) > 500:
+                del _TB["log"][:100]
+    rc = proc.wait()
+    with _TB_LOCK:
+        if _TB["seq"] == seq:
+            _TB["rc"] = rc
+            _TB["state"] = "done" if rc == 0 else ("cancelled" if _TB["state"] == "cancelling" else "failed")
+            _TB["ended"] = time.time()
+
+
+def toolbox_run(tool: str, args: dict) -> dict:
+    spec = TOOLBOX_TOOLS.get(tool)
+    if not spec:
+        raise ValueError(f"未知工具: {tool}(可用: {'/'.join(TOOLBOX_TOOLS)})")
+    if not spec["script"].exists():
+        raise ValueError(f"脚本不存在: {spec['script']}")
+    global _TB_PROC
+    with _TB_LOCK:
+        if _TB["state"] == "running" or _TB["state"] == "cancelling":
+            raise ValueError(f"已有任务在跑: {_TB['title']}(先等它结束或取消)")
+        cmd = [sys.executable, "-u", str(spec["script"])]
+        allow = TOOLBOX_ARG_WHITELIST.get(tool, {})
+        for k, v in (args or {}).items():
+            if k not in allow or v in (None, "", False):
+                continue
+            typ = allow[k]
+            if typ is bool:
+                cmd.append(f"--{k}")
+            elif typ is int:
+                cmd += [f"--{k}", str(int(v))]
+            else:
+                cmd += [f"--{k}", str(v)]
+        env = dict(os.environ, PYTHONIOENCODING="utf-8")
+        proc = subprocess.Popen(
+            cmd, cwd=str(ROOT), env=env,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace")
+        _TB_PROC = proc
+        _TB.update(seq=_TB["seq"] + 1, tool=tool, title=spec["title"], state="running",
+                   log=[], rc=None, started=time.time(), ended=0.0,
+                   cmd=" ".join(cmd[2:]))
+        threading.Thread(target=_toolbox_reader, args=(proc, _TB["seq"]),
+                         daemon=True).start()
+        return {"ok": True, "tool": tool, "title": spec["title"], "cmd": _TB["cmd"]}
+
+
+def toolbox_status() -> dict:
+    with _TB_LOCK:
+        snap = {k: (list(v) if isinstance(v, list) else v) for k, v in _TB.items()}
+    done = total = 0
+    for line in reversed(snap["log"][-40:]):
+        m = _TB_PROGRESS.search(line)
+        if m and int(m.group(2)) >= int(m.group(1)) > 0:
+            done, total = int(m.group(1)), int(m.group(2))
+            break
+    snap["progress"] = {"done": done, "total": total}
+    snap["log"] = snap["log"][-120:]
+    snap["tools"] = {k: {"title": v["title"], "desc": v["desc"],
+                         "available": v["script"].exists()}
+                     for k, v in TOOLBOX_TOOLS.items()}
+    return snap
+
+
+def toolbox_cancel() -> dict:
+    global _TB_PROC
+    with _TB_LOCK:
+        if _TB["state"] != "running" or _TB_PROC is None:
+            return {"ok": False, "log": "当前没有在跑的任务"}
+        _TB["state"] = "cancelling"
+        proc = _TB_PROC
+    try:
+        proc.terminate()
+    except Exception as exc:
+        return {"ok": False, "log": f"终止失败: {exc}"}
+    return {"ok": True, "log": f"已请求终止 {_TB['title']}"}
+
+
 # ---------------------------------------------------------------- http server
 
 
@@ -2755,6 +3205,26 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/souls":
                 self._json(list_souls())
                 return
+            if path == "/boss/list":
+                self._json(wf_boss.boss_list())
+                return
+            if path == "/skill_switch":
+                character = (qs.get("character") or [""])[0]
+                if not character:
+                    self._json({"error": "缺少 character 参数"}, 400)
+                    return
+                self._json(get_skill_switch(character))
+                return
+            if path == "/quest/cats":
+                self._json({"cats": wf_boss.quest_cats()})
+                return
+            if path == "/quest/list":
+                cat = (qs.get("cat") or [""])[0]
+                if not cat:
+                    self._json({"error": "缺少 cat 参数"}, 400)
+                    return
+                self._json(wf_boss.quest_list(cat, (qs.get("q") or [""])[0]))
+                return
             if path == "/status_values":
                 character = (qs.get("character") or [""])[0]
                 if not character:
@@ -2785,6 +3255,10 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({"error": "缺少 character 参数"}, 400)
                     return
                 self._json(get_skill_energy(character))
+                return
+            if path == "/skill_dsl_json":
+                self._json(get_skill_dsl_json((qs.get("character") or [""])[0],
+                                              (qs.get("level") or [""])[0]))
                 return
             if path == "/skill_dsl":
                 self._json(get_skill_dsl((qs.get("character") or [""])[0],
@@ -2820,6 +3294,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/mainpos":
                 self._json(mainpos("status"))
+                return
+            if path == "/toolbox/status":
+                self._json(toolbox_status())
                 return
             self._json({"error": "not found"}, 404)
         except Exception as exc:
@@ -2988,6 +3465,12 @@ class Handler(BaseHTTPRequestHandler):
                                               str(body.get("level", "")),
                                               bool(body.get("dry_run"))))
                 return
+            if path == "/skill_dsl_json/save":
+                self._json(save_skill_dsl_json(str(body.get("character", "")),
+                                               str(body.get("level", "")),
+                                               str(body.get("json_text", "")),
+                                               bool(body.get("dry_run"))))
+                return
             if path == "/skill_dsl/save":
                 self._json(save_skill_dsl(str(body.get("character", "")),
                                           str(body.get("level", "1")),
@@ -3016,6 +3499,28 @@ class Handler(BaseHTTPRequestHandler):
                                          bool(body.get("force")),
                                          bool(body.get("dry_run"))))
                 return
+            if path == "/skill_switch/save":
+                self._json(save_skill_switch(str(body.get("character", "")),
+                                             body.get("edits") or {},
+                                             bool(body.get("dry_run"))))
+                return
+            if path == "/boss/save":
+                res, written = wf_boss.boss_save(str(body.get("key", "")),
+                                                 body.get("edits") or {},
+                                                 bool(body.get("dry_run")))
+                if written:
+                    add_pending(written)
+                    baks = sorted(written.parent.glob(written.name + ".bak-wfquest-*"))
+                    record_change(wf_boss.BOSS_LEVEL, res.get("log", ""),
+                                  baks[-1] if baks else None)
+                self._json(res)
+                return
+            if path == "/asset/import_pack":
+                self._json(import_asset_pack(str(body.get("character", "")),
+                                             str(body.get("dir", "")),
+                                             bool(body.get("force")),
+                                             bool(body.get("dry_run"))))
+                return
             if path == "/delete_line":
                 self._json(delete_line(str(body.get("key", "")), int(body.get("line", 0)),
                                        bool(body.get("dry_run"))))
@@ -3041,6 +3546,12 @@ class Handler(BaseHTTPRequestHandler):
                     body.get("hp_plus", 0),
                     bool(body.get("dry_run")),
                 ))
+                return
+            if path == "/toolbox/run":
+                self._json(toolbox_run(str(body.get("tool", "")), body.get("args") or {}))
+                return
+            if path == "/toolbox/cancel":
+                self._json(toolbox_cancel())
                 return
             self._json({"error": "not found"}, 404)
         except Exception as exc:
