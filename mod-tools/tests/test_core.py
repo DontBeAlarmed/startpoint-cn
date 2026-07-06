@@ -118,6 +118,49 @@ class TestSha1Path(unittest.TestCase):
         self.assertEqual(p.name, h[2:])
 
 
+def _char_csv(code: str, cid: str, refs: list[str]) -> str:
+    row = [""] * 37
+    row[0] = code
+    row[17] = cid
+    row[19:25] = refs
+    return ",".join(row)
+
+
+class TestCharacterLookup(unittest.TestCase):
+    """历史 bug 回归:白(white_tiger)等老行 orderedmap 键('10')≠ character_id 列('3'),
+    只按 col17/code_name 匹配会落进 `id×10+槽位` 回退,读到别人的孤儿词条(101)。"""
+
+    def setUp(self):
+        rows = {
+            "1": _char_csv("alk", "1", ["11", "12", "13", "14", "15", "16"]),
+            "10": _char_csv("white_tiger", "3", ["81", "82", "83", "84", "85", "86"]),
+        }
+        self.ct = core.OrderedMap(LOGICAL, list(rows),
+                                  [v.encode() for v in rows.values()], Path("mem"))
+
+    def test_key_mismatch_row_found_by_map_key(self):
+        self.assertEqual(core.ability_ids_for_character("10", self.ct),
+                         ["81", "82", "83", "84", "85", "86"])
+
+    def test_normal_row_unchanged(self):
+        self.assertEqual(core.ability_ids_for_character("1", self.ct),
+                         ["11", "12", "13", "14", "15", "16"])
+
+    def test_code_name_match_still_works(self):
+        self.assertEqual(core.ability_ids_for_character("white_tiger", self.ct),
+                         ["81", "82", "83", "84", "85", "86"])
+
+    def test_fallback_without_table(self):
+        self.assertEqual(core.ability_ids_for_character("7", None),
+                         ["71", "72", "73", "74", "75", "76"])
+
+    def test_effective_character_id(self):
+        """leader_ability 表按 character_id 列取键:白 → 3,常规行原样,未知 id 原样。"""
+        self.assertEqual(core.effective_character_id("10", self.ct), "3")
+        self.assertEqual(core.effective_character_id("1", self.ct), "1")
+        self.assertEqual(core.effective_character_id("999", self.ct), "999")
+
+
 class TestPublishZipStructure(unittest.TestCase):
     def test_arcname_layout(self):
         """发布包内条目必须是 production/upload/<xx>/<hash>(与官方增量同构)。"""

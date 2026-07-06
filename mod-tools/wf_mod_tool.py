@@ -695,21 +695,46 @@ def expand_fields(fields: Any, index_by_name: dict[str, int]) -> list[int]:
     return result
 
 
-def ability_ids_for_character(character: str, character_table: OrderedMap | None = None) -> list[str]:
-    character = str(character)
-    ids = [f"{character}{slot}" for slot in range(1, 7)]
+def character_row_for(character: str, character_table: OrderedMap | None) -> list[str] | None:
+    """按 orderedmap 键 → character_id 列 → code_name 列的顺序找角色行。
+    白(white_tiger)等老行的键('10')≠ character_id 列('3'),必须先按键匹配。"""
     if not character_table:
-        return ids
-
+        return None
+    character = str(character)
+    width = max(CHARACTER_COLUMNS.values()) + 1
+    text = character_table.text_rows().get(character)
+    if text is not None:
+        rows = read_csv_lines(text)
+        if rows:
+            return normalize_row_length(rows[0], width)
     for row_text in character_table.text_rows().values():
         rows = read_csv_lines(row_text)
         if not rows:
             continue
-        row = rows[0]
-        row = normalize_row_length(row, max(CHARACTER_COLUMNS.values()) + 1)
+        row = normalize_row_length(rows[0], width)
         if row[CHARACTER_COLUMNS["character_id"]] == character or row[CHARACTER_COLUMNS["code_name"]] == character:
-            return [value for value in row[19:25] if value]
-    return ids
+            return row
+    return None
+
+
+def effective_character_id(character: str, character_table: OrderedMap | None = None) -> str:
+    """leader_ability 等表以 character_id 列(col17)为键;键≠col17 的老行需换算。"""
+    row = character_row_for(character, character_table)
+    if row:
+        cid = row[CHARACTER_COLUMNS["character_id"]]
+        if cid and cid != "(None)":
+            return cid
+    return str(character)
+
+
+def ability_ids_for_character(character: str, character_table: OrderedMap | None = None) -> list[str]:
+    character = str(character)
+    row = character_row_for(character, character_table)
+    if row:
+        refs = [value for value in row[19:25] if value]
+        if refs:
+            return refs
+    return [f"{character}{slot}" for slot in range(1, 7)]
 
 
 def row_matches(

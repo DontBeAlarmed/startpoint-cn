@@ -361,14 +361,10 @@ def describe_ability(lines: list[dict], idx: dict[str, int]) -> str:
 
 
 def leader_title_for(character: str) -> str:
-    """从 character 表按 char_id 列查队长技称号(第18列)。"""
-    ct = load_char_table()
-    if not ct:
-        return ""
-    for text in ct.text_rows().values():
-        rows = core.read_csv_lines(text)
-        if rows and len(rows[0]) > 18 and rows[0][17] == str(character):
-            return rows[0][18]
+    """队长技称号(character 行第18列)。键优先匹配(白等老行 键≠character_id 列)。"""
+    row = core.character_row_for(character, load_char_table())
+    if row and row[18] not in ("", "(None)"):
+        return row[18]
     return ""
 
 
@@ -400,17 +396,18 @@ def get_rows_for_character(character: str) -> dict:
                      "desc": describe_ability(lines, idx_by),
                      "line_descs": wf_describe.describe_rows(core.read_csv_lines(text), "ability")})
 
-    # 队长技(leader_ability 表,键=角色ID),伪槽 "L:<id>"
+    # 队长技(leader_ability 表,键=character_id 列;白等老行 键≠该列),伪槽 "L:<id>"
+    lid = core.effective_character_id(character, char_table)
     try:
         leader = core.load_table(LEADER_LOGICAL, TARGET_STORE, SOURCE_STORE)
-        lt = leader.text_rows().get(str(character))
+        lt = leader.text_rows().get(lid)
         if lt is not None:
             lines = make_lines(lt)
-            rows.append({"ability": f"L:{character}", "missing": False, "leader": True,
+            rows.append({"ability": f"L:{lid}", "missing": False, "leader": True,
                          "lines": lines, "desc": describe_ability(lines, idx_by),
                          "line_descs": wf_describe.describe_rows(core.read_csv_lines(lt), "leader_ability")})
         else:
-            rows.append({"ability": f"L:{character}", "missing": True, "leader": True,
+            rows.append({"ability": f"L:{lid}", "missing": True, "leader": True,
                          "lines": [], "desc": ""})
     except Exception:
         pass
@@ -912,7 +909,7 @@ def copy_leader_to_slot(from_character: str, to_character: str, slot: int,
     table = load_ability_table()
     char_table = load_char_table()
 
-    from_character = str(from_character)
+    from_character = core.effective_character_id(from_character, char_table)
     src_text = leader.text_rows().get(from_character)
     if src_text is None:
         raise ValueError(f"leader_ability 表中没有角色 {from_character}")
@@ -969,7 +966,9 @@ def copy_leader_to_leader(from_character: str, to_character: str,
     index_by_name = core.schema_index(schema)
     leader = core.load_table(LEADER_LOGICAL, TARGET_STORE, SOURCE_STORE)
     parsed = {k: core.read_csv_lines(t) for k, t in leader.text_rows().items()}
-    from_character, to_character = str(from_character), str(to_character)
+    ct = load_char_table()
+    from_character = core.effective_character_id(from_character, ct)
+    to_character = core.effective_character_id(to_character, ct)
     if from_character not in parsed:
         raise ValueError(f"leader_ability 表中没有来源角色 {from_character}")
     if to_character not in parsed:
@@ -2302,11 +2301,13 @@ def _char_row(cid: str) -> list[str]:
 
 def _char_flat_parts(cid: str, row: list[str]) -> list[tuple[str, str, list[str]]]:
     abilities = [v for v in row[19:25] if v and v != "(None)"]
+    # leader_ability 键 = character_id 列(白等老行 键≠该列)
+    lid = row[17] if row[17] not in ("", "(None)") else cid
     return [
         (core.CHARACTER_LOGICAL, "character", [cid]),
         (CHAR_TEXT2_LOGICAL, "character_text", [cid]),
         (core.ABILITY_LOGICAL, "ability", abilities),
-        (LEADER_LOGICAL, "leader_ability", [cid]),
+        (LEADER_LOGICAL, "leader_ability", [lid]),
         (AWAKE_LOGICAL, "character_awake_status", [cid]),
     ]
 
@@ -2551,11 +2552,12 @@ def clone_character(src_id: str, new_id: str, new_name: str, dry_run: bool,
                 parsed_a[new] = [list(r) for r in parsed_a[old]]
                 n_ab += 1
         written.append(str(_write_with_backup(ab, parsed_a, [f"新增词条 {n_ab} 键(克隆自 {src_id})"])))
-        # leader_ability
+        # leader_ability(来源键 = character_id 列;白等老行 键≠该列)
+        src_lid = row[17] if row[17] not in ("", "(None)") else src_id
         ld = core.load_table(LEADER_LOGICAL, TARGET_STORE, SOURCE_STORE)
         pl = {k: core.read_csv_lines(t) for k, t in ld.text_rows().items()}
-        if src_id in pl:
-            pl[new_id] = [list(r) for r in pl[src_id]]
+        if src_lid in pl:
+            pl[new_id] = [list(r) for r in pl[src_lid]]
             written.append(str(_write_with_backup(ld, pl, [f"新增队长技 {new_id}(克隆自 {src_id})"])))
         # ② character_text
         try:
