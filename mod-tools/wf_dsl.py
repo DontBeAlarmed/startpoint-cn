@@ -192,12 +192,123 @@ def parse_dsl(data: bytes) -> dict:
     return {"tree": tree, "numbers": p.numbers}
 
 
+# ---------------------------------------------------------------- AMF3 编码器(JSON 整树编辑用)
+# 2026-07-06 全库普查(1035 个技能 DSL):标记只有 null/false/true/int/double/string/
+# dense array/匿名动态 object,零引用、零 assoc、traits 唯一("",dyn)。
+# → 树表示可无损映射到 JSON:null/bool/int/float/str/list/dict,编码器只需覆盖该子集。
+# int/double 区分靠 Python int/float(JSON 文本 3 与 3.0);GUI 全程传 JSON 文本不经 JS 解析。
+
+def encode_amf3(tree) -> bytes:
+    """parse_dsl 的树 → AMF3 字节(canonical U29;字符串表去重与官方序列化器一致)。"""
+    import struct
+    out = bytearray()
+    strings: dict[str, int] = {}
+    traits_written = [False]
+
+    def w_u29(v: int) -> None:
+        if not (0 <= v < (1 << 29)):
+            raise ValueError(f"U29 超范围: {v}")
+        if v < 0x80:
+            out.append(v)
+        elif v < 0x4000:
+            out.extend([(v >> 7) | 0x80, v & 0x7F])
+        elif v < 0x200000:
+            out.extend([(v >> 14) | 0x80, ((v >> 7) & 0x7F) | 0x80, v & 0x7F])
+        else:
+            out.extend([((v >> 22) & 0x7F) | 0x80, ((v >> 15) & 0x7F) | 0x80,
+                        ((v >> 8) & 0x7F) | 0x80, v & 0xFF])
+
+    def w_str(s: str) -> None:
+        if s == "":
+            w_u29(1)
+            return
+        if s in strings:
+            w_u29(strings[s] << 1)
+            return
+        b = s.encode("utf-8")
+        w_u29((len(b) << 1) | 1)
+        out.extend(b)
+        strings[s] = len(strings)
+
+    def w(v) -> None:
+        if v is None:
+            out.append(0x01)
+        elif v is True:
+            out.append(0x03)
+        elif v is False:
+            out.append(0x02)
+        elif isinstance(v, int):
+            if -0x10000000 <= v <= 0x0FFFFFFF:
+                out.append(0x04)
+                w_u29(v & 0x1FFFFFFF)
+            else:  # 超 29 位整数按 AMF3 惯例落 double
+                out.append(0x05)
+                out.extend(struct.pack(">d", float(v)))
+        elif isinstance(v, float):
+            out.append(0x05)
+            out.extend(struct.pack(">d", v))
+        elif isinstance(v, str):
+            out.append(0x06)
+            w_str(v)
+        elif isinstance(v, list):
+            out.append(0x09)
+            w_u29((len(v) << 1) | 1)
+            w_u29(1)  # 空关联部分终止符(空字符串)
+            for x in v:
+                w(x)
+        elif isinstance(v, dict):
+            out.append(0x0A)
+            if traits_written[0]:
+                w_u29(0x01)  # traits 引用 idx0(全库对象 traits 唯一)
+            else:
+                w_u29(0x0B)  # inline traits: dynamic, 0 sealed
+                w_str("")
+                traits_written[0] = True
+            for k, val in v.items():
+                if not isinstance(k, str) or k == "":
+                    raise ValueError(f"对象键必须是非空字符串: {k!r}")
+                w_str(k)
+                w(val)
+            w_u29(1)  # 动态部分终止符
+        else:
+            raise ValueError(f"不支持的节点类型: {type(v).__name__}(只允许 null/bool/int/float/str/list/dict)")
+
+    w(tree)
+    return bytes(out)
+
+
+def dsl_to_json_text(data: bytes) -> str:
+    """AMF3 字节 → 可编辑 JSON 文本(缩进 1;int/double 以 3 / 3.0 区分,勿改类型)。"""
+    import json as _json
+    return _json.dumps(parse_dsl(data)["tree"], ensure_ascii=False, indent=1)
+
+
+def json_text_to_dsl(text: str) -> bytes:
+    """编辑后的 JSON 文本 → AMF3 字节。编码后自校验:重新解析必须与输入树等价。"""
+    import json as _json
+    tree = _json.loads(text)
+    data = encode_amf3(tree)
+    if parse_dsl(data)["tree"] != tree:
+        raise RuntimeError("编码自校验失败(encode→parse 不等价),已放弃")
+    return data
+
+
+def roundtrip_ok(data: bytes) -> tuple[bool, bool]:
+    """(字节级一致, 语义级一致)。字节不一致但语义一致 = 原文件带非规范编码(如历史补丁)。"""
+    tree = parse_dsl(data)["tree"]
+    enc = encode_amf3(tree)
+    if enc == data:
+        return True, True
+    return False, parse_dsl(enc)["tree"] == tree
+
+
 def load_dsl_file(target_store: Path, program_path: str) -> tuple[Path, bytes]:
     lg = dsl_logical(program_path)
     d = core.sha1_path(lg)
     fp = target_store / d[:2] / d[2:]
     if not fp.exists():
-        raise ValueError(f"DSL 文件不存在: {lg}")
+        raise ValueError(f"效果文件不在本地数据包(部分初期角色官方未下发,无法编辑效果参数,"
+                         f"可用「整技能替换」): {lg}")
     return fp, zlib.decompress(fp.read_bytes(), -15)
 
 

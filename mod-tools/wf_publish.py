@@ -110,6 +110,7 @@ TABLE_ALIASES = {
     "rush_event_quest_folder": "master/quest/event/rush_event_quest_folder.orderedmap",
     "rush_event_correction": "master/quest/event/rush_event_battle_quest_correction.orderedmap",
     "event_list": "master/quest/event/event_list.orderedmap",
+    "switched_action_skill": "master/skill/switched_action_skill.orderedmap",
 }
 
 VER_RE = re.compile(r"pinball-(\d+\.\d+\.\d+)-(\d+\.\d+\.\d+)-\d+-")

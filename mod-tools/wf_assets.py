@@ -153,6 +153,29 @@ _CHAR_TEMPLATES = [
     ("ui/illustration_setting_sprite_sheet.png", "图标合集", "头像/队伍小图 sprite sheet(配 .atlas 切割,替换须保持同尺寸同布局)"),
     ("pixelart/sprite_sheet.png", "像素图", "战斗像素动画 sprite sheet(配 atlas/timeline,同尺寸同布局)"),
     ("pixelart/special_sprite_sheet.png", "像素图", "技能特殊动作 sprite sheet(同上)"),
+    # 2026-07-06 补全:store 实测均为独立文件(medium 根),非图集切片
+    ("ui/square_0.png", "头像", "方形头像(基础)。PNG,与原图同尺寸"),
+    ("ui/square_1.png", "头像", "方形头像(进化)。PNG,同上"),
+    ("ui/square_132_132_0.png", "头像", "132x132 方形头像(基础)"),
+    ("ui/square_132_132_1.png", "头像", "132x132 方形头像(进化)"),
+    ("ui/square_round_95_95_0.png", "头像", "95x95 圆角头像(基础)"),
+    ("ui/square_round_95_95_1.png", "头像", "95x95 圆角头像(进化)"),
+    ("ui/square_round_136_136_0.png", "头像", "136x136 圆角头像(基础)"),
+    ("ui/square_round_136_136_1.png", "头像", "136x136 圆角头像(进化)"),
+    ("ui/thumb_level_up_0.png", "缩略图", "升级/强化界面缩略图(基础)"),
+    ("ui/thumb_level_up_1.png", "缩略图", "升级/强化界面缩略图(进化)"),
+    ("ui/thumb_party_main_0.png", "缩略图", "编队主位缩略图(基础)"),
+    ("ui/thumb_party_main_1.png", "缩略图", "编队主位缩略图(进化)"),
+    ("ui/thumb_party_unison_0.png", "缩略图", "编队副位缩略图(基础)"),
+    ("ui/thumb_party_unison_1.png", "缩略图", "编队副位缩略图(进化)"),
+    ("ui/battle_control_board_0.png", "战斗UI", "战斗下方技能条立绘(基础)"),
+    ("ui/battle_control_board_1.png", "战斗UI", "战斗下方技能条立绘(进化)"),
+    ("ui/battle_member_status_0.png", "战斗UI", "战斗队员状态小头像(基础)"),
+    ("ui/battle_member_status_1.png", "战斗UI", "战斗队员状态小头像(进化)"),
+    ("ui/cutin_skill_chain_0.png", "连锁cut-in", "技能连锁 cut-in 头像(基础)"),
+    ("ui/cutin_skill_chain_1.png", "连锁cut-in", "技能连锁 cut-in 头像(进化)"),
+    ("ui/episode_banner_0.png", "剧情横幅", "角色剧情列表横幅(基础)"),
+    ("ui/episode_banner_1.png", "剧情横幅", "角色剧情列表横幅(进化)"),
 ]
 
 # 配套二进制数据(切割坐标/动画帧/时间轴):不可预览,只支持整文件替换(慎改)
@@ -164,6 +187,9 @@ _COMPANION_TEMPLATES = [
     ("pixelart/pixelart.timeline.amf3.deflate", "像素动画时间轴"),
     ("pixelart/special.frame.amf3.deflate", "特殊动作帧定义"),
     ("pixelart/special.timeline.amf3.deflate", "特殊动作时间轴"),
+    ("ui/skill_cutin_0.atf.deflate", "技能cut-in 的 ATF 压缩纹理(与 PNG 成对,部分渲染路径用)"),
+    ("ui/skill_cutin_1.atf.deflate", "同上(进化)"),
+    ("battle/character_detail_skill_preview.battle.amf3.deflate", "角色详情页技能预览战斗数据"),
 ]
 
 _VOICE_PROBE = [f"voice/battle/skill_{i}.mp3" for i in range(4)]
@@ -188,6 +214,32 @@ def dump_voices(code_name: str) -> list[tuple[str, str, str]]:
                 if f.endswith(".mp3"):
                     out.append((cat, f, str(lines.get(f"{cat}/{f[:-4]}", "")).strip()))
     return out
+
+_pathlist_cache: dict[str, list[str]] | None = None
+
+
+def _pathlist_char_index() -> dict[str, list[str]]:
+    """WF_PATHLIST_recovered.txt(约 10 万条,复原率约 75%)里 character/<code>/* 的路径,
+    按 code_name 归组。用于枚举名字因角色而异的资产(ui/story 表情差分、voice/words 剧情语音)。
+    清单是部分复原:缺的路径不代表 store 里没有,固定名资产仍以模板探测为准。"""
+    global _pathlist_cache
+    if _pathlist_cache is not None:
+        return _pathlist_cache
+    idx: dict[str, list[str]] = {}
+    try:
+        with (HERE / "WF_PATHLIST_recovered.txt").open(encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line.startswith("character/"):
+                    continue
+                parts = line.split("/", 2)
+                if len(parts) == 3:
+                    idx.setdefault(parts[1], []).append(line)
+    except Exception:
+        pass
+    _pathlist_cache = idx
+    return idx
+
 
 _harvest_voice_cache: dict[str, list[str]] | None = None
 
@@ -244,6 +296,14 @@ def char_asset_manifest(target_store: Path, code_name: str) -> list[dict]:
             add(lg, "语音·battle", voice_req)
     for lg in _harvest_voice_index().get(code_name, []):
         add(lg, "语音", voice_req)
+    # 变名资产(剧情表情/剧情语音):路径清单枚举 + store 探测(只列真实存在的)
+    for lg in _pathlist_char_index().get(code_name, []):
+        if "/ui/story/" in lg and lg.endswith(".png"):
+            if locate(target_store, lg):
+                add(lg, "剧情表情", "剧情对话表情差分。PNG,与原图同尺寸")
+        elif "/voice/words/" in lg and lg.endswith(".mp3"):
+            if locate(target_store, lg):
+                add(lg, "语音·words", voice_req + "(剧情台词语音)")
     for sub, desc in _COMPANION_TEMPLATES:
         add(f"character/{code_name}/{sub}", "配套数据",
             desc + "(AMF3 二进制,不可预览;仅支持整文件替换,改错会崩,慎动)")
