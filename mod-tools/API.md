@@ -43,7 +43,7 @@
 | `/status_values` | `?character=ID` | `{character, entries:[{level,hp,atk}], awake:{atk_plus,hp_plus}\|null, note}` |
 | `/souls` | — | `[{id, string_id, rarity, lines, name, eq_rarity, kind}]`(436 魂珠=装备同键;name/品质来自 equipment 表,kind 0=武器魂 1=魂珠) |
 | `/soul_rows` | `?soul=ID` | `{soul, columns[], lines[], desc, line_descs[], info:{name,rarity,desc,...}}` |
-| `/skill_energy` | `?character=ID` | `{character, skill_key, skills:[{level, label, name, description, min_skill_weight, max_skill_weight}], note}`(action_skill;description=游戏内技能效果描述,内层 c1) |
+| `/skill_energy` | `?character=ID` | `{character, skill_key, skills:[{level, label, name, description, min_skill_weight, max_skill_weight, dsl_unavailable}], note}`(action_skill;description=游戏内技能效果描述,内层 c1;dsl_unavailable 非空=效果文件不可编辑的原因,前端置灰按钮) |
 | `/weapons` | — | `[{id, slot, learn_level, lines, has_enh, kind, name, enh_name, rarity, soul_id, element}]`(全部 436 件装备:kind 0=武器 424 / 1=主线魂珠 12;element 按词条内容检测,''=通用) |
 | `/weapon_ability` | `?wid=ID` | `{weapon, columns[], lines[], desc, line_descs[], info, soul}`;**soul=同键 ability_soul 的完整行数据**(武器页一并编辑);无强化词条时 `{no_enh:true, soul}` |
 | `/search_abilities` | `?q=关键字` | 搜四表行级中文描述/归属/键/string_id → `{query, count, results:[{key, kind, owner, slot, desc, sid, lines, shared_count, shared:[{key,owner,slot}]}]}`;shared_count>1=共用词条,=1=专属;键前缀 L:/W:/S:;上限150 |
@@ -52,6 +52,12 @@
 | `/char_snapshots` | `?character=ID` | 单角色快照列表 `[{file, id, code_name, ts, note, size, assets}]` |
 | `/asset` | `?logical=路径` | **二进制**响应(自动解混淆:PNG 魔数/MP3 帧头),Content-Type 按扩展名 |
 | `/skill_dsl` | `?character=&level=` | 技能效果 DSL 数值树 `{program_path, numbers:[{offset, len, type, value, ctx}], note}` |
+| `/skill_dsl_json` | `?character=&level=` | 整棵 DSL 命令树 JSON `{program_path, json_text, bytes, sharers[], note}`(往返自检失败的文件拒绝 JSON 编辑;sharers=共享此文件的技能键) |
+| `/skill_switch` | `?character=ID` | 技能形态切换(character 表 col9-16)`{kind, threshold, condition, multiballs, skill, no_voice, no_ready_voice, targets[]}`(targets=switched_action_skill 现有 6 键) |
+| `/boss/list` | — | `{bosses:[{key, name, kind, hp_value, hp_coef, atk_hits, atk_corr, tp_value, levels[], hp_curve, atk_curve}]}`(boss_level 531 条) |
+| `/quest/cats` | — | `{cats:[{alias, cn, exists}]}`(22 类副本表) |
+| `/quest/list` | `?cat=别名&q=关键字` | `{total, shown, rows:[{path, id, name, bosses:[{key,name}]}]}`(quest→field_data→zone 自动解析 boss) |
+| `/toolbox/status` | — | 工具箱任务状态 `{state:idle/running/cancelling/done/failed/cancelled, tool, title, log[](尾120行), rc, progress:{done,total}, started, ended, cmd, tools:{名:{title,desc,available}}}` |
 | `/backups` | — | `[{table, name, size, mtime}]` |
 | `/mainpos` | — | `{restricted_rows, state}`(主位限制现状) |
 
@@ -91,6 +97,12 @@
 | `/rollback` | `{name, restart?}` | 一键回溯 = restore + 自动发布 + 重启游戏 → restore 响应 + `{ok, publish_log, restart_log?}` |
 | `/publish` | `{tables?, list_only?, restart?}` | 一键发布:调 wf_publish 打增量包到 CDN → `{ok, log, list_only, restart_log?}`;`tables` 缺省=发布 pending 并清空;`list_only:true` 只预检不打包(代替 dry_run);成功后默认重启游戏 |
 | `/sync` | `{restart:true}` | adb push pending + 重启游戏 → `{ok, log}`(备用手段;② 层正道是 `/publish`) |
+| `/skill_dsl_json/save` | `{character, level, json_text}` | 整树 JSON 替换 DSL 文件(encode→parse 自校验,结构错拒绝;共享文件改一处全变,响应前查 sharers) |
+| `/skill_switch/save` | `{character, edits:{kind,threshold,condition,multiballs,skill,no_voice,no_ready_voice}}` | 形态切换条件写 character 表 col9-16;kind=(None)/0-4;切换目标限 targets 白名单 |
+| `/boss/save` | `{key, edits:{hp_value,hp_coef,atk_hits,atk_corr,tp_value}}` | boss_level 数值(HP=基础值×等级曲线,改基础值=等比调血);自动备份+进待发布 |
+| `/asset/import_pack` | `{character, dir, force?}` | **资产包一比一导入**:datamine 解包目录批量替换当前角色资产(命中 store 的全替换,提取器产物自动跳过) |
+| `/toolbox/run` | `{tool:"export_assets"\|"recover_pathlist"\|"restore_package", args:{out?,limit?,workers?,...}}` | 启动工具箱长任务(子进程;同时只允许一个,参数白名单透传;**无 dry_run,输出均在 store 之外**) → `{ok, tool, title, cmd}` |
+| `/toolbox/cancel` | `{}` | 终止当前工具箱任务 → `{ok, log}` |
 
 ## 环境变量
 

@@ -51,15 +51,34 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
 **改数据的三种方式**,按场景选:
 
 - **网页修改器(交互式,推荐给用户自己用)**:`python mod-tools/wf_gui.py` → 浏览器
-  `http://127.0.0.1:8765`。角色模式 11 tab:词条编辑(单条主位开关/删行,**基础行与觉醒行
-  分区**) / 角色资料(底部有**单角色一键快照/还原**=②层7表+①层+资产+DSL 打包 zip) /
-  **角色资产**(立绘/觉醒立绘/cut-in/图标合集/像素图/**语音全量三分类 ally·battle·home
-  带台词文本**(清单来自 D:\WF\角色语音 datamine)/配套数据,预览+上传替换+尺寸校验) /
+  `http://127.0.0.1:8765`(8765 常被输入法占用,自动落 8766 等备用口,看启动输出)。
+  顶部导航按**角色/武器/全局/系统**四组分区(左栏带角色头像+元素角标,`/` 键聚焦搜索)。
+  角色模式:词条编辑(单条主位开关/删行,**基础行与觉醒行
+  分区**) / 角色资料(**三层同步**:rarity/element 等 master 字段与文本同时写 ①层 cdndata
+  + ②层 character/character_text 表 + `assets/character.json`;底部有**单角色一键快照/还原**
+  =②层7表+①层+资产+DSL 打包 zip) /
+  **角色资产**(立绘/觉醒立绘/cut-in/图标合集/像素图/头像4组/缩略图3组/战斗UI/连锁cut-in/
+  剧情横幅/**story 表情差分**/**语音全量 ally·battle·home·words**(story/words 来自
+  `WF_PATHLIST_recovered.txt` 枚举+store 探测)/配套数据,预览+上传替换+尺寸校验;
+  顶部「**资产包导入**」= datamine 解包目录一比一批量替换,`POST /asset/import_pack`) /
   基础数值 / **技能·倍率**(名称+游戏内效果描述+能量直改,级别移植/删除,整技能替换,
-  「效果参数」=ActionDsl 数值原地补丁) / 词条移植 / 词条速查 / **新建角色**(克隆模板→
+  「效果参数」=ActionDsl 数值原地补丁,「**JSON**」=整树 JSON 编辑可**增删效果命令**
+  (`wf_dsl.encode_amf3` 全库 1035 文件字节级往返验证;int/double 靠 3 与 3.0 区分),
+  「**形态切换**」区 = character 表 col9-16(HpHigh/ConditionExist/MultiballNumber/
+  ChangeSkillFlag/IsUnison,切换目标限 switched_action_skill 表现有 6 键);
+  注意个别角色技能行是**官方短行**(仅名称/描述,无 program_path,如 161177)或效果文件
+  官方未下发(如 alk 基础技),效果参数/JSON 按钮自动置灰,只能整技能替换) /
+  **Boss·副本**(双模式可见:boss_level 数值编辑 531 条,HP=基础值×等级曲线,改基础值=等比调血;
+  22 类全副本列表,quest→field_data→zone 自动解析 boss,点 boss 名定位编辑;后端 `wf_boss.py`,
+  quest 系三层压缩索引读写用 `wf_quest_lib.py`) /
+  词条移植 / 词条速查 / **新建角色**(克隆模板→
   全新 ID,可勾「资产独立」=新 code_name+全套资产复制+独立 action_skill,金丝雀流程见页内) /
+  **工具箱**(长任务后台子进程+进度轮询,同时只跑一个,输出均在 store 外:
+  **全量解密导出**=`wf_export_assets.py` 全包解密建逻辑目录树、**路径表复原**=
+  `wf_recover_pathlist.py` 重建 WF_PATHLIST_recovered、**数据包还原**=
+  `弹国服/wf_restore_package.py` 自举复原;端点 `/toolbox/run|status|cancel`) /
   配方 / 改动日志(一键回溯) / 备份。武器模式:**武器·魂珠**(436 件装备含 12 主线魂珠,
-  强化词条+同键魂珠效果一页编辑,均可增删改) / 速查 / 配方 / 日志 / 备份。
+  强化词条+同键魂珠效果一页编辑,均可增删改) / Boss·副本 / 速查 / 配方 / 工具箱 / 日志 / 备份。
   魂珠独立页签已删除;S: 键跳转自动进武器模式。
   左栏**角色/武器模式切换**:角色模式隐藏武器词条页,武器模式只留武器/魂珠/速查/配方/日志/备份;
   武器列表 = **全部 424 把**(按属性检测分组:六属性+通用,可筛选),无强化词条的引导去同键魂珠。
@@ -152,6 +171,10 @@ python mod-tools/wf_publish.py --tables ability,character_status   # 或用 pend
 - `references/api.md` — GUI 的 HTTP API 契约(GET/POST 端点,并入服务端后台时对接用)。
 - `mod-tools/wf_mod_tool.py` — 核心引擎(orderedmap 读写 / 嵌套 / AMF3 schema / recipe / profile)。
 - `mod-tools/wf_gui.py` + `wf_gui.html` — 网页修改器(前后端)。
+- `mod-tools/wf_boss.py` — Boss 数值(boss_level)+ 22 类副本列表 + quest→zone→boss 解析。
+- `mod-tools/wf_quest_lib.py` — quest/zone/boss 系**三层压缩索引嵌套表**任意深度读写(自检 `--selftest`)。
+- `mod-tools/技能形态切换与资产包导入结论.md` — 形态切换机制(character 表 col9-16)、
+  资产包一比一导入、资料三层同步、boss 血量位置(本轮五项功能的逆向依据与落地状态)。
 - `mod-tools/wf_describe.py` — 行级中文描述器(布局吃 ability_enum_map.json,枚举中文吃全表 md §6)。
 - `mod-tools/wf_assets.py` — 角色资产编解码(PNG 魔数/MP3 帧头混淆)+三根定位+清单。
 - `mod-tools/wf_dsl.py` — 技能 ActionDsl 数值编辑(AMF3 偏移解析+U29 等长原地补丁)。
