@@ -48,7 +48,7 @@ export/
 # --- mod-tools 本地产物 / 逆向数据(工具代码与文档照常提交)---
 mod-tools/work/
 mod-tools/edit/
-mod-tools/__pycache__/
+mod-tools/**/__pycache__/
 mod-tools/*.csv
 mod-tools/profiles.json
 
