@@ -51,8 +51,27 @@ function buildFeatureContentPatch(gacha) {
     return { hash, size: buf.length };
 }
 
+// Convert CDN gacha.json row array to CSV (GachaTable orderedmap row format)
+// Character odds tables use CSV: 161001,5,500,true,false,false,false
+// GachaTable uses similar flat CSV format with 47 columns
+function toCsv(row) {
+    return row.map(v => {
+        if (v === null || v === undefined) return "";
+        const s = String(v);
+        // Bare values: numbers, booleans, (None), empty
+        if (s === "" || s === "true" || s === "false" || s === "(None)" || /^-?\d+$/.test(s)) {
+            return s;
+        }
+        // Strings with commas or special chars need quoting
+        if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+            return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+    }).join(",");
+}
+
 function buildGachaTablePatch(gacha) {
-    console.log("\n=== [2/2] GachaTable pageKind patch ===\n");
+    console.log("\n=== [2/2] GachaTable pageKind patch (CSV format) ===\n");
 
     // pageKind values that cause GachaLogic.getCost() → None → C2032
     const PROBLEMATIC_PK = new Set(["1", "3", "4", "5"]);
@@ -67,12 +86,11 @@ function buildGachaTablePatch(gacha) {
             // Clone and fix pageKind to "0" (Normal)
             const fixedRow = [...row];
             fixedRow[4] = "0";
-            entries.push({ key: gid, row: JSON.stringify(fixedRow) });
+            entries.push({ key: gid, row: toCsv(fixedRow) });
             fixed++;
             console.log(`  gid=${gid}: pk=${pk}→0 ${String(row[1] || '')}`);
         } else {
-            // Keep original
-            entries.push({ key: gid, row: JSON.stringify(row) });
+            entries.push({ key: gid, row: toCsv(row) });
         }
     }
 
