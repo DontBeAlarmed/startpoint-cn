@@ -135,7 +135,7 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/get_path", async (request: FastifyRequest, reply: FastifyReply) => {
         const baseUrl = getCdnBase(request);
         const resVer = request.headers['res_ver'] as string | undefined;
-        const fullArchives = [
+        const fullArchives = resVer ? [] : [
             ...buildArchiveList(baseUrl, cdnDir, "archive-common-full"),
             ...buildArchiveList(baseUrl, cdnDir, "archive-medium-full"),
             ...buildArchiveList(baseUrl, cdnDir, "archive-android-full"),
