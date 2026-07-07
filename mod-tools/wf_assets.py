@@ -148,8 +148,8 @@ def path_in_root(target_store: Path, root_name: str, logical: str) -> Path:
 _CHAR_TEMPLATES = [
     ("ui/full_shot_1440_1920_0.png", "立绘", "基础立绘。PNG,设计画布 1440x1920(实际可裁边,建议与原图同尺寸,居中构图)"),
     ("ui/full_shot_1440_1920_1.png", "立绘", "进化/觉醒立绘。PNG,设计画布 1440x1920(同上)"),
-    ("ui/skill_cutin_0.png", "技能cut-in", "技能演出横图。PNG 1024x512"),
-    ("ui/skill_cutin_1.png", "技能cut-in", "进化后技能演出横图。PNG 1024x512"),
+    ("ui/skill_cutin_0.png", "技能cut-in", "技能演出横图。PNG 1024x512(战斗真机只读配对 ATF,替换时自动重编码)"),
+    ("ui/skill_cutin_1.png", "技能cut-in", "进化后技能演出横图。PNG 1024x512(同上,ATF 自动重编码)"),
     ("ui/illustration_setting_sprite_sheet.png", "图标合集", "头像/队伍小图 sprite sheet(配 .atlas 切割,替换须保持同尺寸同布局)"),
     ("pixelart/sprite_sheet.png", "像素图", "战斗像素动画 sprite sheet(配 atlas/timeline,同尺寸同布局)"),
     ("pixelart/special_sprite_sheet.png", "像素图", "技能特殊动作 sprite sheet(同上)"),
@@ -187,7 +187,7 @@ _COMPANION_TEMPLATES = [
     ("pixelart/pixelart.timeline.amf3.deflate", "像素动画时间轴"),
     ("pixelart/special.frame.amf3.deflate", "特殊动作帧定义"),
     ("pixelart/special.timeline.amf3.deflate", "特殊动作时间轴"),
-    ("ui/skill_cutin_0.atf.deflate", "技能cut-in 的 ATF 压缩纹理(与 PNG 成对,部分渲染路径用)"),
+    ("ui/skill_cutin_0.atf.deflate", "技能cut-in 的 ATF(ETC1)纹理——战斗真机实际读取的文件;替换 PNG 时 wf_atf 自动重生成"),
     ("ui/skill_cutin_1.atf.deflate", "同上(进化)"),
     ("battle/character_detail_skill_preview.battle.amf3.deflate", "角色详情页技能预览战斗数据"),
 ]

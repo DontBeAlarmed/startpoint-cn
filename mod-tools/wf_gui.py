@@ -42,6 +42,7 @@ import wf_mod_tool as core  # noqa: E402
 import wf_describe  # noqa: E402  行级中文描述器(逆向布局+枚举直译)
 import wf_assets  # noqa: E402    角色资产(立绘/图标/语音)编解码与清单
 import wf_dsl  # noqa: E402       技能 ActionDsl 数值编辑
+import wf_atf  # noqa: E402       skill_cutin ATF(ETC1)纹理重编码(战斗真机只读 ATF 不读 PNG)
 import wf_boss  # noqa: E402      Boss 数值 + 副本列表(Boss·副本页)
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -2067,6 +2068,7 @@ def replace_asset(logical: str, data: bytes, force: bool, dry_run: bool) -> dict
     root_name, fp = loc
     old = fp.read_bytes()
     log = []
+    atf_job = None
     if logical.endswith(".png"):
         if data[:8] != wf_assets.PNG_REAL:
             raise ValueError("上传的不是标准 PNG 文件(魔数不对)")
@@ -2078,6 +2080,15 @@ def replace_asset(logical: str, data: bytes, force: bool, dry_run: bool) -> dict
                              f"(游戏按原 pivot/缩放摆放,尺寸差异会导致偏移)")
         enc = wf_assets.png_encode(data)
         log.append(f"{logical}: PNG {od[0]}x{od[1]}→{nd[0]}x{nd[1]}, {len(old)}B→{len(enc)}B [{root_name}]")
+        # skill_cutin:战斗真机只读配对的 .atf.deflate(android 根),必须连 ATF 一起重编码
+        if "/ui/skill_cutin_" in logical:
+            aloc = wf_assets.locate(TARGET_STORE, logical[:-4] + ".atf.deflate")
+            if aloc:
+                ref = wf_atf.inflate(aloc[1].read_bytes())
+                atf_enc = wf_atf.deflate(wf_atf.build_cutin_atf(data, ref))
+                atf_job = (aloc[1], atf_enc)
+                log.append(f"{logical[:-4]}.atf.deflate: ETC1 纹理重编码 {len(ref)}B→ATF, "
+                           f"{len(atf_enc)}B [{aloc[0]}](战斗内实际读取的是 ATF 而非 PNG)")
     elif logical.endswith(".mp3"):
         enc = wf_assets.mp3_encode(data)
         log.append(f"{logical}: MP3 {len(old)}B→{len(enc)}B [{root_name}]")
@@ -2091,6 +2102,13 @@ def replace_asset(logical: str, data: bytes, force: bool, dry_run: bool) -> dict
             shutil.copy2(fp, bak)
         fp.write_bytes(enc)
         add_pending(fp)
+        if atf_job:
+            afp, aenc = atf_job
+            abak = afp.with_name(afp.name + ".bak-wfmod-asset-" + time.strftime("%Y%m%d-%H%M%S"))
+            if not abak.exists():
+                shutil.copy2(afp, abak)
+            afp.write_bytes(aenc)
+            add_pending(afp)
         record_change(logical, "\n".join(log), bak)
         written = str(fp)
     return {"changes": 1, "log": "\n".join(log), "written": written,

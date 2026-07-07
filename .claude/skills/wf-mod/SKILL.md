@@ -60,6 +60,9 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   **角色资产**(立绘/觉醒立绘/cut-in/图标合集/像素图/头像4组/缩略图3组/战斗UI/连锁cut-in/
   剧情横幅/**story 表情差分**/**语音全量 ally·battle·home·words**(story/words 来自
   `WF_PATHLIST_recovered.txt` 枚举+store 探测)/配套数据,预览+上传替换+尺寸校验;
+  **cut-in 特例**:战斗真机只读配对 `skill_cutin_N.atf.deflate`(android 根,ETC1 纹理)
+  不读 PNG,替换 PNG 时 GUI 经 `wf_atf.py` 自动重编码 ATF(手动:`python mod-tools/wf_atf.py
+  --regen character/<code>/ui/skill_cutin_0.png`);立绘等其他图无 ATF 配对,换 PNG 即生效;
   顶部「**资产包导入**」= datamine 解包目录一比一批量替换,`POST /asset/import_pack`) /
   基础数值 / **技能·倍率**(名称+游戏内效果描述+能量直改,级别移植/删除,整技能替换,
   「效果参数」=ActionDsl 数值原地补丁,「**JSON**」=整树 JSON 编辑可**增删效果命令**

@@ -44,6 +44,7 @@ python mod-tools/wf_publish.py --tables ability,character_status
 | `wf_publish.py` | 把改动打成增量包发布到服务端 CDN(与官方增量更新同构) |
 | `wf_boss.py` / `wf_quest_lib.py` | Boss 数值 + 22 类副本列表;quest 系三层压缩索引嵌套表读写 |
 | `wf_assets.py` / `wf_dsl.py` / `wf_describe.py` | 角色资产编解码;技能 ActionDsl 编辑(AMF3);行级中文描述 |
+| `wf_atf.py` | skill_cutin 的 ATF(ETC1)纹理重编码——战斗真机只读 ATF 不读 PNG,替换 cut-in 时自动/手动重生成 |
 | `wf_export_assets.py` | 全量解密导出(下载包+bundle → 逻辑路径目录树;GUI 工具箱可跑) |
 | `wf_recover_pathlist.py` | 复原哈希→逻辑路径表 WF_PATHLIST_recovered(GUI 工具箱可跑) |
 | `wf_decrypt_all.py` | 单文件零依赖版全量解密(不依赖本工具链任何文件,便于独立分发) |
