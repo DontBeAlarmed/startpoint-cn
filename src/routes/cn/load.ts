@@ -24,8 +24,8 @@ interface CnLoadBody {
 }
 
 function wrapOptionFields(d: any, resVer?: string) {
-    // Align with CN CDN version from client res_ver header, fallback to .env CN_RES_VERSION
-    d.available_asset_version = resVer || process.env.CN_RES_VERSION || "1.4.54";
+    // Report latest server version to trigger client asset update when appropriate
+    d.available_asset_version = process.env.CN_RES_VERSION || resVer || "1.4.54";
 
     if (d.user_info) {
         if (typeof d.user_info.last_login_time === 'number') {
