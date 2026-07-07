@@ -24,10 +24,9 @@ interface CnLoadBody {
 }
 
 function wrapOptionFields(d: any, resVer?: string) {
-    // Report server target version to trigger client asset update when needed
-    // Falls back to CDN baseline (1.4.45) if CN_RES_VERSION not set
-    const { SERVER_VERSION } = require("../../lib/version");
-    d.available_asset_version = SERVER_VERSION;
+    // Report effective server version (CDN + patches) to trigger client update
+    const { getEffectiveVersion } = require("../../lib/version");
+    d.available_asset_version = getEffectiveVersion();
 
     if (d.user_info) {
         if (typeof d.user_info.last_login_time === 'number') {

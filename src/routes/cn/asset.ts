@@ -135,7 +135,7 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/get_path", async (request: FastifyRequest, reply: FastifyReply) => {
         const baseUrl = getCdnBase(request);
         const resVer = request.headers['res_ver'] as string | undefined;
-        const { computeAssetTarget, CDN_BASELINE } = require("../../lib/version");
+        const { computeAssetTarget } = require("../../lib/version");
         const { targetVersion, isFirstTime: first, fullVersion } = computeAssetTarget(resVer);
 
         const fullArchives = first
@@ -157,7 +157,7 @@ const routes = async (fastify: FastifyInstance) => {
                     target_asset_version: targetVersion,
                     eventual_target_asset_version: targetVersion,
                     is_initial: first,
-                    latest_maj_first_version: CDN_BASELINE
+                    latest_maj_first_version: "1.4.0"
                 },
                 full: {
                     version: fullVersion,

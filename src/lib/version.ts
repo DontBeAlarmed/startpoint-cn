@@ -1,19 +1,48 @@
 /**
  * Unified version control for CN asset update.
  * 
- * All version-related logic lives here — no hardcoded "1.4.0" "1.4.54"
- * scattered across load.ts / asset.ts.
+ * CDN_VERSION is auto-detected from diff archive filenames.
+ * CN_RES_VERSION in .env is OBSOLETE — version is derived from CDN + enabled patches.
+ * 
+ * Flow:
+ *   1st-time (no resVer): full.version="1.4.0", full.archives=all, target=CDN_VERSION
+ *   Update  (resVer<target):  full.version=resVer, full.archives=[], target=max(CDN, patches)
+ *   Up-to-date (resVer≥target): same als update but no diffs to download
  */
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "fs";
 import path from "path";
 
-// CN CDN final version — clients below this need full download
-export const CDN_BASELINE = "1.4.45";
+// CDN full archives are at version 1.4.0
+export const FULL_BASE = "1.4.0";
 
-// Server target version from .env, falls back to CDN baseline
-export const SERVER_VERSION = process.env.CN_RES_VERSION || CDN_BASELINE;
+// Detect highest version from CDN diff archives + enabled patches
+export function getEffectiveVersion(): string {
+    const cdnVer = detectCDNVersion();
+    const patchVer = getMaxPatchVersion(cdnVer);
+    if (patchVer && compareVersion(patchVer, cdnVer) > 0) return patchVer;
+    return cdnVer;
+}
 
-/** Parse version string like "1.4.45" into [1, 4, 45] */
+// Detect highest version from CDN diff archive filenames
+let _cdnVersion: string | null = null;
+
+export function detectCDNVersion(): string {
+    if (_cdnVersion) return _cdnVersion;
+    const cdnDir = path.join(__dirname, "..", "..", ".cdn", "cn");
+    let max = "1.4.0";
+    for (const subdir of ["archive-common-diff", "archive-medium-diff", "archive-android-diff"]) {
+        const dir = path.join(cdnDir, subdir);
+        try {
+            for (const f of readdirSync(dir).filter(f => f.endsWith(".zip"))) {
+                const m = f.match(/pinball-\d+\.\d+\.\d+-(\d+\.\d+\.\d+)-\d+-/);
+                if (m && compareVersion(m[1], max) > 0) max = m[1];
+            }
+        } catch (_) { /* ignore */ }
+    }
+    _cdnVersion = max;
+    return max;
+}
+
 export function parseVersion(v: string): number[] {
     return v.split(".").map(Number);
 }
@@ -26,56 +55,24 @@ export function compareVersion(a: string, b: string): number {
     return 0;
 }
 
-/** Is this the client's first-ever asset download? */
-export function isFirstTime(resVer?: string): boolean {
-    return !resVer || compareVersion(CDN_BASELINE, resVer) > 0;
-}
-
-/**
- * Compute the target asset version for a client.
- * First-time: go to baseline. Update: go to server version if newer.
- */
-export function getTargetVersion(resVer?: string): string {
-    if (!resVer) return CDN_BASELINE;
-    if (compareVersion(SERVER_VERSION, resVer) > 0) return SERVER_VERSION;
-    return resVer;
-}
-
-/**
- * Load patch metadata from manifest.json.
- * Returns the maximum enabled patch version whose depends_on <= resVer.
- */
 export interface PatchMeta {
-    id: string;
-    type: "patch" | "mod";
-    name: string;
-    version: string;
-    depends_on: string;
-    enabled: boolean;
+    id: string; type: "patch" | "mod"; name: string;
+    version: string; depends_on: string; enabled: boolean;
 }
 
-let _manifestCache: { patches: PatchMeta[] } | null = null;
+let _manifestCache: { cdn_version: string; patches: PatchMeta[] } | null = null;
 
-export function getPatchManifest(): { patches: PatchMeta[] } {
+export function getPatchManifest(): { cdn_version: string; patches: PatchMeta[] } {
     if (_manifestCache) return _manifestCache;
-    const manifestPath = path.join(__dirname, "..", "..", "assets", "asset-patch", "manifest.json");
-    if (!existsSync(manifestPath)) {
-        _manifestCache = { patches: [] };
-        return _manifestCache;
-    }
-    _manifestCache = JSON.parse(readFileSync(manifestPath, "utf8"));
+    const mp = path.join(__dirname, "..", "..", "assets", "asset-patch", "manifest.json");
+    if (!existsSync(mp)) { _manifestCache = { cdn_version: "1.4.54", patches: [] }; return _manifestCache!; }
+    _manifestCache = JSON.parse(readFileSync(mp, "utf8"));
     return _manifestCache!;
 }
 
-/** Reload manifest cache (for admin toggle) */
-export function reloadPatchManifest(): void {
-    _manifestCache = null;
-}
+export function reloadPatchManifest(): void { _manifestCache = null; }
 
-/**
- * Get the maximum enabled patch version for a given client version.
- * Only patches where depends_on <= resVer AND enabled=true are considered.
- */
+// Max enabled patch version whose depends_on <= resVer
 export function getMaxPatchVersion(resVer?: string): string | null {
     if (!resVer) return null;
     const manifest = getPatchManifest();
@@ -88,31 +85,33 @@ export function getMaxPatchVersion(resVer?: string): string | null {
     return maxV;
 }
 
+export function isFirstTime(resVer?: string): boolean {
+    return !resVer || compareVersion(FULL_BASE, resVer) > 0;
+}
+
 /**
- * Compute the effective target version for get_path response.
- * Takes the maximum of: server version, highest enabled patch, CDN baseline.
+ * Compute asset update response for a client.
+ * 1st-time: full download to CDN_VERSION + applicable patches.
+ * Update:   only diff from resVer to effective version.
  */
 export function computeAssetTarget(resVer?: string): {
     targetVersion: string;
     isFirstTime: boolean;
     fullVersion: string;
 } {
-    const first = isFirstTime(resVer);
-    if (first) {
+    if (isFirstTime(resVer)) {
         return {
-            targetVersion: SERVER_VERSION,
+            targetVersion: getEffectiveVersion(),
             isFirstTime: true,
-            fullVersion: CDN_BASELINE,
+            fullVersion: FULL_BASE,
         };
     }
-    // Non-first-time: target is server version if newer
-    const patchMax = getMaxPatchVersion(resVer);
-    const target = getTargetVersion(resVer);
-    // If a patch is higher than the computed target, use patch version
-    const effective = (patchMax && compareVersion(patchMax, target) > 0) ? patchMax : target;
+    // Non-first-time: client already has full CDN data
+    const effective = getEffectiveVersion();
+    const target = compareVersion(effective, resVer!) > 0 ? effective : resVer!;
     return {
-        targetVersion: effective,
+        targetVersion: target,
         isFirstTime: false,
-        fullVersion: CDN_BASELINE,
+        fullVersion: resVer!,  // tell client its current version = its full version
     };
 }
