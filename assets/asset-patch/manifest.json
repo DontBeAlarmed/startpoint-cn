@@ -1,0 +1,18 @@
+{
+  "cdn_version": "1.4.45",
+  "patches": [
+    {
+      "id": "gacha-feature-fix",
+      "type": "patch",
+      "name": "特辑图片 C2032 修复",
+      "description": "修复 41 个卡池缺失特辑图片导致客户端 C2032 崩溃",
+      "version": "1.4.46",
+      "depends_on": "1.4.45",
+      "enabled": true,
+      "archive": "pinball-1.4.45-1.4.46-1-094ffa5d.zip",
+      "archive_size": 75884,
+      "files": ["14/dd5a36c80d07d94ff3d00bf6666472e23eb5f5"],
+      "created_at": "2026-07-07"
+    }
+  ]
+}

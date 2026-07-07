@@ -527,9 +527,9 @@ fastify.get("/patch/cn/dummy/download/production/upload/:prefix/:hash", async (r
 });
 
 // Serve patch archive files for asset update
-fastify.get("/patch/cn/asset-patch/archive/:file", async (request, reply) => {
+fastify.get("/patch/cn/asset-patch/active/:file", async (request, reply) => {
     const { file } = request.params as { file: string };
-    const patchFile = path.join(__dirname, "..", "assets", "asset-patch", "archive", file);
+    const patchFile = path.join(__dirname, "..", "assets", "asset-patch", "active", file);
     if (existsSync(patchFile)) {
         return reply.type("application/zip").send(readFileSync(patchFile));
     }

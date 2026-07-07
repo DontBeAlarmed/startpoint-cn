@@ -83,8 +83,8 @@ function buildDiffList(baseUrl: string, cdnDir: string): { original_version: str
         }
     }
     
-    // Asset patch archives (e.g., gacha_feature_content fix)
-    const patchDir = path.join(__dirname, "..", "..", "..", "assets", "asset-patch", "archive");
+    // Asset patch archives (active patches only)
+    const patchDir = path.join(__dirname, "..", "..", "..", "assets", "asset-patch", "active");
     try {
         for (const f of readdirSync(patchDir).filter(f => f.endsWith(".zip"))) {
             const match = f.match(/pinball-(\d+\.\d+\.\d+)-(\d+\.\d+\.\d+)-\d+-/);
@@ -93,11 +93,11 @@ function buildDiffList(baseUrl: string, cdnDir: string): { original_version: str
                 const to = match[2];
                 const stats = statSync(path.join(patchDir, f));
                 if (!groups.has(to)) groups.set(to, { original_version: from, archive: [] });
-                groups.get(to)!.archive.push({ location: `${baseUrl}/asset-patch/archive/${f}`, size: stats.size, sha256: "" });
+                groups.get(to)!.archive.push({ location: `${baseUrl}/asset-patch/active/${f}`, size: stats.size, sha256: "" });
             }
         }
     } catch (e) {
-        console.error(`[PATCH] buildDiffList failed for patch archives:`, (e as Error).message);
+        console.error(`[PATCH] buildDiffList failed for active patches:`, (e as Error).message);
     }
     
     return [...groups.entries()]
@@ -144,9 +144,12 @@ const routes = async (fastify: FastifyInstance) => {
         const highestDiff = diffArchives.length > 0
             ? diffArchives[diffArchives.length - 1].version
             : "1.4.0";
-        const targetVer = (resVer && highestDiff && compareVersion(highestDiff, resVer) > 0)
-            ? highestDiff
-            : (resVer || highestDiff || "1.4.0");
+        const envVersion = process.env.CN_RES_VERSION || "";
+        const patchTarget = (envVersion && resVer && compareVersion(envVersion, resVer) > 0) ? envVersion : undefined;
+        const targetVer = patchTarget
+            || ((resVer && highestDiff && compareVersion(highestDiff, resVer) > 0)
+                ? highestDiff
+                : (resVer || highestDiff || "1.4.0"));
 
         reply.type("application/json");
         reply.status(200).send({
