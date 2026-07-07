@@ -5,14 +5,16 @@ import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { generateDataHeaders } from "../../utils";
-import { drawGachaSync, rewardPlayerGachaDrawResultSync } from "../../lib/gacha";
+import { drawGachaWithMetadataSync, rewardPlayerGachaDrawResultSync } from "../../lib/gacha";
 import { getGachaCampaignIdSync, getGachaSync } from "../../lib/assets";
 import { GachaType } from "../../lib/types";
 import { serializeGachaCampaign } from "../../data/utils";
-import { UserGachaCampaign } from "../../data/types";
+import { PlayerGachaCampaign, UserGachaCampaign } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { givePlayerEquipmentSync } from "../../lib/equipment";
+import { buildGachaExecPlan } from "../../lib/gacha-exec-plan";
+import { getExchangeableGachaItem } from "../../lib/gacha-rules";
 
 interface ExecBody {
     api_count: number,
@@ -58,7 +60,7 @@ enum GachaExecType {
     MULTI_TICKET,
     SINGLE_TICKET,
     UNKNOWN_4,
-    UNKNOWN_5,
+    SINGLE_WEAPON_TICKET,
     MULTI_WEAPON_TICKET
 }
 
@@ -94,6 +96,16 @@ const routes = async (fastify: FastifyInstance) => {
         if (gachaInfo === null) return reply.status(400).send({
             "error": "Bad Request",
             "message": "No data for gacha with provided id."
+        })
+
+        const gachaData = getGachaSync(gachaId)
+        if (gachaData === null || gachaData.type !== GachaType.WEAPON) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "No equipment exchange data for gacha with provided id."
+        })
+        if (getExchangeableGachaItem(gachaData, equipmentId) === null) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Equipment is not exchangeable from this gacha."
         })
 
         const newExchangePoints = (gachaInfo.gachaExchangePoint ?? 0) - exchangeRequiredPoints
@@ -165,6 +177,16 @@ const routes = async (fastify: FastifyInstance) => {
         if (gachaInfo === null) return reply.status(400).send({
             "error": "Bad Request",
             "message": "No data for gacha with provided id."
+        })
+
+        const gachaData = getGachaSync(gachaId)
+        if (gachaData === null || gachaData.type !== GachaType.CHARACTER) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "No character exchange data for gacha with provided id."
+        })
+        if (getExchangeableGachaItem(gachaData, characterId) === null) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Character is not exchangeable from this gacha."
         })
 
         const newExchangePoints = (gachaInfo.gachaExchangePoint ?? 0) - exchangeRequiredPoints
@@ -263,117 +285,79 @@ const routes = async (fastify: FastifyInstance) => {
             gachaExchangePoint: 0
         }
 
-        // determine & validate cost
-        let pullCount = 0
-        let playerPaidVmoney = player.vmoney
-        let playerFreeVmoney = player.freeVmoney
         let gachaCampaigns: UserGachaCampaign[] = []
-
         let items: Record<number, number> = {}
+        let plannedCampaign: PlayerGachaCampaign | null = null
 
-        switch (paymentType) {
-            case GachaPaymentType.FREE_VMONEY: {
-                const isMulti = type === GachaExecType.VMONEY_MULTI
-                const cost = (isMulti ? gachaData.multiCost : gachaData.singleCost)
-                const overflow = cost > playerFreeVmoney ? cost - playerFreeVmoney : 0
-                playerFreeVmoney = overflow > 0 ? 0 : playerFreeVmoney - cost
-                playerPaidVmoney = overflow > 0 ? playerPaidVmoney - overflow : playerPaidVmoney
-                
-                pullCount = isMulti ? 10 : 1
-                break;
-            }
+        const planResult = buildGachaExecPlan({
+            gacha: gachaData,
+            paymentType,
+            execType: type,
+            numberOfExec,
+            playerFunds: {
+                freeVmoney: player.freeVmoney,
+                paidVmoney: player.vmoney,
+            },
+            playerGachaData,
+            getTicketCount: (itemId) => getPlayerItemSync(playerId, itemId),
+            getCampaignState: () => {
+                const campaignId = getGachaCampaignIdSync(gachaId)
+                if (campaignId === null) return null
 
-            // paid daily summon
-            case GachaPaymentType.VMONEY: {
-                if (!playerGachaData.isDailyFirst) return reply.status(400).send({
-                    "error": "Bad Request",
-                    "message": "Already did daily paid summon."
-                })
-
-                playerPaidVmoney -= isCharacterGacha ? 50 : 25
-
-                pullCount = 1
-                break;
-            }
-
-            // tickets
-            case GachaPaymentType.TICKET: {
-                const isWeapon = type === GachaExecType.MULTI_WEAPON_TICKET
-                const isMulti = type === GachaExecType.MULTI_TICKET || isWeapon
-
-                const itemId = isMulti ? (isWeapon ? 999004 : 999001) : (isWeapon ? 999005 : 999003)
-
-                const itemCount = getPlayerItemSync(playerId, itemId)
-                const useTicketCount = Math.max(1, numberOfExec) 
-                const newItemCount = (itemCount ?? -1) - useTicketCount
-                if (0 > newItemCount) return reply.status(400).send({
-                    "error": "Bad Request",
-                    "message": "Not enough tickets."
-                })
-
-                pullCount = useTicketCount * (isMulti ? 10 : 1)
-
-                items[itemId] = newItemCount
-                updatePlayerItemSync(playerId, itemId, newItemCount);
-                break;
-            }
-
-            // free pulls
-            case GachaPaymentType.CAMPAIGN: {
-                const gachaCampaignId = getGachaCampaignIdSync(gachaId)
-                if (gachaCampaignId === null) return reply.status(400).send({
-                    "error": "Bad Request",
-                    "message": "No gacha campaign assigned to gacha."
-                })
-
-                // get player campaign data
-                let playerCampaignData = getPlayerGachaCampaignSync(playerId, gachaId, gachaCampaignId)
-                const insertCampaignData = playerCampaignData === null;
-                playerCampaignData = playerCampaignData  ?? {
-                    gachaId: gachaId,
-                    campaignId: gachaCampaignId,
-                    count: 1
+                const existingCampaign = getPlayerGachaCampaignSync(playerId, gachaId, campaignId)
+                const campaignForPlan: PlayerGachaCampaign = existingCampaign ?? {
+                    gachaId,
+                    campaignId,
+                    count: 1,
                 }
+                plannedCampaign = campaignForPlan
 
-                if (0 >= playerCampaignData.count) return reply.status(400).send({
-                    "error": "Bad Request",
-                    "message": "Already redeemed campaign for this period."
-                })
-
-                // update campaign
-                playerCampaignData.count = 0
-                if (insertCampaignData) {
-                    insertPlayerGachaCampaignSync(playerId, playerCampaignData)
-                } else {
-                    updatePlayerGachaCampaignSync(playerId, gachaId, gachaCampaignId, 0)
+                return {
+                    campaignId,
+                    count: campaignForPlan.count,
+                    insert: existingCampaign === null,
                 }
+            },
+        })
 
-                gachaCampaigns.push(serializeGachaCampaign(playerCampaignData))
-
-                const isMulti = type === GachaExecType.CAMPAIGN_MULTI
-                pullCount = isMulti ? 10 : 1
-                break;
-            }
-        }
-
-        if (pullCount === 0) {
-            console.log(`[GACHA] Invalid payment: gachaId=${gachaId} paymentType=${paymentType} type=${type}`);
-            return reply.status(400).send({
+        if (!planResult.ok) {
+            console.log(`[GACHA] Exec plan rejected: gachaId=${gachaId} paymentType=${paymentType} type=${type} message=${planResult.message}`);
+            return reply.status(planResult.status).send({
                 "error": "Bad Request",
-                "message": "Invalid payment type."
+                "message": planResult.message
             })
         }
 
-        if ((0 > playerFreeVmoney) || (0 > playerPaidVmoney)) {
-            console.log(`[GACHA] Not enough beads: gachaId=${gachaId} free=${playerFreeVmoney} paid=${playerPaidVmoney} cost=${gachaData.singleCost}`);
-            return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Not enough beads."
-            })
+        const execPlan = planResult.plan
+        const pullCount = execPlan.pullCount
+        const playerPaidVmoney = execPlan.paidVmoney
+        const playerFreeVmoney = execPlan.freeVmoney
+
+        if (execPlan.ticket) {
+            items[execPlan.ticket.itemId] = execPlan.ticket.afterCount
+            updatePlayerItemSync(playerId, execPlan.ticket.itemId, execPlan.ticket.afterCount)
         }
 
-        const drawResult = drawGachaSync(gachaData, pullCount)
-        const rewardResult = rewardPlayerGachaDrawResultSync(playerId, gachaData, drawResult)
+        if (execPlan.campaign) {
+            const campaignData = plannedCampaign ?? {
+                gachaId,
+                campaignId: execPlan.campaign.campaignId,
+                count: execPlan.campaign.count,
+            }
+            campaignData.count = execPlan.campaign.count
+
+            if (execPlan.campaign.insert) {
+                insertPlayerGachaCampaignSync(playerId, campaignData)
+            } else {
+                updatePlayerGachaCampaignSync(playerId, gachaId, execPlan.campaign.campaignId, execPlan.campaign.count)
+            }
+
+            gachaCampaigns.push(serializeGachaCampaign(campaignData))
+        }
+
+        const drawMetadata = drawGachaWithMetadataSync(gachaData, pullCount)
+        const drawResult = drawMetadata.map((draw) => draw.id)
+        const rewardResult = rewardPlayerGachaDrawResultSync(playerId, gachaData, drawResult, drawMetadata)
 
         // Log each drawn item in history
         const historyType = isCharacterGacha ? MailType.CHARACTER : MailType.EQUIPMENT
@@ -442,7 +426,7 @@ const routes = async (fastify: FastifyInstance) => {
                         "free_vmoney": playerFreeVmoney,
                         "vmoney": playerPaidVmoney
                     },
-                    "is_erupt": false,
+                    "is_erupt": rewardResult.isErupt ?? false,
                     "draw_equipment": rewardResult.draw,
                     "item_list": {
                         ...items,
