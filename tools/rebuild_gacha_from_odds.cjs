@@ -179,6 +179,23 @@ function accumulateElementRevival(oddsId, currentOdds, oddsTable, charTable) {
   const tierPrefix = tierMatch ? RARITY_TO_TIER[tierMatch[1]] : null;
   if (!tierPrefix) return currentOdds.entries;
 
+  // Only accumulate for the LAST series of each color + pattern
+  // Intermediate revivals use raw odds; only the final series accumulates
+  // Match the SAME pattern as current oddsId to avoid special pool keys (e.g. pickup_20)
+  const pattern = oddsId.match(/^([a-z]+)_(element_(?:character_)?pickup_)(\d+)/);
+  if (pattern) {
+    const color = pattern[1];
+    const prefix = pattern[2]; // "element_character_pickup_" or "element_pickup_"
+    const currentSeries = parseInt(pattern[3]);
+    let maxSeries = 0;
+    const seriesRegex = new RegExp(`^${color}_${prefix}(\\d+)`);
+    for (const id of Object.keys(oddsTable)) {
+      const sm = id.match(seriesRegex);
+      if (sm) maxSeries = Math.max(maxSeries, parseInt(sm[1]));
+    }
+    if (currentSeries < maxSeries) return currentOdds.entries;
+  }
+
   // Accumulate from ALL odds files, filter by element prefix + tier prefix
   const allEntries = [];
   const seenIds = new Set();
