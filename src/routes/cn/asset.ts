@@ -156,7 +156,7 @@ const routes = async (fastify: FastifyInstance) => {
                     client_asset_version: resVer ?? "",
                     target_asset_version: targetVer,
                     eventual_target_asset_version: targetVer,
-                    is_initial: true,
+                    is_initial: !resVer,
                     latest_maj_first_version: "1.4.0"
                 },
                 full: {
