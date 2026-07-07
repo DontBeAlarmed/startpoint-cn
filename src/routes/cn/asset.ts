@@ -160,7 +160,7 @@ const routes = async (fastify: FastifyInstance) => {
                     latest_maj_first_version: "1.4.0"
                 },
                 full: {
-                    version: "1.4.0",
+                    version: resVer || "1.4.0",
                     archive: fullArchives
                 },
                 diff: diffArchives,
