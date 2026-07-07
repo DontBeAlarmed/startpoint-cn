@@ -1,13 +1,14 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getMergedPlayerDataSync, reviveMergedPlayerDates } from "../../data/utils";
 import { validatePlayerField, VALID_CHARACTER_IDS, VALID_ITEM_IDS, MAX_INT } from "./validation";
+import { wantsJson } from "./http";
 import { dailyResetPlayerDataSync, getAllPlayersSync, getDefaultPlayerPartyGroupsSync, getPlayerDailyChallengePointListSync, getPlayerSync, insertPlayerDailyChallengePointListSync, replacePlayerDataSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
 import { deleteAllPlayerMailSync } from "../../data/domains/mail"
 import { getDb } from "../../data/db"
 import { getPlayerCharactersSync, insertDefaultPlayerCharacterSync, insertPlayerCharacterSync } from "../../data/domains/character"
 import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
-import { getPlayerItemsSync, setPlayerItemSync } from "../../data/domains/item"
-import { getPlayerQuestProgressSync } from "../../data/domains/quest"
+import { getPlayerItemsSync, setPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
+import { getPlayerQuestProgressSync, getPlayerDrawnQuestsSync } from "../../data/domains/quest"
 import { insertPlayerPartyGroupListSync } from "../../data/domains/party"
 import { PartyCategory } from "../../data/types";
 import { takeSnapshot } from "../../lib/mission/snapshot";
@@ -39,6 +40,92 @@ const routes = async (fastify: FastifyInstance) => {
         return reply.status(200).send(players)
     })
 
+    fastify.get("/:id/detail", async (request: FastifyRequest, reply: FastifyReply) => {
+        const playerId = Number((request.params as any).id)
+        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
+
+        const player = getPlayerSync(playerId)
+        if (!player) return reply.status(404).send({ error: "Player not found" })
+
+        const characters = getPlayerCharactersSync(playerId)
+        const charList = Object.entries(characters)
+            .map(([code, char]) => ({
+                code: Number(code),
+                joinTime: char.joinTime.toISOString(),
+                entryCount: char.entryCount,
+                evolutionLevel: char.evolutionLevel,
+                overLimitStep: char.overLimitStep,
+                exp: char.exp,
+                stack: char.stack,
+                manaBoardIndex: char.manaBoardIndex,
+            }))
+            .sort((a, b) => new Date(b.joinTime).getTime() - new Date(a.joinTime).getTime())
+
+        const items = getPlayerItemsSync(playerId)
+        const itemList = Object.entries(items).map(([id, count]) => ({ id: Number(id), count }))
+
+        const equipment = getPlayerEquipmentListSync(playerId)
+        const equipList = Object.entries(equipment).map(([id, eq]) => ({
+            id: Number(id),
+            level: eq.level,
+            enhancementLevel: eq.enhancementLevel,
+        }))
+
+        const questProgress = getPlayerQuestProgressSync(playerId)
+        const questList: { section: number; questId: number; finished: boolean; highScore: number | null; clearRank: number | null; bestElapsedTimeMs: number | null }[] = []
+        for (const [section, quests] of Object.entries(questProgress)) {
+            for (const qp of quests) {
+                questList.push({
+                    section: Number(section),
+                    questId: qp.questId,
+                    finished: qp.finished,
+                    highScore: qp.highScore ?? null,
+                    clearRank: qp.clearRank ?? null,
+                    bestElapsedTimeMs: qp.bestElapsedTimeMs ?? null,
+                })
+            }
+        }
+
+        const drawnQuests = getPlayerDrawnQuestsSync(playerId)
+
+        return reply.send({
+            player: {
+                id: player.id,
+                name: player.name,
+                comment: player.comment,
+                stamina: player.stamina,
+                boostPoint: player.boostPoint,
+                bossBoostPoint: player.bossBoostPoint,
+                vmoney: player.vmoney,
+                freeVmoney: player.freeVmoney,
+                freeMana: player.freeMana,
+                paidMana: player.paidMana,
+                rankPoint: player.rankPoint,
+                starCrumb: player.starCrumb,
+                bondToken: player.bondToken,
+                expPool: player.expPool,
+                degreeId: player.degreeId,
+                leaderCharacterId: player.leaderCharacterId,
+                birth: player.birth,
+                enableAuto3x: player.enableAuto3x,
+                tutorialStep: player.tutorialStep,
+                lastLoginTime: player.lastLoginTime.toISOString(),
+                staminaHealTime: player.staminaHealTime.toISOString(),
+                expPooledTime: player.expPooledTime.toISOString(),
+                timeOffset: player.timeOffset ?? null,
+            },
+            characters: charList,
+            items: itemList,
+            equipment: equipList,
+            questProgress: questList,
+            drawnQuests: drawnQuests.map(dq => ({
+                categoryId: dq.categoryId,
+                questId: dq.questId,
+                oddsId: dq.oddsId,
+            })),
+        })
+    })
+
     fastify.get("/save", async (request: FastifyRequest, reply: FastifyReply) => {
         const { id } = request.query as SaveQuery
         const playerId = Number(id)
@@ -61,8 +148,12 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/save", async (request: FastifyRequest, reply: FastifyReply) => {
         const { id } = request.query as SaveQuery
         const playerId = Number(id)
-        const fail = (msg: string) => reply.redirect(`/player/${id}?error=${encodeURIComponent(msg)}`)
-        if (isNaN(playerId)) return reply.redirect("/player");
+        const json = wantsJson(request)
+        // JSON 客户端返回结构化错误/成功；旧 SSR 页面保留 redirect
+        const fail = (msg: string, code = 400) => json
+            ? reply.status(code).send({ error: msg })
+            : reply.redirect(`/player/${id}?error=${encodeURIComponent(msg)}`)
+        if (isNaN(playerId)) return json ? reply.status(400).send({ error: "无效的玩家 ID" }) : reply.redirect("/player");
 
         try {
             const file = await (request as any).file()
@@ -91,8 +182,9 @@ const routes = async (fastify: FastifyInstance) => {
             data.player.id = playerId
             replacePlayerDataSync(data)
         } catch (error: any) {
-            return fail(`恢复失败：${error?.message ?? error}`)
+            return fail(`恢复失败：${error?.message ?? error}`, 500)
         }
+        if (json) return reply.status(200).send({ ok: true, playerId })
         return reply.redirect(`/player/${id}`);
     })
 
@@ -138,7 +230,8 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/:id/clear_ex_boost", async (request: FastifyRequest, reply: FastifyReply) => {
         const playerId = Number((request.params as any).id)
         if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
-        const result = getDb().prepare(`UPDATE players_characters SET ex_boost_status_id = NULL, ex_boost_ability_id_list = NULL WHERE player_id = ?`).run(playerId)
+        getDb().prepare(`UPDATE players_characters SET ex_boost_status_id = NULL, ex_boost_ability_id_list = NULL WHERE player_id = ?`).run(playerId)
+        if (wantsJson(request)) return reply.status(200).send({ ok: true })
         return reply.redirect(`/player/${playerId}#actions`)
     })
 
@@ -149,6 +242,7 @@ const routes = async (fastify: FastifyInstance) => {
         getDb().prepare(`DELETE FROM players_parties WHERE player_id = ?`).run(playerId)
         getDb().prepare(`DELETE FROM players_party_groups WHERE player_id = ?`).run(playerId)
         insertPlayerPartyGroupListSync(playerId, getDefaultPlayerPartyGroupsSync(PartyCategory.NORMAL))
+        if (wantsJson(request)) return reply.status(200).send({ ok: true })
         return reply.redirect(`/player/${playerId}#actions`)
     })
 
@@ -165,6 +259,7 @@ const routes = async (fastify: FastifyInstance) => {
         const playerId = Number((request.params as any).id)
         if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
         getDb().prepare(`DELETE FROM players_receive_history WHERE player_id = ?`).run(playerId)
+        if (wantsJson(request)) return reply.status(200).send({ ok: true })
         return reply.redirect(`/player/${playerId}#actions`)
     })
 

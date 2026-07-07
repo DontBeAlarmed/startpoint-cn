@@ -3,6 +3,7 @@ import { ContentTypeParserDoneFunction } from "fastify/types/content-type-parser
 import { pack, unpack } from "msgpackr";
 import fastifyStatic from "@fastify/static";
 import path from "path";
+import { existsSync, readFileSync } from "fs";
 import { getServerTime, getServerTimeForPlayer } from "./utils";
 import { restoreTimeOffset } from "./data/activeAccount";
 
@@ -526,8 +527,29 @@ fastify.register(fastifyStatic, {
     decorateReply: false
 });
 
+// New admin SPA (React, built from admin/ into web/dist) — served at /admin.
+// Old pages at / stay untouched until the SPA fully replaces them (see docs/admin-refactor-plan.md).
+const adminDistDir = path.join(__dirname, "..", "web", "dist");
+const adminSpaAvailable = existsSync(path.join(adminDistDir, "index.html"));
+if (adminSpaAvailable) {
+    fastify.register(fastifyStatic, {
+        root: adminDistDir,
+        prefix: "/admin/",
+        decorateReply: false
+    });
+    fastify.get("/admin", (_request, reply) => reply.redirect("/admin/"));
+} else {
+    console.log("[admin] web/dist not found — admin SPA disabled (run: npm run build:admin)");
+}
+
 // Catch-all to log unknown endpoints
 fastify.setNotFoundHandler((request, reply) => {
+    // SPA fallback: client-side routes like /admin/accounts resolve to index.html
+    if (adminSpaAvailable && request.method === "GET" && request.url.startsWith("/admin/")) {
+        reply.header("content-type", "text/html; charset=utf-8");
+        reply.send(readFileSync(path.join(adminDistDir, "index.html")));
+        return;
+    }
     console.log(`[UNKNOWN] ${request.method} ${request.url}`);
     reply.status(404).send({ error: "Not Found" });
 });

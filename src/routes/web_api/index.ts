@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import playerApiPlugin from "./player"
 import serverApiPlugin from "./server"
 import mailApiPlugin from "./mail"
+import lookupApiPlugin from "./lookup"
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.register(require('@fastify/multipart'), {
@@ -19,6 +20,7 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.register(playerApiPlugin, { prefix: "/player" })
     fastify.register(serverApiPlugin, { prefix: "/server" })
     fastify.register(mailApiPlugin, { prefix: "/mail" })
+    fastify.register(lookupApiPlugin, { prefix: "/lookup" })
 }
 
 export default routes;

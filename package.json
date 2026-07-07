@@ -14,7 +14,9 @@
     "debug": "npm run css && npm run css:watch & npm run debug:ts-only",
     "debug:ts-only": "tsnd --inspect -- src/server.ts",
     "dev:cn": "npm run build && node --env-file=.env out/cn-server.js",
-    "debug:cn": "tsnd --env-file=.env -- src/cn-server.ts"
+    "debug:cn": "tsnd --env-file=.env -- src/cn-server.ts",
+    "build:admin": "cd admin && npm install && npm run build",
+    "dev:admin": "cd admin && npm run dev"
   },
   "author": "",
   "license": "GPL-3.0-or-later",
