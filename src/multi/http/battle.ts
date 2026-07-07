@@ -45,6 +45,45 @@ async function resolvePlayer(viewerId: number): Promise<PlayerContext | null> {
     return { playerId, player };
 }
 
+async function buildFinishFollowInfo(
+    viewerId: number,
+    mateResults: Array<{ viewer_id?: number }>,
+    fallbackMateIds: number[] = [],
+) {
+    const ids = new Set<number>();
+    for (const result of mateResults) {
+        const mateViewerId = Number(result?.viewer_id);
+        if (Number.isFinite(mateViewerId)) ids.add(mateViewerId);
+    }
+    for (const mateViewerId of fallbackMateIds) {
+        if (Number.isFinite(mateViewerId)) ids.add(Number(mateViewerId));
+    }
+
+    const followInfo = [];
+    for (const mateViewerId of ids) {
+        if (mateViewerId === viewerId || mateViewerId >= 900000000) continue;
+
+        const mateCtx = await resolvePlayer(mateViewerId);
+        if (!mateCtx) continue;
+
+        followInfo.push({
+            viewer_id: mateViewerId,
+            name: mateCtx.player.name,
+            last_login_time: getServerTime(new Date()),
+            rank: getRankDegree(mateCtx.player.rankPoint || 0),
+            comment: "",
+            role: mateCtx.player.role || 1,
+            degree_id: mateCtx.player.degreeId || 1,
+            follow_state: 0,
+            follow_time: null,
+            followed_time: null,
+            profile_image_url: null,
+        });
+    }
+
+    return followInfo;
+}
+
 export function registerBattleRoutes(fastify: FastifyInstance): void {
 
     // ---- start ----
@@ -274,6 +313,8 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         );
 
         const dataHeaders = generateDataHeaders({ viewer_id: viewerId });
+        const matePlayerResult = ((body as any).mate_player_result || []) as Array<{ viewer_id?: number }>;
+        const followInfo = await buildFinishFollowInfo(viewerId, matePlayerResult, activeQuestData.matePlayerIds || []);
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
@@ -329,7 +370,8 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 "quest_name": "",
                 "item_list": scoreRewardsResult.items,
                 "presigned_quest_category": [],
-                "mate_player_result": (body as any).mate_player_result || [],
+                "mate_player_result": matePlayerResult,
+                "follow_info": followInfo,
                 "contribution_score": (body as any).contribution_score ?? 0,
                 "host_finished": true,
                 "aborted_play_id": null,
