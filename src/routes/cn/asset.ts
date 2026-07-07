@@ -135,21 +135,18 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/get_path", async (request: FastifyRequest, reply: FastifyReply) => {
         const baseUrl = getCdnBase(request);
         const resVer = request.headers['res_ver'] as string | undefined;
-        const fullArchives = resVer ? [] : [
-            ...buildArchiveList(baseUrl, cdnDir, "archive-common-full"),
-            ...buildArchiveList(baseUrl, cdnDir, "archive-medium-full"),
-            ...buildArchiveList(baseUrl, cdnDir, "archive-android-full"),
-        ];
+        const { computeAssetTarget, CDN_BASELINE } = require("../../lib/version");
+        const { targetVersion, isFirstTime: first, fullVersion } = computeAssetTarget(resVer);
+
+        const fullArchives = first
+            ? [
+                ...buildArchiveList(baseUrl, cdnDir, "archive-common-full"),
+                ...buildArchiveList(baseUrl, cdnDir, "archive-medium-full"),
+                ...buildArchiveList(baseUrl, cdnDir, "archive-android-full"),
+            ]
+            : [];
+
         const diffArchives = buildDiffList(baseUrl, cdnDir);
-        const highestDiff = diffArchives.length > 0
-            ? diffArchives[diffArchives.length - 1].version
-            : "1.4.0";
-        const envVersion = process.env.CN_RES_VERSION || "";
-        const patchTarget = (envVersion && resVer && compareVersion(envVersion, resVer) > 0) ? envVersion : undefined;
-        const targetVer = patchTarget
-            || ((resVer && highestDiff && compareVersion(highestDiff, resVer) > 0)
-                ? highestDiff
-                : (resVer || highestDiff || "1.4.0"));
 
         reply.type("application/json");
         reply.status(200).send({
@@ -157,13 +154,13 @@ const routes = async (fastify: FastifyInstance) => {
             data: {
                 info: {
                     client_asset_version: resVer ?? "",
-                    target_asset_version: targetVer,
-                    eventual_target_asset_version: targetVer,
-                    is_initial: !resVer,
-                    latest_maj_first_version: "1.4.0"
+                    target_asset_version: targetVersion,
+                    eventual_target_asset_version: targetVersion,
+                    is_initial: first,
+                    latest_maj_first_version: CDN_BASELINE
                 },
                 full: {
-                    version: resVer || "1.4.0",
+                    version: fullVersion,
                     archive: fullArchives
                 },
                 diff: diffArchives,
