@@ -526,6 +526,16 @@ fastify.get("/patch/cn/dummy/download/production/upload/:prefix/:hash", async (r
     return reply.status(404).send("Not Found");
 });
 
+// Serve patch archive files for asset update
+fastify.get("/patch/cn/asset-patch/archive/:file", async (request, reply) => {
+    const { file } = request.params as { file: string };
+    const patchFile = path.join(__dirname, "..", "assets", "asset-patch", "archive", file);
+    if (existsSync(patchFile)) {
+        return reply.type("application/zip").send(readFileSync(patchFile));
+    }
+    return reply.status(404).send("Not Found");
+});
+
 fastify.register(fastifyStatic, {
     root: path.isAbsolute(cdnDir) ? cdnDir : path.join(__dirname, "..", cdnDir),
     prefix: "/patch",

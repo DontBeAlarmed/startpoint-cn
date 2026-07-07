@@ -63,6 +63,8 @@ function compareVersion(a: string, b: string): number {
 
 function buildDiffList(baseUrl: string, cdnDir: string): { original_version: string; version: string; archive: { location: string; size: number; sha256: string }[] }[] {
     const groups = new Map<string, { original_version: string; archive: { location: string; size: number; sha256: string }[] }>();
+    
+    // CDN diff archives
     for (const subdir of ["archive-common-diff", "archive-medium-diff", "archive-android-diff"]) {
         const dir = path.join(cdnDir, subdir);
         try {
@@ -80,6 +82,24 @@ function buildDiffList(baseUrl: string, cdnDir: string): { original_version: str
             console.error(`[CDN] buildDiffList failed for ${subdir}:`, (e as Error).message);
         }
     }
+    
+    // Asset patch archives (e.g., gacha_feature_content fix)
+    const patchDir = path.join(__dirname, "..", "..", "..", "assets", "asset-patch", "archive");
+    try {
+        for (const f of readdirSync(patchDir).filter(f => f.endsWith(".zip"))) {
+            const match = f.match(/pinball-(\d+\.\d+\.\d+)-(\d+\.\d+\.\d+)-\d+-/);
+            if (match) {
+                const from = match[1];
+                const to = match[2];
+                const stats = statSync(path.join(patchDir, f));
+                if (!groups.has(to)) groups.set(to, { original_version: from, archive: [] });
+                groups.get(to)!.archive.push({ location: `${baseUrl}/asset-patch/archive/${f}`, size: stats.size, sha256: "" });
+            }
+        }
+    } catch (e) {
+        console.error(`[PATCH] buildDiffList failed for patch archives:`, (e as Error).message);
+    }
+    
     return [...groups.entries()]
         .sort(([a], [b]) => compareVersion(a, b))
         .map(([version, data]) => ({ original_version: data.original_version, version, archive: data.archive }));
@@ -124,7 +144,9 @@ const routes = async (fastify: FastifyInstance) => {
         const highestDiff = diffArchives.length > 0
             ? diffArchives[diffArchives.length - 1].version
             : "1.4.0";
-        const targetVer = resVer ?? highestDiff;
+        const targetVer = (resVer && highestDiff && compareVersion(highestDiff, resVer) > 0)
+            ? highestDiff
+            : (resVer || highestDiff || "1.4.0");
 
         reply.type("application/json");
         reply.status(200).send({
