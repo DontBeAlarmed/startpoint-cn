@@ -514,6 +514,18 @@ const cdnPort = process.env.CN_LISTEN_PORT || "8001";
 const cdnDisplayHost = cdnHost === "0.0.0.0" ? "localhost" : cdnHost;
 const CDN_BASE_URL = process.env.CDN_BASE_URL || `http://${cdnDisplayHost}:${cdnPort}/patch/cn`;
 const cdnDir = process.env.CDN_DIR || ".cdn";
+
+// Serve patched orderedmap files for missing CDN resources
+// Registered BEFORE fastifyStatic to intercept matching requests
+fastify.get("/patch/cn/dummy/download/production/upload/:prefix/:hash", async (request, reply) => {
+    const { prefix, hash } = request.params as { prefix: string; hash: string };
+    const patchFile = path.join(__dirname, "..", "assets", "asset-patch", "production", "upload", prefix, hash);
+    if (existsSync(patchFile)) {
+        return reply.type("application/octet-stream").send(readFileSync(patchFile));
+    }
+    return reply.status(404).send("Not Found");
+});
+
 fastify.register(fastifyStatic, {
     root: path.isAbsolute(cdnDir) ? cdnDir : path.join(__dirname, "..", cdnDir),
     prefix: "/patch",
