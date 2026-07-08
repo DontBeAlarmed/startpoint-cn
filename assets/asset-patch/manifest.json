@@ -2,17 +2,41 @@
   "cdn_version": "1.4.54",
   "patches": [
     {
-      "id": "gacha-feature-fix",
+      "id": "gacha-feature-fix-v1",
       "type": "patch",
-      "name": "特辑图片 C2032 修复",
-      "description": "修复 41 个卡池缺失特辑图片导致客户端 C2032 崩溃",
+      "name": "特辑图片 C2032 修复（第一步）",
+      "description": "修复 41 个卡池缺失特辑图片",
       "version": "1.4.55",
       "depends_on": "1.4.54",
       "enabled": true,
-      "archive": "pinball-1.4.54-1.4.55-1-094ffa5d.zip",
+      "archive": "pinball-1.4.54-1.4.55-1-9f89af3c.zip",
       "archive_size": 75884,
       "files": ["14/dd5a36c80d07d94ff3d00bf6666472e23eb5f5"],
       "created_at": "2026-07-07"
+    },
+    {
+      "id": "gacha-feature-fix-v2",
+      "type": "patch",
+      "name": "holiday odds 补齐（第二步）",
+      "description": "补充 9 个节日卡池缺失有序图文件",
+      "version": "1.4.56",
+      "depends_on": "1.4.55",
+      "enabled": true,
+      "archive": "pinball-1.4.55-1.4.56-1-6ea0c044.zip",
+      "archive_size": 78836,
+      "files": [
+        "14/dd5a36c80d07d94ff3d00bf6666472e23eb5f5",
+        "f5/dab72393899aeb1b0bd0b277472062d44037d1",
+        "a0/ff8ecaacaa15a02b16fcbda88f63fc035ab909",
+        "2b/19f2f7387213c83c40a5bf11b96e5e240ee270",
+        "16/083ccbfd98143403570bec5c9e958db8b3a43f",
+        "56/216de7888df4c8f07f48a795cc8ade05064374",
+        "a3/bd0149ebd029ce5488ec0a33ec9138ec628bd7",
+        "1a/f2bc6403016f928f5d140a9f7360680c80a609",
+        "7d/78b3ca6a53520504ffec70293a54839ab186d6",
+        "68/73b5ecdc9400f5794245a25fcac254510bae93"
+      ],
+      "created_at": "2026-07-08"
     }
   ]
 }

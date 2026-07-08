@@ -519,10 +519,13 @@ const cdnDir = process.env.CDN_DIR || ".cdn";
 // Registered BEFORE fastifyStatic to intercept matching requests
 fastify.get("/patch/cn/dummy/download/production/upload/:prefix/:hash", async (request, reply) => {
     const { prefix, hash } = request.params as { prefix: string; hash: string };
+    const relPath = `${prefix}/${hash}`;
     const patchFile = path.join(__dirname, "..", "assets", "asset-patch", "production", "upload", prefix, hash);
     if (existsSync(patchFile)) {
+        console.log("[PATCH-SERVE]", relPath);
         return reply.type("application/octet-stream").send(readFileSync(patchFile));
     }
+    console.log("[PATCH-MISS]", relPath);
     return reply.status(404).send("Not Found");
 });
 

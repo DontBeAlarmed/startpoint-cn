@@ -18,8 +18,14 @@ export const FULL_BASE = "1.4.0";
 // Detect highest version from CDN diff archives + enabled patches
 export function getEffectiveVersion(): string {
     const cdnVer = detectCDNVersion();
-    const patchVer = getMaxPatchVersion(cdnVer);
-    if (patchVer && compareVersion(patchVer, cdnVer) > 0) return patchVer;
+    // Scan ALL enabled patches for max version (not filtered by depends_on)
+    const manifest = getPatchManifest();
+    let maxPatchVer: string | null = null;
+    for (const p of manifest.patches) {
+        if (!p.enabled || p.type !== "patch") continue;
+        if (!maxPatchVer || compareVersion(p.version, maxPatchVer) > 0) maxPatchVer = p.version;
+    }
+    if (maxPatchVer && compareVersion(maxPatchVer, cdnVer) > 0) return maxPatchVer;
     return cdnVer;
 }
 
