@@ -373,3 +373,32 @@ node tools/gacha_equipment_movie.test.cjs
 - 5 星装备触发 `is_erupt` 的概率分支。
 - `is_erupt=true` 时所有装备 `treasure_up_type=0`。
 - 保底位使用 guarantee treasure-up 概率。
+
+## 按需提取 odds 文件（替代 assets/gacha_odds）
+
+`assets/gacha_odds/` 曾缓存全部 113,367 个 CDN orderedmap 文件(6.5GB)。
+`tools/extract_odds_from_cdn.cjs` 改为按需提取,仅生成需要的 ~800 个 odds 文件(<50MB)。
+
+### 使用方法
+
+```bash
+# 首次或 cdndata/gacha.json 变更时
+node tools/extract_odds_from_cdn.cjs          # 完整流程: 构建索引 + 提取
+node tools/extract_odds_from_cdn.cjs --build-index  # 仅重建索引(归档变更时)
+node tools/extract_odds_from_cdn.cjs --extract      # 仅提取(需已有索引)
+
+# 重建 gacha.json
+node tools/rebuild_gacha_from_odds.cjs --store tmp/gacha_odds
+```
+
+### 原理
+
+1. 扫描 `.cdn/cn/` 下全部 677 个 zip 归档, 建立文件路径→归档名映射(缓存为 `.cdn/zip_index.json`)
+2. 从 `assets/cdndata/gacha.json` 读取所有引用的 odds ID(~800 个)
+3. 计算每个 ID 的 SHA1 hash 定位其在 CDN 归档中的路径
+4. 通过 `unzip -p` 从归档中直接提取, 写入 `tmp/gacha_odds/`
+
+### 备份方案
+
+如果 CDN 归档不可用,可保留旧的 `assets/gacha_odds/`(已 gitignore)。
+提取工具与旧文件完全兼容 — 对比验证 SHA256 一致。
