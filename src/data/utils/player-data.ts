@@ -85,23 +85,11 @@ export function getClientSerializedData(
     // Compute awake mission summary for /load injection
     const awakeSummary = computeAwakeSummary(playerId)
 
-    // Fetch awake levels once, reuse for both node list and mana_board_awake
+    // Fetch awake levels once, reuse for both node list and mana_board_awake.
+    // mana_board_awake is actual post-awakening board state; mission completion is
+    // returned separately through active_mission_list.
     const nodeAwakeLevels = getPlayerCharactersManaNodeAwakeLevelsSync(playerId)
-    const nodeBasedAwakeMap = computeManaBoardAwakeFromNodes(nodeAwakeLevels)
-
-    // Merge mission-based (ability page unlock) and node-based (board UI mode):
-    // use the higher level from either source
-    const mergedMap = new Map(awakeSummary.manaBoardAwakeMap)
-    for (const [charId, levels] of nodeBasedAwakeMap) {
-        const existing = mergedMap.get(charId)
-        if (!existing) {
-            mergedMap.set(charId, levels)
-        } else {
-            for (const [board, level] of Object.entries(levels)) {
-                existing[Number(board)] = Math.max(existing[Number(board)] ?? 0, level)
-            }
-        }
-    }
+    const manaBoardAwakeMap = computeManaBoardAwakeFromNodes(nodeAwakeLevels)
 
     return serializePlayerData({
         player: playerData,
@@ -111,7 +99,7 @@ export function getClientSerializedData(
         characterList: getPlayerCharactersSync(playerId),
         characterManaNodeList: getPlayerCharactersManaNodesSync(playerId),
         characterManaNodeAwakeLevels: nodeAwakeLevels,
-        manaBoardAwakeMap: mergedMap,
+        manaBoardAwakeMap,
         partyGroupList: getPlayerPartyGroupListSync(playerId),
         itemList: getPlayerItemsSync(playerId),
         equipmentList: getPlayerEquipmentListSync(playerId),
