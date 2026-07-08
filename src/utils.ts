@@ -61,6 +61,11 @@ export function getTimeOffset(): number | null {
     return timeOffset;
 }
 
+/** 教程安全时间（游戏开服日），避免教程期间因卡池缺损导致 C2032 */
+const SAFE_TUTORIAL_EPOCH = Math.floor(
+    new Date("2024-08-14T12:00:00Z").getTime() / 1000
+);
+
 /**
  * Returns server time for a specific player.
  * Uses player.time_offset if set, otherwise falls back to global server offset.
@@ -68,6 +73,14 @@ export function getTimeOffset(): number | null {
 export function getServerTimeForPlayer(playerId?: number): number {
     if (playerId) {
         try {
+            // 教程前半段（step < 6）锁定时间，避免 gacha 缺损
+            const { getDb } = require("./data/db");
+            const row = getDb().prepare(
+                `SELECT tutorial_step FROM players WHERE id = ?`
+            ).get(playerId) as { tutorial_step: number } | undefined;
+            if (row && (row.tutorial_step ?? 0) < 6) {
+                return SAFE_TUTORIAL_EPOCH;
+            }
             const { getPlayerTimeOffsetSync } = require("./data/activeAccount");
             const offset = getPlayerTimeOffsetSync(playerId);
             if (offset !== null) return Math.floor((Date.now() + offset) / 1000);
