@@ -8,7 +8,7 @@
       "description": "修复 41 个卡池缺失特辑图片",
       "version": "1.4.55",
       "depends_on": "1.4.54",
-      "enabled": true,
+      "enabled": false,
       "archive": "pinball-1.4.54-1.4.55-1-9f89af3c.zip",
       "archive_size": 75884,
       "files": ["14/dd5a36c80d07d94ff3d00bf6666472e23eb5f5"],
@@ -21,7 +21,7 @@
       "description": "补充 9 个节日卡池缺失有序图文件（含 gacha 10074 section 1 修复）",
       "version": "1.4.56",
       "depends_on": "1.4.55",
-      "enabled": true,
+      "enabled": false,
       "archive": "pinball-1.4.55-1.4.56-1-575dd4f0.zip",
       "archive_size": 206234,
       "files": [
