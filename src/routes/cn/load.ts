@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { generateDataHeaders, getServerTime, getServerDate, getServerTimeForPlayer } from "../../utils";
+import { generateDataHeaders, getServerTime, getServerDate } from "../../utils";
 import { collectPlayerDataPooledExpSync, dailyResetPlayerDataSync, getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { deletePlayerActiveQuestSync, getPlayerActiveQuestSync } from "../../data/domains/quest_active"
 import { getSession } from "../../data/domains/session"
@@ -175,7 +175,7 @@ const routes = async (fastify: FastifyInstance) => {
             data_headers: generateDataHeaders({
                 asset_update: true,
                 viewer_id: accountId,
-                servertime: getServerTimeForPlayer(playerId),
+                servertime: getServerTime(),
             }),
             data: clientData
         });
