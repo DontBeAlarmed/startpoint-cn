@@ -22,8 +22,8 @@
       "version": "1.4.56",
       "depends_on": "1.4.55",
       "enabled": true,
-      "archive": "pinball-1.4.55-1.4.56-1-6ea0c044.zip",
-      "archive_size": 78836,
+      "archive": "pinball-1.4.55-1.4.56-1-0c5f3a12.zip",
+      "archive_size": 206212,
       "files": [
         "14/dd5a36c80d07d94ff3d00bf6666472e23eb5f5",
         "f5/dab72393899aeb1b0bd0b277472062d44037d1",
@@ -34,7 +34,8 @@
         "a3/bd0149ebd029ce5488ec0a33ec9138ec628bd7",
         "1a/f2bc6403016f928f5d140a9f7360680c80a609",
         "7d/78b3ca6a53520504ffec70293a54839ab186d6",
-        "68/73b5ecdc9400f5794245a25fcac254510bae93"
+        "68/73b5ecdc9400f5794245a25fcac254510bae93",
+        "2d/61c787b4c237441691b6a4c4e8b4367f35b889"
       ],
       "created_at": "2026-07-08"
     }
