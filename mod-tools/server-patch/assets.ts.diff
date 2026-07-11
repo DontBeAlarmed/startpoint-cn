@@ -1,0 +1,94 @@
+diff --git a/src/lib/assets.ts b/src/lib/assets.ts
+index 15b0db2..aa1b902 100644
+--- a/src/lib/assets.ts
++++ b/src/lib/assets.ts
+@@ -3,7 +3,6 @@ import adventEventQuestFull from "../../assets/advent_event_quest_full.json";
+ import bossBattleQuests from "../../assets/boss_battle_quest.json";
+ import boxGacha from "../../assets/box_gacha.json";
+ import boxReward from "../../assets/box_reward.json";
+-import characters from "../../assets/character.json";
+ import characterQuests from "../../assets/character_quest.json";
+ import clearRewards from "../../assets/clear_reward.json";
+ import dailyExpManaEventQuests from "../../assets/daily_exp_mana_event_quest.json";
+@@ -34,14 +33,8 @@ import manaBoard from "../../assets/mana_board.json";
+ import rareScoreRewards from "../../assets/rare_score_reward.json";
+ import scoreRewards from "../../assets/score_reward.json";
+ import gachaCampaigns from "../../assets/gacha_campaign.json";
+-import bossCoinShopItems from "../../assets/boss_coin_shop.json";
+-import bossCoinShopItemCategoryMap from "../../assets/boss_coin_shop_item_category_map.json";
+-import eventItemShopItems from "../../assets/event_item_shop.json";
+-import eventItemShopIdMap from "../../assets/event_item_shop_id_map.json";
+-import generalShopItems from "../../assets/general_shop.json";
+-import starGrainShopItems from "../../assets/star_grain_shop.json";
+-import treasureShopItems from "../../assets/treasure_shop.json";
+-import equipmentEnhancementShopItems from "../../assets/equipment_enhancement_shop.json";
++import { readFileSync } from "fs";
++import { join as joinPath } from "path";
+ import rushEventQuestFolders from "../../assets/rush_event_quest_folder.json"
+ import configData from "../../assets/config.json"
+ import equipmentDissolveData from "../../assets/equipment_dissolve.json"
+@@ -49,6 +42,64 @@ import itemSaleData from "../../assets/item_sale.json"
+ import equipmentCraftData from "../../assets/equipment_craft.json"
+ import { AssetCharacter, BattleQuest, BossCoinShopItems, BoxGacha, ClearRewards, ConfigValues, EquipmentCraftEntry, EquipmentDissolveEntry, EventItemShopIdMapItem, EventShopItems, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, Gachas, ItemSaleEntry, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopItem, ShopItems, ShopType, StoryQuest } from "./types";
+ 
++// ---------------------------------------------------------------------------
++// Mod-editable assets (hot-reloadable).
++//
++// These JSON files can be modified at runtime by external tooling (the
++// mod-tools GUI edits shops / character metadata directly on disk). They are
++// loaded with readFileSync instead of static imports so that
++// POST /api/mod-admin/reload_assets can re-read them without restarting the
++// server. Everything else keeps using static imports (loaded once at boot).
++// ---------------------------------------------------------------------------
++
++const MOD_ASSETS_DIR = joinPath(__dirname, "..", "..", "assets");
++
++function loadModAsset(name: string): any {
++    return JSON.parse(readFileSync(joinPath(MOD_ASSETS_DIR, name), "utf-8"));
++}
++
++const MOD_ASSET_FILES = [
++    "character.json",
++    "boss_coin_shop.json",
++    "boss_coin_shop_item_category_map.json",
++    "event_item_shop.json",
++    "event_item_shop_id_map.json",
++    "general_shop.json",
++    "star_grain_shop.json",
++    "treasure_shop.json",
++    "equipment_enhancement_shop.json",
++] as const;
++
++let characters: any;
++let bossCoinShopItems: any;
++let bossCoinShopItemCategoryMap: any;
++let eventItemShopItems: any;
++let eventItemShopIdMap: any;
++let generalShopItems: any;
++let starGrainShopItems: any;
++let treasureShopItems: any;
++let equipmentEnhancementShopItems: any;
++
++/**
++ * (Re)loads the mod-editable asset files from disk.
++ *
++ * @returns The list of file names that were (re)loaded.
++ */
++export function reloadModAssets(): string[] {
++    characters = loadModAsset("character.json");
++    bossCoinShopItems = loadModAsset("boss_coin_shop.json");
++    bossCoinShopItemCategoryMap = loadModAsset("boss_coin_shop_item_category_map.json");
++    eventItemShopItems = loadModAsset("event_item_shop.json");
++    eventItemShopIdMap = loadModAsset("event_item_shop_id_map.json");
++    generalShopItems = loadModAsset("general_shop.json");
++    starGrainShopItems = loadModAsset("star_grain_shop.json");
++    treasureShopItems = loadModAsset("treasure_shop.json");
++    equipmentEnhancementShopItems = loadModAsset("equipment_enhancement_shop.json");
++    return [...MOD_ASSET_FILES];
++}
++
++reloadModAssets();
++
+ /**
+  * Gets a clear reward from its ID.
+  * 

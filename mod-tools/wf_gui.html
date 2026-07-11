@@ -173,6 +173,7 @@ td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;lin
   <span class="badge" id="pendBadge">待发布 0</span>
   <span class="badge" id="adbBadge">adb ?</span>
   <button class="sec" id="btnSync" title="adb 直推数据包(备用手段;② 层正道是「发布」走 CDN)">adb 同步(备用)</button>
+  <button class="sec" id="btnPushSrv" title="让运行中的服务端重读商店/角色简化表等 assets json(①层与服务端侧改动即时生效,不用重启服务端)">推送服务端</button>
   <button id="btnPublish" title="把待发布的改动打成增量包发到 CDN,并重启游戏拉取">发布并重启游戏</button>
 </header>
 <main>
@@ -211,8 +212,11 @@ td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;lin
       <div class="navgrp">
         <span class="ngl">全局</span>
         <div class="tab" data-t="boss">Boss·副本</div>
+        <div class="tab" data-t="unique">特殊效果</div>
+        <div class="tab" data-t="shop">商店</div>
         <div class="tab" data-t="finder">词条速查</div>
         <div class="tab" data-t="port">词条移植</div>
+        <div class="tab" data-t="rawjson">JSON 直改</div>
         <div class="tab" data-t="recipe">配方</div>
       </div>
       <div class="navgrp">
@@ -267,6 +271,7 @@ td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;lin
           <button class="sec" id="btnPackImport">预览导入</button>
         </div>
         <div class="hint">把全资产包一比一替换给<b>当前选中角色</b>:命中 store 的文件全部替换(逐文件备份+进待发布),提取器切片/GIF/JSON 自动跳过。套给<b>其他角色</b>时尺寸多半不同,需勾「强制」;图集类(illustration/pixelart sprite sheet)强制替换会错位,慎用。</div>
+        <div id="imgPosBox"></div>
         <div id="assetBox"><div class="empty">选择左侧角色以加载立绘 / 图标 / 语音</div></div>
       </section>
       <section data-t="boss">
@@ -336,6 +341,11 @@ td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;lin
             <label title="切换形态就绪时不播就绪语音"><input type="checkbox" id="swNoReady"> 就绪静音</label>
             <button class="sec" id="btnSwPrev">预览</button>
             <button id="btnSwSave">保存</button>
+          </div>
+          <div class="row" style="align-items:center" id="swUploadRow" >
+            <label>变体效果文件</label><select id="swUpLevel" style="width:170px"></select>
+            <button class="sec" id="btnSwUpload" title="上传写好的 ActionDsl 效果文件(.json=技能JSON格式 / .amf3·.deflate·.bin=二进制)替换该变体引用的文件">上传替换</button>
+            <span class="hint" style="margin:0">变体 = 本角色在 switched_action_skill 里引用的切换后技能效果;无变体的角色此处为空</span>
           </div>
         </div>
         <h3 style="margin-top:14px">技能 / 词条数值倍率</h3>
@@ -470,6 +480,18 @@ td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;lin
         <h3>工具箱 · 离线长任务</h3>
         <div class="hint">重型工具在<b>后台子进程</b>运行,本页实时看进度/日志;同一时间只跑一个。输出目录都在游戏包之外,<b>不写 store、不进待发布</b>,随便跑。参数留空 = 用工具默认值。</div>
         <div class="tbgrid">
+          <div class="tbcard" data-tool="balance_suite">
+            <div class="tbt">平衡增强总包 <span class="tbava"></span></div>
+            <div class="hint">全角色平衡增强 v3 一键执行:v1专精行替换→刃值倍率→机制引擎→QoL→点名补丁→专精/独特分发/龙兽包(+1050行)→三四星数值→Boss×2.5→武器魂珠同步。<b>什么都不勾 = dry-run 预览</b>,只看统计不写数据;勾「应用」才写表(自动备份+marker防叠加);勾「发布」= 应用后自动打 CDN 增量包下发;勾「分享包」生成给别人用的 zip。前置:logs/all_analysis.json 与 unique_assign.json(改过设计先重跑 wf_all_analysis / wf_unique_mech)。</div>
+            <div class="row">
+              <label title="写入数据表(不勾=只预览)"><input type="checkbox" data-a="apply"> 应用(写store)</label>
+              <label title="应用后自动 wf_publish 打包下发,重启游戏生效"><input type="checkbox" data-a="publish"> 发布CDN</label>
+              <label title="生成 WF平衡增强包-*.zip,别人拖进自己的 .cdn 即可用"><input type="checkbox" data-a="export-pack"> 打分享包</label>
+              <label title="忽略已应用 marker 强制重跑(倍率会叠加,回滚后再用)"><input type="checkbox" data-a="force"> force</label>
+              <span style="flex:1"></span>
+              <button class="tbrun">开始</button>
+            </div>
+          </div>
           <div class="tbcard" data-tool="export_assets">
             <div class="tbt">全量解密导出 <span class="tbava"></span></div>
             <div class="hint">解密下载包+bundle 全部哈希文件,按逻辑路径建目录树:表→CSV · 图→PNG · 音→MP3 · AMF3→JSON。默认跳过已存在文件 = <b>可断点续跑</b>。</div>
@@ -511,6 +533,66 @@ td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;lin
           </div>
         </div>
         <div id="tbStatus"></div>
+      </section>
+      <section data-t="unique">
+        <div class="row" style="align-items:center">
+          <b>特殊效果(固有状态 unique_condition)</b>
+          <button class="sec" id="btnUniqueReload">刷新</button>
+        </div>
+        <div class="hint">战斗内角色头上的<b>专属计数状态</b>(如莉莉丝「继承之炎」):图标 48×48 PNG + 名称注释,存于
+          <code>master/character/unique_condition</code> 表(② 层,改后<b>发布</b>生效)。
+          词条里引用:<b>unique_condition_id 列填本表 ID</b>;赋予=效果枚举 <b>461</b>(ConditionUnique),消耗=<b>525</b>(ConsumeUniqueCondition),
+          触发/条件侧用 accumulation_unique_condition 系枚举。持续 99999999 帧=永续;层数 (None)=1 层。</div>
+        <div id="uniqueBox"><div class="empty">点「刷新」加载列表</div></div>
+        <h3 style="margin-top:16px">新增特殊效果</h3>
+        <div class="row">
+          <label>ID</label><input id="uqNewId" style="width:60px">
+          <label>内部名</label><input id="uqNewSid" placeholder="如 my_flame(自动加 unique_ 前缀)" style="width:200px">
+          <label>名称</label><input id="uqNewName" placeholder="战斗内显示" style="width:140px">
+        </div>
+        <div class="row">
+          <label>持续帧</label><input id="uqNewDur" value="99999999" style="width:100px">
+          <label>最大层数</label><input id="uqNewCnt" placeholder="(None)=1" style="width:80px">
+          <label>图标(48×48 PNG)</label><input type="file" id="uqNewIcon" accept="image/png">
+          <label><input type="checkbox" id="uqNewForce"> 强制尺寸</label>
+          <button id="btnUqCreate">预览并创建</button>
+        </div>
+      </section>
+      <section data-t="shop">
+        <div class="row" style="align-items:center">
+          <b>Boss币商店</b>
+          <select id="shopCat" style="max-width:260px"></select>
+          <button class="sec" id="btnShopLoad">加载物品</button>
+          <span class="badge" id="srvBadge">服务端 ?</span>
+          <button class="sec" id="btnShopPush" title="让服务端重读商店 json,改动即时生效">推送服务端</button>
+          <span class="hint" style="margin:0" id="shopCount"></span>
+        </div>
+        <div class="hint">一次保存<b>同步写三处</b>:② 层 <code>master/shop/boss_coin_shop</code>(客户端显示,改后<b>发布</b>) +
+          cdndata 镜像 + 服务端 <code>assets/boss_coin_shop.json</code>(购买校验,写后<b>推送服务端</b>即时生效)。
+          两侧存在状态:<b>客</b>=客户端可见,<b>服</b>=可购买;只有一侧的条目建议补齐另一侧。
+          时间格式 <code>YYYY-MM-DD HH:MM:SS</code>(结束时间留空=永久);奖励 type 常见 1=道具 2=角色 3=玛纳 4=装备。</div>
+        <div id="shopBox"><div class="empty">选类目后点「加载物品」</div></div>
+        <h3 style="margin-top:16px">新增物品</h3>
+        <div class="row">
+          <label>新物品 ID</label><input id="shopNewId" style="width:90px" placeholder="如 209901">
+          <label>克隆自(同类目物品ID)</label><input id="shopNewClone" style="width:90px" placeholder="缺省取第一个">
+          <button id="btnShopCreate">克隆创建(再改字段)</button>
+        </div>
+      </section>
+      <section data-t="rawjson">
+        <div class="row" style="align-items:center">
+          <b>JSON 直改</b>
+          <select id="rjTable" style="max-width:230px"></select>
+          <input id="rjKey" list="rjKeyOpts" placeholder="键(输入过滤,如 141159 / black_wolf_knight)" style="width:280px">
+          <datalist id="rjKeyOpts"></datalist>
+          <button class="sec" id="btnRjLoad">加载</button>
+        </div>
+        <div class="hint">底层数据的 JSON 视图,整键直接编辑(各编辑页的「JSON」按钮跳到这里):
+          <b>② 层平表</b> = <code>[["列0","列1",…], …]</code> 一行效果一个数组,全是字符串,可增删行;
+          <b>② 层嵌套表</b> = <code>{"内层键": [[…]]}</code>,已有内层键的相对顺序不可重排;
+          <b>① 层 cdndata</b> = 该键的原生 JSON 节点,保存后<b>重启服务端</b>生效(不走发布)。
+          保存一律 预览→确认→自动备份,② 层自动进待发布。</div>
+        <div id="rjBox"><div class="empty">选表 + 填键,点「加载」;或从词条/数值/资料/技能/武器页点「JSON」按钮跳转</div></div>
       </section>
       <section data-t="recipe">
         <div class="row">
@@ -614,9 +696,10 @@ function confirmWithPreview(msg,prev){
 }
 // 未保存修改守卫
 function dirtyCount(){
+  const rjTa=$('#rjTa');
   return Object.keys(edits).length+Object.keys(soulEdits).length+Object.keys(wpnEdits).length
     +$$('.profInp.mod').length+$$('.statInp.mod').length+$$('.energyInp.mod').length
-    +$$('.dslInp.mod').length;
+    +$$('.dslInp.mod').length+((rjTa&&rjTa.value!==rjTa.dataset.orig)?1:0);
 }
 function guardDirty(){
   const n=dirtyCount();
@@ -770,6 +853,10 @@ async function loadRows(){
     const addBtn=document.createElement('button');addBtn.className='mini';addBtn.textContent='＋添加行';
     addBtn.title='从其他角色的'+(ab.leader?'队长技':'词条')+'复制一行到这里,自动换成本角色属性、统一描述文本、清除觉醒门槛(防跨属性崩溃)';
     h.appendChild(addBtn);
+    const jsb=document.createElement('button');jsb.className='mini';jsb.textContent='JSON';
+    jsb.title='以 JSON 直接编辑'+(ab.leader?'该队长技':'该词条')+'的底层行(整键,可增删行)';
+    jsb.onclick=ev=>{ev.stopPropagation();openRawJson(ab.leader?'leader_ability':'ability',ab.leader?ab.ability.slice(2):ab.ability);};
+    h.appendChild(jsb);
     const isLdr=!!ab.leader;
     const af=document.createElement('div');af.className='addform';af.style.display='none';
     af.innerHTML='<div class="row"><label>来源角色</label><input class="afSrc" list="charOpts" placeholder="名字(选列表) 或直接填词条键" style="width:210px">'
@@ -860,6 +947,19 @@ async function loadProfile(){
     inp.oninput=inp.onchange=()=>inp.classList.toggle('mod',inp.value!==inp.dataset.orig);
     row.appendChild(inp);box.appendChild(row);
   });
+  const rjRow=document.createElement('div');rjRow.className='row';rjRow.style.marginTop='8px';
+  [['JSON ①character','cdn:character','① 层 cdndata/character.json 本角色节点(重启服务端生效)'],
+   ['JSON ①character_text','cdn:character_text','① 层 cdndata/character_text.json 本角色节点(重启服务端生效)'],
+   ['JSON ②character','character','② 层 character 表本角色行(发布后生效)'],
+   ['JSON ②character_text','character_text','② 层 character_text 表本角色行(发布后生效)']]
+  .forEach(([label,table,title])=>{
+    const b=document.createElement('button');b.className='mini';b.textContent=label;b.title=title;
+    b.onclick=()=>openRawJson(table,sel.id);rjRow.appendChild(b);
+  });
+  box.appendChild(rjRow);
+  const rjHint=document.createElement('div');rjHint.className='hint';
+  rjHint.textContent='注意:上方「保存资料」是 ①+②+服务端三层同步;JSON 直改只写单层,改完需自己保持各层一致(如星级/属性)。';
+  box.appendChild(rjHint);
 }
 async function saveProf(){
   if(!sel)return;
@@ -953,10 +1053,77 @@ $('#btnNcDelGo').onclick=async()=>{
 };
 
 // ---- 角色资产:立绘/图标/语音 预览与上传替换 ----
+// ---- 立绘定位:character_image(内容框)+ full_shot_image_attribute(pivot/scale/face) ----
+async function loadImagePos(){
+  const box=$('#imgPosBox');box.innerHTML='';
+  if(!sel)return;
+  let d;try{d=await api('/char_image_pos?character='+encodeURIComponent(sel.id));}catch(e){return;}
+  const h=document.createElement('h3');h.textContent='立绘定位(详情页 / 概览页)';h.style.margin='10px 0 4px';box.appendChild(h);
+  const hint=document.createElement('div');hint.className='hint';
+  hint.textContent='立绘 PNG 是裁剪图,内容框把它摆回 1440×1920 设计画布:x/y=画布内偏移,w/h=裁剪图尺寸(必须等于 PNG 实际宽高,换图后点「按图自动」);pivot/scale=详情页标准立绘位置(画布上对齐到视图原点的点);face=概览等页把脸对准框中心用的脸部画布坐标。'+d.note.split(';').pop();
+  box.appendChild(hint);
+  const tb=document.createElement('table');
+  tb.innerHTML='<tr><th>形态</th><th>立绘实际</th><th>框x</th><th>框y</th><th>框w</th><th>框h</th><th></th><th>pivot_x</th><th>pivot_y</th><th>scale</th><th>face_x</th><th>face_y</th><th></th></tr>';
+  d.levels.forEach(L=>{
+    const tr=document.createElement('tr');
+    const t0=document.createElement('td');t0.className='fname';t0.textContent='形态'+L.level+(L.level==='0'?'(基础)':L.level==='1'?'(觉醒)':'');tr.appendChild(t0);
+    const t1=document.createElement('td');t1.textContent=L.img_w?(L.img_w+'×'+L.img_h):'(无立绘)';
+    if(L.size_mismatch){const w=document.createElement('span');w.className='badge warn';w.textContent='≠';w.title='内容框 w/h 与 PNG 实际尺寸不一致,游戏内会错位/裁切,点「按图自动」修正';t1.appendChild(document.createTextNode(' '));t1.appendChild(w);}
+    tr.appendChild(t1);
+    const F={};
+    const mk=(f,v,w)=>{const td=document.createElement('td');const i=document.createElement('input');
+      i.value=v==null?'':v;i.dataset.orig=i.value;i.style.width=w+'px';
+      i.oninput=()=>i.classList.toggle('mod',i.value!==i.dataset.orig);
+      F[f]=i;td.appendChild(i);tr.appendChild(td);};
+    mk('fs_x',L.fs&&L.fs.x,48);mk('fs_y',L.fs&&L.fs.y,48);mk('fs_w',L.fs&&L.fs.w,52);mk('fs_h',L.fs&&L.fs.h,52);
+    const ta=document.createElement('td');
+    const ab=document.createElement('button');ab.className='mini';ab.textContent='按图自动';
+    ab.title='w/h=立绘 PNG 实际尺寸;x/y 保持原内容框中心不变(无原值则按 1440×1920 画布水平居中+底部对齐)';
+    ab.onclick=()=>{
+      if(!L.img_w)return log('该形态没有立绘',true);
+      const ow=parseInt(F.fs_w.value), oh=parseInt(F.fs_h.value);
+      const ox=parseInt(F.fs_x.value), oy=parseInt(F.fs_y.value);
+      F.fs_w.value=L.img_w;F.fs_h.value=L.img_h;
+      F.fs_x.value=isNaN(ox)||isNaN(ow)?Math.round((1440-L.img_w)/2):Math.round(ox+(ow-L.img_w)/2);
+      F.fs_y.value=isNaN(oy)||isNaN(oh)?Math.max(0,1920-L.img_h):Math.round(oy+(oh-L.img_h)/2);
+      Object.values(F).forEach(i=>i.classList.toggle('mod',i.value!==i.dataset.orig));
+    };
+    ta.appendChild(ab);tr.appendChild(ta);
+    mk('pivot_x',L.attr&&L.attr.pivot_x,52);mk('pivot_y',L.attr&&L.attr.pivot_y,52);mk('scale',L.attr&&L.attr.scale,46);
+    mk('face_x',L.attr&&L.attr.face_x,52);mk('face_y',L.attr&&L.attr.face_y,52);
+    const ts=document.createElement('td');
+    const bs=document.createElement('button');bs.className='mini';bs.textContent='保存';
+    bs.onclick=async()=>{
+      const fsAll=['fs_x','fs_y','fs_w','fs_h'].every(k=>F[k].value.trim()!=='');
+      const atAll=['pivot_x','pivot_y','scale','face_x','face_y'].every(k=>F[k].value.trim()!=='');
+      if(!fsAll&&!atAll)return log('内容框 4 项或摆放属性 5 项需填全一组再保存',true);
+      const b={character:sel.id,level:L.level,
+        fs:fsAll?{x:F.fs_x.value,y:F.fs_y.value,w:F.fs_w.value,h:F.fs_h.value}:null,
+        attr:atAll?{pivot_x:F.pivot_x.value,pivot_y:F.pivot_y.value,scale:F.scale.value,face_x:F.face_x.value,face_y:F.face_y.value}:null,
+        dry_run:true};
+      let prev;try{prev=await api('/char_image_pos/save',b);}catch(e){return;}
+      showResult(prev);
+      if(!prev.changes)return;
+      if(confirmWithPreview('确认写入立绘定位(形态'+L.level+')?(自动备份)',prev)){
+        showResult(await api('/char_image_pos/save',{...b,dry_run:false}));
+        loadImagePos();
+      }
+    };
+    ts.appendChild(bs);
+    const bj=document.createElement('button');bj.className='mini';bj.textContent='JSON';
+    bj.title='以 JSON 直接编辑整棵嵌套行(character_image 表)';
+    bj.onclick=()=>openRawJson('character_image',sel.id);
+    ts.appendChild(bj);
+    tr.appendChild(ts);
+    tb.appendChild(tr);
+  });
+  box.appendChild(tb);
+}
 async function loadAssets(){
-  if(!sel){$('#assetBox').innerHTML='<div class="empty">选择左侧角色以加载立绘 / 图标 / 语音</div>';return;}
+  if(!sel){$('#assetBox').innerHTML='<div class="empty">选择左侧角色以加载立绘 / 图标 / 语音</div>';$('#imgPosBox').innerHTML='';return;}
   $('#assetTitle').textContent=sel.name+' ('+sel.id+') 资产';
   $('#assetBtns').style.display='flex';
+  loadImagePos();
   let data;
   try{data=await api('/char_assets?character='+encodeURIComponent(sel.id));}
   catch(e){$('#assetBox').innerHTML='<div class="hint">加载失败(见日志)。</div>';return;}
@@ -1087,6 +1254,18 @@ async function loadStat(){
     aw.innerHTML='<div class="hint" style="margin-top:10px">该角色不在觉醒加成表中(国服现有 36 个觉醒板角色)。</div>';
     box.appendChild(aw);
   }
+  const rjRow=document.createElement('div');rjRow.className='row';rjRow.style.marginTop='8px';
+  const b1=document.createElement('button');b1.className='mini';b1.textContent='JSON(基础数值)';
+  b1.title='以 JSON 直接编辑 character_status 该角色的整棵等级断点树';
+  b1.onclick=()=>openRawJson('character_status',sel.id);
+  rjRow.appendChild(b1);
+  if(data.awake){
+    const b2=document.createElement('button');b2.className='mini';b2.textContent='JSON(觉醒加成)';
+    b2.title='以 JSON 直接编辑 character_awake_status 该角色行(列序 atk,hp)';
+    b2.onclick=()=>openRawJson('character_awake_status',sel.id);
+    rjRow.appendChild(b2);
+  }
+  box.appendChild(rjRow);
 }
 function statPayload(){
   const out=statEntries.map(e=>({level:e.level,hp:e.hp,atk:e.atk}));
@@ -1138,7 +1317,23 @@ async function loadSkillSwitch(){
   $('#swMb').value=d.fields.multiballs||'';
   $('#swNoVoice').checked=d.fields.no_voice==='true';
   $('#swNoReady').checked=d.fields.no_ready_voice==='true';
+  // 变体效果文件上传:本角色在 switched_action_skill 里引用的切换后技能
+  try{
+    const v=await api('/skill_variants?character='+encodeURIComponent(sel.id));
+    const s=$('#swUpLevel');s.innerHTML='';
+    (v.levels||[]).forEach(x=>{
+      const o=document.createElement('option');o.value=x.level;
+      o.textContent='变体'+x.level+' · '+(x.program_path.split('$').pop()||x.program_path);
+      o.title=x.program_path;s.appendChild(o);
+    });
+    $('#swUploadRow').style.display=(v.levels&&v.levels.length)?'flex':'none';
+  }catch(e){$('#swUploadRow').style.display='none';}
 }
+$('#btnSwUpload').onclick=()=>{
+  const lv=$('#swUpLevel').value;
+  if(!lv)return log('该角色没有变体技能',true);
+  uploadDsl('switch',lv,'变体'+lv);
+};
 async function saveSkillSwitch(dryOnly){
   if(!sel)return;
   const edits={kind:$('#swKind').value,threshold:$('#swThr').value.trim(),
@@ -1192,9 +1387,18 @@ async function loadEnergy(){
     jb.title='整棵命令树导出为 JSON 直接编辑(可增删效果命令),保存时自检+备份';
     jb.onclick=()=>loadDslJson(s.level,s.label);
     tdd.appendChild(jb);
+    const ub=document.createElement('button');ub.className='mini';ub.textContent='上传效果';
+    ub.title='上传写好的 ActionDsl 效果文件(.json=「JSON」按钮导出的同款格式 / .amf3·.deflate·.bin=二进制)替换该级别;文件官方未下发时=新建';
+    ub.onclick=()=>uploadDsl('main',s.level,s.label);
+    tdd.appendChild(ub);
     if(s.dsl_unavailable){
       eb.disabled=jb.disabled=true;
       eb.title=jb.title=s.dsl_unavailable+';可用下方「整技能替换」换成其他角色的技能';
+      if(s.dsl_unavailable.includes('引用')){ // 无 program_path:上传也无落点
+        ub.disabled=true;ub.title=s.dsl_unavailable+';需先「整技能替换」建立效果文件引用';
+      }else{ // 引用在但文件官方未下发:上传即新建
+        ub.title='该效果文件官方未下发 —— 上传即为该角色新建效果文件(发布后生效)';
+      }
     }
     if(data.skills.length>1){
       const db=document.createElement('button');db.className='mini';db.textContent='删除级别';
@@ -1206,7 +1410,11 @@ async function loadEnergy(){
     tbl.appendChild(tr);
   });
   box.appendChild(tbl);
-  const note=document.createElement('div');note.className='hint';note.textContent='表键: '+data.skill_key+' · '+data.note;
+  const note=document.createElement('div');note.className='hint';note.textContent='表键: '+data.skill_key+' · '+data.note+' ';
+  const jb2=document.createElement('button');jb2.className='mini';jb2.textContent='action_skill JSON';
+  jb2.title='以 JSON 直接编辑该角色 action_skill 整键(全部技能段的内层树;官方短行也能改)';
+  jb2.onclick=()=>openRawJson('action_skill',data.skill_key);
+  note.appendChild(jb2);
   box.appendChild(note);
   const dsl=document.createElement('div');dsl.id='dslBox';box.appendChild(dsl);
 }
@@ -1370,6 +1578,10 @@ async function loadWpnRows(){
   inf.appendChild(wn);
   if(ei.rarity){const rr=document.createElement('span');rr.className='rar';rr.textContent='★'.repeat(parseInt(ei.rarity)||0);inf.appendChild(rr);}
   const idb=document.createElement('span');idb.className='badge';idb.textContent='ID '+wpnSel;inf.appendChild(idb);
+  const mkJ=(label,table,title)=>{const b=document.createElement('button');b.className='mini';b.textContent=label;b.title=title;b.onclick=()=>openRawJson(table,wpnSel);inf.appendChild(b);};
+  if(!data.no_enh)mkJ('词条JSON','weapon_ability','以 JSON 直接编辑本武器强化词条底层行(整键,可增删行)');
+  if(data.soul)mkJ('魂珠JSON','ability_soul','以 JSON 直接编辑同键魂珠效果底层行(整键,可增删行)');
+  mkJ('装备JSON','equipment','以 JSON 直接编辑装备主表行(名称/品质/kind/soul_id 等)');
   if(ei.desc){const ds=document.createElement('span');ds.className='hint';ds.style.cssText='flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis';ds.textContent=ei.desc;ds.title=ei.desc;inf.appendChild(ds);}
   else{const sp=document.createElement('span');sp.style.flex='1';inf.appendChild(sp);}
   const box=$('#wpnRows'); box.innerHTML='';
@@ -1579,6 +1791,279 @@ async function saveWpnRows(){
 $('#wpnShowAll').onchange=loadWpnRows;
 $('#btnSaveWpn').onclick=saveWpnRows;
 
+// ---- 服务端推送:让运行中的服务端重读商店/角色简化表(不用重启) ----
+async function pushServer(){
+  let r;try{r=await api('/server/push',{});}catch(e){return;}
+  log(r.log);toast('服务端已重读 assets');refreshSrvBadge();
+}
+$('#btnPushSrv').onclick=pushServer;
+async function refreshSrvBadge(){
+  const b=$('#srvBadge');if(!b)return;
+  try{const p=await api('/server/ping');
+    b.textContent=p.online?'服务端在线':'服务端离线';
+    b.className='badge '+(p.online?'ok':'warn');
+    b.title=p.url+(p.online?'':'\n'+(p.detail||''));
+  }catch(e){}
+}
+function pickPng(cb){
+  const i=document.createElement('input');i.type='file';i.accept='image/png';
+  i.onchange=()=>{const f=i.files[0];if(!f)return;
+    const r=new FileReader();r.onload=()=>cb(r.result.split(',')[1]);r.readAsDataURL(f);};
+  i.click();
+}
+function fileToB64(input,cb){
+  const f=input.files&&input.files[0];
+  if(!f)return cb('');
+  const r=new FileReader();r.onload=()=>cb(r.result.split(',')[1]);r.readAsDataURL(f);
+}
+// ---- 技能效果文件上传:.json=技能JSON文本;其他(.amf3/.deflate/.bin)=二进制 ----
+function pickDslFile(cb){
+  const i=document.createElement('input');i.type='file';i.accept='.json,.amf3,.deflate,.bin,.dsl';
+  i.onchange=()=>{const f=i.files[0];if(!f)return;
+    const r=new FileReader();
+    if(f.name.toLowerCase().endsWith('.json')){r.onload=()=>cb({json_text:r.result});r.readAsText(f);}
+    else{r.onload=()=>cb({data_b64:r.result.split(',')[1]});r.readAsDataURL(f);}};
+  i.click();
+}
+function uploadDsl(kind,level,label){
+  if(!sel)return;
+  pickDslFile(async src=>{
+    const b={character:sel.id,level,kind,json_text:src.json_text||'',data_b64:src.data_b64||'',dry_run:true};
+    let prev;try{prev=await api('/skill_dsl_upload',b);}catch(e){return;}
+    showResult(prev);
+    if(!prev.changes)return;
+    if(confirmWithPreview('确认替换 ['+label+'] 的效果文件?(自动备份;共享文件会全键生效)',prev)){
+      showResult(await api('/skill_dsl_upload',{...b,dry_run:false}));
+      if(kind==='main')loadEnergy();
+    }
+  });
+}
+
+// ---- 特殊效果 unique_condition:图标 48x48 + 名称/持续/层数,支持新增 ----
+async function loadUnique(){
+  const box=$('#uniqueBox');box.innerHTML='<div class="hint">加载中...</div>';
+  let d;try{d=await api('/unique_conditions');}catch(e){box.innerHTML='<div class="empty">加载失败(见日志)</div>';return;}
+  box.innerHTML='';
+  const tb=document.createElement('table');
+  tb.innerHTML='<tr><th>ID</th><th>图标</th><th>内部名</th><th>名称(战斗内)</th><th>持续帧</th><th>最大层数</th><th></th></tr>';
+  d.conditions.forEach(c=>{
+    const tr=document.createElement('tr');
+    const td0=document.createElement('td');td0.className='fname';td0.innerHTML='<b></b>';td0.querySelector('b').textContent=c.id;tr.appendChild(td0);
+    const ti=document.createElement('td');
+    if(c.icon){
+      const img=document.createElement('img');
+      img.src=API+'/asset?logical='+encodeURIComponent(c.icon+'.png')+'&t='+Date.now();
+      img.style.cssText='width:36px;height:36px;image-rendering:auto;background:#222;border-radius:4px';
+      img.title=c.icon+'.png'+(c.icon_exists?'':'(缺失)');
+      img.onerror=()=>{img.style.opacity=.2;};
+      ti.appendChild(img);
+    }
+    tr.appendChild(ti);
+    const ts=document.createElement('td');ts.textContent=c.string_id;ts.className='fname';ts.title=c.string_id;tr.appendChild(ts);
+    const inputs={};
+    [['name',c.name,140],['duration',c.duration,90],['max_count',c.max_count,70]].forEach(([f,v,w])=>{
+      const td=document.createElement('td');const inp=document.createElement('input');
+      inp.value=v;inp.dataset.orig=v;inp.style.width=w+'px';
+      inp.oninput=()=>inp.classList.toggle('mod',inp.value!==inp.dataset.orig);
+      inputs[f]=inp;td.appendChild(inp);tr.appendChild(td);
+    });
+    const ta=document.createElement('td');
+    const bs=document.createElement('button');bs.className='mini';bs.textContent='保存';
+    bs.onclick=async()=>{
+      const edits={};Object.entries(inputs).forEach(([f,inp])=>{if(inp.value!==inp.dataset.orig)edits[f]=inp.value;});
+      if(!Object.keys(edits).length)return log('没有修改');
+      await uqSave(c.id,edits,'',false);
+    };
+    ta.appendChild(bs);
+    const bi=document.createElement('button');bi.className='mini';bi.textContent='换图标';
+    bi.title='上传 48x48 PNG 替换该图标(自动备份+进待发布)';
+    bi.onclick=()=>pickPng(async b64=>{await uqSave(c.id,{},b64,false);});
+    ta.appendChild(bi);
+    const bj=document.createElement('button');bj.className='mini';bj.textContent='JSON';
+    bj.title='以 JSON 直接编辑该行(含 c9-c13 行为开关)';
+    bj.onclick=()=>openRawJson('unique_condition',c.id);
+    ta.appendChild(bj);
+    tr.appendChild(ta);
+    tb.appendChild(tr);
+  });
+  box.appendChild(tb);
+  const hint=document.createElement('div');hint.className='hint';hint.textContent=d.note;box.appendChild(hint);
+  const mx=Math.max(0,...d.conditions.map(c=>parseInt(c.id)||0));
+  if(!$('#uqNewId').value)$('#uqNewId').value=String(mx+1);
+}
+async function uqSave(id,edits,iconB64,force){
+  const b={id,edits,icon_b64:iconB64||'',force_icon:force,dry_run:true};
+  let prev;try{prev=await api('/unique_condition/save',b);}catch(e){return;}
+  showResult(prev);
+  if(!prev.changes)return;
+  if(confirmWithPreview('确认写入特殊效果 '+id+' ?(自动备份)',prev)){
+    showResult(await api('/unique_condition/save',{...b,dry_run:false}));
+    loadUnique();
+  }
+}
+$('#btnUniqueReload').onclick=loadUnique;
+$('#btnUqCreate').onclick=()=>{
+  const id=$('#uqNewId').value.trim();
+  if(!id)return log('填新 ID',true);
+  fileToB64($('#uqNewIcon'),async b64=>{
+    if(!b64)return log('新增必须选 48x48 图标 PNG',true);
+    const edits={string_id:$('#uqNewSid').value.trim(),name:$('#uqNewName').value.trim(),
+      duration:$('#uqNewDur').value.trim(),max_count:$('#uqNewCnt').value.trim()};
+    await uqSave(id,edits,b64,$('#uqNewForce').checked);
+  });
+};
+
+// ---- Boss币商店:三处同步编辑(②层表 + cdndata 镜像 + 服务端 json) ----
+let shopCatLoaded=false;
+async function loadShopCats(){
+  refreshSrvBadge();
+  if(shopCatLoaded)return;
+  let d;try{d=await api('/shop/categories');}catch(e){return;}
+  const s=$('#shopCat');s.innerHTML='';
+  d.categories.forEach(c=>{
+    const o=document.createElement('option');o.value=c.id;
+    o.textContent=c.id+' · '+c.code+'(客'+c.client_items+'/服'+c.server_items+')';
+    s.appendChild(o);
+  });
+  shopCatLoaded=true;
+}
+async function loadShopItems(){
+  const cat=$('#shopCat').value;if(!cat)return;
+  const box=$('#shopBox');box.innerHTML='<div class="hint">加载中...</div>';
+  let d;try{d=await api('/shop/items?cat='+encodeURIComponent(cat));}catch(e){box.innerHTML='<div class="empty">加载失败(见日志)</div>';return;}
+  $('#shopCount').textContent='共 '+d.items.length+' 条';
+  box.innerHTML='';
+  const tb=document.createElement('table');
+  tb.innerHTML='<tr><th>ID</th><th>状态</th><th>图标</th><th>名称</th><th>货币ID</th><th>价格</th><th>奖励type</th><th>奖励ID</th><th>数量</th><th>库存</th><th>开始</th><th>结束</th><th></th></tr>';
+  d.items.forEach(it=>{
+    const tr=document.createElement('tr');
+    const td0=document.createElement('td');td0.className='fname';td0.innerHTML='<b></b>';td0.querySelector('b').textContent=it.id;tr.appendChild(td0);
+    const st=document.createElement('td');
+    st.innerHTML=(it.in_client?'<span class="badge ok">客</span>':'<span class="badge warn">无客</span>')
+      +(it.in_server?' <span class="badge ok">服</span>':' <span class="badge warn">无服</span>');
+    st.title=(it.in_client?'':'客户端表无此条(游戏里看不到);保存一次即可补齐\n')
+      +(it.in_server?'':'服务端 json 无此条(不可购买);保存一次即可补齐');
+    tr.appendChild(st);
+    const ti=document.createElement('td');
+    // 道具图标几乎都在 item/sprite_sheet.png 图集里(atlas 切图),没有独立 PNG,
+    // 预览不到就只显示路径提示,不放破图
+    ti.textContent='▨';ti.title=it.icon||'(无图标路径)';ti.style.cssText='text-align:center;color:#4a5163;cursor:help';
+    tr.appendChild(ti);
+    const inputs={};
+    [['name',110],['cost_id',70],['cost_amount',60],['reward_type',52],['reward_id',80],['reward_count',52],['stock',52],['available_from',140],['available_until',140]].forEach(([f,w])=>{
+      const td=document.createElement('td');const inp=document.createElement('input');
+      inp.value=it[f]||'';inp.dataset.orig=inp.value;inp.style.width=w+'px';
+      if(f==='name')inp.title=(it.desc||'').replace(/\\n/g,'\n');
+      inp.oninput=()=>inp.classList.toggle('mod',inp.value!==inp.dataset.orig);
+      inputs[f]=inp;td.appendChild(inp);tr.appendChild(td);
+    });
+    const ta=document.createElement('td');
+    const bs=document.createElement('button');bs.className='mini';bs.textContent='保存';
+    bs.onclick=async()=>{
+      const edits={};Object.entries(inputs).forEach(([f,inp])=>{if(inp.value!==inp.dataset.orig)edits[f]=inp.value;});
+      if(!Object.keys(edits).length&&it.in_client&&it.in_server)return log('没有修改');
+      await shopSave(cat,it.id,edits,'');
+    };
+    ta.appendChild(bs);
+    const bj=document.createElement('button');bj.className='mini';bj.textContent='JSON';
+    bj.title='以 JSON 直接编辑②层整行(50 列,含描述/排序等全部字段)';
+    bj.onclick=()=>openRawJson('boss_coin_shop',it.id);
+    ta.appendChild(bj);
+    tr.appendChild(ta);
+    tb.appendChild(tr);
+  });
+  box.appendChild(tb);
+  const hint=document.createElement('div');hint.className='hint';hint.textContent=d.note;box.appendChild(hint);
+}
+async function shopSave(cat,id,edits,cloneFrom){
+  const b={cat,id,edits,clone_from:cloneFrom||'',dry_run:true};
+  let prev;try{prev=await api('/shop/item/save',b);}catch(e){return;}
+  showResult(prev);
+  if(!prev.changes)return;
+  if(confirmWithPreview('确认写入商店条目 '+id+' ?(三处同步,自动备份)',prev)){
+    const r=await api('/shop/item/save',{...b,dry_run:false});
+    showResult(r);
+    if(r.note)log(r.note);
+    loadShopItems();
+  }
+}
+$('#btnShopLoad').onclick=loadShopItems;
+$('#shopCat').onchange=loadShopItems;
+$('#btnShopPush').onclick=pushServer;
+$('#btnShopCreate').onclick=async()=>{
+  const id=$('#shopNewId').value.trim();
+  if(!id)return log('填新物品 ID',true);
+  await shopSave($('#shopCat').value,id,{},$('#shopNewClone').value.trim());
+};
+
+// ---- JSON 直改:任意支持表一个键(②层行数组/嵌套树、①层节点)的 JSON 文本直接编辑 ----
+let rjCur=null,rjTablesP=null,rjKeyTimer=null;
+function loadRjTables(){
+  if(rjTablesP)return rjTablesP;
+  rjTablesP=(async()=>{
+    const d=await api('/raw_json/tables');
+    const s=$('#rjTable');
+    d.tables.forEach(t=>{const o=document.createElement('option');o.value=t.alias;o.textContent=t.cn+' · '+t.alias;o.title=t.target;s.appendChild(o);});
+  })().catch(e=>{rjTablesP=null;throw e;});
+  return rjTablesP;
+}
+async function rjSuggest(){
+  const t=$('#rjTable').value,q=$('#rjKey').value.trim();
+  if(!t)return;
+  let d;try{d=await api('/raw_json/keys?table='+encodeURIComponent(t)+'&q='+encodeURIComponent(q));}catch(e){return;}
+  const dl=$('#rjKeyOpts');dl.innerHTML='';
+  d.keys.slice(0,50).forEach(k=>{const o=document.createElement('option');o.value=k;dl.appendChild(o);});
+}
+function rjDirty(){const ta=$('#rjTa');return ta&&ta.value!==ta.dataset.orig;}
+async function rjLoad(){
+  const t=$('#rjTable').value,k=$('#rjKey').value.trim();
+  if(!t||!k)return log('JSON 直改:请选择表并填键',true);
+  const box=$('#rjBox');box.innerHTML='<div class="hint">加载中...</div>';
+  let d;
+  try{d=await api('/raw_json?table='+encodeURIComponent(t)+'&key='+encodeURIComponent(k));}
+  catch(e){box.innerHTML='<div class="empty">加载失败(见日志)</div>';return;}
+  rjCur={table:t,key:k};
+  box.innerHTML='';
+  const h=document.createElement('h3');h.style.margin='10px 0 4px';h.textContent=t+' / '+k;box.appendChild(h);
+  const hint=document.createElement('div');hint.className='hint';hint.textContent=d.note||'';box.appendChild(hint);
+  const ta=document.createElement('textarea');ta.id='rjTa';
+  ta.value=d.json_text;ta.dataset.orig=d.json_text;ta.spellcheck=false;
+  ta.style.cssText='width:100%;height:480px;font:12px/1.5 Consolas,monospace;background:#0d1420;color:#cfe0ff;border:1px solid var(--border);border-radius:6px;padding:8px;box-sizing:border-box;white-space:pre;overflow:auto';
+  box.appendChild(ta);
+  const row=document.createElement('div');row.className='row';
+  const bs=document.createElement('button');bs.textContent='保存 JSON';
+  bs.onclick=async()=>{
+    const b={table:rjCur.table,key:rjCur.key,json_text:ta.value,dry_run:true};
+    let prev;try{prev=await api('/raw_json/save',b);}catch(e){return;}
+    showResult(prev);
+    if(!prev.changes)return;
+    if(confirmWithPreview('确认写入 '+rjCur.table+' / '+rjCur.key+' ?(自动备份)',prev)){
+      showResult(await api('/raw_json/save',{...b,dry_run:false}));
+      ta.dataset.orig=ta.value;
+      rjLoad();
+    }
+  };
+  row.appendChild(bs);
+  const fmt=document.createElement('button');fmt.className='sec';fmt.textContent='校验格式';
+  fmt.onclick=()=>{try{JSON.parse(ta.value);log('JSON 格式正确');}catch(e){log('JSON 格式错误: '+e.message,true);}};
+  row.appendChild(fmt);
+  const rv=document.createElement('button');rv.className='sec';rv.textContent='还原为已保存';
+  rv.onclick=()=>{ta.value=ta.dataset.orig;};
+  row.appendChild(rv);
+  box.appendChild(row);
+}
+async function openRawJson(table,key){
+  if(rjDirty()&&!confirm('JSON 直改页有未保存修改,跳转将丢弃。继续?'))return;
+  switchTab('rawjson');
+  try{await loadRjTables();}catch(e){return;}
+  $('#rjTable').value=table;$('#rjKey').value=String(key);
+  rjLoad();
+}
+$('#btnRjLoad').onclick=()=>{if(rjDirty()&&!confirm('当前 JSON 有未保存修改,重新加载将丢弃。继续?'))return;rjLoad();};
+$('#rjKey').oninput=()=>{clearTimeout(rjKeyTimer);rjKeyTimer=setTimeout(rjSuggest,250);};
+$('#rjKey').onkeydown=e=>{if(e.key==='Enter')$('#btnRjLoad').click();};
+$('#rjTable').onchange=()=>{$('#rjKeyOpts').innerHTML='';rjSuggest();};
+
 function switchTab(name){
   $$('nav .tab').forEach(x=>x.classList.toggle('sel',x.dataset.t===name));
   $$('#content > section').forEach(s=>s.classList.toggle('sel',s.dataset.t===name));
@@ -1592,6 +2077,9 @@ function switchTab(name){
   if(name==='assets')loadAssets();
   if(name==='boss')loadBoss();
   if(name==='toolbox')loadToolbox();
+  if(name==='rawjson')loadRjTables();
+  if(name==='unique')loadUnique();
+  if(name==='shop')loadShopCats();
 }
 
 // ---- 工具箱:长任务后台子进程 + 状态轮询 ----

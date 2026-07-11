@@ -92,6 +92,10 @@ TABLE_ALIASES = {
     "mana_board": "master/generated/mana_board.orderedmap",
     "mana_node": "master/mana_board/mana_node.orderedmap",
     "character_gacha_sound": "master/character/character_gacha_sound.orderedmap",
+    # --- 特殊效果(固有状态)+ 商店 ---
+    "unique_condition": "master/character/unique_condition.orderedmap",
+    "boss_coin_shop": "master/shop/boss_coin_shop.orderedmap",
+    "boss_coin_shop_category": "master/shop/boss_coin_shop_category.orderedmap",
     # --- boss 战 / 副本 / 连战(roguelike boss rush 方案用,见 boss连战roguelike方案.md) ---
     "general_boss": "master/battle/boss/general_boss.orderedmap",
     "general_boss_state": "master/battle/boss/general_boss_state.orderedmap",
@@ -117,11 +121,25 @@ VER_RE = re.compile(r"pinball-(\d+\.\d+\.\d+)-(\d+\.\d+\.\d+)-\d+-")
 
 
 def current_max_version(default: str = "1.4.54") -> str:
+    # 三个 diff 目录都要扫:medium:/android: 分包发布也会推进版本号,
+    # 只看 common 会把已存在的目标版本再发一遍(客户端已在该版本则不再拉取)。
     best = default
-    for f in CDN_DIFF.glob("*.zip"):
-        m = VER_RE.match(f.name)
-        if m and _cmp(m.group(2), best) > 0:
-            best = m.group(2)
+    for sub in ("archive-common-diff", "archive-medium-diff", "archive-android-diff"):
+        for f in (CDN_ROOT / sub).glob("*.zip"):
+            m = VER_RE.match(f.name)
+            if m and _cmp(m.group(2), best) > 0:
+                best = m.group(2)
+    # 上游服务端(2026-07 起)另有 assets/asset-patch 补丁机制:getEffectiveVersion()
+    # 取 max(CDN, 启用的 patch 版本)。若某启用 patch 版本高于 CDN,我们不越过它,
+    # 客户端 res_ver 会停在 patch 版,新发的低版本 diff 拉取不到 —— 一并纳入 max。
+    manifest = ROOT / "assets" / "asset-patch" / "manifest.json"
+    try:
+        for p in json.loads(manifest.read_text(encoding="utf-8")).get("patches", []):
+            v = str(p.get("version", ""))
+            if p.get("enabled") and re.fullmatch(r"\d+\.\d+\.\d+", v) and _cmp(v, best) > 0:
+                best = v
+    except Exception:
+        pass
     return best
 
 

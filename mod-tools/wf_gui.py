@@ -25,6 +25,8 @@ WF 单机版 · 本地网页修改器 (GUI)
 
 from __future__ import annotations
 
+import base64
+import csv
 import io
 import json
 import os
@@ -32,6 +34,8 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from contextlib import redirect_stdout
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -210,6 +214,9 @@ _LOGICAL_ALIAS = {
     "master/generated/mana_board.orderedmap": "mana_board",
     "master/mana_board/mana_node.orderedmap": "mana_node",
     "master/character/character_gacha_sound.orderedmap": "character_gacha_sound",
+    "master/character/unique_condition.orderedmap": "unique_condition",
+    "master/shop/boss_coin_shop.orderedmap": "boss_coin_shop",
+    "master/shop/boss_coin_shop_category.orderedmap": "boss_coin_shop_category",
 }
 
 
@@ -2263,6 +2270,101 @@ def save_skill_dsl_json(character: str, level: str, json_text: str, dry_run: boo
     return {"changes": 1, "log": "\n".join(log), "written": written, "dry_run": dry_run}
 
 
+# ---------------------------------------------------------------- 技能效果文件上传
+# 用户自己写好的技能效果(ActionDsl)直接替换目标文件:
+#   main   = action_skill 各级别(1=觉醒前/基础技,2=觉醒后/+进化技,3=++)的 program_path
+#   switch = switched_action_skill 变体(形态切换后技能,外层键=code_name,内层 1/2,c0=program_path)
+# 输入两种:json_text = wf_dsl JSON 格式(「技能 JSON」导出的同款,编码时自校验);
+#          data_b64  = 原始 AMF3 字节(或 .deflate 压缩,自动识别),parse 通过才收。
+# 文件可不存在(官方未下发)→ 新建 sha1 路径;program_path 无效(短行)→ 报错。
+
+
+def _dsl_target_pp(character: str, level: str, kind: str) -> str:
+    level = str(level)
+    if kind == "switch":
+        key = _action_skill_key(character)
+        t = wf_boss.qlib.load_table(SWITCHED_SKILL_LOGICAL)
+        row = (t.get(key) or {}).get(level)
+        if not row:
+            raise ValueError(f"switched_action_skill 中没有 {key} 级别{level}"
+                             f"(现有变体键: {'/'.join(t)})")
+        pp = row.split(",")[0].strip()
+    else:
+        pp = _skill_program_path(character, level)
+    if not pp or pp == "(None)":
+        raise ValueError("该级别没有效果文件引用(官方短行),先用「整技能替换」建立引用")
+    return pp
+
+
+def upload_skill_dsl(character: str, level: str, kind: str, json_text: str,
+                     data_b64: str, dry_run: bool) -> dict:
+    pp = _dsl_target_pp(character, level, kind)
+    if json_text.strip():
+        new = wf_dsl.json_text_to_dsl(json_text)  # 编码 → parse 自校验
+        src_desc = "JSON 文本"
+    elif data_b64:
+        raw = base64.b64decode(data_b64)
+        try:
+            wf_dsl.parse_dsl(raw)
+            new = raw
+            src_desc = "AMF3 二进制"
+        except Exception:
+            import zlib as _z
+            try:
+                new = _z.decompress(raw, -15)
+            except Exception:
+                try:
+                    new = _z.decompress(raw)
+                except Exception:
+                    raise ValueError("上传内容既不是可解析的 AMF3,也不是 deflate/zlib 压缩包")
+            wf_dsl.parse_dsl(new)  # 解压后必须可解析
+            src_desc = "deflate 压缩 AMF3"
+    else:
+        raise ValueError("缺少上传内容(json_text 或 data_b64)")
+
+    lg = wf_dsl.dsl_logical(pp)
+    d = core.sha1_path(lg)
+    fp = TARGET_STORE / d[:2] / d[2:]
+    old = None
+    if fp.exists():
+        import zlib as _z
+        try:
+            old = _z.decompress(fp.read_bytes(), -15)
+        except Exception:
+            old = None
+    if old == new:
+        return {"changes": 0, "log": "内容与当前文件一致,无需写入", "written": None,
+                "dry_run": dry_run}
+    n_leaf = len(wf_dsl.parse_dsl(new)["numbers"])
+    sharers = _dsl_sharers(pp)
+    log = [f"{pp} 效果文件{'替换' if old is not None else '新建'}({src_desc}): "
+           f"{len(old) if old is not None else 0}B -> {len(new)}B,数值叶子 {n_leaf}"]
+    if len(sharers) > 1:
+        log.append(f"共享提醒: {len(sharers)} 个技能键引用此文件({'/'.join(sharers)}),全部一起变")
+    written = None
+    if not dry_run:
+        fp.parent.mkdir(parents=True, exist_ok=True)
+        suffix = ".bak-wfmod-dslup-" + time.strftime("%Y%m%d-%H%M%S")
+        wf_dsl.save_dsl_file(fp, new, suffix)
+        add_pending(fp)
+        record_change(lg, "\n".join(log),
+                      fp.with_name(fp.name + suffix) if old is not None else None)
+        written = str(fp)
+    return {"changes": 1, "log": "\n".join(log), "written": written, "dry_run": dry_run,
+            "note": "发布后生效;上传前可先用「JSON」按钮导出现有文件做底稿"}
+
+
+def switched_skill_variants(character: str) -> dict:
+    """该角色(按 code_name)在 switched_action_skill 里的变体级别与引用;无则给全部键供参考。"""
+    key = _action_skill_key(character)
+    t = wf_boss.qlib.load_table(SWITCHED_SKILL_LOGICAL)
+    mine = t.get(key) or {}
+    return {"character": str(character), "key": key,
+            "levels": [{"level": lv, "program_path": row.split(",")[0].strip()}
+                       for lv, row in mine.items()],
+            "all_keys": list(t)}
+
+
 # ---------------------------------------------------------------- 单角色快照/还原 + 克隆
 # 快照 = 一个 zip:②层全部表行(平表存解码文本/嵌套表存外层原样字节) + ①层两 json 条目
 #        + 全部资产文件(存储态原样) + 技能 DSL 文件。还原 = 逐项写回(自动备份+进待发布)。
@@ -3002,6 +3104,11 @@ import threading
 MOD_DIR = Path(__file__).resolve().parent
 
 TOOLBOX_TOOLS = {
+    "balance_suite": {
+        "title": "平衡增强总包",
+        "script": MOD_DIR / "wf_balance_suite.py",
+        "desc": "全角色平衡增强总包 v3:不勾选=dry-run 预览;可选 应用/发布/打分享包(唯一会写 store 的工具箱任务)",
+    },
     "export_assets": {
         "title": "全量解密导出",
         "script": MOD_DIR / "wf_export_assets.py",
@@ -3020,6 +3127,7 @@ TOOLBOX_TOOLS = {
 }
 # 各工具允许透传的 CLI 参数(白名单;flag 型值为 True 时加开关)
 TOOLBOX_ARG_WHITELIST = {
+    "balance_suite": {"apply": bool, "publish": bool, "export-pack": bool, "force": bool},
     "export_assets": {"out": str, "limit": int, "workers": int,
                       "only-bundle": bool, "no-skip": bool},
     "recover_pathlist": {"out": str},
@@ -3118,6 +3226,860 @@ def toolbox_cancel() -> dict:
     except Exception as exc:
         return {"ok": False, "log": f"终止失败: {exc}"}
     return {"ok": True, "log": f"已请求终止 {_TB['title']}"}
+
+
+# ---------------------------------------------------------------- 立绘定位(详情页/概览页)
+# 逆向结论(2026-07-12,对照 CharacterImageValues/FullShotImageAttributeValues/
+# FullShotImageViewTools.applyTextureToImage/getOffsetToCenterizeFace):
+# 立绘 PNG 是**裁剪图**(trim 后),两张嵌套表把它摆回 1440x1920 设计画布:
+#   master/generated/character_image.orderedmap(内层键=形态0/1,行=CSV 4列):
+#     full_shot_x, full_shot_y = 裁剪图在画布中的偏移;full_shot_width/height =
+#     裁剪图尺寸(**必须等于 PNG 实际宽高**,换不同尺寸立绘不更新这行就会错位!)
+#   master/character/full_shot_image_attribute.orderedmap(内层键=形态0/1,行=CSV 5列):
+#     pivot_x, pivot_y, scale = 角色详情页标准立绘位置(image.x = -pivot_x*scale;
+#       pivot 是画布坐标系里对齐到视图原点的点,默认 1000,1000 / scale=1)
+#     face_x, face_y = 脸部画布坐标;概览/列表页(centeringKind=1/2)按
+#       scale*(pivot-face) 偏移把脸对准框中心 —— 即"概览页立绘位置"
+
+CHAR_IMAGE_LOGICAL = "master/generated/character_image.orderedmap"
+FS_ATTR_LOGICAL = "master/character/full_shot_image_attribute.orderedmap"
+
+
+def _load_nested_opt(logical: str) -> core.OrderedMap:
+    p = core.table_path(TARGET_STORE, logical)
+    if p.exists():
+        return core.read_orderedmap_file_raw_rows(p, logical)
+    if SOURCE_STORE:
+        sp = core.table_path(SOURCE_STORE, logical)
+        if sp.exists():
+            return core.read_orderedmap_file_raw_rows(sp, logical)
+    raise FileNotFoundError(f"cannot read {logical}")
+
+
+def _full_shot_png_dims(code_name: str, level: str) -> tuple[int, int] | None:
+    loc = wf_assets.locate(TARGET_STORE, f"character/{code_name}/ui/full_shot_1440_1920_{level}.png")
+    if not loc:
+        return None
+    return wf_assets.png_dims(wf_assets.png_decode(loc[1].read_bytes()))
+
+
+def get_char_image_pos(cid: str) -> dict:
+    cid = str(cid)
+    code = next((c["code_name"] for c in load_characters() if c["id"] == cid), None)
+    if not code:
+        raise ValueError(f"角色不存在: {cid}")
+    out = []
+    tables = {}
+    for name, logical in (("fs", CHAR_IMAGE_LOGICAL), ("attr", FS_ATTR_LOGICAL)):
+        try:
+            om = _load_nested_opt(logical)
+            tables[name] = core.read_orderedmap_file_from_bytes(om.rows[om.keys.index(cid)]) \
+                if cid in om.keys else {}
+        except Exception:
+            tables[name] = {}
+    levels = sorted(set(tables["fs"]) | set(tables["attr"]) | {"0", "1"}, key=str)
+    for lv in levels:
+        dims = _full_shot_png_dims(code, lv)
+        fs = [x.strip() for x in tables["fs"].get(lv, "").split(",")] if tables["fs"].get(lv) else None
+        at = [x.strip() for x in tables["attr"].get(lv, "").split(",")] if tables["attr"].get(lv) else None
+        out.append({
+            "level": lv,
+            "img_w": dims[0] if dims else None, "img_h": dims[1] if dims else None,
+            "fs": {"x": fs[0], "y": fs[1], "w": fs[2], "h": fs[3]} if fs and len(fs) >= 4 else None,
+            "attr": {"pivot_x": at[0], "pivot_y": at[1], "scale": at[2],
+                     "face_x": at[3], "face_y": at[4]} if at and len(at) >= 5 else None,
+            "size_mismatch": bool(dims and fs and len(fs) >= 4
+                                  and (fs[2] != str(dims[0]) or fs[3] != str(dims[1]))),
+        })
+    return {"character": cid, "code_name": code, "levels": out,
+            "note": "内容框 w/h 必须等于立绘 PNG 实际宽高(换图后点「按图自动」);"
+                    "pivot/scale=详情页位置(x=-pivot*scale),face=概览页脸部居中点(画布坐标)。"
+                    "改后发布生效。"}
+
+
+def _num_or_raise(v, f: str, float_ok: bool = False) -> str:
+    v = str(v).strip()
+    try:
+        (float if float_ok else int)(v)
+    except ValueError:
+        raise ValueError(f"{f} 必须是{'数值' if float_ok else '整数'}: {v!r}")
+    return v
+
+
+def save_char_image_pos(cid: str, level: str, fs: dict | None, attr: dict | None,
+                        dry_run: bool) -> dict:
+    """写立绘定位:fs=内容框(character_image 4列),attr=摆放属性(attribute 5列)。"""
+    cid, level = str(cid), str(level).strip()
+    if level not in ("0", "1"):
+        raise ValueError(f"形态必须是 0(基础)或 1(觉醒): {level!r}")
+    log: list[str] = []
+    jobs = []  # (logical, 新内层行文本)
+    if fs:
+        row = ",".join(_num_or_raise(fs.get(k, ""), f"内容框 {k}") for k in ("x", "y", "w", "h"))
+        jobs.append((CHAR_IMAGE_LOGICAL, row, "内容框(character_image)"))
+    if attr:
+        vals = [_num_or_raise(attr.get("pivot_x", ""), "pivot_x"),
+                _num_or_raise(attr.get("pivot_y", ""), "pivot_y"),
+                _num_or_raise(attr.get("scale", ""), "scale", float_ok=True),
+                _num_or_raise(attr.get("face_x", ""), "face_x"),
+                _num_or_raise(attr.get("face_y", ""), "face_y")]
+        jobs.append((FS_ATTR_LOGICAL, ",".join(vals), "摆放属性(full_shot_image_attribute)"))
+    if not jobs:
+        return {"changes": 0, "log": "没有修改", "written": None, "dry_run": dry_run}
+
+    written = []
+    changes = 0
+    for logical, new_text, tag in jobs:
+        om = _load_nested_opt(logical)
+        if cid in om.keys:
+            inner = core.read_orderedmap_file_from_bytes(om.rows[om.keys.index(cid)])
+        else:
+            inner = {}
+            log.append(f"{cid} {tag}: 表中无此角色,新增外层键")
+        old = inner.get(level)
+        if old == new_text:
+            continue
+        log.append(f"{cid} {tag} 形态{level}: {old!r} -> {new_text!r}")
+        changes += 1
+        if dry_run:
+            continue
+        inner[level] = new_text
+        inner_om = core.OrderedMap("<inner>", list(inner.keys()),
+                                   [t.encode("utf-8") for t in inner.values()], Path("."))
+        blob = core.build_orderedmap(inner_om)
+        if cid in om.keys:
+            om.rows[om.keys.index(cid)] = blob
+        else:
+            om.keys.append(cid)
+            om.rows.append(blob)
+        written.append(_write_nested(om, logical, "\n".join(log)))
+    if changes == 0:
+        return {"changes": 0, "log": "内容与当前一致,无需写入", "written": None, "dry_run": dry_run}
+    return {"changes": changes, "log": "\n".join(log),
+            "written": "; ".join(written) if written else None, "dry_run": dry_run,
+            "note": "发布后生效(两张表都在 ② 层)"}
+
+
+# ---------------------------------------------------------------- 服务端推送(mod-admin)
+# 服务端 src/lib/assets.ts 的商店/角色简化表已改为可热重载;
+# POST /api/mod-admin/reload_assets 让改动即时生效,不用重启服务端。
+# 地址优先级:WF_SERVER_URL > 项目根 .env 的 CN_LISTEN_HOST/PORT > 127.0.0.1:8001。
+
+
+def _resolve_server_url() -> str:
+    env = os.environ.get("WF_SERVER_URL")
+    if env:
+        return env.rstrip("/")
+    host, port = "127.0.0.1", "8001"
+    try:
+        for line in (ROOT / ".env").read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line.startswith("CN_LISTEN_HOST="):
+                host = line.split("=", 1)[1].strip().strip('"').strip("'") or host
+            elif line.startswith("CN_LISTEN_PORT="):
+                port = line.split("=", 1)[1].strip().strip('"').strip("'") or port
+    except Exception:
+        pass
+    if host in ("0.0.0.0", ""):
+        host = "127.0.0.1"
+    return f"http://{host}:{port}"
+
+
+SERVER_URL = _resolve_server_url()
+
+
+def _server_call(path: str, post: bool = False) -> dict:
+    req = urllib.request.Request(
+        SERVER_URL + path,
+        data=b"{}" if post else None,
+        headers={"Content-Type": "application/json"} if post else {},
+        method="POST" if post else "GET")
+    with urllib.request.urlopen(req, timeout=8) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def server_ping() -> dict:
+    try:
+        d = _server_call("/api/mod-admin/ping")
+        return {"online": True, "url": SERVER_URL, **d}
+    except Exception as exc:
+        # 字段名用 detail 而非 error:离线是正常状态,不能触发前端 api() 的统一报错
+        return {"online": False, "url": SERVER_URL, "detail": str(exc)}
+
+
+def server_push() -> dict:
+    """让运行中的服务端重读商店/角色简化表等 assets json(不用重启)。"""
+    try:
+        d = _server_call("/api/mod-admin/reload_assets", post=True)
+    except urllib.error.HTTPError as exc:
+        raise ValueError(f"服务端返回 {exc.code}(旧版服务端无此接口?先 npx tsc + 重启一次): {exc}")
+    except Exception as exc:
+        raise ValueError(f"服务端不在线({SERVER_URL}),改动会在下次启动服务端时生效: {exc}")
+    files = d.get("reloaded") or []
+    return {"ok": True, "log": f"服务端已重读 {len(files)} 个文件: " + ", ".join(files),
+            "reloaded": files}
+
+
+# ---------------------------------------------------------------- 多行安全 CSV
+# boss_coin_shop 等商店表的描述列含换行(带引号的多行 CSV 字段)。
+# read_csv_lines 按物理行拆,会把这类行拆坏 —— 商店/特殊效果表一律用下面这对
+# (csv.reader 吃整段文本,正确处理引号内换行;全表 6566 行字节级往返已验证)。
+
+
+def _read_ml(text: str) -> list[list[str]]:
+    if not text:
+        return []
+    return list(csv.reader(io.StringIO(text)))
+
+
+def _write_ml(rows: list[list[str]]) -> str:
+    buf = io.StringIO()
+    w = csv.writer(buf, lineterminator="\n")
+    w.writerows(rows)
+    out = buf.getvalue()
+    return out[:-1] if out.endswith("\n") else out
+
+
+def _write_with_backup_ml(table: core.OrderedMap, parsed: dict, log_lines: list[str],
+                          bak_tag: str = ".bak-wfmod-gui-") -> Path:
+    """同 _write_with_backup,但行文本用多行安全编码(勿对商店表用 write_csv_lines)。"""
+    table.set_text_rows({k: _write_ml(r) for k, r in parsed.items()})
+    suffix = bak_tag + time.strftime("%Y%m%d-%H%M%S")
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        written = core.write_table(table, TARGET_STORE, suffix, no_backup=False)
+    log_lines.append(buf.getvalue().strip())
+    add_pending(written)
+    summary = "\n".join(l for l in log_lines if l and not l.startswith("backup"))
+    record_change(table.logical_path, summary, written.with_name(written.name + suffix))
+    return written
+
+
+def _write_json_asset_file(p: Path, data, tag: str, bak_tag: str) -> str:
+    """服务端 assets/*.json 或 cdndata 镜像写盘:备份 + 紧凑 JSON + 改动日志。"""
+    suffix = bak_tag + time.strftime("%Y%m%d-%H%M%S")
+    bak = None
+    if p.exists():
+        bak = p.with_name(p.name + suffix)
+        if not bak.exists():
+            shutil.copy2(p, bak)
+    p.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    record_change(tag, f"{p.name} 写入", bak)
+    return str(p)
+
+
+# ---------------------------------------------------------------- 特殊效果 unique_condition
+# 表:master/character/unique_condition.orderedmap(平表,单行 15 列)
+#   c0=string_id  c1=名称(战斗内浮标注释)  c2=图标逻辑路径(不带 .png)
+#   c3=持续帧(99999999=永续)  c4=最大层数((None)=1)  c5-c8=(None)
+#   c9-c13=行为开关(含直接消失/坏状态类,语义未全逆向,JSON 直改可调)  c14=扩展引用
+# 图标:battle/common/unique_condition/<string_id>.png,48x48(全 21 张实测同尺寸)。
+# 词条引用:ability 行的 unique_condition_id 列填本表键;赋予=效果枚举 461(ConditionUnique),
+# 消耗=525(ConsumeUniqueCondition),触发/条件侧用 accumulation_unique_condition 系枚举。
+
+UNIQUE_LOGICAL = "master/character/unique_condition.orderedmap"
+UNIQUE_ICON_DIR = "battle/common/unique_condition"
+UNIQUE_ROW_WIDTH = 15
+
+
+def list_unique_conditions() -> dict:
+    om = core.load_table(UNIQUE_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    out = []
+    for k, t in om.text_rows().items():
+        rows = _read_ml(t)
+        row = core.normalize_row_length(rows[0] if rows else [], UNIQUE_ROW_WIDTH)
+        icon = row[2] if row[2] not in ("", "(None)") else ""
+        out.append({"id": k, "string_id": row[0], "name": row[1], "icon": icon,
+                    "duration": row[3], "max_count": row[4],
+                    "flags": row[9:14], "extra": row[14],
+                    "icon_exists": bool(icon and wf_assets.locate(TARGET_STORE, icon + ".png"))})
+    out.sort(key=lambda c: int(c["id"]) if c["id"].isdigit() else 0)
+    return {"conditions": out,
+            "note": "词条里引用:unique_condition_id 列填本表 ID;赋予=效果枚举 461,消耗=525,"
+                    "触发条件用 accumulation_unique_condition 系。改表/图标后需右上角发布。"}
+
+
+def _write_png_asset(logical: str, png: bytes, expect: tuple[int, int] | None,
+                     force: bool, dry_run: bool) -> tuple[str, Path | None]:
+    """PNG 资产写入(支持全新路径):校验魔数/尺寸 → 混淆编码 → 备份 → 待发布。"""
+    if png[:8] != wf_assets.PNG_REAL:
+        raise ValueError("上传的不是标准 PNG 文件(魔数不对)")
+    dims = wf_assets.png_dims(png)
+    if expect and dims != expect and not force:
+        raise ValueError(f"图标必须是 {expect[0]}x{expect[1]}(上传的是 {dims[0]}x{dims[1]});"
+                         "确要用请勾「强制」(游戏内会被缩放/裁切)")
+    loc = wf_assets.locate(TARGET_STORE, logical)
+    root, fp = loc if loc else ("upload", wf_assets.path_in_root(TARGET_STORE, "upload", logical))
+    new = not fp.exists()
+    line = f"{logical}: {'新增' if new else '替换'} PNG {dims[0]}x{dims[1]} {len(png)}B [{root}]"
+    if dry_run:
+        return line, None
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    if not new:
+        bak = fp.with_name(fp.name + ".bak-wfmod-asset-" + time.strftime("%Y%m%d-%H%M%S"))
+        if not bak.exists():
+            shutil.copy2(fp, bak)
+    fp.write_bytes(wf_assets.png_encode(png))
+    add_pending(fp)
+    return line, fp
+
+
+def save_unique_condition(uid: str, edits: dict, icon_b64: str, force_icon: bool,
+                          dry_run: bool) -> dict:
+    """新增/编辑特殊效果:名称/持续帧/最大层数 + 48x48 图标(新增时必传)。"""
+    uid = str(uid).strip()
+    if not uid.isdigit():
+        raise ValueError(f"ID 必须是数字: {uid!r}")
+    om = core.load_table(UNIQUE_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    parsed = {k: _read_ml(t) for k, t in om.text_rows().items()}
+    exists = uid in parsed
+    log_lines: list[str] = []
+
+    if exists:
+        row = core.normalize_row_length(list(parsed[uid][0]), UNIQUE_ROW_WIDTH)
+    else:
+        sid = str(edits.get("string_id", "")).strip().lower()
+        if sid and not sid.startswith("unique_"):
+            sid = "unique_" + sid
+        if not sid or not all(c.isalnum() or c == "_" for c in sid):
+            raise ValueError("新增需要内部名 string_id(小写字母/数字/下划线,自动加 unique_ 前缀)")
+        if not str(edits.get("name", "")).strip():
+            raise ValueError("新增需要名称(战斗内浮标显示)")
+        if not icon_b64:
+            raise ValueError("新增需要上传 48x48 图标 PNG")
+        if any(_read_ml(t) and _read_ml(t)[0][0] == sid for t in om.text_rows().values()):
+            raise ValueError(f"内部名已存在: {sid}")
+        row = [sid, "", f"{UNIQUE_ICON_DIR}/{sid}", "99999999", "(None)",
+               "(None)", "(None)", "(None)", "(None)",
+               "false", "false", "0", "0", "true", "(None)"]
+        log_lines.append(f"{uid} 新增特殊效果 {sid}")
+
+    field_cols = {"name": 1, "duration": 3, "max_count": 4}
+    for f, ci in field_cols.items():
+        if f not in edits or edits[f] is None:
+            continue
+        val = str(edits[f]).strip()
+        if f in ("duration", "max_count") and val not in ("", "(None)"):
+            if not val.isdigit() or not (0 < int(val) < 2**31):
+                raise ValueError(f"{f} 必须是正整数或 (None): {val!r}")
+        if f == "name":
+            val = val.replace("\r", "").replace("\n", " ")
+            if not val:
+                raise ValueError("名称不能为空")
+        if val == "":
+            val = "(None)"
+        if row[ci] != val:
+            log_lines.append(f"{uid} {f}: {row[ci]!r} -> {val!r}")
+            row[ci] = val
+
+    icon_line = None
+    if icon_b64:
+        png = base64.b64decode(icon_b64)
+        icon_logical = row[2] + ".png"
+        icon_line, _fp = _write_png_asset(icon_logical, png, (48, 48), force_icon, dry_run)
+        log_lines.append(icon_line)
+
+    changes = len([l for l in log_lines if l])
+    if changes == 0:
+        return {"changes": 0, "log": "没有修改", "written": None, "dry_run": dry_run}
+    written = None
+    if not dry_run:
+        parsed[uid] = [row]
+        written = str(_write_with_backup_ml(om, parsed, log_lines, ".bak-wfmod-unique-"))
+    return {"changes": changes, "log": "\n".join(l for l in log_lines if l),
+            "written": written, "dry_run": dry_run,
+            "note": "发布后生效;词条引用该 ID 用 unique_condition_id 列(赋予 461/消耗 525)"}
+
+
+# ---------------------------------------------------------------- 商店 boss_coin_shop(三处同步)
+# ②层 master/shop/boss_coin_shop.orderedmap  = 客户端显示(名称/描述/图标/价格/库存/时间)
+# ①层 assets/cdndata/boss_coin_shop.json    = ②层的 JSON 镜像(逐键 [行数组],保持同步)
+# 服务端 assets/boss_coin_shop.json          = get_sales_list/buy 校验(costs/rewards/时间/库存)
+#        assets/boss_coin_shop_item_category_map.json = 物品ID→类目(buy 查这个)
+# ②层列(50 列,多行 desc 用 _read_ml/_write_ml;实测 6566 行全部 50 列等宽):
+#   c0=类目 c6=名称 c8=序号 c9=物品主表引用 c10=描述 c12=图标 c13=类型
+#   c17=货币道具ID c18=价格 c25=开始时间 c26=结束时间 c27=单次购买量(恒1)
+#   c28=c31=库存 c32=奖励type c33=奖励ID c34=奖励数量
+
+BSHOP_LOGICAL = "master/shop/boss_coin_shop.orderedmap"
+BSHOP_CAT_LOGICAL = "master/shop/boss_coin_shop_category.orderedmap"
+BSHOP_ROW_WIDTH = 50
+BSHOP_COLS = {"name": 6, "desc": 10, "icon": 12, "cost_id": 17, "cost_amount": 18,
+              "available_from": 25, "available_until": 26,
+              "reward_type": 32, "reward_id": 33, "reward_count": 34}
+SERVER_ASSETS = CDNDATA.parent  # assets/
+
+
+def _bshop_server_paths() -> tuple[Path, Path]:
+    return SERVER_ASSETS / "boss_coin_shop.json", SERVER_ASSETS / "boss_coin_shop_item_category_map.json"
+
+
+def _bshop_cdn_path() -> Path:
+    return CDNDATA / "boss_coin_shop.json"
+
+
+def shop_categories() -> dict:
+    cat = core.load_table(BSHOP_CAT_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    om = core.load_table(BSHOP_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    client_count: dict[str, int] = {}
+    for t in om.text_rows().values():
+        rows = _read_ml(t)
+        if rows:
+            c = rows[0][0]
+            client_count[c] = client_count.get(c, 0) + 1
+    try:
+        srv = json.loads(_bshop_server_paths()[0].read_text(encoding="utf-8"))
+    except Exception:
+        srv = {}
+    out = []
+    for k, t in cat.text_rows().items():
+        rows = _read_ml(t)
+        code = rows[0][0] if rows and rows[0] else ""
+        out.append({"id": k, "code": code,
+                    "client_items": client_count.get(k, 0),
+                    "server_items": len(srv.get(k, {}))})
+    out.sort(key=lambda c: int(c["id"]) if c["id"].isdigit() else 0)
+    return {"categories": out,
+            "server_file": str(_bshop_server_paths()[0]),
+            "note": "客户端列 = ②层表(改后发布);服务端列 = assets/boss_coin_shop.json"
+                    "(购买校验,改后点「推送服务端」即时生效)"}
+
+
+def shop_items(cat: str) -> dict:
+    cat = str(cat)
+    om = core.load_table(BSHOP_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    client: dict[str, list[str]] = {}
+    for k, t in om.text_rows().items():
+        rows = _read_ml(t)
+        if rows and rows[0] and rows[0][0] == cat:
+            client[k] = core.normalize_row_length(rows[0], BSHOP_ROW_WIDTH)
+    try:
+        srv_all = json.loads(_bshop_server_paths()[0].read_text(encoding="utf-8"))
+    except Exception:
+        srv_all = {}
+    srv = srv_all.get(cat, {})
+    items = []
+    for iid in sorted(set(client) | set(srv), key=lambda x: int(x) if x.isdigit() else 0):
+        row = client.get(iid)
+        s = srv.get(iid) or {}
+        cost = (s.get("costs") or [{}])[0]
+        reward = (s.get("rewards") or [{}])[0]
+        it = {"id": iid, "in_client": row is not None, "in_server": iid in srv}
+        if row:
+            it.update({f: row[ci] for f, ci in BSHOP_COLS.items()})
+            it["stock"] = row[28]
+        else:
+            it.update({"name": "", "desc": "", "icon": "",
+                       "cost_id": str(cost.get("id", "")), "cost_amount": str(cost.get("amount", "")),
+                       "available_from": s.get("availableFrom", ""),
+                       "available_until": s.get("availableUntil") or "",
+                       "stock": str(s.get("stock", "")),
+                       "reward_type": str(reward.get("type", "")),
+                       "reward_id": str(reward.get("id", "")),
+                       "reward_count": str(reward.get("count", ""))})
+        it["server"] = s or None
+        items.append(it)
+    return {"category": cat, "items": items,
+            "note": "改动同步写三处:②层表(发布生效)+cdndata 镜像+服务端 json(推送生效)。"
+                    "奖励 type:1=道具 2=角色 3=玛纳 4=装备(常见值,以现有条目为准)"}
+
+
+def _validate_shop_edits(edits: dict) -> dict:
+    """字段白名单 + 类型校验,返回规范化后的 {字段: 字符串值}。"""
+    out = {}
+    known = set(BSHOP_COLS) | {"stock"}
+    for f, v in edits.items():
+        if f not in known or v is None:
+            continue
+        v = str(v).strip()
+        if f in ("cost_id", "cost_amount", "stock", "reward_type", "reward_id", "reward_count"):
+            if not v.isdigit():
+                raise ValueError(f"{f} 必须是非负整数: {v!r}")
+            if int(v) >= 2**31:
+                raise ValueError(f"{f} 超出范围: {v}")
+        if f in ("available_from", "available_until") and v:
+            try:
+                time.strptime(v, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                raise ValueError(f"{f} 时间格式须为 YYYY-MM-DD HH:MM:SS: {v!r}")
+        if f in ("name", "desc"):
+            v = v.replace("\r", "")
+        out[f] = v
+    return out
+
+
+def save_shop_item(cat: str, iid: str, edits: dict, clone_from: str, dry_run: bool) -> dict:
+    """三处同步写一个商店条目;iid 不存在时从 clone_from(同类目)克隆新增。"""
+    cat, iid = str(cat).strip(), str(iid).strip()
+    if not cat.isdigit() or not iid.isdigit():
+        raise ValueError("类目/物品 ID 必须是数字")
+    ed = _validate_shop_edits(edits)
+    om = core.load_table(BSHOP_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    parsed = {k: _read_ml(t) for k, t in om.text_rows().items()}
+    log: list[str] = []
+
+    # ---- ② 层行(新增=克隆同类目行) ----
+    if iid in parsed:
+        row = core.normalize_row_length(list(parsed[iid][0]), BSHOP_ROW_WIDTH)
+    else:
+        src = str(clone_from or "").strip()
+        if not src:
+            src = next((k for k, r in parsed.items() if r and r[0] and r[0][0] == cat), "")
+        if not src or src not in parsed:
+            raise ValueError(f"新增需要 clone_from(同类目现有物品 ID),类目 {cat} 找不到可克隆行")
+        row = core.normalize_row_length(list(parsed[src][0]), BSHOP_ROW_WIDTH)
+        row[0] = cat
+        log.append(f"{iid} ②新增(克隆自 {src})")
+    for f, ci in BSHOP_COLS.items():
+        if f in ed and row[ci] != ed[f]:
+            log.append(f"{iid} ②{f}: {row[ci]!r} -> {ed[f]!r}")
+            row[ci] = ed[f]
+    if "stock" in ed:
+        for ci in (28, 31):
+            if row[ci] != ed["stock"]:
+                log.append(f"{iid} ②c{ci}(库存): {row[ci]!r} -> {ed['stock']!r}")
+                row[ci] = ed["stock"]
+
+    # ---- 服务端 json + 类目映射 ----
+    sp, mp = _bshop_server_paths()
+    srv = json.loads(sp.read_text(encoding="utf-8")) if sp.exists() else {}
+    cmap = json.loads(mp.read_text(encoding="utf-8")) if mp.exists() else {}
+    ent = dict(srv.get(cat, {}).get(iid) or {})
+    if not ent:
+        ent = {"costs": [], "rewards": [], "availableFrom": row[25],
+               "availableUntil": row[26] or None, "stock": int(row[28] or 0)}
+        log.append(f"{iid} srv新增条目(类目 {cat})")
+    costs = list(ent.get("costs") or [])
+    c0 = dict(costs[0]) if costs else {}
+    rewards = list(ent.get("rewards") or [])
+    r0 = dict(rewards[0]) if rewards else {}
+    srv_map = {"cost_id": ("costs", c0, "id"), "cost_amount": ("costs", c0, "amount"),
+               "reward_type": ("rewards", r0, "type"), "reward_id": ("rewards", r0, "id"),
+               "reward_count": ("rewards", r0, "count")}
+    for f, (_lst, obj, key) in srv_map.items():
+        if f in ed and obj.get(key) != int(ed[f]):
+            log.append(f"{iid} srv{f}: {obj.get(key)!r} -> {ed[f]}")
+            obj[key] = int(ed[f])
+    if c0:
+        ent["costs"] = [c0] + costs[1:]
+    if r0:
+        ent["rewards"] = [r0] + rewards[1:]
+    if "available_from" in ed and ent.get("availableFrom") != ed["available_from"]:
+        log.append(f"{iid} srvFrom: {ent.get('availableFrom')!r} -> {ed['available_from']!r}")
+        ent["availableFrom"] = ed["available_from"]
+    if "available_until" in ed:
+        nu = ed["available_until"] or None
+        if ent.get("availableUntil") != nu:
+            log.append(f"{iid} srvUntil: {ent.get('availableUntil')!r} -> {nu!r}")
+            ent["availableUntil"] = nu
+    if "stock" in ed and ent.get("stock") != int(ed["stock"]):
+        log.append(f"{iid} srvStock: {ent.get('stock')!r} -> {ed['stock']}")
+        ent["stock"] = int(ed["stock"])
+    if cmap.get(iid) != int(cat):
+        log.append(f"{iid} 类目映射 -> {cat}")
+
+    changes = len(log)
+    if changes == 0:
+        return {"changes": 0, "log": "没有修改", "written": None, "dry_run": dry_run}
+    written = None
+    if not dry_run:
+        # ② 层 + cdndata 镜像 + 服务端两 json,全部备份后写
+        parsed[iid] = [row]
+        written = str(_write_with_backup_ml(om, parsed, log, ".bak-wfmod-shop-"))
+        cp = _bshop_cdn_path()
+        cdn = json.loads(cp.read_text(encoding="utf-8")) if cp.exists() else {}
+        cdn[iid] = [row]
+        _write_json_asset_file(cp, cdn, "cdndata/boss_coin_shop.json", ".bak-wfmod-shop-")
+        srv.setdefault(cat, {})[iid] = ent
+        _write_json_asset_file(sp, srv, "server-assets/boss_coin_shop.json", ".bak-wfmod-shop-")
+        cmap[iid] = int(cat)
+        _write_json_asset_file(mp, cmap, "server-assets/boss_coin_shop_item_category_map.json",
+                               ".bak-wfmod-shop-")
+    return {"changes": changes, "log": "\n".join(log), "written": written, "dry_run": dry_run,
+            "note": "②层改动点右上角「发布」进游戏;服务端 json 已写盘,点「推送服务端」即时生效"}
+
+
+# ---------------------------------------------------------------- 通用 JSON 直改
+# 把任意支持表的一个键导出为 JSON 文本,浏览器里直接改整行/整树,保存 = 解析校验 →
+# dry-run 预览 → 备份写回。三类数据统一入口:
+#   flat   ② 层平表:键 → 多行 CSV,JSON = [[列,...], ...](一行一个数组,全是字符串)
+#   nested ② 层嵌套表:键 → 内层 orderedmap,JSON = {"内层键": [[列,...], ...]}
+#   cdn    ① 层 cdndata json:顶层键 → 原生 JSON 节点(重启服务端生效,不发 CDN)
+
+RAW_JSON_TABLES: dict[str, dict] = {
+    "ability":        {"kind": "flat", "logical": core.ABILITY_LOGICAL, "cn": "角色词条②"},
+    "leader_ability": {"kind": "flat", "logical": LEADER_LOGICAL, "cn": "队长技②"},
+    "ability_soul":   {"kind": "flat", "logical": SOUL_LOGICAL, "cn": "魂珠效果②"},
+    "weapon_ability": {"kind": "flat", "logical": WEAPON_LOGICAL, "cn": "武器强化词条②"},
+    "character":      {"kind": "flat", "logical": core.CHARACTER_LOGICAL, "cn": "角色主表②"},
+    "character_text": {"kind": "flat", "logical": CHAR_TEXT2_LOGICAL, "cn": "角色文本②"},
+    "character_awake_status": {"kind": "flat", "logical": AWAKE_LOGICAL, "cn": "觉醒加成②"},
+    "equipment":      {"kind": "flat", "logical": EQUIP_LOGICAL, "cn": "装备主表②"},
+    "equipment_enhancement": {"kind": "flat", "logical": ENH_LOGICAL, "cn": "武器改造②"},
+    "unique_condition": {"kind": "flat", "logical": UNIQUE_LOGICAL, "cn": "特殊效果②", "ml": True},
+    "boss_coin_shop":   {"kind": "flat", "logical": BSHOP_LOGICAL, "cn": "Boss币商店②", "ml": True},
+    "boss_coin_shop_category": {"kind": "flat", "logical": BSHOP_CAT_LOGICAL,
+                                "cn": "Boss币商店类目②", "ml": True},
+    "character_status": {"kind": "nested", "logical": core.STATUS_LOGICAL, "cn": "基础数值②(嵌套)"},
+    "action_skill":     {"kind": "nested", "logical": core.ACTION_SKILL_LOGICAL, "cn": "主动技②(嵌套)"},
+    "character_image":  {"kind": "nested", "logical": CHAR_IMAGE_LOGICAL, "cn": "立绘内容框②(嵌套)"},
+    "full_shot_image_attribute": {"kind": "nested", "logical": FS_ATTR_LOGICAL,
+                                  "cn": "立绘摆放属性②(嵌套)"},
+    "cdn:character":      {"kind": "cdn", "file": "character.json", "cn": "①角色名录"},
+    "cdn:character_text": {"kind": "cdn", "file": "character_text.json", "cn": "①角色文本"},
+    "cdn:gacha":          {"kind": "cdn", "file": "gacha.json", "cn": "①卡池"},
+    "cdn:gacha_feature_content": {"kind": "cdn", "file": "gacha_feature_content.json", "cn": "①卡池内容"},
+    "cdn:boss_coin_shop": {"kind": "cdn", "file": "boss_coin_shop.json", "cn": "①Boss币商店"},
+    "cdn:player_rank":    {"kind": "cdn", "file": "player_rank.json", "cn": "①玩家等级"},
+    "cdn:player_rank_full": {"kind": "cdn", "file": "player_rank_full.json", "cn": "①玩家等级full"},
+    "cdn:rare_score_reward": {"kind": "cdn", "file": "rare_score_reward.json", "cn": "①稀有度积分"},
+}
+
+
+def _rj_spec(table: str) -> dict:
+    spec = RAW_JSON_TABLES.get(str(table))
+    if not spec:
+        raise ValueError(f"不支持 JSON 直改的表: {table}(支持: {', '.join(RAW_JSON_TABLES)})")
+    return spec
+
+
+def _rj_load_table(spec: dict) -> core.OrderedMap:
+    if spec["kind"] == "flat":
+        return core.load_table(spec["logical"], TARGET_STORE, SOURCE_STORE)
+    for store in (TARGET_STORE, SOURCE_STORE):
+        if store:
+            p = core.table_path(store, spec["logical"])
+            if p.exists():
+                return core.read_orderedmap_file_raw_rows(p, spec["logical"])
+    raise FileNotFoundError(f"cannot read {spec['logical']} from target/source stores")
+
+
+def _rj_cdn_path(spec: dict) -> Path:
+    return CDNDATA / spec["file"]
+
+
+def _rj_dump_rows(rows: list[list[str]], indent: str = "") -> str:
+    """行数组 JSON 格式化:一行 CSV = 一行 JSON(126 列不炸成 126 行)。"""
+    if not rows:
+        return "[]"
+    body = (",\n" + indent + "  ").join(json.dumps(r, ensure_ascii=False) for r in rows)
+    return "[\n" + indent + "  " + body + "\n" + indent + "]"
+
+
+def _rj_dumps(node) -> str:
+    if isinstance(node, list) and node and all(isinstance(r, list) for r in node):
+        return _rj_dump_rows(node)
+    if isinstance(node, dict) and node and all(
+            isinstance(v, list) and all(isinstance(r, list) for r in v) for v in node.values()):
+        parts = [json.dumps(str(k), ensure_ascii=False) + ": " + _rj_dump_rows(v, "  ")
+                 for k, v in node.items()]
+        return "{\n  " + ",\n  ".join(parts) + "\n}"
+    return json.dumps(node, ensure_ascii=False, indent=2)
+
+
+def _rj_coerce_rows(value, where: str) -> list[list[str]]:
+    """JSON → CSV 行:必须是数组的数组,单元格标量一律转字符串(true/false 小写)。"""
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{where}: 必须是非空的「数组的数组」,如 [[\"a\",\"b\"],...]")
+    out = []
+    for li, row in enumerate(value, start=1):
+        if not isinstance(row, list):
+            raise ValueError(f"{where} 第{li}行: 不是数组")
+        cells = []
+        for ci, v in enumerate(row):
+            if isinstance(v, bool):
+                cells.append("true" if v else "false")
+            elif v is None:
+                cells.append("")
+            elif isinstance(v, (int, float, str)):
+                cells.append(str(v))
+            else:
+                raise ValueError(f"{where} 第{li}行第{ci}列: 只能是 字符串/数字/布尔/null")
+        out.append(cells)
+    return out
+
+
+def _rj_diff_rows(key: str, old: list[list[str]], new: list[list[str]],
+                  log_lines: list[str]) -> int:
+    """逐行逐列 diff,返回改动数;明细最多记 40 行。"""
+    changes = 0
+    for li in range(max(len(old), len(new))):
+        o = old[li] if li < len(old) else None
+        n = new[li] if li < len(new) else None
+        if o is None:
+            changes += 1
+            if len(log_lines) < 40:
+                log_lines.append(f"{key} 行{li + 1}: 新增({len(n)} 列)")
+            continue
+        if n is None:
+            changes += 1
+            if len(log_lines) < 40:
+                log_lines.append(f"{key} 行{li + 1}: 删除")
+            continue
+        for ci in range(max(len(o), len(n))):
+            ov = o[ci] if ci < len(o) else ""
+            nv = n[ci] if ci < len(n) else ""
+            if ov != nv:
+                changes += 1
+                if len(log_lines) < 40:
+                    log_lines.append(f"{key} 行{li + 1} c{ci}: {ov!r} -> {nv!r}")
+    return changes
+
+
+def raw_json_tables() -> dict:
+    return {"tables": [{"alias": a, "kind": s["kind"], "cn": s["cn"],
+                        "target": s.get("logical") or ("cdndata/" + s["file"])}
+                       for a, s in RAW_JSON_TABLES.items()]}
+
+
+def raw_json_keys(table: str, q: str) -> dict:
+    spec = _rj_spec(table)
+    if spec["kind"] == "cdn":
+        keys = list(json.loads(_rj_cdn_path(spec).read_text(encoding="utf-8")))
+    else:
+        keys = list(_rj_load_table(spec).keys)
+    q = (q or "").strip().lower()
+    hit = [k for k in keys if q in k.lower()] if q else keys
+    return {"total": len(hit), "keys": hit[:100]}
+
+
+def get_raw_json(table: str, key: str) -> dict:
+    spec = _rj_spec(table)
+    key = str(key)
+    if spec["kind"] == "cdn":
+        data = json.loads(_rj_cdn_path(spec).read_text(encoding="utf-8"))
+        if key not in data:
+            raise ValueError(f"{spec['file']} 中没有键 {key}")
+        note = (f"① 层 cdndata/{spec['file']} 的键 {key}(原生 JSON 节点)。"
+                "保存自动备份;重启服务端生效,不走发布。")
+        return {"table": table, "key": key, "kind": "cdn",
+                "json_text": _rj_dumps(data[key]), "note": note}
+    om = _rj_load_table(spec)
+    if key not in om.keys:
+        raise ValueError(f"{spec['logical']} 中没有键 {key}")
+    ki = om.keys.index(key)
+    if spec["kind"] == "flat":
+        reader = _read_ml if spec.get("ml") else core.read_csv_lines
+        rows = reader(om.rows[ki].decode("utf-8") if om.rows[ki] else "")
+        parsed = {k: reader(t) for k, t in om.text_rows().items()}
+        width = _table_row_width(parsed, len(rows[0]) if rows else 0)
+        note = (f"② 层平表 {spec['logical']}:一行 CSV = 一个数组,所有列都是字符串;"
+                f"表宽 {width} 列(短行自动补空,超宽且尾列非空会被拦下)。"
+                "可增删行;保存自动备份+进待发布。"
+                + ("单元格内允许换行(多行描述)。" if spec.get("ml") else ""))
+        return {"table": table, "key": key, "kind": "flat", "width": width,
+                "json_text": _rj_dumps(rows), "note": note}
+    inner = core.read_orderedmap_file_from_bytes(om.rows[ki])
+    node = {ik: core.read_csv_lines(t) for ik, t in inner.items()}
+    note = (f"② 层嵌套表 {spec['logical']}:{{内层键: [[列,...]]}};"
+            "已有内层键的相对顺序不可重排(客户端读取依赖),可增删键/行;"
+            "保存自动备份+进待发布。")
+    return {"table": table, "key": key, "kind": "nested",
+            "json_text": _rj_dumps(node), "note": note}
+
+
+def save_raw_json(table: str, key: str, json_text: str, dry_run: bool) -> dict:
+    spec = _rj_spec(table)
+    key = str(key)
+    try:
+        node = json.loads(json_text)
+    except Exception as exc:
+        raise ValueError(f"JSON 解析失败: {exc}")
+
+    if spec["kind"] == "cdn":
+        p = _rj_cdn_path(spec)
+        data = json.loads(p.read_text(encoding="utf-8"))
+        if key not in data:
+            raise ValueError(f"{spec['file']} 中没有键 {key}(不允许新增键)")
+        if data[key] == node:
+            return {"changes": 0, "log": "内容与当前文件一致,无需写入",
+                    "written": None, "dry_run": dry_run}
+        old_sz = len(json.dumps(data[key], ensure_ascii=False))
+        new_sz = len(json.dumps(node, ensure_ascii=False))
+        log = [f"{key} ①{spec['file']} 节点整体替换: {old_sz}B -> {new_sz}B"]
+        written = None
+        if not dry_run:
+            data[key] = node
+            suffix = ".bak-wfmod-rawjson-" + time.strftime("%Y%m%d-%H%M%S")
+            bak = p.with_name(p.name + suffix)
+            if not bak.exists():
+                shutil.copy2(p, bak)
+            p.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")),
+                         encoding="utf-8")
+            record_change("cdndata/" + spec["file"], "\n".join(log), bak)
+            if spec["file"] in ("character.json", "character_text.json"):
+                global _char_cache
+                _char_cache = None
+            written = str(p)
+        return {"changes": 1, "log": "\n".join(log) + "\n(① 层:重启服务端生效,不走发布)",
+                "written": written, "dry_run": dry_run}
+
+    om = _rj_load_table(spec)
+    if key not in om.keys:
+        raise ValueError(f"{spec['logical']} 中没有键 {key}(不允许新增键)")
+    ki = om.keys.index(key)
+
+    if spec["kind"] == "flat":
+        new_rows = _rj_coerce_rows(node, key)
+        reader = _read_ml if spec.get("ml") else core.read_csv_lines
+        parsed = {k: reader(t) for k, t in om.text_rows().items()}
+        width = _table_row_width(parsed, len(new_rows[0]))
+        for li, r in enumerate(new_rows, start=1):
+            if len(r) > width and any(x != "" for x in r[width:]):
+                raise ValueError(f"第{li}行 {len(r)} 列超过表宽 {width} 且尾列非空"
+                                 "(整表必须等宽,否则客户端 InvalidRowWidth 崩溃)")
+        new_rows = [core.normalize_row_length(r, width)[:width] for r in new_rows]
+        log_lines: list[str] = []
+        changes = _rj_diff_rows(key, parsed[key], new_rows, log_lines)
+        if changes == 0:
+            return {"changes": 0, "log": "内容与当前表一致,无需写入",
+                    "written": None, "dry_run": dry_run}
+        if changes > len(log_lines):
+            log_lines.append(f"… 其余 {changes - len(log_lines)} 处改动省略")
+        written = None
+        if not dry_run:
+            if spec.get("ml"):
+                written = str(_write_with_backup_ml(om, {key: new_rows}, log_lines))
+            else:
+                written = str(_write_with_backup(om, {key: new_rows}, log_lines))
+        return {"changes": changes, "log": "\n".join(log_lines),
+                "written": written, "dry_run": dry_run}
+
+    # nested:{内层键: [[列,...]]},内层已有键的相对顺序不可重排
+    if not isinstance(node, dict) or not node:
+        raise ValueError("嵌套表必须是非空 JSON 对象: {\"内层键\": [[列,...], ...]}")
+    old_inner = {ik: core.read_csv_lines(t)
+                 for ik, t in core.read_orderedmap_file_from_bytes(om.rows[ki]).items()}
+    new_inner = {str(ik): _rj_coerce_rows(v, f"{key}.{ik}") for ik, v in node.items()}
+    common_old = [k for k in old_inner if k in new_inner]
+    common_new = [k for k in new_inner if k in old_inner]
+    if common_old != common_new:
+        raise ValueError(f"内层已有键的相对顺序不可重排: 原 {common_old} -> 新 {common_new}")
+    log_lines = []
+    changes = 0
+    for ik in old_inner:
+        if ik not in new_inner:
+            changes += 1
+            log_lines.append(f"{key} 内层键 {ik}: 删除")
+    for ik, rows in new_inner.items():
+        if ik not in old_inner:
+            changes += 1
+            log_lines.append(f"{key} 内层键 {ik}: 新增({len(rows)} 行)")
+        else:
+            changes += _rj_diff_rows(f"{key}.{ik}", old_inner[ik], rows, log_lines)
+    if changes == 0:
+        return {"changes": 0, "log": "内容与当前表一致,无需写入",
+                "written": None, "dry_run": dry_run}
+    written = None
+    if not dry_run:
+        inner_om = core.OrderedMap("<rawjson-inner>", list(new_inner.keys()),
+                                   [core.write_csv_lines(r).encode("utf-8") if r else b""
+                                    for r in new_inner.values()], Path("."))
+        om.rows[ki] = core.build_orderedmap(inner_om)
+        written = _write_nested(om, spec["logical"],
+                                "\n".join(l for l in log_lines if l))
+    return {"changes": changes, "log": "\n".join(log_lines),
+            "written": written, "dry_run": dry_run}
 
 
 # ---------------------------------------------------------------- http server
@@ -3318,6 +4280,35 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/toolbox/status":
                 self._json(toolbox_status())
                 return
+            if path == "/raw_json/tables":
+                self._json(raw_json_tables())
+                return
+            if path == "/server/ping":
+                self._json(server_ping())
+                return
+            if path == "/char_image_pos":
+                self._json(get_char_image_pos((qs.get("character") or [""])[0]))
+                return
+            if path == "/skill_variants":
+                self._json(switched_skill_variants((qs.get("character") or [""])[0]))
+                return
+            if path == "/unique_conditions":
+                self._json(list_unique_conditions())
+                return
+            if path == "/shop/categories":
+                self._json(shop_categories())
+                return
+            if path == "/shop/items":
+                self._json(shop_items((qs.get("cat") or [""])[0]))
+                return
+            if path == "/raw_json/keys":
+                self._json(raw_json_keys((qs.get("table") or [""])[0],
+                                         (qs.get("q") or [""])[0]))
+                return
+            if path == "/raw_json":
+                self._json(get_raw_json((qs.get("table") or [""])[0],
+                                        (qs.get("key") or [""])[0]))
+                return
             self._json({"error": "not found"}, 404)
         except Exception as exc:
             self._json({"error": str(exc)}, 500)
@@ -3490,6 +4481,43 @@ class Handler(BaseHTTPRequestHandler):
                                                str(body.get("level", "")),
                                                str(body.get("json_text", "")),
                                                bool(body.get("dry_run"))))
+                return
+            if path == "/raw_json/save":
+                self._json(save_raw_json(str(body.get("table", "")),
+                                         str(body.get("key", "")),
+                                         str(body.get("json_text", "")),
+                                         bool(body.get("dry_run"))))
+                return
+            if path == "/server/push":
+                self._json(server_push())
+                return
+            if path == "/char_image_pos/save":
+                self._json(save_char_image_pos(str(body.get("character", "")),
+                                               str(body.get("level", "")),
+                                               body.get("fs"), body.get("attr"),
+                                               bool(body.get("dry_run"))))
+                return
+            if path == "/skill_dsl_upload":
+                self._json(upload_skill_dsl(str(body.get("character", "")),
+                                            str(body.get("level", "")),
+                                            str(body.get("kind", "main")),
+                                            str(body.get("json_text", "")),
+                                            str(body.get("data_b64", "")),
+                                            bool(body.get("dry_run"))))
+                return
+            if path == "/unique_condition/save":
+                self._json(save_unique_condition(str(body.get("id", "")),
+                                                 body.get("edits") or {},
+                                                 str(body.get("icon_b64", "")),
+                                                 bool(body.get("force_icon")),
+                                                 bool(body.get("dry_run"))))
+                return
+            if path == "/shop/item/save":
+                self._json(save_shop_item(str(body.get("cat", "")),
+                                          str(body.get("id", "")),
+                                          body.get("edits") or {},
+                                          str(body.get("clone_from", "")),
+                                          bool(body.get("dry_run"))))
                 return
             if path == "/skill_dsl/save":
                 self._json(save_skill_dsl(str(body.get("character", "")),
