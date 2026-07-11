@@ -168,7 +168,10 @@ python mod-tools/wf_publish.py --tables ability,character_status   # 或用 pend
 - `get_path` 端点 `is_initial`:客户端报了版本 → `false` → **增量只下小包**;
   不报 → `true` → 全量重下。(曾经硬编码 true 导致每次全量)
 
-服务端两行关键日志(排查用):`[CN-LOAD] res_ver=...` 和 `[CDN] get_path ... initial=false`。
+排查手段(2026-07-12 rebase 上游后):服务端日志看 `[CN-LOAD] res_ver=...`;get_path 行为直接
+curl 验证:`curl -H "res_ver: <客户端版>" -X POST <服务端>/api/index.php/asset/get_path`,
+看 `target_asset_version`(应=发布后最高版)与 `is_initial`(报了 res_ver 应为 false=增量)。
+版本判定逻辑在上游 `src/lib/version.ts`(computeAssetTarget/getEffectiveVersion)。
 
 `--tables` 别名:`ability` `character` `character_status` `leader_ability` `ability_soul`
 `character_awake_status` `action_skill`。新表加别名到 `wf_publish.py` 的 `TABLE_ALIASES`。
