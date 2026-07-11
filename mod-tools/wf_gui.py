@@ -217,6 +217,7 @@ _LOGICAL_ALIAS = {
     "master/character/unique_condition.orderedmap": "unique_condition",
     "master/shop/boss_coin_shop.orderedmap": "boss_coin_shop",
     "master/shop/boss_coin_shop_category.orderedmap": "boss_coin_shop_category",
+    "master/generated/trimmed_image.orderedmap": "trimmed_image",
 }
 
 
@@ -2076,6 +2077,8 @@ def replace_asset(logical: str, data: bytes, force: bool, dry_run: bool) -> dict
     old = fp.read_bytes()
     log = []
     atf_job = None
+    trim_job = None       # (表, 键, 新行) —— trimmed_image frame 同步
+    trim_nested_job = None  # (cid, level, 新内层文本) —— full_shot 的 character_image 同步
     if logical.endswith(".png"):
         if data[:8] != wf_assets.PNG_REAL:
             raise ValueError("上传的不是标准 PNG 文件(魔数不对)")
@@ -2084,9 +2087,34 @@ def replace_asset(logical: str, data: bytes, force: bool, dry_run: bool) -> dict
         if od and nd != od and not force:
             raise ValueError(f"尺寸不匹配:原图 {od[0]}x{od[1]},上传 {nd[0]}x{nd[1]}。"
                              f"sprite sheet/图集类必须同尺寸同布局;立绘可勾选「强制」替换"
-                             f"(游戏按原 pivot/缩放摆放,尺寸差异会导致偏移)")
+                             f"(裁剪图的 trim 定位会自动同步,图集类错位不可自动修)")
         enc = wf_assets.png_encode(data)
         log.append(f"{logical}: PNG {od[0]}x{od[1]}→{nd[0]}x{nd[1]}, {len(old)}B→{len(enc)}B [{root_name}]")
+        # ---- trim 同步:story/skill_cutin/full_shot 是裁剪图,尺寸变了必须同步
+        #      trimmed_image(纹理 frame),否则游戏内错位/出框(2026-07-12 逆向)。
+        if od and nd != od:
+            te = _trim_entry(logical)
+            if te:
+                tt, tkey, parts = te
+                tx, ty, cw, ch = parts[:4]
+                nx = max(0, int(tx) + (od[0] - nd[0]) // 2)
+                ny = max(0, int(ty) + (od[1] - nd[1]) // 2)
+                new_row = [str(nx), str(ny), cw, ch]
+                if new_row != parts[:4]:
+                    trim_job = (tt, tkey, new_row)
+                    log.append(f"trimmed_image[{tkey}]: {','.join(parts[:4])} -> "
+                               f"{','.join(new_row)}(画布 {cw}x{ch} 不变,内容框保持中心)")
+                m = _re.search(r"character/([^/]+)/ui/full_shot_1440_1920_([01])\.png$", logical)
+                if m:
+                    cid = next((c["id"] for c in load_characters()
+                                if c["code_name"] == m.group(1)), None)
+                    if cid:
+                        trim_nested_job = (cid, m.group(2), f"{nx},{ny},{nd[0]},{nd[1]}")
+                        log.append(f"character_image[{cid}][形态{m.group(2)}]: -> "
+                                   f"{trim_nested_job[2]}(内容框 w/h=新图尺寸,详情页 colorBounds 用)")
+            elif logical.split("/")[-1].startswith(("full_shot_", "skill_cutin_")) \
+                    or "/ui/story/" in logical:
+                log.append(f"⚠ trimmed_image 表中无 {logical[:-4]} 键,不同步(该图可能无 frame)")
         # skill_cutin:战斗真机只读配对的 .atf.deflate(android 根),必须连 ATF 一起重编码
         if "/ui/skill_cutin_" in logical:
             aloc = wf_assets.locate(TARGET_STORE, logical[:-4] + ".atf.deflate")
@@ -2116,6 +2144,26 @@ def replace_asset(logical: str, data: bytes, force: bool, dry_run: bool) -> dict
                 shutil.copy2(afp, abak)
             afp.write_bytes(aenc)
             add_pending(afp)
+        if trim_job:
+            tt, tkey, new_row = trim_job
+            _write_trim_row(tt, tkey, new_row, log)
+        if trim_nested_job:
+            cid, lv, new_text = trim_nested_job
+            om = _load_nested_opt(CHAR_IMAGE_LOGICAL)
+            if cid in om.keys:
+                inner = core.read_orderedmap_file_from_bytes(om.rows[om.keys.index(cid)])
+            else:
+                inner = {}
+            inner[lv] = new_text
+            inner_om = core.OrderedMap("<inner>", list(inner.keys()),
+                                       [t.encode("utf-8") for t in inner.values()], Path("."))
+            blob = core.build_orderedmap(inner_om)
+            if cid in om.keys:
+                om.rows[om.keys.index(cid)] = blob
+            else:
+                om.keys.append(cid)
+                om.rows.append(blob)
+            _write_nested(om, CHAR_IMAGE_LOGICAL, f"{cid} 立绘内容框随换图同步(形态{lv})")
         record_change(logical, "\n".join(log), bak)
         written = str(fp)
     return {"changes": 1, "log": "\n".join(log), "written": written,
@@ -3243,6 +3291,31 @@ def toolbox_cancel() -> dict:
 
 CHAR_IMAGE_LOGICAL = "master/generated/character_image.orderedmap"
 FS_ATTR_LOGICAL = "master/character/full_shot_image_attribute.orderedmap"
+# trimmed_image(平表,11778 键):键=图逻辑路径(不带 .png),行=x,y,画布w,画布h。
+# 客户端 ViewAssetCache 给**所有 UI 图**套 frame(Rectangle(-x,-y,w,h)):
+# story 表情差分 9792 / skill_cutin 996 / full_shot 990 全是裁剪图,
+# 换不同尺寸的图不同步此表 = 游戏内错位/出框。full_shot 的 x,y 与
+# character_image 表同值(980/980 实测),两处必须一起写。
+TRIMMED_LOGICAL = "master/generated/trimmed_image.orderedmap"
+
+
+def _trim_entry(logical_png: str) -> tuple[core.OrderedMap, str, list[str]] | None:
+    """查图片的 trim 行:返回 (表, 键, [x,y,画布w,画布h]) 或 None(表中无此图)。"""
+    tkey = logical_png[:-4] if logical_png.endswith(".png") else logical_png
+    try:
+        tt = core.load_table(TRIMMED_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    except Exception:
+        return None
+    text = tt.text_rows().get(tkey)
+    if not text:
+        return None
+    parts = [s.strip() for s in text.split(",")]
+    return (tt, tkey, parts) if len(parts) >= 4 else None
+
+
+def _write_trim_row(tt: core.OrderedMap, tkey: str, row: list[str],
+                    log_lines: list[str]) -> str:
+    return str(_write_with_backup(tt, {tkey: [row]}, log_lines))
 
 
 def _load_nested_opt(logical: str) -> core.OrderedMap:
@@ -3282,9 +3355,11 @@ def get_char_image_pos(cid: str) -> dict:
         dims = _full_shot_png_dims(code, lv)
         fs = [x.strip() for x in tables["fs"].get(lv, "").split(",")] if tables["fs"].get(lv) else None
         at = [x.strip() for x in tables["attr"].get(lv, "").split(",")] if tables["attr"].get(lv) else None
+        te = _trim_entry(f"character/{code}/ui/full_shot_1440_1920_{lv}.png")
         out.append({
             "level": lv,
             "img_w": dims[0] if dims else None, "img_h": dims[1] if dims else None,
+            "canvas_w": te[2][2] if te else "1440", "canvas_h": te[2][3] if te else "1920",
             "fs": {"x": fs[0], "y": fs[1], "w": fs[2], "h": fs[3]} if fs and len(fs) >= 4 else None,
             "attr": {"pivot_x": at[0], "pivot_y": at[1], "scale": at[2],
                      "face_x": at[3], "face_y": at[4]} if at and len(at) >= 5 else None,
@@ -3314,9 +3389,23 @@ def save_char_image_pos(cid: str, level: str, fs: dict | None, attr: dict | None
         raise ValueError(f"形态必须是 0(基础)或 1(觉醒): {level!r}")
     log: list[str] = []
     jobs = []  # (logical, 新内层行文本)
+    trim_sync = None  # (表, 键, 新行) —— trimmed_image 的 full_shot frame 同步
     if fs:
         row = ",".join(_num_or_raise(fs.get(k, ""), f"内容框 {k}") for k in ("x", "y", "w", "h"))
         jobs.append((CHAR_IMAGE_LOGICAL, row, "内容框(character_image)"))
+        # trimmed_image 的 x,y 与 character_image 同值(980/980 实测),必须一起写,
+        # 否则纹理 frame 与 colorBounds 不一致 → 部分场景错位
+        code = next((c["code_name"] for c in load_characters() if c["id"] == cid), None)
+        if code:
+            te = _trim_entry(f"character/{code}/ui/full_shot_1440_1920_{level}.png")
+            if te:
+                tt, tkey, parts = te
+                new_row = [str(fs.get("x")).strip(), str(fs.get("y")).strip(),
+                           parts[2], parts[3]]
+                if new_row != parts[:4]:
+                    trim_sync = (tt, tkey, new_row)
+                    log.append(f"{cid} trimmed_image[{tkey}]: {','.join(parts[:4])} -> "
+                               f"{','.join(new_row)}(x,y 随内容框同步,画布不变)")
     if attr:
         vals = [_num_or_raise(attr.get("pivot_x", ""), "pivot_x"),
                 _num_or_raise(attr.get("pivot_y", ""), "pivot_y"),
@@ -3353,11 +3442,16 @@ def save_char_image_pos(cid: str, level: str, fs: dict | None, attr: dict | None
             om.keys.append(cid)
             om.rows.append(blob)
         written.append(_write_nested(om, logical, "\n".join(log)))
+    if trim_sync:
+        changes += 1
+        if not dry_run:
+            tt, tkey, new_row = trim_sync
+            written.append(_write_trim_row(tt, tkey, new_row, log))
     if changes == 0:
         return {"changes": 0, "log": "内容与当前一致,无需写入", "written": None, "dry_run": dry_run}
     return {"changes": changes, "log": "\n".join(log),
             "written": "; ".join(written) if written else None, "dry_run": dry_run,
-            "note": "发布后生效(两张表都在 ② 层)"}
+            "note": "发布后生效(character_image/attribute/trimmed_image 均 ② 层)"}
 
 
 # ---------------------------------------------------------------- 服务端推送(mod-admin)
@@ -3825,6 +3919,7 @@ RAW_JSON_TABLES: dict[str, dict] = {
     "character_image":  {"kind": "nested", "logical": CHAR_IMAGE_LOGICAL, "cn": "立绘内容框②(嵌套)"},
     "full_shot_image_attribute": {"kind": "nested", "logical": FS_ATTR_LOGICAL,
                                   "cn": "立绘摆放属性②(嵌套)"},
+    "trimmed_image": {"kind": "flat", "logical": TRIMMED_LOGICAL, "cn": "裁剪图frame②(story/cutin/立绘)"},
     "cdn:character":      {"kind": "cdn", "file": "character.json", "cn": "①角色名录"},
     "cdn:character_text": {"kind": "cdn", "file": "character_text.json", "cn": "①角色文本"},
     "cdn:gacha":          {"kind": "cdn", "file": "gacha.json", "cn": "①卡池"},

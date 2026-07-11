@@ -59,7 +59,7 @@
 | `/unique_conditions` | — | 特殊效果(固有状态)全 21+ 条 `{conditions:[{id, string_id, name, icon, duration, max_count, flags[c9-13], extra, icon_exists}], note}` |
 | `/shop/categories` | — | Boss币商店 50 类 `{categories:[{id, code, client_items, server_items}], server_file, note}` |
 | `/shop/items` | `?cat=N` | 该类目物品合并视图(②层+服务端 json)`{items:[{id, in_client, in_server, name, desc, icon, cost_id, cost_amount, available_from/until, stock, reward_type/id/count, server}], note}` |
-| `/char_image_pos` | `?character=ID` | 立绘定位 `{code_name, levels:[{level, img_w, img_h, fs:{x,y,w,h}, attr:{pivot_x,pivot_y,scale,face_x,face_y}, size_mismatch}], note}`(fs=character_image 内容框,attr=full_shot_image_attribute) |
+| `/char_image_pos` | `?character=ID` | 立绘定位 `{code_name, levels:[{level, img_w, img_h, canvas_w, canvas_h, fs:{x,y,w,h}, attr:{pivot_x,pivot_y,scale,face_x,face_y}, size_mismatch}], note}`(fs=character_image 内容框,attr=full_shot_image_attribute,canvas 来自 trimmed_image;保存 fs 时 trimmed_image 的 x,y **自动同步**) |
 | `/skill_variants` | `?character=ID` | 形态切换变体 `{key, levels:[{level, program_path}], all_keys}`(switched_action_skill 内该角色引用) |
 | `/backups` | — | `[{table, name, size, mtime}]` |
 | `/mainpos` | — | `{restricted_rows, state}`(主位限制现状) |
@@ -91,7 +91,7 @@
 | `/shop/item/save` | `{cat, id, edits:{name?,desc?,icon?,cost_id?,cost_amount?,available_from?,available_until?,stock?,reward_type?,reward_id?,reward_count?}, clone_from?}` | **商店三处同步写**:②层 boss_coin_shop 行(c6名称/c10描述/c17-18成本/c25-26时间/c28+c31库存/c32-34奖励)+cdndata 镜像+服务端 boss_coin_shop.json(costs/rewards/时间/stock)+类目映射;id 不存在=克隆 clone_from 新增三处;时间格式 YYYY-MM-DD HH:MM:SS 强校验 |
 | `/char_image_pos/save` | `{character, level:0\|1, fs:{x,y,w,h}?, attr:{pivot_x,pivot_y,scale,face_x,face_y}?}` | **立绘定位**写回:fs→character_image(嵌套),attr→full_shot_image_attribute(嵌套);角色不在表中自动新增外层键;两表均②层发布生效 |
 | `/skill_dsl_upload` | `{character, level, kind:"main"\|"switch", json_text?\|data_b64?}` | **技能效果文件上传**:main=action_skill 级别(1/2/3),switch=switched_action_skill 变体;json_text=技能JSON(编码自校验)/data_b64=AMF3 或 deflate(自动识别,parse 通过才收);目标文件官方未下发=**新建**;program_path 无效(短行)报错;含共享文件提醒 |
-| `/asset/replace` | `{logical, data_b64, force?}` | 上传替换资产:PNG 校验魔数+尺寸(不匹配需 force),MP3 校验并转存储态;自动备份+进待发布(medium/android 根加前缀,发布自动分包) |
+| `/asset/replace` | `{logical, data_b64, force?}` | 上传替换资产:PNG 校验魔数+尺寸(不匹配需 force;**story/cut-in/立绘等裁剪图尺寸变化时 trimmed_image/character_image trim 定位自动同步**),MP3 **严格校验**(逐帧复核覆盖+CBR 恒定,VBR/损坏/半截拒收);自动备份+进待发布(medium/android 根加前缀,发布自动分包) |
 | `/char_snapshot` | `{character, note?}` | **单角色一键快照**:②层全部表行+①层条目+全部资产+技能DSL 打成 zip(work/char_snapshots/,实测约 7MB;无 dry_run,零副作用) |
 | `/char_restore` | `{file, dry_run}` | 快照还原:逐项比对只写有差异的部分(表行/①层/资产),自动备份+进待发布;①层部分需重启服务端 |
 | `/char_clone` | `{src, new_id, new_name?, new_code?, dry_run}` | **新建角色**:②层 **16 张按 character_id 索引的表**全部新增键(词条6键独立;含 character_image/full_shot_image_attribute/mana_board/mana_node 等嵌套表,原样字节复制)+①层两 json;**写入后校验键落盘否则抛错**。new_code 非空=资产独立(复制~32 资产+action_skill 独立键)。发放走官方邮件/admin(跳过扭蛋) |

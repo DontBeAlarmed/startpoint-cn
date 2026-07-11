@@ -263,7 +263,7 @@ td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;lin
           <b id="assetTitle"></b>
           <button class="sec" id="btnAssetReload">刷新</button>
         </div>
-        <div class="hint"><b>替换要求</b>:PNG=标准 PNG 文件;<b>sprite sheet/图标合集必须与原图同尺寸同布局</b>(配套 atlas 按坐标切图);立绘/cut-in 建议同尺寸,勾「强制」可绕过尺寸校验(游戏按原 pivot 摆放,尺寸差会偏移)。MP3=<b>CBR·Layer3</b>(VBR 不支持)。替换走 预览→确认→自动备份,大图(medium 根)发布时自动打进 medium 增量包。</div>
+        <div class="hint"><b>替换要求</b>:PNG=标准 PNG 文件;<b>sprite sheet/图标合集必须与原图同尺寸同布局</b>(配套 atlas 按坐标切图,错位不可自动修)。立绘/cut-in/story 表情差分是<b>裁剪图</b>:换不同尺寸勾「强制」后,<b>trim 定位(trimmed_image/character_image)自动同步</b>(保持内容框中心),不再错位。MP3=<b>CBR·Layer3</b>(VBR/损坏/半截文件会被严格校验拒绝,报错含 ffmpeg 转码命令)。替换走 预览→确认→自动备份,大图(medium 根)发布时自动打进 medium 增量包。</div>
         <div class="row" style="align-items:center">
           <b>资产包导入</b>
           <input id="packDir" placeholder="datamine 解包目录(如 D:\...\pirates_girl;相对路径 = character/&lt;code&gt;/ 下逻辑路径)" style="flex:1;min-width:320px">
@@ -1077,15 +1077,16 @@ async function loadImagePos(){
       F[f]=i;td.appendChild(i);tr.appendChild(td);};
     mk('fs_x',L.fs&&L.fs.x,48);mk('fs_y',L.fs&&L.fs.y,48);mk('fs_w',L.fs&&L.fs.w,52);mk('fs_h',L.fs&&L.fs.h,52);
     const ta=document.createElement('td');
+    const cw=parseInt(L.canvas_w)||1440, ch=parseInt(L.canvas_h)||1920;
     const ab=document.createElement('button');ab.className='mini';ab.textContent='按图自动';
-    ab.title='w/h=立绘 PNG 实际尺寸;x/y 保持原内容框中心不变(无原值则按 1440×1920 画布水平居中+底部对齐)';
+    ab.title='w/h=立绘 PNG 实际尺寸;x/y 保持原内容框中心不变(无原值则按 '+cw+'×'+ch+' 画布居中+底对齐);保存时 trimmed_image frame 自动同步';
     ab.onclick=()=>{
       if(!L.img_w)return log('该形态没有立绘',true);
       const ow=parseInt(F.fs_w.value), oh=parseInt(F.fs_h.value);
       const ox=parseInt(F.fs_x.value), oy=parseInt(F.fs_y.value);
       F.fs_w.value=L.img_w;F.fs_h.value=L.img_h;
-      F.fs_x.value=isNaN(ox)||isNaN(ow)?Math.round((1440-L.img_w)/2):Math.round(ox+(ow-L.img_w)/2);
-      F.fs_y.value=isNaN(oy)||isNaN(oh)?Math.max(0,1920-L.img_h):Math.round(oy+(oh-L.img_h)/2);
+      F.fs_x.value=isNaN(ox)||isNaN(ow)?Math.round((cw-L.img_w)/2):Math.round(ox+(ow-L.img_w)/2);
+      F.fs_y.value=isNaN(oy)||isNaN(oh)?Math.max(0,ch-L.img_h):Math.round(oy+(oh-L.img_h)/2);
       Object.values(F).forEach(i=>i.classList.toggle('mod',i.value!==i.dataset.orig));
     };
     ta.appendChild(ab);tr.appendChild(ta);

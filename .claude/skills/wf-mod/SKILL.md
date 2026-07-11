@@ -68,7 +68,17 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   `WF_PATHLIST_recovered.txt` 枚举+store 探测)/配套数据,预览+上传替换+尺寸校验;
   **cut-in 特例**:战斗真机只读配对 `skill_cutin_N.atf.deflate`(android 根,ETC1 纹理)
   不读 PNG,替换 PNG 时 GUI 经 `wf_atf.py` 自动重编码 ATF(手动:`python mod-tools/wf_atf.py
-  --regen character/<code>/ui/skill_cutin_0.png`);立绘等其他图无 ATF 配对,换 PNG 即生效;
+  --regen character/<code>/ui/skill_cutin_0.png`);android 根 996 文件实测**全部是 cut-in ATF**,
+  其他图无 ATF 配对,换 PNG 即生效;
+  **裁剪图 trim 铁律**(2026-07-12 逆向 TrimmedImageRepository/ViewAssetCache):
+  `master/generated/trimmed_image`(平表 11778 键,键=图逻辑路径不带 .png,行=x,y,画布w,画布h)
+  给 story 表情差分(9792)/skill_cutin(996)/full_shot 立绘(990)的纹理套 frame——
+  **换不同尺寸的这三类图必须同步该表,否则游戏内错位/出框**(语音图标等其余资产不在表内)。
+  full_shot 的 x,y 与 character_image 表同值(980/980 实测),两表须一起写。
+  GUI 替换资产/保存立绘定位时已**自动同步**(保持内容框中心;发布别名 trimmed_image);
+  **MP3 严格校验**(wf_assets.mp3_encode):逐帧复核转换覆盖到文件尾+码率恒定,
+  VBR/损坏/半截文件直接拒收(报错带 ffmpeg 转码命令;官方语音 400 抽样全 CBR 不误杀)——
+  此前半转换文件(前半存储态后半标准态)是"换语音崩溃"的根因;
   顶部「**资产包导入**」= datamine 解包目录一比一批量替换,`POST /asset/import_pack`) /
   基础数值 / **技能·倍率**(名称+游戏内效果描述+能量直改,级别移植/删除,整技能替换,
   「效果参数」=ActionDsl 数值原地补丁,「**JSON**」=整树 JSON 编辑可**增删效果命令**

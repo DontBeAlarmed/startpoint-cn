@@ -112,11 +112,82 @@ def mp3_decode(data: bytes) -> bytes:
     return _mp3_convert(data, 1023, 2047)
 
 
+def mp3_probe(data: bytes, sig: int) -> dict:
+    """逐帧探测(只读):{frames, bitrates, srates, end(帧流覆盖末位), tail(其后字节数)}。
+    与 _mp3_convert 同一走帧逻辑,用于量化"转换到底覆盖了多少"。"""
+    pos, n = 0, len(data)
+    sig_b = (sig >> 3) & 0xFF
+    frames = 0
+    bitrates: set[int] = set()
+    srates: set[int] = set()
+    while pos + 4 <= n:
+        b0 = data[pos]
+        if b0 == 0x49:
+            if data[pos:pos + 3] != b"ID3":
+                break
+            raw = int.from_bytes(data[pos + 6:pos + 10], "big")
+            size = 0
+            mask = 0x7F000000
+            while mask:
+                size >>= 1
+                size |= raw & mask
+                mask >>= 8
+            pos += size + 10
+            continue
+        if b0 == 0x54:
+            if data[pos:pos + 3] != b"TAG":
+                break
+            pos += 128
+            continue
+        if b0 == sig_b and (data[pos + 1] >> 5 & 7) == (sig & 7):
+            header = int.from_bytes(data[pos:pos + 4], "big")
+            version = header >> 19 & 3
+            layer = header >> 17 & 3
+            br_idx = header >> 12 & 0x0F
+            sr_idx = header >> 10 & 3
+            padding = header >> 9 & 1
+            if version == 1 or layer != 1 or br_idx in (0, 15) or sr_idx == 3:
+                break
+            bitrate = (_BITRATE_V1 if version == 3 else _BITRATE_V2)[br_idx]
+            srate = (_SRATE_V1 if version == 3 else _SRATE_V2 if version == 2 else _SRATE_V25)[sr_idx]
+            frames += 1
+            bitrates.add(bitrate)
+            srates.add(srate)
+            pos += int(144 * bitrate / srate + padding + 2e-10)
+            continue
+        break
+    return {"frames": frames, "bitrates": bitrates, "srates": srates,
+            "end": pos, "tail": n - pos}
+
+
 def mp3_encode(data: bytes) -> bytes:
-    """标准 MP3 → 存储态。"""
+    """标准 MP3 → 存储态。严格校验(2026-07-12 起):
+    _mp3_convert 遇到解析不了的地方会静默停止,产出"前半存储态/后半标准态"的
+    半转换文件——客户端播到断点即崩溃或截断。这里转换后逐帧复核:
+    覆盖必须到文件尾(允许 ≤512B 的 TAG/静默填充,且其中不得残留标准帧同步字);
+    帧码率必须恒定(游戏不支持 VBR;官方语音 400 抽样实测全部 CBR)。"""
     if not (data[:3] == b"ID3" or (len(data) > 1 and data[0] == 0xFF and (data[1] >> 5 & 7) == 7)):
-        raise ValueError("不是标准 MP3 文件(需 CBR/Layer3;VBR 不支持)")
-    return _mp3_convert(data, 2047, 1023)
+        raise ValueError("不是标准 MP3 文件(需 CBR·MPEG Layer3;先用 ffmpeg 转码: "
+                         "ffmpeg -i in.xxx -c:a libmp3lame -b:a 96k -write_xing 0 out.mp3)")
+    out = _mp3_convert(data, 2047, 1023)
+    p = mp3_probe(out, 1023)
+    if p["frames"] == 0:
+        raise ValueError("MP3 里找不到任何有效音频帧(文件损坏或非 MPEG Layer3)")
+    if p["tail"]:
+        rest = out[p["end"]:]
+        has_sync = any(rest[i] == 0xFF and i + 1 < len(rest) and rest[i + 1] >> 5 & 7 == 7
+                       for i in range(len(rest) - 1))
+        if has_sync or p["tail"] > 512:
+            raise ValueError(
+                f"MP3 转换不完整:{p['tail']} 字节未被识别"
+                f"({'其中含未转换的音频帧,' if has_sync else ''}疑似 VBR/损坏/含杂质),"
+                f"写入游戏会崩溃或截断,已拒绝。请用 ffmpeg 重转:"
+                f"ffmpeg -i in.mp3 -c:a libmp3lame -b:a 96k -write_xing 0 out.mp3")
+    if len(p["bitrates"]) > 1:
+        rates = sorted(b // 1000 for b in p["bitrates"])
+        raise ValueError(f"VBR 检测:帧码率不恒定 {rates} kbps,"
+                         "游戏只支持 CBR。请用 ffmpeg 转 CBR(加 -write_xing 0)")
+    return out
 
 
 # ---------------------------------------------------------------- 资产定位(三根)

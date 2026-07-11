@@ -96,6 +96,7 @@ TABLE_ALIASES = {
     "unique_condition": "master/character/unique_condition.orderedmap",
     "boss_coin_shop": "master/shop/boss_coin_shop.orderedmap",
     "boss_coin_shop_category": "master/shop/boss_coin_shop_category.orderedmap",
+    "trimmed_image": "master/generated/trimmed_image.orderedmap",
     # --- boss 战 / 副本 / 连战(roguelike boss rush 方案用,见 boss连战roguelike方案.md) ---
     "general_boss": "master/battle/boss/general_boss.orderedmap",
     "general_boss_state": "master/battle/boss/general_boss_state.orderedmap",
