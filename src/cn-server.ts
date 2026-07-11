@@ -15,6 +15,7 @@ import cnAssetPlugin from "./routes/cn/asset";
 import indexWebPlugin from "./routes/web";
 import indexWebApiPlugin from "./routes/web_api";
 import seedsWebApiPlugin from "./routes/web_api/seeds";
+import modAdminApiPlugin from "./routes/api/modAdmin";
 import seedValidator from "./lib/seed-validator";
 import reproduceApiPlugin from "./routes/api/reproduce";
 import tutorialApiPlugin from "./routes/api/tutorial";
@@ -508,6 +509,7 @@ fastify.register(itemApiPlugin, { prefix: `${apiPrefix}/item` });
 fastify.register(indexWebPlugin);
 fastify.register(indexWebApiPlugin, { prefix: "/api" });
 fastify.register(seedsWebApiPlugin, { prefix: "/api/seeds" });
+fastify.register(modAdminApiPlugin, { prefix: "/api/mod-admin" });
 
 const cdnHost = process.env.CN_LISTEN_HOST || "localhost";
 const cdnPort = process.env.CN_LISTEN_PORT || "8001";
