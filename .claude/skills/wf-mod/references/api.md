@@ -52,6 +52,15 @@
 | `/char_snapshots` | `?character=ID` | 单角色快照列表 `[{file, id, code_name, ts, note, size, assets}]` |
 | `/asset` | `?logical=路径` | **二进制**响应(自动解混淆:PNG 魔数/MP3 帧头),Content-Type 按扩展名 |
 | `/skill_dsl` | `?character=&level=` | 技能效果 DSL 数值树 `{program_path, numbers:[{offset, len, type, value, ctx}], note}` |
+| `/raw_json/tables` | — | JSON 直改支持的表 `{tables:[{alias, kind:flat\|nested\|cdn, cn, target}]}`(②平表9张/②嵌套2张/①cdndata 8个) |
+| `/raw_json/keys` | `?table=别名&q=过滤` | `{total, keys[]}`(最多 100) |
+| `/raw_json` | `?table=&key=` | 整键 JSON 视图 `{table, key, kind, json_text, note, width?}`:flat=`[[列,...],...]`(一行一数组)/nested=`{内层键:[[列,...]]}`/cdn=原生节点 |
+| `/server/ping` | — | `{online, url, server_time?, detail?}`(startpoint 服务端 mod-admin 探活;url 来自 WF_SERVER_URL > .env CN_LISTEN_* > 127.0.0.1:8001) |
+| `/unique_conditions` | — | 特殊效果(固有状态)全 21+ 条 `{conditions:[{id, string_id, name, icon, duration, max_count, flags[c9-13], extra, icon_exists}], note}` |
+| `/shop/categories` | — | Boss币商店 50 类 `{categories:[{id, code, client_items, server_items}], server_file, note}` |
+| `/shop/items` | `?cat=N` | 该类目物品合并视图(②层+服务端 json)`{items:[{id, in_client, in_server, name, desc, icon, cost_id, cost_amount, available_from/until, stock, reward_type/id/count, server}], note}` |
+| `/char_image_pos` | `?character=ID` | 立绘定位 `{code_name, levels:[{level, img_w, img_h, fs:{x,y,w,h}, attr:{pivot_x,pivot_y,scale,face_x,face_y}, size_mismatch}], note}`(fs=character_image 内容框,attr=full_shot_image_attribute) |
+| `/skill_variants` | `?character=ID` | 形态切换变体 `{key, levels:[{level, program_path}], all_keys}`(switched_action_skill 内该角色引用) |
 | `/backups` | — | `[{table, name, size, mtime}]` |
 | `/mainpos` | — | `{restricted_rows, state}`(主位限制现状) |
 
@@ -76,6 +85,12 @@
 | `/skill_level_copy` | `{from_character, from_level, to_character, to_level}` | 单级别移植:目标已有该级=原位替换,没有=追加(可给无＋＋角色加第 3 段) |
 | `/skill_level_delete` | `{character, level}` | 删技能级别(至少留 1;删"2"影响已进化存档,慎用) |
 | `/skill_dsl/save` | `{character, level, edits:[{offset, len, type, value}]}` | 技能效果数值**原地补丁**(U29 等长补位/double 覆写;超出原字节数拒绝) |
+| `/raw_json/save` | `{table, key, json_text}` | **JSON 直改**整键写回:flat 强制整表等宽(超宽尾列非空拒绝)、nested 内层已有键相对顺序不可重排、不允许新增顶层键;单元格数字/布尔自动转字符串;②层自动备份+进待发布,①cdndata 备份后直写(重启服务端生效,不发 CDN);ml 标记的表(unique_condition/boss_coin_shop*)走多行安全 CSV |
+| `/server/push` | `{}` | **推送服务端**:POST 服务端 `/api/mod-admin/reload_assets`,让其重读 9 个热重载 json(商店 7 文件+character.json),①层/服务端侧改动即时生效不用重启;服务端离线报友好错误 |
+| `/unique_condition/save` | `{id, edits:{name?,duration?,max_count?,string_id?}, icon_b64?, force_icon?}` | **特殊效果**新增/编辑:已有 id 改名称/持续帧/层数+可换图标;新 id=新增(需 string_id+name+icon_b64),行=默认模板,图标写全新 store 路径 `battle/common/unique_condition/<sid>.png`(48x48 强校验,force 可绕);全部进待发布 |
+| `/shop/item/save` | `{cat, id, edits:{name?,desc?,icon?,cost_id?,cost_amount?,available_from?,available_until?,stock?,reward_type?,reward_id?,reward_count?}, clone_from?}` | **商店三处同步写**:②层 boss_coin_shop 行(c6名称/c10描述/c17-18成本/c25-26时间/c28+c31库存/c32-34奖励)+cdndata 镜像+服务端 boss_coin_shop.json(costs/rewards/时间/stock)+类目映射;id 不存在=克隆 clone_from 新增三处;时间格式 YYYY-MM-DD HH:MM:SS 强校验 |
+| `/char_image_pos/save` | `{character, level:0\|1, fs:{x,y,w,h}?, attr:{pivot_x,pivot_y,scale,face_x,face_y}?}` | **立绘定位**写回:fs→character_image(嵌套),attr→full_shot_image_attribute(嵌套);角色不在表中自动新增外层键;两表均②层发布生效 |
+| `/skill_dsl_upload` | `{character, level, kind:"main"\|"switch", json_text?\|data_b64?}` | **技能效果文件上传**:main=action_skill 级别(1/2/3),switch=switched_action_skill 变体;json_text=技能JSON(编码自校验)/data_b64=AMF3 或 deflate(自动识别,parse 通过才收);目标文件官方未下发=**新建**;program_path 无效(短行)报错;含共享文件提醒 |
 | `/asset/replace` | `{logical, data_b64, force?}` | 上传替换资产:PNG 校验魔数+尺寸(不匹配需 force),MP3 校验并转存储态;自动备份+进待发布(medium/android 根加前缀,发布自动分包) |
 | `/char_snapshot` | `{character, note?}` | **单角色一键快照**:②层全部表行+①层条目+全部资产+技能DSL 打成 zip(work/char_snapshots/,实测约 7MB;无 dry_run,零副作用) |
 | `/char_restore` | `{file, dry_run}` | 快照还原:逐项比对只写有差异的部分(表行/①层/资产),自动备份+进待发布;①层部分需重启服务端 |

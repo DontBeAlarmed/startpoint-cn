@@ -57,7 +57,13 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   分区**) / 角色资料(**三层同步**:rarity/element 等 master 字段与文本同时写 ①层 cdndata
   + ②层 character/character_text 表 + `assets/character.json`;底部有**单角色一键快照/还原**
   =②层7表+①层+资产+DSL 打包 zip) /
-  **角色资产**(立绘/觉醒立绘/cut-in/图标合集/像素图/头像4组/缩略图3组/战斗UI/连锁cut-in/
+  **角色资产**(顶部有**立绘定位**区:立绘 PNG 是**裁剪图**,`generated/character_image`
+  嵌套表(内层0/1)存 内容框x,y=画布内偏移+w,h=**必须等于 PNG 实际宽高**(换不同尺寸立绘
+  不更新会错位,「按图自动」一键修);`character/full_shot_image_attribute` 嵌套表存
+  pivot_x,pivot_y,scale=**详情页标准立绘位置**(image.x=-pivot*scale)+face_x,face_y=
+  **概览页脸部居中点**(偏移=scale*(pivot-face));画布 1440×1920;
+  端点 `/char_image_pos|/char_image_pos/save`) /
+  (立绘/觉醒立绘/cut-in/图标合集/像素图/头像4组/缩略图3组/战斗UI/连锁cut-in/
   剧情横幅/**story 表情差分**/**语音全量 ally·battle·home·words**(story/words 来自
   `WF_PATHLIST_recovered.txt` 枚举+store 探测)/配套数据,预览+上传替换+尺寸校验;
   **cut-in 特例**:战斗真机只读配对 `skill_cutin_N.atf.deflate`(android 根,ETC1 纹理)
@@ -67,6 +73,9 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   基础数值 / **技能·倍率**(名称+游戏内效果描述+能量直改,级别移植/删除,整技能替换,
   「效果参数」=ActionDsl 数值原地补丁,「**JSON**」=整树 JSON 编辑可**增删效果命令**
   (`wf_dsl.encode_amf3` 全库 1035 文件字节级往返验证;int/double 靠 3 与 3.0 区分),
+  「**上传效果**」=外部写好的效果文件直接替换该级别(.json=技能JSON格式/.amf3·.deflate=
+  二进制自动识别,官方未下发的文件=新建;形态切换区另有**变体效果文件上传**,
+  端点 `/skill_dsl_upload`,kind=main/switch),
   「**形态切换**」区 = character 表 col9-16(HpHigh/ConditionExist/MultiballNumber/
   ChangeSkillFlag/IsUnison,切换目标限 switched_action_skill 表现有 6 键);
   注意个别角色技能行是**官方短行**(仅名称/描述,无 program_path,如 161177)或效果文件
@@ -74,7 +83,21 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   **Boss·副本**(双模式可见:boss_level 数值编辑 531 条,HP=基础值×等级曲线,改基础值=等比调血;
   22 类全副本列表,quest→field_data→zone 自动解析 boss,点 boss 名定位编辑;后端 `wf_boss.py`,
   quest 系三层压缩索引读写用 `wf_quest_lib.py`) /
-  词条移植 / 词条速查 / **新建角色**(克隆模板→
+  词条移植 / 词条速查 / **JSON 直改**(全局页签,双模式可见:任意支持表整键的 JSON 视图直接编辑,
+  ②平表=`[[列,...],...]`可增删行、②嵌套表=`{内层键:[[...]]}`内层键序不可重排、①cdndata=原生节点;
+  词条/数值/技能/资产/武器页均有「JSON」按钮带键跳转;端点 `/raw_json|/raw_json/save`) /
+  **特殊效果**(固有状态 `master/character/unique_condition` 表 21 键:c0=string_id c1=名称
+  c2=图标路径 c3=持续帧(99999999=永续) c4=最大层数;图标 `battle/common/unique_condition/
+  <sid>.png` **48×48**;页内可改名称/持续/层数、换图标、**新增条目**(新图标写全新 store 路径);
+  词条引用=unique_condition_id 列填表 ID,赋予枚举 461/消耗 525) /
+  **商店**(Boss币商店**三处同步写**:②层 `master/shop/boss_coin_shop`(客户端显示,50列,
+  c6名称/c10描述/c17-18货币+价格/c25-26时间窗/c28+c31库存/c32-34奖励type·id·数量)+
+  ①cdndata/boss_coin_shop.json(②层的 JSON 镜像,已验证 6566 键 100% 一致)+
+  服务端 assets/boss_coin_shop.json+类目映射(get_sales_list/buy 校验);改价/改奖励/克隆新增,
+  保存后②层走发布、服务端侧点「推送服务端」即时生效。
+  ⚠ 商店表 desc 含换行(引号内多行 CSV):**禁用 read_csv_lines 整表往返**(按物理行拆会拆坏),
+  用 wf_gui 的 `_read_ml/_write_ml`(csv.reader 全文本,6566 行字节级往返已验证)) /
+  **新建角色**(克隆模板→
   全新 ID,可勾「资产独立」=新 code_name+全套资产复制+独立 action_skill,金丝雀流程见页内) /
   **工具箱**(长任务后台子进程+进度轮询,同时只跑一个,输出均在 store 外:
   **全量解密导出**=`wf_export_assets.py` 全包解密建逻辑目录树、**路径表复原**=
@@ -150,10 +173,22 @@ python mod-tools/wf_publish.py --tables ability,character_status   # 或用 pend
 `--tables` 别名:`ability` `character` `character_status` `leader_ability` `ability_soul`
 `character_awake_status` `action_skill`。新表加别名到 `wf_publish.py` 的 `TABLE_ALIASES`。
 
+**上游 asset-patch 兼容**(2026-07-12 对照上游 main `12047e2`):上游服务端另有
+`assets/asset-patch/` 补丁机制(manifest.json 控 enabled,active/*.zip 也进 diff 列表),
+`lib/version.ts` 的 getEffectiveVersion = max(CDN 最高版, 启用 patch 版)。与本发布链路
+**并行不冲突**;`wf_publish.current_max_version` 已把启用 patch 版本纳入 max(防止版本号
+被 patch 越过导致客户端拉不到新包)。上游未动 shop.ts/lib assets/boss_coin_shop.json,
+商店三处同步与上游兼容。服务端 mod-admin 补丁见 `mod-tools/server-patch/`(更新服务端后套回)。
+
 ## 5. 服务端 / 模拟器管理
 
 - **启动服务端**:双击 `start-cn.bat`(自带端口自检:释放 8001 占用)。或
   `node --env-file=.env out/cn-server.js`。改了 `src/*.ts` 要先 `npx tsc`。
+- **热重载(mod-admin)**:`POST /api/mod-admin/reload_assets` 让服务端重读 9 个
+  mod 常改 json(商店 7 文件 + assets/character.json,见 `src/lib/assets.ts` 的
+  `reloadModAssets`),**不用重启**;`GET /api/mod-admin/ping` 探活。GUI 顶部
+  「推送服务端」按钮就是调它(地址取 WF_SERVER_URL > .env CN_LISTEN_* > 127.0.0.1:8001)。
+  其余 assets json 仍是静态 import,改了照旧要重启。
 - **不要用 preview 面板长期跑服务端**——会随会话回收进程,导致"服务端悄悄退了"。
 - **模拟器操作**(adb 路径见第 0 节,Windows 下 shell 命令加 `MSYS_NO_PATHCONV=1` 防路径转换):
   重启游戏 = `am force-stop com.leiting.wf` 然后 `monkey -p com.leiting.wf -c android.intent.category.LAUNCHER 1`。
