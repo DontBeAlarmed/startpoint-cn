@@ -1,0 +1,4 @@
+config.json
+state.json
+inbox/
+*.log

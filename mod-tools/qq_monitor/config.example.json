@@ -1,0 +1,10 @@
+{
+  "ws_url": "ws://127.0.0.1:3001",
+  "access_token": "",
+  "group_id": 0,
+  "group_name": "⭐拉芙世界第一可爱喵⭐️",
+  "trigger_prefixes": ["#修改器", "＃修改器"],
+  "auto_ack": false,
+  "ack_text": "喵～反馈已收到，进入处理队列，弄完会在群里说一声。",
+  "inbox_dir": "inbox"
+}
