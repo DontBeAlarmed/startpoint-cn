@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "wf-gui",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["mod-tools/wf_gui.py"],
+      "port": 8766,
+      "env": { "WF_GUI_PORT": "8766" }
+    }
+  ]
+}

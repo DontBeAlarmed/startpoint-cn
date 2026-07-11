@@ -54,3 +54,12 @@ mod-tools/profiles.json
 
 # --- 打包产物 ---
 *.skill
+
+# local release artifacts / runtime backups (not tracked)
+/WF*.zip
+/WF*.rar
+/WF-mod-手机端*/
+/WF单机补丁*/
+/_old-worktree-uncommitted-*.patch
+logs/
+*.bak-charfields-*
