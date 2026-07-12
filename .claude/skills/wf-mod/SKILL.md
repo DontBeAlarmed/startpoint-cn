@@ -56,8 +56,25 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   角色模式:词条编辑(单条主位开关/删行,**基础行与觉醒行
   分区**) / 角色资料(**三层同步**:rarity/element 等 master 字段与文本同时写 ①层 cdndata
   + ②层 character/character_text 表 + `assets/character.json`;底部有**单角色一键快照/还原**
-  =②层7表+①层+资产+DSL 打包 zip) /
-  **角色资产**(顶部有**立绘定位**区:立绘 PNG 是**裁剪图**,`generated/character_image`
+  =②层7表+①层+资产+DSL 打包 zip;底部「**共鸣通用(OmniElement)**」开关=character 表 c5 加/去
+  OmniElement 标签,配合 client-patch/omni-element 客户端补丁后该角色匹配**任意元素**的
+  共鸣/编成/[限X属性]条件(元素组匹配是严格等值,数据层无通配,详见补丁文档;无补丁时标签无害);
+  「**一键通用共鸣**」/共鸣通用开关(端点 `/omni_convert` 或 `/omni_element/set`)=**只挂
+  OmniElement 标签(c5),不改 element**——角色保留真实元素(伤害/克制/UI 不变),经
+  client-patch/omni-element 补丁(3 处含副位)计入**任意元素**的共鸣/编成/[限X属性];
+  dry-run 附属性配对检查报告。⚠ **element=6(真无属性)已禁止**:2026-07-12 实测
+  element=6(Colorless 是敌人专属元素)给可玩角色会崩(C7050:forceUncolorless 硬抛+
+  连锁数组越界,补丁救不了),已回滚;save_char_fields 硬拦截 element=6、元素下拉去掉「通用」。
+  引擎不支持可玩角色「无属性」,方案见 `mod-tools/docs/通用属性方案.md` §0) /
+  **角色资产**(2026-07-12 改**三栏**:立绘·UI(ui/+battle 配套)/像素图·pixelart/语音·voice,
+  按逻辑路径前缀分栏;像素图栏顶部「**像素图数据**」区 = atlas 排布/frame/timeline 六文件
+  **页内 JSON 编辑 + 外部文档上传**(.json 自动编码 AMF3+deflate,.amf3.deflate 原样;
+  端点 `/pixelart_data|/pixelart_data/save`,容器 raw deflate(-15),全库字节级往返实测)
+  + 「**预览动画**」= timeline+atlas+sprite_sheet 现场拼装(播放/单帧步进/倍速/像素缩放;
+  帧号→图块 = `{frame.name}%04d` 缺号保持上一张;fx,fy 为 Starling 负裁剪偏移,
+  内容位置=(-fx,-fy);r=旋转存储 rotate(-90°) 还原,与商店切图同规则)。
+  ⚠ datamine 的 `fullshot_resized`(500×500)是提取器预览产物,**非游戏资产**,导入照旧跳过。
+  顶部有**立绘定位**区:立绘 PNG 是**裁剪图**,`generated/character_image`
   嵌套表(内层0/1)存 内容框x,y=画布内偏移+w,h=**必须等于 PNG 实际宽高**(换不同尺寸立绘
   不更新会错位,「按图自动」一键修);`character/full_shot_image_attribute` 嵌套表存
   pivot_x,pivot_y,scale=**详情页标准立绘位置**(image.x=-pivot*scale)+face_x,face_y=
@@ -79,13 +96,37 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   **MP3 严格校验**(wf_assets.mp3_encode):逐帧复核转换覆盖到文件尾+码率恒定,
   VBR/损坏/半截文件直接拒收(报错带 ffmpeg 转码命令;官方语音 400 抽样全 CBR 不误杀)——
   此前半转换文件(前半存储态后半标准态)是"换语音崩溃"的根因;
-  顶部「**资产包导入**」= datamine 解包目录一比一批量替换,`POST /asset/import_pack`) /
+  顶部「**资产包导入**」= datamine 解包目录一比一批量替换,`POST /asset/import_pack`;
+  「**一键导出全部资产**」=`GET /asset/export_char` 整角色打包 zip:character/<code>/ 全量
+  (立绘/图标/**点阵像素**/语音/story差分/配套数据)+ 战斗特效动画(**DSL 内 SpecifyEffectDirectly
+  提取+哈希探测**,补 pathlist 75% 复原盲区)+ cut-in ATF + 技能/PF DSL;PNG/MP3 解混淆,
+  目录树与资产包导入一比一互通,落盘 work/asset_exports/) /
   基础数值 / **技能·倍率**(名称+游戏内效果描述+能量直改,级别移植/删除,整技能替换,
+  「**效果词条**」=命令级结构化编辑器(2026-07-12):命令卡片树(嵌套 Block 递归),
+  改参数/删除/复制/上下移/**从全库 1024 个技能的命令实例检索插入**(如借别人的
+  CreateCondition 加 buff、加伤害段);签名表 `wf_dsl_sig.py`(自反编译 AS3 生成:
+  111 命令+6 事件+46 枚举类构造签名,同名命令参数个数全库唯一;42 种 `AC*` 状态词条
+  =CreateCondition p2 列表元素,常见三参=[持续帧,强度,层数],0.5=50%、60帧=1秒);
+  前端字面量保持 JSON 解析器(int/double 按原文 3/3.0 不失真,无改动保存=字节级一致),
+  保存走 `/skill_dsl_json/save`;端点 `/skill_sig`(静态签名)+`/skill_cmd_lib`
+  (命令库,name/q 过滤,按 action_skill mtime 缓存),
   「效果参数」=ActionDsl 数值原地补丁,「**JSON**」=整树 JSON 编辑可**增删效果命令**
   (`wf_dsl.encode_amf3` 全库 1035 文件字节级往返验证;int/double 靠 3 与 3.0 区分),
   「**上传效果**」=外部写好的效果文件直接替换该级别(.json=技能JSON格式/.amf3·.deflate=
   二进制自动识别,官方未下发的文件=新建;形态切换区另有**变体效果文件上传**,
   端点 `/skill_dsl_upload`,kind=main/switch),
+  「**强化弹射**」区(2026-07-12 逆向落地):角色 PF 种类 = character 表 **c6 speciality_type**
+  (0剑士knight/1格斗fighter/2射击ranged/3辅助supporter/4特殊special,同时决定类型图标),
+  页内下拉直改;种类定义表 `master/skill/power_flip_action.orderedmap`(键=种类,行=3级动作
+  DSL 路径)——**store 里是增量部分**,knight 等基础键在 **APK 内置 base 表**(客户端
+  RootMasterBinary 把多文件 union,**键重复=ClientError 7051 崩溃** → 新键禁用标准名);
+  DSL 文件**下载 store 优先于 APK 内置**(FileReader.resolveFiles)→「提取到可编辑」按钮把
+  内置文件原样字节提进 store 后即可用「效果词条」编辑(PF 动作与技能同为 ActionDsl,
+  supporter 的 PF 就是给全队上 3 个 CreateCondition);「克隆新建」= 3 文件复制新路径+表加键,
+  **自定义种类激活 = 队长词条 powerflip_override**(效果块 id=表键/levels="1,2,3"/
+  description_id,官方例 leader 121177 行4;levels 单元格含逗号带 CSV 引号=官方惯例);
+  APK 取 WF_APK 环境变量 > 弹国服/*.apk 最新;端点 `/powerflip|/powerflip/spec|extract|clone`。
+  ⚠ PF 定义全局共享:改标准种类=所有该类型角色一起变,只改一个角色用 新建种类+override。
   「**形态切换**」区 = character 表 col9-16(HpHigh/ConditionExist/MultiballNumber/
   ChangeSkillFlag/IsUnison,切换目标限 switched_action_skill 表现有 6 键);
   注意个别角色技能行是**官方短行**(仅名称/描述,无 program_path,如 161177)或效果文件
@@ -105,11 +146,22 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   ①cdndata/boss_coin_shop.json(②层的 JSON 镜像,已验证 6566 键 100% 一致)+
   服务端 assets/boss_coin_shop.json+类目映射(get_sales_list/buy 校验);改价/改奖励/克隆新增,
   保存后②层走发布、服务端侧点「推送服务端」即时生效。
-  ⚠ 商店表 desc 含换行(引号内多行 CSV):**禁用 read_csv_lines 整表往返**(按物理行拆会拆坏),
-  用 wf_gui 的 `_read_ml/_write_ml`(csv.reader 全文本,6566 行字节级往返已验证)) /
+  (历史注:商店表 desc 含换行曾须专用 `_read_ml/_write_ml`;2026-07-12 起
+  `core.read_csv_lines` 已改为 csv.reader 全文本解析,**多行单元格全局安全**——
+  此前旧实现按物理行拆,克隆时把 character_text 14 行/character_speech 474 行官方
+  多行行写坏 → 客户端 U0000(CharacterTextValues parseUtf8Bytes),已按备份修复;
+  selftest 新增「CSV 多行单元格往返(4 表全量)」回归项) /
   **新建角色**(克隆模板→
-  全新 ID,可勾「资产独立」=新 code_name+全套资产复制+独立 action_skill,金丝雀流程见页内) /
+  全新 ID,可勾「资产独立」=新 code_name+全套资产复制+独立 action_skill,金丝雀流程见页内;
+  **2026-07-12 金丝雀实测通过**:111165→119999 零拷贝克隆+OmniElement,邮件发放→领取演出→
+  角色一览→详情页(技能/队长技/词条描述)全链路客户端零崩;⚠ 途中揪出的雷:
+  ①CSV 多行撕裂(见上);②ability 表 3310041/3310061/2310071 行 c97=22(During 触发需
+  trigger_puller)但 c98 空 → 开角色一览 C7050「不存在的构造函数」——那是 0712 13:58 前
+  批量词条写入埋的雷,与克隆无关,已补 c98='0';排查手段=离线复刻 AbilityValues.parseAt97/98
+  路由扫全表(反编译源在 D:/WF/wf-re-workspace/decompile);**词条组装时凡 During(c5=1)
+  触发 c97 落在需 puller 的 case,c98 必填 0-10**) /
   **工具箱**(长任务后台子进程+进度轮询,同时只跑一个,输出均在 store 外:
+  **全链路自检**=`wf_selftest.py` 环境检测+功能模拟(deep=金丝雀写入闭环,~3 秒 21 项)、
   **全量解密导出**=`wf_export_assets.py` 全包解密建逻辑目录树、**路径表复原**=
   `wf_recover_pathlist.py` 重建 WF_PATHLIST_recovered、**数据包还原**=
   `弹国服/wf_restore_package.py` 自举复原;端点 `/toolbox/run|status|cancel`) /
@@ -122,6 +174,17 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   c10=soul_id)与 ability_soul **同键一一对应**;`equipment_enhancement` 29 键 c2=改造名。
   **添加词条行**:词条编辑/武器页每组「＋添加行」= `POST /append_line_adapted`,复制其他键的行并
   **自动适配目标**(元素→目标属性、sid 统一、觉醒门槛清零、武器解锁等级对齐 = U0000 铁律自动化)。
+  **词条工坊**(2026-07-12):词条/武器/魂珠每行「工坊」+每组「🛠 组装词条」+速查页每结果「工坊」
+  = 结构化组装/编辑单行——按 ability_enum_map 块布局分区表单(头部/前置条件1-3/触发/效果,
+  触发方式切换 瞬发/持续/开幕),五大枚举可搜索下拉(中文+使用次数排序)、单位换算提示
+  (1000=1%、100000=1次、帧×100000)+**快捷输入**(15%→15000、3次→300000)、
+  实时中文效果预览(`/composer/describe`);可拿**全库任意词条当模板**(搜索=/search_abilities,
+  行选择带逐行中文描述;跨表仅 角色词条↔队长技 自动列重排 `as_key` 参数);
+  编辑模式有「另存为追加新行」;**缺失槽位可新建整键**(角色 abilities 引用了但表中没有的键,
+  create_missing);底层状态=完整行(未逆向列原样保留),写入=追加或覆盖行。
+  单元格禁引号/换行;**逗号放行**(官方即有 "1,2,3" 引号单元格,write_csv_lines 自动加引号,
+  客户端解析器已被官方数据证实支持)。
+  端点 `/composer/meta|blank|row|describe|apply`(apply 已验证:追加+删行后表文件字节复原)。
   词条/队长技/魂珠/武器每行都带**行级中文描述**(`wf_describe.py` 按逆向布局+枚举直译生成,
   语义等价非游戏原文——原文由客户端 3.9 万行 AS3 动态拼,离线不可复刻);
   **词条速查** tab 搜四表中文描述/角色名/武器名/键,按效果签名分组显示共用N/专属。
@@ -234,17 +297,31 @@ curl 验证:`curl -H "res_ver: <客户端版>" -X POST <服务端>/api/index.php
 - `mod-tools/wf_gui.py` + `wf_gui.html` — 网页修改器(前后端)。
 - `mod-tools/wf_boss.py` — Boss 数值(boss_level)+ 22 类副本列表 + quest→zone→boss 解析。
 - `mod-tools/wf_quest_lib.py` — quest/zone/boss 系**三层压缩索引嵌套表**任意深度读写(自检 `--selftest`)。
-- `mod-tools/技能形态切换与资产包导入结论.md` — 形态切换机制(character 表 col9-16)、
+- `mod-tools/docs/技能形态切换与资产包导入结论.md` — 形态切换机制(character 表 col9-16)、
   资产包一比一导入、资料三层同步、boss 血量位置(本轮五项功能的逆向依据与落地状态)。
+- `mod-tools/docs/强化弹射与boss连战逆向结论.md` — 特殊强化弹射两种机制
+  (leader_ability 挂 PowerFlipOverride 722/419 → power_flip_action 表 override_ 键 →
+  专属 DSL,仅主位;或弹射触发 InvokeSkill 追击)+ 自定义新弹射配方;
+  boss 连战 = zone 节点多 wave 行(ZoneValues 列布局/boss1-3/_multi=多人变体),
+  187 个现成连战范本;quest 行难度列;星级品质三层排查与克隆漏写服务端表的修复;
+  §6 EX Boost 体系:②ex_ability=效果(发布生效)/服务端 assets/ex_ability.json=抽取池
+  (静态 import,改后须重启服务端)/存档 players_characters.ex_boost_* 直接 UPDATE,
+  A/B 组按 string_id 前缀、金银铜按 _rN 后缀,概率硬编码 exBoost.ts。
 - `mod-tools/wf_describe.py` — 行级中文描述器(布局吃 ability_enum_map.json,枚举中文吃全表 md §6)。
+- `mod-tools/wf_selftest.py` — **全链路自检**:环境检测+功能模拟(--deep 金丝雀写入闭环,写完即复原);
+  GUI 工具箱「全链路自检」同款。改完大功能/换数据包/排查环境先跑它。
+- `mod-tools/wf_dsl_sig.py` — 技能/PF DSL 命令签名表(自反编译 AS3 生成+人工中文标注段)。
 - `mod-tools/wf_assets.py` — 角色资产编解码(PNG 魔数/MP3 帧头混淆)+三根定位+清单。
 - `mod-tools/wf_dsl.py` — 技能 ActionDsl 数值编辑(AMF3 偏移解析+U29 等长原地补丁)。
-- `mod-tools/角色资产与全角色替换方案.md` — 资产体系逆向结论、路径模板/尺寸要求、
+- **文件结构约定(2026-07-12)**:mod-tools 代码平铺在根;分析/方案/逆向结论 md 在 `mod-tools/docs/`;
+  运行时数据(ability_enum_map.json/词条条件代码全表.md/WF_PATHLIST_recovered.txt/HarvestedPaths.csv)
+  留根**勿移动**(工具按固定文件名读取);分析报告生成脚本(wf_all_analysis 等)输出到 docs/。
+- `mod-tools/docs/角色资产与全角色替换方案.md` — 资产体系逆向结论、路径模板/尺寸要求、
   整角色替换(code_name 重定向 / 逐项替换)与全新角色可行性分析。
 - `mod-tools/wf_publish.py` — CDN 增量发布器(pending 支持 medium:/android: 前缀,自动分包到对应 diff 目录)。
 - `mod-tools/wf_char_editor.py` — ① 层角色资料编辑。
-- `mod-tools/角色数据逆向与修改指南.md` — 两层逆向过程 + HP/ATK / 觉醒破解结论。
-- `mod-tools/版本切换设计.md` — profile 版本档案设计(CN/global 切换)。
+- `mod-tools/docs/角色数据逆向与修改指南.md` — 两层逆向过程 + HP/ATK / 觉醒破解结论。
+- `mod-tools/docs/版本切换设计.md` — profile 版本档案设计(CN/global 切换)。
 
 ## 8. 安全规则(写入前必守)
 
