@@ -7,8 +7,8 @@
   },
   "10": {
     "name": "",
-    "rarity": 4,
-    "element": 3,
+    "rarity": 5,
+    "element": 4,
     "skill_count": 6
   },
   "111001": {
@@ -3028,5 +3028,11 @@
     "rarity": 5,
     "element": 1,
     "skill_count": 6
+  },
+  "119999": {
+    "name": "金丝雀",
+    "rarity": 5,
+    "element": 0,
+    "skill_count": 3
   }
 }
