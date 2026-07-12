@@ -354,13 +354,13 @@ td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;lin
         <div id="pixDataWrap" style="display:none">
         <div class="row" style="align-items:center">
           <b>像素图数据</b>
-          <select id="pixDataSel" style="width:290px">
-            <option value="atlas">sprite_sheet 排布(atlas)</option>
-            <option value="special_atlas">special_sprite_sheet 排布(atlas)</option>
-            <option value="frame">pixelart 动画帧定义</option>
-            <option value="timeline">pixelart 动画时间轴</option>
-            <option value="special_frame">special 动画帧定义</option>
-            <option value="special_timeline">special 动画时间轴</option>
+          <select id="pixDataSel" style="width:360px;font-family:Consolas,monospace">
+            <option value="atlas">sprite_sheet.atlas.amf3.deflate — 常规排布</option>
+            <option value="special_atlas">special_sprite_sheet.atlas.amf3.deflate — 特殊排布</option>
+            <option value="frame">pixelart.frame.amf3.deflate — 动画帧定义</option>
+            <option value="timeline">pixelart.timeline.amf3.deflate — 动画时间轴</option>
+            <option value="special_frame">special.frame.amf3.deflate — 特殊帧定义</option>
+            <option value="special_timeline">special.timeline.amf3.deflate — 特殊时间轴</option>
           </select>
           <button class="sec" id="btnPixDataEdit">编辑 JSON</button>
           <button class="sec" id="btnPixPreview">▶ 预览动画</button>
