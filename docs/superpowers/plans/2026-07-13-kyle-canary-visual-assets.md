@@ -605,7 +605,7 @@ Expected: both outputs are RGBA, all four corners have alpha `0`, subject covera
 
 Run: `python mod-tools/wf_kyle_canary.py prepare`
 
-Expected: reports at least 74 copied/generated files and writes both pixel sheets plus six remapped pixel AMF3 documents.
+Expected for the current CN store: exactly 64 files = 45 existing `black_wolf_knight` non-voice assets + 19 existing canary voice files. It writes both pixel sheets plus six remapped pixel AMF3 documents. If the store changes, derive the expected count from those two source inventories instead of using a fixed historical count.
 
 - [ ] **Step 2: Run pure pack validation**
 
