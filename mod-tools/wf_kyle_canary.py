@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import tempfile
 import time
 import zlib
 from pathlib import Path
@@ -77,43 +78,69 @@ def prepare(runtime=None, work: Path = WORK) -> dict:
     """Decode source-store assets and build the offline Kyle pack."""
     gui = _resolve_gui(runtime)
     pack = work / "pack"
-    pack.mkdir(parents=True, exist_ok=True)
-    visual_logicals = wf_assets.all_asset_logicals(
-        gui.TARGET_STORE, PIXEL_TEMPLATE_CODE)
-    voice_logicals = [
-        asset["logical"]
-        for asset in wf_assets.char_asset_manifest(gui.TARGET_STORE, CURRENT_CODE)
-        if asset["exists"] and asset["logical"].endswith(".mp3")
-    ]
+    work.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=".pack-staging-", dir=work))
     copied = []
-    for source, target in build_copy_plan(visual_logicals, voice_logicals):
-        located = wf_assets.locate(gui.TARGET_STORE, source)
-        if not located:
-            continue
-        data = located[1].read_bytes()
-        if source.endswith(".png"):
-            data = wf_assets.png_decode(data)
-        elif source.endswith(".mp3"):
-            data = wf_assets.mp3_decode(data)
-        elif source.endswith(".amf3.deflate"):
-            try:
-                data = skin.remap_amf3_deflate(
-                    data,
-                    f"character/{PIXEL_TEMPLATE_CODE}/",
-                    f"character/{NEW_CODE}/",
-                )
-            except (ValueError, zlib.error):
-                pass
-        relative = target.split(f"character/{NEW_CODE}/", 1)[1]
-        destination = pack / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(data)
-        copied.append(destination.relative_to(pack).as_posix())
-    build_visual_derivatives(
-        work / "source/base.png", work / "source/awake.png", pack)
-    rebuild_illustration_sheet(pack)
-    recolor_pixel_sheets(pack)
+    try:
+        visual_logicals = wf_assets.all_asset_logicals(
+            gui.TARGET_STORE, PIXEL_TEMPLATE_CODE)
+        voice_logicals = [
+            asset["logical"]
+            for asset in wf_assets.char_asset_manifest(
+                gui.TARGET_STORE, CURRENT_CODE)
+            if asset["exists"] and asset["logical"].endswith(".mp3")
+        ]
+        for source, target in build_copy_plan(
+                visual_logicals, voice_logicals):
+            located = wf_assets.locate(gui.TARGET_STORE, source)
+            if not located:
+                continue
+            data = located[1].read_bytes()
+            if source.endswith(".png"):
+                data = wf_assets.png_decode(data)
+            elif source.endswith(".mp3"):
+                data = wf_assets.mp3_decode(data)
+            elif source.endswith(".amf3.deflate"):
+                try:
+                    data = skin.remap_amf3_deflate(
+                        data,
+                        f"character/{PIXEL_TEMPLATE_CODE}/",
+                        f"character/{NEW_CODE}/",
+                    )
+                except (ValueError, zlib.error):
+                    pass
+            relative = target.split(f"character/{NEW_CODE}/", 1)[1]
+            destination = staging / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(data)
+            copied.append(destination.relative_to(staging).as_posix())
+        build_visual_derivatives(
+            work / "source/base.png", work / "source/awake.png", staging)
+        rebuild_illustration_sheet(staging)
+        recolor_pixel_sheets(staging)
+        validate_kyle_pack(staging)
+        _replace_pack_directory(staging, pack)
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging, ignore_errors=True)
     return {"pack": str(pack), "files": len(copied)}
+
+
+def _replace_pack_directory(staging: Path, pack: Path) -> None:
+    """Swap a validated staging directory into place with rollback."""
+    backup = None
+    if pack.exists():
+        backup = Path(tempfile.mkdtemp(prefix=".pack-old-", dir=pack.parent))
+        backup.rmdir()
+        pack.rename(backup)
+    try:
+        staging.rename(pack)
+    except Exception:
+        if backup is not None and backup.exists():
+            backup.rename(pack)
+        raise
+    if backup is not None:
+        shutil.rmtree(backup, ignore_errors=True)
 
 
 def build_visual_derivatives(base_path: Path, awake_path: Path,
@@ -278,6 +305,127 @@ def clone_template_metadata(src_id: str, dst_id: str, src_code: str,
             table, logical, f"Kyle visual metadata {src_id}->{dst_id}")
 
 
+class _FileRollbackJournal:
+    """In-memory before-images for the finite live-file mutation set."""
+
+    def __init__(self, paths) -> None:
+        self.entries = []
+        seen = set()
+        for candidate in paths:
+            path = Path(candidate).absolute()
+            key = str(path).casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            existed = path.exists()
+            if existed and not path.is_file():
+                raise ValueError(f"rollback target is not a file: {path}")
+            self.entries.append(
+                (path, existed, path.read_bytes() if existed else None))
+
+    def restore(self) -> None:
+        for path, existed, data in reversed(self.entries):
+            if existed:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            elif path.exists():
+                if not path.is_file():
+                    raise ValueError(f"new rollback target is not a file: {path}")
+                path.unlink()
+
+
+def _prevalidate_apply(gui, pack: Path, preview: list[dict]) -> list[Path]:
+    """Validate every live input and return the complete mutation path set."""
+    trimmed = gui.core.load_table(
+        gui.TRIMMED_LOGICAL, gui.TARGET_STORE, gui.SOURCE_STORE)
+    source_prefix = f"character/{PIXEL_TEMPLATE_CODE}/"
+    if not any(key.startswith(source_prefix) for key in trimmed.keys):
+        raise ValueError(
+            f"{gui.TRIMMED_LOGICAL}: no metadata for {PIXEL_TEMPLATE_CODE}")
+
+    for logical in (gui.CHAR_IMAGE_LOGICAL, gui.FS_ATTR_LOGICAL):
+        table = gui._load_nested_opt(logical)
+        missing = [
+            cid for cid in (PIXEL_TEMPLATE_ID, CANARY_ID)
+            if cid not in table.keys
+        ]
+        if missing:
+            raise ValueError(f"{logical}: missing {', '.join(missing)}")
+
+    character_logical = getattr(gui.core, "CHARACTER_LOGICAL", None)
+    if character_logical is not None:
+        character = gui.core.load_table(
+            character_logical, gui.TARGET_STORE, gui.SOURCE_STORE)
+        if CANARY_ID not in character.keys:
+            raise ValueError(f"{character_logical}: missing {CANARY_ID}")
+
+    files = {
+        path.relative_to(pack).as_posix(): path
+        for path in pack.rglob("*") if path.is_file()
+    }
+    if set(files) != {item["relative"] for item in preview}:
+        raise ValueError("pack/store write plan does not cover every staged file")
+
+    mutation_paths = []
+    planned_logicals = set()
+    for item in preview:
+        source = files[item["relative"]]
+        _store_bytes(source)
+        destination = wf_assets.path_in_root(
+            gui.TARGET_STORE, item["root"], item["logical"])
+        mutation_paths.append(destination)
+        planned_logicals.add(item["logical"])
+
+    for png in sorted(pack.rglob("*.png")):
+        relative = png.relative_to(pack).as_posix()
+        if "/skill_cutin_" not in f"/{relative}":
+            continue
+        atf_logical = (
+            f"character/{NEW_CODE}/{relative[:-4]}.atf.deflate")
+        if atf_logical in planned_logicals:
+            continue
+        located = wf_assets.locate(gui.TARGET_STORE, atf_logical)
+        if located:
+            located[1].read_bytes()
+            mutation_paths.append(located[1])
+
+    table_path = getattr(gui.core, "table_path", None)
+    if table_path is not None:
+        table_logicals = [
+            gui.TRIMMED_LOGICAL,
+            gui.CHAR_IMAGE_LOGICAL,
+            gui.FS_ATTR_LOGICAL,
+        ]
+        if character_logical is not None:
+            table_logicals.append(character_logical)
+        character_text_logical = getattr(gui, "CHAR_TEXT2_LOGICAL", None)
+        if character_text_logical is not None:
+            table_logicals.append(character_text_logical)
+        mutation_paths.extend(
+            table_path(gui.TARGET_STORE, logical)
+            for logical in table_logicals
+        )
+
+    char_json_paths = getattr(gui, "_char_json_paths", None)
+    if char_json_paths is not None:
+        master_json, text_json = map(Path, char_json_paths())
+        for path in (master_json, text_json):
+            if not path.is_file():
+                raise FileNotFoundError(path)
+            path.read_bytes()
+            mutation_paths.append(path)
+    server_json_path = getattr(gui, "_server_char_json_path", None)
+    if server_json_path is not None:
+        server_json = Path(server_json_path())
+        if server_json.exists():
+            server_json.read_bytes()
+        mutation_paths.append(server_json)
+    pending_file = getattr(gui, "PENDING_FILE", None)
+    if pending_file is not None:
+        mutation_paths.append(Path(pending_file))
+    return mutation_paths
+
+
 def apply(dry_run: bool, runtime=None, work: Path = WORK,
           roots: dict[str, str] | None = None) -> dict:
     """Preview or transactionally install the Kyle pack into the live store."""
@@ -292,23 +440,34 @@ def apply(dry_run: bool, runtime=None, work: Path = WORK,
     preview = plan_store_writes(pack, roots=resolved_roots)
     if dry_run:
         return {"dry_run": True, "writes": preview}
-    snapshot = gui.char_snapshot(CANARY_ID, "before Kyle visual skin")
-    clone_template_metadata(
-        PIXEL_TEMPLATE_ID,
-        CANARY_ID,
-        PIXEL_TEMPLATE_CODE,
-        NEW_CODE,
-        runtime=gui,
-    )
-    materialize_new_paths(pack, runtime=gui, roots=resolved_roots)
-    gui.save_char_fields(CANARY_ID, {"code_name": NEW_CODE}, dry_run=False)
-    for png in sorted(pack.rglob("*.png")):
-        logical = (
-            f"character/{NEW_CODE}/"
-            f"{png.relative_to(pack).as_posix()}"
+    mutation_paths = _prevalidate_apply(gui, pack, preview)
+    journal = _FileRollbackJournal(mutation_paths)
+    try:
+        snapshot = gui.char_snapshot(CANARY_ID, "before Kyle visual skin")
+        clone_template_metadata(
+            PIXEL_TEMPLATE_ID,
+            CANARY_ID,
+            PIXEL_TEMPLATE_CODE,
+            NEW_CODE,
+            runtime=gui,
         )
-        gui.replace_asset(
-            logical, png.read_bytes(), force=True, dry_run=False)
+        materialize_new_paths(pack, runtime=gui, roots=resolved_roots)
+        gui.save_char_fields(
+            CANARY_ID, {"code_name": NEW_CODE}, dry_run=False)
+        for png in sorted(pack.rglob("*.png")):
+            logical = (
+                f"character/{NEW_CODE}/"
+                f"{png.relative_to(pack).as_posix()}"
+            )
+            gui.replace_asset(
+                logical, png.read_bytes(), force=True, dry_run=False)
+    except BaseException as error:
+        try:
+            journal.restore()
+        except Exception as rollback_error:
+            if hasattr(error, "add_note"):
+                error.add_note(f"Kyle rollback failed: {rollback_error}")
+        raise
     return {
         "dry_run": False,
         "snapshot": snapshot,

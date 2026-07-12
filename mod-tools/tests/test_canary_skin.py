@@ -180,6 +180,9 @@ class TestKylePackBuild(unittest.TestCase):
             stored = root / "stored"
             source.mkdir(parents=True)
             stored.mkdir()
+            old_pack = work / "pack"
+            old_pack.mkdir()
+            (old_pack / "obsolete-from-prior-build.bin").write_bytes(b"obsolete")
             Image.new("RGBA", (300, 500), (40, 80, 180, 255)).save(
                 source / "base.png")
             Image.new("RGBA", (400, 600), (180, 140, 40, 255)).save(
@@ -245,6 +248,7 @@ class TestKylePackBuild(unittest.TestCase):
 
             pack = work / "pack"
             self.assertEqual(result["pack"], str(pack))
+            self.assertFalse((pack / "obsolete-from-prior-build.bin").exists())
             self.assertEqual(
                 result["files"],
                 len(kyle.build_copy_plan(visual_logicals, [canary_voice])),
@@ -269,6 +273,32 @@ class TestKylePackBuild(unittest.TestCase):
                 red, green, blue, _alpha = image.getpixel((0, 0))
                 self.assertGreater(blue, red)
                 self.assertGreater(green, red)
+
+    def test_prepare_failure_keeps_prior_pack_and_cleans_staging(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            work = root / "work"
+            pack = work / "pack"
+            write_required_kyle_pack(pack)
+            sentinel = pack / "prior-pack.bin"
+            sentinel.write_bytes(b"known-good")
+            runtime = SimpleNamespace(TARGET_STORE=root / "unused-upload")
+
+            def fail_after_writing(staged_base, _staged_awake, staged_pack):
+                self.assertNotEqual(staged_pack, pack)
+                (staged_pack / "prior-pack.bin").write_bytes(b"corrupted")
+                raise RuntimeError("injected prepare failure")
+
+            with patch.object(wf_assets, "all_asset_logicals", return_value=[]), \
+                    patch.object(wf_assets, "char_asset_manifest", return_value=[]), \
+                    patch.object(kyle, "build_visual_derivatives",
+                                 side_effect=fail_after_writing):
+                with self.assertRaisesRegex(RuntimeError,
+                                            "injected prepare failure"):
+                    kyle.prepare(runtime=runtime, work=work)
+
+            self.assertEqual(sentinel.read_bytes(), b"known-good")
+            self.assertEqual(list(work.glob(".pack-staging-*")), [])
 
 
 class TestKyleStorePlan(unittest.TestCase):
@@ -496,6 +526,168 @@ class TestKyleTransaction(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "unexpected canary code_name"):
                 kyle.apply(True, runtime=refused, work=root / "missing", roots={})
+
+    def test_apply_rolls_back_all_live_files_after_late_failure(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            work = root / "work"
+            pack = work / "pack"
+            write_required_kyle_pack(pack)
+            atf_relative = "ui/skill_cutin_0.atf.deflate"
+            (pack / atf_relative).write_bytes(b"staged-atf")
+            target_store = root / "store/upload"
+
+            trimmed_logical = "trimmed"
+            char_image_logical = "char-image"
+            full_shot_logical = "full-shot"
+            character_logical = "character"
+            character_text_logical = "character-text"
+
+            def table_path(_store, logical):
+                return root / "tables" / (logical.replace("/", "__") + ".bin")
+
+            trimmed = core.OrderedMap(
+                trimmed_logical,
+                ["character/black_wolf_knight/ui/full_shot"],
+                [b"1,2,1440,1920"], root / "trim-source")
+            char_image = core.OrderedMap(
+                char_image_logical, ["111007", "119999"],
+                [b"source-image", b"old-image"], root / "char-image-source")
+            full_shot = core.OrderedMap(
+                full_shot_logical, ["111007", "119999"],
+                [b"source-attr", b"old-attr"], root / "full-shot-source")
+            character = core.OrderedMap(
+                character_logical, ["119999"],
+                [b"resistance_princess_3halfanv"], root / "character-source")
+            character_text = core.OrderedMap(
+                character_text_logical, ["119999"],
+                [b"Kyle"], root / "character-text-source")
+            flat_tables = {
+                trimmed_logical: trimmed,
+                character_logical: character,
+                character_text_logical: character_text,
+            }
+
+            def load_table(logical, _target, _source):
+                return flat_tables[logical]
+
+            def write_table(table, target, _suffix, no_backup=False):
+                path = table_path(target, table.logical_path)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"mutated:" + table.logical_path.encode())
+                return path
+
+            fake_core = SimpleNamespace(
+                CHARACTER_LOGICAL=character_logical,
+                load_table=load_table,
+                write_table=write_table,
+                table_path=table_path,
+            )
+            nested_tables = {
+                char_image_logical: char_image,
+                full_shot_logical: full_shot,
+            }
+            master_json = root / "cdndata/character.json"
+            text_json = root / "cdndata/character_text.json"
+            server_json = root / "assets/character.json"
+            pending_json = root / "work/sync_pending.json"
+
+            originals = {}
+            for logical in (
+                    trimmed_logical, char_image_logical, full_shot_logical,
+                    character_logical, character_text_logical):
+                path = table_path(target_store, logical)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                data = f"original-table:{logical}".encode()
+                path.write_bytes(data)
+                originals[path] = data
+            for path, data in (
+                    (master_json, b"original-master-json"),
+                    (text_json, b"original-text-json"),
+                    (server_json, b"original-server-json"),
+                    (pending_json, b"[]")):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+                originals[path] = data
+
+            preview = kyle.plan_store_writes(pack, roots={})
+            destinations = {
+                item["logical"]: wf_assets.path_in_root(
+                    target_store, item["root"], item["logical"])
+                for item in preview
+            }
+            old_png_logical = (
+                "character/kyle_wolf_knight/ui/full_shot_1440_1920_0.png")
+            old_atf_logical = (
+                "character/kyle_wolf_knight/ui/skill_cutin_0.atf.deflate")
+            for logical, data in (
+                    (old_png_logical, b"original-store-png"),
+                    (old_atf_logical, b"original-store-atf")):
+                path = destinations[logical]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+                originals[path] = data
+
+            def write_nested(_table, logical, _tag):
+                path = table_path(target_store, logical)
+                path.write_bytes(b"mutated-nested:" + logical.encode())
+                return str(path)
+
+            def save_fields(_cid, fields, dry_run):
+                self.assertEqual(fields, {"code_name": "kyle_wolf_knight"})
+                self.assertFalse(dry_run)
+                master_json.write_bytes(b"mutated-master-json")
+                text_json.write_bytes(b"mutated-text-json")
+                server_json.write_bytes(b"mutated-server-json")
+                table_path(target_store, character_logical).write_bytes(
+                    b"mutated-character-table")
+
+            replace_count = 0
+
+            def replace_asset(logical, _data, force, dry_run):
+                nonlocal replace_count
+                self.assertTrue(force)
+                self.assertFalse(dry_run)
+                replace_count += 1
+                destinations[logical].write_bytes(
+                    f"replaced-{replace_count}".encode())
+                if logical.endswith("ui/skill_cutin_0.png"):
+                    destinations[old_atf_logical].write_bytes(b"rewritten-atf")
+                    raise RuntimeError("injected late replace failure")
+
+            runtime = SimpleNamespace(
+                core=fake_core,
+                TARGET_STORE=target_store,
+                SOURCE_STORE=root / "source",
+                TRIMMED_LOGICAL=trimmed_logical,
+                CHAR_IMAGE_LOGICAL=char_image_logical,
+                FS_ATTR_LOGICAL=full_shot_logical,
+                CHAR_TEXT2_LOGICAL=character_text_logical,
+                PENDING_FILE=pending_json,
+                get_char_fields=lambda _cid: {
+                    "fields": {"code_name": "resistance_princess_3halfanv"}},
+                char_snapshot=lambda _cid, _note: {"path": "snapshot.zip"},
+                add_pending=lambda path: pending_json.write_text(
+                    str(path), encoding="utf-8"),
+                _load_nested_opt=lambda logical: nested_tables[logical],
+                _write_nested=write_nested,
+                _char_json_paths=lambda: (master_json, text_json),
+                _server_char_json_path=lambda: server_json,
+                save_char_fields=save_fields,
+                replace_asset=replace_asset,
+            )
+
+            with self.assertRaisesRegex(
+                    RuntimeError, "injected late replace failure"):
+                kyle.apply(False, runtime=runtime, work=work, roots={})
+
+            for path, data in originals.items():
+                with self.subTest(restored=path):
+                    self.assertEqual(path.read_bytes(), data)
+            for path in destinations.values():
+                if path not in originals:
+                    with self.subTest(removed=path):
+                        self.assertFalse(path.exists())
 
     def test_verify_and_help_are_offline(self):
         with tempfile.TemporaryDirectory() as td:
