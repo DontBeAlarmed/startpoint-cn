@@ -130,22 +130,33 @@ class TestKylePackBuild(unittest.TestCase):
                 source / "base.png")
             Image.new("RGBA", (400, 600), (220, 180, 80, 255)).save(
                 source / "awake.png")
-            Image.new("RGBA", (17, 19), (255, 0, 0, 255)).save(
-                story / "anger.png")
-            Image.new("RGBA", (31, 23), (0, 255, 0, 255)).save(
-                story / "surprise_b.png")
+            overlays = {
+                "anger.png": (17, 19),
+                "normal.png": (21, 22),
+                "sad.png": (25, 27),
+                "surprise.png": (29, 31),
+                "surprise_b.png": (31, 23),
+            }
+            for index, (name, size) in enumerate(overlays.items()):
+                Image.new(
+                    "RGBA", size, (255 - index * 20, index * 30, 40, 255)
+                ).save(story / name)
+            for name in ("base_0.png", "base_1.png"):
+                Image.new("RGBA", (9, 11), (90, 100, 110, 255)).save(
+                    story / name)
 
             kyle.build_visual_derivatives(
                 source / "base.png", source / "awake.png", root / "pack")
 
-            for name, size in (("anger.png", (17, 19)),
-                               ("surprise_b.png", (31, 23))):
+            for name, size in overlays.items():
                 with self.subTest(name=name), Image.open(story / name) as image:
                     self.assertEqual(image.size, size)
                     self.assertIsNone(image.getbbox())
             self.assertFalse((story / "normal_b.png").exists())
-            for name in ("base_0.png", "base_1.png"):
+            for name, size in (("base_0.png", (520, 616)),
+                               ("base_1.png", (570, 690))):
                 with Image.open(story / name) as image:
+                    self.assertEqual(image.size, size)
                     self.assertIsNotNone(image.getbbox())
 
     def test_illustration_and_pixel_sheets_keep_geometry(self):
