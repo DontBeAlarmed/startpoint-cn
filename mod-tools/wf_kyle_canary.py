@@ -38,12 +38,6 @@ DERIVATIVES = {
     "ui/cutin_skill_chain_{n}.png": ((276, 319), (0.50, 0.30)),
 }
 
-STORY_OVERLAYS = (
-    "anger", "normal", "normal_b", "sad", "sad_b", "serious",
-    "serious_b", "shame", "smile", "smile_b", "smile_c", "smile_d",
-    "surprise", "sweat", "think",
-)
-
 REQUIRED_SIZES = {
     "ui/full_shot_1440_1920_0.png": (1440, 1920),
     "ui/full_shot_1440_1920_1.png": (1440, 1920),
@@ -161,8 +155,10 @@ def build_visual_derivatives(base_path: Path, awake_path: Path,
         story_path = pack / f"ui/story/base_{n}.png"
         story_path.parent.mkdir(parents=True, exist_ok=True)
         skin.fit_rgba(master, story_size, (0.5, 0.34)).save(story_path)
-    for overlay in STORY_OVERLAYS:
-        target = pack / f"ui/story/{overlay}.png"
+    story_dir = pack / "ui/story"
+    for target in sorted(story_dir.glob("*.png")):
+        if target.name in {"base_0.png", "base_1.png"}:
+            continue
         with Image.open(target) as old:
             size = old.size
         Image.new("RGBA", size, (0, 0, 0, 0)).save(target)

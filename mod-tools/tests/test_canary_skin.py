@@ -119,6 +119,35 @@ class TestKylePackBuild(unittest.TestCase):
                         pack / f"ui/story/{overlay}.png") as image:
                     self.assertIsNone(image.getbbox())
 
+    def test_derivatives_blank_only_copied_story_overlay_inventory(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source = root / "source"
+            story = root / "pack/ui/story"
+            source.mkdir()
+            story.mkdir(parents=True)
+            Image.new("RGBA", (300, 500), (80, 120, 220, 255)).save(
+                source / "base.png")
+            Image.new("RGBA", (400, 600), (220, 180, 80, 255)).save(
+                source / "awake.png")
+            Image.new("RGBA", (17, 19), (255, 0, 0, 255)).save(
+                story / "anger.png")
+            Image.new("RGBA", (31, 23), (0, 255, 0, 255)).save(
+                story / "surprise_b.png")
+
+            kyle.build_visual_derivatives(
+                source / "base.png", source / "awake.png", root / "pack")
+
+            for name, size in (("anger.png", (17, 19)),
+                               ("surprise_b.png", (31, 23))):
+                with self.subTest(name=name), Image.open(story / name) as image:
+                    self.assertEqual(image.size, size)
+                    self.assertIsNone(image.getbbox())
+            self.assertFalse((story / "normal_b.png").exists())
+            for name in ("base_0.png", "base_1.png"):
+                with Image.open(story / name) as image:
+                    self.assertIsNotNone(image.getbbox())
+
     def test_illustration_and_pixel_sheets_keep_geometry(self):
         with tempfile.TemporaryDirectory() as td:
             pack = Path(td)
