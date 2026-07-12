@@ -1,0 +1,379 @@
+{
+  "999100": {
+    "name": "初级养成素材宝箱",
+    "bonuses": [
+      {
+        "itemId": 2,
+        "amount": 300
+      },
+      {
+        "itemId": 6,
+        "amount": 300
+      },
+      {
+        "itemId": 10,
+        "amount": 300
+      },
+      {
+        "itemId": 14,
+        "amount": 300
+      },
+      {
+        "itemId": 43,
+        "amount": 300
+      },
+      {
+        "itemId": 47,
+        "amount": 300
+      }
+    ]
+  },
+  "999101": {
+    "name": "中级养成素材宝箱",
+    "bonuses": [
+      {
+        "itemId": 3,
+        "amount": 200
+      },
+      {
+        "itemId": 7,
+        "amount": 200
+      },
+      {
+        "itemId": 11,
+        "amount": 200
+      },
+      {
+        "itemId": 15,
+        "amount": 200
+      },
+      {
+        "itemId": 44,
+        "amount": 200
+      },
+      {
+        "itemId": 48,
+        "amount": 200
+      }
+    ]
+  },
+  "999102": {
+    "name": "高级养成素材宝箱",
+    "bonuses": [
+      {
+        "itemId": 4,
+        "amount": 30
+      },
+      {
+        "itemId": 8,
+        "amount": 30
+      },
+      {
+        "itemId": 12,
+        "amount": 30
+      },
+      {
+        "itemId": 16,
+        "amount": 30
+      },
+      {
+        "itemId": 45,
+        "amount": 30
+      },
+      {
+        "itemId": 49,
+        "amount": 30
+      }
+    ]
+  },
+  "70033": {
+    "name": "始之宝箱",
+    "bonuses": [
+      {
+        "itemId": 1,
+        "amount": 420
+      },
+      {
+        "itemId": 5,
+        "amount": 420
+      },
+      {
+        "itemId": 9,
+        "amount": 420
+      },
+      {
+        "itemId": 13,
+        "amount": 420
+      },
+      {
+        "itemId": 42,
+        "amount": 420
+      },
+      {
+        "itemId": 46,
+        "amount": 420
+      }
+    ]
+  },
+  "70034": {
+    "name": "力之宝箱",
+    "bonuses": [
+      {
+        "itemId": 2,
+        "amount": 385
+      },
+      {
+        "itemId": 6,
+        "amount": 385
+      },
+      {
+        "itemId": 10,
+        "amount": 385
+      },
+      {
+        "itemId": 14,
+        "amount": 385
+      },
+      {
+        "itemId": 43,
+        "amount": 385
+      },
+      {
+        "itemId": 47,
+        "amount": 385
+      }
+    ]
+  },
+  "70035": {
+    "name": "真之宝箱",
+    "bonuses": [
+      {
+        "itemId": 3,
+        "amount": 200
+      },
+      {
+        "itemId": 7,
+        "amount": 200
+      },
+      {
+        "itemId": 11,
+        "amount": 200
+      },
+      {
+        "itemId": 15,
+        "amount": 200
+      },
+      {
+        "itemId": 44,
+        "amount": 200
+      },
+      {
+        "itemId": 48,
+        "amount": 200
+      }
+    ]
+  },
+  "70036": {
+    "name": "极之宝箱",
+    "bonuses": [
+      {
+        "itemId": 4,
+        "amount": 46
+      },
+      {
+        "itemId": 8,
+        "amount": 46
+      },
+      {
+        "itemId": 12,
+        "amount": 46
+      },
+      {
+        "itemId": 16,
+        "amount": 46
+      },
+      {
+        "itemId": 45,
+        "amount": 46
+      },
+      {
+        "itemId": 49,
+        "amount": 46
+      }
+    ]
+  },
+  "70037": {
+    "name": "心之宝箱",
+    "bonuses": [
+      {
+        "itemId": 50,
+        "amount": 152
+      },
+      {
+        "itemId": 53,
+        "amount": 152
+      },
+      {
+        "itemId": 56,
+        "amount": 152
+      },
+      {
+        "itemId": 59,
+        "amount": 152
+      },
+      {
+        "itemId": 62,
+        "amount": 152
+      },
+      {
+        "itemId": 65,
+        "amount": 152
+      }
+    ]
+  },
+  "70038": {
+    "name": "意之宝箱",
+    "bonuses": [
+      {
+        "itemId": 51,
+        "amount": 71
+      },
+      {
+        "itemId": 54,
+        "amount": 71
+      },
+      {
+        "itemId": 57,
+        "amount": 71
+      },
+      {
+        "itemId": 60,
+        "amount": 71
+      },
+      {
+        "itemId": 63,
+        "amount": 71
+      },
+      {
+        "itemId": 66,
+        "amount": 71
+      }
+    ]
+  },
+  "70039": {
+    "name": "空之宝箱",
+    "bonuses": [
+      {
+        "itemId": 52,
+        "amount": 37
+      },
+      {
+        "itemId": 55,
+        "amount": 37
+      },
+      {
+        "itemId": 58,
+        "amount": 37
+      },
+      {
+        "itemId": 61,
+        "amount": 37
+      },
+      {
+        "itemId": 64,
+        "amount": 37
+      },
+      {
+        "itemId": 67,
+        "amount": 37
+      }
+    ]
+  },
+  "70040": {
+    "name": "★3崇高辉石自选箱",
+    "bonuses": [
+      {
+        "itemId": 14001,
+        "amount": 25
+      },
+      {
+        "itemId": 14004,
+        "amount": 25
+      },
+      {
+        "itemId": 14007,
+        "amount": 25
+      },
+      {
+        "itemId": 14010,
+        "amount": 25
+      },
+      {
+        "itemId": 14013,
+        "amount": 25
+      },
+      {
+        "itemId": 14016,
+        "amount": 25
+      }
+    ]
+  },
+  "70041": {
+    "name": "★4崇高辉石自选箱",
+    "bonuses": [
+      {
+        "itemId": 14002,
+        "amount": 5
+      },
+      {
+        "itemId": 14005,
+        "amount": 5
+      },
+      {
+        "itemId": 14008,
+        "amount": 5
+      },
+      {
+        "itemId": 14011,
+        "amount": 5
+      },
+      {
+        "itemId": 14014,
+        "amount": 5
+      },
+      {
+        "itemId": 14017,
+        "amount": 5
+      }
+    ]
+  },
+  "70042": {
+    "name": "★5崇高辉石自选箱",
+    "bonuses": [
+      {
+        "itemId": 14003,
+        "amount": 3
+      },
+      {
+        "itemId": 14006,
+        "amount": 3
+      },
+      {
+        "itemId": 14009,
+        "amount": 3
+      },
+      {
+        "itemId": 14012,
+        "amount": 3
+      },
+      {
+        "itemId": 14015,
+        "amount": 3
+      },
+      {
+        "itemId": 14018,
+        "amount": 3
+      }
+    ]
+  }
+}

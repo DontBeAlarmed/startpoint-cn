@@ -1,6 +1,6 @@
-// Handles item usage (stamina recovery items, etc.)
+// Handles item usage (stamina recovery items, select bonus boxes, etc.)
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
+import { getPlayerItemSync, updatePlayerItemSync, setPlayerItemSync } from "../../data/domains/item"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -10,13 +10,21 @@ import { sellItemSync } from "../../lib/item-sell";
 import { AccountId, PlayerId } from "../../lib/types";
 import { computeRealTimeStamina } from "../../lib/stamina";
 import itemData from "../../../assets/item_data.json";
+import itemBonusSelectData from "../../../assets/item_bonus_select.json";
 
 interface ItemEffectInfo {
     effectKind: number
     effectValue: number
 }
 
+interface ItemBonusSelectInfo {
+    name: string
+    bonuses: ({ itemId: number, amount: number } | null)[]
+}
+
 const ITEM_EFFECTS: Record<number, ItemEffectInfo> = itemData as Record<number, ItemEffectInfo>
+// effect 22 (CultivatePack) select boxes: box item id -> 6 selectable bonuses (master item_bonus_select mirror)
+const BONUS_BOXES: Record<number, ItemBonusSelectInfo> = itemBonusSelectData as Record<number, ItemBonusSelectInfo>
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/use_item", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -46,7 +54,10 @@ const routes = async (fastify: FastifyInstance) => {
 
         let totalStaminaRecovery = 0
         const itemUpdates: { id: number; newCount: number }[] = []
+        // reward item id -> amount gained from select bonus boxes this request
+        const bonusRewards: Record<number, number> = {}
         let hasStaminaItem = false
+        let hasBonusBox = false
 
         for (const itemReq of body.items) {
             const itemId = itemReq.id
@@ -58,6 +69,33 @@ const routes = async (fastify: FastifyInstance) => {
             }
             if (!Number.isInteger(requestCount) || requestCount <= 0) {
                 console.warn(`[ITEM-USE] invalid count: ${requestCount} for item ${itemId}`)
+                continue
+            }
+
+            // effect 22 select bonus box: consume box, grant the chosen bonus (selectIndex is 1-based)
+            const boxDef = BONUS_BOXES[itemId]
+            if (boxDef) {
+                const selectIndex = itemReq.selectIndex
+                if (!Number.isInteger(selectIndex) || selectIndex < 1 || selectIndex > boxDef.bonuses.length) {
+                    console.warn(`[ITEM-USE] invalid selectIndex ${selectIndex} for box ${itemId}`)
+                    return reply.status(400).send({ "error": "Bad Request", "message": "Invalid select index." })
+                }
+                const bonus = boxDef.bonuses[selectIndex - 1]
+                if (!bonus) {
+                    console.warn(`[ITEM-USE] empty bonus slot ${selectIndex} for box ${itemId}`)
+                    return reply.status(400).send({ "error": "Bad Request", "message": "Empty bonus slot." })
+                }
+
+                const boxCount = getPlayerItemSync(playerId, itemId) ?? 0
+                if (boxCount < requestCount) {
+                    console.warn(`[ITEM-USE] player ${playerId} has ${boxCount} of box ${itemId}, requested ${requestCount}`)
+                    return reply.status(400).send({ "error": "Bad Request", "message": "Insufficient items." })
+                }
+
+                itemUpdates.push({ id: itemId, newCount: boxCount - requestCount })
+                bonusRewards[bonus.itemId] = (bonusRewards[bonus.itemId] ?? 0) + bonus.amount * requestCount
+                hasBonusBox = true
+                console.log(`[ITEM-USE] player ${playerId}: box ${itemId}(${boxDef.name}) ×${requestCount} -> item ${bonus.itemId} ×${bonus.amount * requestCount} (select ${selectIndex})`)
                 continue
             }
 
@@ -102,51 +140,65 @@ const routes = async (fastify: FastifyInstance) => {
             hasStaminaItem = true
         }
 
-        if (!hasStaminaItem) {
-            console.warn(`[ITEM-USE] no valid stamina recovery items in request`)
-            return reply.status(400).send({ "error": "Bad Request", "message": "No valid stamina items." })
+        if (!hasStaminaItem && !hasBonusBox) {
+            console.warn(`[ITEM-USE] no valid usable items in request`)
+            return reply.status(400).send({ "error": "Bad Request", "message": "No valid usable items." })
         }
 
-        if (totalStaminaRecovery <= 0) {
-            console.warn(`[ITEM-USE] zero total recovery`)
-            return reply.status(400).send({ "error": "Bad Request", "message": "Zero recovery." })
+        let afterStamina: number | null = null
+        if (hasStaminaItem) {
+            if (totalStaminaRecovery <= 0) {
+                console.warn(`[ITEM-USE] zero total recovery`)
+                return reply.status(400).send({ "error": "Bad Request", "message": "Zero recovery." })
+            }
+
+            const currentStamina = computeRealTimeStamina(player)
+
+            if (currentStamina >= maxOverflow) {
+                console.log(`[ITEM-USE] player ${playerId} already at max stamina (${currentStamina} >= ${maxOverflow})`)
+                return reply.status(400).send({ "error": "Bad Request", "code": 2102, "message": "Already at max stamina." })
+            }
+
+            afterStamina = Math.min(currentStamina + totalStaminaRecovery, maxOverflow)
+            console.log(`[ITEM-USE] player ${playerId}: stamina ${currentStamina}->${afterStamina} (+${totalStaminaRecovery})`)
         }
 
-        const currentStamina = computeRealTimeStamina(player)
-
-        if (currentStamina >= maxOverflow) {
-            console.log(`[ITEM-USE] player ${playerId} already at max stamina (${currentStamina} >= ${maxOverflow})`)
-            return reply.status(400).send({ "error": "Bad Request", "code": 2102, "message": "Already at max stamina." })
-        }
-
-        const afterStamina = Math.min(currentStamina + totalStaminaRecovery, maxOverflow)
-
-        // Batch update
+        // Batch update: consumed items (stamina items + boxes), then box rewards
         for (const upd of itemUpdates) {
             updatePlayerItemSync(playerId, upd.id, upd.newCount)
         }
-        updatePlayerSync({
-            id: playerId,
-            stamina: afterStamina,
-            staminaHealTime: new Date()
-        })
-
-        console.log(`[ITEM-USE] player ${playerId}: stamina ${currentStamina}->${afterStamina} (+${totalStaminaRecovery}), items: ${JSON.stringify(itemUpdates)}`)
 
         // Build item_list as IntMap<int> (client expects { itemId: count })
         const itemListMap: Record<number, number> = {}
         for (const upd of itemUpdates) {
             itemListMap[upd.id] = upd.newCount
         }
+        for (const [rewardIdStr, gained] of Object.entries(bonusRewards)) {
+            const rewardId = Number(rewardIdStr)
+            const newCount = (getPlayerItemSync(playerId, rewardId) ?? 0) + gained
+            setPlayerItemSync(playerId, rewardId, newCount)
+            itemListMap[rewardId] = newCount
+        }
+
+        if (afterStamina !== null) {
+            updatePlayerSync({
+                id: playerId,
+                stamina: afterStamina,
+                staminaHealTime: new Date()
+            })
+        }
+
+        console.log(`[ITEM-USE] player ${playerId}: items: ${JSON.stringify(itemListMap)}`)
+
+        const userInfo: Record<string, unknown> = afterStamina !== null
+            ? { "stamina": afterStamina, "stamina_heal_time": realToVirtual(new Date()) }
+            : {}
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
-                "user_info": {
-                    "stamina": afterStamina,
-                    "stamina_heal_time": realToVirtual(new Date())
-                },
+                "user_info": userInfo,
                 "item_list": itemListMap
             }
         })
