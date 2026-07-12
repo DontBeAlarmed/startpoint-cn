@@ -1,0 +1,38 @@
+﻿diff --git a/src/lib/version.ts b/src/lib/version.ts
+index 209d469..d34196d 100644
+--- a/src/lib/version.ts
++++ b/src/lib/version.ts
+@@ -29,14 +29,22 @@ export function getEffectiveVersion(): string {
+     return cdnVer;
+ }
+ 
+-// Detect highest version from CDN diff archive filenames
++// Detect highest version from CDN diff archive filenames.
++// Cache invalidates on diff-dir mtime change so newly published archives
++// take effect without a server restart.
+ let _cdnVersion: string | null = null;
++let _cdnStamp = "";
++
++const CDN_DIFF_DIRS = ["archive-common-diff", "archive-medium-diff", "archive-android-diff"];
+ 
+ export function detectCDNVersion(): string {
+-    if (_cdnVersion) return _cdnVersion;
+     const cdnDir = path.join(__dirname, "..", "..", ".cdn", "cn");
++    const stamp = CDN_DIFF_DIRS
++        .map(d => { try { return statSync(path.join(cdnDir, d)).mtimeMs; } catch (_) { return 0; } })
++        .join(",");
++    if (_cdnVersion && stamp === _cdnStamp) return _cdnVersion;
+     let max = "1.4.0";
+-    for (const subdir of ["archive-common-diff", "archive-medium-diff", "archive-android-diff"]) {
++    for (const subdir of CDN_DIFF_DIRS) {
+         const dir = path.join(cdnDir, subdir);
+         try {
+             for (const f of readdirSync(dir).filter(f => f.endsWith(".zip"))) {
+@@ -46,6 +54,7 @@ export function detectCDNVersion(): string {
+         } catch (_) { /* ignore */ }
+     }
+     _cdnVersion = max;
++    _cdnStamp = stamp;
+     return max;
+ }
+ 

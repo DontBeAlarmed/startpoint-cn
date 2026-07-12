@@ -171,6 +171,10 @@ python mod-tools/wf_publish.py --tables ability,character_status   # 或用 pend
 - 版本自动 +0.0.1(扫 CDN 现有最高版本),生成 `pinball-<from>-<to>-1-<tag>.zip`。
 - 服务端 `src/routes/cn/asset.ts` **动态扫描** diff 目录,放入即生效,**不用重启服务端**
   (但改了服务端 .ts 代码才需要 `npx tsc` + 重启)。
+  ⚠ **版本缓存坑**(2026-07-12 已修):上游 `lib/version.ts` 的 `detectCDNVersion` 把最高版
+  缓存进模块变量且永不失效——发布后 diff 列表有新包但 `target_asset_version` 不推进,
+  客户端不下载,症状="发布成功但游戏没更新"。已改为按 diff 目录 mtime 失效
+  (补丁存档 `mod-tools/server-patch/version.ts.diff`,更新服务端后须套回)。
 
 **触发客户端更新的两个开关**(都已修好,排查时先看这里):
 - `load` 端点 `available_asset_version` 必须 > 客户端 res_ver → 客户端才进更新流程。
@@ -205,6 +209,12 @@ curl 验证:`curl -H "res_ver: <客户端版>" -X POST <服务端>/api/index.php
 - **不要用 preview 面板长期跑服务端**——会随会话回收进程,导致"服务端悄悄退了"。
 - **模拟器操作**(adb 路径见第 0 节,Windows 下 shell 命令加 `MSYS_NO_PATHCONV=1` 防路径转换):
   重启游戏 = `am force-stop com.leiting.wf` 然后 `monkey -p com.leiting.wf -c android.intent.category.LAUNCHER 1`。
+  **adb 失联兜底**(2026-07-12 实测):MuMu adb 端口会漂移(16384→16416,记录在
+  `MuMuPlayer\vms\<实例>\configs\vm_config.json` 的 nat.port_forward.adb)甚至整个不监听;
+  此时用 `MuMuManager.exe sh -v <实例号> -c "<命令>"`(自有 RPC 通道,不依赖 adb;实例号看
+  `MuMuManager.exe info -v all`,当前=1)。该通道下 monkey 参数会被拆坏,启动必须用
+  `am start -n com.leiting.wf/com.leiting.sdk.activity.PrivacyActivity`。
+  GUI 的 restart_game 已内置此兜底。
 - **验证服务端在线**:`curl http://192.168.0.130:8001/api/server/currentTime`(本机 + 模拟器内都可达才算通)。
 
 ## 6. 排查"改了没生效"(按此顺序)

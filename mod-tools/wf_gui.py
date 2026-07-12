@@ -3108,23 +3108,66 @@ def sync_to_emulator(restart: bool = True) -> dict:
     return {"ok": True, "log": "\n".join(log)}
 
 
-def restart_game() -> str:
-    """force-stop + 拉起游戏(发布后让客户端立刻拉增量包)。"""
+def _restart_game_via_mumu(log: list) -> bool:
+    """adb 桥失联时的兜底:MuMuManager 的 RPC shell 重启游戏。
+    MuMu 的 adb 端口会漂移(16384→16416…)甚至整个不监听(2026-07-12 实测),
+    但 MuMuManager sh 走自有通道不依赖 adb。注意该通道下 monkey 参数会被拆坏,
+    必须用 am start -n 显式 Activity。"""
     adb = find_adb()
-    if not adb:
-        return "未找到 adb,请手动重启游戏拉取更新"
+    mgr = os.environ.get("WF_MUMU_MANAGER") or (str(Path(adb).with_name("MuMuManager.exe")) if adb else "")
+    if not mgr or not Path(mgr).exists():
+        log.append("MuMuManager.exe 未找到(应在 adb 同目录),无法兜底")
+        return False
+    try:
+        _, out = adb_run(mgr, "info", "-v", "all", timeout=15)
+        data = json.loads(out or "{}")
+        insts = {str(data["index"]): data} if "index" in data else data
+        idx = next((k for k, v in insts.items()
+                    if isinstance(v, dict) and v.get("is_android_started")), None)
+        if idx is None:
+            log.append("MuMuManager: 没有运行中的模拟器实例")
+            return False
+        log.append(f"adb 失联,改走 MuMuManager sh(实例 {idx})")
+        adb_run(mgr, "sh", "-v", idx, "-c", f"am force-stop {PKG}", timeout=20)
+        log.append(f"force-stop {PKG} (MuMuManager)")
+        act = f"{PKG}/com.leiting.sdk.activity.PrivacyActivity"
+        _, out = adb_run(mgr, "sh", "-v", idx, "-c",
+                         f"cmd package resolve-activity --brief {PKG}", timeout=20)
+        for line in out.splitlines():
+            if line.strip().startswith(PKG + "/"):
+                act = line.strip()
+        code, out = adb_run(mgr, "sh", "-v", idx, "-c", f"am start -n {act}", timeout=20)
+        log.append(f"start {act}: {(out.strip() or 'ok')}")
+        return code == 0 and "Error" not in out
+    except Exception as e:
+        log.append(f"MuMuManager 兜底失败: {e}")
+        return False
+
+
+def restart_game() -> str:
+    """force-stop + 拉起游戏(发布后让客户端立刻拉增量包)。adb 失联自动走 MuMuManager。"""
+    adb = find_adb()
     log = []
-    _, out = adb_run(adb, "connect", DEVICE, timeout=15)
-    log.append(f"connect {DEVICE}: {out}")
-    adb_run(adb, "-s", DEVICE, "shell", "am", "force-stop", PKG, timeout=20)
-    log.append(f"force-stop {PKG}")
-    code, out = adb_run(adb, "-s", DEVICE, "shell", "am", "start", "-n", f"{PKG}/.AppEntry", timeout=20)
-    if code != 0 or "Error" in out:
-        _, out2 = adb_run(adb, "-s", DEVICE, "shell", "monkey", "-p", PKG,
-                          "-c", "android.intent.category.LAUNCHER", "1", timeout=20)
-        log.append(f"start(monkey): {out2}")
+    adb_ok = False
+    if adb:
+        _, out = adb_run(adb, "connect", DEVICE, timeout=15)
+        log.append(f"connect {DEVICE}: {out}")
+        if not ("cannot" in out or "failed" in out.lower() or "unable" in out.lower()):
+            adb_run(adb, "-s", DEVICE, "shell", "am", "force-stop", PKG, timeout=20)
+            log.append(f"force-stop {PKG}")
+            code, out = adb_run(adb, "-s", DEVICE, "shell", "am", "start", "-n", f"{PKG}/.AppEntry", timeout=20)
+            if code != 0 or "Error" in out or "not found" in out:
+                code2, out2 = adb_run(adb, "-s", DEVICE, "shell", "monkey", "-p", PKG,
+                                      "-c", "android.intent.category.LAUNCHER", "1", timeout=20)
+                log.append(f"start(monkey): {out2}")
+                adb_ok = code2 == 0 and "not found" not in out2 and "Error" not in out2
+            else:
+                log.append(f"start: {out}")
+                adb_ok = True
     else:
-        log.append(f"start: {out}")
+        log.append("未找到 adb")
+    if not adb_ok:
+        _restart_game_via_mumu(log)
     return "\n".join(log)
 
 
@@ -4232,6 +4275,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(body)
                 return

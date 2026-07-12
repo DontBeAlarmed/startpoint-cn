@@ -629,7 +629,7 @@ td.ldesc{color:var(--okfg);font-size:11px;white-space:normal;max-width:250px;lin
     <button class="mini" id="btnLogClear">清空</button>
     <button class="mini" id="btnLogToggle">折叠</button>
   </div>
-  <div id="log">就绪。操作先「预览」确认改动,再「应用」写入(自动备份);之后点右上角「发布并重启游戏」进游戏。改错了去「改动日志」页签一键回溯。</div>
+  <div id="log">就绪(页面版本 v20260712c)。操作先「预览」确认改动,再「应用」写入(自动备份);之后点右上角「发布并重启游戏」进游戏。改错了去「改动日志」页签一键回溯。</div>
 </div>
   </div>
 </main>
@@ -1165,6 +1165,8 @@ async function loadAssets(){
     const fi=document.createElement('input');fi.type='file';
     fi.accept=a.logical.endsWith('.png')?'image/png':(a.logical.endsWith('.mp3')?'audio/mpeg':'');
     fi.style.cssText='font-size:10.5px;width:130px';
+    // 选中即读入内存:云盘目录(OneDrive 等)会在选择后改写文件导致点「替换」时读取失败
+    fi.onchange=()=>{const f0=fi.files&&fi.files[0];fi._b64=f0?fileToB64(f0).catch(()=>null):null;};
     const fc=document.createElement('label');fc.innerHTML='<input type="checkbox"> 强制';fc.title='绕过尺寸校验(仅立绘/cut-in 建议)';
     const bu=document.createElement('button');bu.className='mini';bu.textContent='替换';
     bu.onclick=()=>replaceAsset(a.logical,fi,fc.querySelector('input').checked);
@@ -1186,9 +1188,11 @@ async function replaceAsset(logical,fileInput,force){
   const f=fileInput.files&&fileInput.files[0];
   if(!f)return log('先选择要上传的文件',true);
   log('读取 '+f.name+' ('+(f.size/1024).toFixed(0)+'KB)...');
-  let b64;
-  try{b64=await fileToB64(f);}
-  catch(e){return log('本地文件读取失败(选择后文件被移动/改名/覆盖?)——重新「选择文件」再试',true);}
+  let b64=fileInput._b64?await fileInput._b64:null;  // 选中时的内存缓存(防云盘同步改写)
+  if(!b64){
+    try{b64=await fileToB64(f);}
+    catch(e){return log('本地文件读取失败(文件在选择后被移动/改名/覆盖——云盘同步目录常见)——重新「选择文件」再试,或把文件先复制到本地非同步目录',true);}
+  }
   log('校验中(dry-run 预览)...');
   let prev;
   try{prev=await api('/asset/replace',{logical,data_b64:b64,force,dry_run:true});}
@@ -1824,7 +1828,7 @@ function pickPng(cb){
     const r=new FileReader();r.onload=()=>cb(r.result.split(',')[1]);r.readAsDataURL(f);};
   i.click();
 }
-function fileToB64(input,cb){
+function inputToB64(input,cb){  // 注意:别再叫 fileToB64——曾与上方 Promise 版重名互覆,导致资产替换全线卡死
   const f=input.files&&input.files[0];
   if(!f)return cb('');
   const r=new FileReader();r.onload=()=>cb(r.result.split(',')[1]);r.readAsDataURL(f);
@@ -1918,7 +1922,7 @@ $('#btnUniqueReload').onclick=loadUnique;
 $('#btnUqCreate').onclick=()=>{
   const id=$('#uqNewId').value.trim();
   if(!id)return log('填新 ID',true);
-  fileToB64($('#uqNewIcon'),async b64=>{
+  inputToB64($('#uqNewIcon'),async b64=>{
     if(!b64)return log('新增必须选 48x48 图标 PNG',true);
     const edits={string_id:$('#uqNewSid').value.trim(),name:$('#uqNewName').value.trim(),
       duration:$('#uqNewDur').value.trim(),max_count:$('#uqNewCnt').value.trim()};
