@@ -26,6 +26,14 @@
 3. 用 FFDec 把改后的 AS3 导回 SWF,替换进 APK,`zipalign` + `apksigner` 重签名。
 4. 安装到设备。
 
+## 可选补丁
+
+- **omni-element**(`apply-omni-element.sh` / `omni-element.md`):共鸣通用属性标签。
+- **random-floor**(`apply-random-floor.sh` / `random-floor.md`):boss 塔每次进本随机——
+  `BattleQuestBaseImpl` 两个 getTower*FloorValues 识别 floor 表 `__random__,K` 头行,
+  每次构建 quest 时从池中抽 K 层洗牌。配合 `mod-tools/wf_chain_build.py --pool K` 生成数据。
+  ⚠ 未打此补丁的客户端读到 `__random__` 数据会崩,数据须在全员换包后再发。
+
 ## 说明
 
 完整的自动化流水线(FFDec 导出 / 导入 / 打包 / 签名)是作者基于 [starview](https://github.com/duosii/starview)(GPL-3.0)的本地扩展,未随本仓库分发。本目录仅提供"最小改动 + 应用脚本",方便手动复现;`apply.sh` 为原创实现,不含 starview 代码。
