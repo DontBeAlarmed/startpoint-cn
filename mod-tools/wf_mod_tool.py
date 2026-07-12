@@ -288,7 +288,7 @@ def default_source_store() -> Path | None:
 # ---------------------------------------------------------------------------
 # Version profiles: bind store + cdndata + schema into one explicit version so
 # the tool never silently mixes CN data with a global-server fallback.
-# See 版本切换设计.md.
+# See docs/版本切换设计.md.
 # ---------------------------------------------------------------------------
 
 
@@ -612,14 +612,12 @@ def write_table(ordered: OrderedMap, target_store: Path, backup_suffix: str, no_
 
 
 def read_csv_lines(text: str) -> list[list[str]]:
+    # csv.reader 吃整段文本:引号单元格内的换行属于同一逻辑行,不会被撕裂。
+    # 旧实现按 splitlines 逐物理行解析,character_text/character_speech 等
+    # 官方多行单元格行会被拆碎+错引号(2026-07-12 U0000 事故根因)。
     if not text:
         return []
-    rows = []
-    for line in text.splitlines():
-        if line == "":
-            continue
-        rows.append(next(csv.reader([line])))
-    return rows
+    return [row for row in csv.reader(io.StringIO(text)) if row]
 
 
 def write_csv_lines(rows: list[list[str]]) -> str:
@@ -907,7 +905,7 @@ def cmd_list(args: argparse.Namespace) -> None:
     if args.text:
         match["text"] = args.text
 
-    # 默认列改为按列名 / 别名派生(版本无关):裸下标会随 schema 版本错位(见版本切换设计.md)。
+    # 默认列改为按列名 / 别名派生(版本无关):裸下标会随 schema 版本错位(见 docs/版本切换设计.md)。
     # 0/1 = string_id/unisonable 是所有版本固定前置列;威力列走 skill_strength 别名。
     selected_fields = expand_fields(args.fields, index_by_name) if args.fields else (
         [0, 1] + expand_fields(["skill_strength"], index_by_name)
@@ -1230,7 +1228,7 @@ def resolve_source_store(value: str | None, profile: "VersionProfile | None" = N
     if value:
         return Path(value)
     if profile:
-        return profile.fallback  # 档案默认 fallback=None:禁止跨版本静默兜底(见版本切换设计.md)
+        return profile.fallback  # 档案默认 fallback=None:禁止跨版本静默兜底(见 docs/版本切换设计.md)
     return default_source_store()
 
 

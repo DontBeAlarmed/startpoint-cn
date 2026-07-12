@@ -80,6 +80,7 @@ TABLE_ALIASES = {
     "ability_soul": "master/ability/ability_soul.orderedmap",
     "character_awake_status": "master/character/character_awake_status.orderedmap",
     "action_skill": "master/skill/action_skill.orderedmap",
+    "power_flip_action": "master/skill/power_flip_action.orderedmap",
     "weapon_ability": "master/equipment_enhancement/equipment_enhancement_ability.orderedmap",
     "character_text": "master/character/character_text.orderedmap",
     "character_speech": "master/character/character_speech.orderedmap",
@@ -97,7 +98,7 @@ TABLE_ALIASES = {
     "boss_coin_shop": "master/shop/boss_coin_shop.orderedmap",
     "boss_coin_shop_category": "master/shop/boss_coin_shop_category.orderedmap",
     "trimmed_image": "master/generated/trimmed_image.orderedmap",
-    # --- boss 战 / 副本 / 连战(roguelike boss rush 方案用,见 boss连战roguelike方案.md) ---
+    # --- boss 战 / 副本 / 连战(roguelike boss rush 方案用,见 docs/boss连战roguelike方案.md) ---
     "general_boss": "master/battle/boss/general_boss.orderedmap",
     "general_boss_state": "master/battle/boss/general_boss_state.orderedmap",
     "general_boss_variable": "master/battle/boss/general_boss_variable.orderedmap",
@@ -115,7 +116,16 @@ TABLE_ALIASES = {
     "rush_event_quest_folder": "master/quest/event/rush_event_quest_folder.orderedmap",
     "rush_event_correction": "master/quest/event/rush_event_battle_quest_correction.orderedmap",
     "event_list": "master/quest/event/event_list.orderedmap",
+    "floor": "master/battle/floor.orderedmap",
+    "challenge_dungeon_event": "master/quest/event/challenge_dungeon_event.orderedmap",
+    "challenge_dungeon_event_quest": "master/quest/event/challenge_dungeon_event_quest.orderedmap",
+    "tower_dungeon_event": "master/quest/event/tower_dungeon_event.orderedmap",
+    "tower_dungeon_event_quest": "master/quest/event/tower_dungeon_event_quest.orderedmap",
     "switched_action_skill": "master/skill/switched_action_skill.orderedmap",
+    # --- EX Boost(EX词条效果/EX强化数值/EX素材定义) ---
+    "ex_ability": "master/ex_boost/ex_ability.orderedmap",
+    "ex_status": "master/ex_boost/ex_status.orderedmap",
+    "ex_boost": "master/ex_boost/ex_boost.orderedmap",
 }
 
 VER_RE = re.compile(r"pinball-(\d+\.\d+\.\d+)-(\d+\.\d+\.\d+)-\d+-")

@@ -67,6 +67,31 @@ def table_kinds() -> list[str]:
     return list(_enum_map["layouts"].keys())
 
 
+def enum_map() -> dict:
+    """ability_enum_map.json 原始内容(布局/块字段/枚举/使用计数),只读。"""
+    _load()
+    return _enum_map
+
+
+# 五大枚举组 → ability_enum_map.json enums 键(词条工坊下拉用)
+_BIG_ENUMS = {"precondition": "AbilityPreconditionMasterValue",
+              "trigger": "InstantAbilityTriggerMasterValue",
+              "during_trigger": "DuringAbilityTriggerMasterValue",
+              "instant_content": "InstantAbilityContentMasterValue",
+              "during_content": "CommonAbilityContentMasterValue"}
+
+
+def enum_options() -> dict[str, dict[str, dict]]:
+    """{组: {值: {en:构造名, cn:直译}}}。cn 缺失时回退构造名(与 describe 同源)。"""
+    _load()
+    out = {}
+    for key, ename in _BIG_ENUMS.items():
+        cn = _cn.get(key, {})
+        out[key] = {v: {"en": en, "cn": cn.get(v, "")}
+                    for v, en in _enum_map["enums"][ename].items()}
+    return out
+
+
 def layout(kind: str) -> dict:
     """某表的布局 {ncols, blocks:{块名:基址}}(来自 ability_enum_map.json)。"""
     _load()

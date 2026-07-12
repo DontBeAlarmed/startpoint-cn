@@ -3,7 +3,7 @@
 
 覆盖:encode_amf3 ↔ parse_dsl 往返、int/double 类型保持、字符串引用表、
 JSON 文本管道、非法结构拒绝。全库 1035 个真实 DSL 文件的字节级往返
-已在 2026-07-06 落地时验证(见 技能形态切换与资产包导入结论.md)。
+已在 2026-07-06 落地时验证(见 docs/技能形态切换与资产包导入结论.md)。
 """
 from __future__ import annotations
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """wf_boss — Boss 数值编辑 + 全副本列表(GUI「Boss·副本」页后端)。
 
-数据链路(见 boss战与副本分析报告.md):
+数据链路(见 docs/boss战与副本分析报告.md):
     quest 行 → (任意单元格 ∈ field_data 键) → field_data col2 = zone id
       → zone 各 wave 行单元格 ∈ boss 键集合 → boss code
     HP = boss_level[code] 基础值 × 等级曲线(battle/enemy/*)×修正曲线;
@@ -28,30 +28,30 @@ STANDARD_BOSS = "master/battle/boss/standard_boss.orderedmap"
 ZONE = "master/battle/zone.orderedmap"
 FIELD_DATA = "master/battle/field_data.orderedmap"
 
-# (别名, 中文名, 逻辑路径)——22 类副本表(boot 注册路径 + master 前缀)
+# (别名, 中文名, 逻辑路径, 分组, 图标)——22 类副本表(boot 注册路径 + master 前缀)
 QUEST_CATS = [
-    ("boss_battle", "领主战", "master/quest/boss_battle_quest.orderedmap"),
-    ("main", "主线", "master/quest/main_quest.orderedmap"),
-    ("ex", "高难EX", "master/quest/ex_quest.orderedmap"),
-    ("character", "角色剧情", "master/quest/character_quest.orderedmap"),
-    ("practice", "训练场", "master/quest/practice/practice_quest.orderedmap"),
-    ("advent", "降临战", "master/quest/event/advent_event_quest.orderedmap"),
-    ("carnival", "嘉年华", "master/quest/event/carnival_event_quest.orderedmap"),
-    ("challenge_dungeon", "挑战迷宫", "master/quest/event/challenge_dungeon_event_quest.orderedmap"),
-    ("daily_exp_mana", "经验玛那", "master/quest/event/daily_exp_mana_event_quest.orderedmap"),
-    ("daily_week", "每日周常", "master/quest/event/daily_week_event_quest.orderedmap"),
-    ("expert_single", "专家单人", "master/quest/event/expert_single_event_quest.orderedmap"),
-    ("hard_multi", "高难多人", "master/quest/event/hard_multi_event_quest.orderedmap"),
-    ("raid", "Raid", "master/quest/event/raid_event_quest.orderedmap"),
-    ("ranking", "排名赛", "master/quest/event/ranking_event_single_quest.orderedmap"),
-    ("rush", "Rush", "master/quest/event/rush_event_quest.orderedmap"),
-    ("score_attack", "分数挑战", "master/quest/event/score_attack_event_quest.orderedmap"),
-    ("solo_time_attack", "单人计时", "master/quest/event/solo_time_attack_event_quest.orderedmap"),
-    ("story_event", "剧情活动", "master/quest/event/story_event_single_quest.orderedmap"),
-    ("tower", "爬塔", "master/quest/event/tower_dungeon_event_quest.orderedmap"),
-    ("world_story", "世界剧情", "master/quest/event/world_story_event_quest.orderedmap"),
-    ("world_story_boss", "世界剧情Boss", "master/quest/event/world_story_event_boss_battle_quest.orderedmap"),
-    ("skill_preview", "技能预览", "master/skill_preview/skill_preview_quest.orderedmap"),
+    ("boss_battle", "领主战", "master/quest/boss_battle_quest.orderedmap", "常驻", "👑"),
+    ("main", "主线", "master/quest/main_quest.orderedmap", "常驻", "📖"),
+    ("ex", "高难EX", "master/quest/ex_quest.orderedmap", "常驻", "🔥"),
+    ("character", "角色剧情", "master/quest/character_quest.orderedmap", "常驻", "🎭"),
+    ("practice", "训练场", "master/quest/practice/practice_quest.orderedmap", "常驻", "🎯"),
+    ("advent", "降临战", "master/quest/event/advent_event_quest.orderedmap", "高难活动", "☄️"),
+    ("raid", "Raid", "master/quest/event/raid_event_quest.orderedmap", "高难活动", "⚔️"),
+    ("rush", "Rush", "master/quest/event/rush_event_quest.orderedmap", "高难活动", "🌊"),
+    ("hard_multi", "高难多人", "master/quest/event/hard_multi_event_quest.orderedmap", "高难活动", "👥"),
+    ("expert_single", "专家单人", "master/quest/event/expert_single_event_quest.orderedmap", "高难活动", "🥇"),
+    ("ranking", "排名赛", "master/quest/event/ranking_event_single_quest.orderedmap", "高难活动", "🏆"),
+    ("score_attack", "分数挑战", "master/quest/event/score_attack_event_quest.orderedmap", "高难活动", "💯"),
+    ("solo_time_attack", "单人计时", "master/quest/event/solo_time_attack_event_quest.orderedmap", "高难活动", "⏱️"),
+    ("carnival", "嘉年华", "master/quest/event/carnival_event_quest.orderedmap", "活动周回", "🎪"),
+    ("challenge_dungeon", "挑战迷宫", "master/quest/event/challenge_dungeon_event_quest.orderedmap", "活动周回", "🗝️"),
+    ("tower", "爬塔", "master/quest/event/tower_dungeon_event_quest.orderedmap", "活动周回", "🗼"),
+    ("daily_exp_mana", "经验玛那", "master/quest/event/daily_exp_mana_event_quest.orderedmap", "活动周回", "💎"),
+    ("daily_week", "每日周常", "master/quest/event/daily_week_event_quest.orderedmap", "活动周回", "📅"),
+    ("story_event", "剧情活动", "master/quest/event/story_event_single_quest.orderedmap", "剧情·其他", "📜"),
+    ("world_story", "世界剧情", "master/quest/event/world_story_event_quest.orderedmap", "剧情·其他", "🌍"),
+    ("world_story_boss", "世界剧情Boss", "master/quest/event/world_story_event_boss_battle_quest.orderedmap", "剧情·其他", "🐲"),
+    ("skill_preview", "技能预览", "master/skill_preview/skill_preview_quest.orderedmap", "剧情·其他", "🎬"),
 ]
 
 _CJK = re.compile(r"[㐀-鿿]")
@@ -221,19 +221,57 @@ def _zone_bosses(zone_id: str, boss_keys: set[str]) -> list[str]:
     return found
 
 
-def quest_cats() -> list[dict]:
+def quest_cats(with_counts: bool = True) -> list[dict]:
     out = []
-    for alias, cn, logical in QUEST_CATS:
+    for alias, cn, logical, group, icon in QUEST_CATS:
         exists = qlib.store_path(logical).exists()
-        out.append({"alias": alias, "cn": cn, "exists": exists})
+        ent = {"alias": alias, "cn": cn, "exists": exists, "group": group, "icon": icon}
+        if exists and with_counts:
+            try:
+                ent["count"] = sum(1 for _ in _leaves(_load(logical)))
+            except Exception:
+                ent["count"] = None
+        out.append(ent)
     return out
+
+
+# ---- boss → 出现的副本类别(全类别扫描一次,进程内缓存;force 重算) ----
+_usage_cache: dict[str, list[str]] | None = None
+
+
+def boss_usage(force: bool = False) -> dict[str, list[str]]:
+    """boss code -> [出现的副本类别 alias 列表](按 QUEST_CATS 顺序)。"""
+    global _usage_cache
+    if _usage_cache is not None and not force:
+        return _usage_cache
+    fd_keys = set(_load(FIELD_DATA).keys())
+    boss_keys = set(boss_names().keys())
+    usage: dict[str, list[str]] = {}
+    for alias, _cn, logical, _group, _icon in QUEST_CATS:
+        if not qlib.store_path(logical).exists():
+            continue
+        try:
+            tree = _load(logical)
+        except Exception:
+            continue
+        seen: set[str] = set()
+        for _path, row in _leaves(tree):
+            cells = row.split(",")
+            fdid = next((x for x in cells if x in fd_keys), "")
+            if not fdid:
+                continue
+            seen.update(_zone_bosses(_fd_zone(fdid), boss_keys))
+        for b in seen:
+            usage.setdefault(b, []).append(alias)
+    _usage_cache = usage
+    return usage
 
 
 def quest_list(cat: str, search: str = "", limit: int = 400) -> dict:
     ent = next((x for x in QUEST_CATS if x[0] == cat), None)
     if not ent:
         raise ValueError(f"未知副本类别: {cat}")
-    _, cn, logical = ent
+    _, cn, logical = ent[:3]
     tree = _load(logical)
     fd_keys = set(_load(FIELD_DATA).keys())
     boss_keys = set(boss_names().keys())

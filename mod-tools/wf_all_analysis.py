@@ -553,7 +553,7 @@ def write_markdown(fire, anchor, base_totals, element):
         L.append(f"\n接收方(全部未达标光五星,共{len(weak5)}人):" + "、".join(weak5[:20]) +
                  ("…" if len(weak5) > 20 else "") + "\n")
 
-    out_md = MOD_DIR / f"{el_cn}系全角色分析与增强方案.md"
+    out_md = MOD_DIR / "docs" / f"{el_cn}系全角色分析与增强方案.md"
     out_md.write_text("\n".join(L), encoding="utf-8")
     print(f"文档 → {out_md}")
 

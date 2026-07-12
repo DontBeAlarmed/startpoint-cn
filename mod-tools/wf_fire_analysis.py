@@ -22,7 +22,7 @@ import wf_mod_tool as core  # noqa: E402
 import wf_describe  # noqa: E402
 
 LEADER_LOGICAL = "master/ability/leader_ability.orderedmap"
-OUT_MD = MOD_DIR / "火系全角色分析与增强方案.md"
+OUT_MD = MOD_DIR / "docs" / "火系全角色分析与增强方案.md"
 OUT_JSON = ROOT / "logs" / "fire_analysis.json"
 
 FAM_CN = {"skill": "技能伤害", "pf": "强化弹射", "fever": "Fever", "ability": "能力伤害", "direct": "直击(协力球)"}

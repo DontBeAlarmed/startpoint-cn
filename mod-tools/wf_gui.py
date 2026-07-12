@@ -30,12 +30,17 @@ import csv
 import io
 import json
 import os
+import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
+import tempfile
 import urllib.error
 import urllib.request
+import zipfile
+import zlib
 from contextlib import redirect_stdout
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -65,7 +70,10 @@ PKG = os.environ.get("WF_PKG", "com.leiting.wf")
 DEVICE = f"127.0.0.1:{ADB_PORT}"
 REMOTE_UPLOAD = "/sdcard/WorldFlipper/dummy/download/production/upload"
 
+# element 6=Colorless 是敌人/boss 专属,给可玩角色写 6 会崩(见 omni_convert 注释);
+# 只保留 0-5 供资料页写入。6 仅用于**显示**(万一有 boss 复用体),显示映射另见 ELEMENTS_DISPLAY。
 ELEMENTS = {"0": "火", "1": "水", "2": "雷", "3": "风", "4": "光", "5": "暗"}
+ELEMENTS_DISPLAY = {**ELEMENTS, "6": "通用"}
 
 
 # ---------------------------------------------------------------- store
@@ -136,7 +144,7 @@ def load_characters() -> list[dict]:
             "id": cid,
             "code_name": row[0],
             "rarity": row[2],
-            "element": ELEMENTS.get(str(row[3]), str(row[3])),
+            "element": ELEMENTS_DISPLAY.get(str(row[3]), str(row[3])),
             "race": row[4],
             "role": row[26],
             "name": name or row[0],
@@ -328,7 +336,7 @@ def _pct(v: str) -> str:
 def describe_ability(lines: list[dict], idx: dict[str, int]) -> str:
     """规则化中文备注:类别 + 触发条件 + 数值端点。启发式,以面板为准。
     持续威力列按 schema 列名派生(CN=112/114,global=109/111),不写死下标以免跨版本错位
-    (见版本切换设计.md)。"""
+    (见 docs/版本切换设计.md)。"""
     if not lines:
         return ""
     v1 = lines[0]["values"]
@@ -1333,6 +1341,159 @@ def mainpos_one(ability: str, line: int, action: str, dry_run: bool) -> dict:
     return {"changes": len(log), "log": "\n".join(log), "written": written, "dry_run": dry_run}
 
 
+# ---------------------------------------------------------------- 词条工坊(按块结构化组装/编辑词条行)
+# 依据 ability_enum_map.json 的块布局(五表基址+块内字段偏移)把 126/124/123 列的行
+# 拆成「前置条件/触发/效果」表单;前端组装完整行后按行写回(追加或覆盖)。
+# 行状态始终是完整 row(未知列原样保留),不做 spec 重建 → 不丢未逆向列。
+
+# 单元格禁引号/换行(破坏单行 CSV)。逗号放行:官方数据即有含逗号单元格
+# (leader 121177 行4 powerflip_override.levels="1,2,3",CSV 引号包裹),
+# write_csv_lines(csv.writer)会自动加引号,客户端解析器已被官方数据证实支持。
+_CELL_BAD = re.compile(r'["\r\n]')
+
+
+def _kind_by_logical(logical: str) -> str:
+    # 惰性映射:WEAPON_LOGICAL 等常量定义在本函数之后,不能在模块级引用
+    return {core.ABILITY_LOGICAL: "ability", LEADER_LOGICAL: "leader_ability",
+            WEAPON_LOGICAL: "equipment_enhancement_ability",
+            SOUL_LOGICAL: "ability_soul"}[logical]
+
+
+def _composer_ctx(key: str):
+    logical, real = _table_for_key(key)
+    kind = _kind_by_logical(logical)
+    table = core.load_table(logical, TARGET_STORE, SOURCE_STORE)
+    parsed = {k: core.read_csv_lines(t) for k, t in table.text_rows().items()}
+    width = _table_row_width(parsed, int(wf_describe.layout(kind)["ncols"]))
+    return logical, real, kind, table, parsed, width
+
+
+def composer_meta() -> dict:
+    m = wf_describe.enum_map()
+    kinds = {}
+    for kind, lay in m["layouts"].items():
+        kinds[kind] = {"ncols": lay["ncols"], "blocks": lay["blocks"],
+                       "head": lay.get("head", []),
+                       "trigger_col": lay["blocks"]["precondition1"] - 1}
+    ucs = []
+    try:
+        for u in list_unique_conditions()["conditions"]:
+            ucs.append({"id": u["id"], "name": u["name"]})
+    except Exception:
+        pass
+    small = {
+        "target": {str(k): v for k, v in wf_describe.TARGET_CN.items()},
+        "puller": {str(k): v for k, v in wf_describe.PULLER_CN.items()},
+        "element": {str(k): v for k, v in wf_describe.ELEMENT_CN.items()},
+        "precontent": {str(k): v for k, v in wf_describe.PRECONTENT_CN.items()},
+        "multiply": {str(k): v for k, v in wf_describe.MULTIPLY_CN.items()},
+        "opening": {str(k): v for k, v in wf_describe.OPENING_CN.items()},
+    }
+    return {"kinds": kinds, "block_fields": m["block_fields"],
+            "enums": wf_describe.enum_options(), "small": small,
+            "groups": {tok: wf_describe.GROUP_CN.get(tok, tok)
+                       for tok in m["character_groups_seen"]},
+            "categories": list(m["category_strings"].keys()),
+            "usage": m["usage_counts"], "unique_conditions": ucs,
+            "note": "数值单位:强度类 1000=1%;阈值 100000=1次/层;帧×100000;60帧=1秒"}
+
+
+def composer_row(key: str, line: int, as_key: str = "") -> dict:
+    """读任意键的一行(补齐到表真实宽)作为工坊底稿/编辑对象。
+    as_key 非空 = 作为该目标键的模板载入:跨表(仅 角色词条<->队长技)自动列重排。"""
+    logical, real, kind, table, parsed, width = _composer_ctx(key)
+    if real not in parsed:
+        raise ValueError(f"键不存在: {key}")
+    rows = parsed[real]
+    if not (1 <= int(line) <= len(rows)):
+        raise ValueError(f"行号越界: {key} 共 {len(rows)} 行")
+    row = _fit_row_width(rows[int(line) - 1], width)
+    remap_note = ""
+    if as_key:
+        dlogical, dreal, dkind, _dt, dparsed, dwidth = _composer_ctx(as_key)
+        if dlogical != logical:
+            row, remap_note = _remap_cross_table(row, logical, dlogical,
+                                                 dparsed.get(dreal) or [])
+            kind, width = dkind, dwidth
+            row = _fit_row_width(row, width)
+    return {"key": key, "kind": kind, "line": int(line), "ncols": width, "row": row,
+            "lines_total": len(rows), "desc": wf_describe.describe_line(row, kind),
+            "remap_note": remap_note}
+
+
+def composer_blank(dst_key: str) -> dict:
+    """按目标键生成空白行:头部列(觉醒门槛清零)抄目标首行,其余全空、触发=瞬发。"""
+    logical, real, kind, table, parsed, width = _composer_ctx(dst_key)
+    lay = wf_describe.layout(kind)
+    head_end = int(lay["blocks"]["precondition1"])
+    row = [""] * width
+    if real in parsed and parsed[real]:
+        d0 = _fit_row_width(parsed[real][0], width)
+        row[:head_end] = d0[:head_end]
+    if kind == "ability":
+        row[1] = "true"
+        row[2] = row[2] or "attack_common"
+        row[3], row[4] = "0", ""
+    elif kind == "leader_ability":
+        row[1], row[2] = "1", "0"
+    tcol = head_end - 1
+    row[tcol] = "0"
+    return {"key": dst_key, "kind": kind, "line": None, "ncols": width, "row": row,
+            "lines_total": len(parsed.get(real) or []), "desc": ""}
+
+
+def composer_describe(kind: str, row: list) -> dict:
+    if kind not in wf_describe.table_kinds():
+        raise ValueError(f"未知表类型: {kind}")
+    return {"desc": wf_describe.describe_line([str(v) for v in row], kind) or "(空)"}
+
+
+def composer_apply(dst_key: str, mode, row: list, adapt_sid: bool, dry_run: bool,
+                   create_missing: bool = False) -> dict:
+    """工坊写入:mode="append" 追加 / 行号 N 覆盖该行。行宽对齐目标表,单元格禁引号/换行。
+    create_missing=True 且键不存在时新建整键(角色 abilities 引用了但表中缺失的槽位)。"""
+    logical, real, kind, table, parsed, width = _composer_ctx(dst_key)
+    created = False
+    if real not in parsed:
+        if not (create_missing and mode == "append"):
+            raise ValueError(f"目标不存在: {dst_key}(缺失槽位可勾「新建键」以追加方式创建)")
+        parsed[real] = []
+        created = True
+    row = [str(v) for v in row]
+    for i, v in enumerate(row):
+        if _CELL_BAD.search(v):
+            raise ValueError(f"c{i} 含引号/换行(会破坏 CSV 行结构): {v!r}")
+    if len(row) > width and any(v != "" for v in row[width:]):
+        raise ValueError(f"行宽超限: {len(row)} 列 > 表宽 {width} 且尾部非空")
+    row = _fit_row_width(row, width)
+    log = []
+    if created:
+        log.append(f"⚠ 新建整键 {dst_key}(此前不在 {kind} 表中)")
+    if adapt_sid and kind in ("ability", "leader_ability") and parsed[real]:
+        sid = parsed[real][0][0] if parsed[real][0] else ""
+        if sid and row[0] != sid:
+            log.append(f"string_id {row[0]!r} -> {sid!r}(描述文本随目标)")
+            row[0] = sid
+    if kind == "ability" and row[1] not in ("true", "false"):
+        row[1] = "true"
+    desc = wf_describe.describe_line(row, kind)
+    if mode == "append":
+        parsed[real].append(row)
+        action = f"追加为第 {len(parsed[real])} 行"
+    else:
+        li = int(mode)
+        if not (1 <= li <= len(parsed[real])):
+            raise ValueError(f"目标行越界: {li}(共 {len(parsed[real])} 行)")
+        parsed[real][li - 1] = row
+        action = f"覆盖第 {li} 行"
+    log.insert(0, f"{dst_key} {action}: {desc or '(空行)'}")
+    written = None
+    if not dry_run:
+        written = str(_write_with_backup(table, parsed, log))
+    return {"changes": 1, "log": "\n".join(log), "written": written,
+            "dry_run": dry_run, "desc": desc}
+
+
 # ---------------------------------------------------------------- 装备/魂珠 equipment
 # master/item/equipment.orderedmap:武器与魂珠共表(436 键,c2 kind 0=武器 1=魂珠orb),
 # c1=中文名 c7=描述 c8=品质 c10=ability_soul_id(实测 436/436 与自身键一致 → 每件装备
@@ -1779,6 +1940,54 @@ def _char_json_paths() -> tuple[Path, Path]:
     return CDNDATA / "character.json", CDNDATA / "character_text.json"
 
 
+# ---- 改星级后的存档校正 ----
+# 已拥有角色的 突破段/exp 超出新星级上限 → 客户端查看角色即 C2275 崩溃
+# (CharacterLevelLogic.as:94 校验)。上限镜像自 src/routes/api/character.ts
+# (characterMaxOverLimits) + src/lib/character.ts(characterExpCaps,index=突破段)。
+SAVE_DB = ROOT / ".database" / "wdfp_data.db"
+MAX_OVER_LIMITS = {1: 12, 2: 10, 3: 8, 4: 6, 5: 4}
+CHARACTER_EXP_CAPS = {
+    1: [11416, 15820, 21477, 28538, 37241, 49481, 66600, 91180, 125223, 170928, 216633, 262338, 308043],
+    2: [21477, 28538, 37241, 49481, 66600, 91180, 125223, 170928, 216633, 262338, 308043],
+    3: [37241, 49481, 66600, 91180, 125223, 170928, 216633, 262338, 308043],
+    4: [76272, 102829, 139190, 189995, 240800, 291605, 342410],
+    5: [153988, 210488, 266988, 323488, 379988],
+}
+
+
+def _clamp_save_for_rarity(cid: str, rarity: int, apply: bool) -> str:
+    """全部存档里该角色的 over_limit_step/exp 钳到新星级合法范围。
+    apply=False 只预览。返回日志串(空=没有需要校正的行)。"""
+    mx = MAX_OVER_LIMITS.get(rarity)
+    caps = CHARACTER_EXP_CAPS.get(rarity)
+    if mx is None or not caps or not SAVE_DB.exists():
+        return ""
+    try:
+        con = sqlite3.connect(str(SAVE_DB), timeout=10)
+        try:
+            rows = con.execute(
+                "SELECT player_id, over_limit_step, exp FROM players_characters WHERE id=?",
+                (int(cid),)).fetchall()
+            fixed = []
+            for pid, ol, exp in rows:
+                ol0 = ol if ol is not None else 0
+                new_ol = min(ol0, mx)
+                cap = caps[min(new_ol, len(caps) - 1)]
+                new_exp = min(exp, cap) if exp is not None else exp
+                if new_ol != ol0 or new_exp != exp:
+                    if apply:
+                        con.execute("UPDATE players_characters SET over_limit_step=?, exp=? "
+                                    "WHERE player_id=? AND id=?", (new_ol, new_exp, pid, int(cid)))
+                    fixed.append(f"存档player{pid}: 突破{ol0}->{new_ol} exp{exp}->{new_exp}")
+            if fixed and apply:
+                con.commit()
+            return "; ".join(fixed)
+        finally:
+            con.close()
+    except Exception as exc:
+        return f"⚠ 存档校正失败(可手动查 .database/wdfp_data.db): {exc}"
+
+
 def get_char_fields(cid: str) -> dict:
     mp, tp = _char_json_paths()
     master = json.loads(mp.read_text(encoding="utf-8"))
@@ -1792,7 +2001,7 @@ def get_char_fields(cid: str) -> dict:
         arr = m if src == "master" else t
         fields[f] = arr[idx] if idx < len(arr) else ""
     return {"id": cid, "fields": fields,
-            "element_name": ELEMENTS.get(str(fields.get("element", "")), fields.get("element", ""))}
+            "element_name": ELEMENTS_DISPLAY.get(str(fields.get("element", "")), fields.get("element", ""))}
 
 
 def _server_char_json_path() -> Path:
@@ -1832,6 +2041,12 @@ def save_char_fields(cid: str, edits: dict, dry_run: bool) -> dict:
         val = str(val)
         if f == "element":
             val = rev_el.get(val, val)  # 中文名 -> 0-5
+            # 硬拦截:element=6(Colorless)敌人专属,写给可玩角色会崩(C7050/连锁越界/
+            # forceUncolorless 抛)。2026-07-12 实测阿尔克 element=6 → 查看即崩,已回滚。
+            if val in ("6", "通用"):
+                raise ValueError(
+                    "element=6(通用/Colorless)是敌人专属元素,写给可玩角色会导致客户端崩溃"
+                    "(C7050 等),已禁止。要「任意共鸣」用『通用共鸣(OmniElement)』开关(保留原元素)。")
         norm[f] = val
         write(src, idx, val)
 
@@ -1898,6 +2113,16 @@ def save_char_fields(cid: str, edits: dict, dry_run: bool) -> dict:
                 if not dirty:
                     server = None
 
+    # 改星级 → 顺带校正所有存档里该角色的 突破段/exp(防 C2275 崩溃;dry-run 只预览)
+    clamp_log = ""
+    if "rarity" in norm:
+        try:
+            clamp_log = _clamp_save_for_rarity(cid, int(norm["rarity"]), apply=not dry_run)
+        except (ValueError, TypeError):
+            clamp_log = ""
+        if clamp_log:
+            log.append(clamp_log + ("" if dry_run else "(已写入存档,重启游戏生效)"))
+
     written = None
     if not dry_run and log:
         global _char_cache
@@ -1937,7 +2162,7 @@ def save_char_fields(cid: str, edits: dict, dry_run: bool) -> dict:
 
 
 # ---------------------------------------------------------------- 技能形态切换
-# 机制(CharacterValues.as 逆向,见 技能形态切换与资产包导入结论.md):
+# 机制(CharacterValues.as 逆向,见 docs/技能形态切换与资产包导入结论.md):
 # ② character 表 col9=条件种类 col10=状态枚举 col12=多球列表 col13=阈值
 # col14=切换后技能键(→ switched_action_skill 表,嵌套,键=code_name)
 # col15/16=切换时静音(技能音/就绪音)。①层 cdndata character.json 同列镜像。
@@ -2176,44 +2401,209 @@ _PACK_ARTIFACT_SUFFIX = (".gif", ".json")
 
 
 def import_asset_pack(character: str, src_dir: str, force: bool, dry_run: bool) -> dict:
-    """全资产包批量导入:datamine 解包目录(相对路径 = character/<code>/ 下的逻辑路径)
-    一比一替换到 store。逐文件走 replace_asset(校验/混淆编码/备份/进 pending/改动日志),
-    命不中 store 的路径跳过并报告。"""
+    """全资产包批量导入:datamine 解包目录或 .zip 包(相对路径 = character/<code>/ 下的
+    逻辑路径)一比一替换到 store。zip 自动解压到临时目录;外层多套的文件夹(zip 内只有
+    一个角色名目录的常见形状)自动下钻到含 ui/pixelart/voice/battle 的那级。
+    逐文件走 replace_asset(校验/混淆编码/备份/进 pending/改动日志),命不中 store 的路径
+    跳过并报告。"""
     c = next((x for x in load_characters() if x["id"] == str(character)), None)
     if not c:
         raise ValueError(f"角色不存在: {character}")
     code = c["code_name"]
-    base = Path(src_dir).expanduser()
-    if not base.is_dir():
-        raise ValueError(f"目录不存在: {src_dir}")
-    replaced, artifacts, missing, bad = [], [], [], []
-    log = []
-    for root, _, files in os.walk(base):
-        for fn in sorted(files):
-            fp = Path(root) / fn
-            rel = fp.relative_to(base).as_posix()
-            marked = "/" + rel
-            if (rel.lower().endswith(_PACK_ARTIFACT_SUFFIX)
-                    or "_resized." in rel
-                    or any(m in marked for m in _PACK_ARTIFACT_DIRS)):
-                artifacts.append(rel)
-                continue
-            logical = f"character/{code}/{rel}"
-            if not wf_assets.locate(TARGET_STORE, logical):
-                missing.append(rel)
-                continue
+    base = Path(src_dir.strip().strip('"')).expanduser()
+    tmp = None
+    try:
+        if base.is_file() and base.suffix.lower() == ".zip":
+            WORK_DIR.mkdir(parents=True, exist_ok=True)
+            tmp = Path(tempfile.mkdtemp(prefix="wfpack-", dir=str(WORK_DIR)))
+            with zipfile.ZipFile(base) as zf:
+                zf.extractall(tmp)
+            base = tmp
+        elif base.is_file():
+            raise ValueError(f"不支持的文件类型(目录或 .zip): {src_dir}")
+        if not base.is_dir():
+            raise ValueError(f"目录/zip 不存在: {src_dir}")
+        markers = ("ui", "pixelart", "voice", "battle")
+        for _ in range(3):  # 自动下钻最多 3 层
+            if any((base / m).is_dir() for m in markers):
+                break
+            subs = [p for p in base.iterdir() if p.is_dir()]
+            if len(subs) != 1:
+                break
+            base = subs[0]
+        replaced, artifacts, missing, bad = [], [], [], []
+        log = []
+        for root, _, files in os.walk(base):
+            for fn in sorted(files):
+                fp = Path(root) / fn
+                rel = fp.relative_to(base).as_posix()
+                marked = "/" + rel
+                if (rel.lower().endswith(_PACK_ARTIFACT_SUFFIX)
+                        or "_resized." in rel
+                        or any(m in marked for m in _PACK_ARTIFACT_DIRS)):
+                    artifacts.append(rel)
+                    continue
+                logical = f"character/{code}/{rel}"
+                if not wf_assets.locate(TARGET_STORE, logical):
+                    missing.append(rel)
+                    continue
+                try:
+                    r = replace_asset(logical, fp.read_bytes(), force, dry_run)
+                    replaced.append(rel)
+                    log.append(r["log"])
+                except ValueError as e:
+                    bad.append(f"{rel}: {e}")
+        return {"changes": len(replaced), "dry_run": dry_run, "code_name": code,
+                "replaced": len(replaced), "artifacts": len(artifacts),
+                "missing": missing, "bad": bad, "log": "\n".join(log),
+                "note": f"替换 {len(replaced)},跳过提取器产物 {len(artifacts)},"
+                        f"store 无对应 {len(missing)},失败 {len(bad)}"
+                        + ("(dry-run 预览,未写入)" if dry_run
+                           else ";已备份+进待发布,点「发布并重启游戏」生效")}
+    finally:
+        if tmp is not None:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ---------------------------------------------------------------- 像素图排布/动画数据
+# sprite_sheet 的小图排布由配套 .atlas.amf3.deflate 决定(AMF3 列表,每项 {n,x,y,w,h[,r]});
+# 动画由 .frame/.timeline 定义。容器 = raw deflate(-15) 包 AMF3,已实测 40 文件
+# core.AMF3Reader 解码 + wf_dsl.encode_amf3 编码字节级一致。
+# 资产包导入会把 datamine 解码出的 .json 当提取器产物跳过——这里是它们的专用入口:
+# GUI 内直改(/pixelart_data → /pixelart_data/save json_text)或
+# 上传外部编辑好的文档(data_b64,.json / .amf3.deflate / 裸 AMF3 自动识别)。
+
+PIXELART_DATA_FILES = {
+    "atlas": ("pixelart/sprite_sheet.atlas.amf3.deflate", "常规像素图排布(atlas)"),
+    "special_atlas": ("pixelart/special_sprite_sheet.atlas.amf3.deflate", "特殊动作排布(atlas)"),
+    "frame": ("pixelart/pixelart.frame.amf3.deflate", "常规动画帧定义"),
+    "timeline": ("pixelart/pixelart.timeline.amf3.deflate", "常规动画时间轴"),
+    "special_frame": ("pixelart/special.frame.amf3.deflate", "特殊动作帧定义"),
+    "special_timeline": ("pixelart/special.timeline.amf3.deflate", "特殊动作时间轴"),
+}
+
+
+def _pixelart_logical(character: str, name: str) -> tuple[str, str]:
+    c = next((x for x in load_characters() if x["id"] == str(character)), None)
+    if not c:
+        raise ValueError(f"角色不存在: {character}")
+    if name not in PIXELART_DATA_FILES:
+        raise ValueError(f"未知数据文件 {name}(可选: {'/'.join(PIXELART_DATA_FILES)})")
+    rel, desc = PIXELART_DATA_FILES[name]
+    return f"character/{c['code_name']}/{rel}", desc
+
+
+def _amf3_container_load(logical: str) -> tuple[bytes, str]:
+    """读 .amf3.deflate:store 优先,APK bundle 兜底;返回 (AMF3 明文, 来源根)。"""
+    loc = wf_assets.locate(TARGET_STORE, logical)
+    if loc:
+        raw, src = loc[1].read_bytes(), loc[0]
+    else:
+        raw = _apk_read_asset(logical)
+        if raw is None:
+            raise ValueError(f"资产不存在(store 与 APK bundle 均无): {logical}")
+        src = "apk_bundle"
+    for blob in (raw, raw[4:] if len(raw) > 4 else raw):
+        for wb in (-15, 15):
             try:
-                r = replace_asset(logical, fp.read_bytes(), force, dry_run)
-                replaced.append(rel)
-                log.append(r["log"])
-            except ValueError as e:
-                bad.append(f"{rel}: {e}")
-    return {"changes": len(replaced), "dry_run": dry_run, "code_name": code,
-            "replaced": len(replaced), "artifacts": len(artifacts),
-            "missing": missing, "bad": bad, "log": "\n".join(log),
-            "note": f"替换 {len(replaced)},跳过提取器产物 {len(artifacts)},"
-                    f"store 无对应 {len(missing)},失败 {len(bad)}"
-                    + ("(dry-run 预览,未写入)" if dry_run else ";已备份+进待发布,点「发布并重启游戏」生效")}
+                return zlib.decompress(blob, wb), src
+            except Exception:
+                continue
+    raise ValueError(f"无法解压(不是 deflate/zlib 容器): {logical}")
+
+
+def get_pixelart_data(character: str, name: str) -> dict:
+    logical, desc = _pixelart_logical(character, name)
+    plain, src = _amf3_container_load(logical)
+    tree = core.AMF3Reader(plain).read_value()
+    byte_ok = wf_dsl.encode_amf3(tree) == plain
+    return {"character": str(character), "name": name, "logical": logical, "source": src,
+            "desc": desc, "bytes": len(plain), "byte_roundtrip": byte_ok,
+            "entries": len(tree) if isinstance(tree, (list, dict)) else None,
+            "json_text": json.dumps(tree, ensure_ascii=False, indent=1),
+            "note": ("atlas 每项 {n:小图名,x,y,w,h[,r:存图旋转90°]},坐标=sprite_sheet.png 内像素;"
+                     "对象键序不可重排(AMF3 按序写 traits);整数别写成 3.0(类型会变)。"
+                     + ("" if byte_ok else " ⚠ 此文件编码器往返不一致,保存前会再自检,谨慎"))}
+
+
+def _tree_equal(a, b) -> bool:
+    """dict 比较须含键序(AMF3 traits 有序;== 忽略键序会漏改动)。"""
+    if isinstance(a, dict) and isinstance(b, dict):
+        return list(a.keys()) == list(b.keys()) and all(_tree_equal(a[k], b[k]) for k in a)
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) == len(b) and all(_tree_equal(x, y) for x, y in zip(a, b))
+    return type(a) is type(b) and a == b
+
+
+def save_pixelart_data(character: str, name: str, json_text: str, data_b64: str,
+                       dry_run: bool) -> dict:
+    """编辑保存(json_text)或上传文档(data_b64:.json/.amf3.deflate/裸 AMF3 自动识别)。"""
+    logical, desc = _pixelart_logical(character, name)
+    if (json_text or "").strip():
+        tree = json.loads(json_text)
+        src_desc = "JSON 文本"
+    elif data_b64:
+        raw = base64.b64decode(data_b64)
+        tree, src_desc = None, ""
+        try:
+            tree = json.loads(raw.decode("utf-8"))
+            src_desc = "JSON 文件"
+        except Exception:
+            for blob in (raw, raw[4:] if len(raw) > 4 else raw):
+                for wb in (-15, 15):
+                    try:
+                        tree = core.AMF3Reader(zlib.decompress(blob, wb)).read_value()
+                        src_desc = "amf3.deflate 二进制"
+                        break
+                    except Exception:
+                        continue
+                if tree is not None:
+                    break
+            if tree is None:
+                try:
+                    tree = core.AMF3Reader(raw).read_value()
+                    src_desc = "裸 AMF3"
+                except Exception:
+                    raise ValueError("上传内容不是 JSON / amf3.deflate / AMF3 任一格式")
+    else:
+        raise ValueError("缺少内容(json_text 或 data_b64)")
+
+    plain = wf_dsl.encode_amf3(tree)
+    if not _tree_equal(core.AMF3Reader(plain).read_value(), tree):
+        raise ValueError("AMF3 编码自校验失败(结构含不支持的类型?),已放弃写入")
+    try:
+        old_plain, src = _amf3_container_load(logical)
+    except ValueError:
+        old_plain, src = None, "new"
+    if old_plain is not None and plain == old_plain:
+        return {"changes": 0, "log": "内容与当前文件一致,无需写入", "written": None,
+                "dry_run": dry_run}
+    n = len(tree) if isinstance(tree, (list, dict)) else 0
+    co = zlib.compressobj(9, zlib.DEFLATED, -15)
+    enc = co.compress(plain) + co.flush()
+    log = [f"{logical}: {desc} {'新建' if old_plain is None else '替换'}({src_desc}),"
+           f"明文 {len(old_plain) if old_plain else 0}B -> {len(plain)}B,条目 {n}"
+           + (" [原文件在 APK bundle,写 store 后下载优先接管]" if src == "apk_bundle" else "")]
+    written = None
+    if not dry_run:
+        loc = wf_assets.locate(TARGET_STORE, logical)
+        if loc:
+            fp = loc[1]
+        else:
+            d = core.sha1_path(logical)
+            fp = TARGET_STORE / d[:2] / d[2:]
+            fp.parent.mkdir(parents=True, exist_ok=True)
+        bak = None
+        if fp.exists():
+            bak = fp.with_name(fp.name + ".bak-wfmod-pixdata-" + time.strftime("%Y%m%d-%H%M%S"))
+            if not bak.exists():
+                shutil.copy2(fp, bak)
+        fp.write_bytes(enc)
+        add_pending(fp)
+        record_change(logical, "\n".join(log), bak)
+        written = str(fp)
+    return {"changes": 1, "log": "\n".join(log), "written": written, "dry_run": dry_run,
+            "note": "发布后生效;改 atlas 只影响排布读取,PNG 本体另用「替换」上传"}
 
 
 # ---------------------------------------------------------------- 技能效果 DSL 数值
@@ -2283,9 +2673,11 @@ def _dsl_sharers(pp: str) -> list[str]:
     return out
 
 
-def get_skill_dsl_json(character: str, level: str) -> dict:
-    """整棵技能 DSL 命令树导出为 JSON 文本(AMF3 序列化器已全库 1035 文件字节级往返验证)。"""
-    pp = _skill_program_path(character, level)
+def get_skill_dsl_json(character: str, level: str, pp: str = "") -> dict:
+    """整棵技能 DSL 命令树导出为 JSON 文本(AMF3 序列化器已全库 1035 文件字节级往返验证)。
+    pp 非空 = 直接按 program_path 打开(强化弹射/变体等非 action_skill 引用的效果文件)。"""
+    if not pp:
+        pp = _skill_program_path(character, level)
     fp, data = wf_dsl.load_dsl_file(TARGET_STORE, pp)
     byte_ok, sem_ok = wf_dsl.roundtrip_ok(data)
     if not (byte_ok or sem_ok):
@@ -2299,8 +2691,10 @@ def get_skill_dsl_json(character: str, level: str) -> dict:
                     + (f"共享提醒:{len(sharers)} 个技能键引用此文件,改动全部生效" if len(sharers) > 1 else "")}
 
 
-def save_skill_dsl_json(character: str, level: str, json_text: str, dry_run: bool) -> dict:
-    pp = _skill_program_path(character, level)
+def save_skill_dsl_json(character: str, level: str, json_text: str, dry_run: bool,
+                        pp: str = "") -> dict:
+    if not pp:
+        pp = _skill_program_path(character, level)
     fp, data = wf_dsl.load_dsl_file(TARGET_STORE, pp)
     new = wf_dsl.json_text_to_dsl(json_text)  # 含 encode→parse 自校验
     if new == data:
@@ -2411,6 +2805,558 @@ def switched_skill_variants(character: str) -> dict:
             "levels": [{"level": lv, "program_path": row.split(",")[0].strip()}
                        for lv, row in mine.items()],
             "all_keys": list(t)}
+
+
+# ---------------------------------------------------------------- 技能效果词条(命令级编辑)
+# 前端「效果词条」编辑器:树在前端用字面量保持型 JSON 解析器编辑(int/double 不失真),
+# 保存复用 /skill_dsl_json/save。后端只提供:
+#   /skill_sig      命令/事件/枚举构造签名 + 中文标注(wf_dsl_sig,静态)
+#   /skill_cmd_lib  全库命令实例库(从 1024 个技能 DSL 收割,去重,供"插入命令"检索)
+
+_CMDLIB_CACHE: dict = {"stamp": None, "items": None, "names": None}
+
+
+def skill_sig() -> dict:
+    import wf_dsl_sig as S
+    return {"commands": S.COMMANDS, "events": S.EVENTS, "enums": S.ENUMS,
+            "cmd_cn": S.CMD_CN, "ac_cn": S.AC_CN, "param_cn": S.PARAM_CN,
+            "ac_param_cn": S.AC_PARAM_CN, "type_cn": S.TYPE_CN,
+            "note": "树语法: [\"Block\",[表达式...]] / [\"Command\",[名,参数...]] / "
+                    "[\"Event\",[名,参数...]];[{min,max}]=SLv1/满级端点"}
+
+
+def _all_program_paths() -> dict[str, list[str]]:
+    """program_path -> [归属技能键(code_name[·级别/变体])];含 switched 变体。"""
+    out: dict[str, list[str]] = {}
+    tbl = core.load_action_skill_table(TARGET_STORE, SOURCE_STORE)
+    C = core.ACTION_SKILL_COLUMNS
+    for ki, key in enumerate(tbl.keys):
+        for lv, fields in core.decode_action_skill_row(tbl.rows[ki]):
+            if len(fields) > C["program_path"]:
+                pp = fields[C["program_path"]]
+                if pp and pp != "(None)":
+                    out.setdefault(pp, []).append(f"{key}·{lv}")
+    try:
+        sw = wf_boss.qlib.load_table(SWITCHED_SKILL_LOGICAL)
+        for key, levels in sw.items():
+            for lv, row in levels.items():
+                pp = row.split(",")[0].strip()
+                if pp and pp != "(None)":
+                    out.setdefault(pp, []).append(f"{key}·变体{lv}")
+    except Exception:
+        pass
+    return out
+
+
+def _build_cmd_library() -> tuple[list[dict], list[dict]]:
+    """全库命令实例收割(按 名称+JSON 去重)。缓存按 action_skill 表 mtime 失效。"""
+    import wf_dsl_sig as S
+    try:
+        stamp = str(core.table_path(TARGET_STORE, core.ACTION_SKILL_LOGICAL).stat().st_mtime_ns)
+    except Exception:
+        stamp = "0"
+    if _CMDLIB_CACHE["stamp"] == stamp:
+        return _CMDLIB_CACHE["items"], _CMDLIB_CACHE["names"]
+    owners_of = _all_program_paths()
+    dedup: dict[tuple, dict] = {}
+
+    def walk(node, pp):
+        if isinstance(node, list):
+            if (len(node) == 2 and node[0] in ("Command", "Event")
+                    and isinstance(node[1], list) and node[1]
+                    and isinstance(node[1][0], str)):
+                jt = json.dumps(node, ensure_ascii=False)
+                k = (node[0], node[1][0], jt)
+                it = dedup.get(k)
+                if it is None:
+                    dedup[k] = it = {"kind": node[0], "name": node[1][0],
+                                     "cn": S.cn_cmd(node[1][0]),
+                                     "brief": S.brief_command(node[1]),
+                                     "owners": [], "count": 0, "json": jt}
+                it["count"] += 1
+                own = owners_of.get(pp, [])
+                for o in own[:2]:
+                    if o not in it["owners"] and len(it["owners"]) < 6:
+                        it["owners"].append(o)
+            for x in node:
+                walk(x, pp)
+        elif isinstance(node, dict):
+            for v in node.values():
+                walk(v, pp)
+
+    for pp in owners_of:
+        lg = wf_dsl.dsl_logical(pp)
+        d = core.sha1_path(lg)
+        fp = TARGET_STORE / d[:2] / d[2:]
+        if not fp.exists():
+            continue
+        try:
+            tree = wf_dsl.parse_dsl(zlib.decompress(fp.read_bytes(), -15))["tree"]
+        except Exception:
+            continue
+        walk(tree, pp)
+
+    items = sorted(dedup.values(), key=lambda x: (-x["count"], x["name"]))
+    by_name: dict[tuple, int] = {}
+    for it in items:
+        k = (it["kind"], it["name"])
+        by_name[k] = by_name.get(k, 0) + it["count"]
+    names = sorted(({"kind": k[0], "name": k[1], "cn": wf_dsl_cn(k[1]), "count": n}
+                    for k, n in by_name.items()), key=lambda x: -x["count"])
+    _CMDLIB_CACHE.update(stamp=stamp, items=items, names=names)
+    return items, names
+
+
+def wf_dsl_cn(name: str) -> str:
+    import wf_dsl_sig as S
+    return S.cn_cmd(name)
+
+
+def skill_cmd_lib(name: str, q: str, limit: int = 80) -> dict:
+    items, names = _build_cmd_library()
+    ql = (q or "").strip().lower()
+    hits = []
+    for it in items:
+        if name and it["name"] != name:
+            continue
+        if ql:
+            hay = (it["name"] + " " + it["cn"] + " " + it["brief"]
+                   + " " + " ".join(it["owners"])).lower()
+            if ql not in hay:
+                continue
+        hits.append(it)
+        if len(hits) >= max(1, int(limit)):
+            break
+    return {"names": names, "count": len(hits), "items": hits,
+            "note": "items[].json 为该命令实例的完整子树(int/double 已按 3/3.0 区分),"
+                    "可直接插入目标技能的 Block"}
+
+
+# ---------------------------------------------------------------- 强化弹射(Power Flip)
+# 逆向结论(2026-07-12,SpecialityTypeTools/PowerFlipLogic/RootMasterBinary/FileReader):
+#   * 角色 PF 种类 = character 表 c6 speciality_type:0=knight剑士 1=fighter格斗
+#     2=ranged射击 3=supporter辅助 4=special特殊(同时决定类型图标)。
+#   * 种类定义表 master/skill/power_flip_action.orderedmap:键=种类 id,行=3 列 DSL 路径
+#     (lv1/2/3)。**store 里的是增量部分**(special/ruin_girl/thunder_dragon/override_*),
+#     knight/fighter/ranged/supporter 基础键在 APK 内置 base 表里;客户端把多文件 union,
+#     键重复 = ClientError 7051 崩溃 → 新键名不得与 base 撞(禁用 4 个标准名)。
+#   * DSL 文件解析:下载 store 优先于 APK 内置(FileReader.resolveFiles)→ 把内置
+#     knight/ranged/supporter 文件提取进 store 即可编辑(字节相同则行为不变)。
+#   * 自定义种类激活 = 队长词条 powerflip_override(instant/during_content 块:
+#     id=表键, levels="1,2,3", description_id=文本键;官方例 leader 121177 行4)。
+
+PF_LOGICAL = "master/skill/power_flip_action.orderedmap"
+PF_STD = [("knight", "剑士"), ("fighter", "格斗"), ("ranged", "射击"),
+          ("supporter", "辅助"), ("special", "特殊")]
+PF_SPEC_CN = {0: "剑士(knight)", 1: "格斗(fighter)", 2: "射击(ranged)",
+              3: "辅助(supporter)", 4: "特殊(special)"}
+_PF_ID_RE = re.compile(r"^[a-z][a-z0-9_]{2,60}$")
+
+
+def _pf_conventional_paths(kind: str) -> list[str]:
+    return [f"battle/action/power_flip/action/{kind}${kind}_lv{n}" for n in (1, 2, 3)]
+
+
+def _dsl_store_path(pp: str) -> Path:
+    d = core.sha1_path(wf_dsl.dsl_logical(pp))
+    return TARGET_STORE / d[:2] / d[2:]
+
+
+def _find_apk() -> Path | None:
+    """内置 base 资产来源 APK:WF_APK 环境变量 > 仓库 弹国服/*.apk 取最新。"""
+    envp = os.environ.get("WF_APK")
+    if envp and Path(envp).exists():
+        return Path(envp)
+    cands = sorted((ROOT / "弹国服").glob("*.apk"),
+                   key=lambda p: p.stat().st_mtime, reverse=True)
+    return cands[0] if cands else None
+
+
+_APK_BUNDLE_CACHE: dict = {"apk": None, "names": None}
+
+
+def _apk_bundle_names(apk: Path):
+    """APK assets/bundle.zip 文件名集(缓存);返回 (ZipFile 工厂, names)。"""
+    import zipfile
+    if _APK_BUNDLE_CACHE["apk"] != str(apk):
+        with zipfile.ZipFile(apk) as z:
+            blob = z.read("assets/bundle.zip")
+        inner = zipfile.ZipFile(io.BytesIO(blob))
+        _APK_BUNDLE_CACHE.update(apk=str(apk), blob=blob,
+                                 names=[n for n in inner.namelist() if not n.endswith("/")])
+    return _APK_BUNDLE_CACHE
+
+
+def _apk_read_asset(pp: str) -> bytes | None:
+    """从 APK bundle.zip 按 sha1 桶取 DSL 存储态字节;不存在返回 None。"""
+    import zipfile
+    apk = _find_apk()
+    if not apk:
+        return None
+    cache = _apk_bundle_names(apk)
+    d = core.sha1_path(wf_dsl.dsl_logical(pp))
+    tail = d[:2] + "/" + d[2:]
+    hit = next((n for n in cache["names"] if n.endswith(tail)), None)
+    if not hit:
+        return None
+    return zipfile.ZipFile(io.BytesIO(cache["blob"])).read(hit)
+
+
+def _pf_table():
+    table = core.load_table(PF_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    parsed = {k: core.read_csv_lines(t) for k, t in table.text_rows().items()}
+    return table, parsed
+
+
+def powerflip_overview(character: str = "") -> dict:
+    table, parsed = _pf_table()
+    apk = _find_apk()
+    kinds = []
+    std_ids = {k for k, _ in PF_STD}
+
+    def level_info(pp: str) -> dict:
+        in_store = _dsl_store_path(pp).exists()
+        in_apk = False
+        if not in_store and apk:
+            in_apk = _apk_read_asset(pp) is not None
+        return {"pp": pp, "in_store": in_store, "in_apk": in_apk}
+
+    for kid, cn in PF_STD:
+        rows = parsed.get(kid)
+        paths = ([c for c in rows[0][:3]] if rows and rows[0] else
+                 _pf_conventional_paths(kid))
+        kinds.append({"id": kid, "cn": cn, "std": True,
+                      "source": "store表" if kid in parsed else "内置base",
+                      "levels": [level_info(p) for p in paths]})
+    for kid, rows in parsed.items():
+        if kid in std_ids:
+            continue
+        paths = rows[0][:3] if rows and rows[0] else []
+        kinds.append({"id": kid, "cn": "", "std": False, "source": "store表",
+                      "levels": [level_info(p) for p in paths]})
+
+    spec = None
+    if character:
+        ct = load_char_table()
+        t = ct.text_rows().get(str(character)) if ct else None
+        if t:
+            r = core.read_csv_lines(t)
+            if r and len(r[0]) > 6:
+                spec = r[0][6]
+    return {"kinds": kinds, "apk": str(apk) if apk else None,
+            "character": str(character), "speciality": spec,
+            "spec_cn": {str(k): v for k, v in PF_SPEC_CN.items()},
+            "note": "PF 定义全局共享:改标准种类的效果 = 所有该类型角色一起变。"
+                    "自定义种类靠队长词条 powerflip_override(id=种类键,levels=\"1,2,3\")激活。"}
+
+
+def powerflip_set_spec(character: str, spec, dry_run: bool) -> dict:
+    """改角色 PF 种类 = character 表 c6 speciality_type(0-4;同时决定类型图标)。"""
+    spec = int(spec)
+    if spec not in PF_SPEC_CN:
+        raise ValueError("speciality_type 只能是 0-4")
+    ct = core.load_table(core.CHARACTER_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    parsed = {k: core.read_csv_lines(t) for k, t in ct.text_rows().items()}
+    key = str(character)
+    if key not in parsed or not parsed[key]:
+        raise ValueError(f"character 表中没有 {key}")
+    row = parsed[key][0]
+    old = row[6] if len(row) > 6 else ""
+    if old == str(spec):
+        return {"changes": 0, "log": f"{key} 种类已是 {PF_SPEC_CN[spec]},无需修改",
+                "written": None, "dry_run": dry_run}
+    while len(row) <= 6:
+        row.append("")
+    row[6] = str(spec)
+    log = [f"{key} speciality_type(c6) {old!r} -> {spec}"
+           f"({PF_SPEC_CN.get(int(old)) if old.isdigit() and int(old) in PF_SPEC_CN else old} → {PF_SPEC_CN[spec]})"]
+    written = None
+    if not dry_run:
+        written = str(_write_with_backup(ct, parsed, log))
+    return {"changes": 1, "log": "\n".join(log), "written": written, "dry_run": dry_run,
+            "note": "类型图标随之改变;PF 动作按新种类生效(发布后)"}
+
+
+def powerflip_extract(kind: str, dry_run: bool) -> dict:
+    """把 APK 内置的该种类 PF DSL 提取进 store(字节原样,行为不变),之后即可编辑。"""
+    table, parsed = _pf_table()
+    paths = (parsed[kind][0][:3] if kind in parsed and parsed[kind]
+             else _pf_conventional_paths(kind))
+    log, wrote = [], []
+    for pp in paths:
+        fp = _dsl_store_path(pp)
+        if fp.exists():
+            log.append(f"{pp}: 已在 store,跳过")
+            continue
+        raw = _apk_read_asset(pp)
+        if raw is None:
+            log.append(f"{pp}: ⚠ APK 里也没有,跳过(该级别不可编辑)")
+            continue
+        wf_dsl.parse_dsl(zlib.decompress(raw, -15))  # 先验证可解析
+        log.append(f"{pp}: 从 APK 提取 {len(raw)}B -> store")
+        if not dry_run:
+            fp.parent.mkdir(parents=True, exist_ok=True)
+            fp.write_bytes(raw)
+            add_pending(fp)
+            record_change(wf_dsl.dsl_logical(pp), f"PF {kind} 提取自 APK({len(raw)}B)", None)
+            wrote.append(str(fp))
+    return {"changes": len(wrote) if not dry_run else sum("提取" in l for l in log),
+            "log": "\n".join(log), "written": "; ".join(wrote) or None, "dry_run": dry_run}
+
+
+def powerflip_clone(src_kind: str, new_id: str, dry_run: bool) -> dict:
+    """新建 PF 种类:克隆 src 的 3 个 DSL 文件到全新路径 + power_flip_action 表加新键。
+    激活方式:队长词条 powerflip_override.id=新键(levels=\"1,2,3\")。"""
+    new_id = str(new_id).strip()
+    if not _PF_ID_RE.match(new_id):
+        raise ValueError("新种类 id 只能用小写字母/数字/下划线(字母开头,3-61 位)")
+    table, parsed = _pf_table()
+    if new_id in parsed:
+        raise ValueError(f"种类已存在: {new_id}")
+    if new_id in {k for k, _ in PF_STD}:
+        raise ValueError("不能占用标准种类名(内置 base 表已有,键重复=客户端 7051 崩溃)")
+    src_paths = (parsed[src_kind][0][:3] if src_kind in parsed and parsed[src_kind]
+                 else _pf_conventional_paths(src_kind) if src_kind in {k for k, _ in PF_STD}
+                 else None)
+    if not src_paths:
+        raise ValueError(f"来源种类不存在: {src_kind}")
+    dst_paths = [f"battle/action/power_flip/action/override/{new_id}${new_id}_lv{n}"
+                 for n in (1, 2, 3)]
+    log = [f"新建 PF 种类 {new_id}(克隆自 {src_kind})"]
+    blobs = []
+    for sp, dp in zip(src_paths, dst_paths):
+        fp = _dsl_store_path(sp)
+        if fp.exists():
+            raw = fp.read_bytes()
+            src_from = "store"
+        else:
+            raw = _apk_read_asset(sp)
+            src_from = "APK"
+        if raw is None:
+            raise ValueError(f"来源效果文件不可得: {sp}(store 与 APK 都没有)")
+        wf_dsl.parse_dsl(zlib.decompress(raw, -15))
+        blobs.append((dp, raw))
+        log.append(f"  {sp} [{src_from}] -> {dp}({len(raw)}B)")
+    log.append(f"  power_flip_action 表 + 键 {new_id}")
+    log.append(f"激活:给队长词条的 效果块 填 powerflip_override.id={new_id}, levels=\"1,2,3\""
+               f"(词条工坊「瞬发/持续效果」区末尾三个字段)")
+    written = []
+    if not dry_run:
+        for dp, raw in blobs:
+            fp = _dsl_store_path(dp)
+            fp.parent.mkdir(parents=True, exist_ok=True)
+            fp.write_bytes(raw)
+            add_pending(fp)
+            written.append(str(fp))
+        parsed[new_id] = [list(dst_paths)]
+        written.append(str(_write_with_backup(table, parsed, log)))
+    return {"changes": 4, "log": "\n".join(log), "written": "; ".join(written) or None,
+            "dry_run": dry_run, "new_id": new_id, "paths": dst_paths}
+
+
+# ---------------------------------------------------------------- 共鸣通用属性(OmniElement)
+# 逆向结论(2026-07-12,OrCharacterGroup/BattleCharacterLogic/SquadMemberSource):
+#   词条里的角色组 token 解析顺序 = 元素名(Red…Colorless)→类型名→性别表→种族表→角色标签表;
+#   元素组匹配 = 角色 element 单值列**严格等值**,数据层没有"全属性通配"。
+#   角色自身的 character_tag(character 表 c5,逗号分隔列表)客户端不做表校验,
+#   加未知 token 无害 → 方案:给角色 c5 加 "OmniElement" 标签作为**数据开关**,
+#   配套**客户端补丁**(client-patch/omni-element 两处 matchCharacterGroup 的 Element 分支
+#   追加 `|| characterTags.indexOf("OmniElement") != -1`)后,该角色匹配任意元素组:
+#   共鸣计数/[限X属性]效果/编队 ribbon 全部生效。无补丁时标签无效果(安全)。
+
+OMNI_TAG = "OmniElement"
+
+
+def _char_tags(row: list[str]) -> list[str]:
+    return [t for t in (row[5] if len(row) > 5 else "").split(",") if t]
+
+
+def omni_element_status(character: str) -> dict:
+    ct = core.load_table(core.CHARACTER_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    t = ct.text_rows().get(str(character))
+    if t is None:
+        raise ValueError(f"character 表中没有 {character}")
+    row = core.read_csv_lines(t)[0]
+    tags = _char_tags(row)
+    return {"character": str(character), "enabled": OMNI_TAG in tags, "tags": tags,
+            "note": "OmniElement=共鸣通用标签(character 表 c5)。需配合客户端补丁 "
+                    "client-patch/omni-element 才生效;无补丁时无效果(无害)。"}
+
+
+def omni_element_set(character: str, enable: bool, dry_run: bool) -> dict:
+    ct = core.load_table(core.CHARACTER_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    parsed = {k: core.read_csv_lines(t) for k, t in ct.text_rows().items()}
+    key = str(character)
+    if key not in parsed or not parsed[key]:
+        raise ValueError(f"character 表中没有 {key}")
+    row = parsed[key][0]
+    while len(row) <= 5:
+        row.append("")
+    tags = _char_tags(row)
+    if enable == (OMNI_TAG in tags):
+        return {"changes": 0, "log": f"{key} OmniElement 已{'开启' if enable else '关闭'},无需修改",
+                "written": None, "dry_run": dry_run}
+    tags = tags + [OMNI_TAG] if enable else [t for t in tags if t != OMNI_TAG]
+    old = row[5]
+    row[5] = ",".join(tags)
+    log = [f"{key} character_tag(c5) {old!r} -> {row[5]!r}"
+           f"({'加' if enable else '去'} OmniElement 共鸣通用标签)",
+           "⚠ 生效前提:客户端已打 omni-element 补丁(client-patch/);发布后重启游戏"]
+    written = None
+    if not dry_run:
+        written = str(_write_with_backup(ct, parsed, log))
+    return {"changes": 1, "log": "\n".join(log), "written": written, "dry_run": dry_run}
+
+
+_OMNI_EL_WORDS = ("火", "水", "雷", "风", "光", "暗")
+
+
+def _omni_kit_audit(cid: str) -> list[str]:
+    """转换预检:列出该角色词条/队长技里提到六色属性的行(属性配对清单)。
+    逆向结论(docs/通用属性方案.md):这些配对**保留原样即最优**,无需改数据——
+    共鸣/编成/[限X属性]类经 omni-element 补丁自身计入任意色,与同色队友协同不丢;
+    「受X属性伤害减免」判攻击方元素、「对X属性敌人加伤」判敌方元素,均与自身元素无关。"""
+    hits = []
+    try:
+        data = get_rows_for_character(cid)
+    except Exception as e:
+        return [f"⚠ 词条审计失败(不影响转换): {e}"]
+    for r in data.get("abilities", []):
+        label = ("队长技 " if r.get("leader") else "词条 ") + str(r.get("ability"))
+        for i, d in enumerate(r.get("line_descs") or [], 1):
+            if d and any(w + "属性" in d or w + "共鸣" in d or "限" + w in d
+                         for w in _OMNI_EL_WORDS):
+                hits.append(f"  {label} 行{i}: {d[:90]}")
+    if not hits:
+        return ["  (词条/队长技中未发现六色属性引用,转换零影响)"]
+    if len(hits) > 15:
+        hits = hits[:15] + [f"  …等共 {len(hits)} 条"]
+    return hits
+
+
+def omni_convert(character: str, dry_run: bool) -> dict:
+    """一键「通用共鸣」= 只挂 OmniElement 标签(Form A),**不改 element**。
+
+    ⚠ 2026-07-12 实测教训:element=6(Colorless)是**敌人/boss 专属**元素,给可玩角色
+    写 6 会崩(客户端 C7050 等):Colorless 不能转成玩家 ElementKind(forceUncolorless
+    硬抛),战斗连锁按 ElementKindValue.LENGTH=6 建数组、index 6 越界,且未打补丁的客户端
+    ElementKindTools 6 个函数缺 case 6。**任何补丁都救不了 element=6 的可玩角色**。
+    因此本按钮**只做安全的 Form A**:角色保留真实元素(伤害/克制/UI 都正常),
+    加 OmniElement 标签后经 omni-element 客户端补丁计入**任意元素**的共鸣/编成/[限X属性]。
+    这满足「能满足任意共鸣」,但不是「无属性」——引擎不支持可玩角色无属性。"""
+    cid = str(character)
+    logs = []
+    r2 = omni_element_set(cid, True, dry_run)
+    if r2.get("log"):
+        logs.append(r2["log"])
+    changes = r2.get("changes", 0)
+    if not changes:
+        logs.append(f"{cid} 已开启通用共鸣(OmniElement),无需修改")
+    else:
+        logs.append("⚠ 生效前提:客户端已打 omni-element 补丁(client-patch/,共鸣通配含副位);"
+                    "②层改动发布后重启游戏。角色元素**未改**(仍按原属性打伤害/吃克制)")
+    logs.append("—— 属性配对检查(该角色词条里的元素引用,均保留原样) ——")
+    logs.extend(_omni_kit_audit(cid))
+    logs.append("  说明:共鸣/编成/[限X属性]类→补丁后自身计入任意色,同色队友协同保留;"
+                "角色自身伤害/克制按原元素不变。想要「无属性伤害」需 element=6,但那会崩("
+                "Colorless 是敌人专属元素),不提供。")
+    return {"changes": changes, "log": "\n".join(logs), "dry_run": dry_run,
+            "note": "只改 c5 标签(安全);②层进待发布,发布后重启游戏生效"}
+
+
+# ---------------------------------------------------------------- 角色资产一键导出
+# 打包该角色**全部**资产为 zip(逻辑路径目录树,PNG/MP3 解混淆为标准格式,数据文件原样):
+#   1) 路径表里 character/<code>/**(立绘/图标/像素点阵/语音/story 差分/配套数据全量)
+#   2) battle/** 里含 /<code>/ 的特效动画(skill_unique/powerflip/chain 等 parts+timeline)
+#   3) 资产清单探测项(pathlist 外的语音/words 等) + cut-in ATF 配对
+#   4) 该角色引用的全部技能/变体 DSL 文件
+# 解码后的逻辑树与「资产包导入」一比一互通(改完可整包导回)。
+
+def export_char_assets(character: str) -> tuple[Path, dict]:
+    import zipfile
+    c = next((x for x in load_characters() if x["id"] == str(character)), None)
+    if not c:
+        raise ValueError(f"角色不存在: {character}")
+    code = c["code_name"]
+    logicals: set[str] = set()
+    pref = f"character/{code}/"
+    tag = f"/{code}/"
+    plp = MOD_DIR / "WF_PATHLIST_recovered.txt"
+    if plp.exists():
+        with plp.open(encoding="utf-8", errors="replace") as f:
+            for line in f:
+                p = line.strip()
+                if p.startswith(pref) or (p.startswith("battle/") and tag in p):
+                    logicals.add(p)
+    for a in wf_assets.char_asset_manifest(TARGET_STORE, code):
+        if a.get("exists"):
+            logicals.add(a["logical"])
+    for i in range(4):  # cut-in ATF 配对(android 根,pathlist 无)
+        logicals.add(f"character/{code}/ui/skill_cutin_{i}.atf.deflate")
+    dsl_pps = [pp for pp, owners in _all_program_paths().items()
+               if any(o.split("·")[0] == code for o in owners)]
+    # 该角色为 PF override 表键时(如 override_<code>),把对应 PF 动作也带上
+    _t, pf_parsed = _pf_table()
+    for k, rows in pf_parsed.items():
+        if code in k and rows and rows[0]:
+            dsl_pps += [p for p in rows[0][:3] if p and p != "(None)"]
+    logicals.update(wf_dsl.dsl_logical(pp) for pp in dsl_pps)
+    # DSL 里 SpecifyEffectDirectly 引用的特效动画:pathlist 复原率有限(这些路径常缺),
+    # 直接从命令树提取路径并按 parts/timeline/atlas/png 后缀探测
+    fx_paths: set[str] = set()
+
+    def _walk_fx(n):
+        if isinstance(n, list):
+            if (len(n) >= 2 and n[0] == "SpecifyEffectDirectly"
+                    and isinstance(n[1], str) and n[1]):
+                fx_paths.add(n[1])
+            for x in n:
+                _walk_fx(x)
+        elif isinstance(n, dict):
+            for v in n.values():
+                _walk_fx(v)
+
+    for pp in dsl_pps:
+        fp = _dsl_store_path(pp)
+        if not fp.exists():
+            continue
+        try:
+            _walk_fx(wf_dsl.parse_dsl(zlib.decompress(fp.read_bytes(), -15))["tree"])
+        except Exception:
+            continue
+    for e in fx_paths:
+        for suf in (".parts.amf3.deflate", ".timeline.amf3.deflate",
+                    ".atlas.amf3.deflate", ".png"):
+            logicals.add(e + suf)
+
+    out_dir = WORK_DIR / "asset_exports"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    zpath = out_dir / f"{code}-assets-{time.strftime('%Y%m%d-%H%M%S')}.zip"
+    found = missing = 0
+    by_root: dict[str, int] = {}
+    with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
+        for lg in sorted(logicals):
+            loc = wf_assets.locate(TARGET_STORE, lg)
+            if not loc:
+                missing += 1
+                continue
+            data = loc[1].read_bytes()
+            try:
+                if lg.endswith(".png"):
+                    data = wf_assets.png_decode(data)
+                elif lg.endswith(".mp3"):
+                    data = wf_assets.mp3_decode(data)
+            except Exception:
+                pass  # 解码失败按原样导出,不中断整包
+            z.writestr(lg, data)
+            found += 1
+            by_root[loc[0]] = by_root.get(loc[0], 0) + 1
+        info = {"character": str(character), "name": c["name"], "code_name": code,
+                "files": found, "missing_candidates": missing, "by_root": by_root,
+                "note": "逻辑路径目录树;PNG/MP3 已解混淆为标准格式,其余原样存储态。"
+                        "改完可用 GUI「资产包导入」一比一导回。"}
+        z.writestr("_export_info.json", json.dumps(info, ensure_ascii=False, indent=1))
+    return zpath, info
 
 
 # ---------------------------------------------------------------- 单角色快照/还原 + 克隆
@@ -2834,6 +3780,22 @@ def clone_character(src_id: str, new_id: str, new_name: str, dry_run: bool,
         tp.write_text(json.dumps(text, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         _char_cache = None
         written.append(str(mp))
+        # 服务端简化表 assets/character.json:补条目(邮件发放校验/升级经验上限读它,缺=发不进存档)
+        sp = _server_char_json_path()
+        try:
+            server = json.loads(sp.read_text(encoding="utf-8"))
+            src_ent = server.get(src_id) or {}
+            server[new_id] = {"name": new_name or src_ent.get("name", ""),
+                              "rarity": int(row[2] or 0), "element": int(row[3] or 0),
+                              "skill_count": src_ent.get("skill_count", 6)}
+            sbak = sp.with_name(sp.name + suffix)
+            if not sbak.exists():
+                shutil.copy2(sp, sbak)
+            sp.write_text(json.dumps(server, ensure_ascii=False, indent=2), encoding="utf-8")
+            written.append(str(sp))
+            log.append(f"服务端简化表已补条目 {new_id}(重启服务端或「推送服务端」生效)")
+        except Exception as exc:
+            log.append(f"⚠ 服务端 character.json 同步失败(admin/邮件发放会被校验拒绝): {exc}")
         # 写入后校验:确认 ②层新键真的落盘(防历史 set_text_rows 静默丢键的坑复发)
         verify = core.load_table(core.CHARACTER_LOGICAL, TARGET_STORE, None)
         va = core.load_table(core.ABILITY_LOGICAL, TARGET_STORE, None)
@@ -2931,6 +3893,21 @@ def delete_character(cid: str, dry_run: bool) -> dict:
             tp.write_text(json.dumps(text, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
             _char_cache = None
             written.append(str(mp))
+    # 服务端简化表 assets/character.json:删条目(与克隆时的补条目对应)
+    sp = _server_char_json_path()
+    try:
+        server = json.loads(sp.read_text(encoding="utf-8"))
+    except Exception:
+        server = None
+    if server is not None and cid in server:
+        log.append("服务端 character.json: 删条目(重启服务端生效)")
+        if not dry_run:
+            sbak = sp.with_name(sp.name + ".bak-charfields-" + time.strftime("%Y%m%d-%H%M%S"))
+            if not sbak.exists():
+                shutil.copy2(sp, sbak)
+            server.pop(cid, None)
+            sp.write_text(json.dumps(server, ensure_ascii=False, indent=2), encoding="utf-8")
+            written.append(str(sp))
     return {"changes": len(log) - 1, "log": "\n".join(log),
             "written": "; ".join(written) or None, "dry_run": dry_run,
             "note": "回滚完成:发布推 ②层 + 重启服务端推 ①层;若已 admin 发放该角色,也去存档里移除避免残留引用"}
@@ -3195,6 +4172,12 @@ import threading
 MOD_DIR = Path(__file__).resolve().parent
 
 TOOLBOX_TOOLS = {
+    "selftest": {
+        "title": "全链路自检",
+        "script": MOD_DIR / "wf_selftest.py",
+        "desc": "环境可用性检测 + 功能模拟演练(词条工坊/技能DSL/命令库/强化弹射/发布预检);"
+                "deep=含金丝雀写入闭环(写入后立即复原,校验字节一致)",
+    },
     "balance_suite": {
         "title": "平衡增强总包",
         "script": MOD_DIR / "wf_balance_suite.py",
@@ -3218,6 +4201,7 @@ TOOLBOX_TOOLS = {
 }
 # 各工具允许透传的 CLI 参数(白名单;flag 型值为 True 时加开关)
 TOOLBOX_ARG_WHITELIST = {
+    "selftest": {"deep": bool, "sample": int},
     "balance_suite": {"apply": bool, "publish": bool, "export-pack": bool, "force": bool},
     "export_assets": {"out": str, "limit": int, "workers": int,
                       "only-bundle": bool, "no-skip": bool},
@@ -3772,7 +4756,10 @@ def shop_categories() -> dict:
     for k, t in cat.text_rows().items():
         rows = _read_ml(t)
         code = rows[0][0] if rows and rows[0] else ""
-        out.append({"id": k, "code": code,
+        banner = rows[0][9] if rows and len(rows[0]) > 9 else ""
+        if banner and not wf_assets.locate(TARGET_STORE, banner + ".png"):
+            banner = ""
+        out.append({"id": k, "code": code, "banner": banner,
                     "client_items": client_count.get(k, 0),
                     "server_items": len(srv.get(k, {}))})
     out.sort(key=lambda c: int(c["id"]) if c["id"].isdigit() else 0)
@@ -3780,6 +4767,70 @@ def shop_categories() -> dict:
             "server_file": str(_bshop_server_paths()[0]),
             "note": "客户端列 = ②层表(改后发布);服务端列 = assets/boss_coin_shop.json"
                     "(购买校验,改后点「推送服务端」即时生效)"}
+
+
+# 名称/图标速查:道具表(货币与 type=1 奖励)、角色(type=2)、装备(type=4)+
+# item 图集坐标(346/355 商店图标在 item/sprite_sheet.png 里,前端 CSS sprite 切图)
+_shop_lookups_cache: dict | None = None
+
+ITEM_LOGICAL = "master/item/item.orderedmap"
+ITEM_SHEET_LOGICAL = "item/sprite_sheet.png"
+ITEM_ATLAS_LOGICAL = "item/sprite_sheet.atlas.amf3.deflate"
+
+
+def _decode_amf3_asset(logical: str):
+    """store 里的 .amf3.deflate → Python 对象(容错 4 字节长度前缀 / raw deflate)。"""
+    loc = wf_assets.locate(TARGET_STORE, logical)
+    if not loc:
+        return None
+    raw = loc[1].read_bytes()
+    for blob in (raw, raw[4:]):
+        for wbits in (15, -15):
+            try:
+                return core.AMF3Reader(zlib.decompress(blob, wbits)).read_value()
+            except Exception:
+                continue
+    return None
+
+
+def shop_lookups() -> dict:
+    global _shop_lookups_cache
+    if _shop_lookups_cache is not None:
+        return _shop_lookups_cache
+    items: dict[str, dict] = {}
+    it = core.load_table(ITEM_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    for k, t in it.text_rows().items():
+        rows = _read_ml(t)  # item 描述列含换行,禁按物理行拆
+        if rows and len(rows[0]) > 3:
+            items[k] = {"n": rows[0][2], "i": rows[0][3]}
+    equip: dict[str, dict] = {}
+    eq = core.load_table(EQUIP_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    for k, t in eq.text_rows().items():
+        rows = _read_ml(t)
+        if rows and len(rows[0]) > 6:
+            equip[k] = {"n": rows[0][1], "i": rows[0][6]}
+    chars = {c["id"]: {"n": c["name"], "i": f"character/{c['code_name']}/ui/square_0"}
+             for c in load_characters()}
+    atlas: dict[str, list] = {}
+    sheet = {"w": 0, "h": 0, "logical": ITEM_SHEET_LOGICAL}
+    entries = _decode_amf3_asset(ITEM_ATLAS_LOGICAL)
+    if isinstance(entries, list):
+        for e in entries:
+            try:
+                atlas[str(e["n"])] = [int(e["x"]), int(e["y"]), int(e["w"]), int(e["h"]),
+                                      1 if e.get("r") else 0]
+            except Exception:
+                continue
+        loc = wf_assets.locate(TARGET_STORE, ITEM_SHEET_LOGICAL)
+        if loc:
+            dims = wf_assets.png_dims(wf_assets.png_decode(loc[1].read_bytes()[:64]))
+            if dims:
+                sheet["w"], sheet["h"] = int(dims[0]), int(dims[1])
+    _shop_lookups_cache = {
+        "items": items, "characters": chars, "equipment": equip,
+        "atlas": atlas, "sheet": sheet,
+        "note": "atlas 条目 = [x,y,w,h,rot](rot=1 时图集里存的是顺时针转 90° 的区域)"}
+    return _shop_lookups_cache
 
 
 def shop_items(cat: str) -> dict:
@@ -3816,7 +4867,9 @@ def shop_items(cat: str) -> dict:
                        "reward_count": str(reward.get("count", ""))})
         it["server"] = s or None
         items.append(it)
+    all_ids = [int(k) for k in om.keys if str(k).isdigit()]
     return {"category": cat, "items": items,
+            "suggest_id": (max(all_ids) + 1) if all_ids else 1,
             "note": "改动同步写三处:②层表(发布生效)+cdndata 镜像+服务端 json(推送生效)。"
                     "奖励 type:1=道具 2=角色 3=玛纳 4=装备(常见值,以现有条目为准)"}
 
@@ -3963,6 +5016,12 @@ RAW_JSON_TABLES: dict[str, dict] = {
     "full_shot_image_attribute": {"kind": "nested", "logical": FS_ATTR_LOGICAL,
                                   "cn": "立绘摆放属性②(嵌套)"},
     "trimmed_image": {"kind": "flat", "logical": TRIMMED_LOGICAL, "cn": "裁剪图frame②(story/cutin/立绘)"},
+    "ex_ability": {"kind": "flat", "logical": "master/ex_boost/ex_ability.orderedmap",
+                   "cn": "EX词条效果②(改效果发布生效;加新键须同步服务端 assets/ex_ability.json 抽取池)"},
+    "ex_status":  {"kind": "flat", "logical": "master/ex_boost/ex_status.orderedmap",
+                   "cn": "EX强化数值②(9档 HP/ATK 加成)"},
+    "ex_boost":   {"kind": "flat", "logical": "master/ex_boost/ex_boost.orderedmap",
+                   "cn": "EX素材定义②(素材id→消耗/组)"},
     "cdn:character":      {"kind": "cdn", "file": "character.json", "cn": "①角色名录"},
     "cdn:character_text": {"kind": "cdn", "file": "character_text.json", "cn": "①角色文本"},
     "cdn:gacha":          {"kind": "cdn", "file": "gacha.json", "cn": "①卡池"},
@@ -4220,6 +5279,172 @@ def save_raw_json(table: str, key: str, json_text: str, dry_run: bool) -> dict:
             "written": written, "dry_run": dry_run}
 
 
+# ---------------------------------------------------------------- 新增武器 / 新增副本(克隆式)
+# 武器 = equipment 行 + 同键 ability_soul 被动(+ 改造武器另有 weapon_ability 行)。
+# 图标默认沿用源武器(item/sprite_sheet.png 图集内 20×20 像素图,c6 路径);
+# 服务端 equipment_ids.json(邮件发放校验)+ equipment_lookup.json(后台显示),静态 import 重启生效。
+# 副本 = boss_battle_quest[1][node][rank] 行(行动模式 = field_data/zone/boss AI 引用原样保留)。
+# 前例:node1 rank4-19(技伤不死王等 16 个测试副本)即此链路,已实战验证。
+
+BBQ_LOGICAL = "master/quest/boss_battle_quest.orderedmap"
+BBQ_NODE_LOGICAL = "master/quest/boss_battle_stage_node.orderedmap"
+
+
+def weapon_clone(src: str, new_id: str, new_name: str, new_desc: str,
+                 soul_from: str, dry_run: bool) -> dict:
+    src, new_id = str(src).strip(), str(new_id).strip()
+    if not new_id.isdigit():
+        raise ValueError("新武器 ID 必须是纯数字(建议 59xxxxx 段避开现有 436 键)")
+    eq = core.load_table(EQUIP_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    eq_rows = eq.text_rows()
+    if src not in eq_rows:
+        raise ValueError(f"源武器 {src} 不在 equipment 表")
+    if new_id in eq_rows:
+        raise ValueError(f"新 ID {new_id} 已存在于 equipment 表")
+    soul_from = str(soul_from or src).strip()
+    soul = core.load_table(SOUL_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    soul_rows = soul.text_rows()
+    if soul_from not in soul_rows:
+        raise ValueError(f"被动来源 {soul_from} 不在 ability_soul 表(武器被动=同键魂效果)")
+    if new_id in soul_rows:
+        raise ValueError(f"新 ID {new_id} 已存在于 ability_soul 表")
+
+    row = list(_read_ml(eq_rows[src])[0])
+    src_name = row[1]
+    if new_name:
+        row[1] = new_name
+    if new_desc and len(row) > 7:
+        row[7] = new_desc
+    if len(row) > 10:
+        row[10] = new_id  # soul_id → 指向自己的新被动
+
+    wa = core.load_table(WEAPON_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    wa_rows = wa.text_rows()
+    has_wa = src in wa_rows
+
+    ids_p = SERVER_ASSETS / "equipment_ids.json"
+    lookup_p = SERVER_ASSETS / "equipment_lookup.json"
+    lookup = json.loads(lookup_p.read_text(encoding="utf-8"))
+    src_lk = lookup.get(src, {})
+    log = [f"equipment[{new_id}] 克隆自 {src}({src_name}): 名={row[1]!r} 图标沿用 {row[6]}",
+           f"ability_soul[{new_id}] 被动克隆自 {soul_from}"
+           + ("" if soul_from == src else "(指定来源)"),
+           (f"weapon_ability[{new_id}] 强化词条克隆自 {src}" if has_wa
+            else "源武器无 weapon_ability 强化词条行,跳过"),
+           f"服务端 equipment_ids.json +{new_id};equipment_lookup.json +name/rarity/category"
+           f"(须重启服务端,之后邮件附件类型 6 id={new_id} 可发放)"]
+    written = None
+    if not dry_run:
+        bak_tag = ".bak-wfmod-wpnclone-"
+        eq_parsed = {k: _read_ml(t) for k, t in eq_rows.items()}
+        eq_parsed[new_id] = [row]
+        w1 = _write_with_backup_ml(eq, eq_parsed, [f"{new_id} 克隆武器(自 {src})"], bak_tag)
+        soul_parsed = {k: _read_ml(t) for k, t in soul_rows.items()}
+        soul_parsed[new_id] = _read_ml(soul_rows[soul_from])
+        _write_with_backup_ml(soul, soul_parsed,
+                              [f"{new_id} 武器被动(克隆 ability_soul[{soul_from}])"], bak_tag)
+        if has_wa:
+            wa_parsed = {k: _read_ml(t) for k, t in wa_rows.items()}
+            wa_parsed[new_id] = _read_ml(wa_rows[src])
+            _write_with_backup_ml(wa, wa_parsed,
+                                  [f"{new_id} 武器强化词条(克隆 {src})"], bak_tag)
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        ids = json.loads(ids_p.read_text(encoding="utf-8"))
+        for p in (ids_p, lookup_p):
+            bak = p.with_name(p.name + bak_tag + stamp)
+            if not bak.exists():
+                shutil.copy2(p, bak)
+        if int(new_id) not in ids:
+            ids.append(int(new_id))
+            ids_p.write_text(json.dumps(ids), encoding="utf-8")
+        lookup[new_id] = {"name": row[1], "rarity": row[8] if len(row) > 8 else "0",
+                          "category": src_lk.get("category", "")}
+        lookup_p.write_text(json.dumps(lookup, ensure_ascii=False), encoding="utf-8")
+        record_change(EQUIP_LOGICAL, f"{new_id} 新增武器(克隆 {src},被动 {soul_from})", None)
+        written = str(w1)
+    return {"changes": 1, "log": "\n".join(log), "written": written, "dry_run": dry_run,
+            "note": "发布 equipment,ability_soul" + (",weapon_ability" if has_wa else "")
+                    + " 三表 + 重启服务端后:邮件(附件类型6)发放,武器页可继续改被动/词条"}
+
+
+def quest_clone(src_node: str, src_rank: str, mode: str, new_name: str,
+                node_name: str, dry_run: bool) -> dict:
+    """克隆领主战副本:mode=rank(源节点内加新难度,推荐/已验证)| node(新建节点)。
+    行动模式(field_data/zone/boss AI)原样保留,数值后续用 Boss·副本页 / JSON 直改调。"""
+    import wf_quest_lib as qlib
+    src_node, src_rank = str(src_node).strip(), str(src_rank).strip()
+    bbq = qlib.load_table(BBQ_LOGICAL)
+    ch = bbq.get("1")
+    if not isinstance(ch, dict) or src_node not in ch:
+        raise ValueError(f"节点 {src_node} 不存在(现有 1-{max(int(k) for k in ch)})")
+    node = ch[src_node]
+    if src_rank not in node:
+        raise ValueError(f"节点 {src_node} 没有难度 {src_rank}(现有: {'/'.join(node)})")
+    c = list(_read_ml(node[src_rank])[0])
+    src_qid = c[0]
+
+    sn = qlib.load_table(BBQ_NODE_LOGICAL)
+    snch = sn["1"]
+    log = []
+    if mode == "node":
+        new_node = str(max(int(k) for k in snch) + 1)
+        new_rank = "1"
+        snrow = list(_read_ml(snch[src_node])[0])
+        snrow[1] = (node_name or (snrow[1] + "·复刻")).strip()
+        if len(snrow) > 6:
+            snrow[6] = new_node
+        if len(snrow) > 13:
+            snrow[13] = str(1000 + int(new_node))
+        log.append(f"stage_node[1][{new_node}] 新节点 {snrow[1]!r}(缩略图/背景沿用节点 {src_node})")
+    else:
+        new_node = src_node
+        new_rank = str(max(int(k) for k in node) + 1)
+        snrow = None
+    qid = f"1{int(new_node):03d}{int(new_rank):03d}"
+    c[0] = qid
+    c[1] = new_rank
+    if new_name:
+        c[2] = new_name
+
+    sj_p = SERVER_ASSETS / "boss_battle_quest.json"
+    sj = json.loads(sj_p.read_text(encoding="utf-8"))
+    if qid in sj:
+        raise ValueError(f"quest id {qid} 已在服务端 boss_battle_quest.json(数据不一致,先排查)")
+    src_entry = sj.get(src_qid)
+    if src_entry is None:
+        raise ValueError(f"源 quest {src_qid} 不在服务端 boss_battle_quest.json,无法克隆报酬参数")
+    log.append(f"boss_battle_quest[1][{new_node}][{new_rank}] = 克隆 [{src_node}][{src_rank}]"
+               f"(quest {src_qid} -> {qid},名={c[2]!r},行动模式/敌人/地形全保留)")
+    log.append(f"服务端 boss_battle_quest.json +{qid}(报酬/评分参数抄 {src_qid},重启服务端生效)")
+    written = None
+    if not dry_run:
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        node[new_rank] = _write_ml([c])
+        if snrow is not None:
+            if new_node in snch:
+                raise ValueError(f"节点 {new_node} 已存在")
+            snch[new_node] = _write_ml([snrow])
+            ch[new_node] = {new_rank: node.pop(new_rank)}  # 行挂到新节点
+            p2 = qlib.save_table(BBQ_NODE_LOGICAL, sn)
+            add_pending(p2)
+            record_change(BBQ_NODE_LOGICAL, f"新节点 {new_node} {snrow[1]!r}", None)
+        p1 = qlib.save_table(BBQ_LOGICAL, bbq)
+        add_pending(p1)
+        record_change(BBQ_LOGICAL, "\n".join(log), None)
+        bak = sj_p.with_name(sj_p.name + ".bak-wfmod-qclone-" + stamp)
+        if not bak.exists():
+            shutil.copy2(sj_p, bak)
+        sj[qid] = dict(src_entry)
+        sj_p.write_text(json.dumps(sj, ensure_ascii=False), encoding="utf-8")
+        written = str(p1)
+    return {"changes": 1, "log": "\n".join(log), "written": written, "dry_run": dry_run,
+            "quest_id": qid, "node": new_node, "rank": new_rank,
+            "note": "发布 boss_battle_quest" + (" + boss_battle_stage_node" if mode == "node" else "")
+                    + " 表 + 重启服务端;游戏内 领主战列表"
+                    + (f"新节点" if mode == "node" else f"节点内新难度 {new_rank}")
+                    + ";数值调整用 Boss·副本页(敌等级/修正列)或 JSON 直改"}
+
+
 # ---------------------------------------------------------------- http server
 
 
@@ -4323,6 +5548,17 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 self._json(get_char_fields(character))
                 return
+            if path == "/composer/meta":
+                self._json(composer_meta())
+                return
+            if path == "/composer/row":
+                self._json(composer_row((qs.get("key") or [""])[0],
+                                        int((qs.get("line") or ["1"])[0]),
+                                        (qs.get("as_key") or [""])[0]))
+                return
+            if path == "/composer/blank":
+                self._json(composer_blank((qs.get("key") or [""])[0]))
+                return
             if path == "/souls":
                 self._json(list_souls())
                 return
@@ -4338,6 +5574,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/quest/cats":
                 self._json({"cats": wf_boss.quest_cats()})
+                return
+            if path == "/boss/usage":
+                force = (qs.get("force") or [""])[0] == "1"
+                self._json({"usage": wf_boss.boss_usage(force)})
                 return
             if path == "/quest/list":
                 cat = (qs.get("cat") or [""])[0]
@@ -4379,7 +5619,37 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/skill_dsl_json":
                 self._json(get_skill_dsl_json((qs.get("character") or [""])[0],
-                                              (qs.get("level") or [""])[0]))
+                                              (qs.get("level") or [""])[0],
+                                              (qs.get("pp") or [""])[0]))
+                return
+            if path == "/skill_sig":
+                self._json(skill_sig())
+                return
+            if path == "/pixelart_data":
+                self._json(get_pixelart_data((qs.get("character") or [""])[0],
+                                             (qs.get("name") or [""])[0]))
+                return
+            if path == "/powerflip":
+                self._json(powerflip_overview((qs.get("character") or [""])[0]))
+                return
+            if path == "/omni_element":
+                self._json(omni_element_status((qs.get("character") or [""])[0]))
+                return
+            if path == "/asset/export_char":
+                zp, info = export_char_assets((qs.get("character") or [""])[0])
+                body = zp.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/zip")
+                self.send_header("Content-Disposition",
+                                 f'attachment; filename="{zp.name}"')
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            if path == "/skill_cmd_lib":
+                self._json(skill_cmd_lib((qs.get("name") or [""])[0],
+                                         (qs.get("q") or [""])[0],
+                                         int((qs.get("limit") or ["80"])[0])))
                 return
             if path == "/skill_dsl":
                 self._json(get_skill_dsl((qs.get("character") or [""])[0],
@@ -4440,6 +5710,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/shop/items":
                 self._json(shop_items((qs.get("cat") or [""])[0]))
                 return
+            if path == "/shop/lookups":
+                self._json(shop_lookups())
+                return
             if path == "/raw_json/keys":
                 self._json(raw_json_keys((qs.get("table") or [""])[0],
                                          (qs.get("q") or [""])[0]))
@@ -4493,6 +5766,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(copy_row(body.get("src") or {}, body.get("dst") or {},
                                     bool(body.get("preserve_string_id", True)),
                                     bool(body.get("dry_run"))))
+                return
+            if path == "/composer/describe":
+                self._json(composer_describe(str(body.get("kind", "ability")),
+                                             list(body.get("row") or [])))
+                return
+            if path == "/composer/apply":
+                self._json(composer_apply(
+                    str(body.get("dst_key", "")), body.get("mode", "append"),
+                    list(body.get("row") or []), bool(body.get("adapt_sid", False)),
+                    bool(body.get("dry_run")), bool(body.get("create_missing", False))))
                 return
             if path == "/append_line_adapted":
                 self._json(append_line_adapted(
@@ -4619,7 +5902,54 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(save_skill_dsl_json(str(body.get("character", "")),
                                                str(body.get("level", "")),
                                                str(body.get("json_text", "")),
-                                               bool(body.get("dry_run"))))
+                                               bool(body.get("dry_run")),
+                                               str(body.get("pp", ""))))
+                return
+            if path == "/pixelart_data/save":
+                self._json(save_pixelart_data(str(body.get("character", "")),
+                                              str(body.get("name", "")),
+                                              str(body.get("json_text", "")),
+                                              str(body.get("data_b64", "")),
+                                              bool(body.get("dry_run"))))
+                return
+            if path == "/weapon_clone":
+                self._json(weapon_clone(str(body.get("src", "")),
+                                        str(body.get("new_id", "")),
+                                        str(body.get("new_name", "")),
+                                        str(body.get("new_desc", "")),
+                                        str(body.get("soul_from", "")),
+                                        bool(body.get("dry_run"))))
+                return
+            if path == "/quest_clone":
+                self._json(quest_clone(str(body.get("src_node", "")),
+                                       str(body.get("src_rank", "")),
+                                       str(body.get("mode", "rank")),
+                                       str(body.get("new_name", "")),
+                                       str(body.get("node_name", "")),
+                                       bool(body.get("dry_run"))))
+                return
+            if path == "/powerflip/spec":
+                self._json(powerflip_set_spec(str(body.get("character", "")),
+                                              body.get("speciality", 0),
+                                              bool(body.get("dry_run"))))
+                return
+            if path == "/omni_element/set":
+                self._json(omni_element_set(str(body.get("character", "")),
+                                            bool(body.get("enable")),
+                                            bool(body.get("dry_run"))))
+                return
+            if path == "/omni_convert":
+                self._json(omni_convert(str(body.get("character", "")),
+                                        bool(body.get("dry_run"))))
+                return
+            if path == "/powerflip/extract":
+                self._json(powerflip_extract(str(body.get("kind", "")),
+                                             bool(body.get("dry_run"))))
+                return
+            if path == "/powerflip/clone":
+                self._json(powerflip_clone(str(body.get("src_kind", "")),
+                                           str(body.get("new_id", "")),
+                                           bool(body.get("dry_run"))))
                 return
             if path == "/raw_json/save":
                 self._json(save_raw_json(str(body.get("table", "")),

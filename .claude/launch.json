@@ -7,6 +7,13 @@
       "runtimeArgs": ["mod-tools/wf_gui.py"],
       "port": 8766,
       "env": { "WF_GUI_PORT": "8766" }
+    },
+    {
+      "name": "wf-gui-dev",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["mod-tools/wf_gui.py"],
+      "port": 18901,
+      "env": { "WF_GUI_PORT": "18901" }
     }
   ]
 }
