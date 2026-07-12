@@ -679,10 +679,19 @@ function toast(msg,isErr){
 const API='/api/mod';
 async function api(path,body){
   const opt=body!==undefined?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{};
-  const r=await fetch(API+path,opt); const j=await r.json();
+  let r;
+  try{r=await fetch(API+path,opt);}
+  catch(e){log('后端连接失败: '+e.message+'(wf_gui.py 进程可能已退出——重启它后刷新本页)',true);toast('后端连接失败,请重启 wf_gui.py',true);throw e;}
+  let j;
+  try{j=await r.json();}
+  catch(e){log('后端响应异常(HTTP '+r.status+',非 JSON)——端口可能被其他程序占用(如输入法),确认地址是 wf_gui.py 启动时打印的端口',true);toast('后端响应异常(HTTP '+r.status+')',true);throw e;}
   if(j&&j.error){log('错误: '+j.error,true);toast('错误: '+j.error,true);throw new Error(j.error);}
   return j;
 }
+window.addEventListener('unhandledrejection',ev=>{
+  const m=(ev.reason&&(ev.reason.message||String(ev.reason)))||'未知错误';
+  log('未捕获异常: '+m,true);
+});
 function showResult(r){
   if(r.log)log(r.log.trim());
   log((r.dry_run?'[预览] ':'[已写入] ')+'改动数: '+r.changes);
@@ -1163,7 +1172,7 @@ async function loadAssets(){
     card.appendChild(row);
     box.appendChild(card);
   });
-  const note=document.createElement('div');note.className='hint';note.style.width='100%';note.textContent=data.note+' · 语音清单来自路径采集,未采集到的语音文件不在列表(可用逻辑路径规律自行推)';
+  const note=document.createElement('div');note.className='hint';note.style.width='100%';note.textContent=data.note+' · 语音=dump清单+全词表store探测+路径清单(75%复原)合并;words 剧情语音靠路径复原,个别仍可能缺';
   box.appendChild(note);
 }
 function fileToB64(file){
@@ -1177,7 +1186,10 @@ async function replaceAsset(logical,fileInput,force){
   const f=fileInput.files&&fileInput.files[0];
   if(!f)return log('先选择要上传的文件',true);
   log('读取 '+f.name+' ('+(f.size/1024).toFixed(0)+'KB)...');
-  const b64=await fileToB64(f);
+  let b64;
+  try{b64=await fileToB64(f);}
+  catch(e){return log('本地文件读取失败(选择后文件被移动/改名/覆盖?)——重新「选择文件」再试',true);}
+  log('校验中(dry-run 预览)...');
   let prev;
   try{prev=await api('/asset/replace',{logical,data_b64:b64,force,dry_run:true});}
   catch(e){return;}

@@ -263,8 +263,19 @@ _COMPANION_TEMPLATES = [
     ("battle/character_detail_skill_preview.battle.amf3.deflate", "角色详情页技能预览战斗数据"),
 ]
 
-_VOICE_PROBE = [f"voice/battle/skill_{i}.mp3" for i in range(4)]
-_VOICE_CATS = ("ally", "battle", "home")
+# 固定名语音(全角色同名,来自 dump 全量 + 路径清单交叉验证):直接探测 store,不依赖采集
+_VOICE_FIXED = (
+    "ally/evolution.mp3", "ally/join.mp3",
+    "battle/battle_start_0.mp3", "battle/battle_start_1.mp3",
+    "battle/normal_attack_0.mp3", "battle/normal_attack_1.mp3",
+    "battle/outhole_0.mp3", "battle/outhole_1.mp3",
+    "battle/power_flip_0.mp3", "battle/power_flip_1.mp3",
+    "battle/skill_0.mp3", "battle/skill_1.mp3",
+    "battle/skill_2.mp3", "battle/skill_3.mp3", "battle/skill_ready.mp3",
+    "battle/win_0.mp3", "battle/win_1.mp3",
+    "login/login_0.mp3", "login/login_1.mp3", "login/login_2.mp3",
+)
+_VOICE_CATS = ("ally", "battle", "home", "login")
 
 
 def dump_voices(code_name: str) -> list[tuple[str, str, str]]:
@@ -312,6 +323,31 @@ def _pathlist_char_index() -> dict[str, list[str]]:
     return idx
 
 
+_voice_vocab_cache: list[str] | None = None
+
+
+def _voice_vocab() -> list[str]:
+    """语音文件名词表 = dump 全部角色 <分类>/<文件名> 的并集(2400+ 条,含 home 变名)。
+    某角色不在 dump 里(新角色/未解包)时,用词表对 store 逐条探测兜底——
+    home 语音多为角色专属罗马音名,命中率低但探测便宜(sha1+stat),不漏才是重点。"""
+    global _voice_vocab_cache
+    if _voice_vocab_cache is not None:
+        return _voice_vocab_cache
+    vocab: set[str] = set(_VOICE_FIXED)
+    try:
+        for char_dir in VOICE_DUMP.iterdir():
+            for cat in _VOICE_CATS:
+                cd = char_dir / cat
+                if cd.is_dir():
+                    for f in os.listdir(cd):
+                        if f.endswith(".mp3"):
+                            vocab.add(f"{cat}/{f}")
+    except Exception:
+        pass
+    _voice_vocab_cache = sorted(vocab)
+    return _voice_vocab_cache
+
+
 _harvest_voice_cache: dict[str, list[str]] | None = None
 
 
@@ -353,18 +389,19 @@ def char_asset_manifest(target_store: Path, code_name: str) -> list[dict]:
 
     for sub, kind, req in _CHAR_TEMPLATES:
         add(f"character/{code_name}/{sub}", kind, req)
-    # 语音:优先 datamine 清单(全量三分类+台词文本),兜底探测+采集
+    # 语音四路合并(store 探测过滤,只列真实存在的):
+    #   ① datamine dump 清单(带台词文本) ② 固定名+词表全量探测(dump 缺角色/缺分类的兜底)
+    #   ③ 运行时采集 ④ 路径清单(words/words_*/login 等变名分类,75% 复原)
     dumped = dump_voices(code_name)
     voice_req = "MP3(CBR,Layer3;VBR 不支持),建议与原文件同码率"
-    if dumped:
-        for cat, f, textline in dumped:
-            lg = f"character/{code_name}/voice/{cat}/{f}"
-            if locate(target_store, lg):
-                add(lg, f"语音·{cat}", voice_req, textline)
-    for sub in _VOICE_PROBE:
-        lg = f"character/{code_name}/{sub}"
+    for cat, f, textline in dumped:
+        lg = f"character/{code_name}/voice/{cat}/{f}"
         if locate(target_store, lg):
-            add(lg, "语音·battle", voice_req)
+            add(lg, f"语音·{cat}", voice_req, textline)
+    for sub in _voice_vocab():
+        lg = f"character/{code_name}/voice/{sub}"
+        if locate(target_store, lg):
+            add(lg, "语音·" + sub.split("/", 1)[0], voice_req)
     for lg in _harvest_voice_index().get(code_name, []):
         add(lg, "语音", voice_req)
     # 变名资产(剧情表情/剧情语音):路径清单枚举 + store 探测(只列真实存在的)
@@ -372,9 +409,11 @@ def char_asset_manifest(target_store: Path, code_name: str) -> list[dict]:
         if "/ui/story/" in lg and lg.endswith(".png"):
             if locate(target_store, lg):
                 add(lg, "剧情表情", "剧情对话表情差分。PNG,与原图同尺寸")
-        elif "/voice/words/" in lg and lg.endswith(".mp3"):
+        elif "/voice/" in lg and lg.endswith(".mp3"):
+            cat = lg.split("/voice/", 1)[1].split("/", 1)[0]
             if locate(target_store, lg):
-                add(lg, "语音·words", voice_req + "(剧情台词语音)")
+                add(lg, "语音·" + cat,
+                    voice_req + ("(剧情台词语音)" if cat.startswith("words") else ""))
     for sub, desc in _COMPANION_TEMPLATES:
         add(f"character/{code_name}/{sub}", "配套数据",
             desc + "(AMF3 二进制,不可预览;仅支持整文件替换,改错会崩,慎动)")
