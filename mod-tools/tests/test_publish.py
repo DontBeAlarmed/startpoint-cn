@@ -264,6 +264,39 @@ class TestPendingCompatibility(PublisherCase):
                 archive.read(f"production/upload/{relative}"),
             )
 
+    def test_multi_group_rename_failure_rolls_back_already_published_archive(self):
+        logical = "master/test/pending.orderedmap"
+        relative = self.write_logical(logical, b"common-bytes")
+        medium_relative = "12/medium-fixture"
+        medium_path = self.store.parent / "medium_upload" / medium_relative
+        medium_path.parent.mkdir(parents=True, exist_ok=True)
+        medium_path.write_bytes(b"medium-bytes")
+        self.pending.write_text(
+            json.dumps([relative, f"medium:{medium_relative}"]), encoding="utf-8"
+        )
+        real_replace = wf_publish.os.replace
+        calls = 0
+
+        def fail_second_replace(source, destination):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError("fixture second rename failure")
+            return real_replace(source, destination)
+
+        with mock.patch.object(
+            wf_publish.os,
+            "replace",
+            side_effect=fail_second_replace,
+        ):
+            result, stdout, _stderr = self.run_publish([])
+
+        self.assertNotEqual(0, result)
+        self.assertNotIn("[OK]", stdout)
+        self.assertEqual([], self.archives())
+        leftovers = list(self.cdn.rglob("*.tmp")) if self.cdn.exists() else []
+        self.assertEqual([], leftovers)
+
 
 if __name__ == "__main__":
     unittest.main()

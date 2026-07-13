@@ -340,6 +340,8 @@ def _build_archives(
     }
     tag = time.strftime("mod%m%d%H%M")
     staged: list[tuple[Path, Path]] = []
+    backups: list[tuple[Path, Path]] = []
+    published: list[Path] = []
     try:
         for prefix, outdir in outdirs.items():
             files = [entry for entry in prepared if entry.prefix == prefix]
@@ -356,15 +358,45 @@ def _build_archives(
             with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as archive:
                 for entry in files:
                     archive.writestr(entry.archive_name, entry.payload)
+        for _temporary, final in staged:
+            if not final.exists():
+                continue
+            handle, backup_name = tempfile.mkstemp(
+                prefix=f".{final.name}.", suffix=".rollback", dir=final.parent
+            )
+            os.close(handle)
+            backup = Path(backup_name)
+            backup.unlink()
+            os.replace(final, backup)
+            backups.append((backup, final))
         for temporary, final in staged:
             os.replace(temporary, final)
-        return [final for _temporary, final in staged]
-    except Exception:
+            published.append(final)
+        for backup, _final in backups:
+            backup.unlink(missing_ok=True)
+        return list(published)
+    except Exception as exc:
+        rollback_errors: list[str] = []
+        for final in reversed(published):
+            try:
+                final.unlink(missing_ok=True)
+            except OSError as rollback_exc:
+                rollback_errors.append(f"remove {final}: {rollback_exc}")
+        for backup, final in reversed(backups):
+            try:
+                os.replace(backup, final)
+            except OSError as rollback_exc:
+                rollback_errors.append(f"restore {final}: {rollback_exc}")
         for temporary, _final in staged:
             try:
                 temporary.unlink(missing_ok=True)
             except OSError:
                 pass
+        if rollback_errors:
+            raise RuntimeError(
+                f"archive publish failed ({exc}); rollback failed: "
+                + "; ".join(rollback_errors)
+            ) from exc
         raise
 
 
