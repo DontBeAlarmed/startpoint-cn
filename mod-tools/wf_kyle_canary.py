@@ -7,6 +7,7 @@ import json
 import shutil
 import tempfile
 import time
+import zipfile
 import zlib
 from pathlib import Path
 
@@ -38,6 +39,10 @@ DERIVATIVES = {
     "ui/cutin_skill_chain_{n}.png": ((276, 319), (0.50, 0.30)),
 }
 
+# Compact UI must show a readable face/upper body.  Only full shots and story
+# bases retain contain semantics; every standard UI derivative is focal-cover.
+COVER_DERIVATIVES = frozenset(DERIVATIVES)
+
 REQUIRED_SIZES = {
     "ui/full_shot_1440_1920_0.png": (1440, 1920),
     "ui/full_shot_1440_1920_1.png": (1440, 1920),
@@ -47,6 +52,89 @@ REQUIRED_SIZES = {
     "pixelart/sprite_sheet.png": (252, 351),
     "pixelart/special_sprite_sheet.png": (512, 512),
 }
+
+PIXEL_AMF3_RELATIVES = (
+    "pixelart/sprite_sheet.atlas.amf3.deflate",
+    "pixelart/special_sprite_sheet.atlas.amf3.deflate",
+    "pixelart/pixelart.frame.amf3.deflate",
+    "pixelart/pixelart.timeline.amf3.deflate",
+    "pixelart/special.frame.amf3.deflate",
+    "pixelart/special.timeline.amf3.deflate",
+)
+
+INVENTORY_FILE = "inventory-manifest.json"
+
+
+def require_cn_profile(runtime=None) -> dict:
+    """Refuse every store-aware operation unless all roots belong to CN."""
+    gui = _resolve_gui(runtime)
+    profile = getattr(gui, "_PROFILE", None)
+    if profile is None:
+        profile = getattr(gui, "PROFILE", None)
+    profile_id = getattr(profile, "id", None)
+    if profile_id != "cn":
+        raise ValueError(
+            f"active profile must be cn (got {profile_id or 'none'})")
+
+    target_store = Path(gui.TARGET_STORE).resolve()
+    profile_store = Path(profile.store).resolve()
+    if target_store != profile_store:
+        raise ValueError(
+            f"TARGET_STORE does not match cn profile: {target_store} != "
+            f"{profile_store}")
+    profile_cdndata = getattr(profile, "cdndata", None)
+    actual_cdndata = getattr(gui, "CDNDATA", None)
+    if profile_cdndata is None or actual_cdndata is None:
+        raise ValueError("CN profile and runtime must both define CDNDATA")
+    if Path(actual_cdndata).resolve() != Path(profile_cdndata).resolve():
+        raise ValueError(
+            f"CDNDATA does not match cn profile: {actual_cdndata} != "
+            f"{profile_cdndata}")
+
+    roots = {name: path.resolve()
+             for name, path in wf_assets.roots(target_store).items()}
+    expected_parent = profile_store.parent
+    expected_roots = {
+        "upload": profile_store,
+        "medium": expected_parent / "medium_upload",
+        "android": expected_parent / "android_upload",
+    }
+    for name, expected in expected_roots.items():
+        if roots[name] != expected.resolve():
+            raise ValueError(f"{name} root is outside cn profile")
+    return {
+        "profile_id": "cn",
+        "upload": str(roots["upload"]),
+        "medium": str(roots["medium"]),
+        "android": str(roots["android"]),
+        "cdndata": str(Path(actual_cdndata).resolve()),
+    }
+
+
+def _inventory_path(work: Path) -> Path:
+    return work / INVENTORY_FILE
+
+
+def _load_inventory(work: Path) -> dict:
+    path = _inventory_path(work)
+    if not path.is_file():
+        raise ValueError(f"inventory manifest missing: {path}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data.get("entries"), list):
+        raise ValueError(f"invalid inventory manifest: {path}")
+    return data
+
+
+def _write_inventory(work: Path, inventory: dict) -> Path:
+    path = _inventory_path(work)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staged = path.with_name(path.name + ".tmp")
+    staged.write_text(
+        json.dumps(inventory, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    staged.replace(path)
+    return path
 
 
 def build_copy_plan(visual_logicals: list[str],
@@ -71,24 +159,49 @@ def build_copy_plan(visual_logicals: list[str],
 def prepare(runtime=None, work: Path = WORK) -> dict:
     """Decode source-store assets and build the offline Kyle pack."""
     gui = _resolve_gui(runtime)
+    profile = require_cn_profile(gui)
     pack = work / "pack"
     work.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=".pack-staging-", dir=work))
     copied = []
     try:
-        visual_logicals = wf_assets.all_asset_logicals(
+        visual_manifest = wf_assets.char_asset_manifest(
             gui.TARGET_STORE, PIXEL_TEMPLATE_CODE)
+        visual_by_logical = {
+            asset["logical"]: asset for asset in visual_manifest
+            if "/voice/" not in asset["logical"]
+        }
+        required_template_relatives = (
+            set(REQUIRED_SIZES) | set(PIXEL_AMF3_RELATIVES))
+        missing_visuals = [
+            f"character/{PIXEL_TEMPLATE_CODE}/{relative}"
+            for relative in sorted(required_template_relatives)
+            if not visual_by_logical.get(
+                f"character/{PIXEL_TEMPLATE_CODE}/{relative}", {}
+            ).get("exists")
+        ]
+        if missing_visuals:
+            raise FileNotFoundError(
+                f"required template inventory sources missing: "
+                f"{missing_visuals}")
+        visual_logicals = [
+            asset["logical"] for asset in visual_manifest
+            if asset["exists"] and "/voice/" not in asset["logical"]
+        ]
+        voice_manifest = wf_assets.char_asset_manifest(
+            gui.TARGET_STORE, CURRENT_CODE)
         voice_logicals = [
             asset["logical"]
-            for asset in wf_assets.char_asset_manifest(
-                gui.TARGET_STORE, CURRENT_CODE)
+            for asset in voice_manifest
             if asset["exists"] and asset["logical"].endswith(".mp3")
         ]
-        for source, target in build_copy_plan(
-                visual_logicals, voice_logicals):
+        copy_plan = build_copy_plan(visual_logicals, voice_logicals)
+        inventory_entries = []
+        for source, target in copy_plan:
             located = wf_assets.locate(gui.TARGET_STORE, source)
             if not located:
-                continue
+                raise FileNotFoundError(
+                    f"inventory source disappeared during prepare: {source}")
             data = located[1].read_bytes()
             if source.endswith(".png"):
                 data = wf_assets.png_decode(data)
@@ -107,17 +220,36 @@ def prepare(runtime=None, work: Path = WORK) -> dict:
             destination = staging / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(data)
-            copied.append(destination.relative_to(staging).as_posix())
+            relative = destination.relative_to(staging).as_posix()
+            copied.append(relative)
+            inventory_entries.append({
+                "relative": relative,
+                "source": source,
+                "source_root": located[0],
+            })
         build_visual_derivatives(
             work / "source/base.png", work / "source/awake.png", staging)
         rebuild_illustration_sheet(staging)
         recolor_pixel_sheets(staging)
-        validate_kyle_pack(staging)
+        inventory = {
+            "version": 1,
+            "profile_id": profile["profile_id"],
+            "visual_template": PIXEL_TEMPLATE_CODE,
+            "voice_source": CURRENT_CODE,
+            "entries": sorted(inventory_entries,
+                              key=lambda item: item["relative"]),
+        }
+        validate_kyle_pack(staging, inventory=inventory)
         _replace_pack_directory(staging, pack)
+        _write_inventory(work, inventory)
     finally:
         if staging.exists():
             shutil.rmtree(staging, ignore_errors=True)
-    return {"pack": str(pack), "files": len(copied)}
+    return {
+        "pack": str(pack),
+        "files": len(copied),
+        "inventory": str(_inventory_path(work)),
+    }
 
 
 def _replace_pack_directory(staging: Path, pack: Path) -> None:
@@ -150,7 +282,11 @@ def build_visual_derivatives(base_path: Path, awake_path: Path,
         for template, (size, focus) in DERIVATIVES.items():
             path = pack / template.format(n=n)
             path.parent.mkdir(parents=True, exist_ok=True)
-            skin.fit_rgba(master, size, focus).save(path)
+            transform = (
+                skin.cover_rgba if template in COVER_DERIVATIVES
+                else skin.fit_rgba
+            )
+            transform(master, size, focus).save(path)
         story_size = (520, 616) if n == 0 else (570, 690)
         story_path = pack / f"ui/story/base_{n}.png"
         story_path.parent.mkdir(parents=True, exist_ok=True)
@@ -189,21 +325,92 @@ def recolor_pixel_sheets(pack: Path) -> None:
         recolored.save(path)
 
 
-def validate_kyle_pack(pack: Path) -> dict:
-    """Validate fixed geometry and reject decodable old template paths."""
-    result = skin.validate_pack(pack, REQUIRED_SIZES)
+def validate_kyle_pack(
+        pack: Path,
+        required_sizes: dict[str, tuple[int, int]] | None = None,
+        inventory: dict | None = None) -> dict:
+    """Decode and reconcile every pack file against its exact inventory."""
+    required_sizes = REQUIRED_SIZES if required_sizes is None else required_sizes
+    if inventory is None:
+        inventory = _load_inventory(pack.parent)
+    entries = inventory.get("entries")
+    if not isinstance(entries, list):
+        raise ValueError("invalid inventory entries")
+    expected = [str(item.get("relative", "")) for item in entries]
+    if any(not relative for relative in expected):
+        raise ValueError("inventory contains an empty relative path")
+    if len(expected) != len(set(expected)):
+        raise ValueError("inventory contains duplicate relative paths")
+    missing_pixel_documents = sorted(
+        set(PIXEL_AMF3_RELATIVES) - set(expected))
+    if missing_pixel_documents:
+        raise ValueError(
+            f"inventory missing pixel AMF3 documents: "
+            f"{missing_pixel_documents}")
+    actual = sorted(
+        path.relative_to(pack).as_posix()
+        for path in pack.rglob("*") if path.is_file()
+    )
+    missing = sorted(set(expected) - set(actual))
+    extra = sorted(set(actual) - set(expected))
+    if missing:
+        raise ValueError(f"inventory missing pack files: {missing}")
+    if extra:
+        raise ValueError(f"inventory has unexpected pack files: {extra}")
+
+    png_count = 0
+    mp3_count = 0
+    pixel_amf3_count = 0
     stale = []
     needle = f"character/{PIXEL_TEMPLATE_CODE}/".encode()
-    for path in pack.rglob("*.amf3.deflate"):
+    for relative in actual:
+        path = pack / relative
+        if relative.endswith(".png"):
+            try:
+                with Image.open(path) as image:
+                    image.verify()
+                with Image.open(path) as image:
+                    image.load()
+            except Exception as error:
+                raise ValueError(f"bad PNG {relative}: {error}") from error
+            png_count += 1
+        elif relative.endswith(".mp3"):
+            try:
+                wf_assets.mp3_encode(path.read_bytes())
+            except Exception as error:
+                raise ValueError(f"bad MP3 {relative}: {error}") from error
+            mp3_count += 1
+        if not relative.endswith(".amf3.deflate"):
+            continue
         try:
             plain = zlib.decompress(path.read_bytes(), -15)
-        except zlib.error:
-            continue
+        except zlib.error as error:
+            raise ValueError(f"bad AMF3 deflate {relative}: {error}") from error
         if needle in plain:
-            stale.append(path.relative_to(pack).as_posix())
+            stale.append(relative)
+        if relative.startswith("pixelart/"):
+            try:
+                skin.core.AMF3Reader(plain).read_value()
+            except Exception as error:
+                raise ValueError(f"bad pixel AMF3 {relative}: {error}") from error
+            pixel_amf3_count += 1
     if stale:
         raise ValueError(f"old code references remain: {stale}")
+
+    try:
+        result = skin.validate_pack(pack, required_sizes)
+    except Exception as error:
+        raise ValueError(f"required asset validation failed: {error}") from error
     result["old_code_references"] = []
+    result["inventory"] = {
+        "expected": len(expected),
+        "actual": len(actual),
+        "png": png_count,
+        "mp3": mp3_count,
+        "amf3": sum(1 for path in actual
+                    if path.endswith(".amf3.deflate")),
+        "pixel_amf3": pixel_amf3_count,
+    }
     return result
 
 
@@ -330,6 +537,76 @@ class _FileRollbackJournal:
                 path.unlink()
 
 
+def write_rollback_snapshot(paths, snapshot_dir: Path) -> Path:
+    """Persist exact before-images, including files that do not yet exist."""
+    snapshot_dir = Path(snapshot_dir)
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    destination = snapshot_dir / (
+        f"{CANARY_ID}-kyle-rollback-{time.time_ns()}.zip")
+    entries = []
+    seen = set()
+    with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
+        for candidate in paths:
+            path = Path(candidate).absolute()
+            key = str(path).casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            existed = path.exists()
+            if existed and not path.is_file():
+                raise ValueError(f"rollback target is not a file: {path}")
+            entry = {
+                "path": str(path),
+                "existed": existed,
+                "member": None,
+            }
+            if existed:
+                member = f"files/{len(entries):04d}.bin"
+                archive.writestr(member, path.read_bytes())
+                entry["member"] = member
+            entries.append(entry)
+        archive.writestr(
+            "manifest.json",
+            json.dumps({
+                "version": 1,
+                "character_id": CANARY_ID,
+                "entries": entries,
+            }, ensure_ascii=False, indent=2),
+        )
+    return destination
+
+
+def restore_rollback_snapshot(snapshot: Path,
+                              allowed_roots=None) -> dict:
+    """Restore one persistent Kyle snapshot byte-for-byte."""
+    snapshot = Path(snapshot)
+    with zipfile.ZipFile(snapshot) as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+        if manifest.get("character_id") != CANARY_ID:
+            raise ValueError("rollback snapshot belongs to another character")
+        roots = ([Path(root).resolve() for root in allowed_roots]
+                 if allowed_roots is not None else None)
+        restored = 0
+        for entry in reversed(manifest.get("entries", [])):
+            path = Path(entry["path"]).absolute()
+            if roots is not None:
+                resolved = path.resolve()
+                if not any(resolved == root or root in resolved.parents
+                           for root in roots):
+                    raise ValueError(
+                        f"rollback path outside active CN profile: {path}")
+            if entry["existed"]:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(archive.read(entry["member"]))
+            elif path.exists():
+                if not path.is_file():
+                    raise ValueError(
+                        f"new rollback target is not a file: {path}")
+                path.unlink()
+            restored += 1
+    return {"snapshot": str(snapshot), "restored": restored}
+
+
 def _prevalidate_apply(gui, pack: Path, preview: list[dict]) -> list[Path]:
     """Validate every live input and return the complete mutation path set."""
     trimmed = gui.core.load_table(
@@ -419,25 +696,87 @@ def _prevalidate_apply(gui, pack: Path, preview: list[dict]) -> list[Path]:
     pending_file = getattr(gui, "PENDING_FILE", None)
     if pending_file is not None:
         mutation_paths.append(Path(pending_file))
+    for attribute in ("CHANGELOG_FILE", "CHANGELOG_MD"):
+        changelog = getattr(gui, attribute, None)
+        if changelog is not None:
+            mutation_paths.append(Path(changelog))
     return mutation_paths
+
+
+def plan_apply(runtime=None, work: Path = WORK,
+               roots: dict[str, str] | None = None) -> dict:
+    """Build the complete read-only audit plan shared by dry-run and apply."""
+    gui = _resolve_gui(runtime)
+    profile = require_cn_profile(gui)
+    current = gui.get_char_fields(CANARY_ID)["fields"]["code_name"]
+    if current not in {CURRENT_CODE, NEW_CODE}:
+        raise ValueError(f"unexpected canary code_name: {current}")
+    pack = work / "pack"
+    validation = validate_kyle_pack(pack)
+    resolved_roots = (
+        _root_by_relative_path(gui) if roots is None else roots)
+    writes = plan_store_writes(pack, roots=resolved_roots)
+    mutation_paths = _prevalidate_apply(gui, pack, writes)
+    root_counts = {
+        name: sum(1 for item in writes if item["root"] == name)
+        for name in ("upload", "medium", "android")
+    }
+    return {
+        "profile": profile,
+        "code_name": {
+            "character_id": CANARY_ID,
+            "from": current,
+            "to": NEW_CODE,
+        },
+        "snapshot": {
+            "character_snapshot": True,
+            "rollback_directory": str(work / "rollback_snapshots"),
+            "files": len({str(Path(path).absolute()).casefold()
+                          for path in mutation_paths}),
+        },
+        "metadata": {
+            "trimmed_image": {
+                "from": f"character/{PIXEL_TEMPLATE_CODE}/",
+                "to": f"character/{NEW_CODE}/",
+            },
+            "nested_tables": [
+                getattr(gui, "CHAR_IMAGE_LOGICAL", "character_image"),
+                getattr(gui, "FS_ATTR_LOGICAL",
+                        "full_shot_image_attribute"),
+            ],
+        },
+        "layer1": {
+            "character_id": CANARY_ID,
+            "paths": [str(path) for path in (
+                getattr(gui, "_char_json_paths", lambda: ())() or ())],
+        },
+        "pending": {
+            "file": (str(gui.PENDING_FILE)
+                     if getattr(gui, "PENDING_FILE", None) else None),
+            "by_root": root_counts,
+        },
+        "writes": writes,
+        "validation": validation,
+        "mutation_paths": [str(Path(path).absolute())
+                           for path in mutation_paths],
+    }
 
 
 def apply(dry_run: bool, runtime=None, work: Path = WORK,
           roots: dict[str, str] | None = None) -> dict:
     """Preview or transactionally install the Kyle pack into the live store."""
     gui = _resolve_gui(runtime)
-    current = gui.get_char_fields(CANARY_ID)["fields"]["code_name"]
-    if current not in {CURRENT_CODE, NEW_CODE}:
-        raise ValueError(f"unexpected canary code_name: {current}")
+    plan = plan_apply(gui, work=work, roots=roots)
     pack = work / "pack"
-    validate_kyle_pack(pack)
-    resolved_roots = (
-        _root_by_relative_path(gui) if roots is None else roots)
-    preview = plan_store_writes(pack, roots=resolved_roots)
     if dry_run:
-        return {"dry_run": True, "writes": preview}
-    mutation_paths = _prevalidate_apply(gui, pack, preview)
+        return {"dry_run": True, **plan}
+    resolved_roots = {
+        item["relative"]: item["root"] for item in plan["writes"]
+    }
+    mutation_paths = [Path(path) for path in plan["mutation_paths"]]
     journal = _FileRollbackJournal(mutation_paths)
+    rollback_snapshot = write_rollback_snapshot(
+        mutation_paths, work / "rollback_snapshots")
     try:
         snapshot = gui.char_snapshot(CANARY_ID, "before Kyle visual skin")
         clone_template_metadata(
@@ -467,8 +806,25 @@ def apply(dry_run: bool, runtime=None, work: Path = WORK,
     return {
         "dry_run": False,
         "snapshot": snapshot,
-        "writes": len(preview),
+        "rollback_snapshot": str(rollback_snapshot),
+        "writes": len(plan["writes"]),
+        "plan": plan,
     }
+
+
+def rollback(snapshot: Path, runtime=None) -> dict:
+    """Explicitly restore an apply snapshot under the active CN profile."""
+    gui = _resolve_gui(runtime)
+    profile = require_cn_profile(gui)
+    allowed_roots = [
+        Path(profile["upload"]).parent,
+        Path(profile["cdndata"]).parent,
+    ]
+    for attribute in ("PENDING_FILE", "CHANGELOG_FILE", "CHANGELOG_MD"):
+        path = getattr(gui, attribute, None)
+        if path is not None:
+            allowed_roots.append(Path(path).parent.resolve())
+    return restore_rollback_snapshot(snapshot, allowed_roots=allowed_roots)
 
 
 def verify(work: Path = WORK) -> dict:
@@ -485,11 +841,14 @@ def main(argv=None) -> None:
     subparsers.add_parser("dry-run")
     subparsers.add_parser("apply")
     subparsers.add_parser("verify")
+    rollback_parser = subparsers.add_parser("rollback")
+    rollback_parser.add_argument("--snapshot", required=True)
     args = parser.parse_args(argv)
     result = (
         prepare() if args.cmd == "prepare" else
         apply(True) if args.cmd == "dry-run" else
         apply(False) if args.cmd == "apply" else
+        rollback(Path(args.snapshot)) if args.cmd == "rollback" else
         verify()
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))

@@ -53,6 +53,46 @@ def fit_rgba(image: Image.Image, size: tuple[int, int],
     return canvas
 
 
+def cover_rgba(image: Image.Image, size: tuple[int, int],
+               focus: tuple[float, float] = (0.5, 0.25),
+               padding: float = 0.04) -> Image.Image:
+    """Focal-crop the visible subject so compact UI slots are actually filled.
+
+    Generated masters commonly contain a large transparent margin.  Cropping
+    from the RGBA alpha bounds first makes ``focus`` describe the character,
+    not the original generation canvas.  ``fit_rgba`` remains the contain
+    operation for full-shot assets.
+    """
+    source = image.convert("RGBA")
+    bbox = source.getchannel("A").getbbox()
+    if bbox is None:
+        return Image.new("RGBA", size, (0, 0, 0, 0))
+    left, top, right, bottom = bbox
+    visible_width = right - left
+    visible_height = bottom - top
+    margin_x = round(visible_width * max(0.0, padding))
+    margin_y = round(visible_height * max(0.0, padding))
+    left = max(0, left - margin_x)
+    top = max(0, top - margin_y)
+    right = min(source.width, right + margin_x)
+    bottom = min(source.height, bottom + margin_y)
+    visible = source.crop((left, top, right, bottom))
+
+    scale = max(size[0] / visible.width, size[1] / visible.height)
+    scaled = visible.resize(
+        (max(1, round(visible.width * scale)),
+         max(1, round(visible.height * scale))),
+        Image.Resampling.LANCZOS,
+    )
+    focus_x = min(1.0, max(0.0, focus[0]))
+    focus_y = min(1.0, max(0.0, focus[1]))
+    max_x = max(0, scaled.width - size[0])
+    max_y = max(0, scaled.height - size[1])
+    crop_x = round(max_x * focus_x)
+    crop_y = round(max_y * focus_y)
+    return scaled.crop((crop_x, crop_y, crop_x + size[0], crop_y + size[1]))
+
+
 def recolor_kyle_pixel_sheet(image: Image.Image) -> Image.Image:
     """Shift saturated red effects to ice blue and dark neutrals to silver."""
     output = Image.new("RGBA", image.size)
@@ -67,7 +107,7 @@ def recolor_kyle_pixel_sheet(image: Image.Image) -> Image.Image:
             hue = 0.58
             saturation = min(0.78, saturation)
             value = min(1.0, value * 1.08)
-        elif saturation < 0.22 and 0.10 < value < 0.52:
+        elif saturation < 0.22 and 0.24 < value < 0.52:
             saturation = 0.08
             value = 0.66 + (value - 0.10) / 0.42 * 0.28
         new_red, new_green, new_blue = colorsys.hsv_to_rgb(
