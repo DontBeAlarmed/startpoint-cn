@@ -52,6 +52,7 @@ mod-tools/edit/
 mod-tools/**/__pycache__/
 mod-tools/*.csv
 mod-tools/profiles.json
+/work/character_packs/
 
 # --- 打包产物 ---
 *.skill

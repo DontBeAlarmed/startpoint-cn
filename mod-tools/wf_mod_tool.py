@@ -31,7 +31,7 @@ import struct
 import sys
 import time
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
@@ -138,6 +138,38 @@ class OrderedMap:
         pairs = [(k, r) for k, r in zip(self.keys, self.rows) if k not in keys]
         self.keys = [k for k, _ in pairs]
         self.rows = [r for _, r in pairs]
+
+
+@dataclass
+class NestedOrderedMap:
+    """Lossless wrapper for tables whose outer rows are inner orderedmaps.
+
+    ``OrderedMap.rows`` intentionally remains ``list[bytes]``.  This sibling
+    type exposes decoded inner maps by outer key while retaining the official
+    raw bytes needed to preserve untouched entries byte-for-byte.
+    """
+
+    logical_path: str
+    rows: dict[str, OrderedMap]
+    source_path: Path = Path("<memory>")
+    original_bytes: bytes | None = None
+    raw_rows: dict[str, bytes] = field(default_factory=dict)
+    original_inner_rows: dict[str, tuple[tuple[str, bytes], ...]] = field(default_factory=dict)
+    original_order: tuple[str, ...] = ()
+    program_path_column: int = -1
+
+    def program_path(self, outer_key: str, inner_key: str) -> str:
+        """Read the program path using this table's verified inner CSV layout."""
+        if self.program_path_column < 0:
+            raise ValueError(f"nested table has no program-path layout: {self.logical_path}")
+        text = self.rows[outer_key].text_rows()[inner_key]
+        csv_rows = read_csv_lines(text)
+        if len(csv_rows) != 1 or self.program_path_column >= len(csv_rows[0]):
+            raise ValueError(
+                f"program-path column c{self.program_path_column} is missing for "
+                f"{outer_key}/{inner_key}"
+            )
+        return csv_rows[0][self.program_path_column]
 
 
 class AMF3Reader:
@@ -518,6 +550,7 @@ def write_status_table(ordered: OrderedMap, target_store: Path, backup_suffix: s
 # ---------------------------------------------------------------------------
 
 ACTION_SKILL_LOGICAL = "master/skill/action_skill.orderedmap"
+SWITCHED_ACTION_SKILL_LOGICAL = "master/skill/switched_action_skill.orderedmap"
 
 # 内层 CSV 列(已确认列;其余列语义未逐一确认,写回原样保留)
 ACTION_SKILL_COLUMNS = {
@@ -528,6 +561,187 @@ ACTION_SKILL_COLUMNS = {
     "max_skill_weight": 5,   # SLv满级 技能能量(面板显示值)
     "program_path": 7,       # 技能程序路径
 }
+
+_NESTED_PROGRAM_PATH_COLUMN = {
+    ACTION_SKILL_LOGICAL: ACTION_SKILL_COLUMNS["program_path"],
+    SWITCHED_ACTION_SKILL_LOGICAL: 0,
+}
+
+
+def _require_nested_layout(logical_path: str) -> int:
+    try:
+        return _NESTED_PROGRAM_PATH_COLUMN[logical_path]
+    except KeyError as exc:
+        raise ValueError(f"unsupported nested table: {logical_path}") from exc
+
+
+def _strict_orderedmap_rows(raw: bytes, *, label: str,
+                            compressed_rows: bool) -> tuple[list[str], list[bytes]]:
+    """Decode one orderedmap layer with corruption checks missing from legacy readers."""
+    try:
+        keys, pairs, index_len = parse_index(raw)
+        index = zlib.decompress(raw[4:4 + index_len])
+    except (IndexError, UnicodeDecodeError, ValueError, zlib.error, struct.error) as exc:
+        raise ValueError(f"{label} orderedmap is malformed: {exc}") from exc
+
+    count = len(keys)
+    key_start = 4 + count * 8
+    if key_start > len(index) or len(pairs) != count:
+        raise ValueError(f"{label} orderedmap key/row length mismatch")
+    key_blob = index[key_start:]
+    previous_key_end = 0
+    previous_row_end = 0
+    for key_end, row_end in pairs:
+        if (key_end < previous_key_end or key_end > len(key_blob)
+                or row_end < previous_row_end):
+            raise ValueError(f"{label} orderedmap length mismatch")
+        previous_key_end = key_end
+        previous_row_end = row_end
+    if previous_key_end != len(key_blob):
+        raise ValueError(f"{label} orderedmap length mismatch")
+
+    blob = raw[4 + index_len:]
+    if previous_row_end != len(blob):
+        raise ValueError(f"{label} orderedmap length mismatch")
+    duplicate = next((key for key in keys if keys.count(key) > 1), None)
+    if duplicate is not None:
+        raise ValueError(f"duplicate {label} key: {duplicate}")
+
+    rows: list[bytes] = []
+    previous_row_end = 0
+    for _, row_end in pairs:
+        chunk = blob[previous_row_end:row_end]
+        previous_row_end = row_end
+        if compressed_rows and chunk:
+            try:
+                chunk = zlib.decompress(chunk)
+            except zlib.error as exc:
+                raise ValueError(f"{label} orderedmap row is not valid zlib data") from exc
+        rows.append(chunk)
+    if len(keys) != len(rows):
+        raise ValueError(f"{label} orderedmap key/row length mismatch")
+    return keys, rows
+
+
+def _validate_inner_map(inner: OrderedMap, outer_key: str) -> tuple[tuple[str, bytes], ...]:
+    if not isinstance(inner, OrderedMap):
+        raise ValueError(f"nested row {outer_key!r} is not an OrderedMap")
+    if len(inner.keys) != len(inner.rows):
+        raise ValueError(f"inner orderedmap {outer_key!r} key/row length mismatch")
+    if len(set(inner.keys)) != len(inner.keys):
+        duplicate = next(key for key in inner.keys if inner.keys.count(key) > 1)
+        raise ValueError(f"duplicate inner key: {duplicate}")
+
+    snapshot: list[tuple[str, bytes]] = []
+    for inner_key, row in zip(inner.keys, inner.rows):
+        if not isinstance(inner_key, str) or not isinstance(row, bytes):
+            raise ValueError(f"inner orderedmap {outer_key!r} must preserve string keys and bytes rows")
+        try:
+            text = row.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"inner orderedmap {outer_key!r}/{inner_key!r} is not UTF-8") from exc
+        if len(read_csv_lines(text)) != 1:
+            raise ValueError(
+                f"inner orderedmap {outer_key!r}/{inner_key!r} must contain exactly one CSV row"
+            )
+        snapshot.append((inner_key, row))
+    return tuple(snapshot)
+
+
+def load_nested_table_bytes(raw: bytes, logical_path: str) -> NestedOrderedMap:
+    """Decode a supported nested table and retain all official source bytes."""
+    program_path_column = _require_nested_layout(logical_path)
+    outer_keys, outer_raw_rows = _strict_orderedmap_rows(
+        raw, label="outer", compressed_rows=False
+    )
+    decoded: dict[str, OrderedMap] = {}
+    raw_rows: dict[str, bytes] = {}
+    snapshots: dict[str, tuple[tuple[str, bytes], ...]] = {}
+    for outer_key, inner_raw in zip(outer_keys, outer_raw_rows):
+        inner_keys, inner_rows = _strict_orderedmap_rows(
+            inner_raw, label="inner", compressed_rows=True
+        )
+        inner = OrderedMap(
+            f"{logical_path}#{outer_key}", inner_keys, inner_rows, Path("<memory>")
+        )
+        snapshots[outer_key] = _validate_inner_map(inner, outer_key)
+        decoded[outer_key] = inner
+        raw_rows[outer_key] = inner_raw
+    return NestedOrderedMap(
+        logical_path=logical_path,
+        rows=decoded,
+        original_bytes=raw,
+        raw_rows=raw_rows,
+        original_inner_rows=snapshots,
+        original_order=tuple(outer_keys),
+        program_path_column=program_path_column,
+    )
+
+
+def load_nested_table(logical_path: str, target_store: Path,
+                      source_store: Path | None = None) -> NestedOrderedMap:
+    """Load a supported nested table, preferring target over explicit fallback."""
+    _require_nested_layout(logical_path)
+    candidates = [table_path(target_store, logical_path)]
+    if source_store is not None:
+        candidates.append(table_path(source_store, logical_path))
+    for path in candidates:
+        if path.exists():
+            result = load_nested_table_bytes(path.read_bytes(), logical_path)
+            result.source_path = path
+            return result
+    raise FileNotFoundError(f"cannot read {logical_path} from target/source stores")
+
+
+def build_nested_table(ordered: NestedOrderedMap, logical_path: str) -> bytes:
+    """Build a nested table, reusing every untouched raw inner orderedmap."""
+    _require_nested_layout(logical_path)
+    if not isinstance(ordered, NestedOrderedMap):
+        raise ValueError("nested table must be a NestedOrderedMap")
+    if ordered.logical_path != logical_path:
+        raise ValueError(
+            f"nested table logical path mismatch: {ordered.logical_path} != {logical_path}"
+        )
+
+    outer_keys = list(ordered.rows)
+    if any(not isinstance(key, str) for key in outer_keys):
+        raise ValueError("outer orderedmap must preserve string keys")
+    current: dict[str, tuple[tuple[str, bytes], ...]] = {}
+    for outer_key, inner in ordered.rows.items():
+        current[outer_key] = _validate_inner_map(inner, outer_key)
+
+    if (ordered.original_bytes is not None
+            and tuple(outer_keys) == ordered.original_order
+            and all(current.get(key) == ordered.original_inner_rows.get(key)
+                    for key in outer_keys)):
+        return ordered.original_bytes
+
+    outer_raw_rows: list[bytes] = []
+    for outer_key, inner in ordered.rows.items():
+        if (current[outer_key] == ordered.original_inner_rows.get(outer_key)
+                and outer_key in ordered.raw_rows):
+            outer_raw_rows.append(ordered.raw_rows[outer_key])
+        else:
+            outer_raw_rows.append(build_orderedmap(inner))
+    outer = OrderedMap(logical_path, outer_keys, outer_raw_rows, ordered.source_path)
+    return build_orderedmap_raw_rows(outer)
+
+
+def write_nested_table(ordered: NestedOrderedMap, logical_path: str, target_store: Path,
+                       backup_suffix: str, no_backup: bool = False) -> Path:
+    """Write a supported nested table using the explicit logical path."""
+    data = build_nested_table(ordered, logical_path)
+    target = table_path(target_store, logical_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists() and not no_backup:
+        backup = target.with_name(target.name + backup_suffix)
+        if not backup.exists():
+            shutil.copy2(target, backup)
+            print(f"backup: {backup}")
+        else:
+            print(f"backup exists: {backup}")
+    target.write_bytes(data)
+    return target
 
 
 def decode_action_skill_row(chunk: bytes) -> list[tuple[str, list[str]]]:
