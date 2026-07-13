@@ -16,13 +16,15 @@ import re
 import shutil
 import uuid
 import zipfile
-from dataclasses import asdict, dataclass
+from collections.abc import Iterator
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path, PureWindowsPath
-from typing import Any, Iterable, Literal, Mapping, Protocol
+from typing import Any, Iterable, Literal, Mapping, Protocol, cast
 
 import wf_mod_tool as core
 
 RootName = Literal["common", "medium", "android", "server"]
+TableKey = tuple[RootName, str]
 
 SCHEMA_VERSION = 1
 ROOT_NAMES: tuple[RootName, ...] = ("common", "medium", "android", "server")
@@ -125,6 +127,7 @@ class SemanticClaim:
 
 @dataclass(frozen=True)
 class TableClaim:
+    root: RootName
     logical_path: str
     codec_id: str
     outer_keys: tuple[str, ...]
@@ -151,23 +154,93 @@ class TableCodec(Protocol):
 
 
 @dataclass(frozen=True)
+class FrozenRecord(Mapping[str, Any]):
+    """Recursively immutable mapping used at every transaction boundary."""
+
+    items_tuple: tuple[tuple[str, Any], ...]
+
+    def __getitem__(self, key: str) -> Any:
+        for item_key, value in self.items_tuple:
+            if item_key == key:
+                return value
+        raise KeyError(key)
+
+    def __iter__(self) -> Iterator[str]:
+        return (key for key, _ in self.items_tuple)
+
+    def __len__(self) -> int:
+        return len(self.items_tuple)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Mapping):
+            return dict(self.items()) == dict(other.items())
+        return False
+
+    def __hash__(self) -> int:
+        return hash(self.items_tuple)
+
+
+def _freeze(value: Any) -> Any:
+    if isinstance(value, FrozenRecord):
+        return value
+    if isinstance(value, Mapping):
+        return FrozenRecord(tuple(
+            (str(key), _freeze(item))
+            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+        ))
+    if isinstance(value, (tuple, list)):
+        return tuple(_freeze(item) for item in value)
+    if isinstance(value, set):
+        return frozenset(_freeze(item) for item in value)
+    return value
+
+
+def _plain(value: Any) -> Any:
+    if isinstance(value, FrozenRecord):
+        return {key: _plain(item) for key, item in value.items()}
+    if isinstance(value, Mapping):
+        return {str(key): _plain(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_plain(item) for item in value]
+    if isinstance(value, frozenset):
+        return sorted(_plain(item) for item in value)
+    if isinstance(value, Path):
+        return str(value)
+    return value
+
+
+@dataclass(frozen=True)
 class PreflightReport:
     package_id: str
     package_version: str
     installed_version: str | None
-    version_diff: dict[str, str | None]
-    creates: tuple[dict, ...]
-    updates: tuple[dict, ...]
-    deletes: tuple[dict, ...]
-    conflicts: tuple[dict, ...]
-    root_totals: dict[str, dict[str, int]]
-    expected_base_hashes: dict[str, Any]
-    capability_warnings: tuple[dict, ...]
+    version_diff: FrozenRecord
+    creates: tuple[FrozenRecord, ...]
+    updates: tuple[FrozenRecord, ...]
+    deletes: tuple[FrozenRecord, ...]
+    conflicts: tuple[FrozenRecord, ...]
+    root_totals: FrozenRecord
+    expected_base_hashes: FrozenRecord
+    capability_warnings: tuple[FrozenRecord, ...]
     can_prepare: bool
     delivery_status: str
 
     def canonical_bytes(self) -> bytes:
-        return _canonical_json_bytes(asdict(self))
+        return _canonical_json_bytes({
+            "package_id": self.package_id,
+            "package_version": self.package_version,
+            "installed_version": self.installed_version,
+            "version_diff": _plain(self.version_diff),
+            "creates": _plain(self.creates),
+            "updates": _plain(self.updates),
+            "deletes": _plain(self.deletes),
+            "conflicts": _plain(self.conflicts),
+            "root_totals": _plain(self.root_totals),
+            "expected_base_hashes": _plain(self.expected_base_hashes),
+            "capability_warnings": _plain(self.capability_warnings),
+            "can_prepare": self.can_prepare,
+            "delivery_status": self.delivery_status,
+        })
 
 
 @dataclass(frozen=True)
@@ -175,10 +248,12 @@ class PreparedPack:
     transaction_id: str
     staging_root: Path
     transaction_dir: Path
+    marker_nonce: str
+    prepared_digest: str
     package_manifest_sha256: str
     release_base: ReleaseBaseState
-    table_key_changes: tuple[dict, ...]
-    file_changes: tuple[dict, ...]
+    table_key_changes: tuple[FrozenRecord, ...]
+    file_changes: tuple[FrozenRecord, ...]
     degraded_data_confirmed: bool
 
 
@@ -187,8 +262,8 @@ class SnapshotRecord:
     transaction_id: str
     snapshot_dir: Path
     release_base: ReleaseBaseState
-    table_before: tuple[dict, ...]
-    file_before: tuple[dict, ...]
+    table_before: tuple[FrozenRecord, ...]
+    file_before: tuple[FrozenRecord, ...]
 
 
 @dataclass(frozen=True)
@@ -196,21 +271,37 @@ class StagedPack:
     transaction_id: str
     staging_root: Path
     transaction_dir: Path
-    staged_files: tuple[dict, ...]
-    table_readback: tuple[dict, ...]
-    provisional_archives: tuple[dict, ...]
+    staged_files: tuple[FrozenRecord, ...]
+    table_readback: tuple[FrozenRecord, ...]
+    provisional_archives: tuple[FrozenRecord, ...]
 
 
 @dataclass
 class _Analysis:
     report: PreflightReport
     release_base: ReleaseBaseState
-    candidate_claims: dict[str, TableClaim]
-    installed_claims: dict[str, TableClaim]
-    candidate_images: dict[str, TableImage]
-    live_images: dict[str, TableImage]
-    table_key_changes: tuple[dict, ...]
-    file_changes: tuple[dict, ...]
+    candidate_claims: dict[TableKey, TableClaim]
+    installed_claims: dict[TableKey, TableClaim]
+    candidate_images: dict[TableKey, TableImage]
+    live_images: dict[TableKey, TableImage]
+    table_key_changes: tuple[FrozenRecord, ...]
+    file_changes: tuple[FrozenRecord, ...]
+
+
+@dataclass
+class _TransactionAuthority:
+    transaction_id: str
+    root: Path
+    transaction_dir: Path
+    root_identity: tuple[int, int, int]
+    dir_identity: tuple[int, int, int]
+    marker_nonce: str
+    marker_digest: str
+    prepared_digest: str
+    prepared: PreparedPack
+    analysis: _Analysis
+    lifecycle: str = "prepared"
+    staged: StagedPack | None = None
 
 
 def _canonical_json_bytes(value: Any) -> bytes:
@@ -229,16 +320,17 @@ def _json_sort_projection(value: Any) -> Any:
         return {"$bytes_base64": base64.b64encode(value).decode("ascii")}
     if isinstance(value, Path):
         return str(value)
-    if isinstance(value, dict):
+    if isinstance(value, Mapping):
         return {key: _json_sort_projection(item) for key, item in value.items()}
     if isinstance(value, (tuple, list)):
         return [_json_sort_projection(item) for item in value]
     return value
 
 
-def _record_sort(records: Iterable[dict]) -> tuple[dict, ...]:
+def _record_sort(records: Iterable[Mapping[str, Any]]) -> tuple[FrozenRecord, ...]:
+    frozen = tuple(_freeze(record) for record in records)
     return tuple(sorted(
-        records,
+        frozen,
         key=lambda item: _canonical_json_bytes(_json_sort_projection(item)),
     ))
 
@@ -605,17 +697,18 @@ def validate_manifest(manifest: dict, package_dir: Path) -> list[str]:
     return sorted(errors)
 
 
-def _parse_transaction_claims(manifest: dict) -> dict[str, TableClaim]:
+def _parse_transaction_claims(manifest: dict) -> dict[TableKey, TableClaim]:
     tables = manifest.get("tables")
     if not isinstance(tables, list):
         raise PackPreflightError("tables must serialize transaction claims as an array")
-    result: dict[str, TableClaim] = {}
-    seen_table_keys: set[tuple[str, str]] = set()
-    seen_inner_keys: set[tuple[str, str, str]] = set()
+    result: dict[TableKey, TableClaim] = {}
+    seen_table_keys: set[tuple[RootName, str, str]] = set()
+    seen_inner_keys: set[tuple[RootName, str, str, str]] = set()
     seen_semantics: set[tuple[str, str]] = set()
     errors: list[str] = []
     required = {
-        "logical_path", "codec_id", "outer_keys", "inner_keys", "semantic_claims",
+        "root", "logical_path", "codec_id", "outer_keys", "inner_keys",
+        "semantic_claims",
     }
     for index, entry in enumerate(tables):
         prefix = f"tables[{index}]"
@@ -630,13 +723,21 @@ def _parse_transaction_claims(manifest: dict) -> dict[str, TableClaim]:
             if extra:
                 errors.append(f"{prefix}: unexpected fields {extra}")
             continue
+        root = entry["root"]
         logical_path = entry["logical_path"]
         codec_id = entry["codec_id"]
+        if root not in ROOT_NAMES:
+            errors.append(f"{prefix}.root: must be one of {ROOT_NAMES}")
+            continue
+        root = cast(RootName, root)
         if not isinstance(logical_path, str) or _path_problem(logical_path):
             errors.append(f"{prefix}.logical_path: invalid logical path")
             continue
-        if logical_path in result:
-            errors.append(f"{prefix}.logical_path: duplicate table claim {logical_path}")
+        table_key = (root, logical_path)
+        if table_key in result:
+            errors.append(
+                f"{prefix}.logical_path: duplicate table claim {root}:{logical_path}"
+            )
             continue
         if not isinstance(codec_id, str) or not codec_id:
             errors.append(f"{prefix}.codec_id: must be a non-empty string")
@@ -653,7 +754,7 @@ def _parse_transaction_claims(manifest: dict) -> dict[str, TableClaim]:
                         f"{prefix}.outer_keys[{item_index}]: must be a non-empty string"
                     )
                     continue
-                marker = (logical_path, key)
+                marker = (root, logical_path, key)
                 if marker in seen_table_keys:
                     errors.append(f"{prefix}.outer_keys[{item_index}]: duplicate claim {key}")
                     continue
@@ -694,7 +795,7 @@ def _parse_transaction_claims(manifest: dict) -> dict[str, TableClaim]:
                             f"{item_prefix}.keys[{key_index}]: must be a non-empty string"
                         )
                         continue
-                    marker = (logical_path, outer_key, key)
+                    marker = (root, logical_path, outer_key, key)
                     if marker in seen_inner_keys:
                         errors.append(f"{item_prefix}.keys[{key_index}]: duplicate claim {key}")
                         continue
@@ -732,7 +833,8 @@ def _parse_transaction_claims(manifest: dict) -> dict[str, TableClaim]:
                 seen_semantics.add(marker)
                 semantics.append(SemanticClaim(namespace, value, source))
 
-        result[logical_path] = TableClaim(
+        result[table_key] = TableClaim(
+            root,
             logical_path,
             codec_id,
             tuple(outer_keys),
@@ -827,6 +929,37 @@ def _dict_rows(image: TableImage) -> tuple[
     return outer, inner, semantics
 
 
+def _merge_inspection_claims(
+    candidate: TableClaim, installed: TableClaim | None
+) -> TableClaim:
+    if installed is None:
+        return candidate
+    if candidate.root != installed.root \
+            or candidate.logical_path != installed.logical_path \
+            or candidate.codec_id != installed.codec_id:
+        raise PackPreflightError("candidate/installed table claim identity mismatch")
+
+    outer = tuple(dict.fromkeys((*candidate.outer_keys, *installed.outer_keys)))
+    inner_map: dict[str, list[str]] = {}
+    for outer_key, keys in (*candidate.inner_keys, *installed.inner_keys):
+        bucket = inner_map.setdefault(outer_key, [])
+        for key in keys:
+            if key not in bucket:
+                bucket.append(key)
+    semantics = tuple({
+        (item.namespace, item.value, item.source_logical_path): item
+        for item in (*candidate.semantic_claims, *installed.semantic_claims)
+    }.values())
+    return TableClaim(
+        candidate.root,
+        candidate.logical_path,
+        candidate.codec_id,
+        outer,
+        tuple((outer_key, tuple(keys)) for outer_key, keys in inner_map.items()),
+        semantics,
+    )
+
+
 def _read_bytes_or_none(path: Path) -> bytes | None:
     try:
         return path.read_bytes() if path.is_file() else None
@@ -867,6 +1000,39 @@ def _has_link_or_junction_component(path: Path) -> bool:
     )
 
 
+def _path_identity(path: Path) -> tuple[int, int, int]:
+    try:
+        stat_result = path.stat()
+    except OSError as exc:
+        raise PackStagingError(f"cannot stat owned path {path}: {exc}") from exc
+    return (stat_result.st_dev, stat_result.st_ino, stat_result.st_mode)
+
+
+def _prepared_digest_value(prepared: PreparedPack) -> str:
+    payload = {
+        "transaction_id": prepared.transaction_id,
+        "staging_root": str(prepared.staging_root),
+        "transaction_dir": str(prepared.transaction_dir),
+        "marker_nonce": prepared.marker_nonce,
+        "package_manifest_sha256": prepared.package_manifest_sha256,
+        "release_base": {
+            "active_raw": prepared.release_base.active_raw,
+            "active_sha256": prepared.release_base.active_sha256,
+            "current_release_id": prepared.release_base.current_release_id,
+            "validated_chain_tail": prepared.release_base.validated_chain_tail,
+            "expected_from_version": prepared.release_base.expected_from_version,
+            "active_package_manifest_sha256": (
+                prepared.release_base.active_package_manifest_sha256
+            ),
+        },
+        "table_key_changes": _plain(prepared.table_key_changes),
+        "file_changes": _plain(prepared.file_changes),
+        "degraded_data_confirmed": prepared.degraded_data_confirmed,
+    }
+    projected = _json_sort_projection(payload)
+    return hashlib.sha256(_canonical_json_bytes(projected)).hexdigest()
+
+
 class PackTransaction:
     """Build a read-only plan and materialize it only in an owned staging child."""
 
@@ -885,13 +1051,23 @@ class PackTransaction:
         snapshot_roots: Iterable[Path] = (),
     ):
         self.package_dir = Path(package_dir)
-        self.manifest = manifest
-        self.live_roots = live_roots
+        try:
+            self._manifest_bytes = canonical_manifest_bytes(manifest)
+            self._installed_manifest_bytes = (
+                canonical_manifest_bytes(installed_manifest)
+                if installed_manifest is not None else None
+            )
+        except Exception as exc:
+            raise PackPreflightError(f"manifest cannot be canonical-copied: {exc}") from exc
+        self.live_roots = LiveRoots(
+            Path(live_roots.common), Path(live_roots.medium),
+            Path(live_roots.android), Path(live_roots.server),
+            tuple(Path(path) for path in live_roots.protected),
+        )
         self.release_base_provider = release_base_provider
         self.codecs = dict(DEFAULT_CODECS)
         if codec_registry:
             self.codecs.update(codec_registry)
-        self.installed_manifest = installed_manifest
         self.installed_package_dir = (
             Path(installed_package_dir) if installed_package_dir is not None else None
         )
@@ -899,8 +1075,18 @@ class PackTransaction:
         self.degraded_data_confirmed = bool(degraded_data_confirmed)
         self.snapshot_roots = tuple(Path(path) for path in snapshot_roots)
         self._analysis: _Analysis | None = None
-        self._prepared: PreparedPack | None = None
-        self._known_transaction_ids: set[str] = set()
+        self._transactions: dict[str, _TransactionAuthority] = {}
+        self._latest_transaction_id: str | None = None
+
+    @property
+    def manifest(self) -> dict:
+        return json.loads(self._manifest_bytes.decode("utf-8"))
+
+    @property
+    def installed_manifest(self) -> dict | None:
+        if self._installed_manifest_bytes is None:
+            return None
+        return json.loads(self._installed_manifest_bytes.decode("utf-8"))
 
     def _root_path(self, root: RootName) -> Path:
         return getattr(self.live_roots, root)
@@ -950,7 +1136,7 @@ class PackTransaction:
         if errors:
             raise PackPreflightError("candidate manifest invalid: " + "; ".join(errors))
         candidate_claims = _parse_transaction_claims(self.manifest)
-        installed_claims: dict[str, TableClaim] = {}
+        installed_claims: dict[TableKey, TableClaim] = {}
         if self.installed_manifest is not None:
             if self.installed_package_dir is None:
                 raise PackPreflightError(
@@ -965,23 +1151,41 @@ class PackTransaction:
                 )
             installed_claims = _parse_transaction_claims(self.installed_manifest)
 
-        server_paths = tuple(
-            entry["logical_path"] for entry in self.manifest["roots"]["server"]
-        )
-        if set(server_paths) != set(SERVER_LOGICAL_PATHS) \
-                or len(server_paths) != len(SERVER_LOGICAL_PATHS):
-            raise PackPreflightError(
-                "server root must contain exactly " + ", ".join(SERVER_LOGICAL_PATHS)
+        def validate_server_contract(
+            manifest: dict, claims: dict[TableKey, TableClaim], label: str,
+        ) -> None:
+            server_paths = tuple(
+                entry["logical_path"] for entry in manifest["roots"]["server"]
+            )
+            expected = set(SERVER_LOGICAL_PATHS)
+            if set(server_paths) != expected or len(server_paths) != len(expected):
+                raise PackPreflightError(
+                    f"{label} server root must contain exactly "
+                    + ", ".join(SERVER_LOGICAL_PATHS)
+                )
+            server_claims = {
+                logical_path for root, logical_path in claims if root == "server"
+            }
+            if server_claims != expected:
+                raise PackPreflightError(
+                    f"{label} server tables must claim exactly "
+                    + ", ".join(SERVER_LOGICAL_PATHS)
+                )
+
+        validate_server_contract(self.manifest, candidate_claims, "candidate")
+        if self.installed_manifest is not None:
+            validate_server_contract(
+                self.installed_manifest, installed_claims, "installed"
             )
         candidate_entries = self._entries(self.manifest)
-        for logical_path, claim in candidate_claims.items():
+        for (root, logical_path), claim in candidate_claims.items():
             if claim.codec_id not in self.codecs:
                 raise PackPreflightError(
-                    f"unknown table codec {claim.codec_id!r} for {logical_path}"
+                    f"unknown table codec {claim.codec_id!r} for {root}:{logical_path}"
                 )
-            if ("common", logical_path) not in candidate_entries:
+            if (root, logical_path) not in candidate_entries:
                 raise PackPreflightError(
-                    f"table claim {logical_path} has no common storage-ready payload"
+                    f"table claim {root}:{logical_path} has no storage-ready payload"
                 )
 
         state = _validate_release_base(self.release_base_provider)
@@ -1005,17 +1209,20 @@ class PackTransaction:
 
     def _inspect_tables(
         self,
-        candidate_claims: dict[str, TableClaim],
-        installed_claims: dict[str, TableClaim],
-    ) -> tuple[dict[str, TableImage], dict[str, TableImage], list[dict], list[dict]]:
+        candidate_claims: dict[TableKey, TableClaim],
+        installed_claims: dict[TableKey, TableClaim],
+    ) -> tuple[
+        dict[TableKey, TableImage], dict[TableKey, TableImage], list[dict], list[dict]
+    ]:
         candidate_entries = self._entries(self.manifest)
-        candidate_images: dict[str, TableImage] = {}
-        live_images: dict[str, TableImage] = {}
+        candidate_images: dict[TableKey, TableImage] = {}
+        live_images: dict[TableKey, TableImage] = {}
         conflicts: list[dict] = []
         changes: list[dict] = []
-        for logical_path in sorted(set(candidate_claims) | set(installed_claims)):
-            candidate_claim = candidate_claims.get(logical_path)
-            installed_claim = installed_claims.get(logical_path)
+        for table_key in sorted(set(candidate_claims) | set(installed_claims)):
+            root, logical_path = table_key
+            candidate_claim = candidate_claims.get(table_key)
+            installed_claim = installed_claims.get(table_key)
             claim = candidate_claim or installed_claim
             assert claim is not None
             if candidate_claim is None:
@@ -1024,22 +1231,25 @@ class PackTransaction:
                 )
             if installed_claim is not None and installed_claim.codec_id != claim.codec_id:
                 raise PackPreflightError(f"codec changed across upgrade for {logical_path}")
+            inspection_claim = _merge_inspection_claims(
+                candidate_claim, installed_claim
+            )
             codec = self.codecs.get(claim.codec_id)
             if codec is None:
                 raise PackPreflightError(f"unknown table codec {claim.codec_id!r}")
-            entry = candidate_entries.get(("common", logical_path))
+            entry = candidate_entries.get(table_key)
             if entry is None:
                 raise PackPreflightError(f"missing candidate table payload {logical_path}")
             candidate_raw = self._source_path(
-                self.package_dir, "common", logical_path
+                self.package_dir, root, logical_path
             ).read_bytes()
-            live_raw = _read_bytes_or_none(self._live_path("common", logical_path))
+            live_raw = _read_bytes_or_none(self._live_path(root, logical_path))
             try:
                 candidate_image = codec.inspect(
-                    candidate_raw, candidate_claim, candidate_claim.semantic_claims
+                    candidate_raw, inspection_claim, inspection_claim.semantic_claims
                 )
                 live_image = (
-                    codec.inspect(live_raw, candidate_claim, candidate_claim.semantic_claims)
+                    codec.inspect(live_raw, inspection_claim, inspection_claim.semantic_claims)
                     if live_raw is not None else TableImage(())
                 )
             except PackPreflightError:
@@ -1048,8 +1258,8 @@ class PackTransaction:
                 raise PackPreflightError(
                     f"codec {claim.codec_id} rejected {logical_path}: {exc}"
                 ) from exc
-            candidate_images[logical_path] = candidate_image
-            live_images[logical_path] = live_image
+            candidate_images[table_key] = candidate_image
+            live_images[table_key] = live_image
             candidate_outer, candidate_inner, candidate_semantics = _dict_rows(candidate_image)
             live_outer, live_inner, live_semantics = _dict_rows(live_image)
 
@@ -1151,6 +1361,7 @@ class PackTransaction:
                 before = live_outer.get(key)
                 after = candidate_outer.get(key)
                 changes.append({
+                    "root": root,
                     "logical_path": logical_path,
                     "kind": "outer",
                     "outer_key": key,
@@ -1164,6 +1375,7 @@ class PackTransaction:
                 before = live_inner.get((outer_key, inner_key))
                 after = candidate_inner.get((outer_key, inner_key))
                 changes.append({
+                    "root": root,
                     "logical_path": logical_path,
                     "kind": "inner",
                     "outer_key": outer_key,
@@ -1177,6 +1389,7 @@ class PackTransaction:
                 before_occupied = (namespace, value) in live_semantics
                 after_declared = (namespace, value) in candidate_semantics
                 changes.append({
+                    "root": root,
                     "logical_path": logical_path,
                     "kind": "semantic",
                     "namespace": namespace,
@@ -1192,7 +1405,7 @@ class PackTransaction:
         return candidate_images, live_images, conflicts, changes
 
     def _file_changes(
-        self, table_paths: set[str]
+        self, table_keys: set[TableKey]
     ) -> tuple[tuple[dict, ...], dict[str, dict[str, int]]]:
         candidate = self._entries(self.manifest)
         installed = self._entries(self.installed_manifest) \
@@ -1224,7 +1437,7 @@ class PackTransaction:
                 "after_sha256": after_sha,
                 "after_size": after_size,
                 "operation": operation,
-                "is_table": root == "common" and logical_path in table_paths,
+                "is_table": (root, logical_path) in table_keys,
             })
         totals: dict[str, dict[str, int]] = {}
         for root in ROOT_NAMES:
@@ -1241,33 +1454,53 @@ class PackTransaction:
             candidate_claims, installed_claims
         )
         file_changes, totals = self._file_changes(set(candidate_claims))
+        installed_entries = (
+            self._entries(self.installed_manifest)
+            if self.installed_manifest is not None else {}
+        )
+        for item in file_changes:
+            ownership_key = (item["root"], item["logical_path"])
+            if (item["root"] in CLIENT_ROOTS
+                    and not item["is_table"]
+                    and item["source_path"] is not None
+                    and item["before"]["exists"]
+                    and ownership_key not in installed_entries):
+                conflicts.append({
+                    "kind": "asset_path",
+                    "claim": f"{item['root']}:{item['logical_path']}",
+                    "reason": "occupied_without_hash_bound_prior_path_ownership",
+                })
         table_file_before = {
-            item["logical_path"]: item["before"]
+            (item["root"], item["logical_path"]): item["before"]
             for item in file_changes if item["is_table"]
         }
         for item in table_changes:
             if item["kind"] == "semantic":
-                item["source_table_before"] = table_file_before[item["logical_path"]]
+                item["source_table_before"] = table_file_before[
+                    (item["root"], item["logical_path"])
+                ]
 
         creates: list[dict] = []
         updates: list[dict] = []
         deletes: list[dict] = []
         candidate_tokens: set[tuple[str, str]] = set()
         installed_tokens: set[tuple[str, str]] = set()
-        for path, claim in candidate_claims.items():
-            candidate_tokens.update(("outer", f"{path}:{key}") for key in claim.outer_keys)
+        for (root, path), claim in candidate_claims.items():
+            prefix = f"{root}:{path}"
+            candidate_tokens.update(("outer", f"{prefix}:{key}") for key in claim.outer_keys)
             candidate_tokens.update(
-                ("inner", f"{path}:{outer}/{key}")
+                ("inner", f"{prefix}:{outer}/{key}")
                 for outer, keys in claim.inner_keys for key in keys
             )
             candidate_tokens.update(
                 ("semantic", f"{item.namespace}:{item.value}")
                 for item in claim.semantic_claims
             )
-        for path, claim in installed_claims.items():
-            installed_tokens.update(("outer", f"{path}:{key}") for key in claim.outer_keys)
+        for (root, path), claim in installed_claims.items():
+            prefix = f"{root}:{path}"
+            installed_tokens.update(("outer", f"{prefix}:{key}") for key in claim.outer_keys)
             installed_tokens.update(
-                ("inner", f"{path}:{outer}/{key}")
+                ("inner", f"{prefix}:{outer}/{key}")
                 for outer, keys in claim.inner_keys for key in keys
             )
             installed_tokens.update(
@@ -1315,23 +1548,23 @@ class PackTransaction:
                 self.installed_manifest["package_version"]
                 if self.installed_manifest is not None else None
             ),
-            version_diff=_version_diff(
+            version_diff=_freeze(_version_diff(
                 self.installed_manifest["package_version"]
                 if self.installed_manifest is not None else None,
                 self.manifest["package_version"],
-            ),
+            )),
             creates=_record_sort(creates),
             updates=_record_sort(updates),
             deletes=_record_sort(deletes),
             conflicts=_record_sort(conflicts),
-            root_totals=totals,
-            expected_base_hashes={
+            root_totals=_freeze(totals),
+            expected_base_hashes=_freeze({
                 "active_sha256": state.active_sha256,
                 "current_release_id": state.current_release_id,
                 "validated_chain_tail": state.validated_chain_tail,
                 "expected_from_version": state.expected_from_version,
                 "live": dict(sorted(live_hashes.items())),
-            },
+            }),
             capability_warnings=_record_sort(capability_warnings),
             can_prepare=can_prepare,
             delivery_status=delivery,
@@ -1402,73 +1635,162 @@ class PackTransaction:
             Path(staging_root), self._protected_for_staging(), "staging root"
         )
         transaction_id = uuid.uuid4().hex
+        previous_latest_transaction_id = self._latest_transaction_id
+        marker_nonce = uuid.uuid4().hex
         child = root / f"character-pack-{transaction_id}"
+        package_manifest_sha256 = hashlib.sha256(self._manifest_bytes).hexdigest()
+        root_identity = _path_identity(root)
+        child_identity: tuple[int, int, int] | None = None
         try:
             child.mkdir()
+            child_identity = _path_identity(child)
+            provisional = PreparedPack(
+                transaction_id=transaction_id,
+                staging_root=root,
+                transaction_dir=child,
+                marker_nonce=marker_nonce,
+                prepared_digest="",
+                package_manifest_sha256=package_manifest_sha256,
+                release_base=self._analysis.release_base,
+                table_key_changes=self._analysis.table_key_changes,
+                file_changes=self._analysis.file_changes,
+                degraded_data_confirmed=self.degraded_data_confirmed,
+            )
+            prepared = replace(
+                provisional,
+                prepared_digest=_prepared_digest_value(provisional),
+            )
             marker = {
                 "kind": "character_pack_transaction",
                 "transaction_id": transaction_id,
+                "marker_nonce": marker_nonce,
+                "prepared_digest": prepared.prepared_digest,
             }
-            (child / TRANSACTION_MARKER).write_bytes(_canonical_json_bytes(marker))
+            marker_bytes = _canonical_json_bytes(marker)
+            marker_path = child / TRANSACTION_MARKER
+            marker_path.write_bytes(marker_bytes)
             metadata = {
                 "transaction_id": transaction_id,
-                "package_manifest_sha256": hashlib.sha256(
-                    canonical_manifest_bytes(self.manifest)
-                ).hexdigest(),
+                "marker_nonce": marker_nonce,
+                "prepared_digest": prepared.prepared_digest,
+                "package_manifest_sha256": package_manifest_sha256,
                 "release_base": self._release_metadata(self._analysis.release_base),
-                "table_key_changes": self._analysis.table_key_changes,
-                "file_changes": self._analysis.file_changes,
+                "table_key_changes": _plain(self._analysis.table_key_changes),
+                "file_changes": _plain(self._analysis.file_changes),
                 "degraded_data_confirmed": self.degraded_data_confirmed,
             }
             (child / "prepared.json").write_bytes(_canonical_json_bytes(metadata))
+            assert child_identity is not None
+            authority = _TransactionAuthority(
+                transaction_id=transaction_id,
+                root=root,
+                transaction_dir=child,
+                root_identity=root_identity,
+                dir_identity=child_identity,
+                marker_nonce=marker_nonce,
+                marker_digest=hashlib.sha256(marker_bytes).hexdigest(),
+                prepared_digest=prepared.prepared_digest,
+                prepared=prepared,
+                analysis=self._analysis,
+            )
+            self._transactions[transaction_id] = authority
+            self._latest_transaction_id = transaction_id
+            self._validate_authority(authority)
         except Exception as exc:
-            if child.exists():
+            self._transactions.pop(transaction_id, None)
+            if self._latest_transaction_id == transaction_id:
+                self._latest_transaction_id = previous_latest_transaction_id
+            try:
+                safe_cleanup = (
+                    child_identity is not None
+                    and child.exists()
+                    and child.parent == root
+                    and not _has_link_or_junction_component(child)
+                    and _path_identity(root) == root_identity
+                    and _path_identity(child) == child_identity
+                )
+            except Exception:
+                safe_cleanup = False
+            if safe_cleanup:
                 shutil.rmtree(child)
             raise PackPreflightError(f"cannot create prepared transaction: {exc}") from exc
-        prepared = PreparedPack(
-            transaction_id=transaction_id,
-            staging_root=root,
-            transaction_dir=child,
-            package_manifest_sha256=hashlib.sha256(
-                canonical_manifest_bytes(self.manifest)
-            ).hexdigest(),
-            release_base=self._analysis.release_base,
-            table_key_changes=self._analysis.table_key_changes,
-            file_changes=self._analysis.file_changes,
-            degraded_data_confirmed=self.degraded_data_confirmed,
-        )
-        self._prepared = prepared
-        self._known_transaction_ids.add(transaction_id)
         return prepared
 
-    def _verify_marker(self, transaction_id: str, transaction_dir: Path,
-                       staging_root: Path) -> None:
-        if transaction_id not in self._known_transaction_ids:
-            raise PackStagingError("transaction is not owned by this PackTransaction")
-        if not transaction_dir.exists():
-            return
-        if _is_link_or_junction(transaction_dir):
-            raise PackStagingError("transaction directory became a symlink or junction")
-        resolved_dir = transaction_dir.resolve()
-        resolved_root = staging_root.resolve()
-        if resolved_dir.parent != resolved_root:
-            raise PackStagingError("transaction directory is not a direct owned child")
-        marker_path = resolved_dir / TRANSACTION_MARKER
+    def _validate_authority(self, authority: _TransactionAuthority) -> None:
+        if authority.lifecycle == "discarded":
+            raise PackStagingError("transaction authority is tombstoned")
+        if (_has_link_or_junction_component(authority.root)
+                or _has_link_or_junction_component(authority.transaction_dir)):
+            raise PackStagingError("owned transaction topology traverses a link/junction")
+        if authority.root.resolve() != authority.root:
+            raise PackStagingError("owned staging root identity changed")
+        if authority.transaction_dir.resolve() != authority.transaction_dir:
+            raise PackStagingError("owned transaction directory identity changed")
+        if authority.transaction_dir.parent != authority.root:
+            raise PackStagingError("owned transaction is no longer a direct child")
+        if _path_identity(authority.root) != authority.root_identity:
+            raise PackStagingError("owned staging root filesystem identity changed")
+        if _path_identity(authority.transaction_dir) != authority.dir_identity:
+            raise PackStagingError("owned transaction directory filesystem identity changed")
+        marker_path = authority.transaction_dir / TRANSACTION_MARKER
         try:
-            marker = json.loads(marker_path.read_text(encoding="utf-8"))
+            marker_bytes = marker_path.read_bytes()
+            marker = json.loads(marker_bytes.decode("utf-8"))
         except Exception as exc:
             raise PackStagingError(f"transaction marker is unreadable: {exc}") from exc
+        if hashlib.sha256(marker_bytes).hexdigest() != authority.marker_digest:
+            raise PackStagingError("transaction marker digest changed")
         if marker != {
             "kind": "character_pack_transaction",
-            "transaction_id": transaction_id,
+            "transaction_id": authority.transaction_id,
+            "marker_nonce": authority.marker_nonce,
+            "prepared_digest": authority.prepared_digest,
         }:
-            raise PackStagingError("transaction marker does not match owner/id")
+            raise PackStagingError("transaction marker does not match authority")
+        if (_prepared_digest_value(authority.prepared) != authority.prepared_digest
+                or authority.prepared.prepared_digest != authority.prepared_digest):
+            raise PackStagingError("prepared authority digest changed")
 
-    def _remove_owned(self, transaction_id: str, transaction_dir: Path,
-                      staging_root: Path) -> None:
-        self._verify_marker(transaction_id, transaction_dir, staging_root)
-        if transaction_dir.exists():
-            shutil.rmtree(transaction_dir)
+    def _authority_for_prepared(self, prepared: PreparedPack) -> _TransactionAuthority:
+        authority = self._transactions.get(prepared.transaction_id)
+        if authority is None or prepared is not authority.prepared:
+            raise PackStagingError("prepared record is not the emitted owned authority")
+        self._validate_authority(authority)
+        return authority
+
+    def _remove_owned(self, authority: _TransactionAuthority) -> None:
+        self._validate_authority(authority)
+        quarantine = authority.root / (
+            f".discard-{authority.transaction_id}-{uuid.uuid4().hex}"
+        )
+        if quarantine.exists():
+            raise PackStagingError("owned discard quarantine already exists")
+        try:
+            authority.transaction_dir.rename(quarantine)
+        except OSError as exc:
+            raise PackStagingError(f"cannot isolate owned transaction for deletion: {exc}") \
+                from exc
+        isolated_matches = False
+        try:
+            isolated_matches = (
+                not _has_link_or_junction_component(quarantine)
+                and quarantine.parent == authority.root
+                and _path_identity(authority.root) == authority.root_identity
+                and _path_identity(quarantine) == authority.dir_identity
+            )
+        except Exception:
+            isolated_matches = False
+        if not isolated_matches:
+            try:
+                if not authority.transaction_dir.exists() and quarantine.exists():
+                    quarantine.rename(authority.transaction_dir)
+            except OSError:
+                pass
+            raise PackStagingError(
+                "owned transaction identity changed while isolating deletion"
+            )
+        shutil.rmtree(quarantine)
+        authority.lifecycle = "discarded"
 
     @staticmethod
     def _phase_failure(fail_after: str | None, phase: str) -> None:
@@ -1480,20 +1802,35 @@ class PackTransaction:
     ) -> StagedPack:
         if fail_after is not None and fail_after not in MATERIALIZE_PHASES:
             raise PackStagingError(f"unknown staging failpoint {fail_after}")
-        if self._analysis is None or self._prepared != prepared:
-            raise PackStagingError("prepared record is not the current owned transaction")
-        self._verify_marker(
-            prepared.transaction_id, prepared.transaction_dir, prepared.staging_root
-        )
-        payload_root = prepared.transaction_dir / "payload"
+        authority = self._authority_for_prepared(prepared)
+        owned = authority.prepared
+        analysis = authority.analysis
+        payload_root = authority.transaction_dir / "payload"
         staged_files: list[dict] = []
         table_readback: list[dict] = []
         provisional: list[dict] = []
 
-        def copy_change(item: dict) -> None:
+        def copy_change(item: Mapping[str, Any]) -> None:
             if item["operation"] == "delete":
                 return
-            source = Path(item["source_path"])
+            root_name = item["root"]
+            logical_path = item["logical_path"]
+            if root_name not in ROOT_NAMES or _path_problem(logical_path):
+                raise PackStagingError("prepared root/logical path is invalid")
+            expected_source = self._source_path(
+                self.package_dir, root_name, logical_path
+            )
+            if str(expected_source) != item["source_path"]:
+                raise PackStagingError("prepared source identity does not match manifest root")
+            source_root = (self.package_dir / "roots" / root_name).resolve()
+            source = expected_source.resolve()
+            try:
+                source.relative_to(source_root)
+            except ValueError as exc:
+                raise PackStagingError("package source escaped its declared root") from exc
+            if _has_link_or_junction_component(source):
+                raise PackStagingError("package source traverses a link/junction")
+            self._validate_authority(authority)
             try:
                 raw = source.read_bytes()
             except OSError as exc:
@@ -1503,12 +1840,23 @@ class PackTransaction:
                 raise PackStagingError(
                     f"package source changed after prepare: {item['root']}:{item['logical_path']}"
                 )
-            destination = payload_root / item["root"] / Path(*item["logical_path"].split("/"))
+            destination = payload_root / root_name / Path(*logical_path.split("/"))
+            try:
+                destination.resolve().relative_to(authority.transaction_dir)
+            except ValueError as exc:
+                raise PackStagingError("staged destination escaped owned transaction") from exc
+            self._validate_authority(authority)
             destination.parent.mkdir(parents=True, exist_ok=True)
+            if _has_link_or_junction_component(destination.parent):
+                raise PackStagingError("staged destination traverses a link/junction")
+            self._validate_authority(authority)
             destination.write_bytes(raw)
+            self._validate_authority(authority)
+            if destination.resolve().parent != destination.parent.resolve():
+                raise PackStagingError("staged destination identity changed")
             staged_files.append({
-                "root": item["root"],
-                "logical_path": item["logical_path"],
+                "root": root_name,
+                "logical_path": logical_path,
                 "path": str(destination),
                 "sha256": item["after_sha256"],
                 "size": item["after_size"],
@@ -1516,12 +1864,12 @@ class PackTransaction:
             })
 
         try:
-            for item in prepared.file_changes:
+            for item in owned.file_changes:
                 if item["is_table"]:
                     copy_change(item)
             self._phase_failure(fail_after, "table_materialization")
 
-            for item in prepared.file_changes:
+            for item in owned.file_changes:
                 if not item["is_table"]:
                     copy_change(item)
             self._phase_failure(fail_after, "asset_copy")
@@ -1529,25 +1877,32 @@ class PackTransaction:
             staged_by_key = {
                 (item["root"], item["logical_path"]): item for item in staged_files
             }
-            for logical_path, claim in sorted(self._analysis.candidate_claims.items()):
-                staged_item = staged_by_key.get(("common", logical_path))
+            for table_key, claim in sorted(analysis.candidate_claims.items()):
+                root_name, logical_path = table_key
+                inspection_claim = _merge_inspection_claims(
+                    claim, analysis.installed_claims.get(table_key)
+                )
+                staged_item = staged_by_key.get(table_key)
                 if staged_item is None:
-                    raise PackStagingError(f"staged table is missing: {logical_path}")
+                    raise PackStagingError(
+                        f"staged table is missing: {root_name}:{logical_path}"
+                    )
                 raw = Path(staged_item["path"]).read_bytes()
                 try:
                     inspected = self.codecs[claim.codec_id].inspect(
-                        raw, claim, claim.semantic_claims
+                        raw, inspection_claim, inspection_claim.semantic_claims
                     )
                     _dict_rows(inspected)
                 except Exception as exc:
                     raise PackStagingError(
                         f"staged table readback failed for {logical_path}: {exc}"
                     ) from exc
-                if inspected != self._analysis.candidate_images[logical_path]:
+                if inspected != analysis.candidate_images[table_key]:
                     raise PackStagingError(
                         f"staged table semantic readback drift for {logical_path}"
                     )
                 table_readback.append({
+                    "root": root_name,
                     "logical_path": logical_path,
                     "codec_id": claim.codec_id,
                     "outer_keys": [key for key, _ in inspected.outer_rows],
@@ -1566,11 +1921,13 @@ class PackTransaction:
                     )
             self._phase_failure(fail_after, "hash_verification")
 
-            archive_dir = prepared.transaction_dir / "provisional"
+            self._validate_authority(authority)
+            archive_dir = authority.transaction_dir / "provisional"
             archive_dir.mkdir()
             for root in CLIENT_ROOTS:
                 archive_path = archive_dir / f"{root}.zip"
                 members: list[str] = []
+                self._validate_authority(authority)
                 with zipfile.ZipFile(
                     archive_path, "w", compression=zipfile.ZIP_DEFLATED
                 ) as archive:
@@ -1601,11 +1958,7 @@ class PackTransaction:
             self._phase_failure(fail_after, "provisional_zip_content")
         except Exception as exc:
             try:
-                self._remove_owned(
-                    prepared.transaction_id,
-                    prepared.transaction_dir,
-                    prepared.staging_root,
-                )
+                self._remove_owned(authority)
             except Exception as cleanup_exc:
                 raise PackStagingError(
                     f"staging failed ({exc}); owned cleanup failed ({cleanup_exc})"
@@ -1614,33 +1967,40 @@ class PackTransaction:
                 raise
             raise PackStagingError(f"staging failed: {exc}") from exc
 
-        return StagedPack(
-            prepared.transaction_id,
-            prepared.staging_root,
-            prepared.transaction_dir,
+        staged = StagedPack(
+            owned.transaction_id,
+            owned.staging_root,
+            owned.transaction_dir,
             _record_sort(staged_files),
             _record_sort(table_readback),
-            tuple(provisional),
+            tuple(_freeze(item) for item in provisional),
         )
+        authority.lifecycle = "staged"
+        authority.staged = staged
+        return staged
 
     def discard_staging(self, staged: StagedPack) -> None:
-        self._remove_owned(
-            staged.transaction_id, staged.transaction_dir, staged.staging_root
-        )
+        authority = self._transactions.get(staged.transaction_id)
+        if authority is None:
+            raise PackStagingError("transaction is not owned by this PackTransaction")
+        if authority.lifecycle == "discarded":
+            if staged is authority.staged:
+                return
+            raise PackStagingError("forged record targets a tombstoned transaction")
+        if staged is not authority.staged:
+            raise PackStagingError("staged record is not the emitted owned authority")
+        self._remove_owned(authority)
 
     def snapshot(self, snapshot_root: Path) -> SnapshotRecord:
-        if self._prepared is None or self._analysis is None:
+        if self._latest_transaction_id is None:
             raise PackPreflightError("snapshot requires a current prepared transaction")
-        prepared = self._prepared
+        authority = self._transactions[self._latest_transaction_id]
+        self._validate_authority(authority)
+        prepared = authority.prepared
+        analysis = authority.analysis
         state = _validate_release_base(self.release_base_provider)
         if state != prepared.release_base:
             raise PackPreflightError("release base drifted after prepare")
-        for item in prepared.file_changes:
-            current = _read_bytes_or_none(Path(item["live_path"]))
-            if _expectation(current) != item["before"]:
-                raise PackPreflightError(
-                    f"live path drifted after prepare: {item['live_path']}"
-                )
         protected = (
             self.package_dir,
             self.live_roots.common,
@@ -1653,22 +2013,65 @@ class PackTransaction:
         root = self._validate_isolated_root(
             Path(snapshot_root), protected, "snapshot root"
         )
-        snapshot_dir = root / f"character-pack-snapshot-{prepared.transaction_id}"
-        if snapshot_dir.exists():
+        final_dir = root / f"character-pack-snapshot-{prepared.transaction_id}"
+        if final_dir.exists():
             raise PackPreflightError("snapshot already exists for transaction")
-        snapshot_dir.mkdir()
-        (snapshot_dir / SNAPSHOT_MARKER).write_bytes(_canonical_json_bytes({
-            "kind": "character_pack_snapshot",
-            "transaction_id": prepared.transaction_id,
-        }))
+
+        captured: dict[TableKey, bytes | None] = {}
+        for item in prepared.file_changes:
+            key = (cast(RootName, item["root"]), item["logical_path"])
+            if key in captured:
+                raise PackPreflightError(
+                    f"prepared plan repeats live path {key[0]}:{key[1]}"
+                )
+            current = _read_bytes_or_none(Path(item["live_path"]))
+            captured[key] = current
+            if _expectation(current) != item["before"]:
+                raise PackPreflightError(
+                    f"live path drifted after prepare: {item['live_path']}"
+                )
+
+        captured_images: dict[TableKey, TableImage] = {}
+        for table_key in sorted(
+            set(analysis.candidate_claims) | set(analysis.installed_claims)
+        ):
+            candidate_claim = analysis.candidate_claims.get(table_key)
+            installed_claim = analysis.installed_claims.get(table_key)
+            claim = candidate_claim or installed_claim
+            assert claim is not None
+            inspection_claim = (
+                _merge_inspection_claims(candidate_claim, installed_claim)
+                if candidate_claim is not None else installed_claim
+            )
+            assert inspection_claim is not None
+            raw = captured.get(table_key)
+            if table_key not in captured:
+                raise PackPreflightError(
+                    f"prepared plan lacks table file {table_key[0]}:{table_key[1]}"
+                )
+            try:
+                image = (
+                    self.codecs[claim.codec_id].inspect(
+                        raw, inspection_claim, inspection_claim.semantic_claims
+                    )
+                    if raw is not None else TableImage(())
+                )
+                _dict_rows(image)
+            except Exception as exc:
+                raise PackPreflightError(
+                    f"snapshot codec {claim.codec_id} rejected "
+                    f"{table_key[0]}:{table_key[1]}: {exc}"
+                ) from exc
+            captured_images[table_key] = image
 
         table_before: list[dict] = []
-        for logical_path in sorted(
-            set(self._analysis.candidate_claims) | set(self._analysis.installed_claims)
+        for table_key in sorted(
+            set(analysis.candidate_claims) | set(analysis.installed_claims)
         ):
-            candidate_claim = self._analysis.candidate_claims.get(logical_path)
-            installed_claim = self._analysis.installed_claims.get(logical_path)
-            live = self._analysis.live_images[logical_path]
+            root_name, logical_path = table_key
+            candidate_claim = analysis.candidate_claims.get(table_key)
+            installed_claim = analysis.installed_claims.get(table_key)
+            live = captured_images[table_key]
             outer, inner, live_semantics = _dict_rows(live)
             outer_keys = set(candidate_claim.outer_keys if candidate_claim else ()) \
                 | set(installed_claim.outer_keys if installed_claim else ())
@@ -1684,6 +2087,7 @@ class PackTransaction:
             }
             for outer_key in sorted(outer_keys):
                 table_before.append({
+                    "root": root_name,
                     "logical_path": logical_path,
                     "kind": "outer",
                     "outer_key": outer_key,
@@ -1692,6 +2096,7 @@ class PackTransaction:
                 })
             for outer_key, inner_key in sorted(inner_keys):
                 table_before.append({
+                    "root": root_name,
                     "logical_path": logical_path,
                     "kind": "inner",
                     "outer_key": outer_key,
@@ -1699,12 +2104,9 @@ class PackTransaction:
                     **_value_before(inner.get((outer_key, inner_key))),
                 })
             for namespace, value in sorted(semantic_keys):
-                source_before = next(
-                    item["before"] for item in prepared.file_changes
-                    if item["root"] == "common"
-                    and item["logical_path"] == logical_path
-                )
+                source_before = _expectation(captured[table_key])
                 table_before.append({
+                    "root": root_name,
                     "logical_path": logical_path,
                     "kind": "semantic",
                     "namespace": namespace,
@@ -1718,7 +2120,8 @@ class PackTransaction:
 
         file_before: list[dict] = []
         for item in prepared.file_changes:
-            raw = _read_bytes_or_none(Path(item["live_path"]))
+            key = (cast(RootName, item["root"]), item["logical_path"])
+            raw = captured[key]
             record = {
                 "root": item["root"],
                 "logical_path": item["logical_path"],
@@ -1726,35 +2129,117 @@ class PackTransaction:
                 **_value_before(raw),
             }
             file_before.append(record)
-            if raw is not None:
-                output = snapshot_dir / "files" / item["root"] / Path(
-                    *item["logical_path"].split("/")
-                )
-                output.parent.mkdir(parents=True, exist_ok=True)
-                output.write_bytes(raw)
 
+        def snapshot_json_record(item: Mapping[str, Any]) -> dict[str, Any]:
+            plain = _plain(item)
+            if "bytes" in plain:
+                plain["bytes"] = (
+                    base64.b64encode(plain["bytes"]).decode("ascii")
+                    if plain["bytes"] is not None else None
+                )
+            return plain
+
+        frozen_table_before = _record_sort(table_before)
+        frozen_file_before = _record_sort(file_before)
         serializable = {
             "transaction_id": prepared.transaction_id,
             "release_base": self._release_metadata(state),
             "table_before": [
-                ({**item, "bytes": (
-                    base64.b64encode(item["bytes"]).decode("ascii")
-                    if item["bytes"] is not None else None
-                )} if "bytes" in item else dict(item))
-                for item in _record_sort(table_before)
+                snapshot_json_record(item) for item in frozen_table_before
             ],
             "file_before": [
-                {**item, "bytes": (
-                    base64.b64encode(item["bytes"]).decode("ascii")
-                    if item["bytes"] is not None else None
-                )} for item in _record_sort(file_before)
+                snapshot_json_record(item) for item in frozen_file_before
             ],
         }
-        (snapshot_dir / "snapshot.json").write_bytes(_canonical_json_bytes(serializable))
+        snapshot_bytes = _canonical_json_bytes(serializable)
+        snapshot_nonce = uuid.uuid4().hex
+        temp_dir = root / (
+            f".character-pack-snapshot-{prepared.transaction_id}-{snapshot_nonce}.tmp"
+        )
+        root_identity = _path_identity(root)
+        temp_identity: tuple[int, int, int] | None = None
+
+        def validate_temp() -> None:
+            if temp_identity is None:
+                raise PackPreflightError("temporary snapshot authority is absent")
+            if (_has_link_or_junction_component(root)
+                    or _has_link_or_junction_component(temp_dir)):
+                raise PackPreflightError("temporary snapshot topology changed")
+            if (_path_identity(root) != root_identity
+                    or _path_identity(temp_dir) != temp_identity
+                    or temp_dir.resolve() != temp_dir
+                    or temp_dir.parent != root):
+                raise PackPreflightError("temporary snapshot identity changed")
+
+        def write_checked(relative: Path, raw: bytes) -> None:
+            validate_temp()
+            output = temp_dir / relative
+            try:
+                output.resolve().relative_to(temp_dir)
+            except ValueError as exc:
+                raise PackPreflightError("snapshot output escaped temporary child") from exc
+            output.parent.mkdir(parents=True, exist_ok=True)
+            if _has_link_or_junction_component(output.parent):
+                raise PackPreflightError("snapshot output traverses a link/junction")
+            validate_temp()
+            output.write_bytes(raw)
+            validate_temp()
+            if output.read_bytes() != raw \
+                    or output.stat().st_size != len(raw) \
+                    or _sha256_file(output) != hashlib.sha256(raw).hexdigest():
+                raise PackPreflightError(f"snapshot write readback failed: {relative}")
+
+        def cleanup_temp() -> None:
+            if temp_identity is None:
+                return
+            try:
+                safe = (
+                    temp_dir.exists()
+                    and not _has_link_or_junction_component(temp_dir)
+                    and temp_dir.parent == root
+                    and _path_identity(root) == root_identity
+                    and _path_identity(temp_dir) == temp_identity
+                )
+            except (OSError, RuntimeError):
+                safe = False
+            if safe:
+                shutil.rmtree(temp_dir)
+
+        try:
+            temp_dir.mkdir()
+            temp_identity = _path_identity(temp_dir)
+            marker_bytes = _canonical_json_bytes({
+                "kind": "character_pack_snapshot",
+                "transaction_id": prepared.transaction_id,
+                "snapshot_nonce": snapshot_nonce,
+                "prepared_digest": prepared.prepared_digest,
+            })
+            write_checked(Path(SNAPSHOT_MARKER), marker_bytes)
+            for item in prepared.file_changes:
+                key = (cast(RootName, item["root"]), item["logical_path"])
+                raw = captured[key]
+                if raw is not None:
+                    write_checked(
+                        Path("files") / item["root"]
+                        / Path(*item["logical_path"].split("/")),
+                        raw,
+                    )
+            write_checked(Path("snapshot.json"), snapshot_bytes)
+            validate_temp()
+            if final_dir.exists():
+                raise PackPreflightError("snapshot appeared concurrently")
+            temp_dir.rename(final_dir)
+            temp_identity = None
+        except Exception as exc:
+            cleanup_temp()
+            if isinstance(exc, PackPreflightError):
+                raise
+            raise PackPreflightError(f"cannot create snapshot: {exc}") from exc
+
         return SnapshotRecord(
             prepared.transaction_id,
-            snapshot_dir,
+            final_dir,
             state,
-            _record_sort(table_before),
-            _record_sort(file_before),
+            frozen_table_before,
+            frozen_file_before,
         )

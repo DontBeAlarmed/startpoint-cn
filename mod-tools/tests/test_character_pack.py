@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import dataclasses
 import hashlib
 import importlib
 import json
@@ -508,7 +509,17 @@ class _JsonFixtureCodec:
         ).encode("utf-8")
 
     def inspect(self, raw: bytes, claim, semantic_claims):
-        payload = json.loads(raw.decode("utf-8"))
+        def reject_duplicates(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError(f"duplicate JSON key {key}")
+                result[key] = value
+            return result
+
+        payload = json.loads(
+            raw.decode("utf-8"), object_pairs_hook=reject_duplicates
+        )
         outer = tuple(
             (str(key), self._value_bytes(value))
             for key, value in payload.get("outer", {}).items()
@@ -524,6 +535,41 @@ class _JsonFixtureCodec:
             for value in values
         )
         return self.pack.TableImage(outer, inner, semantic_values)
+
+
+class _FilteringJsonFixtureCodec(_JsonFixtureCodec):
+    """Valid claim-scoped codec used to expose candidate-only inspection bugs."""
+
+    def inspect(self, raw: bytes, claim, semantic_claims):
+        complete = super().inspect(raw, claim, semantic_claims)
+        outer_requested = set(claim.outer_keys)
+        inner_requested = {
+            (outer_key, key)
+            for outer_key, keys in claim.inner_keys for key in keys
+        }
+        semantic_requested = {
+            (item.namespace, item.value) for item in semantic_claims
+        }
+        return self.pack.TableImage(
+            tuple(item for item in complete.outer_rows if item[0] in outer_requested),
+            tuple(item for item in complete.inner_rows
+                  if (item[0], item[1]) in inner_requested),
+            tuple(item for item in complete.semantic_values
+                  if item in semantic_requested),
+        )
+
+
+class _ControllableJsonFixtureCodec(_JsonFixtureCodec):
+    def __init__(self, pack):
+        super().__init__(pack)
+        self.calls = []
+        self.fail = False
+
+    def inspect(self, raw: bytes, claim, semantic_claims):
+        self.calls.append((claim.root, claim.logical_path, raw))
+        if self.fail:
+            raise ValueError("synthetic snapshot decode failure")
+        return super().inspect(raw, claim, semantic_claims)
 
 
 class _TransactionFixtureMixin:
@@ -606,6 +652,7 @@ class _TransactionFixtureMixin:
             add_file(self.package_dir, self.manifest, "common", logical_path,
                      candidate_bytes)
             self.manifest["tables"].append({
+                "root": "common",
                 "logical_path": logical_path,
                 "codec_id": "fixture_json",
                 "outer_keys": list(outer_keys),
@@ -636,13 +683,36 @@ class _TransactionFixtureMixin:
             "character/seris/ui/skill_cutin.atf", b"storage-ready-atf",
         )
         for logical_path in self.SERVER_PATHS:
+            live_payload = {
+                "outer": {"official": {"value": logical_path}},
+                "inner": {},
+                "semantics": {},
+            }
+            candidate_payload = copy.deepcopy(live_payload)
+            candidate_payload["outer"]["129999"] = {
+                "owner": "seris", "path": logical_path,
+            }
+            live_bytes = json.dumps(
+                live_payload, separators=(",", ":")
+            ).encode("utf-8")
+            candidate_bytes = json.dumps(
+                candidate_payload, separators=(",", ":")
+            ).encode("utf-8")
             add_file(
                 self.package_dir, self.manifest, "server", logical_path,
-                ("candidate:" + logical_path).encode("utf-8"),
+                candidate_bytes,
             )
             server_path = self.server / Path(*logical_path.split("/"))
             server_path.parent.mkdir(parents=True, exist_ok=True)
-            server_path.write_bytes(("live:" + logical_path).encode("utf-8"))
+            server_path.write_bytes(live_bytes)
+            self.manifest["tables"].append({
+                "root": "server",
+                "logical_path": logical_path,
+                "codec_id": "fixture_json",
+                "outer_keys": ["129999"],
+                "inner_keys": [],
+                "semantic_claims": [],
+            })
 
         active_raw = b'{"release_id":"previous"}'
         (self.active_dir / "active.json").write_bytes(active_raw)
@@ -673,7 +743,7 @@ class _TransactionFixtureMixin:
 
     def _tx(self, *, manifest=None, provider=None, installed_manifest=None,
             installed_package_dir=None, capabilities=("dual_form_v1",),
-            degraded=False):
+            degraded=False, codec_registry=None):
         self._require_api()
         if self.provider is None:
             self._finish_setup()
@@ -689,7 +759,9 @@ class _TransactionFixtureMixin:
             manifest or self.manifest,
             live_roots=live_roots,
             release_base_provider=provider or self.provider,
-            codec_registry={"fixture_json": _JsonFixtureCodec(self.pack)},
+            codec_registry=(codec_registry or {
+                "fixture_json": _JsonFixtureCodec(self.pack)
+            }),
             installed_manifest=installed_manifest,
             installed_package_dir=installed_package_dir,
             available_capabilities=capabilities,
@@ -705,10 +777,28 @@ class _TransactionFixtureMixin:
 
     def _occupy_claims(self):
         import wf_mod_tool as core
-        for logical_path, *_ in self.TABLE_SPECS:
-            source = self.package_dir / "roots" / "common" / Path(*logical_path.split("/"))
-            target = core.table_path(self.common, logical_path)
+        for claim in self.manifest["tables"]:
+            root = claim["root"]
+            logical_path = claim["logical_path"]
+            source = self.package_dir / "roots" / root / Path(*logical_path.split("/"))
+            target = (
+                self.server / Path(*logical_path.split("/"))
+                if root == "server" else core.table_path(self.common, logical_path)
+            )
+            target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(source.read_bytes())
+
+    def _set_package_bytes(self, manifest, root, logical_path, data):
+        source = self.package_dir / "roots" / root / Path(
+            *logical_path.split("/")
+        )
+        source.write_bytes(data)
+        entry = next(
+            item for item in manifest["roots"][root]
+            if item["logical_path"] == logical_path
+        )
+        entry["size"] = len(data)
+        entry["sha256"] = hashlib.sha256(data).hexdigest()
 
     def _installed_copy(self, *, package_id="seris_dragon_king", version="0.9.0"):
         installed_dir = self.root / f"installed-{package_id}"
@@ -720,6 +810,85 @@ class _TransactionFixtureMixin:
 
 
 class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
+    def test_non_container_asset_paths_require_exact_manifest_ownership(self):
+        self._finish_setup()
+        import wf_mod_tool as core
+
+        table_paths = {
+            item["logical_path"] for item in self.manifest["tables"]
+        }
+        asset_entries = {
+            root: next(
+                item for item in self.manifest["roots"][root]
+                if item["logical_path"] not in table_paths
+            )
+            for root in ("common", "medium", "android")
+        }
+        roots = {
+            "common": self.common, "medium": self.medium, "android": self.android
+        }
+
+        for root, entry in asset_entries.items():
+            with self.subTest(first_install_root=root):
+                live = core.table_path(roots[root], entry["logical_path"])
+                live.parent.mkdir(parents=True, exist_ok=True)
+                source = self.package_dir / "roots" / root / Path(
+                    *entry["logical_path"].split("/")
+                )
+                live.write_bytes(source.read_bytes())  # equal bytes are not ownership
+                report = self._tx().preflight()
+                conflicts = {(item["kind"], item["claim"])
+                             for item in report.conflicts}
+                self.assertIn(
+                    ("asset_path", f"{root}:{entry['logical_path']}"), conflicts
+                )
+                live.unlink()
+
+        installed, installed_dir = self._installed_copy()
+        installed_hash = hashlib.sha256(
+            self.pack.canonical_manifest_bytes(installed)
+        ).hexdigest()
+        owned_state = self.pack.ReleaseBaseState(
+            **{**self.release_state.__dict__,
+               "active_package_manifest_sha256": installed_hash}
+        )
+        for root, entry in asset_entries.items():
+            live = core.table_path(roots[root], entry["logical_path"])
+            live.parent.mkdir(parents=True, exist_ok=True)
+            live.write_bytes(b"occupied-upgrade-path")
+        owned = self._tx(
+            provider=_FakeReleaseBaseProvider(owned_state),
+            installed_manifest=installed,
+            installed_package_dir=installed_dir,
+        ).preflight()
+        self.assertFalse(any(item["kind"] == "asset_path"
+                             for item in owned.conflicts), owned.conflicts)
+
+        for root, entry in asset_entries.items():
+            with self.subTest(new_upgrade_path=root):
+                unowned = copy.deepcopy(installed)
+                unowned["roots"][root] = [
+                    item for item in unowned["roots"][root]
+                    if item["logical_path"] != entry["logical_path"]
+                ]
+                unowned_hash = hashlib.sha256(
+                    self.pack.canonical_manifest_bytes(unowned)
+                ).hexdigest()
+                unowned_state = self.pack.ReleaseBaseState(
+                    **{**self.release_state.__dict__,
+                       "active_package_manifest_sha256": unowned_hash}
+                )
+                report = self._tx(
+                    provider=_FakeReleaseBaseProvider(unowned_state),
+                    installed_manifest=unowned,
+                    installed_package_dir=installed_dir,
+                ).preflight()
+                conflicts = {(item["kind"], item["claim"])
+                             for item in report.conflicts}
+                self.assertIn(
+                    ("asset_path", f"{root}:{entry['logical_path']}"), conflicts
+                )
+
     def test_first_install_rejects_every_occupied_declared_claim(self):
         self._finish_setup()
         self._occupy_claims()
@@ -830,6 +999,16 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
              if item["root"] == "server"},
             set(self.SERVER_PATHS),
         )
+        self.assertEqual(
+            {item["logical_path"] for item in snapshot.table_before
+             if item["root"] == "server" and item["kind"] == "outer"},
+            set(self.SERVER_PATHS),
+        )
+        prepared_server = {
+            item["logical_path"] for item in prepared.table_key_changes
+            if item["root"] == "server" and item["kind"] == "outer"
+        }
+        self.assertEqual(prepared_server, set(self.SERVER_PATHS))
         nested = {
             (item["logical_path"], item.get("outer_key"), item.get("inner_key"))
             for item in snapshot.table_before if item.get("inner_key") is not None
@@ -881,6 +1060,173 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
                 self.assertIn("source_table_before", item)
                 self.assertNotIn("bytes", item)
 
+    def test_snapshot_captures_each_live_file_once_and_decodes_those_bytes(self):
+        codec = _ControllableJsonFixtureCodec(self.pack)
+        self._finish_setup()
+        tx = self._tx(codec_registry={"fixture_json": codec})
+        prepared = tx.prepare(self.staging_root)
+        codec.calls.clear()
+        original_read = self.pack._read_bytes_or_none
+        reads = []
+
+        def counted(path):
+            reads.append(str(path))
+            return original_read(path)
+
+        with mock.patch.object(self.pack, "_read_bytes_or_none", side_effect=counted):
+            snapshot = tx.snapshot(self.snapshot_root)
+
+        expected_paths = {item["live_path"] for item in prepared.file_changes}
+        self.assertEqual(set(reads), expected_paths)
+        self.assertEqual(len(reads), len(expected_paths))
+        self.assertEqual(
+            {(root, path) for root, path, _ in codec.calls},
+            {(item["root"], item["logical_path"])
+             for item in self.manifest["tables"]},
+        )
+        captured = {
+            (item["root"], item["logical_path"]): item["bytes"]
+            for item in snapshot.file_before
+        }
+        for root, logical_path, raw in codec.calls:
+            self.assertEqual(raw, captured[(root, logical_path)])
+        self.assertEqual(
+            [path for path in self.snapshot_root.iterdir()
+             if path.name.endswith(".tmp")],
+            [],
+        )
+        marker = json.loads(
+            (snapshot.snapshot_dir / self.pack.SNAPSHOT_MARKER).read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(marker["kind"], "character_pack_snapshot")
+
+    def test_snapshot_retains_server_key_bytes_and_exact_whole_file_image(self):
+        installed, installed_dir = self._installed_copy()
+        installed_hash = hashlib.sha256(
+            self.pack.canonical_manifest_bytes(installed)
+        ).hexdigest()
+        self._finish_setup(active_manifest_hash=installed_hash)
+        self._occupy_claims()
+        tx = self._tx(
+            installed_manifest=installed,
+            installed_package_dir=installed_dir,
+        )
+        tx.prepare(self.staging_root)
+        snapshot = tx.snapshot(self.snapshot_root)
+        codec = _JsonFixtureCodec(self.pack)
+        for logical_path in self.SERVER_PATHS:
+            file_record = next(
+                item for item in snapshot.file_before
+                if item["root"] == "server"
+                and item["logical_path"] == logical_path
+            )
+            key_record = next(
+                item for item in snapshot.table_before
+                if item["root"] == "server"
+                and item["logical_path"] == logical_path
+                and item["kind"] == "outer"
+                and item["outer_key"] == "129999"
+            )
+            payload = json.loads(file_record["bytes"].decode("utf-8"))
+            self.assertEqual(
+                key_record["bytes"],
+                codec._value_bytes(payload["outer"]["129999"]),
+            )
+            self.assertEqual(
+                key_record["sha256"],
+                hashlib.sha256(key_record["bytes"]).hexdigest(),
+            )
+
+    def test_snapshot_decode_and_write_failures_remove_only_temporary_child(self):
+        self._finish_setup()
+        sibling = self.snapshot_root / "keep.bin"
+        sibling.write_bytes(b"keep")
+
+        codec = _ControllableJsonFixtureCodec(self.pack)
+        tx = self._tx(codec_registry={"fixture_json": codec})
+        tx.prepare(self.staging_root)
+        codec.fail = True
+        with self.assertRaises(self.pack.PackPreflightError):
+            tx.snapshot(self.snapshot_root)
+        self.assertEqual(sibling.read_bytes(), b"keep")
+        self.assertEqual(
+            [path for path in self.snapshot_root.iterdir() if path != sibling], []
+        )
+
+        codec.fail = False
+        original_hash = self.pack._sha256_file
+
+        def fail_snapshot_hash(path):
+            if ".character-pack-snapshot-" in str(path):
+                raise OSError("synthetic snapshot hash failure")
+            return original_hash(path)
+
+        with mock.patch.object(
+            self.pack, "_sha256_file", side_effect=fail_snapshot_hash
+        ):
+            with self.assertRaises(self.pack.PackPreflightError):
+                tx.snapshot(self.snapshot_root)
+        self.assertEqual(sibling.read_bytes(), b"keep")
+        self.assertEqual(
+            [path for path in self.snapshot_root.iterdir() if path != sibling], []
+        )
+
+        original_rename = Path.rename
+
+        def fail_finalize(path, target):
+            if path.name.endswith(".tmp"):
+                raise OSError("synthetic snapshot finalize failure")
+            return original_rename(path, target)
+
+        with mock.patch.object(Path, "rename", new=fail_finalize):
+            with self.assertRaises(self.pack.PackPreflightError):
+                tx.snapshot(self.snapshot_root)
+        self.assertEqual(sibling.read_bytes(), b"keep")
+        self.assertEqual(
+            [path for path in self.snapshot_root.iterdir() if path != sibling], []
+        )
+
+        original_write = Path.write_bytes
+
+        def fail_metadata(path, data):
+            if path.name == "snapshot.json":
+                raise OSError("synthetic snapshot metadata failure")
+            return original_write(path, data)
+
+        with mock.patch.object(Path, "write_bytes", new=fail_metadata):
+            with self.assertRaises(self.pack.PackPreflightError):
+                tx.snapshot(self.snapshot_root)
+        self.assertEqual(sibling.read_bytes(), b"keep")
+        self.assertEqual(
+            [path for path in self.snapshot_root.iterdir() if path != sibling], []
+        )
+
+    def test_snapshot_drift_at_each_file_capture_never_publishes_a_child(self):
+        self._finish_setup()
+        tx = self._tx()
+        prepared = tx.prepare(self.staging_root)
+        original_read = self.pack._read_bytes_or_none
+        sibling = self.snapshot_root / "keep.bin"
+        sibling.write_bytes(b"keep")
+
+        for changed in prepared.file_changes:
+            with self.subTest(root=changed["root"], path=changed["logical_path"]):
+                def drift(path, target=changed["live_path"]):
+                    raw = original_read(path)
+                    return b"drift" if str(path) == target else raw
+
+                with mock.patch.object(
+                    self.pack, "_read_bytes_or_none", side_effect=drift
+                ):
+                    with self.assertRaises(self.pack.PackPreflightError):
+                        tx.snapshot(self.snapshot_root)
+                self.assertEqual(sibling.read_bytes(), b"keep")
+                self.assertEqual(
+                    [path for path in self.snapshot_root.iterdir() if path != sibling], []
+                )
+
     def test_missing_client_base_requires_explicit_degraded_confirmation(self):
         self._finish_setup()
         blocked = self._tx(capabilities=()).preflight()
@@ -920,6 +1266,92 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
         with self.assertRaises(self.pack.PackPreflightError):
             self._tx(manifest=extra).preflight()
 
+    def test_server_json_tables_require_explicit_claims_and_exact_four_files(self):
+        self._finish_setup()
+        missing_claim = copy.deepcopy(self.manifest)
+        missing_claim["tables"] = [
+            item for item in missing_claim["tables"]
+            if not (item["root"] == "server"
+                    and item["logical_path"] == self.SERVER_PATHS[0])
+        ]
+        with self.assertRaisesRegex(
+            self.pack.PackPreflightError, "server tables must claim exactly"
+        ):
+            self._tx(manifest=missing_claim).preflight()
+
+        missing_file = copy.deepcopy(self.manifest)
+        missing_file["roots"]["server"] = [
+            item for item in missing_file["roots"]["server"]
+            if item["logical_path"] != self.SERVER_PATHS[0]
+        ]
+        with self.assertRaisesRegex(
+            self.pack.PackPreflightError, "server root must contain exactly"
+        ):
+            self._tx(manifest=missing_file).preflight()
+
+    def test_server_json_codec_rejects_malformed_and_duplicate_object_keys(self):
+        self._finish_setup()
+        logical_path = self.SERVER_PATHS[0]
+        original = (
+            self.package_dir / "roots" / "server"
+            / Path(*logical_path.split("/"))
+        ).read_bytes()
+        cases = (
+            b'{"outer":',
+            b'{"outer":{"129999":1,"129999":2},"inner":{},"semantics":{}}',
+        )
+        for data in cases:
+            with self.subTest(data=data):
+                manifest = copy.deepcopy(self.manifest)
+                self._set_package_bytes(manifest, "server", logical_path, data)
+                with self.assertRaises(self.pack.PackPreflightError):
+                    self._tx(manifest=manifest).preflight()
+        self._set_package_bytes(self.manifest, "server", logical_path, original)
+
+    def test_server_unowned_key_and_unrelated_record_diffs_fail_closed(self):
+        self._finish_setup()
+        logical_path = self.SERVER_PATHS[0]
+        source = (
+            self.package_dir / "roots" / "server"
+            / Path(*logical_path.split("/"))
+        )
+        live = self.server / Path(*logical_path.split("/"))
+
+        live.write_bytes(source.read_bytes())
+        occupied = self._tx().preflight()
+        self.assertIn(
+            ("outer_key", f"{logical_path}:129999"),
+            {(item["kind"], item["claim"]) for item in occupied.conflicts},
+        )
+
+        live_payload = json.loads(live.read_text(encoding="utf-8"))
+        live_payload["outer"].pop("129999")
+        live.write_text(json.dumps(live_payload, separators=(",", ":")), encoding="utf-8")
+        original = source.read_bytes()
+        for operation in ("add", "update", "delete"):
+            with self.subTest(operation=operation):
+                manifest = copy.deepcopy(self.manifest)
+                payload = json.loads(original.decode("utf-8"))
+                if operation == "add":
+                    payload["outer"]["undeclared"] = {"unexpected": True}
+                    expected_key = "undeclared"
+                elif operation == "update":
+                    payload["outer"]["official"] = {"unexpected": True}
+                    expected_key = "official"
+                else:
+                    payload["outer"].pop("official")
+                    expected_key = "official"
+                data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+                self._set_package_bytes(manifest, "server", logical_path, data)
+                report = self._tx(manifest=manifest).preflight()
+                conflicts = {(item["kind"], item["claim"])
+                             for item in report.conflicts}
+                self.assertIn(
+                    ("unclaimed_change", f"{logical_path}:{expected_key}"),
+                    conflicts,
+                )
+        self._set_package_bytes(self.manifest, "server", logical_path, original)
+
     def test_duplicate_claims_and_overlapping_live_roots_fail_closed(self):
         self._finish_setup()
         duplicate = copy.deepcopy(self.manifest)
@@ -954,7 +1386,7 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
             "master/test_flat.orderedmap", ["k"], [b"value"], Path("<memory>")
         ))
         flat_claim = self.pack.TableClaim(
-            "master/test_flat.orderedmap", "flat", ("k",)
+            "common", "master/test_flat.orderedmap", "flat", ("k",)
         )
         self.assertEqual(
             self.pack.DEFAULT_CODECS["flat"].inspect(flat_raw, flat_claim, ()).outer_rows,
@@ -966,7 +1398,7 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
             "master/test_raw.orderedmap", ["k"], [raw_payload], Path("<memory>")
         ))
         raw_claim = self.pack.TableClaim(
-            "master/test_raw.orderedmap", "raw_outer", ("k",)
+            "common", "master/test_raw.orderedmap", "raw_outer", ("k",)
         )
         self.assertEqual(
             self.pack.DEFAULT_CODECS["raw_outer"].inspect(
@@ -987,7 +1419,8 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
                 nested = core.NestedOrderedMap(logical_path, {"skill": inner})
                 raw = core.build_nested_table(nested, logical_path)
                 claim = self.pack.TableClaim(
-                    logical_path, codec_id, ("skill",), (("skill", ("1",)),)
+                    "common", logical_path, codec_id, ("skill",),
+                    (("skill", ("1",)),)
                 )
                 image = self.pack.DEFAULT_CODECS[codec_id].inspect(raw, claim, ())
                 self.assertEqual(image.inner_rows, (("skill", "1", row),))
@@ -1065,13 +1498,13 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
         ).preflight()
         delete_claims = {(item["kind"], item["claim"]) for item in report.deletes}
         self.assertIn(
-            ("outer", "master/character.orderedmap:129999"), delete_claims
+            ("outer", "common:master/character.orderedmap:129999"), delete_claims
         )
         self.assertIn(
             ("semantic", "character_code_name:seris_dragon_king"), delete_claims
         )
         self.assertIn(
-            ("inner", "master/action.orderedmap:seris_human/2"), delete_claims
+            ("inner", "common:master/action.orderedmap:seris_human/2"), delete_claims
         )
         deleted_keys = {
             (item["kind"], item.get("outer_key"), item.get("inner_key"),
@@ -1086,6 +1519,74 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
         self.assertIn(("outer", "129999", None, None), deleted_keys)
         self.assertIn(("semantic", None, None, "character_code_name"), deleted_keys)
         self.assertIn(("inner", "seris_human", "2", None), deleted_keys)
+
+    def test_filtering_codec_uses_candidate_and_installed_claim_union_for_deletes(self):
+        installed, installed_dir = self._installed_copy()
+        installed_hash = hashlib.sha256(
+            self.pack.canonical_manifest_bytes(installed)
+        ).hexdigest()
+        self._finish_setup(active_manifest_hash=installed_hash)
+        self._occupy_claims()
+        candidate = copy.deepcopy(self.manifest)
+        character_claim = candidate["tables"][0]
+        character_claim["outer_keys"].remove("129999")
+        character_claim["semantic_claims"] = [
+            item for item in character_claim["semantic_claims"]
+            if item["namespace"] != "character_code_name"
+        ]
+        action_claim = next(
+            item for item in candidate["tables"]
+            if item["logical_path"] == "master/action.orderedmap"
+        )
+        action_claim["inner_keys"][0]["keys"].remove("2")
+        registry = {"fixture_json": _FilteringJsonFixtureCodec(self.pack)}
+
+        with self.assertRaises(self.pack.PackPreflightError):
+            self._tx(
+                manifest=candidate,
+                installed_manifest=installed,
+                installed_package_dir=installed_dir,
+                codec_registry=registry,
+            ).preflight()
+
+        changes = (
+            ("master/character.orderedmap", lambda payload: (
+                payload["outer"].pop("129999"),
+                payload["semantics"]["character_code_name"].remove(
+                    "seris_dragon_king"
+                ),
+            )),
+            ("master/action.orderedmap", lambda payload: (
+                payload["inner"]["seris_human"].pop("2"),
+            )),
+        )
+        for logical_path, mutate in changes:
+            entry = next(
+                item for item in candidate["roots"]["common"]
+                if item["logical_path"] == logical_path
+            )
+            source = self.package_dir / "roots" / "common" / Path(
+                *logical_path.split("/")
+            )
+            payload = json.loads(source.read_text(encoding="utf-8"))
+            mutate(payload)
+            data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+            source.write_bytes(data)
+            entry["size"] = len(data)
+            entry["sha256"] = hashlib.sha256(data).hexdigest()
+
+        report = self._tx(
+            manifest=candidate,
+            installed_manifest=installed,
+            installed_package_dir=installed_dir,
+            codec_registry=registry,
+        ).preflight()
+        deletes = {(item["kind"], item["claim"]) for item in report.deletes}
+        self.assertIn(("outer", "common:master/character.orderedmap:129999"), deletes)
+        self.assertIn(("inner", "common:master/action.orderedmap:seris_human/2"), deletes)
+        self.assertIn(
+            ("semantic", "character_code_name:seris_dragon_king"), deletes
+        )
 
     def test_absent_active_state_cannot_carry_installed_ownership(self):
         self._require_api()
@@ -1105,6 +1606,138 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
 
 
 class TestPackStagingRecovery(_TransactionFixtureMixin, unittest.TestCase):
+    def test_boundary_records_are_deeply_immutable_and_manifest_is_canonical_copied(self):
+        self._finish_setup()
+        caller_manifest = copy.deepcopy(self.manifest)
+        tx = self._tx(manifest=caller_manifest)
+        caller_manifest["package_id"] = "caller_mutated"
+        caller_manifest["roots"]["medium"][0]["logical_path"] = "../../mutated"
+
+        report = tx.preflight()
+        self.assertEqual(report.package_id, "seris_dragon_king")
+        prepared = tx.prepare(self.staging_root)
+        staged = tx.materialize_staging(prepared)
+        snapshot = tx.snapshot(self.snapshot_root)
+
+        mutations = (
+            lambda: report.expected_base_hashes.__setitem__("active_sha256", "f" * 64),
+            lambda: report.creates[0].__setitem__("claim", "forged"),
+            lambda: prepared.file_changes[0].__setitem__("logical_path", "../../escape"),
+            lambda: prepared.table_key_changes[0].__setitem__("operation", "delete"),
+            lambda: staged.staged_files[0].__setitem__("path", "forged"),
+            lambda: staged.provisional_archives[0].__setitem__("members", ("forged",)),
+            lambda: snapshot.file_before[0].__setitem__("bytes", b"forged"),
+            lambda: snapshot.table_before[0].__setitem__("bytes", b"forged"),
+        )
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), self.assertRaises(
+                (AttributeError, TypeError)
+            ):
+                mutation()
+        self.assertRegex(prepared.prepared_digest, r"^[0-9a-f]{64}$")
+
+    def test_mutated_prepared_record_cannot_escape_owned_transaction_child(self):
+        self._finish_setup()
+        tx = self._tx()
+        prepared = tx.prepare(self.staging_root)
+        medium = next(
+            item for item in prepared.file_changes if item["root"] == "medium"
+        )
+        escaped = self.root / "prepared-mutability-escape.bin"
+        with self.assertRaises((AttributeError, TypeError)):
+            medium["logical_path"] = "../../../../prepared-mutability-escape.bin"
+        forged_changes = list(prepared.file_changes)
+        index = forged_changes.index(medium)
+        forged_changes[index] = {
+            **dict(medium),
+            "logical_path": "../../../../prepared-mutability-escape.bin",
+        }
+        forged = dataclasses.replace(prepared, file_changes=tuple(forged_changes))
+        with self.assertRaises(self.pack.PackStagingError):
+            tx.materialize_staging(forged, fail_after="asset_copy")
+        self.assertFalse(escaped.exists(), "mutated plan escaped the owned child")
+
+    def test_same_transaction_forged_sibling_is_never_deleted(self):
+        self._finish_setup()
+        tx = self._tx()
+        prepared = tx.prepare(self.staging_root)
+        staged = tx.materialize_staging(prepared)
+        marker = (staged.transaction_dir / self.pack.TRANSACTION_MARKER).read_bytes()
+        sibling = self.staging_root / "unrelated-sibling"
+        sibling.mkdir()
+        (sibling / self.pack.TRANSACTION_MARKER).write_bytes(marker)
+        sentinel = sibling / "sentinel.bin"
+        sentinel.write_bytes(b"preserve")
+        forged = dataclasses.replace(staged, transaction_dir=sibling)
+
+        with self.assertRaises(self.pack.PackStagingError):
+            tx.discard_staging(forged)
+        self.assertEqual(sentinel.read_bytes(), b"preserve")
+        self.assertTrue(sibling.exists())
+
+    def test_discard_tombstone_never_deletes_recreated_transaction_directory(self):
+        self._finish_setup()
+        tx = self._tx()
+        prepared = tx.prepare(self.staging_root)
+        staged = tx.materialize_staging(prepared)
+        marker = (staged.transaction_dir / self.pack.TRANSACTION_MARKER).read_bytes()
+        transaction_dir = staged.transaction_dir
+        tx.discard_staging(staged)
+        transaction_dir.mkdir()
+        (transaction_dir / self.pack.TRANSACTION_MARKER).write_bytes(marker)
+        sentinel = transaction_dir / "recreated.bin"
+        sentinel.write_bytes(b"must-survive")
+
+        tx.discard_staging(staged)
+        self.assertEqual(sentinel.read_bytes(), b"must-survive")
+        self.assertTrue(transaction_dir.exists())
+
+    def test_replacing_staging_root_with_link_preserves_unrelated_target(self):
+        self._finish_setup()
+        tx = self._tx()
+        prepared = tx.prepare(self.staging_root)
+        staged = tx.materialize_staging(prepared)
+        marker = (staged.transaction_dir / self.pack.TRANSACTION_MARKER).read_bytes()
+        moved_root = self.root / "original-staging-moved"
+        target = self.root / "replacement-target"
+        shutil.move(str(self.staging_root), str(moved_root))
+        target.mkdir()
+        forged_child = target / staged.transaction_dir.name
+        forged_child.mkdir()
+        (forged_child / self.pack.TRANSACTION_MARKER).write_bytes(marker)
+        sentinel = forged_child / "target.bin"
+        sentinel.write_bytes(b"must-survive")
+        make_directory_link(self.staging_root, target)
+        try:
+            with self.assertRaises(self.pack.PackStagingError):
+                tx.discard_staging(staged)
+            self.assertEqual(sentinel.read_bytes(), b"must-survive")
+            self.assertTrue(forged_child.exists())
+        finally:
+            if self.staging_root.exists():
+                self.staging_root.rmdir()
+
+    def test_replacing_owned_child_with_link_preserves_unrelated_target(self):
+        self._finish_setup()
+        tx = self._tx()
+        prepared = tx.prepare(self.staging_root)
+        staged = tx.materialize_staging(prepared)
+        moved_child = self.root / "owned-child-moved"
+        target = self.root / "unrelated-child-target"
+        shutil.move(str(staged.transaction_dir), str(moved_child))
+        target.mkdir()
+        sentinel = target / "must-survive.bin"
+        sentinel.write_bytes(b"preserve")
+        make_directory_link(staged.transaction_dir, target)
+        try:
+            with self.assertRaises(self.pack.PackStagingError):
+                tx.discard_staging(staged)
+            self.assertEqual(sentinel.read_bytes(), b"preserve")
+            self.assertTrue(target.exists())
+        finally:
+            if staged.transaction_dir.exists():
+                staged.transaction_dir.rmdir()
+
     def test_each_materialization_failpoint_cleans_only_owned_child(self):
         self._finish_setup()
         before = {
@@ -1135,13 +1768,51 @@ class TestPackStagingRecovery(_TransactionFixtureMixin, unittest.TestCase):
                     self.assertEqual(self._tree_bytes(path), before[root])
                 self.assertEqual(self.provider.state.active_raw, self._active_raw)
 
+    def test_concurrent_payload_link_injection_never_writes_or_deletes_target(self):
+        self._finish_setup()
+        tx = self._tx()
+        prepared = tx.prepare(self.staging_root)
+        target = self.root / "concurrent-link-target"
+        target.mkdir()
+        sentinel = target / "sentinel.bin"
+        sentinel.write_bytes(b"preserve")
+        original_mkdir = Path.mkdir
+        injected = False
+
+        def inject_link(path, mode=0o777, parents=False, exist_ok=False):
+            nonlocal injected
+            normalized = str(path).replace("\\", "/")
+            if not injected and "/payload/medium/" in normalized:
+                injected = True
+                original_mkdir(path.parent, mode=mode, parents=True, exist_ok=True)
+                make_directory_link(path, target)
+                return None
+            return original_mkdir(
+                path, mode=mode, parents=parents, exist_ok=exist_ok
+            )
+
+        with mock.patch.object(Path, "mkdir", new=inject_link):
+            with self.assertRaises(self.pack.PackStagingError):
+                tx.materialize_staging(prepared)
+        self.assertTrue(injected)
+        self.assertEqual(sentinel.read_bytes(), b"preserve")
+        self.assertEqual(self._tree_bytes(target), {"sentinel.bin": b"preserve"})
+
     def test_successful_materialization_reads_tables_and_builds_three_generic_archives(self):
         self._finish_setup()
         tx = self._tx()
         prepared = tx.prepare(self.staging_root)
         staged = tx.materialize_staging(prepared)
         self.assertEqual(staged.transaction_id, prepared.transaction_id)
-        self.assertEqual(len(staged.table_readback), len(self.TABLE_SPECS))
+        self.assertEqual(len(staged.table_readback), len(self.manifest["tables"]))
+        self.assertEqual(
+            {item["logical_path"] for item in staged.table_readback
+             if item["root"] == "server"},
+            set(self.SERVER_PATHS),
+        )
+        for item in staged.table_readback:
+            if item["root"] == "server":
+                self.assertIn("129999", item["outer_keys"])
         self.assertEqual(
             [item["root"] for item in staged.provisional_archives],
             ["common", "medium", "android"],
