@@ -373,7 +373,12 @@ def _build_archives(
             os.replace(temporary, final)
             published.append(final)
         for backup, _final in backups:
-            backup.unlink(missing_ok=True)
+            try:
+                backup.unlink(missing_ok=True)
+            except OSError:
+                # Publication is already committed. A leftover hidden backup is
+                # safer than entering rollback after earlier backups were removed.
+                pass
         return list(published)
     except Exception as exc:
         rollback_errors: list[str] = []

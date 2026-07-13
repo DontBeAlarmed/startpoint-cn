@@ -297,6 +297,59 @@ class TestPendingCompatibility(PublisherCase):
         leftovers = list(self.cdn.rglob("*.tmp")) if self.cdn.exists() else []
         self.assertEqual([], leftovers)
 
+    def test_backup_cleanup_failure_cannot_roll_back_committed_archives(self):
+        logical = "master/test/pending.orderedmap"
+        relative = self.write_logical(logical, b"new-common")
+        medium_relative = "12/medium-fixture"
+        medium_path = self.store.parent / "medium_upload" / medium_relative
+        medium_path.parent.mkdir(parents=True, exist_ok=True)
+        medium_path.write_bytes(b"new-medium")
+        self.pending.write_text(
+            json.dumps([relative, f"medium:{medium_relative}"]), encoding="utf-8"
+        )
+
+        archive_name = "pinball-1.4.54-1.4.55-1-modfixture.zip"
+        common_final = self.cdn / "archive-common-diff" / archive_name
+        medium_final = self.cdn / "archive-medium-diff" / archive_name
+        for path, payload in (
+            (common_final, b"old-common"),
+            (medium_final, b"old-medium"),
+        ):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload)
+
+        real_unlink = Path.unlink
+        cleanup_calls = 0
+
+        def fail_second_populated_rollback(path, *args, **kwargs):
+            nonlocal cleanup_calls
+            candidate = Path(path)
+            if (
+                candidate.suffix == ".rollback"
+                and candidate.exists()
+                and candidate.stat().st_size > 0
+            ):
+                cleanup_calls += 1
+                if cleanup_calls == 2:
+                    raise OSError("fixture backup cleanup failure")
+            return real_unlink(candidate, *args, **kwargs)
+
+        with mock.patch.object(Path, "unlink", new=fail_second_populated_rollback):
+            result, stdout, _stderr = self.run_publish([])
+
+        self.assertEqual(0, result)
+        self.assertIn("[OK]", stdout)
+        with zipfile.ZipFile(common_final) as archive:
+            self.assertEqual(
+                b"new-common",
+                archive.read(f"production/upload/{relative}"),
+            )
+        with zipfile.ZipFile(medium_final) as archive:
+            self.assertEqual(
+                b"new-medium",
+                archive.read(f"production/medium_upload/{medium_relative}"),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
