@@ -1109,6 +1109,27 @@ class TestImages(unittest.TestCase):
         self.assertTrue(all(got.getpixel((x, 12)) == (0, 0, 0, 255)
                             for x in (4, 5, 9, 10)))
 
+    def test_character_palette_conversion_preserves_warm_gold_vfx_and_alpha(self):
+        source = Image.new("RGBA", (5, 1))
+        source.putdata([
+            (69, 69, 59, 255),
+            (3, 178, 0, 211),
+            (229, 219, 167, 173),
+            (220, 35, 25, 97),
+            (0, 0, 0, 0),
+        ])
+
+        got = skin.recolor_kyle_pixel_sheet(source)
+
+        self.assertEqual(got.getpixel((0, 0))[:3], (224, 232, 242))
+        self.assertEqual(got.getpixel((1, 0))[:3], skin.KYLE_ICE_EYE)
+        self.assertEqual(got.getpixel((2, 0)), (229, 219, 167, 173))
+        self.assertGreater(got.getpixel((3, 0))[2], got.getpixel((3, 0))[0])
+        self.assertEqual(
+            [pixel[3] for pixel in got.get_flattened_data()],
+            [255, 211, 173, 97, 0],
+        )
+
 
 class TestKyleFocalRects(unittest.TestCase):
     @staticmethod
