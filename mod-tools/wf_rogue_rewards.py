@@ -141,11 +141,11 @@ def join_like(row: list[str], like) -> bytes | str:
 def build_equipment_leaf(template_leaf: bytes | str, spec: WeaponSpec) -> bytes | str:
     """从供体装备首行构建一条固定的深渊武装行。"""
     row = list(core.read_csv_lines(_leaf_text(template_leaf))[0])
-    row = core.normalize_row_length(row, 12)
-    row[0] = f"{IMAGE_PREFIX}/{spec.image_slug}"
+    row = core.normalize_row_length(row, 16)
+    row[0] = f"mod_abyss_{spec.id}"
     row[1] = spec.name
-    row[6] = MODE_DESCRIPTION
-    row[7] = str(spec.element)
+    row[6] = f"{IMAGE_PREFIX}/{spec.image_slug}"
+    row[7] = MODE_DESCRIPTION
     row[8] = "5"
     row[9] = "true"
     row[10] = spec.id

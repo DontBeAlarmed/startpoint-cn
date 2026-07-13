@@ -116,23 +116,31 @@ class TestWeaponContract(unittest.TestCase):
 
 @unittest.skipUnless(not MISSING_API, "canonical builder API is not implemented yet")
 class TestEquipmentGeneration(unittest.TestCase):
-    def test_canonical_columns_replace_only_equipment_metadata(self):
-        donor = [f"donor-{index}" for index in range(12)]
+    def test_canonical_columns_match_verified_cn_schema(self):
+        donor = [f"donor-{index}" for index in range(16)]
         leaf = rewards.build_equipment_leaf(core.write_csv_lines([donor]), rewards.WEAPONS[0])
         rows = core.read_csv_lines(leaf)
 
         self.assertEqual(1, len(rows))
         row = rows[0]
-        self.assertEqual("item/equipment/mod/abyss/fire_01", row[0])
+        self.assertEqual(16, len(row))
+        self.assertEqual("mod_abyss_8000101", row[0])
         self.assertEqual("灰烬巨剑", row[1])
-        self.assertEqual("donor-2", row[2])
-        self.assertEqual("donor-5", row[5])
-        self.assertEqual(rewards.MODE_DESCRIPTION, row[6])
-        self.assertEqual("0", row[7])
+        self.assertEqual(donor[2:6], row[2:6])
+        self.assertEqual("item/equipment/mod/abyss/fire_01", row[6])
+        self.assertEqual(rewards.MODE_DESCRIPTION, row[7])
         self.assertEqual("5", row[8])
         self.assertEqual("true", row[9])
         self.assertEqual("8000101", row[10])
         self.assertEqual("5", row[11])
+        self.assertEqual(donor[12:16], row[12:16])
+
+    def test_equipment_leaf_preserves_string_or_bytes_type(self):
+        donor_text = core.write_csv_lines([[f"donor-{index}" for index in range(16)]])
+        for template_leaf in (donor_text, donor_text.encode("utf-8")):
+            with self.subTest(leaf_type=type(template_leaf).__name__):
+                result = rewards.build_equipment_leaf(template_leaf, rewards.WEAPONS[0])
+                self.assertIs(type(template_leaf), type(result))
 
     def test_equipment_status_copies_the_complete_donor_level_map(self):
         donor_levels = {
