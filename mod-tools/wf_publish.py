@@ -492,21 +492,38 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     for output in outputs:
+        try:
+            size_text = f"{output.stat().st_size} B"
+        except Exception as exc:
+            size_text = "size unavailable"
+            print(
+                "[WARN] publish committed; archive stat failed for "
+                f"{output}: {type(exc).__name__}: {exc}",
+                file=sys.stderr,
+            )
         print(
             f"\n[OK] 已发布: {output.parent.name}/{output.name}  "
-            f"({output.stat().st_size} B)"
+            f"({size_text})"
         )
     print("客户端重启游戏即会自动下载更新(服务端动态扫描,无需重启)。")
     print(f"提示: .env 的 CN_RES_VERSION 可保持不变(/load 跟随客户端 res_ver)。")
 
     # 自动公布改动日志:回填版本号 + 把 changelog.md 发到 CDN 目录
-    stamped = stamp_changelog(to_ver)
-    if CHANGELOG_MD.exists():
-        try:
+    try:
+        stamped = stamp_changelog(to_ver)
+        if CHANGELOG_MD.exists():
             shutil.copy2(CHANGELOG_MD, CDN_DIFF / "changelog.md")
-        except Exception:
-            pass
-    print(f"改动日志: {stamped} 条标记为 {to_ver},已公布 changelog.md (work/ + CDN)。")
+    except Exception as exc:
+        print(
+            "[WARN] publish committed; changelog update failed: "
+            f"{type(exc).__name__}: {exc}",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            f"改动日志: {stamped} 条标记为 {to_ver},"
+            "已公布 changelog.md (work/ + CDN)。"
+        )
     return 0
 
 

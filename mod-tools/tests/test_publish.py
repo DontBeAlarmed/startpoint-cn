@@ -244,6 +244,53 @@ class TestStrictSnapshotPublisher(PublisherCase):
         leftovers = list(self.cdn.rglob("*.tmp")) if self.cdn.exists() else []
         self.assertEqual([], leftovers)
 
+    def test_committed_archive_stat_failure_is_warning_only(self):
+        logical = "master/test/one.orderedmap"
+        self.write_logical(logical, b"validated")
+        snapshot = self.write_snapshot([logical])
+        real_stat = Path.stat
+
+        def fail_committed_archive_stat(path, *args, **kwargs):
+            candidate = Path(path)
+            if candidate.suffix == ".zip" and self.cdn in candidate.parents:
+                raise OSError("fixture committed archive stat failure")
+            return real_stat(candidate, *args, **kwargs)
+
+        with mock.patch.object(Path, "stat", new=fail_committed_archive_stat):
+            result, stdout, stderr = self.run_publish(
+                ["--tables", logical, "--snapshot", str(snapshot)],
+                profiles=[self.profile, self.profile],
+            )
+
+        self.assertEqual(0, result)
+        self.assertIn("[OK]", stdout)
+        self.assertIn("[WARN]", stderr)
+        self.assertIn("committed", stderr.lower())
+        self.assertIn("stat", stderr.lower())
+        self.assertEqual(1, len(self.archives()))
+
+    def test_committed_archive_changelog_failure_is_warning_only(self):
+        logical = "master/test/one.orderedmap"
+        self.write_logical(logical, b"validated")
+        snapshot = self.write_snapshot([logical])
+
+        with mock.patch.object(
+            wf_publish,
+            "stamp_changelog",
+            side_effect=OSError("fixture changelog failure"),
+        ):
+            result, stdout, stderr = self.run_publish(
+                ["--tables", logical, "--snapshot", str(snapshot)],
+                profiles=[self.profile, self.profile],
+            )
+
+        self.assertEqual(0, result)
+        self.assertIn("[OK]", stdout)
+        self.assertIn("[WARN]", stderr)
+        self.assertIn("committed", stderr.lower())
+        self.assertIn("changelog", stderr.lower())
+        self.assertEqual(1, len(self.archives()))
+
 
 class TestPendingCompatibility(PublisherCase):
     def test_pending_mode_still_skips_missing_entries_and_publishes_existing(self):
