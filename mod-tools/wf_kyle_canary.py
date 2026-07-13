@@ -145,6 +145,53 @@ CANARY_VOICE_RELATIVES = (
     "home/watashiwayokubukaki.mp3",
 )
 
+CANONICAL_TARGET_RELATIVES = (
+    *BLACK_WOLF_VISUAL_RELATIVES,
+    *(f"voice/{relative}" for relative in CANARY_VOICE_RELATIVES),
+)
+CANONICAL_AMF3_RELATIVES = tuple(
+    relative for relative in BLACK_WOLF_VISUAL_RELATIVES
+    if relative.endswith(".amf3.deflate"))
+CANONICAL_ATF_RELATIVES = tuple(
+    relative for relative in BLACK_WOLF_VISUAL_RELATIVES
+    if relative.endswith(".atf.deflate"))
+
+
+def canonical_source(relative: str) -> str:
+    if relative.startswith("voice/"):
+        return f"character/{CURRENT_CODE}/{relative}"
+    return f"character/{PIXEL_TEMPLATE_CODE}/{relative}"
+
+
+def canonical_source_root(relative: str) -> str:
+    if relative.startswith("voice/"):
+        return "upload"
+    if relative.endswith(".atf.deflate"):
+        return "android"
+    if relative.startswith("ui/") and relative.endswith(".png"):
+        return "medium"
+    return "upload"
+
+
+def canonical_contract() -> dict[str, dict[str, str]]:
+    return {
+        relative: {
+            "source": canonical_source(relative),
+            "source_root": canonical_source_root(relative),
+        }
+        for relative in CANONICAL_TARGET_RELATIVES
+    }
+
+
+def inventory_contract_digest(entries: list[dict]) -> str:
+    payload = [
+        {key: entry[key] for key in (
+            "relative", "source", "source_root", "source_sha256")}
+        for entry in entries
+    ]
+    return hashlib.sha256(json.dumps(
+        payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
 
 def require_cn_profile(runtime=None) -> dict:
     """Refuse every store-aware operation unless all roots belong to CN."""
@@ -223,38 +270,32 @@ def build_source_inventory(runtime=None) -> dict:
     gui = _resolve_gui(runtime)
     profile = require_cn_profile(gui)
     entries = []
-    sources = [
-        *(f"character/{PIXEL_TEMPLATE_CODE}/{relative}"
-          for relative in BLACK_WOLF_VISUAL_RELATIVES),
-        *(f"character/{CURRENT_CODE}/voice/{relative}"
-          for relative in CANARY_VOICE_RELATIVES),
-    ]
-    for source in sources:
+    for relative, expected in canonical_contract().items():
+        source = expected["source"]
         located = wf_assets.locate(gui.TARGET_STORE, source)
         if not located:
             raise FileNotFoundError(source)
         source_root, source_path = located
-        if source_root not in {"upload", "medium", "android"}:
-            raise ValueError(f"invalid source root for {source}: {source_root}")
+        if source_root != expected["source_root"]:
+            raise ValueError(
+                f"canonical source root mismatch for {source}: "
+                f"{source_root} != {expected['source_root']}")
         data = source_path.read_bytes()
-        if source.startswith(f"character/{PIXEL_TEMPLATE_CODE}/"):
-            relative = source.split(
-                f"character/{PIXEL_TEMPLATE_CODE}/", 1)[1]
-        else:
-            relative = "voice/" + source.split("/voice/", 1)[1]
         entries.append({
             "relative": relative,
             "source": source,
             "source_root": source_root,
             "source_sha256": hashlib.sha256(data).hexdigest(),
         })
-    return {
+    result = {
         "version": 2,
         "profile_id": profile["profile_id"],
         "visual_template": PIXEL_TEMPLATE_CODE,
         "voice_source": CURRENT_CODE,
         "entries": entries,
     }
+    result["contract_sha256"] = inventory_contract_digest(entries)
+    return result
 
 
 def build_copy_plan(visual_logicals: list[str],
@@ -331,6 +372,10 @@ def _atomic_replace_file(source: Path, destination: Path) -> None:
     source.replace(destination)
 
 
+def _rename_path(source: Path, destination: Path) -> None:
+    source.rename(destination)
+
+
 def _replace_pack_and_inventory(staging: Path, pack: Path,
                                 inventory: dict, work: Path) -> None:
     """Atomically advance or restore the pack + inventory sidecar as a pair."""
@@ -344,21 +389,27 @@ def _replace_pack_and_inventory(staging: Path, pack: Path,
     old_sidecar = work / f".{INVENTORY_FILE}.old-{time.time_ns()}"
     had_pack = pack.exists()
     had_sidecar = sidecar.exists()
-    if had_pack:
-        pack.rename(old_pack)
-    if had_sidecar:
-        sidecar.rename(old_sidecar)
+    moved_pack = False
+    moved_sidecar = False
+    installed_pack = False
     try:
-        staging.rename(pack)
+        if had_pack:
+            _rename_path(pack, old_pack)
+            moved_pack = True
+        if had_sidecar:
+            _rename_path(sidecar, old_sidecar)
+            moved_sidecar = True
+        _rename_path(staging, pack)
+        installed_pack = True
         _atomic_replace_file(staged_sidecar, sidecar)
     except BaseException:
-        if pack.exists():
+        if installed_pack and pack.exists():
             shutil.rmtree(pack, ignore_errors=True)
-        if sidecar.exists():
+        if moved_sidecar and sidecar.exists():
             sidecar.unlink()
-        if had_pack and old_pack.exists():
+        if moved_pack and old_pack.exists():
             old_pack.rename(pack)
-        if had_sidecar and old_sidecar.exists():
+        if moved_sidecar and old_sidecar.exists():
             old_sidecar.rename(sidecar)
         if staged_sidecar.exists():
             staged_sidecar.unlink()
@@ -422,14 +473,45 @@ def recolor_pixel_sheets(pack: Path) -> None:
         recolored.save(path)
 
 
-def validate_kyle_pack(
+def _validate_canonical_manifest(inventory: dict) -> None:
+    if inventory.get("version") != 2:
+        raise ValueError("canonical inventory requires version 2")
+    if inventory.get("profile_id") != "cn":
+        raise ValueError("canonical inventory requires profile_id=cn")
+    entries = inventory.get("entries")
+    if not isinstance(entries, list):
+        raise ValueError("canonical inventory entries missing")
+    by_relative = {str(entry.get("relative", "")): entry for entry in entries}
+    expected = canonical_contract()
+    if len(by_relative) != len(entries) or set(by_relative) != set(expected):
+        raise ValueError(
+            "canonical inventory paths mismatch: expected exact declared contract")
+    for relative, contract in expected.items():
+        entry = by_relative[relative]
+        if entry.get("source") != contract["source"]:
+            raise ValueError(f"canonical source mismatch: {relative}")
+        if entry.get("source_root") != contract["source_root"]:
+            raise ValueError(f"canonical source_root mismatch: {relative}")
+        digest = str(entry.get("source_sha256", ""))
+        if (len(digest) != 64 or
+                any(c not in "0123456789abcdef" for c in digest) or
+                set(digest) == {"0"}):
+            raise ValueError(f"canonical source_sha256 invalid: {relative}")
+    if inventory.get("contract_sha256") != inventory_contract_digest(entries):
+        raise ValueError("canonical inventory contract_sha256 mismatch")
+
+
+def _validate_kyle_pack(
         pack: Path,
         required_sizes: dict[str, tuple[int, int]] | None = None,
-        inventory: dict | None = None) -> dict:
+        inventory: dict | None = None,
+        strict: bool = False) -> dict:
     """Decode and reconcile every pack file against its exact inventory."""
     required_sizes = REQUIRED_SIZES if required_sizes is None else required_sizes
     if inventory is None:
         inventory = _load_inventory(pack.parent)
+    if strict:
+        _validate_canonical_manifest(inventory)
     entries = inventory.get("entries")
     if not isinstance(entries, list):
         raise ValueError("invalid inventory entries")
@@ -545,7 +627,22 @@ def validate_kyle_pack(
         "pixel_amf3": pixel_amf3_count,
         "atf": atf_count,
     }
+    if strict:
+        if result["inventory"]["amf3"] != len(CANONICAL_AMF3_RELATIVES):
+            raise ValueError("canonical AMF3 inventory count mismatch")
+        if result["inventory"]["atf"] != len(CANONICAL_ATF_RELATIVES):
+            raise ValueError("canonical ATF inventory count mismatch")
     return result
+
+
+def validate_kyle_pack(
+        pack: Path,
+        required_sizes: dict[str, tuple[int, int]] | None = None,
+        inventory: dict | None = None) -> dict:
+    """Production validation: canonical CN v2 inventory is mandatory."""
+    return _validate_kyle_pack(
+        pack, required_sizes=required_sizes,
+        inventory=inventory, strict=True)
 
 
 def _resolve_gui(runtime=None):
@@ -599,10 +696,12 @@ def _store_bytes(path: Path) -> bytes:
 
 
 def materialize_new_paths(pack: Path, runtime=None,
-                          roots: dict[str, str] | None = None) -> None:
+                          roots: dict[str, str] | None = None,
+                          backup_timestamp: str | None = None) -> None:
     """Write the new logical paths with per-file overwrite backups."""
     gui = _resolve_gui(runtime)
     roots = _root_by_relative_path(gui) if roots is None else roots
+    backup_timestamp = backup_timestamp or time.strftime("%Y%m%d-%H%M%S")
     for path in sorted(item for item in pack.rglob("*") if item.is_file()):
         relative = path.relative_to(pack).as_posix()
         root = roots.get(relative, "upload")
@@ -612,16 +711,18 @@ def materialize_new_paths(pack: Path, runtime=None,
         if destination.exists():
             backup = destination.with_name(
                 destination.name + ".bak-wfmod-kyle-" +
-                time.strftime("%Y%m%d-%H%M%S"))
+                backup_timestamp)
             shutil.copy2(destination, backup)
         destination.write_bytes(_store_bytes(path))
         gui.add_pending(destination)
 
 
 def clone_template_metadata(src_id: str, dst_id: str, src_code: str,
-                            dst_code: str, runtime=None) -> None:
+                            dst_code: str, runtime=None,
+                            backup_timestamp: str | None = None) -> None:
     """Clone trim and full-shot metadata without changing combat tables."""
     gui = _resolve_gui(runtime)
+    backup_timestamp = backup_timestamp or time.strftime("%Y%m%d-%H%M%S")
     trimmed = gui.core.load_table(
         gui.TRIMMED_LOGICAL, gui.TARGET_STORE, gui.SOURCE_STORE)
     rows = trimmed.text_rows()
@@ -635,7 +736,7 @@ def clone_template_metadata(src_id: str, dst_id: str, src_code: str,
     written = gui.core.write_table(
         trimmed,
         gui.TARGET_STORE,
-        ".bak-wfmod-kyle-trim-" + time.strftime("%Y%m%d-%H%M%S"),
+        ".bak-wfmod-kyle-trim-" + backup_timestamp,
         no_backup=False,
     )
     gui.add_pending(written)
@@ -677,13 +778,34 @@ class _FileRollbackJournal:
                 path.unlink()
 
 
+class _FixedTimeProxy:
+    """Pin backup/snapshot filename timestamps inside the imported GUI module."""
+
+    def __init__(self, wrapped, timestamp: str) -> None:
+        self._wrapped = wrapped
+        self._timestamp = timestamp
+
+    def strftime(self, fmt: str, *args):
+        if fmt == "%Y%m%d-%H%M%S" and not args:
+            return self._timestamp
+        return self._wrapped.strftime(fmt, *args)
+
+    def __getattr__(self, name):
+        return getattr(self._wrapped, name)
+
+
 def write_rollback_snapshot(paths, snapshot_dir: Path,
-                            binding: dict | None = None) -> Path:
+                            binding: dict | None = None,
+                            scope: dict | None = None,
+                            destination: Path | None = None) -> Path:
     """Persist exact before-images, including files that do not yet exist."""
     snapshot_dir = Path(snapshot_dir)
     snapshot_dir.mkdir(parents=True, exist_ok=True)
-    destination = snapshot_dir / (
-        f"{CANARY_ID}-kyle-rollback-{time.time_ns()}.zip")
+    destination = (Path(destination) if destination is not None else
+                   snapshot_dir /
+                   f"{CANARY_ID}-kyle-rollback-{time.time_ns()}.zip")
+    if destination.parent.resolve() != snapshot_dir.resolve():
+        raise ValueError("rollback snapshot destination outside snapshot directory")
     entries = []
     seen = set()
     with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
@@ -712,6 +834,7 @@ def write_rollback_snapshot(paths, snapshot_dir: Path,
                 "version": 2,
                 "character_id": CANARY_ID,
                 "binding": binding,
+                "scope": scope,
                 "entries": entries,
             }, ensure_ascii=False, indent=2),
         )
@@ -865,7 +988,8 @@ def _prevalidate_apply(gui, pack: Path, preview: list[dict]) -> list[Path]:
             located[1].read_bytes()
             mutation_paths.append(located[1])
 
-    table_path = getattr(gui.core, "table_path", None)
+    core_obj = getattr(gui, "core", None)
+    table_path = getattr(core_obj, "table_path", None)
     if table_path is not None:
         table_logicals = [
             gui.TRIMMED_LOGICAL,
@@ -920,11 +1044,84 @@ def plan_apply(runtime=None, work: Path = WORK,
     writes = plan_store_writes(
         pack, roots=roots, runtime=gui, inventory=inventory)
     mutation_paths = _prevalidate_apply(gui, pack, writes)
+    backup_timestamp = time.strftime("%Y%m%d-%H%M%S")
+    operation_id = f"{backup_timestamp}-{time.time_ns()}"
+    for item in writes:
+        destination = wf_assets.path_in_root(
+            gui.TARGET_STORE, item["root"], item["logical"])
+        item["destination"] = str(destination.absolute())
+        item["destination_exists"] = destination.exists()
+    materialize_backups = []
+    for item in writes:
+        destination = Path(item["destination"])
+        backup = destination.with_name(
+            destination.name + ".bak-wfmod-kyle-" + backup_timestamp)
+        materialize_backups.append({
+            "logical": item["logical"],
+            "destination": str(backup),
+            "source_exists": item["destination_exists"],
+            "backup_exists": backup.exists(),
+            "will_create": item["destination_exists"] and not backup.exists(),
+        })
+    replace_logicals = [
+        item["logical"] for item in writes
+        if item["relative"].endswith(".png")
+    ]
+    replace_logicals.extend(
+        f"character/{NEW_CODE}/ui/skill_cutin_{level}.atf.deflate"
+        for level in (0, 1))
+    replace_backups = []
+    write_by_logical = {item["logical"]: item for item in writes}
+    for logical in dict.fromkeys(replace_logicals):
+        item = write_by_logical[logical]
+        destination = Path(item["destination"])
+        backup = destination.with_name(
+            destination.name + ".bak-wfmod-asset-" + backup_timestamp)
+        replace_backups.append({
+            "logical": logical,
+            "destination": str(backup),
+            "source_exists_before_apply": item["destination_exists"],
+            "source_exists_before_replace": True,
+            "backup_exists": backup.exists(),
+            "will_create": not backup.exists(),
+        })
+
+    metadata_backups = []
+    table_path = getattr(getattr(gui, "core", None), "table_path", None)
+    if table_path is not None:
+        for logical, suffix in (
+                (gui.TRIMMED_LOGICAL, ".bak-wfmod-kyle-trim-"),
+                (gui.CHAR_IMAGE_LOGICAL, ".bak-wfmod-nested-"),
+                (gui.FS_ATTR_LOGICAL, ".bak-wfmod-nested-")):
+            destination = Path(table_path(gui.TARGET_STORE, logical))
+            backup = destination.with_name(
+                destination.name + suffix + backup_timestamp)
+            metadata_backups.append({
+                "logical": logical,
+                "destination": str(backup.absolute()),
+                "source_exists": destination.exists(),
+                "backup_exists": backup.exists(),
+            })
+    snapshot_dir = Path(getattr(gui, "SNAP_DIR",
+                                work / "char_snapshots")).absolute()
+    character_snapshot_path = snapshot_dir / (
+        f"{CANARY_ID}-{backup_timestamp}.zip")
+    persistent_snapshot_path = (
+        work / "rollback_snapshots" /
+        f"{CANARY_ID}-kyle-rollback-{operation_id}.zip")
+    changelog_files = [
+        {"path": str(Path(getattr(gui, attribute)).absolute()),
+         "exists": Path(getattr(gui, attribute)).exists()}
+        for attribute in ("CHANGELOG_FILE", "CHANGELOG_MD")
+        if getattr(gui, attribute, None) is not None
+    ]
     root_counts = {
         name: sum(1 for item in writes if item["root"] == name)
         for name in ("upload", "medium", "android")
     }
     return {
+        "operation_id": operation_id,
+        "backup_timestamp": backup_timestamp,
         "profile": profile,
         "code_name": {
             "character_id": CANARY_ID,
@@ -938,6 +1135,8 @@ def plan_apply(runtime=None, work: Path = WORK,
                 f"{CANARY_ID}-YYYYMMDD-HHMMSS.zip",
             "persistent_artifact_template":
                 f"{CANARY_ID}-kyle-rollback-<time_ns>.zip",
+            "character_artifact": str(character_snapshot_path),
+            "persistent_artifact": str(persistent_snapshot_path.absolute()),
             "files": len({str(Path(path).absolute()).casefold()
                           for path in mutation_paths}),
         },
@@ -946,6 +1145,9 @@ def plan_apply(runtime=None, work: Path = WORK,
             "asset_overwrite_candidates": [
                 item["logical"] for item in writes
             ],
+            "materialize": materialize_backups,
+            "replace_asset": replace_backups,
+            "metadata_destinations": metadata_backups,
             "metadata": {
                 "trimmed_image": ".bak-wfmod-kyle-trim-YYYYMMDD-HHMMSS",
                 "character_image": ".bak-wfmod-*-YYYYMMDD-HHMMSS",
@@ -976,6 +1178,7 @@ def plan_apply(runtime=None, work: Path = WORK,
             "by_root": root_counts,
         },
         "changelog": {
+            "files": changelog_files,
             "semantic_writes": [
                 "trimmed_image clone",
                 "character_image clone",
@@ -1020,8 +1223,16 @@ def apply(dry_run: bool, runtime=None, work: Path = WORK,
     journal = _FileRollbackJournal(mutation_paths)
     rollback_snapshot = write_rollback_snapshot(
         mutation_paths, work / "rollback_snapshots",
-        binding=profile_binding(gui))
+        binding=profile_binding(gui),
+        scope={
+            "character_id": CANARY_ID,
+            "old_code_name": plan["code_name"]["from"],
+        },
+        destination=Path(plan["snapshot"]["persistent_artifact"]))
     observed_operations = ["persistent-rollback-snapshot"]
+    original_time = getattr(gui, "time", None)
+    if original_time is not None:
+        gui.time = _FixedTimeProxy(original_time, plan["backup_timestamp"])
     try:
         snapshot = gui.char_snapshot(CANARY_ID, "before Kyle visual skin")
         observed_operations.append("character-snapshot")
@@ -1031,13 +1242,16 @@ def apply(dry_run: bool, runtime=None, work: Path = WORK,
             PIXEL_TEMPLATE_CODE,
             NEW_CODE,
             runtime=gui,
+            backup_timestamp=plan["backup_timestamp"],
         )
         observed_operations.extend([
             "clone-trimmed-image",
             "clone-character-image",
             "clone-full-shot-attribute",
         ])
-        materialize_new_paths(pack, runtime=gui, roots=resolved_roots)
+        materialize_new_paths(
+            pack, runtime=gui, roots=resolved_roots,
+            backup_timestamp=plan["backup_timestamp"])
         observed_operations.append("materialize-assets")
         gui.save_char_fields(
             CANARY_ID, {"code_name": NEW_CODE}, dry_run=False)
@@ -1061,6 +1275,9 @@ def apply(dry_run: bool, runtime=None, work: Path = WORK,
             if hasattr(error, "add_note"):
                 error.add_note(f"Kyle rollback failed: {rollback_error}")
         raise
+    finally:
+        if original_time is not None:
+            gui.time = original_time
     return {
         "dry_run": False,
         "snapshot": snapshot,
@@ -1076,17 +1293,53 @@ def rollback(snapshot: Path, runtime=None) -> dict:
     gui = _resolve_gui(runtime)
     profile = require_cn_profile(gui)
     binding = profile_binding(gui)
+    manifest, _payloads = _read_rollback_snapshot(
+        snapshot, expected_binding=binding)
+    scope = manifest.get("scope")
+    if not isinstance(scope, dict):
+        raise ValueError("rollback snapshot scope missing")
+    if (scope.get("character_id") != CANARY_ID or
+            scope.get("old_code_name") not in {CURRENT_CODE, NEW_CODE}):
+        raise ValueError("rollback snapshot scope invalid")
     publish_roots = [
         Path(profile[name]).resolve()
         for name in ("upload", "medium", "android")
     ]
-    allowed_roots = list(publish_roots)
+    allowed_paths = set()
+    for relative in CANONICAL_TARGET_RELATIVES:
+        logical = f"character/{NEW_CODE}/{relative}"
+        allowed_paths.add(wf_assets.path_in_root(
+            gui.TARGET_STORE, canonical_source_root(relative), logical).resolve())
+    if scope["old_code_name"] == CURRENT_CODE:
+        for relative in CANARY_VOICE_RELATIVES:
+            logical = f"character/{CURRENT_CODE}/voice/{relative}"
+            allowed_paths.add(wf_assets.path_in_root(
+                gui.TARGET_STORE, "upload", logical).resolve())
+
+    core_obj = getattr(gui, "core", None)
+    table_path = getattr(core_obj, "table_path", None)
+    if table_path is not None:
+        logicals = [
+            gui.TRIMMED_LOGICAL,
+            gui.CHAR_IMAGE_LOGICAL,
+            gui.FS_ATTR_LOGICAL,
+        ]
+        character_logical = getattr(core_obj, "CHARACTER_LOGICAL", None)
+        if character_logical is not None:
+            logicals.append(character_logical)
+        character_text_logical = getattr(gui, "CHAR_TEXT2_LOGICAL", None)
+        if character_text_logical is not None:
+            logicals.append(character_text_logical)
+        allowed_paths.update(
+            Path(table_path(gui.TARGET_STORE, logical)).resolve()
+            for logical in logicals)
+
     cdndata = Path(profile["cdndata"]).resolve()
-    allowed_paths = {
+    allowed_paths.update({
         cdndata / "character.json",
         cdndata / "character_text.json",
         cdndata.parent / "character.json",
-    }
+    })
     char_json_paths = getattr(gui, "_char_json_paths", None)
     if char_json_paths is not None:
         allowed_paths.update(Path(path).resolve()
@@ -1114,7 +1367,7 @@ def rollback(snapshot: Path, runtime=None) -> dict:
     pending_file = getattr(gui, "PENDING_FILE", None)
     result = restore_rollback_snapshot(
         snapshot,
-        allowed_roots=allowed_roots,
+        allowed_roots=[],
         allowed_paths=allowed_paths,
         expected_binding=binding,
         extra_journal_paths=([Path(pending_file)] if pending_file else []),

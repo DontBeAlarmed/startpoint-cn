@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import hashlib
 import json
 import tempfile
 import unittest
@@ -72,26 +73,40 @@ def write_required_kyle_pack(pack: Path) -> None:
         "pixelart/sprite_sheet.png": (252, 351),
         "pixelart/special_sprite_sheet.png": (512, 512),
     }
-    for relative, size in required.items():
-        path = pack / relative
-        path.parent.mkdir(parents=True, exist_ok=True)
-        Image.new("RGBA", size, (20, 40, 60, 255)).save(path)
     tree = [{"n": "character/kyle_wolf_knight/pixelart/frame"}]
     compressor_data = wf_dsl.encode_amf3(tree)
-    for relative in kyle.PIXEL_AMF3_RELATIVES:
-        compressor = zlib.compressobj(9, zlib.DEFLATED, -15)
+    tiny_atf = wf_atf.deflate(wf_atf.build_cutin_atf(png_bytes((4, 4))))
+    for relative in kyle.CANONICAL_TARGET_RELATIVES:
         path = pack / relative
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(
-            compressor.compress(compressor_data) + compressor.flush())
+        if relative.endswith(".png"):
+            Image.new(
+                "RGBA", required.get(relative, (4, 4)),
+                (20, 40, 60, 255)).save(path)
+        elif relative.endswith(".mp3"):
+            path.write_bytes(mp3_bytes())
+        elif relative.endswith(".amf3.deflate"):
+            compressor = zlib.compressobj(9, zlib.DEFLATED, -15)
+            path.write_bytes(
+                compressor.compress(compressor_data) + compressor.flush())
+        elif relative.endswith(".atf.deflate"):
+            path.write_bytes(tiny_atf)
     inventory = {
-        "version": 1,
+        "version": 2,
+        "profile_id": "cn",
         "entries": [
-            {"relative": path.relative_to(pack).as_posix(),
-             "source": "synthetic", "source_root": "upload"}
-            for path in sorted(pack.rglob("*")) if path.is_file()
+            {
+                "relative": relative,
+                "source": kyle.canonical_source(relative),
+                "source_root": kyle.canonical_source_root(relative),
+                "source_sha256": hashlib.sha256(
+                    kyle.canonical_source(relative).encode()).hexdigest(),
+            }
+            for relative in kyle.CANONICAL_TARGET_RELATIVES
         ],
     }
+    inventory["contract_sha256"] = kyle.inventory_contract_digest(
+        inventory["entries"])
     pack.parent.mkdir(parents=True, exist_ok=True)
     (pack.parent / kyle.INVENTORY_FILE).write_text(
         json.dumps(inventory), encoding="utf-8")
@@ -303,7 +318,8 @@ class TestKylePackBuild(unittest.TestCase):
             ]}
 
             with self.assertRaisesRegex(ValueError, "old code references remain"):
-                kyle.validate_kyle_pack(pack, inventory=inventory)
+                kyle._validate_kyle_pack(
+                    pack, inventory=inventory, strict=False)
 
     def test_prepare_builds_pack_from_wolf_visuals_and_canary_voices(self):
         with tempfile.TemporaryDirectory() as td:
@@ -417,11 +433,18 @@ class TestKylePackBuild(unittest.TestCase):
                 return (visual_manifest if code == "black_wolf_knight"
                         else manifest)
 
+            def locate_source(_store, logical):
+                if "/voice/" in logical:
+                    relative = "voice/" + logical.split("/voice/", 1)[1]
+                else:
+                    relative = logical.split(
+                        "character/black_wolf_knight/", 1)[1]
+                return kyle.canonical_source_root(relative), source_paths[logical]
+
             with patch.object(wf_assets, "char_asset_manifest",
                               side_effect=asset_manifest), \
                     patch.object(wf_assets, "locate",
-                                 side_effect=lambda _store, logical:
-                                 ("upload", source_paths[logical])), \
+                                 side_effect=locate_source), \
                     patch.object(wf_assets, "mp3_decode", side_effect=lambda data: data):
                 result = kyle.prepare(runtime=runtime, work=work)
 
@@ -503,7 +526,11 @@ class TestKylePackBuild(unittest.TestCase):
             for index, logical in enumerate(logicals):
                 path = stored / str(index)
                 path.write_bytes(b"source")
-                sources[logical] = ("upload", path)
+                if "/voice/" in logical:
+                    relative = "voice/" + logical.split("/voice/", 1)[1]
+                else:
+                    relative = logical.split("character/black_wolf_knight/", 1)[1]
+                sources[logical] = (kyle.canonical_source_root(relative), path)
             sources.pop(missing)
             with patch.object(wf_assets, "locate",
                               side_effect=lambda _store, logical:
@@ -715,7 +742,7 @@ class TestKyleTransaction(unittest.TestCase):
                 saved,
                 [("119999", {"code_name": "kyle_wolf_knight"}, False)],
             )
-            self.assertEqual(len(replaced), 7)
+            self.assertEqual(len(replaced), 35)
             self.assertTrue(all(item[2:] == (True, False) for item in replaced))
             self.assertLess(events.index("save-code"), events.index("replace-png"))
             installed = [
@@ -753,7 +780,7 @@ class TestKyleTransaction(unittest.TestCase):
                     True, runtime=allowed, work=work, roots={})
 
             self.assertTrue(preview["dry_run"])
-            self.assertEqual(len(preview["writes"]), 13)
+            self.assertEqual(len(preview["writes"]), 64)
             for section in (
                     "code_name", "snapshot", "metadata", "layer1",
                     "pending", "validation"):
@@ -855,7 +882,9 @@ class TestKyleTransaction(unittest.TestCase):
                 path.write_bytes(data)
                 originals[path] = data
 
-            preview = kyle.plan_store_writes(pack, roots={})
+            inventory = json.loads(
+                (work / kyle.INVENTORY_FILE).read_text(encoding="utf-8"))
+            preview = kyle.plan_store_writes(pack, inventory=inventory)
             destinations = {
                 item["logical"]: wf_assets.path_in_root(
                     target_store, item["root"], item["logical"])
@@ -1082,20 +1111,12 @@ class TestKyleFocalRects(unittest.TestCase):
             kyle.build_visual_derivatives(
                 source / "base.png", source / "awake.png", pack)
 
-            for relative in (
-                "ui/square_0.png",
-                "ui/battle_member_status_0.png",
-                "ui/battle_control_board_0.png",
-                "ui/thumb_party_main_0.png",
-                "ui/thumb_party_unison_0.png",
-            ):
+            for template in kyle.DERIVATIVES:
+                relative = template.format(n=0)
                 with self.subTest(relative=relative), Image.open(pack / relative) as image:
                     self.assertTrue(self._has(image, "face"))
                     self.assertTrue(self._has(image, "torso"))
                     self.assertFalse(self._has(image, "boots"))
-            with Image.open(pack / "ui/skill_cutin_0.png") as image:
-                self.assertTrue(self._has(image, "face"))
-                self.assertTrue(self._has(image, "torso"))
             with Image.open(pack / "ui/full_shot_1440_1920_0.png") as image:
                 self.assertTrue(self._has(image, "boots"))
 
@@ -1148,8 +1169,8 @@ class TestKyleReviewBlockers(unittest.TestCase):
                 ],
             }
 
-            result = kyle.validate_kyle_pack(
-                pack, required_sizes={}, inventory=manifest)
+            result = kyle._validate_kyle_pack(
+                pack, required_sizes={}, inventory=manifest, strict=False)
             self.assertEqual(result["inventory"]["expected"], 8)
             self.assertEqual(result["inventory"]["actual"], 8)
             self.assertEqual(result["inventory"]["png"], 1)
@@ -1161,8 +1182,8 @@ class TestKyleReviewBlockers(unittest.TestCase):
 
             (pack / "voice/line.mp3").unlink()
             with self.assertRaisesRegex(ValueError, "inventory missing"):
-                kyle.validate_kyle_pack(
-                    pack, required_sizes={}, inventory=manifest)
+                kyle._validate_kyle_pack(
+                    pack, required_sizes={}, inventory=manifest, strict=False)
 
     def test_inventory_rejects_corrupt_png_and_mp3(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1187,13 +1208,13 @@ class TestKyleReviewBlockers(unittest.TestCase):
                   for relative in kyle.PIXEL_AMF3_RELATIVES),
             ]}
             with self.assertRaisesRegex(ValueError, "bad PNG"):
-                kyle.validate_kyle_pack(
-                    pack, required_sizes={}, inventory=manifest)
+                kyle._validate_kyle_pack(
+                    pack, required_sizes={}, inventory=manifest, strict=False)
 
             (pack / "ui/bad.png").write_bytes(png_bytes((2, 2)))
             with self.assertRaisesRegex(ValueError, "bad MP3"):
-                kyle.validate_kyle_pack(
-                    pack, required_sizes={}, inventory=manifest)
+                kyle._validate_kyle_pack(
+                    pack, required_sizes={}, inventory=manifest, strict=False)
 
     def test_persistent_snapshot_restores_existing_new_and_changelog_bytes(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1230,8 +1251,13 @@ class TestKyleReviewBlockers(unittest.TestCase):
             runtime = cn_runtime(
                 root,
                 PENDING_FILE=pending,
+                CHANGELOG_FILE=root / "mod-work/changelog.jsonl",
+                CHANGELOG_MD=root / "mod-work/changelog.md",
+                SNAP_DIR=root / "mod-work/char_snapshots",
                 CHAR_IMAGE_LOGICAL="character-image",
                 FS_ATTR_LOGICAL="full-shot-attribute",
+                TRIMMED_LOGICAL="trimmed-image",
+                core=SimpleNamespace(table_path=core.table_path),
                 get_char_fields=lambda _cid: {
                     "fields": {
                         "code_name": "resistance_princess_3halfanv"}},
@@ -1256,12 +1282,23 @@ class TestKyleReviewBlockers(unittest.TestCase):
             )
             self.assertEqual(len(plan["layer1"]["paths"]), 2)
             self.assertEqual(plan["pending"]["file"], str(pending))
-            self.assertEqual(len(plan["writes"]), 13)
-            self.assertEqual(plan["validation"]["inventory"]["actual"], 13)
+            self.assertEqual(len(plan["writes"]), 64)
+            self.assertEqual(plan["validation"]["inventory"]["actual"], 64)
             self.assertIn("asset_backup_template", plan["backups"])
             self.assertIn("metadata", plan["backups"])
             self.assertIn("persistent_artifact_template", plan["snapshot"])
             self.assertIn("semantic_writes", plan["changelog"])
+            self.assertTrue(Path(plan["snapshot"]["character_artifact"]).is_absolute())
+            self.assertTrue(Path(plan["snapshot"]["persistent_artifact"]).is_absolute())
+            self.assertEqual(len(plan["backups"]["materialize"]), 64)
+            self.assertEqual(len(plan["backups"]["replace_asset"]), 37)
+            self.assertEqual(len(plan["backups"]["metadata_destinations"]), 3)
+            self.assertEqual(len(plan["changelog"]["files"]), 2)
+            for group in ("materialize", "replace_asset",
+                          "metadata_destinations"):
+                for entry in plan["backups"][group]:
+                    self.assertTrue(Path(entry["destination"]).is_absolute())
+                    self.assertIn("backup_exists", entry)
             for operation in (
                     "character-snapshot", "persistent-rollback-snapshot",
                     "clone-trimmed-image", "clone-character-image",
@@ -1271,6 +1308,36 @@ class TestKyleReviewBlockers(unittest.TestCase):
 
 
 class TestKyleCanonicalInventory(unittest.TestCase):
+    def test_production_validation_requires_exact_canonical_v2_contract(self):
+        with tempfile.TemporaryDirectory() as td:
+            pack = Path(td) / "pack"
+            write_required_kyle_pack(pack)
+            manifest_path = pack.parent / kyle.INVENTORY_FILE
+            valid = json.loads(manifest_path.read_text(encoding="utf-8"))
+            result = kyle.validate_kyle_pack(pack, inventory=valid)
+            self.assertEqual(result["inventory"]["actual"], 64)
+            self.assertEqual(result["inventory"]["amf3"], 8)
+            self.assertEqual(result["inventory"]["atf"], 2)
+
+            mutations = {
+                "v1": lambda value: value.update(version=1),
+                "shortened": lambda value: value["entries"].pop(),
+                "false_source": lambda value: value["entries"][0].update(
+                    source="character/fake/source.png"),
+                "false_root": lambda value: value["entries"][0].update(
+                    source_root="upload" if value["entries"][0]["source_root"] != "upload"
+                    else "medium"),
+                "zero_hash": lambda value: value["entries"][0].update(
+                    source_sha256="0" * 64),
+                "false_nonzero_hash": lambda value: value["entries"][0].update(
+                    source_sha256="1" * 64),
+            }
+            for name, mutate in mutations.items():
+                broken = json.loads(json.dumps(valid))
+                mutate(broken)
+                with self.subTest(name=name), self.assertRaises(ValueError):
+                    kyle.validate_kyle_pack(pack, inventory=broken)
+
     def test_canonical_inventory_is_not_defined_by_source_exists_flags(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -1287,7 +1354,11 @@ class TestKyleCanonicalInventory(unittest.TestCase):
             for index, logical in enumerate(logicals):
                 path = stored / str(index)
                 path.write_bytes(f"source-{index}".encode())
-                sources[logical] = ("medium" if "/ui/" in logical else "upload", path)
+                if "/voice/" in logical:
+                    relative = "voice/" + logical.split("/voice/", 1)[1]
+                else:
+                    relative = logical.split("character/black_wolf_knight/", 1)[1]
+                sources[logical] = (kyle.canonical_source_root(relative), path)
 
             with patch.object(wf_assets, "locate",
                               side_effect=lambda _store, logical: sources.get(logical)):
@@ -1336,23 +1407,29 @@ class TestKyleCanonicalInventory(unittest.TestCase):
             pack = Path(td) / "pack"
             write_required_kyle_pack(pack)
             battle = pack / "battle/detail.battle.amf3.deflate"
-            battle.parent.mkdir()
+            battle.parent.mkdir(exist_ok=True)
             co = zlib.compressobj(9, zlib.DEFLATED, -15)
             battle.write_bytes(co.compress(b"not-amf3") + co.flush())
             inventory = json.loads(
                 (pack.parent / kyle.INVENTORY_FILE).read_text(encoding="utf-8"))
-            inventory["entries"].append({"relative": battle.relative_to(pack).as_posix()})
+            inventory["entries"].append({
+                "relative": battle.relative_to(pack).as_posix(),
+                "source": "synthetic/battle",
+                "source_root": "upload",
+                "source_sha256": "1" * 64,
+            })
             with self.assertRaisesRegex(ValueError, "bad AMF3"):
-                kyle.validate_kyle_pack(pack, inventory=inventory)
+                kyle._validate_kyle_pack(
+                    pack, inventory=inventory, strict=False)
 
             tree = wf_dsl.encode_amf3([{"n": "ok"}])
             co = zlib.compressobj(9, zlib.DEFLATED, -15)
             battle.write_bytes(co.compress(tree) + co.flush())
             atf = pack / "ui/skill_cutin_0.atf.deflate"
             atf.write_bytes(b"broken-atf")
-            inventory["entries"].append({"relative": atf.relative_to(pack).as_posix()})
             with self.assertRaisesRegex(ValueError, "bad ATF"):
-                kyle.validate_kyle_pack(pack, inventory=inventory)
+                kyle._validate_kyle_pack(
+                    pack, inventory=inventory, strict=False)
 
 
 class TestKyleRollbackSafety(unittest.TestCase):
@@ -1361,8 +1438,16 @@ class TestKyleRollbackSafety(unittest.TestCase):
             root = Path(td)
             pending = []
             runtime = cn_runtime(root, add_pending=pending.append)
-            character = runtime.TARGET_STORE / "aa/character"
-            trimmed = runtime.TARGET_STORE / "bb/trimmed"
+            runtime.core = SimpleNamespace(
+                table_path=core.table_path,
+                CHARACTER_LOGICAL="master/character/character.orderedmap")
+            runtime.TRIMMED_LOGICAL = "master/generated/trimmed_image.orderedmap"
+            runtime.CHAR_IMAGE_LOGICAL = "master/generated/character_image.orderedmap"
+            runtime.FS_ATTR_LOGICAL = "master/character/full_shot_image_attribute.orderedmap"
+            character = core.table_path(
+                runtime.TARGET_STORE, runtime.core.CHARACTER_LOGICAL)
+            trimmed = core.table_path(
+                runtime.TARGET_STORE, runtime.TRIMMED_LOGICAL)
             layer1 = runtime.CDNDATA / "character.json"
             pending_file = root / "mod-work/sync_pending.json"
             runtime.PENDING_FILE = pending_file
@@ -1376,7 +1461,9 @@ class TestKyleRollbackSafety(unittest.TestCase):
             binding = kyle.profile_binding(runtime)
             snapshot = kyle.write_rollback_snapshot(
                 [character, trimmed, layer1, pending_file],
-                root / "snapshots", binding=binding)
+                root / "snapshots", binding=binding,
+                scope={"character_id": "119999",
+                       "old_code_name": kyle.CURRENT_CODE})
             character.write_bytes(b"published-character")
             trimmed.write_bytes(b"published-trimmed")
             layer1.write_bytes(b"published-layer1")
@@ -1394,12 +1481,17 @@ class TestKyleRollbackSafety(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             runtime = cn_runtime(root, add_pending=lambda _path: None)
-            target = runtime.TARGET_STORE / "aa/file"
+            relative = kyle.CANONICAL_TARGET_RELATIVES[0]
+            target = wf_assets.path_in_root(
+                runtime.TARGET_STORE, kyle.canonical_source_root(relative),
+                f"character/{kyle.NEW_CODE}/{relative}")
             target.parent.mkdir(parents=True)
             target.write_bytes(b"pre")
             snapshot = kyle.write_rollback_snapshot(
                 [target], root / "snapshots",
-                binding=kyle.profile_binding(runtime))
+                binding=kyle.profile_binding(runtime),
+                scope={"character_id": "119999",
+                       "old_code_name": kyle.CURRENT_CODE})
             target.write_bytes(b"current")
             with zipfile.ZipFile(snapshot, "a") as archive:
                 archive.writestr("unexpected.bin", b"bad")
@@ -1409,18 +1501,21 @@ class TestKyleRollbackSafety(unittest.TestCase):
 
             clean = kyle.write_rollback_snapshot(
                 [target], root / "snapshots",
-                binding=kyle.profile_binding(runtime))
+                binding=kyle.profile_binding(runtime),
+                scope={"character_id": "119999",
+                       "old_code_name": kyle.CURRENT_CODE})
             runtime._PROFILE.store = root / "different/upload"
             runtime.TARGET_STORE = runtime._PROFILE.store
             with self.assertRaisesRegex(ValueError, "snapshot profile binding"):
                 kyle.rollback(clean, runtime=runtime)
 
-    def test_rollback_whitelist_rejects_unrelated_file_beside_pending(self):
+    def test_rollback_whitelist_rejects_unrelated_hash_in_store_root(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             pending_file = root / "mod-work/sync_pending.json"
-            unrelated = root / "mod-work/unrelated.json"
+            unrelated = root / "profile/upload/aa/unrelated-hash"
             pending_file.parent.mkdir(parents=True)
+            unrelated.parent.mkdir(parents=True)
             pending_file.write_bytes(b"[]")
             unrelated.write_bytes(b"pre")
             runtime = cn_runtime(
@@ -1428,7 +1523,9 @@ class TestKyleRollbackSafety(unittest.TestCase):
                 add_pending=lambda _path: None)
             snapshot = kyle.write_rollback_snapshot(
                 [unrelated], root / "snapshots",
-                binding=kyle.profile_binding(runtime))
+                binding=kyle.profile_binding(runtime),
+                scope={"character_id": "119999",
+                       "old_code_name": kyle.CURRENT_CODE})
             unrelated.write_bytes(b"current")
             with self.assertRaisesRegex(ValueError, "outside exact whitelist"):
                 kyle.rollback(snapshot, runtime=runtime)
@@ -1438,14 +1535,21 @@ class TestKyleRollbackSafety(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             runtime = cn_runtime(root, add_pending=lambda _path: None)
-            one = runtime.TARGET_STORE / "aa/one"
-            two = runtime.TARGET_STORE / "bb/two"
+            relatives = kyle.CANONICAL_TARGET_RELATIVES[:2]
+            one, two = [
+                wf_assets.path_in_root(
+                    runtime.TARGET_STORE, kyle.canonical_source_root(relative),
+                    f"character/{kyle.NEW_CODE}/{relative}")
+                for relative in relatives
+            ]
             for path, data in ((one, b"pre-one"), (two, b"pre-two")):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(data)
             snapshot = kyle.write_rollback_snapshot(
                 [one, two], root / "snapshots",
-                binding=kyle.profile_binding(runtime))
+                binding=kyle.profile_binding(runtime),
+                scope={"character_id": "119999",
+                       "old_code_name": kyle.CURRENT_CODE})
             one.write_bytes(b"current-one")
             two.write_bytes(b"current-two")
             original = kyle._restore_snapshot_entry
@@ -1467,6 +1571,32 @@ class TestKyleRollbackSafety(unittest.TestCase):
 
 
 class TestKylePackPairAtomicity(unittest.TestCase):
+    def test_old_sidecar_rename_failure_restores_old_pair(self):
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            pack = work / "pack"
+            staging = work / ".pack-staging"
+            pack.mkdir()
+            staging.mkdir()
+            (pack / "old.bin").write_bytes(b"old-pack")
+            (staging / "new.bin").write_bytes(b"new-pack")
+            sidecar = work / kyle.INVENTORY_FILE
+            sidecar.write_bytes(b"old-sidecar")
+            original = kyle._rename_path
+
+            def fail_sidecar(source, destination):
+                if Path(source) == sidecar:
+                    raise RuntimeError("old sidecar rename failure")
+                return original(source, destination)
+
+            with patch.object(kyle, "_rename_path", side_effect=fail_sidecar):
+                with self.assertRaisesRegex(RuntimeError,
+                                            "old sidecar rename failure"):
+                    kyle._replace_pack_and_inventory(
+                        staging, pack, {"entries": []}, work)
+            self.assertEqual((pack / "old.bin").read_bytes(), b"old-pack")
+            self.assertEqual(sidecar.read_bytes(), b"old-sidecar")
+
     def test_sidecar_replace_failure_restores_old_pack_and_sidecar_pair(self):
         with tempfile.TemporaryDirectory() as td:
             work = Path(td)
