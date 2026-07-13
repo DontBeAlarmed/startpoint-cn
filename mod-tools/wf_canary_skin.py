@@ -93,6 +93,27 @@ def cover_rgba(image: Image.Image, size: tuple[int, int],
     return scaled.crop((crop_x, crop_y, crop_x + size[0], crop_y + size[1]))
 
 
+def focal_rect_rgba(image: Image.Image, size: tuple[int, int],
+                    rect: tuple[float, float, float, float]) -> Image.Image:
+    """Crop an explicit normalized region of the visible subject, then cover."""
+    source = image.convert("RGBA")
+    bbox = source.getchannel("A").getbbox()
+    if bbox is None:
+        return Image.new("RGBA", size, (0, 0, 0, 0))
+    x0, y0, x1, y1 = rect
+    if not (0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1):
+        raise ValueError(f"invalid normalized focal rect: {rect}")
+    left, top, right, bottom = bbox
+    width, height = right - left, bottom - top
+    crop = (
+        left + round(width * x0),
+        top + round(height * y0),
+        left + round(width * x1),
+        top + round(height * y1),
+    )
+    return cover_rgba(source.crop(crop), size, focus=(0.5, 0.12), padding=0)
+
+
 def recolor_kyle_pixel_sheet(image: Image.Image) -> Image.Image:
     """Shift saturated red effects to ice blue and dark neutrals to silver."""
     output = Image.new("RGBA", image.size)
@@ -107,7 +128,7 @@ def recolor_kyle_pixel_sheet(image: Image.Image) -> Image.Image:
             hue = 0.58
             saturation = min(0.78, saturation)
             value = min(1.0, value * 1.08)
-        elif saturation < 0.22 and 0.24 < value < 0.52:
+        elif saturation < 0.22 and 0.32 < value < 0.52:
             saturation = 0.08
             value = 0.66 + (value - 0.10) / 0.42 * 0.28
         new_red, new_green, new_blue = colorsys.hsv_to_rgb(
