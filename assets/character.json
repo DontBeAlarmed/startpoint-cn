@@ -8,7 +8,7 @@
   "10": {
     "name": "",
     "rarity": 5,
-    "element": 3,
+    "element": 4,
     "skill_count": 6
   },
   "111001": {
@@ -3031,12 +3031,6 @@
   },
   "119999": {
     "name": "雨果",
-    "rarity": 5,
-    "element": 0,
-    "skill_count": 3
-  },
-  "119998": {
-    "name": "金丝雀二号",
     "rarity": 5,
     "element": 0,
     "skill_count": 3
