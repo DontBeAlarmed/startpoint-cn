@@ -743,7 +743,7 @@ class _TransactionFixtureMixin:
 
     def _tx(self, *, manifest=None, provider=None, installed_manifest=None,
             installed_package_dir=None, capabilities=("dual_form_v1",),
-            degraded=False, codec_registry=None):
+            degraded=False, codec_registry=None, filesystem_boundary_hook=None):
         self._require_api()
         if self.provider is None:
             self._finish_setup()
@@ -767,12 +767,25 @@ class _TransactionFixtureMixin:
             available_capabilities=capabilities,
             degraded_data_confirmed=degraded,
             snapshot_roots=(self.snapshot_root,),
+            filesystem_boundary_hook=filesystem_boundary_hook,
         )
 
     def _tree_bytes(self, root: Path):
         return {
             path.relative_to(root).as_posix(): path.read_bytes()
             for path in sorted(root.rglob("*")) if path.is_file()
+        }
+
+    def _protected_trees(self):
+        return {
+            name: self._tree_bytes(path)
+            for name, path in {
+                "common": self.common,
+                "medium": self.medium,
+                "android": self.android,
+                "server": self.server,
+                "active": self.active_dir,
+            }.items()
         }
 
     def _occupy_claims(self):
@@ -1156,52 +1169,37 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
         )
 
         codec.fail = False
-        original_hash = self.pack._sha256_file
+        def corrupt_after_write(event, context):
+            if (event == "before_output_verify"
+                    and context["kind"] == "snapshot_json"):
+                authority = context["authority"]
+                authority.owner._write(authority.handle, b"corrupt")
 
-        def fail_snapshot_hash(path):
-            if ".character-pack-snapshot-" in str(path):
-                raise OSError("synthetic snapshot hash failure")
-            return original_hash(path)
-
-        with mock.patch.object(
-            self.pack, "_sha256_file", side_effect=fail_snapshot_hash
-        ):
-            with self.assertRaises(self.pack.PackPreflightError):
-                tx.snapshot(self.snapshot_root)
-        self.assertEqual(sibling.read_bytes(), b"keep")
-        self.assertEqual(
-            [path for path in self.snapshot_root.iterdir() if path != sibling], []
-        )
-
-        original_rename = Path.rename
-
-        def fail_finalize(path, target):
-            if path.name.endswith(".tmp"):
+        def fail_finalize(event, context):
+            if event == "before_finalize":
                 raise OSError("synthetic snapshot finalize failure")
-            return original_rename(path, target)
 
-        with mock.patch.object(Path, "rename", new=fail_finalize):
-            with self.assertRaises(self.pack.PackPreflightError):
-                tx.snapshot(self.snapshot_root)
-        self.assertEqual(sibling.read_bytes(), b"keep")
-        self.assertEqual(
-            [path for path in self.snapshot_root.iterdir() if path != sibling], []
-        )
-
-        original_write = Path.write_bytes
-
-        def fail_metadata(path, data):
-            if path.name == "snapshot.json":
+        def fail_metadata_open(event, context):
+            if (event == "before_output_open"
+                    and context["kind"] == "snapshot_json"):
                 raise OSError("synthetic snapshot metadata failure")
-            return original_write(path, data)
 
-        with mock.patch.object(Path, "write_bytes", new=fail_metadata):
+        for label, hook in (
+            ("hash", corrupt_after_write),
+            ("finalize", fail_finalize),
+            ("write", fail_metadata_open),
+        ):
+            failing_tx = self._tx(
+                codec_registry={"fixture_json": codec},
+                filesystem_boundary_hook=hook,
+            )
+            failing_tx.prepare(self.staging_root / label)
             with self.assertRaises(self.pack.PackPreflightError):
-                tx.snapshot(self.snapshot_root)
-        self.assertEqual(sibling.read_bytes(), b"keep")
-        self.assertEqual(
-            [path for path in self.snapshot_root.iterdir() if path != sibling], []
-        )
+                failing_tx.snapshot(self.snapshot_root)
+            self.assertEqual(sibling.read_bytes(), b"keep")
+            self.assertEqual(
+                [path for path in self.snapshot_root.iterdir() if path != sibling], []
+            )
 
     def test_snapshot_drift_at_each_file_capture_never_publishes_a_child(self):
         self._finish_setup()
@@ -1606,6 +1604,146 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
 
 
 class TestPackStagingRecovery(_TransactionFixtureMixin, unittest.TestCase):
+    def _hardlink_boundary_hook(self, target_kind, sentinel):
+        fired = {"value": False}
+
+        def hook(event, context):
+            if (event == "before_output_open"
+                    and context["kind"] == target_kind
+                    and not fired["value"]):
+                fired["value"] = True
+                os.link(sentinel, context["path"])
+
+        return hook, fired
+
+    def test_owned_prepare_outputs_never_open_a_changed_pathname(self):
+        self._finish_setup()
+        for kind in ("prepare_marker", "prepare_metadata"):
+            with self.subTest(kind=kind):
+                sentinel = self.root / f"unrelated-{kind}.bin"
+                sentinel.write_bytes(b"preserve")
+                before = self._protected_trees()
+                hook, fired = self._hardlink_boundary_hook(kind, sentinel)
+                tx = self._tx(filesystem_boundary_hook=hook)
+                with self.assertRaises(self.pack.PackPreflightError):
+                    tx.prepare(self.staging_root / kind)
+                self.assertTrue(fired["value"])
+                self.assertEqual(sentinel.read_bytes(), b"preserve")
+                self.assertEqual(self._protected_trees(), before)
+
+    def test_owned_materialization_outputs_never_open_a_changed_pathname(self):
+        self._finish_setup()
+        for kind in ("payload_table", "payload_asset", "provisional_zip"):
+            with self.subTest(kind=kind):
+                sentinel = self.root / f"unrelated-{kind}.bin"
+                sentinel.write_bytes(b"preserve")
+                before = self._protected_trees()
+                hook, fired = self._hardlink_boundary_hook(kind, sentinel)
+                tx = self._tx(filesystem_boundary_hook=hook)
+                prepared = tx.prepare(self.staging_root / kind)
+                with self.assertRaises(self.pack.PackStagingError):
+                    tx.materialize_staging(prepared)
+                self.assertTrue(fired["value"])
+                self.assertEqual(sentinel.read_bytes(), b"preserve")
+                self.assertEqual(self._protected_trees(), before)
+
+    def test_owned_snapshot_outputs_never_open_a_changed_pathname(self):
+        self._finish_setup()
+        for kind in ("snapshot_marker", "snapshot_file", "snapshot_json"):
+            with self.subTest(kind=kind):
+                sentinel = self.root / f"unrelated-{kind}.bin"
+                sentinel.write_bytes(b"preserve")
+                before = self._protected_trees()
+                hook, fired = self._hardlink_boundary_hook(kind, sentinel)
+                tx = self._tx(filesystem_boundary_hook=hook)
+                tx.prepare(self.staging_root / kind)
+                with self.assertRaises(self.pack.PackPreflightError):
+                    tx.snapshot(self.snapshot_root / kind)
+                self.assertTrue(fired["value"])
+                self.assertEqual(sentinel.read_bytes(), b"preserve")
+                self.assertEqual(self._protected_trees(), before)
+
+    def test_snapshot_finalize_uses_exact_owned_directory_authority(self):
+        self._finish_setup()
+        unrelated = self.root / "unrelated-finalize-tree"
+        unrelated.mkdir()
+        sentinel = unrelated / "sentinel.bin"
+        sentinel.write_bytes(b"preserve")
+        protected_before = self._protected_trees()
+        owned_orphan = self.root / "owned-finalize-orphan"
+        fired = False
+
+        def hook(event, context):
+            nonlocal fired
+            if event == "before_finalize":
+                fired = True
+                os.rename(context["path"], owned_orphan)
+                os.rename(unrelated, context["path"])
+
+        tx = self._tx(filesystem_boundary_hook=hook)
+        tx.prepare(self.staging_root / "finalize")
+        with self.assertRaises(self.pack.PackPreflightError):
+            tx.snapshot(self.snapshot_root / "finalize")
+        self.assertTrue(fired)
+        self.assertTrue(unrelated.is_dir())
+        self.assertEqual(sentinel.read_bytes(), b"preserve")
+        self.assertEqual(self._protected_trees(), protected_before)
+
+    def test_cleanup_never_deletes_a_changed_pathname_occupant(self):
+        self._finish_setup()
+        for cleanup_kind, failure_kind, operation in (
+            ("prepare_cleanup", "prepare_metadata", "prepare"),
+            ("materialization_cleanup", "payload_asset", "materialize"),
+            ("snapshot_cleanup", "snapshot_json", "snapshot"),
+        ):
+            with self.subTest(cleanup=cleanup_kind):
+                unrelated = self.root / f"unrelated-{cleanup_kind}-tree"
+                unrelated.mkdir()
+                sentinel = unrelated / "sentinel.bin"
+                sentinel.write_bytes(b"preserve")
+                protected_before = self._protected_trees()
+                owned_orphan = self.root / f"owned-{cleanup_kind}-orphan"
+                fired = {"failure": False, "cleanup": False}
+
+                def hook(event, context):
+                    if (event == "before_output_open"
+                            and context["kind"] == failure_kind):
+                        fired["failure"] = True
+                        raise OSError("synthetic owned output failure")
+                    if (event == "before_cleanup_delete"
+                            and context["kind"] == cleanup_kind):
+                        fired["cleanup"] = True
+                        owned_orphan.mkdir()
+                        victim = next(
+                            path for path in context["path"].iterdir()
+                            if path.is_file()
+                        )
+                        os.rename(victim, owned_orphan / victim.name)
+                        os.link(sentinel, victim)
+
+                tx = self._tx(filesystem_boundary_hook=hook)
+                staging = self.staging_root / cleanup_kind
+                if operation == "prepare":
+                    call = lambda: tx.prepare(staging)
+                    error = self.pack.PackPreflightError
+                else:
+                    prepared = tx.prepare(staging)
+                    if operation == "materialize":
+                        call = lambda: tx.materialize_staging(prepared)
+                        error = self.pack.PackStagingError
+                    else:
+                        call = lambda: tx.snapshot(
+                            self.snapshot_root / cleanup_kind
+                        )
+                        error = self.pack.PackPreflightError
+                with self.assertRaises(error):
+                    call()
+                self.assertTrue(fired["failure"])
+                self.assertTrue(fired["cleanup"])
+                self.assertTrue(unrelated.is_dir())
+                self.assertEqual(sentinel.read_bytes(), b"preserve")
+                self.assertEqual(self._protected_trees(), protected_before)
+
     def test_boundary_records_are_deeply_immutable_and_manifest_is_canonical_copied(self):
         self._finish_setup()
         caller_manifest = copy.deepcopy(self.manifest)
@@ -1697,25 +1835,16 @@ class TestPackStagingRecovery(_TransactionFixtureMixin, unittest.TestCase):
         tx = self._tx()
         prepared = tx.prepare(self.staging_root)
         staged = tx.materialize_staging(prepared)
-        marker = (staged.transaction_dir / self.pack.TRANSACTION_MARKER).read_bytes()
         moved_root = self.root / "original-staging-moved"
         target = self.root / "replacement-target"
-        shutil.move(str(self.staging_root), str(moved_root))
         target.mkdir()
-        forged_child = target / staged.transaction_dir.name
-        forged_child.mkdir()
-        (forged_child / self.pack.TRANSACTION_MARKER).write_bytes(marker)
-        sentinel = forged_child / "target.bin"
+        sentinel = target / "target.bin"
         sentinel.write_bytes(b"must-survive")
-        make_directory_link(self.staging_root, target)
-        try:
-            with self.assertRaises(self.pack.PackStagingError):
-                tx.discard_staging(staged)
-            self.assertEqual(sentinel.read_bytes(), b"must-survive")
-            self.assertTrue(forged_child.exists())
-        finally:
-            if self.staging_root.exists():
-                self.staging_root.rmdir()
+        with self.assertRaises(OSError):
+            os.rename(self.staging_root, moved_root)
+        tx.discard_staging(staged)
+        self.assertEqual(sentinel.read_bytes(), b"must-survive")
+        self.assertTrue(target.exists())
 
     def test_replacing_owned_child_with_link_preserves_unrelated_target(self):
         self._finish_setup()
@@ -1724,19 +1853,14 @@ class TestPackStagingRecovery(_TransactionFixtureMixin, unittest.TestCase):
         staged = tx.materialize_staging(prepared)
         moved_child = self.root / "owned-child-moved"
         target = self.root / "unrelated-child-target"
-        shutil.move(str(staged.transaction_dir), str(moved_child))
         target.mkdir()
         sentinel = target / "must-survive.bin"
         sentinel.write_bytes(b"preserve")
-        make_directory_link(staged.transaction_dir, target)
-        try:
-            with self.assertRaises(self.pack.PackStagingError):
-                tx.discard_staging(staged)
-            self.assertEqual(sentinel.read_bytes(), b"preserve")
-            self.assertTrue(target.exists())
-        finally:
-            if staged.transaction_dir.exists():
-                staged.transaction_dir.rmdir()
+        with self.assertRaises(OSError):
+            os.rename(staged.transaction_dir, moved_child)
+        tx.discard_staging(staged)
+        self.assertEqual(sentinel.read_bytes(), b"preserve")
+        self.assertTrue(target.exists())
 
     def test_each_materialization_failpoint_cleans_only_owned_child(self):
         self._finish_setup()
@@ -1770,30 +1894,24 @@ class TestPackStagingRecovery(_TransactionFixtureMixin, unittest.TestCase):
 
     def test_concurrent_payload_link_injection_never_writes_or_deletes_target(self):
         self._finish_setup()
-        tx = self._tx()
-        prepared = tx.prepare(self.staging_root)
         target = self.root / "concurrent-link-target"
         target.mkdir()
         sentinel = target / "sentinel.bin"
         sentinel.write_bytes(b"preserve")
-        original_mkdir = Path.mkdir
         injected = False
+        moved = self.root / "concurrent-owned-moved"
 
-        def inject_link(path, mode=0o777, parents=False, exist_ok=False):
+        def inject_link(event, context):
             nonlocal injected
-            normalized = str(path).replace("\\", "/")
-            if not injected and "/payload/medium/" in normalized:
+            if (not injected and event == "before_output_open"
+                    and context["kind"] == "payload_asset"):
                 injected = True
-                original_mkdir(path.parent, mode=mode, parents=True, exist_ok=True)
-                make_directory_link(path, target)
-                return None
-            return original_mkdir(
-                path, mode=mode, parents=parents, exist_ok=exist_ok
-            )
+                os.rename(prepared.transaction_dir, moved)
 
-        with mock.patch.object(Path, "mkdir", new=inject_link):
-            with self.assertRaises(self.pack.PackStagingError):
-                tx.materialize_staging(prepared)
+        tx = self._tx(filesystem_boundary_hook=inject_link)
+        prepared = tx.prepare(self.staging_root)
+        with self.assertRaises(self.pack.PackStagingError):
+            tx.materialize_staging(prepared)
         self.assertTrue(injected)
         self.assertEqual(sentinel.read_bytes(), b"preserve")
         self.assertEqual(self._tree_bytes(target), {"sentinel.bin": b"preserve"})

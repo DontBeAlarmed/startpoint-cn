@@ -9,17 +9,22 @@ release versions or final archive names.  Production promotion and the single
 from __future__ import annotations
 
 import base64
+import ctypes
 import hashlib
+import io
 import json
 import math
+import os
 import re
-import shutil
 import uuid
 import zipfile
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path, PureWindowsPath
-from typing import Any, Iterable, Literal, Mapping, Protocol, cast
+from typing import Any, Callable, Iterable, Literal, Mapping, Protocol, cast
+
+if os.name == "nt":
+    from ctypes import wintypes
 
 import wf_mod_tool as core
 
@@ -300,6 +305,9 @@ class _TransactionAuthority:
     prepared_digest: str
     prepared: PreparedPack
     analysis: _Analysis
+    owned_fs: "_OwnedFilesystem"
+    owned_dir: "_OwnedDirectoryAuthority"
+    marker_file: "_OwnedFileAuthority"
     lifecycle: str = "prepared"
     staged: StagedPack | None = None
 
@@ -1000,14 +1008,6 @@ def _has_link_or_junction_component(path: Path) -> bool:
     )
 
 
-def _path_identity(path: Path) -> tuple[int, int, int]:
-    try:
-        stat_result = path.stat()
-    except OSError as exc:
-        raise PackStagingError(f"cannot stat owned path {path}: {exc}") from exc
-    return (stat_result.st_dev, stat_result.st_ino, stat_result.st_mode)
-
-
 def _prepared_digest_value(prepared: PreparedPack) -> str:
     payload = {
         "transaction_id": prepared.transaction_id,
@@ -1033,6 +1033,693 @@ def _prepared_digest_value(prepared: PreparedPack) -> str:
     return hashlib.sha256(_canonical_json_bytes(projected)).hexdigest()
 
 
+def _owned_leaf(prefix: str, root: str, logical_path: str) -> str:
+    digest = hashlib.sha256(
+        f"{root}\0{logical_path}".encode("utf-8")
+    ).hexdigest()
+    return f"{prefix}-{root}-{digest}"
+
+
+def _validate_owned_leaf(name: str) -> str:
+    if (not isinstance(name, str) or not name or name in {".", ".."}
+            or "/" in name or "\\" in name or "\0" in name):
+        raise PackStagingError("owned filesystem name must be one safe path leaf")
+    return name
+
+
+if os.name == "nt":
+    class _WinUnicodeString(ctypes.Structure):
+        _fields_ = [
+            ("Length", wintypes.USHORT),
+            ("MaximumLength", wintypes.USHORT),
+            ("Buffer", wintypes.LPWSTR),
+        ]
+
+
+    class _WinObjectAttributes(ctypes.Structure):
+        _fields_ = [
+            ("Length", wintypes.ULONG),
+            ("RootDirectory", wintypes.HANDLE),
+            ("ObjectName", ctypes.POINTER(_WinUnicodeString)),
+            ("Attributes", wintypes.ULONG),
+            ("SecurityDescriptor", wintypes.LPVOID),
+            ("SecurityQualityOfService", wintypes.LPVOID),
+        ]
+
+
+    class _WinIoStatusBlock(ctypes.Structure):
+        _fields_ = [("Status", ctypes.c_void_p), ("Information", ctypes.c_void_p)]
+
+
+    class _WinByHandleInfo(ctypes.Structure):
+        _fields_ = [
+            ("dwFileAttributes", wintypes.DWORD),
+            ("ftCreationTime", wintypes.FILETIME),
+            ("ftLastAccessTime", wintypes.FILETIME),
+            ("ftLastWriteTime", wintypes.FILETIME),
+            ("dwVolumeSerialNumber", wintypes.DWORD),
+            ("nFileSizeHigh", wintypes.DWORD),
+            ("nFileSizeLow", wintypes.DWORD),
+            ("nNumberOfLinks", wintypes.DWORD),
+            ("nFileIndexHigh", wintypes.DWORD),
+            ("nFileIndexLow", wintypes.DWORD),
+        ]
+
+
+    class _WinDispositionInfo(ctypes.Structure):
+        _fields_ = [("DeleteFile", wintypes.BOOL)]
+
+
+class _WindowsOwnedApi:
+    FILE_SHARE_READ = 0x1
+    FILE_SHARE_WRITE = 0x2
+    FILE_SHARE_DELETE = 0x4
+    OPEN_EXISTING = 3
+    FILE_ATTRIBUTE_NORMAL = 0x80
+    FILE_ATTRIBUTE_DIRECTORY = 0x10
+    FILE_ATTRIBUTE_REPARSE_POINT = 0x400
+    FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
+    FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
+    FILE_LIST_DIRECTORY = 0x1
+    FILE_ADD_FILE = 0x2
+    FILE_ADD_SUBDIRECTORY = 0x4
+    FILE_DELETE_CHILD = 0x40
+    FILE_READ_ATTRIBUTES = 0x80
+    FILE_WRITE_ATTRIBUTES = 0x100
+    FILE_READ_DATA = 0x1
+    FILE_WRITE_DATA = 0x2
+    FILE_TRAVERSE = 0x20
+    DELETE = 0x00010000
+    SYNCHRONIZE = 0x00100000
+    GENERIC_READ = 0x80000000
+    GENERIC_WRITE = 0x40000000
+    OBJ_CASE_INSENSITIVE = 0x40
+    FILE_OPEN = 1
+    FILE_CREATE = 2
+    FILE_DIRECTORY_FILE = 0x1
+    FILE_SYNCHRONOUS_IO_NONALERT = 0x20
+    FILE_NON_DIRECTORY_FILE = 0x40
+    FILE_OPEN_FOR_BACKUP_INTENT = 0x4000
+    FILE_OPEN_REPARSE_POINT = 0x00200000
+    FILE_BEGIN = 0
+    FILE_DISPOSITION_INFO = 4
+
+    def __init__(self):
+        self.kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        self.ntdll = ctypes.WinDLL("ntdll")
+        self.CreateFileW = self.kernel32.CreateFileW
+        self.CreateFileW.argtypes = [
+            wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
+            wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE,
+        ]
+        self.CreateFileW.restype = wintypes.HANDLE
+        self.CloseHandle = self.kernel32.CloseHandle
+        self.CloseHandle.argtypes = [wintypes.HANDLE]
+        self.CloseHandle.restype = wintypes.BOOL
+        self.GetFileInformationByHandle = self.kernel32.GetFileInformationByHandle
+        self.GetFileInformationByHandle.argtypes = [
+            wintypes.HANDLE, ctypes.POINTER(_WinByHandleInfo),
+        ]
+        self.GetFileInformationByHandle.restype = wintypes.BOOL
+        self.GetFinalPathNameByHandleW = self.kernel32.GetFinalPathNameByHandleW
+        self.GetFinalPathNameByHandleW.argtypes = [
+            wintypes.HANDLE, wintypes.LPWSTR, wintypes.DWORD, wintypes.DWORD,
+        ]
+        self.GetFinalPathNameByHandleW.restype = wintypes.DWORD
+        self.SetFileInformationByHandle = self.kernel32.SetFileInformationByHandle
+        self.SetFileInformationByHandle.argtypes = [
+            wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD,
+        ]
+        self.SetFileInformationByHandle.restype = wintypes.BOOL
+        self.SetFilePointerEx = self.kernel32.SetFilePointerEx
+        self.SetFilePointerEx.argtypes = [
+            wintypes.HANDLE, ctypes.c_longlong,
+            ctypes.POINTER(ctypes.c_longlong), wintypes.DWORD,
+        ]
+        self.SetFilePointerEx.restype = wintypes.BOOL
+        self.SetEndOfFile = self.kernel32.SetEndOfFile
+        self.SetEndOfFile.argtypes = [wintypes.HANDLE]
+        self.SetEndOfFile.restype = wintypes.BOOL
+        self.WriteFile = self.kernel32.WriteFile
+        self.WriteFile.argtypes = [
+            wintypes.HANDLE, wintypes.LPCVOID, wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD), wintypes.LPVOID,
+        ]
+        self.WriteFile.restype = wintypes.BOOL
+        self.ReadFile = self.kernel32.ReadFile
+        self.ReadFile.argtypes = [
+            wintypes.HANDLE, wintypes.LPVOID, wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD), wintypes.LPVOID,
+        ]
+        self.ReadFile.restype = wintypes.BOOL
+        self.GetFileSizeEx = self.kernel32.GetFileSizeEx
+        self.GetFileSizeEx.argtypes = [
+            wintypes.HANDLE, ctypes.POINTER(ctypes.c_longlong),
+        ]
+        self.GetFileSizeEx.restype = wintypes.BOOL
+        self.FlushFileBuffers = self.kernel32.FlushFileBuffers
+        self.FlushFileBuffers.argtypes = [wintypes.HANDLE]
+        self.FlushFileBuffers.restype = wintypes.BOOL
+        self.NtCreateFile = self.ntdll.NtCreateFile
+        self.NtCreateFile.argtypes = [
+            ctypes.POINTER(wintypes.HANDLE), wintypes.DWORD,
+            ctypes.POINTER(_WinObjectAttributes),
+            ctypes.POINTER(_WinIoStatusBlock), ctypes.c_void_p,
+            wintypes.ULONG, wintypes.ULONG, wintypes.ULONG, wintypes.ULONG,
+            ctypes.c_void_p, wintypes.ULONG,
+        ]
+        self.NtCreateFile.restype = ctypes.c_long
+        self.RtlNtStatusToDosError = self.ntdll.RtlNtStatusToDosError
+        self.RtlNtStatusToDosError.argtypes = [ctypes.c_long]
+        self.RtlNtStatusToDosError.restype = wintypes.ULONG
+
+    @staticmethod
+    def _raise_last(label: str) -> None:
+        code = ctypes.get_last_error()
+        raise OSError(code, f"{label}: {ctypes.FormatError(code)}")
+
+    def close(self, handle: int) -> None:
+        if handle and not self.CloseHandle(wintypes.HANDLE(handle)):
+            self._raise_last("CloseHandle")
+
+    def open_root(self, path: Path) -> int:
+        access = (
+            self.FILE_LIST_DIRECTORY | self.FILE_ADD_FILE
+            | self.FILE_ADD_SUBDIRECTORY | self.FILE_DELETE_CHILD
+            | self.FILE_READ_ATTRIBUTES | self.FILE_WRITE_ATTRIBUTES
+            | self.FILE_TRAVERSE | self.SYNCHRONIZE
+        )
+        handle = self.CreateFileW(
+            str(path), access, self.FILE_SHARE_READ | self.FILE_SHARE_WRITE,
+            None, self.OPEN_EXISTING,
+            self.FILE_FLAG_BACKUP_SEMANTICS | self.FILE_FLAG_OPEN_REPARSE_POINT,
+            None,
+        )
+        invalid = ctypes.c_void_p(-1).value
+        value = ctypes.cast(handle, ctypes.c_void_p).value
+        if value == invalid or value is None:
+            self._raise_last(f"open owned root {path}")
+        return int(value)
+
+    def open_relative(self, parent: int, name: str, *, directory: bool,
+                      create: bool, delete_access: bool = False) -> int:
+        _validate_owned_leaf(name)
+        name_buffer = ctypes.create_unicode_buffer(name)
+        name_bytes = len(name.encode("utf-16-le"))
+        unicode_name = _WinUnicodeString(
+            name_bytes, name_bytes + ctypes.sizeof(wintypes.WCHAR),
+            ctypes.cast(name_buffer, wintypes.LPWSTR),
+        )
+        attributes = _WinObjectAttributes(
+            ctypes.sizeof(_WinObjectAttributes), wintypes.HANDLE(parent),
+            ctypes.pointer(unicode_name), self.OBJ_CASE_INSENSITIVE,
+            None, None,
+        )
+        io_status = _WinIoStatusBlock()
+        output = wintypes.HANDLE()
+        if directory:
+            access = (
+                self.FILE_LIST_DIRECTORY | self.FILE_ADD_FILE
+                | self.FILE_ADD_SUBDIRECTORY | self.FILE_DELETE_CHILD
+                | self.FILE_READ_ATTRIBUTES | self.FILE_WRITE_ATTRIBUTES
+                | self.FILE_TRAVERSE | self.DELETE | self.SYNCHRONIZE
+            )
+            options = (
+                self.FILE_DIRECTORY_FILE | self.FILE_SYNCHRONOUS_IO_NONALERT
+                | self.FILE_OPEN_FOR_BACKUP_INTENT | self.FILE_OPEN_REPARSE_POINT
+            )
+            file_attributes = self.FILE_ATTRIBUTE_DIRECTORY
+            share = self.FILE_SHARE_READ | self.FILE_SHARE_WRITE
+        else:
+            access = (
+                self.FILE_READ_DATA | self.FILE_WRITE_DATA
+                | self.FILE_READ_ATTRIBUTES | self.FILE_WRITE_ATTRIBUTES
+                | self.SYNCHRONIZE
+                | (self.DELETE if delete_access else 0)
+            )
+            options = (
+                self.FILE_NON_DIRECTORY_FILE | self.FILE_SYNCHRONOUS_IO_NONALERT
+                | self.FILE_OPEN_REPARSE_POINT
+            )
+            file_attributes = self.FILE_ATTRIBUTE_NORMAL
+            share = (
+                self.FILE_SHARE_READ | self.FILE_SHARE_WRITE
+                | self.FILE_SHARE_DELETE
+            )
+        status = self.NtCreateFile(
+            ctypes.byref(output), access, ctypes.byref(attributes),
+            ctypes.byref(io_status), None, file_attributes, share,
+            self.FILE_CREATE if create else self.FILE_OPEN,
+            options, None, 0,
+        )
+        if status < 0:
+            code = int(self.RtlNtStatusToDosError(status))
+            raise OSError(code, f"NtCreateFile({name}): {ctypes.FormatError(code)}")
+        value = ctypes.cast(output, ctypes.c_void_p).value
+        if value is None:
+            raise OSError(f"NtCreateFile({name}) returned a null handle")
+        return int(value)
+
+    def identity(self, handle: int, *, directory: bool) -> tuple[int, int, int]:
+        info = _WinByHandleInfo()
+        if not self.GetFileInformationByHandle(
+            wintypes.HANDLE(handle), ctypes.byref(info)
+        ):
+            self._raise_last("GetFileInformationByHandle")
+        if info.dwFileAttributes & self.FILE_ATTRIBUTE_REPARSE_POINT:
+            raise PackStagingError("owned handle resolves to a reparse point")
+        is_directory = bool(info.dwFileAttributes & self.FILE_ATTRIBUTE_DIRECTORY)
+        if is_directory != directory:
+            raise PackStagingError("owned handle type changed")
+        return (
+            int(info.dwVolumeSerialNumber),
+            (int(info.nFileIndexHigh) << 32) | int(info.nFileIndexLow),
+            int(info.dwFileAttributes),
+        )
+
+    def final_path(self, handle: int) -> Path:
+        size = self.GetFinalPathNameByHandleW(
+            wintypes.HANDLE(handle), None, 0, 0
+        )
+        if not size:
+            self._raise_last("GetFinalPathNameByHandleW(size)")
+        buffer = ctypes.create_unicode_buffer(size + 1)
+        written = self.GetFinalPathNameByHandleW(
+            wintypes.HANDLE(handle), buffer, len(buffer), 0
+        )
+        if not written or written >= len(buffer):
+            self._raise_last("GetFinalPathNameByHandleW(path)")
+        value = buffer.value
+        if value.startswith("\\\\?\\UNC\\"):
+            value = "\\\\" + value[8:]
+        elif value.startswith("\\\\?\\"):
+            value = value[4:]
+        return Path(value)
+
+    def read(self, handle: int) -> bytes:
+        size = ctypes.c_longlong()
+        if not self.GetFileSizeEx(wintypes.HANDLE(handle), ctypes.byref(size)):
+            self._raise_last("GetFileSizeEx")
+        if not self.SetFilePointerEx(
+            wintypes.HANDLE(handle), 0, None, self.FILE_BEGIN
+        ):
+            self._raise_last("SetFilePointerEx(read)")
+        remaining = int(size.value)
+        chunks: list[bytes] = []
+        while remaining:
+            amount = min(remaining, 1024 * 1024)
+            buffer = ctypes.create_string_buffer(amount)
+            read = wintypes.DWORD()
+            if not self.ReadFile(
+                wintypes.HANDLE(handle), buffer, amount, ctypes.byref(read), None
+            ):
+                self._raise_last("ReadFile")
+            if read.value == 0:
+                raise OSError("ReadFile returned an unexpected EOF")
+            chunks.append(buffer.raw[:read.value])
+            remaining -= int(read.value)
+        return b"".join(chunks)
+
+    def write(self, handle: int, raw: bytes) -> None:
+        if not self.SetFilePointerEx(
+            wintypes.HANDLE(handle), 0, None, self.FILE_BEGIN
+        ):
+            self._raise_last("SetFilePointerEx(write)")
+        if not self.SetEndOfFile(wintypes.HANDLE(handle)):
+            self._raise_last("SetEndOfFile")
+        offset = 0
+        while offset < len(raw):
+            chunk = raw[offset:offset + 1024 * 1024]
+            buffer = ctypes.create_string_buffer(chunk)
+            written = wintypes.DWORD()
+            if not self.WriteFile(
+                wintypes.HANDLE(handle), buffer, len(chunk),
+                ctypes.byref(written), None,
+            ):
+                self._raise_last("WriteFile")
+            if written.value == 0:
+                raise OSError("WriteFile made no progress")
+            offset += int(written.value)
+        if not self.FlushFileBuffers(wintypes.HANDLE(handle)):
+            self._raise_last("FlushFileBuffers")
+
+    def dispose(self, handle: int) -> None:
+        info = _WinDispositionInfo(True)
+        if not self.SetFileInformationByHandle(
+            wintypes.HANDLE(handle), self.FILE_DISPOSITION_INFO,
+            ctypes.byref(info), ctypes.sizeof(info),
+        ):
+            self._raise_last("SetFileInformationByHandle(disposition)")
+
+_WIN_OWNED_API = _WindowsOwnedApi() if os.name == "nt" else None
+
+
+@dataclass
+class _OwnedFileAuthority:
+    owner: "_OwnedFilesystem"
+    parent: "_OwnedDirectoryAuthority"
+    name: str
+    path: Path
+    handle: int
+    identity: tuple[int, int, int]
+    closed: bool = False
+
+    def validate(self) -> None:
+        if self.closed:
+            raise PackStagingError("owned file handle is closed")
+        current = self.owner._identity(self.handle, directory=False)
+        if current != self.identity:
+            raise PackStagingError("owned file handle identity changed")
+        self.parent.validate()
+        self.owner._validate_file_name(self)
+
+    def read_bytes(self) -> bytes:
+        self.validate()
+        return self.owner._read(self.handle)
+
+    def write_bytes(self, raw: bytes) -> None:
+        self.validate()
+        self.owner._write(self.handle, raw)
+        self.validate()
+        if self.owner._read(self.handle) != raw:
+            raise PackStagingError("owned file handle readback mismatch")
+
+
+@dataclass
+class _OwnedDirectoryAuthority:
+    owner: "_OwnedFilesystem"
+    parent: "_OwnedDirectoryAuthority | None"
+    name: str | None
+    path: Path
+    handle: int
+    identity: tuple[int, int, int]
+    files: dict[str, _OwnedFileAuthority]
+    closed: bool = False
+
+    def validate(self) -> None:
+        if self.closed:
+            raise PackStagingError("owned directory handle is closed")
+        current = self.owner._identity(self.handle, directory=True)
+        if current != self.identity:
+            raise PackStagingError("owned directory handle identity changed")
+        if self.parent is not None:
+            self.parent.validate()
+            self.owner._validate_directory_name(self)
+
+    def create_file(self, name: str, raw: bytes, kind: str) -> _OwnedFileAuthority:
+        return self.owner.create_file(self, name, raw, kind)
+
+
+class _OwnedFilesystem:
+    """Handle-bound, no-follow authority for every owned output and cleanup."""
+
+    def __init__(
+        self, root: Path,
+        hook: Callable[[str, Mapping[str, Any]], None] | None,
+    ):
+        self.hook = hook
+        self.windows = os.name == "nt"
+        self.root = self._open_root(Path(root))
+        self.children: list[_OwnedDirectoryAuthority] = []
+
+    def _fire(self, event: str, **context: Any) -> None:
+        if self.hook is not None:
+            self.hook(event, context)
+
+    def _open_root(self, path: Path) -> _OwnedDirectoryAuthority:
+        if self.windows:
+            assert _WIN_OWNED_API is not None
+            handle = _WIN_OWNED_API.open_root(path)
+        else:
+            flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) \
+                | getattr(os, "O_NOFOLLOW", 0)
+            handle = os.open(path, flags)
+        try:
+            identity = self._identity(handle, directory=True)
+            if self.windows:
+                assert _WIN_OWNED_API is not None
+                opened_path = _WIN_OWNED_API.final_path(handle)
+                if os.path.normcase(str(opened_path.resolve())) != os.path.normcase(
+                    str(path.resolve())
+                ):
+                    raise PackStagingError(
+                        "owned root handle resolved to a different final path"
+                    )
+            elif (Path("/proc/self/fd").exists()
+                  and not os.path.samefile(path, f"/proc/self/fd/{handle}")):
+                raise PackStagingError(
+                    "owned POSIX root handle resolved to a different object"
+                )
+        except Exception:
+            if self.windows:
+                assert _WIN_OWNED_API is not None
+                _WIN_OWNED_API.close(handle)
+            else:
+                os.close(handle)
+            raise
+        return _OwnedDirectoryAuthority(
+            self, None, None, path, handle, identity, {}, False
+        )
+
+    def _identity(self, handle: int, *, directory: bool) -> tuple[int, int, int]:
+        if self.windows:
+            assert _WIN_OWNED_API is not None
+            return _WIN_OWNED_API.identity(handle, directory=directory)
+        stat_result = os.fstat(handle)
+        is_directory = (stat_result.st_mode & 0o170000) == 0o040000
+        if is_directory != directory:
+            raise PackStagingError("owned POSIX handle type changed")
+        return (stat_result.st_dev, stat_result.st_ino, stat_result.st_mode)
+
+    def _validate_directory_name(
+        self, directory: _OwnedDirectoryAuthority,
+    ) -> None:
+        if self.windows:
+            # Windows directory handles deliberately deny FILE_SHARE_DELETE, so
+            # their parent/name association cannot change while retained.
+            return
+        assert directory.parent is not None
+        assert directory.name is not None
+        stat_result = os.stat(
+            directory.name,
+            dir_fd=directory.parent.handle,
+            follow_symlinks=False,
+        )
+        identity = (stat_result.st_dev, stat_result.st_ino, stat_result.st_mode)
+        if identity != directory.identity:
+            raise PackStagingError(
+                "owned POSIX directory name no longer identifies retained handle"
+            )
+
+    def _validate_file_name(self, owned: _OwnedFileAuthority) -> None:
+        if self.windows:
+            assert _WIN_OWNED_API is not None
+            reopened = _WIN_OWNED_API.open_relative(
+                owned.parent.handle,
+                owned.name,
+                directory=False,
+                create=False,
+            )
+            try:
+                identity = _WIN_OWNED_API.identity(reopened, directory=False)
+            finally:
+                _WIN_OWNED_API.close(reopened)
+        else:
+            stat_result = os.stat(
+                owned.name,
+                dir_fd=owned.parent.handle,
+                follow_symlinks=False,
+            )
+            identity = (
+                stat_result.st_dev,
+                stat_result.st_ino,
+                stat_result.st_mode,
+            )
+        if identity != owned.identity:
+            raise PackStagingError(
+                "owned output name no longer identifies retained file handle"
+            )
+
+    def create_directory(self, name: str) -> _OwnedDirectoryAuthority:
+        name = _validate_owned_leaf(name)
+        self.root.validate()
+        if self.windows:
+            assert _WIN_OWNED_API is not None
+            handle = _WIN_OWNED_API.open_relative(
+                self.root.handle, name, directory=True, create=True
+            )
+        else:
+            os.mkdir(name, mode=0o700, dir_fd=self.root.handle)
+            flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) \
+                | getattr(os, "O_NOFOLLOW", 0)
+            handle = os.open(name, flags, dir_fd=self.root.handle)
+        try:
+            identity = self._identity(handle, directory=True)
+        except Exception:
+            self._close_handle(handle)
+            raise
+        child = _OwnedDirectoryAuthority(
+            self, self.root, name, self.root.path / name, handle,
+            identity, {}, False,
+        )
+        self.children.append(child)
+        return child
+
+    def create_file(
+        self, parent: _OwnedDirectoryAuthority, name: str, raw: bytes, kind: str,
+    ) -> _OwnedFileAuthority:
+        name = _validate_owned_leaf(name)
+        parent.validate()
+        path = parent.path / name
+        self._fire("before_output_open", kind=kind, path=path)
+        parent.validate()
+        if self.windows:
+            assert _WIN_OWNED_API is not None
+            handle = _WIN_OWNED_API.open_relative(
+                parent.handle, name, directory=False, create=True
+            )
+        else:
+            flags = os.O_RDWR | os.O_CREAT | os.O_EXCL \
+                | getattr(os, "O_NOFOLLOW", 0)
+            handle = os.open(name, flags, 0o600, dir_fd=parent.handle)
+        try:
+            identity = self._identity(handle, directory=False)
+        except Exception:
+            self._close_handle(handle)
+            raise
+        owned = _OwnedFileAuthority(
+            self, parent, name, path, handle,
+            identity, False,
+        )
+        parent.files[name] = owned
+        owned.write_bytes(raw)
+        self._fire(
+            "before_output_verify", kind=kind, path=path, authority=owned
+        )
+        owned.validate()
+        observed = owned.read_bytes()
+        if (len(observed) != len(raw)
+                or hashlib.sha256(observed).digest() != hashlib.sha256(raw).digest()):
+            raise PackStagingError("owned output hash/readback mismatch")
+        return owned
+
+    def _read(self, handle: int) -> bytes:
+        if self.windows:
+            assert _WIN_OWNED_API is not None
+            return _WIN_OWNED_API.read(handle)
+        os.lseek(handle, 0, os.SEEK_SET)
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(handle, 1024 * 1024)
+            if not chunk:
+                return b"".join(chunks)
+            chunks.append(chunk)
+
+    def _write(self, handle: int, raw: bytes) -> None:
+        if self.windows:
+            assert _WIN_OWNED_API is not None
+            _WIN_OWNED_API.write(handle, raw)
+            return
+        os.lseek(handle, 0, os.SEEK_SET)
+        os.ftruncate(handle, 0)
+        view = memoryview(raw)
+        while view:
+            written = os.write(handle, view)
+            if written <= 0:
+                raise OSError("owned POSIX write made no progress")
+            view = view[written:]
+        os.fsync(handle)
+
+    def _close_handle(self, handle: int) -> None:
+        if self.windows:
+            assert _WIN_OWNED_API is not None
+            _WIN_OWNED_API.close(handle)
+        else:
+            os.close(handle)
+
+    def _close_file(self, owned: _OwnedFileAuthority) -> None:
+        if not owned.closed:
+            self._close_handle(owned.handle)
+            owned.closed = True
+
+    def _close_directory(self, directory: _OwnedDirectoryAuthority) -> None:
+        if not directory.closed:
+            self._close_handle(directory.handle)
+            directory.closed = True
+
+    def delete_directory(
+        self, directory: _OwnedDirectoryAuthority, kind: str,
+    ) -> None:
+        directory.validate()
+        self._fire("before_cleanup_delete", kind=kind, path=directory.path)
+        directory.validate()
+        if self.windows:
+            names = {entry.name for entry in os.scandir(directory.path)}
+        else:
+            names = set(os.listdir(directory.handle))
+        if names != set(directory.files):
+            raise PackStagingError(
+                "owned directory contains untracked entries; preserving orphan"
+            )
+        for name in sorted(directory.files):
+            owned = directory.files[name]
+            owned.validate()
+            if self.windows:
+                assert _WIN_OWNED_API is not None
+                self._close_file(owned)
+                delete_handle = _WIN_OWNED_API.open_relative(
+                    directory.handle, name, directory=False, create=False,
+                    delete_access=True,
+                )
+                try:
+                    if _WIN_OWNED_API.identity(
+                        delete_handle, directory=False
+                    ) != owned.identity:
+                        raise PackStagingError(
+                            "owned output name changed before exact handle deletion"
+                        )
+                    _WIN_OWNED_API.dispose(delete_handle)
+                finally:
+                    _WIN_OWNED_API.close(delete_handle)
+            else:
+                stat_result = os.stat(
+                    name, dir_fd=directory.handle, follow_symlinks=False
+                )
+                identity = (stat_result.st_dev, stat_result.st_ino, stat_result.st_mode)
+                if identity != owned.identity:
+                    raise PackStagingError(
+                        "owned POSIX output name no longer identifies retained file"
+                    )
+                os.unlink(name, dir_fd=directory.handle)
+                self._close_file(owned)
+        directory.validate()
+        if self.windows:
+            assert _WIN_OWNED_API is not None
+            _WIN_OWNED_API.dispose(directory.handle)
+            self._close_directory(directory)
+        else:
+            assert directory.name is not None
+            os.rmdir(directory.name, dir_fd=self.root.handle)
+            self._close_directory(directory)
+        self._close_directory(self.root)
+
+    def abandon(self) -> None:
+        for directory in self.children:
+            for owned in directory.files.values():
+                try:
+                    self._close_file(owned)
+                except OSError:
+                    pass
+            try:
+                self._close_directory(directory)
+            except OSError:
+                pass
+        try:
+            self._close_directory(self.root)
+        except OSError:
+            pass
+
+
 class PackTransaction:
     """Build a read-only plan and materialize it only in an owned staging child."""
 
@@ -1049,6 +1736,7 @@ class PackTransaction:
         available_capabilities: Iterable[str] = (),
         degraded_data_confirmed: bool = False,
         snapshot_roots: Iterable[Path] = (),
+        filesystem_boundary_hook: Callable[[str, Mapping[str, Any]], None] | None = None,
     ):
         self.package_dir = Path(package_dir)
         try:
@@ -1074,9 +1762,26 @@ class PackTransaction:
         self.available_capabilities = frozenset(available_capabilities)
         self.degraded_data_confirmed = bool(degraded_data_confirmed)
         self.snapshot_roots = tuple(Path(path) for path in snapshot_roots)
+        self._filesystem_boundary_hook = filesystem_boundary_hook
         self._analysis: _Analysis | None = None
         self._transactions: dict[str, _TransactionAuthority] = {}
         self._latest_transaction_id: str | None = None
+        self._snapshot_authorities: list[
+            tuple[_OwnedFilesystem, _OwnedDirectoryAuthority]
+        ] = []
+
+    def __del__(self):
+        for authority in getattr(self, "_transactions", {}).values():
+            if authority.lifecycle not in {"discarded", "orphaned"}:
+                try:
+                    authority.owned_fs.abandon()
+                except Exception:
+                    pass
+        for snapshot_fs, _ in getattr(self, "_snapshot_authorities", ()):
+            try:
+                snapshot_fs.abandon()
+            except Exception:
+                pass
 
     @property
     def manifest(self) -> dict:
@@ -1637,13 +2342,14 @@ class PackTransaction:
         transaction_id = uuid.uuid4().hex
         previous_latest_transaction_id = self._latest_transaction_id
         marker_nonce = uuid.uuid4().hex
-        child = root / f"character-pack-{transaction_id}"
+        child_name = f"character-pack-{transaction_id}"
+        child = root / child_name
         package_manifest_sha256 = hashlib.sha256(self._manifest_bytes).hexdigest()
-        root_identity = _path_identity(root)
-        child_identity: tuple[int, int, int] | None = None
+        owned_fs: _OwnedFilesystem | None = None
+        owned_dir: _OwnedDirectoryAuthority | None = None
         try:
-            child.mkdir()
-            child_identity = _path_identity(child)
+            owned_fs = _OwnedFilesystem(root, self._filesystem_boundary_hook)
+            owned_dir = owned_fs.create_directory(child_name)
             provisional = PreparedPack(
                 transaction_id=transaction_id,
                 staging_root=root,
@@ -1667,8 +2373,9 @@ class PackTransaction:
                 "prepared_digest": prepared.prepared_digest,
             }
             marker_bytes = _canonical_json_bytes(marker)
-            marker_path = child / TRANSACTION_MARKER
-            marker_path.write_bytes(marker_bytes)
+            marker_file = owned_dir.create_file(
+                TRANSACTION_MARKER, marker_bytes, "prepare_marker"
+            )
             metadata = {
                 "transaction_id": transaction_id,
                 "marker_nonce": marker_nonce,
@@ -1679,19 +2386,23 @@ class PackTransaction:
                 "file_changes": _plain(self._analysis.file_changes),
                 "degraded_data_confirmed": self.degraded_data_confirmed,
             }
-            (child / "prepared.json").write_bytes(_canonical_json_bytes(metadata))
-            assert child_identity is not None
+            owned_dir.create_file(
+                "prepared.json", _canonical_json_bytes(metadata), "prepare_metadata"
+            )
             authority = _TransactionAuthority(
                 transaction_id=transaction_id,
                 root=root,
                 transaction_dir=child,
-                root_identity=root_identity,
-                dir_identity=child_identity,
+                root_identity=owned_fs.root.identity,
+                dir_identity=owned_dir.identity,
                 marker_nonce=marker_nonce,
                 marker_digest=hashlib.sha256(marker_bytes).hexdigest(),
                 prepared_digest=prepared.prepared_digest,
                 prepared=prepared,
                 analysis=self._analysis,
+                owned_fs=owned_fs,
+                owned_dir=owned_dir,
+                marker_file=marker_file,
             )
             self._transactions[transaction_id] = authority
             self._latest_transaction_id = transaction_id
@@ -1700,41 +2411,30 @@ class PackTransaction:
             self._transactions.pop(transaction_id, None)
             if self._latest_transaction_id == transaction_id:
                 self._latest_transaction_id = previous_latest_transaction_id
-            try:
-                safe_cleanup = (
-                    child_identity is not None
-                    and child.exists()
-                    and child.parent == root
-                    and not _has_link_or_junction_component(child)
-                    and _path_identity(root) == root_identity
-                    and _path_identity(child) == child_identity
-                )
-            except Exception:
-                safe_cleanup = False
-            if safe_cleanup:
-                shutil.rmtree(child)
-            raise PackPreflightError(f"cannot create prepared transaction: {exc}") from exc
+            cleanup_error: Exception | None = None
+            if owned_fs is not None and owned_dir is not None:
+                try:
+                    owned_fs.delete_directory(owned_dir, "prepare_cleanup")
+                except Exception as cleanup_exc:
+                    cleanup_error = cleanup_exc
+                    owned_fs.abandon()
+            elif owned_fs is not None:
+                owned_fs.abandon()
+            detail = f"cannot create prepared transaction: {exc}"
+            if cleanup_error is not None:
+                detail += f"; exact owned cleanup preserved orphan: {cleanup_error}"
+            raise PackPreflightError(detail) from exc
         return prepared
 
     def _validate_authority(self, authority: _TransactionAuthority) -> None:
-        if authority.lifecycle == "discarded":
+        if authority.lifecycle in {"discarded", "orphaned"}:
             raise PackStagingError("transaction authority is tombstoned")
-        if (_has_link_or_junction_component(authority.root)
-                or _has_link_or_junction_component(authority.transaction_dir)):
-            raise PackStagingError("owned transaction topology traverses a link/junction")
-        if authority.root.resolve() != authority.root:
-            raise PackStagingError("owned staging root identity changed")
-        if authority.transaction_dir.resolve() != authority.transaction_dir:
-            raise PackStagingError("owned transaction directory identity changed")
-        if authority.transaction_dir.parent != authority.root:
-            raise PackStagingError("owned transaction is no longer a direct child")
-        if _path_identity(authority.root) != authority.root_identity:
-            raise PackStagingError("owned staging root filesystem identity changed")
-        if _path_identity(authority.transaction_dir) != authority.dir_identity:
-            raise PackStagingError("owned transaction directory filesystem identity changed")
-        marker_path = authority.transaction_dir / TRANSACTION_MARKER
+        authority.owned_dir.validate()
+        if authority.owned_fs.root.identity != authority.root_identity \
+                or authority.owned_dir.identity != authority.dir_identity:
+            raise PackStagingError("retained transaction handle identity changed")
         try:
-            marker_bytes = marker_path.read_bytes()
+            marker_bytes = authority.marker_file.read_bytes()
             marker = json.loads(marker_bytes.decode("utf-8"))
         except Exception as exc:
             raise PackStagingError(f"transaction marker is unreadable: {exc}") from exc
@@ -1760,36 +2460,14 @@ class PackTransaction:
 
     def _remove_owned(self, authority: _TransactionAuthority) -> None:
         self._validate_authority(authority)
-        quarantine = authority.root / (
-            f".discard-{authority.transaction_id}-{uuid.uuid4().hex}"
-        )
-        if quarantine.exists():
-            raise PackStagingError("owned discard quarantine already exists")
         try:
-            authority.transaction_dir.rename(quarantine)
-        except OSError as exc:
-            raise PackStagingError(f"cannot isolate owned transaction for deletion: {exc}") \
-                from exc
-        isolated_matches = False
-        try:
-            isolated_matches = (
-                not _has_link_or_junction_component(quarantine)
-                and quarantine.parent == authority.root
-                and _path_identity(authority.root) == authority.root_identity
-                and _path_identity(quarantine) == authority.dir_identity
+            authority.owned_fs.delete_directory(
+                authority.owned_dir, "materialization_cleanup"
             )
         except Exception:
-            isolated_matches = False
-        if not isolated_matches:
-            try:
-                if not authority.transaction_dir.exists() and quarantine.exists():
-                    quarantine.rename(authority.transaction_dir)
-            except OSError:
-                pass
-            raise PackStagingError(
-                "owned transaction identity changed while isolating deletion"
-            )
-        shutil.rmtree(quarantine)
+            authority.lifecycle = "orphaned"
+            authority.owned_fs.abandon()
+            raise
         authority.lifecycle = "discarded"
 
     @staticmethod
@@ -1805,8 +2483,8 @@ class PackTransaction:
         authority = self._authority_for_prepared(prepared)
         owned = authority.prepared
         analysis = authority.analysis
-        payload_root = authority.transaction_dir / "payload"
         staged_files: list[dict] = []
+        staged_handles: dict[TableKey, _OwnedFileAuthority] = {}
         table_readback: list[dict] = []
         provisional: list[dict] = []
 
@@ -1840,24 +2518,18 @@ class PackTransaction:
                 raise PackStagingError(
                     f"package source changed after prepare: {item['root']}:{item['logical_path']}"
                 )
-            destination = payload_root / root_name / Path(*logical_path.split("/"))
-            try:
-                destination.resolve().relative_to(authority.transaction_dir)
-            except ValueError as exc:
-                raise PackStagingError("staged destination escaped owned transaction") from exc
+            leaf = _owned_leaf("payload", root_name, logical_path)
+            output = authority.owned_dir.create_file(
+                leaf,
+                raw,
+                "payload_table" if item["is_table"] else "payload_asset",
+            )
             self._validate_authority(authority)
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            if _has_link_or_junction_component(destination.parent):
-                raise PackStagingError("staged destination traverses a link/junction")
-            self._validate_authority(authority)
-            destination.write_bytes(raw)
-            self._validate_authority(authority)
-            if destination.resolve().parent != destination.parent.resolve():
-                raise PackStagingError("staged destination identity changed")
+            staged_handles[(cast(RootName, root_name), logical_path)] = output
             staged_files.append({
                 "root": root_name,
                 "logical_path": logical_path,
-                "path": str(destination),
+                "path": str(output.path),
                 "sha256": item["after_sha256"],
                 "size": item["after_size"],
                 "operation": item["operation"],
@@ -1887,7 +2559,7 @@ class PackTransaction:
                     raise PackStagingError(
                         f"staged table is missing: {root_name}:{logical_path}"
                     )
-                raw = Path(staged_item["path"]).read_bytes()
+                raw = staged_handles[table_key].read_bytes()
                 try:
                     inspected = self.codecs[claim.codec_id].inspect(
                         raw, inspection_claim, inspection_claim.semantic_claims
@@ -1913,23 +2585,22 @@ class PackTransaction:
             self._phase_failure(fail_after, "readback")
 
             for item in staged_files:
-                path = Path(item["path"])
-                if path.stat().st_size != item["size"] \
-                        or _sha256_file(path) != item["sha256"]:
+                key = (cast(RootName, item["root"]), item["logical_path"])
+                raw = staged_handles[key].read_bytes()
+                if len(raw) != item["size"] \
+                        or hashlib.sha256(raw).hexdigest() != item["sha256"]:
                     raise PackStagingError(
                         f"staged hash verification failed: {item['root']}:{item['logical_path']}"
                     )
             self._phase_failure(fail_after, "hash_verification")
 
             self._validate_authority(authority)
-            archive_dir = authority.transaction_dir / "provisional"
-            archive_dir.mkdir()
             for root in CLIENT_ROOTS:
-                archive_path = archive_dir / f"{root}.zip"
                 members: list[str] = []
                 self._validate_authority(authority)
+                archive_buffer = io.BytesIO()
                 with zipfile.ZipFile(
-                    archive_path, "w", compression=zipfile.ZIP_DEFLATED
+                    archive_buffer, "w", compression=zipfile.ZIP_DEFLATED
                 ) as archive:
                     for item in sorted(
                         (record for record in staged_files if record["root"] == root),
@@ -1941,18 +2612,23 @@ class PackTransaction:
                         info = zipfile.ZipInfo(member, (1980, 1, 1, 0, 0, 0))
                         info.compress_type = zipfile.ZIP_DEFLATED
                         info.external_attr = 0o100644 << 16
-                        archive.writestr(info, Path(item["path"]).read_bytes())
+                        key = (cast(RootName, root), item["logical_path"])
+                        archive.writestr(info, staged_handles[key].read_bytes())
                         members.append(member)
-                with zipfile.ZipFile(archive_path, "r") as archive:
+                archive_raw = archive_buffer.getvalue()
+                archive_file = authority.owned_dir.create_file(
+                    f"{root}.zip", archive_raw, "provisional_zip"
+                )
+                with zipfile.ZipFile(io.BytesIO(archive_file.read_bytes()), "r") as archive:
                     if archive.namelist() != members:
                         raise PackStagingError(f"provisional {root} archive readback failed")
                     for member in members:
                         archive.read(member)
                 provisional.append({
                     "root": root,
-                    "path": str(archive_path),
-                    "sha256": _sha256_file(archive_path),
-                    "size": archive_path.stat().st_size,
+                    "path": str(archive_file.path),
+                    "sha256": hashlib.sha256(archive_raw).hexdigest(),
+                    "size": len(archive_raw),
                     "members": members,
                 })
             self._phase_failure(fail_after, "provisional_zip_content")
@@ -2013,10 +2689,6 @@ class PackTransaction:
         root = self._validate_isolated_root(
             Path(snapshot_root), protected, "snapshot root"
         )
-        final_dir = root / f"character-pack-snapshot-{prepared.transaction_id}"
-        if final_dir.exists():
-            raise PackPreflightError("snapshot already exists for transaction")
-
         captured: dict[TableKey, bytes | None] = {}
         for item in prepared.file_changes:
             key = (cast(RootName, item["root"]), item["logical_path"])
@@ -2153,88 +2825,69 @@ class PackTransaction:
         }
         snapshot_bytes = _canonical_json_bytes(serializable)
         snapshot_nonce = uuid.uuid4().hex
-        temp_dir = root / (
-            f".character-pack-snapshot-{prepared.transaction_id}-{snapshot_nonce}.tmp"
+        temp_name = (
+            f"character-pack-snapshot-{prepared.transaction_id}-{snapshot_nonce}"
         )
-        root_identity = _path_identity(root)
-        temp_identity: tuple[int, int, int] | None = None
-
-        def validate_temp() -> None:
-            if temp_identity is None:
-                raise PackPreflightError("temporary snapshot authority is absent")
-            if (_has_link_or_junction_component(root)
-                    or _has_link_or_junction_component(temp_dir)):
-                raise PackPreflightError("temporary snapshot topology changed")
-            if (_path_identity(root) != root_identity
-                    or _path_identity(temp_dir) != temp_identity
-                    or temp_dir.resolve() != temp_dir
-                    or temp_dir.parent != root):
-                raise PackPreflightError("temporary snapshot identity changed")
-
-        def write_checked(relative: Path, raw: bytes) -> None:
-            validate_temp()
-            output = temp_dir / relative
-            try:
-                output.resolve().relative_to(temp_dir)
-            except ValueError as exc:
-                raise PackPreflightError("snapshot output escaped temporary child") from exc
-            output.parent.mkdir(parents=True, exist_ok=True)
-            if _has_link_or_junction_component(output.parent):
-                raise PackPreflightError("snapshot output traverses a link/junction")
-            validate_temp()
-            output.write_bytes(raw)
-            validate_temp()
-            if output.read_bytes() != raw \
-                    or output.stat().st_size != len(raw) \
-                    or _sha256_file(output) != hashlib.sha256(raw).hexdigest():
-                raise PackPreflightError(f"snapshot write readback failed: {relative}")
-
-        def cleanup_temp() -> None:
-            if temp_identity is None:
-                return
-            try:
-                safe = (
-                    temp_dir.exists()
-                    and not _has_link_or_junction_component(temp_dir)
-                    and temp_dir.parent == root
-                    and _path_identity(root) == root_identity
-                    and _path_identity(temp_dir) == temp_identity
-                )
-            except (OSError, RuntimeError):
-                safe = False
-            if safe:
-                shutil.rmtree(temp_dir)
-
+        final_dir = root / temp_name
+        snapshot_fs: _OwnedFilesystem | None = None
+        temp_authority: _OwnedDirectoryAuthority | None = None
         try:
-            temp_dir.mkdir()
-            temp_identity = _path_identity(temp_dir)
+            snapshot_fs = _OwnedFilesystem(root, self._filesystem_boundary_hook)
+            temp_authority = snapshot_fs.create_directory(temp_name)
             marker_bytes = _canonical_json_bytes({
                 "kind": "character_pack_snapshot",
                 "transaction_id": prepared.transaction_id,
                 "snapshot_nonce": snapshot_nonce,
                 "prepared_digest": prepared.prepared_digest,
             })
-            write_checked(Path(SNAPSHOT_MARKER), marker_bytes)
             for item in prepared.file_changes:
                 key = (cast(RootName, item["root"]), item["logical_path"])
                 raw = captured[key]
                 if raw is not None:
-                    write_checked(
-                        Path("files") / item["root"]
-                        / Path(*item["logical_path"].split("/")),
+                    temp_authority.create_file(
+                        _owned_leaf(
+                            "file", item["root"], item["logical_path"]
+                        ),
                         raw,
+                        "snapshot_file",
                     )
-            write_checked(Path("snapshot.json"), snapshot_bytes)
-            validate_temp()
-            if final_dir.exists():
-                raise PackPreflightError("snapshot appeared concurrently")
-            temp_dir.rename(final_dir)
-            temp_identity = None
+            temp_authority.create_file(
+                "snapshot.json", snapshot_bytes, "snapshot_json"
+            )
+            # The unique directory is unpublished until this final marker exists.
+            # Keeping all handles retained makes marker creation the atomic
+            # authority-preserving finalize point without a pathname rename.
+            temp_authority.validate()
+            snapshot_fs._fire(
+                "before_finalize", kind="snapshot_finalize",
+                path=temp_authority.path,
+                target=temp_authority.path / SNAPSHOT_MARKER,
+            )
+            temp_authority.validate()
+            temp_authority.create_file(
+                SNAPSHOT_MARKER, marker_bytes, "snapshot_marker"
+            )
+            self._snapshot_authorities.append((snapshot_fs, temp_authority))
         except Exception as exc:
-            cleanup_temp()
+            cleanup_error: Exception | None = None
+            if snapshot_fs is not None and temp_authority is not None \
+                    and not temp_authority.closed:
+                try:
+                    snapshot_fs.delete_directory(
+                        temp_authority, "snapshot_cleanup"
+                    )
+                except Exception as cleanup_exc:
+                    cleanup_error = cleanup_exc
+                    snapshot_fs.abandon()
+            elif snapshot_fs is not None:
+                snapshot_fs.abandon()
+            detail = f"cannot create snapshot: {exc}"
+            if cleanup_error is not None:
+                detail += f"; exact owned cleanup preserved orphan: {cleanup_error}"
             if isinstance(exc, PackPreflightError):
-                raise
-            raise PackPreflightError(f"cannot create snapshot: {exc}") from exc
+                if cleanup_error is None:
+                    raise
+            raise PackPreflightError(detail) from exc
 
         return SnapshotRecord(
             prepared.transaction_id,
