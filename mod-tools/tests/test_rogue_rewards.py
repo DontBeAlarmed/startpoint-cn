@@ -2,16 +2,22 @@
 """深渊武装纯数据构建器测试（合成行，不读取真实 CN store）。"""
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import copy
+import io
 import json
+import shutil
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
+from PIL import Image
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import wf_assets  # noqa: E402
 import wf_mod_tool as core  # noqa: E402
 import wf_rogue_rewards as rewards  # noqa: E402
 
@@ -39,6 +45,12 @@ TASK2_API = (
     "patch_rush_token",
 )
 MISSING_TASK2_API = tuple(name for name in TASK2_API if not hasattr(rewards, name))
+
+TASK3_API = (
+    "validate_source_assets",
+    "install_source_assets",
+)
+MISSING_TASK3_API = tuple(name for name in TASK3_API if not hasattr(rewards, name))
 
 
 EXPECTED_WEAPONS = [
@@ -113,6 +125,39 @@ def require_task2(name: str):
     if value is None:
         raise AssertionError(f"Task 2 API {name} is not implemented")
     return value
+
+
+def require_task3(name: str):
+    value = getattr(rewards, name, None)
+    if value is None:
+        raise AssertionError(f"Task 3 API {name} is not implemented")
+    return value
+
+
+def write_rgba_fixture(
+    path: Path,
+    *,
+    color: tuple[int, int, int, int] = (200, 80, 40, 255),
+    size: tuple[int, int] = (1024, 1024),
+    visible_box: tuple[int, int, int, int] | None = (32, 32, 992, 992),
+    background: tuple[int, int, int, int] = (0, 0, 0, 0),
+) -> None:
+    image = Image.new("RGBA", size, background)
+    if visible_box is not None:
+        image.paste(color, visible_box)
+    image.save(path, format="PNG")
+
+
+def write_valid_asset_set(directory: Path) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    for index, spec in enumerate(rewards.WEAPONS):
+        color = (
+            20 + (index * 37) % 220,
+            20 + (index * 67) % 220,
+            20 + (index * 97) % 220,
+            255,
+        )
+        write_rgba_fixture(directory / f"{spec.image_slug}.png", color=color)
 
 
 def fake_master_tables(*, placeholders: bool = False, binary: bool = False):
@@ -223,6 +268,174 @@ class TestApiSurface(unittest.TestCase):
     def test_task2_writer_api_exists(self):
         self.assertEqual((), MISSING_TASK2_API)
 
+    def test_task3_asset_api_exists(self):
+        self.assertEqual((), MISSING_TASK3_API)
+
+
+class TestSourceAssets(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._fixture_temp = tempfile.TemporaryDirectory()
+        cls._fixture_dir = Path(cls._fixture_temp.name) / "valid-assets"
+        write_valid_asset_set(cls._fixture_dir)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._fixture_temp.cleanup()
+
+    def setUp(self):
+        self._test_temp = tempfile.TemporaryDirectory()
+        self.asset_dir = Path(self._test_temp.name) / "assets"
+        shutil.copytree(self._fixture_dir, self.asset_dir)
+
+    def tearDown(self):
+        self._test_temp.cleanup()
+
+    def validate(self) -> dict[str, Path]:
+        return require_task3("validate_source_assets")(
+            self.asset_dir, rewards.WEAPONS
+        )
+
+    def test_valid_rgba_sources_are_returned_by_fixed_slug(self):
+        sources = self.validate()
+
+        self.assertEqual(
+            [spec.image_slug for spec in rewards.WEAPONS], list(sources)
+        )
+        self.assertEqual(
+            {
+                spec.image_slug: self.asset_dir / f"{spec.image_slug}.png"
+                for spec in rewards.WEAPONS
+            },
+            sources,
+        )
+
+    def test_wrong_dimensions_are_rejected(self):
+        spec = rewards.WEAPONS[0]
+        write_rgba_fixture(
+            self.asset_dir / f"{spec.image_slug}.png", size=(1023, 1024)
+        )
+
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_rgb_without_alpha_is_rejected(self):
+        spec = rewards.WEAPONS[0]
+        Image.new("RGB", (1024, 1024), (20, 40, 60)).save(
+            self.asset_dir / f"{spec.image_slug}.png", format="PNG"
+        )
+
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_fully_opaque_image_is_rejected(self):
+        spec = rewards.WEAPONS[0]
+        write_rgba_fixture(
+            self.asset_dir / f"{spec.image_slug}.png",
+            visible_box=None,
+            background=(20, 40, 60, 255),
+        )
+
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_fully_transparent_image_is_rejected(self):
+        spec = rewards.WEAPONS[0]
+        write_rgba_fixture(
+            self.asset_dir / f"{spec.image_slug}.png", visible_box=None
+        )
+
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_visible_bounds_require_at_least_24_pixels_on_every_edge(self):
+        spec = rewards.WEAPONS[0]
+        write_rgba_fixture(
+            self.asset_dir / f"{spec.image_slug}.png",
+            visible_box=(23, 32, 992, 992),
+        )
+
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_duplicate_sha256_content_is_rejected(self):
+        first, second = rewards.WEAPONS[:2]
+        shutil.copyfile(
+            self.asset_dir / f"{first.image_slug}.png",
+            self.asset_dir / f"{second.image_slug}.png",
+        )
+
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_missing_source_name_is_rejected(self):
+        spec = rewards.WEAPONS[0]
+        (self.asset_dir / f"{spec.image_slug}.png").unlink()
+
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_unexpected_source_name_is_rejected(self):
+        write_rgba_fixture(self.asset_dir / "unexpected.png")
+
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_non_png_bytes_are_rejected(self):
+        spec = rewards.WEAPONS[0]
+        (self.asset_dir / f"{spec.image_slug}.png").write_bytes(b"not a png")
+
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_install_uses_only_png_magic_encoding_and_exact_hashed_paths(self):
+        sources = self.validate()
+        original = {slug: path.read_bytes() for slug, path in sources.items()}
+        store = Path(self._test_temp.name) / "upload"
+
+        installed = require_task3("install_source_assets")(
+            store, sources, rewards.WEAPONS
+        )
+
+        expected = [
+            rewards.q.hashed_rel(
+                f"{rewards.IMAGE_PREFIX}/{spec.image_slug}.png"
+            )
+            for spec in rewards.WEAPONS
+        ]
+        self.assertEqual(expected, installed)
+        self.assertEqual(
+            len(rewards.WEAPONS),
+            sum(1 for path in store.rglob("*") if path.is_file()),
+        )
+        for spec, relative in zip(rewards.WEAPONS, installed):
+            with self.subTest(asset=spec.image_slug):
+                source_bytes = original[spec.image_slug]
+                stored_bytes = (store / relative).read_bytes()
+                self.assertEqual(source_bytes, sources[spec.image_slug].read_bytes())
+                self.assertEqual(wf_assets.png_encode(source_bytes), stored_bytes)
+                self.assertEqual(source_bytes, wf_assets.png_decode(stored_bytes))
+
+    def test_validate_assets_flag_reports_fixed_paths_without_touching_profile(self):
+        output = io.StringIO()
+        with (
+            mock.patch.object(rewards, "SOURCE_ASSET_DIR", self.asset_dir),
+            mock.patch.object(rewards, "require_cn_profile") as require_profile,
+            mock.patch.object(rewards.q, "load_table") as load_table,
+            mock.patch.object(sys, "argv", ["wf_rogue_rewards.py", "--validate-assets"]),
+            contextlib.redirect_stdout(output),
+        ):
+            result = rewards.main()
+
+        self.assertEqual(0, result)
+        require_profile.assert_not_called()
+        load_table.assert_not_called()
+        report = output.getvalue()
+        self.assertIn("15/15 valid", report)
+        self.assertIn("15 distinct SHA-256", report)
+        self.assertIn("item/equipment/mod/abyss/fire_01.png", report)
+        self.assertIn("item/equipment/mod/abyss/universal_03.png", report)
+
 
 class TestCnProfilePreflight(unittest.TestCase):
     def test_active_global_fails_before_any_read_write_or_publish(self):
@@ -267,6 +480,9 @@ class TestCnProfilePreflight(unittest.TestCase):
     def test_profile_is_rechecked_immediately_before_publish(self):
         tables = fake_master_tables(placeholders=True)
         mirrors = fake_server_mirrors()
+        cn_profile = core.VersionProfile(
+            id="cn", label="CN", store=Path("cn-store"), fallback=None
+        )
         stored_tables = {
             rewards.ITEM_T: copy.deepcopy(tables.items),
             rewards.EQUIP_T: copy.deepcopy(tables.equipment),
@@ -298,12 +514,24 @@ class TestCnProfilePreflight(unittest.TestCase):
             mock.patch.object(
                 rewards,
                 "require_cn_profile",
-                side_effect=[mock.sentinel.cn_profile, ValueError("active changed")],
+                side_effect=[cn_profile, ValueError("active changed")],
             ) as preflight,
             mock.patch.object(rewards.q, "load_table", side_effect=load_table),
             mock.patch.object(rewards.q, "save_table", side_effect=save_table),
             mock.patch.object(rewards, "load_json", side_effect=load_json),
             mock.patch.object(rewards, "save_json", side_effect=save_json),
+            mock.patch.object(
+                rewards,
+                "validate_source_assets",
+                return_value={spec.image_slug: Path(f"{spec.image_slug}.png")
+                              for spec in rewards.WEAPONS},
+            ),
+            mock.patch.object(
+                rewards,
+                "install_source_assets",
+                return_value=[f"hash-{index}" for index in range(15)],
+            ),
+            mock.patch.object(rewards, "_print_asset_validation"),
             mock.patch.object(rewards, "_print_plan"),
             mock.patch.object(rewards.subprocess, "run") as publish,
             mock.patch.object(
@@ -315,6 +543,68 @@ class TestCnProfilePreflight(unittest.TestCase):
         self.assertNotEqual(0, result)
         self.assertEqual(2, preflight.call_count)
         publish.assert_not_called()
+
+    def test_write_validates_and_installs_sources_in_the_cn_store(self):
+        tables = fake_master_tables(placeholders=True)
+        mirrors = fake_server_mirrors()
+        stored_tables = {
+            rewards.ITEM_T: copy.deepcopy(tables.items),
+            rewards.EQUIP_T: copy.deepcopy(tables.equipment),
+            rewards.EQUIP_STATUS_T: copy.deepcopy(tables.equipment_status),
+            rewards.SOUL_T: copy.deepcopy(tables.ability_soul),
+            rewards.RUSH_EVENT_T: copy.deepcopy(tables.rush_event),
+        }
+        stored_json = {
+            "equipment_max_level.json": copy.deepcopy(mirrors.equipment_max_level),
+            "equipment_element.json": copy.deepcopy(mirrors.equipment_element),
+            "equipment_lookup.json": copy.deepcopy(mirrors.equipment_lookup),
+            "equipment_ids.json": copy.deepcopy(mirrors.equipment_ids),
+            "item_ids.json": copy.deepcopy(mirrors.item_ids),
+        }
+
+        def load_table(logical):
+            return copy.deepcopy(stored_tables[logical])
+
+        def save_table(logical, data):
+            stored_tables[logical] = copy.deepcopy(data)
+
+        def load_json(name):
+            return copy.deepcopy(stored_json[name])
+
+        def save_json(name, data):
+            stored_json[name] = copy.deepcopy(data)
+
+        with tempfile.TemporaryDirectory() as directory:
+            profile = core.VersionProfile(
+                id="cn", label="CN", store=Path(directory), fallback=None
+            )
+            sources = {
+                spec.image_slug: Path(directory) / f"{spec.image_slug}.png"
+                for spec in rewards.WEAPONS
+            }
+            with (
+                mock.patch.object(rewards, "require_cn_profile", return_value=profile),
+                mock.patch.object(rewards.q, "load_table", side_effect=load_table),
+                mock.patch.object(rewards.q, "save_table", side_effect=save_table),
+                mock.patch.object(rewards, "load_json", side_effect=load_json),
+                mock.patch.object(rewards, "save_json", side_effect=save_json),
+                mock.patch.object(
+                    rewards, "validate_source_assets", return_value=sources
+                ) as validate,
+                mock.patch.object(
+                    rewards,
+                    "install_source_assets",
+                    return_value=[f"hash-{index}" for index in range(15)],
+                ) as install,
+                mock.patch.object(rewards, "_print_asset_validation"),
+                mock.patch.object(rewards, "_print_plan"),
+                mock.patch.object(sys, "argv", ["wf_rogue_rewards.py", "--write"]),
+            ):
+                result = rewards.main()
+
+        self.assertEqual(0, result)
+        validate.assert_called_once_with(rewards.SOURCE_ASSET_DIR, rewards.WEAPONS)
+        install.assert_called_once_with(profile.store, sources, rewards.WEAPONS)
 
 
 @unittest.skipUnless(not MISSING_API, "canonical builder API is not implemented yet")

@@ -14,17 +14,23 @@
 """
 import argparse
 import copy
+import hashlib
+import io
 import json
 import os
 import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
+
+from PIL import Image, UnidentifiedImageError
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "mod-tools"))
 import wf_quest_lib as q          # noqa: E402
 import wf_mod_tool as core        # noqa: E402
 import wf_describe                # noqa: E402
+import wf_assets                  # noqa: E402
 
 ITEM_T = "master/item/item.orderedmap"
 EQUIP_T = "master/item/equipment.orderedmap"
@@ -39,6 +45,8 @@ TOKEN_DESCRIPTION = "在「深渊连战」中获得的深渊结晶。凝聚着�
 
 MODE_DESCRIPTION = "【测试版·连战专属】仅在深渊连战、宝物域连战 2001 与木桩假人生效。"
 IMAGE_PREFIX = "item/equipment/mod/abyss"
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+SOURCE_ASSET_DIR = Path(ROOT) / "mod-tools" / "assets" / "abyss-equipment"
 
 
 @dataclass(frozen=True)
@@ -151,6 +159,139 @@ WEAPONS: tuple[WeaponSpec, ...] = (
         EffectSpec("5090029", "388", 3_000_000),
     )),
 )
+
+
+def validate_source_assets(
+    asset_dir: Path, specs: tuple[WeaponSpec, ...],
+) -> dict[str, Path]:
+    """严格校验 15 张源 PNG，并按固定 image_slug 返回路径。"""
+    if len(specs) != 15:
+        raise ValueError(f"深渊武装源图必须正好 15 张,实际规格数 {len(specs)}")
+    slugs = [spec.image_slug for spec in specs]
+    if len(set(slugs)) != len(slugs):
+        raise ValueError("深渊武装 image_slug 必须全部唯一")
+
+    asset_dir = Path(asset_dir)
+    expected_names = {f"{slug}.png" for slug in slugs}
+    try:
+        actual_names = {
+            path.name for path in asset_dir.iterdir()
+            if path.is_file() and path.suffix.lower() == ".png"
+        }
+    except OSError as exc:
+        raise ValueError(f"无法读取源 PNG 目录 {asset_dir}: {exc}") from exc
+    missing_names = sorted(expected_names.difference(actual_names))
+    unexpected_names = sorted(actual_names.difference(expected_names))
+    if missing_names or unexpected_names:
+        raise ValueError(
+            f"源 PNG 清单必须精确匹配 15 个固定文件: "
+            f"missing={missing_names}, unexpected={unexpected_names}"
+        )
+
+    sources: dict[str, Path] = {}
+    hashes: dict[str, str] = {}
+    for spec in specs:
+        source = asset_dir / f"{spec.image_slug}.png"
+        if not source.is_file():
+            raise ValueError(f"缺少源 PNG: {source.name}")
+
+        try:
+            source_bytes = source.read_bytes()
+        except OSError as exc:
+            raise ValueError(f"无法读取源 PNG {source.name}: {exc}") from exc
+        if source_bytes[:8] != PNG_SIGNATURE:
+            raise ValueError(f"{source.name} 不是标准 PNG(魔数不对)")
+
+        try:
+            image = Image.open(io.BytesIO(source_bytes))
+            with image:
+                image.load()
+                if image.format != "PNG":
+                    raise ValueError(
+                        f"{source.name} Pillow 格式必须是 PNG,实际 {image.format}"
+                    )
+                if image.size != (1024, 1024):
+                    raise ValueError(
+                        f"{source.name} 尺寸必须是 1024x1024,实际 "
+                        f"{image.size[0]}x{image.size[1]}"
+                    )
+                if image.mode != "RGBA":
+                    raise ValueError(
+                        f"{source.name} 模式必须是 RGBA,实际 {image.mode}"
+                    )
+
+                alpha = image.getchannel("A")
+                alpha_min, alpha_max = alpha.getextrema()
+                if alpha_min != 0:
+                    raise ValueError(f"{source.name} 必须包含全透明像素")
+                if alpha_max <= 0:
+                    raise ValueError(f"{source.name} 不能是全透明图")
+
+                bounds = alpha.getbbox()
+                if bounds is None:
+                    raise ValueError(f"{source.name} 没有可见像素")
+                left, top, right, bottom = bounds
+                margins = (left, top, 1024 - right, 1024 - bottom)
+                if any(margin < 24 for margin in margins):
+                    raise ValueError(
+                        f"{source.name} 可见边界距四边至少 24px,实际 "
+                        f"left={margins[0]},top={margins[1]},"
+                        f"right={margins[2]},bottom={margins[3]}"
+                    )
+        except (UnidentifiedImageError, OSError) as exc:
+            raise ValueError(f"{source.name} 不是可解码 PNG: {exc}") from exc
+
+        digest = hashlib.sha256(source_bytes).hexdigest()
+        duplicate = hashes.get(digest)
+        if duplicate is not None:
+            raise ValueError(
+                f"源 PNG 内容重复: {duplicate}.png 与 {spec.image_slug}.png"
+            )
+        hashes[digest] = spec.image_slug
+        sources[spec.image_slug] = source
+
+    if len(hashes) != 15:
+        raise ValueError(f"源 PNG 必须有 15 个不同 SHA-256,实际 {len(hashes)}")
+    return sources
+
+
+def install_source_assets(
+    store: Path, sources: dict[str, Path], specs: tuple[WeaponSpec, ...],
+) -> list[str]:
+    """仅转换 PNG 魔数并写入固定逻辑路径的 upload 哈希位置。"""
+    expected_slugs = [spec.image_slug for spec in specs]
+    missing = [slug for slug in expected_slugs if slug not in sources]
+    unexpected = sorted(set(sources).difference(expected_slugs))
+    if missing or unexpected:
+        raise ValueError(
+            f"源 PNG 映射不完整: missing={missing}, unexpected={unexpected}"
+        )
+
+    store = Path(store)
+    installed: list[str] = []
+    for spec in specs:
+        source = Path(sources[spec.image_slug])
+        try:
+            source_bytes = source.read_bytes()
+        except OSError as exc:
+            raise ValueError(f"无法读取源 PNG {source.name}: {exc}") from exc
+        stored_bytes = wf_assets.png_encode(source_bytes)
+        logical = f"{IMAGE_PREFIX}/{spec.image_slug}.png"
+        relative = q.hashed_rel(logical)
+        destination = store / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(stored_bytes)
+
+        readback = destination.read_bytes()
+        if wf_assets.png_decode(readback) != source_bytes:
+            raise RuntimeError(f"PNG 写后复读不一致: {logical}")
+        installed.append(relative)
+
+    if len(installed) != 15 or len(set(installed)) != 15:
+        raise RuntimeError(
+            f"PNG 安装路径必须是 15 个不同哈希路径,实际 {len(set(installed))}"
+        )
+    return installed
 
 
 def _leaf_text(leaf: bytes | str) -> str:
@@ -451,14 +592,48 @@ def _print_plan(changes: MasterChanges) -> None:
     )
 
 
+def _print_asset_validation(sources: dict[str, Path]) -> None:
+    digests: list[str] = []
+    for spec in WEAPONS:
+        source = sources[spec.image_slug]
+        source_bytes = source.read_bytes()
+        digest = hashlib.sha256(source_bytes).hexdigest()
+        with Image.open(io.BytesIO(source_bytes)) as image:
+            size = image.size
+            mode = image.mode
+        logical = f"{IMAGE_PREFIX}/{spec.image_slug}.png"
+        relative = q.hashed_rel(logical)
+        print(
+            f"[ASSET] {source.name}: {size[0]}x{size[1]} {mode} "
+            f"sha256={digest} logical={logical} hashed={relative}"
+        )
+        digests.append(digest)
+    print(
+        f"[OK] {len(sources)}/15 valid; "
+        f"{len(set(digests))} distinct SHA-256"
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="深渊代币 + 连战专属武装")
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--publish", action="store_true")
+    ap.add_argument("--validate-assets", action="store_true")
     args = ap.parse_args()
 
+    sources: dict[str, Path] | None = None
+    if args.validate_assets or args.write:
+        try:
+            sources = validate_source_assets(SOURCE_ASSET_DIR, WEAPONS)
+            _print_asset_validation(sources)
+        except (KeyError, TypeError, ValueError, RuntimeError, OSError) as exc:
+            print(f"[ERR] 图片校验失败: {exc}", file=sys.stderr)
+            return 1
+        if args.validate_assets and not args.write:
+            return 0
+
     try:
-        require_cn_profile()
+        profile = require_cn_profile()
         tables = MasterTables(
             items=q.load_table(ITEM_T),
             equipment=q.load_table(EQUIP_T),
@@ -529,11 +704,22 @@ def main() -> int:
             save_json(name, data)
             if load_json(name) != data:
                 raise RuntimeError(f"{name} 写后复读不一致")
+
+        if sources is None:
+            raise RuntimeError("写入前未校验源 PNG")
+        installed = install_source_assets(profile.store, sources, WEAPONS)
+        if len(installed) != len(WEAPONS):
+            raise RuntimeError(
+                f"PNG 安装数量不一致: expected={len(WEAPONS)}, actual={len(installed)}"
+            )
     except (KeyError, TypeError, ValueError, RuntimeError, OSError) as exc:
         print(f"[ERR] 写入或复读失败,禁止发布: {exc}", file=sys.stderr)
         return 1
 
-    print("[OK] 5 client tables and 5 server mirrors passed write/readback validation")
+    print(
+        "[OK] 5 client tables, 5 server mirrors, and 15 PNGs passed "
+        "write/readback validation"
+    )
     publish_tables = ",".join(
         (ITEM_T, EQUIP_T, EQUIP_STATUS_T, SOUL_T, RUSH_EVENT_T)
     )
