@@ -304,6 +304,57 @@ def _require_created(path: Path, label: str) -> None:
         raise BuildError(f"{label} is empty or not a file: {path}")
 
 
+def export_verified_class(
+    swf: Path | str,
+    export_dir: Path | str,
+    ffdec: Path | str,
+    java: Path | str,
+) -> Path:
+    """Export and markerless-verify the exact gated class from one SWF."""
+    swf_path = Path(swf)
+    export_root = Path(export_dir)
+    ffdec_path = Path(ffdec)
+    java_path = Path(java)
+    for label, path in (
+        ("SWF", swf_path),
+        ("FFDec jar", ffdec_path),
+        ("Java executable", java_path),
+    ):
+        if not path.is_file():
+            raise BuildError(f"{label} is not a file: {path}")
+    if export_root.exists() and any(export_root.iterdir()):
+        raise BuildError(f"class export directory is not empty: {export_root}")
+    export_root.mkdir(parents=True, exist_ok=True)
+    _run_external(
+        (
+            java_path,
+            "-jar",
+            ffdec_path,
+            "-onerror",
+            "abort",
+            "-selectclass",
+            TARGET_CLASS,
+            "-export",
+            "script",
+            export_root,
+            swf_path,
+        )
+    )
+    reexports = sorted(export_root.rglob("BattleCharacterLogic.as"))
+    if len(reexports) != 1:
+        raise BuildError(
+            "expected exactly one re-exported BattleCharacterLogic.as, "
+            f"found {len(reexports)}"
+        )
+    reexported_as = reexports[0].resolve()
+    try:
+        reexported_text = reexported_as.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError) as exc:
+        raise BuildError(f"cannot read re-exported ActionScript: {exc}") from exc
+    abyss_patch.verify_text(reexported_text, require_markers=False)
+    return reexported_as
+
+
 def _artifact_record(report_path: Path, hash_path: Path | None = None) -> dict[str, str]:
     canonical = report_path.resolve()
     return {
@@ -420,33 +471,12 @@ def build_verified_apk(config: BuildConfig) -> dict[str, Any]:
         )
         _require_created(injected_swf, "FFDec injected SWF")
 
-        _run_external(
-            (
-                config.java,
-                "-jar",
-                config.ffdec,
-                "-onerror",
-                "abort",
-                "-selectclass",
-                TARGET_CLASS,
-                "-export",
-                "script",
-                verify_export,
-                injected_swf,
-            )
+        reexported_as = export_verified_class(
+            injected_swf,
+            verify_export,
+            config.ffdec,
+            config.java,
         )
-        reexports = sorted(verify_export.rglob("BattleCharacterLogic.as"))
-        if len(reexports) != 1:
-            raise BuildError(
-                "expected exactly one re-exported BattleCharacterLogic.as, "
-                f"found {len(reexports)}"
-            )
-        reexported_as = reexports[0].resolve()
-        try:
-            reexported_text = reexported_as.read_text(encoding="utf-8-sig")
-        except (OSError, UnicodeError) as exc:
-            raise BuildError(f"cannot read re-exported ActionScript: {exc}") from exc
-        abyss_patch.verify_text(reexported_text, require_markers=False)
 
         rewrite_apk(config.base, unsigned_apk, injected_swf)
         _run_external(

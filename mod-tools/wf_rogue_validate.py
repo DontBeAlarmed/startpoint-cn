@@ -9,6 +9,7 @@ import hashlib
 import importlib.util
 import json
 import sys
+import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -67,7 +68,12 @@ def release_logicals() -> list[str]:
 
 
 def validate_release(
-    store: Path, assets_dir: Path, report_path: Path,
+    store: Path,
+    assets_dir: Path,
+    report_path: Path,
+    *,
+    ffdec: Path,
+    java: Path,
 ) -> ValidationResult:
     """Validate a materialized release without changing it."""
     store = Path(store)
@@ -115,7 +121,7 @@ def validate_release(
         errors,
     )
     _validate_pngs(store, assets_dir, errors)
-    _validate_client_verification(report_path, errors)
+    _validate_client_verification(report_path, Path(ffdec), Path(java), errors)
 
     return ValidationResult(
         errors=tuple(errors),
@@ -124,10 +130,21 @@ def validate_release(
 
 
 def require_release_ready(
-    store: Path, assets_dir: Path, report_path: Path,
+    store: Path,
+    assets_dir: Path,
+    report_path: Path,
+    *,
+    ffdec: Path,
+    java: Path,
 ) -> None:
     """Raise when ``validate_release`` reports any release blocker."""
-    result = validate_release(store, assets_dir, report_path)
+    result = validate_release(
+        store,
+        assets_dir,
+        report_path,
+        ffdec=ffdec,
+        java=java,
+    )
     _print_result(result)
     if result.errors:
         raise RuntimeError(
@@ -147,6 +164,8 @@ def main() -> int:
         description="Validate the complete abyss equipment release gate"
     )
     parser.add_argument("--client-verification", required=True)
+    parser.add_argument("--ffdec", required=True, type=Path)
+    parser.add_argument("--java", required=True, type=Path)
     args = parser.parse_args()
     try:
         profile = rewards.require_cn_profile()
@@ -157,6 +176,8 @@ def main() -> int:
         profile.store,
         ASSETS_DIR,
         Path(args.client_verification),
+        ffdec=args.ffdec,
+        java=args.java,
     )
     _print_result(result)
     if result.errors:
@@ -597,7 +618,10 @@ def _validate_pngs(store: Path, assets_dir: Path, errors: list[str]) -> None:
 
 
 def _validate_client_verification(
-    report_path: Path, errors: list[str],
+    report_path: Path,
+    ffdec: Path,
+    java: Path,
+    errors: list[str],
 ) -> None:
     if not report_path.is_file():
         errors.append(
@@ -690,9 +714,8 @@ def _validate_client_verification(
                     f"expected=1, actual={len(matches)}"
                 )
                 return
-            embedded_digest = hashlib.sha256(
-                archive.read(matches[0])
-            ).hexdigest()
+            embedded_bytes = archive.read(matches[0])
+            embedded_digest = hashlib.sha256(embedded_bytes).hexdigest()
     except (OSError, KeyError, RuntimeError, zipfile.BadZipFile) as exc:
         errors.append(
             f"client_verification.apk.invalid: "
@@ -705,6 +728,37 @@ def _validate_client_verification(
         errors.append(
             "client_verification.apk.embedded_swf: "
             f"expected={expected_digest!r}, actual={embedded_digest!r}"
+        )
+
+    if reexported is None or not reexported.is_file():
+        return
+    try:
+        with tempfile.TemporaryDirectory(prefix="wf-abyss-release-proof-") as temp:
+            proof_root = Path(temp)
+            embedded_swf = proof_root / "apk-embedded.swf"
+            embedded_swf.write_bytes(embedded_bytes)
+            fresh_export = apk_builder.export_verified_class(
+                embedded_swf,
+                proof_root / "export",
+                ffdec,
+                java,
+            )
+            fresh_digest = hashlib.sha256(fresh_export.read_bytes()).hexdigest()
+        reported_reexport = artifacts.get("reexported_as")
+        reported_digest = (
+            reported_reexport.get("sha256")
+            if isinstance(reported_reexport, dict)
+            else None
+        )
+        if fresh_digest != reported_digest:
+            errors.append(
+                "client_verification.reexport.binding: fresh APK-SWF export "
+                f"sha256={fresh_digest!r} != report sha256={reported_digest!r}"
+            )
+    except Exception as exc:
+        errors.append(
+            "client_verification.reexport.binding: "
+            f"{type(exc).__name__}: {exc}"
         )
 
 

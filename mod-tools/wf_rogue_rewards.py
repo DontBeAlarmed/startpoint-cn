@@ -616,6 +616,8 @@ def main() -> int:
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--publish", action="store_true")
     ap.add_argument("--client-verification")
+    ap.add_argument("--ffdec", type=Path)
+    ap.add_argument("--java", type=Path)
     ap.add_argument("--validate-assets", action="store_true")
     args = ap.parse_args()
 
@@ -624,6 +626,9 @@ def main() -> int:
         return 1
     if args.publish and not args.client_verification:
         print("[ERR] --publish 必须提供 --client-verification", file=sys.stderr)
+        return 1
+    if args.publish and (args.ffdec is None or args.java is None):
+        print("[ERR] --publish 必须同时提供 --ffdec 与 --java", file=sys.stderr)
         return 1
 
     sources: dict[str, Path] | None = None
@@ -743,6 +748,8 @@ def main() -> int:
             publish_profile.store,
             Path(ROOT) / "assets",
             Path(args.client_verification),
+            ffdec=args.ffdec,
+            java=args.java,
         )
     except (KeyError, TypeError, ValueError, RuntimeError, OSError) as exc:
         print(f"[ERR] 发布门禁失败,禁止调用发布器: {exc}", file=sys.stderr)

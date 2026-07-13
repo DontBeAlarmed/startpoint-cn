@@ -175,6 +175,49 @@ class TestBuilderSurface(unittest.TestCase):
         )
 
 
+class TestVerifiedClassExport(unittest.TestCase):
+    def test_exports_exact_class_and_markerless_verifies_it(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config = _build_fixture(root)
+            swf = root / "injected.swf"
+            swf.write_bytes(b"FWS verified fixture")
+            export_root = root / "fresh-export"
+            toolchain = FakeToolchain(config.battle_logic_as)
+
+            with mock.patch.object(
+                builder.subprocess,
+                "run",
+                side_effect=toolchain,
+            ):
+                exported = builder.export_verified_class(
+                    swf,
+                    export_root,
+                    config.ffdec,
+                    config.java,
+                )
+
+            self.assertEqual("BattleCharacterLogic.as", exported.name)
+            self.assertTrue(exported.is_relative_to(export_root))
+            self.assertEqual(1, len(toolchain.commands))
+            self.assertEqual(
+                [
+                    str(config.java),
+                    "-jar",
+                    str(config.ffdec),
+                    "-onerror",
+                    "abort",
+                    "-selectclass",
+                    builder.TARGET_CLASS,
+                    "-export",
+                    "script",
+                    str(export_root),
+                    str(swf),
+                ],
+                toolchain.commands[0],
+            )
+
+
 class TestSignatureMembers(unittest.TestCase):
     def test_only_top_level_apk_signature_members_are_recognized(self) -> None:
         for member in (

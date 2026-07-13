@@ -558,6 +558,10 @@ class TestCnProfilePreflight(unittest.TestCase):
                     "--publish",
                     "--client-verification",
                     "client-verification.json",
+                    "--ffdec",
+                    "client-ffdec.jar",
+                    "--java",
+                    "client-java.exe",
                 ],
             ),
         ):
@@ -704,6 +708,10 @@ class TestCnProfilePreflight(unittest.TestCase):
                         "--publish",
                         "--client-verification",
                         "client-verification.json",
+                        "--ffdec",
+                        "client-ffdec.jar",
+                        "--java",
+                        "client-java.exe",
                     ],
                 ),
             ):
@@ -770,6 +778,32 @@ class TestReleaseGate(unittest.TestCase):
         save_table.assert_not_called()
         publish.assert_not_called()
 
+    def test_publish_without_client_toolchain_is_rejected_before_any_write(self):
+        with (
+            mock.patch.object(rewards, "validate_source_assets") as validate_assets,
+            mock.patch.object(rewards, "require_cn_profile") as profile,
+            mock.patch.object(rewards.q, "save_table") as save_table,
+            mock.patch.object(rewards.subprocess, "run") as publish,
+            mock.patch.object(
+                sys,
+                "argv",
+                [
+                    "wf_rogue_rewards.py",
+                    "--write",
+                    "--publish",
+                    "--client-verification",
+                    "client-verification.json",
+                ],
+            ),
+        ):
+            result = rewards.main()
+
+        self.assertNotEqual(0, result)
+        validate_assets.assert_not_called()
+        profile.assert_not_called()
+        save_table.assert_not_called()
+        publish.assert_not_called()
+
     def _run_write_publish(self, *, gate_error=None, publisher_error=None):
         tables = fake_master_tables(placeholders=True)
         mirrors = fake_server_mirrors()
@@ -817,7 +851,7 @@ class TestReleaseGate(unittest.TestCase):
             events.append("install_pngs")
             return [f"hash-{index}" for index in range(15)]
 
-        def gate(*_args):
+        def gate(*_args, **_kwargs):
             events.append("release_gate")
             if gate_error is not None:
                 raise gate_error
@@ -849,6 +883,10 @@ class TestReleaseGate(unittest.TestCase):
                     "--publish",
                     "--client-verification",
                     "client-verification.json",
+                    "--ffdec",
+                    "client-ffdec.jar",
+                    "--java",
+                    "client-java.exe",
                 ],
             ),
         ):
@@ -877,6 +915,8 @@ class TestReleaseGate(unittest.TestCase):
             profile.store,
             Path(rewards.ROOT) / "assets",
             Path("client-verification.json"),
+            ffdec=Path("client-ffdec.jar"),
+            java=Path("client-java.exe"),
         )
         expected_command = [
             sys.executable,

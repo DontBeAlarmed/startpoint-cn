@@ -189,6 +189,29 @@ def _source_text() -> str:
     )
 
 
+def _verified_reexport_text() -> str:
+    patched_text, insertions = builder.abyss_patch.patch_text(_source_text())
+    if insertions != 1:  # pragma: no cover - fixture invariant
+        raise AssertionError(f"expected one fixture insertion, got {insertions}")
+    return (
+        "\n".join(
+            line
+            for line in patched_text.splitlines()
+            if builder.abyss_patch.BEGIN_MARKER not in line
+            and builder.abyss_patch.END_MARKER not in line
+        )
+        + "\n"
+    )
+
+
+def _write_fake_export(export_dir: Path) -> Path:
+    output = export_dir / "scripts/pinball/common/data/character"
+    output.mkdir(parents=True, exist_ok=True)
+    reexport = output / "BattleCharacterLogic.as"
+    reexport.write_text(_verified_reexport_text(), encoding="utf-8")
+    return reexport
+
+
 def _write_client_verification(root: Path) -> Path:
     artifact_dir = root / "out/abyss-client-patch"
     artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -201,16 +224,7 @@ def _write_client_verification(root: Path) -> Path:
     signed_apk = artifact_dir / "wf_abyss_gate.apk"
     reexported_as.parent.mkdir(parents=True, exist_ok=True)
     patched_as.write_text(patched_text, encoding="utf-8")
-    reexported_as.write_text(
-        "\n".join(
-            line
-            for line in patched_text.splitlines()
-            if builder.abyss_patch.BEGIN_MARKER not in line
-            and builder.abyss_patch.END_MARKER not in line
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    reexported_as.write_text(_verified_reexport_text(), encoding="utf-8")
     injected_swf.write_bytes(b"FWS task-8 verified injected swf")
     with zipfile.ZipFile(signed_apk, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(builder.TARGET_SWF_MEMBER, injected_swf.read_bytes())
@@ -248,6 +262,10 @@ def _build_complete_fixture(root: Path) -> None:
     store.mkdir(parents=True)
     assets_dir.mkdir(parents=True)
     source_dir.mkdir(parents=True)
+    tools = root / "tools"
+    tools.mkdir()
+    (tools / "ffdec.jar").write_bytes(b"fixture ffdec")
+    (tools / "java.exe").write_bytes(b"fixture java")
 
     changes = rewards.build_master_changes(_base_master_tables())
     for logical, table in (
@@ -319,6 +337,8 @@ class CompleteFixtureCase(unittest.TestCase):
         self.store = self.root / "store"
         self.assets_dir = self.root / "assets"
         self.report_path = self.root / "out/abyss-client-patch/gate-verification.json"
+        self.ffdec = self.root / "tools/ffdec.jar"
+        self.java = self.root / "tools/java.exe"
         report = json.loads(self.report_path.read_text(encoding="utf-8"))
         for record in report["artifacts"].values():
             old_path = Path(record["path"])
@@ -327,9 +347,28 @@ class CompleteFixtureCase(unittest.TestCase):
         _write_json(self.report_path, report)
 
     def validate(self):
-        return validate.validate_release(
-            self.store, self.assets_dir, self.report_path
-        )
+        def fake_export(swf, export_dir, ffdec, java):
+            self.assertEqual(self.ffdec, Path(ffdec))
+            self.assertEqual(self.java, Path(java))
+            self.assertTrue(Path(swf).read_bytes().startswith(b"FWS"))
+            output = Path(export_dir) / "scripts/pinball/common/data/character"
+            output.mkdir(parents=True, exist_ok=True)
+            reexport = output / "BattleCharacterLogic.as"
+            reexport.write_text(_verified_reexport_text(), encoding="utf-8")
+            return reexport
+
+        with mock.patch.object(
+            validate.apk_builder,
+            "export_verified_class",
+            side_effect=fake_export,
+        ):
+            return validate.validate_release(
+                self.store,
+                self.assets_dir,
+                self.report_path,
+                ffdec=self.ffdec,
+                java=self.java,
+            )
 
     def assert_error(self, result, prefix: str):
         self.assertTrue(
@@ -409,7 +448,20 @@ class TestCompleteRelease(CompleteFixtureCase):
             contextlib.redirect_stderr(stderr),
             self.assertRaisesRegex(RuntimeError, r"\d+ error"),
         ):
-            validate.require_release_ready(self.store, self.assets_dir, self.report_path)
+            with mock.patch.object(
+                validate.apk_builder,
+                "export_verified_class",
+                side_effect=lambda _swf, export_dir, _ffdec, _java: _write_fake_export(
+                    Path(export_dir)
+                ),
+            ):
+                validate.require_release_ready(
+                    self.store,
+                    self.assets_dir,
+                    self.report_path,
+                    ffdec=self.ffdec,
+                    java=self.java,
+                )
         self.assertEqual(15, stdout.getvalue().count("[ABILITY]"))
         self.assertIn("equipment[8000101].missing", stderr.getvalue())
 
@@ -825,6 +877,24 @@ class TestClientVerificationBoundaries(CompleteFixtureCase):
 
         self.assert_error(result, "client_verification.reexport.semantic")
 
+    def test_self_consistent_mixed_swf_and_reexport_report_is_rejected(self):
+        report = self.load_report()
+        original = Path(report["artifacts"]["reexported_as"]["path"])
+        substituted = original.with_name("substituted-BattleCharacterLogic.as")
+        substituted.write_text(
+            original.read_text(encoding="utf-8") + "// different valid export\n",
+            encoding="utf-8",
+        )
+        report["artifacts"]["reexported_as"] = {
+            "path": str(substituted.resolve()),
+            "sha256": hashlib.sha256(substituted.read_bytes()).hexdigest(),
+        }
+        self.save_report(report)
+
+        result = self.validate()
+
+        self.assert_error(result, "client_verification.reexport.binding")
+
     def test_apk_embedded_swf_must_match_reported_injected_swf(self):
         report = self.load_report()
         apk = Path(report["artifacts"]["signed_apk"]["path"])
@@ -859,12 +929,23 @@ class TestValidatorCli(CompleteFixtureCase):
             mock.patch.object(validate.rewards, "require_cn_profile", return_value=profile),
             mock.patch.object(validate, "ASSETS_DIR", self.assets_dir),
             mock.patch.object(
+                validate.apk_builder,
+                "export_verified_class",
+                side_effect=lambda _swf, export_dir, _ffdec, _java: _write_fake_export(
+                    Path(export_dir)
+                ),
+            ),
+            mock.patch.object(
                 sys,
                 "argv",
                 [
                     "wf_rogue_validate.py",
                     "--client-verification",
                     str(self.report_path),
+                    "--ffdec",
+                    str(self.ffdec),
+                    "--java",
+                    str(self.java),
                 ],
             ),
             contextlib.redirect_stdout(stdout),
