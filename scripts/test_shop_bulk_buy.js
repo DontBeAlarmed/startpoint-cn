@@ -4,6 +4,10 @@ const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "..");
 const ABYSS_EVENT_ITEMS = require("../assets/event_item_shop.json")["11"]["700099"];
+const BOSS_COIN_ITEMS = {
+  200103: require("../assets/boss_coin_shop.json")["1"]["200103"],
+  200117: require("../assets/boss_coin_shop.json")["1"]["200117"],
+};
 
 const ShopType = {
   EVENT_ITEM: 4,
@@ -50,6 +54,25 @@ const SHOP_ITEMS = {
     availableUntil: "2099-12-31 23:59:59",
     stock: 5,
   },
+  9700103: {
+    costs: [{ id: 2370099, amount: 10 }],
+    rewards: [{ type: ShopItemRewardType.EQUIPMENT, id: 8000103, count: 1 }],
+    availableFrom: "2026-07-01 00:00:00",
+    availableUntil: "2099-12-31 23:59:59",
+    stock: 0,
+  },
+};
+
+const TREASURE_EQUIPMENT_ITEMS = {
+  9800101: {
+    costs: [{ id: 2370099, amount: 10 }],
+    rewards: [],
+    availableFrom: "2026-07-01 00:00:00",
+    availableUntil: "2099-12-31 23:59:59",
+    stock: 5,
+    equipmentId: 8000101,
+    enhancementMaxLevel: 5,
+  },
 };
 
 function compiled(relativePath) {
@@ -94,6 +117,9 @@ async function createHarness({
   token = 100,
   purchases = {},
   shopItems = SHOP_ITEMS,
+  bossCoinShopItems = BOSS_COIN_ITEMS,
+  treasureEquipmentItems = TREASURE_EQUIPMENT_ITEMS,
+  initialItems = {},
   failDuringReward = false,
 } = {}) {
   const state = {
@@ -104,7 +130,10 @@ async function createHarness({
       bondToken: 7,
       expPool: 0,
     },
-    items: new Map([[2370099, token]]),
+    items: new Map([
+      [2370099, token],
+      ...Object.entries(initialItems).map(([id, count]) => [Number(id), count]),
+    ]),
     equipment: new Map(),
     purchases: new Map(
       Object.entries(purchases).map(([id, count]) => [Number(id), count]),
@@ -159,8 +188,14 @@ async function createHarness({
     resolvePlayerIdSync: () => 11,
   });
   mockModule("lib/assets.js", {
-    getShopItemSync: (shopType, shopItemId) =>
-      shopType === ShopType.EVENT_ITEM ? shopItems[Number(shopItemId)] ?? null : null,
+    getShopItemSync: (shopType, shopItemId) => {
+      const catalogs = {
+        [ShopType.EVENT_ITEM]: shopItems,
+        [ShopType.BOSS_COIN]: bossCoinShopItems,
+        [ShopType.TREASURE_EQUIPMENT]: treasureEquipmentItems,
+      };
+      return catalogs[shopType]?.[Number(shopItemId)] ?? null;
+    },
     getGenericShopItemsSync: () => null,
     getEventShopItemsSync: () => null,
     getBossCoinShopItemsSync: () => null,
@@ -214,7 +249,10 @@ async function createHarness({
         } else if (reward.type === RewardType.ITEM) {
           const total = (state.items.get(reward.id) ?? 0) + reward.count;
           state.items.set(reward.id, total);
-          itemList[reward.id] = total;
+          // Match the production helper exactly: it adds each absolute
+          // post-write total, which exposes duplicate reward IDs unless the
+          // route consolidates them before calling givePlayerRewardsSync.
+          itemList[reward.id] = (itemList[reward.id] ?? 0) + total;
         } else if (reward.type === RewardType.MANA) {
           state.player.freeMana += reward.count;
           mana += reward.count;
@@ -264,11 +302,11 @@ async function createHarness({
   };
 }
 
-function body(buyItemList) {
+function body(buyItemList, shopType = ShopType.EVENT_ITEM) {
   return {
     viewer_id: 99,
     api_count: 1,
-    shop_type: ShopType.EVENT_ITEM,
+    shop_type: shopType,
     buy_item_list: buyItemList,
   };
 }
@@ -300,6 +338,42 @@ test("event-item bulk_buy applies quantities, total cost, stock counts, and equi
   }
 });
 
+test("event-item bulk_buy rejects numeric aliases that combine past stock", async () => {
+  const harness = await createHarness({ token: 100 });
+  try {
+    const response = await harness.app.inject({
+      method: "POST",
+      url: "/shop/bulk_buy",
+      payload: body({ 9700101: 3, "09700101": 3 }),
+    });
+
+    assert.equal(response.statusCode, 400, response.payload);
+    assert.equal(harness.state.items.get(2370099), 100);
+    assert.equal(harness.state.purchases.size, 0);
+    assert.equal(harness.state.equipment.size, 0);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("event-item bulk_buy treats stock zero as sold out", async () => {
+  const harness = await createHarness({ token: 100 });
+  try {
+    const response = await harness.app.inject({
+      method: "POST",
+      url: "/shop/bulk_buy",
+      payload: body({ 9700103: 1 }),
+    });
+
+    assert.equal(response.statusCode, 400, response.payload);
+    assert.equal(harness.state.items.get(2370099), 100);
+    assert.equal(harness.state.purchases.size, 0);
+    assert.equal(harness.state.equipment.size, 0);
+  } finally {
+    await harness.close();
+  }
+});
+
 test("abyss event-item bulk_buy exchanges all 15 max-stock weapons for the full 825-token price", async () => {
   const harness = await createHarness({
     token: 825,
@@ -325,6 +399,68 @@ test("abyss event-item bulk_buy exchanges all 15 max-stock weapons for the full 
     for (const shopItemId of Object.keys(ABYSS_EVENT_ITEMS)) {
       assert.equal(harness.state.purchases.get(Number(shopItemId)), 5);
     }
+  } finally {
+    await harness.close();
+  }
+});
+
+test("boss-coin bulk_buy consolidates duplicate ITEM rewards before the production helper", async () => {
+  const harness = await createHarness({
+    initialItems: { 40000: 1, 40001: 1, 13: 1 },
+  });
+  try {
+    const response = await harness.app.inject({
+      method: "POST",
+      url: "/shop/bulk_buy",
+      payload: body({ 200103: 1, 200117: 1 }, ShopType.BOSS_COIN),
+    });
+
+    assert.equal(response.statusCode, 200, response.payload);
+    assert.equal(harness.state.items.get(40000), 0);
+    assert.equal(harness.state.items.get(40001), 0);
+    assert.equal(harness.state.items.get(13), 5);
+    assert.equal(harness.state.purchases.get(200103), 1);
+    assert.equal(harness.state.purchases.get(200117), 1);
+    assert.equal(JSON.parse(response.payload).data.item_list[13], 5);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("boss-coin bulk_buy is atomic when one selected currency is insufficient", async () => {
+  const harness = await createHarness({
+    initialItems: { 40000: 1, 40001: 0, 13: 1 },
+  });
+  try {
+    const response = await harness.app.inject({
+      method: "POST",
+      url: "/shop/bulk_buy",
+      payload: body({ 200103: 1, 200117: 1 }, ShopType.BOSS_COIN),
+    });
+
+    assert.equal(response.statusCode, 400, response.payload);
+    assert.equal(harness.state.items.get(40000), 1);
+    assert.equal(harness.state.items.get(40001), 0);
+    assert.equal(harness.state.items.get(13), 1);
+    assert.equal(harness.state.purchases.size, 0);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("bulk_buy rejects treasure-equipment shop type before deducting costs", async () => {
+  const harness = await createHarness({ token: 100 });
+  try {
+    const response = await harness.app.inject({
+      method: "POST",
+      url: "/shop/bulk_buy",
+      payload: body({ 9800101: 1 }, ShopType.TREASURE_EQUIPMENT),
+    });
+
+    assert.equal(response.statusCode, 400, response.payload);
+    assert.equal(harness.state.items.get(2370099), 100);
+    assert.equal(harness.state.purchases.size, 0);
+    assert.equal(harness.state.equipment.size, 0);
   } finally {
     await harness.close();
   }

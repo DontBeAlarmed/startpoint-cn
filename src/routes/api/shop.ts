@@ -133,6 +133,53 @@ interface BulkBuyBody {
 
 class BulkBuyValidationError extends Error {}
 
+function consolidateBulkRewards(rewards: Reward[]): Reward[] {
+    const consolidated: Reward[] = []
+    const rewardIndexes = new Map<string, number>()
+
+    for (const reward of rewards) {
+        let key: string | null = null
+        let count: number | null = null
+
+        switch (reward.type) {
+            case RewardType.ITEM:
+            case RewardType.EQUIPMENT: {
+                const itemReward = reward as EquipmentItemReward
+                key = `${reward.type}:${itemReward.id}`
+                count = itemReward.count
+                break
+            }
+            case RewardType.BEADS:
+            case RewardType.MANA:
+            case RewardType.EXP:
+                key = `${reward.type}`
+                count = (reward as CurrencyReward).count
+                break
+        }
+
+        if (key === null || count === null) {
+            consolidated.push(reward)
+            continue
+        }
+
+        const existingIndex = rewardIndexes.get(key)
+        if (existingIndex === undefined) {
+            rewardIndexes.set(key, consolidated.length)
+            consolidated.push({ ...reward })
+            continue
+        }
+
+        const existing = consolidated[existingIndex] as EquipmentItemReward | CurrencyReward
+        const combinedCount = existing.count + count
+        if (!Number.isSafeInteger(combinedCount)) {
+            throw new BulkBuyValidationError("Bulk purchase reward count is invalid.")
+        }
+        existing.count = combinedCount
+    }
+
+    return consolidated
+}
+
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/buy", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as BuyBody
@@ -622,17 +669,32 @@ const routes = async (fastify: FastifyInstance) => {
             || Array.isArray(rawBuyItemList)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         })
+        if (shopType !== ShopType.EVENT_ITEM && shopType !== ShopType.BOSS_COIN) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Shop type does not support bulk purchases."
+            })
+        }
 
-        const purchases = Object.entries(rawBuyItemList).map(([rawShopItemId, rawCount]) => ({
+        const rawPurchases = Object.entries(rawBuyItemList).map(([rawShopItemId, rawCount]) => ({
             shopItemId: Number(rawShopItemId),
             count: Number(rawCount)
         }))
-        if (purchases.length === 0 || purchases.some(({ shopItemId, count }) =>
+        if (rawPurchases.length === 0 || rawPurchases.some(({ shopItemId, count }) =>
             !Number.isSafeInteger(shopItemId) || shopItemId <= 0
             || !Number.isSafeInteger(count) || count <= 0
         )) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid buy item list."
         })
+
+        const purchaseCounts = new Map<number, number>()
+        for (const { shopItemId, count } of rawPurchases) {
+            const combinedCount = (purchaseCounts.get(shopItemId) ?? 0) + count
+            if (!Number.isSafeInteger(combinedCount)) return reply.status(400).send({
+                "error": "Bad Request", "message": "Invalid buy item list."
+            })
+            purchaseCounts.set(shopItemId, combinedCount)
+        }
+        const purchases = Array.from(purchaseCounts, ([shopItemId, count]) => ({ shopItemId, count }))
 
         const viewerIdSession = await getSession(viewerId.toString())
         if (!viewerIdSession) return reply.status(400).send({
@@ -677,7 +739,7 @@ const routes = async (fastify: FastifyInstance) => {
                         }
                     }
 
-                    if (shopItemData.stock !== undefined && shopItemData.stock > 0) {
+                    if (shopItemData.stock !== undefined && shopItemData.stock >= 0) {
                         const purchased = getPlayerShopPurchaseCountSync(playerId, shopItemId)
                         if (purchased + count > shopItemData.stock) {
                             throw new BulkBuyValidationError(`Shop item with id ${shopItemId} purchase limit reached.`)
@@ -786,7 +848,7 @@ const routes = async (fastify: FastifyInstance) => {
                     bondToken: bondTokens
                 })
 
-                const rewardResult = givePlayerRewardsSync(playerId, rewards)
+                const rewardResult = givePlayerRewardsSync(playerId, consolidateBulkRewards(rewards))
                 for (const { shopItemId, count } of purchases) {
                     for (let i = 0; i < count; i++) {
                         addPlayerShopPurchaseSync(playerId, shopItemId)
