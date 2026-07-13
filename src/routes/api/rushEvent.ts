@@ -1,7 +1,7 @@
 // Handles mail.
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { PartyCategory, RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
+import { PartyCategory, PlayerPartyGroup, RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
 import { deletePlayerRushEventPlayedPartiesUntilSync, deletePlayerRushEventPlayedPartyListSync, deletePlayerRushEventPlayedPartySync, getDefaultPlayerRushEventSync, getPlayerRushEventClearedFoldersSync, getPlayerRushEventNextEndlessBattleRoundSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, getRushEventEndlessRankingListSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, insertPlayerRushEventSync, serializePlayerRushEventPlayedParty, updatePlayerRushEventSync } from "../../data/domains/rushEvent"
 import { getAccountPlayers } from "../../data/domains/account"
 import { getDefaultPlayerPartyGroupsSync } from "../../data/domains/player"
@@ -97,6 +97,41 @@ interface RushPartyGroup {
     party_group_color_id: number,
     party_group_id: number,
     party_list: RushParty[]
+}
+
+export function serializeRushPartyGroups(
+    playerPartyGroups: Record<string, PlayerPartyGroup>
+): RushPartyGroup[] {
+    const userPartyGroupList: RushPartyGroup[] = []
+
+    for (const [idString, group] of Object.entries(playerPartyGroups)) {
+        const groupId = Number(idString)
+        const partyList: RushParty[] = []
+
+        for (const [slotString, party] of Object.entries(group.list)) {
+            const localSlot = Number(slotString)
+            partyList.push({
+                ability_soul_ids: party.abilitySoulIds,
+                character_ids: party.characterIds,
+                equipment_ids: party.equipmentIds,
+                unison_character_ids: party.unisonCharacterIds,
+                options: {
+                    allow_other_players_to_heal_me: party.options.allowOtherPlayersToHealMe
+                },
+                party_edited: party.edited,
+                party_id: (groupId - 1) * 10 + localSlot,
+                party_name: party.name
+            })
+        }
+
+        userPartyGroupList.push({
+            party_group_color_id: group.colorId,
+            party_group_id: groupId,
+            party_list: partyList
+        })
+    }
+
+    return userPartyGroupList
 }
 
 export const rushEventFolderMaxRounds: { [key in RushEventFolder]?: number } = {
@@ -370,34 +405,7 @@ const routes = async (fastify: FastifyInstance) => {
             insertPlayerPartyGroupListSync(playerId, playerPartyGroups)
         }
 
-        // convert to proper format
-        const userPartyGroupList: RushPartyGroup[] = []
-
-        for (const [idString, group] of Object.entries(playerPartyGroups)) {
-            const partyList: RushParty[] = []
-
-            // convert parties
-            for (const [partyIdString, party] of Object.entries(group.list)) {
-                partyList.push({
-                    ability_soul_ids: party.abilitySoulIds,
-                    character_ids: party.characterIds,
-                    equipment_ids: party.equipmentIds,
-                    unison_character_ids: party.unisonCharacterIds,
-                    options: {
-                        allow_other_players_to_heal_me: party.options.allowOtherPlayersToHealMe
-                    },
-                    party_edited: party.edited,
-                    party_id: Number(partyIdString),
-                    party_name: party.name
-                })
-            }
-
-            userPartyGroupList.push({
-                "party_group_color_id": group.colorId,
-                "party_group_id": Number(idString),
-                "party_list": partyList
-            })
-        }
+        const userPartyGroupList = serializeRushPartyGroups(playerPartyGroups)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
