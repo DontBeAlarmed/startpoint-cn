@@ -23,34 +23,39 @@ WITH_COND_SIGNATURE = (
 )
 ACTION_SKILLS_PREFIX = "public function getActionSkills"
 ANCHOR = "_loc14_ = Boolean(_loc5_(_loc13_.questKind));"
-BEGIN_MARKER = "WF_ABYSS_MODE_EQUIPMENT_GATE_V1_BEGIN"
-END_MARKER = "WF_ABYSS_MODE_EQUIPMENT_GATE_V1_END"
+BEGIN_MARKER = "WF_ABYSS_MODE_EQUIPMENT_GATE_V2_BEGIN"
+END_MARKER = "WF_ABYSS_MODE_EQUIPMENT_GATE_V2_END"
 ALLOWED_SUMMARY = (
     "single[8]=2001, single[10]=1..97, single[17]=700099xxx"
 )
 
 PATCH_LINES = (
     f"// {BEGIN_MARKER}",
+    "_loc12_ = null;",
     "if(_loc13_ is AbilitySoulAbilityLogic)",
     "{",
     "   _loc12_ = _loc13_ as AbilitySoulAbilityLogic;",
-    "   if(_loc12_.id >= 8000101 && _loc12_.id <= 8000115)",
+    "}",
+    "else if(_loc13_ is EquipmentAbilityLogic)",
+    "{",
+    "   _loc12_ = (_loc13_ as EquipmentAbilityLogic).abilitySoulAbility;",
+    "}",
+    "if(_loc12_ != null && _loc12_.id >= 8000101 && _loc12_.id <= 8000115)",
+    "{",
+    "   _loc14_ = false;",
+    "   if(param3.index == 0)",
     "   {",
-    "      _loc14_ = false;",
-    "      if(param3.index == 0)",
+    "      _loc15_ = int(param3.params[0].params[0]);",
+    "      switch(param3.params[0].index)",
     "      {",
-    "         _loc15_ = int(param3.params[0].params[0]);",
-    "         switch(param3.params[0].index)",
-    "         {",
-    "            case 8:",
-    "               _loc14_ = _loc15_ == 2001;",
-    "               break;",
-    "            case 10:",
-    "               _loc14_ = _loc15_ >= 1 && _loc15_ <= 97;",
-    "               break;",
-    "            case 17:",
-    "               _loc14_ = int(Math.floor(_loc15_ / 1000 + 1e-10)) == 700099;",
-    "         }",
+    "         case 8:",
+    "            _loc14_ = _loc15_ == 2001;",
+    "            break;",
+    "         case 10:",
+    "            _loc14_ = _loc15_ >= 1 && _loc15_ <= 97;",
+    "            break;",
+    "         case 17:",
+    "            _loc14_ = int(Math.floor(_loc15_ / 1000 + 1e-10)) == 700099;",
     "      }",
     "   }",
     "}",
@@ -247,6 +252,9 @@ _ABILITY_ADD = (
     "false", ")", ";",
 )
 _SIMILAR_GATE_PREFIXES = (
+    ("_loc13_", "is", "EquipmentAbilityLogic"),
+    ("_loc13_", "as", "EquipmentAbilityLogic"),
+    ("_loc12_", "!=", "null"),
     ("_loc12_", ".", "id", ">="),
     ("_loc12_", ".", "id", "<="),
     ("param3", ".", "index", "=="),

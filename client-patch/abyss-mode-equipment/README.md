@@ -9,13 +9,15 @@
 - 唯一修改点：`getAvailableAbilities(...)` 内原有
   `_loc14_ = Boolean(_loc5_(_loc13_.questKind));` 的下一行
 - 禁止修改：`getAvailableAbilitiesWithCond(...)`
-- 受门控的能力魂 ID：`8000101..8000115`
+- 受门控的装备/能力魂 ID：`8000101..8000115`
 
-补丁先保留官方 quest-condition 结果，再仅对上述 15 个保留能力魂执行 fail-closed 覆盖。其他能力继续使用官方结果。
+补丁先保留官方 quest-condition 结果，再把直接装备的 `EquipmentAbilityLogic` 解包到其
+`abilitySoulAbility`，与角色能力魂槽中的 `AbilitySoulAbilityLogic` 一起按上述 15 个 ID
+执行 fail-closed 覆盖。其他能力继续使用官方结果。
 
 ## 精确白名单
 
-只有下列三类 `(group_index, single_index, quest_id)` 允许保留能力魂生效：
+只有下列三类 `(group_index, single_index, quest_id)` 允许这些装备或能力魂生效：
 
 | group_index | single_index | quest_id 条件 |
 |---:|---:|---|
@@ -52,7 +54,10 @@ python -X utf8 client-patch/abyss-mode-equipment/patch.py `
   --verify <FFDec重新打开已保存二进制后导出的BattleCharacterLogic.as>
 ```
 
-验证必须确认：门控仅位于 `getAvailableAbilities`、能力魂范围为 `8000101..8000115`、外层 group 为 `0`、内层仅有 `8/10/17` 三类及其精确 ID 边界，并且 `getAvailableAbilitiesWithCond` 没有同类门控。
+验证必须确认：门控仅位于 `getAvailableAbilities`、能同时识别直接的
+`AbilitySoulAbilityLogic` 与包裹它的 `EquipmentAbilityLogic`、ID 范围为
+`8000101..8000115`、外层 group 为 `0`、内层仅有 `8/10/17` 三类及其精确 ID 边界，
+并且 `getAvailableAbilitiesWithCond` 没有同类门控。
 
 ## 事务式 APK 构建
 

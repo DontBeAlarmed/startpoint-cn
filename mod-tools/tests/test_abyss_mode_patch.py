@@ -61,31 +61,36 @@ OFFICIAL_ABILITY_BLOCK = """         if(_loc14_)
             _loc7_.add(_loc18_,_loc10_[_loc17_],this,param1,param2,false);
          }"""
 
-EXPECTED_BLOCK = """            // WF_ABYSS_MODE_EQUIPMENT_GATE_V1_BEGIN
+EXPECTED_BLOCK = """            // WF_ABYSS_MODE_EQUIPMENT_GATE_V2_BEGIN
+            _loc12_ = null;
             if(_loc13_ is AbilitySoulAbilityLogic)
             {
                _loc12_ = _loc13_ as AbilitySoulAbilityLogic;
-               if(_loc12_.id >= 8000101 && _loc12_.id <= 8000115)
+            }
+            else if(_loc13_ is EquipmentAbilityLogic)
+            {
+               _loc12_ = (_loc13_ as EquipmentAbilityLogic).abilitySoulAbility;
+            }
+            if(_loc12_ != null && _loc12_.id >= 8000101 && _loc12_.id <= 8000115)
+            {
+               _loc14_ = false;
+               if(param3.index == 0)
                {
-                  _loc14_ = false;
-                  if(param3.index == 0)
+                  _loc15_ = int(param3.params[0].params[0]);
+                  switch(param3.params[0].index)
                   {
-                     _loc15_ = int(param3.params[0].params[0]);
-                     switch(param3.params[0].index)
-                     {
-                        case 8:
-                           _loc14_ = _loc15_ == 2001;
-                           break;
-                        case 10:
-                           _loc14_ = _loc15_ >= 1 && _loc15_ <= 97;
-                           break;
-                        case 17:
-                           _loc14_ = int(Math.floor(_loc15_ / 1000 + 1e-10)) == 700099;
-                     }
+                     case 8:
+                        _loc14_ = _loc15_ == 2001;
+                        break;
+                     case 10:
+                        _loc14_ = _loc15_ >= 1 && _loc15_ <= 97;
+                        break;
+                     case 17:
+                        _loc14_ = int(Math.floor(_loc15_ / 1000 + 1e-10)) == 700099;
                   }
                }
             }
-            // WF_ABYSS_MODE_EQUIPMENT_GATE_V1_END"""
+            // WF_ABYSS_MODE_EQUIPMENT_GATE_V2_END"""
 
 
 def source_text(newline: str = "\n") -> str:
@@ -130,7 +135,7 @@ def source_text(newline: str = "\n") -> str:
 def markerless(text: str) -> str:
     lines = [
         line for line in text.splitlines(keepends=True)
-        if "WF_ABYSS_MODE_EQUIPMENT_GATE_V1_" not in line
+        if "WF_ABYSS_MODE_EQUIPMENT_GATE_V2_" not in line
     ]
     return "".join(lines)
 
@@ -138,7 +143,7 @@ def markerless(text: str) -> str:
 def markerless_gate_block() -> str:
     return "\n".join(
         line for line in EXPECTED_BLOCK.splitlines()
-        if "WF_ABYSS_MODE_EQUIPMENT_GATE_V1_" not in line
+        if "WF_ABYSS_MODE_EQUIPMENT_GATE_V2_" not in line
     )
 
 
@@ -155,6 +160,24 @@ class TestAllowedQuest(unittest.TestCase):
 
 
 class TestPatchText(unittest.TestCase):
+    def test_gate_unwraps_equipment_ability_before_checking_reserved_id(self):
+        actual, insertions = abyss_patch.patch_text(source_text())
+
+        self.assertEqual(1, insertions)
+        self.assertIn(
+            "else if(_loc13_ is EquipmentAbilityLogic)",
+            actual,
+        )
+        self.assertIn(
+            "_loc12_ = (_loc13_ as EquipmentAbilityLogic).abilitySoulAbility;",
+            actual,
+        )
+        self.assertIn(
+            "if(_loc12_ != null && _loc12_.id >= 8000101 && "
+            "_loc12_.id <= 8000115)",
+            actual,
+        )
+
     def test_inserts_the_exact_block_once_and_only_changes_target_method(self):
         source = source_text()
 
@@ -291,6 +314,16 @@ class TestSemanticVerification(unittest.TestCase):
         patched, _ = abyss_patch.patch_text(source_text())
         clean = markerless(patched)
         mutations = {
+            "loop reset": ("_loc12_ = null;", "_loc12_ = _loc12_;"),
+            "equipment wrapper": (
+                "else if(_loc13_ is EquipmentAbilityLogic)",
+                "else if(_loc13_ is AbilitySoulAbilityLogic)",
+            ),
+            "equipment unwrap": (
+                "(_loc13_ as EquipmentAbilityLogic).abilitySoulAbility",
+                "(_loc13_ as EquipmentAbilityLogic).enhancementAbility",
+            ),
+            "resolved id guard": ("_loc12_ != null", "_loc12_ == null"),
             "reserved lower": ("8000101", "8000102"),
             "reserved upper": ("8000115", "8000114"),
             "outer group": ("param3.index == 0", "param3.index == 1"),
