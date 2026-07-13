@@ -113,6 +113,18 @@ def write_required_kyle_pack(pack: Path) -> None:
 
 
 class TestKylePlan(unittest.TestCase):
+    def test_target_identity_fields_are_explicit_and_leave_combat_class_unchanged(self):
+        self.assertEqual(kyle.TARGET_CHARACTER_FIELDS, {
+            "code_name": "kyle_wolf_knight",
+            "name": "雨果",
+            "name_en": "HUGO",
+            "race": "Beast",
+            "gender": "Male",
+            "role": "Tank",
+        })
+        for untouched in ("element", "speciality_type", "rarity"):
+            self.assertNotIn(untouched, kyle.TARGET_CHARACTER_FIELDS)
+
     def test_visual_assets_use_black_wolf_but_voice_uses_current_canary(self):
         plan = kyle.build_copy_plan(
             visual_logicals=[
@@ -360,7 +372,8 @@ class TestKylePackBuild(unittest.TestCase):
                 "ui/story/base_0.png": (520, 616),
                 "ui/story/base_1.png": (570, 690),
             }
-            for template, (size, _focus) in kyle.DERIVATIVES.items():
+            for template, spec in kyle.DERIVATIVES.items():
+                size = spec["size"]
                 for n in (0, 1):
                     generated_visuals[template.format(n=n)] = size
             for relative, size in generated_visuals.items():
@@ -670,7 +683,7 @@ class TestKyleStorePlan(unittest.TestCase):
 
 
 class TestKyleTransaction(unittest.TestCase):
-    def test_apply_snapshots_before_isolated_writes_and_changes_only_code_name(self):
+    def test_apply_snapshots_before_isolated_writes_and_updates_identity_fields(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             work = root / "work"
@@ -740,7 +753,7 @@ class TestKyleTransaction(unittest.TestCase):
             self.assertEqual(events[0], "snapshot")
             self.assertEqual(
                 saved,
-                [("119999", {"code_name": "kyle_wolf_knight"}, False)],
+                [("119999", kyle.TARGET_CHARACTER_FIELDS, False)],
             )
             self.assertEqual(len(replaced), 35)
             self.assertTrue(all(item[2:] == (True, False) for item in replaced))
@@ -761,7 +774,7 @@ class TestKyleTransaction(unittest.TestCase):
             for operation in (
                     "character-snapshot", "persistent-rollback-snapshot",
                     "clone-trimmed-image", "materialize-assets",
-                    "update-layer1-code-name", "replace-png-and-derived-metadata"):
+                    "update-character-fields", "replace-png-and-derived-metadata"):
                 self.assertIn(operation, result["observed_operations"])
 
     def test_dry_run_has_no_mutations_and_refuses_unexpected_canary(self):
@@ -781,8 +794,11 @@ class TestKyleTransaction(unittest.TestCase):
 
             self.assertTrue(preview["dry_run"])
             self.assertEqual(len(preview["writes"]), 64)
+            self.assertEqual(
+                preview["character_fields"]["to"],
+                kyle.TARGET_CHARACTER_FIELDS)
             for section in (
-                    "code_name", "snapshot", "metadata", "layer1",
+                    "code_name", "character_fields", "snapshot", "metadata", "layer1",
                     "pending", "validation"):
                 self.assertIn(section, preview)
             refused = cn_runtime(
@@ -908,7 +924,7 @@ class TestKyleTransaction(unittest.TestCase):
                 return str(path)
 
             def save_fields(_cid, fields, dry_run):
-                self.assertEqual(fields, {"code_name": "kyle_wolf_knight"})
+                self.assertEqual(fields, kyle.TARGET_CHARACTER_FIELDS)
                 self.assertFalse(dry_run)
                 master_json.write_bytes(b"mutated-master-json")
                 text_json.write_bytes(b"mutated-text-json")
@@ -1062,15 +1078,36 @@ class TestImages(unittest.TestCase):
         )
         self.assertGreaterEqual(retained, 95)
 
-    def test_recolor_preserves_real_template_dark_boot_gray(self):
-        source = Image.new("RGBA", (20, 10), (69, 69, 59, 255))
+    def test_pixelart0002_palette_reads_as_white_wolf_with_blue_eyes(self):
+        # Synthetic copy of the template's neutral-frame palette roles:
+        # dark wolf fur, two green eyes, blue cloth, outline and boot pixels.
+        source = Image.new("RGBA", (15, 14), (0, 0, 0, 0))
+        for y in range(2, 11):
+            for x in range(3, 12):
+                source.putpixel((x, y), (69, 69, 59, 255))
+        source.putpixel((5, 5), (3, 178, 0, 255))
+        source.putpixel((9, 5), (3, 178, 0, 255))
+        for x in range(5, 10):
+            source.putpixel((x, 9), (64, 121, 174, 255))
+        for x in range(3, 12):
+            source.putpixel((x, 1), (0, 0, 0, 255))
+        for x in (4, 5, 9, 10):
+            source.putpixel((x, 12), (0, 0, 0, 255))
+
         got = skin.recolor_kyle_pixel_sheet(source)
-        retained = sum(
-            before == after
-            for before, after in zip(
-                source.get_flattened_data(), got.get_flattened_data())
-        )
-        self.assertGreaterEqual(retained / 200, 0.98)
+        opaque = [pixel for pixel in got.get_flattened_data() if pixel[3]]
+        white_or_silver = [
+            pixel for pixel in opaque
+            if min(pixel[:3]) >= 175 and max(pixel[:3]) - min(pixel[:3]) <= 45
+        ]
+        self.assertGreater(len(white_or_silver) / len(opaque), 0.55)
+        self.assertEqual(sum(pixel[:3] == (3, 178, 0) for pixel in opaque), 0)
+        self.assertEqual(
+            sum(pixel[:3] == skin.KYLE_ICE_EYE for pixel in opaque), 2)
+        self.assertTrue(all(got.getpixel((x, 1)) == (0, 0, 0, 255)
+                            for x in range(3, 12)))
+        self.assertTrue(all(got.getpixel((x, 12)) == (0, 0, 0, 255)
+                            for x in (4, 5, 9, 10)))
 
 
 class TestKyleFocalRects(unittest.TestCase):
@@ -1121,13 +1158,66 @@ class TestKyleFocalRects(unittest.TestCase):
                 self.assertTrue(self._has(image, "boots"))
 
     def test_each_compact_asset_declares_normalized_focal_rect(self):
-        self.assertEqual(set(kyle.FOCAL_RECTS), set(kyle.DERIVATIVES))
-        for name, rect in kyle.FOCAL_RECTS.items():
+        for name, spec in kyle.DERIVATIVES.items():
             with self.subTest(name=name):
+                self.assertIn(spec["mode"], {
+                    "face", "head_shoulders", "portrait", "upper_body"})
+                rect = spec["rect"]
                 self.assertEqual(len(rect), 4)
                 self.assertTrue(all(0.0 <= value <= 1.0 for value in rect))
                 self.assertLess(rect[0], rect[2])
                 self.assertLess(rect[1], rect[3])
+
+    def test_masked_board_and_chain_slots_are_face_led_not_full_body(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source = root / "source"
+            pack = root / "pack"
+            source.mkdir()
+            master = self._marker_master()
+            master.save(source / "base.png")
+            master.save(source / "awake.png")
+
+            kyle.build_visual_derivatives(
+                source / "base.png", source / "awake.png", pack)
+
+            expected_modes = {
+                "ui/battle_control_board_{n}.png": "head_shoulders",
+                "ui/cutin_skill_chain_{n}.png": "face",
+            }
+            for template, expected_mode in expected_modes.items():
+                self.assertEqual(kyle.DERIVATIVES[template]["mode"], expected_mode)
+                for n in (0, 1):
+                    relative = template.format(n=n)
+                    with self.subTest(relative=relative), Image.open(
+                            pack / relative) as image:
+                        pixels = image.convert("RGBA").get_flattened_data()
+                        face = sum(r > 210 and g < 70 and b < 70 and a
+                                   for r, g, b, a in pixels)
+                        torso = sum(g > 210 and r < 70 and b < 70 and a
+                                    for r, g, b, a in pixels)
+                        boots = sum(b > 210 and r < 70 and g < 70 and a
+                                    for r, g, b, a in pixels)
+                        visible = face + torso + boots
+                        self.assertGreater(face / visible, 0.55)
+                        self.assertGreater(torso / visible, 0.05)
+                        self.assertLess(torso / visible, 0.45)
+                        self.assertEqual(boots, 0)
+
+    def test_official_slot_proxy_keeps_mask_safe_face_scale(self):
+        for template, expected in {
+                "ui/battle_control_board_{n}.png": {
+                    "aspect": 104 / 268, "max_subject_y": 0.40},
+                "ui/cutin_skill_chain_{n}.png": {
+                    "aspect": 276 / 319, "max_subject_y": 0.36},
+        }.items():
+            spec = kyle.DERIVATIVES[template]
+            width, height = spec["size"]
+            x0, y0, x1, y1 = spec["rect"]
+            with self.subTest(template=template):
+                self.assertAlmostEqual(width / height, expected["aspect"], places=4)
+                self.assertEqual(y0, 0.0)
+                self.assertLessEqual(y1, expected["max_subject_y"])
 
 
 class TestKyleReviewBlockers(unittest.TestCase):
@@ -1303,7 +1393,7 @@ class TestKyleReviewBlockers(unittest.TestCase):
                     "character-snapshot", "persistent-rollback-snapshot",
                     "clone-trimmed-image", "clone-character-image",
                     "clone-full-shot-attribute", "materialize-assets",
-                    "update-layer1-code-name", "replace-png-and-derived-metadata"):
+                    "update-character-fields", "replace-png-and-derived-metadata"):
                 self.assertIn(operation, plan["operations"])
 
 
@@ -1444,8 +1534,11 @@ class TestKyleRollbackSafety(unittest.TestCase):
             runtime.TRIMMED_LOGICAL = "master/generated/trimmed_image.orderedmap"
             runtime.CHAR_IMAGE_LOGICAL = "master/generated/character_image.orderedmap"
             runtime.FS_ATTR_LOGICAL = "master/character/full_shot_image_attribute.orderedmap"
+            runtime.CHAR_TEXT2_LOGICAL = "master/character/character_text.orderedmap"
             character = core.table_path(
                 runtime.TARGET_STORE, runtime.core.CHARACTER_LOGICAL)
+            character_text = core.table_path(
+                runtime.TARGET_STORE, runtime.CHAR_TEXT2_LOGICAL)
             trimmed = core.table_path(
                 runtime.TARGET_STORE, runtime.TRIMMED_LOGICAL)
             layer1 = runtime.CDNDATA / "character.json"
@@ -1453,6 +1546,7 @@ class TestKyleRollbackSafety(unittest.TestCase):
             runtime.PENDING_FILE = pending_file
             for path, data in (
                     (character, b"pre-character"),
+                    (character_text, b"pre-character-text"),
                     (trimmed, b"pre-trimmed"),
                     (layer1, b"pre-layer1"),
                     (pending_file, b"[]")):
@@ -1460,21 +1554,25 @@ class TestKyleRollbackSafety(unittest.TestCase):
                 path.write_bytes(data)
             binding = kyle.profile_binding(runtime)
             snapshot = kyle.write_rollback_snapshot(
-                [character, trimmed, layer1, pending_file],
+                [character, character_text, trimmed, layer1, pending_file],
                 root / "snapshots", binding=binding,
                 scope={"character_id": "119999",
                        "old_code_name": kyle.CURRENT_CODE})
             character.write_bytes(b"published-character")
+            character_text.write_bytes(b"published-character-text")
             trimmed.write_bytes(b"published-trimmed")
             layer1.write_bytes(b"published-layer1")
 
             result = kyle.rollback(snapshot, runtime=runtime)
 
             self.assertEqual(character.read_bytes(), b"pre-character")
+            self.assertEqual(
+                character_text.read_bytes(), b"pre-character-text")
             self.assertEqual(trimmed.read_bytes(), b"pre-trimmed")
             self.assertEqual(layer1.read_bytes(), b"pre-layer1")
             self.assertGreater(result["pending_requeued"], 0)
             self.assertIn(character, pending)
+            self.assertIn(character_text, pending)
             self.assertIn(trimmed, pending)
 
     def test_snapshot_binding_and_zip_members_are_prevalidated(self):

@@ -12,6 +12,26 @@ import wf_dsl
 import wf_mod_tool as core
 
 
+KYLE_ICE_EYE = (72, 180, 255)
+
+# Exact character-palette swaps run before the broad red-effect conversion.
+# They are intentionally limited to the black-wolf sprite colors so unrelated
+# purple/coffin VFX are not globally bleached.
+KYLE_PIXEL_EXACT_PALETTE = {
+    (69, 69, 59): (224, 232, 242),       # dark wolf fur -> cold white fur
+    (143, 139, 139): (188, 202, 218),    # mid wolf/armour gray -> silver
+    (196, 188, 185): (220, 228, 238),
+    (229, 211, 211): (238, 243, 249),
+    (208, 203, 204): (224, 232, 241),
+    (239, 229, 213): (244, 247, 251),
+    (229, 219, 167): (229, 236, 245),    # warm trim -> cold silver-white
+    (73, 60, 60): (82, 101, 122),        # dark red armour -> slate blue
+    (73, 61, 66): (83, 102, 124),
+    (66, 33, 43): (43, 76, 110),
+    (3, 178, 0): KYLE_ICE_EYE,
+}
+
+
 def remap_tree(value, old: str, new: str):
     """Recursively replace path prefixes without changing container order."""
     if isinstance(value, str):
@@ -115,12 +135,16 @@ def focal_rect_rgba(image: Image.Image, size: tuple[int, int],
 
 
 def recolor_kyle_pixel_sheet(image: Image.Image) -> Image.Image:
-    """Shift saturated red effects to ice blue and dark neutrals to silver."""
+    """Convert exact wolf colors, then shift remaining red VFX to ice blue."""
     output = Image.new("RGBA", image.size)
     pixels = []
     for red, green, blue, alpha in image.convert("RGBA").get_flattened_data():
         if alpha == 0:
             pixels.append((0, 0, 0, 0))
+            continue
+        exact = KYLE_PIXEL_EXACT_PALETTE.get((red, green, blue))
+        if exact is not None:
+            pixels.append((*exact, alpha))
             continue
         hue, saturation, value = colorsys.rgb_to_hsv(
             red / 255, green / 255, blue / 255)

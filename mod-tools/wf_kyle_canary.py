@@ -27,34 +27,49 @@ CURRENT_CODE = "resistance_princess_3halfanv"
 NEW_CODE = "kyle_wolf_knight"
 WORK = ROOT / "work" / "ai_canary" / NEW_CODE
 
-DERIVATIVES = {
-    "ui/skill_cutin_{n}.png": ((1024, 512), (0.50, 0.30)),
-    "ui/square_{n}.png": ((212, 212), (0.50, 0.24)),
-    "ui/square_132_132_{n}.png": ((132, 132), (0.50, 0.24)),
-    "ui/square_round_95_95_{n}.png": ((95, 95), (0.50, 0.23)),
-    "ui/square_round_136_136_{n}.png": ((136, 136), (0.50, 0.23)),
-    "ui/thumb_level_up_{n}.png": ((252, 329), (0.50, 0.30)),
-    "ui/thumb_party_main_{n}.png": ((186, 392), (0.50, 0.38)),
-    "ui/thumb_party_unison_{n}.png": ((144, 188), (0.50, 0.32)),
-    "ui/battle_control_board_{n}.png": ((104, 268), (0.50, 0.35)),
-    "ui/battle_member_status_{n}.png": ((58, 58), (0.50, 0.22)),
-    "ui/cutin_skill_chain_{n}.png": ((276, 319), (0.50, 0.30)),
+TARGET_CHARACTER_FIELDS = {
+    "code_name": NEW_CODE,
+    "name": "雨果",
+    "name_en": "HUGO",
+    "race": "Beast",
+    "gender": "Male",
+    "role": "Tank",
 }
 
-# Compact UI must show a readable face/upper body.  Only full shots and story
-# bases retain contain semantics; every standard UI derivative is focal-cover.
-FOCAL_RECTS = {
-    "ui/skill_cutin_{n}.png": (0.00, 0.00, 1.00, 0.50),
-    "ui/square_{n}.png": (0.15, 0.00, 0.85, 0.58),
-    "ui/square_132_132_{n}.png": (0.15, 0.00, 0.85, 0.58),
-    "ui/square_round_95_95_{n}.png": (0.15, 0.00, 0.85, 0.58),
-    "ui/square_round_136_136_{n}.png": (0.15, 0.00, 0.85, 0.58),
-    "ui/thumb_level_up_{n}.png": (0.15, 0.00, 0.85, 0.62),
-    "ui/thumb_party_main_{n}.png": (0.22, 0.00, 0.78, 0.68),
-    "ui/thumb_party_unison_{n}.png": (0.16, 0.00, 0.84, 0.64),
-    "ui/battle_control_board_{n}.png": (0.28, 0.00, 0.72, 0.68),
-    "ui/battle_member_status_{n}.png": (0.15, 0.00, 0.85, 0.58),
-    "ui/cutin_skill_chain_{n}.png": (0.15, 0.00, 0.85, 0.64),
+DERIVATIVES = {
+    "ui/skill_cutin_{n}.png": {
+        "size": (1024, 512), "mode": "upper_body",
+        "rect": (0.00, 0.00, 1.00, 0.50)},
+    "ui/square_{n}.png": {
+        "size": (212, 212), "mode": "portrait",
+        "rect": (0.15, 0.00, 0.85, 0.58)},
+    "ui/square_132_132_{n}.png": {
+        "size": (132, 132), "mode": "portrait",
+        "rect": (0.15, 0.00, 0.85, 0.58)},
+    "ui/square_round_95_95_{n}.png": {
+        "size": (95, 95), "mode": "face",
+        "rect": (0.15, 0.00, 0.85, 0.58)},
+    "ui/square_round_136_136_{n}.png": {
+        "size": (136, 136), "mode": "face",
+        "rect": (0.15, 0.00, 0.85, 0.58)},
+    "ui/thumb_level_up_{n}.png": {
+        "size": (252, 329), "mode": "portrait",
+        "rect": (0.15, 0.00, 0.85, 0.62)},
+    "ui/thumb_party_main_{n}.png": {
+        "size": (186, 392), "mode": "upper_body",
+        "rect": (0.22, 0.00, 0.78, 0.68)},
+    "ui/thumb_party_unison_{n}.png": {
+        "size": (144, 188), "mode": "portrait",
+        "rect": (0.16, 0.00, 0.84, 0.64)},
+    "ui/battle_control_board_{n}.png": {
+        "size": (104, 268), "mode": "head_shoulders",
+        "rect": (0.30, 0.00, 0.70, 0.26)},
+    "ui/battle_member_status_{n}.png": {
+        "size": (58, 58), "mode": "face",
+        "rect": (0.15, 0.00, 0.85, 0.58)},
+    "ui/cutin_skill_chain_{n}.png": {
+        "size": (276, 319), "mode": "face",
+        "rect": (0.20, 0.00, 0.80, 0.27)},
 }
 
 REQUIRED_SIZES = {
@@ -430,11 +445,11 @@ def build_visual_derivatives(base_path: Path, awake_path: Path,
         full_path = pack / f"ui/full_shot_1440_1920_{n}.png"
         full_path.parent.mkdir(parents=True, exist_ok=True)
         full.save(full_path)
-        for template, (size, _focus) in DERIVATIVES.items():
+        for template, spec in DERIVATIVES.items():
             path = pack / template.format(n=n)
             path.parent.mkdir(parents=True, exist_ok=True)
             skin.focal_rect_rgba(
-                master, size, FOCAL_RECTS[template]).save(path)
+                master, spec["size"], spec["rect"]).save(path)
         story_size = (520, 616) if n == 0 else (570, 690)
         story_path = pack / f"ui/story/base_{n}.png"
         story_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1035,7 +1050,8 @@ def plan_apply(runtime=None, work: Path = WORK,
     """Build the complete read-only audit plan shared by dry-run and apply."""
     gui = _resolve_gui(runtime)
     profile = require_cn_profile(gui)
-    current = gui.get_char_fields(CANARY_ID)["fields"]["code_name"]
+    current_fields = gui.get_char_fields(CANARY_ID)["fields"]
+    current = current_fields["code_name"]
     if current not in {CURRENT_CODE, NEW_CODE}:
         raise ValueError(f"unexpected canary code_name: {current}")
     pack = work / "pack"
@@ -1128,6 +1144,14 @@ def plan_apply(runtime=None, work: Path = WORK,
             "from": current,
             "to": NEW_CODE,
         },
+        "character_fields": {
+            "character_id": CANARY_ID,
+            "from": {
+                field: current_fields.get(field, "")
+                for field in TARGET_CHARACTER_FIELDS
+            },
+            "to": dict(TARGET_CHARACTER_FIELDS),
+        },
         "snapshot": {
             "character_snapshot": True,
             "rollback_directory": str(work / "rollback_snapshots"),
@@ -1183,7 +1207,7 @@ def plan_apply(runtime=None, work: Path = WORK,
                 "trimmed_image clone",
                 "character_image clone",
                 "full_shot_image_attribute clone",
-                "character code_name update",
+                "character identity/profile update",
                 "Kyle asset writes and derived ATF/trim updates",
             ],
         },
@@ -1196,7 +1220,7 @@ def plan_apply(runtime=None, work: Path = WORK,
             "clone-character-image",
             "clone-full-shot-attribute",
             "materialize-assets",
-            "update-layer1-code-name",
+            "update-character-fields",
             "replace-png-and-derived-metadata",
             "changelog-writes",
             "pending-writes",
@@ -1254,8 +1278,8 @@ def apply(dry_run: bool, runtime=None, work: Path = WORK,
             backup_timestamp=plan["backup_timestamp"])
         observed_operations.append("materialize-assets")
         gui.save_char_fields(
-            CANARY_ID, {"code_name": NEW_CODE}, dry_run=False)
-        observed_operations.append("update-layer1-code-name")
+            CANARY_ID, dict(TARGET_CHARACTER_FIELDS), dry_run=False)
+        observed_operations.append("update-character-fields")
         for png in sorted(pack.rglob("*.png")):
             logical = (
                 f"character/{NEW_CODE}/"
