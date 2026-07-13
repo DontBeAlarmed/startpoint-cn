@@ -19,6 +19,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import wf_assets  # noqa: E402
 import wf_mod_tool as core  # noqa: E402
+import wf_publish  # noqa: E402
 import wf_rogue_rewards as rewards  # noqa: E402
 
 
@@ -381,6 +382,18 @@ class TestSourceAssets(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.validate()
 
+    def test_unexpected_non_png_file_is_rejected(self):
+        (self.asset_dir / "unexpected.jpg").write_bytes(b"not an allowed asset")
+
+        with self.assertRaisesRegex(ValueError, "unexpected"):
+            self.validate()
+
+    def test_unexpected_subdirectory_is_rejected(self):
+        (self.asset_dir / "nested").mkdir()
+
+        with self.assertRaisesRegex(ValueError, "unexpected"):
+            self.validate()
+
     def test_non_png_bytes_are_rejected(self):
         spec = rewards.WEAPONS[0]
         (self.asset_dir / f"{spec.image_slug}.png").write_bytes(b"not a png")
@@ -605,6 +618,91 @@ class TestCnProfilePreflight(unittest.TestCase):
         self.assertEqual(0, result)
         validate.assert_called_once_with(rewards.SOURCE_ASSET_DIR, rewards.WEAPONS)
         install.assert_called_once_with(profile.store, sources, rewards.WEAPONS)
+
+    def test_publish_collects_all_fifteen_installed_asset_paths(self):
+        tables = fake_master_tables(placeholders=True)
+        mirrors = fake_server_mirrors()
+        stored_tables = {
+            rewards.ITEM_T: copy.deepcopy(tables.items),
+            rewards.EQUIP_T: copy.deepcopy(tables.equipment),
+            rewards.EQUIP_STATUS_T: copy.deepcopy(tables.equipment_status),
+            rewards.SOUL_T: copy.deepcopy(tables.ability_soul),
+            rewards.RUSH_EVENT_T: copy.deepcopy(tables.rush_event),
+        }
+        stored_json = {
+            "equipment_max_level.json": copy.deepcopy(mirrors.equipment_max_level),
+            "equipment_element.json": copy.deepcopy(mirrors.equipment_element),
+            "equipment_lookup.json": copy.deepcopy(mirrors.equipment_lookup),
+            "equipment_ids.json": copy.deepcopy(mirrors.equipment_ids),
+            "item_ids.json": copy.deepcopy(mirrors.item_ids),
+        }
+
+        def load_table(logical):
+            return copy.deepcopy(stored_tables[logical])
+
+        def save_table(logical, data):
+            stored_tables[logical] = copy.deepcopy(data)
+
+        def load_json(name):
+            return copy.deepcopy(stored_json[name])
+
+        def save_json(name, data):
+            stored_json[name] = copy.deepcopy(data)
+
+        with tempfile.TemporaryDirectory() as directory:
+            profile = core.VersionProfile(
+                id="cn", label="CN", store=Path(directory), fallback=None
+            )
+            sources = {
+                spec.image_slug: Path(directory) / f"{spec.image_slug}.png"
+                for spec in rewards.WEAPONS
+            }
+            expected_asset_paths = {
+                rewards.q.hashed_rel(
+                    f"{rewards.IMAGE_PREFIX}/{spec.image_slug}.png"
+                )
+                for spec in rewards.WEAPONS
+            }
+            with (
+                mock.patch.object(rewards, "require_cn_profile", return_value=profile),
+                mock.patch.object(rewards.q, "load_table", side_effect=load_table),
+                mock.patch.object(rewards.q, "save_table", side_effect=save_table),
+                mock.patch.object(rewards, "load_json", side_effect=load_json),
+                mock.patch.object(rewards, "save_json", side_effect=save_json),
+                mock.patch.object(
+                    rewards, "validate_source_assets", return_value=sources
+                ),
+                mock.patch.object(
+                    rewards,
+                    "install_source_assets",
+                    return_value=sorted(expected_asset_paths),
+                ),
+                mock.patch.object(rewards, "_print_asset_validation"),
+                mock.patch.object(rewards, "_print_plan"),
+                mock.patch.object(
+                    rewards.subprocess,
+                    "run",
+                    return_value=mock.Mock(returncode=0),
+                ) as publish,
+                mock.patch.object(
+                    sys, "argv", ["wf_rogue_rewards.py", "--write", "--publish"]
+                ),
+            ):
+                result = rewards.main()
+
+        self.assertEqual(0, result)
+        publish.assert_called_once()
+        command = publish.call_args.args[0]
+        publish_argument = command[command.index("--tables") + 1]
+        collected = set(wf_publish.collect_files(mock.Mock(tables=publish_argument)))
+        published_assets = collected.intersection(expected_asset_paths)
+        missing_assets = expected_asset_paths.difference(collected)
+        self.assertEqual(
+            15,
+            len(published_assets),
+            f"PUBLISHED_ASSET_PATHS={len(published_assets)}",
+        )
+        self.assertEqual(set(), missing_assets, f"missing={sorted(missing_assets)}")
 
 
 @unittest.skipUnless(not MISSING_API, "canonical builder API is not implemented yet")

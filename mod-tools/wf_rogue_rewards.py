@@ -174,10 +174,7 @@ def validate_source_assets(
     asset_dir = Path(asset_dir)
     expected_names = {f"{slug}.png" for slug in slugs}
     try:
-        actual_names = {
-            path.name for path in asset_dir.iterdir()
-            if path.is_file() and path.suffix.lower() == ".png"
-        }
+        actual_names = {path.name for path in asset_dir.iterdir()}
     except OSError as exc:
         raise ValueError(f"无法读取源 PNG 目录 {asset_dir}: {exc}") from exc
     missing_names = sorted(expected_names.difference(actual_names))
@@ -720,9 +717,12 @@ def main() -> int:
         "[OK] 5 client tables, 5 server mirrors, and 15 PNGs passed "
         "write/readback validation"
     )
-    publish_tables = ",".join(
-        (ITEM_T, EQUIP_T, EQUIP_STATUS_T, SOUL_T, RUSH_EVENT_T)
+    publish_logicals = (
+        ITEM_T, EQUIP_T, EQUIP_STATUS_T, SOUL_T, RUSH_EVENT_T,
+    ) + tuple(
+        f"{IMAGE_PREFIX}/{spec.image_slug}.png" for spec in WEAPONS
     )
+    publish_tables = ",".join(publish_logicals)
     if not args.publish:
         print(f"发布命令: python mod-tools/wf_publish.py --tables {publish_tables}")
         return 0
