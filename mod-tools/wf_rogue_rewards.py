@@ -615,8 +615,16 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="深渊代币 + 连战专属武装")
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--publish", action="store_true")
+    ap.add_argument("--client-verification")
     ap.add_argument("--validate-assets", action="store_true")
     args = ap.parse_args()
+
+    if args.publish and not args.write:
+        print("[ERR] --publish 必须与 --write 同时使用", file=sys.stderr)
+        return 1
+    if args.publish and not args.client_verification:
+        print("[ERR] --publish 必须提供 --client-verification", file=sys.stderr)
+        return 1
 
     sources: dict[str, Path] | None = None
     if args.validate_assets or args.write:
@@ -717,29 +725,46 @@ def main() -> int:
         "[OK] 5 client tables, 5 server mirrors, and 15 PNGs passed "
         "write/readback validation"
     )
-    publish_logicals = (
-        ITEM_T, EQUIP_T, EQUIP_STATUS_T, SOUL_T, RUSH_EVENT_T,
-    ) + tuple(
-        f"{IMAGE_PREFIX}/{spec.image_slug}.png" for spec in WEAPONS
-    )
-    publish_tables = ",".join(publish_logicals)
+    from wf_rogue_validate import require_release_ready, release_logicals
+
+    publish_tables = ",".join(release_logicals())
     if not args.publish:
         print(f"发布命令: python mod-tools/wf_publish.py --tables {publish_tables}")
         return 0
 
     try:
-        require_cn_profile()
+        publish_profile = require_cn_profile()
     except (KeyError, TypeError, ValueError, RuntimeError, OSError) as exc:
         print(f"[ERR] 发布前 CN profile 复检失败: {exc}", file=sys.stderr)
         return 1
 
-    result = subprocess.run(
-        [sys.executable, os.path.join(ROOT, "mod-tools", "wf_publish.py"),
-         "--tables", publish_tables],
-        cwd=ROOT,
-    )
-    print(f"[PUBLISH] wf_publish 退出码 {result.returncode}")
-    return result.returncode
+    try:
+        require_release_ready(
+            publish_profile.store,
+            Path(ROOT) / "assets",
+            Path(args.client_verification),
+        )
+    except (KeyError, TypeError, ValueError, RuntimeError, OSError) as exc:
+        print(f"[ERR] 发布门禁失败,禁止调用发布器: {exc}", file=sys.stderr)
+        return 1
+
+    command = [
+        sys.executable,
+        str(Path(ROOT) / "mod-tools" / "wf_publish.py"),
+        "--tables",
+        publish_tables,
+    ]
+    try:
+        subprocess.run(command, cwd=ROOT, check=True)
+    except subprocess.CalledProcessError as exc:
+        code = exc.returncode if exc.returncode else 1
+        print(f"[ERR] wf_publish 退出码 {code}", file=sys.stderr)
+        return code
+    except OSError as exc:
+        print(f"[ERR] 无法调用 wf_publish: {exc}", file=sys.stderr)
+        return 1
+    print("[PUBLISH] wf_publish 退出码 0")
+    return 0
 
 
 if __name__ == "__main__":

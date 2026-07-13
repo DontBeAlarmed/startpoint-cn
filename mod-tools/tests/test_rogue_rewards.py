@@ -8,6 +8,7 @@ import copy
 import io
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -21,6 +22,7 @@ import wf_assets  # noqa: E402
 import wf_mod_tool as core  # noqa: E402
 import wf_publish  # noqa: E402
 import wf_rogue_rewards as rewards  # noqa: E402
+import wf_rogue_validate as validator  # noqa: E402
 
 
 REQUIRED_API = (
@@ -548,7 +550,15 @@ class TestCnProfilePreflight(unittest.TestCase):
             mock.patch.object(rewards, "_print_plan"),
             mock.patch.object(rewards.subprocess, "run") as publish,
             mock.patch.object(
-                sys, "argv", ["wf_rogue_rewards.py", "--write", "--publish"]
+                sys,
+                "argv",
+                [
+                    "wf_rogue_rewards.py",
+                    "--write",
+                    "--publish",
+                    "--client-verification",
+                    "client-verification.json",
+                ],
             ),
         ):
             result = rewards.main()
@@ -679,13 +689,22 @@ class TestCnProfilePreflight(unittest.TestCase):
                 ),
                 mock.patch.object(rewards, "_print_asset_validation"),
                 mock.patch.object(rewards, "_print_plan"),
+                mock.patch.object(validator, "require_release_ready"),
                 mock.patch.object(
                     rewards.subprocess,
                     "run",
                     return_value=mock.Mock(returncode=0),
                 ) as publish,
                 mock.patch.object(
-                    sys, "argv", ["wf_rogue_rewards.py", "--write", "--publish"]
+                    sys,
+                    "argv",
+                    [
+                        "wf_rogue_rewards.py",
+                        "--write",
+                        "--publish",
+                        "--client-verification",
+                        "client-verification.json",
+                    ],
                 ),
             ):
                 result = rewards.main()
@@ -703,6 +722,187 @@ class TestCnProfilePreflight(unittest.TestCase):
             f"PUBLISHED_ASSET_PATHS={len(published_assets)}",
         )
         self.assertEqual(set(), missing_assets, f"missing={sorted(missing_assets)}")
+
+
+class TestReleaseGate(unittest.TestCase):
+    def test_publish_without_write_is_rejected_before_reads_writes_or_subprocess(self):
+        with (
+            mock.patch.object(rewards, "validate_source_assets") as validate_assets,
+            mock.patch.object(rewards, "require_cn_profile") as profile,
+            mock.patch.object(rewards.q, "load_table") as load_table,
+            mock.patch.object(rewards.q, "save_table") as save_table,
+            mock.patch.object(rewards.subprocess, "run") as publish,
+            mock.patch.object(
+                sys,
+                "argv",
+                [
+                    "wf_rogue_rewards.py",
+                    "--publish",
+                    "--client-verification",
+                    "client-verification.json",
+                ],
+            ),
+        ):
+            result = rewards.main()
+
+        self.assertNotEqual(0, result)
+        validate_assets.assert_not_called()
+        profile.assert_not_called()
+        load_table.assert_not_called()
+        save_table.assert_not_called()
+        publish.assert_not_called()
+
+    def test_publish_without_client_verification_is_rejected_before_any_write(self):
+        with (
+            mock.patch.object(rewards, "validate_source_assets") as validate_assets,
+            mock.patch.object(rewards, "require_cn_profile") as profile,
+            mock.patch.object(rewards.q, "save_table") as save_table,
+            mock.patch.object(rewards.subprocess, "run") as publish,
+            mock.patch.object(
+                sys, "argv", ["wf_rogue_rewards.py", "--write", "--publish"]
+            ),
+        ):
+            result = rewards.main()
+
+        self.assertNotEqual(0, result)
+        validate_assets.assert_not_called()
+        profile.assert_not_called()
+        save_table.assert_not_called()
+        publish.assert_not_called()
+
+    def _run_write_publish(self, *, gate_error=None, publisher_error=None):
+        tables = fake_master_tables(placeholders=True)
+        mirrors = fake_server_mirrors()
+        stored_tables = {
+            rewards.ITEM_T: copy.deepcopy(tables.items),
+            rewards.EQUIP_T: copy.deepcopy(tables.equipment),
+            rewards.EQUIP_STATUS_T: copy.deepcopy(tables.equipment_status),
+            rewards.SOUL_T: copy.deepcopy(tables.ability_soul),
+            rewards.RUSH_EVENT_T: copy.deepcopy(tables.rush_event),
+        }
+        stored_json = {
+            "equipment_max_level.json": copy.deepcopy(mirrors.equipment_max_level),
+            "equipment_element.json": copy.deepcopy(mirrors.equipment_element),
+            "equipment_lookup.json": copy.deepcopy(mirrors.equipment_lookup),
+            "equipment_ids.json": copy.deepcopy(mirrors.equipment_ids),
+            "item_ids.json": copy.deepcopy(mirrors.item_ids),
+        }
+        events: list[str] = []
+
+        def load_table(logical):
+            events.append(f"load:{logical}")
+            return copy.deepcopy(stored_tables[logical])
+
+        def save_table(logical, data):
+            events.append(f"save:{logical}")
+            stored_tables[logical] = copy.deepcopy(data)
+
+        def load_json(name):
+            events.append(f"load_json:{name}")
+            return copy.deepcopy(stored_json[name])
+
+        def save_json(name, data):
+            events.append(f"save_json:{name}")
+            stored_json[name] = copy.deepcopy(data)
+
+        profile = core.VersionProfile(
+            id="cn", label="CN", store=Path("cn-store"), fallback=None
+        )
+        sources = {
+            spec.image_slug: Path(f"{spec.image_slug}.png")
+            for spec in rewards.WEAPONS
+        }
+
+        def install(*_args):
+            events.append("install_pngs")
+            return [f"hash-{index}" for index in range(15)]
+
+        def gate(*_args):
+            events.append("release_gate")
+            if gate_error is not None:
+                raise gate_error
+
+        def publish(*_args, **_kwargs):
+            events.append("publisher")
+            if publisher_error is not None:
+                raise publisher_error
+            return mock.Mock(returncode=0)
+
+        with (
+            mock.patch.object(rewards, "require_cn_profile", return_value=profile) as preflight,
+            mock.patch.object(rewards.q, "load_table", side_effect=load_table),
+            mock.patch.object(rewards.q, "save_table", side_effect=save_table),
+            mock.patch.object(rewards, "load_json", side_effect=load_json),
+            mock.patch.object(rewards, "save_json", side_effect=save_json),
+            mock.patch.object(rewards, "validate_source_assets", return_value=sources),
+            mock.patch.object(rewards, "install_source_assets", side_effect=install),
+            mock.patch.object(rewards, "_print_asset_validation"),
+            mock.patch.object(rewards, "_print_plan"),
+            mock.patch.object(validator, "require_release_ready", side_effect=gate) as gate_mock,
+            mock.patch.object(rewards.subprocess, "run", side_effect=publish) as publish_mock,
+            mock.patch.object(
+                sys,
+                "argv",
+                [
+                    "wf_rogue_rewards.py",
+                    "--write",
+                    "--publish",
+                    "--client-verification",
+                    "client-verification.json",
+                ],
+            ),
+        ):
+            result = rewards.main()
+
+        return result, events, profile, preflight, gate_mock, publish_mock
+
+    def test_release_validation_failure_never_invokes_publisher(self):
+        result, events, _profile, preflight, gate, publish = self._run_write_publish(
+            gate_error=RuntimeError("invalid release")
+        )
+
+        self.assertNotEqual(0, result)
+        self.assertEqual(2, preflight.call_count)
+        gate.assert_called_once()
+        publish.assert_not_called()
+        self.assertNotIn("publisher", events)
+        self.assertGreater(events.index("release_gate"), events.index("install_pngs"))
+
+    def test_valid_release_invokes_publisher_once_with_exact_allowlist_and_check(self):
+        result, events, profile, preflight, gate, publish = self._run_write_publish()
+
+        self.assertEqual(0, result)
+        self.assertEqual(2, preflight.call_count)
+        gate.assert_called_once_with(
+            profile.store,
+            Path(rewards.ROOT) / "assets",
+            Path("client-verification.json"),
+        )
+        expected_command = [
+            sys.executable,
+            str(Path(rewards.ROOT) / "mod-tools" / "wf_publish.py"),
+            "--tables",
+            ",".join(validator.release_logicals()),
+        ]
+        publish.assert_called_once_with(
+            expected_command,
+            cwd=rewards.ROOT,
+            check=True,
+        )
+        self.assertEqual("release_gate", events[-2])
+        self.assertEqual("publisher", events[-1])
+        self.assertNotIn("pending", " ".join(expected_command).lower())
+
+    def test_publisher_nonzero_exit_is_propagated(self):
+        failure = subprocess.CalledProcessError(9, ["wf_publish.py"])
+        result, events, _profile, _preflight, gate, publish = self._run_write_publish(
+            publisher_error=failure
+        )
+
+        self.assertEqual(9, result)
+        gate.assert_called_once()
+        publish.assert_called_once()
+        self.assertEqual(1, events.count("publisher"))
 
 
 @unittest.skipUnless(not MISSING_API, "canonical builder API is not implemented yet")
