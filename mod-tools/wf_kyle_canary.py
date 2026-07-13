@@ -730,6 +730,7 @@ def _restore_snapshot_entry(entry: dict, data: bytes | None) -> None:
 
 
 def _read_rollback_snapshot(snapshot: Path, allowed_roots=None,
+                            allowed_paths=(),
                             expected_binding: dict | None = None):
     snapshot = Path(snapshot)
     with zipfile.ZipFile(snapshot) as archive:
@@ -740,6 +741,7 @@ def _read_rollback_snapshot(snapshot: Path, allowed_roots=None,
             raise ValueError("snapshot profile binding does not match active CN profile")
         roots = ([Path(root).resolve() for root in allowed_roots]
                  if allowed_roots is not None else None)
+        exact_paths = {Path(path).resolve() for path in allowed_paths}
         entries = manifest.get("entries")
         if not isinstance(entries, list):
             raise ValueError("invalid rollback snapshot entries")
@@ -754,10 +756,11 @@ def _read_rollback_snapshot(snapshot: Path, allowed_roots=None,
             seen_paths.add(key)
             if roots is not None:
                 resolved = path.resolve()
-                if not any(resolved == root or root in resolved.parents
-                           for root in roots):
+                in_root = any(resolved == root or root in resolved.parents
+                              for root in roots)
+                if not in_root and resolved not in exact_paths:
                     raise ValueError(
-                        f"rollback path outside active CN profile: {path}")
+                        f"rollback path outside exact whitelist: {path}")
             member = entry.get("member")
             if entry.get("existed"):
                 if not member:
@@ -780,11 +783,13 @@ def _read_rollback_snapshot(snapshot: Path, allowed_roots=None,
 
 def restore_rollback_snapshot(
         snapshot: Path, allowed_roots=None,
+        allowed_paths=(),
         expected_binding: dict | None = None,
         extra_journal_paths=(), after_restore=None) -> dict:
     """Prevalidate, then transactionally restore one persistent snapshot."""
     manifest, payloads = _read_rollback_snapshot(
         snapshot, allowed_roots=allowed_roots,
+        allowed_paths=allowed_paths,
         expected_binding=expected_binding)
     entries = manifest["entries"]
     paths = [Path(entry["path"]) for entry in entries]
@@ -1075,14 +1080,24 @@ def rollback(snapshot: Path, runtime=None) -> dict:
         Path(profile[name]).resolve()
         for name in ("upload", "medium", "android")
     ]
-    allowed_roots = [
-        *publish_roots,
-        Path(profile["cdndata"]).parent,
-    ]
+    allowed_roots = list(publish_roots)
+    cdndata = Path(profile["cdndata"]).resolve()
+    allowed_paths = {
+        cdndata / "character.json",
+        cdndata / "character_text.json",
+        cdndata.parent / "character.json",
+    }
+    char_json_paths = getattr(gui, "_char_json_paths", None)
+    if char_json_paths is not None:
+        allowed_paths.update(Path(path).resolve()
+                             for path in char_json_paths())
+    server_json_path = getattr(gui, "_server_char_json_path", None)
+    if server_json_path is not None:
+        allowed_paths.add(Path(server_json_path()).resolve())
     for attribute in ("PENDING_FILE", "CHANGELOG_FILE", "CHANGELOG_MD"):
         path = getattr(gui, attribute, None)
         if path is not None:
-            allowed_roots.append(Path(path).parent.resolve())
+            allowed_paths.add(Path(path).resolve())
     queued = []
 
     def requeue(entries):
@@ -1100,6 +1115,7 @@ def rollback(snapshot: Path, runtime=None) -> dict:
     result = restore_rollback_snapshot(
         snapshot,
         allowed_roots=allowed_roots,
+        allowed_paths=allowed_paths,
         expected_binding=binding,
         extra_journal_paths=([Path(pending_file)] if pending_file else []),
         after_restore=requeue,

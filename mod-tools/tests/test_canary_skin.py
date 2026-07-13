@@ -1415,6 +1415,25 @@ class TestKyleRollbackSafety(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "snapshot profile binding"):
                 kyle.rollback(clean, runtime=runtime)
 
+    def test_rollback_whitelist_rejects_unrelated_file_beside_pending(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            pending_file = root / "mod-work/sync_pending.json"
+            unrelated = root / "mod-work/unrelated.json"
+            pending_file.parent.mkdir(parents=True)
+            pending_file.write_bytes(b"[]")
+            unrelated.write_bytes(b"pre")
+            runtime = cn_runtime(
+                root, PENDING_FILE=pending_file,
+                add_pending=lambda _path: None)
+            snapshot = kyle.write_rollback_snapshot(
+                [unrelated], root / "snapshots",
+                binding=kyle.profile_binding(runtime))
+            unrelated.write_bytes(b"current")
+            with self.assertRaisesRegex(ValueError, "outside exact whitelist"):
+                kyle.rollback(snapshot, runtime=runtime)
+            self.assertEqual(unrelated.read_bytes(), b"current")
+
     def test_late_restore_failure_rolls_back_the_rollback_call(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
