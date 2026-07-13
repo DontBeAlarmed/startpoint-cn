@@ -8,18 +8,18 @@ import { getSession } from "../../data/domains/session"
 import { incrementPlayerCharacterClearSync } from "../../data/domains/character_clear"
 import { updatePlayerEquipmentSync } from "../../data/domains/equipment"
 import { upsertPlayerCarnivalEventRecordSync } from "../../data/domains/carnivalEvent"
-import { getQuestFromCategorySync, getRushEventFolderClearRewards } from "../../lib/assets";
+import { getQuestFromCategorySync, getRushEventFolderClearRewards, getRushEventFolderMaxRounds } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
-import { rushEventFolderMaxRounds } from "./rushEvent";
 import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/stamina";
 import { getStaminaCost } from "../../lib/stamina-cost";
 import { handleCarnivalEventFinish } from "../../lib/quest/finish/carnival-handler";
 import { handleRushEventFinish } from "../../lib/quest/finish/rush-handler";
+import { handleRoguePerRoundDrops } from "../../lib/quest/finish/rogue-drops";
 import { handleRaidEventFinish } from "../../lib/quest/finish/raid-handler";
 import { calculateClearRank } from "../../lib/quest/finish/quest-calc";
 import { validateSessionAndPlayer } from "../../lib/quest/finish/session-validator";
@@ -381,6 +381,10 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // handle event quest-specific data & rewards
+        // folder max rounds derived per event: folder ids repeat across events,
+        // the flat hardcoded map capped every folder at 2 rounds (700007 超级
+        // is actually 3, custom events can be longer)
+        const derivedFolderMaxRounds = getRushEventFolderMaxRounds(questData.rushEventId ?? 0)
         const { rushEventData, rushEventRewardsResult } = handleRushEventFinish({
             questCategory,
             questData,
@@ -389,7 +393,7 @@ const routes = async (fastify: FastifyInstance) => {
             playerId,
             questId,
             getEvoLevels: (pid, chars) => getCharactersEvolutionImgLevels(pid, chars),
-            folderMaxRounds: rushEventFolderMaxRounds,
+            folderMaxRounds: derivedFolderMaxRounds,
             getRushEvent: (pid, eid) => getPlayerRushEventSync(pid, eid),
             updateRushEvent: (pid, data) => updatePlayerRushEventSync(pid, data),
             insertParty: (pid, eid, p) => insertPlayerRushEventPlayedPartySync(pid, eid, p),
@@ -399,6 +403,22 @@ const routes = async (fastify: FastifyInstance) => {
             getFolderRewards: (eid, fid) => getRushEventFolderClearRewards(eid, fid),
             giveRewards: (pid, r) => givePlayerRewardsSync(pid, r),
         })
+
+        // roguelike rush mod: per-round loot drops (assets/rogue_event.json)
+        const rogueDrops = handleRoguePerRoundDrops({
+            questCategory,
+            questAccomplished,
+            playerId,
+            questData,
+            folderMaxRounds: derivedFolderMaxRounds,
+            partyCharacterIds: partyCharacterIdsArray,
+        })
+        if (rogueDrops !== null && rushEventData !== null && rogueDrops.showInRewardList) {
+            rushEventData.rush_battle_reward_list = [
+                ...rushEventData.rush_battle_reward_list,
+                ...rogueDrops.rewardListEntries
+            ]
+        }
 
         // Record played party for RAID_EVENT
         handleRaidEventFinish({
@@ -426,7 +446,8 @@ const routes = async (fastify: FastifyInstance) => {
         const itemList = {
             ...(activeQuestData.entryItemId ? { [activeQuestData.entryItemId]: getPlayerItemSync(playerId, activeQuestData.entryItemId) ?? 0 } : {}),
             ...scoreRewardsResult.items,
-            ...(rushEventRewardsResult?.items ?? {})
+            ...(rushEventRewardsResult?.items ?? {}),
+            ...(rogueDrops?.rewardResult.items ?? {})
         }
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -434,7 +455,7 @@ const routes = async (fastify: FastifyInstance) => {
             "data": {
                 "user_info": {
                     "free_mana": newMana + (clearReward?.user_info.free_mana || 0) + (sPlusClearReward?.user_info.free_mana || 0) + scoreRewardsResult.user_info.free_mana,
-                    "exp_pool": rewardCharacterExpResult.exp_pool + (clearReward?.user_info.exp_pool || 0) + scoreRewardsResult.user_info.exp_pool,
+                    "exp_pool": (rogueDrops?.expPoolAbsolute ?? rewardCharacterExpResult.exp_pool) + (clearReward?.user_info.exp_pool || 0) + scoreRewardsResult.user_info.exp_pool,
                     "exp_pooled_time": getServerTime(playerData.expPooledTime),
                     "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney,
                     "rank_point": newRankPoint,
@@ -444,14 +465,26 @@ const routes = async (fastify: FastifyInstance) => {
                     "boost_point": newBoostPoint,
                     "boss_boost_point": newBossBoostPoint
                 },
-                "add_exp_list": rewardCharacterExpResult.add_exp_list,
+                "add_exp_list": [
+                    ...rewardCharacterExpResult.add_exp_list,
+                    ...(rogueDrops?.addExpList || [])
+                ],
                 "character_list": [
                     ...rewardCharacterExpResult.character_list,
                     ...(clearReward?.character_list || []),
                     ...(sPlusClearReward?.character_list || []),
-                    ...scoreRewardsResult.character_list
+                    ...scoreRewardsResult.character_list,
+                    ...(rushEventRewardsResult?.character_list || []),
+                    // full entry (with entry_count/bond_token_list) must precede
+                    // the exp-updated entry so the client registers the new
+                    // character before skipping already-owned entries
+                    ...(rogueDrops?.rewardResult.character_list || []),
+                    ...(rogueDrops?.expCharacterList || [])
                 ],
-                "bond_token_status_list": rewardCharacterExpResult.bond_token_status_list,
+                "bond_token_status_list": {
+                    ...rewardCharacterExpResult.bond_token_status_list,
+                    ...(rogueDrops?.bondTokenStatusList || {})
+                },
                 "rewards": {
                     "overflow_pool_exp": 0,
                     "converted_pool_exp": 0,
@@ -475,7 +508,8 @@ const routes = async (fastify: FastifyInstance) => {
                     ...scoreRewardsResult.equipment_list,
                     ...(clearReward?.equipment_list || []),
                     ...(sPlusClearReward?.equipment_list || []),
-                    ...(rushEventRewardsResult?.equipment_list || [])
+                    ...(rushEventRewardsResult?.equipment_list || []),
+                    ...(rogueDrops?.rewardResult.equipment_list || [])
                 ],
                 "category_id": body.category,
                 "start_time": dataHeaders['servertime'],

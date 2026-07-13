@@ -1,1 +1,2257 @@
-{"1010001": {"name": "老旧短剑", "rarity": "0", "category": "剑"}, "2010002": {"name": "无名长剑", "rarity": "0", "category": "剑"}, "3010006": {"name": "流转之剑", "rarity": "0", "category": "剑"}, "3010007": {"name": "短弯刀", "rarity": "0", "category": "剑"}, "3010008": {"name": "玻璃之刃", "rarity": "0", "category": "剑"}, "3010013": {"name": "焰形剑", "rarity": "0", "category": "剑"}, "3010023": {"name": "幻想的胡萝卜剑", "rarity": "0", "category": "剑"}, "3010027": {"name": "闪电匕首", "rarity": "0", "category": "剑"}, "3010035": {"name": "高热剑", "rarity": "0", "category": "剑"}, "3010053": {"name": "野营刀", "rarity": "0", "category": "剑"}, "4010003": {"name": "妖刀蛇崩", "rarity": "0", "category": "剑"}, "4010010": {"name": "伊文剑", "rarity": "0", "category": "剑"}, "4010014": {"name": "木灵大剑", "rarity": "0", "category": "剑"}, "4010015": {"name": "祸根之剑", "rarity": "0", "category": "剑"}, "4010017": {"name": "贝帝之剑", "rarity": "0", "category": "剑"}, "4010018": {"name": "断罪之剑", "rarity": "0", "category": "剑"}, "4010021": {"name": "PHL光剑", "rarity": "0", "category": "剑"}, "4010024": {"name": "七支铜刀", "rarity": "0", "category": "剑"}, "4010048": {"name": "灼炎龙剑", "rarity": "0", "category": "剑"}, "4010049": {"name": "水蚀龙鞭", "rarity": "0", "category": "剑"}, "4010052": {"name": "凶暗龙刃", "rarity": "0", "category": "剑"}, "4010071": {"name": "无瑕灵剑", "rarity": "0", "category": "剑"}, "5010004": {"name": "天羽羽斩", "rarity": "0", "category": "剑"}, "5010005": {"name": "杜兰德尔", "rarity": "0", "category": "剑"}, "5010011": {"name": "海姆达尔之剑", "rarity": "0", "category": "剑"}, "5010012": {"name": "普罗米修斯之剑", "rarity": "0", "category": "剑"}, "5010019": {"name": "黑龙雷剑", "rarity": "0", "category": "剑"}, "5010020": {"name": "极彩宝石双剑", "rarity": "0", "category": "剑"}, "5010022": {"name": "死皇之剑", "rarity": "0", "category": "剑"}, "5010025": {"name": "海渊棘刃", "rarity": "0", "category": "剑"}, "5010026": {"name": "公主之剑", "rarity": "0", "category": "剑"}, "5010028": {"name": "提尔锋", "rarity": "0", "category": "剑"}, "5010029": {"name": "枢机卿", "rarity": "0", "category": "剑"}, "5010030": {"name": "牛鬼之尾", "rarity": "0", "category": "剑"}, "5010031": {"name": "盟约之剑", "rarity": "0", "category": "剑"}, "5010032": {"name": "天府剑", "rarity": "0", "category": "剑"}, "5010033": {"name": "斯库尔之剑", "rarity": "0", "category": "剑"}, "5010034": {"name": "歼风龙剑", "rarity": "0", "category": "剑"}, "5010036": {"name": "希望誓剑", "rarity": "0", "category": "剑"}, "5010037": {"name": "流水刃剑", "rarity": "0", "category": "剑"}, "5010038": {"name": "基因切割者", "rarity": "0", "category": "剑"}, "5010039": {"name": "格拉墨", "rarity": "0", "category": "剑"}, "5010040": {"name": "杀生石匕首", "rarity": "0", "category": "剑"}, "5010041": {"name": "水晶刃", "rarity": "0", "category": "剑"}, "5010042": {"name": "朱图尔纳之扇", "rarity": "0", "category": "剑"}, "5010043": {"name": "破坏之雷", "rarity": "0", "category": "剑"}, "5010044": {"name": "紫电真打", "rarity": "0", "category": "剑"}, "5010045": {"name": "七杀鞭", "rarity": "0", "category": "剑"}, "5010046": {"name": "哈尼帕纽斯", "rarity": "0", "category": "剑"}, "5010047": {"name": "勇者的扩音器", "rarity": "0", "category": "剑"}, "5010050": {"name": "鬼柴刀", "rarity": "0", "category": "剑"}, "5010051": {"name": "勿忘罪剑", "rarity": "0", "category": "剑"}, "5010054": {"name": "烈焰刃剑", "rarity": "0", "category": "剑"}, "5010055": {"name": "WBR-01", "rarity": "0", "category": "剑"}, "5010056": {"name": "天梁刀", "rarity": "0", "category": "剑"}, "5010057": {"name": "星芥镰剑", "rarity": "0", "category": "剑"}, "5010058": {"name": "兔兔长剑", "rarity": "0", "category": "剑"}, "5010059": {"name": "羊角大剑", "rarity": "0", "category": "剑"}, "5010060": {"name": "无妨剑", "rarity": "0", "category": "剑"}, "5010061": {"name": "水刃石剑", "rarity": "0", "category": "剑"}, "5010062": {"name": "冲突", "rarity": "0", "category": "剑"}, "5010063": {"name": "胜利大剑", "rarity": "0", "category": "剑"}, "5010064": {"name": "酸空匕", "rarity": "0", "category": "剑"}, "5010065": {"name": "噩梦羽", "rarity": "0", "category": "剑"}, "5010066": {"name": "十字军长剑", "rarity": "0", "category": "剑"}, "5010068": {"name": "疾风锐剑", "rarity": "0", "category": "剑"}, "5010069": {"name": "断魔之剑Ｒ", "rarity": "0", "category": "剑"}, "5010070": {"name": "解放者", "rarity": "0", "category": "剑"}, "5010072": {"name": "九归一剑", "rarity": "0", "category": "剑"}, "5010073": {"name": "朱安里克", "rarity": "0", "category": "剑"}, "5010074": {"name": "祸树露刃", "rarity": "0", "category": "剑"}, "5010075": {"name": "哈尼泽乌可", "rarity": "0", "category": "剑"}, "5010077": {"name": "雷鸣刃剑", "rarity": "0", "category": "剑"}, "5010078": {"name": "冥暗刃剑", "rarity": "0", "category": "剑"}, "5017716": {"name": "天耀刃剑", "rarity": "0", "category": "剑"}, "2020001": {"name": "无名之斧", "rarity": "0", "category": "斧"}, "3020003": {"name": "战士之斧", "rarity": "0", "category": "斧"}, "3020006": {"name": "战争巨镰", "rarity": "0", "category": "斧"}, "3020011": {"name": "维京斧", "rarity": "0", "category": "斧"}, "3020012": {"name": "牛斧", "rarity": "0", "category": "斧"}, "4020007": {"name": "印第安战斧", "rarity": "0", "category": "斧"}, "4020013": {"name": "古代战斧", "rarity": "0", "category": "斧"}, "4020014": {"name": "狐影之斧", "rarity": "0", "category": "斧"}, "4020016": {"name": "诅咒之斧", "rarity": "0", "category": "斧"}, "4020019": {"name": "名匠之槌", "rarity": "0", "category": "斧"}, "4020021": {"name": "黄金耙", "rarity": "0", "category": "斧"}, "4020033": {"name": "巨斧", "rarity": "0", "category": "斧"}, "4020034": {"name": "黑龙雷斧", "rarity": "0", "category": "斧"}, "5020008": {"name": "乌贡瓦萨拉", "rarity": "0", "category": "斧"}, "5020009": {"name": "雷神之锤", "rarity": "0", "category": "斧"}, "5020010": {"name": "死亡镰刀", "rarity": "0", "category": "斧"}, "5020017": {"name": "虎王斧", "rarity": "0", "category": "斧"}, "5020018": {"name": "死皇之斧", "rarity": "0", "category": "斧"}, "5020020": {"name": "凶暗龙镰", "rarity": "0", "category": "斧"}, "5020022": {"name": "前鬼之斧", "rarity": "0", "category": "斧"}, "5020023": {"name": "流星锤", "rarity": "0", "category": "斧"}, "5020024": {"name": "帕拉修", "rarity": "0", "category": "斧"}, "5020025": {"name": "百臂巨人之斧", "rarity": "0", "category": "斧"}, "5020026": {"name": "歼风龙斧", "rarity": "0", "category": "斧"}, "5020027": {"name": "分海棒", "rarity": "0", "category": "斧"}, "5020028": {"name": "镇压", "rarity": "0", "category": "斧"}, "5020029": {"name": "虚城斧", "rarity": "0", "category": "斧"}, "5020030": {"name": "灼钺", "rarity": "0", "category": "斧"}, "5020031": {"name": "哈尼勒斯", "rarity": "0", "category": "斧"}, "5020032": {"name": "镇痛剂", "rarity": "0", "category": "斧"}, "5020035": {"name": "豪缝熊Z", "rarity": "0", "category": "斧"}, "5020036": {"name": "哈尼可利", "rarity": "0", "category": "斧"}, "5020037": {"name": "悲叹死镰", "rarity": "0", "category": "斧"}, "5020038": {"name": "哈尼哈加玛", "rarity": "0", "category": "斧"}, "5020039": {"name": "哈尼古斯塔", "rarity": "0", "category": "斧"}, "5020040": {"name": "破刃镰", "rarity": "0", "category": "斧"}, "5020041": {"name": "金刚镰", "rarity": "0", "category": "斧"}, "5020042": {"name": "哈尔波曼", "rarity": "0", "category": "斧"}, "5020043": {"name": "终结者", "rarity": "0", "category": "斧"}, "2030001": {"name": "无名之枪", "rarity": "0", "category": "枪"}, "3030006": {"name": "流转之枪", "rarity": "0", "category": "枪"}, "3030007": {"name": "步兵长矛", "rarity": "0", "category": "枪"}, "3030012": {"name": "长柄刀", "rarity": "0", "category": "枪"}, "3030013": {"name": "偃月刀", "rarity": "0", "category": "枪"}, "3030027": {"name": "激光标枪", "rarity": "0", "category": "枪"}, "4030003": {"name": "标枪", "rarity": "0", "category": "枪"}, "4030004": {"name": "螺旋长枪", "rarity": "0", "category": "枪"}, "4030008": {"name": "游击者", "rarity": "0", "category": "枪"}, "4030009": {"name": "珊瑚之枪", "rarity": "0", "category": "枪"}, "4030014": {"name": "毁灭者", "rarity": "0", "category": "枪"}, "4030019": {"name": "黑龙雷枪", "rarity": "0", "category": "枪"}, "4030024": {"name": "风车", "rarity": "0", "category": "枪"}, "4030032": {"name": "王国兵制式长枪", "rarity": "0", "category": "枪"}, "5030005": {"name": "马尔特", "rarity": "0", "category": "枪"}, "5030011": {"name": "俄刻阿诺斯之枪", "rarity": "0", "category": "枪"}, "5030016": {"name": "灵树之枪", "rarity": "0", "category": "枪"}, "5030017": {"name": "海王之枪", "rarity": "0", "category": "枪"}, "5030018": {"name": "兽将之矛", "rarity": "0", "category": "枪"}, "5030020": {"name": "古王之枪", "rarity": "0", "category": "枪"}, "5030021": {"name": "暴食之枪", "rarity": "0", "category": "枪"}, "5030022": {"name": "方天画戟", "rarity": "0", "category": "枪"}, "5030023": {"name": "父祖战棍", "rarity": "0", "category": "枪"}, "5030025": {"name": "伏特电击枪", "rarity": "0", "category": "枪"}, "5030026": {"name": "天狗堂之笔", "rarity": "0", "category": "枪"}, "5030028": {"name": "天同枪", "rarity": "0", "category": "枪"}, "5030029": {"name": "水蚀龙枪", "rarity": "0", "category": "枪"}, "5030030": {"name": "警备", "rarity": "0", "category": "枪"}, "5030033": {"name": "布里欧纳克", "rarity": "0", "category": "枪"}, "5030034": {"name": "哈尼克利特", "rarity": "0", "category": "枪"}, "5030035": {"name": "岩融", "rarity": "0", "category": "枪"}, "5030036": {"name": "月之舞", "rarity": "0", "category": "枪"}, "5030037": {"name": "星芥二叉枪", "rarity": "0", "category": "枪"}, "5030038": {"name": "怨嗟之枪", "rarity": "0", "category": "枪"}, "5030039": {"name": "怨嗟逆枪", "rarity": "0", "category": "枪"}, "5030040": {"name": "怠惰枪", "rarity": "0", "category": "枪"}, "5030041": {"name": "哈尼特肯", "rarity": "0", "category": "枪"}, "2040001": {"name": "无名之弓", "rarity": "0", "category": "弓"}, "3040003": {"name": "长弓", "rarity": "0", "category": "弓"}, "3040006": {"name": "十字弓", "rarity": "0", "category": "弓"}, "3040032": {"name": "投石机", "rarity": "0", "category": "弓"}, "4040007": {"name": "合成弓", "rarity": "0", "category": "弓"}, "4040008": {"name": "梓弓", "rarity": "0", "category": "弓"}, "4040012": {"name": "玄虎之弓", "rarity": "0", "category": "弓"}, "4040021": {"name": "旋涡之弓", "rarity": "0", "category": "弓"}, "4040023": {"name": "祈愿之弓", "rarity": "0", "category": "弓"}, "4040024": {"name": "歼风龙弓", "rarity": "0", "category": "弓"}, "4040027": {"name": "猎弓", "rarity": "0", "category": "弓"}, "4040034": {"name": "传焰弦", "rarity": "0", "category": "弓"}, "5040009": {"name": "埃俄罗斯之弓", "rarity": "0", "category": "弓"}, "5040010": {"name": "流星弓", "rarity": "0", "category": "弓"}, "5040014": {"name": "愚者之弓", "rarity": "0", "category": "弓"}, "5040016": {"name": "捕食者", "rarity": "0", "category": "弓"}, "5040017": {"name": "光芒龙弓", "rarity": "0", "category": "弓"}, "5040018": {"name": "海马雷弓", "rarity": "0", "category": "弓"}, "5040019": {"name": "灼炎龙弓", "rarity": "0", "category": "弓"}, "5040020": {"name": "天相弓", "rarity": "0", "category": "弓"}, "5040022": {"name": "米斯特汀", "rarity": "0", "category": "弓"}, "5040025": {"name": "二度弦", "rarity": "0", "category": "弓"}, "5040026": {"name": "海伯利安之弓", "rarity": "0", "category": "弓"}, "5040028": {"name": "风将强弓", "rarity": "0", "category": "弓"}, "5040029": {"name": "俄耳甫斯竖琴", "rarity": "0", "category": "弓"}, "5040030": {"name": "哈尼卡西", "rarity": "0", "category": "弓"}, "5040031": {"name": "星芥复合弓", "rarity": "0", "category": "弓"}, "5040033": {"name": "至止羽", "rarity": "0", "category": "弓"}, "5040035": {"name": "哈尼戈", "rarity": "0", "category": "弓"}, "5040036": {"name": "海帝之弓", "rarity": "0", "category": "弓"}, "5040037": {"name": "哈尼必茨滋", "rarity": "0", "category": "弓"}, "2050001": {"name": "无名古书", "rarity": "0", "category": "书"}, "3050002": {"name": "罗洪特写本", "rarity": "0", "category": "书"}, "3050005": {"name": "谎言之书", "rarity": "0", "category": "书"}, "3050010": {"name": "斐莱布篇", "rarity": "0", "category": "书"}, "4050004": {"name": "战国策写本", "rarity": "0", "category": "书"}, "4050007": {"name": "尼伯龙根之歌", "rarity": "0", "category": "书"}, "4050011": {"name": "石兵要术", "rarity": "0", "category": "书"}, "4050019": {"name": "海盗兵法", "rarity": "0", "category": "书"}, "4050021": {"name": "百物语", "rarity": "0", "category": "书"}, "4050023": {"name": "万圣日志", "rarity": "0", "category": "书"}, "4050030": {"name": "偏执狂", "rarity": "0", "category": "书"}, "4050031": {"name": "光芒龙典", "rarity": "0", "category": "书"}, "5050009": {"name": "占事略决", "rarity": "0", "category": "书"}, "5050013": {"name": "圣典", "rarity": "0", "category": "书"}, "5050014": {"name": "妖怪百名账", "rarity": "0", "category": "书"}, "5050015": {"name": "瓦伦特伯爵的笔记", "rarity": "0", "category": "书"}, "5050016": {"name": "死皇之书", "rarity": "0", "category": "书"}, "5050017": {"name": "傲慢之书", "rarity": "0", "category": "书"}, "5050018": {"name": "C・魔法书", "rarity": "0", "category": "书"}, "5050020": {"name": "水蚀龙书", "rarity": "0", "category": "书"}, "5050022": {"name": "黑龙雷书", "rarity": "0", "category": "书"}, "5050024": {"name": "露格尼卡童话抄本", "rarity": "0", "category": "书"}, "5050025": {"name": "达佛涅斯石板", "rarity": "0", "category": "书"}, "5050026": {"name": "太平清领", "rarity": "0", "category": "书"}, "5050027": {"name": "哈尼克西美尼", "rarity": "0", "category": "书"}, "5050028": {"name": "阿尔凯乌斯禁书", "rarity": "0", "category": "书"}, "5050029": {"name": "翻旧了的小说", "rarity": "0", "category": "书"}, "5050032": {"name": "梦想史记", "rarity": "0", "category": "书"}, "5050033": {"name": "星芥异本", "rarity": "0", "category": "书"}, "5050034": {"name": "哈尼拉达姆", "rarity": "0", "category": "书"}, "5050036": {"name": "庆典机密", "rarity": "0", "category": "书"}, "5050037": {"name": "狮王公记", "rarity": "0", "category": "书"}, "5050038": {"name": "艾特兰报告", "rarity": "0", "category": "书"}, "5050039": {"name": "启程的毕业证", "rarity": "0", "category": "书"}, "1060001": {"name": "老旧法杖", "rarity": "0", "category": "杖"}, "3060002": {"name": "流转之杖", "rarity": "0", "category": "杖"}, "3060003": {"name": "司祭之杖", "rarity": "0", "category": "杖"}, "3060007": {"name": "魔术手杖", "rarity": "0", "category": "杖"}, "3060010": {"name": "战士棍棒", "rarity": "0", "category": "杖"}, "4060005": {"name": "神圣之杖", "rarity": "0", "category": "杖"}, "4060011": {"name": "百妖花杖", "rarity": "0", "category": "杖"}, "4060022": {"name": "血脉之杖", "rarity": "0", "category": "杖"}, "4060023": {"name": "凶暗龙杖", "rarity": "0", "category": "杖"}, "4060028": {"name": "熔岩长杖", "rarity": "0", "category": "杖"}, "4060031": {"name": "歼风龙杖", "rarity": "0", "category": "杖"}, "4060032": {"name": "启明之杖", "rarity": "0", "category": "杖"}, "4060035": {"name": "高洁之伞", "rarity": "0", "category": "杖"}, "4060036": {"name": "真理之泪", "rarity": "0", "category": "杖"}, "5060009": {"name": "星盘杖", "rarity": "0", "category": "杖"}, "5060013": {"name": "冥王锡杖", "rarity": "0", "category": "杖"}, "5060015": {"name": "潮汐之杖", "rarity": "0", "category": "杖"}, "5060016": {"name": "灼炎龙杖", "rarity": "0", "category": "杖"}, "5060017": {"name": "古王之杖", "rarity": "0", "category": "杖"}, "5060018": {"name": "２４／７", "rarity": "0", "category": "杖"}, "5060019": {"name": "怠惰之杖", "rarity": "0", "category": "杖"}, "5060020": {"name": "父祖王锡", "rarity": "0", "category": "杖"}, "5060021": {"name": "莫斯尼亚指挥棒", "rarity": "0", "category": "杖"}, "5060024": {"name": "糖果长杖", "rarity": "0", "category": "杖"}, "5060025": {"name": "湛蓝魔杖", "rarity": "0", "category": "杖"}, "5060026": {"name": "圣柊棘杖", "rarity": "0", "category": "杖"}, "5060027": {"name": "束缚", "rarity": "0", "category": "杖"}, "5060029": {"name": "鸣狐之杖", "rarity": "0", "category": "杖"}, "5060030": {"name": "哈尼诺涅", "rarity": "0", "category": "杖"}, "5060033": {"name": "宇宙蓝色魔杖", "rarity": "0", "category": "杖"}, "5060034": {"name": "怨嗟之杖", "rarity": "0", "category": "杖"}, "5060037": {"name": "奥西里斯之杖", "rarity": "0", "category": "杖"}, "5060038": {"name": "爆裂之杖", "rarity": "0", "category": "杖"}, "5060039": {"name": "阿克西斯长杖", "rarity": "0", "category": "杖"}, "5060040": {"name": "错乱杖", "rarity": "0", "category": "杖"}, "5060041": {"name": "替身虚空", "rarity": "0", "category": "杖"}, "5060042": {"name": "哈尼雷亚思", "rarity": "0", "category": "杖"}, "5060043": {"name": "诺艾尔的杖Ｒ", "rarity": "0", "category": "杖"}, "5060044": {"name": "酒神权杖", "rarity": "0", "category": "杖"}, "5060045": {"name": "皇帝之杖", "rarity": "0", "category": "杖"}, "2070001": {"name": "无名拳具", "rarity": "0", "category": "拳"}, "3070006": {"name": "半月拳刃", "rarity": "0", "category": "拳"}, "3070010": {"name": "龙之拳套", "rarity": "0", "category": "拳"}, "3070018": {"name": "黄铜拳套", "rarity": "0", "category": "拳"}, "3070022": {"name": "混沌指虎", "rarity": "0", "category": "拳"}, "4070004": {"name": "赤鬼手套", "rarity": "0", "category": "拳"}, "4070007": {"name": "强力拳", "rarity": "0", "category": "拳"}, "4070011": {"name": "大乌贼爪", "rarity": "0", "category": "拳"}, "4070012": {"name": "兽王牙拳", "rarity": "0", "category": "拳"}, "4070016": {"name": "灼炎龙拳", "rarity": "0", "category": "拳"}, "4070031": {"name": "虚假克隆", "rarity": "0", "category": "拳"}, "4070034": {"name": "狮子笼手", "rarity": "0", "category": "拳"}, "4070037": {"name": "战火人偶", "rarity": "0", "category": "拳"}, "4070038": {"name": "无爱拳", "rarity": "0", "category": "拳"}, "4070041": {"name": "拓枪爪", "rarity": "0", "category": "拳"}, "5070009": {"name": "奥库斯之拳", "rarity": "0", "category": "拳"}, "5070017": {"name": "古王之拳", "rarity": "0", "category": "拳"}, "5070019": {"name": "父祖拳套", "rarity": "0", "category": "拳"}, "5070020": {"name": "海渊钩爪", "rarity": "0", "category": "拳"}, "5070021": {"name": "虚城拳", "rarity": "0", "category": "拳"}, "5070023": {"name": "图腾拳套", "rarity": "0", "category": "拳"}, "5070024": {"name": "捣蛋钩爪", "rarity": "0", "category": "拳"}, "5070025": {"name": "碎墙拳", "rarity": "0", "category": "拳"}, "5070026": {"name": "圣柊笼手", "rarity": "0", "category": "拳"}, "5070027": {"name": "波利克斯", "rarity": "0", "category": "拳"}, "5070028": {"name": "胜利坚守者", "rarity": "0", "category": "拳"}, "5070029": {"name": "鲨牙拘拳", "rarity": "0", "category": "拳"}, "5070030": {"name": "哈尼克托耳", "rarity": "0", "category": "拳"}, "5070032": {"name": "熊岚", "rarity": "0", "category": "拳"}, "5070033": {"name": "平行论", "rarity": "0", "category": "拳"}, "5070035": {"name": "星芥指虎", "rarity": "0", "category": "拳"}, "5070036": {"name": "位高责重之环", "rarity": "0", "category": "拳"}, "5070039": {"name": "无情拳", "rarity": "0", "category": "拳"}, "5070040": {"name": "哈尼雷伊", "rarity": "0", "category": "拳"}, "5070042": {"name": "格里帕拳套", "rarity": "0", "category": "拳"}, "5070043": {"name": "哈尼斯卡密", "rarity": "0", "category": "拳"}, "5070044": {"name": "亚弗登特", "rarity": "0", "category": "拳"}, "1080001": {"name": "老旧盾牌", "rarity": "0", "category": "盾"}, "3080002": {"name": "战士之盾", "rarity": "0", "category": "盾"}, "3080008": {"name": "青金石盾", "rarity": "0", "category": "盾"}, "3080009": {"name": "骑士盾", "rarity": "0", "category": "盾"}, "3080017": {"name": "空气反应炉", "rarity": "0", "category": "盾"}, "4080003": {"name": "钻石盾", "rarity": "0", "category": "盾"}, "4080015": {"name": "林德虫之盾", "rarity": "0", "category": "盾"}, "4080016": {"name": "光芒龙盾", "rarity": "0", "category": "盾"}, "4080019": {"name": "四向巴纹盾", "rarity": "0", "category": "盾"}, "4080021": {"name": "噪声划痕盾", "rarity": "0", "category": "盾"}, "4080023": {"name": "JIT盾", "rarity": "0", "category": "盾"}, "4080024": {"name": "因果理", "rarity": "0", "category": "盾"}, "4080027": {"name": "暴击大盾", "rarity": "0", "category": "盾"}, "5080007": {"name": "天磐盾", "rarity": "0", "category": "盾"}, "5080011": {"name": "护神大盾", "rarity": "0", "category": "盾"}, "5080012": {"name": "太古之盾", "rarity": "0", "category": "盾"}, "5080013": {"name": "阻碍者", "rarity": "0", "category": "盾"}, "5080014": {"name": "圣铃圆盾", "rarity": "0", "category": "盾"}, "5080018": {"name": "海渊壳盾", "rarity": "0", "category": "盾"}, "5080020": {"name": "乡愁", "rarity": "0", "category": "盾"}, "5080022": {"name": "怨念巨盾", "rarity": "0", "category": "盾"}, "5080025": {"name": "风将骨盾", "rarity": "0", "category": "盾"}, "5080026": {"name": "一兽王盾", "rarity": "0", "category": "盾"}, "5080028": {"name": "哈尼霍普隆", "rarity": "0", "category": "盾"}, "5080029": {"name": "星芥狮盾", "rarity": "0", "category": "盾"}, "5080031": {"name": "哈尼霍木拉", "rarity": "0", "category": "盾"}, "5080032": {"name": "凯斯莫里", "rarity": "0", "category": "盾"}, "5080033": {"name": "埃癸斯·炎驭", "rarity": "0", "category": "盾"}, "5080034": {"name": "埃癸斯·碧源", "rarity": "0", "category": "盾"}, "5080035": {"name": "埃癸斯·霆霓", "rarity": "0", "category": "盾"}, "5080036": {"name": "埃癸斯·扶摇", "rarity": "0", "category": "盾"}, "5080037": {"name": "埃癸斯·日华", "rarity": "0", "category": "盾"}, "5080038": {"name": "埃癸斯·幽冥", "rarity": "0", "category": "盾"}, "5085000": {"name": "城门盾", "rarity": "0", "category": "盾"}, "3090036": {"name": "蓝晶耳坠", "rarity": "0", "category": "饰品"}, "4090006": {"name": "钥匙挂坠", "rarity": "0", "category": "饰品"}, "4090012": {"name": "典礼勋章", "rarity": "0", "category": "饰品"}, "4090033": {"name": "怨嗟逆饰", "rarity": "0", "category": "饰品"}, "4090037": {"name": "月宫环", "rarity": "0", "category": "饰品"}, "4090043": {"name": "纪念相机", "rarity": "0", "category": "饰品"}, "4090050": {"name": "桶形开心炸弹·祝", "rarity": "0", "category": "饰品"}, "5090001": {"name": "水滴吊坠", "rarity": "0", "category": "饰品"}, "5090002": {"name": "驱动芯片", "rarity": "0", "category": "饰品"}, "5090003": {"name": "双牙项链", "rarity": "0", "category": "饰品"}, "5090004": {"name": "世界树的晨露", "rarity": "0", "category": "饰品"}, "5090005": {"name": "爱梅斯护符", "rarity": "0", "category": "饰品"}, "5090007": {"name": "水滴手镯", "rarity": "0", "category": "饰品"}, "5090008": {"name": "少女的蝴蝶结", "rarity": "0", "category": "饰品"}, "5090009": {"name": "某人的墨镜", "rarity": "0", "category": "饰品"}, "5090010": {"name": "似乎很重要的绷带", "rarity": "0", "category": "饰品"}, "5090011": {"name": "基因组穿孔器", "rarity": "0", "category": "饰品"}, "5090013": {"name": "仿制品徽章", "rarity": "0", "category": "饰品"}, "5090014": {"name": "八咫镜", "rarity": "0", "category": "饰品"}, "5090015": {"name": "八尺琼勾玉", "rarity": "0", "category": "饰品"}, "5090016": {"name": "水滴项圈", "rarity": "0", "category": "饰品"}, "5090017": {"name": "缘环吊坠", "rarity": "0", "category": "饰品"}, "5090018": {"name": "得摩斯手镯", "rarity": "0", "category": "饰品"}, "5090019": {"name": "交融手镯", "rarity": "0", "category": "饰品"}, "5090020": {"name": "蝎尾坠", "rarity": "0", "category": "饰品"}, "5090021": {"name": "清夏缎带", "rarity": "0", "category": "饰品"}, "5090022": {"name": "候补团员袖章", "rarity": "0", "category": "饰品"}, "5090023": {"name": "风将弹袋", "rarity": "0", "category": "饰品"}, "5090024": {"name": "光芒龙冠", "rarity": "0", "category": "饰品"}, "5090025": {"name": "哈尼翁", "rarity": "0", "category": "饰品"}, "5090026": {"name": "黑色皮包", "rarity": "0", "category": "饰品"}, "5090027": {"name": "星芥手镯", "rarity": "0", "category": "饰品"}, "5090028": {"name": "星芥腰带", "rarity": "0", "category": "饰品"}, "5090029": {"name": "星芥宝冠", "rarity": "0", "category": "饰品"}, "5090030": {"name": "止战徽记", "rarity": "0", "category": "饰品"}, "5090031": {"name": "捣蛋礼物", "rarity": "0", "category": "饰品"}, "5090032": {"name": "怨嗟外套", "rarity": "0", "category": "饰品"}, "5090034": {"name": "方框眼镜", "rarity": "0", "category": "饰品"}, "5090035": {"name": "交融耳环", "rarity": "0", "category": "饰品"}, "5090038": {"name": "原始生毛药剂NR", "rarity": "0", "category": "饰品"}, "5090039": {"name": "特别追梦者", "rarity": "0", "category": "饰品"}, "5090040": {"name": "无声无瑕", "rarity": "0", "category": "饰品"}, "5090041": {"name": "赤色纷争", "rarity": "0", "category": "饰品"}, "5090042": {"name": "条纹泳圈", "rarity": "0", "category": "饰品"}, "5090044": {"name": "哈尼巴尔", "rarity": "0", "category": "饰品"}, "5090045": {"name": "交融胸针", "rarity": "0", "category": "饰品"}, "5090046": {"name": "由诺的吊坠Ｒ", "rarity": "0", "category": "饰品"}, "5090047": {"name": "阿罗朗德涅莫", "rarity": "0", "category": "饰品"}, "5090048": {"name": "祸树拼花首饰", "rarity": "0", "category": "饰品"}, "5090049": {"name": "勤勉委托天平证", "rarity": "0", "category": "饰品"}, "5090051": {"name": "水滴围巾", "rarity": "0", "category": "饰品"}, "5090052": {"name": "水滴戒指", "rarity": "0", "category": "饰品"}, "5090053": {"name": "碧绿羽衣", "rarity": "0", "category": "饰品"}, "5090054": {"name": "黄金羽衣", "rarity": "0", "category": "饰品"}, "5090055": {"name": "水滴胸针", "rarity": "0", "category": "饰品"}, "5090056": {"name": "水滴腰带", "rarity": "0", "category": "饰品"}, "5090057": {"name": "漆黑羽衣", "rarity": "0", "category": "饰品"}, "5090058": {"name": "真红羽衣", "rarity": "0", "category": "饰品"}, "5090059": {"name": "群青羽衣", "rarity": "0", "category": "饰品"}, "5090060": {"name": "纯白羽衣", "rarity": "0", "category": "饰品"}, "3100007": {"name": "虹彩起爆器", "rarity": "0", "category": "铳"}, "4100003": {"name": "水蚀龙铳", "rarity": "0", "category": "铳"}, "4100008": {"name": "极光来福枪", "rarity": "0", "category": "铳"}, "4100014": {"name": "ＳＧ２１", "rarity": "0", "category": "铳"}, "5100001": {"name": "正电子发射器", "rarity": "0", "category": "铳"}, "5100002": {"name": "船上式343号铳", "rarity": "0", "category": "铳"}, "5100004": {"name": "疯狂者", "rarity": "0", "category": "铳"}, "5100005": {"name": "ＭＭ２８", "rarity": "0", "category": "铳"}, "5100006": {"name": "凶暗龙铳", "rarity": "0", "category": "铳"}, "5100009": {"name": "华弩魔-II", "rarity": "0", "category": "铳"}, "5100010": {"name": "飞鹫爆裂炮", "rarity": "0", "category": "铳"}, "5100011": {"name": "天机铳", "rarity": "0", "category": "铳"}, "5100012": {"name": "ＳＫ５０９", "rarity": "0", "category": "铳"}, "5100013": {"name": "叉鬼猎铳", "rarity": "0", "category": "铳"}, "5100015": {"name": "哈尼兰切", "rarity": "0", "category": "铳"}, "5100016": {"name": "星芥骑兵铳", "rarity": "0", "category": "铳"}, "5100017": {"name": "黑市步枪", "rarity": "0", "category": "铳"}, "5100018": {"name": "哈尼海耶", "rarity": "0", "category": "铳"}, "5100019": {"name": "格里帕铳枪", "rarity": "0", "category": "铳"}, "5100020": {"name": "哈里萨尔瓦", "rarity": "0", "category": "铳"}, "5005000": {"name": "无界轻吻", "rarity": "0", "category": "CN专属"}, "5025000": {"name": "碎星炬锋", "rarity": "0", "category": "CN专属"}, "5035000": {"name": "森灵长弓", "rarity": "0", "category": "CN专属"}, "5045000": {"name": "恩赐秘典", "rarity": "0", "category": "CN专属"}, "5055000": {"name": "林蔓之枝", "rarity": "0", "category": "CN专属"}, "5095000": {"name": "占位", "rarity": "0", "category": "CN专属"}, "5095001": {"name": "紫晶巨剑", "rarity": "0", "category": "CN专属"}, "5095002": {"name": "蝶翼吊坠", "rarity": "0", "category": "CN专属"}, "5095003": {"name": "秘钥魔杖", "rarity": "0", "category": "CN专属"}, "100001": {"name": "精灵的微笑", "rarity": "1", "category": "主线宝珠"}, "100002": {"name": "沙海的友情", "rarity": "1", "category": "主线宝珠"}, "100003": {"name": "女海盗的盛宴", "rarity": "1", "category": "主线宝珠"}, "100004": {"name": "爪牙之交", "rarity": "1", "category": "主线宝珠"}, "100005": {"name": "歌姬之声", "rarity": "1", "category": "主线宝珠"}, "100006": {"name": "人妖百鬼夜行", "rarity": "1", "category": "主线宝珠"}, "100007": {"name": "炎之信赖", "rarity": "1", "category": "主线宝珠"}, "100008": {"name": "传承之物", "rarity": "1", "category": "主线宝珠"}, "100009": {"name": "逆天而行的决意", "rarity": "1", "category": "主线宝珠"}, "100010": {"name": "伸出你的手", "rarity": "1", "category": "主线宝珠"}, "100011": {"name": "黄金之路", "rarity": "1", "category": "主线宝珠"}, "100012": {"name": "延续的黄金", "rarity": "1", "category": "主线宝珠"}, "200001": {"name": "超越守护之证", "rarity": "0", "category": "练习勋章"}, "200002": {"name": "超越诅咒之证", "rarity": "0", "category": "练习勋章"}, "200003": {"name": "超越强度之证", "rarity": "0", "category": "练习勋章"}, "200004": {"name": "超越速度之证", "rarity": "0", "category": "练习勋章"}, "200005": {"name": "超越硬度之证", "rarity": "0", "category": "练习勋章"}, "200006": {"name": "歼灭之证", "rarity": "0", "category": "勋章"}, "300001": {"name": "破星剑", "rarity": "0", "category": "不可装备"}, "300002": {"name": "破星剑", "rarity": "0", "category": "不可装备"}}
+{
+ "1010001": {
+  "name": "老旧短剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "2010002": {
+  "name": "无名长剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "3010006": {
+  "name": "流转之剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "3010007": {
+  "name": "短弯刀",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "3010008": {
+  "name": "玻璃之刃",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "3010013": {
+  "name": "焰形剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "3010023": {
+  "name": "幻想的胡萝卜剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "3010027": {
+  "name": "闪电匕首",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "3010035": {
+  "name": "高热剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "3010053": {
+  "name": "野营刀",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "4010003": {
+  "name": "妖刀蛇崩",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "4010010": {
+  "name": "伊文剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "4010014": {
+  "name": "木灵大剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "4010015": {
+  "name": "祸根之剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "4010017": {
+  "name": "贝帝之剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "4010018": {
+  "name": "断罪之剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "4010021": {
+  "name": "PHL光剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "4010024": {
+  "name": "七支铜刀",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "4010048": {
+  "name": "灼炎龙剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "4010049": {
+  "name": "水蚀龙鞭",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "4010052": {
+  "name": "凶暗龙刃",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "4010071": {
+  "name": "无瑕灵剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010004": {
+  "name": "天羽羽斩",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010005": {
+  "name": "杜兰德尔",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010011": {
+  "name": "海姆达尔之剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010012": {
+  "name": "普罗米修斯之剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010019": {
+  "name": "黑龙雷剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010020": {
+  "name": "极彩宝石双剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010022": {
+  "name": "死皇之剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010025": {
+  "name": "海渊棘刃",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010026": {
+  "name": "公主之剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010028": {
+  "name": "提尔锋",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010029": {
+  "name": "枢机卿",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010030": {
+  "name": "牛鬼之尾",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010031": {
+  "name": "盟约之剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010032": {
+  "name": "天府剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010033": {
+  "name": "斯库尔之剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010034": {
+  "name": "歼风龙剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010036": {
+  "name": "希望誓剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010037": {
+  "name": "流水刃剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010038": {
+  "name": "基因切割者",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010039": {
+  "name": "格拉墨",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010040": {
+  "name": "杀生石匕首",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010041": {
+  "name": "水晶刃",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010042": {
+  "name": "朱图尔纳之扇",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010043": {
+  "name": "破坏之雷",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010044": {
+  "name": "紫电真打",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010045": {
+  "name": "七杀鞭",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010046": {
+  "name": "哈尼帕纽斯",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010047": {
+  "name": "勇者的扩音器",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010050": {
+  "name": "鬼柴刀",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010051": {
+  "name": "勿忘罪剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010054": {
+  "name": "烈焰刃剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010055": {
+  "name": "WBR-01",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010056": {
+  "name": "天梁刀",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010057": {
+  "name": "星芥镰剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010058": {
+  "name": "兔兔长剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010059": {
+  "name": "羊角大剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010060": {
+  "name": "无妨剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010061": {
+  "name": "水刃石剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010062": {
+  "name": "冲突",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010063": {
+  "name": "胜利大剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010064": {
+  "name": "酸空匕",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010065": {
+  "name": "噩梦羽",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010066": {
+  "name": "十字军长剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010068": {
+  "name": "疾风锐剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010069": {
+  "name": "断魔之剑Ｒ",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010070": {
+  "name": "解放者",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010072": {
+  "name": "九归一剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010073": {
+  "name": "朱安里克",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010074": {
+  "name": "祸树露刃",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010075": {
+  "name": "哈尼泽乌可",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010077": {
+  "name": "雷鸣刃剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5010078": {
+  "name": "冥暗刃剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "5017716": {
+  "name": "天耀刃剑",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "2020001": {
+  "name": "无名之斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "3020003": {
+  "name": "战士之斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "3020006": {
+  "name": "战争巨镰",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "3020011": {
+  "name": "维京斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "3020012": {
+  "name": "牛斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "4020007": {
+  "name": "印第安战斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "4020013": {
+  "name": "古代战斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "4020014": {
+  "name": "狐影之斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "4020016": {
+  "name": "诅咒之斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "4020019": {
+  "name": "名匠之槌",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "4020021": {
+  "name": "黄金耙",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "4020033": {
+  "name": "巨斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "4020034": {
+  "name": "黑龙雷斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020008": {
+  "name": "乌贡瓦萨拉",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020009": {
+  "name": "雷神之锤",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020010": {
+  "name": "死亡镰刀",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020017": {
+  "name": "虎王斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020018": {
+  "name": "死皇之斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020020": {
+  "name": "凶暗龙镰",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020022": {
+  "name": "前鬼之斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020023": {
+  "name": "流星锤",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020024": {
+  "name": "帕拉修",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020025": {
+  "name": "百臂巨人之斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020026": {
+  "name": "歼风龙斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020027": {
+  "name": "分海棒",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020028": {
+  "name": "镇压",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020029": {
+  "name": "虚城斧",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020030": {
+  "name": "灼钺",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020031": {
+  "name": "哈尼勒斯",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020032": {
+  "name": "镇痛剂",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020035": {
+  "name": "豪缝熊Z",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020036": {
+  "name": "哈尼可利",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020037": {
+  "name": "悲叹死镰",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020038": {
+  "name": "哈尼哈加玛",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020039": {
+  "name": "哈尼古斯塔",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020040": {
+  "name": "破刃镰",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020041": {
+  "name": "金刚镰",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020042": {
+  "name": "哈尔波曼",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "5020043": {
+  "name": "终结者",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "2030001": {
+  "name": "无名之枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "3030006": {
+  "name": "流转之枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "3030007": {
+  "name": "步兵长矛",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "3030012": {
+  "name": "长柄刀",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "3030013": {
+  "name": "偃月刀",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "3030027": {
+  "name": "激光标枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "4030003": {
+  "name": "标枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "4030004": {
+  "name": "螺旋长枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "4030008": {
+  "name": "游击者",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "4030009": {
+  "name": "珊瑚之枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "4030014": {
+  "name": "毁灭者",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "4030019": {
+  "name": "黑龙雷枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "4030024": {
+  "name": "风车",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "4030032": {
+  "name": "王国兵制式长枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030005": {
+  "name": "马尔特",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030011": {
+  "name": "俄刻阿诺斯之枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030016": {
+  "name": "灵树之枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030017": {
+  "name": "海王之枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030018": {
+  "name": "兽将之矛",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030020": {
+  "name": "古王之枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030021": {
+  "name": "暴食之枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030022": {
+  "name": "方天画戟",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030023": {
+  "name": "父祖战棍",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030025": {
+  "name": "伏特电击枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030026": {
+  "name": "天狗堂之笔",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030028": {
+  "name": "天同枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030029": {
+  "name": "水蚀龙枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030030": {
+  "name": "警备",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030033": {
+  "name": "布里欧纳克",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030034": {
+  "name": "哈尼克利特",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030035": {
+  "name": "岩融",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030036": {
+  "name": "月之舞",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030037": {
+  "name": "星芥二叉枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030038": {
+  "name": "怨嗟之枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030039": {
+  "name": "怨嗟逆枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030040": {
+  "name": "怠惰枪",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "5030041": {
+  "name": "哈尼特肯",
+  "rarity": "0",
+  "category": "枪"
+ },
+ "2040001": {
+  "name": "无名之弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "3040003": {
+  "name": "长弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "3040006": {
+  "name": "十字弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "3040032": {
+  "name": "投石机",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "4040007": {
+  "name": "合成弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "4040008": {
+  "name": "梓弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "4040012": {
+  "name": "玄虎之弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "4040021": {
+  "name": "旋涡之弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "4040023": {
+  "name": "祈愿之弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "4040024": {
+  "name": "歼风龙弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "4040027": {
+  "name": "猎弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "4040034": {
+  "name": "传焰弦",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040009": {
+  "name": "埃俄罗斯之弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040010": {
+  "name": "流星弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040014": {
+  "name": "愚者之弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040016": {
+  "name": "捕食者",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040017": {
+  "name": "光芒龙弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040018": {
+  "name": "海马雷弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040019": {
+  "name": "灼炎龙弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040020": {
+  "name": "天相弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040022": {
+  "name": "米斯特汀",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040025": {
+  "name": "二度弦",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040026": {
+  "name": "海伯利安之弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040028": {
+  "name": "风将强弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040029": {
+  "name": "俄耳甫斯竖琴",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040030": {
+  "name": "哈尼卡西",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040031": {
+  "name": "星芥复合弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040033": {
+  "name": "至止羽",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040035": {
+  "name": "哈尼戈",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040036": {
+  "name": "海帝之弓",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "5040037": {
+  "name": "哈尼必茨滋",
+  "rarity": "0",
+  "category": "弓"
+ },
+ "2050001": {
+  "name": "无名古书",
+  "rarity": "0",
+  "category": "书"
+ },
+ "3050002": {
+  "name": "罗洪特写本",
+  "rarity": "0",
+  "category": "书"
+ },
+ "3050005": {
+  "name": "谎言之书",
+  "rarity": "0",
+  "category": "书"
+ },
+ "3050010": {
+  "name": "斐莱布篇",
+  "rarity": "0",
+  "category": "书"
+ },
+ "4050004": {
+  "name": "战国策写本",
+  "rarity": "0",
+  "category": "书"
+ },
+ "4050007": {
+  "name": "尼伯龙根之歌",
+  "rarity": "0",
+  "category": "书"
+ },
+ "4050011": {
+  "name": "石兵要术",
+  "rarity": "0",
+  "category": "书"
+ },
+ "4050019": {
+  "name": "海盗兵法",
+  "rarity": "0",
+  "category": "书"
+ },
+ "4050021": {
+  "name": "百物语",
+  "rarity": "0",
+  "category": "书"
+ },
+ "4050023": {
+  "name": "万圣日志",
+  "rarity": "0",
+  "category": "书"
+ },
+ "4050030": {
+  "name": "偏执狂",
+  "rarity": "0",
+  "category": "书"
+ },
+ "4050031": {
+  "name": "光芒龙典",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050009": {
+  "name": "占事略决",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050013": {
+  "name": "圣典",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050014": {
+  "name": "妖怪百名账",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050015": {
+  "name": "瓦伦特伯爵的笔记",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050016": {
+  "name": "死皇之书",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050017": {
+  "name": "傲慢之书",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050018": {
+  "name": "C・魔法书",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050020": {
+  "name": "水蚀龙书",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050022": {
+  "name": "黑龙雷书",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050024": {
+  "name": "露格尼卡童话抄本",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050025": {
+  "name": "达佛涅斯石板",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050026": {
+  "name": "太平清领",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050027": {
+  "name": "哈尼克西美尼",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050028": {
+  "name": "阿尔凯乌斯禁书",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050029": {
+  "name": "翻旧了的小说",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050032": {
+  "name": "梦想史记",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050033": {
+  "name": "星芥异本",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050034": {
+  "name": "哈尼拉达姆",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050036": {
+  "name": "庆典机密",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050037": {
+  "name": "狮王公记",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050038": {
+  "name": "艾特兰报告",
+  "rarity": "0",
+  "category": "书"
+ },
+ "5050039": {
+  "name": "启程的毕业证",
+  "rarity": "0",
+  "category": "书"
+ },
+ "1060001": {
+  "name": "老旧法杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "3060002": {
+  "name": "流转之杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "3060003": {
+  "name": "司祭之杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "3060007": {
+  "name": "魔术手杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "3060010": {
+  "name": "战士棍棒",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "4060005": {
+  "name": "神圣之杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "4060011": {
+  "name": "百妖花杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "4060022": {
+  "name": "血脉之杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "4060023": {
+  "name": "凶暗龙杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "4060028": {
+  "name": "熔岩长杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "4060031": {
+  "name": "歼风龙杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "4060032": {
+  "name": "启明之杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "4060035": {
+  "name": "高洁之伞",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "4060036": {
+  "name": "真理之泪",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060009": {
+  "name": "星盘杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060013": {
+  "name": "冥王锡杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060015": {
+  "name": "潮汐之杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060016": {
+  "name": "灼炎龙杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060017": {
+  "name": "古王之杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060018": {
+  "name": "２４／７",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060019": {
+  "name": "怠惰之杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060020": {
+  "name": "父祖王锡",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060021": {
+  "name": "莫斯尼亚指挥棒",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060024": {
+  "name": "糖果长杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060025": {
+  "name": "湛蓝魔杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060026": {
+  "name": "圣柊棘杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060027": {
+  "name": "束缚",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060029": {
+  "name": "鸣狐之杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060030": {
+  "name": "哈尼诺涅",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060033": {
+  "name": "宇宙蓝色魔杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060034": {
+  "name": "怨嗟之杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060037": {
+  "name": "奥西里斯之杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060038": {
+  "name": "爆裂之杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060039": {
+  "name": "阿克西斯长杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060040": {
+  "name": "错乱杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060041": {
+  "name": "替身虚空",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060042": {
+  "name": "哈尼雷亚思",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060043": {
+  "name": "诺艾尔的杖Ｒ",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060044": {
+  "name": "酒神权杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "5060045": {
+  "name": "皇帝之杖",
+  "rarity": "0",
+  "category": "杖"
+ },
+ "2070001": {
+  "name": "无名拳具",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "3070006": {
+  "name": "半月拳刃",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "3070010": {
+  "name": "龙之拳套",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "3070018": {
+  "name": "黄铜拳套",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "3070022": {
+  "name": "混沌指虎",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "4070004": {
+  "name": "赤鬼手套",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "4070007": {
+  "name": "强力拳",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "4070011": {
+  "name": "大乌贼爪",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "4070012": {
+  "name": "兽王牙拳",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "4070016": {
+  "name": "灼炎龙拳",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "4070031": {
+  "name": "虚假克隆",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "4070034": {
+  "name": "狮子笼手",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "4070037": {
+  "name": "战火人偶",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "4070038": {
+  "name": "无爱拳",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "4070041": {
+  "name": "拓枪爪",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070009": {
+  "name": "奥库斯之拳",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070017": {
+  "name": "古王之拳",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070019": {
+  "name": "父祖拳套",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070020": {
+  "name": "海渊钩爪",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070021": {
+  "name": "虚城拳",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070023": {
+  "name": "图腾拳套",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070024": {
+  "name": "捣蛋钩爪",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070025": {
+  "name": "碎墙拳",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070026": {
+  "name": "圣柊笼手",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070027": {
+  "name": "波利克斯",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070028": {
+  "name": "胜利坚守者",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070029": {
+  "name": "鲨牙拘拳",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070030": {
+  "name": "哈尼克托耳",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070032": {
+  "name": "熊岚",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070033": {
+  "name": "平行论",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070035": {
+  "name": "星芥指虎",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070036": {
+  "name": "位高责重之环",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070039": {
+  "name": "无情拳",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070040": {
+  "name": "哈尼雷伊",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070042": {
+  "name": "格里帕拳套",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070043": {
+  "name": "哈尼斯卡密",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "5070044": {
+  "name": "亚弗登特",
+  "rarity": "0",
+  "category": "拳"
+ },
+ "1080001": {
+  "name": "老旧盾牌",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "3080002": {
+  "name": "战士之盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "3080008": {
+  "name": "青金石盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "3080009": {
+  "name": "骑士盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "3080017": {
+  "name": "空气反应炉",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "4080003": {
+  "name": "钻石盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "4080015": {
+  "name": "林德虫之盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "4080016": {
+  "name": "光芒龙盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "4080019": {
+  "name": "四向巴纹盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "4080021": {
+  "name": "噪声划痕盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "4080023": {
+  "name": "JIT盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "4080024": {
+  "name": "因果理",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "4080027": {
+  "name": "暴击大盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080007": {
+  "name": "天磐盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080011": {
+  "name": "护神大盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080012": {
+  "name": "太古之盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080013": {
+  "name": "阻碍者",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080014": {
+  "name": "圣铃圆盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080018": {
+  "name": "海渊壳盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080020": {
+  "name": "乡愁",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080022": {
+  "name": "怨念巨盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080025": {
+  "name": "风将骨盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080026": {
+  "name": "一兽王盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080028": {
+  "name": "哈尼霍普隆",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080029": {
+  "name": "星芥狮盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080031": {
+  "name": "哈尼霍木拉",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080032": {
+  "name": "凯斯莫里",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080033": {
+  "name": "埃癸斯·炎驭",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080034": {
+  "name": "埃癸斯·碧源",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080035": {
+  "name": "埃癸斯·霆霓",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080036": {
+  "name": "埃癸斯·扶摇",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080037": {
+  "name": "埃癸斯·日华",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5080038": {
+  "name": "埃癸斯·幽冥",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "5085000": {
+  "name": "城门盾",
+  "rarity": "0",
+  "category": "盾"
+ },
+ "3090036": {
+  "name": "蓝晶耳坠",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "4090006": {
+  "name": "钥匙挂坠",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "4090012": {
+  "name": "典礼勋章",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "4090033": {
+  "name": "怨嗟逆饰",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "4090037": {
+  "name": "月宫环",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "4090043": {
+  "name": "纪念相机",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "4090050": {
+  "name": "桶形开心炸弹·祝",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090001": {
+  "name": "水滴吊坠",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090002": {
+  "name": "驱动芯片",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090003": {
+  "name": "双牙项链",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090004": {
+  "name": "世界树的晨露",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090005": {
+  "name": "爱梅斯护符",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090007": {
+  "name": "水滴手镯",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090008": {
+  "name": "少女的蝴蝶结",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090009": {
+  "name": "某人的墨镜",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090010": {
+  "name": "似乎很重要的绷带",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090011": {
+  "name": "基因组穿孔器",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090013": {
+  "name": "仿制品徽章",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090014": {
+  "name": "八咫镜",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090015": {
+  "name": "八尺琼勾玉",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090016": {
+  "name": "水滴项圈",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090017": {
+  "name": "缘环吊坠",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090018": {
+  "name": "得摩斯手镯",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090019": {
+  "name": "交融手镯",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090020": {
+  "name": "蝎尾坠",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090021": {
+  "name": "清夏缎带",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090022": {
+  "name": "候补团员袖章",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090023": {
+  "name": "风将弹袋",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090024": {
+  "name": "光芒龙冠",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090025": {
+  "name": "哈尼翁",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090026": {
+  "name": "黑色皮包",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090027": {
+  "name": "星芥手镯",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090028": {
+  "name": "星芥腰带",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090029": {
+  "name": "星芥宝冠",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090030": {
+  "name": "止战徽记",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090031": {
+  "name": "捣蛋礼物",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090032": {
+  "name": "怨嗟外套",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090034": {
+  "name": "方框眼镜",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090035": {
+  "name": "交融耳环",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090038": {
+  "name": "原始生毛药剂NR",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090039": {
+  "name": "特别追梦者",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090040": {
+  "name": "无声无瑕",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090041": {
+  "name": "赤色纷争",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090042": {
+  "name": "条纹泳圈",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090044": {
+  "name": "哈尼巴尔",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090045": {
+  "name": "交融胸针",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090046": {
+  "name": "由诺的吊坠Ｒ",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090047": {
+  "name": "阿罗朗德涅莫",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090048": {
+  "name": "祸树拼花首饰",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090049": {
+  "name": "勤勉委托天平证",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090051": {
+  "name": "水滴围巾",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090052": {
+  "name": "水滴戒指",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090053": {
+  "name": "碧绿羽衣",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090054": {
+  "name": "黄金羽衣",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090055": {
+  "name": "水滴胸针",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090056": {
+  "name": "水滴腰带",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090057": {
+  "name": "漆黑羽衣",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090058": {
+  "name": "真红羽衣",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090059": {
+  "name": "群青羽衣",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "5090060": {
+  "name": "纯白羽衣",
+  "rarity": "0",
+  "category": "饰品"
+ },
+ "3100007": {
+  "name": "虹彩起爆器",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "4100003": {
+  "name": "水蚀龙铳",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "4100008": {
+  "name": "极光来福枪",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "4100014": {
+  "name": "ＳＧ２１",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100001": {
+  "name": "正电子发射器",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100002": {
+  "name": "船上式343号铳",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100004": {
+  "name": "疯狂者",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100005": {
+  "name": "ＭＭ２８",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100006": {
+  "name": "凶暗龙铳",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100009": {
+  "name": "华弩魔-II",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100010": {
+  "name": "飞鹫爆裂炮",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100011": {
+  "name": "天机铳",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100012": {
+  "name": "ＳＫ５０９",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100013": {
+  "name": "叉鬼猎铳",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100015": {
+  "name": "哈尼兰切",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100016": {
+  "name": "星芥骑兵铳",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100017": {
+  "name": "黑市步枪",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100018": {
+  "name": "哈尼海耶",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100019": {
+  "name": "格里帕铳枪",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5100020": {
+  "name": "哈里萨尔瓦",
+  "rarity": "0",
+  "category": "铳"
+ },
+ "5005000": {
+  "name": "无界轻吻",
+  "rarity": "0",
+  "category": "CN专属"
+ },
+ "5025000": {
+  "name": "碎星炬锋",
+  "rarity": "0",
+  "category": "CN专属"
+ },
+ "5035000": {
+  "name": "森灵长弓",
+  "rarity": "0",
+  "category": "CN专属"
+ },
+ "5045000": {
+  "name": "恩赐秘典",
+  "rarity": "0",
+  "category": "CN专属"
+ },
+ "5055000": {
+  "name": "林蔓之枝",
+  "rarity": "0",
+  "category": "CN专属"
+ },
+ "5095000": {
+  "name": "占位",
+  "rarity": "0",
+  "category": "CN专属"
+ },
+ "5095001": {
+  "name": "紫晶巨剑",
+  "rarity": "0",
+  "category": "CN专属"
+ },
+ "5095002": {
+  "name": "蝶翼吊坠",
+  "rarity": "0",
+  "category": "CN专属"
+ },
+ "5095003": {
+  "name": "秘钥魔杖",
+  "rarity": "0",
+  "category": "CN专属"
+ },
+ "100001": {
+  "name": "精灵的微笑",
+  "rarity": "1",
+  "category": "主线宝珠"
+ },
+ "100002": {
+  "name": "沙海的友情",
+  "rarity": "1",
+  "category": "主线宝珠"
+ },
+ "100003": {
+  "name": "女海盗的盛宴",
+  "rarity": "1",
+  "category": "主线宝珠"
+ },
+ "100004": {
+  "name": "爪牙之交",
+  "rarity": "1",
+  "category": "主线宝珠"
+ },
+ "100005": {
+  "name": "歌姬之声",
+  "rarity": "1",
+  "category": "主线宝珠"
+ },
+ "100006": {
+  "name": "人妖百鬼夜行",
+  "rarity": "1",
+  "category": "主线宝珠"
+ },
+ "100007": {
+  "name": "炎之信赖",
+  "rarity": "1",
+  "category": "主线宝珠"
+ },
+ "100008": {
+  "name": "传承之物",
+  "rarity": "1",
+  "category": "主线宝珠"
+ },
+ "100009": {
+  "name": "逆天而行的决意",
+  "rarity": "1",
+  "category": "主线宝珠"
+ },
+ "100010": {
+  "name": "伸出你的手",
+  "rarity": "1",
+  "category": "主线宝珠"
+ },
+ "100011": {
+  "name": "黄金之路",
+  "rarity": "1",
+  "category": "主线宝珠"
+ },
+ "100012": {
+  "name": "延续的黄金",
+  "rarity": "1",
+  "category": "主线宝珠"
+ },
+ "200001": {
+  "name": "超越守护之证",
+  "rarity": "0",
+  "category": "练习勋章"
+ },
+ "200002": {
+  "name": "超越诅咒之证",
+  "rarity": "0",
+  "category": "练习勋章"
+ },
+ "200003": {
+  "name": "超越强度之证",
+  "rarity": "0",
+  "category": "练习勋章"
+ },
+ "200004": {
+  "name": "超越速度之证",
+  "rarity": "0",
+  "category": "练习勋章"
+ },
+ "200005": {
+  "name": "超越硬度之证",
+  "rarity": "0",
+  "category": "练习勋章"
+ },
+ "200006": {
+  "name": "歼灭之证",
+  "rarity": "0",
+  "category": "勋章"
+ },
+ "300001": {
+  "name": "破星剑",
+  "rarity": "0",
+  "category": "不可装备"
+ },
+ "300002": {
+  "name": "破星剑",
+  "rarity": "0",
+  "category": "不可装备"
+ },
+ "8000101": {
+  "name": "深渊武装·火壹(占位)",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "8000102": {
+  "name": "深渊武装·火贰(占位)",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "8000103": {
+  "name": "深渊武装·水壹(占位)",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "8000104": {
+  "name": "深渊武装·水贰(占位)",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "8000105": {
+  "name": "深渊武装·雷壹(占位)",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "8000106": {
+  "name": "深渊武装·雷贰(占位)",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "8000107": {
+  "name": "深渊武装·风壹(占位)",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "8000108": {
+  "name": "深渊武装·风贰(占位)",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "8000109": {
+  "name": "深渊武装·光壹(占位)",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "8000110": {
+  "name": "深渊武装·光贰(占位)",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "8000111": {
+  "name": "深渊武装·暗壹(占位)",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "8000112": {
+  "name": "深渊武装·暗贰(占位)",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "8000113": {
+  "name": "深渊武装·通用壹(占位)",
+  "rarity": "0",
+  "category": "剑"
+ },
+ "8000114": {
+  "name": "深渊武装·通用贰(占位)",
+  "rarity": "0",
+  "category": "斧"
+ },
+ "8000115": {
+  "name": "深渊武装·通用叁(占位)",
+  "rarity": "0",
+  "category": "饰品"
+ }
+}
