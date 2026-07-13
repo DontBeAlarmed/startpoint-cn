@@ -264,6 +264,30 @@ def patch_event_metadata(row: list[str]) -> list[str]:
     return row
 
 
+def build_event_metadata_leaf(
+    template_leaf: bytes | str,
+    current_leaf: bytes | str,
+) -> bytes | str:
+    """Rebuild 700099 from the canonical template, preserving only banner art."""
+    template = cells(template_leaf)
+    current = cells(current_leaf)
+    if len(template) < 18:
+        raise ValueError(f"rush_event[{TEMPLATE_EVENT}] must have at least 18 columns")
+    if len(current) < 5:
+        raise ValueError(f"rush_event[{EVENT_ID}] must have at least 5 columns")
+
+    row = list(template)
+    row[0] = EVENT_STRING_ID
+    row[1] = EVENT_NAME
+    row[2] = f"{START},{END},{RESULT_END},{EXCHANGE_END}"
+    row[3:5] = current[3:5]
+    row[10] = TOKEN_ID
+    row[15] = START
+    row[16] = END
+    row[17] = EXCHANGE_END
+    return join(row, isinstance(current_leaf, bytes))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="生成 700099 深渊连战")
     ap.add_argument("--rounds", type=int, default=15)
@@ -323,16 +347,11 @@ def main() -> int:
     # c15=start_time c16=playable_end_time c17=exchangeable_end_time。
     # 700099 行已存在时以现有行为基底(保留 wf_rogue_banner 换过的横幅列 c3/c4)。
     ev = q.load_table(Q_EVENT)
-    base_leaf = ev.get(EVENT_ID) or ev[TEMPLATE_EVENT]
-    tmpl_ev = cells(base_leaf)
-    ev_bytes = isinstance(base_leaf, bytes)
-    ev_row = patch_event_metadata(list(tmpl_ev))
-    ev_row[0] = EVENT_STRING_ID
-    ev_row[1] = EVENT_NAME
-    ev_row[2] = f"{START},{END},{RESULT_END},{EXCHANGE_END}"   # 横幅排期,顺带拉满
-    ev_row[15] = START            # 活动开始
-    ev_row[16] = END              # 可游玩截止
-    ev_row[17] = EXCHANGE_END     # 兑换截止
+    template_leaf = ev[TEMPLATE_EVENT]
+    current_leaf = ev.get(EVENT_ID) or template_leaf
+    event_leaf = build_event_metadata_leaf(template_leaf, current_leaf)
+    ev_row = cells(event_leaf)
+    ev_bytes = isinstance(event_leaf, bytes)
 
     # ---- ② folder 行(连战=700007 超级 folder 3 模板;无尽=folder 4 模板)----
     fo = q.load_table(Q_FOLDER)

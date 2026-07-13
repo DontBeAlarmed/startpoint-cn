@@ -25,6 +25,7 @@ import wf_assets  # noqa: E402
 import wf_describe  # noqa: E402
 import wf_mod_tool as core  # noqa: E402
 import wf_quest_lib as q  # noqa: E402
+import wf_rogue_build as rogue_build  # noqa: E402
 import wf_rogue_rewards as rewards  # noqa: E402
 import wf_rogue_shop as shop  # noqa: E402
 import wf_rogue_validate as validate  # noqa: E402
@@ -89,6 +90,7 @@ def _base_master_tables() -> rewards.MasterTables:
     }
     rush_row = [f"rush-{index}" for index in range(18)]
     rush_row[10] = rewards.TOKEN_TEMPLATE
+    rush_template = [f"rush-template-{index}" for index in range(18)]
     return rewards.MasterTables(
         items={rewards.TOKEN_TEMPLATE: _leaf([item_row])},
         equipment=equipment,
@@ -96,6 +98,7 @@ def _base_master_tables() -> rewards.MasterTables:
         ability_soul=ability_soul,
         rush_event={
             rewards.EVENT_ID: _leaf([rush_row]),
+            rogue_build.TEMPLATE_EVENT: _leaf([rush_template]),
             "700001": _leaf([["unrelated"]]),
         },
     )
@@ -521,6 +524,28 @@ class TestMasterBoundaries(CompleteFixtureCase):
         ):
             self.assert_error(result, f"equipment[8000101].{suffix}")
 
+    def test_noncanonical_item_column_is_named(self):
+        self.mutate_leaf(
+            rewards.ITEM_T,
+            rewards.TOKEN_ID,
+            {3: "foreign-item-column"},
+        )
+
+        result = self.validate()
+
+        self.assert_error(result, "item[2370099].canonical_row")
+
+    def test_noncanonical_rush_column_is_named(self):
+        self.mutate_leaf(
+            rewards.RUSH_EVENT_T,
+            rewards.EVENT_ID,
+            {0: "foreign-rush-string-id"},
+        )
+
+        result = self.validate()
+
+        self.assert_error(result, "rush_event[700099].canonical_row")
+
     def test_wrong_status_donor_map_and_server_mirrors_are_named(self):
         first = rewards.WEAPONS[0]
         status = _read_table(self.store, rewards.EQUIP_STATUS_T)
@@ -551,6 +576,17 @@ class TestMasterBoundaries(CompleteFixtureCase):
         self.assert_error(result, "assets.equipment_element[8000101].value")
         self.assert_error(result, "assets.equipment_lookup[8000101].name")
         self.assert_error(result, "assets.equipment_lookup[8000101].rarity")
+
+    def test_extra_owned_lookup_field_is_named(self):
+        first = rewards.WEAPONS[0]
+        path = self.assets_dir / "equipment_lookup.json"
+        lookup = json.loads(path.read_text(encoding="utf-8"))
+        lookup[first.id]["foreign"] = "must-not-survive"
+        _write_json(path, lookup)
+
+        result = self.validate()
+
+        self.assert_error(result, f"assets.equipment_lookup[{first.id}].record")
 
     def test_boolean_mirror_values_do_not_equal_integer_contract_values(self):
         max_level_spec = rewards.WEAPONS[0]
@@ -636,6 +672,15 @@ class TestMasterBoundaries(CompleteFixtureCase):
         ):
             self.assert_error(result, f"assets.{name}.invalid")
 
+    def test_json_integer_digit_limit_is_collected_without_exception_escape(self):
+        path = self.assets_dir / "equipment_ids.json"
+        path.write_text('["prefix",' + ("9" * 5000) + "]", encoding="utf-8")
+
+        result = self.validate()
+
+        self.assert_error(result, "assets.equipment_ids.invalid")
+        self.assertEqual(15, len(result.descriptions))
+
     def test_csv_parser_error_is_collected_without_exception_escape(self):
         with mock.patch.object(
             core,
@@ -678,6 +723,17 @@ class TestMasterBoundaries(CompleteFixtureCase):
 
 
 class TestPngBoundaries(CompleteFixtureCase):
+    def test_decompression_bomb_is_collected_without_exception_escape(self):
+        with mock.patch.object(
+            rewards,
+            "validate_source_assets",
+            side_effect=Image.DecompressionBombError("fixture bomb"),
+        ):
+            result = self.validate()
+
+        self.assert_error(result, "png.sources.invalid")
+        self.assertEqual(15, len(result.descriptions))
+
     def test_missing_source_png_is_named(self):
         source = self.root / "mod-tools/assets/abyss-equipment/fire_01.png"
         source.unlink()
@@ -733,6 +789,17 @@ class TestPngBoundaries(CompleteFixtureCase):
 
 
 class TestShopBoundaries(CompleteFixtureCase):
+    def test_noncanonical_client_shop_column_is_named(self):
+        self.mutate_leaf(
+            shop.SHOP_T,
+            shop.RESERVED_SHOP_IDS[0],
+            {3: "foreign-client-shop-column"},
+        )
+
+        result = self.validate()
+
+        self.assert_error(result, "shop.client[9700101].canonical_row")
+
     def test_wrong_shop_cost_stock_reward_ordering_nesting_and_id_map_are_named(self):
         client = _read_table(self.store, shop.SHOP_T)
         last = client.pop(shop.RESERVED_SHOP_IDS[-1])

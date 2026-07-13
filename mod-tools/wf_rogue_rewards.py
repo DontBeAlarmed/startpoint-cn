@@ -31,6 +31,7 @@ import wf_quest_lib as q          # noqa: E402
 import wf_mod_tool as core        # noqa: E402
 import wf_describe                # noqa: E402
 import wf_assets                  # noqa: E402
+import wf_rogue_build as rogue_build  # noqa: E402
 
 ITEM_T = "master/item/item.orderedmap"
 EQUIP_T = "master/item/equipment.orderedmap"
@@ -383,6 +384,19 @@ def patch_rush_token(leaf: bytes | str) -> bytes | str:
     return _join_like(rows, leaf)
 
 
+def build_token_leaf(template_leaf: bytes | str) -> bytes | str:
+    """Clone the complete canonical token template and patch owned columns."""
+    rows = core.read_csv_lines(_leaf_text(template_leaf))
+    if len(rows) != 1 or len(rows[0]) <= 5:
+        raise ValueError(f"item[{TOKEN_TEMPLATE}] must be a single row with 6+ columns")
+    row = list(rows[0])
+    row[0] = "rogue_event_item_99"
+    row[1] = TOKEN_ID
+    row[2] = "深渊代币"
+    row[5] = TOKEN_DESCRIPTION
+    return _join_like([row], template_leaf)
+
+
 def build_master_changes(tables: MasterTables) -> MasterChanges:
     """纯内存构建五张客户端表;所有占用与依赖在修改副本前完成校验。"""
     assert_reserved_ownership(tables.equipment)
@@ -412,21 +426,13 @@ def build_master_changes(tables: MasterTables) -> MasterChanges:
     token_template = _require_leaf(
         tables.items[TOKEN_TEMPLATE], f"item[{TOKEN_TEMPLATE}]"
     )
-    token_row = cells(token_template)
-    if len(token_row) <= 5:
-        raise ValueError(f"item[{TOKEN_TEMPLATE}] 少于 6 列")
-    token_row[0] = "rogue_event_item_99"
-    token_row[1] = TOKEN_ID
-    token_row[2] = "深渊代币"
-    token_row[5] = TOKEN_DESCRIPTION
-
     items = copy.deepcopy(tables.items)
     equipment = copy.deepcopy(tables.equipment)
     equipment_status = copy.deepcopy(tables.equipment_status)
     ability_soul = copy.deepcopy(tables.ability_soul)
     rush_event = copy.deepcopy(tables.rush_event)
 
-    items[TOKEN_ID] = join_like(token_row, token_template)
+    items[TOKEN_ID] = build_token_leaf(token_template)
     for spec in WEAPONS:
         donor_leaf = _require_leaf(
             tables.equipment[spec.donor], f"equipment[{spec.donor}]"
@@ -434,8 +440,17 @@ def build_master_changes(tables: MasterTables) -> MasterChanges:
         equipment[spec.id] = build_equipment_leaf(donor_leaf, spec)
         equipment_status[spec.id] = build_equipment_status(tables.equipment_status, spec)
         ability_soul[spec.id] = build_soul_leaf(tables.ability_soul, spec)
+    if rogue_build.TEMPLATE_EVENT not in tables.rush_event:
+        raise ValueError(f"缺少 Rush Event 模板 {rogue_build.TEMPLATE_EVENT}")
     rush_leaf = _require_leaf(tables.rush_event[EVENT_ID], f"rush_event[{EVENT_ID}]")
-    rush_event[EVENT_ID] = patch_rush_token(rush_leaf)
+    rush_template = _require_leaf(
+        tables.rush_event[rogue_build.TEMPLATE_EVENT],
+        f"rush_event[{rogue_build.TEMPLATE_EVENT}]",
+    )
+    rush_event[EVENT_ID] = rogue_build.build_event_metadata_leaf(
+        rush_template,
+        rush_leaf,
+    )
 
     assert_reserved_ownership(equipment)
     generated = {spec.id for spec in WEAPONS}

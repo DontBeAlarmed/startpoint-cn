@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import wf_assets  # noqa: E402
 import wf_mod_tool as core  # noqa: E402
 import wf_publish  # noqa: E402
+import wf_rogue_build as rogue_build  # noqa: E402
 import wf_rogue_rewards as rewards  # noqa: E402
 import wf_rogue_validate as validator  # noqa: E402
 
@@ -210,7 +211,12 @@ def fake_master_tables(*, placeholders: bool = False, binary: bool = False):
 
     rush_row = [f"rush-{index}" for index in range(18)]
     rush_row[10] = rewards.TOKEN_TEMPLATE
-    rush_event = {"700099": leaf([rush_row]), "700001": leaf([["untouched"]])}
+    rush_template = [f"rush-template-{index}" for index in range(18)]
+    rush_event = {
+        "700099": leaf([rush_row]),
+        rogue_build.TEMPLATE_EVENT: leaf([rush_template]),
+        "700001": leaf([["untouched"]]),
+    }
     return tables_type(
         items=items,
         equipment=equipment,
@@ -1009,6 +1015,25 @@ class TestEquipmentGeneration(unittest.TestCase):
 
 
 @unittest.skipUnless(not MISSING_API, "canonical builder API is not implemented yet")
+class TestTokenGeneration(unittest.TestCase):
+    def test_token_leaf_is_the_complete_canonical_template_clone(self):
+        template = [f"template-{index}" for index in range(23)]
+        template[1] = rewards.TOKEN_TEMPLATE
+        template[2] = "激战代币"
+        original = core.write_csv_lines([template])
+
+        actual = rewards.build_token_leaf(original)
+
+        expected = list(template)
+        expected[0] = "rogue_event_item_99"
+        expected[1] = rewards.TOKEN_ID
+        expected[2] = "深渊代币"
+        expected[5] = rewards.TOKEN_DESCRIPTION
+        self.assertEqual([expected], core.read_csv_lines(actual))
+        self.assertIs(str, type(actual))
+
+
+@unittest.skipUnless(not MISSING_API, "canonical builder API is not implemented yet")
 class TestSoulGeneration(unittest.TestCase):
     def test_fire_greatsword_uses_only_requested_template_lines(self):
         leaf = rewards.build_soul_leaf(fake_templates(), rewards.WEAPONS[0])
@@ -1117,7 +1142,7 @@ class TestMasterChanges(unittest.TestCase):
             self.assertEqual(tables.equipment_status[spec.donor], result.equipment_status[spec.id])
             self.assertNotEqual(tables.ability_soul[spec.id], result.ability_soul[spec.id])
 
-    def test_token_is_cloned_and_rush_reward_changes_only_c10(self):
+    def test_token_and_rush_event_are_complete_canonical_clones(self):
         tables = fake_master_tables()
         result = require_task2("build_master_changes")(tables)
 
@@ -1131,9 +1156,27 @@ class TestMasterChanges(unittest.TestCase):
         )
 
         before = core.read_csv_lines(tables.rush_event["700099"])[0]
+        template_event = core.read_csv_lines(
+            tables.rush_event[rogue_build.TEMPLATE_EVENT]
+        )[0]
         after = core.read_csv_lines(result.rush_event["700099"])[0]
-        self.assertEqual("2370099", after[10])
-        self.assertEqual(before[:10] + before[11:], after[:10] + after[11:])
+        expected = list(template_event)
+        expected[0] = rogue_build.EVENT_STRING_ID
+        expected[1] = rogue_build.EVENT_NAME
+        expected[2] = ",".join(
+            (
+                rogue_build.START,
+                rogue_build.END,
+                rogue_build.RESULT_END,
+                rogue_build.EXCHANGE_END,
+            )
+        )
+        expected[3:5] = before[3:5]
+        expected[10] = rewards.TOKEN_ID
+        expected[15] = rogue_build.START
+        expected[16] = rogue_build.END
+        expected[17] = rogue_build.EXCHANGE_END
+        self.assertEqual(expected, after)
         self.assertEqual(tables.rush_event["700001"], result.rush_event["700001"])
 
     def test_patch_rush_token_preserves_leaf_type(self):

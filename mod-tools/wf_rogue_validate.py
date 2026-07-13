@@ -19,6 +19,7 @@ import wf_assets
 import wf_describe
 import wf_mod_tool as core
 import wf_quest_lib as q
+import wf_rogue_build as rogue_build
 import wf_rogue_rewards as rewards
 import wf_rogue_shop as shop
 
@@ -199,7 +200,7 @@ def _load_table(
         return None
     try:
         table = q.load_table(logical, path=path)
-    except (OSError, UnicodeError, TypeError, ValueError) as exc:
+    except Exception as exc:
         errors.append(
             f"table.{logical}.invalid: {type(exc).__name__}: {exc}"
         )
@@ -219,7 +220,7 @@ def _load_json(
         return None
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+    except Exception as exc:
         errors.append(
             f"assets.{stem}.invalid: {type(exc).__name__}: {exc}"
         )
@@ -233,7 +234,7 @@ def _leaf_rows(value: object, label: str, errors: list[str]) -> list[list[str]] 
     try:
         text = value.decode("utf-8") if isinstance(value, bytes) else value
         rows = core.read_csv_lines(text)
-    except (UnicodeError, TypeError, ValueError, csv.Error) as exc:
+    except Exception as exc:
         errors.append(f"{label}.invalid: {type(exc).__name__}: {exc}")
         return None
     if not rows:
@@ -267,6 +268,25 @@ def _validate_item(table: object, errors: list[str]) -> None:
                 f"item[{rewards.TOKEN_ID}].{name}: "
                 f"expected={value!r}, actual={row[column]!r}"
             )
+    template = table.get(rewards.TOKEN_TEMPLATE)
+    if template is None:
+        errors.append(f"item[{rewards.TOKEN_ID}].template_missing: {rewards.TOKEN_TEMPLATE}")
+        return
+    try:
+        expected_leaf = rewards.build_token_leaf(template)
+        expected_rows = _leaf_rows(
+            expected_leaf,
+            f"item[{rewards.TOKEN_ID}].expected",
+            errors,
+        )
+    except Exception as exc:
+        errors.append(
+            f"item[{rewards.TOKEN_ID}].expected.invalid: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        return
+    if expected_rows is not None and rows != expected_rows:
+        errors.append(f"item[{rewards.TOKEN_ID}].canonical_row")
 
 
 def _validate_weapons(
@@ -307,13 +327,7 @@ def _validate_weapons(
                         )
                         if expected_rows is not None and len(expected_rows) == 1:
                             expected_row = expected_rows[0]
-                    except (
-                        KeyError,
-                        IndexError,
-                        TypeError,
-                        ValueError,
-                        csv.Error,
-                    ) as exc:
+                    except Exception as exc:
                         errors.append(
                             f"equipment[{spec.id}].expected.invalid: "
                             f"{type(exc).__name__}: {exc}"
@@ -350,7 +364,7 @@ def _validate_weapons(
                 expected_status = rewards.build_equipment_status(status_map, spec)
                 if actual_status != expected_status:
                     errors.append(f"equipment_status[{spec.id}].donor_map")
-            except (KeyError, TypeError, ValueError) as exc:
+            except Exception as exc:
                 errors.append(
                     f"equipment_status[{spec.id}].invalid: "
                     f"{type(exc).__name__}: {exc}"
@@ -372,13 +386,7 @@ def _validate_weapons(
                 )
                 if expected_rows is not None and actual_soul_rows != expected_rows:
                     errors.append(f"ability_soul[{spec.id}].canonical_rows")
-            except (
-                KeyError,
-                IndexError,
-                TypeError,
-                ValueError,
-                csv.Error,
-            ) as exc:
+            except Exception as exc:
                 errors.append(
                     f"ability_soul[{spec.id}].templates: "
                     f"{type(exc).__name__}: {exc}"
@@ -390,13 +398,7 @@ def _validate_weapons(
                 rendered = wf_describe.describe_rows(
                     actual_soul_rows, "ability_soul"
                 )
-            except (
-                ArithmeticError,
-                KeyError,
-                IndexError,
-                TypeError,
-                ValueError,
-            ) as exc:
+            except Exception as exc:
                 errors.append(
                     f"ability_soul[{spec.id}].description.invalid: "
                     f"{type(exc).__name__}: {exc}"
@@ -435,6 +437,28 @@ def _validate_rush(table: object, errors: list[str]) -> None:
             f"rush_event[{rewards.EVENT_ID}].token: "
             f"expected={rewards.TOKEN_ID}, actual={rows[0][10]!r}"
         )
+    template = table.get(rogue_build.TEMPLATE_EVENT)
+    if template is None:
+        errors.append(
+            f"rush_event[{rewards.EVENT_ID}].template_missing: "
+            f"{rogue_build.TEMPLATE_EVENT}"
+        )
+        return
+    try:
+        expected_leaf = rogue_build.build_event_metadata_leaf(template, leaf)
+        expected_rows = _leaf_rows(
+            expected_leaf,
+            f"rush_event[{rewards.EVENT_ID}].expected",
+            errors,
+        )
+    except Exception as exc:
+        errors.append(
+            f"rush_event[{rewards.EVENT_ID}].expected.invalid: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        return
+    if expected_rows is not None and rows != expected_rows:
+        errors.append(f"rush_event[{rewards.EVENT_ID}].canonical_row")
 
 
 def _validate_mirrors(values: dict[str, Any], errors: list[str]) -> None:
@@ -443,6 +467,48 @@ def _validate_mirrors(values: dict[str, Any], errors: list[str]) -> None:
     lookup = values.get("equipment_lookup")
     equipment_ids = values.get("equipment_ids")
     item_ids = values.get("item_ids")
+
+    canonical: rewards.ServerMirrors | None = None
+    if all(
+        isinstance(value, expected_type)
+        for value, expected_type in (
+            (max_level, dict),
+            (element, dict),
+            (lookup, dict),
+            (equipment_ids, list),
+            (item_ids, list),
+        )
+    ):
+        owned = {spec.id for spec in rewards.WEAPONS}
+        base_max_level = {
+            key: value for key, value in max_level.items() if key not in owned
+        }
+        base_element = {
+            key: value for key, value in element.items() if key not in owned
+        }
+        base_lookup = {
+            key: value for key, value in lookup.items() if key not in owned
+        }
+        try:
+            base_equipment_ids = [
+                value for value in equipment_ids if str(value) not in owned
+            ]
+            base_item_ids = [
+                value for value in item_ids if str(value) != rewards.TOKEN_ID
+            ]
+            canonical = rewards.apply_server_mirrors(
+                rewards.ServerMirrors(
+                    equipment_max_level=base_max_level,
+                    equipment_element=base_element,
+                    equipment_lookup=base_lookup,
+                    equipment_ids=base_equipment_ids,
+                    item_ids=base_item_ids,
+                )
+            )
+        except Exception as exc:
+            errors.append(
+                f"assets.mirrors.canonical.invalid: {type(exc).__name__}: {exc}"
+            )
 
     for spec in rewards.WEAPONS:
         if isinstance(max_level, dict):
@@ -481,6 +547,18 @@ def _validate_mirrors(values: dict[str, Any], errors: list[str]) -> None:
                     )
                 elif actual.get("category") != donor["category"]:
                     errors.append(f"assets.equipment_lookup[{spec.id}].category")
+        if canonical is not None:
+            for name, actual_map, expected_map in (
+                (
+                    "equipment_max_level",
+                    max_level,
+                    canonical.equipment_max_level,
+                ),
+                ("equipment_element", element, canonical.equipment_element),
+                ("equipment_lookup", lookup, canonical.equipment_lookup),
+            ):
+                if not _strict_equal(actual_map.get(spec.id), expected_map[spec.id]):
+                    errors.append(f"assets.{name}[{spec.id}].record")
 
     _validate_id_list(
         equipment_ids,
@@ -488,6 +566,11 @@ def _validate_mirrors(values: dict[str, Any], errors: list[str]) -> None:
         "assets.equipment_ids",
         errors,
     )
+    if canonical is not None:
+        if not _strict_equal(equipment_ids, canonical.equipment_ids):
+            errors.append("assets.equipment_ids.canonical")
+        if not _strict_equal(item_ids, canonical.item_ids):
+            errors.append("assets.item_ids.canonical")
     _validate_id_list(
         item_ids,
         [int(rewards.TOKEN_ID)],
@@ -547,10 +630,27 @@ def _validate_shop(
         try:
             for problem in shop.validate_shop(client, server, id_map):
                 errors.append(f"shop.contract: {problem}")
-        except (KeyError, IndexError, TypeError, ValueError, csv.Error) as exc:
+        except Exception as exc:
             errors.append(
                 f"shop.contract.invalid: {type(exc).__name__}: {exc}"
             )
+
+    if isinstance(client, dict):
+        base_client = {
+            key: value
+            for key, value in client.items()
+            if key not in shop.RESERVED_SHOP_IDS
+        }
+        try:
+            canonical_client = shop.build_client_shop(base_client, rewards.WEAPONS)
+        except Exception as exc:
+            errors.append(
+                f"shop.client.canonical.invalid: {type(exc).__name__}: {exc}"
+            )
+        else:
+            for shop_id in shop.RESERVED_SHOP_IDS:
+                if not _strict_equal(client.get(shop_id), canonical_client[shop_id]):
+                    errors.append(f"shop.client[{shop_id}].canonical_row")
 
     expected_products = shop._expected_products(rewards.WEAPONS)
     target_products: dict[str, Any] = {}
@@ -589,7 +689,7 @@ def _validate_pngs(store: Path, assets_dir: Path, errors: list[str]) -> None:
     source_dir = assets_dir.parent / "mod-tools" / "assets" / "abyss-equipment"
     try:
         rewards.validate_source_assets(source_dir, rewards.WEAPONS)
-    except (OSError, KeyError, TypeError, ValueError, RuntimeError) as exc:
+    except Exception as exc:
         errors.append(
             f"png.sources.invalid: {type(exc).__name__}: {exc}"
         )
@@ -611,7 +711,7 @@ def _validate_pngs(store: Path, assets_dir: Path, errors: list[str]) -> None:
         try:
             source_bytes = source.read_bytes()
             expected_stored = wf_assets.png_encode(source_bytes)
-        except (OSError, TypeError, ValueError):
+        except Exception:
             expected_stored = None
         if expected_stored is not None and stored != expected_stored:
             errors.append(f"png.store[{logical}].bytes")
