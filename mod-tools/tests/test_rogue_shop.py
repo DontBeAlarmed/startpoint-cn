@@ -304,7 +304,8 @@ class TestCli(unittest.TestCase):
                     self.assertEqual(payload, path.read_bytes())
 
     def _run_transaction_failure(
-        self, failure_at: str, exception_type=OSError
+        self, failure_at: str, exception_type=OSError,
+        errors: io.StringIO | None = None,
     ) -> tuple[int, str]:
         stored_table = copy.deepcopy(self.client)
         stored_json = {
@@ -321,10 +322,15 @@ class TestCli(unittest.TestCase):
             stored_table = copy.deepcopy(data)
             self.client_target.write_bytes(b"client-after\n")
 
+        def injected_exception(message):
+            if isinstance(exception_type, BaseException):
+                return exception_type
+            return exception_type(message)
+
         def load_json(name):
             json_loads[name] += 1
             if json_loads[name] > 1 and failure_at == f"read_{name}":
-                raise exception_type(f"injected {name} readback failure")
+                raise injected_exception(f"injected {name} readback failure")
             return copy.deepcopy(stored_json[name])
 
         def save_json(name, data):
@@ -334,9 +340,9 @@ class TestCli(unittest.TestCase):
                 (json.dumps(data, ensure_ascii=False) + "\n").encode("utf-8")
             )
             if failure_at == f"write_{name}":
-                raise exception_type(f"injected {name} write failure")
+                raise injected_exception(f"injected {name} write failure")
 
-        errors = io.StringIO()
+        errors = errors if errors is not None else io.StringIO()
         with (
             mock.patch.object(shop, "require_cn_profile", return_value=self.profile),
             mock.patch.object(shop.q, "load_table", side_effect=load_table),
@@ -562,6 +568,50 @@ class TestCli(unittest.TestCase):
         self.assertIn("injected event_item_shop.json write failure", errors)
         self.assertIn("回滚失败", errors)
         self.assertIn("injected rollback failure", errors)
+
+    def test_cancelled_late_operations_restore_exact_targets_before_reraise(self):
+        cases = (
+            (
+                f"write_{shop.SHOP_ID_MAP_JSON}",
+                KeyboardInterrupt("cancel third write"),
+                False,
+            ),
+            (
+                f"read_{shop.SHOP_ID_MAP_JSON}",
+                SystemExit("cancel third readback"),
+                True,
+            ),
+        )
+        for failure_at, cancellation, client_exists in cases:
+            with self.subTest(failure_at=failure_at):
+                originals = self._reset_transaction_targets(
+                    client_exists=client_exists
+                )
+                errors = io.StringIO()
+                with self.assertRaises(type(cancellation)) as caught:
+                    self._run_transaction_failure(
+                        failure_at, cancellation, errors
+                    )
+                self.assertIs(cancellation, caught.exception)
+                self._assert_transaction_targets(originals)
+                self.assertIn("ROLLBACK", errors.getvalue())
+
+    def test_cancelled_operation_reports_rollback_failure_before_reraise(self):
+        self._reset_transaction_targets()
+        cancellation = KeyboardInterrupt("cancel third write")
+        errors = io.StringIO()
+        with mock.patch.object(
+            shop._FileBeforeImages,
+            "restore",
+            return_value=["injected cancellation rollback failure"],
+        ):
+            with self.assertRaises(KeyboardInterrupt) as caught:
+                self._run_transaction_failure(
+                    f"write_{shop.SHOP_ID_MAP_JSON}", cancellation, errors
+                )
+        self.assertIs(cancellation, caught.exception)
+        self.assertIn("回滚失败", errors.getvalue())
+        self.assertIn("injected cancellation rollback failure", errors.getvalue())
 
 
 if __name__ == "__main__":

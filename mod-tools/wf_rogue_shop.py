@@ -449,6 +449,19 @@ class _FileBeforeImages:
         return errors
 
 
+def _rollback_write_targets(before_images: _FileBeforeImages | None) -> None:
+    if before_images is None:
+        return
+    rollback_errors = before_images.restore()
+    if rollback_errors:
+        print(
+            "[ERR] 回滚失败: " + " | ".join(rollback_errors),
+            file=sys.stderr,
+        )
+    else:
+        print("[ROLLBACK] 三个写入目标已恢复到写前状态。", file=sys.stderr)
+
+
 def _stale_product_count(shop: dict) -> int:
     count = 0
     for _event_type, _event_id, products in _walk_product_maps(shop):
@@ -528,16 +541,15 @@ def main() -> int:
             raise RuntimeError("写后复读校验失败: " + "; ".join(problems))
     except Exception as exc:
         print(f"[ERR] 写入或复读失败: {exc}", file=sys.stderr)
-        if before_images is not None:
-            rollback_errors = before_images.restore()
-            if rollback_errors:
-                print(
-                    "[ERR] 回滚失败: " + " | ".join(rollback_errors),
-                    file=sys.stderr,
-                )
-            else:
-                print("[ROLLBACK] 三个写入目标已恢复到写前状态。", file=sys.stderr)
+        _rollback_write_targets(before_images)
         return 1
+    except BaseException as exc:
+        print(
+            f"[ERR] 写入或复读被中断: {type(exc).__name__}: {exc}",
+            file=sys.stderr,
+        )
+        _rollback_write_targets(before_images)
+        raise
 
     print("[OK] 15 products passed client/server write-readback validation; 未发布。")
     return 0
