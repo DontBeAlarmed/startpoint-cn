@@ -47,7 +47,9 @@ TOKEN_DESCRIPTION = "在「深渊连战」中获得的深渊结晶。凝聚着�
 
 MODE_DESCRIPTION = "【测试版·连战专属】仅在深渊连战、宝物域连战 2001 与木桩假人生效。"
 IMAGE_PREFIX = "item/equipment/mod/abyss"
+ABILITY_SOUL_ALL_ELEMENTS = "0,3,2,1,4,5"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+SOURCE_ASSET_SIZE = (20, 20)
 SOURCE_ASSET_DIR = Path(ROOT) / "mod-tools" / "assets" / "abyss-equipment"
 
 
@@ -147,15 +149,15 @@ WEAPONS: tuple[WeaponSpec, ...] = (
         EffectSpec("5090029", "388", 5_000_000),
         EffectSpec("3050010", "211", 1_000_000),
     )),
-    WeaponSpec("8000113", "深渊征服者", "5010057", -1, "", "universal_01", (
+    WeaponSpec("8000113", "深渊征服者", "5010057", -1, "(None)", "universal_01", (
         EffectSpec("3020006", "32", 3_000_000),
         EffectSpec("3040003", "205", 1_000_000),
     )),
-    WeaponSpec("8000114", "深渊轮转核", "5020010", -1, "", "universal_02", (
+    WeaponSpec("8000114", "深渊轮转核", "5020010", -1, "(None)", "universal_02", (
         EffectSpec("4020013", "34", 5_000_000),
         EffectSpec("3050010", "211", 1_000_000),
     )),
-    WeaponSpec("8000115", "深渊万象铳", "5090045", -1, "", "universal_03", (
+    WeaponSpec("8000115", "深渊万象铳", "5090045", -1, "(None)", "universal_03", (
         EffectSpec("5070035", "33", 3_000_000),
         EffectSpec("5050009", "55", 3_000_000),
         EffectSpec("5090029", "388", 3_000_000),
@@ -209,9 +211,10 @@ def validate_source_assets(
                     raise ValueError(
                         f"{source.name} Pillow 格式必须是 PNG,实际 {image.format}"
                     )
-                if image.size != (1024, 1024):
+                if image.size != SOURCE_ASSET_SIZE:
                     raise ValueError(
-                        f"{source.name} 尺寸必须是 1024x1024,实际 "
+                        f"{source.name} 尺寸必须是 "
+                        f"{SOURCE_ASSET_SIZE[0]}x{SOURCE_ASSET_SIZE[1]},实际 "
                         f"{image.size[0]}x{image.size[1]}"
                     )
                 if image.mode != "RGBA":
@@ -229,14 +232,6 @@ def validate_source_assets(
                 bounds = alpha.getbbox()
                 if bounds is None:
                     raise ValueError(f"{source.name} 没有可见像素")
-                left, top, right, bottom = bounds
-                margins = (left, top, 1024 - right, 1024 - bottom)
-                if any(margin < 24 for margin in margins):
-                    raise ValueError(
-                        f"{source.name} 可见边界距四边至少 24px,实际 "
-                        f"left={margins[0]},top={margins[1]},"
-                        f"right={margins[2]},bottom={margins[3]}"
-                    )
         except (UnidentifiedImageError, OSError) as exc:
             raise ValueError(f"{source.name} 不是可解码 PNG: {exc}") from exc
 
@@ -325,6 +320,22 @@ def build_equipment_leaf(template_leaf: bytes | str, spec: WeaponSpec) -> bytes 
     return _join_like([row], template_leaf)
 
 
+def build_ability_soul_item_leaf(
+    template_leaf: bytes | str, spec: WeaponSpec,
+) -> bytes | str:
+    """Register the same-ID ability soul item required by detail/upgrade views."""
+    row = list(core.read_csv_lines(_leaf_text(template_leaf))[0])
+    row = core.normalize_row_length(row, 23)
+    row[0] = f"mod_abyss_{spec.id}"
+    row[1] = spec.id
+    row[2] = f"{spec.name}魂珠"
+    row[3] = f"{IMAGE_PREFIX}/{spec.image_slug}"
+    row[12] = (
+        str(spec.element) if spec.element >= 0 else ABILITY_SOUL_ALL_ELEMENTS
+    )
+    return _join_like([row], template_leaf)
+
+
 def build_soul_leaf(
     template_table: dict[str, bytes | str], spec: WeaponSpec,
 ) -> bytes | str:
@@ -376,6 +387,25 @@ def assert_reserved_ownership(equipment: dict[str, object]) -> None:
             )
 
 
+def assert_reserved_item_ownership(items: dict[str, object]) -> None:
+    """Reject foreign occupants before writing same-ID ability soul items."""
+    for spec in WEAPONS:
+        if spec.id not in items:
+            continue
+        leaf = _require_leaf(items[spec.id], f"item[{spec.id}]")
+        try:
+            rows = core.read_csv_lines(_leaf_text(leaf))
+        except Exception as exc:
+            raise ValueError(f"reserved item ID {spec.id} cannot be parsed") from exc
+        marker = f"mod_abyss_{spec.id}"
+        if len(rows) != 1 or not rows[0] or rows[0][0] != marker:
+            actual = rows[0][0] if rows and rows[0] else "<missing>"
+            raise ValueError(
+                f"reserved item ID {spec.id} is occupied by foreign data: "
+                f"c0={actual!r}, expected {marker!r}"
+            )
+
+
 def patch_rush_token(leaf: bytes | str) -> bytes | str:
     """只把 Rush Event 行的 c10 改为深渊代币,并保留叶子类型。"""
     rows = core.read_csv_lines(_leaf_text(leaf))
@@ -401,6 +431,7 @@ def build_token_leaf(template_leaf: bytes | str) -> bytes | str:
 def build_master_changes(tables: MasterTables) -> MasterChanges:
     """纯内存构建五张客户端表;所有占用与依赖在修改副本前完成校验。"""
     assert_reserved_ownership(tables.equipment)
+    assert_reserved_item_ownership(tables.items)
 
     for spec in WEAPONS:
         has_owner = spec.id in tables.equipment
@@ -410,6 +441,8 @@ def build_master_changes(tables: MasterTables) -> MasterChanges:
             raise ValueError(f"保留 ID {spec.id} 存在孤立 soul/status,但没有所有权装备行")
         if spec.donor not in tables.equipment:
             raise ValueError(f"缺少装备供体 {spec.donor}")
+        if spec.donor not in tables.items:
+            raise ValueError(f"ability soul item donor missing: {spec.donor}")
         if spec.donor not in tables.equipment_status:
             raise ValueError(f"缺少装备状态供体 {spec.donor}")
         missing_templates = [
@@ -435,6 +468,10 @@ def build_master_changes(tables: MasterTables) -> MasterChanges:
 
     items[TOKEN_ID] = build_token_leaf(token_template)
     for spec in WEAPONS:
+        donor_item_leaf = _require_leaf(
+            tables.items[spec.donor], f"item[{spec.donor}]"
+        )
+        items[spec.id] = build_ability_soul_item_leaf(donor_item_leaf, spec)
         donor_leaf = _require_leaf(
             tables.equipment[spec.donor], f"equipment[{spec.donor}]"
         )
@@ -456,6 +493,7 @@ def build_master_changes(tables: MasterTables) -> MasterChanges:
     assert_reserved_ownership(equipment)
     generated = {spec.id for spec in WEAPONS}
     for label, table in (
+        ("item", items),
         ("equipment", equipment),
         ("equipment_status", equipment_status),
         ("ability_soul", ability_soul),
@@ -689,7 +727,9 @@ def main() -> int:
     try:
         q.save_table(ITEM_T, changes.items)
         item_readback = q.load_table(ITEM_T)
-        _assert_readback_rows(item_readback, changes.items, [TOKEN_ID], "item")
+        _assert_readback_rows(
+            item_readback, changes.items, [TOKEN_ID, *weapon_ids], "item"
+        )
 
         q.save_table(EQUIP_T, changes.equipment)
         equipment_readback = q.load_table(EQUIP_T)

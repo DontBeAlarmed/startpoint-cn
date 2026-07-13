@@ -60,9 +60,19 @@ def _base_master_tables() -> rewards.MasterTables:
     item_row = [f"item-{index}" for index in range(23)]
     item_row[1] = rewards.TOKEN_TEMPLATE
     item_row[2] = "激战代币"
+    items: dict[str, object] = {rewards.TOKEN_TEMPLATE: _leaf([item_row])}
     equipment: dict[str, object] = {}
     status: dict[str, object] = {}
     for index, spec in enumerate(rewards.WEAPONS):
+        donor_item = [f"donor-item-{spec.id}-{column}" for column in range(23)]
+        donor_item[0] = f"donor_{spec.donor}"
+        donor_item[1] = spec.donor
+        donor_item[2] = f"donor soul {spec.donor}"
+        donor_item[3] = f"item/generated/ability_soul/general/{spec.donor}"
+        donor_item[5] = "AbilitySoul"
+        donor_item[12] = str(spec.element) if spec.element >= 0 else "0,3,2,1,4,5"
+        items[spec.donor] = _leaf([donor_item])
+
         donor = [f"donor-{spec.id}-{column}" for column in range(16)]
         donor[0] = f"donor_{spec.donor}"
         donor[1] = f"供体 {spec.donor}"
@@ -92,7 +102,7 @@ def _base_master_tables() -> rewards.MasterTables:
     rush_row[10] = rewards.TOKEN_TEMPLATE
     rush_template = [f"rush-template-{index}" for index in range(18)]
     return rewards.MasterTables(
-        items={rewards.TOKEN_TEMPLATE: _leaf([item_row])},
+        items=items,
         equipment=equipment,
         equipment_status=status,
         ability_soul=ability_soul,
@@ -300,7 +310,7 @@ def _build_complete_fixture(root: Path) -> None:
     _write_json(assets_dir / shop.SHOP_ID_MAP_JSON, id_map)
 
     for index, spec in enumerate(rewards.WEAPONS):
-        image = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
+        image = Image.new("RGBA", (20, 20), (0, 0, 0, 0))
         image.paste(
             (
                 20 + (index * 37) % 220,
@@ -308,7 +318,7 @@ def _build_complete_fixture(root: Path) -> None:
                 20 + (index * 97) % 220,
                 255,
             ),
-            (32, 32, 992, 992),
+            (1, 1, 19, 19),
         )
         image.save(source_dir / f"{spec.image_slug}.png", format="PNG")
     sources = rewards.validate_source_assets(source_dir, rewards.WEAPONS)
@@ -503,6 +513,28 @@ class TestCompleteRelease(CompleteFixtureCase):
 
 
 class TestMasterBoundaries(CompleteFixtureCase):
+    def test_missing_same_id_ability_soul_item_is_rejected(self):
+        first = rewards.WEAPONS[0]
+        table = _read_table(self.store, rewards.ITEM_T)
+        table.pop(first.id)
+        _write_table(self.store, rewards.ITEM_T, table)
+
+        result = self.validate()
+
+        self.assert_error(result, "item[8000101].missing")
+
+    def test_noncanonical_ability_soul_item_is_rejected(self):
+        first = rewards.WEAPONS[0]
+        self.mutate_leaf(
+            rewards.ITEM_T,
+            first.id,
+            {3: "item/equipment/wrong", 12: rewards.ABILITY_SOUL_ALL_ELEMENTS},
+        )
+
+        result = self.validate()
+
+        self.assert_error(result, "item[8000101].canonical_row")
+
     def test_missing_equipment_status_soul_shop_item_and_rush_rows_are_named(self):
         first = rewards.WEAPONS[0]
         for logical, key in (
@@ -660,6 +692,18 @@ class TestMasterBoundaries(CompleteFixtureCase):
         self.assert_error(result, "ability_soul[8000101].canonical_rows")
         self.assert_error(result, "ability_soul[8000101].description.empty")
         self.assertEqual(15, len(result.descriptions))
+
+    def test_empty_universal_target_group_is_rejected(self):
+        universal = rewards.WEAPONS[-3]
+        self.mutate_leaf(
+            rewards.SOUL_T,
+            universal.id,
+            {46: ""},
+        )
+
+        result = self.validate()
+
+        self.assert_error(result, f"ability_soul[{universal.id}].canonical_rows")
 
     def test_wrong_rush_token_is_named(self):
         self.mutate_leaf(

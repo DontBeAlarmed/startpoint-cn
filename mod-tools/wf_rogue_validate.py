@@ -320,44 +320,71 @@ def _validate_item(table: object, errors: list[str]) -> None:
     leaf = table.get(rewards.TOKEN_ID)
     if leaf is None:
         errors.append(f"item[{rewards.TOKEN_ID}].missing")
-        return
-    rows = _leaf_rows(leaf, f"item[{rewards.TOKEN_ID}]", errors)
-    if rows is None or len(rows) != 1 or len(rows[0]) <= 5:
-        if rows is not None:
-            errors.append(f"item[{rewards.TOKEN_ID}].schema")
-        return
-    row = rows[0]
-    expected = {
-        0: ("string_id", "rogue_event_item_99"),
-        1: ("id", rewards.TOKEN_ID),
-        2: ("name", "深渊代币"),
-        5: ("description", rewards.TOKEN_DESCRIPTION),
-    }
-    for column, (name, value) in expected.items():
-        if row[column] != value:
+    else:
+        rows = _leaf_rows(leaf, f"item[{rewards.TOKEN_ID}]", errors)
+        if rows is None or len(rows) != 1 or len(rows[0]) <= 5:
+            if rows is not None:
+                errors.append(f"item[{rewards.TOKEN_ID}].schema")
+        else:
+            row = rows[0]
+            expected = {
+                0: ("string_id", "rogue_event_item_99"),
+                1: ("id", rewards.TOKEN_ID),
+                2: ("name", "深渊代币"),
+                5: ("description", rewards.TOKEN_DESCRIPTION),
+            }
+            for column, (name, value) in expected.items():
+                if row[column] != value:
+                    errors.append(
+                        f"item[{rewards.TOKEN_ID}].{name}: "
+                        f"expected={value!r}, actual={row[column]!r}"
+                    )
+            template = table.get(rewards.TOKEN_TEMPLATE)
+            if template is None:
+                errors.append(
+                    f"item[{rewards.TOKEN_ID}].template_missing: "
+                    f"{rewards.TOKEN_TEMPLATE}"
+                )
+            else:
+                try:
+                    expected_leaf = rewards.build_token_leaf(template)
+                    expected_rows = _leaf_rows(
+                        expected_leaf,
+                        f"item[{rewards.TOKEN_ID}].expected",
+                        errors,
+                    )
+                except Exception as exc:
+                    errors.append(
+                        f"item[{rewards.TOKEN_ID}].expected.invalid: "
+                        f"{type(exc).__name__}: {exc}"
+                    )
+                else:
+                    if expected_rows is not None and rows != expected_rows:
+                        errors.append(f"item[{rewards.TOKEN_ID}].canonical_row")
+
+    for spec in rewards.WEAPONS:
+        label = f"item[{spec.id}]"
+        soul_item_leaf = table.get(spec.id)
+        if soul_item_leaf is None:
+            errors.append(f"{label}.missing")
+            continue
+        donor_leaf = table.get(spec.donor)
+        if donor_leaf is None:
+            errors.append(f"{label}.donor_missing: {spec.donor}")
+            continue
+        rows = _leaf_rows(soul_item_leaf, label, errors)
+        if rows is None:
+            continue
+        try:
+            expected_leaf = rewards.build_ability_soul_item_leaf(donor_leaf, spec)
+            expected_rows = _leaf_rows(expected_leaf, f"{label}.expected", errors)
+        except Exception as exc:
             errors.append(
-                f"item[{rewards.TOKEN_ID}].{name}: "
-                f"expected={value!r}, actual={row[column]!r}"
+                f"{label}.expected.invalid: {type(exc).__name__}: {exc}"
             )
-    template = table.get(rewards.TOKEN_TEMPLATE)
-    if template is None:
-        errors.append(f"item[{rewards.TOKEN_ID}].template_missing: {rewards.TOKEN_TEMPLATE}")
-        return
-    try:
-        expected_leaf = rewards.build_token_leaf(template)
-        expected_rows = _leaf_rows(
-            expected_leaf,
-            f"item[{rewards.TOKEN_ID}].expected",
-            errors,
-        )
-    except Exception as exc:
-        errors.append(
-            f"item[{rewards.TOKEN_ID}].expected.invalid: "
-            f"{type(exc).__name__}: {exc}"
-        )
-        return
-    if expected_rows is not None and rows != expected_rows:
-        errors.append(f"item[{rewards.TOKEN_ID}].canonical_row")
+            continue
+        if expected_rows is not None and rows != expected_rows:
+            errors.append(f"{label}.canonical_row")
 
 
 def _validate_weapons(

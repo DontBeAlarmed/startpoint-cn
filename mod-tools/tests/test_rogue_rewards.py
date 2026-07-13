@@ -99,11 +99,11 @@ EXPECTED_WEAPONS = [
      (("3020006", "32", 5_000_000), ("4020013", "34", 5_000_000))),
     ("8000112", "冥灯魔杖", "5020040", 5, "Black", "item/equipment/mod/abyss/dark_02",
      (("5090029", "388", 5_000_000), ("3050010", "211", 1_000_000))),
-    ("8000113", "深渊征服者", "5010057", -1, "", "item/equipment/mod/abyss/universal_01",
+    ("8000113", "深渊征服者", "5010057", -1, "(None)", "item/equipment/mod/abyss/universal_01",
      (("3020006", "32", 3_000_000), ("3040003", "205", 1_000_000))),
-    ("8000114", "深渊轮转核", "5020010", -1, "", "item/equipment/mod/abyss/universal_02",
+    ("8000114", "深渊轮转核", "5020010", -1, "(None)", "item/equipment/mod/abyss/universal_02",
      (("4020013", "34", 5_000_000), ("3050010", "211", 1_000_000))),
-    ("8000115", "深渊万象铳", "5090045", -1, "", "item/equipment/mod/abyss/universal_03",
+    ("8000115", "深渊万象铳", "5090045", -1, "(None)", "item/equipment/mod/abyss/universal_03",
      (("5070035", "33", 3_000_000), ("5050009", "55", 3_000_000),
       ("5090029", "388", 3_000_000))),
 ]
@@ -157,8 +157,8 @@ def write_rgba_fixture(
     path: Path,
     *,
     color: tuple[int, int, int, int] = (200, 80, 40, 255),
-    size: tuple[int, int] = (1024, 1024),
-    visible_box: tuple[int, int, int, int] | None = (32, 32, 992, 992),
+    size: tuple[int, int] = (20, 20),
+    visible_box: tuple[int, int, int, int] | None = (1, 1, 19, 19),
     background: tuple[int, int, int, int] = (0, 0, 0, 0),
 ) -> None:
     image = Image.new("RGBA", size, background)
@@ -194,6 +194,15 @@ def fake_master_tables(*, placeholders: bool = False, binary: bool = False):
     equipment: dict[str, object] = {}
     equipment_status: dict[str, object] = {}
     for spec in rewards.WEAPONS:
+        donor_item = [f"donor-item-{spec.id}-{index}" for index in range(23)]
+        donor_item[0] = f"donor_{spec.donor}"
+        donor_item[1] = spec.donor
+        donor_item[2] = f"donor soul {spec.donor}"
+        donor_item[3] = f"item/generated/ability_soul/general/{spec.donor}"
+        donor_item[5] = "AbilitySoul"
+        donor_item[12] = str(spec.element) if spec.element >= 0 else "0,3,2,1,4,5"
+        items[spec.donor] = leaf([donor_item])
+
         donor = [f"donor-{spec.id}-{index}" for index in range(16)]
         donor[0] = f"donor_{spec.donor}"
         donor[1] = f"供体 {spec.donor}"
@@ -334,10 +343,29 @@ class TestSourceAssets(unittest.TestCase):
             sources,
         )
 
+    def test_client_native_20px_sources_are_accepted(self):
+        for index, spec in enumerate(rewards.WEAPONS):
+            color = (
+                20 + (index * 37) % 220,
+                20 + (index * 67) % 220,
+                20 + (index * 97) % 220,
+                255,
+            )
+            write_rgba_fixture(
+                self.asset_dir / f"{spec.image_slug}.png",
+                color=color,
+                size=(20, 20),
+                visible_box=(1, 1, 19, 19),
+            )
+
+        sources = self.validate()
+
+        self.assertEqual(15, len(sources))
+
     def test_wrong_dimensions_are_rejected(self):
         spec = rewards.WEAPONS[0]
         write_rgba_fixture(
-            self.asset_dir / f"{spec.image_slug}.png", size=(1023, 1024)
+            self.asset_dir / f"{spec.image_slug}.png", size=(21, 20)
         )
 
         with self.assertRaises(ValueError):
@@ -345,7 +373,7 @@ class TestSourceAssets(unittest.TestCase):
 
     def test_rgb_without_alpha_is_rejected(self):
         spec = rewards.WEAPONS[0]
-        Image.new("RGB", (1024, 1024), (20, 40, 60)).save(
+        Image.new("RGB", (20, 20), (20, 40, 60)).save(
             self.asset_dir / f"{spec.image_slug}.png", format="PNG"
         )
 
@@ -372,15 +400,16 @@ class TestSourceAssets(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.validate()
 
-    def test_visible_bounds_require_at_least_24_pixels_on_every_edge(self):
+    def test_edge_touching_visible_bounds_match_official_atlas_contract(self):
         spec = rewards.WEAPONS[0]
         write_rgba_fixture(
             self.asset_dir / f"{spec.image_slug}.png",
-            visible_box=(23, 32, 992, 992),
+            visible_box=(0, 0, 20, 19),
         )
 
-        with self.assertRaises(ValueError):
-            self.validate()
+        sources = self.validate()
+
+        self.assertIn(spec.image_slug, sources)
 
     def test_duplicate_sha256_content_is_rejected(self):
         first, second = rewards.WEAPONS[:2]
@@ -1143,8 +1172,36 @@ class TestSoulGeneration(unittest.TestCase):
                     self.assertEqual(row[48], row[49])
                     self.assertFalse(row[3].startswith("unwanted-"))
 
+    def test_universal_effects_use_none_sentinel_for_unfiltered_party_target(self):
+        templates = fake_templates()
+
+        for spec in rewards.WEAPONS[-3:]:
+            with self.subTest(weapon=spec.id):
+                rows = core.read_csv_lines(rewards.build_soul_leaf(templates, spec))
+                self.assertEqual({"(None)"}, {row[46] for row in rows})
+
 
 class TestMasterChanges(unittest.TestCase):
+    def test_registers_same_id_ability_soul_items_for_every_weapon(self):
+        tables = fake_master_tables()
+
+        result = require_task2("build_master_changes")(tables)
+
+        for spec in rewards.WEAPONS:
+            with self.subTest(weapon=spec.id):
+                self.assertIn(spec.id, result.items)
+                donor = core.read_csv_lines(tables.items[spec.donor])[0]
+                actual = core.read_csv_lines(result.items[spec.id])[0]
+                expected = list(donor)
+                expected[0] = f"mod_abyss_{spec.id}"
+                expected[1] = spec.id
+                expected[2] = f"{spec.name}魂珠"
+                expected[3] = f"{rewards.IMAGE_PREFIX}/{spec.image_slug}"
+                expected[12] = (
+                    str(spec.element) if spec.element >= 0 else "0,3,2,1,4,5"
+                )
+                self.assertEqual(expected, actual)
+
     def test_first_run_materializes_exactly_fifteen_owned_rows_per_table(self):
         tables = fake_master_tables()
         result = require_task2("build_master_changes")(tables)
@@ -1188,6 +1245,20 @@ class TestMasterChanges(unittest.TestCase):
         foreign = [f"foreign-{index}" for index in range(16)]
         foreign[0] = "not_owned_by_abyss"
         tables.equipment[spec.id] = core.write_csv_lines([foreign])
+        before = copy.deepcopy(tables)
+
+        with self.assertRaisesRegex(ValueError, spec.id):
+            require_task2("build_master_changes")(tables)
+
+        self.assertEqual(before, tables)
+
+    def test_foreign_reserved_ability_soul_item_fails_without_mutation(self):
+        tables = fake_master_tables(placeholders=True)
+        spec = rewards.WEAPONS[0]
+        foreign = [f"foreign-item-{index}" for index in range(23)]
+        foreign[0] = "not_owned_by_abyss"
+        foreign[1] = spec.id
+        tables.items[spec.id] = core.write_csv_lines([foreign])
         before = copy.deepcopy(tables)
 
         with self.assertRaisesRegex(ValueError, spec.id):
