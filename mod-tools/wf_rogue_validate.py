@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import hashlib
 import importlib.util
 import json
@@ -47,9 +46,50 @@ apk_builder = _load_task7_builder()
 
 
 @dataclass(frozen=True)
+class ReleaseEntry:
+    logical: str
+    relative: str
+    sha256: str
+    size: int
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "logical": self.logical,
+            "relative": self.relative,
+            "sha256": self.sha256,
+            "size": self.size,
+        }
+
+
+@dataclass(frozen=True)
+class ReleaseSnapshot:
+    store: str
+    entries: tuple[ReleaseEntry, ...]
+    profile_id: str = "cn"
+
+    def logicals(self) -> list[str]:
+        return [entry.logical for entry in self.entries]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "schema_version": 1,
+            "profile_id": self.profile_id,
+            "store": self.store,
+            "entries": [entry.to_dict() for entry in self.entries],
+        }
+
+    def write(self, path: Path) -> None:
+        Path(path).write_text(
+            json.dumps(self.to_dict(), ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+
+@dataclass(frozen=True)
 class ValidationResult:
     errors: tuple[str, ...]
     descriptions: tuple[str, ...]
+    snapshot: ReleaseSnapshot | None = None
 
 
 def release_logicals() -> list[str]:
@@ -81,9 +121,10 @@ def validate_release(
     assets_dir = Path(assets_dir)
     report_path = Path(report_path)
     errors: list[str] = []
+    release_entries: list[ReleaseEntry] = []
 
     tables = {
-        logical: _load_table(store, logical, errors)
+        logical: _load_table(store, logical, errors, release_entries)
         for logical in release_logicals()[:6]
     }
     json_values: dict[str, Any] = {}
@@ -121,12 +162,27 @@ def validate_release(
         json_values.get("event_item_shop_id_map"),
         errors,
     )
-    _validate_pngs(store, assets_dir, errors)
+    _validate_pngs(store, assets_dir, errors, release_entries)
     _validate_client_verification(report_path, Path(ffdec), Path(java), errors)
+
+    expected_logicals = release_logicals()
+    actual_logicals = [entry.logical for entry in release_entries]
+    if actual_logicals != expected_logicals:
+        errors.append(
+            "release.snapshot.allowlist: "
+            f"expected={expected_logicals!r}, actual={actual_logicals!r}"
+        )
+    snapshot = None
+    if not errors:
+        snapshot = ReleaseSnapshot(
+            store=str(store.resolve()),
+            entries=tuple(release_entries),
+        )
 
     return ValidationResult(
         errors=tuple(errors),
         descriptions=tuple(descriptions),
+        snapshot=snapshot,
     )
 
 
@@ -137,7 +193,7 @@ def require_release_ready(
     *,
     ffdec: Path,
     java: Path,
-) -> None:
+) -> ReleaseSnapshot:
     """Raise when ``validate_release`` reports any release blocker."""
     result = validate_release(
         store,
@@ -151,6 +207,9 @@ def require_release_ready(
         raise RuntimeError(
             f"abyss release validation failed with {len(result.errors)} error(s)"
         )
+    if result.snapshot is None:
+        raise RuntimeError("abyss release validation did not produce a snapshot")
+    return result.snapshot
 
 
 def _print_result(result: ValidationResult) -> None:
@@ -192,14 +251,26 @@ def main() -> int:
 
 
 def _load_table(
-    store: Path, logical: str, errors: list[str],
+    store: Path,
+    logical: str,
+    errors: list[str],
+    release_entries: list[ReleaseEntry],
 ) -> dict[str, object] | None:
     path = store / q.hashed_rel(logical)
     if not path.is_file():
         errors.append(f"table.{logical}.missing: {path}")
         return None
     try:
-        table = q.load_table(logical, path=path)
+        raw = path.read_bytes()
+        release_entries.append(
+            ReleaseEntry(
+                logical=logical,
+                relative=q.hashed_rel(logical),
+                sha256=hashlib.sha256(raw).hexdigest(),
+                size=len(raw),
+            )
+        )
+        table = q.parse_node(raw)
     except Exception as exc:
         errors.append(
             f"table.{logical}.invalid: {type(exc).__name__}: {exc}"
@@ -665,6 +736,8 @@ def _validate_shop(
         if not isinstance(actual, dict):
             errors.append(f"shop.server[{shop_id}].nesting")
             continue
+        if not _strict_equal(actual, expected):
+            errors.append(f"shop.server[{shop_id}].record")
         if not _strict_equal(actual.get("costs"), expected["costs"]):
             errors.append(f"shop.server[{shop_id}].cost")
         if not _strict_equal(actual.get("stock"), expected["stock"]):
@@ -685,7 +758,12 @@ def _validate_shop(
                 errors.append(f"shop.id_map[{shop_id}].value")
 
 
-def _validate_pngs(store: Path, assets_dir: Path, errors: list[str]) -> None:
+def _validate_pngs(
+    store: Path,
+    assets_dir: Path,
+    errors: list[str],
+    release_entries: list[ReleaseEntry],
+) -> None:
     source_dir = assets_dir.parent / "mod-tools" / "assets" / "abyss-equipment"
     try:
         rewards.validate_source_assets(source_dir, rewards.WEAPONS)
@@ -703,6 +781,14 @@ def _validate_pngs(store: Path, assets_dir: Path, errors: list[str]) -> None:
             continue
         try:
             stored = destination.read_bytes()
+            release_entries.append(
+                ReleaseEntry(
+                    logical=logical,
+                    relative=q.hashed_rel(logical),
+                    sha256=hashlib.sha256(stored).hexdigest(),
+                    size=len(stored),
+                )
+            )
         except OSError as exc:
             errors.append(
                 f"png.store[{logical}].invalid: {type(exc).__name__}: {exc}"
@@ -730,7 +816,7 @@ def _validate_client_verification(
         return
     try:
         data = json.loads(report_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+    except Exception as exc:
         errors.append(
             f"client_verification.report.invalid: "
             f"{type(exc).__name__}: {exc}"
@@ -747,7 +833,7 @@ def _validate_client_verification(
 
     try:
         apk_builder.validate_verification_report(data)
-    except (OSError, UnicodeError, TypeError, ValueError, RuntimeError) as exc:
+    except Exception as exc:
         errors.append(
             f"client_verification.report.invalid: "
             f"{type(exc).__name__}: {exc}"
@@ -770,7 +856,7 @@ def _validate_client_verification(
         artifact_paths[name] = path
         try:
             artifact_mtime = path.stat().st_mtime_ns
-        except (OSError, ValueError):
+        except Exception:
             artifact_mtime = None
         if (
             report_mtime is not None
@@ -791,7 +877,7 @@ def _validate_client_verification(
             apk_builder.abyss_patch.verify_text(
                 reexported_text, require_markers=False
             )
-        except (OSError, UnicodeError, TypeError, ValueError, RuntimeError) as exc:
+        except Exception as exc:
             errors.append(
                 f"client_verification.reexport.semantic: "
                 f"{type(exc).__name__}: {exc}"
@@ -816,7 +902,7 @@ def _validate_client_verification(
                 return
             embedded_bytes = archive.read(matches[0])
             embedded_digest = hashlib.sha256(embedded_bytes).hexdigest()
-    except (OSError, KeyError, RuntimeError, zipfile.BadZipFile) as exc:
+    except Exception as exc:
         errors.append(
             f"client_verification.apk.invalid: "
             f"{type(exc).__name__}: {exc}"

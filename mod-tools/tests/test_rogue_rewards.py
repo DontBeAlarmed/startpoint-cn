@@ -50,6 +50,21 @@ TASK2_API = (
 )
 MISSING_TASK2_API = tuple(name for name in TASK2_API if not hasattr(rewards, name))
 
+
+def fake_release_snapshot(store: Path) -> validator.ReleaseSnapshot:
+    return validator.ReleaseSnapshot(
+        store=str(store.resolve()),
+        entries=tuple(
+            validator.ReleaseEntry(
+                logical=logical,
+                relative=rewards.q.hashed_rel(logical),
+                sha256="0" * 64,
+                size=0,
+            )
+            for logical in validator.release_logicals()
+        ),
+    )
+
 TASK3_API = (
     "validate_source_assets",
     "install_source_assets",
@@ -683,6 +698,16 @@ class TestCnProfilePreflight(unittest.TestCase):
                 )
                 for spec in rewards.WEAPONS
             }
+            snapshot = fake_release_snapshot(profile.store)
+            published_manifest: dict[str, object] = {}
+
+            def publish_snapshot(command, **_kwargs):
+                manifest_path = Path(command[command.index("--snapshot") + 1])
+                published_manifest.update(
+                    json.loads(manifest_path.read_text(encoding="utf-8"))
+                )
+                return mock.Mock(returncode=0)
+
             with (
                 mock.patch.object(rewards, "require_cn_profile", return_value=profile),
                 mock.patch.object(rewards.q, "load_table", side_effect=load_table),
@@ -699,11 +724,15 @@ class TestCnProfilePreflight(unittest.TestCase):
                 ),
                 mock.patch.object(rewards, "_print_asset_validation"),
                 mock.patch.object(rewards, "_print_plan"),
-                mock.patch.object(validator, "require_release_ready"),
+                mock.patch.object(
+                    validator,
+                    "require_release_ready",
+                    return_value=snapshot,
+                ),
                 mock.patch.object(
                     rewards.subprocess,
                     "run",
-                    return_value=mock.Mock(returncode=0),
+                    side_effect=publish_snapshot,
                 ) as publish,
                 mock.patch.object(
                     sys,
@@ -736,6 +765,11 @@ class TestCnProfilePreflight(unittest.TestCase):
             f"PUBLISHED_ASSET_PATHS={len(published_assets)}",
         )
         self.assertEqual(set(), missing_assets, f"missing={sorted(missing_assets)}")
+        self.assertEqual(1, published_manifest["schema_version"])
+        self.assertEqual(
+            validator.release_logicals(),
+            [entry["logical"] for entry in published_manifest["entries"]],
+        )
 
 
 class TestReleaseGate(unittest.TestCase):
@@ -852,6 +886,8 @@ class TestReleaseGate(unittest.TestCase):
             spec.image_slug: Path(f"{spec.image_slug}.png")
             for spec in rewards.WEAPONS
         }
+        snapshot = fake_release_snapshot(profile.store)
+        published_manifest: dict[str, object] = {}
 
         def install(*_args):
             events.append("install_pngs")
@@ -861,11 +897,16 @@ class TestReleaseGate(unittest.TestCase):
             events.append("release_gate")
             if gate_error is not None:
                 raise gate_error
+            return snapshot
 
-        def publish(*_args, **_kwargs):
+        def publish(command, **_kwargs):
             events.append("publisher")
             if publisher_error is not None:
                 raise publisher_error
+            manifest_path = Path(command[command.index("--snapshot") + 1])
+            published_manifest.update(
+                json.loads(manifest_path.read_text(encoding="utf-8"))
+            )
             return mock.Mock(returncode=0)
 
         with (
@@ -898,10 +939,26 @@ class TestReleaseGate(unittest.TestCase):
         ):
             result = rewards.main()
 
-        return result, events, profile, preflight, gate_mock, publish_mock
+        return (
+            result,
+            events,
+            profile,
+            preflight,
+            gate_mock,
+            publish_mock,
+            published_manifest,
+        )
 
     def test_release_validation_failure_never_invokes_publisher(self):
-        result, events, _profile, preflight, gate, publish = self._run_write_publish(
+        (
+            result,
+            events,
+            _profile,
+            preflight,
+            gate,
+            publish,
+            _manifest,
+        ) = self._run_write_publish(
             gate_error=RuntimeError("invalid release")
         )
 
@@ -913,7 +970,15 @@ class TestReleaseGate(unittest.TestCase):
         self.assertGreater(events.index("release_gate"), events.index("install_pngs"))
 
     def test_valid_release_invokes_publisher_once_with_exact_allowlist_and_check(self):
-        result, events, profile, preflight, gate, publish = self._run_write_publish()
+        (
+            result,
+            events,
+            profile,
+            preflight,
+            gate,
+            publish,
+            manifest,
+        ) = self._run_write_publish()
 
         self.assertEqual(0, result)
         self.assertEqual(2, preflight.call_count)
@@ -924,24 +989,40 @@ class TestReleaseGate(unittest.TestCase):
             ffdec=Path("client-ffdec.jar"),
             java=Path("client-java.exe"),
         )
-        expected_command = [
-            sys.executable,
-            str(Path(rewards.ROOT) / "mod-tools" / "wf_publish.py"),
-            "--tables",
-            ",".join(validator.release_logicals()),
-        ]
-        publish.assert_called_once_with(
-            expected_command,
-            cwd=rewards.ROOT,
-            check=True,
+        publish.assert_called_once()
+        command = publish.call_args.args[0]
+        self.assertEqual(
+            [
+                sys.executable,
+                str(Path(rewards.ROOT) / "mod-tools" / "wf_publish.py"),
+                "--tables",
+                ",".join(validator.release_logicals()),
+            ],
+            command[:4],
+        )
+        self.assertEqual("--snapshot", command[4])
+        self.assertEqual(rewards.ROOT, publish.call_args.kwargs["cwd"])
+        self.assertIs(True, publish.call_args.kwargs["check"])
+        self.assertEqual(1, manifest["schema_version"])
+        self.assertEqual(
+            validator.release_logicals(),
+            [entry["logical"] for entry in manifest["entries"]],
         )
         self.assertEqual("release_gate", events[-2])
         self.assertEqual("publisher", events[-1])
-        self.assertNotIn("pending", " ".join(expected_command).lower())
+        self.assertNotIn("pending", " ".join(command).lower())
 
     def test_publisher_nonzero_exit_is_propagated(self):
         failure = subprocess.CalledProcessError(9, ["wf_publish.py"])
-        result, events, _profile, _preflight, gate, publish = self._run_write_publish(
+        (
+            result,
+            events,
+            _profile,
+            _preflight,
+            gate,
+            publish,
+            _manifest,
+        ) = self._run_write_publish(
             publisher_error=failure
         )
 

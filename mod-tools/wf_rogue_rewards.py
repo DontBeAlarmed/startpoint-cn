@@ -20,6 +20,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -759,7 +760,7 @@ def main() -> int:
         return 1
 
     try:
-        require_release_ready(
+        release_snapshot = require_release_ready(
             publish_profile.store,
             Path(ROOT) / "assets",
             Path(args.client_verification),
@@ -770,14 +771,19 @@ def main() -> int:
         print(f"[ERR] 发布门禁失败,禁止调用发布器: {exc}", file=sys.stderr)
         return 1
 
-    command = [
-        sys.executable,
-        str(Path(ROOT) / "mod-tools" / "wf_publish.py"),
-        "--tables",
-        publish_tables,
-    ]
     try:
-        subprocess.run(command, cwd=ROOT, check=True)
+        with tempfile.TemporaryDirectory(prefix="wf-abyss-release-snapshot-") as temp:
+            snapshot_path = Path(temp) / "release-snapshot.json"
+            release_snapshot.write(snapshot_path)
+            command = [
+                sys.executable,
+                str(Path(ROOT) / "mod-tools" / "wf_publish.py"),
+                "--tables",
+                publish_tables,
+                "--snapshot",
+                str(snapshot_path),
+            ]
+            subprocess.run(command, cwd=ROOT, check=True)
     except subprocess.CalledProcessError as exc:
         code = exc.returncode if exc.returncode else 1
         print(f"[ERR] wf_publish 退出码 {code}", file=sys.stderr)

@@ -414,6 +414,7 @@ class TestValidatorSurface(unittest.TestCase):
 
     def test_validator_api_is_present(self):
         self.assertTrue(hasattr(validate, "ValidationResult"))
+        self.assertTrue(hasattr(validate, "ReleaseSnapshot"))
         self.assertTrue(hasattr(validate, "validate_release"))
         self.assertTrue(hasattr(validate, "require_release_ready"))
 
@@ -424,9 +425,41 @@ class TestCompleteRelease(CompleteFixtureCase):
 
         self.assertEqual((), result.errors)
         self.assertEqual(15, len(result.descriptions))
+        self.assertIsNotNone(result.snapshot)
+        self.assertEqual(
+            validate.release_logicals(),
+            [entry.logical for entry in result.snapshot.entries],
+        )
+        self.assertEqual(21, len(result.snapshot.entries))
+        self.assertEqual(str(self.store.resolve()), result.snapshot.store)
+        self.assertEqual("cn", result.snapshot.profile_id)
+        for entry in result.snapshot.entries:
+            path = self.store / entry.relative
+            payload = path.read_bytes()
+            self.assertEqual(len(payload), entry.size)
+            self.assertEqual(hashlib.sha256(payload).hexdigest(), entry.sha256)
         for spec, description in zip(rewards.WEAPONS, result.descriptions):
             self.assertIn(spec.id, description)
             self.assertNotIn("<unavailable>", description.lower())
+
+    def test_require_release_ready_returns_the_validated_snapshot(self):
+        with mock.patch.object(
+            validate.apk_builder,
+            "export_verified_class",
+            side_effect=lambda _swf, export_dir, _ffdec, _java: _write_fake_export(
+                Path(export_dir)
+            ),
+        ):
+            snapshot = validate.require_release_ready(
+                self.store,
+                self.assets_dir,
+                self.report_path,
+                ffdec=self.ffdec,
+                java=self.java,
+            )
+
+        self.assertEqual(21, len(snapshot.entries))
+        self.assertEqual(validate.release_logicals(), snapshot.logicals())
 
     def test_require_release_ready_raises_with_every_collected_error(self):
         equipment = _read_table(self.store, rewards.EQUIP_T)
@@ -851,6 +884,17 @@ class TestShopBoundaries(CompleteFixtureCase):
 
         self.assert_error(result, f"shop.server[{shop_id}].reward")
 
+    def test_extra_owned_server_shop_field_is_named(self):
+        server_path = self.assets_dir / shop.SHOP_JSON
+        server = json.loads(server_path.read_text(encoding="utf-8"))
+        shop_id = shop.RESERVED_SHOP_IDS[0]
+        server[shop.EVENT_TYPE][shop.EVENT_ID][shop_id]["foreign"] = "not-owned"
+        _write_json(server_path, server)
+
+        result = self.validate()
+
+        self.assert_error(result, f"shop.server[{shop_id}].record")
+
 
 class TestClientVerificationBoundaries(CompleteFixtureCase):
     def load_report(self) -> dict[str, object]:
@@ -869,6 +913,17 @@ class TestClientVerificationBoundaries(CompleteFixtureCase):
         result = self.validate()
 
         self.assert_error(result, "client_verification.report.invalid")
+
+    def test_report_integer_digit_limit_is_collected_without_exception_escape(self):
+        self.report_path.write_text(
+            '{"schema_version":' + ("9" * 5000) + "}",
+            encoding="utf-8",
+        )
+
+        result = self.validate()
+
+        self.assert_error(result, "client_verification.report.invalid")
+        self.assertEqual(15, len(result.descriptions))
 
     def test_nul_artifact_path_is_named_without_exception_escape(self):
         report = self.load_report()
