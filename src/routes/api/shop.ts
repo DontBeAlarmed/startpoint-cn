@@ -1,6 +1,7 @@
 // Handles the insertion of mana into characters.
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { getDb } from "../../data/db";
 import { addPlayerShopPurchaseSync, getPlayerShopPurchaseCountSync, getPlayerShopPurchasesMapSync } from "../../data/domains/shopPurchase"
 import { getAccountPlayers } from "../../data/domains/account"
 import { getPlayerEquipmentSync, playerOwnsEquipmentSync, updatePlayerEquipmentSync } from "../../data/domains/equipment"
@@ -123,6 +124,14 @@ interface BuyBody {
     number: number,
     viewer_id: number
 }
+
+interface BulkBuyBody {
+    shop_type: number
+    buy_item_list: Record<string, number>
+    viewer_id: number
+}
+
+class BulkBuyValidationError extends Error {}
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/buy", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -598,18 +607,234 @@ const routes = async (fastify: FastifyInstance) => {
         })
     })
 
-    // bulk_buy — stub, returns empty (TODO: implement multi-item purchase)
+    // The client sends one shop type plus a map of shop_item_id -> quantity.
+    // Keep the complete selection in one transaction because HTTP 200 makes
+    // the client immediately update its local stock counters.
     fastify.post("/bulk_buy", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as any
+        const body = request.body as BulkBuyBody
         const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+        const shopType = body.shop_type
+        const rawBuyItemList = body.buy_item_list
+        if (!Number.isSafeInteger(viewerId) || viewerId <= 0
+            || !Number.isSafeInteger(shopType)
+            || rawBuyItemList === null
+            || typeof rawBuyItemList !== "object"
+            || Array.isArray(rawBuyItemList)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         })
-        reply.header("content-type", "application/x-msgpack")
-        return reply.status(200).send({
-            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {}
+
+        const purchases = Object.entries(rawBuyItemList).map(([rawShopItemId, rawCount]) => ({
+            shopItemId: Number(rawShopItemId),
+            count: Number(rawCount)
+        }))
+        if (purchases.length === 0 || purchases.some(({ shopItemId, count }) =>
+            !Number.isSafeInteger(shopItemId) || shopItemId <= 0
+            || !Number.isSafeInteger(count) || count <= 0
+        )) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid buy item list."
         })
+
+        const viewerIdSession = await getSession(viewerId.toString())
+        if (!viewerIdSession) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid viewer id."
+        })
+
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)
+        if (playerId === null) return reply.status(500).send({
+            "error": "Internal Server Error", "message": "No players bound to account."
+        })
+
+        const player = getPlayerSync(playerId)
+        if (player === null) return reply.status(500).send({
+            "error": "Internal Server Error", "message": "Player not found."
+        })
+
+        try {
+            const result = getDb().transaction(() => {
+                let freeVmoney = player.freeVmoney
+                let freeMana = player.freeMana
+                let bondTokens = player.bondToken
+                const itemList = new Map<number, number>()
+                const rewards: Reward[] = []
+                const now = getServerDate()
+
+                for (const { shopItemId, count } of purchases) {
+                    const shopItemData = getShopItemSync(shopType, shopItemId)
+                    if (shopItemData === null) {
+                        throw new BulkBuyValidationError(`Shop item with id ${shopItemId} does not exist.`)
+                    }
+
+                    if (shopItemData.availableFrom) {
+                        const availableFrom = new Date(shopItemData.availableFrom.replace(" ", "T") + "Z")
+                        if (availableFrom > now) {
+                            throw new BulkBuyValidationError(`Shop item with id ${shopItemId} is not currently available.`)
+                        }
+                    }
+                    if (shopItemData.availableUntil) {
+                        const availableUntil = new Date(shopItemData.availableUntil.replace(" ", "T") + "Z")
+                        if (availableUntil < now) {
+                            throw new BulkBuyValidationError(`Shop item with id ${shopItemId} is not currently available.`)
+                        }
+                    }
+
+                    if (shopItemData.stock !== undefined && shopItemData.stock > 0) {
+                        const purchased = getPlayerShopPurchaseCountSync(playerId, shopItemId)
+                        if (purchased + count > shopItemData.stock) {
+                            throw new BulkBuyValidationError(`Shop item with id ${shopItemId} purchase limit reached.`)
+                        }
+                    }
+
+                    const userCost = shopItemData.userCost
+                    if (userCost !== undefined) {
+                        const totalCost = userCost.amount * count
+                        if (!Number.isSafeInteger(totalCost)) {
+                            throw new BulkBuyValidationError(`Invalid user cost for shop item ${shopItemId}.`)
+                        }
+                        switch (userCost.type) {
+                            case ShopItemUserCostType.MANA:
+                                freeMana -= totalCost
+                                if (freeMana < 0) throw new BulkBuyValidationError("Not enough mana to purchase shop items.")
+                                break
+                            case ShopItemUserCostType.BEADS:
+                                freeVmoney -= totalCost
+                                if (freeVmoney < 0) throw new BulkBuyValidationError("Not enough beads to purchase shop items.")
+                                break
+                            case ShopItemUserCostType.AMITY_SCROLL:
+                                bondTokens -= totalCost
+                                if (bondTokens < 0) throw new BulkBuyValidationError("Not enough amity scrolls to purchase shop items.")
+                                break
+                        }
+                    }
+
+                    for (const cost of shopItemData.costs) {
+                        const totalCost = cost.amount * count
+                        if (!Number.isSafeInteger(totalCost)) {
+                            throw new BulkBuyValidationError(`Invalid item cost for shop item ${shopItemId}.`)
+                        }
+                        const currentAmount = itemList.has(cost.id)
+                            ? itemList.get(cost.id)!
+                            : (getPlayerItemSync(playerId, cost.id) ?? 0)
+                        const newAmount = currentAmount - totalCost
+                        if (newAmount < 0) {
+                            throw new BulkBuyValidationError(`Not enough of item with id ${cost.id} to purchase shop items.`)
+                        }
+                        itemList.set(cost.id, newAmount)
+                    }
+
+                    for (const reward of shopItemData.rewards) {
+                        switch (reward.type) {
+                            case ShopItemRewardType.ITEM: {
+                                const shopReward = reward as EquipmentItemShopItemReward
+                                rewards.push({
+                                    name: "",
+                                    type: RewardType.ITEM,
+                                    id: shopReward.id,
+                                    count: shopReward.count * count
+                                } as EquipmentItemReward)
+                                break
+                            }
+                            case ShopItemRewardType.EXP: {
+                                const shopReward = reward as CurrencyShopItemReward
+                                rewards.push({
+                                    name: "",
+                                    type: RewardType.EXP,
+                                    count: shopReward.count * count
+                                } as CurrencyReward)
+                                break
+                            }
+                            case ShopItemRewardType.MANA: {
+                                const shopReward = reward as CurrencyShopItemReward
+                                rewards.push({
+                                    name: "",
+                                    type: RewardType.MANA,
+                                    count: shopReward.count * count
+                                } as CurrencyReward)
+                                break
+                            }
+                            case ShopItemRewardType.CHARACTER: {
+                                const shopReward = reward as CharacterShopItemReward
+                                for (let i = 0; i < count; i++) {
+                                    rewards.push({
+                                        name: "",
+                                        type: RewardType.CHARACTER,
+                                        id: shopReward.id
+                                    } as CharacterReward)
+                                }
+                                break
+                            }
+                            case ShopItemRewardType.EQUIPMENT: {
+                                const shopReward = reward as EquipmentItemShopItemReward
+                                rewards.push({
+                                    name: "",
+                                    type: RewardType.EQUIPMENT,
+                                    id: shopReward.id,
+                                    count: shopReward.count * count
+                                } as EquipmentItemReward)
+                                break
+                            }
+                        }
+                    }
+                }
+
+                for (const [itemId, amount] of itemList) {
+                    updatePlayerItemSync(playerId, itemId, amount)
+                }
+                updatePlayerSync({
+                    id: playerId,
+                    freeMana,
+                    freeVmoney,
+                    bondToken: bondTokens
+                })
+
+                const rewardResult = givePlayerRewardsSync(playerId, rewards)
+                for (const { shopItemId, count } of purchases) {
+                    for (let i = 0; i < count; i++) {
+                        addPlayerShopPurchaseSync(playerId, shopItemId)
+                    }
+                }
+
+                return {
+                    freeMana,
+                    freeVmoney,
+                    bondTokens,
+                    itemList: Object.fromEntries(itemList),
+                    rewardResult
+                }
+            })()
+
+            const totalPurchaseCount = purchases.reduce((sum, purchase) => sum + purchase.count, 0)
+            console.log(`[shop:bulk_buy] player=${playerId} shopType=${shopType} itemKinds=${purchases.length} units=${totalPurchaseCount}`)
+
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+                "data": {
+                    "user_info": {
+                        "free_vmoney": result.freeVmoney + (result.rewardResult?.user_info.free_vmoney ?? 0),
+                        "free_mana": result.freeMana + (result.rewardResult?.user_info.free_mana ?? 0),
+                        "bond_token": result.bondTokens,
+                        "exp_pool": player.expPool + (result.rewardResult?.user_info.exp_pool ?? 0)
+                    },
+                    "character_list": result.rewardResult?.character_list ?? [],
+                    "equipment_list": result.rewardResult?.equipment_list ?? [],
+                    "item_list": {
+                        ...result.itemList,
+                        ...(result.rewardResult?.items ?? {})
+                    },
+                    "mail_arrived": false
+                }
+            })
+        } catch (error) {
+            if (error instanceof BulkBuyValidationError) {
+                return reply.status(400).send({
+                    "error": "Bad Request", "message": error.message
+                })
+            }
+            console.error("[shop:bulk_buy] transaction failed", error)
+            return reply.status(500).send({
+                "error": "Internal Server Error", "message": "Bulk purchase failed."
+            })
+        }
     })
 
     // get_campaign_lineup_id — stub
