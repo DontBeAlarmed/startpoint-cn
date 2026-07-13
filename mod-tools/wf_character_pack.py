@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
@@ -39,6 +40,7 @@ FORBIDDEN_ASSET_SEGMENTS = frozenset({
     "story", "words", "login", "expression", "expressions",
 })
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+FILESYSTEM_ERRORS = (OSError, RuntimeError, ValueError)
 
 
 @dataclass(frozen=True)
@@ -49,9 +51,26 @@ class PackFile:
     size: int
 
 
+def _reject_json_constant(value: str):
+    raise ValueError(f"non-JSON constant {value}")
+
+
+def _reject_duplicate_object_keys(pairs: list[tuple[str, object]]) -> dict:
+    result: dict = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key {key!r}")
+        result[key] = value
+    return result
+
+
 def load_manifest(path: Path) -> dict:
     """Load a UTF-8 JSON manifest without touching any package or live root."""
-    manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest = json.loads(
+        path.read_text(encoding="utf-8"),
+        parse_constant=_reject_json_constant,
+        object_pairs_hook=_reject_duplicate_object_keys,
+    )
     if not isinstance(manifest, dict):
         raise ValueError("character-pack manifest must be a JSON object")
     return manifest
@@ -69,7 +88,8 @@ def canonical_manifest_bytes(manifest: dict) -> bytes:
 
 
 def _path_problem(logical_path: str) -> str | None:
-    if logical_path.startswith("/") or PureWindowsPath(logical_path).is_absolute():
+    windows_path = PureWindowsPath(logical_path)
+    if logical_path.startswith("/") or windows_path.is_absolute() or windows_path.drive:
         return "must be relative"
     if "\\" in logical_path:
         return "must use forward slashes"
@@ -89,6 +109,14 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _resolve_for_validation(path: Path, field: str, errors: list[str]) -> Path | None:
+    try:
+        return path.resolve()
+    except FILESYSTEM_ERRORS:
+        errors.append(f"{field}: cannot resolve path")
+        return None
+
+
 def _validate_string_field(manifest: dict, field: str, errors: list[str]) -> None:
     if field not in manifest:
         return
@@ -97,12 +125,61 @@ def _validate_string_field(manifest: dict, field: str, errors: list[str]) -> Non
         errors.append(f"{field}: must be a non-empty string")
 
 
+def _json_value_errors(value: object, path: str = "$",
+                       ancestors: set[int] | None = None) -> list[str]:
+    """Reject values that canonical JSON cannot represent deterministically."""
+    errors: list[str] = []
+    ancestors = set() if ancestors is None else ancestors
+    value_type = type(value)
+    if value is None or value_type in (bool, int):
+        return errors
+    if value_type is str:
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError:
+            errors.append(f"{path}: string is not valid UTF-8")
+        return errors
+    if value_type is float:
+        if not math.isfinite(value):
+            errors.append(f"{path}: non-finite number is not a JSON value")
+        return errors
+    if value_type not in (list, dict):
+        errors.append(f"{path}: not a JSON value ({value_type.__name__})")
+        return errors
+
+    marker = id(value)
+    if marker in ancestors:
+        errors.append(f"{path}: circular reference is not a JSON value")
+        return errors
+    ancestors.add(marker)
+    try:
+        if value_type is list:
+            for index, item in enumerate(value):
+                errors.extend(_json_value_errors(item, f"{path}[{index}]", ancestors))
+        else:
+            for key, item in value.items():
+                if type(key) is not str:
+                    errors.append(f"{path}: object key must be a string")
+                    continue
+                try:
+                    key.encode("utf-8")
+                except UnicodeEncodeError:
+                    errors.append(f"{path}: object key is not valid UTF-8")
+                    continue
+                errors.extend(_json_value_errors(item, f"{path}.{key}", ancestors))
+    finally:
+        ancestors.remove(marker)
+    return errors
+
+
 def validate_manifest(manifest: dict, package_dir: Path) -> list[str]:
     """Return every deterministic contract error without mutating any input/root."""
     if not isinstance(manifest, dict):
         return ["manifest: must be an object"]
 
-    errors: list[str] = []
+    errors = _json_value_errors(manifest)
+    if errors:
+        return sorted(errors)
     for field in sorted(REQUIRED_TOP_LEVEL - set(manifest)):
         errors.append(f"{field} is required")
     for field in sorted(set(manifest) - REQUIRED_TOP_LEVEL):
@@ -160,7 +237,17 @@ def validate_manifest(manifest: dict, package_dir: Path) -> list[str]:
         errors.append(f"roots: unexpected root {root}")
 
     seen_paths: dict[str, str] = {}
-    package_dir = Path(package_dir)
+    package_anchor = _resolve_for_validation(Path(package_dir), "package_dir", errors)
+    roots_anchor: Path | None = None
+    if package_anchor is not None:
+        roots_anchor = _resolve_for_validation(package_anchor / "roots", "roots", errors)
+        if roots_anchor is not None:
+            try:
+                roots_anchor.relative_to(package_anchor)
+            except ValueError:
+                errors.append("roots: resolves outside package_dir")
+                roots_anchor = None
+
     for root in ROOT_NAMES:
         entries = roots.get(root)
         if entries is None:
@@ -168,7 +255,17 @@ def validate_manifest(manifest: dict, package_dir: Path) -> list[str]:
         if not isinstance(entries, list):
             errors.append(f"roots.{root}: must be an array")
             continue
-        root_dir = (package_dir / "roots" / root).resolve()
+        root_dir: Path | None = None
+        if roots_anchor is not None:
+            root_dir = _resolve_for_validation(
+                roots_anchor / root, f"roots.{root}", errors
+            )
+            if root_dir is not None:
+                try:
+                    root_dir.relative_to(roots_anchor)
+                except ValueError:
+                    errors.append(f"roots.{root}: resolves outside package roots")
+                    root_dir = None
         for index, entry in enumerate(entries):
             prefix = f"roots.{root}[{index}]"
             if not isinstance(entry, dict):
@@ -219,27 +316,49 @@ def validate_manifest(manifest: dict, package_dir: Path) -> list[str]:
             if "size" in entry and not size_valid:
                 errors.append(f"{prefix}.size: must be a non-negative integer")
 
-            if not path_valid:
+            if not path_valid or root_dir is None:
                 continue
-            candidate = (root_dir.joinpath(*path_segments)).resolve()
+            candidate = _resolve_for_validation(
+                root_dir.joinpath(*path_segments), f"{prefix}.logical_path", errors
+            )
+            if candidate is None:
+                continue
             try:
                 candidate.relative_to(root_dir)
             except ValueError:
-                errors.append(f"{prefix}.logical_path: resolves outside package root")
+                errors.append(f"{prefix}.logical_path: resolves outside declared root")
                 continue
-            if not candidate.is_file():
+            try:
+                is_file = candidate.is_file()
+            except FILESYSTEM_ERRORS:
+                errors.append(f"{prefix}: cannot inspect file")
+                continue
+            if not is_file:
                 errors.append(f"{prefix}: file does not exist: {logical_path}")
                 continue
-            actual_size = candidate.stat().st_size
+            try:
+                actual_size = candidate.stat().st_size
+            except FILESYSTEM_ERRORS:
+                errors.append(f"{prefix}.size: cannot inspect file size")
+                continue
             if size_valid and actual_size != size:
                 errors.append(
                     f"{prefix}: size mismatch: expected {size}, got {actual_size}"
                 )
             if sha_valid:
-                actual_sha256 = _sha256_file(candidate)
+                try:
+                    actual_sha256 = _sha256_file(candidate)
+                except FILESYSTEM_ERRORS:
+                    errors.append(f"{prefix}.sha256: cannot hash file")
+                    continue
                 if actual_sha256 != sha256:
                     errors.append(
                         f"{prefix}: sha256 mismatch: expected {sha256}, got {actual_sha256}"
                     )
 
+    if not errors:
+        try:
+            canonical_manifest_bytes(manifest)
+        except (TypeError, ValueError, OverflowError, RecursionError, UnicodeError):
+            errors.append("manifest: cannot be canonicalized as deterministic JSON")
     return sorted(errors)

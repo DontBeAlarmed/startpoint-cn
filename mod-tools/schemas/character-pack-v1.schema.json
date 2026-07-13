@@ -4,6 +4,31 @@
   "title": "World Flipper CN character package manifest v1",
   "type": "object",
   "additionalProperties": false,
+  "$defs": {
+    "logicalPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*//)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*(?:^|/)(?:[sS][tT][oO][rR][yY]|[wW][oO][rR][dD][sS]|[lL][oO][gG][iI][nN]|[eE][xX][pP][rR][eE][sS][sS][iI][oO][nN][sS]?)(?:/|$))[^/]+(?:/[^/]+)*$"
+    },
+    "fileEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["logical_path", "sha256", "size"],
+      "properties": {
+        "logical_path": {
+          "$ref": "#/$defs/logicalPath"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
   "required": [
     "schema_version",
     "package_id",
@@ -60,93 +85,25 @@
         "common": {
           "type": "array",
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["logical_path", "sha256", "size"],
-            "properties": {
-              "logical_path": {
-                "type": "string",
-                "minLength": 1,
-                "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*//)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$)).+$"
-              },
-              "sha256": {
-                "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
-              },
-              "size": {
-                "type": "integer",
-                "minimum": 0
-              }
-            }
+            "$ref": "#/$defs/fileEntry"
           }
         },
         "medium": {
           "type": "array",
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["logical_path", "sha256", "size"],
-            "properties": {
-              "logical_path": {
-                "type": "string",
-                "minLength": 1,
-                "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*//)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$)).+$"
-              },
-              "sha256": {
-                "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
-              },
-              "size": {
-                "type": "integer",
-                "minimum": 0
-              }
-            }
+            "$ref": "#/$defs/fileEntry"
           }
         },
         "android": {
           "type": "array",
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["logical_path", "sha256", "size"],
-            "properties": {
-              "logical_path": {
-                "type": "string",
-                "minLength": 1,
-                "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*//)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$)).+$"
-              },
-              "sha256": {
-                "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
-              },
-              "size": {
-                "type": "integer",
-                "minimum": 0
-              }
-            }
+            "$ref": "#/$defs/fileEntry"
           }
         },
         "server": {
           "type": "array",
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["logical_path", "sha256", "size"],
-            "properties": {
-              "logical_path": {
-                "type": "string",
-                "minLength": 1,
-                "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*//)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$)).+$"
-              },
-              "sha256": {
-                "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
-              },
-              "size": {
-                "type": "integer",
-                "minimum": 0
-              }
-            }
+            "$ref": "#/$defs/fileEntry"
           }
         }
       }
