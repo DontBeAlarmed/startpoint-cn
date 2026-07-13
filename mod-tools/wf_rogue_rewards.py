@@ -24,13 +24,18 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "mod-tools"))
 import wf_quest_lib as q          # noqa: E402
 import wf_mod_tool as core        # noqa: E402
+import wf_describe                # noqa: E402
 
 ITEM_T = "master/item/item.orderedmap"
 EQUIP_T = "master/item/equipment.orderedmap"
+EQUIP_STATUS_T = "master/item/equipment_status.orderedmap"
 SOUL_T = "master/ability/ability_soul.orderedmap"
+RUSH_EVENT_T = "master/quest/event/rush_event.orderedmap"
 
 TOKEN_ID = "2370099"
 TOKEN_TEMPLATE = "2370007"     # 激战代币
+EVENT_ID = "700099"
+TOKEN_DESCRIPTION = "在「深渊连战」中获得的深渊结晶。凝聚着历战boss的力量,可用于锻造深渊武装。"
 
 MODE_DESCRIPTION = "【测试版·连战专属】仅在深渊连战、宝物域连战 2001 与木桩假人生效。"
 IMAGE_PREFIX = "item/equipment/mod/abyss"
@@ -52,6 +57,33 @@ class WeaponSpec:
     group: str
     image_slug: str
     effects: tuple[EffectSpec, ...]
+
+
+@dataclass(frozen=True)
+class MasterTables:
+    items: dict[str, object]
+    equipment: dict[str, object]
+    equipment_status: dict[str, object]
+    ability_soul: dict[str, object]
+    rush_event: dict[str, object]
+
+
+@dataclass(frozen=True)
+class MasterChanges:
+    items: dict[str, object]
+    equipment: dict[str, object]
+    equipment_status: dict[str, object]
+    ability_soul: dict[str, object]
+    rush_event: dict[str, object]
+
+
+@dataclass(frozen=True)
+class ServerMirrors:
+    equipment_max_level: dict[str, object]
+    equipment_element: dict[str, object]
+    equipment_lookup: dict[str, object]
+    equipment_ids: list[int]
+    item_ids: list[int]
 
 
 WEAPONS: tuple[WeaponSpec, ...] = (
@@ -179,6 +211,161 @@ def build_equipment_status(status_table: dict[str, object], spec: WeaponSpec):
     return copy.deepcopy(status_table[spec.donor])
 
 
+def _require_leaf(value: object, label: str) -> bytes | str:
+    if not isinstance(value, (bytes, str)):
+        raise ValueError(f"{label} 必须是 CSV 叶子,得到 {type(value).__name__}")
+    return value
+
+
+def assert_reserved_ownership(equipment: dict[str, object]) -> None:
+    """拒绝覆盖未带精确深渊所有权标记的保留装备 ID。"""
+    for spec in WEAPONS:
+        if spec.id not in equipment:
+            continue
+        leaf = _require_leaf(equipment[spec.id], f"equipment[{spec.id}]")
+        try:
+            rows = core.read_csv_lines(_leaf_text(leaf))
+        except Exception as exc:
+            raise ValueError(f"保留装备 ID {spec.id} 的行无法解析") from exc
+        marker = f"mod_abyss_{spec.id}"
+        if len(rows) != 1 or not rows[0] or rows[0][0] != marker:
+            actual = rows[0][0] if rows and rows[0] else "<missing>"
+            raise ValueError(
+                f"保留装备 ID {spec.id} 已被未知数据占用: c0={actual!r}, "
+                f"期望 {marker!r}"
+            )
+
+
+def patch_rush_token(leaf: bytes | str) -> bytes | str:
+    """只把 Rush Event 行的 c10 改为深渊代币,并保留叶子类型。"""
+    rows = core.read_csv_lines(_leaf_text(leaf))
+    if len(rows) != 1 or len(rows[0]) <= 10:
+        raise ValueError(f"rush_event[{EVENT_ID}] 必须是至少 11 列的单行 CSV")
+    rows[0][10] = TOKEN_ID
+    return _join_like(rows, leaf)
+
+
+def build_master_changes(tables: MasterTables) -> MasterChanges:
+    """纯内存构建五张客户端表;所有占用与依赖在修改副本前完成校验。"""
+    assert_reserved_ownership(tables.equipment)
+
+    for spec in WEAPONS:
+        has_owner = spec.id in tables.equipment
+        if not has_owner and (
+            spec.id in tables.equipment_status or spec.id in tables.ability_soul
+        ):
+            raise ValueError(f"保留 ID {spec.id} 存在孤立 soul/status,但没有所有权装备行")
+        if spec.donor not in tables.equipment:
+            raise ValueError(f"缺少装备供体 {spec.donor}")
+        if spec.donor not in tables.equipment_status:
+            raise ValueError(f"缺少装备状态供体 {spec.donor}")
+        missing_templates = [
+            effect.template_id for effect in spec.effects
+            if effect.template_id not in tables.ability_soul
+        ]
+        if missing_templates:
+            raise ValueError(f"武装 {spec.id} 缺少词条模板: {','.join(missing_templates)}")
+
+    if TOKEN_TEMPLATE not in tables.items:
+        raise ValueError(f"缺少代币模板 {TOKEN_TEMPLATE}")
+    if EVENT_ID not in tables.rush_event:
+        raise ValueError(f"缺少 Rush Event {EVENT_ID}")
+
+    token_template = _require_leaf(
+        tables.items[TOKEN_TEMPLATE], f"item[{TOKEN_TEMPLATE}]"
+    )
+    token_row = cells(token_template)
+    if len(token_row) <= 5:
+        raise ValueError(f"item[{TOKEN_TEMPLATE}] 少于 6 列")
+    token_row[0] = "rogue_event_item_99"
+    token_row[1] = TOKEN_ID
+    token_row[2] = "深渊代币"
+    token_row[5] = TOKEN_DESCRIPTION
+
+    items = copy.deepcopy(tables.items)
+    equipment = copy.deepcopy(tables.equipment)
+    equipment_status = copy.deepcopy(tables.equipment_status)
+    ability_soul = copy.deepcopy(tables.ability_soul)
+    rush_event = copy.deepcopy(tables.rush_event)
+
+    items[TOKEN_ID] = join_like(token_row, token_template)
+    for spec in WEAPONS:
+        donor_leaf = _require_leaf(
+            tables.equipment[spec.donor], f"equipment[{spec.donor}]"
+        )
+        equipment[spec.id] = build_equipment_leaf(donor_leaf, spec)
+        equipment_status[spec.id] = build_equipment_status(tables.equipment_status, spec)
+        ability_soul[spec.id] = build_soul_leaf(tables.ability_soul, spec)
+    rush_leaf = _require_leaf(tables.rush_event[EVENT_ID], f"rush_event[{EVENT_ID}]")
+    rush_event[EVENT_ID] = patch_rush_token(rush_leaf)
+
+    assert_reserved_ownership(equipment)
+    generated = {spec.id for spec in WEAPONS}
+    for label, table in (
+        ("equipment", equipment),
+        ("equipment_status", equipment_status),
+        ("ability_soul", ability_soul),
+    ):
+        missing = generated.difference(table)
+        if missing:
+            raise RuntimeError(f"{label} 构建后缺少保留 ID: {sorted(missing)}")
+    if cells(_require_leaf(items[TOKEN_ID], f"item[{TOKEN_ID}]"))[2] != "深渊代币":
+        raise RuntimeError("深渊代币构建后名称校验失败")
+    if cells(_require_leaf(rush_event[EVENT_ID], f"rush_event[{EVENT_ID}]"))[10] != TOKEN_ID:
+        raise RuntimeError("Rush Event 构建后代币校验失败")
+
+    return MasterChanges(
+        items=items,
+        equipment=equipment,
+        equipment_status=equipment_status,
+        ability_soul=ability_soul,
+        rush_event=rush_event,
+    )
+
+
+def apply_server_mirrors(mirrors: ServerMirrors) -> ServerMirrors:
+    """纯内存应用五个服务端镜像,并规范化 ID 数组。"""
+    for spec in WEAPONS:
+        if spec.donor not in mirrors.equipment_max_level:
+            raise ValueError(f"equipment_max_level 缺少供体 {spec.donor}")
+        donor_lookup = mirrors.equipment_lookup.get(spec.donor)
+        if not isinstance(donor_lookup, dict) or "category" not in donor_lookup:
+            raise ValueError(f"equipment_lookup 缺少供体类别 {spec.donor}")
+
+    max_level = copy.deepcopy(mirrors.equipment_max_level)
+    element = copy.deepcopy(mirrors.equipment_element)
+    lookup = copy.deepcopy(mirrors.equipment_lookup)
+    for spec in WEAPONS:
+        donor_lookup = mirrors.equipment_lookup[spec.donor]
+        max_level[spec.id] = copy.deepcopy(mirrors.equipment_max_level[spec.donor])
+        element[spec.id] = spec.element
+        lookup[spec.id] = {
+            "name": spec.name,
+            "rarity": "5",
+            "category": copy.deepcopy(donor_lookup["category"]),
+        }
+
+    try:
+        equipment_ids = sorted({
+            *(int(value) for value in mirrors.equipment_ids),
+            *(int(spec.id) for spec in WEAPONS),
+        })
+        item_ids = sorted({
+            *(int(value) for value in mirrors.item_ids),
+            int(TOKEN_ID),
+        })
+    except (TypeError, ValueError) as exc:
+        raise ValueError("equipment_ids/item_ids 必须是整数数组") from exc
+
+    return ServerMirrors(
+        equipment_max_level=max_level,
+        equipment_element=element,
+        equipment_lookup=lookup,
+        equipment_ids=equipment_ids,
+        item_ids=item_ids,
+    )
+
+
 def load_json(name: str):
     with open(os.path.join(ROOT, "assets", name), encoding="utf-8") as fh:
         return json.load(fh)
@@ -189,84 +376,143 @@ def save_json(name: str, data) -> None:
         json.dump(data, fh, ensure_ascii=False, indent=0 if isinstance(data, list) else 1)
 
 
+def _assert_readback_rows(
+    actual: dict[str, object], expected: dict[str, object], keys: list[str], label: str,
+) -> None:
+    for key in keys:
+        if key not in actual:
+            raise RuntimeError(f"{label} 写后复读缺少键 {key}")
+        if actual[key] != expected[key]:
+            raise RuntimeError(f"{label} 写后复读不一致: {key}")
+
+
+def _print_plan(changes: MasterChanges) -> None:
+    print(f"代币: {TOKEN_ID} 深渊代币 <- {TOKEN_TEMPLATE}")
+    for spec in WEAPONS:
+        effects = ", ".join(
+            f"kind {effect.effect_kind}={effect.strength}"
+            for effect in spec.effects
+        )
+        image = f"{IMAGE_PREFIX}/{spec.image_slug}"
+        print(
+            f"武装: {spec.id} {spec.name} | donor={spec.donor} | "
+            f"element={spec.element} | image={image} | effects=[{effects}]"
+        )
+        leaf = _require_leaf(changes.ability_soul[spec.id], f"ability_soul[{spec.id}]")
+        descriptions = wf_describe.describe_rows(
+            core.read_csv_lines(_leaf_text(leaf)), "ability_soul"
+        )
+        for slot, description in enumerate(descriptions, start=1):
+            print(f"  词条 {slot}: {description}")
+    print(
+        f"[PLAN] {len(WEAPONS)} weapons; token {TOKEN_ID}; "
+        "5 client tables; 5 server mirrors"
+    )
+    print(
+        "[PLAN] client: item, equipment, equipment_status, ability_soul, rush_event"
+    )
+    print(
+        "[PLAN] mirrors: equipment_max_level, equipment_element, equipment_lookup, "
+        "equipment_ids, item_ids"
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="深渊代币 + 连战专属武装")
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--publish", action="store_true")
     args = ap.parse_args()
 
-    # ---- 代币 ----
-    items = q.load_table(ITEM_T)
-    tmpl = items[TOKEN_TEMPLATE]
-    trow = cells(tmpl)
-    trow[0] = "rogue_event_item_99"
-    trow[1] = TOKEN_ID
-    trow[2] = "深渊代币"
-    trow[5] = "在「深渊连战」中获得的深渊结晶。凝聚着历战boss的力量,可用于锻造深渊武装。"
-    print(f"代币: {TOKEN_ID} 深渊代币(克隆 {TOKEN_TEMPLATE} 激战代币,图标暂共用)")
-
-    # ---- 连战专属武装 ----
-    equip = q.load_table(EQUIP_T)
-    souls = q.load_table(SOUL_T)
-    new_equips: dict[str, object] = {}
-    new_souls: dict[str, object] = {}
-    for spec in WEAPONS:
-        if spec.donor not in equip:
-            print(f"[ERR] 捐赠武器 {spec.donor} 不存在")
-            return 1
-        missing_templates = [effect.template_id for effect in spec.effects
-                             if effect.template_id not in souls]
-        if missing_templates:
-            print(f"[ERR] 武装 {spec.id} 缺少词条模板:{','.join(missing_templates)}")
-            return 1
-        new_equips[spec.id] = build_equipment_leaf(equip[spec.donor], spec)
-        new_souls[spec.id] = build_soul_leaf(souls, spec)
-        print(f"武装: {spec.id} {spec.name} <- {spec.donor}")
+    try:
+        tables = MasterTables(
+            items=q.load_table(ITEM_T),
+            equipment=q.load_table(EQUIP_T),
+            equipment_status=q.load_table(EQUIP_STATUS_T),
+            ability_soul=q.load_table(SOUL_T),
+            rush_event=q.load_table(RUSH_EVENT_T),
+        )
+        mirrors = ServerMirrors(
+            equipment_max_level=load_json("equipment_max_level.json"),
+            equipment_element=load_json("equipment_element.json"),
+            equipment_lookup=load_json("equipment_lookup.json"),
+            equipment_ids=load_json("equipment_ids.json"),
+            item_ids=load_json("item_ids.json"),
+        )
+        changes = build_master_changes(tables)
+        mirror_changes = apply_server_mirrors(mirrors)
+        _print_plan(changes)
+    except (KeyError, TypeError, ValueError, RuntimeError) as exc:
+        print(f"[ERR] 生成计划失败: {exc}", file=sys.stderr)
+        return 1
 
     if not args.write:
-        print("[DRY-RUN] 未写入。加 --write 生效。")
+        print("[DRY-RUN] 未写入任何文件。加 --write 生效。")
         return 0
 
-    items[TOKEN_ID] = join_like(trow, tmpl)
-    q.save_table(ITEM_T, items)
-    for nid, leaf in new_equips.items():
-        equip[nid] = leaf
-    q.save_table(EQUIP_T, equip)
-    for nid, leaf in new_souls.items():
-        souls[nid] = leaf
-    q.save_table(SOUL_T, souls)
-    print("[OK] ②层三表已写入(item / equipment / ability_soul)")
+    weapon_ids = [spec.id for spec in WEAPONS]
+    try:
+        q.save_table(ITEM_T, changes.items)
+        item_readback = q.load_table(ITEM_T)
+        _assert_readback_rows(item_readback, changes.items, [TOKEN_ID], "item")
 
-    # ---- 服务端镜像 ----
-    maxl = load_json("equipment_max_level.json")
-    elem = load_json("equipment_element.json")
-    lookup = load_json("equipment_lookup.json")
-    eq_ids = load_json("equipment_ids.json")
-    it_ids = load_json("item_ids.json")
-    for spec in WEAPONS:
-        maxl[spec.id] = maxl.get(spec.donor, 5)
-        elem[spec.id] = elem.get(spec.donor, -1)
-        dl = lookup.get(spec.donor, {})
-        lookup[spec.id] = {"name": spec.name, "rarity": dl.get("rarity", "0"),
-                           "category": dl.get("category", "剑")}
-        if int(spec.id) not in eq_ids:
-            eq_ids.append(int(spec.id))
-    if int(TOKEN_ID) not in it_ids:
-        it_ids.append(int(TOKEN_ID))
-    save_json("equipment_max_level.json", maxl)
-    save_json("equipment_element.json", elem)
-    save_json("equipment_lookup.json", lookup)
-    save_json("equipment_ids.json", eq_ids)
-    save_json("item_ids.json", it_ids)
-    print("[OK] 服务端镜像已更新(max_level/element/lookup/equipment_ids/item_ids)——须重启服务端")
+        q.save_table(EQUIP_T, changes.equipment)
+        equipment_readback = q.load_table(EQUIP_T)
+        _assert_readback_rows(
+            equipment_readback, changes.equipment, weapon_ids, "equipment"
+        )
+        assert_reserved_ownership(equipment_readback)
 
-    if args.publish:
-        r = subprocess.run([sys.executable, os.path.join(ROOT, "mod-tools", "wf_publish.py"),
-                            "--tables", f"{ITEM_T},{EQUIP_T},ability_soul"], cwd=ROOT)
-        print(f"[PUBLISH] wf_publish 退出码 {r.returncode}")
-    else:
-        print(f"记得发布:python mod-tools/wf_publish.py --tables {ITEM_T},{EQUIP_T},ability_soul")
-    return 0
+        q.save_table(EQUIP_STATUS_T, changes.equipment_status)
+        status_readback = q.load_table(EQUIP_STATUS_T)
+        _assert_readback_rows(
+            status_readback, changes.equipment_status, weapon_ids, "equipment_status"
+        )
+
+        q.save_table(SOUL_T, changes.ability_soul)
+        soul_readback = q.load_table(SOUL_T)
+        _assert_readback_rows(
+            soul_readback, changes.ability_soul, weapon_ids, "ability_soul"
+        )
+
+        q.save_table(RUSH_EVENT_T, changes.rush_event)
+        rush_readback = q.load_table(RUSH_EVENT_T)
+        _assert_readback_rows(
+            rush_readback, changes.rush_event, [EVENT_ID], "rush_event"
+        )
+        rush_leaf = _require_leaf(rush_readback[EVENT_ID], f"rush_event[{EVENT_ID}]")
+        if cells(rush_leaf)[10] != TOKEN_ID:
+            raise RuntimeError(f"rush_event[{EVENT_ID}] 写后复读 c10 不是 {TOKEN_ID}")
+
+        mirror_writes = (
+            ("equipment_max_level.json", mirror_changes.equipment_max_level),
+            ("equipment_element.json", mirror_changes.equipment_element),
+            ("equipment_lookup.json", mirror_changes.equipment_lookup),
+            ("equipment_ids.json", mirror_changes.equipment_ids),
+            ("item_ids.json", mirror_changes.item_ids),
+        )
+        for name, data in mirror_writes:
+            save_json(name, data)
+            if load_json(name) != data:
+                raise RuntimeError(f"{name} 写后复读不一致")
+    except (KeyError, TypeError, ValueError, RuntimeError, OSError) as exc:
+        print(f"[ERR] 写入或复读失败,禁止发布: {exc}", file=sys.stderr)
+        return 1
+
+    print("[OK] 5 client tables and 5 server mirrors passed write/readback validation")
+    publish_tables = ",".join(
+        (ITEM_T, EQUIP_T, EQUIP_STATUS_T, SOUL_T, RUSH_EVENT_T)
+    )
+    if not args.publish:
+        print(f"发布命令: python mod-tools/wf_publish.py --tables {publish_tables}")
+        return 0
+
+    result = subprocess.run(
+        [sys.executable, os.path.join(ROOT, "mod-tools", "wf_publish.py"),
+         "--tables", publish_tables],
+        cwd=ROOT,
+    )
+    print(f"[PUBLISH] wf_publish 退出码 {result.returncode}")
+    return result.returncode
 
 
 if __name__ == "__main__":
