@@ -55,6 +55,11 @@ WITH_COND_SIGNATURE = (
 ACTION_SKILLS_PREFIX = "public function getActionSkills"
 ANCHOR = "_loc14_ = Boolean(_loc5_(_loc13_.questKind));"
 ANCHOR_LINE = f"            {ANCHOR}"
+OFFICIAL_ABILITY_BLOCK = """         if(_loc14_)
+         {
+            _loc10_ = _loc13_.getTriggers();
+            _loc7_.add(_loc18_,_loc10_[_loc17_],this,param1,param2,false);
+         }"""
 
 EXPECTED_BLOCK = """            // WF_ABYSS_MODE_EQUIPMENT_GATE_V1_BEGIN
             if(_loc13_ is AbilitySoulAbilityLogic)
@@ -106,7 +111,8 @@ def source_text(newline: str = "\n") -> str:
         ANCHOR_LINE,
         "         if(_loc14_)",
         "         {",
-        "            useAbility(_loc13_);",
+        "            _loc10_ = _loc13_.getTriggers();",
+        "            _loc7_.add(_loc18_,_loc10_[_loc17_],this,param1,param2,false);",
         "         }",
         "      }",
         "",
@@ -127,6 +133,13 @@ def markerless(text: str) -> str:
         if "WF_ABYSS_MODE_EQUIPMENT_GATE_V1_" not in line
     ]
     return "".join(lines)
+
+
+def markerless_gate_block() -> str:
+    return "\n".join(
+        line for line in EXPECTED_BLOCK.splitlines()
+        if "WF_ABYSS_MODE_EQUIPMENT_GATE_V1_" not in line
+    )
 
 
 class TestAllowedQuest(unittest.TestCase):
@@ -215,6 +228,65 @@ class TestSemanticVerification(unittest.TestCase):
         with self.assertRaises(abyss_patch.PatchError):
             abyss_patch.verify_text(markerless(patched), require_markers=True)
 
+    def test_markerless_verification_tolerates_comments_and_token_whitespace(self):
+        patched, _ = abyss_patch.patch_text(source_text())
+        clean = markerless(patched)
+        reformatted = clean.replace(
+            "if(_loc13_ is AbilitySoulAbilityLogic)",
+            "if /* FFDec formatting */ (\n"
+            "               _loc13_\t is AbilitySoulAbilityLogic\n"
+            "            )",
+            1,
+        ).replace(
+            "8000101 && _loc12_.id",
+            "8000101\n                  && _loc12_.id",
+            1,
+        )
+
+        abyss_patch.verify_text(reformatted, require_markers=False)
+
+    def test_rejects_harmless_if_followed_by_unconditional_ability_path(self):
+        patched, _ = abyss_patch.patch_text(source_text())
+        clean = markerless(patched)
+        unconditional = clean.replace(
+            OFFICIAL_ABILITY_BLOCK,
+            """         if(_loc14_)
+         {
+         }
+         _loc10_ = _loc13_.getTriggers();
+         _loc7_.add(_loc18_,_loc10_[_loc17_],this,param1,param2,false);""",
+            1,
+        )
+        self.assertNotEqual(clean, unconditional)
+
+        with self.assertRaises(abyss_patch.PatchError):
+            abyss_patch.verify_text(unconditional, require_markers=False)
+
+    def test_rejects_a_second_complete_markerless_gate_as_non_idempotent(self):
+        patched, _ = abyss_patch.patch_text(source_text())
+        clean = markerless(patched)
+        method_boundary = "\n      }\n\n      public function getActionSkills"
+        duplicate = clean.replace(
+            method_boundary,
+            "\n" + markerless_gate_block() + method_boundary,
+            1,
+        )
+        self.assertNotEqual(clean, duplicate)
+
+        with self.assertRaises(abyss_patch.PatchError):
+            abyss_patch.verify_text(duplicate, require_markers=False)
+        with self.assertRaises(abyss_patch.PatchError):
+            abyss_patch.patch_text(duplicate)
+
+    def test_rejects_numeric_tokens_split_by_whitespace(self):
+        patched, _ = abyss_patch.patch_text(source_text())
+        clean = markerless(patched)
+        split_number = clean.replace("8000101", "8000 101", 1)
+        self.assertNotEqual(clean, split_number)
+
+        with self.assertRaises(abyss_patch.PatchError):
+            abyss_patch.verify_text(split_number, require_markers=False)
+
     def test_every_gate_bound_is_semantically_required_without_markers(self):
         patched, _ = abyss_patch.patch_text(source_text())
         clean = markerless(patched)
@@ -239,14 +311,10 @@ class TestSemanticVerification(unittest.TestCase):
 
     def test_rejects_a_similar_gate_in_get_available_abilities_with_cond(self):
         patched, _ = abyss_patch.patch_text(source_text())
-        block_without_markers = "\n".join(
-            line for line in EXPECTED_BLOCK.splitlines()
-            if "WF_ABYSS_MODE_EQUIPMENT_GATE_V1_" not in line
-        )
         duplicate = patched.replace(
             "         _loc14_ = Boolean(param3(_loc13_.questKind));\n",
             "         _loc14_ = Boolean(param3(_loc13_.questKind));\n"
-            + block_without_markers
+            + markerless_gate_block()
             + "\n",
             1,
         )
@@ -332,6 +400,83 @@ class TestAtomicFilePatching(unittest.TestCase):
                 abyss_patch.patch_file(source, output)
 
             self.assertEqual(b"prior-output", output.read_bytes())
+            self.assertEqual({source, output}, set(root.iterdir()))
+
+    def test_replace_then_cancellation_restores_existing_output_exactly(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source = root / "source.as"
+            output = root / "output.as"
+            source.write_bytes(source_text().encode("utf-8"))
+            prior = b"\xef\xbb\xbfprior-output\x00\r\n"
+            output.write_bytes(prior)
+            real_replace = os.replace
+
+            def replace_then_cancel(src, dst):
+                real_replace(src, dst)
+                raise KeyboardInterrupt("cancelled after replacement committed")
+
+            with mock.patch.object(
+                abyss_patch.os, "replace", side_effect=replace_then_cancel
+            ), self.assertRaises(KeyboardInterrupt):
+                abyss_patch.patch_file(source, output)
+
+            self.assertEqual(prior, output.read_bytes())
+            self.assertEqual({source, output}, set(root.iterdir()))
+
+    def test_replace_then_cancellation_removes_new_output(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source = root / "source.as"
+            output = root / "output.as"
+            source.write_bytes(source_text().encode("utf-8"))
+            real_replace = os.replace
+
+            def replace_then_cancel(src, dst):
+                real_replace(src, dst)
+                raise KeyboardInterrupt("cancelled after replacement committed")
+
+            with mock.patch.object(
+                abyss_patch.os, "replace", side_effect=replace_then_cancel
+            ), self.assertRaises(KeyboardInterrupt):
+                abyss_patch.patch_file(source, output)
+
+            self.assertFalse(output.exists())
+            self.assertEqual({source}, set(root.iterdir()))
+
+    def test_restore_failure_is_attached_to_original_cancellation(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source = root / "source.as"
+            output = root / "output.as"
+            source.write_bytes(source_text().encode("utf-8"))
+            prior = b"prior-output"
+            output.write_bytes(prior)
+            real_replace = os.replace
+            calls = 0
+
+            def commit_then_cancel_then_block_restore(src, dst):
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    real_replace(src, dst)
+                    raise KeyboardInterrupt("cancelled after replacement committed")
+                raise PermissionError("restore blocked")
+
+            with mock.patch.object(
+                abyss_patch.os,
+                "replace",
+                side_effect=commit_then_cancel_then_block_restore,
+            ), self.assertRaises(KeyboardInterrupt) as caught:
+                abyss_patch.patch_file(source, output)
+
+            notes = getattr(caught.exception, "__notes__", [])
+            self.assertTrue(
+                any("restore" in note.lower() and "restore blocked" in note
+                    for note in notes),
+                notes,
+            )
+            self.assertNotEqual(prior, output.read_bytes())
             self.assertEqual({source, output}, set(root.iterdir()))
 
 

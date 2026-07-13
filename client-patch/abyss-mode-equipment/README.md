@@ -38,7 +38,7 @@ python -X utf8 client-patch/abyss-mode-equipment/patch.py `
   --verify .superpowers\task-6-validation\BattleCharacterLogic.as
 ```
 
-补丁器要求目标方法和锚点各恰好出现一次；重复运行保持字节一致。它保留源文件的 CRLF/LF，并在语义校验成功后才通过同目录临时文件和 `os.replace` 原子替换输出。任何计数、锚点或语义错误都不会覆盖已有输出。
+补丁器要求目标方法和锚点各恰好出现一次；重复运行保持字节一致。语义校验按 AS3 token 比对，要求完整门控恰好一次、紧跟锚点，且后续官方 `if(_loc14_)` 的平衡块确实包住能力的 `getTriggers/add` 路径；注释和 token 间排版变化不影响校验，数字 token 则不能靠空白拼接伪装。它保留源文件的 CRLF/LF，并在语义校验成功后才通过同目录临时文件和 `os.replace` 原子替换输出。任何计数、锚点或语义错误都不会覆盖已有输出；即使替换已提交后才收到错误或取消，也会按写前快照原子恢复旧输出（原先不存在则删除新输出），恢复自身失败会附加到原始错误后再重抛原始错误。
 
 ## FFDec 二进制回读验证
 

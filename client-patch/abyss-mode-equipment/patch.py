@@ -9,7 +9,7 @@ import re
 import sys
 import tempfile
 from pathlib import Path
-from typing import Sequence
+from typing import NamedTuple, Sequence
 
 
 TARGET_SIGNATURE = (
@@ -126,14 +126,132 @@ def _render_block(indent: str, newline: str) -> str:
     return newline.join(indent + line for line in PATCH_LINES)
 
 
-def _semantic_compact(text: str) -> str:
-    without_comments = re.sub(r"//[^\r\n]*", "", text)
-    return re.sub(r"\s+", "", without_comments)
+class _Token(NamedTuple):
+    value: str
+    start: int
+    end: int
 
 
-def _expected_semantics() -> str:
+_NUMBER_RE = re.compile(
+    r"(?:0[xX][0-9A-Fa-f]+|(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)"
+)
+_IDENTIFIER_RE = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*")
+_MULTI_OPERATORS = tuple(sorted({
+    ">>>=", "===", "!==", ">>>", "<<=", ">>=", "&&", "||", "==",
+    "!=", "<=", ">=", "++", "--", "+=", "-=", "*=", "/=", "%=",
+    "<<", ">>", "::", "..",
+}, key=len, reverse=True))
+
+
+def _tokenize(text: str) -> list[_Token]:
+    """Tokenize enough AS3 to compare code while preserving token boundaries."""
+    tokens: list[_Token] = []
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char.isspace():
+            index += 1
+            continue
+        if text.startswith("//", index):
+            newline = re.search(r"[\r\n]", text[index + 2:])
+            index = len(text) if newline is None else index + 2 + newline.start()
+            continue
+        if text.startswith("/*", index):
+            end = text.find("*/", index + 2)
+            if end < 0:
+                raise PatchError("unterminated block comment in ActionScript")
+            index = end + 2
+            continue
+        if char in {'"', "'"}:
+            quote = char
+            end = index + 1
+            while end < len(text):
+                if text[end] == "\\":
+                    end += 2
+                    continue
+                if text[end] == quote:
+                    end += 1
+                    break
+                end += 1
+            else:
+                raise PatchError("unterminated string literal in ActionScript")
+            tokens.append(_Token(text[index:end], index, end))
+            index = end
+            continue
+        number = _NUMBER_RE.match(text, index)
+        if number is not None:
+            tokens.append(_Token(number.group(0), index, number.end()))
+            index = number.end()
+            continue
+        identifier = _IDENTIFIER_RE.match(text, index)
+        if identifier is not None:
+            tokens.append(_Token(identifier.group(0), index, identifier.end()))
+            index = identifier.end()
+            continue
+        operator = next(
+            (value for value in _MULTI_OPERATORS
+             if text.startswith(value, index)),
+            None,
+        )
+        if operator is not None:
+            tokens.append(_Token(operator, index, index + len(operator)))
+            index += len(operator)
+            continue
+        tokens.append(_Token(char, index, index + 1))
+        index += 1
+    return tokens
+
+
+def _token_values(tokens: Sequence[_Token]) -> tuple[str, ...]:
+    return tuple(token.value for token in tokens)
+
+
+def _gate_token_values() -> tuple[str, ...]:
     lines = [line for line in PATCH_LINES if not line.startswith("// ")]
-    return _semantic_compact("\n".join(lines))
+    return _token_values(_tokenize("\n".join(lines)))
+
+
+def _sequence_positions(
+    tokens: Sequence[_Token], expected: Sequence[str]
+) -> list[int]:
+    values = _token_values(tokens)
+    width = len(expected)
+    if width == 0:
+        return []
+    return [
+        index for index in range(len(values) - width + 1)
+        if values[index:index + width] == tuple(expected)
+    ]
+
+
+def _matching_brace(tokens: Sequence[_Token], open_index: int) -> int:
+    if open_index >= len(tokens) or tokens[open_index].value != "{":
+        raise PatchError("official ability guard has no opening brace")
+    depth = 0
+    for index in range(open_index, len(tokens)):
+        if tokens[index].value == "{":
+            depth += 1
+        elif tokens[index].value == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    raise PatchError("official if(_loc14_) block is not balanced")
+
+
+_ABILITY_GET_TRIGGERS = (
+    "_loc10_", "=", "_loc13_", ".", "getTriggers", "(", ")", ";",
+)
+_ABILITY_ADD = (
+    "_loc7_", ".", "add", "(", "_loc18_", ",", "_loc10_", "[",
+    "_loc17_", "]", ",", "this", ",", "param1", ",", "param2", ",",
+    "false", ")", ";",
+)
+_SIMILAR_GATE_PREFIXES = (
+    ("_loc12_", ".", "id", ">="),
+    ("_loc12_", ".", "id", "<="),
+    ("param3", ".", "index", "=="),
+    ("Math", ".", "floor", "(", "_loc15_", "/", "1000"),
+)
 
 
 def _validate_markers(
@@ -171,17 +289,48 @@ def verify_text(text: str, require_markers: bool) -> None:
     with_cond_start, with_cond_end = _with_cond_bounds(text, method_start)
     method_text = text[method_start:method_end]
     anchor = _checked_anchor(method_text)
-
     post_anchor = method_text[anchor.end():]
-    official_if = re.search(r"if\s*\(\s*_loc14_\s*\)", post_anchor)
-    if official_if is None:
-        raise PatchError("cannot find the official if(_loc14_) after the anchor")
-    gate_text = post_anchor[:official_if.start()]
-    if _semantic_compact(gate_text) != _expected_semantics():
-        raise PatchError("post-anchor abyss gate semantics do not match exactly")
+    method_tokens = _tokenize(method_text)
+    post_tokens = _tokenize(post_anchor)
+    gate_tokens = _gate_token_values()
+    occurrences = _sequence_positions(method_tokens, gate_tokens)
+    if len(occurrences) != 1:
+        raise PatchError(
+            f"expected exactly one complete abyss gate, found {len(occurrences)}"
+        )
+    if _token_values(post_tokens[:len(gate_tokens)]) != gate_tokens:
+        raise PatchError("complete abyss gate is not immediately after the anchor")
+
+    guard_start = len(gate_tokens)
+    guard_prefix = ("if", "(", "_loc14_", ")", "{")
+    if _token_values(
+        post_tokens[guard_start:guard_start + len(guard_prefix)]
+    ) != guard_prefix:
+        raise PatchError("official if(_loc14_) does not immediately follow the gate")
+    guard_open = guard_start + len(guard_prefix) - 1
+    guard_close = _matching_brace(post_tokens, guard_open)
+    if guard_close + 1 >= len(post_tokens) \
+            or post_tokens[guard_close + 1].value != "}":
+        raise PatchError("official ability guard is not followed by the loop close")
+
+    for label, expected in (
+        ("getTriggers", _ABILITY_GET_TRIGGERS),
+        ("add", _ABILITY_ADD),
+    ):
+        positions = _sequence_positions(post_tokens, expected)
+        if len(positions) != 1:
+            raise PatchError(
+                f"expected one official ability {label} path, found {len(positions)}"
+            )
+        position = positions[0]
+        if not (guard_open < position
+                and position + len(expected) - 1 < guard_close):
+            raise PatchError(
+                f"official ability {label} path is outside if(_loc14_)"
+            )
 
     gate_start = method_start + anchor.end()
-    gate_end = gate_start + official_if.start()
+    gate_end = gate_start + post_tokens[guard_start].start
     _validate_markers(
         text,
         method_start,
@@ -192,16 +341,13 @@ def verify_text(text: str, require_markers: bool) -> None:
     )
 
     with_cond = text[with_cond_start:with_cond_end]
-    with_cond_compact = _semantic_compact(with_cond)
-    similar_tokens = (
-        BEGIN_MARKER,
-        END_MARKER,
-        "_loc12_.id>=",
-        "_loc12_.id<=",
-        "param3.index==0",
-        "Math.floor(_loc15_/1000",
-    )
-    found = [token for token in similar_tokens if token in with_cond_compact]
+    with_cond_tokens = _tokenize(with_cond)
+    found = [
+        " ".join(prefix) for prefix in _SIMILAR_GATE_PREFIXES
+        if _sequence_positions(with_cond_tokens, prefix)
+    ]
+    if _sequence_positions(with_cond_tokens, gate_tokens):
+        found.append("complete gate")
     if found:
         raise PatchError(
             "abyss gate semantics found in getAvailableAbilitiesWithCond: "
@@ -213,15 +359,14 @@ def patch_text(text: str) -> tuple[str, int]:
     """Insert the exact gate once, returning ``(text, insertion_count)``."""
     method_start, method_end = _target_bounds(text)
     method_text = text[method_start:method_end]
-
-    gate_indicators = (
-        BEGIN_MARKER,
-        END_MARKER,
-        "8000101",
-        "8000115",
-        "param3.index == 0",
+    method_tokens = _tokenize(method_text)
+    has_gate_indicator = (
+        BEGIN_MARKER in text
+        or END_MARKER in text
+        or any(_sequence_positions(method_tokens, prefix)
+               for prefix in _SIMILAR_GATE_PREFIXES)
     )
-    if any(indicator in method_text for indicator in gate_indicators):
+    if has_gate_indicator:
         require_markers = BEGIN_MARKER in text or END_MARKER in text
         verify_text(text, require_markers=require_markers)
         return text, 0
@@ -241,6 +386,69 @@ def _decode_utf8(data: bytes) -> tuple[str, bytes]:
     return data[len(bom):].decode("utf-8"), bom
 
 
+class _OutputSnapshot(NamedTuple):
+    existed: bool
+    data: bytes
+
+
+def _snapshot_output(path: Path) -> _OutputSnapshot:
+    try:
+        return _OutputSnapshot(True, path.read_bytes())
+    except FileNotFoundError:
+        return _OutputSnapshot(False, b"")
+
+
+def _snapshot_matches(path: Path, snapshot: _OutputSnapshot) -> bool:
+    if not snapshot.existed:
+        return not path.exists()
+    try:
+        return path.read_bytes() == snapshot.data
+    except OSError:
+        return False
+
+
+def _restore_output_snapshot(path: Path, snapshot: _OutputSnapshot) -> None:
+    """Restore exact prior bytes/existence after a replacement was attempted."""
+    if _snapshot_matches(path, snapshot):
+        return
+    if not snapshot.existed:
+        try:
+            path.unlink(missing_ok=True)
+        except BaseException:
+            if _snapshot_matches(path, snapshot):
+                return
+            raise
+        if not _snapshot_matches(path, snapshot):
+            raise PatchError("failed to remove newly created output during restore")
+        return
+
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            dir=path.parent,
+            prefix=f".{path.name}.restore-",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(snapshot.data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.replace(temporary, path)
+            temporary = None
+        except BaseException:
+            if _snapshot_matches(path, snapshot):
+                return
+            raise
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    if not _snapshot_matches(path, snapshot):
+        raise PatchError("restored output bytes do not match the prior snapshot")
+
+
 def patch_file(source: Path | str, output: Path | str) -> int:
     """Patch to an atomic sibling temp, preserving any existing output on error."""
     source_path = Path(source)
@@ -256,8 +464,10 @@ def patch_file(source: Path | str, output: Path | str) -> int:
     verify_text(patched_text, require_markers=True)
     patched_bytes = bom + patched_text.encode("utf-8")
 
+    prior_output = _snapshot_output(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
+    replacement_attempted = False
     try:
         with tempfile.NamedTemporaryFile(
             mode="wb",
@@ -276,8 +486,19 @@ def patch_file(source: Path | str, output: Path | str) -> int:
             raise PatchError("temporary output bytes differ from the verified patch")
         written_text, _ = _decode_utf8(written)
         verify_text(written_text, require_markers=True)
+        replacement_attempted = True
         os.replace(temporary, output_path)
         temporary = None
+    except BaseException as original_error:
+        if replacement_attempted:
+            try:
+                _restore_output_snapshot(output_path, prior_output)
+            except BaseException as restore_error:
+                original_error.add_note(
+                    "output restore failed after replacement attempt: "
+                    f"{type(restore_error).__name__}: {restore_error}"
+                )
+        raise
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
