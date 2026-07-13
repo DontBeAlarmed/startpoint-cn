@@ -37,6 +37,7 @@ import wf_quest_lib as q          # noqa: E402
 import wf_chain_build as cb       # noqa: E402
 
 EVENT_ID = "700099"
+TOKEN_ID = "2370099"
 EVENT_STRING_ID = "mod_rogue_gauntlet"
 EVENT_NAME = "深渊连战"
 Q_EVENT = "master/quest/event/rush_event.orderedmap"
@@ -257,6 +258,12 @@ def fmt(v: float) -> str:
     return s or "0"
 
 
+def patch_event_metadata(row: list[str]) -> list[str]:
+    """只把深渊 Rush Event 的兑换代币改为深渊代币。"""
+    row[10] = TOKEN_ID
+    return row
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="生成 700099 深渊连战")
     ap.add_argument("--rounds", type=int, default=15)
@@ -319,7 +326,7 @@ def main() -> int:
     base_leaf = ev.get(EVENT_ID) or ev[TEMPLATE_EVENT]
     tmpl_ev = cells(base_leaf)
     ev_bytes = isinstance(base_leaf, bytes)
-    ev_row = list(tmpl_ev)
+    ev_row = patch_event_metadata(list(tmpl_ev))
     ev_row[0] = EVENT_STRING_ID
     ev_row[1] = EVENT_NAME
     ev_row[2] = f"{START},{END},{RESULT_END},{EXCHANGE_END}"   # 横幅排期,顺带拉满
