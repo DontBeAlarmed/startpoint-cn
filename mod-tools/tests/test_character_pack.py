@@ -968,6 +968,7 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
         with self.assertRaises(self.pack.PackPreflightError):
             self._tx(provider=_FakeReleaseBaseProvider(ValueError("detached chain"))).preflight()
 
+    @unittest.skipUnless(os.name == "nt", "exact named staging unavailable")
     def test_prepare_maps_exact_roots_and_captures_complete_base(self):
         self._finish_setup()
         tx = self._tx()
@@ -999,6 +1000,7 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
             self.assertIn("before", item)
             self.assertIn("after_sha256", item)
 
+    @unittest.skipUnless(os.name == "nt", "exact named staging unavailable")
     def test_snapshot_preserves_exact_files_outer_and_nested_keys(self):
         self._finish_setup()
         tx = self._tx()
@@ -1041,6 +1043,7 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
             self.assertIn("sha256", item)
         self.assertFalse(hasattr(snapshot, "restore"))
 
+    @unittest.skipUnless(os.name == "nt", "exact named staging unavailable")
     def test_prepared_and_snapshot_address_semantic_claims_explicitly(self):
         self._finish_setup()
         tx = self._tx()
@@ -1073,6 +1076,7 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
                 self.assertIn("source_table_before", item)
                 self.assertNotIn("bytes", item)
 
+    @unittest.skipUnless(os.name == "nt", "exact named staging unavailable")
     def test_snapshot_captures_each_live_file_once_and_decodes_those_bytes(self):
         codec = _ControllableJsonFixtureCodec(self.pack)
         self._finish_setup()
@@ -1115,6 +1119,7 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
         )
         self.assertEqual(marker["kind"], "character_pack_snapshot")
 
+    @unittest.skipUnless(os.name == "nt", "exact named staging unavailable")
     def test_snapshot_retains_server_key_bytes_and_exact_whole_file_image(self):
         installed, installed_dir = self._installed_copy()
         installed_hash = hashlib.sha256(
@@ -1152,6 +1157,7 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
                 hashlib.sha256(key_record["bytes"]).hexdigest(),
             )
 
+    @unittest.skipUnless(os.name == "nt", "exact named staging unavailable")
     def test_snapshot_decode_and_write_failures_remove_only_temporary_child(self):
         self._finish_setup()
         sibling = self.snapshot_root / "keep.bin"
@@ -1201,6 +1207,7 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
                 [path for path in self.snapshot_root.iterdir() if path != sibling], []
             )
 
+    @unittest.skipUnless(os.name == "nt", "exact named staging unavailable")
     def test_snapshot_drift_at_each_file_capture_never_publishes_a_child(self):
         self._finish_setup()
         tx = self._tx()
@@ -1440,6 +1447,7 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
         self.assertIn(("outer_key", "master/character.orderedmap:129999"), claims)
         self.assertIn(("semantic", "character_code_name:seris_dragon_king"), claims)
 
+    @unittest.skipUnless(os.name == "nt", "exact named staging unavailable")
     def test_omitted_prior_claim_is_delete_only_when_payload_removes_it(self):
         installed, installed_dir = self._installed_copy()
         installed_hash = hashlib.sha256(
@@ -1603,7 +1611,171 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
             ).preflight()
 
 
+class TestOwnedFilesystemPlatformContract(unittest.TestCase):
+    def setUp(self):
+        self.pack = importlib.import_module("wf_character_pack")
+
+    def test_posix_named_staging_is_explicitly_unsupported(self):
+        self.assertFalse(
+            self.pack._OwnedFilesystem.POSIX_EXACT_NAMED_STAGING_SUPPORTED
+        )
+
+    def test_posix_cleanup_closes_authority_and_never_deletes_a_name(self):
+        owned = mock.Mock()
+        owned.closed = False
+        owned.identity = (1, 2, 3)
+        directory = mock.Mock()
+        directory.closed = False
+        directory.path = Path("owned-orphan")
+        directory.handle = 12
+        directory.name = "owned-orphan"
+        directory.files = {"payload": owned}
+        root = mock.Mock()
+        root.closed = False
+        root.handle = 11
+
+        owned_fs = object.__new__(self.pack._OwnedFilesystem)
+        owned_fs.windows = False
+        owned_fs.hook = None
+        owned_fs.root = root
+        owned_fs.children = [directory]
+
+        def close_file(value):
+            value.closed = True
+
+        def close_directory(value):
+            value.closed = True
+
+        stat_result = mock.Mock(st_dev=1, st_ino=2, st_mode=3)
+        with (
+            mock.patch.object(owned_fs, "_close_file", side_effect=close_file),
+            mock.patch.object(
+                owned_fs, "_close_directory", side_effect=close_directory
+            ),
+            mock.patch.object(
+                os, "listdir", return_value=["payload"]
+            ) as listdir,
+            mock.patch.object(os, "stat", return_value=stat_result) as stat,
+            mock.patch.object(os, "unlink") as unlink,
+            mock.patch.object(os, "rmdir") as rmdir,
+        ):
+            with self.assertRaisesRegex(
+                self.pack.PackStagingError,
+                "exact POSIX cleanup unavailable.*owned orphan retained",
+            ):
+                owned_fs.delete_directory(directory, "posix_cleanup")
+
+        unlink.assert_not_called()
+        rmdir.assert_not_called()
+        listdir.assert_not_called()
+        stat.assert_not_called()
+        self.assertTrue(owned.closed)
+        self.assertTrue(directory.closed)
+        self.assertTrue(root.closed)
+
+
+@unittest.skipUnless(os.name != "nt", "POSIX fail-closed contract")
+class TestPosixStagingFailClosed(_TransactionFixtureMixin, unittest.TestCase):
+    def test_prepare_fails_before_owned_output_and_preserves_every_tree(self):
+        self._finish_setup()
+        self.staging_root.mkdir()
+        unrelated = self.staging_root / "unrelated.bin"
+        unrelated.write_bytes(b"preserve")
+        protected_before = self._protected_trees()
+        boundary_events = []
+
+        tx = self._tx(
+            filesystem_boundary_hook=lambda event, context: boundary_events.append(
+                (event, context.get("kind"))
+            )
+        )
+        with self.assertRaisesRegex(
+            self.pack.PackPreflightError,
+            "POSIX exact named staging unavailable.*no owned output was written",
+        ):
+            tx.prepare(self.staging_root)
+
+        self.assertEqual(boundary_events, [])
+        self.assertEqual(unrelated.read_bytes(), b"preserve")
+        self.assertEqual(
+            {path.name for path in self.staging_root.iterdir()},
+            {"unrelated.bin"},
+        )
+        self.assertEqual(self._protected_trees(), protected_before)
+
+
+@unittest.skipUnless(os.name == "nt", "exact named staging unavailable")
 class TestPackStagingRecovery(_TransactionFixtureMixin, unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "Windows handle-sharing contract")
+    def test_windows_owned_output_open_modes_are_split_and_defensive(self):
+        self._finish_setup()
+        api = self.pack._WIN_OWNED_API
+        self.assertIsNotNone(api)
+
+        retained = api.relative_open_contract("retained_output")
+        identity = api.relative_open_contract("identity_reopen")
+        cleanup = api.relative_open_contract("cleanup_delete_reopen")
+
+        self.assertTrue(retained.access & api.FILE_READ_DATA)
+        self.assertTrue(retained.access & api.FILE_WRITE_DATA)
+        self.assertFalse(retained.access & api.DELETE)
+        self.assertEqual(retained.share, api.FILE_SHARE_READ)
+        self.assertEqual(retained.disposition, api.FILE_CREATE)
+
+        self.assertEqual(
+            identity.access,
+            api.FILE_READ_ATTRIBUTES | api.SYNCHRONIZE,
+        )
+        self.assertTrue(identity.share & api.FILE_SHARE_READ)
+        self.assertTrue(identity.share & api.FILE_SHARE_WRITE)
+        self.assertFalse(identity.share & api.FILE_SHARE_DELETE)
+        self.assertEqual(identity.disposition, api.FILE_OPEN)
+
+        self.assertTrue(cleanup.access & api.DELETE)
+        self.assertTrue(cleanup.access & api.FILE_READ_ATTRIBUTES)
+        self.assertFalse(cleanup.access & api.FILE_WRITE_DATA)
+        self.assertFalse(cleanup.share & api.FILE_SHARE_WRITE)
+        self.assertFalse(cleanup.share & api.FILE_SHARE_DELETE)
+        self.assertEqual(cleanup.disposition, api.FILE_OPEN)
+
+        for method in (
+            "create_retained_output",
+            "reopen_output_identity",
+            "reopen_output_cleanup",
+        ):
+            self.assertTrue(callable(getattr(api, method, None)), method)
+
+    @unittest.skipUnless(os.name == "nt", "Windows handle-sharing contract")
+    def test_windows_output_name_is_locked_through_final_readback(self):
+        self._finish_setup()
+        moved = self.root / "retained-output-moved"
+        observed = {"hook": False}
+
+        def hook(event, context):
+            if (event == "before_output_verify"
+                    and context["kind"] == "prepare_marker"):
+                observed["hook"] = True
+                authority = context["authority"]
+                with self.assertRaises(OSError):
+                    with open(context["path"], "r+b"):
+                        pass
+                with self.assertRaises(OSError):
+                    os.rename(context["path"], moved)
+                authority.validate()
+                self.assertEqual(
+                    authority.owner._identity(
+                        authority.handle, directory=False
+                    ),
+                    authority.identity,
+                )
+
+        tx = self._tx(filesystem_boundary_hook=hook)
+        prepared = tx.prepare(self.staging_root)
+        staged = tx.materialize_staging(prepared)
+        self.assertTrue(observed["hook"])
+        self.assertFalse(moved.exists())
+        tx.discard_staging(staged)
+
     def _hardlink_boundary_hook(self, target_kind, sentinel):
         fired = {"value": False}
 
@@ -1980,7 +2152,10 @@ class TestPackStagingRecovery(_TransactionFixtureMixin, unittest.TestCase):
         prepared = tx.prepare(self.staging_root)
         staged = tx.materialize_staging(prepared)
         marker = staged.transaction_dir / ".character-pack-transaction.json"
-        marker.write_text('{"transaction_id":"forged"}', encoding="utf-8")
+        with self.assertRaises(OSError):
+            marker.write_text('{"transaction_id":"forged"}', encoding="utf-8")
+        authority = tx._transactions[prepared.transaction_id]
+        authority.marker_file.write_bytes(b'{"transaction_id":"forged"}')
         with self.assertRaises(self.pack.PackStagingError):
             tx.discard_staging(staged)
         self.assertTrue(staged.transaction_dir.exists())

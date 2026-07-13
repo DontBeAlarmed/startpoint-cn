@@ -1090,6 +1090,15 @@ if os.name == "nt":
         _fields_ = [("DeleteFile", wintypes.BOOL)]
 
 
+@dataclass(frozen=True)
+class _WindowsRelativeOpenContract:
+    access: int
+    share: int
+    disposition: int
+    options: int
+    attributes: int
+
+
 class _WindowsOwnedApi:
     FILE_SHARE_READ = 0x1
     FILE_SHARE_WRITE = 0x2
@@ -1221,8 +1230,71 @@ class _WindowsOwnedApi:
             self._raise_last(f"open owned root {path}")
         return int(value)
 
-    def open_relative(self, parent: int, name: str, *, directory: bool,
-                      create: bool, delete_access: bool = False) -> int:
+    def relative_open_contract(
+        self, mode: str,
+    ) -> _WindowsRelativeOpenContract:
+        if mode == "retained_output":
+            return _WindowsRelativeOpenContract(
+                access=(
+                    self.FILE_READ_DATA | self.FILE_WRITE_DATA
+                    | self.FILE_READ_ATTRIBUTES | self.FILE_WRITE_ATTRIBUTES
+                    | self.SYNCHRONIZE
+                ),
+                share=self.FILE_SHARE_READ,
+                disposition=self.FILE_CREATE,
+                options=(
+                    self.FILE_NON_DIRECTORY_FILE
+                    | self.FILE_SYNCHRONOUS_IO_NONALERT
+                    | self.FILE_OPEN_REPARSE_POINT
+                ),
+                attributes=self.FILE_ATTRIBUTE_NORMAL,
+            )
+        if mode == "identity_reopen":
+            return _WindowsRelativeOpenContract(
+                access=self.FILE_READ_ATTRIBUTES | self.SYNCHRONIZE,
+                share=self.FILE_SHARE_READ | self.FILE_SHARE_WRITE,
+                disposition=self.FILE_OPEN,
+                options=(
+                    self.FILE_NON_DIRECTORY_FILE
+                    | self.FILE_SYNCHRONOUS_IO_NONALERT
+                    | self.FILE_OPEN_REPARSE_POINT
+                ),
+                attributes=self.FILE_ATTRIBUTE_NORMAL,
+            )
+        if mode == "cleanup_delete_reopen":
+            return _WindowsRelativeOpenContract(
+                access=self.DELETE | self.FILE_READ_ATTRIBUTES | self.SYNCHRONIZE,
+                share=self.FILE_SHARE_READ,
+                disposition=self.FILE_OPEN,
+                options=(
+                    self.FILE_NON_DIRECTORY_FILE
+                    | self.FILE_SYNCHRONOUS_IO_NONALERT
+                    | self.FILE_OPEN_REPARSE_POINT
+                ),
+                attributes=self.FILE_ATTRIBUTE_NORMAL,
+            )
+        if mode == "owned_directory_create":
+            return _WindowsRelativeOpenContract(
+                access=(
+                    self.FILE_LIST_DIRECTORY | self.FILE_ADD_FILE
+                    | self.FILE_ADD_SUBDIRECTORY | self.FILE_DELETE_CHILD
+                    | self.FILE_READ_ATTRIBUTES | self.FILE_WRITE_ATTRIBUTES
+                    | self.FILE_TRAVERSE | self.DELETE | self.SYNCHRONIZE
+                ),
+                share=self.FILE_SHARE_READ | self.FILE_SHARE_WRITE,
+                disposition=self.FILE_CREATE,
+                options=(
+                    self.FILE_DIRECTORY_FILE | self.FILE_SYNCHRONOUS_IO_NONALERT
+                    | self.FILE_OPEN_FOR_BACKUP_INTENT
+                    | self.FILE_OPEN_REPARSE_POINT
+                ),
+                attributes=self.FILE_ATTRIBUTE_DIRECTORY,
+            )
+        raise ValueError(f"unknown Windows relative-open mode: {mode}")
+
+    def _open_relative(
+        self, parent: int, name: str, contract: _WindowsRelativeOpenContract,
+    ) -> int:
         _validate_owned_leaf(name)
         name_buffer = ctypes.create_unicode_buffer(name)
         name_bytes = len(name.encode("utf-16-le"))
@@ -1237,40 +1309,10 @@ class _WindowsOwnedApi:
         )
         io_status = _WinIoStatusBlock()
         output = wintypes.HANDLE()
-        if directory:
-            access = (
-                self.FILE_LIST_DIRECTORY | self.FILE_ADD_FILE
-                | self.FILE_ADD_SUBDIRECTORY | self.FILE_DELETE_CHILD
-                | self.FILE_READ_ATTRIBUTES | self.FILE_WRITE_ATTRIBUTES
-                | self.FILE_TRAVERSE | self.DELETE | self.SYNCHRONIZE
-            )
-            options = (
-                self.FILE_DIRECTORY_FILE | self.FILE_SYNCHRONOUS_IO_NONALERT
-                | self.FILE_OPEN_FOR_BACKUP_INTENT | self.FILE_OPEN_REPARSE_POINT
-            )
-            file_attributes = self.FILE_ATTRIBUTE_DIRECTORY
-            share = self.FILE_SHARE_READ | self.FILE_SHARE_WRITE
-        else:
-            access = (
-                self.FILE_READ_DATA | self.FILE_WRITE_DATA
-                | self.FILE_READ_ATTRIBUTES | self.FILE_WRITE_ATTRIBUTES
-                | self.SYNCHRONIZE
-                | (self.DELETE if delete_access else 0)
-            )
-            options = (
-                self.FILE_NON_DIRECTORY_FILE | self.FILE_SYNCHRONOUS_IO_NONALERT
-                | self.FILE_OPEN_REPARSE_POINT
-            )
-            file_attributes = self.FILE_ATTRIBUTE_NORMAL
-            share = (
-                self.FILE_SHARE_READ | self.FILE_SHARE_WRITE
-                | self.FILE_SHARE_DELETE
-            )
         status = self.NtCreateFile(
-            ctypes.byref(output), access, ctypes.byref(attributes),
-            ctypes.byref(io_status), None, file_attributes, share,
-            self.FILE_CREATE if create else self.FILE_OPEN,
-            options, None, 0,
+            ctypes.byref(output), contract.access, ctypes.byref(attributes),
+            ctypes.byref(io_status), None, contract.attributes, contract.share,
+            contract.disposition, contract.options, None, 0,
         )
         if status < 0:
             code = int(self.RtlNtStatusToDosError(status))
@@ -1279,6 +1321,27 @@ class _WindowsOwnedApi:
         if value is None:
             raise OSError(f"NtCreateFile({name}) returned a null handle")
         return int(value)
+
+    def create_owned_directory(self, parent: int, name: str) -> int:
+        return self._open_relative(
+            parent, name, self.relative_open_contract("owned_directory_create")
+        )
+
+    def create_retained_output(self, parent: int, name: str) -> int:
+        return self._open_relative(
+            parent, name, self.relative_open_contract("retained_output")
+        )
+
+    def reopen_output_identity(self, parent: int, name: str) -> int:
+        return self._open_relative(
+            parent, name, self.relative_open_contract("identity_reopen")
+        )
+
+    def reopen_output_cleanup(self, parent: int, name: str) -> int:
+        return self._open_relative(
+            parent, name,
+            self.relative_open_contract("cleanup_delete_reopen"),
+        )
 
     def identity(self, handle: int, *, directory: bool) -> tuple[int, int, int]:
         info = _WinByHandleInfo()
@@ -1433,12 +1496,18 @@ class _OwnedDirectoryAuthority:
 class _OwnedFilesystem:
     """Handle-bound, no-follow authority for every owned output and cleanup."""
 
+    POSIX_EXACT_NAMED_STAGING_SUPPORTED = False
+
     def __init__(
         self, root: Path,
         hook: Callable[[str, Mapping[str, Any]], None] | None,
     ):
         self.hook = hook
         self.windows = os.name == "nt"
+        if not self.windows:
+            raise PackStagingError(
+                "POSIX exact named staging unavailable; no owned output was written"
+            )
         self.root = self._open_root(Path(root))
         self.children: list[_OwnedDirectoryAuthority] = []
 
@@ -1514,11 +1583,8 @@ class _OwnedFilesystem:
     def _validate_file_name(self, owned: _OwnedFileAuthority) -> None:
         if self.windows:
             assert _WIN_OWNED_API is not None
-            reopened = _WIN_OWNED_API.open_relative(
-                owned.parent.handle,
-                owned.name,
-                directory=False,
-                create=False,
+            reopened = _WIN_OWNED_API.reopen_output_identity(
+                owned.parent.handle, owned.name
             )
             try:
                 identity = _WIN_OWNED_API.identity(reopened, directory=False)
@@ -1545,14 +1611,13 @@ class _OwnedFilesystem:
         self.root.validate()
         if self.windows:
             assert _WIN_OWNED_API is not None
-            handle = _WIN_OWNED_API.open_relative(
-                self.root.handle, name, directory=True, create=True
+            handle = _WIN_OWNED_API.create_owned_directory(
+                self.root.handle, name
             )
         else:
-            os.mkdir(name, mode=0o700, dir_fd=self.root.handle)
-            flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) \
-                | getattr(os, "O_NOFOLLOW", 0)
-            handle = os.open(name, flags, dir_fd=self.root.handle)
+            raise PackStagingError(
+                "POSIX exact named staging unavailable; directory not created"
+            )
         try:
             identity = self._identity(handle, directory=True)
         except Exception:
@@ -1575,13 +1640,13 @@ class _OwnedFilesystem:
         parent.validate()
         if self.windows:
             assert _WIN_OWNED_API is not None
-            handle = _WIN_OWNED_API.open_relative(
-                parent.handle, name, directory=False, create=True
+            handle = _WIN_OWNED_API.create_retained_output(
+                parent.handle, name
             )
         else:
-            flags = os.O_RDWR | os.O_CREAT | os.O_EXCL \
-                | getattr(os, "O_NOFOLLOW", 0)
-            handle = os.open(name, flags, 0o600, dir_fd=parent.handle)
+            raise PackStagingError(
+                "POSIX exact named staging unavailable; output not opened"
+            )
         try:
             identity = self._identity(handle, directory=False)
         except Exception:
@@ -1650,13 +1715,16 @@ class _OwnedFilesystem:
     def delete_directory(
         self, directory: _OwnedDirectoryAuthority, kind: str,
     ) -> None:
+        if not self.windows:
+            self._fire("before_cleanup_delete", kind=kind, path=directory.path)
+            self.abandon()
+            raise PackStagingError(
+                "exact POSIX cleanup unavailable; owned orphan retained"
+            )
         directory.validate()
         self._fire("before_cleanup_delete", kind=kind, path=directory.path)
         directory.validate()
-        if self.windows:
-            names = {entry.name for entry in os.scandir(directory.path)}
-        else:
-            names = set(os.listdir(directory.handle))
+        names = {entry.name for entry in os.scandir(directory.path)}
         if names != set(directory.files):
             raise PackStagingError(
                 "owned directory contains untracked entries; preserving orphan"
@@ -1664,43 +1732,25 @@ class _OwnedFilesystem:
         for name in sorted(directory.files):
             owned = directory.files[name]
             owned.validate()
-            if self.windows:
-                assert _WIN_OWNED_API is not None
-                self._close_file(owned)
-                delete_handle = _WIN_OWNED_API.open_relative(
-                    directory.handle, name, directory=False, create=False,
-                    delete_access=True,
-                )
-                try:
-                    if _WIN_OWNED_API.identity(
-                        delete_handle, directory=False
-                    ) != owned.identity:
-                        raise PackStagingError(
-                            "owned output name changed before exact handle deletion"
-                        )
-                    _WIN_OWNED_API.dispose(delete_handle)
-                finally:
-                    _WIN_OWNED_API.close(delete_handle)
-            else:
-                stat_result = os.stat(
-                    name, dir_fd=directory.handle, follow_symlinks=False
-                )
-                identity = (stat_result.st_dev, stat_result.st_ino, stat_result.st_mode)
-                if identity != owned.identity:
-                    raise PackStagingError(
-                        "owned POSIX output name no longer identifies retained file"
-                    )
-                os.unlink(name, dir_fd=directory.handle)
-                self._close_file(owned)
-        directory.validate()
-        if self.windows:
             assert _WIN_OWNED_API is not None
-            _WIN_OWNED_API.dispose(directory.handle)
-            self._close_directory(directory)
-        else:
-            assert directory.name is not None
-            os.rmdir(directory.name, dir_fd=self.root.handle)
-            self._close_directory(directory)
+            self._close_file(owned)
+            delete_handle = _WIN_OWNED_API.reopen_output_cleanup(
+                directory.handle, name,
+            )
+            try:
+                if _WIN_OWNED_API.identity(
+                    delete_handle, directory=False
+                ) != owned.identity:
+                    raise PackStagingError(
+                        "owned output name changed before exact handle deletion"
+                    )
+                _WIN_OWNED_API.dispose(delete_handle)
+            finally:
+                _WIN_OWNED_API.close(delete_handle)
+        directory.validate()
+        assert _WIN_OWNED_API is not None
+        _WIN_OWNED_API.dispose(directory.handle)
+        self._close_directory(directory)
         self._close_directory(self.root)
 
     def abandon(self) -> None:
