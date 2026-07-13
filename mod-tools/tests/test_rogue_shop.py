@@ -7,6 +7,7 @@ import copy
 import io
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -265,6 +266,88 @@ class TestCli(unittest.TestCase):
         self.profile = core.VersionProfile(
             id="cn", label="CN", store=Path("cn-store"), fallback=None
         )
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.target_root = Path(self.temp_dir.name)
+        self.client_target = self.target_root / "event_item_shop.orderedmap"
+        self.assets_target = self.target_root / "assets"
+        self.assets_target.mkdir()
+        self.server_target = self.assets_target / shop.SHOP_JSON
+        self.id_map_target = self.assets_target / shop.SHOP_ID_MAP_JSON
+        self.assets_patch = mock.patch.object(shop, "ASSETS_DIR", self.assets_target)
+        self.store_path_patch = mock.patch.object(
+            shop.q, "store_path", return_value=self.client_target
+        )
+        self.assets_patch.start()
+        self.store_path_patch.start()
+        self.addCleanup(self.assets_patch.stop)
+        self.addCleanup(self.store_path_patch.stop)
+
+    def _reset_transaction_targets(self, *, client_exists: bool = True):
+        originals = {
+            self.client_target: b"client-before\x00\r\n" if client_exists else None,
+            self.server_target: b'{\r\n  "before": "shop"\r\n}\r\n',
+            self.id_map_target: b'{"before":"id-map"}\n',
+        }
+        for path, payload in originals.items():
+            if path.exists():
+                path.unlink()
+            if payload is not None:
+                path.write_bytes(payload)
+        return originals
+
+    def _assert_transaction_targets(self, originals):
+        for path, payload in originals.items():
+            with self.subTest(target=path.name):
+                self.assertEqual(payload is not None, path.exists())
+                if payload is not None:
+                    self.assertEqual(payload, path.read_bytes())
+
+    def _run_transaction_failure(
+        self, failure_at: str, exception_type=OSError
+    ) -> tuple[int, str]:
+        stored_table = copy.deepcopy(self.client)
+        stored_json = {
+            shop.SHOP_JSON: copy.deepcopy(self.server),
+            shop.SHOP_ID_MAP_JSON: copy.deepcopy(self.id_map),
+        }
+        json_loads = {shop.SHOP_JSON: 0, shop.SHOP_ID_MAP_JSON: 0}
+
+        def load_table(_logical):
+            return copy.deepcopy(stored_table)
+
+        def save_table(_logical, data):
+            nonlocal stored_table
+            stored_table = copy.deepcopy(data)
+            self.client_target.write_bytes(b"client-after\n")
+
+        def load_json(name):
+            json_loads[name] += 1
+            if json_loads[name] > 1 and failure_at == f"read_{name}":
+                raise exception_type(f"injected {name} readback failure")
+            return copy.deepcopy(stored_json[name])
+
+        def save_json(name, data):
+            stored_json[name] = copy.deepcopy(data)
+            target = self.assets_target / name
+            target.write_bytes(
+                (json.dumps(data, ensure_ascii=False) + "\n").encode("utf-8")
+            )
+            if failure_at == f"write_{name}":
+                raise exception_type(f"injected {name} write failure")
+
+        errors = io.StringIO()
+        with (
+            mock.patch.object(shop, "require_cn_profile", return_value=self.profile),
+            mock.patch.object(shop.q, "load_table", side_effect=load_table),
+            mock.patch.object(shop.q, "save_table", side_effect=save_table),
+            mock.patch.object(shop, "load_json", side_effect=load_json),
+            mock.patch.object(shop, "save_json", side_effect=save_json),
+            mock.patch.object(sys, "argv", ["wf_rogue_shop.py", "--write"]),
+            contextlib.redirect_stderr(errors),
+        ):
+            result = shop.main()
+        return result, errors.getvalue()
 
     def test_default_is_dry_run_and_does_not_write(self):
         output = io.StringIO()
@@ -430,6 +513,55 @@ class TestCli(unittest.TestCase):
             result = shop.main()
 
         self.assertNotEqual(0, result)
+
+    def test_second_and_third_write_failures_restore_exact_targets(self):
+        cases = (
+            (f"write_{shop.SHOP_JSON}", True),
+            (f"write_{shop.SHOP_ID_MAP_JSON}", False),
+        )
+        for failure_at, client_exists in cases:
+            with self.subTest(failure_at=failure_at):
+                originals = self._reset_transaction_targets(
+                    client_exists=client_exists
+                )
+                result, errors = self._run_transaction_failure(failure_at)
+                self.assertEqual(1, result)
+                self.assertIn("injected", errors)
+                self._assert_transaction_targets(originals)
+
+    def test_second_and_third_readback_failures_restore_exact_targets(self):
+        for name in (shop.SHOP_JSON, shop.SHOP_ID_MAP_JSON):
+            failure_at = f"read_{name}"
+            with self.subTest(failure_at=failure_at):
+                originals = self._reset_transaction_targets()
+                result, errors = self._run_transaction_failure(failure_at)
+                self.assertEqual(1, result)
+                self.assertIn("injected", errors)
+                self._assert_transaction_targets(originals)
+
+    def test_unexpected_write_exception_still_restores_exact_targets(self):
+        originals = self._reset_transaction_targets()
+        result, errors = self._run_transaction_failure(
+            f"write_{shop.SHOP_JSON}", LookupError
+        )
+        self.assertEqual(1, result)
+        self.assertIn("injected", errors)
+        self._assert_transaction_targets(originals)
+
+    def test_rollback_failure_is_reported_alongside_original_error(self):
+        self._reset_transaction_targets()
+        with mock.patch.object(
+            shop._FileBeforeImages,
+            "restore",
+            return_value=["injected rollback failure"],
+        ):
+            result, errors = self._run_transaction_failure(
+                f"write_{shop.SHOP_JSON}"
+            )
+        self.assertEqual(1, result)
+        self.assertIn("injected event_item_shop.json write failure", errors)
+        self.assertIn("回滚失败", errors)
+        self.assertIn("injected rollback failure", errors)
 
 
 if __name__ == "__main__":

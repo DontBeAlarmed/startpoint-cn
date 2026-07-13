@@ -12,6 +12,7 @@ import copy
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -375,11 +376,77 @@ def load_json(name: str):
     return json.loads((ASSETS_DIR / name).read_text(encoding="utf-8"))
 
 
+def _atomic_write_bytes(path: Path, payload: bytes) -> None:
+    """Replace one file from a sibling temporary file."""
+    path = Path(path).absolute()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            fd = -1
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if fd >= 0:
+            os.close(fd)
+        temporary.unlink(missing_ok=True)
+
+
 def save_json(name: str, data) -> None:
     ordered = _sort_numeric_mapping(data) if isinstance(data, dict) else data
     payload = json.dumps(ordered, ensure_ascii=False, indent=4) + "\n"
-    with (ASSETS_DIR / name).open("w", encoding="utf-8", newline="\n") as handle:
-        handle.write(payload)
+    _atomic_write_bytes(ASSETS_DIR / name, payload.encode("utf-8"))
+
+
+def _write_target_paths() -> tuple[Path, Path, Path]:
+    return (
+        Path(q.store_path(SHOP_T)),
+        ASSETS_DIR / SHOP_JSON,
+        ASSETS_DIR / SHOP_ID_MAP_JSON,
+    )
+
+
+class _FileBeforeImages:
+    """Exact in-memory before-images for the complete live mutation set."""
+
+    def __init__(self, paths) -> None:
+        self.entries: list[tuple[Path, bool, bytes | None]] = []
+        seen: set[str] = set()
+        for candidate in paths:
+            path = Path(candidate).absolute()
+            key = str(path).casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            existed = path.exists()
+            if existed and not path.is_file():
+                raise ValueError(f"rollback target is not a file: {path}")
+            self.entries.append(
+                (path, existed, path.read_bytes() if existed else None)
+            )
+
+    def restore(self) -> list[str]:
+        errors: list[str] = []
+        for path, existed, payload in reversed(self.entries):
+            try:
+                if existed:
+                    if path.exists() and not path.is_file():
+                        raise ValueError(f"rollback target became non-file: {path}")
+                    if payload is None:
+                        raise RuntimeError(f"rollback payload missing: {path}")
+                    _atomic_write_bytes(path, payload)
+                elif path.exists():
+                    if not path.is_file():
+                        raise ValueError(f"new rollback target is not a file: {path}")
+                    path.unlink()
+            except Exception as exc:
+                errors.append(f"{path}: {exc}")
+        return errors
 
 
 def _stale_product_count(shop: dict) -> int:
@@ -434,6 +501,7 @@ def main() -> int:
         print("[DRY-RUN] 未写入任何文件；加 --write 才会落盘。本脚本不会发布。")
         return 0
 
+    before_images: _FileBeforeImages | None = None
     try:
         write_profile = require_cn_profile()
         if write_profile.store.resolve() != profile.store.resolve():
@@ -441,6 +509,7 @@ def main() -> int:
                 f"写入前 CN store 已变化: {profile.store.resolve()} -> "
                 f"{write_profile.store.resolve()}"
             )
+        before_images = _FileBeforeImages(_write_target_paths())
         q.save_table(SHOP_T, client_after)
         save_json(SHOP_JSON, shop_after)
         save_json(SHOP_ID_MAP_JSON, id_map_after)
@@ -457,8 +526,17 @@ def main() -> int:
         problems = validate_shop(client_readback, shop_readback, id_map_readback)
         if problems:
             raise RuntimeError("写后复读校验失败: " + "; ".join(problems))
-    except (KeyError, TypeError, ValueError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+    except Exception as exc:
         print(f"[ERR] 写入或复读失败: {exc}", file=sys.stderr)
+        if before_images is not None:
+            rollback_errors = before_images.restore()
+            if rollback_errors:
+                print(
+                    "[ERR] 回滚失败: " + " | ".join(rollback_errors),
+                    file=sys.stderr,
+                )
+            else:
+                print("[ROLLBACK] 三个写入目标已恢复到写前状态。", file=sys.stderr)
         return 1
 
     print("[OK] 15 products passed client/server write-readback validation; 未发布。")
