@@ -376,6 +376,40 @@ def save_json(name: str, data) -> None:
         json.dump(data, fh, ensure_ascii=False, indent=0 if isinstance(data, list) else 1)
 
 
+def require_cn_profile() -> core.VersionProfile:
+    """锁定生成、写入与发布到同一个无 fallback 的 CN store。"""
+    active = core.resolve_profile()
+    cn_profile = core.resolve_profile("cn")
+    if active is None or cn_profile is None:
+        raise ValueError("必须同时配置 active profile 与 cn profile")
+    if active.id != "cn" or cn_profile.id != "cn":
+        raise ValueError(
+            f"仅允许 active=cn,当前 active={active.id!r}, cn={cn_profile.id!r}"
+        )
+    if active.fallback is not None or cn_profile.fallback is not None:
+        raise ValueError("CN profile 必须设置 fallback=null")
+
+    active_store = active.store.resolve()
+    cn_store = cn_profile.store.resolve()
+    if not active_store.exists() or not cn_store.exists():
+        raise ValueError(
+            f"CN store 不存在: active={active_store}, explicit={cn_store}"
+        )
+    if active_store != cn_store:
+        raise ValueError(
+            f"active/cn store 不一致: active={active_store}, explicit={cn_store}"
+        )
+
+    quest_store = q.store_path(ITEM_T).parents[1].resolve()
+    if quest_store != active_store:
+        raise ValueError(
+            f"wf_quest_lib store 与 CN profile 不一致: quest={quest_store}, "
+            f"profile={active_store}"
+        )
+    print(f"[PROFILE] active=cn store={active_store}")
+    return active
+
+
 def _assert_readback_rows(
     actual: dict[str, object], expected: dict[str, object], keys: list[str], label: str,
 ) -> None:
@@ -424,6 +458,7 @@ def main() -> int:
     args = ap.parse_args()
 
     try:
+        require_cn_profile()
         tables = MasterTables(
             items=q.load_table(ITEM_T),
             equipment=q.load_table(EQUIP_T),
@@ -505,6 +540,12 @@ def main() -> int:
     if not args.publish:
         print(f"发布命令: python mod-tools/wf_publish.py --tables {publish_tables}")
         return 0
+
+    try:
+        require_cn_profile()
+    except (KeyError, TypeError, ValueError, RuntimeError, OSError) as exc:
+        print(f"[ERR] 发布前 CN profile 复检失败: {exc}", file=sys.stderr)
+        return 1
 
     result = subprocess.run(
         [sys.executable, os.path.join(ROOT, "mod-tools", "wf_publish.py"),

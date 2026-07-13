@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import wf_mod_tool as core  # noqa: E402
@@ -221,6 +222,99 @@ class TestApiSurface(unittest.TestCase):
 
     def test_task2_writer_api_exists(self):
         self.assertEqual((), MISSING_TASK2_API)
+
+
+class TestCnProfilePreflight(unittest.TestCase):
+    def test_active_global_fails_before_any_read_write_or_publish(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            active_global = core.VersionProfile(
+                id="global",
+                label="Global",
+                store=root / "global",
+                fallback=None,
+            )
+            explicit_cn = core.VersionProfile(
+                id="cn",
+                label="CN",
+                store=root / "cn",
+                fallback=None,
+            )
+            active_global.store.mkdir()
+            explicit_cn.store.mkdir()
+
+            def resolve_profile(profile_id=None):
+                return explicit_cn if profile_id == "cn" else active_global
+
+            with (
+                mock.patch.object(rewards.core, "resolve_profile", side_effect=resolve_profile),
+                mock.patch.object(rewards.q, "load_table", return_value={}) as load_table,
+                mock.patch.object(rewards.q, "save_table") as save_table,
+                mock.patch.object(rewards, "load_json", return_value={}) as load_json,
+                mock.patch.object(rewards, "save_json") as save_json,
+                mock.patch.object(rewards.subprocess, "run") as publish,
+                mock.patch.object(sys, "argv", ["wf_rogue_rewards.py"]),
+            ):
+                result = rewards.main()
+
+            self.assertNotEqual(0, result)
+            load_table.assert_not_called()
+            save_table.assert_not_called()
+            load_json.assert_not_called()
+            save_json.assert_not_called()
+            publish.assert_not_called()
+
+    def test_profile_is_rechecked_immediately_before_publish(self):
+        tables = fake_master_tables(placeholders=True)
+        mirrors = fake_server_mirrors()
+        stored_tables = {
+            rewards.ITEM_T: copy.deepcopy(tables.items),
+            rewards.EQUIP_T: copy.deepcopy(tables.equipment),
+            rewards.EQUIP_STATUS_T: copy.deepcopy(tables.equipment_status),
+            rewards.SOUL_T: copy.deepcopy(tables.ability_soul),
+            rewards.RUSH_EVENT_T: copy.deepcopy(tables.rush_event),
+        }
+        stored_json = {
+            "equipment_max_level.json": copy.deepcopy(mirrors.equipment_max_level),
+            "equipment_element.json": copy.deepcopy(mirrors.equipment_element),
+            "equipment_lookup.json": copy.deepcopy(mirrors.equipment_lookup),
+            "equipment_ids.json": copy.deepcopy(mirrors.equipment_ids),
+            "item_ids.json": copy.deepcopy(mirrors.item_ids),
+        }
+
+        def load_table(logical):
+            return copy.deepcopy(stored_tables[logical])
+
+        def save_table(logical, data):
+            stored_tables[logical] = copy.deepcopy(data)
+
+        def load_json(name):
+            return copy.deepcopy(stored_json[name])
+
+        def save_json(name, data):
+            stored_json[name] = copy.deepcopy(data)
+
+        with (
+            mock.patch.object(
+                rewards,
+                "require_cn_profile",
+                side_effect=[mock.sentinel.cn_profile, ValueError("active changed")],
+            ) as preflight,
+            mock.patch.object(rewards.q, "load_table", side_effect=load_table),
+            mock.patch.object(rewards.q, "save_table", side_effect=save_table),
+            mock.patch.object(rewards, "load_json", side_effect=load_json),
+            mock.patch.object(rewards, "save_json", side_effect=save_json),
+            mock.patch.object(rewards, "_print_plan"),
+            mock.patch.object(rewards.subprocess, "run") as publish,
+            mock.patch.object(
+                sys, "argv", ["wf_rogue_rewards.py", "--write", "--publish"]
+            ),
+        ):
+            result = rewards.main()
+
+        self.assertNotEqual(0, result)
+        self.assertEqual(2, preflight.call_count)
+        publish.assert_not_called()
 
 
 @unittest.skipUnless(not MISSING_API, "canonical builder API is not implemented yet")
