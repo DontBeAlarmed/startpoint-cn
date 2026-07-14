@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 import wf_character_pack as character_pack
+import wf_assets
 import wf_mod_tool as core
 
 
@@ -106,6 +107,30 @@ def _copy_exact(source: Path, target: Path, *, anchor: Path) -> bytes:
         stream.flush()
         os.fsync(stream.fileno())
     return raw
+
+
+def _copy_runtime_payload(
+    source: Path,
+    target: Path,
+    *,
+    anchor: Path,
+    logical_path: str,
+) -> tuple[bytes, bytes]:
+    """Copy an authoring payload after converting media to WF storage form."""
+    _require_regular_source(source, anchor)
+    source_raw = source.read_bytes()
+    if logical_path.endswith(".png"):
+        stored_raw = wf_assets.png_encode(source_raw)
+    elif logical_path.endswith(".mp3"):
+        stored_raw = wf_assets.mp3_encode(source_raw)
+    else:
+        stored_raw = source_raw
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("xb") as stream:
+        stream.write(stored_raw)
+        stream.flush()
+        os.fsync(stream.fileno())
+    return source_raw, stored_raw
 
 
 def _formal_table_claims(offline: dict, package_dir: Path) -> list[dict]:
@@ -267,6 +292,30 @@ def validate_runtime_test_package(package_dir: Path) -> list[str]:
                 errors.append(f"roots.{root_name}: undeclared files: {extras}")
             if missing:
                 errors.append(f"roots.{root_name}: missing files: {missing}")
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                logical = entry.get("logical_path")
+                if not isinstance(logical, str):
+                    continue
+                payload = package_dir / "roots" / root_name / Path(*logical.split("/"))
+                if not payload.is_file():
+                    continue
+                try:
+                    raw = payload.read_bytes()
+                except OSError as exc:
+                    errors.append(f"roots.{root_name}:{logical}: cannot read: {exc}")
+                    continue
+                if logical.endswith(".png") and raw[:8] != wf_assets.PNG_FAKE:
+                    errors.append(
+                        f"roots.{root_name}:{logical}: WF storage PNG signature required"
+                    )
+                elif logical.endswith(".mp3"):
+                    probe = wf_assets.mp3_probe(raw, 1023)
+                    if probe["frames"] == 0:
+                        errors.append(
+                            f"roots.{root_name}:{logical}: WF storage MP3 frames required"
+                        )
     qa_files = qa.get("files") if isinstance(qa, dict) else None
     if isinstance(qa_files, list):
         declared_qa = {
@@ -331,15 +380,23 @@ def assemble_runtime_test_package(
             for logical, claim in sorted(source_roots[root_name].items()):
                 source = offline_package / "roots" / root_name / Path(*logical.split("/"))
                 target = staging / "roots" / root_name / Path(*logical.split("/"))
-                raw = _copy_exact(source, target, anchor=offline_package)
+                source_raw, stored_raw = _copy_runtime_payload(
+                    source,
+                    target,
+                    anchor=offline_package,
+                    logical_path=logical,
+                )
                 expected_sha = claim.get("sha256")
                 expected_size = claim.get("size")
-                if _sha256(raw) != expected_sha or len(raw) != expected_size:
+                if (
+                    _sha256(source_raw) != expected_sha
+                    or len(source_raw) != expected_size
+                ):
                     raise ReleasePackError(f"offline payload drift: {root_name}:{logical}")
                 formal_roots[root_name].append({
                     "logical_path": logical,
-                    "sha256": _sha256(raw),
-                    "size": len(raw),
+                    "sha256": _sha256(stored_raw),
+                    "size": len(stored_raw),
                 })
         qa_entries = offline_manifest.get("qa")
         if not isinstance(qa_entries, list):
