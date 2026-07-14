@@ -1,7 +1,35 @@
 # 可选补丁:boss 塔每次进本随机(random-floor)
 
-配合 `mod-tools/wf_chain_build.py --pool` 使用:floor 表键写成「魔法头行 + boss 层池」,
-客户端**每次构建 quest 时**从池里随机抽 K 层——真·每次进本全 boss 随机,无需重新发布数据。
+配合 `mod-tools/wf_chain_build.py --pool`(或 GUI 连战塔页「每次进本随机」模式)使用:
+floor 表键写成「魔法头行 + boss 层池」,客户端**每次构建 quest 时**从池里随机抽 K 层——
+真·每次进本全 boss 随机,无需重新发布数据。
+
+> ## ❌ indexOf 版真机同样未通过(2026-07-14)——排除"运算符"假设
+> 假设:FFDec 只编坏字符串 `==`,改 `battle_field_data_id.indexOf("__random__") != -1`
+> (omni-element 实证可用的 indexOf 模式)可绕开。**实测:回编字节级导出守卫存活、类未坏,
+> 但真机进宝物域 2001 仍 C8601(与 == 版一字不差)。** ⇒ **问题不在运算符,在"往
+> getTowerFloorValues 插一整个新块(新 if + 6 局部 + while 洗牌)"本身**被直编器编成运行时
+> 不等价字节码。omni-element 能用 = 它只**改一句已有表达式**(给现有 if 加 `||`),不是插块。
+> 全链路(FFDec 导出/replace/回读/zipfile 回填/zipalign/apksigner/装包/发布/金丝雀)已打通并
+> 验证,签名 hashCode=设备已装(干净更新),`build_instrumented_apk.py` 是现成回封范本
+> (口令 wfmod2026)——**唯一没跨过的就是这一个方法的回编正确性**。
+> **剩余路径**(2026-07-14 用户暂收手,回退固定链 + PC 侧 wf_rogue_reroll/wf_chain_build 重摇):
+>   ① 无循环简化块(去 while,改随机起点连续 K 层,只剩 if+slice+4 局部;文档判"回编最稳",**未试**);
+>   ② P-code 直接注入方法体(绕开 AS3 直编,根治,但需手写 AVM2 汇编)。
+>
+> ## ⚠ 历史:真机未通过(2026-07-13,字符串 == 版)
+> FFDec `-air -replace` 回编本补丁后**真机不生效**:进宝物域(Tower quest)时
+> `getTowerFloorValues` 的头行守卫 `_rfHead.battle_field_data_id == "__random__"`
+> 运行时判**假**,`__random__` 头行漏进循环 → `createBattleQuestSafeFloorValues`
+> 拿它当 field_data 查表 → **ClientError C8601「指定的Key不存在。key=__random__」**(进本即崩)。
+> 反编译回读证实字节码里守卫**在**、源码正确(无类型 `_loc2_[0]` 与强类型 `FloorValues` 两种写法均试,
+> 崩溃堆栈逐字节一致),数据层也正确(floor 表 __random__ 确在 row 0,MasterArray.init 保序不排序,
+> FloorValues 属性映射 param[0]→field_data_id 无误)。共同变量 = **FFDec 实验性 AS3 直编**
+> 对该方法插入块/字符串字面量比较编译出运行时不等价字节码(即 README「回编风险」实锤)。
+> **修复方向**:改用 **P-code 编辑**注入(绕开 AS3 直编),或换**数值哨兵**(把头行标记放进
+> 客户端按 int 读的列、用数值比较代替字符串字面量比较)。固定链模式(无 `__random__` 头行,
+> `--floors`/GUI「固定链」)**不受影响、真机正常**——连战塔 boss 连打本身已验证可玩,
+> 受阻的**仅是「每次进本随机」这一档**。GUI 连战塔页两档均已就绪,随机档等本补丁修好后即可用。
 
 ## 机制依据(2026-07-12 逆向)
 

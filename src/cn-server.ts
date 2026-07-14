@@ -3,7 +3,7 @@ import { ContentTypeParserDoneFunction } from "fastify/types/content-type-parser
 import { pack, unpack } from "msgpackr";
 import fastifyStatic from "@fastify/static";
 import path from "path";
-import { existsSync, readFileSync } from "fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs";
 import { getServerTime, getServerTimeForPlayer } from "./utils";
 import { restoreTimeOffset } from "./data/activeAccount";
 
@@ -511,6 +511,14 @@ fastify.register(indexWebApiPlugin, { prefix: "/api" });
 fastify.register(seedsWebApiPlugin, { prefix: "/api/seeds" });
 fastify.register(modAdminApiPlugin, { prefix: "/api/mod-admin" });
 
+// 404 audit log: console scrollback dies with the window, this file doesn't.
+// Every client-visible H404 (asset per-file miss / unknown endpoint) lands here.
+const HTTP404_LOG = path.join(__dirname, "..", "logs", "http404.log");
+try { mkdirSync(path.dirname(HTTP404_LOG), { recursive: true }); } catch { /* best effort */ }
+function log404(kind: string, detail: string): void {
+    try { appendFileSync(HTTP404_LOG, `${new Date().toISOString()} [${kind}] ${detail}\n`); } catch { /* best effort */ }
+}
+
 const cdnHost = process.env.CN_LISTEN_HOST || "localhost";
 const cdnPort = process.env.CN_LISTEN_PORT || "8001";
 const cdnDisplayHost = cdnHost === "0.0.0.0" ? "localhost" : cdnHost;
@@ -528,6 +536,7 @@ fastify.get("/patch/cn/dummy/download/production/upload/:prefix/:hash", async (r
         return reply.type("application/octet-stream").send(readFileSync(patchFile));
     }
     console.log("[PATCH-MISS]", relPath);
+    log404("PATCH-MISS", relPath);
     return reply.status(404).send("Not Found");
 });
 
@@ -538,6 +547,7 @@ fastify.get("/patch/cn/asset-patch/active/:file", async (request, reply) => {
     if (existsSync(patchFile)) {
         return reply.type("application/zip").send(readFileSync(patchFile));
     }
+    log404("ASSET-PATCH-MISS", file);
     return reply.status(404).send("Not Found");
 });
 
@@ -578,6 +588,7 @@ fastify.setNotFoundHandler((request, reply) => {
         return;
     }
     console.log(`[UNKNOWN] ${request.method} ${request.url}`);
+    log404("UNKNOWN", `${request.method} ${request.url}`);
     reply.status(404).send({ error: "Not Found" });
 });
 
