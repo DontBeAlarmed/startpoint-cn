@@ -10,6 +10,7 @@ import io
 import json
 import os
 import re
+import shutil
 import socket
 import stat
 import sys
@@ -99,6 +100,14 @@ class PreparedRuntimeRelease:
     payload: ReleasePayload
 
 
+@dataclass(frozen=True)
+class RuntimeRebaseResult:
+    output_dir: Path
+    source_manifest_sha256: str
+    manifest_sha256: str
+    table_count: int
+
+
 class JsonObjectCodec:
     """Expose top-level server JSON ownership to ``PackTransaction``."""
 
@@ -113,6 +122,140 @@ class JsonObjectCodec:
         return character_pack.TableImage(tuple(
             (str(key), _canonical(item)) for key, item in value.items()
         ))
+
+
+def _merge_claimed_rows(
+    live_keys: list[str],
+    live_rows: list[bytes],
+    candidate_rows: Mapping[str, bytes],
+    claimed_keys: tuple[str, ...],
+    *,
+    label: str,
+) -> tuple[list[str], list[bytes]]:
+    keys = list(live_keys)
+    rows = list(live_rows)
+    positions = {key: index for index, key in enumerate(keys)}
+    for key in claimed_keys:
+        if key not in candidate_rows:
+            raise ReleaseError(f"candidate lacks claimed row: {label}:{key}")
+        row = candidate_rows[key]
+        if key in positions:
+            rows[positions[key]] = row
+        else:
+            positions[key] = len(keys)
+            keys.append(key)
+            rows.append(row)
+    return keys, rows
+
+
+def _merge_claimed_table_bytes(
+    claim: character_pack.TableClaim,
+    candidate_raw: bytes,
+    live_raw: bytes,
+) -> bytes:
+    """Rebase only declared rows onto the current live full-table bytes."""
+    import wf_mod_tool as core
+
+    logical = claim.logical_path
+    try:
+        if claim.codec_id in {"flat", "raw_outer"}:
+            compressed = claim.codec_id == "flat"
+            candidate_keys, candidate_rows = core._strict_orderedmap_rows(  # type: ignore[attr-defined]
+                candidate_raw, label=f"candidate:{logical}", compressed_rows=compressed
+            )
+            live_keys, live_rows = core._strict_orderedmap_rows(  # type: ignore[attr-defined]
+                live_raw, label=f"live:{logical}", compressed_rows=compressed
+            )
+            keys, rows = _merge_claimed_rows(
+                live_keys,
+                live_rows,
+                dict(zip(candidate_keys, candidate_rows)),
+                claim.outer_keys,
+                label=logical,
+            )
+            table = core.OrderedMap(logical, keys, rows, Path("<runtime-rebase>"))
+            return (
+                core.build_orderedmap(table)
+                if compressed else core.build_orderedmap_raw_rows(table)
+            )
+
+        if claim.codec_id in {"action_nested", "switched_nested"}:
+            candidate_outer_keys, candidate_outer_rows = core._strict_orderedmap_rows(  # type: ignore[attr-defined]
+                candidate_raw, label=f"candidate:{logical}", compressed_rows=False
+            )
+            live_outer_keys, live_outer_rows = core._strict_orderedmap_rows(  # type: ignore[attr-defined]
+                live_raw, label=f"live:{logical}", compressed_rows=False
+            )
+            candidate_outer = dict(zip(candidate_outer_keys, candidate_outer_rows))
+            live_outer = dict(zip(live_outer_keys, live_outer_rows))
+            inner_claims = dict(claim.inner_keys)
+            if set(inner_claims) != set(claim.outer_keys):
+                raise ReleaseError(f"nested claims are incomplete: {logical}")
+            merged_outer_rows = list(live_outer_rows)
+            outer_positions = {
+                key: index for index, key in enumerate(live_outer_keys)
+            }
+            merged_outer_keys = list(live_outer_keys)
+            for outer_key in claim.outer_keys:
+                candidate_inner_raw = candidate_outer.get(outer_key)
+                if candidate_inner_raw is None:
+                    raise ReleaseError(
+                        f"candidate lacks claimed nested row: {logical}:{outer_key}"
+                    )
+                candidate_inner_keys, candidate_inner_rows = core._strict_orderedmap_rows(  # type: ignore[attr-defined]
+                    candidate_inner_raw,
+                    label=f"candidate:{logical}:{outer_key}",
+                    compressed_rows=True,
+                )
+                live_inner_raw = live_outer.get(outer_key)
+                if live_inner_raw is None:
+                    live_inner_keys: list[str] = []
+                    live_inner_rows: list[bytes] = []
+                else:
+                    live_inner_keys, live_inner_rows = core._strict_orderedmap_rows(  # type: ignore[attr-defined]
+                        live_inner_raw,
+                        label=f"live:{logical}:{outer_key}",
+                        compressed_rows=True,
+                    )
+                inner_keys, inner_rows = _merge_claimed_rows(
+                    live_inner_keys,
+                    live_inner_rows,
+                    dict(zip(candidate_inner_keys, candidate_inner_rows)),
+                    inner_claims[outer_key],
+                    label=f"{logical}:{outer_key}",
+                )
+                merged_inner = core.build_orderedmap(core.OrderedMap(
+                    f"{logical}#{outer_key}",
+                    inner_keys,
+                    inner_rows,
+                    Path("<runtime-rebase>"),
+                ))
+                if outer_key in outer_positions:
+                    merged_outer_rows[outer_positions[outer_key]] = merged_inner
+                else:
+                    outer_positions[outer_key] = len(merged_outer_keys)
+                    merged_outer_keys.append(outer_key)
+                    merged_outer_rows.append(merged_inner)
+            return core.build_orderedmap_raw_rows(core.OrderedMap(
+                logical,
+                merged_outer_keys,
+                merged_outer_rows,
+                Path("<runtime-rebase>"),
+            ))
+
+        if claim.codec_id == "json_object":
+            candidate = _strict_object(candidate_raw, f"candidate:{logical}")
+            live = _strict_object(live_raw, f"live:{logical}")
+            for key in claim.outer_keys:
+                if key not in candidate:
+                    raise ReleaseError(f"candidate lacks claimed JSON row: {logical}:{key}")
+                live[key] = candidate[key]
+            return _canonical(live)
+    except ReleaseError:
+        raise
+    except Exception as exc:
+        raise ReleaseError(f"cannot rebase claimed table {logical}: {exc}") from exc
+    raise ReleaseError(f"unsupported runtime rebase codec: {claim.codec_id}")
 
 
 def release_payload_from_records(
@@ -410,6 +553,133 @@ def _strict_object(raw: bytes, label: str) -> dict:
     if not isinstance(value, dict):
         raise ReleaseError(f"{label}: object required")
     return value
+
+
+def rebase_runtime_package(
+    package_dir: Path,
+    output_dir: Path,
+    *,
+    live_roots: character_pack.LiveRoots,
+    generator_git_head: str,
+) -> RuntimeRebaseResult:
+    """Create a new package whose full tables preserve the current live baseline."""
+    import wf_mod_tool as core
+    import wf_seris_release_pack as release_pack
+
+    package_dir = Path(package_dir)
+    output_dir = Path(output_dir)
+    if re.fullmatch(r"[0-9a-f]{40}", generator_git_head) is None:
+        raise ReleaseError("runtime rebase git head must be 40 lowercase hex characters")
+    errors = release_pack.validate_runtime_test_package(package_dir)
+    if errors:
+        raise ReleaseError("runtime package is invalid before rebase:\n- " + "\n- ".join(errors))
+    if output_dir.exists():
+        raise ReleaseError("runtime rebase output already exists")
+    source_resolved = package_dir.resolve()
+    output_parent = output_dir.parent.resolve()
+    output_resolved = output_parent / output_dir.name
+    try:
+        output_resolved.relative_to(source_resolved)
+    except ValueError:
+        pass
+    else:
+        raise ReleaseError("runtime rebase output may not be inside the source package")
+    manifest_path = package_dir / "manifest.json"
+    source_manifest_raw = manifest_path.read_bytes()
+    manifest = character_pack.load_manifest(manifest_path)
+    claims = character_pack._parse_transaction_claims(manifest)  # type: ignore[attr-defined]
+    source_files = release_pack._scan_files(package_dir)  # type: ignore[attr-defined]
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(
+        prefix=f".{output_dir.name}.live-rebase-", dir=output_dir.parent
+    ))
+    try:
+        for relative in sorted(source_files - {"manifest.json"}):
+            release_pack._copy_exact(  # type: ignore[attr-defined]
+                package_dir / Path(*PurePosixPath(relative).parts),
+                staging / Path(*PurePosixPath(relative).parts),
+                anchor=package_dir,
+            )
+
+        root_entries: dict[tuple[str, str], dict] = {}
+        roots = manifest.get("roots")
+        if not isinstance(roots, dict):
+            raise ReleaseError("runtime package roots are invalid")
+        for root_name, entries in roots.items():
+            if not isinstance(root_name, str) or not isinstance(entries, list):
+                raise ReleaseError("runtime package root inventory is invalid")
+            for entry in entries:
+                if not isinstance(entry, dict) or not isinstance(entry.get("logical_path"), str):
+                    raise ReleaseError("runtime package root entry is invalid")
+                root_entries[(root_name, entry["logical_path"])] = entry
+
+        rebase_facts: list[dict] = []
+        for (root_name, logical), claim in sorted(claims.items()):
+            if root_name == "common":
+                live_path = core.table_path(Path(live_roots.common), logical)
+            elif root_name == "server":
+                live_path = Path(live_roots.server) / Path(*logical.split("/"))
+            else:
+                raise ReleaseError(
+                    f"runtime table rebase supports common/server only: {root_name}:{logical}"
+                )
+            try:
+                live_raw = live_path.read_bytes()
+            except OSError as exc:
+                raise ReleaseError(f"cannot read live table for rebase: {root_name}:{logical}: {exc}") from exc
+            candidate_path = staging / "roots" / root_name / Path(*logical.split("/"))
+            candidate_raw = candidate_path.read_bytes()
+            merged_raw = _merge_claimed_table_bytes(claim, candidate_raw, live_raw)
+            _atomic_write(candidate_path, merged_raw)
+            entry = root_entries.get((root_name, logical))
+            if entry is None:
+                raise ReleaseError(f"table rebase lacks root inventory entry: {root_name}:{logical}")
+            entry["sha256"] = _sha256(merged_raw)
+            entry["size"] = len(merged_raw)
+            rebase_facts.append({
+                "root": root_name,
+                "logical_path": logical,
+                "live_before_sha256": _sha256(live_raw),
+                "live_before_size": len(live_raw),
+                "rebased_sha256": _sha256(merged_raw),
+                "rebased_size": len(merged_raw),
+            })
+
+        snapshot = manifest.get("snapshot")
+        if not isinstance(snapshot, dict):
+            raise ReleaseError("runtime package snapshot is invalid")
+        snapshot["generator_git_head"] = generator_git_head
+        snapshot["runtime_rebase"] = {
+            "source_manifest_sha256": _sha256(source_manifest_raw),
+            "tables": rebase_facts,
+        }
+        manifest_raw = character_pack.canonical_manifest_bytes(manifest)
+        _atomic_write(staging / "manifest.json", manifest_raw)
+        staged_errors = release_pack.validate_runtime_test_package(staging)
+        if staged_errors:
+            raise ReleaseError(
+                "rebased runtime package validation failed:\n- "
+                + "\n- ".join(staged_errors)
+            )
+        os.replace(staging, output_dir)
+        final_errors = release_pack.validate_runtime_test_package(output_dir)
+        if final_errors:
+            raise ReleaseError(
+                "renamed rebased runtime package validation failed:\n- "
+                + "\n- ".join(final_errors)
+            )
+        return RuntimeRebaseResult(
+            output_dir=output_dir,
+            source_manifest_sha256=_sha256(source_manifest_raw),
+            manifest_sha256=_sha256(manifest_raw),
+            table_count=len(rebase_facts),
+        )
+    except Exception:
+        if staging.exists():
+            shutil.rmtree(staging, ignore_errors=True)
+        if output_dir.exists():
+            shutil.rmtree(output_dir, ignore_errors=True)
+        raise
 
 
 class ActiveReleaseStore:
@@ -883,6 +1153,11 @@ def main(argv: list[str] | None = None) -> int:
         child = sub.add_parser(command)
         child.add_argument("--package-dir", required=True, type=Path)
         child.add_argument("--profile", default="cn")
+    rebase = sub.add_parser("rebase", help="rebase declared rows onto current live tables")
+    rebase.add_argument("--package-dir", required=True, type=Path)
+    rebase.add_argument("--output", required=True, type=Path)
+    rebase.add_argument("--git-head", required=True)
+    rebase.add_argument("--profile", default="cn")
     publish = sub.choices["publish"]
     publish.add_argument("--confirm", required=True)
     publish.add_argument("--staging-root", type=Path)
@@ -891,6 +1166,22 @@ def main(argv: list[str] | None = None) -> int:
     try:
         repo_root, live_roots, cdn_root = _repo_paths(args.profile)
         canonical_base = detect_canonical_base_version(cdn_root, repo_root)
+        if args.command == "rebase":
+            result = rebase_runtime_package(
+                args.package_dir,
+                args.output,
+                live_roots=live_roots,
+                generator_git_head=args.git_head,
+            )
+            print(_canonical({
+                "operation": "rebase",
+                "output": str(result.output_dir),
+                "source_manifest_sha256": result.source_manifest_sha256,
+                "manifest_sha256": result.manifest_sha256,
+                "table_count": result.table_count,
+                "writes_live": False,
+            }).decode("utf-8"))
+            return 0
         if args.command == "preflight":
             _manifest, transaction = _new_transaction(
                 args.package_dir, live_roots, cdn_root, canonical_base

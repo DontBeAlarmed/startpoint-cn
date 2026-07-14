@@ -341,6 +341,81 @@ class TestAtomicCharacterRelease(unittest.TestCase):
         with self.assertRaisesRegex(module.ReleaseError, "JSON object"):
             module.JsonObjectCodec().inspect(b"[]", claim, ())
 
+    def test_live_rebase_preserves_unclaimed_rows_for_every_table_codec(self):
+        module = self._module()
+        core = importlib.import_module("wf_mod_tool")
+
+        def ordered(keys, rows, *, raw_outer=False):
+            table = core.OrderedMap("<fixture>", keys, rows, Path("<memory>"))
+            return (
+                core.build_orderedmap_raw_rows(table)
+                if raw_outer else core.build_orderedmap(table)
+            )
+
+        flat_claim = module.character_pack.TableClaim(
+            "common", "master/character/character.orderedmap", "flat", ("129999",)
+        )
+        flat = module._merge_claimed_table_bytes(
+            flat_claim,
+            ordered(["1", "129999"], [b"stale", b"seris"]),
+            ordered(["1", "119998"], [b"live", b"hugo"]),
+        )
+        flat_keys, flat_rows = core._strict_orderedmap_rows(
+            flat, label="flat", compressed_rows=True
+        )
+        self.assertEqual(["1", "119998", "129999"], flat_keys)
+        self.assertEqual([b"live", b"hugo", b"seris"], flat_rows)
+
+        raw_claim = module.character_pack.TableClaim(
+            "common", "master/character/character_status.orderedmap",
+            "raw_outer", ("129999",),
+        )
+        raw_outer = module._merge_claimed_table_bytes(
+            raw_claim,
+            ordered(["1", "129999"], [b"stale-inner", b"seris-inner"], raw_outer=True),
+            ordered(["1", "119998"], [b"live-inner", b"hugo-inner"], raw_outer=True),
+        )
+        raw_keys, raw_rows = core._strict_orderedmap_rows(
+            raw_outer, label="raw", compressed_rows=False
+        )
+        self.assertEqual(["1", "119998", "129999"], raw_keys)
+        self.assertEqual([b"live-inner", b"hugo-inner", b"seris-inner"], raw_rows)
+
+        candidate_inner = ordered(["old", "skill"], [b"stale", b"seris-skill"])
+        live_inner = ordered(["old", "hugo"], [b"live", b"hugo-skill"])
+        nested_claim = module.character_pack.TableClaim(
+            "common", "master/skill/action_skill.orderedmap", "action_nested",
+            ("seris_dragon_king",), (("seris_dragon_king", ("skill",)),),
+        )
+        nested = module._merge_claimed_table_bytes(
+            nested_claim,
+            ordered(["seris_dragon_king"], [candidate_inner], raw_outer=True),
+            ordered(["seris_dragon_king"], [live_inner], raw_outer=True),
+        )
+        nested_outer_keys, nested_outer_rows = core._strict_orderedmap_rows(
+            nested, label="nested", compressed_rows=False
+        )
+        self.assertEqual(["seris_dragon_king"], nested_outer_keys)
+        nested_keys, nested_rows = core._strict_orderedmap_rows(
+            nested_outer_rows[0], label="nested-inner", compressed_rows=True
+        )
+        self.assertEqual(["old", "hugo", "skill"], nested_keys)
+        self.assertEqual([b"live", b"hugo-skill", b"seris-skill"], nested_rows)
+
+        json_claim = module.character_pack.TableClaim(
+            "server", "character.json", "json_object", ("129999",)
+        )
+        merged_json = json.loads(module._merge_claimed_table_bytes(
+            json_claim,
+            b'{"1":{"name":"stale"},"129999":{"name":"Seris"}}',
+            b'{"1":{"name":"live"},"119998":{"name":"Hugo"}}',
+        ))
+        self.assertEqual(
+            {"1": {"name": "live"}, "119998": {"name": "Hugo"},
+             "129999": {"name": "Seris"}},
+            merged_json,
+        )
+
     def test_transaction_records_convert_to_hash_bound_release_payload(self):
         module = self._module()
         with tempfile.TemporaryDirectory() as td:
@@ -410,7 +485,7 @@ class TestAtomicCharacterRelease(unittest.TestCase):
                 logical, ["1"], [b"old"], Path("<memory>")
             ))
             candidate_table = core.build_orderedmap(core.OrderedMap(
-                logical, ["1", "129999"], [b"old", b"seris"], Path("<memory>")
+                logical, ["1", "129999"], [b"stale", b"seris"], Path("<memory>")
             ))
             core_path = core.table_path(live["common"], logical)
             core_path.parent.mkdir(parents=True, exist_ok=True)
@@ -438,7 +513,7 @@ class TestAtomicCharacterRelease(unittest.TestCase):
             for server_path in server_paths:
                 before = json.dumps({"1": {"old": True}}, separators=(",", ":")).encode()
                 after = json.dumps(
-                    {"1": {"old": True}, "129999": {"seris": True}},
+                    {"1": {"stale": True}, "129999": {"seris": True}},
                     separators=(",", ":"),
                 ).encode()
                 live_path = live["server"] / Path(*server_path.split("/"))
@@ -489,12 +564,31 @@ class TestAtomicCharacterRelease(unittest.TestCase):
                 for directory in live.values()
                 for path in directory.rglob("*") if path.is_file()
             }
-            prepared = module.prepare_runtime_release(
+            live_roots = module.character_pack.LiveRoots(
+                live["common"], live["medium"], live["android"], live["server"],
+                (root / "cdn",),
+            )
+            rebased = root / "rebased"
+            module.rebase_runtime_package(
                 package,
-                live_roots=module.character_pack.LiveRoots(
-                    live["common"], live["medium"], live["android"], live["server"],
-                    (root / "cdn",),
-                ),
+                rebased,
+                live_roots=live_roots,
+                generator_git_head="f" * 40,
+            )
+            rebased_flat = core.read_orderedmap_file(
+                rebased / "roots" / "common" / Path(*logical.split("/")), logical
+            )
+            self.assertEqual(b"old", dict(zip(rebased_flat.keys, rebased_flat.rows))["1"])
+            for server_path in server_paths:
+                self.assertEqual(
+                    {"old": True},
+                    json.loads(
+                        (rebased / "roots" / "server" / server_path).read_bytes()
+                    )["1"],
+                )
+            prepared = module.prepare_runtime_release(
+                rebased,
+                live_roots=live_roots,
                 cdn_root=root / "cdn",
                 canonical_base_version="1.4.54",
                 staging_root=root / "staging",
