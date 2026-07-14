@@ -148,7 +148,9 @@ def _formal_table_claims(offline: dict, package_dir: Path) -> list[dict]:
                     "outer_key": outer_key,
                     "keys": list(table.rows[outer_key].keys),
                 })
-        elif kind not in {"flat", "recursive"}:
+        elif kind == "recursive":
+            codec_id = "raw_outer"
+        elif kind != "flat":
             raise ReleasePackError(f"unsupported offline table kind: {kind!r}")
         claims.append({
             "root": "common",

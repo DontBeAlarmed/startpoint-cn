@@ -34,6 +34,7 @@ def _write_offline_fixture(root: Path) -> Path:
     payloads = {
         "common": {
             "master/character/character.orderedmap": b"table-bytes",
+            "master/character/character_status.orderedmap": b"recursive-table-bytes",
             "character/seris_dragon_king/voice/ally/join.mp3": b"voice",
         },
         "medium": {"character/seris_dragon_king/ui/square_0.png": b"png"},
@@ -66,12 +67,20 @@ def _write_offline_fixture(root: Path) -> Path:
         "character_id": "129999",
         "code_name": "seris_dragon_king",
         "roots": roots,
-        "tables": [{
-            "root": "common",
-            "logical_path": "master/character/character.orderedmap",
-            "kind": "flat",
-            "keys": ["129999"],
-        }],
+        "tables": [
+            {
+                "root": "common",
+                "logical_path": "master/character/character.orderedmap",
+                "kind": "flat",
+                "keys": ["129999"],
+            },
+            {
+                "root": "common",
+                "logical_path": "master/character/character_status.orderedmap",
+                "kind": "recursive",
+                "keys": ["129999"],
+            },
+        ],
         "skills": [],
         "unique_condition": {"id": "22"},
         "qa": [{
@@ -137,7 +146,15 @@ class TestSerisRuntimeTestPackage(unittest.TestCase):
                 {name: len(manifest["roots"][name]) for name in module.ROOT_NAMES},
                 dict(result.root_counts),
             )
-            self.assertEqual(5, len(manifest["tables"]))
+            self.assertEqual(6, len(manifest["tables"]))
+            self.assertEqual(
+                "raw_outer",
+                next(
+                    item["codec_id"] for item in manifest["tables"]
+                    if item["logical_path"]
+                    == "master/character/character_status.orderedmap"
+                ),
+            )
             self.assertEqual(
                 {
                     "cdndata/character.json",
