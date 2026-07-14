@@ -23,7 +23,6 @@ from typing import Callable, Mapping
 
 import wf_character_pack as character_pack
 import wf_mod_tool as core
-import wf_seris_offline_handoff as offline_handoff
 
 
 ROOT_NAMES = character_pack.ROOT_NAMES
@@ -299,7 +298,12 @@ def assemble_runtime_test_package(
     output_dir = Path(output_dir)
     if output_dir.exists():
         raise ReleasePackError("runtime-test output already exists")
-    validator = offline_validator or offline_handoff.validate_package
+    if offline_validator is None:
+        import wf_seris_offline_handoff as offline_handoff
+
+        validator = offline_handoff.validate_package
+    else:
+        validator = offline_validator
     offline_errors = validator(offline_package)
     if offline_errors:
         raise ReleasePackError(
