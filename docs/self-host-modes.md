@@ -1,14 +1,14 @@
 # 自建服 · 玩「深渊连战 + 15 把深渊武器」完整指南
 
-面向想**自己从零搭一套私服**、玩这两个自制模式和深渊武器的人。整条链缺任一环都进不去游戏,按顺序来。
+面向**已经有(或能自己搞到)一套能跑的 WF CN 私服**、想在其上加载这两个自制模式和深渊武器的人。本 mod 只提供**增量**(数据 + 客户端补丁),不含官方基础 CDN。
 
-## 先备齐四样
+## 先备齐
 
 | # | 东西 | 说明 |
 |---|---|---|
 | 1 | 一台 Linux 服务器 + 一个域名 | Node ≥ 20;联机/CDN/证书需要域名(纯本地内网玩可简化,见步骤 3) |
-| 2 | 本仓库 `release/modes-20260714` 分支 | 含两模式、武器数据、`client-patch/` 全套客户端改造工具 |
-| 3 | **CN CDN 数据 `cn_cdn.rar`(~10GB)** | ⚠️ 官方源 `shijtswydl.leiting.com` **已停服失效**,这份 dump 只能从服主处获取(见步骤 2) |
+| 2 | 本仓库 `release/modes-20260714` 分支 | **本 mod 的全部增量**:两模式+武器 masterdata(`assets/*.json`,服务端直接读)+ `client-patch/` 客户端改造工具 |
+| 3 | **CN 基础 CDN(~11GB)自备** | 官方源 `shijtswydl.leiting.com` **已停服**,需自行从 WF 私服圈/现有部署获取,放到 `.cdn/cn/`。**服主不分发这个,只发上面的增量**;已有能跑的 WF CN 私服的人此项已具备 |
 | 4 | 官方 CN 客户端 APK(1.8.1)+ FFDec + keystore + Android build-tools | 自己重打客户端用(步骤 4) |
 
 ---
@@ -24,13 +24,10 @@ cd starpoint-cn && npm install
 
 > 必须是 `release/modes-20260714` 分支。默认 `main` 没有这两个模式。
 
-### 2. 放 CDN 资源
+### 2. 基础 CDN(自备)+ 本 mod 增量(随代码到手)
 
-把 `cn_cdn.rar` 解开到 `.cdn/cn/`(目录结构与校验见 [`docs/cdn/overview.md`](cdn/overview.md))。
-
-> ⚠️ **官方 CDN 已停服**,这份 ~10GB dump 官方渠道拿不到了,只能从服主获取:
->
-> **【服主填写下载链接 —— 网盘 / BT / 自建镜像】**
+- **基础 CDN(~11GB)**:确保 `.cdn/cn/` 已就位(目录结构与校验见 [`docs/cdn/overview.md`](cdn/overview.md))。官方源已停服,本 mod **不分发**基础 CDN——需你自行从 WF 私服圈/现有部署获取。已有能跑的 WF CN 私服的人跳过此项。
+- **本 mod 的增量**:两个模式和武器的 masterdata 已经**随 release 分支一起 clone 到 `assets/` 里**(服务端直接读),无需另外下载或"发布 CDN 增量"。
 
 ### 3. 起服
 
