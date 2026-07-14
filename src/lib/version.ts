@@ -11,22 +11,17 @@
  */
 import { readFileSync, existsSync, readdirSync, statSync } from "fs";
 import path from "path";
+import {
+    maxCharacterReleaseVersion,
+    resolveCnCdnDir,
+} from "./cn-character-release";
 
 // CDN full archives are at version 1.4.0
 export const FULL_BASE = "1.4.0";
 
 // Detect highest version from CDN diff archives + enabled patches
 export function getEffectiveVersion(): string {
-    const cdnVer = detectCDNVersion();
-    // Scan ALL enabled patches for max version (not filtered by depends_on)
-    const manifest = getPatchManifest();
-    let maxPatchVer: string | null = null;
-    for (const p of manifest.patches) {
-        if (!p.enabled || p.type !== "patch") continue;
-        if (!maxPatchVer || compareVersion(p.version, maxPatchVer) > 0) maxPatchVer = p.version;
-    }
-    if (maxPatchVer && compareVersion(maxPatchVer, cdnVer) > 0) return maxPatchVer;
-    return cdnVer;
+    return detectCDNVersion();
 }
 
 // Detect highest version from CDN diff archive filenames.
@@ -38,21 +33,36 @@ let _cdnStamp = "";
 const CDN_DIFF_DIRS = ["archive-common-diff", "archive-medium-diff", "archive-android-diff"];
 
 export function detectCDNVersion(): string {
-    const cdnDir = path.join(__dirname, "..", "..", ".cdn", "cn");
+    const cdnDir = resolveCnCdnDir();
+    const activePath = path.join(cdnDir, "character-releases", "active.json");
+    const patchPath = path.join(__dirname, "..", "..", "assets", "asset-patch", "manifest.json");
     const stamp = CDN_DIFF_DIRS
-        .map(d => { try { return statSync(path.join(cdnDir, d)).mtimeMs; } catch (_) { return 0; } })
+        .map(d => { try { return `${statSync(path.join(cdnDir, d)).mtimeMs}:${statSync(path.join(cdnDir, d)).size}`; } catch (_) { return "0:0"; } })
+        .concat([
+            (() => { try { const s = statSync(activePath); return `${s.mtimeMs}:${s.size}`; } catch (_) { return "0:0"; } })(),
+            (() => { try { const s = statSync(patchPath); return `${s.mtimeMs}:${s.size}`; } catch (_) { return "0:0"; } })(),
+        ])
         .join(",");
     if (_cdnVersion && stamp === _cdnStamp) return _cdnVersion;
     let max = "1.4.0";
     for (const subdir of CDN_DIFF_DIRS) {
         const dir = path.join(cdnDir, subdir);
         try {
-            for (const f of readdirSync(dir).filter(f => f.endsWith(".zip"))) {
+            for (const f of readdirSync(dir).filter(
+                f => f.endsWith(".zip") && !f.includes("-charpkg-"),
+            )) {
                 const m = f.match(/pinball-\d+\.\d+\.\d+-(\d+\.\d+\.\d+)-\d+-/);
                 if (m && compareVersion(m[1], max) > 0) max = m[1];
             }
         } catch (_) { /* ignore */ }
     }
+    for (const patch of getPatchManifest().patches) {
+        if (patch.enabled && patch.type === "patch" && compareVersion(patch.version, max) > 0) {
+            max = patch.version;
+        }
+    }
+    const characterVersion = maxCharacterReleaseVersion(cdnDir, max);
+    if (characterVersion && compareVersion(characterVersion, max) > 0) max = characterVersion;
     _cdnVersion = max;
     _cdnStamp = stamp;
     return max;

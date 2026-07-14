@@ -2,6 +2,12 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { generateDataHeaders } from "../../utils";
 import { readdirSync, statSync, existsSync } from "fs";
 import path from "path";
+import {
+    DiffGroup,
+    mergeLegacyAndCharacterDiffs,
+    readActiveCharacterReleases,
+    resolveCnCdnDir,
+} from "../../lib/cn-character-release";
 
 const CN_PORT = process.env.CN_LISTEN_PORT || "8001";
 const CDN_BASE = process.env.CDN_BASE_URL;
@@ -61,14 +67,16 @@ function compareVersion(a: string, b: string): number {
     return 0;
 }
 
-function buildDiffList(baseUrl: string, cdnDir: string): { original_version: string; version: string; archive: { location: string; size: number; sha256: string }[] }[] {
+export function buildDiffList(baseUrl: string, cdnDir: string): DiffGroup[] {
     const groups = new Map<string, { original_version: string; archive: { location: string; size: number; sha256: string }[] }>();
     
     // CDN diff archives
     for (const subdir of ["archive-common-diff", "archive-medium-diff", "archive-android-diff"]) {
         const dir = path.join(cdnDir, subdir);
         try {
-            for (const f of readdirSync(dir).filter(f => f.endsWith(".zip"))) {
+            for (const f of readdirSync(dir).filter(
+                f => f.endsWith(".zip") && !f.includes("-charpkg-"),
+            )) {
                 const match = f.match(/pinball-(\d+\.\d+\.\d+)-(\d+\.\d+\.\d+)-\d+-/);
                 if (match) {
                     const from = match[1];
@@ -100,13 +108,21 @@ function buildDiffList(baseUrl: string, cdnDir: string): { original_version: str
         console.error(`[PATCH] buildDiffList failed for active patches:`, (e as Error).message);
     }
     
-    return [...groups.entries()]
+    const legacy = [...groups.entries()]
         .sort(([a], [b]) => compareVersion(a, b))
         .map(([version, data]) => ({ original_version: data.original_version, version, archive: data.archive }));
+    const canonicalBase = legacy.reduce(
+        (best, group) => compareVersion(group.version, best) > 0 ? group.version : best,
+        "1.4.0",
+    );
+    const characterChain = readActiveCharacterReleases(cdnDir, canonicalBase);
+    if (characterChain.error) {
+        console.error(`[CDN] character release chain truncated: ${characterChain.error}`);
+    }
+    return mergeLegacyAndCharacterDiffs(legacy, characterChain, baseUrl);
 }
 
-const envCdnDir = process.env.CDN_DIR || ".cdn";
-const cdnDir = path.isAbsolute(envCdnDir) ? path.join(envCdnDir, "cn") : path.join(__dirname, "..", "..", "..", envCdnDir, "cn");
+const cdnDir = resolveCnCdnDir();
 
 // 启动时扫描一次，动态计算总大小
 const TOTAL_SIZE = (() => {
