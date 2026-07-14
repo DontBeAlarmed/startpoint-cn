@@ -5,8 +5,8 @@
       "id": "rush-abyss-modes",
       "type": "patch",
       "name": "深渊连战 + 深渊武器 ②层客户端数据",
-      "description": "rush 700099 深渊连战 roguelike + 15 把深渊武器(8000101-8000115)/代币 2370099/兑换商店的客户端 orderedmap(equipment/ability_soul/item/equipment_status/event_item_shop/rush_event)。缺此层→打完15轮或开兑换商店 C8601。前提:base CDN 需接到 1.4.90(链起点)。",
-      "version": "1.4.101",
+      "description": "rush 700099 深渊连战 roguelike + 15 把深渊武器(8000101-8000115)/代币 2370099/兑换商店的客户端 orderedmap(equipment/ability_soul/item/equipment_status/event_item_shop/rush_event)。缺此层→打完15轮或开兑换商店 C8601。关键:末尾 `1.4.101→1.4.102` 是整合桥接包(6表完整文件整替换),让任何卡在 1.4.101 的客户端(不论血统、不论base CDN如何到的1.4.101)一跳拿到深渊②层——解决版本号撞车(客户端已是1.4.101→原1.4.90→1.4.101增量链不会被下发)。前面的链供更早版本客户端逐级追到1.4.101。",
+      "version": "1.4.102",
       "depends_on": "1.4.90",
       "enabled": true,
       "chain": [
@@ -20,7 +20,8 @@
         "pinball-1.4.97-1.4.98-1-mod07130700.zip",
         "pinball-1.4.98-1.4.99-1-mod07130732.zip",
         "pinball-1.4.99-1.4.100-1-mod07130812.zip",
-        "pinball-1.4.100-1.4.101-1-mod07130822.zip"
+        "pinball-1.4.100-1.4.101-1-mod07130822.zip",
+        "pinball-1.4.101-1.4.102-1-mod07142258.zip"
       ],
       "created_at": "2026-07-14"
     },
