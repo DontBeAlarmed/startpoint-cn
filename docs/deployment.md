@@ -32,10 +32,13 @@ fnm use 20
 ## 2. 克隆项目 & 安装依赖
 
 ```bash
-git clone <YOUR_REPO_URL> starpoint-cn
+# 要玩「深渊连战 + 深渊武器」两个自制模式,必须 clone release/modes-20260714 分支(默认 main 没有)
+git clone -b release/modes-20260714 https://github.com/kuronzzhan-droid/startpoint-cn.git starpoint-cn
 cd starpoint-cn
 npm install
 ```
+
+> 想玩两个自制模式的完整自建流程(含客户端三合一补丁),见 [`docs/self-host-modes.md`](./self-host-modes.md)。
 
 ---
 

@@ -28,6 +28,7 @@
 
 ## 可选补丁
 
+- **abyss-mode-equipment**(`abyss-mode-equipment/`):深渊连战 15 把武器/能力魂(`8000101`–`8000115`)的战斗生效门控——只在 Rush `700099` / 挑战 `2001` / 练习 `1`–`97` 内生效。**服务端启用深渊连战模式时必须打**,否则武器装上不生效。用法见 `abyss-mode-equipment/README.md`,自建服完整流程见 [`docs/self-host-modes.md`](../docs/self-host-modes.md)。
 - **omni-element**(`apply-omni-element.sh` / `omni-element.md`):共鸣通用属性标签。
 - **random-floor**(`apply-random-floor.sh` / `random-floor.md`):boss 塔每次进本随机——
   `BattleQuestBaseImpl` 两个 getTower*FloorValues 识别 floor 表 `__random__,K` 头行,
