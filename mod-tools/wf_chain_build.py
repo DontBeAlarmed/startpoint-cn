@@ -112,6 +112,7 @@ def main() -> None:
         for fdk, _ln, b in cand:
             print(f"  候选: {fdk:40s} boss={','.join(b)}")
         chain = "\n".join([f"__random__,{args.pool},-"] + [ln for _fdk, ln, _b in cand])
+        n = len(cand) + 1                       # 1 头行 + 候选池行数
     else:
         n = min(args.floors, len(pool))
         picks = rng.sample(pool, n)

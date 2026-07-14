@@ -34,7 +34,10 @@ function buildCarnivalPartyGroupList(playerId: number): any[] {
         for (const [partyId, party] of Object.entries(list)) {
             const p = party as any;
             partyList.push({
-                "party_id": parseInt(partyId),
+                // global PartyId ((group-1)*10+slot): client stores all groups'
+                // parties in one flat map keyed by party_id — per-slot ids
+                // collide across groups (same bug as rush /party)
+                "party_id": (parseInt(groupId) - 1) * 10 + parseInt(partyId),
                 "party_name": p.name || "Party",
                 "party_edited": p.edited || false,
                 "character_ids": p.character_ids || [null, null, null],

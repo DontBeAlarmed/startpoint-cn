@@ -164,7 +164,7 @@ def _desc_precondition(row: list[str], b: int) -> str:
         s = f"{grp}·{s}"
     th = _endpoints(_cell(row, b + 3), _cell(row, b + 4), _threshold)
     if th:
-        s += f"≥{th}"
+        s += th if s and s[-1] in "≥≤<>=" else f"≥{th}"
     puller = _num(_cell(row, b + 1))
     if puller:
         s += f"({PULLER_CN.get(puller, puller)})"
@@ -177,6 +177,9 @@ def _desc_precondition(row: list[str], b: int) -> str:
 def _desc_trigger(row: list[str], b: int, enum_key: str) -> str:
     kind = _cell(row, b).strip()
     th = _endpoints(_cell(row, b + 3), _cell(row, b + 4), _threshold)
+    if th in ("0", "0%"):
+        th = ""  # 阈值 0 = 无门槛(官方哨兵),不显示
+
     if kind in ("", "0") and enum_key == "trigger" and not th:
         return ""  # Initial 且无阈值 = 常驻/开局生效,不值得占字
     if kind in ("", "0") and enum_key == "trigger":
@@ -188,7 +191,8 @@ def _desc_trigger(row: list[str], b: int, enum_key: str) -> str:
     if grp:
         s = f"{grp}·{s}"
     if th:
-        s += f"≥{th}"
+        # 触发名自带比较符(HP≤/连击≥…)时直接接数值,避免「HP≤≥50%」双符号
+        s += th if s and s[-1] in "≥≤<>=" else f"≥{th}"
     lim_off = 7 if enum_key == "trigger" else 5
     lim = _num(_cell(row, b + lim_off))
     if lim:
@@ -231,10 +235,28 @@ def _desc_content(row: list[str], b: int, enum_key: str) -> str:
     name = _cn[enum_key].get(kind, f"效果{kind}")
     tgt = _num(_cell(row, b + 1)) or 0
     s = f"{name}"
+    # 对敌伤害三族(251-286 EnemyDamage/316-351 Trigger/352-387 Nearest):
+    # 补敌方目标语义(time 列:EnemyDamage 空=全体/N=最近顺序N段)+ 倍数显示
+    k_i = int(kind) if kind.isdigit() else -1
+    dmg = is_instant and (251 <= k_i <= 387)
+    if dmg:
+        time_v = _num(_cell(row, b + 22))
+        if 251 <= k_i <= 286:
+            phrase = f"最近顺序{time_v}段" if time_v else "全体敌人"
+        elif 316 <= k_i <= 351:
+            phrase = "触发源敌人" + (f"×{time_v}段" if time_v and time_v > 1 else "")
+        else:
+            phrase = "最近的敌人" + (f"×{time_v}段" if time_v and time_v > 1 else "")
+        m_basis = re.search(r"依(.+)$", name)
+        s = f"对{phrase} 能力伤害·依{m_basis.group(1)}" if m_basis else f"对{phrase} {name}"
     # 计数类效果(连击/次数/数量/层)强度按整数存(十万=1),其余按千分比
     flat = any(w in name for w in ("连击", "次数", "数量", "层"))
-    fmt_stren = (lambda v: f"{v / 100000:g}") if flat and all(
-        (_num(_cell(row, b + i)) or 0) % 100000 == 0 for i in (4, 5)) else _pct
+    if dmg:
+        fmt_stren = lambda v: _pct(v) + (f"({v / 100000:g}倍)" if v >= 100000 else "")
+    elif flat and all((_num(_cell(row, b + i)) or 0) % 100000 == 0 for i in (4, 5)):
+        fmt_stren = lambda v: f"{v / 100000:g}"
+    else:
+        fmt_stren = _pct
     stren = _endpoints(_cell(row, b + 4), _cell(row, b + 5), fmt_stren)
     if stren:
         s += f" {stren}"
@@ -275,7 +297,10 @@ def _desc_content(row: list[str], b: int, enum_key: str) -> str:
     tgt_s = TARGET_CN.get(tgt, str(tgt))
     if tgt_grp:
         tgt_s += f"({tgt_grp})"
-    out = f"自身 {s}" if tgt_s == "自身" else f"赋予{tgt_s} {s}"
+    if dmg:  # 对敌伤害:target 列=数值基准载体(依谁的攻击/HP),不是受益方
+        out = s if tgt_s == "自身" else f"{s}(以{tgt_s}为基准)"
+    else:
+        out = f"自身 {s}" if tgt_s == "自身" else f"赋予{tgt_s} {s}"
     if grp:
         out += f"[限{grp}]"
     return out

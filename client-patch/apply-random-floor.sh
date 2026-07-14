@@ -20,10 +20,12 @@ import sys
 
 f = sys.argv[1]
 ANCHOR = "         var _loc2_:Array = logicAssets.getMasterTable(FloorTable).get_data().get(param1.tower_floor_id);"
+# 用强类型 FloorValues 读头行(与下方工作循环同款访问方式)
 BLOCK = """
-         if(int(_loc2_.length) > 0 && _loc2_[0].battle_field_data_id == "__random__")
+         var _rfHead:FloorValues = _loc2_.length > 0 ? _loc2_[0] as FloorValues : null;
+         if(_rfHead != null && _rfHead.battle_field_data_id.indexOf("__random__") != -1)
          {
-            var _rfK:int = int(_loc2_[0].battle_bgm_prefix);
+            var _rfK:int = int(_rfHead.battle_bgm_prefix);
             var _rfPool:Array = _loc2_.slice(1);
             var _rfI:int = int(_rfPool.length);
             while(_rfI > 1)

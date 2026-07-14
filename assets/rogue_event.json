@@ -1,0 +1,55 @@
+{
+    "_readme": "Roguelike 连战配置(热重载: POST /api/mod-admin/reload_assets;drop_pool/pool_draws 为新逻辑,改代码后需重启服务端才认)。enabled=false 全部旁路。unlock_played_parties: 下发已用队伍时洗掉角色ID(轮数条目保留=folder轮进度不受影响),解除角色锁定实现固定队复用。per_round_drops: 每轮固定掉落, type=item|equipment|character。drop_pool+pool_draws: 每轮从池加权随机抽 N 件(weight 默认1)。drop_character_exp: 掉落角色时同步灌入的经验(0=不灌)。drop_equipment_level: 掉落装备觉醒等级,按件钳制到 equipment_max_level.json 的上限(超上限客户端 C2284 闪退);特殊改造 enhancement 全局不提供(仅29件武器有定义,超限 C2287 闪退)。match_party_element(默认开): 池子按通关队伍的元素过滤(equipment_element.json,-1=通用),魂珠/武器属性不合装不上,过滤空则回退全池。guarantee_weapon(默认开): 每轮第一抽只从武器抽,保底不空军。池=每属性剑+斧各1(max_level=5)+2通用,魂珠同键。show_reward_list_endless: 无尽轮结算是否展示战利品列表(folder 非最终轮永不展示——客户端把非空clear reward当通关庆祝,会把选关列表换成最后一轮导致跳关)。配合 mod-tools/wf_rogue_save.py 生成的空武器存档(player 10 肉鸽空武器)= 独立武器池玩法。",
+    "enabled": true,
+    "events": {
+        "700099": {
+            "unlock_played_parties": true,
+            "show_reward_list_endless": true,
+            "per_round_drops": [
+                { "type": "item", "id": 2370099, "count": 5 }
+            ],
+            "pool_draws": 0,
+            "drop_pool": []
+        },
+        "700007": {
+            "unlock_played_parties": true,
+            "show_reward_list_endless": true,
+            "drop_character_exp": 0,
+            "drop_equipment_level": 5,
+            "match_party_element": true,
+            "guarantee_weapon": true,
+            "per_round_drops": [],
+            "pool_draws": 2,
+            "drop_pool": [
+                { "type": "equipment", "id": 5010060 },
+                { "type": "equipment", "id": 5020042 },
+                { "type": "equipment", "id": 5010075 },
+                { "type": "equipment", "id": 5020031 },
+                { "type": "equipment", "id": 5010077 },
+                { "type": "equipment", "id": 5020038 },
+                { "type": "equipment", "id": 5010068 },
+                { "type": "equipment", "id": 5020026 },
+                { "type": "equipment", "id": 5017716 },
+                { "type": "equipment", "id": 5020039 },
+                { "type": "equipment", "id": 5010078 },
+                { "type": "equipment", "id": 5020040 },
+                { "type": "equipment", "id": 5010057 },
+                { "type": "equipment", "id": 5020010 },
+                { "type": "item", "id": 5010060, "weight": 0.5 },
+                { "type": "item", "id": 5020042, "weight": 0.5 },
+                { "type": "item", "id": 5010075, "weight": 0.5 },
+                { "type": "item", "id": 5020031, "weight": 0.5 },
+                { "type": "item", "id": 5010077, "weight": 0.5 },
+                { "type": "item", "id": 5020038, "weight": 0.5 },
+                { "type": "item", "id": 5010068, "weight": 0.5 },
+                { "type": "item", "id": 5020026, "weight": 0.5 },
+                { "type": "item", "id": 5017716, "weight": 0.5 },
+                { "type": "item", "id": 5020039, "weight": 0.5 },
+                { "type": "item", "id": 5010078, "weight": 0.5 },
+                { "type": "item", "id": 5020040, "weight": 0.5 },
+                { "type": "item", "id": 5010057, "weight": 0.5 },
+                { "type": "item", "id": 5020010, "weight": 0.5 }
+            ]
+        }
+    }
+}

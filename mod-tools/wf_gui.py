@@ -147,6 +147,7 @@ def load_characters() -> list[dict]:
             "element": ELEMENTS_DISPLAY.get(str(row[3]), str(row[3])),
             "race": row[4],
             "role": row[26],
+            "leader_id": row[17],   # leader_ability 表键(≠角色ID,如白虎 角色10/队长技3)
             "name": name or row[0],
             "name_en": name_en,
             "skill_name": skill_name,
@@ -631,7 +632,9 @@ def append_line_adapted(src_key: str, src_line: int, dst_key: str, element: str 
             cid = o[1] if o else ""
             elem_cn = next((c["element"] for c in load_characters() if c["id"] == cid), "")
         elif kind == "leader_ability":
-            elem_cn = next((c["element"] for c in load_characters() if c["id"] == dkey), "")
+            # 队长技键≠角色ID(白虎:角色10/队长技3),按 c17 leader_ability_id 反查
+            elem_cn = next((c["element"] for c in load_characters()
+                            if c.get("leader_id") == dkey), "")
         else:
             elem_cn = _detect_element(parsed[dkey])
     elif element in _CN_ELEM_TOKEN:
@@ -1421,12 +1424,55 @@ def composer_row(key: str, line: int, as_key: str = "") -> dict:
             "remap_note": remap_note}
 
 
+_BLANK_TPL_CACHE: dict = {}
+
+
+def _blank_template(kind: str, parsed: dict, width: int, tcol: int) -> list[str]:
+    """客户端合法空白行模板:每列取官方行众数(按块所属触发模式分组统计)。
+    **C7050 铁律(2026-07-13 实锤)**:AbilityValues.parseAt* 的枚举列(前置条件1-3/
+    瞬发触发/瞬发内容等)没有空串分支,空串直接 throw ClientError 7050——官方哨兵是
+    前置='0'、instant_precontent='(None)'、delay='0';Option 列(time/threshold)的
+    None 哨兵是字面量 "(None)" 不是空串。全空白行 = 必崩客户端,模板必须取官方惯例值。"""
+    ck = (kind, width)
+    if ck in _BLANK_TPL_CACHE:
+        return list(_BLANK_TPL_CACHE[ck])
+    from collections import Counter
+    blocks = wf_describe.layout(kind)["blocks"]
+    # 每列归属触发模式:precondition* 全模式读;instant_*=0;during_*/even_if=1;opening=2
+    order = sorted(blocks.items(), key=lambda kv: kv[1])
+    col_mode = {}
+    for (bname, base), (nname, nbase) in zip(order, order[1:] + [("", width)]):
+        mode = None
+        if bname.startswith("instant"):
+            mode = "0"
+        elif bname.startswith("during") or bname == "even_if_owner_dead":
+            mode = "1"
+        elif bname == "opening":
+            mode = "2"
+        for c in range(int(base), int(nbase)):
+            col_mode[c] = mode
+    cnts = [Counter() for _ in range(width)]
+    for rows in parsed.values():
+        for r in rows:
+            rmode = r[tcol] if tcol < len(r) else ""
+            for c in range(width):
+                m = col_mode.get(c)
+                if m is not None and m != rmode:
+                    continue          # 该块只统计对应触发模式的官方行
+                cnts[c][r[c] if c < len(r) else ""] += 1
+    tpl = [(cnts[c].most_common(1)[0][0] if cnts[c] else "") for c in range(width)]
+    _BLANK_TPL_CACHE[ck] = list(tpl)
+    return tpl
+
+
 def composer_blank(dst_key: str) -> dict:
-    """按目标键生成空白行:头部列(觉醒门槛清零)抄目标首行,其余全空、触发=瞬发。"""
+    """按目标键生成空白行:头部列(觉醒门槛清零)抄目标首行,其余=官方众数模板
+    (纯空串行会触发客户端 C7050,见 _blank_template)、触发=瞬发。"""
     logical, real, kind, table, parsed, width = _composer_ctx(dst_key)
     lay = wf_describe.layout(kind)
     head_end = int(lay["blocks"]["precondition1"])
-    row = [""] * width
+    tcol = head_end - 1
+    row = _blank_template(kind, parsed, width, tcol)
     if real in parsed and parsed[real]:
         d0 = _fit_row_width(parsed[real][0], width)
         row[:head_end] = d0[:head_end]
@@ -1435,8 +1481,8 @@ def composer_blank(dst_key: str) -> dict:
         row[2] = row[2] or "attack_common"
         row[3], row[4] = "0", ""
     elif kind == "leader_ability":
-        row[1], row[2] = "1", "0"
-    tcol = head_end - 1
+        # 官方众数:c1='0'(2200/2316,'1'仅78例)、c2='0'/''——此前硬编码 '1','0' 无先例
+        row[1], row[2] = "0", "0"
     row[tcol] = "0"
     return {"key": dst_key, "kind": kind, "line": None, "ncols": width, "row": row,
             "lines_total": len(parsed.get(real) or []), "desc": ""}
@@ -1446,6 +1492,57 @@ def composer_describe(kind: str, row: list) -> dict:
     if kind not in wf_describe.table_kinds():
         raise ValueError(f"未知表类型: {kind}")
     return {"desc": wf_describe.describe_line([str(v) for v in row], kind) or "(空)"}
+
+
+def _client_legality_problems(kind: str, row: list[str]) -> list[str]:
+    """客户端 AbilityValues.parseAt* 硬规则(违者 C7050/7101 打开角色页即崩,2026-07-13 实锤):
+    枚举列无空串分支,前置1-3/触发/内容 kind 必须数字;instant_precontent 哨兵 '(None)';
+    during_accumulation_trigger 哨兵 '(None)';even_if_owner_dead 必须 true/false。"""
+    lay = wf_describe.layout(kind)
+    B = {k: int(v) for k, v in lay["blocks"].items()}
+    tcol = B["precondition1"] - 1
+
+    def cell(i):
+        return (row[i] if i < len(row) else "").strip()
+
+    def is_num(v):
+        return bool(v) and v.lstrip("-").isdigit()
+
+    probs = []
+    tmode = cell(tcol)
+    if tmode not in ("0", "1", "2"):
+        return [f"c{tcol} 触发模式={tmode!r},须为 0(瞬发)/1(持续)/2(开幕)"]
+    for p in ("precondition1", "precondition2", "precondition3"):
+        v = cell(B[p])
+        if not is_num(v):
+            probs.append(f"c{B[p]} {p}.kind={v!r} 须为数字(无条件填 0;空串=客户端C7050)")
+    if tmode == "0":
+        for name, label in (("instant_trigger", "瞬发触发kind"),
+                            ("instant_delay", "延迟"), ("instant_content", "瞬发效果kind")):
+            v = cell(B[name])
+            if not is_num(v):
+                probs.append(f"c{B[name]} {label}={v!r} 须为数字(空串=客户端C7050)")
+        v = cell(B["instant_precontent"])
+        if v != "(None)" and not is_num(v):
+            probs.append(f"c{B['instant_precontent']} instant_precontent={v!r} 须为 '(None)' 或数字")
+    elif tmode == "1":
+        v = cell(B["during_accumulation_trigger"])
+        if v != "(None)" and not is_num(v):
+            probs.append(f"c{B['during_accumulation_trigger']} 累积触发={v!r} 须为 '(None)' 或数字")
+        v = cell(B["during_trigger"])
+        if not is_num(v):
+            probs.append(f"c{B['during_trigger']} 持续触发kind={v!r} 须为数字")
+        v = cell(B["even_if_owner_dead"])
+        if v.lower() not in ("true", "false"):
+            probs.append(f"c{B['even_if_owner_dead']} even_if_owner_dead={v!r} 须为 true/false(否则C7101)")
+        v = cell(B["during_content"])
+        if not is_num(v):
+            probs.append(f"c{B['during_content']} 持续效果kind={v!r} 须为数字")
+    else:
+        v = cell(B["opening"])
+        if not is_num(v):
+            probs.append(f"c{B['opening']} 开幕kind={v!r} 须为数字")
+    return probs
 
 
 def composer_apply(dst_key: str, mode, row: list, adapt_sid: bool, dry_run: bool,
@@ -1476,6 +1573,35 @@ def composer_apply(dst_key: str, mode, row: list, adapt_sid: bool, dry_run: bool
             row[0] = sid
     if kind == "ability" and row[1] not in ("true", "false"):
         row[1] = "true"
+    probs = _client_legality_problems(kind, row)
+    if probs:
+        raise ValueError("行未通过客户端合法性校验(写入会导致打开角色页 C7050 崩溃):\n"
+                         + "\n".join(f"  · {p}" for p in probs))
+    # InvokeSkill(629) 的 string_id 必须在 custom_ability_string 表注册,
+    # 否则角色页描述生成 MasterBinaryMap.get → C8601「指定的Key不存在」(2026-07-13 实锤)
+    invoke_sid = ""
+    B = {k: int(v) for k, v in wf_describe.layout(kind)["blocks"].items()}
+    tcol = B["precondition1"] - 1
+    if (row[tcol] if tcol < len(row) else "") == "0" \
+            and (row[B["instant_content"]] if B["instant_content"] < len(row) else "") == "629":
+        invoke_sid = (row[B["instant_content"] + 23] or "").strip()
+        if not invoke_sid or invoke_sid == "(None)":
+            raise ValueError("InvokeSkill(629) 需填 string_id(效果文本键),否则客户端 C8601")
+        castr_lp = "master/string/custom_ability_string.orderedmap"
+        castr = core.load_table(castr_lp, TARGET_STORE, SOURCE_STORE)
+        if invoke_sid not in castr.text_rows():
+            log_extra = f"⚠ custom_ability_string 缺文案键 {invoke_sid},自动注册(默认文案「发动特殊技能」,可在 JSON 直改里改)"
+            if not dry_run:
+                cr = castr.text_rows()
+                cr[invoke_sid] = "发动特殊技能"
+                castr.set_text_rows(cr)
+                w = core.write_table(castr, TARGET_STORE,
+                                     ".bak-wfmod-gui-" + time.strftime("%Y%m%d-%H%M%S"))
+                add_pending(w)
+        else:
+            log_extra = ""
+    else:
+        log_extra = ""
     desc = wf_describe.describe_line(row, kind)
     if mode == "append":
         parsed[real].append(row)
@@ -1487,11 +1613,293 @@ def composer_apply(dst_key: str, mode, row: list, adapt_sid: bool, dry_run: bool
         parsed[real][li - 1] = row
         action = f"覆盖第 {li} 行"
     log.insert(0, f"{dst_key} {action}: {desc or '(空行)'}")
+    if log_extra:
+        log.append(log_extra)
     written = None
     if not dry_run:
         written = str(_write_with_backup(table, parsed, log))
     return {"changes": 1, "log": "\n".join(log), "written": written,
             "dry_run": dry_run, "desc": desc}
+
+
+# ---------------------------------------------------------------- 词条工坊·按效果生成(效果选择器)
+# 目录条目全部来自真实枚举 + 全库使用频次(composer_meta usage),生成 = 空白行按块布局填格,
+# 单位换算内置(强度 千=1%、阈值/次数 十万=1次、HP阈值 千=1%)。写入仍走 /composer/apply。
+
+_FXGEN_TRIGGERS = [
+    # (id, 中文, 模式, 触发枚举, 阈值单位 None|pct|count, 说明)
+    ("battle_start", "开幕(战斗开始,常驻)", "instant", "0", None, "最常见的常驻被动(全库×2631)"),
+    ("skill", "技能发动时", "instant", "23", None, "每次发动技能触发"),
+    ("pf", "强化弹射时", "instant", "2", "count", "阈值=第N次强化弹射(空=每次)"),
+    ("dash", "冲刺时", "instant", "4", "count", "阈值=第N次冲刺(空=每次;可配前置条件如Fever中)"),
+    ("flip", "弹射时", "instant", "6", "count", "阈值=第N次弹射(空=每次;高频,建议配冷却/前置)"),
+    ("pf3", "强化弹射Lv3时", "instant", "65", None, ""),
+    ("fever_in", "Fever发动时", "instant", "8", None, ""),
+    ("member", "编成含指定角色组", "instant", "57", "count", "阈值=编成N名以上;配合目标角色组"),
+    ("combo", "连击数达标时", "instant", "12", "count", "阈值=连击数"),
+    ("heal_cnt", "治疗计数达标", "instant", "19", "count", "阈值=治疗N次"),
+    ("dmg_cnt", "伤害计数达标", "instant", "21", "count", "阈值=造成伤害N次"),
+    ("hp_high", "HP≥X%期间(持续)", "during", "0", "pct", "阈值=HP百分比"),
+    ("hp_low", "HP≤X%期间(持续)", "during", "1", "pct", "阈值=HP百分比"),
+    ("pierce", "贯通状态期间(持续)", "during", "30", None, "全库×123,配合贯通授予行"),
+    ("fever_during", "Fever期间(持续)", "during", "4", None, ""),
+    ("atkup_during", "攻击力↑状态期间(持续)", "during", "9", None, ""),
+]
+
+_FXGEN_EFFECTS = [
+    # (id, 中文, 模式, 效果枚举, 数值单位 pct|count, 说明)
+    ("atk", "攻击力 +X%", "instant", "32", "pct", "全库×1441 的标准数值行"),
+    ("skill_dmg", "技能伤害 +X%", "instant", "34", "pct", ""),
+    ("pf_dmg", "强化弹射伤害 +X%", "instant", "55", "pct", ""),
+    ("direct_dmg", "Direct伤害 +X%", "instant", "33", "pct", ""),
+    ("hp", "HP +X%", "instant", "205", "pct", ""),
+    ("gauge", "技能槽 +X%(立即)", "instant", "211", "pct", "发动型:立即充能"),
+    ("charge", "技能槽充能速度 +X%", "instant", "35", "pct", ""),
+    ("heal", "比例治疗 X%", "instant", "206", "pct", "按最大HP比例回复"),
+    ("combo_add", "追加连击 +N", "instant", "226", "count", ""),
+    ("fever_add", "追加Fever点 +X%", "instant", "213", "pct", ""),
+    ("fever_ext", "Fever时间延长 +X%", "instant", "56", "pct", ""),
+    ("d_atk", "攻击力 +X%(持续)", "during", "0", "pct", "持续触发期间生效"),
+    ("d_skill", "技能伤害 +X%(持续)", "during", "2", "pct", ""),
+    ("d_pf", "强化弹射伤害 +X%(持续)", "during", "23", "pct", ""),
+    ("d_direct", "Direct伤害 +X%(持续)", "during", "1", "pct", ""),
+    ("d_charge", "技能槽充能 +X%(持续)", "during", "3", "pct", ""),
+    ("d_ability", "能力伤害 +X%(持续)", "during", "154", "pct", ""),
+    ("d_ind_direct", "独立乘区Direct +X%(持续)", "during", "410", "pct", "后期五星标志乘区"),
+    ("d_ind_pf", "独立乘区强化弹射 +X%(持续)", "during", "413", "pct", ""),
+    # 对敌伤害(能力伤害,DMG: 伪 kind 在 generate 按角色元素解析成真实枚举 251/316/352+elem)
+    ("dmg_all", "对全体敌人 能力伤害(依自身攻击,X倍)", "instant", "DMG:all", "x",
+     "元素自动跟角色;「段数」填N=改为最近顺序N段"),
+    ("dmg_near", "对最近的敌人 能力伤害(依自身攻击,X倍)", "instant", "DMG:near", "x",
+     "「段数」=多段连击(空=1段)"),
+    ("dmg_trig", "对触发源敌人 能力伤害(依自身攻击,X倍)", "instant", "DMG:trig", "x",
+     "配合受击/敌方行动类触发"),
+    ("invoke", "发动技能动作 InvokeSkill(伤害计为技能伤害)", "instant", "629", "raw",
+     "填「技能键/动作路径」;范本=队长技 L:111183 行5(火龙弹射追击)"),
+]
+
+_FXGEN_GROUPS = [("", "(不限)"), ("Red", "火属性"), ("Blue", "水属性"), ("Yellow", "雷属性"),
+                 ("Green", "风属性"), ("White", "光属性"), ("Black", "暗属性")]
+
+
+def _enum_menu(cat: str, table: str = "ability") -> list:
+    """某枚举类别的全量选项,按全库使用频次降序(0 次的沉底);供自由构建器下拉。
+    返回 [{kind, cn, en, n}]。cat ∈ enums 键;table ∈ usage 的表名(ability/leader…)。"""
+    m = composer_meta()
+    usage_key = {"trigger": "instant_trigger", "during_trigger": "during_trigger",
+                 "instant_content": "instant_content", "during_content": "during_content"}.get(cat, cat)
+    use = (m["usage"].get(usage_key) or {}).get(table, {}) or {}
+    out = []
+    for k, v in m["enums"].get(cat, {}).items():
+        out.append({"kind": k, "cn": v.get("cn") or v.get("en"), "en": v.get("en", ""),
+                    "n": int(use.get(k, 0))})
+    out.sort(key=lambda x: (-x["n"], int(x["kind"]) if x["kind"].isdigit() else 1 << 30))
+    return out
+
+
+def composer_catalog() -> dict:
+    """效果构建器目录:`common` = 精选常用(带默认单位/阈值提示);`all` = 全量枚举
+    (触发/效果各按 瞬发/持续 分组,中文名+使用频次,可搜),让人**自由组合**任意效果
+    而不是面对空白块。目标/角色组/来源/属性附带。"""
+    tg = {str(k): v for k, v in wf_describe.TARGET_CN.items()}
+    pl = {str(k): v for k, v in wf_describe.PULLER_CN.items()}
+    return {"triggers": [{"id": t[0], "name": t[1], "mode": t[2], "kind": t[3],
+                          "threshold": t[4], "note": t[5]} for t in _FXGEN_TRIGGERS],
+            "effects": [{"id": e[0], "name": e[1], "mode": e[2], "kind": e[3],
+                         "unit": e[4], "note": e[5]} for e in _FXGEN_EFFECTS],
+            "all": {
+                "trigger": {"instant": _enum_menu("trigger"),
+                            "during": _enum_menu("during_trigger")},
+                "effect": {"instant": _enum_menu("instant_content"),
+                           "during": _enum_menu("during_content")},
+                "precondition": _enum_menu("precondition"),
+            },
+            "pullers": pl,
+            "targets": tg, "groups": [{"id": g[0], "name": g[1]} for g in _FXGEN_GROUPS],
+            "preconditions_common": [
+                {"kind": "", "name": "(无前置条件)", "threshold": None},
+                {"kind": "12", "name": "Fever中", "threshold": None},
+                {"kind": "186", "name": "非Fever", "threshold": None},
+                {"kind": "8", "name": "HP≥X%", "threshold": "pct"},
+                {"kind": "9", "name": "HP≤X%", "threshold": "pct"},
+                {"kind": "119", "name": "技能槽≥X%", "threshold": "pct"},
+            ],
+            "note": "触发与效果须同模式(瞬发/持续);数值单位自动换算(%×1000,次×100000,倍×100000)"}
+
+
+def _unit_mul(unit: str) -> int:
+    return {"pct": 1000, "count": 100000, "raw": 1, "x": 100000}.get(unit, 1000)
+
+
+# 对敌伤害三族(依攻击 ByAttack)基准枚举:族基址 + 元素下标(0火..5暗) = 真实 kind。
+# all=EnemyDamage(time空=全体/N=最近顺序N段) near=NearestEnemyDamage trig=TriggerEnemyDamage
+_DMG_FAMILY_BASE = {"all": 251, "near": 352, "trig": 316}
+_GROUP_TOKEN_ELEM = {"Red": 0, "Blue": 1, "Yellow": 2, "Green": 3, "White": 4, "Black": 5}
+
+
+def _element_index_for_key(dst_key: str) -> int | None:
+    """dst_key 所属角色的伤害族元素下标(0火..5暗)。
+    ⚠ character c3 element 是 **0-based**(火=0 水=1 雷=2 风=3 光=4 暗=5),与对敌伤害枚举族
+    (251 EnemyDamageByAttackRed…)**同基,直接可用,无需换算**——2026-07-13 全库实证:
+    c3 × 队长技元素token 对照 火80/水82/雷80/风75/光79/黑81 全吻合。此前"1-based 须 -1"
+    是误诊(把 wf_describe.ELEMENT_CN 的 1-based 枚举当成了 c3 语义),曾把风角色(c3=3)的
+    伤害错生成雷(253)。非 0-5 → None。
+    L: 前缀=队长技键,按 character c17(leader_ability_id)反查角色——**键≠角色ID**
+    (白虎:角色10/队长技3);多个角色共用同一队长技且元素不同时 → None(须手选属性)。
+    纯数字键扫 character 表 c19-24 词条引用。"""
+    ks = str(dst_key)
+    if ks.startswith(("W:", "S:")):
+        return None
+
+    def _to_idx(el: str) -> int | None:
+        return int(el) if el.isdigit() and 0 <= int(el) <= 5 else None
+
+    try:
+        table = core.load_table(core.CHARACTER_LOGICAL, TARGET_STORE, SOURCE_STORE)
+        rows = {k: core.read_csv_lines(t) for k, t in table.text_rows().items() if t}
+        if ks.startswith("L:"):
+            lk = ks[2:]
+            els = {lines[0][3].strip() for lines in rows.values()
+                   if len(lines[0]) > 17 and lines[0][17] == lk}
+            return _to_idx(els.pop()) if len(els) == 1 else None
+        for lines in rows.values():
+            r = lines[0]
+            if len(r) > 24 and ks in r[19:25]:
+                return _to_idx(r[3].strip())
+    except Exception:
+        return None
+    return None
+
+
+def composer_generate(dst_key: str, trigger_id: str = "", effect_id: str = "",
+                      value: float = 0, value_max=None, threshold=None,
+                      target: str = "0", groups: str = "",
+                      mode: str = "", trigger_kind: str = "", effect_kind: str = "",
+                      effect_unit: str = "pct", threshold_unit: str = "count",
+                      puller: str = "0", trigger_groups: str = "",
+                      precondition_kind: str = "", precondition_threshold=None,
+                      precondition_unit: str = "pct", hits=None,
+                      string_id: str = "", action_path: str = "") -> dict:
+    """生成整行(不写盘;预览后 /composer/apply 写入)。两种调用:
+    ① 精选:传 trigger_id/effect_id(取自 catalog.triggers/effects,带默认单位);
+    ② 自由:传 mode('instant'|'during') + trigger_kind + effect_kind(枚举 ID,取自 catalog.all)
+       + effect_unit('pct'|'count'|'raw'|'x'倍)。自由模式支持全量枚举任意组合。
+    通用扩展:precondition_kind=前置条件枚举(如 12=Fever中,阈值单位 pct/count);
+    hits=对敌伤害段数(EnemyDamage族 time 列:空=全体/N=最近顺序N段);
+    string_id/action_path=InvokeSkill(629) 的技能键与 DSL 路径;
+    effect_kind='DMG:all|near|trig'=对敌能力伤害伪 kind,按角色元素解析(元素取
+    「角色组/属性」选择,否则自动查 dst_key 所属角色 c3)。"""
+    tr = next((t for t in _FXGEN_TRIGGERS if t[0] == trigger_id), None)
+    fx = next((e for e in _FXGEN_EFFECTS if e[0] == effect_id), None)
+    # 归一化:精选 → 通用参数
+    if tr and fx:
+        if tr[2] != fx[2]:
+            raise ValueError(f"触发({tr[1]})与效果({fx[1]})模式不一致:瞬发配瞬发,持续配持续")
+        mode = tr[2]
+        trigger_kind = tr[3]
+        effect_kind = fx[3]
+        effect_unit = fx[4] or "pct"
+        threshold_unit = tr[4] or "count"
+        if tr[0] == "member":       # 编成:阈值判编成人数、组进触发角色组
+            trigger_groups = groups
+        tr_name, fx_name = tr[1], fx[1]
+    else:
+        if mode not in ("instant", "during"):
+            raise ValueError("自由模式需 mode='instant'|'during'")
+        if not effect_kind:
+            raise ValueError("需选择效果(effect_kind)")
+        m = composer_meta()
+        trcat = "trigger" if mode == "instant" else "during_trigger"
+        fxcat = "instant_content" if mode == "instant" else "during_content"
+        tr_name = (m["enums"][trcat].get(trigger_kind, {}) or {}).get("cn") \
+            or (trigger_kind and f"触发{trigger_kind}") or "常驻"
+        fx_name = (m["enums"][fxcat].get(effect_kind, {}) or {}).get("cn") or f"效果{effect_kind}"
+    # DMG: 伪 kind → 真实对敌伤害枚举(族基址+元素)。元素:属性下拉 token > 角色 c3 自动
+    is_dmg = str(effect_kind).startswith("DMG:")
+    if is_dmg:
+        if mode != "instant":
+            raise ValueError("对敌伤害为瞬发效果,模式须为 instant")
+        fam = str(effect_kind)[4:]
+        base_k = _DMG_FAMILY_BASE.get(fam)
+        if base_k is None:
+            raise ValueError(f"未知伤害族: {effect_kind}")
+        el = _GROUP_TOKEN_ELEM.get(groups)
+        if el is None:
+            el = _element_index_for_key(dst_key)
+        if el is None:
+            raise ValueError("无法确定伤害元素:请在「角色组/属性」下拉选一个属性")
+        effect_kind = str(base_k + el)
+        groups = ""      # 属性已消费为伤害元素,不写入目标角色组
+        fx_name = f"{fx_name}[{['火','水','雷','风','光','暗'][el]}]"
+
+    b = composer_blank(dst_key)
+    kind, row = b["kind"], b["row"]
+    blocks = wf_describe.layout(kind)["blocks"]
+    tcol = blocks["precondition1"] - 1
+    vmax = value_max if value_max not in (None, "") else value
+    umul = _unit_mul(effect_unit)
+    if mode == "instant":
+        row[tcol] = "0"
+        base = blocks["instant_trigger"]
+        row[base] = trigger_kind or "0"          # 空=Initial(常驻/开局)
+        row[base + 1] = "0"                       # 来源=自身
+        if threshold not in (None, "", 0):
+            tmul = _unit_mul(threshold_unit)
+            row[base + 3] = row[base + 4] = str(int(float(threshold) * tmul))
+        elif (trigger_kind or "0") not in ("0", "1"):
+            # 计数型触发(冲刺/弹射/强化弹射等)官方全库阈值最小=100000(1次),0/0 全库
+            # 零先例——写 0 客户端渲染成「0次冲刺时」且触发行为未定义(2026-07-13 实锤)。
+            # 空阈值默认=每次(1次=100000)。
+            row[base + 3] = row[base + 4] = "100000"
+        if (trigger_kind or "0") not in ("0", "1"):
+            if not str(row[base + 7]).strip():
+                row[base + 7] = "(None)"          # trigger_limit
+            if not str(row[base + 8]).strip():
+                row[base + 8] = "0"               # cooltime
+        if trigger_groups:
+            row[base + 9] = trigger_groups        # instant_trigger.character_groups
+        cbase = blocks["instant_content"]
+    else:
+        row[tcol] = "1"
+        base = blocks["during_trigger"]
+        row[base] = trigger_kind or "0"
+        row[base + 1] = str(puller or "0")        # puller 必填(7050:需 puller 的 case 空=崩)
+        if threshold not in (None, "", 0):
+            tmul = _unit_mul(threshold_unit)
+            row[base + 3] = row[base + 4] = str(int(float(threshold) * tmul))
+        if trigger_groups:
+            row[base + 6] = trigger_groups        # during_trigger.character_groups
+        cbase = blocks["during_content"]
+    row[cbase] = effect_kind
+    row[cbase + 1] = str(target or "0")
+    if groups:
+        row[cbase + 2] = groups                   # 目标·角色组(如 全队(火))
+    if effect_kind == "629" and float(value or 0) == 0:
+        row[cbase + 4] = row[cbase + 5] = ""      # InvokeSkill 不读强度,官方行留空
+    else:
+        row[cbase + 4] = str(int(float(value) * umul))
+        row[cbase + 5] = str(int(float(vmax) * umul))
+    # 前置条件(precondition1 块:kind / 阈值)
+    if precondition_kind not in ("", None):
+        pbase = blocks["precondition1"]
+        row[pbase] = str(precondition_kind)
+        if precondition_threshold not in (None, "", 0):
+            pmul = _unit_mul(precondition_unit)
+            row[pbase + 3] = row[pbase + 4] = str(int(float(precondition_threshold) * pmul))
+    if mode == "instant":
+        if is_dmg:
+            # time 列:读 time 的 kind 空串非法(Some(parseInt(''))),None 哨兵=字面量 (None)
+            row[cbase + 22] = str(int(hits)) if hits not in (None, "", 0) else "(None)"
+        elif hits not in (None, "", 0):           # 其他 kind:仅显式给段数时写
+            row[cbase + 22] = str(int(hits))
+        if string_id:
+            row[cbase + 23] = string_id           # InvokeSkill 技能键
+        if action_path:
+            row[cbase + 24] = action_path         # InvokeSkill DSL 路径
+    desc = wf_describe.describe_line(row, kind)
+    return {"key": dst_key, "kind": kind, "ncols": len(row), "row": row, "desc": desc,
+            "trigger": tr_name, "effect": fx_name,
+            "note": "预览无误后用「追加到词条」写入(走 /composer/apply,自动 dry-run→确认)"}
 
 
 # ---------------------------------------------------------------- 装备/魂珠 equipment
@@ -1935,6 +2343,19 @@ CHAR_FIELD_MAP = {
     "leader_title": ("text", 10), "cv": ("text", 11),
 }
 
+# 显示源结论(2026-07-13 逆向 StatusWindow/CharacterValues/CharacterTextValues):
+# character_text 的 skill_name_*/leader_ability_name 只喂**抽卡特性页**;
+# 详情页/战斗的 队长技名 = character 表 c18(leader_ability Option 的 name,c17=id),
+# 技能名/描述 = action_skill 表 name/description(按技能级别)。
+# 所以 leader_title 要**双写** text[10] + master[18];技能名系字段另同步 action_skill
+# (save_char_fields 里做)。种族 = character c4 token → APK 内 race 表映射,乱填不显示。
+CHAR_FIELD_EXTRA = {"leader_title": ("master", 18)}
+RACE_TOKENS = ("Human", "Beast", "Element", "Machine", "Undead",
+               "Mystery", "Dragon", "Devil", "Plants", "Aquatic")
+# 资料页技能字段 → action_skill 级别/列(技能名＋=级别2;＋＋级别3 资料页未暴露不动)
+_SKILL_TEXT_SYNC = {"1": ("skill_name", "skill_desc"),
+                    "2": ("skill_plus_name", "skill_plus_desc")}
+
 
 def _char_json_paths() -> tuple[Path, Path]:
     return CDNDATA / "character.json", CDNDATA / "character_text.json"
@@ -2047,15 +2468,29 @@ def save_char_fields(cid: str, edits: dict, dry_run: bool) -> dict:
                 raise ValueError(
                     "element=6(通用/Colorless)是敌人专属元素,写给可玩角色会导致客户端崩溃"
                     "(C7050 等),已禁止。要「任意共鸣」用『通用共鸣(OmniElement)』开关(保留原元素)。")
+        if f == "race":
+            # 客户端把 c4 按逗号拆 token 查 APK 内 race 表,未知 token 显示不出来(中文更不行)
+            val = ",".join(t.strip() for t in val.split(",") if t.strip())
+            bad = [t for t in val.split(",") if t and t not in RACE_TOKENS]
+            if bad:
+                raise ValueError(f"未知种族 token: {'/'.join(bad)}。只认英文 token(逗号分隔多值): "
+                                 + ",".join(RACE_TOKENS)
+                                 + "(Human人型 Beast兽型 Element精灵 Machine机械 Undead不死"
+                                   " Mystery神秘 Dragon龙族 Devil魔族 Plants植物 Aquatic水栖)")
         norm[f] = val
         write(src, idx, val)
+        if f in CHAR_FIELD_EXTRA:  # 队长技名双写:客户端详情页读 character c18,不读 text[10]
+            write(*CHAR_FIELD_EXTRA[f], val)
 
     # ---- ②层:同列写 character / character_text(客户端显示与战斗读这里) ----
     l2 = {"master": None, "text": None}   # 有变更的表对象,写盘阶段用
     l2_parsed = {}
     for src_kind, logical in (("master", core.CHARACTER_LOGICAL), ("text", CHAR_TEXT2_LOGICAL)):
-        fields = {f: v for f, v in norm.items() if CHAR_FIELD_MAP[f][0] == src_kind}
-        if not fields:
+        idx_writes = [(CHAR_FIELD_MAP[f][1], v) for f, v in norm.items()
+                      if CHAR_FIELD_MAP[f][0] == src_kind]
+        idx_writes += [(CHAR_FIELD_EXTRA[f][1], v) for f, v in norm.items()
+                       if f in CHAR_FIELD_EXTRA and CHAR_FIELD_EXTRA[f][0] == src_kind]
+        if not idx_writes:
             continue
         try:
             table = core.load_table(logical, TARGET_STORE, SOURCE_STORE)
@@ -2068,8 +2503,7 @@ def save_char_fields(cid: str, edits: dict, dry_run: bool) -> dict:
             continue
         row = parsed[cid][0]
         changed = False
-        for f, val in fields.items():
-            idx = CHAR_FIELD_MAP[f][1]
+        for idx, val in idx_writes:
             while len(row) <= idx:
                 row.append("")
             if row[idx] != val:
@@ -2079,6 +2513,34 @@ def save_char_fields(cid: str, edits: dict, dry_run: bool) -> dict:
         if changed:
             l2[src_kind] = table
             l2_parsed[src_kind] = parsed
+
+    # ---- ②层 action_skill:技能名/描述的**实际显示源**(详情页/战斗)同步 ----
+    # character_text 的 skill_name_*/description_* 只喂抽卡特性页;详情页与战斗读
+    # action_skill 表 name/description(2026-07-13 逆向 StatusWindowView L1086/1103)。
+    sk_edits = []
+    for lv, (fn, fd) in _SKILL_TEXT_SYNC.items():
+        e = {"level": lv}
+        if fn in norm:
+            e["name"] = norm[fn]
+        if fd in norm:
+            e["description"] = norm[fd]
+        if len(e) > 1:
+            sk_edits.append(e)
+    if sk_edits:
+        askey = _action_skill_key(cid)
+        sharers = [k for k, v in master.items()
+                   if v and len(v[0]) > 8 and v[0][8] == askey and k != cid]
+        try:
+            r = save_skill_energy(cid, sk_edits, dry_run)
+            if r.get("log"):
+                log.append("②action_skill 同步(详情页/战斗显示源): "
+                           + "; ".join(l for l in r["log"].splitlines() if l))
+            if r.get("changes") and sharers:
+                log.append(f"⚠ 技能 {askey} 与 {len(sharers)} 个角色共用"
+                           f"({'/'.join(sharers[:5])}{'…' if len(sharers) > 5 else ''}),"
+                           "技能名/描述会一起变(克隆时勾「资产独立」可避免)")
+        except Exception as e:
+            log.append(f"⚠ action_skill 同步失败(游戏内技能名/描述不会变): {e}")
 
     # ---- 服务端简化表 assets/character.json(name/rarity/element) ----
     sp = _server_char_json_path()
@@ -2159,6 +2621,154 @@ def save_char_fields(cid: str, edits: dict, dry_run: bool) -> dict:
         note += ";服务端简化表已同步(重启服务端生效)"
     return {"changes": len(log), "log": "\n".join(log), "written": written, "dry_run": dry_run,
             "note": note}
+
+
+# ---------------------------------------------------------------- 整体转属性(一键)
+# 元素在角色数据里的落点(2026-07-13 逆向):
+#  1) character 表 c3 element(0火1水2雷3风4光5暗)—— 决定 UI 属性 + 属性球 + 克制
+#     + **技能伤害元素随此自动**(白等技能 DSL 无显式元素参数,伤害元素 = 角色 c3)。
+#  2) ability/leader 全行的**元素 string token**(Red/Blue/Yellow/Green/White/Black)——
+#     只出现在 character_groups 类单元格(编成≥/共鸣/[限X属性]/赋予全队(X)),全是己方队门槛,
+#     改属性必须整套翻(否则如白转光后队长技还判"风编成"→永不触发,上轮实锤)。
+#  3) content 块的 **element 数值列(0-5)**:显式指定造物/攻击元素,非空且=旧属性时翻。
+#  ❌ 不翻:元素型**枚举 kind**(数字 ID,如 抗性风/敌方抗性火↓/来自抗性X)——判攻击方/敌方
+#     元素,是独立机制,与角色自身属性无关(翻了会改玩法);工具报告出来供人工决定。
+_EL_TOKENS = {"0": "Red", "1": "Blue", "2": "Yellow", "3": "Green", "4": "White", "5": "Black"}
+_EL_TOKEN_SET = set(_EL_TOKENS.values())
+_EL_ENUM_SETS = None  # 惰性:元素型枚举 kind 的 (block -> {kind_id}) 供报告
+
+
+def _element_enum_ids() -> dict:
+    """元素型枚举 kind 的 ID 集合(供报告"未改动机制类"),按 content 块。"""
+    global _EL_ENUM_SETS
+    if _EL_ENUM_SETS is not None:
+        return _EL_ENUM_SETS
+    en = composer_meta()["enums"]
+    out = {}
+    for cat in ("instant_content", "during_content"):
+        ids = {}
+        for k, v in en.get(cat, {}).items():
+            if any(e in v.get("en", "") for e in _EL_TOKEN_SET) \
+                    or any(c in v.get("cn", "") for c in "火水雷风光暗"):
+                ids[k] = v.get("cn") or v.get("en")
+        out[cat] = ids
+    _EL_ENUM_SETS = out
+    return out
+
+
+def _flip_row_tokens(row: list, tok: str) -> list[str]:
+    """把一行里所有元素 token 单元格翻成 tok;返回改动说明列表。"""
+    logs = []
+    for ci, v in enumerate(row):
+        if not v:
+            continue
+        parts = v.split(",")
+        if any(p in _EL_TOKEN_SET for p in parts):
+            newparts = [tok if p in _EL_TOKEN_SET else p for p in parts]
+            nv = ",".join(newparts)
+            if nv != v:
+                logs.append(f"c{ci} {v!r}->{nv!r}")
+                row[ci] = nv
+    return logs
+
+
+def element_convert(character: str, target: str, dry_run: bool) -> dict:
+    """一键把角色整套改成 target 属性(0-5/中文):c3 + 全套词条/队长技元素 token +
+    content element 列 + ①层三层同步。元素型枚举 kind(抗性/敌方,判他方元素)不动,列进报告。"""
+    rev_el = {v: k for k, v in ELEMENTS.items()}
+    tgt = rev_el.get(str(target), str(target))
+    if tgt not in _EL_TOKENS:
+        raise ValueError(f"目标属性非法: {target}(要 0-5 或 火/水/雷/风/光/暗;element=6 禁用)")
+    tok = _EL_TOKENS[tgt]
+    cid = str(character)
+    char_table = load_char_table()
+    ids = list(core.ability_ids_for_character(cid, char_table))
+    lid = core.effective_character_id(cid, char_table)
+    logs = []
+    written = []
+
+    # ---- ② ability 表:6 词条整套翻 token + element 数值列 ----
+    ab_blocks = wf_describe.layout("ability")["blocks"]
+    ab_el_cols = [ab_blocks["instant_content"] + 26, ab_blocks["during_content"] + 10]
+    ab = core.load_table(core.ABILITY_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    pa = {k: core.read_csv_lines(t) for k, t in ab.text_rows().items()}
+    ab_changed = False
+    for aid in ids:
+        if aid not in pa:
+            continue
+        for li, row in enumerate(pa[aid], 1):
+            for msg in _flip_row_tokens(row, tok):
+                logs.append(f"词条{aid} 行{li} {msg}")
+                ab_changed = True
+            for ec in ab_el_cols:
+                if len(row) > ec and row[ec] in _EL_TOKENS and row[ec] != tgt:
+                    logs.append(f"词条{aid} 行{li} c{ec} element {row[ec]}->{tgt}")
+                    row[ec] = tgt
+                    ab_changed = True
+
+    # ---- ② leader 表 ----
+    ld_blocks = wf_describe.layout("leader_ability")["blocks"]
+    ld_el_cols = [ld_blocks["instant_content"] + 26, ld_blocks["during_content"] + 10]
+    ld = core.load_table(LEADER_LOGICAL, TARGET_STORE, SOURCE_STORE)
+    pl = {k: core.read_csv_lines(t) for k, t in ld.text_rows().items()}
+    ld_changed = False
+    if lid in pl:
+        for li, row in enumerate(pl[lid], 1):
+            for msg in _flip_row_tokens(row, tok):
+                logs.append(f"队长技 行{li} {msg}")
+                ld_changed = True
+            for ec in ld_el_cols:
+                if len(row) > ec and row[ec] in _EL_TOKENS and row[ec] != tgt:
+                    logs.append(f"队长技 行{li} c{ec} element {row[ec]}->{tgt}")
+                    row[ec] = tgt
+                    ld_changed = True
+
+    # ---- 报告:元素型枚举 kind(不改)----
+    enum_ids = _element_enum_ids()
+    mech = []
+    for label, keys, parsed, blocks in (("词条", ids, pa, ab_blocks),
+                                        ("队长技", [lid], pl, ld_blocks)):
+        for k in keys:
+            for li, row in enumerate(parsed.get(k, []), 1):
+                for blk, off in (("instant_content", blocks["instant_content"]),
+                                 ("during_content", blocks["during_content"])):
+                    kind = row[off] if len(row) > off else ""
+                    if kind and kind in enum_ids[blk]:
+                        who = k if label == "词条" else ""
+                        mech.append(f"  {label}{who} 行{li}: {enum_ids[blk][kind]}(机制类,未改)")
+
+    logs.append(f"—— 属性整体转换 -> {ELEMENTS[tgt]}({tok})——")
+    logs.append(f"己方队门槛(编成/共鸣/赋予全队/[限X]) + 造物元素:共 "
+                f"{sum(1 for l in logs if '->' in l)} 处已翻(见上)"
+                if any('->' in l for l in logs) else "词条/队长技里没有需要翻的元素引用")
+    if mech:
+        logs.append(f"以下 {len(mech)} 处是**判他方元素的机制**(抗性/敌方特攻),按属性无关"
+                    "→保留不动(如需改用词条工坊手动换枚举):")
+        logs.extend(mech[:20])
+        if len(mech) > 20:
+            logs.append(f"  …等共 {len(mech)} 处")
+
+    changes = 0
+    if not dry_run:
+        if ab_changed:
+            written.append(str(_write_with_backup(ab, pa, [f"{cid} 整体转{ELEMENTS[tgt]}:词条元素 token"])))
+            changes += 1
+        if ld_changed:
+            written.append(str(_write_with_backup(ld, pl, [f"{cid} 整体转{ELEMENTS[tgt]}:队长技元素 token"])))
+            changes += 1
+    # c3 + ①层三层同步(复用 save_char_fields;dry_run 透传)
+    r_fields = save_char_fields(cid, {"element": tgt}, dry_run)
+    if r_fields.get("log"):
+        logs.insert(0, "【属性字段】" + r_fields["log"].replace("\n", " / "))
+    changes += r_fields.get("changes", 0)
+    if not dry_run:
+        written.append(r_fields.get("written") or "")
+    return {"changes": changes if not dry_run else (int(ab_changed) + int(ld_changed) + 1),
+            "log": "\n".join(logs), "written": "; ".join(w for w in written if w) or None,
+            "dry_run": dry_run,
+            "note": "②层(c3+词条+队长技)进待发布→「发布并重启游戏」;①层资料+服务端简化表"
+                    "重启服务端生效。技能伤害元素随 c3 自动,无需改 DSL。"
+                    "机制类枚举(抗性/敌方)按属性无关未动。"}
 
 
 # ---------------------------------------------------------------- 技能形态切换
@@ -2401,11 +3011,13 @@ _PACK_ARTIFACT_SUFFIX = (".gif", ".json")
 
 
 def import_asset_pack(character: str, src_dir: str, force: bool, dry_run: bool) -> dict:
-    """全资产包批量导入:datamine 解包目录或 .zip 包(相对路径 = character/<code>/ 下的
-    逻辑路径)一比一替换到 store。zip 自动解压到临时目录;外层多套的文件夹(zip 内只有
-    一个角色名目录的常见形状)自动下钻到含 ui/pixelart/voice/battle 的那级。
-    逐文件走 replace_asset(校验/混淆编码/备份/进 pending/改动日志),命不中 store 的路径
-    跳过并报告。"""
+    """全资产包批量导入:datamine 解包目录或 .zip 包一比一替换到 store。
+    路径识别(2026-07-13 起两段式):相对路径先按 character/<code>/ 下的逻辑路径找,
+    命不中再按**全局逻辑路径**原样找——「一键导出全部资产」的 zip(character/<code>/**、
+    battle/** 技能 DSL/特效原样全局树)因此可以直接整包导回,不再报"store 无对应路径"。
+    zip 自动解压到临时目录;外层多套的文件夹(zip 内只有一个角色名目录的常见形状)
+    自动下钻到含 ui/pixelart/voice/battle 的那级。逐文件走 replace_asset
+    (校验/混淆编码/备份/进 pending/改动日志),两种前缀都命不中 store 的路径跳过并报告。"""
     c = next((x for x in load_characters() if x["id"] == str(character)), None)
     if not c:
         raise ValueError(f"角色不存在: {character}")
@@ -2445,8 +3057,13 @@ def import_asset_pack(character: str, src_dir: str, force: bool, dry_run: bool) 
                     continue
                 logical = f"character/{code}/{rel}"
                 if not wf_assets.locate(TARGET_STORE, logical):
-                    missing.append(rel)
-                    continue
+                    # 全局逻辑路径兜底:一键导出包里 character/<code>/**、battle/**(技能
+                    # DSL/特效)是完整逻辑树,不能再套 character/<code>/ 前缀
+                    if wf_assets.locate(TARGET_STORE, rel):
+                        logical = rel
+                    else:
+                        missing.append(rel)
+                        continue
                 try:
                     r = replace_asset(logical, fp.read_bytes(), force, dry_run)
                     replaced.append(rel)
@@ -3154,6 +3771,255 @@ def powerflip_clone(src_kind: str, new_id: str, dry_run: bool) -> dict:
             "dry_run": dry_run, "new_id": new_id, "paths": dst_paths}
 
 
+# ---------------------------------------------------------------- PF 合成工坊
+# 任选已有 PF 种类组合成新种类并一键挂角色(2026-07-13,真机范本 override_dual_spgirl_meteor
+# =希尔媞+索维,白 ID10 验证通过)。合并规则:
+#   * 基底保留完整生命周期(SetPowerFilpSuppress/NotifyPowerflipEnd/命中重置时间线);
+#   * 供体只贡献攻击/演出块——递归剥离生命周期命令(抑制/结束通知/RemoveEvent),
+#     剥空的 Wait 事件一并丢弃;
+#   * 供体标签(特效名/事件名,'*'匿名除外)加 _N 后缀,防止与基底/其他供体串扰
+#     (基底的 HideEffect/RemoveEvent 只认自己的标签);
+#   * 顶层抑制帧取全体最大(供体动作不被提前打断)。
+# 挂角色 = 队长技追加 instant 722(powerflip_override)行,模板取全表官方 722 行,
+# 前置清空=无条件常驻;已有 722 行则改指新种类。仅队长位生效;PF 图标仍随 c6。
+_PF_LABEL_ARGS = {"ShowEffect": (1,), "HideEffect": (1,), "Wait": (2,),
+                  "RemoveEvent": (1,), "CollisionOfBallAndEnemy": (3,), "CreateHitArea": (1,)}
+_PF_LIFECYCLE_CMDS = {"SetPowerFilpSuppress", "NotifyPowerflipEnd", "RemoveEvent"}
+
+
+def _pf_kind_paths(kind: str, parsed: dict) -> "list[str] | None":
+    if kind in parsed and parsed[kind]:
+        return parsed[kind][0][:3]
+    if kind in {k for k, _ in PF_STD}:
+        return _pf_conventional_paths(kind)
+    return None
+
+
+def _pf_load_tree(pp: str):
+    fp = _dsl_store_path(pp)
+    raw = fp.read_bytes() if fp.exists() else _apk_read_asset(pp)
+    if raw is None:
+        raise ValueError(f"PF 动作文件不可得(store 与 APK 都没有): {pp}")
+    return wf_dsl.parse_dsl(zlib.decompress(raw, -15))["tree"]
+
+
+def _pf_top_block(tree) -> list:
+    for el in tree:
+        if isinstance(el, list) and el and el[0] == "Block":
+            return el[1]
+    raise ValueError("PF DSL 无顶层 Block")
+
+
+def _pf_cmd_name(entry) -> str:
+    return (entry[1][0] if isinstance(entry, list) and len(entry) > 1
+            and isinstance(entry[1], list) and entry[1]
+            and isinstance(entry[1][0], str) else "")
+
+
+def _pf_brief_lines(tree) -> list[str]:
+    import wf_dsl_sig as _S
+    out: list[str] = []
+
+    def walk(n, depth=0):
+        if isinstance(n, list):
+            if len(n) >= 2 and n[0] in ("Command", "Event") and isinstance(n[1], list) \
+                    and n[1] and isinstance(n[1][0], str):
+                try:
+                    b = _S.brief_command(n[1])
+                except Exception:
+                    b = None
+                out.append("  " * depth + (b or str(n[1][0])))
+                for x in n[1][1:]:
+                    walk(x, depth + 1)
+                return
+            for x in n:
+                walk(x, depth)
+
+    walk(tree)
+    return out
+
+
+def _pf_has_commands(node) -> bool:
+    if isinstance(node, list):
+        if node and node[0] == "Command":
+            return True
+        return any(_pf_has_commands(x) for x in node)
+    return False
+
+
+def _pf_clean_donor(node) -> None:
+    """就地递归:每个 Block 内剔除生命周期命令;剥空(不再含任何 Command)的 Wait 事件丢弃。"""
+    if not isinstance(node, list):
+        return
+    if node and node[0] == "Block" and len(node) > 1 and isinstance(node[1], list):
+        kept = []
+        for e in node[1]:
+            nm = _pf_cmd_name(e)
+            if isinstance(e, list) and e and e[0] == "Command" and nm in _PF_LIFECYCLE_CMDS:
+                continue
+            _pf_clean_donor(e)
+            if isinstance(e, list) and e and e[0] == "Event" and nm == "Wait" \
+                    and not _pf_has_commands(e):
+                continue
+            kept.append(e)
+        node[1] = kept
+        return
+    for x in node:
+        _pf_clean_donor(x)
+
+
+def _pf_rename_labels(node, suffix: str):
+    """就地递归:标签参数(特效名/事件名)加后缀;'*'(匿名)与空串不动。"""
+    if isinstance(node, list):
+        if len(node) >= 2 and node[0] in ("Command", "Event") and isinstance(node[1], list) \
+                and node[1] and isinstance(node[1][0], str):
+            cmd = node[1]
+            for i in _PF_LABEL_ARGS.get(cmd[0], ()):
+                if i < len(cmd) and isinstance(cmd[i], str) and cmd[i] not in ("", "*"):
+                    cmd[i] = cmd[i] + suffix
+            for x in cmd[1:]:
+                _pf_rename_labels(x, suffix)
+            return node
+        for x in node:
+            _pf_rename_labels(x, suffix)
+    return node
+
+
+def powerflip_brief(kind: str) -> dict:
+    """一个 PF 种类三级动作的中文命令摘要(合成工坊选材预览用)。"""
+    _table, parsed = _pf_table()
+    paths = _pf_kind_paths(kind, parsed)
+    if not paths:
+        raise ValueError(f"种类不存在: {kind}")
+    briefs = {}
+    for lv, pp in enumerate(paths, 1):
+        try:
+            briefs[str(lv)] = _pf_brief_lines(_pf_load_tree(pp))
+        except Exception as exc:
+            briefs[str(lv)] = [f"(不可读: {exc})"]
+    return {"kind": kind, "briefs": briefs}
+
+
+def powerflip_compose(new_id: str, base_kind: str, donor_kinds: list, character: str,
+                      dry_run: bool) -> dict:
+    """合成新 PF 种类(基底+任意供体)并可选一键挂到角色队长技(instant 722,无条件)。"""
+    import copy as _copy
+    new_id = str(new_id).strip()
+    if not _PF_ID_RE.match(new_id):
+        raise ValueError("新种类 id 只能用小写字母/数字/下划线(字母开头,3-61 位)")
+    donor_kinds = [str(k).strip() for k in (donor_kinds or []) if str(k).strip()]
+    base_kind = str(base_kind).strip()
+    if not donor_kinds:
+        raise ValueError("至少选一个供体种类(要拼进基底的 PF)")
+    if base_kind in donor_kinds:
+        raise ValueError(f"基底与供体重复: {base_kind}")
+    table, parsed = _pf_table()
+    if new_id in parsed:
+        raise ValueError(f"种类已存在: {new_id}")
+    if new_id in {k for k, _ in PF_STD}:
+        raise ValueError("不能占用标准种类名(内置 base 表已有,键重复=客户端 7051 崩溃)")
+    src_all = [base_kind] + donor_kinds
+    paths = {}
+    for k in src_all:
+        p = _pf_kind_paths(k, parsed)
+        if not p:
+            raise ValueError(f"来源种类不存在: {k}")
+        paths[k] = p
+    dst_paths = [f"battle/action/power_flip/action/override/{new_id}${new_id}_lv{n}"
+                 for n in (1, 2, 3)]
+    log = [f"合成 PF 种类 {new_id} = 基底 {base_kind} + 供体 {'+'.join(donor_kinds)}"]
+    briefs = {}
+    blobs = []
+    for lv in (1, 2, 3):
+        base = _pf_load_tree(paths[base_kind][lv - 1])
+        blk = _pf_top_block(base)
+        sup_vals = [int(e[1][1]) for e in blk
+                    if _pf_cmd_name(e) == "SetPowerFilpSuppress" and len(e[1]) > 1]
+        for i, dk in enumerate(donor_kinds):
+            donor = _pf_load_tree(paths[dk][lv - 1])
+            for e in _pf_top_block(donor):
+                if _pf_cmd_name(e) == "SetPowerFilpSuppress" and len(e[1]) > 1:
+                    sup_vals.append(int(e[1][1]))
+            wrap = ["Block", _copy.deepcopy(_pf_top_block(donor))]
+            _pf_clean_donor(wrap)
+            _pf_rename_labels(wrap, f"_{i + 2}")
+            if not wrap[1]:
+                log.append(f"  lv{lv} 供体 {dk}: 剥离生命周期后无剩余命令,跳过")
+                continue
+            blk.extend(wrap[1])
+        if sup_vals:
+            for e in blk:
+                if _pf_cmd_name(e) == "SetPowerFilpSuppress":
+                    e[1][1] = max(sup_vals)
+                    break
+        enc = wf_dsl.encode_amf3(base)
+        if wf_dsl.parse_dsl(enc)["tree"] != base:
+            raise ValueError(f"lv{lv} 合成树编码后解析不一致,取消写入")
+        blobs.append((dst_paths[lv - 1], enc))
+        briefs[str(lv)] = _pf_brief_lines(base)
+        log.append(f"  lv{lv}: {len(enc)}B,顶层 {len(blk)} 块,抑制帧="
+                   f"{max(sup_vals) if sup_vals else '(沿用基底)'}")
+
+    # ---- 可选:挂到角色队长技(instant 722,无条件常驻) ----
+    ld = pl = None
+    lk = ""
+    leader_log: list[str] = []
+    if str(character or "").strip():
+        c = next((x for x in load_characters() if x["id"] == str(character)), None)
+        if not c:
+            raise ValueError(f"角色不存在: {character}")
+        lk = (c.get("leader_id") or "").strip()
+        ld = core.load_table(LEADER_LOGICAL, TARGET_STORE, SOURCE_STORE)
+        pl = {k: core.read_csv_lines(t) for k, t in ld.text_rows().items()}
+        if not lk or lk not in pl:
+            raise ValueError(f"角色 {c['name']} 无队长技表键(character c17={lk!r}),无法挂 override")
+        rows = pl[lk]
+        exist_i = next((i for i, r in enumerate(rows) if len(r) > 45 and r[45] == "722"), None)
+        if exist_i is not None:
+            rows[exist_i][80] = new_id
+            leader_log.append(f"队长技 {lk} 行{exist_i + 1} 已有 722 行 → 改指 {new_id}")
+        else:
+            tpl = None
+            for rr in pl.values():
+                tpl = next((_copy.deepcopy(r) for r in rr
+                            if len(r) > 82 and r[45] == "722" and r[80]), None)
+                if tpl:
+                    break
+            if tpl is None:
+                raise ValueError("全表未找到官方 722 模板行,无法组装 override 行")
+            tpl[0] = rows[0][0] if rows and rows[0] else tpl[0]
+            tpl[4:9] = ["0", "", "", "", ""]      # 前置1-3 清空 = 无条件常驻
+            tpl[11:16] = ["0", "", "", "", ""]
+            tpl[18:23] = ["0", "", "", "", ""]
+            tpl[80] = new_id                       # id;c81 levels='1,2,3'/c82 描述键沿用模板
+            probs = _client_legality_problems("leader_ability", tpl)
+            if probs:
+                raise ValueError("override 行未过客户端合法性校验:\n"
+                                 + "\n".join(f"  · {p}" for p in probs))
+            rows.append(tpl)
+            leader_log.append(f"队长技 {lk} 追加 722 行(无条件) → {new_id}, levels=1,2,3")
+        leader_log.append("⚠ 生效条件:该角色需在队长位;PF 类型图标仍随 character c6")
+
+    written = []
+    if not dry_run:
+        for dp, raw in blobs:
+            fp = _dsl_store_path(dp)
+            fp.parent.mkdir(parents=True, exist_ok=True)
+            wf_dsl.save_dsl_file(fp, raw, ".bak-wfmod-pfmix-" + time.strftime("%Y%m%d-%H%M%S"))
+            add_pending(fp)
+            record_change(wf_dsl.dsl_logical(dp), f"PF 合成 {new_id}({len(raw)}B)", None)
+            written.append(str(fp))
+        parsed[new_id] = [list(dst_paths)]
+        written.append(str(_write_with_backup(table, parsed, list(log))))
+        if lk:
+            written.append(str(_write_with_backup(ld, pl, list(leader_log))))
+    return {"changes": (3 + 1 + (1 if lk else 0)),
+            "log": "\n".join(log + leader_log), "written": "; ".join(written) or None,
+            "dry_run": dry_run, "new_id": new_id, "paths": dst_paths,
+            "leader_key": lk or None, "briefs": briefs,
+            "note": "写入后「发布并重启游戏」生效;合成种类全局可复用,其他角色挂同 id 即同款"}
+
+
 # ---------------------------------------------------------------- 共鸣通用属性(OmniElement)
 # 逆向结论(2026-07-12,OrCharacterGroup/BattleCharacterLogic/SquadMemberSource):
 #   词条里的角色组 token 解析顺序 = 元素名(Red…Colorless)→类型名→性别表→种族表→角色标签表;
@@ -3234,6 +4100,66 @@ def _omni_kit_audit(cid: str) -> list[str]:
     return hits
 
 
+_MANA_TREE_TABLES = ("master/generated/mana_board.orderedmap",
+                     "master/mana_board/mana_node.orderedmap")
+
+
+def _remap_mana_for_clone(src_id: str, new_id: str) -> tuple[list[str], list[str]]:
+    """克隆后玛纳板修复:②层两张三层树(角色→板→节点→CSV)中,新角色键下的节点
+    multiplied_id 全部由 模板前缀(src_id×2) 重编号为 新前缀(new_id×2),含 mana_board
+    的前置节点引用列;并给服务端 assets/mana_node.json 补新角色条目(键同步重编号)。
+    ⚠ mana_node.json 是静态 import,补条目后须重启服务端才生效(不在热重载 9 json 内)。"""
+    import re as _re
+    import wf_quest_lib as ql
+    old_pref, new_pref = str(int(src_id) * 2), str(int(new_id) * 2)
+    token = _re.compile(r"^%s(\d{3})$" % _re.escape(old_pref))
+    logs: list[str] = []
+    written: list[str] = []
+
+    def remap(node):
+        if isinstance(node, dict):
+            return {k: remap(v) for k, v in node.items()}
+        s = node if isinstance(node, str) else node.decode("utf-8")
+        rows = core.read_csv_lines(s)
+        for r in rows:
+            for i, c in enumerate(r):
+                m = token.match(c)
+                if m:
+                    r[i] = new_pref + m.group(1)
+        out = core.write_csv_lines(rows)
+        return out if isinstance(node, str) else out.encode("utf-8")
+
+    for lg in _MANA_TREE_TABLES:
+        p = core.table_path(TARGET_STORE, lg)
+        tree = ql.load_table(lg, p)
+        if new_id not in tree:
+            continue
+        tree[new_id] = remap(tree[new_id])
+        w = ql.save_table(lg, tree, p)
+        add_pending(w)
+        record_change(lg, f"玛纳板节点重编号 {old_pref}xxx->{new_pref}xxx({new_id},克隆自 {src_id})", None)
+        written.append(str(w))
+        logs.append(f"{lg.split('/')[-1]}: 节点前缀 {old_pref}->{new_pref}")
+    # 服务端 assets/mana_node.json(learn_mana_node 校验/扣费读它)
+    sp = _server_char_json_path().parent / "mana_node.json"
+    try:
+        server = json.loads(sp.read_text(encoding="utf-8"))
+        if src_id in server and new_id not in server:
+            server[new_id] = {board: {new_pref + nid[len(old_pref):]: dict(nd)
+                                      for nid, nd in nodes.items()}
+                              for board, nodes in server[src_id].items()}
+            sbak = sp.with_name(sp.name + ".bak-wfmod-mana-" + time.strftime("%Y%m%d-%H%M%S"))
+            if not sbak.exists():
+                shutil.copy2(sp, sbak)
+            sp.write_text(json.dumps(server, ensure_ascii=False, separators=(",", ":")),
+                          encoding="utf-8")
+            written.append(str(sp))
+            logs.append(f"服务端 mana_node.json 已补 {new_id}(⚠ 静态 import,须重启服务端)")
+    except Exception as exc:
+        logs.append(f"⚠ 服务端 mana_node.json 同步失败(升级玛纳板会 400): {exc}")
+    return logs, written
+
+
 def omni_convert(character: str, dry_run: bool) -> dict:
     """一键「通用共鸣」= 只挂 OmniElement 标签(Form A),**不改 element**。
 
@@ -3262,6 +4188,179 @@ def omni_convert(character: str, dry_run: bool) -> dict:
                 "Colorless 是敌人专属元素),不提供。")
     return {"changes": changes, "log": "\n".join(logs), "dry_run": dry_run,
             "note": "只改 c5 标签(安全);②层进待发布,发布后重启游戏生效"}
+
+
+# ---------------------------------------------------------------- 新角色生态:动画/特效预览 + 资产模板 + 技能摘要
+# 像素动画(flatomo FrameAnimation):sprite_sheet.png + atlas(帧矩形,pixelartNNNN/specialNNNN)
+#   + timeline(sequences: name/kind(loop|once|pass)/begin..end)+ frame(画布原点/scale)。
+#   序列帧号有空洞 = 沿用前一张有图的帧(hold-last)。
+# 战斗特效(flatomo PartsAnimation):<目录>/<目录名>.png + 同名 atlas(帧名 .gen/<效果>/x)
+#   + <效果>.parts(骨架:贴图/图层/12位定点矩阵)+ <效果>.timeline。完整骨架播放未复刻
+#   (GraphicsSource 补间语义 1000+ 行),预览 = 贴图帧墙 + 时间线/音效元数据。
+
+def _amf3_tree(logical: str):
+    """store 里的 .amf3.deflate → 解压 + AMF3 解码,返回数据树;不存在返回 None。"""
+    loc = wf_assets.locate(TARGET_STORE, logical)
+    if not loc:
+        return None
+    try:
+        return wf_dsl.parse_dsl(zlib.decompress(loc[1].read_bytes(), -15))["tree"]
+    except Exception:
+        return None
+
+
+def _char_code(character: str) -> str:
+    c = next((x for x in load_characters() if x["id"] == str(character)), None)
+    if not c:
+        raise ValueError(f"角色不存在: {character}")
+    return c["code_name"]
+
+
+# (像素动画预览已有完整实现:前端 loadPixPreview + 后端 get_pixelart_data,勿重复造)
+
+
+def effect_previews(character: str) -> dict:
+    """角色战斗特效预览:pathlist 扫 battle/** 含 /<code>/ 的 parts/timeline,
+    按目录取 <目录名>.png+atlas 切帧墙;timeline 给序列/音效元数据。"""
+    code = _char_code(character)
+    tag = f"/{code}/"
+    dirs: dict[str, set[str]] = {}
+    plp = MOD_DIR / "WF_PATHLIST_recovered.txt"
+    if plp.exists():
+        with plp.open(encoding="utf-8", errors="replace") as f:
+            for line in f:
+                p = line.strip()
+                if p.startswith("battle/") and tag in p and p.endswith(".parts.amf3.deflate"):
+                    d, fn = p.rsplit("/", 1)
+                    dirs.setdefault(d, set()).add(fn[:-len(".parts.amf3.deflate")])
+    out = []
+    for d, effects in sorted(dirs.items()):
+        dname = d.rsplit("/", 1)[-1]
+        sheet_lg = f"{d}/{dname}.png"
+        has_sheet = bool(wf_assets.locate(TARGET_STORE, sheet_lg))
+        atlas = _amf3_tree(f"{d}/{dname}.atlas.amf3.deflate") or []
+        by_fx: dict[str, list] = {}
+        for e in atlas:
+            n = e.get("n", "")
+            if "/.gen/" not in n:
+                continue
+            fx, frame = (n.split("/.gen/", 1)[1].split("/", 1) + [""])[:2]
+            by_fx.setdefault(fx, []).append(
+                {"frame": frame, "x": e["x"], "y": e["y"], "w": e["w"], "h": e["h"],
+                 "r": bool(e.get("r")), "fx": e.get("fx", 0), "fy": e.get("fy", 0),
+                 "fw": e.get("fw", e["w"]), "fh": e.get("fh", e["h"])})
+        for name in sorted(effects):
+            tl = _amf3_tree(f"{d}/{name}.timeline.amf3.deflate") or {}
+            parts = _amf3_tree(f"{d}/{name}.parts.amf3.deflate") or {}
+            out.append({
+                "dir": d, "name": name,
+                "sheet": sheet_lg if has_sheet else None,
+                "frames": sorted(by_fx.get(name, []), key=lambda x: x["frame"]),
+                "sequences": tl.get("sequences", []),
+                "sounds": tl.get("sounds", []),
+                "n_images": len(parts.get("i", [])), "n_layers": len(parts.get("g", [])),
+            })
+    return {"character": str(character), "code": code, "effects": out,
+            "note": "帧墙=特效贴图按 atlas 切割;完整骨架动画(矩阵补间)在游戏内合成,此处不复刻"}
+
+
+# ---- 资产模板(新角色必要资源检查;剧情类不计入必要) ----
+_TPL_REQUIRED_KINDS = {"立绘", "技能cut-in", "图标合集", "像素图", "头像", "缩略图",
+                       "战斗UI", "连锁cut-in"}
+_TPL_STORY_KINDS = {"剧情横幅", "剧情表情"}
+
+
+def asset_template_check(character: str) -> dict:
+    """新角色资产模板完整度:必要项(缺=游戏内空白/崩溃风险)/建议项(语音等体验项)/
+    剧情项(用户明确不管)。数据来自 char_asset_manifest + 配套数据探测。"""
+    code = _char_code(character)
+    manifest = wf_assets.char_asset_manifest(TARGET_STORE, code)
+    groups: dict[str, dict] = {}
+    for a in manifest:
+        kind = a["kind"]
+        if kind.startswith("语音"):
+            cat = "语音(建议)"
+        elif kind in _TPL_STORY_KINDS:
+            cat = "剧情(不检查)"
+        elif kind == "配套数据":
+            cat = "配套数据(必要)"
+        elif kind in _TPL_REQUIRED_KINDS:
+            cat = f"{kind}(必要)"
+        else:
+            cat = kind
+        g = groups.setdefault(cat, {"name": cat, "required": "必要" in cat,
+                                    "items": [], "exists": 0, "total": 0})
+        g["items"].append({"logical": a["logical"], "kind": kind, "exists": a["exists"],
+                           "dims": a.get("dims"), "size": a["size"], "req": a.get("req", ""),
+                           "text": a.get("text", "")})
+        g["total"] += 1
+        g["exists"] += 1 if a["exists"] else 0
+    req_total = sum(g["total"] for g in groups.values() if g["required"])
+    req_ok = sum(g["exists"] for g in groups.values() if g["required"])
+    missing = [i["logical"] for g in groups.values() if g["required"]
+               for i in g["items"] if not i["exists"]]
+    return {"character": str(character), "code": code,
+            "groups": sorted(groups.values(), key=lambda g: (not g["required"], g["name"])),
+            "required_total": req_total, "required_exists": req_ok,
+            "pct": round(req_ok * 100 / req_total) if req_total else 0,
+            "missing_required": missing,
+            "note": "必要=界面/战斗直接引用,缺失显示空白(不一定崩);建议=语音;"
+                    "克隆(资产独立)会整套复制模板,替换后逐项生效"}
+
+
+# ---- 技能效果摘要(DSL 命令树 → 可读分组) ----
+_SUM_CATS = [
+    ("伤害", ("CreateNormalAttack", "CreateFixedAttack", "CreateRatioAttack",
+              "CreateOnlyHitAttack", "CreateShockWaveAttack", "CreateTargetAttack",
+              "CreateWindAttack")),
+    ("增益/状态", ("CreateCondition", "RemoveCondition")),
+    ("治疗", ("Heal",)),
+    ("召唤/生成", ("CreateBall", "CreateObstacle", "SummonUnit", "CreateField")),
+    ("移动/球体", ("StopBall", "MoveBall", "ShootBall", "WarpBall", "AccelerateBall")),
+]
+
+
+def _sum_cat(name: str) -> str:
+    for cat, names in _SUM_CATS:
+        if name in names:
+            return cat
+    for cat, pref in (("伤害", "Attack"), ("召唤/生成", "Create"), ("演出", "Effect"),
+                      ("演出", "Sound"), ("演出", "Camera"), ("演出", "Shake")):
+        if pref in name:
+            return cat
+    return "其他"
+
+
+def skill_effect_summary(character: str, level: str) -> dict:
+    """技能效果预览:命令树按类别分组成中文摘要(伤害/增益/治疗/演出…)。"""
+    import wf_dsl_sig as S
+    pp = _skill_program_path(character, level)
+    fp, data = wf_dsl.load_dsl_file(TARGET_STORE, pp)
+    tree = json.loads(wf_dsl.dsl_to_json_text(data))
+    cats: dict[str, list[str]] = {}
+    counts: dict[str, int] = {}
+
+    def walk(n):
+        if isinstance(n, list):
+            if len(n) >= 2 and n[0] in ("Command", "Event") and isinstance(n[1], list) \
+                    and n[1] and isinstance(n[1][0], str):
+                name = n[1][0]
+                cat = _sum_cat(name)
+                counts[cat] = counts.get(cat, 0) + 1
+                b = S.brief_command(n[1])
+                if b and len(cats.setdefault(cat, [])) < 40:
+                    cats[cat].append(b)
+            for x in n:
+                walk(x)
+
+    walk(tree)
+    order = ["伤害", "增益/状态", "治疗", "召唤/生成", "移动/球体", "演出", "其他"]
+    head = " / ".join(f"{c}×{counts[c]}" for c in order if counts.get(c))
+    return {"character": str(character), "level": str(level), "program_path": pp,
+            "headline": head or "(空)",
+            "groups": [{"cat": c, "lines": cats.get(c, []), "count": counts.get(c, 0)}
+                       for c in order if counts.get(c)],
+            "note": "语义等价摘要(非游戏原文);倍率/帧数为 SLv1→满级 区间,60帧=1秒"}
 
 
 # ---------------------------------------------------------------- 角色资产一键导出
@@ -3715,6 +4814,15 @@ def clone_character(src_id: str, new_id: str, new_name: str, dry_run: bool,
                 om.keys.append(new_id)
                 om.rows.append(bytes(om.rows[om.keys.index(src_id)]))
                 written.append(_write_nested(om, logical, f"新增 {logical.split('/')[-1]} {new_id}"))
+        # 玛纳板节点重编号(2026-07-13 金丝雀 H400 教训):节点 multiplied_id 前缀=角色ID×2,
+        # 客户端由节点 ID 反推角色 ID——原样字节复制会让新角色的板指回模板,
+        # learn_mana_node 发成模板 ID → 服务端 400(游戏内 H400 弹回登录)。
+        try:
+            mlog, mwritten = _remap_mana_for_clone(src_id, new_id)
+            log.extend(mlog)
+            written.extend(mwritten)
+        except Exception as exc:
+            log.append(f"⚠ 玛纳板重编号失败(升级玛纳板会 H400,需手工修): {exc}")
         # character_status(嵌套,外层原样字节追加)
         st = core.load_status_table(TARGET_STORE, SOURCE_STORE)
         if src_id in st.keys and new_id not in st.keys:
@@ -3908,6 +5016,22 @@ def delete_character(cid: str, dry_run: bool) -> dict:
             server.pop(cid, None)
             sp.write_text(json.dumps(server, ensure_ascii=False, indent=2), encoding="utf-8")
             written.append(str(sp))
+    # 服务端 mana_node.json:删条目(与克隆时的玛纳板补条目对应)
+    mnp = _server_char_json_path().parent / "mana_node.json"
+    try:
+        mserver = json.loads(mnp.read_text(encoding="utf-8"))
+    except Exception:
+        mserver = None
+    if mserver is not None and cid in mserver:
+        log.append("服务端 mana_node.json: 删条目(重启服务端生效)")
+        if not dry_run:
+            mbak = mnp.with_name(mnp.name + ".bak-wfmod-mana-" + time.strftime("%Y%m%d-%H%M%S"))
+            if not mbak.exists():
+                shutil.copy2(mnp, mbak)
+            mserver.pop(cid, None)
+            mnp.write_text(json.dumps(mserver, ensure_ascii=False, separators=(",", ":")),
+                           encoding="utf-8")
+            written.append(str(mnp))
     return {"changes": len(log) - 1, "log": "\n".join(log),
             "written": "; ".join(written) or None, "dry_run": dry_run,
             "note": "回滚完成:发布推 ②层 + 重启服务端推 ①层;若已 admin 发放该角色,也去存档里移除避免残留引用"}
@@ -4181,7 +5305,13 @@ TOOLBOX_TOOLS = {
     "balance_suite": {
         "title": "平衡增强总包",
         "script": MOD_DIR / "wf_balance_suite.py",
-        "desc": "全角色平衡增强总包 v3:不勾选=dry-run 预览;可选 应用/发布/打分享包(唯一会写 store 的工具箱任务)",
+        "desc": "全角色平衡增强总包 v3:不勾选=dry-run 预览;可选 应用/发布/打分享包(会写 store)",
+    },
+    "rogue_reroll": {
+        "title": "深渊连战·一键重开",
+        "script": MOD_DIR / "wf_rogue_reroll.py",
+        "desc": "重摇 700099 爬塔全部楼层/boss属性/场地效果(随机种子)+清爬塔进度+发布CDN+重启游戏;"
+                "不勾「应用」= 只预览新阵容(会写 store)",
     },
     "export_assets": {
         "title": "全量解密导出",
@@ -4203,6 +5333,8 @@ TOOLBOX_TOOLS = {
 TOOLBOX_ARG_WHITELIST = {
     "selftest": {"deep": bool, "sample": int},
     "balance_suite": {"apply": bool, "publish": bool, "export-pack": bool, "force": bool},
+    "rogue_reroll": {"rounds": int, "seed": int, "enemy-level": int, "event": str,
+                     "player": int, "keep-progress": bool, "no-restart": bool, "apply": bool},
     "export_assets": {"out": str, "limit": int, "workers": int,
                       "only-bundle": bool, "no-skip": bool},
     "recover_pathlist": {"out": str},
@@ -5445,6 +6577,174 @@ def quest_clone(src_node: str, src_rank: str, mode: str, new_name: str,
                     + ";数值调整用 Boss·副本页(敌等级/修正列)或 JSON 直改"}
 
 
+# ---------------------------------------------------------------- 连战塔(宝物域 boss 连战)
+# 机制见 docs/强化弹射与boss连战逆向结论.md §9.55:Tower 类 quest 的 tower_floor_id →
+# floor 表键,单 zlib chunk 内每行 = 一层,层间无结算连打;素材池复用 wf_chain_build。
+
+CHAIN_FLOOR_LOGICAL = "master/battle/floor.orderedmap"
+CHAIN_QUEST_LOGICAL = "master/quest/event/challenge_dungeon_event_quest.orderedmap"
+CHAIN_KEY = "mod_chain_canary"
+CHAIN_OFFICIAL_FLOOR = "treasure_cave_area"  # 宝物域官方层键(摘除入口时还原)
+CHAIN_GROUP = "2"  # 外层键 2 = 摇曳的迷宫宝物域(2001-2006);外层键 1 = 崩坏域
+# 列号:ChallengeDungeonEventQuestValues.as 实证(126 列,col110=tower_floor_id)
+CHAIN_QCOLS = {
+    "enemy_level": 107,  # 敌等级
+    "hp_zako": 98, "hp_boss": 100,     # HP 修正(小怪/boss;99=funnel 不动)
+    "atk_zako": 101, "atk_boss": 103,  # ATK 修正
+    "time_limit": 111,  # 帧(60=1秒)
+}
+CHAIN_DIFF_FIELDS = ("enemy_level", "hp_zako", "hp_boss", "atk_zako", "atk_boss", "time_limit")
+
+
+def _chain_pool() -> list:
+    import wf_chain_build as cb
+    return cb.build_pool()
+
+
+def _chain_row_cols(row: str) -> list[str]:
+    return next(csv.reader(io.StringIO(row)))
+
+
+def _chain_floor_info(lines: list[str], pool_by_fd: dict, names: dict) -> list[dict]:
+    out = []
+    for ln in lines:
+        c = _chain_row_cols(ln)
+        fdk = c[0] if c else ""
+        bosses = pool_by_fd.get(fdk, [])
+        out.append({"field": fdk,
+                    "bosses": [{"key": b, "name": names.get(b, "")} for b in bosses]})
+    return out
+
+
+def chain_state() -> dict:
+    """连战塔现状:floor 链内容(模式/层列表带 boss 名)+ 宝物域 6 入口(指向/难度列)。"""
+    import wf_quest_lib as qlib
+    names = wf_boss.boss_names()
+    pool = _chain_pool()
+    pool_by_fd = {fdk: b for fdk, _ln, b in pool}
+
+    floor = qlib.load_table(CHAIN_FLOOR_LOGICAL)
+    raw = floor.get(CHAIN_KEY)
+    mode, k, floors = "empty", 0, []
+    if isinstance(raw, str) and raw.strip():
+        lines = raw.split("\n")
+        head = _chain_row_cols(lines[0])
+        if head and head[0] == "__random__":
+            mode, k = "random", int(head[1] or "1")
+            floors = _chain_floor_info(lines[1:], pool_by_fd, names)
+        else:
+            mode = "fixed"
+            floors = _chain_floor_info(lines, pool_by_fd, names)
+
+    quest = qlib.load_table(CHAIN_QUEST_LOGICAL)
+    quests = []
+    for ik, row in quest.get(CHAIN_GROUP, {}).items():
+        c = _read_ml(row)[0]
+        q = {"inner": ik, "id": c[0], "name": c[2], "floor": c[110],
+             "attached": c[110] == CHAIN_KEY}
+        for f, col in CHAIN_QCOLS.items():
+            q[f] = c[col]
+        quests.append(q)
+    return {"key": CHAIN_KEY, "mode": mode, "random_k": k, "floors": floors,
+            "pool_total": len(pool), "official_floor": CHAIN_OFFICIAL_FLOOR,
+            "quests": quests}
+
+
+def chain_pool_list() -> dict:
+    names = wf_boss.boss_names()
+    return {"pool": [{"field": fdk,
+                      "bosses": [{"key": b, "name": names.get(b, "")} for b in bosses]}
+                     for fdk, _ln, bosses in _chain_pool()]}
+
+
+def chain_apply(body: dict, dry_run: bool) -> dict:
+    """写连战塔:floor 链(fixed=发布时抽定 N 层 / random=__random__ 头行+候选池)
+    + 宝物域入口指向 + 难度列。random 模式必须客户端已打 client-patch/random-floor。"""
+    import random as _random
+    import wf_quest_lib as qlib
+
+    mode = str(body.get("mode") or "fixed")
+    if mode not in ("fixed", "random"):
+        raise ValueError(f"mode 只能是 fixed/random,收到 {mode!r}")
+    seed = str(body.get("seed") or "").strip() or time.strftime("%Y%m%d")
+    rng = _random.Random(seed)
+    pool = _chain_pool()
+    names = wf_boss.boss_names()
+    pool_by_fd = {fdk: b for fdk, _ln, b in pool}
+    log: list[str] = []
+
+    if mode == "fixed":
+        n = max(1, min(int(body.get("floors") or 5), len(pool)))
+        picks = rng.sample(pool, n)
+        chain = "\n".join(ln for _fdk, ln, _b in picks)
+        chain_lines = [ln for _fdk, ln, _b in picks]
+        log.append(f"floor[{CHAIN_KEY}] = 固定链 {n} 层(种子 {seed})")
+    else:
+        k = max(1, int(body.get("random_k") or 3))
+        cand = pool
+        pool_size = int(body.get("pool_size") or 0)
+        if pool_size and pool_size < len(pool):
+            cand = rng.sample(pool, pool_size)
+        k = min(k, len(cand))
+        chain_lines = [ln for _fdk, ln, _b in cand]
+        chain = "\n".join([f"__random__,{k},-"] + chain_lines)
+        log.append(f"floor[{CHAIN_KEY}] = 随机池模式:每次进本从 {len(cand)} 层抽 {k} 层"
+                   f"(种子 {seed} 决定候选池)")
+        log.append("⚠ 前置:客户端必须已打 random-floor 补丁,否则进本即崩")
+
+    floors_info = _chain_floor_info(chain_lines, pool_by_fd, names)
+    for i, f in enumerate(floors_info):
+        bs = ",".join(x["name"] or x["key"] for x in f["bosses"]) or "?"
+        log.append(f"  {'候选' if mode == 'random' else '层' + str(i + 1)}: "
+                   f"{f['field']}  boss={bs}")
+
+    # 入口 + 难度
+    attach_ids = {str(x) for x in (body.get("attach_ids") or [])}
+    diff = {f: str(body[f]).strip() for f in CHAIN_DIFF_FIELDS
+            if body.get(f) not in (None, "")}
+    quest = qlib.load_table(CHAIN_QUEST_LOGICAL)
+    group = quest.get(CHAIN_GROUP, {})
+    quest_changes = 0
+    for ik, row in group.items():
+        c = _read_ml(row)[0]
+        qid, qname = c[0], c[2]
+        want = CHAIN_KEY if qid in attach_ids else CHAIN_OFFICIAL_FLOOR
+        changed = []
+        if c[110] != want:
+            changed.append(f"floor {c[110]} → {want}")
+            c[110] = want
+        if qid in attach_ids:
+            for f, val in diff.items():
+                col = CHAIN_QCOLS[f]
+                if c[col] != val:
+                    changed.append(f"{f} {c[col]} → {val}")
+                    c[col] = val
+        if changed:
+            quest_changes += 1
+            group[ik] = _write_ml([c])
+            log.append(f"quest {qid} {qname}: " + ";".join(changed))
+
+    changes = 1 + quest_changes
+    written = None
+    if not dry_run:
+        floor = qlib.load_table(CHAIN_FLOOR_LOGICAL)
+        floor[CHAIN_KEY] = chain
+        p1 = qlib.save_table(CHAIN_FLOOR_LOGICAL, floor)
+        assert qlib.load_table(CHAIN_FLOOR_LOGICAL)[CHAIN_KEY] == chain, "floor 回读校验失败"
+        add_pending(p1)
+        if quest_changes:
+            p2 = qlib.save_table(CHAIN_QUEST_LOGICAL, quest)
+            add_pending(p2)
+        record_change(CHAIN_FLOOR_LOGICAL, "\n".join(log), None)
+        written = str(p1)
+    note = "写入后点右上角「发布并重启游戏」生效(floor" \
+           + (" + challenge_dungeon_event_quest" if quest_changes else "") + ")"
+    if mode == "random":
+        note += ";随机池模式需客户端 random-floor 补丁"
+    return {"changes": changes, "log": "\n".join(log), "written": written,
+            "dry_run": dry_run, "floors": floors_info, "mode": mode, "note": note}
+
+
 # ---------------------------------------------------------------- http server
 
 
@@ -5457,6 +6757,545 @@ def read_page() -> bytes:
 #   标准:/api/mod/*  —— 将来 Fastify 只反代这一个前缀,与服务端自身 /api/* 零冲突
 #   兼容:/api/*      —— 旧路径仍可用(标记 deprecated),迁移期后可删
 API_PREFIX = "/api/mod"
+
+
+# ================================================================ 深渊连战(700099 rush 活动)编辑
+# 五块:①难度曲线/重摇(wf_rogue_build)②无尽修正(wf_rogue_nerf)③掉落代币(rogue_event.json)
+# ④商店(event_item_shop 9700101-9700115,三处同步)⑤boss 阵容查看。
+# CLI 工具封装为子进程复用;数据侧直读写(qlib 读嵌套/平表,assets json 直改)。
+ROGUE_EVENT_ID = "700099"
+ROGUE_Q_LOGICAL = "master/quest/event/rush_event_quest.orderedmap"
+ROGUE_CORR_LOGICAL = "master/quest/event/rush_event_battle_quest_correction.orderedmap"
+ROGUE_SHOP_LOGICAL = "master/shop/event_item_shop.orderedmap"
+ROGUE_SHOP_KEYS = [str(i) for i in range(9700101, 9700116)]
+# event_item_shop 列(51 列,plan Task4 + 真机实证):c7 名 c18 货币id c19 价 c29 库存
+# c32 奖励type c33 奖励id c34 数量
+ROGUE_SHOP_COLS = {"name": 7, "cost_id": 18, "price": 19, "stock": 29,
+                   "reward_type": 32, "reward_id": 33, "reward_count": 34}
+ROGUE_ELEM_CN = ["火", "水", "雷", "风", "光", "暗"]
+
+
+def _rogue_cells(leaf) -> list[str]:
+    line = leaf.decode("utf-8") if isinstance(leaf, (bytes, bytearray)) else leaf
+    return next(csv.reader(io.StringIO(line)))
+
+
+def _rogue_join(row: list[str], like) -> object:
+    buf = io.StringIO()
+    csv.writer(buf, lineterminator="").writerow(row)
+    s = buf.getvalue()
+    return s.encode("utf-8") if isinstance(like, (bytes, bytearray)) else s
+
+
+def _rogue_asset_path(name: str) -> str:
+    return os.path.join(ROOT, "assets", name)
+
+
+def _rogue_run(script: str, args: list[str]) -> dict:
+    """跑 mod-tools 下的 rogue CLI,返回 {ok, rc, log}。"""
+    cmd = [sys.executable, "-X", "utf8", str(MOD_DIR / script)] + args
+    r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    return {"ok": r.returncode == 0, "rc": r.returncode,
+            "log": ((r.stdout or "") + (r.stderr or "")).strip()}
+
+
+def rogue_state() -> dict:
+    """深渊连战现状汇总:轮次 / 无尽 / 无尽修正曲线 / 掉落配置 / 商店。"""
+    import wf_quest_lib as qlib
+    names = wf_boss.boss_names()
+    try:
+        import wf_chain_build as cb
+        pool_by_fd = {fdk: b for fdk, _ln, b in cb.build_pool()}
+    except Exception:
+        pool_by_fd = {}
+    quest = qlib.load_table(ROGUE_Q_LOGICAL)
+    rounds, endless = [], None
+    for k, v in (quest.get(ROGUE_EVENT_ID) or {}).items():
+        c = _rogue_cells(v)
+        fd = c[98] if len(c) > 98 else ""
+        bosses = pool_by_fd.get(fd, [])
+        eff = []
+        for s in range(5):
+            ki = 71 + s * 2
+            if len(c) > ki + 1 and c[ki] not in ("", "(None)"):
+                eff.append({"kind": c[ki], "strength": c[ki + 1]})
+        el = c[69] if len(c) > 69 else ""
+        entry = {"qno": k, "round": c[2] if len(c) > 2 else "",
+                 "subname": c[4] if len(c) > 4 else "", "field": fd,
+                 "boss": "、".join(names.get(b, b) for b in bosses) or fd,
+                 "element": el,
+                 "element_cn": ROGUE_ELEM_CN[int(el)] if el.isdigit() and int(el) < 6 else "",
+                 "enemy_level": c[95] if len(c) > 95 else "",
+                 "hp": c[86] if len(c) > 86 else "", "atk": c[89] if len(c) > 89 else "",
+                 "effects": eff}
+        if entry["round"] == "0":
+            endless = entry
+        else:
+            rounds.append(entry)
+    rounds.sort(key=lambda r: int(r["round"] or 0))
+    # 无尽修正曲线 [folder][questNo][round]
+    corr = qlib.load_table(ROGUE_CORR_LOGICAL)
+    curve = []
+
+    def _walk(n):
+        for kk in sorted(n, key=lambda x: int(x) if str(x).isdigit() else 0):
+            vv = n[kk]
+            if isinstance(vv, dict):
+                yield from _walk(vv)
+            else:
+                yield kk, _rogue_cells(vv)
+    if ROGUE_EVENT_ID in corr:
+        for rk, row in _walk(corr[ROGUE_EVENT_ID]):
+            curve.append({"round": rk, "hp": row[0] if row else "",
+                          "atk": row[1] if len(row) > 1 else ""})
+    # 掉落配置(rogue_event.json: {enabled, events:{700099:{...}}})
+    drops, rogue_enabled = {}, False
+    try:
+        with open(_rogue_asset_path("rogue_event.json"), encoding="utf-8") as fh:
+            rj = json.load(fh)
+        rogue_enabled = bool(rj.get("enabled"))
+        drops = (rj.get("events") or {}).get(ROGUE_EVENT_ID, {})
+    except Exception:
+        pass
+    # 商店(15 商品)
+    shop = []
+    try:
+        srows = core.load_table(ROGUE_SHOP_LOGICAL, TARGET_STORE, SOURCE_STORE).text_rows()
+        for sid in ROGUE_SHOP_KEYS:
+            if sid not in srows:
+                continue
+            c = _rogue_cells(srows[sid])
+            shop.append({"id": sid, **{f: (c[i] if len(c) > i else "")
+                                       for f, i in ROGUE_SHOP_COLS.items()}})
+    except Exception as exc:
+        shop = [{"error": str(exc)}]
+    return {"event": ROGUE_EVENT_ID, "enabled": rogue_enabled, "rounds": rounds,
+            "endless": endless, "curve": curve, "drops": drops, "shop": shop}
+
+
+def rogue_build_apply(body: dict, dry_run: bool) -> dict:
+    """难度曲线 + 重摇:封装 wf_rogue_build。dry_run=预览,否则 --write --publish。"""
+    def _num(key, default):
+        v = body.get(key)
+        return str(default if v in (None, "") else v)
+    args = ["--rounds", str(int(float(_num("rounds", 15)))),
+            "--hp-base", _num("hp_base", 0.5), "--hp-growth", _num("hp_growth", 1.185),
+            "--atk-base", _num("atk_base", 0.35), "--atk-growth", _num("atk_growth", 1.13),
+            "--enemy-level", str(int(float(_num("enemy_level", 80))))]
+    if body.get("seed") not in (None, ""):
+        args += ["--seed", str(int(float(body["seed"])))]
+    if not dry_run:
+        args += ["--write"]
+        if body.get("publish"):
+            args += ["--publish"]
+    return _rogue_run("wf_rogue_build.py", args)
+
+
+def rogue_nerf_apply(body: dict, dry_run: bool) -> dict:
+    """无尽修正曲线:封装 wf_rogue_nerf。"""
+    args = ["--event", ROGUE_EVENT_ID]
+    if body.get("hp_scale") not in (None, ""):
+        args += ["--hp-scale", str(body["hp_scale"])]
+    if body.get("atk_scale") not in (None, ""):
+        args += ["--atk-scale", str(body["atk_scale"])]
+    if body.get("hp_values"):
+        args += ["--hp-values", str(body["hp_values"]).strip()]
+    if len(args) == 2:
+        return {"ok": True, "log": "未给任何参数(hp-scale/atk-scale/hp-values),仅查看当前曲线。"}
+    if not dry_run:
+        args += ["--write", "--publish"]
+    return _rogue_run("wf_rogue_nerf.py", args)
+
+
+def rogue_drops_save(body: dict, dry_run: bool) -> dict:
+    """写 rogue_event.json(events[700099] 掉落配置 + enabled 总开关)+ 热重载服务端。"""
+    cfg = body.get("config")
+    if not isinstance(cfg, dict):
+        return {"ok": False, "log": "config 必须是 JSON 对象"}
+    path = _rogue_asset_path("rogue_event.json")
+    with open(path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    events = data.setdefault("events", {})
+    old = json.dumps({"enabled": data.get("enabled"),
+                      "cfg": events.get(ROGUE_EVENT_ID, {})}, ensure_ascii=False, indent=2)
+    new_enabled = data.get("enabled") if body.get("enabled") is None else bool(body["enabled"])
+    new = json.dumps({"enabled": new_enabled, "cfg": cfg}, ensure_ascii=False, indent=2)
+    if old == new:
+        return {"ok": True, "log": "没有修改"}
+    if dry_run:
+        return {"ok": True, "dry_run": True,
+                "log": f"--- 现值 ---\n{old}\n\n--- 将写入 ---\n{new}"}
+    shutil.copy(path, path + time.strftime(".bak-wfmod-rogue-%Y%m%d-%H%M%S"))
+    events[ROGUE_EVENT_ID] = cfg
+    data["enabled"] = new_enabled
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, ensure_ascii=False, indent=1)
+    try:
+        _server_call("/api/mod-admin/reload_assets", post=True)
+        reload_log = "已热重载服务端"
+    except Exception:
+        reload_log = "已写盘(热重载失败,点「推送服务端」或重启服务端生效)"
+    return {"ok": True, "log": f"rogue_event.json 已更新(enabled={new_enabled})。{reload_log}"}
+
+
+def rogue_shop_save(body: dict, dry_run: bool) -> dict:
+    """深渊兑换商店三处同步:②表 event_item_shop + 服务端 json + id_map。
+    body.items = [{id, name?, price?, cost_id?, reward_id?, reward_count?, stock?}, ...]。"""
+    import wf_quest_lib as qlib
+    edits = body.get("items") or []
+    if not isinstance(edits, list) or not edits:
+        return {"ok": False, "log": "items 为空"}
+    tbl = qlib.load_table(ROGUE_SHOP_LOGICAL)
+    sp = _rogue_asset_path("event_item_shop.json")
+    with open(sp, encoding="utf-8") as fh:
+        srv = json.load(fh)
+    node = srv.setdefault("11", {}).setdefault(ROGUE_EVENT_ID, {})
+    log: list[str] = []
+    pend_tbl: dict = {}
+    pend_srv = json.loads(json.dumps(srv))  # 深拷贝供预览
+    pnode = pend_srv["11"][ROGUE_EVENT_ID]
+    for ed in edits:
+        sid = str(ed.get("id", "")).strip()
+        if sid not in ROGUE_SHOP_KEYS or sid not in tbl:
+            log.append(f"[跳过] {sid} 不是深渊商店键")
+            continue
+        row = list(_rogue_cells(tbl[sid]))
+        for f, ci in ROGUE_SHOP_COLS.items():
+            if f in ed and ed[f] not in (None, "") and len(row) > ci and row[ci] != str(ed[f]):
+                log.append(f"{sid} ②{f}: {row[ci]!r} -> {ed[f]!r}")
+                row[ci] = str(ed[f])
+        pend_tbl[sid] = _rogue_join(row, tbl[sid])
+        # 服务端 json 条目
+        e = dict(pnode.get(sid) or {})
+        costs = list(e.get("costs") or [{}]); c0 = dict(costs[0]) if costs else {}
+        rews = list(e.get("rewards") or [{}]); r0 = dict(rews[0]) if rews else {}
+        if "cost_id" in ed and ed["cost_id"] not in (None, ""):
+            c0["id"] = int(ed["cost_id"])
+        if "price" in ed and ed["price"] not in (None, ""):
+            c0["amount"] = int(ed["price"]); log.append(f"{sid} srv价 -> {ed['price']}")
+        if "reward_id" in ed and ed["reward_id"] not in (None, ""):
+            r0["id"] = int(ed["reward_id"])
+        if "reward_count" in ed and ed["reward_count"] not in (None, ""):
+            r0["count"] = int(ed["reward_count"])
+        if "reward_type" in ed and ed["reward_type"] not in (None, ""):
+            r0["type"] = int(ed["reward_type"])
+        if "stock" in ed and ed["stock"] not in (None, ""):
+            e["stock"] = int(ed["stock"]); log.append(f"{sid} srv库存 -> {ed['stock']}")
+        e["costs"] = [c0]; e["rewards"] = [r0]
+        pnode[sid] = e
+    if not log:
+        return {"ok": True, "log": "没有修改"}
+    if dry_run:
+        return {"ok": True, "dry_run": True, "log": "\n".join(log)}
+    # 写 ②表(自动备份)+ 发布
+    for sid, leaf in pend_tbl.items():
+        tbl[sid] = leaf
+    out = qlib.save_table(ROGUE_SHOP_LOGICAL, tbl)
+    shutil.copy(sp, sp + time.strftime(".bak-wfmod-eshop-%Y%m%d-%H%M%S"))
+    with open(sp, "w", encoding="utf-8") as fh:
+        json.dump(pend_srv, fh, ensure_ascii=False, indent=1)
+    pub = _rogue_run("wf_publish.py", ["--tables", ROGUE_SHOP_LOGICAL])
+    reload_ok = ""
+    try:
+        _server_call("/api/mod-admin/reload_assets", post=True); reload_ok = "已热重载服务端"
+    except Exception:
+        reload_ok = "服务端未热重载(点「推送服务端」或重启)"
+    return {"ok": pub["ok"], "log": "\n".join(log)
+            + f"\n[②表已写 {os.path.basename(str(out))} 并发布]\n[服务端 json 已写盘,{reload_ok}]\n"
+            + pub["log"][-400:]}
+
+
+# 综合可选池的类别(quest_pool key → 中文类别);steampunk 场地统一归「机兵」
+ROGUE_POOL_CATS = [
+    ("boss_battle", "领主战"), ("ex", "EX·决战"), ("advent", "降临讨伐"),
+    ("hard_multi", "机兵"), ("raid", "战阵之宴"), ("expert_single", "专家单人"),
+    ("score_attack", "积分战"), ("solo_time_attack", "计时战"), ("ranking", "排名战"),
+    ("world_story_boss", "剧情boss"), ("challenge_dungeon", "临境域/幽玄"),
+]
+
+
+_ROGUE_POOL_CACHE: dict | None = None
+
+
+def rogue_pool(force: bool = False) -> dict:
+    """综合可选 boss 池(全高难类别):塔层/领主战/EX决战/机兵(含菲诺梅那)/降临/战阵之宴/
+    专家单人/积分战/计时战/排名战/剧情boss/临境域/小怪房。field 去重,元素=固定元素 boss 查表。
+    结果按进程缓存(master 数据不常变);带 thumb=来源 quest 缩略图(布局写入时同步)。"""
+    global _ROGUE_POOL_CACHE
+    if _ROGUE_POOL_CACHE is not None and not force:
+        return _ROGUE_POOL_CACHE
+    import wf_rogue_build as rb
+    import wf_chain_build as cb
+    names = wf_boss.boss_names()
+    belem = rb.boss_element_map()
+    seen: dict = {}
+    out: list = []
+
+    def push(cat, field, disp, bosses, thumb=""):
+        if not field or field in seen:
+            return
+        seen[field] = 1
+        el = next((belem[b] for b in bosses if belem.get(b) is not None), None)
+        out.append({"field": field, "cat": cat, "boss": disp or field,
+                    "label": f"{cat} · {disp or field}  [{field}]",
+                    "element": ("" if el is None else str(el)),
+                    "element_cn": (ROGUE_ELEM_CN[el] if el is not None and el < 6 else ""),
+                    "thumb": thumb or ""})
+    try:
+        for fdk, _ln, b in cb.build_pool():
+            push("连战塔", fdk, "、".join(names.get(x, x) for x in b) or fdk, b)
+    except Exception:
+        pass
+    for cat_key, cat_cn in ROGUE_POOL_CATS:
+        try:
+            for e in rb.quest_pool(cat_key):
+                cat = "机兵" if "steampunk" in e["field"] else cat_cn
+                push(cat, e["field"], e["name"], e.get("bosses", []), e.get("thumb", ""))
+        except Exception:
+            continue
+    try:
+        for e in rb.zako_room_pool():
+            push("小怪房", e["field"], e["name"] or "小怪房", e.get("bosses", []), e.get("thumb", ""))
+    except Exception:
+        pass
+    # 分类排序(高难类别靠前),同类按名字
+    cat_order = {c[1]: i for i, c in enumerate(
+        [("", "机兵"), ("", "领主战"), ("", "EX·决战"), ("", "战阵之宴"), ("", "降临讨伐"),
+         ("", "专家单人"), ("", "临境域/幽玄"), ("", "剧情boss"), ("", "积分战"),
+         ("", "计时战"), ("", "排名战"), ("", "连战塔"), ("", "小怪房")])}
+    out.sort(key=lambda x: (cat_order.get(x["cat"], 99), x["boss"]))
+    _ROGUE_POOL_CACHE = {"pool": out,
+                         "cats": sorted({x["cat"] for x in out}, key=lambda c: cat_order.get(c, 99))}
+    return _ROGUE_POOL_CACHE
+
+
+def rogue_layout_apply(body: dict, dry_run: bool) -> dict:
+    """逐层手动布局:写 700099 folder1 各轮的 field/element/场地效果(c71-80),
+    保留 hp/atk 曲线与 view_condition 链。body.rounds=[{round,field,element?,effects:[{kind,strength}],subname?}]。"""
+    import wf_quest_lib as qlib
+    import wf_rogue_build as rb
+    rounds = body.get("rounds") or []
+    if not rounds:
+        return {"ok": False, "log": "rounds 为空"}
+    thumb_map = dict(_rogue_thumbs())
+    try:
+        for x in rogue_pool()["pool"]:
+            if x.get("thumb") and x["field"] not in thumb_map:
+                thumb_map[x["field"]] = x["thumb"]
+    except Exception:
+        pass
+    quest = qlib.load_table(ROGUE_Q_LOGICAL)
+    inner = quest.get(ROGUE_EVENT_ID) or {}
+    qno_by_round = {}
+    for k, v in inner.items():
+        c = _rogue_cells(v)
+        if len(c) > 2 and c[1] == "1":
+            qno_by_round[c[2]] = k
+    log, pend = [], {}
+    for rd in rounds:
+        rn = str(rd.get("round", "")).strip()
+        qno = qno_by_round.get(rn)
+        if not qno:
+            log.append(f"[跳过] 轮 {rn} 无对应 quest")
+            continue
+        like = inner[qno]
+        row = list(_rogue_cells(like))
+        field = str(rd.get("field", "")).strip()
+        if field and len(row) > 98:
+            if row[98] != field:
+                log.append(f"轮{rn} 场地: {row[98]!r} -> {field!r}")
+            row[98] = field
+            th = thumb_map.get(field)
+            if th and len(row) > 5:
+                row[5] = th
+        el = rd.get("element")
+        if el not in (None, "") and len(row) > 69 and row[69] != str(el):
+            log.append(f"轮{rn} 属性: {row[69]!r} -> {el}")
+            row[69] = str(el)
+        effects = rd.get("effects")
+        if effects is not None:                       # 不带 effects 键 = 保留原效果列
+            for s in range(5):
+                ki = 71 + s * 2
+                if len(row) > ki + 1:
+                    if s < len(effects) and str(effects[s].get("kind", "")) not in ("", "(None)"):
+                        row[ki] = str(effects[s].get("kind"))
+                        row[ki + 1] = str(effects[s].get("strength", ""))
+                    else:
+                        row[ki], row[ki + 1] = "(None)", ""
+            log.append(f"轮{rn} 场地效果 {len([e for e in effects if str(e.get('kind',''))not in('','(None)')])} 槽")
+        if rd.get("subname") is not None and len(row) > 4:
+            row[4] = str(rd["subname"]).strip() or "(None)"
+        pend[qno] = rb.join(row, isinstance(like, (bytes, bytearray)))
+    if not pend:
+        return {"ok": True, "log": "没有可写的轮次"}
+    # (下方写入+可选发布)
+    if dry_run:
+        return {"ok": True, "dry_run": True, "log": "\n".join(log) or "(将写入所选轮次)"}
+    for qno, leaf in pend.items():
+        inner[qno] = leaf
+    quest[ROGUE_EVENT_ID] = inner
+    out = qlib.save_table(ROGUE_Q_LOGICAL, quest)
+    if body.get("publish"):
+        pub = _rogue_run("wf_publish.py", ["--tables", "rush_event_quest"])
+        return {"ok": pub["ok"], "log": "\n".join(log)
+                + f"\n[已写 {os.path.basename(str(out))} 并发布 ②表]\n" + pub["log"][-300:]}
+    return {"ok": True, "log": "\n".join(log)
+            + f"\n[已写 {os.path.basename(str(out))},未发布——点「📤 发布」推送到游戏]"}
+
+
+_ROGUE_THUMBS: dict | None = None
+
+
+def _rogue_thumbs() -> dict:
+    """field → 宿主 quest 缩略图(重型,进程内缓存)。"""
+    global _ROGUE_THUMBS
+    if _ROGUE_THUMBS is None:
+        try:
+            import wf_rogue_build as rb
+            _ROGUE_THUMBS = rb.field_thumbnail_map()
+        except Exception:
+            _ROGUE_THUMBS = {}
+    return _ROGUE_THUMBS
+
+
+# rush 五表(随机/布局写入涉及的全部 ②层表;发布按钮一次推齐)
+ROGUE_TABLES_LOGICAL = ",".join([
+    "master/quest/event/rush_event.orderedmap",
+    "master/quest/event/rush_event_quest_folder.orderedmap",
+    "master/quest/event/rush_event_quest.orderedmap",
+    "master/quest/event/event_list.orderedmap",
+    "master/quest/event/rush_event_battle_quest_correction.orderedmap",
+])
+
+
+def rogue_publish() -> dict:
+    """发布 rush 五表到 CDN(与写入分离的独立动作)。"""
+    r = _rogue_run("wf_publish.py", ["--tables", ROGUE_TABLES_LOGICAL])
+    r["log"] = (r["log"] or "")[-1200:]
+    return r
+
+
+def rogue_randomize(body: dict, dry_run: bool) -> dict:
+    """随机生成:难度参数 + 每层池子计划(plan=[{round,cat}],cat 空=build 默认方案,
+    '*'=全池任意)。先 wf_rogue_build --write(不发布),再按计划逐层随机覆盖 boss/场地。"""
+    import random as _random
+    seed = body.get("seed")
+    seed = int(seed) if str(seed or "").strip() else _random.SystemRandom().randrange(1, 10 ** 8)
+    r1 = rogue_build_apply({**body, "seed": seed, "publish": False}, dry_run)
+    if not r1.get("ok"):
+        return r1
+    plan = [p for p in (body.get("plan") or []) if str(p.get("cat", "")).strip()]
+    lines = [f"[seed {seed}(复现填此值)]", r1["log"][-1200:]]
+    if plan:
+        pool = rogue_pool()["pool"]
+        rng = _random.Random(seed * 31 + 7)
+        payload = []
+        lines.append("—— 按层池子覆盖 ——")
+        for p in sorted(plan, key=lambda x: int(x.get("round", 0) or 0)):
+            cat = str(p["cat"]).strip()
+            cand = pool if cat == "*" else [x for x in pool if x["cat"] == cat]
+            if not cand:
+                lines.append(f"层{p.get('round')}: 池「{cat}」为空,跳过")
+                continue
+            pick = rng.choice(cand)
+            el = pick["element"] if pick["element"] != "" else str(rng.randrange(6))
+            payload.append({"round": str(p.get("round")), "field": pick["field"], "element": el})
+            lines.append(f"层{p.get('round')} [{'任意' if cat == '*' else cat}] → {pick['boss']} "
+                         f"[{pick['field']}] 属性:{ROGUE_ELEM_CN[int(el)]}")
+        if payload and not dry_run:
+            r2 = rogue_layout_apply({"rounds": payload}, False)
+            lines.append(r2["log"][-400:])
+    lines.append("[DRY-RUN] 未写入。" if dry_run
+                 else "已写入(未发布)。可在⑥手动微调,然后点「📤 发布」。")
+    return {"ok": True, "log": "\n".join(lines)}
+
+
+# ---------------------------------------------------------------- 定时自动随机刷新
+ROGUE_AUTO_PATH = MOD_DIR / "work" / "rogue_auto.json"
+_ROGUE_AUTO_LOCK = threading.Lock()
+_ROGUE_AUTO = {"enabled": False, "time": "04:30", "rounds": 15, "enemy_level": 80,
+               "clear_progress": True, "restart_game": False, "last_run_date": ""}
+_ROGUE_AUTO_RT = {"running": False, "last_run": "", "last_log": ""}
+
+
+def _rogue_auto_load() -> None:
+    try:
+        with open(ROGUE_AUTO_PATH, encoding="utf-8") as fh:
+            _ROGUE_AUTO.update(json.load(fh))
+    except Exception:
+        pass
+
+
+def _rogue_auto_save() -> None:
+    os.makedirs(os.path.dirname(str(ROGUE_AUTO_PATH)), exist_ok=True)
+    with open(ROGUE_AUTO_PATH, "w", encoding="utf-8") as fh:
+        json.dump(_ROGUE_AUTO, fh, ensure_ascii=False, indent=1)
+
+
+def _rogue_auto_due_ts() -> float:
+    hh, mm = (str(_ROGUE_AUTO.get("time", "04:30")).split(":") + ["0"])[:2]
+    now = time.localtime()
+    return time.mktime((now.tm_year, now.tm_mon, now.tm_mday, int(hh), int(mm), 0,
+                        now.tm_wday, now.tm_yday, now.tm_isdst))
+
+
+def _rogue_auto_state() -> dict:
+    nxt = ""
+    if _ROGUE_AUTO.get("enabled"):
+        try:
+            due = _rogue_auto_due_ts()
+            today = time.strftime("%Y-%m-%d")
+            if time.time() < due:
+                nxt = time.strftime("今天 %H:%M", time.localtime(due))
+            elif _ROGUE_AUTO.get("last_run_date") != today:
+                nxt = "即将执行(30 秒内)"
+            else:
+                nxt = time.strftime("明天 %H:%M", time.localtime(due))
+        except Exception:
+            nxt = "?"
+    return {**{k: v for k, v in _ROGUE_AUTO.items() if k != "last_run_date"},
+            **_ROGUE_AUTO_RT, "next_due": nxt}
+
+
+def _rogue_auto_run() -> dict:
+    """整局重开一次(wf_rogue_reroll):重摇+发布,按配置清进度/重启游戏。"""
+    with _ROGUE_AUTO_LOCK:
+        if _ROGUE_AUTO_RT["running"]:
+            return {"ok": False, "log": "已在执行中"}
+        _ROGUE_AUTO_RT["running"] = True
+    try:
+        args = ["--apply", "--rounds", str(_ROGUE_AUTO.get("rounds", 15)),
+                "--enemy-level", str(_ROGUE_AUTO.get("enemy_level", 80))]
+        if not _ROGUE_AUTO.get("clear_progress", True):
+            args.append("--keep-progress")
+        if not _ROGUE_AUTO.get("restart_game"):
+            args.append("--no-restart")
+        r = _rogue_run("wf_rogue_reroll.py", args)
+        _ROGUE_AUTO_RT["last_run"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        _ROGUE_AUTO_RT["last_log"] = (r["log"] or "")[-1500:]
+        _ROGUE_AUTO["last_run_date"] = time.strftime("%Y-%m-%d")
+        _rogue_auto_save()
+        return r
+    finally:
+        _ROGUE_AUTO_RT["running"] = False
+
+
+def _rogue_auto_thread() -> None:
+    while True:
+        time.sleep(30)
+        try:
+            if not _ROGUE_AUTO.get("enabled"):
+                continue
+            if (time.time() >= _rogue_auto_due_ts()
+                    and _ROGUE_AUTO.get("last_run_date") != time.strftime("%Y-%m-%d")):
+                threading.Thread(target=_rogue_auto_run, daemon=True).start()
+        except Exception:
+            pass
+
+
+_rogue_auto_load()
+threading.Thread(target=_rogue_auto_thread, daemon=True).start()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -5565,6 +7404,21 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/boss/list":
                 self._json(wf_boss.boss_list())
                 return
+            if path == "/chain/state":
+                self._json(chain_state())
+                return
+            if path == "/chain/pool":
+                self._json(chain_pool_list())
+                return
+            if path == "/rogue/state":
+                self._json(rogue_state())
+                return
+            if path == "/rogue/pool":
+                self._json(rogue_pool())
+                return
+            if path == "/rogue/auto":
+                self._json(_rogue_auto_state())
+                return
             if path == "/skill_switch":
                 character = (qs.get("character") or [""])[0]
                 if not character:
@@ -5632,6 +7486,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/powerflip":
                 self._json(powerflip_overview((qs.get("character") or [""])[0]))
                 return
+            if path == "/powerflip/brief":
+                self._json(powerflip_brief((qs.get("kind") or [""])[0]))
+                return
             if path == "/omni_element":
                 self._json(omni_element_status((qs.get("character") or [""])[0]))
                 return
@@ -5657,6 +7514,19 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/char_assets":
                 self._json(char_assets((qs.get("character") or [""])[0]))
+                return
+            if path == "/effects":
+                self._json(effect_previews((qs.get("character") or [""])[0]))
+                return
+            if path == "/asset_template":
+                self._json(asset_template_check((qs.get("character") or [""])[0]))
+                return
+            if path == "/skill_summary":
+                self._json(skill_effect_summary((qs.get("character") or [""])[0],
+                                                (qs.get("level") or ["1"])[0]))
+                return
+            if path == "/composer/catalog":
+                self._json(composer_catalog())
                 return
             if path == "/char_snapshots":
                 self._json(list_char_snapshots((qs.get("character") or [""])[0]))
@@ -5777,6 +7647,26 @@ class Handler(BaseHTTPRequestHandler):
                     list(body.get("row") or []), bool(body.get("adapt_sid", False)),
                     bool(body.get("dry_run")), bool(body.get("create_missing", False))))
                 return
+            if path == "/composer/generate":
+                self._json(composer_generate(
+                    str(body.get("dst_key", "")), str(body.get("trigger", "")),
+                    str(body.get("effect", "")), float(body.get("value") or 0),
+                    body.get("value_max"), body.get("threshold"),
+                    str(body.get("target", "0")), str(body.get("groups", "")),
+                    mode=str(body.get("mode", "")),
+                    trigger_kind=str(body.get("trigger_kind", "")),
+                    effect_kind=str(body.get("effect_kind", "")),
+                    effect_unit=str(body.get("effect_unit", "pct")),
+                    threshold_unit=str(body.get("threshold_unit", "count")),
+                    puller=str(body.get("puller", "0")),
+                    trigger_groups=str(body.get("trigger_groups", "")),
+                    precondition_kind=str(body.get("precondition_kind", "")),
+                    precondition_threshold=body.get("precondition_threshold"),
+                    precondition_unit=str(body.get("precondition_unit", "pct")),
+                    hits=body.get("hits"),
+                    string_id=str(body.get("string_id", "")),
+                    action_path=str(body.get("action_path", ""))))
+                return
             if path == "/append_line_adapted":
                 self._json(append_line_adapted(
                     str(body.get("src_key", "")), int(body.get("src_line", 1)),
@@ -5872,6 +7762,13 @@ class Handler(BaseHTTPRequestHandler):
                     bool(body.get("dry_run")),
                 ))
                 return
+            if path == "/element_convert":
+                self._json(element_convert(
+                    str(body.get("character", "")),
+                    str(body.get("target", "")),
+                    bool(body.get("dry_run")),
+                ))
+                return
             if path == "/soul_rows/save":
                 self._json(save_soul_rows(body.get("edits") or [], bool(body.get("dry_run"))))
                 return
@@ -5928,6 +7825,47 @@ class Handler(BaseHTTPRequestHandler):
                                        str(body.get("node_name", "")),
                                        bool(body.get("dry_run"))))
                 return
+            if path == "/chain/apply":
+                self._json(chain_apply(body, bool(body.get("dry_run"))))
+                return
+            if path == "/rogue/build":
+                self._json(rogue_build_apply(body, bool(body.get("dry_run"))))
+                return
+            if path == "/rogue/nerf":
+                self._json(rogue_nerf_apply(body, bool(body.get("dry_run"))))
+                return
+            if path == "/rogue/drops":
+                self._json(rogue_drops_save(body, bool(body.get("dry_run"))))
+                return
+            if path == "/rogue/shop":
+                self._json(rogue_shop_save(body, bool(body.get("dry_run"))))
+                return
+            if path == "/rogue/layout":
+                self._json(rogue_layout_apply(body, bool(body.get("dry_run"))))
+                return
+            if path == "/rogue/randomize":
+                self._json(rogue_randomize(body, bool(body.get("dry_run"))))
+                return
+            if path == "/rogue/publish":
+                self._json(rogue_publish())
+                return
+            if path == "/rogue/auto":
+                for k in ("enabled", "clear_progress", "restart_game"):
+                    if k in body:
+                        _ROGUE_AUTO[k] = bool(body[k])
+                if body.get("time"):
+                    _ROGUE_AUTO["time"] = str(body["time"])[:5]
+                for k in ("rounds", "enemy_level"):
+                    if body.get(k) not in (None, ""):
+                        _ROGUE_AUTO[k] = int(float(body[k]))
+                _rogue_auto_save()
+                self._json(_rogue_auto_state())
+                return
+            if path == "/rogue/auto/run":
+                threading.Thread(target=_rogue_auto_run, daemon=True).start()
+                self._json({"ok": True,
+                            "log": "已在后台执行整局重开(重摇+发布,约半分钟),稍后点「刷新」看新阵容/状态"})
+                return
             if path == "/powerflip/spec":
                 self._json(powerflip_set_spec(str(body.get("character", "")),
                                               body.get("speciality", 0),
@@ -5950,6 +7888,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(powerflip_clone(str(body.get("src_kind", "")),
                                            str(body.get("new_id", "")),
                                            bool(body.get("dry_run"))))
+                return
+            if path == "/powerflip/compose":
+                self._json(powerflip_compose(str(body.get("new_id", "")),
+                                             str(body.get("base_kind", "")),
+                                             list(body.get("donors") or []),
+                                             str(body.get("character", "") or ""),
+                                             bool(body.get("dry_run"))))
                 return
             if path == "/raw_json/save":
                 self._json(save_raw_json(str(body.get("table", "")),

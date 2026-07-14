@@ -387,7 +387,12 @@ const routes = async (fastify: FastifyInstance) => {
                         allow_other_players_to_heal_me: party.options.allowOtherPlayersToHealMe
                     },
                     party_edited: party.edited,
-                    party_id: Number(partyIdString),
+                    // global PartyId ((group-1)*10+slot): the client stores all
+                    // groups' parties in ONE flat map keyed by party_id
+                    // (RushEventData applyPartyResponse) and the update route
+                    // parses the same global numbering — per-slot ids collide
+                    // across groups and later groups clobber earlier ones
+                    party_id: (Number(idString) - 1) * 10 + Number(partyIdString),
                     party_name: party.name
                 })
             }

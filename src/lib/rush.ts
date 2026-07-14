@@ -1,6 +1,7 @@
 import { Player, PlayerRushEvent, RushEventBattleType, UserRushEventEndlessBattleMyRankingPartyMemberListItem, UserRushEventEndlessBattleRanking, UserRushEventPlayedPartyList } from "../data/types";
 import { getPlayerIdFromRushEventEndlessRankSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, serializePlayerRushEventPlayedParty } from "../data/domains/rushEvent"
 import { getPlayerSync } from "../data/domains/player"
+import { getRogueEventConfig } from "./assets"
 import { SerializedPlayerRushEventPlayedPartyList, SerializedPlayerRushEventPlayedParties } from "./types";
 
 /**
@@ -25,7 +26,23 @@ export function getSerializedPlayerRushEventPlayedPartiesSync(
         const record = party.battleType === RushEventBattleType.FOLDER ? rushBattlePlayedPartyList : endlessBattlePlayedPartyList;
         record[party.round] = serializePlayerRushEventPlayedParty(party)
     }
-    
+
+    // rogue mode: strip member ids from played parties before sending them to
+    // the client. Character locking (RushEventPartyGroupHolder) is derived
+    // purely from these lists, so scrubbed entries release the lock while the
+    // preserved entry count keeps folder round progression intact
+    // (client getRushBattleRound() = list size + 1).
+    if (getRogueEventConfig(eventId)?.unlock_played_parties === true) {
+        for (const record of [rushBattlePlayedPartyList, endlessBattlePlayedPartyList]) {
+            for (const party of Object.values(record)) {
+                party.character_id_1 = party.character_id_2 = party.character_id_3 = null
+                party.unison_character_id_1 = party.unison_character_id_2 = party.unison_character_id_3 = null
+                party.evolution_img_level_1 = party.evolution_img_level_2 = party.evolution_img_level_3 = null
+                party.unison_evolution_img_level_1 = party.unison_evolution_img_level_2 = party.unison_evolution_img_level_3 = null
+            }
+        }
+    }
+
     // return parties
     return {
         folderParties: rushBattlePlayedPartyList,

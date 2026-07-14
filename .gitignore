@@ -38,6 +38,7 @@ wf-modded/
 decompile/
 ffdec/
 ffdec_26.2.1/
+ffdec_26.2.1.zip
 pc-run/
 export/
 *.apk
@@ -63,3 +64,7 @@ mod-tools/profiles.json
 /_old-worktree-uncommitted-*.patch
 logs/
 *.bak-charfields-*
+*.bak-wfmod-*
+
+# codex agent 本地配置(不提交)
+.codex/

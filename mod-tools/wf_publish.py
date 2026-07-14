@@ -95,6 +95,7 @@ TABLE_ALIASES = {
     "character_gacha_sound": "master/character/character_gacha_sound.orderedmap",
     # --- 特殊效果(固有状态)+ 商店 ---
     "unique_condition": "master/character/unique_condition.orderedmap",
+    "custom_ability_string": "master/string/custom_ability_string.orderedmap",
     "boss_coin_shop": "master/shop/boss_coin_shop.orderedmap",
     "boss_coin_shop_category": "master/shop/boss_coin_shop_category.orderedmap",
     "trimmed_image": "master/generated/trimmed_image.orderedmap",
@@ -253,6 +254,12 @@ def main() -> None:
         except Exception:
             pass
     print(f"改动日志: {stamped} 条标记为 {to_ver},已公布 changelog.md (work/ + CDN)。")
+
+    # 发布来源=pending 时自动清空(与 GUI run_publish 语义对齐;CLI 直跑曾留残留,
+    # 下次发布会把已发文件重复打进 diff——无害但包变大、日志变噪)
+    if not args.tables and PENDING.exists():
+        PENDING.write_text("[]", encoding="utf-8")
+        print("pending 列表已清空。")
 
 
 if __name__ == "__main__":

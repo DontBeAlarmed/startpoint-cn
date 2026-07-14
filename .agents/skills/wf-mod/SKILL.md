@@ -55,7 +55,14 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   顶部导航按**角色/武器/全局/系统**四组分区(左栏带角色头像+元素角标,`/` 键聚焦搜索)。
   角色模式:词条编辑(单条主位开关/删行,**基础行与觉醒行
   分区**) / 角色资料(**三层同步**:rarity/element 等 master 字段与文本同时写 ①层 cdndata
-  + ②层 character/character_text 表 + `assets/character.json`;底部有**单角色一键快照/还原**
+  + ②层 character/character_text 表 + `assets/character.json`;
+  ⚠ **显示源铁律(2026-07-13 逆向 StatusWindow)**:详情页/战斗的 技能名/描述 读
+  **action_skill 表**、队长技名 读 **character 表 c18**(c17=leader_ability 表键)——
+  character_text 的 skill_name_*/leader_ability_name **只喂抽卡特性页**,单改它游戏里看不到;
+  资料页保存已自动三处同步(技能名→action_skill 级别1、技能名＋→级别2,**共用技能的克隆
+  角色改名会连模板一起变**;队长技称号双写 text[10]+c18);种族=character c4 英文 token
+  (Human/Beast/Element/Machine/Undead/Mystery/Dragon/Devil/Plants/Aquatic,后端强校验,
+  token 查 APK 内 race 表,乱填显示不出来);底部有**单角色一键快照/还原**
   =②层7表+①层+资产+DSL 打包 zip;底部「**共鸣通用(OmniElement)**」开关=character 表 c5 加/去
   OmniElement 标签,配合 client-patch/omni-element 客户端补丁后该角色匹配**任意元素**的
   共鸣/编成/[限X属性]条件(元素组匹配是严格等值,数据层无通配,详见补丁文档;无补丁时标签无害);
@@ -65,7 +72,16 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   dry-run 附属性配对检查报告。⚠ **element=6(真无属性)已禁止**:2026-07-12 实测
   element=6(Colorless 是敌人专属元素)给可玩角色会崩(C7050:forceUncolorless 硬抛+
   连锁数组越界,补丁救不了),已回滚;save_char_fields 硬拦截 element=6、元素下拉去掉「通用」。
-  引擎不支持可玩角色「无属性」,方案见 `mod-tools/docs/通用属性方案.md` §0) /
+  引擎不支持可玩角色「无属性」,方案见 `mod-tools/docs/通用属性方案.md` §0);
+  「**整体转属性**」(2026-07-13,端点 `/element_convert`)=一键把角色整套改成目标属性:
+  **c3 element + 6词条/队长技的元素 token(character_groups:编成/共鸣/赋予全队X/[限X]) +
+  content 的 element 数值列 + ①层三层同步**。逆向结论:①元素 string token(Red/Blue/Yellow/
+  Green/White/Black)**只出现在 character_groups 类单元格**(己方队门槛),枚举 kind 是数字
+  ID 不混淆→翻所有 token 天然只动己方门槛;②**技能伤害元素随 c3 自动**(白等技能 DSL 无
+  显式元素参数),改 c3 即变,无需动 DSL;③元素型枚举 kind(抗性X/敌方抗性X↓/来自抗性X)
+  判他方元素=独立机制,**不翻**,列进报告(实测全库无角色在词条里用这类,风险为零)。
+  ⚠ **单改资料页元素下拉只动显示,词条门槛不跟着变**——白转光后队长技还判"风编成"永不触发
+  就是这坑(2026-07-13 实锤),要整套生效必须走「整体转属性」) /
   **角色资产**(2026-07-12 改**三栏**:立绘·UI(ui/+battle 配套)/像素图·pixelart/语音·voice,
   按逻辑路径前缀分栏;像素图栏顶部「**像素图数据**」区 = atlas 排布/frame/timeline 六文件
   **页内 JSON 编辑 + 外部文档上传**(.json 自动编码 AMF3+deflate,.amf3.deflate 原样;
@@ -96,12 +112,26 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   **MP3 严格校验**(wf_assets.mp3_encode):逐帧复核转换覆盖到文件尾+码率恒定,
   VBR/损坏/半截文件直接拒收(报错带 ffmpeg 转码命令;官方语音 400 抽样全 CBR 不误杀)——
   此前半转换文件(前半存储态后半标准态)是"换语音崩溃"的根因;
-  顶部「**资产包导入**」= datamine 解包目录一比一批量替换,`POST /asset/import_pack`;
+  顶部「**资产包导入**」= datamine 解包目录/zip 一比一批量替换,`POST /asset/import_pack`
+  (**路径两段式识别,2026-07-13 修**:相对路径先按 `character/<code>/` 找,命不中再按
+  **全局逻辑路径**原样找——此前一律强加前缀,一键导出包里的 `battle/**` 技能 DSL/特效和
+  `character/<code>/**` 全量树全部报"store 无对应路径",导不回去);
   「**一键导出全部资产**」=`GET /asset/export_char` 整角色打包 zip:character/<code>/ 全量
   (立绘/图标/**点阵像素**/语音/story差分/配套数据)+ 战斗特效动画(**DSL 内 SpecifyEffectDirectly
   提取+哈希探测**,补 pathlist 75% 复原盲区)+ cut-in ATF + 技能/PF DSL;PNG/MP3 解混淆,
-  目录树与资产包导入一比一互通,落盘 work/asset_exports/) /
+  zip 内=**全局逻辑路径树**,与资产包导入一比一互通(实测回导 0 missing),落盘 work/asset_exports/;
+  「**✅模板检查**」(2026-07-13)=新角色必要资产完整度(`/asset_template`):必要=立绘/头像/
+  缩略图/战斗UI/连锁cutin/技能cutin/图标合集/像素图/配套数据(缺=界面空白),建议=语音,
+  剧情类不检查;「**✨战斗特效**」子页签(`/effects`)=特效贴图帧墙+时间线/音效元数据——
+  **特效贴图打包规律(2026-07-13 逆向)**:`battle/effect/.../<目录>/<目录名>.png`+同名 atlas,
+  atlas 帧名=`.gen/<效果名>/x`;<效果>.parts=flatomo 骨架(贴图/图层/12位定点矩阵 4096=1.0),
+  完整骨架播放(GraphicsSource 补间 1000+ 行)未复刻,反编译源在
+  D:/WF/wf-re-workspace/decompile/scripts/flatomo/;像素动画三件套 AMF3 均可用
+  `wf_dsl.parse_dsl` 通读(atlas=帧矩形 fx/fy 取负=画布内偏移,timeline=序列 loop/once/pass,
+  帧号缺洞=沿用前一帧)) /
   基础数值 / **技能·倍率**(名称+游戏内效果描述+能量直改,级别移植/删除,整技能替换,
+  「**效果预览**」=DSL 命令树浓缩成中文分组摘要(伤害/增益状态/治疗/演出,倍率与帧数直读,
+  端点 `/skill_summary`,复用 wf_dsl_sig.brief_command),
   「**效果词条**」=命令级结构化编辑器(2026-07-12):命令卡片树(嵌套 Block 递归),
   改参数/删除/复制/上下移/**从全库 1024 个技能的命令实例检索插入**(如借别人的
   CreateCondition 加 buff、加伤害段);签名表 `wf_dsl_sig.py`(自反编译 AS3 生成:
@@ -125,7 +155,14 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   supporter 的 PF 就是给全队上 3 个 CreateCondition);「克隆新建」= 3 文件复制新路径+表加键,
   **自定义种类激活 = 队长词条 powerflip_override**(效果块 id=表键/levels="1,2,3"/
   description_id,官方例 leader 121177 行4;levels 单元格含逗号带 CSV 引号=官方惯例);
-  APK 取 WF_APK 环境变量 > 弹国服/*.apk 最新;端点 `/powerflip|/powerflip/spec|extract|clone`。
+  APK 取 WF_APK 环境变量 > 弹国服/*.apk 最新;端点 `/powerflip|/powerflip/spec|extract|clone|brief|compose`。
+  「**🧪 PF 合成工坊**」(2026-07-13,真机范本=白 ID10 挂 override_dual_spgirl_meteor
+  =希尔媞+索维):任选已有 PF 种类组合成新种类并一键挂角色——基底保留完整生命周期
+  (抑制/结束通知/命中重置),供体只贡献攻击/演出块(递归剥离 SetPowerFilpSuppress/
+  NotifyPowerflipEnd/RemoveEvent,剥空 Wait 丢弃),供体标签加 _N 后缀防串扰,顶层
+  抑制帧取全体最大;挂角色=队长技 instant 722 行(模板取全表官方 722 行,前置清空=
+  无条件;已有 722 行则改指新 id),仅队长位生效,PF 图标仍随 c6;
+  端点 `/powerflip/brief`(选材预览)+`/powerflip/compose`(dry-run→写入)。
   ⚠ PF 定义全局共享:改标准种类=所有该类型角色一起变,只改一个角色用 新建种类+override。
   「**形态切换**」区 = character 表 col9-16(HpHigh/ConditionExist/MultiballNumber/
   ChangeSkillFlag/IsUnison,切换目标限 switched_action_skill 表现有 6 键);
@@ -159,12 +196,18 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   trigger_puller)但 c98 空 → 开角色一览 C7050「不存在的构造函数」——那是 0712 13:58 前
   批量词条写入埋的雷,与克隆无关,已补 c98='0';排查手段=离线复刻 AbilityValues.parseAt97/98
   路由扫全表(反编译源在 D:/WF/wf-re-workspace/decompile);**词条组装时凡 During(c5=1)
-  触发 c97 落在需 puller 的 case,c98 必填 0-10**) /
+  触发 c97 落在需 puller 的 case,c98 必填 0-10**;
+  ③玛纳板 H400(2026-07-13):节点 multiplied_id=**角色ID×2 拼 板序×200+节点号**,客户端由
+  节点 ID 反推角色 ID——嵌套表原样复制会让新角色的板指回模板→learn_mana_node 400;
+  clone/delete 已内置重映射(`_remap_mana_for_clone`:②层两张三层树 wf_quest_lib 重编号+
+  服务端 assets/mana_node.json 补/删条目,后者静态 import **须重启服务端**)) /
   **工具箱**(长任务后台子进程+进度轮询,同时只跑一个,输出均在 store 外:
   **全链路自检**=`wf_selftest.py` 环境检测+功能模拟(deep=金丝雀写入闭环,~3 秒 21 项)、
   **全量解密导出**=`wf_export_assets.py` 全包解密建逻辑目录树、**路径表复原**=
   `wf_recover_pathlist.py` 重建 WF_PATHLIST_recovered、**数据包还原**=
-  `弹国服/wf_restore_package.py` 自举复原;端点 `/toolbox/run|status|cancel`) /
+  `弹国服/wf_restore_package.py` 自举复原、**深渊连战一键重开**=`wf_rogue_reroll.py`
+  随机种子重摇 700099 爬塔全部楼层/boss属性/场地效果+按 event_id 清爬塔进度(武器/角色/
+  官方 700007 不动)+发布 CDN+重启游戏,默认勾「应用」=真·一键;端点 `/toolbox/run|status|cancel`) /
   配方 / 改动日志(一键回溯) / 备份。武器模式:**武器·魂珠**(436 件装备含 12 主线魂珠,
   强化词条+同键魂珠效果一页编辑,均可增删改) / Boss·副本 / 速查 / 配方 / 工具箱 / 日志 / 备份。
   魂珠独立页签已删除;S: 键跳转自动进武器模式。
@@ -185,8 +228,56 @@ Python 脚本统一在 `mod-tools/` 下运行(cwd 建议为项目根)。输出�
   单元格禁引号/换行;**逗号放行**(官方即有 "1,2,3" 引号单元格,write_csv_lines 自动加引号,
   客户端解析器已被官方数据证实支持)。
   端点 `/composer/meta|blank|row|describe|apply`(apply 已验证:追加+删行后表文件字节复原)。
+  「**✨效果构建器**」(2026-07-13,原「按效果生成」升级)=解决"面对空白块不知填啥":
+  **双模式**——⭐常用速选(16 触发含冲刺/弹射 × 23 效果精选,单位/阈值预配好,只填数值);
+  🔍**全部枚举·自由组合**(触发 262/230 + 效果 724/422 全量,可搜下拉带中文名+全库使用频次,
+  瞬发/持续自动同步,数值单位可选 %/次/倍/原值)——**任意触发×任意效果自由拼**,实时中文预览,
+  (2026-07-13 UI 重构:标准弹窗(Esc/×关闭)+「触发/效果与数值/InvokeSkill」三分区;字段**按需
+  显隐**——段数只在对敌伤害、技能键/DSL只在InvokeSkill、阈值只在计数型触发、前置阈值只在带
+  阈值前置;数值格支持 15%/3次/70倍 快捷后缀(自由模式自动同步单位下拉);300ms 防抖即时预览;
+  记住上次模式。整体 UI 同步优化:左栏匹配计数、待发布徽章可点击看清单、发布按钮空 pending
+  置灰、页签跨会话记忆)
+  走 /composer/apply 追加;端点 `/composer/catalog`(common 精选 + all 全量枚举)+
+  `/composer/generate`(精选传 trigger_id/effect_id,自由传 mode+trigger_kind+effect_kind+
+  effect_unit;count 型效果数值也写 strength 列,×100000);during 触发 puller 恒填 0(7050 内建);
+  **计数型触发(冲刺4/弹射6/强化弹射2等)阈值空=每次=100000**(官方全库最小值,
+  0/0 零先例——写 0 客户端渲染「0次冲刺时」且触发行为未定义,2026-07-13 实锤已改默认)。
+  **2026-07-13 二次升级(对敌伤害/前置/InvokeSkill)**:①**前置条件**下拉(无/Fever中/非Fever/
+  HP≥≤X%/技能槽≥X%,precondition_kind+阈值)——"进入fever后每次冲刺…"这类词条可直接拼;
+  ②**对敌伤害精选**(伪 kind `DMG:all|near|trig` → 251/352/316 族+元素,元素自动查角色 c3,
+  属性下拉可覆盖;魂珠/武器键须手选属性)。⚠ **character c3 element 是 0-based**(火=0 水=1
+  雷=2 风=3 光=4 暗=5),与伤害枚举族同基**直接可用无需换算**——2026-07-13 全库实证
+  (c3×队长技元素token 对照 80/82/80/75/79/81 全吻合);此前"1-based 须-1"是把
+  wf_describe.ELEMENT_CN(1-based,另一枚举)误当 c3 语义,曾把风角色伤害错生成雷。
+  **L: 队长技键≠角色ID**(白虎=角色10/队长技3),元素反查按 character c17
+  (leader_ability_id,495/495 实证)扫描,勿用键当角色ID:**对敌伤害逆向结论=content 33/34/388 是增伤buff
+  不是造伤**,真造伤是 EnemyDamage 族 251-286(**time 列空=全体敌人 AllEnemyDamage/
+  填N=最近顺序N段**,「段数」输入框)、NearestEnemyDamage 352-387(最近单体)、
+  TriggerEnemyDamage 316-351(触发源),各=6元素×依攻击/现HP/最大HP×计/不计连击,
+  强度千=1%(70倍=7000000);伤害走 AbilityDamageShot→NormalAttack impact,
+  createdByAbility=true 硬编码(吃能力伤害buff,**词条层做不出"计为技能伤害"的直接伤害**);
+  ③**InvokeSkill(629)**精选+技能键/DSL路径输入:发动 ability_skill DSL,ActionKind=
+  AbilitySkill→**createdByMainSkillAction=true=真·技能伤害**(范本 L:111183 行5 火龙弹射追击;
+  DSL 里 FindNearSubjects(1个)+CreateHitArea+CreateNormalAttack=对最近敌人,官方范本
+  marching_rival_1;新DSL文件=新逻辑路径写store+pending,官方未下发=新建,客户端照常拉);
+  行级描述同步升级:对敌伤害显示"对全体敌人/最近顺序N段/最近的敌人/触发源敌人"+"7000%(70倍)";
+  工坊数值格快捷输入支持 `70倍`→7000000。
+  ⚠ **空白行哨兵铁律(2026-07-13 C7050 实锤修复)**:AbilityValues.parseAt* 的枚举列
+  **没有空串分支,空串=打开角色页即崩 C7050**——官方哨兵:前置条件1-3 kind='0'、
+  instant_precontent='(None)'、delay='0'、during_accumulation_trigger='(None)'、
+  even_if_owner_dead='false'、Option 列(time/threshold)的 None=字面量 `(None)` 非空串
+  (EnemyDamage 族 time 空串→Some(null)=0段永不伤害);composer_blank 已改为**官方众数
+  模板**(按块所属触发模式统计每列众数,`_blank_template`),composer_apply 写入前跑
+  `_client_legality_problems` 硬校验(违规拒绝写入);手写行/外部脚本组行也必须过这套哨兵。
+  ⚠ **InvokeSkill(629) 的 string_id 必须注册进 `custom_ability_string` 表**(单列=描述文案),
+  缺键=角色页 C8601「指定的Key不存在」(界面显示"资源文件已损坏"纯误导);
+  composer_apply 已内置缺键自动注册,发布别名 custom_ability_string。
+  **文案勿写触发词**:客户端渲染时自动加「N次X时,」触发前缀,文案再写就双重
+  (「0次弹射时,弹射时,…」2026-07-13 实锤),官方文案即纯效果句如"发动特殊技能"。
   词条/队长技/魂珠/武器每行都带**行级中文描述**(`wf_describe.py` 按逆向布局+枚举直译生成,
-  语义等价非游戏原文——原文由客户端 3.9 万行 AS3 动态拼,离线不可复刻);
+  语义等价非游戏原文——原文由客户端 3.9 万行 AS3 动态拼,离线不可复刻;
+  2026-07-13 可读性升级:前端 fmtDesc 数值/触发词/六色属性/限制着色,
+  「HP≤≥50%」双比较符已修——触发名末尾带比较符时直接接数值);
   **词条速查** tab 搜四表中文描述/角色名/武器名/键,按效果签名分组显示共用N/专属。
   右上角「发布并重启游戏」按钮 = 第 4 节发布链路一键完成,用户全程不用碰命令行。
   写操作都先 dry-run 预览再确认,自动备份 + 加入 pending。

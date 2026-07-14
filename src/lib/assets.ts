@@ -40,6 +40,8 @@ import configData from "../../assets/config.json"
 import equipmentDissolveData from "../../assets/equipment_dissolve.json"
 import itemSaleData from "../../assets/item_sale.json"
 import equipmentCraftData from "../../assets/equipment_craft.json"
+import equipmentMaxLevels from "../../assets/equipment_max_level.json"
+import equipmentElements from "../../assets/equipment_element.json"
 import { AssetCharacter, BattleQuest, BossCoinShopItems, BoxGacha, ClearRewards, ConfigValues, EquipmentCraftEntry, EquipmentDissolveEntry, EventItemShopIdMapItem, EventShopItems, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, Gachas, ItemSaleEntry, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopItem, ShopItems, ShopType, StoryQuest } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -68,6 +70,7 @@ const MOD_ASSET_FILES = [
     "star_grain_shop.json",
     "treasure_shop.json",
     "equipment_enhancement_shop.json",
+    "rogue_event.json",
 ] as const;
 
 let characters: any;
@@ -79,6 +82,7 @@ let generalShopItems: any;
 let starGrainShopItems: any;
 let treasureShopItems: any;
 let equipmentEnhancementShopItems: any;
+let rogueEventConfig: any;
 
 /**
  * (Re)loads the mod-editable asset files from disk.
@@ -95,7 +99,73 @@ export function reloadModAssets(): string[] {
     starGrainShopItems = loadModAsset("star_grain_shop.json");
     treasureShopItems = loadModAsset("treasure_shop.json");
     equipmentEnhancementShopItems = loadModAsset("equipment_enhancement_shop.json");
+    rogueEventConfig = loadModAsset("rogue_event.json");
     return [...MOD_ASSET_FILES];
+}
+
+/**
+ * Gets the roguelike rush-event mod config for an event, or null when the
+ * feature is disabled or the event has no entry. Hot-reloadable via
+ * POST /api/mod-admin/reload_assets (assets/rogue_event.json).
+ *
+ * @param eventId The ID of the rush event.
+ * @returns The per-event config object, or null.
+ */
+export function getRogueEventConfig(eventId: number): any | null {
+    if (!rogueEventConfig || rogueEventConfig.enabled !== true) return null;
+    return rogueEventConfig.events?.[String(eventId)] ?? null;
+}
+
+/**
+ * Gets an equipment's max evolution level (equipment master col8, mirrored in
+ * assets/equipment_max_level.json — 385 items cap at 5, 51 at 1). The client
+ * hard-throws C2284 when players_equipment.level exceeds this.
+ *
+ * @param equipmentId The ID of the equipment.
+ * @returns The max level, defaulting to 1 for unknown ids.
+ */
+export function getEquipmentMaxLevel(equipmentId: number): number {
+    return (equipmentMaxLevels as Record<string, number>)[String(equipmentId)] ?? 1;
+}
+
+/**
+ * Gets an equipment's element, mirrored in assets/equipment_element.json
+ * (detected from element tokens in its enhancement/soul ability rows, same
+ * rule as the mod GUI). 0-based 火0 水1 雷2 风3 光4 暗5; -1 = universal.
+ * Souls share ids with their weapons, so this covers both.
+ *
+ * @param equipmentId The ID of the equipment (or its same-id soul item).
+ * @returns The element index, or -1 for universal/unknown.
+ */
+export function getEquipmentElement(equipmentId: number): number {
+    return (equipmentElements as Record<string, number>)[String(equipmentId)] ?? -1;
+}
+
+// derived per-event rush folder max rounds; folder ids repeat across events
+// (700007 folder 1 = 2 rounds, 700099 folder 1 = 10 rounds), so a flat
+// folder-id map like the old hardcoded rushEventFolderMaxRounds is ambiguous
+const rushFolderMaxRoundsCache: Record<number, Record<number, number>> = {};
+
+/**
+ * Gets the max round per folder for a rush event, derived from
+ * assets/rush_event_quest.json (endless rounds are 0 and never count).
+ *
+ * @param eventId The ID of the rush event.
+ * @returns folderId -> max round map (empty for unknown events).
+ */
+export function getRushEventFolderMaxRounds(eventId: number): Record<number, number> {
+    let map = rushFolderMaxRoundsCache[eventId];
+    if (!map) {
+        map = {};
+        for (const quest of Object.values(rushEventQuests as Record<string, any>)) {
+            if (Number(quest?.rushEventId) !== eventId) continue;
+            const folder = Number(quest.rushEventFolderId);
+            const round = Number(quest.rushEventRound);
+            if (round > (map[folder] ?? 0)) map[folder] = round;
+        }
+        rushFolderMaxRoundsCache[eventId] = map;
+    }
+    return map;
 }
 
 reloadModAssets();
