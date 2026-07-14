@@ -27,7 +27,10 @@ cd starpoint-cn && npm install
 ### 2. 基础 CDN(自备)+ 本 mod 增量(随代码到手)
 
 - **基础 CDN(~11GB)**:确保 `.cdn/cn/` 已就位(目录结构与校验见 [`docs/cdn/overview.md`](cdn/overview.md))。官方源已停服,本 mod **不分发**基础 CDN——需你自行从 WF 私服圈/现有部署获取。已有能跑的 WF CN 私服的人跳过此项。
-- **本 mod 的增量**:两个模式和武器的 masterdata 已经**随 release 分支一起 clone 到 `assets/` 里**(服务端直接读),无需另外下载或"发布 CDN 增量"。
+- **本 mod 的增量(①+②两层都在分支里)**:
+  - ① **服务端层**:两模式和武器的 masterdata 在 `assets/*.json`(服务端直接读)。
+  - ② **客户端层**:深渊武器/兑换商店/rush 700099 的客户端 orderedmap 数据,已打包成 **`assets/asset-patch/active/pinball-1.4.90→1.4.101-mod*.zip`(11 个,git 跟踪)**,服务端 `asset.ts` 会自动 serve、`manifest.json` 已 enabled 到 1.4.101。**这层缺了 → 打完 15 轮或开兑换商店会 C8601**(客户端没有武器/商店主数据)。
+  - ⚠️ **前提**:你的 base CDN 必须接到 **1.4.90**(这条增量链的起点),客户端才能续上 1.4.90→1.4.101 拿到 ② 层。base CDN 版本不到 1.4.90 的话这段接不上。
 
 ### 3. 起服
 
