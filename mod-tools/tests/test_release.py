@@ -87,6 +87,98 @@ class TestAtomicCharacterRelease(unittest.TestCase):
     def _module(self):
         return importlib.import_module("wf_release")
 
+    def test_new_transaction_supplies_validated_installed_package_for_upgrade(self):
+        module = self._module()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            candidate_dir = root / "candidate"
+            installed_dir = root / "installed"
+            candidate_dir.mkdir()
+            installed_dir.mkdir()
+            candidate_manifest = {"package_id": "seris_dragon_king", "candidate": True}
+            installed_manifest = {"package_id": "seris_dragon_king", "installed": True}
+            live_roots = module.character_pack.LiveRoots(
+                root / "common", root / "medium", root / "android", root / "server"
+            )
+            transaction = object()
+            release_pack = importlib.import_module("wf_seris_release_pack")
+            with (
+                mock.patch.object(
+                    release_pack, "validate_runtime_test_package", return_value=[]
+                ),
+                mock.patch.object(
+                    module.character_pack,
+                    "load_manifest",
+                    side_effect=[candidate_manifest, installed_manifest],
+                ),
+                mock.patch.object(
+                    module.character_pack, "validate_manifest", return_value=[]
+                ) as validate_manifest,
+                mock.patch.object(
+                    module.character_pack, "PackTransaction", return_value=transaction
+                ) as pack_transaction,
+            ):
+                manifest, result = module._new_transaction(
+                    candidate_dir,
+                    live_roots,
+                    root / "cdn",
+                    "1.4.134",
+                    installed_package_dir=installed_dir,
+                )
+
+            self.assertIs(candidate_manifest, manifest)
+            self.assertIs(transaction, result)
+            validate_manifest.assert_called_once_with(installed_manifest, installed_dir)
+            self.assertIs(
+                installed_manifest,
+                pack_transaction.call_args.kwargs["installed_manifest"],
+            )
+            self.assertEqual(
+                installed_dir,
+                pack_transaction.call_args.kwargs["installed_package_dir"],
+            )
+
+    def test_new_transaction_rejects_invalid_installed_package(self):
+        module = self._module()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            candidate_dir = root / "candidate"
+            installed_dir = root / "installed"
+            candidate_dir.mkdir()
+            installed_dir.mkdir()
+            candidate_manifest = {"package_id": "seris_dragon_king", "candidate": True}
+            installed_manifest = {"package_id": "seris_dragon_king", "installed": True}
+            live_roots = module.character_pack.LiveRoots(
+                root / "common", root / "medium", root / "android", root / "server"
+            )
+            release_pack = importlib.import_module("wf_seris_release_pack")
+            with (
+                mock.patch.object(
+                    release_pack, "validate_runtime_test_package", return_value=[]
+                ),
+                mock.patch.object(
+                    module.character_pack,
+                    "load_manifest",
+                    side_effect=[candidate_manifest, installed_manifest],
+                ),
+                mock.patch.object(
+                    module.character_pack,
+                    "validate_manifest",
+                    return_value=["hash mismatch"],
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    module.ReleaseError,
+                    r"installed package invalid:[\s\S]*hash mismatch",
+                ):
+                    module._new_transaction(
+                        candidate_dir,
+                        live_roots,
+                        root / "cdn",
+                        "1.4.134",
+                        installed_package_dir=installed_dir,
+                    )
+
     def test_absent_active_state_binds_exact_legacy_tail(self):
         module = self._module()
         with tempfile.TemporaryDirectory() as td:
@@ -504,7 +596,11 @@ class TestAtomicCharacterRelease(unittest.TestCase):
                 })
 
             add("common", logical, candidate_table)
-            add("medium", "character/seris_dragon_king/ui/square_0.png", b"png")
+            add(
+                "medium",
+                "character/seris_dragon_king/ui/square_0.png",
+                b"\x89png\r\n\x1a\n",
+            )
             add("android", "character/seris_dragon_king/ui/skill_cutin_0.atf.deflate", b"atf")
             server_paths = (
                 "cdndata/character.json", "cdndata/character_text.json",

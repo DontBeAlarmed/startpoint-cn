@@ -314,6 +314,7 @@ def release_payload_from_records(
 def prepare_runtime_release(
     package_dir: Path,
     *,
+    installed_package_dir: Path | None = None,
     live_roots: character_pack.LiveRoots,
     cdn_root: Path,
     canonical_base_version: str,
@@ -330,6 +331,9 @@ def prepare_runtime_release(
             "runtime-test package validation failed:\n- " + "\n- ".join(errors)
         )
     manifest = character_pack.load_manifest(package_dir / "manifest.json")
+    installed_manifest, installed_package_dir = _load_installed_package(
+        installed_package_dir
+    )
     qa = manifest.get("qa")
     if (
         not isinstance(qa, dict)
@@ -351,6 +355,8 @@ def prepare_runtime_release(
         live_roots=live_roots,
         release_base_provider=provider,
         codec_registry={"json_object": JsonObjectCodec()},
+        installed_manifest=installed_manifest,
+        installed_package_dir=installed_package_dir,
         available_capabilities=available_capabilities,
         snapshot_roots=(snapshot_root,),
     )
@@ -1121,11 +1127,32 @@ def _server_running(repo_root: Path) -> bool:
         return False
 
 
+def _load_installed_package(
+    installed_package_dir: Path | None,
+) -> tuple[dict | None, Path | None]:
+    if installed_package_dir is None:
+        return None, None
+    installed_package_dir = Path(installed_package_dir)
+    installed_manifest = character_pack.load_manifest(
+        installed_package_dir / "manifest.json"
+    )
+    errors = character_pack.validate_manifest(
+        installed_manifest, installed_package_dir
+    )
+    if errors:
+        raise ReleaseError(
+            "installed package invalid:\n- " + "\n- ".join(errors)
+        )
+    return installed_manifest, installed_package_dir
+
+
 def _new_transaction(
     package_dir: Path,
     live_roots: character_pack.LiveRoots,
     cdn_root: Path,
     canonical_base: str,
+    *,
+    installed_package_dir: Path | None = None,
 ) -> tuple[dict, character_pack.PackTransaction]:
     import wf_seris_release_pack as seris_release_pack
 
@@ -1133,6 +1160,9 @@ def _new_transaction(
     if errors:
         raise ReleaseError("runtime-test package invalid:\n- " + "\n- ".join(errors))
     manifest = character_pack.load_manifest(package_dir / "manifest.json")
+    installed_manifest, installed_package_dir = _load_installed_package(
+        installed_package_dir
+    )
     transaction = character_pack.PackTransaction(
         package_dir,
         manifest,
@@ -1141,6 +1171,8 @@ def _new_transaction(
             cdn_root, canonical_base_version=canonical_base
         ),
         codec_registry={"json_object": JsonObjectCodec()},
+        installed_manifest=installed_manifest,
+        installed_package_dir=installed_package_dir,
         available_capabilities=("dual_form_v1",),
     )
     return manifest, transaction
@@ -1152,6 +1184,7 @@ def main(argv: list[str] | None = None) -> int:
     for command in ("preflight", "publish"):
         child = sub.add_parser(command)
         child.add_argument("--package-dir", required=True, type=Path)
+        child.add_argument("--installed-package-dir", type=Path)
         child.add_argument("--profile", default="cn")
     rebase = sub.add_parser("rebase", help="rebase declared rows onto current live tables")
     rebase.add_argument("--package-dir", required=True, type=Path)
@@ -1184,7 +1217,11 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "preflight":
             _manifest, transaction = _new_transaction(
-                args.package_dir, live_roots, cdn_root, canonical_base
+                args.package_dir,
+                live_roots,
+                cdn_root,
+                canonical_base,
+                installed_package_dir=args.installed_package_dir,
             )
             report = transaction.preflight()
             print(report.canonical_bytes().decode("utf-8"))
@@ -1199,6 +1236,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         prepared = prepare_runtime_release(
             args.package_dir,
+            installed_package_dir=args.installed_package_dir,
             live_roots=live_roots,
             cdn_root=cdn_root,
             canonical_base_version=canonical_base,
