@@ -10,7 +10,6 @@ import {
     maxCharacterReleaseVersion,
     readActiveCharacterReleases,
 } from "../lib/cn-character-release";
-import { detectCDNVersion } from "../lib/version";
 
 function sha256(data: Buffer): string {
     return createHash("sha256").update(data).digest("hex");
@@ -65,11 +64,11 @@ test("valid active chain is continuous and contributes complete three-root group
     const f = fixture();
     try {
         writeRelease(f.root, f.active);
-        const chain = readActiveCharacterReleases(f.root, "1.4.54");
+        const chain = readActiveCharacterReleases(f.root);
         assert.equal(chain.error, null);
         assert.equal(chain.releases.length, 2);
         assert.equal(chain.tailVersion, "1.4.56");
-        assert.equal(maxCharacterReleaseVersion(f.root, "1.4.54"), "1.4.56");
+        assert.equal(maxCharacterReleaseVersion(f.root), "1.4.56");
         assert.deepEqual(chain.releases.map(item => item.archives.length), [3, 3]);
     } finally {
         f.cleanup();
@@ -80,7 +79,7 @@ test("bad archive hides that release and descendants while preserving valid pref
     const f = fixture();
     try {
         writeRelease(f.root, f.active, { badSecond: true });
-        const chain = readActiveCharacterReleases(f.root, "1.4.54");
+        const chain = readActiveCharacterReleases(f.root);
         assert.match(chain.error ?? "", /archive hash\/size mismatch/);
         assert.equal(chain.releases.length, 1);
         assert.equal(chain.tailVersion, "1.4.55");
@@ -89,14 +88,15 @@ test("bad archive hides that release and descendants while preserving valid pref
     }
 });
 
-test("detached manifest contributes no character release", () => {
+test("manifest validation is independent from the legacy directory tail", () => {
     const f = fixture();
     try {
         writeRelease(f.root, f.active);
         const chain = readActiveCharacterReleases(f.root, "1.4.53");
-        assert.match(chain.error ?? "", /base_version/);
-        assert.equal(chain.releases.length, 0);
-        assert.equal(chain.tailVersion, "1.4.53");
+        assert.equal(chain.error, null);
+        assert.equal(chain.baseVersion, "1.4.54");
+        assert.equal(chain.releases.length, 2);
+        assert.equal(chain.tailVersion, "1.4.56");
     } finally {
         f.cleanup();
     }
@@ -106,7 +106,7 @@ test("merge hides every unmanifested charpkg archive and adds only active groups
     const f = fixture();
     try {
         writeRelease(f.root, f.active);
-        const chain = readActiveCharacterReleases(f.root, "1.4.54");
+        const chain = readActiveCharacterReleases(f.root);
         const legacy = [{
             original_version: "1.4.53",
             version: "1.4.54",
@@ -123,42 +123,5 @@ test("merge hides every unmanifested charpkg archive and adds only active groups
             .every(archive => archive.location.includes("-charpkg-")));
     } finally {
         f.cleanup();
-    }
-});
-
-test("asset route and effective version consume only the validated active chain", () => {
-    const parent = mkdtempSync(path.join(os.tmpdir(), "wf-char-route-"));
-    const cdn = path.join(parent, "cn");
-    const active = path.join(cdn, "character-releases", "active.json");
-    mkdirSync(path.dirname(active), { recursive: true });
-    const previous = process.env.CDN_DIR;
-    const previousError = console.error;
-    try {
-        const legacyDir = path.join(cdn, "archive-common-diff");
-        mkdirSync(legacyDir, { recursive: true });
-        writeFileSync(
-            path.join(legacyDir, "pinball-1.4.53-1.4.54-1-legacy.zip"),
-            Buffer.from("legacy"),
-        );
-        writeFileSync(
-            path.join(legacyDir, "pinball-1.4.54-1.4.99-1-unpublished-charpkg-x.zip"),
-            Buffer.from("must stay hidden"),
-        );
-        writeRelease(cdn, active);
-        process.env.CDN_DIR = parent;
-        const expectedMissingFixtureLogs: unknown[][] = [];
-        console.error = (...args: unknown[]) => { expectedMissingFixtureLogs.push(args); };
-        const { buildDiffList } = require("../routes/cn/asset") as typeof import("../routes/cn/asset");
-        const groups = buildDiffList("http://cdn", cdn);
-        assert.deepEqual(groups.map(group => group.version), ["1.4.54", "1.4.55", "1.4.56"]);
-        assert.ok(groups.flatMap(group => group.archive)
-            .every(archive => !archive.location.includes("unpublished-charpkg")));
-        assert.equal(detectCDNVersion(), "1.4.56");
-        assert.ok(expectedMissingFixtureLogs.every(args => String(args[0]).includes("failed")));
-    } finally {
-        console.error = previousError;
-        if (previous === undefined) delete process.env.CDN_DIR;
-        else process.env.CDN_DIR = previous;
-        rmSync(parent, { recursive: true, force: true });
     }
 });

@@ -87,17 +87,14 @@ export function resolveCnCdnDir(): string {
 
 export function readActiveCharacterReleases(
     cdnDir: string,
-    canonicalBaseVersion: string,
+    _legacyCanonicalBaseVersion?: string,
 ): ValidatedReleaseChain {
-    const empty = (error: string | null): ValidatedReleaseChain => ({
-        baseVersion: canonicalBaseVersion,
-        tailVersion: canonicalBaseVersion,
+    const empty = (error: string | null, baseVersion = ""): ValidatedReleaseChain => ({
+        baseVersion,
+        tailVersion: baseVersion,
         releases: [],
         error,
     });
-    if (!VERSION_RE.test(canonicalBaseVersion)) {
-        return empty("canonical base version is invalid");
-    }
     const activePath = path.join(cdnDir, "character-releases", "active.json");
     if (!existsSync(activePath)) return empty(null);
     let value: unknown;
@@ -111,22 +108,23 @@ export function readActiveCharacterReleases(
         return empty("active.json fields are invalid");
     }
     if (manifest.schema_version !== 1) return empty("active.json schema_version must be 1");
-    if (manifest.base_version !== canonicalBaseVersion) {
-        return empty("active.json base_version is detached from the canonical legacy tail");
+    const baseVersion = manifest.base_version;
+    if (typeof baseVersion !== "string" || !VERSION_RE.test(baseVersion)) {
+        return empty("active.json base_version is invalid");
     }
     if (!Array.isArray(manifest.releases)) return empty("active.json releases must be an array");
 
     const accepted: CharacterRelease[] = [];
-    let expectedFrom = canonicalBaseVersion;
+    let expectedFrom = baseVersion;
     const seenIds = new Set<string>();
     for (let index = 0; index < manifest.releases.length; index += 1) {
         const rawRelease = asObject(manifest.releases[index]);
         const label = `active.json releases[${index}]`;
         const fail = (message: string): ValidatedReleaseChain => ({
-            baseVersion: canonicalBaseVersion,
+            baseVersion,
             tailVersion: accepted.length > 0
                 ? accepted[accepted.length - 1].version
-                : canonicalBaseVersion,
+                : baseVersion,
             releases: accepted,
             error: `${label}: ${message}`,
         });
@@ -215,7 +213,7 @@ export function readActiveCharacterReleases(
         expectedFrom = version as string;
     }
     return {
-        baseVersion: canonicalBaseVersion,
+        baseVersion,
         tailVersion: expectedFrom,
         releases: accepted,
         error: null,
@@ -248,8 +246,8 @@ export function mergeLegacyAndCharacterDiffs(
 
 export function maxCharacterReleaseVersion(
     cdnDir: string,
-    canonicalBaseVersion: string,
+    _legacyCanonicalBaseVersion?: string,
 ): string | null {
-    const chain = readActiveCharacterReleases(cdnDir, canonicalBaseVersion);
+    const chain = readActiveCharacterReleases(cdnDir);
     return chain.releases.length > 0 ? chain.tailVersion : null;
 }
