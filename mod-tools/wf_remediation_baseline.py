@@ -218,7 +218,7 @@ def _allocate_run_dir(output_root: Path) -> Path:
     raise BaselineError(f"unable to allocate a unique run directory under {output_root}")
 
 
-def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
+def atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
     raw = (
         json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False)
         + "\n"
@@ -235,6 +235,22 @@ def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
             temporary.unlink()
         except FileNotFoundError:
             pass
+
+
+def append_jsonl(path: Path, payload: Mapping[str, Any]) -> None:
+    raw = (
+        json.dumps(payload, ensure_ascii=False, sort_keys=True, allow_nan=False)
+        + "\n"
+    ).encode("utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("ab") as stream:
+        stream.write(raw)
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
+# Backward-compatible private name for older callers.
+_atomic_json = atomic_json
 
 
 def capture_baseline(
