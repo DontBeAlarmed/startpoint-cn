@@ -23,7 +23,9 @@
     "dev:admin": "npm --prefix admin run dev",
     "test:hygiene": "node scripts/run-bash.mjs scripts/tests/test-hygiene.sh",
     "check:hygiene": "node scripts/run-bash.mjs scripts/check-hygiene.sh --all",
-    "test:launcher": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/test-start-cn.ps1",
+    "test:launcher:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/test-start-cn.ps1",
+    "test:launcher:linux": "node scripts/run-bash.mjs scripts/tests/test-start-cn-sh.sh",
+    "test:launcher": "npm run test:launcher:windows && npm run test:launcher:linux",
     "verify": "npm run typecheck && npm run test:node && npm run typecheck:admin && npm run build:admin && npm run test:python"
   },
   "author": "",
