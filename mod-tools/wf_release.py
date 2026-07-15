@@ -13,12 +13,13 @@ import re
 import shutil
 import socket
 import stat
+import subprocess
 import sys
 import tempfile
 import uuid
 import zipfile
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Callable, Iterator, Literal, Mapping
@@ -49,6 +50,33 @@ class ReleaseError(RuntimeError):
 
 class CommittedReleaseError(RuntimeError):
     """The active manifest committed; only idempotent recovery remains."""
+
+
+def _validate_qa_contract(manifest: dict, *, confirmation: str | None = None) -> str:
+    """Validate the mutually exclusive production/runtime-test authorization gates."""
+    qa = manifest.get("qa") if isinstance(manifest, dict) else None
+    if not isinstance(qa, dict):
+        raise ReleaseError("package qa contract is missing")
+    mode = qa.get("delivery_mode")
+    if mode == "runtime_test":
+        if qa.get("release_ready") is not False \
+                or qa.get("user_authorized_direct_real_test") is not True:
+            raise ReleaseError("runtime-test authorization contract is missing")
+        if confirmation is not None and confirmation != "DIRECT_REAL_TEST":
+            raise ReleaseError("runtime-test publish requires DIRECT_REAL_TEST")
+        return mode
+    if mode != "production":
+        raise ReleaseError("qa.delivery_mode must be production or runtime_test")
+    if confirmation is not None and confirmation != "PUBLISH_CHARACTER_PACKAGE":
+        raise ReleaseError("production publish requires PUBLISH_CHARACTER_PACKAGE")
+    if qa.get("release_ready") is not True:
+        raise ReleaseError("production package must declare release_ready=true")
+    if qa.get("required_assets_total") != 37 or qa.get("required_assets_present") != 37:
+        raise ReleaseError("production package requires exactly 37/37 required assets")
+    digest = qa.get("workspace_input_sha256")
+    if not isinstance(digest, str) or HASH_RE.fullmatch(digest) is None:
+        raise ReleaseError("production package workspace_input_sha256 is invalid")
+    return mode
 
 
 @dataclass(frozen=True)
@@ -88,6 +116,7 @@ class ReleaseResult:
     version: str
     active_manifest_sha256: str
     archive_paths: tuple[Path, ...]
+    snapshot_dir: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -1103,6 +1132,39 @@ def _repo_paths(profile_id: str) -> tuple[Path, character_pack.LiveRoots, Path]:
     return repo_root, live_roots, cdn_root
 
 
+def _current_git_head(repo_root: Path) -> str:
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=Path(repo_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    head = result.stdout.strip().lower()
+    if result.returncode != 0 or re.fullmatch(r"[0-9a-f]{40}", head) is None:
+        detail = result.stderr.strip() or "git rev-parse HEAD failed"
+        raise ReleaseError(f"cannot determine generator git head: {detail}")
+    return head
+
+
+def rebase_package(
+    package_dir: Path,
+    profile_id: str,
+    *,
+    output_dir: Path,
+    generator_git_head: str | None = None,
+) -> RuntimeRebaseResult:
+    """Rebase declared runtime-table rows without touching live roots."""
+    repo_root, live_roots, _cdn_root = _repo_paths(profile_id)
+    git_head = generator_git_head or _current_git_head(repo_root)
+    return rebase_runtime_package(
+        Path(package_dir),
+        Path(output_dir),
+        live_roots=live_roots,
+        generator_git_head=git_head,
+    )
+
+
 def _server_running(repo_root: Path) -> bool:
     values: dict[str, str] = {}
     env_path = repo_root / ".env"
@@ -1178,6 +1240,270 @@ def _new_transaction(
     return manifest, transaction
 
 
+def _reachable_client_base(
+    required_base: str,
+    *,
+    repo_root: Path,
+    cdn_root: Path,
+    canonical_base: str,
+) -> str:
+    """Require an actual archive path from the declared base to the validated tail."""
+    if VERSION_RE.fullmatch(required_base) is None:
+        raise ReleaseError(
+            "production requires_client_base must be a semantic asset version"
+        )
+    edges: dict[str, set[str]] = {}
+
+    def add_edge(source: str, target: str) -> None:
+        edges.setdefault(source, set()).add(target)
+
+    for directory in (
+        Path(cdn_root) / ROOT_DIRS["common"],
+        Path(repo_root) / "assets" / "asset-patch" / "active",
+    ):
+        try:
+            paths = tuple(directory.iterdir())
+        except FileNotFoundError:
+            paths = ()
+        for path in paths:
+            if not path.is_file():
+                continue
+            match = LEGACY_ARCHIVE_RE.fullmatch(path.name)
+            if match:
+                add_edge(match.group(1), match.group(2))
+
+    active_store = ActiveReleaseStore(
+        Path(cdn_root), canonical_base_version=canonical_base
+    )
+    _raw, active = active_store.read_manifest()
+    target = canonical_base
+    if active is not None:
+        for release in active["releases"]:
+            add_edge(release["from_version"], release["version"])
+        target = active["releases"][-1]["version"]
+
+    pending = [required_base]
+    visited: set[str] = set()
+    while pending:
+        current = pending.pop()
+        if current in visited:
+            continue
+        visited.add(current)
+        pending.extend(sorted(edges.get(current, ()), reverse=True))
+    if target not in visited:
+        raise ReleaseError(
+            f"requires_client_base {required_base} cannot reach validated tail {target}"
+        )
+    return target
+
+
+def _production_workspace_status(package_dir: Path):
+    import wf_character_workspace as character_workspace
+
+    package_dir = Path(package_dir)
+    if package_dir.name != "package":
+        raise ReleaseError("production package must be inside a character workspace")
+    try:
+        workspace = character_workspace.load_workspace(package_dir.parent)
+        status = character_workspace.workspace_status(workspace)
+    except character_workspace.WorkspaceError as exc:
+        raise ReleaseError(f"production workspace is invalid: {exc}") from exc
+    if not status.release_ready:
+        details = "; ".join(status.manifest_errors) or \
+            ", ".join(status.requirement_report.get("missing_required", ())[:5])
+        raise ReleaseError(
+            "production workspace is not release-ready"
+            + (f": {details}" if details else "")
+        )
+    return status
+
+
+def _new_production_transaction(
+    package_dir: Path,
+    live_roots: character_pack.LiveRoots,
+    cdn_root: Path,
+    canonical_base: str,
+    *,
+    installed_package_dir: Path | None = None,
+    snapshot_root: Path | None = None,
+) -> tuple[dict, character_pack.PackTransaction]:
+    package_dir = Path(package_dir)
+    manifest = character_pack.load_manifest(package_dir / "manifest.json")
+    errors = character_pack.validate_manifest(manifest, package_dir)
+    if errors:
+        raise ReleaseError("production package invalid:\n- " + "\n- ".join(errors))
+    _validate_qa_contract(manifest)
+    installed_manifest, installed_package_dir = _load_installed_package(
+        installed_package_dir
+    )
+    transaction = character_pack.PackTransaction(
+        package_dir,
+        manifest,
+        live_roots=live_roots,
+        release_base_provider=ActiveReleaseStore(
+            cdn_root, canonical_base_version=canonical_base
+        ),
+        codec_registry={"json_object": JsonObjectCodec()},
+        installed_manifest=installed_manifest,
+        installed_package_dir=installed_package_dir,
+        available_capabilities=(manifest["requires_client_base"],),
+        snapshot_roots=((Path(snapshot_root),) if snapshot_root is not None else ()),
+    )
+    return manifest, transaction
+
+
+def _prepare_production_release(
+    package_dir: Path,
+    *,
+    installed_package_dir: Path | None,
+    live_roots: character_pack.LiveRoots,
+    cdn_root: Path,
+    canonical_base_version: str,
+    staging_root: Path,
+    snapshot_root: Path,
+) -> PreparedRuntimeRelease:
+    manifest, transaction = _new_production_transaction(
+        package_dir,
+        live_roots,
+        cdn_root,
+        canonical_base_version,
+        installed_package_dir=installed_package_dir,
+        snapshot_root=snapshot_root,
+    )
+    preflight = transaction.preflight()
+    if not preflight.can_prepare:
+        conflicts = [str(item.get("claim", item)) for item in preflight.conflicts]
+        raise ReleaseError(
+            "production package preflight rejected"
+            + (": " + "; ".join(conflicts) if conflicts else "")
+        )
+    prepared: character_pack.PreparedPack | None = None
+    staged: character_pack.StagedPack | None = None
+    try:
+        prepared = transaction.prepare(staging_root)
+        snapshot = transaction.snapshot(snapshot_root)
+        staged = transaction.materialize_staging(prepared)
+        payload = release_payload_from_records(manifest, prepared, staged, snapshot)
+        AtomicReleasePublisher._validate_payload(payload)
+        return PreparedRuntimeRelease(
+            transaction=transaction,
+            preflight=preflight,
+            prepared=prepared,
+            snapshot=snapshot,
+            staged=staged,
+            payload=payload,
+        )
+    except Exception:
+        if staged is not None:
+            try:
+                transaction.discard_staging(staged)
+            except Exception:
+                pass
+        raise
+
+
+def preflight_package(
+    package_dir: Path,
+    profile_id: str,
+    installed_package_dir: Path | None = None,
+) -> dict:
+    """Run the read-only package gate and return a stable JSON-ready report."""
+    package_dir = Path(package_dir)
+    manifest = character_pack.load_manifest(package_dir / "manifest.json")
+    mode = _validate_qa_contract(manifest)
+    repo_root, live_roots, cdn_root = _repo_paths(profile_id)
+    canonical_base = detect_canonical_base_version(cdn_root, repo_root)
+    if mode == "production":
+        status = _production_workspace_status(package_dir)
+        tail = _reachable_client_base(
+            manifest["requires_client_base"],
+            repo_root=repo_root,
+            cdn_root=cdn_root,
+            canonical_base=canonical_base,
+        )
+        _manifest, transaction = _new_production_transaction(
+            package_dir,
+            live_roots,
+            cdn_root,
+            canonical_base,
+            installed_package_dir=installed_package_dir,
+        )
+    else:
+        status = None
+        tail = ActiveReleaseStore(
+            cdn_root, canonical_base_version=canonical_base
+        ).read_validated_base().validated_chain_tail
+        _manifest, transaction = _new_transaction(
+            package_dir,
+            live_roots,
+            cdn_root,
+            canonical_base,
+            installed_package_dir=installed_package_dir,
+        )
+    report = json.loads(transaction.preflight().canonical_bytes().decode("utf-8"))
+    report.update({
+        "delivery_mode": mode,
+        "release_ready": bool(report.get("can_prepare"))
+        and (status.release_ready if status is not None else False),
+        "workspace_input_sha256": status.input_digest if status is not None else None,
+        "validated_chain_tail": tail,
+        "writes_live": False,
+    })
+    return report
+
+
+def publish_package(
+    package_dir: Path,
+    profile_id: str,
+    confirmation: str,
+    installed_package_dir: Path | None = None,
+) -> ReleaseResult:
+    """Publish a production or explicitly authorized runtime-test package."""
+    package_dir = Path(package_dir)
+    manifest = character_pack.load_manifest(package_dir / "manifest.json")
+    mode = _validate_qa_contract(manifest, confirmation=confirmation)
+    repo_root, live_roots, cdn_root = _repo_paths(profile_id)
+    if _server_running(repo_root):
+        raise ReleaseError("CN server must be stopped before character publication")
+    canonical_base = detect_canonical_base_version(cdn_root, repo_root)
+    staging_root = repo_root / "work" / "character_releases" / "staging"
+    snapshot_root = repo_root / "work" / "character_releases" / "snapshots"
+    if mode == "production":
+        _production_workspace_status(package_dir)
+        _reachable_client_base(
+            manifest["requires_client_base"],
+            repo_root=repo_root,
+            cdn_root=cdn_root,
+            canonical_base=canonical_base,
+        )
+        prepared = _prepare_production_release(
+            package_dir,
+            installed_package_dir=installed_package_dir,
+            live_roots=live_roots,
+            cdn_root=cdn_root,
+            canonical_base_version=canonical_base,
+            staging_root=staging_root,
+            snapshot_root=snapshot_root,
+        )
+    else:
+        prepared = prepare_runtime_release(
+            package_dir,
+            installed_package_dir=installed_package_dir,
+            live_roots=live_roots,
+            cdn_root=cdn_root,
+            canonical_base_version=canonical_base,
+            staging_root=staging_root,
+            snapshot_root=snapshot_root,
+        )
+    try:
+        result = AtomicReleasePublisher(
+            cdn_root, canonical_base_version=canonical_base
+        ).publish(prepared.payload, server_running=lambda: _server_running(repo_root))
+    finally:
+        close_prepared_runtime_release(prepared, discard_staging=True)
+    return replace(result, snapshot_dir=prepared.snapshot.snapshot_dir)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1193,17 +1519,13 @@ def main(argv: list[str] | None = None) -> int:
     rebase.add_argument("--profile", default="cn")
     publish = sub.choices["publish"]
     publish.add_argument("--confirm", required=True)
-    publish.add_argument("--staging-root", type=Path)
-    publish.add_argument("--snapshot-root", type=Path)
     args = parser.parse_args(argv)
     try:
-        repo_root, live_roots, cdn_root = _repo_paths(args.profile)
-        canonical_base = detect_canonical_base_version(cdn_root, repo_root)
         if args.command == "rebase":
-            result = rebase_runtime_package(
+            result = rebase_package(
                 args.package_dir,
-                args.output,
-                live_roots=live_roots,
+                args.profile,
+                output_dir=args.output,
                 generator_git_head=args.git_head,
             )
             print(_canonical({
@@ -1216,42 +1538,19 @@ def main(argv: list[str] | None = None) -> int:
             }).decode("utf-8"))
             return 0
         if args.command == "preflight":
-            _manifest, transaction = _new_transaction(
+            report = preflight_package(
                 args.package_dir,
-                live_roots,
-                cdn_root,
-                canonical_base,
+                args.profile,
                 installed_package_dir=args.installed_package_dir,
             )
-            report = transaction.preflight()
-            print(report.canonical_bytes().decode("utf-8"))
-            return 0 if report.can_prepare else 3
-        if args.confirm != "DIRECT_REAL_TEST":
-            raise ReleaseError("publish requires --confirm DIRECT_REAL_TEST")
-        staging_root = args.staging_root or (
-            repo_root / "work" / "character_releases" / "staging"
-        )
-        snapshot_root = args.snapshot_root or (
-            repo_root / "work" / "character_releases" / "snapshots"
-        )
-        prepared = prepare_runtime_release(
+            print(_canonical(report).decode("utf-8"))
+            return 0 if report.get("can_prepare") else 3
+        result = publish_package(
             args.package_dir,
+            args.profile,
+            args.confirm,
             installed_package_dir=args.installed_package_dir,
-            live_roots=live_roots,
-            cdn_root=cdn_root,
-            canonical_base_version=canonical_base,
-            staging_root=staging_root,
-            snapshot_root=snapshot_root,
         )
-        try:
-            result = AtomicReleasePublisher(
-                cdn_root, canonical_base_version=canonical_base
-            ).publish(
-                prepared.payload,
-                server_running=lambda: _server_running(repo_root),
-            )
-        finally:
-            close_prepared_runtime_release(prepared, discard_staging=True)
         print(_canonical({
             "committed": result.committed,
             "release_id": result.release_id,
@@ -1259,6 +1558,9 @@ def main(argv: list[str] | None = None) -> int:
             "version": result.version,
             "active_manifest_sha256": result.active_manifest_sha256,
             "archives": [str(path) for path in result.archive_paths],
+            "snapshot_dir": (
+                str(result.snapshot_dir) if result.snapshot_dir is not None else None
+            ),
             "server_restart_required": True,
         }).decode("utf-8"))
         return 0

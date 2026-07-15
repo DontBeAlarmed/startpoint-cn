@@ -118,10 +118,108 @@
       "type": "object"
     },
     "qa": {
-      "type": "object"
+      "type": "object",
+      "required": ["delivery_mode", "release_ready"],
+      "properties": {
+        "delivery_mode": {
+          "type": "string",
+          "enum": ["production", "runtime_test"]
+        },
+        "release_ready": {
+          "type": "boolean"
+        },
+        "user_authorized_direct_real_test": {
+          "type": "boolean"
+        },
+        "required_assets_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required_assets_present": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "workspace_input_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
     },
     "snapshot": {
       "type": "object"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "qa": {
+            "properties": {
+              "delivery_mode": {
+                "const": "production"
+              }
+            },
+            "required": ["delivery_mode"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "qa": {
+            "required": [
+              "delivery_mode",
+              "release_ready",
+              "required_assets_total",
+              "required_assets_present",
+              "workspace_input_sha256"
+            ],
+            "properties": {
+              "release_ready": {
+                "const": true
+              },
+              "required_assets_total": {
+                "const": 37
+              },
+              "required_assets_present": {
+                "const": 37
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "qa": {
+            "properties": {
+              "delivery_mode": {
+                "const": "runtime_test"
+              }
+            },
+            "required": ["delivery_mode"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "qa": {
+            "required": [
+              "delivery_mode",
+              "release_ready",
+              "user_authorized_direct_real_test"
+            ],
+            "properties": {
+              "release_ready": {
+                "const": false
+              },
+              "user_authorized_direct_real_test": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
