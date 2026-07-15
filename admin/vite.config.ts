@@ -15,7 +15,8 @@ export default defineConfig(({ mode }) => {
             proxy: {
                 "/api": {
                     target: apiTarget,
-                    changeOrigin: true
+                    // 保留浏览器 Host，使 Cookie 写请求的 Origin/Host 同源校验成立。
+                    changeOrigin: false
                 }
             }
         },

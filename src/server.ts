@@ -3,6 +3,7 @@ import { ContentTypeParserDoneFunction } from "fastify/types/content-type-parser
 import fastifyStatic from "@fastify/static";
 import { pack, unpack } from "msgpackr";
 import path from "path";
+import { existsSync, readFileSync } from "fs";
 import { installAdminGuard, loadAdminAuthConfig } from "./lib/admin-auth";
 // api routes
 import apiPlugin from "./routes/api";
@@ -152,6 +153,29 @@ fastify.register(fastifyStatic, {
     root: path.isAbsolute(cdnDir) ? cdnDir : path.join(__dirname, "..", process.env.CDN_DIR || ".cdn"),
     prefix: "/patch/Live/2.0.0",
     decorateReply: false
+})
+
+// Share the authenticated React admin with the international entry as well.
+const adminDistDir = path.join(__dirname, "..", "web", "dist")
+const adminSpaAvailable = existsSync(path.join(adminDistDir, "index.html"))
+if (adminSpaAvailable) {
+    fastify.register(fastifyStatic, {
+        root: adminDistDir,
+        prefix: "/admin/",
+        decorateReply: false
+    })
+    fastify.get("/admin", (_request, reply) => reply.redirect("/admin/"))
+} else {
+    console.log("[admin] web/dist not found — admin SPA disabled (run: npm run build:admin)")
+}
+
+fastify.setNotFoundHandler((request, reply) => {
+    if (adminSpaAvailable && request.method === "GET" && request.url.startsWith("/admin/")) {
+        reply.header("content-type", "text/html; charset=utf-8")
+        reply.send(readFileSync(path.join(adminDistDir, "index.html")))
+        return
+    }
+    reply.status(404).send({ error: "Not Found" })
 })
 
 // listen
