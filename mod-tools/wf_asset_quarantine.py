@@ -252,6 +252,45 @@ def build_plan_entry(
     if kind == "other":
         raise QuarantineError(f"cannot plan unsupported asset type: {absolute}")
     digest, size = _digest_path(absolute, kind)
+    return build_plan_entry_from_evidence(
+        absolute,
+        kind=kind,
+        digest=digest,
+        size=size,
+        mtime_ns=int(metadata.st_mtime_ns),
+        category=category,
+        reason=reason,
+        auto_approved=auto_approved,
+        evidence=evidence,
+    )
+
+
+def build_plan_entry_from_evidence(
+    source: Path,
+    *,
+    kind: str,
+    digest: str,
+    size: int,
+    mtime_ns: int,
+    category: str,
+    reason: str,
+    auto_approved: bool,
+    evidence: Sequence[str] = (),
+) -> dict[str, Any]:
+    absolute = _absolute(source)
+    metadata = absolute.stat(follow_symlinks=False)
+    if _is_reparse(metadata):
+        raise QuarantineError(f"cannot plan a reparse asset: {absolute}")
+    actual_kind = "file" if stat.S_ISREG(metadata.st_mode) else "tree" if stat.S_ISDIR(metadata.st_mode) else "other"
+    if actual_kind != kind:
+        raise QuarantineError(
+            f"asset kind changed since scan: {absolute}; expected={kind} actual={actual_kind}"
+        )
+    if kind == "file":
+        if int(metadata.st_mtime_ns) != int(mtime_ns):
+            raise QuarantineError(f"asset mtime changed since scan: {absolute}")
+        if int(metadata.st_size) != int(size):
+            raise QuarantineError(f"asset size changed since scan: {absolute}")
     entry = {
         "id": "",
         "source": str(absolute),
@@ -263,7 +302,7 @@ def build_plan_entry(
         "size": size,
         "digest": digest,
         "digest_algorithm": "sha256" if kind == "file" else "tree-sha256",
-        "mtime_ns": int(metadata.st_mtime_ns),
+        "mtime_ns": int(mtime_ns),
     }
     entry["id"] = _entry_identity(entry)
     _validate_entry(entry, "generated plan entry")
@@ -348,6 +387,10 @@ def _read_plan(path: Path) -> dict[str, Any]:
         seen_ids.add(entry["id"])
         seen_sources.add(source_key)
     return payload
+
+
+def read_plan(path: Path) -> dict[str, Any]:
+    return _read_plan(path)
 
 
 def _same_volume(source: Path, target: Path) -> bool:

@@ -101,6 +101,16 @@ class AssetInventoryTests(unittest.TestCase):
                 list(inventory.scan_root(missing))
             self.assertFalse(missing.exists())
 
+    def test_explicit_exclusion_is_not_descended_or_hashed(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "safe.bin").write_bytes(b"safe")
+            output = root / "run"
+            output.mkdir()
+            (output / "growing-scan.jsonl").write_bytes(b"mutable")
+            entries = list(inventory.scan_root(root, exclude_roots=[output]))
+            self.assertEqual(["safe.bin"], [entry.relative_path for entry in entries])
+
 
 if __name__ == "__main__":
     unittest.main()

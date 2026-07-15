@@ -76,6 +76,33 @@ class AssetQuarantineTests(unittest.TestCase):
             records = quarantine_module.read_manifest(summary.manifest_path)
             self.assertEqual(1, len({record["id"] for record in records}))
 
+    def test_tree_plan_ignores_directory_mtime_but_quarantine_still_checks_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source = root / "__pycache__"
+            source.mkdir()
+            child = source / "cache.pyc"
+            child.write_bytes(b"before")
+            manifest = tree_manifest(source)
+            scanned_mtime = source.stat().st_mtime_ns
+            os.utime(source, ns=(scanned_mtime + 1_000_000, scanned_mtime + 1_000_000))
+
+            entry = quarantine_module.build_plan_entry_from_evidence(
+                source,
+                kind="tree",
+                digest=manifest.tree_sha256,
+                size=manifest.total_size,
+                mtime_ns=scanned_mtime,
+                category="stale_cache",
+                reason="test evidence",
+                auto_approved=True,
+            )
+            plan = quarantine_module.write_plan([entry], root / "run", run_id="fixture-run")
+            child.write_bytes(b"after")
+            with self.assertRaisesRegex(quarantine_module.QuarantineError, "digest mismatch"):
+                quarantine_module.quarantine(plan.path, root / "quarantine")
+            self.assertTrue(source.is_dir())
+
     def test_existing_destination_and_cross_volume_move_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

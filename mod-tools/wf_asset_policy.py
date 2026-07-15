@@ -308,13 +308,46 @@ class ReferenceIndex:
 
         for relative in (
             "assets/asset-patch/manifest.json",
-            "work/changelog.jsonl",
-            "work/changelog.md",
-            "work/sync_pending.json",
-            "work/rogue_auto.json",
+            "mod-tools/work/changelog.jsonl",
+            "mod-tools/work/changelog.md",
+            "mod-tools/work/sync_pending.json",
+            "mod-tools/work/rogue_auto.json",
             "弹国服/wf_restore_package.py",
         ):
             add_if_exists(root / Path(relative), "fixed runtime evidence")
+
+        assets_root = root / "assets"
+        if assets_root.is_dir():
+            for child in assets_root.iterdir():
+                folded = child.name.casefold()
+                if child.is_file() and ".bak-" not in folded:
+                    index.add_path(child, "active server asset")
+                elif child.is_dir() and child.name in {
+                    "asset_lists",
+                    "cdndata",
+                    "gacha_movie_configs",
+                }:
+                    index.add_root(child, "active server asset root")
+
+        changelog = root / "mod-tools" / "work" / "changelog.jsonl"
+        if changelog.is_file():
+            try:
+                with changelog.open(encoding="utf-8-sig") as stream:
+                    for line in stream:
+                        if not line.strip():
+                            continue
+                        record = json.loads(line)
+                        backup = record.get("backup") if isinstance(record, dict) else None
+                        if isinstance(backup, str) and backup:
+                            candidate = Path(backup)
+                            if not candidate.is_absolute():
+                                candidate = root / candidate
+                            if _is_within(candidate, root) and (
+                                candidate.exists() or candidate.is_symlink()
+                            ):
+                                index.add_path(candidate, "backup referenced by modifier changelog")
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                pass
 
         search_roots = [root, root / "mod-tools", root / "弹国服"]
         protected_names = {

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "scan_roots": [
     ".cdn/cn",
-    "assets/asset-patch",
+    "assets",
     "work",
     "mod-tools/work",
     "logs",
@@ -19,6 +19,9 @@
     "assets/asset-patch/active",
     "assets/asset-patch/production",
     "assets/asset-patch/manifest.json",
+    "assets/asset_lists",
+    "assets/cdndata",
+    "assets/gacha_movie_configs",
     "work/ai_canary",
     "work/asset_exports",
     "work/character_releases",

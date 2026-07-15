@@ -6,6 +6,7 @@ import os
 import stat
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Iterable
 from typing import Iterator
 
 
@@ -62,6 +63,17 @@ def _stable_name_key(name: str) -> tuple[str, str]:
     return name.casefold(), name
 
 
+def _path_key(path: Path) -> str:
+    return os.path.normcase(os.path.abspath(os.fspath(path)))
+
+
+def _is_within_key(path: Path, root_key: str) -> bool:
+    try:
+        return os.path.commonpath([_path_key(path), root_key]) == root_key
+    except ValueError:
+        return False
+
+
 def _relative(root: Path, target: Path) -> str:
     return target.relative_to(root).as_posix()
 
@@ -90,6 +102,7 @@ def _scan_directory(
     directory: Path,
     *,
     hash_files: bool,
+    exclude_keys: tuple[str, ...],
 ) -> Iterator[InventoryEntry]:
     try:
         with os.scandir(directory) as stream:
@@ -100,6 +113,8 @@ def _scan_directory(
 
     for child in children:
         target = directory / child.name
+        if any(_is_within_key(target, excluded) for excluded in exclude_keys):
+            continue
         metadata: os.stat_result | None = None
         try:
             metadata = child.stat(follow_symlinks=False)
@@ -127,7 +142,12 @@ def _scan_directory(
                     mtime_ns=int(metadata.st_mtime_ns),
                     reparse=False,
                 )
-                yield from _scan_directory(root, target, hash_files=hash_files)
+                yield from _scan_directory(
+                    root,
+                    target,
+                    hash_files=hash_files,
+                    exclude_keys=exclude_keys,
+                )
                 continue
 
             if stat.S_ISREG(metadata.st_mode):
@@ -166,8 +186,16 @@ def _scan_directory(
             yield _error_entry(root, target, metadata, error)
 
 
-def scan_root(root: Path, *, hash_files: bool = True) -> Iterator[InventoryEntry]:
+def scan_root(
+    root: Path,
+    *,
+    hash_files: bool = True,
+    exclude_roots: Iterable[Path] = (),
+) -> Iterator[InventoryEntry]:
     root = Path(os.path.abspath(os.fspath(root)))
+    exclude_keys = tuple(_path_key(Path(item)) for item in exclude_roots)
+    if any(_is_within_key(root, excluded) for excluded in exclude_keys):
+        raise InventoryError(f"scan root is excluded: {root}")
     try:
         metadata = root.stat(follow_symlinks=False)
     except OSError as error:
@@ -176,7 +204,12 @@ def scan_root(root: Path, *, hash_files: bool = True) -> Iterator[InventoryEntry
         raise InventoryError(f"scan root must not be a reparse point: {root}")
     if not stat.S_ISDIR(metadata.st_mode):
         raise InventoryError(f"scan root is not a directory: {root}")
-    yield from _scan_directory(root, root, hash_files=hash_files)
+    yield from _scan_directory(
+        root,
+        root,
+        hash_files=hash_files,
+        exclude_keys=exclude_keys,
+    )
 
 
 def tree_manifest(root: Path) -> TreeManifest:
