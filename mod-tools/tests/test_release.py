@@ -87,6 +87,35 @@ class TestAtomicCharacterRelease(unittest.TestCase):
     def _module(self):
         return importlib.import_module("wf_release")
 
+    def test_detect_canonical_base_preserves_active_anchor_after_late_legacy_edge(self):
+        module = self._module()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            cdn = root / "cdn"
+            repo = root / "repo"
+            common = cdn / module.ROOT_DIRS["common"]
+            common.mkdir(parents=True)
+            (common / "pinball-1.4.132-1.4.133-1-before.zip").write_bytes(b"before")
+            (common / "pinball-1.4.138-1.4.139-1-late.zip").write_bytes(b"late")
+            active_path = cdn / "character-releases" / "active.json"
+            active_path.parent.mkdir(parents=True)
+            active_path.write_text(json.dumps({
+                "schema_version": 1,
+                "base_version": "1.4.133",
+                "releases": [{
+                    "release_id": "release-1",
+                    "package_id": "fixture",
+                    "from_version": "1.4.133",
+                    "version": "1.4.134",
+                    "package_manifest_sha256": "a" * 64,
+                    "archives": [],
+                }],
+            }), encoding="utf-8")
+
+            detected = module.detect_canonical_base_version(cdn, repo)
+
+            self.assertEqual("1.4.133", detected)
+
     def test_new_transaction_supplies_validated_installed_package_for_upgrade(self):
         module = self._module()
         with tempfile.TemporaryDirectory() as td:

@@ -480,6 +480,31 @@ def _compare_version(left: str, right: str) -> int:
 
 
 def detect_canonical_base_version(cdn_root: Path, repo_root: Path) -> str:
+    active_path = Path(cdn_root) / "character-releases" / "active.json"
+    try:
+        active = _strict_object(active_path.read_bytes(), "active.json anchor")
+    except FileNotFoundError:
+        active = None
+    if active is not None:
+        if set(active) != {"schema_version", "base_version", "releases"} \
+                or active.get("schema_version") != 1:
+            raise ReleaseError("active.json anchor fields are invalid")
+        base = active.get("base_version")
+        releases = active.get("releases")
+        if not isinstance(base, str) or VERSION_RE.fullmatch(base) is None \
+                or not isinstance(releases, list) or not releases:
+            raise ReleaseError("active.json anchor is invalid")
+        expected = base
+        for index, release in enumerate(releases):
+            if not isinstance(release, dict) \
+                    or release.get("from_version") != expected \
+                    or release.get("version") != _bump(expected):
+                raise ReleaseError(
+                    f"active.json anchor release[{index}] breaks the version chain"
+                )
+            expected = release["version"]
+        return base
+
     best = "1.4.0"
     for directory in ROOT_DIRS.values():
         try:
