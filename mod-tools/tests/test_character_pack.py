@@ -1118,6 +1118,11 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
             )
         )
         self.assertEqual(marker["kind"], "character_pack_snapshot")
+        self.assertRegex(marker["snapshot_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(
+            marker["snapshot_sha256"],
+            hashlib.sha256((snapshot.snapshot_dir / "snapshot.json").read_bytes()).hexdigest(),
+        )
 
     @unittest.skipUnless(os.name == "nt", "exact named staging unavailable")
     def test_snapshot_retains_server_key_bytes_and_exact_whole_file_image(self):

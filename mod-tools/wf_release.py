@@ -88,6 +88,7 @@ class ReleaseFile:
     before_raw: bytes | None
     after_sha256: str
     after_size: int
+    delete_after: bool = False
 
 
 @dataclass(frozen=True)
@@ -572,6 +573,20 @@ def _atomic_commit_write(
         raise
 
 
+def _atomic_commit_delete(
+    path: Path,
+    expected_raw: bytes | None,
+    *,
+    deleted: Callable[[], None],
+) -> None:
+    """Delete one validated live path and expose it to rollback bookkeeping."""
+    if _read(path) != expected_raw:
+        raise ReleaseError(f"live payload drift before delete: {path}")
+    path.unlink()
+    deleted()
+    _fsync_directory(path.parent)
+
+
 def _strict_object(raw: bytes, label: str) -> dict:
     def pairs(items):
         result = {}
@@ -914,7 +929,13 @@ class AtomicReleasePublisher:
                 raise ReleaseError("release payload repeats a live path")
             seen_live.add(live)
             staged = item.staged_path.read_bytes()
-            if len(staged) != item.after_size or _sha256(staged) != item.after_sha256:
+            if item.delete_after:
+                if staged != b"" or item.after_size != 0 \
+                        or item.after_sha256 != _sha256(b""):
+                    raise ReleaseError(
+                        f"invalid staged delete marker: {item.root}:{item.logical_path}"
+                    )
+            elif len(staged) != item.after_size or _sha256(staged) != item.after_sha256:
                 raise ReleaseError(f"staged payload drift: {item.root}:{item.logical_path}")
             if check_live and _read(item.live_path) != item.before_raw:
                 raise ReleaseError(f"live payload drift: {item.root}:{item.logical_path}")
@@ -1011,6 +1032,7 @@ class AtomicReleasePublisher:
                         if item.before_raw is not None else None
                     ),
                     "after_sha256": item.after_sha256,
+                    "delete_after": item.delete_after,
                 } for item in payload.files],
                 "archives": [str(target) for _archive, target, _relative in final_archives],
             }
@@ -1024,14 +1046,28 @@ class AtomicReleasePublisher:
                     def mark_live_replaced(item: ReleaseFile = item) -> None:
                         promoted_files.append(item)
 
-                    _atomic_commit_write(
-                        item.live_path,
-                        item.staged_path.read_bytes(),
-                        replaced=mark_live_replaced,
-                    )
-                    readback = item.live_path.read_bytes()
-                    if len(readback) != item.after_size or _sha256(readback) != item.after_sha256:
-                        raise ReleaseError(f"live promotion readback failed: {item.live_path}")
+                    if item.delete_after:
+                        _atomic_commit_delete(
+                            item.live_path,
+                            item.before_raw,
+                            deleted=mark_live_replaced,
+                        )
+                        if item.live_path.exists():
+                            raise ReleaseError(
+                                f"live deletion readback failed: {item.live_path}"
+                            )
+                    else:
+                        _atomic_commit_write(
+                            item.live_path,
+                            item.staged_path.read_bytes(),
+                            replaced=mark_live_replaced,
+                        )
+                        readback = item.live_path.read_bytes()
+                        if len(readback) != item.after_size \
+                                or _sha256(readback) != item.after_sha256:
+                            raise ReleaseError(
+                                f"live promotion readback failed: {item.live_path}"
+                            )
                     self._checkpoint(fail_after, f"after_live_{index}")
                 self._checkpoint(fail_after, "after_live_promotions")
                 for index, (archive, target, _relative) in enumerate(final_archives):

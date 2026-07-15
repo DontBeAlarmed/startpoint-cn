@@ -2889,6 +2889,7 @@ class PackTransaction:
                 "transaction_id": prepared.transaction_id,
                 "snapshot_nonce": snapshot_nonce,
                 "prepared_digest": prepared.prepared_digest,
+                "snapshot_sha256": hashlib.sha256(snapshot_bytes).hexdigest(),
             })
             for item in prepared.file_changes:
                 key = (cast(RootName, item["root"]), item["logical_path"])

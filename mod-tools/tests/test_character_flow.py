@@ -50,6 +50,45 @@ class FakeReleaseModule:
 
 
 class TestCharacterFlow(unittest.TestCase):
+    def test_rollback_requires_distinct_confirmation_before_release_call(self):
+        code, result = flow.run_command([
+            "rollback", "--snapshot-dir", "missing", "--confirm", "yes",
+        ])
+
+        self.assertEqual(2, code)
+        self.assertIn("ROLLBACK_CHARACTER_PACKAGE", " ".join(result["errors"]))
+
+    def test_rollback_delegates_to_snapshot_release_api(self):
+        released = SimpleNamespace(
+            committed=True,
+            release_id="rollback-1",
+            from_version="1.4.140",
+            version="1.4.141",
+            active_manifest_sha256="b" * 64,
+            archive_paths=(Path("rollback-common.zip"),),
+            snapshot_dir=None,
+        )
+        with patch(
+            "wf_character_rollback.publish_snapshot_rollback",
+            return_value=released,
+        ) as delegated:
+            code, result = flow.run_command([
+                "rollback",
+                "--snapshot-dir", "snapshot-1",
+                "--profile", "cn",
+                "--installed-package-dir", "installed",
+                "--confirm", "ROLLBACK_CHARACTER_PACKAGE",
+            ])
+
+        self.assertEqual(0, code)
+        self.assertEqual("1.4.141", result["version"])
+        delegated.assert_called_once_with(
+            Path("snapshot-1"),
+            profile_id="cn",
+            confirmation="ROLLBACK_CHARACTER_PACKAGE",
+            installed_package_dir=Path("installed"),
+        )
+
     def test_init_and_status_write_only_inside_workspace(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
