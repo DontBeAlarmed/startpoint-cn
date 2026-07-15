@@ -1,0 +1,75 @@
+name: verify
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Server (Node ${{ matrix.node }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node:
+          - 20.19.0
+          - 22.x
+    env:
+      WF_DATABASE_DIR: ${{ runner.temp }}\starpoint-node-test-db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:node
+      - run: npm audit --omit=dev --audit-level=high
+
+  admin:
+    name: Admin
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+      - run: npm ci
+        working-directory: admin
+      - run: npm run typecheck
+        working-directory: admin
+      - run: npm run build
+        working-directory: admin
+      - run: npm audit --audit-level=high
+        working-directory: admin
+
+  tools:
+    name: Python tools and launcher
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: mod-tools/requirements.txt
+      - run: npm ci
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -r mod-tools/requirements.txt
+      - run: python -m unittest discover -s mod-tools/tests -p "test_*.py"
+      - shell: powershell
+        run: ./scripts/tests/test-start-cn.ps1
