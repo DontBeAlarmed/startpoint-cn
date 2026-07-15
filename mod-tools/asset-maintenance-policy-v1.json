@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "scan_roots": [
+    ".cdn/cn",
+    "assets/asset-patch",
+    "work",
+    "mod-tools/work",
+    "logs",
+    "弹国服"
+  ],
+  "protected_roots": [
+    ".database",
+    ".cdn/cn/archive-common-full",
+    ".cdn/cn/archive-medium-full",
+    ".cdn/cn/archive-android-full",
+    ".cdn/cn/EntityLists",
+    ".cdn/cn/entities",
+    ".cdn/cn/character-releases",
+    "assets/asset-patch/active",
+    "assets/asset-patch/production",
+    "assets/asset-patch/manifest.json",
+    "work/ai_canary",
+    "work/asset_exports",
+    "work/character_releases",
+    "work/char_gen",
+    "work/char_snapshots",
+    "work/remediation",
+    "work/changelog.jsonl",
+    "work/changelog.md",
+    "work/rogue_auto.json",
+    "work/sync_pending.json",
+    "mod-tools/work",
+    "弹国服/WorldFlipper",
+    "弹国服/instrument",
+    "弹国服/scripts",
+    "弹国服/.claude",
+    "弹国服/wf_restore_package.py",
+    "弹国服/assets.rar",
+    "弹国服/bundle.zip",
+    "弹国服/单机版数据包.zip",
+    "弹国服/WFdebug单机版.apk (1).1",
+    "弹国服/wf_M358262.apk",
+    "弹国服/wf_wjg20250626米.apk",
+    "decompile",
+    "ffdec_26.2.1",
+    "pc-run"
+  ],
+  "backup_keep_latest": 3,
+  "backup_markers": [
+    ".bak-wfmod-",
+    ".bak-charfields-"
+  ],
+  "auto_categories": [
+    "exact_duplicate",
+    "proven_regenerable",
+    "stale_cache",
+    "retention_expired"
+  ],
+  "stale_cache_directory_names": [
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache"
+  ],
+  "stale_cache_suffixes": [
+    ".pyc",
+    ".pyo"
+  ]
+}
