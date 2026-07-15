@@ -8,6 +8,9 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDisplayHost } from "../../multi/room/serializer";
 import { getRoom } from "../../multi/room/manager";
 import { runPermanentValidators } from "../../lib/validate";
+import { getCnReleaseGraphSnapshot } from "../../lib/cn-asset-graph";
+import type { ReleaseGraphSnapshot } from "../../lib/cn-asset-graph";
+import { computeAssetTarget } from "../../lib/version";
 
 interface CnLoadBody {
     device_id: number;
@@ -23,10 +26,9 @@ interface CnLoadBody {
     viewer_id?: number;
 }
 
-function wrapOptionFields(d: any, resVer?: string) {
-    // Report effective server version (CDN + patches) to trigger client update
-    const { getEffectiveVersion } = require("../../lib/version");
-    d.available_asset_version = getEffectiveVersion();
+function wrapOptionFields(d: any, resVer: string | undefined, snapshot: ReleaseGraphSnapshot) {
+    // Use the same validated graph path as /asset/get_path.
+    d.available_asset_version = computeAssetTarget(resVer, snapshot).targetVersion;
 
     if (d.user_info) {
         if (typeof d.user_info.last_login_time === 'number') {
@@ -143,7 +145,8 @@ const routes = async (fastify: FastifyInstance) => {
 
         const resVer = request.headers['res_ver'] as string | undefined;
         console.log(`[CN-LOAD] res_ver=${resVer || '(not sent)'} account=${accountId} player=${playerId} party_slot=${clientData?.user_info?.party_slot}`);
-        wrapOptionFields(clientData, resVer);
+        const releaseGraph = getCnReleaseGraphSnapshot();
+        wrapOptionFields(clientData, resVer, releaseGraph);
 
         // Inject unfinished quest lists for battle recovery
         const activeQuest = getPlayerActiveQuestSync(playerId);

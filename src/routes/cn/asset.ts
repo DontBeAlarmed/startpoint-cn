@@ -2,12 +2,14 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { generateDataHeaders } from "../../utils";
 import { readdirSync, statSync, existsSync } from "fs";
 import path from "path";
+import { resolveCnCdnDir } from "../../lib/cn-character-release";
+import type { DiffGroup } from "../../lib/cn-character-release";
 import {
-    DiffGroup,
-    mergeLegacyAndCharacterDiffs,
-    readActiveCharacterReleases,
-    resolveCnCdnDir,
-} from "../../lib/cn-character-release";
+    findReleasePath,
+    getCnReleaseGraphSnapshot,
+} from "../../lib/cn-asset-graph";
+import type { ReleaseGraphSnapshot, ReleasePathResult } from "../../lib/cn-asset-graph";
+import { computeAssetTarget } from "../../lib/version";
 
 const CN_PORT = process.env.CN_LISTEN_PORT || "8001";
 const CDN_BASE = process.env.CDN_BASE_URL;
@@ -55,71 +57,21 @@ function buildArchiveList(baseUrl: string, cdnDir: string, subdir: string): { lo
     }
 }
 
-function parseVersion(v: string): number[] {
-    return v.split(".").map(Number);
-}
-
-function compareVersion(a: string, b: string): number {
-    const av = parseVersion(a), bv = parseVersion(b);
-    for (let i = 0; i < 3; i++) {
-        if (av[i] !== bv[i]) return av[i] - bv[i];
-    }
-    return 0;
-}
-
-export function buildDiffList(baseUrl: string, cdnDir: string): DiffGroup[] {
-    const groups = new Map<string, { original_version: string; archive: { location: string; size: number; sha256: string }[] }>();
-    
-    // CDN diff archives
-    for (const subdir of ["archive-common-diff", "archive-medium-diff", "archive-android-diff"]) {
-        const dir = path.join(cdnDir, subdir);
-        try {
-            for (const f of readdirSync(dir).filter(
-                f => f.endsWith(".zip") && !f.includes("-charpkg-"),
-            )) {
-                const match = f.match(/pinball-(\d+\.\d+\.\d+)-(\d+\.\d+\.\d+)-\d+-/);
-                if (match) {
-                    const from = match[1];
-                    const to = match[2];
-                    const stats = statSync(path.join(dir, f));
-                    if (!groups.has(to)) groups.set(to, { original_version: from, archive: [] });
-                    groups.get(to)!.archive.push({ location: `${baseUrl}/${subdir}/${f}`, size: stats.size, sha256: "" });
-                }
-            }
-        } catch (e) {
-            console.error(`[CDN] buildDiffList failed for ${subdir}:`, (e as Error).message);
-        }
-    }
-    
-    // Asset patch archives (active patches only)
-    const patchDir = path.join(__dirname, "..", "..", "..", "assets", "asset-patch", "active");
-    try {
-        for (const f of readdirSync(patchDir).filter(f => f.endsWith(".zip"))) {
-            const match = f.match(/pinball-(\d+\.\d+\.\d+)-(\d+\.\d+\.\d+)-\d+-/);
-            if (match) {
-                const from = match[1];
-                const to = match[2];
-                const stats = statSync(path.join(patchDir, f));
-                if (!groups.has(to)) groups.set(to, { original_version: from, archive: [] });
-                groups.get(to)!.archive.push({ location: `${baseUrl}/asset-patch/active/${f}`, size: stats.size, sha256: "" });
-            }
-        }
-    } catch (e) {
-        console.error(`[PATCH] buildDiffList failed for active patches:`, (e as Error).message);
-    }
-    
-    const legacy = [...groups.entries()]
-        .sort(([a], [b]) => compareVersion(a, b))
-        .map(([version, data]) => ({ original_version: data.original_version, version, archive: data.archive }));
-    const canonicalBase = legacy.reduce(
-        (best, group) => compareVersion(group.version, best) > 0 ? group.version : best,
-        "1.4.0",
-    );
-    const characterChain = readActiveCharacterReleases(cdnDir, canonicalBase);
-    if (characterChain.error) {
-        console.error(`[CDN] character release chain truncated: ${characterChain.error}`);
-    }
-    return mergeLegacyAndCharacterDiffs(legacy, characterChain, baseUrl);
+export function buildDiffList(
+    baseUrl: string,
+    snapshot: ReleaseGraphSnapshot,
+    releasePath: ReleasePathResult = findReleasePath(snapshot, snapshot.fullBase),
+): DiffGroup[] {
+    const normalizedBase = baseUrl.replace(/\/$/, "");
+    return releasePath.edges.map(edge => ({
+        original_version: edge.from,
+        version: edge.to,
+        archive: edge.archives.map(archive => ({
+            location: `${normalizedBase}/${archive.relativePath}`,
+            size: archive.size,
+            sha256: archive.sha256,
+        })),
+    }));
 }
 
 const cdnDir = resolveCnCdnDir();
@@ -151,18 +103,23 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/get_path", async (request: FastifyRequest, reply: FastifyReply) => {
         const baseUrl = getCdnBase(request);
         const resVer = request.headers['res_ver'] as string | undefined;
-        const { computeAssetTarget } = require("../../lib/version");
-        const { targetVersion, isFirstTime: first, fullVersion } = computeAssetTarget(resVer);
+        const snapshot = getCnReleaseGraphSnapshot();
+        const {
+            targetVersion,
+            isFirstTime: first,
+            fullVersion,
+            path: selectedPath,
+        } = computeAssetTarget(resVer, snapshot);
 
         const fullArchives = first
             ? [
-                ...buildArchiveList(baseUrl, cdnDir, "archive-common-full"),
-                ...buildArchiveList(baseUrl, cdnDir, "archive-medium-full"),
-                ...buildArchiveList(baseUrl, cdnDir, "archive-android-full"),
+                ...buildArchiveList(baseUrl, snapshot.cdnDir, "archive-common-full"),
+                ...buildArchiveList(baseUrl, snapshot.cdnDir, "archive-medium-full"),
+                ...buildArchiveList(baseUrl, snapshot.cdnDir, "archive-android-full"),
             ]
             : [];
 
-        const diffArchives = buildDiffList(baseUrl, cdnDir);
+        const diffArchives = buildDiffList(baseUrl, snapshot, selectedPath);
 
         reply.type("application/json");
         reply.status(200).send({

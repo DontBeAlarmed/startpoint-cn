@@ -14,8 +14,12 @@ import test from "node:test";
 import {
     buildReleaseGraph,
     findReleasePath,
-    ReleaseGraphSnapshot,
+    getCnReleaseGraphSnapshot,
+    resetCnReleaseGraphCache,
 } from "../lib/cn-asset-graph";
+import type { ReleaseGraphSnapshot } from "../lib/cn-asset-graph";
+import { computeAssetTarget } from "../lib/version";
+import { buildDiffList } from "../routes/cn/asset";
 
 
 const DIFF_DIRS = {
@@ -272,6 +276,90 @@ test("every declared supported base is evaluated against the canonical tail", ()
             { base: "1.4.2", target: "1.4.2", reachable: true },
         ]);
     } finally {
+        f.cleanup();
+    }
+});
+
+
+test("load and get_path choose the same reachable target from an injected snapshot", () => {
+    const f = fixture();
+    try {
+        writeLegacy(f, "1.4.102", "1.4.133");
+        writePatch(f, "1.4.138", "1.4.139", "fixture-active");
+        writeCharacterChain(f, 133, 140);
+        const graph = build(f, "1.4.102", ["1.4.102", "1.4.133"]);
+
+        const target = computeAssetTarget("1.4.102", graph);
+        assert.equal(target.targetVersion, "1.4.140");
+        assert.deepEqual(target.path.edges.map(edge => edge.to), [
+            "1.4.133",
+            "1.4.134",
+            "1.4.135",
+            "1.4.136",
+            "1.4.137",
+            "1.4.138",
+            "1.4.139",
+            "1.4.140",
+        ]);
+
+        const groups = buildDiffList("http://cdn", graph);
+        assert.deepEqual(groups.map(group => group.version), target.path.edges.map(edge => edge.to));
+        assert.ok(groups.flatMap(group => group.archive).some(archive => (
+            archive.location.includes("/asset-patch/active/")
+            && archive.location.includes("fixture-active")
+        )));
+        assert.ok(groups.flatMap(group => group.archive).every(archive => (
+            archive.location.startsWith("http://cdn/")
+        )));
+    } finally {
+        f.cleanup();
+    }
+});
+
+
+test("a disconnected client keeps its current version and receives no diff path", () => {
+    const f = fixture();
+    try {
+        writeLegacy(f, "1.4.102", "1.4.133");
+        writeCharacterChain(f, 133, 140);
+        const graph = build(f, "1.4.102");
+
+        const target = computeAssetTarget("1.4.120", graph);
+        assert.equal(target.isFirstTime, false);
+        assert.equal(target.fullVersion, "1.4.120");
+        assert.equal(target.targetVersion, "1.4.120");
+        assert.deepEqual(target.path.edges, []);
+        assert.deepEqual(buildDiffList("http://cdn", graph, target.path), []);
+    } finally {
+        f.cleanup();
+    }
+});
+
+
+test("cached snapshots invalidate when a diff directory changes", () => {
+    const f = fixture();
+    resetCnReleaseGraphCache();
+    try {
+        writeLegacy(f, "1.4.0", "1.4.1");
+        const options = {
+            cdnDir: f.cdnDir,
+            assetPatchRoot: f.assetPatchRoot,
+            fullBase: "1.4.0",
+            supportedBases: ["1.4.0"],
+        };
+        const first = getCnReleaseGraphSnapshot(options);
+        const cached = getCnReleaseGraphSnapshot(options);
+        assert.equal(cached, first);
+        assert.equal(first.tailVersion, "1.4.1");
+        assert.ok(Object.isFrozen(first));
+        assert.ok(Object.isFrozen(first.edges));
+
+        writeLegacy(f, "1.4.1", "1.4.2", "medium", "cache-invalidation");
+        const rebuilt = getCnReleaseGraphSnapshot(options);
+        assert.notEqual(rebuilt, first);
+        assert.equal(rebuilt.tailVersion, "1.4.2");
+    } finally {
+        resetCnReleaseGraphCache();
         f.cleanup();
     }
 });

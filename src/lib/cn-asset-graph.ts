@@ -1,11 +1,8 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
-import {
-    CharacterRoot,
-    readActiveCharacterReleases,
-    ValidatedReleaseChain,
-} from "./cn-character-release";
+import { readActiveCharacterReleases, resolveCnCdnDir } from "./cn-character-release";
+import type { CharacterRoot, ValidatedReleaseChain } from "./cn-character-release";
 
 
 export type ReleaseArchiveRoot = CharacterRoot | "patch";
@@ -55,6 +52,13 @@ export interface ReleasePathResult {
     startVersion: string;
     targetVersion: string;
     edges: ReleaseEdge[];
+}
+
+export interface CnReleaseGraphOptions {
+    cdnDir?: string;
+    assetPatchRoot?: string;
+    fullBase?: string;
+    supportedBases?: string[];
 }
 
 
@@ -198,6 +202,93 @@ export function parseSupportedAssetBases(raw: string | undefined): string[] {
 
 export function resolveAssetPatchRoot(): string {
     return path.resolve(__dirname, "..", "..", "assets", "asset-patch");
+}
+
+
+function fileStamp(target: string): string {
+    try {
+        const stats = statSync(target);
+        return `${target}:${stats.isFile() ? "f" : "o"}:${stats.size}:${stats.mtimeMs}`;
+    } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code ?? "error";
+        return `${target}:missing:${code}`;
+    }
+}
+
+
+function directoryStamp(directory: string): string {
+    const entries: string[] = [fileStamp(directory)];
+    try {
+        for (const name of readdirSync(directory).sort()) {
+            entries.push(`${name}:${fileStamp(path.join(directory, name))}`);
+        }
+    } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code ?? "error";
+        entries.push(`unreadable:${code}`);
+    }
+    return entries.join("|");
+}
+
+
+function releaseGraphStamp(cdnDir: string, assetPatchRoot: string): string {
+    return [
+        ...LEGACY_ROOTS.map(item => directoryStamp(path.join(cdnDir, item.directory))),
+        directoryStamp(path.join(assetPatchRoot, "active")),
+        fileStamp(path.join(assetPatchRoot, "manifest.json")),
+        fileStamp(path.join(cdnDir, "character-releases", "active.json")),
+    ].join("\n");
+}
+
+
+function freezeReleaseGraph(snapshot: ReleaseGraphSnapshot): ReleaseGraphSnapshot {
+    for (const edge of snapshot.edges) {
+        for (const archive of edge.archives) Object.freeze(archive);
+        Object.freeze(edge.archives);
+        Object.freeze(edge.sources);
+        Object.freeze(edge);
+    }
+    for (const list of snapshot.outgoing.values()) Object.freeze(list);
+    for (const item of snapshot.supported) Object.freeze(item);
+    Object.freeze(snapshot.edges);
+    Object.freeze(snapshot.supported);
+    Object.freeze(snapshot.issues);
+    return Object.freeze(snapshot);
+}
+
+
+let releaseGraphCache: {
+    key: string;
+    stamp: string;
+    snapshot: ReleaseGraphSnapshot;
+} | null = null;
+
+
+export function resetCnReleaseGraphCache(): void {
+    releaseGraphCache = null;
+}
+
+
+export function getCnReleaseGraphSnapshot(
+    options: CnReleaseGraphOptions = {},
+): ReleaseGraphSnapshot {
+    const cdnDir = path.resolve(options.cdnDir ?? resolveCnCdnDir());
+    const assetPatchRoot = path.resolve(options.assetPatchRoot ?? resolveAssetPatchRoot());
+    const fullBase = options.fullBase ?? "1.4.0";
+    const supportedBases = options.supportedBases
+        ?? parseSupportedAssetBases(process.env.CN_SUPPORTED_ASSET_BASES);
+    const key = JSON.stringify({ cdnDir, assetPatchRoot, fullBase, supportedBases });
+    const stamp = releaseGraphStamp(cdnDir, assetPatchRoot);
+    if (releaseGraphCache?.key === key && releaseGraphCache.stamp === stamp) {
+        return releaseGraphCache.snapshot;
+    }
+    const snapshot = freezeReleaseGraph(buildReleaseGraph({
+        cdnDir,
+        assetPatchRoot,
+        fullBase,
+        supportedBases,
+    }));
+    releaseGraphCache = { key, stamp, snapshot };
+    return snapshot;
 }
 
 

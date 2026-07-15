@@ -85,10 +85,7 @@ export function resolveCnCdnDir(): string {
     return path.resolve(parent, "cn");
 }
 
-export function readActiveCharacterReleases(
-    cdnDir: string,
-    _legacyCanonicalBaseVersion?: string,
-): ValidatedReleaseChain {
+export function readActiveCharacterReleases(cdnDir: string): ValidatedReleaseChain {
     const empty = (error: string | null, baseVersion = ""): ValidatedReleaseChain => ({
         baseVersion,
         tailVersion: baseVersion,
@@ -244,10 +241,7 @@ export function mergeLegacyAndCharacterDiffs(
     return [...legacyWithoutCharacterArchives, ...characterGroups];
 }
 
-export function maxCharacterReleaseVersion(
-    cdnDir: string,
-    _legacyCanonicalBaseVersion?: string,
-): string | null {
+export function maxCharacterReleaseVersion(cdnDir: string): string | null {
     const chain = readActiveCharacterReleases(cdnDir);
     return chain.releases.length > 0 ? chain.tailVersion : null;
 }

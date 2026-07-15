@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { reloadModAssets } from "../../lib/assets";
+import { getCnReleaseGraphSnapshot } from "../../lib/cn-asset-graph";
 import { getServerTime } from "../../utils";
 
 /**
@@ -14,6 +15,18 @@ const routes = async (fastify: FastifyInstance) => {
         reply.status(200).send({
             ok: true,
             server_time: getServerTime(),
+        });
+    });
+
+    fastify.get("/cdn-health", async (_request: FastifyRequest, reply: FastifyReply) => {
+        const snapshot = getCnReleaseGraphSnapshot();
+        const ok = snapshot.issues.length === 0
+            && snapshot.supported.every(item => item.reachable);
+        reply.status(ok ? 200 : 503).send({
+            ok,
+            tailVersion: snapshot.tailVersion,
+            supported: snapshot.supported,
+            issues: snapshot.issues,
         });
     });
 

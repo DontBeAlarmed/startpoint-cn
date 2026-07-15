@@ -92,7 +92,7 @@ test("manifest validation is independent from the legacy directory tail", () => 
     const f = fixture();
     try {
         writeRelease(f.root, f.active);
-        const chain = readActiveCharacterReleases(f.root, "1.4.53");
+        const chain = readActiveCharacterReleases(f.root);
         assert.equal(chain.error, null);
         assert.equal(chain.baseVersion, "1.4.54");
         assert.equal(chain.releases.length, 2);
