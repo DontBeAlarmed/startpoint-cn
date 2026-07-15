@@ -671,6 +671,25 @@ class TestAtomicCharacterRelease(unittest.TestCase):
                 live_roots=live_roots,
                 generator_git_head="f" * 40,
             )
+            production_manifest = json.loads(json.dumps(manifest))
+            production_manifest["qa"] = {
+                "delivery_mode": "production",
+                "release_ready": True,
+                "required_assets_total": 37,
+                "required_assets_present": 37,
+                "workspace_input_sha256": "a" * 64,
+            }
+            (package / "manifest.json").write_bytes(
+                module.character_pack.canonical_manifest_bytes(production_manifest)
+            )
+            production_rebased = root / "rebased-production"
+            module.rebase_runtime_package(
+                package,
+                production_rebased,
+                live_roots=live_roots,
+                generator_git_head="f" * 40,
+            )
+            self.assertTrue((production_rebased / "manifest.json").is_file())
             rebased_flat = core.read_orderedmap_file(
                 rebased / "roots" / "common" / Path(*logical.split("/")), logical
             )

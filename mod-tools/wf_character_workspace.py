@@ -120,13 +120,12 @@ def _canonical_bytes(payload: Any) -> bytes:
     ).encode("utf-8")
 
 
-def _atomic_json(path: Path, payload: Any) -> None:
+def _atomic_bytes(path: Path, raw: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     try:
         with temporary.open("wb") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8"))
-            handle.write(b"\n")
+            handle.write(raw)
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
@@ -135,6 +134,13 @@ def _atomic_json(path: Path, payload: Any) -> None:
             temporary.unlink()
         except FileNotFoundError:
             pass
+
+
+def _atomic_json(path: Path, payload: Any) -> None:
+    raw = json.dumps(
+        payload, ensure_ascii=False, indent=2, sort_keys=True,
+    ).encode("utf-8") + b"\n"
+    _atomic_bytes(path, raw)
 
 
 def _validated_id(value: int, label: str) -> int:
@@ -490,3 +496,56 @@ def workspace_status(workspace: Workspace | Path) -> WorkspaceStatus:
     )
     _atomic_json(current.evidence_dir / "status.json", status.to_dict())
     return status
+
+
+def seal_workspace(workspace: Workspace | Path) -> WorkspaceStatus:
+    """Bind a complete production package to its stable semantic input digest."""
+    current = load_workspace(
+        workspace.root if isinstance(workspace, Workspace) else workspace
+    )
+    before = workspace_status(current)
+    report = before.requirement_report
+    allowed_errors = {
+        "manifest workspace_input_sha256 does not match status",
+    }
+    unexpected = set(before.manifest_errors) - allowed_errors
+    if (
+        report.get("required_total") != 37
+        or report.get("required_present") != 37
+        or report.get("release_ready") is not True
+    ):
+        raise WorkspaceError("production workspace must contain exactly 37/37 required assets")
+    if unexpected:
+        raise WorkspaceError(
+            "production workspace manifest is invalid: " + "; ".join(sorted(unexpected))
+        )
+    if before.three_layer_claim_status.get("consistent") is not True:
+        raise WorkspaceError("production workspace three-layer claims are incomplete")
+
+    manifest_path = current.package_dir / "manifest.json"
+    original_raw = manifest_path.read_bytes()
+    try:
+        manifest = json.loads(original_raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise WorkspaceError(f"invalid manifest.json: {exc}") from exc
+    qa = manifest.get("qa") if isinstance(manifest, dict) else None
+    if not isinstance(qa, dict) or qa.get("delivery_mode") != "production":
+        raise WorkspaceError("only production workspaces can be sealed")
+    qa.update({
+        "release_ready": True,
+        "required_assets_total": 37,
+        "required_assets_present": 37,
+        "workspace_input_sha256": "",
+    })
+    try:
+        _atomic_json(manifest_path, manifest)
+        binding = workspace_status(current)
+        qa["workspace_input_sha256"] = binding.input_digest
+        _atomic_json(manifest_path, manifest)
+        sealed = workspace_status(current)
+        if not sealed.release_ready:
+            raise WorkspaceError("sealed workspace did not pass release readiness checks")
+        return sealed
+    except Exception:
+        _atomic_bytes(manifest_path, original_raw)
+        raise

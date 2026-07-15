@@ -4,8 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
+import shutil
 import sys
+import uuid
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
@@ -100,6 +104,58 @@ def _release_result_payload(result: Any) -> dict[str, Any]:
     }
 
 
+def _can_seal(status: workspace_module.WorkspaceStatus) -> bool:
+    allowed_errors = {
+        "manifest workspace_input_sha256 does not match status",
+    }
+    report = status.requirement_report
+    return bool(
+        report.get("release_ready") is True
+        and report.get("required_total") == 37
+        and report.get("required_present") == 37
+        and status.three_layer_claim_status.get("consistent") is True
+        and not (set(status.manifest_errors) - allowed_errors)
+    )
+
+
+def _activate_rebased_package(
+    workspace: workspace_module.Workspace,
+    output: Path,
+) -> workspace_module.WorkspaceStatus:
+    output = Path(output).absolute()
+    if output.parent != workspace.root or output == workspace.package_dir:
+        raise FlowError("production rebase output must be a direct workspace child")
+    if not output.is_dir() or workspace_module._path_has_reparse_component(output):
+        raise FlowError("production rebase output is missing or contains a reparse point")
+    backup = workspace.root / f"package-pre-rebase-{uuid.uuid4().hex}"
+    os.replace(workspace.package_dir, backup)
+    activated = False
+    try:
+        os.replace(output, workspace.package_dir)
+        activated = True
+        sealed = workspace_module.seal_workspace(workspace)
+        if workspace_module._is_reparse(backup):
+            raise FlowError("rebase backup ownership changed; preserving it for inspection")
+        shutil.rmtree(backup)
+        return sealed
+    except Exception as exc:
+        restore_errors: list[str] = []
+        if activated and workspace.package_dir.exists():
+            try:
+                os.replace(workspace.package_dir, output)
+            except OSError as restore_exc:
+                restore_errors.append(f"preserve rebased output: {restore_exc}")
+        if backup.exists() and not workspace.package_dir.exists():
+            try:
+                os.replace(backup, workspace.package_dir)
+            except OSError as restore_exc:
+                restore_errors.append(f"restore original package: {restore_exc}")
+        detail = f"production rebase activation failed: {exc}"
+        if restore_errors:
+            detail += "; " + "; ".join(restore_errors)
+        raise FlowError(detail) from exc
+
+
 def run_command(
     argv: list[str] | None = None,
     *,
@@ -170,6 +226,12 @@ def run_command(
 
         if command == "preflight":
             status = workspace_module.workspace_status(workspace)
+            if (
+                _manifest_mode(workspace) == "production"
+                and not status.release_ready
+                and _can_seal(status)
+            ):
+                status = workspace_module.seal_workspace(workspace)
             report = release_module.preflight_package(
                 workspace.package_dir,
                 args.profile,
@@ -217,6 +279,11 @@ def run_command(
         if command == "rebase":
             if not hasattr(release_module, "rebase_package"):
                 raise FlowError("release API 未提供 rebase_package")
+            mode = _manifest_mode(workspace)
+            if mode == "production":
+                status = workspace_module.workspace_status(workspace)
+                if not status.release_ready:
+                    raise FlowError("production workspace 未达到 release_ready=true")
             output = args.output or (workspace.root / "rebased-package")
             result = release_module.rebase_package(
                 workspace.package_dir,
@@ -224,6 +291,25 @@ def run_command(
                 output_dir=output,
                 generator_git_head=args.git_head,
             )
+            if mode == "production":
+                sealed = _activate_rebased_package(workspace, result.output_dir)
+                manifest_sha256 = hashlib.sha256(
+                    (workspace.package_dir / "manifest.json").read_bytes()
+                ).hexdigest()
+                return 0, _base_payload(
+                    stage="rebase",
+                    workspace=workspace_path,
+                    release_ready=sealed.release_ready,
+                    next_command=(
+                        f"python mod-tools/wf_character_flow.py publish --workspace "
+                        f"{workspace.root} --confirm PUBLISH_CHARACTER_PACKAGE"
+                    ),
+                    output=str(workspace.package_dir),
+                    manifest_sha256=manifest_sha256,
+                    table_count=result.table_count,
+                    writes_live=False,
+                    status=sealed.to_dict(),
+                )
             return 0, _base_payload(
                 stage="rebase",
                 workspace=workspace_path,

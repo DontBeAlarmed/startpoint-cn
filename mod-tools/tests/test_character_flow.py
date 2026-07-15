@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import sys
 import tempfile
 import unittest
@@ -49,7 +50,122 @@ class FakeReleaseModule:
         )
 
 
+class FakeRebaseModule:
+    def __init__(self):
+        self.calls = []
+
+    def rebase_package(
+        self, package_dir, profile_id, *, output_dir, generator_git_head=None,
+    ):
+        self.calls.append((Path(package_dir), profile_id, Path(output_dir), generator_git_head))
+        shutil.copytree(package_dir, output_dir)
+        (Path(output_dir) / "rebased.marker").write_text("rebased", encoding="utf-8")
+        return SimpleNamespace(
+            output_dir=Path(output_dir),
+            source_manifest_sha256="a" * 64,
+            manifest_sha256="b" * 64,
+            table_count=1,
+        )
+
+
+class ReadyPreflightModule(FakeReleaseModule):
+    def preflight_package(self, package_dir, profile_id, installed_package_dir=None):
+        self.preflight_calls.append((Path(package_dir), profile_id, installed_package_dir))
+        return {"can_prepare": True, "release_ready": True, "conflicts": []}
+
+
 class TestCharacterFlow(unittest.TestCase):
+    def test_preflight_auto_seals_complete_production_workspace(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = workspace_module.init_workspace(
+                Path(tmp), 111165, 129999, "seris_dragon_king", "seris",
+            )
+            complete = SimpleNamespace(
+                release_ready=False,
+                requirement_report={
+                    "release_ready": True,
+                    "required_total": 37,
+                    "required_present": 37,
+                },
+                three_layer_claim_status={"consistent": True},
+                manifest_errors=(),
+                next_command="preflight",
+                to_dict=lambda: {"release_ready": False},
+            )
+            sealed = SimpleNamespace(
+                release_ready=True,
+                next_command="publish",
+                to_dict=lambda: {"release_ready": True},
+            )
+            fake = ReadyPreflightModule()
+            with patch.object(
+                flow.workspace_module, "workspace_status", return_value=complete
+            ), patch.object(
+                flow.workspace_module, "seal_workspace", return_value=sealed
+            ) as seal:
+                code, result = flow.run_command([
+                    "preflight", "--workspace", str(workspace.root),
+                ], release_module=fake)
+
+            self.assertEqual(0, code)
+            self.assertTrue(result["release_ready"])
+            seal.assert_called_once_with(workspace)
+
+    def test_production_rebase_replaces_package_and_reseals_workspace_atomically(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = workspace_module.init_workspace(
+                Path(tmp), 111165, 129999, "seris_dragon_king", "seris",
+            )
+            fake = FakeRebaseModule()
+            ready = SimpleNamespace(release_ready=True)
+            sealed = SimpleNamespace(
+                release_ready=True,
+                input_digest="c" * 64,
+                to_dict=lambda: {"release_ready": True, "input_digest": "c" * 64},
+            )
+            with patch.object(
+                flow.workspace_module, "workspace_status", return_value=ready
+            ), patch.object(
+                flow.workspace_module, "seal_workspace", return_value=sealed
+            ) as resealed:
+                code, result = flow.run_command([
+                    "rebase", "--workspace", str(workspace.root),
+                ], release_module=fake)
+
+            self.assertEqual(0, code)
+            self.assertTrue(result["release_ready"])
+            self.assertTrue((workspace.package_dir / "rebased.marker").is_file())
+            self.assertFalse((workspace.root / "rebased-package").exists())
+            self.assertEqual([], list(workspace.root.glob("package-pre-rebase-*")))
+            resealed.assert_called_once()
+
+    def test_production_rebase_seal_failure_restores_original_package(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = workspace_module.init_workspace(
+                Path(tmp), 111165, 129999, "seris_dragon_king", "seris",
+            )
+            (workspace.package_dir / "original.marker").write_text("original", encoding="utf-8")
+            fake = FakeRebaseModule()
+            with patch.object(
+                flow.workspace_module,
+                "workspace_status",
+                return_value=SimpleNamespace(release_ready=True),
+            ), patch.object(
+                flow.workspace_module,
+                "seal_workspace",
+                side_effect=workspace_module.WorkspaceError("fixture seal failure"),
+            ):
+                code, result = flow.run_command([
+                    "rebase", "--workspace", str(workspace.root),
+                ], release_module=fake)
+
+            self.assertEqual(2, code)
+            self.assertIn("activation failed", " ".join(result["errors"]))
+            self.assertTrue((workspace.package_dir / "original.marker").is_file())
+            self.assertFalse((workspace.package_dir / "rebased.marker").exists())
+            self.assertTrue((workspace.root / "rebased-package" / "rebased.marker").is_file())
+            self.assertEqual([], list(workspace.root.glob("package-pre-rebase-*")))
+
     def test_rollback_requires_distinct_confirmation_before_release_call(self):
         code, result = flow.run_command([
             "rollback", "--snapshot-dir", "missing", "--confirm", "yes",

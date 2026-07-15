@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -15,6 +16,45 @@ import wf_character_workspace as workspace_module  # noqa: E402
 
 
 class TestCharacterWorkspace(unittest.TestCase):
+    def test_seal_workspace_binds_ready_manifest_to_semantic_input_digest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = workspace_module.init_workspace(
+                Path(tmp), 111165, 129999, "seris_dragon_king", "seris",
+            )
+            before = SimpleNamespace(
+                input_digest="a" * 64,
+                requirement_report={
+                    "release_ready": True,
+                    "required_total": 37,
+                    "required_present": 37,
+                },
+                manifest_errors=(),
+                three_layer_claim_status={"consistent": True},
+            )
+            binding = SimpleNamespace(input_digest="b" * 64)
+            after = SimpleNamespace(release_ready=True)
+            with patch.object(
+                workspace_module, "workspace_status", side_effect=(before, binding, after)
+            ):
+                result = workspace_module.seal_workspace(workspace)
+
+            manifest = json.loads(
+                (workspace.package_dir / "manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertIs(after, result)
+            self.assertEqual("b" * 64, manifest["qa"]["workspace_input_sha256"])
+            self.assertEqual(37, manifest["qa"]["required_assets_total"])
+            self.assertEqual(37, manifest["qa"]["required_assets_present"])
+            self.assertTrue(manifest["qa"]["release_ready"])
+
+    def test_seal_workspace_rejects_incomplete_draft(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = workspace_module.init_workspace(
+                Path(tmp), 111165, 129999, "seris_dragon_king", "seris",
+            )
+            with self.assertRaisesRegex(workspace_module.WorkspaceError, "37/37"):
+                workspace_module.seal_workspace(workspace)
+
     def test_init_writes_only_inside_workspace_and_status_is_resumable(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)

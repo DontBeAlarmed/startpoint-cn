@@ -612,7 +612,7 @@ def rebase_runtime_package(
     live_roots: character_pack.LiveRoots,
     generator_git_head: str,
 ) -> RuntimeRebaseResult:
-    """Create a new package whose full tables preserve the current live baseline."""
+    """Create a package whose declared full tables preserve the current live baseline."""
     import wf_mod_tool as core
     import wf_seris_release_pack as release_pack
 
@@ -620,9 +620,23 @@ def rebase_runtime_package(
     output_dir = Path(output_dir)
     if re.fullmatch(r"[0-9a-f]{40}", generator_git_head) is None:
         raise ReleaseError("runtime rebase git head must be 40 lowercase hex characters")
-    errors = release_pack.validate_runtime_test_package(package_dir)
+    manifest = character_pack.load_manifest(package_dir / "manifest.json")
+    mode = _validate_qa_contract(manifest)
+
+    def validate(candidate: Path) -> list[str]:
+        if mode == "runtime_test":
+            return release_pack.validate_runtime_test_package(candidate)
+        candidate_manifest = character_pack.load_manifest(candidate / "manifest.json")
+        candidate_errors = character_pack.validate_manifest(candidate_manifest, candidate)
+        try:
+            _validate_qa_contract(candidate_manifest)
+        except ReleaseError as exc:
+            candidate_errors.append(str(exc))
+        return sorted(set(candidate_errors))
+
+    errors = validate(package_dir)
     if errors:
-        raise ReleaseError("runtime package is invalid before rebase:\n- " + "\n- ".join(errors))
+        raise ReleaseError("package is invalid before rebase:\n- " + "\n- ".join(errors))
     if output_dir.exists():
         raise ReleaseError("runtime rebase output already exists")
     source_resolved = package_dir.resolve()
@@ -636,7 +650,6 @@ def rebase_runtime_package(
         raise ReleaseError("runtime rebase output may not be inside the source package")
     manifest_path = package_dir / "manifest.json"
     source_manifest_raw = manifest_path.read_bytes()
-    manifest = character_pack.load_manifest(manifest_path)
     claims = character_pack._parse_transaction_claims(manifest)  # type: ignore[attr-defined]
     source_files = release_pack._scan_files(package_dir)  # type: ignore[attr-defined]
     output_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -705,17 +718,17 @@ def rebase_runtime_package(
         }
         manifest_raw = character_pack.canonical_manifest_bytes(manifest)
         _atomic_write(staging / "manifest.json", manifest_raw)
-        staged_errors = release_pack.validate_runtime_test_package(staging)
+        staged_errors = validate(staging)
         if staged_errors:
             raise ReleaseError(
-                "rebased runtime package validation failed:\n- "
+                "rebased package validation failed:\n- "
                 + "\n- ".join(staged_errors)
             )
         os.replace(staging, output_dir)
-        final_errors = release_pack.validate_runtime_test_package(output_dir)
+        final_errors = validate(output_dir)
         if final_errors:
             raise ReleaseError(
-                "renamed rebased runtime package validation failed:\n- "
+                "renamed rebased package validation failed:\n- "
                 + "\n- ".join(final_errors)
             )
         return RuntimeRebaseResult(
