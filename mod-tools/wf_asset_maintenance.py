@@ -171,9 +171,17 @@ def scan_assets(
     repo = Path(repo_root).resolve(strict=True)
     policy = Policy.load(policy_path, repo_root=repo)
     output = _absolute(run_dir)
+    if not _is_within(output, repo):
+        raise MaintenanceError(f"run directory must stay inside repository: {output}")
     output.mkdir(parents=True, exist_ok=True)
     scan_path = output / "scan.jsonl"
     temporary = output / f".scan.jsonl.{uuid.uuid4().hex}.tmp"
+    excluded_by_key: dict[str, Path] = {}
+    for excluded in (output, *policy.protected_roots):
+        excluded_by_key.setdefault(_path_key(excluded), _absolute(excluded))
+    excluded_roots = tuple(
+        sorted(excluded_by_key.values(), key=lambda item: (_path_key(item), str(item)))
+    )
     header = {
         "record_type": "header",
         "schema_version": 1,
@@ -183,7 +191,7 @@ def scan_assets(
         "policy_path": str(policy.source),
         "policy_sha256": sha256_file(policy.source),
         "scan_roots": [_relative_to_repo(root, repo) for root in policy.scan_roots],
-        "excluded_roots": [str(output)],
+        "excluded_roots": [str(path) for path in excluded_roots],
     }
     digest = hashlib.sha256()
     count = 0
@@ -198,8 +206,13 @@ def scan_assets(
                 if not scan_root_path.is_dir():
                     raise MaintenanceError(f"configured scan root is missing: {scan_root_path}")
                 root_relative = _relative_to_repo(scan_root_path, repo)
+                exclusions = [
+                    excluded for excluded in excluded_roots if _is_within(excluded, scan_root_path)
+                ]
+                if any(_path_key(excluded) == _path_key(scan_root_path) for excluded in exclusions):
+                    print(f"[asset-scan] {root_relative} (protected root skipped)", file=sys.stderr, flush=True)
+                    continue
                 print(f"[asset-scan] {root_relative}", file=sys.stderr, flush=True)
-                exclusions = [output] if _is_within(output, scan_root_path) else []
                 for entry in scan_root(scan_root_path, exclude_roots=exclusions):
                     record = _scan_record(entry, root_relative)
                     raw = _json_bytes(record)
@@ -294,11 +307,18 @@ def load_scan(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]], dict[st
                     or record.get("schema_version") != 1
                     or set(record) != header_keys
                     or not isinstance(record.get("scan_roots"), list)
+                    or not isinstance(record.get("excluded_roots"), list)
                     or not isinstance(record.get("repo_root"), str)
                     or not Path(record["repo_root"]).is_absolute()
                 ):
                     raise MaintenanceError("scan header is invalid")
                 header = record
+                excluded_roots = header["excluded_roots"]
+                if (
+                    not all(isinstance(item, str) and Path(item).is_absolute() for item in excluded_roots)
+                    or len({_path_key(item) for item in excluded_roots}) != len(excluded_roots)
+                ):
+                    raise MaintenanceError("scan excluded roots are invalid")
                 digest.update(raw)
                 continue
             if record_type == "footer":

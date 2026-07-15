@@ -134,6 +134,22 @@ class AssetMaintenanceCliTests(unittest.TestCase):
             self.assertEqual(0, code, restored)
             self.assertTrue((root / "work" / "__pycache__" / "cache.pyc").is_file())
 
+    def test_scan_records_but_does_not_descend_into_protected_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td).resolve()
+            policy, _graph, run_dir = self._fixture(root)
+            code, scanned, _ = run_cli(
+                "scan", "--repo-root", str(root), "--policy", str(policy), "--run-dir", str(run_dir)
+            )
+            self.assertEqual(0, code, scanned)
+            header, entries, _footer = maintenance.load_scan(Path(str(scanned["artifact"])))
+            protected = str((root / "work" / "protected").resolve())
+            self.assertIn(protected, header["excluded_roots"])
+            self.assertFalse(
+                any(Path(str(entry["absolute_path"])).is_relative_to(root / "work" / "protected") for entry in entries)
+            )
+            self.assertTrue(any(entry["relative_path"] == "unknown.bin" for entry in entries))
+
     def test_scan_and_plan_digests_gate_every_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td).resolve()

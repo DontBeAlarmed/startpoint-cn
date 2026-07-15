@@ -35,6 +35,7 @@
     "mod-tools/work",
     "弹国服/WorldFlipper",
     "弹国服/instrument",
+    "弹国服/restored",
     "弹国服/scripts",
     "弹国服/.claude",
     "弹国服/wf_restore_package.py",
