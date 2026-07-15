@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useState } from "react"
 import { Layout, Menu, Grid, Button, Drawer, Space, Result, Spin } from "antd"
 import { useQueryClient } from "@tanstack/react-query"
 import {
@@ -11,13 +11,14 @@ import {
     BulbFilled,
 } from "@ant-design/icons"
 import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom"
-import Dashboard from "./pages/Dashboard"
-import Accounts from "./pages/Accounts"
-import PlayerDetail from "./pages/PlayerDetail"
-import Mail from "./pages/Mail"
-import Seeds from "./pages/Seeds"
 import Login from "./pages/Login"
 import { ApiError, apiLogin, apiLogout, apiSession, subscribeUnauthorized } from "./api/client"
+
+const Dashboard = lazy(() => import("./pages/Dashboard"))
+const Accounts = lazy(() => import("./pages/Accounts"))
+const PlayerDetail = lazy(() => import("./pages/PlayerDetail"))
+const Mail = lazy(() => import("./pages/Mail"))
+const Seeds = lazy(() => import("./pages/Seeds"))
 
 const { Sider, Content, Header } = Layout
 const { useBreakpoint } = Grid
@@ -139,14 +140,16 @@ export default function App({ dark, onToggleDark }: AppProps) {
                     </Space>
                 </Header>
                 <Content style={{ margin: isMobile ? 12 : 24 }}>
-                    <Routes>
-                        <Route path="/" element={<Dashboard />} />
-                        <Route path="/accounts" element={<Accounts />} />
-                        <Route path="/players/:playerId" element={<PlayerDetail />} />
-                        <Route path="/mail" element={<Mail />} />
-                        <Route path="/seeds" element={<Seeds />} />
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
+                    <Suspense fallback={<div style={{ display: "grid", placeItems: "center", minHeight: 240 }}><Spin size="large" /></div>}>
+                        <Routes>
+                            <Route path="/" element={<Dashboard />} />
+                            <Route path="/accounts" element={<Accounts />} />
+                            <Route path="/players/:playerId" element={<PlayerDetail />} />
+                            <Route path="/mail" element={<Mail />} />
+                            <Route path="/seeds" element={<Seeds />} />
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                    </Suspense>
                 </Content>
             </Layout>
             {isMobile && (

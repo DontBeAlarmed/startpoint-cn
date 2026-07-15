@@ -22,7 +22,25 @@ export default defineConfig(({ mode }) => {
         },
         build: {
             outDir: "../web/dist",
-            emptyOutDir: true
+            emptyOutDir: true,
+            chunkSizeWarningLimit: 900,
+            rollupOptions: {
+                output: {
+                    manualChunks(id) {
+                        if (!id.includes("node_modules")) return undefined
+                        const normalized = id.replaceAll("\\", "/")
+                        if (normalized.includes("/@rc-component/") || /\/node_modules\/rc-[^/]+\//.test(normalized)) {
+                            return "vendor-rc"
+                        }
+                        if (normalized.includes("/antd/") || normalized.includes("/@ant-design/")) {
+                            return "vendor-antd"
+                        }
+                        if (id.includes("@tanstack")) return "vendor-query"
+                        if (id.includes("react") || id.includes("react-router") || normalized.includes("/scheduler/")) return "vendor-react"
+                        return "vendor-misc"
+                    }
+                }
+            }
         }
     }
 })
