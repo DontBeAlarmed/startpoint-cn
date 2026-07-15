@@ -24,20 +24,34 @@ export default defineConfig(({ mode }) => {
             outDir: "../web/dist",
             emptyOutDir: true,
             chunkSizeWarningLimit: 900,
-            rollupOptions: {
+            rolldownOptions: {
                 output: {
-                    manualChunks(id) {
-                        if (!id.includes("node_modules")) return undefined
-                        const normalized = id.replaceAll("\\", "/")
-                        if (normalized.includes("/@rc-component/") || /\/node_modules\/rc-[^/]+\//.test(normalized)) {
-                            return "vendor-rc"
-                        }
-                        if (normalized.includes("/antd/") || normalized.includes("/@ant-design/")) {
-                            return "vendor-antd"
-                        }
-                        if (id.includes("@tanstack")) return "vendor-query"
-                        if (id.includes("react") || id.includes("react-router") || normalized.includes("/scheduler/")) return "vendor-react"
-                        return "vendor-misc"
+                    codeSplitting: {
+                        includeDependenciesRecursively: false,
+                        groups: [
+                            {
+                                name: "vendor-antd",
+                                test: /[\\/]node_modules[\\/](?:antd[\\/]|@ant-design[\\/]|@rc-component[\\/]|rc-[^\\/]+[\\/])/,
+                                priority: 40,
+                                maxSize: 700 * 1024
+                            },
+                            {
+                                name: "vendor-query",
+                                test: /[\\/]node_modules[\\/]@tanstack[\\/]/,
+                                priority: 30
+                            },
+                            {
+                                name: "vendor-react",
+                                test: /[\\/]node_modules[\\/](?:react(?:-dom|-router|-router-dom)?|scheduler|@remix-run)[\\/]/,
+                                priority: 20
+                            },
+                            {
+                                name: "vendor-misc",
+                                test: /[\\/]node_modules[\\/]/,
+                                priority: 10,
+                                maxSize: 600 * 1024
+                            }
+                        ]
                     }
                 }
             }

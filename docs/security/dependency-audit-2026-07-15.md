@@ -40,4 +40,28 @@ Regression evidence:
 
 ## Admin workspace
 
-Pending the Vite migration batch. This section is completed by the admin dependency upgrade so that the two lockfiles remain independently reviewable.
+Before remediation, `npm --prefix admin audit` reported 2 findings: 1 moderate (`esbuild`), 1 high (`vite`), and 0 critical. The installed build tools were `vite@5.4.21` and `@vitejs/plugin-react@4.7.0`.
+
+The selected exact versions are:
+
+- `vite@8.1.4`
+- `@vitejs/plugin-react@6.0.3`
+
+Official migration guidance states that Vite 8 uses Rolldown/Oxc and requires Node 20.19+ or 22.12+. The old `build.rollupOptions.output.manualChunks` compatibility path was replaced with native `build.rolldownOptions.output.codeSplitting`. Size-aware groups preserve route/vendor boundaries without retaining the circular chunk warnings produced by the Rollup-era partition.
+
+Sources:
+
+- [Vite 8 announcement and Node requirement](https://vite.dev/blog/announcing-vite8)
+- [Vite 8 migration guide](https://vite.dev/guide/migration.html)
+- [Vite releases](https://github.com/vitejs/vite/releases)
+- [React plugin releases](https://github.com/vitejs/vite-plugin-react/releases)
+- [Rolldown code-splitting reference](https://rolldown.rs/reference/OutputOptions.codeSplitting)
+
+Final `npm --prefix admin audit` result: 0 low, 0 moderate, 0 high, and 0 critical.
+
+Regression evidence:
+
+- Admin TypeScript typecheck passed.
+- Vite 8 production build and bundle-budget check passed.
+- Largest generated chunk: 269,831 bytes; largest business route chunk: 14,196 bytes.
+- Isolated server mount smoke passed: `/admin/` `200`, SPA fallback `/admin/accounts` `200`, built JavaScript asset `200` with `application/javascript` content type; temporary database and listener were removed afterward.
