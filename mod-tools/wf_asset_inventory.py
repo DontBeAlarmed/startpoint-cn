@@ -85,7 +85,12 @@ def _error_entry(
     )
 
 
-def _scan_directory(root: Path, directory: Path) -> Iterator[InventoryEntry]:
+def _scan_directory(
+    root: Path,
+    directory: Path,
+    *,
+    hash_files: bool,
+) -> Iterator[InventoryEntry]:
     try:
         with os.scandir(directory) as stream:
             children = sorted(list(stream), key=lambda item: _stable_name_key(item.name))
@@ -122,18 +127,19 @@ def _scan_directory(root: Path, directory: Path) -> Iterator[InventoryEntry]:
                     mtime_ns=int(metadata.st_mtime_ns),
                     reparse=False,
                 )
-                yield from _scan_directory(root, target)
+                yield from _scan_directory(root, target, hash_files=hash_files)
                 continue
 
             if stat.S_ISREG(metadata.st_mode):
-                digest = sha256_file(target)
-                after = target.stat(follow_symlinks=False)
-                if (
-                    _is_reparse(after)
-                    or after.st_size != metadata.st_size
-                    or after.st_mtime_ns != metadata.st_mtime_ns
-                ):
-                    raise InventoryError(f"file changed while hashing: {target}")
+                digest = sha256_file(target) if hash_files else None
+                if hash_files:
+                    after = target.stat(follow_symlinks=False)
+                    if (
+                        _is_reparse(after)
+                        or after.st_size != metadata.st_size
+                        or after.st_mtime_ns != metadata.st_mtime_ns
+                    ):
+                        raise InventoryError(f"file changed while hashing: {target}")
                 yield InventoryEntry(
                     root=root,
                     absolute_path=target,
@@ -160,7 +166,7 @@ def _scan_directory(root: Path, directory: Path) -> Iterator[InventoryEntry]:
             yield _error_entry(root, target, metadata, error)
 
 
-def scan_root(root: Path) -> Iterator[InventoryEntry]:
+def scan_root(root: Path, *, hash_files: bool = True) -> Iterator[InventoryEntry]:
     root = Path(os.path.abspath(os.fspath(root)))
     try:
         metadata = root.stat(follow_symlinks=False)
@@ -170,7 +176,7 @@ def scan_root(root: Path) -> Iterator[InventoryEntry]:
         raise InventoryError(f"scan root must not be a reparse point: {root}")
     if not stat.S_ISDIR(metadata.st_mode):
         raise InventoryError(f"scan root is not a directory: {root}")
-    yield from _scan_directory(root, root)
+    yield from _scan_directory(root, root, hash_files=hash_files)
 
 
 def tree_manifest(root: Path) -> TreeManifest:
