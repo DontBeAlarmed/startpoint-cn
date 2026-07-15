@@ -21,7 +21,7 @@ description: >-
 |---|---|
 | 项目根 | `D:\WF\startpoint-cn` |
 | 数据包 store | 由 `mod-tools/profiles.json` 的 active 档案决定(当前锁 `cn` = `弹国服/.../upload`) |
-| 服务端 | `http://192.168.0.130:8001`(LAN IP,见 `.env`),启动用 `start-cn.bat` |
+| 服务端 | base URL 由 `.env` 的 `CN_LISTEN_HOST` / `CN_LISTEN_PORT` 决定(默认 `http://127.0.0.1:8001`),启动用 `start-cn.bat` |
 | 模拟器 | MuMu 12,adb=`D:\WF\MuMuPlayer\nx_main\adb.exe`,device=`127.0.0.1:16384`,包名=`com.leiting.wf` |
 | CDN mod 目录 | `.cdn/cn/archive-common-diff/`(发布的 diff 包落这里) |
 
@@ -351,10 +351,43 @@ curl 验证:`curl -H "res_ver: <客户端版>" -X POST <服务端>/api/index.php
 被 patch 越过导致客户端拉不到新包)。上游未动 shop.ts/lib assets/boss_coin_shop.json,
 商店三处同步与上游兼容。服务端 mod-admin 补丁见 `mod-tools/server-patch/`(更新服务端后套回)。
 
+### 4.1 新角色/整角色包唯一入口
+
+只要任务涉及“创建新角色、克隆角色骨架、补齐整角色资源、发布角色 package 或回滚角色包”，
+**禁止让生成器直接写 live store、`.cdn` 或 `assets`，也禁止直接调用 `wf_publish.py` 发布整包**。
+统一走 `mod-tools/wf_character_flow.py`，完整说明见 `mod-tools/docs/角色包工作流.md`。
+
+```powershell
+$workspace = 'work/character_packs/<package_id>'
+python mod-tools/wf_character_flow.py init --template-id <模板ID> --character-id <新ID> --code-name <code_name> --package-id <package_id>
+python mod-tools/wf_character_flow.py status --workspace $workspace
+python mod-tools/wf_character_flow.py preflight --workspace $workspace
+python mod-tools/wf_character_flow.py rebase --workspace $workspace
+python mod-tools/wf_character_flow.py publish --workspace $workspace --confirm PUBLISH_CHARACTER_PACKAGE
+python mod-tools/wf_character_flow.py rollback --snapshot-dir <发布输出的snapshot_dir> --installed-package-dir <发布时package目录> --confirm ROLLBACK_CHARACTER_PACKAGE
+```
+
+硬门禁：
+
+- production 角色包必须满足 **37/37 必需资产**、`missing_required=[]`、三层声明一致、
+  manifest/hash/seal 全部匹配，且 `preflight` 确认 active release 链和 live 基线未漂移；
+- `story` 与 `words` 两类剧情/台词资源明确排除，不纳入 37 项，也不得顺手复制；
+- 缺少 `character_detail_skill_preview` 等必需资源时是**发布阻塞**。只能补该角色的真实产物，
+  不得复制相似角色、改名占位或只改 manifest/SHA 掩盖缺失；
+- workspace 固定放在忽略的 `work/character_packs/`，状态和哈希缓存可续跑；每次输入变化后重新
+  `status → preflight`，live 表变化后执行 `rebase → preflight`；
+- publish 必须停服并以 `active.json` 原子替换作为提交点。回滚发布更高版本的反向增量，
+  不覆盖历史、不降低 active 版本；旧快照缺少 finalized 摘要时不可手工补造；
+- 命令最后一行是稳定 JSON。自动化按退出码及 `ok`、`release_ready`、`errors`、
+  `next_command` 判断，不解析提示文本。
+
 ## 5. 服务端 / 模拟器管理
 
-- **启动服务端**:双击 `start-cn.bat`(自带端口自检:释放 8001 占用)。或
-  `node --env-file=.env out/cn-server.js`。改了 `src/*.ts` 要先 `npx tsc`。
+- **启动服务端**:双击 `start-cn.bat`，或执行 `./start-cn.bat`。启动器从 `.env` 读取监听地址，
+  检查构建新鲜度并记录受管 PID；发现端口属于其他进程时会拒绝启动，**绝不清理陌生端口占用者**。
+  `./start-cn.bat -CheckOnly` 只检查，`./start-cn.bat -RestartOwned` 只重启经 PID、命令行、入口文件
+  三重确认的本项目进程。直接运行 `node --env-file=.env out/cn-server.js` 仅用于受监督的前台调试。
+  改了 `src/*.ts` 要先 `npm run build:server`。
 - **热重载(mod-admin)**:`POST /api/mod-admin/reload_assets` 让服务端重读 9 个
   mod 常改 json(商店 7 文件 + assets/character.json,见 `src/lib/assets.ts` 的
   `reloadModAssets`),**不用重启**;`GET /api/mod-admin/ping` 探活。GUI 顶部
@@ -369,7 +402,18 @@ curl 验证:`curl -H "res_ver: <客户端版>" -X POST <服务端>/api/index.php
   `MuMuManager.exe info -v all`,当前=1)。该通道下 monkey 参数会被拆坏,启动必须用
   `am start -n com.leiting.wf/com.leiting.sdk.activity.PrivacyActivity`。
   GUI 的 restart_game 已内置此兜底。
-- **验证服务端在线**:`curl http://192.168.0.130:8001/api/server/currentTime`(本机 + 模拟器内都可达才算通)。
+- **验证服务端在线**:按 `.env` 的 `CN_LISTEN_HOST` / `CN_LISTEN_PORT` 请求 `/api/server/currentTime`(本机 + 模拟器内都可达才算通),禁止把某台机器的 LAN IP 写回脚本或文档。
+
+工程改动或发布工具变更后，至少执行：
+
+```powershell
+npm run verify
+npm run test:launcher
+npm run test:hygiene
+npm run check:hygiene
+```
+
+依赖变更还要分别执行根目录和 `admin/` 的 `npm audit`，high/critical 必须为 0。
 
 ## 6. 排查"改了没生效"(按此顺序)
 
@@ -422,3 +466,8 @@ curl 验证:`curl -H "res_ver: <客户端版>" -X POST <服务端>/api/index.php
 4. **数值范围** 0 ~ 2³¹-1;千分比语义确认后再改;断点/键白名单(不新增不存在的键)。
 5. **① 层改动不发 CDN**(重启服务端生效);**② 层改动必发 CDN**(不走 adb 手推)。
 6. 破坏性操作(改 store、删备份)前先确认目标,别动未跟踪的逆向工作区。
+7. **资产整理必须可逆**：先 `scan/plan`，核对证据后 `quarantine`，再 `verify`，并对至少一个
+   小条目完成 `restore → resume quarantine` 演练。隔离不等于删除；`purge` 是独立破坏性动作，
+   只有用户另行明确授权和精确确认口令时才允许执行。
+8. **保留用户工作区**：已有 JSON 修改、`work/`、角色方案文档、反编译目录和本地 package
+   都按用户资产处理；清理只移除能证明可再生的缓存/重复物，不用 `git clean` 代替证据判断。
