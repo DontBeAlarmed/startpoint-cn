@@ -21,6 +21,11 @@ import struct
 from pathlib import Path
 
 import wf_mod_tool as core
+from wf_character_requirements import (
+    AssetRequirement,
+    char_asset_requirements,
+    classify_asset_category,
+)
 
 HERE = Path(__file__).resolve().parent
 # 全角色语音 datamine(537 角色,ally/battle/home 三分类 + voiceLines.json 台词文本)。
@@ -215,54 +220,6 @@ def path_in_root(target_store: Path, root_name: str, logical: str) -> Path:
 
 # ---------------------------------------------------------------- 角色资产清单
 
-# (子路径模板, 分类, 说明/格式要求)
-_CHAR_TEMPLATES = [
-    ("ui/full_shot_1440_1920_0.png", "立绘", "基础立绘。PNG,设计画布 1440x1920(实际可裁边,建议与原图同尺寸,居中构图)"),
-    ("ui/full_shot_1440_1920_1.png", "立绘", "进化/觉醒立绘。PNG,设计画布 1440x1920(同上)"),
-    ("ui/skill_cutin_0.png", "技能cut-in", "技能演出横图。PNG 1024x512(战斗真机只读配对 ATF,替换时自动重编码)"),
-    ("ui/skill_cutin_1.png", "技能cut-in", "进化后技能演出横图。PNG 1024x512(同上,ATF 自动重编码)"),
-    ("ui/illustration_setting_sprite_sheet.png", "图标合集", "头像/队伍小图 sprite sheet(配 .atlas 切割,替换须保持同尺寸同布局)"),
-    ("pixelart/sprite_sheet.png", "像素图", "战斗像素动画 sprite sheet(配 atlas/timeline,同尺寸同布局)"),
-    ("pixelart/special_sprite_sheet.png", "像素图", "技能特殊动作 sprite sheet(同上)"),
-    # 2026-07-06 补全:store 实测均为独立文件(medium 根),非图集切片
-    ("ui/square_0.png", "头像", "方形头像(基础)。PNG,与原图同尺寸"),
-    ("ui/square_1.png", "头像", "方形头像(进化)。PNG,同上"),
-    ("ui/square_132_132_0.png", "头像", "132x132 方形头像(基础)"),
-    ("ui/square_132_132_1.png", "头像", "132x132 方形头像(进化)"),
-    ("ui/square_round_95_95_0.png", "头像", "95x95 圆角头像(基础)"),
-    ("ui/square_round_95_95_1.png", "头像", "95x95 圆角头像(进化)"),
-    ("ui/square_round_136_136_0.png", "头像", "136x136 圆角头像(基础)"),
-    ("ui/square_round_136_136_1.png", "头像", "136x136 圆角头像(进化)"),
-    ("ui/thumb_level_up_0.png", "缩略图", "升级/强化界面缩略图(基础)"),
-    ("ui/thumb_level_up_1.png", "缩略图", "升级/强化界面缩略图(进化)"),
-    ("ui/thumb_party_main_0.png", "缩略图", "编队主位缩略图(基础)"),
-    ("ui/thumb_party_main_1.png", "缩略图", "编队主位缩略图(进化)"),
-    ("ui/thumb_party_unison_0.png", "缩略图", "编队副位缩略图(基础)"),
-    ("ui/thumb_party_unison_1.png", "缩略图", "编队副位缩略图(进化)"),
-    ("ui/battle_control_board_0.png", "战斗UI", "战斗下方技能条立绘(基础)"),
-    ("ui/battle_control_board_1.png", "战斗UI", "战斗下方技能条立绘(进化)"),
-    ("ui/battle_member_status_0.png", "战斗UI", "战斗队员状态小头像(基础)"),
-    ("ui/battle_member_status_1.png", "战斗UI", "战斗队员状态小头像(进化)"),
-    ("ui/cutin_skill_chain_0.png", "连锁cut-in", "技能连锁 cut-in 头像(基础)"),
-    ("ui/cutin_skill_chain_1.png", "连锁cut-in", "技能连锁 cut-in 头像(进化)"),
-    ("ui/episode_banner_0.png", "剧情横幅", "角色剧情列表横幅(基础)"),
-    ("ui/episode_banner_1.png", "剧情横幅", "角色剧情列表横幅(进化)"),
-]
-
-# 配套二进制数据(切割坐标/动画帧/时间轴):不可预览,只支持整文件替换(慎改)
-_COMPANION_TEMPLATES = [
-    ("ui/illustration_setting_sprite_sheet.atlas.amf3.deflate", "图标合集的切割坐标"),
-    ("pixelart/sprite_sheet.atlas.amf3.deflate", "像素图切割坐标"),
-    ("pixelart/special_sprite_sheet.atlas.amf3.deflate", "特殊动作切割坐标"),
-    ("pixelart/pixelart.frame.amf3.deflate", "像素动画帧定义"),
-    ("pixelart/pixelart.timeline.amf3.deflate", "像素动画时间轴"),
-    ("pixelart/special.frame.amf3.deflate", "特殊动作帧定义"),
-    ("pixelart/special.timeline.amf3.deflate", "特殊动作时间轴"),
-    ("ui/skill_cutin_0.atf.deflate", "技能cut-in 的 ATF(ETC1)纹理——战斗真机实际读取的文件;替换 PNG 时 wf_atf 自动重生成"),
-    ("ui/skill_cutin_1.atf.deflate", "同上(进化)"),
-    ("battle/character_detail_skill_preview.battle.amf3.deflate", "角色详情页技能预览战斗数据"),
-]
-
 # 固定名语音(全角色同名,来自 dump 全量 + 路径清单交叉验证):直接探测 store,不依赖采集
 _VOICE_FIXED = (
     "ally/evolution.mp3", "ally/join.mp3",
@@ -375,20 +332,28 @@ def char_asset_manifest(target_store: Path, code_name: str) -> list[dict]:
     out = []
     seen = set()
 
-    def add(logical: str, kind: str, req: str, text: str = ""):
+    def add(requirement: AssetRequirement, text: str | None = None):
+        logical = requirement.logical_path
         if logical in seen:
             return
         seen.add(logical)
         loc = locate(target_store, logical)
-        item = {"logical": logical, "kind": kind, "req": req, "text": text,
+        item = {"logical": logical, "kind": requirement.kind,
+                "req": requirement.requirement,
+                "category": requirement.category,
+                "expected_dims": requirement.expected_dims,
+                "text": requirement.text if text is None else text,
                 "exists": bool(loc), "root": loc[0] if loc else "",
                 "size": loc[1].stat().st_size if loc else 0, "dims": None}
         if loc and logical.endswith(".png"):
             item["dims"] = png_dims(loc[1].read_bytes()[:64])
         out.append(item)
 
-    for sub, kind, req in _CHAR_TEMPLATES:
-        add(f"character/{code_name}/{sub}", kind, req)
+    static_requirements = char_asset_requirements(code_name)
+    for requirement in static_requirements:
+        if requirement.kind == "配套数据":
+            continue
+        add(requirement)
     # 语音四路合并(store 探测过滤,只列真实存在的):
     #   ① datamine dump 清单(带台词文本) ② 固定名+词表全量探测(dump 缺角色/缺分类的兜底)
     #   ③ 运行时采集 ④ 路径清单(words/words_*/login 等变名分类,75% 复原)
@@ -397,26 +362,34 @@ def char_asset_manifest(target_store: Path, code_name: str) -> list[dict]:
     for cat, f, textline in dumped:
         lg = f"character/{code_name}/voice/{cat}/{f}"
         if locate(target_store, lg):
-            add(lg, f"语音·{cat}", voice_req, textline)
+            add(AssetRequirement(lg, f"语音·{cat}",
+                                 classify_asset_category(lg, f"语音·{cat}"),
+                                 voice_req, text=textline))
     for sub in _voice_vocab():
         lg = f"character/{code_name}/voice/{sub}"
         if locate(target_store, lg):
-            add(lg, "语音·" + sub.split("/", 1)[0], voice_req)
+            kind = "语音·" + sub.split("/", 1)[0]
+            add(AssetRequirement(lg, kind, classify_asset_category(lg, kind), voice_req))
     for lg in _harvest_voice_index().get(code_name, []):
-        add(lg, "语音", voice_req)
+        add(AssetRequirement(lg, "语音", classify_asset_category(lg, "语音"), voice_req))
     # 变名资产(剧情表情/剧情语音):路径清单枚举 + store 探测(只列真实存在的)
     for lg in _pathlist_char_index().get(code_name, []):
         if "/ui/story/" in lg and lg.endswith(".png"):
             if locate(target_store, lg):
-                add(lg, "剧情表情", "剧情对话表情差分。PNG,与原图同尺寸")
+                add(AssetRequirement(lg, "剧情表情", "excluded",
+                                     "剧情对话表情差分。PNG,与原图同尺寸"))
         elif "/voice/" in lg and lg.endswith(".mp3"):
             cat = lg.split("/voice/", 1)[1].split("/", 1)[0]
             if locate(target_store, lg):
-                add(lg, "语音·" + cat,
-                    voice_req + ("(剧情台词语音)" if cat.startswith("words") else ""))
-    for sub, desc in _COMPANION_TEMPLATES:
-        add(f"character/{code_name}/{sub}", "配套数据",
-            desc + "(AMF3 二进制,不可预览;仅支持整文件替换,改错会崩,慎动)")
+                kind = "语音·" + cat
+                add(AssetRequirement(
+                    lg, kind, classify_asset_category(lg, kind),
+                    voice_req + ("(剧情台词语音)" if cat.startswith("words") else ""),
+                ))
+    # 保持历史清单顺序：配套二进制始终排在动态语音/剧情资产之后。
+    for requirement in static_requirements:
+        if requirement.kind == "配套数据":
+            add(requirement)
     return out
 
 

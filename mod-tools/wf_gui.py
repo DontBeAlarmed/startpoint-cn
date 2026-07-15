@@ -50,6 +50,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import wf_mod_tool as core  # noqa: E402
 import wf_describe  # noqa: E402  行级中文描述器(逆向布局+枚举直译)
 import wf_assets  # noqa: E402    角色资产(立绘/图标/语音)编解码与清单
+import wf_character_requirements as char_requirements  # noqa: E402  统一 37 项资源契约
 import wf_dsl  # noqa: E402       技能 ActionDsl 数值编辑
 import wf_atf  # noqa: E402       skill_cutin ATF(ETC1)纹理重编码(战斗真机只读 ATF 不读 PNG)
 import wf_boss  # noqa: E402      Boss 数值 + 副本列表(Boss·副本页)
@@ -4265,48 +4266,39 @@ def effect_previews(character: str) -> dict:
             "note": "帧墙=特效贴图按 atlas 切割;完整骨架动画(矩阵补间)在游戏内合成,此处不复刻"}
 
 
-# ---- 资产模板(新角色必要资源检查;剧情类不计入必要) ----
-_TPL_REQUIRED_KINDS = {"立绘", "技能cut-in", "图标合集", "像素图", "头像", "缩略图",
-                       "战斗UI", "连锁cut-in"}
-_TPL_STORY_KINDS = {"剧情横幅", "剧情表情"}
-
-
 def asset_template_check(character: str) -> dict:
     """新角色资产模板完整度:必要项(缺=游戏内空白/崩溃风险)/建议项(语音等体验项)/
     剧情项(用户明确不管)。数据来自 char_asset_manifest + 配套数据探测。"""
     code = _char_code(character)
     manifest = wf_assets.char_asset_manifest(TARGET_STORE, code)
-    groups: dict[str, dict] = {}
-    for a in manifest:
-        kind = a["kind"]
-        if kind.startswith("语音"):
-            cat = "语音(建议)"
-        elif kind in _TPL_STORY_KINDS:
-            cat = "剧情(不检查)"
-        elif kind == "配套数据":
-            cat = "配套数据(必要)"
-        elif kind in _TPL_REQUIRED_KINDS:
-            cat = f"{kind}(必要)"
-        else:
-            cat = kind
-        g = groups.setdefault(cat, {"name": cat, "required": "必要" in cat,
-                                    "items": [], "exists": 0, "total": 0})
-        g["items"].append({"logical": a["logical"], "kind": kind, "exists": a["exists"],
-                           "dims": a.get("dims"), "size": a["size"], "req": a.get("req", ""),
-                           "text": a.get("text", "")})
-        g["total"] += 1
-        g["exists"] += 1 if a["exists"] else 0
-    req_total = sum(g["total"] for g in groups.values() if g["required"])
-    req_ok = sum(g["exists"] for g in groups.values() if g["required"])
-    missing = [i["logical"] for g in groups.values() if g["required"]
-               for i in g["items"] if not i["exists"]]
-    return {"character": str(character), "code": code,
-            "groups": sorted(groups.values(), key=lambda g: (not g["required"], g["name"])),
-            "required_total": req_total, "required_exists": req_ok,
-            "pct": round(req_ok * 100 / req_total) if req_total else 0,
-            "missing_required": missing,
-            "note": "必要=界面/战斗直接引用,缺失显示空白(不一定崩);建议=语音;"
-                    "克隆(资产独立)会整套复制模板,替换后逐项生效"}
+    requirements = tuple(
+        char_requirements.AssetRequirement(
+            logical_path=a["logical"],
+            kind=a["kind"],
+            category=a.get("category") or
+            char_requirements.classify_asset_category(a["logical"], a["kind"]),
+            requirement=a.get("req", ""),
+            expected_dims=a.get("expected_dims"),
+            text=a.get("text", ""),
+        )
+        for a in manifest
+    )
+    metadata = {
+        a["logical"]: {
+            "dims": a.get("dims"),
+            "size": a.get("size", 0),
+            "text": a.get("text", ""),
+        }
+        for a in manifest if a.get("exists")
+    }
+    report = char_requirements.build_requirement_report(requirements, metadata)
+    return {
+        "character": str(character),
+        "code": code,
+        **report,
+        "note": "必要=界面/战斗直接引用,缺失显示空白(不一定崩);建议=语音;"
+                "克隆(资产独立)会整套复制模板,替换后逐项生效",
+    }
 
 
 # ---- 技能效果摘要(DSL 命令树 → 可读分组) ----
