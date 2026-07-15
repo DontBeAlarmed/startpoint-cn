@@ -43,6 +43,19 @@ Fastify + TypeScript，CN 服务入口 `src/cn-server.ts`（端口 8001），国
 - PlayerDetail：账号设置字段/时间字段编辑、存档导入（`POST /:id/save` multipart）、清除接收历史按钮、表格搜索
 - M4 前需：`/` 重定向到 `/admin`、删除 `web/pages`+`routes/web`+`web/public/player.js`（须作者同意）
 
+## 工程基线（2026-07-15）
+
+- Node.js 最低版本 `20.19.0`；根目录和 `admin/` 使用 `npm ci`，不得绕过 lockfile。
+- Fastify 5 与插件版本已锁定在已验证兼容组；Vite 8/Rolldown 已启用按路由拆包和构建预算。
+- Windows 启动入口为 `start-cn.bat`：从 `.env` 读取地址，校验构建新鲜度和 PID 所有权；
+  端口属于陌生进程时必须拒绝，禁止按端口或进程名直接终止。
+- Linux `scripts/start-cn.sh` 以前台方式运行，生命周期交给终端或 systemd；禁止恢复宽泛进程匹配。
+- 新角色整包必须走 `mod-tools/wf_character_flow.py`：production 发布要求 37/37 必需资产、
+  完整 manifest/hash/seal、三层一致和无漂移 preflight；普通单表修改才直接走 `wf_publish.py`。
+- 资产整理必须执行 `scan → plan → preflight → quarantine → verify → restore drill`。
+  隔离不等于删除，`purge` 需要单独明确授权和精确确认口令。
+- 当前工程验收证据见 `docs/engineering-verification-2026-07-15.md`。
+
 ## 硬性约束
 
 - **迁移期间旧后台零改动**：`web/pages/`、`src/routes/web/`、`web/public/` 在 M4 之前不许修改/删除
@@ -50,18 +63,25 @@ Fastify + TypeScript，CN 服务入口 `src/cn-server.ts`（端口 8001），国
 - 定期 `git rebase origin/main`
 - 全仓 LF（`.gitattributes` 已配置）；不要提交 `web/dist`、`admin/node_modules`
 - 未跟踪的 `decompile/`、`ffdec_26.2.1/`、`mod-tools/`、`pc-run/`、`弹国服/`、`assets/*.backup.json` 是本地逆向工作区，别动也别提交
+- 已修改的 `assets/*.json`、`assets/cdndata/*.json`、`work/` 和未跟踪角色方案文档默认属于用户 WIP；
+  未证明归属前不覆盖、不还原、不提交，也不得用 `git clean` 批量处理
+- 依赖变更后根目录与 `admin/` 的 `npm audit` high/critical 必须为 0
 
 ## 常用命令
 
 ```bash
-npm run typecheck        # 服务端 TS 检查
-npm run dev:cn           # 构建 + 启动 CN 服务(8001)，/admin 即新后台
+npm run verify           # 服务端/后台/Python 工具完整验收
+npm run test:launcher    # Windows + Linux 启动安全门禁
+npm run test:hygiene     # 仓库卫生检查器隔离测试
+npm run check:hygiene    # 全仓路径安全扫描
+npm run dev:cn           # 构建 + 前台启动 CN 服务(8001)
 npm run dev:admin        # Vite 热更新(5173)，/api 代理到 8001
-npm run build:admin      # 构建 SPA 到 web/dist
+npm run build:admin      # 构建 SPA 到 web/dist，并执行 bundle budget
 ```
 
 ## 已知坑
 
 - 玩家详情数据量大（角色/道具数千行），前端用 AntD Table 虚拟滚动或分页
 - `@fastify/multipart` 已在 web_api 注册（存档导入用），新端点勿重复注册
-- AntD 全量引入 bundle 573KB，M3 后考虑 manualChunks 拆分
+- 后台已按页面 lazy-load，并由 Vite 8/Rolldown 拆包；修改依赖分组或路由后必须保留
+  `admin/scripts/check-bundle.mjs` 的单 chunk 与业务路由预算，不能用提高阈值掩盖回归

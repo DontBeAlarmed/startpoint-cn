@@ -1,121 +1,175 @@
-# 公网部署完整指南（从零到运行）
+# StarPoint CN 部署与运维指南
 
-## 核心原则
+本文覆盖本机 Windows 验收和 Linux 公网部署。管理接口同时使用应用令牌与反向代理边界；
+`8001` 不应直接暴露公网，`/admin/` 也不应绕过 nginx 的 IP/Basic Auth 防线。
 
-**管理面板和控制台绝不能直接暴露在公网**。使用 nginx 反向代理隔离，仅转发游戏 API 和 CDN 资源。
+## 1. 运行基线
 
----
-
-## 1. 环境准备
+- Node.js `>=20.19.0`（与根 `package.json` 的 `engines` 一致）；
+- 使用 lockfile 安装：根目录和 `admin/` 均执行 `npm ci`；
+- `web/dist` 是本地产物，不提交 Git；部署前必须执行 `npm run build:admin`；
+- 根目录与 `admin/` 的 high/critical audit 必须为 0。
 
 ```bash
-# Ubuntu / Debian
-sudo apt update && sudo apt install -y \
-  nodejs npm nginx certbot python3-certbot-nginx \
-  git apache2-utils sqlite3
-
-# Node.js ≥ 20.0.0（系统默认版本可能不够，推荐 fnm 管理版本）
-node -v
+node --version
+npm ci
+npm --prefix admin ci
+npm audit
+npm --prefix admin audit
+npm run verify
 ```
 
-如果 `node -v` 显示版本低于 20：
+`npm run verify` 会依次检查服务端类型、Node 测试、后台类型和构建体积、Python 工具测试。
+启动器与仓库卫生门禁需另外执行：
 
 ```bash
-# 用 fnm 安装（推荐）
-curl -fsSL https://fnm.vercel.app/install | bash
-fnm install 20
-fnm use 20
+npm run test:launcher
+npm run test:hygiene
+npm run check:hygiene
 ```
 
----
+## 2. 本机 Windows 安全运行
 
-## 2. 克隆项目 & 安装依赖
+复制配置并生成管理令牌：
+
+```powershell
+Copy-Item .env.example .env
+./scripts/generate-admin-token.ps1
+```
+
+若 `.env` 已有令牌，需要主动轮换时使用 `-Rotate`。脚本只输出令牌指纹，不打印令牌正文。
+
+```powershell
+./start-cn.bat -CheckOnly       # 只检查环境、端口归属和构建新鲜度
+./start-cn.bat                  # 前台运行，Ctrl-C 停止
+./start-cn.bat -RestartOwned    # 只重启本项目 PID 记录确认的进程
+```
+
+Windows 启动器根据 PID 记录、Node 命令行和 `out/cn-server.js` 入口三重确认所有权。
+端口属于其他进程时会拒绝启动，不会终止陌生进程。地址和端口取自 `.env` 的
+`CN_LISTEN_HOST` / `CN_LISTEN_PORT`，不要把某台机器的 LAN IP 写死进脚本。
+
+管理后台地址为 `http://<CN_LISTEN_HOST>:<CN_LISTEN_PORT>/admin/`。
+
+## 3. Linux 准备与资源
+
+以 Ubuntu/Debian 为例：
 
 ```bash
-# 要玩「深渊连战 + 深渊武器」两个自制模式,必须 clone release/modes-20260714 分支(默认 main 没有)
+sudo apt update
+sudo apt install -y nginx certbot python3-certbot-nginx git apache2-utils sqlite3 openssl
+```
+
+使用 fnm、发行版 NodeSource 包或其他受维护方式安装 Node 20.19+，然后克隆项目：
+
+```bash
 git clone -b release/modes-20260714 https://github.com/kuronzzhan-droid/startpoint-cn.git starpoint-cn
 cd starpoint-cn
-npm install
+npm ci
+npm --prefix admin ci
 ```
 
-> 想玩两个自制模式的完整自建流程(含客户端三合一补丁),见 [`docs/self-host-modes.md`](./self-host-modes.md)。
+需要“深渊连战 + 深渊武器”完整自建流程时，再阅读
+[`self-host-modes.md`](./self-host-modes.md)。
 
----
+将 CN CDN 资源放入 `.cdn/cn/`（约 10 GB）：
 
-## 3. CDN 资源
-
-将 CN CDN 资源放入 `.cdn/cn/` 目录（约 10 GB，从官方 CDN 下载或本地上传）：
-
-```bash
-# 确保以下结构存在
-ls .cdn/cn/
-# EntityLists/       ← 必须同时有 PathFile 和 10939-android_medium.csv
-# production/        ← 所有 CDN 资源文件
-# archive-*/         ← 版本化的 sha1+salt 命名归档
+```text
+.cdn/cn/
+├─ EntityLists/       # PathFile 与 10939-android_medium.csv
+├─ production/
+└─ archive-*/
 ```
 
-`EntityLists/` 目录需要两套命名的同内容文件：
+两份 EntityList 必须内容一致。资源结构说明见 [`cdn/overview.md`](./cdn/overview.md)。
 
-```bash
-cd .cdn/cn/EntityLists/
-# 如果只有 PathFile，复制一份改名
-cp PathFile 10939-android_medium.csv   # 反之亦然
-```
-
-> 详见 [`docs/cdn/overview.md`](./cdn/overview.md)
-
----
-
-## 4. 配置 `.env`
+## 4. `.env` 与管理鉴权
 
 ```bash
 cp .env.example .env
+TOKEN="$(openssl rand -hex 32)"
+printf '\nCN_ADMIN_TOKEN="%s"\n' "$TOKEN" >> .env
+unset TOKEN
+chmod 600 .env
 ```
 
-编辑 `.env`，找到公网部署区块（以 `# ═══════ 公网部署 ═══════` 标注），取消注释并填入实际值：
+公网部署的关键项：
 
-```bash
-# 公网部署 — 取消注释，<YOUR_DOMAIN> 替换为你的实际域名
-CN_LISTEN_HOST="127.0.0.1"                        # 仅监听本地，由 nginx 代理
-CDN_BASE_URL="https://<YOUR_DOMAIN>/patch/cn"     # 公网域名 + HTTPS
-SESSION_PUBLIC_HOST="<YOUR_DOMAIN>"               # 联机 TCP 公网地址
-
-# 确认局域网部署区块的值也被注释或改为上方值
-# CN_LISTEN_HOST 只能有一个未注释的值
+```dotenv
+CN_LISTEN_HOST="127.0.0.1"
+CN_LISTEN_PORT="8001"
+CDN_BASE_URL="https://<YOUR_DOMAIN>/patch/cn"
+SESSION_PUBLIC_HOST="<YOUR_DOMAIN>"
+CN_ADMIN_COOKIE_SECURE="true"
 ```
 
-完整 `.env` 各字段说明见文件内注释。
+`CN_ADMIN_TOKEN` 至少 32 UTF-8 字节。非 loopback 监听没有令牌时服务端会拒绝启动；
+`CN_ADMIN_ALLOW_INSECURE_LOOPBACK=true` 只允许纯本机临时开发，不能用于 LAN/公网。
+后台登录成功后使用带签名、限时的 HttpOnly 会话 cookie；管理 API 也支持
+`Authorization: Bearer <CN_ADMIN_TOKEN>`。
 
----
+## 5. 构建、前台启动与 systemd
 
-## 5. 域名 & SSL 证书
+先执行完整验收和构建：
 
 ```bash
-# 将域名 DNS 解析到你的服务器 IP
-# 然后申请 Let's Encrypt 免费证书
+npm audit
+npm --prefix admin audit
+npm run verify
+bash scripts/start-cn.sh --check-only
+```
+
+Linux 启动器以前台方式运行，不做宽泛进程匹配，也不自动终止已有监听者：
+
+```bash
+bash scripts/start-cn.sh
+```
+
+生产环境建议交给 systemd 管理生命周期。下面的用户、路径和 Node 路径需要按实际环境替换：
+
+```ini
+# /etc/systemd/system/starpoint-cn.service
+[Unit]
+Description=StarPoint CN
+After=network.target
+
+[Service]
+Type=simple
+User=starpoint
+WorkingDirectory=/srv/starpoint-cn
+ExecStart=/usr/bin/node --env-file=/srv/starpoint-cn/.env /srv/starpoint-cn/out/cn-server.js
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now starpoint-cn
+sudo systemctl status starpoint-cn
+journalctl -u starpoint-cn -f
+```
+
+代码或依赖更新时，先停服务，再执行 `npm ci`、`npm --prefix admin ci`、`npm run verify`，
+最后 `sudo systemctl restart starpoint-cn`。不要用进程名范围匹配代替服务管理器。
+
+## 6. 域名、TLS 与 nginx
+
+域名解析到服务器后申请证书：
+
+```bash
 sudo certbot certonly --standalone -d <YOUR_DOMAIN>
-# 或如果 nginx 已运行：
-sudo certbot --nginx -d <YOUR_DOMAIN>
-
-# 验证自动续期
 sudo certbot renew --dry-run
+sudo htpasswd -c /etc/nginx/.htpasswd admin
 ```
 
----
-
-## 6. nginx 反向代理
-
-### 6.1 创建站点配置
-
-```bash
-sudo nano /etc/nginx/sites-available/starpoint
-```
-
-填入以下配置（**替换所有 `<YOUR_DOMAIN>` 为你的实际域名**）：
+nginx 站点示例（替换域名和内网网段）：
 
 ```nginx
-# 速率限制 zone 定义（放在 server 块外的 http 块中）
-# 如果你的 nginx.conf 没有单独配置，就在此 server 块前定义
 limit_req_zone $binary_remote_addr zone=api:10m rate=20r/s;
 limit_req_zone $binary_remote_addr zone=diagnostics:10m rate=1r/s;
 
@@ -123,52 +177,53 @@ server {
     listen 443 ssl http2;
     server_name <YOUR_DOMAIN>;
 
-    # SSL 证书（certbot 自动填入或手动指定）
     ssl_certificate     /etc/letsencrypt/live/<YOUR_DOMAIN>/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/<YOUR_DOMAIN>/privkey.pem;
-
     client_max_body_size 64k;
 
-    # ── 游戏 API → Fastify ──
+    # 游戏 API：公网客户端需要
     location /api/index.php/ {
         limit_req zone=api burst=30 nodelay;
         proxy_pass http://127.0.0.1:8001;
         proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # ── CN CDN 静态资源 ──
+    # CN CDN：公网客户端需要
     location /patch/cn/ {
         proxy_pass http://127.0.0.1:8001;
         proxy_set_header Host $host;
     }
 
-    # ── 诊断端点（严格限速） ──
-    location /crash {
-        limit_req zone=diagnostics burst=2;
-        proxy_pass http://127.0.0.1:8001;
-    }
-    location /debug {
+    location = /crash {
         limit_req zone=diagnostics burst=2;
         proxy_pass http://127.0.0.1:8001;
     }
 
-    # ── 管理面板（内网 only + 密码保护） ──
+    location = /debug {
+        limit_req zone=diagnostics burst=2;
+        proxy_pass http://127.0.0.1:8001;
+    }
+
+    # 其余路径（含 /admin/ 与管理 API）：内网/VPN + Basic Auth。
+    # 服务端自己的 CN_ADMIN_TOKEN 仍然必须启用，形成第二层防线。
     location / {
         allow 10.0.0.0/8;
         allow 172.16.0.0/12;
-        allow <YOUR_LAN_SUBNET>;               # 替换为你的实际内网网段
+        allow <YOUR_LAN_SUBNET>;
         deny all;
 
-        auth_basic "Admin Panel";
+        auth_basic "StarPoint Admin";
         auth_basic_user_file /etc/nginx/.htpasswd;
 
         proxy_pass http://127.0.0.1:8001;
         proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 
-# HTTP → HTTPS 永久重定向
 server {
     listen 80;
     server_name <YOUR_DOMAIN>;
@@ -176,175 +231,104 @@ server {
 }
 ```
 
-### 6.2 创建管理面板密码
-
 ```bash
-sudo htpasswd -c /etc/nginx/.htpasswd admin
-# 输入密码
-```
-
-### 6.3 启用站点
-
-```bash
-sudo ln -sf /etc/nginx/sites-available/starpoint /etc/nginx/sites-enabled/
-sudo nginx -t                     # 检查配置语法
+sudo ln -sf /etc/nginx/sites-available/starpoint /etc/nginx/sites-enabled/starpoint
+sudo nginx -t
 sudo systemctl reload nginx
 ```
 
----
+## 7. 防火墙
 
-## 7. 防火墙（iptables）
+不要清空一台已有服务器的防火墙规则。新机器可用 UFW 建立最小放行集：
 
 ```bash
-# 清空现有规则（谨慎！已经有精细规则则跳过此步）
-sudo iptables -F
-
-# 只允许本地 nginx → Fastify 8001
-sudo iptables -A INPUT -p tcp --dport 8001 -s 127.0.0.1 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 8001 -j DROP
-
-# TCP 联机 8003（可选，见第 11 步）
-sudo iptables -A INPUT -p tcp --dport 8003 -j ACCEPT
-
-# SSH
-sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
-
-# HTTP/HTTPS（nginx 对外）
-sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
-
-# 已建立连接的响应包放行
-sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-
-# 默认拒绝所有入站
-sudo iptables -P INPUT DROP
-
-# 持久化（重启后保留）
-sudo apt install -y iptables-persistent
-sudo netfilter-persistent save
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow 8003/tcp        # 仅启用联机 TCP 时
+sudo ufw enable
+sudo ufw status verbose
 ```
 
----
+`8001` 只监听 `127.0.0.1`，不应添加公网放行规则。
 
-## 8. 构建 & 启动
-
-```bash
-# 一键构建 + 重启 + 日志
-bash scripts/start-cn.sh
-
-# 查看日志确认启动成功
-tail -f /tmp/cn-server.log
-# 预期输出：CN StarPoint listening on http://127.0.0.1:8001
-```
-
-### 手动方式（备选）
+## 8. 部署验收
 
 ```bash
-npm run build
-pkill -f "cn-server.js"  2>/dev/null; sleep 1
-nohup node --env-file=.env out/cn-server.js > /tmp/cn-server.log 2>&1 &
-```
-
-### 管理面板访问
-
-通过 VPN 或 SSH 隧道访问管理面板：
-
-```bash
-# 在你的本地机器上建立 SSH 隧道
-ssh -L 8001:127.0.0.1:8001 user@<SERVER_IP>
-# 然后浏览器打开 http://127.0.0.1:8001/
-```
-
----
-
-## 9. 验证部署
-
-```bash
-# 1. 查看监听端口（应只有 127.0.0.1 上）
+# 只监听 loopback
 ss -tlnp | grep 8001
-# 输出：127.0.0.1:8001  ← 公网不可达
 
-# 2. 公网访问测试（从外部机器执行）
-curl -s -o /dev/null -w "%{http_code}" http://<SERVER_IP>:8001/
-# 预期：000（被防火墙拦截）
+# 游戏 API 与 CDN
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  https://<YOUR_DOMAIN>/api/index.php/tool/get_header_response
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  https://<YOUR_DOMAIN>/patch/cn/
 
-# 3. API 端点测试
-curl -s -o /dev/null -w "%{http_code}" https://<YOUR_DOMAIN>/api/index.php/tool/get_header_response
-# 预期：200
+# 管理面必须先被 nginx Basic Auth 拦截
+curl -sS -o /dev/null -w '%{http_code}\n' https://<YOUR_DOMAIN>/admin/
 
-# 4. 管理面板拦截测试
-curl -s -o /dev/null -w "%{http_code}" https://<YOUR_DOMAIN>/
-# 预期：401 Unauthorized（需要 Basic Auth 密码）
-
-# 5. 服务端安全日志
-tail -20 /tmp/cn-server.log | grep -E "CN StarPoint|SEED|TCP|listen"
+# 应用层管理 API：无令牌 401，Bearer 令牌 200
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8001/api/server/currentTime
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Bearer <CN_ADMIN_TOKEN>" \
+  http://127.0.0.1:8001/api/server/currentTime
 ```
 
----
+还要验证 `/admin/` 和至少一个 SPA 子路由（如 `/admin/accounts`）都返回 HTML，JS 资源返回
+JavaScript MIME，并确认服务停止后端口释放。
 
-## 10. 客户端 APK 改造
+## 9. 可逆资产维护
 
-需要修改官方 APK 连接到你的服务器。详见 [`client-patch/README.md`](../client-patch/README.md)：
+资产整理不是直接删除。固定顺序为 `scan → plan → preflight → quarantine → verify → restore drill`：
 
-- **免登录** — `DevConfig.as`:`sdkDummy = false` → `true`
-- **重定向** — 域名改为 `https://<YOUR_DOMAIN>`
+```powershell
+$runDir = 'work/remediation/<run-id>'
+$policy = 'mod-tools/asset-maintenance-policy-v1.json'
+$quarantine = 'D:\WF\asset-quarantine\startpoint-cn-<run-id>'
 
----
-
-## 11. 联机 TCP（默认启用）
-
-联机战斗需要客户端直连 TCP 端口 8003。
-
-### `.env` 配置
-
-```bash
-SESSION_HOST="0.0.0.0"               # TCP 公网监听（.env.example 已默认）
-SESSION_PUBLIC_HOST="<YOUR_DOMAIN>"   # 客户端连接的公网地址
+python mod-tools/wf_asset_maintenance.py scan --repo-root D:\WF\startpoint-cn --policy $policy --run-dir $runDir
+# 先把当前已验证的 CDN release graph 导出为 $runDir/cdn-graph.json；图不可达或 issues 非空时停止。
+python mod-tools/wf_asset_maintenance.py plan --scan "$runDir/scan.jsonl" --cdn-graph "$runDir/cdn-graph.json" --policy $policy
+python mod-tools/wf_asset_maintenance.py verify --plan "$runDir/plan.json" --mode preflight
+python mod-tools/wf_asset_maintenance.py quarantine --plan "$runDir/plan.json" --quarantine-root $quarantine
+python mod-tools/wf_asset_maintenance.py verify --manifest "$quarantine/manifest.jsonl"
 ```
 
-### 防火墙
+从 manifest 选择一个小条目执行恢复演练，再恢复隔离状态：
 
-```bash
-# 已在第 7 步配置
-sudo iptables -A INPUT -p tcp --dport 8003 -j ACCEPT
+```powershell
+python mod-tools/wf_asset_maintenance.py restore --manifest "$quarantine/manifest.jsonl" --id <entry-id>
+python mod-tools/wf_asset_maintenance.py quarantine --resume --manifest "$quarantine/manifest.jsonl" --id <entry-id>
+python mod-tools/wf_asset_maintenance.py verify --manifest "$quarantine/manifest.jsonl"
 ```
 
-### 如需关闭联机
+`purge` 是独立、不可逆动作。隔离成功不构成永久删除授权；没有用户另行明确授权和精确确认口令时，
+保持隔离即可。不要对本地逆向目录、角色 workspace 或未提交 JSON 使用 `git clean`。
 
-```bash
-# 防火墙阻止 8003 + .env 改为 SESSION_HOST="127.0.0.1"
-sudo iptables -D INPUT -p tcp --dport 8003 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 8003 -s 127.0.0.1 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 8003 -j DROP
+## 10. 客户端与联机 TCP
+
+客户端 APK 重定向见 [`client-patch/README.md`](../client-patch/README.md)：
+
+- `DevConfig.as`：`sdkDummy = false` 改为 `true`；
+- 服务域名改为 `https://<YOUR_DOMAIN>`。
+
+联机战斗默认使用 TCP `8003`：
+
+```dotenv
+SESSION_HOST="0.0.0.0"
+SESSION_PUBLIC_HOST="<YOUR_DOMAIN>"
 ```
 
-### 安全
+TCP 目前为明文传输；只在需要联机时开放端口，并避免传输敏感内容。不需要联机时将
+`SESSION_HOST` 改为 `127.0.0.1` 并关闭公网 `8003`。
 
-- TCP 联机为**明文传输**，无 TLS 加密。未来可通过 nginx stream 模块添加 TLS 层
-- 服务端已内置连接管理和房间过期清理，无需额外配置
+## 11. 已知边界
 
----
-
-## 安全加固清单
-
-| # | 检查项 | 状态 |
-|---|--------|:---:|
-| 1 | CN 会话 token 使用随机数（非自增 ID） | ✅ `tool.ts` |
-| 2 | `contentsGuide.ts` 验证 session | ✅ `contentsGuide.ts` |
-| 3 | `/crash` 速率限制（30次/60秒）；`/debug` 不限速（游戏beacon流量大） | ✅ `cn-server.ts` |
-| 4 | 请求体大小限制 64KB | ✅ `cn-server.ts` |
-| 5 | `CN_LISTEN_HOST="127.0.0.1"`（仅本地监听） | ✅ `.env` |
-| 6 | nginx 反向代理（443 + SSL） | ✅ 第 6 步 |
-| 7 | 管理面板 IP 白名单 + HTTP Basic Auth | ✅ 第 6.2 步 |
-| 8 | 防火墙只允许 22/80/443/8003 | ✅ 第 7 步 |
-
----
-
-## 已知局限性
-
-| 项目 | 风险 | 缓解 |
-|------|------|------|
-| Web 管理面板无应用层认证 | 内网用户可操作 | nginx `allow` IP + `auth_basic` |
-| TCP 联机无 TLS | 明文传输 | 可加 nginx stream TLS；已有连接数管理和房间过期 |
-| 支付端点无真实验证 | 本地支付绕过 | 设计如此（自建服），不对外 |
-| 日志不脱敏 | 可能记录设备 ID | crash 截断至 2000 字符 |
+| 项目 | 当前状态 | 运维措施 |
+|---|---|---|
+| 管理面 | 应用令牌 + 8 小时签名会话 | nginx 内网/VPN + Basic Auth 继续作为纵深防御 |
+| TCP 联机 | 无 TLS | 按需开放 8003，不承载敏感数据 |
+| 支付端点 | 自建服测试语义 | 不作为真实支付系统对外提供 |
+| 日志 | 可能含设备标识 | 限制日志权限、保留期和对外分享范围 |
