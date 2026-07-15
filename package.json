@@ -4,19 +4,26 @@
   "description": "世界弹射物语(World Flipper)CN(雷霆)版本服务端模拟器",
   "main": "server.ts",
   "scripts": {
-    "build": "npx tsc && npm run css",
+    "build": "npm run build:server && npm run css",
+    "build:server": "tsc",
     "typecheck": "tsc --noEmit",
+    "test:node": "npm run build:server && node --test out/tests",
+    "test:python": "python -m unittest discover -s mod-tools/tests -p \"test_*.py\"",
     "css": "npx tailwindcss -i ./src/input.css -o ./web/public/tailwind.css",
     "css:watch": "npx tailwindcss -i ./src/input.css -o ./web/public/tailwind.css --watch --poll",
     "dev": "npm run build && node --env-file=.env out/server.js",
-    "cdn": "npx tsc & node --env-file=.env out/validate_cdn.js",
-    "unzip": "npx tsc & node --env-file=.env out/unzip_cdn.js",
-    "debug": "npm run css && npm run css:watch & npm run debug:ts-only",
+    "cdn": "npm run build:server && node --env-file=.env out/validate_cdn.js",
+    "unzip": "npm run build:server && node --env-file=.env out/unzip_cdn.js",
+    "debug": "npm run css && npm run debug:ts-only",
     "debug:ts-only": "tsnd --inspect -- src/server.ts",
     "dev:cn": "npm run build && node --env-file=.env out/cn-server.js",
     "debug:cn": "tsnd --env-file=.env -- src/cn-server.ts",
-    "build:admin": "cd admin && npm install && npm run build",
-    "dev:admin": "cd admin && npm run dev"
+    "build:admin": "npm --prefix admin run build",
+    "typecheck:admin": "npm --prefix admin run typecheck",
+    "dev:admin": "npm --prefix admin run dev",
+    "test:hygiene": "bash scripts/tests/test-hygiene.sh",
+    "test:launcher": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/test-start-cn.ps1",
+    "verify": "npm run typecheck && npm run test:node && npm run typecheck:admin && npm run build:admin && npm run test:python"
   },
   "author": "",
   "license": "GPL-3.0-or-later",
@@ -43,6 +50,6 @@
     "unzipper": "^0.12.3"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.19.0"
   }
 }
