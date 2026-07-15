@@ -8,7 +8,7 @@ start "" "%~dp0start-cn.bat"
 
 rem ---- 2) wait for server on 8001 (max ~30s) ----
 echo [WAIT] server on 8001 ...
-powershell -NoProfile -Command "$ok=$false; foreach($i in 1..30){ try{ Invoke-RestMethod 'http://192.168.0.130:8001/api/server/currentTime' -TimeoutSec 2 | Out-Null; $ok=$true; break } catch { Start-Sleep 1 } }; if(-not $ok){ exit 1 }"
+powershell -NoProfile -Command "$ok=$false; foreach($i in 1..30){ try{ Invoke-RestMethod 'http://192.168.0.130:8001/api/admin-auth/session' -TimeoutSec 2 | Out-Null; $ok=$true; break } catch { Start-Sleep 1 } }; if(-not $ok){ exit 1 }"
 if errorlevel 1 echo [WARN] server not confirmed in 30s, opening pages anyway
 
 rem ---- 3) mod GUI window (port 18803; 8765 is taken by an IME on this PC) ----

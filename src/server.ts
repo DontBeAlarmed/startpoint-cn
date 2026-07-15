@@ -3,6 +3,7 @@ import { ContentTypeParserDoneFunction } from "fastify/types/content-type-parser
 import fastifyStatic from "@fastify/static";
 import { pack, unpack } from "msgpackr";
 import path from "path";
+import { installAdminGuard, loadAdminAuthConfig } from "./lib/admin-auth";
 // api routes
 import apiPlugin from "./routes/api";
 import assetApiPlugin from "./routes/api/asset";
@@ -47,6 +48,10 @@ import infodeskPlugin from "./routes/infodesk";
 const fastify = Fastify({
     logger: false
 })
+
+const configuredListenHost = process.env.LISTEN_HOST ?? "localhost";
+const adminAuthConfig = loadAdminAuthConfig(process.env, configuredListenHost);
+installAdminGuard(fastify, adminAuthConfig);
 
 // serializers
 fastify.addHook('onSend', (_, reply, payload, done) => {
@@ -132,7 +137,7 @@ fastify.register(infodeskPlugin, { prefix: "/infodesk" })
 fastify.register(indexWebPlugin, { prefix: "/" })
 
 // web api routes
-fastify.register(indexWebApiPlugin, { prefix: "/api" })
+fastify.register(indexWebApiPlugin, { prefix: "/api", adminAuthConfig })
 
 // web static
 fastify.register(fastifyStatic, {
@@ -150,7 +155,7 @@ fastify.register(fastifyStatic, {
 })
 
 // listen
-const listenHost = process.env.LISTEN_HOST ?? "localhost"
+const listenHost = configuredListenHost
 
 const envListenPort = process.env.LISTEN_PORT === undefined ? 8000 : Number.parseInt(process.env.LISTEN_PORT)
 const listenPort = isNaN(envListenPort) ? 8000 : envListenPort
@@ -161,4 +166,5 @@ fastify.listen({ port: listenPort, host: listenHost }, (err, address) => {
         process.exit(1)
     }
     console.log(`StarPoint is listening on http://${listenHost}:${listenPort}`)
+    console.log(`[admin-auth] mode=${adminAuthConfig.mode}; secure_cookie=${adminAuthConfig.cookieSecure}`)
 })

@@ -16,7 +16,7 @@
       # 一条命令整局重开:杀游戏→清状态→随机换无尽boss战场(发布)→拉起游戏
 选项:
   --name <存档名>    默认 肉鸽空武器
-  --server <url>     默认 WF_SERVER_URL 环境变量,再退 http://192.168.0.130:8001
+  --server <url>     默认 WF_SERVER_URL,再读项目 .env,最后回退 127.0.0.1:8001
   --keep-active      克隆后默认存档留在新档(默认会切回原存档,防止误登)
   --reset <id>       不克隆,直接重置指定存档的 run 状态(装备/魂珠道具/编队引用/
                      rush 活动进度与已用队伍全清,角色练度与其余道具保留);改后重启游戏生效
@@ -34,6 +34,9 @@ import sqlite3
 import subprocess
 import sys
 import urllib.request
+from pathlib import Path
+
+import wf_server_auth
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(ROOT, ".database", "wdfp_data.db")
@@ -46,10 +49,12 @@ RUSH_QUEST_LOGICAL = "master/quest/event/rush_event_quest.orderedmap"
 def api_post(server: str, path: str, query: str = "", body: dict | None = None) -> dict:
     url = f"{server}{path}" + (f"?{query}" if query else "")
     data = json.dumps(body).encode("utf-8") if body is not None else b""
-    req = urllib.request.Request(url, data=data, method="POST", headers={
+    headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
-    })
+        **wf_server_auth.admin_bearer_headers(Path(ROOT)),
+    }
+    req = urllib.request.Request(url, data=data, method="POST", headers=headers)
     with urllib.request.urlopen(req, timeout=15) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
@@ -146,7 +151,7 @@ def main() -> int:
     ap.add_argument("--event", default="700007", help="rush 活动 id(--random-boss 用)")
     ap.add_argument("--quest-no", default="8", help="无尽 quest 在活动内的序号键(--random-boss 用)")
     ap.add_argument("--name", default="肉鸽空武器", help="新存档名")
-    ap.add_argument("--server", default=os.environ.get("WF_SERVER_URL", "http://192.168.0.130:8001"))
+    ap.add_argument("--server", default=wf_server_auth.resolve_server_url(Path(ROOT)))
     ap.add_argument("--apply", action="store_true", help="真执行(默认 dry-run)")
     ap.add_argument("--keep-active", action="store_true", help="默认存档留在新档")
     args = ap.parse_args()

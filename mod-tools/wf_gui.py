@@ -53,6 +53,7 @@ import wf_assets  # noqa: E402    角色资产(立绘/图标/语音)编解码与
 import wf_dsl  # noqa: E402       技能 ActionDsl 数值编辑
 import wf_atf  # noqa: E402       skill_cutin ATF(ETC1)纹理重编码(战斗真机只读 ATF 不读 PNG)
 import wf_boss  # noqa: E402      Boss 数值 + 副本列表(Boss·副本页)
+import wf_server_auth  # noqa: E402  服务端管理 API 地址与 Bearer 认证
 
 ROOT = Path(__file__).resolve().parent.parent
 _PROFILE = core.resolve_profile(os.environ.get("WF_PROFILE"))
@@ -5620,32 +5621,20 @@ def save_char_image_pos(cid: str, level: str, fs: dict | None, attr: dict | None
 
 
 def _resolve_server_url() -> str:
-    env = os.environ.get("WF_SERVER_URL")
-    if env:
-        return env.rstrip("/")
-    host, port = "127.0.0.1", "8001"
-    try:
-        for line in (ROOT / ".env").read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line.startswith("CN_LISTEN_HOST="):
-                host = line.split("=", 1)[1].strip().strip('"').strip("'") or host
-            elif line.startswith("CN_LISTEN_PORT="):
-                port = line.split("=", 1)[1].strip().strip('"').strip("'") or port
-    except Exception:
-        pass
-    if host in ("0.0.0.0", ""):
-        host = "127.0.0.1"
-    return f"http://{host}:{port}"
+    return wf_server_auth.resolve_server_url(ROOT)
 
 
 SERVER_URL = _resolve_server_url()
 
 
 def _server_call(path: str, post: bool = False) -> dict:
+    headers = wf_server_auth.admin_bearer_headers(ROOT)
+    if post:
+        headers["Content-Type"] = "application/json"
     req = urllib.request.Request(
         SERVER_URL + path,
         data=b"{}" if post else None,
-        headers={"Content-Type": "application/json"} if post else {},
+        headers=headers,
         method="POST" if post else "GET")
     with urllib.request.urlopen(req, timeout=8) as r:
         return json.loads(r.read().decode("utf-8"))

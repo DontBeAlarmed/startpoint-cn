@@ -6,6 +6,7 @@ import path from "path";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs";
 import { getServerTime, getServerTimeForPlayer } from "./utils";
 import { restoreTimeOffset } from "./data/activeAccount";
+import { installAdminGuard, loadAdminAuthConfig } from "./lib/admin-auth";
 
 import versionCheckPlugin from "./routes/cn/versionCheck";
 import leitingAuthPlugin from "./routes/cn/leitingAuth";
@@ -62,6 +63,10 @@ const fastify = Fastify({
     },
     bodyLimit: 262144  // 256KB — covers /single_battle_quest/finish large battle stats
 });
+
+const configuredListenHost = process.env.CN_LISTEN_HOST ?? "127.0.0.1";
+const adminAuthConfig = loadAdminAuthConfig(process.env, configuredListenHost);
+installAdminGuard(fastify, adminAuthConfig);
 
 // Restore saved time offset from active player on startup
 restoreTimeOffset();
@@ -508,7 +513,7 @@ fastify.register(itemApiPlugin, { prefix: `${apiPrefix}/item` });
 
 // Web management panel
 fastify.register(indexWebPlugin);
-fastify.register(indexWebApiPlugin, { prefix: "/api" });
+fastify.register(indexWebApiPlugin, { prefix: "/api", adminAuthConfig });
 fastify.register(seedsWebApiPlugin, { prefix: "/api/seeds" });
 fastify.register(modAdminApiPlugin, { prefix: "/api/mod-admin" });
 
@@ -584,6 +589,7 @@ fastify.listen({ port, host }, (err, address) => {
         process.exit(1);
     }
     console.log(`CN StarPoint listening on http://${host}:${port}`);
+    console.log(`[admin-auth] mode=${adminAuthConfig.mode}; secure_cookie=${adminAuthConfig.cookieSecure}`);
 
     // Start multi battle TCP session server
     startSessionServer();
