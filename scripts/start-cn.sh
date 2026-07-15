@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="$ROOT/.env"
 ENTRY="$ROOT/out/cn-server.js"
+BUILD_STAMP="$ROOT/out/.cn-server-build-stamp"
 CHECK_ONLY=false
 NO_BUILD=false
 
@@ -73,11 +74,11 @@ fi
 printf '[PORT] %s:%s is available\n' "$HOST" "$PORT"
 
 build_required=false
-if [[ ! -f "$ENTRY" ]]; then
+if [[ ! -f "$ENTRY" || ! -f "$BUILD_STAMP" ]]; then
     build_required=true
-elif [[ "$ROOT/package.json" -nt "$ENTRY" || "$ROOT/package-lock.json" -nt "$ENTRY" || "$ROOT/tsconfig.json" -nt "$ENTRY" ]]; then
+elif [[ "$ROOT/package.json" -nt "$BUILD_STAMP" || "$ROOT/package-lock.json" -nt "$BUILD_STAMP" || "$ROOT/tsconfig.json" -nt "$BUILD_STAMP" ]]; then
     build_required=true
-elif find "$ROOT/src" -type f -name '*.ts' -newer "$ENTRY" -print -quit | grep -q .; then
+elif find "$ROOT/src" -type f -name '*.ts' -newer "$BUILD_STAMP" -print -quit | grep -q .; then
     build_required=true
 fi
 

@@ -88,8 +88,10 @@ function Test-BuildRequired {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
     $output = Join-Path $RepoRoot 'out\cn-server.js'
-    if (-not (Test-Path -LiteralPath $output -PathType Leaf)) { return $true }
-    $outputTime = (Get-Item -LiteralPath $output).LastWriteTimeUtc
+    $stamp = Join-Path $RepoRoot 'out\.cn-server-build-stamp'
+    if (-not (Test-Path -LiteralPath $output -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $stamp -PathType Leaf)) { return $true }
+    $buildTime = (Get-Item -LiteralPath $stamp).LastWriteTimeUtc
     $inputs = @(
         (Join-Path $RepoRoot 'package.json'),
         (Join-Path $RepoRoot 'package-lock.json'),
@@ -97,7 +99,7 @@ function Test-BuildRequired {
     ) + @(Get-ChildItem -LiteralPath (Join-Path $RepoRoot 'src') -Recurse -File -Filter '*.ts' |
         Select-Object -ExpandProperty FullName)
     foreach ($inputPath in $inputs) {
-        if ((Get-Item -LiteralPath $inputPath).LastWriteTimeUtc -gt $outputTime) { return $true }
+        if ((Get-Item -LiteralPath $inputPath).LastWriteTimeUtc -gt $buildTime) { return $true }
     }
     return $false
 }

@@ -37,5 +37,6 @@ assert_contains 'exec[[:space:]]+node' 'launcher keeps the CN server in the supe
 assert_contains '--check-only' 'launcher exposes a read-only preflight mode'
 assert_contains 'CN_LISTEN_PORT' 'launcher derives the checked port from environment configuration'
 assert_contains '20\.19\.0' 'launcher enforces the supported Node baseline'
+assert_contains '\.cn-server-build-stamp' 'launcher uses an explicit successful-build stamp'
 
 printf '[PASS] Linux launcher safety suite (%d assertions)\n' "$passed"

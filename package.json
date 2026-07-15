@@ -5,7 +5,7 @@
   "main": "server.ts",
   "scripts": {
     "build": "npm run build:server && npm run css",
-    "build:server": "tsc",
+    "build:server": "tsc && node scripts/write-build-stamp.mjs",
     "typecheck": "tsc --noEmit",
     "test:node": "npm run build:server && node --test out/tests",
     "test:python": "python -m unittest discover -s mod-tools/tests -p \"test_*.py\"",

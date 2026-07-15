@@ -123,26 +123,33 @@ try {
 
     $buildRoot = Join-Path $testRoot 'build-repo'
     $output = Join-Path $buildRoot 'out\cn-server.js'
+    $buildStamp = Join-Path $buildRoot 'out\.cn-server-build-stamp'
     $source = Join-Path $buildRoot 'src\nested\server.ts'
     $packageJson = Join-Path $buildRoot 'package.json'
     $packageLock = Join-Path $buildRoot 'package-lock.json'
     $tsconfig = Join-Path $buildRoot 'tsconfig.json'
-    foreach ($path in @($output, $source, $packageJson, $packageLock, $tsconfig)) {
+    foreach ($path in @($output, $buildStamp, $source, $packageJson, $packageLock, $tsconfig)) {
         Write-TextFile -Path $path -Content '{}'
     }
     $old = [DateTime]::UtcNow.AddMinutes(-5)
+    $outputOld = [DateTime]::UtcNow.AddMinutes(-10)
     $fresh = [DateTime]::UtcNow.AddMinutes(-1)
     foreach ($path in @($source, $packageJson, $packageLock, $tsconfig)) {
         (Get-Item -LiteralPath $path).LastWriteTimeUtc = $old
     }
-    (Get-Item -LiteralPath $output).LastWriteTimeUtc = $fresh
-    Assert-True (-not (Test-BuildRequired -RepoRoot $buildRoot)) 'newer build output is accepted'
+    (Get-Item -LiteralPath $output).LastWriteTimeUtc = $outputOld
+    (Get-Item -LiteralPath $buildStamp).LastWriteTimeUtc = $fresh
+    Assert-True (-not (Test-BuildRequired -RepoRoot $buildRoot)) 'successful build stamp accepts unchanged incremental output'
 
     foreach ($input in @($source, $packageJson, $packageLock, $tsconfig)) {
         (Get-Item -LiteralPath $input).LastWriteTimeUtc = [DateTime]::UtcNow
         Assert-True (Test-BuildRequired -RepoRoot $buildRoot) "newer input requires a build: $([IO.Path]::GetFileName($input))"
         (Get-Item -LiteralPath $input).LastWriteTimeUtc = $old
     }
+    Remove-Item -LiteralPath $buildStamp -Force
+    Assert-True (Test-BuildRequired -RepoRoot $buildRoot) 'missing build stamp requires a build'
+    Write-TextFile -Path $buildStamp -Content '{}'
+    (Get-Item -LiteralPath $buildStamp).LastWriteTimeUtc = $fresh
     Remove-Item -LiteralPath $output -Force
     Assert-True (Test-BuildRequired -RepoRoot $buildRoot) 'missing build output requires a build'
     Assert-Throws { Assert-BuildPolicy -BuildRequired $true -NoBuild $true } '-NoBuild rejects stale output' 'stale'
