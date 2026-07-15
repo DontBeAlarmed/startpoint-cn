@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from wf_asset_inventory import sha256_file, tree_manifest
+from wf_asset_inventory import InventoryError, scan_root, sha256_file, tree_manifest
 from wf_asset_policy import AUTO_CATEGORIES
 from wf_remediation_baseline import append_jsonl, atomic_json
 
@@ -56,6 +56,8 @@ class VerificationSummary:
 _ID_RE = re.compile(r"^[0-9a-f]{24}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _REPARSE_ATTRIBUTE = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+_IS_WINDOWS = os.name == "nt"
+_WINDOWS_MAX_PATH = 260
 _ENTRY_KEYS = frozenset(
     {
         "id",
@@ -533,7 +535,40 @@ def _selected(values: Iterable[str] | None) -> set[str] | None:
 
 
 def _target_for(quarantine_root: Path, entry: Mapping[str, Any]) -> Path:
-    return quarantine_root / "data" / str(entry["id"]) / Path(str(entry["source"])).name
+    return quarantine_root / "data" / str(entry["id"])
+
+
+def _validate_target_path_budget(source: Path, target: Path, kind: str) -> None:
+    if not _IS_WINDOWS:
+        return
+    offender_count = 0
+    longest_path = ""
+    longest_length = 0
+
+    def check(path: Path) -> None:
+        nonlocal offender_count, longest_path, longest_length
+        absolute = str(_absolute(path))
+        length = len(absolute)
+        if length >= _WINDOWS_MAX_PATH:
+            offender_count += 1
+            if length > longest_length:
+                longest_path = absolute
+                longest_length = length
+
+    check(target)
+    if kind == "tree":
+        try:
+            for entry in scan_root(source, hash_files=False):
+                check(target / Path(entry.relative_path))
+        except InventoryError as error:
+            raise QuarantineError(f"cannot inspect target path budget for {source}: {error}") from error
+    if offender_count:
+        raise QuarantineError(
+            "Windows MAX_PATH budget would be exceeded before quarantine move: "
+            f"source={source} target={target} offenders={offender_count} "
+            f"longest={longest_length} limit={_WINDOWS_MAX_PATH - 1} path={longest_path}; "
+            "choose a shorter quarantine root"
+        )
 
 
 def _verify_expected(path: Path, entry: Mapping[str, Any]) -> None:
@@ -602,14 +637,20 @@ def quarantine(
     entries = [entry for entry in plan["entries"] if selected is None or entry["id"] in selected]
     if selected is not None and {entry["id"] for entry in entries} != selected:
         raise QuarantineError("one or more selected IDs are absent from the plan")
+    locations: dict[str, tuple[Path, Path]] = {}
     for entry in entries:
         if not entry.get("auto_approved") or entry.get("category") not in AUTO_CATEGORIES:
             raise QuarantineError(
                 f"plan entry is not auto-approved: {entry.get('source')} category={entry.get('category')}"
             )
         source = _absolute(entry["source"])
+        target = _target_for(root, entry)
         if _is_within(root, source) or _is_within(source, root):
             raise QuarantineError(f"quarantine root overlaps a source: {root} and {source}")
+        if not _is_within(target, root / "data"):
+            raise QuarantineError(f"computed quarantine target escapes data root: {target}")
+        _validate_target_path_budget(source, target, str(entry["kind"]))
+        locations[str(entry["id"])] = (source, target)
 
     root.mkdir(parents=True, exist_ok=True)
     manifest = root / "manifest.jsonl"
@@ -620,10 +661,7 @@ def quarantine(
 
     work: list[tuple[dict[str, Any], Path, Path, str]] = []
     for entry in entries:
-        source = _absolute(entry["source"])
-        target = _target_for(root, entry)
-        if not _is_within(target, root / "data"):
-            raise QuarantineError(f"computed quarantine target escapes data root: {target}")
+        source, target = locations[str(entry["id"])]
         prior = latest.get(entry["id"])
         if prior is not None and prior.get("plan_digest") != plan["plan_digest"]:
             raise QuarantineError(f"manifest plan digest mismatch for {entry['id']}")

@@ -111,7 +111,7 @@ class AssetQuarantineTests(unittest.TestCase):
             plan = self._plan(root, source)
             payload = json.loads(plan.path.read_text(encoding="utf-8"))
             entry_id = payload["entries"][0]["id"]
-            target = root / "quarantine" / "data" / entry_id / source.name
+            target = root / "quarantine" / "data" / entry_id
             target.parent.mkdir(parents=True)
             target.write_bytes(b"do not overwrite")
             with self.assertRaisesRegex(quarantine_module.QuarantineError, "destination exists"):
@@ -122,6 +122,60 @@ class AssetQuarantineTests(unittest.TestCase):
         if os.name == "nt":
             with self.assertRaisesRegex(quarantine_module.QuarantineError, "cross-volume"):
                 quarantine_module.atomic_move(Path(r"C:\source.bin"), Path(r"D:\target.bin"))
+
+    def test_target_layout_is_compact_and_does_not_repeat_source_name(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source = root / "restored_readable"
+            source.mkdir()
+            plan = self._plan(root, source)
+            payload = json.loads(plan.path.read_text(encoding="utf-8"))
+            entry = payload["entries"][0]
+            self.assertEqual(
+                root / "quarantine" / "data" / entry["id"],
+                quarantine_module._target_for(root / "quarantine", entry),
+            )
+
+    def test_windows_target_budget_is_rejected_before_any_quarantine_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            first = root / "a.pyc"
+            second = root / "b.pyc"
+            first.write_bytes(b"a")
+            second.write_bytes(b"b")
+            entries = [
+                quarantine_module.build_plan_entry(
+                    source,
+                    category="stale_cache",
+                    reason="test evidence",
+                    auto_approved=True,
+                )
+                for source in (first, second)
+            ]
+            plan = quarantine_module.write_plan(entries, root / "run", run_id="fixture-run")
+            quarantine_root = root / "quarantine"
+            with mock.patch.object(
+                quarantine_module,
+                "_validate_target_path_budget",
+                side_effect=[None, quarantine_module.QuarantineError("Windows MAX_PATH budget")],
+            ):
+                with self.assertRaisesRegex(quarantine_module.QuarantineError, "MAX_PATH"):
+                    quarantine_module.quarantine(plan.path, quarantine_root)
+            self.assertTrue(first.is_file())
+            self.assertTrue(second.is_file())
+            self.assertFalse(quarantine_root.exists())
+
+    def test_windows_target_budget_counts_descendant_paths_before_move(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source = root / "tree"
+            nested = source / "nested"
+            nested.mkdir(parents=True)
+            (nested / "file.bin").write_bytes(b"x")
+            long_target = root / ("q" * 250)
+            with mock.patch.object(quarantine_module, "_IS_WINDOWS", True):
+                with self.assertRaisesRegex(quarantine_module.QuarantineError, "MAX_PATH"):
+                    quarantine_module._validate_target_path_budget(source, long_target, "tree")
 
     def test_manifest_tampering_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as td:
