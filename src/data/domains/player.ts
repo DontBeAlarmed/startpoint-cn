@@ -29,13 +29,41 @@ import { insertPlayerOptionsSync } from "./option";
 import { insertPlayerItemsSync } from "./item";
 import { insertPlayerEquipmentListSync } from "./equipment";
 import { insertPlayerPartyGroupListSync } from "./party";
-import { insertPlayerCharactersSync, insertPlayerCharactersManaNodesSync } from "./character";
+import {
+    getPlayerCharactersManaNodeAwakeLevelsSync,
+    insertPlayerCharactersSync,
+    insertPlayerCharactersManaNodesSync,
+    updatePlayerCharacterManaNodeAwakeLevelSync,
+} from "./character";
 import { insertPlayerDrawnQuestsSync, insertPlayerQuestProgressListSync } from "./quest";
 import { insertPlayerGachaInfoListSync, insertPlayerGachaCampaignListSync , getPlayerGachaInfoListSync, updatePlayerGachaInfoSync, getPlayerGachaCampaignListSync, updatePlayerGachaCampaignSync } from "./gacha";
 import { insertPlayerBoxGachasSync } from "./boxGacha";
 import { insertPlayerRushEventListSync, insertPlayerRushEventClearedFolderListSync, insertPlayerRushEventPlayedPartyListSync } from "./rushEvent";
 import { insertPlayerClearedRegularMissionListSync, insertPlayerActiveMissionsSync } from "./mission";
 import { insertPlayerPeriodicRewardPointsListSync, insertPlayerStartDashExchangeCampaignsSync, insertPlayerMultiSpecialExchangeCampaignsSync } from "./campaign";
+import { assertMergedPlayerData, mergedPlayerCollectionCounts } from "../validation/merged-player";
+
+
+export type PlayerInsertPhase =
+    | "delete"
+    | "player"
+    | "player_children"
+    | "characters"
+    | "parties_inventory"
+    | "quests_gacha"
+    | "campaigns_options"
+    | "rush_event"
+    | "readback"
+    | "complete";
+
+export interface PlayerWriteHooks {
+    beforePhase?(phase: PlayerInsertPhase): void;
+}
+
+export interface ReplacePlayerResult {
+    playerId: number;
+    accountId: number;
+}
 
 /**
  * Gets a player's daily challenge point list based on their id.
@@ -457,24 +485,45 @@ export function insertPlayerSync(
  */
 export function insertMergedPlayerDataSync(
     accountId: number,
-    toInsert: MergedPlayerData
+    toInsert: MergedPlayerData,
+    hooks: PlayerWriteHooks = {},
 ) {
     const player = toInsert.player
     const playerId = player.id
+    hooks.beforePhase?.("player")
     insertPlayerSync(accountId, player)
 
+    hooks.beforePhase?.("player_children")
     insertPlayerDailyChallengePointListSync(playerId, toInsert.dailyChallengePointList)
     insertPlayerTriggeredTutorialsSync(playerId, toInsert.triggeredTutorial)
     insertPlayerClearedRegularMissionListSync(playerId, toInsert.clearedRegularMissionList)
+
+    hooks.beforePhase?.("characters")
     insertPlayerCharactersSync(playerId, toInsert.characterList)
     insertPlayerCharactersManaNodesSync(playerId, toInsert.characterManaNodeList)
+    for (const [characterId, levels] of Object.entries(toInsert.characterManaNodeAwakeLevels ?? {})) {
+        for (const [nodeId, level] of Object.entries(levels)) {
+            updatePlayerCharacterManaNodeAwakeLevelSync(
+                playerId,
+                Number(characterId),
+                Number(nodeId),
+                level,
+            )
+        }
+    }
+
+    hooks.beforePhase?.("parties_inventory")
     insertPlayerPartyGroupListSync(playerId, toInsert.partyGroupList)
     insertPlayerItemsSync(playerId, toInsert.itemList)
     insertPlayerEquipmentListSync(playerId, toInsert.equipmentList)
+
+    hooks.beforePhase?.("quests_gacha")
     insertPlayerQuestProgressListSync(playerId, toInsert.questProgress)
     insertPlayerGachaInfoListSync(playerId, toInsert.gachaInfoList)
     insertPlayerGachaCampaignListSync(playerId, toInsert.gachaCampaignList)
     insertPlayerDrawnQuestsSync(playerId, toInsert.drawnQuestList)
+
+    hooks.beforePhase?.("campaigns_options")
     insertPlayerPeriodicRewardPointsListSync(playerId, toInsert.periodicRewardPointList)
     insertPlayerActiveMissionsSync(playerId, toInsert.allActiveMissionList)
     insertPlayerBoxGachasSync(playerId, toInsert.boxGachaList)
@@ -483,6 +532,7 @@ export function insertMergedPlayerDataSync(
     insertPlayerOptionsSync(playerId, toInsert.userOption)
 
     // insert data that could be undefined.
+    hooks.beforePhase?.("rush_event")
     const rushEventList = toInsert.rushEventList
     if (rushEventList !== undefined) {
         insertPlayerRushEventListSync(playerId, rushEventList)
@@ -1105,24 +1155,71 @@ export function updatePlayerSync(
  * @param replaceWith The MergedPlayerData to replace.
  */
 export function replacePlayerDataSync(
-    replaceWith: MergedPlayerData
-) {
-    try {
-        const playerId = replaceWith.player.id
-
-        const account = getAccountFromPlayerIdSync(playerId)
-        if (account === null)
-            throw new Error("No account tied to player id.");
-
-        // delete player
-        deletePlayerSync(playerId)
-
-        // insert new
-        insertMergedPlayerDataSync(account.id, replaceWith)
-    } catch (error: Error | any) {
-        console.error(error)
-        throw error
+    replaceWith: MergedPlayerData,
+    hooks: PlayerWriteHooks = {},
+): ReplacePlayerResult {
+    const candidate = replaceWith as unknown as Record<string, unknown>;
+    const candidatePlayer = candidate !== null && typeof candidate === "object" && !Array.isArray(candidate)
+        ? candidate.player as Record<string, unknown> | undefined
+        : undefined;
+    const playerId = candidatePlayer?.id;
+    if (typeof playerId !== "number" || !Number.isSafeInteger(playerId) || playerId < 1) {
+        throw new Error("data.player.id: must be a safe integer >= 1");
     }
+
+    const account = getAccountFromPlayerIdSync(playerId)
+    if (account === null) throw new Error("No account tied to player id.");
+
+    // Backward compatibility for snapshots exported before awake levels were included:
+    // preserve only levels whose character and node still exist in the imported snapshot.
+    if (replaceWith.characterManaNodeAwakeLevels === undefined) {
+        const retained: Record<string, Record<number, number>> = {}
+        const current = getPlayerCharactersManaNodeAwakeLevelsSync(playerId)
+        const importedNodes = replaceWith.characterManaNodeList
+        if (importedNodes && typeof importedNodes === "object" && !Array.isArray(importedNodes)) {
+            for (const [characterId, levels] of Object.entries(current)) {
+                const nodes = importedNodes[characterId]
+                if (!Array.isArray(nodes)) continue
+                const allowed = new Set(nodes)
+                for (const [nodeId, level] of Object.entries(levels)) {
+                    if (!allowed.has(Number(nodeId))) continue
+                    if (!retained[characterId]) retained[characterId] = {}
+                    retained[characterId][Number(nodeId)] = level
+                }
+            }
+        }
+        replaceWith.characterManaNodeAwakeLevels = retained
+    }
+
+    assertMergedPlayerData(replaceWith, playerId, account.id)
+
+    const replace = getDb().transaction((): ReplacePlayerResult => {
+        hooks.beforePhase?.("delete")
+        deletePlayerSync(playerId)
+        insertMergedPlayerDataSync(account.id, replaceWith, hooks)
+
+        hooks.beforePhase?.("readback")
+        const { getMergedPlayerDataSync } = require("../utils/player-data") as typeof import("../utils/player-data")
+        const readback = getMergedPlayerDataSync(playerId)
+        if (readback === null) throw new Error("replacement readback is missing the player")
+        const linkedAccount = getAccountFromPlayerIdSync(playerId)
+        if (linkedAccount?.id !== account.id) {
+            throw new Error(`replacement readback account mismatch: expected ${account.id}`)
+        }
+        const expectedCounts = mergedPlayerCollectionCounts(replaceWith)
+        const actualCounts = mergedPlayerCollectionCounts(readback)
+        for (const [collection, expected] of Object.entries(expectedCounts)) {
+            if (actualCounts[collection] !== expected) {
+                throw new Error(
+                    `replacement readback count mismatch for ${collection}: expected ${expected}, got ${actualCounts[collection]}`,
+                )
+            }
+        }
+        hooks.beforePhase?.("complete")
+        return { playerId, accountId: account.id }
+    })
+
+    return replace()
 }
 
 /**

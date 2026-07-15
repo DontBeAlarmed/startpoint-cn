@@ -1,8 +1,9 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getMergedPlayerDataSync, reviveMergedPlayerDates } from "../../data/utils";
+import { assertMergedPlayerData } from "../../data/validation/merged-player";
 import { validatePlayerField, VALID_CHARACTER_IDS, VALID_ITEM_IDS, MAX_INT } from "./validation";
 import { wantsJson } from "./http";
-import { dailyResetPlayerDataSync, getAllPlayersSync, getDefaultPlayerPartyGroupsSync, getPlayerDailyChallengePointListSync, getPlayerSync, insertPlayerDailyChallengePointListSync, replacePlayerDataSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
+import { dailyResetPlayerDataSync, getAccountFromPlayerIdSync, getAllPlayersSync, getDefaultPlayerPartyGroupsSync, getPlayerDailyChallengePointListSync, getPlayerSync, insertPlayerDailyChallengePointListSync, replacePlayerDataSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
 import { deleteAllPlayerMailSync } from "../../data/domains/mail"
 import { getDb } from "../../data/db"
 import { getPlayerCharactersSync, insertDefaultPlayerCharacterSync, insertPlayerCharacterSync } from "../../data/domains/character"
@@ -133,12 +134,15 @@ const routes = async (fastify: FastifyInstance) => {
 
         const data = getMergedPlayerDataSync(playerId)
         if (data === null) return reply.redirect("/player");
+        const account = getAccountFromPlayerIdSync(playerId)
+        if (account === null) return reply.redirect("/player");
 
         const snapshot = {
             schema: "starpoint-cn-save",
             version: 1,
             exportedAt: new Date().toISOString(),
             playerId,
+            accountId: account.id,
             data
         }
         reply.header("content-disposition", `attachment; filename="save_${playerId}.json"`)
@@ -178,9 +182,26 @@ const routes = async (fastify: FastifyInstance) => {
                 return fail("存档数据缺失 player 字段")
             }
 
+            if (!Number.isSafeInteger(parsed.playerId) || parsed.playerId !== playerId) {
+                return fail(`存档 playerId 与目标不符：应为 ${playerId}`)
+            }
+            const account = getAccountFromPlayerIdSync(playerId)
+            if (account === null) return fail("目标玩家没有关联账号", 404)
+            if (parsed.accountId !== undefined && parsed.accountId !== account.id) {
+                return fail(`存档 accountId 与目标不符：应为 ${account.id}`)
+            }
+
+            try {
+                assertMergedPlayerData(data, playerId, account.id)
+            } catch (validationError: any) {
+                return fail(`存档结构无效：${validationError?.message ?? validationError}`)
+            }
+
             reviveMergedPlayerDates(data)
-            data.player.id = playerId
             replacePlayerDataSync(data)
+            const diagnostic = getMergedPlayerDataSync(playerId)
+            if (diagnostic === null) throw new Error("提交后无法读回玩家存档")
+            assertMergedPlayerData(diagnostic, playerId, account.id)
         } catch (error: any) {
             return fail(`恢复失败：${error?.message ?? error}`, 500)
         }

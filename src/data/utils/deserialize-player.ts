@@ -182,8 +182,18 @@ export function deserializePlayerData(
         const rawCharacterManaNodeList = toDeserialize['user_character_mana_node_list']
         if (rawCharacterManaNodeList === undefined) throw new Error("Missing 'user_character_mana_node_list' field.");
         const characterManaNodeList: Record<string, number[]> = {}
+        const characterManaNodeAwakeLevels: Record<string, Record<number, number>> = {}
         for (const [charId, nodes] of Object.entries(rawCharacterManaNodeList)) {
-            characterManaNodeList[charId] = (nodes as { multiplied_id: number }[]).map(n => n.multiplied_id)
+            const typedNodes = nodes as { multiplied_id: number, awake_level?: number }[]
+            characterManaNodeList[charId] = typedNodes.map(n => n.multiplied_id)
+            for (const node of typedNodes) {
+                if (node.awake_level === undefined) continue
+                if (!Number.isSafeInteger(node.awake_level) || node.awake_level < 0) {
+                    throw new Error(`Invalid awake_level for character ${charId}, node ${node.multiplied_id}.`)
+                }
+                if (!characterManaNodeAwakeLevels[charId]) characterManaNodeAwakeLevels[charId] = {}
+                characterManaNodeAwakeLevels[charId][node.multiplied_id] = node.awake_level
+            }
         }
 
         // deserialize party list
@@ -461,6 +471,7 @@ export function deserializePlayerData(
             clearedRegularMissionList: clearedRegularMissionList,
             characterList: characterList,
             characterManaNodeList: characterManaNodeList,
+            characterManaNodeAwakeLevels: characterManaNodeAwakeLevels,
             partyGroupList: partyGroupList,
             itemList: itemList,
             equipmentList: equipmentList,
@@ -484,4 +495,3 @@ export function deserializePlayerData(
         throw error
     }
 }
-

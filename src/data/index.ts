@@ -4,13 +4,17 @@ import path from "path";
 import { updateBeforeInit as updateWdfpDataBefore, updateAfterInit as updateWdfpDataAfter} from "./updaters/wdfpData";
 import initWdfpData from "./initializers/wdfpData";
 
-// Use __dirname so DB path is relative to the source file, not process.cwd()
-const dataDir = path.resolve(__dirname, "../../.database")
+// Tests may opt into an isolated database root before importing this module.
+// Production keeps the existing __dirname-relative .database location.
+const configuredDataDir = process.env.WF_DATABASE_DIR?.trim()
+const dataDir = configuredDataDir
+    ? path.resolve(configuredDataDir)
+    : path.resolve(__dirname, "../../.database")
 const versionFileExtension = ".version"
 if (!existsSync(dataDir)) {
     // make the data directory since it doesn't exist
     try {
-        mkdirSync(dataDir)
+        mkdirSync(dataDir, { recursive: true })
     } catch (error) {
         throw new Error(`Failed to create the data directory. Reason: ${(error as Error).message}`)
     }

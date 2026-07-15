@@ -141,6 +141,7 @@ export function getMergedPlayerDataSync(
         clearedRegularMissionList: getPlayerClearedRegularMissionListSync(playerId),
         characterList: getPlayerCharactersSync(playerId),
         characterManaNodeList: getPlayerCharactersManaNodesSync(playerId),
+        characterManaNodeAwakeLevels: getPlayerCharactersManaNodeAwakeLevelsSync(playerId),
         partyGroupList: getPlayerPartyGroupListSync(playerId),
         itemList: getPlayerItemsSync(playerId),
         equipmentList: getPlayerEquipmentListSync(playerId),
@@ -160,4 +161,3 @@ export function getMergedPlayerDataSync(
         rushEventPlayedPartyList: getPlayerRushEventListPlayedPartiesSync(playerId)
     }
 }
-
