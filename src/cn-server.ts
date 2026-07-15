@@ -53,6 +53,7 @@ import historyApiPlugin from "./routes/api/history";
 import comicApiPlugin from "./routes/api/comic";
 import questUnlockApiPlugin from "./routes/api/questUnlock";
 import itemApiPlugin from "./routes/api/item";
+import { patchFileRoutes } from "./routes/cn/patch-files";
 import { startSessionServer } from "./multi";
 
 const fastify = Fastify({
@@ -525,30 +526,12 @@ const cdnDisplayHost = cdnHost === "0.0.0.0" ? "localhost" : cdnHost;
 const CDN_BASE_URL = process.env.CDN_BASE_URL || `http://${cdnDisplayHost}:${cdnPort}/patch/cn`;
 const cdnDir = process.env.CDN_DIR || ".cdn";
 
-// Serve patched orderedmap files for missing CDN resources
-// Registered BEFORE fastifyStatic to intercept matching requests
-fastify.get("/patch/cn/dummy/download/production/upload/:prefix/:hash", async (request, reply) => {
-    const { prefix, hash } = request.params as { prefix: string; hash: string };
-    const relPath = `${prefix}/${hash}`;
-    const patchFile = path.join(__dirname, "..", "assets", "asset-patch", "production", "upload", prefix, hash);
-    if (existsSync(patchFile)) {
-        console.log("[PATCH-SERVE]", relPath);
-        return reply.type("application/octet-stream").send(readFileSync(patchFile));
-    }
-    console.log("[PATCH-MISS]", relPath);
-    log404("PATCH-MISS", relPath);
-    return reply.status(404).send("Not Found");
-});
-
-// Serve patch archive files for asset update
-fastify.get("/patch/cn/asset-patch/active/:file", async (request, reply) => {
-    const { file } = request.params as { file: string };
-    const patchFile = path.join(__dirname, "..", "assets", "asset-patch", "active", file);
-    if (existsSync(patchFile)) {
-        return reply.type("application/zip").send(readFileSync(patchFile));
-    }
-    log404("ASSET-PATCH-MISS", file);
-    return reply.status(404).send("Not Found");
+// Serve only fixed-format patch leaves from explicitly allowed roots.
+// Registered BEFORE fastifyStatic to intercept matching requests.
+fastify.register(patchFileRoutes, {
+    productionRoot: path.join(__dirname, "..", "assets", "asset-patch", "production", "upload"),
+    activeRoot: path.join(__dirname, "..", "assets", "asset-patch", "active"),
+    onMiss: log404,
 });
 
 fastify.register(fastifyStatic, {

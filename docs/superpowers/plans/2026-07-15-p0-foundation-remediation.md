@@ -151,7 +151,7 @@ git commit -m "feat(mod-tools): capture remediation baselines"
 **Interfaces:**
 - Produces: `resolveSafeLeaf(root: string, leaf: string, pattern: RegExp): string | null`
 - Produces: `patchFileRoutes(fastify, { productionRoot, activeRoot }): Promise<void>`
-- Consumes: active filenames matching `^[A-Za-z0-9][A-Za-z0-9._-]*\.zip$`; production prefix `[0-9a-f]{2}` and hash `[0-9a-f]{40}`.
+- Consumes: active filenames matching `^[A-Za-z0-9][A-Za-z0-9._-]*\.zip$`; production store splits the 40-hex SHA-1 into prefix `[0-9a-f]{2}` plus leaf `[0-9a-f]{38}`.
 
 - [ ] **Step 1: Write Fastify injection tests for traversal and legal files**
 
@@ -201,7 +201,7 @@ export function resolveSafeLeaf(root: string, leaf: string, pattern: RegExp): st
 }
 ```
 
-`patch-files.ts` validates `prefix` and `hash`, calls `resolveSafeLeaf`, sets the correct content type and returns `createReadStream(file)`. All validation failures return 404.
+`patch-files.ts` validates `prefix` and the 38-hex remainder, calls `openSafeRelativeFile` against the unchanged production root (never treating `prefix` as a new trust root), sets the correct content type and streams the opened handle. All validation failures return 404.
 
 - [ ] **Step 4: Remove only the two inline routes and register the plugin**
 
