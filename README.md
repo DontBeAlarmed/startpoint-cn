@@ -4,10 +4,14 @@
 
 > 🎮 **本分支(`release/modes-20260714`)是自制内容发布分支**,在上游服务端基础上加入:
 > 「深渊连战」roguelike 活动(Rush 700099)· 15 把深渊武器 · 双自制新角色(苍海龙王·赛瑞斯 / 夏日女神·史黛拉)。
->
-> - **自建服完整攻略:[docs/self-host-modes.md](docs/self-host-modes.md)**(拿代码→CDN→起服→四合一客户端→发角色)
-> - 数据修改工具链:[mod-tools/](mod-tools/)(独立仓 [startpoint-cn-mod-tools](https://github.com/kuronzzhan-droid/startpoint-cn-mod-tools))
-> - 现成客户端整合包:[wf-abyss-client](https://github.com/kuronzzhan-droid/wf-abyss-client)(仅深渊连战;玩新角色需按攻略自行重打含 dual-form 补丁的客户端)
+
+## 我该下载什么?
+
+| 你是谁 | 需要什么 |
+|---|---|
+| **想进别人的服玩** | 不用下载本仓库。找服主要:① 他重打好的客户端 APK ② 服务器地址/账号说明。([wf-abyss-client](https://github.com/kuronzzhan-droid/wf-abyss-client) 的现成整合包只适用于它指向的那个服,且**不支持新角色**) |
+| **想自己开服**(玩全部内容,含双新角色) | clone 本仓库(默认分支就是本分支),照 **[docs/self-host-modes.md](docs/self-host-modes.md)** 一步步来:自备基础 CDN(~11GB)→ 起服 → 重打**四合一**客户端 → 管理后台邮件发角色 |
+| **想改数据 / 做自己的 mod** | 数据修改工具链:[mod-tools/](mod-tools/)(独立仓 [startpoint-cn-mod-tools](https://github.com/kuronzzhan-droid/startpoint-cn-mod-tools),带全套文档与《新角色制作心得》) |
 
 ## 功能状态
 
