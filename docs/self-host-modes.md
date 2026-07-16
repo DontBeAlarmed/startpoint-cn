@@ -31,7 +31,7 @@ cd starpoint-cn && npm install
   - ① **服务端层**:两模式和武器的 masterdata 在 `assets/*.json`(服务端直接读)。
   - ② **客户端层**:深渊武器/兑换商店/rush 700099 的客户端 orderedmap 数据,已打包成 **`assets/asset-patch/active/pinball-1.4.90→1.4.101-mod*.zip`(11 个,git 跟踪)**,服务端 `asset.ts` 会自动 serve、`manifest.json` 已 enabled 到 1.4.101。**这层缺了 → 打完 15 轮或开兑换商店会 C8601**(客户端没有武器/商店主数据)。
   - ⚠️ **前提**:你的 base CDN 必须接到 **1.4.90**(这条增量链的起点),客户端才能续上 1.4.90→1.4.101 拿到 ② 层。base CDN 版本不到 1.4.90 的话这段接不上。
-  - ③ **双新角色层(1.4.102→1.4.103)**:`assets/asset-patch/active/pinball-1.4.102-1.4.103-1-charpkg*.zip`(164 个 payload,28MB,git 跟踪)——赛瑞斯(129999)与史黛拉(139999)的全部客户端资产:16 表克隆数据、UI、像素动画、语音、技能 DSL、独有状态图标。打完模式链的客户端自动续上这层。服务端侧的四张角色表已在 `assets/*.json` 里随分支到手。
+  - ③ **双新角色层(1.4.102→1.4.103)**:`assets/asset-patch/active/pinball-1.4.102-1.4.103-*-charpkg*.zip`(7 个分包共 28MB、164 个 payload,git 跟踪;同一版本跨越拆多包,客户端按 get_path 列表全部下载)——赛瑞斯(129999)与史黛拉(139999)的全部客户端资产:16 表克隆数据、UI、像素动画、语音、技能 DSL、独有状态图标。打完模式链的客户端自动续上这层。服务端侧的四张角色表已在 `assets/*.json` 里随分支到手。
 
 ### 3. 起服
 

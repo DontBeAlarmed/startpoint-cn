@@ -34,7 +34,13 @@
    "depends_on": "1.4.102",
    "enabled": true,
    "chain": [
-    "pinball-1.4.102-1.4.103-1-charpkgmod07161121.zip"
+    "pinball-1.4.102-1.4.103-1-charpkgmod07161121.zip",
+    "pinball-1.4.102-1.4.103-2-charpkgmod07161121.zip",
+    "pinball-1.4.102-1.4.103-3-charpkgmod07161121.zip",
+    "pinball-1.4.102-1.4.103-4-charpkgmod07161121.zip",
+    "pinball-1.4.102-1.4.103-5-charpkgmod07161121.zip",
+    "pinball-1.4.102-1.4.103-6-charpkgmod07161121.zip",
+    "pinball-1.4.102-1.4.103-7-charpkgmod07161121.zip"
    ],
    "created_at": "2026-07-16"
   },
