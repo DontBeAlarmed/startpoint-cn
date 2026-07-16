@@ -5,12 +5,14 @@
 
 | 层级 | 技术 |
 |------|------|
-| 运行时 | Node.js 20+ |
+| 运行时 | Node.js（使用当前环境默认版本；最低要求见 `package.json` 的 `engines`） |
 | 语言 | TypeScript |
 | HTTP | Fastify 5 |
 | 数据库 | better-sqlite3 (SQLite) |
 | 序列化 | MsgPack (msgpackr) |
 | 客户端 | Adobe AIR SWF (ActionScript 3) |
+
+日常开发直接使用 `node` / `npm`，不维护不同 Node 主版本的两套命令。切换 Node 主版本后，如果 `better-sqlite3` 报 `NODE_MODULE_VERSION` 或 `ERR_DLOPEN_FAILED`，执行 `npm rebuild better-sqlite3`；仍未恢复时重装依赖。
 
 ## 服务入口
 

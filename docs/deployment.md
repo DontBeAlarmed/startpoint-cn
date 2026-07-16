@@ -14,18 +14,21 @@ sudo apt update && sudo apt install -y \
   nodejs npm nginx certbot python3-certbot-nginx \
   git apache2-utils sqlite3
 
-# Node.js ≥ 20.0.0（系统默认版本可能不够，推荐 fnm 管理版本）
+# 使用当前环境默认的 Node.js；最低要求见 package.json 的 engines
 node -v
 ```
 
-如果 `node -v` 显示版本低于 20：
+如果默认版本不满足 `package.json` 的 `engines`：
+
+1. 从 [Node.js 官方下载页](https://nodejs.org/en/download)安装满足 `engines` 的当前受支持版本。
+2. 重新打开 shell，确认新版本已生效：
 
 ```bash
-# 用 fnm 安装（推荐）
-curl -fsSL https://fnm.vercel.app/install | bash
-fnm install 20
-fnm use 20
+node -v
+npm -v
 ```
+
+确认后再继续执行 `npm install`。
 
 ---
 
