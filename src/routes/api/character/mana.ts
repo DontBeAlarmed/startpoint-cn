@@ -2,6 +2,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerCharacterManaNodesSync, getPlayerCharacterSync, getPlayerCharactersManaNodesSync, hasPlayerUnlockedCharacterManaNodeSync, insertPlayerCharacterManaNodesSync, getPlayerCharactersManaNodeAwakeLevelsSync, updatePlayerCharacterManaNodeAwakeLevelSync } from "../../../data/domains/character"
+import { getPlayerCharacterAwakeUnlocksSync } from "../../../data/domains/character_awake"
 import { getPlayerItemSync, updatePlayerItemSync } from "../../../data/domains/item"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
 import { getSession } from "../../../data/domains/session"
@@ -9,8 +10,7 @@ import { getCharacterDataSync, getCharacterManaNodesSync, getManaNodeAwakeCost }
 import { clientSerializeDate } from "../../../data/utils";
 import { resolvePlayerIdSync } from "../../../data/activeAccount";
 import { getDb } from "../../../data/db";
-import { validateSessionAndPlayer, validateCharacterOwnership, computeManaDeduction, computeItemDeductions, buildCharacterListEntry, sendCharacterResponse, computeBondTokenAndEvolution, computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps, validateManaBoardAwakeRequest } from "../../../lib/character-helpers";
-import { computeAwakeSummary } from "../../../lib/mission";
+import { validateSessionAndPlayer, validateCharacterOwnership, computeManaDeduction, computeItemDeductions, buildCharacterListEntry, sendCharacterResponse, computeBondTokenAndEvolution, validateManaBoardAwakeRequest } from "../../../lib/character-helpers";
 
 interface LearnManaNodeBody {
     viewer_id: number,
@@ -157,10 +157,7 @@ const routes = async (fastify: FastifyInstance) => {
         const board1NodeIds = Object.keys(board1Nodes).map(Number)
         const awakeLevels = getPlayerCharactersManaNodeAwakeLevelsSync(playerId)
         const charAwakeLevels = awakeLevels[String(characterId)] ?? {}
-        const unlockedAwakeMap = mergeManaBoardAwakeMaps(
-            computeAwakeSummary(playerId).manaBoardAwakeMap,
-            computeManaBoardAwakeFromNodes(awakeLevels)
-        )
+        const unlockedAwakeMap = getPlayerCharacterAwakeUnlocksSync(playerId)
         const unlockedAwakeLevel = unlockedAwakeMap.get(String(characterId))?.[1] ?? 0
         const learnedNodeIds = getPlayerCharactersManaNodesSync(playerId)[String(characterId)] ?? []
         const validationError = validateManaBoardAwakeRequest(

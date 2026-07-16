@@ -102,7 +102,7 @@ const { getPlayerItemSync } = require("../out/data/domains/item")
 const { insertAccountSync } = require("../out/data/domains/account")
 const { insertDefaultPlayerCharacterSync } = require("../out/data/domains/character")
 const { insertDefaultPlayerSync } = require("../out/data/domains/player")
-const { reconcileAwakeUnlocks } = require("../out/lib/mission")
+const { reconcileAwakeUnlocks, reconcileAwakeUnlocksFromProgress } = require("../out/lib/mission")
 const missionRegistry = require("../out/lib/mission/registry")
 
 const db = getDb()
@@ -157,11 +157,43 @@ try {
         WHERE player_id = ?
     `).run(playerId)
 
+    assert.equal(typeof reconcileAwakeUnlocksFromProgress, "function")
+    const authoritativeProgress = [
+        { missionId: 3410051, progress: 1 },
+        { missionId: 3410052, progress: 5 },
+        { missionId: 3410053, progress: 5 },
+        { missionId: 3410054, progress: 3 },
+    ]
+    const expectedUnlocks = new Map([["341005", { 1: 1 }]])
+    const originalGetComputerForProgress = missionRegistry.getComputer
+    missionRegistry.getComputer = () => {
+        throw new Error("fromProgress must not build a mission context")
+    }
+    try {
+        const emptyProgressReconciliation = reconcileAwakeUnlocksFromProgress(playerId, [])
+        assert.equal(emptyProgressReconciliation.changed.size, 0)
+        assert.equal(emptyProgressReconciliation.all.size, 0)
+
+        const fromProgressReconciliation = reconcileAwakeUnlocksFromProgress(playerId, authoritativeProgress)
+        assert.deepEqual(fromProgressReconciliation.changed, expectedUnlocks)
+        assert.deepEqual(fromProgressReconciliation.all, expectedUnlocks)
+
+        const repeatedProgressReconciliation = reconcileAwakeUnlocksFromProgress(playerId, authoritativeProgress)
+        assert.equal(repeatedProgressReconciliation.changed.size, 0)
+        assert.deepEqual(repeatedProgressReconciliation.all, expectedUnlocks)
+    } finally {
+        missionRegistry.getComputer = originalGetComputerForProgress
+    }
+
+    db.prepare(`
+        DELETE FROM players_character_awake_unlocks
+        WHERE player_id = ?
+    `).run(playerId)
+
     const itemAmountsBefore = Object.fromEntries(
         [13, 14, 15, 16].map(itemId => [itemId, getPlayerItemSync(playerId, itemId) ?? 0])
     )
     const firstReconciliation = reconcileAwakeUnlocks(playerId, [341005])
-    const expectedUnlocks = new Map([["341005", { 1: 1 }]])
 
     assert.deepEqual(firstReconciliation.changed, expectedUnlocks)
     assert.deepEqual(firstReconciliation.all, expectedUnlocks)

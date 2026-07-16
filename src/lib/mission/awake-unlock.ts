@@ -13,33 +13,22 @@ export interface AwakeUnlockReconciliationResult {
     changed: CharacterAwakeUnlockMap
 }
 
-export function reconcileAwakeUnlocks(
-    playerId: number,
-    candidateCharacterIds?: number[]
-): AwakeUnlockReconciliationResult {
-    if (candidateCharacterIds?.length === 0) {
-        return {
-            all: getPlayerCharacterAwakeUnlocksSync(playerId),
-            changed: new Map(),
-        }
-    }
+export interface AwakeUnlockProgress {
+    missionId: number
+    progress: number
+}
 
-    const ownedCharacters = getPlayerCharactersSync(playerId)
-    const persistedMissions = getPlayerCategoryMissionsSync(playerId, 9)
-    const candidateIds = candidateCharacterIds ? new Set(candidateCharacterIds.map(String)) : null
-    const computer = getComputer(9)
-    const context = computer.buildContext(playerId, 9)
+export function reconcileAwakeUnlocksFromProgress(
+    playerId: number,
+    progressList: AwakeUnlockProgress[]
+): AwakeUnlockReconciliationResult {
     const changed: CharacterAwakeUnlockMap = new Map()
 
     getDb().transaction(() => {
-        for (const missionId of getMissionIdsByCategory(9)) {
-            const characterId = getCharacterIdFromMission(missionId)
-            if (!ownedCharacters[characterId] || (candidateIds && !candidateIds.has(characterId))) continue
-
-            const dbProgress = persistedMissions[String(missionId)]?.progress ?? 0
-            const progress = computer.compute(missionId, context, dbProgress)
-            for (const stage of getCompletedStageNumbers(9, missionId, progress)) {
-                const specialReward = getAwakeMissionRewardStageDefinition(missionId, stage)?.specialReward
+        for (const entry of progressList) {
+            const characterId = getCharacterIdFromMission(entry.missionId)
+            for (const stage of getCompletedStageNumbers(9, entry.missionId, entry.progress)) {
+                const specialReward = getAwakeMissionRewardStageDefinition(entry.missionId, stage)?.specialReward
                 if (!specialReward || String(specialReward.characterId) !== characterId) continue
                 if (!upsertPlayerCharacterAwakeUnlockSync(
                     playerId,
@@ -62,4 +51,33 @@ export function reconcileAwakeUnlocks(
         all: getPlayerCharacterAwakeUnlocksSync(playerId),
         changed,
     }
+}
+
+export function reconcileAwakeUnlocks(
+    playerId: number,
+    candidateCharacterIds?: number[]
+): AwakeUnlockReconciliationResult {
+    if (candidateCharacterIds?.length === 0) {
+        return reconcileAwakeUnlocksFromProgress(playerId, [])
+    }
+
+    const ownedCharacters = getPlayerCharactersSync(playerId)
+    const persistedMissions = getPlayerCategoryMissionsSync(playerId, 9)
+    const candidateIds = candidateCharacterIds ? new Set(candidateCharacterIds.map(String)) : null
+    const computer = getComputer(9)
+    const context = computer.buildContext(playerId, 9)
+    const progressList: AwakeUnlockProgress[] = []
+
+    for (const missionId of getMissionIdsByCategory(9)) {
+        const characterId = getCharacterIdFromMission(missionId)
+        if (!ownedCharacters[characterId] || (candidateIds && !candidateIds.has(characterId))) continue
+
+        const dbProgress = persistedMissions[String(missionId)]?.progress ?? 0
+        progressList.push({
+            missionId,
+            progress: computer.compute(missionId, context, dbProgress),
+        })
+    }
+
+    return reconcileAwakeUnlocksFromProgress(playerId, progressList)
 }

@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const path = require("node:path")
 
 const {
     buildManaBoardAwakeCharacterList,
@@ -6,8 +8,8 @@ const {
     validateManaBoardAwakeRequest,
 } = require("../out/lib/character-helpers")
 
-function testMissionUnlockAndNodeStateAreMerged() {
-    const missionUnlocks = new Map([
+function testIndependentUnlockAndNodeStateAreMergedByMaximum() {
+    const independentUnlocks = new Map([
         ["101", { 1: 1 }],
         ["102", { 1: 1 }],
     ])
@@ -17,12 +19,45 @@ function testMissionUnlockAndNodeStateAreMerged() {
     ])
 
     assert.deepEqual(
-        [...mergeManaBoardAwakeMaps(missionUnlocks, nodeState).entries()],
+        [...mergeManaBoardAwakeMaps(independentUnlocks, nodeState).entries()],
         [
             ["101", { 1: 2 }],
             ["102", { 1: 1 }],
             ["103", { 1: 1 }],
         ]
+    )
+}
+
+function testAwakeAuthorizationUsesIndependentUnlockState() {
+    const manaRouteSource = fs.readFileSync(
+        path.join(__dirname, "../src/routes/api/character/mana.ts"),
+        "utf8"
+    )
+    const awakeRouteBlock = manaRouteSource.split('fastify.post("/awake_mana_node"')[1]
+    const authorizationBlock = awakeRouteBlock
+        .split("const unlockedAwakeMap =")[1]
+        .split("const unlockedAwakeLevel =")[0]
+
+    assert.equal(authorizationBlock.includes("getPlayerCharacterAwakeUnlocksSync(playerId)"), true)
+    assert.equal(authorizationBlock.includes("computeManaBoardAwakeFromNodes"), false)
+    assert.equal(authorizationBlock.includes("computeAwakeSummary"), false)
+}
+
+function testLoadReconcilesFromComputedAwakeSummary() {
+    const playerDataSource = fs.readFileSync(
+        path.join(__dirname, "../src/data/utils/player-data.ts"),
+        "utf8"
+    )
+    const loadBlock = playerDataSource.split("export function getClientSerializedData(")[1]
+    const summaryIndex = loadBlock.indexOf("computeAwakeSummary(playerId)")
+    const reconcileIndex = loadBlock.indexOf("reconcileAwakeUnlocksFromProgress(")
+
+    assert.notEqual(reconcileIndex, -1)
+    assert.equal(summaryIndex < reconcileIndex, true)
+    assert.equal(loadBlock.includes("reconcileAwakeUnlocks(playerId)"), false)
+    assert.equal(
+        loadBlock.includes("awakeSummary.manaBoardAwakeMap = reconcileAwakeUnlocksFromProgress("),
+        true
     )
 }
 
@@ -72,7 +107,9 @@ function testAwakeUnlockUsesCommonCharacterResponseShape() {
     assert.equal(typeof entries[0].update_time, "string")
 }
 
-testMissionUnlockAndNodeStateAreMerged()
+testIndependentUnlockAndNodeStateAreMergedByMaximum()
+testAwakeAuthorizationUsesIndependentUnlockState()
+testLoadReconcilesFromComputedAwakeSummary()
 testAwakeUnlockUsesCommonCharacterResponseShape()
 testAwakeRequestGate()
 console.log("character awake refresh tests passed")

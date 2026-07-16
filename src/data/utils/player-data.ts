@@ -15,8 +15,7 @@ import { getPlayerMultiSpecialExchangeCampaignsSync, getPlayerPeriodicRewardPoin
 import { getPlayerOptionsSync } from "../domains/option"
 import { getPlayerPartyGroupListSync } from "../domains/party"
 import { getPlayerTriggeredTutorialsSync } from "../domains/tutorial"
-import { filterToActiveMissions } from "../../lib/mission/index"
-import { computeAwakeSummary } from "../../lib/mission/index"
+import { computeAwakeSummary, filterToActiveMissions, reconcileAwakeUnlocksFromProgress } from "../../lib/mission/index"
 import { computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps } from "../../lib/character-helpers"
 
 /**
@@ -85,6 +84,13 @@ export function getClientSerializedData(
 
     // Compute awake mission summary for /load injection
     const awakeSummary = computeAwakeSummary(playerId)
+    awakeSummary.manaBoardAwakeMap = reconcileAwakeUnlocksFromProgress(
+        playerId,
+        awakeSummary.activeMissionList.map(mission => ({
+            missionId: mission.mission_id,
+            progress: mission.progress_value,
+        }))
+    ).all
 
     // The client uses mana_board_awake both to unlock the Awake tab and as the
     // target node-awake level. Keep mission unlocks and persisted node state.

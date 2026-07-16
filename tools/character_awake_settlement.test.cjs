@@ -1,33 +1,34 @@
 const assert = require("node:assert/strict")
+const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
 const path = require("node:path")
 
 const { getDb } = require("../out/data/db")
-const { computeAwakeSummary, settleAwakeMissionRewards } = require("../out/lib/mission")
+const { computeAwakeSummary, reconcileAwakeUnlocks, settleAwakeMissionRewards } = require("../out/lib/mission")
+const { insertAccountSync } = require("../out/data/domains/account")
+const { insertDefaultPlayerCharacterSync } = require("../out/data/domains/character")
 const { getPlayerItemSync } = require("../out/data/domains/item")
 const { getPlayerCategoryMissionsSync } = require("../out/data/domains/mission")
+const { insertDefaultPlayerSync } = require("../out/data/domains/player")
 
 const db = getDb()
-const player = db.prepare(`
-    SELECT players.id
-    FROM players
-    JOIN players_characters
-      ON players_characters.player_id = players.id
-     AND players_characters.id = 341005
-    ORDER BY players.id
-    LIMIT 1
-`).get()
-
-if (!player) {
-    console.log("character awake settlement tests skipped: no player owns Mew")
-    process.exit(0)
-}
+const idpId = `character-awake-settlement-test-${randomUUID()}`
 
 db.exec("BEGIN")
 try {
-    const playerId = player.id
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId,
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    insertDefaultPlayerCharacterSync(playerId, 341005)
+
     db.prepare("DELETE FROM players_category_mission_stages WHERE player_id = ? AND category = 9").run(playerId)
     db.prepare("DELETE FROM players_category_missions WHERE player_id = ? AND category = 9").run(playerId)
+    db.prepare("DELETE FROM players_character_awake_unlocks WHERE player_id = ?").run(playerId)
     db.prepare(`
         INSERT INTO players_character_quest_clears (
             player_id, character_id, clear_count, multi_count,
@@ -36,16 +37,24 @@ try {
         ON CONFLICT(player_id, character_id) DO UPDATE SET clear_count = 5
     `).run(playerId)
 
+    const itemAmountsBefore = Object.fromEntries(
+        [13, 14, 15, 16].map(itemId => [itemId, getPlayerItemSync(playerId, itemId) ?? 0])
+    )
+    const reconciliation = reconcileAwakeUnlocks(playerId, [341005])
+    assert.deepEqual(reconciliation.all.get("341005"), { 1: 1 })
+
     const completedButUnreceived = computeAwakeSummary(playerId)
     const mewMissions = completedButUnreceived.activeMissionList
         .filter(mission => Math.floor(mission.mission_id / 10) === 341005)
+    const mewStages = mewMissions.flatMap(mission => mission.stages)
 
     assert.equal(mewMissions.length, 4)
-    assert.equal(mewMissions.every(mission => mission.stages[0].received === false), true)
-    assert.equal(completedButUnreceived.manaBoardAwakeMap.has("341005"), false)
-
-    const itemAmountsBefore = Object.fromEntries(
-        [13, 14, 15, 16].map(itemId => [itemId, getPlayerItemSync(playerId, itemId) ?? 0])
+    assert.equal(mewStages.length, 4)
+    assert.equal(mewStages.every(stage => stage.received === false), true)
+    assert.deepEqual(completedButUnreceived.manaBoardAwakeMap.get("341005"), { 1: 1 })
+    assert.deepEqual(
+        Object.fromEntries([13, 14, 15, 16].map(itemId => [itemId, getPlayerItemSync(playerId, itemId) ?? 0])),
+        itemAmountsBefore
     )
     const progressList = [
         { missionId: 3410051, progress: 1 },
@@ -97,4 +106,9 @@ try {
     console.log("character awake settlement tests passed")
 } finally {
     db.exec("ROLLBACK")
+    assert.equal(db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM accounts
+        WHERE idp_id = ?
+    `).get(idpId).count, 0)
 }

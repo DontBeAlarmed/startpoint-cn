@@ -3,10 +3,10 @@
 
 import { getPlayerCategoryMissionsSync } from "../../data/domains/mission"
 import { getPlayerCharactersSync } from "../../data/domains/character"
+import { getPlayerCharacterAwakeUnlocksSync } from "../../data/domains/character_awake"
 import { getComputer } from "./registry"
 import { getMissionIdsByCategory, getMissionStageIds } from "./stages"
 import { getCharacterIdFromMission } from "./character-queries"
-import { getAwakeMissionRewardStageDefinition } from "./rewards"
 import type { CategoryContext } from "./types"
 
 export interface AwakeMissionEntry {
@@ -36,7 +36,7 @@ export function computeAwakeSummary(playerId: number): AwakeSummary {
     const ctx = computer.buildContext(playerId, 9) as CategoryContext
 
     const activeMissionList: AwakeMissionEntry[] = []
-    const manaBoardAwakeMap = new Map<string, Record<number, number>>()
+    const manaBoardAwakeMap = getPlayerCharacterAwakeUnlocksSync(playerId)
 
     for (const [charKId, missionIds] of charMissionMap) {
         if (!playerChars[charKId]) continue
@@ -57,18 +57,6 @@ export function computeAwakeSummary(playerId: number): AwakeSummary {
                 progress_value: progress,
                 stages,
             })
-
-            for (const stage of stages) {
-                if (!stage.received) continue
-                const specialReward = getAwakeMissionRewardStageDefinition(missionId, stage.stage)?.specialReward
-                if (!specialReward || !playerChars[String(specialReward.characterId)]) continue
-                const levels = manaBoardAwakeMap.get(String(specialReward.characterId)) ?? {}
-                levels[specialReward.boardIndex] = Math.max(
-                    levels[specialReward.boardIndex] ?? 0,
-                    specialReward.awakeLevel
-                )
-                manaBoardAwakeMap.set(String(specialReward.characterId), levels)
-            }
         }
     }
 
