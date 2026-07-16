@@ -27,6 +27,8 @@ export { getCharacterStoryQuestIds, getCharacterIdFromMission } from "./characte
 export { computeAwakeSummary } from "./compute-awake-summary"
 export type { AwakeMissionComputedProgress, AwakeMissionInfo, AwakeMissionSettlementResult } from "./awake-settlement"
 export { settleAwakeMissionRewards } from "./awake-settlement"
+export type { AwakeUnlockReconciliationResult } from "./awake-unlock"
+export { reconcileAwakeUnlocks } from "./awake-unlock"
 
 // Degree helpers
 export { getTargetDegree } from "./computer-degree"

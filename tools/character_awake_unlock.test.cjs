@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict")
+const { randomUUID } = require("node:crypto")
 const Database = require("better-sqlite3")
 
 function testVersion4BackfillValidation() {
@@ -97,31 +98,102 @@ const {
     getPlayerCharacterAwakeUnlocksSync,
     upsertPlayerCharacterAwakeUnlockSync,
 } = require("../out/data/domains/character_awake")
+const { getPlayerItemSync } = require("../out/data/domains/item")
+const { insertAccountSync } = require("../out/data/domains/account")
+const { insertDefaultPlayerCharacterSync } = require("../out/data/domains/character")
+const { insertDefaultPlayerSync } = require("../out/data/domains/player")
+const { reconcileAwakeUnlocks } = require("../out/lib/mission")
+const missionRegistry = require("../out/lib/mission/registry")
 
 const db = getDb()
-const player = db.prepare(`
-    SELECT player_id AS id
-    FROM players_characters
-    WHERE id = 341005
-    ORDER BY player_id
-    LIMIT 1
-`).get()
-
-if (!player) {
-    console.log("character awake unlock tests skipped: no player owns character 341005")
-    process.exit(0)
-}
-
-const originalUnlockRows = db.prepare(`
-    SELECT player_id, character_id, board_index, awake_level
-    FROM players_character_awake_unlocks
-    WHERE player_id = ? AND character_id = 341005
-    ORDER BY board_index
-`).all(player.id)
+const idpId = `character-awake-unlock-test-${randomUUID()}`
 
 db.exec("BEGIN")
 try {
-    const playerId = player.id
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId,
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    insertDefaultPlayerCharacterSync(playerId, 341005)
+
+    db.prepare(`
+        DELETE FROM players_category_mission_stages
+        WHERE player_id = ? AND category = 9
+    `).run(playerId)
+    db.prepare(`
+        DELETE FROM players_category_missions
+        WHERE player_id = ? AND category = 9
+    `).run(playerId)
+    db.prepare(`
+        DELETE FROM players_character_awake_unlocks
+        WHERE player_id = ?
+    `).run(playerId)
+    db.prepare(`
+        INSERT INTO players_character_quest_clears (
+            player_id, character_id, clear_count, multi_count,
+            leader_clear_count, leader_multi_count, leader_power_flip_count
+        ) VALUES (?, 341005, 5, 0, 0, 0, 0)
+        ON CONFLICT(player_id, character_id) DO UPDATE SET clear_count = 5
+    `).run(playerId)
+
+    assert.equal(upsertPlayerCharacterAwakeUnlockSync(playerId, 341005, 1, 1), true)
+    const originalGetComputer = missionRegistry.getComputer
+    missionRegistry.getComputer = () => {
+        throw new Error("candidate=[] must not build a mission context")
+    }
+    try {
+        const emptyCandidateReconciliation = reconcileAwakeUnlocks(playerId, [])
+        assert.deepEqual(emptyCandidateReconciliation.all, new Map([["341005", { 1: 1 }]]))
+        assert.equal(emptyCandidateReconciliation.changed.size, 0)
+    } finally {
+        missionRegistry.getComputer = originalGetComputer
+    }
+    db.prepare(`
+        DELETE FROM players_character_awake_unlocks
+        WHERE player_id = ?
+    `).run(playerId)
+
+    const itemAmountsBefore = Object.fromEntries(
+        [13, 14, 15, 16].map(itemId => [itemId, getPlayerItemSync(playerId, itemId) ?? 0])
+    )
+    const firstReconciliation = reconcileAwakeUnlocks(playerId, [341005])
+    const expectedUnlocks = new Map([["341005", { 1: 1 }]])
+
+    assert.deepEqual(firstReconciliation.changed, expectedUnlocks)
+    assert.deepEqual(firstReconciliation.all, expectedUnlocks)
+    assert.equal(firstReconciliation.changed.has("341006"), false)
+    assert.equal(firstReconciliation.all.size, 1)
+    assert.equal(db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM players_category_missions
+        WHERE player_id = ? AND category = 9
+    `).get(playerId).count, 0)
+    assert.equal(db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM players_category_mission_stages
+        WHERE player_id = ? AND category = 9
+    `).get(playerId).count, 0)
+    assert.deepEqual(
+        Object.fromEntries([13, 14, 15, 16].map(itemId => [itemId, getPlayerItemSync(playerId, itemId) ?? 0])),
+        itemAmountsBefore
+    )
+
+    const secondReconciliation = reconcileAwakeUnlocks(playerId, [341005])
+    assert.equal(secondReconciliation.changed.size, 0)
+    assert.deepEqual(secondReconciliation.all, expectedUnlocks)
+
+    db.prepare(`
+        DELETE FROM players_character_awake_unlocks
+        WHERE player_id = ?
+    `).run(playerId)
+    const fullReconciliation = reconcileAwakeUnlocks(playerId)
+    assert.deepEqual(fullReconciliation.changed, expectedUnlocks)
+    assert.deepEqual(fullReconciliation.all, expectedUnlocks)
+
     db.prepare(`
         DELETE FROM players_character_awake_unlocks
         WHERE player_id = ? AND character_id = 341005
@@ -137,11 +209,9 @@ try {
     console.log("character awake unlock tests passed")
 } finally {
     db.exec("ROLLBACK")
-    const restoredUnlockRows = db.prepare(`
-        SELECT player_id, character_id, board_index, awake_level
-        FROM players_character_awake_unlocks
-        WHERE player_id = ? AND character_id = 341005
-        ORDER BY board_index
-    `).all(player.id)
-    assert.deepEqual(restoredUnlockRows, originalUnlockRows)
+    assert.equal(db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM accounts
+        WHERE idp_id = ?
+    `).get(idpId).count, 0)
 }
