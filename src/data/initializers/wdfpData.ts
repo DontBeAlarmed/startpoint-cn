@@ -281,6 +281,16 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_character_awake_unlocks (
+        player_id INTEGER NOT NULL,
+        character_id INTEGER NOT NULL,
+        board_index INTEGER NOT NULL,
+        awake_level INTEGER NOT NULL,
+        PRIMARY KEY (player_id, character_id, board_index),
+        FOREIGN KEY (character_id, player_id) REFERENCES players_characters (id, player_id) ON DELETE CASCADE,
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run();
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_party_groups (
         id INTEGER NOT NULL,
         color_id INTEGER NOT NULL,

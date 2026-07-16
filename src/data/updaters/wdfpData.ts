@@ -3,6 +3,13 @@
 import { Database } from "better-sqlite3";
 import awakeRewards from "../../../assets/mission_char_awake_reward.json";
 
+function parseDecimalSafeInteger(value: unknown): number | null {
+    if (typeof value !== "string" || !/^[0-9]+$/.test(value)) return null
+
+    const parsed = Number(value)
+    return Number.isSafeInteger(parsed) ? parsed : null
+}
+
 /**
  * Updates a database before its initialization function has been called.
  * 
@@ -96,5 +103,58 @@ export function updateAfterInit(
                 `).run(...awakeMissionIds)
             })()
         }
+    }
+
+    if (3 >= currentVersion) {
+        const insertUnlock = database.prepare(`
+            INSERT INTO players_character_awake_unlocks
+                (player_id, character_id, board_index, awake_level)
+            SELECT mission_stage.player_id, owned_character.id, ?, ?
+            FROM players_category_mission_stages AS mission_stage
+            JOIN players_characters AS owned_character
+              ON owned_character.player_id = mission_stage.player_id
+             AND owned_character.id = ?
+            WHERE mission_stage.category = 9
+              AND mission_stage.mission_id = ?
+              AND mission_stage.id = ?
+              AND mission_stage.status = 1
+            ON CONFLICT(player_id, character_id, board_index) DO UPDATE SET
+                awake_level = MAX(awake_level, excluded.awake_level)
+        `)
+
+        const missionRewards = awakeRewards as Record<string, Record<string, unknown>>
+        database.transaction(() => {
+            for (const [rawMissionId, stages] of Object.entries(missionRewards)) {
+                const missionId = parseDecimalSafeInteger(rawMissionId)
+                if (missionId === null || missionId <= 0) continue
+
+                for (const [rawStageId, wrappedRows] of Object.entries(stages)) {
+                    const stageId = parseDecimalSafeInteger(rawStageId)
+                    if (stageId === null || stageId <= 0 || !Array.isArray(wrappedRows)) continue
+
+                    const row = wrappedRows[0]
+                    if (!Array.isArray(row)) continue
+
+                    const specialKind = parseDecimalSafeInteger(row[1])
+                    const characterId = parseDecimalSafeInteger(row[2])
+                    const boardIndex = parseDecimalSafeInteger(row[3])
+                    const awakeLevel = parseDecimalSafeInteger(row[4])
+                    if (
+                        specialKind !== 0
+                        || characterId === null || characterId <= 0
+                        || boardIndex === null || boardIndex <= 0
+                        || awakeLevel === null || awakeLevel <= 0
+                    ) continue
+
+                    insertUnlock.run(
+                        boardIndex,
+                        awakeLevel,
+                        characterId,
+                        missionId,
+                        stageId
+                    )
+                }
+            }
+        })()
     }
 }
