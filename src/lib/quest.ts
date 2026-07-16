@@ -8,6 +8,8 @@ import { givePlayerEquipmentSync } from "./equipment";
 import { CharacterReward, CommonScoreReward, CurrencyReward, CurrencyScoreReward, DropScoreRewardId, EquipmentItemReward, GivePlayerScoreRewardsResult, ItemScoreReward, PlayerRewardResult, RareScoreRewardGroup, Reward, RewardType, ScoreReward, ScoreRewardType } from "./types";
 import { Player } from "../data/types";
 import rewardElementMap from "../../assets/reward_element_map.json";
+import { resolveEventCurrencyId } from "./event-currency";
+import { getDateFromServerTime, getServerTimeForPlayer } from "../utils";
 
 const ELEMENT_TO_ENEMY_MAP: Record<number, number> = {
     0: 3, 1: 0, 2: 1, 3: 2, 4: 5, 5: 4,
@@ -54,6 +56,7 @@ export function givePlayerScoreRewardsSync(
 
     if (scoreRewards != null && groupId != null) {
         const dropMultiplier = parseFloat(process.env.DROP_MULTIPLIER || '1')
+        const rewardDate = getDateFromServerTime(getServerTimeForPlayer(playerId))
         console.log(`[QUEST] givePlayerScoreRewards group=${groupId} items=${scoreRewards.length} pid=${playerId}`)
         let seqIndex = 0
         for (const scoreReward of scoreRewards) {
@@ -68,7 +71,7 @@ export function givePlayerScoreRewardsSync(
                     switch (reward.reward_type) {
                         case RewardType.ITEM: {
                             const itemReward = reward as ItemScoreReward
-                            const itemId = itemReward.id
+                            const itemId = resolveEventCurrencyId(itemReward.id, rewardDate)
                             rewardAmount = itemReward.count * dropMultiplier * (boostPointUsed ? 2 : 1)
                             items[String(itemId)] = givePlayerItemSync(playerId, itemId, rewardAmount);
                             console.log(`[QUEST-ITEM] id=${itemId} cdnCount=${itemReward.count} ×drop=${dropMultiplier} ×boost=${boostPointUsed ? 2 : 1} → ${rewardAmount}`)
