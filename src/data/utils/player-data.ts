@@ -17,7 +17,7 @@ import { getPlayerPartyGroupListSync } from "../domains/party"
 import { getPlayerTriggeredTutorialsSync } from "../domains/tutorial"
 import { filterToActiveMissions } from "../../lib/mission/index"
 import { computeAwakeSummary } from "../../lib/mission/index"
-import { computeManaBoardAwakeFromNodes } from "../../lib/character-helpers"
+import { computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps } from "../../lib/character-helpers"
 
 /**
  * Generates default player data.
@@ -65,6 +65,7 @@ export function getDefaultPlayerData(): Omit<Player, 'id'> {
 }
 
 
+
 /**
  * Takes a playerID and returns all of the necessary data for the game client.
  * 
@@ -85,11 +86,13 @@ export function getClientSerializedData(
     // Compute awake mission summary for /load injection
     const awakeSummary = computeAwakeSummary(playerId)
 
-    // Fetch awake levels once, reuse for both node list and mana_board_awake.
-    // mana_board_awake is actual post-awakening board state; mission completion is
-    // returned separately through active_mission_list.
+    // The client uses mana_board_awake both to unlock the Awake tab and as the
+    // target node-awake level. Keep mission unlocks and persisted node state.
     const nodeAwakeLevels = getPlayerCharactersManaNodeAwakeLevelsSync(playerId)
-    const manaBoardAwakeMap = computeManaBoardAwakeFromNodes(nodeAwakeLevels)
+    const manaBoardAwakeMap = mergeManaBoardAwakeMaps(
+        awakeSummary.manaBoardAwakeMap,
+        computeManaBoardAwakeFromNodes(nodeAwakeLevels)
+    )
 
     return serializePlayerData({
         player: playerData,
@@ -160,4 +163,3 @@ export function getMergedPlayerDataSync(
         rushEventPlayedPartyList: getPlayerRushEventListPlayedPartiesSync(playerId)
     }
 }
-

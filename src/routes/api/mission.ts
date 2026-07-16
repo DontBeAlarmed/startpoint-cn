@@ -5,12 +5,13 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerActiveMissionsSync, updatePlayerActiveMissionStageSync, updatePlayerActiveMissionSync } from "../../data/domains/mission"
 import { getSession } from "../../data/domains/session"
 import { givePlayerItemSync } from "../../data/domains/item"
-import { insertDefaultPlayerCharacterSync } from "../../data/domains/character"
+import { getPlayerCharactersSync, insertDefaultPlayerCharacterSync } from "../../data/domains/character"
 import { updatePlayerSync } from "../../data/domains/player"
 import { generateDataHeaders } from "../../utils";
-import { getComputer, getMissionIdsByCategory, getMissionsByPattern, getCurrentStage, getActiveMissionRewards, getAwakeMissionRewards, getEventMissionRewards, getCompletedStageNumbers, getCharacterIdFromMission } from "../../lib/mission/index";
+import { computeAwakeSummary, getComputer, getMissionIdsByCategory, getMissionsByPattern, getCurrentStage, getActiveMissionRewards, getAwakeMissionRewards, getEventMissionRewards, getCompletedStageNumbers, getCharacterIdFromMission } from "../../lib/mission/index";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import type { CategoryContext } from "../../lib/mission/index";
+import { buildManaBoardAwakeCharacterList } from "../../lib/character-helpers";
 
 interface GetMissionProgressBody {
     api_count: number,
@@ -142,11 +143,18 @@ const routes = async (fastify: FastifyInstance) => {
 
         console.log(`[MISSION] get_progress viewer=${viewerId} categories=${requestCategories} missions=${missionProgressList.length}`)
 
+        const awakeSummary = computeAwakeSummary(playerId)
+        const awakeCharacterList = buildManaBoardAwakeCharacterList(
+            getPlayerCharactersSync(playerId),
+            awakeSummary.manaBoardAwakeMap
+        )
+
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
-                "mission_progress_list": missionProgressList
+                "mission_progress_list": missionProgressList,
+                "character_list": awakeCharacterList
             }
         })
     })
@@ -186,12 +194,19 @@ const routes = async (fastify: FastifyInstance) => {
 
         console.log(`[MISSION] update_progress viewer=${viewerId} params=${missionParams.length} db_updates=${updatedCount}`)
 
+        const awakeSummary = computeAwakeSummary(playerId)
+        const awakeCharacterList = buildManaBoardAwakeCharacterList(
+            getPlayerCharactersSync(playerId),
+            awakeSummary.manaBoardAwakeMap
+        )
+
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
                 "mission_info": [],
-                "degree_list": []
+                "degree_list": [],
+                "character_list": awakeCharacterList
             }
         })
     })

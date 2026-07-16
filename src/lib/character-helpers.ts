@@ -129,6 +129,49 @@ export function buildCharacterListEntry(
     }
 }
 
+/** Merges mission-unlocked and persisted mana-board awake levels. */
+export function mergeManaBoardAwakeMaps(
+    ...maps: Map<string, Record<number, number>>[]
+): Map<string, Record<number, number>> {
+    const merged = new Map<string, Record<number, number>>()
+
+    for (const map of maps) {
+        for (const [characterId, boardLevels] of map) {
+            const current = merged.get(characterId) ?? {}
+            for (const [boardIndex, awakeLevel] of Object.entries(boardLevels)) {
+                const index = Number(boardIndex)
+                current[index] = Math.max(current[index] ?? 0, awakeLevel)
+            }
+            merged.set(characterId, current)
+        }
+    }
+
+    return merged
+}
+
+/** Builds the minimal common-response entries needed to refresh Awake unlocks. */
+export function buildManaBoardAwakeCharacterList(
+    characters: Record<string, PlayerCharacter>,
+    manaBoardAwakeMap: Map<string, Record<number, number>>
+): Record<string, unknown>[] {
+    const result: Record<string, unknown>[] = []
+
+    for (const [characterId, manaBoardAwake] of manaBoardAwakeMap) {
+        const character = characters[characterId]
+        if (!character) continue
+
+        result.push({
+            character_id: Number(characterId),
+            exp: character.exp,
+            join_time: clientSerializeDate(character.joinTime),
+            update_time: clientSerializeDate(character.updateTime),
+            mana_board_awake: { ...manaBoardAwake },
+        })
+    }
+
+    return result
+}
+
 // ─── Bond token + evolution ───
 
 export interface BondTokenResult {
@@ -187,14 +230,7 @@ export function sendCharacterResponse(
 
 // ─── Mana board awake level computation ───
 
-/**
- * Computes mana_board_awake for characters based on actual node awake levels.
- * Only sets { "1": N } if at least one board 1 node has been awakened to level N.
- *
- * This replaces the old mission-based mana_board_awake — the client uses
- * mana_board_awake to determine the board's "target awake level" for
- * hasLearnedManaNode comparisons, so it must only be set AFTER actual awakening.
- */
+/** Computes persisted mana-board awake levels from node state. */
 export function computeManaBoardAwakeFromNodes(
     characterManaNodeAwakeLevels: Record<string, Record<number, number>>
 ): Map<string, Record<number, number>> {
