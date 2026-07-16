@@ -102,13 +102,20 @@ function parseZipListing(stdout) {
   const entries = [];
   const lines = stdout.split("\n");
   for (const line of lines) {
-    // File entries format: "  NNNNN  MM-DD-YYYY HH:MM   path/to/file"
-    const match = line.match(/^\s+\d+\s+\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}\s{2}(.+)$/);
+    // The date token differs between unzip builds (MM-DD-YYYY vs YYYY-MM-DD).
+    const match = line.match(/^\s+\d+\s+\S+\s+\d{1,2}:\d{2}\s+(.+)$/);
     if (match) {
       entries.push(match[1].trim());
     }
   }
   return entries;
+}
+
+function archiveVersionKey(name) {
+  const versions = [...name.matchAll(/(\d+)\.(\d+)\.(\d+)/g)].map(
+    (match) => Number(match[1]) * 1e6 + Number(match[2]) * 1e3 + Number(match[3]),
+  );
+  return versions.length ? Math.max(...versions) : 0;
 }
 
 /** Scan all CDN archives and build a path→archive mapping.
@@ -142,6 +149,7 @@ async function buildZipIndex(cdnDir) {
   console.log("  Indexing (this takes ~5 min)...");
 
   const index = new Map();
+  const bestVersion = new Map();
   const CONCURRENCY = 8;
   const startTime = Date.now();
 
@@ -166,10 +174,11 @@ async function buildZipIndex(cdnDir) {
         continue;
       }
       const { archive, entries } = result.value;
+      const version = archiveVersionKey(archive.zipName);
       for (const filePath of entries) {
-        // First archive wins (full archives take priority over diffs)
-        if (!index.has(filePath)) {
+        if (!index.has(filePath) || version > bestVersion.get(filePath)) {
           index.set(filePath, archive.archiveRef);
+          bestVersion.set(filePath, version);
         }
       }
     }

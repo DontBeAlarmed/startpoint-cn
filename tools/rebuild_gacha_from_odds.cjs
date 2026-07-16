@@ -137,7 +137,7 @@ function normalizePoolEntries(entries, idField) {
   });
 }
 
-function buildPoolForOddsIds(oddsTable, mapping, idField, charTable) {
+function buildPoolForOddsIds(oddsTable, mapping, idField) {
   const pool = {};
   for (const [poolKey, oddsId] of Object.entries(mapping)) {
     if (!oddsId) {
@@ -148,116 +148,12 @@ function buildPoolForOddsIds(oddsTable, mapping, idField, charTable) {
       console.warn(`[WARN] missing odds file for ${oddsId} (banner may have incomplete pool)`);
       continue;
     }
-    // Element revival pools: accumulate from ALL odds files by element
-    const entries = accumulateElementRevival(oddsId, odds, oddsTable, charTable);
-    pool[poolKey] = normalizePoolEntries(entries, idField);
+    pool[poolKey] = normalizePoolEntries(odds.entries, idField);
   }
   return pool;
 }
 
-// ── Element revival pool accumulation ──────────────────────────
-// CN element revival pools contain ALL characters of that element
-// (fire-only, dark-only, etc.) accumulated from every previous banner.
-// The CDN odds files for these pools only contain NEW additions.
-// Scan ALL odds files, filter by element, exclude collab characters.
-function accumulateElementRevival(oddsId, currentOdds, oddsTable, charTable) {
-  // Detect: is this an element-filtered revival pool?
-  let elemPrefix = null;
-  for (const entry of currentOdds.entries) {
-    const code = String(entry.characterId || entry.equipmentId || '');
-    if (code.length < 2) return currentOdds.entries;
-    if (elemPrefix === null) elemPrefix = code[1];
-    else if (code[1] !== elemPrefix) return currentOdds.entries;
-  }
-  if (!elemPrefix) return currentOdds.entries;
-  if (currentOdds.entries.length < 10) return currentOdds.entries;
-
-  // Determine tier prefix from oddsId suffix
-  // _character_5 → code starts with '1', _character_4 → '2', _character_3 → '3'
-  const RARITY_TO_TIER = { '5': '1', '4': '2', '3': '3' };
-  const tierMatch = oddsId.match(/_character_(\d)$/);
-  const tierPrefix = tierMatch ? RARITY_TO_TIER[tierMatch[1]] : null;
-  if (!tierPrefix) return currentOdds.entries;
-
-  // Only accumulate for the LAST series of each color + pattern
-  // Intermediate revivals use raw odds; only the final series accumulates
-  // Match the SAME pattern as current oddsId to avoid special pool keys (e.g. pickup_20)
-  const pattern = oddsId.match(/^([a-z]+)_(element_(?:character_)?pickup_)(\d+)/);
-  if (pattern) {
-    const color = pattern[1];
-    const prefix = pattern[2]; // "element_character_pickup_" or "element_pickup_"
-    const currentSeries = parseInt(pattern[3]);
-    let maxSeries = 0;
-    const seriesRegex = new RegExp(`^${color}_${prefix}(\\d+)`);
-    for (const id of Object.keys(oddsTable)) {
-      const sm = id.match(seriesRegex);
-      if (sm) maxSeries = Math.max(maxSeries, parseInt(sm[1]));
-    }
-    if (currentSeries < maxSeries) return currentOdds.entries;
-  }
-
-  // Accumulate from ALL odds files, filter by element prefix + tier prefix
-  const allEntries = [];
-  const seenIds = new Set();
-
-  for (const odds of Object.values(oddsTable)) {
-    for (const entry of (odds.entries || [])) {
-      const code = String(entry.characterId || entry.equipmentId || '');
-      if (code.length < 2) continue;
-      if (code[1] !== elemPrefix) continue; // wrong element
-      if (code[0] !== tierPrefix) continue; // wrong tier
-      const cid = entry.characterId || entry.equipmentId;
-      if (cid && !seenIds.has(cid)) {
-        seenIds.add(cid);
-        allEntries.push(entry);
-      }
-    }
-  }
-
-  // Exclude collab characters
-  if (charTable) {
-    return allEntries.filter(entry => {
-      const code = String(entry.characterId || '');
-      const char = charTable.find(c => String(c.code_number) === code);
-      return !char || char.source !== '联动';
-    });
-  }
-  return allEntries;
-}
-
-// ── Holiday pool fallback ──────────────────────────────────────
-// Missing CN holiday odds files (2024_10, 2025_01, 2025_05):
-// build full-template pool from character_table.json
-function buildHolidaySyntheticPool(charTable, startDate, rarity) {
-  return charTable
-    .filter(c => c.source === '常驻卡池' || c.source === '限定卡池')
-    .filter(c => c.rarity === rarity)
-    .filter(c => !c.available_from || c.available_from <= startDate.substring(0, 10))
-    .map(c => ({
-      characterId: parseInt(c.code_number, 10),
-      rarity,
-      weight: 1,
-      oddsUp: false,
-      isLimited: c.source === '限定卡池',
-      isExchangeable: false,
-    }));
-}
-
-function injectHolidayFallback(oddsExport, charTable, row) {
-  const poolCols = { '1': 16, '2': 15, '3': 14 };
-  for (const [poolKey, col] of Object.entries(poolCols)) {
-    const oddsId = String(row[col] || '').trim();
-    if (!oddsId || !oddsId.startsWith('holiday_') || oddsExport.character[oddsId]) continue;
-    const rarity = poolKey === '1' ? 5 : poolKey === '2' ? 4 : 3;
-    const startDate = String(row[29] || '2000-01-01');
-    oddsExport.character[oddsId] = {
-      entries: buildHolidaySyntheticPool(charTable, startDate, rarity),
-    };
-    console.log(`[HOLIDAY] injected synthetic pool: ${oddsId} (${rarity}★)`);
-  }
-}
-
-function buildBannerFromRow(gachaId, row, oddsExport, charTable) {
+function buildBannerFromRow(gachaId, row, oddsExport) {
   const prizeKind = row[13];
   const isEquipment = prizeKind === "1";
   const name = String(row[1] || `Gacha ${gachaId}`);
@@ -322,16 +218,11 @@ function buildBannerFromRow(gachaId, row, oddsExport, charTable) {
     startDate,
     endDate,
     name,
-    pool: (() => {
-      // Inject synthetic pools for missing CN holiday odds
-      injectHolidayFallback(oddsExport, charTable, row);
-      return buildPoolForOddsIds(
-        oddsExport.character,
-        { "1": row[16], "2": row[15], "3": row[14] },
-        "characterId",
-        charTable,
-      );
-    })(),
+    pool: buildPoolForOddsIds(
+      oddsExport.character,
+      { "1": row[16], "2": row[15], "3": row[14] },
+      "characterId",
+    ),
   };
 }
 
@@ -345,18 +236,13 @@ function buildGachaFromOdds(options = {}) {
     fs.readFileSync(path.join(root, "assets", "cdndata", "gacha.json"), "utf8"),
   );
 
-  const charTablePath = path.join(root, "data", "character_table.json");
-  const charTable = fs.existsSync(charTablePath)
-    ? JSON.parse(fs.readFileSync(charTablePath, "utf8"))
-    : [];
-
   const output = {};
   for (const [gachaId, rowGroup] of Object.entries(cdnGacha)) {
     const row = firstRow(rowGroup);
     if (!row) {
       continue;
     }
-    output[gachaId] = buildBannerFromRow(gachaId, row, oddsExport, charTable);
+    output[gachaId] = buildBannerFromRow(gachaId, row, oddsExport);
   }
   return output;
 }
