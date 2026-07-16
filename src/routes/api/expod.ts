@@ -13,6 +13,7 @@ import { getCharacterDataSync } from "../../lib/assets";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
+import { validateCharacterStackConversion } from "../../lib/character-stack";
 
 interface InjectExpBody {
     character_id: number,
@@ -57,7 +58,7 @@ const routes = async (fastify: FastifyInstance) => {
         const viewerId = body.viewer_id
         const characterId = body.character_id
         const convertCount = body.number
-        if (isNaN(viewerId) || isNaN(characterId) || !Number.isInteger(convertCount) || convertCount <= 0) return reply.status(400).send({
+        if (isNaN(viewerId) || isNaN(characterId)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
         })
@@ -91,20 +92,19 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "Player does not own character."
         })
 
-        const rarity = characterAssetData.rarity
-        const maxOverLimit = characterMaxOverLimits[rarity]
-        if (maxOverLimit === undefined || character.overLimitStep < maxOverLimit) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Character must be fully uncapped before converting duplicates."
-        })
+        const validationError = validateCharacterStackConversion(character.stack, convertCount, character.protection)
+        if (validationError) {
+            console.warn(`[EXPOD] stack_to_exp rejected viewer=${viewerId} char=${characterId} count=${convertCount} reason=${validationError}`)
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": validationError
+            })
+        }
         
         const afterStack = character.stack - convertCount
-        if (0 > afterStack) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Not enough stack."
-        })
 
         // get amounts to add
+        const rarity = characterAssetData.rarity
         const increaseExp = rarityStackConvertExp[rarity] * convertCount
         const increaseItemCount = rarityStackConvertItemCount[rarity] * convertCount
 
@@ -119,6 +119,7 @@ const routes = async (fastify: FastifyInstance) => {
             })
             afterItemCount = givePlayerItemSync(playerId, rewardItemId, increaseItemCount)
         })()
+        console.log(`[EXPOD] stack_to_exp viewer=${viewerId} char=${characterId} count=${convertCount} stack=${character.stack}->${afterStack}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

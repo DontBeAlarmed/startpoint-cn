@@ -20,8 +20,13 @@
 ## 修复
 
 - 在同一个 SQLite 事务内扣除角色 stack、增加经验池和发放星之粒。
-- 仅允许满突破角色转换，和客户端批量转换条件一致。
+- 单角色转换与 CN 客户端一致：只要求角色未保护且重复数充足，不要求满突破。
+- 批量转换继续只处理满突破且有重复数的角色；这是批量入口独有的筛选条件。
 - `number` 与 `over_limit_count` 必须为正整数，阻止 0、负数和小数构造异常库存。
 - 响应 `update_time` 使用本次操作时间，避免回传旧时间。
 
 CN 1.8.1 离线逻辑 `ExpodStackToExpDummyRemote` 明确调用 `consumeCharacterStack(characterId, number)`；本次修复与该行为对齐。
+
+`ConvertToExpWindow.getConversionAvailability()` 仅检查 `protection` 和
+`stack == 0`。将批量入口的满突破条件用于单角色入口会导致合法请求返回
+HTTP 400，并触发客户端 H400；该限制已移除。
