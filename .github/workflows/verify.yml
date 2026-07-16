@@ -21,8 +21,6 @@ jobs:
         node:
           - 20.19.0
           - 22.x
-    env:
-      WF_DATABASE_DIR: ${{ runner.temp }}\starpoint-node-test-db
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,6 +30,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run test:node
+        env:
+          WF_DATABASE_DIR: ${{ runner.temp }}\starpoint-node-test-db
       - run: npm audit --omit=dev --audit-level=high
 
   admin:
