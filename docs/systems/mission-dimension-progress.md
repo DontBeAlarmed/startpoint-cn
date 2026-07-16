@@ -1,6 +1,6 @@
 # 任务维度覆盖进度
 
-最后更新：2026-07-05
+最后更新：2026-07-16
 
 ## 当前结论
 
@@ -13,8 +13,9 @@
 | 管线 | 状态 | 说明 |
 | --- | --- | --- |
 | 阶段阈值解析 | 已对齐主要分类 | regular/daily/event/degree/weekly 读 `target_progress` 第 1 列，collect 读第 2 列，awake 读第 5 列 |
-| 奖励解析 | 基本可用 | active/regular/daily/event/degree/collect/weekly/awake 都有分类入口，`Stone(kind=0)` 不再被跳过 |
-| 每日任务发奖 | 已修复 | 每日任务通过 `get_mission_progress` 自动标记阶段并返回 `user_info/item_list` |
+| 奖励解析 | 基本可用 | active/regular/daily/event/degree/collect/weekly/awake 都有分类入口，`Stone(kind=0)` 不再被跳过；Degree/Weekly 暂不自动发放 |
+| 每日任务发奖 | 已修复 | 仅评估 `enable_start_time <= now <= enable_end_time` 的任务，并通过 `get_mission_progress` 返回 `user_info/item_list` |
+| 奖励安全 | 已加固 | CollectItemEvent 必须匹配请求 `event_id`；`active_mission/receive` 先验证活跃任务、完成阶段并去重，再在事务内发奖 |
 | 角色觉醒发奖 | 已修复主要缺口 | 角色觉醒奖励按客户端 4 槽结构解析，仍走进度接口自动完成 |
 | 分类计算器 | 第一批已接入 | regular/daily/event/degree/awake 有计算器；daily 的 single/multi/battle clear 与 dash/powerflip/skill 可由服务端 counter evaluator 读取，collect/weekly 仍主要依赖 DB progress |
 | 客户端回传进度 | 已保留 | `mission/update_mission_progress` 仍能按 pattern 写入 DB；unsupported 或 filtered 行继续走 DB/client fallback，适合暂时承接未服务端化的维度 |

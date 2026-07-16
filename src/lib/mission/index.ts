@@ -10,7 +10,7 @@ export { getComputer } from "./registry"
 export { getMissionIdsByCategory, getCurrentStage, getCompletedStageNumbers, getMissionStageIds } from "./stages"
 
 // Rewards
-export type { ActiveMissionReward } from "./rewards"
+export type { ActiveMissionReward, MissionRewardStageDefinition } from "./rewards"
 export {
     getActiveMissionRewards,
     getAwakeMissionRewards,
@@ -18,13 +18,14 @@ export {
     getDailyMissionRewards,
     getDegreeMissionRewards,
     getEventMissionRewards,
+    getMissionRewardStageDefinition,
     getRegularMissionRewards,
     getWeeklyMissionRewards,
 } from "./rewards"
 
 // Patterns (for update_mission_progress)
 export type { PatternMatch } from "./patterns"
-export { getMissionsByPattern, getMissionDefinition, getMissionPattern, isComputablePattern } from "./patterns"
+export { getMissionsByPattern, getMissionDefinition, getMissionPattern, isComputablePattern, isMissionEnabledAt } from "./patterns"
 
 // Evaluator
 export type { MissionEvaluationInput, MissionEvaluationResult } from "./evaluator"
@@ -66,3 +67,7 @@ export {
 export type { BattleFinishMissionEvent, BattleStatisticsSummary, MissionProgressEvent } from "./events"
 export { collectPartyCharacterIds, summarizeBattleStatistics } from "./events"
 export { recordBattleMissionDimensions, recordBattleMissionDimensionsSafe } from "./battle-dimensions"
+
+// Active mission reward claims
+export type { MissionRewardClaimValidation, ValidatedMissionRewardClaim } from "./claims"
+export { validateMissionRewardClaims } from "./claims"
