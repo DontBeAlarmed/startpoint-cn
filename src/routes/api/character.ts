@@ -115,6 +115,10 @@ const routes = async (fastify: FastifyInstance) => {
 
         // calculate new over limit
         const overLimitCount = body.over_limit_count
+        if (!Number.isInteger(overLimitCount) || overLimitCount <= 0) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Over limit count must be a positive integer."
+        })
         const newOverLimit = playerCharacterData.overLimitStep + overLimitCount
         const characterRarity = characterAssetData.rarity
         if (newOverLimit > characterMaxOverLimits[characterRarity]) return reply.status(400).send({

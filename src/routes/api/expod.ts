@@ -12,6 +12,7 @@ import { generateDataHeaders, getServerTime } from "../../utils";
 import { getCharacterDataSync } from "../../lib/assets";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
+import { getDb } from "../../data/db";
 
 interface InjectExpBody {
     character_id: number,
@@ -56,7 +57,7 @@ const routes = async (fastify: FastifyInstance) => {
         const viewerId = body.viewer_id
         const characterId = body.character_id
         const convertCount = body.number
-        if (isNaN(viewerId) || isNaN(characterId) || isNaN(convertCount)) return reply.status(400).send({
+        if (isNaN(viewerId) || isNaN(characterId) || !Number.isInteger(convertCount) || convertCount <= 0) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
         })
@@ -89,6 +90,13 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Bad Request",
             "message": "Player does not own character."
         })
+
+        const rarity = characterAssetData.rarity
+        const maxOverLimit = characterMaxOverLimits[rarity]
+        if (maxOverLimit === undefined || character.overLimitStep < maxOverLimit) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Character must be fully uncapped before converting duplicates."
+        })
         
         const afterStack = character.stack - convertCount
         if (0 > afterStack) return reply.status(400).send({
@@ -97,20 +105,20 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get amounts to add
-        const rarity = characterAssetData.rarity
         const increaseExp = rarityStackConvertExp[rarity] * convertCount
         const increaseItemCount = rarityStackConvertItemCount[rarity] * convertCount
 
         const afterExp = player.expPool + increaseExp
 
-        // update player
-        updatePlayerSync({
-            id: playerId,
-            expPool: afterExp
-        })
-
-        // add item
-        const afterItemCount = givePlayerItemSync(playerId, rewardItemId, increaseItemCount)
+        let afterItemCount = 0
+        getDb().transaction(() => {
+            updatePlayerCharacterSync(playerId, characterId, { stack: afterStack })
+            updatePlayerSync({
+                id: playerId,
+                expPool: afterExp
+            })
+            afterItemCount = givePlayerItemSync(playerId, rewardItemId, increaseItemCount)
+        })()
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -130,7 +138,7 @@ const routes = async (fastify: FastifyInstance) => {
                         "exp": character.exp,
                         "exp_total": character.exp,
                         "create_time": clientSerializeDate(character.joinTime),
-                        "update_time": clientSerializeDate(character.updateTime),
+                        "update_time": clientSerializeDate(new Date()),
                         "join_time": clientSerializeDate(character.joinTime)
                     }
                 ],
