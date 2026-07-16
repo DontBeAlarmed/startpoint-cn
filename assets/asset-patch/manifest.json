@@ -1,58 +1,73 @@
 {
-  "cdn_version": "1.4.54",
-  "patches": [
-    {
-      "id": "rush-abyss-modes",
-      "type": "patch",
-      "name": "深渊连战 + 深渊武器 ②层客户端数据",
-      "description": "rush 700099 深渊连战 roguelike + 15 把深渊武器(8000101-8000115)/代币 2370099/兑换商店的客户端 orderedmap(equipment/ability_soul/item/equipment_status/event_item_shop/rush_event)。缺此层→打完15轮或开兑换商店 C8601。关键:末尾 `1.4.101→1.4.102` 是整合桥接包(6表完整文件整替换),让任何卡在 1.4.101 的客户端(不论血统、不论base CDN如何到的1.4.101)一跳拿到深渊②层——解决版本号撞车(客户端已是1.4.101→原1.4.90→1.4.101增量链不会被下发)。前面的链供更早版本客户端逐级追到1.4.101。",
-      "version": "1.4.102",
-      "depends_on": "1.4.90",
-      "enabled": true,
-      "chain": [
-        "pinball-1.4.90-1.4.91-1-mod07121706.zip",
-        "pinball-1.4.91-1.4.92-1-mod07121736.zip",
-        "pinball-1.4.92-1.4.93-1-mod07121757.zip",
-        "pinball-1.4.93-1.4.94-1-mod07130444.zip",
-        "pinball-1.4.94-1.4.95-1-mod07130639.zip",
-        "pinball-1.4.95-1.4.96-1-mod07130645.zip",
-        "pinball-1.4.96-1.4.97-1-mod07130650.zip",
-        "pinball-1.4.97-1.4.98-1-mod07130700.zip",
-        "pinball-1.4.98-1.4.99-1-mod07130732.zip",
-        "pinball-1.4.99-1.4.100-1-mod07130812.zip",
-        "pinball-1.4.100-1.4.101-1-mod07130822.zip",
-        "pinball-1.4.101-1.4.102-1-mod07142258.zip"
-      ],
-      "created_at": "2026-07-14"
-    },
-    {
-      "id": "gacha-feature-fix-v1",
-      "type": "patch",
-      "name": "特辑图片 C2032 修复（第一步）",
-      "description": "修复 41 个卡池缺失特辑图片",
-      "version": "1.4.55",
-      "depends_on": "1.4.54",
-      "enabled": false,
-      "archive": "pinball-1.4.54-1.4.55-1-9f89af3c.zip",
-      "archive_size": 75884,
-      "files": ["14/dd5a36c80d07d94ff3d00bf6666472e23eb5f5"],
-      "created_at": "2026-07-07"
-    },
-    {
-      "id": "gacha-feature-fix-v2",
-      "type": "patch",
-      "name": "holiday odds 补齐（第二步）",
-      "description": "补充 9 个节日卡池缺失有序图文件（含 gacha 10074 section 1 修复）",
-      "version": "1.4.56",
-      "depends_on": "1.4.55",
-      "enabled": false,
-      "archive": "pinball-1.4.55-1.4.56-1-575dd4f0.zip",
-      "archive_size": 206234,
-      "files": [
-        "14/dd5a36c80d07d94ff3d00bf6666472e23eb5f5",
-        "2d/61c787b4c237441691b6a4c4e8b4367f35b889"
-      ],
-      "created_at": "2026-07-09"
-    }
-  ]
+ "cdn_version": "1.4.54",
+ "patches": [
+  {
+   "id": "rush-abyss-modes",
+   "type": "patch",
+   "name": "深渊连战 + 深渊武器 ②层客户端数据",
+   "description": "rush 700099 深渊连战 roguelike + 15 把深渊武器(8000101-8000115)/代币 2370099/兑换商店的客户端 orderedmap(equipment/ability_soul/item/equipment_status/event_item_shop/rush_event)。缺此层→打完15轮或开兑换商店 C8601。关键:末尾 `1.4.101→1.4.102` 是整合桥接包(6表完整文件整替换),让任何卡在 1.4.101 的客户端(不论血统、不论base CDN如何到的1.4.101)一跳拿到深渊②层——解决版本号撞车(客户端已是1.4.101→原1.4.90→1.4.101增量链不会被下发)。前面的链供更早版本客户端逐级追到1.4.101。",
+   "version": "1.4.102",
+   "depends_on": "1.4.90",
+   "enabled": true,
+   "chain": [
+    "pinball-1.4.90-1.4.91-1-mod07121706.zip",
+    "pinball-1.4.91-1.4.92-1-mod07121736.zip",
+    "pinball-1.4.92-1.4.93-1-mod07121757.zip",
+    "pinball-1.4.93-1.4.94-1-mod07130444.zip",
+    "pinball-1.4.94-1.4.95-1-mod07130639.zip",
+    "pinball-1.4.95-1.4.96-1-mod07130645.zip",
+    "pinball-1.4.96-1.4.97-1-mod07130650.zip",
+    "pinball-1.4.97-1.4.98-1-mod07130700.zip",
+    "pinball-1.4.98-1.4.99-1-mod07130732.zip",
+    "pinball-1.4.99-1.4.100-1-mod07130812.zip",
+    "pinball-1.4.100-1.4.101-1-mod07130822.zip",
+    "pinball-1.4.101-1.4.102-1-mod07142258.zip"
+   ],
+   "created_at": "2026-07-14"
+  },
+  {
+   "id": "seris-stella-characters",
+   "type": "patch",
+   "name": "苍海龙王·赛瑞斯 + 夏日女神·史黛拉 双新角色客户端数据",
+   "description": "129999 赛瑞斯(水,双形态龙王,湿润机制)与 139999 史黛拉(光,能力攻击辅助)的全部客户端资产与主数据(164 个 payload:16 表克隆+UI+像素动画+语音+技能DSL+独有状态图标)。累计包,接在深渊模式链(1.4.102)之后;服务端四张 assets/*.json 已随分支提供。发放:管理后台邮件页发送角色 129999/139999。赛瑞斯需客户端打 dual-form-v1 补丁(特殊演出/湿润倍率/退场充能),否则开他的特殊演出会崩。",
+   "version": "1.4.103",
+   "depends_on": "1.4.102",
+   "enabled": true,
+   "chain": [
+    "pinball-1.4.102-1.4.103-1-charpkgmod07161121.zip"
+   ],
+   "created_at": "2026-07-16"
+  },
+  {
+   "id": "gacha-feature-fix-v1",
+   "type": "patch",
+   "name": "特辑图片 C2032 修复（第一步）",
+   "description": "修复 41 个卡池缺失特辑图片",
+   "version": "1.4.55",
+   "depends_on": "1.4.54",
+   "enabled": false,
+   "archive": "pinball-1.4.54-1.4.55-1-9f89af3c.zip",
+   "archive_size": 75884,
+   "files": [
+    "14/dd5a36c80d07d94ff3d00bf6666472e23eb5f5"
+   ],
+   "created_at": "2026-07-07"
+  },
+  {
+   "id": "gacha-feature-fix-v2",
+   "type": "patch",
+   "name": "holiday odds 补齐（第二步）",
+   "description": "补充 9 个节日卡池缺失有序图文件（含 gacha 10074 section 1 修复）",
+   "version": "1.4.56",
+   "depends_on": "1.4.55",
+   "enabled": false,
+   "archive": "pinball-1.4.55-1.4.56-1-575dd4f0.zip",
+   "archive_size": 206234,
+   "files": [
+    "14/dd5a36c80d07d94ff3d00bf6666472e23eb5f5",
+    "2d/61c787b4c237441691b6a4c4e8b4367f35b889"
+   ],
+   "created_at": "2026-07-09"
+  }
+ ]
 }
