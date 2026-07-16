@@ -82,6 +82,18 @@ python -X utf8 client-patch/dual-form-v1/build_patch.py \
 
 ---
 
+## 已有部署如何升级(存量服)
+
+已经跑着一个 WF CN 私服(上游 startpoint-cn 或旧版本)想加上两模式+双新角色,不用从零来:
+
+1. **换服务端代码**:`git remote add kuron https://github.com/kuronzzhan-droid/startpoint-cn.git && git fetch kuron && git checkout -b release/modes-20260714 kuron/release/modes-20260714`,然后 `npm install`、重新构建、重启。**数据库零迁移**——本分支不改表结构,原 `.database/` 和全部玩家存档直接沿用。
+2. **数据自动下发**:服务端 masterdata 和客户端增量链都随分支到手(见步骤 2),重启后自动 serve。base CDN 须到 1.4.90;玩家客户端不论卡在哪个版本(含 1.4.101 撞车位),桥接包会把它推进到链尾,重启游戏即触发下载。
+3. **重打客户端(唯一的人工大步)**:按步骤 4 打**四合一**,②重定向填你们**已有的**服务器地址。存量服的旧客户端只有①②——缺③=深渊武器装上不生效,缺④=赛瑞斯特殊演出必崩。
+4. **换包与账号**:新 APK 签名与旧包不同时玩家须卸载重装,**本地客户端身份会被抹掉、下次登录开新号**;服主可在管理后台按 device_id 把老存档重绑,或重打时沿用旧包同一个 keystore(可覆盖安装,身份保留)。**全员换完包再发角色**——数据与客户端补丁必须配套。
+5. **发角色 + 验证**:同步骤 5/6。
+
+---
+
 ## 内容速览
 
 - **深渊连战(Rush 700099)**:自制无尽/roguelike 活动,每轮不同 boss,通关掉落。
