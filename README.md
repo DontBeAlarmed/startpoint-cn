@@ -2,6 +2,13 @@
 
 世界弹射物语(World Flipper)CN(雷霆 Leiting)版本的服务端模拟器。
 
+> 🎮 **本分支(`release/modes-20260714`)是自制内容发布分支**,在上游服务端基础上加入:
+> 「深渊连战」roguelike 活动(Rush 700099)· 15 把深渊武器 · 双自制新角色(苍海龙王·赛瑞斯 / 夏日女神·史黛拉)。
+>
+> - **自建服完整攻略:[docs/self-host-modes.md](docs/self-host-modes.md)**(拿代码→CDN→起服→四合一客户端→发角色)
+> - 数据修改工具链:[mod-tools/](mod-tools/)(独立仓 [startpoint-cn-mod-tools](https://github.com/kuronzzhan-droid/startpoint-cn-mod-tools))
+> - 现成客户端整合包:[wf-abyss-client](https://github.com/kuronzzhan-droid/wf-abyss-client)(仅深渊连战;玩新角色需按攻略自行重打含 dual-form 补丁的客户端)
+
 ## 功能状态
 
 已实现(部分端点沿用国际服设计,对 CN 的通用性尚未验证):
