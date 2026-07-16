@@ -29,6 +29,12 @@
 ## 可选补丁
 
 - **abyss-mode-equipment**(`abyss-mode-equipment/`):深渊连战 15 把武器/能力魂(`8000101`–`8000115`)的战斗生效门控——只在 Rush `700099` / 挑战 `2001` / 练习 `1`–`97` 内生效。**服务端启用深渊连战模式时必须打**,否则武器装上不生效。用法见 `abyss-mode-equipment/README.md`,自建服完整流程见 [`docs/self-host-modes.md`](../docs/self-host-modes.md)。
+- **dual-form-v1**(`dual-form-v1/`):赛瑞斯(129999)双形态 P-code 补丁——★4 特殊演出预载、
+  双形态动画切换、湿润雷伤终乘、显形退场全队充能、显形中弱化延长。**服务端启用双新角色
+  数据链(asset-patch `1.4.103`)时必须打**,否则客户端播放赛瑞斯特殊演出会硬崩。
+  与其余补丁不同,它作用于 FFDec 的 **P-code 导出**(非 AS3 源),用法:
+  `python dual-form-v1/build_patch.py --baseline-swf <主SWF> --baseline-pcode-root <pcode导出目录> --ffdec-jar <ffdec.jar> --output-dir <空目录> --profile-dir <FFDec配置目录> --manifest dual-form-v1/patch-manifest-seris-combat.json`
+  (完整战斗体验用 `patch-manifest-seris-combat.json`;只求不崩可用默认最小 manifest)。
 - **omni-element**(`apply-omni-element.sh` / `omni-element.md`):共鸣通用属性标签。
 - **random-floor**(`apply-random-floor.sh` / `random-floor.md`):boss 塔每次进本随机——
   `BattleQuestBaseImpl` 两个 getTower*FloorValues 识别 floor 表 `__random__,K` 头行,

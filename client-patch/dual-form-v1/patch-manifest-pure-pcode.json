@@ -1,0 +1,30 @@
+{
+  "schema_version": 3,
+  "injection_strategy": "pure_pcode_existing_classes",
+  "baseline": {
+    "main_swf_sha256": "6217b2dacbb083eb76e260574c08eee732b38f3c9b5620caae1867c5e62e08e2",
+    "resource_version": "1.4.54"
+  },
+  "methods": [
+    {
+      "method_name": "pinball.common.data.character:BattleCharacterLogic/resolvePathCollection",
+      "pcode_path": "pinball/common/data/character/BattleCharacterLogic.pcode",
+      "code_sha256": "e89d17f76514e9ccb053aff7d17b5a76d6ad5bdc2d7168466e8bdc6d8f31635e",
+      "patches": [
+        "preload_rarity4_special_animation"
+      ],
+      "required_maxstack": 7,
+      "required_localcount": 15
+    },
+    {
+      "method_name": "pinball.scene.battle.battle.squad.member:MemberView/draw",
+      "pcode_path": "pinball/scene/battle/battle/squad/member/MemberView.pcode",
+      "code_sha256": "2749c95ba3f18e3693c47795f7e3f556e1a129442b734485a5363bc922866190",
+      "patches": [
+        "swap_mod_dual_form_special_animation"
+      ],
+      "required_maxstack": 4,
+      "required_localcount": 25
+    }
+  ]
+}

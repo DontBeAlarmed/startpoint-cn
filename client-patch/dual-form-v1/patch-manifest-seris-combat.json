@@ -1,0 +1,70 @@
+{
+  "schema_version": 3,
+  "injection_strategy": "pure_pcode_existing_classes",
+  "baseline": {
+    "main_swf_sha256": "6217b2dacbb083eb76e260574c08eee732b38f3c9b5620caae1867c5e62e08e2",
+    "resource_version": "1.4.54"
+  },
+  "methods": [
+    {
+      "method_name": "pinball.common.data.character:BattleCharacterLogic/resolvePathCollection",
+      "pcode_path": "pinball/common/data/character/BattleCharacterLogic.pcode",
+      "code_sha256": "e89d17f76514e9ccb053aff7d17b5a76d6ad5bdc2d7168466e8bdc6d8f31635e",
+      "patches": [
+        "preload_rarity4_special_animation"
+      ],
+      "required_maxstack": 7,
+      "required_localcount": 15
+    },
+    {
+      "method_name": "pinball.scene.battle.battle.squad.member:MemberView/draw",
+      "pcode_path": "pinball/scene/battle/battle/squad/member/MemberView.pcode",
+      "code_sha256": "2749c95ba3f18e3693c47795f7e3f556e1a129442b734485a5363bc922866190",
+      "patches": [
+        "swap_mod_dual_form_special_animation"
+      ],
+      "required_maxstack": 4,
+      "required_localcount": 25
+    },
+    {
+      "method_name": "pinball.online.battle.impact.attack:NormalAttackCalculator/_calculate",
+      "pcode_path": "pinball/online/battle/impact/attack/NormalAttackCalculator.pcode",
+      "code_sha256": "7dddd5147a3e7d51a7ebd4fbdf2897513d8341ef980f185c7f05e19229378bfd",
+      "patches": [
+        "wet_thunder_final_multiplier"
+      ],
+      "required_maxstack": 90,
+      "required_localcount": 131
+    },
+    {
+      "method_name": "pinball.scene.battle.battle.condition:ConditionSlot/update",
+      "pcode_path": "pinball/scene/battle/battle/condition/ConditionSlot.pcode",
+      "code_sha256": "68f7ca773222d9cee8bc6921cba6a538107fb06f1a9a679dc42c5d79408e15a6",
+      "patches": [
+        "seris_unique22_natural_exit_team_gauge"
+      ],
+      "required_maxstack": 11,
+      "required_localcount": 43
+    },
+    {
+      "method_name": "pinball.scene.battle.battle.squad.member:MemberImpl/enterEncoffinmentState",
+      "pcode_path": "pinball/scene/battle/battle/squad/member/MemberImpl.pcode",
+      "code_sha256": "60958e4a5e91a88ddb6ef82571866d0c27c66585f776a03840303ed6c6e30220",
+      "patches": [
+        "seris_unique22_death_exit_team_gauge"
+      ],
+      "required_maxstack": 3,
+      "required_localcount": 5
+    },
+    {
+      "method_name": "pinball.scene.battle.battle.squad.member:MemberImpl/getStatModifierConditionExtention",
+      "pcode_path": "pinball/scene/battle/battle/squad/member/MemberImpl.pcode",
+      "code_sha256": "c870bc992b097c518491a7f62d3163ea9d7b1f3abe2672e25f68f83b54986a27",
+      "patches": [
+        "seris_manifestation_debuff_extension"
+      ],
+      "required_maxstack": 3,
+      "required_localcount": 19
+    }
+  ]
+}
