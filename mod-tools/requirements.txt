@@ -1,0 +1,3 @@
+# mod-tools 唯一的第三方依赖(图像工具:wf_canary_skin / wf_kyle_canary / wf_rogue_*)。
+# 其余全部为标准库。
+Pillow>=11,<13

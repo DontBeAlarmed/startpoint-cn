@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
 import unittest
@@ -72,7 +73,11 @@ class ServerAuthTests(unittest.TestCase):
             self.assertEqual({}, auth.admin_bearer_headers(root, {}))
 
     def test_wf_gui_sends_bearer_to_mod_admin(self) -> None:
-        gui = import_module("wf_gui")
+        # wf_gui 导入时就解析 WF 上传目录;干净检出(CI)既无模拟器路径也无
+        # profiles.json,必须先把 WF_TARGET_STORE 指到一个存在的目录。
+        with tempfile.TemporaryDirectory() as store_dir:
+            with mock.patch.dict(os.environ, {"WF_TARGET_STORE": store_dir}):
+                gui = import_module("wf_gui")
         captured = []
 
         class Response:
