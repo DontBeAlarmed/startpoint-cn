@@ -4,7 +4,8 @@ title StarPoint CN launcher
 cd /d "%~dp0"
 
 rem ---- 1) server window (safe ownership checks + freshness-aware build) ----
-start "" "%~dp0start-cn.bat"
+rem      -RestartOwned: 端口已被本项目实例占用时安全重启它,而不是报错退出
+start "" "%~dp0start-cn.bat" -RestartOwned
 
 rem ---- 2) resolve .env endpoint and wait for the server (max ~30s) ----
 set "CN_BASE_URL="

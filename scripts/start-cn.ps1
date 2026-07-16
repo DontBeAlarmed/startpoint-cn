@@ -150,11 +150,13 @@ function Write-OwnedPidRecord {
     }
     try {
         [IO.File]::WriteAllText($temporary, ($record | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
+        # [IO.File]::Replace throws "path is not of a legal form" on PS 5.1 when the
+        # pid file already exists, and the failure tears down the freshly started
+        # server via the caller's finally block. Delete-then-move avoids it.
         if (Test-Path -LiteralPath $PidFile -PathType Leaf) {
-            [IO.File]::Replace($temporary, $PidFile, $null)
-        } else {
-            [IO.File]::Move($temporary, $PidFile)
+            Remove-Item -LiteralPath $PidFile -Force
         }
+        [IO.File]::Move($temporary, $PidFile)
     } finally {
         if (Test-Path -LiteralPath $temporary) {
             Remove-Item -LiteralPath $temporary -Force
