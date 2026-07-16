@@ -34,7 +34,7 @@ import { insertPlayerDrawnQuestsSync, insertPlayerQuestProgressListSync } from "
 import { insertPlayerGachaInfoListSync, insertPlayerGachaCampaignListSync , getPlayerGachaInfoListSync, updatePlayerGachaInfoSync, getPlayerGachaCampaignListSync, updatePlayerGachaCampaignSync } from "./gacha";
 import { insertPlayerBoxGachasSync } from "./boxGacha";
 import { insertPlayerRushEventListSync, insertPlayerRushEventClearedFolderListSync, insertPlayerRushEventPlayedPartyListSync } from "./rushEvent";
-import { insertPlayerClearedRegularMissionListSync, insertPlayerActiveMissionsSync } from "./mission";
+import { deletePlayerCategoryMissionsSync, insertPlayerCategoryMissionListSync, insertPlayerClearedRegularMissionListSync, insertPlayerActiveMissionsSync } from "./mission";
 import { insertPlayerPeriodicRewardPointsListSync, insertPlayerStartDashExchangeCampaignsSync, insertPlayerMultiSpecialExchangeCampaignsSync } from "./campaign";
 
 /**
@@ -477,6 +477,9 @@ export function insertMergedPlayerDataSync(
     insertPlayerDrawnQuestsSync(playerId, toInsert.drawnQuestList)
     insertPlayerPeriodicRewardPointsListSync(playerId, toInsert.periodicRewardPointList)
     insertPlayerActiveMissionsSync(playerId, toInsert.allActiveMissionList)
+    if (toInsert.categoryMissionList) {
+        insertPlayerCategoryMissionListSync(playerId, toInsert.categoryMissionList)
+    }
     insertPlayerBoxGachasSync(playerId, toInsert.boxGachaList)
     insertPlayerStartDashExchangeCampaignsSync(playerId, toInsert.startDashExchangeCampaignList)
     insertPlayerMultiSpecialExchangeCampaignsSync(playerId, toInsert.multiSpecialExchangeCampaignList)
@@ -1248,8 +1251,7 @@ export function dailyResetPlayerDataSync(
             staminaUsed: player.totalStaminaUsed,
             rankSs: ss, rankS: s, rankA: a, rankB: b,
         })
-        getDb().prepare(`DELETE FROM players_active_missions_stages WHERE player_id = ? AND mission_id IN (SELECT id FROM players_active_missions WHERE player_id = ? AND progress >= 0)`).run(playerId, playerId)
-        getDb().prepare(`DELETE FROM players_active_missions WHERE player_id = ?`).run(playerId)
+        deletePlayerCategoryMissionsSync(playerId, 2)
 
         // weekly reset
         if (crossedWeek) {
@@ -1258,6 +1260,7 @@ export function dailyResetPlayerDataSync(
                 staminaUsed: player.totalStaminaUsed,
                 rankSs: ss, rankS: s, rankA: a, rankB: b,
             })
+            deletePlayerCategoryMissionsSync(playerId, 10)
         }
 
         return true

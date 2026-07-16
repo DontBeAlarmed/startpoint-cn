@@ -10,12 +10,15 @@ export { getComputer } from "./registry"
 export { getMissionIdsByCategory, getCurrentStage, getCompletedStageNumbers, getMissionStageIds } from "./stages"
 
 // Rewards
-export type { ActiveMissionReward } from "./rewards"
-export { getActiveMissionRewards, getAwakeMissionRewards, getEventMissionRewards } from "./rewards"
+export type { ActiveMissionReward, MissionRewardStageDefinition } from "./rewards"
+export { getActiveMissionRewards, getAwakeMissionRewards, getCollectMissionRewards, getDailyMissionRewards, getDegreeMissionRewards, getEventMissionRewards, getMissionRewardStageDefinition, getRegularMissionRewards, getWeeklyMissionRewards } from "./rewards"
 
 // Patterns (for update_mission_progress)
 export type { PatternMatch } from "./patterns"
-export { getMissionsByPattern, getMissionPattern, isComputablePattern } from "./patterns"
+export { getMissionsByPattern, getMissionDefinition, getMissionPattern, isComputablePattern, isMissionEnabledAt } from "./patterns"
+
+export type { MissionRewardClaimValidation, ValidatedMissionRewardClaim } from "./claims"
+export { validateMissionRewardClaims } from "./claims"
 
 // Character queries
 export { getCharacterStoryQuestIds, getCharacterIdFromMission } from "./character-queries"

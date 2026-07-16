@@ -411,6 +411,27 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_category_missions (
+        category INTEGER NOT NULL,
+        id INTEGER NOT NULL,
+        progress INTEGER NOT NULL,
+        player_id INTEGER NOT NULL,
+        PRIMARY KEY (category, id, player_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_category_mission_stages (
+        category INTEGER NOT NULL,
+        id INTEGER NOT NULL,
+        status INTEGER NOT NULL,
+        player_id INTEGER NOT NULL,
+        mission_id INTEGER NOT NULL,
+        PRIMARY KEY (category, id, mission_id, player_id),
+        FOREIGN KEY (category, mission_id, player_id)
+            REFERENCES players_category_missions (category, id, player_id) ON DELETE CASCADE,
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_box_gacha (
         id INTEGER NOT NULL,
         box_id INTEGER NOT NULL,

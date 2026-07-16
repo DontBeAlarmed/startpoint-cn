@@ -746,6 +746,7 @@ export interface MergedPlayerData {
     drawnQuestList: PlayerDrawnQuest[],
     periodicRewardPointList: PlayerPeriodicRewardPoint[],
     allActiveMissionList: Record<string, PlayerActiveMission>,
+    categoryMissionList?: Record<string, Record<string, PlayerActiveMission>>,
     boxGachaList: Record<string, PlayerBoxGacha[]>,
     purchasedTimesList: Record<string, number>,
     startDashExchangeCampaignList: PlayerStartDashExchangeCampaign[],

@@ -1,7 +1,7 @@
 // Compute awake mission summary for /load response
 // Returns active_mission_list (Array format for data.active_mission_list)
 
-import { getPlayerActiveMissionsSync } from "../../data/domains/mission"
+import { getPlayerCategoryMissionsSync } from "../../data/domains/mission"
 import { getPlayerCharactersSync } from "../../data/domains/character"
 import { getComputer } from "./registry"
 import { getMissionIdsByCategory, getCompletedStageNumbers, getMissionStageIds } from "./stages"
@@ -20,7 +20,7 @@ export interface AwakeSummary {
 }
 
 export function computeAwakeSummary(playerId: number): AwakeSummary {
-    const activeMissions = getPlayerActiveMissionsSync(playerId)
+    const activeMissions = getPlayerCategoryMissionsSync(playerId, 9)
     const playerChars = getPlayerCharactersSync(playerId)
     const awakeMissionIds = getMissionIdsByCategory(9)
 

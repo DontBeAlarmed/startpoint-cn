@@ -225,9 +225,139 @@ export function updatePlayerActiveMissionSync(
     progress: number
 ) {
     getDb().prepare(`
-    INSERT OR REPLACE INTO players_active_missions (id, progress, player_id)
+    INSERT INTO players_active_missions (id, progress, player_id)
     VALUES (?, ?, ?)
+    ON CONFLICT(id, player_id) DO UPDATE SET progress = excluded.progress
     `).run(Number(missionId), progress, playerId)
+}
+
+/** Atomically adds a client-reported counter delta to a mission. */
+export function incrementPlayerActiveMissionSync(
+    playerId: number,
+    missionId: number | string,
+    delta: number
+) {
+    getDb().prepare(`
+    INSERT INTO players_active_missions (id, progress, player_id)
+    VALUES (?, ?, ?)
+    ON CONFLICT(id, player_id) DO UPDATE SET progress = progress + excluded.progress
+    `).run(Number(missionId), delta, playerId)
+}
+
+/** Retrieves category-scoped mission progress without mixing equal IDs. */
+export function getPlayerCategoryMissionsSync(
+    playerId: number,
+    category: number
+): Record<string, PlayerActiveMission> {
+    const missions = getDb().prepare(`
+    SELECT id, progress
+    FROM players_category_missions
+    WHERE player_id = ? AND category = ?
+    `).all(playerId, category) as RawPlayerActiveMission[]
+    const stages = getDb().prepare(`
+    SELECT id, status, mission_id
+    FROM players_category_mission_stages
+    WHERE player_id = ? AND category = ?
+    `).all(playerId, category) as RawPlayerActiveMissionStage[]
+
+    const stageBuckets: Record<string, Record<string, boolean>> = {}
+    for (const stage of stages) {
+        const missionId = String(stage.mission_id)
+        const bucket = stageBuckets[missionId] ?? {}
+        bucket[String(stage.id)] = deserializeBoolean(stage.status)
+        stageBuckets[missionId] = bucket
+    }
+
+    const result: Record<string, PlayerActiveMission> = {}
+    for (const mission of missions) {
+        result[String(mission.id)] = {
+            progress: mission.progress,
+            stages: stageBuckets[String(mission.id)] ?? [],
+        }
+    }
+    return result
+}
+
+export function getPlayerCategoryMissionListSync(
+    playerId: number
+): Record<string, Record<string, PlayerActiveMission>> {
+    const categories = getDb().prepare(`
+    SELECT DISTINCT category
+    FROM players_category_missions
+    WHERE player_id = ?
+    ORDER BY category
+    `).all(playerId) as { category: number }[]
+    const result: Record<string, Record<string, PlayerActiveMission>> = {}
+    for (const { category } of categories) {
+        result[String(category)] = getPlayerCategoryMissionsSync(playerId, category)
+    }
+    return result
+}
+
+export function insertPlayerCategoryMissionListSync(
+    playerId: number,
+    categories: Record<string, Record<string, PlayerActiveMission>>
+) {
+    getDb().transaction(() => {
+        for (const [categoryKey, missions] of Object.entries(categories)) {
+            const category = Number(categoryKey)
+            if (!Number.isInteger(category)) continue
+            for (const [missionId, mission] of Object.entries(missions)) {
+                updatePlayerCategoryMissionSync(playerId, category, missionId, mission.progress)
+                if (!mission.stages || Array.isArray(mission.stages)) continue
+                for (const [stageId, received] of Object.entries(mission.stages)) {
+                    updatePlayerCategoryMissionStageSync(playerId, category, stageId, missionId, received)
+                }
+            }
+        }
+    })()
+}
+
+export function updatePlayerCategoryMissionSync(
+    playerId: number,
+    category: number,
+    missionId: number | string,
+    progress: number
+) {
+    getDb().prepare(`
+    INSERT INTO players_category_missions (category, id, progress, player_id)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(category, id, player_id) DO UPDATE SET progress = excluded.progress
+    `).run(category, Number(missionId), progress, playerId)
+}
+
+export function incrementPlayerCategoryMissionSync(
+    playerId: number,
+    category: number,
+    missionId: number | string,
+    delta: number
+) {
+    getDb().prepare(`
+    INSERT INTO players_category_missions (category, id, progress, player_id)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(category, id, player_id) DO UPDATE SET progress = progress + excluded.progress
+    `).run(category, Number(missionId), delta, playerId)
+}
+
+export function updatePlayerCategoryMissionStageSync(
+    playerId: number,
+    category: number,
+    stageId: number | string,
+    missionId: number | string,
+    status: boolean
+) {
+    getDb().prepare(`
+    INSERT INTO players_category_mission_stages (category, id, status, player_id, mission_id)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(category, id, mission_id, player_id) DO UPDATE SET status = excluded.status
+    `).run(category, Number(stageId), serializeBoolean(status), playerId, Number(missionId))
+}
+
+export function deletePlayerCategoryMissionsSync(playerId: number, category: number) {
+    getDb().transaction(() => {
+        getDb().prepare(`DELETE FROM players_category_mission_stages WHERE player_id = ? AND category = ?`).run(playerId, category)
+        getDb().prepare(`DELETE FROM players_category_missions WHERE player_id = ? AND category = ?`).run(playerId, category)
+    })()
 }
 
 /**

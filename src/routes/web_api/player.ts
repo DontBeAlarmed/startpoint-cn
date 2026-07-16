@@ -12,6 +12,7 @@ import { getPlayerQuestProgressSync, getPlayerDrawnQuestsSync } from "../../data
 import { insertPlayerPartyGroupListSync } from "../../data/domains/party"
 import { PartyCategory } from "../../data/types";
 import { takeSnapshot } from "../../lib/mission/snapshot";
+import { deletePlayerCategoryMissionsSync } from "../../data/domains/mission";
 import { getServerDate } from "../../utils";
 import dailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 
@@ -453,8 +454,7 @@ const routes = async (fastify: FastifyInstance) => {
                 questClears: totalClears, staminaUsed: player.totalStaminaUsed,
                 rankSs: ss, rankS: s, rankA: a, rankB: b,
             })
-            getDb().prepare(`DELETE FROM players_active_missions WHERE player_id = ?`).run(playerId)
-            getDb().prepare(`DELETE FROM players_active_missions_stages WHERE player_id = ?`).run(playerId)
+            deletePlayerCategoryMissionsSync(playerId, 2)
             return reply.status(200).send({ ok: true })
         } catch (e: any) { return reply.status(500).send({ error: e.message }) }
     })
@@ -483,8 +483,7 @@ const routes = async (fastify: FastifyInstance) => {
                 questClears: totalClears, staminaUsed: player.totalStaminaUsed,
                 rankSs: ss, rankS: s, rankA: a, rankB: b,
             })
-            getDb().prepare(`DELETE FROM players_active_missions WHERE player_id = ?`).run(playerId)
-            getDb().prepare(`DELETE FROM players_active_missions_stages WHERE player_id = ?`).run(playerId)
+            deletePlayerCategoryMissionsSync(playerId, 10)
             return reply.status(200).send({ ok: true })
         } catch (e: any) { return reply.status(500).send({ error: e.message }) }
     })
