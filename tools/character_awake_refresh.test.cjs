@@ -3,6 +3,7 @@ const assert = require("node:assert/strict")
 const {
     buildManaBoardAwakeCharacterList,
     mergeManaBoardAwakeMaps,
+    validateManaBoardAwakeRequest,
 } = require("../out/lib/character-helpers")
 
 function testMissionUnlockAndNodeStateAreMerged() {
@@ -23,6 +24,18 @@ function testMissionUnlockAndNodeStateAreMerged() {
             ["103", { 1: 1 }],
         ]
     )
+}
+
+function testAwakeRequestGate() {
+    const boardNodeIds = [101, 102, 103]
+    const learnedNodeIds = [101, 102, 103]
+
+    assert.equal(validateManaBoardAwakeRequest([101, 102], 1, 1, boardNodeIds, learnedNodeIds), null)
+    assert.equal(validateManaBoardAwakeRequest([101], 1, 0, boardNodeIds, learnedNodeIds), "Awake missions are not complete.")
+    assert.equal(validateManaBoardAwakeRequest([101], 2, 1, boardNodeIds, learnedNodeIds), "Invalid awake level.")
+    assert.equal(validateManaBoardAwakeRequest([101], 1, 1, boardNodeIds, [101, 102]), "Base mana board is not complete.")
+    assert.equal(validateManaBoardAwakeRequest([101, 101], 1, 1, boardNodeIds, learnedNodeIds), "Invalid mana node list.")
+    assert.equal(validateManaBoardAwakeRequest([999], 1, 1, boardNodeIds, learnedNodeIds), "Mana node is outside the awake board.")
 }
 
 function testAwakeUnlockUsesCommonCharacterResponseShape() {
@@ -61,4 +74,5 @@ function testAwakeUnlockUsesCommonCharacterResponseShape() {
 
 testMissionUnlockAndNodeStateAreMerged()
 testAwakeUnlockUsesCommonCharacterResponseShape()
+testAwakeRequestGate()
 console.log("character awake refresh tests passed")

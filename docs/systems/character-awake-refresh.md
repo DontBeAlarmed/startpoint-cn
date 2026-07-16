@@ -26,6 +26,12 @@ the owned character.
 - `active_mission_list` remains separate from `all_active_mission_list`; Awake
   category IDs are not injected into the latter.
 
+`/character/awake_mana_node` also enforces the server-side gate. The request is
+rejected unless all four Awake missions are complete, the requested level
+matches the unlocked level, every base board node has been learned, and every
+requested node belongs to board 1. Duplicate/empty node lists are invalid. Mana,
+items, and node awake levels are committed in one SQLite transaction.
+
 ## Remaining client limitation
 
 If the final mission completes while `CharacterAwakeScene` is already open,

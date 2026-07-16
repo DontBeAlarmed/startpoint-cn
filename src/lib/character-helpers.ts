@@ -172,6 +172,34 @@ export function buildManaBoardAwakeCharacterList(
     return result
 }
 
+export function validateManaBoardAwakeRequest(
+    requestedNodeIds: unknown,
+    targetAwakeLevel: unknown,
+    unlockedAwakeLevel: number,
+    boardNodeIds: readonly number[],
+    learnedNodeIds: readonly number[]
+): string | null {
+    if (!Array.isArray(requestedNodeIds) || requestedNodeIds.length === 0
+        || requestedNodeIds.some(nodeId => !Number.isInteger(nodeId))
+        || new Set(requestedNodeIds).size !== requestedNodeIds.length) {
+        return "Invalid mana node list."
+    }
+    if (unlockedAwakeLevel <= 0) return "Awake missions are not complete."
+    if (!Number.isInteger(targetAwakeLevel) || targetAwakeLevel !== unlockedAwakeLevel) {
+        return "Invalid awake level."
+    }
+
+    const learned = new Set(learnedNodeIds)
+    if (boardNodeIds.some(nodeId => !learned.has(nodeId))) {
+        return "Base mana board is not complete."
+    }
+    const board = new Set(boardNodeIds)
+    if (requestedNodeIds.some(nodeId => !board.has(nodeId))) {
+        return "Mana node is outside the awake board."
+    }
+    return null
+}
+
 // ─── Bond token + evolution ───
 
 export interface BondTokenResult {
