@@ -1,4 +1,5 @@
 import { getPlayerCharactersSync } from "../../data/domains/character"
+import { upsertPlayerCharacterAwakeUnlockSync } from "../../data/domains/character_awake"
 import {
     getPlayerCategoryMissionsSync,
     updatePlayerCategoryMissionStageSync,
@@ -35,6 +36,18 @@ export function settleAwakeMissionRewards(
     playerId: number,
     progressList: AwakeMissionComputedProgress[]
 ): AwakeMissionSettlementResult {
+    const progressByMissionId = new Map<number, number>()
+    for (const entry of progressList) {
+        const currentProgress = progressByMissionId.get(entry.missionId)
+        if (currentProgress === undefined || entry.progress > currentProgress) {
+            progressByMissionId.set(entry.missionId, entry.progress)
+        }
+    }
+    const aggregatedProgressList = [...progressByMissionId].map(([missionId, progress]) => ({
+        missionId,
+        progress,
+    }))
+
     const player = getPlayerSync(playerId)
     if (!player) throw new Error(`Player ${playerId} not found during CharacterAwake settlement.`)
 
@@ -42,19 +55,15 @@ export function settleAwakeMissionRewards(
     const granter = new MissionRewardGranter(playerId, player)
     const missionInfo: AwakeMissionInfo[] = []
     const unlockMap = new Map<string, Record<number, number>>()
-    const claimedStages = new Set<string>()
 
     getDb().transaction(() => {
-        for (const entry of progressList) {
+        for (const entry of aggregatedProgressList) {
             updatePlayerCategoryMissionSync(playerId, 9, entry.missionId, entry.progress)
         }
 
-        for (const entry of progressList) {
+        for (const entry of aggregatedProgressList) {
             const persistedStages = persistedMissions[String(entry.missionId)]?.stages
             for (const stage of getCompletedStageNumbers(9, entry.missionId, entry.progress)) {
-                const claimKey = `${entry.missionId}:${stage}`
-                if (claimedStages.has(claimKey)) continue
-                claimedStages.add(claimKey)
                 if (!Array.isArray(persistedStages) && persistedStages?.[String(stage)] === true) continue
 
                 const definition = getAwakeMissionRewardStageDefinition(entry.missionId, stage)
@@ -70,9 +79,16 @@ export function settleAwakeMissionRewards(
 
                 if (definition.specialReward) {
                     const special = definition.specialReward
-                    const levels = unlockMap.get(String(special.characterId)) ?? {}
-                    levels[special.boardIndex] = Math.max(levels[special.boardIndex] ?? 0, special.awakeLevel)
-                    unlockMap.set(String(special.characterId), levels)
+                    if (upsertPlayerCharacterAwakeUnlockSync(
+                        playerId,
+                        special.characterId,
+                        special.boardIndex,
+                        special.awakeLevel
+                    )) {
+                        const levels = unlockMap.get(String(special.characterId)) ?? {}
+                        levels[special.boardIndex] = Math.max(levels[special.boardIndex] ?? 0, special.awakeLevel)
+                        unlockMap.set(String(special.characterId), levels)
+                    }
                 }
             }
         }

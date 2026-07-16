@@ -174,7 +174,7 @@ lib/mission/
 
 ### 进入页面时结算奖励（2026-07-17）✅
 
-- `update_mission_progress` 只累计任务进度，不发奖、不解锁觉醒板。
+- `update_mission_progress` 只累计任务进度，不在该端点发奖；进度落库后会校准持久解锁。
 - 客户端进入觉醒任务页面时请求 category 9 的 `get_mission_progress`；
   服务端在此结算已完成且尚未领取的阶段。
 - `received` 来自 `players_category_mission_stages.status`，不再由完成进度推导。
@@ -183,5 +183,21 @@ lib/mission/
   `AwakeManaBoard(character_id, board_index, awake_level)` 作为特殊奖励处理。
 - 奖励发放、阶段领取状态和玩家货币更新在同一个 SQLite 事务中提交；重复进入页面不会重复发奖。
 
+### 解锁与领奖时序（2026-07-17）✅
 
-(End of file - total 85 lines)
+第二页解锁与第一页领奖使用独立的持久状态：前者保存在
+`players_character_awake_unlocks`，后者保存在
+`players_category_mission_stages.status`。
+
+- 任务未全部完成时，客户端进入第一页；`get_mission_progress` 自动结算当前已完成且未领取的奖励，
+  第二页继续锁定。
+- 最终条件由权威端点写入后，服务端立即校准并幂等保存持久解锁，通过
+  `character_list.mana_board_awake` 发布，但不领取 category 9 奖励，也不改变物品。
+- 全部完成的角色首次进入场景时直接显示第二页。玩家手动切回第一页后，
+  `tabChanged(1)` 才请求 `get_mission_progress`，一次领取全部未领奖励并显示对应 `mission_info`。
+- 因持久解锁已经存在，正常领奖不会再次返回解锁角色条目；重复请求不会重复发奖或重复通知。
+- 旧/异常存档若缺少持久解锁，且最终 `AwakeManaBoard` 特殊阶段仍未领奖，该阶段首次结算会幂等补写。
+  只有 UPSERT 本次确实改变状态时，`character_list` 才发布一次解锁；第二次结算不再发布。
+- 如果最终特殊阶段已经存在领奖状态但解锁行丢失，结算逻辑不会重放该阶段；恢复由 `/load` 校准或
+  数据库升级回填负责，客户端需要重新执行 `/load`（通常为重新登录）。
+- 同一次结算收到重复 `mission_id` 时，会先按任务取最大进度，再统一持久化与领奖，避免低值覆盖高值。
