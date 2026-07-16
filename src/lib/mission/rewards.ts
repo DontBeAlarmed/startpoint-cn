@@ -1,12 +1,7 @@
 // Mission reward parsers — from CDN reward tables
 
 import activeRewards from "../../../assets/mission_active_reward.json"
-import regularRewards from "../../../assets/mission_regular_reward.json"
-import dailyRewards from "../../../assets/mission_daily_reward.json"
 import eventRewards from "../../../assets/mission_event_reward.json"
-import degreeRewards from "../../../assets/mission_degree_reward.json"
-import collectRewards from "../../../assets/mission_collect_item_reward.json"
-import weeklyRewards from "../../../assets/mission_weekly_reward.json"
 import charAwakeRewards from "../../../assets/mission_char_awake_reward.json"
 
 export interface ActiveMissionReward {
@@ -17,55 +12,6 @@ export interface ActiveMissionReward {
     equipmentId?: number
 }
 
-export interface MissionRewardStageDefinition {
-    source: "active" | "awake"
-    targetProgress: number
-    targetClearSeconds?: number
-    rewards: ActiveMissionReward[]
-}
-
-function getRewardRow(
-    table: Record<string, Record<string, any[]>>,
-    missionId: number,
-    stage: number
-): any[] | undefined {
-    return table[String(missionId)]?.[String(stage)]?.[0]
-}
-
-function parseOptionalInteger(value: unknown): number | undefined {
-    if (value === undefined || value === null || value === "" || value === "(None)") return undefined
-    const parsed = parseInt(String(value))
-    return Number.isNaN(parsed) ? undefined : parsed
-}
-
-function parseMissionRewardSlots(row: any[], firstKindIndex: number, slotCount: number): ActiveMissionReward[] {
-    const result: ActiveMissionReward[] = []
-    for (let slot = 0; slot < slotCount; slot++) {
-        const base = firstKindIndex + slot * 6
-        const kindRaw = row[base]
-        if (kindRaw === undefined || kindRaw === "" || kindRaw === "(None)") continue
-        const kind = parseInt(kindRaw)
-        if (Number.isNaN(kind)) continue
-
-        const amount = parseInt(row[base + 1]) || 0
-        if (amount === 0 && kind !== 6) continue
-
-        const itemId = row[base + 2] ? parseInt(row[base + 2]) : undefined
-        const charId = row[base + 3] ? parseInt(row[base + 3]) : undefined
-        const equipId = row[base + 4] ? parseInt(row[base + 4]) : undefined
-
-        if (kind === 1 && !itemId) continue
-        if (kind === 2 && !equipId) continue
-
-        const reward: ActiveMissionReward = { kind, amount }
-        if (itemId) reward.itemId = itemId
-        if (charId) reward.characterId = charId
-        if (equipId) reward.equipmentId = equipId
-        result.push(reward)
-    }
-    return result
-}
-
 export function getActiveMissionRewards(missionId: number, stage: number): ActiveMissionReward[] {
     const mission = (activeRewards as Record<string, Record<string, any[]>>)[String(missionId)]
     if (!mission) return []
@@ -73,51 +19,30 @@ export function getActiveMissionRewards(missionId: number, stage: number): Activ
     if (!stageData || !stageData[0]) return []
     const row = stageData[0]
 
-    return parseMissionRewardSlots(row, 7, 4)
-}
+    const result: ActiveMissionReward[] = []
+    for (let slot = 0; slot < 4; slot++) {
+        const base = 7 + slot * 6
+        const kind = parseInt(row[base]) || 0
+        if (kind === 0) continue
+        const amount = parseInt(row[base + 1]) || 0
+        if (amount === 0) continue
 
-export function getMissionRewardStageDefinition(
-    missionId: number,
-    stage: number
-): MissionRewardStageDefinition | null {
-    const awakeRow = getRewardRow(charAwakeRewards as Record<string, Record<string, any[]>>, missionId, stage)
-    if (awakeRow) {
-        const targetProgress = parseFloat(String(awakeRow[5]))
-        if (!Number.isFinite(targetProgress)) return null
-        return {
-            source: "awake",
-            targetProgress,
-            targetClearSeconds: parseOptionalInteger(awakeRow[6]),
-            rewards: parseMissionRewardSlots(awakeRow, 9, 4),
-        }
+        const itemId = row[base + 2] ? parseInt(row[base + 2]) : undefined
+        const charId = row[base + 3] ? parseInt(row[base + 3]) : undefined
+        const equipId = row[base + 4] ? parseInt(row[base + 4]) : undefined
+
+        // Skip item/equipment rewards with missing IDs (prevents SQL NOT NULL crash)
+        if (kind === 1 && !itemId) continue
+        if (kind === 2 && !equipId) continue
+
+        const reward: ActiveMissionReward = { kind, amount }
+        if (itemId) reward.itemId = itemId
+        if (charId) reward.characterId = charId
+        if (equipId) reward.equipmentId = equipId
+
+        result.push(reward)
     }
-
-    const activeRow = getRewardRow(activeRewards as Record<string, Record<string, any[]>>, missionId, stage)
-    if (!activeRow) return null
-    const targetProgress = parseFloat(String(activeRow[3]))
-    if (!Number.isFinite(targetProgress)) return null
-    return {
-        source: "active",
-        targetProgress,
-        targetClearSeconds: parseOptionalInteger(activeRow[4]),
-        rewards: parseMissionRewardSlots(activeRow, 7, 4),
-    }
-}
-
-export function getRegularMissionRewards(missionId: number, stage: number): ActiveMissionReward[] {
-    const mission = (regularRewards as Record<string, Record<string, any[]>>)[String(missionId)]
-    if (!mission) return []
-    const stageData = mission[String(stage)]
-    if (!stageData || !stageData[0]) return []
-    return parseMissionRewardSlots(stageData[0], 5, 4)
-}
-
-export function getDailyMissionRewards(missionId: number, stage: number): ActiveMissionReward[] {
-    const mission = (dailyRewards as Record<string, Record<string, any[]>>)[String(missionId)]
-    if (!mission) return []
-    const stageData = mission[String(stage)]
-    if (!stageData || !stageData[0]) return []
-    return parseMissionRewardSlots(stageData[0], 5, 4)
+    return result
 }
 
 export function getAwakeMissionRewards(missionId: number, stage: number): ActiveMissionReward[] {
@@ -125,7 +50,24 @@ export function getAwakeMissionRewards(missionId: number, stage: number): Active
     if (!mission) return []
     const stageData = mission[String(stage)]
     if (!stageData || !stageData[0]) return []
-    return parseMissionRewardSlots(stageData[0], 9, 4)
+    const row = stageData[0]
+
+    const result: ActiveMissionReward[] = []
+    const base = 9
+    const kind = parseInt(row[base]) || 0
+    if (kind === 0) return []
+    const amount = parseInt(row[base + 1]) || 0
+    if (amount === 0) return []
+
+    const itemId = row[base + 2] ? parseInt(row[base + 2]) : undefined
+
+    // Skip item/equipment rewards with missing IDs (prevents SQL NOT NULL crash)
+    if ((kind === 1 || kind === 2) && !itemId) return []
+
+    const reward: ActiveMissionReward = { kind, amount }
+    if (itemId) reward.itemId = itemId
+    result.push(reward)
+    return result
 }
 
 export function getEventMissionRewards(missionId: number, stage: number): ActiveMissionReward[] {
@@ -135,29 +77,21 @@ export function getEventMissionRewards(missionId: number, stage: number): Active
     if (!stageData || !stageData[0]) return []
     const row = stageData[0]
 
-    return parseMissionRewardSlots(row, 5, 4)
-}
+    const result: ActiveMissionReward[] = []
+    // Event rewards use base=5 (single slot, kind=col[5], amount=col[6], item=col[7])
+    const base = 5
+    const kind = parseInt(row[base]) || 0
+    if (kind === 0) return []
+    const amount = parseInt(row[base + 1]) || 0
+    if (amount === 0) return []
 
-export function getDegreeMissionRewards(missionId: number, stage: number): ActiveMissionReward[] {
-    const mission = (degreeRewards as Record<string, Record<string, any[]>>)[String(missionId)]
-    if (!mission) return []
-    const stageData = mission[String(stage)]
-    if (!stageData || !stageData[0]) return []
-    return parseMissionRewardSlots(stageData[0], 5, 4)
-}
+    const itemId = row[base + 2] ? parseInt(row[base + 2]) : undefined
 
-export function getCollectMissionRewards(missionId: number, stage: number): ActiveMissionReward[] {
-    const mission = (collectRewards as Record<string, Record<string, any[]>>)[String(missionId)]
-    if (!mission) return []
-    const stageData = mission[String(stage)]
-    if (!stageData || !stageData[0]) return []
-    return parseMissionRewardSlots(stageData[0], 6, 4)
-}
+    // Skip item/equipment rewards with missing IDs (prevents SQL NOT NULL crash)
+    if ((kind === 1 || kind === 2) && !itemId) return []
 
-export function getWeeklyMissionRewards(missionId: number, stage: number): ActiveMissionReward[] {
-    const mission = (weeklyRewards as Record<string, Record<string, any[]>>)[String(missionId)]
-    if (!mission) return []
-    const stageData = mission[String(stage)]
-    if (!stageData || !stageData[0]) return []
-    return parseMissionRewardSlots(stageData[0], 5, 4)
+    const reward: ActiveMissionReward = { kind, amount }
+    if (itemId) reward.itemId = itemId
+    result.push(reward)
+    return result
 }

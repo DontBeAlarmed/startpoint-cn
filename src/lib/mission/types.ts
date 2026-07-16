@@ -15,13 +15,11 @@ export interface PlayerQuestProgressEntry {
 /** Per-category pre-computed context — built once, read many times */
 export interface CategoryContext {
     playerId: number
-    category: number
     player: Player
     questProgress: Record<string, PlayerQuestProgressEntry[]>
     totalQuestClears: number
     totalStories: number
     rankCounts: Record<string, number>
-    activeMissionProgress?: Record<string, number>
     snapshot?: SnapshotData | null
 }
 
@@ -31,13 +29,13 @@ export interface MissionComputer {
 
     /**
      * Build pre-cached context for this category.
-     * Prefer loading shared category data here so repeated mission evaluation stays cheap.
+     * All DB I/O happens here — compute() must be pure.
      */
     buildContext(playerId: number, category: number): CategoryContext
 
     /**
      * Compute progress for a single mission.
-     * Keep this read-only: calculators may read fresh counter state, but must not mutate progress.
+     * NO DB calls inside — use ctx for all data.
      */
     compute(missionId: number, ctx: CategoryContext, dbProgress: number): number
 }
