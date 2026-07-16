@@ -1,9 +1,18 @@
 import { RushEventBattleType } from "../../../data/types"
 import { QuestCategory } from "../../types"
 
+export interface RaidEventFinishData {
+    auto_start_point: number
+    is_out_of_period: boolean
+    quest_boss: { kill_count: number }
+    raid_boss: { hp_percentage: number, total_kill_count: number }
+}
+
 export function handleRaidEventFinish(params: {
     questCategory: number
+    questAccomplished: boolean
     activeEventId: number | undefined
+    killCountWeight?: number
     party: { characters: ({ id: number | null } | null)[], unison_characters: ({ id: number | null } | null)[], equipments: ({ id: number | null } | null)[], ability_soul_ids: (number | null)[] }
     playerId: number
     questId: number
@@ -18,10 +27,10 @@ export function handleRaidEventFinish(params: {
         battleType: RushEventBattleType
         round: number
     }) => void
-}): void {
-    const { questCategory, activeEventId, party, playerId, questId, getEvoLevelsFn, insertPartyFn } = params
+}): RaidEventFinishData | null {
+    const { questCategory, questAccomplished, activeEventId, killCountWeight, party, playerId, questId, getEvoLevelsFn, insertPartyFn } = params
 
-    if (questCategory !== QuestCategory.RAID_EVENT || !activeEventId) return
+    if (questCategory !== QuestCategory.RAID_EVENT || !questAccomplished || activeEventId === undefined) return null
 
     const characterIds = party.characters.map(val => val?.id ?? null)
     const unisonCharacterIds = party.unison_characters.map(val => val?.id ?? null)
@@ -37,4 +46,11 @@ export function handleRaidEventFinish(params: {
         battleType: RushEventBattleType.FOLDER,
         round: questId
     })
+
+    return {
+        auto_start_point: 0,
+        is_out_of_period: false,
+        quest_boss: { kill_count: killCountWeight ?? 1 },
+        raid_boss: { hp_percentage: 100, total_kill_count: 0 }
+    }
 }

@@ -18,6 +18,7 @@ interface ReturnRushEvent {
 
 interface RushHandlerParams {
     questCategory: number
+    questAccomplished: boolean
     questData: {
         rushEventId?: number
         rushEventFolderId?: RushEventFolder
@@ -48,7 +49,7 @@ export function handleRushEventFinish(params: RushHandlerParams): {
     rushEventData: ReturnRushEvent | null
     rushEventRewardsResult: PlayerRewardResult | null
 } {
-    const { questCategory, questData, clearTime, party, playerId, questId,
+    const { questCategory, questAccomplished, questData, clearTime, party, playerId, questId,
         getEvoLevels, folderMaxRounds, getRushEvent, updateRushEvent,
         insertParty, insertClearedFolder, deletePartyList,
         getSerializedParties, getFolderRewards, giveRewards } = params
@@ -56,7 +57,7 @@ export function handleRushEventFinish(params: RushHandlerParams): {
     let rushEventData: ReturnRushEvent | null = null
     let rushEventRewardsResult: PlayerRewardResult | null = null
 
-    if (questCategory !== QuestCategory.RUSH_EVENT) {
+    if (questCategory !== QuestCategory.RUSH_EVENT || !questAccomplished) {
         return { rushEventData, rushEventRewardsResult }
     }
 
@@ -85,7 +86,7 @@ export function handleRushEventFinish(params: RushHandlerParams): {
     if (rushEventBattleType === RushEventBattleType.ENDLESS) {
         const playerRushEventData = getRushEvent(playerId, rushEventId)
         const playerNextRound = playerRushEventData?.endlessBattleNextRound ?? 1
-        const playerMaxRound = playerRushEventData?.endlessBattleMaxRound ?? 1
+        const playerMaxRound = playerRushEventData?.endlessBattleMaxRound ?? 0
         const playerBestClearTime = playerRushEventData?.endlessBattleMaxRoundTime ?? Number.MAX_SAFE_INTEGER
         round = playerNextRound
 

@@ -51,6 +51,9 @@ export interface RawQuest {
     scoreRewardGroupId?: number,
     eventId?: number,
     folderId?: number,
+    difficultyScore?: number,
+    timeLimitMs?: number,
+    killCountWeight?: number,
     bRankTime?: number,
     aRankTime?: number,
     sRankTime?: number,
@@ -81,6 +84,9 @@ export interface BattleQuest {
     scoreRewardGroup?: ScoreReward[],
     eventId?: number,
     folderId?: number,
+    difficultyScore?: number,
+    timeLimitMs?: number,
+    killCountWeight?: number,
     bRankTime: number,
     aRankTime: number,
     sRankTime: number,
@@ -98,4 +104,3 @@ export interface BattleQuest {
 
 
 export type RawQuests = Record<string, RawQuest>
-

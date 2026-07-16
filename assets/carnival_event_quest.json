@@ -6,10 +6,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 800
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 1,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 200000
     },
     "1002": {
         "name": "",
@@ -18,10 +23,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 800
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 1,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "1003": {
         "name": "",
@@ -30,10 +40,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 800
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 1,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "1004": {
         "name": "",
@@ -42,10 +57,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 1,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 200000
     },
     "1005": {
         "name": "",
@@ -54,10 +74,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 1,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "1006": {
         "name": "",
@@ -66,10 +91,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 1,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "1007": {
         "name": "",
@@ -78,10 +108,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 1,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 200000
     },
     "1008": {
         "name": "",
@@ -90,10 +125,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 1,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "1009": {
         "name": "",
@@ -102,10 +142,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 1,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250601001": {
         "name": "",
@@ -114,10 +159,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 250601,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250601002": {
         "name": "",
@@ -126,10 +176,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 250601,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250601003": {
         "name": "",
@@ -138,10 +193,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 250601,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250601004": {
         "name": "",
@@ -150,10 +210,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 250601,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250601005": {
         "name": "",
@@ -162,10 +227,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 250601,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250601006": {
         "name": "",
@@ -174,10 +244,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 250601,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250601007": {
         "name": "",
@@ -186,10 +261,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 250601,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250601008": {
         "name": "",
@@ -198,10 +278,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 250601,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250601009": {
         "name": "",
@@ -210,10 +295,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 250601,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250602001": {
         "name": "",
@@ -222,10 +312,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 250602,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250602002": {
         "name": "",
@@ -234,10 +329,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 250602,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250602003": {
         "name": "",
@@ -246,10 +346,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 250602,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250602004": {
         "name": "",
@@ -258,10 +363,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 250602,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250602005": {
         "name": "",
@@ -270,10 +380,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 250602,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250602006": {
         "name": "",
@@ -282,10 +397,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 250602,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250602007": {
         "name": "",
@@ -294,10 +414,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 500
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 250602,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250602008": {
         "name": "",
@@ -306,10 +431,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 500
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 250602,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250602009": {
         "name": "",
@@ -318,10 +448,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 500
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 250602,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250603001": {
         "name": "",
@@ -330,10 +465,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 250603,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250603002": {
         "name": "",
@@ -342,10 +482,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 250603,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250603003": {
         "name": "",
@@ -354,10 +499,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 250603,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250603004": {
         "name": "",
@@ -366,10 +516,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 250603,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250603005": {
         "name": "",
@@ -378,10 +533,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 250603,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250603006": {
         "name": "",
@@ -390,10 +550,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 250603,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250603007": {
         "name": "",
@@ -402,10 +567,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 250603,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250603008": {
         "name": "",
@@ -414,10 +584,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 250603,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250603009": {
         "name": "",
@@ -426,10 +601,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 250603,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250604001": {
         "name": "",
@@ -438,10 +618,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 250604,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250604002": {
         "name": "",
@@ -450,10 +635,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 250604,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250604003": {
         "name": "",
@@ -462,10 +652,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 250604,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250604004": {
         "name": "",
@@ -474,10 +669,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 250604,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250604005": {
         "name": "",
@@ -486,10 +686,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 250604,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250604006": {
         "name": "",
@@ -498,10 +703,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 250604,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250604007": {
         "name": "",
@@ -510,10 +720,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 250604,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250604008": {
         "name": "",
@@ -522,10 +737,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 250604,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250604009": {
         "name": "",
@@ -534,10 +754,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 250604,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250605001": {
         "name": "",
@@ -546,10 +771,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 250605,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250605002": {
         "name": "",
@@ -558,10 +788,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 250605,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250605003": {
         "name": "",
@@ -570,10 +805,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 250605,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250605004": {
         "name": "",
@@ -582,10 +822,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 250605,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250605005": {
         "name": "",
@@ -594,10 +839,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 250605,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250605006": {
         "name": "",
@@ -606,10 +856,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 250605,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250605007": {
         "name": "",
@@ -618,10 +873,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 250605,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250605008": {
         "name": "",
@@ -630,10 +890,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 250605,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250605009": {
         "name": "",
@@ -642,10 +907,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 250605,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250606001": {
         "name": "",
@@ -654,10 +924,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 250606,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250606002": {
         "name": "",
@@ -666,10 +941,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 250606,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250606003": {
         "name": "",
@@ -678,10 +958,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 250606,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250606004": {
         "name": "",
@@ -690,10 +975,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 250606,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250606005": {
         "name": "",
@@ -702,10 +992,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 250606,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250606006": {
         "name": "",
@@ -714,10 +1009,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 250606,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "250606007": {
         "name": "",
@@ -726,10 +1026,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 250606,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "250606008": {
         "name": "",
@@ -738,10 +1043,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 250606,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "250606009": {
         "name": "",
@@ -750,10 +1060,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 250606,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "100004001": {
         "name": "",
@@ -762,10 +1077,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 100004,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "100004002": {
         "name": "",
@@ -774,10 +1094,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 100004,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "100004003": {
         "name": "",
@@ -786,10 +1111,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 100004,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "100004004": {
         "name": "",
@@ -798,10 +1128,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 100004,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "100004005": {
         "name": "",
@@ -810,10 +1145,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 100004,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "100004006": {
         "name": "",
@@ -822,10 +1162,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 100004,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "100004007": {
         "name": "",
@@ -834,10 +1179,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 100004,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "100004008": {
         "name": "",
@@ -846,10 +1196,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 100004,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "100004009": {
         "name": "",
@@ -858,10 +1213,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 100004,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "100003001": {
         "name": "",
@@ -870,10 +1230,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 100003,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "100003002": {
         "name": "",
@@ -882,10 +1247,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 100003,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "100003003": {
         "name": "",
@@ -894,10 +1264,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 100003,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "100003004": {
         "name": "",
@@ -906,10 +1281,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 100003,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "100003005": {
         "name": "",
@@ -918,10 +1298,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 100003,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "100003006": {
         "name": "",
@@ -930,10 +1315,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 100003,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "100003007": {
         "name": "",
@@ -942,10 +1332,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 500
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 100003,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "100003008": {
         "name": "",
@@ -954,10 +1349,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 500
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 100003,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "100003009": {
         "name": "",
@@ -966,10 +1366,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 500
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 100003,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "100000001": {
         "name": "",
@@ -978,10 +1383,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 100000,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "100000002": {
         "name": "",
@@ -990,10 +1400,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 100000,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "100000003": {
         "name": "",
@@ -1002,10 +1417,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 100000,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "100000004": {
         "name": "",
@@ -1014,10 +1434,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 100000,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "100000005": {
         "name": "",
@@ -1026,10 +1451,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 100000,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "100000006": {
         "name": "",
@@ -1038,10 +1468,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 100000,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "100000007": {
         "name": "",
@@ -1050,10 +1485,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 100000,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "100000008": {
         "name": "",
@@ -1062,10 +1502,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 100000,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "100000009": {
         "name": "",
@@ -1074,10 +1519,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 100000,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "100002001": {
         "name": "",
@@ -1086,10 +1536,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 100002,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "100002002": {
         "name": "",
@@ -1098,10 +1553,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 100002,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "100002003": {
         "name": "",
@@ -1110,10 +1570,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 100002,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "100002004": {
         "name": "",
@@ -1122,10 +1587,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 100002,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "100002005": {
         "name": "",
@@ -1134,10 +1604,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 100002,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "100002006": {
         "name": "",
@@ -1146,10 +1621,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 100002,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "100002007": {
         "name": "",
@@ -1158,10 +1638,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 100002,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "100002008": {
         "name": "",
@@ -1170,10 +1655,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 100002,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "100002009": {
         "name": "",
@@ -1182,10 +1672,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 1,
+        "eventId": 100002,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "9001": {
         "name": "",
@@ -1194,10 +1689,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 9,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "9002": {
         "name": "",
@@ -1206,10 +1706,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 9,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "9003": {
         "name": "",
@@ -1218,10 +1723,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 9,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "9004": {
         "name": "",
@@ -1230,10 +1740,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 9,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "9005": {
         "name": "",
@@ -1242,10 +1757,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 9,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "9006": {
         "name": "",
@@ -1254,10 +1774,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 9,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "9007": {
         "name": "",
@@ -1266,10 +1791,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 9,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "9008": {
         "name": "",
@@ -1278,10 +1808,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 9,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "9009": {
         "name": "",
@@ -1290,10 +1825,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 9,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "8001": {
         "name": "",
@@ -1302,10 +1842,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 8,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "8002": {
         "name": "",
@@ -1314,10 +1859,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 8,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "8003": {
         "name": "",
@@ -1326,10 +1876,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 8,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "8004": {
         "name": "",
@@ -1338,10 +1893,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 8,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "8005": {
         "name": "",
@@ -1350,10 +1910,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 8,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "8006": {
         "name": "",
@@ -1362,10 +1927,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 8,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "8007": {
         "name": "",
@@ -1374,10 +1944,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 8,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "8008": {
         "name": "",
@@ -1386,10 +1961,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 8,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "8009": {
         "name": "",
@@ -1398,10 +1978,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 8,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "7001": {
         "name": "",
@@ -1410,10 +1995,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 7,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "7002": {
         "name": "",
@@ -1422,10 +2012,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 7,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "7003": {
         "name": "",
@@ -1434,10 +2029,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 7,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "7004": {
         "name": "",
@@ -1446,10 +2046,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 7,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "7005": {
         "name": "",
@@ -1458,10 +2063,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 7,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "7006": {
         "name": "",
@@ -1470,10 +2080,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 7,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "7007": {
         "name": "",
@@ -1482,10 +2097,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 7,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "7008": {
         "name": "",
@@ -1494,10 +2114,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 7,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "7009": {
         "name": "",
@@ -1506,10 +2131,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 0,
+        "eventId": 7,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "6001": {
         "name": "",
@@ -1518,10 +2148,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 6,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "6002": {
         "name": "",
@@ -1530,10 +2165,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 6,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "6003": {
         "name": "",
@@ -1542,10 +2182,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 6,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "6004": {
         "name": "",
@@ -1554,10 +2199,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 6,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "6005": {
         "name": "",
@@ -1566,10 +2216,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 6,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "6006": {
         "name": "",
@@ -1578,10 +2233,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 6,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "6007": {
         "name": "",
@@ -1590,10 +2250,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 6,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "6008": {
         "name": "",
@@ -1602,10 +2267,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 6,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "6009": {
         "name": "",
@@ -1614,10 +2284,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 6,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "5001": {
         "name": "",
@@ -1626,10 +2301,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 5,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "5002": {
         "name": "",
@@ -1638,10 +2318,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 5,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "5003": {
         "name": "",
@@ -1650,10 +2335,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 5,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "5004": {
         "name": "",
@@ -1662,10 +2352,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 5,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "5005": {
         "name": "",
@@ -1674,10 +2369,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 5,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "5006": {
         "name": "",
@@ -1686,10 +2386,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 5,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "5007": {
         "name": "",
@@ -1698,10 +2403,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 5,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "5008": {
         "name": "",
@@ -1710,10 +2420,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 5,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "5009": {
         "name": "",
@@ -1722,10 +2437,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 5,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "4001": {
         "name": "",
@@ -1734,10 +2454,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 4,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "4002": {
         "name": "",
@@ -1746,10 +2471,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 4,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "4003": {
         "name": "",
@@ -1758,10 +2488,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 4,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "4004": {
         "name": "",
@@ -1770,10 +2505,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 4,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "4005": {
         "name": "",
@@ -1782,10 +2522,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 4,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "4006": {
         "name": "",
@@ -1794,10 +2539,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 4,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "4007": {
         "name": "",
@@ -1806,10 +2556,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 500
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 4,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "4008": {
         "name": "",
@@ -1818,10 +2573,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 500
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 4,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "4009": {
         "name": "",
@@ -1830,10 +2590,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 500
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 2,
+        "eventId": 4,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "3001": {
         "name": "",
@@ -1842,10 +2607,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 3,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "3002": {
         "name": "",
@@ -1854,10 +2624,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 3,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "3003": {
         "name": "",
@@ -1866,10 +2641,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 3,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "3004": {
         "name": "",
@@ -1878,10 +2658,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 3,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "3005": {
         "name": "",
@@ -1890,10 +2675,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 3,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "3006": {
         "name": "",
@@ -1902,10 +2692,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 3,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "3007": {
         "name": "",
@@ -1914,10 +2709,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 3,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "3008": {
         "name": "",
@@ -1926,10 +2726,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 3,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "3009": {
         "name": "",
@@ -1938,10 +2743,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 3,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "2001": {
         "name": "",
@@ -1950,10 +2760,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 2,
+        "folderId": 1,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "2002": {
         "name": "",
@@ -1962,10 +2777,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 2,
+        "folderId": 1,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "2003": {
         "name": "",
@@ -1974,10 +2794,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 3,
+        "eventId": 2,
+        "folderId": 1,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "2004": {
         "name": "",
@@ -1986,10 +2811,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 2,
+        "folderId": 2,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "2005": {
         "name": "",
@@ -1998,10 +2828,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 2,
+        "folderId": 2,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "2006": {
         "name": "",
@@ -2010,10 +2845,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 5,
+        "eventId": 2,
+        "folderId": 2,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     },
     "2007": {
         "name": "",
@@ -2022,10 +2862,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 20,
-        "manaReward": 2,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 2,
+        "folderId": 3,
+        "timeLimitMs": 108000,
+        "difficultyScore": 1000000
     },
     "2008": {
         "name": "",
@@ -2034,10 +2879,15 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 55,
-        "manaReward": 3,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 2,
+        "folderId": 3,
+        "timeLimitMs": 72000,
+        "difficultyScore": 2000000
     },
     "2009": {
         "name": "",
@@ -2046,9 +2896,14 @@
         "aRankTime": 0,
         "sRankTime": 0,
         "sPlusRankTime": 0,
-        "rankPointReward": 1,
-        "characterExpReward": 80,
-        "manaReward": 4,
-        "poolExpReward": 1000
+        "rankPointReward": 8,
+        "characterExpReward": 28,
+        "manaReward": 8,
+        "poolExpReward": 28,
+        "element": 4,
+        "eventId": 2,
+        "folderId": 3,
+        "timeLimitMs": 54000,
+        "difficultyScore": 2650000
     }
 }

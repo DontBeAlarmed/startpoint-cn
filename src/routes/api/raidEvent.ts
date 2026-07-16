@@ -10,6 +10,8 @@ import { PartyCategory, RushEventBattleType } from "../../data/types";
 import { clientSerializeDate } from "../../data/utils";
 import { getSerializedPlayerRushEventPlayedPartiesSync, getPlayerRushEventEndlessBattleRankingSync } from "../../lib/rush";
 import { insertActiveQuest } from "./singleBattleQuest";
+import { getQuestFromCategorySync } from "../../lib/assets";
+import { BattleQuest, QuestCategory } from "../../lib/types";
 
 const raidEventIds: Record<number, number> = {}
 
@@ -296,11 +298,17 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Internal Server Error", "message": "No player bound to account."
         })
 
-        // Register active quest for /single_battle_quest/finish
-        const raidEventId = raidEventIds[playerId] ?? Math.floor(body.quest_id / 1000)
+        const questData = getQuestFromCategorySync(QuestCategory.RAID_EVENT, body.quest_id) as BattleQuest | null
+        if (questData === null || questData.eventId === undefined) return reply.status(400).send({
+            "error": "Bad Request", "message": "Quest doesn't exist."
+        })
+
+        // Register active quest for /single_battle_quest/finish. The request has
+        // no event_id, so derive it from the CN raid quest master data.
+        const raidEventId = questData.eventId
         insertActiveQuest(playerId, {
             questId: body.quest_id,
-            category: 23,  // RAID_EVENT
+            category: QuestCategory.RAID_EVENT,
             useBossBoostPoint: false,
             useBoostPoint: false,
             isAutoStartMode: body.is_auto_start_mode,

@@ -495,6 +495,7 @@ export function getPlayerRushEventNextEndlessBattleRoundSync(
     SELECT round
     FROM players_rush_events_played_parties
     WHERE player_id = ? AND event_id = ? AND battle_type = ?
+    ORDER BY round ASC
     `).all(
         playerId,
         eventId,

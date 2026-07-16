@@ -19,7 +19,15 @@ def convert_solo_time_attack_event_quest(obj):
     return qb.convert_3level(obj, f.TYPE_MAP['solo_time_attack_event_quest']['layout'], hardcode_clear_reward=False, hardcode_s_plus=True)
 
 def convert_raid_event_quest(obj):
-    return qb.convert_3level(obj, f.TYPE_MAP['raid_event_quest']['layout'], hardcode_clear_reward=False)
+    converted = qb.convert_3level(obj, f.TYPE_MAP['raid_event_quest']['layout'], hardcode_clear_reward=False)
+    for event_id, stages in obj.items():
+        for _, row_wrapper in stages.items():
+            row = qb.unwrap(row_wrapper)
+            quest = converted[str(row[0])]
+            quest['eventId'] = int(event_id)
+            quest['folderId'] = int(row[2])
+            quest['killCountWeight'] = int(row[52])
+    return converted
 
 def convert_character_quests(obj):
     converted = {}

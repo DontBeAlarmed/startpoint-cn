@@ -17,7 +17,16 @@ def convert_tower_dungeon_event_quest(obj):
 
 
 def convert_carnival_event_quest(obj):
-    return qb.convert_3level(obj, f.TYPE_MAP['carnival_event_quest']['layout'], hardcode_s_plus=False)
+    converted = qb.convert_3level(obj, f.TYPE_MAP['carnival_event_quest']['layout'], hardcode_s_plus=False)
+    for event_id, stages in obj.items():
+        for _, row_wrapper in stages.items():
+            row = qb.unwrap(row_wrapper)
+            quest = converted[str(row[0])]
+            quest['eventId'] = int(event_id)
+            quest['folderId'] = int(row[1])
+            quest['timeLimitMs'] = int(row[100])
+            quest['difficultyScore'] = int(float(row[104]))
+    return converted
 
 
 
@@ -44,5 +53,4 @@ def convert_rush_event_quest(obj):
             if quest[73] != "(None)" and quest[73] != "":
                 converted[quest[0]]["element"] = int(quest[73])
     return converted 
-
 

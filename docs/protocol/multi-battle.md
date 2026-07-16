@@ -797,7 +797,7 @@ const NPC_TEMPLATES = {
 | 房间断线恢复 | ✅ | TCP 断线→disband，restore_room 返回 9 |
 | 自动招募 NPC（进入房间时） | ✅ | `npc_count > 0` 时自动 EnterComs，首次计算 NPC 数量并持久化，Rematch 恢复固定数量 |
 | NPC 数量持久化 | ✅ | `npc_count` 字段：首次招募写入 `3-realPlayers`，Rematch 恢复。真人不齐时 `checkAllReadyAndStart` 等待。|
-| 战斗协议完善 | ✅ | SceneReady(tag=0)+Finalize(tag=1)+Measurement(tag=2) |
+| 战斗协议基础 | ⚠️ | SceneReady 可用；LevelNext/Finalize/Measurement/Heartbeat 枚举仍需按 CN 1.8.1 修正 |
 
 ### 9.3 环境变量
 
@@ -882,10 +882,12 @@ state=1 (Ready: 可加入/可招募)
 
 | 消息 | 通道 | 服务端处理 |
 |------|------|------|
-| `BattleNotifyMessage.SceneReady(0)` | Notify | → `BattleStart(1)` |
-| `BattleNotifyMessage.Finalize(1)` | Notify | → `Finalized(2)` |
-| `BattleNotifyMessage.Measurement(2)` | Notify | → 回显 `Measurement(3)` |
-| `BattleNotifyMessage.Heartbeat(4)` | Notify | → 回显 `Measurement(3)` |
+| `BattleNotifyMessage.SceneReady(0)` | Notify | → 全员就绪后 `BattleStart(1)` |
+| `BattleNotifyMessage.LevelNext(1)` | Notify | → 重置下一场景 SceneReady 屏障（待实现） |
+| `BattleNotifyMessage.Finalize(2)` | Notify | → `Finalized(2)`（当前 tag 处理错误） |
+| `BattleNotifyMessage.Measurement(3)` | Notify | → `Measurement(3)`（待修正） |
+| `BattleNotifyMessage.LineSpeedWarning(4)` | Notify | 线路告警（待修正） |
+| `BattleNotifyMessage.Heartbeat(5)` | Notify | 保持连接（待修正） |
 | `BattleSocketCommand.Heartbeat(2)` | Broadcast/Send | → 回显 `Measurement(3)` |
 
 ### 9.7 战斗恢复数据层（Phase 3 基础）
@@ -940,6 +942,7 @@ Client B → Broadcast(frameCmd) → Server → relayToBattleRoom → BattleServ
 | C5602 Disband NPE | ✅ 已修复 | `notifyRoomDisbanded` 仅用于 TCP 断线通知 |
 | 消息 TCP 合并 | ⚠️ | 100ms/200ms 延迟规避 |
 | 战斗恢复 UI（RestoreState.Battle） | 待测 | DB 层已就绪，客户端恢复弹窗流程待验证 |
+| 双 Boss 场景切换 | ❌ | `LevelNext(1)` 被误作 Finalize，且 SceneReady 屏障只能使用一次；见 `super-owl-multiscene.md` |
 | state=3 (Filled) | ✅ 已移除 | `updateRoomState(3)` 去掉——旧代码不设 Filled，导致客机 `get_rooms` 显示"满房" |
 | 空房间浮字 + 快速解散 | ⚠️ 服务端已排查完毕，待客户端日志确认 | 见 9.8.2 专题研究 |
 

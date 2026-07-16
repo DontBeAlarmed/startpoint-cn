@@ -7,7 +7,7 @@ import { getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, update
 import { getSession } from "../../data/domains/session"
 import { incrementPlayerCharacterClearSync } from "../../data/domains/character_clear"
 import { updatePlayerEquipmentSync } from "../../data/domains/equipment"
-import { upsertPlayerCarnivalEventRecordSync } from "../../data/domains/carnivalEvent"
+import { getPlayerCarnivalEventRecordsSync, upsertPlayerCarnivalEventRecordSync } from "../../data/domains/carnivalEvent"
 import { getQuestFromCategorySync, getRushEventFolderClearRewards } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
@@ -29,20 +29,10 @@ import { trackPowerflip } from "../../lib/quest/finish/powerflip-tracker";
 import { trackLeaderPowerflip } from "../../lib/quest/finish/leader-powerflip-tracker";
 import { trackPartyCoClears } from "../../lib/quest/finish/party-co-clear-tracker";
 import type { FinishContext } from "../../lib/quest/finish/types";
-import { readFileSync, existsSync } from "fs";
-import path from "path";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
 import scoreAttackBorderRewards from "../../../assets/score_attack_border_reward.json";
 import eventChallengePointMap from "../../../assets/event_challenge_point_map.json";
 
-// Load carnival quest score data
-let carnivalScoreLookup: Record<string, { difficulty_score: number, time_limit_ms: number, folder_id: number, event_id: number }> = {}
-try {
-    const scorePath = path.join(process.cwd(), "assets", "carnival_event_quest_scores.json")
-    if (existsSync(scorePath)) {
-        carnivalScoreLookup = JSON.parse(readFileSync(scorePath, "utf-8"))
-    }
-} catch {} // Init failed silently; carnival scoring won't work
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 
 interface StartBody {
@@ -379,6 +369,7 @@ const routes = async (fastify: FastifyInstance) => {
         // handle event quest-specific data & rewards
         const { rushEventData, rushEventRewardsResult } = handleRushEventFinish({
             questCategory,
+            questAccomplished,
             questData,
             clearTime,
             party: bodyPartyStatistics,
@@ -397,9 +388,11 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // Record played party for RAID_EVENT
-        handleRaidEventFinish({
+        const raidEventData = handleRaidEventFinish({
             questCategory,
+            questAccomplished,
             activeEventId: activeQuestData.eventId,
+            killCountWeight: questData.killCountWeight,
             party: bodyPartyStatistics,
             playerId,
             questId,
@@ -412,10 +405,11 @@ const routes = async (fastify: FastifyInstance) => {
             questCategory,
             questAccomplished,
             questId,
+            questData,
             clearTime,
             party: bodyPartyStatistics,
             playerId,
-            carnivalLookup: carnivalScoreLookup,
+            getRecordsFn: (pid, eid) => getPlayerCarnivalEventRecordsSync(pid, eid),
             upsertFn: (pid, eid, fid, score, chars, unisons) => upsertPlayerCarnivalEventRecordSync(pid, eid, fid, score, chars, unisons),
         })
 
@@ -478,6 +472,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "is_multi": "single",
                 "quest_name": "",
                 "item_list": itemList,
+                "raid_event": raidEventData,
                 "rush_event": rushEventData,
                 "carnival_event": carnivalEventData,
                 "user_daily_challenge_point_list": dailyChallengePointList ?? [],
