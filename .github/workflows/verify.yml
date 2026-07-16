@@ -56,8 +56,18 @@ jobs:
   tools:
     name: Python tools and launcher
     runs-on: windows-latest
+    env:
+      # 工具链全程中文输出;runner 控制台是 cp1252,不设 UTF-8 会 UnicodeEncodeError。
+      PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v4
+      # 默认 TEMP 是 C:\Users\RUNNER~1\...(8.3 短路径),tempfile 基于它建目录后
+      # 任何 Path.resolve() 都会展开成长路径,路径比较/relative_to 全部失配。
+      # RUNNER_TEMP(D:\a\_temp)没有短路径成分。
+      - name: Point TEMP at the long-form runner temp dir
+        run: |
+          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
       - uses: actions/setup-node@v4
         with:
           node-version: 20.19.0
