@@ -34,6 +34,7 @@ import scoreAttackBorderRewards from "../../../assets/score_attack_border_reward
 import eventChallengePointMap from "../../../assets/event_challenge_point_map.json";
 
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
+import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 
 interface StartBody {
     quest_id: number
@@ -418,6 +419,12 @@ const routes = async (fastify: FastifyInstance) => {
             ...scoreRewardsResult.items,
             ...(rushEventRewardsResult?.items ?? {})
         }
+        const characterList = reconcileAwakeUnlockCharacterList(playerId, [
+            ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
+            ...((clearReward?.character_list || []) as Record<string, unknown>[]),
+            ...((sPlusClearReward?.character_list || []) as Record<string, unknown>[]),
+            ...(scoreRewardsResult.character_list as Record<string, unknown>[])
+        ])
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": dataHeaders,
@@ -435,12 +442,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "boss_boost_point": newBossBoostPoint
                 },
                 "add_exp_list": rewardCharacterExpResult.add_exp_list,
-                "character_list": [
-                    ...rewardCharacterExpResult.character_list,
-                    ...(clearReward?.character_list || []),
-                    ...(sPlusClearReward?.character_list || []),
-                    ...scoreRewardsResult.character_list
-                ],
+                "character_list": characterList,
                 "bond_token_status_list": rewardCharacterExpResult.bond_token_status_list,
                 "rewards": {
                     "overflow_pool_exp": 0,

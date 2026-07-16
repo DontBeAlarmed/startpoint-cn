@@ -10,6 +10,7 @@ import { clientSerializeDate } from "../../../data/utils";
 import { resolvePlayerIdSync } from "../../../data/activeAccount";
 import { validateSessionAndPlayer, validateCharacterOwnership, buildCharacterListEntry, sendCharacterResponse } from "../../../lib/character-helpers";
 import { characterExpCaps } from "../../../lib/character";
+import { reconcileAwakeUnlockCharacterList } from "../../../lib/mission";
 
 interface ReceiveBondTokenBody {
     character_id: number,
@@ -76,10 +77,13 @@ const routes = async (fastify: FastifyInstance) => {
         for (const entry of characterData.bondTokenList) {
             bondTokenList.push({ "mana_board_index": entry.manaBoardIndex, "status": entry.manaBoardIndex === manaBoardIndex ? 2 : entry.status })
         }
+        const characterList = reconcileAwakeUnlockCharacterList(playerId, [
+            buildCharacterListEntry(characterId, characterData, { bond_token_list: bondTokenList })
+        ])
 
         return sendCharacterResponse(reply, viewerId, {
             user_info: { bond_token: newBondTokens },
-            character_list: [buildCharacterListEntry(characterId, characterData, { bond_token_list: bondTokenList })],
+            character_list: characterList,
             user_character_mana_node_list: {},
             item_list: {},
             evolution: [],

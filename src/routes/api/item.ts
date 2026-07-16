@@ -10,6 +10,7 @@ import { sellItemSync } from "../../lib/item-sell";
 import { AccountId, PlayerId } from "../../lib/types";
 import { computeRealTimeStamina } from "../../lib/stamina";
 import itemData from "../../../assets/item_data.json";
+import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 
 interface ItemEffectInfo {
     effectKind: number
@@ -180,17 +181,21 @@ const routes = async (fastify: FastifyInstance) => {
             const code = 'errorCode' in result ? result.errorCode : undefined
             return reply.status(400).send({ "error": "Bad Request", "code": code, "message": result.error })
         }
+        const characterList = reconcileAwakeUnlockCharacterList(playerId, [])
 
         console.log(`[ITEM_SELL] account=${accountId} player=${playerId}: item ${itemId} ×${sellNumber} sold, mana +${result.manaGained} (${result.freeMana - result.manaGained} -> ${result.freeMana})`)
+
+        const responseData: Record<string, unknown> = {
+            "item_list": { [itemId]: result.newCount },
+            "user_info": { "free_mana": result.freeMana },
+            "mail_arrived": false
+        }
+        if (characterList.length > 0) responseData.character_list = characterList
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "item_list": { [itemId]: result.newCount },
-                "user_info": { "free_mana": result.freeMana },
-                "mail_arrived": false
-            }
+            "data": responseData
         })
     })
 }

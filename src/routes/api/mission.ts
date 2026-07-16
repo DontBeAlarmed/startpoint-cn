@@ -6,7 +6,7 @@ import { getPlayerCategoryMissionsSync, incrementPlayerCategoryMissionSync } fro
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { generateDataHeaders, getServerTimeForPlayer } from "../../utils";
-import { getComputer, getMissionIdsByCategory, getMissionsByPattern, getCurrentStage, getCharacterIdFromMission, isMissionEnabledAt, settleAwakeMissionRewards } from "../../lib/mission/index";
+import { getComputer, getMissionIdsByCategory, getMissionsByPattern, getCurrentStage, getCharacterIdFromMission, isMissionEnabledAt, reconcileAwakeUnlockCharacterList, settleAwakeMissionRewards } from "../../lib/mission/index";
 import type { AwakeMissionComputedProgress, AwakeMissionInfo } from "../../lib/mission/index";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import type { CategoryContext } from "../../lib/mission/index";
@@ -189,6 +189,7 @@ const routes = async (fastify: FastifyInstance) => {
             }
         })()
 
+        const characterList = reconcileAwakeUnlockCharacterList(playerId, [])
         console.log(`[MISSION] update_progress viewer=${viewerId} params=${missionParams.length} db_updates=${updatedCount}`)
 
         reply.header("content-type", "application/x-msgpack")
@@ -197,6 +198,7 @@ const routes = async (fastify: FastifyInstance) => {
             "data": {
                 "mission_info": [],
                 "degree_list": [],
+                character_list: characterList,
                 "mail_arrived": false
             }
         })

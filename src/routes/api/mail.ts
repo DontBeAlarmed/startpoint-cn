@@ -9,6 +9,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { clientSerializeDate } from "../../data/utils";
 import { givePlayerEquipmentSync } from "../../lib/equipment";
+import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 
 interface IndexBody {
     api_count: number
@@ -229,6 +230,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         // Then mark as received
         receiveMailSync(playerId, mailId)
+        const reconciledCharacterList = reconcileAwakeUnlockCharacterList(playerId, characterList)
 
         const totalCount = getPlayerMailCountSync(playerId)
 
@@ -239,7 +241,7 @@ const routes = async (fastify: FastifyInstance) => {
             mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
         }
 
-        if (characterList.length > 0) responseData.character_list = characterList
+        if (reconciledCharacterList.length > 0) responseData.character_list = reconciledCharacterList
         if (equipmentList.length > 0) responseData.equipment_list = equipmentList
         if (Object.keys(itemList).length > 0) responseData.item_list = itemList
         if (Object.keys(userInfo).length > 0) responseData.user_info = userInfo
@@ -295,6 +297,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         // Mark all as received
         const claimed = receiveAllMailsSync(playerId, mailIds.filter(id => mailMap.has(id)))
+        const reconciledCharacterList = reconcileAwakeUnlockCharacterList(playerId, characterList)
 
         const responseData: Record<string, any> = {
             already_mail_count: alreadyCount,
@@ -309,7 +312,7 @@ const routes = async (fastify: FastifyInstance) => {
             mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
         }
 
-        if (characterList.length > 0) responseData.character_list = characterList
+        if (reconciledCharacterList.length > 0) responseData.character_list = reconciledCharacterList
         if (equipmentList.length > 0) responseData.equipment_list = equipmentList
         if (Object.keys(itemList).length > 0) responseData.item_list = itemList
         if (Object.keys(userInfo).length > 0) responseData.user_info = userInfo

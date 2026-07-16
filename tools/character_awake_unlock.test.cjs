@@ -1,6 +1,147 @@
 const assert = require("node:assert/strict")
 const { randomUUID } = require("node:crypto")
+const fs = require("node:fs")
+const path = require("node:path")
 const Database = require("better-sqlite3")
+
+function readRouteSource(relativePath) {
+    return fs.readFileSync(path.join(__dirname, "../src/routes/api", relativePath), "utf8")
+}
+
+function countOccurrences(source, value) {
+    return source.split(value).length - 1
+}
+
+function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
+    const singleBattleSource = readRouteSource("singleBattleQuest.ts")
+    const storySource = readRouteSource("storyQuest.ts")
+    const bondSource = readRouteSource("character/bond.ts")
+    const missionSource = readRouteSource("mission.ts")
+    const mailSource = readRouteSource("mail.ts")
+    const itemSource = readRouteSource("item.ts")
+    const shopSource = readRouteSource("shop.ts")
+    const routeSources = [
+        singleBattleSource,
+        storySource,
+        bondSource,
+        missionSource,
+        mailSource,
+        itemSource,
+        shopSource,
+    ]
+
+    for (const source of routeSources) {
+        assert.equal(source.includes("reconcileAwakeUnlockCharacterList"), true)
+    }
+
+    const singleBattleCall = singleBattleSource.lastIndexOf("reconcileAwakeUnlockCharacterList(")
+    assert.equal(countOccurrences(singleBattleSource, "reconcileAwakeUnlockCharacterList("), 1)
+    assert.equal(singleBattleCall > singleBattleSource.indexOf("trackCharacterClears(finishCtx)"), true)
+    assert.equal(singleBattleCall > singleBattleSource.indexOf("givePlayerCharactersExpSync("), true)
+    assert.equal(singleBattleCall > singleBattleSource.indexOf("handleRushEventFinish({"), true)
+    assert.equal(singleBattleCall > singleBattleSource.indexOf("handleCarnivalEventFinish({"), true)
+    const singleBattleMergeBlock = singleBattleSource.slice(
+        singleBattleSource.indexOf("const characterList = reconcileAwakeUnlockCharacterList("),
+        singleBattleSource.indexOf("reply.header", singleBattleCall)
+    )
+    for (const existingSegment of [
+        "...rewardCharacterExpResult.character_list",
+        "...((clearReward?.character_list || [])",
+        "...((sPlusClearReward?.character_list || [])",
+        "...(scoreRewardsResult.character_list",
+    ]) {
+        assert.equal(singleBattleMergeBlock.includes(existingSegment), true)
+    }
+    assert.equal(singleBattleSource.includes('"character_list": characterList'), true)
+
+    const storyCall = storySource.lastIndexOf("reconcileAwakeUnlockCharacterList(")
+    assert.equal(countOccurrences(storySource, "reconcileAwakeUnlockCharacterList("), 1)
+    assert.equal(storyCall > storySource.indexOf("insertPlayerQuestProgressSync("), true)
+    assert.equal(storyCall > storySource.indexOf("updatePlayerQuestProgressSync("), true)
+    assert.equal(storySource.includes("if (finished) return { data: [] }"), true)
+
+    const bondReceiveBlock = bondSource.split('fastify.post("/receive_bond_token"')[1]
+        .split('fastify.post("/open_mana_board"')[0]
+    const bondAlreadyClaimedBlock = bondReceiveBlock.split("// Claim the bond token")[0]
+    const bondMutationBlock = bondReceiveBlock.split("// Claim the bond token")[1]
+    assert.equal(countOccurrences(bondSource, "reconcileAwakeUnlockCharacterList("), 1)
+    assert.equal(bondAlreadyClaimedBlock.includes("reconcileAwakeUnlockCharacterList("), false)
+    assert.equal(
+        bondMutationBlock.indexOf("reconcileAwakeUnlockCharacterList(")
+            > bondMutationBlock.indexOf("updatePlayerCharacterBondTokenSync("),
+        true
+    )
+
+    const missionUpdateBlock = missionSource.split('fastify.post("/update_mission_progress"')[1]
+    assert.equal(countOccurrences(missionSource, "reconcileAwakeUnlockCharacterList("), 1)
+    assert.equal(
+        missionUpdateBlock.indexOf("reconcileAwakeUnlockCharacterList(")
+            > missionUpdateBlock.indexOf("})()"),
+        true
+    )
+    assert.equal(missionUpdateBlock.includes("settleAwakeMissionRewards"), false)
+    assert.equal(missionUpdateBlock.includes("givePlayerReward"), false)
+    assert.equal(missionUpdateBlock.includes("incrementPlayerCategoryMissionStage"), false)
+    assert.equal(missionUpdateBlock.includes("character_list: characterList"), true)
+
+    const mailIndexBlock = mailSource.split('fastify.post("/index"')[1]
+        .split('fastify.post("/receive"')[0]
+    const mailReceiveBlock = mailSource.split('fastify.post("/receive"')[1]
+        .split('fastify.post("/receive_all"')[0]
+    const mailReceiveAllBlock = mailSource.split('fastify.post("/receive_all"')[1]
+    assert.equal(countOccurrences(mailSource, "reconcileAwakeUnlockCharacterList("), 2)
+    assert.equal(mailIndexBlock.includes("reconcileAwakeUnlockCharacterList("), false)
+    assert.equal(
+        mailReceiveBlock.indexOf("reconcileAwakeUnlockCharacterList(")
+            > mailReceiveBlock.indexOf("receiveMailSync("),
+        true
+    )
+    assert.equal(
+        mailReceiveBlock.indexOf("reconcileAwakeUnlockCharacterList(")
+            > mailReceiveBlock.indexOf("applyMailReward("),
+        true
+    )
+    assert.equal(
+        mailReceiveAllBlock.indexOf("reconcileAwakeUnlockCharacterList(")
+            > mailReceiveAllBlock.indexOf("receiveAllMailsSync("),
+        true
+    )
+
+    const itemUseBlock = itemSource.split('fastify.post("/use_item"')[1]
+        .split('fastify.post("/sell"')[0]
+    const itemSellBlock = itemSource.split('fastify.post("/sell"')[1]
+    assert.equal(countOccurrences(itemSource, "reconcileAwakeUnlockCharacterList("), 1)
+    assert.equal(itemUseBlock.includes("reconcileAwakeUnlockCharacterList("), false)
+    assert.equal(
+        itemSellBlock.indexOf("reconcileAwakeUnlockCharacterList(")
+            > itemSellBlock.indexOf("if (!result.ok)"),
+        true
+    )
+
+    const shopBuyBlock = shopSource.split('fastify.post("/buy"')[1]
+        .split('fastify.post("/get_sales_list"')[0]
+    const enhancementBlock = shopBuyBlock.split("// build rewards array")[0]
+    const shopReadOnlyBlock = shopSource.split('fastify.post("/get_sales_list"')[1]
+    assert.equal(countOccurrences(shopSource, "reconcileAwakeUnlockCharacterList("), 1)
+    assert.equal(enhancementBlock.includes("reconcileAwakeUnlockCharacterList("), false)
+    assert.equal(
+        shopBuyBlock.indexOf("reconcileAwakeUnlockCharacterList(")
+            > shopBuyBlock.indexOf("givePlayerRewardsSync("),
+        true
+    )
+    assert.equal(
+        shopBuyBlock.indexOf("reconcileAwakeUnlockCharacterList(")
+            > shopBuyBlock.lastIndexOf("addPlayerShopPurchaseSync("),
+        true
+    )
+    assert.equal(shopReadOnlyBlock.includes("reconcileAwakeUnlockCharacterList("), false)
+
+    for (const source of routeSources.filter(source => source !== missionSource)) {
+        assert.equal(source.includes("settleAwakeMissionRewards"), false)
+    }
+}
+
+testAuthoritativeMutationRoutesPublishAwakeUnlocks()
 
 function testVersion4BackfillValidation() {
     const database = new Database(":memory:")

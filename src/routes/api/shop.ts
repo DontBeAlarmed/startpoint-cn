@@ -16,6 +16,7 @@ import { givePlayerRewardsSync } from "../../lib/quest";
 import { computeRealTimeStamina } from "../../lib/stamina";
 import { clientSerializeEquipment } from "../../lib/equipment";
 import { planEquipmentEnhancementPurchase } from "../../lib/equipment-enhancement";
+import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import CDN_GENERAL_SHOP_WHITELIST from "../../../assets/cdn_general_shop_whitelist.json";
 
 const GENERAL_SHOP_CDN_KEYS: Set<number> = new Set(CDN_GENERAL_SHOP_WHITELIST);
@@ -384,6 +385,10 @@ const routes = async (fastify: FastifyInstance) => {
         for (let i = 0; i < purchaseAmount; i++) {
             addPlayerShopPurchaseSync(playerId, shopItemId)
         }
+        const characterList = reconcileAwakeUnlockCharacterList(
+            playerId,
+            (rewardResult?.character_list ?? []) as Record<string, unknown>[]
+        )
 
         // verify DB write
         const afterPlayer = getPlayerSync(playerId)!
@@ -401,7 +406,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "bond_token": bondTokens,
                     "exp_pool": player.expPool + (rewardResult?.user_info.exp_pool ?? 0),
                 },
-                "character_list": rewardResult?.character_list ?? [],
+                "character_list": characterList,
                 "equipment_list": rewardResult?.equipment_list ?? [],
                 "item_list": {
                     ...itemList,
