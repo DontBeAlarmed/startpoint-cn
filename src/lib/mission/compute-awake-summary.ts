@@ -4,8 +4,9 @@
 import { getPlayerCategoryMissionsSync } from "../../data/domains/mission"
 import { getPlayerCharactersSync } from "../../data/domains/character"
 import { getComputer } from "./registry"
-import { getMissionIdsByCategory, getCompletedStageNumbers, getMissionStageIds } from "./stages"
+import { getMissionIdsByCategory, getMissionStageIds } from "./stages"
 import { getCharacterIdFromMission } from "./character-queries"
+import { getAwakeMissionRewardStageDefinition } from "./rewards"
 import type { CategoryContext } from "./types"
 
 export interface AwakeMissionEntry {
@@ -40,17 +41,15 @@ export function computeAwakeSummary(playerId: number): AwakeSummary {
     for (const [charKId, missionIds] of charMissionMap) {
         if (!playerChars[charKId]) continue
 
-        let allComplete = true
-
         for (const missionId of missionIds) {
             const dbProgress = activeMissions[String(missionId)]?.progress ?? 0
             const progress = computer.compute(missionId, ctx, dbProgress)
-            const completedStages = getCompletedStageNumbers(9, missionId, progress)
             const allStageIds = getMissionStageIds(9, missionId)
+            const persistedStages = activeMissions[String(missionId)]?.stages
 
             const stages = allStageIds.map(sid => ({
                 stage: sid,
-                received: completedStages.includes(sid),
+                received: !Array.isArray(persistedStages) && persistedStages?.[String(sid)] === true,
             }))
 
             activeMissionList.push({
@@ -59,13 +58,17 @@ export function computeAwakeSummary(playerId: number): AwakeSummary {
                 stages,
             })
 
-            if (!allStageIds.every(sid => completedStages.includes(sid))) {
-                allComplete = false
+            for (const stage of stages) {
+                if (!stage.received) continue
+                const specialReward = getAwakeMissionRewardStageDefinition(missionId, stage.stage)?.specialReward
+                if (!specialReward || !playerChars[String(specialReward.characterId)]) continue
+                const levels = manaBoardAwakeMap.get(String(specialReward.characterId)) ?? {}
+                levels[specialReward.boardIndex] = Math.max(
+                    levels[specialReward.boardIndex] ?? 0,
+                    specialReward.awakeLevel
+                )
+                manaBoardAwakeMap.set(String(specialReward.characterId), levels)
             }
-        }
-
-        if (allComplete) {
-            manaBoardAwakeMap.set(charKId, { 1: 1 })
         }
     }
 

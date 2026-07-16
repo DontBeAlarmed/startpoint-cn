@@ -17,8 +17,9 @@
   degree/weekly column 1, collect-item column 2, Awake column 5.
 - `get_mission_progress` honors mission availability windows, collect-item
   `event_id`, and each CharacterAwake `character_id` request independently.
-- `get_mission_progress` is read-only. It no longer marks stages received or
-  grants inventory while the client is merely refreshing a list.
+- `get_mission_progress` remains read-only for ordinary category list refreshes.
+  Category 9 requests carrying a CharacterAwake `character_id` are the official
+  screen-entry settlement trigger and atomically claim newly completed stages.
 - ActiveMission claims validate mission existence, stage definitions,
   completion thresholds, prior receipt, and duplicates before an atomic grant.
 - ActiveMission rewards now preserve kind 0 (Stone) and dispatch items,
@@ -27,10 +28,13 @@
 
 ## CharacterAwake refresh
 
-Awake mission completion is stored under category 9. `/load`, the silent
-progress response, and the progress-list fallback derive `mana_board_awake`
-from that isolated state. The already-open scene limitation remains documented
-in `character-awake-refresh.md`.
+Awake mission completion and reward receipt are stored separately under
+category 9. The silent progress response never unlocks the board. Category 9
+screen entry returns `mission_info`, changed reward collections, and the
+`AwakeManaBoard` special reward; `/load` reconstructs the unlock only from a
+received special-reward stage or persisted awakened node state. The
+already-open scene limitation remains documented in
+`character-awake-refresh.md`.
 
 ## Remaining feature gaps
 
@@ -38,14 +42,16 @@ in `character-awake-refresh.md`.
   entries but no extracted server stage/reward master data. They still return
   no mission rows.
 - Category mission reward settlement is not yet wired into every gameplay
-  endpoint that can change server-computed progress. `get_mission_progress`
-  intentionally does not compensate by granting rewards during a query.
+  endpoint that can change server-computed progress. CharacterAwake is handled
+  separately because its client contract settles rewards on category 9 screen
+  entry.
 - Event missions whose goal is repeated clears need per-event repeat counters;
   the current quest-progress model can count distinct completed quests and
   stored multiplayer clear counts, but not every historical single-player
   repeat.
-- CharacterAwake pair/race conditions and the final special-reward trigger need
-  captured CN traffic before replacing the current derived unlock rule.
+- CharacterAwake pair/race progress still relies on the documented local
+  counters and mappings; reward settlement and the final special-reward trigger
+  are implemented from the CN 1.8.1 client master schema.
 
 These gaps keep both mission progress routes at partial status even though the
 storage, reset, protocol filtering, and ActiveMission claim safety issues are

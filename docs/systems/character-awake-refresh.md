@@ -18,19 +18,25 @@ the owned character.
 
 ## Server behavior
 
-- `/mission/update_mission_progress` returns minimal `character_list` entries
-  for characters whose four Awake missions are complete.
-- `/mission/get_mission_progress` returns the same entries as a fallback.
-- `/load` merges mission-unlocked levels with levels reconstructed from stored
-  node state, taking the maximum per board.
+- `/mission/update_mission_progress` only stores progress deltas. It does not
+  grant CharacterAwake rewards or return `mana_board_awake`.
+- A category 9 `/mission/get_mission_progress` request settles completed,
+  unreceived stages when the player enters the CharacterAwake mission screen.
+- Settlement returns `mission_info` for the official reward toast, changed
+  inventory collections, and `character_list.mana_board_awake` only when the
+  reward row contains an `AwakeManaBoard` special reward.
+- `/load` derives mission unlocks from received special-reward stages and merges
+  them with levels reconstructed from stored node state, taking the maximum per
+  board.
 - `active_mission_list` remains separate from `all_active_mission_list`; Awake
   category IDs are not injected into the latter.
 
 `/character/awake_mana_node` also enforces the server-side gate. The request is
-rejected unless all four Awake missions are complete, the requested level
-matches the unlocked level, every base board node has been learned, and every
-requested node belongs to board 1. Duplicate/empty node lists are invalid. Mana,
-items, and node awake levels are committed in one SQLite transaction.
+rejected unless the `AwakeManaBoard` special reward has been settled, the
+requested level matches the unlocked level, every base board node has been
+learned, and every requested node belongs to board 1. Duplicate/empty node
+lists are invalid. Mana, items, and node awake levels are committed in one
+SQLite transaction.
 
 ## Remaining client limitation
 

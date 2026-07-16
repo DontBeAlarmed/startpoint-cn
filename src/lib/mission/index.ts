@@ -10,8 +10,8 @@ export { getComputer } from "./registry"
 export { getMissionIdsByCategory, getCurrentStage, getCompletedStageNumbers, getMissionStageIds, isMissionProgressComplete } from "./stages"
 
 // Rewards
-export type { ActiveMissionReward, MissionRewardStageDefinition } from "./rewards"
-export { getActiveMissionRewards, getAwakeMissionRewards, getCollectMissionRewards, getDailyMissionRewards, getDegreeMissionRewards, getEventMissionRewards, getMissionRewardStageDefinition, getRegularMissionRewards, getWeeklyMissionRewards } from "./rewards"
+export type { ActiveMissionReward, AwakeMissionRewardStageDefinition, AwakeMissionSpecialReward, MissionRewardStageDefinition } from "./rewards"
+export { getActiveMissionRewards, getAwakeMissionRewards, getAwakeMissionRewardStageDefinition, getCollectMissionRewards, getDailyMissionRewards, getDegreeMissionRewards, getEventMissionRewards, getMissionRewardStageDefinition, getRegularMissionRewards, getWeeklyMissionRewards } from "./rewards"
 
 // Patterns (for update_mission_progress)
 export type { PatternMatch } from "./patterns"
@@ -25,6 +25,8 @@ export { getCharacterStoryQuestIds, getCharacterIdFromMission } from "./characte
 
 // Awake summary (for /load response)
 export { computeAwakeSummary } from "./compute-awake-summary"
+export type { AwakeMissionComputedProgress, AwakeMissionInfo, AwakeMissionSettlementResult } from "./awake-settlement"
+export { settleAwakeMissionRewards } from "./awake-settlement"
 
 // Degree helpers
 export { getTargetDegree } from "./computer-degree"

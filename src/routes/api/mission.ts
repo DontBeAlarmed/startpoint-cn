@@ -4,13 +4,12 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerCategoryMissionsSync, incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
 import { getSession } from "../../data/domains/session"
-import { getPlayerCharactersSync } from "../../data/domains/character"
 import { getDb } from "../../data/db"
 import { generateDataHeaders, getServerTimeForPlayer } from "../../utils";
-import { computeAwakeSummary, getComputer, getMissionIdsByCategory, getMissionsByPattern, getCurrentStage, getCharacterIdFromMission, isMissionEnabledAt } from "../../lib/mission/index";
+import { getComputer, getMissionIdsByCategory, getMissionsByPattern, getCurrentStage, getCharacterIdFromMission, isMissionEnabledAt, settleAwakeMissionRewards } from "../../lib/mission/index";
+import type { AwakeMissionComputedProgress, AwakeMissionInfo } from "../../lib/mission/index";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import type { CategoryContext } from "../../lib/mission/index";
-import { buildManaBoardAwakeCharacterList } from "../../lib/character-helpers";
 import { addMissionProgressDelta } from "../../lib/mission/progress";
 
 interface GetMissionProgressBody {
@@ -73,6 +72,7 @@ const routes = async (fastify: FastifyInstance) => {
         const missionProgressList: any[] = []
         const evaluationTime = new Date(getServerTimeForPlayer(playerId) * 1000)
         const categoryMissionCache = new Map<number, ReturnType<typeof getPlayerCategoryMissionsSync>>()
+        const awakeProgressByCharacter = new Map<string, AwakeMissionComputedProgress[]>()
 
         for (const requestEntry of requestList) {
             const category = requestEntry.category
@@ -104,21 +104,46 @@ const routes = async (fastify: FastifyInstance) => {
                     progress_value: Number(progress),
                     stage: stage
                 })
+
+                if (category === 9 && charId !== undefined) {
+                    const awakeProgress = awakeProgressByCharacter.get(charId) ?? []
+                    awakeProgress.push({ missionId, progress: Number(progress) })
+                    awakeProgressByCharacter.set(charId, awakeProgress)
+                }
             }
         }
 
         console.log(`[MISSION] get_progress viewer=${viewerId} categories=${requestCategories} missions=${missionProgressList.length}`)
 
-        const awakeSummary = computeAwakeSummary(playerId)
-        const awakeCharacterList = buildManaBoardAwakeCharacterList(
-            getPlayerCharactersSync(playerId),
-            awakeSummary.manaBoardAwakeMap
-        )
+        const missionInfo: AwakeMissionInfo[] = []
+        const itemList: Record<string, number> = {}
+        const characterList: Record<string, unknown>[] = []
+        const equipmentList: Object[] = []
+        const degreeIds: number[] = []
+        let userInfo: Record<string, number> | undefined
+
+        for (const awakeProgress of awakeProgressByCharacter.values()) {
+            const settlement = settleAwakeMissionRewards(playerId, awakeProgress)
+            missionInfo.push(...settlement.missionInfo)
+            Object.assign(itemList, settlement.itemList)
+            characterList.push(...settlement.characterList)
+            equipmentList.push(...settlement.equipmentList)
+            for (const degreeId of settlement.degreeIds) {
+                if (!degreeIds.includes(degreeId)) degreeIds.push(degreeId)
+            }
+            if (settlement.userInfo) userInfo = settlement.userInfo
+        }
+
         const responseData: Record<string, unknown> = {
             mission_progress_list: missionProgressList,
-            character_list: awakeCharacterList,
+            mission_info: missionInfo,
+            item_list: itemList,
+            character_list: characterList,
+            equipment_list: equipmentList,
+            degree_list: degreeIds.map(degreeId => ({ viewer_id: viewerId, degree_id: degreeId })),
             mail_arrived: false,
         }
+        if (userInfo) responseData.user_info = userInfo
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -166,19 +191,12 @@ const routes = async (fastify: FastifyInstance) => {
 
         console.log(`[MISSION] update_progress viewer=${viewerId} params=${missionParams.length} db_updates=${updatedCount}`)
 
-        const awakeSummary = computeAwakeSummary(playerId)
-        const awakeCharacterList = buildManaBoardAwakeCharacterList(
-            getPlayerCharactersSync(playerId),
-            awakeSummary.manaBoardAwakeMap
-        )
-
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
                 "mission_info": [],
                 "degree_list": [],
-                "character_list": awakeCharacterList,
                 "mail_arrived": false
             }
         })

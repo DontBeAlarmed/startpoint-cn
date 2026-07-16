@@ -66,7 +66,7 @@ Endpoint | Status
 [/mission/get_mission_progress](../routes/mission_get_mission_progress.md) | :warning:
 [/mission/update_mission_progress](../routes/mission_update_mission_progress.md) | :warning:
 [/active_mission/receive](../routes/active_mission_receive.md) | :white_check_mark:
-<!-- mission: category-isolated storage and ActiveMission claims are safe; pass 6/7/8 and category reward settlement remain partial -->
+<!-- mission: category-isolated storage, ActiveMission claims, and CharacterAwake screen-entry settlement are safe; pass 6/7/8 and other category reward settlement remain partial -->
 [/multi_battle_quest/abort](../routes/multi_battle_quest_abort.md) | :no_entry:
 [/multi_battle_quest/create_room](../routes/multi_battle_quest_create_room.md) | :no_entry:
 [/multi_battle_quest/disband_room](../routes/multi_battle_quest_disband_room.md) | :no_entry:

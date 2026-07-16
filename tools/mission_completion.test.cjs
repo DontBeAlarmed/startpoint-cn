@@ -4,6 +4,7 @@ const {
     getComputer,
     getCompletedStageNumbers,
     getActiveMissionRewards,
+    getAwakeMissionRewardStageDefinition,
     getDailyMissionRewards,
     isMissionProgressComplete,
     getRegularMissionRewards,
@@ -59,6 +60,18 @@ assert.deepEqual(getActiveMissionRewards(20001, 1), [
     { kind: 2, amount: 5, equipmentId: 5080018 },
     { kind: 2, amount: 5, equipmentId: 5030029 },
 ])
+
+assert.deepEqual(getAwakeMissionRewardStageDefinition(3410051, 1), {
+    missionRewardId: 34100511,
+    targetProgress: 1,
+    rewards: [{ kind: 1, amount: 10, itemId: 13 }],
+})
+assert.deepEqual(getAwakeMissionRewardStageDefinition(3410054, 1), {
+    missionRewardId: 34100541,
+    targetProgress: 3,
+    specialReward: { characterId: 341005, boardIndex: 1, awakeLevel: 1 },
+    rewards: [{ kind: 1, amount: 1, itemId: 16 }],
+})
 
 const incompleteClaim = validateMissionRewardClaims(
     { 11110: { progress: 9, stages: [] } },

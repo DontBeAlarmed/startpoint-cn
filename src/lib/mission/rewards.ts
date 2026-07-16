@@ -24,6 +24,17 @@ export interface MissionRewardStageDefinition {
     rewards: ActiveMissionReward[]
 }
 
+export interface AwakeMissionSpecialReward {
+    characterId: number
+    boardIndex: number
+    awakeLevel: number
+}
+
+export interface AwakeMissionRewardStageDefinition extends MissionRewardStageDefinition {
+    missionRewardId: number
+    specialReward?: AwakeMissionSpecialReward
+}
+
 function getRewardRow(
     table: Record<string, Record<string, any[]>>,
     missionId: number,
@@ -102,8 +113,43 @@ export const getRegularMissionRewards = (missionId: number, stage: number) =>
 export const getDailyMissionRewards = (missionId: number, stage: number) =>
     getCategoryRewards(dailyRewards as Record<string, Record<string, any[]>>, missionId, stage, 5)
 
+export function getAwakeMissionRewardStageDefinition(
+    missionId: number,
+    stage: number
+): AwakeMissionRewardStageDefinition | null {
+    const row = getRewardRow(
+        charAwakeRewards as Record<string, Record<string, any[]>>,
+        missionId,
+        stage
+    )
+    if (!row) return null
+
+    const missionRewardId = parseOptionalInteger(row[0])
+    const targetProgress = Number.parseFloat(String(row[5]))
+    if (missionRewardId === undefined || !Number.isFinite(targetProgress)) return null
+
+    const specialKind = parseOptionalInteger(row[1])
+    let specialReward: AwakeMissionSpecialReward | undefined
+    if (specialKind === 0) {
+        const characterId = parseOptionalInteger(row[2])
+        const boardIndex = parseOptionalInteger(row[3])
+        const awakeLevel = parseOptionalInteger(row[4])
+        if (characterId === undefined || boardIndex === undefined || awakeLevel === undefined) return null
+        specialReward = { characterId, boardIndex, awakeLevel }
+    }
+
+    const targetClearSeconds = parseOptionalInteger(row[6])
+    return {
+        missionRewardId,
+        targetProgress,
+        ...(targetClearSeconds !== undefined ? { targetClearSeconds } : {}),
+        ...(specialReward ? { specialReward } : {}),
+        rewards: parseMissionRewardSlots(row, 9),
+    }
+}
+
 export function getAwakeMissionRewards(missionId: number, stage: number): ActiveMissionReward[] {
-    return getCategoryRewards(charAwakeRewards as Record<string, Record<string, any[]>>, missionId, stage, 9)
+    return getAwakeMissionRewardStageDefinition(missionId, stage)?.rewards ?? []
 }
 
 export function getEventMissionRewards(missionId: number, stage: number): ActiveMissionReward[] {

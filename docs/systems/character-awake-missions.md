@@ -1,6 +1,6 @@
 # 角色觉醒任务覆盖文档
 
-> 状态: 基本完成   最后更新: 2026-06-28
+> 状态: 基本完成   最后更新: 2026-07-17
 
 ## 概览
 
@@ -155,7 +155,8 @@ lib/mission/
 ├── types.ts           MissionComputer + CategoryContext 接口
 ├── registry.ts        分类→MissionComputer 分发表
 ├── stages.ts          阶段阈值 (getCurrentStage, getCompletedStageNumbers)
-├── rewards.ts         奖励解析 (getActiveMissionRewards, getAwakeMissionRewards)
+├── rewards.ts         奖励、奖励 ID 和 AwakeManaBoard 特殊奖励解析
+├── awake-settlement.ts  category 9 进入页面时的幂等奖励结算
 ├── patterns.ts        pattern→mission 索引 (getMissionsByPattern)
 ├── character-queries.ts  角色→任务映射
 ├── computer-regular.ts   category 1/2 (pattern 分发)
@@ -171,10 +172,16 @@ lib/mission/
 - **队长**（characters[0]）：单独追踪，"以X为队长"任务
 - **队员**（characters[1+], unison）：批量追踪，"队伍中编有X"任务
 
-### 自动奖励
+### 进入页面时结算奖励（2026-07-17）✅
 
-- `get_mission_progress` 中检测阶段完成 → 自动标记 `received=true`
-- `getAwakeMissionRewards()` 使用 `base=9`（1 个道具/阶段）
+- `update_mission_progress` 只累计任务进度，不发奖、不解锁觉醒板。
+- 客户端进入觉醒任务页面时请求 category 9 的 `get_mission_progress`；
+  服务端在此结算已完成且尚未领取的阶段。
+- `received` 来自 `players_category_mission_stages.status`，不再由完成进度推导。
+- `mission_info` 使用奖励表第 0 列的 `mission_reward_id`，触发客户端官方任务奖励提示。
+- 普通奖励从第 9 列开始解析；第 1-4 列的
+  `AwakeManaBoard(character_id, board_index, awake_level)` 作为特殊奖励处理。
+- 奖励发放、阶段领取状态和玩家货币更新在同一个 SQLite 事务中提交；重复进入页面不会重复发奖。
 
 
 (End of file - total 85 lines)
