@@ -7,7 +7,7 @@
     "build": "npm run build:server && npm run css",
     "build:server": "tsc && node scripts/write-build-stamp.mjs",
     "typecheck": "tsc --noEmit",
-    "test:node": "npm run build:server && node --test out/tests",
+    "test:node": "npm run build:server && node scripts/run-node-tests.mjs",
     "test:python": "python -m unittest discover -s mod-tools/tests -p \"test_*.py\"",
     "css": "npx tailwindcss -i ./src/input.css -o ./web/public/tailwind.css",
     "css:watch": "npx tailwindcss -i ./src/input.css -o ./web/public/tailwind.css --watch --poll",
