@@ -29,6 +29,7 @@ export type { AwakeMissionComputedProgress, AwakeMissionInfo, AwakeMissionSettle
 export { settleAwakeMissionRewards } from "./awake-settlement"
 export type { AwakeUnlockProgress, AwakeUnlockReconciliationResult } from "./awake-unlock"
 export { reconcileAwakeUnlocks, reconcileAwakeUnlocksFromProgress } from "./awake-unlock"
+export { reconcileAwakeUnlockCharacterList } from "./awake-unlock-response"
 
 // Degree helpers
 export { getTargetDegree } from "./computer-degree"

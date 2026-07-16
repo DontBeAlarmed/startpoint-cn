@@ -102,7 +102,12 @@ const { getPlayerItemSync } = require("../out/data/domains/item")
 const { insertAccountSync } = require("../out/data/domains/account")
 const { insertDefaultPlayerCharacterSync } = require("../out/data/domains/character")
 const { insertDefaultPlayerSync } = require("../out/data/domains/player")
-const { reconcileAwakeUnlocks, reconcileAwakeUnlocksFromProgress } = require("../out/lib/mission")
+const {
+    reconcileAwakeUnlockCharacterList,
+    reconcileAwakeUnlocks,
+    reconcileAwakeUnlocksFromProgress,
+} = require("../out/lib/mission")
+const awakeUnlockModule = require("../out/lib/mission/awake-unlock")
 const missionRegistry = require("../out/lib/mission/registry")
 
 const db = getDb()
@@ -237,6 +242,106 @@ try {
     assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 1 })
     assert.equal(upsertPlayerCharacterAwakeUnlockSync(playerId, 341005, 1, 2), true)
     assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 2 })
+
+    db.prepare(`
+        DELETE FROM players_character_awake_unlocks
+        WHERE player_id = ? AND character_id = 341005
+    `).run(playerId)
+    assert.equal(db.prepare(`
+        SELECT clear_count
+        FROM players_character_quest_clears
+        WHERE player_id = ? AND character_id = 341005
+    `).get(playerId).clear_count, 5)
+
+    const endpointBondTokenList = [{ mana_board_index: 2, status: 1 }]
+    const existingCharacterList = [{
+        character_id: 341005,
+        exp: 123,
+        bond_token_list: endpointBondTokenList,
+        mana_board_awake: {
+            1: 0,
+            2: 1,
+            4: "invalid",
+            5: Number.NaN,
+            6: Number.POSITIVE_INFINITY,
+            7: -1,
+            8: 1.5,
+            0: 1,
+            "-1": 1,
+            invalid: 1,
+        },
+    }, {
+        character_id: 341005,
+        exp: 999,
+        stack: 7,
+        update_time: "newer-endpoint-value",
+        mana_board_awake: { 2: 2, 3: 1, 4: 2 },
+    }]
+    const mergedCharacterList = reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
+    const mergedMew = mergedCharacterList.find(entry => entry.character_id === 341005)
+    assert.equal(mergedCharacterList.filter(entry => entry.character_id === 341005).length, 1)
+    assert.equal(mergedMew.exp, 999)
+    assert.equal(mergedMew.stack, 7)
+    assert.equal(mergedMew.update_time, "newer-endpoint-value")
+    assert.strictEqual(mergedMew.bond_token_list, endpointBondTokenList)
+    assert.deepEqual(mergedMew.mana_board_awake, { 1: 1, 2: 2, 3: 1, 4: 2 })
+
+    db.prepare(`
+        DELETE FROM players_character_awake_unlocks
+        WHERE player_id = ? AND character_id = 341005
+    `).run(playerId)
+    const appendedCharacterList = reconcileAwakeUnlockCharacterList(playerId, [])
+    assert.equal(appendedCharacterList.length, 1)
+    assert.equal(appendedCharacterList[0].character_id, 341005)
+    assert.equal(typeof appendedCharacterList[0].join_time, "string")
+    assert.equal(typeof appendedCharacterList[0].update_time, "string")
+    assert.deepEqual(appendedCharacterList[0].mana_board_awake, { 1: 1 })
+
+    const unchangedCharacterList = [
+        { character_id: 341005, exp: 1 },
+        { character_id: 341005, exp: 2 },
+    ]
+    assert.strictEqual(
+        reconcileAwakeUnlockCharacterList(playerId, unchangedCharacterList),
+        unchangedCharacterList
+    )
+    assert.deepEqual(unchangedCharacterList, [
+        { character_id: 341005, exp: 1 },
+        { character_id: 341005, exp: 2 },
+    ])
+
+    db.prepare(`
+        DELETE FROM players_character_awake_unlocks
+        WHERE player_id = ? AND character_id = 341005
+    `).run(playerId)
+    const originalReconcileAwakeUnlocks = awakeUnlockModule.reconcileAwakeUnlocks
+    awakeUnlockModule.reconcileAwakeUnlocks = () => ({
+        all: new Map(),
+        changed: new Map([
+            ["341006", { 1: 1 }],
+            ["999999", { 1: 1 }],
+        ]),
+    })
+    try {
+        assert.deepEqual(reconcileAwakeUnlockCharacterList(playerId, []), [])
+    } finally {
+        awakeUnlockModule.reconcileAwakeUnlocks = originalReconcileAwakeUnlocks
+    }
+
+    assert.equal(db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM players_category_missions
+        WHERE player_id = ? AND category = 9
+    `).get(playerId).count, 0)
+    assert.equal(db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM players_category_mission_stages
+        WHERE player_id = ? AND category = 9
+    `).get(playerId).count, 0)
+    assert.deepEqual(
+        Object.fromEntries([13, 14, 15, 16].map(itemId => [itemId, getPlayerItemSync(playerId, itemId) ?? 0])),
+        itemAmountsBefore
+    )
 
     console.log("character awake unlock tests passed")
 } finally {
