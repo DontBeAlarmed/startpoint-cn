@@ -10,12 +10,16 @@ import os
 import shutil
 import sys
 import uuid
+import zlib
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
 import wf_character_pack as character_pack
+import wf_character_requirements as requirements
 import wf_character_workspace as workspace_module
+import wf_dsl
+import wf_mod_tool as core
 import wf_release
 
 
@@ -102,6 +106,182 @@ def _release_result_payload(result: Any) -> dict[str, Any]:
         "archives": [str(path) for path in archives],
         "snapshot_dir": str(snapshot) if snapshot is not None else None,
     }
+
+
+# ---------------------------------------------------------------------------
+# master 表资产引用门禁(2026-07-16 unique_seris_wet F1009 事故)
+# 纯逻辑在 wf_character_requirements;这里只做 I/O:解码包内表/DSL、读 manifest
+# 声明、探测 live store(sha1 桶),然后把缺失清单折进 preflight/publish 的
+# release_ready 判定。runtime_test 只随 preflight 报告,不拦截。
+# ---------------------------------------------------------------------------
+
+
+def _master_gate_stores(profile_id: str) -> tuple[Path, ...]:
+    profile = core.resolve_profile(profile_id)
+    if profile is None:
+        return ()
+    candidates = [profile.store]
+    if profile.fallback is not None:
+        candidates.append(profile.fallback)
+    return tuple(path for path in candidates if path.is_dir())
+
+
+def _package_client_file(package_dir: Path, logical: str) -> Path:
+    return package_dir / "roots" / "common" / Path(*logical.split("/"))
+
+
+def _store_table_path(stores: tuple[Path, ...], logical: str) -> Path | None:
+    for store in stores:
+        path = core.table_path(store, logical)
+        if path.is_file():
+            return path
+    return None
+
+
+def _decode_nested(path: Path, logical: str) -> dict[str, dict[str, str]]:
+    outer = core.read_orderedmap_file_raw_rows(path, logical)
+    return {
+        key: core.read_orderedmap_file_from_bytes(raw)
+        for key, raw in zip(outer.keys, outer.rows)
+    }
+
+
+def master_reference_report(
+    package_dir: Path,
+    stores: tuple[Path, ...],
+) -> dict[str, Any]:
+    """包内 master 表/DSL 的全局资产引用 → 对照包声明与 live store 的缺失报告。
+
+    角色包整表随包,基线行不归包负责(CN 基线本就有悬空引用,如 rare4/alk 的
+    DSL 从未进国服包)。因此逐行 diff live store,只把**新增/修改行**交给提取器;
+    live store 没有该表时保守全量检查。
+    """
+    package_dir = Path(package_dir)
+    problems: list[str] = []
+
+    flat_tables: dict[str, dict[str, str]] = {}
+    changed_flat: dict[str, dict[str, str]] = {}
+    for logical in (requirements.UNIQUE_CONDITION_TABLE, *requirements.ABILITY_TABLES):
+        path = _package_client_file(package_dir, logical)
+        if not path.is_file():
+            continue
+        try:
+            rows = core.read_orderedmap_file_from_bytes(path.read_bytes())
+        except Exception as exc:
+            problems.append(f"无法解码 {logical}: {type(exc).__name__}")
+            continue
+        flat_tables[logical] = rows
+        store_rows: dict[str, str] | None = None
+        store_path = _store_table_path(stores, logical)
+        if store_path is not None:
+            try:
+                store_rows = core.read_orderedmap_file_from_bytes(store_path.read_bytes())
+            except Exception as exc:
+                problems.append(f"无法解码 live store {logical}: {type(exc).__name__}")
+        if store_rows is None:
+            changed_flat[logical] = rows
+        else:
+            changed_flat[logical] = {
+                key: text for key, text in rows.items()
+                if store_rows.get(key) != text
+            }
+
+    nested_tables: dict[str, dict[str, dict[str, str]]] = {}
+    for logical in requirements.NESTED_SKILL_PROGRAM_COLUMNS:
+        path = _package_client_file(package_dir, logical)
+        if not path.is_file():
+            continue
+        try:
+            outer = _decode_nested(path, logical)
+        except Exception as exc:
+            problems.append(f"无法解码 {logical}: {type(exc).__name__}")
+            continue
+        store_outer: dict[str, dict[str, str]] | None = None
+        store_path = _store_table_path(stores, logical)
+        if store_path is not None:
+            try:
+                store_outer = _decode_nested(store_path, logical)
+            except Exception as exc:
+                problems.append(f"无法解码 live store {logical}: {type(exc).__name__}")
+        changed_outer: dict[str, dict[str, str]] = {}
+        for outer_key, inner in outer.items():
+            store_inner = (store_outer or {}).get(outer_key, {})
+            changed_inner = {
+                inner_key: text for inner_key, text in inner.items()
+                if store_outer is None or store_inner.get(inner_key) != text
+            }
+            if changed_inner:
+                changed_outer[outer_key] = changed_inner
+        if changed_outer:
+            nested_tables[logical] = changed_outer
+
+    dsl_trees: dict[str, Any] = {}
+    common_root = package_dir / "roots" / "common"
+    if common_root.is_dir():
+        for path in sorted(common_root.rglob("*.action.dsl.amf3.deflate")):
+            logical = path.relative_to(common_root).as_posix()
+            try:
+                dsl_trees[logical] = wf_dsl.parse_dsl(
+                    zlib.decompress(path.read_bytes(), -15)
+                )["tree"]
+            except Exception as exc:
+                problems.append(f"无法解码 {logical}: {type(exc).__name__}")
+
+    references = requirements.extract_master_asset_references(
+        changed_flat, nested_tables, dsl_trees,
+    )
+
+    # 包内可满足 = manifest roots.common 声明(发布只装声明过的文件,
+    # 与 wf_character_pack._unique_condition_asset_errors 同口径)
+    declared_common: set[str] = set()
+    try:
+        manifest = character_pack.load_manifest(package_dir / "manifest.json")
+        roots = manifest.get("roots")
+        entries = roots.get("common") if isinstance(roots, dict) else None
+        for entry in entries if isinstance(entries, list) else ():
+            if isinstance(entry, dict) and isinstance(entry.get("logical_path"), str):
+                declared_common.add(entry["logical_path"])
+    except (OSError, ValueError) as exc:
+        problems.append(f"无法读取 manifest.json: {type(exc).__name__}")
+
+    store_condition_ids: set[str] = set()
+    if any(item.kind == "unique_condition_id" for item in references):
+        for store in stores:
+            path = core.table_path(store, requirements.UNIQUE_CONDITION_TABLE)
+            if not path.is_file():
+                continue
+            try:
+                store_condition_ids.update(
+                    core.read_orderedmap_file_from_bytes(path.read_bytes())
+                )
+            except Exception as exc:
+                problems.append(
+                    f"无法解码 live store unique_condition 表: {type(exc).__name__}"
+                )
+
+    report = requirements.build_master_reference_report(
+        references,
+        package_asset_paths=declared_common,
+        package_condition_ids=flat_tables.get(requirements.UNIQUE_CONDITION_TABLE, {}),
+        asset_exists=lambda logical: any(
+            core.table_path(store, logical).exists() for store in stores
+        ),
+        condition_id_exists=lambda cid: cid in store_condition_ids,
+    )
+    report["stores"] = [str(store) for store in stores]
+    report["problems"] = problems
+    if problems:
+        report["release_ready"] = False
+    return report
+
+
+def _master_gate_errors(report: dict[str, Any]) -> list[str]:
+    errors = [
+        f"master 表引用缺失资产: {item['kind']} {item['missing']} (来源 {item['source']})"
+        for item in report.get("missing", ())
+    ]
+    errors.extend(report.get("problems", ()))
+    return errors
 
 
 def _can_seal(status: workspace_module.WorkspaceStatus) -> bool:
@@ -226,8 +406,24 @@ def run_command(
 
         if command == "preflight":
             status = workspace_module.workspace_status(workspace)
+            mode = _manifest_mode(workspace)
+            master_report = master_reference_report(
+                workspace.package_dir, _master_gate_stores(args.profile)
+            )
+            if mode == "production" and not master_report["release_ready"]:
+                return 3, _base_payload(
+                    stage="preflight",
+                    workspace=workspace_path,
+                    release_ready=False,
+                    errors=_master_gate_errors(master_report),
+                    next_command=(
+                        "补齐 master_reference_report.missing 的资产后重新运行 preflight"
+                    ),
+                    status=status.to_dict(),
+                    master_reference_report=master_report,
+                )
             if (
-                _manifest_mode(workspace) == "production"
+                mode == "production"
                 and not status.release_ready
                 and _can_seal(status)
             ):
@@ -250,6 +446,7 @@ def run_command(
                 ),
                 status=status.to_dict(),
                 preflight=report,
+                master_reference_report=master_report,
             )
 
         if command == "publish":
@@ -259,8 +456,17 @@ def run_command(
             if args.confirm != expected:
                 raise FlowError(f"{mode} 发布必须使用确认口令 {expected}")
             status = workspace_module.workspace_status(workspace)
-            if mode == "production" and not status.release_ready:
-                raise FlowError("production workspace 未达到 release_ready=true")
+            if mode == "production":
+                if not status.release_ready:
+                    raise FlowError("production workspace 未达到 release_ready=true")
+                master_report = master_reference_report(
+                    workspace.package_dir, _master_gate_stores(args.profile)
+                )
+                if not master_report["release_ready"]:
+                    raise FlowError(
+                        "master 表资产引用门禁未通过: "
+                        + "; ".join(_master_gate_errors(master_report))
+                    )
             result = release_module.publish_package(
                 workspace.package_dir,
                 args.profile,

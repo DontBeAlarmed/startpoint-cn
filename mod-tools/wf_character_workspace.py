@@ -426,8 +426,8 @@ def workspace_status(workspace: Workspace | Path) -> WorkspaceStatus:
     tables = manifest.get("tables", []) if isinstance(manifest, dict) else []
     layer_status = {
         "layer_1_cdndata": {
-            "assets/cdndata/character.json",
-            "assets/cdndata/character_text.json",
+            "cdndata/character.json",
+            "cdndata/character_text.json",
         }.issubset(server_paths),
         "layer_2_client": bool(
             isinstance(tables, list)
@@ -435,7 +435,7 @@ def workspace_status(workspace: Workspace | Path) -> WorkspaceStatus:
             and any(isinstance(roots.get(name), list) and roots.get(name)
                     for name in ("common", "medium", "android"))
         ),
-        "server_character": "assets/character.json" in server_paths,
+        "server_character": "character.json" in server_paths,
     }
     layer_status["consistent"] = all(layer_status.values())
     qa = manifest.get("qa", {}) if isinstance(manifest, dict) else {}

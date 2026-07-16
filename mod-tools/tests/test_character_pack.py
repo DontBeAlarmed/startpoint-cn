@@ -213,6 +213,62 @@ class TestManifestContract(unittest.TestCase):
                 "common",
             )
 
+    def test_unique_condition_claim_requires_declared_icon_asset(self):
+        pack = self._module()
+        import wf_mod_tool as core
+
+        with tempfile.TemporaryDirectory() as td:
+            package_dir = Path(td)
+            manifest = base_manifest()
+            logical_table = "master/character/unique_condition.orderedmap"
+            logical_icon = (
+                "battle/common/unique_condition/unique_seris_wet.png"
+            )
+            table_raw = core.build_orderedmap(core.OrderedMap(
+                logical_table,
+                ["23"],
+                [(
+                    "unique_seris_wet,湿润,"
+                    "battle/common/unique_condition/unique_seris_wet,1800,1"
+                ).encode("utf-8")],
+                Path("<memory>"),
+            ))
+            add_file(package_dir, manifest, "common", logical_table, table_raw)
+            manifest["tables"].append({
+                "root": "common",
+                "logical_path": logical_table,
+                "codec_id": "flat",
+                "outer_keys": ["23"],
+                "inner_keys": [],
+                "semantic_claims": [],
+            })
+
+            self.assertEqual(
+                pack.validate_manifest(manifest, package_dir),
+                [],
+                "an already-installed legacy package must remain usable as repair input",
+            )
+            errors = pack.validate_manifest(
+                manifest,
+                package_dir,
+                require_referenced_assets=True,
+            )
+            self.assertIn(
+                "tables[0].outer_keys[0]: referenced asset is not declared "
+                f"in roots.common: {logical_icon}",
+                errors,
+            )
+
+            add_file(package_dir, manifest, "common", logical_icon, b"stored-png")
+            self.assertEqual(
+                pack.validate_manifest(
+                    manifest,
+                    package_dir,
+                    require_referenced_assets=True,
+                ),
+                [],
+            )
+
     def test_load_rejects_non_json_constants_and_duplicate_object_keys(self):
         pack = self._module()
         invalid_sources = (

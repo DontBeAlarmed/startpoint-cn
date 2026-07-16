@@ -36,6 +36,7 @@ class TestRequirementReport(unittest.TestCase):
 
         self.assertEqual(37, report["required_total"])
         self.assertEqual(36, report["required_exists"])
+        self.assertEqual(36, report["required_present"])
         self.assertEqual(["required/36.bin"], report["missing_required"])
         self.assertFalse(report["release_ready"])
         self.assertEqual(97, report["pct"])

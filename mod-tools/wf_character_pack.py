@@ -66,6 +66,7 @@ ARCHIVE_PREFIXES = {
     "medium": "production/medium_upload/",
     "android": "production/android_upload/",
 }
+UNIQUE_CONDITION_TABLE = "master/character/unique_condition.orderedmap"
 TRANSACTION_MARKER = ".character-pack-transaction.json"
 SNAPSHOT_MARKER = ".character-pack-snapshot.json"
 MATERIALIZE_PHASES = (
@@ -513,7 +514,87 @@ def _json_value_errors(value: object, path: str = "$",
     return errors
 
 
-def validate_manifest(manifest: dict, package_dir: Path) -> list[str]:
+def _unique_condition_asset_errors(
+    manifest: dict,
+    package_dir: Path,
+    declared_common_paths: set[str],
+) -> list[str]:
+    """Require every owned unique-condition icon reference to ship in common."""
+    tables = manifest.get("tables")
+    if not isinstance(tables, list):
+        return []
+
+    errors: list[str] = []
+    for table_index, claim in enumerate(tables):
+        if not isinstance(claim, dict):
+            continue
+        if (
+            claim.get("root") != "common"
+            or claim.get("logical_path") != UNIQUE_CONDITION_TABLE
+            or claim.get("codec_id") != "flat"
+        ):
+            continue
+        owned_keys = claim.get("outer_keys")
+        if not isinstance(owned_keys, list):
+            continue
+        table_path = package_dir / "roots" / "common" / Path(
+            *UNIQUE_CONDITION_TABLE.split("/")
+        )
+        try:
+            keys, rows = core._strict_orderedmap_rows(  # type: ignore[attr-defined]
+                table_path.read_bytes(),
+                label=UNIQUE_CONDITION_TABLE,
+                compressed_rows=True,
+            )
+            row_map = dict(zip(keys, rows))
+        except Exception as exc:
+            errors.append(
+                f"tables[{table_index}]: cannot inspect unique-condition "
+                f"asset references ({type(exc).__name__})"
+            )
+            continue
+
+        for key_index, key in enumerate(owned_keys):
+            if not isinstance(key, str):
+                continue
+            raw_row = row_map.get(key)
+            if raw_row is None:
+                continue
+            prefix = f"tables[{table_index}].outer_keys[{key_index}]"
+            try:
+                csv_rows = core.read_csv_lines(raw_row.decode("utf-8"))
+            except Exception as exc:
+                errors.append(
+                    f"{prefix}: cannot inspect unique-condition asset reference "
+                    f"({type(exc).__name__})"
+                )
+                continue
+            if len(csv_rows) != 1 or len(csv_rows[0]) < 3:
+                errors.append(
+                    f"{prefix}: unique-condition row does not contain an icon path"
+                )
+                continue
+            icon_path = csv_rows[0][2].strip()
+            if not icon_path:
+                continue
+            logical_icon = icon_path if icon_path.endswith(".png") else icon_path + ".png"
+            problem = _path_problem(logical_icon)
+            if problem:
+                errors.append(f"{prefix}: invalid referenced asset path: {problem}")
+            elif logical_icon not in declared_common_paths:
+                errors.append(
+                    f"{prefix}: referenced asset is not declared in roots.common: "
+                    f"{logical_icon}"
+                )
+    return errors
+
+
+def validate_manifest(
+    manifest: dict,
+    package_dir: Path,
+    *,
+    require_referenced_assets: bool = False,
+) -> list[str]:
     """Return every deterministic contract error without mutating any input/root."""
     if not isinstance(manifest, dict):
         return ["manifest: must be an object"]
@@ -578,6 +659,7 @@ def validate_manifest(manifest: dict, package_dir: Path) -> list[str]:
         errors.append(f"roots: unexpected root {root}")
 
     seen_paths: dict[str, str] = {}
+    declared_common_paths: set[str] = set()
     package_anchor = _resolve_for_validation(Path(package_dir), "package_dir", errors)
     roots_anchor: Path | None = None
     if package_anchor is not None:
@@ -638,6 +720,8 @@ def validate_manifest(manifest: dict, package_dir: Path) -> list[str]:
                         )
                     else:
                         seen_paths[logical_path] = prefix
+                        if root == "common":
+                            declared_common_paths.add(logical_path)
                 forbidden = sorted(
                     {segment.lower() for segment in path_segments}
                     & FORBIDDEN_ASSET_SEGMENTS
@@ -697,6 +781,12 @@ def validate_manifest(manifest: dict, package_dir: Path) -> list[str]:
                         f"{prefix}: sha256 mismatch: expected {sha256}, got {actual_sha256}"
                     )
 
+    if require_referenced_assets and not errors and package_anchor is not None:
+        errors.extend(_unique_condition_asset_errors(
+            manifest,
+            package_anchor,
+            declared_common_paths,
+        ))
     if not errors:
         try:
             canonical_manifest_bytes(manifest)
@@ -1887,7 +1977,11 @@ class PackTransaction:
                     raise PackPreflightError(
                         f"live {name} root overlaps active/CDN protected root"
                     )
-        errors = validate_manifest(self.manifest, self.package_dir)
+        errors = validate_manifest(
+            self.manifest,
+            self.package_dir,
+            require_referenced_assets=True,
+        )
         if errors:
             raise PackPreflightError("candidate manifest invalid: " + "; ".join(errors))
         candidate_claims = _parse_transaction_claims(self.manifest)

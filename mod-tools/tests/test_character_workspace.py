@@ -2,6 +2,7 @@
 """Resumable character workspace tests (temporary directories only)."""
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import tempfile
@@ -16,6 +17,62 @@ import wf_character_workspace as workspace_module  # noqa: E402
 
 
 class TestCharacterWorkspace(unittest.TestCase):
+    def test_status_recognizes_server_paths_relative_to_assets_live_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = workspace_module.init_workspace(
+                Path(tmp), 151147, 139999,
+                "stella_summer_goddess", "stella_summer_goddess",
+            )
+            package = workspace.package_dir
+            server_payloads = {
+                "cdndata/character.json": b"{}",
+                "cdndata/character_text.json": b"{}",
+                "character.json": b"{}",
+                "mana_node.json": b"{}",
+            }
+            for logical, raw in server_payloads.items():
+                path = package / "roots" / "server" / Path(logical)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(raw)
+            client_logical = "master/character/character.orderedmap"
+            client_raw = b"table"
+            client_path = package / "roots" / "common" / Path(client_logical)
+            client_path.parent.mkdir(parents=True, exist_ok=True)
+            client_path.write_bytes(client_raw)
+
+            manifest_path = package / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["roots"]["common"] = [{
+                "logical_path": client_logical,
+                "sha256": hashlib.sha256(client_raw).hexdigest(),
+                "size": len(client_raw),
+            }]
+            manifest["roots"]["server"] = [
+                {
+                    "logical_path": logical,
+                    "sha256": hashlib.sha256(raw).hexdigest(),
+                    "size": len(raw),
+                }
+                for logical, raw in server_payloads.items()
+            ]
+            manifest["tables"] = [{
+                "root": "common",
+                "logical_path": client_logical,
+                "codec_id": "flat",
+                "outer_keys": ["139999"],
+                "inner_keys": [],
+                "semantic_claims": [],
+            }]
+            manifest_path.write_text(
+                json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8",
+            )
+
+            status = workspace_module.workspace_status(workspace)
+            self.assertTrue(status.three_layer_claim_status["layer_1_cdndata"])
+            self.assertTrue(status.three_layer_claim_status["server_character"])
+            self.assertTrue(status.three_layer_claim_status["layer_2_client"])
+            self.assertTrue(status.three_layer_claim_status["consistent"])
+
     def test_seal_workspace_binds_ready_manifest_to_semantic_input_digest(self):
         with tempfile.TemporaryDirectory() as tmp:
             workspace = workspace_module.init_workspace(
