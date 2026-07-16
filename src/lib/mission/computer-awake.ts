@@ -6,6 +6,7 @@ import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getPlayerSync } from "../../data/domains/player"
 import { getDb } from "../../data/db"
 import { getCharacterStoryQuestIds, getCharacterIdFromMission } from "./character-queries"
+import { isMissionProgressComplete } from "./stages"
 import type { MissionComputer, CategoryContext } from "./types"
 import type { PlayerCharacter } from "../../data/types"
 import charAwakeDefs from "../../../assets/mission_char_awake.json"
@@ -231,10 +232,12 @@ export const AwakeComputer: MissionComputer = {
                     : actx.charClears.get(charId) ?? 0
 
             case AwakeType.ALL_COMPLETE: {
-                const s1 = AwakeComputer.compute(missionId - 3, ctx, dbProgress)
-                const s2 = AwakeComputer.compute(missionId - 2, ctx, dbProgress)
-                const s3 = AwakeComputer.compute(missionId - 1, ctx, dbProgress)
-                return (s1 >= 1 ? 1 : 0) + (s2 >= 1 ? 1 : 0) + (s3 >= 1 ? 1 : 0)
+                let completedCount = 0
+                for (const childMissionId of [missionId - 3, missionId - 2, missionId - 1]) {
+                    const childProgress = AwakeComputer.compute(childMissionId, ctx, dbProgress)
+                    if (isMissionProgressComplete(9, childMissionId, childProgress)) completedCount++
+                }
+                return completedCount
             }
         }
 

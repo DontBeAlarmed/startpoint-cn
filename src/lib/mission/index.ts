@@ -7,7 +7,7 @@ export type { MissionComputer, CategoryContext, ComputerRegistry, PlayerQuestPro
 export { getComputer } from "./registry"
 
 // Stages
-export { getMissionIdsByCategory, getCurrentStage, getCompletedStageNumbers, getMissionStageIds } from "./stages"
+export { getMissionIdsByCategory, getCurrentStage, getCompletedStageNumbers, getMissionStageIds, isMissionProgressComplete } from "./stages"
 
 // Rewards
 export type { ActiveMissionReward, MissionRewardStageDefinition } from "./rewards"

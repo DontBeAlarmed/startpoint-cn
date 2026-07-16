@@ -15,7 +15,13 @@
 | 1 | 阅读个人剧情 / 队伍中编有X通关 | 故事计数 或 `clears.clear_count`（fallback） |
 | 2 | 累计阅读故事（Alk）/ 累计玛纳（拉芙）/ 队长或队伍通关 | Alk=`totalStories`，拉芙=`totalManaObtained`，其他=`clears.clear_count` |
 | 3 | 强化弹射（Alk）/ 信赖证 / 共斗/限时 | Alk=`totalPowerflips`，信赖证=`bondTokenList.every(status>=2)`，其他=`clears.clear_count` |
-| 4 | 完成全部觉醒任务 | 检查 slot 1+2+3 是否全部 ≥1 |
+| 4 | 完成全部觉醒任务 | 按各槽位 CDN `target_progress` 统计已完成任务数 |
+
+### 总任务完成判定
+
+槽位 4 的 `target_progress=3`，其进度表示已经达到完成阶段的子任务数量，不是已有正数进度的子任务数量。
+
+例如缪（`341005`）的三个子任务目标分别为通关 `1`、`3`、`5` 次。通关一次时三个任务的原始进度都可能是 1，但只有第一个任务达到目标，因此总任务进度必须为 1，不能为 3。服务端使用 `mission_char_awake_reward` 中各子任务的 `target_progress` 判定完成状态。
 
 ### 统计
 

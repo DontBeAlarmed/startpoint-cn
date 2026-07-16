@@ -5,6 +5,7 @@ const {
     getCompletedStageNumbers,
     getActiveMissionRewards,
     getDailyMissionRewards,
+    isMissionProgressComplete,
     getRegularMissionRewards,
     getWeeklyMissionRewards,
     isMissionEnabledAt,
@@ -15,6 +16,17 @@ const { addMissionProgressDelta } = require("../out/lib/mission/progress")
 assert.equal(getComputer(10).name, "Regular")
 assert.deepEqual(getCompletedStageNumbers(1, 1, 0), [])
 assert.deepEqual(getCompletedStageNumbers(1, 1, 10), [1])
+assert.equal(typeof isMissionProgressComplete, "function")
+assert.equal(isMissionProgressComplete(9, 3410051, 1), true)
+assert.equal(isMissionProgressComplete(9, 3410052, 1), false)
+assert.equal(isMissionProgressComplete(9, 3410052, 3), true)
+assert.equal(isMissionProgressComplete(9, 3410053, 1), false)
+assert.equal(isMissionProgressComplete(9, 3410053, 5), true)
+
+const awakeComputer = getComputer(9)
+assert.equal(awakeComputer.compute(3410054, { charClears: new Map([["341005", 1]]) }, 0), 1)
+assert.equal(awakeComputer.compute(3410054, { charClears: new Map([["341005", 3]]) }, 0), 2)
+assert.equal(awakeComputer.compute(3410054, { charClears: new Map([["341005", 5]]) }, 0), 3)
 
 assert.equal(
     isMissionEnabledAt(2, 3, new Date("2019-11-28T02:59:59.999Z")),
