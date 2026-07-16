@@ -7,6 +7,7 @@ import { getPlayerEquipmentSync, playerOwnsEquipmentSync, updatePlayerEquipmentS
 import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
+import { getDb } from "../../data/db"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getBossCoinShopItemsSync, getConfigSync, getEventShopItemsSync, getGenericShopItemsSync, getShopItemSync } from "../../lib/assets";
 import { CharacterReward, CharacterShopItemReward, CurrencyReward, CurrencyShopItemReward, EquipmentItemReward, EquipmentItemShopItemReward, Reward, RewardType, ShopItem, ShopItemRewardType, ShopItems, ShopItemUserCostType, ShopType } from "../../lib/types";
@@ -14,6 +15,7 @@ import { generateDataHeaders, getServerDate, getServerTime, realToVirtual } from
 import { givePlayerRewardsSync } from "../../lib/quest";
 import { computeRealTimeStamina } from "../../lib/stamina";
 import { clientSerializeEquipment } from "../../lib/equipment";
+import { planEquipmentEnhancementPurchase } from "../../lib/equipment-enhancement";
 import CDN_GENERAL_SHOP_WHITELIST from "../../../assets/cdn_general_shop_whitelist.json";
 
 const GENERAL_SHOP_CDN_KEYS: Set<number> = new Set(CDN_GENERAL_SHOP_WHITELIST);
@@ -172,6 +174,54 @@ const routes = async (fastify: FastifyInstance) => {
             }
         }
 
+        let enhancementEquipmentId: number | null = null
+        let enhancementNewLevel: number | null = null
+        if (shopType === ShopType.TREASURE_EQUIPMENT) {
+            const equipmentId = shopItemData.equipmentId
+            const stageMaxLevel = shopItemData.enhancementMaxLevel
+            const requiredAwakeningLevel = shopItemData.requireAwakeningLevel
+            if (equipmentId === undefined || stageMaxLevel === undefined || requiredAwakeningLevel === undefined) {
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    "message": "Enhancement item is missing equipment progression data."
+                })
+            }
+
+            const currentEquipment = getPlayerEquipmentSync(playerId, equipmentId)
+            if (currentEquipment === null) return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Player does not own the target equipment."
+            })
+
+            const groupItems = Object.entries(getGenericShopItemsSync(ShopType.TREASURE_EQUIPMENT) ?? {})
+                .filter(([, item]) => item.groupId === shopItemData.groupId && item.equipmentId === equipmentId)
+                .sort(([, a], [, b]) => (a.stage ?? 0) - (b.stage ?? 0))
+            const currentStage = groupItems.find(([, item]) =>
+                (item.enhancementMaxLevel ?? 0) > currentEquipment.enhancementLevel
+            )
+            if (!currentStage || Number(currentStage[0]) !== shopItemId) {
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    "message": "Enhancement item is not the current stage."
+                })
+            }
+
+            const plan = planEquipmentEnhancementPurchase(
+                currentEquipment.enhancementLevel,
+                purchaseAmount,
+                stageMaxLevel,
+                currentEquipment.level,
+                requiredAwakeningLevel,
+            )
+            if (!plan.ok) return reply.status(400).send({
+                "error": "Bad Request",
+                "message": plan.message
+            })
+
+            enhancementEquipmentId = equipmentId
+            enhancementNewLevel = plan.newLevel
+        }
+
         console.log(`[shop:buy] player=${playerId} shopType=${shopType} item=${shopItemId} x${purchaseAmount} before freeMana=${player.freeMana} freeVmoney=${player.freeVmoney}`)
 
         // keep track of various stats
@@ -222,44 +272,33 @@ const routes = async (fastify: FastifyInstance) => {
                 itemList[itemId] = newItemAmount
             }
 
-            // deduct cost item
+        }
+
+        const applyPurchaseCosts = () => {
             for (const [itemId, newAmount] of Object.entries(itemList)) {
                 updatePlayerItemSync(playerId, itemId, newAmount)
             }
+            updatePlayerSync({
+                id: playerId,
+                freeMana: freeMana,
+                freeVmoney: freeVmoney,
+                bondToken: bondTokens
+            })
         }
-
-        // update player
-        updatePlayerSync({
-            id: playerId,
-            freeMana: freeMana,
-            freeVmoney: freeVmoney,
-            bondToken: bondTokens
-        })
 
         // Equipment enhancement shop: update equipment enhancement level
         if (shopType === ShopType.TREASURE_EQUIPMENT) {
-            const equipmentId = shopItemData.equipmentId
-            const targetLevel = shopItemData.enhancementMaxLevel
-            if (equipmentId === undefined || targetLevel === undefined) return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Enhancement item missing equipment_id or target level."
-            })
+            const equipmentId = enhancementEquipmentId!
+            const newLevel = enhancementNewLevel!
+            getDb().transaction(() => {
+                applyPurchaseCosts()
+                updatePlayerEquipmentSync(playerId, equipmentId, { enhancementLevel: newLevel })
+                for (let i = 0; i < purchaseAmount; i++) {
+                    addPlayerShopPurchaseSync(playerId, shopItemId)
+                }
+            })()
 
-            const currentEquipment = getPlayerEquipmentSync(playerId, equipmentId)
-            if (currentEquipment === null) return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Player does not own the target equipment."
-            })
-
-            // Update to target enhancement level
-            const newLevel = Math.max(currentEquipment.enhancementLevel, targetLevel)
-            updatePlayerEquipmentSync(playerId, equipmentId, { enhancementLevel: newLevel })
-            currentEquipment.enhancementLevel = newLevel
-
-            // Record purchase
-            for (let i = 0; i < purchaseAmount; i++) {
-                addPlayerShopPurchaseSync(playerId, shopItemId)
-            }
+            const currentEquipment = getPlayerEquipmentSync(playerId, equipmentId)!
 
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
@@ -279,6 +318,8 @@ const routes = async (fastify: FastifyInstance) => {
                 }
             })
         }
+
+        applyPurchaseCosts()
 
         // build rewards array
         const rewards: Reward[] = []

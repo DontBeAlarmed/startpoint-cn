@@ -1,4 +1,25 @@
 # /latest/api/index.php/shop/buy
+
+## CN 追忆装备强化
+
+`shop_type=10` 表示追忆装备强化。它不是普通装备觉醒接口：
+
+```json
+{
+  "shop_type": 10,
+  "shop_item_id": 57,
+  "number": 1,
+  "viewer_id": 297417490,
+  "api_count": 64
+}
+```
+
+服务端对 `players_equipment.enhancement_level` 增加 `number`。商品主数据中的
+`enhancement_max_level` 是当前阶段可购买到的等级上限，只用于库存和越界校验，不能直接赋给装备。
+
+例如当前强化等级为 1、商品阶段上限为 69 时：购买 1 次后为 2，购买 68 次后才为 69。
+
+普通装备觉醒继续由 `/equipment/upgrade` 修改 `players_equipment.level`，两套流程互不替代。
                        
 ## Request
 ### Headers
@@ -79,4 +100,3 @@ param: 23af97e7d8a73dbaa2a460f3157d94003a55bf9d
   }
 }
 ```
-

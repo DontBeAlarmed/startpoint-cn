@@ -1,4 +1,42 @@
-# 特殊装备升级材料审计
+# 装备升级与追忆强化审计
+
+## 两套系统的边界
+
+普通装备觉醒与追忆装备强化是两套独立流程：
+
+| 流程 | 端点 | 持久化字段 | 含义 |
+|---|---|---|---|
+| 普通装备觉醒 | `/equipment/upgrade`、`/equipment/bulk_upgrade` | `players_equipment.level` | 消耗重复装备或星铁钢，最高通常为 5 |
+| 追忆装备强化 | `/shop/buy`，`shop_type=10` | `players_equipment.enhancement_level` | 在强化商店按购买数量逐级提升，最高可到 99 |
+
+两者不能共用“阶段升级”语义。`equipment_enhancement_shop.enhancement_max_level` 是当前商品阶段的购买上限，不是一次购买后的目标等级。
+
+## 追忆强化跳级缺陷
+
+玩家对装备 `5020040` 连续购买商品 `56`、`57` 各一次后，数据库出现：
+
+```text
+level=5, enhancement_level=69
+```
+
+商品 `57` 属于第 2 阶段，`enhancement_max_level=69`。旧实现直接执行
+`enhancement_level = max(current, enhancement_max_level)`，因此从 1 级购买一次便错误跳到 69 级。
+
+CN 1.8.1 客户端的权威行为：
+
+- `ShopBuyRealRemote` 将购买数量作为请求字段 `number` 发送。
+- `ShopBuyDummyRemote` 按 `number` 循环调用 `addEquipmentEnhancement()`。
+- `PlayerLogic.addEquipmentEnhancement()` 每次只执行 `enhancementLevel++`。
+- `ShopGetSalesListDummyResponseTools` 仅用 `enhancement_max_level - enhancementLevel` 计算当前阶段库存。
+
+修复后使用 `newEnhancementLevel = currentEnhancementLevel + number`，并在扣除材料前验证：
+
+- `number` 是正整数；
+- 请求商品确实是当前强化阶段；
+- 新等级不超过该阶段的 `enhancement_max_level`；
+- 普通觉醒等级满足 `require_awakening_level`。
+
+材料、货币、追忆强化等级与购买记录在同一个 SQLite 事务内提交。
 
 ## 结论
 
