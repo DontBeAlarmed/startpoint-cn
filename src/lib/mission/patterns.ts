@@ -1,4 +1,4 @@
-// Pattern → mission_id reverse index (for update_mission_progress)
+// Pattern to mission_id reverse index (for update_mission_progress)
 
 import regularDefs from "../../../assets/mission_regular.json"
 import dailyDefs from "../../../assets/mission_daily.json"
@@ -15,11 +15,23 @@ export interface PatternMatch {
 
 const patternIndex: Record<string, PatternMatch[]> = {}
 const missionPatternLookup: Record<string, string> = {}
+const missionDefinitionLookup: Record<string, any[]> = {}
+
+const enablePeriodColumns: Record<number, readonly [number, number]> = {
+    1: [25, 26],
+    2: [25, 26],
+    3: [25, 26],
+    4: [27, 28],
+    5: [26, 27],
+    9: [27, 28],
+    10: [25, 26],
+}
 
 function indexPatterns(defs: Record<string, any>, category: number) {
     for (const [missionId, rows] of Object.entries(defs)) {
         const row = (rows as any[])[0]
         if (!row || !Array.isArray(row)) continue
+        missionDefinitionLookup[`${category}_${missionId}`] = row
         const pattern = String(row[0])
         if (!pattern || pattern === '(None)') continue
         if (!patternIndex[pattern]) patternIndex[pattern] = []
@@ -42,6 +54,41 @@ export function getMissionsByPattern(pattern: string): PatternMatch[] {
 
 export function getMissionPattern(category: number, missionId: number): string {
     return missionPatternLookup[`${category}_${missionId}`] || ''
+}
+
+export function getMissionDefinition(category: number, missionId: number): any[] | undefined {
+    return missionDefinitionLookup[`${category}_${missionId}`]
+}
+
+function parseMasterJstTime(value: unknown): number | undefined {
+    if (value === undefined || value === null || value === "" || value === "(None)") return undefined
+    const timestamp = Date.parse(`${String(value).replace(" ", "T")}+09:00`)
+    return timestamp
+}
+
+export function isMissionEnabledAt(
+    category: number,
+    missionId: number,
+    at: Date,
+    eventId?: number
+): boolean {
+    const definition = getMissionDefinition(category, missionId)
+    if (!definition) return false
+
+    // CollectItemEvent requests always carry the event id in the CN client.
+    if (category === 4) {
+        if (eventId === undefined || Number(definition[0]) !== eventId) return false
+    }
+
+    const columns = enablePeriodColumns[category]
+    if (!columns) return true
+
+    const start = parseMasterJstTime(definition[columns[0]])
+    const end = parseMasterJstTime(definition[columns[1]])
+    const now = at.getTime()
+    if (start !== undefined && (!Number.isFinite(start) || start > now)) return false
+    if (end !== undefined && (!Number.isFinite(end) || now > end)) return false
+    return true
 }
 
 export function isComputablePattern(pattern: string): boolean {

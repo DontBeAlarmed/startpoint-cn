@@ -1,5 +1,5 @@
 // Event mission computer (category 3)
-// Uses pre-generated mission_event_quest_map.json for O(1) pattern→quest lookup
+// Uses pre-generated mission_event_quest_map.json for O(1) pattern-to-quest lookup
 
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getPlayerSync } from "../../data/domains/player"
@@ -13,7 +13,7 @@ interface QuestMapping {
     countMode: string  // "single" = finished-based, "multi" = multi_clear_count
 }
 
-function buildContext(playerId: number, _category: number): CategoryContext {
+function buildContext(playerId: number, category: number): CategoryContext {
     const player = getPlayerSync(playerId)!
     const questProgressRaw = getPlayerQuestProgressSync(playerId)
 
@@ -42,7 +42,7 @@ function buildContext(playerId: number, _category: number): CategoryContext {
     }
 
     return {
-        playerId, player, questProgress,
+        playerId, category, player, questProgress,
         totalQuestClears, totalStories,
         rankCounts: { rank_ss: ssClears, rank_s: sClears, rank_a: aClears, rank_b: bClears },
     }
