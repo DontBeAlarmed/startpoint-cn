@@ -61,9 +61,9 @@ jobs:
       PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v4
-      # 默认 TEMP 是 C:\Users\RUNNER~1\...(8.3 短路径),tempfile 基于它建目录后
-      # 任何 Path.resolve() 都会展开成长路径,路径比较/relative_to 全部失配。
-      # RUNNER_TEMP(D:\a\_temp)没有短路径成分。
+      # 默认 TEMP 落在用户资料目录下且带 8.3 短名(RUNNER~1);tempfile 基于它
+      # 建目录后,任何 Path.resolve() 都会展开成长路径,路径比较/relative_to
+      # 全部失配。RUNNER_TEMP 没有短路径成分。
       - name: Point TEMP at the long-form runner temp dir
         run: |
           "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
