@@ -15,6 +15,8 @@ import { clientSerializeEquipment, buildFullEquipmentList } from "../../lib/equi
 import { getEquipmentDissolveSync, getConfigSync, getEquipmentCraftSync } from "../../lib/assets";
 import { AccountId, PlayerId } from "../../lib/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
+import { getDb } from "../../data/db";
+import { canUseEquipmentAwakeningCrystal } from "../../lib/equipment-upgrade";
 
 interface SetProtectionBody {
     protection: boolean
@@ -50,11 +52,12 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as UpgradeBody
 
         const viewerId = body.viewer_id
-        const upgradeCount = Math.max(1, body.upgrade_count ?? 1)
+        const upgradeCount = body.upgrade_count
         const useStack = body.use_stack
         const itemId = body.item_id
         const equipmentId = body.equipment_id
-        if (isNaN(viewerId) || isNaN(equipmentId) || useStack === undefined) {
+        if (isNaN(viewerId) || isNaN(equipmentId) || typeof useStack !== "boolean"
+            || !Number.isInteger(upgradeCount) || upgradeCount <= 0) {
             return reply.status(400).send({ "error": "Bad Request", "message": "Invalid request body." })
         }
 
@@ -77,6 +80,9 @@ const routes = async (fastify: FastifyInstance) => {
         if (newStack < 0) return reply.status(400).send({ "error": "Bad Request", "message": "Not enough stack." })
 
         const equipmentRarity = Math.floor(equipmentId / 1000000)  // 1-indexed
+        if (!useStack && (itemId === undefined || !canUseEquipmentAwakeningCrystal(itemId, equipmentRarity))) {
+            return reply.status(400).send({ "error": "Bad Request", "message": "Invalid awakening material for equipment rarity." })
+        }
         const wrightPieces = getPlayerItemSync(playerId, wrightpieceItemId()) ?? 0
         const upgradeCost = getUpgradeCost(equipmentRarity)
         const newWrightPieces = wrightPieces - (upgradeCost * upgradeCount)
@@ -88,23 +94,24 @@ const routes = async (fastify: FastifyInstance) => {
 
         const returnItemList: Record<string, number> = {}
 
-        if (!useStack && itemId !== undefined) {
-            returnItemList[itemId] = newItemCount
-            updatePlayerItemSync(playerId, itemId, newItemCount)
-        }
+        const dissolveInfo = getEquipmentDissolveSync(equipmentId)
+        getDb().transaction(() => {
+            if (!useStack && itemId !== undefined) {
+                returnItemList[itemId] = newItemCount
+                updatePlayerItemSync(playerId, itemId, newItemCount)
+            }
 
-        returnItemList[wrightpieceItemId()] = newWrightPieces
-        updatePlayerItemSync(playerId, wrightpieceItemId(), newWrightPieces)
+            returnItemList[wrightpieceItemId()] = newWrightPieces
+            updatePlayerItemSync(playerId, wrightpieceItemId(), newWrightPieces)
+            updatePlayerEquipmentSync(playerId, equipmentId, { stack: newStack, level: newLevel })
+
+            if (dissolveInfo && dissolveInfo.generate_ability_soul) {
+                returnItemList[dissolveInfo.ability_soul_id] = givePlayerItemSync(playerId, dissolveInfo.ability_soul_id, upgradeCount)
+            }
+        })()
 
         equipment.level = newLevel
         equipment.stack = newStack
-        updatePlayerEquipmentSync(playerId, equipmentId, { stack: newStack, level: newLevel })
-
-        // give ability cores (CDN check: only if generate_ability_soul)
-        const dissolveInfo = getEquipmentDissolveSync(equipmentId)
-        if (dissolveInfo && dissolveInfo.generate_ability_soul) {
-            returnItemList[dissolveInfo.ability_soul_id] = givePlayerItemSync(playerId, dissolveInfo.ability_soul_id, upgradeCount)
-        }
 
         const returnEquipmentList = buildFullEquipmentList(playerId)
 
@@ -175,19 +182,20 @@ const routes = async (fastify: FastifyInstance) => {
 
         const returnItemList: Record<number, number> = {}
 
-        for (const { equipmentId, upgradeCount } of upgrades) {
-            const equipment = getPlayerEquipmentSync(playerId, equipmentId)!
-            equipment.level += upgradeCount
-            equipment.stack -= upgradeCount
-            updatePlayerEquipmentSync(playerId, equipmentId, { level: equipment.level, stack: equipment.stack })
-            const dissolveInfo = getEquipmentDissolveSync(equipmentId)
-            if (dissolveInfo && dissolveInfo.generate_ability_soul) {
-                returnItemList[dissolveInfo.ability_soul_id] = givePlayerItemSync(playerId, dissolveInfo.ability_soul_id, upgradeCount)
-            }
-        }
-
         const newCraftPoints = currentCraftPoints - totalCraftPointCost
-        updatePlayerItemSync(playerId, wrightpieceItemId(), newCraftPoints)
+        getDb().transaction(() => {
+            for (const { equipmentId, upgradeCount } of upgrades) {
+                const equipment = getPlayerEquipmentSync(playerId, equipmentId)!
+                equipment.level += upgradeCount
+                equipment.stack -= upgradeCount
+                updatePlayerEquipmentSync(playerId, equipmentId, { level: equipment.level, stack: equipment.stack })
+                const dissolveInfo = getEquipmentDissolveSync(equipmentId)
+                if (dissolveInfo && dissolveInfo.generate_ability_soul) {
+                    returnItemList[dissolveInfo.ability_soul_id] = givePlayerItemSync(playerId, dissolveInfo.ability_soul_id, upgradeCount)
+                }
+            }
+            updatePlayerItemSync(playerId, wrightpieceItemId(), newCraftPoints)
+        })()
         returnItemList[wrightpieceItemId()] = newCraftPoints
 
         console.log(`[BULK_UPGRADE] account=${accountId} player=${playerId}: ${upgrades.length} equipment upgraded, craft points ${currentCraftPoints} -> ${newCraftPoints}`)
