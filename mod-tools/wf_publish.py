@@ -406,6 +406,11 @@ def _build_archives(
         raise
 
 
+def committed_archive_size(output: Path) -> int:
+    """已提交产物的字节数;独立成函数供测试注入 stat 失败(仅告警路径)。"""
+    return output.stat().st_size
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="WF mod diff 发布器")
     ap.add_argument("--tables", help="逗号分隔的表别名/逻辑路径(默认用 pending 列表)")
@@ -494,7 +499,7 @@ def main(argv: list[str] | None = None) -> int:
 
     for output in outputs:
         try:
-            size_text = f"{output.stat().st_size} B"
+            size_text = f"{committed_archive_size(output)} B"
         except Exception as exc:
             size_text = "size unavailable"
             print(

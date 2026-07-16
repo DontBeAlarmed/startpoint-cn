@@ -248,15 +248,15 @@ class TestStrictSnapshotPublisher(PublisherCase):
         logical = "master/test/one.orderedmap"
         self.write_logical(logical, b"validated")
         snapshot = self.write_snapshot([logical])
-        real_stat = Path.stat
 
-        def fail_committed_archive_stat(path, *args, **kwargs):
-            candidate = Path(path)
-            if candidate.suffix == ".zip" and self.cdn in candidate.parents:
-                raise OSError("fixture committed archive stat failure")
-            return real_stat(candidate, *args, **kwargs)
-
-        with mock.patch.object(Path, "stat", new=fail_committed_archive_stat):
+        # 不能全局 patch Path.stat:3.11 的 Path.exists()/is_file() 也经由
+        # Path.stat,会把 _build_archives 里的存在性检查一起弄坏(CI 实测
+        # 走到 [ERR] preflight 退出 1);patch 专用 seam 才只影响告警路径。
+        with mock.patch.object(
+            wf_publish,
+            "committed_archive_size",
+            side_effect=OSError("fixture committed archive stat failure"),
+        ):
             result, stdout, stderr = self.run_publish(
                 ["--tables", logical, "--snapshot", str(snapshot)],
                 profiles=[self.profile, self.profile],
