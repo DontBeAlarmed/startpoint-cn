@@ -1,36 +1,107 @@
-# CN gacha odds rebuild
+# 国服扭蛋数据来源审计
 
-## Symptom
+> 数据验收状态：奖池成员数量与种类已通过（2026-07-17）。费用、保底换算细节与动画种子暂不纳入本阶段验收。
 
-Some CN banners had missing, stale, or expanded prize pools whose members and
-weights did not match the official odds data.
+## 结论
 
-## Root cause
+当前奖池中会影响抽取结果的核心数据已经全部来自国服 CDN：
 
-This is not CDN transfer corruption. Two deterministic rebuild defects caused
-the mismatch:
+- 卡池与稀有度表的引用关系；
+- 角色、装备成员；
+- 每个成员的整数权重；
+- 稀有度、UP、限定、可兑换标记；
+- 卡池开放时间、页面类型、保底稀有度和动画配置名。
 
-1. The archive index used the first ZIP containing a path. With full and
-   incremental archives present, that could select an older copy of the same
-   odds file.
-2. The rebuild script synthesized element-revival and missing holiday pools by
-   accumulating character-table entries. Those inferred pools were not
-   authoritative CN odds and could add characters absent from the official
-   banner.
+当前实现不再使用“按属性累计角色”“复刻池补全”或“节日池合成”等推测奖池。**不存在服务端自行猜测角色/装备成员或抽取权重的情况。**
 
-The archive `gacha-odds-fix-2026-07-14.zip` is directionally correct. Its data
-replacement is appropriate only when paired with a reproducible extractor that
-selects the newest archive and a builder that does not regenerate synthetic
-pools afterward.
+但不能把生成后的 `assets/gacha.json` 描述为“每个字段都原样复制自 CDN”。其中仍有确定性计算字段、协议适配字段和少量不会影响当前实际扣费路径的默认值。
 
-## Fix
+## 当前数据完整性
 
-- Parse ZIP listings independently of the local `unzip` date format.
-- Compare semantic versions in archive names and select the newest archive for
-  duplicate paths.
-- Build every pool directly from its referenced official odds file.
-- Remove element accumulation and holiday synthetic fallbacks.
-- Rebuild `assets/gacha.json` from all 935 available official odds files.
+本次审计直接使用当前提取缓存重新构建，并与仓库中的 `assets/gacha.json` 比较：
 
-The existing gacha rule, execution-plan, and draw-weight regressions validate
-banner eligibility and weighted draws against the rebuilt data.
+| 项目 | 数量 |
+|---|---:|
+| 卡池总数 | 584 |
+| 角色卡池 | 493 |
+| 装备卡池 | 91 |
+| 稀有度赔率文件 | 5 |
+| 角色赔率文件 | 795 |
+| 装备赔率文件 | 135 |
+| 赔率文件合计 | 935 |
+| 缺失引用文件 | 0 |
+
+重新执行 `buildGachaFromOdds()` 得到的对象与当前 `assets/gacha.json` 完全一致，证明当前文件可以由现有 CDN 源确定性复现。
+
+## 原始 CDN 字段
+
+### 卡池主表
+
+`assets/cdndata/gacha.json` 保存从国服 CDN 主表转换出的卡池定义。重建脚本从中读取：
+
+- 卡池 ID、名称、角色/装备类型；
+- 页面类型、单抽/十连/折扣费用；
+- 保底稀有度与稀有度赔率表 ID；
+- 各稀有度成员赔率表 ID；
+- 单抽券、十连券、动画配置；
+- 开始和结束时间。
+
+### 赔率有序映射
+
+`tools/extract_odds_from_cdn.cjs` 根据主表引用，从 CDN 压缩包提取 `master/gacha_odds/*.orderedmap`。同一路径在多个完整包或增量包中出现时，按压缩包语义版本选择最新文件。
+
+赔率文件直接提供：
+
+- 角色或装备 ID；
+- 稀有度；
+- 整数抽取权重；
+- `odds_up`；
+- `is_limited`；
+- `is_exchangeable`；
+- 角色剧情强制阅读标记。
+
+服务端抽取成员时使用这里的整数 `odds` 权重，不使用推测百分比。
+
+## 确定性计算字段
+
+以下字段不是 CDN 文件中的同名原始列，但由 CDN 数值按固定规则计算：
+
+- `rankRates.normal`：将稀有度权重按千分制归一化。
+- `rankRates.multiGuarantee`：按照主表的 `guaranteeRarity`，把低于保底稀有度的权重并入保底档。
+- 奖池键 `1/2/3`：分别映射五星、四星、三星成员表。
+- 成员的 `rarity`：由成员权重除以当前成员表总权重后换算为千分值并保留两位小数。
+
+当前五张稀有度表都能无损换算为千分制，没有出现比例舍入偏差。实际成员抽取仍直接使用原始整数 `odds`。
+
+## 默认值与硬编码
+
+重建脚本仍保留防御性默认值，因此严格来说并非所有输出字段都是 CDN 原值：
+
+1. 49 个卡池的一个或多个费用列为空，脚本会填入角色池 `150/1500/50` 或装备池 `75/750/25`。
+2. 其中 39 个卡池的单抽或十连费用为空：
+   - 票券专用页面禁止宝珠支付，因此默认费用不会进入扣费逻辑；
+   - 账号限次十连使用 CDN 主表中的 `tenTimesPerAccountCost`，当前均为 1500；
+   - 无每日折扣页面缺少的仅是 `discountCost`，当前执行计划不读取该字段。
+3. `paymentType` 在生成文件中固定为 0，但当前扭蛋执行根据请求的 `payment_type` 和页面类型判断，不读取这个生成字段。
+4. 名称、页面类型、保底稀有度、日期和动画名也有代码默认值，但当前 584 个卡池没有触发这些默认分支。
+5. 运行时 `src/lib/gacha.ts` 保留旧稀有度比例回退；当前所有卡池都有 `rankRates`，该回退未被使用。
+
+这些默认值目前不会改变实际奖池成员、成员权重或正常扣费结果，但属于需要进一步收紧的数据来源噪音。
+
+## 动画种子不属于赔率数据
+
+`gacha_movie_seeds*.json` 不是 CDN 提供的“中奖种子表”。它们由服务端根据客户端物理配置扫描生成，并通过运行时反馈继续验证。
+
+动画种子只负责让客户端扭蛋演出与已经选中的稀有度相容；中奖角色或装备在此之前已经按照 CDN 奖池权重确定。因此动画种子的仿真和回退不会改变奖池概率。
+
+## 后续收紧建议
+
+若目标是实现“所有输出字段均可追溯，不允许任何默认值”，建议在扭蛋客户端验收前继续处理：
+
+1. 将票券专用卡池的空费用保留为未定义，不再写入虚构费用。
+2. 对实际允许宝珠支付的卡池实行严格费用校验，缺失时让构建失败。
+3. 删除或明确标注未被执行逻辑使用的 `paymentType`、`discountCost` 等兼容字段。
+4. 为每个输出字段生成来源报告，区分 CDN 原值、确定性计算和协议默认值。
+5. 对照国服客户端确认十连保底权重折叠和每日付费单抽价格规则。
+
+因此，当前可以确认的是：**奖池成员与实际抽取权重完全由 CDN 数据决定；外围元数据仍包含确定性计算和未触发/不影响当前执行的默认值。**
