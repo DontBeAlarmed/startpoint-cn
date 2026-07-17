@@ -138,6 +138,18 @@ cp ../archive/pinball-1.4.90-1.4.101-9-modassets07170102.zip "pinball-$V-$W-9-mo
 >   工具仓 docs),从一台完整更新到当前版本的设备把这几个表文件拉下来**覆盖进重建树**即可;
 >   APK 若自带数据也可以直接解 APK 取表。覆盖后先确认间隙 key 已在(如 item 10000140)再发布。
 
+0. **先试现成的「7 表救援包」(免工具,适用于与本链同源的血统)**:
+   `archive/pinball-1.4.103-1.4.125-1-tables125mod07171232.zip` = 七张核心表
+   (item/equipment/equipment_status/ability_soul/rush_event/event_item_shop/floor)在本链
+   **1.4.125 窗口的状态**,已含全部模式行、该窗口的官方键(如 item 10000140)和真机验证的
+   连战塔 floor。适用判据:你玩家客户端的 1.4.10x-12x 版本段是经本链(或其打包产物)到达的
+   ——你缺的间隙键这套表里有,就是同源。用法(V=你玩家当前 res_ver):
+   ```bash
+   cd assets/asset-patch/active
+   cp ../archive/pinball-1.4.103-1.4.125-1-tables125mod07171232.zip "pinball-V-W-1-tables125mod07171232.zip"
+   cp ../archive/pinball-1.4.90-1.4.101-9-modassets07170102.zip    "pinball-V-W-2-modassets07170102.zip"
+   ```
+   重启服务端,玩家清缓存/重启游戏即到位。**表键仍缺(血统真不同源)再走下面 1-4。**
 1. **纯资产补充包对任何血统都安全**(`archive/pinball-1.4.90-1.4.101-9-modassets07170102.zip`,
    30 个全新路径文件:武器图/横幅/商店图,不含任何表),重命名成你的一跳直接发;
 2. 深渊行数据用 [mod-tools](https://github.com/kuronzzhan-droid/startpoint-cn-mod-tools) 在
