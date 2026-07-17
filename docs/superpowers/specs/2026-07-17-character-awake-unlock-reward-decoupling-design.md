@@ -16,6 +16,8 @@
 - `/character/awake_mana_node` 的授权只读取持久解锁状态；已持有节点的觉醒等级仅作为客户端回退显示。
 - 未全部完成时进入第一页并执行正常结算；全部完成时立即解锁第二页，玩家手动回第一页后才领奖。
 - 第 9 类任务结算内的解锁状态 `upsert` 是幂等安全补写，不是主要解锁来源。
+- 覆盖范围限定为截至当前代码与主数据已经审计的条件生产入口，不承诺自动覆盖未来新增条件或路由。
+- 角色所有权是完成度之外的最终门槛；条件已经满足但尚未持有角色时不得写入解锁状态。
 
 ## 已确认的客户端契约
 
@@ -93,24 +95,42 @@ CREATE TABLE IF NOT EXISTS players_character_awake_unlocks (
 
 `reconcileAwakeUnlockCharacterList` 只序列化 `changed`，按 `character_id` 去重并与入口原有 `character_list` 合并；同一板索引取最大等级。没有变化时保留原响应，避免重复发布。
 
-## 权威状态变更边界
+## 增量发布与异常语义
 
-在权威状态写入完成后、响应返回前执行校准；根据端点事务边界，可位于同一事务末尾，以保证失败整体回滚。不能在中间状态提前计算。最终覆盖如下入口：
+正常路径在权威状态写入完成后、响应返回前执行校准。`reconcileAwakeUnlockCharacterList` 可位于端点外层事务末尾；校准成功时立即写入持久解锁状态，并只把实际返回字段 `changed` 中的变化合入响应。
 
-| 边界 | 执行校准的时点 |
-|---|---|
-| `singleBattleQuest` | 战斗结算、任务统计器和奖励写入完成后 |
-| `storyQuest` | 剧情进度和奖励写入完成后 |
-| `character/bond` | 羁绊代币状态更新完成后 |
-| `mission` | 任务计数器写入完成后、响应返回前 |
-| `mail` | 单封或批量邮件奖励应用并标记领取后 |
-| `item` | 出售物品并增加 `mana` 后 |
-| `shop` | 购买、奖励和库存记录完成后 |
-| `multi` | 联机战斗结算、任务统计器和奖励写入完成后 |
-| `activeMission` | 有效奖励领取并持久化后 |
-| `boxGacha` | 实际抽取并写入奖励后 |
+`reconcileAwakeUnlockCharacterList` 属于主奖励响应后的协调层。若其内部校准或响应合并抛出异常，辅助函数会捕获异常、记录错误并原样返回传入的角色列表，不让觉醒增量发布破坏已经成功的抽卡、领奖、购买或角色发放请求。即使辅助函数位于端点外层事务末尾，这类已经捕获的异常也不会触发外层事务回滚或形成 `5xx`。该降级只影响当前响应中的即时解锁提示；持久状态可由后续 `/load` 恢复。
 
-这些边界覆盖 `singleBattleQuest`、`storyQuest`、`character/bond`、`mission`、`mail`、`item`、`shop`、`multi`、`activeMission` 和 `boxGacha` 等可改变觉醒条件的权威入口。只读请求或没有实际状态写入的分支不制造解锁响应。
+`/load` 不使用上述异常降级。它直接调用 `reconcileAwakeUnlocksFromProgress`；校准失败时错误继续上抛，不静默返回可能过期的完整玩家状态。修复异常后重新 `/load` 或登录，是可靠恢复方式。
+
+端点主业务外层事务本身若发生未捕获异常，仍按该端点原有事务语义整体回滚。这个边界与辅助函数内部已经捕获的协调异常不同：前者终止主业务，后者保留主奖励和状态写入。
+
+## 条件反向审计
+
+截至当前代码与主数据，`mission_char_awake.json` 共 144 条记录，任务标识末位只出现 1、2、3、4，均进入 `AwakeComputer` 的已知分支，没有当前记录依赖未知类型的通用进度回退。`AwakeComputer` 实际消费的条件及其生产写入口已经逐项反向审计：
+
+| 实际消费条件 | 权威数据 | 截至当前的生产写入口 |
+|---|---|---|
+| 角色剧情阅读、剧情累计数、指定关卡完成、限时完成、指定队长完成 | `players_quest_progress` 的完成状态、最佳时间和队长角色 | `storyQuest`、`singleBattleQuest`、`multi` 的成功结算 |
+| 角色出战、队长出战、联机队长出战、角色组合共同通关、种族组合通关 | 角色通关计数、共同通关计数和种族组合计数 | `singleBattleQuest`、`multi` 成功结算后的任务统计器 |
+| 队长强化弹射、累计强化弹射、最高连击 | 角色强化弹射计数、`totalPowerflips`、`maxComboAchieved` | `singleBattleQuest`、`multi` 成功结算后的战斗统计器 |
+| 累计获得玛那 | `totalManaObtained` | `singleBattleQuest`、`storyQuest`、`multi`、`mail`、`item`、`shop`、`activeMission`、`boxGacha` 的实际奖励或出售成功分支 |
+| 羁绊代币全部完成 | `bond_token_list.status` | `character/bond` 成功更新分支 |
+| 三个子任务全部完成 | `AwakeType.ALL_COMPLETE` 对前三个子任务的聚合结果 | 不单独生产；由上述子条件共同决定 |
+| 角色所有权最终门槛 | `players_characters` | 已有奖励入口，以及下列六个新增角色获得成功分支 |
+
+角色所有权由 `reconcileAwakeUnlocks` 在计算候选任务前过滤。即使历史计数已经满足全部子任务，只要角色尚未入队，就不会写入解锁状态；获得角色后才允许校准完成。新增覆盖的六个成功分支为：
+
+1. 普通扭蛋 `gacha/exec`。
+2. 扭蛋积分兑换角色 `gacha/exchange_character`。
+3. 星粒兑换 `exchange/star_crumb` 的 `kind=0`。
+4. 城镇加入 `character/add_character_from_town`。
+5. 教程 `tutorial/update_step` 的步骤 15。
+6. 教程 `tutorial/update_step` 的步骤 16。
+
+`mission/update_mission_progress` 仍保留状态写入后的校准边界，但当前 144 条主数据均由明确条件分支计算，不依赖未知类型的通用进度回退。后台或管理端直接修改玩家数据时不要求即时发布，由下一次 `/load` 统一校准恢复。
+
+本审计不是对未来入口的泛化保证。新增觉醒条件、调整主数据字段、增加角色发放路由或改变既有生产写路径时，必须重新执行“条件消费字段到生产写入口”的反向审计，并同步更新入口契约测试和本文档。
 
 ## `/load`、显示与授权
 
@@ -127,7 +147,7 @@ CREATE TABLE IF NOT EXISTS players_character_awake_unlocks (
 
 ### 结算幂等安全补写
 
-`settleAwakeMissionRewards` 仍是第 9 类任务的唯一发奖路径。在同一结算事务中，它会写进度、写领取记录、发普通奖励，并对 `AwakeManaBoard` 执行最大值 `upsert`。正常情况下持久解锁状态已经存在，因此 `upsert` 没有变化；若解锁状态意外丢失，结算会恢复它，并仅在确有变化时返回 `mana_board_awake`。
+`settleAwakeMissionRewards` 仍是第 9 类任务的唯一发奖路径。在同一结算事务中，它会写进度、写领取记录、发普通奖励，并对 `AwakeManaBoard` 执行最大值 `upsert`。正常情况下持久解锁状态已经存在，因此 `upsert` 没有变化；若解锁状态意外丢失，结算会恢复它，并仅在确有变化时返回 `mana_board_awake`。结算内部不经过增量响应辅助函数的异常降级；安全补写、奖励和领取记录中的任一未捕获异常都会使该结算事务整体回滚。
 
 ### 数据库迁移
 
@@ -148,6 +168,9 @@ CREATE TABLE IF NOT EXISTS players_character_awake_unlocks (
 - 解锁状态与领取记录在逻辑上独立，即使结算安全路径可能在同一事务中同时写入二者。
 - 重复完成动作、重复 `/load`、重复第一页请求和重复节点觉醒请求均不得复制解锁状态或奖励。
 - 动作响应只发布 `changed`，完整状态只由 `/load` 序列化。
+- 端点主业务外层事务的未捕获异常按端点原语义回滚；增量辅助函数内部已捕获异常不触发外层回滚。
+- 增量发布协调异常不得使主奖励请求失败或形成 `5xx`；`/load` 校准异常不得被静默吞掉。
+- 结算幂等安全补写与奖励、领取记录同事务，未捕获异常时整体回滚。
 
 ## 验证范围
 
@@ -159,8 +182,12 @@ CREATE TABLE IF NOT EXISTS players_character_awake_unlocks (
 6. `/load` 恢复已完成未领取、已领取但解锁状态缺失的情况。
 7. 版本 4 迁移从历史已领取特殊阶段回填解锁状态。
 8. 节点状态仅作为回退显示，节点觉醒授权只认持久解锁状态。
-9. 所有权威变更入口在状态写入完成后、响应返回前执行校准，且仅发布 `changed`。
-10. 类型检查、8 组聚焦回归、`hygiene` 和 `diff-check` 全部通过。
+9. 截至当前代码与主数据，所有已审计条件的生产入口在状态写入完成后、响应返回前执行校准，且仅发布 `changed`。
+10. 六个角色获得成功分支在角色实际入队后执行校准，空结果和失败分支不发布。
+11. 端点主业务外层事务自身失败时按原事务语义回滚；辅助函数内部已捕获异常不触发该回滚。
+12. 增量发布协调异常记录错误并原样返回传入角色列表，不形成 `5xx`；`/load` 直接校准且不吞错。
+13. 结算安全补写、奖励与领取记录同事务，未捕获异常时整体回滚。
+14. 类型检查、8 组聚焦回归、`hygiene` 和 `diff-check` 全部通过。
 
 ## 非目标
 
@@ -168,3 +195,4 @@ CREATE TABLE IF NOT EXISTS players_character_awake_unlocks (
 - 仅因进入已解锁第二页而自动领取第一页奖励。
 - 依靠资源请求、周期请求或其他场景猜测触发结算。
 - 宣称服务端可以强制已打开的客户端场景切页。
+- 对未来新增条件、主数据或角色发放路由作未经审计的自动覆盖承诺。

@@ -1,6 +1,6 @@
 # 角色觉醒任务覆盖文档
 
-> 状态: 基本完成   最后更新: 2026-07-17
+> 状态: 已完成   最后更新: 2026-07-17
 
 ## 概览
 
@@ -35,11 +35,7 @@
 
 最后 1 个 ❌（1210013 连击）通过 `max_combo_achieved` 追踪解决。
 
-### 后续完善路径
-
-| 顺序 | 功能 | 工作量 | 影响 |
-|------|------|--------|------|
-| 1 | 时间追踪 + 联机 | 大 | 解锁 5 个 ❌→✅ |
+时间追踪与联机追踪均已完成，相关任务已经纳入下方已实现特性和当前进度计算，不再存在待补齐的 ❌ 项。
 
 ---
 
@@ -74,12 +70,12 @@
   - 掉落奖励：`lib/quest.ts`（`givePlayerRewardsSync` + `givePlayerScoreRewardsSync`）
   - 邮件领取：`mail.ts`
   - 活跃任务：`activeMission.ts`
-  - 觉醒任务自奖励：`mission.ts`
+  - 觉醒任务自奖励：`src/routes/api/mission.ts`
   - 物品出售：`item-sell.ts`
 
 ### 特定关卡通关（2026-06-28）✅
 
-5 个任务通过 `ctx.questProgress[category]` 检测 quest 完成状态：
+6 个任务通过 `ctx.questProgress[category]` 检测关卡完成状态：
 
 | mission_id | 角色 | 关卡 | quest_id | category |
 |------------|------|------|----------|:---:|
@@ -90,15 +86,16 @@
 | 2510032 | 艾莉亚 | 临境域 深渊之兽 | 1020 等多周期 | 13 |
 | 2630023 | 贝瑞塔 | 女王拉芙 超级+ | 100100004/100401004 | 19 |
 
-映射常量 `QUEST_CLEAR_MISSIONS` 在 `mission.ts` 中定义，
-`computeProgress` 在 lastDigit 分支之前优先检测。
+映射常量 `QUEST_CLEAR_MAP` 在 `src/lib/mission/computer-awake.ts` 中定义，
+`AwakeComputer.compute` 在 `lastDigit` 分支之前优先检测。
 
 ### 队长追踪（2026-06-28）✅
 
 `players_character_quest_clears` 新增 `leader_clear_count` 列，`/finish` 中 `characters[0]` 传 `isLeader=true`。
 
-- `LEADER_REQUIRED_IDS` 集合：`{1510062, 1610022, 1610023, 2310012, 2610072}`
-- leader-required 任务使用 `leader_clear_count`（纯队长出场），非 leader 任务使用 `clear_count`（任意位置）
+- `LEADER_REQUIRED_IDS` 集合：`{1510062, 1610022, 1610023, 2610072}`
+- 需要指定队长的任务使用 `leader_clear_count`（纯队长出场），其他任务使用 `clear_count`（任意位置）
+- 2310012 不属于队长集合；它由 `RACE_MISSION_IDS` 的种族组合映射单独处理。
 - 1610023（威隆队长通关）⚠️→✅
 
 ### 时间追踪（2026-06-28）✅
@@ -114,7 +111,7 @@
 
 - `multi/http/battle.ts` `/finish` 新增 leader + party 的 `incrementPlayerCharacterClearSync(isMulti=true)`
 - `AwakeContext.multiClears` 预缓存 `multi_count`
-- `COOP_MISSION_IDS` 集合 → `multi_count`
+- `COOP_MISSION_IDS` 使用 `leader_multi_count`，要求指定角色作为联机队长完成。
 
 ### 连击追踪（2026-06-28）✅
 
@@ -122,11 +119,11 @@
 `statistics.max_combo_count` 来自客户端 `ComboCalculatorImpl.getMaxCombo()`，
 `/finish` 时 `maxComboAchieved = max(old, body.statistics.max_combo_count)`。
 
-### Quest 队长校验（2026-06-28）✅
+### 关卡队长校验（2026-06-28）✅
 
 `players_quest_progress` 新增 `leader_character_id` 列，
 `/finish` 写入 `characters[0].id`。
-`QUEST_CLEAR_MAP` 扩展 `leaderCharId` 字段，9 条 quest-clear 任务精确校验队长：
+`QUEST_CLEAR_MAP` 扩展 `leaderCharId` 字段；关卡通关映射共 8 条任务，其中配置了队长的任务会精确校验：
 
 | mission | quest | leaderCharId |
 |---------|-------|:---:|
