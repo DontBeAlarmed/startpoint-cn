@@ -132,6 +132,11 @@ cp ../archive/pinball-1.4.90-1.4.101-9-modassets07170102.zip "pinball-$V-$W-9-mo
 >   叠 android 链),把 profiles/WF_TARGET_STORE 指过去;
 > - **从设备拉**:任何一台跟着你的服更新到当前版本的设备/模拟器,
 >   拉 `/sdcard/WorldFlipper/dummy/download/production/upload` 整目录。
+> - **CDN 重建也追不上客户端时**(你的 CDN 链尾 < 客户端版本,差段来自别的链或自带数据的
+>   重打包 APK):那段内容只存在于玩家设备上,但**不用拉全量——工具要写的只有表**。
+>   表的存储路径 = `sha1(逻辑路径+SALT)`(`wf_mod_tool.sha1_path`,模式 7 表的现成对照表见
+>   工具仓 docs),从一台完整更新到当前版本的设备把这几个表文件拉下来**覆盖进重建树**即可;
+>   APK 若自带数据也可以直接解 APK 取表。覆盖后先确认间隙 key 已在(如 item 10000140)再发布。
 
 1. **纯资产补充包对任何血统都安全**(`archive/pinball-1.4.90-1.4.101-9-modassets07170102.zip`,
    30 个全新路径文件:武器图/横幅/商店图,不含任何表),重命名成你的一跳直接发;
