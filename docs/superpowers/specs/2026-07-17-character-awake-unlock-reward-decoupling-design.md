@@ -1,62 +1,58 @@
-# Character Awake Unlock and Reward Decoupling Design
+# 角色觉醒解锁与奖励解耦设计
 
-## Goal
+**日期：** 2026-07-17
 
-Allow a character whose awakening missions are all complete to open the
-CharacterAwake scene directly on tab 2, while keeping any unclaimed tab 1
-mission rewards pending until the player manually opens tab 1.
+**状态：** 已完成，待用户客户端验收
 
-This is a server-only change. The CN 1.8.1 client remains unmodified.
+## 目标
 
-## Confirmed Client Contract
+角色的觉醒任务全部完成后，第二页应立即解锁；第一页尚未领取的任务奖励仍保持待领取，直到玩家手动回到第一页。服务端不修改 `CN 1.8.1` 客户端，也不把“解锁第二页”和“领取第 9 类任务奖励”重新绑定。
 
-`CharacterAwakeScene.preparation()` caches `mana_board_awake[1]` before the
-scene sends a CharacterAwake API request.
+## 最终结论
 
-- A cached level of `0` selects tab 1, disables tab 2, and automatically sends
-  `mission/get_mission_progress` after the transition.
-- A positive cached level selects tab 2 and sends no automatic mission request.
-- When the player later selects tab 1, `tabChanged(1)` sends
-  `mission/get_mission_progress` if the mission list has not been requested in
-  the current scene instance.
+- `players_character_awake_unlocks` 是第二页解锁的持久权威状态，与第 9 类任务的领取记录独立。
+- 权威状态写入完成后执行校准；响应只发布本次新增或提升的 `changed` 解锁状态。
+- `/load` 负责校准、旧存档恢复和完整序列化，但绝不发放任务奖励或写入领取记录。
+- `/character/awake_mana_node` 的授权只读取持久解锁状态；已持有节点的觉醒等级仅作为客户端回退显示。
+- 未全部完成时进入第一页并执行正常结算；全部完成时立即解锁第二页，玩家手动回第一页后才领奖。
+- 第 9 类任务结算内的解锁状态 `upsert` 是幂等安全补写，不是主要解锁来源。
 
-Consequently, a first-entry tab 2 unlock must already be present in client
-player state before scene construction. Pending rewards can then be settled by
-the existing manual tab 1 request.
+## 已确认的客户端契约
 
-## Accepted User Flow
+`CharacterAwakeScene.preparation()` 在场景发出 `CharacterAwake` 接口请求之前缓存 `mana_board_awake[1]`。
 
-### Missions Not All Complete
+- 缓存值为 `0`：选择第一页、禁用第二页，并在转场后自动请求 `mission/get_mission_progress`。
+- 缓存值大于 `0`：直接选择第二页，不自动请求任务进度。
+- 玩家之后手动选择第一页时，如果当前场景实例尚未请求过任务列表，`tabChanged(1)` 会请求 `mission/get_mission_progress`。
 
-1. The character remains locked at `mana_board_awake[1] = 0`.
-2. Entering CharacterAwake opens tab 1 and disables tab 2.
-3. The automatic category 9 `get_mission_progress` request settles completed,
-   unreceived stages in order.
-4. The response shows `mission_info` reward notifications.
-5. Tab 2 remains locked.
+因此，首次进入时要直接显示第二页，解锁状态必须在场景构造前进入客户端玩家状态。服务端只能通过完成动作响应或后续 `/load` 提供该状态，不能在场景已按旧缓存创建后强制客户端切页。
 
-### Missions All Complete
+## 用户流程
 
-1. The authoritative action that completes the final requirement persists the
-   tab 2 unlock without claiming mission rewards.
-2. That action's response includes the unlocked character's
-   `character_list.mana_board_awake` value so the active client is updated.
-3. Entering CharacterAwake opens tab 2 immediately and sends no mission request.
-4. Rewards remain pending until the player manually selects tab 1.
-5. The tab 1 `get_mission_progress` request grants every completed, unreceived
-   reward and returns the corresponding `mission_info` notifications.
-6. Repeated tab visits and later scene entries do not duplicate rewards.
+### 任务尚未全部完成
 
-If the player never opens tab 1, those mission rewards remain unclaimed. This
-is intentional and is the accepted server-only compromise.
+1. `mana_board_awake[1]` 保持 `0`。
+2. 进入 `CharacterAwake` 时打开第一页，第二页不可用。
+3. 自动发出的第 9 类任务 `get_mission_progress` 按顺序结算已完成且未领取的阶段。
+4. 响应返回奖励变更、`mission_info` 和最新任务进度。
+5. 若本次结算仍未满足最终特殊阶段，第二页继续锁定。
 
-## State Model
+### 任务已全部完成
 
-Unlock availability and reward receipt are separate durable states.
+1. 完成最后条件的权威入口在状态落库后执行校准，并持久化第二页解锁状态，不领取任务奖励。
+2. 该入口仅在解锁状态新增或提升时，把对应角色的 `character_list.mana_board_awake` 合入响应。
+3. 客户端收到响应后，首次进入 `CharacterAwake` 直接打开第二页。
+4. 第一页奖励继续处于未领取状态。
+5. 玩家手动切回第一页时，`mission/get_mission_progress` 结算全部已完成且未领取的奖励，并返回对应 `mission_info`。
+6. 重复进入、重复校准或重复请求不会重复解锁、发奖或通知。
 
-### Unlock State
+玩家不打开第一页时，奖励会一直保持未领取。这是已接受的服务端实现语义。
 
-Add a `players_character_awake_unlocks` table:
+## 持久状态模型
+
+### 持久解锁状态
+
+独立表按玩家、角色和觉醒板索引保存最高解锁等级：
 
 ```sql
 CREATE TABLE IF NOT EXISTS players_character_awake_unlocks (
@@ -65,112 +61,110 @@ CREATE TABLE IF NOT EXISTS players_character_awake_unlocks (
     board_index INTEGER NOT NULL,
     awake_level INTEGER NOT NULL,
     PRIMARY KEY (player_id, character_id, board_index),
+    FOREIGN KEY (character_id, player_id)
+        REFERENCES players_characters (id, player_id) ON DELETE CASCADE,
     FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
 );
 ```
 
-An upsert keeps the maximum `awake_level`. Unlock rows never regress when party
-composition or another live condition changes later.
+`upsert` 只接受更高的 `awake_level`，因此解锁等级单调递增，不会因队伍、临时条件或重复请求回退。
 
-### Reward Receipt State
+### 奖励领取状态
 
-Continue using `players_category_mission_stages.status` for category 9 reward
-receipt. Persisting an unlock must not insert or update a receipt row and must
-not grant normal rewards.
+`players_category_mission_stages.status` 继续表示奖励是否已领取。写入持久解锁状态不得创建或修改领取记录，也不得发放普通奖励。两种状态可形成以下合法组合：
 
-The `AwakeManaBoard` special reward becomes an idempotent confirmation of an
-already persisted unlock during later tab 1 settlement. The settlement still
-marks its stage received and emits its actual `mission_reward_id`, but it does
-not grant or advance the unlock a second time.
+| 解锁状态 | 领取记录 | 含义 |
+|---|---|---|
+| 无 | 未领取 | 条件尚未完成，或等待校准 |
+| 有 | 未领取 | 已解锁第二页，第一页奖励待手动领取 |
+| 有 | 已领取 | 正常完成并已领取奖励 |
+| 无 | 已领取 | 历史数据缺失，需要迁移、`/load` 或结算兜底恢复 |
 
-## Unlock Reconciliation
+## 解锁校准规则
 
-Create a focused CharacterAwake unlock service. For each candidate character it
-will:
+`reconcileAwakeUnlocks` 从权威玩家状态和已存计数计算第 9 类任务进度；`reconcileAwakeUnlocksFromProgress` 检查资源定义中已完成阶段的 `AwakeManaBoard` 特殊奖励，并执行最大值 `upsert`。
 
-1. build the existing category 9 computation context;
-2. compute the character's mission progress from authoritative player state and
-   stored counters;
-3. find completed reward stages carrying an `AwakeManaBoard` special reward;
-4. upsert the corresponding character, board index, and awake level;
-5. return only newly created or increased unlocks for response serialization.
+解锁依据是特殊奖励阶段“已经完成”，不是该阶段“已经领取”。角色、`board_index` 和 `awake_level` 均来自资源定义，不硬编码某个任务标识。
 
-Completion of the special-reward stage, rather than receipt of that stage,
-drives the unlock. This preserves CDN-defined character, board, and level data
-without hard-coding a specific mission ID.
+返回值分为：
 
-Reconciliation runs after every authoritative mutation that can complete an
-awakening requirement, including battle completion trackers, story completion,
-bond-token completion, and applicable mission counter updates. Each affected
-route merges newly unlocked character entries into its existing
-`character_list` response by `character_id`.
+- `all`：当前全部持久解锁状态，供 `/load` 完整序列化。
+- `changed`：本次新建或提升的解锁状态，供动作响应增量发布。
 
-`/load` also reconciles all owned CharacterAwake candidates before full player
-serialization. This is the compatibility path for existing accounts and for a
-final-action response that was not delivered to the client.
+`reconcileAwakeUnlockCharacterList` 只序列化 `changed`，按 `character_id` 去重并与入口原有 `character_list` 合并；同一板索引取最大等级。没有变化时保留原响应，避免重复发布。
 
-## Response and Serialization Rules
+## 权威状态变更边界
 
-- Mutation responses include `mana_board_awake` only for unlocks newly created
-  or increased by that request.
-- `/load` reconstructs `mana_board_awake` from persisted unlock rows and merges
-  it with actual mana-node awake levels, taking the maximum per board.
-- `mission/get_mission_progress` continues returning reward inventory changes,
-  `mission_info`, and mission progress for tab 1.
-- Category 9 settlement may idempotently ensure the unlock row exists, but
-  reward receipt is never required to expose tab 2.
-- `/character/awake_mana_node` checks the persisted unlock row rather than a
-  received special-reward stage. Existing node ownership, base-board
-  completion, requested level, cost, and transaction validations remain intact.
+在权威状态写入完成后、响应返回前执行校准；根据端点事务边界，可位于同一事务末尾，以保证失败整体回滚。不能在中间状态提前计算。最终覆盖如下入口：
 
-## Compatibility and Recovery
+| 边界 | 执行校准的时点 |
+|---|---|
+| `singleBattleQuest` | 战斗结算、任务统计器和奖励写入完成后 |
+| `storyQuest` | 剧情进度和奖励写入完成后 |
+| `character/bond` | 羁绊代币状态更新完成后 |
+| `mission` | 任务计数器写入完成后、响应返回前 |
+| `mail` | 单封或批量邮件奖励应用并标记领取后 |
+| `item` | 出售物品并增加 `mana` 后 |
+| `shop` | 购买、奖励和库存记录完成后 |
+| `multi` | 联机战斗结算、任务统计器和奖励写入完成后 |
+| `activeMission` | 有效奖励领取并持久化后 |
+| `boxGacha` | 实际抽取并写入奖励后 |
 
-Database version 4 will create the unlock table for existing databases and
-backfill rows from received `AwakeManaBoard` stages. Existing nonzero mana-node
-awake levels remain a serialization fallback and may also seed matching unlock
-rows.
+这些边界覆盖 `singleBattleQuest`、`storyQuest`、`character/bond`、`mission`、`mail`、`item`、`shop`、`multi`、`activeMission` 和 `boxGacha` 等可改变觉醒条件的权威入口。只读请求或没有实际状态写入的分支不制造解锁响应。
 
-On the next `/load`, reconciliation additionally unlocks characters whose
-missions were already complete but whose final rewards were never claimed.
-Their receipt rows remain untouched, so manual tab 1 entry still grants the
-pending rewards.
+## `/load`、显示与授权
 
-For immediate tab 2 entry in an active session, the response that observes the
-final completion must reach the client. If it is lost, the client can still
-enter with stale level `0`; the automatic tab 1 request will settle rewards and
-return the unlock, but that already-created scene cannot enable tab 2 in place.
-The next `/load` or scene entry repairs the presentation. No server response can
-remove this client cache edge case.
+`/load` 在序列化玩家数据时执行以下流程：
 
-## Transaction and Idempotency
+1. 计算已持有角色的第 9 类任务当前进度和领取显示状态。
+2. 用这份已计算进度校准持久解锁状态。
+3. 读取校准后的 `all` 解锁状态。
+4. 将持久解锁状态与已持有玛那板节点的觉醒等级按板索引取最大值，生成客户端 `mana_board_awake`。
 
-- Unlock reconciliation uses a transaction and maximum-level upserts.
-- Reward settlement keeps its existing transaction for progress persistence,
-  grants, receipt updates, and player inventory persistence.
-- Unlock writes and reward receipt writes remain logically independent even
-  when category 9 settlement performs both as a recovery path.
-- Duplicate final-action requests, repeated `/load`, repeated tab 1 requests,
-  and repeated node-awakening requests must not duplicate unlocks or rewards.
+第 4 步的节点状态只用于显示和兼容旧存档；它不会反向成为授权依据。`/character/awake_mana_node` 只通过 `getPlayerCharacterAwakeUnlocksSync` 检查持久解锁状态，同时保留角色所有权、节点列表、基础板完成度、目标等级、物品消耗、`mana` 消耗和事务校验。
 
-## Verification
+## 领奖安全与恢复路径
 
-Focused tests will cover:
+### 结算幂等安全补写
 
-1. incomplete missions: tab 1 settlement behavior and no unlock;
-2. final completion: unlock persisted with no reward receipt or inventory grant;
-3. final-action response: merged `character_list.mana_board_awake`;
-4. first entry after completion: client-visible data is sufficient for tab 2;
-5. manual tab 1 request: all pending rewards and notifications are returned;
-6. repeated tab 1 request: no duplicate rewards or notifications;
-7. `/load` recovery for historical completed-but-unclaimed missions;
-8. migration backfill for previously received unlock stages and awakened nodes;
-9. `awake_mana_node` authorization using unlock state before tab 1 rewards are
-   claimed;
-10. TypeScript compilation and repository hygiene checks.
+`settleAwakeMissionRewards` 仍是第 9 类任务的唯一发奖路径。在同一结算事务中，它会写进度、写领取记录、发普通奖励，并对 `AwakeManaBoard` 执行最大值 `upsert`。正常情况下持久解锁状态已经存在，因此 `upsert` 没有变化；若解锁状态意外丢失，结算会恢复它，并仅在确有变化时返回 `mana_board_awake`。
 
-## Out of Scope
+### 数据库迁移
 
-- Client changes that send a request when tab 2 first opens.
-- Automatic reward settlement merely from entering an already unlocked tab 2.
-- CDN request inference, periodic request inference, or other unreliable scene
-  detection.
+数据库版本 4 创建解锁状态表，并根据历史第 9 类任务已领取特殊阶段回填解锁状态。迁移只处理升级时已有领取记录的历史数据，不重新计算全部实时任务条件，也不发奖。
+
+### `/load` 校准
+
+`/load` 每次根据当前权威进度校准已持有角色，因此既能恢复“任务已完成但奖励未领取”的旧存档，也能恢复“领取记录已存在但解锁状态行丢失”的运行时数据。它只补解锁状态，不改领取记录、不发奖励；这与仅在版本升级时运行的迁移、以及领取事务内的幂等安全补写各自独立。
+
+### 丢失响应和当前场景限制
+
+若完成最后条件的响应丢失，而 `CharacterAwake` 场景已经用旧值 `0` 创建，服务端不能强制当前场景切到第二页，也不保证后续任务响应能重建该场景。可靠恢复方式是重新触发 `/load`，通常即重新登录；校准后的玩家状态会在下一次构造场景前包含持久解锁状态。
+
+## 事务与幂等性
+
+- 校准和解锁状态 `upsert` 在数据库事务中执行，等级只增不减。
+- 第 9 类任务结算继续在独立事务中完成进度、奖励、领取记录和玩家资产持久化。
+- 解锁状态与领取记录在逻辑上独立，即使结算安全路径可能在同一事务中同时写入二者。
+- 重复完成动作、重复 `/load`、重复第一页请求和重复节点觉醒请求均不得复制解锁状态或奖励。
+- 动作响应只发布 `changed`，完整状态只由 `/load` 序列化。
+
+## 验证范围
+
+1. 未完成任务时保持第一页流程且不解锁。
+2. 最终条件完成时写入解锁状态，不写领取记录、不发奖励。
+3. 完成动作响应合并唯一的 `character_list.mana_board_awake`。
+4. 手动返回第一页后一次性发放全部待领奖励和通知。
+5. 重复第一页请求不重复发奖或通知。
+6. `/load` 恢复已完成未领取、已领取但解锁状态缺失的情况。
+7. 版本 4 迁移从历史已领取特殊阶段回填解锁状态。
+8. 节点状态仅作为回退显示，节点觉醒授权只认持久解锁状态。
+9. 所有权威变更入口在状态写入完成后、响应返回前执行校准，且仅发布 `changed`。
+10. 类型检查、8 组聚焦回归、`hygiene` 和 `diff-check` 全部通过。
+
+## 非目标
+
+- 修改客户端或新增第二页首次打开请求。
+- 仅因进入已解锁第二页而自动领取第一页奖励。
+- 依靠资源请求、周期请求或其他场景猜测触发结算。
+- 宣称服务端可以强制已打开的客户端场景切页。
