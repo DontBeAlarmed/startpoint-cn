@@ -7,6 +7,7 @@ import { updatePlayerPartySync } from "../../data/domains/party"
 import { generateDataHeaders } from "../../utils";
 import { PartyCategory } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
+import { hasValidPartyCategory } from "../../lib/special-event-parties";
 
 interface PartyInfoListItem {
     party_edited: boolean
@@ -418,6 +419,13 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Bad Request",
             "message": "Invalid request body."
         })
+        if (!Array.isArray(body.party_info_list)
+            || body.party_info_list.some(info => !hasValidPartyCategory(info))) {
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Invalid party category."
+            })
+        }
 
         const viewerIdSession = await getSession(viewerId.toString())
         if (!viewerIdSession) return reply.status(400).send({
@@ -492,7 +500,7 @@ const routes = async (fastify: FastifyInstance) => {
                     abilitySoulIds: updateInfo.ability_soul_ids,
                     options: { allowOtherPlayersToHealMe: updateInfo.options.allow_other_players_to_heal_me },
                     edited: updateInfo.party_edited,
-                    category: updateInfo.party_category === 3 ? 4 : updateInfo.party_category,
+                    category: updateInfo.party_category as PartyCategory,
                     currentBattlePower: updateInfo.current_battle_power ?? 0,
                     beforeBattlePower: updateInfo.before_battle_power ?? 0
                 },

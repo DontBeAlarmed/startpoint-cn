@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerCarnivalEventRecordsSync } from "../../data/domains/carnivalEvent"
-import { getPlayerPartyGroupListSync, insertPlayerPartyGroupListSync } from "../../data/domains/party"
+import { ensurePlayerPartyGroupListSync, getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -8,6 +8,7 @@ import { getDefaultPlayerPartyGroupsSync } from "../../data/domains/player";
 import { serializePartyGroupList } from "../../data/utils";
 import { generateDataHeaders } from "../../utils";
 import { PartyCategory } from "../../data/types";
+import { ensureSpecialEventPartyGroupsSync } from "../../lib/special-event-parties";
 
 interface IndexBody {
     event_id: number,
@@ -16,14 +17,16 @@ interface IndexBody {
 }
 
 function buildCarnivalPartyGroupList(playerId: number): any[] {
-    // 1. Try to get saved EVENT party groups
-    let groups = getPlayerPartyGroupListSync(playerId, PartyCategory.EVENT)
-
-    // 2. First time - create empty EVENT defaults (independent from NORMAL pool)
-    if (Object.keys(groups).length === 0) {
-        groups = getDefaultPlayerPartyGroupsSync(PartyCategory.EVENT)
-        insertPlayerPartyGroupListSync(playerId, groups)
-    }
+    const groups = ensureSpecialEventPartyGroupsSync(
+        playerId,
+        PartyCategory.CARNIVAL,
+        PartyCategory.RUSH,
+        {
+            getGroups: getPlayerPartyGroupListSync,
+            getDefaults: getDefaultPlayerPartyGroupsSync,
+            ensureGroups: ensurePlayerPartyGroupListSync,
+        },
+    )
 
     const serialized = serializePartyGroupList(groups);
     // Convert to array format the client expects

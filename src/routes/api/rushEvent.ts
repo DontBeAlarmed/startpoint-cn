@@ -6,7 +6,7 @@ import { deletePlayerRushEventPlayedPartiesUntilSync, deletePlayerRushEventPlaye
 import { getAccountPlayers } from "../../data/domains/account"
 import { getDefaultPlayerPartyGroupsSync } from "../../data/domains/player"
 import { getPlayerCharacterSync } from "../../data/domains/character"
-import { getPlayerPartyGroupListSync, insertPlayerPartyGroupListSync } from "../../data/domains/party"
+import { ensurePlayerPartyGroupListSync, getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getSession } from "../../data/domains/session"
 import { getQuestFromCategorySync } from "../../lib/assets";
 import { BattleQuest, QuestCategory, RushEventFolder } from "../../lib/types";
@@ -16,6 +16,7 @@ import { getPlayerRushEventEndlessBattleRankingSync, getRushEventEndlessBattleRa
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import rushEventRankingRewards from "../../../assets/rush_event_ranking_reward.json";
+import { ensureSpecialEventPartyGroupsSync } from "../../lib/special-event-parties";
 
 interface SummaryBody {
     event_id: number,
@@ -361,14 +362,16 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No player bound to account."
         })
 
-        // get parties
-        let playerPartyGroups = getPlayerPartyGroupListSync(playerId, PartyCategory.EVENT)
-        console.log(`[RUSH] party: EVENT groups=${Object.keys(playerPartyGroups).length}`)
-        if (0 >= Object.keys(playerPartyGroups).length) {
-            console.log(`[RUSH] party: creating default EVENT parties`)
-            playerPartyGroups = getDefaultPlayerPartyGroupsSync(PartyCategory.EVENT)
-            insertPlayerPartyGroupListSync(playerId, playerPartyGroups)
-        }
+        const playerPartyGroups = ensureSpecialEventPartyGroupsSync(
+            playerId,
+            PartyCategory.RUSH,
+            undefined,
+            {
+                getGroups: getPlayerPartyGroupListSync,
+                getDefaults: getDefaultPlayerPartyGroupsSync,
+                ensureGroups: ensurePlayerPartyGroupListSync,
+            },
+        )
 
         // convert to proper format
         const userPartyGroupList: RushPartyGroup[] = []

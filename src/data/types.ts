@@ -143,9 +143,10 @@ export interface RawPlayerCharacterManaNode {
 export enum PartyCategory {
     EMPTY,
     NORMAL,
-    EMPTY2,
-    EMPTY3,
-    EVENT
+    CARNIVAL,
+    RAID,
+    RUSH,
+    EVENT = RUSH
 }
 
 export interface RawPlayerPartyOptions {

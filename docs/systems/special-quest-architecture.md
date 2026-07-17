@@ -13,13 +13,13 @@
 | 路由 | `rushEvent.ts` | `carnivalEvent.ts` | `raidEvent.ts` | 独立 |
 | 主数据 | `rush_event_quest.json` | `carnival_event_quest.json` | `raid_event_quest.json` | 独立 |
 | 特有结算 | `rush-handler.ts` | `carnival-handler.ts` | `raid-handler.ts` | 独立 |
-| 队伍 | `PartyCategory.EVENT` | `PartyCategory.EVENT` | `PartyCategory.EVENT` | 共享且互相覆盖 |
+| 队伍 | `PartyCategory.RUSH`（4） | `PartyCategory.CARNIVAL`（2） | `PartyCategory.RAID`（3） | 已按客户端协议隔离，待验收 |
 | 玩家状态 | Rush 表 | Carnival 专用表 | 复用 Rush played-party 表 | Raid 与 Rush 耦合 |
 | 通用结算 | `singleBattleQuest.ts` | `singleBattleQuest.ts` | `singleBattleQuest.ts` | 共享且体积较大 |
 
 ## 已确认风险
 
-1. 无限激战当前已确认存在“配队无法保存”的客户端问题。三种模式都保存到 `PartyCategory.EVENT`，进入另一模式后看到或修改的是同一套活动队伍，不具备模式级隔离；下一阶段应先抓取无限激战配队保存请求，确认问题发生在请求未发送、category 映射还是服务端持久化。
+1. 三种模式的配队分类已按国服客户端协议拆分为 Carnival=2、Raid=3、Rush=4。服务端曾把 Raid 的 3 强制映射为 4，并让 Carnival/Raid/Rush 路由都读取 4，现已修复。客户端仍需验证无限激战原“配队无法保存”是否只由该问题引起。
 2. Raid 使用 `players_rush_events_played_parties` 和 `RushEventBattleType.FOLDER` 保存出战队伍。字段目前足够，但命名、生命周期和未来迁移都与 Rush 绑定。
 3. 单人和多人结算分别实现了经验、Mana、进度、奖励和统计更新。两条路径已经出现字段取值差异，后续新增关卡规则需要改两处。
 4. `getQuestFromCategorySync()` 是集中式 category switch。新增模式必须同时修改资源加载、路由注册、开始和结算分派。
@@ -30,7 +30,7 @@
 1. 先抽取共享 `QuestFinishService`，让 single/multi 共用奖励、角色经验、关卡进度和统计更新事务。
 2. 定义轻量 `QuestModeHandler`：`validateStart`、`onStart`、`onFinish`、`onAbort`、`buildResponse`。按 category 注册，不一次性重写现有路由。
 3. 为 Raid 建立专用 played-party domain/table；保留兼容读取迁移，避免直接改旧数据。
-4. 队伍隔离应依据客户端真实 `party_category` 能力决定。客户端只提供 EVENT 时，服务端不能凭空增加 category；可在 EVENT 下增加服务端 mode scope，但必须验证客户端切换模式时的保存请求。
+4. 继续使用客户端原生 `party_category`，不要新增服务端私有分类。历史 `category=4` 数据只在目标分类缺失时用于补齐；目标分类已有记录始终优先，避免兼容迁移覆盖玩家新配队。
 5. 最后把资源转换器的字段契约加入生成测试，防止 CDN 列偏移再次进入运行资产。
 
 ## 本轮已修正的数据/流程
@@ -40,6 +40,9 @@
 - Raid 修正列偏移，并在结算返回客户端必需的 `raid_event`。
 - Rush/Raid 失败结算不再推进模式进度。
 - Rush endless 下一轮按 round 排序。
+- 特殊关卡配队按 Carnival=2、Raid=3、Rush=4 独立保存和读取；配队组颜色使用请求分类更新并在页面重载时返回持久化值。
+- 配队及配队组编辑端点只接受整数分类 1 至 4，避免创建客户端无法访问的协议外数据。
+- 历史 `category=4` 配队按“目标分类 > 历史数据 > 默认队伍”的顺序补齐，使用只插入缺失记录的方式保留现有数据。
 - Carnival 171 行、Raid 50 行运行资产均完成字段完整性检查。
 
 以上属于代码和资产检查结果，不代表客户端进入、配队和结算已经验收通过。

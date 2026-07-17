@@ -7,6 +7,8 @@ import { getSession } from "../../data/domains/session"
 import { updatePlayerPartyGroupSync } from "../../data/domains/party"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders } from "../../utils";
+import { PartyCategory } from "../../data/types";
+import { hasValidPartyCategory } from "../../lib/special-event-parties";
 
 interface EditBody {
     viewer_id: number
@@ -28,6 +30,13 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Bad Request",
             "message": "Invalid request body."
         })
+        if (!Array.isArray(body.party_group_edit_params_list)
+            || body.party_group_edit_params_list.some(params => !hasValidPartyCategory(params))) {
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Invalid party category."
+            })
+        }
 
         const viewerIdSession = await getSession(viewerId.toString())
         if (!viewerIdSession) return reply.status(400).send({
@@ -46,7 +55,12 @@ const routes = async (fastify: FastifyInstance) => {
 
         // update party groups
         for (const editParamsList of body.party_group_edit_params_list) {
-            updatePlayerPartyGroupSync(playerId, editParamsList.party_group_id, editParamsList.party_group_color_id)
+            updatePlayerPartyGroupSync(
+                playerId,
+                editParamsList.party_group_id,
+                editParamsList.party_group_color_id,
+                editParamsList.party_category as PartyCategory,
+            )
         }
         
         reply.header("content-type", "application/x-msgpack")

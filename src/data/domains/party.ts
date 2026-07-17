@@ -1,6 +1,7 @@
 import { getDb } from "../db";
 import { PartyCategory, PlayerParty, PlayerPartyGroup, RawPlayerParty, RawPlayerPartyGroup } from "../types";
 import { deserializeBoolean, serializeBoolean } from "../utils";
+import { insertMissingPartyGroupListSync } from "../../lib/party-group-persistence";
 
 export function getPlayerPartyGroupListSync(
     playerId: number,
@@ -63,7 +64,7 @@ export function getPlayerPartyGroupListSync(
 function insertPlayerPartySync(playerId: number, slot: number | string, groupId: number | string, party: PlayerParty) {
     const db = getDb();
     db.prepare(`
-    INSERT INTO players_parties (slot, name, character_id_1, character_id_2, character_id_3, 
+    INSERT INTO players_parties (slot, name, character_id_1, character_id_2, character_id_3,
         unison_character_1, unison_character_2, unison_character_3, equipment_1, equipment_2,
         equipment_3, ability_soul_1, ability_soul_2, ability_soul_3, edited, player_id, group_id, category,
         current_battle_power, before_battle_power)
@@ -98,6 +99,13 @@ export function insertPlayerPartyGroupListSync(playerId: number, groups: Record<
             insertPlayerPartyGroupSync(playerId, groupId, group)
         }
     })()
+}
+
+export function ensurePlayerPartyGroupListSync(
+    playerId: number,
+    groups: Record<string, PlayerPartyGroup>,
+) {
+    insertMissingPartyGroupListSync(getDb(), playerId, groups)
 }
 
 export function updatePlayerPartySync(playerId: number, slot: number, party: PlayerParty, groupId: number = 1) {

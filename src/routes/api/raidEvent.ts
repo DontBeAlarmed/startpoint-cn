@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { deletePlayerRushEventPlayedPartiesUntilSync, deletePlayerRushEventPlayedPartyListSync, deletePlayerRushEventPlayedPartySync, getDefaultPlayerRushEventSync, getPlayerRushEventClearedFoldersSync, getPlayerRushEventSync, insertPlayerRushEventSync, updatePlayerRushEventSync } from "../../data/domains/rushEvent"
 import { getDefaultPlayerPartyGroupsSync } from "../../data/domains/player"
 import { getPlayerCharactersSync } from "../../data/domains/character"
-import { getPlayerPartyGroupListSync, insertPlayerPartyGroupListSync } from "../../data/domains/party"
+import { ensurePlayerPartyGroupListSync, getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerDate } from "../../utils";
@@ -12,6 +12,7 @@ import { getSerializedPlayerRushEventPlayedPartiesSync, getPlayerRushEventEndles
 import { insertActiveQuest } from "./singleBattleQuest";
 import { getQuestFromCategorySync } from "../../lib/assets";
 import { BattleQuest, QuestCategory } from "../../lib/types";
+import { ensureSpecialEventPartyGroupsSync, resolvePartyGroupColorId } from "../../lib/special-event-parties";
 
 const raidEventIds: Record<number, number> = {}
 
@@ -158,19 +159,16 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Internal Server Error", "message": "No player bound to account."
         })
 
-        // Read from EVENT (dedicated party set), first time copy from NORMAL
-        let playerPartyGroups = getPlayerPartyGroupListSync(playerId, PartyCategory.EVENT)
-        if (Object.keys(playerPartyGroups).length === 0) {
-            console.log(`[RAID] party: no EVENT groups, copying from NORMAL`)
-            playerPartyGroups = getPlayerPartyGroupListSync(playerId, PartyCategory.NORMAL)
-            for (const group of Object.values(playerPartyGroups)) {
-                for (const party of Object.values(group.list)) {
-                    party.category = PartyCategory.EVENT
-                }
-                group.category = PartyCategory.EVENT
-            }
-            insertPlayerPartyGroupListSync(playerId, playerPartyGroups)
-        }
+        const playerPartyGroups = ensureSpecialEventPartyGroupsSync(
+            playerId,
+            PartyCategory.RAID,
+            PartyCategory.RUSH,
+            {
+                getGroups: getPlayerPartyGroupListSync,
+                getDefaults: getDefaultPlayerPartyGroupsSync,
+                ensureGroups: ensurePlayerPartyGroupListSync,
+            },
+        )
         const group1 = playerPartyGroups['1']
         const partyList: RushParty[] = []
 
@@ -212,7 +210,7 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         const userPartyGroupList: RushPartyGroup[] = [{
-            "party_group_color_id": 15,
+            "party_group_color_id": resolvePartyGroupColorId(group1),
             "party_group_id": 1,
             "party_list": partyList
         }]
