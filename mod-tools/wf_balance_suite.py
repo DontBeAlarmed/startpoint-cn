@@ -239,6 +239,11 @@ def main() -> None:
     ap.add_argument("--publish", action="store_true", help="写入后发布 CDN(需 --apply)")
     ap.add_argument("--export-pack", action="store_true", help="打可分享改动包")
     ap.add_argument("--force", action="store_true")
+    # 原版武器回调(2026-07-17):默认不再对原版武器魂珠做数值拉平/上限×5/证章×4。
+    # --apply 从锁定基准重建时不跑第 10 步 = 原版武器回到官方原值。仅当明确想恢复旧的
+    # 超模武器平衡时才加 --legacy-weapon-buff。自制深渊武器不经此步,由 wf_rogue_rewards 定义。
+    ap.add_argument("--legacy-weapon-buff", action="store_true",
+                    help="恢复旧版原版武器超模加强(默认关闭=官方原值)")
     args = ap.parse_args()
     dry = not args.apply
     if args.apply and MARKER.exists() and not args.force:
@@ -1218,223 +1223,228 @@ def main() -> None:
         print("写入", qlib.save_table(BOSS_LEVEL, tree))
 
     # ---- 10 武器魂珠:数值同步 + 上限×5 ----
-    # 武器拉平预计算:各属性以顶级武器(封顶1000)为基准,低于基准的按 power 比例拉升(封顶×5)
-    ETOK2 = {"Red": 0, "Blue": 1, "Yellow": 2, "Green": 3, "White": 4, "Black": 5}
-    eq_tbl = core.load_table("master/item/equipment.orderedmap", store)
-    soul_pre = core.load_table(SOUL, store)
-    sp_pre = {k: core.read_csv_lines(t) for k, t in soul_pre.text_rows().items()}
+    # 用户 2026-07-17:原版全套武器此前加强太多 → 默认回官方原值(--apply 重建时不跑本步)。
+    # 自制深渊武器(8000101-8000115)不经本步,词条由 wf_rogue_rewards 独立定义。
+    if not getattr(args, "legacy_weapon_buff", False):
+        print("[10] 原版武器魂珠:回官方原值(跳过拉平/上限×5/证章×4;--legacy-weapon-buff 可恢复旧超模)")
+    else:
+        # 武器拉平预计算:各属性以顶级武器(封顶1000)为基准,低于基准的按 power 比例拉升(封顶×5)
+        ETOK2 = {"Red": 0, "Blue": 1, "Yellow": 2, "Green": 3, "White": 4, "Black": 5}
+        eq_tbl = core.load_table("master/item/equipment.orderedmap", store)
+        soul_pre = core.load_table(SOUL, store)
+        sp_pre = {k: core.read_csv_lines(t) for k, t in soul_pre.text_rows().items()}
 
-    def _wpow(k):
-        tot = 0.0
-        for row in sp_pre.get(k, []):
-            row = pad(row, 123)
-            for base in (44, 106):
-                for sc in (base + 4, base + 5):
-                    try:
-                        v = float(row[sc])
-                        if v > 0:
-                            tot += v / 1000
-                    except ValueError:
-                        pass
-        return tot
+        def _wpow(k):
+            tot = 0.0
+            for row in sp_pre.get(k, []):
+                row = pad(row, 123)
+                for base in (44, 106):
+                    for sc in (base + 4, base + 5):
+                        try:
+                            v = float(row[sc])
+                            if v > 0:
+                                tot += v / 1000
+                        except ValueError:
+                            pass
+            return tot
 
-    def _wel(k):
-        votes = Counter()
-        for row in sp_pre.get(k, []):
-            row = pad(row, 123)
-            for v in row:
-                for t, e in ETOK2.items():
-                    if v == t or ("/" in str(v) and t in str(v).split("/")):
-                        votes[e] += 1
-            for ci in (70, 116):
-                if ci < len(row) and row[ci] in ("1", "2", "3", "4", "5", "6"):
-                    votes[int(row[ci]) - 1] += 1
-        return votes.most_common(1)[0][0] if votes else None
+        def _wel(k):
+            votes = Counter()
+            for row in sp_pre.get(k, []):
+                row = pad(row, 123)
+                for v in row:
+                    for t, e in ETOK2.items():
+                        if v == t or ("/" in str(v) and t in str(v).split("/")):
+                            votes[e] += 1
+                for ci in (70, 116):
+                    if ci < len(row) and row[ci] in ("1", "2", "3", "4", "5", "6"):
+                        votes[int(row[ci]) - 1] += 1
+            return votes.most_common(1)[0][0] if votes else None
 
-    wpow, wel = {}, {}
-    el_bench = {}
-    for k, rows in eq_tbl.text_rows().items():
-        r = core.normalize_row_length(core.read_csv_lines(rows)[0] if False else
-                                      core.read_csv_lines(eq_tbl.text_rows()[k])[0], 12)
-        if r[2] != "0":
-            continue
-        sid = r[10]
-        e = _wel(sid)
-        if e is None:
-            continue
-        p = _wpow(sid)
-        wpow[sid] = p
-        wel[sid] = e
-        el_bench[e] = max(el_bench.get(e, 0), min(p, 1000))
-    wfactor = {}
-    for sid, p in wpow.items():
-        if sid in MAINLINE_ORBS or p <= 0:
-            continue
-        bench = el_bench.get(wel[sid], 800)
-        if p < bench:
-            wfactor[sid] = min(5.0, bench / p)
+        wpow, wel = {}, {}
+        el_bench = {}
+        for k, rows in eq_tbl.text_rows().items():
+            r = core.normalize_row_length(core.read_csv_lines(rows)[0] if False else
+                                          core.read_csv_lines(eq_tbl.text_rows()[k])[0], 12)
+            if r[2] != "0":
+                continue
+            sid = r[10]
+            e = _wel(sid)
+            if e is None:
+                continue
+            p = _wpow(sid)
+            wpow[sid] = p
+            wel[sid] = e
+            el_bench[e] = max(el_bench.get(e, 0), min(p, 1000))
+        wfactor = {}
+        for sid, p in wpow.items():
+            if sid in MAINLINE_ORBS or p <= 0:
+                continue
+            bench = el_bench.get(wel[sid], 800)
+            if p < bench:
+                wfactor[sid] = min(5.0, bench / p)
 
-    for logical, ib, db, tag in ((SOUL, 44, 106, "soul"), (WAB, 47, 109, "wab")):
-        tbl = core.load_table(logical, store)
-        p2 = {k: core.read_csv_lines(t) for k, t in tbl.text_rows().items()}
-        changed = False
-        limcols = (31, 89, 99) if tag == "soul" else (34, 92, 102)
-        coolcols = (32, 90) if tag == "soul" else (35, 93)
-        # 装备血量条件在 during_trigger(基址 魂珠94/武器97);during_content 存强度(106/109)。
-        # 前置枚举 0=Always 非血量,不动。
-        dtrcol, dccol = (94, 106) if tag == "soul" else (97, 109)
-        ncol = 123 if tag == "soul" else 126   # soul 官方123列,wab=ability布局126列
-        for k, rows in p2.items():
-            is_orb = tag == "soul" and k in MAINLINE_ORBS
-            wf = wfactor.get(k) if tag == "soul" else None   # 武器拉平系数
-            new_rows = []
-            for row in rows:
-                row[:] = pad(row, ncol)
-                # 武器拉平:低于本属性基准的武器,正面强度按比例拉升(单行封顶500%)
-                if wf:
-                    for base in (ib, db):
+        for logical, ib, db, tag in ((SOUL, 44, 106, "soul"), (WAB, 47, 109, "wab")):
+            tbl = core.load_table(logical, store)
+            p2 = {k: core.read_csv_lines(t) for k, t in tbl.text_rows().items()}
+            changed = False
+            limcols = (31, 89, 99) if tag == "soul" else (34, 92, 102)
+            coolcols = (32, 90) if tag == "soul" else (35, 93)
+            # 装备血量条件在 during_trigger(基址 魂珠94/武器97);during_content 存强度(106/109)。
+            # 前置枚举 0=Always 非血量,不动。
+            dtrcol, dccol = (94, 106) if tag == "soul" else (97, 109)
+            ncol = 123 if tag == "soul" else 126   # soul 官方123列,wab=ability布局126列
+            for k, rows in p2.items():
+                is_orb = tag == "soul" and k in MAINLINE_ORBS
+                wf = wfactor.get(k) if tag == "soul" else None   # 武器拉平系数
+                new_rows = []
+                for row in rows:
+                    row[:] = pad(row, ncol)
+                    # 武器拉平:低于本属性基准的武器,正面强度按比例拉升(单行封顶500%)
+                    if wf:
+                        for base in (ib, db):
+                            for sc in (base + 4, base + 5):
+                                try:
+                                    fv = float(row[sc])
+                                except ValueError:
+                                    continue
+                                if fv > 0:
+                                    row[sc] = str(min(500000, int(round(fv * wf))))
+                        changed = True
+                    # 主线证章/黄金宝珠:大幅强化(正面强度×4)+ 删负面副作用行(用户 2026-07-09)
+                    if is_orb:
+                        neg = False
+                        for base in (ib, db):
+                            for sc in (base + 4, base + 5):
+                                v = row[sc]
+                                try:
+                                    fv = float(v)
+                                except ValueError:
+                                    continue
+                                if fv < 0:
+                                    neg = True
+                                elif fv > 0:
+                                    row[sc] = str(min(500000, int(round(fv * MAINLINE_ORB_MULT))))
+                        if neg:              # 掉抗/掉攻这类倒扣行直接丢弃
+                            cnt["orb_neg_drop"] += 1
+                            changed = True
+                            continue
+                        # 触发型强化行去次数上限,常驻满收益
+                        for lc in limcols:
+                            if row[lc] not in ("", "(None)", "0"):
+                                row[lc] = "(None)"
+                        cnt["orb_buff"] += 1
+                        changed = True
+                    new_rows.append(row)
+                    # 去掉装备血量要求词条(用户 2026-07-09):HpHigh0/HpLow1/HpIncrease109/HpDecrease110
+                    # 持续触发→恒真 HpLow≤100%;HpIncrease 堆叠先取满值
+                    if row[dtrcol] in ("0", "1", "109", "110"):
+                        if row[dtrcol] == "109":       # HpIncrease 堆叠:单层×层数 → 满值
+                            try:
+                                stacks = int(float(row[dtrcol + 5]))
+                            except ValueError:
+                                stacks = 0
+                            if stacks >= 2:
+                                for sc in (dccol + 4, dccol + 5):
+                                    try:
+                                        fv = float(row[sc])
+                                        if fv > 0:
+                                            row[sc] = str(min(500000, int(fv * stacks)))
+                                    except ValueError:
+                                        pass
+                                row[dtrcol + 5] = ""   # 清 trigger_limit
+                        row[dtrcol] = "1"              # → HpLow
+                        row[dtrcol + 3] = "100000"      # 阈值 100% = 恒真
+                        row[dtrcol + 4] = "100000"
+                        cnt[f"{tag}_hp_dtr"] += 1
+                        changed = True
+                    for base, offs in ((ib, (4, 6, 8)), (db, (4, 6))):
+                        for offp in offs:
+                            a, b = row[base + offp], row[base + offp + 1]
+                            try:
+                                if a not in ("", "(None)") and b not in ("", "(None)") and float(a) < float(b):
+                                    row[base + offp] = b
+                                    cnt[f"{tag}_sync"] += 1
+                                    changed = True
+                            except ValueError:
+                                pass
+                    # 次数上限:与角色同策略——伤害暖机行=层数×0.6+单层补偿(总量不变,叠更快);
+                    # 工具行=少层保×5总量(装备侧此前统一×5被过度放大,2026-07-09 修正)
+                    def harm2(name):
+                        return any(w in name for w in ("伤害", "攻击力", "特攻")) and "↓" not in name
+                    dmg_i2 = row[ib] != "" and harm2(cn_i.get(row[ib], ""))
+                    dmg_d2 = row[db] != "" and harm2(cn_d.get(row[db], ""))
+                    for ci, dmg2, base in ((limcols[0], dmg_i2, ib),
+                                           (limcols[1], dmg_d2, db), (limcols[2], dmg_d2, db)):
+                        v = row[ci]
+                        if v in ("", "(None)", "0"):
+                            continue
+                        try:
+                            iv = int(float(v))
+                        except ValueError:
+                            continue
+                        if iv < 2:
+                            continue
+                        newl = max(2, int(round(iv * 0.6)))
+                        mult = (iv / newl) if dmg2 else (min(LIMIT_CAP, iv * LIMIT_F) / newl)
+                        row[ci] = str(newl)
                         for sc in (base + 4, base + 5):
                             try:
                                 fv = float(row[sc])
+                                if fv > 0:
+                                    row[sc] = str(round05_raw(fv * mult, up=True))
                             except ValueError:
-                                continue
-                            if fv > 0:
-                                row[sc] = str(min(500000, int(round(fv * wf))))
-                    changed = True
-                # 主线证章/黄金宝珠:大幅强化(正面强度×4)+ 删负面副作用行(用户 2026-07-09)
-                if is_orb:
-                    neg = False
-                    for base in (ib, db):
-                        for sc in (base + 4, base + 5):
-                            v = row[sc]
+                                pass
+                        cnt[f"{tag}_limit"] += 1
+                        changed = True
+                    for ci in coolcols:   # 装备侧阶梯冷却
+                        v = row[ci]
+                        if v not in ("", "(None)", "0", "1"):
                             try:
-                                fv = float(v)
+                                nv = tier_ct(float(v))
+                                if nv != int(float(v)):
+                                    row[ci] = str(nv)
+                                    cnt[f"{tag}_cool"] += 1
+                                    changed = True
                             except ValueError:
-                                continue
-                            if fv < 0:
-                                neg = True
-                            elif fv > 0:
-                                row[sc] = str(min(500000, int(round(fv * MAINLINE_ORB_MULT))))
-                    if neg:              # 掉抗/掉攻这类倒扣行直接丢弃
-                        cnt["orb_neg_drop"] += 1
-                        changed = True
-                        continue
-                    # 触发型强化行去次数上限,常驻满收益
-                    for lc in limcols:
-                        if row[lc] not in ("", "(None)", "0"):
-                            row[lc] = "(None)"
-                    cnt["orb_buff"] += 1
-                    changed = True
-                new_rows.append(row)
-                # 去掉装备血量要求词条(用户 2026-07-09):HpHigh0/HpLow1/HpIncrease109/HpDecrease110
-                # 持续触发→恒真 HpLow≤100%;HpIncrease 堆叠先取满值
-                if row[dtrcol] in ("0", "1", "109", "110"):
-                    if row[dtrcol] == "109":       # HpIncrease 堆叠:单层×层数 → 满值
-                        try:
-                            stacks = int(float(row[dtrcol + 5]))
-                        except ValueError:
-                            stacks = 0
-                        if stacks >= 2:
-                            for sc in (dccol + 4, dccol + 5):
-                                try:
-                                    fv = float(row[sc])
-                                    if fv > 0:
-                                        row[sc] = str(min(500000, int(fv * stacks)))
-                                except ValueError:
-                                    pass
-                            row[dtrcol + 5] = ""   # 清 trigger_limit
-                    row[dtrcol] = "1"              # → HpLow
-                    row[dtrcol + 3] = "100000"      # 阈值 100% = 恒真
-                    row[dtrcol + 4] = "100000"
-                    cnt[f"{tag}_hp_dtr"] += 1
-                    changed = True
-                for base, offs in ((ib, (4, 6, 8)), (db, (4, 6))):
-                    for offp in offs:
-                        a, b = row[base + offp], row[base + offp + 1]
-                        try:
-                            if a not in ("", "(None)") and b not in ("", "(None)") and float(a) < float(b):
-                                row[base + offp] = b
-                                cnt[f"{tag}_sync"] += 1
-                                changed = True
-                        except ValueError:
-                            pass
-                # 次数上限:与角色同策略——伤害暖机行=层数×0.6+单层补偿(总量不变,叠更快);
-                # 工具行=少层保×5总量(装备侧此前统一×5被过度放大,2026-07-09 修正)
-                def harm2(name):
-                    return any(w in name for w in ("伤害", "攻击力", "特攻")) and "↓" not in name
-                dmg_i2 = row[ib] != "" and harm2(cn_i.get(row[ib], ""))
-                dmg_d2 = row[db] != "" and harm2(cn_d.get(row[db], ""))
-                for ci, dmg2, base in ((limcols[0], dmg_i2, ib),
-                                       (limcols[1], dmg_d2, db), (limcols[2], dmg_d2, db)):
-                    v = row[ci]
-                    if v in ("", "(None)", "0"):
-                        continue
-                    try:
-                        iv = int(float(v))
-                    except ValueError:
-                        continue
-                    if iv < 2:
-                        continue
-                    newl = max(2, int(round(iv * 0.6)))
-                    mult = (iv / newl) if dmg2 else (min(LIMIT_CAP, iv * LIMIT_F) / newl)
-                    row[ci] = str(newl)
-                    for sc in (base + 4, base + 5):
-                        try:
-                            fv = float(row[sc])
-                            if fv > 0:
-                                row[sc] = str(round05_raw(fv * mult, up=True))
-                        except ValueError:
-                            pass
-                    cnt[f"{tag}_limit"] += 1
-                    changed = True
-                for ci in coolcols:   # 装备侧阶梯冷却
-                    v = row[ci]
-                    if v not in ("", "(None)", "0", "1"):
-                        try:
-                            nv = tier_ct(float(v))
-                            if nv != int(float(v)):
-                                row[ci] = str(nv)
-                                cnt[f"{tag}_cool"] += 1
-                                changed = True
-                        except ValueError:
-                            pass
-            # 雷系武器:Fever 中扣 Fever 点(特殊玩法,克隆本武器 during 行→Fever触发+负Fever点)
-            if tag == "soul" and wel.get(k) == 2 and cnt["wpn_fever_consume"] < 5 and new_rows:
-                tmpl = next((r for r in new_rows if r[94] in ("0", "1", "109", "110")
-                             or (len(r) > 106 and r[106] not in ("", "(None)"))), None)
-                if tmpl is not None:
-                    fc = list(tmpl)
-                    fc[94] = "4"; fc[95] = "0"        # during_trigger = Fever
-                    fc[97] = fc[98] = ""; fc[99] = ""  # 清阈值/次数
-                    fc[106] = "18"                    # during_content = Fever点
-                    fc[107] = "0"
-                    fc[110] = fc[111] = "-20000"      # -20%(负值,金丝雀)
-                    if fc not in new_rows:
-                        new_rows.append(fc)
-                        cnt["wpn_fever_consume"] += 1
-                        changed = True
-            # 部分武器分有趣词条:克隆本武器已有 during 行(结构必然合法)→ 换 during_content
-            # 效果 kind 与强度为按属性的好玩效果。避免手工构造 soul 行导致列错位(2026-07-09)
-            if wf and new_rows:
-                fun_kind = {0: "2", 1: "3", 2: "1", 3: "23", 4: "0", 5: "154"}[wel[k]]
-                tmpl = next((r for r in new_rows if r[94] in ("0", "1", "109", "110")
-                             or (len(r) > 106 and r[106] not in ("", "(None)"))), None)
-                if tmpl is not None:
-                    fun = list(tmpl)
-                    fun[94] = "1"; fun[95] = "0"        # during_trigger HpLow, puller 自身
-                    fun[97] = fun[98] = "100000"        # 阈值100%恒真
-                    fun[99] = ""                         # 清 trigger_limit
-                    fun[106] = fun_kind                  # during_content kind = 属性好玩效果
-                    fun[107] = "0"                       # 目标=自身
-                    fun[110] = fun[111] = "20000"        # +20%
-                    if fun not in new_rows:
-                        new_rows.append(fun)
-                        cnt["weapon_fun"] += 1
-                        changed = True
-            p2[k] = new_rows   # 写回(负面证章行已被 continue 丢弃)
-        if not dry and changed:
-            tbl.set_text_rows({k: core.write_csv_lines(r) for k, r in p2.items()})
-            print("写入", core.write_table(tbl, store, suffix))
+                                pass
+                # 雷系武器:Fever 中扣 Fever 点(特殊玩法,克隆本武器 during 行→Fever触发+负Fever点)
+                if tag == "soul" and wel.get(k) == 2 and cnt["wpn_fever_consume"] < 5 and new_rows:
+                    tmpl = next((r for r in new_rows if r[94] in ("0", "1", "109", "110")
+                                 or (len(r) > 106 and r[106] not in ("", "(None)"))), None)
+                    if tmpl is not None:
+                        fc = list(tmpl)
+                        fc[94] = "4"; fc[95] = "0"        # during_trigger = Fever
+                        fc[97] = fc[98] = ""; fc[99] = ""  # 清阈值/次数
+                        fc[106] = "18"                    # during_content = Fever点
+                        fc[107] = "0"
+                        fc[110] = fc[111] = "-20000"      # -20%(负值,金丝雀)
+                        if fc not in new_rows:
+                            new_rows.append(fc)
+                            cnt["wpn_fever_consume"] += 1
+                            changed = True
+                # 部分武器分有趣词条:克隆本武器已有 during 行(结构必然合法)→ 换 during_content
+                # 效果 kind 与强度为按属性的好玩效果。避免手工构造 soul 行导致列错位(2026-07-09)
+                if wf and new_rows:
+                    fun_kind = {0: "2", 1: "3", 2: "1", 3: "23", 4: "0", 5: "154"}[wel[k]]
+                    tmpl = next((r for r in new_rows if r[94] in ("0", "1", "109", "110")
+                                 or (len(r) > 106 and r[106] not in ("", "(None)"))), None)
+                    if tmpl is not None:
+                        fun = list(tmpl)
+                        fun[94] = "1"; fun[95] = "0"        # during_trigger HpLow, puller 自身
+                        fun[97] = fun[98] = "100000"        # 阈值100%恒真
+                        fun[99] = ""                         # 清 trigger_limit
+                        fun[106] = fun_kind                  # during_content kind = 属性好玩效果
+                        fun[107] = "0"                       # 目标=自身
+                        fun[110] = fun[111] = "20000"        # +20%
+                        if fun not in new_rows:
+                            new_rows.append(fun)
+                            cnt["weapon_fun"] += 1
+                            changed = True
+                p2[k] = new_rows   # 写回(负面证章行已被 continue 丢弃)
+            if not dry and changed:
+                tbl.set_text_rows({k: core.write_csv_lines(r) for k, r in p2.items()})
+                print("写入", core.write_table(tbl, store, suffix))
 
     # ---- 11 技能能量:已撤销(用户 2026-07-09"能量全部恢复") ----
     # 原 ×0.85+0/5 化层删除;--apply 从锁定基准重建时 action_skill 自动还原官方原值,
