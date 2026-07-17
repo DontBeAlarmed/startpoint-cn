@@ -150,9 +150,11 @@ cp ../archive/pinball-1.4.90-1.4.101-9-modassets07170102.zip "pinball-$V-$W-9-mo
    cp ../archive/pinball-1.4.90-1.4.101-9-modassets07170102.zip    "pinball-V-W-2-modassets07170102.zip"
    ```
    重启服务端,玩家清缓存/重启游戏即到位。**表键仍缺(血统真不同源)再走下面 1-4。**
-   另外把窗口内容包也带上(修兑换商店『数据不足』死循环——横幅/美术只在 1.4.104-125 窗口发布过):
+   另外把两个资产闭环包也带上(修兑换商店『数据不足』死循环——横幅在 1.4.104-125 窗口、
+   武器图标与角色特效在 1.4.126+ 才发布,都不在早期链里):
    ```bash
-   cp pinball-1.4.103-1.4.104-1-windowmod07171640.zip "pinball-V-W-3-windowmod07171640.zip"
+   cp pinball-1.4.103-1.4.104-1-windowmod07171640.zip      "pinball-V-W-3-windowmod07171640.zip"
+   cp pinball-1.4.104-1.4.105-1-afterchainassets07171830.zip "pinball-V-W-4-afterchainassets07171830.zip"
    ```
    ⚠ `windowquests`(连战塔任务表+event_list)是给**跟链血统**的:`event_list` 会整表替换
    活动页列表,外血统换上会把你自己的活动滤没,只有连战塔内 UI 出问题时再单独考虑前三张。
