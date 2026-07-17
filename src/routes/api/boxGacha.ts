@@ -12,6 +12,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { getBoxGachaSync } from "../../lib/assets";
 import { drawBoxGachaSync, rewardPlayerBoxGachaResultSync } from "../../lib/gacha";
+import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { BoxGachaBoxes } from "../../lib/types";
 
 interface GetBoxListBody {
@@ -305,6 +306,11 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
+        const existingCharacterList = (rewardResult?.character_list ?? []) as Record<string, unknown>[]
+        const characterList = drawnRewards.length > 0
+            ? reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
+            : existingCharacterList
+
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({
@@ -324,7 +330,7 @@ const routes = async (fastify: FastifyInstance) => {
                 }),
                 "all_box_info": allBoxInfo,
                 "joined_character_id_list": rewardResult?.joined_character_id_list ?? [],
-                "character_list": rewardResult?.character_list ?? [],
+                "character_list": characterList,
                 "equipment_list": rewardResult?.equipment_list ?? [],
                 "item_list": {
                     [pullCurrencyId]: newPullCurrency,

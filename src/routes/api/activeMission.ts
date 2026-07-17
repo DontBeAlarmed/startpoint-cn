@@ -6,7 +6,7 @@ import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { validateMissionRewardClaims } from "../../lib/mission/index";
+import { reconcileAwakeUnlockCharacterList, validateMissionRewardClaims } from "../../lib/mission/index";
 import { MissionRewardGranter } from "../../lib/mission/grants";
 
 const routes = async (fastify: FastifyInstance) => {
@@ -56,7 +56,7 @@ const routes = async (fastify: FastifyInstance) => {
             stages: { stage: number, received: boolean }[]
         }>()
 
-        getDb().transaction(() => {
+        const characterList = getDb().transaction(() => {
             for (const claim of validation.claims) {
                 updatePlayerActiveMissionStageSync(playerId, claim.stage, claim.missionId, true)
                 let result = resultByMission.get(claim.missionId)
@@ -68,6 +68,10 @@ const routes = async (fastify: FastifyInstance) => {
                 granter.grant(claim.rewards)
             }
             granter.persistPlayer()
+            const existingCharacterList = granter.characterList as unknown as Record<string, unknown>[]
+            return validation.claims.length > 0
+                ? reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
+                : existingCharacterList
         })()
 
         const resultList = [...resultByMission.values()]
@@ -82,7 +86,7 @@ const routes = async (fastify: FastifyInstance) => {
                     ...granter.getUserInfo(),
                     "exp_pooled_time": getServerTime(player.expPooledTime)
                 },
-                "character_list": granter.characterList,
+                "character_list": characterList,
                 "equipment_list": granter.equipmentList,
                 "item_list": granter.itemList,
                 "degree_list": granter.degreeList.map(degreeId => ({ viewer_id: viewerId, degree_id: degreeId })),

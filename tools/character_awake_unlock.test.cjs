@@ -3,13 +3,124 @@ const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
 const path = require("node:path")
 const Database = require("better-sqlite3")
+const ts = require("typescript")
+
+function readProjectSource(relativePath) {
+    return fs.readFileSync(path.join(__dirname, "..", relativePath), "utf8")
+}
 
 function readRouteSource(relativePath) {
-    return fs.readFileSync(path.join(__dirname, "../src/routes/api", relativePath), "utf8")
+    return readProjectSource(path.join("src/routes/api", relativePath))
 }
 
 function countOccurrences(source, value) {
     return source.split(value).length - 1
+}
+
+function getRouteBlock(source, route, nextRoute) {
+    const start = source.indexOf(`fastify.post("${route}"`)
+    assert.notEqual(start, -1, `missing route ${route}`)
+    const end = nextRoute === undefined
+        ? source.length
+        : source.indexOf(`fastify.post("${nextRoute}"`, start)
+    assert.notEqual(end, -1, `missing route ${nextRoute}`)
+    return source.slice(start, end)
+}
+
+function getCalleeName(expression) {
+    return ts.isIdentifier(expression)
+        ? expression.text
+        : ts.isPropertyAccessExpression(expression)
+            ? expression.name.text
+            : null
+}
+
+function findCalls(source, calleeName) {
+    const sourceFile = ts.createSourceFile(
+        "route-contract.ts",
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS
+    )
+    const calls = []
+
+    function visit(node) {
+        if (ts.isCallExpression(node)) {
+            const name = getCalleeName(node.expression)
+            if (name === calleeName) {
+                const conditionalConditions = []
+                const enclosingLoops = []
+                const enclosingTransactionCallbacks = []
+                let assignedVariable = null
+                for (let parent = node.parent; parent; parent = parent.parent) {
+                    if (ts.isConditionalExpression(parent)) {
+                        conditionalConditions.push(parent.condition.getText(sourceFile))
+                    }
+                    if (ts.isForStatement(parent) || ts.isForOfStatement(parent) || ts.isForInStatement(parent)) {
+                        enclosingLoops.push(ts.SyntaxKind[parent.kind])
+                    }
+                    if ((ts.isArrowFunction(parent) || ts.isFunctionExpression(parent))
+                        && ts.isCallExpression(parent.parent)
+                        && parent.parent.arguments.includes(parent)
+                        && getCalleeName(parent.parent.expression) === "transaction") {
+                        enclosingTransactionCallbacks.push(parent.parent.expression.getText(sourceFile))
+                    }
+                    if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
+                        assignedVariable = parent.name.text
+                    }
+                }
+                calls.push({
+                    position: node.getStart(sourceFile),
+                    arguments: node.arguments.map(argument => argument.getText(sourceFile)),
+                    conditionalConditions,
+                    enclosingLoops,
+                    enclosingTransactionCallbacks,
+                    assignedVariable,
+                })
+            }
+        }
+        ts.forEachChild(node, visit)
+    }
+
+    visit(sourceFile)
+    return calls
+}
+
+function findPropertyAssignmentValues(source, propertyName) {
+    const sourceFile = ts.createSourceFile(
+        "route-contract.ts",
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS
+    )
+    const values = []
+
+    function visit(node) {
+        if (ts.isPropertyAssignment(node)) {
+            const name = ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)
+                ? node.name.text
+                : null
+            if (name === propertyName) values.push(node.initializer.getText(sourceFile))
+        }
+        ts.forEachChild(node, visit)
+    }
+
+    visit(sourceFile)
+    return values
+}
+
+function getOnlyCall(source, calleeName) {
+    const calls = findCalls(source, calleeName)
+    assert.equal(calls.length, 1, `expected one real call to ${calleeName}`)
+    return calls[0]
+}
+
+function getLastCallPosition(source, calleeName) {
+    const calls = findCalls(source, calleeName)
+    assert.notEqual(calls.length, 0, `expected a real call to ${calleeName}`)
+    return calls[calls.length - 1].position
 }
 
 function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
@@ -142,6 +253,88 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
 }
 
 testAuthoritativeMutationRoutesPublishAwakeUnlocks()
+
+function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
+    const multiSource = readProjectSource("src/multi/http/battle.ts")
+    const activeMissionSource = readRouteSource("activeMission.ts")
+    const boxGachaSource = readRouteSource("boxGacha.ts")
+
+    const multiStartBlock = getRouteBlock(multiSource, "/start", "/finish")
+    const multiFinishBlock = getRouteBlock(multiSource, "/finish", "/abort")
+    const multiAbortBlock = getRouteBlock(multiSource, "/abort", "/play_continue")
+    const multiContinueBlock = getRouteBlock(multiSource, "/play_continue")
+    const multiCall = getOnlyCall(multiFinishBlock, "reconcileAwakeUnlockCharacterList")
+    assert.equal(findCalls(multiSource, "reconcileAwakeUnlockCharacterList").length, 1)
+    assert.deepEqual(multiCall.arguments.slice(0, 1), ["playerId"])
+    assert.equal(multiCall.arguments[1].includes("rewardCharacterExpResult.character_list"), true)
+    assert.equal(multiCall.arguments[1].includes("clearReward?.character_list"), true)
+    assert.equal(multiCall.arguments[1].includes("sPlusClearReward?.character_list"), true)
+    assert.equal(multiCall.arguments[1].includes("scoreRewardsResult.character_list"), true)
+    assert.equal(multiCall.position > multiFinishBlock.indexOf("if (activeQuestData === undefined)"), true)
+    assert.equal(multiCall.position > multiFinishBlock.indexOf("if (questData === null"), true)
+    for (const persistenceCall of [
+        "deletePlayerActiveQuestSync",
+        "insertPlayerQuestProgressSync",
+        "updatePlayerQuestProgressSync",
+        "updatePlayerSync",
+        "givePlayerScoreRewardsSync",
+        "trackCharacterClears",
+        "trackLeaderPowerflip",
+        "trackPartyCoClears",
+        "trackPowerflip",
+        "givePlayerCharactersExpSync",
+    ]) {
+        assert.equal(multiCall.position > getLastCallPosition(multiFinishBlock, persistenceCall), true)
+    }
+    assert.deepEqual(findPropertyAssignmentValues(multiFinishBlock, "character_list"), ["characterList"])
+    assert.equal(findCalls(multiStartBlock, "reconcileAwakeUnlockCharacterList").length, 0)
+    assert.equal(findCalls(multiAbortBlock, "reconcileAwakeUnlockCharacterList").length, 0)
+    assert.equal(findCalls(multiContinueBlock, "reconcileAwakeUnlockCharacterList").length, 0)
+
+    const activeReceiveBlock = getRouteBlock(activeMissionSource, "/receive")
+    const activeMissionCall = getOnlyCall(activeReceiveBlock, "reconcileAwakeUnlockCharacterList")
+    assert.equal(findCalls(activeMissionSource, "reconcileAwakeUnlockCharacterList").length, 1)
+    assert.deepEqual(activeMissionCall.arguments, ["playerId", "existingCharacterList"])
+    assert.equal(activeMissionCall.position > activeReceiveBlock.indexOf("if (!validation.ok)"), true)
+    assert.equal(activeMissionCall.position > getLastCallPosition(activeReceiveBlock, "updatePlayerActiveMissionStageSync"), true)
+    assert.equal(activeMissionCall.position > getLastCallPosition(activeReceiveBlock, "grant"), true)
+    assert.equal(activeMissionCall.position > getLastCallPosition(activeReceiveBlock, "persistPlayer"), true)
+    assert.deepEqual(activeMissionCall.conditionalConditions, ["validation.claims.length > 0"])
+    assert.deepEqual(activeMissionCall.enclosingLoops, [])
+    assert.deepEqual(activeMissionCall.enclosingTransactionCallbacks, ["getDb().transaction"])
+    const activeMissionTransactionCall = getOnlyCall(activeReceiveBlock, "transaction")
+    assert.equal(activeMissionTransactionCall.assignedVariable, "characterList")
+    assert.deepEqual(findPropertyAssignmentValues(activeReceiveBlock, "character_list"), ["characterList"])
+
+    const boxCloseBlock = getRouteBlock(boxGachaSource, "/close", "/exec")
+    const boxExecBlock = getRouteBlock(boxGachaSource, "/exec", "/get_box_list")
+    const boxReadOnlyBlock = getRouteBlock(boxGachaSource, "/get_box_list")
+    const boxGachaCall = getOnlyCall(boxExecBlock, "reconcileAwakeUnlockCharacterList")
+    assert.equal(findCalls(boxGachaSource, "reconcileAwakeUnlockCharacterList").length, 1)
+    assert.deepEqual(boxGachaCall.arguments, ["playerId", "existingCharacterList"])
+    assert.equal(boxGachaCall.position > boxExecBlock.indexOf("if (playerBoxData !== null && playerBoxData.isClosed)"), true)
+    for (const persistenceCall of [
+        "rewardPlayerBoxGachaResultSync",
+        "insertPlayerBoxGachaSync",
+        "updatePlayerBoxGachaSync",
+        "insertPlayerBoxGachaDrawnRewardSync",
+        "updatePlayerBoxGachaDrawnRewardSync",
+        "updatePlayerItemSync",
+    ]) {
+        assert.equal(boxGachaCall.position > getLastCallPosition(boxExecBlock, persistenceCall), true)
+    }
+    assert.deepEqual(boxGachaCall.conditionalConditions, ["drawnRewards.length > 0"])
+    assert.deepEqual(boxGachaCall.enclosingLoops, [])
+    assert.deepEqual(findPropertyAssignmentValues(boxExecBlock, "character_list"), ["characterList"])
+    assert.equal(findCalls(boxCloseBlock, "reconcileAwakeUnlockCharacterList").length, 0)
+    assert.equal(findCalls(boxReadOnlyBlock, "reconcileAwakeUnlockCharacterList").length, 0)
+
+    for (const source of [multiSource, activeMissionSource, boxGachaSource]) {
+        assert.equal(findCalls(source, "settleAwakeMissionRewards").length, 0)
+    }
+}
+
+testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks()
 
 function testVersion4BackfillValidation() {
     const database = new Database(":memory:")

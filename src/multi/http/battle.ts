@@ -32,6 +32,7 @@ import { trackPowerflip } from "../../lib/quest/finish/powerflip-tracker";
 import { trackLeaderPowerflip } from "../../lib/quest/finish/leader-powerflip-tracker";
 import { trackPartyCoClears } from "../../lib/quest/finish/party-co-clear-tracker";
 import type { FinishContext } from "../../lib/quest/finish/types";
+import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 
 interface PlayerContext { playerId: number; player: Player }
 
@@ -311,6 +312,12 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             playerId, partyCharacterIdsArray, questData.characterExpReward || 0,
             questData.fixedParty !== undefined
         );
+        const characterList = reconcileAwakeUnlockCharacterList(playerId, [
+            ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
+            ...((clearReward?.character_list || []) as Record<string, unknown>[]),
+            ...((sPlusClearReward?.character_list || []) as Record<string, unknown>[]),
+            ...(scoreRewardsResult.character_list as Record<string, unknown>[])
+        ]);
 
         const dataHeaders = generateDataHeaders({ viewer_id: viewerId });
         const matePlayerResult = ((body as any).mate_player_result || []) as Array<{ viewer_id?: number }>;
@@ -333,12 +340,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                     "boss_boost_point": newBossBoostPoint
                 },
                 "add_exp_list": rewardCharacterExpResult.add_exp_list,
-                "character_list": [
-                    ...rewardCharacterExpResult.character_list,
-                    ...(clearReward?.character_list || []),
-                    ...(sPlusClearReward?.character_list || []),
-                    ...scoreRewardsResult.character_list
-                ],
+                "character_list": characterList,
                 "bond_token_status_list": rewardCharacterExpResult.bond_token_status_list,
                 "rewards": {
                     "overflow_pool_exp": 0,
