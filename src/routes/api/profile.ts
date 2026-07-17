@@ -10,6 +10,7 @@ import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 // removed getAccountPlayers "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
+import { getOwnedPlayerDegreeIdsSync } from "../../data/domains/degree";
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/get_my_profile", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -37,6 +38,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         const characters = getPlayerCharactersSync(playerId)
         const charCount = Object.keys(characters).length
+        const degreeCount = getOwnedPlayerDegreeIdsSync(playerId, player.degreeId).length
 
         // Build party group list (map from DB format to client format)
         const partyGroups = getPlayerPartyGroupListSync(playerId)
@@ -92,10 +94,10 @@ const routes = async (fastify: FastifyInstance) => {
                 profile_info: {
                     max_opened_mana_board_second_count: 0,
                     max_owned_character_count: charCount,
-                    max_owned_degree_count: 1,
+                    max_owned_degree_count: degreeCount,
                     opened_mana_board_second_count: 0,
                     owned_character_count: charCount,
-                    owned_degree_count: 1,
+                    owned_degree_count: degreeCount,
                 },
                 profile_settings: {
                     show_opened_mana_board_second_count: false,
@@ -149,12 +151,13 @@ const routes = async (fastify: FastifyInstance) => {
         const playerId = resolvePlayerIdSync(session.accountId)!
         const player = playerId !== null ? getPlayerSync(playerId) : null
         const degreeId = player?.degreeId || 1
+        const degreeIds = playerId !== null ? getOwnedPlayerDegreeIdsSync(playerId, degreeId) : [1, degreeId]
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
-                degree_ids: [1, degreeId],  // default title + current
+                degree_ids: degreeIds,
             }
         })
     })
@@ -187,6 +190,12 @@ const routes = async (fastify: FastifyInstance) => {
         if (!player) return reply.status(500).send({
             error: "Internal Server Error",
             message: "Player not found."
+        })
+
+        const ownedDegreeIds = new Set(getOwnedPlayerDegreeIdsSync(playerId, player.degreeId))
+        if (!ownedDegreeIds.has(Number(degreeId))) return reply.status(400).send({
+            error: "Bad Request",
+            message: "Degree is not owned."
         })
 
         updatePlayerSync({ id: playerId, degreeId: Number(degreeId) })

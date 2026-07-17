@@ -166,7 +166,7 @@ export function serializePlayerData(
             "exp_pooled_time": getServerTime(playerData.expPooledTime),
             "leader_character_id": playerData.leaderCharacterId != null ? kIdToBusinessCode(playerData.leaderCharacterId) : 0,
             "party_slot": playerData.partySlot,
-            "degree_id": 1,
+            "degree_id": playerData.degreeId,
             "birth": playerData.birth,
             "free_mana": playerData.freeMana,
             "paid_mana": playerData.paidMana,
@@ -342,4 +342,3 @@ export function serializePlayerData(
 
     return clientData
 }
-

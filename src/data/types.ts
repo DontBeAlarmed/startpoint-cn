@@ -756,7 +756,10 @@ export interface MergedPlayerData {
     // rush event data
     rushEventList?: PlayerRushEvent[],
     rushEventClearedFolderList?: Record<string, PlayerRushEventClearedFolders>,
-    rushEventPlayedPartyList?: Record<string, PlayerRushEventPlayedParty[]>
+    rushEventPlayedPartyList?: Record<string, PlayerRushEventPlayedParty[]>,
+    carnivalEventRecords?: PlayerCarnivalEventRecord[],
+    carnivalRewardClaims?: PlayerCarnivalRewardClaim[],
+    degreeIds?: number[]
 }
 
 export interface RawPlayerCarnivalEventRecord {
@@ -776,6 +779,11 @@ export interface PlayerCarnivalEventRecord {
     previousScore: number | null
     previousCharacterIds: (number | null)[] | null
     previousUnisonCharacterIds: (number | null)[] | null
+}
+
+export interface PlayerCarnivalRewardClaim {
+    eventId: number
+    rewardId: number
 }
 
 // Active quest (unfinished battle recovery)

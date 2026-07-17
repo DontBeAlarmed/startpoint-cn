@@ -36,6 +36,7 @@ import { insertPlayerBoxGachasSync } from "./boxGacha";
 import { insertPlayerRushEventListSync, insertPlayerRushEventClearedFolderListSync, insertPlayerRushEventPlayedPartyListSync } from "./rushEvent";
 import { deletePlayerCategoryMissionsSync, insertPlayerCategoryMissionListSync, insertPlayerClearedRegularMissionListSync, insertPlayerActiveMissionsSync } from "./mission";
 import { insertPlayerPeriodicRewardPointsListSync, insertPlayerStartDashExchangeCampaignsSync, insertPlayerMultiSpecialExchangeCampaignsSync } from "./campaign";
+import { insertCarnivalSaveStateSync } from "../../lib/carnival-save-state";
 
 /**
  * Gets a player's daily challenge point list based on their id.
@@ -484,6 +485,7 @@ export function insertMergedPlayerDataSync(
     insertPlayerStartDashExchangeCampaignsSync(playerId, toInsert.startDashExchangeCampaignList)
     insertPlayerMultiSpecialExchangeCampaignsSync(playerId, toInsert.multiSpecialExchangeCampaignList)
     insertPlayerOptionsSync(playerId, toInsert.userOption)
+    insertCarnivalSaveStateSync(getDb(), playerId, toInsert)
 
     // insert data that could be undefined.
     const rushEventList = toInsert.rushEventList
@@ -1111,17 +1113,14 @@ export function replacePlayerDataSync(
     replaceWith: MergedPlayerData
 ) {
     try {
-        const playerId = replaceWith.player.id
+        getDb().transaction(() => {
+            const playerId = replaceWith.player.id
+            const account = getAccountFromPlayerIdSync(playerId)
+            if (account === null) throw new Error("No account tied to player id.")
 
-        const account = getAccountFromPlayerIdSync(playerId)
-        if (account === null)
-            throw new Error("No account tied to player id.");
-
-        // delete player
-        deletePlayerSync(playerId)
-
-        // insert new
-        insertMergedPlayerDataSync(account.id, replaceWith)
+            deletePlayerSync(playerId)
+            insertMergedPlayerDataSync(account.id, replaceWith)
+        })()
     } catch (error: Error | any) {
         console.error(error)
         throw error

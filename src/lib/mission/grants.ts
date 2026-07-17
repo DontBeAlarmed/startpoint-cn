@@ -4,6 +4,7 @@ import { updatePlayerSync } from "../../data/domains/player"
 import { givePlayerCharacterSync } from "../character"
 import { givePlayerEquipmentSync } from "../equipment"
 import type { ActiveMissionReward } from "./rewards"
+import { givePlayerDegreeSync } from "../../data/domains/degree"
 
 export class MissionRewardGranter {
     readonly itemList: Record<string, number> = {}
@@ -58,7 +59,9 @@ export class MissionRewardGranter {
                     this.expPool += reward.amount
                     break
                 case 6:
-                    if (reward.degreeId !== undefined && !this.degreeList.includes(reward.degreeId)) {
+                    if (reward.degreeId !== undefined
+                        && !this.degreeList.includes(reward.degreeId)
+                        && givePlayerDegreeSync(this.playerId, reward.degreeId)) {
                         this.degreeList.push(reward.degreeId)
                         this.latestDegreeId = reward.degreeId
                     }

@@ -1,6 +1,10 @@
 import { getDb } from "../db";
 import { PlayerCarnivalEventRecord, RawPlayerCarnivalEventRecord } from "../types";
 import { deserializeNumberList, serializeNumberList } from "../utils";
+import {
+    getClaimedCarnivalRewardIdsSync,
+    insertClaimedCarnivalRewardIdsSync,
+} from "../../lib/carnival-reward-persistence";
 
 function buildRecord(raw: RawPlayerCarnivalEventRecord): PlayerCarnivalEventRecord {
     return {
@@ -77,4 +81,23 @@ export function upsertPlayerCarnivalEventRecordSync(
         previousCharacterIds: characterIds,
         previousUnisonCharacterIds: unisonCharacterIds,
     }
+}
+
+export function getPlayerClaimedCarnivalRewardIdsSync(
+    playerId: number,
+    eventId: number,
+): Set<number> {
+    return getClaimedCarnivalRewardIdsSync(getDb(), playerId, eventId)
+}
+
+export function insertPlayerClaimedCarnivalRewardIdsSync(
+    playerId: number,
+    eventId: number,
+    rewardIds: number[],
+) {
+    insertClaimedCarnivalRewardIdsSync(getDb(), playerId, eventId, rewardIds)
+}
+
+export function runCarnivalEventTransactionSync<T>(operation: () => T): T {
+    return getDb().transaction(operation)()
 }

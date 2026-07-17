@@ -7,7 +7,13 @@ import { getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, update
 import { getSession } from "../../data/domains/session"
 import { incrementPlayerCharacterClearSync } from "../../data/domains/character_clear"
 import { updatePlayerEquipmentSync } from "../../data/domains/equipment"
-import { getPlayerCarnivalEventRecordsSync, upsertPlayerCarnivalEventRecordSync } from "../../data/domains/carnivalEvent"
+import {
+    getPlayerCarnivalEventRecordsSync,
+    getPlayerClaimedCarnivalRewardIdsSync,
+    insertPlayerClaimedCarnivalRewardIdsSync,
+    runCarnivalEventTransactionSync,
+    upsertPlayerCarnivalEventRecordSync,
+} from "../../data/domains/carnivalEvent"
 import { getQuestFromCategorySync, getRushEventFolderClearRewards } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
@@ -35,6 +41,9 @@ import eventChallengePointMap from "../../../assets/event_challenge_point_map.js
 
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import { getCarnivalRewardDefinitions, grantCarnivalRewards } from "../../lib/carnival-rewards";
+import { givePlayerDegreeSync } from "../../data/domains/degree";
+import { givePlayerEquipmentSync } from "../../lib/equipment";
 
 interface StartBody {
     quest_id: number
@@ -402,7 +411,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // handle carnival event score & records
-        const carnivalEventData = handleCarnivalEventFinish({
+        const carnivalFinishResult = handleCarnivalEventFinish({
             questCategory,
             questAccomplished,
             questId,
@@ -412,12 +421,26 @@ const routes = async (fastify: FastifyInstance) => {
             playerId,
             getRecordsFn: (pid, eid) => getPlayerCarnivalEventRecordsSync(pid, eid),
             upsertFn: (pid, eid, fid, score, chars, unisons) => upsertPlayerCarnivalEventRecordSync(pid, eid, fid, score, chars, unisons),
+            getRewardDefinitionsFn: eid => getCarnivalRewardDefinitions(eid),
+            getClaimedRewardIdsFn: (pid, eid) => getPlayerClaimedCarnivalRewardIdsSync(pid, eid),
+            grantRewardsFn: (pid, definitions) => grantCarnivalRewards(pid, definitions, {
+                getPlayer: getPlayerSync,
+                giveItem: givePlayerItemSync,
+                giveEquipment: givePlayerEquipmentSync,
+                giveDegree: givePlayerDegreeSync,
+                updatePlayer: updatePlayerSync,
+            }),
+            claimRewardIdsFn: (pid, eid, rewardIds) => insertPlayerClaimedCarnivalRewardIdsSync(pid, eid, rewardIds),
+            transactionFn: runCarnivalEventTransactionSync,
         })
+        const carnivalEventData = carnivalFinishResult?.carnivalEventData ?? null
+        const carnivalRewardResult = carnivalFinishResult?.rewardResult
 
         const itemList = {
             ...(activeQuestData.entryItemId ? { [activeQuestData.entryItemId]: getPlayerItemSync(playerId, activeQuestData.entryItemId) ?? 0 } : {}),
             ...scoreRewardsResult.items,
-            ...(rushEventRewardsResult?.items ?? {})
+            ...(rushEventRewardsResult?.items ?? {}),
+            ...(carnivalRewardResult?.item_list ?? {}),
         }
         const characterList = reconcileAwakeUnlockCharacterList(playerId, [
             ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
@@ -430,12 +453,12 @@ const routes = async (fastify: FastifyInstance) => {
             "data_headers": dataHeaders,
             "data": {
                 "user_info": {
-                    "free_mana": newMana + (clearReward?.user_info.free_mana || 0) + (sPlusClearReward?.user_info.free_mana || 0) + scoreRewardsResult.user_info.free_mana,
-                    "exp_pool": rewardCharacterExpResult.exp_pool + (clearReward?.user_info.exp_pool || 0) + scoreRewardsResult.user_info.exp_pool,
+                    "free_mana": newMana + (clearReward?.user_info.free_mana || 0) + (sPlusClearReward?.user_info.free_mana || 0) + scoreRewardsResult.user_info.free_mana + (carnivalRewardResult?.user_info.free_mana ?? 0),
+                    "exp_pool": rewardCharacterExpResult.exp_pool + (clearReward?.user_info.exp_pool || 0) + scoreRewardsResult.user_info.exp_pool + (carnivalRewardResult?.user_info.exp_pool ?? 0),
                     "exp_pooled_time": getServerTime(playerData.expPooledTime),
-                    "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney,
+                    "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney + (carnivalRewardResult?.user_info.free_vmoney ?? 0),
                     "rank_point": newRankPoint,
-                    "degree_id": 1,
+                    "degree_id": playerData.degreeId,
                     "stamina": playerData.stamina,
                     "stamina_heal_time": realToVirtual(playerData.staminaHealTime),
                     "boost_point": newBoostPoint,
@@ -467,7 +490,8 @@ const routes = async (fastify: FastifyInstance) => {
                     ...scoreRewardsResult.equipment_list,
                     ...(clearReward?.equipment_list || []),
                     ...(sPlusClearReward?.equipment_list || []),
-                    ...(rushEventRewardsResult?.equipment_list || [])
+                    ...(rushEventRewardsResult?.equipment_list || []),
+                    ...(carnivalRewardResult?.equipment_list ?? []),
                 ],
                 "category_id": body.category,
                 "start_time": dataHeaders['servertime'],

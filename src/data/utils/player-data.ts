@@ -17,6 +17,8 @@ import { getPlayerPartyGroupListSync } from "../domains/party"
 import { getPlayerTriggeredTutorialsSync } from "../domains/tutorial"
 import { computeAwakeSummary, filterToActiveMissions, reconcileAwakeUnlocksFromProgress } from "../../lib/mission/index"
 import { computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps } from "../../lib/character-helpers"
+import { getDb } from "../db"
+import { getCarnivalSaveStateSync } from "../../lib/carnival-save-state"
 
 /**
  * Generates default player data.
@@ -167,6 +169,7 @@ export function getMergedPlayerDataSync(
         userOption: getPlayerOptionsSync(playerId),
         rushEventList: getPlayerRushEventListSync(playerId),
         rushEventClearedFolderList: getPlayerRushEventListClearedFoldersSync(playerId),
-        rushEventPlayedPartyList: getPlayerRushEventListPlayedPartiesSync(playerId)
+        rushEventPlayedPartyList: getPlayerRushEventListPlayedPartiesSync(playerId),
+        ...getCarnivalSaveStateSync(getDb(), playerId),
     }
 }

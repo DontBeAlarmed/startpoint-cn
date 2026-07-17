@@ -4,7 +4,7 @@ import { deleteAccountSync, getAccountPlayersSync, getAllAccountsSync } from "..
 import { deletePlayerSync, getPlayerSync, insertDefaultPlayerSync, replacePlayerDataSync, updatePlayerSync } from "../../data/domains/player"
 import { getAllDeviceBindingsSync, updateDeviceBindingNameSync } from "../../data/domains/session"
 import { getPlayerCharactersSync } from "../../data/domains/character"
-import { getClientSerializedData, deserializePlayerData, reviveMergedPlayerDates } from "../../data/utils";
+import { getMergedPlayerDataSync, reviveMergedPlayerDates } from "../../data/utils";
 import { getActivePlayerId, setActivePlayerId, getSelectedAccountId, setSelectedAccountId, saveTimeOffset, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
 import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTemplate, getDefaultSaveMeta } from "../../data/defaultSave";
 import { wantsJson } from "./http";
@@ -264,8 +264,8 @@ const routes = async (fastify: FastifyInstance) => {
             return reply.redirect('/player')
         }
 
-        const serialized = getClientSerializedData(playerId, { viewerId: 0 })
-        if (!serialized) {
+        const mergedData = getMergedPlayerDataSync(playerId)
+        if (!mergedData) {
             if (wantsJson(request)) return reply.status(404).send({ error: "Source player not found" })
             return reply.redirect('/player')
         }
@@ -273,7 +273,7 @@ const routes = async (fastify: FastifyInstance) => {
         const newPlayer = insertDefaultPlayerSync(accountId)
         setActivePlayerId(newPlayer.id)
 
-        const mergedData = deserializePlayerData(newPlayer.id, serialized)
+        mergedData.player.id = newPlayer.id
         replacePlayerDataSync(mergedData)
 
         saveAccountDefaultPlayer(accountId, newPlayer.id)
