@@ -10,6 +10,7 @@ import { getCharacterDataSync } from "../../lib/assets";
 import { characterExpCaps, givePlayerCharacterSync } from "../../lib/character";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
+import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 
 interface OverLimitBody {
     viewer_id: number
@@ -288,28 +289,23 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Internal Server Error", "message": "No player bound to account."
         })
 
-        givePlayerCharacterSync(playerId, characterId)
-
-        // Return character_list so the framework updates local player data
-        const charData = getPlayerCharacterSync(playerId, characterId)
-        const characterList = charData ? [{
-            "character_id": characterId,
-            "entry_count": charData.entryCount,
-            "evolution_level": charData.evolutionLevel,
-            "bond_token_list": charData.bondTokenList?.map(bt => ({
-                "mana_board_index": bt.manaBoardIndex,
-                "status": bt.status
-            })) ?? [],
-            "create_time": clientSerializeDate(charData.joinTime),
-            "update_time": clientSerializeDate(charData.updateTime),
-            "join_time": clientSerializeDate(charData.joinTime)
-        }] : []
+        const giveResult = givePlayerCharacterSync(playerId, characterId)
+        const existingCharacterList: Record<string, unknown>[] = giveResult?.character
+            ? [giveResult.character as Record<string, unknown>]
+            : []
+        const itemList = giveResult?.item
+            ? { [giveResult.item.id]: giveResult.item.count }
+            : {}
+        const characterList = existingCharacterList.length > 0
+            ? reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
+            : existingCharacterList
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
                 "character_list": characterList,
+                "item_list": itemList,
                 "mail_arrived": false
             }
         })

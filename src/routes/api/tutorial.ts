@@ -10,6 +10,7 @@ import { randomPoolItem, rewardPlayerGachaDrawResultSync } from "../../lib/gacha
 import { givePlayerCharacterSync } from "../../lib/character";
 import { randomInt } from "crypto";
 import { GachaCharacterDraw } from "../../lib/types";
+import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 
 interface UpdateStepBody {
     viewer_id: number
@@ -157,6 +158,17 @@ const routes = async (fastify: FastifyInstance) => {
             draw.movie_id = "normal_guarantee"
             draw.seed = 10007656
 
+            const existingCharacterList = rewardResult.characters.filter(
+                (character): character is Record<string, unknown> =>
+                    character !== undefined
+                    && character !== null
+                    && typeof character === "object"
+                    && !Array.isArray(character)
+            )
+            const characterList = existingCharacterList.length > 0
+                ? reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
+                : existingCharacterList
+
             return reply.status(200).send({
                 "data_headers": headers,
                 "data": {
@@ -174,7 +186,7 @@ const routes = async (fastify: FastifyInstance) => {
                             }
                         ],
                     },
-                    "character_list": rewardResult.characters,
+                    "character_list": characterList,
                     "item_list": rewardResult.items,
                     "encyclopedia_info": [],
                     "mail_arrived": false,
@@ -192,7 +204,12 @@ const routes = async (fastify: FastifyInstance) => {
 
             // give free character directly (required for tutorial popup)
             const giveResult = givePlayerCharacterSync(playerId, freeTutorialCharacterId)
-            const characterList = giveResult !== null ? [giveResult.character] : []
+            const existingCharacterList: Record<string, unknown>[] = giveResult?.character
+                ? [giveResult.character as Record<string, unknown>]
+                : []
+            const itemList = giveResult?.item
+                ? { [giveResult.item.id]: giveResult.item.count }
+                : {}
             insertReceiveHistorySync(playerId, { type: MailType.CHARACTER, type_id: freeTutorialCharacterId, number: 1 })
 
             // also send a mail with tutorial gift (gacha ticket, etc.)
@@ -209,6 +226,10 @@ const routes = async (fastify: FastifyInstance) => {
                 reward_limit_time: null,
             })
 
+            const characterList = existingCharacterList.length > 0
+                ? reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
+                : existingCharacterList
+
             reply.status(200).send({
                 "data_headers": headers,
                 "data": {
@@ -217,6 +238,7 @@ const routes = async (fastify: FastifyInstance) => {
                         "free_vmoney": newVMoney
                     },
                     "character_list": characterList,
+                    "item_list": itemList,
                     "encyclopedia_info": {
                         [`1${freeTutorialCharacterId}01`]: {
                             "read": false

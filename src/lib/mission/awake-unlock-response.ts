@@ -25,62 +25,70 @@ export function reconcileAwakeUnlockCharacterList(
     playerId: number,
     existing: Record<string, unknown>[]
 ): Record<string, unknown>[] {
-    const changed = reconcileAwakeUnlocks(playerId).changed
-    if (changed.size === 0) return existing
+    try {
+        const changed = reconcileAwakeUnlocks(playerId).changed
+        if (changed.size === 0) return existing
 
-    const updates = buildManaBoardAwakeCharacterList(
-        getPlayerCharactersSync(playerId),
-        changed
-    )
-    const merged: Record<string, unknown>[] = []
-    const indexByCharacterId = new Map<string, number>()
+        const updates = buildManaBoardAwakeCharacterList(
+            getPlayerCharactersSync(playerId),
+            changed
+        )
+        const merged: Record<string, unknown>[] = []
+        const indexByCharacterId = new Map<string, number>()
 
-    for (const entry of existing) {
-        const characterId = entry.character_id
-        if (typeof characterId !== "number" && typeof characterId !== "string") {
-            merged.push({ ...entry })
-            continue
+        for (const entry of existing) {
+            const characterId = entry.character_id
+            if (typeof characterId !== "number" && typeof characterId !== "string") {
+                merged.push({ ...entry })
+                continue
+            }
+
+            const key = String(characterId)
+            const index = indexByCharacterId.get(key)
+            if (index === undefined) {
+                indexByCharacterId.set(key, merged.length)
+                merged.push({ ...entry })
+                continue
+            }
+
+            const previous = merged[index]
+            merged[index] = {
+                ...previous,
+                ...entry,
+                ...((previous.mana_board_awake !== undefined || entry.mana_board_awake !== undefined) ? {
+                    mana_board_awake: mergeManaBoardAwake(
+                        previous.mana_board_awake,
+                        entry.mana_board_awake
+                    ),
+                } : {}),
+            }
         }
 
-        const key = String(characterId)
-        const index = indexByCharacterId.get(key)
-        if (index === undefined) {
-            indexByCharacterId.set(key, merged.length)
-            merged.push({ ...entry })
-            continue
-        }
+        for (const update of updates) {
+            const key = String(update.character_id)
+            const index = indexByCharacterId.get(key)
+            if (index === undefined) {
+                indexByCharacterId.set(key, merged.length)
+                merged.push(update)
+                continue
+            }
 
-        const previous = merged[index]
-        merged[index] = {
-            ...previous,
-            ...entry,
-            ...((previous.mana_board_awake !== undefined || entry.mana_board_awake !== undefined) ? {
+            merged[index] = {
+                ...update,
+                ...merged[index],
                 mana_board_awake: mergeManaBoardAwake(
-                    previous.mana_board_awake,
-                    entry.mana_board_awake
+                    merged[index].mana_board_awake,
+                    update.mana_board_awake
                 ),
-            } : {}),
+            }
         }
+
+        return merged
+    } catch (cause) {
+        const error = cause instanceof Error
+            ? cause
+            : new Error("Unknown awake unlock publication error")
+        console.error("[awake-unlock] Failed to publish character unlocks.", error)
+        return existing
     }
-
-    for (const update of updates) {
-        const key = String(update.character_id)
-        const index = indexByCharacterId.get(key)
-        if (index === undefined) {
-            indexByCharacterId.set(key, merged.length)
-            merged.push(update)
-            continue
-        }
-
-        merged[index] = {
-            ...update,
-            ...merged[index],
-            mana_board_awake: mergeManaBoardAwake(
-                merged[index].mana_board_awake,
-                update.mana_board_awake
-            ),
-        }
-    }
-
-    return merged
 }

@@ -11,6 +11,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders } from "../../utils";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { givePlayerEquipmentSync } from "../../lib/equipment";
+import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import starCrumbExchange from "../../../assets/star_crumb_exchange.json";
 import starCrumbExchangeCost from "../../../assets/star_crumb_exchange_cost.json";
 
@@ -92,7 +93,7 @@ const routes = async (fastify: FastifyInstance) => {
         updatePlayerSync({ id: playerId, starCrumb: newStarCrumb });
 
         // Give reward
-        const characterList: any[] = [];
+        let characterList: Record<string, unknown>[] = [];
         const itemList: Record<string, number> = {};
         const equipmentList: any[] = [];
 
@@ -103,7 +104,7 @@ const routes = async (fastify: FastifyInstance) => {
                     updatePlayerSync({ id: playerId, starCrumb: player.starCrumb });
                     return reply.status(500).send({ error: "Internal Server Error", message: "Failed to give character." });
                 }
-                characterList.push(result.character);
+                if (result.character) characterList.push(result.character as Record<string, unknown>);
                 break;
             }
             case 1: { // Item
@@ -121,6 +122,10 @@ const routes = async (fastify: FastifyInstance) => {
                 break;
             }
         }
+
+        characterList = characterList.length > 0
+            ? reconcileAwakeUnlockCharacterList(playerId, characterList)
+            : characterList;
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({

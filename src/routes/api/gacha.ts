@@ -15,6 +15,7 @@ import { givePlayerCharacterSync } from "../../lib/character";
 import { givePlayerEquipmentSync } from "../../lib/equipment";
 import { buildGachaExecPlan } from "../../lib/gacha-exec-plan";
 import { getExchangeableGachaItem } from "../../lib/gacha-rules";
+import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 
 interface ExecBody {
     api_count: number,
@@ -209,15 +210,20 @@ const routes = async (fastify: FastifyInstance) => {
             gachaExchangePoint: newExchangePoints
         })
 
+        const existingCharacterList: Record<string, unknown>[] = giveResult.character
+            ? [giveResult.character as Record<string, unknown>]
+            : []
+        const characterList = existingCharacterList.length > 0
+            ? reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
+            : existingCharacterList
+
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({
                 viewer_id: viewerId
             }),
             "data": {
-                "character_list": [
-                    giveResult?.character
-                ],
+                "character_list": characterList,
                 "item_list": giveResult.item !== undefined ? {
                     [giveResult.item.id]: giveResult.item.count
                 } : [],
@@ -388,6 +394,17 @@ const routes = async (fastify: FastifyInstance) => {
 
         reply.header("content-type", "application/x-msgpack")
         if (isCharacterGacha) {
+            const existingCharacterList = rewardResult.characters.filter(
+                (character): character is Record<string, unknown> =>
+                    character !== undefined
+                    && character !== null
+                    && typeof character === "object"
+                    && !Array.isArray(character)
+            )
+            const characterList = existingCharacterList.length > 0
+                ? reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
+                : existingCharacterList
+
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({
                     viewer_id: viewerId
@@ -398,7 +415,7 @@ const routes = async (fastify: FastifyInstance) => {
                         "vmoney": playerPaidVmoney
                     },
                     "draw": rewardResult.draw,
-                    "character_list": rewardResult.characters,
+                    "character_list": characterList,
                     "item_list": {
                         ...items,
                         ...rewardResult.items

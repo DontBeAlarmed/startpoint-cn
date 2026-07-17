@@ -111,6 +111,30 @@ function findPropertyAssignmentValues(source, propertyName) {
     return values
 }
 
+function findVariableInitializers(source, variableName) {
+    const sourceFile = ts.createSourceFile(
+        "route-contract.ts",
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS
+    )
+    const initializers = []
+
+    function visit(node) {
+        if (ts.isVariableDeclaration(node)
+            && ts.isIdentifier(node.name)
+            && node.name.text === variableName
+            && node.initializer) {
+            initializers.push(node.initializer.getText(sourceFile))
+        }
+        ts.forEachChild(node, visit)
+    }
+
+    visit(sourceFile)
+    return initializers
+}
+
 function getOnlyCall(source, calleeName) {
     const calls = findCalls(source, calleeName)
     assert.equal(calls.length, 1, `expected one real call to ${calleeName}`)
@@ -336,6 +360,142 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
 
 testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks()
 
+function testCharacterGrantRoutesPublishAwakeUnlocks() {
+    const gachaSource = readRouteSource("gacha.ts")
+    const exchangeSource = readRouteSource("exchange.ts")
+    const characterSource = readRouteSource("character.ts")
+    const tutorialSource = readRouteSource("tutorial.ts")
+
+    const gachaEquipmentBlock = getRouteBlock(gachaSource, "/exchange_equipment", "/exchange_character")
+    const gachaCharacterBlock = getRouteBlock(gachaSource, "/exchange_character", "/exec")
+    const gachaExecBlock = getRouteBlock(gachaSource, "/exec")
+    assert.equal(findCalls(gachaSource, "reconcileAwakeUnlockCharacterList").length, 2)
+    assert.equal(findCalls(gachaEquipmentBlock, "reconcileAwakeUnlockCharacterList").length, 0)
+
+    const gachaExchangeCall = getOnlyCall(gachaCharacterBlock, "reconcileAwakeUnlockCharacterList")
+    assert.deepEqual(gachaExchangeCall.arguments, ["playerId", "existingCharacterList"])
+    assert.deepEqual(gachaExchangeCall.conditionalConditions, ["existingCharacterList.length > 0"])
+    assert.equal(gachaExchangeCall.position > getLastCallPosition(gachaCharacterBlock, "givePlayerCharacterSync"), true)
+    assert.equal(gachaExchangeCall.position > getLastCallPosition(gachaCharacterBlock, "updatePlayerGachaInfoSync"), true)
+    const gachaExchangeExistingList = findVariableInitializers(gachaCharacterBlock, "existingCharacterList")
+    assert.equal(gachaExchangeExistingList.length, 1)
+    assert.equal(gachaExchangeExistingList[0].startsWith("giveResult.character"), true)
+    assert.equal(gachaExchangeExistingList[0].includes("? [giveResult.character"), true)
+    assert.equal(gachaExchangeExistingList[0].endsWith(": []"), true)
+    assert.deepEqual(findPropertyAssignmentValues(gachaCharacterBlock, "character_list"), ["characterList"])
+
+    const gachaExecCall = getOnlyCall(gachaExecBlock, "reconcileAwakeUnlockCharacterList")
+    assert.deepEqual(gachaExecCall.arguments, ["playerId", "existingCharacterList"])
+    assert.deepEqual(gachaExecCall.conditionalConditions, ["existingCharacterList.length > 0"])
+    for (const persistenceCall of [
+        "rewardPlayerGachaDrawResultSync",
+        "insertReceiveHistorySync",
+        "insertPlayerGachaInfoSync",
+        "updatePlayerGachaInfoSync",
+        "updatePlayerSync",
+    ]) {
+        assert.equal(gachaExecCall.position > getLastCallPosition(gachaExecBlock, persistenceCall), true)
+    }
+    const gachaExecExistingList = findVariableInitializers(gachaExecBlock, "existingCharacterList")
+    assert.equal(gachaExecExistingList.length, 1)
+    assert.equal(gachaExecExistingList[0].startsWith("rewardResult.characters.filter("), true)
+    assert.equal(gachaExecExistingList[0].includes("character !== undefined"), true)
+    assert.equal(gachaExecExistingList[0].includes("character !== null"), true)
+    assert.equal(gachaExecExistingList[0].includes('typeof character === "object"'), true)
+    assert.equal(gachaExecExistingList[0].includes("!Array.isArray(character)"), true)
+    assert.deepEqual(findPropertyAssignmentValues(gachaExecBlock, "character_list"), ["characterList"])
+
+    const starCrumbBlock = getRouteBlock(exchangeSource, "/star_crumb")
+    const starCrumbCall = getOnlyCall(starCrumbBlock, "reconcileAwakeUnlockCharacterList")
+    assert.equal(findCalls(exchangeSource, "reconcileAwakeUnlockCharacterList").length, 1)
+    assert.deepEqual(starCrumbCall.arguments, ["playerId", "characterList"])
+    assert.deepEqual(starCrumbCall.conditionalConditions, ["characterList.length > 0"])
+    assert.equal(starCrumbCall.position > getLastCallPosition(starCrumbBlock, "givePlayerCharacterSync"), true)
+    assert.equal(starCrumbCall.position > getLastCallPosition(starCrumbBlock, "updatePlayerSync"), true)
+    assert.equal(starCrumbBlock.includes("if (result.character) characterList.push(result.character"), true)
+    assert.deepEqual(findPropertyAssignmentValues(starCrumbBlock, "character_list"), ["characterList"])
+
+    const townReadOnlyBlock = getRouteBlock(characterSource, "/set_illustration_settings", "/over_limit")
+    const townOverLimitBlock = getRouteBlock(characterSource, "/over_limit", "/bulk_over_limit")
+    const townBulkBlock = getRouteBlock(characterSource, "/bulk_over_limit", "/add_character_from_town")
+    const townGrantBlock = getRouteBlock(characterSource, "/add_character_from_town")
+    const townCall = getOnlyCall(townGrantBlock, "reconcileAwakeUnlockCharacterList")
+    assert.equal(findCalls(characterSource, "reconcileAwakeUnlockCharacterList").length, 1)
+    assert.deepEqual(townCall.arguments, ["playerId", "existingCharacterList"])
+    assert.deepEqual(townCall.conditionalConditions, ["existingCharacterList.length > 0"])
+    assert.equal(townCall.position > getLastCallPosition(townGrantBlock, "givePlayerCharacterSync"), true)
+    assert.equal(findCalls(townGrantBlock, "getPlayerCharacterSync").length, 0)
+    const townExistingList = findVariableInitializers(townGrantBlock, "existingCharacterList")
+    assert.equal(townExistingList.length, 1)
+    assert.equal(townExistingList[0].startsWith("giveResult?.character"), true)
+    assert.equal(townExistingList[0].includes("? [giveResult.character"), true)
+    assert.equal(townExistingList[0].endsWith(": []"), true)
+    const townItemList = findVariableInitializers(townGrantBlock, "itemList")
+    assert.equal(townItemList.length, 1)
+    assert.equal(townItemList[0].startsWith("giveResult?.item"), true)
+    assert.equal(townItemList[0].includes("[giveResult.item.id]"), true)
+    assert.equal(townItemList[0].includes("giveResult.item.count"), true)
+    assert.deepEqual(findPropertyAssignmentValues(townGrantBlock, "character_list"), ["characterList"])
+    assert.deepEqual(findPropertyAssignmentValues(townGrantBlock, "item_list"), ["itemList"])
+    for (const block of [townReadOnlyBlock, townOverLimitBlock, townBulkBlock]) {
+        assert.equal(findCalls(block, "reconcileAwakeUnlockCharacterList").length, 0)
+    }
+
+    const tutorialFinishBlock = getRouteBlock(tutorialSource, "/finish_trigger", "/update_step")
+    const tutorialUpdateBlock = getRouteBlock(tutorialSource, "/update_step")
+    const step15Start = tutorialUpdateBlock.indexOf("if (nextStep === 15")
+    const step16Start = tutorialUpdateBlock.indexOf("} else if (nextStep === 16)")
+    const otherStepStart = tutorialUpdateBlock.indexOf("} else {", step16Start)
+    const tutorialStep15Block = tutorialUpdateBlock.slice(step15Start, step16Start)
+    const tutorialStep16Block = tutorialUpdateBlock.slice(step16Start, otherStepStart)
+    const tutorialOtherStepBlock = tutorialUpdateBlock.slice(otherStepStart)
+    assert.equal(findCalls(tutorialSource, "reconcileAwakeUnlockCharacterList").length, 2)
+    assert.equal(findCalls(tutorialFinishBlock, "reconcileAwakeUnlockCharacterList").length, 0)
+    assert.equal(findCalls(tutorialOtherStepBlock, "reconcileAwakeUnlockCharacterList").length, 0)
+
+    const tutorialStep15Call = getOnlyCall(tutorialStep15Block, "reconcileAwakeUnlockCharacterList")
+    assert.deepEqual(tutorialStep15Call.arguments, ["playerId", "existingCharacterList"])
+    assert.deepEqual(tutorialStep15Call.conditionalConditions, ["existingCharacterList.length > 0"])
+    assert.equal(tutorialStep15Call.position > getLastCallPosition(tutorialStep15Block, "rewardPlayerGachaDrawResultSync"), true)
+    assert.equal(tutorialStep15Call.position > getLastCallPosition(tutorialStep15Block, "insertReceiveHistorySync"), true)
+    assert.equal(tutorialStep15Call.position > getLastCallPosition(tutorialStep15Block, "updatePlayerSync"), true)
+    const tutorialStep15ExistingList = findVariableInitializers(tutorialStep15Block, "existingCharacterList")
+    assert.equal(tutorialStep15ExistingList.length, 1)
+    assert.equal(tutorialStep15ExistingList[0].startsWith("rewardResult.characters.filter("), true)
+    assert.equal(tutorialStep15ExistingList[0].includes("character !== undefined"), true)
+    assert.equal(tutorialStep15ExistingList[0].includes("character !== null"), true)
+    assert.equal(tutorialStep15ExistingList[0].includes('typeof character === "object"'), true)
+    assert.equal(tutorialStep15ExistingList[0].includes("!Array.isArray(character)"), true)
+    assert.deepEqual(findPropertyAssignmentValues(tutorialStep15Block, "character_list"), ["characterList"])
+
+    const tutorialStep16Call = getOnlyCall(tutorialStep16Block, "reconcileAwakeUnlockCharacterList")
+    assert.deepEqual(tutorialStep16Call.arguments, ["playerId", "existingCharacterList"])
+    assert.deepEqual(tutorialStep16Call.conditionalConditions, ["existingCharacterList.length > 0"])
+    assert.equal(tutorialStep16Call.position > getLastCallPosition(tutorialStep16Block, "givePlayerCharacterSync"), true)
+    assert.equal(tutorialStep16Call.position > getLastCallPosition(tutorialStep16Block, "insertReceiveHistorySync"), true)
+    assert.equal(tutorialStep16Call.position > getLastCallPosition(tutorialStep16Block, "insertMailSync"), true)
+    const tutorialStep16ExistingList = findVariableInitializers(tutorialStep16Block, "existingCharacterList")
+    assert.equal(tutorialStep16ExistingList.length, 1)
+    assert.equal(tutorialStep16ExistingList[0].startsWith("giveResult?.character"), true)
+    assert.equal(tutorialStep16ExistingList[0].includes("? [giveResult.character"), true)
+    assert.equal(tutorialStep16ExistingList[0].endsWith(": []"), true)
+    const tutorialStep16ItemList = findVariableInitializers(tutorialStep16Block, "itemList")
+    assert.equal(tutorialStep16ItemList.length, 1)
+    assert.equal(tutorialStep16ItemList[0].startsWith("giveResult?.item"), true)
+    assert.equal(tutorialStep16ItemList[0].includes("[giveResult.item.id]"), true)
+    assert.equal(tutorialStep16ItemList[0].includes("giveResult.item.count"), true)
+    assert.deepEqual(findPropertyAssignmentValues(tutorialStep16Block, "character_list"), ["characterList"])
+    assert.deepEqual(findPropertyAssignmentValues(tutorialStep16Block, "item_list"), ["itemList"])
+
+    for (const source of [gachaSource, exchangeSource, characterSource, tutorialSource]) {
+        assert.equal(findCalls(source, "settleAwakeMissionRewards").length, 0)
+        assert.equal(findCalls(source, "givePlayerReward").length, 0)
+        assert.equal(findCalls(source, "incrementPlayerCategoryMissionStage").length, 0)
+    }
+}
+
+testCharacterGrantRoutesPublishAwakeUnlocks()
+
 function testVersion4BackfillValidation() {
     const database = new Database(":memory:")
     database.exec(`
@@ -436,6 +596,7 @@ const { getPlayerItemSync } = require("../out/data/domains/item")
 const { insertAccountSync } = require("../out/data/domains/account")
 const { insertDefaultPlayerCharacterSync } = require("../out/data/domains/character")
 const { insertDefaultPlayerSync } = require("../out/data/domains/player")
+const { givePlayerCharacterSync } = require("../out/lib/character")
 const {
     reconcileAwakeUnlockCharacterList,
     reconcileAwakeUnlocks,
@@ -477,6 +638,63 @@ try {
             leader_clear_count, leader_multi_count, leader_power_flip_count
         ) VALUES (?, 341005, 5, 0, 0, 0, 0)
         ON CONFLICT(player_id, character_id) DO UPDATE SET clear_count = 5
+    `).run(playerId)
+
+    db.prepare(`
+        DELETE FROM players_characters
+        WHERE player_id = ? AND id = 341005
+    `).run(playerId)
+    const ownershipItemAmountsBefore = Object.fromEntries(
+        [13, 14, 15, 16].map(itemId => [itemId, getPlayerItemSync(playerId, itemId) ?? 0])
+    )
+    const beforeOwnership = reconcileAwakeUnlocks(playerId, [341005])
+    assert.equal(beforeOwnership.changed.size, 0)
+    assert.equal(beforeOwnership.all.size, 0)
+
+    const ownershipGrant = givePlayerCharacterSync(playerId, 341005)
+    assert.notEqual(ownershipGrant, null)
+    const afterOwnershipCharacterList = reconcileAwakeUnlockCharacterList(
+        playerId,
+        ownershipGrant.character ? [ownershipGrant.character] : []
+    )
+    assert.equal(afterOwnershipCharacterList.length, 1)
+    assert.equal(afterOwnershipCharacterList[0].character_id, 341005)
+    assert.deepEqual(afterOwnershipCharacterList[0].mana_board_awake, { 1: 1 })
+    assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 1 })
+    assert.equal(db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM players_category_missions
+        WHERE player_id = ? AND category = 9
+    `).get(playerId).count, 0)
+    assert.equal(db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM players_category_mission_stages
+        WHERE player_id = ? AND category = 9
+    `).get(playerId).count, 0)
+    assert.deepEqual(
+        Object.fromEntries([13, 14, 15, 16].map(itemId => [itemId, getPlayerItemSync(playerId, itemId) ?? 0])),
+        ownershipItemAmountsBefore
+    )
+
+    const firstDuplicateGrant = givePlayerCharacterSync(playerId, 341005)
+    assert.notEqual(firstDuplicateGrant, null)
+    assert.equal(firstDuplicateGrant.character.stack, 1)
+    assert.notEqual(firstDuplicateGrant.item, undefined)
+    const duplicateItemId = firstDuplicateGrant.item.id
+    const itemCountAfterFirstDuplicate = getPlayerItemSync(playerId, duplicateItemId)
+
+    const secondDuplicateGrant = givePlayerCharacterSync(playerId, 341005)
+    assert.notEqual(secondDuplicateGrant, null)
+    assert.equal(secondDuplicateGrant.character.stack, 2)
+    assert.equal(secondDuplicateGrant.item.id, duplicateItemId)
+    assert.equal(
+        getPlayerItemSync(playerId, duplicateItemId),
+        itemCountAfterFirstDuplicate + secondDuplicateGrant.item.count
+    )
+
+    db.prepare(`
+        DELETE FROM players_character_awake_unlocks
+        WHERE player_id = ?
     `).run(playerId)
 
     assert.equal(upsertPlayerCharacterAwakeUnlockSync(playerId, 341005, 1, 1), true)
@@ -644,11 +862,52 @@ try {
         { character_id: 341005, exp: 2 },
     ])
 
+    const fallbackExistingCharacterList = [{ character_id: 341005, stack: 2 }]
+    const fallbackError = new Error("synthetic awake unlock reconciliation failure")
+    const fallbackItemAmountsBefore = Object.fromEntries(
+        [13, 14, 15, 16].map(itemId => [itemId, getPlayerItemSync(playerId, itemId) ?? 0])
+    )
+    const originalReconcileAwakeUnlocks = awakeUnlockModule.reconcileAwakeUnlocks
+    const originalConsoleError = console.error
+    let loggedFallbackError = null
+    awakeUnlockModule.reconcileAwakeUnlocks = () => {
+        throw fallbackError
+    }
+    console.error = (...args) => {
+        loggedFallbackError = args
+    }
+    try {
+        assert.strictEqual(
+            reconcileAwakeUnlockCharacterList(playerId, fallbackExistingCharacterList),
+            fallbackExistingCharacterList
+        )
+        assert.deepEqual(loggedFallbackError, [
+            "[awake-unlock] Failed to publish character unlocks.",
+            fallbackError,
+        ])
+    } finally {
+        console.error = originalConsoleError
+        awakeUnlockModule.reconcileAwakeUnlocks = originalReconcileAwakeUnlocks
+    }
+    assert.equal(db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM players_category_missions
+        WHERE player_id = ? AND category = 9
+    `).get(playerId).count, 0)
+    assert.equal(db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM players_category_mission_stages
+        WHERE player_id = ? AND category = 9
+    `).get(playerId).count, 0)
+    assert.deepEqual(
+        Object.fromEntries([13, 14, 15, 16].map(itemId => [itemId, getPlayerItemSync(playerId, itemId) ?? 0])),
+        fallbackItemAmountsBefore
+    )
+
     db.prepare(`
         DELETE FROM players_character_awake_unlocks
         WHERE player_id = ? AND character_id = 341005
     `).run(playerId)
-    const originalReconcileAwakeUnlocks = awakeUnlockModule.reconcileAwakeUnlocks
     awakeUnlockModule.reconcileAwakeUnlocks = () => ({
         all: new Map(),
         changed: new Map([
