@@ -121,6 +121,18 @@ cp ../archive/pinball-1.4.90-1.4.101-9-modassets07170102.zip "pinball-$V-$W-9-mo
 
 **B. 外血统 → 行级合并,禁止整表替换**:
 
+> ⚠ **前提 0(2026-07-17 野外事故后补明)**:mod-tools 的 **store(数据包)基线必须等于你目标
+> 客户端的当前版本**。`wf_publish` 是整文件发布——store 里的表是什么状态,发出去客户端就被
+> 覆盖成什么状态;用落后的 store(如 1.4.54)对 1.4.125 的客户端发布 = 把表滚回 71 个版本,
+> 版本间隙里官方加的 key 全部丢失(实例:item 表缺 10000140 → 仓库 C8601)。
+> store 落后时先刷新,两个办法任选:
+> - **从你自己的 base CDN 重建**:把 `.cdn/cn/archive-common-full` 和 `archive-common-diff`
+>   里的 zip **按版本升序**依次解压到同一目录(后解压覆盖先解压),得到的 `production/upload`
+>   树就是链尾基线的 store(表数据全在 common 变体,跑数据工具足够;要编辑语音/立绘再按同法
+>   叠 android 链),把 profiles/WF_TARGET_STORE 指过去;
+> - **从设备拉**:任何一台跟着你的服更新到当前版本的设备/模拟器,
+>   拉 `/sdcard/WorldFlipper/dummy/download/production/upload` 整目录。
+
 1. **纯资产补充包对任何血统都安全**(`archive/pinball-1.4.90-1.4.101-9-modassets07170102.zip`,
    30 个全新路径文件:武器图/横幅/商店图,不含任何表),重命名成你的一跳直接发;
 2. 深渊行数据用 [mod-tools](https://github.com/kuronzzhan-droid/startpoint-cn-mod-tools) 在
