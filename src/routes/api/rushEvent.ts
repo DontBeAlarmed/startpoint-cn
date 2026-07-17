@@ -16,7 +16,7 @@ import { getPlayerRushEventEndlessBattleRankingSync, getRushEventEndlessBattleRa
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import rushEventRankingRewards from "../../../assets/rush_event_ranking_reward.json";
-import { ensureSpecialEventPartyGroupsSync } from "../../lib/special-event-parties";
+import { ensureSpecialEventPartyGroupsSync, getGlobalPartyId } from "../../lib/special-event-parties";
 
 interface SummaryBody {
     event_id: number,
@@ -390,7 +390,7 @@ const routes = async (fastify: FastifyInstance) => {
                         allow_other_players_to_heal_me: party.options.allowOtherPlayersToHealMe
                     },
                     party_edited: party.edited,
-                    party_id: Number(partyIdString),
+                    party_id: getGlobalPartyId(Number(idString), Number(partyIdString)),
                     party_name: party.name
                 })
             }

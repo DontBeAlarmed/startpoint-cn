@@ -22,6 +22,8 @@ assert.equal(typeof specialEventParties.ensureSpecialEventPartyGroupsSync, "func
 assert.equal(typeof specialEventParties.resolvePartyGroupColorId, "function")
 assert.equal(typeof specialEventParties.isPartyCategory, "function")
 assert.equal(typeof specialEventParties.hasValidPartyCategory, "function")
+assert.equal(typeof specialEventParties.getGlobalPartyId, "function")
+assert.equal(typeof specialEventParties.parseGlobalPartyId, "function")
 assert.equal(typeof partyGroupPersistence.insertMissingPartyGroupListSync, "function")
 
 assert.equal(specialEventParties.resolvePartyGroupColorId(undefined), 15)
@@ -38,6 +40,23 @@ for (const value of [{ party_category: 1 }, { party_category: 4 }]) {
 for (const value of [null, undefined, 2, {}, { party_category: "2" }, { party_category: 5 }]) {
     assert.equal(specialEventParties.hasValidPartyCategory(value), false)
 }
+
+const rushPartyIds = []
+for (let groupId = 1; groupId <= 12; groupId++) {
+    for (let slot = 1; slot <= 10; slot++) {
+        rushPartyIds.push(specialEventParties.getGlobalPartyId(groupId, slot))
+    }
+}
+assert.equal(new Set(rushPartyIds).size, 120)
+assert.deepEqual(rushPartyIds.slice(0, 12), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+assert.equal(rushPartyIds.at(-1), 120)
+assert.deepEqual(specialEventParties.parseGlobalPartyId(12), { groupId: 2, slot: 2 })
+assert.deepEqual(specialEventParties.parseGlobalPartyId(120), { groupId: 12, slot: 10 })
+for (const partyId of [0, 121, 1.5, NaN]) {
+    assert.equal(specialEventParties.parseGlobalPartyId(partyId), null)
+}
+assert.throws(() => specialEventParties.getGlobalPartyId(0, 1), RangeError)
+assert.throws(() => specialEventParties.getGlobalPartyId(1, 11), RangeError)
 
 const party = (name, category) => ({
     name,

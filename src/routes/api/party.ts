@@ -7,7 +7,7 @@ import { updatePlayerPartySync } from "../../data/domains/party"
 import { generateDataHeaders } from "../../utils";
 import { PartyCategory } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { hasValidPartyCategory } from "../../lib/special-event-parties";
+import { hasValidPartyCategory, parseGlobalPartyId } from "../../lib/special-event-parties";
 
 interface PartyInfoListItem {
     party_edited: boolean
@@ -420,10 +420,11 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "Invalid request body."
         })
         if (!Array.isArray(body.party_info_list)
-            || body.party_info_list.some(info => !hasValidPartyCategory(info))) {
+            || body.party_info_list.some(info => !hasValidPartyCategory(info)
+                || parseGlobalPartyId((info as PartyInfoListItem).party_id) === null)) {
             return reply.status(400).send({
                 "error": "Bad Request",
-                "message": "Invalid party category."
+                "message": "Invalid party category or party ID."
             })
         }
 
@@ -441,13 +442,6 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Internal Server Error",
             "message": "No players bound to account."
         })
-
-        // parse global PartyId: (groupIndex * 10 + slot), groupIndex 0-based
-        const parsePartyId = (partyId: number) => {
-            const gIdx = Math.floor((partyId - 1) / 10)
-            const s = ((partyId - 1) % 10) + 1
-            return { groupIndex: gIdx, groupId: gIdx + 1, slot: s }
-        }
 
         // store full global PartyId so /load returns the correct group+slot combo
         if (player.partySlot !== body.main_party_id) {
@@ -487,7 +481,7 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         for (const updateInfo of body.party_info_list) {
-                const parsed = parsePartyId(updateInfo.party_id)
+            const parsed = parseGlobalPartyId(updateInfo.party_id)!
             console.log(`[PARTY] edit: player=${playerId} id=${updateInfo.party_id} -> group=${parsed.groupId} slot=${parsed.slot} name="${updateInfo.party_name}" chars=${updateInfo.character_ids?.filter(Boolean).length || 0}`)
             updatePlayerPartySync(
                 playerId,

@@ -28,6 +28,22 @@ export function resolvePartyGroupColorId(
     return group?.colorId ?? 15
 }
 
+export function getGlobalPartyId(groupId: number, slot: number): number {
+    if (!Number.isInteger(groupId) || groupId < 1 || groupId > 12
+        || !Number.isInteger(slot) || slot < 1 || slot > 10) {
+        throw new RangeError("Party group or slot is outside the CN protocol range")
+    }
+    return (groupId - 1) * 10 + slot
+}
+
+export function parseGlobalPartyId(partyId: number): { groupId: number, slot: number } | null {
+    if (!Number.isInteger(partyId) || partyId < 1 || partyId > 120) return null
+    return {
+        groupId: Math.floor((partyId - 1) / 10) + 1,
+        slot: ((partyId - 1) % 10) + 1,
+    }
+}
+
 function copyParty(party: PlayerParty, category: PartyCategory): PlayerParty {
     return {
         ...party,
