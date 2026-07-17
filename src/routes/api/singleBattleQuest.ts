@@ -44,6 +44,15 @@ import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { getCarnivalRewardDefinitions, grantCarnivalRewards } from "../../lib/carnival-rewards";
 import { givePlayerDegreeSync } from "../../data/domains/degree";
 import { givePlayerEquipmentSync } from "../../lib/equipment";
+import { getDb } from "../../data/db";
+import {
+    buildStartEntryItemList,
+    InsufficientEntryItemError,
+    InsufficientStaminaError,
+    PlayerNotFoundError,
+    runStartEntryTransaction,
+    StartEntryCost,
+} from "../../lib/quest/start-entry";
 
 interface StartBody {
     quest_id: number
@@ -145,7 +154,6 @@ const continueVmoneyCost = 50;
 export const activeQuests: Record<number, ActiveQuest> = {}
 
 export function insertActiveQuest(playerId: number, quest: ActiveQuest) {
-    activeQuests[playerId] = quest
     // Persist to DB for battle recovery across server restarts
     insertPlayerActiveQuestSync(playerId, {
         playerId,
@@ -161,6 +169,7 @@ export function insertActiveQuest(playerId: number, quest: ActiveQuest) {
         eventId: quest.eventId ?? null,
         continueCount: quest.continueCount
     })
+    activeQuests[playerId] = quest
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -570,71 +579,56 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
-        // Deduct entry cost (ticket/item)
+        // Validate and persist all quest-start state atomically.
         const questKey = `${category}_${questId}`
-        const entryCost = (questEntryCosts as Record<string, {itemId: number, itemCount: number, stamina: number}>)[questKey]
+        const entryCost = (questEntryCosts as Record<string, StartEntryCost>)[questKey]
         const staminaInfo = getStaminaCost(questKey)
         console.log(`[BATTLE] start entry: questId=${questId} questKey=${questKey} entryCost=${JSON.stringify(entryCost)} discountRate=${staminaInfo.rate} baseStamina=${staminaInfo.baseCost}→${staminaInfo.cost}`)
-        if (entryCost && entryCost.itemId > 0) {
-            const playerItemCount = getPlayerItemSync(playerId, entryCost.itemId) ?? 0
-            console.log(`[BATTLE] start deduct: itemId=${entryCost.itemId} playerHas=${playerItemCount} need=${entryCost.itemCount}`)
-            if (playerItemCount < entryCost.itemCount) {
-                return reply.status(400).send({
-                    "error": "Bad Request",
-                    "message": `Not enough entry items (need ${entryCost.itemCount} of ${entryCost.itemId}, have ${playerItemCount}).`
-                })
-            }
-            updatePlayerItemSync(playerId, entryCost.itemId, playerItemCount - entryCost.itemCount)
-        }
-
-        // Deduct stamina cost
         const staminaCost = staminaInfo.cost
-        let afterStamina = 0
-        if (staminaCost > 0) {
-            const currentStamina = computeRealTimeStamina(player)
-            if (currentStamina < staminaCost) {
-                console.warn(`[BATTLE-START] player ${playerId} stamina insufficient: ${currentStamina} < ${staminaCost}`)
-                return reply.status(400).send({
-                    "error": "Bad Request",
-                    "message": "Insufficient stamina."
-                })
-            }
-            const newStamina = Math.max(0, currentStamina - staminaCost)
-            updatePlayerSync({
-                id: playerId,
-                stamina: newStamina,
-                staminaHealTime: new Date(),
-                totalStaminaUsed: (player.totalStaminaUsed ?? 0) + staminaCost
-            })
-            afterStamina = newStamina
-            console.log(`[BATTLE-START] stamina: ${currentStamina} -> ${newStamina} (cost: ${staminaCost}, rate: ${staminaInfo.rate})`)
-        } else {
-            // No stamina deduction, read current stamina for response
-            const player = getPlayerSync(playerId)
-            afterStamina = player?.stamina ?? 0
-        }
-
-        // add to active quests table
-        delete activeQuests[playerId]
-        activeQuests[playerId] = {
+        const activeQuest: ActiveQuest = {
             questId: questId,
             category: category,
             useBoostPoint: useBoostPoint,
             useBossBoostPoint: useBossBoostPoint,
             isAutoStartMode: isAutoStartMode,
             isMulti: false,
-            entryItemId: entryCost?.itemId,
+            entryItemId: entryCost?.itemMode === 1 ? entryCost.itemId : undefined,
             playId: body.play_id,
             continueCount: 0
         }
-
-        // update player last party slot
-        if (questData.fixedParty === undefined) {
-            updatePlayerSync({
-                id: playerId,
-                partySlot: partyId
+        const startTime = new Date()
+        let startResult
+        try {
+            startResult = runStartEntryTransaction({
+                playerId,
+                entryCost,
+                staminaCost,
+                partyId,
+                updatePartySlot: questData.fixedParty === undefined,
+                activeQuest,
+                now: startTime,
+            }, {
+                transaction: operation => getDb().transaction(operation)(),
+                getPlayer: getPlayerSync,
+                computeStamina: computeRealTimeStamina,
+                getItemCount: getPlayerItemSync,
+                updateItemCount: updatePlayerItemSync,
+                updatePlayer: updatePlayerSync,
+                insertActiveQuest,
             })
+        } catch (error) {
+            if (error instanceof InsufficientEntryItemError
+                || error instanceof InsufficientStaminaError
+                || error instanceof PlayerNotFoundError) {
+                console.warn(`[BATTLE-START] player ${playerId}: ${error.message}`)
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    "message": error.message,
+                })
+            }
+            throw error
         }
+        console.log(`[BATTLE-START] stamina: ${player.stamina} -> ${startResult.afterStamina} (cost: ${staminaCost}, rate: ${staminaInfo.rate})`)
 
         const dataHeaders = generateDataHeaders({
             viewer_id: viewerId
@@ -646,9 +640,10 @@ const routes = async (fastify: FastifyInstance) => {
             "data": {
                 "user_info": {
                     "last_main_quest_id": body.quest_id,
-                    "stamina": afterStamina,
+                    "stamina": startResult.afterStamina,
                     "stamina_heal_time": realToVirtual(new Date())
                 },
+                "item_list": buildStartEntryItemList(startResult),
                 "category_id": body.category,
                 "is_multi": "single",
                 "start_time": dataHeaders['servertime'],

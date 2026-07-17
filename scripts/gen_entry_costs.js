@@ -5,6 +5,7 @@
  */
 const fs = require("fs");
 const path = require("path");
+const assert = require("assert/strict");
 
 const OM = path.resolve(__dirname, "..", "..", "wf-assets-cn", "orderedmap");
 const OUT = path.join(__dirname, "..", "assets", "quest_entry_costs.json");
@@ -23,11 +24,16 @@ const QUEST_TYPES = {
   character_quest: { file: "quest/character_quest.json", cat: 3 },
   advent_event_quest: { file: "quest/event/advent_event_quest.json", cat: 7 },
   carnival_event_quest: { file: "quest/event/carnival_event_quest.json", cat: 22 },
-  challenge_dungeon_event_quest: { file: "quest/event/challenge_dungeon_event_quest.json", cat: 13 },
+  challenge_dungeon_event_quest: {
+    file: "quest/event/challenge_dungeon_event_quest.json",
+    cat: 13,
+    entryItem: { modeIndex: 56, itemIdIndex: 57, itemCountIndex: 58, staminaIndex: 70 },
+  },
   daily_exp_mana_event_quest: { file: "quest/event/daily_exp_mana_event_quest.json", cat: 14 },
   daily_week_event_quest: { file: "quest/event/daily_week_event_quest.json", cat: 6 },
   expert_single_event_quest: { file: "quest/event/expert_single_event_quest.json", cat: 21 },
-  hard_multi_event_quest: { file: "quest/event/hard_multi_event_quest.json", cat: 26 },
+  // Fields 50 and 69 both equal 1 on the first row, so first-match calibration is ambiguous.
+  hard_multi_event_quest: { file: "quest/event/hard_multi_event_quest.json", cat: 26, staminaIndex: 69 },
   raid_event_quest: { file: "quest/event/raid_event_quest.json", cat: 8 },
   ranking_event_single_quest: { file: "quest/event/ranking_event_single_quest.json", cat: 10 },
   rush_event_quest: { file: "quest/event/rush_event_quest.json", cat: 24 },
@@ -59,7 +65,7 @@ for (const [name, cfg] of Object.entries(QUEST_TYPES)) {
   const obj = readJSON(cfg.file);
   if (!obj) continue;
 
-  let idx = null;
+  let idx = cfg.staminaIndex ?? cfg.entryItem?.staminaIndex ?? null;
   walk(obj, (f) => {
     if (idx !== null) return;
     const qid = f[0];
@@ -122,7 +128,16 @@ for (const [name, cfg] of Object.entries(QUEST_TYPES)) {
     if (!isNaN(st) && st > 0) {
       withStamina++;
       const key = `${cfg.cat}_${qid}`;
-      result[key] = { itemId: 0, itemCount: 0, stamina: st };
+      const itemMode = cfg.entryItem ? parseInt(f[cfg.entryItem.modeIndex]) : 0;
+      const itemId = cfg.entryItem && itemMode === 1
+        ? parseInt(f[cfg.entryItem.itemIdIndex])
+        : 0;
+      const itemCount = cfg.entryItem && itemMode === 1
+        ? parseInt(f[cfg.entryItem.itemCountIndex])
+        : 0;
+      result[key] = cfg.entryItem && itemMode === 1
+        ? { itemMode, itemId, itemCount, stamina: st }
+        : { itemId, itemCount, stamina: st };
       details[key] = { new: st, old: oldCosts[key]?.stamina ?? null };
     }
   });
@@ -130,6 +145,14 @@ for (const [name, cfg] of Object.entries(QUEST_TYPES)) {
 }
 
 console.log(`\nTotal entries: ${Object.keys(result).length}`);
+
+for (let questId = 2001; questId <= 2006; questId++) {
+  assert.deepStrictEqual(
+    result[`13_${questId}`],
+    { itemMode: 1, itemId: 500000, itemCount: 1, stamina: 10 },
+    `invalid treasure domain entry cost for quest ${questId}`,
+  );
+}
 
 // Phase 3: Diff
 console.log("\n=== Phase 3: Diff OLD vs NEW ===\n");

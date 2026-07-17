@@ -58,6 +58,14 @@ Key stamina config values:
 ### Quest entry costs
 `assets/quest_entry_costs.json` — CDN 原值（无折扣），`scripts/gen_entry_costs.js` 自动校准索引生成。2018 quests total, 1629 with stamina > 0。
 
+#### 宝物域示宝金钥匙（2026-07-18）
+
+宝物域 ChallengeDungeon `2001～2006` 的入场成本直接来自 CN 主数据：字段 `56/57/58/70` 分别为道具使用模式、道具 ID、道具数量和体力。六关均为模式 `Always(1)`、示宝金钥匙 `500000×1`、体力 `10`；生成器在写入资产前会逐关断言这组值，防止重建时再次遗漏钥匙成本。
+
+`/single_battle_quest/start` 每收到一次成功开战请求只扣 1 把钥匙，不按自动周回次数预扣。钥匙和体力的充足性会先完成校验，随后在同一个 SQLite 事务中扣除钥匙、扣除体力、更新当前队伍槽并持久化 active quest；任一校验或写入失败时均不保留部分修改。
+
+成功响应的 `data.item_list` 包含扣除后的钥匙余额。余额变为 `0` 时仍返回 `{"500000":0}`，使客户端立即刷新并移除已耗尽的库存项。
+
 ### Stamina campaign discounts (2026-06-30)
 
 **数据流**：
