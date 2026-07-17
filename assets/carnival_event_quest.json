@@ -13,7 +13,7 @@
         "element": 1,
         "eventId": 1,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 200000
     },
     "1002": {
@@ -30,7 +30,7 @@
         "element": 1,
         "eventId": 1,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "1003": {
@@ -47,7 +47,7 @@
         "element": 1,
         "eventId": 1,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "1004": {
@@ -64,7 +64,7 @@
         "element": 2,
         "eventId": 1,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 200000
     },
     "1005": {
@@ -81,7 +81,7 @@
         "element": 2,
         "eventId": 1,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "1006": {
@@ -98,7 +98,7 @@
         "element": 2,
         "eventId": 1,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "1007": {
@@ -115,7 +115,7 @@
         "element": 0,
         "eventId": 1,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 200000
     },
     "1008": {
@@ -132,7 +132,7 @@
         "element": 0,
         "eventId": 1,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "1009": {
@@ -149,7 +149,7 @@
         "element": 0,
         "eventId": 1,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250601001": {
@@ -166,7 +166,7 @@
         "element": 1,
         "eventId": 250601,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250601002": {
@@ -183,7 +183,7 @@
         "element": 1,
         "eventId": 250601,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250601003": {
@@ -200,7 +200,7 @@
         "element": 1,
         "eventId": 250601,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250601004": {
@@ -217,7 +217,7 @@
         "element": 1,
         "eventId": 250601,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250601005": {
@@ -234,7 +234,7 @@
         "element": 1,
         "eventId": 250601,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250601006": {
@@ -251,7 +251,7 @@
         "element": 1,
         "eventId": 250601,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250601007": {
@@ -268,7 +268,7 @@
         "element": 1,
         "eventId": 250601,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250601008": {
@@ -285,7 +285,7 @@
         "element": 1,
         "eventId": 250601,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250601009": {
@@ -302,7 +302,7 @@
         "element": 1,
         "eventId": 250601,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250602001": {
@@ -319,7 +319,7 @@
         "element": 2,
         "eventId": 250602,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250602002": {
@@ -336,7 +336,7 @@
         "element": 2,
         "eventId": 250602,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250602003": {
@@ -353,7 +353,7 @@
         "element": 2,
         "eventId": 250602,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250602004": {
@@ -370,7 +370,7 @@
         "element": 2,
         "eventId": 250602,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250602005": {
@@ -387,7 +387,7 @@
         "element": 2,
         "eventId": 250602,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250602006": {
@@ -404,7 +404,7 @@
         "element": 2,
         "eventId": 250602,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250602007": {
@@ -421,7 +421,7 @@
         "element": 2,
         "eventId": 250602,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250602008": {
@@ -438,7 +438,7 @@
         "element": 2,
         "eventId": 250602,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250602009": {
@@ -455,7 +455,7 @@
         "element": 2,
         "eventId": 250602,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250603001": {
@@ -472,7 +472,7 @@
         "element": 3,
         "eventId": 250603,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250603002": {
@@ -489,7 +489,7 @@
         "element": 3,
         "eventId": 250603,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250603003": {
@@ -506,7 +506,7 @@
         "element": 3,
         "eventId": 250603,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250603004": {
@@ -523,7 +523,7 @@
         "element": 3,
         "eventId": 250603,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250603005": {
@@ -540,7 +540,7 @@
         "element": 3,
         "eventId": 250603,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250603006": {
@@ -557,7 +557,7 @@
         "element": 3,
         "eventId": 250603,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250603007": {
@@ -574,7 +574,7 @@
         "element": 3,
         "eventId": 250603,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250603008": {
@@ -591,7 +591,7 @@
         "element": 3,
         "eventId": 250603,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250603009": {
@@ -608,7 +608,7 @@
         "element": 3,
         "eventId": 250603,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250604001": {
@@ -625,7 +625,7 @@
         "element": 0,
         "eventId": 250604,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250604002": {
@@ -642,7 +642,7 @@
         "element": 0,
         "eventId": 250604,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250604003": {
@@ -659,7 +659,7 @@
         "element": 0,
         "eventId": 250604,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250604004": {
@@ -676,7 +676,7 @@
         "element": 0,
         "eventId": 250604,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250604005": {
@@ -693,7 +693,7 @@
         "element": 0,
         "eventId": 250604,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250604006": {
@@ -710,7 +710,7 @@
         "element": 0,
         "eventId": 250604,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250604007": {
@@ -727,7 +727,7 @@
         "element": 0,
         "eventId": 250604,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250604008": {
@@ -744,7 +744,7 @@
         "element": 0,
         "eventId": 250604,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250604009": {
@@ -761,7 +761,7 @@
         "element": 0,
         "eventId": 250604,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250605001": {
@@ -778,7 +778,7 @@
         "element": 5,
         "eventId": 250605,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250605002": {
@@ -795,7 +795,7 @@
         "element": 5,
         "eventId": 250605,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250605003": {
@@ -812,7 +812,7 @@
         "element": 5,
         "eventId": 250605,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250605004": {
@@ -829,7 +829,7 @@
         "element": 5,
         "eventId": 250605,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250605005": {
@@ -846,7 +846,7 @@
         "element": 5,
         "eventId": 250605,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250605006": {
@@ -863,7 +863,7 @@
         "element": 5,
         "eventId": 250605,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250605007": {
@@ -880,7 +880,7 @@
         "element": 5,
         "eventId": 250605,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250605008": {
@@ -897,7 +897,7 @@
         "element": 5,
         "eventId": 250605,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250605009": {
@@ -914,7 +914,7 @@
         "element": 5,
         "eventId": 250605,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250606001": {
@@ -931,7 +931,7 @@
         "element": 4,
         "eventId": 250606,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250606002": {
@@ -948,7 +948,7 @@
         "element": 4,
         "eventId": 250606,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250606003": {
@@ -965,7 +965,7 @@
         "element": 4,
         "eventId": 250606,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250606004": {
@@ -982,7 +982,7 @@
         "element": 4,
         "eventId": 250606,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250606005": {
@@ -999,7 +999,7 @@
         "element": 4,
         "eventId": 250606,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250606006": {
@@ -1016,7 +1016,7 @@
         "element": 4,
         "eventId": 250606,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "250606007": {
@@ -1033,7 +1033,7 @@
         "element": 4,
         "eventId": 250606,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "250606008": {
@@ -1050,7 +1050,7 @@
         "element": 4,
         "eventId": 250606,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "250606009": {
@@ -1067,7 +1067,7 @@
         "element": 4,
         "eventId": 250606,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "100004001": {
@@ -1084,7 +1084,7 @@
         "element": 0,
         "eventId": 100004,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "100004002": {
@@ -1101,7 +1101,7 @@
         "element": 0,
         "eventId": 100004,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "100004003": {
@@ -1118,7 +1118,7 @@
         "element": 0,
         "eventId": 100004,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "100004004": {
@@ -1135,7 +1135,7 @@
         "element": 0,
         "eventId": 100004,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "100004005": {
@@ -1152,7 +1152,7 @@
         "element": 0,
         "eventId": 100004,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "100004006": {
@@ -1169,7 +1169,7 @@
         "element": 0,
         "eventId": 100004,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "100004007": {
@@ -1186,7 +1186,7 @@
         "element": 0,
         "eventId": 100004,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "100004008": {
@@ -1203,7 +1203,7 @@
         "element": 0,
         "eventId": 100004,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "100004009": {
@@ -1220,7 +1220,7 @@
         "element": 0,
         "eventId": 100004,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "100003001": {
@@ -1237,7 +1237,7 @@
         "element": 2,
         "eventId": 100003,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "100003002": {
@@ -1254,7 +1254,7 @@
         "element": 2,
         "eventId": 100003,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "100003003": {
@@ -1271,7 +1271,7 @@
         "element": 2,
         "eventId": 100003,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "100003004": {
@@ -1288,7 +1288,7 @@
         "element": 2,
         "eventId": 100003,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "100003005": {
@@ -1305,7 +1305,7 @@
         "element": 2,
         "eventId": 100003,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "100003006": {
@@ -1322,7 +1322,7 @@
         "element": 2,
         "eventId": 100003,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "100003007": {
@@ -1339,7 +1339,7 @@
         "element": 2,
         "eventId": 100003,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "100003008": {
@@ -1356,7 +1356,7 @@
         "element": 2,
         "eventId": 100003,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "100003009": {
@@ -1373,7 +1373,7 @@
         "element": 2,
         "eventId": 100003,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "100000001": {
@@ -1390,7 +1390,7 @@
         "element": 3,
         "eventId": 100000,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "100000002": {
@@ -1407,7 +1407,7 @@
         "element": 3,
         "eventId": 100000,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "100000003": {
@@ -1424,7 +1424,7 @@
         "element": 3,
         "eventId": 100000,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "100000004": {
@@ -1441,7 +1441,7 @@
         "element": 3,
         "eventId": 100000,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "100000005": {
@@ -1458,7 +1458,7 @@
         "element": 3,
         "eventId": 100000,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "100000006": {
@@ -1475,7 +1475,7 @@
         "element": 3,
         "eventId": 100000,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "100000007": {
@@ -1492,7 +1492,7 @@
         "element": 3,
         "eventId": 100000,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "100000008": {
@@ -1509,7 +1509,7 @@
         "element": 3,
         "eventId": 100000,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "100000009": {
@@ -1526,7 +1526,7 @@
         "element": 3,
         "eventId": 100000,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "100002001": {
@@ -1543,7 +1543,7 @@
         "element": 1,
         "eventId": 100002,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "100002002": {
@@ -1560,7 +1560,7 @@
         "element": 1,
         "eventId": 100002,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "100002003": {
@@ -1577,7 +1577,7 @@
         "element": 1,
         "eventId": 100002,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "100002004": {
@@ -1594,7 +1594,7 @@
         "element": 1,
         "eventId": 100002,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "100002005": {
@@ -1611,7 +1611,7 @@
         "element": 1,
         "eventId": 100002,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "100002006": {
@@ -1628,7 +1628,7 @@
         "element": 1,
         "eventId": 100002,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "100002007": {
@@ -1645,7 +1645,7 @@
         "element": 1,
         "eventId": 100002,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "100002008": {
@@ -1662,7 +1662,7 @@
         "element": 1,
         "eventId": 100002,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "100002009": {
@@ -1679,7 +1679,7 @@
         "element": 1,
         "eventId": 100002,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "9001": {
@@ -1696,7 +1696,7 @@
         "element": 4,
         "eventId": 9,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "9002": {
@@ -1713,7 +1713,7 @@
         "element": 4,
         "eventId": 9,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "9003": {
@@ -1730,7 +1730,7 @@
         "element": 4,
         "eventId": 9,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "9004": {
@@ -1747,7 +1747,7 @@
         "element": 4,
         "eventId": 9,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "9005": {
@@ -1764,7 +1764,7 @@
         "element": 4,
         "eventId": 9,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "9006": {
@@ -1781,7 +1781,7 @@
         "element": 4,
         "eventId": 9,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "9007": {
@@ -1798,7 +1798,7 @@
         "element": 4,
         "eventId": 9,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "9008": {
@@ -1815,7 +1815,7 @@
         "element": 4,
         "eventId": 9,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "9009": {
@@ -1832,7 +1832,7 @@
         "element": 4,
         "eventId": 9,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "8001": {
@@ -1849,7 +1849,7 @@
         "element": 5,
         "eventId": 8,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "8002": {
@@ -1866,7 +1866,7 @@
         "element": 5,
         "eventId": 8,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "8003": {
@@ -1883,7 +1883,7 @@
         "element": 5,
         "eventId": 8,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "8004": {
@@ -1900,7 +1900,7 @@
         "element": 5,
         "eventId": 8,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "8005": {
@@ -1917,7 +1917,7 @@
         "element": 5,
         "eventId": 8,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "8006": {
@@ -1934,7 +1934,7 @@
         "element": 5,
         "eventId": 8,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "8007": {
@@ -1951,7 +1951,7 @@
         "element": 5,
         "eventId": 8,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "8008": {
@@ -1968,7 +1968,7 @@
         "element": 5,
         "eventId": 8,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "8009": {
@@ -1985,7 +1985,7 @@
         "element": 5,
         "eventId": 8,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "7001": {
@@ -2002,7 +2002,7 @@
         "element": 0,
         "eventId": 7,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "7002": {
@@ -2019,7 +2019,7 @@
         "element": 0,
         "eventId": 7,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "7003": {
@@ -2036,7 +2036,7 @@
         "element": 0,
         "eventId": 7,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "7004": {
@@ -2053,7 +2053,7 @@
         "element": 0,
         "eventId": 7,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "7005": {
@@ -2070,7 +2070,7 @@
         "element": 0,
         "eventId": 7,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "7006": {
@@ -2087,7 +2087,7 @@
         "element": 0,
         "eventId": 7,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "7007": {
@@ -2104,7 +2104,7 @@
         "element": 0,
         "eventId": 7,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "7008": {
@@ -2121,7 +2121,7 @@
         "element": 0,
         "eventId": 7,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "7009": {
@@ -2138,7 +2138,7 @@
         "element": 0,
         "eventId": 7,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "6001": {
@@ -2155,7 +2155,7 @@
         "element": 3,
         "eventId": 6,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "6002": {
@@ -2172,7 +2172,7 @@
         "element": 3,
         "eventId": 6,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "6003": {
@@ -2189,7 +2189,7 @@
         "element": 3,
         "eventId": 6,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "6004": {
@@ -2206,7 +2206,7 @@
         "element": 3,
         "eventId": 6,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "6005": {
@@ -2223,7 +2223,7 @@
         "element": 3,
         "eventId": 6,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "6006": {
@@ -2240,7 +2240,7 @@
         "element": 3,
         "eventId": 6,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "6007": {
@@ -2257,7 +2257,7 @@
         "element": 3,
         "eventId": 6,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "6008": {
@@ -2274,7 +2274,7 @@
         "element": 3,
         "eventId": 6,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "6009": {
@@ -2291,7 +2291,7 @@
         "element": 3,
         "eventId": 6,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "5001": {
@@ -2308,7 +2308,7 @@
         "element": 4,
         "eventId": 5,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "5002": {
@@ -2325,7 +2325,7 @@
         "element": 4,
         "eventId": 5,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "5003": {
@@ -2342,7 +2342,7 @@
         "element": 4,
         "eventId": 5,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "5004": {
@@ -2359,7 +2359,7 @@
         "element": 4,
         "eventId": 5,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "5005": {
@@ -2376,7 +2376,7 @@
         "element": 4,
         "eventId": 5,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "5006": {
@@ -2393,7 +2393,7 @@
         "element": 4,
         "eventId": 5,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "5007": {
@@ -2410,7 +2410,7 @@
         "element": 4,
         "eventId": 5,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "5008": {
@@ -2427,7 +2427,7 @@
         "element": 4,
         "eventId": 5,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "5009": {
@@ -2444,7 +2444,7 @@
         "element": 4,
         "eventId": 5,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "4001": {
@@ -2461,7 +2461,7 @@
         "element": 2,
         "eventId": 4,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "4002": {
@@ -2478,7 +2478,7 @@
         "element": 2,
         "eventId": 4,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "4003": {
@@ -2495,7 +2495,7 @@
         "element": 2,
         "eventId": 4,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "4004": {
@@ -2512,7 +2512,7 @@
         "element": 2,
         "eventId": 4,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "4005": {
@@ -2529,7 +2529,7 @@
         "element": 2,
         "eventId": 4,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "4006": {
@@ -2546,7 +2546,7 @@
         "element": 2,
         "eventId": 4,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "4007": {
@@ -2563,7 +2563,7 @@
         "element": 2,
         "eventId": 4,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "4008": {
@@ -2580,7 +2580,7 @@
         "element": 2,
         "eventId": 4,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "4009": {
@@ -2597,7 +2597,7 @@
         "element": 2,
         "eventId": 4,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "3001": {
@@ -2614,7 +2614,7 @@
         "element": 5,
         "eventId": 3,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "3002": {
@@ -2631,7 +2631,7 @@
         "element": 5,
         "eventId": 3,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "3003": {
@@ -2648,7 +2648,7 @@
         "element": 5,
         "eventId": 3,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "3004": {
@@ -2665,7 +2665,7 @@
         "element": 5,
         "eventId": 3,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "3005": {
@@ -2682,7 +2682,7 @@
         "element": 5,
         "eventId": 3,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "3006": {
@@ -2699,7 +2699,7 @@
         "element": 5,
         "eventId": 3,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "3007": {
@@ -2716,7 +2716,7 @@
         "element": 5,
         "eventId": 3,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "3008": {
@@ -2733,7 +2733,7 @@
         "element": 5,
         "eventId": 3,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "3009": {
@@ -2750,7 +2750,7 @@
         "element": 5,
         "eventId": 3,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "2001": {
@@ -2767,7 +2767,7 @@
         "element": 3,
         "eventId": 2,
         "folderId": 1,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "2002": {
@@ -2784,7 +2784,7 @@
         "element": 3,
         "eventId": 2,
         "folderId": 1,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "2003": {
@@ -2801,7 +2801,7 @@
         "element": 3,
         "eventId": 2,
         "folderId": 1,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "2004": {
@@ -2818,7 +2818,7 @@
         "element": 5,
         "eventId": 2,
         "folderId": 2,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "2005": {
@@ -2835,7 +2835,7 @@
         "element": 5,
         "eventId": 2,
         "folderId": 2,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "2006": {
@@ -2852,7 +2852,7 @@
         "element": 5,
         "eventId": 2,
         "folderId": 2,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     },
     "2007": {
@@ -2869,7 +2869,7 @@
         "element": 4,
         "eventId": 2,
         "folderId": 3,
-        "timeLimitMs": 108000,
+        "timeLimitMs": 1800000,
         "difficultyScore": 1000000
     },
     "2008": {
@@ -2886,7 +2886,7 @@
         "element": 4,
         "eventId": 2,
         "folderId": 3,
-        "timeLimitMs": 72000,
+        "timeLimitMs": 1200000,
         "difficultyScore": 2000000
     },
     "2009": {
@@ -2903,7 +2903,7 @@
         "element": 4,
         "eventId": 2,
         "folderId": 3,
-        "timeLimitMs": 54000,
+        "timeLimitMs": 900000,
         "difficultyScore": 2650000
     }
 }

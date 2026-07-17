@@ -36,6 +36,7 @@
 ## 本轮已修正的数据/流程
 
 - Carnival 分数使用主数据第 104 列的真实 `difficulty_score`。
+- Carnival 第 100 列 `battle_time_limit` 按客户端逻辑从 60 FPS 帧数换算为毫秒；禁止直接作为毫秒使用。
 - Raid 修正列偏移，并在结算返回客户端必需的 `raid_event`。
 - Rush/Raid 失败结算不再推进模式进度。
 - Rush endless 下一轮按 round 排序。

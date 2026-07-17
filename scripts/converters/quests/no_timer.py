@@ -24,7 +24,8 @@ def convert_carnival_event_quest(obj):
             quest = converted[str(row[0])]
             quest['eventId'] = int(event_id)
             quest['folderId'] = int(row[1])
-            quest['timeLimitMs'] = int(row[100])
+            # Master data stores battle_time_limit in 60 FPS frames.
+            quest['timeLimitMs'] = round(int(row[100]) * 1000 / 60)
             quest['difficultyScore'] = int(float(row[104]))
     return converted
 
@@ -53,4 +54,3 @@ def convert_rush_event_quest(obj):
             if quest[73] != "(None)" and quest[73] != "":
                 converted[quest[0]]["element"] = int(quest[73])
     return converted 
-

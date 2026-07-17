@@ -4,6 +4,7 @@ const { handleCarnivalEventFinish } = require("../out/lib/quest/finish/carnival-
 const { handleRaidEventFinish } = require("../out/lib/quest/finish/raid-handler")
 const { handleRushEventFinish } = require("../out/lib/quest/finish/rush-handler")
 const { QuestCategory, RushEventFolder } = require("../out/lib/types")
+const carnivalEventQuests = require("../assets/carnival_event_quest.json")
 
 const party = {
     characters: [{ id: 101 }, { id: 102 }, null],
@@ -31,6 +32,58 @@ function testCarnivalScoreAndPreviousTotal() {
     assert.equal(result.score.time_bonus, 100000)
     assert.equal(result.previous_total_best_score, 550000)
     assert.deepEqual(upsert.slice(0, 4), [7, 1, 1, 300000])
+}
+
+function testCarnivalFrameLimitIsConvertedToMilliseconds() {
+    let upsert = null
+    const questData = carnivalEventQuests["250604002"]
+    const result = handleCarnivalEventFinish({
+        questCategory: QuestCategory.CARNIVAL_EVENT,
+        questAccomplished: true,
+        questId: 250604002,
+        questData,
+        clearTime: 166277,
+        party,
+        playerId: 17,
+        getRecordsFn: () => [],
+        upsertFn: (...args) => { upsert = args },
+    })
+
+    assert.equal(questData.timeLimitMs, 1200000)
+    assert.equal(result.score.time_bonus, 1033723)
+    assert.deepEqual(upsert.slice(0, 4), [17, 250604, 1, 3033723])
+}
+
+function testCarnivalScoreRoundsClearTime() {
+    const result = handleCarnivalEventFinish({
+        questCategory: QuestCategory.CARNIVAL_EVENT,
+        questAccomplished: true,
+        questId: 250604002,
+        questData: carnivalEventQuests["250604002"],
+        clearTime: 166277.6,
+        party,
+        playerId: 17,
+        getRecordsFn: () => [],
+        upsertFn: () => {},
+    })
+
+    assert.equal(result.score.time_bonus, 1033722)
+}
+
+function testCarnivalTimeBonusDoesNotBecomeNegative() {
+    const result = handleCarnivalEventFinish({
+        questCategory: QuestCategory.CARNIVAL_EVENT,
+        questAccomplished: true,
+        questId: 250604002,
+        questData: carnivalEventQuests["250604002"],
+        clearTime: 1200000.6,
+        party,
+        playerId: 17,
+        getRecordsFn: () => [],
+        upsertFn: () => {},
+    })
+
+    assert.equal(result.score.time_bonus, 0)
 }
 
 function testFailedSpecialQuestsDoNotProgress() {
@@ -111,6 +164,9 @@ function testRushEndlessProgressAndRaidResponse() {
 }
 
 testCarnivalScoreAndPreviousTotal()
+testCarnivalFrameLimitIsConvertedToMilliseconds()
+testCarnivalScoreRoundsClearTime()
+testCarnivalTimeBonusDoesNotBecomeNegative()
 testFailedSpecialQuestsDoNotProgress()
 testRushEndlessProgressAndRaidResponse()
 console.log("special quest flow tests passed")
