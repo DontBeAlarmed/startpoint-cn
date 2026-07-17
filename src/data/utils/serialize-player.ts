@@ -26,6 +26,20 @@ export interface SerializePlayerDataOptions {
     activeMissionList?: { mission_id: number; progress_value: number; stages: { stage: number; received: boolean }[] }[]
 }
 
+export function serializePlayerQuestProgress(progress: PlayerQuestProgress): UserQuestProgress {
+    return {
+        "best_elapsed_time_ms": progress.bestElapsedTimeMs,
+        "clear_rank": progress.clearRank,
+        "finished": progress.finished,
+        "high_score": progress.highScore ?? 0,
+        "quest_id": progress.questId,
+        "unlocked": progress.unlocked,
+        ...(progress.hostFinished !== undefined
+            ? { "host_finished": progress.hostFinished }
+            : {}),
+    }
+}
+
 
 /**
  * Serializes a player data object in the way that the world flipper client expects it.
@@ -99,14 +113,7 @@ export function serializePlayerData(
     for (const [section, progresses] of Object.entries(toSerialize.questProgress)) {
         const list: UserQuestProgress[] = []
         for (const progress of progresses) {
-            list.push({
-                "best_elapsed_time_ms": progress.bestElapsedTimeMs,
-                "clear_rank": progress.clearRank,
-                "finished": progress.finished,
-                "high_score": progress.highScore ?? 0,
-                "quest_id": progress.questId,
-                "unlocked": progress.unlocked
-            })
+            list.push(serializePlayerQuestProgress(progress))
         }
         userQuestProgress[section] = list
     }

@@ -33,6 +33,7 @@ import { trackLeaderPowerflip } from "../../lib/quest/finish/leader-powerflip-tr
 import { trackPartyCoClears } from "../../lib/quest/finish/party-co-clear-tracker";
 import type { FinishContext } from "../../lib/quest/finish/types";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import { resolveHostFinished, resolveIsRoomHost } from "../../lib/quest/host-finish";
 
 interface PlayerContext { playerId: number; player: Player }
 
@@ -195,9 +196,13 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             sessionManager.clearBattleExpectedCount(activeQuestData.roomNumber);
         }
 
+        const room = activeQuestData.roomNumber ? getRoom(activeQuestData.roomNumber) : null;
+        const isRoomHost = resolveIsRoomHost({
+            roomHostPlayerId: room?.host_player_id ?? null,
+            playerId,
+        });
         if (activeQuestData.roomNumber) {
-            const room = getRoom(activeQuestData.roomNumber);
-            if (room && room.host_player_id === playerId) {
+            if (isRoomHost && room) {
                 updateRoomState(room.room_number, 1);
                 console.log(`[MULTI] finish: room ${activeQuestData.roomNumber} reset to raising_state=1`);
             }
@@ -228,6 +233,11 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         const questProgress = getPlayerSingleQuestProgressSync(playerId, questCategory, questId);
         const questPreviouslyCompleted = questProgress !== null;
         const questAccomplished = (body as any).is_accomplished;
+        const hostFinished = resolveHostFinished({
+            previouslyHostFinished: questProgress?.hostFinished ?? false,
+            questAccomplished,
+            isRoomHost,
+        });
         const leaderId = ((body as any).statistics?.party || (body as any).quest_statistics?.party)?.characters?.[0]?.id
 
         const clearReward = !questPreviouslyCompleted && (questData as any).clearReward !== undefined ? givePlayerRewardSync(playerId, (questData as any).clearReward) : null;
@@ -239,7 +249,8 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                     finished: true,
                     bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
                     highScore: questProgress.highScore === undefined ? ((body as any).score || 0) : Math.max((body as any).score || 0, questProgress.highScore),
-                    leaderCharacterId: leaderId ?? null
+                    leaderCharacterId: leaderId ?? null,
+                    hostFinished,
                 };
                 if (clearRank !== null) {
                     updateData.clearRank = questProgress.clearRank === undefined ? clearRank : Math.max(clearRank, questProgress.clearRank);
@@ -252,7 +263,8 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                     bestElapsedTimeMs: clearTime,
                     highScore: (body as any).score || 0,
                     clearRank: clearRank ?? 5,
-                    leaderCharacterId: leaderId ?? null
+                    leaderCharacterId: leaderId ?? null,
+                    hostFinished,
                 });
             }
         }
@@ -375,7 +387,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 "mate_player_result": matePlayerResult,
                 "follow_info": followInfo,
                 "contribution_score": (body as any).contribution_score ?? 0,
-                "host_finished": true,
+                "host_finished": hostFinished,
                 "aborted_play_id": null,
             }
         });

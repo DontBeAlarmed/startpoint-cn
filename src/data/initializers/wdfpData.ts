@@ -1,4 +1,5 @@
 import { Database } from "better-sqlite3";
+import { ensureQuestHostFinishedStorageSync } from "../../lib/quest/host-finish-persistence";
 
 
 export default function init(
@@ -362,10 +363,13 @@ export default function init(
         best_elapsed_time_ms INTEGER,
         leader_character_id INTEGER,
         multi_clear_count INTEGER NOT NULL DEFAULT 0,
+        host_finished INTEGER,
         player_id INTEGER NOT NULL,
         PRIMARY KEY (section, quest_id, player_id),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
+
+    ensureQuestHostFinishedStorageSync(database)
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_gacha_info (
         gacha_id INTEGER NOT NULL,

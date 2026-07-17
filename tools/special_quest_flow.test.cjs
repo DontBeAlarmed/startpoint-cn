@@ -5,7 +5,16 @@ const { handleCarnivalEventFinish } = require("../src/lib/quest/finish/carnival-
 const { handleRaidEventFinish } = require("../src/lib/quest/finish/raid-handler")
 const { handleRushEventFinish } = require("../src/lib/quest/finish/rush-handler")
 const { QuestCategory, RushEventFolder } = require("../src/lib/types")
+let hostFinish = {}
+try {
+    hostFinish = require("../src/lib/quest/host-finish")
+} catch {
+    // The first TDD run intentionally reaches this branch before the module exists.
+}
 const carnivalEventQuests = require("../assets/carnival_event_quest.json")
+
+assert.equal(typeof hostFinish.resolveHostFinished, "function")
+assert.equal(typeof hostFinish.resolveIsRoomHost, "function")
 
 const party = {
     characters: [{ id: 101 }, { id: 102 }, null],
@@ -173,6 +182,42 @@ function testFailedSpecialQuestsDoNotProgress() {
     assert.equal(raid, null)
 }
 
+function testAdventHostFinishState() {
+    assert.equal(hostFinish.resolveIsRoomHost({
+        roomHostPlayerId: 17,
+        playerId: 17,
+    }), true)
+    assert.equal(hostFinish.resolveIsRoomHost({
+        roomHostPlayerId: 18,
+        playerId: 17,
+    }), false)
+    assert.equal(hostFinish.resolveIsRoomHost({
+        roomHostPlayerId: null,
+        playerId: 17,
+    }), false)
+
+    assert.equal(hostFinish.resolveHostFinished({
+        previouslyHostFinished: false,
+        questAccomplished: true,
+        isRoomHost: true,
+    }), true)
+    assert.equal(hostFinish.resolveHostFinished({
+        previouslyHostFinished: false,
+        questAccomplished: true,
+        isRoomHost: false,
+    }), false)
+    assert.equal(hostFinish.resolveHostFinished({
+        previouslyHostFinished: false,
+        questAccomplished: false,
+        isRoomHost: true,
+    }), false)
+    assert.equal(hostFinish.resolveHostFinished({
+        previouslyHostFinished: true,
+        questAccomplished: true,
+        isRoomHost: false,
+    }), true)
+}
+
 function testRushEndlessProgressAndRaidResponse() {
     const writes = []
     const rush = handleRushEventFinish({
@@ -218,5 +263,6 @@ testCarnivalScoreRoundsClearTime()
 testCarnivalTimeBonusDoesNotBecomeNegative()
 testCarnivalUnclaimedRewardsAreGrantedAtomically()
 testFailedSpecialQuestsDoNotProgress()
+testAdventHostFinishState()
 testRushEndlessProgressAndRaidResponse()
 console.log("special quest flow tests passed")

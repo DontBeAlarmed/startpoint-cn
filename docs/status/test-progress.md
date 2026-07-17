@@ -10,6 +10,7 @@
 - 无限激战（Rush）：进入、配队、结算全流程待测；配队分类及全局 `party_id` 冲突已修复，等待客户端验收。
 - 土俑（Carnival）：进入、分数和配队已通过；累计分奖励发放与动画已补全，等待客户端验收。
 - 战阵（Raid）：进入、配队、战斗启动与结算全流程待重测；配队已与 Rush/Carnival 隔离。
+- 歼灭者讨伐战：最高难度房主前置已补全；按“成员不解锁、三关房主通关后立即解锁、重载后保持”验收。
 
 ## 测试清单
 
@@ -27,7 +28,7 @@
 | 10 | 高难关卡（EX） | `ex_quest` | 221 | ⬜ | ⬜ | |
 | 11 | 角色剧情 | `character_quest` | 1,318 | ✅ | ✅ | story_quest/finish 通过；⚠️ 阅读后不记录已读状态（紫色标记不消除），待实现 episode_trial/save |
 | 12 | 主线 BOSS 战 | `boss_battle_quest` | 232 | ⬜ | ⬜ | |
-| 13 | 降临讨伐 | `advent_event_quest` | 459 | ✅ | ✅ | 暗机兵 Boss 币掉落正常到账；361/459 关有掉落组 |
+| 13 | 降临讨伐 | `advent_event_quest` | 459 | ✅ | 🔧 | 暗机兵掉落已通过；歼灭者 `200076009` 的三关房主前置及重载持久化待验收 |
 | 14 | 外传故事 | `world_story_event_quest` | 913 | ✅ | ✅ | 剧情关 S+ 金冠 + Boss 战正常评级；C3212 彻底修复（见底部详解） |
 | 15 | 外传 BOSS（多人） | `world_story_event_boss_battle_quest` | 96 | ⬜ | ⬜ | 联机 Phase 2 |
 | 16 | 挑战迷宫 | `challenge_dungeon_event_quest` | 46 | ⬜ | ⬜ | |

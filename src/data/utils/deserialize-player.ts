@@ -278,7 +278,8 @@ export function deserializePlayerData(
                     clearRank: progress['clear_rank'],
                     finished: finished,
                     highScore: progress['high_score'],
-                    questId: questId
+                    questId: questId,
+                    hostFinished: progress['host_finished'],
                 })
             }
             questProgress[section] = list
@@ -484,4 +485,3 @@ export function deserializePlayerData(
         throw error
     }
 }
-

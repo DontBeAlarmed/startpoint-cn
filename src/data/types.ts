@@ -229,6 +229,7 @@ export interface RawPlayerQuestProgress {
     best_elapsed_time_ms?: number
     leader_character_id?: number
     multi_clear_count?: number
+    host_finished?: number | null
 }
 
 export interface PlayerQuestProgress {
@@ -240,6 +241,7 @@ export interface PlayerQuestProgress {
     leaderCharacterId?: number
     multiClearCount?: number
     unlocked?: boolean
+    hostFinished?: boolean
 }
 
 export interface RawPlayerGachaInfo {
@@ -642,6 +644,7 @@ export interface UserQuestProgress {
     high_score?: number
     best_elapsed_time_ms?: number
     clear_rank?: number
+    host_finished?: boolean
 }
 
 export interface UserGachaInfo {
