@@ -150,6 +150,12 @@ cp ../archive/pinball-1.4.90-1.4.101-9-modassets07170102.zip "pinball-$V-$W-9-mo
    cp ../archive/pinball-1.4.90-1.4.101-9-modassets07170102.zip    "pinball-V-W-2-modassets07170102.zip"
    ```
    重启服务端,玩家清缓存/重启游戏即到位。**表键仍缺(血统真不同源)再走下面 1-4。**
+   另外把窗口内容包也带上(修兑换商店『数据不足』死循环——横幅/美术只在 1.4.104-125 窗口发布过):
+   ```bash
+   cp pinball-1.4.103-1.4.104-1-windowmod07171640.zip "pinball-V-W-3-windowmod07171640.zip"
+   ```
+   ⚠ `windowquests`(连战塔任务表+event_list)是给**跟链血统**的:`event_list` 会整表替换
+   活动页列表,外血统换上会把你自己的活动滤没,只有连战塔内 UI 出问题时再单独考虑前三张。
 1. **纯资产补充包对任何血统都安全**(`archive/pinball-1.4.90-1.4.101-9-modassets07170102.zip`,
    30 个全新路径文件:武器图/横幅/商店图,不含任何表),重命名成你的一跳直接发;
 2. 深渊行数据用 [mod-tools](https://github.com/kuronzzhan-droid/startpoint-cn-mod-tools) 在

@@ -45,6 +45,20 @@
    "created_at": "2026-07-16"
   },
   {
+   "id": "mode-window-content",
+   "type": "patch",
+   "name": "深渊连战 1.4.104-125 窗口客户端内容补齐",
+   "description": "git 链此前只收录到 1.4.103,而模式的客户端内容在作者 CDN 一直发布到 1.4.125:连战塔三张任务表(rush_event_quest/folder/battle_quest_correction)、event_list、专属横幅(1.4.119)、1.4.115 批次美术、白虎 InvokeSkill DSL、custom_ability_string 与 power_flip_action(取现役状态)。缺横幅/美术=兑换商店『数据不足』死循环(零404零报错);缺任务表=连战塔内 UI 不完整。windowmod 对任何血统安全;windowquests 的 event_list 会整表替换活动列表,外血统慎用(见指南)。",
+   "version": "1.4.104",
+   "depends_on": "1.4.103",
+   "enabled": true,
+   "chain": [
+    "pinball-1.4.103-1.4.104-1-windowmod07171640.zip",
+    "pinball-1.4.103-1.4.104-2-windowquests07171641.zip"
+   ],
+   "created_at": "2026-07-17"
+  },
+  {
    "id": "gacha-feature-fix-v1",
    "type": "patch",
    "name": "特辑图片 C2032 修复（第一步）",
