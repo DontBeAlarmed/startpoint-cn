@@ -153,8 +153,7 @@ const continueVmoneyCost = 50;
 
 export const activeQuests: Record<number, ActiveQuest> = {}
 
-export function insertActiveQuest(playerId: number, quest: ActiveQuest) {
-    // Persist to DB for battle recovery across server restarts
+export function persistActiveQuest(playerId: number, quest: ActiveQuest) {
     insertPlayerActiveQuestSync(playerId, {
         playerId,
         playId: quest.playId,
@@ -169,7 +168,16 @@ export function insertActiveQuest(playerId: number, quest: ActiveQuest) {
         eventId: quest.eventId ?? null,
         continueCount: quest.continueCount
     })
+}
+
+export function publishActiveQuest(playerId: number, quest: ActiveQuest) {
     activeQuests[playerId] = quest
+}
+
+export function insertActiveQuest(playerId: number, quest: ActiveQuest) {
+    // 其他调用方继续保持先写数据库、再更新内存的行为。
+    persistActiveQuest(playerId, quest)
+    publishActiveQuest(playerId, quest)
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -592,7 +600,7 @@ const routes = async (fastify: FastifyInstance) => {
             useBossBoostPoint: useBossBoostPoint,
             isAutoStartMode: isAutoStartMode,
             isMulti: false,
-            entryItemId: entryCost?.itemMode === 1 ? entryCost.itemId : undefined,
+            entryItemId: entryCost && entryCost.itemId > 0 ? entryCost.itemId : undefined,
             playId: body.play_id,
             continueCount: 0
         }
@@ -614,7 +622,8 @@ const routes = async (fastify: FastifyInstance) => {
                 getItemCount: getPlayerItemSync,
                 updateItemCount: updatePlayerItemSync,
                 updatePlayer: updatePlayerSync,
-                insertActiveQuest,
+                persistActiveQuest,
+                publishActiveQuest,
             })
         } catch (error) {
             if (error instanceof InsufficientEntryItemError

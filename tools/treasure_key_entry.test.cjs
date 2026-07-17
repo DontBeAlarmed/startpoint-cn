@@ -12,24 +12,6 @@ const challengeDungeonQuests = require(path.join(
     "wf-assets-cn/orderedmap/quest/event/challenge_dungeon_event_quest.json",
 ))
 
-const treasureQuestIds = ["2001", "2002", "2003", "2004", "2005", "2006"]
-const rawTreasureRows = Object.values(challengeDungeonQuests["2"]).map(wrapper => wrapper[0])
-
-for (const questId of treasureQuestIds) {
-    const row = rawTreasureRows.find(candidate => candidate[0] === questId)
-    assert.ok(row, `missing raw treasure quest ${questId}`)
-    assert.deepEqual(
-        questEntryCosts[`13_${questId}`],
-        {
-            itemMode: Number(row[56]),
-            itemId: Number(row[57]),
-            itemCount: Number(row[58]),
-            stamina: Number(row[70]),
-        },
-        `treasure quest ${questId} must preserve entry fields 56/57/58/70`,
-    )
-}
-
 const {
     InsufficientEntryItemError,
     InsufficientStaminaError,
@@ -37,8 +19,13 @@ const {
     runStartEntryTransaction,
 } = require("../src/lib/quest/start-entry")
 
-function createFixture({ itemCount = 4, stamina = 40 } = {}) {
-    let state = {
+function createFixture({
+    itemCount = 4,
+    stamina = 40,
+    failDuringWrite = false,
+    failDuringCommit = false,
+} = {}) {
+    let databaseState = {
         itemCount,
         player: {
             id: 7,
@@ -50,53 +37,76 @@ function createFixture({ itemCount = 4, stamina = 40 } = {}) {
         },
         activeQuest: null,
     }
+    let publishedActiveQuest = null
+    let publishedWithinTransaction = false
     let transactionActive = false
     let transactionCount = 0
     const writes = []
 
+    function persistActiveQuest(_playerId, activeQuest) {
+        assert.equal(transactionActive, true)
+        writes.push("dbActiveQuest")
+        databaseState.activeQuest = activeQuest
+        if (failDuringWrite) throw new Error("simulated write failure")
+    }
+
+    function publishActiveQuest(_playerId, activeQuest) {
+        writes.push("publishActiveQuest")
+        publishedWithinTransaction ||= transactionActive
+        publishedActiveQuest = activeQuest
+    }
+
     const dependencies = {
         transaction(operation) {
             transactionCount++
-            const snapshot = structuredClone(state)
+            const databaseSnapshot = structuredClone(databaseState)
             transactionActive = true
             try {
-                return operation()
+                const result = operation()
+                if (failDuringCommit) throw new Error("simulated commit failure")
+                return result
             } catch (error) {
-                state = snapshot
+                databaseState = databaseSnapshot
                 throw error
             } finally {
                 transactionActive = false
             }
         },
         getPlayer() {
-            return state.player
+            return databaseState.player
         },
         computeStamina(player) {
             return player.stamina
         },
         getItemCount() {
-            return state.itemCount
+            return databaseState.itemCount
         },
         updateItemCount(_playerId, _itemId, amount) {
             assert.equal(transactionActive, true)
             writes.push("item")
-            state.itemCount = amount
+            databaseState.itemCount = amount
         },
         updatePlayer(update) {
             assert.equal(transactionActive, true)
             writes.push("player")
-            state.player = { ...state.player, ...update }
+            databaseState.player = { ...databaseState.player, ...update }
         },
-        insertActiveQuest(_playerId, activeQuest) {
-            assert.equal(transactionActive, true)
-            writes.push("activeQuest")
-            state.activeQuest = activeQuest
+        persistActiveQuest,
+        publishActiveQuest,
+        // Compatibility path proving the old implementation publishes before commit.
+        insertActiveQuest(playerId, activeQuest) {
+            persistActiveQuest(playerId, activeQuest)
+            publishActiveQuest(playerId, activeQuest)
         },
     }
 
     return {
         dependencies,
-        getState: () => state,
+        getState: () => ({
+            ...databaseState,
+            publishedActiveQuest,
+        }),
+        getPublishedWithinTransaction: () => publishedWithinTransaction,
         getTransactionCount: () => transactionCount,
         writes,
     }
@@ -106,7 +116,6 @@ function createInput() {
     return {
         playerId: 7,
         entryCost: {
-            itemMode: 1,
             itemId: 500000,
             itemCount: 1,
             stamina: 10,
@@ -133,6 +142,21 @@ function createInput() {
 }
 
 {
+    const fixture = createFixture({ failDuringCommit: true })
+    assert.throws(
+        () => runStartEntryTransaction(createInput(), fixture.dependencies),
+        /simulated commit failure/,
+    )
+    assert.equal(fixture.getState().itemCount, 4)
+    assert.equal(fixture.getState().player.stamina, 40)
+    assert.equal(fixture.getState().player.totalStaminaUsed, 12)
+    assert.equal(fixture.getState().player.partySlot, 1)
+    assert.equal(fixture.getState().activeQuest, null)
+    assert.equal(fixture.getState().publishedActiveQuest, null)
+    assert.deepEqual(fixture.writes, ["item", "player", "dbActiveQuest"])
+}
+
+{
     const fixture = createFixture({ itemCount: 0, stamina: 40 })
     assert.throws(
         () => runStartEntryTransaction(createInput(), fixture.dependencies),
@@ -142,6 +166,7 @@ function createInput() {
     assert.equal(fixture.getTransactionCount(), 1)
     assert.equal(fixture.getState().player.stamina, 40)
     assert.equal(fixture.getState().activeQuest, null)
+    assert.equal(fixture.getState().publishedActiveQuest, null)
 }
 
 {
@@ -154,6 +179,22 @@ function createInput() {
     assert.equal(fixture.getTransactionCount(), 1)
     assert.equal(fixture.getState().itemCount, 4)
     assert.equal(fixture.getState().activeQuest, null)
+    assert.equal(fixture.getState().publishedActiveQuest, null)
+}
+
+{
+    const fixture = createFixture({ failDuringWrite: true })
+    assert.throws(
+        () => runStartEntryTransaction(createInput(), fixture.dependencies),
+        /simulated write failure/,
+    )
+    assert.equal(fixture.getState().itemCount, 4)
+    assert.equal(fixture.getState().player.stamina, 40)
+    assert.equal(fixture.getState().player.totalStaminaUsed, 12)
+    assert.equal(fixture.getState().player.partySlot, 1)
+    assert.equal(fixture.getState().activeQuest, null)
+    assert.equal(fixture.getState().publishedActiveQuest, null)
+    assert.deepEqual(fixture.writes, ["item", "player", "dbActiveQuest"])
 }
 
 {
@@ -165,23 +206,45 @@ function createInput() {
     }
 
     assert.equal(fixture.getTransactionCount(), 4)
+    assert.equal(fixture.getPublishedWithinTransaction(), false)
     assert.equal(fixture.getState().itemCount, 0)
     assert.equal(fixture.getState().player.stamina, 0)
     assert.equal(fixture.getState().player.totalStaminaUsed, 52)
     assert.equal(fixture.getState().player.partySlot, 3)
     assert.equal(fixture.getState().activeQuest.playId, "treasure-play-1")
-    assert.deepEqual(fixture.writes, Array(4).fill(["item", "player", "activeQuest"]).flat())
+    assert.equal(fixture.getState().publishedActiveQuest.playId, "treasure-play-1")
+    assert.deepEqual(
+        fixture.writes,
+        Array(4).fill(["item", "player", "dbActiveQuest", "publishActiveQuest"]).flat(),
+    )
 
     assert.throws(
         () => runStartEntryTransaction(createInput(), fixture.dependencies),
         InsufficientEntryItemError,
     )
     assert.equal(fixture.getTransactionCount(), 5)
-    assert.deepEqual(fixture.writes, Array(4).fill(["item", "player", "activeQuest"]).flat())
 }
 
 assert.deepEqual(buildStartEntryItemList({ entryItemId: 500000, entryItemCount: 0 }), { 500000: 0 })
 assert.deepEqual(buildStartEntryItemList({ entryItemId: null, entryItemCount: null }), {})
+
+const treasureQuestIds = ["2001", "2002", "2003", "2004", "2005", "2006"]
+const rawTreasureRows = Object.values(challengeDungeonQuests["2"]).map(wrapper => wrapper[0])
+
+for (const questId of treasureQuestIds) {
+    const row = rawTreasureRows.find(candidate => candidate[0] === questId)
+    assert.ok(row, `missing raw treasure quest ${questId}`)
+    assert.equal(Number(row[56]), 1, `treasure quest ${questId} must use Always item mode`)
+    assert.deepEqual(
+        questEntryCosts[`13_${questId}`],
+        {
+            itemId: Number(row[57]),
+            itemCount: Number(row[58]),
+            stamina: Number(row[70]),
+        },
+        `treasure quest ${questId} must preserve entry fields 57/58/70`,
+    )
+}
 
 const routeSource = fs.readFileSync(
     path.join(projectRoot, "src/routes/api/singleBattleQuest.ts"),
@@ -192,9 +255,14 @@ const insertActiveQuestSource = routeSource.slice(
     routeSource.indexOf("const routes = async"),
 )
 assert.ok(
-    insertActiveQuestSource.indexOf("insertPlayerActiveQuestSync")
-        < insertActiveQuestSource.indexOf("activeQuests[playerId] = quest"),
-    "insertActiveQuest must persist to DB before updating memory",
+    insertActiveQuestSource.indexOf("persistActiveQuest")
+        < insertActiveQuestSource.indexOf("publishActiveQuest"),
+    "insertActiveQuest must persist to DB before publishing to memory",
+)
+assert.match(
+    routeSource,
+    /["']item_list["']\s*:\s*buildStartEntryItemList\(startResult\)/,
+    "quest start response must include the post-deduction item_list",
 )
 
 console.log("treasure key entry tests passed")

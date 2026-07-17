@@ -1,5 +1,4 @@
 export interface StartEntryCost {
-    itemMode?: number
     itemId: number
     itemCount: number
     stamina: number
@@ -31,7 +30,8 @@ export interface StartEntryDependencies<TActiveQuest> {
     getItemCount(playerId: number, itemId: number): number | null
     updateItemCount(playerId: number, itemId: number, amount: number): void
     updatePlayer(update: Partial<StartEntryPlayer> & Pick<StartEntryPlayer, "id">): void
-    insertActiveQuest(playerId: number, activeQuest: TActiveQuest): void
+    persistActiveQuest(playerId: number, activeQuest: TActiveQuest): void
+    publishActiveQuest(playerId: number, activeQuest: TActiveQuest): void
 }
 
 export interface StartEntryResult {
@@ -79,11 +79,11 @@ export function runStartEntryTransaction<TActiveQuest>(
     input: StartEntryInput<TActiveQuest>,
     dependencies: StartEntryDependencies<TActiveQuest>,
 ): StartEntryResult {
-    return dependencies.transaction(() => {
+    const result = dependencies.transaction(() => {
         const player = dependencies.getPlayer(input.playerId)
         if (!player) throw new PlayerNotFoundError(input.playerId)
 
-        const entryItemCost = input.entryCost?.itemMode === 1
+        const entryItemCost = input.entryCost
             && input.entryCost.itemId > 0
             && input.entryCost.itemCount > 0
             ? input.entryCost
@@ -124,7 +124,7 @@ export function runStartEntryTransaction<TActiveQuest>(
         if (input.updatePartySlot) playerUpdate.partySlot = input.partyId
         if (Object.keys(playerUpdate).length > 1) dependencies.updatePlayer(playerUpdate)
 
-        dependencies.insertActiveQuest(input.playerId, input.activeQuest)
+        dependencies.persistActiveQuest(input.playerId, input.activeQuest)
 
         return {
             afterStamina,
@@ -132,4 +132,6 @@ export function runStartEntryTransaction<TActiveQuest>(
             entryItemCount,
         }
     })
+    dependencies.publishActiveQuest(input.playerId, input.activeQuest)
+    return result
 }

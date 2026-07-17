@@ -32,7 +32,7 @@ const QUEST_TYPES = {
   daily_exp_mana_event_quest: { file: "quest/event/daily_exp_mana_event_quest.json", cat: 14 },
   daily_week_event_quest: { file: "quest/event/daily_week_event_quest.json", cat: 6 },
   expert_single_event_quest: { file: "quest/event/expert_single_event_quest.json", cat: 21 },
-  // Fields 50 and 69 both equal 1 on the first row, so first-match calibration is ambiguous.
+  // 首行字段 50 与 69 同为 1；固定真实体力字段 69 仅防止旧校准算法误判，不改变类别 26 的既有资产。
   hard_multi_event_quest: { file: "quest/event/hard_multi_event_quest.json", cat: 26, staminaIndex: 69 },
   raid_event_quest: { file: "quest/event/raid_event_quest.json", cat: 8 },
   ranking_event_single_quest: { file: "quest/event/ranking_event_single_quest.json", cat: 10 },
@@ -135,9 +135,7 @@ for (const [name, cfg] of Object.entries(QUEST_TYPES)) {
       const itemCount = cfg.entryItem && itemMode === 1
         ? parseInt(f[cfg.entryItem.itemCountIndex])
         : 0;
-      result[key] = cfg.entryItem && itemMode === 1
-        ? { itemMode, itemId, itemCount, stamina: st }
-        : { itemId, itemCount, stamina: st };
+      result[key] = { itemId, itemCount, stamina: st };
       details[key] = { new: st, old: oldCosts[key]?.stamina ?? null };
     }
   });
@@ -149,7 +147,7 @@ console.log(`\nTotal entries: ${Object.keys(result).length}`);
 for (let questId = 2001; questId <= 2006; questId++) {
   assert.deepStrictEqual(
     result[`13_${questId}`],
-    { itemMode: 1, itemId: 500000, itemCount: 1, stamina: 10 },
+    { itemId: 500000, itemCount: 1, stamina: 10 },
     `invalid treasure domain entry cost for quest ${questId}`,
   );
 }
