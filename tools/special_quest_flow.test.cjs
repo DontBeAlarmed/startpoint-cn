@@ -44,6 +44,25 @@ function testCarnivalScoreAndPreviousTotal() {
     assert.deepEqual(upsert.slice(0, 4), [7, 1, 1, 300000])
 }
 
+function testCarnivalLeaderFallsBackToFirstPartyCharacter() {
+    const result = handleCarnivalEventFinish({
+        questCategory: QuestCategory.CARNIVAL_EVENT,
+        questAccomplished: true,
+        questId: 1,
+        questData: { eventId: 1, folderId: 1, difficultyScore: 200000, timeLimitMs: 108000 },
+        clearTime: 8000,
+        party: {
+            characters: [{ id: 101 }, { id: 102 }, null],
+            unison_characters: [{ id: 201 }, null, null],
+        },
+        playerId: 7,
+        getRecordsFn: () => [],
+        upsertFn: () => {},
+    })
+
+    assert.equal(result.carnivalEventData.leader_character_id, 101)
+}
+
 function testCarnivalFrameLimitIsConvertedToMilliseconds() {
     let upsert = null
     const questData = carnivalEventQuests["250604002"]
@@ -258,6 +277,7 @@ function testRushEndlessProgressAndRaidResponse() {
 }
 
 testCarnivalScoreAndPreviousTotal()
+testCarnivalLeaderFallsBackToFirstPartyCharacter()
 testCarnivalFrameLimitIsConvertedToMilliseconds()
 testCarnivalScoreRoundsClearTime()
 testCarnivalTimeBonusDoesNotBecomeNegative()

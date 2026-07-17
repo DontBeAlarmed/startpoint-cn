@@ -53,7 +53,7 @@ export function handleCarnivalEventFinish(params: {
     return transactionFn(() => {
         const characterIds = party.characters.map(v => v?.id ?? null)
         const unisonCharacterIds = party.unison_characters.map(v => v?.id ?? null)
-        const leaderCharId = party.leader?.id ?? 0
+        const leaderCharId = party.leader?.id ?? party.characters[0]?.id ?? 0
         const records = getRecordsFn(playerId, eventId)
         const previousTotalBestScore = records.reduce(
             (sum, record) => sum + (record.bestScore ?? 0),
