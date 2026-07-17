@@ -1,32 +1,22 @@
-# CN early event currency fix
+# 国服早期活动代币修复
 
-## Symptom
+> 客户端验收状态：暂缓测试。当前仅完成代码、主数据和专项回归验证。
 
-Some early advent score rewards granted an item ID that did not match the
-currency accepted by the active CN event shop. The reward appeared to be
-missing even though the score reward itself completed normally.
+## 现象
 
-## Root cause
+部分早期降临活动的分数奖励发放了与当前活动商店不匹配的道具 ID。分数奖励流程正常完成，但玩家看到的结果像是代币没有进入可用背包。
 
-This is not a CDN download or transport-corruption problem. The server combined
-score reward rows and event shop rows from different CN master-data generations.
-Several event currencies reuse the same display name while their numeric IDs
-change between reruns. A static score-reward ID can therefore point at an older
-generation than the shop active at the server's virtual date.
+## 根因
 
-The archive `CN早期降临活动代币相关.zip` correctly identifies the affected
-reward rows, but replacing IDs only in `score_reward.json` is not sufficient for
-servers that move the virtual date across original runs and reruns.
+这不是 CDN 下载或传输损坏。服务端混用了不同国服主数据世代的分数奖励和活动商店记录。若初次活动与复刻活动使用同名但不同数字 ID 的代币，固定的分数奖励 ID 就可能指向与当前虚拟日期不一致的旧世代代币。
 
-## Fix
+`CN早期降临活动代币相关.zip` 正确定位了受影响的奖励行，但只替换 `score_reward.json` 中的 ID 无法同时覆盖初次活动与后续复刻。
 
-- Correct the known mixed-generation rows in `assets/score_reward.json`.
-- Build currency families from `event_item_shop.json` using the shared names in
-  `item_lookup.json`.
-- At reward time, select the family member whose shop availability contains the
-  player's virtual server date.
-- Leave unrelated item IDs unchanged.
+## 修复
 
-This preserves old-event behavior while also supporting later reruns. The
-focused regression covers the original ID, the `999800` generation, the later
-`70002` generation, dates with no matching shop, and unrelated items.
+- 修正 `assets/score_reward.json` 中已知的混合世代记录。
+- 根据 `item_lookup.json` 的名称，从 `event_item_shop.json` 建立代币世代族。
+- 发奖时按照玩家虚拟服务器日期选择商店开放期匹配的代币 ID。
+- 不修改无关道具 ID。
+
+专项回归覆盖原始 ID、`999800` 世代、后续 `70002` 世代、没有匹配商店的日期以及无关道具。客户端跨初次活动与复刻日期的验收暂缓。
