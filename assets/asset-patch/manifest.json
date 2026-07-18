@@ -72,6 +72,19 @@
    "created_at": "2026-07-17"
   },
   {
+   "id": "abyss-weapon-balance-v1",
+   "type": "patch",
+   "name": "深渊武器最终平衡修复",
+   "description": "以 1.4.102 整合桥接包为表基线，重新生成 8000101-8000115 的最终数值与模式说明；能力魂从官方基线重建，并恢复官方 equipment_enhancement_ability，避免历史测试倍率和武器能力表残留。",
+   "version": "1.4.106",
+   "depends_on": "1.4.105",
+   "enabled": true,
+   "chain": [
+    "pinball-1.4.105-1.4.106-1-abyssbalance0718.zip"
+   ],
+   "created_at": "2026-07-18"
+  },
+  {
    "id": "gacha-feature-fix-v1",
    "type": "patch",
    "name": "特辑图片 C2032 修复（第一步）",
