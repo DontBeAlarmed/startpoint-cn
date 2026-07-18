@@ -81,7 +81,7 @@
 | `200071009` | `10000049` | 1 | 30 |
 | `200076009` | `10000072` | 1 | 30 |
 
-正式服在 `/single_battle_quest/start` 成功时预扣门票并返回扣除后的 `item_list`，成功 finish 后确认消费；失败或主动 abort 时返还门票但不返体力。active quest 会保存门票 ID 和数量，服务重启后由 CN load 恢复到内存；旧记录仅在门票 ID 与当前主数据一致时回退数量。重复 abort 不会重复返还。
+正式服在 `/single_battle_quest/start` 成功时预扣门票并返回扣除后的 `item_list`，成功 finish 后确认消费；失败或主动 abort 时返还门票但不返体力。active quest 会保存门票 ID 和数量，服务重启后由 CN load 恢复到内存；迁移前的旧记录仅在门票 ID 一致且当前配置恰好消耗 1 张时回退数量。abort 还会核对 `play_id/quest_id/category`，延迟到达的旧请求不会删除新战斗或返还新战斗的门票。
 
 ## 客户端验收
 

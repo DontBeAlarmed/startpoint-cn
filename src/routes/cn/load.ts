@@ -9,7 +9,7 @@ import { getDisplayHost } from "../../multi/room/serializer";
 import { getRoom } from "../../multi/room/manager";
 import { runPermanentValidators } from "../../lib/validate";
 import { restoreActiveQuestFromStorage } from "../../lib/quest/entry-lifecycle";
-import { ActiveQuest, publishActiveQuest, runAbortActiveQuestTransaction } from "../api/singleBattleQuest";
+import { ActiveQuest, publishActiveQuest, runAbortActiveQuestTransaction } from "../../lib/quest/active-quest-service";
 import type { StartEntryCost } from "../../lib/quest/start-entry";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
 
@@ -140,12 +140,16 @@ const routes = async (fastify: FastifyInstance) => {
             updatePlayerSync({ id: player.id, lastLoginTime: now });
         }
 
-        let activeQuest = getPlayerActiveQuestSync(playerId) as ActiveQuest | null;
+        let activeQuest: ActiveQuest | null = getPlayerActiveQuestSync(playerId);
         if (activeQuest) {
             const roomExists = activeQuest.roomNumber ? getRoom(activeQuest.roomNumber) : true;
             if (!roomExists) {
                 console.log(`[CN-LOAD] active quest room ${activeQuest.roomNumber} not found, cancelling`);
-                runAbortActiveQuestTransaction(playerId);
+                runAbortActiveQuestTransaction(playerId, {
+                    playId: activeQuest.playId,
+                    questId: activeQuest.questId,
+                    category: activeQuest.category,
+                });
                 activeQuest = null;
             } else {
                 activeQuest = restoreActiveQuestFromStorage(playerId, activeQuest, {

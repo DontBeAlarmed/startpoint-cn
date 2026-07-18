@@ -171,23 +171,6 @@ export interface SummonResponse {
     mate2: import("../lib/types").MultiMate | null
 }
 
-// === Active quest state (shared with singleBattleQuest.ts) ===
-export interface ActiveQuest {
-    questId: number
-    category: number
-    useBossBoostPoint: boolean
-    useBoostPoint: boolean
-    isAutoStartMode: boolean
-    isMulti: boolean
-    roomNumber?: string
-    matePlayerIds?: number[]
-    mateComIds?: number[]
-    entryItemId?: number
-    eventId?: number
-    playId: string
-    continueCount: number
-}
-
 // === State machine enums ===
 export enum RoomState {
     Waiting = 0,

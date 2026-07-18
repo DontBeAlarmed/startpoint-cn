@@ -1,10 +1,18 @@
 import type { StartEntryCost } from "./start-entry"
 
 export interface EntryLifecycleActiveQuest {
+    playId: string
     questId: number
     category: number
     entryItemId?: number | null
     entryItemCount?: number | null
+}
+
+export interface AbortEntryInput {
+    playerId: number
+    playId: string
+    questId: number
+    category: number
 }
 
 export interface AbortEntryDependencies<TActiveQuest extends EntryLifecycleActiveQuest> {
@@ -24,6 +32,7 @@ export interface RestoreActiveQuestDependencies<TActiveQuest extends EntryLifecy
 }
 
 export interface AbortEntryResult<TActiveQuest> {
+    cancelled: boolean
     activeQuest: TActiveQuest | null
     itemList: Record<string, number>
 }
@@ -46,32 +55,38 @@ function resolvePrepaidEntryItem(
     }
 
     const currentCost = getEntryCost(activeQuest.category, activeQuest.questId)
-    if (!currentCost || currentCost.itemId !== itemId || currentCost.itemCount <= 0) return null
+    if (!currentCost || currentCost.itemId !== itemId || currentCost.itemCount !== 1) return null
     return { itemId, itemCount: currentCost.itemCount }
 }
 
 export function runAbortEntryTransaction<TActiveQuest extends EntryLifecycleActiveQuest>(
-    playerId: number,
+    input: AbortEntryInput,
     dependencies: AbortEntryDependencies<TActiveQuest>,
 ): AbortEntryResult<TActiveQuest> {
     const result = dependencies.transaction(() => {
-        const activeQuest = dependencies.getActiveQuest(playerId)
-        if (!activeQuest) return { activeQuest: null, itemList: {} }
+        const activeQuest = dependencies.getActiveQuest(input.playerId)
+        const matchesActiveQuest = activeQuest
+            && activeQuest.playId === input.playId
+            && activeQuest.questId === input.questId
+            && activeQuest.category === input.category
+        if (!activeQuest || !matchesActiveQuest) {
+            return { cancelled: false, activeQuest: null, itemList: {} }
+        }
 
         const prepaidItem = resolvePrepaidEntryItem(activeQuest, dependencies.getEntryCost)
         const itemList: Record<string, number> = {}
         if (prepaidItem) {
-            const afterCount = (dependencies.getItemCount(playerId, prepaidItem.itemId) ?? 0)
+            const afterCount = (dependencies.getItemCount(input.playerId, prepaidItem.itemId) ?? 0)
                 + prepaidItem.itemCount
-            dependencies.setItemCount(playerId, prepaidItem.itemId, afterCount)
+            dependencies.setItemCount(input.playerId, prepaidItem.itemId, afterCount)
             itemList[prepaidItem.itemId] = afterCount
         }
 
-        dependencies.deleteActiveQuest(playerId)
-        return { activeQuest, itemList }
+        dependencies.deleteActiveQuest(input.playerId)
+        return { cancelled: true, activeQuest, itemList }
     })
 
-    dependencies.clearActiveQuest(playerId)
+    if (result.cancelled) dependencies.clearActiveQuest(input.playerId)
     return result
 }
 

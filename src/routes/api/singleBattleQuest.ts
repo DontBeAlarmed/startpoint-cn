@@ -1,8 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { deletePlayerActiveQuestSync, getPlayerActiveQuestSync, insertPlayerActiveQuestSync, updatePlayerActiveQuestContinueCountSync } from "../../data/domains/quest_active"
+import { deletePlayerActiveQuestSync, updatePlayerActiveQuestContinueCountSync } from "../../data/domains/quest_active"
 import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerRushEventSync } from "../../data/domains/rushEvent"
 import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
-import { getPlayerItemSync, givePlayerItemSync, setPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
+import { getPlayerItemSync, givePlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
 import { getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync } from "../../data/domains/quest"
 import { getSession } from "../../data/domains/session"
 import { incrementPlayerCharacterClearSync } from "../../data/domains/character_clear"
@@ -53,7 +53,13 @@ import {
     runStartEntryTransaction,
     StartEntryCost,
 } from "../../lib/quest/start-entry";
-import { runAbortEntryTransaction } from "../../lib/quest/entry-lifecycle";
+import {
+    ActiveQuest,
+    activeQuests,
+    persistActiveQuest,
+    publishActiveQuest,
+    runAbortActiveQuestTransaction,
+} from "../../lib/quest/active-quest-service";
 
 interface StartBody {
     quest_id: number
@@ -134,68 +140,7 @@ interface ReturnRushEvent {
     old_best_elapsed_time_ms: number | null
 }
 
-export interface ActiveQuest {
-    questId: number,
-    category: QuestCategory,
-    useBossBoostPoint: boolean,
-    useBoostPoint: boolean,
-    isAutoStartMode: boolean,
-    isMulti: boolean,
-    roomNumber?: string,
-    matePlayerIds?: number[],
-    mateComIds?: number[],
-    entryItemId?: number,
-    entryItemCount?: number,
-    eventId?: number,
-    playId: string,
-    continueCount: number
-}
-
 const continueVmoneyCost = 50;
-
-export const activeQuests: Record<number, ActiveQuest> = {}
-
-export function persistActiveQuest(playerId: number, quest: ActiveQuest) {
-    insertPlayerActiveQuestSync(playerId, {
-        playerId,
-        playId: quest.playId,
-        questId: quest.questId,
-        category: quest.category,
-        useBossBoostPoint: quest.useBossBoostPoint,
-        useBoostPoint: quest.useBoostPoint,
-        isAutoStartMode: quest.isAutoStartMode,
-        isMulti: quest.isMulti,
-        roomNumber: quest.roomNumber ?? null,
-        entryItemId: quest.entryItemId ?? null,
-        entryItemCount: quest.entryItemCount ?? null,
-        eventId: quest.eventId ?? null,
-        continueCount: quest.continueCount
-    })
-}
-
-export function publishActiveQuest(playerId: number, quest: ActiveQuest) {
-    activeQuests[playerId] = quest
-}
-
-export function insertActiveQuest(playerId: number, quest: ActiveQuest) {
-    // 其他调用方继续保持先写数据库、再更新内存的行为。
-    persistActiveQuest(playerId, quest)
-    publishActiveQuest(playerId, quest)
-}
-
-export function runAbortActiveQuestTransaction(playerId: number) {
-    return runAbortEntryTransaction(playerId, {
-        transaction: operation => getDb().transaction(operation)(),
-        getActiveQuest: getPlayerActiveQuestSync,
-        getItemCount: getPlayerItemSync,
-        setItemCount: setPlayerItemSync,
-        deleteActiveQuest: deletePlayerActiveQuestSync,
-        clearActiveQuest: id => { delete activeQuests[id] },
-        getEntryCost: (category, questId) => (
-            questEntryCosts as Record<string, StartEntryCost>
-        )[`${category}_${questId}`],
-    })
-}
 
 const routes = async (fastify: FastifyInstance) => {
 
@@ -435,7 +380,7 @@ const routes = async (fastify: FastifyInstance) => {
         const raidEventData = handleRaidEventFinish({
             questCategory,
             questAccomplished,
-            activeEventId: activeQuestData.eventId,
+            activeEventId: activeQuestData.eventId ?? undefined,
             killCountWeight: questData.killCountWeight,
             party: bodyPartyStatistics,
             playerId,
@@ -558,8 +503,13 @@ const routes = async (fastify: FastifyInstance) => {
 
         const headers = generateDataHeaders({ viewer_id: body.viewer_id })
 
-        const abortResult = runAbortActiveQuestTransaction(playerId)
+        const abortResult = runAbortActiveQuestTransaction(playerId, {
+            playId: body.play_id,
+            questId: body.quest_id,
+            category: body.category,
+        })
 
+        reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": headers,
             "data": {

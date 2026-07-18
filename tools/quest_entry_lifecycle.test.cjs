@@ -36,10 +36,21 @@ function createActiveQuest(overrides = {}) {
     }
 }
 
+function createAbortInput(overrides = {}) {
+    return {
+        playerId: 7,
+        playId: "ticket-play-1",
+        questId: 200076009,
+        category: 7,
+        ...overrides,
+    }
+}
+
 function createFixture({
     activeQuest = createActiveQuest(),
     itemCount = 0,
     failDuringCommit = false,
+    entryCost,
 } = {}) {
     let databaseState = { activeQuest, itemCount }
     let memoryActiveQuest = activeQuest ? { ...activeQuest } : null
@@ -85,7 +96,7 @@ function createFixture({
             memoryActiveQuest = null
         },
         getEntryCost(category, questId) {
-            return questEntryCosts[`${category}_${questId}`]
+            return entryCost ?? questEntryCosts[`${category}_${questId}`]
         },
     }
 
@@ -98,21 +109,22 @@ function createFixture({
 
 {
     const fixture = createFixture()
-    const result = lifecycle.runAbortEntryTransaction(7, fixture.dependencies)
+    const result = lifecycle.runAbortEntryTransaction(createAbortInput(), fixture.dependencies)
 
+    assert.equal(result.cancelled, true)
     assert.deepEqual(result.itemList, { 10000072: 1 })
     assert.equal(fixture.getState().itemCount, 1)
     assert.equal(fixture.getState().activeQuest, null)
     assert.equal(fixture.getState().memoryActiveQuest, null)
     assert.deepEqual(fixture.writes, ["item", "dbActiveQuest", "memoryActiveQuest"])
 
-    const repeated = lifecycle.runAbortEntryTransaction(7, fixture.dependencies)
+    const repeated = lifecycle.runAbortEntryTransaction(createAbortInput(), fixture.dependencies)
+    assert.equal(repeated.cancelled, false)
     assert.deepEqual(repeated.itemList, {})
     assert.equal(fixture.getState().itemCount, 1)
     assert.deepEqual(fixture.writes, [
         "item",
         "dbActiveQuest",
-        "memoryActiveQuest",
         "memoryActiveQuest",
     ])
 }
@@ -120,7 +132,7 @@ function createFixture({
 {
     const fixture = createFixture({ failDuringCommit: true })
     assert.throws(
-        () => lifecycle.runAbortEntryTransaction(7, fixture.dependencies),
+        () => lifecycle.runAbortEntryTransaction(createAbortInput(), fixture.dependencies),
         /simulated abort commit failure/,
     )
     assert.equal(fixture.getState().itemCount, 0)
@@ -134,7 +146,7 @@ function createFixture({
         activeQuest: createActiveQuest({ entryItemId: null, entryItemCount: null }),
         itemCount: 9,
     })
-    const result = lifecycle.runAbortEntryTransaction(7, fixture.dependencies)
+    const result = lifecycle.runAbortEntryTransaction(createAbortInput(), fixture.dependencies)
     assert.deepEqual(result.itemList, {})
     assert.equal(fixture.getState().itemCount, 9)
     assert.equal(fixture.getState().activeQuest, null)
@@ -145,7 +157,7 @@ function createFixture({
         activeQuest: createActiveQuest({ entryItemCount: null }),
         itemCount: 2,
     })
-    const result = lifecycle.runAbortEntryTransaction(7, fixture.dependencies)
+    const result = lifecycle.runAbortEntryTransaction(createAbortInput(), fixture.dependencies)
     assert.deepEqual(result.itemList, { 10000072: 3 })
     assert.equal(fixture.getState().itemCount, 3)
 }
@@ -155,7 +167,7 @@ function createFixture({
         activeQuest: createActiveQuest({ entryItemId: 500000, entryItemCount: null }),
         itemCount: 2,
     })
-    const result = lifecycle.runAbortEntryTransaction(7, fixture.dependencies)
+    const result = lifecycle.runAbortEntryTransaction(createAbortInput(), fixture.dependencies)
     assert.deepEqual(result.itemList, {})
     assert.equal(fixture.getState().itemCount, 2)
     assert.equal(fixture.getState().activeQuest, null)
@@ -166,7 +178,37 @@ function createFixture({
         activeQuest: createActiveQuest({ entryItemCount: 0 }),
         itemCount: 2,
     })
-    const result = lifecycle.runAbortEntryTransaction(7, fixture.dependencies)
+    const result = lifecycle.runAbortEntryTransaction(createAbortInput(), fixture.dependencies)
+    assert.deepEqual(result.itemList, {})
+    assert.equal(fixture.getState().itemCount, 2)
+}
+
+{
+    const fixture = createFixture({
+        activeQuest: createActiveQuest({
+            playId: "new-play",
+            questId: 200071009,
+            entryItemId: 10000049,
+        }),
+        itemCount: 4,
+    })
+    const result = lifecycle.runAbortEntryTransaction(createAbortInput(), fixture.dependencies)
+    assert.equal(result.cancelled, false)
+    assert.deepEqual(result.itemList, {})
+    assert.equal(fixture.getState().itemCount, 4)
+    assert.equal(fixture.getState().activeQuest.playId, "new-play")
+    assert.equal(fixture.getState().memoryActiveQuest.playId, "new-play")
+    assert.deepEqual(fixture.writes, [])
+}
+
+{
+    const fixture = createFixture({
+        activeQuest: createActiveQuest({ entryItemCount: null }),
+        itemCount: 2,
+        entryCost: { itemId: 10000072, itemCount: 2, stamina: 30 },
+    })
+    const result = lifecycle.runAbortEntryTransaction(createAbortInput(), fixture.dependencies)
+    assert.equal(result.cancelled, true)
     assert.deepEqual(result.itemList, {})
     assert.equal(fixture.getState().itemCount, 2)
 }
@@ -223,7 +265,6 @@ assert.match(
 )
 
 assert.match(singleRouteSource, /entryItemCount:/, "quest start must persist the prepaid item count")
-assert.match(singleRouteSource, /runAbortEntryTransaction\s*\(/, "quest abort must use the refund transaction")
 assert.match(
     singleRouteSource,
     /["']item_list["']\s*:\s*abortResult\.itemList/,
@@ -231,6 +272,86 @@ assert.match(
 )
 
 const Database = require("better-sqlite3")
+const transactionDb = new Database(":memory:")
+transactionDb.exec(`
+    CREATE TABLE players_active_quests (
+        player_id INTEGER PRIMARY KEY,
+        play_id TEXT NOT NULL,
+        quest_id INTEGER NOT NULL,
+        category INTEGER NOT NULL,
+        entry_item_id INTEGER,
+        entry_item_count INTEGER
+    );
+    CREATE TABLE players_items (
+        player_id INTEGER NOT NULL,
+        id INTEGER NOT NULL,
+        amount INTEGER NOT NULL,
+        PRIMARY KEY (player_id, id)
+    );
+    INSERT INTO players_active_quests VALUES
+        (7, 'ticket-play-1', 200076009, 7, 10000072, 1);
+    INSERT INTO players_items VALUES (7, 10000072, 0);
+    CREATE TRIGGER reject_active_delete
+    BEFORE DELETE ON players_active_quests
+    BEGIN
+        SELECT RAISE(ABORT, 'simulated active delete failure');
+    END;
+`)
+let transactionMemoryActive = createActiveQuest()
+const transactionDependencies = {
+    transaction(operation) {
+        return transactionDb.transaction(operation)()
+    },
+    getActiveQuest(playerId) {
+        const row = transactionDb.prepare(`
+            SELECT * FROM players_active_quests WHERE player_id = ?
+        `).get(playerId)
+        return row ? createActiveQuest({
+            playId: row.play_id,
+            questId: row.quest_id,
+            category: row.category,
+            entryItemId: row.entry_item_id,
+            entryItemCount: row.entry_item_count,
+        }) : null
+    },
+    getItemCount(playerId, itemId) {
+        return transactionDb.prepare(`
+            SELECT amount FROM players_items WHERE player_id = ? AND id = ?
+        `).get(playerId, itemId)?.amount ?? null
+    },
+    setItemCount(playerId, itemId, amount) {
+        transactionDb.prepare(`
+            UPDATE players_items SET amount = ? WHERE player_id = ? AND id = ?
+        `).run(amount, playerId, itemId)
+    },
+    deleteActiveQuest(playerId) {
+        transactionDb.prepare(`DELETE FROM players_active_quests WHERE player_id = ?`).run(playerId)
+    },
+    clearActiveQuest() {
+        transactionMemoryActive = null
+    },
+    getEntryCost(category, questId) {
+        return questEntryCosts[`${category}_${questId}`]
+    },
+}
+
+assert.throws(
+    () => lifecycle.runAbortEntryTransaction(createAbortInput(), transactionDependencies),
+    /simulated active delete failure/,
+)
+assert.equal(transactionDb.prepare(`SELECT amount FROM players_items`).get().amount, 0)
+assert.equal(transactionDb.prepare(`SELECT COUNT(*) AS count FROM players_active_quests`).get().count, 1)
+assert.equal(transactionMemoryActive.playId, "ticket-play-1")
+
+transactionDb.exec(`DROP TRIGGER reject_active_delete`)
+const committedAbort = lifecycle.runAbortEntryTransaction(createAbortInput(), transactionDependencies)
+assert.equal(committedAbort.cancelled, true)
+assert.deepEqual(committedAbort.itemList, { 10000072: 1 })
+assert.equal(transactionDb.prepare(`SELECT amount FROM players_items`).get().amount, 1)
+assert.equal(transactionDb.prepare(`SELECT COUNT(*) AS count FROM players_active_quests`).get().count, 0)
+assert.equal(transactionMemoryActive, null)
+transactionDb.close()
+
 const legacyDb = new Database(":memory:")
 legacyDb.exec(`
     CREATE TABLE players_active_quests (

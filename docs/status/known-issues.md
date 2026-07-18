@@ -39,7 +39,9 @@
 
 **根因**：入口消耗生成器没有配置 Advent 主数据的门票字段，`quest_entry_costs.json` 因此把该关生成成 `itemId=0`、`itemCount=0`、`stamina=30`。服务端开始事务本身具备门票校验与扣除逻辑，但收到的生成配置只要求扣体力。
 
-**修复**：按国服 `AdventEventQuestValues` 使用列 `61/62/63/75` 重建入口消耗数据。包括歼灭者在内的 5 个 Advent 最高难度关卡恢复各自的 1 张门票和 30 体力消耗；生成器也不再过滤零体力的 `Always` 门票关。active quest 现会持久化预扣门票 ID 和数量；abort 原子返还一次但不返体力；CN load 会恢复有效 active quest，失效多人房间则按同一取消语义返还后清理。continue 和成功 finish 均不会二次扣票。
+**修复**：按国服 `AdventEventQuestValues` 使用列 `61/62/63/75` 重建入口消耗数据。包括歼灭者在内的 5 个 Advent 最高难度关卡恢复各自的 1 张门票和 30 体力消耗；生成器也不再过滤零体力的 `Always` 门票关。active quest 现会持久化预扣门票 ID 和数量；abort 在同一事务内核对 `play_id/quest_id/category` 后原子返还一次但不返体力，延迟的旧 abort 不影响新战斗；CN load 会恢复有效 active quest，失效多人房间则按同一取消语义返还后清理。continue 和成功 finish 均不会二次扣票。
+
+迁移前 `entry_item_count=NULL` 的旧记录只兼容当前明确为 1 张的配置，同时要求门票 ID 一致；未来非 1 数量不会根据主数据猜测返还。abort 已显式设置 MsgPack 响应头，active quest 状态也已从路由模块抽离为独立 service，避免 load 与单人战斗路由形成运行时依赖。
 
 **客户端验收重点**：开始 `200076009` 后歼灭心核立即预扣 1，完成并重新 load 后保持；主动放弃会返还门票但不返还体力；数量为 0 时无法开始且体力不应单独减少。
 

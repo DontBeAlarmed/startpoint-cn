@@ -11,7 +11,8 @@ import { getSession } from "../../data/domains/session"
 import { getQuestFromCategorySync } from "../../lib/assets";
 import { BattleQuest, QuestCategory, RushEventFolder } from "../../lib/types";
 import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
-import { FinishBody, insertActiveQuest } from "./singleBattleQuest";
+import type { FinishBody } from "./singleBattleQuest";
+import { insertActiveQuest } from "../../lib/quest/active-quest-service";
 import { getPlayerRushEventEndlessBattleRankingSync, getRushEventEndlessBattleRankPlayedPartyListSync, getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";

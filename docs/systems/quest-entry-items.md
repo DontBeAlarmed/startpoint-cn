@@ -37,10 +37,12 @@ Advent 字段来自原始行 `61/62/63/75`，挑战迷宫与宝物域字段来�
 `Always` 门票按以下生命周期处理：
 
 1. `/single_battle_quest/start` 在一个 SQLite 事务中校验门票和体力、预扣门票、扣除体力并保存 active quest。事务失败时全部回滚，内存中也不会发布 active quest。
-2. active quest 同时持久化 `entry_item_id` 和 `entry_item_count`。旧数据库会自动增加数量列；旧 active 行数量为空时，只在当前 `category + quest_id` 的门票 ID 与旧行 ID 完全一致时采用当前数量，避免主数据变化后误返其他道具。
-3. `/single_battle_quest/abort` 在一个事务中读取 active quest、返还预扣门票并删除 active quest。提交成功后才清除内存记录；重复 abort 因数据库记录已删除而不会重复返还。响应 `item_list` 是返还后的绝对数量，无门票时为空对象。
+2. active quest 同时持久化 `entry_item_id` 和 `entry_item_count`。旧数据库会自动增加数量列；迁移前遗留的 `entry_item_count=NULL` 只在当前 `category + quest_id` 的门票 ID 一致且数量恰好为 1 时回退。这是一条一次性兼容规则，未来若出现一次消耗多张门票的关卡，服务端不会猜测并返还数量。
+3. `/single_battle_quest/abort` 在一个事务中读取 active quest，并同时核对请求的 `play_id/quest_id/category`。三项全部匹配才返还门票并删除 active；旧 abort 延迟到达且当前已有新战斗时，服务端返回成功和空 `item_list`，但不会修改数据库或清除内存。正常提交后才清除内存记录，重复 abort 也不会重复返还。
 4. abort 不返还体力。`/play_continue` 只处理续关费用和次数；成功 finish 保留 start 的门票扣除，不再扣除第二次，也不返还。
 5. CN `/load` 会把有效的持久化 active quest 重新发布到内存，因此服务重启后仍可继续、完成或放弃。多人房间已失效时，load 会先执行同一取消事务再序列化背包，不再直接删除记录。
+
+abort 路由显式返回 `application/x-msgpack`，由 CN 服务的 `onSend` hook 执行 MsgPack 打包和 Base64 编码。active quest 的 registry、持久化与取消事务位于独立 service，load 和各战斗路由不再互相导入。
 
 多人战斗 start 当前不读取 `quest_entry_costs`，也不会写入 `entry_item_id/count`，因此正常多人 abort 没有门票可返还；失效房间清理仍统一走取消事务，以兼容可能存在的历史或异常记录。
 

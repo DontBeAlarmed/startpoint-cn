@@ -287,9 +287,13 @@ const routeSource = fs.readFileSync(
     path.join(projectRoot, "src/routes/api/singleBattleQuest.ts"),
     "utf8",
 )
-const insertActiveQuestSource = routeSource.slice(
-    routeSource.indexOf("export function insertActiveQuest"),
-    routeSource.indexOf("const routes = async"),
+const activeQuestServiceSource = fs.readFileSync(
+    path.join(projectRoot, "src/lib/quest/active-quest-service.ts"),
+    "utf8",
+)
+const insertActiveQuestSource = activeQuestServiceSource.slice(
+    activeQuestServiceSource.indexOf("export function insertActiveQuest"),
+    activeQuestServiceSource.indexOf("export function runAbortActiveQuestTransaction"),
 )
 assert.ok(
     insertActiveQuestSource.indexOf("persistActiveQuest")

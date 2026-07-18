@@ -3,7 +3,11 @@ import { MultiStartBody, MultiFinishBody, MultiAbortBody, PlayContinueBody } fro
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
 import { getRoom, setRoomBattle, disbandRoom, updateRoomState } from "../room/manager";
 import { sessionManager } from "../state/SessionManager";
-import { insertActiveQuest, activeQuests } from "../../routes/api/singleBattleQuest";
+import {
+    activeQuests,
+    insertActiveQuest,
+    runAbortActiveQuestTransaction,
+} from "../../lib/quest/active-quest-service";
 import {
     deletePlayerActiveQuestSync,
     updatePlayerActiveQuestContinueCountSync,
@@ -401,7 +405,12 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         const { playerId, player } = ctx;
         const activeQuestData = activeQuests[playerId];
 
-        if (activeQuestData) {
+        const abortResult = runAbortActiveQuestTransaction(playerId, {
+            playId: body.play_id,
+            questId: body.quest_id,
+            category: body.category,
+        });
+        if (abortResult.cancelled && activeQuestData) {
             if (activeQuestData.roomNumber) {
                 const room = getRoom(activeQuestData.roomNumber);
                 if (room && room.host_player_id === playerId) {
@@ -409,8 +418,6 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                     console.log(`[MULTI] abort: room ${activeQuestData.roomNumber} disbanded (host abandoned)`);
                 }
             }
-            delete activeQuests[playerId];
-            deletePlayerActiveQuestSync(playerId);
             if (activeQuestData.roomNumber) {
                 sessionManager.clearBattleExpectedCount(activeQuestData.roomNumber);
             }
