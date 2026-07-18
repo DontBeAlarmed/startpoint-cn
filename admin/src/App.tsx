@@ -62,7 +62,7 @@ export default function App({ dark, onToggleDark }: AppProps) {
             <span className="admin-brand-mark">
                 <img src={logoUrl} alt="World Flipper 上游项目标识" />
             </span>
-            <span>
+            <span className="admin-brand-copy">
                 <span className="admin-brand-title">Starpoint CN</span>
                 <span className="admin-brand-subtitle">World Flipper Server</span>
             </span>

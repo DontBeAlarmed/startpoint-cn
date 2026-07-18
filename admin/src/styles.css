@@ -92,6 +92,11 @@ html[data-admin-theme="dark"] body {
   border-bottom: 1px solid var(--admin-border);
 }
 
+.admin-brand-copy {
+  min-width: 0;
+  overflow: hidden;
+}
+
 .admin-brand-mark {
   display: grid;
   place-items: center;
@@ -115,6 +120,9 @@ html[data-admin-theme="dark"] body {
   font-size: 16px;
   font-weight: 800;
   line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-brand-subtitle {
@@ -123,6 +131,18 @@ html[data-admin-theme="dark"] body {
   color: var(--admin-muted);
   font-size: 12px;
   line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ant-layout-sider-collapsed .admin-brand {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.ant-layout-sider-collapsed .admin-brand-copy {
+  display: none;
 }
 
 .admin-menu {
