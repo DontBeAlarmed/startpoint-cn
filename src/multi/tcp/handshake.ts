@@ -7,13 +7,6 @@
 
 import * as net from "net"
 import {
-    getSession,
-} from "../../data/domains/session"
-import { getAccountPlayers } from "../../data/domains/account"
-import {
-    getPlayerSync,
-} from "../../data/domains/player"
-import {
     getPlayerPartyGroupListSync,
 } from "../../data/domains/party"
 import {
@@ -27,6 +20,7 @@ import { PartyCategory, PlayerParty } from "../../data/types"
 import { sessionManager } from "../state/SessionManager"
 import type { SessionClient } from "../state/SessionManager"
 import { ClientState } from "../types"
+import { resolveMultiPlayerContext } from "../player-context"
 
 const playerRankTable = require("../../../assets/cdndata/player_rank.json")
 
@@ -179,28 +173,14 @@ export async function handleHandshake(socket: net.Socket, data: any): Promise<vo
             return
         }
 
-        const session = await getSession(String(viewerId))
-        if (!session) {
+        const ctx = await resolveMultiPlayerContext(Number(viewerId))
+        if (!ctx) {
             sessionManager.sendJson(socket, [3, "HANDSHAKE_DENIED"])
             socket.end()
             return
         }
 
-        const playerIds = await getAccountPlayers(session.accountId)
-        if (!playerIds || playerIds.length === 0 || isNaN(playerIds[0])) {
-            sessionManager.sendJson(socket, [3, "HANDSHAKE_DENIED"])
-            socket.end()
-            return
-        }
-
-        const player = getPlayerSync(playerIds[0])
-        if (!player) {
-            sessionManager.sendJson(socket, [3, "HANDSHAKE_DENIED"])
-            socket.end()
-            return
-        }
-
-        const playerId = playerIds[0]
+        const { playerId, player } = ctx
         const connectionId = data.connection_id || data.connectionId || `${socket.remoteAddress}:${socket.remotePort}`
         const client = sessionManager.createClient(socket, Number(viewerId), String(roomNumber), String(connectionId), playerId)
         client.clientState.tryTransition(ClientState.Handshaking)

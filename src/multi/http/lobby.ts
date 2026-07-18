@@ -1,23 +1,12 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
 import { GetRoomsBody, CreateRoomBody, SearchRoomBody, SelectRoomBody } from "../types"
-import { getAccountPlayers } from "../../data/domains/account"
-import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { getQuestFromCategorySync } from "../../lib/assets"
 import { generateDataHeaders } from "../../utils"
+import { resolveMultiPlayerContext } from "../player-context"
 import { createRoom, getRoom, getRoomByToken, getRooms } from "../room/manager"
 import { serializeRoom, serializeRoomConnection } from "../room/serializer"
 import { sessionManager } from "../state/SessionManager"
-
-async function getViewerIdAndPlayer(viewerId: number): Promise<{ playerId: number; player: any } | null> {
-    const sid = await getSession(viewerId.toString())
-    if (!sid) return null
-    const players = await getAccountPlayers(sid.accountId)
-    if (!players || players.length === 0) return null
-    const player = getPlayerSync(players[0])
-    if (!player) return null
-    return { playerId: players[0], player }
-}
 
 export function registerLobbyRoutes(fastify: FastifyInstance): void {
 
@@ -50,7 +39,7 @@ export function registerLobbyRoutes(fastify: FastifyInstance): void {
         if (!viewer_id || isNaN(viewer_id)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         })
-        const ctx = await getViewerIdAndPlayer(viewer_id)
+        const ctx = await resolveMultiPlayerContext(viewer_id)
         if (!ctx) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid viewer id or no player bound."
         })
@@ -113,7 +102,7 @@ export function registerLobbyRoutes(fastify: FastifyInstance): void {
         if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         })
-        const ctx = await getViewerIdAndPlayer(viewerId)
+        const ctx = await resolveMultiPlayerContext(viewerId)
         if (!ctx) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid viewer id or no player bound."
         })

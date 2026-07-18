@@ -10,7 +10,6 @@ import {
 } from "../../data/domains/quest_active";
 import { incrementPlayerCharacterClearSync } from "../../data/domains/character_clear";
 import {
-    getPlayerSync,
     updatePlayerSync,
 } from "../../data/domains/player";
 import {
@@ -18,15 +17,12 @@ import {
     insertPlayerQuestProgressSync,
     updatePlayerQuestProgressSync,
 } from "../../data/domains/quest";
-import { getSession } from "../../data/domains/session";
 import { getQuestFromCategorySync } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
 import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/stamina";
-import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import { getDb } from "../../data/db";
-import type { Player } from "../../data/types";
 import { trackCharacterClears } from "../../lib/quest/finish/character-clear-tracker";
 import { trackPowerflip } from "../../lib/quest/finish/powerflip-tracker";
 import { trackLeaderPowerflip } from "../../lib/quest/finish/leader-powerflip-tracker";
@@ -34,18 +30,7 @@ import { trackPartyCoClears } from "../../lib/quest/finish/party-co-clear-tracke
 import type { FinishContext } from "../../lib/quest/finish/types";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { resolveHostFinished, resolveIsRoomHost } from "../../lib/quest/host-finish";
-
-interface PlayerContext { playerId: number; player: Player }
-
-async function resolvePlayer(viewerId: number): Promise<PlayerContext | null> {
-    const session = await getSession(viewerId.toString());
-    if (!session) return null;
-    const playerId = resolvePlayerIdSync(session.accountId);
-    if (!playerId) return null;
-    const player = getPlayerSync(playerId);
-    if (!player) return null;
-    return { playerId, player };
-}
+import { resolveMultiPlayerContext } from "../player-context";
 
 async function buildFinishFollowInfo(
     viewerId: number,
@@ -65,7 +50,7 @@ async function buildFinishFollowInfo(
     for (const mateViewerId of ids) {
         if (mateViewerId === viewerId || mateViewerId >= 900000000) continue;
 
-        const mateCtx = await resolvePlayer(mateViewerId);
+        const mateCtx = await resolveMultiPlayerContext(mateViewerId);
         if (!mateCtx) continue;
 
         followInfo.push({
@@ -100,7 +85,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             });
         }
 
-        const ctx = await resolvePlayer(viewer_id);
+        const ctx = await resolveMultiPlayerContext(viewer_id);
         if (!ctx) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id or no player bound."
@@ -164,7 +149,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             });
         }
 
-        const ctx = await resolvePlayer(viewerId);
+        const ctx = await resolveMultiPlayerContext(viewerId);
         if (!ctx || !ctx.player) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id."
@@ -201,6 +186,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             roomHostPlayerId: room?.host_player_id ?? null,
             playerId,
         });
+        console.log(`[MULTI] finish host context: roomHostPlayerId=${room?.host_player_id ?? "none"} playerId=${playerId} isRoomHost=${isRoomHost}`);
         if (activeQuestData.roomNumber) {
             if (isRoomHost && room) {
                 updateRoomState(room.room_number, 1);
@@ -405,7 +391,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             });
         }
 
-        const ctx = await resolvePlayer(viewerId);
+        const ctx = await resolveMultiPlayerContext(viewerId);
         if (!ctx) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id or no player bound."
@@ -461,7 +447,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             });
         }
 
-        const ctx = await resolvePlayer(viewerId);
+        const ctx = await resolveMultiPlayerContext(viewerId);
         if (!ctx || !ctx.player) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id or no player bound."
