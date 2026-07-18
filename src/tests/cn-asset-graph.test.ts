@@ -336,6 +336,46 @@ test("a disconnected client keeps its current version and receives no diff path"
 });
 
 
+// 2026-07-18 链重锚事故回归:base_version 抬高后,被 active.json 丢弃的
+// charpkg 历史边因文件名过滤从 graph 消失,停在中间版本的客户端塌回"已最新"。
+// charbridge 命名的硬链接副本(非 charpkg)必须能把老客户端重新接回 tail。
+test("re-anchored chain strands old clients until charbridge copies restore the path", () => {
+    const f = fixture();
+    const roots = Object.keys(DIFF_DIRS) as Array<keyof typeof DIFF_DIRS>;
+    const writeHistory = (label: string): void => {
+        for (let patch = 133; patch < 140; patch += 1) {
+            for (const root of roots) {
+                writeLegacy(f, `1.4.${patch}`, `1.4.${patch + 1}`, root, `${label}-old-${root}`);
+            }
+        }
+    };
+    try {
+        writeLegacy(f, "1.4.0", "1.4.133");
+        writeLegacy(f, "1.4.140", "1.4.141");
+        writeHistory("charpkg-fixture");
+        writeCharacterChain(f, 141, 143);
+
+        const stranded = build(f, "1.4.0");
+        assert.equal(stranded.tailVersion, "1.4.133");
+        assert.equal(findReleasePath(stranded, "1.4.136").targetVersion, "1.4.136");
+        assert.match(
+            stranded.issues.join("\n"),
+            /character release base is unreachable: 1\.4\.141/,
+        );
+
+        writeHistory("charbridge-fixture");
+        const bridged = build(f, "1.4.0");
+        assert.equal(bridged.tailVersion, "1.4.143");
+        assert.deepEqual(bridged.issues, []);
+        assert.equal(findReleasePath(bridged, "1.4.133").targetVersion, "1.4.143");
+        assert.equal(findReleasePath(bridged, "1.4.136").targetVersion, "1.4.143");
+        assert.equal(computeAssetTarget("1.4.136", bridged).targetVersion, "1.4.143");
+    } finally {
+        f.cleanup();
+    }
+});
+
+
 test("cached snapshots invalidate when a diff directory changes", () => {
     const f = fixture();
     resetCnReleaseGraphCache();
