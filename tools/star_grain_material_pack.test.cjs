@@ -1,18 +1,20 @@
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
-const { execFileSync } = require("node:child_process");
+const { spawnSync } = require("node:child_process");
 
 const projectRoot = path.resolve(__dirname, "..");
 const serverAssetPath = path.resolve(projectRoot, "assets/star_grain_shop.json");
 const generatorPath = path.resolve(__dirname, "rebuild_star_grain_shop.ts");
 const tsNodePath = path.resolve(projectRoot, "node_modules/ts-node/dist/bin.js");
-const serverShop = require(serverAssetPath);
-const cnShop = require(path.resolve(
+const cnSourcePath = path.resolve(
     __dirname,
     "../../wf-assets-cn/orderedmap/shop/star_grain_shop.json",
-));
+);
+const serverShop = require(serverAssetPath);
+const cnShop = require(cnSourcePath);
 
 const REWARD_SLOT_STARTS = [25, 28, 31, 34, 37, 40];
 const MATERIAL_PACK_IDS = [100017, 100018, 100019, 100020, 100021, 100022];
@@ -128,27 +130,69 @@ function sha256(content) {
     return crypto.createHash("sha256").update(content).digest("hex");
 }
 
-function runGenerator() {
-    return execFileSync(process.execPath, [tsNodePath, generatorPath], {
+function runGenerator(existingPath, outputPath) {
+    const result = spawnSync(process.execPath, [tsNodePath, generatorPath], {
         cwd: projectRoot,
+        env: {
+            ...process.env,
+            STAR_GRAIN_CDN_SOURCE: cnSourcePath,
+            STAR_GRAIN_EXISTING: existingPath,
+            STAR_GRAIN_OUTPUT: outputPath,
+        },
         encoding: "utf8",
     });
+    assert.equal(
+        result.status,
+        0,
+        `使用隔离路径重建必须成功: ${result.stderr || result.error || "unknown error"}`,
+    );
 }
 
 // Asset assertions above intentionally run before the generator can rewrite stale output.
-const beforeGeneration = fs.readFileSync(serverAssetPath);
-const beforeHash = sha256(beforeGeneration);
-const firstStdout = runGenerator();
-const firstGeneration = fs.readFileSync(serverAssetPath);
-const firstHash = sha256(firstGeneration);
-assert.deepEqual(firstGeneration, beforeGeneration, "首次重建不得修复测试开始时的陈旧资产");
-assert.equal(firstHash, beforeHash, "首次重建前后资产哈希必须一致");
+const productionBefore = fs.readFileSync(serverAssetPath);
+const productionStatBefore = fs.statSync(serverAssetPath);
+const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "star-grain-shop-"));
+const temporaryAssetPath = path.join(temporaryDirectory, "star_grain_shop.json");
 
-const secondStdout = runGenerator();
-const secondGeneration = fs.readFileSync(serverAssetPath);
-const secondHash = sha256(secondGeneration);
-assert.equal(secondStdout, firstStdout, "连续两次生成器标准输出必须完全一致");
-assert.deepEqual(secondGeneration, firstGeneration, "连续两次生成的完整资产必须逐字节一致");
-assert.equal(secondHash, firstHash, "连续两次生成的资产 SHA-256 必须一致");
+try {
+    fs.writeFileSync(temporaryAssetPath, productionBefore);
+    fs.chmodSync(serverAssetPath, productionStatBefore.mode & ~0o222);
+
+    runGenerator(temporaryAssetPath, temporaryAssetPath);
+    const firstGeneration = fs.readFileSync(temporaryAssetPath);
+    const firstHash = sha256(firstGeneration);
+    assert.deepEqual(firstGeneration, productionBefore, "临时生成结果必须等于已提交生产资产");
+
+    runGenerator(temporaryAssetPath, temporaryAssetPath);
+    const secondGeneration = fs.readFileSync(temporaryAssetPath);
+    const secondHash = sha256(secondGeneration);
+    assert.deepEqual(secondGeneration, firstGeneration, "连续两次生成的完整资产必须逐字节一致");
+    assert.equal(secondHash, firstHash, "连续两次生成的资产 SHA-256 必须一致");
+
+    assert.deepEqual(
+        fs.readFileSync(serverAssetPath),
+        productionBefore,
+        "隔离重建不得修改仓库生产资产字节",
+    );
+    assert.equal(
+        fs.statSync(serverAssetPath).mtimeMs,
+        productionStatBefore.mtimeMs,
+        "隔离重建不得修改仓库生产资产 mtime",
+    );
+} finally {
+    fs.chmodSync(serverAssetPath, productionStatBefore.mode);
+
+    if (!fs.readFileSync(serverAssetPath).equals(productionBefore)) {
+        fs.writeFileSync(serverAssetPath, productionBefore);
+    }
+    if (fs.statSync(serverAssetPath).mtimeMs !== productionStatBefore.mtimeMs) {
+        fs.utimesSync(
+            serverAssetPath,
+            productionStatBefore.atimeMs / 1000,
+            productionStatBefore.mtimeMs / 1000,
+        );
+    }
+    fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+}
 
 console.log("star grain material pack asset tests passed");

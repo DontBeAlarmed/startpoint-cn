@@ -5,9 +5,15 @@
 import * as fs from "fs";
 import * as path from "path";
 
-const CDN_SOURCE = path.resolve(__dirname, "../../wf-assets-cn/orderedmap/shop/star_grain_shop.json");
-const OUTPUT = path.resolve(__dirname, "../assets/star_grain_shop.json");
-const EXISTING = path.resolve(__dirname, "../assets/star_grain_shop.json"); // Use current as "existing"
+const CDN_SOURCE = process.env.STAR_GRAIN_CDN_SOURCE
+    ? path.resolve(process.env.STAR_GRAIN_CDN_SOURCE)
+    : path.resolve(__dirname, "../../wf-assets-cn/orderedmap/shop/star_grain_shop.json");
+const OUTPUT = process.env.STAR_GRAIN_OUTPUT
+    ? path.resolve(process.env.STAR_GRAIN_OUTPUT)
+    : path.resolve(__dirname, "../assets/star_grain_shop.json");
+const EXISTING = process.env.STAR_GRAIN_EXISTING
+    ? path.resolve(process.env.STAR_GRAIN_EXISTING)
+    : path.resolve(__dirname, "../assets/star_grain_shop.json");
 const REWARD_SLOT_STARTS = [25, 28, 31, 34, 37, 40] as const;
 
 interface ShopItem {
