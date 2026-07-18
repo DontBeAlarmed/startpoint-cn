@@ -156,7 +156,6 @@ const temporaryAssetPath = path.join(temporaryDirectory, "star_grain_shop.json")
 
 try {
     fs.writeFileSync(temporaryAssetPath, productionBefore);
-    fs.chmodSync(serverAssetPath, productionStatBefore.mode & ~0o222);
 
     runGenerator(temporaryAssetPath, temporaryAssetPath);
     const firstGeneration = fs.readFileSync(temporaryAssetPath);
@@ -174,24 +173,18 @@ try {
         productionBefore,
         "隔离重建不得修改仓库生产资产字节",
     );
+    const productionStatAfter = fs.statSync(serverAssetPath);
     assert.equal(
-        fs.statSync(serverAssetPath).mtimeMs,
+        productionStatAfter.mtimeMs,
         productionStatBefore.mtimeMs,
         "隔离重建不得修改仓库生产资产 mtime",
     );
+    assert.equal(
+        productionStatAfter.mode,
+        productionStatBefore.mode,
+        "隔离重建不得修改仓库生产资产 mode",
+    );
 } finally {
-    fs.chmodSync(serverAssetPath, productionStatBefore.mode);
-
-    if (!fs.readFileSync(serverAssetPath).equals(productionBefore)) {
-        fs.writeFileSync(serverAssetPath, productionBefore);
-    }
-    if (fs.statSync(serverAssetPath).mtimeMs !== productionStatBefore.mtimeMs) {
-        fs.utimesSync(
-            serverAssetPath,
-            productionStatBefore.atimeMs / 1000,
-            productionStatBefore.mtimeMs / 1000,
-        );
-    }
     fs.rmSync(temporaryDirectory, { recursive: true, force: true });
 }
 

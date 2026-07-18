@@ -262,7 +262,7 @@ npx ts-node tools/rebuild_star_grain_shop.ts
 node tools/star_grain_material_pack.test.cjs
 ```
 
-专项测试先逐项比较当前资产中的 CN 六槽与服务端 `rewards`，并确认素材箱商品 ID 不会作为自身奖励进入背包，避免测试先修复陈旧资产再误判通过。随后测试使用 `fs.mkdtempSync` 创建临时目录，把当前生产资产复制为临时 `EXISTING/OUTPUT`，连续运行两次生成器，只比较生成文件的完整字节与 SHA-256，不依赖日志文本。临时结果还必须等于生产资产，以覆盖日期人工覆盖语义；`finally` 会删除临时目录，并断言仓库资产的字节和 `mtime` 始终不变。
+专项测试先逐项比较当前资产中的 CN 六槽与服务端 `rewards`，并确认素材箱商品 ID 不会作为自身奖励进入背包，避免测试先修复陈旧资产再误判通过。随后测试使用 `fs.mkdtempSync` 创建临时目录，把当前生产资产复制为临时 `EXISTING/OUTPUT`，连续运行两次生成器，只比较生成文件的完整字节与 SHA-256，不依赖日志文本。临时结果还必须等于生产资产，以覆盖日期人工覆盖语义；仓库生产资产在测试全程只读，`finally` 只删除临时目录，并断言其字节、`mtime` 和 mode 始终不变。
 
 ---
 
