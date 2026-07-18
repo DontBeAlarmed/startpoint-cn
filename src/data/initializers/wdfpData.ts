@@ -411,6 +411,29 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_mission_counters (
+        player_id INTEGER NOT NULL,
+        counter_key TEXT NOT NULL,
+        dimension TEXT NOT NULL,
+        scope_type TEXT NOT NULL,
+        scope_key TEXT NOT NULL,
+        qualifier_json TEXT NOT NULL,
+        value INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (player_id, counter_key),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_mission_counter_snapshots (
+        player_id INTEGER NOT NULL,
+        period_type TEXT NOT NULL,
+        counter_key TEXT NOT NULL,
+        value INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (player_id, period_type, counter_key),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_box_gacha (
         id INTEGER NOT NULL,
         box_id INTEGER NOT NULL,

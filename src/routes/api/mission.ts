@@ -7,7 +7,7 @@ import { getSession } from "../../data/domains/session"
 import { givePlayerItemSync } from "../../data/domains/item"
 import { insertDefaultPlayerCharacterSync } from "../../data/domains/character"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
-import { generateDataHeaders, getServerTime } from "../../utils";
+import { generateDataHeaders, getServerTime, getServerTimeForPlayer } from "../../utils";
 import {
     getActiveMissionRewards,
     getAwakeMissionRewards,
@@ -23,6 +23,7 @@ import {
     getRegularMissionRewards,
     getWeeklyMissionRewards,
     getCharacterIdFromMission,
+    isMissionEnabledAt,
 } from "../../lib/mission/index";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import type { ActiveMissionReward, CategoryContext } from "../../lib/mission/index";
@@ -31,7 +32,9 @@ interface GetMissionProgressBody {
     api_count: number,
     viewer_id: number,
     category_list: {
-        category: number
+        category: number,
+        event_id?: number,
+        character_id?: number
     }[]
 }
 
@@ -88,6 +91,7 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Internal Server Error",
             "message": "Player not found."
         })
+        const missionEvaluationTime = new Date(getServerTimeForPlayer(playerId) * 1000)
 
         const missionProgressList: any[] = []
         const receivedStageKeys = new Set<string>()
@@ -150,19 +154,16 @@ const routes = async (fastify: FastifyInstance) => {
             }
         }
 
-        // Build category-to-character_id filter map
-        const categoryCharMap: Record<number, string | undefined> = {}
-        for (const entry of requestList) {
-            if ((entry as any).character_id !== undefined) {
-                categoryCharMap[entry.category] = String((entry as any).character_id)
-            }
-        }
-
-        for (const category of requestCategories) {
+        for (const requestEntry of requestList) {
+            const category = requestEntry.category
             const computer = getComputer(category)
             const ctx = getCtx(category)
-            const allIds = getMissionIdsByCategory(category)
-            const charId = categoryCharMap[category]
+            const allIds = getMissionIdsByCategory(category).filter(missionId =>
+                isMissionEnabledAt(category, missionId, missionEvaluationTime, requestEntry.event_id)
+            )
+            const charId = requestEntry.character_id === undefined
+                ? undefined
+                : String(requestEntry.character_id)
 
             for (const missionId of allIds) {
                 // Character-awake: filter by character_id
@@ -176,7 +177,8 @@ const routes = async (fastify: FastifyInstance) => {
 
                 // Auto-grant rewards for newly completed stages.
                 const completedStages = getCompletedStageNumbers(category, missionId, progress)
-                const skipAutoGrant = category === 10
+                // Degree and weekly rewards require side effects not handled by this endpoint yet.
+                const skipAutoGrant = category === 5 || category === 10
 
                 if (!skipAutoGrant) for (const s of completedStages) {
                     const stageKey = `${missionId}:${s}`

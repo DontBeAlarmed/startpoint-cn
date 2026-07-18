@@ -31,6 +31,7 @@ import { trackCharacterClears } from "../../lib/quest/finish/character-clear-tra
 import { trackPowerflip } from "../../lib/quest/finish/powerflip-tracker";
 import { trackLeaderPowerflip } from "../../lib/quest/finish/leader-powerflip-tracker";
 import { trackPartyCoClears } from "../../lib/quest/finish/party-co-clear-tracker";
+import { collectPartyCharacterIds, recordBattleMissionDimensionsSafe, summarizeBattleStatistics } from "../../lib/mission";
 import type { FinishContext } from "../../lib/quest/finish/types";
 import { canStartQuestByPrerequisites, hasClearedQuestPrerequisiteForCategory } from "../../lib/quest/start-handler";
 
@@ -321,6 +322,20 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         trackLeaderPowerflip(finishCtx)
         trackPartyCoClears(finishCtx)
         trackPowerflip(finishCtx)
+        const multiBattleParty = collectPartyCharacterIds(finishCtx.party)
+        recordBattleMissionDimensionsSafe({
+            type: "battle_finish",
+            playerId,
+            questCategory,
+            questId,
+            accomplished: questAccomplished,
+            mode: "multi",
+            role: activeQuestData.roomNumber ? "host" : undefined,
+            clearRank,
+            clearTimeMs: clearTime,
+            ...multiBattleParty,
+            statistics: summarizeBattleStatistics(finishCtx.statistics),
+        })
 
         const rewardCharacterExpResult = givePlayerCharactersExpSync(
             playerId, partyCharacterIdsArray, questData.characterExpReward || 0,

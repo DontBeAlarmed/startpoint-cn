@@ -6,6 +6,7 @@ import { getAccountSync } from "./account";
 import { getPlayerQuestProgressSync } from "./quest";
 import { isNewDay, isNewWeek } from "../../lib/time-utils";
 import { takeSnapshot } from "../../lib/mission/snapshot";
+import { snapshotAllMissionCountersSync } from "../../lib/mission/counters";
 import dailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 
 type DailyChallengePointLookup = Record<string, { maxPoint: number, isRecovery: boolean, name: string }>
@@ -1345,8 +1346,7 @@ export function dailyResetPlayerDataSync(
             staminaUsed: player.totalStaminaUsed,
             rankSs: ss, rankS: s, rankA: a, rankB: b,
         })
-        getDb().prepare(`DELETE FROM players_active_missions_stages WHERE player_id = ? AND mission_id IN (SELECT id FROM players_active_missions WHERE player_id = ? AND progress >= 0)`).run(playerId, playerId)
-        getDb().prepare(`DELETE FROM players_active_missions WHERE player_id = ?`).run(playerId)
+        snapshotAllMissionCountersSync(playerId, 'daily')
 
         // weekly reset
         if (crossedWeek) {
@@ -1355,7 +1355,11 @@ export function dailyResetPlayerDataSync(
                 staminaUsed: player.totalStaminaUsed,
                 rankSs: ss, rankS: s, rankA: a, rankB: b,
             })
+            snapshotAllMissionCountersSync(playerId, 'weekly')
         }
+
+        getDb().prepare(`DELETE FROM players_active_missions_stages WHERE player_id = ? AND mission_id IN (SELECT id FROM players_active_missions WHERE player_id = ? AND progress >= 0)`).run(playerId, playerId)
+        getDb().prepare(`DELETE FROM players_active_missions WHERE player_id = ?`).run(playerId)
 
         return true
     } else {

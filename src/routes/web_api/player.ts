@@ -12,6 +12,7 @@ import { getPlayerItemsSync, setPlayerItemSync, updatePlayerItemSync } from "../
 import { getPlayerQuestProgressSync, getPlayerDrawnQuestsSync } from "../../data/domains/quest"
 import { insertPlayerPartyGroupListSync } from "../../data/domains/party"
 import { PartyCategory } from "../../data/types";
+import { snapshotAllMissionCountersSync } from "../../lib/mission"
 import { takeSnapshot } from "../../lib/mission/snapshot";
 import { getServerDate } from "../../utils";
 import dailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
@@ -474,6 +475,8 @@ const routes = async (fastify: FastifyInstance) => {
                 questClears: totalClears, staminaUsed: player.totalStaminaUsed,
                 rankSs: ss, rankS: s, rankA: a, rankB: b,
             })
+            const missionCounterSnapshots = snapshotAllMissionCountersSync(playerId, "daily")
+            console.log(`[MISSION] daily counter snapshot player=${playerId} counters=${missionCounterSnapshots}`)
             getDb().prepare(`DELETE FROM players_active_missions WHERE player_id = ?`).run(playerId)
             getDb().prepare(`DELETE FROM players_active_missions_stages WHERE player_id = ?`).run(playerId)
             return reply.status(200).send({ ok: true })
@@ -504,6 +507,8 @@ const routes = async (fastify: FastifyInstance) => {
                 questClears: totalClears, staminaUsed: player.totalStaminaUsed,
                 rankSs: ss, rankS: s, rankA: a, rankB: b,
             })
+            const missionCounterSnapshots = snapshotAllMissionCountersSync(playerId, "weekly")
+            console.log(`[MISSION] weekly counter snapshot player=${playerId} counters=${missionCounterSnapshots}`)
             getDb().prepare(`DELETE FROM players_active_missions WHERE player_id = ?`).run(playerId)
             getDb().prepare(`DELETE FROM players_active_missions_stages WHERE player_id = ?`).run(playerId)
             return reply.status(200).send({ ok: true })

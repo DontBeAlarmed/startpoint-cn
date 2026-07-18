@@ -17,6 +17,27 @@ export interface ActiveMissionReward {
     equipmentId?: number
 }
 
+export interface MissionRewardStageDefinition {
+    source: "active" | "awake"
+    targetProgress: number
+    targetClearSeconds?: number
+    rewards: ActiveMissionReward[]
+}
+
+function getRewardRow(
+    table: Record<string, Record<string, any[]>>,
+    missionId: number,
+    stage: number
+): any[] | undefined {
+    return table[String(missionId)]?.[String(stage)]?.[0]
+}
+
+function parseOptionalInteger(value: unknown): number | undefined {
+    if (value === undefined || value === null || value === "" || value === "(None)") return undefined
+    const parsed = parseInt(String(value))
+    return Number.isNaN(parsed) ? undefined : parsed
+}
+
 function parseMissionRewardSlots(row: any[], firstKindIndex: number, slotCount: number): ActiveMissionReward[] {
     const result: ActiveMissionReward[] = []
     for (let slot = 0; slot < slotCount; slot++) {
@@ -53,6 +74,34 @@ export function getActiveMissionRewards(missionId: number, stage: number): Activ
     const row = stageData[0]
 
     return parseMissionRewardSlots(row, 7, 4)
+}
+
+export function getMissionRewardStageDefinition(
+    missionId: number,
+    stage: number
+): MissionRewardStageDefinition | null {
+    const awakeRow = getRewardRow(charAwakeRewards as Record<string, Record<string, any[]>>, missionId, stage)
+    if (awakeRow) {
+        const targetProgress = parseFloat(String(awakeRow[5]))
+        if (!Number.isFinite(targetProgress)) return null
+        return {
+            source: "awake",
+            targetProgress,
+            targetClearSeconds: parseOptionalInteger(awakeRow[6]),
+            rewards: parseMissionRewardSlots(awakeRow, 9, 4),
+        }
+    }
+
+    const activeRow = getRewardRow(activeRewards as Record<string, Record<string, any[]>>, missionId, stage)
+    if (!activeRow) return null
+    const targetProgress = parseFloat(String(activeRow[3]))
+    if (!Number.isFinite(targetProgress)) return null
+    return {
+        source: "active",
+        targetProgress,
+        targetClearSeconds: parseOptionalInteger(activeRow[4]),
+        rewards: parseMissionRewardSlots(activeRow, 7, 4),
+    }
 }
 
 export function getRegularMissionRewards(missionId: number, stage: number): ActiveMissionReward[] {

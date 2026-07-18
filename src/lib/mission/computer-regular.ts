@@ -3,6 +3,7 @@
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerActiveMissionsSync } from "../../data/domains/mission"
+import { evaluateMissionCounterProgress, isFilteredMissionUnsupported } from "./evaluator"
 import { isComputablePattern, getMissionDefinition, getMissionPattern } from "./patterns"
 import { getSnapshot } from "./snapshot"
 import { getCompletedStageNumbers } from "./stages"
@@ -91,6 +92,19 @@ function computeProgress(missionId: number, ctx: CategoryContext, dbProgress: nu
             if (getCompletedStageNumbers(2, depId, depProgress).length > 0) completedDeps++
         }
         return completedDeps
+    }
+
+    if (category === 2) {
+        const evaluated = evaluateMissionCounterProgress({
+            playerId: ctx.playerId,
+            category,
+            missionId,
+            pattern,
+            definition,
+            period: "daily",
+        })
+        if (evaluated.supported) return Math.max(evaluated.progress, dbProgress)
+        if (isFilteredMissionUnsupported(evaluated)) return dbProgress
     }
 
     if (pattern && isComputablePattern(pattern)) {
