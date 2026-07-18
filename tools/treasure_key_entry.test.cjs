@@ -7,6 +7,10 @@ require("ts-node/register/transpile-only")
 const projectRoot = path.resolve(__dirname, "..")
 const worldFlipperRoot = path.resolve(projectRoot, "..")
 const questEntryCosts = require(path.join(projectRoot, "assets/quest_entry_costs.json"))
+const adventEventQuests = require(path.join(
+    worldFlipperRoot,
+    "wf-assets-cn/orderedmap/quest/event/advent_event_quest.json",
+))
 const challengeDungeonQuests = require(path.join(
     worldFlipperRoot,
     "wf-assets-cn/orderedmap/quest/event/challenge_dungeon_event_quest.json",
@@ -228,8 +232,18 @@ function createInput() {
 assert.deepEqual(buildStartEntryItemList({ entryItemId: 500000, entryItemCount: 0 }), { 500000: 0 })
 assert.deepEqual(buildStartEntryItemList({ entryItemId: null, entryItemCount: null }), {})
 
-const treasureQuestIds = ["2001", "2002", "2003", "2004", "2005", "2006"]
-const rawTreasureRows = Object.values(challengeDungeonQuests["2"]).map(wrapper => wrapper[0])
+const treasureQuestIds = ["1038", "1039", "1040", "2001", "2002", "2003", "2004", "2005", "2006"]
+const rawTreasureRows = []
+function collectRawQuestRows(value, rows) {
+    if (Array.isArray(value) && Array.isArray(value[0])) {
+        rows.push(value[0])
+        return
+    }
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+        for (const child of Object.values(value)) collectRawQuestRows(child, rows)
+    }
+}
+collectRawQuestRows(challengeDungeonQuests, rawTreasureRows)
 
 for (const questId of treasureQuestIds) {
     const row = rawTreasureRows.find(candidate => candidate[0] === questId)
@@ -242,7 +256,30 @@ for (const questId of treasureQuestIds) {
             itemCount: Number(row[58]),
             stamina: Number(row[70]),
         },
-        `treasure quest ${questId} must preserve entry fields 57/58/70`,
+        `challenge dungeon quest ${questId} must preserve entry fields 57/58/70`,
+    )
+}
+
+const adventTicketQuestIds = ["200013009", "200021009", "200050009", "200071009", "200076009"]
+const rawAdventRows = []
+for (const eventRows of Object.values(adventEventQuests)) {
+    for (const wrapper of Object.values(eventRows)) {
+        if (Array.isArray(wrapper) && Array.isArray(wrapper[0])) rawAdventRows.push(wrapper[0])
+    }
+}
+
+for (const questId of adventTicketQuestIds) {
+    const row = rawAdventRows.find(candidate => candidate[0] === questId)
+    assert.ok(row, `missing raw advent ticket quest ${questId}`)
+    assert.equal(Number(row[61]), 1, `advent quest ${questId} must use Always item mode`)
+    assert.deepEqual(
+        questEntryCosts[`7_${questId}`],
+        {
+            itemId: Number(row[62]),
+            itemCount: Number(row[63]),
+            stamina: Number(row[75]),
+        },
+        `advent quest ${questId} must preserve entry fields 62/63/75`,
     )
 }
 

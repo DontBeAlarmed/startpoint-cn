@@ -22,7 +22,11 @@ const QUEST_TYPES = {
   ex_quest: { file: "quest/ex_quest.json", cat: 4 },
   boss_battle_quest: { file: "quest/boss_battle_quest.json", cat: 2 },
   character_quest: { file: "quest/character_quest.json", cat: 3 },
-  advent_event_quest: { file: "quest/event/advent_event_quest.json", cat: 7 },
+  advent_event_quest: {
+    file: "quest/event/advent_event_quest.json",
+    cat: 7,
+    entryItem: { modeIndex: 61, itemIdIndex: 62, itemCountIndex: 63, staminaIndex: 75 },
+  },
   carnival_event_quest: { file: "quest/event/carnival_event_quest.json", cat: 22 },
   challenge_dungeon_event_quest: {
     file: "quest/event/challenge_dungeon_event_quest.json",
@@ -125,18 +129,20 @@ for (const [name, cfg] of Object.entries(QUEST_TYPES)) {
     total++;
     const qid = f[0];
     const st = parseInt(f[idx]);
-    if (!isNaN(st) && st > 0) {
-      withStamina++;
+    const itemMode = cfg.entryItem ? parseInt(f[cfg.entryItem.modeIndex]) : 0;
+    const usesEntryItem = Boolean(cfg.entryItem && itemMode === 1);
+    if ((!isNaN(st) && st > 0) || usesEntryItem) {
+      if (!isNaN(st) && st > 0) withStamina++;
       const key = `${cfg.cat}_${qid}`;
-      const itemMode = cfg.entryItem ? parseInt(f[cfg.entryItem.modeIndex]) : 0;
-      const itemId = cfg.entryItem && itemMode === 1
+      const itemId = usesEntryItem
         ? parseInt(f[cfg.entryItem.itemIdIndex])
         : 0;
-      const itemCount = cfg.entryItem && itemMode === 1
+      const itemCount = usesEntryItem
         ? parseInt(f[cfg.entryItem.itemCountIndex])
         : 0;
-      result[key] = { itemId, itemCount, stamina: st };
-      details[key] = { new: st, old: oldCosts[key]?.stamina ?? null };
+      const stamina = !isNaN(st) && st > 0 ? st : 0;
+      result[key] = { itemId, itemCount, stamina };
+      details[key] = { new: stamina, old: oldCosts[key]?.stamina ?? null };
     }
   });
   console.log(`  ${name}: ${total} quests, ${withStamina} with stamina > 0`);
@@ -149,6 +155,14 @@ for (let questId = 2001; questId <= 2006; questId++) {
     result[`13_${questId}`],
     { itemId: 500000, itemCount: 1, stamina: 10 },
     `invalid treasure domain entry cost for quest ${questId}`,
+  );
+}
+
+for (let questId = 1038; questId <= 1040; questId++) {
+  assert.deepStrictEqual(
+    result[`13_${questId}`],
+    { itemId: 30029, itemCount: 1, stamina: 0 },
+    `invalid item-only challenge dungeon entry cost for quest ${questId}`,
   );
 }
 
