@@ -4,7 +4,13 @@
 
 ## 结论
 
-无限激战（Rush）、土俑（Carnival）和战阵（Raid）的 HTTP 入口已经分开，结算中的模式特有逻辑也分别位于 `src/lib/quest/finish/*-handler.ts`。目前属于“流程可独立运行，但状态与通用结算仍有耦合”，还不是完全插件化的关卡架构。
+无限激战（Rush）、土俑（Carnival）和战阵（Raid）的 HTTP 入口已经分开，结算中的模式特有逻辑也分别位于 `src/lib/quest/finish/*-handler.ts`。战阵由客户端作为本地三队 Raid 启动，不属于常规多人房间。目前属于“流程可独立运行，但状态与通用结算仍有耦合”，还不是完全插件化的关卡架构。
+
+## 战阵协议语义
+
+国服客户端对 Quest Category 23 固定进入 `SingleQuestStartFlow`，配队使用 `RaidEventPartySelectLogic`，战斗进入 `RaidBattleStart`。玩家操作自己的三支队伍，流程不会创建、搜索或加入 `multi_battle_quest` 房间。
+
+因此 Raid 的验收范围是三队配队、`event/raid/battle/start`、战斗和结算。多人 HTTP/TCP 房间实现不属于战阵流程，也不应把缺少常规共斗入口记录为 Raid 缺陷。
 
 ## 当前边界
 

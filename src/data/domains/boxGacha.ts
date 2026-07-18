@@ -184,6 +184,18 @@ export function getPlayerBoxGachaDrawnRewardsSync(
     `).all(Number(boxId), gachaId, playerId) as PlayerBoxGachaDrawnReward[]
 }
 
+/** Deletes drawn rewards for exactly one player's box. */
+export function deletePlayerBoxGachaDrawnRewardsSync(
+    playerId: number,
+    gachaId: number,
+    boxId: string | number
+) {
+    getDb().prepare(`
+    DELETE FROM players_box_gacha_drawn_rewards
+    WHERE player_id = ? AND gacha_id = ? AND box_id = ?
+    `).run(playerId, gachaId, Number(boxId))
+}
+
 /**
  * Inserts a drawn reward for a box gacha.
  * 

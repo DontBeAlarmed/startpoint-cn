@@ -1,16 +1,18 @@
 // Handles the insertion of mana into characters.
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { getDb } from "../../data/db";
 import { getAccountPlayers } from "../../data/domains/account"
-import { getPlayerBoxGachaDrawnRewardsSync, getPlayerBoxGachaSync, insertPlayerBoxGachaDrawnRewardSync, insertPlayerBoxGachaSync, updatePlayerBoxGachaDrawnRewardSync, updatePlayerBoxGachaSync } from "../../data/domains/boxGacha"
+import { deletePlayerBoxGachaDrawnRewardsSync, getPlayerBoxGachaDrawnRewardsSync, getPlayerBoxGachaSync, insertPlayerBoxGachaDrawnRewardSync, insertPlayerBoxGachaSync, updatePlayerBoxGachaDrawnRewardSync, updatePlayerBoxGachaSync } from "../../data/domains/boxGacha"
 import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { playerOwnsEquipmentSync, updatePlayerEquipmentSync } from "../../data/domains/equipment"
 import { updatePlayerPartyGroupSync } from "../../data/domains/party"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { generateDataHeaders, getServerTime } from "../../utils";
+import { generateDataHeaders, getServerTime, getServerTimeForPlayer } from "../../utils";
 import { getBoxGachaSync } from "../../lib/assets";
+import { BoxGachaInvalidPeriodError, BoxGachaResetError, resetBoxGachaSync } from "../../lib/box-gacha-reset";
 import { drawBoxGachaSync, rewardPlayerBoxGachaResultSync } from "../../lib/gacha";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { BoxGachaBoxes } from "../../lib/types";
@@ -35,6 +37,12 @@ interface CloseBody {
     box_id: number,
     viewer_id: number,
     api_count: number
+}
+
+interface ResetBody {
+    box_gacha_id: number
+    box_id: number
+    viewer_id: number
 }
 
 /**
@@ -78,6 +86,86 @@ function getAllBoxList(
 }
 
 const routes = async (fastify: FastifyInstance) => {
+    fastify.post("/reset", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as ResetBody
+        const viewerId = body.viewer_id
+        const boxGachaId = body.box_gacha_id
+        const boxId = body.box_id
+        if (
+            !Number.isInteger(viewerId)
+            || !Number.isInteger(boxGachaId)
+            || !Number.isInteger(boxId)
+        ) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid request body."
+        })
+
+        const viewerIdSession = await getSession(viewerId.toString())
+        if (!viewerIdSession) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid viewer id."
+        })
+
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)
+        if (playerId === null) return reply.status(500).send({
+            "error": "Internal Server Error",
+            "message": "No players bound to account."
+        })
+
+        const boxGachaData = getBoxGachaSync(boxGachaId)
+        const settings = boxGachaData?.boxSettings[boxId]
+        const availableCount = boxGachaData?.availableCounts[boxId]
+        if (
+            boxGachaData === null
+            || settings === undefined
+            || availableCount === undefined
+        ) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid box gacha or box id."
+        })
+
+        try {
+            resetBoxGachaSync({
+                playerId,
+                boxGachaId,
+                boxId,
+                availableCount,
+                settings,
+                nowMs: getServerTimeForPlayer(playerId) * 1000,
+            }, {
+                transaction: operation => getDb().transaction(operation)(),
+                getBox: getPlayerBoxGachaSync,
+                updateBox: updatePlayerBoxGachaSync,
+                deleteDrawnRewards: deletePlayerBoxGachaDrawnRewardsSync,
+            })
+        } catch (error) {
+            if (error instanceof BoxGachaInvalidPeriodError) {
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    "code": error.errorCode,
+                    "message": error.message,
+                })
+            }
+            if (error instanceof BoxGachaResetError) {
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    "message": error.message,
+                })
+            }
+            throw error
+        }
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({
+                viewer_id: viewerId
+            }),
+            "data": {
+                "all_box_info": getAllBoxList(playerId, boxGachaId, boxGachaData.boxes)
+            }
+        })
+    })
+
     fastify.post("/close", async (request: FastifyRequest, reply: FastifyReply) => {
 
         const body = request.body as CloseBody

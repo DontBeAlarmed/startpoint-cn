@@ -1,6 +1,16 @@
 # 已知问题
 > 状态: 持续更新   关键文件: -   相关端点: -
 
+## 活动扭蛋最终箱无法重置 ✅ 已修复，待客户端验收 (2026-07-19)
+
+**症状**：活动 28 的箱 5 抽完 2732 个胶囊后，客户端点击“库存重置”请求 `POST /api/index.php/box_gacha/reset`，服务端因路由不存在返回 H404。
+
+**修复**：从国服箱规则资产读取 `requiredBoxId`、`resetKind`、`resetLimit` 和 JST 开放期；使用账号当前存档和玩家服务器时间校验请求；在单个 SQLite 同步事务内恢复库存、增加重置次数、重新开放箱子并精确删除该玩家该箱的已抽记录。重置不扣活动道具、不回收奖励，也不影响其他箱。期间错误返回业务码 `4608`，立即重复重置会失败且不留下部分状态。
+
+**验收重点**：在箱 5 点击重置，确认不再 H404、页面仍停留箱 5、库存恢复为 2732、重置次数为 1；未重新抽空前再次请求应被拒绝。当前服务端专项测试已通过，仍待国服客户端验收。
+
+详见 [箱式扭蛋](../systems/box-gacha.md)。
+
 ## 土俑奖励动画 C8601 key=0 ✅ 已修复并通过客户端验收 (2026-07-17)
 
 **症状**：土俑挑战结算及累计奖励发放成功，返回活动页面准备播放奖励动画时报 `C8601`，内部信息为“指定的 Key 不存在，key=0”。
@@ -364,7 +374,7 @@ Player 页面 `/player/:id` → 「恢复挑战次数」按钮：
 
 ## 战阵（RAID_EVENT / 编队系统）— 待客户端重测
 
-> 下列项目记录历史修复内容，不再视为客户端验收结论。特殊关卡已统一列入下一阶段测试；当前明确可复现的问题是无限激战配队无法保存。
+> 战阵不是常规多人房间。国服客户端由 `SingleQuestStartFlow` 启动玩家本地三队 Raid，不创建、搜索或加入 `multi_battle_quest` 房间。下列项目记录历史修复内容，不代表客户端已经验收。
 
 ### 问题链
 
@@ -384,7 +394,7 @@ Player 页面 `/player/:id` → 「恢复挑战次数」按钮：
 | 文件 | 变更 |
 |------|------|
 | `src/routes/api/raidEvent.ts` | `/summary`、`/party`、`/battle/start`、`/select_folder`、`/reset` 全部重写 |
-| `src/routes/api/party.ts` | `/party/edit` 加 `category: 3→1` 映射 |
+| `src/routes/api/party.ts` | `/party/edit` 按原生 `PartyCategory.RAID=3` 保存 |
 | `src/routes/api/singleBattleQuest.ts` | RAID_EVENT played party 记录 + eventId 支持 |
 | `src/data/domains/rushEvent.ts` | `INSERT OR REPLACE` 防重复 |
 | `scripts/converter.py` | `convert_raid_event_quest` 从 CDN 提取完整奖励字段 |
@@ -393,12 +403,14 @@ Player 页面 `/player/:id` → 「恢复挑战次数」按钮：
 ### 当前配队流程
 
 ```
-进战阵之宴 → /event/raid/party 读 NORMAL party → 显示
+进战阵之宴 → /event/raid/party 读取 RAID category 的本地三队 → 显示
 编辑配队 → 内存修改（不发请求）
-退出编队组编辑 → /party/edit {category:3→1} → 存 NORMAL
-重进 → /event/raid/party → 读 NORMAL → 编辑持久 ✅
-打关 → /finish → played party 记录 ✅
+退出编队组编辑 → /party/edit {category:3} → 持久化
+选择关卡 → SingleQuestStartFlow → /event/raid/battle/start
+战斗与结算 → 本地三队 Raid → /finish → played party 记录
 ```
+
+验收目标是三队配队、Raid 启动、战斗和结算，不再寻找常规共斗入口。
 ---
 
 ## 关卡高分显示截顶（>2,147,483,647） ✅ 已修复
