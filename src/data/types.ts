@@ -801,6 +801,7 @@ export interface RawPlayerActiveQuest {
     is_multi: number
     room_number: string | null
     entry_item_id: number | null
+    entry_item_count: number | null
     event_id: number | null
     continue_count: number
 }
@@ -816,6 +817,7 @@ export interface PlayerActiveQuest {
     isMulti: boolean
     roomNumber: string | null
     entryItemId: number | null
+    entryItemCount: number | null
     eventId: number | null
     continueCount: number
 }

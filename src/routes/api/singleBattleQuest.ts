@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { deletePlayerActiveQuestSync, getPlayerActiveQuestSync, insertPlayerActiveQuestSync, updatePlayerActiveQuestContinueCountSync } from "../../data/domains/quest_active"
 import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerRushEventSync } from "../../data/domains/rushEvent"
 import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
-import { getPlayerItemSync, givePlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
+import { getPlayerItemSync, givePlayerItemSync, setPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
 import { getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync } from "../../data/domains/quest"
 import { getSession } from "../../data/domains/session"
 import { incrementPlayerCharacterClearSync } from "../../data/domains/character_clear"
@@ -53,6 +53,7 @@ import {
     runStartEntryTransaction,
     StartEntryCost,
 } from "../../lib/quest/start-entry";
+import { runAbortEntryTransaction } from "../../lib/quest/entry-lifecycle";
 
 interface StartBody {
     quest_id: number
@@ -144,6 +145,7 @@ export interface ActiveQuest {
     matePlayerIds?: number[],
     mateComIds?: number[],
     entryItemId?: number,
+    entryItemCount?: number,
     eventId?: number,
     playId: string,
     continueCount: number
@@ -165,6 +167,7 @@ export function persistActiveQuest(playerId: number, quest: ActiveQuest) {
         isMulti: quest.isMulti,
         roomNumber: quest.roomNumber ?? null,
         entryItemId: quest.entryItemId ?? null,
+        entryItemCount: quest.entryItemCount ?? null,
         eventId: quest.eventId ?? null,
         continueCount: quest.continueCount
     })
@@ -178,6 +181,20 @@ export function insertActiveQuest(playerId: number, quest: ActiveQuest) {
     // 其他调用方继续保持先写数据库、再更新内存的行为。
     persistActiveQuest(playerId, quest)
     publishActiveQuest(playerId, quest)
+}
+
+export function runAbortActiveQuestTransaction(playerId: number) {
+    return runAbortEntryTransaction(playerId, {
+        transaction: operation => getDb().transaction(operation)(),
+        getActiveQuest: getPlayerActiveQuestSync,
+        getItemCount: getPlayerItemSync,
+        setItemCount: setPlayerItemSync,
+        deleteActiveQuest: deletePlayerActiveQuestSync,
+        clearActiveQuest: id => { delete activeQuests[id] },
+        getEntryCost: (category, questId) => (
+            questEntryCosts as Record<string, StartEntryCost>
+        )[`${category}_${questId}`],
+    })
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -541,9 +558,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         const headers = generateDataHeaders({ viewer_id: body.viewer_id })
 
-        // delete existing active quest
-        delete activeQuests[playerId]
-        deletePlayerActiveQuestSync(playerId)
+        const abortResult = runAbortActiveQuestTransaction(playerId)
 
         return reply.status(200).send({
             "data_headers": headers,
@@ -552,7 +567,8 @@ const routes = async (fastify: FastifyInstance) => {
                 "category_id": body.category,
                 "is_multi": "single",
                 "start_time": headers['servertime'],
-                "quest_name": ""
+                "quest_name": "",
+                "item_list": abortResult.itemList
             }
         })
     })
@@ -601,6 +617,7 @@ const routes = async (fastify: FastifyInstance) => {
             isAutoStartMode: isAutoStartMode,
             isMulti: false,
             entryItemId: entryCost && entryCost.itemId > 0 ? entryCost.itemId : undefined,
+            entryItemCount: entryCost && entryCost.itemCount > 0 ? entryCost.itemCount : undefined,
             playId: body.play_id,
             continueCount: 0
         }

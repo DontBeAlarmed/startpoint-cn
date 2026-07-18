@@ -1,13 +1,17 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { generateDataHeaders, getServerTime, getServerDate } from "../../utils";
 import { collectPlayerDataPooledExpSync, dailyResetPlayerDataSync, getPlayerSync, updatePlayerSync } from "../../data/domains/player"
-import { deletePlayerActiveQuestSync, getPlayerActiveQuestSync } from "../../data/domains/quest_active"
+import { getPlayerActiveQuestSync, updatePlayerActiveQuestEntryItemCountSync } from "../../data/domains/quest_active"
 import { getSession } from "../../data/domains/session"
 import { getClientSerializedData } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDisplayHost } from "../../multi/room/serializer";
 import { getRoom } from "../../multi/room/manager";
 import { runPermanentValidators } from "../../lib/validate";
+import { restoreActiveQuestFromStorage } from "../../lib/quest/entry-lifecycle";
+import { ActiveQuest, publishActiveQuest, runAbortActiveQuestTransaction } from "../api/singleBattleQuest";
+import type { StartEntryCost } from "../../lib/quest/start-entry";
+import questEntryCosts from "../../../assets/quest_entry_costs.json";
 
 interface CnLoadBody {
     device_id: number;
@@ -136,6 +140,24 @@ const routes = async (fastify: FastifyInstance) => {
             updatePlayerSync({ id: player.id, lastLoginTime: now });
         }
 
+        let activeQuest = getPlayerActiveQuestSync(playerId) as ActiveQuest | null;
+        if (activeQuest) {
+            const roomExists = activeQuest.roomNumber ? getRoom(activeQuest.roomNumber) : true;
+            if (!roomExists) {
+                console.log(`[CN-LOAD] active quest room ${activeQuest.roomNumber} not found, cancelling`);
+                runAbortActiveQuestTransaction(playerId);
+                activeQuest = null;
+            } else {
+                activeQuest = restoreActiveQuestFromStorage(playerId, activeQuest, {
+                    getEntryCost: (category, questId) => (
+                        questEntryCosts as Record<string, StartEntryCost>
+                    )[`${category}_${questId}`],
+                    persistEntryItemCount: updatePlayerActiveQuestEntryItemCountSync,
+                    publishActiveQuest,
+                });
+            }
+        }
+
         const clientData = getClientSerializedData(playerId, { viewerId: accountId }) as any;
         if (clientData === null) {
             return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
@@ -146,24 +168,14 @@ const routes = async (fastify: FastifyInstance) => {
         wrapOptionFields(clientData, resVer);
 
         // Inject unfinished quest lists for battle recovery
-        const activeQuest = getPlayerActiveQuestSync(playerId);
         if (activeQuest) {
-            // Verify room still exists (survives server restart)
-            const roomExists = activeQuest.roomNumber ? getRoom(activeQuest.roomNumber) : true;
-            if (!roomExists) {
-                console.log(`[CN-LOAD] active quest room ${activeQuest.roomNumber} not found, clearing`);
-                deletePlayerActiveQuestSync(playerId);
+            const entry = { play_id: activeQuest.playId, continue_count: activeQuest.continueCount };
+            if (activeQuest.isMulti) {
                 clientData.unfinished_quest_list = [];
-                clientData.unfinished_multi_quest_list = [];
+                clientData.unfinished_multi_quest_list = [entry];
             } else {
-                const entry = { play_id: activeQuest.playId, continue_count: activeQuest.continueCount };
-                if (activeQuest.isMulti) {
-                    clientData.unfinished_quest_list = [];
-                    clientData.unfinished_multi_quest_list = [entry];
-                } else {
-                    clientData.unfinished_quest_list = [entry];
-                    clientData.unfinished_multi_quest_list = [];
-                }
+                clientData.unfinished_quest_list = [entry];
+                clientData.unfinished_multi_quest_list = [];
             }
         } else {
             clientData.unfinished_quest_list = [];

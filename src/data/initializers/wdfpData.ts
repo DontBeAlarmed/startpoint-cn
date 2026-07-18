@@ -1,5 +1,6 @@
 import { Database } from "better-sqlite3";
 import { ensureQuestHostFinishedStorageSync } from "../../lib/quest/host-finish-persistence";
+import { ensureActiveQuestEntryItemCountStorageSync } from "../../lib/quest/active-quest-persistence";
 
 
 export default function init(
@@ -585,8 +586,10 @@ export default function init(
         is_multi INTEGER NOT NULL DEFAULT 0,
         room_number TEXT,
         entry_item_id INTEGER,
+        entry_item_count INTEGER,
         event_id INTEGER,
         continue_count INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
+    ensureActiveQuestEntryItemCountStorageSync(database)
 }
