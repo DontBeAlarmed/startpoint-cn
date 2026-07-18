@@ -12,6 +12,7 @@ import { updatePlayerPartyGroupSync } from "../../data/domains/party"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime, getServerTimeForPlayer } from "../../utils";
 import { getBoxGachaSync } from "../../lib/assets";
+import { parseBoxGachaResetRequest, sendBoxGachaResultCode } from "../../lib/box-gacha-protocol";
 import { BoxGachaInvalidPeriodError, BoxGachaResetError, resetBoxGachaSync } from "../../lib/box-gacha-reset";
 import { drawBoxGachaSync, rewardPlayerBoxGachaResultSync } from "../../lib/gacha";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
@@ -37,12 +38,6 @@ interface CloseBody {
     box_id: number,
     viewer_id: number,
     api_count: number
-}
-
-interface ResetBody {
-    box_gacha_id: number
-    box_id: number
-    viewer_id: number
 }
 
 /**
@@ -87,18 +82,12 @@ function getAllBoxList(
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/reset", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as ResetBody
-        const viewerId = body.viewer_id
-        const boxGachaId = body.box_gacha_id
-        const boxId = body.box_id
-        if (
-            !Number.isInteger(viewerId)
-            || !Number.isInteger(boxGachaId)
-            || !Number.isInteger(boxId)
-        ) return reply.status(400).send({
+        const resetRequest = parseBoxGachaResetRequest(request.body)
+        if (resetRequest === null) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
         })
+        const { viewerId, boxGachaId, boxId } = resetRequest
 
         const viewerIdSession = await getSession(viewerId.toString())
         if (!viewerIdSession) return reply.status(400).send({
@@ -140,11 +129,7 @@ const routes = async (fastify: FastifyInstance) => {
             })
         } catch (error) {
             if (error instanceof BoxGachaInvalidPeriodError) {
-                return reply.status(400).send({
-                    "error": "Bad Request",
-                    "code": error.errorCode,
-                    "message": error.message,
-                })
+                return sendBoxGachaResultCode(reply, viewerId, error.errorCode)
             }
             if (error instanceof BoxGachaResetError) {
                 return reply.status(400).send({

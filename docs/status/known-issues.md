@@ -382,7 +382,7 @@ Player 页面 `/player/:id` → 「恢复挑战次数」按钮：
 |---|------|------|------|
 | 1 | 无法进入战阵之宴 | `/event/raid/summary` 为 stub，缺 `raid_boss`/`auto_start_point` 等必填字段 | 补齐 5 个必填 raid 字段 |
 | 2 | 按钮灰色，提示"队伍内存在已使用的角色" | `/event/raid/party` stub 返回 60 个 NORMAL party，同一角色跨多个 party 重复 | 改为返回 1 group × 3 party |
-| 3 | 编辑配队后重进不持久 | `/party/edit` 客户端发 `category=3`（EMPTY3），DB 存 `category=1`（NORMAL），update 找不到行 | `category: 3 → 1` 映射 |
+| 3 | 编辑配队后重进不持久 | 早期实现把客户端的 `category=3` 错误映射成 NORMAL，破坏了 Raid 独立分类 | 取消映射，按原生 `PartyCategory.RAID=3` 持久化 |
 | 4 | 重新进入报错 | 缺少 `getServerDate` import → H500 | 补 import |
 | 5 | 战斗结束 H400 | `/event/raid/battle/start` stub 未写 `activeQuests` | 写入 `activeQuests` + 推算 eventId |
 | 6 | `/finish` 500 UNIQUE | 重复挑战同一关 played party 冲突 | `INSERT OR REPLACE` |

@@ -16,6 +16,7 @@ const settingsPath = path.resolve(
 const generatorPath = path.resolve(__dirname, "rebuild_box_gacha_settings.ts");
 const tsNodePath = path.resolve(projectRoot, "node_modules/ts-node/dist/bin.js");
 const resetServicePath = path.resolve(projectRoot, "src/lib/box-gacha-reset.ts");
+const protocolPath = path.resolve(projectRoot, "src/lib/box-gacha-protocol.ts");
 const routePath = path.resolve(projectRoot, "src/routes/api/boxGacha.ts");
 
 const source = require(sourcePath);
@@ -207,6 +208,14 @@ try {
     missingFeatures.push("box gacha reset service is missing");
 }
 
+let protocolModule;
+try {
+    protocolModule = require(protocolPath);
+} catch (error) {
+    if (error?.code !== "MODULE_NOT_FOUND") throw error;
+    missingFeatures.push("box gacha reset protocol helpers are missing");
+}
+
 const routeSource = fs.readFileSync(routePath, "utf8");
 if (!routeSource.includes('fastify.post("/reset"')) {
     missingFeatures.push("box_gacha/reset route is missing");
@@ -222,6 +231,60 @@ const {
     BoxGachaStateNotFoundError,
     resetBoxGachaSync,
 } = resetModule;
+
+const {
+    parseBoxGachaResetRequest,
+    sendBoxGachaResultCode,
+} = protocolModule;
+
+assert.deepEqual(
+    parseBoxGachaResetRequest({ viewer_id: 123, box_gacha_id: 28, box_id: 5, api_count: 1 }),
+    { viewerId: 123, boxGachaId: 28, boxId: 5 },
+    "valid reset request must be normalized",
+);
+for (const invalidBody of [
+    null,
+    undefined,
+    [],
+    "invalid",
+    {},
+    { viewer_id: "123", box_gacha_id: 28, box_id: 5 },
+    { viewer_id: 123, box_gacha_id: 28.5, box_id: 5 },
+    { viewer_id: 123, box_gacha_id: 28, box_id: 0 },
+]) {
+    assert.equal(
+        parseBoxGachaResetRequest(invalidBody),
+        null,
+        `invalid reset body must be rejected: ${JSON.stringify(invalidBody)}`,
+    );
+}
+
+{
+    const replyState = { headers: {}, statusCode: null, payload: null };
+    const reply = {
+        header(name, value) {
+            replyState.headers[name] = value;
+            return this;
+        },
+        status(statusCode) {
+            replyState.statusCode = statusCode;
+            return this;
+        },
+        send(payload) {
+            replyState.payload = payload;
+            return payload;
+        },
+    };
+
+    const payload = sendBoxGachaResultCode(reply, 123, 4608);
+
+    assert.equal(replyState.headers["content-type"], "application/x-msgpack");
+    assert.equal(replyState.statusCode, 200);
+    assert.equal(replyState.payload, payload);
+    assert.equal(payload.data_headers.viewer_id, 123);
+    assert.equal(payload.data_headers.result_code, 4608);
+    assert.deepEqual(payload.data, {});
+}
 
 const PLAYER_ID = 18;
 const BOX_GACHA_ID = 28;
@@ -469,8 +532,8 @@ for (const input of [
 
 assert.match(
     routeSource,
-    /fastify\.post\("\/reset"[\s\S]*?resolvePlayerIdSync[\s\S]*?getServerTimeForPlayer[\s\S]*?"all_box_info": getAllBoxList\(playerId, boxGachaId, boxGachaData\.boxes\)/,
-    "reset route must resolve the active player, use player server time, and return complete all_box_info",
+    /fastify\.post\("\/reset"[\s\S]*?parseBoxGachaResetRequest[\s\S]*?resolvePlayerIdSync[\s\S]*?getServerTimeForPlayer[\s\S]*?sendBoxGachaResultCode[\s\S]*?"all_box_info": getAllBoxList\(playerId, boxGachaId, boxGachaData\.boxes\)/,
+    "reset route must validate input, resolve the active player, use player server time, return protocol result codes, and return complete all_box_info",
 );
 
 console.log("box gacha reset asset, transaction, and route tests passed");
