@@ -13,19 +13,8 @@ const queryClient = new QueryClient({
     }
 })
 
-const prefersDark = () =>
-    typeof window !== "undefined" && !!window.matchMedia?.("(prefers-color-scheme: dark)").matches
-
 function Root() {
-    // 自动跟随系统深浅色；用户可在顶栏手动覆盖（覆盖后系统再变化仍会跟随）
-    const [dark, setDark] = useState(prefersDark)
-
-    useEffect(() => {
-        const mq = window.matchMedia("(prefers-color-scheme: dark)")
-        const handler = (e: MediaQueryListEvent) => setDark(e.matches)
-        mq.addEventListener("change", handler)
-        return () => mq.removeEventListener("change", handler)
-    }, [])
+    const [dark, setDark] = useState(true)
 
     useEffect(() => {
         document.documentElement.dataset.adminTheme = dark ? "dark" : "light"
@@ -39,16 +28,17 @@ function Root() {
                 theme={{
                     algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
                     token: {
-                        colorPrimary: dark ? "#62b397" : "#2f7a67",
-                        colorInfo: dark ? "#72afd0" : "#2d6f99",
-                        colorSuccess: dark ? "#81bb92" : "#43805d",
-                        colorWarning: dark ? "#dfb15c" : "#b27822",
-                        colorError: dark ? "#df776c" : "#b84a42",
+                        colorPrimary: dark ? "#39d9e6" : "#48d6d2",
+                        colorInfo: dark ? "#6ba9ff" : "#67a7ff",
+                        colorSuccess: dark ? "#65eca7" : "#64e6a2",
+                        colorWarning: dark ? "#ffc15d" : "#ffb84a",
+                        colorError: dark ? "#ff6c9d" : "#ff6b91",
                         colorBgLayout: "transparent",
-                        colorBgContainer: dark ? "#20231d" : "#fffdf7",
-                        colorBorder: dark ? "#3b4035" : "#d8d0bf",
-                        colorText: dark ? "#f0eadb" : "#292621",
-                        colorTextSecondary: dark ? "#b6ad98" : "#6f6658",
+                        colorBgContainer: dark ? "#10182a" : "#172133",
+                        colorBgElevated: dark ? "#16223a" : "#1d2a41",
+                        colorBorder: dark ? "#263a5b" : "#2e4263",
+                        colorText: dark ? "#f7fbff" : "#f5f8ff",
+                        colorTextSecondary: dark ? "#aebbd2" : "#afbdd1",
                         borderRadius: 6,
                         borderRadiusLG: 8,
                         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
@@ -63,8 +53,8 @@ function Root() {
                             headerFontSize: 15,
                         },
                         Table: {
-                            borderColor: dark ? "#3b4035" : "#d8d0bf",
-                            headerBg: dark ? "#262a22" : "#f7f1e4",
+                            borderColor: dark ? "#263a5b" : "#2e4263",
+                            headerBg: dark ? "#16223a" : "#1d2a41",
                         },
                     },
                 }}

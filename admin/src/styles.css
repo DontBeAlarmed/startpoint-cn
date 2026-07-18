@@ -4,39 +4,43 @@
 }
 
 :root {
-  --admin-bg: #f3f0e8;
-  --admin-surface: #fffdf7;
-  --admin-surface-raised: #ffffff;
-  --admin-border: #d8d0bf;
-  --admin-border-strong: #b9ab91;
-  --admin-text: #292621;
-  --admin-muted: #6f6658;
-  --admin-primary: #2f7a67;
-  --admin-primary-strong: #1f5f50;
-  --admin-accent: #c7841b;
-  --admin-info: #2d6f99;
-  --admin-danger: #b84a42;
-  --admin-success: #43805d;
-  --admin-warning: #b27822;
-  --admin-shadow: 0 1px 2px rgb(45 38 29 / 8%);
+  --admin-bg: #101827;
+  --admin-bg-deep: #09111f;
+  --admin-surface: #172133;
+  --admin-surface-raised: #1d2a41;
+  --admin-border: #2e4263;
+  --admin-border-strong: #4b6d9f;
+  --admin-text: #f5f8ff;
+  --admin-muted: #afbdd1;
+  --admin-primary: #48d6d2;
+  --admin-primary-strong: #8df4ee;
+  --admin-accent: #ffd34f;
+  --admin-accent-strong: #fff08a;
+  --admin-info: #67a7ff;
+  --admin-danger: #ff6b91;
+  --admin-success: #64e6a2;
+  --admin-warning: #ffb84a;
+  --admin-shadow: 0 12px 26px rgb(3 9 21 / 28%);
 }
 
 html[data-admin-theme="dark"] {
-  --admin-bg: #171915;
-  --admin-surface: #20231d;
-  --admin-surface-raised: #262a22;
-  --admin-border: #3b4035;
-  --admin-border-strong: #59614f;
-  --admin-text: #f0eadb;
-  --admin-muted: #b6ad98;
-  --admin-primary: #62b397;
-  --admin-primary-strong: #7cc4aa;
-  --admin-accent: #e0a94b;
-  --admin-info: #72afd0;
-  --admin-danger: #df776c;
-  --admin-success: #81bb92;
-  --admin-warning: #dfb15c;
-  --admin-shadow: 0 1px 2px rgb(0 0 0 / 28%);
+  --admin-bg: #070c18;
+  --admin-bg-deep: #030711;
+  --admin-surface: #10182a;
+  --admin-surface-raised: #16223a;
+  --admin-border: #263a5b;
+  --admin-border-strong: #4b77b8;
+  --admin-text: #f7fbff;
+  --admin-muted: #aebbd2;
+  --admin-primary: #39d9e6;
+  --admin-primary-strong: #93f6ff;
+  --admin-accent: #ffd94c;
+  --admin-accent-strong: #fff19a;
+  --admin-info: #6ba9ff;
+  --admin-danger: #ff6c9d;
+  --admin-success: #65eca7;
+  --admin-warning: #ffc15d;
+  --admin-shadow: 0 14px 32px rgb(0 0 0 / 42%);
 }
 
 * {
@@ -48,18 +52,24 @@ body {
   margin: 0;
   color: var(--admin-text);
   background:
-    linear-gradient(90deg, rgb(0 0 0 / 3%) 1px, transparent 1px),
-    linear-gradient(rgb(0 0 0 / 3%) 1px, transparent 1px),
+    radial-gradient(circle at 18% 8%, color-mix(in srgb, var(--admin-primary) 18%, transparent) 0 1px, transparent 2px),
+    radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--admin-accent) 24%, transparent) 0 1px, transparent 2px),
+    linear-gradient(90deg, rgb(255 255 255 / 4%) 1px, transparent 1px),
+    linear-gradient(rgb(255 255 255 / 4%) 1px, transparent 1px),
+    linear-gradient(180deg, var(--admin-bg) 0%, var(--admin-bg-deep) 100%),
     var(--admin-bg);
-  background-size: 24px 24px;
+  background-size: 360px 220px, 420px 260px, 24px 24px, 24px 24px, auto, auto;
 }
 
 html[data-admin-theme="dark"] body {
   background:
-    linear-gradient(90deg, rgb(255 255 255 / 3%) 1px, transparent 1px),
-    linear-gradient(rgb(255 255 255 / 3%) 1px, transparent 1px),
+    radial-gradient(circle at 18% 8%, color-mix(in srgb, var(--admin-primary) 20%, transparent) 0 1px, transparent 2px),
+    radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--admin-accent) 25%, transparent) 0 1px, transparent 2px),
+    linear-gradient(90deg, rgb(255 255 255 / 4%) 1px, transparent 1px),
+    linear-gradient(rgb(255 255 255 / 4%) 1px, transparent 1px),
+    linear-gradient(180deg, var(--admin-bg) 0%, var(--admin-bg-deep) 100%),
     var(--admin-bg);
-  background-size: 24px 24px;
+  background-size: 360px 220px, 420px 260px, 24px 24px, 24px 24px, auto, auto;
 }
 
 .admin-app {
@@ -88,9 +98,9 @@ html[data-admin-theme="dark"] body {
   width: 34px;
   height: 34px;
   flex: 0 0 auto;
-  border: 2px solid var(--admin-text);
+  border: 2px solid var(--admin-accent);
   background: #10100f;
-  box-shadow: 3px 3px 0 var(--admin-border-strong);
+  box-shadow: 3px 3px 0 var(--admin-primary), 0 0 14px color-mix(in srgb, var(--admin-accent) 35%, transparent);
 }
 
 .admin-brand-mark img {
@@ -129,7 +139,7 @@ html[data-admin-theme="dark"] body {
 
 .admin-menu .ant-menu-item-selected {
   color: var(--admin-primary-strong);
-  background: color-mix(in srgb, var(--admin-primary) 14%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--admin-primary) 20%, transparent), color-mix(in srgb, var(--admin-accent) 10%, transparent));
   font-weight: 700;
 }
 
@@ -142,7 +152,7 @@ html[data-admin-theme="dark"] body {
   min-height: 56px;
   padding: 0 18px;
   gap: 10px;
-  background: color-mix(in srgb, var(--admin-bg) 86%, transparent) !important;
+  background: color-mix(in srgb, var(--admin-bg-deep) 88%, transparent) !important;
   border-bottom: 1px solid var(--admin-border);
   backdrop-filter: blur(12px);
 }
@@ -184,8 +194,9 @@ html[data-admin-theme="dark"] body {
   align-items: center;
   margin-bottom: 7px;
   padding: 2px 6px;
-  border: 1px solid var(--admin-border-strong);
-  color: var(--admin-primary-strong);
+  border: 1px solid color-mix(in srgb, var(--admin-accent) 72%, var(--admin-border));
+  color: var(--admin-accent-strong);
+  background: color-mix(in srgb, var(--admin-accent) 10%, transparent);
   font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   font-weight: 800;
@@ -345,6 +356,7 @@ html[data-admin-theme="dark"] body {
 .ant-card {
   border-color: var(--admin-border);
   box-shadow: var(--admin-shadow);
+  background: color-mix(in srgb, var(--admin-surface) 96%, transparent);
 }
 
 .ant-card-head {
