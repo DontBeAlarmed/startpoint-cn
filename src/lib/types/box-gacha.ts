@@ -49,11 +49,25 @@ export type RawBoxGachas = Record<string, RawBoxGacha>
 export type RawBoxRewards = Record<string, BoxGachaBoxes>
 
 
+export interface BoxGachaBoxSettings {
+    requiredBoxId: number | null
+    resetKind: number
+    resetLimit: number | null
+    availableFrom: string
+    availableUntil: string | null
+    closeKind: number
+}
+
+
+export type RawBoxGachaSettings = Record<string, Record<string, BoxGachaBoxSettings>>
+
+
 export interface BoxGacha {
     redeemItemId: number,
     redeemItemCount: number,
     boxes: Record<string, BoxGachaBox>
     availableCounts: Record<string, number>
+    boxSettings: Record<string, BoxGachaBoxSettings>
 }
 
 
@@ -65,4 +79,3 @@ export interface BoxGachaDrawResult {
     equipment: Map<number, number>
     items: Map<number, number>
 }
-

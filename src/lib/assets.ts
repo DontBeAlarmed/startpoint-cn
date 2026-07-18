@@ -1,6 +1,7 @@
 import adventEventQuests from "../../assets/advent_event_quest.json";
 import bossBattleQuests from "../../assets/boss_battle_quest.json";
 import boxGacha from "../../assets/box_gacha.json";
+import boxGachaBoxSettings from "../../assets/box_gacha_box_settings.json";
 import boxReward from "../../assets/box_reward.json";
 import characters from "../../assets/character.json";
 import characterQuests from "../../assets/character_quest.json";
@@ -47,6 +48,7 @@ import equipmentDissolveData from "../../assets/equipment_dissolve.json"
 import itemSaleData from "../../assets/item_sale.json"
 import equipmentCraftData from "../../assets/equipment_craft.json"
 import { AssetCharacter, BattleQuest, BossCoinShopItems, BoxGacha, ClearRewards, ConfigValues, EquipmentCraftEntry, EquipmentDissolveEntry, EventItemShopIdMapItem, EventShopItems, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, Gachas, ItemSaleEntry, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopItem, ShopItems, ShopType, StoryQuest } from "./types";
+import { RawBoxGachaSettings } from "./types/box-gacha";
 
 /**
  * Gets a clear reward from its ID.
@@ -512,12 +514,16 @@ export function getBoxGachaSync(
     const boxes = (boxReward as RawBoxRewards)[idString]
     if (boxes === undefined) return null;
 
+    const boxSettings = (boxGachaBoxSettings as RawBoxGachaSettings)[idString]
+    if (boxSettings === undefined) return null;
+
     // build box gacha
     return {
         redeemItemId: redeemItemData.itemId,
         redeemItemCount: redeemItemData.count,
         boxes: boxes,
-        availableCounts: redeemItemData.availableCounts
+        availableCounts: redeemItemData.availableCounts,
+        boxSettings
     }
 }
 
