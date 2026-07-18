@@ -287,8 +287,25 @@ export function getCnReleaseGraphSnapshot(
         fullBase,
         supportedBases,
     }));
+    logReleaseGraphIssues(snapshot);
     releaseGraphCache = { key, stamp, snapshot };
     return snapshot;
+}
+
+
+// 2026-07-18 链重锚事故:issues 里早已有 "character release base is unreachable"
+// 却无任何告警面,停在中间版本的客户端静默收不到更新。graph 每次重建时把
+// issues 显著打到日志(缓存命中不重复刷)。
+export function logReleaseGraphIssues(snapshot: ReleaseGraphSnapshot): void {
+    if (snapshot.issues.length === 0) return;
+    console.error(
+        `[RELEASE-GRAPH] ${snapshot.issues.length} issue(s) in release graph; `
+        + `tail=${snapshot.tailVersion} fullBase=${snapshot.fullBase} — `
+        + "stranded clients may be told they are up to date",
+    );
+    for (const issue of snapshot.issues) {
+        console.error(`[RELEASE-GRAPH]   ${issue}`);
+    }
 }
 
 

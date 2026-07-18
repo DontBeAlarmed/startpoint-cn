@@ -7,6 +7,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs";
 import { getServerTime, getServerTimeForPlayer } from "./utils";
 import { restoreTimeOffset } from "./data/activeAccount";
 import { installAdminGuard, loadAdminAuthConfig } from "./lib/admin-auth";
+import { getCnReleaseGraphSnapshot } from "./lib/cn-asset-graph";
 
 import versionCheckPlugin from "./routes/cn/versionCheck";
 import leitingAuthPlugin from "./routes/cn/leitingAuth";
@@ -590,6 +591,18 @@ fastify.listen({ port, host }, (err, address) => {
     }
     console.log(`CN StarPoint listening on http://${host}:${port}`);
     console.log(`[admin-auth] mode=${adminAuthConfig.mode}; secure_cookie=${adminAuthConfig.cookieSecure}`);
+
+    // 启动即构建 release graph:issues 非空时 getCnReleaseGraphSnapshot 会显著告警,
+    // 不再等到第一个客户端请求才暴露(2026-07-18 链重锚事故毫无告警面)
+    try {
+        const releaseGraph = getCnReleaseGraphSnapshot();
+        console.log(
+            `[RELEASE-GRAPH] tail=${releaseGraph.tailVersion} `
+            + `edges=${releaseGraph.edges.length} issues=${releaseGraph.issues.length}`
+        );
+    } catch (error) {
+        console.error("[RELEASE-GRAPH] failed to build release graph snapshot at startup:", error);
+    }
 
     // Start multi battle TCP session server
     startSessionServer();
