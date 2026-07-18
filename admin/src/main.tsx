@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ConfigProvider, theme as antdTheme } from "antd"
 import zhCN from "antd/locale/zh_CN"
 import App from "./App"
+import "./styles.css"
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -27,16 +28,46 @@ function Root() {
     }, [])
 
     useEffect(() => {
+        document.documentElement.dataset.adminTheme = dark ? "dark" : "light"
         document.documentElement.style.colorScheme = dark ? "dark" : "light"
-        document.body.style.background = dark ? "#141414" : "#f5f5f5"
-        document.body.style.margin = "0"
     }, [dark])
 
     return (
         <QueryClientProvider client={queryClient}>
             <ConfigProvider
                 locale={zhCN}
-                theme={{ algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}
+                theme={{
+                    algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+                    token: {
+                        colorPrimary: dark ? "#62b397" : "#2f7a67",
+                        colorInfo: dark ? "#72afd0" : "#2d6f99",
+                        colorSuccess: dark ? "#81bb92" : "#43805d",
+                        colorWarning: dark ? "#dfb15c" : "#b27822",
+                        colorError: dark ? "#df776c" : "#b84a42",
+                        colorBgLayout: "transparent",
+                        colorBgContainer: dark ? "#20231d" : "#fffdf7",
+                        colorBorder: dark ? "#3b4035" : "#d8d0bf",
+                        colorText: dark ? "#f0eadb" : "#292621",
+                        colorTextSecondary: dark ? "#b6ad98" : "#6f6658",
+                        borderRadius: 6,
+                        borderRadiusLG: 8,
+                        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                    },
+                    components: {
+                        Button: {
+                            borderRadius: 6,
+                            controlHeight: 34,
+                        },
+                        Card: {
+                            borderRadiusLG: 8,
+                            headerFontSize: 15,
+                        },
+                        Table: {
+                            borderColor: dark ? "#3b4035" : "#d8d0bf",
+                            headerBg: dark ? "#262a22" : "#f7f1e4",
+                        },
+                    },
+                }}
             >
                 <BrowserRouter basename="/admin">
                     <App dark={dark} onToggleDark={() => setDark(d => !d)} />

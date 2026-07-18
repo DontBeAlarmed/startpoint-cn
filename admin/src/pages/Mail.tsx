@@ -1,7 +1,8 @@
 import { useState } from "react"
-import { Card, Form, Select, InputNumber, Input, Button, message, Alert, Typography, Radio, Modal, Descriptions, Table, Tag } from "antd"
+import { Card, Form, Select, InputNumber, Input, Button, message, Alert, Typography, Radio, Modal, Descriptions, Table, Tag, Space } from "antd"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiGet, apiPost } from "../api/client"
+import { AdminPage } from "../components/AdminPage"
 
 const { TextArea } = Input
 const { Text } = Typography
@@ -90,8 +91,13 @@ export default function Mail() {
     }
 
     return (
-        <div style={{ maxWidth: 640 }}>
-            <Card title="邮件群发">
+        <AdminPage
+            eyebrow="MAIL"
+            title="邮件群发"
+            description="按全体、账号或单个存档发送附件邮件。高风险发送动作会先展示目标和附件摘要。"
+        >
+        <Space direction="vertical" size="large" className="admin-stack">
+            <Card title="发送邮件" className="admin-form-panel">
                 <Alert type={targetMode === "all" ? "warning" : "info"} showIcon style={{ marginBottom: 16 }}
                     message={
                         targetMode === "all" ? `将向全体 ${totalSaves} 个存档发送同一封邮件`
@@ -100,7 +106,7 @@ export default function Mail() {
                     } />
                 <Form form={form} layout="vertical" onFinish={openConfirm} initialValues={{ number: 1, targetMode: "all" }}>
                     <Form.Item name="targetMode" label="发送对象">
-                        <Radio.Group>
+                        <Radio.Group optionType="button" buttonStyle="solid">
                             <Radio.Button value="all">全体存档</Radio.Button>
                             <Radio.Button value="account">指定账号</Radio.Button>
                             <Radio.Button value="player">指定存档</Radio.Button>
@@ -172,19 +178,22 @@ export default function Mail() {
                     </Form.Item>
 
                     <Form.Item>
-                        <Button type="primary" htmlType="submit">发送</Button>
-                        <Text type="secondary" style={{ marginLeft: 12 }}>发送后无法撤回，请确认附件 ID</Text>
+                        <Space wrap>
+                            <Button type="primary" htmlType="submit">发送</Button>
+                            <Text type="secondary">发送后无法撤回，请确认附件 ID</Text>
+                        </Space>
                     </Form.Item>
                 </Form>
             </Card>
 
-            <Card title="最近群发记录" size="small" style={{ marginTop: 16 }}>
+            <Card title="最近群发记录" size="small" className="admin-table-card">
                 <Table<MailRecord & { key: number }>
                     rowKey="key"
                     size="small"
                     pagination={false}
                     dataSource={history.map((h, i) => ({ ...h, key: i }))}
                     locale={{ emptyText: "暂无记录" }}
+                    scroll={{ x: "max-content" }}
                     columns={[
                         { title: "时间", dataIndex: "time", width: 160 },
                         { title: "对象", dataIndex: "target" },
@@ -196,6 +205,7 @@ export default function Mail() {
                     ]}
                 />
             </Card>
+        </Space>
 
             <Modal
                 open={!!confirm}
@@ -226,6 +236,6 @@ export default function Mail() {
                     </>
                 )}
             </Modal>
-        </div>
+        </AdminPage>
     )
 }

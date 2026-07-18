@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import type { Dayjs } from "dayjs"
 import { apiGet, apiUpload, apiDelete } from "../api/client"
+import { AdminPage } from "../components/AdminPage"
 
 interface ServerTime {
     servertime: number
@@ -89,124 +90,132 @@ export default function Dashboard() {
     })
 
     return (
-        <Space direction="vertical" size="large" style={{ width: "100%" }}>
+        <AdminPage
+            eyebrow="OPERATIONS"
+            title="服务器总览"
+            description="集中查看账号、存档、默认模板与服务器时间。像素风只作为识别层，不影响高频管理操作。"
+            actions={
+                <Button
+                    icon={<ReloadOutlined />}
+                    loading={accountsFetching}
+                    onClick={() => qc.invalidateQueries({ queryKey: ["accounts"] })}
+                >
+                    刷新概览
+                </Button>
+            }
+        >
+        <Space direction="vertical" size="large" className="admin-stack">
             <Alert
                 type="info"
                 showIcon
-                message="新版管理后台（开发中）"
-                description="旧版页面仍在 / 正常运行，功能迁移完成前两者并存。"
+                message="新版 React 管理后台"
+                description="当前阶段优先统一应用壳、视觉系统和响应式体验；旧后台页面保持冻结。"
             />
-            <Card
-                title="概览统计"
-                style={{ maxWidth: 720 }}
-                extra={
-                    <Button
-                        type="text"
-                        icon={<ReloadOutlined />}
-                        loading={accountsFetching}
-                        onClick={() => qc.invalidateQueries({ queryKey: ["accounts"] })}
-                    >
-                        刷新
-                    </Button>
-                }
-            >
-                {accountsError ? (
-                    <Alert
-                        type="error"
-                        showIcon
-                        message="概览数据加载失败"
-                        description="接口 /api/server/accounts 不可用。"
-                    />
-                ) : (
-                    <Row gutter={[16, 16]}>
-                        <Col xs={12} sm={8}>
-                            <Statistic title="账号总数" value={accountCount} loading={accountsLoading} />
-                        </Col>
-                        <Col xs={12} sm={8}>
-                            <Statistic title="存档总数（玩家）" value={saveCount} loading={accountsLoading} />
-                        </Col>
-                        <Col xs={12} sm={8}>
-                            <Statistic title="平均每账号存档" value={avgSaves} precision={1} loading={accountsLoading} />
-                        </Col>
-                    </Row>
-                )}
-                <Divider style={{ margin: "16px 0" }} />
-                <Space wrap>
-                    <Button icon={<TeamOutlined />} onClick={() => navigate("/accounts")}>账号 / 存档</Button>
-                    <Button icon={<MailOutlined />} onClick={() => navigate("/mail")}>邮件群发</Button>
-                    <Button icon={<ExperimentOutlined />} onClick={() => navigate("/seeds")}>种子管理</Button>
-                </Space>
-            </Card>
-            <Card title="默认存档" style={{ maxWidth: 720 }}>
-                <Space direction="vertical" style={{ width: "100%" }}>
-                    <Typography.Text type="secondary">
-                        上传一份存档快照（玩家详情页「导出存档」得到的 JSON）。之后任意账户「新建存档」时，将用它替换空存档。
-                    </Typography.Text>
-                    {defSave?.exists ? (
+            <div className="admin-card-grid">
+                <Card title="概览统计">
+                    {accountsError ? (
+                        <Alert
+                            type="error"
+                            showIcon
+                            message="概览数据加载失败"
+                            description="接口 /api/server/accounts 不可用。"
+                        />
+                    ) : (
+                        <Row gutter={[16, 16]}>
+                            <Col xs={12} sm={8}>
+                                <Statistic title="账号总数" value={accountCount} loading={accountsLoading} />
+                            </Col>
+                            <Col xs={12} sm={8}>
+                                <Statistic title="存档总数（玩家）" value={saveCount} loading={accountsLoading} />
+                            </Col>
+                            <Col xs={24} sm={8}>
+                                <Statistic title="平均每账号存档" value={avgSaves} precision={1} loading={accountsLoading} />
+                            </Col>
+                        </Row>
+                    )}
+                    <Divider style={{ margin: "16px 0" }} />
+                    <Space wrap>
+                        <Button icon={<TeamOutlined />} onClick={() => navigate("/accounts")}>账号 / 存档</Button>
+                        <Button icon={<MailOutlined />} onClick={() => navigate("/mail")}>邮件群发</Button>
+                        <Button icon={<ExperimentOutlined />} onClick={() => navigate("/seeds")}>种子管理</Button>
+                    </Space>
+                </Card>
+
+                <Card title="默认存档">
+                    <Space direction="vertical" className="admin-stack">
+                        <Typography.Text type="secondary">
+                            上传玩家详情页「导出存档」得到的 JSON。之后任意账户「新建存档」时，将用它替换空存档。
+                        </Typography.Text>
+                        {defSave?.exists ? (
+                            <Space wrap>
+                                <Tag color="green">已设置</Tag>
+                                <Typography.Text>模板玩家：{defSave.playerName || "-"}</Typography.Text>
+                                {defSave.exportedAt && (
+                                    <Typography.Text type="secondary">
+                                        导出于 {new Date(defSave.exportedAt).toLocaleString("zh-CN")}
+                                    </Typography.Text>
+                                )}
+                            </Space>
+                        ) : (
+                            <Tag>未设置（新建存档为空档）</Tag>
+                        )}
                         <Space wrap>
-                            <Tag color="green">已设置</Tag>
-                            <Typography.Text>模板玩家：{defSave.playerName || "-"}</Typography.Text>
-                            {defSave.exportedAt && (
-                                <Typography.Text type="secondary">
-                                    导出于 {new Date(defSave.exportedAt).toLocaleString("zh-CN")}
-                                </Typography.Text>
+                            <Upload
+                                showUploadList={false}
+                                accept=".json"
+                                beforeUpload={(file) => { uploadDefault.mutate(file as File); return false }}
+                            >
+                                <Button icon={<UploadOutlined />} loading={uploadDefault.isPending}>
+                                    {defSave?.exists ? "替换默认存档" : "上传默认存档"}
+                                </Button>
+                            </Upload>
+                            {defSave?.exists && (
+                                <Popconfirm
+                                    title="清除默认存档？之后新建存档将为空档。"
+                                    onConfirm={() => clearDefault.mutate()}
+                                    okText="确认" cancelText="取消" okButtonProps={{ danger: true }}
+                                >
+                                    <Button danger icon={<DeleteOutlined />} loading={clearDefault.isPending}>清除</Button>
+                                </Popconfirm>
                             )}
                         </Space>
-                    ) : (
-                        <Tag>未设置（新建存档为空档）</Tag>
-                    )}
-                    <Space wrap>
-                        <Upload
-                            showUploadList={false}
-                            accept=".json"
-                            beforeUpload={(file) => { uploadDefault.mutate(file as File); return false }}
-                        >
-                            <Button icon={<UploadOutlined />} loading={uploadDefault.isPending}>
-                                {defSave?.exists ? "替换默认存档" : "上传默认存档"}
+                    </Space>
+                </Card>
+            </div>
+
+            <div className="admin-card-grid">
+                <Card title="服务器状态">
+                    <Statistic
+                        title="服务器时间"
+                        value={timeText}
+                        suffix={data?.isCustom ? "（自定义）" : undefined}
+                    />
+                </Card>
+                <Card title="时间控制">
+                    <Space direction="vertical" className="admin-stack">
+                        <Space wrap>
+                            <DatePicker
+                                showTime
+                                value={picked}
+                                onChange={setPicked}
+                                placeholder="选择服务器时间 (UTC)"
+                                format="YYYY-MM-DD HH:mm:ss"
+                            />
+                            <Button type="primary" disabled={!picked} loading={setTime.isPending}
+                                onClick={() => picked && setTime.mutate(picked)}>
+                                设置时间
                             </Button>
-                        </Upload>
-                        {defSave?.exists && (
-                            <Popconfirm
-                                title="清除默认存档？之后新建存档将为空档。"
-                                onConfirm={() => clearDefault.mutate()}
-                                okText="确认" cancelText="取消" okButtonProps={{ danger: true }}
-                            >
-                                <Button danger icon={<DeleteOutlined />} loading={clearDefault.isPending}>清除</Button>
-                            </Popconfirm>
-                        )}
+                            <Button loading={resetTime.isPending} onClick={() => resetTime.mutate()}>
+                                重置为系统时间
+                            </Button>
+                        </Space>
+                        <Typography.Text type="secondary">
+                            所选时间按 UTC 解释；重置后跟随真实系统时间。
+                        </Typography.Text>
                     </Space>
-                </Space>
-            </Card>
-            <Card title="服务器状态" style={{ maxWidth: 520 }}>
-                <Statistic
-                    title="服务器时间"
-                    value={timeText}
-                    suffix={data?.isCustom ? "（自定义）" : undefined}
-                />
-            </Card>
-            <Card title="时间控制" style={{ maxWidth: 520 }}>
-                <Space direction="vertical" style={{ width: "100%" }}>
-                    <Space wrap>
-                        <DatePicker
-                            showTime
-                            value={picked}
-                            onChange={setPicked}
-                            placeholder="选择服务器时间 (UTC)"
-                            format="YYYY-MM-DD HH:mm:ss"
-                        />
-                        <Button type="primary" disabled={!picked} loading={setTime.isPending}
-                            onClick={() => picked && setTime.mutate(picked)}>
-                            设置时间
-                        </Button>
-                        <Button loading={resetTime.isPending} onClick={() => resetTime.mutate()}>
-                            重置为系统时间
-                        </Button>
-                    </Space>
-                    <Typography.Text type="secondary">
-                        所选时间按 UTC 解释；重置后跟随真实系统时间。
-                    </Typography.Text>
-                </Space>
-            </Card>
+                </Card>
+            </div>
         </Space>
+        </AdminPage>
     )
 }

@@ -4,6 +4,7 @@ import { PlusOutlined, CopyOutlined, DeleteOutlined, SwapOutlined, EditOutlined 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import { apiGet, apiPost } from "../api/client"
+import { AdminPage } from "../components/AdminPage"
 
 interface AccountRow {
     id: number
@@ -86,36 +87,36 @@ export default function Accounts() {
     })
 
     const accountColumns = [
-        { title: "ID", dataIndex: "id", width: 80 },
-        { title: "存档数", dataIndex: "saveCount", width: 80 },
+        { title: "ID", dataIndex: "id", width: 64 },
+        { title: "存档数", dataIndex: "saveCount", width: 80, responsive: ["sm"] as any },
         {
-            title: "生效存档", width: 160,
+            title: "生效存档", width: 160, responsive: ["md"] as any,
             render: (_: unknown, row: AccountRow) => row.defaultPlayerName ?? <Tag>无</Tag>,
         },
         {
-            title: "操作", width: 280,
+            title: "操作", width: 250,
             render: (_: unknown, row: AccountRow) => (
-                <Space size="small">
+                <div className="admin-action-row">
                     <Button size="small" type="primary" onClick={() => setSelectedAccountId(row.id)}>查看存档</Button>
                     <Button size="small" icon={<PlusOutlined />} onClick={() => newSave.mutate(row.id)}>新建存档</Button>
                     <Popconfirm title={`删除账号 ${row.id} 及所有存档？`} onConfirm={() => deleteAccount.mutate(row.id)} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
                         <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
                     </Popconfirm>
-                </Space>
+                </div>
             ),
         },
     ]
 
     const saveColumns = [
-        { title: "ID", dataIndex: "id", width: 60 },
+        { title: "ID", dataIndex: "id", width: 60, responsive: ["sm"] as any },
         {
-            title: "名字", width: 180,
+            title: "名字", width: 150,
             render: (_: unknown, row: PlayerBrief) => renameId === row.id ? (
-                <Space.Compact>
+                <div className="admin-edit-compact">
                     <Input size="small" value={renameName} onChange={e => setRenameName(e.target.value)} onPressEnter={() => renameSave.mutate({ playerId: row.id, name: renameName })} style={{ width: 100 }} />
                     <Button size="small" type="primary" onClick={() => renameSave.mutate({ playerId: row.id, name: renameName })}>确定</Button>
                     <Button size="small" onClick={() => setRenameId(null)}>取消</Button>
-                </Space.Compact>
+                </div>
             ) : (
                 <Space>
                     <a onClick={() => navigate(`/players/${row.id}`)}>{row.name}</a>
@@ -123,16 +124,16 @@ export default function Accounts() {
                 </Space>
             ),
         },
-        { title: "等级", width: 80, render: (_: unknown, row: PlayerBrief) => `Lv.${row.degreeId || 1}` },
+        { title: "等级", width: 80, responsive: ["md"] as any, render: (_: unknown, row: PlayerBrief) => `Lv.${row.degreeId || 1}` },
         {
-            title: "状态", width: 80,
+            title: "状态", width: 80, responsive: ["sm"] as any,
             render: (_: unknown, row: PlayerBrief) =>
                 selectedAccount?.defaultPlayerId === row.id ? <Tag color="green">生效中</Tag> : null,
         },
         {
-            title: "操作", width: 320,
+            title: "操作", width: 210,
             render: (_: unknown, row: PlayerBrief) => (
-                <Space size="small">
+                <div className="admin-action-row">
                     <Button size="small" icon={<SwapOutlined />} disabled={selectedAccount?.defaultPlayerId === row.id} onClick={() => activateSave.mutate(row.id)}>
                         切换
                     </Button>
@@ -142,14 +143,19 @@ export default function Accounts() {
                     <Popconfirm title={`删除存档 ${row.id}？`} onConfirm={() => deleteSave.mutate(row.id)} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
                         <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
                     </Popconfirm>
-                </Space>
+                </div>
             ),
         },
     ]
 
     return (
-        <Space direction="vertical" size="large" style={{ width: "100%" }}>
-            <Card title="账号管理">
+        <AdminPage
+            eyebrow="SAVES"
+            title="账号 / 存档"
+            description="查看账号与玩家存档关系，执行新建、复制、切换和删除等高频维护动作。"
+        >
+        <Space direction="vertical" size="large" className="admin-stack">
+            <Card title="账号管理" className="admin-table-card">
                 <Table
                     rowKey="id"
                     columns={accountColumns}
@@ -157,11 +163,12 @@ export default function Accounts() {
                     loading={isLoading}
                     pagination={false}
                     size="small"
+                    scroll={{ x: "max-content" }}
                 />
             </Card>
 
             {selectedAccountId !== null && (
-                <Card title={`账号 ${selectedAccountId} 的存档`} extra={<Button size="small" onClick={() => setSelectedAccountId(null)}>关闭</Button>}>
+                <Card title={`账号 ${selectedAccountId} 的存档`} className="admin-table-card" extra={<Button size="small" onClick={() => setSelectedAccountId(null)}>关闭</Button>}>
                     <Table
                         rowKey="id"
                         columns={saveColumns}
@@ -169,31 +176,34 @@ export default function Accounts() {
                         pagination={false}
                         size="small"
                         locale={{ emptyText: "暂无存档" }}
+                        scroll={{ x: "max-content" }}
                     />
                 </Card>
             )}
 
             <Divider />
 
-            <Card title="全部玩家">
+            <Card title="全部玩家" className="admin-table-card">
                 <Table
                     rowKey="id"
                     columns={[
-                        { title: "ID", dataIndex: "id", width: 80 },
+                        { title: "ID", dataIndex: "id", width: 70 },
                         {
                             title: "名字", dataIndex: "name",
                             render: (name: string, row: PlayerBrief) => <a onClick={() => navigate(`/players/${row.id}`)}>{name}</a>,
                         },
                         {
-                            title: "最后登录", dataIndex: "lastLoginTime",
+                            title: "最后登录", dataIndex: "lastLoginTime", responsive: ["sm"] as any,
                             render: (t: string) => new Date(t).toLocaleDateString(),
                         },
                     ]}
                     dataSource={allPlayers}
                     pagination={{ pageSize: 20, showSizeChanger: true }}
                     size="small"
+                    scroll={{ x: "max-content" }}
                 />
             </Card>
         </Space>
+        </AdminPage>
     )
 }
