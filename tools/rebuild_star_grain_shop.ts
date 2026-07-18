@@ -43,7 +43,7 @@ export function parseRewardSlots(productId: string, raw: string[]): ShopItem["re
         const type = parseInteger(typeValue);
         const id = parseInteger(idValue);
         const count = parseInteger(countValue);
-        const isValid = type !== null && type >= 0
+        const isValid = type !== null && type >= 0 && type <= 4
             && id !== null && id > 0
             && count !== null && count > 0;
         if (!isValid) {
@@ -95,7 +95,6 @@ function main() {
     let cdnCount = 0;
     let addedCount = 0;
     let updatedCount = 0;
-    const uncheckedExisting = new Set(Object.keys(existingData));
 
     for (const [key, arr] of Object.entries(cdnRaw)) {
         if (key === "9999") continue;
@@ -127,7 +126,6 @@ function main() {
             } else {
                 console.log(`  ${key}: unchanged`);
             }
-            uncheckedExisting.delete(key);
         } else {
             // New item from CDN
             newData[key] = cdnItem;
@@ -136,13 +134,9 @@ function main() {
         }
     }
 
-    // Add orphaned server items that don't exist in CDN
-    let orphanCount = 0;
-    for (const key of uncheckedExisting) {
-        newData[key] = existingData[key];
-        orphanCount++;
-        console.log(`  ${key}: ORPHAN (not in CDN, kept as-is)`);
-    }
+    const droppedCount = Object.keys(existingData)
+        .filter((key) => newData[key] === undefined)
+        .length;
 
     // Stats
     const totalCount = Object.keys(newData).length;
@@ -152,7 +146,7 @@ function main() {
     console.log(`New items: ${totalCount}`);
     console.log(`  Updated: ${updatedCount}`);
     console.log(`  Added (from CDN): ${addedCount}`);
-    console.log(`  Orphans (kept): ${orphanCount}`);
+    console.log(`  Dropped (no valid CN source): ${droppedCount}`);
 
     fs.writeFileSync(OUTPUT, JSON.stringify(newData, null, 2));
     console.log(`\nWritten: ${OUTPUT}`);
