@@ -62,6 +62,8 @@ const routes = async (fastify: FastifyInstance) => {
         const activePatchSummary = countZipFiles(path.join(root, "assets", "asset-patch", "active"))
         const patchManifest = getPatchManifest()
         const enabledPatches = patchManifest.patches.filter(p => p.enabled)
+        const detectedVersion = detectCDNVersion()
+        const effectiveVersion = getEffectiveVersion()
 
         reply.status(200).send({
             server: {
@@ -75,14 +77,42 @@ const routes = async (fastify: FastifyInstance) => {
             },
             cdn: {
                 baseUrl: getCdnBaseUrl(),
+                baseline: {
+                    mode: "fixed-cn-final",
+                    source: "国服最终 CDN",
+                    fullVersion: FULL_BASE,
+                    cnFinalVersion: patchManifest.cdn_version,
+                    detectedArchiveVersion: detectedVersion,
+                    manifestVersion: patchManifest.cdn_version,
+                    pinned: true,
+                    dataScope: ["items", "characters", "events", "quests", "shops"],
+                },
+                extension: {
+                    mode: "reserved-patch-version-layer",
+                    status: enabledPatches.length > 0 ? "manifest-enabled" : "reserved",
+                    runtimeEnabled: enabledPatches.length > 0,
+                    effectiveVersionPreview: effectiveVersion,
+                    enabledPatchCount: enabledPatches.length,
+                    totalPatchCount: patchManifest.patches.length,
+                    activePatchArchiveCount: activePatchSummary.count,
+                    note: "Reserved for future custom characters and event patch imports.",
+                },
+                storage: {
+                    configuredDir: cdnDir,
+                    directoryPresent: archiveSummary.exists,
+                    archiveCount: archiveSummary.count,
+                    archiveBytes: archiveSummary.totalBytes,
+                    latestArchiveMtime: archiveSummary.latestMtime,
+                },
+                // Backward-compatible flat fields for temporary admin scripts and older SPA builds.
                 configuredDir: cdnDir,
                 directoryPresent: archiveSummary.exists,
                 archiveCount: archiveSummary.count,
                 archiveBytes: archiveSummary.totalBytes,
                 latestArchiveMtime: archiveSummary.latestMtime,
                 fullVersion: FULL_BASE,
-                detectedVersion: detectCDNVersion(),
-                effectiveVersion: getEffectiveVersion(),
+                detectedVersion,
+                effectiveVersion,
                 manifestVersion: patchManifest.cdn_version,
                 enabledPatchCount: enabledPatches.length,
                 totalPatchCount: patchManifest.patches.length,
