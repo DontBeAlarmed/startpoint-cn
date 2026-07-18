@@ -1000,6 +1000,7 @@ class AtomicReleasePublisher:
         *,
         server_running: Callable[[], bool],
         fail_after: str | None = None,
+        prepare_live_guard: Callable[[], Callable[[], None] | None] | None = None,
     ) -> ReleaseResult:
         self._validate_payload(payload, check_live=False)
         with _release_lock(self.lock_path):
@@ -1023,6 +1024,8 @@ class AtomicReleasePublisher:
                 )
                 relative = f"{ROOT_DIRS[archive.root]}/{filename}"
                 target = self.cdn_root / ROOT_DIRS[archive.root] / filename
+                if target.exists():
+                    raise ReleaseError(f"final archive already exists: {target}")
                 final_archives.append((archive, target, relative))
                 archive_records.append({
                     "root": archive.root,
@@ -1077,6 +1080,9 @@ class AtomicReleasePublisher:
             committed = False
             promoted_files: list[ReleaseFile] = []
             promoted_archives: list[Path] = []
+            guard_rollback = (
+                prepare_live_guard() if prepare_live_guard is not None else None
+            )
             try:
                 _atomic_write(journal, _canonical(journal_value))
                 self._checkpoint(fail_after, "after_journal_fsync")
@@ -1109,8 +1115,6 @@ class AtomicReleasePublisher:
                     self._checkpoint(fail_after, f"after_live_{index}")
                 self._checkpoint(fail_after, "after_live_promotions")
                 for index, (archive, target, _relative) in enumerate(final_archives):
-                    if target.exists():
-                        raise ReleaseError(f"final archive already exists: {target}")
                     def mark_archive_replaced(target: Path = target) -> None:
                         promoted_archives.append(target)
 
@@ -1175,6 +1179,13 @@ class AtomicReleasePublisher:
                         target.unlink(missing_ok=True)
                     except Exception as cleanup_exc:
                         cleanup_errors.append(f"remove {target}: {cleanup_exc}")
+                if guard_rollback is not None:
+                    try:
+                        guard_rollback()
+                    except Exception as cleanup_exc:
+                        cleanup_errors.append(
+                            f"rollback prepared live guard: {cleanup_exc}"
+                        )
                 try:
                     journal.unlink(missing_ok=True)
                 except Exception as cleanup_exc:
@@ -1548,7 +1559,6 @@ def publish_package(
     # 缺口自动补 charbridge 副本,补不齐则拒绝发布(2026-07-18 链重锚事故)
     import wf_release_guard
 
-    wf_release_guard.ensure_charpkg_history_bridged(cdn_root, repo_root)
     staging_root = repo_root / "work" / "character_releases" / "staging"
     snapshot_root = repo_root / "work" / "character_releases" / "snapshots"
     if mode == "production":
@@ -1578,12 +1588,44 @@ def publish_package(
             staging_root=staging_root,
             snapshot_root=snapshot_root,
         )
+
+    def prepare_live_guard() -> Callable[[], None] | None:
+        report = wf_release_guard.ensure_charpkg_history_bridged(
+            cdn_root, repo_root, assume_lock_held=True
+        )
+        receipts = tuple(report["bridge_receipts"])
+        if not receipts:
+            return None
+        return lambda: wf_release_guard.rollback_charpkg_bridges(
+            receipts, cdn_root, assume_lock_held=True
+        )
+
     try:
         result = AtomicReleasePublisher(
             cdn_root, canonical_base_version=canonical_base
-        ).publish(prepared.payload, server_running=lambda: _server_running(repo_root))
-    finally:
+        ).publish(
+            prepared.payload,
+            server_running=lambda: _server_running(repo_root),
+            prepare_live_guard=prepare_live_guard,
+        )
+    except Exception as exc:
+        try:
+            close_prepared_runtime_release(prepared, discard_staging=True)
+        except Exception as cleanup_exc:
+            detail = f"{exc}; prepared release cleanup failed: {cleanup_exc}"
+            if isinstance(exc, CommittedReleaseError):
+                raise CommittedReleaseError(detail) from exc
+            raise ReleaseError(detail) from exc
+        raise
+    try:
         close_prepared_runtime_release(prepared, discard_staging=True)
+    except Exception as cleanup_exc:
+        if result.committed:
+            raise CommittedReleaseError(
+                "release committed; prepared release cleanup only: "
+                + str(cleanup_exc)
+            ) from cleanup_exc
+        raise
     return replace(result, snapshot_dir=prepared.snapshot.snapshot_dir)
 
 

@@ -11,11 +11,14 @@ zip,charpkg 边只来自 active.json),停在中间版本的真实客户端被告
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
+import tempfile
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
+from typing import Iterable, Iterator
 
 import wf_release
 
@@ -23,6 +26,15 @@ import wf_release
 FULL_BASE_VERSION = "1.4.0"
 CHARPKG_MARK = "-charpkg-"
 CHARBRIDGE_MARK = "-charbridge-"
+
+
+@dataclass(frozen=True)
+class BridgeReceipt:
+    path: Path
+    device: int
+    inode: int
+    size: int
+    sha256: str
 
 
 def _version_key(version: str) -> tuple[int, ...]:
@@ -175,7 +187,125 @@ def charpkg_strand_report(cdn_root: Path, repo_root: Path) -> dict:
     }
 
 
-def ensure_charpkg_history_bridged(cdn_root: Path, repo_root: Path) -> dict:
+def _bridge_receipt(path: Path) -> BridgeReceipt:
+    stat = path.stat()
+    return BridgeReceipt(
+        path=path,
+        device=stat.st_dev,
+        inode=stat.st_ino,
+        size=stat.st_size,
+        sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+    )
+
+
+def _receipt_matches(receipt: BridgeReceipt) -> bool:
+    try:
+        stat = receipt.path.stat()
+        if (
+            stat.st_dev != receipt.device
+            or stat.st_ino != receipt.inode
+            or stat.st_size != receipt.size
+        ):
+            return False
+        return hashlib.sha256(receipt.path.read_bytes()).hexdigest() == receipt.sha256
+    except FileNotFoundError:
+        return False
+
+
+def _rollback_charpkg_bridges(receipts: Iterable[BridgeReceipt]) -> None:
+    errors: list[str] = []
+    for receipt in reversed(tuple(receipts)):
+        try:
+            matches = _receipt_matches(receipt)
+        except OSError as exc:
+            errors.append(f"verify {receipt.path}: {exc}")
+            continue
+        if not matches:
+            continue
+        try:
+            receipt.path.unlink(missing_ok=True)
+        except OSError as exc:
+            errors.append(f"remove {receipt.path}: {exc}")
+    if errors:
+        raise wf_release.ReleaseError(
+            "charbridge rollback failed: " + "; ".join(errors)
+        )
+
+
+def rollback_charpkg_bridges(
+    receipts: Iterable[BridgeReceipt],
+    cdn_root: Path,
+    *,
+    assume_lock_held: bool = False,
+) -> None:
+    """Remove only byte-identical bridges created by one gate invocation."""
+    if assume_lock_held:
+        _rollback_charpkg_bridges(receipts)
+        return
+    lock_path = Path(cdn_root) / ".character-release.lock"
+    with wf_release._release_lock(lock_path):
+        _rollback_charpkg_bridges(receipts)
+
+
+def _receipt_for_target(source: Path, target: Path) -> BridgeReceipt:
+    source_receipt = _bridge_receipt(source)
+    return BridgeReceipt(
+        path=target,
+        device=source_receipt.device,
+        inode=source_receipt.inode,
+        size=source_receipt.size,
+        sha256=source_receipt.sha256,
+    )
+
+
+def _validate_created_bridge(receipt: BridgeReceipt) -> BridgeReceipt:
+    try:
+        if not _receipt_matches(receipt):
+            raise wf_release.ReleaseError(
+                f"created charbridge identity changed before validation: {receipt.path}"
+            )
+        return receipt
+    except Exception as exc:
+        try:
+            _rollback_charpkg_bridges((receipt,))
+        except wf_release.ReleaseError as rollback_exc:
+            raise wf_release.ReleaseError(
+                f"{exc}; rollback errors: {rollback_exc}"
+            ) from exc
+        raise
+
+
+def _create_bridge_atomic(source: Path, target: Path) -> BridgeReceipt | None:
+    """Create one bridge without exposing a partial fallback copy."""
+    hardlink_receipt = _receipt_for_target(source, target)
+    try:
+        os.link(source, target)
+    except FileExistsError:
+        return None
+    except OSError:
+        pass
+    else:
+        return _validate_created_bridge(hardlink_receipt)
+
+    descriptor, raw_temp = tempfile.mkstemp(
+        dir=target.parent,
+        prefix=f".{target.name}.",
+        suffix=".tmp",
+    )
+    os.close(descriptor)
+    temp_path = Path(raw_temp)
+    try:
+        shutil.copy2(source, temp_path)
+        if target.exists():
+            return None
+        fallback_receipt = _receipt_for_target(temp_path, target)
+        os.replace(temp_path, target)
+        return _validate_created_bridge(fallback_receipt)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+def _ensure_charpkg_history_bridged(cdn_root: Path, repo_root: Path) -> dict:
     """重锚硬门禁:搁浅的孤儿 charpkg 归档自动补 charbridge 副本,补不齐则拒绝。
 
     charbridge 副本优先硬链接(零空间成本),文件系统不支持时退化为普通复制。
@@ -184,24 +314,51 @@ def ensure_charpkg_history_bridged(cdn_root: Path, repo_root: Path) -> dict:
     report = charpkg_strand_report(cdn_root, repo_root)
     if not report["stranded_archives"]:
         report["bridged_archives"] = []
+        report["bridge_receipts"] = []
         return report
     bridged: list[str] = []
-    for raw in report["stranded_archives"]:
-        source = Path(raw)
-        target = source.with_name(source.name.replace(CHARPKG_MARK, CHARBRIDGE_MARK, 1))
-        if target.exists():
-            continue
+    receipts: list[BridgeReceipt] = []
+    try:
+        for raw in report["stranded_archives"]:
+            source = Path(raw)
+            target = source.with_name(
+                source.name.replace(CHARPKG_MARK, CHARBRIDGE_MARK, 1)
+            )
+            if target.exists():
+                continue
+            receipt = _create_bridge_atomic(source, target)
+            if receipt is not None:
+                bridged.append(str(target))
+                receipts.append(receipt)
+        report = charpkg_strand_report(cdn_root, repo_root)
+        report["bridged_archives"] = bridged
+        report["bridge_receipts"] = receipts
+        if report["stranded_archives"]:
+            raise wf_release.ReleaseError(
+                "charpkg history is stranded even after charbridge copies: "
+                + ", ".join(report["stranded_edges"])
+                + f" cannot reach tail {report['tail']}"
+            )
+        return report
+    except Exception as exc:
         try:
-            os.link(source, target)
-        except OSError:
-            shutil.copy2(source, target)
-        bridged.append(str(target))
-    report = charpkg_strand_report(cdn_root, repo_root)
-    report["bridged_archives"] = bridged
-    if report["stranded_archives"]:
-        raise wf_release.ReleaseError(
-            "charpkg history is stranded even after charbridge copies: "
-            + ", ".join(report["stranded_edges"])
-            + f" cannot reach tail {report['tail']}"
-        )
-    return report
+            _rollback_charpkg_bridges(receipts)
+        except wf_release.ReleaseError as rollback_exc:
+            raise wf_release.ReleaseError(
+                f"{exc}; rollback errors: {rollback_exc}"
+            ) from exc
+        raise
+
+
+def ensure_charpkg_history_bridged(
+    cdn_root: Path,
+    repo_root: Path,
+    *,
+    assume_lock_held: bool = False,
+) -> dict:
+    """Run the strand repair under the shared character-release lock."""
+    cdn_root = Path(cdn_root)
+    if assume_lock_held:
+        return _ensure_charpkg_history_bridged(cdn_root, repo_root)
+    with wf_release._release_lock(cdn_root / ".character-release.lock"):
+        return _ensure_charpkg_history_bridged(cdn_root, repo_root)
