@@ -1,7 +1,7 @@
 # 商店系统修复文档
 > 状态: 已修复   关键文件: src/data/domains/*, assets/general_shop.json   相关端点: /shop/buy, /shop/get_sales_list
 
-本次修复解决了三个独立但相关的商店问题。
+本文记录四个独立但相关的商店问题及其维护方式。
 
 ---
 
@@ -229,6 +229,40 @@ value = [[
 
 ---
 
+## 四、星之粒属性培育素材箱奖励缺失
+
+### 错误现象与语义
+
+星之粒兑换所商品 `100017～100022` 购买后只发放第一项 `10001×1`，对应属性的五项培育素材没有到账。
+
+这些商品不是购买后进入背包、再通过道具接口开启的箱子，而是购买时立即展开的组合奖励。服务端继续使用现有 `/shop/buy` 多奖励发放链路，不创建 ID 为 `100017～100022` 的背包道具，也不接入 `/item/use_item`。
+
+### 主数据来源与生成规则
+
+重建工具 `tools/rebuild_star_grain_shop.ts` 以 `wf-assets-cn/orderedmap/shop/star_grain_shop.json` 为奖励的唯一来源。每个商品按以下六组固定字段解析 `type/id/count`：
+
+```
+25～27、28～30、31～33、34～36、37～39、40～42
+```
+
+- 完整空槽会被跳过。
+- 非空槽的 `type`、`id`、`count` 必须是合法整数，其中 `type >= 0`、`id > 0`、`count > 0`。
+- 非法槽位会终止重建，错误同时标明商品 ID 与槽位起点，避免生成部分或静默降级的奖励。
+- 旧资产不再保留或覆盖组合奖励；现有 `availableFrom`、`availableUntil` 人工日期覆盖语义保持不变。
+
+重建后 `100017～100022` 均为六项奖励。`100017` 的完整内容为 `10001×1、1×175、2×140、3×75、4×25、99×25`，其余五种属性按 CN 主数据映射对应素材 ID。`100038～100051` 等已有组合奖励同样从六槽主数据生成，专项测试负责防止回归。
+
+### 验证与维护
+
+```bash
+npx ts-node tools/rebuild_star_grain_shop.ts
+node tools/star_grain_material_pack.test.cjs
+```
+
+专项测试逐项比较 CN 六槽与服务端 `rewards`，并确认素材箱商品 ID 不会作为自身奖励进入背包。重建工具应可连续运行且第二次不产生资产变化。
+
+---
+
 ## 相关文件索引
 
 | 文件 | 用途 |
@@ -238,7 +272,10 @@ value = [[
 | `assets/boss_coin_shop.json` | Boss 币商店商品数据（50 类别，6132 条） |
 | `assets/boss_coin_shop_item_category_map.json` | Boss 币商品 → 类别映射 |
 | `assets/general_shop.json` | 通用商店商品数据 |
+| `assets/star_grain_shop.json` | 星之粒兑换所商品与组合奖励数据 |
 | `src/data/utils.ts` | 玩家数据序列化（含 mana_node 格式修复） |
 | `src/data/types.ts` | 数据类型定义 |
 | `tools/rebuild_boss_coin_shop.ts` | Boss 币商店数据重建工具 |
+| `tools/rebuild_star_grain_shop.ts` | 从 CN 主数据重建星之粒兑换所资产 |
+| `tools/star_grain_material_pack.test.cjs` | 素材箱及既有组合奖励一致性测试 |
 | `docs/shop_fixes.md` | 本文档 |
