@@ -93,7 +93,7 @@ export default function Mail() {
     return (
         <AdminPage
             eyebrow="MAIL"
-            title="邮件群发"
+            title="邮件"
             description="按全体、账号或单个存档发送附件邮件。高风险发送动作会先展示目标和附件摘要。"
         >
         <Space direction="vertical" size="large" className="admin-stack">

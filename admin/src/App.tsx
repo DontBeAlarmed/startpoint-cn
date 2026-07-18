@@ -3,6 +3,7 @@ import { Layout, Menu, Grid, Button, Drawer, Space } from "antd"
 import {
     Database,
     Gauge,
+    Clock3,
     Mail as MailIcon,
     Menu as MenuIcon,
     Moon,
@@ -16,21 +17,25 @@ import Accounts from "./pages/Accounts"
 import PlayerDetail from "./pages/PlayerDetail"
 import Mail from "./pages/Mail"
 import Seeds from "./pages/Seeds"
+import TimeControl from "./pages/TimeControl"
+import logoUrl from "./assets/logo.png"
 
 const { Sider, Content, Header } = Layout
 const { useBreakpoint } = Grid
 
 const menuItems = [
     { key: "/", icon: <Gauge size={18} />, label: "总览" },
+    { key: "/time", icon: <Clock3 size={18} />, label: "时间 / 千里眼" },
     { key: "/accounts", icon: <Users size={18} />, label: "账号 / 存档" },
-    { key: "/mail", icon: <MailIcon size={18} />, label: "邮件群发" },
+    { key: "/mail", icon: <MailIcon size={18} />, label: "邮件" },
     { key: "/seeds", icon: <Database size={18} />, label: "种子管理" },
 ]
 
 const pageTitles: Record<string, string> = {
     "/": "总览",
+    "/time": "时间 / 千里眼",
     "/accounts": "账号 / 存档",
-    "/mail": "邮件群发",
+    "/mail": "邮件",
     "/seeds": "种子管理",
 }
 
@@ -54,7 +59,9 @@ export default function App({ dark, onToggleDark }: AppProps) {
 
     const brand = (
         <div className="admin-brand">
-            <span className="admin-brand-mark" aria-hidden="true" />
+            <span className="admin-brand-mark">
+                <img src={logoUrl} alt="World Flipper 上游项目标识" />
+            </span>
             <span>
                 <span className="admin-brand-title">Starpoint CN</span>
                 <span className="admin-brand-subtitle">World Flipper Server</span>
@@ -103,6 +110,7 @@ export default function App({ dark, onToggleDark }: AppProps) {
                 <Content className="admin-content">
                     <Routes>
                         <Route path="/" element={<Dashboard />} />
+                        <Route path="/time" element={<TimeControl />} />
                         <Route path="/accounts" element={<Accounts />} />
                         <Route path="/players/:playerId" element={<PlayerDetail />} />
                         <Route path="/mail" element={<Mail />} />

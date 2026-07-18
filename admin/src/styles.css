@@ -83,25 +83,20 @@ html[data-admin-theme="dark"] body {
 }
 
 .admin-brand-mark {
-  position: relative;
+  display: grid;
+  place-items: center;
   width: 34px;
   height: 34px;
   flex: 0 0 auto;
   border: 2px solid var(--admin-text);
-  background:
-    linear-gradient(135deg, transparent 0 36%, var(--admin-accent) 37% 62%, transparent 63%),
-    var(--admin-primary);
+  background: #10100f;
   box-shadow: 3px 3px 0 var(--admin-border-strong);
 }
 
-.admin-brand-mark::after {
-  position: absolute;
-  right: 5px;
-  bottom: 5px;
-  width: 7px;
-  height: 7px;
-  content: "";
-  background: var(--admin-surface);
+.admin-brand-mark img {
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
 }
 
 .admin-brand-title {

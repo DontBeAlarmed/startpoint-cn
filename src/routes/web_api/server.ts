@@ -1,4 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { existsSync, readdirSync, statSync } from "fs";
+import path from "path";
 import { getServerTime, getServerDate, setServerTime, getTimeOffset } from "../../utils";
 import { deleteAccountSync, getAccountPlayersSync, getAllAccountsSync } from "../../data/domains/account"
 import { deletePlayerSync, getPlayerSync, insertDefaultPlayerSync, replacePlayerDataSync, updatePlayerSync } from "../../data/domains/player"
@@ -7,13 +9,87 @@ import { getPlayerCharactersSync } from "../../data/domains/character"
 import { getMergedPlayerDataSync, reviveMergedPlayerDates } from "../../data/utils";
 import { getActivePlayerId, setActivePlayerId, getSelectedAccountId, setSelectedAccountId, saveTimeOffset, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
 import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTemplate, getDefaultSaveMeta } from "../../data/defaultSave";
+import { detectCDNVersion, FULL_BASE, getEffectiveVersion, getPatchManifest } from "../../lib/version";
 import { wantsJson } from "./http";
 
 interface TimeQuery {
     time: string | undefined
 }
 
+function countZipFiles(dir: string): { exists: boolean; count: number; latestMtime: string | null; totalBytes: number } {
+    if (!existsSync(dir)) return { exists: false, count: 0, latestMtime: null, totalBytes: 0 }
+    let count = 0
+    let totalBytes = 0
+    let latest = 0
+    const stack = [dir]
+    while (stack.length) {
+        const current = stack.pop()!
+        for (const name of readdirSync(current)) {
+            const fp = path.join(current, name)
+            const st = statSync(fp)
+            if (st.isDirectory()) {
+                stack.push(fp)
+                continue
+            }
+            if (!name.endsWith(".zip")) continue
+            count += 1
+            totalBytes += st.size
+            latest = Math.max(latest, st.mtimeMs)
+        }
+    }
+    return {
+        exists: true,
+        count,
+        latestMtime: latest ? new Date(latest).toISOString() : null,
+        totalBytes,
+    }
+}
+
+function getCdnBaseUrl(): string {
+    const cdnHost = process.env.CN_LISTEN_HOST || "localhost"
+    const cdnPort = process.env.CN_LISTEN_PORT || "8001"
+    const cdnDisplayHost = cdnHost === "0.0.0.0" ? "localhost" : cdnHost
+    return process.env.CDN_BASE_URL || `http://${cdnDisplayHost}:${cdnPort}/patch/cn`
+}
+
 const routes = async (fastify: FastifyInstance) => {
+
+    fastify.get("/status", async (_request: FastifyRequest, reply: FastifyReply) => {
+        const root = process.cwd()
+        const cdnDir = process.env.CDN_DIR || ".cdn"
+        const cdnRoot = path.isAbsolute(cdnDir) ? path.join(cdnDir, "cn") : path.join(root, cdnDir, "cn")
+        const archiveSummary = countZipFiles(cdnRoot)
+        const activePatchSummary = countZipFiles(path.join(root, "assets", "asset-patch", "active"))
+        const patchManifest = getPatchManifest()
+        const enabledPatches = patchManifest.patches.filter(p => p.enabled)
+
+        reply.status(200).send({
+            server: {
+                uptimeSeconds: Math.floor(process.uptime()),
+                nodeVersion: process.version,
+                platform: `${process.platform}/${process.arch}`,
+                pid: process.pid,
+                memory: process.memoryUsage(),
+                listenHost: process.env.CN_LISTEN_HOST || "localhost",
+                listenPort: process.env.CN_LISTEN_PORT || "8001",
+            },
+            cdn: {
+                baseUrl: getCdnBaseUrl(),
+                configuredDir: cdnDir,
+                directoryPresent: archiveSummary.exists,
+                archiveCount: archiveSummary.count,
+                archiveBytes: archiveSummary.totalBytes,
+                latestArchiveMtime: archiveSummary.latestMtime,
+                fullVersion: FULL_BASE,
+                detectedVersion: detectCDNVersion(),
+                effectiveVersion: getEffectiveVersion(),
+                manifestVersion: patchManifest.cdn_version,
+                enabledPatchCount: enabledPatches.length,
+                totalPatchCount: patchManifest.patches.length,
+                activePatchArchiveCount: activePatchSummary.count,
+            },
+        })
+    })
 
     fastify.get("/currentTime", async (_request: FastifyRequest, reply: FastifyReply) => {
         const date = getServerDate()
