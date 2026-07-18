@@ -4,7 +4,9 @@
 This repair builder is intentionally isolated from wf_publish.py and the active
 CN store. It validates the pinned bridge archive and two official backup
 payloads, copies the validated backups into an OS temp directory, and writes
-one repository asset-patch archive.
+one repository asset-patch archive. The committed archive hash is canonical;
+rebuilds on different zlib implementations are validated by decoded table
+content because standard zlib and zlib-ng may choose different DEFLATE bytes.
 """
 from __future__ import annotations
 
@@ -46,6 +48,9 @@ OUTPUT_ARCHIVE = (
 BRIDGE_SHA256 = "31c897762d89e6d55064c477dc989d97e30e86a05ecca258e61e44ea90d0f86d"
 SOUL_BASELINE_SIZE = 38_313
 SOUL_BASELINE_SHA256 = "70dd53d7e1f9078199a017d49c0adb2946ecb6e91abfbc42f4b6a4da4b0a2e1e"
+SOUL_CANONICAL_BASELINE_SHA256 = (
+    "a464c324f44a9a7a685ec0036bb895e4a0f70ab4e1f0bd1f0a0a1780bfc661df"
+)
 WAB_BASELINE_SIZE = 3_640
 WAB_BASELINE_SHA256 = "b9aa82f7c7483af88f758bcdaeed6474178e57a076d86b660d0bab902996e0ae"
 
@@ -113,6 +118,34 @@ def parse_table(data: bytes, logical: str) -> dict[str, object]:
     return table
 
 
+def canonical_node_sha256(node: object) -> str:
+    """Hash ordered table content and order independently of compression bytes."""
+    digest = hashlib.sha256()
+
+    def visit(value: object) -> None:
+        if isinstance(value, str):
+            raw = value.encode("utf-8")
+            digest.update(b"S")
+            digest.update(struct.pack("<Q", len(raw)))
+            digest.update(raw)
+            return
+        if not isinstance(value, dict):
+            raise TypeError(
+                f"orderedmap node must be str or dict, got {type(value).__name__}"
+            )
+        digest.update(b"M")
+        digest.update(struct.pack("<Q", len(value)))
+        for key, child in value.items():
+            raw = key.encode("utf-8")
+            digest.update(b"K")
+            digest.update(struct.pack("<Q", len(raw)))
+            digest.update(raw)
+            visit(child)
+
+    visit(node)
+    return digest.hexdigest()
+
+
 def build_official_orderedmap(node: object) -> bytes:
     """Serialize with the official ability_soul payload's zlib level 9."""
     if isinstance(node, str):
@@ -142,11 +175,14 @@ def strip_custom_soul_rows(soul_bytes: bytes) -> bytes:
     return build_official_orderedmap(stripped)
 
 
-def build_payloads(
-    bridge_bytes: bytes, soul_baseline_bytes: bytes, wab_baseline_bytes: bytes
+def build_payloads_from_soul_table(
+    bridge_bytes: bytes,
+    soul_baseline: dict[str, object],
+    wab_baseline_bytes: bytes,
 ) -> tuple[bytes, bytes, bytes]:
-    if sha256(soul_baseline_bytes) != SOUL_BASELINE_SHA256:
-        raise ValueError("ability_soul baseline hash is not pinned official baseline")
+    """Build from an already parsed official soul table."""
+    if canonical_node_sha256(soul_baseline) != SOUL_CANONICAL_BASELINE_SHA256:
+        raise ValueError("ability_soul baseline does not match canonical content")
     if sha256(wab_baseline_bytes) != WAB_BASELINE_SHA256:
         raise ValueError(
             "equipment_enhancement_ability hash is not pinned official baseline"
@@ -159,7 +195,7 @@ def build_payloads(
         equipment_status=parse_table(
             read_bridge_member(bridge_bytes, STATUS_LOGICAL), STATUS_LOGICAL
         ),
-        ability_soul=parse_table(soul_baseline_bytes, SOUL_LOGICAL),
+        ability_soul=soul_baseline,
         rush_event=parse_table(read_bridge_member(bridge_bytes, RUSH_LOGICAL), RUSH_LOGICAL),
     )
     changes = rewards.build_master_changes(tables)
@@ -177,10 +213,22 @@ def build_payloads(
     ]
     if final_noncustom != bridge_noncustom:
         raise RuntimeError("equipment non-custom rows or order changed")
-    if sha256(strip_custom_soul_rows(soul_bytes)) != SOUL_BASELINE_SHA256:
+    stripped_soul = parse_table(strip_custom_soul_rows(soul_bytes), SOUL_LOGICAL)
+    if canonical_node_sha256(stripped_soul) != canonical_node_sha256(soul_baseline):
         raise RuntimeError("removing custom ability_soul rows did not restore baseline")
 
     return equipment_bytes, soul_bytes, wab_baseline_bytes
+
+
+def build_payloads(
+    bridge_bytes: bytes, soul_baseline_bytes: bytes, wab_baseline_bytes: bytes
+) -> tuple[bytes, bytes, bytes]:
+    if sha256(soul_baseline_bytes) != SOUL_BASELINE_SHA256:
+        raise ValueError("ability_soul baseline hash is not pinned official baseline")
+    soul_baseline = parse_table(soul_baseline_bytes, SOUL_LOGICAL)
+    return build_payloads_from_soul_table(
+        bridge_bytes, soul_baseline, wab_baseline_bytes
+    )
 
 
 def build_archive_bytes(payloads: tuple[bytes, bytes, bytes]) -> bytes:
@@ -191,7 +239,12 @@ def build_archive_bytes(payloads: tuple[bytes, bytes, bytes]) -> bytes:
             info.compress_type = zipfile.ZIP_DEFLATED
             info.create_system = 0
             info.external_attr = 0
-            archive.writestr(info, payload, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+            archive.writestr(
+                info,
+                payload,
+                compress_type=zipfile.ZIP_DEFLATED,
+                compresslevel=9,
+            )
     return output.getvalue()
 
 

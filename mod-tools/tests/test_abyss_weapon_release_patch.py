@@ -3,6 +3,7 @@ import re
 import sys
 import unittest
 import zipfile
+import zlib
 from collections import deque
 from io import BytesIO
 from pathlib import Path
@@ -32,7 +33,8 @@ class AbyssWeaponReleasePatchTests(unittest.TestCase):
             cls.members = archive.namelist()
             cls.bad_member = archive.testzip()
             cls.member_bytes = {name: archive.read(name) for name in cls.members}
-            cls.timestamps = [info.date_time for info in archive.infolist()]
+            cls.infos = archive.infolist()
+            cls.archive_comment = archive.comment
 
     def test_enabled_tail_edge_is_published(self) -> None:
         matches = [
@@ -80,7 +82,21 @@ class AbyssWeaponReleasePatchTests(unittest.TestCase):
             self.members,
         )
         self.assertEqual(list(builder.ARCHIVE_MEMBERS), self.members)
-        self.assertEqual([builder.ZIP_TIMESTAMP] * 3, self.timestamps)
+        self.assertEqual(
+            [builder.ZIP_TIMESTAMP] * 3,
+            [info.date_time for info in self.infos],
+        )
+        self.assertEqual(
+            [zipfile.ZIP_DEFLATED] * 3,
+            [info.compress_type for info in self.infos],
+        )
+        self.assertEqual([0] * 3, [info.flag_bits for info in self.infos])
+        self.assertEqual([b""] * 3, [info.extra for info in self.infos])
+        self.assertEqual(b"", self.archive_comment)
+        for info in self.infos:
+            payload = self.member_bytes[info.filename]
+            self.assertEqual(len(payload), info.file_size)
+            self.assertEqual(zlib.crc32(payload) & 0xFFFFFFFF, info.CRC)
         self.assertEqual(115_915, len(self.archive_bytes))
         self.assertEqual(ARCHIVE_SHA256, builder.sha256(self.archive_bytes))
 
@@ -89,17 +105,40 @@ class AbyssWeaponReleasePatchTests(unittest.TestCase):
         soul_bytes = self.member_bytes[builder.SOUL_MEMBER]
         wab_bytes = self.member_bytes[builder.WAB_MEMBER]
 
-        official_soul = builder.strip_custom_soul_rows(soul_bytes)
-        self.assertEqual(builder.SOUL_BASELINE_SIZE, len(official_soul))
-        self.assertEqual(builder.SOUL_BASELINE_SHA256, builder.sha256(official_soul))
+        official_soul = builder.parse_table(
+            builder.strip_custom_soul_rows(soul_bytes), builder.SOUL_LOGICAL
+        )
+        self.assertEqual(
+            builder.SOUL_CANONICAL_BASELINE_SHA256,
+            builder.canonical_node_sha256(official_soul),
+        )
         self.assertEqual(builder.WAB_BASELINE_SIZE, len(wab_bytes))
         self.assertEqual(builder.WAB_BASELINE_SHA256, builder.sha256(wab_bytes))
 
         bridge_bytes = builder.checked_bridge(builder.BRIDGE_ARCHIVE)
-        expected_payloads = builder.build_payloads(
-            bridge_bytes, official_soul, wab_bytes
+        tampered_soul = dict(official_soul)
+        first_soul_id = next(iter(tampered_soul))
+        tampered_soul[first_soul_id] = str(tampered_soul[first_soul_id]) + ",tamper"
+        with self.assertRaisesRegex(ValueError, "canonical content"):
+            builder.build_payloads_from_soul_table(
+                bridge_bytes,
+                tampered_soul,
+                wab_bytes,
+            )
+        expected_payloads = builder.build_payloads_from_soul_table(
+            bridge_bytes,
+            official_soul,
+            wab_bytes,
         )
-        self.assertEqual(expected_payloads, (equipment_bytes, soul_bytes, wab_bytes))
+        self.assertEqual(
+            builder.parse_table(expected_payloads[0], builder.EQUIPMENT_LOGICAL),
+            builder.parse_table(equipment_bytes, builder.EQUIPMENT_LOGICAL),
+        )
+        self.assertEqual(
+            builder.parse_table(expected_payloads[1], builder.SOUL_LOGICAL),
+            builder.parse_table(soul_bytes, builder.SOUL_LOGICAL),
+        )
+        self.assertEqual(expected_payloads[2], wab_bytes)
 
         equipment = builder.parse_table(equipment_bytes, builder.EQUIPMENT_LOGICAL)
         souls = builder.parse_table(soul_bytes, builder.SOUL_LOGICAL)
@@ -137,7 +176,7 @@ class AbyssWeaponReleasePatchTests(unittest.TestCase):
         ]
         self.assertEqual(bridge_noncustom, final_noncustom)
 
-    def test_rebuild_is_byte_deterministic_without_live_store(self) -> None:
+    def test_rebuild_is_semantically_stable_without_live_store(self) -> None:
         payloads = (
             self.member_bytes[builder.EQUIPMENT_MEMBER],
             self.member_bytes[builder.SOUL_MEMBER],
@@ -146,7 +185,18 @@ class AbyssWeaponReleasePatchTests(unittest.TestCase):
         first = builder.build_archive_bytes(payloads)
         second = builder.build_archive_bytes(payloads)
         self.assertEqual(first, second)
-        self.assertEqual(self.archive_bytes, first)
+        with zipfile.ZipFile(BytesIO(first)) as rebuilt:
+            self.assertEqual(self.members, rebuilt.namelist())
+            for member in self.members:
+                actual = self.member_bytes[member]
+                candidate = rebuilt.read(member)
+                if member == builder.WAB_MEMBER:
+                    self.assertEqual(actual, candidate)
+                else:
+                    self.assertEqual(
+                        builder.parse_table(actual, member),
+                        builder.parse_table(candidate, member),
+                    )
 
 
 if __name__ == "__main__":
