@@ -1487,6 +1487,9 @@ def preflight_package(
     mode = _validate_qa_contract(manifest)
     repo_root, live_roots, cdn_root = _repo_paths(profile_id)
     canonical_base = detect_canonical_base_version(cdn_root, repo_root)
+    import wf_release_guard
+
+    charpkg_strand = wf_release_guard.charpkg_strand_report(cdn_root, repo_root)
     if mode == "production":
         status = _production_workspace_status(package_dir)
         tail = _reachable_client_base(
@@ -1521,6 +1524,7 @@ def preflight_package(
         and (status.release_ready if status is not None else False),
         "workspace_input_sha256": status.input_digest if status is not None else None,
         "validated_chain_tail": tail,
+        "charpkg_strand": charpkg_strand,
         "writes_live": False,
     })
     return report
@@ -1540,6 +1544,11 @@ def publish_package(
     if _server_running(repo_root):
         raise ReleaseError("CN server must be stopped before character publication")
     canonical_base = detect_canonical_base_version(cdn_root, repo_root)
+    # 重锚防孤儿门禁:被 active.json 丢弃的 charpkg 历史必须仍可达 tail,
+    # 缺口自动补 charbridge 副本,补不齐则拒绝发布(2026-07-18 链重锚事故)
+    import wf_release_guard
+
+    wf_release_guard.ensure_charpkg_history_bridged(cdn_root, repo_root)
     staging_root = repo_root / "work" / "character_releases" / "staging"
     snapshot_root = repo_root / "work" / "character_releases" / "snapshots"
     if mode == "production":
