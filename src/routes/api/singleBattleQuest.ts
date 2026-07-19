@@ -367,6 +367,7 @@ const routes = async (fastify: FastifyInstance) => {
                 getSerializedParties: (pid, eid) => getSerializedPlayerRushEventPlayedPartiesSync(pid, eid),
                 getFolderRewards: (eid, fid) => getRushEventFolderClearRewards(eid, fid),
                 giveRewards: (pid, r) => givePlayerRewardsSync(pid, r),
+                transaction: operation => getDb().transaction(operation)(),
             })
 
             const raidEventData = handleRaidEventFinish({

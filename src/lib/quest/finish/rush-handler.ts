@@ -38,11 +38,12 @@ interface RushHandlerParams {
     getRushEvent: (playerId: number, eventId: number) => any | null
     updateRushEvent: (playerId: number, data: any) => void
     insertParty: (playerId: number, eventId: number, data: any) => void
-    insertClearedFolder: (playerId: number, eventId: number, folderId: number) => void
+    insertClearedFolder: (playerId: number, eventId: number, folderId: number) => boolean
     deletePartyList: (playerId: number, eventId: number, battleType: number) => void
     getSerializedParties: (playerId: number, eventId: number) => any
     getFolderRewards: (eventId: number, folderId: number) => any[] | null
     giveRewards: (playerId: number, rewards: any[]) => any | null
+    transaction: <T>(operation: () => T) => T
 }
 
 export function handleRushEventFinish(params: RushHandlerParams): {
@@ -52,10 +53,11 @@ export function handleRushEventFinish(params: RushHandlerParams): {
     const { questCategory, questAccomplished, questData, clearTime, party, playerId, questId,
         getEvoLevels, folderMaxRounds, getRushEvent, updateRushEvent,
         insertParty, insertClearedFolder, deletePartyList,
-        getSerializedParties, getFolderRewards, giveRewards } = params
+        getSerializedParties, getFolderRewards, giveRewards, transaction } = params
 
     let rushEventData: ReturnRushEvent | null = null
     let rushEventRewardsResult: PlayerRewardResult | null = null
+    let rushBattleRewards: EquipmentItemReward[] = []
 
     if (questCategory !== QuestCategory.RUSH_EVENT || !questAccomplished) {
         return { rushEventData, rushEventRewardsResult }
@@ -120,9 +122,15 @@ export function handleRushEventFinish(params: RushHandlerParams): {
     } else if (rushEventBattleType === RushEventBattleType.FOLDER) {
         const isFolderFinal = rushEventRound >= (folderMaxRounds[rushEventFolderId] ?? 0)
         if (isFolderFinal) {
-            insertClearedFolder(playerId, rushEventId, rushEventFolderId)
-            updateRushEvent(playerId, { eventId: rushEventId, activeRushBattleFolderId: null })
-            deletePartyList(playerId, rushEventId, rushEventBattleType)
+            transaction(() => {
+                const isFirstClear = insertClearedFolder(playerId, rushEventId, rushEventFolderId)
+                updateRushEvent(playerId, { eventId: rushEventId, activeRushBattleFolderId: null })
+                deletePartyList(playerId, rushEventId, rushEventBattleType)
+                if (!isFirstClear) return
+
+                rushBattleRewards = getFolderRewards(rushEventId, rushEventFolderId) ?? []
+                rushEventRewardsResult = giveRewards(playerId, rushBattleRewards)
+            })
         } else {
             insertParty(playerId, rushEventId, {
                 characterIds, unisonCharacterIds,
@@ -137,7 +145,11 @@ export function handleRushEventFinish(params: RushHandlerParams): {
     const serializedPlayedParties = getSerializedParties(playerId, rushEventId)
     const isEndless = rushEventBattleType === RushEventBattleType.ENDLESS
     rushEventData = {
-        "rush_battle_reward_list": [],
+        "rush_battle_reward_list": rushBattleRewards.map(reward => ({
+            "kind": 1,
+            "kind_id": reward.id,
+            "number": reward.count,
+        })),
         "rush_battle_played_party_list": serializedPlayedParties.folderParties,
         "endless_battle_played_party_list": serializedPlayedParties.endlessParties,
         "is_out_of_period": false,
@@ -147,15 +159,6 @@ export function handleRushEventFinish(params: RushHandlerParams): {
         "best_elapsed_time_ms": isEndless ? newBestElapsedTimeMs : null,
         "old_endless_battle_max_round": isEndless ? oldEndlessMaxRound : null,
         "old_best_elapsed_time_ms": isEndless ? oldBestElapsedTimeMs : null
-    }
-
-    if (rushEventBattleType === RushEventBattleType.FOLDER && rushEventRound >= (folderMaxRounds[rushEventFolderId] ?? 0)) {
-        const rewards = getFolderRewards(rushEventId, rushEventFolderId) ?? []
-        rushEventRewardsResult = giveRewards(playerId, rewards)
-        rushEventData.rush_battle_reward_list = rewards.map(reward => {
-            const itemReward = reward as EquipmentItemReward
-            return { "kind": 1, "kind_id": itemReward.id, "number": itemReward.count }
-        })
     }
 
     return { rushEventData, rushEventRewardsResult }

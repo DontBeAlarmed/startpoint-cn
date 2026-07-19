@@ -560,6 +560,55 @@ export function getGachaCampaignIdSync(
 
 // shop functions
 
+interface RushCompatibilityEvent {
+    sourceEventId: number
+    availableFrom: string
+    availableUntil: string
+}
+
+const RUSH_COMPATIBILITY_EVENTS: Record<number, RushCompatibilityEvent> = Object.fromEntries(
+    Array.from({ length: 7 }, (_, index) => [700011 + index, {
+        sourceEventId: 700001 + index,
+        availableFrom: "2025-06-26 12:00:00",
+        availableUntil: "2025-08-14 23:59:59",
+    }]),
+)
+
+function getRushCompatibilityEvent(eventId: number | string): RushCompatibilityEvent | null {
+    const numericEventId = Number(eventId)
+    return Number.isInteger(numericEventId) ? RUSH_COMPATIBILITY_EVENTS[numericEventId] ?? null : null
+}
+
+function addRushCompatibilityPeriod(item: ShopItem, compatibility: RushCompatibilityEvent): ShopItem {
+    const compatibilityPeriod = {
+        availableFrom: compatibility.availableFrom,
+        availableUntil: compatibility.availableUntil,
+    }
+    const existingPeriods = item.compatibilityPeriods ?? []
+    const compatibilityPeriods = existingPeriods.some(period => (
+        period.availableFrom === compatibilityPeriod.availableFrom
+        && period.availableUntil === compatibilityPeriod.availableUntil
+    ))
+        ? existingPeriods
+        : [...existingPeriods, compatibilityPeriod]
+
+    return {
+        ...item,
+        compatibilityPeriods,
+    }
+}
+
+function addRushCompatibilityPeriods(items: ShopItems, compatibility: RushCompatibilityEvent): ShopItems {
+    return Object.fromEntries(Object.entries(items).map(([itemId, item]) => [
+        itemId,
+        addRushCompatibilityPeriod(item, compatibility),
+    ]))
+}
+
+function hasShopItems(items: ShopItems | undefined): items is ShopItems {
+    return items !== undefined && Object.keys(items).length > 0
+}
+
 /**
  * Gets the items for a generic shop.
  * 
@@ -596,7 +645,16 @@ export function getEventShopItemsSync(
     const typeSection = (eventItemShopItems as EventShopItems)[String(eventType)]
     if (typeSection === undefined) return null;
 
-    return typeSection[String(eventId)] ?? null
+    const exactItems = typeSection[String(eventId)]
+    if (hasShopItems(exactItems)) return exactItems
+
+    // CN v1.4.54 has no standalone constant-Rush shop rows. Keep this
+    // compatibility fallback until a CDN patch or official response replaces it.
+    if (Number(eventType) !== 11) return null
+    const compatibility = getRushCompatibilityEvent(eventId)
+    if (compatibility === null) return null
+    const sourceItems = typeSection[String(compatibility.sourceEventId)]
+    return !hasShopItems(sourceItems) ? null : addRushCompatibilityPeriods(sourceItems, compatibility)
 }
 
 /**
@@ -638,7 +696,18 @@ export function getShopItemSync(
         case ShopType.EVENT_ITEM:
             const mapInfo = (eventItemShopIdMap as Record<string, EventItemShopIdMapItem>)[itemId]
             if (mapInfo === undefined) return null;
-            return (eventItemShopItems as EventShopItems)[mapInfo.eventType][mapInfo.eventId][itemId] ?? null
+            const eventItem = (eventItemShopItems as EventShopItems)[mapInfo.eventType][mapInfo.eventId][itemId]
+            if (eventItem === undefined) return null
+            if (mapInfo.eventType !== 11) return eventItem
+            const compatibilityTarget = Object.entries(RUSH_COMPATIBILITY_EVENTS).find(
+                ([, entry]) => entry.sourceEventId === mapInfo.eventId,
+            )
+            if (compatibilityTarget === undefined) return eventItem
+            const [targetEventId, compatibilityEntry] = compatibilityTarget
+            const targetItems = (eventItemShopItems as EventShopItems)[String(mapInfo.eventType)]?.[targetEventId]
+            return hasShopItems(targetItems)
+                ? eventItem
+                : addRushCompatibilityPeriod(eventItem, compatibilityEntry)
         default:
             return null
     }
@@ -657,7 +726,12 @@ export function getRushEventFolderClearRewards(
 ): Reward[] | null {
     const folders = (rushEventQuestFolders as RushEventFolders)[rushEventId]
     const rewards = folders?.[folderId]
-    return Array.isArray(rewards) && rewards.length > 0 ? rewards : null
+    if (Array.isArray(rewards) && rewards.length > 0) return rewards
+
+    const compatibility = getRushCompatibilityEvent(rushEventId)
+    if (compatibility === null) return null
+    const fallbackRewards = (rushEventQuestFolders as RushEventFolders)[compatibility.sourceEventId]?.[folderId]
+    return Array.isArray(fallbackRewards) && fallbackRewards.length > 0 ? fallbackRewards : null
 }
 
 // TODO: 待从CDN二进制 config.orderedmap 提取真实数据

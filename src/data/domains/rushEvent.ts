@@ -319,11 +319,12 @@ export function insertPlayerRushEventClearedFolderSync(
     playerId: number,
     eventId: number,
     folderId: number
-) {
-    getDb().prepare(`
+): boolean {
+    const result = getDb().prepare(`
     INSERT OR IGNORE INTO players_rush_events_cleared_folders (player_id, event_id, folder_id)
     VALUES (?, ?, ?)
     `).run(playerId, eventId, folderId)
+    return result.changes === 1
 }
 
 /**

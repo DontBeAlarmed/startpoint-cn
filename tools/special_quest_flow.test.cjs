@@ -276,6 +276,62 @@ function testRushEndlessProgressAndRaidResponse() {
     assert.equal(raid.is_out_of_period, false)
 }
 
+function testRushFolderRewardsAreGrantedOnlyOnFirstClear() {
+    let firstClear = true
+    let grantCount = 0
+    const calls = []
+    const runFinish = () => handleRushEventFinish({
+        questCategory: QuestCategory.RUSH_EVENT,
+        questAccomplished: true,
+        questData: {
+            rushEventId: 700011,
+            rushEventFolderId: RushEventFolder.INTERMEDIATE,
+            rushEventRound: 2,
+        },
+        clearTime: 12345,
+        party,
+        playerId: 7,
+        questId: 700011002,
+        getEvoLevels: () => [1, 1, null],
+        folderMaxRounds: { [RushEventFolder.INTERMEDIATE]: 2 },
+        getRushEvent: () => null,
+        updateRushEvent: () => { calls.push("update") },
+        insertParty: () => assert.fail("最终回合不能保存下一回合配队"),
+        insertClearedFolder: () => {
+            calls.push("insert")
+            const inserted = firstClear
+            firstClear = false
+            return inserted
+        },
+        deletePartyList: () => { calls.push("delete") },
+        getSerializedParties: () => ({ folderParties: null, endlessParties: null }),
+        getFolderRewards: () => [{ type: 0, id: 2370001, count: 100 }],
+        giveRewards: () => {
+            grantCount++
+            calls.push("grant")
+            return { items: { "2370001": 100 } }
+        },
+        transaction: operation => {
+            calls.push("begin")
+            const value = operation()
+            calls.push("commit")
+            return value
+        },
+    })
+
+    const first = runFinish()
+    assert.equal(grantCount, 1)
+    assert.deepEqual(first.rushEventData.rush_battle_reward_list, [
+        { kind: 1, kind_id: 2370001, number: 100 },
+    ])
+
+    calls.length = 0
+    const repeated = runFinish()
+    assert.equal(grantCount, 1, "重复通关已记录的文件夹不得再次发奖")
+    assert.deepEqual(repeated.rushEventData.rush_battle_reward_list, [])
+    assert.deepEqual(calls, ["begin", "insert", "update", "delete", "commit"])
+}
+
 testCarnivalScoreAndPreviousTotal()
 testCarnivalLeaderFallsBackToFirstPartyCharacter()
 testCarnivalFrameLimitIsConvertedToMilliseconds()
@@ -285,4 +341,5 @@ testCarnivalUnclaimedRewardsAreGrantedAtomically()
 testFailedSpecialQuestsDoNotProgress()
 testAdventHostFinishState()
 testRushEndlessProgressAndRaidResponse()
+testRushFolderRewardsAreGrantedOnlyOnFirstClear()
 console.log("special quest flow tests passed")

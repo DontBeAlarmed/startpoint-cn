@@ -6,6 +6,7 @@ require("ts-node/register/transpile-only")
 const {
     getEventShopItemsSync,
     getRushEventFolderClearRewards,
+    getShopItemSync,
 } = require("../src/lib/assets.ts")
 
 const primaryShopCounts = new Map([
@@ -35,16 +36,85 @@ assert.equal(
 )
 
 for (let eventId = 700011; eventId <= 700017; eventId++) {
-    assert.equal(
-        getEventShopItemsSync(11, eventId),
-        null,
-        `常驻狂热激战 ${eventId} 必须严格返回空商店，不能共享原始批次库存`,
+    const originalEventId = eventId - 10
+    const compatibilityItems = getEventShopItemsSync(11, eventId)
+    const originalItems = getEventShopItemsSync(11, originalEventId)
+    assert.notEqual(compatibilityItems, null)
+    assert.notEqual(originalItems, null)
+    assert.deepEqual(
+        Object.keys(compatibilityItems),
+        Object.keys(originalItems),
+        `常驻狂热激战 ${eventId} 必须兼容复用原始批次 ${originalEventId} 的全部商品`,
     )
-    assert.equal(
+    for (const [itemId, compatibilityItem] of Object.entries(compatibilityItems)) {
+        const { compatibilityPeriods, ...baseItem } = compatibilityItem
+        assert.deepEqual(baseItem, originalItems[itemId])
+        assert.deepEqual(compatibilityPeriods, [{
+            availableFrom: "2025-06-26 12:00:00",
+            availableUntil: "2025-08-14 23:59:59",
+        }])
+    }
+    assert.deepEqual(
         getRushEventFolderClearRewards(eventId, 1),
-        null,
-        `常驻狂热激战 ${eventId} 不得共享原始批次文件夹代币奖励`,
+        getRushEventFolderClearRewards(originalEventId, 1),
+        `常驻狂热激战 ${eventId} 必须兼容复用原始批次 ${originalEventId} 的文件夹代币奖励`,
     )
+}
+
+assert.equal(
+    getEventShopItemsSync(6, 700011),
+    null,
+    "常驻兼容回退只能用于服务端 Rush event_type=11",
+)
+
+const eventItemShopAsset = require("../assets/event_item_shop.json")
+assert.deepEqual(getShopItemSync(4, 700000).compatibilityPeriods, [{
+    availableFrom: "2025-06-26 12:00:00",
+    availableUntil: "2025-08-14 23:59:59",
+}])
+eventItemShopAsset["11"]["700011"] = {}
+try {
+    assert.equal(
+        Object.keys(getEventShopItemsSync(11, 700011)).length,
+        33,
+        "空的常驻商品对象仍表示 CDN 尚未补全，必须继续兼容回退",
+    )
+    assert.notEqual(getShopItemSync(4, 700000).compatibilityPeriods, undefined)
+
+    eventItemShopAsset["11"]["700011"] = {
+        "999999": eventItemShopAsset["11"]["700001"]["700000"],
+    }
+    assert.equal(
+        getShopItemSync(4, 700000).compatibilityPeriods,
+        undefined,
+        "常驻活动出现非空精确 CDN 商品后必须关闭旧商品的兼容直购期",
+    )
+} finally {
+    delete eventItemShopAsset["11"]["700011"]
+}
+
+const sourceShopItem = eventItemShopAsset["11"]["700001"]["700000"]
+sourceShopItem.compatibilityPeriods = [{
+    availableFrom: "2024-01-01 00:00:00",
+    availableUntil: "2024-01-02 00:00:00",
+}]
+try {
+    assert.deepEqual(
+        getEventShopItemsSync(11, 700011)["700000"].compatibilityPeriods,
+        [
+            {
+                availableFrom: "2024-01-01 00:00:00",
+                availableUntil: "2024-01-02 00:00:00",
+            },
+            {
+                availableFrom: "2025-06-26 12:00:00",
+                availableUntil: "2025-08-14 23:59:59",
+            },
+        ],
+        "常驻兼容期必须追加到商品已有的附加开放期",
+    )
+} finally {
+    delete sourceShopItem.compatibilityPeriods
 }
 
 const {
@@ -77,6 +147,8 @@ const periodItem = {
 const periodStart = parseShopJstTimestamp(periodItem.availableFrom)
 const periodEnd = parseShopJstTimestamp(periodItem.availableUntil)
 assert.equal(periodStart, Date.parse("2023-11-23T12:00:00+09:00"))
+assert.throws(() => parseShopJstTimestamp("2025-02-31 12:00:00"), /Invalid shop period/)
+assert.throws(() => parseShopJstTimestamp("2025-01-01 24:00:00"), /Invalid shop period/)
 assert.equal(isShopItemAvailable(periodItem, periodStart - 1), false)
 assert.equal(isShopItemAvailable(periodItem, periodStart), true, "开放起点必须包含")
 assert.equal(isShopItemAvailable(periodItem, periodEnd), true, "开放终点必须包含")

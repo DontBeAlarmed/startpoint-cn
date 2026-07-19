@@ -33,6 +33,10 @@ export interface ShopItemUserCost {
     amount: number
 }
 
+export interface ShopItemAvailabilityPeriod {
+    availableFrom: string
+    availableUntil: string | null
+}
 
 export interface ShopItem {
     costs: ShopItemCost[] | never[],
@@ -50,6 +54,7 @@ export interface ShopItem {
     maxFrequency?: number
     dailyStock?: number
     monthlyStock?: number
+    compatibilityPeriods?: ShopItemAvailabilityPeriod[]
 }
 
 

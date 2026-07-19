@@ -181,6 +181,7 @@ stubModule("../src/lib/mission", {
 })
 
 const shopRoutes = require("../src/routes/api/shop.ts").default
+const eventItemShopAsset = require("../assets/event_item_shop.json")
 
 async function createServer() {
     const fastify = Fastify()
@@ -222,6 +223,58 @@ async function main() {
         globalNowSeconds = Date.parse("2023-12-01T00:00:00+09:00") / 1000
         assert.equal((await getRushSales(fastify, 11, 700001)).length, 33)
         assert.equal((await getRushSales(fastify, 6, 700001)).length, 0)
+        assert.equal(
+            (await getRushSales(fastify, 11, 700011)).length,
+            33,
+            "常驻 Rush 商店必须在原始批次商品开放期内兼容复用商品",
+        )
+
+        globalNowSeconds = Date.parse("2025-07-12T12:00:00+09:00") / 1000
+        assert.equal(
+            (await getRushSales(fastify, 11, 700011)).length,
+            33,
+            "常驻 Rush 商店必须在常驻活动自身开放期内显示兼容商品",
+        )
+        const compatibilityPurchase = await fastify.inject({
+            method: "POST",
+            url: "/buy",
+            payload: { viewer_id: 123, shop_type: 4, shop_item_id: 700032, number: 1 },
+        })
+        assert.equal(compatibilityPurchase.statusCode, 200)
+        assert.equal(decode(compatibilityPurchase).data_headers.result_code, 1)
+        db.prepare("UPDATE item_state SET amount = 1000 WHERE player_id = ? AND item_id = ?")
+            .run(17, 2370001)
+        db.prepare("DELETE FROM item_state WHERE player_id = ? AND item_id = ?").run(17, 100000)
+        db.prepare("DELETE FROM purchase_state WHERE player_id = ? AND shop_item_id = ?").run(17, 700032)
+
+        eventItemShopAsset["11"]["700011"] = {
+            "999999": eventItemShopAsset["11"]["700001"]["700000"],
+        }
+        try {
+            const beforeExactShopPurchase = snapshot()
+            const oldItemPurchase = await fastify.inject({
+                method: "POST",
+                url: "/buy",
+                payload: { viewer_id: 123, shop_type: 4, shop_item_id: 700000, number: 1 },
+            })
+            assert.equal(oldItemPurchase.statusCode, 200)
+            assert.equal(
+                decode(oldItemPurchase).data_headers.result_code,
+                2053,
+                "常驻活动出现非空精确商品后必须关闭旧商品的常驻期直购",
+            )
+            assert.deepEqual(snapshot(), beforeExactShopPurchase)
+        } finally {
+            delete eventItemShopAsset["11"]["700011"]
+        }
+
+        globalNowSeconds = Date.parse("2025-06-26T11:59:59+09:00") / 1000
+        assert.equal((await getRushSales(fastify, 11, 700011)).length, 0)
+        globalNowSeconds = Date.parse("2025-06-26T12:00:00+09:00") / 1000
+        assert.equal((await getRushSales(fastify, 11, 700011)).length, 33)
+        globalNowSeconds = Date.parse("2025-08-14T23:59:59+09:00") / 1000
+        assert.equal((await getRushSales(fastify, 11, 700011)).length, 33)
+        globalNowSeconds = Date.parse("2025-08-15T00:00:00+09:00") / 1000
         assert.equal((await getRushSales(fastify, 11, 700011)).length, 0)
 
         globalNowSeconds = Date.parse("2023-12-18T12:00:00+09:00") / 1000
