@@ -1,22 +1,20 @@
 import { useState } from "react"
-import { Card, Descriptions, Table, Button, Space, InputNumber, Popconfirm, message, Tag, Tabs, Spin, Typography, Switch, DatePicker, Input, Upload } from "antd"
+import { Card, Descriptions, Table, Button, Space, InputNumber, Popconfirm, message, Tag, Tabs, Spin, Typography, Switch, Input, Upload } from "antd"
 import { SaveOutlined, DeleteOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, UndoOutlined, SearchOutlined } from "@ant-design/icons"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import dayjs from "dayjs"
 import { apiGet, apiPost, apiPatch, apiDelete, apiUpload } from "../api/client"
 import { AdminPage, StateCard } from "../components/AdminPage"
 
 const { Text } = Typography
 
 interface PlayerInfo {
-    id: number; name: string; comment: string
+    id: number; accountId: number; name: string; comment: string
     stamina: number; boostPoint: number; bossBoostPoint: number
     vmoney: number; freeVmoney: number; freeMana: number; paidMana: number
     rankPoint: number; starCrumb: number; bondToken: number
     expPool: number; degreeId: number; leaderCharacterId: number
     birth: number; enableAuto3x: boolean; tutorialStep: number | null
-    lastLoginTime: string; staminaHealTime: string; expPooledTime: string; timeOffset: number | null
 }
 
 interface CharRow { code: number; joinTime: string; entryCount: number; evolutionLevel: number; overLimitStep: number; exp: number; stack: number; manaBoardIndex: number }
@@ -63,7 +61,6 @@ export default function PlayerDetail() {
     const navigate = useNavigate()
     const qc = useQueryClient()
     const [editValues, setEditValues] = useState<Record<string, any>>({})
-    const [addCharCode, setAddCharCode] = useState<number | undefined>()
     const [addItemId, setAddItemId] = useState<number | undefined>()
     const [addItemCount, setAddItemCount] = useState<number>(1)
     const [searchChars, setSearchChars] = useState("")
@@ -102,12 +99,6 @@ export default function PlayerDetail() {
             setEditValues(v => { const n = { ...v }; delete n[field]; return n })
             refresh()
         },
-        onError: (e: Error) => message.error(e.message),
-    })
-
-    const addChar = useMutation({
-        mutationFn: (code: number) => apiPost(`/api/player/${pid}/character`, { code }),
-        onSuccess: () => { message.success("角色已添加"); setAddCharCode(undefined); refresh() },
         onError: (e: Error) => message.error(e.message),
     })
 
@@ -188,7 +179,7 @@ export default function PlayerDetail() {
 
     const { player, characters, items, equipment, questProgress, drawnQuests } = data
 
-    // 内联可编辑数字字段（复用于资源/账号/时间偏移）
+    // 内联可编辑数字字段（复用于资源/账号字段）
     const numField = (key: string, label: string, opts: { min?: number; allowNull?: boolean } = {}) => {
         const has = key in editValues
         const current = (player as any)[key]
@@ -212,24 +203,6 @@ export default function PlayerDetail() {
                         />
                     )}
                 </Space.Compact>
-            </div>
-        )
-    }
-
-    // 时间字段（DatePicker，改动即提交 ISO）
-    const dateField = (key: string, label: string) => {
-        const iso = (player as any)[key] as string | null
-        return (
-            <div key={key}>
-                <Text type="secondary" style={{ fontSize: 12 }}>{label}</Text>
-                <DatePicker
-                    showTime
-                    allowClear={false}
-                    size="small"
-                    style={{ width: "100%" }}
-                    value={iso ? dayjs(iso) : null}
-                    onChange={d => d && editField.mutate({ field: key, value: d.toISOString() })}
-                />
             </div>
         )
     }
@@ -270,8 +243,6 @@ export default function PlayerDetail() {
             children: (
                 <Space direction="vertical" style={{ width: "100%" }}>
                     <div className="admin-toolbar">
-                        <InputNumber placeholder="角色 Code" value={addCharCode} onChange={v => setAddCharCode(v ?? undefined)} style={{ width: 140 }} />
-                        <Button icon={<PlusOutlined />} onClick={() => addCharCode && addChar.mutate(addCharCode)}>添加角色</Button>
                         {searchBox(searchChars, setSearchChars)}
                     </div>
                     <Table rowKey="code" dataSource={fChars} size="small" pagination={{ pageSize: 50 }}
@@ -416,19 +387,15 @@ export default function PlayerDetail() {
         <AdminPage
             eyebrow="PLAYER"
             title={`${player.name} (#${player.id})`}
-            description="编辑玩家资源、账号状态、时间字段，并维护角色、道具、装备和关卡记录。"
-            actions={<Button onClick={() => navigate("/accounts")}>返回列表</Button>}
+            description={`账号 #${player.accountId} 的存档。角色获取入口仅保留邮件发送，避免绕过客户端领取校验。`}
+            actions={<Button onClick={() => navigate("/accounts")}>返回账号 / 存档</Button>}
         >
         <Space direction="vertical" size="large" className="admin-stack">
-            <Card title="玩家摘要">
+            <Card title="存档标识">
                     <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
-                        <Descriptions.Item label="等级">{player.degreeId}</Descriptions.Item>
-                        <Descriptions.Item label="签名">{player.comment || "-"}</Descriptions.Item>
-                        <Descriptions.Item label="最后登录">{player.lastLoginTime.replace("T", " ").substring(0, 19)}</Descriptions.Item>
-                        <Descriptions.Item label="队长角色">{player.leaderCharacterId}</Descriptions.Item>
-                        <Descriptions.Item label="生日">{player.birth}</Descriptions.Item>
-                        <Descriptions.Item label="3x加速">{player.enableAuto3x ? "开" : "关"}</Descriptions.Item>
-                        <Descriptions.Item label="教程步骤">{player.tutorialStep ?? "无"}</Descriptions.Item>
+                        <Descriptions.Item label="存档名">{player.name}</Descriptions.Item>
+                        <Descriptions.Item label="存档 ID">{player.id}</Descriptions.Item>
+                        <Descriptions.Item label="账号 ID">{player.accountId}</Descriptions.Item>
                     </Descriptions>
             </Card>
 
@@ -452,15 +419,6 @@ export default function PlayerDetail() {
                             {numField("leaderCharacterId", "队长角色ID", { min: 0 })}
                             {numField("birth", "生日(birth)", { min: 0 })}
                             {numField("tutorialStep", "教程步骤(空=null)", { min: 0, allowNull: true })}
-                        </div>
-                    </Card>
-
-                    <Card title="时间设置" size="small">
-                        <div style={gridStyle}>
-                            {dateField("staminaHealTime", "体力恢复时间")}
-                            {dateField("lastLoginTime", "最后登录时间")}
-                            {dateField("expPooledTime", "经验池结算时间")}
-                            {numField("timeOffset", "时间偏移(ms，空=null)", { allowNull: true })}
                         </div>
                     </Card>
 

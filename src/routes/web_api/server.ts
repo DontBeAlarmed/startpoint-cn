@@ -181,15 +181,31 @@ const routes = async (fastify: FastifyInstance) => {
 
     fastify.get("/accounts", async (_request: FastifyRequest, reply: FastifyReply) => {
         const accounts = getAllAccountsSync()
+        const activePlayerId = getActivePlayerId()
         const result = accounts.map(acc => {
             const playerIds = getAccountPlayersSync(acc.id)
-            const defaultPid = getAccountDefaultPlayer(acc.id)
+            const savedDefaultPid = getAccountDefaultPlayer(acc.id)
+            const defaultPid = savedDefaultPid && playerIds.includes(savedDefaultPid)
+                ? savedDefaultPid
+                : (playerIds[0] ?? null)
             const defaultPlayer = defaultPid ? getPlayerSync(defaultPid) : null
             return {
                 id: acc.id,
                 saveCount: playerIds.length,
                 defaultPlayerId: defaultPid,
                 defaultPlayerName: defaultPlayer?.name ?? null,
+                activePlayerId,
+                players: playerIds.map(pid => {
+                    const player = getPlayerSync(pid)
+                    return {
+                        id: pid,
+                        accountId: acc.id,
+                        name: player?.name ?? `存档 #${pid}`,
+                        degreeId: player?.degreeId ?? 0,
+                        isDefault: defaultPid === pid,
+                        isActive: activePlayerId === pid,
+                    }
+                }),
                 playerIds
             }
         })
@@ -319,6 +335,10 @@ const routes = async (fastify: FastifyInstance) => {
             } catch (_) {}
         } else {
             deletePlayerSync(pid)
+            const remainingPlayerIds = getAccountPlayersSync(accountId)
+            if (getAccountDefaultPlayer(accountId) === pid && remainingPlayerIds.length > 0) {
+                saveAccountDefaultPlayer(accountId, remainingPlayerIds[0])
+            }
         }
         const accountAlsoDeleted = accountId && getAccountPlayersSync(accountId).length === 0
         if (getActivePlayerId() === pid) setActivePlayerId(null)
