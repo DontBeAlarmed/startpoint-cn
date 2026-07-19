@@ -46,7 +46,7 @@ function parseArguments(argv) {
 
         if (argument === "--base") {
             const value = argv[++index]
-            if (!value || value.startsWith("--")) throw new Error("--base requires a git ref")
+            if (!value || value.startsWith("-")) throw new Error("--base requires a git ref")
             base = value
             continue
         }
@@ -81,17 +81,18 @@ function readGitFileList(args, cwd) {
     return result.stdout.split(/\r?\n/).filter(Boolean)
 }
 
-function getChangedFiles({ cwd = projectRoot, base = null } = {}) {
-    const fileLists = [
-        readGitFileList(["diff", "--name-only", "--cached"], cwd),
-        readGitFileList(["diff", "--name-only"], cwd),
-        readGitFileList(["ls-files", "--others", "--exclude-standard"], cwd),
+function buildGitCommands(base = null) {
+    const commands = [
+        ["diff", "--name-only", "--cached", "--"],
+        ["diff", "--name-only", "--"],
+        ["ls-files", "--others", "--exclude-standard", "--"],
     ]
+    if (base !== null) commands.push(["diff", "--name-only", `${base}...HEAD`, "--"])
+    return commands
+}
 
-    if (base !== null) {
-        fileLists.push(readGitFileList(["diff", "--name-only", `${base}...HEAD`], cwd))
-    }
-
+function getChangedFiles({ cwd = projectRoot, base = null } = {}) {
+    const fileLists = buildGitCommands(base).map(args => readGitFileList(args, cwd))
     return mergeChangedFiles(fileLists)
 }
 
@@ -117,27 +118,70 @@ function expandGroupNames(names, testGroups = TEST_GROUPS, aggregateGroups = AGG
     return expanded
 }
 
-function hasExplicitSkipOutput(output) {
-    return output.split(/\r?\n/).some(line =>
-        /\btests?\s+(?:were\s+)?skipped\b/i.test(line)
-        || /\bskipped:\s*\S/i.test(line)
-        || /^\s*#\s*SKIP(?:\s|$)/.test(line)
-        || /跳过/.test(line)
-    )
-}
+function parseTapSkipCounts(output) {
+    const lines = output.split(/\r?\n/)
+    let totalCases = null
+    let skippedCases = null
 
-function terminateChild(child, signal) {
-    if (!child.pid || child.exitCode !== null || child.signalCode !== null) return
+    for (const line of lines) {
+        const totalMatch = line.match(/^\s*#\s*tests\s+(\d+)\s*$/i)
+        if (totalMatch) totalCases = Number(totalMatch[1])
+        const skippedMatch = line.match(/^\s*#\s*skipped\s+(\d+)\s*$/i)
+        if (skippedMatch) skippedCases = Number(skippedMatch[1])
+    }
 
-    try {
-        if (process.platform === "win32") child.kill(signal)
-        else process.kill(-child.pid, signal)
-    } catch (error) {
-        if (error.code !== "ESRCH") child.kill(signal)
+    const resultLines = lines.filter(line => /^(?:ok|not ok)\s+\d+\b/i.test(line))
+    const inlineSkippedCases = resultLines.filter(line => /#\s*SKIP(?:\s|$)/i.test(line)).length
+    const isTap = /^TAP version\s+\d+/m.test(output)
+        || totalCases !== null
+        || skippedCases !== null
+        || resultLines.length > 0
+    if (!isTap) return null
+
+    return {
+        totalCases: totalCases ?? resultLines.length,
+        skippedCases: skippedCases ?? inlineSkippedCases,
     }
 }
 
-function runTestFile({ cwd, file, group, activeChildren, timeoutMs }) {
+function hasExplicitWholeFileSkip(output) {
+    return output.split(/\r?\n/).some(line => {
+        if (/^\s*\d+\s+tests?\s+(?:were\s+)?skipped\b/i.test(line)) return false
+        return /\btests?\s+(?:were\s+)?skipped(?:\s*:|$)/i.test(line)
+            || /^\s*skip(?:ped)?(?:\s*:|\s+-)\s*\S/i.test(line)
+            || /^\s*跳过(?:\s*:|：|\s+-)\s*\S/.test(line)
+            || /(?:测试.*跳过|跳过.*测试)/.test(line)
+    })
+}
+
+function classifyTestOutput(exitCode, output, { timedOut = false } = {}) {
+    const tapCounts = parseTapSkipCounts(output)
+    const skippedCases = tapCounts?.skippedCases
+        ?? (hasExplicitWholeFileSkip(output) ? 1 : 0)
+
+    if (timedOut || exitCode !== 0) return { status: "failed", skippedCases }
+    if (tapCounts && tapCounts.totalCases > 0 && skippedCases >= tapCounts.totalCases) {
+        return { status: "skipped", skippedCases }
+    }
+    if (!tapCounts && skippedCases > 0) return { status: "skipped", skippedCases }
+    return { status: "passed", skippedCases }
+}
+
+function hasExplicitSkipOutput(output) {
+    return classifyTestOutput(0, output).status === "skipped"
+}
+
+function terminateProcessGroup(child, processGroupId, signal) {
+    if (!processGroupId) return
+    try {
+        if (process.platform === "win32") child.kill(signal)
+        else process.kill(-processGroupId, signal)
+    } catch (error) {
+        if (error.code !== "ESRCH") throw error
+    }
+}
+
+function runTestFile({ cwd, file, group, activeChildren, forceKillAfterMs, timeoutMs }) {
     return new Promise(resolve => {
         const startedAt = process.hrtime.bigint()
         const child = spawn(process.execPath, [path.resolve(cwd, file)], {
@@ -149,17 +193,57 @@ function runTestFile({ cwd, file, group, activeChildren, timeoutMs }) {
             },
             stdio: ["ignore", "pipe", "pipe"],
         })
+        const processGroupId = child.pid
         activeChildren.add(child)
 
         let stdout = ""
         let stderr = ""
         let timedOut = false
         let forceKillTimer = null
+        let forceKillAttempted = false
+        let closeResult = null
+        let resolved = false
+
+        function finishIfReady() {
+            if (resolved || closeResult === null || (timedOut && !forceKillAttempted)) return
+            resolved = true
+            clearTimeout(timeout)
+            activeChildren.delete(child)
+            const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6
+            const output = `${stdout}${stderr}`
+            const classification = classifyTestOutput(closeResult.exitCode, output, { timedOut })
+
+            resolve({
+                durationMs,
+                exitCode: closeResult.exitCode,
+                file,
+                group,
+                output,
+                signal: closeResult.signal,
+                ...classification,
+                timedOut,
+            })
+        }
+
         const timeout = setTimeout(() => {
             timedOut = true
             stderr += `test timed out after ${timeoutMs}ms\n`
-            terminateChild(child, "SIGTERM")
-            forceKillTimer = setTimeout(() => terminateChild(child, "SIGKILL"), 1000)
+            try {
+                terminateProcessGroup(child, processGroupId, "SIGTERM")
+            } catch (error) {
+                stderr += `failed to terminate process group: ${error.message}\n`
+            }
+            forceKillTimer = setTimeout(() => {
+                try {
+                    terminateProcessGroup(child, processGroupId, "SIGKILL")
+                } catch (error) {
+                    stderr += `failed to kill process group: ${error.message}\n`
+                } finally {
+                    forceKillAttempted = true
+                    forceKillTimer = null
+                    finishIfReady()
+                }
+            }, forceKillAfterMs)
         }, timeoutMs)
         child.stdout.on("data", chunk => { stdout += chunk })
         child.stderr.on("data", chunk => { stderr += chunk })
@@ -169,27 +253,9 @@ function runTestFile({ cwd, file, group, activeChildren, timeoutMs }) {
         })
 
         child.on("close", (exitCode, signal) => {
-            clearTimeout(timeout)
-            if (forceKillTimer !== null) clearTimeout(forceKillTimer)
-            activeChildren.delete(child)
-            const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6
-            const output = `${stdout}${stderr}`
-            const status = timedOut
-                ? "failed"
-                : exitCode === 0
-                ? hasExplicitSkipOutput(output) ? "skipped" : "passed"
-                : "failed"
-
-            resolve({
-                durationMs,
-                exitCode,
-                file,
-                group,
-                output,
-                signal,
-                status,
-                timedOut,
-            })
+            closeResult = { exitCode, signal }
+            if (!timedOut && forceKillTimer === null) clearTimeout(timeout)
+            finishIfReady()
         })
     })
 }
@@ -214,7 +280,10 @@ async function runParallel(items, concurrency, operation, shouldStop) {
 function summarizeResults(results) {
     return results.reduce(
         (summary, result) => {
-            summary[result.status]++
+            if (result.status === "passed") summary.passed++
+            if (result.status === "failed") summary.failed++
+            summary.skipped += result.skippedCases
+                ?? (result.status === "skipped" ? 1 : 0)
             return summary
         },
         { passed: 0, failed: 0, skipped: 0 },
@@ -249,6 +318,10 @@ async function executeTestGroups(groupNames, options = {}) {
     const serialItems = []
     const emptyResults = []
 
+    if (leafNames.length === 1 && testGroups[leafNames[0]].tests.length === 0) {
+        throw new Error(`group ${leafNames[0]} has no tests configured`)
+    }
+
     for (const group of leafNames) {
         const definition = testGroups[group]
         if (!["parallel", "serial"].includes(definition.execution)) {
@@ -263,6 +336,7 @@ async function executeTestGroups(groupNames, options = {}) {
                 output: "",
                 signal: null,
                 status: "skipped",
+                skippedCases: 1,
             })
             continue
         }
@@ -270,7 +344,10 @@ async function executeTestGroups(groupNames, options = {}) {
         const destination = definition.execution === "parallel" ? parallelItems : serialItems
         const timeoutMs = definition.timeoutMs
             ?? (definition.execution === "parallel" ? 30000 : 120000)
-        for (const file of definition.tests) destination.push({ file, group, timeoutMs })
+        const forceKillAfterMs = definition.forceKillAfterMs ?? 2000
+        for (const file of definition.tests) {
+            destination.push({ file, forceKillAfterMs, group, timeoutMs })
+        }
     }
 
     const runItem = item => runTestFile({ ...item, cwd, activeChildren })
@@ -303,49 +380,43 @@ function installSignalHandlers(activeChildren, onSignal, options = {}) {
     const handlers = {}
     const forceKillAfterMs = options.forceKillAfterMs ?? 2000
     const forceKillTimers = new Map()
-    const closeHandlers = new Map()
-
-    function clearForceKill(child) {
-        const timer = forceKillTimers.get(child)
-        if (timer) clearTimeout(timer)
-        forceKillTimers.delete(child)
-
-        const closeHandler = closeHandlers.get(child)
-        if (closeHandler) child.off("close", closeHandler)
-        closeHandlers.delete(child)
-    }
 
     function scheduleForceKill(child) {
-        if (forceKillTimers.has(child)) return
+        const processGroupId = child.pid
+        if (!processGroupId || forceKillTimers.has(processGroupId)) return
 
-        const closeHandler = () => clearForceKill(child)
-        closeHandlers.set(child, closeHandler)
-        child.once("close", closeHandler)
-
+        let resolveForceKill
+        const completion = new Promise(resolve => { resolveForceKill = resolve })
         const timer = setTimeout(() => {
-            forceKillTimers.delete(child)
-            terminateChild(child, "SIGKILL")
+            try {
+                terminateProcessGroup(child, processGroupId, "SIGKILL")
+            } finally {
+                forceKillTimers.delete(processGroupId)
+                resolveForceKill()
+            }
         }, forceKillAfterMs)
-        timer.unref()
-        forceKillTimers.set(child, timer)
+        forceKillTimers.set(processGroupId, { completion, timer })
     }
 
     for (const signal of Object.keys(signalExitCodes)) {
         handlers[signal] = () => {
             onSignal(signal)
             for (const child of activeChildren) {
-                terminateChild(child, signal)
-                scheduleForceKill(child)
+                try {
+                    terminateProcessGroup(child, child.pid, signal)
+                } finally {
+                    scheduleForceKill(child)
+                }
             }
         }
         process.on(signal, handlers[signal])
     }
 
-    return () => {
+    return async () => {
         for (const [signal, handler] of Object.entries(handlers)) {
             process.off(signal, handler)
         }
-        for (const child of [...forceKillTimers.keys()]) clearForceKill(child)
+        await Promise.all([...forceKillTimers.values()].map(entry => entry.completion))
     }
 }
 
@@ -355,7 +426,7 @@ async function main(argv = process.argv.slice(2), options = {}) {
     const writeError = options.writeError ?? (value => process.stderr.write(value))
     const activeChildren = new Set()
     let interruptedBy = null
-    let removeSignalHandlers = () => {}
+    let removeSignalHandlers = async () => {}
 
     try {
         const parsed = parseArguments(argv)
@@ -390,7 +461,7 @@ async function main(argv = process.argv.slice(2), options = {}) {
         writeError(`${error.message}\n`)
         return 2
     } finally {
-        removeSignalHandlers()
+        await removeSignalHandlers()
     }
 }
 
@@ -401,6 +472,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+    buildGitCommands,
+    classifyTestOutput,
     executeTestGroups,
     expandGroupNames,
     getChangedFiles,

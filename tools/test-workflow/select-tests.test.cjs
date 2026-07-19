@@ -6,8 +6,30 @@ const { selectTestGroups } = require("./select-tests.cjs")
 
 test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/lib/gacha.ts"]), ["quick:gacha"])
-    assert.deepEqual(selectTestGroups(["src/routes/cn/asset.ts"]), ["integration:cdn"])
+    assert.deepEqual(selectTestGroups(["src/routes/cn/asset.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["admin/src/App.tsx"]), ["admin"])
+})
+
+test("selects the registered group before applying workflow path rules", () => {
+    assert.deepEqual(
+        selectTestGroups(["tools/test-workflow/database-isolation.test.cjs"]),
+        ["integration:database"],
+    )
+})
+
+test("accumulates every directly related source group", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/host-finish-persistence.ts"]),
+        ["integration:database", "quick:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/awake-unlock.ts"]),
+        ["integration:compiled", "integration:database"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/routes/web_api/server.ts"]),
+        ["admin", "integration:database"],
+    )
 })
 
 test("upgrades package and unknown source changes to full", () => {
@@ -20,10 +42,10 @@ test("deduplicates and stably sorts selected groups", () => {
         selectTestGroups([
             "src/lib/gacha.ts",
             "admin/src/App.tsx",
-            "src/routes/cn/asset.ts",
+            "src/lib/quest/host-finish-persistence.ts",
             "src/lib/gacha.ts",
         ]),
-        ["admin", "integration:cdn", "quick:gacha"],
+        ["admin", "integration:database", "quick:gacha", "quick:quest"],
     )
 })
 

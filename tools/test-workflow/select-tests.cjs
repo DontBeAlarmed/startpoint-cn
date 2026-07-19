@@ -5,9 +5,12 @@ const { TEST_GROUPS } = require("./groups.cjs")
 const SOURCE_RULES = [
     { pattern: /^admin\//, groups: ["admin"] },
     { pattern: /^tests\/admin-/, groups: ["admin"] },
-    { pattern: /^src\/routes\/cn\/(?:asset|versionCheck)\.ts$/, groups: ["integration:cdn"] },
+    { pattern: /^src\/routes\/cn\/(?:asset|versionCheck)\.ts$/, groups: ["full"] },
+    { pattern: /^src\/routes\/web_api\//, groups: ["admin"] },
     { pattern: /^src\/lib\/gacha(?:[\/.\-]|\.ts$)/, groups: ["quick:gacha"] },
+    { pattern: /^src\/lib\/quest\/host-finish-persistence\.ts$/, groups: ["integration:database"] },
     { pattern: /^src\/lib\/quest\//, groups: ["quick:quest"] },
+    { pattern: /^src\/lib\/mission\/awake-unlock\.ts$/, groups: ["integration:database"] },
     { pattern: /^src\/lib\/mission\//, groups: ["integration:compiled"] },
     { pattern: /^src\/lib\/(?:character|equipment|event-currency|inventory)/, groups: ["integration:compiled"] },
     { pattern: /^src\/lib\/score-attack/, groups: ["generator"] },
@@ -27,13 +30,14 @@ function groupsForTestFile(filePath) {
 }
 
 function groupsForFile(filePath) {
-    if (filePath.startsWith("tools/test-workflow/")) return ["quick:workflow"]
-
     const testGroups = groupsForTestFile(filePath)
     if (testGroups.length > 0) return testGroups
+    if (filePath.startsWith("tools/test-workflow/")) return ["quick:workflow"]
 
-    const matchedRule = SOURCE_RULES.find(rule => rule.pattern.test(filePath))
-    return matchedRule?.groups ?? ["full"]
+    const matchedGroups = SOURCE_RULES
+        .filter(rule => rule.pattern.test(filePath))
+        .flatMap(rule => rule.groups)
+    return matchedGroups.length > 0 ? matchedGroups : ["full"]
 }
 
 function selectTestGroups(filePaths) {
