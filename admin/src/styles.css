@@ -276,6 +276,32 @@ html[data-admin-theme="dark"] body {
   gap: 14px;
 }
 
+.admin-mail-type-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.admin-mail-type-group .admin-mail-type-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 38px;
+  height: auto;
+  padding: 6px 10px;
+  border-inline-start-width: 1px;
+  border-radius: 6px;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+}
+
+.admin-mail-type-group .admin-mail-type-option::before {
+  display: none !important;
+}
+
 .admin-time-editor {
   display: flex;
   flex-direction: column;

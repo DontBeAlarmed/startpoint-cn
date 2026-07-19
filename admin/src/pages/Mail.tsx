@@ -8,17 +8,13 @@ import { getMailAttachmentRule } from "../lib/mailRules"
 const { TextArea } = Input
 const { Text } = Typography
 
-// 附件类型对应旧 mail.html 下拉；needsId=需 type_id，singleOnly=每封仅 1 个
+// 新后台只暴露常用且客户端领取校验稳定的附件类型。
 const MAIL_TYPES = [
-    { value: 1, label: "道具 (Item)", needsId: true },
-    { value: 3, label: "付费星导石 (Paid Vmoney)" },
-    { value: 4, label: "免费星导石 (Free Vmoney)" },
-    { value: 5, label: "角色 (Character)", needsId: true, singleOnly: true },
-    { value: 6, label: "装备 (Equipment)", needsId: true, singleOnly: true },
-    { value: 7, label: "星之碎片 (Star Crumb)" },
-    { value: 8, label: "法力 (Mana)" },
-    { value: 9, label: "经验池 (Exp Pool)" },
-    { value: 10, label: "羁绊之证 (Bond Token)" },
+    { value: 1, label: "道具", needsId: true },
+    { value: 4, label: "免费星导石" },
+    { value: 5, label: "角色", needsId: true, singleOnly: true },
+    { value: 6, label: "装备", needsId: true, singleOnly: true },
+    { value: 10, label: "羁绊之证" },
     { value: 11, label: "Boss Boost 点" },
     { value: 12, label: "Boost 点" },
     { value: 15, label: "Rank 点" },
@@ -256,18 +252,25 @@ export default function Mail() {
                     )}
 
                     <Form.Item name="type" label="附件类型" rules={[{ required: true, message: "请选择附件类型" }]}>
-                        <Select
-                            placeholder="-- 请选择附件类型 --"
-                            options={MAIL_TYPES.map(t => ({ value: t.value, label: t.label }))}
-                            onChange={(nextType) => {
-                                const nextRule = getMailAttachmentRule(nextType, null)
+                        <Radio.Group
+                            className="admin-mail-type-group"
+                            optionType="button"
+                            buttonStyle="solid"
+                            onChange={(event) => {
+                                const nextRule = getMailAttachmentRule(event.target.value, null)
                                 form.setFieldsValue({
                                     type_id: undefined,
                                     number: nextRule.max === 1 ? 1 : 1,
                                 })
                                 form.validateFields(["type_id", "number"]).catch(() => {})
                             }}
-                        />
+                        >
+                            {MAIL_TYPES.map(t => (
+                                <Radio.Button key={t.value} value={t.value} className="admin-mail-type-option">
+                                    {t.label}
+                                </Radio.Button>
+                            ))}
+                        </Radio.Group>
                     </Form.Item>
 
                     {needsId && (
@@ -275,7 +278,6 @@ export default function Mail() {
                             name="type_id"
                             label="附件"
                             rules={[
-                                { required: true, message: "请选择附件" },
                                 {
                                     validator: async (_, value) => {
                                         if (attachmentError) throw new Error("附件索引加载失败，无法发送")
