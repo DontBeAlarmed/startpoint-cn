@@ -5,7 +5,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerCategoryMissionsSync, incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
-import { generateDataHeaders, getServerTimeForPlayer } from "../../utils";
+import { generateDataHeaders, getServerTime } from "../../utils";
 import { getComputer, getMissionIdsByCategory, getMissionsByPattern, getCurrentStage, getCharacterIdFromMission, isMissionEnabledAt, reconcileAwakeUnlockCharacterList, settleAwakeMissionRewards } from "../../lib/mission/index";
 import type { AwakeMissionComputedProgress, AwakeMissionInfo } from "../../lib/mission/index";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -70,7 +70,7 @@ const routes = async (fastify: FastifyInstance) => {
         const requestList = body.category_list || [{ category: 1 }]
         const requestCategories = requestList.map(c => c.category)
         const missionProgressList: any[] = []
-        const evaluationTime = new Date(getServerTimeForPlayer(playerId) * 1000)
+        const evaluationTime = new Date(getServerTime() * 1000)
         const categoryMissionCache = new Map<number, ReturnType<typeof getPlayerCategoryMissionsSync>>()
         const awakeProgressByCharacter = new Map<string, AwakeMissionComputedProgress[]>()
 

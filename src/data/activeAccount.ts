@@ -60,22 +60,13 @@ export function setSelectedAccountId(id: number | null): void {
 }
 
 /**
- * Save time offset from Web panel, also updates active player's time_offset.
+ * Save the global server time offset from Web panel.
  */
 export function saveTimeOffset(offset: number | null): void {
     const state = readState();
     state.timeOffset = offset;
     state.lastSetTime = offset !== null ? new Date(Date.now() + offset).toISOString() : null;
     writeState(state);
-
-    // Also persist to current active player
-    const pid = state.activePlayerId;
-    if (pid) {
-        try {
-            const { getDb } = require("./db");
-            getDb().prepare(`UPDATE players SET time_offset = ? WHERE id = ?`).run(offset, pid);
-        } catch {}
-    }
 }
 
 /**
@@ -125,19 +116,4 @@ export function resolvePlayerIdSync(accountId: number): number | null {
     const state = readState();
     const preferredId = state.defaultPlayers[accountId];
     return (preferredId && playerIds.includes(preferredId)) ? preferredId : playerIds[0];
-}
-
-/**
- * Returns the per-player time_offset, or null if not set.
- */
-export function getPlayerTimeOffsetSync(playerId: number): number | null {
-    try {
-        const { getDb } = require("./db");
-        const row = getDb().prepare(
-            `SELECT time_offset FROM players WHERE id = ?`
-        ).get(playerId) as { time_offset: number | null } | undefined;
-        return row?.time_offset ?? null;
-    } catch {
-        return null;
-    }
 }

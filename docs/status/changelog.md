@@ -1128,17 +1128,17 @@ else → 新建 account + player + device_bindings 行
 
 **新增表：** `device_bindings(device_id, account_id, last_seen)`
 
-### 13.2 两级时间系统
+### 13.2 单一全局时间系统
 
 | 层级 | 存储 | 用途 |
 |------|------|------|
-| 服务器虚拟时间 | `active_account.json` → `timeOffset` | 全局默认，避免 CDN C8601 |
-| 存档独立时间 | `players.time_offset` | 单存档穿越用（预留，待加 UI） |
+| 服务器虚拟时间 | `active_account.json` → `timeOffset` | 全局生效，避免 CDN C8601 |
 
 ```
 getServerTime() = Date.now() + globalOffset
-getServerTimeForPlayer(pid) = player.time_offset ?? getServerTime()
 ```
+
+`players.time_offset` 仅作为旧数据库兼容列保留；当前服务端运行逻辑和管理端都不再读取或写入单存档时间偏移。
 
 ### 13.3 Web 面板简化
 
@@ -1159,7 +1159,7 @@ getServerTimeForPlayer(pid) = player.time_offset ?? getServerTime()
 |------|------|
 | `getActivePlayerId/setActivePlayerId` | 当前活跃存档 |
 | `getSelectedAccountId/setSelectedAccountId` | Player 页当前查看的 account |
-| `saveTimeOffset` | Dashboard 时间设置 → 存全局偏移 + player 偏移 |
+| `saveTimeOffset` | Dashboard 时间设置 → 存全局偏移 |
 | `restoreTimeOffset` | 启动时恢复全局时间偏移 |
 
 删除：`rotateToNextAccount`、`giftIndex`、`restoreTimeOffset(player查)`
@@ -1174,7 +1174,7 @@ getServerTimeForPlayer(pid) = player.time_offset ?? getServerTime()
 | Player 页/存档表 | 改名 | 改 `players.name` |
 | Player 页/存档表 | 新建 | 同 account 下新建空 player |
 | Player 页/存档表 | 删除 | 删该 save（最后一 save 顺带删 account） |
-| Dashboard | 时间控件 | 设服务器全局偏移 + 写活跃存档的 `time_offset` |
+| Dashboard | 时间控件 | 设服务器全局偏移 |
 
 ### 13.6 默认安全时间
 

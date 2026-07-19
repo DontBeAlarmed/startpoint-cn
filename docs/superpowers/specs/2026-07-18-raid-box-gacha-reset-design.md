@@ -83,7 +83,7 @@ interface BoxGachaBoxSettings {
 `POST /reset` 依次完成：
 
 1. 校验 session、当前玩家、扭蛋 ID 和箱 ID。
-2. 按玩家服务器时间校验箱的开放期；期外返回业务码 `4608`。
+2. 按全局服务器时间校验箱的开放期；期外返回业务码 `4608`。
 3. 校验前置箱已经解锁当前箱。
 4. 校验 `resetKind`、`resetLimit` 和当前库存：`reset_kind=2` 只允许 `remaining_number=0`。
 5. 在一个 SQLite 同步事务中重新读取状态，随后：

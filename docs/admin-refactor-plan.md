@@ -25,7 +25,7 @@ cn-server.ts (8001)
 
 | 模块 | 现有页面 | 现有 API | 备注 |
 |---|---|---|---|
-| 服务器时间 | index.html | GET/POST `/api/server/currentTime` `resetTime` `time` | 全局/按存档时间偏移 |
+| 服务器时间 | index.html | GET/POST `/api/server/currentTime` `resetTime` `time` | 全局服务器时间偏移 |
 | 账号/存档管理 | players.html | `/api/server/selectAccount` `activateSave` `newSave` `deleteSave` `deleteAccount` `renameSave` `cloneSave` | 依赖服务端内存态 `selectedAccountId` |
 | 玩家详情 | player.html + player.js | `/api/player/*`（字段编辑、角色/道具增删、关卡进度/抽选关卡删除、存档导入导出、清邮件/EX/编队/挑战次数） | 最复杂页 |
 | 邮件群发 | mail.html | POST `/api/mail/send`（multipart） | |

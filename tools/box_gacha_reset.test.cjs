@@ -532,8 +532,8 @@ for (const input of [
 
 assert.match(
     routeSource,
-    /fastify\.post\("\/reset"[\s\S]*?parseBoxGachaResetRequest[\s\S]*?resolvePlayerIdSync[\s\S]*?getServerTimeForPlayer[\s\S]*?sendBoxGachaResultCode[\s\S]*?"all_box_info": getAllBoxList\(playerId, boxGachaId, boxGachaData\.boxes\)/,
-    "reset route must validate input, resolve the active player, use player server time, return protocol result codes, and return complete all_box_info",
+    /fastify\.post\("\/reset"[\s\S]*?parseBoxGachaResetRequest[\s\S]*?resolvePlayerIdSync[\s\S]*?nowMs: getServerTime\(\) \* 1000[\s\S]*?sendBoxGachaResultCode[\s\S]*?"all_box_info": getAllBoxList\(playerId, boxGachaId, boxGachaData\.boxes\)/,
+    "reset route must validate input, resolve the active player, use global server time, return protocol result codes, and return complete all_box_info",
 );
 
 console.log("box gacha reset asset, transaction, and route tests passed");

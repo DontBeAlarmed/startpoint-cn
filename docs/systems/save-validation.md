@@ -16,7 +16,7 @@ Web 管理面板对玩家数据的写入安全设计。核心原则:**只做结�
 
 违规一律 `400 + 明确中文报错`,不写库。整数硬上限 `MAX_INT = 2³¹-1`。
 
-- `PATCH /:id/field`:字段**白名单**(`Player` 已知可编辑字段,`id` 禁改)+ 类型正确(uint 0~2³¹ / 字符串限长 name≤32·comment≤128 / 布尔 / 可空 / Date 可解析 / timeOffset ±约1000年 可空)。不卡平衡上限;不校验 leaderCharacterId 拥有(允许改存档加角色)。
+- `PATCH /:id/field`:字段**白名单**(`Player` 已知可编辑字段,`id` 禁改)+ 类型正确(uint 0~2³¹ / 字符串限长 name≤32·comment≤128 / 布尔 / 可空 / Date 可解析)。不卡平衡上限;不校验 leaderCharacterId 拥有(允许改存档加角色)。
 - `/:id/refill_resources`:amount 0 ~ 99,999,999。
 - `/:id/character`:characterId 校验存在于资源表(`character.json`);不设拥有上限。
 - `/:id/item`:itemId 校验存在;count 0 ~ 2³¹。

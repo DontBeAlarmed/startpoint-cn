@@ -4,7 +4,7 @@ import { pack, unpack } from "msgpackr";
 import fastifyStatic from "@fastify/static";
 import path from "path";
 import { existsSync, readFileSync } from "fs";
-import { getServerTime, getServerTimeForPlayer } from "./utils";
+import { getServerTime } from "./utils";
 import { restoreTimeOffset } from "./data/activeAccount";
 import { fixUint32Tags } from "./lib/msgpack-compat";
 
@@ -125,8 +125,8 @@ const apiPrefix = "/api/index.php";
 fastify.register(cnLoadPlugin, { prefix: apiPrefix });
 fastify.register(cnAssetPlugin, { prefix: `${apiPrefix}/asset` });
 
-function stubMsgpackReply(reply: any, data: any, playerId?: number) {
-    const servertime = playerId ? getServerTimeForPlayer(playerId) : getServerTime()
+function stubMsgpackReply(reply: any, data: any) {
+    const servertime = getServerTime()
     reply.header("content-type", "application/x-msgpack");
     reply.status(200).send({
         data_headers: { force_update: false, asset_update: false, short_udid: 0, viewer_id: 0, servertime, result_code: 1 },

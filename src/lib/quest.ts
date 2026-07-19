@@ -9,7 +9,7 @@ import { CharacterReward, CommonScoreReward, CurrencyReward, CurrencyScoreReward
 import { Player } from "../data/types";
 import rewardElementMap from "../../assets/reward_element_map.json";
 import { resolveEventCurrencyId } from "./event-currency";
-import { getDateFromServerTime, getServerTimeForPlayer } from "../utils";
+import { getDateFromServerTime, getServerTime } from "../utils";
 
 const ELEMENT_TO_ENEMY_MAP: Record<number, number> = {
     0: 3, 1: 0, 2: 1, 3: 2, 4: 5, 5: 4,
@@ -56,7 +56,7 @@ export function givePlayerScoreRewardsSync(
 
     if (scoreRewards != null && groupId != null) {
         const dropMultiplier = parseFloat(process.env.DROP_MULTIPLIER || '1')
-        const rewardDate = getDateFromServerTime(getServerTimeForPlayer(playerId))
+        const rewardDate = getDateFromServerTime(getServerTime())
         console.log(`[QUEST] givePlayerScoreRewards group=${groupId} items=${scoreRewards.length} pid=${playerId}`)
         let seqIndex = 0
         for (const scoreReward of scoreRewards) {

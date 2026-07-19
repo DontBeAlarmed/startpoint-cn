@@ -113,7 +113,6 @@ const routes = async (fastify: FastifyInstance) => {
                 lastLoginTime: player.lastLoginTime.toISOString(),
                 staminaHealTime: player.staminaHealTime.toISOString(),
                 expPooledTime: player.expPooledTime.toISOString(),
-                timeOffset: player.timeOffset ?? null,
             },
             characters: charList,
             items: itemList,

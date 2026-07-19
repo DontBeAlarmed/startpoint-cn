@@ -22,12 +22,6 @@ for (const c of (characterTable as { id: number; name: string; title: string; ra
     charLookup[c.id] = { name: c.name, title: c.title, rarity: c.rarity, element: c.element }
 }
 
-function formatTime(offset: number | null): string {
-    if (offset === null || offset === undefined) return "系统时间"
-    const d = new Date(Date.now() + offset)
-    return d.toISOString().replace("T", " ").substring(0, 19)
-}
-
 function htmlEscape(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
            .replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -103,7 +97,6 @@ const routes = async (fastify: FastifyInstance) => {
                     <td><a href="/player/${pid}" class="text-primary underline">${name}</a></td>
                     <td>Lv.${level}</td>
                     <td>${charCount}</td>
-                    <td>${formatTime(player.timeOffset ?? null)}</td>
                     <td>
                         <form method="post" action="/api/server/activateSave?playerId=${pid}" style="display:inline">
                             <button type="submit" class="text-xs bg-primary text-on-primary px-2 py-1 rounded-full">${isActive ? '当前' : '切换'}</button>
@@ -125,8 +118,8 @@ const routes = async (fastify: FastifyInstance) => {
             listContent += `<section class="flex flex-col p-5 border border-outline-variant rounded-3xl w-full gap-3">
                 <h3 class="text-xl text-on-background font-semibold">账号 ${accountLabel} 的存档</h3>
                 <table class="w-full text-sm"><thead><tr class="text-left border-b border-outline-variant">
-                    <th class="p-1">存档ID</th><th class="p-1">名字</th><th class="p-1">等级</th><th class="p-1">角色数</th><th class="p-1">存档时间</th><th class="p-1">操作</th>
-                </tr></thead><tbody>${saveRows || '<tr><td colspan="6" class="text-on-surface-variant p-2">暂无存档</td></tr>'}</tbody></table>
+                    <th class="p-1">存档ID</th><th class="p-1">名字</th><th class="p-1">等级</th><th class="p-1">角色数</th><th class="p-1">操作</th>
+                </tr></thead><tbody>${saveRows || '<tr><td colspan="5" class="text-on-surface-variant p-2">暂无存档</td></tr>'}</tbody></table>
             </section>`
         }
 

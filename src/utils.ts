@@ -62,21 +62,6 @@ export function getTimeOffset(): number | null {
 }
 
 /**
- * Returns server time for a specific player.
- * Uses player.time_offset if set, otherwise falls back to global server offset.
- */
-export function getServerTimeForPlayer(playerId?: number): number {
-    if (playerId) {
-        try {
-            const { getPlayerTimeOffsetSync } = require("./data/activeAccount");
-            const offset = getPlayerTimeOffsetSync(playerId);
-            if (offset !== null) return Math.floor((Date.now() + offset) / 1000);
-        } catch {}
-    }
-    return getServerTime();
-}
-
-/**
  * Converts a server time value (unix epoch in seconds) into a Date.
  * 
  * @param serverTime The unix epoch value.

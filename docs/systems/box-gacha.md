@@ -26,7 +26,7 @@
 
 ## 空箱重置
 
-`POST /reset` 请求包含 `viewer_id`、`box_gacha_id` 和 `box_id`。服务端通过 session 与 `resolvePlayerIdSync` 解析账号当前存档，并使用该玩家的服务器时间检查开放期。
+`POST /reset` 请求包含 `viewer_id`、`box_gacha_id` 和 `box_id`。服务端通过 session 与 `resolvePlayerIdSync` 解析账号当前存档，并使用全局服务器时间检查开放期。
 
 主数据日期按 JST（UTC+9）解释，起止时刻均包含在有效期内。期外请求使用 HTTP 200 的 MsgPack 响应，并在 `data_headers.result_code` 返回业务码 `4608`，避免客户端把业务失败误判为 H400。重置前还必须满足：
 

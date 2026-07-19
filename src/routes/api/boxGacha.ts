@@ -10,7 +10,7 @@ import { getSession } from "../../data/domains/session"
 import { playerOwnsEquipmentSync, updatePlayerEquipmentSync } from "../../data/domains/equipment"
 import { updatePlayerPartyGroupSync } from "../../data/domains/party"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { generateDataHeaders, getServerTime, getServerTimeForPlayer } from "../../utils";
+import { generateDataHeaders, getServerTime } from "../../utils";
 import { getBoxGachaSync } from "../../lib/assets";
 import { parseBoxGachaResetRequest, sendBoxGachaResultCode } from "../../lib/box-gacha-protocol";
 import { BoxGachaInvalidPeriodError, BoxGachaResetError, resetBoxGachaSync } from "../../lib/box-gacha-reset";
@@ -120,7 +120,7 @@ const routes = async (fastify: FastifyInstance) => {
                 boxId,
                 availableCount,
                 settings,
-                nowMs: getServerTimeForPlayer(playerId) * 1000,
+                nowMs: getServerTime() * 1000,
             }, {
                 transaction: operation => getDb().transaction(operation)(),
                 getBox: getPlayerBoxGachaSync,
