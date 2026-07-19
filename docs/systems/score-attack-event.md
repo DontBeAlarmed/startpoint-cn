@@ -35,3 +35,5 @@
 - 结算响应显示本次主位角色；重新 load 后最高分和最高评级保持。
 
 当前状态：服务端专项测试通过，客户端待重新验收。履历页面不属于本轮范围。
+
+服务端事务回归使用真实 Fastify `/finish` 与内存 SQLite：先允许 progress 正常写入，再由 `players_active_quests` 的 `AFTER DELETE` trigger 在删除阶段抛错，确认玩家字段、角色经验、任务统计、档位奖励、progress 和 DB active 全部回滚且内存 active 保留；移除 trigger 后以同一请求重试，所有奖励与计数只写入一次。
