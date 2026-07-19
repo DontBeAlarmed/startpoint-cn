@@ -276,6 +276,16 @@ html[data-admin-theme="dark"] body {
   gap: 14px;
 }
 
+.admin-clairvoyance-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--admin-surface-raised) 55%, transparent);
+}
+
 .admin-mail-type-group {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

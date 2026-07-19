@@ -1,5 +1,5 @@
-import { useRef, useState } from "react"
-import { Alert, Button, Card, Divider, Space, Tag, Typography, message } from "antd"
+import { useMemo, useRef, useState } from "react"
+import { Alert, Button, Card, Divider, Empty, Input, Space, Table, Tag, Typography, message } from "antd"
 import { ReloadOutlined, UndoOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import dayjs, { type Dayjs } from "dayjs"
@@ -10,6 +10,42 @@ interface ServerTime {
     servertime: number
     date: string
     isCustom: boolean
+}
+
+interface ClairvoyanceCharacter {
+    id: number
+    name: string
+    title: string
+    rarity: number | null
+    element: number | null
+}
+
+interface ClairvoyanceGacha {
+    id: number
+    name: string
+    type: "character"
+    pageKind: number
+    startDate: string
+    endDate: string
+    durationDays: number
+    rateUpCharacters: ClairvoyanceCharacter[]
+}
+
+interface ClairvoyanceSearchRow {
+    characterId: number
+    name: string
+    title: string
+    gachas: Array<Pick<ClairvoyanceGacha, "id" | "name" | "startDate" | "endDate">>
+}
+
+interface ClairvoyanceGachaTimeline {
+    cdnVersion: string
+    baseline: string
+    scope: "short-up-character-gacha"
+    currentTime: string
+    current: ClairvoyanceGacha[]
+    timeline: ClairvoyanceGacha[]
+    searchIndex: ClairvoyanceSearchRow[]
 }
 
 type SegmentKey = "year" | "month" | "day" | "hour" | "minute" | "second"
@@ -67,6 +103,26 @@ function buildDateFromParts(year: number, month: number, day: number, hour: numb
     return dayjs(`${padSegment(year, 4)}-${padSegment(month, 2)}-${padSegment(day, 2)}T${padSegment(hour, 2)}:${padSegment(minute, 2)}:${padSegment(second, 2)}`)
 }
 
+function normalizeSearch(value: string): string {
+    return value.normalize("NFKC").trim().toLowerCase()
+}
+
+function renderGachaPeriod(gacha: Pick<ClairvoyanceGacha, "startDate" | "endDate">): string {
+    return `${gacha.startDate} - ${gacha.endDate}`
+}
+
+function renderRateUpCharacters(characters: ClairvoyanceCharacter[]) {
+    return (
+        <Space wrap size={[4, 4]}>
+            {characters.map(character => (
+                <Tag key={character.id} color={character.rarity === 5 ? "gold" : character.rarity === 4 ? "purple" : "blue"}>
+                    {character.name} #{character.id}
+                </Tag>
+            ))}
+        </Space>
+    )
+}
+
 function normalizeDraft(base: Dayjs, draft: DraftSegments): Dayjs {
     const read = (key: SegmentKey, fallback: number) => {
         const parsed = Number.parseInt(draft[key], 10)
@@ -112,6 +168,7 @@ export default function TimeControl() {
     const [picked, setPicked] = useState<Dayjs | null>(null)
     const [draftSegments, setDraftSegments] = useState<DraftSegments | null>(null)
     const [editingTime, setEditingTime] = useState(false)
+    const [gachaSearch, setGachaSearch] = useState("")
     const segmentRefs = useRef<Array<HTMLInputElement | null>>([])
     const applyingRef = useRef(false)
 
@@ -120,6 +177,23 @@ export default function TimeControl() {
         queryFn: () => apiGet<ServerTime>("/api/server/currentTime"),
         refetchInterval: 30_000,
     })
+
+    const { data: gachaTimeline, isError: gachaTimelineError, isLoading: gachaTimelineLoading } = useQuery({
+        queryKey: ["clairvoyanceGacha"],
+        queryFn: () => apiGet<ClairvoyanceGachaTimeline>("/api/server/clairvoyance/gacha"),
+        refetchInterval: 30_000,
+    })
+
+    const searchResults = useMemo(() => {
+        const query = normalizeSearch(gachaSearch)
+        if (!query || !gachaTimeline) return []
+        return gachaTimeline.searchIndex
+            .filter(row => {
+                const haystack = normalizeSearch(`${row.characterId} ${row.name} ${row.title}`)
+                return haystack.includes(query)
+            })
+            .slice(0, 20)
+    }, [gachaSearch, gachaTimeline])
 
     const timeText = isLoading
         ? "加载中..."
@@ -189,6 +263,7 @@ export default function TimeControl() {
             setPicked(null)
             setDraftSegments(null)
             qc.invalidateQueries({ queryKey: ["serverTime"] })
+            qc.invalidateQueries({ queryKey: ["clairvoyanceGacha"] })
         },
         onError: (e: Error) => {
             applyingRef.current = false
@@ -204,6 +279,7 @@ export default function TimeControl() {
             setPicked(null)
             setDraftSegments(null)
             qc.invalidateQueries({ queryKey: ["serverTime"] })
+            qc.invalidateQueries({ queryKey: ["clairvoyanceGacha"] })
         },
         onError: (e: Error) => message.error(e.message),
     })
@@ -212,14 +288,17 @@ export default function TimeControl() {
         <AdminPage
             eyebrow="TIME"
             title="时间 / 千里眼"
-            description="管理服务端全局模拟时间。后续千里眼的事件窗口、资源时序和玩家视角校验都从这里扩展。"
+            description="管理服务端全局模拟时间，并按固定 CDN 基线查看短期 UP 角色池时间线。"
             actions={
                 <Button
                     icon={<ReloadOutlined />}
-                    loading={isFetching}
-                    onClick={() => qc.invalidateQueries({ queryKey: ["serverTime"] })}
+                    loading={isFetching || gachaTimelineLoading}
+                    onClick={() => {
+                        qc.invalidateQueries({ queryKey: ["serverTime"] })
+                        qc.invalidateQueries({ queryKey: ["clairvoyanceGacha"] })
+                    }}
                 >
-                    刷新时间
+                    刷新
                 </Button>
             }
         >
@@ -325,18 +404,95 @@ export default function TimeControl() {
                         </Space>
                     )}
                 </Card>
-                <Card title="千里眼预留">
-                    <Space direction="vertical" className="admin-stack">
-                        <Typography.Text type="secondary">
-                            后续事件日程、资源开放窗口和玩家视角校验会接入同一个服务器模拟时间。
-                        </Typography.Text>
-                        <Divider style={{ margin: "8px 0" }} />
-                        <Space wrap>
-                            <Tag>事件窗口</Tag>
-                            <Tag>资源时序</Tag>
-                            <Tag>玩家 time_offset</Tag>
+                <Card
+                    title="千里眼：短期 UP 角色池"
+                    extra={gachaTimeline && <Tag color="cyan">CDN {gachaTimeline.cdnVersion}</Tag>}
+                >
+                    {gachaTimelineError ? (
+                        <Alert type="error" showIcon message="千里眼数据加载失败" description="接口 /api/server/clairvoyance/gacha 不可用。" />
+                    ) : (
+                        <Space direction="vertical" size="large" className="admin-stack">
+                            <Alert
+                                type="info"
+                                showIcon
+                                message="当前阶段只追踪短期 UP 角色池"
+                                description="范围限定为固定 CDN 基线内 pageKind=0、持续不超过 60 天且包含 UP 角色的角色扭蛋。"
+                            />
+
+                            <section>
+                                <Typography.Title level={5}>当前生效卡池</Typography.Title>
+                                {gachaTimelineLoading ? (
+                                    <Typography.Text type="secondary">加载中...</Typography.Text>
+                                ) : gachaTimeline && gachaTimeline.current.length > 0 ? (
+                                    <Space direction="vertical" className="admin-stack">
+                                        {gachaTimeline.current.map(gacha => (
+                                            <div key={gacha.id} className="admin-clairvoyance-panel">
+                                                <Typography.Text strong>{gacha.name} #{gacha.id}</Typography.Text>
+                                                <Typography.Text type="secondary">{renderGachaPeriod(gacha)}</Typography.Text>
+                                                {renderRateUpCharacters(gacha.rateUpCharacters)}
+                                            </div>
+                                        ))}
+                                    </Space>
+                                ) : (
+                                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前服务器模拟时间没有命中的短期 UP 角色池" />
+                                )}
+                            </section>
+
+                            <Divider style={{ margin: "0" }} />
+
+                            <section>
+                                <Typography.Title level={5}>UP 角色搜索</Typography.Title>
+                                <Input
+                                    allowClear
+                                    placeholder="输入角色名、称号或角色 ID"
+                                    value={gachaSearch}
+                                    onChange={event => setGachaSearch(event.target.value)}
+                                />
+                                {gachaSearch && (
+                                    <div style={{ marginTop: 12 }}>
+                                        {searchResults.length > 0 ? (
+                                            <Space direction="vertical" className="admin-stack">
+                                                {searchResults.map(row => (
+                                                    <div key={row.characterId} className="admin-clairvoyance-panel">
+                                                        <Typography.Text strong>{row.name} #{row.characterId}</Typography.Text>
+                                                        {row.title && <Typography.Text type="secondary">{row.title}</Typography.Text>}
+                                                        <Space wrap size={[4, 4]}>
+                                                            {row.gachas.map(gacha => (
+                                                                <Tag key={gacha.id}>
+                                                                    #{gacha.id} {gacha.name} / {renderGachaPeriod(gacha)}
+                                                                </Tag>
+                                                            ))}
+                                                        </Space>
+                                                    </div>
+                                                ))}
+                                            </Space>
+                                        ) : (
+                                            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的 UP 角色" />
+                                        )}
+                                    </div>
+                                )}
+                            </section>
+
+                            <Divider style={{ margin: "0" }} />
+
+                            <section>
+                                <Typography.Title level={5}>时间线</Typography.Title>
+                                <Table<ClairvoyanceGacha>
+                                    rowKey="id"
+                                    size="small"
+                                    loading={gachaTimelineLoading}
+                                    dataSource={gachaTimeline?.timeline ?? []}
+                                    scroll={{ x: "max-content" }}
+                                    pagination={{ pageSize: 8, showSizeChanger: false }}
+                                    columns={[
+                                        { title: "卡池", dataIndex: "name", render: (name: string, row) => `${name} #${row.id}` },
+                                        { title: "上线 / 下线", render: (_: unknown, row) => renderGachaPeriod(row), width: 300 },
+                                        { title: "UP 角色", render: (_: unknown, row) => renderRateUpCharacters(row.rateUpCharacters) },
+                                    ]}
+                                />
+                            </section>
                         </Space>
-                    </Space>
+                    )}
                 </Card>
             </Space>
         </AdminPage>

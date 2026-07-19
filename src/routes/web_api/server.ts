@@ -10,6 +10,7 @@ import { getMergedPlayerDataSync, reviveMergedPlayerDates } from "../../data/uti
 import { getActivePlayerId, setActivePlayerId, getSelectedAccountId, setSelectedAccountId, saveTimeOffset, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
 import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTemplate, getDefaultSaveMeta } from "../../data/defaultSave";
 import { detectCDNVersion, FULL_BASE, getEffectiveVersion, getPatchManifest } from "../../lib/version";
+import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance";
 import { wantsJson } from "./http";
 
 interface TimeQuery {
@@ -175,6 +176,15 @@ const routes = async (fastify: FastifyInstance) => {
                 "message": error?.message ?? "Unknown error"
             })
         }
+    })
+
+    fastify.get("/clairvoyance/gacha", async (_request: FastifyRequest, reply: FastifyReply) => {
+        const patchManifest = getPatchManifest()
+        return reply.status(200).send({
+            cdnVersion: patchManifest.cdn_version,
+            baseline: "fixed-cn-final",
+            ...buildShortUpCharacterGachaTimeline(getServerDate()),
+        })
     })
 
     // === Account list (JSON, for admin SPA) ===
