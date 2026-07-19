@@ -276,6 +276,110 @@ html[data-admin-theme="dark"] body {
   gap: 14px;
 }
 
+.admin-time-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.admin-time-value {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--admin-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.admin-time-value:hover,
+.admin-time-value:focus-visible {
+  color: var(--admin-primary-strong);
+  outline: 2px solid color-mix(in srgb, var(--admin-primary) 28%, transparent);
+  outline-offset: 4px;
+}
+
+.admin-time-value:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.admin-time-inline-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.admin-time-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  align-items: center;
+}
+
+.admin-time-segment-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--admin-border) 70%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--admin-surface) 70%, transparent);
+}
+
+.admin-time-segment-main {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.admin-time-segment {
+  min-width: 46px;
+  min-height: 42px;
+  padding: 4px 7px;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--admin-surface-raised) 82%, transparent);
+  color: var(--admin-text);
+  cursor: pointer;
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+}
+
+.admin-time-step {
+  width: 28px;
+  min-width: 28px;
+  height: 30px;
+  padding: 0 !important;
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 800;
+}
+
+.admin-time-segment:hover,
+.admin-time-segment:focus-visible {
+  border-color: var(--admin-primary);
+  color: var(--admin-primary-strong);
+  outline: 2px solid color-mix(in srgb, var(--admin-primary) 28%, transparent);
+  outline-offset: 2px;
+}
+
+.admin-time-segment-label {
+  color: var(--admin-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .admin-form-panel {
   width: min(100%, 760px);
 }
@@ -433,5 +537,31 @@ html[data-admin-theme="dark"] body {
   .admin-edit-compact {
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+
+  .admin-time-segment {
+    min-width: 40px;
+    min-height: 38px;
+    font-size: 20px;
+  }
+
+  .admin-time-segment-wrap {
+    width: 100%;
+    justify-content: space-between;
+    min-width: 0;
+  }
+
+  .admin-time-step {
+    width: 34px;
+    min-width: 34px;
+    height: 32px;
+  }
+
+  .admin-time-segment-main {
+    min-width: 0;
+  }
+
+  .admin-time-segment-label {
+    flex: 0 0 auto;
   }
 }
