@@ -44,7 +44,6 @@ interface ScoreAttackFinishDependencies {
     transaction: <T>(operation: () => T) => T
     getProgress: (playerId: number, category: number, questId: number) => PlayerQuestProgress | null
     grantRewards: (playerId: number, rewards: Reward[]) => PlayerRewardResult | null
-    giveDegree: (playerId: number, degreeId: number) => boolean
     updateProgress: (
         playerId: number,
         category: number,
@@ -58,7 +57,6 @@ export interface ScoreAttackFinishResult {
     clearRank: number
     oldHighScore: number
     rewardResult: PlayerRewardResult
-    newDegreeIds: number[]
     scoreAttackEvent: {
         main_character_ids: Record<number, number>
         reward_ids: number[]
@@ -107,24 +105,19 @@ export function buildScoreAttackMainCharacterIds(
     return result
 }
 
-function buildGeneralRewards(tiers: ScoreAttackBorderTier[]): {
-    rewards: Reward[]
-    degreeIds: number[]
-} {
+function buildCurrentCnRewards(tiers: ScoreAttackBorderTier[]): Reward[] {
     const rewards = new Map<string, Reward & { count?: number }>()
-    const characters: Reward[] = []
-    const degreeIds = new Set<number>()
 
-    const addCountedReward = (type: RewardType, amount: number, id?: number) => {
-        const key = `${type}_${id ?? "currency"}`
+    const addItemReward = (amount: number, id: number) => {
+        const key = `${RewardType.ITEM}_${id}`
         const existing = rewards.get(key)
         if (existing) {
             existing.count = (existing.count ?? 0) + amount
             return
         }
         rewards.set(key, {
-            type,
-            ...(id !== undefined ? { id } : {}),
+            type: RewardType.ITEM,
+            id,
             count: amount,
         })
     }
@@ -134,43 +127,15 @@ function buildGeneralRewards(tiers: ScoreAttackBorderTier[]): {
             if (!Number.isInteger(slot.amount) || slot.amount <= 0) {
                 throw new Error(`Score attack reward ${tier.id} has invalid amount ${slot.amount}`)
             }
-            switch (slot.kind) {
-                case 0:
-                    if (slot.id === undefined) throw new Error(`Score attack reward ${tier.id} item has no id`)
-                    addCountedReward(RewardType.ITEM, slot.amount, slot.id)
-                    break
-                case 1:
-                    if (slot.id === undefined) throw new Error(`Score attack reward ${tier.id} equipment has no id`)
-                    addCountedReward(RewardType.EQUIPMENT, slot.amount, slot.id)
-                    break
-                case 2:
-                    addCountedReward(RewardType.BEADS, slot.amount)
-                    break
-                case 3:
-                    addCountedReward(RewardType.MANA, slot.amount)
-                    break
-                case 4:
-                    addCountedReward(RewardType.EXP, slot.amount)
-                    break
-                case 5:
-                    throw new Error(`Score attack reward ${tier.id} uses unsupported pass card points`)
-                case 6:
-                    if (slot.id === undefined) throw new Error(`Score attack reward ${tier.id} character has no id`)
-                    for (let count = 0; count < slot.amount; count++) {
-                        characters.push({ type: RewardType.CHARACTER, id: slot.id })
-                    }
-                    break
-                case 7:
-                    if (slot.id === undefined) throw new Error(`Score attack reward ${tier.id} degree has no id`)
-                    degreeIds.add(slot.id)
-                    break
-                default:
-                    throw new Error(`Score attack reward ${tier.id} has unknown kind ${slot.kind}`)
+            if (slot.kind !== 0) {
+                throw new Error(`Score attack reward ${tier.id} has unsupported reward kind ${slot.kind}`)
             }
+            if (slot.id === undefined) throw new Error(`Score attack reward ${tier.id} item has no id`)
+            addItemReward(slot.amount, slot.id)
         }
     }
 
-    return { rewards: [...rewards.values(), ...characters], degreeIds: [...degreeIds] }
+    return [...rewards.values()]
 }
 
 export function handleScoreAttackEventFinish(
@@ -184,13 +149,12 @@ export function handleScoreAttackEventFinish(
         const eligibleTiers = input.isAccomplished
             ? selectScoreAttackRewardTiers(input.tiers, oldHighScore, input.score)
             : []
-        const { rewards, degreeIds } = buildGeneralRewards(eligibleTiers)
+        const rewards = buildCurrentCnRewards(eligibleTiers)
         const rewardResult = rewards.length > 0
             ? dependencies.grantRewards(input.playerId, rewards)
             : emptyRewardResult()
         if (rewardResult === null) throw new Error(`Player ${input.playerId} does not exist`)
 
-        const newDegreeIds = degreeIds.filter(degreeId => dependencies.giveDegree(input.playerId, degreeId))
         const leaderCharacterId = input.party.characters[0]?.id ?? undefined
 
         if (input.isAccomplished) {
@@ -218,7 +182,6 @@ export function handleScoreAttackEventFinish(
             clearRank,
             oldHighScore,
             rewardResult,
-            newDegreeIds,
             scoreAttackEvent: {
                 main_character_ids: buildScoreAttackMainCharacterIds(input.party),
                 reward_ids: eligibleTiers.map(tier => tier.id),

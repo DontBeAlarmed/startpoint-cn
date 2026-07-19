@@ -278,45 +278,8 @@ const routes = async (fastify: FastifyInstance) => {
             }
         }
 
-        // update player
-        const oldRkDegree = getRankDegree(beforeRankPoint)
-        const newDegreeId = getRankDegree(newRankPoint)
-        const didLevelUp = newDegreeId > oldRkDegree
-        updatePlayerSync({
-            id: playerId,
-            freeMana: newMana,
-            expPool: newExpPool,
-            rankPoint: newRankPoint,
-            boostPoint: newBoostPoint,
-            bossBoostPoint: newBossBoostPoint,
-            totalManaObtained: (playerData.totalManaObtained ?? 0) + manaObtained,
-            maxComboAchieved: Math.max(playerData.maxComboAchieved ?? 0, (body as any).statistics?.max_combo_count ?? 0),
-            ...(didLevelUp ? { stamina: playerData.stamina + getMaxStamina(newDegreeId), staminaHealTime: new Date() } : {}),
-        })
-        if (didLevelUp) {
-            playerData.stamina = playerData.stamina + getMaxStamina(newDegreeId)
-            playerData.staminaHealTime = new Date()
-            console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldRkDegree} -> ${newDegreeId}, stamina refilled`)
-        }
-
-        // Consume daily challenge point
-        const dailyChallengePointList = handleDailyChallengePoint({
-            questCategory,
-            eventId: questData.eventId,
-            playerId,
-            challengePointMap: eventChallengePointMap as Record<string, number>,
-            getEntries: (pid) => getPlayerDailyChallengePointListSync(pid),
-            updatePoint: (pid, id, pt) => updatePlayerDailyChallengePointSync(pid, id, pt),
-        })
-
-        console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${questData.scoreRewardGroup?.length ?? 'null'} questId=${questId} category=${questCategory}`)
-        const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element)
-
-        // reward character exp
         const bodyPartyStatistics = body.statistics.party
         const partyCharacterIds = [...bodyPartyStatistics.characters, ...bodyPartyStatistics.unison_characters]
-
-        // Build finish context for mission trackers
         const finishCtx: FinishContext = {
             playerId, questCategory, questId,
             questAccomplished,
@@ -328,133 +291,198 @@ const routes = async (fastify: FastifyInstance) => {
             questPreviouslyCompleted,
             questProgress,
         }
-
-        // Track mission progress (decoupled from core quest mechanics)
-        trackCharacterClears(finishCtx)
-        trackLeaderPowerflip(finishCtx)
-        trackPartyCoClears(finishCtx)
-        trackPowerflip(finishCtx)
         const partyCharacterIdsArray: number[] = []
         for (const value of partyCharacterIds.values()) {
             if (value !== null && value.id !== null) partyCharacterIdsArray.push(value.id);
         }
         const addExpAmount = questData.characterExpReward
 
-        const rewardCharacterExpResult = givePlayerCharactersExpSync(
-            playerId,
-            partyCharacterIdsArray,
-            addExpAmount,
-            questData.fixedParty !== undefined
-        )
+        const executeFinishWrites = () => {
+            const oldRkDegree = getRankDegree(beforeRankPoint)
+            const newDegreeId = getRankDegree(newRankPoint)
+            const didLevelUp = newDegreeId > oldRkDegree
+            const afterStamina = didLevelUp
+                ? playerData.stamina + getMaxStamina(newDegreeId)
+                : playerData.stamina
+            const afterStaminaHealTime = didLevelUp ? new Date() : playerData.staminaHealTime
+            updatePlayerSync({
+                id: playerId,
+                freeMana: newMana,
+                expPool: newExpPool,
+                rankPoint: newRankPoint,
+                boostPoint: newBoostPoint,
+                bossBoostPoint: newBossBoostPoint,
+                totalManaObtained: (playerData.totalManaObtained ?? 0) + manaObtained,
+                maxComboAchieved: Math.max(playerData.maxComboAchieved ?? 0, (body as any).statistics?.max_combo_count ?? 0),
+                ...(didLevelUp ? { stamina: afterStamina, staminaHealTime: afterStaminaHealTime } : {}),
+            })
+            if (didLevelUp) {
+                console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldRkDegree} -> ${newDegreeId}, stamina refilled`)
+            }
 
-        const dataHeaders = generateDataHeaders({
-            viewer_id: viewerId
-        })
+            const dailyChallengePointList = handleDailyChallengePoint({
+                questCategory,
+                eventId: questData.eventId,
+                playerId,
+                challengePointMap: eventChallengePointMap as Record<string, number>,
+                getEntries: (pid) => getPlayerDailyChallengePointListSync(pid),
+                updatePoint: (pid, id, pt) => updatePlayerDailyChallengePointSync(pid, id, pt),
+            })
 
-        // handle event quest-specific data & rewards
-        const { rushEventData, rushEventRewardsResult } = handleRushEventFinish({
-            questCategory,
-            questAccomplished,
-            questData,
-            clearTime,
-            party: bodyPartyStatistics,
-            playerId,
-            questId,
-            getEvoLevels: (pid, chars) => getCharactersEvolutionImgLevels(pid, chars),
-            folderMaxRounds: rushEventFolderMaxRounds,
-            getRushEvent: (pid, eid) => getPlayerRushEventSync(pid, eid),
-            updateRushEvent: (pid, data) => updatePlayerRushEventSync(pid, data),
-            insertParty: (pid, eid, p) => insertPlayerRushEventPlayedPartySync(pid, eid, p),
-            insertClearedFolder: (pid, eid, fid) => insertPlayerRushEventClearedFolderSync(pid, eid, fid),
-            deletePartyList: (pid, eid, bt) => deletePlayerRushEventPlayedPartyListSync(pid, eid, bt),
-            getSerializedParties: (pid, eid) => getSerializedPlayerRushEventPlayedPartiesSync(pid, eid),
-            getFolderRewards: (eid, fid) => getRushEventFolderClearRewards(eid, fid),
-            giveRewards: (pid, r) => givePlayerRewardsSync(pid, r),
-        })
+            console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${questData.scoreRewardGroup?.length ?? 'null'} questId=${questId} category=${questCategory}`)
+            const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element)
 
-        // Record played party for RAID_EVENT
-        const raidEventData = handleRaidEventFinish({
-            questCategory,
-            questAccomplished,
-            activeEventId: activeQuestData.eventId ?? undefined,
-            killCountWeight: questData.killCountWeight,
-            party: bodyPartyStatistics,
-            playerId,
-            questId,
-            getEvoLevelsFn: (pid, chars) => getCharactersEvolutionImgLevels(pid, chars),
-            insertPartyFn: (pid, eid, p) => insertPlayerRushEventPlayedPartySync(pid, eid, p),
-        })
+            trackCharacterClears(finishCtx)
+            trackLeaderPowerflip(finishCtx)
+            trackPartyCoClears(finishCtx)
+            trackPowerflip(finishCtx)
 
-        // handle carnival event score & records
-        const carnivalFinishResult = handleCarnivalEventFinish({
-            questCategory,
-            questAccomplished,
-            questId,
-            questData,
-            clearTime,
-            party: bodyPartyStatistics,
-            playerId,
-            getRecordsFn: (pid, eid) => getPlayerCarnivalEventRecordsSync(pid, eid),
-            upsertFn: (pid, eid, fid, score, chars, unisons) => upsertPlayerCarnivalEventRecordSync(pid, eid, fid, score, chars, unisons),
-            getRewardDefinitionsFn: eid => getCarnivalRewardDefinitions(eid),
-            getClaimedRewardIdsFn: (pid, eid) => getPlayerClaimedCarnivalRewardIdsSync(pid, eid),
-            grantRewardsFn: (pid, definitions) => grantCarnivalRewards(pid, definitions, {
-                getPlayer: getPlayerSync,
-                giveItem: givePlayerItemSync,
-                giveEquipment: givePlayerEquipmentSync,
-                giveDegree: givePlayerDegreeSync,
-                updatePlayer: updatePlayerSync,
-            }),
-            claimRewardIdsFn: (pid, eid, rewardIds) => insertPlayerClaimedCarnivalRewardIdsSync(pid, eid, rewardIds),
-            transactionFn: runCarnivalEventTransactionSync,
-        })
-        const carnivalEventData = carnivalFinishResult?.carnivalEventData ?? null
-        const carnivalRewardResult = carnivalFinishResult?.rewardResult
+            const rewardCharacterExpResult = givePlayerCharactersExpSync(
+                playerId,
+                partyCharacterIdsArray,
+                addExpAmount,
+                questData.fixedParty !== undefined
+            )
 
-        const scoreAttackFinishResult = isScoreAttackEvent
-            ? handleScoreAttackEventFinish({
+            const { rushEventData, rushEventRewardsResult } = handleRushEventFinish({
+                questCategory,
+                questAccomplished,
+                questData,
+                clearTime,
+                party: bodyPartyStatistics,
                 playerId,
                 questId,
-                category: questCategory,
-                score: body.score,
-                elapsedTimeMs: clearTime,
-                isAccomplished: questAccomplished,
-                quest: {
-                    bRankScore: questData.bRankScore!,
-                    aRankScore: questData.aRankScore!,
-                    sRankScore: questData.sRankScore!,
-                    ssRankScore: questData.ssRankScore!,
-                },
-                tiers: scoreAttackBorderTiers,
-                party: bodyPartyStatistics,
-            }, {
-                transaction: operation => getDb().transaction(operation)(),
-                getProgress: (pid, category, qid) => getPlayerSingleQuestProgressSync(pid, category, qid),
-                grantRewards: (pid, rewards) => givePlayerRewardsSync(pid, rewards),
-                giveDegree: (pid, degreeId) => givePlayerDegreeSync(pid, degreeId),
-                updateProgress: (pid, category, progress) => updatePlayerQuestProgressSync(pid, category, progress),
-                insertProgress: (pid, category, progress) => insertPlayerQuestProgressSync(pid, category, progress),
-                deleteActiveQuest: pid => deletePlayerActiveQuestSync(pid),
+                getEvoLevels: (pid, chars) => getCharactersEvolutionImgLevels(pid, chars),
+                folderMaxRounds: rushEventFolderMaxRounds,
+                getRushEvent: (pid, eid) => getPlayerRushEventSync(pid, eid),
+                updateRushEvent: (pid, data) => updatePlayerRushEventSync(pid, data),
+                insertParty: (pid, eid, p) => insertPlayerRushEventPlayedPartySync(pid, eid, p),
+                insertClearedFolder: (pid, eid, fid) => insertPlayerRushEventClearedFolderSync(pid, eid, fid),
+                deletePartyList: (pid, eid, bt) => deletePlayerRushEventPlayedPartyListSync(pid, eid, bt),
+                getSerializedParties: (pid, eid) => getSerializedPlayerRushEventPlayedPartiesSync(pid, eid),
+                getFolderRewards: (eid, fid) => getRushEventFolderClearRewards(eid, fid),
+                giveRewards: (pid, r) => givePlayerRewardsSync(pid, r),
             })
-            : null
+
+            const raidEventData = handleRaidEventFinish({
+                questCategory,
+                questAccomplished,
+                activeEventId: activeQuestData.eventId ?? undefined,
+                killCountWeight: questData.killCountWeight,
+                party: bodyPartyStatistics,
+                playerId,
+                questId,
+                getEvoLevelsFn: (pid, chars) => getCharactersEvolutionImgLevels(pid, chars),
+                insertPartyFn: (pid, eid, p) => insertPlayerRushEventPlayedPartySync(pid, eid, p),
+            })
+
+            const carnivalFinishResult = handleCarnivalEventFinish({
+                questCategory,
+                questAccomplished,
+                questId,
+                questData,
+                clearTime,
+                party: bodyPartyStatistics,
+                playerId,
+                getRecordsFn: (pid, eid) => getPlayerCarnivalEventRecordsSync(pid, eid),
+                upsertFn: (pid, eid, fid, score, chars, unisons) => upsertPlayerCarnivalEventRecordSync(pid, eid, fid, score, chars, unisons),
+                getRewardDefinitionsFn: eid => getCarnivalRewardDefinitions(eid),
+                getClaimedRewardIdsFn: (pid, eid) => getPlayerClaimedCarnivalRewardIdsSync(pid, eid),
+                grantRewardsFn: (pid, definitions) => grantCarnivalRewards(pid, definitions, {
+                    getPlayer: getPlayerSync,
+                    giveItem: givePlayerItemSync,
+                    giveEquipment: givePlayerEquipmentSync,
+                    giveDegree: givePlayerDegreeSync,
+                    updatePlayer: updatePlayerSync,
+                }),
+                claimRewardIdsFn: (pid, eid, rewardIds) => insertPlayerClaimedCarnivalRewardIdsSync(pid, eid, rewardIds),
+                transactionFn: runCarnivalEventTransactionSync,
+            })
+            const carnivalEventData = carnivalFinishResult?.carnivalEventData ?? null
+            const carnivalRewardResult = carnivalFinishResult?.rewardResult
+
+            const scoreAttackFinishResult = isScoreAttackEvent
+                ? handleScoreAttackEventFinish({
+                    playerId,
+                    questId,
+                    category: questCategory,
+                    score: body.score,
+                    elapsedTimeMs: clearTime,
+                    isAccomplished: questAccomplished,
+                    quest: {
+                        bRankScore: questData.bRankScore!,
+                        aRankScore: questData.aRankScore!,
+                        sRankScore: questData.sRankScore!,
+                        ssRankScore: questData.ssRankScore!,
+                    },
+                    tiers: scoreAttackBorderTiers,
+                    party: bodyPartyStatistics,
+                }, {
+                    transaction: operation => operation(),
+                    getProgress: (pid, category, qid) => getPlayerSingleQuestProgressSync(pid, category, qid),
+                    grantRewards: (pid, rewards) => givePlayerRewardsSync(pid, rewards),
+                    updateProgress: (pid, category, progress) => updatePlayerQuestProgressSync(pid, category, progress),
+                    insertProgress: (pid, category, progress) => insertPlayerQuestProgressSync(pid, category, progress),
+                    deleteActiveQuest: pid => deletePlayerActiveQuestSync(pid),
+                })
+                : null
+            const scoreAttackRewardResult = scoreAttackFinishResult?.rewardResult
+            const itemList = {
+                ...(activeQuestData.entryItemId ? { [activeQuestData.entryItemId]: getPlayerItemSync(playerId, activeQuestData.entryItemId) ?? 0 } : {}),
+                ...scoreRewardsResult.items,
+                ...(scoreAttackRewardResult?.items ?? {}),
+                ...(rushEventRewardsResult?.items ?? {}),
+                ...(carnivalRewardResult?.item_list ?? {}),
+            }
+            const characterList = reconcileAwakeUnlockCharacterList(playerId, [
+                ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
+                ...((clearReward?.character_list || []) as Record<string, unknown>[]),
+                ...((sPlusClearReward?.character_list || []) as Record<string, unknown>[]),
+                ...(scoreRewardsResult.character_list as Record<string, unknown>[]),
+                ...((scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[]),
+            ])
+
+            return {
+                afterStamina,
+                afterStaminaHealTime,
+                dailyChallengePointList,
+                scoreRewardsResult,
+                rewardCharacterExpResult,
+                rushEventData,
+                rushEventRewardsResult,
+                raidEventData,
+                carnivalEventData,
+                carnivalRewardResult,
+                scoreAttackFinishResult,
+                scoreAttackRewardResult,
+                itemList,
+                characterList,
+            }
+        }
+
+        const finishWrites = isScoreAttackEvent
+            ? getDb().transaction(executeFinishWrites)()
+            : executeFinishWrites()
+        const {
+            afterStamina,
+            afterStaminaHealTime,
+            dailyChallengePointList,
+            scoreRewardsResult,
+            rewardCharacterExpResult,
+            rushEventData,
+            rushEventRewardsResult,
+            raidEventData,
+            carnivalEventData,
+            carnivalRewardResult,
+            scoreAttackFinishResult,
+            scoreAttackRewardResult,
+            itemList,
+            characterList,
+        } = finishWrites
         if (scoreAttackFinishResult !== null) delete activeQuests[playerId]
-        const scoreAttackRewardResult = scoreAttackFinishResult?.rewardResult
         const scoreAttackEventData = scoreAttackFinishResult?.scoreAttackEvent ?? null
 
-        const itemList = {
-            ...(activeQuestData.entryItemId ? { [activeQuestData.entryItemId]: getPlayerItemSync(playerId, activeQuestData.entryItemId) ?? 0 } : {}),
-            ...scoreRewardsResult.items,
-            ...(scoreAttackRewardResult?.items ?? {}),
-            ...(rushEventRewardsResult?.items ?? {}),
-            ...(carnivalRewardResult?.item_list ?? {}),
-        }
-        const characterList = reconcileAwakeUnlockCharacterList(playerId, [
-            ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
-            ...((clearReward?.character_list || []) as Record<string, unknown>[]),
-            ...((sPlusClearReward?.character_list || []) as Record<string, unknown>[]),
-            ...(scoreRewardsResult.character_list as Record<string, unknown>[]),
-            ...((scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[]),
-        ])
+        const dataHeaders = generateDataHeaders({ viewer_id: viewerId })
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": dataHeaders,
@@ -466,8 +494,8 @@ const routes = async (fastify: FastifyInstance) => {
                     "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney + (scoreAttackRewardResult?.user_info.free_vmoney ?? 0) + (carnivalRewardResult?.user_info.free_vmoney ?? 0),
                     "rank_point": newRankPoint,
                     "degree_id": playerData.degreeId,
-                    "stamina": playerData.stamina,
-                    "stamina_heal_time": realToVirtual(playerData.staminaHealTime),
+                    "stamina": afterStamina,
+                    "stamina_heal_time": realToVirtual(afterStaminaHealTime),
                     "boost_point": newBoostPoint,
                     "boss_boost_point": newBossBoostPoint
                 },

@@ -340,7 +340,7 @@ Player 页面 `/player/:id` → 「恢复挑战次数」按钮：
 
 **历史根因**：服务端曾把无限演武错误映射到 category 9，并把关卡分数阈值当作耗时阈值；同时把分数奖励的 `reason_id=16001` 误认成道具 ID，只发最高一档的第一项奖励。category 9 实际是教程关卡，国服 1.8.1 客户端完整支持 category 27 和 `score_attack_event` 结算响应。
 
-**修复**：按 `ScoreAttackEventQuestValues` 重建 123 个关卡，全部使用 category 27 和 10 体力；移除虚构的首通、S+ 与普通掉落奖励。按 `ScoreAttackBorderRewardValues` 重建 11,100 档奖励，保留奖励行 ID、分数线、原因 ID 和最多 6 个奖励槽。成功结算按 `(旧最高分, 新最高分]` 发放所有跨越档位，按分数计算 C/B/A/S/SS，并在同一事务内完成奖励、最高分/评级持久化和 active quest 删除。响应返回 `score_attack_event.main_character_ids` 与奖励行 ID 列表。
+**修复**：按 `ScoreAttackEventQuestValues` 重建 123 个关卡，全部使用 category 27 和 10 体力；移除虚构的首通、S+ 与普通掉落奖励。按 `ScoreAttackBorderRewardValues` 重建 11,100 档奖励，保留奖励行 ID、分数线、原因 ID 和最多 6 个奖励槽。当前奖励 kind 扫描结果仅为 `{0}`，服务端完整发放现有道具槽并明确拒绝未出现类型。成功结算按 `(旧最高分, 新最高分]` 发放所有跨越档位，按分数计算 C/B/A/S/SS；category 27 的基础玩家更新、普通掉落、任务统计、角色经验、档位奖励、进度和 active 删除全部位于同一事务。响应返回 `score_attack_event.main_character_ids` 与奖励行 ID 列表。
 
 **客户端验收重点**：检查 10 体力扣除、跨多档奖励、重复或低分不重复发奖、专用结算卡与奖励动画，以及重新 load 后最高分和评级保持。
 

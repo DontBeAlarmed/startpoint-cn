@@ -77,6 +77,7 @@ for (const { eventId, localQuestId, row } of rawQuestRows) {
 }
 
 let convertedBorderCount = 0
+const currentRewardKinds = new Set()
 for (const [rewardId, wrappers] of Object.entries(rawBorderRewards)) {
     const row = wrappers[0]
     const key = `${row[1]}_${row[2]}`
@@ -92,6 +93,7 @@ for (const [rewardId, wrappers] of Object.entries(rawBorderRewards)) {
         const base = 6 + slot * 3
         const kind = optionalNumber(row[base])
         if (kind === undefined) continue
+        currentRewardKinds.add(kind)
         const id = optionalNumber(row[base + 1])
         expectedSlots.push({
             kind,
@@ -103,6 +105,7 @@ for (const [rewardId, wrappers] of Object.entries(rawBorderRewards)) {
     convertedBorderCount++
 }
 assert.equal(convertedBorderCount, 11100)
+assert.deepEqual([...currentRewardKinds].sort(), [0])
 assert.equal(borderRewards["1_101"].find(value => value.id === 101075).rewards.length, 2)
 
 const {
@@ -162,12 +165,7 @@ const multiRewardTier = {
     reasonId: 16001,
     rewards: [
         { kind: 0, id: 40501, amount: 2 },
-        { kind: 1, id: 505001, amount: 1 },
-        { kind: 2, amount: 50 },
-        { kind: 3, amount: 1000 },
-        { kind: 4, amount: 2000 },
-        { kind: 6, id: 101, amount: 1 },
-        { kind: 7, id: 61000, amount: 1 },
+        { kind: 0, id: 40502, amount: 3 },
     ],
 }
 const result = handleScoreAttackEventFinish({
@@ -195,16 +193,12 @@ const result = handleScoreAttackEventFinish({
         calls.push("grant")
         capturedRewards = rewards
         return {
-            user_info: { free_mana: 1000, free_vmoney: 50, exp_pool: 2000 },
-            character_list: [{ character_id: 101 }],
-            joined_character_id_list: [101],
-            equipment_list: [{ equipment_id: 505001 }],
+            user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
+            character_list: [],
+            joined_character_id_list: [],
+            equipment_list: [],
             items: { 40501: 12, 40502: 3 },
         }
-    },
-    giveDegree(_playerId, degreeId) {
-        calls.push(`degree:${degreeId}`)
-        return true
     },
     updateProgress(_playerId, category, progress) {
         calls.push(`progress:${category}`)
@@ -222,7 +216,6 @@ assert.deepEqual(calls, [
     "begin",
     "get-progress",
     "grant",
-    "degree:61000",
     "progress:27",
     "delete-active",
     "commit",
@@ -231,11 +224,10 @@ assert.deepEqual(result.scoreAttackEvent, {
     main_character_ids: { 0: 101, 1: 102 },
     reward_ids: [101001, 101002, 101075],
 })
-assert.deepEqual(result.rewardResult.user_info, { free_mana: 1000, free_vmoney: 50, exp_pool: 2000 })
-assert.deepEqual(result.rewardResult.character_list, [{ character_id: 101 }])
-assert.deepEqual(result.rewardResult.equipment_list, [{ equipment_id: 505001 }])
+assert.deepEqual(result.rewardResult.user_info, { free_mana: 0, free_vmoney: 0, exp_pool: 0 })
+assert.deepEqual(result.rewardResult.character_list, [])
+assert.deepEqual(result.rewardResult.equipment_list, [])
 assert.deepEqual(result.rewardResult.items, { 40501: 12, 40502: 3 })
-assert.deepEqual(result.newDegreeIds, [61000])
 assert.equal(result.oldHighScore, 50)
 assert.equal(result.clearRank, 4)
 assert.deepEqual(storedProgress, {
@@ -248,12 +240,7 @@ assert.deepEqual(storedProgress, {
 })
 assert.deepEqual(capturedRewards, [
     { type: 0, id: 40501, count: 3 },
-    { type: 0, id: 40502, count: 2 },
-    { type: 1, id: 505001, count: 1 },
-    { type: 3, count: 50 },
-    { type: 4, count: 1000 },
-    { type: 5, count: 2000 },
-    { type: 2, id: 101 },
+    { type: 0, id: 40502, count: 5 },
 ])
 
 for (const lowerScore of [300, 299]) {
@@ -272,7 +259,6 @@ for (const lowerScore of [300, 299]) {
         transaction: operation => operation(),
         getProgress: () => ({ questId: 1101, finished: true, highScore: 300, clearRank: 4, bestElapsedTimeMs: 120000 }),
         grantRewards: () => { grantCount++; return emptyGrantResult() },
-        giveDegree: () => false,
         updateProgress: () => {},
         insertProgress: () => assert.fail("已有进度不应插入新行"),
         deleteActiveQuest: () => {},
@@ -297,7 +283,6 @@ handleScoreAttackEventFinish({
     transaction: operation => operation(),
     getProgress: () => null,
     grantRewards: () => emptyGrantResult(),
-    giveDegree: () => false,
     updateProgress: () => assert.fail("首次通关应插入进度"),
     insertProgress: (_playerId, category, progress) => { insertedProgress = { category, ...progress } },
     deleteActiveQuest: () => {},
@@ -322,12 +307,37 @@ assert.throws(() => handleScoreAttackEventFinish({
     transaction: operation => operation(),
     getProgress: () => null,
     grantRewards: () => { throw new Error("grant failed") },
-    giveDegree: () => false,
     updateProgress: () => {},
     insertProgress: () => {},
     deleteActiveQuest: () => { deletedAfterFailure = true },
 }), /grant failed/)
 assert.equal(deletedAfterFailure, false)
+
+assert.throws(() => handleScoreAttackEventFinish({
+    playerId: 20,
+    questId: 1104,
+    category: 27,
+    score: 100,
+    elapsedTimeMs: 90000,
+    isAccomplished: true,
+    quest: thresholds,
+    tiers: [{
+        id: 104001,
+        eventId: 1,
+        questId: 104,
+        score: 100,
+        reasonId: 16001,
+        rewards: [{ kind: 1, id: 505001, amount: 1 }],
+    }],
+    party: { characters: [{ id: 401 }] },
+}, {
+    transaction: operation => operation(),
+    getProgress: () => null,
+    grantRewards: () => emptyGrantResult(),
+    updateProgress: () => {},
+    insertProgress: () => {},
+    deleteActiveQuest: () => {},
+}), /unsupported reward kind 1/)
 
 assert.equal(calculateClearRank(999, {
     bRankTime: 1000,
