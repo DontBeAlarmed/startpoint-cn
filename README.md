@@ -24,7 +24,7 @@
 
 ## 环境需求
 
-- Node.js（使用当前环境默认版本；最低要求见 `package.json` 的 `engines`） · 打补丁后的 CN 客户端 APK(见"客户端改造")
+- Node.js v22.23.1（当前默认版本；最低要求见 `package.json` 的 `engines`，日常直接使用默认版本即可） · 打补丁后的 CN 客户端 APK(见"客户端改造")
 - 一份 CN CDN 资源,放入 `.cdn/cn/`
 
 ### CDN 路径清单文件(PathFile)
@@ -45,6 +45,24 @@ cd starpoint-cn
 npm install
 cp .env.example .env
 ```
+
+管理后台依赖独立维护。首次安装，或 `admin/package-lock.json` 发生变化后，执行一次：
+
+```bash
+npm run install:admin
+```
+
+日常构建不重复安装后台依赖，各命令边界如下：
+
+| 命令 | 边界 |
+|------|------|
+| `npm run build:server` | 仅编译 CN 服务端入口及其依赖，不构建 CSS 或管理后台 |
+| `npm run dev:cn` | 先执行 `build:server`，再启动 `out/cn-server.js` |
+| `npm run build:legacy` | 使用原 `tsconfig.json` 编译 legacy 全量 TypeScript，不构建 CSS |
+| `npm run build` | 保留原有 legacy 全量 TypeScript + Tailwind CSS 构建语义 |
+| `npm run build:admin` | 仅构建管理后台，不安装依赖 |
+| `npm run verify:full` | 依次执行类型检查、完整测试、仓库卫生检查和 CN 服务端构建 |
+| `npm run cdn` / `npm run unzip` | 先同步完成 legacy 编译，再运行对应 CDN 工具 |
 
 ### 本地局域网（开发/测试）
 

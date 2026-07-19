@@ -10,15 +10,15 @@ cd "$ROOT"
 
 echo "=== CN StarPoint Server ==="
 
+# Build before touching the running process. A failed build must never start stale output.
+echo "[build] npm run build:server..."
+npm run build:server
+
 # Kill old process
 if pkill -f "cn-server.js" 2>/dev/null; then
     echo "[kill] 已终止旧进程"
     sleep 1
 fi
-
-# Build
-echo "[build] npm run build..."
-npm run build 2>&1 | grep -v "Browserslist\|caniuse" || true
 
 # Start
 echo "[start] node --env-file=.env out/cn-server.js"

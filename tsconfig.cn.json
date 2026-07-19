@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./out/.tsbuildinfo-cn"
+  },
+  "files": ["src/cn-server.ts"]
+}
