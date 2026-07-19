@@ -85,6 +85,28 @@
    "created_at": "2026-07-18"
   },
   {
+   "id": "three-characters-final",
+   "type": "patch",
+   "name": "三自制角色终态:白狼杰拉德 + 赛瑞斯修复列车 + 史黛拉",
+   "description": "真机验收版三角色客户端全量:149999 白狼杰拉德 v2 全套(原图立绘/原创像素 v6/五段特效/PF 全链/语音,对应本地 1.4.172 发布,manifest c4a7b142)+ 129999 赛瑞斯五轮战斗修复终态(官方 fixture PF 树/特效容器/14 官方光束容器/语音,对应本地 1.4.182 发布,manifest c1311b52)+ 随包史黛拉资产刷新。表为外科式合并:仅角色认领行进包(ability/character/PF/upskill 等 18 张),刻意排除本地运营向的 ability_soul/equipment_enhancement_ability 平衡总包与 rush_event_quest 每日重摇态。杰拉德服务端主数据已随分支(assets/*.json);像素占屏需客户端叠 render-scale-v1 补丁,赛瑞斯仍需 dual-form-v1。发放:管理后台邮件 129999/139999/149999。构建器 mod-tools/build_three_char_release_patch.py,CI 守护 test_three_char_release_patch.py。",
+   "version": "1.4.107",
+   "depends_on": "1.4.106",
+   "enabled": true,
+   "chain": [
+    "pinball-1.4.106-1.4.107-1-threechar0719.zip",
+    "pinball-1.4.106-1.4.107-2-threechar0719.zip",
+    "pinball-1.4.106-1.4.107-3-threechar0719.zip",
+    "pinball-1.4.106-1.4.107-4-threechar0719.zip",
+    "pinball-1.4.106-1.4.107-5-threechar0719.zip",
+    "pinball-1.4.106-1.4.107-6-threechar0719.zip",
+    "pinball-1.4.106-1.4.107-7-threechar0719.zip",
+    "pinball-1.4.106-1.4.107-8-threechar0719.zip",
+    "pinball-1.4.106-1.4.107-9-threechar0719.zip",
+    "pinball-1.4.106-1.4.107-10-threechar0719.zip"
+   ],
+   "created_at": "2026-07-19"
+  },
+  {
    "id": "gacha-feature-fix-v1",
    "type": "patch",
    "name": "特辑图片 C2032 修复（第一步）",
