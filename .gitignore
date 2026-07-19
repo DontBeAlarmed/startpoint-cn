@@ -49,11 +49,11 @@ export/
 # --- mod-tools 本地产物 / 逆向数据(工具代码与文档照常提交)---
 mod-tools/work/
 mod-tools/edit/
-mod-tools/**/__pycache__/
+__pycache__/
 mod-tools/*.csv
 mod-tools/profiles.json
-/work/character_packs/
-/work/remediation/
+# 本地会话工作区(打包中间产物/顾问纪要/夜班脚手架,含未发布媒体,不提交)
+/work/
 
 # --- 打包产物 ---
 *.skill
