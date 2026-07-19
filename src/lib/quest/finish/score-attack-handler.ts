@@ -63,6 +63,21 @@ export interface ScoreAttackFinishResult {
     }
 }
 
+export function resolveScoreAttackBorderTiers(
+    eventId: number | undefined,
+    localQuestId: number | undefined,
+    tierMap: Record<string, ScoreAttackBorderTier[]>,
+): ScoreAttackBorderTier[] {
+    if (eventId === undefined) throw new Error("Score attack event id is missing")
+    if (localQuestId === undefined) throw new Error("Score attack local quest id is missing")
+    const key = `${eventId}_${localQuestId}`
+    const tiers = tierMap[key]
+    if (!Array.isArray(tiers) || tiers.length === 0) {
+        throw new Error(`Score attack border tiers are missing for ${key}`)
+    }
+    return tiers
+}
+
 function emptyRewardResult(): PlayerRewardResult {
     return {
         user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },

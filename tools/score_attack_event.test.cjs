@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
 const path = require("node:path")
+const { execFileSync } = require("node:child_process")
 
 require("ts-node/register/transpile-only")
 
@@ -27,6 +28,47 @@ const entryCosts = JSON.parse(fs.readFileSync(
     path.join(ROOT, "assets/quest_entry_costs.json"),
     "utf8",
 ))
+const fieldMap = JSON.parse(execFileSync("python3", [
+    "-c",
+    "import json,sys;sys.path.insert(0,'scripts');import field_map;print(json.dumps(field_map.SCORE_ATTACK))",
+], { cwd: ROOT, encoding: "utf8" }))
+
+assert.deepEqual(fieldMap, {
+    quest_id: 0,
+    clear_reward: 6,
+    score_group: 72,
+    element: 73,
+    rank_b: 52,
+    rank_a: 53,
+    rank_s: 54,
+    rank_sp: 55,
+    rank_point: 86,
+    char_exp: 87,
+    mana: 88,
+    pool_exp: 89,
+    fixed_party: -1,
+    story_check: -1,
+})
+
+const converterSource = fs.readFileSync(
+    path.join(ROOT, "scripts/converters/quests/campaign.py"),
+    "utf8",
+)
+for (const [field, index] of Object.entries({
+    bRankScore: 52,
+    aRankScore: 53,
+    sRankScore: 54,
+    ssRankScore: 55,
+    rankPointReward: 86,
+    characterExpReward: 87,
+    manaReward: 88,
+    poolExpReward: 89,
+    element: 73,
+})) {
+    assert.match(converterSource, new RegExp(`"${field}"\\s*:\\s*int\\(.*quest\\[${index}\\]`))
+}
+assert.match(converterSource, /clear_reward_id\s*=\s*_optional_int\(quest\[6\]\)/)
+assert.match(converterSource, /score_reward_group_id\s*=\s*_optional_int\(quest\[72\]\)/)
 
 function flattenQuestRows(source) {
     const rows = []
@@ -112,6 +154,7 @@ const {
     buildScoreAttackMainCharacterIds,
     calculateScoreAttackClearRank,
     handleScoreAttackEventFinish,
+    resolveScoreAttackBorderTiers,
     selectScoreAttackRewardTiers,
 } = require("../src/lib/quest/finish/score-attack-handler")
 const { calculateClearRank } = require("../src/lib/quest/finish/quest-calc")
@@ -135,6 +178,11 @@ const tiers = [
     { id: 101002, eventId: 1, questId: 101, score: 200, reasonId: 16001, rewards: [{ kind: 0, id: 40502, amount: 2 }] },
     { id: 101003, eventId: 1, questId: 101, score: 300, reasonId: 16001, rewards: [{ kind: 0, id: 40503, amount: 3 }] },
 ]
+assert.equal(resolveScoreAttackBorderTiers(1, 101, { "1_101": tiers }), tiers)
+assert.throws(() => resolveScoreAttackBorderTiers(undefined, 101, { "1_101": tiers }), /event id/)
+assert.throws(() => resolveScoreAttackBorderTiers(1, undefined, { "1_101": tiers }), /local quest id/)
+assert.throws(() => resolveScoreAttackBorderTiers(1, 999, { "1_101": tiers }), /border tiers/)
+assert.throws(() => resolveScoreAttackBorderTiers(1, 101, { "1_101": [] }), /border tiers/)
 assert.deepEqual(selectScoreAttackRewardTiers(tiers, 0, 300).map(value => value.id), [101001, 101002, 101003])
 assert.deepEqual(selectScoreAttackRewardTiers(tiers, 200, 300).map(value => value.id), [101003])
 assert.deepEqual(selectScoreAttackRewardTiers(tiers, 300, 300), [])
@@ -192,12 +240,14 @@ const result = handleScoreAttackEventFinish({
     grantRewards(_playerId, rewards) {
         calls.push("grant")
         capturedRewards = rewards
+        const inventory = { 40501: 7, 40502: 20 }
+        for (const reward of rewards) inventory[reward.id] += reward.count
         return {
             user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
             character_list: [],
             joined_character_id_list: [],
             equipment_list: [],
-            items: { 40501: 12, 40502: 3 },
+            items: inventory,
         }
     },
     updateProgress(_playerId, category, progress) {
@@ -227,7 +277,7 @@ assert.deepEqual(result.scoreAttackEvent, {
 assert.deepEqual(result.rewardResult.user_info, { free_mana: 0, free_vmoney: 0, exp_pool: 0 })
 assert.deepEqual(result.rewardResult.character_list, [])
 assert.deepEqual(result.rewardResult.equipment_list, [])
-assert.deepEqual(result.rewardResult.items, { 40501: 12, 40502: 3 })
+assert.deepEqual(result.rewardResult.items, { 40501: 10, 40502: 25 })
 assert.equal(result.oldHighScore, 50)
 assert.equal(result.clearRank, 4)
 assert.deepEqual(storedProgress, {

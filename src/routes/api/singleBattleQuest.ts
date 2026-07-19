@@ -31,6 +31,7 @@ import { calculateClearRank } from "../../lib/quest/finish/quest-calc";
 import {
     calculateScoreAttackClearRank,
     handleScoreAttackEventFinish,
+    resolveScoreAttackBorderTiers,
     ScoreAttackBorderTier,
 } from "../../lib/quest/finish/score-attack-handler";
 import { validateSessionAndPlayer } from "../../lib/quest/finish/session-validator";
@@ -230,16 +231,20 @@ const routes = async (fastify: FastifyInstance) => {
         let questAccomplished = body.is_accomplished
         let scoreAttackBorderTiers: ScoreAttackBorderTier[] = []
         if (isScoreAttackEvent) {
-            const eventId = questData.eventId
-            const localQuestId = questData.scoreAttackQuestId
-            if (eventId !== undefined && localQuestId !== undefined) {
-                scoreAttackBorderTiers = (
-                    scoreAttackBorderRewards as Record<string, ScoreAttackBorderTier[]>
-                ) [`${eventId}_${localQuestId}`] ?? []
-                if (scoreAttackBorderTiers.length > 0) {
-                    questAccomplished = body.score >= scoreAttackBorderTiers[0].score
-                }
+            try {
+                scoreAttackBorderTiers = resolveScoreAttackBorderTiers(
+                    questData.eventId,
+                    questData.scoreAttackQuestId,
+                    scoreAttackBorderRewards as Record<string, ScoreAttackBorderTier[]>,
+                )
+            } catch (error) {
+                console.error(`[SCORE_ATTACK] invalid configuration: ${(error as Error).message}`)
+                return reply.status(500).send({
+                    "error": "Internal Server Error",
+                    "message": "Score attack reward configuration is missing.",
+                })
             }
+            questAccomplished = body.score >= scoreAttackBorderTiers[0].score
         }
 
         const clearReward = !isScoreAttackEvent && !questPreviouslyCompleted && questData.clearReward !== undefined

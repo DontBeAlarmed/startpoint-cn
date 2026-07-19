@@ -226,19 +226,20 @@ EXPERT_SINGLE = {
 
 SCORE_ATTACK = {
     'quest_id':      0,
-    'clear_reward':  FROM_KEY,   # hardcoded to 1
-    'score_group':   70,
-    'element':       NOT_USED,
-    'rank_b':        85,
-    'rank_a':        86,
-    'rank_s':        87,
-    'rank_sp':       88,
-    'rank_point':    92,
-    'char_exp':      93,
-    'mana':          94,
-    'pool_exp':      95,
+    'clear_reward':  6,
+    'score_group':   72,
+    'element':       73,
+    # ScoreAttack uses score thresholds here, not elapsed-time thresholds.
+    'rank_b':        52,
+    'rank_a':        53,
+    'rank_s':        54,
+    'rank_sp':       55,
+    'rank_point':    86,
+    'char_exp':      87,
+    'mana':          88,
+    'pool_exp':      89,
     'fixed_party':   NOT_USED,
-    'story_check':   85,         # "" or "(None)" = story
+    'story_check':   NOT_USED,
 }
 
 # ─── Group 7: Special ────────────────────────────────────────────────────

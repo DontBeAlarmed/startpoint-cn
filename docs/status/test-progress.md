@@ -12,7 +12,7 @@
 - 战阵（Raid）：按本地三队 Raid 流程重测进入、配队、`event/raid/battle/start`、战斗与结算；不创建常规多人房间，配队已与 Rush/Carnival 隔离。
 - 活动扭蛋箱：活动 28 箱 5 重置已通过客户端验收；库存恢复为 2732、重置次数加一、非空时拒绝再次重置，重新 load 后状态保持。
 - 歼灭者讨伐战：三关房主通关、最高难度即时解锁和重新 load 保持均已通过客户端验收；成员不解锁由回归测试覆盖并降为低优先级客户端回归。最高难度歼灭心核已补齐 start 预扣、abort 单次返还和重启恢复，待客户端验收。
-- 无限演武（ScoreAttackEvent）：category 27、体力、分数评级、跨档奖励、专用响应和进度持久化已完成服务端测试；真实 Fastify/SQLite 测试在 progress 成功后由 `AFTER DELETE` trigger 注入 active 删除故障，验证全部写入回滚、内存 active 保留，移除 trigger 后同请求仅结算一次。等待客户端重新验收结算卡、奖励动画和 load 后最高分。
+- 无限演武（ScoreAttackEvent）：category 27、体力、分数评级、跨档奖励、专用响应和进度持久化已完成服务端测试；缺失奖励配置会在写库前 fail closed。真实 Fastify/SQLite 测试覆盖 active 删除回滚、单次重试和 `item_list` 绝对库存；MsgPack 测试覆盖 int32 边界及真实大分数。等待客户端重新验收结算卡、奖励动画和 load 后最高分。
 
 ## 测试清单
 

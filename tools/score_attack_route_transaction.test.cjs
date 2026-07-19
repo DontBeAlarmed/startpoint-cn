@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict")
 const Database = require("better-sqlite3")
 const Fastify = require("fastify")
-const { pack } = require("msgpackr")
+const { pack, unpack } = require("msgpackr")
 
 require("ts-node/register/transpile-only")
 
@@ -57,6 +57,7 @@ CREATE TABLE players_active_quests (
 INSERT INTO player_state VALUES (17, 1000, 2000, 3000, 0, 0);
 INSERT INTO character_state VALUES (17, 101, 100);
 INSERT INTO mission_state VALUES (17, 0);
+INSERT INTO item_state VALUES (17, 40501, 7);
 INSERT INTO players_active_quests VALUES (17, 1101, 27);
 CREATE TRIGGER fail_score_attack_active_delete
 AFTER DELETE ON players_active_quests
@@ -87,6 +88,7 @@ function playerRow() {
 }
 
 function updatePlayer(data) {
+    writeAttempts++
     const fields = {
         freeMana: "free_mana",
         expPool: "exp_pool",
@@ -101,6 +103,24 @@ function updatePlayer(data) {
     }
 }
 
+let writeAttempts = 0
+const scoreQuest = {
+    name: "无限演武",
+    eventId: 1,
+    scoreAttackQuestId: 999999,
+    bRankScore: 100,
+    aRankScore: 200,
+    sRankScore: 300,
+    ssRankScore: 400,
+    bRankTime: 0,
+    aRankTime: 0,
+    sRankTime: 0,
+    sPlusRankTime: 0,
+    rankPointReward: 10,
+    characterExpReward: 15,
+    manaReward: 15,
+    poolExpReward: 15,
+}
 const activeQuests = {
     17: {
         questId: 1101,
@@ -117,6 +137,7 @@ const activeQuests = {
 stubModule("../src/data/db", { getDb: () => db })
 stubModule("../src/data/domains/quest_active", {
     deletePlayerActiveQuestSync(playerId) {
+        writeAttempts++
         db.prepare("DELETE FROM players_active_quests WHERE player_id = ?").run(playerId)
     },
     updatePlayerActiveQuestContinueCountSync() {},
@@ -132,6 +153,7 @@ stubModule("../src/data/domains/item", {
         return db.prepare("SELECT count FROM item_state WHERE player_id = ? AND item_id = ?").get(playerId, itemId)?.count ?? 0
     },
     givePlayerItemSync(playerId, itemId, count) {
+        writeAttempts++
         db.prepare(`
             INSERT INTO item_state VALUES (?, ?, ?)
             ON CONFLICT(player_id, item_id) DO UPDATE SET count = count + excluded.count
@@ -146,6 +168,7 @@ stubModule("../src/data/domains/quest", {
         return row ? { questId, finished: true, highScore: row.high_score, clearRank: row.clear_rank } : null
     },
     insertPlayerQuestProgressSync(playerId, category, progress) {
+        writeAttempts++
         db.prepare("INSERT INTO quest_progress VALUES (?, ?, ?, ?, ?)").run(
             playerId, category, progress.questId, progress.highScore, progress.clearRank,
         )
@@ -173,28 +196,13 @@ stubModule("../src/data/domains/carnivalEvent", {
 stubModule("../src/data/domains/degree", { givePlayerDegreeSync: () => false })
 stubModule("../src/data/activeAccount", { resolvePlayerIdSync: () => 17 })
 stubModule("../src/lib/assets", {
-    getQuestFromCategorySync: () => ({
-        name: "无限演武",
-        eventId: 1,
-        scoreAttackQuestId: 101,
-        bRankScore: 100,
-        aRankScore: 200,
-        sRankScore: 300,
-        ssRankScore: 400,
-        bRankTime: 0,
-        aRankTime: 0,
-        sRankTime: 0,
-        sPlusRankTime: 0,
-        rankPointReward: 10,
-        characterExpReward: 15,
-        manaReward: 15,
-        poolExpReward: 15,
-    }),
+    getQuestFromCategorySync: () => scoreQuest,
     getRushEventFolderClearRewards: () => [],
 })
 stubModule("../src/lib/character", {
     getCharactersEvolutionImgLevels: () => [1],
     givePlayerCharactersExpSync(playerId, characterIds, amount) {
+        writeAttempts++
         for (const characterId of characterIds) {
             db.prepare("UPDATE character_state SET exp = exp + ? WHERE player_id = ? AND character_id = ?").run(amount, playerId, characterId)
         }
@@ -250,6 +258,7 @@ stubModule("../src/lib/quest/finish/session-validator", {
 stubModule("../src/lib/quest/finish/challenge-point", { handleDailyChallengePoint: () => [] })
 stubModule("../src/lib/quest/finish/character-clear-tracker", {
     trackCharacterClears() {
+        writeAttempts++
         db.prepare("UPDATE mission_state SET clear_count = clear_count + 1 WHERE player_id = 17").run()
     },
 })
@@ -271,6 +280,7 @@ const initialState = {
     player: db.prepare("SELECT * FROM player_state").get(),
     character: db.prepare("SELECT * FROM character_state").get(),
     mission: db.prepare("SELECT * FROM mission_state").get(),
+    item: db.prepare("SELECT * FROM item_state").get(),
 }
 
 async function finish(fastify) {
@@ -315,17 +325,32 @@ async function main() {
     })
     fastify.register(routes)
 
+    const missingTiers = await finish(fastify)
+    assert.equal(missingTiers.statusCode, 500)
+    assert.equal(writeAttempts, 0)
+    assert.deepEqual(db.prepare("SELECT * FROM player_state").get(), initialState.player)
+    assert.deepEqual(db.prepare("SELECT * FROM character_state").get(), initialState.character)
+    assert.deepEqual(db.prepare("SELECT * FROM mission_state").get(), initialState.mission)
+    assert.deepEqual(db.prepare("SELECT * FROM item_state").get(), initialState.item)
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM quest_progress").get().count, 0)
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players_active_quests").get().count, 1)
+    assert.ok(activeQuests[17])
+
+    scoreQuest.scoreAttackQuestId = 101
+    writeAttempts = 0
     const failed = await finish(fastify)
     assert.equal(failed.statusCode, 500)
     assert.deepEqual(db.prepare("SELECT * FROM player_state").get(), initialState.player)
     assert.deepEqual(db.prepare("SELECT * FROM character_state").get(), initialState.character)
     assert.deepEqual(db.prepare("SELECT * FROM mission_state").get(), initialState.mission)
-    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM item_state").get().count, 0)
+    assert.deepEqual(db.prepare("SELECT * FROM item_state").get(), initialState.item)
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM quest_progress").get().count, 0)
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players_active_quests").get().count, 1)
     assert.ok(activeQuests[17])
+    assert.ok(writeAttempts > 0)
 
     db.exec("DROP TRIGGER fail_score_attack_active_delete")
+    writeAttempts = 0
     const succeeded = await finish(fastify)
     assert.equal(succeeded.statusCode, 200)
     assert.equal(db.prepare("SELECT free_mana FROM player_state WHERE player_id = 17").get().free_mana, 1015)
@@ -333,10 +358,12 @@ async function main() {
     assert.equal(db.prepare("SELECT rank_point FROM player_state WHERE player_id = 17").get().rank_point, 3010)
     assert.equal(db.prepare("SELECT exp FROM character_state WHERE player_id = 17 AND character_id = 101").get().exp, 115)
     assert.equal(db.prepare("SELECT clear_count FROM mission_state WHERE player_id = 17").get().clear_count, 1)
-    assert.equal(db.prepare("SELECT count FROM item_state WHERE player_id = 17 AND item_id = 40501").get().count, 1)
+    assert.equal(db.prepare("SELECT count FROM item_state WHERE player_id = 17 AND item_id = 40501").get().count, 8)
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM quest_progress").get().count, 1)
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players_active_quests").get().count, 0)
     assert.equal(activeQuests[17], undefined)
+    const decoded = unpack(Buffer.from(succeeded.body, "base64"))
+    assert.equal(decoded.data.item_list["40501"], 8)
 
     await fastify.close()
     db.close()
