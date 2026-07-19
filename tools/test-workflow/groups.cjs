@@ -2,6 +2,7 @@ const TEST_GROUPS = Object.freeze({
     "quick:workflow": {
         execution: "parallel",
         tests: [
+            "tools/test-workflow/package-scripts.test.cjs",
             "tools/test-workflow/select-tests.test.cjs",
             "tools/test-workflow/run.test.cjs",
         ],

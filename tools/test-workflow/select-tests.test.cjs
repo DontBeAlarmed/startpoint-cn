@@ -61,6 +61,14 @@ test("full contains quick, integration, and admin but excludes generators", () =
     assert.deepEqual(TEST_GROUPS["integration:cdn"].tests, [])
 })
 
+test("quick workflow includes the package scripts contract", () => {
+    assert.deepEqual(TEST_GROUPS["quick:workflow"].tests, [
+        "tools/test-workflow/package-scripts.test.cjs",
+        "tools/test-workflow/select-tests.test.cjs",
+        "tools/test-workflow/run.test.cjs",
+    ])
+})
+
 test("keeps compiled-output and external-data tests out of quick", () => {
     assert.deepEqual(TEST_GROUPS["integration:compiled"].tests, [
         "tools/character_awake_refresh.test.cjs",
