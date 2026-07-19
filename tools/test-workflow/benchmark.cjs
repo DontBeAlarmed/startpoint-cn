@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const { spawn, spawnSync } = require("node:child_process")
+const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
 const path = require("node:path")
 
@@ -110,52 +111,113 @@ function parseArguments(argv) {
     return parsed
 }
 
-function terminateProcessGroup(child, signal) {
-    if (!child?.pid) return
-    try {
-        if (process.platform === "win32") child.kill(signal)
-        else process.kill(-child.pid, signal)
-    } catch (error) {
-        if (error.code !== "ESRCH") throw error
+function signalProcessTree(activeRun, signal, options = {}) {
+    if (!activeRun?.processGroupId) return
+    const platform = options.platform ?? process.platform
+    if (platform === "win32") {
+        activeRun.child.kill(signal)
+        return
     }
+    const killProcess = options.killProcess ?? process.kill.bind(process)
+    killProcess(-activeRun.processGroupId, signal)
+}
+
+function forceKillProcessTree(activeRun, options = {}) {
+    if (!activeRun?.processGroupId) return
+    const platform = options.platform ?? process.platform
+    if (platform === "win32") {
+        const spawnSyncImpl = options.spawnSync ?? spawnSync
+        const result = spawnSyncImpl(
+            "taskkill",
+            ["/PID", String(activeRun.processGroupId), "/T", "/F"],
+            { encoding: "utf8", windowsHide: true },
+        )
+        if (result.error) throw result.error
+        if (result.status !== 0) {
+            throw new Error(result.stderr?.trim() || `taskkill exited with status ${result.status}`)
+        }
+        return
+    }
+    const killProcess = options.killProcess ?? process.kill.bind(process)
+    killProcess(-activeRun.processGroupId, "SIGKILL")
+}
+
+function recordLifecycleError(activeRun, context, error) {
+    if (error?.code === "ESRCH") return
+    activeRun.cleanupErrors ??= []
+    activeRun.cleanupErrors.push(`${context}: ${error?.message ?? String(error)}`)
+}
+
+function safelySignalProcessTree(activeRun, signal, options = {}) {
+    try {
+        signalProcessTree(activeRun, signal, options)
+    } catch (error) {
+        recordLifecycleError(activeRun, `failed to signal process tree with ${signal}`, error)
+    }
+}
+
+function scheduleForceKill(activeRun, options = {}) {
+    if (activeRun.cleanupPromise) return activeRun.cleanupPromise
+    const forceKillAfterMs = options.forceKillAfterMs ?? 2000
+    const setTimeoutImpl = options.setTimeout ?? setTimeout
+    let resolveCleanup
+    activeRun.cleanupPromise = new Promise(resolve => { resolveCleanup = resolve })
+    try {
+        activeRun.cleanupTimer = setTimeoutImpl(() => {
+            activeRun.cleanupTimer = null
+            try {
+                forceKillProcessTree(activeRun, options)
+            } catch (error) {
+                recordLifecycleError(activeRun, "failed to force-kill process tree", error)
+            } finally {
+                resolveCleanup()
+            }
+        }, forceKillAfterMs)
+    } catch (error) {
+        recordLifecycleError(activeRun, "failed to schedule process-tree cleanup", error)
+        resolveCleanup()
+    }
+    return activeRun.cleanupPromise
 }
 
 function runCommand(command, state, options = {}) {
     const cwd = options.cwd ?? projectRoot
-    const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm"
+    const platform = options.platform ?? process.platform
+    const npmCommand = platform === "win32" ? "npm.cmd" : "npm"
     const executable = command.executable ?? npmCommand
-    const forceKillAfterMs = options.forceKillAfterMs ?? 2000
+    const spawnImpl = options.spawn ?? spawn
+    const setTimeoutImpl = options.setTimeout ?? setTimeout
+    const clearTimeoutImpl = options.clearTimeout ?? clearTimeout
+    const now = options.now ?? (() => Number(process.hrtime.bigint()) / 1e6)
 
     return new Promise(resolve => {
-        const startedAt = process.hrtime.bigint()
-        const child = spawn(executable, command.args, {
+        const startedAt = now()
+        const child = spawnImpl(executable, command.args, {
             cwd,
-            detached: process.platform !== "win32",
+            detached: platform !== "win32",
             env: process.env,
             stdio: ["ignore", "pipe", "pipe"],
         })
-        state.activeChild = child
+        const activeRun = {
+            child,
+            cleanupErrors: [],
+            cleanupPromise: null,
+            cleanupTimer: null,
+            processGroupId: child.pid ?? null,
+            timeoutTimer: null,
+        }
+        state.activeRun = activeRun
 
         let output = ""
         let timedOut = false
         let spawnError = null
-        let forceKillTimer = null
+        let resolved = false
 
-        const timeoutTimer = setTimeout(() => {
+        activeRun.timeoutTimer = setTimeoutImpl(() => {
             timedOut = true
             output += `\nbenchmark timeout after ${command.timeoutMs}ms\n`
-            try {
-                terminateProcessGroup(child, "SIGTERM")
-            } catch (error) {
-                output += `failed to terminate command: ${error.message}\n`
-            }
-            forceKillTimer = setTimeout(() => {
-                try {
-                    terminateProcessGroup(child, "SIGKILL")
-                } catch (error) {
-                    output += `failed to kill command: ${error.message}\n`
-                }
-            }, forceKillAfterMs)
+            safelySignalProcessTree(activeRun, "SIGTERM", { ...options, platform })
+            scheduleForceKill(activeRun, { ...options, platform })
         }, command.timeoutMs)
 
         child.stdout.on("data", chunk => { output += chunk })
@@ -164,12 +226,18 @@ function runCommand(command, state, options = {}) {
             spawnError = error
             output += `${error.stack || error.message}\n`
         })
-        child.on("close", (exitCode, signal) => {
-            clearTimeout(timeoutTimer)
-            if (forceKillTimer !== null) clearTimeout(forceKillTimer)
-            if (state.activeChild === child) state.activeChild = null
+        child.on("close", async (exitCode, signal) => {
+            if (resolved) return
+            resolved = true
+            clearTimeoutImpl(activeRun.timeoutTimer)
+            activeRun.timeoutTimer = null
+            if (activeRun.cleanupPromise) await activeRun.cleanupPromise
+            if (activeRun.cleanupErrors.length > 0) {
+                output += `${activeRun.cleanupErrors.join("\n")}\n`
+            }
+            if (state.activeRun === activeRun) state.activeRun = null
 
-            const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6
+            const durationMs = now() - startedAt
             const summary = parseRunnerSummary(output) ?? { failed: 0, passed: 0, skipped: 0 }
             resolve({
                 durationMs,
@@ -216,24 +284,13 @@ function compactRun(run) {
     }
 }
 
-async function benchmarkCommand(command, state, options = {}) {
-    const writeStatus = options.writeStatus ?? (value => process.stderr.write(value))
-    writeStatus(`[benchmark] ${command.name}: warm-up\n`)
-    const warmup = await runCommand(command, state, options)
-    const runs = []
-
-    for (let attempt = 1; attempt <= 3 && state.interruptedBy === null; attempt++) {
-        writeStatus(`[benchmark] ${command.name}: run ${attempt}/3\n`)
-        runs.push(await runCommand(command, state, options))
-    }
-
-    if (runs.length !== 3) return null
-    const durationsMs = runs.map(run => roundMilliseconds(run.durationMs))
-    const medianMs = roundMilliseconds(median(durationsMs))
+function buildCommandReport(command, warmup, runs, options = {}) {
+    const rawDurationsMs = runs.map(run => run.durationMs)
+    const rawMedianMs = median(rawDurationsMs)
     const commandExitCodes = [warmup, ...runs].map(rawExitCodeForEvaluation)
     const evaluation = evaluateThreshold({
         commandExitCodes,
-        medianMs,
+        medianMs: rawMedianMs,
         reportOnly: options.reportOnly ?? false,
         thresholdMs: command.thresholdMs,
     })
@@ -245,10 +302,10 @@ async function benchmarkCommand(command, state, options = {}) {
     return {
         command: command.command,
         commandSucceeded: evaluation.commandSucceeded,
-        durationsMs,
+        durationsMs: rawDurationsMs.map(roundMilliseconds),
         exitCode: evaluation.exitCode,
         failed: counts.failed,
-        medianMs,
+        medianMs: roundMilliseconds(rawMedianMs),
         name: command.name,
         passed: counts.passed,
         rawExitCodes: runs.map(run => run.rawExitCode),
@@ -261,6 +318,22 @@ async function benchmarkCommand(command, state, options = {}) {
     }
 }
 
+async function benchmarkCommand(command, state, options = {}) {
+    const writeStatus = options.writeStatus ?? (value => process.stderr.write(value))
+    const runCommandImpl = options.runCommand ?? runCommand
+    writeStatus(`[benchmark] ${command.name}: warm-up\n`)
+    const warmup = await runCommandImpl(command, state, options)
+    const runs = []
+
+    for (let attempt = 1; attempt <= 3 && state.interruptedBy === null; attempt++) {
+        writeStatus(`[benchmark] ${command.name}: run ${attempt}/3\n`)
+        runs.push(await runCommandImpl(command, state, options))
+    }
+
+    if (runs.length !== 3) return null
+    return buildCommandReport(command, warmup, runs, options)
+}
+
 function readCommit(cwd) {
     const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8" })
     if (result.error) throw result.error
@@ -268,79 +341,116 @@ function readCommit(cwd) {
     return result.stdout.trim()
 }
 
-function writeReport(report, outputPath, cwd) {
+function writeReport(report, outputPath, cwd, options = {}) {
+    const fsImpl = options.fs ?? fs
+    const createUniqueId = options.randomUUID ?? randomUUID
+    const writeOutput = options.writeOutput ?? (value => process.stdout.write(value))
     const serialized = `${JSON.stringify(report, null, 2)}\n`
     if (outputPath === null) {
-        process.stdout.write(serialized)
+        writeOutput(serialized)
         return
     }
 
     const resolvedPath = path.resolve(cwd, outputPath)
-    fs.mkdirSync(path.dirname(resolvedPath), { recursive: true })
-    fs.writeFileSync(resolvedPath, serialized)
-    process.stdout.write(`benchmark report: ${resolvedPath}\n`)
+    const outputDirectory = path.dirname(resolvedPath)
+    const temporaryPath = path.join(
+        outputDirectory,
+        `.${path.basename(resolvedPath)}.${process.pid}.${createUniqueId()}.tmp`,
+    )
+    fsImpl.mkdirSync(outputDirectory, { recursive: true })
+
+    let failure = null
+    try {
+        fsImpl.writeFileSync(temporaryPath, serialized, { encoding: "utf8", flag: "wx" })
+        fsImpl.renameSync(temporaryPath, resolvedPath)
+    } catch (error) {
+        failure = error
+    } finally {
+        try {
+            fsImpl.unlinkSync(temporaryPath)
+        } catch (error) {
+            if (error.code !== "ENOENT" && failure === null) failure = error
+        }
+    }
+    if (failure !== null) throw failure
+    writeOutput(`benchmark report: ${resolvedPath}\n`)
 }
 
 function installSignalHandlers(state, options = {}) {
-    const forceKillAfterMs = options.forceKillAfterMs ?? 2000
+    const processTarget = options.processTarget ?? process
+    const signalTree = options.signalProcessTree
+        ?? ((activeRun, signal) => safelySignalProcessTree(activeRun, signal, options))
+    const scheduleKill = options.scheduleForceKill
+        ?? (activeRun => scheduleForceKill(activeRun, options))
     const handlers = {}
-    let forceKillTimer = null
+    const cleanupPromises = new Set()
 
     for (const signal of Object.keys(signalExitCodes)) {
         handlers[signal] = () => {
             if (state.interruptedBy !== null) return
             state.interruptedBy = signal
-            if (!state.activeChild) return
+            const activeRun = state.activeRun
+            if (!activeRun) return
             try {
-                terminateProcessGroup(state.activeChild, signal)
-            } finally {
-                forceKillTimer = setTimeout(() => {
-                    try {
-                        terminateProcessGroup(state.activeChild, "SIGKILL")
-                    } catch (error) {
-                        if (error.code !== "ESRCH") process.stderr.write(`${error.message}\n`)
-                    }
-                }, forceKillAfterMs)
+                signalTree(activeRun, signal)
+            } catch (error) {
+                recordLifecycleError(activeRun, `failed to signal process tree with ${signal}`, error)
+            }
+            try {
+                const cleanupPromise = scheduleKill(activeRun)
+                cleanupPromises.add(cleanupPromise)
+                cleanupPromise.then(
+                    () => cleanupPromises.delete(cleanupPromise),
+                    () => cleanupPromises.delete(cleanupPromise),
+                )
+            } catch (error) {
+                recordLifecycleError(activeRun, "failed to schedule process-tree cleanup", error)
             }
         }
-        process.on(signal, handlers[signal])
+        processTarget.on(signal, handlers[signal])
     }
 
-    return () => {
-        if (forceKillTimer !== null) clearTimeout(forceKillTimer)
+    return async () => {
         for (const [signal, handler] of Object.entries(handlers)) {
-            process.off(signal, handler)
+            processTarget.off(signal, handler)
         }
+        await Promise.allSettled([...cleanupPromises])
     }
 }
 
 async function main(argv = process.argv.slice(2), options = {}) {
     const cwd = options.cwd ?? projectRoot
     const writeError = options.writeError ?? (value => process.stderr.write(value))
-    const state = { activeChild: null, interruptedBy: null }
-    let removeSignalHandlers = () => {}
+    const commandsToBenchmark = options.commands ?? DEFAULT_COMMANDS
+    const benchmarkCommandImpl = options.benchmarkCommand ?? benchmarkCommand
+    const createDate = options.createDate ?? (() => new Date())
+    const installSignalHandlersImpl = options.installSignalHandlers ?? installSignalHandlers
+    const readCommitImpl = options.readCommit ?? readCommit
+    const writeReportImpl = options.writeReport ?? writeReport
+    const state = { activeRun: null, interruptedBy: null }
+    let removeSignalHandlers = async () => {}
 
     try {
         const parsed = parseArguments(argv)
         const commands = parsed.only === null
-            ? DEFAULT_COMMANDS
-            : DEFAULT_COMMANDS.filter(command => command.name === parsed.only)
+            ? commandsToBenchmark
+            : commandsToBenchmark.filter(command => command.name === parsed.only)
         if (commands.length === 0) {
             throw new Error(`unknown benchmark command: ${parsed.only}`)
         }
 
         const report = {
             schemaVersion: 1,
-            commit: readCommit(cwd),
+            commit: readCommitImpl(cwd),
             nodeVersion: process.version,
-            startedAt: new Date().toISOString(),
+            startedAt: createDate().toISOString(),
             commands: [],
         }
-        removeSignalHandlers = installSignalHandlers(state, options)
+        removeSignalHandlers = installSignalHandlersImpl(state, options)
 
         for (const command of commands) {
             if (state.interruptedBy !== null) break
-            const result = await benchmarkCommand(command, state, {
+            const result = await benchmarkCommandImpl(command, state, {
                 ...options,
                 reportOnly: parsed.reportOnly,
             })
@@ -348,13 +458,13 @@ async function main(argv = process.argv.slice(2), options = {}) {
         }
 
         if (state.interruptedBy !== null) return signalExitCodes[state.interruptedBy]
-        writeReport(report, parsed.output, cwd)
+        writeReportImpl(report, parsed.output, cwd, options)
         return report.commands.some(command => command.exitCode !== 0) ? 1 : 0
     } catch (error) {
         writeError(`${error.stack || error.message}\n`)
         return 2
     } finally {
-        removeSignalHandlers()
+        await removeSignalHandlers()
     }
 }
 
@@ -367,9 +477,15 @@ if (require.main === module) {
 module.exports = {
     DEFAULT_COMMANDS,
     benchmarkCommand,
+    buildCommandReport,
     evaluateThreshold,
+    forceKillProcessTree,
+    installSignalHandlers,
     main,
     median,
     parseArguments,
     parseRunnerSummary,
+    runCommand,
+    signalProcessTree,
+    writeReport,
 }
