@@ -10,7 +10,7 @@ const OUT = path.join(__dirname, "..", "docs", "generated");
 const chars = JSON.parse(fs.readFileSync(path.join(CDN, "character.json"), "utf8"));
 const texts = JSON.parse(fs.readFileSync(path.join(CDN, "character_text.json"), "utf8"));
 const elem = { 0: "火", 1: "水", 2: "雷", 3: "风", 4: "光", 5: "暗" };
-const gender = { 0: "不明", 1: "男性", 2: "女性", 3: "不明", 4: "不明" };
+const gender = { Male: "男性", Female: "女性" }; // c7 原始串；其余(Unknown/Ririi 等)→不明。c6 是 speciality_type 不是性别
 
 const rows = [];
 for (const [id, arr] of Object.entries(chars)) {
@@ -19,7 +19,7 @@ for (const [id, arr] of Object.entries(chars)) {
   const name = t ? t[0] : (f[9] || f[0] || "?");
   const el = elem[f[3]] || "?";
   const rar = f[2] ? f[2] + "★" : "?";
-  const g = gender[f[6]] || f[6] || "?";
+  const g = gender[f[7]] || "不明";
   const race = f[4] || "";
   const title = f[18] || "";
 
