@@ -84,7 +84,7 @@ for (const productId of COMBINATION_REWARD_IDS) {
     );
 }
 
-require("ts-node/register");
+require("ts-node/register/transpile-only");
 const { parseRewardSlots } = require("./rebuild_star_grain_shop.ts");
 
 const malformedSlots = Array(43).fill("");
@@ -135,6 +135,7 @@ function runGenerator(existingPath, outputPath) {
         cwd: projectRoot,
         env: {
             ...process.env,
+            TS_NODE_TRANSPILE_ONLY: "1",
             STAR_GRAIN_CDN_SOURCE: cnSourcePath,
             STAR_GRAIN_EXISTING: existingPath,
             STAR_GRAIN_OUTPUT: outputPath,

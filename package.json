@@ -27,6 +27,7 @@
     "@types/node": "^20.14.2",
     "@types/readline-sync": "^1.4.8",
     "@types/unzipper": "^0.10.9",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.4.5"
   },
