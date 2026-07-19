@@ -3,14 +3,14 @@
 世界弹射物语(World Flipper)CN(雷霆 Leiting)版本的服务端模拟器。
 
 > 🎮 **本分支(`release/modes-20260714`)是自制内容发布分支**,在上游服务端基础上加入:
-> 「深渊连战」roguelike 活动(Rush 700099)· 15 把深渊武器 · 双自制新角色(苍海龙王·赛瑞斯 / 夏日女神·史黛拉)。
+> 「深渊连战」roguelike 活动(Rush 700099)· 15 把深渊武器 · 三自制新角色(苍海龙王·赛瑞斯 / 夏日女神·史黛拉 / 白狼骑士·杰拉德,均真机验收)。
 
 ## 我该下载什么?
 
 | 你是谁 | 需要什么 |
 |---|---|
 | **想进别人的服玩** | 不用下载本仓库。找服主要:① 他重打好的客户端 APK ② 服务器地址/账号说明。([wf-abyss-client](https://github.com/kuronzzhan-droid/wf-abyss-client) 的现成整合包只适用于它指向的那个服,且**不支持新角色**) |
-| **想自己开服**(玩全部内容,含双新角色) | clone 本仓库(默认分支就是本分支),照 **[docs/self-host-modes.md](docs/self-host-modes.md)** 一步步来:自备基础 CDN(~11GB)→ 起服 → 重打**四合一**客户端 → 管理后台邮件发角色 |
+| **想自己开服**(玩全部内容,含三自制角色) | clone 本仓库(默认分支就是本分支),照 **[docs/self-host-modes.md](docs/self-host-modes.md)** 一步步来:自备基础 CDN(~11GB)→ 起服 → 重打**五合一**客户端 → 管理后台邮件发角色 |
 | **想改数据 / 做自己的 mod** | 数据修改工具链:[mod-tools/](mod-tools/)(独立仓 [startpoint-cn-mod-tools](https://github.com/kuronzzhan-droid/startpoint-cn-mod-tools),带全套文档与《新角色制作心得》) |
 
 ## 功能状态
