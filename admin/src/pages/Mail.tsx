@@ -1,8 +1,9 @@
-import { useState } from "react"
+import { ReactNode, useMemo, useState } from "react"
 import { Card, Form, Select, InputNumber, Input, Button, message, Alert, Typography, Radio, Modal, Descriptions, Table, Tag, Space } from "antd"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiGet, apiPost } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
+import { getMailAttachmentRule } from "../lib/mailRules"
 
 const { TextArea } = Input
 const { Text } = Typography
@@ -23,7 +24,6 @@ const MAIL_TYPES = [
     { value: 15, label: "Rank 点" },
 ]
 
-const MAX_INT = 2147483647
 const TYPE_LABEL: Record<number, string> = Object.fromEntries(MAIL_TYPES.map(t => [t.value, t.label]))
 
 type TargetMode = "all" | "account" | "player"
@@ -32,22 +32,133 @@ interface SendResult { ok: boolean; sent: number }
 interface AccountRow { id: number; saveCount: number; defaultPlayerId: number | null; defaultPlayerName: string | null; playerIds: number[] }
 interface PlayerBrief { id: number; name: string; lastLoginTime: string; degreeId: number }
 interface MailRecord { time: string; type: number; typeId: number | null; number: number; subject: string | null; target: string; sent: number }
+interface CharacterLookupRow { name: string; title: string; rarity: string; element: string }
+interface EquipmentLookupRow { name: string; rarity: string; category: string }
+type ItemLookup = Record<string, string>
+type CharacterLookup = Record<string, CharacterLookupRow>
+type EquipmentLookup = Record<string, EquipmentLookupRow>
+type AttachmentLookup = ItemLookup | CharacterLookup | EquipmentLookup
+interface AttachmentOption {
+    value: number
+    label: ReactNode
+    searchText: string
+    titleText: string
+}
+
+function norm(value: unknown): string {
+    return String(value ?? "").normalize("NFKC").trim().toLowerCase()
+}
+
+function lookupEndpoint(type: number | undefined): string | null {
+    if (type === 1) return "/api/lookup/items"
+    if (type === 5) return "/api/lookup/characters"
+    if (type === 6) return "/api/lookup/equipment"
+    return null
+}
+
+function attachmentTitle(type: number | undefined, id: number | null | undefined, lookup: AttachmentLookup | undefined): string {
+    if (id == null || !lookup) return id == null ? "" : `#${id}`
+    const row = lookup[String(id)]
+    if (!row) return `#${id}`
+    if (type === 1 && typeof row === "string") return `${row} #${id}`
+    if (type === 5 && typeof row !== "string") {
+        const character = row as CharacterLookupRow
+        return `${character.name}${character.title ? ` · ${character.title}` : ""} #${id}`
+    }
+    if (type === 6 && typeof row !== "string") return `${(row as EquipmentLookupRow).name} #${id}`
+    return `#${id}`
+}
+
+function buildAttachmentOptions(type: number | undefined, lookup: AttachmentLookup | undefined): AttachmentOption[] {
+    if (!type || !lookup) return []
+    return Object.entries(lookup)
+        .map(([rawId, row]): AttachmentOption | null => {
+            const id = Number(rawId)
+            if (type === 1 && typeof row === "string") {
+                const titleText = `${row} #${id}`
+                return {
+                    value: id,
+                    titleText,
+                    searchText: norm(`${id} ${row}`),
+                    label: (
+                        <Space direction="vertical" size={0}>
+                            <Text>{row}</Text>
+                            <Text type="secondary">#{id}</Text>
+                        </Space>
+                    ),
+                }
+            }
+            if (type === 5 && typeof row !== "string") {
+                const character = row as CharacterLookupRow
+                const titleText = `${character.name}${character.title ? ` · ${character.title}` : ""} #${id}`
+                return {
+                    value: id,
+                    titleText,
+                    searchText: norm(`${id} ${character.name} ${character.title} ${character.rarity} ${character.element}`),
+                    label: (
+                        <Space direction="vertical" size={0}>
+                            <Text>{character.name}</Text>
+                            <Text type="secondary">#{id} · {character.title || "无称号"} · {character.rarity} · {character.element}</Text>
+                        </Space>
+                    ),
+                }
+            }
+            if (type === 6 && typeof row !== "string") {
+                const equipment = row as EquipmentLookupRow
+                const titleText = `${equipment.name} #${id}`
+                return {
+                    value: id,
+                    titleText,
+                    searchText: norm(`${id} ${equipment.name} ${equipment.rarity} ${equipment.category}`),
+                    label: (
+                        <Space direction="vertical" size={0}>
+                            <Text>{equipment.name}</Text>
+                            <Text type="secondary">#{id} · {equipment.rarity} · {equipment.category}</Text>
+                        </Space>
+                    ),
+                }
+            }
+            return null
+        })
+        .filter((option): option is AttachmentOption => option !== null)
+        .sort((a, b) => a.value - b.value)
+}
+
+function filterAttachmentOption(input: string, option?: AttachmentOption): boolean {
+    if (!option) return false
+    const query = norm(input)
+    if (!query) return true
+    if (/^[0-9]+$/.test(query)) return String(option.value) === query
+    return option.searchText.includes(query)
+}
 
 export default function Mail() {
     const qc = useQueryClient()
     const [form] = Form.useForm()
     const type = Form.useWatch("type", form)
+    const typeId = Form.useWatch("type_id", form)
     const targetMode: TargetMode = Form.useWatch("targetMode", form) ?? "all"
     const meta = MAIL_TYPES.find(t => t.value === type)
     const needsId = !!meta?.needsId
-    const singleOnly = !!meta?.singleOnly
+    const attachmentEndpoint = lookupEndpoint(type)
+    const quantityRule = getMailAttachmentRule(type, typeId)
 
     // 预览确认：暂存待发送的表单值 + 计算好的对象描述/角色数
-    const [confirm, setConfirm] = useState<null | { values: any; count: number; targetText: string }>(null)
+    const [confirm, setConfirm] = useState<null | { values: any; count: number; targetText: string; attachmentText: string }>(null)
 
     const { data: accounts = [] } = useQuery({ queryKey: ["accounts"], queryFn: () => apiGet<AccountRow[]>("/api/server/accounts") })
     const { data: players = [] } = useQuery({ queryKey: ["players"], queryFn: () => apiGet<PlayerBrief[]>("/api/player") })
     const { data: history = [] } = useQuery({ queryKey: ["mailHistory"], queryFn: () => apiGet<MailRecord[]>("/api/mail/history") })
+    const { data: attachmentLookup, isLoading: attachmentLoading, isError: attachmentError } = useQuery({
+        queryKey: ["mailAttachmentLookup", type],
+        queryFn: () => apiGet<AttachmentLookup>(attachmentEndpoint!),
+        enabled: needsId && !!attachmentEndpoint,
+        staleTime: Infinity,
+    })
+    const attachmentOptions = useMemo(
+        () => buildAttachmentOptions(type, attachmentLookup),
+        [type, attachmentLookup],
+    )
 
     const totalSaves = accounts.reduce((n, a) => n + a.saveCount, 0)
 
@@ -87,7 +198,11 @@ export default function Mail() {
             count = totalSaves
             targetText = `全体（${accounts.length} 个账号 / ${totalSaves} 个存档）`
         }
-        setConfirm({ values: v, count, targetText })
+        const attachmentName = attachmentTitle(v.type, v.type_id, attachmentLookup)
+        const attachmentText = attachmentName
+            ? `${TYPE_LABEL[v.type] ?? v.type} · ${attachmentName}`
+            : `${TYPE_LABEL[v.type] ?? v.type}`
+        setConfirm({ values: v, count, targetText, attachmentText })
     }
 
     return (
@@ -144,29 +259,74 @@ export default function Mail() {
                         <Select
                             placeholder="-- 请选择附件类型 --"
                             options={MAIL_TYPES.map(t => ({ value: t.value, label: t.label }))}
-                            onChange={() => {
-                                const m = MAIL_TYPES.find(t => t.value === form.getFieldValue("type"))
-                                if (m?.singleOnly) form.setFieldValue("number", 1)
-                                form.validateFields(["type_id"]).catch(() => {})
+                            onChange={(nextType) => {
+                                const nextRule = getMailAttachmentRule(nextType, null)
+                                form.setFieldsValue({
+                                    type_id: undefined,
+                                    number: nextRule.max === 1 ? 1 : 1,
+                                })
+                                form.validateFields(["type_id", "number"]).catch(() => {})
                             }}
                         />
                     </Form.Item>
 
-                    <Form.Item
-                        name="type_id"
-                        label="附件 ID (type_id)"
-                        rules={needsId ? [{ required: true, message: "此类型需填写附件 ID" }] : []}
-                        extra={needsId
-                            ? "道具=道具ID / 角色=6位 business code / 装备=7位 ID，发送前会校验 CDN 数据"
-                            : "此附件类型无需填写附件 ID"}
-                    >
-                        <InputNumber style={{ width: "100%" }} min={1} max={MAX_INT} disabled={!needsId}
-                            placeholder="道具 ID / 角色 code / 装备 ID" />
-                    </Form.Item>
+                    {needsId && (
+                        <Form.Item
+                            name="type_id"
+                            label="附件"
+                            rules={[
+                                { required: true, message: "请选择附件" },
+                                {
+                                    validator: async (_, value) => {
+                                        if (attachmentError) throw new Error("附件索引加载失败，无法发送")
+                                        if (value == null) throw new Error("请选择附件")
+                                    },
+                                },
+                            ]}
+                            extra="输入完整 ID 或中文名称搜索；数字查询按完整 ID 精确匹配，避免误选相近编号。"
+                        >
+                            <Select
+                                showSearch
+                                allowClear
+                                placeholder="输入 ID 或名称搜索附件"
+                                loading={attachmentLoading}
+                                disabled={attachmentError}
+                                options={attachmentOptions}
+                                filterOption={filterAttachmentOption}
+                                optionLabelProp="titleText"
+                                notFoundContent={attachmentLoading ? "正在加载附件索引" : "没有匹配附件"}
+                                onChange={(nextTypeId) => {
+                                    const nextRule = getMailAttachmentRule(type, nextTypeId)
+                                    const currentNumber = form.getFieldValue("number") ?? 1
+                                    form.setFieldValue("number", Math.min(currentNumber, nextRule.max))
+                                    form.validateFields(["number"]).catch(() => {})
+                                }}
+                            />
+                        </Form.Item>
+                    )}
 
-                    <Form.Item name="number" label="数量" rules={[{ required: true, message: "请输入数量" }]}
-                        extra={singleOnly ? "角色 / 装备每封邮件仅可发送 1 个" : undefined}>
-                        <InputNumber style={{ width: "100%" }} min={1} max={MAX_INT} disabled={singleOnly} />
+                    <Form.Item
+                        name="number"
+                        label="数量"
+                        rules={[
+                            { required: true, message: "请输入数量" },
+                            {
+                                validator: async (_, value) => {
+                                    if (value == null) throw new Error("请输入数量")
+                                    if (value < quantityRule.min || value > quantityRule.max) {
+                                        throw new Error(`数量需在 ${quantityRule.min}-${quantityRule.max} 之间`)
+                                    }
+                                },
+                            },
+                        ]}
+                        extra={`${quantityRule.label}：${quantityRule.min}-${quantityRule.max}。${quantityRule.reason}`}
+                    >
+                        <InputNumber
+                            style={{ width: "100%" }}
+                            min={quantityRule.min}
+                            max={quantityRule.max}
+                            disabled={quantityRule.max === 1}
+                        />
                     </Form.Item>
 
                     <Form.Item name="subject" label="标题（可选）">
@@ -222,7 +382,7 @@ export default function Mail() {
                         <Descriptions column={1} size="small" bordered>
                             <Descriptions.Item label="发送对象">{confirm.targetText}</Descriptions.Item>
                             <Descriptions.Item label="角色数量">{confirm.count} 个</Descriptions.Item>
-                            <Descriptions.Item label="附件类型">{TYPE_LABEL[confirm.values.type] ?? confirm.values.type}</Descriptions.Item>
+                            <Descriptions.Item label="附件">{confirm.attachmentText}</Descriptions.Item>
                             {confirm.values.type_id != null && (
                                 <Descriptions.Item label="附件 ID">{confirm.values.type_id}</Descriptions.Item>
                             )}
