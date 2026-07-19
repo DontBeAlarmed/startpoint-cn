@@ -1,8 +1,10 @@
+require("ts-node/register/transpile-only")
+
 const assert = require("assert")
 
 const {
     buildShortUpCharacterGachaTimeline,
-} = require("../out/lib/admin-clairvoyance")
+} = require("../src/lib/admin-clairvoyance")
 
 const timeline = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T14:00:00.000Z"))
 

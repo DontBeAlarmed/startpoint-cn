@@ -1,10 +1,12 @@
+require("ts-node/register/transpile-only")
+
 const assert = require("assert")
 
 const {
     getMailAttachmentRule,
     parseAdminMailInteger,
     validateMailAttachment,
-} = require("../out/lib/admin-mail-rules")
+} = require("../src/lib/admin-mail-rules")
 
 function expectOk(result) {
     assert.strictEqual(result.ok, true, result.error)

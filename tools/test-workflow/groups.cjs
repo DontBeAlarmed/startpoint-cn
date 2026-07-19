@@ -44,6 +44,7 @@ const TEST_GROUPS = Object.freeze({
     "integration:database": {
         execution: "serial",
         tests: [
+            "tools/test-workflow/database-isolation.test.cjs",
             "tools/carnival_rewards.test.cjs",
             "tools/character_awake_settlement.test.cjs",
             "tools/character_awake_unlock.test.cjs",

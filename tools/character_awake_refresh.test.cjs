@@ -1,12 +1,28 @@
+require("ts-node/register/transpile-only")
+
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
+
+const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "awake-refresh-db-"))
+process.env.WDFP_DATABASE_DIR = databaseDirectory
+let db
+
+function cleanupDatabase() {
+    if (db?.open) db.close()
+    fs.rmSync(databaseDirectory, { recursive: true, force: true })
+    delete process.env.WDFP_DATABASE_DIR
+}
+
+process.once("exit", cleanupDatabase)
 
 const {
     buildManaBoardAwakeCharacterList,
     mergeManaBoardAwakeMaps,
     validateManaBoardAwakeRequest,
-} = require("../out/lib/character-helpers")
+} = require("../src/lib/character-helpers")
+db = require("../src/data/db").getDb()
 
 function testIndependentUnlockAndNodeStateAreMergedByMaximum() {
     const independentUnlocks = new Map([
@@ -107,9 +123,14 @@ function testAwakeUnlockUsesCommonCharacterResponseShape() {
     assert.equal(typeof entries[0].update_time, "string")
 }
 
-testIndependentUnlockAndNodeStateAreMergedByMaximum()
-testAwakeAuthorizationUsesIndependentUnlockState()
-testLoadReconcilesFromComputedAwakeSummary()
-testAwakeUnlockUsesCommonCharacterResponseShape()
-testAwakeRequestGate()
-console.log("character awake refresh tests passed")
+try {
+    testIndependentUnlockAndNodeStateAreMergedByMaximum()
+    testAwakeAuthorizationUsesIndependentUnlockState()
+    testLoadReconcilesFromComputedAwakeSummary()
+    testAwakeUnlockUsesCommonCharacterResponseShape()
+    testAwakeRequestGate()
+    console.log("character awake refresh tests passed")
+} finally {
+    cleanupDatabase()
+    process.removeListener("exit", cleanupDatabase)
+}

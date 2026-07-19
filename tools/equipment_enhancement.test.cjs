@@ -1,8 +1,10 @@
+require("ts-node/register/transpile-only")
+
 const assert = require("node:assert/strict")
 
 let planEquipmentEnhancementPurchase
 try {
-    ({ planEquipmentEnhancementPurchase } = require("../out/lib/equipment-enhancement"))
+    ({ planEquipmentEnhancementPurchase } = require("../src/lib/equipment-enhancement"))
 } catch {
     assert.fail("equipment enhancement purchase planner is missing")
 }

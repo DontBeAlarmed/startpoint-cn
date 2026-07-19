@@ -1,5 +1,7 @@
+require("ts-node/register/transpile-only")
+
 const assert = require("node:assert/strict")
-const { validateCharacterStackConversion } = require("../out/lib/character-stack")
+const { validateCharacterStackConversion } = require("../src/lib/character-stack")
 
 assert.equal(validateCharacterStackConversion(2, 1, false), null)
 assert.equal(validateCharacterStackConversion(2, 2, false), null)

@@ -1,4 +1,21 @@
+require("ts-node/register/transpile-only")
+
 const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const os = require("node:os")
+const path = require("node:path")
+
+const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "mission-completion-db-"))
+process.env.WDFP_DATABASE_DIR = databaseDirectory
+let db
+
+function cleanupDatabase() {
+    if (db?.open) db.close()
+    fs.rmSync(databaseDirectory, { recursive: true, force: true })
+    delete process.env.WDFP_DATABASE_DIR
+}
+
+process.once("exit", cleanupDatabase)
 
 const {
     getComputer,
@@ -11,8 +28,9 @@ const {
     getWeeklyMissionRewards,
     isMissionEnabledAt,
     validateMissionRewardClaims,
-} = require("../out/lib/mission")
-const { addMissionProgressDelta } = require("../out/lib/mission/progress")
+} = require("../src/lib/mission")
+const { addMissionProgressDelta } = require("../src/lib/mission/progress")
+db = require("../src/data/db").getDb()
 
 assert.equal(getComputer(10).name, "Regular")
 assert.deepEqual(getCompletedStageNumbers(1, 1, 0), [])
@@ -94,3 +112,5 @@ const alreadyReceived = validateMissionRewardClaims(
 assert.deepEqual(alreadyReceived, { ok: true, claims: [] })
 
 console.log("mission completion tests passed")
+cleanupDatabase()
+process.removeListener("exit", cleanupDatabase)

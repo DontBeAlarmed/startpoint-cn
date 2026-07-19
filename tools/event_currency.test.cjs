@@ -1,5 +1,7 @@
+require("ts-node/register/transpile-only")
+
 const assert = require("node:assert/strict")
-const { resolveEventCurrencyId } = require("../out/lib/event-currency")
+const { resolveEventCurrencyId } = require("../src/lib/event-currency")
 
 assert.equal(resolveEventCurrencyId(40236, new Date("2020-08-14T00:00:00Z")), 40236)
 assert.equal(resolveEventCurrencyId(40236, new Date("2022-09-20T00:00:00Z")), 999800)

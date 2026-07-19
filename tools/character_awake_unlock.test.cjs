@@ -1,9 +1,24 @@
+require("ts-node/register/transpile-only")
+
 const assert = require("node:assert/strict")
 const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 const Database = require("better-sqlite3")
 const ts = require("typescript")
+
+const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "awake-unlock-db-"))
+process.env.WDFP_DATABASE_DIR = databaseDirectory
+let db
+
+function cleanupDatabase() {
+    if (db?.open) db.close()
+    fs.rmSync(databaseDirectory, { recursive: true, force: true })
+    delete process.env.WDFP_DATABASE_DIR
+}
+
+process.once("exit", cleanupDatabase)
 
 function readProjectSource(relativePath) {
     return fs.readFileSync(path.join(__dirname, "..", relativePath), "utf8")
@@ -563,7 +578,7 @@ function testVersion4BackfillValidation() {
     }
 
     const assetPath = require.resolve("../assets/mission_char_awake_reward.json")
-    const updaterPath = require.resolve("../out/data/updaters/wdfpData")
+    const updaterPath = require.resolve("../src/data/updaters/wdfpData")
     const originalRewards = require(assetPath)
     require.cache[assetPath].exports = syntheticRewards
     delete require.cache[updaterPath]
@@ -592,25 +607,25 @@ function testVersion4BackfillValidation() {
 
 testVersion4BackfillValidation()
 
-const { getDb } = require("../out/data/db")
+const { getDb } = require("../src/data/db")
 const {
     getPlayerCharacterAwakeUnlocksSync,
     upsertPlayerCharacterAwakeUnlockSync,
-} = require("../out/data/domains/character_awake")
-const { getPlayerItemSync } = require("../out/data/domains/item")
-const { insertAccountSync } = require("../out/data/domains/account")
-const { insertDefaultPlayerCharacterSync } = require("../out/data/domains/character")
-const { insertDefaultPlayerSync } = require("../out/data/domains/player")
-const { givePlayerCharacterSync } = require("../out/lib/character")
+} = require("../src/data/domains/character_awake")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const { insertAccountSync } = require("../src/data/domains/account")
+const { insertDefaultPlayerCharacterSync } = require("../src/data/domains/character")
+const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { givePlayerCharacterSync } = require("../src/lib/character")
 const {
     reconcileAwakeUnlockCharacterList,
     reconcileAwakeUnlocks,
     reconcileAwakeUnlocksFromProgress,
-} = require("../out/lib/mission")
-const awakeUnlockModule = require("../out/lib/mission/awake-unlock")
-const missionRegistry = require("../out/lib/mission/registry")
+} = require("../src/lib/mission")
+const awakeUnlockModule = require("../src/lib/mission/awake-unlock")
+const missionRegistry = require("../src/lib/mission/registry")
 
-const db = getDb()
+db = getDb()
 const idpId = `character-awake-unlock-test-${randomUUID()}`
 
 db.exec("BEGIN")
@@ -950,3 +965,5 @@ try {
         WHERE idp_id = ?
     `).get(idpId).count, 0)
 }
+cleanupDatabase()
+process.removeListener("exit", cleanupDatabase)

@@ -1,6 +1,26 @@
-const assert = require("node:assert/strict")
+require("ts-node/register/transpile-only")
 
-const { getDb } = require("../out/data/db")
+const assert = require("node:assert/strict")
+const { randomUUID } = require("node:crypto")
+const fs = require("node:fs")
+const os = require("node:os")
+const path = require("node:path")
+
+const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "mission-storage-db-"))
+process.env.WDFP_DATABASE_DIR = databaseDirectory
+let db
+
+function cleanupDatabase() {
+    if (db?.open) db.close()
+    fs.rmSync(databaseDirectory, { recursive: true, force: true })
+    delete process.env.WDFP_DATABASE_DIR
+}
+
+process.once("exit", cleanupDatabase)
+
+const { getDb } = require("../src/data/db")
+const { insertAccountSync } = require("../src/data/domains/account")
+const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const {
     deletePlayerCategoryMissionsSync,
     getPlayerActiveMissionsSync,
@@ -10,19 +30,20 @@ const {
     updatePlayerActiveMissionSync,
     updatePlayerCategoryMissionStageSync,
     updatePlayerCategoryMissionSync,
-} = require("../out/data/domains/mission")
+} = require("../src/data/domains/mission")
 
-const db = getDb()
-const player = db.prepare("SELECT id FROM players ORDER BY id LIMIT 1").get()
-
-if (!player) {
-    console.log("mission storage tests skipped: no local player")
-    process.exit(0)
-}
+db = getDb()
 
 db.exec("BEGIN")
 try {
-    const playerId = player.id
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: `mission-storage-test-${randomUUID()}`,
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
     const missionId = 987654321
 
     updatePlayerCategoryMissionSync(playerId, 1, missionId, 5)
@@ -47,3 +68,5 @@ try {
 } finally {
     db.exec("ROLLBACK")
 }
+cleanupDatabase()
+process.removeListener("exit", cleanupDatabase)

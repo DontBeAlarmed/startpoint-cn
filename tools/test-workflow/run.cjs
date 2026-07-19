@@ -299,13 +299,44 @@ async function executeTestGroups(groupNames, options = {}) {
     }
 }
 
-function installSignalHandlers(activeChildren, onSignal) {
+function installSignalHandlers(activeChildren, onSignal, options = {}) {
     const handlers = {}
+    const forceKillAfterMs = options.forceKillAfterMs ?? 2000
+    const forceKillTimers = new Map()
+    const closeHandlers = new Map()
+
+    function clearForceKill(child) {
+        const timer = forceKillTimers.get(child)
+        if (timer) clearTimeout(timer)
+        forceKillTimers.delete(child)
+
+        const closeHandler = closeHandlers.get(child)
+        if (closeHandler) child.off("close", closeHandler)
+        closeHandlers.delete(child)
+    }
+
+    function scheduleForceKill(child) {
+        if (forceKillTimers.has(child)) return
+
+        const closeHandler = () => clearForceKill(child)
+        closeHandlers.set(child, closeHandler)
+        child.once("close", closeHandler)
+
+        const timer = setTimeout(() => {
+            forceKillTimers.delete(child)
+            terminateChild(child, "SIGKILL")
+        }, forceKillAfterMs)
+        timer.unref()
+        forceKillTimers.set(child, timer)
+    }
 
     for (const signal of Object.keys(signalExitCodes)) {
         handlers[signal] = () => {
             onSignal(signal)
-            for (const child of activeChildren) terminateChild(child, signal)
+            for (const child of activeChildren) {
+                terminateChild(child, signal)
+                scheduleForceKill(child)
+            }
         }
         process.on(signal, handlers[signal])
     }
@@ -314,6 +345,7 @@ function installSignalHandlers(activeChildren, onSignal) {
         for (const [signal, handler] of Object.entries(handlers)) {
             process.off(signal, handler)
         }
+        for (const child of [...forceKillTimers.keys()]) clearForceKill(child)
     }
 }
 
@@ -373,6 +405,7 @@ module.exports = {
     expandGroupNames,
     getChangedFiles,
     hasExplicitSkipOutput,
+    installSignalHandlers,
     main,
     mergeChangedFiles,
     parseArguments,

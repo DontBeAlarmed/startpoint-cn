@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict")
+const { spawn } = require("node:child_process")
+const { once } = require("node:events")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
@@ -7,6 +9,7 @@ const test = require("node:test")
 const {
     executeTestGroups,
     hasExplicitSkipOutput,
+    installSignalHandlers,
     mergeChangedFiles,
     parseArguments,
 } = require("./run.cjs")
@@ -118,4 +121,39 @@ test("times out and terminates a child that keeps handles open", async t => {
     assert.equal(report.exitCode, 1)
     assert.equal(report.results[0].timedOut, true)
     assert.match(report.results[0].output, /timed out after 100ms/)
+})
+
+test("force-kills a child process group that ignores SIGTERM", async () => {
+    const child = spawn(process.execPath, [
+        "-e",
+        'process.on("SIGTERM", () => {}); console.log("ready"); setInterval(() => {}, 1000)',
+    ], {
+        detached: process.platform !== "win32",
+        stdio: ["ignore", "pipe", "ignore"],
+    })
+    await once(child.stdout, "data")
+
+    const activeChildren = new Set([child])
+    const removeHandlers = installSignalHandlers(
+        activeChildren,
+        () => {},
+        { forceKillAfterMs: 50 },
+    )
+    const safetyTimer = setTimeout(() => {
+        try {
+            if (process.platform === "win32") child.kill("SIGKILL")
+            else process.kill(-child.pid, "SIGKILL")
+        } catch {}
+    }, 500)
+    const startedAt = Date.now()
+
+    try {
+        process.emit("SIGTERM")
+        const [, signal] = await once(child, "close")
+        assert.equal(signal, "SIGKILL")
+        assert.equal(Date.now() - startedAt < 300, true)
+    } finally {
+        clearTimeout(safetyTimer)
+        removeHandlers()
+    }
 })

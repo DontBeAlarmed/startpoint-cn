@@ -1,21 +1,36 @@
+require("ts-node/register/transpile-only")
+
 const assert = require("node:assert/strict")
 const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 
-const { getDb } = require("../out/data/db")
-const { computeAwakeSummary, reconcileAwakeUnlocks, settleAwakeMissionRewards } = require("../out/lib/mission")
-const { insertAccountSync } = require("../out/data/domains/account")
-const { insertDefaultPlayerCharacterSync } = require("../out/data/domains/character")
-const characterAwakeDomain = require("../out/data/domains/character_awake")
+const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "awake-settlement-db-"))
+process.env.WDFP_DATABASE_DIR = databaseDirectory
+let db
+
+function cleanupDatabase() {
+    if (db?.open) db.close()
+    fs.rmSync(databaseDirectory, { recursive: true, force: true })
+    delete process.env.WDFP_DATABASE_DIR
+}
+
+process.once("exit", cleanupDatabase)
+
+const { getDb } = require("../src/data/db")
+const { computeAwakeSummary, reconcileAwakeUnlocks, settleAwakeMissionRewards } = require("../src/lib/mission")
+const { insertAccountSync } = require("../src/data/domains/account")
+const { insertDefaultPlayerCharacterSync } = require("../src/data/domains/character")
+const characterAwakeDomain = require("../src/data/domains/character_awake")
 const { getPlayerCharacterAwakeUnlocksSync } = characterAwakeDomain
-const { getPlayerItemSync } = require("../out/data/domains/item")
-const { getPlayerCategoryMissionsSync } = require("../out/data/domains/mission")
-const { insertDefaultPlayerSync } = require("../out/data/domains/player")
-const { getAwakeMissionRewardStageDefinition } = require("../out/lib/mission/rewards")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
+const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { getAwakeMissionRewardStageDefinition } = require("../src/lib/mission/rewards")
 const awakeRewardMaster = require("../assets/mission_char_awake_reward.json")
 
-const db = getDb()
+db = getDb()
 const idpId = `character-awake-settlement-test-${randomUUID()}`
 const duplicateProgressIdpId = `${idpId}-duplicate-progress`
 const unreceivedFinalStageRecoveryIdpId = `${idpId}-unreceived-final-stage-recovery`
@@ -262,3 +277,5 @@ try {
         ORDER BY idp_id
     `).all(idpId, duplicateProgressIdpId, unreceivedFinalStageRecoveryIdpId, faultIdpId), [])
 }
+cleanupDatabase()
+process.removeListener("exit", cleanupDatabase)

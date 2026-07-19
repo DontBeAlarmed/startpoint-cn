@@ -1,5 +1,7 @@
+require("ts-node/register/transpile-only")
+
 const assert = require("node:assert/strict")
-const { canUseEquipmentAwakeningCrystal } = require("../out/lib/equipment-upgrade")
+const { canUseEquipmentAwakeningCrystal } = require("../src/lib/equipment-upgrade")
 
 assert.equal(canUseEquipmentAwakeningCrystal(12001, 1), true)
 assert.equal(canUseEquipmentAwakeningCrystal(12001, 4), true)
