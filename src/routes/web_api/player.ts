@@ -92,6 +92,7 @@ const routes = async (fastify: FastifyInstance) => {
         return reply.send({
             player: {
                 id: player.id,
+                accountId: (getDb().prepare(`SELECT account_id FROM players WHERE id = ?`).get(player.id) as { account_id: number } | undefined)?.account_id ?? 0,
                 name: player.name,
                 comment: player.comment,
                 stamina: player.stamina,

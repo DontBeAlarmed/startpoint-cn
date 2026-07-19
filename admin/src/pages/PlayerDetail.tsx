@@ -1,21 +1,20 @@
 import { useState } from "react"
-import { Card, Descriptions, Table, Button, Space, InputNumber, Popconfirm, message, Tag, Tabs, Spin, Typography, Switch, DatePicker, Input, Upload } from "antd"
+import { Card, Descriptions, Table, Button, Space, InputNumber, Popconfirm, message, Tag, Tabs, Spin, Typography, Switch, Input, Upload } from "antd"
 import { SaveOutlined, DeleteOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, UndoOutlined, SearchOutlined } from "@ant-design/icons"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import dayjs from "dayjs"
 import { apiGet, apiPost, apiPatch, apiDelete, apiUpload } from "../api/client"
+import { AdminPage, StateCard } from "../components/AdminPage"
 
 const { Text } = Typography
 
 interface PlayerInfo {
-    id: number; name: string; comment: string
+    id: number; accountId: number; name: string; comment: string
     stamina: number; boostPoint: number; bossBoostPoint: number
     vmoney: number; freeVmoney: number; freeMana: number; paidMana: number
     rankPoint: number; starCrumb: number; bondToken: number
     expPool: number; degreeId: number; leaderCharacterId: number
     birth: number; enableAuto3x: boolean; tutorialStep: number | null
-    lastLoginTime: string; staminaHealTime: string; expPooledTime: string; timeOffset: number | null
 }
 
 interface CharRow { code: number; joinTime: string; entryCount: number; evolutionLevel: number; overLimitStep: number; exp: number; stack: number; manaBoardIndex: number }
@@ -62,7 +61,6 @@ export default function PlayerDetail() {
     const navigate = useNavigate()
     const qc = useQueryClient()
     const [editValues, setEditValues] = useState<Record<string, any>>({})
-    const [addCharCode, setAddCharCode] = useState<number | undefined>()
     const [addItemId, setAddItemId] = useState<number | undefined>()
     const [addItemCount, setAddItemCount] = useState<number>(1)
     const [searchChars, setSearchChars] = useState("")
@@ -101,12 +99,6 @@ export default function PlayerDetail() {
             setEditValues(v => { const n = { ...v }; delete n[field]; return n })
             refresh()
         },
-        onError: (e: Error) => message.error(e.message),
-    })
-
-    const addChar = useMutation({
-        mutationFn: (code: number) => apiPost(`/api/player/${pid}/character`, { code }),
-        onSuccess: () => { message.success("角色已添加"); setAddCharCode(undefined); refresh() },
         onError: (e: Error) => message.error(e.message),
     })
 
@@ -182,12 +174,12 @@ export default function PlayerDetail() {
     })
 
     if (isNaN(pid)) return <Card><Text type="danger">无效的玩家 ID</Text></Card>
-    if (isLoading) return <div style={{ textAlign: "center", marginTop: 100 }}><Spin size="large" /></div>
+    if (isLoading) return <StateCard><Spin size="large" /></StateCard>
     if (isError || !data) return <Card><Text type="danger">加载失败</Text></Card>
 
     const { player, characters, items, equipment, questProgress, drawnQuests } = data
 
-    // 内联可编辑数字字段（复用于资源/账号/时间偏移）
+    // 内联可编辑数字字段（复用于资源/账号字段）
     const numField = (key: string, label: string, opts: { min?: number; allowNull?: boolean } = {}) => {
         const has = key in editValues
         const current = (player as any)[key]
@@ -215,27 +207,9 @@ export default function PlayerDetail() {
         )
     }
 
-    // 时间字段（DatePicker，改动即提交 ISO）
-    const dateField = (key: string, label: string) => {
-        const iso = (player as any)[key] as string | null
-        return (
-            <div key={key}>
-                <Text type="secondary" style={{ fontSize: 12 }}>{label}</Text>
-                <DatePicker
-                    showTime
-                    allowClear={false}
-                    size="small"
-                    style={{ width: "100%" }}
-                    value={iso ? dayjs(iso) : null}
-                    onChange={d => d && editField.mutate({ field: key, value: d.toISOString() })}
-                />
-            </div>
-        )
-    }
-
     const searchBox = (value: string, setValue: (s: string) => void) => (
         <Input allowClear size="small" prefix={<SearchOutlined />} placeholder="搜索名称或 ID"
-            value={value} onChange={e => setValue(e.target.value)} style={{ width: 240 }} />
+            value={value} onChange={e => setValue(e.target.value)} style={{ width: 260, maxWidth: "100%" }} />
     )
 
     // 大表格搜索过滤（名称或 ID）
@@ -268,12 +242,11 @@ export default function PlayerDetail() {
             label: `角色 (${characters.length})`,
             children: (
                 <Space direction="vertical" style={{ width: "100%" }}>
-                    <Space wrap>
-                        <InputNumber placeholder="角色 Code" value={addCharCode} onChange={v => setAddCharCode(v ?? undefined)} style={{ width: 140 }} />
-                        <Button icon={<PlusOutlined />} onClick={() => addCharCode && addChar.mutate(addCharCode)}>添加角色</Button>
+                    <div className="admin-toolbar">
                         {searchBox(searchChars, setSearchChars)}
-                    </Space>
+                    </div>
                     <Table rowKey="code" dataSource={fChars} size="small" pagination={{ pageSize: 50 }}
+                        scroll={{ x: "max-content" }}
                         columns={[
                             { title: "名字", render: (_, r: CharRow) => lookups?.characters[r.code]?.name ?? "?" },
                             { title: "称号", render: (_, r: CharRow) => lookups?.characters[r.code]?.title ?? "-", responsive: ["lg"] as any },
@@ -298,13 +271,14 @@ export default function PlayerDetail() {
             label: `道具 (${items.length})`,
             children: (
                 <Space direction="vertical" style={{ width: "100%" }}>
-                    <Space wrap>
+                    <div className="admin-toolbar">
                         <InputNumber placeholder="道具 ID" value={addItemId} onChange={v => setAddItemId(v ?? undefined)} style={{ width: 120 }} />
                         <InputNumber placeholder="数量" value={addItemCount} onChange={v => setAddItemCount(v ?? 1)} min={0} style={{ width: 100 }} />
                         <Button icon={<PlusOutlined />} onClick={() => addItemId != null && addItem.mutate({ id: addItemId, count: addItemCount })}>添加/设置</Button>
                         {searchBox(searchItems, setSearchItems)}
-                    </Space>
+                    </div>
                     <Table rowKey="id" dataSource={fItems} size="small" pagination={{ pageSize: 50 }}
+                        scroll={{ x: "max-content" }}
                         columns={[
                             { title: "名字", render: (_, r: ItemRow) => (lookups?.items as any)?.[r.id] ?? "-" },
                             { title: "ID", dataIndex: "id", width: 80 },
@@ -329,6 +303,7 @@ export default function PlayerDetail() {
                 <Space direction="vertical" style={{ width: "100%" }}>
                     {searchBox(searchEquip, setSearchEquip)}
                     <Table rowKey="id" dataSource={fEquip} size="small" pagination={{ pageSize: 50 }}
+                        scroll={{ x: "max-content" }}
                         columns={[
                             { title: "名字", render: (_, r: EquipRow) => (lookups?.equipment as any)?.[r.id]?.name ?? "-" },
                             { title: "ID", dataIndex: "id", width: 80 },
@@ -346,18 +321,19 @@ export default function PlayerDetail() {
             label: `关卡 (${questProgress.length})`,
             children: (
                 <Space direction="vertical" style={{ width: "100%" }}>
-                    <Space wrap>
+                    <div className="admin-toolbar">
                         <Popconfirm title="清除全部关卡进度？" onConfirm={() => clearAllQuestProgress.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
                             <Button danger size="small" icon={<DeleteOutlined />}>清除全部</Button>
                         </Popconfirm>
                         {searchBox(searchQuests, setSearchQuests)}
-                    </Space>
+                    </div>
                     <Table rowKey={(r: QuestRow) => `${r.section}_${r.questId}`} dataSource={fQuests} size="small" pagination={{ pageSize: 50 }}
+                        scroll={{ x: "max-content" }}
                         columns={[
                             { title: "名字", render: (_, r: QuestRow) => (lookups?.quests as any)?.[`${r.section}_${r.questId}`] ?? "-" },
                             { title: "Section", dataIndex: "section", width: 80 },
                             { title: "Quest", dataIndex: "questId", width: 80 },
-                            { title: "通关", render: (_, r: QuestRow) => r.finished ? "✅" : "—", width: 60 },
+                            { title: "通关", render: (_, r: QuestRow) => r.finished ? "已通关" : "—", width: 72 },
                             { title: "最高分", dataIndex: "highScore", render: (v: number | null) => v ?? "—", width: 80 },
                             { title: "评价", dataIndex: "clearRank", render: (v: number | null) => v ?? "—", width: 60 },
                             { title: "最佳时间", dataIndex: "bestElapsedTimeMs", render: (v: number | null) => v ?? "—", width: 100 },
@@ -379,13 +355,14 @@ export default function PlayerDetail() {
             label: `抽选关卡 (${drawnQuests.length})`,
             children: (
                 <Space direction="vertical" style={{ width: "100%" }}>
-                    <Space wrap>
+                    <div className="admin-toolbar">
                         <Popconfirm title="清除全部抽选记录？" onConfirm={() => clearAllDrawnQuests.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
                             <Button danger size="small" icon={<DeleteOutlined />}>清除全部</Button>
                         </Popconfirm>
                         {searchBox(searchDrawn, setSearchDrawn)}
-                    </Space>
+                    </div>
                     <Table rowKey={(r: DrawnQuestRow) => `${r.categoryId}_${r.questId}`} dataSource={fDrawn} size="small" pagination={{ pageSize: 50 }}
+                        scroll={{ x: "max-content" }}
                         columns={[
                             { title: "名字", render: (_, r: DrawnQuestRow) => (lookups?.quests as any)?.[`${r.categoryId}_${r.questId}`] ?? "-" },
                             { title: "Category", dataIndex: "categoryId", width: 80 },
@@ -407,26 +384,29 @@ export default function PlayerDetail() {
     ]
 
     return (
-        <Space direction="vertical" size="large" style={{ width: "100%" }}>
-            <Card title={`${player.name} (#${player.id})`} extra={<Button onClick={() => navigate("/accounts")}>返回列表</Button>}>
-                <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+        <AdminPage
+            eyebrow="PLAYER"
+            title={`${player.name} (#${player.id})`}
+            description={`账号 #${player.accountId} 的存档。角色获取入口仅保留邮件发送，避免绕过客户端领取校验。`}
+            actions={<Button onClick={() => navigate("/accounts")}>返回账号 / 存档</Button>}
+        >
+        <Space direction="vertical" size="large" className="admin-stack">
+            <Card title="存档标识">
                     <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
-                        <Descriptions.Item label="等级">{player.degreeId}</Descriptions.Item>
-                        <Descriptions.Item label="签名">{player.comment || "-"}</Descriptions.Item>
-                        <Descriptions.Item label="最后登录">{player.lastLoginTime.replace("T", " ").substring(0, 19)}</Descriptions.Item>
-                        <Descriptions.Item label="队长角色">{player.leaderCharacterId}</Descriptions.Item>
-                        <Descriptions.Item label="生日">{player.birth}</Descriptions.Item>
-                        <Descriptions.Item label="3x加速">{player.enableAuto3x ? "开" : "关"}</Descriptions.Item>
-                        <Descriptions.Item label="教程步骤">{player.tutorialStep ?? "无"}</Descriptions.Item>
+                        <Descriptions.Item label="存档名">{player.name}</Descriptions.Item>
+                        <Descriptions.Item label="存档 ID">{player.id}</Descriptions.Item>
+                        <Descriptions.Item label="账号 ID">{player.accountId}</Descriptions.Item>
                     </Descriptions>
+            </Card>
 
-                    <Card type="inner" title="资源编辑" size="small">
+            <div className="admin-card-grid">
+                    <Card title="资源编辑" size="small">
                         <div style={gridStyle}>
                             {resourceFields.map(f => numField(f.key, f.label, { min: 0 }))}
                         </div>
                     </Card>
 
-                    <Card type="inner" title="账号设置" size="small">
+                    <Card title="账号设置" size="small">
                         <div style={gridStyle}>
                             <div>
                                 <Text type="secondary" style={{ fontSize: 12 }}>3x加速</Text>
@@ -442,16 +422,7 @@ export default function PlayerDetail() {
                         </div>
                     </Card>
 
-                    <Card type="inner" title="时间设置" size="small">
-                        <div style={gridStyle}>
-                            {dateField("staminaHealTime", "体力恢复时间")}
-                            {dateField("lastLoginTime", "最后登录时间")}
-                            {dateField("expPooledTime", "经验池结算时间")}
-                            {numField("timeOffset", "时间偏移(ms，空=null)", { allowNull: true })}
-                        </div>
-                    </Card>
-
-                    <Card type="inner" title="工具操作" size="small">
+                    <Card title="工具操作" size="small">
                         <Space wrap>
                             <Popconfirm title="清除全部 EX Boost？" onConfirm={() => clearExBoost.mutate()} okText="确认" cancelText="取消">
                                 <Button size="small">清除 EX Boost</Button>
@@ -475,12 +446,12 @@ export default function PlayerDetail() {
                             </Upload>
                         </Space>
                     </Card>
-                </Space>
-            </Card>
+            </div>
 
-            <Card>
+            <Card className="admin-table-card">
                 <Tabs items={tabItems} />
             </Card>
         </Space>
+        </AdminPage>
     )
 }

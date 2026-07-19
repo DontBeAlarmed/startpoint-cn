@@ -1,8 +1,9 @@
 import { Card, Segmented, Button, Space, Statistic, Progress, Spin, Empty, message, Typography } from "antd"
 import { ReloadOutlined, CloseOutlined } from "@ant-design/icons"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { useState } from "react"
+import { useState, type CSSProperties } from "react"
 import { apiGet, apiPost, apiDelete } from "../api/client"
+import { AdminPage, StateCard } from "../components/AdminPage"
 
 const { Text } = Typography
 
@@ -144,42 +145,41 @@ export default function Seeds() {
         const cold = row.tag === "冷血躲避球"
         const isTest = data?.testSeeds[row.rarity - 3] === row.seed
         return (
-            <div style={{
-                display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center",
-                padding: "2px 0", borderBottom: "1px solid #f0f0f0", fontSize: 12,
-                opacity: cold ? 0.4 : 1, textDecoration: cold ? "line-through" : "none",
-            }}>
-                <span style={{ width: 66, color: cold ? undefined : "#a371f7" }}>{row.seed}</span>
+            <div className="admin-seed-line" style={{ opacity: cold ? 0.45 : 1, textDecoration: cold ? "line-through" : "none" }}>
+                <span className="admin-seed-id">{row.seed}</span>
                 {TAGS.map((t, i) => (
-                    <button key={t} title={t}
+                    <button
+                        key={t}
+                        title={t}
+                        aria-pressed={row.tag === t}
+                        className={`admin-chip-button ${row.tag === t ? "is-active" : ""}`}
                         onClick={() => setTag.mutate({ seed: row.seed, tag: t, movie: row.movie })}
-                        style={{
-                            cursor: "pointer", fontSize: 11, lineHeight: "16px", padding: "0 5px",
-                            borderRadius: 8, border: `1px solid ${row.tag === t ? TAG_COLOR[i] : "#d9d9d9"}`,
-                            background: row.tag === t ? TAG_COLOR[i] : "transparent",
-                            color: row.tag === t ? "#fff" : "inherit",
-                        }}>{TAG_SHORT[i]}</button>
+                        style={{ "--chip-color": TAG_COLOR[i] } as CSSProperties}
+                    >
+                        {TAG_SHORT[i]}
+                    </button>
                 ))}
                 {showTest && (
-                    <button disabled={cold}
+                    <button
+                        disabled={cold}
+                        className={`admin-chip-button ${isTest ? "is-active" : ""}`}
                         onClick={() => setTestSeed.mutate({ seed: row.seed, rarity: row.rarity })}
-                        style={{
-                            cursor: cold ? "not-allowed" : "pointer", fontSize: 11, lineHeight: "16px", padding: "0 5px",
-                            borderRadius: 8, border: `1px solid ${isTest ? "#a371f7" : "#d9d9d9"}`,
-                            background: isTest ? "#a371f7" : "transparent", color: isTest ? "#fff" : "inherit",
-                        }}>★{row.rarity}测试</button>
+                        style={{ "--chip-color": "var(--admin-primary)" } as CSSProperties}
+                    >
+                        ★{row.rarity}测试
+                    </button>
                 )}
             </div>
         )
     }
 
     const SeedColumns = ({ rows, showTest }: { rows: SeedRow[]; showTest: boolean }) => (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
+        <div className="admin-seed-grid">
             {COLUMNS.map(col => {
                 const items = rows.filter(r => inColumn(r, col.rarity, col.guarantee))
                 return (
-                    <div key={col.key}>
-                        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4, color: col.color }}>
+                    <div key={col.key} className="admin-seed-column">
+                        <div className="admin-seed-column-title" style={{ color: col.color }}>
                             {col.label} ({items.length})
                         </div>
                         {items.length === 0
@@ -191,12 +191,17 @@ export default function Seeds() {
         </div>
     )
 
-    if (isLoading) return <div style={{ textAlign: "center", marginTop: 100 }}><Spin size="large" /></div>
+    if (isLoading) return <StateCard><Spin size="large" /></StateCard>
     if (isError || !data) return <Card><Text type="danger">种子接口不可用</Text></Card>
 
     return (
-        <Space direction="vertical" size="large" style={{ width: "100%" }}>
-            <Space wrap>
+        <AdminPage
+            eyebrow="SEEDS"
+            title="种子管理"
+            description="维护验证池、播放池和测试池状态。页面强调密度和可扫描性，标签按钮保留像素化小控件风格。"
+        >
+        <Space direction="vertical" size="large" className="admin-stack">
+            <div className="admin-toolbar">
                 <Button icon={<ReloadOutlined />} loading={isFetching} onClick={() => refetch()}>刷新</Button>
                 <Text type="secondary">模式:</Text>
                 <Segmented
@@ -211,15 +216,15 @@ export default function Seeds() {
                 <Text type="secondary">卡池:</Text>
                 <Segmented value={groupId} onChange={v => setGroupId(v as string)}
                     options={GROUPS.map(g => ({ label: g.name, value: g.id }))} />
-            </Space>
+            </div>
 
             <Card size="small">
-                <Space size="large" wrap>
-                    <Statistic title="验证池" value={data.verified} valueStyle={{ color: "#a371f7" }} />
-                    <Statistic title="播放池" value={data.play} valueStyle={{ color: "#a371f7" }} />
+                <div className="admin-metric-row">
+                    <Statistic title="验证池" value={data.verified} valueStyle={{ color: "var(--admin-primary-strong)" }} />
+                    <Statistic title="播放池" value={data.play} valueStyle={{ color: "var(--admin-primary-strong)" }} />
                     <Statistic title="确认·非保底" value={data.baseConfirm} valueStyle={{ color: "#3fb950" }} />
                     <Statistic title="确认·保底" value={data.gtConfirm} valueStyle={{ color: "#b0882c" }} />
-                </Space>
+                </div>
             </Card>
 
             <Card title="验证池" size="small"
@@ -235,7 +240,7 @@ export default function Seeds() {
                                     ★{r}=
                                     {ts != null ? (
                                         <>
-                                            <span style={{ color: "#a371f7" }}> {ts} </span>
+                                            <span style={{ color: "var(--admin-primary-strong)" }}> {ts} </span>
                                             <span style={{ color: "#888" }}>[{TAG_SHORT[TAGS.indexOf(e?.tag ?? "未测试")]}]</span>
                                             <Button type="text" size="small" danger icon={<CloseOutlined />}
                                                 onClick={() => clearTestSeed.mutate(r)} />
@@ -269,5 +274,6 @@ export default function Seeds() {
                 <div><Text type="secondary" style={{ fontSize: 12 }}>已测 {data.tested.toLocaleString()} / {data.total.toLocaleString()} · 覆盖率 {data.coverage}%</Text></div>
             </Card>
         </Space>
+        </AdminPage>
     )
 }

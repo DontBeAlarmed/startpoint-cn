@@ -1,4 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { existsSync, readdirSync, statSync } from "fs";
+import path from "path";
 import { getServerTime, getServerDate, setServerTime, getTimeOffset } from "../../utils";
 import { deleteAccountSync, getAccountPlayersSync, getAllAccountsSync } from "../../data/domains/account"
 import { deletePlayerSync, getPlayerSync, insertDefaultPlayerSync, replacePlayerDataSync, updatePlayerSync } from "../../data/domains/player"
@@ -7,7 +9,7 @@ import { getPlayerCharactersSync } from "../../data/domains/character"
 import { getMergedPlayerDataSync, reviveMergedPlayerDates } from "../../data/utils";
 import { getActivePlayerId, setActivePlayerId, getSelectedAccountId, setSelectedAccountId, saveTimeOffset, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
 import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTemplate, getDefaultSaveMeta } from "../../data/defaultSave";
-import { getPatchManifest } from "../../lib/version";
+import { detectCDNVersion, FULL_BASE, getEffectiveVersion, getPatchManifest } from "../../lib/version";
 import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance";
 import { wantsJson } from "./http";
 
@@ -15,7 +17,110 @@ interface TimeQuery {
     time: string | undefined
 }
 
+function countZipFiles(dir: string): { exists: boolean; count: number; latestMtime: string | null; totalBytes: number } {
+    if (!existsSync(dir)) return { exists: false, count: 0, latestMtime: null, totalBytes: 0 }
+    let count = 0
+    let totalBytes = 0
+    let latest = 0
+    const stack = [dir]
+    while (stack.length) {
+        const current = stack.pop()!
+        for (const name of readdirSync(current)) {
+            const fp = path.join(current, name)
+            const st = statSync(fp)
+            if (st.isDirectory()) {
+                stack.push(fp)
+                continue
+            }
+            if (!name.endsWith(".zip")) continue
+            count += 1
+            totalBytes += st.size
+            latest = Math.max(latest, st.mtimeMs)
+        }
+    }
+    return {
+        exists: true,
+        count,
+        latestMtime: latest ? new Date(latest).toISOString() : null,
+        totalBytes,
+    }
+}
+
+function getCdnBaseUrl(): string {
+    const cdnHost = process.env.CN_LISTEN_HOST || "localhost"
+    const cdnPort = process.env.CN_LISTEN_PORT || "8001"
+    const cdnDisplayHost = cdnHost === "0.0.0.0" ? "localhost" : cdnHost
+    return process.env.CDN_BASE_URL || `http://${cdnDisplayHost}:${cdnPort}/patch/cn`
+}
+
 const routes = async (fastify: FastifyInstance) => {
+
+    fastify.get("/status", async (_request: FastifyRequest, reply: FastifyReply) => {
+        const root = process.cwd()
+        const cdnDir = process.env.CDN_DIR || ".cdn"
+        const cdnRoot = path.isAbsolute(cdnDir) ? path.join(cdnDir, "cn") : path.join(root, cdnDir, "cn")
+        const archiveSummary = countZipFiles(cdnRoot)
+        const activePatchSummary = countZipFiles(path.join(root, "assets", "asset-patch", "active"))
+        const patchManifest = getPatchManifest()
+        const enabledPatches = patchManifest.patches.filter(p => p.enabled)
+        const detectedVersion = detectCDNVersion()
+        const effectiveVersion = getEffectiveVersion()
+
+        reply.status(200).send({
+            server: {
+                uptimeSeconds: Math.floor(process.uptime()),
+                nodeVersion: process.version,
+                platform: `${process.platform}/${process.arch}`,
+                pid: process.pid,
+                memory: process.memoryUsage(),
+                listenHost: process.env.CN_LISTEN_HOST || "localhost",
+                listenPort: process.env.CN_LISTEN_PORT || "8001",
+            },
+            cdn: {
+                baseUrl: getCdnBaseUrl(),
+                baseline: {
+                    mode: "fixed-cn-final",
+                    source: "国服最终 CDN",
+                    fullVersion: FULL_BASE,
+                    cnFinalVersion: patchManifest.cdn_version,
+                    detectedArchiveVersion: detectedVersion,
+                    manifestVersion: patchManifest.cdn_version,
+                    pinned: true,
+                    dataScope: ["items", "characters", "events", "quests", "shops"],
+                },
+                extension: {
+                    mode: "reserved-patch-version-layer",
+                    status: enabledPatches.length > 0 ? "manifest-enabled" : "reserved",
+                    runtimeEnabled: enabledPatches.length > 0,
+                    effectiveVersionPreview: effectiveVersion,
+                    enabledPatchCount: enabledPatches.length,
+                    totalPatchCount: patchManifest.patches.length,
+                    activePatchArchiveCount: activePatchSummary.count,
+                    note: "Reserved for future custom characters and event patch imports.",
+                },
+                storage: {
+                    configuredDir: cdnDir,
+                    directoryPresent: archiveSummary.exists,
+                    archiveCount: archiveSummary.count,
+                    archiveBytes: archiveSummary.totalBytes,
+                    latestArchiveMtime: archiveSummary.latestMtime,
+                },
+                // Backward-compatible flat fields for temporary admin scripts and older SPA builds.
+                configuredDir: cdnDir,
+                directoryPresent: archiveSummary.exists,
+                archiveCount: archiveSummary.count,
+                archiveBytes: archiveSummary.totalBytes,
+                latestArchiveMtime: archiveSummary.latestMtime,
+                fullVersion: FULL_BASE,
+                detectedVersion,
+                effectiveVersion,
+                manifestVersion: patchManifest.cdn_version,
+                enabledPatchCount: enabledPatches.length,
+                totalPatchCount: patchManifest.patches.length,
+                activePatchArchiveCount: activePatchSummary.count,
+            },
+        })
+    })
 
     fastify.get("/currentTime", async (_request: FastifyRequest, reply: FastifyReply) => {
         const date = getServerDate()
@@ -86,15 +191,31 @@ const routes = async (fastify: FastifyInstance) => {
 
     fastify.get("/accounts", async (_request: FastifyRequest, reply: FastifyReply) => {
         const accounts = getAllAccountsSync()
+        const activePlayerId = getActivePlayerId()
         const result = accounts.map(acc => {
             const playerIds = getAccountPlayersSync(acc.id)
-            const defaultPid = getAccountDefaultPlayer(acc.id)
+            const savedDefaultPid = getAccountDefaultPlayer(acc.id)
+            const defaultPid = savedDefaultPid && playerIds.includes(savedDefaultPid)
+                ? savedDefaultPid
+                : (playerIds[0] ?? null)
             const defaultPlayer = defaultPid ? getPlayerSync(defaultPid) : null
             return {
                 id: acc.id,
                 saveCount: playerIds.length,
                 defaultPlayerId: defaultPid,
                 defaultPlayerName: defaultPlayer?.name ?? null,
+                activePlayerId,
+                players: playerIds.map(pid => {
+                    const player = getPlayerSync(pid)
+                    return {
+                        id: pid,
+                        accountId: acc.id,
+                        name: player?.name ?? `存档 #${pid}`,
+                        degreeId: player?.degreeId ?? 0,
+                        isDefault: defaultPid === pid,
+                        isActive: activePlayerId === pid,
+                    }
+                }),
                 playerIds
             }
         })
@@ -224,6 +345,10 @@ const routes = async (fastify: FastifyInstance) => {
             } catch (_) {}
         } else {
             deletePlayerSync(pid)
+            const remainingPlayerIds = getAccountPlayersSync(accountId)
+            if (getAccountDefaultPlayer(accountId) === pid && remainingPlayerIds.length > 0) {
+                saveAccountDefaultPlayer(accountId, remainingPlayerIds[0])
+            }
         }
         const accountAlsoDeleted = accountId && getAccountPlayersSync(accountId).length === 0
         if (getActivePlayerId() === pid) setActivePlayerId(null)
