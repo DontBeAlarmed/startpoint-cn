@@ -66,6 +66,7 @@ test("quick workflow includes the package scripts contract", () => {
         "tools/test-workflow/package-scripts.test.cjs",
         "tools/test-workflow/select-tests.test.cjs",
         "tools/test-workflow/run.test.cjs",
+        "tools/test-workflow/verify-cn-build.test.cjs",
     ])
 })
 

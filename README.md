@@ -24,7 +24,7 @@
 
 ## 环境需求
 
-- Node.js v22.23.1（当前默认版本；最低要求见 `package.json` 的 `engines`，日常直接使用默认版本即可） · 打补丁后的 CN 客户端 APK(见"客户端改造")
+- Node.js（日常使用当前默认版本；`package.json` 的 `engines` 要求 >=20，仅在确认版本兼容问题时再区分具体版本） · 打补丁后的 CN 客户端 APK(见"客户端改造")
 - 一份 CN CDN 资源,放入 `.cdn/cn/`
 
 ### CDN 路径清单文件(PathFile)

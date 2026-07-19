@@ -3,5 +3,8 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./out/.tsbuildinfo-cn"
   },
-  "files": ["src/cn-server.ts"]
+  "files": [
+    "src/cn-server.ts",
+    "src/multi/tcp/lobby.ts"
+  ]
 }

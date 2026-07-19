@@ -5,6 +5,7 @@ const test = require("node:test")
 
 const root = path.resolve(__dirname, "../..")
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"))
+const cnTsconfig = JSON.parse(fs.readFileSync(path.join(root, "tsconfig.cn.json"), "utf8"))
 const { scripts } = packageJson
 
 const tsc = "node --max-old-space-size=4096 node_modules/typescript/bin/tsc"
@@ -14,9 +15,19 @@ test("runs typecheck through Node with the project memory limit", () => {
 })
 
 test("keeps CN server and legacy builds separate", () => {
-    assert.equal(scripts["build:server"], `${tsc} -p tsconfig.cn.json`)
+    assert.equal(
+        scripts["build:server"],
+        `${tsc} -p tsconfig.cn.json && node tools/test-workflow/verify-cn-build.cjs`,
+    )
     assert.equal(scripts["build:legacy"], `${tsc} -p tsconfig.json`)
     assert.doesNotMatch(scripts["build:server"], /admin|css/)
+})
+
+test("includes runtime-loaded CN modules as explicit compilation roots", () => {
+    assert.deepEqual(cnTsconfig.files, [
+        "src/cn-server.ts",
+        "src/multi/tcp/lobby.ts",
+    ])
 })
 
 test("builds the CN development server before starting it", () => {

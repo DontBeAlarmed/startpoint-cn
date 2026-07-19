@@ -5,6 +5,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/test-workflow/package-scripts.test.cjs",
             "tools/test-workflow/select-tests.test.cjs",
             "tools/test-workflow/run.test.cjs",
+            "tools/test-workflow/verify-cn-build.test.cjs",
         ],
     },
     "quick:gacha": {

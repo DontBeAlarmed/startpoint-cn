@@ -6,7 +6,7 @@
   "scripts": {
     "build": "npm run build:legacy && npm run css",
     "typecheck": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit",
-    "build:server": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc -p tsconfig.cn.json",
+    "build:server": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc -p tsconfig.cn.json && node tools/test-workflow/verify-cn-build.cjs",
     "build:legacy": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc -p tsconfig.json",
     "css": "npx tailwindcss -i ./src/input.css -o ./web/public/tailwind.css",
     "css:watch": "npx tailwindcss -i ./src/input.css -o ./web/public/tailwind.css --watch --poll",
