@@ -241,6 +241,25 @@ async function main() {
         assert.equal(decode(expired).data_headers.result_code, 2053)
         assert.deepEqual(snapshot(), beforeExpired)
 
+        db.prepare(`
+            INSERT INTO purchase_state VALUES (?, ?, ?)
+            ON CONFLICT(player_id, shop_item_id) DO UPDATE SET count = excluded.count
+        `).run(17, 700000, 5)
+        const beforeExpiredAndSoldOut = snapshot()
+        const expiredAndSoldOut = await fastify.inject({
+            method: "POST",
+            url: "/buy",
+            payload: { viewer_id: 123, shop_type: 4, shop_item_id: 700000, number: 1 },
+        })
+        assert.equal(
+            expiredAndSoldOut.statusCode,
+            200,
+            "过期商品即使库存已耗尽，也必须返回客户端识别的 2053",
+        )
+        assert.equal(decode(expiredAndSoldOut).data_headers.result_code, 2053)
+        assert.deepEqual(snapshot(), beforeExpiredAndSoldOut)
+        db.prepare("DELETE FROM purchase_state WHERE player_id = ? AND shop_item_id = ?").run(17, 700000)
+
         for (const invalidNumber of [0, -1, 1.5]) {
             const response = await fastify.inject({
                 method: "POST",

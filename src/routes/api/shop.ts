@@ -174,7 +174,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // validate stock limit
-        if (shopItemData.stock !== undefined && shopItemData.stock > 0) {
+        if (shopType !== ShopType.EVENT_ITEM && shopItemData.stock !== undefined && shopItemData.stock > 0) {
             const purchased = getPlayerShopPurchaseCountSync(playerId, shopItemId)
             if (purchased + purchaseAmount > shopItemData.stock) {
                 return reply.status(400).send({
