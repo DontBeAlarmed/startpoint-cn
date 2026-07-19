@@ -120,7 +120,6 @@ export default function Dashboard() {
 
     const accountCount = accounts.length
     const saveCount = accounts.reduce((sum, a) => sum + a.saveCount, 0)
-    const activeSaveCount = accounts.filter(a => a.defaultPlayerId != null).length
 
     const { data: defSave } = useQuery({
         queryKey: ["defaultSave"],
@@ -268,14 +267,11 @@ export default function Dashboard() {
                             />
                         ) : (
                             <Row gutter={[16, 16]}>
-                                <Col xs={8}>
+                                <Col xs={24} sm={12}>
                                     <Statistic title="账号总数" value={accountCount} loading={accountsLoading} />
                                 </Col>
-                                <Col xs={8}>
+                                <Col xs={24} sm={12}>
                                     <Statistic title="存档总数" value={saveCount} loading={accountsLoading} />
-                                </Col>
-                                <Col xs={8}>
-                                    <Statistic title="已绑定生效存档" value={activeSaveCount} loading={accountsLoading} />
                                 </Col>
                             </Row>
                         )}
