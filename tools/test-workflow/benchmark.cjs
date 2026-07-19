@@ -16,8 +16,9 @@ const DEFAULT_COMMANDS = Object.freeze([
         timeoutMs: 30000,
     }),
     Object.freeze({
-        args: ["run", "test:changed", "--", "--files", "src/lib/gacha.ts"],
-        command: "npm run test:changed -- --files src/lib/gacha.ts",
+        args: ["tools/test-workflow/run.cjs", "--files", "src/lib/gacha.ts"],
+        command: "node tools/test-workflow/run.cjs --files src/lib/gacha.ts",
+        executable: process.execPath,
         name: "test:changed",
         thresholdMs: 20000,
         timeoutMs: 60000,
@@ -122,11 +123,12 @@ function terminateProcessGroup(child, signal) {
 function runCommand(command, state, options = {}) {
     const cwd = options.cwd ?? projectRoot
     const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm"
+    const executable = command.executable ?? npmCommand
     const forceKillAfterMs = options.forceKillAfterMs ?? 2000
 
     return new Promise(resolve => {
         const startedAt = process.hrtime.bigint()
-        const child = spawn(npmCommand, command.args, {
+        const child = spawn(executable, command.args, {
             cwd,
             detached: process.platform !== "win32",
             env: process.env,

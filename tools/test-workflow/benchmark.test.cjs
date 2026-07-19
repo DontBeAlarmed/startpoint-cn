@@ -2,10 +2,26 @@ const assert = require("node:assert/strict")
 const test = require("node:test")
 
 const {
+    DEFAULT_COMMANDS,
     evaluateThreshold,
     median,
     parseRunnerSummary,
 } = require("./benchmark.cjs")
+
+test("runs the changed benchmark directly with an explicit source file", () => {
+    const command = DEFAULT_COMMANDS.find(candidate => candidate.name === "test:changed")
+
+    assert.equal(command.executable, process.execPath)
+    assert.deepEqual(command.args, [
+        "tools/test-workflow/run.cjs",
+        "--files",
+        "src/lib/gacha.ts",
+    ])
+    assert.equal(
+        command.command,
+        "node tools/test-workflow/run.cjs --files src/lib/gacha.ts",
+    )
+})
 
 test("calculates odd and even medians without changing the samples", () => {
     const oddSamples = [9, 1, 5]
