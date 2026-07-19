@@ -63,9 +63,9 @@
 
 详见 [土俑累计分奖励](../systems/carnival-score-rewards.md)。
 
-## 无限激战配队重新进入后恢复默认 ✅ 已修复，待客户端验收 (2026-07-17)
+## 狂热激战配队重新进入后恢复默认 ✅ 已修复，待客户端验收 (2026-07-17)
 
-**症状**：无限激战配队编辑请求成功，数据库也已保存 category 4 的新队伍，但退出配队页面后重新进入仍显示默认队伍。
+**症状**：狂热激战配队编辑请求成功，数据库也已保存 category 4 的新队伍，但退出配队页面后重新进入仍显示默认队伍。
 
 **根因**：`/event/rush/party` 将每个配队组内部的槽位 `1` 至 `10` 直接作为 `party_id` 返回，导致 12 个组重复使用同一批 ID。客户端把所有 Rush 队伍存入以全局 `party_id` 为键的 Map，后返回的组会覆盖前面的组，通常表现为第 12 组默认队伍覆盖第 1 组已保存队伍。
 
@@ -75,7 +75,7 @@
 
 **症状**：在土俑配队页面编辑后重新进入可以看到新配队；使用该配队完成一次挑战后，再进入配队页面却恢复为旧队伍或默认队伍。
 
-**根因**：国服客户端会按模式发送独立的 `party_category`：普通关卡为 `1`、土俑为 `2`、战阵为 `3`、无限激战为 `4`。服务端保存土俑配队时保留了 `2`，但 `/carnival_event/index` 和 `/get_party` 固定读取 `4`。挑战结算没有删除或覆盖配队，只是页面重新请求后用错误分类的数据覆盖了客户端缓存。Raid 的 `3` 还会被保存端强制改成 `4`，因此 Raid 与 Rush 也会互相覆盖。
+**根因**：国服客户端会按模式发送独立的 `party_category`：普通关卡为 `1`、土俑为 `2`、战阵为 `3`、狂热激战为 `4`。服务端保存土俑配队时保留了 `2`，但 `/carnival_event/index` 和 `/get_party` 固定读取 `4`。挑战结算没有删除或覆盖配队，只是页面重新请求后用错误分类的数据覆盖了客户端缓存。Raid 的 `3` 还会被保存端强制改成 `4`，因此 Raid 与 Rush 也会互相覆盖。
 
 **修复**：
 
@@ -336,59 +336,17 @@ Player 页面 `/player/:id` → 「恢复挑战次数」按钮：
 - [ ] `dailyReset` 改用 `getServerDate()`（虚拟时间）而非 `new Date()`（真实时间），与时间旅行系统统一
 - [ ] CDN 条目按 `isRecovery` 区分每日恢复 vs 一次性条目，后者不应每日重置
 
-## 技能演武（SCORE_ATTACK_EVENT / 无限演武）🟡
+## 无限演武（ScoreAttackEvent）核心流程 ✅ 已修复，待客户端验收 (2026-07-19)
 
-### 已完成
+**历史根因**：服务端曾把无限演武错误映射到 category 9，并把关卡分数阈值当作耗时阈值；同时把分数奖励的 `reason_id=16001` 误认成道具 ID，只发最高一档的第一项奖励。category 9 实际是教程关卡，国服 1.8.1 客户端完整支持 category 27 和 `score_attack_event` 结算响应。
 
-| 功能 | 实现方式 |
-|------|---------|
-| 关卡数据转换 | `convert_score_attack_event_quest` 输出 `eventId`/`folderId`/`scoreRewardGroupId`/`sPlusRewardId` |
-| 分数奖励档位 | `convert_score_attack_border_reward` 从 `score_attack_border_reward.json`（11100 条）生成 123 组 `{event_folder: [{score, rewardItemId, coinItemId, coinCount}]}` |
-| 道具发放 | `/finish` 中查 border 表 → 按 `body.score` 匹配最高档位 → `givePlayerItemSync` 发放 reward item + coin item |
-| 完成判定 | `is_accomplished` 对比 border reward 最低档位分数，达标才算完成 |
-| 详细日志 | `[SCORE_ATTACK]` 标签打印请求 body、questData、borderReward 匹配结果、响应字段 |
+**修复**：按 `ScoreAttackEventQuestValues` 重建 123 个关卡，全部使用 category 27 和 10 体力；移除虚构的首通、S+ 与普通掉落奖励。按 `ScoreAttackBorderRewardValues` 重建 11,100 档奖励，保留奖励行 ID、分数线、原因 ID 和最多 6 个奖励槽。成功结算按 `(旧最高分, 新最高分]` 发放所有跨越档位，按分数计算 C/B/A/S/SS，并在同一事务内完成奖励、最高分/评级持久化和 active quest 删除。响应返回 `score_attack_event.main_character_ids` 与奖励行 ID 列表。
 
-### 已知未解决：奖励弹窗
+**客户端验收重点**：检查 10 体力扣除、跨多档奖励、重复或低分不重复发奖、专用结算卡与奖励动画，以及重新 load 后最高分和评级保持。
 
-**症状**：道具正常发放（`items={"16001":1,"40501":1}`），但客户端不播放结算动画/奖励弹窗，退出战斗直接结束。
+**剩余低优先级**：`/history/score_attack_event_battle` 仍返回空履历。核心开战、结算和奖励不依赖该接口；没有完整字段依据前不猜测实现。
 
-**根因分析**：
-
-1. CN 客户端（APK 1.8.1）中 `SingleQuestIdKind` 枚举最大 index=18（SoloTimeAttackEvent）。`SCORE_ATTACK_EVENT (category=27)` 在 CN 客户端中没有对应的 QuestLogic 类。
-
-2. 尝试复用 `solo_time_attack_event` 响应字段 → 客户端处理代码 `SingleOrMultiBattleQuestFinishProcess.execute()` 第 276 行执行 `_loc21_.soloTimeAttackEvent.eventId`，其中 `_loc21_` 是 QuestLogic。因 score_attack 的 QuestLogic 不是 `SoloTimeAttackEventQuestLogic`，`soloTimeAttackEvent` 属性不存在 → TypeError #1034 (F1034)。
-
-3. 尝试 `drop_score_reward_ids` → 客户端查本地 CDN binary 的 group_id=4 → C8601（key 不存在）。
-
-4. EN 全局版有完整的 `ScoreAttackEventQuestLogic`/`ScoreAttackEventScoreCardLogic`/`BattleQuestFinishResponseScoreAttackEvent` 等类，但 CN 客户端 v2.1.125 反编译源码中**完全没有**这些类——仅有战斗内视觉效果资源（`battle/common/score_attack/`）。
-
-### 后续研究方向
-
-- [ ] 分析 APK 1.8.1 二进制中是否有 ScoreAttackEvent 相关类（反编译缺失但实际 APK 可能有）
-- [ ] 确认 CN 客户端的 `QuestIdGroupKindTools.fromCategoryAndId()` 是否在二进制中支持 category 27
-- [ ] 如客户端确实有 ScoreAttackEvent 支持，需确定 `data.score_attack_event` 响应字段的精确格式（参考 EN 全局版的 `BattleQuestFinishResponseScoreAttackEvent`）
-- [ ] 如客户端无专门支持，考虑在 `/start` 端点将 category 映射为 SoloTimeAttackEvent(25) 并用 `solo_time_attack_event` 字段（需确认不会破坏关卡场景加载）
-
-### 关键文件
-
-| 文件 | 说明 |
-|------|------|
-| `assets/score_attack_border_reward.json` | 123 组 (event_folder) 分数档位数据 |
-| `scripts/converter.py` | `convert_score_attack_border_reward` / `convert_score_attack_event_quest` |
-| `src/routes/api/singleBattleQuest.ts` | `/finish` 中 `SCORE_ATTACK_EVENT` 分支（行 ~245-285） |
-| `wf-2.1.125-cn-decompiled/.../SingleOrMultiBattleQuestFinishProcess.as` | 客户端结算处理，`solo_time_attack_event` 分支（行 239-305） |
-| `wf-2.1.125-cn-decompiled/.../BattleQuestFinishRealRemote.as` | 客户端响应解析，`solo_time_attack_event` 字段（行 2224-2341） |
-| `wf-assets-cn/orderedmap/quest/event/score_attack_border_reward.json` | CDN 原始档位数据（11100 条） |
-| `wf-assets-cn/orderedmap/quest/event/score_attack_event_quest.json` | CDN 关卡数据 |
-
-### 已知未解决：border reward item 16001 C8601
-
-`score_attack_border_reward.json` 中所有档位的 `rewardItemId` 均为 **16001**，但该 ID **不存在于 CDN item 表**（`wf-assets-cn/orderedmap/item/item.json` 中无此条目）。
-
-- **影响**：`/finish` 通过 `givePlayerItemSync(playerId, 16001, 1)` 写入玩家道具栏 → `/load` 时客户端查本地 CDN binary → `C8601 (key=16001 不存在)`
-- **不受影响**：`coinItemId`（40501 无限金币、40502 无限紫币、49100 普莉莉艾勋章）均存在于 CDN
-- **临时处理**：手动删除 `players_items` 表中 `id=16001` 的行
-- **后续修复**：在 `/finish` 的 borderReward 分支中跳过 `rewardItemId` 发放，仅发放 `coinItemId`
+详见 [无限演武](../systems/score-attack-event.md)。
 
 ## 战阵（RAID_EVENT / 编队系统）— 待客户端重测
 

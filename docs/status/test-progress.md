@@ -7,21 +7,22 @@
 
 特殊关卡按以下最新客户端验收结果记录，不沿用更早的历史测试状态：
 
-- 无限激战（Rush）：进入、配队、结算全流程待测；配队分类及全局 `party_id` 冲突已修复，等待客户端验收。
+- 狂热激战（Rush）：进入、配队、结算全流程待测；配队分类及全局 `party_id` 冲突已修复。常驻版无活动代币和兑换商品，商店逻辑另行完善。
 - 土俑（Carnival）：进入、分数、配队、累计分奖励到账、动画提示和防重复领取均已通过客户端验收。
 - 战阵（Raid）：按本地三队 Raid 流程重测进入、配队、`event/raid/battle/start`、战斗与结算；不创建常规多人房间，配队已与 Rush/Carnival 隔离。
 - 活动扭蛋箱：活动 28 箱 5 重置已通过客户端验收；库存恢复为 2732、重置次数加一、非空时拒绝再次重置，重新 load 后状态保持。
 - 歼灭者讨伐战：三关房主通关、最高难度即时解锁和重新 load 保持均已通过客户端验收；成员不解锁由回归测试覆盖并降为低优先级客户端回归。最高难度歼灭心核已补齐 start 预扣、abort 单次返还和重启恢复，待客户端验收。
+- 无限演武（ScoreAttackEvent）：category 27、体力、分数评级、跨档奖励、专用结算响应和进度持久化已完成服务端测试；等待客户端重新验收结算卡、奖励动画和重新 load 后最高分。
 
 ## 测试清单
 
 | # | 活动名称 | quest JSON | 关数 | 进入 | 结算 | 备注 |
 |---|------|------|:---:|:---:|:---:|------|
 | 1 | 土俑（Carnival） | `carnival_event_quest` | 171 | ✅ | ✅ | 分数、配队、累计分奖励到账、动画提示和防重复领取均通过 |
-| 2 | 无限激战（Rush） | `rush_event_quest` | 110 | ⬜ | ⬜ | 配队分类及 12 组全局 ID 已修复；优先复测编辑、重进与挑战后重进 |
+| 2 | 狂热激战（Rush） | `rush_event_quest` | 110 | ⬜ | ⬜ | 配队分类及 12 组全局 ID 已修复；优先复测编辑、重进与挑战后重进 |
 | 3 | 战阵（Raid） | `raid_event_quest` | 50 | ⬜ | ⬜ | 本地三队 Raid；重测配队、Raid 启动、战斗与结算，不寻找常规共斗房间 |
 | 4 | 练习战 | `practice_quest` | 21 | 🔧 | 🔧 | 云水试炼进入+结算通过；余下 4 试炼待测（共 5 试炼，复用同一网络请求） |
-| 5 | 分数挑战 | `score_attack_event_quest` | 123 | ✅ | ✅ | 进入+结算通过；⚠️ 无 scoreRewardGroup，仅首通 clearReward |
+| 5 | 无限演武（ScoreAttackEvent） | `score_attack_event_quest` | 123 | ⬜ | ⬜ | 核心服务端流程已重建；重测 10 体力、分数评级、跨多档奖励、动画和 load 持久化 |
 | 6 | 剧情活动 | `story_event_single_quest` | 348 | ⬜ | ⬜ | 需活动开放期 |
 | 7 | 排名战 | `ranking_event_single_quest` | 7 | ✅ | ✅ | 测 2 个通过，走 single_battle_quest 通用流程 |
 | 8 | 专家挑战 | `expert_single_event_quest` | 28 | ⬜ | ⬜ | 高难单人 |
@@ -67,7 +68,7 @@
 | F1025 事件商店购买限制 | `shop.ts` + `players_shop_purchases` 表：stock_quantity 真实库存 + /buy 校验上限 + 购买记录 |
 | F1026 280 关 BOSS 掉落修复 | `boss_battle_quest.json` + `world_story_event_boss_battle_quest.json` 从 CDN col[70] 重新生成 scoreRewardGroup |
 | F1027 DROP_MULTIPLIER 可配置 | `.env` 中 `DROP_MULTIPLIER=10`（测试状态），`quest.ts` 默认 1；影响 ITEM/MANA/EXP 普通掉落 |
-| F1028 score_attack_event_quest 字段修复 | 转换脚本重写，rankTime/reward 字段正确提取，移除不存在的 scoreRewardGroup |
+| F1028 score_attack_event_quest 字段修复 | 按 CN 1.8.1 原始列重建分数阈值、体力、基础奖励与本地关卡 ID，移除虚构 clear/S+ 奖励 |
 | F1029 event_item_shop 57 事件缺失 | 从 `orderedmap/shop/event_item_shop.json` 原始数据补全 3595 个商品 |
 | F1031 advent_event_quest 掉落修复 | 转换脚本 `col[70]`→`col[76]` + 再生 JSON |
 | F1032 CDN 数据再生 + C8601 根除 | `score_reward.json` + `rare_score_reward.json` 从 CDN 全量重新生成：修复 array wrapper bug，type=0/1 正确分类，罕见组 ID 对齐客户端表 |

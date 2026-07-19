@@ -41,7 +41,11 @@ const QUEST_TYPES = {
   raid_event_quest: { file: "quest/event/raid_event_quest.json", cat: 8 },
   ranking_event_single_quest: { file: "quest/event/ranking_event_single_quest.json", cat: 10 },
   rush_event_quest: { file: "quest/event/rush_event_quest.json", cat: 24 },
-  score_attack_event_quest: { file: "quest/event/score_attack_event_quest.json", cat: 9 },
+  score_attack_event_quest: {
+    file: "quest/event/score_attack_event_quest.json",
+    cat: 27,
+    entryItem: { modeIndex: 57, itemIdIndex: 58, itemCountIndex: 59, staminaIndex: 71 },
+  },
   solo_time_attack_event_quest: { file: "quest/event/solo_time_attack_event_quest.json", cat: 25 },
   story_event_single_quest: { file: "quest/event/story_event_single_quest.json", cat: 11 },
   tower_dungeon_event_quest: { file: "quest/event/tower_dungeon_event_quest.json", cat: 20 },

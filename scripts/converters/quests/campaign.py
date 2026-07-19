@@ -1,6 +1,11 @@
-from math import floor
 import field_map as f
 import quest_builder as qb
+
+
+def _optional_int(value):
+    if value is None or value == '' or value == '(None)':
+        return None
+    return int(float(value))
 
 def convert_story_event_single_quest(obj):
     return qb.convert_3level_with_story(obj, f.TYPE_MAP['story_event_single_quest']['layout'])
@@ -20,36 +25,37 @@ def convert_expert_single_event_quest(obj):
 def convert_score_attack_event_quest(obj):
     converted = {}
     for event_id, folders in obj.items():
-        for folder_id, wrapper in folders.items():
+        for local_quest_id, wrapper in folders.items():
             if isinstance(wrapper, list):
                 for quest in wrapper:
-                    if not isinstance(quest, list) or len(quest) < 90:
+                    if not isinstance(quest, list) or len(quest) <= 104:
                         continue
                     qid = quest[0]
-                    # Boss-only quests (10xx) have no rank times
-                    if len(quest) <= 85 or quest[85] == '' or quest[85] == '(None)':
-                        converted[qid] = {
-                            "name": "",
-                            "clearRewardId": 1
-                        }
-                    else:
-                        converted[qid] = {
-                            "name": "",
-                            "clearRewardId": 1,
-                            "sPlusRewardId": 1,
-                            "bRankTime": floor(float(quest[85]) * 1000),
-                            "aRankTime": floor(float(quest[86]) * 1000),
-                            "sRankTime": floor(float(quest[87]) * 1000),
-                            "sPlusRankTime": floor(float(quest[88]) * 1000),
-                            "rankPointReward": int(float(quest[92])) if len(quest) > 92 and quest[92] != '' else 0,
-                            "characterExpReward": int(float(quest[93])) if len(quest) > 93 and quest[93] != '' else 0,
-                            "manaReward": int(float(quest[94])) if len(quest) > 94 and quest[94] != '' else 0,
-                            "poolExpReward": int(float(quest[95])) if len(quest) > 95 and quest[95] != '' else 0
-                        }
-                        if len(quest) > 70 and quest[70] != '' and quest[70] != '(None)':
-                            converted[qid]["scoreRewardGroupId"] = int(quest[70])
-                            converted[qid]["folderId"] = int(quest[70])
-                        converted[qid]["eventId"] = int(event_id)
+                    result = {
+                        "name": quest[4],
+                        "eventId": int(event_id),
+                        "scoreAttackQuestId": int(local_quest_id),
+                        "bRankScore": int(float(quest[52])),
+                        "aRankScore": int(float(quest[53])),
+                        "sRankScore": int(float(quest[54])),
+                        "ssRankScore": int(float(quest[55])),
+                        "rankPointReward": int(float(quest[86])),
+                        "characterExpReward": int(float(quest[87])),
+                        "manaReward": int(float(quest[88])),
+                        "poolExpReward": int(float(quest[89])),
+                        "element": int(quest[73]),
+                        # Master data stores battle_time_limit in 60 FPS frames.
+                        "timeLimitMs": round(int(quest[104]) * 1000 / 60),
+                    }
+                    folder_id = _optional_int(quest[1])
+                    if folder_id is not None:
+                        result["folderId"] = folder_id
+                    clear_reward_id = _optional_int(quest[6])
+                    if clear_reward_id is not None:
+                        result["clearRewardId"] = clear_reward_id
+                    score_reward_group_id = _optional_int(quest[72])
+                    if score_reward_group_id is not None:
+                        result["scoreRewardGroupId"] = score_reward_group_id
+                    converted[qid] = result
     return converted
-
 

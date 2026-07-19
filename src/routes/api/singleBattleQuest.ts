@@ -28,6 +28,11 @@ import { handleCarnivalEventFinish } from "../../lib/quest/finish/carnival-handl
 import { handleRushEventFinish } from "../../lib/quest/finish/rush-handler";
 import { handleRaidEventFinish } from "../../lib/quest/finish/raid-handler";
 import { calculateClearRank } from "../../lib/quest/finish/quest-calc";
+import {
+    calculateScoreAttackClearRank,
+    handleScoreAttackEventFinish,
+    ScoreAttackBorderTier,
+} from "../../lib/quest/finish/score-attack-handler";
 import { validateSessionAndPlayer } from "../../lib/quest/finish/session-validator";
 import { handleDailyChallengePoint } from "../../lib/quest/finish/challenge-point";
 import { trackCharacterClears } from "../../lib/quest/finish/character-clear-tracker";
@@ -178,13 +183,33 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
-        // delete the active quest data from global record
-        delete activeQuests[playerId]
-        deletePlayerActiveQuestSync(playerId)
-
         // calculate clear rank
         const clearTime = body.elapsed_time_ms
-        const clearRank = calculateClearRank(clearTime, questData)
+        const isScoreAttackEvent = questCategory === QuestCategory.SCORE_ATTACK_EVENT
+        if (isScoreAttackEvent && (
+            questData.bRankScore === undefined
+            || questData.aRankScore === undefined
+            || questData.sRankScore === undefined
+            || questData.ssRankScore === undefined
+        )) {
+            return reply.status(500).send({
+                "error": "Internal Server Error",
+                "message": "Score attack rank thresholds are missing.",
+            })
+        }
+        const clearRank = isScoreAttackEvent
+            ? calculateScoreAttackClearRank(body.score, {
+                bRankScore: questData.bRankScore!,
+                aRankScore: questData.aRankScore!,
+                sRankScore: questData.sRankScore!,
+                ssRankScore: questData.ssRankScore!,
+            })
+            : calculateClearRank(clearTime, questData)
+
+        if (!isScoreAttackEvent) {
+            delete activeQuests[playerId]
+            deletePlayerActiveQuestSync(playerId)
+        }
 
         // calculate player rewards
         const newExpPool = playerData.expPool + questData.poolExpReward
@@ -202,23 +227,29 @@ const routes = async (fastify: FastifyInstance) => {
         const questProgress = getPlayerSingleQuestProgressSync(playerId, questCategory, questId);
         const questPreviouslyCompleted = questProgress !== null
 
-        // Score attack: accomplished determined by border reward minimum tier (from CDN)
         let questAccomplished = body.is_accomplished
-        if (questCategory === QuestCategory.SCORE_ATTACK_EVENT) {
+        let scoreAttackBorderTiers: ScoreAttackBorderTier[] = []
+        if (isScoreAttackEvent) {
             const eventId = questData.eventId
-            const folderId = questData.folderId
-            if (eventId !== undefined && folderId !== undefined) {
-                const borderTiers = (scoreAttackBorderRewards as Record<string, {score: number}[]>)[`${eventId}_${folderId}`]
-                if (borderTiers && borderTiers.length > 0) {
-                    questAccomplished = body.score >= borderTiers[0].score
+            const localQuestId = questData.scoreAttackQuestId
+            if (eventId !== undefined && localQuestId !== undefined) {
+                scoreAttackBorderTiers = (
+                    scoreAttackBorderRewards as Record<string, ScoreAttackBorderTier[]>
+                ) [`${eventId}_${localQuestId}`] ?? []
+                if (scoreAttackBorderTiers.length > 0) {
+                    questAccomplished = body.score >= scoreAttackBorderTiers[0].score
                 }
             }
         }
 
-        const clearReward = !questPreviouslyCompleted && questData.clearReward !== undefined ? givePlayerRewardSync(playerId, questData.clearReward) : null
-        const sPlusClearReward = (clearRank === 5) && (questProgress?.clearRank !== 5) && (questData.sPlusReward !== undefined) ? givePlayerRewardSync(playerId, questData.sPlusReward) : null
+        const clearReward = !isScoreAttackEvent && !questPreviouslyCompleted && questData.clearReward !== undefined
+            ? givePlayerRewardSync(playerId, questData.clearReward)
+            : null
+        const sPlusClearReward = !isScoreAttackEvent && (clearRank === 5) && (questProgress?.clearRank !== 5) && (questData.sPlusReward !== undefined)
+            ? givePlayerRewardSync(playerId, questData.sPlusReward)
+            : null
         const leaderId = body.statistics.party.characters[0]?.id
-        if (questAccomplished) {
+        if (questAccomplished && !isScoreAttackEvent) {
             // update quest progress
             if (questPreviouslyCompleted) {
                 // simply update the quest progress if it already exists.
@@ -278,43 +309,8 @@ const routes = async (fastify: FastifyInstance) => {
             updatePoint: (pid, id, pt) => updatePlayerDailyChallengePointSync(pid, id, pt),
         })
 
-        // reward score rewards
-        if (questCategory === QuestCategory.SCORE_ATTACK_EVENT) {
-            console.log(`[SCORE_ATTACK] questId=${questId} body={score:${body.score}, elapsed:${body.elapsed_time_ms}, accomplished:${body.is_accomplished}, addMana:${body.add_mana}, continue:${body.continue_count}}`)
-            console.log(`[SCORE_ATTACK] questData={groupId:${questData.scoreRewardGroupId}, groupLen:${questData.scoreRewardGroup?.length ?? 'null'}, bRank:${questData.bRankTime}, aRank:${questData.aRankTime}, sRank:${questData.sRankTime}, sPlus:${questData.sPlusRankTime}, rankPt:${questData.rankPointReward}, charExp:${questData.characterExpReward}, mana:${questData.manaReward}, poolExp:${questData.poolExpReward}, clearReward:${questData.clearReward?.id ?? 'none'}}`)
-        }
         console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${questData.scoreRewardGroup?.length ?? 'null'} questId=${questId} category=${questCategory}`)
         const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element)
-        let scoreAttackRewardIds: number[] = []
-        if (questCategory === QuestCategory.SCORE_ATTACK_EVENT) {
-            // Look up border rewards for score attack events
-            const eventId = questData.eventId
-            const folderId = questData.folderId
-            if (eventId !== undefined && folderId !== undefined) {
-                const borderKey = `${eventId}_${folderId}`
-                const borderTiers = (scoreAttackBorderRewards as Record<string, {score: number, rewardItemId: number, rewardCount: number, coinItemId: number, coinCount: number}[]>)[borderKey]
-                if (borderTiers) {
-                    // Find highest tier the player's score qualifies for
-                    let matched: typeof borderTiers[0] | null = null
-                    for (const tier of borderTiers) {
-                        if (body.score >= tier.score) {
-                            matched = tier
-                        }
-                    }
-                    if (matched) {
-                        console.log(`[SCORE_ATTACK] borderReward matched: score=${body.score} tierScore=${matched.score} coinItem=${matched.coinItemId}x${matched.coinCount}`)
-                        // Give coin item only (rewardItemId=16001 does not exist in CDN)
-                        if (matched.coinItemId > 0 && matched.coinCount > 0) {
-                            givePlayerItemSync(playerId, matched.coinItemId, matched.coinCount)
-                            scoreRewardsResult.items[String(matched.coinItemId)] = (scoreRewardsResult.items[String(matched.coinItemId)] ?? 0) + matched.coinCount
-                            scoreAttackRewardIds.push(matched.coinItemId)
-                        }
-                    }
-                }
-            }
-            console.log(`[SCORE_ATTACK] afterReward: dropIds=${JSON.stringify(scoreRewardsResult.drop_score_reward_ids)}, drops=${scoreRewardsResult.drop_score_reward_ids.length}, items=${JSON.stringify(scoreRewardsResult.items)}, equipList=${scoreRewardsResult.equipment_list?.length ?? 0}`)
-            console.log(`[SCORE_ATTACK] response: accomplished=${questAccomplished}, clearRank=${clearRank}, score=${body.score}, elapsed=${body.elapsed_time_ms}, items=${JSON.stringify(scoreRewardsResult.items)}, clientCategory=${questCategory}`)
-        }
 
         // reward character exp
         const bodyPartyStatistics = body.statistics.party
@@ -415,9 +411,40 @@ const routes = async (fastify: FastifyInstance) => {
         const carnivalEventData = carnivalFinishResult?.carnivalEventData ?? null
         const carnivalRewardResult = carnivalFinishResult?.rewardResult
 
+        const scoreAttackFinishResult = isScoreAttackEvent
+            ? handleScoreAttackEventFinish({
+                playerId,
+                questId,
+                category: questCategory,
+                score: body.score,
+                elapsedTimeMs: clearTime,
+                isAccomplished: questAccomplished,
+                quest: {
+                    bRankScore: questData.bRankScore!,
+                    aRankScore: questData.aRankScore!,
+                    sRankScore: questData.sRankScore!,
+                    ssRankScore: questData.ssRankScore!,
+                },
+                tiers: scoreAttackBorderTiers,
+                party: bodyPartyStatistics,
+            }, {
+                transaction: operation => getDb().transaction(operation)(),
+                getProgress: (pid, category, qid) => getPlayerSingleQuestProgressSync(pid, category, qid),
+                grantRewards: (pid, rewards) => givePlayerRewardsSync(pid, rewards),
+                giveDegree: (pid, degreeId) => givePlayerDegreeSync(pid, degreeId),
+                updateProgress: (pid, category, progress) => updatePlayerQuestProgressSync(pid, category, progress),
+                insertProgress: (pid, category, progress) => insertPlayerQuestProgressSync(pid, category, progress),
+                deleteActiveQuest: pid => deletePlayerActiveQuestSync(pid),
+            })
+            : null
+        if (scoreAttackFinishResult !== null) delete activeQuests[playerId]
+        const scoreAttackRewardResult = scoreAttackFinishResult?.rewardResult
+        const scoreAttackEventData = scoreAttackFinishResult?.scoreAttackEvent ?? null
+
         const itemList = {
             ...(activeQuestData.entryItemId ? { [activeQuestData.entryItemId]: getPlayerItemSync(playerId, activeQuestData.entryItemId) ?? 0 } : {}),
             ...scoreRewardsResult.items,
+            ...(scoreAttackRewardResult?.items ?? {}),
             ...(rushEventRewardsResult?.items ?? {}),
             ...(carnivalRewardResult?.item_list ?? {}),
         }
@@ -425,17 +452,18 @@ const routes = async (fastify: FastifyInstance) => {
             ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
             ...((clearReward?.character_list || []) as Record<string, unknown>[]),
             ...((sPlusClearReward?.character_list || []) as Record<string, unknown>[]),
-            ...(scoreRewardsResult.character_list as Record<string, unknown>[])
+            ...(scoreRewardsResult.character_list as Record<string, unknown>[]),
+            ...((scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[]),
         ])
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": dataHeaders,
             "data": {
                 "user_info": {
-                    "free_mana": newMana + (clearReward?.user_info.free_mana || 0) + (sPlusClearReward?.user_info.free_mana || 0) + scoreRewardsResult.user_info.free_mana + (carnivalRewardResult?.user_info.free_mana ?? 0),
-                    "exp_pool": rewardCharacterExpResult.exp_pool + (clearReward?.user_info.exp_pool || 0) + scoreRewardsResult.user_info.exp_pool + (carnivalRewardResult?.user_info.exp_pool ?? 0),
+                    "free_mana": newMana + (clearReward?.user_info.free_mana || 0) + (sPlusClearReward?.user_info.free_mana || 0) + scoreRewardsResult.user_info.free_mana + (scoreAttackRewardResult?.user_info.free_mana ?? 0) + (carnivalRewardResult?.user_info.free_mana ?? 0),
+                    "exp_pool": rewardCharacterExpResult.exp_pool + (clearReward?.user_info.exp_pool || 0) + scoreRewardsResult.user_info.exp_pool + (scoreAttackRewardResult?.user_info.exp_pool ?? 0) + (carnivalRewardResult?.user_info.exp_pool ?? 0),
                     "exp_pooled_time": getServerTime(playerData.expPooledTime),
-                    "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney + (carnivalRewardResult?.user_info.free_vmoney ?? 0),
+                    "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney + (scoreAttackRewardResult?.user_info.free_vmoney ?? 0) + (carnivalRewardResult?.user_info.free_vmoney ?? 0),
                     "rank_point": newRankPoint,
                     "degree_id": playerData.degreeId,
                     "stamina": playerData.stamina,
@@ -453,11 +481,12 @@ const routes = async (fastify: FastifyInstance) => {
                     "reward_mana": questData.manaReward,
                     "field_mana": body.add_mana
                 },
-                "old_high_score": questProgress === null ? 0 : questProgress.highScore || 0,
+                "old_high_score": scoreAttackFinishResult?.oldHighScore ?? (questProgress === null ? 0 : questProgress.highScore || 0),
                 "joined_character_id_list": [
                     ...(clearReward?.joined_character_id_list || []),
                     ...(sPlusClearReward?.joined_character_id_list || []),
-                    ...scoreRewardsResult.joined_character_id_list
+                    ...scoreRewardsResult.joined_character_id_list,
+                    ...(scoreAttackRewardResult?.joined_character_id_list ?? []),
                 ],
                 "before_rank_point": beforeRankPoint,
                 "clear_rank": clearRank ?? 5,
@@ -470,6 +499,7 @@ const routes = async (fastify: FastifyInstance) => {
                     ...(clearReward?.equipment_list || []),
                     ...(sPlusClearReward?.equipment_list || []),
                     ...(rushEventRewardsResult?.equipment_list || []),
+                    ...(scoreAttackRewardResult?.equipment_list ?? []),
                     ...(carnivalRewardResult?.equipment_list ?? []),
                 ],
                 "category_id": body.category,
@@ -480,6 +510,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "raid_event": raidEventData,
                 "rush_event": rushEventData,
                 "carnival_event": carnivalEventData,
+                "score_attack_event": scoreAttackEventData,
                 "user_daily_challenge_point_list": dailyChallengePointList ?? [],
                 "presigned_quest_category": []
             }
