@@ -62,3 +62,10 @@ test("defines the full verification pipeline", () => {
         "npm run typecheck && npm run test:full && npm run hygiene && npm run build:server",
     )
 })
+
+test("exposes the workflow benchmark command", () => {
+    assert.equal(
+        scripts["benchmark:workflow"],
+        "node tools/test-workflow/benchmark.cjs",
+    )
+})

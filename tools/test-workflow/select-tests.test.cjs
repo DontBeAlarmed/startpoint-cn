@@ -63,6 +63,7 @@ test("full contains quick, integration, and admin but excludes generators", () =
 
 test("quick workflow includes the package scripts contract", () => {
     assert.deepEqual(TEST_GROUPS["quick:workflow"].tests, [
+        "tools/test-workflow/benchmark.test.cjs",
         "tools/test-workflow/package-scripts.test.cjs",
         "tools/test-workflow/select-tests.test.cjs",
         "tools/test-workflow/run.test.cjs",
