@@ -380,6 +380,23 @@ function installSignalHandlers(activeChildren, onSignal, options = {}) {
     const handlers = {}
     const forceKillAfterMs = options.forceKillAfterMs ?? 2000
     const forceKillTimers = new Map()
+    const sendSignal = options.sendSignal ?? terminateProcessGroup
+    const onSignalError = options.onSignalError ?? ((error, context) => {
+        process.stderr.write(
+            `failed to signal process group ${context.processGroupId} with ${context.signal}: ${error.message}\n`,
+        )
+    })
+
+    function safelySendSignal(child, processGroupId, signal) {
+        try {
+            sendSignal(child, processGroupId, signal)
+        } catch (error) {
+            if (error.code === "ESRCH") return
+            try {
+                onSignalError(error, { processGroupId, signal })
+            } catch {}
+        }
+    }
 
     function scheduleForceKill(child) {
         const processGroupId = child.pid
@@ -389,7 +406,7 @@ function installSignalHandlers(activeChildren, onSignal, options = {}) {
         const completion = new Promise(resolve => { resolveForceKill = resolve })
         const timer = setTimeout(() => {
             try {
-                terminateProcessGroup(child, processGroupId, "SIGKILL")
+                safelySendSignal(child, processGroupId, "SIGKILL")
             } finally {
                 forceKillTimers.delete(processGroupId)
                 resolveForceKill()
@@ -403,7 +420,7 @@ function installSignalHandlers(activeChildren, onSignal, options = {}) {
             onSignal(signal)
             for (const child of activeChildren) {
                 try {
-                    terminateProcessGroup(child, child.pid, signal)
+                    safelySendSignal(child, child.pid, signal)
                 } finally {
                     scheduleForceKill(child)
                 }

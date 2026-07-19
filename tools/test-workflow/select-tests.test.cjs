@@ -35,6 +35,9 @@ test("accumulates every directly related source group", () => {
 test("upgrades package and unknown source changes to full", () => {
     assert.deepEqual(selectTestGroups(["package.json"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/unmapped/new-feature.ts"]), ["full"])
+    assert.deepEqual(selectTestGroups(["src/lib/mission/awake-settlement.ts"]), ["full"])
+    assert.deepEqual(selectTestGroups(["src/lib/character.ts"]), ["full"])
+    assert.deepEqual(selectTestGroups(["tools/test-workflow/groups.cjs"]), ["full"])
 })
 
 test("deduplicates and stably sorts selected groups", () => {

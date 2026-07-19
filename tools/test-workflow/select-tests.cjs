@@ -7,13 +7,18 @@ const SOURCE_RULES = [
     { pattern: /^tests\/admin-/, groups: ["admin"] },
     { pattern: /^src\/routes\/cn\/(?:asset|versionCheck)\.ts$/, groups: ["full"] },
     { pattern: /^src\/routes\/web_api\//, groups: ["admin"] },
-    { pattern: /^src\/lib\/gacha(?:[\/.\-]|\.ts$)/, groups: ["quick:gacha"] },
-    { pattern: /^src\/lib\/quest\/host-finish-persistence\.ts$/, groups: ["integration:database"] },
-    { pattern: /^src\/lib\/quest\//, groups: ["quick:quest"] },
-    { pattern: /^src\/lib\/mission\/awake-unlock\.ts$/, groups: ["integration:database"] },
-    { pattern: /^src\/lib\/mission\//, groups: ["integration:compiled"] },
-    { pattern: /^src\/lib\/(?:character|equipment|event-currency|inventory)/, groups: ["integration:compiled"] },
-    { pattern: /^src\/lib\/score-attack/, groups: ["generator"] },
+    {
+        pattern: /^src\/lib\/(?:gacha|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-ticket)\.ts$/,
+        groups: ["quick:gacha"],
+    },
+    {
+        pattern: /^src\/lib\/quest\/host-finish-persistence\.ts$/,
+        groups: ["integration:database", "quick:quest"],
+    },
+    {
+        pattern: /^src\/lib\/mission\/awake-unlock\.ts$/,
+        groups: ["integration:compiled", "integration:database"],
+    },
     { pattern: /^src\/multi\//, groups: ["quick:protocol"] },
     { pattern: /^src\/data\//, groups: ["integration:database"] },
     { pattern: /^src\/routes\//, groups: ["integration:database"] },
@@ -32,6 +37,7 @@ function groupsForTestFile(filePath) {
 function groupsForFile(filePath) {
     const testGroups = groupsForTestFile(filePath)
     if (testGroups.length > 0) return testGroups
+    if (filePath === "tools/test-workflow/groups.cjs") return ["full"]
     if (filePath.startsWith("tools/test-workflow/")) return ["quick:workflow"]
 
     const matchedGroups = SOURCE_RULES

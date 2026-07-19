@@ -328,3 +328,36 @@ test("signal cleanup kills a grandchild after its parent exits on SIGTERM", {
         await removeHandlers()
     }
 })
+
+test("records process group signal errors without escaping cleanup", async () => {
+    const calls = []
+    const errors = []
+    const denied = Object.assign(new Error("permission denied"), { code: "EACCES" })
+    const fakeChild = { pid: 424242 }
+    const removeHandlers = installSignalHandlers(
+        new Set([fakeChild]),
+        () => {},
+        {
+            forceKillAfterMs: 10,
+            onSignalError(error, context) {
+                errors.push({ error, ...context })
+            },
+            sendSignal(_child, processGroupId, signal) {
+                calls.push({ processGroupId, signal })
+                throw denied
+            },
+        },
+    )
+
+    assert.doesNotThrow(() => process.emit("SIGTERM"))
+    await removeHandlers()
+
+    assert.deepEqual(calls, [
+        { processGroupId: 424242, signal: "SIGTERM" },
+        { processGroupId: 424242, signal: "SIGKILL" },
+    ])
+    assert.deepEqual(errors, [
+        { error: denied, processGroupId: 424242, signal: "SIGTERM" },
+        { error: denied, processGroupId: 424242, signal: "SIGKILL" },
+    ])
+})
