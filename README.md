@@ -9,7 +9,7 @@
 
 | 你是谁 | 需要什么 |
 |---|---|
-| **想进别人的服玩** | 不用下载本仓库。找服主要:① 他重打好的客户端 APK ② 服务器地址/账号说明。([wf-abyss-client](https://github.com/kuronzzhan-droid/wf-abyss-client) 的现成整合包只适用于它指向的那个服,且**不支持新角色**) |
+| **想进别人的服玩** | 不用下载本仓库。找服主要:① 他重打好的客户端 APK ② 服务器地址/账号说明。([wf-abyss-client](https://github.com/kuronzzhan-droid/wf-abyss-client) 的 v2.0 整合包已是五合一、**支持全部三位自制角色**,但仍只适用于它指向的那个服) |
 | **想自己开服**(玩全部内容,含三自制角色) | clone 本仓库(默认分支就是本分支),新手照 **[docs/部署攻略.md](docs/部署攻略.md)**(保姆级,从零到领角色)一步步来;技术参考/存量服升级/救援见 [docs/self-host-modes.md](docs/self-host-modes.md)。主线:自备基础 CDN(~11GB)→ 起服 → 重打**五合一**客户端 → 管理后台邮件发角色 |
 | **想改数据 / 做自己的 mod** | 数据修改工具链:[mod-tools/](mod-tools/)(独立仓 [startpoint-cn-mod-tools](https://github.com/kuronzzhan-droid/startpoint-cn-mod-tools),带全套文档与《新角色制作心得》) |
 
