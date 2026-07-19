@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -97,6 +97,40 @@ test("manifest validation is independent from the legacy directory tail", () => 
         assert.equal(chain.baseVersion, "1.4.54");
         assert.equal(chain.releases.length, 2);
         assert.equal(chain.tailVersion, "1.4.56");
+    } finally {
+        f.cleanup();
+    }
+});
+
+test("active chain with base_package_owners anchor is accepted", () => {
+    const f = fixture();
+    try {
+        writeRelease(f.root, f.active);
+        const manifest = JSON.parse(readFileSync(f.active, "utf8"));
+        manifest.base_package_owners = [
+            ["seris_dragon_king", "a".repeat(64)],
+            ["white_wolf_gerald", "b".repeat(64)],
+        ];
+        writeFileSync(f.active, JSON.stringify(manifest));
+        const chain = readActiveCharacterReleases(f.root);
+        assert.equal(chain.error, null);
+        assert.equal(chain.releases.length, 2);
+        assert.equal(chain.tailVersion, "1.4.56");
+    } finally {
+        f.cleanup();
+    }
+});
+
+test("malformed base_package_owners is rejected", () => {
+    const f = fixture();
+    try {
+        writeRelease(f.root, f.active);
+        const manifest = JSON.parse(readFileSync(f.active, "utf8"));
+        manifest.base_package_owners = [["seris_dragon_king", "not-a-hash"]];
+        writeFileSync(f.active, JSON.stringify(manifest));
+        const chain = readActiveCharacterReleases(f.root);
+        assert.match(chain.error ?? "", /base_package_owners is invalid/);
+        assert.equal(chain.releases.length, 0);
     } finally {
         f.cleanup();
     }

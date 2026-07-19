@@ -87,6 +87,26 @@ class TestAtomicCharacterRelease(unittest.TestCase):
     def _module(self):
         return importlib.import_module("wf_release")
 
+    def test_server_running_uses_explicit_endpoint_when_dotenv_is_unreadable(self):
+        module = self._module()
+        with tempfile.TemporaryDirectory() as td:
+            endpoint = ("127.0.0.1", 8001)
+            with (
+                mock.patch.object(Path, "read_text", side_effect=PermissionError("denied")),
+                mock.patch.dict(
+                    module.os.environ,
+                    {"CN_LISTEN_HOST": endpoint[0], "CN_LISTEN_PORT": str(endpoint[1])},
+                    clear=False,
+                ),
+                mock.patch.object(
+                    module.socket,
+                    "create_connection",
+                    side_effect=ConnectionRefusedError,
+                ) as connect,
+            ):
+                self.assertFalse(module._server_running(Path(td)))
+            connect.assert_called_once_with(endpoint, timeout=0.3)
+
     def test_detect_canonical_base_preserves_active_anchor_after_late_legacy_edge(self):
         module = self._module()
         with tempfile.TemporaryDirectory() as td:
@@ -744,6 +764,172 @@ class TestAtomicCharacterRelease(unittest.TestCase):
             self.assertEqual(3, len(prepared.payload.provisional_archives))
             self.assertEqual(before_facts, {path: path.read_bytes() for path in before_facts})
             module.close_prepared_runtime_release(prepared, discard_staging=True)
+
+
+class TestDerivePackageOwners(unittest.TestCase):
+    def _module(self):
+        return importlib.import_module("wf_release")
+
+    @staticmethod
+    def _release(package_id: str, manifest_hash: str) -> dict:
+        return {
+            "package_id": package_id,
+            "package_manifest_sha256": manifest_hash,
+        }
+
+    def test_last_release_per_package_wins(self):
+        module = self._module()
+        owners = module.derive_package_owners([
+            self._release("alpha", "a" * 64),
+            self._release("beta", "b" * 64),
+            self._release("alpha", "c" * 64),
+        ])
+        self.assertEqual(
+            (("alpha", "c" * 64), ("beta", "b" * 64)), owners
+        )
+
+    def test_rollback_entry_restores_previous_owner(self):
+        module = self._module()
+        owners = module.derive_package_owners([
+            self._release("alpha", "a" * 64),
+            self._release("alpha", "c" * 64),
+            self._release("alpha-rollback", "d" * 64),
+        ])
+        self.assertEqual((("alpha", "a" * 64),), owners)
+
+    def test_rollback_of_only_release_removes_owner(self):
+        module = self._module()
+        owners = module.derive_package_owners([
+            self._release("alpha", "a" * 64),
+            self._release("beta", "b" * 64),
+            self._release("beta-rollback", "d" * 64),
+        ])
+        self.assertEqual((("alpha", "a" * 64),), owners)
+
+    def test_rollback_without_source_release_raises(self):
+        module = self._module()
+        with self.assertRaisesRegex(module.ReleaseError, "rollback entry"):
+            module.derive_package_owners([
+                self._release("beta-rollback", "d" * 64),
+            ])
+
+    def test_base_owner_survives_other_package_releases(self):
+        module = self._module()
+        owners = module.derive_package_owners(
+            [self._release("gerald", "c" * 64)],
+            base_package_owners=(
+                ("gerald", "b" * 64),
+                ("seris", "a" * 64),
+            ),
+        )
+        self.assertEqual(
+            (("gerald", "c" * 64), ("seris", "a" * 64)), owners
+        )
+
+    def test_rollback_restores_package_to_base_owner(self):
+        module = self._module()
+        owners = module.derive_package_owners(
+            [
+                self._release("seris", "b" * 64),
+                self._release("seris-rollback", "c" * 64),
+            ],
+            base_package_owners=(("seris", "a" * 64),),
+        )
+        self.assertEqual((("seris", "a" * 64),), owners)
+
+    def test_zero_release_owner_anchor_is_a_valid_base(self):
+        module = self._module()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            store = module.ActiveReleaseStore(
+                root, canonical_base_version="1.4.54"
+            )
+            store.active_path.parent.mkdir(parents=True)
+            value = {
+                "schema_version": 1,
+                "base_version": "1.4.54",
+                "base_package_owners": [["seris", "a" * 64]],
+                "releases": [],
+            }
+            store.active_path.write_bytes(module._canonical(value))
+
+            state = store.read_validated_base()
+
+            self.assertIsNotNone(state.active_raw)
+            self.assertIsNone(state.current_release_id)
+            self.assertEqual("1.4.54", state.expected_from_version)
+            self.assertEqual((("seris", "a" * 64),), state.package_owners)
+            self.assertEqual(
+                "1.4.54", module.detect_canonical_base_version(root, root)
+            )
+
+    def test_publish_preserves_base_owner_anchor_and_merges_release_owner(self):
+        module = self._module()
+        with tempfile.TemporaryDirectory() as td:
+            fixture = AtomicReleaseFixture(module, Path(td))
+            anchor = {
+                "schema_version": 1,
+                "base_version": "1.4.54",
+                "base_package_owners": [["gerald", "b" * 64]],
+                "releases": [],
+            }
+            fixture.active.parent.mkdir(parents=True, exist_ok=True)
+            fixture.active.write_bytes(module._canonical(anchor))
+            payload = module.ReleasePayload(
+                package_id=fixture.payload.package_id,
+                package_manifest_sha256=fixture.payload.package_manifest_sha256,
+                expected_base=fixture.store.read_validated_base(),
+                files=fixture.payload.files,
+                provisional_archives=fixture.payload.provisional_archives,
+            )
+
+            fixture.publisher().publish(payload, server_running=lambda: False)
+
+            active = json.loads(fixture.active.read_bytes())
+            self.assertEqual(
+                [["gerald", "b" * 64]], active["base_package_owners"]
+            )
+            self.assertEqual(
+                (
+                    ("gerald", "b" * 64),
+                    ("seris_dragon_king", "a" * 64),
+                ),
+                fixture.store.read_validated_base().package_owners,
+            )
+
+    def test_base_owner_anchor_rejects_noncanonical_entries(self):
+        module = self._module()
+        cases = (
+            ("duplicate", [["seris", "a" * 64], ["seris", "b" * 64]]),
+            ("unsorted", [["seris", "a" * 64], ["gerald", "b" * 64]]),
+            ("rollback", [["seris-rollback", "a" * 64]]),
+            ("hash", [["seris", "A" * 64]]),
+        )
+        for label, owners in cases:
+            with self.subTest(case=label), tempfile.TemporaryDirectory() as td:
+                store = module.ActiveReleaseStore(
+                    Path(td), canonical_base_version="1.4.54"
+                )
+                store.active_path.parent.mkdir(parents=True)
+                store.active_path.write_bytes(module._canonical({
+                    "schema_version": 1,
+                    "base_version": "1.4.54",
+                    "base_package_owners": owners,
+                    "releases": [],
+                }))
+                with self.assertRaisesRegex(
+                    module.ReleaseError, "base package owners"
+                ):
+                    store.read_validated_base()
+
+    def test_read_validated_base_exposes_package_owners(self):
+        module = self._module()
+        with tempfile.TemporaryDirectory() as td:
+            store = module.ActiveReleaseStore(
+                Path(td), canonical_base_version="1.4.54"
+            )
+            state = store.read_validated_base()
+            self.assertEqual((), state.package_owners)
 
 
 if __name__ == "__main__":

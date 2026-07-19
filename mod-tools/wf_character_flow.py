@@ -268,6 +268,58 @@ def master_reference_report(
         ),
         condition_id_exists=lambda cid: cid in store_condition_ids,
     )
+    runtime_texture_checks: list[dict[str, Any]] = []
+    for reference in references:
+        if reference.kind != "skill_effect":
+            continue
+        required_paths = requirements.required_asset_paths(reference)
+        if len(required_paths) != 4:
+            continue
+        parts_logical, _timeline_logical, _sheet_logical, atlas_logical = required_paths
+        if parts_logical not in declared_common or atlas_logical not in declared_common:
+            continue
+        parts_path = _package_client_file(package_dir, parts_logical)
+        atlas_path = _package_client_file(package_dir, atlas_logical)
+        try:
+            parts_tree = wf_dsl.parse_dsl(
+                zlib.decompress(parts_path.read_bytes(), -15)
+            )["tree"]
+            atlas_tree = wf_dsl.parse_dsl(
+                zlib.decompress(atlas_path.read_bytes(), -15)
+            )["tree"]
+            if not isinstance(parts_tree, dict) or not isinstance(atlas_tree, list):
+                raise ValueError("parts/atlas root type mismatch")
+            texture_refs = {
+                image["p"]
+                for image in parts_tree.get("i", ())
+                if isinstance(image, dict) and isinstance(image.get("p"), str)
+            }
+            loaded_textures = {
+                image["n"]
+                for image in atlas_tree
+                if isinstance(image, dict) and isinstance(image.get("n"), str)
+            }
+            missing_textures = sorted(texture_refs - loaded_textures)
+        except (OSError, KeyError, TypeError, ValueError, zlib.error) as exc:
+            problems.append(
+                f"cannot validate runtime effect textures for {reference.value}: "
+                f"{type(exc).__name__}"
+            )
+            continue
+        runtime_texture_checks.append({
+            "effect": reference.value,
+            "source": reference.source,
+            "parts": parts_logical,
+            "loader_atlas": atlas_logical,
+            "texture_reference_count": len(texture_refs),
+            "missing_textures": missing_textures,
+        })
+        if missing_textures:
+            problems.append(
+                f"runtime loader atlas misses textures for {reference.value}: "
+                + ", ".join(missing_textures)
+            )
+    report["runtime_texture_checks"] = runtime_texture_checks
     report["stores"] = [str(store) for store in stores]
     report["problems"] = problems
     if problems:

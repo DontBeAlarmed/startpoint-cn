@@ -27,6 +27,7 @@ if os.name == "nt":
     from ctypes import wintypes
 
 import wf_mod_tool as core
+import wf_assets
 
 RootName = Literal["common", "medium", "android", "server"]
 TableKey = tuple[RootName, str]
@@ -69,6 +70,9 @@ ARCHIVE_PREFIXES = {
 UNIQUE_CONDITION_TABLE = "master/character/unique_condition.orderedmap"
 TRANSACTION_MARKER = ".character-pack-transaction.json"
 SNAPSHOT_MARKER = ".character-pack-snapshot.json"
+# 回滚增量在 active 链上的 package_id 后缀（见 wf_character_rollback）；
+# 正常包禁用该后缀，保证所有权推导无歧义。
+ROLLBACK_PACKAGE_SUFFIX = "-rollback"
 MATERIALIZE_PHASES = (
     "table_materialization",
     "asset_copy",
@@ -109,6 +113,9 @@ class ReleaseBaseState:
     validated_chain_tail: str
     expected_from_version: str
     active_package_manifest_sha256: str | None = None
+    # 每个 package_id 当前生效的 manifest 哈希（多独立包共存）。
+    # None = 旧 provider 未提供，回退到"链尾单一所有者"语义。
+    package_owners: tuple[tuple[str, str], ...] | None = None
 
 
 class ReleaseBaseProvider(Protocol):
@@ -660,6 +667,10 @@ def validate_manifest(
 
     seen_paths: dict[str, str] = {}
     declared_common_paths: set[str] = set()
+    qa = manifest.get("qa")
+    production_package = (
+        isinstance(qa, dict) and qa.get("delivery_mode") == "production"
+    )
     package_anchor = _resolve_for_validation(Path(package_dir), "package_dir", errors)
     roots_anchor: Path | None = None
     if package_anchor is not None:
@@ -770,6 +781,22 @@ def validate_manifest(
                 errors.append(
                     f"{prefix}: size mismatch: expected {size}, got {actual_size}"
                 )
+            if (
+                production_package
+                and require_referenced_assets
+                and root in CLIENT_ROOTS
+                and logical_path.endswith(".png")
+            ):
+                try:
+                    with candidate.open("rb") as stream:
+                        signature = stream.read(len(wf_assets.PNG_FAKE))
+                except FILESYSTEM_ERRORS:
+                    errors.append(f"{prefix}: cannot inspect WF storage signature")
+                else:
+                    if signature != wf_assets.PNG_FAKE:
+                        errors.append(
+                            f"{prefix}: {logical_path}: WF storage signature required"
+                        )
             if sha_valid:
                 try:
                     actual_sha256 = _sha256_file(candidate)
@@ -974,6 +1001,22 @@ def _validate_release_base(provider: ReleaseBaseProvider) -> ReleaseBaseState:
     manifest_hash = state.active_package_manifest_sha256
     if manifest_hash is not None and SHA256_RE.fullmatch(manifest_hash) is None:
         raise PackPreflightError("active package-manifest hash is invalid")
+    owners = state.package_owners
+    if owners is not None:
+        if not isinstance(owners, tuple):
+            raise PackPreflightError("package owners must be a tuple of pairs")
+        if state.active_raw is None and owners:
+            raise PackPreflightError("absent active state requires empty package owners")
+        seen_owner_ids: set[str] = set()
+        for pair in owners:
+            if (not isinstance(pair, tuple) or len(pair) != 2
+                    or not isinstance(pair[0], str) or not pair[0]
+                    or not isinstance(pair[1], str)
+                    or SHA256_RE.fullmatch(pair[1]) is None):
+                raise PackPreflightError("package owner entry is invalid")
+            if pair[0] in seen_owner_ids:
+                raise PackPreflightError("package owners repeat a package_id")
+            seen_owner_ids.add(pair[0])
     return state
 
 
@@ -1113,6 +1156,10 @@ def _prepared_digest_value(prepared: PreparedPack) -> str:
             "expected_from_version": prepared.release_base.expected_from_version,
             "active_package_manifest_sha256": (
                 prepared.release_base.active_package_manifest_sha256
+            ),
+            "package_owners": (
+                [list(pair) for pair in prepared.release_base.package_owners]
+                if prepared.release_base.package_owners is not None else None
             ),
         },
         "table_key_changes": _plain(prepared.table_key_changes),
@@ -2038,19 +2085,29 @@ class PackTransaction:
                 )
 
         state = _validate_release_base(self.release_base_provider)
+        candidate_package_id = self.manifest["package_id"]
+        if candidate_package_id.endswith(ROLLBACK_PACKAGE_SUFFIX):
+            raise PackPreflightError(
+                "candidate package_id must not use the reserved -rollback suffix"
+            )
+        if state.package_owners is None:
+            # 旧 provider（无 owners 信息）：保持链尾单一所有者语义。
+            owner_hash = state.active_package_manifest_sha256
+        else:
+            owner_hash = dict(state.package_owners).get(candidate_package_id)
         if self.installed_manifest is not None:
             installed_hash = hashlib.sha256(
                 canonical_manifest_bytes(self.installed_manifest)
             ).hexdigest()
-            if state.active_package_manifest_sha256 != installed_hash:
+            if owner_hash != installed_hash:
                 raise PackPreflightError(
                     "installed ownership manifest is not hash-bound to active state"
                 )
-            if self.installed_manifest["package_id"] != self.manifest["package_id"]:
+            if self.installed_manifest["package_id"] != candidate_package_id:
                 raise PackPreflightError(
                     "installed ownership belongs to a different package_id"
                 )
-        elif state.active_package_manifest_sha256 is not None:
+        elif owner_hash is not None:
             raise PackPreflightError(
                 "active ownership hash exists but installed manifest was not supplied"
             )
@@ -2471,6 +2528,10 @@ class PackTransaction:
             "validated_chain_tail": state.validated_chain_tail,
             "expected_from_version": state.expected_from_version,
             "active_package_manifest_sha256": state.active_package_manifest_sha256,
+            "package_owners": (
+                [list(pair) for pair in state.package_owners]
+                if state.package_owners is not None else None
+            ),
         }
 
     def prepare(self, staging_root: Path) -> PreparedPack:

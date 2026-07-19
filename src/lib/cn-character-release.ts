@@ -65,6 +65,21 @@ function exactKeys(value: Record<string, unknown>, expected: string[]): boolean 
         && keys.every((key, index) => key === [...expected].sort()[index]);
 }
 
+function validBasePackageOwners(value: unknown): boolean {
+    if (!Array.isArray(value)) return false;
+    const seen = new Set<string>();
+    for (const entry of value) {
+        if (!Array.isArray(entry) || entry.length !== 2) return false;
+        const [packageId, hash] = entry as unknown[];
+        if (typeof packageId !== "string" || !TOKEN_RE.test(packageId) || seen.has(packageId)) {
+            return false;
+        }
+        if (typeof hash !== "string" || !HASH_RE.test(hash)) return false;
+        seen.add(packageId);
+    }
+    return true;
+}
+
 function safeRelative(value: string): boolean {
     if (!value || value.includes("\\") || path.posix.isAbsolute(value)) return false;
     const parts = value.split("/");
@@ -101,8 +116,16 @@ export function readActiveCharacterReleases(cdnDir: string): ValidatedReleaseCha
         return empty(`active.json invalid JSON: ${(error as Error).message}`);
     }
     const manifest = asObject(value);
-    if (!manifest || !exactKeys(manifest, ["schema_version", "base_version", "releases"])) {
+    const manifestKeysOk = manifest !== null && (
+        exactKeys(manifest, ["schema_version", "base_version", "releases"])
+        || exactKeys(manifest, ["schema_version", "base_version", "releases", "base_package_owners"])
+    );
+    if (!manifest || !manifestKeysOk) {
         return empty("active.json fields are invalid");
+    }
+    if (manifest.base_package_owners !== undefined
+        && !validBasePackageOwners(manifest.base_package_owners)) {
+        return empty("active.json base_package_owners is invalid");
     }
     if (manifest.schema_version !== 1) return empty("active.json schema_version must be 1");
     const baseVersion = manifest.base_version;

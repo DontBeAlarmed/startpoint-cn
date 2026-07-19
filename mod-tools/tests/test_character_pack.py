@@ -213,6 +213,91 @@ class TestManifestContract(unittest.TestCase):
                 "common",
             )
 
+    def test_production_manifest_requires_wf_storage_png_signature_in_client_roots(self):
+        pack = self._module()
+        import wf_assets
+
+        standard_png = b"\x89PNG\r\n\x1a\n" + b"payload"
+        stored_png = wf_assets.PNG_FAKE + b"payload"
+        with tempfile.TemporaryDirectory() as td:
+            package_dir = Path(td)
+            for root in ("android", "common", "medium"):
+                logical_path = f"character/seris/ui/{root}.png"
+                with self.subTest(root=root, signature="standard"):
+                    manifest = base_manifest()
+                    manifest["qa"] = {
+                        "delivery_mode": "production",
+                        "release_ready": True,
+                        "required_assets_total": 37,
+                        "required_assets_present": 37,
+                    }
+                    entry = add_file(
+                        package_dir, manifest, root, logical_path, standard_png
+                    )
+                    self.assertEqual(
+                        hashlib.sha256(standard_png).hexdigest(), entry["sha256"]
+                    )
+                    self.assertEqual(
+                        [],
+                        pack.validate_manifest(manifest, package_dir),
+                        "legacy installed packages must remain usable as repair input",
+                    )
+                    errors = pack.validate_manifest(
+                        manifest,
+                        package_dir,
+                        require_referenced_assets=True,
+                    )
+                    self.assertTrue(
+                        any(
+                            logical_path in error
+                            and "WF storage signature" in error
+                            for error in errors
+                        ),
+                        errors,
+                    )
+
+                with self.subTest(root=root, signature="storage"):
+                    manifest = base_manifest()
+                    manifest["qa"] = {
+                        "delivery_mode": "production",
+                        "release_ready": True,
+                        "required_assets_total": 37,
+                        "required_assets_present": 37,
+                    }
+                    add_file(package_dir, manifest, root, logical_path, stored_png)
+                    self.assertEqual(
+                        [],
+                        pack.validate_manifest(
+                            manifest,
+                            package_dir,
+                            require_referenced_assets=True,
+                        ),
+                    )
+
+            server_manifest = base_manifest()
+            server_manifest["qa"] = {
+                "delivery_mode": "production",
+                "release_ready": True,
+                "required_assets_total": 37,
+                "required_assets_present": 37,
+            }
+            add_file(
+                package_dir,
+                server_manifest,
+                "server",
+                "cdndata/preview.png",
+                standard_png,
+            )
+            self.assertEqual(
+                [],
+                pack.validate_manifest(
+                    server_manifest,
+                    package_dir,
+                    require_referenced_assets=True,
+                ),
+                "server root is not WF client storage and must remain exempt",
+            )
+
     def test_unique_condition_claim_requires_declared_icon_asset(self):
         pack = self._module()
         import wf_mod_tool as core
@@ -879,6 +964,25 @@ class _TransactionFixtureMixin:
 
 
 class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
+    def test_production_preflight_rejects_rehashed_standard_png(self):
+        self._finish_setup()
+        manifest = copy.deepcopy(self.manifest)
+        manifest["qa"] = {
+            "delivery_mode": "production",
+            "release_ready": True,
+            "required_assets_total": 37,
+            "required_assets_present": 37,
+        }
+        logical_path = "character/seris/ui/full_shot.png"
+        standard_png = b"\x89PNG\r\n\x1a\n" + b"payload"
+        self._set_package_bytes(manifest, "medium", logical_path, standard_png)
+
+        with self.assertRaises(self.pack.PackPreflightError) as caught:
+            self._tx(manifest=manifest).preflight()
+        message = str(caught.exception)
+        self.assertIn(logical_path, message)
+        self.assertIn("WF storage signature", message)
+
     def test_non_container_asset_paths_require_exact_manifest_ownership(self):
         self._finish_setup()
         import wf_mod_tool as core
@@ -1008,6 +1112,116 @@ class TestPackPreflight(_TransactionFixtureMixin, unittest.TestCase):
             self._tx(provider=_FakeReleaseBaseProvider(other_state),
                      installed_manifest=other,
                      installed_package_dir=other_dir).preflight()
+
+    def _multi_owner_state(self, owners, *, tail_hash=None):
+        if self.release_state is None:
+            self._finish_setup(active_manifest_hash=tail_hash)
+        return self.pack.ReleaseBaseState(
+            **{**self.release_state.__dict__, "package_owners": tuple(owners)}
+        )
+
+    def test_multi_owner_fresh_install_alongside_foreign_owner(self):
+        # 链尾归他包所有，但候选包在 owners 里没有条目 → 免 installed manifest
+        state = self._multi_owner_state(
+            (("other_pkg", "a" * 64),), tail_hash="a" * 64
+        )
+        report = self._tx(provider=_FakeReleaseBaseProvider(state)).preflight()
+        self.assertEqual(report.conflicts, ())
+        self.assertTrue(report.can_prepare)
+        self.assertEqual(
+            report.version_diff,
+            {"installed": None, "candidate": "1.0.0", "relation": "install"},
+        )
+
+    def test_multi_owner_fresh_install_still_rejects_occupied_claims(self):
+        state = self._multi_owner_state(
+            (("other_pkg", "a" * 64),), tail_hash="a" * 64
+        )
+        self._occupy_claims()
+        report = self._tx(provider=_FakeReleaseBaseProvider(state)).preflight()
+        self.assertTrue(any(
+            item.get("reason") == "occupied_without_hash_bound_prior_ownership"
+            for item in report.conflicts
+        ), report.conflicts)
+        self.assertFalse(report.can_prepare)
+
+    def test_multi_owner_upgrade_binds_to_own_entry_not_chain_tail(self):
+        installed, installed_dir = self._installed_copy()
+        installed_hash = hashlib.sha256(
+            self.pack.canonical_manifest_bytes(installed)
+        ).hexdigest()
+        state = self._multi_owner_state(
+            (("other_pkg", "b" * 64), ("seris_dragon_king", installed_hash)),
+            tail_hash="b" * 64,
+        )
+        self._occupy_claims()
+        report = self._tx(
+            provider=_FakeReleaseBaseProvider(state),
+            installed_manifest=installed,
+            installed_package_dir=installed_dir,
+        ).preflight()
+        self.assertEqual(report.conflicts, ())
+        self.assertEqual(
+            report.version_diff,
+            {"installed": "0.9.0", "candidate": "1.0.0", "relation": "upgrade"},
+        )
+
+    def test_multi_owner_owned_package_requires_installed_manifest(self):
+        state = self._multi_owner_state(
+            (("other_pkg", "b" * 64), ("seris_dragon_king", "c" * 64)),
+            tail_hash="b" * 64,
+        )
+        with self.assertRaisesRegex(
+            self.pack.PackPreflightError, "installed manifest was not supplied"
+        ):
+            self._tx(provider=_FakeReleaseBaseProvider(state)).preflight()
+
+    def test_multi_owner_rejects_installed_manifest_without_own_entry(self):
+        installed, installed_dir = self._installed_copy()
+        state = self._multi_owner_state(
+            (("other_pkg", "b" * 64),), tail_hash="b" * 64
+        )
+        with self.assertRaisesRegex(
+            self.pack.PackPreflightError, "not hash-bound"
+        ):
+            self._tx(
+                provider=_FakeReleaseBaseProvider(state),
+                installed_manifest=installed,
+                installed_package_dir=installed_dir,
+            ).preflight()
+
+    def test_candidate_rollback_suffix_package_id_is_rejected(self):
+        self._finish_setup()
+        manifest = copy.deepcopy(self.manifest)
+        manifest["package_id"] = "seris_dragon_king-rollback"
+        with self.assertRaisesRegex(
+            self.pack.PackPreflightError, "-rollback"
+        ):
+            self._tx(manifest=manifest).preflight()
+
+    def test_multi_owner_state_invariants_fail_closed(self):
+        self._finish_setup()
+        base = self.release_state.__dict__
+        cases = (
+            {"package_owners": (("other_pkg", "zz"),)},
+            {"package_owners": (
+                ("other_pkg", "a" * 64), ("other_pkg", "b" * 64)
+            )},
+            {"package_owners": (("", "a" * 64),)},
+        )
+        for overrides in cases:
+            state = self.pack.ReleaseBaseState(**{**base, **overrides})
+            with self.subTest(overrides=overrides), \
+                    self.assertRaises(self.pack.PackPreflightError):
+                self._tx(provider=_FakeReleaseBaseProvider(state)).preflight()
+        empty_active = self.pack.ReleaseBaseState(
+            active_raw=None, active_sha256=None, current_release_id=None,
+            validated_chain_tail="1.4.54", expected_from_version="1.4.54",
+            active_package_manifest_sha256=None,
+            package_owners=(("other_pkg", "a" * 64),),
+        )
+        with self.assertRaises(self.pack.PackPreflightError):
+            self._tx(provider=_FakeReleaseBaseProvider(empty_active)).preflight()
 
     def test_provider_invariants_fail_closed(self):
         self._finish_setup()

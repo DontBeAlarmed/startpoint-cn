@@ -17,6 +17,7 @@ from PIL import Image
 import wf_assets
 import wf_atf
 import wf_canary_skin as skin
+import wf_ui_derive as ui_derive
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -36,40 +37,22 @@ TARGET_CHARACTER_FIELDS = {
     "role": "Tank",
 }
 
+_KYLE_DERIVATIVE_SIZES = {
+    "ui/skill_cutin_{n}.png": (1024, 512),
+    "ui/square_{n}.png": (212, 212),
+    "ui/square_132_132_{n}.png": (132, 132),
+    "ui/square_round_95_95_{n}.png": (95, 95),
+    "ui/square_round_136_136_{n}.png": (136, 136),
+    "ui/thumb_level_up_{n}.png": (252, 329),
+    "ui/thumb_party_main_{n}.png": (186, 392),
+    "ui/thumb_party_unison_{n}.png": (144, 188),
+    "ui/battle_control_board_{n}.png": (104, 268),
+    "ui/battle_member_status_{n}.png": (58, 58),
+    "ui/cutin_skill_chain_{n}.png": (276, 319),
+}
 DERIVATIVES = {
-    "ui/skill_cutin_{n}.png": {
-        "size": (1024, 512), "mode": "upper_body",
-        "rect": (0.00, 0.00, 1.00, 0.50)},
-    "ui/square_{n}.png": {
-        "size": (212, 212), "mode": "portrait",
-        "rect": (0.15, 0.00, 0.85, 0.58)},
-    "ui/square_132_132_{n}.png": {
-        "size": (132, 132), "mode": "portrait",
-        "rect": (0.15, 0.00, 0.85, 0.58)},
-    "ui/square_round_95_95_{n}.png": {
-        "size": (95, 95), "mode": "face",
-        "rect": (0.15, 0.00, 0.85, 0.58)},
-    "ui/square_round_136_136_{n}.png": {
-        "size": (136, 136), "mode": "face",
-        "rect": (0.15, 0.00, 0.85, 0.58)},
-    "ui/thumb_level_up_{n}.png": {
-        "size": (252, 329), "mode": "portrait",
-        "rect": (0.15, 0.00, 0.85, 0.62)},
-    "ui/thumb_party_main_{n}.png": {
-        "size": (186, 392), "mode": "upper_body",
-        "rect": (0.22, 0.00, 0.78, 0.68)},
-    "ui/thumb_party_unison_{n}.png": {
-        "size": (144, 188), "mode": "portrait",
-        "rect": (0.16, 0.00, 0.84, 0.64)},
-    "ui/battle_control_board_{n}.png": {
-        "size": (104, 268), "mode": "head_shoulders",
-        "rect": (0.30, 0.00, 0.70, 0.26)},
-    "ui/battle_member_status_{n}.png": {
-        "size": (58, 58), "mode": "face",
-        "rect": (0.15, 0.00, 0.85, 0.58)},
-    "ui/cutin_skill_chain_{n}.png": {
-        "size": (276, 319), "mode": "face",
-        "rect": (0.20, 0.00, 0.80, 0.27)},
+    template: {**spec, "size": _KYLE_DERIVATIVE_SIZES[template]}
+    for template, spec in ui_derive.DERIVATIVES.items()
 }
 
 REQUIRED_SIZES = {
@@ -438,18 +421,19 @@ def _replace_pack_and_inventory(staging: Path, pack: Path,
 def build_visual_derivatives(base_path: Path, awake_path: Path,
                              pack: Path) -> None:
     """Create all fixed-size UI assets from the two Kyle masters."""
+    sizes = {
+        f"ui/full_shot_1440_1920_{n}.png": (1440, 1920)
+        for n in (0, 1)
+    }
+    sizes.update({
+        template.format(n=n): spec["size"]
+        for template, spec in DERIVATIVES.items()
+        for n in (0, 1)
+    })
+    ui_derive.build_visual_derivatives(base_path, awake_path, pack, sizes)
     with Image.open(base_path) as base_image, Image.open(awake_path) as awake_image:
         masters = [base_image.convert("RGBA"), awake_image.convert("RGBA")]
     for n, master in enumerate(masters):
-        full = skin.fit_rgba(master, (1440, 1920), (0.5, 0.5))
-        full_path = pack / f"ui/full_shot_1440_1920_{n}.png"
-        full_path.parent.mkdir(parents=True, exist_ok=True)
-        full.save(full_path)
-        for template, spec in DERIVATIVES.items():
-            path = pack / template.format(n=n)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            skin.focal_rect_rgba(
-                master, spec["size"], spec["rect"]).save(path)
         story_size = (520, 616) if n == 0 else (570, 690)
         story_path = pack / f"ui/story/base_{n}.png"
         story_path.parent.mkdir(parents=True, exist_ok=True)
@@ -465,16 +449,7 @@ def build_visual_derivatives(base_path: Path, awake_path: Path,
 
 def rebuild_illustration_sheet(pack: Path) -> None:
     """Rebuild the template's fixed illustration atlas from Kyle masters."""
-    sheet = Image.new("RGBA", (361, 806), (0, 0, 0, 0))
-    with Image.open(pack / "ui/full_shot_1440_1920_1.png") as image:
-        awake = image.convert("RGBA")
-    with Image.open(pack / "ui/full_shot_1440_1920_0.png") as image:
-        base = image.convert("RGBA")
-    sheet.alpha_composite(
-        skin.fit_rgba(awake, (360, 372), (0.5, 0.33)), (0, 0))
-    sheet.alpha_composite(
-        skin.fit_rgba(base, (359, 365), (0.5, 0.33)), (0, 373))
-    sheet.save(pack / "ui/illustration_setting_sprite_sheet.png")
+    ui_derive.rebuild_illustration_sheet(pack, (361, 806))
 
 
 def recolor_pixel_sheets(pack: Path) -> None:

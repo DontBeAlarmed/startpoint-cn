@@ -12,6 +12,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -228,6 +229,34 @@ class RollbackFixture:
 class TestCharacterRollback(unittest.TestCase):
     def _module(self):
         return importlib.import_module("wf_character_rollback")
+
+    def test_first_release_binding_preserves_zero_release_base_owner_anchor(self):
+        module = self._module()
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = RollbackFixture(module, Path(tmp))
+            active = json.loads(fixture.store.active_path.read_bytes())
+            owners = [["seris", "a" * 64]]
+            active["base_package_owners"] = owners
+            fixture.store.active_path.write_bytes(wf_release._canonical(active))
+            anchor_raw = wf_release._canonical({
+                "schema_version": 1,
+                "base_version": "1.4.54",
+                "base_package_owners": owners,
+                "releases": [],
+            })
+            snapshot = SimpleNamespace(release_base=character_pack.ReleaseBaseState(
+                active_raw=anchor_raw,
+                active_sha256=hashlib.sha256(anchor_raw).hexdigest(),
+                current_release_id=None,
+                validated_chain_tail="1.4.54",
+                expected_from_version="1.4.54",
+                active_package_manifest_sha256=None,
+                package_owners=(("seris", "a" * 64),),
+            ))
+
+            bound = module._bind_to_current_release(snapshot, fixture.store)
+
+            self.assertEqual("fixture", bound["package_id"])
 
     def test_snapshot_rollback_publishes_before_bytes_as_new_release(self):
         module = self._module()

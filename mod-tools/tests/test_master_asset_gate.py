@@ -345,6 +345,48 @@ class TestFlowAdapterReport(unittest.TestCase):
                 [item["missing"] for item in report["missing"]],
             )
 
+    def test_dsl_effect_blocks_when_loader_atlas_omits_parts_texture(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            package_dir = Path(tmp) / "package"
+            program = "battle/action/skill/action/rare5/seris$seris_1"
+            directory, _, _name = EFFECT_REF.rpartition("/")
+            directory_name = directory.rsplit("/", 1)[-1]
+            parts_path = f"{EFFECT_REF}.parts.amf3.deflate"
+            timeline_path = f"{EFFECT_REF}.timeline.amf3.deflate"
+            sheet_path = f"{directory}/{directory_name}.png"
+            atlas_path = f"{directory}/{directory_name}.atlas.amf3.deflate"
+            declared = [parts_path, timeline_path, sheet_path, atlas_path]
+            write_manifest(package_dir, declared)
+            put_package_file(
+                package_dir,
+                f"{program}.action.dsl.amf3.deflate",
+                dsl_file_bytes(["Block", [["Command", [
+                    "ShowEffect", "all", ["SpecifyEffectDirectly", EFFECT_REF],
+                ]]]]),
+            )
+            missing_texture = f"{directory}/.gen/separate_sheet/00"
+            put_package_file(
+                package_dir,
+                parts_path,
+                dsl_file_bytes({"i": [{"p": missing_texture}], "t": []}),
+            )
+            put_package_file(package_dir, timeline_path, dsl_file_bytes({"sequences": []}))
+            put_package_file(package_dir, sheet_path, b"png")
+            put_package_file(
+                package_dir,
+                atlas_path,
+                dsl_file_bytes([{"n": f"{directory}/.gen/{directory_name}/00"}]),
+            )
+
+            report = flow.master_reference_report(package_dir, ())
+
+            self.assertFalse(report["release_ready"])
+            self.assertTrue(any(
+                "runtime loader atlas misses textures" in problem
+                and missing_texture in problem
+                for problem in report["problems"]
+            ))
+
     def test_nested_skill_table_program_path_must_resolve(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)

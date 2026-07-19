@@ -13,7 +13,7 @@ import shutil
 import stat
 import tempfile
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -126,7 +126,10 @@ def _safe_logical(value: object) -> str:
 
 
 def _decode_base(value: object) -> character_pack.ReleaseBaseState:
-    if not isinstance(value, dict) or set(value) != BASE_FIELDS:
+    # 旧 snapshot 没有 package_owners 字段（多包共存之前生成），仍需可回滚。
+    if not isinstance(value, dict) or set(value) not in (
+        BASE_FIELDS, BASE_FIELDS | {"package_owners"}
+    ):
         raise wf_release.ReleaseError("snapshot release_base fields are invalid")
     encoded = value["active_raw_base64"]
     if encoded is None:
@@ -160,6 +163,28 @@ def _decode_base(value: object) -> character_pack.ReleaseBaseState:
         raise wf_release.ReleaseError("snapshot active package hash is invalid")
     if active_raw is None and (current_release_id is not None or package_hash is not None):
         raise wf_release.ReleaseError("snapshot empty active base has release metadata")
+    raw_owners = value.get("package_owners")
+    if raw_owners is None:
+        package_owners = None
+    elif not isinstance(raw_owners, list):
+        raise wf_release.ReleaseError("snapshot package owners are invalid")
+    else:
+        pairs: list[tuple[str, str]] = []
+        seen_owner_ids: set[str] = set()
+        for item in raw_owners:
+            if (
+                not isinstance(item, list) or len(item) != 2
+                or not isinstance(item[0], str) or not item[0]
+                or item[0] in seen_owner_ids
+                or not isinstance(item[1], str)
+                or wf_release.HASH_RE.fullmatch(item[1]) is None
+            ):
+                raise wf_release.ReleaseError("snapshot package owner entry is invalid")
+            seen_owner_ids.add(item[0])
+            pairs.append((item[0], item[1]))
+        package_owners = tuple(pairs)
+        if active_raw is None and package_owners:
+            raise wf_release.ReleaseError("snapshot empty active base has package owners")
     return character_pack.ReleaseBaseState(
         active_raw=active_raw,
         active_sha256=active_sha,
@@ -167,6 +192,7 @@ def _decode_base(value: object) -> character_pack.ReleaseBaseState:
         validated_chain_tail=value["validated_chain_tail"],
         expected_from_version=value["expected_from_version"],
         active_package_manifest_sha256=package_hash,
+        package_owners=package_owners,
     )
 
 
@@ -302,14 +328,36 @@ def _bind_to_current_release(
     releases = active["releases"]
     last = releases[-1]
     if len(releases) == 1:
-        expected_base = character_pack.ReleaseBaseState(
-            active_raw=None,
-            active_sha256=None,
-            current_release_id=None,
-            validated_chain_tail=active["base_version"],
-            expected_from_version=active["base_version"],
-            active_package_manifest_sha256=None,
-        )
+        if "base_package_owners" in active:
+            prefix = {
+                "schema_version": active["schema_version"],
+                "base_version": active["base_version"],
+                "base_package_owners": active["base_package_owners"],
+                "releases": [],
+            }
+            prefix_raw = wf_release._canonical(prefix)
+            base_owners = wf_release._validate_base_package_owners(prefix)
+            expected_base = character_pack.ReleaseBaseState(
+                active_raw=prefix_raw,
+                active_sha256=hashlib.sha256(prefix_raw).hexdigest(),
+                current_release_id=None,
+                validated_chain_tail=active["base_version"],
+                expected_from_version=active["base_version"],
+                active_package_manifest_sha256=None,
+                package_owners=wf_release.derive_package_owners(
+                    [], base_package_owners=base_owners
+                ),
+            )
+        else:
+            expected_base = character_pack.ReleaseBaseState(
+                active_raw=None,
+                active_sha256=None,
+                current_release_id=None,
+                validated_chain_tail=active["base_version"],
+                expected_from_version=active["base_version"],
+                active_package_manifest_sha256=None,
+                package_owners=(),
+            )
     else:
         previous = releases[-2]
         prefix = {
@@ -317,7 +365,10 @@ def _bind_to_current_release(
             "base_version": active["base_version"],
             "releases": releases[:-1],
         }
+        if "base_package_owners" in active:
+            prefix["base_package_owners"] = active["base_package_owners"]
         prefix_raw = wf_release._canonical(prefix)
+        base_owners = wf_release._validate_base_package_owners(prefix)
         expected_base = character_pack.ReleaseBaseState(
             active_raw=prefix_raw,
             active_sha256=hashlib.sha256(prefix_raw).hexdigest(),
@@ -325,8 +376,17 @@ def _bind_to_current_release(
             validated_chain_tail=previous["version"],
             expected_from_version=previous["version"],
             active_package_manifest_sha256=previous["package_manifest_sha256"],
+            package_owners=wf_release.derive_package_owners(
+                releases[:-1], base_package_owners=base_owners
+            ),
         )
-    if snapshot.release_base != expected_base or last["from_version"] != expected_base.expected_from_version:
+    if snapshot.release_base.package_owners is None:
+        # 旧 snapshot 未记录 owners：仅比较其余字段。
+        expected_compare = replace(expected_base, package_owners=None)
+    else:
+        expected_compare = expected_base
+    if snapshot.release_base != expected_compare \
+            or last["from_version"] != expected_base.expected_from_version:
         raise wf_release.ReleaseError(
             "snapshot does not describe the immediately preceding active release base"
         )
