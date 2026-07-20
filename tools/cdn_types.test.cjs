@@ -94,9 +94,9 @@ archive.order = 1
 // @ts-expect-error scan input fields are immutable
 catalogInput.relativePath = "changed.zip"
 // @ts-expect-error incremental plans require a non-empty diff
-const emptyDiff: UpdatePlan = { kind: "incremental", full: null, diff: [], downloadBytes: 0 }
+const emptyDiff: UpdatePlan = { kind: "incremental", full: null, diff: [], downloadBytes: 0, delayedAssetsBytes: 0 }
 // @ts-expect-error initial plans also reject an empty diff
-const emptyInitialDiff: UpdatePlan = { kind: "initial", full: fullEdge, diff: [], downloadBytes: 0 }
+const emptyInitialDiff: UpdatePlan = { kind: "initial", full: fullEdge, diff: [], downloadBytes: 0, delayedAssetsBytes: 0 }
 // @ts-expect-error up-to-date plans cannot include archives
 const invalidCurrent: UpdatePlan = { kind: "up-to-date", full: fullEdge, diff: null, downloadBytes: 0 }
 // @ts-expect-error a diff edge cannot be used as an initial full edge
