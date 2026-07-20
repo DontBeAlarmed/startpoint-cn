@@ -98,13 +98,13 @@ const emptyDiff: UpdatePlan = { kind: "incremental", full: null, diff: [], downl
 // @ts-expect-error initial plans also reject an empty diff
 const emptyInitialDiff: UpdatePlan = { kind: "initial", full: fullEdge, diff: [], downloadBytes: 0, delayedAssetsBytes: 0 }
 // @ts-expect-error up-to-date plans cannot include archives
-const invalidCurrent: UpdatePlan = { kind: "up-to-date", full: fullEdge, diff: null, downloadBytes: 0 }
+const invalidCurrent: UpdatePlan = { kind: "up-to-date", full: fullEdge, diff: null, downloadBytes: 0, delayedAssetsBytes: 0 }
 // @ts-expect-error a diff edge cannot be used as an initial full edge
-const diffAsFull: UpdatePlan = { kind: "initial", full: diffEdge, diff: null, downloadBytes: 100 }
+const diffAsFull: UpdatePlan = { kind: "initial", full: diffEdge, diff: null, downloadBytes: 100, delayedAssetsBytes: 0 }
 // @ts-expect-error a full edge cannot be used in an initial diff chain
-const fullAsInitialDiff: UpdatePlan = { kind: "initial", full: fullEdge, diff: [fullEdge], downloadBytes: 100 }
+const fullAsInitialDiff: UpdatePlan = { kind: "initial", full: fullEdge, diff: [fullEdge], downloadBytes: 100, delayedAssetsBytes: 0 }
 // @ts-expect-error a full edge cannot be used in an incremental diff chain
-const fullAsIncrementalDiff: UpdatePlan = { kind: "incremental", full: null, diff: [fullEdge], downloadBytes: 100 }
+const fullAsIncrementalDiff: UpdatePlan = { kind: "incremental", full: null, diff: [fullEdge], downloadBytes: 100, delayedAssetsBytes: 0 }
 // @ts-expect-error full and diff edge contracts are not cross-assignable
 const invalidFullEdge: FullCatalogEdge = diffEdge
 // @ts-expect-error full and diff edge contracts are not cross-assignable

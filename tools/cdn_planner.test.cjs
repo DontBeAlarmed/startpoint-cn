@@ -62,6 +62,24 @@ function assertPlannerCode(callback, code) {
     ))
 }
 
+function diamondEdges(startVersion, prefix, layers) {
+    const edges = []
+    let merge = startVersion
+    for (let index = 0; index < layers; index++) {
+        const left = `${prefix}-left-${index}`
+        const right = `${prefix}-right-${index}`
+        const nextMerge = `${prefix}-merge-${index + 1}`
+        edges.push(
+            edge(merge, left, 1),
+            edge(merge, right, 1),
+            edge(left, nextMerge, 1),
+            edge(right, nextMerge, 1),
+        )
+        merge = nextMerge
+    }
+    return { edges, endVersion: merge }
+}
+
 test("returns Option.None fields and zero bytes when the client is current", () => {
     const result = planCdnUpdate(catalog([
         edge(null, "1.4.0", 100),
@@ -75,6 +93,37 @@ test("returns Option.None fields and zero bytes when the client is current", () 
         downloadBytes: 0,
         delayedAssetsBytes: 0,
     })
+})
+
+test("validates the fulfill full edge before an up-to-date shortcut", () => {
+    const diff = edge("1.4.53", "1.4.54", 54)
+    assertPlannerCode(() => planCdnUpdate(
+        catalog([diff]),
+        request({ currentVersion: "1.4.54" }),
+    ), "INVALID_CATALOG")
+
+    const wrongFull = edge(null, "1.3.0", 100)
+    assertPlannerCode(() => planCdnUpdate(
+        catalog([wrongFull, diff]),
+        request({ currentVersion: "1.3.0", targetVersion: "1.3.0" }),
+    ), "INVALID_CATALOG")
+})
+
+test("rejects multiple fulfill full edges independently of edge order", () => {
+    const fullBase = edge(null, "1.4.0", 100)
+    const otherFull = edge(null, "1.3.0", 90)
+    const diff = edge("1.4.53", "1.4.54", 54)
+    const inputOrders = [
+        [fullBase, otherFull, diff],
+        [diff, otherFull, fullBase],
+    ]
+
+    for (const edges of inputOrders) {
+        assertPlannerCode(() => planCdnUpdate(
+            catalog(edges),
+            request({ currentVersion: "1.4.54" }),
+        ), "INVALID_CATALOG")
+    }
 })
 
 test("returns only the requested incremental edge and sums its archives", () => {
@@ -189,6 +238,26 @@ test("rejects unsupported runtime platforms", () => {
     ]), request({ platform: "ios" })), "UNSUPPORTED_PLATFORM")
 })
 
+test("rejects unsupported runtime asset size kinds", () => {
+    const validCatalog = catalog([
+        edge(null, "1.4.0", 100),
+        edge("1.4.53", "1.4.54", 54),
+    ])
+    for (const assetSizeKind of ["bogus", null, undefined]) {
+        assertPlannerCode(() => planCdnUpdate(
+            validCatalog,
+            request({ assetSizeKind }),
+        ), "UNSUPPORTED_ASSET_SIZE_KIND")
+    }
+})
+
+test("validates platform before asset size kind", () => {
+    assertPlannerCode(() => planCdnUpdate(catalog([]), request({
+        platform: "ios",
+        assetSizeKind: "bogus",
+    })), "UNSUPPORTED_PLATFORM")
+})
+
 test("uses fulfill archives for both asset size kinds", () => {
     const fulfill = edge("1.4.53", "1.4.54", 54)
     const shortened = edge("1.4.53", "1.4.54", 5, {
@@ -237,17 +306,61 @@ test("does not modify the input catalog", () => {
     assert.deepEqual(input, snapshot)
 })
 
-test("avoids repeated visits while finding the only simple path", () => {
-    const first = edge("1.4.0", "1.4.1", 10)
-    const last = edge("1.4.1", "1.4.54", 20)
+test("rejects repeated visits through a catalog cycle", () => {
+    assertPlannerCode(() => planCdnUpdate(catalog([
+        edge(null, "1.4.0", 100),
+        edge("1.4.0", "1.4.1", 10),
+        edge("1.4.1", "1.4.0", 99),
+        edge("1.4.1", "1.4.54", 20),
+    ]), request({ currentVersion: "1.4.0" })), "INVALID_CATALOG")
+})
+
+test("plans a 5000-edge linear chain without overflowing the call stack", () => {
+    const diffs = []
+    let fromVersion = "1.4.0"
+    for (let index = 1; index <= 5_000; index++) {
+        const toVersion = `long-${index}`
+        diffs.push(edge(fromVersion, toVersion, 1))
+        fromVersion = toVersion
+    }
+
+    const result = planCdnUpdate(
+        catalog([edge(null, "1.4.0", 100), ...diffs]),
+        request({ currentVersion: "1.4.0", targetVersion: fromVersion }),
+    )
+
+    assert.equal(result.kind, "incremental")
+    assert.equal(result.diff.length, 5_000)
+    assert.equal(result.diff[0], diffs[0])
+    assert.equal(result.diff.at(-1), diffs.at(-1))
+    assert.equal(result.downloadBytes, 5_000)
+})
+
+test("rejects a multi-layer diamond dead end as no update path", () => {
+    const dead = diamondEdges("1.4.0", "unreachable", 22)
+    const startedAt = process.hrtime.bigint()
+
+    assertPlannerCode(() => planCdnUpdate(
+        catalog([edge(null, "1.4.0", 100), ...dead.edges]),
+        request({ currentVersion: "1.4.0", targetVersion: "missing-target" }),
+    ), "NO_UPDATE_PATH")
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6
+    assert.ok(durationMs < 5_000, `diamond traversal took ${durationMs.toFixed(0)}ms`)
+})
+
+test("returns the only live path beside a large converging dead end", () => {
+    const dead = diamondEdges("dead-root", "side-dead", 18)
+    const liveFirst = edge("1.4.0", "live-middle", 10)
+    const liveLast = edge("live-middle", "live-target", 20)
     const result = planCdnUpdate(catalog([
         edge(null, "1.4.0", 100),
-        edge("1.4.1", "1.4.0", 99),
-        last,
-        first,
-    ]), request({ currentVersion: "1.4.0" }))
+        edge("1.4.0", "dead-root", 1),
+        ...dead.edges,
+        liveLast,
+        liveFirst,
+    ]), request({ currentVersion: "1.4.0", targetVersion: "live-target" }))
 
-    assert.deepEqual(result.diff, [first, last])
+    assert.deepEqual(result.diff, [liveFirst, liveLast])
     assert.equal(result.downloadBytes, 30)
 })
 
