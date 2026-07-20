@@ -18,8 +18,9 @@ import type {
 } from "./types"
 
 const VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
-const DIFF_ARCHIVE_PATTERN = /^.+?-(\d+\.\d+\.\d+)-(\d+\.\d+\.\d+)-(\d+)-([a-fA-F0-9]+)\.zip$/
-const FULL_ARCHIVE_PATTERN = /^.+?-(\d+\.\d+\.\d+)-(\d+)-([a-fA-F0-9]+)\.zip$/
+const DIFF_ARCHIVE_PATTERN = /^pinball-(\d+\.\d+\.\d+)-(\d+\.\d+\.\d+)-(\d+)-([a-fA-F0-9]+)\.zip$/
+const FULL_ARCHIVE_PATTERN = /^pinball-(\d+\.\d+\.\d+)-(\d+)-([a-fA-F0-9]+)\.zip$/
+const ENTITY_LIST_HEADER = ["path", "version", "size", "hash", "layer"] as const
 const ASSET_SIZE_KINDS: ReadonlyArray<AssetSizeKind> = ["shortened", "fulfill"]
 const LAYER_ORDER: Readonly<Record<ArchiveLayer, number>> = {
     common: 0,
@@ -166,16 +167,30 @@ function parseCsvLine(line: string): string[] {
 
 export function parseEntityListInstalledBytes(content: string | Buffer): number {
     let total = 0
+    let contentRows = 0
     const lines = content.toString().replace(/^\uFEFF/, "").split(/\r?\n/)
     for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
         const line = lines[lineIndex]
         if (!line.trim()) continue
         const columns = parseCsvLine(line)
-        const sizeText = columns[3]?.trim()
+        const normalizedColumns = columns.map(column => column.trim())
+        const isExplicitHeader = contentRows === 0
+            && normalizedColumns.length === ENTITY_LIST_HEADER.length
+            && normalizedColumns.every((column, index) => column === ENTITY_LIST_HEADER[index])
+        contentRows++
+        if (isExplicitHeader) continue
+
+        const sizeText = normalizedColumns[2]
+        if (normalizedColumns.length !== 5) {
+            throwValidationIssue(
+                "INVALID_INSTALLED_BYTES",
+                `EntityLists row ${lineIndex + 1} must contain exactly five columns`,
+            )
+        }
         if (!sizeText || !/^\d+$/.test(sizeText)) {
             throwValidationIssue(
                 "INVALID_INSTALLED_BYTES",
-                `EntityLists row ${lineIndex + 1} has an invalid fourth column`,
+                `EntityLists row ${lineIndex + 1} has an invalid third column`,
             )
         }
         const size = Number(sizeText)
@@ -394,7 +409,7 @@ export function buildCdnCatalog(input: CdnCatalogInput): CdnCatalog {
 
     for (const group of edgeGroups.values()) {
         const layers = new Set(group.map(archive => archive.layer))
-        for (const requiredLayer of ["common", "platform"] as const) {
+        for (const requiredLayer of ["common", "quality", "platform"] as const) {
             if (!layers.has(requiredLayer)) {
                 const representative = group[0]
                 issues.push(validationIssue(

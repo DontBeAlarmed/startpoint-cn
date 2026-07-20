@@ -78,15 +78,19 @@ function issueCodes(callback) {
 }
 
 test("parses full and diff archive names without accepting unrelated names", () => {
-    assert.deepEqual(parseDiffArchiveName("pinball-1.4.53-1.4.54-2-abcd.zip"), {
+    const diffName = "pinball-1.4.53-1.4.54-2-abcd.zip"
+    const fullName = "pinball-1.4.0-2-abcd.zip"
+    assert.deepEqual(parseDiffArchiveName(diffName), {
         fromVersion: "1.4.53",
         toVersion: "1.4.54",
         order: 2,
     })
-    assert.deepEqual(parseFullArchiveName("pinball-1.4.0-2-abcd.zip"), {
+    assert.deepEqual(parseFullArchiveName(fullName), {
         toVersion: "1.4.0",
         order: 2,
     })
+    assert.equal(parseFullArchiveName(diffName), null)
+    assert.equal(parseDiffArchiveName(fullName), null)
 
     for (const invalid of [
         "notes.txt",
@@ -99,24 +103,31 @@ test("parses full and diff archive names without accepting unrelated names", () 
     }
     assert.equal(parseFullArchiveName("pinball-1.4.0-0-abcd.zip"), null)
     assert.equal(parseFullArchiveName("pinball-1.4.x-2-abcd.zip"), null)
+    assert.equal(parseFullArchiveName("s_asset-1.4.0-2-abcd.zip"), null)
+    assert.equal(parseDiffArchiveName("s_asset-1.4.0-1.4.1-2-abcd.zip"), null)
 })
 
-test("sums the fourth EntityLists CSV column and rejects invalid sizes", () => {
+test("sums the third EntityLists CSV column from the real five-column format", () => {
     const csv = [
-        "upload/a,1.4.0,hash-a,10,common",
+        "production/upload/2d/asset-a,1.4.43,72979,SHA256_BASE64_A,common",
         "",
-        "upload/b,1.4.1,hash-b,20,android",
+        "production/upload/3e/asset-b,1.4.54,20,SHA256_BASE64_B,android",
         "   ",
     ].join("\n")
-    assert.equal(parseEntityListInstalledBytes(csv), 30)
-    assert.equal(parseEntityListInstalledBytes(Buffer.from(csv)), 30)
+    assert.equal(parseEntityListInstalledBytes(csv), 72999)
+    assert.equal(parseEntityListInstalledBytes(Buffer.from(csv)), 72999)
+    assert.equal(parseEntityListInstalledBytes([
+        "path,version,size,hash,layer",
+        "production/upload/2d/asset-a,1.4.43,72979,not-a-size,common",
+    ].join("\n")), 72979)
 
     for (const invalid of [
-        "upload/a,1.4.0,hash-a,-1,common",
-        "upload/a,1.4.0,hash-a,1.5,common",
-        "upload/a,1.4.0,hash-a,nope,common",
-        "upload/a,1.4.0,hash-a,9007199254740992,common",
+        "upload/a,1.4.0,-1,hash-a,common",
+        "upload/a,1.4.0,1.5,hash-a,common",
+        "upload/a,1.4.0,nope,hash-a,common",
+        "upload/a,1.4.0,9007199254740992,hash-a,common",
         "upload/a,1.4.0",
+        "not,path,size,hash,layer",
     ]) {
         assert.throws(() => parseEntityListInstalledBytes(invalid), error => (
             error instanceof CatalogValidationError
@@ -203,6 +214,10 @@ test("reports forks, conflicting paths, duplicate orders, and missing required l
     const missingPlatform = validInput()
     missingPlatform.archives = missingPlatform.archives.filter(item => !(item.kind === "full" && item.layer === "platform"))
     assert.ok(issueCodes(() => buildCdnCatalog(missingPlatform)).includes("MISSING_ARCHIVE_LAYER"))
+
+    const missingQuality = validInput()
+    missingQuality.archives = missingQuality.archives.filter(item => !(item.kind === "diff" && item.layer === "quality"))
+    assert.ok(issueCodes(() => buildCdnCatalog(missingQuality)).includes("MISSING_ARCHIVE_LAYER"))
 })
 
 test("reports duplicate archive paths even when their metadata is identical", () => {
