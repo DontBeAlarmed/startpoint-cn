@@ -1,5 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
-import { CdnPlannerError, planCdnUpdate } from "../../content/cdn/planner"
+import {
+    CdnPlannerError,
+    planCdnUpdate,
+    type CdnPlannerErrorCode,
+} from "../../content/cdn/planner"
 import { normalizeCdnBaseUrl, serializeCdnUpdatePlan } from "../../content/cdn/protocol"
 import type { ContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
@@ -16,9 +20,10 @@ export interface AssetTargetMismatchWarning {
 }
 
 export type AssetRouteErrorCode = "CONTENT_SNAPSHOT_UNAVAILABLE" | "ASSET_SERVICE_ERROR"
+export type AssetRouteLogCode = AssetRouteErrorCode | CdnPlannerErrorCode
 
 export interface AssetRouteErrorDetails {
-    readonly code: AssetRouteErrorCode
+    readonly code: AssetRouteLogCode
     readonly error: unknown
     readonly route: string
 }
@@ -59,8 +64,14 @@ export function getCdnVersionInfo(
     }
 }
 
-function plannerStatus(code: CdnPlannerError["code"]): number {
-    return code === "UNKNOWN_CURRENT_VERSION" ? 400 : 500
+const PLANNER_CLIENT_MESSAGES: Readonly<Partial<Record<CdnPlannerErrorCode, string>>> = {
+    UNKNOWN_CURRENT_VERSION: "unknown current asset version",
+    UNSUPPORTED_PLATFORM: "unsupported asset platform",
+    UNSUPPORTED_ASSET_SIZE_KIND: "unsupported asset size kind",
+}
+
+function plannerStatus(code: CdnPlannerErrorCode): number {
+    return PLANNER_CLIENT_MESSAGES[code] === undefined ? 500 : 400
 }
 
 const ERROR_MESSAGES: Readonly<Record<AssetRouteErrorCode, string>> = {
@@ -80,6 +91,36 @@ export function sendAssetRouteError(
     if (logError) logError(details)
     else request.log.error({ err: error, code, route: details.route }, "CN asset route failed")
     return reply.status(500).type(contentType).send({ code, message: ERROR_MESSAGES[code] })
+}
+
+function sendPlannerError(
+    request: FastifyRequest,
+    reply: FastifyReply,
+    error: CdnPlannerError,
+    logError: AssetRouteErrorLogger | undefined,
+) {
+    const status = plannerStatus(error.code)
+    if (status === 400) {
+        return reply.status(status).type("application/json").send({
+            code: error.code,
+            message: PLANNER_CLIENT_MESSAGES[error.code],
+        })
+    }
+
+    const details = {
+        code: error.code,
+        error,
+        route: request.routeOptions.url ?? request.url,
+    }
+    if (logError) logError(details)
+    else request.log.error(
+        { err: error, code: error.code, route: details.route },
+        "CN asset planner failed",
+    )
+    return reply.status(status).type("application/json").send({
+        code: error.code,
+        message: "asset update plan is unavailable",
+    })
 }
 
 const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) => {
@@ -171,10 +212,7 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
             })
         } catch (error) {
             if (error instanceof CdnPlannerError) {
-                return reply.status(plannerStatus(error.code)).type("application/json").send({
-                    code: error.code,
-                    message: error.message,
-                })
+                return sendPlannerError(request, reply, error, options.logError)
             }
             return sendAssetRouteError(request, reply, "ASSET_SERVICE_ERROR", error, options.logError)
         }

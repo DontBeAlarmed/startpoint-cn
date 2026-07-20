@@ -11,7 +11,7 @@ require("ts-node/register/transpile-only")
 const Fastify = require("fastify")
 const { pack, unpack } = require("msgpackr")
 const assetPlugin = require("../src/routes/cn/asset").default
-const { planCdnUpdate } = require("../src/content/cdn/planner")
+const { CdnPlannerError, planCdnUpdate } = require("../src/content/cdn/planner")
 
 const SHA = "a".repeat(64)
 
@@ -285,6 +285,68 @@ test("rejects unsupported asset sizes and planner failures without partial data"
     assert.equal(noPath.statusCode, 500)
     assert.equal(noPath.json().code, "NO_UPDATE_PATH")
     assert.equal("data" in noPath.json(), false)
+})
+
+test("redacts and logs INVALID_DOWNLOAD_BYTES planner failures", async t => {
+    const privatePath = "archive-private/internal/customer-a.zip"
+    const invalidSnapshot = createSnapshot({
+        edges: Object.freeze([
+            edge(null, "1.4.0", [archive("archive-common-full/base.zip", 100)]),
+            edge("1.4.53", "1.4.54", [archive(privatePath, Number.MAX_SAFE_INTEGER + 1)]),
+        ]),
+    })
+    const logged = []
+    const app = await createAssetApp({
+        snapshot: invalidSnapshot,
+        logError: details => logged.push(details),
+    })
+    t.after(() => app.close())
+
+    const response = await postGetPath(app, { res_ver: "1.4.53" })
+    assert.equal(response.statusCode, 500)
+    assert.match(response.headers["content-type"], /^application\/json/)
+    assert.deepEqual(response.json(), {
+        code: "INVALID_DOWNLOAD_BYTES",
+        message: "asset update plan is unavailable",
+    })
+    assert.equal(response.body.includes(privatePath), false)
+    assert.equal("data" in response.json(), false)
+    assert.equal("full" in response.json(), false)
+    assert.equal("diff" in response.json(), false)
+    assert.equal(logged.length, 1)
+    assert.equal(logged[0].code, "INVALID_DOWNLOAD_BYTES")
+    assert.equal(logged[0].error instanceof CdnPlannerError, true)
+    assert.match(logged[0].error.message, new RegExp(privatePath))
+})
+
+test("redacts and logs INVALID_CATALOG planner failures", async t => {
+    const privatePath = "archive-private/internal/customer-b.zip"
+    const invalidSnapshot = createSnapshot({
+        edges: Object.freeze([
+            edge("1.4.53", "1.4.54", [archive(privatePath, 54)]),
+        ]),
+    })
+    const logged = []
+    const app = await createAssetApp({
+        snapshot: invalidSnapshot,
+        logError: details => logged.push(details),
+    })
+    t.after(() => app.close())
+
+    const response = await postGetPath(app, { res_ver: "1.4.53" })
+    assert.equal(response.statusCode, 500)
+    assert.match(response.headers["content-type"], /^application\/json/)
+    assert.deepEqual(response.json(), {
+        code: "INVALID_CATALOG",
+        message: "asset update plan is unavailable",
+    })
+    assert.equal(response.body.includes(privatePath), false)
+    assert.equal("data" in response.json(), false)
+    assert.equal("full" in response.json(), false)
+    assert.equal("diff" in response.json(), false)
+    assert.equal(logged.length, 1)
+    assert.equal(logged[0].code, "INVALID_CATALOG")
+    assert.equal(logged[0].error instanceof CdnPlannerError, true)
 })
 
 test("get_path returns stable diagnostics and logs the original snapshot error", async t => {
