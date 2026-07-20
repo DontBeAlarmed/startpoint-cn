@@ -105,6 +105,7 @@ const TEST_GROUPS = Object.freeze({
         execution: "serial",
         tests: [
             "tools/cdn_asset_import.test.cjs",
+            "tools/cn_asset_route.test.cjs",
             "tools/cdn_catalog_provider.test.cjs",
         ],
     },

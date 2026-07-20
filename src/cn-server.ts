@@ -13,7 +13,9 @@ import versionCheckPlugin from "./routes/cn/versionCheck";
 import leitingAuthPlugin from "./routes/cn/leitingAuth";
 import cnToolPlugin from "./routes/cn/tool";
 import cnLoadPlugin from "./routes/cn/load";
-import cnAssetPlugin, { getCdnVersionInfo } from "./routes/cn/asset";
+import cnAssetPlugin from "./routes/cn/asset";
+import cnAssetInTitlePlugin from "./routes/cn/assetInTitle";
+import cnCdnFilesPlugin from "./routes/cn/cdnFiles";
 import indexWebPlugin from "./routes/web";
 import indexWebApiPlugin from "./routes/web_api";
 import seedsWebApiPlugin from "./routes/web_api/seeds";
@@ -125,6 +127,7 @@ fastify.register(leitingAuthPlugin, { prefix: "/api/index.php" });
 const apiPrefix = "/api/index.php";
 fastify.register(cnLoadPlugin, { prefix: apiPrefix });
 fastify.register(cnAssetPlugin, { prefix: `${apiPrefix}/asset` });
+fastify.register(cnAssetInTitlePlugin, { prefix: `${apiPrefix}/assetintitle` });
 
 function stubMsgpackReply(reply: any, data: any) {
     const servertime = getServerTime()
@@ -134,10 +137,6 @@ function stubMsgpackReply(reply: any, data: any) {
         data
     });
 }
-
-fastify.post(`${apiPrefix}/assetintitle/version_info_in_title`, async (_request, reply) => {
-    stubMsgpackReply(reply, getCdnVersionInfo(CDN_BASE_URL));
-});
 
 fastify.post(`${apiPrefix}/tool/check_social_link_enable`, async (_request, reply) => {
     stubMsgpackReply(reply, { enable: false });
@@ -330,12 +329,6 @@ fastify.register(indexWebPlugin);
 fastify.register(indexWebApiPlugin, { prefix: "/api" });
 fastify.register(seedsWebApiPlugin, { prefix: "/api/seeds" });
 
-const cdnHost = process.env.CN_LISTEN_HOST || "localhost";
-const cdnPort = process.env.CN_LISTEN_PORT || "8001";
-const cdnDisplayHost = cdnHost === "0.0.0.0" ? "localhost" : cdnHost;
-const CDN_BASE_URL = process.env.CDN_BASE_URL || `http://${cdnDisplayHost}:${cdnPort}/patch/cn`;
-const cdnDir = process.env.CDN_DIR || ".cdn";
-
 // Serve patched orderedmap files for missing CDN resources
 // Registered BEFORE fastifyStatic to intercept matching requests
 fastify.get("/patch/cn/dummy/download/production/upload/:prefix/:hash", async (request, reply) => {
@@ -350,21 +343,7 @@ fastify.get("/patch/cn/dummy/download/production/upload/:prefix/:hash", async (r
     return reply.status(404).send("Not Found");
 });
 
-// Serve patch archive files for asset update
-fastify.get("/patch/cn/asset-patch/active/:file", async (request, reply) => {
-    const { file } = request.params as { file: string };
-    const patchFile = path.join(__dirname, "..", "assets", "asset-patch", "active", file);
-    if (existsSync(patchFile)) {
-        return reply.type("application/zip").send(readFileSync(patchFile));
-    }
-    return reply.status(404).send("Not Found");
-});
-
-fastify.register(fastifyStatic, {
-    root: path.isAbsolute(cdnDir) ? cdnDir : path.join(__dirname, "..", cdnDir),
-    prefix: "/patch",
-    decorateReply: false
-});
+fastify.register(cnCdnFilesPlugin);
 
 // Web static assets
 fastify.register(fastifyStatic, {

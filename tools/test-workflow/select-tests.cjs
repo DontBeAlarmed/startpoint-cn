@@ -11,13 +11,18 @@ const SOURCE_RULES = [
         pattern: /^src\/content\/cdn\/(?:catalog-builder|patch-graph|digest-cache|planner)\.ts$/,
         groups: ["quick:cdn"],
     },
+    { pattern: /^src\/content\/cdn\/protocol\.ts$/, groups: ["integration:cdn", "full"] },
     { pattern: /^src\/content\/cdn\/catalog-loader\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/content\/runtime\/content-snapshot\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/content\/deep-freeze\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/lib\/version\.ts$/, groups: ["full"] },
     { pattern: /^src\/routes\/cn\/load\.ts$/, groups: ["full"] },
-    { pattern: /^src\/cn-server\.ts$/, groups: ["full"] },
-    { pattern: /^src\/routes\/cn\/(?:asset|versionCheck)\.ts$/, groups: ["full"] },
+    { pattern: /^src\/cn-server\.ts$/, groups: ["integration:cdn", "full"] },
+    {
+        pattern: /^src\/routes\/cn\/(?:asset|assetInTitle|cdnFiles)\.ts$/,
+        groups: ["integration:cdn", "full"],
+    },
+    { pattern: /^src\/routes\/cn\/versionCheck\.ts$/, groups: ["full"] },
     { pattern: /^src\/routes\/web_api\//, groups: ["admin", "integration:database"] },
     {
         pattern: /^src\/lib\/(?:gacha|gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-ticket)\.ts$/,
@@ -67,7 +72,6 @@ function selectTestGroups(filePaths) {
 
     for (const inputPath of filePaths) {
         for (const group of groupsForFile(normalizePath(inputPath))) {
-            if (group === "full") return ["full"]
             selected.add(group)
         }
     }

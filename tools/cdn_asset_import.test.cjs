@@ -67,9 +67,9 @@ productionContentSnapshotProvider.snapshot = Object.freeze({
 })
 
 assert.deepEqual(assetModule.getCdnVersionInfo("https://cdn.test/patch/cn"), {
-    base_url: "https://cdn.test/patch/cn/EntityLists/",
-    files_list: "https://cdn.test/patch/cn/EntityLists/10939-android_medium.csv",
-    total_size: 20,
+    base_url: "https://cdn.test/patch/cn/",
+    files_list: "https://cdn.test/patch/cn/recovery/empty.csv",
+    total_size: 30,
     delayed_assets_size: 0,
 })
 assert.deepEqual(probes, [])

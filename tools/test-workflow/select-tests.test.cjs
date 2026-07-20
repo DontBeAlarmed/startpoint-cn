@@ -20,10 +20,13 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/content/runtime/content-snapshot.ts"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/deep-freeze.ts"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/internal/types.ts"]), ["full"])
-    assert.deepEqual(selectTestGroups(["src/routes/cn/asset.ts"]), ["full"])
+    assert.deepEqual(selectTestGroups(["src/content/cdn/protocol.ts"]), ["full", "integration:cdn"])
+    assert.deepEqual(selectTestGroups(["src/routes/cn/asset.ts"]), ["full", "integration:cdn"])
+    assert.deepEqual(selectTestGroups(["src/routes/cn/assetInTitle.ts"]), ["full", "integration:cdn"])
+    assert.deepEqual(selectTestGroups(["src/routes/cn/cdnFiles.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/lib/version.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/load.ts"]), ["full"])
-    assert.deepEqual(selectTestGroups(["src/cn-server.ts"]), ["full"])
+    assert.deepEqual(selectTestGroups(["src/cn-server.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["admin/src/App.tsx"]), ["admin"])
 })
 
@@ -100,6 +103,7 @@ test("full contains quick, integration, and admin but excludes generators", () =
     assert.equal(AGGREGATE_GROUPS.full.includes("generator"), false)
     assert.deepEqual(TEST_GROUPS["integration:cdn"].tests, [
         "tools/cdn_asset_import.test.cjs",
+        "tools/cn_asset_route.test.cjs",
         "tools/cdn_catalog_provider.test.cjs",
     ])
 })
@@ -120,6 +124,7 @@ test("registers the focused CDN path contract", () => {
     assert.deepEqual(selectTestGroups(["tools/cdn_types.test.cjs"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_catalog_provider.test.cjs"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_asset_import.test.cjs"]), ["integration:cdn"])
+    assert.deepEqual(selectTestGroups(["tools/cn_asset_route.test.cjs"]), ["integration:cdn"])
 })
 
 test("registers every test in exactly one leaf group and full covers runtime regressions", () => {
