@@ -55,36 +55,3 @@ export function getMaxPatchVersion(resVer?: string): string | null {
     }
     return maxV;
 }
-
-export function isFirstTime(resVer?: string): boolean {
-    const fullBaseVersion = getContentSnapshot().cdn.fullBaseVersion;
-    return !resVer || compareVersion(fullBaseVersion, resVer) > 0;
-}
-
-/**
- * Compute asset update response for a client.
- * 1st-time: full download to CDN_VERSION + applicable patches.
- * Update:   only diff from resVer to effective version.
- */
-export function computeAssetTarget(resVer?: string): {
-    targetVersion: string;
-    isFirstTime: boolean;
-    fullVersion: string;
-} {
-    const { targetVersion, fullBaseVersion } = getContentSnapshot().cdn;
-    const firstTime = !resVer || compareVersion(fullBaseVersion, resVer) > 0;
-    if (firstTime) {
-        return {
-            targetVersion,
-            isFirstTime: true,
-            fullVersion: fullBaseVersion,
-        };
-    }
-    // Non-first-time: client already has full CDN data
-    const target = compareVersion(targetVersion, resVer!) > 0 ? targetVersion : resVer!;
-    return {
-        targetVersion: target,
-        isFirstTime: false,
-        fullVersion: resVer!,  // tell client its current version = its full version
-    };
-}

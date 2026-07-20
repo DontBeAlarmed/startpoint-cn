@@ -2,7 +2,12 @@ import type { FastifyInstance } from "fastify"
 import type { ContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { generateDataHeaders } from "../../utils"
-import { getCdnBase, getCdnVersionInfo } from "./asset"
+import {
+    getCdnBase,
+    getCdnVersionInfo,
+    sendAssetRouteError,
+    type AssetRouteErrorLogger,
+} from "./asset"
 
 interface AssetInTitleEnvironment {
     readonly [name: string]: string | undefined
@@ -12,6 +17,7 @@ interface AssetInTitleEnvironment {
 export interface CnAssetInTitleRouteOptions {
     readonly getSnapshot?: () => ContentSnapshot
     readonly env?: AssetInTitleEnvironment
+    readonly logError?: AssetRouteErrorLogger
 }
 
 const routes = async (fastify: FastifyInstance, options: CnAssetInTitleRouteOptions) => {
@@ -19,10 +25,34 @@ const routes = async (fastify: FastifyInstance, options: CnAssetInTitleRouteOpti
     const env = options.env ?? process.env
 
     fastify.post("/version_info_in_title", async (request, reply) => {
-        reply.type("application/x-msgpack")
-        return {
-            data_headers: generateDataHeaders(),
-            data: getCdnVersionInfo(getCdnBase(request, env), snapshot()),
+        let contentSnapshot: ContentSnapshot
+        try {
+            contentSnapshot = snapshot()
+        } catch (error) {
+            return sendAssetRouteError(
+                request,
+                reply,
+                "CONTENT_SNAPSHOT_UNAVAILABLE",
+                error,
+                options.logError,
+                "application/x-msgpack",
+            )
+        }
+
+        try {
+            return reply.type("application/x-msgpack").send({
+                data_headers: generateDataHeaders(),
+                data: getCdnVersionInfo(getCdnBase(request, env), contentSnapshot),
+            })
+        } catch (error) {
+            return sendAssetRouteError(
+                request,
+                reply,
+                "ASSET_SERVICE_ERROR",
+                error,
+                options.logError,
+                "application/x-msgpack",
+            )
         }
     })
 }

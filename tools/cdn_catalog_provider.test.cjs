@@ -564,19 +564,6 @@ test("legacy version facade derives every runtime version from the pinned snapsh
     assert.equal(version.detectCDNVersion(), "1.4.1")
     assert.equal(version.getEffectiveVersion(), "1.4.1")
     assert.equal(version.FULL_BASE, "1.4.0")
-    assert.equal(version.isFirstTime(), true)
-    assert.equal(version.isFirstTime("1.3.9"), true)
-    assert.equal(version.isFirstTime("1.4.0"), false)
-    assert.deepEqual(version.computeAssetTarget(), {
-        targetVersion: "1.4.1",
-        isFirstTime: true,
-        fullVersion: "1.4.0",
-    })
-    assert.deepEqual(version.computeAssetTarget("1.4.0"), {
-        targetVersion: "1.4.1",
-        isFirstTime: false,
-        fullVersion: "1.4.0",
-    })
     const source = fs.readFileSync(path.join(__dirname, "../src/lib/version.ts"), "utf8")
     assert.doesNotMatch(source, /readdirSync|scanCdnCatalogInput/)
 })

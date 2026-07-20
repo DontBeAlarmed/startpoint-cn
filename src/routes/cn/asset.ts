@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest } from "fastify"
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { CdnPlannerError, planCdnUpdate } from "../../content/cdn/planner"
 import { normalizeCdnBaseUrl, serializeCdnUpdatePlan } from "../../content/cdn/protocol"
 import type { ContentSnapshot } from "../../content/runtime/content-snapshot"
@@ -15,10 +15,21 @@ export interface AssetTargetMismatchWarning {
     readonly snapshotTargetVersion: string
 }
 
+export type AssetRouteErrorCode = "CONTENT_SNAPSHOT_UNAVAILABLE" | "ASSET_SERVICE_ERROR"
+
+export interface AssetRouteErrorDetails {
+    readonly code: AssetRouteErrorCode
+    readonly error: unknown
+    readonly route: string
+}
+
+export type AssetRouteErrorLogger = (details: AssetRouteErrorDetails) => void
+
 export interface CnAssetRouteOptions {
     readonly getSnapshot?: () => ContentSnapshot
     readonly env?: AssetRouteEnvironment
     readonly warn?: (details: AssetTargetMismatchWarning) => void
+    readonly logError?: AssetRouteErrorLogger
 }
 
 function headerValue(request: FastifyRequest, name: string): string | undefined {
@@ -52,15 +63,50 @@ function plannerStatus(code: CdnPlannerError["code"]): number {
     return code === "UNKNOWN_CURRENT_VERSION" ? 400 : 500
 }
 
+const ERROR_MESSAGES: Readonly<Record<AssetRouteErrorCode, string>> = {
+    CONTENT_SNAPSHOT_UNAVAILABLE: "content snapshot is unavailable",
+    ASSET_SERVICE_ERROR: "asset service is unavailable",
+}
+
+export function sendAssetRouteError(
+    request: FastifyRequest,
+    reply: FastifyReply,
+    code: AssetRouteErrorCode,
+    error: unknown,
+    logError: AssetRouteErrorLogger | undefined,
+    contentType = "application/json",
+) {
+    const details = { code, error, route: request.routeOptions.url ?? request.url }
+    if (logError) logError(details)
+    else request.log.error({ err: error, code, route: details.route }, "CN asset route failed")
+    return reply.status(500).type(contentType).send({ code, message: ERROR_MESSAGES[code] })
+}
+
 const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) => {
     const snapshot = options.getSnapshot ?? getContentSnapshot
     const env = options.env ?? process.env
 
     fastify.post("/version_info", async (request, reply) => {
-        reply.type("application/json")
-        return {
-            data_headers: generateDataHeaders(),
-            data: getCdnVersionInfo(getCdnBase(request, env), snapshot()),
+        let contentSnapshot: ContentSnapshot
+        try {
+            contentSnapshot = snapshot()
+        } catch (error) {
+            return sendAssetRouteError(
+                request,
+                reply,
+                "CONTENT_SNAPSHOT_UNAVAILABLE",
+                error,
+                options.logError,
+            )
+        }
+
+        try {
+            return reply.type("application/json").send({
+                data_headers: generateDataHeaders(),
+                data: getCdnVersionInfo(getCdnBase(request, env), contentSnapshot),
+            })
+        } catch (error) {
+            return sendAssetRouteError(request, reply, "ASSET_SERVICE_ERROR", error, options.logError)
         }
     })
 
@@ -81,20 +127,32 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
             })
         }
 
-        const contentSnapshot = snapshot()
-        const currentVersion = headerValue(request, "res_ver") ?? null
-        const body = request.body as { target_asset_version?: unknown } | null | undefined
-        const clientTarget = body?.target_asset_version
-        if (clientTarget !== undefined && clientTarget !== contentSnapshot.cdn.targetVersion) {
-            const warning = {
-                clientTargetVersion: clientTarget,
-                snapshotTargetVersion: contentSnapshot.cdn.targetVersion,
-            }
-            if (options.warn) options.warn(warning)
-            else request.log.warn(warning, "ignoring client asset target that differs from pinned snapshot")
+        let contentSnapshot: ContentSnapshot
+        try {
+            contentSnapshot = snapshot()
+        } catch (error) {
+            return sendAssetRouteError(
+                request,
+                reply,
+                "CONTENT_SNAPSHOT_UNAVAILABLE",
+                error,
+                options.logError,
+            )
         }
 
+        const currentVersion = headerValue(request, "res_ver") ?? null
         try {
+            const body = request.body as { target_asset_version?: unknown } | null | undefined
+            const clientTarget = body?.target_asset_version
+            if (clientTarget !== undefined && clientTarget !== contentSnapshot.cdn.targetVersion) {
+                const warning = {
+                    clientTargetVersion: clientTarget,
+                    snapshotTargetVersion: contentSnapshot.cdn.targetVersion,
+                }
+                if (options.warn) options.warn(warning)
+                else request.log.warn(warning, "ignoring client asset target that differs from pinned snapshot")
+            }
+
             const plan = planCdnUpdate(contentSnapshot.cdn, {
                 currentVersion,
                 targetVersion: contentSnapshot.cdn.targetVersion,
@@ -112,11 +170,13 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
                 data,
             })
         } catch (error) {
-            if (!(error instanceof CdnPlannerError)) throw error
-            return reply.status(plannerStatus(error.code)).type("application/json").send({
-                code: error.code,
-                message: error.message,
-            })
+            if (error instanceof CdnPlannerError) {
+                return reply.status(plannerStatus(error.code)).type("application/json").send({
+                    code: error.code,
+                    message: error.message,
+                })
+            }
+            return sendAssetRouteError(request, reply, "ASSET_SERVICE_ERROR", error, options.logError)
         }
     })
 }

@@ -61,9 +61,10 @@ async function createAssetApp(options = {}) {
     const app = Fastify({ logger: false })
     app.register(assetPlugin, {
         prefix: "/asset",
-        getSnapshot: () => options.snapshot ?? createSnapshot(),
+        getSnapshot: options.getSnapshot ?? (() => options.snapshot ?? createSnapshot()),
         env: options.env ?? {},
         warn: options.warn,
+        logError: options.logError,
     })
     await app.ready()
     return app
@@ -286,6 +287,53 @@ test("rejects unsupported asset sizes and planner failures without partial data"
     assert.equal("data" in noPath.json(), false)
 })
 
+test("get_path returns stable diagnostics and logs the original snapshot error", async t => {
+    const originalError = new Error("snapshot failed at /private/internal/catalog.json")
+    const logged = []
+    const app = await createAssetApp({
+        getSnapshot: () => { throw originalError },
+        logError: details => logged.push(details),
+    })
+    t.after(() => app.close())
+
+    const response = await postGetPath(app)
+    assert.equal(response.statusCode, 500)
+    assert.match(response.headers["content-type"], /^application\/json/)
+    assert.deepEqual(response.json(), {
+        code: "CONTENT_SNAPSHOT_UNAVAILABLE",
+        message: "content snapshot is unavailable",
+    })
+    assert.equal(response.body.includes("/private/internal"), false)
+    assert.equal("data" in response.json(), false)
+    assert.equal("full" in response.json(), false)
+    assert.equal("diff" in response.json(), false)
+    assert.strictEqual(logged[0].error, originalError)
+    assert.equal(logged[0].code, "CONTENT_SNAPSHOT_UNAVAILABLE")
+})
+
+test("get_path returns a stable service error without leaking serializer details", async t => {
+    const logged = []
+    const app = await createAssetApp({
+        env: { CDN_BASE_URL: "not a valid CDN URL /private/internal" },
+        logError: details => logged.push(details),
+    })
+    t.after(() => app.close())
+
+    const response = await postGetPath(app, { res_ver: "1.4.53" })
+    assert.equal(response.statusCode, 500)
+    assert.deepEqual(response.json(), {
+        code: "ASSET_SERVICE_ERROR",
+        message: "asset service is unavailable",
+    })
+    assert.equal(response.body.includes("/private/internal"), false)
+    assert.equal("data" in response.json(), false)
+    assert.equal("full" in response.json(), false)
+    assert.equal("diff" in response.json(), false)
+    assert.equal(logged[0].code, "ASSET_SERVICE_ERROR")
+    assert.equal(logged[0].error.code, "ERR_INVALID_URL")
+    assert.match(logged[0].error.input, /private\/internal/)
+})
+
 test("version_info uses installed bytes and the shared empty Recovery URL", async t => {
     const app = await createAssetApp()
     t.after(() => app.close())
@@ -329,6 +377,83 @@ test("title version_info is Base64 MsgPack with the same fields as JSON version_
     const decoded = unpack(Buffer.from(title.body, "base64"))
     assert.deepEqual(decoded.data, ordinary.json().data)
     assert.equal(typeof decoded.data_headers, "object")
+})
+
+test("ordinary and title version_info return content-consistent snapshot diagnostics", async t => {
+    const titlePlugin = require("../src/routes/cn/assetInTitle").default
+    const originalError = new Error("snapshot failed at /private/internal/catalog.json")
+    const logged = []
+    const app = Fastify({ logger: false })
+    msgpackHook(app)
+    const options = {
+        getSnapshot: () => { throw originalError },
+        env: {},
+        logError: details => logged.push(details),
+    }
+    app.register(assetPlugin, { prefix: "/asset", ...options })
+    app.register(titlePlugin, { prefix: "/assetintitle", ...options })
+    await app.ready()
+    t.after(() => app.close())
+
+    const ordinary = await app.inject({ method: "POST", url: "/asset/version_info", payload: {} })
+    assert.equal(ordinary.statusCode, 500)
+    assert.match(ordinary.headers["content-type"], /^application\/json/)
+    assert.deepEqual(ordinary.json(), {
+        code: "CONTENT_SNAPSHOT_UNAVAILABLE",
+        message: "content snapshot is unavailable",
+    })
+
+    const title = await app.inject({
+        method: "POST",
+        url: "/assetintitle/version_info_in_title",
+        payload: {},
+    })
+    assert.equal(title.statusCode, 500)
+    assert.equal(title.headers["content-type"], "application/x-msgpack")
+    assert.deepEqual(unpack(Buffer.from(title.body, "base64")), {
+        code: "CONTENT_SNAPSHOT_UNAVAILABLE",
+        message: "content snapshot is unavailable",
+    })
+    assert.equal(logged.length, 2)
+    assert.strictEqual(logged[0].error, originalError)
+    assert.strictEqual(logged[1].error, originalError)
+})
+
+test("ordinary and title version_info return malformed-base service errors", async t => {
+    const titlePlugin = require("../src/routes/cn/assetInTitle").default
+    const logged = []
+    const app = Fastify({ logger: false })
+    msgpackHook(app)
+    const options = {
+        getSnapshot: () => createSnapshot(),
+        env: { CDN_BASE_URL: "not a URL /private/internal" },
+        logError: details => logged.push(details),
+    }
+    app.register(assetPlugin, { prefix: "/asset", ...options })
+    app.register(titlePlugin, { prefix: "/assetintitle", ...options })
+    await app.ready()
+    t.after(() => app.close())
+
+    const ordinary = await app.inject({ method: "POST", url: "/asset/version_info", payload: {} })
+    assert.equal(ordinary.statusCode, 500)
+    assert.deepEqual(ordinary.json(), {
+        code: "ASSET_SERVICE_ERROR",
+        message: "asset service is unavailable",
+    })
+
+    const title = await app.inject({
+        method: "POST",
+        url: "/assetintitle/version_info_in_title",
+        payload: {},
+    })
+    assert.equal(title.statusCode, 500)
+    assert.equal(title.headers["content-type"], "application/x-msgpack")
+    assert.deepEqual(unpack(Buffer.from(title.body, "base64")), {
+        code: "ASSET_SERVICE_ERROR",
+        message: "asset service is unavailable",
+    })
+    assert.equal(title.body.includes("/private/internal"), false)
+    assert.equal(logged.length, 2)
 })
 
 test("CDN files serve pinned ZIPs and non-ZIP assets but reject every other ZIP and traversal", async t => {
