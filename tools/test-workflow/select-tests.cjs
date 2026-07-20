@@ -8,7 +8,7 @@ const SOURCE_RULES = [
     { pattern: /^src\/content\/paths\.ts$/, groups: ["quick:cdn"] },
     { pattern: /^src\/content\/cdn\/types\.ts$/, groups: ["quick:cdn"] },
     {
-        pattern: /^src\/content\/cdn\/(?:catalog-builder|patch-graph|digest-cache)\.ts$/,
+        pattern: /^src\/content\/cdn\/(?:catalog-builder|patch-graph|digest-cache|planner)\.ts$/,
         groups: ["quick:cdn"],
     },
     { pattern: /^src\/routes\/cn\/(?:asset|versionCheck)\.ts$/, groups: ["full"] },

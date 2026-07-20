@@ -37,6 +37,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/cdn_catalog.test.cjs",
             "tools/cdn_paths.test.cjs",
+            "tools/cdn_planner.test.cjs",
             "tools/cdn_types.test.cjs",
         ],
     },

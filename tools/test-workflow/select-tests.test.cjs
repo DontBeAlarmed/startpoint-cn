@@ -15,7 +15,7 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/content/cdn/patch-graph.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/digest-cache.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/catalog.ts"]), ["full"])
-    assert.deepEqual(selectTestGroups(["src/content/cdn/planner.ts"]), ["full"])
+    assert.deepEqual(selectTestGroups(["src/content/cdn/planner.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/internal/types.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/asset.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["admin/src/App.tsx"]), ["admin"])
@@ -101,11 +101,13 @@ test("registers the focused CDN path contract", () => {
         tests: [
             "tools/cdn_catalog.test.cjs",
             "tools/cdn_paths.test.cjs",
+            "tools/cdn_planner.test.cjs",
             "tools/cdn_types.test.cjs",
         ],
     })
     assert.deepEqual(selectTestGroups(["tools/cdn_catalog.test.cjs"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_paths.test.cjs"]), ["quick:cdn"])
+    assert.deepEqual(selectTestGroups(["tools/cdn_planner.test.cjs"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_types.test.cjs"]), ["quick:cdn"])
 })
 

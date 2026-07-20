@@ -99,6 +99,7 @@ export interface PlanRequest {
 
 interface UpdatePlanBase {
     readonly downloadBytes: number
+    readonly delayedAssetsBytes: 0
 }
 
 export interface UpToDateUpdatePlan extends UpdatePlanBase {

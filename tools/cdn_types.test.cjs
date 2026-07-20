@@ -7,6 +7,7 @@ const test = require("node:test")
 
 const projectRoot = path.resolve(__dirname, "..")
 const typesModule = path.join(projectRoot, "src/content/cdn/types").replaceAll("\\", "/")
+const plannerModule = path.join(projectRoot, "src/content/cdn/planner").replaceAll("\\", "/")
 const tscPath = path.join(projectRoot, "node_modules/typescript/bin/tsc")
 
 test("keeps catalog data readonly and update plans structurally valid", t => {
@@ -25,6 +26,7 @@ import type {
     ReadonlyNonEmptyArray,
     UpdatePlan,
 } from ${JSON.stringify(typesModule)}
+import { planCdnUpdate } from ${JSON.stringify(plannerModule)}
 
 const archive: CatalogArchive = {
     relativePath: "archive-common-full/base.zip",
@@ -66,14 +68,25 @@ const catalog: CdnCatalog = {
     entityListsRelativePath: "EntityLists/android_medium.csv",
     edges,
 }
+const planned: UpdatePlan = planCdnUpdate(catalog, {
+    currentVersion: "1.4.0",
+    targetVersion: "1.4.1",
+    platform: "android",
+    assetSizeKind: "fulfill",
+    isInitial: false,
+})
 
 const plans: ReadonlyArray<UpdatePlan> = [
-    { kind: "up-to-date", full: null, diff: null, downloadBytes: 0 },
-    { kind: "initial", full: fullEdge, diff: null, downloadBytes: 100 },
-    { kind: "initial", full: fullEdge, diff: diffs, downloadBytes: 200 },
-    { kind: "incremental", full: null, diff: diffs, downloadBytes: 100 },
+    { kind: "up-to-date", full: null, diff: null, downloadBytes: 0, delayedAssetsBytes: 0 },
+    { kind: "initial", full: fullEdge, diff: null, downloadBytes: 100, delayedAssetsBytes: 0 },
+    { kind: "initial", full: fullEdge, diff: diffs, downloadBytes: 200, delayedAssetsBytes: 0 },
+    { kind: "incremental", full: null, diff: diffs, downloadBytes: 100, delayedAssetsBytes: 0 },
 ]
 
+// @ts-expect-error update plans must expose delayed asset bytes
+const missingDelayed: UpdatePlan = { kind: "up-to-date", full: null, diff: null, downloadBytes: 0 }
+// @ts-expect-error delayed asset downloads are not supported in the first stage
+const nonzeroDelayed: UpdatePlan = { kind: "up-to-date", full: null, diff: null, downloadBytes: 0, delayedAssetsBytes: 1 }
 // @ts-expect-error catalog arrays are immutable
 catalog.edges.push(fullEdge)
 // @ts-expect-error archive fields are immutable
@@ -98,6 +111,9 @@ const invalidFullEdge: FullCatalogEdge = diffEdge
 const invalidDiffEdge: DiffCatalogEdge = fullEdge
 
 void plans
+void planned
+void missingDelayed
+void nonzeroDelayed
 void catalogInput
 void emptyDiff
 void emptyInitialDiff
