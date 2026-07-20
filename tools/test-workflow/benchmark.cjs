@@ -7,11 +7,13 @@ const path = require("node:path")
 
 const projectRoot = path.resolve(__dirname, "../..")
 const signalExitCodes = { SIGINT: 130, SIGTERM: 143 }
+const MAX_OUTPUT_BYTES = 1024 * 1024
 
 const DEFAULT_COMMANDS = Object.freeze([
     Object.freeze({
-        args: ["run", "test:quick"],
-        command: "npm run test:quick",
+        args: ["tools/test-workflow/run.cjs", "--group", "quick"],
+        command: "node tools/test-workflow/run.cjs --group quick",
+        executable: process.execPath,
         name: "test:quick",
         thresholdMs: 5000,
         timeoutMs: 30000,
@@ -25,22 +27,25 @@ const DEFAULT_COMMANDS = Object.freeze([
         timeoutMs: 60000,
     }),
     Object.freeze({
-        args: ["run", "test:integration"],
-        command: "npm run test:integration",
+        args: ["tools/test-workflow/run.cjs", "--group", "integration"],
+        command: "node tools/test-workflow/run.cjs --group integration",
+        executable: process.execPath,
         name: "test:integration",
         thresholdMs: 30000,
         timeoutMs: 90000,
     }),
     Object.freeze({
-        args: ["run", "test:full"],
-        command: "npm run test:full",
+        args: ["tools/test-workflow/run.cjs", "--group", "full"],
+        command: "node tools/test-workflow/run.cjs --group full",
+        executable: process.execPath,
         name: "test:full",
         thresholdMs: 60000,
         timeoutMs: 120000,
     }),
     Object.freeze({
-        args: ["run", "typecheck"],
-        command: "npm run typecheck",
+        args: ["--max-old-space-size=4096", "node_modules/typescript/bin/tsc", "--noEmit"],
+        command: "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit",
+        executable: process.execPath,
         name: "typecheck",
         thresholdMs: 30000,
         timeoutMs: 90000,
@@ -111,11 +116,55 @@ function parseArguments(argv) {
     return parsed
 }
 
+function createTailBuffer(maxBytes = MAX_OUTPUT_BYTES) {
+    if (!Number.isInteger(maxBytes) || maxBytes <= 0) {
+        throw new TypeError("output capture limit must be a positive integer")
+    }
+    let tail = Buffer.alloc(0)
+    let truncated = false
+
+    return {
+        append(value) {
+            const chunk = Buffer.isBuffer(value) ? value : Buffer.from(String(value))
+            if (chunk.length === 0) return
+            if (tail.length + chunk.length <= maxBytes) {
+                tail = Buffer.concat([tail, chunk], tail.length + chunk.length)
+                return
+            }
+
+            truncated = true
+            if (chunk.length >= maxBytes) {
+                tail = Buffer.from(chunk.subarray(chunk.length - maxBytes))
+                return
+            }
+            const retainedTail = tail.subarray(tail.length - (maxBytes - chunk.length))
+            tail = Buffer.concat([retainedTail, chunk], maxBytes)
+        },
+        get outputTruncated() {
+            return truncated
+        },
+        toString() {
+            return tail.toString("utf8")
+        },
+    }
+}
+
+function taskkillProcessTree(activeRun, force, options = {}) {
+    const spawnSyncImpl = options.spawnSync ?? spawnSync
+    const args = ["/PID", String(activeRun.processGroupId), "/T"]
+    if (force) args.push("/F")
+    const result = spawnSyncImpl("taskkill", args, { encoding: "utf8", windowsHide: true })
+    if (result.error) throw result.error
+    if (result.status !== 0) {
+        throw new Error(result.stderr?.trim() || `taskkill exited with status ${result.status}`)
+    }
+}
+
 function signalProcessTree(activeRun, signal, options = {}) {
     if (!activeRun?.processGroupId) return
     const platform = options.platform ?? process.platform
     if (platform === "win32") {
-        activeRun.child.kill(signal)
+        taskkillProcessTree(activeRun, false, options)
         return
     }
     const killProcess = options.killProcess ?? process.kill.bind(process)
@@ -126,16 +175,7 @@ function forceKillProcessTree(activeRun, options = {}) {
     if (!activeRun?.processGroupId) return
     const platform = options.platform ?? process.platform
     if (platform === "win32") {
-        const spawnSyncImpl = options.spawnSync ?? spawnSync
-        const result = spawnSyncImpl(
-            "taskkill",
-            ["/PID", String(activeRun.processGroupId), "/T", "/F"],
-            { encoding: "utf8", windowsHide: true },
-        )
-        if (result.error) throw result.error
-        if (result.status !== 0) {
-            throw new Error(result.stderr?.trim() || `taskkill exited with status ${result.status}`)
-        }
+        taskkillProcessTree(activeRun, true, options)
         return
     }
     const killProcess = options.killProcess ?? process.kill.bind(process)
@@ -183,12 +223,12 @@ function scheduleForceKill(activeRun, options = {}) {
 function runCommand(command, state, options = {}) {
     const cwd = options.cwd ?? projectRoot
     const platform = options.platform ?? process.platform
-    const npmCommand = platform === "win32" ? "npm.cmd" : "npm"
-    const executable = command.executable ?? npmCommand
+    const executable = command.executable ?? process.execPath
     const spawnImpl = options.spawn ?? spawn
     const setTimeoutImpl = options.setTimeout ?? setTimeout
     const clearTimeoutImpl = options.clearTimeout ?? clearTimeout
     const now = options.now ?? (() => Number(process.hrtime.bigint()) / 1e6)
+    const outputBuffer = createTailBuffer(options.maxOutputBytes ?? MAX_OUTPUT_BYTES)
 
     return new Promise(resolve => {
         const startedAt = now()
@@ -208,23 +248,22 @@ function runCommand(command, state, options = {}) {
         }
         state.activeRun = activeRun
 
-        let output = ""
         let timedOut = false
         let spawnError = null
         let resolved = false
 
         activeRun.timeoutTimer = setTimeoutImpl(() => {
             timedOut = true
-            output += `\nbenchmark timeout after ${command.timeoutMs}ms\n`
+            outputBuffer.append(`\nbenchmark timeout after ${command.timeoutMs}ms\n`)
             safelySignalProcessTree(activeRun, "SIGTERM", { ...options, platform })
             scheduleForceKill(activeRun, { ...options, platform })
         }, command.timeoutMs)
 
-        child.stdout.on("data", chunk => { output += chunk })
-        child.stderr.on("data", chunk => { output += chunk })
+        child.stdout.on("data", chunk => { outputBuffer.append(chunk) })
+        child.stderr.on("data", chunk => { outputBuffer.append(chunk) })
         child.on("error", error => {
             spawnError = error
-            output += `${error.stack || error.message}\n`
+            outputBuffer.append(`${error.stack || error.message}\n`)
         })
         child.on("close", async (exitCode, signal) => {
             if (resolved) return
@@ -233,16 +272,18 @@ function runCommand(command, state, options = {}) {
             activeRun.timeoutTimer = null
             if (activeRun.cleanupPromise) await activeRun.cleanupPromise
             if (activeRun.cleanupErrors.length > 0) {
-                output += `${activeRun.cleanupErrors.join("\n")}\n`
+                outputBuffer.append(`${activeRun.cleanupErrors.join("\n")}\n`)
             }
             if (state.activeRun === activeRun) state.activeRun = null
 
             const durationMs = now() - startedAt
+            const output = outputBuffer.toString()
             const summary = parseRunnerSummary(output) ?? { failed: 0, passed: 0, skipped: 0 }
             resolve({
                 durationMs,
                 failed: summary.failed,
                 output,
+                outputTruncated: outputBuffer.outputTruncated,
                 passed: summary.passed,
                 rawExitCode: exitCode,
                 signal,
@@ -276,6 +317,7 @@ function compactRun(run) {
     return {
         durationMs: roundMilliseconds(run.durationMs),
         failed: run.failed,
+        outputTruncated: run.outputTruncated ?? false,
         passed: run.passed,
         rawExitCode: run.rawExitCode,
         signal: run.signal,
@@ -307,6 +349,7 @@ function buildCommandReport(command, warmup, runs, options = {}) {
         failed: counts.failed,
         medianMs: roundMilliseconds(rawMedianMs),
         name: command.name,
+        outputTruncated: [warmup, ...runs].some(run => run.outputTruncated === true),
         passed: counts.passed,
         rawExitCodes: runs.map(run => run.rawExitCode),
         runs: runs.map(compactRun),
@@ -476,6 +519,7 @@ if (require.main === module) {
 
 module.exports = {
     DEFAULT_COMMANDS,
+    MAX_OUTPUT_BYTES,
     benchmarkCommand,
     buildCommandReport,
     evaluateThreshold,

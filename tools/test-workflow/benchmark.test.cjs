@@ -8,6 +8,7 @@ const test = require("node:test")
 
 const {
     DEFAULT_COMMANDS,
+    MAX_OUTPUT_BYTES,
     buildCommandReport,
     evaluateThreshold,
     forceKillProcessTree,
@@ -25,6 +26,7 @@ function createRun(durationMs, overrides = {}) {
         durationMs,
         failed: 0,
         output: "",
+        outputTruncated: false,
         passed: 1,
         rawExitCode: 0,
         signal: null,
@@ -87,19 +89,48 @@ async function waitForProcessExit(pid, timeoutMs = 2000) {
     return !isProcessAlive(pid)
 }
 
-test("runs the changed benchmark directly with an explicit source file", () => {
-    const command = DEFAULT_COMMANDS.find(candidate => candidate.name === "test:changed")
-
-    assert.equal(command.executable, process.execPath)
-    assert.deepEqual(command.args, [
-        "tools/test-workflow/run.cjs",
-        "--files",
-        "src/lib/gacha.ts",
+test("runs every default benchmark command directly with Node", () => {
+    assert.deepEqual(DEFAULT_COMMANDS.map(command => ({
+        args: command.args,
+        command: command.command,
+        executable: command.executable,
+        name: command.name,
+    })), [
+        {
+            args: ["tools/test-workflow/run.cjs", "--group", "quick"],
+            command: "node tools/test-workflow/run.cjs --group quick",
+            executable: process.execPath,
+            name: "test:quick",
+        },
+        {
+            args: ["tools/test-workflow/run.cjs", "--files", "src/lib/gacha.ts"],
+            command: "node tools/test-workflow/run.cjs --files src/lib/gacha.ts",
+            executable: process.execPath,
+            name: "test:changed",
+        },
+        {
+            args: ["tools/test-workflow/run.cjs", "--group", "integration"],
+            command: "node tools/test-workflow/run.cjs --group integration",
+            executable: process.execPath,
+            name: "test:integration",
+        },
+        {
+            args: ["tools/test-workflow/run.cjs", "--group", "full"],
+            command: "node tools/test-workflow/run.cjs --group full",
+            executable: process.execPath,
+            name: "test:full",
+        },
+        {
+            args: [
+                "--max-old-space-size=4096",
+                "node_modules/typescript/bin/tsc",
+                "--noEmit",
+            ],
+            command: "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit",
+            executable: process.execPath,
+            name: "typecheck",
+        },
     ])
-    assert.equal(
-        command.command,
-        "node tools/test-workflow/run.cjs --files src/lib/gacha.ts",
-    )
 })
 
 test("calculates odd and even medians without changing the samples", () => {
@@ -300,29 +331,35 @@ test("signal handlers retain the active run captured at signal time", async () =
     assert.deepEqual(calls, [["SIGTERM", 41], ["force", 41]])
 })
 
-test("uses child.kill then taskkill for Windows process trees", () => {
-    const signals = []
+test("uses non-forced then forced taskkill for Windows process trees", () => {
     const taskkillCalls = []
     const activeRun = {
-        child: { kill(signal) { signals.push(signal) } },
+        child: { kill() { assert.fail("Windows tree cleanup must not call child.kill") } },
         processGroupId: 77,
     }
-
-    signalProcessTree(activeRun, "SIGTERM", { platform: "win32" })
-    forceKillProcessTree(activeRun, {
+    const options = {
         platform: "win32",
-        spawnSync(command, args, options) {
-            taskkillCalls.push({ args, command, options })
+        spawnSync(command, args, spawnOptions) {
+            taskkillCalls.push({ args, command, options: spawnOptions })
             return { status: 0, stderr: "" }
         },
-    })
+    }
 
-    assert.deepEqual(signals, ["SIGTERM"])
-    assert.deepEqual(taskkillCalls, [{
-        args: ["/PID", "77", "/T", "/F"],
-        command: "taskkill",
-        options: { encoding: "utf8", windowsHide: true },
-    }])
+    signalProcessTree(activeRun, "SIGTERM", options)
+    forceKillProcessTree(activeRun, options)
+
+    assert.deepEqual(taskkillCalls, [
+        {
+            args: ["/PID", "77", "/T"],
+            command: "taskkill",
+            options: { encoding: "utf8", windowsHide: true },
+        },
+        {
+            args: ["/PID", "77", "/T", "/F"],
+            command: "taskkill",
+            options: { encoding: "utf8", windowsHide: true },
+        },
+    ])
 })
 
 test("timeout kills a TERM-resistant grandchild after its parent closes", {
@@ -431,6 +468,47 @@ test("reports spawn failures and clears the normal timeout timer", async () => {
     assert.equal(result.timedOut, false)
     assert.equal(state.activeRun, null)
     assert.equal(clock.pendingCount(), 0)
+})
+
+test("caps captured output while preserving the final summary and error tail", async () => {
+    const child = createFakeChild()
+    const clock = createFakeClock()
+    const state = { activeRun: null, interruptedBy: null }
+    const resultPromise = runCommand({
+        args: [],
+        command: "verbose",
+        executable: "verbose",
+        timeoutMs: 100,
+    }, state, {
+        clearTimeout: clock.clearTimeout,
+        now: () => 0,
+        setTimeout: clock.setTimeout,
+        spawn: () => child,
+    })
+    const summary = "\nSummary: passed=9 failed=1 skipped=2 total=3.00s\n"
+    const errorTail = "final diagnostic tail\n"
+
+    child.stdout.write(Buffer.alloc(MAX_OUTPUT_BYTES + 128, "x"))
+    child.stdout.write(summary)
+    child.stderr.write(errorTail)
+    child.emit("close", 1, null)
+    const result = await resultPromise
+    const report = buildCommandReport(
+        { command: "verbose", name: "verbose", thresholdMs: 1000 },
+        createRun(1),
+        [result, createRun(1), createRun(1)],
+    )
+
+    assert.ok(Buffer.byteLength(result.output) <= MAX_OUTPUT_BYTES)
+    assert.match(result.output, /Summary: passed=9 failed=1 skipped=2/)
+    assert.match(result.output, /final diagnostic tail/)
+    assert.equal(result.outputTruncated, true)
+    assert.deepEqual(
+        { failed: result.failed, passed: result.passed, skipped: result.skipped },
+        { failed: 1, passed: 9, skipped: 2 },
+    )
+    assert.equal(report.outputTruncated, true)
+    assert.equal(report.runs[0].outputTruncated, true)
 })
 
 test("main stays non-zero for command failures in report-only mode", async () => {
