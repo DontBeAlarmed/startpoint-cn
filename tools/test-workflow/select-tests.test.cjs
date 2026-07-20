@@ -179,6 +179,15 @@ test("keeps runtime wiring contracts in full instead of generator", () => {
     }
 })
 
+test("guards missing active quest persistence calls before comparing order", () => {
+    const source = fs.readFileSync("tools/treasure_key_entry.test.cjs", "utf8")
+    assert.match(source, /const persistIndex\s*=\s*insertActiveQuestSource\.indexOf/)
+    assert.match(source, /const publishIndex\s*=\s*insertActiveQuestSource\.indexOf/)
+    assert.match(source, /assert\.ok\(persistIndex\s*>=\s*0/)
+    assert.match(source, /assert\.ok\(publishIndex\s*>=\s*0/)
+    assert.match(source, /assert\.ok\(\s*persistIndex\s*<\s*publishIndex/)
+})
+
 test("keeps isolated test groups parallel while infrastructure groups stay serial", () => {
     for (const group of AGGREGATE_GROUPS.quick) {
         assert.equal(TEST_GROUPS[group].execution, "parallel")

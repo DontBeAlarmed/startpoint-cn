@@ -234,9 +234,12 @@ const insertActiveQuestSource = activeQuestServiceSource.slice(
     activeQuestServiceSource.indexOf("export function insertActiveQuest"),
     activeQuestServiceSource.indexOf("export function runAbortActiveQuestTransaction"),
 )
+const persistIndex = insertActiveQuestSource.indexOf("persistActiveQuest")
+const publishIndex = insertActiveQuestSource.indexOf("publishActiveQuest")
+assert.ok(persistIndex >= 0, "insertActiveQuest must call persistActiveQuest")
+assert.ok(publishIndex >= 0, "insertActiveQuest must call publishActiveQuest")
 assert.ok(
-    insertActiveQuestSource.indexOf("persistActiveQuest")
-        < insertActiveQuestSource.indexOf("publishActiveQuest"),
+    persistIndex < publishIndex,
     "insertActiveQuest must persist to DB before publishing to memory",
 )
 assert.match(
