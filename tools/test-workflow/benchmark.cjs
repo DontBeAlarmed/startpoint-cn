@@ -120,32 +120,142 @@ function createTailBuffer(maxBytes = MAX_OUTPUT_BYTES) {
     if (!Number.isInteger(maxBytes) || maxBytes <= 0) {
         throw new TypeError("output capture limit must be a positive integer")
     }
-    let tail = Buffer.alloc(0)
+    const chunks = []
+    let totalBytes = 0
     let truncated = false
 
     return {
         append(value) {
             const chunk = Buffer.isBuffer(value) ? value : Buffer.from(String(value))
             if (chunk.length === 0) return
-            if (tail.length + chunk.length <= maxBytes) {
-                tail = Buffer.concat([tail, chunk], tail.length + chunk.length)
+            if (chunk.length >= maxBytes) {
+                truncated ||= totalBytes > 0 || chunk.length > maxBytes
+                chunks.length = 0
+                chunks.push(Buffer.from(chunk.subarray(chunk.length - maxBytes)))
+                totalBytes = maxBytes
                 return
             }
 
-            truncated = true
-            if (chunk.length >= maxBytes) {
-                tail = Buffer.from(chunk.subarray(chunk.length - maxBytes))
-                return
+            chunks.push(chunk)
+            totalBytes += chunk.length
+            while (totalBytes > maxBytes) {
+                truncated = true
+                const excessBytes = totalBytes - maxBytes
+                const firstChunk = chunks[0]
+                if (firstChunk.length <= excessBytes) {
+                    chunks.shift()
+                    totalBytes -= firstChunk.length
+                    continue
+                }
+                chunks[0] = Buffer.from(firstChunk.subarray(excessBytes))
+                totalBytes -= excessBytes
             }
-            const retainedTail = tail.subarray(tail.length - (maxBytes - chunk.length))
-            tail = Buffer.concat([retainedTail, chunk], maxBytes)
         },
         get outputTruncated() {
             return truncated
         },
         toString() {
-            return tail.toString("utf8")
+            return Buffer.concat(chunks, totalBytes).toString("utf8")
         },
+    }
+}
+
+function readPosixProcessTable(options = {}) {
+    if (options.readProcessTable) return options.readProcessTable()
+    const spawnSyncImpl = options.spawnSync ?? spawnSync
+    const result = spawnSyncImpl(
+        "ps",
+        ["-axo", "pid=,ppid=,pgid="],
+        { encoding: "utf8" },
+    )
+    if (result.error) throw result.error
+    if (result.status !== 0) {
+        throw new Error(result.stderr?.trim() || `ps exited with status ${result.status}`)
+    }
+    return result.stdout.split(/\r?\n/).flatMap(line => {
+        const fields = line.trim().split(/\s+/).map(Number)
+        if (fields.length !== 3 || fields.some(field => !Number.isInteger(field))) return []
+        return [{ pid: fields[0], ppid: fields[1], pgid: fields[2] }]
+    })
+}
+
+function capturePosixTerminationTargets(activeRun, options = {}) {
+    if (activeRun.terminationTargets) return activeRun.terminationTargets
+    let processTable = []
+    try {
+        processTable = readPosixProcessTable(options)
+    } catch (error) {
+        recordLifecycleError(activeRun, "failed to read POSIX process tree", error)
+    }
+
+    const normalizedTable = processTable.map(entry => ({
+        pgid: Number(entry.pgid),
+        pid: Number(entry.pid),
+        ppid: Number(entry.ppid),
+    })).filter(entry => [entry.pid, entry.ppid, entry.pgid].every(Number.isInteger))
+    const processesByPid = new Map(normalizedTable.map(entry => [entry.pid, entry]))
+    const childrenByParent = new Map()
+    for (const entry of normalizedTable) {
+        const children = childrenByParent.get(entry.ppid) ?? []
+        children.push(entry.pid)
+        childrenByParent.set(entry.ppid, children)
+    }
+
+    const rootPid = activeRun.processId ?? activeRun.processGroupId
+    const rootEntry = processesByPid.get(rootPid) ?? {
+        pgid: activeRun.processGroupId,
+        pid: rootPid,
+        ppid: 0,
+    }
+    const currentPid = options.currentPid ?? process.pid
+    const currentProcessGroupId = processesByPid.get(currentPid)?.pgid
+        ?? options.currentProcessGroupId
+        ?? null
+    const capturedProcesses = []
+    const seen = new Set()
+
+    function visit(entry, depth) {
+        if (!entry || seen.has(entry.pid)) return
+        seen.add(entry.pid)
+        capturedProcesses.push({ ...entry, depth })
+        for (const childPid of childrenByParent.get(entry.pid) ?? []) {
+            visit(processesByPid.get(childPid), depth + 1)
+        }
+    }
+    visit(rootEntry, 0)
+
+    const groupDepths = new Map()
+    const pidTargets = []
+    for (const entry of capturedProcesses) {
+        const isKnownSafeGroup = entry.pgid > 0 && (
+            (currentProcessGroupId !== null && entry.pgid !== currentProcessGroupId)
+            || (entry.pid === rootPid && entry.pgid === activeRun.processGroupId)
+        )
+        if (isKnownSafeGroup) {
+            groupDepths.set(entry.pgid, Math.max(groupDepths.get(entry.pgid) ?? -1, entry.depth))
+        } else if (entry.pid > 0 && entry.pid !== currentPid) {
+            pidTargets.push({ depth: entry.depth, id: entry.pid, type: "pid" })
+        }
+    }
+    const groupTargets = [...groupDepths].map(([id, depth]) => ({ depth, id, type: "group" }))
+    activeRun.terminationTargets = [...groupTargets, ...pidTargets]
+        .sort((left, right) => right.depth - left.depth || left.id - right.id)
+    return activeRun.terminationTargets
+}
+
+function signalPosixProcessTree(activeRun, signal, options = {}) {
+    const killProcess = options.killProcess ?? process.kill.bind(process)
+    for (const target of capturePosixTerminationTargets(activeRun, options)) {
+        const processTarget = target.type === "group" ? -target.id : target.id
+        try {
+            killProcess(processTarget, signal)
+        } catch (error) {
+            recordLifecycleError(
+                activeRun,
+                `failed to signal ${target.type} ${target.id} with ${signal}`,
+                error,
+            )
+        }
     }
 }
 
@@ -167,8 +277,7 @@ function signalProcessTree(activeRun, signal, options = {}) {
         taskkillProcessTree(activeRun, false, options)
         return
     }
-    const killProcess = options.killProcess ?? process.kill.bind(process)
-    killProcess(-activeRun.processGroupId, signal)
+    signalPosixProcessTree(activeRun, signal, options)
 }
 
 function forceKillProcessTree(activeRun, options = {}) {
@@ -178,8 +287,7 @@ function forceKillProcessTree(activeRun, options = {}) {
         taskkillProcessTree(activeRun, true, options)
         return
     }
-    const killProcess = options.killProcess ?? process.kill.bind(process)
-    killProcess(-activeRun.processGroupId, "SIGKILL")
+    signalPosixProcessTree(activeRun, "SIGKILL", options)
 }
 
 function recordLifecycleError(activeRun, context, error) {
@@ -243,7 +351,9 @@ function runCommand(command, state, options = {}) {
             cleanupErrors: [],
             cleanupPromise: null,
             cleanupTimer: null,
+            processId: child.pid ?? null,
             processGroupId: child.pid ?? null,
+            terminationTargets: null,
             timeoutTimer: null,
         }
         state.activeRun = activeRun
@@ -435,7 +545,7 @@ function installSignalHandlers(state, options = {}) {
             const activeRun = state.activeRun
             if (!activeRun) return
             try {
-                signalTree(activeRun, signal)
+                signalTree(activeRun, "SIGTERM")
             } catch (error) {
                 recordLifecycleError(activeRun, `failed to signal process tree with ${signal}`, error)
             }

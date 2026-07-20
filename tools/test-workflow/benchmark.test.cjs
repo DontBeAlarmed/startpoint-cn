@@ -70,6 +70,13 @@ function createFakeClock() {
     }
 }
 
+function createSingleProcessTable(pid) {
+    return [
+        { pgid: 999999, pid: process.pid, ppid: 1 },
+        { pgid: pid, pid, ppid: process.pid },
+    ]
+}
+
 function isProcessAlive(pid) {
     try {
         process.kill(pid, 0)
@@ -87,6 +94,15 @@ async function waitForProcessExit(pid, timeoutMs = 2000) {
         await new Promise(resolve => setTimeout(resolve, 20))
     }
     return !isProcessAlive(pid)
+}
+
+async function waitForFile(filePath, timeoutMs = 5000) {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+        if (fs.existsSync(filePath)) return
+        await new Promise(resolve => setTimeout(resolve, 20))
+    }
+    throw new Error(`fixture did not become ready within ${timeoutMs}ms`)
 }
 
 test("runs every default benchmark command directly with Node", () => {
@@ -212,6 +228,7 @@ test("waits for the fixed process-group force kill after a timed-out child close
         killProcess(target, signal) { signals.push([target, signal]) },
         now: () => 0,
         platform: "linux",
+        readProcessTable: () => createSingleProcessTable(321),
         setTimeout: clock.setTimeout,
         spawn: () => child,
     })
@@ -247,6 +264,7 @@ test("waits for force kill after an interrupted child closes", async () => {
         now: () => 0,
         platform: "linux",
         processTarget,
+        readProcessTable: () => createSingleProcessTable(432),
         setTimeout: clock.setTimeout,
         spawn: () => child,
     }
@@ -269,7 +287,7 @@ test("waits for force kill after an interrupted child closes", async () => {
     await resultPromise
     await removeHandlers()
 
-    assert.deepEqual(signals, [[-432, "SIGINT"], [-432, "SIGKILL"]])
+    assert.deepEqual(signals, [[-432, "SIGTERM"], [-432, "SIGKILL"]])
     assert.equal(clock.pendingCount(), 0)
 })
 
@@ -293,6 +311,7 @@ test("treats ESRCH as clean and records other process-tree cleanup errors", asyn
         },
         now: () => 0,
         platform: "linux",
+        readProcessTable: () => createSingleProcessTable(654),
         setTimeout: clock.setTimeout,
         spawn: () => child,
     })
@@ -303,7 +322,46 @@ test("treats ESRCH as clean and records other process-tree cleanup errors", asyn
     const result = await resultPromise
 
     assert.doesNotMatch(result.output, /already gone/)
-    assert.match(result.output, /failed to force-kill process tree: permission denied/)
+    assert.match(result.output, /failed to signal group 654 with SIGKILL: permission denied/)
+})
+
+test("signals captured POSIX descendant groups leaf-first without killing its own group", () => {
+    const signals = []
+    let processTableReads = 0
+    const activeRun = {
+        child: createFakeChild(100),
+        cleanupErrors: [],
+        processGroupId: 100,
+    }
+    const options = {
+        currentPid: 10,
+        killProcess(target, signal) { signals.push([target, signal]) },
+        platform: "linux",
+        readProcessTable() {
+            processTableReads++
+            return [
+                { pgid: 10, pid: 10, ppid: 1 },
+                { pgid: 100, pid: 100, ppid: 10 },
+                { pgid: 200, pid: 200, ppid: 100 },
+                { pgid: 200, pid: 201, ppid: 200 },
+                { pgid: 10, pid: 300, ppid: 100 },
+            ]
+        },
+    }
+
+    signalProcessTree(activeRun, "SIGTERM", options)
+    forceKillProcessTree(activeRun, options)
+
+    assert.equal(processTableReads, 1)
+    assert.deepEqual(signals, [
+        [-200, "SIGTERM"],
+        [300, "SIGTERM"],
+        [-100, "SIGTERM"],
+        [-200, "SIGKILL"],
+        [300, "SIGKILL"],
+        [-100, "SIGKILL"],
+    ])
+    assert.equal(signals.some(([target]) => target === -10), false)
 })
 
 test("signal handlers retain the active run captured at signal time", async () => {
@@ -362,39 +420,86 @@ test("uses non-forced then forced taskkill for Windows process trees", () => {
     ])
 })
 
-test("timeout kills a TERM-resistant grandchild after its parent closes", {
+test("timeout kills a detached test process group and its descendant after ready", {
     skip: process.platform === "win32",
 }, async t => {
-    const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "benchmark-tree-"))
-    const fixturePath = path.join(fixtureRoot, "parent.cjs")
-    const pidPath = path.join(fixtureRoot, "grandchild.pid")
-    let grandchildPid = null
+    const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "benchmark-nested-tree-"))
+    const runnerPath = path.join(fixtureRoot, "runner.cjs")
+    const testPath = path.join(fixtureRoot, "test-process.cjs")
+    const descendantPath = path.join(fixtureRoot, "descendant.cjs")
+    const readyPath = path.join(fixtureRoot, "ready")
+    const pidPath = path.join(fixtureRoot, "pids.json")
+    const fixturePids = []
     t.after(() => {
-        if (grandchildPid !== null && isProcessAlive(grandchildPid)) {
-            try { process.kill(grandchildPid, "SIGKILL") } catch {}
+        for (const pid of fixturePids) {
+            if (isProcessAlive(pid)) {
+                try { process.kill(pid, "SIGKILL") } catch {}
+            }
         }
         fs.rmSync(fixtureRoot, { force: true, recursive: true })
     })
-    fs.writeFileSync(fixturePath, [
+    fs.writeFileSync(runnerPath, [
         'const { spawn } = require("node:child_process")',
-        'const fs = require("node:fs")',
-        'const child = spawn(process.execPath, ["-e", "process.on(\\"SIGTERM\\", () => {}); setInterval(() => {}, 1000)"], { stdio: "ignore" })',
-        'fs.writeFileSync(process.argv[2], String(child.pid))',
+        'spawn(process.execPath, process.argv.slice(2), { detached: true, stdio: "ignore" })',
         'process.on("SIGTERM", () => process.exit(0))',
         'setInterval(() => {}, 1000)',
     ].join("\n"))
+    fs.writeFileSync(testPath, [
+        'const { spawn } = require("node:child_process")',
+        'process.on("SIGTERM", () => {})',
+        'spawn(process.execPath, [process.argv[2], process.argv[3], process.argv[4], String(process.pid)], { stdio: "ignore" })',
+        'setInterval(() => {}, 1000)',
+    ].join("\n"))
+    fs.writeFileSync(descendantPath, [
+        'const fs = require("node:fs")',
+        'process.on("SIGTERM", () => {})',
+        'fs.writeFileSync(process.argv[2], JSON.stringify({ test: Number(process.argv[4]), descendant: process.pid }))',
+        'fs.writeFileSync(process.argv[3], "ready")',
+        'setInterval(() => {}, 1000)',
+    ].join("\n"))
 
+    const clock = createFakeClock()
+    let nestedPids = null
     const state = { activeRun: null, interruptedBy: null }
-    const result = await runCommand({
-        args: [fixturePath, pidPath],
+    const resultPromise = runCommand({
+        args: [runnerPath, testPath, descendantPath, pidPath, readyPath],
         command: "fixture",
         executable: process.execPath,
-        timeoutMs: 200,
-    }, state, { cwd: fixtureRoot, forceKillAfterMs: 100 })
-    grandchildPid = Number(fs.readFileSync(pidPath, "utf8"))
+        timeoutMs: 5000,
+    }, state, {
+        clearTimeout: clock.clearTimeout,
+        currentProcessGroupId: 999999,
+        cwd: fixtureRoot,
+        forceKillAfterMs: 100,
+        readProcessTable() {
+            assert.notEqual(nestedPids, null)
+            return [
+                { pgid: 999999, pid: process.pid, ppid: 1 },
+                { pgid: runnerPid, pid: runnerPid, ppid: process.pid },
+                { pgid: nestedPids.test, pid: nestedPids.test, ppid: runnerPid },
+                {
+                    pgid: nestedPids.test,
+                    pid: nestedPids.descendant,
+                    ppid: nestedPids.test,
+                },
+            ]
+        },
+        setTimeout: clock.setTimeout,
+    })
+    const runnerPid = state.activeRun.processGroupId
+    fixturePids.push(runnerPid)
+    await waitForFile(readyPath)
+    nestedPids = JSON.parse(fs.readFileSync(pidPath, "utf8"))
+    fixturePids.push(nestedPids.test, nestedPids.descendant)
+
+    clock.fire(5000)
+    clock.fire(100)
+    const result = await resultPromise
 
     assert.equal(result.timedOut, true)
-    assert.equal(await waitForProcessExit(grandchildPid), true)
+    for (const pid of fixturePids) {
+        assert.equal(await waitForProcessExit(pid), true, `process ${pid} survived timeout`)
+    }
 })
 
 test("keeps an existing report intact when atomic writing fails", t => {
@@ -488,7 +593,9 @@ test("caps captured output while preserving the final summary and error tail", a
     const summary = "\nSummary: passed=9 failed=1 skipped=2 total=3.00s\n"
     const errorTail = "final diagnostic tail\n"
 
-    child.stdout.write(Buffer.alloc(MAX_OUTPUT_BYTES + 128, "x"))
+    for (let index = 0; index < 1100; index++) {
+        child.stdout.write(Buffer.alloc(1024, "x"))
+    }
     child.stdout.write(summary)
     child.stderr.write(errorTail)
     child.emit("close", 1, null)
