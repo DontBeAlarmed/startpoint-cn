@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from "fs";
 import { getServerTime } from "./utils";
 import { restoreTimeOffset } from "./data/activeAccount";
 import { fixUint32Tags } from "./lib/msgpack-compat";
+import { initializeContentSnapshot } from "./content/runtime/content-snapshot";
 
 import versionCheckPlugin from "./routes/cn/versionCheck";
 import leitingAuthPlugin from "./routes/cn/leitingAuth";
@@ -408,13 +409,16 @@ fastify.setNotFoundHandler((request, reply) => {
 const host = process.env.CN_LISTEN_HOST ?? "127.0.0.1";
 const port = parseInt(process.env.CN_LISTEN_PORT ?? "8001");
 
-fastify.listen({ port, host }, (err, address) => {
-    if (err) {
-        console.error(err);
-        process.exit(1);
-    }
+async function bootstrap(): Promise<void> {
+    await initializeContentSnapshot();
+    await fastify.listen({ port, host });
     console.log(`CN StarPoint listening on http://${host}:${port}`);
 
     // Start multi battle TCP session server
     startSessionServer();
+}
+
+void bootstrap().catch(error => {
+    console.error(error);
+    process.exit(1);
 });

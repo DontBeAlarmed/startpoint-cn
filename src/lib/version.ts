@@ -1,52 +1,17 @@
-/**
- * Unified version control for CN asset update.
- * 
- * CDN_VERSION is auto-detected from diff archive filenames.
- * CN_RES_VERSION in .env is OBSOLETE — version is derived from CDN + enabled patches.
- * 
- * Flow:
- *   1st-time (no resVer): full.version="1.4.0", full.archives=all, target=CDN_VERSION
- *   Update  (resVer<target):  full.version=resVer, full.archives=[], target=max(CDN, patches)
- *   Up-to-date (resVer≥target): same als update but no diffs to download
- */
-import { readFileSync, existsSync, readdirSync, statSync } from "fs";
+/** Backward-compatible version facade over the process-pinned content snapshot. */
+import { readFileSync, existsSync } from "fs";
 import path from "path";
+import { getContentSnapshot } from "../content/runtime/content-snapshot";
 
 // CDN full archives are at version 1.4.0
 export const FULL_BASE = "1.4.0";
 
-// Detect highest version from CDN diff archives + enabled patches
 export function getEffectiveVersion(): string {
-    const cdnVer = detectCDNVersion();
-    // Scan ALL enabled patches for max version (not filtered by depends_on)
-    const manifest = getPatchManifest();
-    let maxPatchVer: string | null = null;
-    for (const p of manifest.patches) {
-        if (!p.enabled || p.type !== "patch") continue;
-        if (!maxPatchVer || compareVersion(p.version, maxPatchVer) > 0) maxPatchVer = p.version;
-    }
-    if (maxPatchVer && compareVersion(maxPatchVer, cdnVer) > 0) return maxPatchVer;
-    return cdnVer;
+    return getContentSnapshot().cdn.targetVersion;
 }
 
-// Detect highest version from CDN diff archive filenames
-let _cdnVersion: string | null = null;
-
 export function detectCDNVersion(): string {
-    if (_cdnVersion) return _cdnVersion;
-    const cdnDir = path.join(__dirname, "..", "..", ".cdn", "cn");
-    let max = "1.4.0";
-    for (const subdir of ["archive-common-diff", "archive-medium-diff", "archive-android-diff"]) {
-        const dir = path.join(cdnDir, subdir);
-        try {
-            for (const f of readdirSync(dir).filter(f => f.endsWith(".zip"))) {
-                const m = f.match(/pinball-\d+\.\d+\.\d+-(\d+\.\d+\.\d+)-\d+-/);
-                if (m && compareVersion(m[1], max) > 0) max = m[1];
-            }
-        } catch (_) { /* ignore */ }
-    }
-    _cdnVersion = max;
-    return max;
+    return getContentSnapshot().cdn.targetVersion;
 }
 
 export function parseVersion(v: string): number[] {
@@ -92,7 +57,8 @@ export function getMaxPatchVersion(resVer?: string): string | null {
 }
 
 export function isFirstTime(resVer?: string): boolean {
-    return !resVer || compareVersion(FULL_BASE, resVer) > 0;
+    const fullBaseVersion = getContentSnapshot().cdn.fullBaseVersion;
+    return !resVer || compareVersion(fullBaseVersion, resVer) > 0;
 }
 
 /**
@@ -105,16 +71,17 @@ export function computeAssetTarget(resVer?: string): {
     isFirstTime: boolean;
     fullVersion: string;
 } {
-    if (isFirstTime(resVer)) {
+    const { targetVersion, fullBaseVersion } = getContentSnapshot().cdn;
+    const firstTime = !resVer || compareVersion(fullBaseVersion, resVer) > 0;
+    if (firstTime) {
         return {
-            targetVersion: getEffectiveVersion(),
+            targetVersion,
             isFirstTime: true,
-            fullVersion: FULL_BASE,
+            fullVersion: fullBaseVersion,
         };
     }
     // Non-first-time: client already has full CDN data
-    const effective = getEffectiveVersion();
-    const target = compareVersion(effective, resVer!) > 0 ? effective : resVer!;
+    const target = compareVersion(targetVersion, resVer!) > 0 ? targetVersion : resVer!;
     return {
         targetVersion: target,
         isFirstTime: false,

@@ -16,8 +16,13 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/content/cdn/digest-cache.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/catalog.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/planner.ts"]), ["quick:cdn"])
+    assert.deepEqual(selectTestGroups(["src/content/cdn/catalog-loader.ts"]), ["integration:cdn"])
+    assert.deepEqual(selectTestGroups(["src/content/runtime/content-snapshot.ts"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/internal/types.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/asset.ts"]), ["full"])
+    assert.deepEqual(selectTestGroups(["src/lib/version.ts"]), ["full"])
+    assert.deepEqual(selectTestGroups(["src/routes/cn/load.ts"]), ["full"])
+    assert.deepEqual(selectTestGroups(["src/cn-server.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["admin/src/App.tsx"]), ["admin"])
 })
 
@@ -92,7 +97,9 @@ test("full contains quick, integration, and admin but excludes generators", () =
         [...AGGREGATE_GROUPS.quick, ...AGGREGATE_GROUPS.integration, "admin"],
     )
     assert.equal(AGGREGATE_GROUPS.full.includes("generator"), false)
-    assert.deepEqual(TEST_GROUPS["integration:cdn"].tests, [])
+    assert.deepEqual(TEST_GROUPS["integration:cdn"].tests, [
+        "tools/cdn_catalog_provider.test.cjs",
+    ])
 })
 
 test("registers the focused CDN path contract", () => {
@@ -109,6 +116,7 @@ test("registers the focused CDN path contract", () => {
     assert.deepEqual(selectTestGroups(["tools/cdn_paths.test.cjs"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_planner.test.cjs"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_types.test.cjs"]), ["quick:cdn"])
+    assert.deepEqual(selectTestGroups(["tools/cdn_catalog_provider.test.cjs"]), ["integration:cdn"])
 })
 
 test("registers every test in exactly one leaf group and full covers runtime regressions", () => {

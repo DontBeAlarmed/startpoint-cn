@@ -11,6 +11,7 @@ import { runPermanentValidators } from "../../lib/validate";
 import { restoreActiveQuestFromStorage } from "../../lib/quest/entry-lifecycle";
 import { ActiveQuest, publishActiveQuest, runAbortActiveQuestTransaction } from "../../lib/quest/active-quest-service";
 import type { StartEntryCost } from "../../lib/quest/start-entry";
+import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
 
 interface CnLoadBody {
@@ -28,9 +29,7 @@ interface CnLoadBody {
 }
 
 function wrapOptionFields(d: any, resVer?: string) {
-    // Report effective server version (CDN + patches) to trigger client update
-    const { getEffectiveVersion } = require("../../lib/version");
-    d.available_asset_version = getEffectiveVersion();
+    d.available_asset_version = getContentSnapshot().cdn.targetVersion;
 
     if (d.user_info) {
         if (typeof d.user_info.last_login_time === 'number') {

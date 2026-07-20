@@ -103,7 +103,9 @@ const TEST_GROUPS = Object.freeze({
     },
     "integration:cdn": {
         execution: "serial",
-        tests: [],
+        tests: [
+            "tools/cdn_catalog_provider.test.cjs",
+        ],
     },
     admin: {
         execution: "parallel",

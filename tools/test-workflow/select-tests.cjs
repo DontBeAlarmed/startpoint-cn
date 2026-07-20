@@ -11,6 +11,11 @@ const SOURCE_RULES = [
         pattern: /^src\/content\/cdn\/(?:catalog-builder|patch-graph|digest-cache|planner)\.ts$/,
         groups: ["quick:cdn"],
     },
+    { pattern: /^src\/content\/cdn\/catalog-loader\.ts$/, groups: ["integration:cdn"] },
+    { pattern: /^src\/content\/runtime\/content-snapshot\.ts$/, groups: ["integration:cdn"] },
+    { pattern: /^src\/lib\/version\.ts$/, groups: ["full"] },
+    { pattern: /^src\/routes\/cn\/load\.ts$/, groups: ["full"] },
+    { pattern: /^src\/cn-server\.ts$/, groups: ["full"] },
     { pattern: /^src\/routes\/cn\/(?:asset|versionCheck)\.ts$/, groups: ["full"] },
     { pattern: /^src\/routes\/web_api\//, groups: ["admin", "integration:database"] },
     {
