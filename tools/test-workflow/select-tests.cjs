@@ -6,7 +6,7 @@ const SOURCE_RULES = [
     { pattern: /^admin\//, groups: ["admin"] },
     { pattern: /^tests\/admin-/, groups: ["admin"] },
     { pattern: /^src\/content\/paths\.ts$/, groups: ["quick:cdn"] },
-    { pattern: /^src\/content\/cdn\//, groups: ["quick:cdn"] },
+    { pattern: /^src\/content\/cdn\/types\.ts$/, groups: ["quick:cdn"] },
     { pattern: /^src\/routes\/cn\/(?:asset|versionCheck)\.ts$/, groups: ["full"] },
     { pattern: /^src\/routes\/web_api\//, groups: ["admin", "integration:database"] },
     {

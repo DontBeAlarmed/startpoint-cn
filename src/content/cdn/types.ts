@@ -1,3 +1,5 @@
+export type ReadonlyNonEmptyArray<T> = readonly [T, ...T[]]
+
 export type CdnPlatform = "android"
 
 export type AssetSizeKind = "shortened" | "fulfill"
@@ -5,24 +7,24 @@ export type AssetSizeKind = "shortened" | "fulfill"
 export type ArchiveLayer = "common" | "quality" | "platform"
 
 export interface CatalogArchive {
-    relativePath: string
-    compressedBytes: number
-    sha256: string
-    layer: ArchiveLayer
-    order: number
+    readonly relativePath: string
+    readonly compressedBytes: number
+    readonly sha256: string
+    readonly layer: ArchiveLayer
+    readonly order: number
 }
 
 export interface CatalogEdge {
-    fromVersion: string | null
-    toVersion: string
-    platform: CdnPlatform
-    assetSizeKind: AssetSizeKind
-    archives: CatalogArchive[]
+    readonly fromVersion: string | null
+    readonly toVersion: string
+    readonly platform: CdnPlatform
+    readonly assetSizeKind: AssetSizeKind
+    readonly archives: ReadonlyArray<CatalogArchive>
 }
 
 export interface CdnCatalog {
-    schemaVersion: 1
-    edges: CatalogEdge[]
+    readonly schemaVersion: 1
+    readonly edges: ReadonlyArray<CatalogEdge>
 }
 
 export type CatalogValidationIssueCode =
@@ -40,23 +42,41 @@ export type CatalogValidationIssueCode =
     | "MISSING_PATH"
 
 export interface CatalogValidationIssue {
-    code: CatalogValidationIssueCode
-    message: string
-    edgeIndex?: number
-    archiveIndex?: number
-    relativePath?: string
+    readonly code: CatalogValidationIssueCode
+    readonly message: string
+    readonly edgeIndex?: number
+    readonly archiveIndex?: number
+    readonly relativePath?: string
 }
 
 export interface PlanRequest {
-    currentVersion: string | null
-    targetVersion: string
-    platform: CdnPlatform
-    assetSizeKind: AssetSizeKind
-    isInitial: boolean
+    readonly currentVersion: string | null
+    readonly targetVersion: string
+    readonly platform: CdnPlatform
+    readonly assetSizeKind: AssetSizeKind
+    readonly isInitial: boolean
 }
 
-export interface UpdatePlan {
-    full: CatalogEdge | null
-    diff: CatalogEdge[] | null
-    downloadBytes: number
+interface UpdatePlanBase {
+    readonly downloadBytes: number
 }
+
+export interface UpToDateUpdatePlan extends UpdatePlanBase {
+    readonly kind: "up-to-date"
+    readonly full: null
+    readonly diff: null
+}
+
+export interface InitialUpdatePlan extends UpdatePlanBase {
+    readonly kind: "initial"
+    readonly full: CatalogEdge
+    readonly diff: ReadonlyNonEmptyArray<CatalogEdge> | null
+}
+
+export interface IncrementalUpdatePlan extends UpdatePlanBase {
+    readonly kind: "incremental"
+    readonly full: null
+    readonly diff: ReadonlyNonEmptyArray<CatalogEdge>
+}
+
+export type UpdatePlan = UpToDateUpdatePlan | InitialUpdatePlan | IncrementalUpdatePlan
