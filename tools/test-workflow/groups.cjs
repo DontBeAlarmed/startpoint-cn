@@ -32,6 +32,12 @@ const TEST_GROUPS = Object.freeze({
             "tools/multi_player_context.test.cjs",
         ],
     },
+    "quick:cdn": {
+        execution: "parallel",
+        tests: [
+            "tools/cdn_paths.test.cjs",
+        ],
+    },
     "integration:compiled": {
         execution: "parallel",
         tests: [

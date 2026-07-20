@@ -9,8 +9,16 @@ const { selectTestGroups } = require("./select-tests.cjs")
 test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/lib/gacha.ts"]), ["quick:gacha"])
     assert.deepEqual(selectTestGroups(["src/lib/gacha-draw.ts"]), ["quick:gacha"])
+    assert.deepEqual(selectTestGroups(["src/content/paths.ts"]), ["quick:cdn"])
+    assert.deepEqual(selectTestGroups(["src/content/cdn/types.ts"]), ["quick:cdn"])
+    assert.deepEqual(selectTestGroups(["src/content/cdn/catalog.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/asset.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["admin/src/App.tsx"]), ["admin"])
+})
+
+test("keeps unknown content files on the full suite", () => {
+    assert.deepEqual(selectTestGroups(["src/content/repository.ts"]), ["full"])
+    assert.deepEqual(selectTestGroups(["src/content/build/manifest.ts"]), ["full"])
 })
 
 test("selects the registered group before applying workflow path rules", () => {
@@ -80,6 +88,14 @@ test("full contains quick, integration, and admin but excludes generators", () =
     )
     assert.equal(AGGREGATE_GROUPS.full.includes("generator"), false)
     assert.deepEqual(TEST_GROUPS["integration:cdn"].tests, [])
+})
+
+test("registers the focused CDN path contract", () => {
+    assert.deepEqual(TEST_GROUPS["quick:cdn"], {
+        execution: "parallel",
+        tests: ["tools/cdn_paths.test.cjs"],
+    })
+    assert.deepEqual(selectTestGroups(["tools/cdn_paths.test.cjs"]), ["quick:cdn"])
 })
 
 test("registers every test in exactly one leaf group and full covers runtime regressions", () => {
