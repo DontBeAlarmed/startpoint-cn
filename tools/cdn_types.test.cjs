@@ -18,6 +18,7 @@ test("keeps catalog data readonly and update plans structurally valid", t => {
 import type {
     CatalogArchive,
     CatalogEdge,
+    CdnCatalogArchiveInput,
     CdnCatalog,
     DiffCatalogEdge,
     FullCatalogEdge,
@@ -46,7 +47,25 @@ const diffEdge: DiffCatalogEdge = {
 }
 const edges: ReadonlyArray<CatalogEdge> = [fullEdge, diffEdge]
 const diffs: ReadonlyNonEmptyArray<DiffCatalogEdge> = [diffEdge]
-const catalog: CdnCatalog = { schemaVersion: 1, edges }
+const catalogInput: CdnCatalogArchiveInput = {
+    kind: "full",
+    fromVersion: null,
+    toVersion: "1.4.0",
+    platform: "android",
+    layer: "common",
+    order: 1,
+    relativePath: "archive-common-full/base.zip",
+    compressedBytes: 100,
+    sha256: "a".repeat(64),
+}
+const catalog: CdnCatalog = {
+    schemaVersion: 1,
+    fullBaseVersion: "1.4.0",
+    targetVersion: "1.4.1",
+    installedBytes: 1000,
+    entityListsRelativePath: "EntityLists/android_medium.csv",
+    edges,
+}
 
 const plans: ReadonlyArray<UpdatePlan> = [
     { kind: "up-to-date", full: null, diff: null, downloadBytes: 0 },
@@ -59,6 +78,8 @@ const plans: ReadonlyArray<UpdatePlan> = [
 catalog.edges.push(fullEdge)
 // @ts-expect-error archive fields are immutable
 archive.order = 1
+// @ts-expect-error scan input fields are immutable
+catalogInput.relativePath = "changed.zip"
 // @ts-expect-error incremental plans require a non-empty diff
 const emptyDiff: UpdatePlan = { kind: "incremental", full: null, diff: [], downloadBytes: 0 }
 // @ts-expect-error initial plans also reject an empty diff
@@ -77,6 +98,7 @@ const invalidFullEdge: FullCatalogEdge = diffEdge
 const invalidDiffEdge: DiffCatalogEdge = fullEdge
 
 void plans
+void catalogInput
 void emptyDiff
 void emptyInitialDiff
 void invalidCurrent

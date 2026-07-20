@@ -35,6 +35,7 @@ const TEST_GROUPS = Object.freeze({
     "quick:cdn": {
         execution: "parallel",
         tests: [
+            "tools/cdn_catalog.test.cjs",
             "tools/cdn_paths.test.cjs",
             "tools/cdn_types.test.cjs",
         ],

@@ -11,6 +11,9 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/lib/gacha-draw.ts"]), ["quick:gacha"])
     assert.deepEqual(selectTestGroups(["src/content/paths.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/types.ts"]), ["quick:cdn"])
+    assert.deepEqual(selectTestGroups(["src/content/cdn/catalog-builder.ts"]), ["quick:cdn"])
+    assert.deepEqual(selectTestGroups(["src/content/cdn/patch-graph.ts"]), ["quick:cdn"])
+    assert.deepEqual(selectTestGroups(["src/content/cdn/digest-cache.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/catalog.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/planner.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/internal/types.ts"]), ["full"])
@@ -96,10 +99,12 @@ test("registers the focused CDN path contract", () => {
     assert.deepEqual(TEST_GROUPS["quick:cdn"], {
         execution: "parallel",
         tests: [
+            "tools/cdn_catalog.test.cjs",
             "tools/cdn_paths.test.cjs",
             "tools/cdn_types.test.cjs",
         ],
     })
+    assert.deepEqual(selectTestGroups(["tools/cdn_catalog.test.cjs"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_paths.test.cjs"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_types.test.cjs"]), ["quick:cdn"])
 })

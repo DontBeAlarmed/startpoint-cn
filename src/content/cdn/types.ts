@@ -33,7 +33,31 @@ export type CatalogEdge = FullCatalogEdge | DiffCatalogEdge
 
 export interface CdnCatalog {
     readonly schemaVersion: 1
+    readonly fullBaseVersion: string
+    readonly targetVersion: string
+    readonly installedBytes: number
+    readonly entityListsRelativePath: string
     readonly edges: ReadonlyArray<CatalogEdge>
+}
+
+export type CatalogArchiveKind = "full" | "diff"
+
+export interface CdnCatalogArchiveInput {
+    readonly kind: CatalogArchiveKind
+    readonly fromVersion: string | null
+    readonly toVersion: string
+    readonly platform: CdnPlatform
+    readonly layer: ArchiveLayer
+    readonly order: number
+    readonly relativePath: string
+    readonly compressedBytes: number
+    readonly sha256: string
+}
+
+export interface CdnCatalogInput {
+    readonly archives: ReadonlyArray<CdnCatalogArchiveInput>
+    readonly installedBytes: number
+    readonly entityListsRelativePath: string
 }
 
 export type CatalogValidationIssueCode =
@@ -43,10 +67,15 @@ export type CatalogValidationIssueCode =
     | "INVALID_COMPRESSED_BYTES"
     | "INVALID_SHA256"
     | "INVALID_ARCHIVE_ORDER"
+    | "INVALID_INSTALLED_BYTES"
     | "DUPLICATE_ARCHIVE_ORDER"
+    | "DUPLICATE_ARCHIVE_PATH"
+    | "CONFLICTING_ARCHIVE_PATH"
     | "DUPLICATE_EDGE"
     | "CONFLICTING_EDGE"
     | "GRAPH_CYCLE"
+    | "GRAPH_FORK"
+    | "MISSING_ARCHIVE_LAYER"
     | "AMBIGUOUS_PATH"
     | "MISSING_PATH"
 
