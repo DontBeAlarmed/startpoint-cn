@@ -7,6 +7,7 @@ const path = require("node:path")
 const test = require("node:test")
 
 const {
+    MAX_PARALLEL_TESTS,
     buildGitCommands,
     classifyTestOutput,
     executeTestGroups,
@@ -14,6 +15,7 @@ const {
     main,
     mergeChangedFiles,
     parseArguments,
+    runParallel,
     summarizeResults,
 } = require("./run.cjs")
 
@@ -96,6 +98,46 @@ test("merges changed file sources with stable sorting and deduplication", () => 
             ["src/new.ts"],
         ]),
         ["admin/src/App.tsx", "src/a.ts", "src/new.ts", "src/z.ts"],
+    )
+})
+
+test("schedules eight safe parallel operations while preserving result order", async () => {
+    let active = 0
+    let maxActive = 0
+    let started = 0
+    let release
+    const gate = new Promise(resolve => { release = resolve })
+    const items = Array.from({ length: 10 }, (_, index) => index)
+
+    const resultPromise = runParallel(items, MAX_PARALLEL_TESTS, async item => {
+        active++
+        started++
+        maxActive = Math.max(maxActive, active)
+        if (started === MAX_PARALLEL_TESTS) release()
+        await gate
+        await new Promise(resolve => setImmediate(resolve))
+        active--
+        return item * 2
+    }, () => false)
+
+    assert.equal(MAX_PARALLEL_TESTS, 8)
+    assert.deepEqual(await resultPromise, items.map(item => item * 2))
+    assert.equal(maxActive, 8)
+})
+
+test("propagates failures from parallel operations", async () => {
+    await assert.rejects(
+        runParallel(
+            Array.from({ length: 9 }, (_, index) => index),
+            MAX_PARALLEL_TESTS,
+            async item => {
+                await Promise.resolve()
+                if (item === 3) throw new Error("parallel fixture failed")
+                return item
+            },
+            () => false,
+        ),
+        /parallel fixture failed/,
     )
 })
 

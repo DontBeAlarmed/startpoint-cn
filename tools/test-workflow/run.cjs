@@ -8,6 +8,7 @@ const { selectTestGroups } = require("./select-tests.cjs")
 
 const projectRoot = path.resolve(__dirname, "../..")
 const signalExitCodes = { SIGINT: 130, SIGTERM: 143 }
+const MAX_PARALLEL_TESTS = 8
 
 function parseArguments(argv) {
     let mode = null
@@ -351,7 +352,12 @@ async function executeTestGroups(groupNames, options = {}) {
     }
 
     const runItem = item => runTestFile({ ...item, cwd, activeChildren })
-    const parallelResults = (await runParallel(parallelItems, 4, runItem, shouldStop))
+    const parallelResults = (await runParallel(
+        parallelItems,
+        MAX_PARALLEL_TESTS,
+        runItem,
+        shouldStop,
+    ))
         .filter(Boolean)
     const serialResults = []
     for (const item of serialItems) {
@@ -489,6 +495,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+    MAX_PARALLEL_TESTS,
     buildGitCommands,
     classifyTestOutput,
     executeTestGroups,
@@ -499,5 +506,6 @@ module.exports = {
     main,
     mergeChangedFiles,
     parseArguments,
+    runParallel,
     summarizeResults,
 }
