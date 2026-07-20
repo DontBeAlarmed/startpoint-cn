@@ -319,7 +319,12 @@ function forceKillCapturedPosixProcesses(activeRun, options = {}) {
 function taskkillProcessTree(activeRun, options = {}) {
     const spawnSyncImpl = options.spawnSync ?? spawnSync
     const args = ["/PID", String(activeRun.processGroupId), "/T", "/F"]
-    const result = spawnSyncImpl("taskkill", args, { encoding: "utf8", windowsHide: true })
+    const result = spawnSyncImpl("taskkill", args, {
+        encoding: "utf8",
+        maxBuffer: 2 * 1024 * 1024,
+        timeout: 5000,
+        windowsHide: true,
+    })
     if (result.error) throw result.error
     if (result.status !== 0) {
         throw new Error(result.stderr?.trim() || `taskkill exited with status ${result.status}`)
@@ -352,8 +357,11 @@ function recordLifecycleError(activeRun, context, error) {
 function safelySignalProcessTree(activeRun, signal, options = {}) {
     try {
         signalProcessTree(activeRun, signal, options)
+        return true
     } catch (error) {
         recordLifecycleError(activeRun, `failed to signal process tree with ${signal}`, error)
+        activeRun.handleCleanupFailure?.()
+        return false
     }
 }
 
@@ -409,12 +417,75 @@ function runCommand(command, state, options = {}) {
             processGroupId: child.pid ?? null,
             terminationTargets: null,
             timeoutTimer: null,
+            windowsFallbackTimer: null,
         }
         state.activeRun = activeRun
 
         let timedOut = false
         let spawnError = null
+        let finalizing = false
         let resolved = false
+
+        async function finalize(exitCode, signal) {
+            if (finalizing || resolved) return
+            finalizing = true
+            if (activeRun.timeoutTimer !== null) {
+                clearTimeoutImpl(activeRun.timeoutTimer)
+                activeRun.timeoutTimer = null
+            }
+            if (activeRun.windowsFallbackTimer !== null) {
+                clearTimeoutImpl(activeRun.windowsFallbackTimer)
+                activeRun.windowsFallbackTimer = null
+            }
+            if (activeRun.cleanupPromise) await activeRun.cleanupPromise
+            if (activeRun.cleanupErrors.length > 0) {
+                outputBuffer.append(`${activeRun.cleanupErrors.join("\n")}\n`)
+            }
+            if (state.activeRun === activeRun) state.activeRun = null
+
+            const durationMs = now() - startedAt
+            const output = outputBuffer.toString()
+            const summary = parseRunnerSummary(output) ?? { failed: 0, passed: 0, skipped: 0 }
+            const result = {
+                cleanupError: activeRun.cleanupErrors.length > 0,
+                durationMs,
+                failed: summary.failed,
+                output,
+                outputTruncated: outputBuffer.outputTruncated,
+                passed: summary.passed,
+                rawExitCode: exitCode,
+                signal,
+                skipped: summary.skipped,
+                spawnError: spawnError?.message ?? null,
+                timedOut,
+            }
+            resolved = true
+            resolve(result)
+        }
+
+        activeRun.handleCleanupFailure = () => {
+            if (platform !== "win32" || finalizing || resolved) return
+            if (activeRun.windowsFallbackTimer !== null) return
+            try {
+                const killed = child.kill("SIGKILL")
+                if (killed === false) {
+                    recordLifecycleError(activeRun, "failed to force-kill root process", new Error("child.kill returned false"))
+                }
+            } catch (error) {
+                recordLifecycleError(activeRun, "failed to force-kill root process", error)
+            }
+
+            const fallbackAfterMs = options.windowsFallbackAfterMs ?? 1000
+            try {
+                activeRun.windowsFallbackTimer = setTimeoutImpl(() => {
+                    activeRun.windowsFallbackTimer = null
+                    void finalize(null, null)
+                }, fallbackAfterMs)
+            } catch (error) {
+                recordLifecycleError(activeRun, "failed to schedule Windows cleanup fallback", error)
+                void finalize(null, null)
+            }
+        }
 
         activeRun.timeoutTimer = setTimeoutImpl(() => {
             timedOut = true
@@ -431,38 +502,19 @@ function runCommand(command, state, options = {}) {
             spawnError = error
             outputBuffer.append(`${error.stack || error.message}\n`)
         })
-        child.on("close", async (exitCode, signal) => {
-            if (resolved) return
-            resolved = true
-            clearTimeoutImpl(activeRun.timeoutTimer)
-            activeRun.timeoutTimer = null
-            if (activeRun.cleanupPromise) await activeRun.cleanupPromise
-            if (activeRun.cleanupErrors.length > 0) {
-                outputBuffer.append(`${activeRun.cleanupErrors.join("\n")}\n`)
-            }
-            if (state.activeRun === activeRun) state.activeRun = null
-
-            const durationMs = now() - startedAt
-            const output = outputBuffer.toString()
-            const summary = parseRunnerSummary(output) ?? { failed: 0, passed: 0, skipped: 0 }
-            resolve({
-                durationMs,
-                failed: summary.failed,
-                output,
-                outputTruncated: outputBuffer.outputTruncated,
-                passed: summary.passed,
-                rawExitCode: exitCode,
-                signal,
-                skipped: summary.skipped,
-                spawnError: spawnError?.message ?? null,
-                timedOut,
-            })
+        child.on("close", (exitCode, signal) => {
+            void finalize(exitCode, signal)
         })
     })
 }
 
 function rawExitCodeForEvaluation(run) {
-    return run.rawExitCode === 0 && !run.timedOut && run.spawnError === null ? 0 : 1
+    return run.rawExitCode === 0
+        && !run.timedOut
+        && run.spawnError === null
+        && run.cleanupError !== true
+        ? 0
+        : 1
 }
 
 function roundMilliseconds(value) {
@@ -481,6 +533,7 @@ function latestCounts(runs) {
 
 function compactRun(run) {
     return {
+        cleanupError: run.cleanupError ?? false,
         durationMs: roundMilliseconds(run.durationMs),
         failed: run.failed,
         outputTruncated: run.outputTruncated ?? false,
@@ -605,6 +658,7 @@ function installSignalHandlers(state, options = {}) {
                 signalTree(activeRun, "SIGTERM")
             } catch (error) {
                 recordLifecycleError(activeRun, `failed to signal process tree with ${signal}`, error)
+                activeRun.handleCleanupFailure?.()
             }
             if (platform !== "win32") {
                 try {

@@ -494,14 +494,83 @@ test("Windows timeout completes one forced taskkill before resolving", async () 
     assert.deepEqual(taskkillCalls, [{
         args: ["/PID", "77", "/T", "/F"],
         command: "taskkill",
-        options: { encoding: "utf8", windowsHide: true },
+        options: {
+            encoding: "utf8",
+            maxBuffer: 2 * 1024 * 1024,
+            timeout: 5000,
+            windowsHide: true,
+        },
     }])
 })
 
-test("Windows taskkill failures are recorded and fail the command", async () => {
+test("Windows taskkill timeouts fall back to root kill and resolve without close", async () => {
     const child = createFakeChild(88)
     const clock = createFakeClock()
-    const taskkillCalls = []
+    const killCalls = []
+    child.kill = signal => {
+        killCalls.push(signal)
+        return true
+    }
+    const state = { activeRun: null, interruptedBy: null }
+    let nowCalls = 0
+    const resultPromise = runCommand({
+        args: [],
+        command: "windows-timeout",
+        executable: "windows-timeout",
+        timeoutMs: 10,
+    }, state, {
+        clearTimeout: clock.clearTimeout,
+        now: () => nowCalls++,
+        platform: "win32",
+        spawnSync() {
+            return {
+                error: Object.assign(new Error("taskkill timed out"), { code: "ETIMEDOUT" }),
+                status: null,
+                stderr: "",
+            }
+        },
+        setTimeout: clock.setTimeout,
+        spawn: () => child,
+    })
+    let resolutions = 0
+    resultPromise.then(() => { resolutions++ })
+
+    clock.fire(10)
+    assert.deepEqual(killCalls, ["SIGKILL"])
+    assert.equal(clock.pendingCount(), 1)
+    clock.fire(1000)
+    const result = await resultPromise
+    const report = buildCommandReport(
+        { command: "windows-timeout", name: "windows-timeout", thresholdMs: 100 },
+        createRun(1),
+        [result, createRun(1), createRun(1)],
+    )
+
+    assert.equal(result.cleanupError, true)
+    assert.equal(result.rawExitCode, null)
+    assert.equal(result.timedOut, true)
+    assert.match(result.output, /failed to signal process tree with SIGTERM: taskkill timed out/)
+    assert.equal(report.commandSucceeded, false)
+    assert.equal(report.exitCode, 1)
+    assert.equal(clock.pendingCount(), 0)
+
+    const completedResult = { ...result }
+    const completedNowCalls = nowCalls
+    child.emit("close", 0, null)
+    await Promise.resolve()
+    assert.equal(resolutions, 1)
+    assert.equal(nowCalls, completedNowCalls)
+    assert.deepEqual(result, completedResult)
+})
+
+test("Windows taskkill non-zero status has a bounded fallback without child close", async () => {
+    const child = createFakeChild(89)
+    const clock = createFakeClock()
+    const killCalls = []
+    child.kill = signal => {
+        killCalls.push(signal)
+        return true
+    }
     const state = { activeRun: null, interruptedBy: null }
     const resultPromise = runCommand({
         args: [],
@@ -512,8 +581,7 @@ test("Windows taskkill failures are recorded and fail the command", async () => 
         clearTimeout: clock.clearTimeout,
         now: () => 0,
         platform: "win32",
-        spawnSync(command, args) {
-            taskkillCalls.push([command, args])
+        spawnSync() {
             return { status: 1, stderr: "access denied" }
         },
         setTimeout: clock.setTimeout,
@@ -521,18 +589,15 @@ test("Windows taskkill failures are recorded and fail the command", async () => 
     })
 
     clock.fire(10)
-    child.emit("close", 0, null)
+    assert.deepEqual(killCalls, ["SIGKILL"])
+    clock.fire(1000)
     const result = await resultPromise
-    const report = buildCommandReport(
-        { command: "windows-failure", name: "windows-failure", thresholdMs: 100 },
-        createRun(1),
-        [result, createRun(1), createRun(1)],
-    )
 
-    assert.deepEqual(taskkillCalls, [["taskkill", ["/PID", "88", "/T", "/F"]]])
+    assert.equal(result.cleanupError, true)
+    assert.equal(result.rawExitCode, null)
     assert.match(result.output, /failed to signal process tree with SIGTERM: access denied/)
-    assert.equal(report.commandSucceeded, false)
-    assert.equal(report.exitCode, 1)
+    assert.equal(state.activeRun, null)
+    assert.equal(clock.pendingCount(), 0)
 })
 
 test("Windows signal handlers force the tree once without scheduling cleanup", async () => {
