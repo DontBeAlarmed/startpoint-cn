@@ -1,10 +1,6 @@
 const assert = require("node:assert/strict")
-const fs = require("node:fs")
-const path = require("node:path")
 
 require("ts-node/register/transpile-only")
-
-const ROOT = path.resolve(__dirname, "..")
 
 const {
     buildScoreAttackMainCharacterIds,
@@ -251,12 +247,5 @@ assert.equal(calculateClearRank(999, {
     sRankTime: 600,
     sPlusRankTime: 400,
 }), 2)
-
-const finishSource = fs.readFileSync(
-    path.join(ROOT, "src/routes/api/singleBattleQuest.ts"),
-    "utf8",
-)
-assert.match(finishSource, /"score_attack_event"\s*:\s*scoreAttackEventData/)
-assert.match(finishSource, /handleScoreAttackEventFinish\s*\(/)
 
 console.log("score attack event tests passed")

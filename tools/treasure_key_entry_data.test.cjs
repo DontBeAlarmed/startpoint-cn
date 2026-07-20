@@ -76,4 +76,27 @@ for (const questId of adventTicketQuestIds) {
     )
 }
 
+const routeSource = fs.readFileSync(
+    path.join(projectRoot, "src/routes/api/singleBattleQuest.ts"),
+    "utf8",
+)
+const activeQuestServiceSource = fs.readFileSync(
+    path.join(projectRoot, "src/lib/quest/active-quest-service.ts"),
+    "utf8",
+)
+const insertActiveQuestSource = activeQuestServiceSource.slice(
+    activeQuestServiceSource.indexOf("export function insertActiveQuest"),
+    activeQuestServiceSource.indexOf("export function runAbortActiveQuestTransaction"),
+)
+assert.ok(
+    insertActiveQuestSource.indexOf("persistActiveQuest")
+        < insertActiveQuestSource.indexOf("publishActiveQuest"),
+    "insertActiveQuest must persist to DB before publishing to memory",
+)
+assert.match(
+    routeSource,
+    /["']item_list["']\s*:\s*buildStartEntryItemList\(startResult\)/,
+    "quest start response must include the post-deduction item_list",
+)
+
 console.log("treasure key entry data tests passed")

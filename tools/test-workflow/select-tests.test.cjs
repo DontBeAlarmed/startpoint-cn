@@ -130,6 +130,30 @@ test("registers every test in exactly one leaf group and full covers runtime reg
     }
 })
 
+test("keeps external data and source inspection out of self-contained runtime tests", () => {
+    const runtimeTests = [
+        "tools/score_attack_event.test.cjs",
+        "tools/treasure_key_entry.test.cjs",
+    ]
+    const forbiddenMarkers = [
+        "node:fs",
+        "node:path",
+        "readFileSync",
+        "orderedmap",
+        "fieldMap",
+        "converterSource",
+        ["wf-assets", "-cn"].join(""),
+        ["git", "CommonDirectory"].join(""),
+    ]
+
+    for (const file of runtimeTests) {
+        const source = fs.readFileSync(file, "utf8")
+        for (const marker of forbiddenMarkers) {
+            assert.equal(source.includes(marker), false, `${file}: ${marker}`)
+        }
+    }
+})
+
 test("keeps quick and safe compiled tests parallel while stateful groups stay serial", () => {
     for (const group of AGGREGATE_GROUPS.quick) {
         assert.equal(TEST_GROUPS[group].execution, "parallel")

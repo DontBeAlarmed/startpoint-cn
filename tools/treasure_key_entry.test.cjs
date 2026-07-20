@@ -1,10 +1,6 @@
 const assert = require("node:assert/strict")
-const fs = require("node:fs")
-const path = require("node:path")
 
 require("ts-node/register/transpile-only")
-
-const projectRoot = path.resolve(__dirname, "..")
 
 const {
     InsufficientEntryItemError,
@@ -221,28 +217,5 @@ function createInput() {
 
 assert.deepEqual(buildStartEntryItemList({ entryItemId: 500000, entryItemCount: 0 }), { 500000: 0 })
 assert.deepEqual(buildStartEntryItemList({ entryItemId: null, entryItemCount: null }), {})
-
-const routeSource = fs.readFileSync(
-    path.join(projectRoot, "src/routes/api/singleBattleQuest.ts"),
-    "utf8",
-)
-const activeQuestServiceSource = fs.readFileSync(
-    path.join(projectRoot, "src/lib/quest/active-quest-service.ts"),
-    "utf8",
-)
-const insertActiveQuestSource = activeQuestServiceSource.slice(
-    activeQuestServiceSource.indexOf("export function insertActiveQuest"),
-    activeQuestServiceSource.indexOf("export function runAbortActiveQuestTransaction"),
-)
-assert.ok(
-    insertActiveQuestSource.indexOf("persistActiveQuest")
-        < insertActiveQuestSource.indexOf("publishActiveQuest"),
-    "insertActiveQuest must persist to DB before publishing to memory",
-)
-assert.match(
-    routeSource,
-    /["']item_list["']\s*:\s*buildStartEntryItemList\(startResult\)/,
-    "quest start response must include the post-deduction item_list",
-)
 
 console.log("treasure key entry tests passed")
