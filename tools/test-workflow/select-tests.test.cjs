@@ -100,6 +100,20 @@ test("registers every test in exactly one leaf group and full covers runtime reg
         .flatMap(group => TEST_GROUPS[group].tests)
         .sort()
     assert.deepEqual(fullTests, runtimeTests)
+
+    const externalDataMarkers = [
+        ["wf-assets", "-cn"].join(""),
+        ["--git-common", "-dir"].join(""),
+        ["direct", "WorkspaceRoot"].join(""),
+        ["world", "FlipperRoot"].join(""),
+        ["RAW", "_ROOT"].join(""),
+    ]
+    for (const file of fullTests) {
+        const source = fs.readFileSync(file, "utf8")
+        for (const marker of externalDataMarkers) {
+            assert.equal(source.includes(marker), false, `${file}: ${marker}`)
+        }
+    }
 })
 
 test("keeps quick and safe compiled tests parallel while stateful groups stay serial", () => {
@@ -138,6 +152,8 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/box_gacha_reset.test.cjs",
         "tools/gacha_odds_export.test.cjs",
         "tools/rebuild_gacha_from_odds.test.cjs",
+        "tools/score_attack_event_data.test.cjs",
         "tools/star_grain_material_pack.test.cjs",
+        "tools/treasure_key_entry_data.test.cjs",
     ])
 })

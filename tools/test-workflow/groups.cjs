@@ -82,7 +82,9 @@ const TEST_GROUPS = Object.freeze({
             "tools/box_gacha_reset.test.cjs",
             "tools/gacha_odds_export.test.cjs",
             "tools/rebuild_gacha_from_odds.test.cjs",
+            "tools/score_attack_event_data.test.cjs",
             "tools/star_grain_material_pack.test.cjs",
+            "tools/treasure_key_entry_data.test.cjs",
         ],
     },
 })
