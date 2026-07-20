@@ -8,8 +8,12 @@ const SOURCE_RULES = [
     { pattern: /^src\/routes\/cn\/(?:asset|versionCheck)\.ts$/, groups: ["full"] },
     { pattern: /^src\/routes\/web_api\//, groups: ["admin"] },
     {
-        pattern: /^src\/lib\/(?:gacha|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-ticket)\.ts$/,
+        pattern: /^src\/lib\/(?:gacha|gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-ticket)\.ts$/,
         groups: ["quick:gacha"],
+    },
+    {
+        pattern: /^src\/routes\/api\/singleBattleQuest\.ts$/,
+        groups: ["integration:compiled"],
     },
     {
         pattern: /^src\/lib\/quest\/host-finish-persistence\.ts$/,

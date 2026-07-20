@@ -41,3 +41,18 @@ node tools/test-workflow/benchmark.cjs --report-only --output /tmp/starpoint-cn-
 | `typecheck` | 29.854 / 22.399 / 20.592 | 22.399 | 30 | 达标 | 0 / 0 / 0 |
 
 当前整体**未达设计指标**，不得据此宣称阶段 0 性能验收通过。最慢中位数是 `test:full` 的 41.073 秒，但它仍在 60 秒阈值内；按相对阈值看，`test:quick` 超出最多。`test:changed` 修正后直接调用 runner，三次原始退出码均为 0，4 个相关测试文件全部通过，中位数 4.270 秒，已在 20 秒阈值内。现有未达项仍是 `test:quick` 和 `test:integration`，未通过放宽阈值或改写结果掩盖。
+
+## 第二轮分层优化实测
+
+- 测量日期：2026-07-20
+- 测量时 HEAD：`4395dd97e5aa66db0b325097103e880c3e7f5396`（包含本任务尚未提交的分组工作树改动）
+- 默认 Node.js：`v22.23.1`
+
+| 命令 | 三次正式耗时（秒） | 中位数（秒） | 阈值（秒） | 当前状态 | 通过/失败/跳过 |
+|---|---:|---:|---:|---|---:|
+| `test:quick` | 2.744 / 2.845 / 3.697 | 2.845 | 5 | 达标 | 13 / 0 / 0 |
+| `test:integration` | 29.836 / 27.729 / 28.186 | 28.186 | 30 | 达标 | 18 / 0 / 1 |
+
+`quest_abort_route.test.cjs` 会加载并转译完整路由依赖，不再计入 quick，而是归入 `integration:compiled`。逐项审查该组后确认：纯函数测试不访问数据库；`character_awake_refresh.test.cjs` 和 `mission_completion.test.cjs` 在加载数据库模块前分别创建唯一的临时数据库目录；`quest_abort_route.test.cjs` 预先替换数据库模块并通过 Fastify `inject()` 测试，不绑定真实端口。该组因此改为最多 4 路并行。需要真实数据库语义的 `integration:database` 与预留的 `integration:cdn` 继续串行，所有 quick 组继续并行。
+
+changed 选择器将 `src/lib/gacha-draw.ts` 精确映射到 `quick:gacha`；`src/routes/api/singleBattleQuest.ts` 同时选择 `integration:compiled` 和 `integration:database`，未知文件仍升级为 `full`。单次完整回归为 36 通过、0 失败、1 跳过，总耗时 29.42 秒。分层单次回归前后，真实 `.database`、`assets/confirmed_seeds.json` 和 `out/` 的内容摘要均未变化。

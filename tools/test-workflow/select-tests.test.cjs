@@ -6,6 +6,7 @@ const { selectTestGroups } = require("./select-tests.cjs")
 
 test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/lib/gacha.ts"]), ["quick:gacha"])
+    assert.deepEqual(selectTestGroups(["src/lib/gacha-draw.ts"]), ["quick:gacha"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/asset.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["admin/src/App.tsx"]), ["admin"])
 })
@@ -29,6 +30,10 @@ test("accumulates every directly related source group", () => {
     assert.deepEqual(
         selectTestGroups(["src/routes/web_api/server.ts"]),
         ["admin", "integration:database"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/routes/api/singleBattleQuest.ts"]),
+        ["integration:compiled", "integration:database"],
     )
 })
 
@@ -61,6 +66,15 @@ test("full contains quick, integration, and admin but excludes generators", () =
     assert.deepEqual(TEST_GROUPS["integration:cdn"].tests, [])
 })
 
+test("keeps quick and safe compiled tests parallel while stateful groups stay serial", () => {
+    for (const group of AGGREGATE_GROUPS.quick) {
+        assert.equal(TEST_GROUPS[group].execution, "parallel")
+    }
+    assert.equal(TEST_GROUPS["integration:compiled"].execution, "parallel")
+    assert.equal(TEST_GROUPS["integration:database"].execution, "serial")
+    assert.equal(TEST_GROUPS["integration:cdn"].execution, "serial")
+})
+
 test("quick workflow includes the package scripts contract", () => {
     assert.deepEqual(TEST_GROUPS["quick:workflow"].tests, [
         "tools/test-workflow/benchmark.test.cjs",
@@ -72,6 +86,7 @@ test("quick workflow includes the package scripts contract", () => {
 })
 
 test("keeps compiled-output and external-data tests out of quick", () => {
+    assert.equal(TEST_GROUPS["quick:quest"].tests.includes("tools/quest_abort_route.test.cjs"), false)
     assert.deepEqual(TEST_GROUPS["integration:compiled"].tests, [
         "tools/character_awake_refresh.test.cjs",
         "tools/character_stack.test.cjs",
@@ -79,6 +94,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/event_currency.test.cjs",
         "tools/inventory_rules.test.cjs",
         "tools/mission_completion.test.cjs",
+        "tools/quest_abort_route.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS.generator.tests, [
         "tools/box_gacha_reset.test.cjs",

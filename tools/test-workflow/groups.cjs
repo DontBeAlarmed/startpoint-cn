@@ -22,7 +22,6 @@ const TEST_GROUPS = Object.freeze({
         execution: "parallel",
         tests: [
             "tools/active_quest_service_import.test.cjs",
-            "tools/quest_abort_route.test.cjs",
             "tools/special_quest_flow.test.cjs",
         ],
     },
@@ -34,7 +33,7 @@ const TEST_GROUPS = Object.freeze({
         ],
     },
     "integration:compiled": {
-        execution: "serial",
+        execution: "parallel",
         tests: [
             "tools/character_awake_refresh.test.cjs",
             "tools/character_stack.test.cjs",
@@ -42,6 +41,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/event_currency.test.cjs",
             "tools/inventory_rules.test.cjs",
             "tools/mission_completion.test.cjs",
+            "tools/quest_abort_route.test.cjs",
         ],
     },
     "integration:database": {
