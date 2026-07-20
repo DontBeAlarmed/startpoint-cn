@@ -123,8 +123,8 @@ test("runs every default benchmark command directly with Node", () => {
             name: "test:quick",
         },
         {
-            args: ["tools/test-workflow/run.cjs", "--files", "src/lib/gacha.ts"],
-            command: "node tools/test-workflow/run.cjs --files src/lib/gacha.ts",
+            args: ["tools/test-workflow/run.cjs", "--files", "src/routes/api/singleBattleQuest.ts"],
+            command: "node tools/test-workflow/run.cjs --files src/routes/api/singleBattleQuest.ts",
             executable: process.execPath,
             name: "test:changed",
         },

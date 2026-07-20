@@ -23,11 +23,11 @@ test("selects the registered group before applying workflow path rules", () => {
 test("accumulates every directly related source group", () => {
     assert.deepEqual(
         selectTestGroups(["src/lib/quest/host-finish-persistence.ts"]),
-        ["integration:database", "quick:quest"],
+        ["integration:quest", "quick:quest"],
     )
     assert.deepEqual(
         selectTestGroups(["src/lib/mission/awake-unlock.ts"]),
-        ["integration:compiled", "integration:database"],
+        ["integration:mission", "integration:mission-compiled"],
     )
     assert.deepEqual(
         selectTestGroups(["src/routes/web_api/server.ts"]),
@@ -35,8 +35,22 @@ test("accumulates every directly related source group", () => {
     )
     assert.deepEqual(
         selectTestGroups(["src/routes/api/singleBattleQuest.ts"]),
-        ["integration:compiled", "integration:database", "quick:quest"],
+        ["integration:compiled", "integration:quest", "quick:quest"],
     )
+})
+
+test("selects only the direct single battle route regressions", () => {
+    const groups = selectTestGroups(["src/routes/api/singleBattleQuest.ts"])
+    assert.deepEqual(groups, ["integration:compiled", "integration:quest", "quick:quest"])
+    assert.deepEqual(groups.flatMap(group => TEST_GROUPS[group].tests), [
+        "tools/quest_abort_route.test.cjs",
+        "tools/score_attack_event.test.cjs",
+        "tools/treasure_key_entry.test.cjs",
+        "tools/quest_entry_lifecycle.test.cjs",
+        "tools/quest_host_finish.test.cjs",
+        "tools/active_quest_service_import.test.cjs",
+        "tools/special_quest_flow.test.cjs",
+    ])
 })
 
 test("upgrades package and unknown source changes to full", () => {
@@ -55,7 +69,7 @@ test("deduplicates and stably sorts selected groups", () => {
             "src/lib/quest/host-finish-persistence.ts",
             "src/lib/gacha.ts",
         ]),
-        ["admin", "integration:database", "quick:gacha", "quick:quest"],
+        ["admin", "integration:quest", "quick:gacha", "quick:quest"],
     )
 })
 
@@ -121,8 +135,38 @@ test("keeps quick and safe compiled tests parallel while stateful groups stay se
         assert.equal(TEST_GROUPS[group].execution, "parallel")
     }
     assert.equal(TEST_GROUPS["integration:compiled"].execution, "parallel")
+    assert.equal(TEST_GROUPS["integration:mission-compiled"].execution, "parallel")
+    assert.equal(TEST_GROUPS["integration:rules"].execution, "parallel")
     assert.equal(TEST_GROUPS["integration:database"].execution, "serial")
+    assert.equal(TEST_GROUPS["integration:event"].execution, "serial")
+    assert.equal(TEST_GROUPS["integration:mission"].execution, "serial")
+    assert.equal(TEST_GROUPS["integration:party"].execution, "serial")
+    assert.equal(TEST_GROUPS["integration:quest"].execution, "serial")
     assert.equal(TEST_GROUPS["integration:cdn"].execution, "serial")
+})
+
+test("splits stateful integration tests into focused serial domains", () => {
+    assert.deepEqual(TEST_GROUPS["integration:database"].tests, [
+        "tools/test-workflow/database-isolation.test.cjs",
+    ])
+    assert.deepEqual(TEST_GROUPS["integration:event"].tests, [
+        "tools/carnival_rewards.test.cjs",
+        "tools/rush_event_shop.test.cjs",
+        "tools/rush_event_shop_route.test.cjs",
+        "tools/score_attack_route_transaction.test.cjs",
+    ])
+    assert.deepEqual(TEST_GROUPS["integration:mission"].tests, [
+        "tools/character_awake_settlement.test.cjs",
+        "tools/character_awake_unlock.test.cjs",
+        "tools/mission_storage.test.cjs",
+    ])
+    assert.deepEqual(TEST_GROUPS["integration:quest"].tests, [
+        "tools/quest_entry_lifecycle.test.cjs",
+        "tools/quest_host_finish.test.cjs",
+    ])
+    assert.deepEqual(TEST_GROUPS["integration:party"].tests, [
+        "tools/special_quest_party.test.cjs",
+    ])
 })
 
 test("quick workflow includes the package scripts contract", () => {
@@ -138,15 +182,19 @@ test("quick workflow includes the package scripts contract", () => {
 test("keeps compiled-output and external-data tests out of quick", () => {
     assert.equal(TEST_GROUPS["quick:quest"].tests.includes("tools/quest_abort_route.test.cjs"), false)
     assert.deepEqual(TEST_GROUPS["integration:compiled"].tests, [
+        "tools/quest_abort_route.test.cjs",
+        "tools/score_attack_event.test.cjs",
+        "tools/treasure_key_entry.test.cjs",
+    ])
+    assert.deepEqual(TEST_GROUPS["integration:mission-compiled"].tests, [
         "tools/character_awake_refresh.test.cjs",
+        "tools/mission_completion.test.cjs",
+    ])
+    assert.deepEqual(TEST_GROUPS["integration:rules"].tests, [
         "tools/character_stack.test.cjs",
         "tools/equipment_enhancement.test.cjs",
         "tools/event_currency.test.cjs",
         "tools/inventory_rules.test.cjs",
-        "tools/mission_completion.test.cjs",
-        "tools/quest_abort_route.test.cjs",
-        "tools/score_attack_event.test.cjs",
-        "tools/treasure_key_entry.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS.generator.tests, [
         "tools/box_gacha_reset.test.cjs",

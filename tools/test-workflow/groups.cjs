@@ -35,30 +35,60 @@ const TEST_GROUPS = Object.freeze({
     "integration:compiled": {
         execution: "parallel",
         tests: [
+            "tools/quest_abort_route.test.cjs",
+            "tools/score_attack_event.test.cjs",
+            "tools/treasure_key_entry.test.cjs",
+        ],
+    },
+    "integration:mission-compiled": {
+        execution: "parallel",
+        tests: [
             "tools/character_awake_refresh.test.cjs",
+            "tools/mission_completion.test.cjs",
+        ],
+    },
+    "integration:rules": {
+        execution: "parallel",
+        tests: [
             "tools/character_stack.test.cjs",
             "tools/equipment_enhancement.test.cjs",
             "tools/event_currency.test.cjs",
             "tools/inventory_rules.test.cjs",
-            "tools/mission_completion.test.cjs",
-            "tools/quest_abort_route.test.cjs",
-            "tools/score_attack_event.test.cjs",
-            "tools/treasure_key_entry.test.cjs",
         ],
     },
     "integration:database": {
         execution: "serial",
         tests: [
             "tools/test-workflow/database-isolation.test.cjs",
+        ],
+    },
+    "integration:event": {
+        execution: "serial",
+        tests: [
             "tools/carnival_rewards.test.cjs",
-            "tools/character_awake_settlement.test.cjs",
-            "tools/character_awake_unlock.test.cjs",
-            "tools/mission_storage.test.cjs",
-            "tools/quest_entry_lifecycle.test.cjs",
-            "tools/quest_host_finish.test.cjs",
             "tools/rush_event_shop.test.cjs",
             "tools/rush_event_shop_route.test.cjs",
             "tools/score_attack_route_transaction.test.cjs",
+        ],
+    },
+    "integration:mission": {
+        execution: "serial",
+        tests: [
+            "tools/character_awake_settlement.test.cjs",
+            "tools/character_awake_unlock.test.cjs",
+            "tools/mission_storage.test.cjs",
+        ],
+    },
+    "integration:quest": {
+        execution: "serial",
+        tests: [
+            "tools/quest_entry_lifecycle.test.cjs",
+            "tools/quest_host_finish.test.cjs",
+        ],
+    },
+    "integration:party": {
+        execution: "serial",
+        tests: [
             "tools/special_quest_party.test.cjs",
         ],
     },

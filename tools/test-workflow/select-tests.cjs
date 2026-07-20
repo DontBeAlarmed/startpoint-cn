@@ -6,26 +6,26 @@ const SOURCE_RULES = [
     { pattern: /^admin\//, groups: ["admin"] },
     { pattern: /^tests\/admin-/, groups: ["admin"] },
     { pattern: /^src\/routes\/cn\/(?:asset|versionCheck)\.ts$/, groups: ["full"] },
-    { pattern: /^src\/routes\/web_api\//, groups: ["admin"] },
+    { pattern: /^src\/routes\/web_api\//, groups: ["admin", "integration:database"] },
     {
         pattern: /^src\/lib\/(?:gacha|gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-ticket)\.ts$/,
         groups: ["quick:gacha"],
     },
     {
         pattern: /^src\/routes\/api\/singleBattleQuest\.ts$/,
-        groups: ["integration:compiled", "quick:quest"],
+        groups: ["integration:compiled", "integration:quest", "quick:quest"],
     },
     {
         pattern: /^src\/lib\/quest\/host-finish-persistence\.ts$/,
-        groups: ["integration:database", "quick:quest"],
+        groups: ["integration:quest", "quick:quest"],
     },
     {
         pattern: /^src\/lib\/mission\/awake-unlock\.ts$/,
-        groups: ["integration:compiled", "integration:database"],
+        groups: ["integration:mission", "integration:mission-compiled"],
     },
     { pattern: /^src\/multi\//, groups: ["quick:protocol"] },
-    { pattern: /^src\/data\//, groups: ["integration:database"] },
-    { pattern: /^src\/routes\//, groups: ["integration:database"] },
+    { pattern: /^src\/data\//, groups: ["full"] },
+    { pattern: /^src\/routes\/(?!api\/singleBattleQuest\.ts$|web_api\/)/, groups: ["full"] },
 ]
 
 function normalizePath(filePath) {

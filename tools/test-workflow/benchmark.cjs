@@ -19,8 +19,8 @@ const DEFAULT_COMMANDS = Object.freeze([
         timeoutMs: 30000,
     }),
     Object.freeze({
-        args: ["tools/test-workflow/run.cjs", "--files", "src/lib/gacha.ts"],
-        command: "node tools/test-workflow/run.cjs --files src/lib/gacha.ts",
+        args: ["tools/test-workflow/run.cjs", "--files", "src/routes/api/singleBattleQuest.ts"],
+        command: "node tools/test-workflow/run.cjs --files src/routes/api/singleBattleQuest.ts",
         executable: process.execPath,
         name: "test:changed",
         thresholdMs: 20000,

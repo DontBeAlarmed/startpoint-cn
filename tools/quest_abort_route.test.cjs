@@ -14,6 +14,50 @@ function stubModule(relativePath, exports) {
     }
 }
 
+const unusedRouteDependencies = [
+    "../src/data/activeAccount",
+    "../src/data/domains/carnivalEvent",
+    "../src/data/domains/character_clear",
+    "../src/data/domains/degree",
+    "../src/data/domains/equipment",
+    "../src/data/domains/item",
+    "../src/data/domains/player",
+    "../src/data/domains/quest",
+    "../src/data/domains/quest_active",
+    "../src/data/domains/rushEvent",
+    "../src/data/domains/session",
+    "../src/data/types",
+    "../src/lib/assets",
+    "../src/lib/carnival-rewards",
+    "../src/lib/character",
+    "../src/lib/equipment",
+    "../src/lib/mission",
+    "../src/lib/quest",
+    "../src/lib/quest/finish/carnival-handler",
+    "../src/lib/quest/finish/challenge-point",
+    "../src/lib/quest/finish/character-clear-tracker",
+    "../src/lib/quest/finish/leader-powerflip-tracker",
+    "../src/lib/quest/finish/party-co-clear-tracker",
+    "../src/lib/quest/finish/powerflip-tracker",
+    "../src/lib/quest/finish/quest-calc",
+    "../src/lib/quest/finish/raid-handler",
+    "../src/lib/quest/finish/rush-handler",
+    "../src/lib/quest/finish/score-attack-handler",
+    "../src/lib/quest/start-entry",
+    "../src/lib/rush",
+    "../src/lib/stamina",
+    "../src/lib/stamina-cost",
+    "../src/lib/types",
+    "../src/routes/api/rushEvent",
+    "../assets/event_challenge_point_map.json",
+    "../assets/quest_entry_costs.json",
+    "../assets/score_attack_border_reward.json",
+]
+for (const dependency of unusedRouteDependencies) stubModule(dependency, {})
+stubModule("../src/utils", {
+    generateDataHeaders: () => ({ servertime: "2026-07-20T00:00:00.000Z" }),
+})
+
 const abortCalls = []
 stubModule("../src/data/db", {
     getDb: () => ({ transaction: operation => operation }),
