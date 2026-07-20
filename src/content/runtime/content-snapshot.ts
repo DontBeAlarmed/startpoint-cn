@@ -1,5 +1,6 @@
 import path from "node:path"
 
+import { deepFreeze } from "../deep-freeze"
 import { CdnCatalogLoader } from "../cdn/catalog-loader"
 import type { CdnCatalog } from "../cdn/types"
 
@@ -21,12 +22,6 @@ export class ContentSnapshotError extends Error {
 
 export interface ContentCatalogSource {
     load(): Promise<CdnCatalog>
-}
-
-function deepFreeze<T>(value: T): T {
-    if (!value || typeof value !== "object" || Object.isFrozen(value)) return value
-    for (const nested of Object.values(value as Record<string, unknown>)) deepFreeze(nested)
-    return Object.freeze(value)
 }
 
 export function resolveContentProjectRoot(moduleDirectory: string): string {

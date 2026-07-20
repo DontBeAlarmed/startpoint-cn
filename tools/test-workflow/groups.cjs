@@ -104,6 +104,7 @@ const TEST_GROUPS = Object.freeze({
     "integration:cdn": {
         execution: "serial",
         tests: [
+            "tools/cdn_asset_import.test.cjs",
             "tools/cdn_catalog_provider.test.cjs",
         ],
     },

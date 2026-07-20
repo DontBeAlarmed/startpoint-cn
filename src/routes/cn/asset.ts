@@ -1,7 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { generateDataHeaders } from "../../utils";
-import { readdirSync, statSync, existsSync } from "fs";
+import { readdirSync, statSync } from "fs";
 import path from "path";
+import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 
 const CN_PORT = process.env.CN_LISTEN_PORT || "8001";
 const CDN_BASE = process.env.CDN_BASE_URL;
@@ -13,19 +14,19 @@ function getCdnBase(request: FastifyRequest): string {
     return `http://${host}/patch/cn`;
 }
 
-/** Detect CDN path-list dir name: `EntityLists` (cn_cdn) or `entities` (cn_cdn_new). */
-function entityListsDirName(): string {
-    if (existsSync(path.join(cdnDir, "EntityLists"))) return "EntityLists";
-    if (existsSync(path.join(cdnDir, "entities"))) return "entities";
-    return "EntityLists";
-}
-
-function getVersionInfo(baseUrl: string) {
-    const el = entityListsDirName();
+export function getCdnVersionInfo(baseUrl: string) {
+    const catalog = getContentSnapshot().cdn;
+    const entityListsDirectory = path.posix.dirname(catalog.entityListsRelativePath);
+    const archiveBytes = new Map<string, number>();
+    for (const edge of catalog.edges) {
+        for (const archive of edge.archives) {
+            archiveBytes.set(archive.relativePath, archive.compressedBytes);
+        }
+    }
     return {
-        base_url: `${baseUrl}/${el}/`,
-        files_list: `${baseUrl}/${el}/10939-android_medium.csv`,
-        total_size: TOTAL_SIZE,
+        base_url: `${baseUrl}/${entityListsDirectory}/`,
+        files_list: `${baseUrl}/${catalog.entityListsRelativePath}`,
+        total_size: [...archiveBytes.values()].reduce((total, bytes) => total + bytes, 0),
         delayed_assets_size: 0
     };
 }
@@ -108,27 +109,13 @@ function buildDiffList(baseUrl: string, cdnDir: string): { original_version: str
 const envCdnDir = process.env.CDN_DIR || ".cdn";
 const cdnDir = path.isAbsolute(envCdnDir) ? path.join(envCdnDir, "cn") : path.join(__dirname, "..", "..", "..", envCdnDir, "cn");
 
-// 启动时扫描一次，动态计算总大小
-const TOTAL_SIZE = (() => {
-    let total = 0;
-    for (const subdir of ["archive-common-full","archive-medium-full","archive-android-full","archive-common-diff","archive-medium-diff","archive-android-diff"]) {
-        try {
-            for (const f of readdirSync(path.join(cdnDir, subdir)).filter(f => f.endsWith(".zip")))
-                total += statSync(path.join(cdnDir, subdir, f)).size;
-        } catch (e) {
-            console.error(`[CDN] TOTAL_SIZE failed for ${subdir}:`, (e as Error).message);
-        }
-    }
-    return total;
-})();
-
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/version_info", async (request: FastifyRequest, reply: FastifyReply) => {
         const baseUrl = getCdnBase(request);
         reply.type("application/json");
         reply.status(200).send({
             data_headers: generateDataHeaders(),
-            data: getVersionInfo(baseUrl)
+            data: getCdnVersionInfo(baseUrl)
         });
     });
 
@@ -171,6 +158,3 @@ const routes = async (fastify: FastifyInstance) => {
 };
 
 export default routes;
-
-export const CDN_TOTAL_SIZE = TOTAL_SIZE;
-export const ENTITY_LISTS_DIR = entityListsDirName();

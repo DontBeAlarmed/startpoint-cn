@@ -18,6 +18,7 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/content/cdn/planner.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/catalog-loader.ts"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/runtime/content-snapshot.ts"]), ["integration:cdn"])
+    assert.deepEqual(selectTestGroups(["src/content/deep-freeze.ts"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/internal/types.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/asset.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/lib/version.ts"]), ["full"])
@@ -98,6 +99,7 @@ test("full contains quick, integration, and admin but excludes generators", () =
     )
     assert.equal(AGGREGATE_GROUPS.full.includes("generator"), false)
     assert.deepEqual(TEST_GROUPS["integration:cdn"].tests, [
+        "tools/cdn_asset_import.test.cjs",
         "tools/cdn_catalog_provider.test.cjs",
     ])
 })
@@ -117,6 +119,7 @@ test("registers the focused CDN path contract", () => {
     assert.deepEqual(selectTestGroups(["tools/cdn_planner.test.cjs"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_types.test.cjs"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_catalog_provider.test.cjs"]), ["integration:cdn"])
+    assert.deepEqual(selectTestGroups(["tools/cdn_asset_import.test.cjs"]), ["integration:cdn"])
 })
 
 test("registers every test in exactly one leaf group and full covers runtime regressions", () => {

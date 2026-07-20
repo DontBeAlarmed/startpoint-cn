@@ -13,7 +13,7 @@ import versionCheckPlugin from "./routes/cn/versionCheck";
 import leitingAuthPlugin from "./routes/cn/leitingAuth";
 import cnToolPlugin from "./routes/cn/tool";
 import cnLoadPlugin from "./routes/cn/load";
-import cnAssetPlugin from "./routes/cn/asset";
+import cnAssetPlugin, { getCdnVersionInfo } from "./routes/cn/asset";
 import indexWebPlugin from "./routes/web";
 import indexWebApiPlugin from "./routes/web_api";
 import seedsWebApiPlugin from "./routes/web_api/seeds";
@@ -136,13 +136,7 @@ function stubMsgpackReply(reply: any, data: any) {
 }
 
 fastify.post(`${apiPrefix}/assetintitle/version_info_in_title`, async (_request, reply) => {
-    const { CDN_TOTAL_SIZE, ENTITY_LISTS_DIR } = require("./routes/cn/asset");
-    stubMsgpackReply(reply, {
-        base_url: `${CDN_BASE_URL}/${ENTITY_LISTS_DIR}/`,
-        files_list: `${CDN_BASE_URL}/${ENTITY_LISTS_DIR}/10939-android_medium.csv`,
-        total_size: CDN_TOTAL_SIZE,
-        delayed_assets_size: 0
-    });
+    stubMsgpackReply(reply, getCdnVersionInfo(CDN_BASE_URL));
 });
 
 fastify.post(`${apiPrefix}/tool/check_social_link_enable`, async (_request, reply) => {

@@ -9,6 +9,7 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const { CatalogValidationError } = require("../src/content/cdn/catalog-builder")
+const { deepFreeze } = require("../src/content/deep-freeze")
 const {
     CdnCatalogLoader,
     CatalogLoaderError,
@@ -50,6 +51,25 @@ function catalog(targetVersion) {
         entityListsRelativePath: "EntityLists/fixture-android_medium.csv",
         edges: [],
     }
+}
+
+function shallowFrozenCatalog(targetVersion = "1.4.1") {
+    return Object.freeze({
+        ...catalog(targetVersion),
+        edges: [{
+            fromVersion: null,
+            toVersion: "1.4.0",
+            platform: "android",
+            assetSizeKind: "fulfill",
+            archives: [{
+                relativePath: "archive-common-full/pinball-1.4.0-1-abcd.zip",
+                compressedBytes: 10,
+                sha256: "a".repeat(64),
+                layer: "common",
+                order: 1,
+            }],
+        }],
+    })
 }
 
 function injectedLoader({ scan, build }) {
@@ -177,6 +197,33 @@ test("failed initial load leaves no catalog and can be retried", async () => {
     )
     assert.equal((await loader.load()).targetVersion, "1.4.1")
     assert.equal(scans, 2)
+})
+
+test("loader recursively freezes children of an already frozen catalog root", async () => {
+    const shallow = shallowFrozenCatalog()
+    const loader = injectedLoader({
+        scan: async () => ({}),
+        build: () => shallow,
+    })
+
+    const loaded = await loader.load()
+    assert.strictEqual(loaded, shallow)
+    assert.equal(Object.isFrozen(loaded.edges), true)
+    assert.equal(Object.isFrozen(loaded.edges[0]), true)
+    assert.equal(Object.isFrozen(loaded.edges[0].archives), true)
+    assert.equal(Object.isFrozen(loaded.edges[0].archives[0]), true)
+    assert.throws(() => loaded.edges[0].archives.push({}), TypeError)
+})
+
+test("deep freeze handles cycles while freezing every reachable object", () => {
+    const root = { child: {} }
+    root.child.parent = root
+    Object.freeze(root)
+
+    assert.doesNotThrow(() => deepFreeze(root))
+    assert.equal(Object.isFrozen(root), true)
+    assert.equal(Object.isFrozen(root.child), true)
+    assert.strictEqual(root.child.parent, root)
 })
 
 test("reload publishes only a complete candidate and preserves the old catalog on failure", async () => {
@@ -356,6 +403,20 @@ test("failed snapshot initialization leaves no partial state and can be retried 
     assert.equal(attempts, 2)
 })
 
+test("snapshot recursively freezes children of an already frozen catalog root", async () => {
+    const shallow = shallowFrozenCatalog()
+    const provider = new ContentSnapshotProvider({ load: async () => shallow })
+
+    const snapshot = await provider.initialize()
+    assert.strictEqual(snapshot.cdn, shallow)
+    assert.equal(Object.isFrozen(snapshot), true)
+    assert.equal(Object.isFrozen(snapshot.cdn.edges), true)
+    assert.equal(Object.isFrozen(snapshot.cdn.edges[0]), true)
+    assert.equal(Object.isFrozen(snapshot.cdn.edges[0].archives), true)
+    assert.equal(Object.isFrozen(snapshot.cdn.edges[0].archives[0]), true)
+    assert.throws(() => snapshot.cdn.edges[0].archives.push({}), TypeError)
+})
+
 test("legacy version facade derives every runtime version from the pinned snapshot", t => {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     productionContentSnapshotProvider.snapshot = Object.freeze({ cdn: catalog("1.4.1") })
@@ -413,4 +474,6 @@ test("CN bootstrap initializes the content snapshot before listening", () => {
     assert.ok(listenIndex >= 0)
     assert.ok(initializeIndex < listenIndex)
     assert.doesNotMatch(source, /^await\s/m)
+    assert.match(source, /getCdnVersionInfo\(CDN_BASE_URL\)/)
+    assert.doesNotMatch(source, /CDN_TOTAL_SIZE|ENTITY_LISTS_DIR/)
 })
