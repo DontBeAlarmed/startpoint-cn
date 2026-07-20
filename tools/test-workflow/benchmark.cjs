@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const { spawn, spawnSync } = require("node:child_process")
-const { randomUUID } = require("node:crypto")
+const { createHash, randomUUID } = require("node:crypto")
 const fs = require("node:fs")
 const path = require("node:path")
 
@@ -665,6 +665,63 @@ function readCommit(cwd) {
     return result.stdout.trim()
 }
 
+function summarizeWorkingTreeStatus(statusOutput) {
+    if (!Buffer.isBuffer(statusOutput)) {
+        throw new TypeError("working tree status must be a Buffer")
+    }
+
+    let trackedChanges = 0
+    let untrackedFiles = 0
+    let offset = 0
+    while (offset < statusOutput.length) {
+        const terminator = statusOutput.indexOf(0, offset)
+        if (terminator === -1 || terminator - offset < 3) {
+            throw new Error("invalid git porcelain status output")
+        }
+
+        const indexStatus = statusOutput[offset]
+        const workTreeStatus = statusOutput[offset + 1]
+        if (indexStatus === 0x3f && workTreeStatus === 0x3f) untrackedFiles++
+        else trackedChanges++
+
+        offset = terminator + 1
+        const isRenameOrCopy = [indexStatus, workTreeStatus]
+            .some(status => status === 0x52 || status === 0x43)
+        if (isRenameOrCopy) {
+            const sourceTerminator = statusOutput.indexOf(0, offset)
+            if (sourceTerminator === -1) throw new Error("invalid git rename status output")
+            offset = sourceTerminator + 1
+        }
+    }
+
+    return {
+        dirty: statusOutput.length > 0,
+        statusSha256: createHash("sha256").update(statusOutput).digest("hex"),
+        trackedChanges,
+        untrackedFiles,
+    }
+}
+
+function readWorkingTree(cwd, options = {}) {
+    const spawnSyncImpl = options.spawnSync ?? spawnSync
+    const result = spawnSyncImpl(
+        "git",
+        ["status", "--porcelain=v1", "-z"],
+        { cwd, maxBuffer: 2 * 1024 * 1024 },
+    )
+    if (result.error) throw result.error
+    if (result.status !== 0) {
+        const message = Buffer.isBuffer(result.stderr)
+            ? result.stderr.toString("utf8").trim()
+            : String(result.stderr ?? "").trim()
+        throw new Error(message || "git status --porcelain failed")
+    }
+    const statusOutput = Buffer.isBuffer(result.stdout)
+        ? result.stdout
+        : Buffer.from(result.stdout ?? "")
+    return summarizeWorkingTreeStatus(statusOutput)
+}
+
 function writeReport(report, outputPath, cwd, options = {}) {
     const fsImpl = options.fs ?? fs
     const createUniqueId = options.randomUUID ?? randomUUID
@@ -754,6 +811,7 @@ async function main(argv = process.argv.slice(2), options = {}) {
     const createDate = options.createDate ?? (() => new Date())
     const installSignalHandlersImpl = options.installSignalHandlers ?? installSignalHandlers
     const readCommitImpl = options.readCommit ?? readCommit
+    const readWorkingTreeImpl = options.readWorkingTree ?? readWorkingTree
     const writeReportImpl = options.writeReport ?? writeReport
     const state = { activeRun: null, interruptedBy: null }
     let removeSignalHandlers = async () => {}
@@ -774,6 +832,7 @@ async function main(argv = process.argv.slice(2), options = {}) {
             nodeVersion: process.version,
             startedAt: createDate().toISOString(),
             status: "completed",
+            workingTree: readWorkingTreeImpl(cwd),
             commands: [],
         }
         removeSignalHandlers = installSignalHandlersImpl(state, options)
@@ -826,5 +885,6 @@ module.exports = {
     parseRunnerSummary,
     runCommand,
     signalProcessTree,
+    summarizeWorkingTreeStatus,
     writeReport,
 }

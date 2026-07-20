@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const path = require("node:path")
 const test = require("node:test")
 
 const { AGGREGATE_GROUPS, TEST_GROUPS } = require("./groups.cjs")
@@ -33,7 +35,7 @@ test("accumulates every directly related source group", () => {
     )
     assert.deepEqual(
         selectTestGroups(["src/routes/api/singleBattleQuest.ts"]),
-        ["integration:compiled", "integration:database"],
+        ["integration:compiled", "integration:database", "quick:quest"],
     )
 })
 
@@ -66,6 +68,40 @@ test("full contains quick, integration, and admin but excludes generators", () =
     assert.deepEqual(TEST_GROUPS["integration:cdn"].tests, [])
 })
 
+test("registers every test in exactly one leaf group and full covers runtime regressions", () => {
+    function findTests(directory) {
+        return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+            const entryPath = path.join(directory, entry.name)
+            if (entry.isDirectory()) return findTests(entryPath)
+            return /\.test\.(?:cjs|js)$/.test(entry.name)
+                ? [entryPath.replaceAll(path.sep, "/")]
+                : []
+        })
+    }
+
+    const allTests = [...findTests("tests"), ...findTests("tools")].sort()
+    const leafMembership = new Map()
+    for (const [group, definition] of Object.entries(TEST_GROUPS)) {
+        for (const file of definition.tests) {
+            const groups = leafMembership.get(file) ?? []
+            groups.push(group)
+            leafMembership.set(file, groups)
+        }
+    }
+
+    assert.ok(allTests.length >= 42)
+    for (const file of allTests) {
+        assert.deepEqual(leafMembership.get(file), [selectTestGroups([file])[0]], file)
+    }
+
+    const generatorTests = new Set(TEST_GROUPS.generator.tests)
+    const runtimeTests = allTests.filter(file => !generatorTests.has(file))
+    const fullTests = AGGREGATE_GROUPS.full
+        .flatMap(group => TEST_GROUPS[group].tests)
+        .sort()
+    assert.deepEqual(fullTests, runtimeTests)
+})
+
 test("keeps quick and safe compiled tests parallel while stateful groups stay serial", () => {
     for (const group of AGGREGATE_GROUPS.quick) {
         assert.equal(TEST_GROUPS[group].execution, "parallel")
@@ -95,13 +131,13 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/inventory_rules.test.cjs",
         "tools/mission_completion.test.cjs",
         "tools/quest_abort_route.test.cjs",
+        "tools/score_attack_event.test.cjs",
+        "tools/treasure_key_entry.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS.generator.tests, [
         "tools/box_gacha_reset.test.cjs",
         "tools/gacha_odds_export.test.cjs",
         "tools/rebuild_gacha_from_odds.test.cjs",
-        "tools/score_attack_event.test.cjs",
         "tools/star_grain_material_pack.test.cjs",
-        "tools/treasure_key_entry.test.cjs",
     ])
 })

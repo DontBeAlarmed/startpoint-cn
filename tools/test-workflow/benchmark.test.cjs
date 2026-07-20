@@ -21,6 +21,7 @@ const {
     parseRunnerSummary,
     runCommand,
     signalProcessTree,
+    summarizeWorkingTreeStatus,
     writeReport,
 } = require("./benchmark.cjs")
 
@@ -160,6 +161,39 @@ test("calculates odd and even medians without changing the samples", () => {
     assert.equal(median(evenSamples), 4)
     assert.deepEqual(oddSamples, [9, 1, 5])
     assert.deepEqual(evenSamples, [9, 1, 5, 3])
+})
+
+test("summarizes clean and dirty working trees without exposing status paths", () => {
+    assert.deepEqual(summarizeWorkingTreeStatus(Buffer.alloc(0)), {
+        dirty: false,
+        statusSha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        trackedChanges: 0,
+        untrackedFiles: 0,
+    })
+
+    const status = Buffer.from(" M tracked.ts\0?? secret.txt\0")
+    const first = summarizeWorkingTreeStatus(status)
+    const second = summarizeWorkingTreeStatus(Buffer.from(status))
+    assert.deepEqual(first, {
+        dirty: true,
+        statusSha256: "20e7173479e36e7e3579ef5851c48149cdb57696028bbaeb8a9256632f055b08",
+        trackedChanges: 1,
+        untrackedFiles: 1,
+    })
+    assert.deepEqual(second, first)
+    assert.doesNotMatch(JSON.stringify(first), /tracked\.ts|secret\.txt/)
+})
+
+test("counts a porcelain rename as one tracked change", () => {
+    assert.deepEqual(
+        summarizeWorkingTreeStatus(Buffer.from("R  new.ts\0old.ts\0?? fresh.ts\0")),
+        {
+            dirty: true,
+            statusSha256: "8231745a316077997882411da402b2a0f700852fdd9a677859d6349fdff6c64e",
+            trackedChanges: 1,
+            untrackedFiles: 1,
+        },
+    )
 })
 
 test("fails threshold evaluation when the median exceeds the limit", () => {
@@ -936,6 +970,7 @@ test("main stays non-zero for command failures in report-only mode", async () =>
         createDate: () => new Date("2026-07-20T00:00:00.000Z"),
         installSignalHandlers: () => async () => {},
         readCommit: () => "fixture-commit",
+        readWorkingTree: () => ({ dirty: false }),
         writeError() {},
         writeReport(report) { writtenReport = report },
     })
@@ -990,6 +1025,7 @@ test("cleanup failure aborts remaining runs and commands even in report-only mod
         createDate: () => new Date("2026-07-20T00:00:00.000Z"),
         installSignalHandlers: () => async () => {},
         readCommit: () => "fixture-commit",
+        readWorkingTree: () => ({ dirty: false }),
         runCommand(command) {
             spawnCalls.push(command.name)
             const result = pendingRuns.shift()
@@ -1032,6 +1068,12 @@ test("main writes a valid report to the requested output path", async t => {
         cwd: fixtureRoot,
         installSignalHandlers: () => async () => {},
         readCommit: () => "fixture-commit",
+        readWorkingTree: () => ({
+            dirty: true,
+            statusSha256: "fixture-digest",
+            trackedChanges: 2,
+            untrackedFiles: 1,
+        }),
         writeError() {},
         writeOutput() {},
     })
@@ -1040,6 +1082,12 @@ test("main writes a valid report to the requested output path", async t => {
     assert.equal(exitCode, 0)
     assert.equal(report.commit, "fixture-commit")
     assert.equal(report.startedAt, "2026-07-20T00:00:00.000Z")
+    assert.deepEqual(report.workingTree, {
+        dirty: true,
+        statusSha256: "fixture-digest",
+        trackedChanges: 2,
+        untrackedFiles: 1,
+    })
     assert.deepEqual(report.commands, [{ exitCode: 0, name: "fixture" }])
 })
 

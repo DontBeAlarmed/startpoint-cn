@@ -6,7 +6,15 @@ const { execFileSync } = require("node:child_process")
 require("ts-node/register/transpile-only")
 
 const ROOT = path.resolve(__dirname, "..")
-const RAW_ROOT = path.resolve(ROOT, "..", "wf-assets-cn", "orderedmap")
+const directWorkspaceRoot = path.resolve(ROOT, "..")
+const gitCommonDirectory = path.resolve(
+    ROOT,
+    execFileSync("git", ["rev-parse", "--git-common-dir"], { cwd: ROOT, encoding: "utf8" }).trim(),
+)
+const workspaceRoot = fs.existsSync(path.join(directWorkspaceRoot, "wf-assets-cn"))
+    ? directWorkspaceRoot
+    : path.resolve(path.dirname(gitCommonDirectory), "..")
+const RAW_ROOT = path.join(workspaceRoot, "wf-assets-cn", "orderedmap")
 
 const rawQuests = JSON.parse(fs.readFileSync(
     path.join(RAW_ROOT, "quest/event/score_attack_event_quest.json"),

@@ -1,11 +1,22 @@
 const assert = require("node:assert/strict")
+const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
 const path = require("node:path")
 
 require("ts-node/register/transpile-only")
 
 const projectRoot = path.resolve(__dirname, "..")
-const worldFlipperRoot = path.resolve(projectRoot, "..")
+const directWorkspaceRoot = path.resolve(projectRoot, "..")
+const gitCommonDirectory = path.resolve(
+    projectRoot,
+    execFileSync("git", ["rev-parse", "--git-common-dir"], {
+        cwd: projectRoot,
+        encoding: "utf8",
+    }).trim(),
+)
+const worldFlipperRoot = fs.existsSync(path.join(directWorkspaceRoot, "wf-assets-cn"))
+    ? directWorkspaceRoot
+    : path.resolve(path.dirname(gitCommonDirectory), "..")
 const questEntryCosts = require(path.join(projectRoot, "assets/quest_entry_costs.json"))
 const adventEventQuests = require(path.join(
     worldFlipperRoot,

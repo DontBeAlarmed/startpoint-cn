@@ -13,7 +13,7 @@ const SOURCE_RULES = [
     },
     {
         pattern: /^src\/routes\/api\/singleBattleQuest\.ts$/,
-        groups: ["integration:compiled"],
+        groups: ["integration:compiled", "quick:quest"],
     },
     {
         pattern: /^src\/lib\/quest\/host-finish-persistence\.ts$/,
