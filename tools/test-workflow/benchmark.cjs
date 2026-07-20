@@ -423,10 +423,39 @@ function runCommand(command, state, options = {}) {
 
         let timedOut = false
         let spawnError = null
+        let childHandlesReleased = false
         let finalizing = false
         let resolved = false
 
-        async function finalize(exitCode, signal) {
+        function releaseFailedWindowsChildHandles() {
+            if (childHandlesReleased) return
+            childHandlesReleased = true
+
+            child.stdout?.removeListener("data", handleStdoutData)
+            child.stderr?.removeListener("data", handleStderrData)
+            child.removeListener("error", handleChildError)
+            child.removeListener("close", handleChildClose)
+
+            for (const [name, stream] of [
+                ["stdin", child.stdin],
+                ["stdout", child.stdout],
+                ["stderr", child.stderr],
+            ]) {
+                try {
+                    stream?.destroy()
+                } catch (error) {
+                    recordLifecycleError(activeRun, `failed to destroy child ${name}`, error)
+                }
+            }
+            try {
+                child.unref?.()
+            } catch (error) {
+                recordLifecycleError(activeRun, "failed to unref child process", error)
+            }
+            activeRun.child = null
+        }
+
+        async function finalize(exitCode, signal, finalizeOptions = {}) {
             if (finalizing || resolved) return
             finalizing = true
             if (activeRun.timeoutTimer !== null) {
@@ -438,6 +467,9 @@ function runCommand(command, state, options = {}) {
                 activeRun.windowsFallbackTimer = null
             }
             if (activeRun.cleanupPromise) await activeRun.cleanupPromise
+            if (finalizeOptions.releaseFailedWindowsChild === true) {
+                releaseFailedWindowsChildHandles()
+            }
             if (activeRun.cleanupErrors.length > 0) {
                 outputBuffer.append(`${activeRun.cleanupErrors.join("\n")}\n`)
             }
@@ -479,12 +511,29 @@ function runCommand(command, state, options = {}) {
             try {
                 activeRun.windowsFallbackTimer = setTimeoutImpl(() => {
                     activeRun.windowsFallbackTimer = null
-                    void finalize(null, null)
+                    void finalize(null, null, { releaseFailedWindowsChild: true })
                 }, fallbackAfterMs)
             } catch (error) {
                 recordLifecycleError(activeRun, "failed to schedule Windows cleanup fallback", error)
-                void finalize(null, null)
+                void finalize(null, null, { releaseFailedWindowsChild: true })
             }
+        }
+
+        function handleStdoutData(chunk) {
+            outputBuffer.append(chunk)
+        }
+
+        function handleStderrData(chunk) {
+            outputBuffer.append(chunk)
+        }
+
+        function handleChildError(error) {
+            spawnError = error
+            outputBuffer.append(`${error.stack || error.message}\n`)
+        }
+
+        function handleChildClose(exitCode, signal) {
+            void finalize(exitCode, signal)
         }
 
         activeRun.timeoutTimer = setTimeoutImpl(() => {
@@ -496,15 +545,10 @@ function runCommand(command, state, options = {}) {
             }
         }, command.timeoutMs)
 
-        child.stdout.on("data", chunk => { outputBuffer.append(chunk) })
-        child.stderr.on("data", chunk => { outputBuffer.append(chunk) })
-        child.on("error", error => {
-            spawnError = error
-            outputBuffer.append(`${error.stack || error.message}\n`)
-        })
-        child.on("close", (exitCode, signal) => {
-            void finalize(exitCode, signal)
-        })
+        child.stdout.on("data", handleStdoutData)
+        child.stderr.on("data", handleStderrData)
+        child.on("error", handleChildError)
+        child.on("close", handleChildClose)
     })
 }
 

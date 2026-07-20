@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict")
+const { spawn } = require("node:child_process")
 const { EventEmitter } = require("node:events")
 const fs = require("node:fs")
 const os = require("node:os")
@@ -598,6 +599,74 @@ test("Windows taskkill non-zero status has a bounded fallback without child clos
     assert.match(result.output, /failed to signal process tree with SIGTERM: access denied/)
     assert.equal(state.activeRun, null)
     assert.equal(clock.pendingCount(), 0)
+})
+
+test("Windows failed cleanup releases a live child handle before resolving", async () => {
+    let child = null
+    let guardTimer = null
+    let killFixture = null
+    let unrefCalls = 0
+    const state = { activeRun: null, interruptedBy: null }
+
+    try {
+        const startedAt = Date.now()
+        const result = await Promise.race([
+            runCommand({
+                args: ["-e", "setInterval(() => {}, 1000)"],
+                command: "long-lived-node-fixture",
+                executable: process.execPath,
+                timeoutMs: 25,
+            }, state, {
+                platform: "win32",
+                spawn(executable, args, options) {
+                    child = spawn(executable, args, { ...options, stdio: ["pipe", "pipe", "pipe"] })
+                    killFixture = child.kill.bind(child)
+                    child.kill = () => false
+                    const unref = child.unref.bind(child)
+                    child.unref = () => {
+                        unrefCalls++
+                        return unref()
+                    }
+                    return child
+                },
+                spawnSync() {
+                    return { status: 1, stderr: "taskkill unavailable" }
+                },
+                windowsFallbackAfterMs: 25,
+            }),
+            new Promise((_, reject) => {
+                guardTimer = setTimeout(
+                    () => reject(new Error("runCommand did not release the child handle")),
+                    2000,
+                )
+            }),
+        ])
+        clearTimeout(guardTimer)
+        guardTimer = null
+
+        assert.ok(Date.now() - startedAt < 2000)
+        assert.equal(result.cleanupError, true)
+        assert.equal(result.rawExitCode, null)
+        assert.equal(result.timedOut, true)
+        assert.match(result.output, /taskkill unavailable/)
+        assert.match(result.output, /child\.kill returned false/)
+        assert.equal(child.stdin.destroyed, true)
+        assert.equal(child.stdout.destroyed, true)
+        assert.equal(child.stderr.destroyed, true)
+        assert.equal(child.stdout.listenerCount("data"), 0)
+        assert.equal(child.stderr.listenerCount("data"), 0)
+        assert.equal(child.listenerCount("close"), 0)
+        assert.equal(child.listenerCount("error"), 0)
+        assert.equal(unrefCalls, 1)
+        assert.equal(state.activeRun, null)
+        assert.equal(isProcessAlive(child.pid), true)
+    } finally {
+        if (guardTimer !== null) clearTimeout(guardTimer)
+        if (child?.pid && isProcessAlive(child.pid)) {
+            killFixture?.("SIGKILL")
+            assert.equal(await waitForProcessExit(child.pid), true)
+        }
+    }
 })
 
 test("Windows signal handlers force the tree once without scheduling cleanup", async () => {
