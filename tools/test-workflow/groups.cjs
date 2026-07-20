@@ -63,7 +63,7 @@ const TEST_GROUPS = Object.freeze({
         ],
     },
     "integration:event": {
-        execution: "serial",
+        execution: "parallel",
         tests: [
             "tools/carnival_rewards.test.cjs",
             "tools/rush_event_shop.test.cjs",
@@ -72,7 +72,7 @@ const TEST_GROUPS = Object.freeze({
         ],
     },
     "integration:mission": {
-        execution: "serial",
+        execution: "parallel",
         tests: [
             "tools/character_awake_settlement.test.cjs",
             "tools/character_awake_unlock.test.cjs",
@@ -80,14 +80,14 @@ const TEST_GROUPS = Object.freeze({
         ],
     },
     "integration:quest": {
-        execution: "serial",
+        execution: "parallel",
         tests: [
             "tools/quest_entry_lifecycle.test.cjs",
             "tools/quest_host_finish.test.cjs",
         ],
     },
     "integration:party": {
-        execution: "serial",
+        execution: "parallel",
         tests: [
             "tools/special_quest_party.test.cjs",
         ],

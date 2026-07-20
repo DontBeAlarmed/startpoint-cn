@@ -154,7 +154,7 @@ test("keeps external data and source inspection out of self-contained runtime te
     }
 })
 
-test("keeps quick and safe compiled tests parallel while stateful groups stay serial", () => {
+test("keeps isolated test groups parallel while infrastructure groups stay serial", () => {
     for (const group of AGGREGATE_GROUPS.quick) {
         assert.equal(TEST_GROUPS[group].execution, "parallel")
     }
@@ -162,14 +162,14 @@ test("keeps quick and safe compiled tests parallel while stateful groups stay se
     assert.equal(TEST_GROUPS["integration:mission-compiled"].execution, "parallel")
     assert.equal(TEST_GROUPS["integration:rules"].execution, "parallel")
     assert.equal(TEST_GROUPS["integration:database"].execution, "serial")
-    assert.equal(TEST_GROUPS["integration:event"].execution, "serial")
-    assert.equal(TEST_GROUPS["integration:mission"].execution, "serial")
-    assert.equal(TEST_GROUPS["integration:party"].execution, "serial")
-    assert.equal(TEST_GROUPS["integration:quest"].execution, "serial")
+    assert.equal(TEST_GROUPS["integration:event"].execution, "parallel")
+    assert.equal(TEST_GROUPS["integration:mission"].execution, "parallel")
+    assert.equal(TEST_GROUPS["integration:party"].execution, "parallel")
+    assert.equal(TEST_GROUPS["integration:quest"].execution, "parallel")
     assert.equal(TEST_GROUPS["integration:cdn"].execution, "serial")
 })
 
-test("splits stateful integration tests into focused serial domains", () => {
+test("splits isolated integration tests into focused domains", () => {
     assert.deepEqual(TEST_GROUPS["integration:database"].tests, [
         "tools/test-workflow/database-isolation.test.cjs",
     ])
