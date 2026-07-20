@@ -117,6 +117,11 @@ function parsePatchManifest(value: unknown): PatchManifest {
         }
         return patch as unknown as PatchManifestEntry
     })
+    const patchIds = new Set<string>()
+    for (const patch of patches) {
+        if (patchIds.has(patch.id)) throw schemaError(`duplicate patch id ${patch.id}`)
+        patchIds.add(patch.id)
+    }
     return { cdn_version: candidate.cdn_version, patches }
 }
 

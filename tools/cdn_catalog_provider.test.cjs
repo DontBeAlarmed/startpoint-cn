@@ -99,6 +99,16 @@ function patch(overrides = {}) {
     }
 }
 
+function deferred() {
+    let resolve
+    let reject
+    const promise = new Promise((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise
+        reject = rejectPromise
+    })
+    return { promise, resolve, reject }
+}
+
 test("default loader validates a real CDN once and caches one deep-frozen catalog", async t => {
     const projectRoot = createProject(t)
     const loader = new CdnCatalogLoader({ projectRoot, env: {} })
@@ -179,6 +189,61 @@ test("concurrent initial loads share one scan and get fails clearly before initi
     assert.equal(scans, 1)
 })
 
+test("load then reload linearizes candidates in call order", async () => {
+    const firstCandidate = deferred()
+    const secondCandidate = deferred()
+    let scans = 0
+    const loader = injectedLoader({
+        scan: () => (++scans === 1 ? firstCandidate.promise : secondCandidate.promise),
+        build: input => catalog(input.targetVersion),
+    })
+
+    const initialLoad = loader.load()
+    const reload = loader.reload()
+    assert.equal(scans, 1)
+
+    firstCandidate.resolve({ targetVersion: "1.4.1" })
+    const initial = await initialLoad
+    assert.equal(initial.targetVersion, "1.4.1")
+    assert.equal(scans, 2)
+
+    secondCandidate.resolve({ targetVersion: "1.4.2" })
+    const replacement = await reload
+    assert.equal(replacement.targetVersion, "1.4.2")
+    assert.strictEqual(loader.get(), replacement)
+})
+
+test("reload then load linearizes candidates in call order without stale overwrite", async () => {
+    const firstCandidate = deferred()
+    const secondCandidate = deferred()
+    const secondStarted = deferred()
+    let scans = 0
+    const loader = injectedLoader({
+        scan: () => {
+            scans++
+            if (scans === 1) return firstCandidate.promise
+            secondStarted.resolve()
+            return secondCandidate.promise
+        },
+        build: input => catalog(input.targetVersion),
+    })
+
+    const reload = loader.reload()
+    const load = loader.load()
+    assert.equal(scans, 1)
+
+    firstCandidate.resolve({ targetVersion: "1.4.1" })
+    const first = await reload
+    assert.equal(first.targetVersion, "1.4.1")
+    await secondStarted.promise
+    assert.equal(scans, 2)
+
+    secondCandidate.resolve({ targetVersion: "1.4.2" })
+    const second = await load
+    assert.equal(second.targetVersion, "1.4.2")
+    assert.strictEqual(loader.get(), second)
+})
+
 test("failed initial load leaves no catalog and can be retried", async () => {
     let scans = 0
     const loader = injectedLoader({
@@ -249,6 +314,38 @@ test("reload publishes only a complete candidate and preserves the old catalog o
     assert.equal(scans, 3)
 })
 
+test("a failed reload does not lock the queue and a queued success becomes cache", async () => {
+    const failedCandidate = deferred()
+    const successfulCandidate = deferred()
+    const successStarted = deferred()
+    let scans = 0
+    const loader = injectedLoader({
+        scan: () => {
+            scans++
+            if (scans === 1) return Promise.resolve({ targetVersion: "1.4.1" })
+            if (scans === 2) return failedCandidate.promise
+            successStarted.resolve()
+            return successfulCandidate.promise
+        },
+        build: input => catalog(input.targetVersion),
+    })
+    const initial = await loader.load()
+    const failedReload = loader.reload()
+    const successfulReload = loader.reload()
+    assert.equal(scans, 2)
+
+    failedCandidate.reject(new Error("queued candidate rejected"))
+    await assert.rejects(failedReload, /queued candidate rejected/)
+    await successStarted.promise
+    assert.equal(scans, 3)
+    assert.strictEqual(loader.get(), initial)
+
+    successfulCandidate.resolve({ targetVersion: "1.4.2" })
+    const replacement = await successfulReload
+    assert.equal(replacement.targetVersion, "1.4.2")
+    assert.strictEqual(loader.get(), replacement)
+})
+
 test("concurrent reloads build serial candidates and publish in call order", async () => {
     let scans = 0
     let releaseFirstReload
@@ -308,6 +405,25 @@ test("enabled patches must match one fulfill diff edge archive basename and size
     await assert.rejects(
         new CdnCatalogLoader({ projectRoot, env: {} }).load(),
         error => error instanceof CatalogLoaderError && error.code === "PATCH_CATALOG_MISMATCH",
+    )
+})
+
+test("patch manifest rejects duplicate ids even when both entries match the catalog", async t => {
+    const projectRoot = createProject(t)
+    const archiveSize = fs.statSync(path.join(
+        projectRoot,
+        ".cdn/cn/archive-android-diff/pinball-1.4.0-1.4.1-1-abcd.zip",
+    )).size
+    const matchingPatch = patch({ archive_size: archiveSize })
+    writePatchManifest(projectRoot, [matchingPatch, { ...matchingPatch }])
+
+    await assert.rejects(
+        new CdnCatalogLoader({ projectRoot, env: {} }).load(),
+        error => (
+            error instanceof CatalogLoaderError
+            && error.code === "PATCH_MANIFEST_SCHEMA"
+            && error.message.includes("duplicate patch id fixture-patch")
+        ),
     )
 })
 
@@ -379,6 +495,28 @@ test("content snapshot is initialized once, deep-frozen, and pinned across loade
     const candidateSnapshot = await candidateProvider.initialize()
     assert.strictEqual(candidateSnapshot.cdn, replacement)
     assert.equal(candidateSnapshot.cdn.targetVersion, "1.4.2")
+})
+
+test("concurrent snapshot initialization loads once and returns one snapshot object", async () => {
+    const candidate = deferred()
+    let loads = 0
+    const provider = new ContentSnapshotProvider({
+        load: () => {
+            loads++
+            return candidate.promise
+        },
+    })
+
+    const firstInitialization = provider.initialize()
+    const secondInitialization = provider.initialize()
+    assert.strictEqual(secondInitialization, firstInitialization)
+    assert.equal(loads, 1)
+
+    candidate.resolve(catalog("1.4.1"))
+    const [first, second] = await Promise.all([firstInitialization, secondInitialization])
+    assert.strictEqual(second, first)
+    assert.strictEqual(provider.get(), first)
+    assert.equal(loads, 1)
 })
 
 test("failed snapshot initialization leaves no partial state and can be retried safely", async () => {
@@ -476,4 +614,7 @@ test("CN bootstrap initializes the content snapshot before listening", () => {
     assert.doesNotMatch(source, /^await\s/m)
     assert.match(source, /getCdnVersionInfo\(CDN_BASE_URL\)/)
     assert.doesNotMatch(source, /CDN_TOTAL_SIZE|ENTITY_LISTS_DIR/)
+    const sessionIndex = source.indexOf("await startSessionServer()")
+    assert.ok(sessionIndex >= 0)
+    assert.ok(listenIndex < sessionIndex)
 })

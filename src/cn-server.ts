@@ -409,7 +409,7 @@ async function bootstrap(): Promise<void> {
     console.log(`CN StarPoint listening on http://${host}:${port}`);
 
     // Start multi battle TCP session server
-    startSessionServer();
+    await startSessionServer();
 }
 
 void bootstrap().catch(error => {
