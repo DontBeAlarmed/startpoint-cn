@@ -591,26 +591,39 @@ function compactRun(run) {
 
 function buildCommandReport(command, warmup, runs, options = {}) {
     const rawDurationsMs = runs.map(run => run.durationMs)
-    const rawMedianMs = median(rawDurationsMs)
+    const cleanupFailed = [warmup, ...runs].some(run => run.cleanupError === true)
+    const rawMedianMs = rawDurationsMs.length === 0 ? null : median(rawDurationsMs)
     const commandExitCodes = [warmup, ...runs].map(rawExitCodeForEvaluation)
-    const evaluation = evaluateThreshold({
-        commandExitCodes,
-        medianMs: rawMedianMs,
-        reportOnly: options.reportOnly ?? false,
-        thresholdMs: command.thresholdMs,
-    })
-    const counts = latestCounts(runs)
-    const status = !evaluation.commandSucceeded
-        ? "command-failed"
-        : evaluation.withinThreshold ? "passed" : "threshold-exceeded"
+    const evaluation = cleanupFailed
+        ? {
+            commandSucceeded: false,
+            exitCode: 1,
+            withinThreshold: null,
+        }
+        : evaluateThreshold({
+            commandExitCodes,
+            medianMs: rawMedianMs,
+            reportOnly: options.reportOnly ?? false,
+            thresholdMs: command.thresholdMs,
+        })
+    const counts = latestCounts(runs.length === 0 ? [warmup] : runs)
+    let status
+    if (cleanupFailed) {
+        status = "cleanup-failed"
+    } else if (!evaluation.commandSucceeded) {
+        status = "command-failed"
+    } else {
+        status = evaluation.withinThreshold ? "passed" : "threshold-exceeded"
+    }
 
     return {
+        aborted: cleanupFailed,
         command: command.command,
         commandSucceeded: evaluation.commandSucceeded,
         durationsMs: rawDurationsMs.map(roundMilliseconds),
         exitCode: evaluation.exitCode,
         failed: counts.failed,
-        medianMs: roundMilliseconds(rawMedianMs),
+        medianMs: cleanupFailed || rawMedianMs === null ? null : roundMilliseconds(rawMedianMs),
         name: command.name,
         outputTruncated: [warmup, ...runs].some(run => run.outputTruncated === true),
         passed: counts.passed,
@@ -630,13 +643,18 @@ async function benchmarkCommand(command, state, options = {}) {
     writeStatus(`[benchmark] ${command.name}: warm-up\n`)
     const warmup = await runCommandImpl(command, state, options)
     const runs = []
+    if (warmup.cleanupError === true) {
+        return buildCommandReport(command, warmup, runs, options)
+    }
 
     for (let attempt = 1; attempt <= 3 && state.interruptedBy === null; attempt++) {
         writeStatus(`[benchmark] ${command.name}: run ${attempt}/3\n`)
-        runs.push(await runCommandImpl(command, state, options))
+        const run = await runCommandImpl(command, state, options)
+        runs.push(run)
+        if (run.cleanupError === true) break
     }
 
-    if (runs.length !== 3) return null
+    if (runs.length !== 3 && !runs.some(run => run.cleanupError === true)) return null
     return buildCommandReport(command, warmup, runs, options)
 }
 
@@ -751,9 +769,11 @@ async function main(argv = process.argv.slice(2), options = {}) {
 
         const report = {
             schemaVersion: 1,
+            aborted: false,
             commit: readCommitImpl(cwd),
             nodeVersion: process.version,
             startedAt: createDate().toISOString(),
+            status: "completed",
             commands: [],
         }
         removeSignalHandlers = installSignalHandlersImpl(state, options)
@@ -764,12 +784,19 @@ async function main(argv = process.argv.slice(2), options = {}) {
                 ...options,
                 reportOnly: parsed.reportOnly,
             })
-            if (result !== null) report.commands.push(result)
+            if (result !== null) {
+                report.commands.push(result)
+                if (result.aborted === true) {
+                    report.aborted = true
+                    report.status = result.status
+                    break
+                }
+            }
         }
 
         if (state.interruptedBy !== null) return signalExitCodes[state.interruptedBy]
         writeReportImpl(report, parsed.output, cwd, options)
-        return report.commands.some(command => command.exitCode !== 0) ? 1 : 0
+        return report.aborted || report.commands.some(command => command.exitCode !== 0) ? 1 : 0
     } catch (error) {
         writeError(`${error.stack || error.message}\n`)
         return 2

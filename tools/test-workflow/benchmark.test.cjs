@@ -10,6 +10,7 @@ const test = require("node:test")
 const {
     DEFAULT_COMMANDS,
     MAX_OUTPUT_BYTES,
+    benchmarkCommand,
     buildCommandReport,
     createTailBuffer,
     evaluateThreshold,
@@ -941,6 +942,81 @@ test("main stays non-zero for command failures in report-only mode", async () =>
 
     assert.equal(exitCode, 1)
     assert.deepEqual(writtenReport.commands, [{ exitCode: 1, name: "fixture" }])
+})
+
+test("benchmarkCommand aborts before formal runs when warmup cleanup fails", async () => {
+    const calls = []
+    const command = {
+        command: "fixture",
+        name: "fixture",
+        thresholdMs: 100,
+    }
+    const report = await benchmarkCommand(
+        command,
+        { activeRun: null, interruptedBy: null },
+        {
+            runCommand() {
+                calls.push(command.name)
+                return Promise.resolve(createRun(5, { cleanupError: true, rawExitCode: null }))
+            },
+            writeStatus() {},
+        },
+    )
+
+    assert.deepEqual(calls, ["fixture"])
+    assert.equal(report.aborted, true)
+    assert.equal(report.status, "cleanup-failed")
+    assert.equal(report.exitCode, 1)
+    assert.equal(report.medianMs, null)
+    assert.deepEqual(report.runs, [])
+    assert.equal(report.warmup.cleanupError, true)
+})
+
+test("cleanup failure aborts remaining runs and commands even in report-only mode", async () => {
+    const commands = [
+        { command: "first", name: "first", thresholdMs: 100 },
+        { command: "later", name: "later", thresholdMs: 100 },
+    ]
+    const pendingRuns = [
+        createRun(1),
+        createRun(2),
+        createRun(3, { cleanupError: true, rawExitCode: null }),
+    ]
+    const spawnCalls = []
+    let writtenReport = null
+
+    const exitCode = await main(["--report-only"], {
+        commands,
+        createDate: () => new Date("2026-07-20T00:00:00.000Z"),
+        installSignalHandlers: () => async () => {},
+        readCommit: () => "fixture-commit",
+        runCommand(command) {
+            spawnCalls.push(command.name)
+            const result = pendingRuns.shift()
+            assert.notEqual(result, undefined, "benchmark spawned after cleanup failure")
+            return Promise.resolve(result)
+        },
+        writeError() {},
+        writeReport(report) { writtenReport = report },
+        writeStatus() {},
+    })
+
+    assert.equal(exitCode, 1)
+    assert.deepEqual(spawnCalls, ["first", "first", "first"])
+    assert.equal(writtenReport.aborted, true)
+    assert.equal(writtenReport.status, "cleanup-failed")
+    assert.equal(writtenReport.commands.length, 1)
+    const failedCommand = writtenReport.commands[0]
+    assert.equal(failedCommand.aborted, true)
+    assert.equal(failedCommand.status, "cleanup-failed")
+    assert.equal(failedCommand.exitCode, 1)
+    assert.deepEqual(failedCommand.durationsMs, [2, 3])
+    assert.equal(failedCommand.medianMs, null)
+    assert.equal(failedCommand.withinThreshold, null)
+    assert.equal(failedCommand.runs.length, 2)
+    assert.equal(failedCommand.runs[0].cleanupError, false)
+    assert.equal(failedCommand.runs[1].cleanupError, true)
+    assert.equal(failedCommand.warmup.durationMs, 1)
 })
 
 test("main writes a valid report to the requested output path", async t => {
