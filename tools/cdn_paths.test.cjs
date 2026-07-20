@@ -11,43 +11,68 @@ const {
     resolveContentPaths,
 } = require("../src/content/paths")
 
+const identityFsApi = {
+    existsSync: () => true,
+    realpathSync: value => value,
+}
+const posixDependencies = { fsApi: identityFsApi, pathApi: path.posix }
+
+function createHostDirectorySymlink(t, target, linkPath) {
+    try {
+        fs.symlinkSync(target, linkPath, "dir")
+        return true
+    } catch (error) {
+        if (process.platform === "win32" && ["EACCES", "EPERM"].includes(error.code)) {
+            t.skip("directory symlink creation is unavailable on this Windows host")
+            return false
+        }
+        throw error
+    }
+}
+
 test("resolves the CN CDN root from absolute and project-relative paths", () => {
-    assert.equal(resolveCnCdnRoot("/srv/wf-cdn", "/repo"), "/srv/wf-cdn/cn")
-    assert.equal(resolveCnCdnRoot(".cdn", "/repo"), "/repo/.cdn/cn")
+    assert.equal(
+        resolveCnCdnRoot("/srv/wf-cdn", "/repo", posixDependencies),
+        path.posix.join("/srv/wf-cdn", "cn"),
+    )
+    assert.equal(
+        resolveCnCdnRoot(".cdn", "/repo", posixDependencies),
+        path.posix.join(path.posix.resolve("/repo"), ".cdn", "cn"),
+    )
 })
 
 test("rejects a CDN_DIR that already names the CN child", () => {
     assert.throws(
-        () => resolveCnCdnRoot("/srv/wf-cdn/cn", "/repo"),
+        () => resolveCnCdnRoot("/srv/wf-cdn/cn", "/repo", posixDependencies),
         /CDN_DIR.*parent directory/i,
     )
     assert.throws(
-        () => resolveCnCdnRoot("/srv/wf-cdn/cn/", "/repo"),
+        () => resolveCnCdnRoot("/srv/wf-cdn/cn/", "/repo", posixDependencies),
         /CDN_DIR.*parent directory/i,
     )
 })
 
 test("rejects empty CDN paths", () => {
-    assert.throws(() => resolveCnCdnRoot("", "/repo"), /CDN_DIR/)
-    assert.throws(() => resolveCnCdnRoot("   ", "/repo"), /CDN_DIR/)
+    assert.throws(() => resolveCnCdnRoot("", "/repo", posixDependencies), /CDN_DIR/)
+    assert.throws(() => resolveCnCdnRoot("   ", "/repo", posixDependencies), /CDN_DIR/)
 })
 
 test("normalizes relative CDN paths without allowing project-root escape", () => {
     assert.equal(
-        resolveCnCdnRoot("cache/../.cdn", "/repo"),
-        "/repo/.cdn/cn",
+        resolveCnCdnRoot("cache/../.cdn", "/repo", posixDependencies),
+        path.posix.join(path.posix.resolve("/repo"), ".cdn", "cn"),
     )
     assert.throws(
-        () => resolveCnCdnRoot("../outside", "/repo"),
+        () => resolveCnCdnRoot("../outside", "/repo", posixDependencies),
         /outside projectRoot/,
     )
     assert.equal(
-        resolveCnCdnRoot("/external/wf-cdn", "/repo"),
-        "/external/wf-cdn/cn",
+        resolveCnCdnRoot("/external/wf-cdn", "/repo", posixDependencies),
+        path.posix.join("/external/wf-cdn", "cn"),
     )
     assert.equal(
-        resolveCnCdnRoot("C:cache", "/repo"),
-        "/repo/C:cache/cn",
+        resolveCnCdnRoot("C:cache", "/repo", posixDependencies),
+        path.posix.join(path.posix.resolve("/repo"), "C:cache", "cn"),
     )
 })
 
@@ -91,6 +116,7 @@ test("resolves Windows content paths with the injected path API", () => {
             CONTENT_RUNTIME_DIR: "\\\\server\\share\\runtime",
         },
     }), {
+        cdnDir: path.win32.join(projectRoot, "cache", "cdn-parent"),
         cdnRoot: path.win32.join(projectRoot, "cache", "cdn-parent", "cn"),
         contentStoreDir: path.win32.resolve("D:\\content-store"),
         contentStateDir: path.win32.join(projectRoot, "state"),
@@ -99,9 +125,10 @@ test("resolves Windows content paths with the injected path API", () => {
 })
 
 test("resolves all content paths from explicit environment values", () => {
-    const projectRoot = path.resolve("/repo/project")
+    const projectRoot = path.posix.resolve("/repo/project")
     const paths = resolveContentPaths({
         projectRoot,
+        ...posixDependencies,
         env: {
             CDN_DIR: "var/cdn",
             CONTENT_STORE_DIR: "var/content-store",
@@ -111,21 +138,23 @@ test("resolves all content paths from explicit environment values", () => {
     })
 
     assert.deepEqual(paths, {
-        cdnRoot: path.join(projectRoot, "var/cdn/cn"),
-        contentStoreDir: path.join(projectRoot, "var/content-store"),
+        cdnDir: path.posix.join(projectRoot, "var/cdn"),
+        cdnRoot: path.posix.join(projectRoot, "var/cdn/cn"),
+        contentStoreDir: path.posix.join(projectRoot, "var/content-store"),
         contentStateDir: "/srv/content-state",
-        contentRuntimeDir: path.join(projectRoot, "var/runtime"),
+        contentRuntimeDir: path.posix.join(projectRoot, "var/runtime"),
     })
 })
 
 test("uses project-root-relative defaults without consulting process.cwd", () => {
-    const projectRoot = path.resolve("/repo/project")
+    const projectRoot = path.posix.resolve("/repo/project")
 
-    assert.deepEqual(resolveContentPaths({ projectRoot, env: {} }), {
-        cdnRoot: path.join(projectRoot, ".cdn/cn"),
-        contentStoreDir: path.join(projectRoot, ".content/store"),
-        contentStateDir: path.join(projectRoot, ".content/state"),
-        contentRuntimeDir: path.join(projectRoot, ".content/runtime"),
+    assert.deepEqual(resolveContentPaths({ projectRoot, env: {}, ...posixDependencies }), {
+        cdnDir: path.posix.join(projectRoot, ".cdn"),
+        cdnRoot: path.posix.join(projectRoot, ".cdn/cn"),
+        contentStoreDir: path.posix.join(projectRoot, ".content/store"),
+        contentStateDir: path.posix.join(projectRoot, ".content/state"),
+        contentRuntimeDir: path.posix.join(projectRoot, ".content/runtime"),
     })
 })
 
@@ -135,8 +164,8 @@ test("rejects relative paths that physically escape through a symbolic link", t 
     const externalRoot = path.join(sandbox, "external")
     fs.mkdirSync(projectRoot)
     fs.mkdirSync(externalRoot)
-    fs.symlinkSync(externalRoot, path.join(projectRoot, "outside"), "dir")
     t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+    if (!createHostDirectorySymlink(t, externalRoot, path.join(projectRoot, "outside"))) return
 
     for (const [variable, value] of [
         ["CDN_DIR", "outside/cdn-parent"],
@@ -158,6 +187,7 @@ test("rejects equal or nested lifecycle directories", () => {
     assert.throws(
         () => resolveContentPaths({
             projectRoot: "/repo",
+            ...posixDependencies,
             env: {
                 CONTENT_STORE_DIR: ".content/shared",
                 CONTENT_STATE_DIR: ".content/shared",
@@ -168,6 +198,7 @@ test("rejects equal or nested lifecycle directories", () => {
     assert.throws(
         () => resolveContentPaths({
             projectRoot: "/repo",
+            ...posixDependencies,
             env: { CONTENT_RUNTIME_DIR: ".content/store/runtime" },
         }),
         /CONTENT_STORE_DIR.*CONTENT_RUNTIME_DIR.*equal or nested/,
@@ -175,6 +206,7 @@ test("rejects equal or nested lifecycle directories", () => {
     assert.throws(
         () => resolveContentPaths({
             projectRoot: "/repo",
+            ...posixDependencies,
             env: { CONTENT_STORE_DIR: ".content" },
         }),
         /CONTENT_STORE_DIR.*CONTENT_STATE_DIR.*equal or nested/,
@@ -182,11 +214,20 @@ test("rejects equal or nested lifecycle directories", () => {
     assert.throws(
         () => resolveContentPaths({
             projectRoot: "/repo",
+            ...posixDependencies,
             env: {
                 CDN_DIR: ".content/store/cdn-parent",
             },
         }),
-        /CDN_DIR\/cn.*CONTENT_STORE_DIR.*equal or nested/,
+        /CDN_DIR.*CONTENT_STORE_DIR.*equal or nested/,
+    )
+    assert.throws(
+        () => resolveContentPaths({
+            projectRoot: "/repo",
+            ...posixDependencies,
+            env: { CDN_DIR: ".content" },
+        }),
+        /CDN_DIR.*CONTENT_STORE_DIR.*equal or nested/,
     )
 })
 
@@ -195,8 +236,8 @@ test("rejects lifecycle directories that overlap through symbolic-link aliases",
     const projectRoot = path.join(sandbox, "project")
     const sharedRoot = path.join(projectRoot, "shared")
     fs.mkdirSync(sharedRoot, { recursive: true })
-    fs.symlinkSync(sharedRoot, path.join(projectRoot, "shared-alias"), "dir")
     t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+    if (!createHostDirectorySymlink(t, sharedRoot, path.join(projectRoot, "shared-alias"))) return
 
     assert.throws(
         () => resolveContentPaths({
@@ -224,6 +265,7 @@ test("rejects relative content paths that escape projectRoot", () => {
         assert.throws(
             () => resolveContentPaths({
                 projectRoot: "/repo",
+                ...posixDependencies,
                 env: { [variable]: "../outside" },
             }),
             new RegExp(`${variable}.*outside projectRoot`),

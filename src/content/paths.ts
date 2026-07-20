@@ -10,6 +10,7 @@ export interface ContentPathEnvironment {
 }
 
 export interface ContentPaths {
+    readonly cdnDir: string
     readonly cdnRoot: string
     readonly contentStoreDir: string
     readonly contentStateDir: string
@@ -123,6 +124,20 @@ function resolveConfiguredPath(
     return resolvedPath
 }
 
+function resolveCdnDir(
+    cdnDir: string,
+    projectRoot: string,
+    pathApi: PathApi,
+    fsApi: PathFileSystem,
+): string {
+    const root = requireAbsoluteProjectRoot(projectRoot, pathApi)
+    const resolvedCdnDir = resolveConfiguredPath(cdnDir, root, "CDN_DIR", pathApi, fsApi)
+    if (pathApi.basename(resolvedCdnDir).toLowerCase() === "cn") {
+        throw new Error("CDN_DIR must point to the parent directory; remove the trailing cn segment")
+    }
+    return resolvedCdnDir
+}
+
 export function resolveCnCdnRoot(
     cdnDir: string,
     projectRoot: string,
@@ -130,12 +145,7 @@ export function resolveCnCdnRoot(
 ): string {
     const pathApi = dependencies.pathApi ?? path
     const fsApi = dependencies.fsApi ?? defaultFsApi
-    const root = requireAbsoluteProjectRoot(projectRoot, pathApi)
-    const resolvedCdnDir = resolveConfiguredPath(cdnDir, root, "CDN_DIR", pathApi, fsApi)
-    if (pathApi.basename(resolvedCdnDir).toLowerCase() === "cn") {
-        throw new Error("CDN_DIR must point to the parent directory; remove the trailing cn segment")
-    }
-    return pathApi.join(resolvedCdnDir, "cn")
+    return pathApi.join(resolveCdnDir(cdnDir, projectRoot, pathApi, fsApi), "cn")
 }
 
 function assertIsolatedContentPaths(
@@ -166,8 +176,10 @@ export function resolveContentPaths({
     fsApi = defaultFsApi,
 }: ResolveContentPathsOptions): ContentPaths {
     const root = requireAbsoluteProjectRoot(projectRoot, pathApi)
+    const cdnDir = resolveCdnDir(env.CDN_DIR ?? ".cdn", root, pathApi, fsApi)
     const paths: ContentPaths = {
-        cdnRoot: resolveCnCdnRoot(env.CDN_DIR ?? ".cdn", root, { pathApi, fsApi }),
+        cdnDir,
+        cdnRoot: pathApi.join(cdnDir, "cn"),
         contentStoreDir: resolveConfiguredPath(
             env.CONTENT_STORE_DIR ?? ".content/store",
             root,
@@ -192,7 +204,7 @@ export function resolveContentPaths({
     }
 
     assertIsolatedContentPaths([
-        ["CDN_DIR/cn", paths.cdnRoot],
+        ["CDN_DIR", paths.cdnDir],
         ["CONTENT_STORE_DIR", paths.contentStoreDir],
         ["CONTENT_STATE_DIR", paths.contentStateDir],
         ["CONTENT_RUNTIME_DIR", paths.contentRuntimeDir],

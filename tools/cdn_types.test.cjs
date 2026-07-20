@@ -19,6 +19,8 @@ import type {
     CatalogArchive,
     CatalogEdge,
     CdnCatalog,
+    DiffCatalogEdge,
+    FullCatalogEdge,
     ReadonlyNonEmptyArray,
     UpdatePlan,
 } from ${JSON.stringify(typesModule)}
@@ -30,38 +32,59 @@ const archive: CatalogArchive = {
     layer: "common",
     order: 0,
 }
-const edge: CatalogEdge = {
+const fullEdge: FullCatalogEdge = {
     fromVersion: null,
     toVersion: "1.4.0",
     platform: "android",
     assetSizeKind: "fulfill",
     archives: [archive],
 }
-const edges: ReadonlyNonEmptyArray<CatalogEdge> = [edge]
+const diffEdge: DiffCatalogEdge = {
+    ...fullEdge,
+    fromVersion: "1.4.0",
+    toVersion: "1.4.1",
+}
+const edges: ReadonlyArray<CatalogEdge> = [fullEdge, diffEdge]
+const diffs: ReadonlyNonEmptyArray<DiffCatalogEdge> = [diffEdge]
 const catalog: CdnCatalog = { schemaVersion: 1, edges }
 
 const plans: ReadonlyArray<UpdatePlan> = [
     { kind: "up-to-date", full: null, diff: null, downloadBytes: 0 },
-    { kind: "initial", full: edge, diff: null, downloadBytes: 100 },
-    { kind: "initial", full: edge, diff: edges, downloadBytes: 200 },
-    { kind: "incremental", full: null, diff: edges, downloadBytes: 100 },
+    { kind: "initial", full: fullEdge, diff: null, downloadBytes: 100 },
+    { kind: "initial", full: fullEdge, diff: diffs, downloadBytes: 200 },
+    { kind: "incremental", full: null, diff: diffs, downloadBytes: 100 },
 ]
 
 // @ts-expect-error catalog arrays are immutable
-catalog.edges.push(edge)
+catalog.edges.push(fullEdge)
 // @ts-expect-error archive fields are immutable
 archive.order = 1
 // @ts-expect-error incremental plans require a non-empty diff
 const emptyDiff: UpdatePlan = { kind: "incremental", full: null, diff: [], downloadBytes: 0 }
 // @ts-expect-error initial plans also reject an empty diff
-const emptyInitialDiff: UpdatePlan = { kind: "initial", full: edge, diff: [], downloadBytes: 0 }
+const emptyInitialDiff: UpdatePlan = { kind: "initial", full: fullEdge, diff: [], downloadBytes: 0 }
 // @ts-expect-error up-to-date plans cannot include archives
-const invalidCurrent: UpdatePlan = { kind: "up-to-date", full: edge, diff: null, downloadBytes: 0 }
+const invalidCurrent: UpdatePlan = { kind: "up-to-date", full: fullEdge, diff: null, downloadBytes: 0 }
+// @ts-expect-error a diff edge cannot be used as an initial full edge
+const diffAsFull: UpdatePlan = { kind: "initial", full: diffEdge, diff: null, downloadBytes: 100 }
+// @ts-expect-error a full edge cannot be used in an initial diff chain
+const fullAsInitialDiff: UpdatePlan = { kind: "initial", full: fullEdge, diff: [fullEdge], downloadBytes: 100 }
+// @ts-expect-error a full edge cannot be used in an incremental diff chain
+const fullAsIncrementalDiff: UpdatePlan = { kind: "incremental", full: null, diff: [fullEdge], downloadBytes: 100 }
+// @ts-expect-error full and diff edge contracts are not cross-assignable
+const invalidFullEdge: FullCatalogEdge = diffEdge
+// @ts-expect-error full and diff edge contracts are not cross-assignable
+const invalidDiffEdge: DiffCatalogEdge = fullEdge
 
 void plans
 void emptyDiff
 void emptyInitialDiff
 void invalidCurrent
+void diffAsFull
+void fullAsInitialDiff
+void fullAsIncrementalDiff
+void invalidFullEdge
+void invalidDiffEdge
 `, "utf8")
 
     const result = spawnSync(process.execPath, [

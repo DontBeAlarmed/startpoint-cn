@@ -14,13 +14,22 @@ export interface CatalogArchive {
     readonly order: number
 }
 
-export interface CatalogEdge {
-    readonly fromVersion: string | null
+interface CatalogEdgeBase {
     readonly toVersion: string
     readonly platform: CdnPlatform
     readonly assetSizeKind: AssetSizeKind
     readonly archives: ReadonlyArray<CatalogArchive>
 }
+
+export interface FullCatalogEdge extends CatalogEdgeBase {
+    readonly fromVersion: null
+}
+
+export interface DiffCatalogEdge extends CatalogEdgeBase {
+    readonly fromVersion: string
+}
+
+export type CatalogEdge = FullCatalogEdge | DiffCatalogEdge
 
 export interface CdnCatalog {
     readonly schemaVersion: 1
@@ -69,14 +78,14 @@ export interface UpToDateUpdatePlan extends UpdatePlanBase {
 
 export interface InitialUpdatePlan extends UpdatePlanBase {
     readonly kind: "initial"
-    readonly full: CatalogEdge
-    readonly diff: ReadonlyNonEmptyArray<CatalogEdge> | null
+    readonly full: FullCatalogEdge
+    readonly diff: ReadonlyNonEmptyArray<DiffCatalogEdge> | null
 }
 
 export interface IncrementalUpdatePlan extends UpdatePlanBase {
     readonly kind: "incremental"
     readonly full: null
-    readonly diff: ReadonlyNonEmptyArray<CatalogEdge>
+    readonly diff: ReadonlyNonEmptyArray<DiffCatalogEdge>
 }
 
 export type UpdatePlan = UpToDateUpdatePlan | InitialUpdatePlan | IncrementalUpdatePlan
