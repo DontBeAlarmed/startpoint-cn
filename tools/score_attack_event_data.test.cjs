@@ -159,11 +159,4 @@ assert.equal(convertedBorderCount, 11100)
 assert.deepEqual([...currentRewardKinds].sort(), [0])
 assert.equal(borderRewards["1_101"].find(value => value.id === 101075).rewards.length, 2)
 
-const finishSource = fs.readFileSync(
-    path.join(projectRoot, "src/routes/api/singleBattleQuest.ts"),
-    "utf8",
-)
-assert.match(finishSource, /"score_attack_event"\s*:\s*scoreAttackEventData/)
-assert.match(finishSource, /handleScoreAttackEventFinish\s*\(/)
-
 console.log("score attack event data tests passed")

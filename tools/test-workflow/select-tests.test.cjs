@@ -130,15 +130,12 @@ test("registers every test in exactly one leaf group and full covers runtime reg
     }
 })
 
-test("keeps external data and source inspection out of self-contained runtime tests", () => {
+test("keeps external data concerns out of self-contained runtime tests", () => {
     const runtimeTests = [
         "tools/score_attack_event.test.cjs",
         "tools/treasure_key_entry.test.cjs",
     ]
     const forbiddenMarkers = [
-        "node:fs",
-        "node:path",
-        "readFileSync",
         "orderedmap",
         "fieldMap",
         "converterSource",
@@ -150,6 +147,34 @@ test("keeps external data and source inspection out of self-contained runtime te
         const source = fs.readFileSync(file, "utf8")
         for (const marker of forbiddenMarkers) {
             assert.equal(source.includes(marker), false, `${file}: ${marker}`)
+        }
+    }
+})
+
+test("keeps runtime wiring contracts in full instead of generator", () => {
+    const contracts = [
+        {
+            data: "tools/score_attack_event_data.test.cjs",
+            markers: ["src/routes/api/singleBattleQuest.ts", "scoreAttackEventData"],
+            runtime: "tools/score_attack_event.test.cjs",
+        },
+        {
+            data: "tools/treasure_key_entry_data.test.cjs",
+            markers: [
+                "src/lib/quest/active-quest-service.ts",
+                "insertActiveQuestSource",
+                "quest start response must include the post-deduction item_list",
+            ],
+            runtime: "tools/treasure_key_entry.test.cjs",
+        },
+    ]
+
+    for (const contract of contracts) {
+        const runtimeSource = fs.readFileSync(contract.runtime, "utf8")
+        const dataSource = fs.readFileSync(contract.data, "utf8")
+        for (const marker of contract.markers) {
+            assert.equal(runtimeSource.includes(marker), true, `${contract.runtime}: ${marker}`)
+            assert.equal(dataSource.includes(marker), false, `${contract.data}: ${marker}`)
         }
     }
 })
