@@ -56,3 +56,24 @@ node tools/test-workflow/benchmark.cjs --report-only --output /tmp/starpoint-cn-
 `quest_abort_route.test.cjs` 会加载并转译完整路由依赖，不再计入 quick，而是归入 `integration:compiled`。逐项审查该组后确认：纯函数测试不访问数据库；`character_awake_refresh.test.cjs` 和 `mission_completion.test.cjs` 在加载数据库模块前分别创建唯一的临时数据库目录；`quest_abort_route.test.cjs` 预先替换数据库模块并通过 Fastify `inject()` 测试，不绑定真实端口。该组因此改为最多 4 路并行。需要真实数据库语义的 `integration:database` 与预留的 `integration:cdn` 继续串行，所有 quick 组继续并行。
 
 changed 选择器将 `src/lib/gacha-draw.ts` 精确映射到 `quick:gacha`；`src/routes/api/singleBattleQuest.ts` 同时选择 `integration:compiled` 和 `integration:database`，未知文件仍升级为 `full`。单次完整回归为 36 通过、0 失败、1 跳过，总耗时 29.42 秒。分层单次回归前后，真实 `.database`、`assets/confirmed_seeds.json` 和 `out/` 的内容摘要均未变化。
+
+## 阶段 0 干净树最终验收
+
+- 测量日期：2026-07-20
+- 验收 commit：`2c84232d54f3c6260e1aaae5874ee5d46f9453bd`
+- 默认 Node.js：`v22.23.1`
+- 工作树：`dirty=false`，tracked changes 0，untracked files 0
+- `statusSha256`：`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+- 原始报告：`/tmp/starpoint-cn-stage0-final.json`（本机临时文件，不进入仓库）
+
+| 命令 | 三次正式耗时（秒） | 中位数（秒） | 阈值（秒） | 当前状态 | 通过/失败/跳过 |
+|---|---:|---:|---:|---|---:|
+| `test:quick` | 2.672 / 2.703 / 3.589 | 2.703 | 5 | 达标 | 13 / 0 / 0 |
+| `test:changed` | 0.896 / 0.926 / 0.889 | 0.896 | 20 | 达标 | 4 / 0 / 0 |
+| `test:integration` | 28.093 / 26.057 / 27.052 | 27.052 | 30 | 达标 | 20 / 0 / 1 |
+| `test:full` | 32.545 / 27.793 / 29.041 | 29.041 | 60 | 达标 | 38 / 0 / 1 |
+| `typecheck` | 20.328 / 19.613 / 17.921 | 19.613 | 30 | 达标 | 0 / 0 / 0 |
+
+本次验收由非 `report-only` 的完整 benchmark 在 A 提交后的干净工作树上执行，五项预热后各运行三次，所有正式运行原始退出码均为 0。`score_attack_event.test.cjs` 与 `treasure_key_entry.test.cjs` 经副作用审查后从 generator 迁入并行的 `integration:compiled`：两者只读 CDN 参考数据、使用内存依赖，不访问真实数据库、不绑定端口，也不依赖跨进程共享状态。full 因此新增这两个运行时回归，由上一轮 36 项增加到 38 项；generator 仅保留真正的数据生成器验证。
+
+changed 选择器对 `src/routes/api/singleBattleQuest.ts` 同时选择 `quick:quest`、`integration:compiled` 和 `integration:database`。测试清单契约会枚举至少 42 个测试文件，要求每个测试只属于一个叶组，并要求 full 精确覆盖全部非 generator 运行时回归。benchmark 报告只公开工作树是否脏、原始 porcelain 状态字节的 SHA-256 和变更数量，不包含状态文本、文件路径或 diff 内容。
