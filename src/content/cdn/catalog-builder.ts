@@ -2,7 +2,12 @@ import fs from "node:fs"
 import path from "node:path"
 
 import type { ContentPaths } from "../paths"
-import { resolveDigestCache, type DigestCacheDependencies, type DigestFileCandidate } from "./digest-cache"
+import {
+    resolveDigestCache,
+    UnstableFileSnapshotError,
+    type DigestCacheDependencies,
+    type DigestFileCandidate,
+} from "./digest-cache"
 import { validatePatchGraph } from "./patch-graph"
 import type {
     ArchiveLayer,
@@ -59,15 +64,8 @@ interface ScanDirectoryEntry {
     isFile?(): boolean
 }
 
-interface ScanFileStat {
-    readonly size: number
-    readonly mtimeMs: number
-    isFile(): boolean
-}
-
 export interface ScanCdnCatalogDependencies extends DigestCacheDependencies {
     readonly readdir?: (directory: string) => Promise<ReadonlyArray<string | ScanDirectoryEntry>>
-    readonly stat?: (filePath: string) => Promise<ScanFileStat>
     readonly readEntityList?: (filePath: string) => Promise<Buffer>
 }
 
@@ -260,6 +258,31 @@ function compareEdges(left: CatalogEdge, right: CatalogEdge): number {
         || kindOrder
         || compareVersions(left.fromVersion ?? left.toVersion, right.fromVersion ?? right.toVersion)
         || compareVersions(left.toVersion, right.toVersion)
+}
+
+function appendArchiveOrderIssues(
+    edges: ReadonlyArray<CatalogEdge>,
+    issues: CatalogValidationIssue[],
+): void {
+    edges.forEach((edge, edgeIndex) => {
+        const layers = new Set(edge.archives.map(archive => archive.layer))
+        for (const layer of layers) {
+            const layerArchives = edge.archives
+                .filter(archive => archive.layer === layer)
+                .sort((left, right) => left.order - right.order)
+            const uniqueOrders = [...new Set(layerArchives.map(archive => archive.order))]
+            const invalidOrderIndex = uniqueOrders.findIndex((order, index) => order !== index + 1)
+            if (invalidOrderIndex === -1) continue
+
+            const invalidOrder = uniqueOrders[invalidOrderIndex]
+            const invalidArchive = layerArchives.find(archive => archive.order === invalidOrder) as CatalogArchive
+            issues.push(validationIssue(
+                "NON_CONTIGUOUS_ARCHIVE_ORDER",
+                `${edge.fromVersion === null ? "full" : "diff"} edge ${edge.fromVersion ?? "full"} -> ${edge.toVersion} platform ${edge.platform} mode ${edge.assetSizeKind} layer ${layer} must use contiguous archive orders starting at 1`,
+                { edgeIndex, relativePath: invalidArchive.relativePath },
+            ))
+        }
+    })
 }
 
 function deepFreeze<T>(value: T): T {
@@ -467,6 +490,7 @@ export function buildCdnCatalog(input: CdnCatalogInput): CdnCatalog {
         }
     }
     edges.sort(compareEdges)
+    appendArchiveOrderIssues(edges, issues)
     issues.push(...validatePatchGraph(edges, fullBaseVersion))
 
     if (issues.length > 0) throw new CatalogValidationError(issues)
@@ -505,10 +529,24 @@ export async function scanCdnCatalogInput(
     dependencies: ScanCdnCatalogDependencies = {},
 ): Promise<CdnCatalogInput> {
     const readdir = dependencies.readdir ?? (directory => fs.promises.readdir(directory, { withFileTypes: true }))
-    const stat = dependencies.stat ?? (filePath => fs.promises.stat(filePath))
     const readEntityList = dependencies.readEntityList ?? (filePath => fs.promises.readFile(filePath))
+    const entityListsDirectory = path.join(paths.cdnRoot, "EntityLists")
+    const entityCandidates = fileNames(await readDirectory(entityListsDirectory, readdir))
+        .filter(fileName => /-android_medium\.csv$/.test(fileName))
+    if (entityCandidates.length === 0) {
+        throwValidationIssue("MISSING_PATH", "missing Android medium EntityLists CSV")
+    }
+    if (entityCandidates.length > 1) {
+        throwValidationIssue(
+            "AMBIGUOUS_PATH",
+            `multiple Android medium EntityLists CSV files: ${entityCandidates.join(", ")}`,
+        )
+    }
+    const entityListsRelativePath = `EntityLists/${entityCandidates[0]}`
+    const entityListContent = await readEntityList(path.join(paths.cdnRoot, entityListsRelativePath))
+    const installedBytes = parseEntityListInstalledBytes(entityListContent)
     const pendingArchives: Array<{
-        readonly archive: Omit<CdnCatalogArchiveInput, "sha256">
+        readonly archive: Omit<CdnCatalogArchiveInput, "compressedBytes" | "sha256">
         readonly digest: DigestFileCandidate
     }> = []
 
@@ -528,8 +566,6 @@ export async function scanCdnCatalogInput(
             }
             const relativePath = `${directory.name}/${fileName}`
             const absolutePath = path.join(absoluteDirectory, fileName)
-            const metadata = await stat(absolutePath)
-            if (!metadata.isFile()) continue
             const edge = directory.kind === "full"
                 ? { kind: "full" as const, fromVersion: null, toVersion: parsed.toVersion }
                 : {
@@ -544,47 +580,46 @@ export async function scanCdnCatalogInput(
                     layer: directory.layer,
                     order: parsed.order,
                     relativePath,
-                    compressedBytes: metadata.size,
                 },
                 digest: {
                     path: relativePath,
                     absolutePath,
-                    size: metadata.size,
-                    mtime: metadata.mtimeMs,
                 },
             })
         }
     }
 
     const digestCachePath = path.join(paths.contentStateDir, "cdn-digest-cache.json")
-    const digests = await resolveDigestCache(
-        pendingArchives.map(item => item.digest),
-        digestCachePath,
-        dependencies,
-    )
-    const archives: CdnCatalogArchiveInput[] = pendingArchives.map(item => ({
-        ...item.archive,
-        sha256: digests.get(item.archive.relativePath) as string,
-    }))
-
-    const entityListsDirectory = path.join(paths.cdnRoot, "EntityLists")
-    const entityCandidates = fileNames(await readDirectory(entityListsDirectory, readdir))
-        .filter(fileName => /-android_medium\.csv$/.test(fileName))
-    if (entityCandidates.length === 0) {
-        throwValidationIssue("MISSING_PATH", "missing Android medium EntityLists CSV")
-    }
-    if (entityCandidates.length > 1) {
-        throwValidationIssue(
-            "AMBIGUOUS_PATH",
-            `multiple Android medium EntityLists CSV files: ${entityCandidates.join(", ")}`,
+    let snapshots
+    try {
+        snapshots = await resolveDigestCache(
+            pendingArchives.map(item => item.digest),
+            digestCachePath,
+            dependencies,
         )
+    } catch (error) {
+        if (error instanceof UnstableFileSnapshotError) {
+            throwValidationIssue(
+                "UNSTABLE_ARCHIVE_SNAPSHOT",
+                error.message,
+                { relativePath: error.relativePath },
+            )
+        }
+        throw error
     }
-    const entityListsRelativePath = `EntityLists/${entityCandidates[0]}`
-    const entityListContent = await readEntityList(path.join(paths.cdnRoot, entityListsRelativePath))
+    const archives: CdnCatalogArchiveInput[] = pendingArchives.map(item => {
+        const snapshot = snapshots.get(item.archive.relativePath)
+        if (!snapshot) throw new Error(`missing archive snapshot: ${item.archive.relativePath}`)
+        return {
+            ...item.archive,
+            compressedBytes: snapshot.size,
+            sha256: snapshot.digest,
+        }
+    })
 
     return {
         archives,
-        installedBytes: parseEntityListInstalledBytes(entityListContent),
+        installedBytes,
         entityListsRelativePath,
     }
 }

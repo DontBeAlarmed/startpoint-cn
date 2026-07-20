@@ -24,6 +24,19 @@ const fixtureRoot = path.join(__dirname, "fixtures/cdn-catalog")
 const DIGEST_A = "a".repeat(64)
 const DIGEST_B = "b".repeat(64)
 
+async function digestOpenFile(fileHandle) {
+    const hash = crypto.createHash("sha256")
+    const buffer = Buffer.alloc(64 * 1024)
+    let position = 0
+    while (true) {
+        const { bytesRead } = await fileHandle.read(buffer, 0, buffer.length, position)
+        if (bytesRead === 0) break
+        hash.update(buffer.subarray(0, bytesRead))
+        position += bytesRead
+    }
+    return hash.digest("hex")
+}
+
 function archive(overrides = {}) {
     const kind = overrides.kind ?? "diff"
     const layer = overrides.layer ?? "common"
@@ -226,6 +239,32 @@ test("reports duplicate archive paths even when their metadata is identical", ()
     assert.ok(issueCodes(() => buildCdnCatalog(input)).includes("DUPLICATE_ARCHIVE_PATH"))
 })
 
+test("requires each archive layer order to start at one and remain contiguous", () => {
+    const startsAtTwo = validInput()
+    startsAtTwo.archives = startsAtTwo.archives.map(item => (
+        item.kind === "diff" && item.layer === "quality"
+            ? {
+                ...item,
+                order: 2,
+                relativePath: "archive-medium-diff/pinball-1.4.0-1.4.1-2-abcd.zip",
+            }
+            : item
+    ))
+    assert.ok(issueCodes(() => buildCdnCatalog(startsAtTwo)).includes("NON_CONTIGUOUS_ARCHIVE_ORDER"))
+
+    const hasGap = validInput()
+    hasGap.archives = hasGap.archives.map(item => (
+        item.kind === "full" && item.layer === "common" && item.order === 2
+            ? {
+                ...item,
+                order: 3,
+                relativePath: "archive-common-full/pinball-1.4.0-3-abcd.zip",
+            }
+            : item
+    ))
+    assert.ok(issueCodes(() => buildCdnCatalog(hasGap)).includes("NON_CONTIGUOUS_ARCHIVE_ORDER"))
+})
+
 test("rejects cycles and diff edges disconnected from the full base", () => {
     const cycle = validInput()
     cycle.archives.push(
@@ -336,10 +375,172 @@ test("scanner reads only fixed CDN directories and reuses an atomic digest cache
     const cache = JSON.parse(fs.readFileSync(path.join(contentStateDir, "cdn-digest-cache.json"), "utf8"))
     assert.equal(cache.length, 7)
     assert.ok(cache.every(entry => (
-        Object.keys(entry).sort().join(",") === "digest,mtime,path,size"
+        Object.keys(entry).sort().join(",") === "ctimeMs,dev,digest,ino,mtimeMs,path,size"
     )))
     assert.ok(cache.every(entry => !path.isAbsolute(entry.path)))
     assert.equal(fs.readdirSync(contentStateDir).some(name => name.includes(".tmp-")), false)
+})
+
+test("scanner retries a changed archive and publishes only its stable snapshot", async t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "cdn-catalog-stable-"))
+    const cdnRoot = path.join(sandbox, "cdn")
+    const contentStateDir = path.join(sandbox, "state")
+    fs.cpSync(fixtureRoot, cdnRoot, { recursive: true })
+    t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+
+    const targetPath = path.join(cdnRoot, "archive-android-diff", "pinball-1.4.0-1.4.1-1-abcd.zip")
+    let targetDigestCalls = 0
+    const digestFile = async (fileHandle, filePath) => {
+        if (filePath === targetPath) {
+            targetDigestCalls++
+            if (targetDigestCalls === 1) fs.appendFileSync(filePath, "changed-during-hash")
+        }
+        return digestOpenFile(fileHandle)
+    }
+    const input = await scanCdnCatalogInput({
+        cdnDir: sandbox,
+        cdnRoot,
+        contentStoreDir: path.join(sandbox, "store"),
+        contentStateDir,
+        contentRuntimeDir: path.join(sandbox, "runtime"),
+    }, { digestFile })
+
+    const archive = input.archives.find(item => item.relativePath === "archive-android-diff/pinball-1.4.0-1.4.1-1-abcd.zip")
+    const stableContent = fs.readFileSync(targetPath)
+    assert.equal(targetDigestCalls, 2)
+    assert.equal(archive.compressedBytes, stableContent.length)
+    assert.equal(archive.sha256, crypto.createHash("sha256").update(stableContent).digest("hex"))
+})
+
+test("scanner rejects an archive that changes throughout every snapshot attempt", async t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "cdn-catalog-unstable-"))
+    const cdnRoot = path.join(sandbox, "cdn")
+    const contentStateDir = path.join(sandbox, "state")
+    fs.cpSync(fixtureRoot, cdnRoot, { recursive: true })
+    t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+
+    const targetPath = path.join(cdnRoot, "archive-android-diff", "pinball-1.4.0-1.4.1-1-abcd.zip")
+    let targetDigestCalls = 0
+    const digestFile = async (fileHandle, filePath) => {
+        if (filePath === targetPath) {
+            targetDigestCalls++
+            fs.appendFileSync(filePath, "x")
+        }
+        return digestOpenFile(fileHandle)
+    }
+    await assert.rejects(
+        scanCdnCatalogInput({
+            cdnDir: sandbox,
+            cdnRoot,
+            contentStoreDir: path.join(sandbox, "store"),
+            contentStateDir,
+            contentRuntimeDir: path.join(sandbox, "runtime"),
+        }, { digestFile }),
+        error => error instanceof CatalogValidationError && error.code === "UNSTABLE_ARCHIVE_SNAPSHOT",
+    )
+    assert.equal(targetDigestCalls, 3)
+    assert.equal(fs.existsSync(path.join(contentStateDir, "cdn-digest-cache.json")), false)
+})
+
+test("scanner rehashes a same-size replacement even when mtime is restored", async t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "cdn-catalog-replaced-"))
+    const cdnRoot = path.join(sandbox, "cdn")
+    const contentStateDir = path.join(sandbox, "state")
+    fs.cpSync(fixtureRoot, cdnRoot, { recursive: true })
+    t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+
+    const targetRelativePath = "archive-common-full/pinball-1.4.0-1-abcd.zip"
+    const targetPath = path.join(cdnRoot, targetRelativePath)
+    const fixedTime = new Date("2024-01-02T03:04:05.000Z")
+    fs.utimesSync(targetPath, fixedTime, fixedTime)
+    const beforeStat = fs.statSync(targetPath)
+    let digestCalls = 0
+    const digestFile = async fileHandle => {
+        digestCalls++
+        return digestOpenFile(fileHandle)
+    }
+    const paths = {
+        cdnDir: sandbox,
+        cdnRoot,
+        contentStoreDir: path.join(sandbox, "store"),
+        contentStateDir,
+        contentRuntimeDir: path.join(sandbox, "runtime"),
+    }
+    const first = await scanCdnCatalogInput(paths, { digestFile })
+    const firstArchive = first.archives.find(item => item.relativePath === targetRelativePath)
+    assert.equal(digestCalls, 6)
+
+    const replacementPath = `${targetPath}.replacement`
+    const replacement = Buffer.alloc(beforeStat.size, 0x78)
+    fs.writeFileSync(replacementPath, replacement)
+    fs.unlinkSync(targetPath)
+    fs.renameSync(replacementPath, targetPath)
+    fs.utimesSync(targetPath, fixedTime, fixedTime)
+    const afterStat = fs.statSync(targetPath)
+    assert.equal(afterStat.size, beforeStat.size)
+    assert.equal(afterStat.mtimeMs, beforeStat.mtimeMs)
+
+    const second = await scanCdnCatalogInput(paths, { digestFile })
+    const secondArchive = second.archives.find(item => item.relativePath === targetRelativePath)
+    assert.equal(digestCalls, 7)
+    assert.notEqual(secondArchive.sha256, firstArchive.sha256)
+    assert.equal(secondArchive.sha256, crypto.createHash("sha256").update(replacement).digest("hex"))
+})
+
+test("scanner invalidates the old digest cache schema and writes portable fingerprints", async t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "cdn-catalog-old-cache-"))
+    const cdnRoot = path.join(sandbox, "cdn")
+    const contentStateDir = path.join(sandbox, "state")
+    fs.cpSync(fixtureRoot, cdnRoot, { recursive: true })
+    fs.mkdirSync(contentStateDir)
+    t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+
+    const archiveDirectories = [
+        "archive-android-diff",
+        "archive-android-full",
+        "archive-common-diff",
+        "archive-common-full",
+        "archive-medium-diff",
+        "archive-medium-full",
+    ]
+    const oldCache = archiveDirectories.map(directory => {
+        const fileName = fs.readdirSync(path.join(cdnRoot, directory))[0]
+        const relativePath = `${directory}/${fileName}`
+        const stat = fs.statSync(path.join(cdnRoot, relativePath))
+        return {
+            path: relativePath,
+            size: stat.size,
+            mtime: stat.mtimeMs,
+            digest: "0".repeat(64),
+        }
+    })
+    fs.writeFileSync(
+        path.join(contentStateDir, "cdn-digest-cache.json"),
+        JSON.stringify(oldCache),
+    )
+
+    let digestCalls = 0
+    await scanCdnCatalogInput({
+        cdnDir: sandbox,
+        cdnRoot,
+        contentStoreDir: path.join(sandbox, "store"),
+        contentStateDir,
+        contentRuntimeDir: path.join(sandbox, "runtime"),
+    }, {
+        digestFile: async fileHandle => {
+            digestCalls++
+            return digestOpenFile(fileHandle)
+        },
+    })
+    assert.equal(digestCalls, 6)
+
+    const cache = JSON.parse(fs.readFileSync(path.join(contentStateDir, "cdn-digest-cache.json"), "utf8"))
+    assert.ok(cache.every(entry => (
+        Object.keys(entry).sort().join(",") === "ctimeMs,dev,digest,ino,mtimeMs,path,size"
+    )))
+    assert.ok(cache.every(entry => ["ctimeMs", "dev", "ino", "mtimeMs"].every(key => (
+        typeof entry[key] === "string"
+    ))))
 })
 
 test("scanner rejects ambiguous EntityLists candidates without inspecting arbitrary trees", async t => {
@@ -359,10 +560,18 @@ test("scanner rejects ambiguous EntityLists candidates without inspecting arbitr
         contentStateDir: path.join(sandbox, "state"),
         contentRuntimeDir: path.join(sandbox, "runtime"),
     }
+    let digestCalls = 0
     await assert.rejects(
-        scanCdnCatalogInput(paths),
+        scanCdnCatalogInput(paths, {
+            digestFile: async () => {
+                digestCalls++
+                throw new Error("archive hashing must not run before EntityLists validation")
+            },
+        }),
         error => error instanceof CatalogValidationError && error.code === "AMBIGUOUS_PATH",
     )
+    assert.equal(digestCalls, 0)
+    assert.equal(fs.existsSync(path.join(paths.contentStateDir, "cdn-digest-cache.json")), false)
 })
 
 test("catalog rejects invalid scalar metadata with explicit issue codes", () => {
