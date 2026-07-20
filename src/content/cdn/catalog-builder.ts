@@ -268,7 +268,11 @@ function appendArchiveOrderIssues(
         const layers = new Set(edge.archives.map(archive => archive.layer))
         for (const layer of layers) {
             const layerArchives = edge.archives
-                .filter(archive => archive.layer === layer)
+                .filter(archive => (
+                    archive.layer === layer
+                    && Number.isSafeInteger(archive.order)
+                    && archive.order > 0
+                ))
                 .sort((left, right) => left.order - right.order)
             const uniqueOrders = [...new Set(layerArchives.map(archive => archive.order))]
             const invalidOrderIndex = uniqueOrders.findIndex((order, index) => order !== index + 1)

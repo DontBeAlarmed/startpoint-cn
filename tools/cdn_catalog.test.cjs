@@ -265,6 +265,27 @@ test("requires each archive layer order to start at one and remain contiguous", 
     assert.ok(issueCodes(() => buildCdnCatalog(hasGap)).includes("NON_CONTIGUOUS_ARCHIVE_ORDER"))
 })
 
+test("reports only INVALID_ARCHIVE_ORDER for non-finite or unsafe orders", () => {
+    for (const invalidOrder of [Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+        const input = validInput()
+        input.archives = input.archives.map(item => (
+            item.kind === "full" && item.layer === "common" && item.order === 2
+                ? { ...item, order: invalidOrder }
+                : item
+        ))
+
+        assert.throws(() => buildCdnCatalog(input), error => {
+            assert.ok(error instanceof CatalogValidationError)
+            assert.equal(error.code, "INVALID_ARCHIVE_ORDER")
+            assert.deepEqual(
+                [...new Set(error.issues.map(issue => issue.code))],
+                ["INVALID_ARCHIVE_ORDER"],
+            )
+            return true
+        })
+    }
+})
+
 test("rejects cycles and diff edges disconnected from the full base", () => {
     const cycle = validInput()
     cycle.archives.push(
@@ -379,6 +400,87 @@ test("scanner reads only fixed CDN directories and reuses an atomic digest cache
     )))
     assert.ok(cache.every(entry => !path.isAbsolute(entry.path)))
     assert.equal(fs.readdirSync(contentStateDir).some(name => name.includes(".tmp-")), false)
+})
+
+test("default digest loop hashes archive bytes and closes every file handle", async t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "cdn-catalog-default-digest-"))
+    const cdnRoot = path.join(sandbox, "cdn")
+    fs.cpSync(fixtureRoot, cdnRoot, { recursive: true })
+    t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+
+    let openedHandles = 0
+    let closedHandles = 0
+    let readCalls = 0
+    const openFile = async filePath => {
+        const fileHandle = await fs.promises.open(filePath, "r")
+        openedHandles++
+        return {
+            stat: options => fileHandle.stat(options),
+            read: async (...arguments_) => {
+                readCalls++
+                return fileHandle.read(...arguments_)
+            },
+            close: async () => {
+                closedHandles++
+                await fileHandle.close()
+            },
+        }
+    }
+    const input = await scanCdnCatalogInput({
+        cdnDir: sandbox,
+        cdnRoot,
+        contentStoreDir: path.join(sandbox, "store"),
+        contentStateDir: path.join(sandbox, "state"),
+        contentRuntimeDir: path.join(sandbox, "runtime"),
+    }, { openFile })
+
+    assert.equal(openedHandles, 6)
+    assert.equal(closedHandles, openedHandles)
+    assert.ok(readCalls >= openedHandles * 2)
+    for (const archive of input.archives) {
+        const content = fs.readFileSync(path.join(cdnRoot, archive.relativePath))
+        assert.equal(archive.compressedBytes, content.length)
+        assert.equal(
+            archive.sha256,
+            crypto.createHash("sha256").update(content).digest("hex"),
+        )
+    }
+})
+
+test("default digest loop closes its file handle when reading fails", async t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "cdn-catalog-default-error-"))
+    const cdnRoot = path.join(sandbox, "cdn")
+    fs.cpSync(fixtureRoot, cdnRoot, { recursive: true })
+    t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+
+    let openedHandles = 0
+    let closedHandles = 0
+    const openFile = async filePath => {
+        const fileHandle = await fs.promises.open(filePath, "r")
+        openedHandles++
+        return {
+            stat: options => fileHandle.stat(options),
+            read: async () => {
+                throw new Error("synthetic archive read failure")
+            },
+            close: async () => {
+                closedHandles++
+                await fileHandle.close()
+            },
+        }
+    }
+    await assert.rejects(
+        scanCdnCatalogInput({
+            cdnDir: sandbox,
+            cdnRoot,
+            contentStoreDir: path.join(sandbox, "store"),
+            contentStateDir: path.join(sandbox, "state"),
+            contentRuntimeDir: path.join(sandbox, "runtime"),
+        }, { openFile }),
+        /synthetic archive read failure/,
+    )
+    assert.equal(openedHandles, 1)
+    assert.equal(closedHandles, openedHandles)
 })
 
 test("scanner retries a changed archive and publishes only its stable snapshot", async t => {
