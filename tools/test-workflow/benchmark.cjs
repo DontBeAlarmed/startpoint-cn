@@ -120,8 +120,9 @@ function createTailBuffer(maxBytes = MAX_OUTPUT_BYTES) {
     if (!Number.isInteger(maxBytes) || maxBytes <= 0) {
         throw new TypeError("output capture limit must be a positive integer")
     }
-    const chunks = []
-    let totalBytes = 0
+    const storage = Buffer.allocUnsafe(maxBytes)
+    let start = 0
+    let length = 0
     let truncated = false
 
     return {
@@ -129,35 +130,51 @@ function createTailBuffer(maxBytes = MAX_OUTPUT_BYTES) {
             const chunk = Buffer.isBuffer(value) ? value : Buffer.from(String(value))
             if (chunk.length === 0) return
             if (chunk.length >= maxBytes) {
-                truncated ||= totalBytes > 0 || chunk.length > maxBytes
-                chunks.length = 0
-                chunks.push(Buffer.from(chunk.subarray(chunk.length - maxBytes)))
-                totalBytes = maxBytes
+                truncated ||= length > 0 || chunk.length > maxBytes
+                chunk.copy(storage, 0, chunk.length - maxBytes)
+                start = 0
+                length = maxBytes
                 return
             }
 
-            chunks.push(chunk)
-            totalBytes += chunk.length
-            while (totalBytes > maxBytes) {
+            if (length + chunk.length > maxBytes) {
                 truncated = true
-                const excessBytes = totalBytes - maxBytes
-                const firstChunk = chunks[0]
-                if (firstChunk.length <= excessBytes) {
-                    chunks.shift()
-                    totalBytes -= firstChunk.length
-                    continue
-                }
-                chunks[0] = Buffer.from(firstChunk.subarray(excessBytes))
-                totalBytes -= excessBytes
+                const discardedBytes = length + chunk.length - maxBytes
+                start = (start + discardedBytes) % maxBytes
+                length -= discardedBytes
             }
+
+            const end = (start + length) % maxBytes
+            const firstCopyBytes = Math.min(chunk.length, maxBytes - end)
+            chunk.copy(storage, end, 0, firstCopyBytes)
+            if (firstCopyBytes < chunk.length) {
+                chunk.copy(storage, 0, firstCopyBytes)
+            }
+            length += chunk.length
         },
         get outputTruncated() {
             return truncated
         },
+        get storageBytes() {
+            return storage.length
+        },
+        get storageSegments() {
+            return 1
+        },
         toString() {
-            return Buffer.concat(chunks, totalBytes).toString("utf8")
+            if (length === 0) return ""
+            if (start + length <= maxBytes) {
+                return storage.subarray(start, start + length).toString("utf8")
+            }
+            const firstPart = storage.subarray(start)
+            const secondPart = storage.subarray(0, length - firstPart.length)
+            return Buffer.concat([firstPart, secondPart], length).toString("utf8")
         },
     }
+}
+
+function normalizeProcessIdentity(identity) {
+    return typeof identity === "string" ? identity.trim().replace(/\s+/g, " ") : null
 }
 
 function readPosixProcessTable(options = {}) {
@@ -165,17 +182,22 @@ function readPosixProcessTable(options = {}) {
     const spawnSyncImpl = options.spawnSync ?? spawnSync
     const result = spawnSyncImpl(
         "ps",
-        ["-axo", "pid=,ppid=,pgid="],
-        { encoding: "utf8" },
+        ["-axo", "pid=,ppid=,pgid=,lstart="],
+        { encoding: "utf8", maxBuffer: 2 * 1024 * 1024, timeout: 1000 },
     )
     if (result.error) throw result.error
     if (result.status !== 0) {
         throw new Error(result.stderr?.trim() || `ps exited with status ${result.status}`)
     }
     return result.stdout.split(/\r?\n/).flatMap(line => {
-        const fields = line.trim().split(/\s+/).map(Number)
-        if (fields.length !== 3 || fields.some(field => !Number.isInteger(field))) return []
-        return [{ pid: fields[0], ppid: fields[1], pgid: fields[2] }]
+        const match = line.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.+?)\s*$/)
+        if (!match) return []
+        return [{
+            identity: normalizeProcessIdentity(match[4]),
+            pgid: Number(match[3]),
+            pid: Number(match[1]),
+            ppid: Number(match[2]),
+        }]
     })
 }
 
@@ -189,6 +211,7 @@ function capturePosixTerminationTargets(activeRun, options = {}) {
     }
 
     const normalizedTable = processTable.map(entry => ({
+        identity: normalizeProcessIdentity(entry.identity),
         pgid: Number(entry.pgid),
         pid: Number(entry.pid),
         ppid: Number(entry.ppid),
@@ -203,6 +226,7 @@ function capturePosixTerminationTargets(activeRun, options = {}) {
 
     const rootPid = activeRun.processId ?? activeRun.processGroupId
     const rootEntry = processesByPid.get(rootPid) ?? {
+        identity: null,
         pgid: activeRun.processGroupId,
         pid: rootPid,
         ppid: 0,
@@ -223,6 +247,9 @@ function capturePosixTerminationTargets(activeRun, options = {}) {
         }
     }
     visit(rootEntry, 0)
+    activeRun.capturedProcesses = capturedProcesses
+        .filter(entry => entry.pid > 0 && entry.pid !== currentPid)
+        .sort((left, right) => right.depth - left.depth || left.pid - right.pid)
 
     const groupDepths = new Map()
     const pidTargets = []
@@ -259,6 +286,36 @@ function signalPosixProcessTree(activeRun, signal, options = {}) {
     }
 }
 
+function forceKillCapturedPosixProcesses(activeRun, options = {}) {
+    capturePosixTerminationTargets(activeRun, options)
+    let currentProcessTable
+    try {
+        currentProcessTable = readPosixProcessTable(options)
+    } catch (error) {
+        recordLifecycleError(activeRun, "failed to verify POSIX process identities", error)
+        return
+    }
+    const currentProcesses = new Map(currentProcessTable.map(entry => [Number(entry.pid), {
+        identity: normalizeProcessIdentity(entry.identity),
+        pid: Number(entry.pid),
+    }]))
+    const killProcess = options.killProcess ?? process.kill.bind(process)
+
+    for (const capturedProcess of activeRun.capturedProcesses ?? []) {
+        const currentProcess = currentProcesses.get(capturedProcess.pid)
+        if (!capturedProcess.identity || currentProcess?.identity !== capturedProcess.identity) continue
+        try {
+            killProcess(capturedProcess.pid, "SIGKILL")
+        } catch (error) {
+            recordLifecycleError(
+                activeRun,
+                `failed to force-kill pid ${capturedProcess.pid}`,
+                error,
+            )
+        }
+    }
+}
+
 function taskkillProcessTree(activeRun, force, options = {}) {
     const spawnSyncImpl = options.spawnSync ?? spawnSync
     const args = ["/PID", String(activeRun.processGroupId), "/T"]
@@ -284,10 +341,15 @@ function forceKillProcessTree(activeRun, options = {}) {
     if (!activeRun?.processGroupId) return
     const platform = options.platform ?? process.platform
     if (platform === "win32") {
+        const childHasExited = activeRun.childExited === true
+            || activeRun.childClosed === true
+            || (activeRun.child?.exitCode !== null && activeRun.child?.exitCode !== undefined)
+            || (activeRun.child?.signalCode !== null && activeRun.child?.signalCode !== undefined)
+        if (childHasExited) return
         taskkillProcessTree(activeRun, true, options)
         return
     }
-    signalPosixProcessTree(activeRun, "SIGKILL", options)
+    forceKillCapturedPosixProcesses(activeRun, options)
 }
 
 function recordLifecycleError(activeRun, context, error) {
@@ -348,6 +410,9 @@ function runCommand(command, state, options = {}) {
         })
         const activeRun = {
             child,
+            childClosed: false,
+            childExited: false,
+            capturedProcesses: null,
             cleanupErrors: [],
             cleanupPromise: null,
             cleanupTimer: null,
@@ -375,9 +440,13 @@ function runCommand(command, state, options = {}) {
             spawnError = error
             outputBuffer.append(`${error.stack || error.message}\n`)
         })
+        child.on("exit", () => {
+            activeRun.childExited = true
+        })
         child.on("close", async (exitCode, signal) => {
             if (resolved) return
             resolved = true
+            activeRun.childClosed = true
             clearTimeoutImpl(activeRun.timeoutTimer)
             activeRun.timeoutTimer = null
             if (activeRun.cleanupPromise) await activeRun.cleanupPromise
@@ -632,6 +701,7 @@ module.exports = {
     MAX_OUTPUT_BYTES,
     benchmarkCommand,
     buildCommandReport,
+    createTailBuffer,
     evaluateThreshold,
     forceKillProcessTree,
     installSignalHandlers,

@@ -10,6 +10,7 @@ const {
     DEFAULT_COMMANDS,
     MAX_OUTPUT_BYTES,
     buildCommandReport,
+    createTailBuffer,
     evaluateThreshold,
     forceKillProcessTree,
     installSignalHandlers,
@@ -72,8 +73,8 @@ function createFakeClock() {
 
 function createSingleProcessTable(pid) {
     return [
-        { pgid: 999999, pid: process.pid, ppid: 1 },
-        { pgid: pid, pid, ppid: process.pid },
+        { identity: `process-${process.pid}`, pgid: 999999, pid: process.pid, ppid: 1 },
+        { identity: `process-${pid}`, pgid: pid, pid, ppid: process.pid },
     ]
 }
 
@@ -245,7 +246,7 @@ test("waits for the fixed process-group force kill after a timed-out child close
     clock.fire(20)
     const result = await resultPromise
 
-    assert.deepEqual(signals, [[-321, "SIGTERM"], [-321, "SIGKILL"]])
+    assert.deepEqual(signals, [[-321, "SIGTERM"], [321, "SIGKILL"]])
     assert.equal(result.timedOut, true)
     assert.equal(state.activeRun, null)
     assert.equal(clock.pendingCount(), 0)
@@ -287,7 +288,7 @@ test("waits for force kill after an interrupted child closes", async () => {
     await resultPromise
     await removeHandlers()
 
-    assert.deepEqual(signals, [[-432, "SIGTERM"], [-432, "SIGKILL"]])
+    assert.deepEqual(signals, [[-432, "SIGTERM"], [432, "SIGKILL"]])
     assert.equal(clock.pendingCount(), 0)
 })
 
@@ -304,7 +305,7 @@ test("treats ESRCH as clean and records other process-tree cleanup errors", asyn
         clearTimeout: clock.clearTimeout,
         forceKillAfterMs: 20,
         killProcess(target, signal) {
-            assert.equal(target, -654)
+            assert.equal(target, signal === "SIGTERM" ? -654 : 654)
             const error = new Error(signal === "SIGTERM" ? "already gone" : "permission denied")
             error.code = signal === "SIGTERM" ? "ESRCH" : "EACCES"
             throw error
@@ -322,7 +323,7 @@ test("treats ESRCH as clean and records other process-tree cleanup errors", asyn
     const result = await resultPromise
 
     assert.doesNotMatch(result.output, /already gone/)
-    assert.match(result.output, /failed to signal group 654 with SIGKILL: permission denied/)
+    assert.match(result.output, /failed to force-kill pid 654: permission denied/)
 })
 
 test("signals captured POSIX descendant groups leaf-first without killing its own group", () => {
@@ -340,11 +341,11 @@ test("signals captured POSIX descendant groups leaf-first without killing its ow
         readProcessTable() {
             processTableReads++
             return [
-                { pgid: 10, pid: 10, ppid: 1 },
-                { pgid: 100, pid: 100, ppid: 10 },
-                { pgid: 200, pid: 200, ppid: 100 },
-                { pgid: 200, pid: 201, ppid: 200 },
-                { pgid: 10, pid: 300, ppid: 100 },
+                { identity: "benchmark", pgid: 10, pid: 10, ppid: 1 },
+                { identity: "root", pgid: 100, pid: 100, ppid: 10 },
+                { identity: "child", pgid: 200, pid: 200, ppid: 100 },
+                { identity: "descendant", pgid: 200, pid: 201, ppid: 200 },
+                { identity: "shared-group", pgid: 10, pid: 300, ppid: 100 },
             ]
         },
     }
@@ -352,16 +353,83 @@ test("signals captured POSIX descendant groups leaf-first without killing its ow
     signalProcessTree(activeRun, "SIGTERM", options)
     forceKillProcessTree(activeRun, options)
 
-    assert.equal(processTableReads, 1)
+    assert.equal(processTableReads, 2)
     assert.deepEqual(signals, [
         [-200, "SIGTERM"],
         [300, "SIGTERM"],
         [-100, "SIGTERM"],
-        [-200, "SIGKILL"],
+        [201, "SIGKILL"],
+        [200, "SIGKILL"],
         [300, "SIGKILL"],
-        [-100, "SIGKILL"],
+        [100, "SIGKILL"],
     ])
     assert.equal(signals.some(([target]) => target === -10), false)
+})
+
+test("force kill skips reused PIDs and kills matching process identities", () => {
+    const signals = []
+    let readCount = 0
+    const activeRun = {
+        child: createFakeChild(700),
+        cleanupErrors: [],
+        processGroupId: 700,
+    }
+    const options = {
+        currentPid: 10,
+        killProcess(target, signal) { signals.push([target, signal]) },
+        platform: "linux",
+        readProcessTable() {
+            readCount++
+            return [
+                { identity: "benchmark", pgid: 10, pid: 10, ppid: 1 },
+                {
+                    identity: readCount === 1 ? "root-original" : "root-reused",
+                    pgid: 700,
+                    pid: 700,
+                    ppid: 10,
+                },
+                { identity: "child-stable", pgid: 701, pid: 701, ppid: 700 },
+            ]
+        },
+    }
+
+    signalProcessTree(activeRun, "SIGTERM", options)
+    forceKillProcessTree(activeRun, options)
+
+    assert.deepEqual(signals, [
+        [-701, "SIGTERM"],
+        [-700, "SIGTERM"],
+        [701, "SIGKILL"],
+    ])
+})
+
+test("bounds ps snapshots and records timeout fallback errors", () => {
+    const calls = []
+    const signals = []
+    const activeRun = {
+        child: createFakeChild(808),
+        cleanupErrors: [],
+        processGroupId: 808,
+    }
+    const timeoutError = Object.assign(new Error("ps timed out"), { code: "ETIMEDOUT" })
+
+    signalProcessTree(activeRun, "SIGTERM", {
+        currentProcessGroupId: 999999,
+        killProcess(target, signal) { signals.push([target, signal]) },
+        platform: "linux",
+        spawnSync(command, args, options) {
+            calls.push({ args, command, options })
+            return { error: timeoutError, status: null, stderr: "" }
+        },
+    })
+
+    assert.deepEqual(calls, [{
+        args: ["-axo", "pid=,ppid=,pgid=,lstart="],
+        command: "ps",
+        options: { encoding: "utf8", maxBuffer: 2 * 1024 * 1024, timeout: 1000 },
+    }])
+    assert.deepEqual(signals, [[-808, "SIGTERM"]])
+    assert.match(activeRun.cleanupErrors.join("\n"), /failed to read POSIX process tree: ps timed out/)
 })
 
 test("signal handlers retain the active run captured at signal time", async () => {
@@ -420,6 +488,29 @@ test("uses non-forced then forced taskkill for Windows process trees", () => {
     ])
 })
 
+test("does not force taskkill after the Windows child has closed", () => {
+    const taskkillCalls = []
+    const activeRun = {
+        child: createFakeChild(88),
+        childClosed: false,
+        childExited: false,
+        processGroupId: 88,
+    }
+    const options = {
+        platform: "win32",
+        spawnSync(command, args) {
+            taskkillCalls.push([command, args])
+            return { status: 0, stderr: "" }
+        },
+    }
+
+    signalProcessTree(activeRun, "SIGTERM", options)
+    activeRun.childClosed = true
+    forceKillProcessTree(activeRun, options)
+
+    assert.deepEqual(taskkillCalls, [["taskkill", ["/PID", "88", "/T"]]])
+})
+
 test("timeout kills a detached test process group and its descendant after ready", {
     skip: process.platform === "win32",
 }, async t => {
@@ -474,10 +565,26 @@ test("timeout kills a detached test process group and its descendant after ready
         readProcessTable() {
             assert.notEqual(nestedPids, null)
             return [
-                { pgid: 999999, pid: process.pid, ppid: 1 },
-                { pgid: runnerPid, pid: runnerPid, ppid: process.pid },
-                { pgid: nestedPids.test, pid: nestedPids.test, ppid: runnerPid },
                 {
+                    identity: `process-${process.pid}`,
+                    pgid: 999999,
+                    pid: process.pid,
+                    ppid: 1,
+                },
+                {
+                    identity: `process-${runnerPid}`,
+                    pgid: runnerPid,
+                    pid: runnerPid,
+                    ppid: process.pid,
+                },
+                {
+                    identity: `process-${nestedPids.test}`,
+                    pgid: nestedPids.test,
+                    pid: nestedPids.test,
+                    ppid: runnerPid,
+                },
+                {
+                    identity: `process-${nestedPids.descendant}`,
                     pgid: nestedPids.test,
                     pid: nestedPids.descendant,
                     ppid: nestedPids.test,
@@ -616,6 +723,20 @@ test("caps captured output while preserving the final summary and error tail", a
     )
     assert.equal(report.outputTruncated, true)
     assert.equal(report.runs[0].outputTruncated, true)
+})
+
+test("keeps ring storage bounded across many one-byte chunks", () => {
+    const tail = createTailBuffer(1024)
+    const summary = "Summary: passed=3 failed=0 skipped=1 total=1ms\n"
+
+    for (let index = 0; index < 1000000; index++) tail.append(Buffer.from("x"))
+    tail.append(summary)
+    const output = tail.toString()
+
+    assert.equal(tail.storageBytes, 1024)
+    assert.equal(tail.storageSegments, 1)
+    assert.ok(Buffer.byteLength(output) <= 1024)
+    assert.deepEqual(parseRunnerSummary(output), { failed: 0, passed: 3, skipped: 1 })
 })
 
 test("main stays non-zero for command failures in report-only mode", async () => {
