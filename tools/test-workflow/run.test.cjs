@@ -48,6 +48,25 @@ async function waitForProcessExit(pid, timeoutMs = 500) {
     return !isProcessAlive(pid)
 }
 
+function createDeferred() {
+    let resolve
+    let reject
+    const promise = new Promise((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise
+        reject = rejectPromise
+    })
+    return { promise, reject, resolve }
+}
+
+async function waitForCondition(condition, timeoutMs = 1000) {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+        if (condition()) return
+        await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    assert.fail("condition was not met before timeout")
+}
+
 test("parses group, files, and changed modes", () => {
     assert.deepEqual(parseArguments(["--group", "quick:gacha"]), {
         mode: "group",
@@ -101,44 +120,66 @@ test("merges changed file sources with stable sorting and deduplication", () => 
     )
 })
 
-test("schedules eight safe parallel operations while preserving result order", async () => {
-    let active = 0
-    let maxActive = 0
-    let started = 0
-    let release
-    const gate = new Promise(resolve => { release = resolve })
-    const items = Array.from({ length: 10 }, (_, index) => index)
+test("preserves input order when parallel operations finish in reverse order", async () => {
+    const items = Array.from({ length: MAX_PARALLEL_TESTS }, (_, index) => index)
+    const completionOrder = []
 
-    const resultPromise = runParallel(items, MAX_PARALLEL_TESTS, async item => {
-        active++
-        started++
-        maxActive = Math.max(maxActive, active)
-        if (started === MAX_PARALLEL_TESTS) release()
-        await gate
-        await new Promise(resolve => setImmediate(resolve))
-        active--
+    const results = await runParallel(items, MAX_PARALLEL_TESTS, async item => {
+        await new Promise(resolve => setTimeout(resolve, (items.length - item) * 20))
+        completionOrder.push(item)
         return item * 2
     }, () => false)
 
-    assert.equal(MAX_PARALLEL_TESTS, 8)
-    assert.deepEqual(await resultPromise, items.map(item => item * 2))
-    assert.equal(maxActive, 8)
+    assert.deepEqual(completionOrder, items.toReversed())
+    assert.deepEqual(results, items.map(item => item * 2))
 })
 
-test("propagates failures from parallel operations", async () => {
-    await assert.rejects(
-        runParallel(
-            Array.from({ length: 9 }, (_, index) => index),
-            MAX_PARALLEL_TESTS,
-            async item => {
-                await Promise.resolve()
-                if (item === 3) throw new Error("parallel fixture failed")
-                return item
-            },
-            () => false,
-        ),
-        /parallel fixture failed/,
+test("stops scheduling after the first infrastructure error and waits for workers", async () => {
+    const items = Array.from({ length: 10 }, (_, index) => index)
+    const releases = Array.from({ length: MAX_PARALLEL_TESTS }, createDeferred)
+    const firstBatchStarted = createDeferred()
+    const infrastructureError = new Error("parallel fixture failed")
+    const started = []
+    let outcome = "pending"
+
+    const resultPromise = runParallel(items, MAX_PARALLEL_TESTS, async item => {
+        started.push(item)
+        if (started.length === MAX_PARALLEL_TESTS) firstBatchStarted.resolve()
+        await firstBatchStarted.promise
+        if (item === 0) throw infrastructureError
+        await releases[item].promise
+        return item
+    }, () => false)
+    const rejection = assert.rejects(resultPromise, error => error === infrastructureError)
+    resultPromise.then(
+        () => { outcome = "fulfilled" },
+        () => { outcome = "rejected" },
     )
+
+    await firstBatchStarted.promise
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(outcome, "pending")
+    assert.deepEqual(started, items.slice(0, MAX_PARALLEL_TESTS))
+
+    for (const item of items.slice(1, MAX_PARALLEL_TESTS)) releases[item].resolve()
+    await rejection
+    assert.equal(outcome, "rejected")
+    assert.deepEqual(started, items.slice(0, MAX_PARALLEL_TESTS))
+})
+
+test("continues scheduling ordinary failed results", async () => {
+    const items = Array.from({ length: 10 }, (_, index) => index)
+    const started = []
+    const results = await runParallel(items, 2, async item => {
+        started.push(item)
+        return { item, status: item === 0 ? "failed" : "passed" }
+    }, () => false)
+
+    assert.deepEqual(started, items)
+    assert.deepEqual(results.map(result => result.status), [
+        "failed",
+        ...Array.from({ length: 9 }, () => "passed"),
+    ])
 })
 
 test("reports no changes successfully in a clean worktree", async t => {
@@ -269,6 +310,96 @@ test("aggregates passed, failed, and explicitly skipped child processes", async 
     assert.deepEqual(report.summary, { passed: 1, failed: 1, skipped: 1 })
     assert.equal(report.exitCode, 1)
     assert.equal(report.results.find(result => result.file === "fail.cjs").exitCode, 7)
+})
+
+test("runs eight real child processes within the parallel limit and clears active children", async t => {
+    const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "test-workflow-parallel-"))
+    t.after(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }))
+    assert.equal(MAX_PARALLEL_TESTS, 8)
+    const tests = Array.from({ length: MAX_PARALLEL_TESTS }, (_, index) => `child-${index}.cjs`)
+    for (const file of tests) {
+        fs.writeFileSync(path.join(fixtureRoot, file), "setTimeout(() => {}, 100)\n")
+    }
+
+    let peakActiveChildren = 0
+    const activeChildren = new class extends Set {
+        add(child) {
+            super.add(child)
+            peakActiveChildren = Math.max(peakActiveChildren, this.size)
+            return this
+        }
+    }()
+    const report = await executeTestGroups(["quick:fixture"], {
+        activeChildren,
+        cwd: fixtureRoot,
+        testGroups: {
+            "quick:fixture": { execution: "parallel", tests },
+        },
+        writeOutput() {},
+    })
+
+    assert.equal(peakActiveChildren, MAX_PARALLEL_TESTS)
+    assert.ok(peakActiveChildren <= MAX_PARALLEL_TESTS)
+    assert.equal(report.results.length, tests.length)
+    assert.ok(report.results.every(result => result.status === "passed"))
+    assert.equal(activeChildren.size, 0)
+})
+
+test("signal stops new child scheduling and waits for all started children", {
+    skip: process.platform === "win32",
+}, async t => {
+    const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "test-workflow-signal-parallel-"))
+    const markerRoot = path.join(fixtureRoot, "started")
+    fs.mkdirSync(markerRoot)
+    t.after(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }))
+    const tests = Array.from({ length: 10 }, (_, index) => `child-${index}.cjs`)
+    for (const [index, file] of tests.entries()) {
+        fs.writeFileSync(path.join(fixtureRoot, file), [
+            'const fs = require("node:fs")',
+            `fs.writeFileSync(${JSON.stringify(path.join(markerRoot, String(index)))}, "")`,
+            'process.on("SIGTERM", () => setTimeout(() => process.exit(0), 25))',
+            'setInterval(() => {}, 1000)',
+        ].join("\n"))
+    }
+
+    const activeChildren = new Set()
+    let interrupted = false
+    const removeHandlers = installSignalHandlers(
+        activeChildren,
+        () => { interrupted = true },
+        { forceKillAfterMs: 100 },
+    )
+
+    try {
+        const reportPromise = executeTestGroups(["quick:fixture"], {
+            activeChildren,
+            cwd: fixtureRoot,
+            shouldStop: () => interrupted,
+            testGroups: {
+                "quick:fixture": {
+                    execution: "parallel",
+                    forceKillAfterMs: 100,
+                    timeoutMs: 2000,
+                    tests,
+                },
+            },
+            writeOutput() {},
+        })
+
+        await waitForCondition(() => fs.readdirSync(markerRoot).length === MAX_PARALLEL_TESTS)
+        process.emit("SIGTERM")
+        const report = await reportPromise
+
+        assert.deepEqual(
+            fs.readdirSync(markerRoot).sort(),
+            Array.from({ length: MAX_PARALLEL_TESTS }, (_, index) => String(index)),
+        )
+        assert.equal(report.results.length, MAX_PARALLEL_TESTS)
+        assert.equal(activeChildren.size, 0)
+    } finally {
+        for (const child of activeChildren) killProcessGroup(child.pid)
+        await removeHandlers()
+    }
 })
 
 test("times out and terminates a child that keeps handles open", async t => {

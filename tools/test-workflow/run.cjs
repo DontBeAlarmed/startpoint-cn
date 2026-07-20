@@ -264,17 +264,28 @@ function runTestFile({ cwd, file, group, activeChildren, forceKillAfterMs, timeo
 async function runParallel(items, concurrency, operation, shouldStop) {
     const results = new Array(items.length)
     let nextIndex = 0
+    let stop = false
+    let firstError
 
     async function worker() {
         while (nextIndex < items.length) {
-            if (shouldStop()) return
+            if (stop || shouldStop()) return
             const index = nextIndex++
-            results[index] = await operation(items[index])
+            try {
+                results[index] = await operation(items[index])
+            } catch (error) {
+                if (!stop) {
+                    stop = true
+                    firstError = error
+                }
+                return
+            }
         }
     }
 
     const workerCount = Math.min(concurrency, items.length)
     await Promise.all(Array.from({ length: workerCount }, () => worker()))
+    if (stop) throw firstError
     return results
 }
 
