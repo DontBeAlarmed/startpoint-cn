@@ -316,10 +316,9 @@ function forceKillCapturedPosixProcesses(activeRun, options = {}) {
     }
 }
 
-function taskkillProcessTree(activeRun, force, options = {}) {
+function taskkillProcessTree(activeRun, options = {}) {
     const spawnSyncImpl = options.spawnSync ?? spawnSync
-    const args = ["/PID", String(activeRun.processGroupId), "/T"]
-    if (force) args.push("/F")
+    const args = ["/PID", String(activeRun.processGroupId), "/T", "/F"]
     const result = spawnSyncImpl("taskkill", args, { encoding: "utf8", windowsHide: true })
     if (result.error) throw result.error
     if (result.status !== 0) {
@@ -331,7 +330,7 @@ function signalProcessTree(activeRun, signal, options = {}) {
     if (!activeRun?.processGroupId) return
     const platform = options.platform ?? process.platform
     if (platform === "win32") {
-        taskkillProcessTree(activeRun, false, options)
+        taskkillProcessTree(activeRun, options)
         return
     }
     signalPosixProcessTree(activeRun, signal, options)
@@ -340,15 +339,7 @@ function signalProcessTree(activeRun, signal, options = {}) {
 function forceKillProcessTree(activeRun, options = {}) {
     if (!activeRun?.processGroupId) return
     const platform = options.platform ?? process.platform
-    if (platform === "win32") {
-        const childHasExited = activeRun.childExited === true
-            || activeRun.childClosed === true
-            || (activeRun.child?.exitCode !== null && activeRun.child?.exitCode !== undefined)
-            || (activeRun.child?.signalCode !== null && activeRun.child?.signalCode !== undefined)
-        if (childHasExited) return
-        taskkillProcessTree(activeRun, true, options)
-        return
-    }
+    if (platform === "win32") return
     forceKillCapturedPosixProcesses(activeRun, options)
 }
 
@@ -410,8 +401,6 @@ function runCommand(command, state, options = {}) {
         })
         const activeRun = {
             child,
-            childClosed: false,
-            childExited: false,
             capturedProcesses: null,
             cleanupErrors: [],
             cleanupPromise: null,
@@ -431,7 +420,9 @@ function runCommand(command, state, options = {}) {
             timedOut = true
             outputBuffer.append(`\nbenchmark timeout after ${command.timeoutMs}ms\n`)
             safelySignalProcessTree(activeRun, "SIGTERM", { ...options, platform })
-            scheduleForceKill(activeRun, { ...options, platform })
+            if (platform !== "win32") {
+                scheduleForceKill(activeRun, { ...options, platform })
+            }
         }, command.timeoutMs)
 
         child.stdout.on("data", chunk => { outputBuffer.append(chunk) })
@@ -440,13 +431,9 @@ function runCommand(command, state, options = {}) {
             spawnError = error
             outputBuffer.append(`${error.stack || error.message}\n`)
         })
-        child.on("exit", () => {
-            activeRun.childExited = true
-        })
         child.on("close", async (exitCode, signal) => {
             if (resolved) return
             resolved = true
-            activeRun.childClosed = true
             clearTimeoutImpl(activeRun.timeoutTimer)
             activeRun.timeoutTimer = null
             if (activeRun.cleanupPromise) await activeRun.cleanupPromise
@@ -600,6 +587,7 @@ function writeReport(report, outputPath, cwd, options = {}) {
 
 function installSignalHandlers(state, options = {}) {
     const processTarget = options.processTarget ?? process
+    const platform = options.platform ?? process.platform
     const signalTree = options.signalProcessTree
         ?? ((activeRun, signal) => safelySignalProcessTree(activeRun, signal, options))
     const scheduleKill = options.scheduleForceKill
@@ -618,15 +606,17 @@ function installSignalHandlers(state, options = {}) {
             } catch (error) {
                 recordLifecycleError(activeRun, `failed to signal process tree with ${signal}`, error)
             }
-            try {
-                const cleanupPromise = scheduleKill(activeRun)
-                cleanupPromises.add(cleanupPromise)
-                cleanupPromise.then(
-                    () => cleanupPromises.delete(cleanupPromise),
-                    () => cleanupPromises.delete(cleanupPromise),
-                )
-            } catch (error) {
-                recordLifecycleError(activeRun, "failed to schedule process-tree cleanup", error)
+            if (platform !== "win32") {
+                try {
+                    const cleanupPromise = scheduleKill(activeRun)
+                    cleanupPromises.add(cleanupPromise)
+                    cleanupPromise.then(
+                        () => cleanupPromises.delete(cleanupPromise),
+                        () => cleanupPromises.delete(cleanupPromise),
+                    )
+                } catch (error) {
+                    recordLifecycleError(activeRun, "failed to schedule process-tree cleanup", error)
+                }
             }
         }
         processTarget.on(signal, handlers[signal])

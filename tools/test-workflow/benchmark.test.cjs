@@ -457,58 +457,112 @@ test("signal handlers retain the active run captured at signal time", async () =
     assert.deepEqual(calls, [["SIGTERM", 41], ["force", 41]])
 })
 
-test("uses non-forced then forced taskkill for Windows process trees", () => {
+test("Windows timeout completes one forced taskkill before resolving", async () => {
+    const child = createFakeChild(77)
+    const clock = createFakeClock()
     const taskkillCalls = []
-    const activeRun = {
-        child: { kill() { assert.fail("Windows tree cleanup must not call child.kill") } },
-        processGroupId: 77,
-    }
-    const options = {
+    const state = { activeRun: null, interruptedBy: null }
+    let taskkillCompleted = false
+    const resultPromise = runCommand({
+        args: [],
+        command: "windows-fixture",
+        executable: "windows-fixture",
+        timeoutMs: 10,
+    }, state, {
+        clearTimeout: clock.clearTimeout,
+        now: () => 0,
         platform: "win32",
         spawnSync(command, args, spawnOptions) {
             taskkillCalls.push({ args, command, options: spawnOptions })
+            taskkillCompleted = true
             return { status: 0, stderr: "" }
         },
-    }
+        setTimeout: clock.setTimeout,
+        spawn: () => child,
+    })
+    let resolved = false
+    resultPromise.then(() => { resolved = true })
 
-    signalProcessTree(activeRun, "SIGTERM", options)
-    forceKillProcessTree(activeRun, options)
+    clock.fire(10)
+    assert.equal(taskkillCompleted, true)
+    assert.equal(clock.pendingCount(), 0)
+    assert.equal(resolved, false)
+    child.emit("close", 0, null)
+    const result = await resultPromise
 
-    assert.deepEqual(taskkillCalls, [
-        {
-            args: ["/PID", "77", "/T"],
-            command: "taskkill",
-            options: { encoding: "utf8", windowsHide: true },
-        },
-        {
-            args: ["/PID", "77", "/T", "/F"],
-            command: "taskkill",
-            options: { encoding: "utf8", windowsHide: true },
-        },
-    ])
+    assert.equal(result.timedOut, true)
+    assert.deepEqual(taskkillCalls, [{
+        args: ["/PID", "77", "/T", "/F"],
+        command: "taskkill",
+        options: { encoding: "utf8", windowsHide: true },
+    }])
 })
 
-test("does not force taskkill after the Windows child has closed", () => {
+test("Windows taskkill failures are recorded and fail the command", async () => {
+    const child = createFakeChild(88)
+    const clock = createFakeClock()
     const taskkillCalls = []
-    const activeRun = {
-        child: createFakeChild(88),
-        childClosed: false,
-        childExited: false,
-        processGroupId: 88,
-    }
-    const options = {
+    const state = { activeRun: null, interruptedBy: null }
+    const resultPromise = runCommand({
+        args: [],
+        command: "windows-failure",
+        executable: "windows-failure",
+        timeoutMs: 10,
+    }, state, {
+        clearTimeout: clock.clearTimeout,
+        now: () => 0,
         platform: "win32",
+        spawnSync(command, args) {
+            taskkillCalls.push([command, args])
+            return { status: 1, stderr: "access denied" }
+        },
+        setTimeout: clock.setTimeout,
+        spawn: () => child,
+    })
+
+    clock.fire(10)
+    child.emit("close", 0, null)
+    const result = await resultPromise
+    const report = buildCommandReport(
+        { command: "windows-failure", name: "windows-failure", thresholdMs: 100 },
+        createRun(1),
+        [result, createRun(1), createRun(1)],
+    )
+
+    assert.deepEqual(taskkillCalls, [["taskkill", ["/PID", "88", "/T", "/F"]]])
+    assert.match(result.output, /failed to signal process tree with SIGTERM: access denied/)
+    assert.equal(report.commandSucceeded, false)
+    assert.equal(report.exitCode, 1)
+})
+
+test("Windows signal handlers force the tree once without scheduling cleanup", async () => {
+    const clock = createFakeClock()
+    const processTarget = new EventEmitter()
+    const taskkillCalls = []
+    const state = {
+        activeRun: {
+            child: createFakeChild(99),
+            cleanupErrors: [],
+            processGroupId: 99,
+        },
+        interruptedBy: null,
+    }
+    const removeHandlers = installSignalHandlers(state, {
+        platform: "win32",
+        processTarget,
+        setTimeout: clock.setTimeout,
         spawnSync(command, args) {
             taskkillCalls.push([command, args])
             return { status: 0, stderr: "" }
         },
-    }
+    })
 
-    signalProcessTree(activeRun, "SIGTERM", options)
-    activeRun.childClosed = true
-    forceKillProcessTree(activeRun, options)
+    processTarget.emit("SIGINT")
+    await removeHandlers()
 
-    assert.deepEqual(taskkillCalls, [["taskkill", ["/PID", "88", "/T"]]])
+    assert.equal(state.interruptedBy, "SIGINT")
+    assert.deepEqual(taskkillCalls, [["taskkill", ["/PID", "99", "/T", "/F"]]])
+    assert.equal(clock.pendingCount(), 0)
 })
 
 test("timeout kills a detached test process group and its descendant after ready", {
