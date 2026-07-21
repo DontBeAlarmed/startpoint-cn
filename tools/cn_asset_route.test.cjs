@@ -185,6 +185,7 @@ test("serializer rejects unsafe base URLs and archive paths", () => {
         "http://127.1/patch/cn",
         "http://0.0.0.0/patch/cn",
         "http://[::]/patch/cn",
+        "http://[0:0:0:0:0:0:0:0]/patch/cn",
     ]) {
         assert.throws(() => serializeCdnUpdatePlan(plan, {
             baseUrl,
@@ -384,6 +385,8 @@ test("rejects untrusted CDN and host configuration without using request Host", 
         { CN_PUBLIC_HOST: "", CN_LISTEN_PORT: "8001" },
         { CN_PUBLIC_HOST: "0.0.0.0", CN_LISTEN_PORT: "8001" },
         { CN_PUBLIC_HOST: "::", CN_LISTEN_PORT: "8001" },
+        { CN_PUBLIC_HOST: "0:0:0:0:0:0:0:0", CN_LISTEN_PORT: "8001" },
+        { CN_PUBLIC_HOST: "[0:0:0:0:0:0:0:0]", CN_LISTEN_PORT: "8001" },
         { CN_PUBLIC_HOST: "12345", CN_LISTEN_PORT: "8001" },
         { CN_PUBLIC_HOST: "127.1", CN_LISTEN_PORT: "8001" },
         { CN_LISTEN_HOST: "", CN_LISTEN_PORT: "8001" },
@@ -404,6 +407,19 @@ test("rejects untrusted CDN and host configuration without using request Host", 
         assert.equal(response.body.includes("evil.test"), false)
         await app.close()
     }
+
+    const fallbackApp = await createAssetApp({
+        env: { CN_LISTEN_HOST: "::", CN_LISTEN_PORT: "8001" },
+        resolveListenHost: () => "0:0:0:0:0:0:0:0",
+    })
+    const fallbackResponse = await fallbackApp.inject({
+        method: "POST",
+        url: "/asset/version_info",
+        payload: {},
+    })
+    assert.equal(fallbackResponse.statusCode, 500)
+    assert.equal(fallbackResponse.json().code, "ASSET_SERVICE_ERROR")
+    await fallbackApp.close()
 })
 
 test("CDN host fallback ignores SESSION_PUBLIC_HOST and never advertises a wildcard", async t => {
@@ -1396,6 +1412,211 @@ test("CDN ZIP limiter rejects unsafe limits and budgets below the largest archiv
         await assert.rejects(app.ready(), /spool|archive/i)
         await app.close().catch(() => undefined)
     }
+})
+
+test("CDN ZIP response cleanup failures are logged without rejection and release the limiter", async t => {
+    const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-runtime-cleanup-"))
+    const contentStateDir = createContentStateDir(t, "cn-content-state-runtime-cleanup-")
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const archivePath = path.join(root, "archive", "allowed.zip")
+    const archiveBytes = Buffer.from("verified cleanup archive")
+    fs.mkdirSync(path.dirname(archivePath), { recursive: true })
+    fs.writeFileSync(archivePath, archiveBytes)
+    const snapshot = createSnapshot({
+        targetVersion: "1.4.0",
+        edges: Object.freeze([edge(null, "1.4.0", [
+            archive("archive/allowed.zip", archiveBytes.length, 1, sha256(archiveBytes)),
+        ])]),
+    })
+    const cleanupSecret = "RUNTIME_CLEANUP_SECRET"
+    const cleanupOperations = []
+    const createdSpools = []
+    const logLines = []
+    const idle = [deferred(), deferred()]
+    let idleIndex = 0
+    let limiterState
+    let denyCleanup = true
+    let unhandledRejections = 0
+    const onUnhandledRejection = () => { unhandledRejections++ }
+    process.on("unhandledRejection", onUnhandledRejection)
+    t.after(() => process.off("unhandledRejection", onUnhandledRejection))
+
+    const accessDenied = (operation, filePath) => {
+        const error = new Error(`${cleanupSecret}:${operation}:${filePath}`)
+        error.code = "EACCES"
+        error.path = filePath
+        return error
+    }
+    const fileSystem = {
+        realpath: filePath => fs.promises.realpath(filePath),
+        lstat: filePath => fs.promises.lstat(filePath),
+        open: (...args) => fs.promises.open(...args),
+        unlink: async filePath => {
+            cleanupOperations.push("unlink")
+            if (denyCleanup) throw accessDenied("unlink", filePath)
+            await fs.promises.unlink(filePath)
+        },
+        rmdir: async directory => {
+            cleanupOperations.push("rmdir")
+            if (denyCleanup) throw accessDenied("rmdir", directory)
+            await fs.promises.rmdir(directory)
+        },
+    }
+    const app = Fastify({
+        logger: {
+            level: "error",
+            stream: { write: line => { logLines.push(String(line)) } },
+        },
+    })
+    app.register(cdnFilesPlugin, {
+        getSnapshot: () => snapshot,
+        paths: { cdnRoot: root, contentStateDir },
+        fileSystem,
+        spoolLimits: { maxConcurrent: 1, maxReservedBytes: archiveBytes.length },
+        zipSpoolHooks: {
+            spoolCreated: ({ directory }) => { createdSpools.push(directory) },
+            limiterChanged: state => {
+                limiterState = state
+                if (state.active === 0) idle[idleIndex++]?.resolve()
+            },
+        },
+    })
+    await app.ready()
+    t.after(() => app.close())
+
+    const first = await app.inject({ method: "GET", url: "/patch/cn/archive/allowed.zip" })
+    await idle[0].promise
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(first.statusCode, 200)
+    assert.deepEqual(first.rawPayload, archiveBytes)
+    assert.deepEqual(cleanupOperations.slice(0, 2), ["unlink", "rmdir"])
+    assert.equal(unhandledRejections, 0)
+    assert.deepEqual(limiterState, { active: 0, reservedBytes: 0 })
+    assert.equal(fs.existsSync(createdSpools[0]), true)
+    const cleanupLogs = logLines.map(line => JSON.parse(line)).filter(log => (
+        log.code === "CDN_SPOOL_CLEANUP_FAILED"
+    ))
+    assert.deepEqual(cleanupLogs.map(log => ({
+        operation: log.operation,
+        errorCode: log.errorCode,
+    })), [
+        { operation: "unlink", errorCode: "EACCES" },
+        { operation: "rmdir", errorCode: "EACCES" },
+    ])
+    const diagnostics = `${first.body}\n${logLines.join("")}`
+    assert.equal(diagnostics.includes(cleanupSecret), false)
+    assert.equal(diagnostics.includes(contentStateDir), false)
+    assert.equal(diagnostics.includes(createdSpools[0]), false)
+
+    denyCleanup = false
+    const retry = await app.inject({ method: "GET", url: "/patch/cn/archive/allowed.zip" })
+    await idle[1].promise
+    assert.equal(retry.statusCode, 200)
+    assert.deepEqual(retry.rawPayload, archiveBytes)
+    assert.deepEqual(limiterState, { active: 0, reservedBytes: 0 })
+
+    fs.rmSync(createdSpools[0], { recursive: true, force: true })
+    assertNoRequestSpools(contentStateDir)
+})
+
+test("CDN ZIP pre-response cleanup failures preserve the original response and allow retry", async t => {
+    const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-error-cleanup-"))
+    const contentStateDir = createContentStateDir(t, "cn-content-state-error-cleanup-")
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const archivePath = path.join(root, "archive", "allowed.zip")
+    const archiveBytes = Buffer.from("verified error cleanup archive")
+    fs.mkdirSync(path.dirname(archivePath), { recursive: true })
+    fs.writeFileSync(archivePath, archiveBytes)
+    const snapshot = createSnapshot({
+        targetVersion: "1.4.0",
+        edges: Object.freeze([edge(null, "1.4.0", [
+            archive("archive/allowed.zip", archiveBytes.length, 1, sha256(archiveBytes)),
+        ])]),
+    })
+    const cleanupSecret = "ERROR_CLEANUP_SECRET"
+    const createdSpools = []
+    const logLines = []
+    let denyCleanup = true
+    let failBeforeResponse = true
+    let limiterState
+    const idle = [deferred(), deferred()]
+    let idleIndex = 0
+    const accessDenied = filePath => {
+        const error = new Error(`${cleanupSecret}:${filePath}`)
+        error.code = "EACCES"
+        error.path = filePath
+        return error
+    }
+    const fileSystem = {
+        realpath: filePath => fs.promises.realpath(filePath),
+        lstat: filePath => fs.promises.lstat(filePath),
+        open: (...args) => fs.promises.open(...args),
+        unlink: async filePath => {
+            if (denyCleanup) throw accessDenied(filePath)
+            await fs.promises.unlink(filePath)
+        },
+        rmdir: async directory => {
+            if (denyCleanup) throw accessDenied(directory)
+            await fs.promises.rmdir(directory)
+        },
+    }
+    const app = Fastify({
+        logger: {
+            level: "error",
+            stream: { write: line => { logLines.push(String(line)) } },
+        },
+    })
+    app.register(cdnFilesPlugin, {
+        getSnapshot: () => snapshot,
+        paths: { cdnRoot: root, contentStateDir },
+        fileSystem,
+        spoolLimits: { maxConcurrent: 1, maxReservedBytes: archiveBytes.length },
+        zipSpoolHooks: {
+            spoolCreated: ({ directory }) => { createdSpools.push(directory) },
+            beforeResponse: () => {
+                if (failBeforeResponse) throw new Error("injected pre-response business failure")
+            },
+            limiterChanged: state => {
+                limiterState = state
+                if (state.active === 0) idle[idleIndex++]?.resolve()
+            },
+        },
+    })
+    await app.ready()
+    t.after(() => app.close())
+
+    const failed = await app.inject({ method: "GET", url: "/patch/cn/archive/allowed.zip" })
+    await idle[0].promise
+    assert.equal(failed.statusCode, 404)
+    assert.equal(failed.body, "Not Found")
+    assert.deepEqual(limiterState, { active: 0, reservedBytes: 0 })
+    assert.equal(fs.existsSync(createdSpools[0]), true)
+    const cleanupLogs = logLines.map(line => JSON.parse(line)).filter(log => (
+        log.code === "CDN_SPOOL_CLEANUP_FAILED"
+    ))
+    assert.deepEqual(cleanupLogs.map(log => ({
+        operation: log.operation,
+        errorCode: log.errorCode,
+    })), [
+        { operation: "unlink", errorCode: "EACCES" },
+        { operation: "rmdir", errorCode: "EACCES" },
+    ])
+    const diagnostics = `${failed.body}\n${logLines.join("")}`
+    assert.equal(diagnostics.includes(cleanupSecret), false)
+    assert.equal(diagnostics.includes(contentStateDir), false)
+    assert.equal(diagnostics.includes(createdSpools[0]), false)
+
+    denyCleanup = false
+    failBeforeResponse = false
+    const retry = await app.inject({ method: "GET", url: "/patch/cn/archive/allowed.zip" })
+    await idle[1].promise
+    assert.equal(retry.statusCode, 200)
+    assert.deepEqual(limiterState, { active: 0, reservedBytes: 0 })
+
+    fs.rmSync(createdSpools[0], { recursive: true, force: true })
+    assertNoRequestSpools(contentStateDir)
 })
 
 test("CDN ZIP spool removes files and closes descriptors on pre-response errors", async t => {

@@ -45,6 +45,14 @@ function invalidCdnBaseUrl(): Error {
     return error
 }
 
+function isUnspecifiedIpHost(hostname: string): boolean {
+    const unwrapped = hostname.startsWith("[") && hostname.endsWith("]")
+        ? hostname.slice(1, -1)
+        : hostname
+    return unwrapped === "0.0.0.0"
+        || (isIP(unwrapped) === 6 && /^[0:]+$/.test(unwrapped))
+}
+
 export function normalizeCdnBaseUrl(baseUrl: string): string {
     const value = baseUrl
     if (!value
@@ -65,8 +73,7 @@ export function normalizeCdnBaseUrl(baseUrl: string): string {
         : authority.split(":", 1)[0]
     if (!authority
         || !rawHost
-        || rawHost === "0.0.0.0"
-        || rawHost === "[::]"
+        || isUnspecifiedIpHost(rawHost)
         || (/^[0-9.]+$/.test(rawHost) && isIP(rawHost) !== 4)) {
         throw invalidCdnBaseUrl()
     }
@@ -87,7 +94,8 @@ export function normalizeCdnBaseUrl(baseUrl: string): string {
     }
     if ((parsed.protocol !== "http:" && parsed.protocol !== "https:")
         || parsed.username
-        || parsed.password) {
+        || parsed.password
+        || isUnspecifiedIpHost(parsed.hostname)) {
         throw invalidCdnBaseUrl()
     }
     const pathname = parsed.pathname.replace(/\/+$/, "")

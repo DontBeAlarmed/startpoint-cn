@@ -55,6 +55,14 @@ function headerValue(request: FastifyRequest, name: string): string | undefined 
     return typeof value === "string" ? value : undefined
 }
 
+function isUnspecifiedIpHost(hostname: string): boolean {
+    const unwrapped = hostname.startsWith("[") && hostname.endsWith("]")
+        ? hostname.slice(1, -1)
+        : hostname
+    return unwrapped === "0.0.0.0"
+        || (isIP(unwrapped) === 6 && /^[0:]+$/.test(unwrapped))
+}
+
 function formatTrustedHost(value: string): string {
     if (!value
         || value !== value.trim()
@@ -62,7 +70,7 @@ function formatTrustedHost(value: string): string {
         || /[\\/@?#]/.test(value)) {
         throw new Error("configured CDN host is invalid")
     }
-    if (value === "0.0.0.0" || value === "::" || value === "[::]" || /^\d+$/.test(value)) {
+    if (isUnspecifiedIpHost(value) || /^\d+$/.test(value)) {
         throw new Error("configured CDN host is invalid")
     }
     if (value.startsWith("[") || value.endsWith("]")) {

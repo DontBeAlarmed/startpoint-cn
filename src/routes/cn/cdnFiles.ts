@@ -9,6 +9,7 @@ import {
     readdir,
     realpath,
     rm,
+    rmdir,
     unlink,
     writeFile,
     type FileHandle,
@@ -24,6 +25,8 @@ export interface CdnFileSystem {
     realpath(filePath: string): Promise<string>
     lstat(filePath: string): Promise<Stats>
     open(filePath: string, flags: number, mode?: number): Promise<FileHandle>
+    unlink?(filePath: string): Promise<void>
+    rmdir?(directory: string): Promise<void>
 }
 
 export interface CdnFileHandleObserver {
@@ -103,7 +106,10 @@ interface CdnSpoolReservation {
     release(): void
 }
 
-const defaultFileSystem: CdnFileSystem = { realpath, lstat, open }
+type RuntimeCleanupOperation = "unlink" | "rmdir" | "observer" | "finalize"
+type RuntimeCleanupFailureLogger = (operation: RuntimeCleanupOperation, error: unknown) => void
+
+const defaultFileSystem: CdnFileSystem = { realpath, lstat, open, unlink, rmdir }
 const OPEN_READ_NOFOLLOW = constants.O_RDONLY | constants.O_NOFOLLOW
 const OPEN_CREATE_EXCLUSIVE = constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW
 const ZIP_COPY_BUFFER_BYTES = 64 * 1024
@@ -430,16 +436,29 @@ async function copyZipToSpool(
 
 function makeSpoolCleanup(
     directory: string,
+    spoolPath: string,
     relativePath: string,
+    fileSystem: CdnFileSystem,
     hooks: CdnZipSpoolHooks | undefined,
+    logFailure: RuntimeCleanupFailureLogger,
 ): () => Promise<void> {
     let cleanup: Promise<void> | null = null
     return () => {
         cleanup ??= (async () => {
             try {
-                await rm(directory, { recursive: true, force: true })
-            } finally {
+                await (fileSystem.unlink?.(spoolPath) ?? unlink(spoolPath))
+            } catch (error) {
+                if ((error as NodeJS.ErrnoException).code !== "ENOENT") logFailure("unlink", error)
+            }
+            try {
+                await (fileSystem.rmdir?.(directory) ?? rmdir(directory))
+            } catch (error) {
+                if ((error as NodeJS.ErrnoException).code !== "ENOENT") logFailure("rmdir", error)
+            }
+            try {
                 hooks?.spoolRemoved?.({ relativePath, directory })
+            } catch (error) {
+                logFailure("observer", error)
             }
         })()
         return cleanup
@@ -456,6 +475,7 @@ async function createVerifiedZipSpool(
     hooks: CdnZipSpoolHooks | undefined,
     signal: AbortSignal,
     abortRequest: () => void,
+    logCleanupFailure: RuntimeCleanupFailureLogger,
 ): Promise<VerifiedZipSpool> {
     let source: FileHandle | null = null
     let spoolWriter: FileHandle | null = null
@@ -480,9 +500,16 @@ async function createVerifiedZipSpool(
         throwIfAborted(signal)
 
         directory = await mkdtemp(path.join(spoolRoot, "request-"))
-        cleanup = makeSpoolCleanup(directory, relativePath, hooks)
-        hooks?.spoolCreated?.({ relativePath, directory })
         const spoolPath = path.join(directory, "archive.zip")
+        cleanup = makeSpoolCleanup(
+            directory,
+            spoolPath,
+            relativePath,
+            fileSystem,
+            hooks,
+            logCleanupFailure,
+        )
+        hooks?.spoolCreated?.({ relativePath, directory })
         spoolWriter = await openObserved(
             spoolPath,
             OPEN_CREATE_EXCLUSIVE,
@@ -532,7 +559,13 @@ async function createVerifiedZipSpool(
         await closeObservedQuietly(spoolWriter, observer)
         await closeObservedQuietly(spoolReader, observer)
         if (cleanup) await cleanup()
-        else if (directory) await rm(directory, { recursive: true, force: true })
+        else if (directory) {
+            try {
+                await (fileSystem.rmdir?.(directory) ?? rmdir(directory))
+            } catch (cleanupError) {
+                logCleanupFailure("rmdir", cleanupError)
+            }
+        }
         throw error
     }
 }
@@ -611,6 +644,7 @@ async function sendPinnedZip(
     observer: CdnFileHandleObserver | undefined,
     hooks: CdnZipSpoolHooks | undefined,
     limiter: CdnSpoolLimiter,
+    logCleanupFailure: RuntimeCleanupFailureLogger,
 ) {
     const abortController = new AbortController()
     const abortRequest = () => abortController.abort()
@@ -627,6 +661,7 @@ async function sendPinnedZip(
     let spool: VerifiedZipSpool | null = null
     let onReplyClose: (() => void) | null = null
     let handedToResponse = false
+    let finish: (() => Promise<void>) | null = null
     try {
         throwIfAborted(abortController.signal)
         reservation = limiter.tryReserve(identity.size)
@@ -644,32 +679,35 @@ async function sendPinnedZip(
             hooks,
             abortController.signal,
             abortRequest,
+            logCleanupFailure,
         )
-        throwIfAborted(abortController.signal)
         const verifiedSpool = spool
         const verifiedReservation = reservation
         let finishPromise: Promise<void> | null = null
-        const finish = () => {
+        finish = () => {
             finishPromise ??= (async () => {
                 try {
                     await verifiedSpool.cleanup()
+                } catch (error) {
+                    logCleanupFailure("finalize", error)
                 } finally {
                     verifiedReservation.release()
                 }
             })()
             return finishPromise
         }
+        throwIfAborted(abortController.signal)
         reply.raw.off("close", onPreResponseClose)
         onReplyClose = () => {
             abortRequest()
             if (!verifiedSpool.stream.closed) verifiedSpool.stream.destroy()
-            else void finish()
+            else void finish!().catch(error => logCleanupFailure("finalize", error))
         }
         reply.raw.once("close", onReplyClose)
         if (reply.raw.destroyed) throw new Error("client disconnected before ZIP verification completed")
         verifiedSpool.stream.once("close", () => {
             if (onReplyClose) reply.raw.off("close", onReplyClose)
-            void finish()
+            void finish!().catch(error => logCleanupFailure("finalize", error))
         })
         await hooks?.beforeResponse?.({
             relativePath,
@@ -682,16 +720,19 @@ async function sendPinnedZip(
         return reply.status(200).type("application/zip").send(verifiedSpool.stream)
     } catch {
         if (onReplyClose) reply.raw.off("close", onReplyClose)
-        if (spool) {
-            if (!spool.stream.closed) {
-                await new Promise<void>(resolve => {
-                    spool!.stream.once("close", resolve)
-                    if (!spool!.stream.destroyed) spool!.stream.destroy()
-                })
+        try {
+            if (spool) {
+                if (!spool.stream.closed) {
+                    await new Promise<void>(resolve => {
+                        spool!.stream.once("close", resolve)
+                        if (!spool!.stream.destroyed) spool!.stream.destroy()
+                    })
+                }
+                if (finish) await finish().catch(error => logCleanupFailure("finalize", error))
             }
-            await spool.cleanup()
+        } finally {
+            if (!finish) reservation?.release()
         }
-        reservation?.release()
         if (abortController.signal.aborted) return reply.status(499).send("")
         return reply.status(404).send("Not Found")
     } finally {
@@ -744,6 +785,21 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
     const fileSystem = options.fileSystem ?? defaultFileSystem
     const observer = options.handleObserver
     const hooks = options.zipSpoolHooks
+    const logCleanupFailure: RuntimeCleanupFailureLogger = (operation, error) => {
+        const rawCode = (error as NodeJS.ErrnoException | null)?.code
+        const errorCode = typeof rawCode === "string" && /^[A-Z0-9_]{1,32}$/.test(rawCode)
+            ? rawCode
+            : "UNKNOWN"
+        try {
+            fastify.log.error({
+                code: "CDN_SPOOL_CLEANUP_FAILED",
+                operation,
+                errorCode,
+            }, "CDN archive spool cleanup failed")
+        } catch {
+            // Logging failures cannot re-open the request cleanup lifecycle.
+        }
+    }
     const limiter = createSpoolLimiter(snapshot, options.spoolLimits, hooks?.limiterChanged)
     const logicalRoot = path.resolve(paths.cdnRoot)
     const physicalRoot = await fileSystem.realpath(logicalRoot)
@@ -821,6 +877,7 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
                     observer,
                     hooks,
                     limiter,
+                    logCleanupFailure,
                 )
                 : reply.status(404).send("Not Found")
         }
