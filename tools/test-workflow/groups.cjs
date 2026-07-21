@@ -41,6 +41,12 @@ const TEST_GROUPS = Object.freeze({
             "tools/cdn_types.test.cjs",
         ],
     },
+    "quick:content": {
+        execution: "parallel",
+        tests: [
+            "tools/content_schema.test.cjs",
+        ],
+    },
     "integration:compiled": {
         execution: "parallel",
         tests: [
