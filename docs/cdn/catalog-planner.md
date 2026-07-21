@@ -51,7 +51,7 @@ Planner 保持三种语义：
 
 ## 资源发送与 Range
 
-资源路由先规范化请求相对路径并限制在 CDN root 内。ZIP 还必须属于当前 Catalog allowlist；Catalog 外 ZIP 返回 404。Catalog ZIP 的路径组件不得包含符号链接，解析后的物理路径必须仍位于 CDN root 内；打开文件时还会复核文件身份和 manifest 大小，拒绝路径逃逸、根外符号链接和打开期间发生变化的文件。
+资源路由先规范化请求相对路径并限制在 CDN root 内。ZIP 还必须属于当前 Catalog allowlist；Catalog 外 ZIP 返回 404。Catalog ZIP 的路径组件不得包含符号链接，解析后的物理路径必须仍位于 CDN root 内；打开文件时还会复核文件身份和 manifest 大小，拒绝路径逃逸、根外符号链接，以及打开验证阶段可观察到的路径、身份或大小变化。同一 inode、同一大小的内容原地改写不在运行时检测范围内；官方 CDN 通过离线审计后，部署后不得原地改写文件，这是运行时信任前提。
 
 通过检查后，路由从已打开的文件句柄直接流式发送，不计算请求级 SHA-256，不复制到 spool，也不执行 digest cache 写入：
 

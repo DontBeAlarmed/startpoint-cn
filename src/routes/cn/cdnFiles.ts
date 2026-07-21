@@ -240,6 +240,23 @@ function sendOpenedFile(
             .send())
     }
 
+    reply.type(contentType(relativePath)).header("Accept-Ranges", "bytes")
+    if (range.kind === "partial") {
+        const contentLength = range.end - range.start + 1
+        reply
+            .status(206)
+            .header("Content-Range", `bytes ${range.start}-${range.end}/${openedFile.size}`)
+            .header("Content-Length", String(contentLength))
+    } else {
+        reply
+            .status(200)
+            .header("Content-Length", String(openedFile.size))
+    }
+
+    if (request.method === "HEAD") {
+        return closeObserved(openedFile.handle, observer).then(() => reply.send())
+    }
+
     let stream: Readable
     try {
         stream = openedFile.handle.createReadStream(streamOptions(range))
@@ -263,19 +280,7 @@ function sendOpenedFile(
     stream.once("close", onStreamClose)
     if (request.raw.aborted || reply.raw.destroyed) destroyStream()
 
-    reply.type(contentType(relativePath)).header("Accept-Ranges", "bytes")
-    if (range.kind === "partial") {
-        const contentLength = range.end - range.start + 1
-        return reply
-            .status(206)
-            .header("Content-Range", `bytes ${range.start}-${range.end}/${openedFile.size}`)
-            .header("Content-Length", String(contentLength))
-            .send(stream)
-    }
-    return reply
-        .status(200)
-        .header("Content-Length", String(openedFile.size))
-        .send(stream)
+    return reply.send(stream)
 }
 
 async function sendFile(
@@ -332,24 +337,28 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
         // The compatibility patch store is optional.
     }
 
-    fastify.get("/patch/cn/dummy/download/production/upload/:prefix/:hash", async (request, reply) => {
-        if (physicalPatchUploadRoot === null) return reply.status(404).send("Not Found")
-        if ((request.raw.url?.split("?", 1)[0] ?? "").includes("%")) {
-            return reply.status(404).send("Not Found")
-        }
-        const { prefix, hash } = request.params as { prefix: string; hash: string }
-        if (!/^[A-Za-z0-9._-]+$/.test(prefix) || !/^[A-Za-z0-9._-]+$/.test(hash)) {
-            return reply.status(404).send("Not Found")
-        }
-        return sendFile(
-            request,
-            reply,
-            patchUploadRoot,
-            physicalPatchUploadRoot,
-            `${prefix}/${hash}`,
-            fileSystem,
-            observer,
-        )
+    fastify.route({
+        method: ["GET", "HEAD"],
+        url: "/patch/cn/dummy/download/production/upload/:prefix/:hash",
+        handler: async (request, reply) => {
+            if (physicalPatchUploadRoot === null) return reply.status(404).send("Not Found")
+            if ((request.raw.url?.split("?", 1)[0] ?? "").includes("%")) {
+                return reply.status(404).send("Not Found")
+            }
+            const { prefix, hash } = request.params as { prefix: string; hash: string }
+            if (!/^[A-Za-z0-9._-]+$/.test(prefix) || !/^[A-Za-z0-9._-]+$/.test(hash)) {
+                return reply.status(404).send("Not Found")
+            }
+            return sendFile(
+                request,
+                reply,
+                patchUploadRoot,
+                physicalPatchUploadRoot,
+                `${prefix}/${hash}`,
+                fileSystem,
+                observer,
+            )
+        },
     })
 
     fastify.get("/patch/cn/recovery/empty.csv", async (_request, reply) => {
@@ -360,34 +369,38 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
             .send("")
     })
 
-    fastify.get("/patch/cn/*", async (request, reply) => {
-        const relativePath = requestRelativePath(request)
-        if (relativePath === null) return reply.status(404).send("Not Found")
-        if (path.posix.extname(relativePath).toLowerCase() === ".zip") {
-            const expectedSize = zipAllowlist.get(relativePath)
-            return expectedSize === undefined
-                ? reply.status(404).send("Not Found")
-                : sendFile(
-                    request,
-                    reply,
-                    logicalRoot,
-                    physicalRoot,
-                    relativePath,
-                    fileSystem,
-                    observer,
-                    expectedSize,
-                    true,
-                )
-        }
-        return sendFile(
-            request,
-            reply,
-            logicalRoot,
-            physicalRoot,
-            relativePath,
-            fileSystem,
-            observer,
-        )
+    fastify.route({
+        method: ["GET", "HEAD"],
+        url: "/patch/cn/*",
+        handler: async (request, reply) => {
+            const relativePath = requestRelativePath(request)
+            if (relativePath === null) return reply.status(404).send("Not Found")
+            if (path.posix.extname(relativePath).toLowerCase() === ".zip") {
+                const expectedSize = zipAllowlist.get(relativePath)
+                return expectedSize === undefined
+                    ? reply.status(404).send("Not Found")
+                    : sendFile(
+                        request,
+                        reply,
+                        logicalRoot,
+                        physicalRoot,
+                        relativePath,
+                        fileSystem,
+                        observer,
+                        expectedSize,
+                        true,
+                    )
+            }
+            return sendFile(
+                request,
+                reply,
+                logicalRoot,
+                physicalRoot,
+                relativePath,
+                fileSystem,
+                observer,
+            )
+        },
     })
 }
 

@@ -186,7 +186,7 @@ test("parseHttpByteRange rejects invalid and unsatisfiable ranges", () => {
     assert.deepEqual(parseHttpByteRange("bytes=0-0", 0), { kind: "unsatisfiable" })
 })
 
-test("serves complete and HEAD responses with byte metadata", async t => {
+test("serves complete responses with byte metadata", async t => {
     const { app, observer, zipBytes } = await createFixture(t)
 
     const response = await app.inject({
@@ -197,16 +197,88 @@ test("serves complete and HEAD responses with byte metadata", async t => {
     assert.equal(response.headers["accept-ranges"], "bytes")
     assert.equal(response.headers["content-length"], String(zipBytes.length))
     assert.deepEqual(response.rawPayload, zipBytes)
-
-    const head = await app.inject({
-        method: "HEAD",
-        url: "/patch/cn/archive-common-full/base.zip",
-    })
-    assert.equal(head.statusCode, 200)
-    assert.equal(head.headers["accept-ranges"], "bytes")
-    assert.equal(head.headers["content-length"], String(zipBytes.length))
-    assert.equal(head.rawPayload.length, 0)
     await waitForBalancedHandles(observer)
+})
+
+test("HEAD validates CDN and patch files without creating or reading streams", async t => {
+    const reads = { createReadStreamCalls: 0, bytes: 0 }
+    const { app, observer } = await createFixture(t, {
+        fileSystemFactory: () => ({
+            realpath: filePath => fs.promises.realpath(filePath),
+            lstat: filePath => fs.promises.lstat(filePath),
+            open: async (...args) => {
+                const handle = await fs.promises.open(...args)
+                const createReadStream = handle.createReadStream.bind(handle)
+                handle.createReadStream = streamOptions => {
+                    reads.createReadStreamCalls++
+                    const stream = createReadStream(streamOptions)
+                    stream.on("data", chunk => { reads.bytes += chunk.length })
+                    return stream
+                }
+                return handle
+            },
+        }),
+    })
+    const cases = [
+        {
+            url: "/patch/cn/archive-common-full/base.zip",
+            statusCode: 200,
+            contentLength: "10",
+        },
+        {
+            url: "/patch/cn/archive-common-full/base.zip",
+            range: "bytes=2-5",
+            statusCode: 206,
+            contentLength: "4",
+            contentRange: "bytes 2-5/10",
+        },
+        {
+            url: "/patch/cn/archive-common-full/base.zip",
+            range: "bytes=99-100",
+            statusCode: 416,
+            contentLength: "0",
+            contentRange: "bytes */10",
+        },
+        {
+            url: "/patch/cn/dummy/download/production/upload/ab/patch-hash",
+            statusCode: 200,
+            contentLength: "7",
+        },
+        {
+            url: "/patch/cn/dummy/download/production/upload/ab/patch-hash",
+            range: "bytes=1-3",
+            statusCode: 206,
+            contentLength: "3",
+            contentRange: "bytes 1-3/7",
+        },
+        {
+            url: "/patch/cn/dummy/download/production/upload/ab/patch-hash",
+            range: "bytes=99-100",
+            statusCode: 416,
+            contentLength: "0",
+            contentRange: "bytes */7",
+        },
+    ]
+
+    for (const expected of cases) {
+        const openedBefore = observer.opened
+        const closedBefore = observer.closed
+        const response = await app.inject({
+            method: "HEAD",
+            url: expected.url,
+            headers: expected.range ? { range: expected.range } : undefined,
+        })
+        assert.equal(response.statusCode, expected.statusCode, expected.range ?? expected.url)
+        assert.equal(response.headers["accept-ranges"], "bytes")
+        assert.equal(response.headers["content-length"], expected.contentLength)
+        assert.equal(response.headers["content-range"], expected.contentRange)
+        assert.equal(response.rawPayload.length, 0)
+        await waitForBalancedHandles(observer)
+        assert.equal(observer.opened, openedBefore + 1)
+        assert.equal(observer.closed, closedBefore + 1)
+        assert.equal(reads.createReadStreamCalls, 0)
+        assert.equal(reads.bytes, 0)
+    }
 })
 
 test("serves closed, open, suffix, and truncated ranges", async t => {
