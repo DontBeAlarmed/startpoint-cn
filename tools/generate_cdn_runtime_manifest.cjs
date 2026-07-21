@@ -78,6 +78,73 @@ function isSameOrDescendant(parent, candidate) {
             && !relativePath.startsWith(`..${path.sep}`))
 }
 
+async function resolvePhysicalPathFromExistingAncestor(candidate, dependencies, rejectTargetSymlink) {
+    const lstat = dependencies.lstat ?? fs.promises.lstat
+    const realpath = dependencies.realpath ?? fs.promises.realpath
+    const absoluteCandidate = path.resolve(candidate)
+    const missingSegments = []
+    let existingAncestor = absoluteCandidate
+    let ancestorStats
+
+    while (true) {
+        try {
+            ancestorStats = await lstat(existingAncestor)
+            break
+        } catch (error) {
+            if (!error || error.code !== "ENOENT") throw error
+            const parent = path.dirname(existingAncestor)
+            if (parent === existingAncestor) throw error
+            missingSegments.unshift(path.basename(existingAncestor))
+            existingAncestor = parent
+        }
+    }
+
+    if (rejectTargetSymlink
+        && existingAncestor === absoluteCandidate
+        && ancestorStats.isSymbolicLink()) {
+        throw new ManifestCliError(
+            "MANIFEST_OUTPUT_FORBIDDEN",
+            "output 不能是符号链接",
+        )
+    }
+
+    const physicalAncestor = await realpath(existingAncestor)
+    return path.resolve(physicalAncestor, ...missingSegments)
+}
+
+async function assertOutputPathAllowed(outputPath, paths, dependencies) {
+    if (isSameOrDescendant(paths.cdnDir, outputPath)
+        || isSameOrDescendant(paths.contentRuntimeDir, outputPath)) {
+        throw new ManifestCliError(
+            "MANIFEST_OUTPUT_FORBIDDEN",
+            "output 不能位于 CDN 或内容运行时目录内",
+        )
+    }
+
+    const physicalOutputPath = await resolvePhysicalPathFromExistingAncestor(
+        outputPath,
+        dependencies,
+        true,
+    )
+    const physicalCdnDir = await resolvePhysicalPathFromExistingAncestor(
+        paths.cdnDir,
+        dependencies,
+        false,
+    )
+    const physicalRuntimeDir = await resolvePhysicalPathFromExistingAncestor(
+        paths.contentRuntimeDir,
+        dependencies,
+        false,
+    )
+    if (isSameOrDescendant(physicalCdnDir, physicalOutputPath)
+        || isSameOrDescendant(physicalRuntimeDir, physicalOutputPath)) {
+        throw new ManifestCliError(
+            "MANIFEST_OUTPUT_FORBIDDEN",
+            "output 不能位于 CDN 或内容运行时目录内",
+        )
+    }
+}
+
 async function run(argv, dependencies = {}) {
     const parsed = parseArguments(argv)
     const projectRoot = dependencies.projectRoot ?? PROJECT_ROOT
@@ -88,14 +155,7 @@ async function run(argv, dependencies = {}) {
         env: { ...env, ...parsed.pathOverrides },
     })
     const outputPath = parsed.outputPath === null ? null : path.resolve(cwd, parsed.outputPath)
-    if (outputPath !== null
-        && (isSameOrDescendant(paths.cdnDir, outputPath)
-            || isSameOrDescendant(paths.contentRuntimeDir, outputPath))) {
-        throw new ManifestCliError(
-            "MANIFEST_OUTPUT_FORBIDDEN",
-            "output 不能位于 CDN 或内容运行时目录内",
-        )
-    }
+    if (outputPath !== null) await assertOutputPathAllowed(outputPath, paths, dependencies)
     const input = await (dependencies.scanCatalogInput ?? scanCdnCatalogInput)(paths)
     const catalog = (dependencies.buildCatalog ?? buildCdnCatalog)(input)
     if (catalog.targetVersion !== "1.4.54") {

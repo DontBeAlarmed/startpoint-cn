@@ -2,6 +2,7 @@
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 
@@ -222,6 +223,117 @@ test("manifest CLI refuses output inside the CDN or runtime directory", async ()
             && error.code === "MANIFEST_OUTPUT_FORBIDDEN"
         ))
     }
+})
+
+test("manifest CLI refuses output through an ancestor symlink into the CDN before scanning", async t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cdn-manifest-ancestor-link-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+
+    const cdnDir = path.join(root, "cdn")
+    const runtimeDir = path.join(root, "runtime")
+    const outputDirectory = path.join(root, "output-link")
+    const protectedTarget = path.join(cdnDir, "catalog.json")
+    fs.mkdirSync(cdnDir)
+    fs.mkdirSync(runtimeDir)
+    fs.writeFileSync(protectedTarget, "protected CDN content\n")
+    fs.symlinkSync(cdnDir, outputDirectory, "dir")
+
+    let scans = 0
+    let stderr = ""
+    const exitCode = await executeManifestCli(["--output", path.join(outputDirectory, "catalog.json")], {
+        cwd: root,
+        resolvePaths: () => ({
+            cdnDir,
+            cdnRoot: path.join(cdnDir, "cn"),
+            contentStoreDir: path.join(root, "store"),
+            contentStateDir: path.join(root, "state"),
+            contentRuntimeDir: runtimeDir,
+        }),
+        scanCatalogInput: async () => {
+            scans++
+            return validInput()
+        },
+        readFile: async () => Buffer.from("entity lists"),
+        stderr: { write: value => { stderr += value } },
+        setExitCode() {},
+    })
+
+    assert.equal(exitCode, 1)
+    assert.match(stderr, /MANIFEST_OUTPUT_FORBIDDEN/)
+    assert.equal(scans, 0)
+    assert.equal(fs.readFileSync(protectedTarget, "utf8"), "protected CDN content\n")
+})
+
+test("manifest CLI refuses a symlink output file into runtime before scanning", async t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cdn-manifest-output-link-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+
+    const cdnDir = path.join(root, "cdn")
+    const runtimeDir = path.join(root, "runtime")
+    const outputDirectory = path.join(root, "output")
+    const protectedTarget = path.join(runtimeDir, "catalog.json")
+    const outputPath = path.join(outputDirectory, "catalog.json")
+    fs.mkdirSync(cdnDir)
+    fs.mkdirSync(runtimeDir)
+    fs.mkdirSync(outputDirectory)
+    fs.writeFileSync(protectedTarget, "protected runtime content\n")
+    fs.symlinkSync(protectedTarget, outputPath, "file")
+
+    let scans = 0
+    let stderr = ""
+    const exitCode = await executeManifestCli(["--output", outputPath], {
+        cwd: root,
+        resolvePaths: () => ({
+            cdnDir,
+            cdnRoot: path.join(cdnDir, "cn"),
+            contentStoreDir: path.join(root, "store"),
+            contentStateDir: path.join(root, "state"),
+            contentRuntimeDir: runtimeDir,
+        }),
+        scanCatalogInput: async () => {
+            scans++
+            return validInput()
+        },
+        readFile: async () => Buffer.from("entity lists"),
+        stderr: { write: value => { stderr += value } },
+        setExitCode() {},
+    })
+
+    assert.equal(exitCode, 1)
+    assert.match(stderr, /MANIFEST_OUTPUT_FORBIDDEN/)
+    assert.equal(scans, 0)
+    assert.equal(fs.readFileSync(protectedTarget, "utf8"), "protected runtime content\n")
+})
+
+test("manifest CLI allows a nonexistent output path outside protected directories", async t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cdn-manifest-new-output-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+
+    const cdnDir = path.join(root, "cdn")
+    const runtimeDir = path.join(root, "runtime")
+    const outputPath = path.join(root, "output", "nested", "catalog.json")
+    fs.mkdirSync(cdnDir)
+    fs.mkdirSync(runtimeDir)
+
+    let scans = 0
+    const result = await run(["--output", outputPath], {
+        cwd: root,
+        resolvePaths: () => ({
+            cdnDir,
+            cdnRoot: path.join(cdnDir, "cn"),
+            contentStoreDir: path.join(root, "store"),
+            contentStateDir: path.join(root, "state"),
+            contentRuntimeDir: runtimeDir,
+        }),
+        scanCatalogInput: async () => {
+            scans++
+            return validInput()
+        },
+        readFile: async () => Buffer.from("entity lists"),
+    })
+
+    assert.equal(result.outputPath, outputPath)
+    assert.equal(scans, 1)
 })
 
 test("tracked official manifest is the path-safe 1.4.54 baseline with 677 archives", () => {
