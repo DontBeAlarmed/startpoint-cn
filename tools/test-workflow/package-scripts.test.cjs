@@ -69,3 +69,12 @@ test("exposes the workflow benchmark command", () => {
         "node tools/test-workflow/benchmark.cjs",
     )
 })
+
+test("runs content sync through the TypeScript entry without a prebuild", () => {
+    assert.equal(
+        scripts["content:sync"],
+        "node tools/content_sync.cjs",
+    )
+    assert.doesNotMatch(scripts["content:sync"], /build/)
+    assert.doesNotMatch(scripts["content:sync"], /--env-file/)
+})

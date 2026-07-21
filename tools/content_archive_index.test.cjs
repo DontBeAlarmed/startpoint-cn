@@ -194,6 +194,81 @@ test("materialization reuses a complete baseline and hashes only archives added 
     assert.equal(fs.existsSync(paths.contentStateDir), false)
 })
 
+test("materialization loads the tracked official baseline by default without rehashing it", async () => {
+    const manifest = JSON.parse(fs.readFileSync(
+        path.join(__dirname, "../assets/cdn/catalog-cn-1.4.54.json"),
+        "utf8",
+    ))
+    const cdnRoot = path.resolve(os.tmpdir(), "virtual-content-baseline-cdn")
+    const entityListsRelativePath = manifest.catalogInput.entityListsRelativePath
+    const entityBody = Buffer.from("path,version,size,hash,layer\na,1,24,h,common\n")
+    const entityPhysicalPath = path.join(cdnRoot, entityListsRelativePath)
+    const archives = manifest.catalogInput.archives.map((archive, index) => ({
+        kind: archive.kind,
+        fromVersion: archive.fromVersion,
+        toVersion: archive.toVersion,
+        platform: archive.platform,
+        layer: archive.layer,
+        order: archive.order,
+        relativePath: archive.relativePath,
+        physicalPath: path.join(cdnRoot, archive.relativePath),
+        compressedBytes: archive.compressedBytes,
+        mtimeMs: "1",
+        ctimeMs: "1",
+        dev: "1",
+        ino: String(index + 2),
+    }))
+    const sizeByPath = new Map(archives.map(archive => [
+        archive.physicalPath,
+        [archive.compressedBytes, archive.ino],
+    ]))
+    sizeByPath.set(entityPhysicalPath, [entityBody.length, "1"])
+    const stat = async filePath => {
+        const metadata = sizeByPath.get(filePath)
+        if (!metadata) throw Object.assign(new Error("missing virtual file"), { code: "ENOENT" })
+        return {
+            size: BigInt(metadata[0]),
+            mtimeMs: BigInt(1),
+            ctimeMs: BigInt(1),
+            dev: BigInt(1),
+            ino: BigInt(metadata[1]),
+            isFile: () => true,
+        }
+    }
+    const scan = {
+        cdnRoot,
+        targetVersion: "1.4.54",
+        entityListsRelativePath,
+        entityListsFingerprint: {
+            physicalPath: entityPhysicalPath,
+            compressedBytes: entityBody.length,
+            mtimeMs: "1",
+            ctimeMs: "1",
+            dev: "1",
+            ino: "1",
+        },
+        archives,
+        ignoredPaths: [],
+    }
+
+    const materialized = await materializeContentCatalogInput(scan, {
+        realpath: async filePath => filePath,
+        stat,
+        openFile: async filePath => ({
+            stat: async () => stat(filePath),
+            close: async () => undefined,
+        }),
+        readEntityList: async () => entityBody,
+        digestArchive: async () => { throw new Error("official baseline was rehashed") },
+    })
+
+    assert.equal(materialized.archives.length, 677)
+    assert.deepEqual(
+        materialized.archives.map(archive => archive.sha256),
+        manifest.catalogInput.archives.map(archive => archive.sha256),
+    )
+})
+
 test("scanner records unknown files but rejects zip-like invalid names", async t => {
     const { paths } = createScannerFixture(t)
     fs.writeFileSync(path.join(paths.cdnRoot, "archive-common-diff", "readme.md"), "ok")

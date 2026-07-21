@@ -11,11 +11,16 @@ import {
     type ParsedDiffArchiveName,
 } from "../cdn/catalog-builder"
 import type { DigestFileHandle } from "../cdn/digest-cache"
+import { parseCdnRuntimeManifest } from "../cdn/runtime-manifest"
 import type { ArchiveLayer, CdnCatalogArchiveInput, CdnCatalogInput, CdnPlatform } from "../cdn/types"
 import { deepFreeze } from "../deep-freeze"
 import type { ContentPaths } from "../paths"
 
 const PLACEHOLDER_DIGEST = "0".repeat(64)
+const TRACKED_BASELINE_PATH = path.resolve(
+    __dirname,
+    "../../../assets/cdn/catalog-cn-1.4.54.json",
+)
 
 interface ArchiveDirectory {
     readonly name: string
@@ -371,6 +376,24 @@ async function defaultReadEntityList(fileHandle: DigestFileHandle): Promise<Buff
     return Buffer.concat(chunks)
 }
 
+async function loadTrackedBaselineInput(): Promise<CdnCatalogInput> {
+    let value: unknown
+    try {
+        value = JSON.parse(await fs.promises.readFile(TRACKED_BASELINE_PATH, "utf8"))
+    } catch (error) {
+        throw new Error(
+            `cannot read tracked CDN catalog baseline: ${(error as Error).message}`,
+        )
+    }
+    try {
+        return parseCdnRuntimeManifest(value).catalogInput
+    } catch (error) {
+        throw new Error(
+            `tracked CDN catalog baseline is invalid: ${(error as Error).message}`,
+        )
+    }
+}
+
 function assertUnchanged(
     expected: ContentFileFingerprint,
     actual: ContentFileFingerprint,
@@ -392,9 +415,9 @@ export async function materializeContentCatalogInput(
     const cdnRoot = path.resolve(scan.cdnRoot)
     const realpath = options.realpath ?? (filePath => fs.promises.realpath(filePath))
     const cdnRealRoot = path.resolve(await realpath(cdnRoot))
-    const baseline = options.baselineInput
-    if (baseline) buildCdnCatalog(baseline)
-    const baselineByPath = new Map((baseline?.archives ?? []).map(archive => [archive.relativePath, archive]))
+    const baseline = options.baselineInput ?? await loadTrackedBaselineInput()
+    buildCdnCatalog(baseline)
+    const baselineByPath = new Map(baseline.archives.map(archive => [archive.relativePath, archive]))
 
     const openFile = options.openFile ?? (filePath => fs.promises.open(
         filePath,

@@ -18,6 +18,7 @@
     "dev:cn": "npm run build:server && node --env-file=.env out/cn-server.js",
     "debug:cn": "tsnd --env-file=.env -- src/cn-server.ts",
     "cdn:manifest": "node tools/generate_cdn_runtime_manifest.cjs",
+    "content:sync": "node tools/content_sync.cjs",
     "install:admin": "npm --prefix admin ci",
     "build:admin": "npm --prefix admin run build",
     "dev:admin": "cd admin && npm run dev",

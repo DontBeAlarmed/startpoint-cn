@@ -36,6 +36,11 @@ export interface ContentObjectStoreDependencies {
     readonly rename?: (source: string, destination: string) => Promise<void>
 }
 
+export interface ContentCurrentRelease {
+    readonly current: ContentCurrentPointer
+    readonly manifest: ContentReleaseManifest
+}
+
 function isMissing(error: unknown): error is NodeJS.ErrnoException {
     return Boolean(error && typeof error === "object" && (error as NodeJS.ErrnoException).code === "ENOENT")
 }
@@ -162,6 +167,10 @@ export class ContentObjectStore {
     }
 
     async readCurrent(): Promise<ContentCurrentPointer | null> {
+        return (await this.readCurrentRelease())?.current ?? null
+    }
+
+    async readCurrentRelease(): Promise<ContentCurrentRelease | null> {
         let root: DirectoryIdentity
         try {
             root = await this.secureRoot(false)
@@ -191,8 +200,8 @@ export class ContentObjectStore {
         } catch (error) {
             throw errorWithCause("current pointer is corrupt", error)
         }
-        await this.readRelease(current)
-        return current
+        const manifest = await this.readRelease(current)
+        return Object.freeze({ current, manifest })
     }
 
     async readRelease(
