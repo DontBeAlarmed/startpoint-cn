@@ -4,6 +4,7 @@ import path from "node:path"
 export interface ContentPathEnvironment {
     readonly [name: string]: string | undefined
     readonly CDN_DIR?: string
+    readonly CONTENT_DIR?: string
     readonly CONTENT_STORE_DIR?: string
     readonly CONTENT_STATE_DIR?: string
     readonly CONTENT_RUNTIME_DIR?: string
@@ -12,6 +13,7 @@ export interface ContentPathEnvironment {
 export interface ContentPaths {
     readonly cdnDir: string
     readonly cdnRoot: string
+    readonly contentRootDir: string
     readonly contentStoreDir: string
     readonly contentStateDir: string
     readonly contentRuntimeDir: string
@@ -30,6 +32,7 @@ export interface PathApi {
 export interface PathFileSystem {
     existsSync(filePath: string): boolean
     realpathSync(filePath: string): string
+    lstatSync?(filePath: string): { isSymbolicLink(): boolean }
 }
 
 export interface ResolvePathDependencies {
@@ -45,6 +48,7 @@ export interface ResolveContentPathsOptions extends ResolvePathDependencies {
 const defaultFsApi: PathFileSystem = {
     existsSync: filePath => fs.existsSync(filePath),
     realpathSync: filePath => fs.realpathSync(filePath),
+    lstatSync: filePath => fs.lstatSync(filePath),
 }
 
 function isFullyQualifiedAbsolute(filePath: string, pathApi: PathApi): boolean {
@@ -73,11 +77,24 @@ function resolvePhysicalPath(
     filePath: string,
     pathApi: PathApi,
     fsApi: PathFileSystem,
+    label = "path",
 ): string {
     const missingSegments: string[] = []
     let existingAncestor = filePath
 
     while (!fsApi.existsSync(existingAncestor)) {
+        if (fsApi.lstatSync) {
+            try {
+                if (fsApi.lstatSync(existingAncestor).isSymbolicLink()) {
+                    throw new Error(
+                        `${label} contains a dangling symbolic link: ${existingAncestor}`,
+                    )
+                }
+            } catch (error) {
+                const code = (error as NodeJS.ErrnoException).code
+                if (code !== "ENOENT" && code !== "ENOTDIR") throw error
+            }
+        }
         const parent = pathApi.dirname(existingAncestor)
         if (parent === existingAncestor) {
             throw new Error(`cannot find an existing ancestor for ${filePath}`)
@@ -116,8 +133,8 @@ function resolveConfiguredPath(
         throw new Error(`${variableName} resolves outside projectRoot; use an absolute path for external locations`)
     }
 
-    const physicalRoot = resolvePhysicalPath(projectRoot, pathApi, fsApi)
-    const physicalPath = resolvePhysicalPath(resolvedPath, pathApi, fsApi)
+    const physicalRoot = resolvePhysicalPath(projectRoot, pathApi, fsApi, "projectRoot")
+    const physicalPath = resolvePhysicalPath(resolvedPath, pathApi, fsApi, variableName)
     if (!isSameOrDescendant(physicalRoot, physicalPath, pathApi)) {
         throw new Error(`${variableName} resolves physically outside projectRoot; use an absolute path for external locations`)
     }
@@ -154,7 +171,7 @@ function assertIsolatedContentPaths(
     fsApi: PathFileSystem,
 ): void {
     const physicalEntries = entries.map(([name, filePath]) => (
-        [name, resolvePhysicalPath(filePath, pathApi, fsApi)] as const
+        [name, resolvePhysicalPath(filePath, pathApi, fsApi, name)] as const
     ))
 
     for (let leftIndex = 0; leftIndex < physicalEntries.length; leftIndex++) {
@@ -180,6 +197,13 @@ export function resolveContentPaths({
     const paths: ContentPaths = {
         cdnDir,
         cdnRoot: pathApi.join(cdnDir, "cn"),
+        contentRootDir: resolveConfiguredPath(
+            env.CONTENT_DIR ?? ".content",
+            root,
+            "CONTENT_DIR",
+            pathApi,
+            fsApi,
+        ),
         contentStoreDir: resolveConfiguredPath(
             env.CONTENT_STORE_DIR ?? ".content/store",
             root,
@@ -209,5 +233,17 @@ export function resolveContentPaths({
         ["CONTENT_STATE_DIR", paths.contentStateDir],
         ["CONTENT_RUNTIME_DIR", paths.contentRuntimeDir],
     ], pathApi, fsApi)
+    assertIsolatedContentPaths([
+        ["CDN_DIR", paths.cdnDir],
+        ["CONTENT_DIR", paths.contentRootDir],
+    ], pathApi, fsApi)
+    if (env.CONTENT_DIR !== undefined) {
+        assertIsolatedContentPaths([
+            ["CONTENT_DIR", paths.contentRootDir],
+            ["CONTENT_STORE_DIR", paths.contentStoreDir],
+            ["CONTENT_STATE_DIR", paths.contentStateDir],
+            ["CONTENT_RUNTIME_DIR", paths.contentRuntimeDir],
+        ], pathApi, fsApi)
+    }
     return paths
 }

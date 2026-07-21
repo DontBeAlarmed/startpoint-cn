@@ -111,6 +111,7 @@ test("resolves Windows content paths with the injected path API", () => {
         fsApi,
         env: {
             CDN_DIR: "cache\\cdn-parent",
+            CONTENT_DIR: "content",
             CONTENT_STORE_DIR: "D:\\content-store",
             CONTENT_STATE_DIR: "state",
             CONTENT_RUNTIME_DIR: "\\\\server\\share\\runtime",
@@ -118,6 +119,7 @@ test("resolves Windows content paths with the injected path API", () => {
     }), {
         cdnDir: path.win32.join(projectRoot, "cache", "cdn-parent"),
         cdnRoot: path.win32.join(projectRoot, "cache", "cdn-parent", "cn"),
+        contentRootDir: path.win32.join(projectRoot, "content"),
         contentStoreDir: path.win32.resolve("D:\\content-store"),
         contentStateDir: path.win32.join(projectRoot, "state"),
         contentRuntimeDir: path.win32.resolve("\\\\server\\share\\runtime"),
@@ -131,6 +133,7 @@ test("resolves all content paths from explicit environment values", () => {
         ...posixDependencies,
         env: {
             CDN_DIR: "var/cdn",
+            CONTENT_DIR: "/srv/content",
             CONTENT_STORE_DIR: "var/content-store",
             CONTENT_STATE_DIR: "/srv/content-state",
             CONTENT_RUNTIME_DIR: "var/runtime",
@@ -140,6 +143,7 @@ test("resolves all content paths from explicit environment values", () => {
     assert.deepEqual(paths, {
         cdnDir: path.posix.join(projectRoot, "var/cdn"),
         cdnRoot: path.posix.join(projectRoot, "var/cdn/cn"),
+        contentRootDir: "/srv/content",
         contentStoreDir: path.posix.join(projectRoot, "var/content-store"),
         contentStateDir: "/srv/content-state",
         contentRuntimeDir: path.posix.join(projectRoot, "var/runtime"),
@@ -152,6 +156,7 @@ test("uses project-root-relative defaults without consulting process.cwd", () =>
     assert.deepEqual(resolveContentPaths({ projectRoot, env: {}, ...posixDependencies }), {
         cdnDir: path.posix.join(projectRoot, ".cdn"),
         cdnRoot: path.posix.join(projectRoot, ".cdn/cn"),
+        contentRootDir: path.posix.join(projectRoot, ".content"),
         contentStoreDir: path.posix.join(projectRoot, ".content/store"),
         contentStateDir: path.posix.join(projectRoot, ".content/state"),
         contentRuntimeDir: path.posix.join(projectRoot, ".content/runtime"),
@@ -169,6 +174,7 @@ test("rejects relative paths that physically escape through a symbolic link", t 
 
     for (const [variable, value] of [
         ["CDN_DIR", "outside/cdn-parent"],
+        ["CONTENT_DIR", "outside/content"],
         ["CONTENT_STORE_DIR", "outside/store"],
         ["CONTENT_STATE_DIR", "outside/state"],
         ["CONTENT_RUNTIME_DIR", "outside/runtime"],
@@ -181,6 +187,32 @@ test("rejects relative paths that physically escape through a symbolic link", t 
             new RegExp(`${variable}.*physically outside projectRoot`),
         )
     }
+})
+
+test("rejects dangling symbolic links in relative content paths", t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "cdn-dangling-paths-"))
+    const projectRoot = path.join(sandbox, "project")
+    const missingTarget = path.join(sandbox, "outside", "future-content")
+    const linkPath = path.join(projectRoot, "content-link")
+    fs.mkdirSync(projectRoot)
+    t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+    try {
+        fs.symlinkSync(missingTarget, linkPath, "dir")
+    } catch (error) {
+        if (process.platform === "win32" && ["EACCES", "EPERM"].includes(error.code)) {
+            t.skip("directory symlink creation is unavailable on this Windows host")
+            return
+        }
+        throw error
+    }
+
+    assert.throws(
+        () => resolveContentPaths({
+            projectRoot,
+            env: { CONTENT_DIR: "content-link" },
+        }),
+        /CONTENT_DIR.*dangling symbolic link|dangling symbolic link.*CONTENT_DIR/i,
+    )
 })
 
 test("rejects equal or nested lifecycle directories", () => {
@@ -231,6 +263,44 @@ test("rejects equal or nested lifecycle directories", () => {
     )
 })
 
+test("allows the content root to contain legacy defaults but isolates it from CDN", () => {
+    const projectRoot = "/repo"
+    const defaults = resolveContentPaths({
+        projectRoot,
+        ...posixDependencies,
+        env: {},
+    })
+    assert.equal(defaults.contentRootDir, "/repo/.content")
+    assert.equal(defaults.contentStoreDir, "/repo/.content/store")
+    assert.equal(defaults.contentStateDir, "/repo/.content/state")
+    assert.equal(defaults.contentRuntimeDir, "/repo/.content/runtime")
+
+    assert.throws(
+        () => resolveContentPaths({
+            projectRoot,
+            ...posixDependencies,
+            env: { CONTENT_DIR: ".cdn/content" },
+        }),
+        /CDN_DIR.*CONTENT_DIR.*equal or nested/,
+    )
+    assert.throws(
+        () => resolveContentPaths({
+            projectRoot,
+            ...posixDependencies,
+            env: { CDN_DIR: ".content/cdn" },
+        }),
+        /CDN_DIR.*CONTENT_DIR.*equal or nested/,
+    )
+    assert.throws(
+        () => resolveContentPaths({
+            projectRoot,
+            ...posixDependencies,
+            env: { CONTENT_DIR: ".content/store" },
+        }),
+        /CONTENT_DIR.*CONTENT_STORE_DIR.*equal or nested/,
+    )
+})
+
 test("rejects lifecycle directories that overlap through symbolic-link aliases", t => {
     const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "cdn-overlap-"))
     const projectRoot = path.join(sandbox, "project")
@@ -258,6 +328,7 @@ test("ignores the default content artifact tree", () => {
 
 test("rejects relative content paths that escape projectRoot", () => {
     for (const variable of [
+        "CONTENT_DIR",
         "CONTENT_STORE_DIR",
         "CONTENT_STATE_DIR",
         "CONTENT_RUNTIME_DIR",

@@ -44,6 +44,7 @@ const TEST_GROUPS = Object.freeze({
     "quick:content": {
         execution: "parallel",
         tests: [
+            "tools/content_object_store.test.cjs",
             "tools/content_archive_index.test.cjs",
             "tools/content_ordered_map.test.cjs",
             "tools/content_registry.test.cjs",
