@@ -4,11 +4,16 @@ export type HttpByteRange =
     | { readonly kind: "unsatisfiable" }
 
 const UNSATISFIABLE = Object.freeze({ kind: "unsatisfiable" } as const)
+const MAX_RANGE_HEADER_LENGTH = 256
 
-function parseDecimal(value: string): number | null {
-    if (!/^\d+$/.test(value)) return null
-    const parsed = Number(value)
-    return Number.isSafeInteger(parsed) ? parsed : null
+function parseSaturatedDecimal(value: string, maximum: number): number {
+    let parsed = 0
+    for (let index = 0; index < value.length; index++) {
+        const digit = value.charCodeAt(index) - 0x30
+        if (parsed > Math.floor((maximum - digit) / 10)) return maximum
+        parsed = parsed * 10 + digit
+    }
+    return parsed
 }
 
 export function parseHttpByteRange(
@@ -19,6 +24,7 @@ export function parseHttpByteRange(
     if (Array.isArray(header)
         || !Number.isSafeInteger(size)
         || size <= 0
+        || header.length > MAX_RANGE_HEADER_LENGTH
         || header.includes(",")) {
         return UNSATISFIABLE
     }
@@ -29,8 +35,8 @@ export function parseHttpByteRange(
     if (rawStart === "" && rawEnd === "") return UNSATISFIABLE
 
     if (rawStart === "") {
-        const suffixLength = parseDecimal(rawEnd)
-        if (suffixLength === null || suffixLength === 0) return UNSATISFIABLE
+        const suffixLength = parseSaturatedDecimal(rawEnd, size)
+        if (suffixLength === 0) return UNSATISFIABLE
         return {
             kind: "partial",
             start: Math.max(size - suffixLength, 0),
@@ -38,11 +44,11 @@ export function parseHttpByteRange(
         }
     }
 
-    const start = parseDecimal(rawStart)
-    if (start === null || start >= size) return UNSATISFIABLE
+    const start = parseSaturatedDecimal(rawStart, size)
+    if (start >= size) return UNSATISFIABLE
     if (rawEnd === "") return { kind: "partial", start, end: size - 1 }
 
-    const requestedEnd = parseDecimal(rawEnd)
-    if (requestedEnd === null || requestedEnd < start) return UNSATISFIABLE
-    return { kind: "partial", start, end: Math.min(requestedEnd, size - 1) }
+    const requestedEnd = parseSaturatedDecimal(rawEnd, size - 1)
+    if (requestedEnd < start) return UNSATISFIABLE
+    return { kind: "partial", start, end: requestedEnd }
 }

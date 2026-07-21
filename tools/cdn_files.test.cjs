@@ -147,11 +147,35 @@ test("parseHttpByteRange supports full, closed, open, suffix, and truncated rang
     assert.deepEqual(parseHttpByteRange("bytes=-99", 20), { kind: "partial", start: 0, end: 19 })
 })
 
+test("parseHttpByteRange saturates decimal values relative to the file size", () => {
+    const aboveSafeInteger = "9007199254740992"
+    assert.deepEqual(
+        parseHttpByteRange(`bytes=0-${aboveSafeInteger}`, 20),
+        { kind: "partial", start: 0, end: 19 },
+    )
+    assert.deepEqual(
+        parseHttpByteRange(`bytes=-${aboveSafeInteger}`, 20),
+        { kind: "partial", start: 0, end: 19 },
+    )
+    assert.deepEqual(
+        parseHttpByteRange(`bytes=${aboveSafeInteger}-`, 20),
+        { kind: "unsatisfiable" },
+    )
+    assert.deepEqual(
+        parseHttpByteRange(`bytes=0-${"9".repeat(10_000)}`, 20),
+        { kind: "unsatisfiable" },
+    )
+})
+
 test("parseHttpByteRange rejects invalid and unsatisfiable ranges", () => {
     for (const header of [
         "bytes=20-21",
         "bytes=10-9",
         "bytes=-0",
+        "bytes=+1-2",
+        "bytes=1--2",
+        "bytes=-",
+        "bytes=",
         "bytes=x-y",
         "items=0-1",
         "bytes=0-1,3-4",
@@ -204,6 +228,28 @@ test("serves closed, open, suffix, and truncated ranges", async t => {
         assert.equal(response.headers["accept-ranges"], "bytes", range)
         assert.equal(response.headers["content-range"], contentRange, range)
         assert.equal(response.headers["content-length"], String(Buffer.byteLength(body)), range)
+        assert.equal(response.body, body, range)
+    }
+    await waitForBalancedHandles(observer)
+})
+
+test("serves saturated decimal ranges and rejects oversized Range headers", async t => {
+    const { app, observer } = await createFixture(t)
+    const cases = [
+        ["bytes=0-9007199254740992", 206, "0123456789", "bytes 0-9/10"],
+        ["bytes=-9007199254740992", 206, "0123456789", "bytes 0-9/10"],
+        ["bytes=9007199254740992-", 416, "", "bytes */10"],
+        [`bytes=0-${"9".repeat(1024)}`, 416, "", "bytes */10"],
+    ]
+
+    for (const [range, statusCode, body, contentRange] of cases) {
+        const response = await app.inject({
+            method: "GET",
+            url: "/patch/cn/archive-common-full/base.zip",
+            headers: { range },
+        })
+        assert.equal(response.statusCode, statusCode, range)
+        assert.equal(response.headers["content-range"], contentRange, range)
         assert.equal(response.body, body, range)
     }
     await waitForBalancedHandles(observer)
@@ -453,6 +499,95 @@ test("releases the FileHandle after a real socket client aborts the response", a
     assert.ok(serverReply)
     assert.equal(serverRequest.listeners("aborted").some(listener => listener.name === "destroyStream"), false)
     assert.equal(serverReply.listeners("close").some(listener => listener.name === "onResponseClose"), false)
+})
+
+test("closes a real socket when the read stream fails after headers are sent", async t => {
+    const injectedError = new Error("injected post-header stream failure")
+    let interruptedStream
+    let serverReply
+    let headersSentAtDestroy = false
+    let responseSeen = false
+    let connectionClosed = false
+    let responseComplete = true
+    const { app, observer } = await createFixture(t, {
+        configureApp: instance => {
+            instance.addHook("onRequest", async (request, reply) => {
+                if (request.url === "/patch/cn/objects/large.bin") serverReply = reply.raw
+            })
+        },
+        fileSystemFactory: ({ cdnRoot }) => {
+            const physicalLargePath = fs.realpathSync(path.join(cdnRoot, "objects", "large.bin"))
+            return {
+                realpath: filePath => fs.promises.realpath(filePath),
+                lstat: filePath => fs.promises.lstat(filePath),
+                open: async (...args) => {
+                    const handle = await fs.promises.open(...args)
+                    if (path.resolve(args[0]) === physicalLargePath) {
+                        const createReadStream = handle.createReadStream.bind(handle)
+                        handle.createReadStream = streamOptions => {
+                            const stream = createReadStream({ ...streamOptions, highWaterMark: 1024 })
+                            interruptedStream = stream
+                            stream.once("data", () => {
+                                setImmediate(() => {
+                                    headersSentAtDestroy = serverReply.headersSent
+                                    stream.destroy(injectedError)
+                                })
+                            })
+                            return stream
+                        }
+                    }
+                    return handle
+                },
+            }
+        },
+    })
+
+    await captureUnhandledErrors(async () => {
+        await app.listen({ host: "127.0.0.1", port: 0 })
+        const address = app.server.address()
+        assert.ok(address && typeof address === "object")
+        await new Promise((resolve, reject) => {
+            let settled = false
+            const finish = error => {
+                if (settled) return
+                settled = true
+                clearTimeout(timeout)
+                if (error) reject(error)
+                else resolve()
+            }
+            const timeout = setTimeout(() => finish(new Error("post-header stream failure timed out")), 5000)
+            const request = http.get({
+                host: "127.0.0.1",
+                port: address.port,
+                path: "/patch/cn/objects/large.bin",
+            }, response => {
+                responseSeen = true
+                response.once("close", () => {
+                    connectionClosed = true
+                    responseComplete = response.complete
+                    finish()
+                })
+                response.on("error", () => {})
+                response.resume()
+            })
+            request.once("error", error => {
+                if (!responseSeen) finish(error)
+            })
+        })
+        await waitForBalancedHandles(observer)
+    })
+
+    assert.equal(headersSentAtDestroy, true)
+    assert.equal(responseSeen, true)
+    assert.equal(connectionClosed, true)
+    assert.equal(responseComplete, false)
+    assert.ok(observer.opened > 0)
+    assert.ok(interruptedStream)
+    assert.equal(interruptedStream.closed, true)
+    assert.equal(
+        interruptedStream.listeners("close").some(listener => listener.name === "onStreamClose"),
+        false,
+    )
 })
 
 test("releases the FileHandle when the read stream is destroyed with an error", async t => {
