@@ -65,6 +65,8 @@ export function normalizeCdnBaseUrl(baseUrl: string): string {
         : authority.split(":", 1)[0]
     if (!authority
         || !rawHost
+        || rawHost === "0.0.0.0"
+        || rawHost === "[::]"
         || (/^[0-9.]+$/.test(rawHost) && isIP(rawHost) !== 4)) {
         throw invalidCdnBaseUrl()
     }

@@ -1,6 +1,18 @@
 import { createHash } from "node:crypto"
 import { constants, type Stats } from "node:fs"
-import { lstat, mkdir, mkdtemp, open, realpath, rm, type FileHandle } from "node:fs/promises"
+import {
+    lstat,
+    mkdir,
+    mkdtemp,
+    open,
+    readFile,
+    readdir,
+    realpath,
+    rm,
+    unlink,
+    writeFile,
+    type FileHandle,
+} from "node:fs/promises"
 import path from "node:path"
 import type { Readable } from "node:stream"
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
@@ -30,18 +42,30 @@ interface ZipSpoolDirectoryContext extends ZipSpoolContext {
 interface ZipSpoolChunkContext extends ZipSpoolContext {
     readonly bytesCopied: number
     readonly totalBytes: number
+    readonly abortRequest: () => void
 }
 
 interface ZipSpoolResponseContext extends ZipSpoolDirectoryContext {
     readonly stream: Readable
 }
 
+export interface CdnSpoolLimiterState {
+    readonly active: number
+    readonly reservedBytes: number
+}
+
 export interface CdnZipSpoolHooks {
     readonly afterSourceStat?: (context: ZipSpoolContext) => void | Promise<void>
     readonly afterChunk?: (context: ZipSpoolChunkContext) => void | Promise<void>
     readonly beforeResponse?: (context: ZipSpoolResponseContext) => void | Promise<void>
+    readonly limiterChanged?: (state: CdnSpoolLimiterState) => void
     readonly spoolCreated?: (context: ZipSpoolDirectoryContext) => void
     readonly spoolRemoved?: (context: ZipSpoolDirectoryContext) => void
+}
+
+export interface CdnSpoolLimits {
+    readonly maxConcurrent?: number
+    readonly maxReservedBytes?: number
 }
 
 export interface CnCdnFilesRouteOptions {
@@ -51,6 +75,7 @@ export interface CnCdnFilesRouteOptions {
     readonly fileSystem?: CdnFileSystem
     readonly handleObserver?: CdnFileHandleObserver
     readonly zipSpoolHooks?: CdnZipSpoolHooks
+    readonly spoolLimits?: CdnSpoolLimits
 }
 
 interface ZipIdentity {
@@ -74,11 +99,25 @@ interface VerifiedZipSpool {
     readonly cleanup: () => Promise<void>
 }
 
+interface CdnSpoolReservation {
+    release(): void
+}
+
 const defaultFileSystem: CdnFileSystem = { realpath, lstat, open }
 const OPEN_READ_NOFOLLOW = constants.O_RDONLY | constants.O_NOFOLLOW
 const OPEN_CREATE_EXCLUSIVE = constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW
 const ZIP_COPY_BUFFER_BYTES = 64 * 1024
 const ZIP_SPOOL_DIRECTORY = "cdn-response-spool-v1"
+const ZIP_SPOOL_MARKER = ".starpoint-cn-cdn-spool"
+const ZIP_SPOOL_MARKER_CONTENT = "starpoint-cn:cdn-response-spool-v1\n"
+const DEFAULT_MAX_CONCURRENT_SPOOLS = 2
+const MAX_CONCURRENT_SPOOLS = 16
+const DEFAULT_MAX_RESERVED_BYTES = 2 * 1024 * 1024 * 1024
+const MAX_RESERVED_BYTES = 16 * 1024 * 1024 * 1024
+const CDN_SPOOL_BUSY_RESPONSE = Object.freeze({
+    code: "CDN_SPOOL_BUSY",
+    message: "CDN archive service is busy",
+})
 
 function requestRelativePath(request: FastifyRequest): string | null {
     const rawUrl = request.raw.url?.split("?", 1)[0] ?? ""
@@ -114,6 +153,117 @@ function isDescendant(root: string, candidate: string): boolean {
         && !path.isAbsolute(relativePath)
         && relativePath !== ".."
         && !relativePath.startsWith(`..${path.sep}`)
+}
+
+function requirePositiveSafeInteger(value: number, name: string, maximum: number): number {
+    if (!Number.isSafeInteger(value) || value <= 0 || value > maximum) {
+        throw new Error(`${name} must be a positive safe integer no greater than ${maximum}`)
+    }
+    return value
+}
+
+function largestCatalogZip(snapshot: ContentSnapshot): number {
+    let largest = 0
+    for (const edge of snapshot.cdn.edges) {
+        for (const archive of edge.archives) {
+            if (path.posix.extname(archive.relativePath).toLowerCase() === ".zip") {
+                largest = Math.max(largest, archive.compressedBytes)
+            }
+        }
+    }
+    return largest
+}
+
+class CdnSpoolLimiter {
+    private active = 0
+    private reservedBytes = 0
+
+    constructor(
+        private readonly maxConcurrent: number,
+        private readonly maxReservedBytes: number,
+        private readonly onChange: ((state: CdnSpoolLimiterState) => void) | undefined,
+    ) {}
+
+    tryReserve(bytes: number): CdnSpoolReservation | null {
+        if (this.active >= this.maxConcurrent
+            || bytes > this.maxReservedBytes - this.reservedBytes) {
+            return null
+        }
+        this.active++
+        this.reservedBytes += bytes
+        this.notify()
+        let released = false
+        return {
+            release: () => {
+                if (released) return
+                released = true
+                this.active--
+                this.reservedBytes -= bytes
+                this.notify()
+            },
+        }
+    }
+
+    private notify(): void {
+        try {
+            this.onChange?.({ active: this.active, reservedBytes: this.reservedBytes })
+        } catch {
+            // Test/diagnostic observers cannot change limiter accounting.
+        }
+    }
+}
+
+function createSpoolLimiter(
+    snapshot: ContentSnapshot,
+    configured: CdnSpoolLimits | undefined,
+    onChange: ((state: CdnSpoolLimiterState) => void) | undefined,
+): CdnSpoolLimiter {
+    const largestArchive = largestCatalogZip(snapshot)
+    if (largestArchive > MAX_RESERVED_BYTES) {
+        throw new Error("catalog archive exceeds the hard CDN spool byte limit")
+    }
+    const maxConcurrent = requirePositiveSafeInteger(
+        configured?.maxConcurrent ?? DEFAULT_MAX_CONCURRENT_SPOOLS,
+        "CDN spool concurrency",
+        MAX_CONCURRENT_SPOOLS,
+    )
+    const maxReservedBytes = requirePositiveSafeInteger(
+        configured?.maxReservedBytes ?? Math.max(DEFAULT_MAX_RESERVED_BYTES, largestArchive),
+        "CDN spool byte budget",
+        MAX_RESERVED_BYTES,
+    )
+    if (maxReservedBytes < largestArchive) {
+        throw new Error("CDN spool byte budget must accommodate the largest catalog archive")
+    }
+    return new CdnSpoolLimiter(maxConcurrent, maxReservedBytes, onChange)
+}
+
+async function initializeSpoolRoot(spoolRoot: string): Promise<void> {
+    const markerPath = path.join(spoolRoot, ZIP_SPOOL_MARKER)
+    try {
+        const markerStat = await lstat(markerPath)
+        if (!markerStat.isFile() || markerStat.isSymbolicLink()) {
+            throw new Error("CDN spool marker is invalid")
+        }
+        if (await readFile(markerPath, "utf8") !== ZIP_SPOOL_MARKER_CONTENT) {
+            throw new Error("CDN spool marker is invalid")
+        }
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+        await writeFile(markerPath, ZIP_SPOOL_MARKER_CONTENT, { flag: "wx", mode: 0o600 })
+    }
+
+    // This namespace is single-process-owned; only its request-* entries are stale across startup.
+    for (const entry of await readdir(spoolRoot, { withFileTypes: true })) {
+        if (!/^request-[A-Za-z0-9_-]+$/.test(entry.name)) continue
+        const candidate = path.join(spoolRoot, entry.name)
+        const candidateStat = await lstat(candidate)
+        if (candidateStat.isDirectory() && !candidateStat.isSymbolicLink()) {
+            await rm(candidate, { recursive: true, force: false })
+        } else {
+            await unlink(candidate)
+        }
+    }
 }
 
 function contentType(relativePath: string): string {
@@ -237,25 +387,43 @@ async function writeAll(handle: FileHandle, buffer: Buffer, position: number): P
     }
 }
 
+function throwIfAborted(signal: AbortSignal): void {
+    if (!signal.aborted) return
+    const error = new Error("CDN spool request was aborted")
+    error.name = "AbortError"
+    throw error
+}
+
 async function copyZipToSpool(
     source: FileHandle,
     destination: FileHandle,
     identity: ZipIdentity,
     relativePath: string,
     hooks: CdnZipSpoolHooks | undefined,
+    signal: AbortSignal,
+    abortRequest: () => void,
 ): Promise<string> {
     const hash = createHash("sha256")
     const buffer = Buffer.allocUnsafe(Math.min(ZIP_COPY_BUFFER_BYTES, Math.max(identity.size, 1)))
     let bytesCopied = 0
     while (bytesCopied < identity.size) {
+        throwIfAborted(signal)
         const bytesToRead = Math.min(buffer.length, identity.size - bytesCopied)
         const result = await source.read(buffer, 0, bytesToRead, bytesCopied)
+        throwIfAborted(signal)
         if (result.bytesRead === 0) throw new Error("ZIP source ended during spool copy")
         const chunk = buffer.subarray(0, result.bytesRead)
         hash.update(chunk)
         await writeAll(destination, chunk, bytesCopied)
         bytesCopied += result.bytesRead
-        await hooks?.afterChunk?.({ relativePath, bytesCopied, totalBytes: identity.size })
+        throwIfAborted(signal)
+        await hooks?.afterChunk?.({
+            relativePath,
+            bytesCopied,
+            totalBytes: identity.size,
+            abortRequest,
+        })
+        throwIfAborted(signal)
     }
     return hash.digest("hex")
 }
@@ -286,6 +454,8 @@ async function createVerifiedZipSpool(
     fileSystem: CdnFileSystem,
     observer: CdnFileHandleObserver | undefined,
     hooks: CdnZipSpoolHooks | undefined,
+    signal: AbortSignal,
+    abortRequest: () => void,
 ): Promise<VerifiedZipSpool> {
     let source: FileHandle | null = null
     let spoolWriter: FileHandle | null = null
@@ -293,10 +463,12 @@ async function createVerifiedZipSpool(
     let directory: string | null = null
     let cleanup: (() => Promise<void>) | null = null
     try {
+        throwIfAborted(signal)
         if (await hasSymlinkComponent(logicalRoot, relativePath, fileSystem)) {
             throw new Error("ZIP path contains a symlink")
         }
         source = await openObserved(identity.logicalPath, OPEN_READ_NOFOLLOW, fileSystem, observer)
+        throwIfAborted(signal)
         const beforeStat = await source.stat()
         const beforePathStat = await fileSystem.lstat(identity.logicalPath)
         if (!sameIdentity(beforeStat, identity)
@@ -305,6 +477,7 @@ async function createVerifiedZipSpool(
             throw new Error("ZIP identity changed before spool copy")
         }
         await hooks?.afterSourceStat?.({ relativePath })
+        throwIfAborted(signal)
 
         directory = await mkdtemp(path.join(spoolRoot, "request-"))
         cleanup = makeSpoolCleanup(directory, relativePath, hooks)
@@ -323,7 +496,10 @@ async function createVerifiedZipSpool(
             identity,
             relativePath,
             hooks,
+            signal,
+            abortRequest,
         )
+        throwIfAborted(signal)
         await spoolWriter.sync()
         const spoolStat = await spoolWriter.stat()
         const afterStat = await source.stat()
@@ -350,7 +526,6 @@ async function createVerifiedZipSpool(
         }
         const stream = createObservedReadStream(spoolReader, observer)
         spoolReader = null
-        stream.once("close", () => { void cleanup?.() })
         return { directory, stream, cleanup }
     } catch (error) {
         await closeObservedQuietly(source, observer)
@@ -426,6 +601,7 @@ async function buildZipIdentities(
 }
 
 async function sendPinnedZip(
+    request: FastifyRequest,
     reply: FastifyReply,
     relativePath: string,
     identity: ZipIdentity,
@@ -434,10 +610,29 @@ async function sendPinnedZip(
     fileSystem: CdnFileSystem,
     observer: CdnFileHandleObserver | undefined,
     hooks: CdnZipSpoolHooks | undefined,
+    limiter: CdnSpoolLimiter,
 ) {
+    const abortController = new AbortController()
+    const abortRequest = () => abortController.abort()
+    const onRequestAborted = () => abortRequest()
+    const onRequestClose = () => {
+        if (request.raw.aborted || !request.raw.complete) abortRequest()
+    }
+    const onPreResponseClose = () => abortRequest()
+    request.raw.once("aborted", onRequestAborted)
+    request.raw.once("close", onRequestClose)
+    reply.raw.once("close", onPreResponseClose)
+
+    let reservation: CdnSpoolReservation | null = null
     let spool: VerifiedZipSpool | null = null
     let onReplyClose: (() => void) | null = null
+    let handedToResponse = false
     try {
+        throwIfAborted(abortController.signal)
+        reservation = limiter.tryReserve(identity.size)
+        if (!reservation) {
+            return reply.status(503).type("application/json").send(CDN_SPOOL_BUSY_RESPONSE)
+        }
         // Phase 1 security boundary: verify and spool before sending; immutable object storage can replace this double-I/O path later.
         spool = await createVerifiedZipSpool(
             relativePath,
@@ -447,24 +642,43 @@ async function sendPinnedZip(
             fileSystem,
             observer,
             hooks,
+            abortController.signal,
+            abortRequest,
         )
+        throwIfAborted(abortController.signal)
         const verifiedSpool = spool
+        const verifiedReservation = reservation
+        let finishPromise: Promise<void> | null = null
+        const finish = () => {
+            finishPromise ??= (async () => {
+                try {
+                    await verifiedSpool.cleanup()
+                } finally {
+                    verifiedReservation.release()
+                }
+            })()
+            return finishPromise
+        }
+        reply.raw.off("close", onPreResponseClose)
         onReplyClose = () => {
+            abortRequest()
             if (!verifiedSpool.stream.closed) verifiedSpool.stream.destroy()
-            else void verifiedSpool.cleanup()
+            else void finish()
         }
         reply.raw.once("close", onReplyClose)
         if (reply.raw.destroyed) throw new Error("client disconnected before ZIP verification completed")
+        verifiedSpool.stream.once("close", () => {
+            if (onReplyClose) reply.raw.off("close", onReplyClose)
+            void finish()
+        })
         await hooks?.beforeResponse?.({
             relativePath,
             directory: verifiedSpool.directory,
             stream: verifiedSpool.stream,
         })
+        throwIfAborted(abortController.signal)
         if (reply.raw.destroyed) throw new Error("client disconnected before ZIP response")
-        verifiedSpool.stream.once("close", () => {
-            if (onReplyClose) reply.raw.off("close", onReplyClose)
-            void verifiedSpool.cleanup()
-        })
+        handedToResponse = true
         return reply.status(200).type("application/zip").send(verifiedSpool.stream)
     } catch {
         if (onReplyClose) reply.raw.off("close", onReplyClose)
@@ -477,7 +691,14 @@ async function sendPinnedZip(
             }
             await spool.cleanup()
         }
+        reservation?.release()
+        if (abortController.signal.aborted) return reply.status(499).send("")
         return reply.status(404).send("Not Found")
+    } finally {
+        request.raw.off("aborted", onRequestAborted)
+        request.raw.off("close", onRequestClose)
+        reply.raw.off("close", onPreResponseClose)
+        if (!handedToResponse && onReplyClose) reply.raw.off("close", onReplyClose)
     }
 }
 
@@ -523,6 +744,7 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
     const fileSystem = options.fileSystem ?? defaultFileSystem
     const observer = options.handleObserver
     const hooks = options.zipSpoolHooks
+    const limiter = createSpoolLimiter(snapshot, options.spoolLimits, hooks?.limiterChanged)
     const logicalRoot = path.resolve(paths.cdnRoot)
     const physicalRoot = await fileSystem.realpath(logicalRoot)
     const contentStateRoot = path.resolve(paths.contentStateDir)
@@ -539,6 +761,7 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
     if (!isDescendant(physicalContentStateRoot, spoolRoot)) {
         throw new Error("CDN spool directory must resolve inside CONTENT_STATE_DIR")
     }
+    await initializeSpoolRoot(spoolRoot)
     const zipIdentities = await buildZipIdentities(
         snapshot,
         logicalRoot,
@@ -588,6 +811,7 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
             const identity = zipIdentities.get(relativePath)
             return identity
                 ? sendPinnedZip(
+                    request,
                     reply,
                     relativePath,
                     identity,
@@ -596,6 +820,7 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
                     fileSystem,
                     observer,
                     hooks,
+                    limiter,
                 )
                 : reply.status(404).send("Not Found")
         }
