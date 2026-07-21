@@ -13,6 +13,7 @@ const SOURCE_RULES = [
     },
     { pattern: /^src\/content\/cdn\/protocol\.ts$/, groups: ["integration:cdn", "full"] },
     { pattern: /^src\/content\/cdn\/catalog-loader\.ts$/, groups: ["integration:cdn"] },
+    { pattern: /^src\/content\/cdn\/audit\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/content\/runtime\/content-snapshot\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/content\/deep-freeze\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/lib\/version\.ts$/, groups: ["full"] },
@@ -60,6 +61,8 @@ function groupsForFile(filePath) {
     if (testGroups.length > 0) return testGroups
     if (filePath === "tools/test-workflow/groups.cjs") return ["full"]
     if (filePath.startsWith("tools/test-workflow/")) return ["quick:workflow"]
+    if (filePath === "tools/audit_cdn_catalog.cjs") return ["integration:cdn"]
+    if (filePath === "docs/cdn/catalog-planner.md") return ["integration:cdn"]
 
     const matchedGroups = SOURCE_RULES
         .filter(rule => rule.pattern.test(filePath))
