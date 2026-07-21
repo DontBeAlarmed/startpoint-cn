@@ -2,6 +2,7 @@
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
+const http = require("node:http")
 const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
@@ -50,6 +51,31 @@ async function waitForBalancedHandles(observer) {
     assert.equal(observer.closed, observer.opened)
 }
 
+async function captureUnhandledErrors(run) {
+    const baseline = {
+        uncaughtException: process.listenerCount("uncaughtException"),
+        unhandledRejection: process.listenerCount("unhandledRejection"),
+    }
+    const errors = []
+    const onError = error => errors.push(error)
+    process.on("uncaughtException", onError)
+    process.on("unhandledRejection", onError)
+    let failure
+    try {
+        await run()
+        await new Promise(resolve => setImmediate(resolve))
+    } catch (error) {
+        failure = error
+    } finally {
+        process.off("uncaughtException", onError)
+        process.off("unhandledRejection", onError)
+    }
+    assert.equal(process.listenerCount("uncaughtException"), baseline.uncaughtException)
+    assert.equal(process.listenerCount("unhandledRejection"), baseline.unhandledRejection)
+    assert.deepEqual(errors, [])
+    if (failure) throw failure
+}
+
 async function createFixture(t, options = {}) {
     const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-files-"))
     const cdnRoot = path.join(sandbox, "cdn")
@@ -74,13 +100,15 @@ async function createFixture(t, options = {}) {
     fs.writeFileSync(path.join(outsideRoot, "outside.zip"), zipBytes)
     fs.symlinkSync(path.join(outsideRoot, "outside.bin"), path.join(cdnRoot, "objects", "outside.bin"))
     fs.symlinkSync(path.join(outsideRoot, "outside.zip"), path.join(cdnRoot, "archive-common-full", "outside.zip"))
+    options.setup?.({ cdnRoot, outsideRoot, zipBytes })
 
     const observer = { opened: 0, closed: 0 }
     const app = Fastify({ logger: false })
+    options.configureApp?.(app)
     const previousContentStateDir = process.env.CONTENT_STATE_DIR
     process.env.CONTENT_STATE_DIR = contentStateDir
     app.register(cdnFilesPlugin, {
-        getSnapshot: () => snapshot([
+        getSnapshot: () => snapshot(options.archives?.({ cdnRoot, outsideRoot, zipBytes }) ?? [
             archive("archive-common-full/base.zip", zipBytes.length),
             archive("archive-common-full/outside.zip", zipBytes.length, 2),
         ]),
@@ -107,7 +135,7 @@ async function createFixture(t, options = {}) {
         await app.close()
         fs.rmSync(sandbox, { recursive: true, force: true })
     })
-    return { app, contentStateDir, observer, zipBytes }
+    return { app, cdnRoot, contentStateDir, observer, outsideRoot, zipBytes }
 }
 
 test("parseHttpByteRange supports full, closed, open, suffix, and truncated ranges", () => {
@@ -250,28 +278,219 @@ test("keeps ZIP allowlist, ordinary files, patch upload, and path boundaries", a
     await waitForBalancedHandles(observer)
 })
 
-test("releases the open FileHandle when client streaming is interrupted", async t => {
+test("rejects a Catalog ZIP reached through an intermediate directory symlink", async t => {
+    const targetBody = "middle-secret"
     const { app, observer } = await createFixture(t, {
-        fileSystemFactory: ({ cdnRoot }) => ({
-            realpath: filePath => fs.promises.realpath(filePath),
-            lstat: filePath => fs.promises.lstat(filePath),
-            open: async (...args) => {
-                const handle = await fs.promises.open(...args)
-                if (path.resolve(args[0]) === path.join(cdnRoot, "objects", "large.bin")) {
-                    const createReadStream = handle.createReadStream.bind(handle)
-                    handle.createReadStream = streamOptions => {
-                        const stream = createReadStream({ ...streamOptions, highWaterMark: 1024 })
-                        stream.once("data", () => stream.destroy())
-                        return stream
-                    }
-                }
-                return handle
-            },
-        }),
+        setup: ({ cdnRoot }) => {
+            fs.mkdirSync(path.join(cdnRoot, "actual-middle"))
+            fs.writeFileSync(path.join(cdnRoot, "actual-middle", "allowed.zip"), targetBody)
+            fs.symlinkSync("actual-middle", path.join(cdnRoot, "archive-middle"))
+        },
+        archives: () => [archive("archive-middle/allowed.zip", Buffer.byteLength(targetBody))],
     })
 
-    await app.inject({ method: "GET", url: "/patch/cn/objects/large.bin" })
-        .catch(() => undefined)
+    const response = await app.inject({ method: "GET", url: "/patch/cn/archive-middle/allowed.zip" })
+    assert.equal(response.statusCode, 404)
+    assert.equal(response.body.includes(targetBody), false)
+    await waitForBalancedHandles(observer)
+})
+
+test("rejects a Catalog ZIP path replaced by a symlink after route registration", async t => {
+    const targetBody = "extra"
+    const { app, cdnRoot, observer } = await createFixture(t)
+    const archivePath = path.join(cdnRoot, "archive-common-full", "base.zip")
+    fs.unlinkSync(archivePath)
+    fs.symlinkSync("extra.zip", archivePath)
+
+    const response = await app.inject({
+        method: "GET",
+        url: "/patch/cn/archive-common-full/base.zip",
+    })
+    assert.equal(response.statusCode, 404)
+    assert.equal(response.body.includes(targetBody), false)
+    await waitForBalancedHandles(observer)
+})
+
+test("rejects a Catalog ZIP replaced while its opened handle is validated", async t => {
+    const replacementBody = "abcdefghij"
+    let swapped = false
+    const { app, observer } = await createFixture(t, {
+        fileSystemFactory: ({ cdnRoot }) => {
+            const archivePath = path.join(cdnRoot, "archive-common-full", "base.zip")
+            const physicalArchivePath = fs.realpathSync(archivePath)
+            return {
+                realpath: filePath => fs.promises.realpath(filePath),
+                lstat: filePath => fs.promises.lstat(filePath),
+                open: async (...args) => {
+                    const handle = await fs.promises.open(...args)
+                    if (!swapped && path.resolve(args[0]) === physicalArchivePath) {
+                        swapped = true
+                        fs.renameSync(archivePath, `${archivePath}.opened`)
+                        fs.writeFileSync(archivePath, replacementBody)
+                    }
+                    return handle
+                },
+            }
+        },
+    })
+
+    const response = await app.inject({
+        method: "GET",
+        url: "/patch/cn/archive-common-full/base.zip",
+    })
+    assert.equal(response.statusCode, 404)
+    assert.equal(response.body.includes("0123456789"), false)
+    assert.equal(response.body.includes(replacementBody), false)
+    assert.equal(swapped, true)
     await waitForBalancedHandles(observer)
     assert.ok(observer.opened > 0)
+})
+
+test("rejects a non-ZIP intermediate directory swapped during open validation", async t => {
+    const targetBody = "outside-secret"
+    let swapped = false
+    const { app, observer } = await createFixture(t, {
+        setup: ({ outsideRoot }) => {
+            fs.writeFileSync(path.join(outsideRoot, "ordinary.bin"), targetBody)
+        },
+        fileSystemFactory: ({ cdnRoot }) => {
+            const assetPath = path.join(cdnRoot, "objects", "ordinary.bin")
+            return {
+                realpath: async filePath => {
+                    const resolved = await fs.promises.realpath(filePath)
+                    if (!swapped && path.resolve(filePath) === assetPath) {
+                        swapped = true
+                        fs.renameSync(path.dirname(assetPath), `${path.dirname(assetPath)}.opened`)
+                        fs.symlinkSync(path.join(path.dirname(cdnRoot), "outside"), path.dirname(assetPath))
+                    }
+                    return resolved
+                },
+                lstat: filePath => fs.promises.lstat(filePath),
+                open: (...args) => fs.promises.open(...args),
+            }
+        },
+    })
+
+    const response = await app.inject({ method: "GET", url: "/patch/cn/objects/ordinary.bin" })
+    assert.equal(response.statusCode, 404)
+    assert.equal(response.body.includes(targetBody), false)
+    assert.equal(swapped, true)
+    await waitForBalancedHandles(observer)
+    assert.ok(observer.opened > 0)
+})
+
+test("releases the FileHandle after a real socket client aborts the response", async t => {
+    let serverRequest
+    let serverReply
+    const { app, observer } = await createFixture(t, {
+        configureApp: instance => {
+            instance.addHook("onRequest", async (request, reply) => {
+                if (request.url !== "/patch/cn/objects/large.bin") return
+                serverRequest = request.raw
+                serverReply = reply.raw
+            })
+        },
+        fileSystemFactory: ({ cdnRoot }) => {
+            const physicalLargePath = fs.realpathSync(path.join(cdnRoot, "objects", "large.bin"))
+            return {
+                realpath: filePath => fs.promises.realpath(filePath),
+                lstat: filePath => fs.promises.lstat(filePath),
+                open: async (...args) => {
+                    const handle = await fs.promises.open(...args)
+                    if (path.resolve(args[0]) === physicalLargePath) {
+                        const createReadStream = handle.createReadStream.bind(handle)
+                        handle.createReadStream = streamOptions => {
+                            const stream = createReadStream({ ...streamOptions, highWaterMark: 1024 })
+                            stream.once("data", () => stream.pause())
+                            return stream
+                        }
+                    }
+                    return handle
+                },
+            }
+        },
+    })
+
+    await captureUnhandledErrors(async () => {
+        await app.listen({ host: "127.0.0.1", port: 0 })
+        const address = app.server.address()
+        assert.ok(address && typeof address === "object")
+        await new Promise((resolve, reject) => {
+            let aborted = false
+            let settled = false
+            const finish = error => {
+                if (settled) return
+                settled = true
+                clearTimeout(timeout)
+                if (error) reject(error)
+                else resolve()
+            }
+            const timeout = setTimeout(() => finish(new Error("socket abort timed out")), 5000)
+            const request = http.get({
+                host: "127.0.0.1",
+                port: address.port,
+                path: "/patch/cn/objects/large.bin",
+            }, response => {
+                response.once("data", () => {
+                    aborted = true
+                    response.destroy()
+                    request.destroy()
+                })
+                response.once("close", () => finish())
+                response.once("error", error => {
+                    if (!aborted) finish(error)
+                })
+            })
+            request.once("error", error => {
+                if (!aborted) finish(error)
+            })
+        })
+        await waitForBalancedHandles(observer)
+    })
+
+    assert.ok(observer.opened > 0)
+    assert.ok(serverRequest)
+    assert.ok(serverReply)
+    assert.equal(serverRequest.listeners("aborted").some(listener => listener.name === "destroyStream"), false)
+    assert.equal(serverReply.listeners("close").some(listener => listener.name === "onResponseClose"), false)
+})
+
+test("releases the FileHandle when the read stream is destroyed with an error", async t => {
+    const injectedError = new Error("injected read stream failure")
+    let interruptedStream
+    const { app, observer } = await createFixture(t, {
+        fileSystemFactory: ({ cdnRoot }) => {
+            const physicalLargePath = fs.realpathSync(path.join(cdnRoot, "objects", "large.bin"))
+            return {
+                realpath: filePath => fs.promises.realpath(filePath),
+                lstat: filePath => fs.promises.lstat(filePath),
+                open: async (...args) => {
+                    const handle = await fs.promises.open(...args)
+                    if (path.resolve(args[0]) === physicalLargePath) {
+                        const createReadStream = handle.createReadStream.bind(handle)
+                        handle.createReadStream = streamOptions => {
+                            const stream = createReadStream({ ...streamOptions, highWaterMark: 1024 })
+                            interruptedStream = stream
+                            stream.once("data", () => stream.destroy(injectedError))
+                            return stream
+                        }
+                    }
+                    return handle
+                },
+            }
+        },
+    })
+
+    await captureUnhandledErrors(async () => {
+        await app.inject({ method: "GET", url: "/patch/cn/objects/large.bin" })
+            .catch(() => undefined)
+        await waitForBalancedHandles(observer)
+    })
+    assert.ok(observer.opened > 0)
+    assert.ok(interruptedStream)
+    assert.equal(interruptedStream.closed, true)
+    assert.equal(
+        interruptedStream.listeners("close").some(listener => listener.name === "onStreamClose"),
+        false,
+    )
 })
