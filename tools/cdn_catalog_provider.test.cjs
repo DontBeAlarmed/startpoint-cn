@@ -200,6 +200,24 @@ function deferred() {
     return { promise, resolve, reject }
 }
 
+function causeContainsPath(value, sensitivePaths, seen = new Set()) {
+    if (typeof value === "string") {
+        return sensitivePaths.some(sensitivePath => value.includes(sensitivePath))
+    }
+    if (!value || typeof value !== "object" || seen.has(value)) return false
+    seen.add(value)
+    return [value.message, value.path, value.cause]
+        .some(nested => causeContainsPath(nested, sensitivePaths, seen))
+}
+
+function isRedactedRuntimeManifestError(error, code, sensitivePaths) {
+    assert.equal(error instanceof CatalogLoaderError, true)
+    assert.equal(error.code, code)
+    assert.equal(causeContainsPath(error.cause, sensitivePaths), false)
+    assert.equal(error.cause, undefined)
+    return true
+}
+
 test("default loader uses the trusted manifest without ZIP reads or runtime state", async t => {
     const projectRoot = createProject(t)
     const contentStateDir = path.join(projectRoot, "missing-content-state")
@@ -593,13 +611,14 @@ test("the repository disabled patch manifest preserves the 1.4.54 catalog baseli
 
 test("runtime manifest read, JSON, and schema failures use stable loader errors", async t => {
     const missingRoot = createProject(t)
-    fs.unlinkSync(path.join(missingRoot, "assets/cdn/catalog-cn-1.4.54.json"))
+    const missingManifestPath = path.join(missingRoot, "assets/cdn/catalog-cn-1.4.54.json")
+    fs.unlinkSync(missingManifestPath)
     await assert.rejects(
         new CdnCatalogLoader({ projectRoot: missingRoot, env: {} }).load(),
-        error => (
-            error instanceof CatalogLoaderError
-            && error.code === "RUNTIME_MANIFEST_READ"
-            && !error.message.includes(missingRoot)
+        error => isRedactedRuntimeManifestError(
+            error,
+            "RUNTIME_MANIFEST_READ",
+            [missingRoot, missingManifestPath],
         ),
     )
 
@@ -607,10 +626,10 @@ test("runtime manifest read, JSON, and schema failures use stable loader errors"
     fs.writeFileSync(path.join(invalidJsonRoot, "assets/cdn/catalog-cn-1.4.54.json"), "{")
     await assert.rejects(
         new CdnCatalogLoader({ projectRoot: invalidJsonRoot, env: {} }).load(),
-        error => (
-            error instanceof CatalogLoaderError
-            && error.code === "RUNTIME_MANIFEST_SCHEMA"
-            && !error.message.includes(invalidJsonRoot)
+        error => isRedactedRuntimeManifestError(
+            error,
+            "RUNTIME_MANIFEST_SCHEMA",
+            [invalidJsonRoot],
         ),
     )
 
@@ -621,10 +640,40 @@ test("runtime manifest read, JSON, and schema failures use stable loader errors"
     )
     await assert.rejects(
         new CdnCatalogLoader({ projectRoot: invalidSchemaRoot, env: {} }).load(),
-        error => (
-            error instanceof CatalogLoaderError
-            && error.code === "RUNTIME_MANIFEST_SCHEMA"
-            && !error.message.includes(invalidSchemaRoot)
+        error => isRedactedRuntimeManifestError(
+            error,
+            "RUNTIME_MANIFEST_SCHEMA",
+            [invalidSchemaRoot],
+        ),
+    )
+})
+
+test("injected runtime manifest read failures redact nested absolute paths", async () => {
+    const projectRoot = path.resolve("/private/injected-runtime-project")
+    const manifestPath = path.join(projectRoot, "assets/cdn/catalog-cn-1.4.54.json")
+    const nestedCause = Object.assign(
+        new Error(`nested read failure for ${projectRoot}`),
+        { path: manifestPath },
+    )
+    const injectedError = Object.assign(
+        new Error(`cannot read ${manifestPath}`),
+        { path: manifestPath, cause: nestedCause },
+    )
+    const loader = new CdnCatalogLoader({
+        projectRoot,
+        env: {},
+        dependencies: {
+            resolvePaths: () => ({ cdnRoot: "/unused-cdn-root" }),
+            readRuntimeManifest: async () => { throw injectedError },
+        },
+    })
+
+    await assert.rejects(
+        loader.load(),
+        error => isRedactedRuntimeManifestError(
+            error,
+            "RUNTIME_MANIFEST_READ",
+            [projectRoot, manifestPath],
         ),
     )
 })

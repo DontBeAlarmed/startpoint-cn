@@ -77,29 +77,26 @@ const RUNTIME_MANIFEST_RELATIVE_PATH = "assets/cdn/catalog-cn-1.4.54.json"
 function runtimeManifestError(
     code: "RUNTIME_MANIFEST_READ" | "RUNTIME_MANIFEST_SCHEMA",
     message: string,
-    cause?: unknown,
 ): CatalogLoaderError {
-    return new CatalogLoaderError(code, message, cause)
+    return new CatalogLoaderError(code, message)
 }
 
 async function readRuntimeManifestFile(manifestPath: string): Promise<unknown> {
     let content: string
     try {
         content = await fs.promises.readFile(manifestPath, "utf8")
-    } catch (error) {
+    } catch {
         throw runtimeManifestError(
             "RUNTIME_MANIFEST_READ",
             `cannot read ${RUNTIME_MANIFEST_RELATIVE_PATH}`,
-            error,
         )
     }
     try {
         return JSON.parse(content)
-    } catch (error) {
+    } catch {
         throw runtimeManifestError(
             "RUNTIME_MANIFEST_SCHEMA",
             `${RUNTIME_MANIFEST_RELATIVE_PATH} is not valid JSON`,
-            error,
         )
     }
 }
@@ -268,22 +265,25 @@ export class CdnCatalogLoader {
             if (error instanceof CatalogLoaderError
                 && (error.code === "RUNTIME_MANIFEST_READ"
                     || error.code === "RUNTIME_MANIFEST_SCHEMA")) {
-                throw error
+                throw runtimeManifestError(
+                    error.code,
+                    error.code === "RUNTIME_MANIFEST_READ"
+                        ? `cannot read ${RUNTIME_MANIFEST_RELATIVE_PATH}`
+                        : `${RUNTIME_MANIFEST_RELATIVE_PATH} failed schema validation`,
+                )
             }
             throw runtimeManifestError(
                 "RUNTIME_MANIFEST_READ",
                 `cannot read ${RUNTIME_MANIFEST_RELATIVE_PATH}`,
-                error,
             )
         }
         let runtimeManifest: CdnRuntimeManifest
         try {
             runtimeManifest = parseCdnRuntimeManifest(runtimeManifestValue)
-        } catch (error) {
+        } catch {
             throw runtimeManifestError(
                 "RUNTIME_MANIFEST_SCHEMA",
                 `${RUNTIME_MANIFEST_RELATIVE_PATH} failed schema validation`,
-                error,
             )
         }
         const candidate = deepFreeze(build(runtimeManifest.catalogInput))
