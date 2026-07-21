@@ -1,38 +1,87 @@
-# CDN 目录与更新计划审计
+# CDN Catalog、Planner 与受信任运行时
 
-本文说明阶段 1 的 CDN 目录、更新计划、运行时快照和只读审计边界，并记录 2026-07-21 对真实 1.4.54 数据的审计结果。本文不表示阶段 2 内容构建器、后台管理或启动器已经完成。
+本文说明官方 CN 1.8.1 客户端与官方 1.4.54 CDN 的运行时加载、更新计划、资源发送和离线审计流程。完整支持边界见 [`runtime-support.md`](runtime-support.md)。
 
-## 数据流与权威边界
+## 唯一保证组合
 
-数据按以下顺序流动：
+当前项目只保证以下组合：
 
-1. `resolveContentPaths` 解析 CDN 父目录、内容对象库、状态目录和运行时目录。`CDN_DIR` 必须指向包含 `cn` 子目录的父目录，不能直接指向末尾的 `cn`。
-2. `scanCdnCatalogInput` 只读扫描 `cn` 下的归档和安卓中画质 `EntityLists`。它读取 ZIP 的稳定文件快照和 SHA-256，并把摘要缓存写入 `CONTENT_STATE_DIR`；它不解压、不重命名、不改权限，也不写 CDN。
-3. `buildCdnCatalog` 从扫描结果构建规范化目录，校验版本、归档层、顺序、重复项、分叉、环和缺失路径。只有零校验问题的目录才能发布。
-4. `ContentSnapshot` 把已经验证的目录与其他内容状态一起固定为单个运行时快照。请求处理只读取这个快照，不在请求期间重新扫描 CDN。
-5. `planCdnUpdate` 根据当前版本、目标版本、平台、资源体积模式和是否初装，从固定目录中选择唯一连续路径并计算本次下载字节。
-6. 路由序列化更新计划。只读审计命令具体复用步骤 1、2、3、5 的 `resolveContentPaths`、`scanCdnCatalogInput`、`buildCdnCatalog` 和 `planCdnUpdate`；它独立运行，不执行步骤 4，不加载、发布或替换服务器的 `ContentSnapshot`。
+- 官方 CN 1.8.1 客户端，仅修改服务器 IP 和跳过登录所需内容；
+- 从官方客户端提取的完整 CN 1.4.54 CDN；
+- 服务端使用版本库跟踪的 `assets/cdn/catalog-cn-1.4.54.json` 作为运行时 Catalog manifest。
 
-权威来源是只读 CDN 文件及其 `EntityLists`。摘要缓存只是加速索引，删除后可以重建，不能覆盖文件事实。目录负责表达经过验证的版本图，`ContentSnapshot` 是请求处理期间唯一可见的已发布状态，计划器只做纯选择和求和，不写任何运行状态。
+缺失、不完整、被修改、重新打包或自制的 CDN 不属于运行时兼容目标。CN 1.8.1 之外的客户端、额外修改资源下载器或战斗逻辑的客户端也不在保证范围内。
 
-## 体积与空值语义
+## 启动加载流程
 
-旧实现出现约 700 MB 更新提示的原因，是把全部历史差分归档都返回给客户端。客户端弹窗会累加响应中的全部 `archive.size`，而实际更新只应下载当前版本到目标版本之间的唯一连续链。目录计划器因此只返回本次连续路径；例如 1.4.53 到 1.4.54 只能返回这一条边，不能夹带更早版本的归档。
+服务器启动按以下顺序构建受信任运行时：
 
-`null` 与空数组 `[]` 不可互换：
+1. `resolveContentPaths` 解析 CDN 和内容目录。`CDN_DIR` 必须指向包含 `cn` 子目录的父目录，不能直接指向末尾的 `cn`。
+2. `CdnCatalogLoader` 读取跟踪文件 `assets/cdn/catalog-cn-1.4.54.json`。
+3. `parseCdnRuntimeManifest` 严格校验 schema、固定基线 `cn-1.4.54`、字段集合、版本、归档层、顺序、相对路径、大小和 SHA-256 字段格式。
+4. `buildCdnCatalog` 从 manifest 中的 `catalogInput` 构建 Catalog，并校验版本图、重复项、分叉、环、缺失层和路径。
+5. `validateCdnRuntimeFiles` 逐项 `stat` manifest 引用的归档和 `EntityLists`，只确认路径存在、是普通文件且大小与 `compressedBytes` 一致。
+6. 启用的补丁必须与 Catalog 中的版本边、归档名和大小一致。
+7. `ContentSnapshotProvider` 将 Catalog 深度冻结为统一 `ContentSnapshot`，随后各路由只读取该 snapshot。
 
-- `null` 表示该部分计划不存在，对应客户端的 `None`。已是最新版本时 `full=null`、`diff=null`。
-- `[]` 表示存在一个列表，但列表为空。它不能代替 `None`，否则会改变客户端的分支语义。
-- 初装目标正好等于 full base 时，`full` 有值而 `diff=null`。
-- 非空增量计划的 `diff` 必须至少包含一条严格连续边。
+启动过程不会调用 `scanCdnCatalogInput`，不会读取全部 ZIP 内容计算 SHA-256，不会写入 digest cache，也不会写入 CDN、内容对象库或运行时缓存。目录中出现 manifest 未声明的新 ZIP 时，服务器不会自动发现、导入或提高目标版本。引用文件缺失、不是普通文件或大小不一致时，启动快速失败，不触发自动修复。
 
-`total_size` 等于目标 `EntityLists` 中各项安装体积之和，也就是审计结果的 `installedBytes`。`downloadBytes` 等于本次计划所选 ZIP 归档的压缩字节之和，两者不是同一个指标。阶段 1 中 `shortened` 和 `delayed` 与路由保持兼容，统一复用 `fulfill` 范围；`delayedAssetsBytes` 固定为 0。
+## 统一 Snapshot 与更新计划
 
-## 只读审计命令
+`/load`、`version_info`、`get_path`、标题页版本信息和 ZIP allowlist 使用同一份固定 `ContentSnapshot`：
 
-下文 `<PROJECT_ROOT>` 专指 `starpoint-cn` 仓库根目录（其中包含 `package.json`、`src/` 和 `tools/`），不是 monorepo 上层目录。
+- `/load` 的可用资源版本来自 `snapshot.cdn.targetVersion`；
+- `version_info.total_size` 来自 manifest 中已经审计的 `installedBytes`；
+- `get_path` 始终以 snapshot 的目标版本规划，客户端提交的不同目标版本不会覆盖它；
+- ZIP allowlist 由 snapshot 中的 Catalog 归档生成。
 
-以下命令使用同一个临时状态目录，因此第一次完整 SHA-256 扫描后，后两次会复用摘要缓存。`CONTENT_STORE_DIR` 和 `CONTENT_RUNTIME_DIR` 也显式放在 `/tmp`，不会污染仓库或正在运行的内容状态。
+Planner 保持三种语义：
+
+| 场景 | 结果 |
+|---|---|
+| latest：当前版本等于目标版本 | `full=null`、`diff=null`，下载 0 字节 |
+| incremental：已安装旧版本 | 只返回当前版本到目标版本的唯一严格连续差分链 |
+| initial：客户端没有当前版本 | 返回 1.4.0 full，并在需要时追加从 1.4.0 到目标版本的唯一连续差分链 |
+
+`null` 表示该部分计划不存在，对应客户端的 `None`；空数组 `[]` 不能代替 `null`。初装目标恰好等于 full base 时，`full` 有值而 `diff=null`。`total_size` 是目标 `EntityLists` 的安装体积，`downloadBytes` 是本次计划所选 ZIP 的压缩字节总和，两者不是同一指标。
+
+阶段 1 中客户端请求的 `shortened`、`fulfill` 和 `delayed` 均统一按 `fulfill` 规划，`delayed_assets_size` 固定为 0。
+
+## 资源发送与 Range
+
+资源路由先规范化请求相对路径并限制在 CDN root 内。ZIP 还必须属于当前 Catalog allowlist；Catalog 外 ZIP 返回 404。Catalog ZIP 的路径组件不得包含符号链接，解析后的物理路径必须仍位于 CDN root 内；打开文件时还会复核文件身份和 manifest 大小，拒绝路径逃逸、根外符号链接和打开期间发生变化的文件。
+
+通过检查后，路由从已打开的文件句柄直接流式发送，不计算请求级 SHA-256，不复制到 spool，也不执行 digest cache 写入：
+
+| 请求 | 响应 |
+|---|---|
+| 无 `Range` | `200`、完整 `Content-Length`、`Accept-Ranges: bytes` |
+| 单区间 `bytes=start-end`、`bytes=start-` 或 `bytes=-suffix` | `206`、正确的 `Content-Range` 和区间 `Content-Length` |
+| 非法、越界、多区间或过长的 `Range` | `416`、`Content-Range: bytes */<size>`、零长度响应体 |
+
+旧的 verified spool、spool 并发/字节预算和临时目录清理状态机已经删除，不是当前资源发送流程。运行时信任已离线审计且部署后不原地改写的官方 CDN；对不受支持输入不提供请求级重新哈希兜底。
+
+服务端 Range 行为已有自动测试，但不能据此声称官方客户端原生 ANE 已验证归档内断点续传。AS3 反编译只能确认客户端记录已完成归档；仍需通过真实客户端抓包确认中断后的请求是否携带 `Range`、服务端 `206` 是否被 ANE 正确接受，以及多归档更新是否只跳过已经完成的归档。
+
+## 显式离线 SHA-256
+
+完整 SHA-256 只在显式离线生成或审计时执行，不是服务器启动或资源请求的前置步骤。
+
+`npm run cdn:manifest` 是实际存在的 manifest 生成命令。它调用 `scanCdnCatalogInput` 完整扫描并计算 SHA-256，默认把候选 manifest 输出到 stdout；使用 `--output` 时才写入指定文件。建议把状态目录和候选输出放在 `/tmp`，评审后再决定是否更新跟踪文件：
+
+```bash
+cd <PROJECT_ROOT>
+AUDIT_ROOT="$(mktemp -d /tmp/starpoint-cn-cdn-manifest.XXXXXX)"
+
+npm run cdn:manifest -- \
+  --cdn-dir <PROJECT_ROOT>/.cdn \
+  --content-state-dir "$AUDIT_ROOT/state" \
+  --content-store-dir "$AUDIT_ROOT/store" \
+  --content-runtime-dir "$AUDIT_ROOT/runtime" \
+  --output "$AUDIT_ROOT/catalog-cn-1.4.54.json"
+```
+
+项目当前没有 `npm run cdn:audit` 脚本。完整审计的实际入口是 `node tools/audit_cdn_catalog.cjs`：
 
 ```bash
 cd <PROJECT_ROOT>
@@ -46,40 +95,18 @@ node tools/audit_cdn_catalog.cjs --json \
   --content-state-dir "$AUDIT_ROOT/state" \
   --content-store-dir "$AUDIT_ROOT/store" \
   --content-runtime-dir "$AUDIT_ROOT/runtime"
-
-node tools/audit_cdn_catalog.cjs --json \
-  --current 1.4.53 \
-  --target 1.4.54 \
-  --platform android \
-  --asset-size fulfill \
-  --cdn-dir <PROJECT_ROOT>/.cdn \
-  --content-state-dir "$AUDIT_ROOT/state" \
-  --content-store-dir "$AUDIT_ROOT/store" \
-  --content-runtime-dir "$AUDIT_ROOT/runtime"
-
-node tools/audit_cdn_catalog.cjs --json \
-  --initial \
-  --target 1.4.54 \
-  --platform android \
-  --asset-size fulfill \
-  --cdn-dir <PROJECT_ROOT>/.cdn \
-  --content-state-dir "$AUDIT_ROOT/state" \
-  --content-store-dir "$AUDIT_ROOT/store" \
-  --content-runtime-dir "$AUDIT_ROOT/runtime"
 ```
 
-省略 `--target` 时使用目录的 `targetVersion`。省略 `--platform` 和 `--asset-size` 时分别使用 `android` 和 `fulfill`。非初装审计必须提供 `--current`；`--initial` 不能与 `--current` 同时使用。默认输出为中文，`--json` 输出稳定机器结构。参数、目录、目录校验或计划失败时命令非零退出，只输出稳定错误代码，不输出堆栈、绝对主目录或半成品计划。
+审计命令也可使用 `--current 1.4.53 --target 1.4.54` 检查增量计划，或使用 `--initial --target 1.4.54` 检查初装计划。离线扫描可以在临时 `CONTENT_STATE_DIR` 写入并复用 `cdn-digest-cache.json`；删除该审计缓存不影响服务器运行。
 
-## 真实 1.4.54 结果
+## 官方 1.4.54 审计基线
 
 审计日期：2026-07-21。
-
-### 目录概况
 
 | 项目 | 结果 |
 |---|---:|
 | full base | 1.4.0 |
-| 目录目标版本 | 1.4.54 |
+| 目标版本 | 1.4.54 |
 | 安装体积 `installedBytes` | 10,177,212,635 字节 |
 | 有效范围边数 | 55 |
 | 差分边数 | 54 |
@@ -88,69 +115,27 @@ node tools/audit_cdn_catalog.cjs --json \
 | `EntityLists` 相对路径 | `EntityLists/10939-android_medium.csv` |
 | 分叉、环、重复、缺失路径、缺失层 | 均为 0 |
 
-### 分层归档
-
-| 层 | 归档数 | 压缩字节 |
-|---|---:|---:|
-| common | 401 | 7,252,868,774 |
-| quality | 218 | 3,399,065,737 |
-| platform | 58 | 83,158,885 |
-
-### 三种计划
-
 | 场景 | full | 连续差分 | 本次下载字节 |
 |---|---|---:|---:|
 | 当前 1.4.54，目标 1.4.54 | `null` | `null` | 0 |
 | 当前 1.4.53，目标 1.4.54 | `null` | 1 条边、3 个归档 | 10,392 |
 | 清缓存初装到 1.4.54 | 1.4.0、490 个归档、9,989,433,861 字节 | 54 条连续边、187 个归档 | 10,735,093,396 |
 
-后两次审计复用了第一次生成的 `cdn-digest-cache.json`。本次临时状态目录中只有 1 个 195,972 字节的缓存文件；独立的内容对象库和运行时目录均保持为空。
+该结果来自显式离线完整扫描。它证明候选 manifest 与当时的官方 CDN 一致，不表示运行时会再次读取 10 GB 文件内容。
 
-### CDN 前后只读校验
+## Recovery 与未来内容
 
-审计前后均枚举完整 CDN 文件树，只读取相对路径、文件大小和纳秒级修改时间，按相对路径排序并把 JSON 元数据数组生成 SHA-256；没有再次读取 10 GB 文件内容。
+`version_info.files_list` 当前指向 `/patch/cn/recovery/empty.csv`。该地址只返回 HTTP 200 的零字节 CSV，不提供逐文件 Recovery，也不会自动修复、重新下载或回滚 CDN。详细边界和后续 Content Builder/Release 候选流程见 [`runtime-support.md`](runtime-support.md)。
 
-| 项目 | 审计前 | 审计后 |
-|---|---:|---:|
-| 文件数 | 695 | 695 |
-| 总字节 | 10,865,836,327 | 10,865,836,327 |
-| 元数据摘要 | `4bda4b9a8fef343fabd7c34fb5f16e38482cde4c2362be3ddc2ebd317d380241` | `4bda4b9a8fef343fabd7c34fb5f16e38482cde4c2362be3ddc2ebd317d380241` |
+## 客户端验收清单
 
-三条代表性文件的相对路径、大小和修改时间也完全一致：
+1. 已是最新：1.4.54 到 1.4.54 不发生下载，`full` 和 `diff` 均为 `None`。
+2. 单边增量：1.4.53 到 1.4.54 只返回一条差分边和 3 个归档，下载字节为 10,392。
+3. 清缓存初装：返回 1.4.0 full 加 54 条严格连续差分，不返回旁支或无关历史边。
+4. 版本信息：`version_info.total_size` 为 10,177,212,635。
+5. Recovery：Recovery 地址返回 HTTP 200、CSV 内容类型和零字节响应体。
+6. ZIP 边界：Catalog 外 ZIP、路径逃逸和符号链接路径均被拒绝。
+7. 断点续传：中断单个 ZIP 后抓包确认客户端是否发送单区间 `Range`，并确认 `206` 后可以完成下载。
+8. 多归档恢复：中断更新后确认客户端只跳过已经完成的归档。
 
-| 相对路径 | 字节 | 修改时间（纳秒） |
-|---|---:|---:|
-| `archive-android-diff/pinball-1.4.0-1.4.1-1-e41c3c7f.zip` | 111 | 1754316460421380996 |
-| `archive-common-full/pinball-1.4.0-289-a2165de2.zip` | 20,417,629 | 1754316305456563949 |
-| `EntityLists/PathFile` | 171,358 | 1754314780515449523 |
-
-## Recovery 空文件策略
-
-阶段 1 的 Recovery 地址采用零字节 CSV：仅对明确允许的 Recovery 相对路径返回 HTTP 200、CSV 内容类型和空响应体。它不生成虚假记录，不把目录扫描失败降级成任意文件访问，也不借此写入 CDN。客户端验收必须确认该地址为 200 且响应体确实为零字节。
-
-## ZIP 安全发送
-
-阶段 1 继续采用安全 spool：发送前固定归档文件身份并校验 SHA-256，把文件复制到隔离的运行时 spool 时再次校验大小、摘要和快照，响应前再确认 spool 身份。路由同时限制并发 spool 数和在途字节，避免多个大归档耗尽磁盘或内存。
-
-这种方式的代价是首字节延迟增加，并产生读取源文件、写入并再次读取 spool 的双倍输入输出。后续应以按摘要寻址、写入后不可变的对象库替代可变 CDN 源文件，使已验证对象可以直接发送；这属于后续阶段，不是本次审计的完成项。
-
-## 当前兼容边界
-
-当前 CDN 层负责读取、校验、规划和供给已经存在的合法归档，不负责生成新角色、卡池、商店或客户端资源补丁，也没有向 Mod 工具开放直接修改当前 CDN 的接口。外部补丁工具不能只写入一个 ZIP：它还需要通过后续 Content Builder 同步生成客户端资源索引、版本边、`EntityLists` 和服务端 runtime 数据，再形成可审计的候选 release。导入、校验、差异报告和激活必须分开，不能由未认证接口直接覆盖当前快照。
-
-目标客户端协议以 CN 1.8.1 反编译源码为依据。客户端会记录目标版本和已完成归档，但实际下载由原生 ANE 执行，AS3 层无法证明是否需要 HTTP `Range` 完成单个 ZIP 内的字节级续传。旧静态文件插件默认支持 Range，新 `cdnFiles` 安全路由目前按完整 ZIP 返回，尚未实现或验证 `206 Partial Content`。因此当前只能确认版本图和已完成归档级恢复语义，不能宣称归档内断点续传已经兼容。
-
-新实现也比旧服务端更严格：Catalog 或补丁映射无效时拒绝启动，禁用补丁 ZIP 不再供给，Recovery 暂时使用空清单，且 `/patch/<非 cn>` 不再作为通用静态目录开放。这些是明确的安全和一致性边界，不属于无差别兼容。
-
-## 后续客户端验收
-
-1. 已是最新：从 1.4.54 请求 1.4.54，不发生下载，`full` 和 `diff` 都是 `None`。
-2. 单边增量：从 1.4.53 更新到 1.4.54，只返回一条差分边，客户端弹窗字节必须等于审计值 10,392。
-3. 清缓存初装：返回 1.4.0 full 加到 1.4.54 的严格连续差分链，不返回任何旁支或无关历史边。
-4. 体积模式：`shortened`、`fulfill` 和 `delayed` 在阶段 1 结果一致，且 delayed 字节为 0。
-5. 版本信息：`version_info.total_size` 与审计的 `installedBytes` 10,177,212,635 完全一致。
-6. Recovery：Recovery 地址返回 HTTP 200 和零字节 CSV。
-7. ZIP 权限：未授权请求和禁用状态下的 ZIP 请求都返回 HTTP 404。
-8. 断点续传：分别中断完整归档下载和多归档更新，确认客户端是否发送 HTTP `Range`、服务端是否需要返回 206，以及重启后是否只跳过已完成归档。
-
-本次工作没有启动或重启服务，也没有执行上述客户端验收。这些项目必须在用户确认后使用实际客户端和受控服务环境继续验证。
+本文档更新没有启动或重启服务。原生 ANE 的 Range 行为必须在用户确认后使用实际客户端和受控服务环境验收。
