@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { isIP } from "node:net"
+import os from "node:os"
 import {
     CdnPlannerError,
     planCdnUpdate,
@@ -9,7 +10,6 @@ import { normalizeCdnBaseUrl, serializeCdnUpdatePlan } from "../../content/cdn/p
 import type { ContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { generateDataHeaders } from "../../utils"
-import { getDisplayHost } from "../../multi/room/serializer"
 
 interface AssetRouteEnvironment {
     readonly [name: string]: string | undefined
@@ -47,7 +47,7 @@ export interface CnAssetRouteOptions {
     readonly env?: AssetRouteEnvironment
     readonly warn?: (details: AssetTargetMismatchWarning) => void
     readonly logError?: AssetRouteErrorLogger
-    readonly displayHost?: () => string
+    readonly resolveListenHost?: (listenHost: string) => string
 }
 
 function headerValue(request: FastifyRequest, name: string): string | undefined {
@@ -62,6 +62,9 @@ function formatTrustedHost(value: string): string {
         || /[\\/@?#]/.test(value)) {
         throw new Error("configured CDN host is invalid")
     }
+    if (value === "0.0.0.0" || value === "::" || value === "[::]" || /^\d+$/.test(value)) {
+        throw new Error("configured CDN host is invalid")
+    }
     if (value.startsWith("[") || value.endsWith("]")) {
         if (!value.startsWith("[") || !value.endsWith("]") || isIP(value.slice(1, -1)) !== 6) {
             throw new Error("configured CDN host is invalid")
@@ -70,6 +73,7 @@ function formatTrustedHost(value: string): string {
     }
     if (isIP(value) === 6) return `[${value}]`
     if (isIP(value) === 4) return value
+    if (/^[0-9.]+$/.test(value)) throw new Error("configured CDN host is invalid")
     if (value.length > 253 || !/^[A-Za-z0-9.-]+$/.test(value)) {
         throw new Error("configured CDN host is invalid")
     }
@@ -85,6 +89,14 @@ function formatTrustedHost(value: string): string {
     return value
 }
 
+function resolveCdnListenHost(listenHost: string): string {
+    const addresses = Object.values(os.networkInterfaces()).flatMap(items => items ?? [])
+    const preferredFamily = listenHost === "::" ? "IPv6" : "IPv4"
+    const preferred = addresses.find(address => !address.internal && address.family === preferredFamily)
+    const fallback = addresses.find(address => !address.internal)
+    return preferred?.address ?? fallback?.address ?? (listenHost === "::" ? "::1" : "127.0.0.1")
+}
+
 function requireTrustedPort(value: string): number {
     if (!/^[1-9]\d{0,4}$/.test(value)) throw new Error("configured CDN port is invalid")
     const port = Number(value)
@@ -94,16 +106,17 @@ function requireTrustedPort(value: string): number {
 
 export function getCdnBase(
     env: AssetRouteEnvironment = process.env,
-    resolveDisplayHost: () => string = getDisplayHost,
+    resolveListenHost: (listenHost: string) => string = resolveCdnListenHost,
 ): string {
     if (env.CDN_BASE_URL !== undefined) return normalizeCdnBaseUrl(env.CDN_BASE_URL)
-    const configuredHost = env.CN_PUBLIC_HOST !== undefined
-        ? env.CN_PUBLIC_HOST
-        : env.CN_LISTEN_HOST ?? "127.0.0.1"
-    const displayHost = configuredHost === "0.0.0.0" || configuredHost === "::"
-        ? resolveDisplayHost()
-        : configuredHost
-    const host = formatTrustedHost(displayHost)
+    const publicHost = env.CN_PUBLIC_HOST
+    const listenHost = env.CN_LISTEN_HOST ?? "127.0.0.1"
+    const selectedHost = publicHost !== undefined
+        ? publicHost
+        : listenHost === "0.0.0.0" || listenHost === "::"
+            ? resolveListenHost(listenHost)
+            : listenHost
+    const host = formatTrustedHost(selectedHost)
     const port = requireTrustedPort(env.CN_LISTEN_PORT ?? "8001")
     return normalizeCdnBaseUrl(`http://${host}:${port}/patch/cn`)
 }
@@ -203,7 +216,7 @@ function sendPlannerError(
 const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) => {
     const snapshot = options.getSnapshot ?? getContentSnapshot
     const env = options.env ?? process.env
-    const displayHost = options.displayHost ?? getDisplayHost
+    const resolveListenHost = options.resolveListenHost ?? resolveCdnListenHost
 
     fastify.post("/version_info", async (request, reply) => {
         let contentSnapshot: ContentSnapshot
@@ -222,7 +235,7 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
         try {
             return reply.type("application/json").send({
                 data_headers: generateDataHeaders(),
-                data: getCdnVersionInfo(getCdnBase(env, displayHost), contentSnapshot),
+                data: getCdnVersionInfo(getCdnBase(env, resolveListenHost), contentSnapshot),
             })
         } catch (error) {
             return sendAssetRouteError(request, reply, "ASSET_SERVICE_ERROR", error, options.logError)
@@ -280,7 +293,7 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
                 isInitial: currentVersion === null,
             })
             const data = serializeCdnUpdatePlan(plan, {
-                baseUrl: getCdnBase(env, displayHost),
+                baseUrl: getCdnBase(env, resolveListenHost),
                 currentVersion,
                 targetVersion: contentSnapshot.cdn.targetVersion,
             })

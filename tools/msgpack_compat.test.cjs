@@ -16,6 +16,19 @@ const msgpackHookSource = fs.readFileSync(path.resolve(__dirname, "../src/routes
 assert.match(cnServerSource, /registerCnMsgpackOnSend/)
 assert.match(msgpackHookSource, /fixUint32Tags\(pack\(payload\)\)/)
 assert.doesNotMatch(cnServerSource, /function\s+fixUint32Tags\s*\(/)
+assert.equal((cnServerSource.match(/registerCnMsgpackOnSend\(fastify\)/g) ?? []).length, 1)
+
+function msgpackInt32Token(tag, value) {
+    const token = Buffer.alloc(5)
+    token[0] = tag
+    token.writeUInt32BE(value, 1)
+    return token
+}
+
+function assertCnInt32Token(wire, value) {
+    assert.equal(wire.indexOf(msgpackInt32Token(0xce, value)), -1)
+    assert.notEqual(wire.indexOf(msgpackInt32Token(0xd2, value)), -1)
+}
 
 const values = [
     2_147_483_647,
@@ -53,18 +66,22 @@ assert.ok(thresholds.includes(9_692_180_000))
 test("production CN MsgPack hook packs, fixes uint32, and Base64-encodes exactly once", async t => {
     const app = Fastify({ logger: false })
     registerCnMsgpackOnSend(app)
-    app.get("/msgpack", (_request, reply) => reply.type("application/x-msgpack").send({
+    const payload = {
         total_size: 987_654,
-    }))
+        unrelated_bytes: Buffer.from([0xce, 0xd2, 0xaa, 0xbb, 0xcc, 0xdd]),
+        unrelated_text: "CE and D2 are data, not MsgPack tokens",
+    }
+    app.get("/msgpack", (_request, reply) => reply.type("application/x-msgpack").send(payload))
     await app.ready()
     t.after(() => app.close())
 
-    const response = await app.inject({ method: "GET", url: "/msgpack" })
-    const wire = Buffer.from(response.body, "base64")
-    assert.equal(response.headers["content-type"], "application/x-msgpack")
-    assert.equal(wire.includes(0xce), false)
-    assert.equal(wire.includes(0xd2), true)
-    assert.deepEqual(unpack(wire), { total_size: 987_654 })
+    for (let iteration = 0; iteration < 10; iteration++) {
+        const response = await app.inject({ method: "GET", url: "/msgpack" })
+        const wire = Buffer.from(response.body, "base64")
+        assert.equal(response.headers["content-type"], "application/x-msgpack")
+        assertCnInt32Token(wire, 987_654)
+        assert.deepEqual(unpack(wire), payload)
+    }
 })
 
 console.log("msgpack compatibility tests passed")

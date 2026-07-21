@@ -1,10 +1,12 @@
 "use strict"
 
 const assert = require("node:assert/strict")
+const crypto = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
+const util = require("node:util")
 
 require("ts-node/register/transpile-only")
 
@@ -15,8 +17,45 @@ const { CdnPlannerError, planCdnUpdate } = require("../src/content/cdn/planner")
 
 const SHA = "a".repeat(64)
 
-function archive(relativePath, compressedBytes, order = 1) {
-    return { relativePath, compressedBytes, sha256: SHA, layer: "common", order }
+function sha256(value) {
+    return crypto.createHash("sha256").update(value).digest("hex")
+}
+
+function archive(relativePath, compressedBytes, order = 1, digest = SHA) {
+    return { relativePath, compressedBytes, sha256: digest, layer: "common", order }
+}
+
+function msgpackInt32Token(tag, value) {
+    const token = Buffer.alloc(5)
+    token[0] = tag
+    token.writeUInt32BE(value, 1)
+    return token
+}
+
+function assertCnInt32Token(wire, value) {
+    assert.equal(wire.indexOf(msgpackInt32Token(0xce, value)), -1)
+    assert.notEqual(wire.indexOf(msgpackInt32Token(0xd2, value)), -1)
+}
+
+function createContentStateDir(t, prefix) {
+    const contentStateDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix))
+    t.after(() => fs.rmSync(contentStateDir, { recursive: true, force: true }))
+    return contentStateDir
+}
+
+function deferred() {
+    let resolve
+    let reject
+    const promise = new Promise((onResolve, onReject) => {
+        resolve = onResolve
+        reject = onReject
+    })
+    return { promise, resolve, reject }
+}
+
+function assertNoRequestSpools(contentStateDir) {
+    const entries = fs.readdirSync(contentStateDir, { recursive: true })
+    assert.deepEqual(entries.filter(entry => path.basename(String(entry)).startsWith("request-")), [])
 }
 
 function edge(fromVersion, toVersion, archives) {
@@ -60,7 +99,7 @@ async function createAssetApp(options = {}) {
         env: options.env ?? {},
         warn: options.warn,
         logError: options.logError,
-        displayHost: options.displayHost,
+        resolveListenHost: options.resolveListenHost,
     })
     await app.ready()
     return app
@@ -143,6 +182,7 @@ test("serializer rejects unsafe base URLs and archive paths", () => {
         "https://cdn.test/patch/\ncn",
         "https://cdn.test/patch/c n",
         "https://cdn.test/patch/<cn>",
+        "http://127.1/patch/cn",
     ]) {
         assert.throws(() => serializeCdnUpdatePlan(plan, {
             baseUrl,
@@ -322,7 +362,7 @@ test("uses only trusted CDN host configuration and formats dynamic IPv6", async 
 
     const ipv6App = await createAssetApp({
         env: { CN_LISTEN_HOST: "::", CN_LISTEN_PORT: "8001" },
-        displayHost: () => "2001:db8::5",
+        resolveListenHost: () => "2001:db8::5",
     })
     t.after(() => ipv6App.close())
     const ipv6 = await ipv6App.inject({ method: "POST", url: "/asset/version_info", payload: {} })
@@ -340,6 +380,10 @@ test("rejects untrusted CDN and host configuration without using request Host", 
         { CDN_BASE_URL: "https://cdn.test/patch/\ncn" },
         { CN_PUBLIC_HOST: "trusted.test/extra", CN_LISTEN_PORT: "8001" },
         { CN_PUBLIC_HOST: "", CN_LISTEN_PORT: "8001" },
+        { CN_PUBLIC_HOST: "0.0.0.0", CN_LISTEN_PORT: "8001" },
+        { CN_PUBLIC_HOST: "::", CN_LISTEN_PORT: "8001" },
+        { CN_PUBLIC_HOST: "12345", CN_LISTEN_PORT: "8001" },
+        { CN_PUBLIC_HOST: "127.1", CN_LISTEN_PORT: "8001" },
         { CN_LISTEN_HOST: "", CN_LISTEN_PORT: "8001" },
         { CN_PUBLIC_HOST: "trusted.test", CN_LISTEN_PORT: "8001/extra" },
         { CN_PUBLIC_HOST: "trusted.test", CN_LISTEN_PORT: "" },
@@ -358,6 +402,58 @@ test("rejects untrusted CDN and host configuration without using request Host", 
         assert.equal(response.body.includes("evil.test"), false)
         await app.close()
     }
+})
+
+test("CDN host fallback ignores SESSION_PUBLIC_HOST and never advertises a wildcard", async t => {
+    const previousSessionHost = process.env.SESSION_PUBLIC_HOST
+    process.env.SESSION_PUBLIC_HOST = "session-secret.example.test"
+    t.after(() => {
+        if (previousSessionHost === undefined) delete process.env.SESSION_PUBLIC_HOST
+        else process.env.SESSION_PUBLIC_HOST = previousSessionHost
+    })
+
+    const app = await createAssetApp({
+        env: { CN_LISTEN_HOST: "0.0.0.0", CN_LISTEN_PORT: "8011" },
+        resolveListenHost: () => "198.51.100.7",
+    })
+    t.after(() => app.close())
+    const response = await app.inject({ method: "POST", url: "/asset/version_info", payload: {} })
+
+    assert.equal(response.statusCode, 200)
+    assert.equal(response.json().data.base_url, "http://198.51.100.7:8011/patch/cn/")
+    assert.equal(response.body.includes("session-secret"), false)
+    assert.equal(response.body.includes("0.0.0.0"), false)
+})
+
+test("CDN_BASE_URL parser failures redact credentials from responses and logs", async t => {
+    const { normalizeCdnBaseUrl } = require("../src/content/cdn/protocol")
+    const secret = "TOP_SECRET"
+    const configuredUrl = `https://user:${secret}@cdn.test:99999/patch/cn`
+    let validationError
+    assert.throws(() => normalizeCdnBaseUrl(configuredUrl), error => {
+        validationError = error
+        return true
+    })
+    assert.equal(util.inspect(validationError, { depth: 5 }).includes(secret), false)
+    assert.equal(validationError.message, "invalid CDN base URL configuration")
+
+    const logged = []
+    const app = await createAssetApp({
+        env: { CDN_BASE_URL: configuredUrl },
+        logError: details => logged.push(details),
+    })
+    t.after(() => app.close())
+    const response = await app.inject({ method: "POST", url: "/asset/version_info", payload: {} })
+
+    assert.equal(response.statusCode, 500)
+    assert.deepEqual(response.json(), {
+        code: "ASSET_SERVICE_ERROR",
+        message: "asset service is unavailable",
+    })
+    const diagnostics = `${response.body}\n${util.inspect(logged, { depth: 8 })}\n${JSON.stringify(logged)}`
+    assert.equal(diagnostics.includes(secret), false)
+    assert.equal(logged[0].error.message, "invalid CDN base URL configuration")
+    assert.equal("cause" in logged[0].error, false)
 })
 
 test("accepts missing or Android DEVICE and rejects explicit other platforms", async t => {
@@ -552,8 +648,7 @@ test("title version_info is Base64 MsgPack with the same fields as JSON version_
     assert.match(ordinary.headers["content-type"], /^application\/json/)
     assert.equal(title.headers["content-type"], "application/x-msgpack")
     const wire = Buffer.from(title.body, "base64")
-    assert.equal(wire.includes(0xce), false)
-    assert.equal(wire.includes(0xd2), true)
+    assertCnInt32Token(wire, 987_654)
     const decoded = unpack(wire)
     assert.deepEqual(decoded.data, ordinary.json().data)
     assert.equal(decoded.data.total_size, 987_654)
@@ -641,13 +736,15 @@ test("CDN files serve pinned ZIPs and non-ZIP assets but reject every other ZIP 
     const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-route-"))
     const patchRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cn-patch-route-"))
+    const contentStateDir = createContentStateDir(t, "cn-content-state-")
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))
     t.after(() => fs.rmSync(patchRoot, { recursive: true, force: true }))
     fs.mkdirSync(path.join(root, "archive-common-full"), { recursive: true })
     fs.mkdirSync(path.join(root, "asset-patch", "active"), { recursive: true })
     fs.mkdirSync(path.join(root, "dummy", "download"), { recursive: true })
     fs.mkdirSync(path.join(patchRoot, "ab"), { recursive: true })
-    fs.writeFileSync(path.join(root, "archive-common-full", "base.zip"), Buffer.from([1, 2, 3]))
+    const allowedBytes = Buffer.from([1, 2, 3])
+    fs.writeFileSync(path.join(root, "archive-common-full", "base.zip"), allowedBytes)
     fs.writeFileSync(path.join(root, "archive-common-full", "extra.zip"), Buffer.from([4, 5, 6]))
     fs.writeFileSync(path.join(root, "asset-patch", "active", "disabled.zip"), Buffer.from([7]))
     fs.writeFileSync(path.join(root, "dummy", "download", "hash"), Buffer.from("asset"))
@@ -656,12 +753,19 @@ test("CDN files serve pinned ZIPs and non-ZIP assets but reject every other ZIP 
     const snapshot = createSnapshot({
         targetVersion: "1.4.0",
         edges: Object.freeze([
-            edge(null, "1.4.0", [archive("archive-common-full/base.zip", 3)]),
+            edge(null, "1.4.0", [archive(
+                "archive-common-full/base.zip",
+                allowedBytes.length,
+                1,
+                sha256(allowedBytes),
+            )]),
         ]),
     })
     let rootRealpaths = 0
     let opened = 0
     let closed = 0
+    let createdSpool
+    const removedSpool = deferred()
     const fileSystem = {
         realpath: async filePath => {
             if (path.resolve(filePath) === path.resolve(root)) rootRealpaths++
@@ -674,12 +778,16 @@ test("CDN files serve pinned ZIPs and non-ZIP assets but reject every other ZIP 
     const app = Fastify({ logger: false })
     app.register(cdnFilesPlugin, {
         getSnapshot: () => snapshot,
-        paths: { cdnRoot: root },
+        paths: { cdnRoot: root, contentStateDir },
         patchUploadRoot: patchRoot,
         fileSystem,
         handleObserver: {
             opened: () => { opened++ },
             closed: () => { closed++ },
+        },
+        zipSpoolHooks: {
+            spoolCreated: ({ directory }) => { createdSpool = directory },
+            spoolRemoved: ({ directory }) => removedSpool.resolve(directory),
         },
     })
     await app.ready()
@@ -687,7 +795,13 @@ test("CDN files serve pinned ZIPs and non-ZIP assets but reject every other ZIP 
 
     const allowed = await app.inject({ method: "GET", url: "/patch/cn/archive-common-full/base.zip" })
     assert.equal(allowed.statusCode, 200)
-    assert.deepEqual(allowed.rawPayload, Buffer.from([1, 2, 3]))
+    assert.deepEqual(allowed.rawPayload, allowedBytes)
+    assert.ok(createdSpool)
+    assert.equal(await removedSpool.promise, createdSpool)
+    assert.equal(path.resolve(createdSpool).startsWith(`${fs.realpathSync(contentStateDir)}${path.sep}`), true)
+    assert.equal(path.resolve(createdSpool).startsWith(`${path.resolve(root)}${path.sep}`), false)
+    assert.equal(fs.existsSync(createdSpool), false)
+    assertNoRequestSpools(contentStateDir)
 
     for (const url of [
         "/patch/cn/archive-common-full/extra.zip",
@@ -732,6 +846,7 @@ test("CDN ZIP allowlist rejects final, intermediate, and outside-root symlinks",
     const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-symlink-"))
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-outside-"))
+    const contentStateDir = createContentStateDir(t, "cn-content-state-")
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))
     t.after(() => fs.rmSync(outside, { recursive: true, force: true }))
 
@@ -748,12 +863,15 @@ test("CDN ZIP allowlist rejects final, intermediate, and outside-root symlinks",
     const snapshot = createSnapshot({
         targetVersion: "1.4.0",
         edges: Object.freeze([edge(null, "1.4.0", [
-            archive("archive-final/allowed.zip", 3, 1),
-            archive("archive-middle/allowed.zip", 3, 2),
+            archive("archive-final/allowed.zip", 3, 1, sha256("zip")),
+            archive("archive-middle/allowed.zip", 3, 2, sha256("mid")),
         ])]),
     })
     const app = Fastify({ logger: false })
-    app.register(cdnFilesPlugin, { getSnapshot: () => snapshot, paths: { cdnRoot: root } })
+    app.register(cdnFilesPlugin, {
+        getSnapshot: () => snapshot,
+        paths: { cdnRoot: root, contentStateDir },
+    })
     await app.ready()
     t.after(() => app.close())
 
@@ -769,6 +887,7 @@ test("CDN ZIP allowlist rejects final, intermediate, and outside-root symlinks",
 test("CDN ZIP identity is pinned across post-registration replacements", async t => {
     const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-identity-"))
+    const contentStateDir = createContentStateDir(t, "cn-content-state-")
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))
     fs.mkdirSync(path.join(root, "archive"), { recursive: true })
     for (const name of ["swap-symlink.zip", "swap-file.zip", "unlisted.zip"]) {
@@ -777,8 +896,8 @@ test("CDN ZIP identity is pinned across post-registration replacements", async t
     const snapshot = createSnapshot({
         targetVersion: "1.4.0",
         edges: Object.freeze([edge(null, "1.4.0", [
-            archive("archive/swap-symlink.zip", 3, 1),
-            archive("archive/swap-file.zip", 3, 2),
+            archive("archive/swap-symlink.zip", 3, 1, sha256("old")),
+            archive("archive/swap-file.zip", 3, 2, sha256("old")),
         ])]),
     })
     let opened = 0
@@ -786,7 +905,7 @@ test("CDN ZIP identity is pinned across post-registration replacements", async t
     const app = Fastify({ logger: false })
     app.register(cdnFilesPlugin, {
         getSnapshot: () => snapshot,
-        paths: { cdnRoot: root },
+        paths: { cdnRoot: root, contentStateDir },
         handleObserver: {
             opened: () => { opened++ },
             closed: () => { closed++ },
@@ -821,6 +940,7 @@ test("CDN ZIP identity is pinned across post-registration replacements", async t
 test("CDN ZIP replacement during request is rejected after the pinned fd opens", async t => {
     const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-open-race-"))
+    const contentStateDir = createContentStateDir(t, "cn-content-state-")
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))
     const archivePath = path.join(root, "archive", "allowed.zip")
     fs.mkdirSync(path.dirname(archivePath), { recursive: true })
@@ -829,7 +949,7 @@ test("CDN ZIP replacement during request is rejected after the pinned fd opens",
     const snapshot = createSnapshot({
         targetVersion: "1.4.0",
         edges: Object.freeze([edge(null, "1.4.0", [
-            archive("archive/allowed.zip", 3),
+            archive("archive/allowed.zip", 3, 1, sha256("old")),
         ])]),
     })
     let archiveOpenCount = 0
@@ -849,7 +969,7 @@ test("CDN ZIP replacement during request is rejected after the pinned fd opens",
     const app = Fastify({ logger: false })
     app.register(cdnFilesPlugin, {
         getSnapshot: () => snapshot,
-        paths: { cdnRoot: root },
+        paths: { cdnRoot: root, contentStateDir },
         fileSystem,
     })
     await app.ready()
@@ -861,10 +981,254 @@ test("CDN ZIP replacement during request is rejected after the pinned fd opens",
     assert.notEqual(response.body, "new")
 })
 
+test("CDN ZIP rejects same-inode same-size rewrites after registration", async t => {
+    const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-in-place-"))
+    const contentStateDir = createContentStateDir(t, "cn-content-state-")
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const archivePath = path.join(root, "archive", "allowed.zip")
+    fs.mkdirSync(path.dirname(archivePath), { recursive: true })
+    fs.writeFileSync(archivePath, Buffer.from("OLD"))
+
+    const snapshot = createSnapshot({
+        targetVersion: "1.4.0",
+        edges: Object.freeze([edge(null, "1.4.0", [
+            archive("archive/allowed.zip", 3, 1, sha256("OLD")),
+        ])]),
+    })
+    const app = Fastify({ logger: false })
+    app.register(cdnFilesPlugin, {
+        getSnapshot: () => snapshot,
+        paths: { cdnRoot: root, contentStateDir },
+    })
+    await app.ready()
+    t.after(() => app.close())
+
+    const registeredStat = fs.statSync(archivePath)
+    fs.writeFileSync(archivePath, Buffer.from("NEW"))
+    const rewrittenStat = fs.statSync(archivePath)
+    assert.equal(rewrittenStat.dev, registeredStat.dev)
+    assert.equal(rewrittenStat.ino, registeredStat.ino)
+    assert.equal(rewrittenStat.size, registeredStat.size)
+
+    const response = await app.inject({ method: "GET", url: "/patch/cn/archive/allowed.zip" })
+    assert.equal(response.statusCode, 404)
+    assert.equal(response.body.includes("NEW"), false)
+    assertNoRequestSpools(contentStateDir)
+})
+
+test("CDN ZIP rejects deterministic in-place rewrites after request open and during copy", async t => {
+    const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
+
+    for (const phase of ["afterSourceStat", "afterChunk"]) {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), `cn-cdn-${phase}-`))
+        const contentStateDir = createContentStateDir(t, `cn-content-state-${phase}-`)
+        t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+        const archivePath = path.join(root, "archive", "allowed.zip")
+        const oldBytes = Buffer.alloc(192 * 1024, 0x41)
+        const newBytes = Buffer.alloc(oldBytes.length, 0x42)
+        fs.mkdirSync(path.dirname(archivePath), { recursive: true })
+        fs.writeFileSync(archivePath, oldBytes)
+        const snapshot = createSnapshot({
+            targetVersion: "1.4.0",
+            edges: Object.freeze([edge(null, "1.4.0", [
+                archive("archive/allowed.zip", oldBytes.length, 1, sha256(oldBytes)),
+            ])]),
+        })
+        let hookCalls = 0
+        let mutations = 0
+        const hooks = {
+            [phase]: async () => {
+                hookCalls++
+                if (mutations === 0) {
+                    mutations++
+                    fs.writeFileSync(archivePath, newBytes)
+                }
+            },
+        }
+        const app = Fastify({ logger: false })
+        app.register(cdnFilesPlugin, {
+            getSnapshot: () => snapshot,
+            paths: { cdnRoot: root, contentStateDir },
+            zipSpoolHooks: hooks,
+        })
+        await app.ready()
+        t.after(() => app.close())
+
+        const response = await app.inject({ method: "GET", url: "/patch/cn/archive/allowed.zip" })
+        assert.ok(hookCalls >= 1, phase)
+        assert.equal(mutations, 1, phase)
+        assert.equal(response.statusCode, 404, phase)
+        assert.equal(response.rawPayload.includes(Buffer.from("BBBB")), false, phase)
+        assertNoRequestSpools(contentStateDir)
+    }
+})
+
+test("CDN ZIP spool removes files and closes descriptors on copy errors", async t => {
+    const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-spool-error-"))
+    const contentStateDir = createContentStateDir(t, "cn-content-state-error-")
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const archivePath = path.join(root, "archive", "allowed.zip")
+    const archiveBytes = Buffer.alloc(128 * 1024, 0x31)
+    fs.mkdirSync(path.dirname(archivePath), { recursive: true })
+    fs.writeFileSync(archivePath, archiveBytes)
+    const snapshot = createSnapshot({
+        targetVersion: "1.4.0",
+        edges: Object.freeze([edge(null, "1.4.0", [
+            archive("archive/allowed.zip", archiveBytes.length, 1, sha256(archiveBytes)),
+        ])]),
+    })
+    let opened = 0
+    let closed = 0
+    let createdSpool
+    const removedSpool = deferred()
+    const app = Fastify({ logger: false })
+    app.register(cdnFilesPlugin, {
+        getSnapshot: () => snapshot,
+        paths: { cdnRoot: root, contentStateDir },
+        handleObserver: {
+            opened: () => { opened++ },
+            closed: () => { closed++ },
+        },
+        zipSpoolHooks: {
+            spoolCreated: ({ directory }) => { createdSpool = directory },
+            spoolRemoved: ({ directory }) => removedSpool.resolve(directory),
+            afterChunk: () => { throw new Error("injected copy failure") },
+        },
+    })
+    await app.ready()
+    t.after(() => app.close())
+
+    const response = await app.inject({ method: "GET", url: "/patch/cn/archive/allowed.zip" })
+    assert.equal(response.statusCode, 404)
+    assert.ok(createdSpool)
+    assert.equal(await removedSpool.promise, createdSpool)
+    assert.equal(fs.existsSync(createdSpool), false)
+    assert.equal(closed, opened)
+    assertNoRequestSpools(contentStateDir)
+})
+
+test("CDN ZIP spool root must resolve inside CONTENT_STATE_DIR", async t => {
+    const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-spool-root-"))
+    const contentStateDir = createContentStateDir(t, "cn-content-state-root-")
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "cn-content-state-outside-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    t.after(() => fs.rmSync(outside, { recursive: true, force: true }))
+    fs.symlinkSync(outside, path.join(contentStateDir, "cdn-response-spool-v1"))
+
+    const app = Fastify({ logger: false })
+    app.register(cdnFilesPlugin, {
+        getSnapshot: () => createSnapshot({ targetVersion: "1.4.0", edges: Object.freeze([]) }),
+        paths: { cdnRoot: root, contentStateDir },
+    })
+    await assert.rejects(app.ready(), /spool|CONTENT_STATE_DIR/)
+    await app.close().catch(() => undefined)
+})
+
+test("CDN ZIP spool removes files and closes descriptors on pre-response errors", async t => {
+    const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-spool-response-error-"))
+    const contentStateDir = createContentStateDir(t, "cn-content-state-response-error-")
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const archivePath = path.join(root, "archive", "allowed.zip")
+    const archiveBytes = Buffer.from("verified archive")
+    fs.mkdirSync(path.dirname(archivePath), { recursive: true })
+    fs.writeFileSync(archivePath, archiveBytes)
+    const snapshot = createSnapshot({
+        targetVersion: "1.4.0",
+        edges: Object.freeze([edge(null, "1.4.0", [
+            archive("archive/allowed.zip", archiveBytes.length, 1, sha256(archiveBytes)),
+        ])]),
+    })
+    let opened = 0
+    let closed = 0
+    let createdSpool
+    const removedSpool = deferred()
+    const app = Fastify({ logger: false })
+    app.register(cdnFilesPlugin, {
+        getSnapshot: () => snapshot,
+        paths: { cdnRoot: root, contentStateDir },
+        handleObserver: {
+            opened: () => { opened++ },
+            closed: () => { closed++ },
+        },
+        zipSpoolHooks: {
+            spoolCreated: ({ directory }) => { createdSpool = directory },
+            spoolRemoved: ({ directory }) => removedSpool.resolve(directory),
+            beforeResponse: () => { throw new Error("injected pre-response failure") },
+        },
+    })
+    await app.ready()
+    t.after(() => app.close())
+
+    const response = await app.inject({ method: "GET", url: "/patch/cn/archive/allowed.zip" })
+    assert.equal(response.statusCode, 404)
+    assert.ok(createdSpool)
+    assert.equal(fs.existsSync(createdSpool), false)
+    assert.equal(await removedSpool.promise, createdSpool)
+    assert.equal(closed, opened)
+    assertNoRequestSpools(contentStateDir)
+})
+
+test("CDN ZIP spool removes files and closes descriptors when response streaming aborts", async t => {
+    const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-spool-abort-"))
+    const contentStateDir = createContentStateDir(t, "cn-content-state-abort-")
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const archivePath = path.join(root, "archive", "allowed.zip")
+    const archiveBytes = Buffer.alloc(128 * 1024, 0x32)
+    fs.mkdirSync(path.dirname(archivePath), { recursive: true })
+    fs.writeFileSync(archivePath, archiveBytes)
+    const snapshot = createSnapshot({
+        targetVersion: "1.4.0",
+        edges: Object.freeze([edge(null, "1.4.0", [
+            archive("archive/allowed.zip", archiveBytes.length, 1, sha256(archiveBytes)),
+        ])]),
+    })
+    let opened = 0
+    let closed = 0
+    let interrupted = false
+    let createdSpool
+    const removedSpool = deferred()
+    const app = Fastify({ logger: false })
+    app.register(cdnFilesPlugin, {
+        getSnapshot: () => snapshot,
+        paths: { cdnRoot: root, contentStateDir },
+        handleObserver: {
+            opened: () => { opened++ },
+            closed: () => { closed++ },
+        },
+        zipSpoolHooks: {
+            spoolCreated: ({ directory }) => { createdSpool = directory },
+            spoolRemoved: ({ directory }) => removedSpool.resolve(directory),
+            beforeResponse: ({ stream }) => {
+                stream.once("error", () => {})
+                stream.once("data", () => {
+                    interrupted = true
+                    stream.destroy(new Error("simulated client interruption"))
+                })
+            },
+        },
+    })
+    await app.ready()
+    t.after(() => app.close())
+
+    await app.inject({ method: "GET", url: "/patch/cn/archive/allowed.zip" }).catch(() => undefined)
+    assert.ok(createdSpool)
+    assert.equal(await removedSpool.promise, createdSpool)
+    assert.equal(interrupted, true)
+    assert.equal(fs.existsSync(createdSpool), false)
+    assert.equal(closed, opened)
+    assertNoRequestSpools(contentStateDir)
+})
+
 test("CDN non-ZIP files reject an intermediate symlink swapped in after realpath", async t => {
     const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-nonzip-race-"))
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-nonzip-outside-"))
+    const contentStateDir = createContentStateDir(t, "cn-content-state-")
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))
     t.after(() => fs.rmSync(outside, { recursive: true, force: true }))
     const assetPath = path.join(root, "dummy", "hash")
@@ -890,7 +1254,7 @@ test("CDN non-ZIP files reject an intermediate symlink swapped in after realpath
     const app = Fastify({ logger: false })
     app.register(cdnFilesPlugin, {
         getSnapshot: () => createSnapshot({ targetVersion: "1.4.0", edges: Object.freeze([]) }),
-        paths: { cdnRoot: root },
+        paths: { cdnRoot: root, contentStateDir },
         fileSystem,
     })
     await app.ready()

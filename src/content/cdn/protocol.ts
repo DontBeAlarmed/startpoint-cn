@@ -1,3 +1,4 @@
+import { isIP } from "node:net"
 import type { CatalogArchive, DiffCatalogEdge, FullCatalogEdge, UpdatePlan } from "./types"
 
 export interface CdnProtocolOptions {
@@ -36,31 +37,56 @@ export interface CnAssetUpdateWire {
     readonly delayed_assets_size: 0
 }
 
+const INVALID_CDN_BASE_URL_MESSAGE = "invalid CDN base URL configuration"
+
+function invalidCdnBaseUrl(): Error {
+    const error = new Error(INVALID_CDN_BASE_URL_MESSAGE)
+    error.name = "CdnConfigurationError"
+    return error
+}
+
 export function normalizeCdnBaseUrl(baseUrl: string): string {
     const value = baseUrl
     if (!value
-        || value !== value.trim()
-        || /[\x00-\x1f\x7f]/.test(value)
+        || value.length > 2048
+        || /\s/u.test(value)
+        || value.includes("@")
         || value.includes("\\")
         || /[?#]/.test(value)
         || !/^https?:\/\//.test(value)) {
-        throw new Error("CDN base URL contains unsupported characters")
+        throw invalidCdnBaseUrl()
     }
 
-    const pathStart = value.indexOf("/", value.indexOf("://") + 3)
+    const authorityStart = value.indexOf("://") + 3
+    const pathStart = value.indexOf("/", authorityStart)
+    const authority = value.slice(authorityStart, pathStart === -1 ? value.length : pathStart)
+    const rawHost = authority.startsWith("[")
+        ? authority.slice(0, authority.indexOf("]") + 1)
+        : authority.split(":", 1)[0]
+    if (!authority
+        || !rawHost
+        || (/^[0-9.]+$/.test(rawHost) && isIP(rawHost) !== 4)) {
+        throw invalidCdnBaseUrl()
+    }
+
     const rawPath = pathStart === -1 ? "" : value.slice(pathStart)
     if ((rawPath !== "" && !/^\/[A-Za-z0-9._~/-]*$/.test(rawPath))
         || rawPath.includes("%")
         || /\/{2,}/.test(rawPath)
         || /(?:^|\/)\.{1,2}(?:\/|$)/.test(rawPath)) {
-        throw new Error("CDN base URL contains an unsafe path")
+        throw invalidCdnBaseUrl()
     }
 
-    const parsed = new URL(value)
+    let parsed: URL
+    try {
+        parsed = new URL(value)
+    } catch {
+        throw invalidCdnBaseUrl()
+    }
     if ((parsed.protocol !== "http:" && parsed.protocol !== "https:")
         || parsed.username
         || parsed.password) {
-        throw new Error("CDN base URL must be an HTTP(S) origin URL")
+        throw invalidCdnBaseUrl()
     }
     const pathname = parsed.pathname.replace(/\/+$/, "")
     return `${parsed.origin}${pathname}`
