@@ -7,7 +7,7 @@
 
 ## 一、目标
 
-在保持游戏服务端职责纯粹的前提下，增加一个显式的 `content:sync` 离线命令：
+在保持游戏服务端职责纯粹的前提下，增加一个 `content:sync` 离线同步器，并由受支持的服务启动脚本在监听端口前自动执行版本预检查：
 
 1. 扫描 CDN 作者放入 `.cdn/cn` 的可识别文件。
 2. 根据 CDN 作者定义的 full/diff 归档和 EntityLists 得到目标资源版本。
@@ -21,7 +21,7 @@
 
 ### 2.1 旧 CDN
 
-未运行 `content:sync` 时，服务端继续使用仓库内现有 `assets/*.json` 和官方 1.4.54 Catalog manifest：
+没有本地同步结果时，服务端继续使用仓库内现有 `assets/*.json` 和官方 1.4.54 Catalog manifest：
 
 ```text
 下载服务端
@@ -30,21 +30,33 @@
   -> 启动服务
 ```
 
-因此直接拉取代码后的默认体验不变。
+因此直接拉取代码后的默认数据体验不变。受支持的启动脚本会先执行快速同步预检查；官方 1.4.54 与 bundled fallback 一致时允许直接启动。
 
 ### 2.2 新 CDN
 
-CDN 作者完成版本和补丁配置后，操作者执行：
+CDN 作者完成版本和补丁配置并将文件放入 `.cdn/cn` 后，操作者按原方式启动服务：
 
 ```text
 把 CDN 文件放入 .cdn/cn
-  -> npm run content:sync
-  -> 重启服务
+  -> 执行受支持的服务启动脚本
+  -> 启动脚本比较 CDN 版本和本地同步版本
+  -> 需要时自动运行 content:sync
+  -> 同步成功后启动游戏服务
 ```
 
-运行中的服务不监视 CDN 目录，也不会在请求期间扫描 ZIP、提取 orderedmap 或写入主数据。
+运行中的服务不监视 CDN 目录，也不会在请求期间扫描 ZIP、提取 orderedmap 或写入主数据。自动同步只发生在启动脚本的预启动阶段，不进入 Fastify 游戏请求进程。
 
-### 2.3 命令
+### 2.3 启动入口
+
+以下受支持入口必须执行自动同步预检查：
+
+- `npm run dev:cn`
+- `scripts/start-cn.sh`
+- 项目提供的正式 CN 启动脚本
+
+直接运行 `node out/cn-server.js` 只加载已经生成的内容，不执行同步。这样游戏服务进程可以在同步完成后保持只读。
+
+### 2.4 同步命令
 
 ```bash
 npm run content:sync
@@ -52,7 +64,8 @@ npm run content:sync
 
 - 没有同步记录时生成当前版本。
 - CDN 目标版本与 `current.json` 不同时生成或复用对应 Release，并更新指针。
-- 版本相同时输出 `already synchronized`，不重新提取。
+- `generatorVersion` 与当前 Release 不同时重新生成，以避免服务代码升级后继续加载旧格式表。
+- 资源版本和生成器版本都相同时输出 `already synchronized`，不重新提取。
 
 ```bash
 npm run content:sync -- --check
@@ -65,7 +78,7 @@ npm run content:sync -- --check
 npm run content:sync -- --force
 ```
 
-- 即使资源版本相同，也重新提取并运行转换器。
+- 即使资源版本和生成器版本相同，也重新提取并运行转换器。
 - 生成内容相同时复用既有对象和 Release。
 
 命令允许沿用现有 `CDN_DIR` 路径解析规则，但不修改原始 CDN。
@@ -109,6 +122,7 @@ npm run content:sync -- --force
 - 不修改玩家 SQLite。
 - 不为错误 CDN 提供修复、降级或客户端缓存处理。
 - 不在正常同步或启动流程中完整哈希 10GB CDN。
+- 不在 Fastify 游戏服务进程中执行同步或写 `.content`。
 
 ## 四、整体架构
 
@@ -146,11 +160,15 @@ npm run content:sync -- --force
       .content/current.json
           |
           v
+      StartupBootstrap
+  比较 CDN 版本和 generatorVersion，必要时运行同步
+          |
+          v
       ContentRepository
   服务启动时只读加载
 ```
 
-各组件不得依赖 Fastify、玩家数据库或服务启动状态。
+同步组件不得依赖 Fastify、玩家数据库或游戏服务运行状态。StartupBootstrap 只负责在服务启动前编排同步命令，不把转换器导入 Fastify 进程。
 
 ## 五、CDN 扫描与提取
 
@@ -293,6 +311,7 @@ Release manifest 至少包含：
   "schemaVersion": 1,
   "assetVersion": "1.4.55",
   "runtimeSchemaVersion": 1,
+  "generatorVersion": 1,
   "releaseDigest": "sha256:...",
   "tables": {
     "character.json": {
@@ -314,7 +333,7 @@ Release manifest 至少包含：
 
 `releaseDigest` 由不含自身的规范 manifest 内容计算。构建时间、绝对路径和操作人不进入摘要。
 
-同一 `assetVersion` 可以因为 `--force` 或转换器版本变化产生不同 `releaseDigest`，但普通同步只用版本号判断是否需要运行。
+同一 `assetVersion` 可以因为 `--force` 或转换器版本变化产生不同 `releaseDigest`。普通同步比较 `assetVersion` 和顶层 `generatorVersion`；任一变化都会运行同步。
 
 ### 7.4 current.json
 
@@ -326,12 +345,31 @@ Release manifest 至少包含：
 
 ## 八、同步流程
 
-### 8.1 普通同步
+### 8.1 启动自动同步
+
+受支持的启动脚本执行：
+
+```text
+获取 .content/sync.lock
+  -> 扫描 CDN 得到 targetVersion
+  -> 读取 current.json
+  -> 比较 assetVersion 和 generatorVersion
+  -> 相同则释放锁并启动服务
+  -> 不同或 current 不存在则执行普通同步
+  -> 同步成功后释放锁并启动服务
+  -> 同步失败则释放锁并以非零状态退出，不启动服务
+```
+
+同步锁用于防止两个启动流程同时写对象、Release 和 `current.json`。锁只保护本机同步写入，不是 Release 状态机。
+
+启动脚本不会在失败后自动切换到旧 `current.json` 启动。旧指针虽然保持未变，但本次启动直接失败，等待操作者修复 CDN 或显式回退。
+
+### 8.2 普通同步
 
 ```text
 扫描 CDN 得到 targetVersion
   -> 读取 current.json
-  -> 版本相同则跳过
+  -> assetVersion 和 generatorVersion 都相同则跳过
   -> 建立 ArchiveIndex
   -> 提取 Registry 来源
   -> 运行转换器和 bundled 导入
@@ -340,17 +378,17 @@ Release manifest 至少包含：
   -> 原子更新 current.json
 ```
 
-同步完成后当前服务进程不会热切换。操作者重启服务后，新 Catalog 和主数据同时生效。
+手动同步完成后当前服务进程不会热切换。下一次重启后，新 Catalog 和主数据同时生效。启动脚本自动同步发生在游戏服务尚未启动时，因此同步成功后可以直接启动新内容。
 
-### 8.2 check
+### 8.3 check
 
-`--check` 只执行得到目标版本所需的最低扫描，并与 `current.json.assetVersion` 比较，不建立 ArchiveIndex 或读取 orderedmap。
+`--check` 只执行得到目标版本所需的最低扫描，并与 `current.json` 中的 `assetVersion`、`generatorVersion` 比较，不建立 ArchiveIndex 或读取 orderedmap。
 
-### 8.3 force
+### 8.4 force
 
-`--force` 跳过版本相同的快速退出，重新提取并运行转换器。对象和 Release 内容相同时不会重复占用磁盘。
+`--force` 跳过资源版本和生成器版本相同的快速退出，重新提取并运行转换器。对象和 Release 内容相同时不会重复占用磁盘。
 
-### 8.4 同步失败
+### 8.5 同步失败
 
 下列失败会让命令退出非零，且不更新 `current.json`：
 
@@ -363,6 +401,12 @@ Release manifest 至少包含：
 这只是生成完整文件所需的最低失败处理，不是内容正确性校验。可解析但业务内容错误的数据照常生成。
 
 无法识别且不属于支持目录/格式的文件不阻止同步，只记录在 source summary。
+
+### 8.6 CDN 文件准备约束
+
+启动自动同步的主要风险是 CDN 文件仍在复制。CDN 作者或部署者必须先在临时目录准备完整文件，再移动到 `.cdn/cn` 的正式位置，或者确保复制完成后才启动服务。
+
+同步器不实现目录监视、上传完成协议或 CDN 发布审批。启动时读到半写 ZIP 会导致同步失败和本次服务启动失败。
 
 ## 九、CDN 更新与回退
 
@@ -383,7 +427,7 @@ content:sync
 
 ### 9.2 同版本修改
 
-普通同步只比较版本号。同版本修改不会自动重建，CDN 作者必须执行：
+普通同步比较资源版本和生成器版本。同版本、同生成器版本下的 CDN 原地修改不会自动重建，CDN 作者必须执行：
 
 ```bash
 npm run content:sync -- --force
@@ -426,6 +470,8 @@ CDN 作者删除错误版本文件并恢复旧 EntityLists 后，再次运行普
 
 Repository 在服务启动时固定数据来源。运行中修改 `current.json` 不影响已启动进程，必须重启。
 
+受支持的启动脚本在 Repository 初始化前完成自动同步。直接运行 `out/cn-server.js` 时，Repository 只读加载现有指针或 bundled fallback。
+
 ### 10.2 Catalog
 
 同步 Release 的 Catalog 取代固定 1.4.54 runtime manifest，成为该次启动的 Planner 和 CDN 文件 allowlist 来源。
@@ -441,6 +487,8 @@ Repository 在服务启动时固定数据来源。运行中修改 `current.json`
 ### 11.1 不读取全部 CDN 正文
 
 普通同步可以读取归档中央目录并只解压 Registry 需要的主数据 entry。它不对全部归档计算 SHA-256。
+
+资源版本和生成器版本均未变化时，启动预检查不建立完整 ArchiveIndex，也不读取 orderedmap，因此日常重启只增加一次轻量版本扫描。
 
 ### 11.2 首版转换策略
 
@@ -483,7 +531,11 @@ Repository 在服务启动时固定数据来源。运行中修改 `current.json`
 - 同一输入和转换器版本产生相同对象摘要和 Release manifest。
 - 相同表只保存一个物理对象。
 - 版本变化触发同步，版本相同跳过，`--force` 重建。
+- `generatorVersion` 变化时，即使 CDN 版本相同也自动重建。
 - `--check` 不写文件。
+- 两个并发启动只能有一个同步写入者，另一个遵守同步锁结果。
+- 受支持启动入口在版本变化时先同步再启动，版本未变化时快速启动。
+- 同步失败时受支持启动入口不启动游戏服务。
 - 同步失败不更新 `current.json`，不留下可加载的半成品 Release。
 - 没有 `current.json` 时旧服务端正常运行。
 - current 指针或对象损坏时服务启动明确失败。
@@ -517,6 +569,7 @@ Repository 在服务启动时固定数据来源。运行中修改 `current.json`
 ### 阶段 A：首轮可测试版本
 
 - Content Sync CLI、版本判断和路径解析。
+- StartupBootstrap、支持入口接线和同步锁。
 - CdnScanner、ArchiveIndex、OrderedMapExtractor。
 - TableSourceRegistry。
 - 规范 JSON 对象库、Release manifest 和 current 指针。
