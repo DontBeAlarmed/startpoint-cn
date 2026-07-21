@@ -14,13 +14,10 @@ function isSameOrDescendant(parent: string, candidate: string): boolean {
 
 export async function importBundledTable(projectRoot: string, tableName: string): Promise<unknown> {
     const definition = findTableSource(tableName)
-    if (definition.scope === "cdn") {
-        throw new Error(`cannot import CDN table from bundled assets: ${tableName}`)
-    }
 
     const root = path.resolve(projectRoot)
     const assetsRoot = path.resolve(root, "assets")
-    const sourcePath = path.resolve(root, definition.sourceOrderedMaps[0])
+    const sourcePath = path.resolve(root, definition.bundledPath)
     if (!isSameOrDescendant(assetsRoot, sourcePath)) {
         throw new Error(`registered source is outside assets: ${tableName}`)
     }
@@ -32,8 +29,8 @@ export async function importBundledTable(projectRoot: string, tableName: string)
             fs.promises.realpath(assetsRoot),
             fs.promises.realpath(sourcePath),
         ])
-    } catch (error) {
-        throw new Error(`cannot read bundled table ${tableName}: ${(error as Error).message}`)
+    } catch {
+        throw new Error(`cannot read bundled table ${tableName}`)
     }
     if (!isSameOrDescendant(physicalAssetsRoot, physicalSourcePath)) {
         throw new Error(`bundled table resolves outside assets through a symlink: ${tableName}`)
@@ -46,11 +43,8 @@ export async function importBundledTable(projectRoot: string, tableName: string)
             physicalSourcePath,
             fs.constants.O_RDONLY | noFollow,
         )
-    } catch (error) {
-        throw new Error(
-            `cannot safely open bundled table ${tableName}; symlink or changed file: `
-            + (error as Error).message,
-        )
+    } catch {
+        throw new Error(`cannot safely open bundled table ${tableName}; symlink or changed file`)
     }
 
     let text: string
@@ -68,13 +62,19 @@ export async function importBundledTable(projectRoot: string, tableName: string)
             throw new Error(`bundled table changed while opening: ${tableName}`)
         }
         text = await fileHandle.readFile({ encoding: "utf8" })
+    } catch {
+        throw new Error(`cannot safely read bundled table ${tableName}; symlink or changed file`)
     } finally {
-        await fileHandle.close()
+        try {
+            await fileHandle.close()
+        } catch {
+            throw new Error(`cannot safely close bundled table ${tableName}`)
+        }
     }
 
     try {
         return deepFreeze(JSON.parse(text) as unknown)
-    } catch (error) {
-        throw new Error(`invalid JSON in bundled table ${tableName}: ${(error as Error).message}`)
+    } catch {
+        throw new Error(`invalid JSON in bundled table ${tableName}`)
     }
 }

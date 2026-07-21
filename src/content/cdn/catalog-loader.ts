@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 
+import { BUNDLED_CDN_CATALOG_VERSION } from "../constants"
 import {
     resolveContentPaths,
     type ContentPathEnvironment,
@@ -72,7 +73,9 @@ interface PatchManifest {
 }
 
 const VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
-const RUNTIME_MANIFEST_RELATIVE_PATH = "assets/cdn/catalog-cn-1.4.54.json"
+const RUNTIME_MANIFEST_RELATIVE_PATH = (
+    `assets/cdn/catalog-cn-${BUNDLED_CDN_CATALOG_VERSION}.json`
+)
 
 function runtimeManifestError(
     code: "RUNTIME_MANIFEST_READ" | "RUNTIME_MANIFEST_SCHEMA",

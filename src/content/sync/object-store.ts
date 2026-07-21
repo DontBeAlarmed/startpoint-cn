@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
+import { mapWithConcurrency } from "../concurrency"
 import { deepFreeze } from "../deep-freeze"
 import type { ContentPaths } from "../paths"
 import { canonicalJsonBuffer, sha256Object } from "./canonical-json"
@@ -17,6 +18,7 @@ const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/
 const RELEASE_PATH_PATTERN = /^releases\/(.+)-([0-9a-f]{64})\/manifest\.json$/
 const NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0
 const DIRECTORY = fs.constants.O_DIRECTORY ?? 0
+const OBJECT_READ_CONCURRENCY = 8
 
 interface FileIdentity {
     readonly dev: number
@@ -39,6 +41,15 @@ export interface ContentObjectStoreDependencies {
 export interface ContentCurrentRelease {
     readonly current: ContentCurrentPointer
     readonly manifest: ContentReleaseManifest
+}
+
+export interface ContentReleaseSnapshot {
+    readonly manifest: ContentReleaseManifest
+    readonly objects: Readonly<Record<`sha256:${string}`, unknown>>
+}
+
+export interface ContentCurrentReleaseSnapshot extends ContentCurrentRelease {
+    readonly objects: Readonly<Record<`sha256:${string}`, unknown>>
 }
 
 function isMissing(error: unknown): error is NodeJS.ErrnoException {
@@ -171,6 +182,23 @@ export class ContentObjectStore {
     }
 
     async readCurrentRelease(): Promise<ContentCurrentRelease | null> {
+        const snapshot = await this.readCurrentReleaseSnapshot()
+        if (snapshot === null) return null
+        return Object.freeze({ current: snapshot.current, manifest: snapshot.manifest })
+    }
+
+    async readCurrentReleaseSnapshot(): Promise<ContentCurrentReleaseSnapshot | null> {
+        const current = await this.readCurrentPointer()
+        if (current === null) return null
+        const release = await this.readReleaseSnapshot(current)
+        return deepFreeze({
+            current,
+            manifest: release.manifest,
+            objects: release.objects,
+        })
+    }
+
+    private async readCurrentPointer(): Promise<ContentCurrentPointer | null> {
         let root: DirectoryIdentity
         try {
             root = await this.secureRoot(false)
@@ -200,13 +228,18 @@ export class ContentObjectStore {
         } catch (error) {
             throw errorWithCause("current pointer is corrupt", error)
         }
-        const manifest = await this.readRelease(current)
-        return Object.freeze({ current, manifest })
+        return current
     }
 
     async readRelease(
         pointerOrManifestPath: ContentCurrentPointer | string,
     ): Promise<ContentReleaseManifest> {
+        return (await this.readReleaseSnapshot(pointerOrManifestPath)).manifest
+    }
+
+    async readReleaseSnapshot(
+        pointerOrManifestPath: ContentCurrentPointer | string,
+    ): Promise<ContentReleaseSnapshot> {
         const location = this.releaseLocationFromInput(pointerOrManifestPath)
         let bytes: Buffer
         try {
@@ -238,8 +271,15 @@ export class ContentObjectStore {
             || manifest.releaseDigest.slice(7) !== location.digest) {
             throw new Error(`release manifest does not match its path: ${location.relativePath}`)
         }
-        for (const digest of referencedObjects(manifest)) await this.readObject(digest)
-        return manifest
+        const objectEntries = await mapWithConcurrency(
+            [...referencedObjects(manifest)],
+            OBJECT_READ_CONCURRENCY,
+            async digest => [digest, await this.readObject(digest)] as const,
+        )
+        return deepFreeze({
+            manifest,
+            objects: Object.fromEntries(objectEntries) as Record<`sha256:${string}`, unknown>,
+        })
     }
 
     async activate(manifest: ContentReleaseManifest): Promise<ContentCurrentPointer> {

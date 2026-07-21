@@ -180,6 +180,14 @@ function assertDeepFrozen(value, seen = new Set()) {
     for (const key of Reflect.ownKeys(value)) assertDeepFrozen(value[key], seen)
 }
 
+function containsSensitivePath(value, sensitivePath, seen = new Set()) {
+    if (typeof value === "string") return value.includes(sensitivePath)
+    if (!value || typeof value !== "object" || seen.has(value)) return false
+    seen.add(value)
+    return [value.message, value.path, value.cause]
+        .some(nested => containsSensitivePath(nested, sensitivePath, seen))
+}
+
 function collectStaticAssetJsonReferences(directory) {
     const references = new Set()
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -209,6 +217,7 @@ test("registry is sorted, unique, deeply frozen, and versioned", () => {
         assert.ok(Number.isSafeInteger(entry.converterVersion) && entry.converterVersion > 0)
         assert.ok(Number.isSafeInteger(entry.outputShapeVersion) && entry.outputShapeVersion > 0)
         assert.ok(entry.sourceOrderedMaps.length > 0)
+        assert.equal(entry.bundledPath, `assets/${entry.tableName}`)
     }
 })
 
@@ -268,13 +277,31 @@ test("registry independently covers static CN runtime JSON references", () => {
     assert.deepEqual(unreferenced, [])
 })
 
-test("every non-CDN registry source exists and imports from the repository", async () => {
-    for (const entry of TABLE_SOURCES.filter(source => source.scope !== "cdn")) {
-        assert.deepEqual(entry.sourceOrderedMaps, [`assets/${entry.tableName}`], entry.tableName)
-        const sourcePath = path.resolve(projectRoot, entry.sourceOrderedMaps[0])
+test("every registry table has an explicit existing bundled fallback", () => {
+    assert.equal(TABLE_SOURCES.length, 94)
+    for (const entry of TABLE_SOURCES) {
+        const sourcePath = path.resolve(projectRoot, entry.bundledPath)
         assert.ok(fs.existsSync(sourcePath), `${entry.tableName} source must exist`)
-        const imported = await importBundledTable(projectRoot, entry.tableName)
-        assertDeepFrozen(imported)
+
+        if (entry.scope === "cdn") {
+            assert.doesNotMatch(entry.bundledPath, /\.orderedmap$/)
+            assert.notEqual(entry.bundledPath, entry.sourceOrderedMaps[0])
+        } else {
+            assert.deepEqual(entry.sourceOrderedMaps, [`assets/${entry.tableName}`], entry.tableName)
+        }
+    }
+})
+
+test("bundled importer samples CDN, bundled, and server registry scopes", async () => {
+    const samples = [
+        ["gacha_campaign.json", "cdn"],
+        ["equipment_ids.json", "bundled"],
+        ["news.json", "server"],
+    ]
+
+    for (const [tableName, scope] of samples) {
+        assert.equal(findTableSource(tableName).scope, scope)
+        assertDeepFrozen(await importBundledTable(projectRoot, tableName))
     }
 })
 
@@ -284,13 +311,12 @@ test("runtime state and non-table assets are excluded", () => {
     assert.equal(names.has("confirmed_seeds.json"), false)
 })
 
-test("registry lookup and CDN imports reject unsupported tables", async () => {
+test("registry lookup and bundled imports reject unsupported tables", async () => {
     assert.throws(() => findTableSource("not_registered.json"), /not registered/i)
     await assert.rejects(
         importBundledTable(projectRoot, "not_registered.json"),
         /not registered/i,
     )
-    await assert.rejects(importBundledTable(projectRoot, "character.json"), /cdn/i)
 })
 
 test("bundled importer reads and freezes a valid temporary JSON table", async t => {
@@ -310,8 +336,25 @@ test("bundled importer rejects damaged JSON and symlink escapes", async t => {
     t.after(() => fs.rmSync(temporaryRoot, { recursive: true, force: true }))
     t.after(() => fs.rmSync(outsideRoot, { recursive: true, force: true }))
     fs.mkdirSync(path.join(temporaryRoot, "assets"))
+
+    await assert.rejects(
+        importBundledTable(temporaryRoot, "news.json"),
+        error => (
+            /cannot read bundled table news\.json/i.test(error.message)
+            && !containsSensitivePath(error, temporaryRoot)
+            && error.cause === undefined
+        ),
+    )
+
     fs.writeFileSync(path.join(temporaryRoot, "assets", "news.json"), "{")
-    await assert.rejects(importBundledTable(temporaryRoot, "news.json"), /invalid JSON/i)
+    await assert.rejects(
+        importBundledTable(temporaryRoot, "news.json"),
+        error => (
+            /invalid JSON in bundled table news\.json/i.test(error.message)
+            && !containsSensitivePath(error, temporaryRoot)
+            && error.cause === undefined
+        ),
+    )
 
     fs.writeFileSync(path.join(outsideRoot, "payment_products.json"), "[]")
     fs.symlinkSync(
@@ -321,6 +364,32 @@ test("bundled importer rejects damaged JSON and symlink escapes", async t => {
     await assert.rejects(
         importBundledTable(temporaryRoot, "payment_products.json"),
         /outside.*assets|symlink/i,
+    )
+})
+
+test("bundled importer redacts nested absolute paths from open failures", async t => {
+    const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "content-registry-open-"))
+    const sourcePath = path.join(temporaryRoot, "assets", "news.json")
+    t.after(() => fs.rmSync(temporaryRoot, { recursive: true, force: true }))
+    fs.mkdirSync(path.dirname(sourcePath))
+    fs.writeFileSync(sourcePath, "[]")
+    const nestedCause = Object.assign(new Error(`nested failure ${temporaryRoot}`), {
+        path: sourcePath,
+    })
+    t.mock.method(fs.promises, "open", async () => {
+        throw Object.assign(new Error(`cannot open ${sourcePath}`), {
+            path: sourcePath,
+            cause: nestedCause,
+        })
+    })
+
+    await assert.rejects(
+        importBundledTable(temporaryRoot, "news.json"),
+        error => (
+            /cannot safely open bundled table news\.json/i.test(error.message)
+            && !containsSensitivePath(error, temporaryRoot)
+            && error.cause === undefined
+        ),
     )
 })
 

@@ -528,6 +528,7 @@ test("package and quick workflow expose content sync", () => {
         "node tools/content_sync.cjs",
     )
     assert.ok(TEST_GROUPS["quick:content"].tests.includes("tools/content_sync.test.cjs"))
+    assert.equal(TEST_GROUPS["quick:content"].timeoutMs, 60_000)
     assert.ok(fs.existsSync(path.join(projectRoot, "tools", "content_sync.cjs")))
 })
 

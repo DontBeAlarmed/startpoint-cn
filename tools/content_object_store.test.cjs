@@ -74,6 +74,36 @@ function releaseInput(objects, overrides = {}) {
     }
 }
 
+async function writeManyObjectRelease(store, tableCount = 20) {
+    const tables = {}
+    const digests = []
+    for (let index = 0; index < tableCount; index++) {
+        const tableName = `table-${index}.json`
+        const object = await store.writeObject({ index })
+        digests.push(object)
+        tables[tableName] = {
+            object,
+            scope: "bundled",
+            converterId: "bundled-json",
+            converterVersion: 1,
+            sources: [`assets/${tableName}`],
+        }
+    }
+    const catalog = await store.writeObject({ targetVersion: "1.4.55" })
+    const summary = await store.writeObject({ tables: tableCount })
+    digests.push(catalog, summary)
+    const manifest = await store.writeRelease({
+        schemaVersion: 1,
+        assetVersion: "1.4.55",
+        runtimeSchemaVersion: 1,
+        generatorVersion: 1,
+        tables,
+        catalog: { object: catalog },
+        summary: { object: summary },
+    })
+    return { digests, manifest }
+}
+
 function listJsonFiles(directory) {
     if (!fs.existsSync(directory)) return []
     return fs.readdirSync(directory, { recursive: true })
@@ -132,6 +162,94 @@ test("different releases reuse unchanged objects and manifests are deterministic
     assert.equal(listJsonFiles(path.join(contentRootDir, "objects")).length, 4)
     assert.equal(listJsonFiles(path.join(contentRootDir, "releases")).length, 2)
     assert.deepEqual(await store.readRelease(releasePath(contentRootDir, first)), first)
+})
+
+test("current release snapshot reads each unique object once and preserves references", async t => {
+    const { store } = createFixture(t)
+    const objects = await writeReleaseObjects(store)
+    const input = releaseInput(objects)
+    input.tables["gacha.json"] = {
+        ...input.tables["character.json"],
+        converterId: "gacha",
+    }
+    const manifest = await store.writeRelease(input)
+    await store.activate(manifest)
+
+    const originalReadObject = store.readObject.bind(store)
+    let objectReads = 0
+    store.readObject = async digest => {
+        objectReads++
+        return originalReadObject(digest)
+    }
+
+    const snapshot = await store.readCurrentReleaseSnapshot()
+
+    assert.equal(objectReads, 3)
+    assert.strictEqual(
+        snapshot.objects[manifest.tables["character.json"].object],
+        snapshot.objects[manifest.tables["gacha.json"].object],
+    )
+    assert.deepEqual(snapshot.objects[objects.table], { rows: [{ id: 1, name: "shared" }] })
+    assert.equal(Object.isFrozen(snapshot), true)
+    assert.equal(Object.isFrozen(snapshot.objects), true)
+})
+
+test("release snapshot bounds unique object reads and reads each digest once", async t => {
+    const { contentRootDir, store } = createFixture(t)
+    const { digests, manifest } = await writeManyObjectRelease(store)
+    const readCounts = new Map()
+    let active = 0
+    let maxActive = 0
+    store.readObject = async digest => {
+        active++
+        maxActive = Math.max(maxActive, active)
+        readCounts.set(digest, (readCounts.get(digest) ?? 0) + 1)
+        try {
+            await new Promise(resolve => setImmediate(resolve))
+            return { digest }
+        } finally {
+            active--
+        }
+    }
+
+    const snapshot = await store.readReleaseSnapshot(releasePath(contentRootDir, manifest))
+
+    assert.ok(maxActive > 1)
+    assert.ok(maxActive <= 8, `maximum object read concurrency was ${maxActive}`)
+    assert.equal(active, 0)
+    assert.equal(readCounts.size, digests.length)
+    for (const digest of digests) assert.equal(readCounts.get(digest), 1)
+    assert.deepEqual(Object.keys(snapshot.objects).sort(), [...digests].sort())
+})
+
+test("release snapshot waits for active object reads before rejecting", async t => {
+    const { contentRootDir, store } = createFixture(t)
+    const { digests, manifest } = await writeManyObjectRelease(store)
+    const failure = new Error("controlled object read failure")
+    const failingDigest = digests[0]
+    let active = 0
+    let maxActive = 0
+    store.readObject = async digest => {
+        active++
+        maxActive = Math.max(maxActive, active)
+        try {
+            if (digest === failingDigest) {
+                await new Promise(resolve => setImmediate(resolve))
+                throw failure
+            }
+            await new Promise(resolve => setTimeout(resolve, 20))
+            return { digest }
+        } finally {
+            active--
+        }
+    }
+
+    await assert.rejects(
+        store.readReleaseSnapshot(releasePath(contentRootDir, manifest)),
+        error => error === failure,
+    )
+    assert.equal(active, 0)
+    assert.ok(maxActive <= 8, `maximum object read concurrency was ${maxActive}`)
 })
 
 test("activate atomically switches current and a rename failure preserves the old pointer", async t => {

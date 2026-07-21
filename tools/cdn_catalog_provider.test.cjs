@@ -22,6 +22,7 @@ const {
 const {
     ContentSnapshotError,
     ContentSnapshotProvider,
+    ContentSnapshotSourcesError,
     productionContentSnapshotProvider,
     resolveContentProjectRoot,
 } = require("../src/content/runtime/content-snapshot")
@@ -198,6 +199,30 @@ function deferred() {
         reject = rejectPromise
     })
     return { promise, resolve, reject }
+}
+
+function repository(source = "bundled") {
+    const metadata = {
+        source,
+        assetVersion: source === "bundled" ? "1.4.54" : "1.4.55",
+        generatorVersion: 1,
+        releaseDigest: source === "bundled" ? null : `sha256:${"b".repeat(64)}`,
+    }
+    return {
+        metadata,
+        info() {
+            return this.metadata
+        },
+        table(tableName) {
+            if (tableName !== "fixture.json") throw new Error(`not registered: ${tableName}`)
+            return this.fixture
+        },
+        fixture: { nested: { value: 1 } },
+    }
+}
+
+function snapshotProvider(catalogSource, repositorySource = { load: async () => repository() }) {
+    return new ContentSnapshotProvider({ catalogSource, repositorySource })
 }
 
 function causeContainsPath(value, sensitivePaths, seen = new Set()) {
@@ -698,7 +723,8 @@ test("content snapshot is initialized once, deep-frozen, and pinned across loade
         read: async () => ({ targetVersion: candidates[reads++] }),
         build: input => catalog(input.targetVersion),
     })
-    const provider = new ContentSnapshotProvider(loader)
+    const contentRepository = repository("release")
+    const provider = snapshotProvider(loader, { load: async () => contentRepository })
 
     assert.throws(
         () => provider.get(),
@@ -709,67 +735,150 @@ test("content snapshot is initialized once, deep-frozen, and pinned across loade
     assert.strictEqual(second, first)
     assert.strictEqual(provider.get(), first)
     assert.strictEqual(first.cdn, loader.get())
+    assert.strictEqual(first.repository, contentRepository)
     assert.equal(Object.isFrozen(first), true)
     assert.equal(Object.isFrozen(first.cdn), true)
+    assert.equal(Object.isFrozen(first.repository), true)
+    assert.equal(Object.isFrozen(first.repository.info()), true)
 
     const replacement = await loader.reload()
     assert.equal(replacement.targetVersion, "1.4.2")
     assert.strictEqual(provider.get(), first)
     assert.equal(provider.get().cdn.targetVersion, "1.4.1")
 
-    const candidateProvider = new ContentSnapshotProvider(loader)
+    const candidateRepository = repository("release")
+    const candidateProvider = snapshotProvider(loader, {
+        load: async () => candidateRepository,
+    })
     const candidateSnapshot = await candidateProvider.initialize()
     assert.strictEqual(candidateSnapshot.cdn, replacement)
+    assert.strictEqual(candidateSnapshot.repository, candidateRepository)
     assert.equal(candidateSnapshot.cdn.targetVersion, "1.4.2")
 })
 
 test("concurrent snapshot initialization loads once and returns one snapshot object", async () => {
     const candidate = deferred()
-    let loads = 0
-    const provider = new ContentSnapshotProvider({
+    const repositoryCandidate = deferred()
+    let catalogLoads = 0
+    let repositoryLoads = 0
+    const provider = snapshotProvider({
         load: () => {
-            loads++
+            catalogLoads++
             return candidate.promise
+        },
+    }, {
+        load: () => {
+            repositoryLoads++
+            return repositoryCandidate.promise
         },
     })
 
     const firstInitialization = provider.initialize()
     const secondInitialization = provider.initialize()
     assert.strictEqual(secondInitialization, firstInitialization)
-    assert.equal(loads, 1)
+    assert.equal(catalogLoads, 1)
+    assert.equal(repositoryLoads, 1)
 
     candidate.resolve(catalog("1.4.1"))
+    const contentRepository = repository()
+    repositoryCandidate.resolve(contentRepository)
     const [first, second] = await Promise.all([firstInitialization, secondInitialization])
     assert.strictEqual(second, first)
     assert.strictEqual(provider.get(), first)
-    assert.equal(loads, 1)
+    assert.strictEqual(first.repository, contentRepository)
+    assert.equal(catalogLoads, 1)
+    assert.equal(repositoryLoads, 1)
 })
 
 test("failed snapshot initialization leaves no partial state and can be retried safely", async () => {
     let attempts = 0
     const expected = catalog("1.4.1")
-    const provider = new ContentSnapshotProvider({
+    const expectedRepository = repository()
+    const provider = snapshotProvider({ load: async () => expected }, {
         load: async () => {
             attempts++
-            if (attempts === 1) throw new Error("initial catalog failed")
-            return expected
+            if (attempts === 1) throw new Error("initial repository failed")
+            return expectedRepository
         },
     })
 
-    await assert.rejects(provider.initialize(), /initial catalog failed/)
+    await assert.rejects(provider.initialize(), /initial repository failed/)
     assert.throws(
         () => provider.get(),
         error => error instanceof ContentSnapshotError && error.code === "CONTENT_SNAPSHOT_NOT_INITIALIZED",
     )
     const snapshot = await provider.initialize()
     assert.strictEqual(snapshot.cdn, expected)
+    assert.strictEqual(snapshot.repository, expectedRepository)
     assert.equal(Object.isFrozen(expected), true)
     assert.equal(attempts, 2)
 })
 
+test("snapshot waits for both sources to settle before rejecting or allowing retry", async () => {
+    const catalogCandidate = deferred()
+    const repositoryCandidate = deferred()
+    const catalogFailure = new Error("catalog rejected first")
+    let catalogLoads = 0
+    let repositoryLoads = 0
+    const provider = snapshotProvider({
+        load: () => (++catalogLoads === 1
+            ? catalogCandidate.promise
+            : Promise.resolve(catalog("1.4.2"))),
+    }, {
+        load: () => (++repositoryLoads === 1
+            ? repositoryCandidate.promise
+            : Promise.resolve(repository("release"))),
+    })
+
+    const initialization = provider.initialize()
+    let initializationSettled = false
+    void initialization.then(
+        () => { initializationSettled = true },
+        () => { initializationSettled = true },
+    )
+    catalogCandidate.reject(catalogFailure)
+    await new Promise(resolve => setImmediate(resolve))
+
+    assert.equal(initializationSettled, false)
+    assert.strictEqual(provider.initialize(), initialization)
+    assert.equal(catalogLoads, 1)
+    assert.equal(repositoryLoads, 1)
+
+    repositoryCandidate.resolve(repository())
+    await assert.rejects(initialization, error => error === catalogFailure)
+
+    const retried = await provider.initialize()
+    assert.equal(retried.cdn.targetVersion, "1.4.2")
+    assert.equal(catalogLoads, 2)
+    assert.equal(repositoryLoads, 2)
+})
+
+test("snapshot preserves both source diagnostics when both loads fail", async () => {
+    const catalogFailure = new Error("catalog failed")
+    const repositoryFailure = new Error("repository failed")
+    const provider = snapshotProvider(
+        { load: async () => { throw catalogFailure } },
+        { load: async () => { throw repositoryFailure } },
+    )
+
+    await assert.rejects(
+        provider.initialize(),
+        error => (
+            error instanceof ContentSnapshotSourcesError
+            && Object.isFrozen(error.errors)
+            && error.errors[0] === catalogFailure
+            && error.errors[1] === repositoryFailure
+        ),
+    )
+})
+
 test("snapshot recursively freezes children of an already frozen catalog root", async () => {
     const shallow = shallowFrozenCatalog()
-    const provider = new ContentSnapshotProvider({ load: async () => shallow })
+    const contentRepository = repository()
+    const provider = snapshotProvider(
+        { load: async () => shallow },
+        { load: async () => contentRepository },
+    )
 
     const snapshot = await provider.initialize()
     assert.strictEqual(snapshot.cdn, shallow)
@@ -778,12 +887,17 @@ test("snapshot recursively freezes children of an already frozen catalog root", 
     assert.equal(Object.isFrozen(snapshot.cdn.edges[0]), true)
     assert.equal(Object.isFrozen(snapshot.cdn.edges[0].archives), true)
     assert.equal(Object.isFrozen(snapshot.cdn.edges[0].archives[0]), true)
+    assert.equal(Object.isFrozen(snapshot.repository.fixture), true)
+    assert.equal(Object.isFrozen(snapshot.repository.fixture.nested), true)
     assert.throws(() => snapshot.cdn.edges[0].archives.push({}), TypeError)
 })
 
 test("legacy version facade derives every runtime version from the pinned snapshot", t => {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
-    productionContentSnapshotProvider.snapshot = Object.freeze({ cdn: catalog("1.4.1") })
+    productionContentSnapshotProvider.snapshot = Object.freeze({
+        cdn: catalog("1.4.1"),
+        repository: repository(),
+    })
     t.after(() => { productionContentSnapshotProvider.snapshot = previousSnapshot })
 
     const version = require("../src/lib/version")

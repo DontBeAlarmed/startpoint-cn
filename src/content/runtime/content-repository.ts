@@ -1,0 +1,154 @@
+import path from "node:path"
+
+import { mapWithConcurrency } from "../concurrency"
+import { BUNDLED_CDN_CATALOG_VERSION } from "../constants"
+import { deepFreeze } from "../deep-freeze"
+import {
+    resolveContentPaths,
+    type ContentPathEnvironment,
+} from "../paths"
+import { importBundledTable as defaultImportBundledTable } from "../sync/bundled-importer"
+import { ContentObjectStore } from "../sync/object-store"
+import {
+    CONTENT_GENERATOR_VERSION,
+    type ContentReleaseManifest,
+    type ContentTableReference,
+} from "../sync/schema"
+import { findTableSource, TABLE_SOURCES } from "../sync/table-registry"
+
+export interface ContentRepositoryInfo {
+    readonly source: "bundled" | "release"
+    readonly assetVersion: string
+    readonly generatorVersion: number
+    readonly releaseDigest: `sha256:${string}` | null
+}
+
+export interface ContentRepositoryOptions {
+    readonly projectRoot: string
+    readonly env?: ContentPathEnvironment
+}
+
+export interface ContentRepositoryDependencies {
+    readonly importBundledTable?: typeof defaultImportBundledTable
+}
+
+const BUNDLED_IMPORT_CONCURRENCY = 8
+
+function sameStrings(left: readonly string[], right: readonly string[]): boolean {
+    return left.length === right.length && left.every((value, index) => value === right[index])
+}
+
+function validateTableMetadata(
+    tableName: string,
+    reference: ContentTableReference,
+): void {
+    const definition = findTableSource(tableName)
+    if (reference.scope !== definition.scope) {
+        throw new Error(`content release table ${tableName} has mismatched scope`)
+    }
+    if (reference.converterId !== definition.converterId) {
+        throw new Error(`content release table ${tableName} has mismatched converterId`)
+    }
+    if (reference.converterVersion !== definition.converterVersion) {
+        throw new Error(`content release table ${tableName} has mismatched converterVersion`)
+    }
+    if (!sameStrings(reference.sources, definition.sourceOrderedMaps)) {
+        throw new Error(`content release table ${tableName} has mismatched sources`)
+    }
+}
+
+function validateReleaseTables(manifest: ContentReleaseManifest): void {
+    const registeredNames = new Set(TABLE_SOURCES.map(definition => definition.tableName))
+    const releaseNames = Object.keys(manifest.tables)
+    const missing = [...registeredNames].filter(tableName => !(tableName in manifest.tables)).sort()
+    const extra = releaseNames.filter(tableName => !registeredNames.has(tableName)).sort()
+    if (missing.length > 0 || extra.length > 0) {
+        const details = [
+            ...(missing.length === 0 ? [] : [`missing tables: ${missing.join(", ")}`]),
+            ...(extra.length === 0 ? [] : [`extra tables: ${extra.join(", ")}`]),
+        ]
+        throw new Error(`content release tables do not match registry (${details.join("; ")})`)
+    }
+
+    for (const definition of TABLE_SOURCES) {
+        validateTableMetadata(definition.tableName, manifest.tables[definition.tableName])
+    }
+}
+
+export class ContentRepository {
+    readonly #repositoryInfo: ContentRepositoryInfo
+    readonly #tables: Readonly<Record<string, unknown>>
+
+    private constructor(
+        repositoryInfo: ContentRepositoryInfo,
+        tables: Readonly<Record<string, unknown>>,
+    ) {
+        this.#repositoryInfo = repositoryInfo
+        this.#tables = tables
+    }
+
+    static async load(
+        options: ContentRepositoryOptions,
+        dependencies: ContentRepositoryDependencies = {},
+    ): Promise<ContentRepository> {
+        if (!options.projectRoot || !path.isAbsolute(options.projectRoot)) {
+            throw new TypeError("projectRoot must be an absolute path")
+        }
+        const projectRoot = path.resolve(options.projectRoot)
+        const paths = resolveContentPaths({
+            projectRoot,
+            env: options.env ?? process.env,
+        })
+        const store = new ContentObjectStore(paths)
+        const release = await store.readCurrentReleaseSnapshot()
+
+        if (release === null) {
+            const importer = dependencies.importBundledTable ?? defaultImportBundledTable
+            const entries = await mapWithConcurrency(
+                TABLE_SOURCES,
+                BUNDLED_IMPORT_CONCURRENCY,
+                async definition => (
+                    [
+                        definition.tableName,
+                        await importer(projectRoot, definition.tableName),
+                    ] as const
+                ),
+            )
+            return deepFreeze(new ContentRepository(
+                deepFreeze({
+                    source: "bundled",
+                    assetVersion: BUNDLED_CDN_CATALOG_VERSION,
+                    generatorVersion: CONTENT_GENERATOR_VERSION,
+                    releaseDigest: null,
+                }),
+                deepFreeze(Object.fromEntries(entries)),
+            ))
+        }
+
+        validateReleaseTables(release.manifest)
+        const entries = TABLE_SOURCES.map(definition => (
+            [
+                definition.tableName,
+                release.objects[release.manifest.tables[definition.tableName].object],
+            ] as const
+        ))
+        return deepFreeze(new ContentRepository(
+            deepFreeze({
+                source: "release",
+                assetVersion: release.manifest.assetVersion,
+                generatorVersion: release.manifest.generatorVersion,
+                releaseDigest: release.manifest.releaseDigest,
+            }),
+            deepFreeze(Object.fromEntries(entries)),
+        ))
+    }
+
+    info(): ContentRepositoryInfo {
+        return this.#repositoryInfo
+    }
+
+    table<T>(tableName: string): T {
+        findTableSource(tableName)
+        return this.#tables[tableName] as T
+    }
+}

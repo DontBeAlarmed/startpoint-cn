@@ -5,10 +5,13 @@ export interface TableSourceDefinition {
     readonly tableName: string
     readonly scope: TableScope
     readonly sourceOrderedMaps: readonly string[]
+    readonly bundledPath: string
     readonly converterId: string
     readonly converterVersion: number
     readonly outputShapeVersion: number
 }
+
+type TableSourceInput = Omit<TableSourceDefinition, "bundledPath">
 
 const BUNDLED_TABLE_NAMES = [
     "advent_event_quest.json",
@@ -95,7 +98,7 @@ const SERVER_TABLE_NAMES = [
     "payment_products.json",
 ] as const
 
-function bundledDefinition(tableName: string): TableSourceDefinition {
+function bundledDefinition(tableName: string): TableSourceInput {
     return {
         tableName,
         scope: "bundled",
@@ -106,7 +109,7 @@ function bundledDefinition(tableName: string): TableSourceDefinition {
     }
 }
 
-function serverDefinition(tableName: string): TableSourceDefinition {
+function serverDefinition(tableName: string): TableSourceInput {
     return {
         tableName,
         scope: "server",
@@ -117,7 +120,7 @@ function serverDefinition(tableName: string): TableSourceDefinition {
     }
 }
 
-const definitions: TableSourceDefinition[] = [
+const definitionInputs: TableSourceInput[] = [
     {
         tableName: "character.json",
         scope: "cdn",
@@ -249,6 +252,11 @@ const definitions: TableSourceDefinition[] = [
     ...BUNDLED_TABLE_NAMES.map(bundledDefinition),
     ...SERVER_TABLE_NAMES.map(serverDefinition),
 ]
+
+const definitions: TableSourceDefinition[] = definitionInputs.map(definition => ({
+    ...definition,
+    bundledPath: `assets/${definition.tableName}`,
+}))
 
 definitions.sort((left, right) => (
     left.tableName < right.tableName ? -1 : left.tableName > right.tableName ? 1 : 0
