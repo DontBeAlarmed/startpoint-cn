@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 "use strict"
 
-require("ts-node/register/transpile-only")
-
 const path = require("node:path")
+
+require("ts-node").register({
+    project: path.resolve(__dirname, "../tsconfig.json"),
+    transpileOnly: true,
+})
 
 const { resolveContentPaths } = require("../src/content/paths")
 const {
@@ -11,10 +14,11 @@ const {
     CatalogValidationError,
     scanCdnCatalogInput,
 } = require("../src/content/cdn/catalog-builder")
-const { createCdnAuditReport } = require("../src/content/cdn/audit")
+const { CdnAuditError, createCdnAuditReport } = require("../src/content/cdn/audit")
 const { CdnPlannerError, planCdnUpdate } = require("../src/content/cdn/planner")
 
 const PROJECT_ROOT = path.resolve(__dirname, "..")
+const MAX_ARGUMENT_VALUE_LENGTH = 4096
 const VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
 const VALUE_OPTIONS = new Map([
     ["--current", "currentVersion"],
@@ -73,8 +77,11 @@ function parseArguments(argv) {
         }
         seen.add(argument)
         const value = argv[index + 1]
-        if (value === undefined || value.startsWith("--")) {
+        if (value === undefined || value === "" || value.startsWith("--")) {
             throw new AuditCliError("AUDIT_MISSING_ARGUMENT_VALUE", `参数 ${argument} 缺少值`)
+        }
+        if (value.length > MAX_ARGUMENT_VALUE_LENGTH) {
+            throw new AuditCliError("AUDIT_ARGUMENT_VALUE_TOO_LONG", "参数值过长")
         }
         index++
         if (property === "currentVersion" || property === "targetVersion") {
@@ -123,6 +130,9 @@ function errorPayload(code, message) {
 
 function classifyError(error) {
     if (error instanceof AuditCliError) return { code: error.code, message: error.message }
+    if (error instanceof CdnAuditError) {
+        return { code: error.code, message: `审计汇总失败：${error.code}` }
+    }
     if (error instanceof CatalogValidationError) {
         return {
             code: error.code,
@@ -166,13 +176,15 @@ function renderHuman(report) {
     return `${lines.join("\n")}\n`
 }
 
-async function run(argv) {
+async function run(argv, dependencies = {}) {
     const parsed = parseArguments(argv)
+    const projectRoot = dependencies.projectRoot ?? PROJECT_ROOT
+    const env = dependencies.env ?? process.env
     let paths
     try {
         paths = resolveContentPaths({
-            projectRoot: PROJECT_ROOT,
-            env: { ...process.env, ...parsed.pathOverrides },
+            projectRoot,
+            env: { ...env, ...parsed.pathOverrides },
         })
     } catch {
         throw new AuditCliError(
@@ -203,28 +215,43 @@ async function run(argv) {
     return { json: parsed.json, report }
 }
 
-async function main(argv = process.argv.slice(2)) {
+async function executeAuditCli(argv, dependencies = {}) {
     const wantsJson = argv.includes("--json")
+    const stdout = dependencies.stdout ?? process.stdout
+    const stderr = dependencies.stderr ?? process.stderr
+    const setExitCode = dependencies.setExitCode ?? (code => { process.exitCode = code })
+    const runAudit = dependencies.runAudit ?? run
     try {
-        const result = await run(argv)
-        process.stdout.write(result.json
+        const result = await runAudit(argv, {
+            env: dependencies.env ?? process.env,
+            projectRoot: dependencies.projectRoot ?? PROJECT_ROOT,
+        })
+        stdout.write(result.json
             ? `${JSON.stringify(result.report, null, 2)}\n`
             : renderHuman(result.report))
+        setExitCode(0)
+        return 0
     } catch (error) {
         const classified = classifyError(error)
         if (wantsJson) {
-            process.stdout.write(`${JSON.stringify(errorPayload(classified.code, classified.message), null, 2)}\n`)
+            stdout.write(`${JSON.stringify(errorPayload(classified.code, classified.message), null, 2)}\n`)
         } else {
-            process.stderr.write(`错误 [${classified.code}]：${classified.message}\n`)
+            stderr.write(`错误 [${classified.code}]：${classified.message}\n`)
         }
-        process.exitCode = 1
+        setExitCode(1)
+        return 1
     }
+}
+
+async function main(argv = process.argv.slice(2)) {
+    return executeAuditCli(argv)
 }
 
 if (require.main === module) void main()
 
 module.exports = {
     AuditCliError,
+    executeAuditCli,
     main,
     parseArguments,
     renderHuman,

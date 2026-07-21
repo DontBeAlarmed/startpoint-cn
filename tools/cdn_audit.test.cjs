@@ -10,8 +10,14 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
-const { createCdnAuditReport } = require("../src/content/cdn/audit")
-const { AuditCliError, parseArguments } = require("./audit_cdn_catalog.cjs")
+const { CdnAuditError, createCdnAuditReport } = require("../src/content/cdn/audit")
+const {
+    AuditCliError,
+    executeAuditCli,
+    parseArguments,
+    renderHuman,
+    run,
+} = require("./audit_cdn_catalog.cjs")
 
 const PROJECT_ROOT = path.resolve(__dirname, "..")
 const AUDIT_TOOL = path.join(PROJECT_ROOT, "tools/audit_cdn_catalog.cjs")
@@ -131,6 +137,108 @@ test("summarizes a validated catalog and an initial continuous plan", () => {
     })
 })
 
+function auditRequest(overrides = {}) {
+    return {
+        currentVersion: "1.4.54",
+        targetVersion: "1.4.54",
+        platform: "android",
+        requestedAssetSize: "fulfill",
+        effectiveAssetSize: "fulfill",
+        isInitial: false,
+        ...overrides,
+    }
+}
+
+function upToDatePlan() {
+    return {
+        kind: "up-to-date",
+        full: null,
+        diff: null,
+        downloadBytes: 0,
+        delayedAssetsBytes: 0,
+    }
+}
+
+test("rejects catalog byte overflow even when an up-to-date plan bypasses planner sums", () => {
+    const { catalog } = reportFixture()
+    const overflowingCatalog = {
+        ...catalog,
+        edges: [edge(null, "1.4.0", [
+            archive("archive-common-full/max.zip", Number.MAX_SAFE_INTEGER, "common"),
+            archive("archive-android-full/one.zip", 1, "platform", 2),
+        ])],
+    }
+
+    assert.throws(
+        () => createCdnAuditReport(overflowingCatalog, upToDatePlan(), auditRequest()),
+        error => error?.code === "AUDIT_INTEGER_OVERFLOW",
+    )
+})
+
+test("rejects layer byte overflow with a stable audit code", () => {
+    const { catalog } = reportFixture()
+    const overflowingCatalog = {
+        ...catalog,
+        edges: [edge(null, "1.4.0", [
+            archive("archive-common-full/max.zip", Number.MAX_SAFE_INTEGER, "common"),
+            archive("archive-common-full/one.zip", 1, "common", 2),
+        ])],
+    }
+
+    assert.throws(
+        () => createCdnAuditReport(overflowingCatalog, upToDatePlan(), auditRequest()),
+        error => error?.code === "AUDIT_INTEGER_OVERFLOW",
+    )
+})
+
+test("rejects overflow while summarizing full and diff plan edges", () => {
+    const { catalog } = reportFixture()
+    const overflowingArchives = [
+        archive("archive-common-full/max.zip", Number.MAX_SAFE_INTEGER, "common"),
+        archive("archive-quality-full/one.zip", 1, "quality", 2),
+    ]
+    const full = edge(null, "1.4.0", overflowingArchives)
+    const diff = edge("1.4.53", "1.4.54", overflowingArchives)
+
+    assert.throws(
+        () => createCdnAuditReport(catalog, {
+            kind: "initial",
+            full,
+            diff: null,
+            downloadBytes: 0,
+            delayedAssetsBytes: 0,
+        }, auditRequest({ currentVersion: null, isInitial: true })),
+        error => error?.code === "AUDIT_INTEGER_OVERFLOW",
+    )
+    assert.throws(
+        () => createCdnAuditReport(catalog, {
+            kind: "incremental",
+            full: null,
+            diff: [diff],
+            downloadBytes: 0,
+            delayedAssetsBytes: 0,
+        }, auditRequest({ currentVersion: "1.4.53" })),
+        error => error?.code === "AUDIT_INTEGER_OVERFLOW",
+    )
+})
+
+test("rejects non-safe and negative audit summary inputs", () => {
+    const { catalog } = reportFixture()
+    assert.throws(
+        () => createCdnAuditReport({ ...catalog, installedBytes: Number.NaN }, upToDatePlan(), auditRequest()),
+        error => error?.code === "AUDIT_INVALID_SUMMARY_INPUT",
+    )
+
+    const invalidCatalog = {
+        ...catalog,
+        edges: [edge(null, "1.4.0", [archive("archive-common-full/negative.zip", -1, "common")])],
+    }
+    assert.throws(
+        () => createCdnAuditReport(invalidCatalog, upToDatePlan(), auditRequest()),
+        error => error?.code === "AUDIT_INVALID_SUMMARY_INPUT",
+    )
+})
+
 function writeArchive(cdnRoot, directory, name, bytes) {
     const archiveDirectory = path.join(cdnRoot, directory)
     fs.mkdirSync(archiveDirectory, { recursive: true })
@@ -186,16 +294,30 @@ function explicitPathArguments(fixture) {
     ]
 }
 
-function runAudit(fixture, arguments_) {
-    return spawnSync(process.execPath, [
-        AUDIT_TOOL,
-        ...arguments_,
-        ...explicitPathArguments(fixture),
-    ], {
-        cwd: PROJECT_ROOT,
-        encoding: "utf8",
-        env: { ...process.env },
+function runAudit(fixture, arguments_, env = {}) {
+    return run([...arguments_, ...explicitPathArguments(fixture)], {
+        env,
+        projectRoot: PROJECT_ROOT,
     })
+}
+
+async function executeAudit(fixture, arguments_, options = {}) {
+    let stdout = ""
+    let stderr = ""
+    let exitCode = null
+    const status = await executeAuditCli(
+        [...arguments_, ...explicitPathArguments(fixture)],
+        {
+            env: options.env ?? {},
+            projectRoot: PROJECT_ROOT,
+            runAudit: options.runAudit,
+            stdout: { write(chunk) { stdout += String(chunk) } },
+            stderr: { write(chunk) { stderr += String(chunk) } },
+            setExitCode(code) { exitCode = code },
+        },
+    )
+    assert.equal(exitCode, status)
+    return { status, stdout, stderr }
 }
 
 function treeSnapshot(root) {
@@ -220,14 +342,14 @@ function treeSnapshot(root) {
     return result.sort((left, right) => left.path.localeCompare(right.path))
 }
 
-test("CLI emits stable JSON for up-to-date, incremental, and initial plans without changing CDN files", t => {
+test("run composes up-to-date, incremental, and initial plans without changing CDN files", async t => {
     const fixture = createFixture()
     t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }))
     const before = treeSnapshot(fixture.cdnRoot)
 
-    const upToDate = runAudit(fixture, ["--json", "--current", "1.4.54"])
-    assert.equal(upToDate.status, 0, upToDate.stderr)
-    const currentReport = JSON.parse(upToDate.stdout)
+    const upToDate = await runAudit(fixture, ["--json", "--current", "1.4.54"])
+    assert.equal(upToDate.json, true)
+    const currentReport = upToDate.report
     assert.deepEqual(currentReport.plan, {
         kind: "up-to-date",
         currentVersion: "1.4.54",
@@ -243,11 +365,10 @@ test("CLI emits stable JSON for up-to-date, incremental, and initial plans witho
     assert.equal(currentReport.catalog.archiveCompressedBytes, 81)
     assert.equal(currentReport.graph.validationIssueCount, 0)
 
-    const incremental = runAudit(fixture, [
+    const incremental = await runAudit(fixture, [
         "--json", "--current", "1.4.53", "--target", "1.4.54", "--asset-size", "shortened",
     ])
-    assert.equal(incremental.status, 0, incremental.stderr)
-    const incrementalReport = JSON.parse(incremental.stdout)
+    const incrementalReport = incremental.report
     assert.deepEqual(incrementalReport.scope, {
         platform: "android",
         assetSize: "shortened",
@@ -258,11 +379,10 @@ test("CLI emits stable JSON for up-to-date, incremental, and initial plans witho
     ])
     assert.equal(incrementalReport.plan.downloadBytes, 15)
 
-    const initial = runAudit(fixture, [
+    const initial = await runAudit(fixture, [
         "--json", "--initial", "--target", "1.4.54", "--asset-size", "delayed",
     ])
-    assert.equal(initial.status, 0, initial.stderr)
-    const initialReport = JSON.parse(initial.stdout)
+    const initialReport = initial.report
     assert.equal(initialReport.plan.kind, "initial")
     assert.equal(initialReport.plan.full.version, "1.4.0")
     assert.deepEqual(initialReport.plan.diff.map(item => [item.fromVersion, item.toVersion]), [
@@ -278,22 +398,27 @@ test("CLI emits stable JSON for up-to-date, incremental, and initial plans witho
     assert.equal(fs.existsSync(fixture.runtimeDir), false)
 })
 
-test("CLI human output is Chinese and contains no absolute paths", t => {
+test("human renderer is Chinese and contains no absolute paths", async t => {
     const fixture = createFixture()
     t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }))
-    const result = runAudit(fixture, ["--current", "1.4.54"])
+    const result = await runAudit(fixture, ["--current", "1.4.54"])
+    const output = renderHuman(result.report)
 
-    assert.equal(result.status, 0, result.stderr)
-    assert.match(result.stdout, /CDN Catalog 只读审计/)
-    assert.match(result.stdout, /已是最新版本/)
-    assert.doesNotMatch(result.stdout, new RegExp(fixture.root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
-    assert.doesNotMatch(result.stdout, /\/Users\//)
+    assert.match(output, /CDN Catalog 只读审计/)
+    assert.match(output, /已是最新版本/)
+    assert.doesNotMatch(output, new RegExp(fixture.root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+    assert.doesNotMatch(output, /\/Users\//)
 })
 
 test("argument parser rejects invalid and conflicting arguments with stable codes", () => {
     const cases = [
         [["--wat"], "AUDIT_UNKNOWN_ARGUMENT"],
+        [["--wat=value"], "AUDIT_UNKNOWN_ARGUMENT"],
         [["--current", "1.4.53", "--current", "1.4.54"], "AUDIT_DUPLICATE_ARGUMENT"],
+        [["--json", "--json", "--current", "1.4.54"], "AUDIT_DUPLICATE_ARGUMENT"],
+        [["--initial", "--initial"], "AUDIT_DUPLICATE_ARGUMENT"],
+        [["--current", ""], "AUDIT_MISSING_ARGUMENT_VALUE"],
+        [["--current", "1.4.54", "--cdn-dir", "x".repeat(4097)], "AUDIT_ARGUMENT_VALUE_TOO_LONG"],
         [["--current", "01.4.54"], "AUDIT_INVALID_VERSION"],
         [["--current", "1.4.54", "--platform", "ios"], "UNSUPPORTED_PLATFORM"],
         [["--current", "1.4.54", "--asset-size", "tiny"], "UNSUPPORTED_ASSET_SIZE_KIND"],
@@ -309,10 +434,10 @@ test("argument parser rejects invalid and conflicting arguments with stable code
     }
 })
 
-test("CLI serializes argument failures as stable JSON without a partial plan or stack", t => {
+test("execute serializes argument failures as stable JSON without a partial plan or stack", async t => {
     const fixture = createFixture()
     t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }))
-    const result = runAudit(fixture, ["--json", fixture.root])
+    const result = await executeAudit(fixture, ["--json", fixture.root])
 
     assert.notEqual(result.status, 0)
     const output = JSON.parse(result.stdout)
@@ -324,32 +449,126 @@ test("CLI serializes argument failures as stable JSON without a partial plan or 
     assert.doesNotMatch(result.stdout, /at .*audit_cdn_catalog/)
 })
 
-test("CLI rejects a CDN_DIR ending in cn without exposing the configured path", t => {
+test("execute does not echo an overlong argument value", async t => {
     const fixture = createFixture()
     t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }))
-    const result = spawnSync(process.execPath, [
-        AUDIT_TOOL,
-        "--json",
-        "--current", "1.4.54",
-        "--cdn-dir", fixture.cdnRoot,
-        "--content-state-dir", fixture.stateDir,
-        "--content-store-dir", fixture.storeDir,
-        "--content-runtime-dir", fixture.runtimeDir,
-    ], { cwd: PROJECT_ROOT, encoding: "utf8", env: { ...process.env } })
+    const secretValue = `sensitive-${"x".repeat(4097)}`
+    const result = await executeAudit(fixture, ["--json", "--current", "1.4.54", "--cdn-dir", secretValue])
+
+    assert.equal(result.status, 1)
+    assert.equal(JSON.parse(result.stdout).error.code, "AUDIT_ARGUMENT_VALUE_TOO_LONG")
+    assert.equal(result.stdout.includes(secretValue), false)
+    assert.equal(result.stderr, "")
+})
+
+test("execute rejects a CDN_DIR ending in cn without exposing the configured path", async t => {
+    const fixture = createFixture()
+    t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }))
+    const result = await executeAudit(
+        { ...fixture, cdnDir: fixture.cdnRoot },
+        ["--json", "--current", "1.4.54"],
+    )
 
     assert.notEqual(result.status, 0)
     assert.equal(JSON.parse(result.stdout).error.code, "AUDIT_PATH_CONFIG_ERROR")
     assert.equal(result.stdout.includes(fixture.root), false)
 })
 
-test("CLI returns a stable catalog error and no partial plan for a broken graph", t => {
+test("execute returns a stable catalog error and no partial plan for a broken graph", async t => {
     const fixture = createFixture({ brokenGraph: true })
     t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }))
-    const result = runAudit(fixture, ["--json", "--initial", "--target", "1.4.54"])
+    const result = await executeAudit(fixture, ["--json", "--initial", "--target", "1.4.54"])
 
     assert.notEqual(result.status, 0)
     const output = JSON.parse(result.stdout)
     assert.equal(output.error.code, "MISSING_PATH")
     assert.equal(output.plan, undefined)
     assert.doesNotMatch(result.stdout, new RegExp(fixture.root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+})
+
+test("explicit path arguments override environment paths", async t => {
+    const fixture = createFixture()
+    t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }))
+    const result = await runAudit(fixture, ["--current", "1.4.54"], {
+        CDN_DIR: fixture.cdnRoot,
+        CONTENT_STATE_DIR: fixture.cdnRoot,
+        CONTENT_STORE_DIR: fixture.cdnRoot,
+        CONTENT_RUNTIME_DIR: fixture.cdnRoot,
+    })
+
+    assert.equal(result.report.plan.kind, "up-to-date")
+})
+
+test("target beyond the catalog returns NO_UPDATE_PATH without a partial plan", async t => {
+    const fixture = createFixture()
+    t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }))
+    const result = await executeAudit(fixture, [
+        "--json", "--current", "1.4.54", "--target", "1.4.55",
+    ])
+
+    assert.equal(result.status, 1)
+    const output = JSON.parse(result.stdout)
+    assert.equal(output.error.code, "NO_UPDATE_PATH")
+    assert.equal(output.plan, undefined)
+    assert.equal(result.stderr, "")
+})
+
+test("execute classifies audit integer failures without leaking a stack or partial report", async () => {
+    const marker = "/private/sensitive/catalog.zip"
+    const error = new CdnAuditError("AUDIT_INTEGER_OVERFLOW", marker)
+    const result = await executeAudit({
+        cdnDir: "unused",
+        stateDir: "unused",
+        storeDir: "unused",
+        runtimeDir: "unused",
+    }, ["--json", "--current", "1.4.54"], {
+        runAudit: async () => { throw error },
+    })
+
+    assert.equal(result.status, 1)
+    const output = JSON.parse(result.stdout)
+    assert.equal(output.error.code, "AUDIT_INTEGER_OVERFLOW")
+    assert.equal(output.plan, undefined)
+    assert.equal(result.stdout.includes(marker), false)
+    assert.doesNotMatch(result.stdout, /at .*cdn_audit/)
+    assert.equal(result.stderr, "")
+})
+
+test("execute renders audit integer failures on the human error channel", async () => {
+    const marker = "/private/sensitive/catalog.zip"
+    const result = await executeAudit({
+        cdnDir: "unused",
+        stateDir: "unused",
+        storeDir: "unused",
+        runtimeDir: "unused",
+    }, ["--current", "1.4.54"], {
+        runAudit: async () => {
+            throw new CdnAuditError("AUDIT_INVALID_SUMMARY_INPUT", marker)
+        },
+    })
+
+    assert.equal(result.status, 1)
+    assert.equal(result.stdout, "")
+    assert.match(result.stderr, /^错误 \[AUDIT_INVALID_SUMMARY_INPUT\]：审计汇总失败：AUDIT_INVALID_SUMMARY_INPUT\n$/)
+    assert.equal(result.stderr.includes(marker), false)
+    assert.doesNotMatch(result.stderr, /at .*cdn_audit/)
+})
+
+test("script runs from a fixture cwd and emits JSON with a zero exit code", t => {
+    const fixture = createFixture()
+    t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }))
+    const result = spawnSync(process.execPath, [
+        AUDIT_TOOL,
+        "--json",
+        "--current", "1.4.54",
+        ...explicitPathArguments(fixture),
+    ], {
+        cwd: fixture.root,
+        encoding: "utf8",
+        env: {},
+    })
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(JSON.parse(result.stdout).plan.kind, "up-to-date")
+    assert.equal(result.stderr, "")
 })

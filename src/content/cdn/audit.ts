@@ -9,6 +9,20 @@ import type {
 
 export type AuditAssetSizeKind = "shortened" | "fulfill" | "delayed"
 
+export type CdnAuditErrorCode =
+    | "AUDIT_INTEGER_OVERFLOW"
+    | "AUDIT_INVALID_SUMMARY_INPUT"
+
+export class CdnAuditError extends Error {
+    readonly code: CdnAuditErrorCode
+
+    constructor(code: CdnAuditErrorCode, message: string) {
+        super(`${code}: ${message}`)
+        this.name = "CdnAuditError"
+        this.code = code
+    }
+}
+
 export interface CdnAuditRequest {
     readonly currentVersion: string | null
     readonly targetVersion: string
@@ -71,27 +85,61 @@ export interface CdnAuditReport {
     }
 }
 
-function sumArchiveBytes(archives: ReadonlyArray<{ readonly compressedBytes: number }>): number {
-    return archives.reduce((total, archive) => total + archive.compressedBytes, 0)
+function requireSummaryInteger(value: number, field: string): number {
+    if (!Number.isSafeInteger(value) || value < 0) {
+        throw new CdnAuditError(
+            "AUDIT_INVALID_SUMMARY_INPUT",
+            `${field} must be a non-negative safe integer`,
+        )
+    }
+    return value
+}
+
+function checkedAdd(total: number, value: number, field: string): number {
+    requireSummaryInteger(total, field)
+    requireSummaryInteger(value, field)
+    const result = total + value
+    if (!Number.isSafeInteger(result) || result < 0) {
+        throw new CdnAuditError(
+            "AUDIT_INTEGER_OVERFLOW",
+            `${field} exceeds the safe integer range`,
+        )
+    }
+    return result
+}
+
+function summarizeArchives(
+    archives: ReadonlyArray<{ readonly compressedBytes: number }>,
+    field: string,
+): ArchiveSummary {
+    let archiveCount = 0
+    let bytes = 0
+    for (const archive of archives) {
+        archiveCount = checkedAdd(archiveCount, 1, `${field}.archiveCount`)
+        bytes = checkedAdd(bytes, archive.compressedBytes, `${field}.bytes`)
+    }
+    return { archiveCount, bytes }
 }
 
 function summarizeFull(edge: FullCatalogEdge | null): FullSummary | null {
     if (edge === null) return null
+    const summary = summarizeArchives(edge.archives, "plan.full")
     return {
         version: edge.toVersion,
-        archiveCount: edge.archives.length,
-        bytes: sumArchiveBytes(edge.archives),
+        ...summary,
     }
 }
 
 function summarizeDiff(edges: ReadonlyArray<DiffCatalogEdge> | null): ReadonlyArray<DiffSummary> | null {
     if (edges === null) return null
-    return edges.map(edge => ({
-        fromVersion: edge.fromVersion,
-        toVersion: edge.toVersion,
-        archiveCount: edge.archives.length,
-        bytes: sumArchiveBytes(edge.archives),
-    }))
+    return edges.map((edge, index) => {
+        const summary = summarizeArchives(edge.archives, `plan.diff[${index}]`)
+        return {
+            fromVersion: edge.fromVersion,
+            toVersion: edge.toVersion,
+            ...summary,
+        }
+    })
 }
 
 export function createCdnAuditReport(
@@ -108,19 +156,44 @@ export function createCdnAuditReport(
         quality: { archiveCount: 0, bytes: 0 },
         platform: { archiveCount: 0, bytes: 0 },
     }
+    let edgeCount = 0
+    let diffEdgeCount = 0
     let archiveCount = 0
     let archiveCompressedBytes = 0
     for (const edge of scopedEdges) {
-        archiveCount += edge.archives.length
+        edgeCount = checkedAdd(edgeCount, 1, "catalog.edgeCount")
+        if (edge.fromVersion !== null) {
+            diffEdgeCount = checkedAdd(diffEdgeCount, 1, "catalog.diffEdgeCount")
+        }
         for (const archive of edge.archives) {
-            archiveCompressedBytes += archive.compressedBytes
             const previous = layerSummaries[archive.layer]
             layerSummaries[archive.layer] = {
-                archiveCount: previous.archiveCount + 1,
-                bytes: previous.bytes + archive.compressedBytes,
+                archiveCount: checkedAdd(
+                    previous.archiveCount,
+                    1,
+                    `catalog.layers.${archive.layer}.archiveCount`,
+                ),
+                bytes: checkedAdd(
+                    previous.bytes,
+                    archive.compressedBytes,
+                    `catalog.layers.${archive.layer}.bytes`,
+                ),
             }
+            archiveCount = checkedAdd(archiveCount, 1, "catalog.archiveCount")
+            archiveCompressedBytes = checkedAdd(
+                archiveCompressedBytes,
+                archive.compressedBytes,
+                "catalog.archiveCompressedBytes",
+            )
         }
     }
+
+    const installedBytes = requireSummaryInteger(catalog.installedBytes, "catalog.installedBytes")
+    const downloadBytes = requireSummaryInteger(plan.downloadBytes, "plan.downloadBytes")
+    const delayedAssetsBytes = requireSummaryInteger(
+        plan.delayedAssetsBytes,
+        "plan.delayedAssetsBytes",
+    )
 
     return {
         schemaVersion: 1,
@@ -128,9 +201,9 @@ export function createCdnAuditReport(
         catalog: {
             fullBaseVersion: catalog.fullBaseVersion,
             targetVersion: catalog.targetVersion,
-            installedBytes: catalog.installedBytes,
-            edgeCount: scopedEdges.length,
-            diffEdgeCount: scopedEdges.filter(edge => edge.fromVersion !== null).length,
+            installedBytes,
+            edgeCount,
+            diffEdgeCount,
             archiveCount,
             archiveCompressedBytes,
             layers: layerSummaries,
@@ -156,8 +229,8 @@ export function createCdnAuditReport(
             isInitial: request.isInitial,
             full: summarizeFull(plan.full),
             diff: summarizeDiff(plan.diff),
-            downloadBytes: plan.downloadBytes,
-            delayedAssetsBytes: plan.delayedAssetsBytes,
+            downloadBytes,
+            delayedAssetsBytes: delayedAssetsBytes as 0,
         },
     }
 }

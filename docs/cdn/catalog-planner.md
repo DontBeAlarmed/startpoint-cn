@@ -11,7 +11,7 @@
 3. `buildCdnCatalog` 从扫描结果构建规范化目录，校验版本、归档层、顺序、重复项、分叉、环和缺失路径。只有零校验问题的目录才能发布。
 4. `ContentSnapshot` 把已经验证的目录与其他内容状态一起固定为单个运行时快照。请求处理只读取这个快照，不在请求期间重新扫描 CDN。
 5. `planCdnUpdate` 根据当前版本、目标版本、平台、资源体积模式和是否初装，从固定目录中选择唯一连续路径并计算本次下载字节。
-6. 路由序列化更新计划。只读审计命令复用前四个核心函数中的路径解析、扫描、目录构建和计划选择，但独立运行，不发布或替换服务器的 `ContentSnapshot`。
+6. 路由序列化更新计划。只读审计命令具体复用步骤 1、2、3、5 的 `resolveContentPaths`、`scanCdnCatalogInput`、`buildCdnCatalog` 和 `planCdnUpdate`；它独立运行，不执行步骤 4，不加载、发布或替换服务器的 `ContentSnapshot`。
 
 权威来源是只读 CDN 文件及其 `EntityLists`。摘要缓存只是加速索引，删除后可以重建，不能覆盖文件事实。目录负责表达经过验证的版本图，`ContentSnapshot` 是请求处理期间唯一可见的已发布状态，计划器只做纯选择和求和，不写任何运行状态。
 
@@ -29,6 +29,8 @@
 `total_size` 等于目标 `EntityLists` 中各项安装体积之和，也就是审计结果的 `installedBytes`。`downloadBytes` 等于本次计划所选 ZIP 归档的压缩字节之和，两者不是同一个指标。阶段 1 中 `shortened` 和 `delayed` 与路由保持兼容，统一复用 `fulfill` 范围；`delayedAssetsBytes` 固定为 0。
 
 ## 只读审计命令
+
+下文 `<PROJECT_ROOT>` 专指 `starpoint-cn` 仓库根目录（其中包含 `package.json`、`src/` 和 `tools/`），不是 monorepo 上层目录。
 
 以下命令使用同一个临时状态目录，因此第一次完整 SHA-256 扫描后，后两次会复用摘要缓存。`CONTENT_STORE_DIR` 和 `CONTENT_RUNTIME_DIR` 也显式放在 `/tmp`，不会污染仓库或正在运行的内容状态。
 
