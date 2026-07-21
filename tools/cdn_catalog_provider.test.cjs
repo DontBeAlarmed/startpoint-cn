@@ -8,13 +8,17 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
-const { CatalogValidationError } = require("../src/content/cdn/catalog-builder")
 const { deepFreeze } = require("../src/content/deep-freeze")
 const {
     CdnCatalogLoader,
     CatalogLoaderError,
     resolveCatalogProjectRoot,
 } = require("../src/content/cdn/catalog-loader")
+const {
+    CdnRuntimeFileError,
+    createCdnRuntimeManifest,
+    serializeCdnRuntimeManifest,
+} = require("../src/content/cdn/runtime-manifest")
 const {
     ContentSnapshotError,
     ContentSnapshotProvider,
@@ -23,13 +27,94 @@ const {
 } = require("../src/content/runtime/content-snapshot")
 
 const fixtureRoot = path.join(__dirname, "fixtures/cdn-catalog")
+const DIGEST = "a".repeat(64)
+const runtimeArchiveDefinitions = [
+    {
+        kind: "full",
+        fromVersion: null,
+        toVersion: "1.4.0",
+        layer: "common",
+        relativePath: "archive-common-full/pinball-1.4.0-1-abcd.zip",
+    },
+    {
+        kind: "full",
+        fromVersion: null,
+        toVersion: "1.4.0",
+        layer: "quality",
+        relativePath: "archive-medium-full/pinball-1.4.0-1-abcd.zip",
+    },
+    {
+        kind: "full",
+        fromVersion: null,
+        toVersion: "1.4.0",
+        layer: "platform",
+        relativePath: "archive-android-full/pinball-1.4.0-1-abcd.zip",
+    },
+    {
+        kind: "diff",
+        fromVersion: "1.4.0",
+        toVersion: "1.4.54",
+        layer: "common",
+        relativePath: "archive-common-diff/pinball-1.4.0-1.4.1-1-abcd.zip",
+    },
+    {
+        kind: "diff",
+        fromVersion: "1.4.0",
+        toVersion: "1.4.54",
+        layer: "quality",
+        relativePath: "archive-medium-diff/pinball-1.4.0-1.4.1-1-abcd.zip",
+    },
+    {
+        kind: "diff",
+        fromVersion: "1.4.0",
+        toVersion: "1.4.54",
+        layer: "platform",
+        relativePath: "archive-android-diff/pinball-1.4.0-1.4.1-1-abcd.zip",
+    },
+]
+
+function runtimeManifest(sizeFor = () => 10, entityListsBytes = 127) {
+    const input = {
+        archives: runtimeArchiveDefinitions.map(definition => ({
+            ...definition,
+            platform: "android",
+            order: 1,
+            compressedBytes: sizeFor(definition.relativePath),
+            sha256: DIGEST,
+        })),
+        installedBytes: 30,
+        entityListsRelativePath: "EntityLists/fixture-android_medium.csv",
+    }
+    return createCdnRuntimeManifest(input, {
+        relativePath: input.entityListsRelativePath,
+        compressedBytes: entityListsBytes,
+        sha256: DIGEST,
+    })
+}
+
+function writeRuntimeManifest(projectRoot, manifest = runtimeManifest(
+    relativePath => fs.statSync(path.join(projectRoot, ".cdn", "cn", relativePath)).size,
+    fs.statSync(path.join(
+        projectRoot,
+        ".cdn",
+        "cn",
+        "EntityLists/fixture-android_medium.csv",
+    )).size,
+)) {
+    const manifestDirectory = path.join(projectRoot, "assets", "cdn")
+    fs.mkdirSync(manifestDirectory, { recursive: true })
+    fs.writeFileSync(
+        path.join(manifestDirectory, "catalog-cn-1.4.54.json"),
+        serializeCdnRuntimeManifest(manifest),
+    )
+}
 
 function writePatchManifest(projectRoot, patches = []) {
     const manifestDirectory = path.join(projectRoot, "assets", "asset-patch")
     fs.mkdirSync(manifestDirectory, { recursive: true })
     fs.writeFileSync(
         path.join(manifestDirectory, "manifest.json"),
-        JSON.stringify({ cdn_version: "1.4.1", patches }),
+        JSON.stringify({ cdn_version: "1.4.54", patches }),
     )
 }
 
@@ -37,6 +122,7 @@ function createProject(t) {
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cdn-provider-"))
     fs.mkdirSync(path.join(projectRoot, ".cdn"), { recursive: true })
     fs.cpSync(fixtureRoot, path.join(projectRoot, ".cdn", "cn"), { recursive: true })
+    writeRuntimeManifest(projectRoot)
     writePatchManifest(projectRoot)
     t.after(() => fs.rmSync(projectRoot, { force: true, recursive: true }))
     return projectRoot
@@ -72,14 +158,19 @@ function shallowFrozenCatalog(targetVersion = "1.4.1") {
     })
 }
 
-function injectedLoader({ scan, build }) {
+function injectedLoader({ read, build }) {
+    let candidateInput
     return new CdnCatalogLoader({
         projectRoot: path.resolve("/synthetic-project"),
         env: {},
         dependencies: {
-            resolvePaths: () => ({}),
-            scan,
-            build,
+            resolvePaths: () => ({ cdnRoot: "/synthetic-cdn" }),
+            readRuntimeManifest: async manifestPath => {
+                candidateInput = await read(manifestPath)
+                return runtimeManifest()
+            },
+            validateRuntimeFiles: async () => {},
+            build: input => build(candidateInput, input),
             readPatchManifest: async () => ({ cdn_version: "1.4.1", patches: [] }),
         },
     })
@@ -90,7 +181,7 @@ function patch(overrides = {}) {
         id: "fixture-patch",
         type: "patch",
         name: "fixture patch",
-        version: "1.4.1",
+        version: "1.4.54",
         depends_on: "1.4.0",
         enabled: true,
         archive: "pinball-1.4.0-1.4.1-1-abcd.zip",
@@ -109,65 +200,112 @@ function deferred() {
     return { promise, resolve, reject }
 }
 
-test("default loader validates a real CDN once and caches one deep-frozen catalog", async t => {
+test("default loader uses the trusted manifest without ZIP reads or runtime state", async t => {
     const projectRoot = createProject(t)
-    const loader = new CdnCatalogLoader({ projectRoot, env: {} })
+    const contentStateDir = path.join(projectRoot, "missing-content-state")
+    const digestCachePath = path.join(contentStateDir, "cdn-digest-cache.json")
+    const originalOpen = fs.promises.open
+    let zipOpens = 0
+    t.mock.method(fs.promises, "open", async (filePath, ...args) => {
+        if (String(filePath).endsWith(".zip")) {
+            zipOpens++
+            throw new Error("ZIP content must not be opened by the runtime loader")
+        }
+        return originalOpen.call(fs.promises, filePath, ...args)
+    })
+    const loader = new CdnCatalogLoader({
+        projectRoot,
+        env: { CONTENT_STATE_DIR: contentStateDir },
+    })
+
+    assert.equal(fs.existsSync(contentStateDir), false)
+    assert.equal(fs.existsSync(digestCachePath), false)
 
     const first = await loader.load()
     const second = await loader.load()
 
     assert.strictEqual(second, first)
     assert.strictEqual(loader.get(), first)
-    assert.equal(first.targetVersion, "1.4.1")
+    assert.equal(first.targetVersion, "1.4.54")
     assert.equal(first.installedBytes, 30)
     assert.equal(Object.isFrozen(first), true)
     assert.equal(Object.isFrozen(first.edges), true)
     assert.equal(Object.isFrozen(first.edges[0]), true)
     assert.equal(Object.isFrozen(first.edges[0].archives), true)
     assert.equal(Object.isFrozen(first.edges[0].archives[0]), true)
-    for (const edge of first.edges.filter(candidate => candidate.assetSizeKind === "fulfill")) {
-        for (const archive of edge.archives) {
-            const content = fs.readFileSync(path.join(projectRoot, ".cdn", "cn", archive.relativePath))
-            assert.equal(archive.compressedBytes, content.length)
-            assert.equal(
-                archive.sha256,
-                require("node:crypto").createHash("sha256").update(content).digest("hex"),
-            )
-        }
-    }
+    assert.equal(zipOpens, 0)
+    assert.equal(fs.existsSync(contentStateDir), false)
+    assert.equal(fs.existsSync(digestCachePath), false)
 })
 
-test("default loader rejects missing archives and disconnected real catalog graphs", async t => {
+test("loader reads the fixed trusted manifest path before validating runtime files", async t => {
+    const projectRoot = createProject(t)
+    const expectedManifestPath = path.join(
+        projectRoot,
+        "assets",
+        "cdn",
+        "catalog-cn-1.4.54.json",
+    )
+    const calls = []
+    const loader = new CdnCatalogLoader({
+        projectRoot,
+        env: {},
+        dependencies: {
+            readRuntimeManifest: async manifestPath => {
+                calls.push(["read", manifestPath])
+                return runtimeManifest()
+            },
+            validateRuntimeFiles: async (manifest, paths) => {
+                calls.push(["validate", manifest.baseline, paths.cdnRoot])
+            },
+        },
+    })
+
+    assert.equal((await loader.load()).targetVersion, "1.4.54")
+    assert.deepEqual(calls, [
+        ["read", expectedManifestPath],
+        ["validate", "cn-1.4.54", path.join(projectRoot, ".cdn", "cn")],
+    ])
+})
+
+test("default loader rejects missing and wrong-size referenced archives", async t => {
     const missingRoot = createProject(t)
+    const relativePath = "archive-android-diff/pinball-1.4.0-1.4.1-1-abcd.zip"
     fs.unlinkSync(path.join(
         missingRoot,
-        ".cdn/cn/archive-android-diff/pinball-1.4.0-1.4.1-1-abcd.zip",
+        ".cdn/cn",
+        relativePath,
     ))
     await assert.rejects(
         new CdnCatalogLoader({ projectRoot: missingRoot, env: {} }).load(),
-        error => error instanceof CatalogValidationError && error.code === "MISSING_ARCHIVE_LAYER",
+        error => (
+            error instanceof CdnRuntimeFileError
+            && error.code === "RUNTIME_FILE_MISSING"
+            && error.message.includes(relativePath)
+            && !error.message.includes(missingRoot)
+        ),
     )
 
-    const disconnectedRoot = createProject(t)
-    for (const directory of ["archive-common-diff", "archive-medium-diff", "archive-android-diff"]) {
-        fs.renameSync(
-            path.join(disconnectedRoot, ".cdn", "cn", directory, "pinball-1.4.0-1.4.1-1-abcd.zip"),
-            path.join(disconnectedRoot, ".cdn", "cn", directory, "pinball-1.4.2-1.4.3-1-abcd.zip"),
-        )
-    }
+    const wrongSizeRoot = createProject(t)
+    fs.appendFileSync(path.join(wrongSizeRoot, ".cdn", "cn", relativePath), "tampered")
     await assert.rejects(
-        new CdnCatalogLoader({ projectRoot: disconnectedRoot, env: {} }).load(),
-        error => error instanceof CatalogValidationError && error.code === "MISSING_PATH",
+        new CdnCatalogLoader({ projectRoot: wrongSizeRoot, env: {} }).load(),
+        error => (
+            error instanceof CdnRuntimeFileError
+            && error.code === "RUNTIME_FILE_SIZE"
+            && error.message.includes(relativePath)
+            && !error.message.includes(wrongSizeRoot)
+        ),
     )
 })
 
-test("concurrent initial loads share one scan and get fails clearly before initialization", async () => {
-    let scans = 0
-    let releaseScan
+test("concurrent initial loads share one manifest read and get fails clearly before initialization", async () => {
+    let reads = 0
+    let releaseRead
     const loader = injectedLoader({
-        scan: () => {
-            scans++
-            return new Promise(resolve => { releaseScan = resolve })
+        read: () => {
+            reads++
+            return new Promise(resolve => { releaseRead = resolve })
         },
         build: input => catalog(input.targetVersion),
     })
@@ -179,33 +317,33 @@ test("concurrent initial loads share one scan and get fails clearly before initi
     const firstLoad = loader.load()
     const secondLoad = loader.load()
     assert.strictEqual(secondLoad, firstLoad)
-    assert.equal(scans, 1)
+    assert.equal(reads, 1)
 
-    releaseScan({ targetVersion: "1.4.1" })
+    releaseRead({ targetVersion: "1.4.1" })
     const [first, second] = await Promise.all([firstLoad, secondLoad])
     assert.strictEqual(second, first)
     assert.strictEqual(loader.get(), first)
     assert.strictEqual(await loader.load(), first)
-    assert.equal(scans, 1)
+    assert.equal(reads, 1)
 })
 
 test("load then reload linearizes candidates in call order", async () => {
     const firstCandidate = deferred()
     const secondCandidate = deferred()
-    let scans = 0
+    let reads = 0
     const loader = injectedLoader({
-        scan: () => (++scans === 1 ? firstCandidate.promise : secondCandidate.promise),
+        read: () => (++reads === 1 ? firstCandidate.promise : secondCandidate.promise),
         build: input => catalog(input.targetVersion),
     })
 
     const initialLoad = loader.load()
     const reload = loader.reload()
-    assert.equal(scans, 1)
+    assert.equal(reads, 1)
 
     firstCandidate.resolve({ targetVersion: "1.4.1" })
     const initial = await initialLoad
     assert.equal(initial.targetVersion, "1.4.1")
-    assert.equal(scans, 2)
+    assert.equal(reads, 2)
 
     secondCandidate.resolve({ targetVersion: "1.4.2" })
     const replacement = await reload
@@ -217,11 +355,11 @@ test("reload then load linearizes candidates in call order without stale overwri
     const firstCandidate = deferred()
     const secondCandidate = deferred()
     const secondStarted = deferred()
-    let scans = 0
+    let reads = 0
     const loader = injectedLoader({
-        scan: () => {
-            scans++
-            if (scans === 1) return firstCandidate.promise
+        read: () => {
+            reads++
+            if (reads === 1) return firstCandidate.promise
             secondStarted.resolve()
             return secondCandidate.promise
         },
@@ -230,13 +368,13 @@ test("reload then load linearizes candidates in call order without stale overwri
 
     const reload = loader.reload()
     const load = loader.load()
-    assert.equal(scans, 1)
+    assert.equal(reads, 1)
 
     firstCandidate.resolve({ targetVersion: "1.4.1" })
     const first = await reload
     assert.equal(first.targetVersion, "1.4.1")
     await secondStarted.promise
-    assert.equal(scans, 2)
+    assert.equal(reads, 2)
 
     secondCandidate.resolve({ targetVersion: "1.4.2" })
     const second = await load
@@ -245,29 +383,32 @@ test("reload then load linearizes candidates in call order without stale overwri
 })
 
 test("failed initial load leaves no catalog and can be retried", async () => {
-    let scans = 0
+    let reads = 0
     const loader = injectedLoader({
-        scan: async () => {
-            scans++
-            if (scans === 1) throw new Error("initial candidate rejected")
+        read: async () => {
+            reads++
+            if (reads === 1) throw new Error("initial candidate rejected")
             return { targetVersion: "1.4.1" }
         },
         build: input => catalog(input.targetVersion),
     })
 
-    await assert.rejects(loader.load(), /initial candidate rejected/)
+    await assert.rejects(
+        loader.load(),
+        error => error instanceof CatalogLoaderError && error.code === "RUNTIME_MANIFEST_READ",
+    )
     assert.throws(
         () => loader.get(),
         error => error instanceof CatalogLoaderError && error.code === "CATALOG_NOT_LOADED",
     )
     assert.equal((await loader.load()).targetVersion, "1.4.1")
-    assert.equal(scans, 2)
+    assert.equal(reads, 2)
 })
 
 test("loader recursively freezes children of an already frozen catalog root", async () => {
     const shallow = shallowFrozenCatalog()
     const loader = injectedLoader({
-        scan: async () => ({}),
+        read: async () => ({}),
         build: () => shallow,
     })
 
@@ -293,10 +434,10 @@ test("deep freeze handles cycles while freezing every reachable object", () => {
 
 test("reload publishes only a complete candidate and preserves the old catalog on failure", async () => {
     const candidates = ["1.4.1", "1.4.2", new Error("candidate rejected")]
-    let scans = 0
+    let reads = 0
     const loader = injectedLoader({
-        scan: async () => {
-            const candidate = candidates[scans++]
+        read: async () => {
+            const candidate = candidates[reads++]
             if (candidate instanceof Error) throw candidate
             return { targetVersion: candidate }
         },
@@ -309,21 +450,24 @@ test("reload publishes only a complete candidate and preserves the old catalog o
     assert.equal(replacement.targetVersion, "1.4.2")
     assert.strictEqual(loader.get(), replacement)
 
-    await assert.rejects(loader.reload(), /candidate rejected/)
+    await assert.rejects(
+        loader.reload(),
+        error => error instanceof CatalogLoaderError && error.code === "RUNTIME_MANIFEST_READ",
+    )
     assert.strictEqual(loader.get(), replacement)
-    assert.equal(scans, 3)
+    assert.equal(reads, 3)
 })
 
 test("a failed reload does not lock the queue and a queued success becomes cache", async () => {
     const failedCandidate = deferred()
     const successfulCandidate = deferred()
     const successStarted = deferred()
-    let scans = 0
+    let reads = 0
     const loader = injectedLoader({
-        scan: () => {
-            scans++
-            if (scans === 1) return Promise.resolve({ targetVersion: "1.4.1" })
-            if (scans === 2) return failedCandidate.promise
+        read: () => {
+            reads++
+            if (reads === 1) return Promise.resolve({ targetVersion: "1.4.1" })
+            if (reads === 2) return failedCandidate.promise
             successStarted.resolve()
             return successfulCandidate.promise
         },
@@ -332,12 +476,15 @@ test("a failed reload does not lock the queue and a queued success becomes cache
     const initial = await loader.load()
     const failedReload = loader.reload()
     const successfulReload = loader.reload()
-    assert.equal(scans, 2)
+    assert.equal(reads, 2)
 
     failedCandidate.reject(new Error("queued candidate rejected"))
-    await assert.rejects(failedReload, /queued candidate rejected/)
+    await assert.rejects(
+        failedReload,
+        error => error instanceof CatalogLoaderError && error.code === "RUNTIME_MANIFEST_READ",
+    )
     await successStarted.promise
-    assert.equal(scans, 3)
+    assert.equal(reads, 3)
     assert.strictEqual(loader.get(), initial)
 
     successfulCandidate.resolve({ targetVersion: "1.4.2" })
@@ -347,13 +494,13 @@ test("a failed reload does not lock the queue and a queued success becomes cache
 })
 
 test("concurrent reloads build serial candidates and publish in call order", async () => {
-    let scans = 0
+    let reads = 0
     let releaseFirstReload
     const loader = injectedLoader({
-        scan: () => {
-            scans++
-            if (scans === 1) return Promise.resolve({ targetVersion: "1.4.1" })
-            if (scans === 2) {
+        read: () => {
+            reads++
+            if (reads === 1) return Promise.resolve({ targetVersion: "1.4.1" })
+            if (reads === 2) {
                 return new Promise(resolve => { releaseFirstReload = resolve })
             }
             return Promise.resolve({ targetVersion: "1.4.3" })
@@ -364,11 +511,11 @@ test("concurrent reloads build serial candidates and publish in call order", asy
 
     const firstReload = loader.reload()
     const secondReload = loader.reload()
-    assert.equal(scans, 2)
+    assert.equal(reads, 2)
     releaseFirstReload({ targetVersion: "1.4.2" })
     assert.equal((await firstReload).targetVersion, "1.4.2")
     assert.equal((await secondReload).targetVersion, "1.4.3")
-    assert.equal(scans, 3)
+    assert.equal(reads, 3)
     assert.equal(loader.get().targetVersion, "1.4.3")
 })
 
@@ -382,7 +529,7 @@ test("enabled patches must match one fulfill diff edge archive basename and size
     writePatchManifest(projectRoot, [patch({ archive_size: archiveSize })])
 
     const loader = new CdnCatalogLoader({ projectRoot, env: {} })
-    assert.equal((await loader.load()).targetVersion, "1.4.1")
+    assert.equal((await loader.load()).targetVersion, "1.4.54")
 
     for (const [overrides, detail] of [
         [{ depends_on: "1.3.9" }, "missing edge"],
@@ -399,13 +546,6 @@ test("enabled patches must match one fulfill diff edge archive basename and size
             ),
         )
     }
-
-    fs.appendFileSync(archivePath, "tampered")
-    writePatchManifest(projectRoot, [patch({ archive_size: archiveSize })])
-    await assert.rejects(
-        new CdnCatalogLoader({ projectRoot, env: {} }).load(),
-        error => error instanceof CatalogLoaderError && error.code === "PATCH_CATALOG_MISMATCH",
-    )
 })
 
 test("patch manifest rejects duplicate ids even when both entries match the catalog", async t => {
@@ -435,7 +575,7 @@ test("disabled patches and mods never raise the catalog target", async t => {
     ])
 
     const loaded = await new CdnCatalogLoader({ projectRoot, env: {} }).load()
-    assert.equal(loaded.targetVersion, "1.4.1")
+    assert.equal(loaded.targetVersion, "1.4.54")
 })
 
 test("the repository disabled patch manifest preserves the 1.4.54 catalog baseline", async () => {
@@ -443,16 +583,53 @@ test("the repository disabled patch manifest preserves the 1.4.54 catalog baseli
         projectRoot: path.join(__dirname, ".."),
         env: {},
         dependencies: {
-            resolvePaths: () => ({}),
-            scan: async () => ({ targetVersion: "1.4.54" }),
-            build: input => catalog(input.targetVersion),
+            resolvePaths: () => ({ cdnRoot: "/unused-cdn-root" }),
+            validateRuntimeFiles: async () => {},
         },
     })
 
     assert.equal((await loader.load()).targetVersion, "1.4.54")
 })
 
-test("manifest schema failures use a stable diagnostic loader error", async t => {
+test("runtime manifest read, JSON, and schema failures use stable loader errors", async t => {
+    const missingRoot = createProject(t)
+    fs.unlinkSync(path.join(missingRoot, "assets/cdn/catalog-cn-1.4.54.json"))
+    await assert.rejects(
+        new CdnCatalogLoader({ projectRoot: missingRoot, env: {} }).load(),
+        error => (
+            error instanceof CatalogLoaderError
+            && error.code === "RUNTIME_MANIFEST_READ"
+            && !error.message.includes(missingRoot)
+        ),
+    )
+
+    const invalidJsonRoot = createProject(t)
+    fs.writeFileSync(path.join(invalidJsonRoot, "assets/cdn/catalog-cn-1.4.54.json"), "{")
+    await assert.rejects(
+        new CdnCatalogLoader({ projectRoot: invalidJsonRoot, env: {} }).load(),
+        error => (
+            error instanceof CatalogLoaderError
+            && error.code === "RUNTIME_MANIFEST_SCHEMA"
+            && !error.message.includes(invalidJsonRoot)
+        ),
+    )
+
+    const invalidSchemaRoot = createProject(t)
+    fs.writeFileSync(
+        path.join(invalidSchemaRoot, "assets/cdn/catalog-cn-1.4.54.json"),
+        JSON.stringify({ schemaVersion: 2 }),
+    )
+    await assert.rejects(
+        new CdnCatalogLoader({ projectRoot: invalidSchemaRoot, env: {} }).load(),
+        error => (
+            error instanceof CatalogLoaderError
+            && error.code === "RUNTIME_MANIFEST_SCHEMA"
+            && !error.message.includes(invalidSchemaRoot)
+        ),
+    )
+})
+
+test("patch manifest schema failures use a stable diagnostic loader error", async t => {
     const projectRoot = createProject(t)
     fs.writeFileSync(
         path.join(projectRoot, "assets/asset-patch/manifest.json"),
@@ -467,9 +644,9 @@ test("manifest schema failures use a stable diagnostic loader error", async t =>
 
 test("content snapshot is initialized once, deep-frozen, and pinned across loader reloads", async () => {
     const candidates = ["1.4.1", "1.4.2"]
-    let scans = 0
+    let reads = 0
     const loader = injectedLoader({
-        scan: async () => ({ targetVersion: candidates[scans++] }),
+        read: async () => ({ targetVersion: candidates[reads++] }),
         build: input => catalog(input.targetVersion),
     })
     const provider = new ContentSnapshotProvider(loader)
@@ -574,6 +751,15 @@ test("CN load publishes available_asset_version from the same content snapshot",
     assert.doesNotMatch(source, /getEffectiveVersion/)
     assert.doesNotMatch(source, /detectCDNVersion/)
     assert.doesNotMatch(source, /scanCdnCatalogInput/)
+})
+
+test("runtime catalog loader source no longer references CDN scanning or digest dependencies", () => {
+    const source = fs.readFileSync(path.join(
+        __dirname,
+        "../src/content/cdn/catalog-loader.ts",
+    ), "utf8")
+
+    assert.doesNotMatch(source, /scanCdnCatalogInput|ScanCdnCatalogDependencies|scanDependencies/)
 })
 
 test("content project root resolution is independent of cwd in src and out layouts", () => {

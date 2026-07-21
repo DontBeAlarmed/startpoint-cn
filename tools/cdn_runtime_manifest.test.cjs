@@ -9,9 +9,11 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const {
+    CdnRuntimeFileError,
     createCdnRuntimeManifest,
     parseCdnRuntimeManifest,
     serializeCdnRuntimeManifest,
+    validateCdnRuntimeFiles,
 } = require("../src/content/cdn/runtime-manifest")
 const { buildCdnCatalog } = require("../src/content/cdn/catalog-builder")
 const {
@@ -139,6 +141,75 @@ test("strictly rejects malformed runtime manifests", () => {
 
     for (const value of invalidValues) {
         assert.throws(() => parseCdnRuntimeManifest(value))
+    }
+})
+
+test("runtime validation stats only the referenced EntityLists and archives", async () => {
+    const manifest = validManifest()
+    const cdnRoot = path.resolve("/trusted-cdn-root")
+    const expectedFiles = [manifest.entityLists, ...manifest.catalogInput.archives]
+    const expectedSizes = new Map(expectedFiles.map(file => [
+        path.join(cdnRoot, file.relativePath),
+        file.compressedBytes,
+    ]))
+    const statCalls = []
+
+    await validateCdnRuntimeFiles(manifest, cdnRoot, {
+        stat: async filePath => {
+            statCalls.push(filePath)
+            assert.equal(expectedSizes.has(filePath), true)
+            return {
+                isFile: () => true,
+                size: expectedSizes.get(filePath),
+            }
+        },
+    })
+
+    assert.deepEqual(statCalls, [...expectedSizes.keys()])
+})
+
+test("runtime validation reports stable relative-path errors for missing, wrong-size, and non-file inputs", async () => {
+    const manifest = validManifest()
+    const cdnRoot = path.resolve("/private/runtime-cdn-root")
+    const entityPath = manifest.entityLists.relativePath
+    const archivePath = manifest.catalogInput.archives[0].relativePath
+    const cases = [
+        ["missing EntityLists", entityPath, "missing", "RUNTIME_FILE_MISSING"],
+        ["missing archive", archivePath, "missing", "RUNTIME_FILE_MISSING"],
+        ["wrong-size EntityLists", entityPath, "size", "RUNTIME_FILE_SIZE"],
+        ["wrong-size archive", archivePath, "size", "RUNTIME_FILE_SIZE"],
+        ["non-file EntityLists", entityPath, "type", "RUNTIME_FILE_TYPE"],
+        ["non-file archive", archivePath, "type", "RUNTIME_FILE_TYPE"],
+    ]
+
+    for (const [label, failingPath, failure, code] of cases) {
+        await assert.rejects(
+            validateCdnRuntimeFiles(manifest, cdnRoot, {
+                stat: async filePath => {
+                    const relativePath = path.relative(cdnRoot, filePath)
+                    const metadata = relativePath === entityPath
+                        ? manifest.entityLists
+                        : manifest.catalogInput.archives.find(item => item.relativePath === relativePath)
+                    assert.ok(metadata, `${label}: unexpected stat ${relativePath}`)
+                    if (relativePath === failingPath && failure === "missing") {
+                        throw Object.assign(new Error(`ENOENT: ${filePath}`), { code: "ENOENT" })
+                    }
+                    return {
+                        isFile: () => relativePath !== failingPath || failure !== "type",
+                        size: relativePath === failingPath && failure === "size"
+                            ? metadata.compressedBytes + 1
+                            : metadata.compressedBytes,
+                    }
+                },
+            }),
+            error => (
+                error instanceof CdnRuntimeFileError
+                && error.code === code
+                && error.message.includes(failingPath)
+                && !error.message.includes(cdnRoot)
+            ),
+            label,
+        )
     }
 })
 

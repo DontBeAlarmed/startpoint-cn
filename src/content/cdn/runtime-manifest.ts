@@ -1,3 +1,4 @@
+import fs from "node:fs"
 import path from "node:path"
 
 import { buildCdnCatalog } from "./catalog-builder"
@@ -28,6 +29,28 @@ export interface CdnRuntimeManifest {
         readonly compressedBytes: number
         readonly sha256: string
     }
+}
+
+export type CdnRuntimeFileErrorCode =
+    | "RUNTIME_FILE_MISSING"
+    | "RUNTIME_FILE_TYPE"
+    | "RUNTIME_FILE_SIZE"
+    | "RUNTIME_FILE_STAT"
+
+export class CdnRuntimeFileError extends Error {
+    readonly code: CdnRuntimeFileErrorCode
+    readonly relativePath: string
+
+    constructor(code: CdnRuntimeFileErrorCode, relativePath: string, message: string) {
+        super(`${code}: ${message}: ${relativePath}`)
+        this.name = "CdnRuntimeFileError"
+        this.code = code
+        this.relativePath = relativePath
+    }
+}
+
+export interface ValidateCdnRuntimeFilesDependencies {
+    readonly stat?: typeof fs.promises.stat
 }
 
 function requireExactObject(
@@ -188,4 +211,48 @@ export function createCdnRuntimeManifest(
 
 export function serializeCdnRuntimeManifest(manifest: CdnRuntimeManifest): string {
     return `${JSON.stringify(parseCdnRuntimeManifest(manifest), null, 2)}\n`
+}
+
+export async function validateCdnRuntimeFiles(
+    manifest: CdnRuntimeManifest,
+    cdnRoot: string,
+    dependencies: ValidateCdnRuntimeFilesDependencies = {},
+): Promise<void> {
+    const stat = dependencies.stat ?? fs.promises.stat
+    const files = [manifest.entityLists, ...manifest.catalogInput.archives]
+
+    for (const file of files) {
+        let metadata: fs.Stats
+        try {
+            metadata = await stat(path.join(cdnRoot, file.relativePath))
+        } catch (error) {
+            const code = (error as NodeJS.ErrnoException | undefined)?.code
+            if (code === "ENOENT" || code === "ENOTDIR") {
+                throw new CdnRuntimeFileError(
+                    "RUNTIME_FILE_MISSING",
+                    file.relativePath,
+                    "runtime file is missing",
+                )
+            }
+            throw new CdnRuntimeFileError(
+                "RUNTIME_FILE_STAT",
+                file.relativePath,
+                "runtime file cannot be inspected",
+            )
+        }
+        if (!metadata.isFile()) {
+            throw new CdnRuntimeFileError(
+                "RUNTIME_FILE_TYPE",
+                file.relativePath,
+                "runtime path is not a regular file",
+            )
+        }
+        if (metadata.size !== file.compressedBytes) {
+            throw new CdnRuntimeFileError(
+                "RUNTIME_FILE_SIZE",
+                file.relativePath,
+                `runtime file size ${metadata.size} does not match ${file.compressedBytes}`,
+            )
+        }
+    }
 }

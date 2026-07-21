@@ -7,15 +7,18 @@ import {
     type ContentPaths,
 } from "../paths"
 import { deepFreeze } from "../deep-freeze"
+import { buildCdnCatalog } from "./catalog-builder"
 import {
-    buildCdnCatalog,
-    scanCdnCatalogInput,
-    type ScanCdnCatalogDependencies,
-} from "./catalog-builder"
+    parseCdnRuntimeManifest,
+    validateCdnRuntimeFiles,
+    type CdnRuntimeManifest,
+} from "./runtime-manifest"
 import type { CdnCatalog, CdnCatalogInput } from "./types"
 
 export type CatalogLoaderErrorCode =
     | "CATALOG_NOT_LOADED"
+    | "RUNTIME_MANIFEST_READ"
+    | "RUNTIME_MANIFEST_SCHEMA"
     | "PATCH_MANIFEST_READ"
     | "PATCH_MANIFEST_SCHEMA"
     | "PATCH_CATALOG_MISMATCH"
@@ -37,13 +40,13 @@ export interface CatalogLoaderDependencies {
         readonly projectRoot: string
         readonly env: ContentPathEnvironment
     }) => ContentPaths
-    readonly scan?: (
-        paths: ContentPaths,
-        dependencies?: ScanCdnCatalogDependencies,
-    ) => Promise<CdnCatalogInput>
     readonly build?: (input: CdnCatalogInput) => CdnCatalog
+    readonly readRuntimeManifest?: (manifestPath: string) => Promise<unknown>
+    readonly validateRuntimeFiles?: (
+        manifest: CdnRuntimeManifest,
+        paths: ContentPaths,
+    ) => Promise<void>
     readonly readPatchManifest?: (manifestPath: string) => Promise<unknown>
-    readonly scanDependencies?: ScanCdnCatalogDependencies
 }
 
 export interface CdnCatalogLoaderOptions {
@@ -69,6 +72,37 @@ interface PatchManifest {
 }
 
 const VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
+const RUNTIME_MANIFEST_RELATIVE_PATH = "assets/cdn/catalog-cn-1.4.54.json"
+
+function runtimeManifestError(
+    code: "RUNTIME_MANIFEST_READ" | "RUNTIME_MANIFEST_SCHEMA",
+    message: string,
+    cause?: unknown,
+): CatalogLoaderError {
+    return new CatalogLoaderError(code, message, cause)
+}
+
+async function readRuntimeManifestFile(manifestPath: string): Promise<unknown> {
+    let content: string
+    try {
+        content = await fs.promises.readFile(manifestPath, "utf8")
+    } catch (error) {
+        throw runtimeManifestError(
+            "RUNTIME_MANIFEST_READ",
+            `cannot read ${RUNTIME_MANIFEST_RELATIVE_PATH}`,
+            error,
+        )
+    }
+    try {
+        return JSON.parse(content)
+    } catch (error) {
+        throw runtimeManifestError(
+            "RUNTIME_MANIFEST_SCHEMA",
+            `${RUNTIME_MANIFEST_RELATIVE_PATH} is not valid JSON`,
+            error,
+        )
+    }
+}
 
 function schemaError(message: string, cause?: unknown): CatalogLoaderError {
     return new CatalogLoaderError(
@@ -204,8 +238,10 @@ export class CdnCatalogLoader {
 
     private async buildCandidate(): Promise<CdnCatalog> {
         const resolvePaths = this.dependencies.resolvePaths ?? resolveContentPaths
-        const scan = this.dependencies.scan ?? scanCdnCatalogInput
         const build = this.dependencies.build ?? buildCdnCatalog
+        const readRuntimeManifest = this.dependencies.readRuntimeManifest ?? readRuntimeManifestFile
+        const validateRuntimeFiles = this.dependencies.validateRuntimeFiles
+            ?? ((manifest, paths) => validateCdnRuntimeFiles(manifest, paths.cdnRoot))
         const readPatchManifest = this.dependencies.readPatchManifest ?? (async manifestPath => {
             let content: string
             try {
@@ -224,8 +260,34 @@ export class CdnCatalogLoader {
             }
         })
         const paths = resolvePaths({ projectRoot: this.projectRoot, env: this.env })
-        const input = await scan(paths, this.dependencies.scanDependencies)
-        const candidate = deepFreeze(build(input))
+        const runtimeManifestPath = path.join(this.projectRoot, RUNTIME_MANIFEST_RELATIVE_PATH)
+        let runtimeManifestValue: unknown
+        try {
+            runtimeManifestValue = await readRuntimeManifest(runtimeManifestPath)
+        } catch (error) {
+            if (error instanceof CatalogLoaderError
+                && (error.code === "RUNTIME_MANIFEST_READ"
+                    || error.code === "RUNTIME_MANIFEST_SCHEMA")) {
+                throw error
+            }
+            throw runtimeManifestError(
+                "RUNTIME_MANIFEST_READ",
+                `cannot read ${RUNTIME_MANIFEST_RELATIVE_PATH}`,
+                error,
+            )
+        }
+        let runtimeManifest: CdnRuntimeManifest
+        try {
+            runtimeManifest = parseCdnRuntimeManifest(runtimeManifestValue)
+        } catch (error) {
+            throw runtimeManifestError(
+                "RUNTIME_MANIFEST_SCHEMA",
+                `${RUNTIME_MANIFEST_RELATIVE_PATH} failed schema validation`,
+                error,
+            )
+        }
+        const candidate = deepFreeze(build(runtimeManifest.catalogInput))
+        await validateRuntimeFiles(runtimeManifest, paths)
         const manifestPath = path.join(this.projectRoot, "assets", "asset-patch", "manifest.json")
         const manifest = parsePatchManifest(await readPatchManifest(manifestPath))
         validateEnabledPatches(candidate, manifest)
