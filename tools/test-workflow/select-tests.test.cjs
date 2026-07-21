@@ -24,6 +24,7 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/routes/cn/asset.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/assetInTitle.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/cdnFiles.ts"]), ["full", "integration:cdn"])
+    assert.deepEqual(selectTestGroups(["src/routes/cn/msgpack.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/lib/version.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/load.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/cn-server.ts"]), ["full", "integration:cdn"])

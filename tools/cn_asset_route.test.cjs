@@ -9,7 +9,7 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const Fastify = require("fastify")
-const { pack, unpack } = require("msgpackr")
+const { unpack } = require("msgpackr")
 const assetPlugin = require("../src/routes/cn/asset").default
 const { CdnPlannerError, planCdnUpdate } = require("../src/content/cdn/planner")
 
@@ -48,13 +48,8 @@ function createSnapshot(overrides = {}) {
 }
 
 function msgpackHook(fastify) {
-    fastify.addHook("onSend", (_request, reply, payload, done) => {
-        if (reply.getHeader("content-type") === "application/x-msgpack") {
-            done(null, pack(payload).toString("base64"))
-            return
-        }
-        done(null, payload)
-    })
+    const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
+    registerCnMsgpackOnSend(fastify)
 }
 
 async function createAssetApp(options = {}) {
@@ -65,6 +60,7 @@ async function createAssetApp(options = {}) {
         env: options.env ?? {},
         warn: options.warn,
         logError: options.logError,
+        displayHost: options.displayHost,
     })
     await app.ready()
     return app
@@ -138,6 +134,15 @@ test("serializer rejects unsafe base URLs and archive paths", () => {
         "https://cdn.test//patch/cn",
         "https://cdn.test/patch\\cn",
         "https://cdn.test/patch/%2e%2e/private",
+        "https:/cdn.test/patch/cn",
+        " https://cdn.test/patch/cn",
+        "https://cdn.test/patch/cn ",
+        "https://user:password@cdn.test/patch/cn",
+        "https://cdn.test/patch/cn?token=secret",
+        "https://cdn.test/patch/cn#fragment",
+        "https://cdn.test/patch/\ncn",
+        "https://cdn.test/patch/c n",
+        "https://cdn.test/patch/<cn>",
     ]) {
         assert.throws(() => serializeCdnUpdatePlan(plan, {
             baseUrl,
@@ -146,7 +151,21 @@ test("serializer rejects unsafe base URLs and archive paths", () => {
         }))
     }
 
-    for (const relativePath of ["../escape.zip", "/absolute.zip", "https://evil.test/a.zip", "dir\\a.zip", "dir//a.zip"]) {
+    for (const relativePath of [
+        "../escape.zip",
+        "/absolute.zip",
+        "https://evil.test/a.zip",
+        "dir\\a.zip",
+        "dir//a.zip",
+        "dir/a%20b.zip",
+        "dir/a\0b.zip",
+        "dir/a b.zip",
+        "dir/中文.zip",
+        "dir/a\"b.zip",
+        "dir/a<b>.zip",
+        "dir/a|b.zip",
+        "dir/a:b.zip",
+    ]) {
         const unsafePlan = structuredClone(plan)
         unsafePlan.full.archives[0].relativePath = relativePath
         assert.throws(() => serializeCdnUpdatePlan(unsafePlan, {
@@ -185,7 +204,7 @@ test("get_path emits only the current-to-target incremental edge", async t => {
     assert.equal(data.full, null)
     assert.deepEqual(data.diff.map(item => [item.original_version, item.version]), [["1.4.53", "1.4.54"]])
     assert.deepEqual(wireArchives(data), [{
-        location: "http://localhost/patch/cn/archive-common-diff/latest.zip",
+        location: "http://127.0.0.1:8001/patch/cn/archive-common-diff/latest.zip",
         size: 54,
     }])
     assert.equal(data.info.is_initial, false)
@@ -234,7 +253,12 @@ test("ignores a client target mismatch and records a warning", async t => {
     assert.equal(response.statusCode, 200)
     assert.equal(response.json().data.info.eventual_target_asset_version, "1.4.54")
     assert.equal(warnings.length, 1)
-    assert.equal(warnings[0].clientTargetVersion, "9.9.9")
+    assert.deepEqual(warnings[0].clientTarget, {
+        type: "string",
+        length: 5,
+        value: "9.9.9",
+        truncated: false,
+    })
     assert.equal(warnings[0].snapshotTargetVersion, "1.4.54")
 
     const nonString = await postGetPath(app, { res_ver: "1.4.53" }, {
@@ -242,7 +266,98 @@ test("ignores a client target mismatch and records a warning", async t => {
     })
     assert.equal(nonString.statusCode, 200)
     assert.equal(warnings.length, 2)
-    assert.equal(warnings[1].clientTargetVersion, 1454)
+    assert.deepEqual(warnings[1].clientTarget, { type: "number" })
+})
+
+test("bounds target mismatch logging for large strings and nested values", async t => {
+    const secret = "TARGET_MISMATCH_SECRET"
+    const warnings = []
+    const app = await createAssetApp({ warn: details => warnings.push(details) })
+    t.after(() => app.close())
+
+    const largeString = `${secret}:` + "x".repeat(256 * 1024)
+    const stringResponse = await postGetPath(app, { res_ver: "1.4.53" }, {
+        target_asset_version: largeString,
+    })
+    assert.equal(stringResponse.statusCode, 200)
+
+    const objectResponse = await postGetPath(app, { res_ver: "1.4.53" }, {
+        target_asset_version: {
+            nested: { secret, payload: "y".repeat(256 * 1024) },
+            list: [secret, secret],
+        },
+    })
+    assert.equal(objectResponse.statusCode, 200)
+    assert.equal(warnings.length, 2)
+    assert.deepEqual(warnings[0].clientTarget, {
+        type: "string",
+        length: largeString.length,
+        truncated: true,
+    })
+    assert.deepEqual(warnings[1].clientTarget, { type: "object", keyCount: 2 })
+    for (const warning of warnings) {
+        const serialized = JSON.stringify(warning)
+        assert.equal(serialized.includes(secret), false)
+        assert.ok(serialized.length < 256, serialized.length)
+    }
+})
+
+test("uses only trusted CDN host configuration and formats dynamic IPv6", async t => {
+    const app = await createAssetApp({
+        env: { CN_PUBLIC_HOST: "cdn.example.test", CN_LISTEN_PORT: "9000" },
+    })
+    t.after(() => app.close())
+
+    for (const host of ["evil.test", "evil.test/extra"]) {
+        const response = await app.inject({
+            method: "POST",
+            url: "/asset/version_info",
+            headers: { host },
+            payload: {},
+        })
+        assert.equal(response.statusCode, 200)
+        assert.equal(response.json().data.base_url, "http://cdn.example.test:9000/patch/cn/")
+        assert.equal(response.body.includes("evil.test"), false)
+    }
+
+    const ipv6App = await createAssetApp({
+        env: { CN_LISTEN_HOST: "::", CN_LISTEN_PORT: "8001" },
+        displayHost: () => "2001:db8::5",
+    })
+    t.after(() => ipv6App.close())
+    const ipv6 = await ipv6App.inject({ method: "POST", url: "/asset/version_info", payload: {} })
+    assert.equal(ipv6.statusCode, 200)
+    assert.equal(ipv6.json().data.base_url, "http://[2001:db8::5]:8001/patch/cn/")
+})
+
+test("rejects untrusted CDN and host configuration without using request Host", async t => {
+    const cases = [
+        { CDN_BASE_URL: "" },
+        { CDN_BASE_URL: "ftp://cdn.test/patch/cn" },
+        { CDN_BASE_URL: "https://user:secret@cdn.test/patch/cn" },
+        { CDN_BASE_URL: "https:/cdn.test/patch/cn" },
+        { CDN_BASE_URL: "https://cdn.test/patch/../private" },
+        { CDN_BASE_URL: "https://cdn.test/patch/\ncn" },
+        { CN_PUBLIC_HOST: "trusted.test/extra", CN_LISTEN_PORT: "8001" },
+        { CN_PUBLIC_HOST: "", CN_LISTEN_PORT: "8001" },
+        { CN_LISTEN_HOST: "", CN_LISTEN_PORT: "8001" },
+        { CN_PUBLIC_HOST: "trusted.test", CN_LISTEN_PORT: "8001/extra" },
+        { CN_PUBLIC_HOST: "trusted.test", CN_LISTEN_PORT: "" },
+    ]
+
+    for (const env of cases) {
+        const app = await createAssetApp({ env })
+        const response = await app.inject({
+            method: "POST",
+            url: "/asset/version_info",
+            headers: { host: "evil.test" },
+            payload: {},
+        })
+        assert.equal(response.statusCode, 500, JSON.stringify(env))
+        assert.equal(response.json().code, "ASSET_SERVICE_ERROR")
+        assert.equal(response.body.includes("evil.test"), false)
+        await app.close()
+    }
 })
 
 test("accepts missing or Android DEVICE and rejects explicit other platforms", async t => {
@@ -392,8 +507,8 @@ test("get_path returns a stable service error without leaking serializer details
     assert.equal("full" in response.json(), false)
     assert.equal("diff" in response.json(), false)
     assert.equal(logged[0].code, "ASSET_SERVICE_ERROR")
-    assert.equal(logged[0].error.code, "ERR_INVALID_URL")
-    assert.match(logged[0].error.input, /private\/internal/)
+    assert.equal(logged[0].error instanceof Error, true)
+    assert.match(logged[0].error.message, /unsupported|invalid/)
 })
 
 test("version_info uses installed bytes and the shared empty Recovery URL", async t => {
@@ -409,8 +524,8 @@ test("version_info uses installed bytes and the shared empty Recovery URL", asyn
     assert.equal(response.statusCode, 200)
     assert.match(response.headers["content-type"], /^application\/json/)
     assert.deepEqual(response.json().data, {
-        base_url: "http://assets.example.test:8443/patch/cn/",
-        files_list: "http://assets.example.test:8443/patch/cn/recovery/empty.csv",
+        base_url: "http://127.0.0.1:8001/patch/cn/",
+        files_list: "http://127.0.0.1:8001/patch/cn/recovery/empty.csv",
         total_size: 987_654,
         delayed_assets_size: 0,
     })
@@ -436,8 +551,12 @@ test("title version_info is Base64 MsgPack with the same fields as JSON version_
 
     assert.match(ordinary.headers["content-type"], /^application\/json/)
     assert.equal(title.headers["content-type"], "application/x-msgpack")
-    const decoded = unpack(Buffer.from(title.body, "base64"))
+    const wire = Buffer.from(title.body, "base64")
+    assert.equal(wire.includes(0xce), false)
+    assert.equal(wire.includes(0xd2), true)
+    const decoded = unpack(wire)
     assert.deepEqual(decoded.data, ordinary.json().data)
+    assert.equal(decoded.data.total_size, 987_654)
     assert.equal(typeof decoded.data_headers, "object")
 })
 
@@ -521,19 +640,47 @@ test("ordinary and title version_info return malformed-base service errors", asy
 test("CDN files serve pinned ZIPs and non-ZIP assets but reject every other ZIP and traversal", async t => {
     const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-route-"))
+    const patchRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cn-patch-route-"))
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    t.after(() => fs.rmSync(patchRoot, { recursive: true, force: true }))
     fs.mkdirSync(path.join(root, "archive-common-full"), { recursive: true })
     fs.mkdirSync(path.join(root, "asset-patch", "active"), { recursive: true })
     fs.mkdirSync(path.join(root, "dummy", "download"), { recursive: true })
+    fs.mkdirSync(path.join(patchRoot, "ab"), { recursive: true })
     fs.writeFileSync(path.join(root, "archive-common-full", "base.zip"), Buffer.from([1, 2, 3]))
     fs.writeFileSync(path.join(root, "archive-common-full", "extra.zip"), Buffer.from([4, 5, 6]))
     fs.writeFileSync(path.join(root, "asset-patch", "active", "disabled.zip"), Buffer.from([7]))
     fs.writeFileSync(path.join(root, "dummy", "download", "hash"), Buffer.from("asset"))
+    fs.writeFileSync(path.join(patchRoot, "ab", "patch-hash"), Buffer.from("patched"))
+
+    const snapshot = createSnapshot({
+        targetVersion: "1.4.0",
+        edges: Object.freeze([
+            edge(null, "1.4.0", [archive("archive-common-full/base.zip", 3)]),
+        ]),
+    })
+    let rootRealpaths = 0
+    let opened = 0
+    let closed = 0
+    const fileSystem = {
+        realpath: async filePath => {
+            if (path.resolve(filePath) === path.resolve(root)) rootRealpaths++
+            return fs.promises.realpath(filePath)
+        },
+        lstat: filePath => fs.promises.lstat(filePath),
+        open: (...args) => fs.promises.open(...args),
+    }
 
     const app = Fastify({ logger: false })
     app.register(cdnFilesPlugin, {
-        getSnapshot: () => createSnapshot(),
+        getSnapshot: () => snapshot,
         paths: { cdnRoot: root },
+        patchUploadRoot: patchRoot,
+        fileSystem,
+        handleObserver: {
+            opened: () => { opened++ },
+            closed: () => { closed++ },
+        },
     })
     await app.ready()
     t.after(() => app.close())
@@ -548,6 +695,7 @@ test("CDN files serve pinned ZIPs and non-ZIP assets but reject every other ZIP 
         "/patch/cn/%2e%2e/escape.zip",
         "/patch/cn/archive-common-full%2fbase.zip",
         "/patch/cn/archive-common-full%5cbase.zip",
+        "/patch/cn/archive-common-full/%62ase.zip",
     ]) {
         assert.equal((await app.inject({ method: "GET", url })).statusCode, 404, url)
     }
@@ -560,4 +708,195 @@ test("CDN files serve pinned ZIPs and non-ZIP assets but reject every other ZIP 
     assert.equal(recovery.statusCode, 200)
     assert.match(recovery.headers["content-type"], /^text\/csv/)
     assert.equal(recovery.rawPayload.length, 0)
+
+    const patch = await app.inject({
+        method: "GET",
+        url: "/patch/cn/dummy/download/production/upload/ab/patch-hash",
+    })
+    assert.equal(patch.statusCode, 200)
+    assert.equal(patch.body, "patched")
+    assert.equal((await app.inject({
+        method: "GET",
+        url: "/patch/cn/dummy/download/production/upload/%61b/patch-hash",
+    })).statusCode, 404)
+    assert.equal((await app.inject({ method: "GET", url: "/patch/other/file" })).statusCode, 404)
+    assert.ok(opened > 0)
+    for (let attempt = 0; attempt < 50 && closed !== opened; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    assert.equal(closed, opened)
+    assert.equal(rootRealpaths, 1)
+})
+
+test("CDN ZIP allowlist rejects final, intermediate, and outside-root symlinks", async t => {
+    const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-symlink-"))
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-outside-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    t.after(() => fs.rmSync(outside, { recursive: true, force: true }))
+
+    fs.mkdirSync(path.join(root, "archive-final"), { recursive: true })
+    fs.mkdirSync(path.join(root, "actual-middle"), { recursive: true })
+    fs.mkdirSync(path.join(root, "dummy"), { recursive: true })
+    fs.writeFileSync(path.join(root, "archive-final", "unlisted.zip"), Buffer.from("zip"))
+    fs.symlinkSync("unlisted.zip", path.join(root, "archive-final", "allowed.zip"))
+    fs.writeFileSync(path.join(root, "actual-middle", "allowed.zip"), Buffer.from("mid"))
+    fs.symlinkSync("actual-middle", path.join(root, "archive-middle"))
+    fs.writeFileSync(path.join(outside, "outside.bin"), Buffer.from("outside"))
+    fs.symlinkSync(path.join(outside, "outside.bin"), path.join(root, "dummy", "outside-hash"))
+
+    const snapshot = createSnapshot({
+        targetVersion: "1.4.0",
+        edges: Object.freeze([edge(null, "1.4.0", [
+            archive("archive-final/allowed.zip", 3, 1),
+            archive("archive-middle/allowed.zip", 3, 2),
+        ])]),
+    })
+    const app = Fastify({ logger: false })
+    app.register(cdnFilesPlugin, { getSnapshot: () => snapshot, paths: { cdnRoot: root } })
+    await app.ready()
+    t.after(() => app.close())
+
+    for (const url of [
+        "/patch/cn/archive-final/allowed.zip",
+        "/patch/cn/archive-middle/allowed.zip",
+        "/patch/cn/dummy/outside-hash",
+    ]) {
+        assert.equal((await app.inject({ method: "GET", url })).statusCode, 404, url)
+    }
+})
+
+test("CDN ZIP identity is pinned across post-registration replacements", async t => {
+    const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-identity-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    fs.mkdirSync(path.join(root, "archive"), { recursive: true })
+    for (const name of ["swap-symlink.zip", "swap-file.zip", "unlisted.zip"]) {
+        fs.writeFileSync(path.join(root, "archive", name), Buffer.from("old"))
+    }
+    const snapshot = createSnapshot({
+        targetVersion: "1.4.0",
+        edges: Object.freeze([edge(null, "1.4.0", [
+            archive("archive/swap-symlink.zip", 3, 1),
+            archive("archive/swap-file.zip", 3, 2),
+        ])]),
+    })
+    let opened = 0
+    let closed = 0
+    const app = Fastify({ logger: false })
+    app.register(cdnFilesPlugin, {
+        getSnapshot: () => snapshot,
+        paths: { cdnRoot: root },
+        handleObserver: {
+            opened: () => { opened++ },
+            closed: () => { closed++ },
+        },
+    })
+    await app.ready()
+    t.after(() => app.close())
+
+    fs.unlinkSync(path.join(root, "archive", "swap-symlink.zip"))
+    fs.symlinkSync("unlisted.zip", path.join(root, "archive", "swap-symlink.zip"))
+    fs.renameSync(
+        path.join(root, "archive", "swap-file.zip"),
+        path.join(root, "archive", "original-swap-file.zip"),
+    )
+    fs.writeFileSync(path.join(root, "archive", "swap-file.zip"), Buffer.from("new"))
+
+    assert.equal((await app.inject({
+        method: "GET",
+        url: "/patch/cn/archive/swap-symlink.zip",
+    })).statusCode, 404)
+    assert.equal((await app.inject({
+        method: "GET",
+        url: "/patch/cn/archive/swap-file.zip",
+    })).statusCode, 404)
+    for (let attempt = 0; attempt < 50 && closed !== opened; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    assert.ok(opened > 0)
+    assert.equal(closed, opened)
+})
+
+test("CDN ZIP replacement during request is rejected after the pinned fd opens", async t => {
+    const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-open-race-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const archivePath = path.join(root, "archive", "allowed.zip")
+    fs.mkdirSync(path.dirname(archivePath), { recursive: true })
+    fs.writeFileSync(archivePath, Buffer.from("old"))
+
+    const snapshot = createSnapshot({
+        targetVersion: "1.4.0",
+        edges: Object.freeze([edge(null, "1.4.0", [
+            archive("archive/allowed.zip", 3),
+        ])]),
+    })
+    let archiveOpenCount = 0
+    const fileSystem = {
+        realpath: filePath => fs.promises.realpath(filePath),
+        lstat: filePath => fs.promises.lstat(filePath),
+        open: async (...args) => {
+            const handle = await fs.promises.open(...args)
+            if (path.resolve(args[0]) === archivePath && ++archiveOpenCount === 2) {
+                fs.renameSync(archivePath, `${archivePath}.registered`)
+                fs.writeFileSync(archivePath, Buffer.from("new"))
+            }
+            return handle
+        },
+    }
+
+    const app = Fastify({ logger: false })
+    app.register(cdnFilesPlugin, {
+        getSnapshot: () => snapshot,
+        paths: { cdnRoot: root },
+        fileSystem,
+    })
+    await app.ready()
+    t.after(() => app.close())
+
+    const response = await app.inject({ method: "GET", url: "/patch/cn/archive/allowed.zip" })
+    assert.equal(response.statusCode, 404)
+    assert.notEqual(response.body, "old")
+    assert.notEqual(response.body, "new")
+})
+
+test("CDN non-ZIP files reject an intermediate symlink swapped in after realpath", async t => {
+    const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-nonzip-race-"))
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-nonzip-outside-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    t.after(() => fs.rmSync(outside, { recursive: true, force: true }))
+    const assetPath = path.join(root, "dummy", "hash")
+    fs.mkdirSync(path.dirname(assetPath), { recursive: true })
+    fs.writeFileSync(assetPath, Buffer.from("inside"))
+    fs.writeFileSync(path.join(outside, "hash"), Buffer.from("outside"))
+
+    let swapped = false
+    const fileSystem = {
+        realpath: async filePath => {
+            const resolved = await fs.promises.realpath(filePath)
+            if (!swapped && path.resolve(filePath) === assetPath) {
+                swapped = true
+                fs.renameSync(path.dirname(assetPath), `${path.dirname(assetPath)}.registered`)
+                fs.symlinkSync(outside, path.dirname(assetPath))
+            }
+            return resolved
+        },
+        lstat: filePath => fs.promises.lstat(filePath),
+        open: (...args) => fs.promises.open(...args),
+    }
+
+    const app = Fastify({ logger: false })
+    app.register(cdnFilesPlugin, {
+        getSnapshot: () => createSnapshot({ targetVersion: "1.4.0", edges: Object.freeze([]) }),
+        paths: { cdnRoot: root },
+        fileSystem,
+    })
+    await app.ready()
+    t.after(() => app.close())
+
+    const response = await app.inject({ method: "GET", url: "/patch/cn/dummy/hash" })
+    assert.equal(response.statusCode, 404)
+    assert.notEqual(response.body, "outside")
 })

@@ -8,6 +8,7 @@ import {
     sendAssetRouteError,
     type AssetRouteErrorLogger,
 } from "./asset"
+import { getDisplayHost } from "../../multi/room/serializer"
 
 interface AssetInTitleEnvironment {
     readonly [name: string]: string | undefined
@@ -18,11 +19,13 @@ export interface CnAssetInTitleRouteOptions {
     readonly getSnapshot?: () => ContentSnapshot
     readonly env?: AssetInTitleEnvironment
     readonly logError?: AssetRouteErrorLogger
+    readonly displayHost?: () => string
 }
 
 const routes = async (fastify: FastifyInstance, options: CnAssetInTitleRouteOptions) => {
     const snapshot = options.getSnapshot ?? getContentSnapshot
     const env = options.env ?? process.env
+    const displayHost = options.displayHost ?? getDisplayHost
 
     fastify.post("/version_info_in_title", async (request, reply) => {
         let contentSnapshot: ContentSnapshot
@@ -42,7 +45,7 @@ const routes = async (fastify: FastifyInstance, options: CnAssetInTitleRouteOpti
         try {
             return reply.type("application/x-msgpack").send({
                 data_headers: generateDataHeaders(),
-                data: getCdnVersionInfo(getCdnBase(request, env), contentSnapshot),
+                data: getCdnVersionInfo(getCdnBase(env, displayHost), contentSnapshot),
             })
         } catch (error) {
             return sendAssetRouteError(

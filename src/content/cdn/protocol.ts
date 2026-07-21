@@ -37,14 +37,20 @@ export interface CnAssetUpdateWire {
 }
 
 export function normalizeCdnBaseUrl(baseUrl: string): string {
-    const value = baseUrl.trim()
-    if (!value || value.includes("\\") || /[?#]/.test(value)) {
+    const value = baseUrl
+    if (!value
+        || value !== value.trim()
+        || /[\x00-\x1f\x7f]/.test(value)
+        || value.includes("\\")
+        || /[?#]/.test(value)
+        || !/^https?:\/\//.test(value)) {
         throw new Error("CDN base URL contains unsupported characters")
     }
 
     const pathStart = value.indexOf("/", value.indexOf("://") + 3)
     const rawPath = pathStart === -1 ? "" : value.slice(pathStart)
-    if (rawPath.includes("%")
+    if ((rawPath !== "" && !/^\/[A-Za-z0-9._~/-]*$/.test(rawPath))
+        || rawPath.includes("%")
         || /\/{2,}/.test(rawPath)
         || /(?:^|\/)\.{1,2}(?:\/|$)/.test(rawPath)) {
         throw new Error("CDN base URL contains an unsafe path")
@@ -62,6 +68,7 @@ export function normalizeCdnBaseUrl(baseUrl: string): string {
 
 function requireSafeRelativePath(relativePath: string): string {
     if (!relativePath
+        || !/^[\x21-\x7e]+$/.test(relativePath)
         || relativePath.includes("\\")
         || relativePath.startsWith("/")
         || relativePath.includes("//")
@@ -70,7 +77,12 @@ function requireSafeRelativePath(relativePath: string): string {
         throw new Error(`unsafe CDN archive path: ${relativePath}`)
     }
     const segments = relativePath.split("/")
-    if (segments.some(segment => segment === "" || segment === "." || segment === "..")) {
+    if (segments.some(segment => (
+        segment === ""
+        || segment === "."
+        || segment === ".."
+        || !/^[A-Za-z0-9._~-]+$/.test(segment)
+    ))) {
         throw new Error(`unsafe CDN archive path: ${relativePath}`)
     }
     return relativePath

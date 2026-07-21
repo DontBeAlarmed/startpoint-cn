@@ -1,12 +1,11 @@
 import Fastify, { FastifyRequest } from "fastify";
 import { ContentTypeParserDoneFunction } from "fastify/types/content-type-parser";
-import { pack, unpack } from "msgpackr";
+import { unpack } from "msgpackr";
 import fastifyStatic from "@fastify/static";
 import path from "path";
 import { existsSync, readFileSync } from "fs";
 import { getServerTime } from "./utils";
 import { restoreTimeOffset } from "./data/activeAccount";
-import { fixUint32Tags } from "./lib/msgpack-compat";
 import { initializeContentSnapshot } from "./content/runtime/content-snapshot";
 
 import versionCheckPlugin from "./routes/cn/versionCheck";
@@ -16,6 +15,7 @@ import cnLoadPlugin from "./routes/cn/load";
 import cnAssetPlugin from "./routes/cn/asset";
 import cnAssetInTitlePlugin from "./routes/cn/assetInTitle";
 import cnCdnFilesPlugin from "./routes/cn/cdnFiles";
+import { registerCnMsgpackOnSend } from "./routes/cn/msgpack";
 import indexWebPlugin from "./routes/web";
 import indexWebApiPlugin from "./routes/web_api";
 import seedsWebApiPlugin from "./routes/web_api/seeds";
@@ -87,16 +87,7 @@ fastify.addHook("onRequest", async (request, reply) => {
     }
 });
 
-fastify.addHook("onSend", (_, reply, payload, done) => {
-    try {
-        if (reply.getHeader("content-type") === "application/x-msgpack") {
-            const packed = fixUint32Tags(pack(payload));
-            done(null, packed.toString("base64"));
-            return;
-        }
-    } catch {}
-    done(null, payload);
-});
+registerCnMsgpackOnSend(fastify);
 
 function jsonParser(_: FastifyRequest, body: string, done: ContentTypeParserDoneFunction) {
     try {
@@ -328,20 +319,6 @@ fastify.register(itemApiPlugin, { prefix: `${apiPrefix}/item` });
 fastify.register(indexWebPlugin);
 fastify.register(indexWebApiPlugin, { prefix: "/api" });
 fastify.register(seedsWebApiPlugin, { prefix: "/api/seeds" });
-
-// Serve patched orderedmap files for missing CDN resources
-// Registered BEFORE fastifyStatic to intercept matching requests
-fastify.get("/patch/cn/dummy/download/production/upload/:prefix/:hash", async (request, reply) => {
-    const { prefix, hash } = request.params as { prefix: string; hash: string };
-    const relPath = `${prefix}/${hash}`;
-    const patchFile = path.join(__dirname, "..", "assets", "asset-patch", "production", "upload", prefix, hash);
-    if (existsSync(patchFile)) {
-        console.log("[PATCH-SERVE]", relPath);
-        return reply.type("application/octet-stream").send(readFileSync(patchFile));
-    }
-    console.log("[PATCH-MISS]", relPath);
-    return reply.status(404).send("Not Found");
-});
 
 fastify.register(cnCdnFilesPlugin);
 

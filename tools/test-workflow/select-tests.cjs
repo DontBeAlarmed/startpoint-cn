@@ -19,7 +19,7 @@ const SOURCE_RULES = [
     { pattern: /^src\/routes\/cn\/load\.ts$/, groups: ["full"] },
     { pattern: /^src\/cn-server\.ts$/, groups: ["integration:cdn", "full"] },
     {
-        pattern: /^src\/routes\/cn\/(?:asset|assetInTitle|cdnFiles)\.ts$/,
+        pattern: /^src\/routes\/cn\/(?:asset|assetInTitle|cdnFiles|msgpack)\.ts$/,
         groups: ["integration:cdn", "full"],
     },
     { pattern: /^src\/routes\/cn\/versionCheck\.ts$/, groups: ["full"] },
