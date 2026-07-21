@@ -107,7 +107,9 @@ const TEST_GROUPS = Object.freeze({
             "tools/cdn_asset_import.test.cjs",
             "tools/cn_asset_route.test.cjs",
             "tools/cdn_catalog_provider.test.cjs",
+            "tools/cdn_runtime_manifest.test.cjs",
             "tools/cdn_audit.test.cjs",
+            "tools/cdn_files.test.cjs",
         ],
     },
     admin: {

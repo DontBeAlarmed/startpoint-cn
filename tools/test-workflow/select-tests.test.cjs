@@ -12,6 +12,7 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/content/paths.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/types.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/catalog-builder.ts"]), ["quick:cdn"])
+    assert.deepEqual(selectTestGroups(["src/content/cdn/runtime-manifest.ts"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/patch-graph.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/digest-cache.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/catalog.ts"]), ["full"])
@@ -25,6 +26,7 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/routes/cn/asset.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/assetInTitle.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/cdnFiles.ts"]), ["full", "integration:cdn"])
+    assert.deepEqual(selectTestGroups(["src/routes/cn/httpRange.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/msgpack.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/lib/version.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/load.ts"]), ["full"])
@@ -107,7 +109,9 @@ test("full contains quick, integration, and admin but excludes generators", () =
         "tools/cdn_asset_import.test.cjs",
         "tools/cn_asset_route.test.cjs",
         "tools/cdn_catalog_provider.test.cjs",
+        "tools/cdn_runtime_manifest.test.cjs",
         "tools/cdn_audit.test.cjs",
+        "tools/cdn_files.test.cjs",
     ])
 })
 
@@ -127,6 +131,8 @@ test("registers the focused CDN path contract", () => {
     assert.deepEqual(selectTestGroups(["tools/cdn_types.test.cjs"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_catalog_provider.test.cjs"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_audit.test.cjs"]), ["integration:cdn"])
+    assert.deepEqual(selectTestGroups(["tools/cdn_runtime_manifest.test.cjs"]), ["integration:cdn"])
+    assert.deepEqual(selectTestGroups(["tools/cdn_files.test.cjs"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["tools/audit_cdn_catalog.cjs"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["docs/cdn/catalog-planner.md"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_asset_import.test.cjs"]), ["integration:cdn"])

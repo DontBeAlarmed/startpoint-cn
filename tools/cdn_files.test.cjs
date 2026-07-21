@@ -1,0 +1,277 @@
+"use strict"
+
+const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const os = require("node:os")
+const path = require("node:path")
+const test = require("node:test")
+
+require("ts-node/register/transpile-only")
+
+const Fastify = require("fastify")
+const cdnFilesPlugin = require("../src/routes/cn/cdnFiles").default
+const { parseHttpByteRange } = require("../src/routes/cn/httpRange")
+
+const SHA256 = "a".repeat(64)
+
+function archive(relativePath, compressedBytes, order = 1) {
+    return {
+        relativePath,
+        compressedBytes,
+        sha256: SHA256,
+        layer: "common",
+        order,
+    }
+}
+
+function snapshot(archives) {
+    return Object.freeze({
+        cdn: Object.freeze({
+            schemaVersion: 1,
+            fullBaseVersion: "1.4.0",
+            targetVersion: "1.4.54",
+            installedBytes: 10,
+            entityListsRelativePath: "EntityLists/android_medium.csv",
+            edges: Object.freeze([{
+                fromVersion: null,
+                toVersion: "1.4.0",
+                platform: "android",
+                assetSizeKind: "fulfill",
+                archives: Object.freeze(archives),
+            }]),
+        }),
+    })
+}
+
+async function waitForBalancedHandles(observer) {
+    for (let attempt = 0; attempt < 100 && observer.opened !== observer.closed; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    assert.equal(observer.closed, observer.opened)
+}
+
+async function createFixture(t, options = {}) {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-files-"))
+    const cdnRoot = path.join(sandbox, "cdn")
+    const patchUploadRoot = path.join(sandbox, "patch-upload")
+    const contentStateDir = path.join(sandbox, "must-not-exist")
+    const outsideRoot = path.join(sandbox, "outside")
+    const zipBytes = Buffer.from("0123456789")
+
+    fs.mkdirSync(path.join(cdnRoot, "archive-common-full"), { recursive: true })
+    fs.mkdirSync(path.join(cdnRoot, "EntityLists"), { recursive: true })
+    fs.mkdirSync(path.join(cdnRoot, "objects"), { recursive: true })
+    fs.mkdirSync(path.join(patchUploadRoot, "ab"), { recursive: true })
+    fs.mkdirSync(outsideRoot, { recursive: true })
+    fs.writeFileSync(path.join(cdnRoot, "archive-common-full", "base.zip"), zipBytes)
+    fs.writeFileSync(path.join(cdnRoot, "archive-common-full", "extra.zip"), "extra")
+    fs.writeFileSync(path.join(cdnRoot, "EntityLists", "android_medium.csv"), "entities")
+    fs.writeFileSync(path.join(cdnRoot, "EntityLists", "empty.csv"), "")
+    fs.writeFileSync(path.join(cdnRoot, "objects", "ordinary.bin"), "ordinary")
+    fs.writeFileSync(path.join(cdnRoot, "objects", "large.bin"), Buffer.alloc(256 * 1024, 0x31))
+    fs.writeFileSync(path.join(patchUploadRoot, "ab", "patch-hash"), "patched")
+    fs.writeFileSync(path.join(outsideRoot, "outside.bin"), "outside")
+    fs.writeFileSync(path.join(outsideRoot, "outside.zip"), zipBytes)
+    fs.symlinkSync(path.join(outsideRoot, "outside.bin"), path.join(cdnRoot, "objects", "outside.bin"))
+    fs.symlinkSync(path.join(outsideRoot, "outside.zip"), path.join(cdnRoot, "archive-common-full", "outside.zip"))
+
+    const observer = { opened: 0, closed: 0 }
+    const app = Fastify({ logger: false })
+    const previousContentStateDir = process.env.CONTENT_STATE_DIR
+    process.env.CONTENT_STATE_DIR = contentStateDir
+    app.register(cdnFilesPlugin, {
+        getSnapshot: () => snapshot([
+            archive("archive-common-full/base.zip", zipBytes.length),
+            archive("archive-common-full/outside.zip", zipBytes.length, 2),
+        ]),
+        paths: { cdnRoot },
+        patchUploadRoot,
+        ...(options.fileSystemFactory
+            ? { fileSystem: options.fileSystemFactory({ cdnRoot }) }
+            : {}),
+        handleObserver: {
+            opened: () => { observer.opened++ },
+            closed: () => { observer.closed++ },
+        },
+    })
+
+    try {
+        await app.ready()
+    } finally {
+        if (previousContentStateDir === undefined) delete process.env.CONTENT_STATE_DIR
+        else process.env.CONTENT_STATE_DIR = previousContentStateDir
+    }
+    assert.equal(fs.existsSync(contentStateDir), false)
+
+    t.after(async () => {
+        await app.close()
+        fs.rmSync(sandbox, { recursive: true, force: true })
+    })
+    return { app, contentStateDir, observer, zipBytes }
+}
+
+test("parseHttpByteRange supports full, closed, open, suffix, and truncated ranges", () => {
+    assert.deepEqual(parseHttpByteRange(undefined, 20), { kind: "full" })
+    assert.deepEqual(parseHttpByteRange("bytes=0-9", 20), { kind: "partial", start: 0, end: 9 })
+    assert.deepEqual(parseHttpByteRange("bytes=10-", 20), { kind: "partial", start: 10, end: 19 })
+    assert.deepEqual(parseHttpByteRange("bytes=-10", 20), { kind: "partial", start: 10, end: 19 })
+    assert.deepEqual(parseHttpByteRange("bytes=15-99", 20), { kind: "partial", start: 15, end: 19 })
+    assert.deepEqual(parseHttpByteRange("bytes=-99", 20), { kind: "partial", start: 0, end: 19 })
+})
+
+test("parseHttpByteRange rejects invalid and unsatisfiable ranges", () => {
+    for (const header of [
+        "bytes=20-21",
+        "bytes=10-9",
+        "bytes=-0",
+        "bytes=x-y",
+        "items=0-1",
+        "bytes=0-1,3-4",
+        ["bytes=0-1"],
+    ]) {
+        assert.deepEqual(parseHttpByteRange(header, 20), { kind: "unsatisfiable" }, String(header))
+    }
+    assert.deepEqual(parseHttpByteRange("bytes=0-0", 0), { kind: "unsatisfiable" })
+})
+
+test("serves complete and HEAD responses with byte metadata", async t => {
+    const { app, observer, zipBytes } = await createFixture(t)
+
+    const response = await app.inject({
+        method: "GET",
+        url: "/patch/cn/archive-common-full/base.zip",
+    })
+    assert.equal(response.statusCode, 200)
+    assert.equal(response.headers["accept-ranges"], "bytes")
+    assert.equal(response.headers["content-length"], String(zipBytes.length))
+    assert.deepEqual(response.rawPayload, zipBytes)
+
+    const head = await app.inject({
+        method: "HEAD",
+        url: "/patch/cn/archive-common-full/base.zip",
+    })
+    assert.equal(head.statusCode, 200)
+    assert.equal(head.headers["accept-ranges"], "bytes")
+    assert.equal(head.headers["content-length"], String(zipBytes.length))
+    assert.equal(head.rawPayload.length, 0)
+    await waitForBalancedHandles(observer)
+})
+
+test("serves closed, open, suffix, and truncated ranges", async t => {
+    const { app, observer } = await createFixture(t)
+    const cases = [
+        ["bytes=2-5", "2345", "bytes 2-5/10"],
+        ["bytes=6-", "6789", "bytes 6-9/10"],
+        ["bytes=-4", "6789", "bytes 6-9/10"],
+        ["bytes=7-99", "789", "bytes 7-9/10"],
+    ]
+
+    for (const [range, body, contentRange] of cases) {
+        const response = await app.inject({
+            method: "GET",
+            url: "/patch/cn/archive-common-full/base.zip",
+            headers: { range },
+        })
+        assert.equal(response.statusCode, 206, range)
+        assert.equal(response.headers["accept-ranges"], "bytes", range)
+        assert.equal(response.headers["content-range"], contentRange, range)
+        assert.equal(response.headers["content-length"], String(Buffer.byteLength(body)), range)
+        assert.equal(response.body, body, range)
+    }
+    await waitForBalancedHandles(observer)
+})
+
+test("returns empty 416 responses for invalid, unsatisfiable, and empty-file ranges", async t => {
+    const { app, observer } = await createFixture(t)
+    for (const range of [
+        "bytes=99-100",
+        "bytes=5-2",
+        "bytes=-0",
+        "bytes=x-y",
+        "items=0-1",
+        "bytes=0-1,3-4",
+    ]) {
+        const response = await app.inject({
+            method: "GET",
+            url: "/patch/cn/archive-common-full/base.zip",
+            headers: { range },
+        })
+        assert.equal(response.statusCode, 416, range)
+        assert.equal(response.headers["content-range"], "bytes */10", range)
+        assert.equal(response.headers["content-length"], "0", range)
+        assert.equal(response.rawPayload.length, 0, range)
+    }
+
+    const empty = await app.inject({
+        method: "GET",
+        url: "/patch/cn/EntityLists/empty.csv",
+        headers: { range: "bytes=0-0" },
+    })
+    assert.equal(empty.statusCode, 416)
+    assert.equal(empty.headers["content-range"], "bytes */0")
+    assert.equal(empty.headers["content-length"], "0")
+    assert.equal(empty.rawPayload.length, 0)
+    await waitForBalancedHandles(observer)
+})
+
+test("keeps ZIP allowlist, ordinary files, patch upload, and path boundaries", async t => {
+    const { app, contentStateDir, observer } = await createFixture(t)
+
+    const ordinary = await app.inject({ method: "GET", url: "/patch/cn/objects/ordinary.bin" })
+    assert.equal(ordinary.statusCode, 200)
+    assert.equal(ordinary.body, "ordinary")
+
+    const patch = await app.inject({
+        method: "GET",
+        url: "/patch/cn/dummy/download/production/upload/ab/patch-hash",
+    })
+    assert.equal(patch.statusCode, 200)
+    assert.equal(patch.body, "patched")
+
+    for (const url of [
+        "/patch/cn/archive-common-full/extra.zip",
+        "/patch/cn/archive-common-full/outside.zip",
+        "/patch/cn/objects/outside.bin",
+        "/patch/cn/%2e%2e/outside.zip",
+        "/patch/cn/archive-common-full%2fbase.zip",
+        "/patch/cn/archive-common-full%5cbase.zip",
+        "/patch/cn/archive-common-full/%62ase.zip",
+        "/patch/cn/dummy/download/production/upload/%61b/patch-hash",
+    ]) {
+        assert.equal((await app.inject({ method: "GET", url })).statusCode, 404, url)
+    }
+
+    const recovery = await app.inject({ method: "GET", url: "/patch/cn/recovery/empty.csv" })
+    assert.equal(recovery.statusCode, 200)
+    assert.match(recovery.headers["content-type"], /^text\/csv/)
+    assert.equal(recovery.headers["content-length"], "0")
+    assert.equal(recovery.rawPayload.length, 0)
+    assert.equal(fs.existsSync(contentStateDir), false)
+    await waitForBalancedHandles(observer)
+})
+
+test("releases the open FileHandle when client streaming is interrupted", async t => {
+    const { app, observer } = await createFixture(t, {
+        fileSystemFactory: ({ cdnRoot }) => ({
+            realpath: filePath => fs.promises.realpath(filePath),
+            lstat: filePath => fs.promises.lstat(filePath),
+            open: async (...args) => {
+                const handle = await fs.promises.open(...args)
+                if (path.resolve(args[0]) === path.join(cdnRoot, "objects", "large.bin")) {
+                    const createReadStream = handle.createReadStream.bind(handle)
+                    handle.createReadStream = streamOptions => {
+                        const stream = createReadStream({ ...streamOptions, highWaterMark: 1024 })
+                        stream.once("data", () => stream.destroy())
+                        return stream
+                    }
+                }
+                return handle
+            },
+        }),
+    })
+
+    await app.inject({ method: "GET", url: "/patch/cn/objects/large.bin" })
+        .catch(() => undefined)
+    await waitForBalancedHandles(observer)
+    assert.ok(observer.opened > 0)
+})

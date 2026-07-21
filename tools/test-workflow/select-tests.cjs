@@ -12,6 +12,7 @@ const SOURCE_RULES = [
         groups: ["quick:cdn"],
     },
     { pattern: /^src\/content\/cdn\/protocol\.ts$/, groups: ["integration:cdn", "full"] },
+    { pattern: /^src\/content\/cdn\/runtime-manifest\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/content\/cdn\/catalog-loader\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/content\/cdn\/audit\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/content\/runtime\/content-snapshot\.ts$/, groups: ["integration:cdn"] },
@@ -20,7 +21,7 @@ const SOURCE_RULES = [
     { pattern: /^src\/routes\/cn\/load\.ts$/, groups: ["full"] },
     { pattern: /^src\/cn-server\.ts$/, groups: ["integration:cdn", "full"] },
     {
-        pattern: /^src\/routes\/cn\/(?:asset|assetInTitle|cdnFiles|msgpack)\.ts$/,
+        pattern: /^src\/routes\/cn\/(?:asset|assetInTitle|cdnFiles|httpRange|msgpack)\.ts$/,
         groups: ["integration:cdn", "full"],
     },
     { pattern: /^src\/routes\/cn\/versionCheck\.ts$/, groups: ["full"] },
