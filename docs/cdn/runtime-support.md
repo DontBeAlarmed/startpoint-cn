@@ -7,9 +7,9 @@
 | 输入或能力 | 状态 | 当前边界 |
 |---|---|---|
 | 官方 CN 1.8.1 客户端，仅修改服务器 IP 和跳过登录 | 保证 | 唯一保证的客户端；协议与行为以该版本为准 |
-| 官方 CN 1.4.54 CDN | 保证 | 必须完整、未修改，并与跟踪的 `assets/cdn/catalog-cn-1.4.54.json` 路径和大小一致 |
+| 停服前从官方 CDN 主机下载的 CN 1.4.54 dump | 有限保证 | 物理 dump 有 692 个 ZIP；运行时只保证 tracked manifest 引用的 677 个 Android common、medium（Catalog `quality` 层）和 platform 归档完整，不使用 15 个 iOS 归档 |
 | latest 更新计划 | 保证 | 当前版本等于 1.4.54 时返回 `full=null`、`diff=null` |
-| incremental 更新计划 | 保证 | 只返回当前版本到 1.4.54 的唯一连续差分链 |
+| incremental 更新计划 | 有限保证 | 只保证 manifest 已知节点 1.4.0 至 1.4.53 到 1.4.54 的唯一连续差分链；未知版本返回 `UNKNOWN_CURRENT_VERSION` |
 | initial 更新计划 | 保证 | 返回 1.4.0 full 和到 1.4.54 的连续差分链 |
 | 完整归档下载 | 保证 | 从文件句柄直接流式返回 HTTP 200 |
 | 标准单区间 Range | 服务端已实现，客户端待验收 | 服务端返回 206 或 416；官方客户端原生 ANE 行为仍需抓包确认 |
@@ -33,13 +33,13 @@
 - 除服务器 IP 和跳过登录外，还修改资源下载器、战斗逻辑或其他客户端行为的包；
 - 只向目录写入 ZIP、但没有匹配版本边、`EntityLists`、服务端 runtime 数据和完整 release manifest 的内容。
 
-运行时不会为这些输入降级安全边界、猜测版本图或自动生成缺失数据。完整 SHA-256 只能通过 `npm run cdn:manifest` 或实际审计入口 `node tools/audit_cdn_catalog.cjs` 显式离线执行；项目当前没有 `npm run cdn:audit` 脚本。
+运行时不会为这些输入降级安全边界、猜测版本图或自动生成缺失数据。完整 SHA-256 的实际命令、参数和目录约束统一见 [`catalog-planner.md` 的“显式离线 SHA-256”章节](catalog-planner.md#显式离线-sha-256)，本页不重复维护命令副本。
 
 ## Recovery 边界
 
-`version_info.files_list` 当前固定指向零字节 Recovery CSV。该响应只说明当前阶段不向客户端声明需要逐文件补全的对象，不代表逐文件恢复已经实现。
+`version_info.files_list` 当前固定指向零字节 Recovery CSV。该响应只说明当前实现不向客户端声明需要逐文件补全的对象，不代表逐文件恢复已经实现。
 
-如果客户端本地单个解压文件缺失，当前项目不保证能按 EntityLists 中的 `hash` 从 `base_url + hash` 恢复该文件，也不自动从 ZIP 重建逐文件对象、重新下载归档或修复服务端 CDN。逐文件 Recovery 不是本阶段客户端验收的通过条件。
+如果客户端本地单个解压文件缺失，当前项目不保证能按 EntityLists 中的 `hash` 从 `base_url + hash` 恢复该文件，也不自动从 ZIP 重建逐文件对象、重新下载归档或修复服务端 CDN。逐文件 Recovery 不是当前实现的客户端验收通过条件。
 
 若未来需要支持，应由独立 Content Builder 从受信任归档生成只读对象库，并验证所有正式 EntityLists 记录都能通过对应 URL 读取；在此之前不得返回无法完整供给的 Recovery 清单。
 

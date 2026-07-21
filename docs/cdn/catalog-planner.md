@@ -1,16 +1,18 @@
 # CDN Catalog、Planner 与受信任运行时
 
-本文说明官方 CN 1.8.1 客户端与官方 1.4.54 CDN 的运行时加载、更新计划、资源发送和离线审计流程。完整支持边界见 [`runtime-support.md`](runtime-support.md)。
+本文说明官方 CN 1.8.1 客户端与 CN 1.4.54 官方 CDN dump 的运行时加载、更新计划、资源发送和离线审计流程。完整支持边界见 [`runtime-support.md`](runtime-support.md)。
 
 ## 唯一保证组合
 
 当前项目只保证以下组合：
 
 - 官方 CN 1.8.1 客户端，仅修改服务器 IP 和跳过登录所需内容；
-- 从官方客户端提取的完整 CN 1.4.54 CDN；
-- 服务端使用版本库跟踪的 `assets/cdn/catalog-cn-1.4.54.json` 作为运行时 Catalog manifest。
+- 停服前从官方 CDN 主机下载的 CN 1.4.54 dump；
+- 服务端使用版本库跟踪的 `assets/cdn/catalog-cn-1.4.54.json` 作为运行时 Catalog manifest；该 manifest 只引用 Android 所需的 common、medium（Catalog `quality` 层）和 platform 归档。
 
-缺失、不完整、被修改、重新打包或自制的 CDN 不属于运行时兼容目标。CN 1.8.1 之外的客户端、额外修改资源下载器或战斗逻辑的客户端也不在保证范围内。
+物理 dump 共含 692 个 ZIP，其中包括 Android 和 iOS 归档；tracked manifest 引用 677 个 Android common/medium/platform Catalog 归档，即 490 个 full 和 187 个 diff，不引用 5 个 iOS full 与 10 个 iOS diff。“完整”只表示这 677 个归档覆盖 manifest 声明的 Android Catalog 范围，不表示运行时使用全部 692 个物理 ZIP。
+
+Android Catalog 范围缺失、不完整、被修改、重新打包或自制的 CDN 不属于运行时兼容目标。CN 1.8.1 之外的客户端、额外修改资源下载器或战斗逻辑的客户端也不在保证范围内。
 
 ## 启动加载流程
 
@@ -40,12 +42,12 @@ Planner 保持三种语义：
 | 场景 | 结果 |
 |---|---|
 | latest：当前版本等于目标版本 | `full=null`、`diff=null`，下载 0 字节 |
-| incremental：已安装旧版本 | 只返回当前版本到目标版本的唯一严格连续差分链 |
+| incremental：当前版本是 manifest 版本图中的已知起点 | 本基线只保证从 1.4.0 至 1.4.53 的已知节点到 1.4.54 的唯一严格连续差分链 |
 | initial：客户端没有当前版本 | 返回 1.4.0 full，并在需要时追加从 1.4.0 到目标版本的唯一连续差分链 |
 
-`null` 表示该部分计划不存在，对应客户端的 `None`；空数组 `[]` 不能代替 `null`。初装目标恰好等于 full base 时，`full` 有值而 `diff=null`。`total_size` 是目标 `EntityLists` 的安装体积，`downloadBytes` 是本次计划所选 ZIP 的压缩字节总和，两者不是同一指标。
+`null` 表示该部分计划不存在，对应客户端的 `None`；空数组 `[]` 不能代替 `null`。初装目标恰好等于 full base 时，`full` 有值而 `diff=null`。incremental 当前版本不在 manifest 版本图中时，Planner 返回稳定错误 `UNKNOWN_CURRENT_VERSION`，不承诺推断或拼接更新路径。`total_size` 是目标 `EntityLists` 的安装体积，`downloadBytes` 是本次计划所选 ZIP 的压缩字节总和，两者不是同一指标。
 
-阶段 1 中客户端请求的 `shortened`、`fulfill` 和 `delayed` 均统一按 `fulfill` 规划，`delayed_assets_size` 固定为 0。
+当前实现中客户端请求的 `shortened`、`fulfill` 和 `delayed` 均统一按 `fulfill` 规划，`delayed_assets_size` 固定为 0。
 
 ## 资源发送与 Range
 
@@ -66,6 +68,8 @@ Planner 保持三种语义：
 ## 显式离线 SHA-256
 
 完整 SHA-256 只在显式离线生成或审计时执行，不是服务器启动或资源请求的前置步骤。
+
+下文 `<PROJECT_ROOT>` 专指包含 `package.json`、`src/` 和 `tools/` 的 `starpoint-cn` 仓库根目录；`<PROJECT_ROOT>/.cdn` 必须包含 `cn/` 子目录。命令使用占位符和 `/tmp` 临时目录，不记录构建机器的绝对主目录。
 
 `npm run cdn:manifest` 是实际存在的 manifest 生成命令。它调用 `scanCdnCatalogInput` 完整扫描并计算 SHA-256，默认把候选 manifest 输出到 stdout；使用 `--output` 时才写入指定文件。建议把状态目录和候选输出放在 `/tmp`，评审后再决定是否更新跟踪文件：
 
