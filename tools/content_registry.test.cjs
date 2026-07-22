@@ -24,11 +24,9 @@ const { importBundledTable } = require("../src/content/sync/bundled-importer")
 const EXPECTED_CDN_TABLES = Object.freeze({
     "character.json": ["character", [
         "master/character/character.orderedmap",
-        "master/character/character_status.orderedmap",
     ]],
     "cdndata/character.json": ["character", [
         "master/character/character.orderedmap",
-        "master/character/character_status.orderedmap",
     ]],
     "cdndata/character_text.json": ["character", [
         "master/character/character_text.orderedmap",

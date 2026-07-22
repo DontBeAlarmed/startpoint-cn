@@ -3,7 +3,6 @@ import bossBattleQuests from "../../assets/boss_battle_quest.json";
 import boxGacha from "../../assets/box_gacha.json";
 import boxGachaBoxSettings from "../../assets/box_gacha_box_settings.json";
 import boxReward from "../../assets/box_reward.json";
-import characters from "../../assets/character.json";
 import characterQuests from "../../assets/character_quest.json";
 import clearRewards from "../../assets/clear_reward.json";
 import dailyExpManaEventQuests from "../../assets/daily_exp_mana_event_quest.json";
@@ -49,6 +48,7 @@ import itemSaleData from "../../assets/item_sale.json"
 import equipmentCraftData from "../../assets/equipment_craft.json"
 import { AssetCharacter, BattleQuest, BossCoinShopItems, BoxGacha, ClearRewards, ConfigValues, EquipmentCraftEntry, EquipmentDissolveEntry, EventItemShopIdMapItem, EventShopItems, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, Gachas, ItemSaleEntry, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopItem, ShopItems, ShopType, StoryQuest } from "./types";
 import { RawBoxGachaSettings } from "./types/box-gacha";
+import { getContentSnapshot } from "../content/runtime/content-snapshot";
 
 /**
  * Gets a clear reward from its ID.
@@ -315,6 +315,7 @@ export function getQuestFromCategorySync(
 export function getCharacterDataSync(
     characterId: string | number
 ): AssetCharacter | null {
+    const characters = getContentSnapshot().repository.table<RawAssetCharacters>("character.json")
     const character = (characters as RawAssetCharacters)[String(characterId)]
 
     if (!character) return null;

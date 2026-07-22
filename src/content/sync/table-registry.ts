@@ -124,10 +124,7 @@ const definitionInputs: TableSourceInput[] = [
     {
         tableName: "character.json",
         scope: "cdn",
-        sourceOrderedMaps: [
-            "master/character/character.orderedmap",
-            "master/character/character_status.orderedmap",
-        ],
+        sourceOrderedMaps: ["master/character/character.orderedmap"],
         converterId: "character",
         converterVersion: 1,
         outputShapeVersion: 1,
@@ -135,10 +132,7 @@ const definitionInputs: TableSourceInput[] = [
     {
         tableName: "cdndata/character.json",
         scope: "cdn",
-        sourceOrderedMaps: [
-            "master/character/character.orderedmap",
-            "master/character/character_status.orderedmap",
-        ],
+        sourceOrderedMaps: ["master/character/character.orderedmap"],
         converterId: "character",
         converterVersion: 1,
         outputShapeVersion: 1,

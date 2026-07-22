@@ -38,6 +38,7 @@ import indexWebApiPlugin from "./routes/web_api"
 // misc routes
 import openapiPlugin from "./routes/openapi";
 import infodeskPlugin from "./routes/infodesk";
+import { initializeContentSnapshot } from "./content/runtime/content-snapshot";
 
 // gc-openapi-zinny3.kakaogames.com
 // gc-infodesk-zinny3.kakaogames.com
@@ -154,11 +155,15 @@ const listenHost = process.env.LISTEN_HOST ?? "localhost"
 
 const envListenPort = process.env.LISTEN_PORT === undefined ? 8000 : Number.parseInt(process.env.LISTEN_PORT)
 const listenPort = isNaN(envListenPort) ? 8000 : envListenPort
-fastify.listen({ port: listenPort, host: listenHost }, (err, address) => {
-    if (err) {
-        console.error(err)
-        fastify.log.error(err)
-        process.exit(1)
-    }
+
+async function bootstrap(): Promise<void> {
+    await initializeContentSnapshot()
+    await fastify.listen({ port: listenPort, host: listenHost })
     console.log(`StarPoint is listening on http://${listenHost}:${listenPort}`)
+}
+
+void bootstrap().catch(error => {
+    console.error(error)
+    fastify.log.error(error)
+    process.exit(1)
 })

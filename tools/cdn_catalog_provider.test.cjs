@@ -957,3 +957,17 @@ test("CN bootstrap initializes the content snapshot before listening", () => {
     assert.ok(sessionIndex >= 0)
     assert.ok(listenIndex < sessionIndex)
 })
+
+test("legacy bootstrap initializes the content snapshot before listening and exits on failure", () => {
+    const source = fs.readFileSync(path.join(__dirname, "../src/server.ts"), "utf8")
+    const initializeIndex = source.indexOf("await initializeContentSnapshot()")
+    const listenIndex = source.indexOf("await fastify.listen(")
+
+    assert.match(source, /import \{ initializeContentSnapshot \} from ["']\.\/content\/runtime\/content-snapshot["']/)
+    assert.ok(initializeIndex >= 0)
+    assert.ok(listenIndex >= 0)
+    assert.ok(initializeIndex < listenIndex)
+    assert.doesNotMatch(source, /^await\s/m)
+    assert.match(source, /async function bootstrap\(\): Promise<void>/)
+    assert.match(source, /void bootstrap\(\)\.catch\(error => \{[\s\S]*console\.error\(error\)[\s\S]*process\.exit\(1\)/)
+})

@@ -30,7 +30,7 @@
   -> 启动服务
 ```
 
-因此直接拉取代码后的默认数据体验不变。受支持的启动脚本会先执行快速同步预检查；官方 1.4.54 与 bundled fallback 一致时允许直接启动。
+因此直接拉取代码后的默认数据体验不变。受支持的启动脚本会先执行快速同步预检查；没有同步结果时使用 bundled 历史兼容基线，生成 Release 后则使用官方 CDN 重建结果。两者已验证的角色差异见 6.4。
 
 ### 2.2 新 CDN
 
@@ -272,6 +272,12 @@ Extractor 只处理转换器需要的资源，不解压整个 CDN。解析结果
 - 同一输入和同一 `converterVersion` 必须产生相同输出字节。
 - 转换器规则变化时增加 `converterVersion`。
 - 第一版允许每次运行全部转换器，不预先实现脏表依赖分析。
+
+### 6.4 角色 bundled/Release 兼容边界
+
+官方 1.4.54 的 `character` 与 `character_text` orderedmap 各有 505 个 key，转换后的两张 `cdndata` 表与仓库内 tracked 输出全量一致。`character.json` 的 `name`、`rarity`、`element` 也全量一致；`skill_count` 复现上游转换规则，严格解析 col36 后只统计值等于 `6` 的能力槽。
+
+仓库内 bundled `character.json` 是历史兼容基线，其中恰有 45 个角色保留 `skill_count=3`，而官方 1.4.54 重建值为 `6`；另有 12 个 `skill_count=2` 的特殊角色保持一致。没有 `current.json` 时继续保留 bundled 行为；同步 Release 以官方 CDN 为权威，不叠加历史 ID overlay。该 `3→6` 变化会让这些角色按现有规则获得第二张 mana board 的 bond token，属于已接受的数据源纠正，不额外修改觉醒业务逻辑。
 
 ## 七、完整逻辑快照与物理去重
 
@@ -540,7 +546,7 @@ Repository 在服务启动时固定数据来源。运行中修改 `current.json`
 - 没有 `current.json` 时旧服务端正常运行。
 - current 指针或对象损坏时服务启动明确失败。
 - Repository 的角色、卡池、商店数据与转换器输出一致。
-- 官方 1.4.54 真实 CDN 同步后，首轮接口行为与 bundled 基线一致。
+- 官方 1.4.54 真实 CDN 同步后，两张角色 `cdndata` 表和角色 `name`、`rarity`、`element` 与 bundled 基线一致；`skill_count` 保留 45 个已验证的 `3→6` 官方重建差异。
 - 同步和测试不修改原始 CDN、玩家 SQLite 或运行期种子文件。
 - 动态 Catalog 仍满足现有 latest、incremental、initial 和 Range 协议测试。
 
@@ -557,7 +563,7 @@ Repository 在服务启动时固定数据来源。运行中修改 `current.json`
 第一阶段：
 
 1. 使用当前官方 1.4.54 CDN 运行同步。
-2. 启动服务，验证角色、卡池和商店行为与 bundled 基线一致。
+2. 启动服务，验证角色 `cdndata`、大多数角色字段、卡池和商店行为与 bundled 基线一致，并确认 45 个角色的 `skill_count` 按官方数据从 3 重建为 6。
 3. 使用包含小范围角色、卡池或商店变更的测试 CDN 再次同步。
 4. 重启并确认服务端表和客户端内容同时变化。
 5. 验证版本相同跳过、`--force` 重建和回退流程。
