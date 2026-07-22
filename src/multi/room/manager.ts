@@ -15,6 +15,21 @@ const REMAINING_NOTIFY_MS = 30000; // send RemainingTime float 30s before disban
 // Track which rooms have already been notified (to avoid repeat floats)
 const notifiedRooms = new Set<string>();
 
+type RoomCleanupTimer = ReturnType<typeof setInterval>;
+
+export interface RoomCleanupOptions {
+    intervalMs?: number;
+    createInterval?: (callback: () => void, intervalMs: number) => RoomCleanupTimer;
+    clearInterval?: (timer: RoomCleanupTimer) => void;
+}
+
+export interface RoomCleanupStatus {
+    readonly running: boolean;
+}
+
+let cleanupTimer: RoomCleanupTimer | null = null;
+let clearCleanupInterval: ((timer: RoomCleanupTimer) => void) | null = null;
+
 function cleanExpiredRooms() {
     const now = Date.now();
     const timeOffset = now - getServerTime() * 1000;
@@ -43,7 +58,35 @@ function cleanExpiredRooms() {
     }
     if (cleaned > 0) console.log(`[MULTI] expired rooms cleaned: ${cleaned}`);
 }
-setInterval(cleanExpiredRooms, CLEAN_INTERVAL_MS);
+
+export function startRoomCleanup(options: RoomCleanupOptions = {}): void {
+    if (cleanupTimer) return;
+
+    const createInterval = options.createInterval ?? setInterval;
+    const clearIntervalHandle = options.clearInterval ?? clearInterval;
+    const timer = createInterval(cleanExpiredRooms, options.intervalMs ?? CLEAN_INTERVAL_MS);
+    try {
+        timer.unref();
+    } catch (error) {
+        clearIntervalHandle(timer);
+        throw error;
+    }
+    cleanupTimer = timer;
+    clearCleanupInterval = clearIntervalHandle;
+}
+
+export function stopRoomCleanup(): void {
+    if (!cleanupTimer) return;
+    const timer = cleanupTimer;
+    const clearIntervalHandle = clearCleanupInterval ?? clearInterval;
+    cleanupTimer = null;
+    clearCleanupInterval = null;
+    clearIntervalHandle(timer);
+}
+
+export function getRoomCleanupStatus(): RoomCleanupStatus {
+    return Object.freeze({ running: cleanupTimer !== null });
+}
 
 export const STATIC_ACCESS_TOKEN = "multi_battle_quest_access_token";
 

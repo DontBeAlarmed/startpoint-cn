@@ -121,6 +121,22 @@ export class SessionManager {
         return { ok: true, value: undefined }
     }
 
+    removeClientBySocket(socket: net.Socket): boolean {
+        for (const client of this.clients.values()) {
+            if (client.socket === socket) {
+                this.removeClient(client)
+                return true
+            }
+        }
+        for (const client of this.cidToBattleClient.values()) {
+            if (client.socket === socket) {
+                this.removeClient(client)
+                return true
+            }
+        }
+        return false
+    }
+
     getClientsInRoom(roomNumber: string): SessionClient[] {
         const set = this.roomClients.get(roomNumber)
         if (!set) return []

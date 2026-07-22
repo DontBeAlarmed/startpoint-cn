@@ -2,7 +2,12 @@
 // Re-exports for backward compatibility with cn-server.ts
 
 export { multiBattleRoutes } from "./http/register"
-export { startSessionServer, stopSessionServer } from "./tcp/server"
+export {
+    getSessionServerStatus,
+    isSessionServerListening,
+    startSessionServer,
+    stopSessionServer,
+} from "./tcp/server"
 export { sessionManager } from "./state/SessionManager"
 
 // Compatibility shims — mirror the old exports that other files depend on

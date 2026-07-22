@@ -24,6 +24,18 @@ import { resolveMultiPlayerContext } from "../player-context"
 
 const playerRankTable = require("../../../assets/cdndata/player_rank.json")
 
+export interface HandshakeLifecycleGuard {
+    /** Identifies the session-server generation that accepted this socket. */
+    readonly generation: number
+    /** Must be checked immediately before registering session or room state. */
+    isAccepting(): boolean
+}
+
+const unmanagedLifecycle: HandshakeLifecycleGuard = Object.freeze({
+    generation: 0,
+    isAccepting: () => true,
+})
+
 function getRankLevel(rankPoint: number): number {
     let level = 1
     for (const [lvl, data] of Object.entries(playerRankTable as Record<string, any>)) {
@@ -144,7 +156,11 @@ export function buildRealParty(playerId: number, targetParty?: PlayerParty): any
     }
 }
 
-export async function handleHandshake(socket: net.Socket, data: any): Promise<void> {
+export async function handleHandshake(
+    socket: net.Socket,
+    data: any,
+    lifecycle: HandshakeLifecycleGuard = unmanagedLifecycle,
+): Promise<void> {
     console.log(`[TCP] handshake:`, JSON.stringify(data).substring(0, 200))
 
     const socklet = data.socklet
@@ -158,6 +174,7 @@ export async function handleHandshake(socket: net.Socket, data: any): Promise<vo
             return
         }
 
+        if (!lifecycle.isAccepting()) return
         const battleClient = sessionManager.createClient(socket, 0, String(roomNumber), String(connectionId), null)
         battleClient.isBattle = true
         sessionManager.addBattleClient(String(connectionId), battleClient)
@@ -179,6 +196,8 @@ export async function handleHandshake(socket: net.Socket, data: any): Promise<vo
             socket.end()
             return
         }
+
+        if (!lifecycle.isAccepting()) return
 
         const { playerId, player } = ctx
         const connectionId = data.connection_id || data.connectionId || `${socket.remoteAddress}:${socket.remotePort}`
@@ -211,6 +230,7 @@ export async function handleHandshake(socket: net.Socket, data: any): Promise<vo
         }
         client.yourself = yourSelf
 
+        if (!lifecycle.isAccepting()) return
         sessionManager.addClientToRoom(client)
         sessionManager.sendJson(socket, [0, connectionId, roomNumber])
         return

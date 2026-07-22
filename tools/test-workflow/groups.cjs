@@ -29,8 +29,12 @@ const TEST_GROUPS = Object.freeze({
     "quick:protocol": {
         execution: "parallel",
         tests: [
+            "tools/handshake_lifecycle.test.cjs",
+            "tools/lobby_lifecycle.test.cjs",
             "tools/msgpack_compat.test.cjs",
             "tools/multi_player_context.test.cjs",
+            "tools/room_cleanup_lifecycle.test.cjs",
+            "tools/session_server_lifecycle.test.cjs",
         ],
     },
     "quick:cdn": {

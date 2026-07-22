@@ -359,3 +359,14 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/treasure_key_entry_data.test.cjs",
     ])
 })
+
+test("quick protocol includes multi runtime lifecycle coverage", () => {
+    assert.deepEqual(TEST_GROUPS["quick:protocol"].tests, [
+        "tools/handshake_lifecycle.test.cjs",
+        "tools/lobby_lifecycle.test.cjs",
+        "tools/msgpack_compat.test.cjs",
+        "tools/multi_player_context.test.cjs",
+        "tools/room_cleanup_lifecycle.test.cjs",
+        "tools/session_server_lifecycle.test.cjs",
+    ])
+})

@@ -5,6 +5,11 @@ import { NpcMateProvider } from "../npc/controller"
 import { buildRealParty } from "./handshake"
 import { PartyCategory } from "../../data/types"
 import { getPlayerPartyGroupListSync } from "../../data/domains/party"
+import {
+    getLobbyLifecycleGuard,
+    LobbyLifecycleGuard,
+    scheduleLobbyTask,
+} from "./lobby-lifecycle"
 
 const NPC_JOIN_DELAY_MS = parseInt(process.env.NPC_JOIN_DELAY_MS || "2000")
 const NPC_READY_DELAY_MS = parseInt(process.env.NPC_READY_DELAY_MS || "500")
@@ -91,7 +96,11 @@ export function notifyRoomDisbanded(roomNumber: string): void {
     sessionManager.broadcastToRoom(roomNumber, [1, [6, "multibattle_room_dismissed"]])
 }
 
-async function handleEnterComs(client: SessionClient, coms: { name: string }[]): Promise<void> {
+async function handleEnterComs(
+    client: SessionClient,
+    coms: { name: string }[],
+    lifecycle: LobbyLifecycleGuard = getLobbyLifecycleGuard(),
+): Promise<void> {
     const room = getRoom(client.roomNumber)
     if (!room) return
     room.is_npc_mode = true
@@ -124,6 +133,7 @@ async function handleEnterComs(client: SessionClient, coms: { name: string }[]):
 
     const npcProvider = new NpcMateProvider()
     const recruitResult = await npcProvider.onRecruit(client.roomNumber, String(room?.host_viewer_id ?? 0))
+    if (!lifecycle.isActive()) return
 
     // Fetch NPC party data from player's DB (uses real equipment/character IDs)
     const npcParties: any[] = []
@@ -183,14 +193,14 @@ async function handleEnterComs(client: SessionClient, coms: { name: string }[]):
 
     console.log(`[LOBBY] EnterComs: room=${client.roomNumber} real=${realMates.length} npc=${npcMates.length} total=${client.mates.length}`)
 
-    setTimeout(() => {
+    scheduleLobbyTask(() => {
         try {
             // Send Mates only to triggering client — others get theirs via handleEnter
             sessionManager.sendJson(client.socket, [1, [1, client.mates]])
         } catch (e) { console.error("[LOBBY] EnterComs send-mates error", e) }
     }, NPC_JOIN_DELAY_MS)
 
-    setTimeout(() => {
+    scheduleLobbyTask(() => {
         try {
             for (const npc of npcMates) {
                 npc.state = [1]
@@ -251,7 +261,7 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
             sessionManager.broadcastToRoom(client.roomNumber, [1, [1, client.mates]], `${client.viewerId}@${client.roomNumber}`)
         }
         if (room && room.npc_count > 0 && countRealPlayers(client.mates) < 3) {
-            setTimeout(() => { handleEnterComs(client, [{ name: "开心超人" }, { name: "名字真难取" }]).catch(e => console.error("[LOBBY] EnterComs (timer) error", e)); }, 500)
+            scheduleLobbyTask(lifecycle => { handleEnterComs(client, [{ name: "开心超人" }, { name: "名字真难取" }], lifecycle).catch(e => console.error("[LOBBY] EnterComs (timer) error", e)); }, 500)
         }
     } else {
         if (hostClient && client.yourself) {
