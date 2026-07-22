@@ -7,6 +7,7 @@ const path = require("node:path")
 const test = require("node:test")
 
 const {
+    FULL_MAX_PARALLEL_TESTS,
     MAX_PARALLEL_TESTS,
     buildGitCommands,
     classifyTestOutput,
@@ -15,6 +16,7 @@ const {
     main,
     mergeChangedFiles,
     parseArguments,
+    resolveMaxParallelTests,
     runParallel,
     summarizeResults,
 } = require("./run.cjs")
@@ -98,6 +100,45 @@ test("rejects conflicting selectors and base without changed", () => {
         () => parseArguments(["--changed", "--base", "-invalid-ref"]),
         /requires a git ref/i,
     )
+})
+
+test("uses conservative concurrency only for direct full, not files or changed leaf selection", () => {
+    assert.equal(FULL_MAX_PARALLEL_TESTS, 4)
+    assert.equal(resolveMaxParallelTests(parseArguments(["--group", "full"])), 4)
+    assert.equal(resolveMaxParallelTests(parseArguments(["--group", "quick"])), 8)
+    assert.equal(resolveMaxParallelTests(parseArguments(["--group", "quick:content"])), 8)
+    assert.equal(resolveMaxParallelTests(parseArguments(["--files", "tools/example.test.cjs"])), 8)
+    assert.equal(resolveMaxParallelTests(parseArguments(["--changed"])), 8)
+})
+
+test("rejects invalid parallel limits before scheduling", async () => {
+    const invalidLimits = [
+        0,
+        -1,
+        Number.NaN,
+        Number.POSITIVE_INFINITY,
+        1.5,
+        "4",
+        Number.MAX_SAFE_INTEGER + 1,
+    ]
+
+    for (const maxParallelTests of invalidLimits) {
+        await assert.rejects(
+            executeTestGroups(["quick:fixture"], {
+                cwd: process.cwd(),
+                maxParallelTests,
+                shouldStop: () => true,
+                testGroups: {
+                    "quick:fixture": {
+                        execution: "parallel",
+                        tests: ["must-not-run.cjs"],
+                    },
+                },
+                writeOutput() {},
+            }),
+            /maxParallelTests must be a positive safe integer/,
+        )
+    }
 })
 
 test("terminates every git path command with a double dash", () => {
@@ -340,6 +381,39 @@ test("runs eight real child processes within the parallel limit and clears activ
 
     assert.equal(peakActiveChildren, MAX_PARALLEL_TESTS)
     assert.ok(peakActiveChildren <= MAX_PARALLEL_TESTS)
+    assert.equal(report.results.length, tests.length)
+    assert.ok(report.results.every(result => result.status === "passed"))
+    assert.equal(activeChildren.size, 0)
+})
+
+test("honors an injected parallel limit for real child processes", async t => {
+    const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "test-workflow-bounded-parallel-"))
+    t.after(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }))
+    const maxParallelTests = 3
+    const tests = Array.from({ length: maxParallelTests * 2 }, (_, index) => `child-${index}.cjs`)
+    for (const file of tests) {
+        fs.writeFileSync(path.join(fixtureRoot, file), "setTimeout(() => {}, 100)\n")
+    }
+
+    let peakActiveChildren = 0
+    const activeChildren = new class extends Set {
+        add(child) {
+            super.add(child)
+            peakActiveChildren = Math.max(peakActiveChildren, this.size)
+            return this
+        }
+    }()
+    const report = await executeTestGroups(["quick:fixture"], {
+        activeChildren,
+        cwd: fixtureRoot,
+        maxParallelTests,
+        testGroups: {
+            "quick:fixture": { execution: "parallel", tests },
+        },
+        writeOutput() {},
+    })
+
+    assert.equal(peakActiveChildren, maxParallelTests)
     assert.equal(report.results.length, tests.length)
     assert.ok(report.results.every(result => result.status === "passed"))
     assert.equal(activeChildren.size, 0)

@@ -9,6 +9,7 @@ const { selectTestGroups } = require("./select-tests.cjs")
 const projectRoot = path.resolve(__dirname, "../..")
 const signalExitCodes = { SIGINT: 130, SIGTERM: 143 }
 const MAX_PARALLEL_TESTS = 8
+const FULL_MAX_PARALLEL_TESTS = 4
 
 function parseArguments(argv) {
     let mode = null
@@ -66,6 +67,12 @@ function parseArguments(argv) {
     }
 
     return { mode, group, files, base }
+}
+
+function resolveMaxParallelTests(parsed) {
+    return parsed.mode === "group" && parsed.group === "full"
+        ? FULL_MAX_PARALLEL_TESTS
+        : MAX_PARALLEL_TESTS
 }
 
 function mergeChangedFiles(fileLists) {
@@ -324,6 +331,10 @@ async function executeTestGroups(groupNames, options = {}) {
     const writeOutput = options.writeOutput ?? (value => process.stdout.write(value))
     const activeChildren = options.activeChildren ?? new Set()
     const shouldStop = options.shouldStop ?? (() => false)
+    const maxParallelTests = options.maxParallelTests ?? MAX_PARALLEL_TESTS
+    if (!Number.isSafeInteger(maxParallelTests) || maxParallelTests <= 0) {
+        throw new Error("maxParallelTests must be a positive safe integer")
+    }
     const leafNames = expandGroupNames(groupNames, testGroups, aggregateGroups)
     const startedAt = process.hrtime.bigint()
     const parallelItems = []
@@ -365,7 +376,7 @@ async function executeTestGroups(groupNames, options = {}) {
     const runItem = item => runTestFile({ ...item, cwd, activeChildren })
     const parallelResults = (await runParallel(
         parallelItems,
-        MAX_PARALLEL_TESTS,
+        maxParallelTests,
         runItem,
         shouldStop,
     ))
@@ -487,6 +498,7 @@ async function main(argv = process.argv.slice(2), options = {}) {
         const report = await executeTestGroups(requestedGroups, {
             activeChildren,
             cwd,
+            maxParallelTests: resolveMaxParallelTests(parsed),
             shouldStop: () => interruptedBy !== null,
             writeOutput,
         })
@@ -506,6 +518,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+    FULL_MAX_PARALLEL_TESTS,
     MAX_PARALLEL_TESTS,
     buildGitCommands,
     classifyTestOutput,
@@ -517,6 +530,7 @@ module.exports = {
     main,
     mergeChangedFiles,
     parseArguments,
+    resolveMaxParallelTests,
     runParallel,
     summarizeResults,
 }
