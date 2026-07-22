@@ -135,6 +135,14 @@ test("registers the focused CDN path contract", () => {
     assert.deepEqual(selectTestGroups(["tools/cdn_files.test.cjs"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["tools/audit_cdn_catalog.cjs"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["docs/cdn/catalog-planner.md"]), ["integration:cdn"])
+    assert.deepEqual(
+        selectTestGroups(["tools/content_sync_smoke.cjs"]),
+        ["integration:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["docs/cdn/content-sync.md"]),
+        ["integration:cdn", "integration:content"],
+    )
     assert.deepEqual(selectTestGroups(["tools/cdn_asset_import.test.cjs"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cn_asset_route.test.cjs"]), ["integration:cdn"])
 })

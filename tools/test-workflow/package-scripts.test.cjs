@@ -88,3 +88,11 @@ test("runs content sync through the TypeScript entry without a prebuild", () => 
     assert.doesNotMatch(scripts["content:sync"], /build/)
     assert.doesNotMatch(scripts["content:sync"], /--env-file/)
 })
+
+test("exposes the explicit real-CDN content smoke without adding it to normal tests", () => {
+    assert.equal(
+        scripts["content:smoke"],
+        "node tools/content_sync_smoke.cjs",
+    )
+    assert.doesNotMatch(scripts["content:smoke"], /--cdn-root|--content-root/)
+})

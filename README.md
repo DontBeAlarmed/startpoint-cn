@@ -62,6 +62,8 @@ npm run install:admin
 | `npm run build:legacy` | 使用原 `tsconfig.json` 编译 legacy 全量 TypeScript，不构建 CSS |
 | `npm run build` | 保留原有 legacy 全量 TypeScript + Tailwind CSS 构建语义 |
 | `npm run build:admin` | 仅构建管理后台，不安装依赖 |
+| `npm run content:sync` | 手动执行内容同步；支持 `--check` 或 `--force` |
+| `npm run content:smoke -- --cdn-root <CDN_PARENT> --content-root <TMP_ROOT>` | 在显式隔离目录执行真实 CDN force smoke，不启动服务 |
 | `npm run verify:full` | 依次执行类型检查、完整测试、仓库卫生检查和 CN 服务端构建 |
 | `npm run cdn` / `npm run unzip` | 先同步完成 legacy 编译，再运行对应 CDN 工具 |
 
@@ -118,6 +120,8 @@ bash scripts/start-cn.sh
 受支持入口会先完成 `content:sync` normal，只有同步成功才启动游戏服务。`scripts/start-cn.sh` 在前台依次执行 `build:server` 和 bootstrap，不执行 `pkill`、不创建 `nohup` 后台进程，也不写固定日志文件；需要后台运行时由调用者或进程管理器托管该前台命令并收集标准输出和标准错误。
 
 `node out/cn-server.js` 是低级调试入口，不会自动同步；直接使用前必须自行确认当前内容 Release 已准备并激活。
+
+Content Sync 的 fallback、`check`/`force`、Release 布局、真实 CDN smoke 和错误回退步骤见 [`docs/cdn/content-sync.md`](./docs/cdn/content-sync.md)。
 
 ## 关键配置(.env)
 

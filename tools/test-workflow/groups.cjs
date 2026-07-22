@@ -75,6 +75,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/content_dynamic_catalog.test.cjs",
             "tools/content_dynamic_catalog_integration.test.cjs",
             "tools/shop_repository_integration.test.cjs",
+            "tools/content_sync_smoke.test.cjs",
         ],
     },
     "integration:mission-compiled": {

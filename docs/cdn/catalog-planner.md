@@ -8,25 +8,27 @@
 
 - 官方 CN 1.8.1 客户端，仅修改服务器 IP 和跳过登录所需内容；
 - 停服前从官方 CDN 主机下载的 CN 1.4.54 dump；
-- 服务端使用版本库跟踪的 `assets/cdn/catalog-cn-1.4.54.json` 作为运行时 Catalog manifest；该 manifest 只引用 Android 所需的 common、medium（Catalog `quality` 层）和 platform 归档。
+- Content Sync 从该官方 dump 生成 current Release；没有 current Release 时，服务端才使用版本库跟踪的 `assets/cdn/catalog-cn-1.4.54.json` 作为 fallback Catalog。该 Catalog 只引用 Android 所需的 common、medium（Catalog `quality` 层）和 platform 归档。
 
 物理 dump 共含 692 个 ZIP，其中包括 Android 和 iOS 归档；tracked manifest 引用 677 个 Android common/medium/platform Catalog 归档，即 490 个 full 和 187 个 diff，不引用 5 个 iOS full 与 10 个 iOS diff。“完整”只表示这 677 个归档覆盖 manifest 声明的 Android Catalog 范围，不表示运行时使用全部 692 个物理 ZIP。
 
 Android Catalog 范围缺失、不完整、被修改、重新打包或自制的 CDN 不属于运行时兼容目标。CN 1.8.1 之外的客户端、额外修改资源下载器或战斗逻辑的客户端也不在保证范围内。
 
-## 启动加载流程
+## Content Release 与启动加载流程
 
-服务器启动按以下顺序构建受信任运行时：
+受支持入口先执行 normal Content Sync；版本或生成器变化时生成并原子激活新的 Release，同步失败则不启动游戏服务。详细命令、对象布局、smoke 和回退步骤见 [`content-sync.md`](content-sync.md)。
+
+游戏服务初始化按以下顺序构建受信任运行时：
 
 1. `resolveContentPaths` 解析 CDN 和内容目录。`CDN_DIR` 必须指向包含 `cn` 子目录的父目录，不能直接指向末尾的 `cn`。
-2. `CdnCatalogLoader` 读取跟踪文件 `assets/cdn/catalog-cn-1.4.54.json`。
-3. `parseCdnRuntimeManifest` 严格校验 schema、固定基线 `cn-1.4.54`、字段集合、版本、归档层、顺序、相对路径、大小和 SHA-256 字段格式。
-4. `buildCdnCatalog` 从 manifest 中的 `catalogInput` 构建 Catalog，并校验版本图、重复项、分叉、环、缺失层和路径。
-5. `validateCdnRuntimeFiles` 逐项 `stat` manifest 引用的归档和 `EntityLists`，只确认路径存在、是普通文件且大小与 `compressedBytes` 一致。
-6. 启用的补丁必须与 Catalog 中的版本边、归档名和大小一致。
-7. `ContentSnapshotProvider` 将 Catalog 深度冻结为统一 `ContentSnapshot`，随后各路由只读取该 snapshot。
+2. `ContentSnapshotProvider` 只读取一次 `.content/current.json` 对应的完整 Release snapshot。
+3. current 存在时，`CdnCatalogLoader` 从该 snapshot 的 Catalog 对象构建 Catalog，`ContentRepository` 从同一 snapshot 加载全部 94 张表；两者版本必须一致。
+4. current 不存在时，两者一起退回 tracked 官方 1.4.54 Catalog 与 bundled JSON。current、manifest 或对象损坏时明确失败，不静默 fallback。
+5. Catalog 严格校验 schema、版本、归档层、顺序、相对路径、大小、版本图、重复项、分叉、环和缺失层。
+6. 运行时逐项 `stat` Catalog 引用的归档和 `EntityLists`，只确认路径存在、是普通文件且大小与 `compressedBytes` 一致。
+7. `ContentSnapshotProvider` 将 Catalog 与 Repository 深度冻结为统一 `ContentSnapshot`，随后各路由只读取该 snapshot；运行期间 current 变化不会热切换。
 
-启动过程不会调用 `scanCdnCatalogInput`，不会读取全部 ZIP 内容计算 SHA-256，不会写入 digest cache，也不会写入 CDN、内容对象库或运行时缓存。目录中出现 manifest 未声明的新 ZIP 时，服务器不会自动发现、导入或提高目标版本。引用文件缺失、不是普通文件或大小不一致时，启动快速失败，不触发自动修复。
+游戏服务初始化本身不会扫描 CDN、读取全部 ZIP 计算 SHA-256、写 digest cache 或生成 Release。受支持入口在它之前执行的 Content Sync 会做目标扫描；只有版本或生成器变化、current 缺失或显式 `--force` 时才建立 ArchiveIndex 并转换内容。目录中新增 ZIP 不会被已经运行的服务热加载。
 
 ## 统一 Snapshot 与更新计划
 
@@ -127,9 +129,9 @@ node tools/audit_cdn_catalog.cjs --json \
 
 该结果来自显式离线完整扫描。它证明候选 manifest 与当时的官方 CDN 一致，不表示运行时会再次读取 10 GB 文件内容。
 
-## Recovery 与未来内容
+## Recovery 与内容同步
 
-`version_info.files_list` 当前指向 `/patch/cn/recovery/empty.csv`。该地址只返回 HTTP 200 的零字节 CSV，不提供逐文件 Recovery，也不会自动修复、重新下载或回滚 CDN。详细边界和后续 Content Builder/Release 候选流程见 [`runtime-support.md`](runtime-support.md)。
+`version_info.files_list` 当前指向 `/patch/cn/recovery/empty.csv`。该地址只返回 HTTP 200 的零字节 CSV，不提供逐文件 Recovery，也不会自动修复、重新下载或回滚 CDN。Content Release 负责让 Planner Catalog 与服务端 Repository 同源，不替代客户端 Recovery；错误 CDN 的服务端回退和客户端缓存处理见 [`content-sync.md` 的“回退步骤”](content-sync.md#回退步骤)。
 
 ## 客户端验收清单
 

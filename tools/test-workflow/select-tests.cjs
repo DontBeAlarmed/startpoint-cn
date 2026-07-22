@@ -62,8 +62,12 @@ function groupsForFile(filePath) {
     if (testGroups.length > 0) return testGroups
     if (filePath === "tools/test-workflow/groups.cjs") return ["full"]
     if (filePath.startsWith("tools/test-workflow/")) return ["quick:workflow"]
+    if (filePath === "tools/content_sync_smoke.cjs") return ["integration:content"]
     if (filePath === "tools/audit_cdn_catalog.cjs") return ["integration:cdn"]
     if (filePath === "docs/cdn/catalog-planner.md") return ["integration:cdn"]
+    if (filePath === "docs/cdn/content-sync.md") {
+        return ["integration:cdn", "integration:content"]
+    }
 
     const matchedGroups = SOURCE_RULES
         .filter(rule => rule.pattern.test(filePath))
