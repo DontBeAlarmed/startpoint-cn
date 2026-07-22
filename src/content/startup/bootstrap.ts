@@ -1,6 +1,8 @@
 import { spawn as spawnChildProcess } from "node:child_process"
 import path from "node:path"
 
+import { parseAssetProviderConfig } from "../cdn/asset-mode"
+
 export interface StartupOutcome {
     readonly code: number | null
     readonly signal: NodeJS.Signals | null
@@ -57,6 +59,7 @@ export async function runContentStartup(
     const projectRoot = path.resolve(dependencies.projectRoot ?? path.resolve(__dirname, "../../.."))
     const executable = dependencies.executable ?? process.execPath
     const env = dependencies.env ?? process.env
+    const assetProvider = parseAssetProviderConfig({ projectRoot, env })
     const processTarget = dependencies.processTarget ?? process
     const spawn = dependencies.spawn ?? ((command, args, options) => (
         spawnChildProcess(command, args, options)
@@ -117,16 +120,18 @@ export async function runContentStartup(
     }
 
     try {
-        const syncOutcome = await runStage(
-            "sync",
-            path.join(projectRoot, "tools/content_sync.cjs"),
-        )
-        if (
-            shutdownSignal !== null
-            || syncOutcome.signal !== null
-            || syncOutcome.code !== 0
-        ) {
-            return syncOutcome
+        if (assetProvider.mode === "local") {
+            const syncOutcome = await runStage(
+                "sync",
+                path.join(projectRoot, "tools/content_sync.cjs"),
+            )
+            if (
+                shutdownSignal !== null
+                || syncOutcome.signal !== null
+                || syncOutcome.code !== 0
+            ) {
+                return syncOutcome
+            }
         }
         return await runStage(
             "server",

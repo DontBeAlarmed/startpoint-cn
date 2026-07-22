@@ -908,7 +908,7 @@ test("integration:content 包含离线 smoke fixture，quick 与自动组不运�
     const { TEST_GROUPS } = require("./test-workflow/groups.cjs")
     const quickTests = TEST_GROUPS["quick:content"].tests
     const integrationTests = TEST_GROUPS["integration:content"].tests
-    assert.equal(quickTests.length, 13)
+    assert.equal(quickTests.length, 14)
     assert.equal(integrationTests.length, 4)
     assert.equal(quickTests.includes("tools/content_sync_smoke.test.cjs"), false)
     assert.ok(integrationTests.includes("tools/content_sync_smoke.test.cjs"))

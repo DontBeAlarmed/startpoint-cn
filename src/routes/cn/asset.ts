@@ -1,23 +1,22 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
-import { isIP } from "node:net"
-import os from "node:os"
+import path from "node:path"
 import {
     CdnPlannerError,
     planCdnUpdate,
     type CdnPlannerErrorCode,
 } from "../../content/cdn/planner"
+import {
+    isValidAssetVersion,
+    parseAssetProviderConfig,
+    type AssetModeEnvironment,
+    type AssetProviderConfig,
+} from "../../content/cdn/asset-mode"
 import { normalizeCdnBaseUrl, serializeCdnUpdatePlan } from "../../content/cdn/protocol"
 import type { ContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { generateDataHeaders } from "../../utils"
 
-interface AssetRouteEnvironment {
-    readonly [name: string]: string | undefined
-    readonly CDN_BASE_URL?: string
-    readonly CN_PUBLIC_HOST?: string
-    readonly CN_LISTEN_HOST?: string
-    readonly CN_LISTEN_PORT?: string
-}
+type AssetRouteEnvironment = AssetModeEnvironment
 
 export type AssetTargetSummary =
     | { readonly type: "string"; readonly length: number; readonly value?: string; readonly truncated: boolean }
@@ -44,6 +43,7 @@ export type AssetRouteErrorLogger = (details: AssetRouteErrorDetails) => void
 
 export interface CnAssetRouteOptions {
     readonly getSnapshot?: () => ContentSnapshot
+    readonly provider?: AssetProviderConfig
     readonly env?: AssetRouteEnvironment
     readonly warn?: (details: AssetTargetMismatchWarning) => void
     readonly logError?: AssetRouteErrorLogger
@@ -55,78 +55,19 @@ function headerValue(request: FastifyRequest, name: string): string | undefined 
     return typeof value === "string" ? value : undefined
 }
 
-function isUnspecifiedIpHost(hostname: string): boolean {
-    const unwrapped = hostname.startsWith("[") && hostname.endsWith("]")
-        ? hostname.slice(1, -1)
-        : hostname
-    return unwrapped === "0.0.0.0"
-        || (isIP(unwrapped) === 6 && /^[0:]+$/.test(unwrapped))
-}
-
-function formatTrustedHost(value: string): string {
-    if (!value
-        || value !== value.trim()
-        || /[\x00-\x20\x7f]/.test(value)
-        || /[\\/@?#]/.test(value)) {
-        throw new Error("configured CDN host is invalid")
-    }
-    if (isUnspecifiedIpHost(value) || /^\d+$/.test(value)) {
-        throw new Error("configured CDN host is invalid")
-    }
-    if (value.startsWith("[") || value.endsWith("]")) {
-        if (!value.startsWith("[") || !value.endsWith("]") || isIP(value.slice(1, -1)) !== 6) {
-            throw new Error("configured CDN host is invalid")
-        }
-        return value
-    }
-    if (isIP(value) === 6) return `[${value}]`
-    if (isIP(value) === 4) return value
-    if (/^[0-9.]+$/.test(value)) throw new Error("configured CDN host is invalid")
-    if (value.length > 253 || !/^[A-Za-z0-9.-]+$/.test(value)) {
-        throw new Error("configured CDN host is invalid")
-    }
-    const labels = value.split(".")
-    if (labels.some(label => (
-        !label
-        || label.length > 63
-        || label.startsWith("-")
-        || label.endsWith("-")
-    ))) {
-        throw new Error("configured CDN host is invalid")
-    }
-    return value
-}
-
-function resolveCdnListenHost(listenHost: string): string {
-    const addresses = Object.values(os.networkInterfaces()).flatMap(items => items ?? [])
-    const preferredFamily = listenHost === "::" ? "IPv6" : "IPv4"
-    const preferred = addresses.find(address => !address.internal && address.family === preferredFamily)
-    const fallback = addresses.find(address => !address.internal)
-    return preferred?.address ?? fallback?.address ?? (listenHost === "::" ? "::1" : "127.0.0.1")
-}
-
-function requireTrustedPort(value: string): number {
-    if (!/^[1-9]\d{0,4}$/.test(value)) throw new Error("configured CDN port is invalid")
-    const port = Number(value)
-    if (port > 65535) throw new Error("configured CDN port is invalid")
-    return port
-}
-
 export function getCdnBase(
     env: AssetRouteEnvironment = process.env,
-    resolveListenHost: (listenHost: string) => string = resolveCdnListenHost,
+    resolveListenHost?: (listenHost: string) => string,
 ): string {
-    if (env.CDN_BASE_URL !== undefined) return normalizeCdnBaseUrl(env.CDN_BASE_URL)
-    const publicHost = env.CN_PUBLIC_HOST
-    const listenHost = env.CN_LISTEN_HOST ?? "127.0.0.1"
-    const selectedHost = publicHost !== undefined
-        ? publicHost
-        : listenHost === "0.0.0.0" || listenHost === "::"
-            ? resolveListenHost(listenHost)
-            : listenHost
-    const host = formatTrustedHost(selectedHost)
-    const port = requireTrustedPort(env.CN_LISTEN_PORT ?? "8001")
-    return normalizeCdnBaseUrl(`http://${host}:${port}/patch/cn`)
+    const provider = parseAssetProviderConfig({
+        projectRoot: path.resolve(__dirname, "../../.."),
+        env,
+        resolveListenHost,
+    })
+    if (provider.mode === "client-owned") {
+        throw new Error("client-owned asset mode does not expose a CDN base URL")
+    }
+    return provider.baseUrl
 }
 
 function summarizeClientTarget(value: unknown): AssetTargetSummary {
@@ -224,9 +165,31 @@ function sendPlannerError(
 const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) => {
     const snapshot = options.getSnapshot ?? getContentSnapshot
     const env = options.env ?? process.env
-    const resolveListenHost = options.resolveListenHost ?? resolveCdnListenHost
+    const getProvider = (): AssetProviderConfig => options.provider ?? parseAssetProviderConfig({
+        projectRoot: path.resolve(__dirname, "../../.."),
+        env,
+        resolveListenHost: options.resolveListenHost,
+    })
 
     fastify.post("/version_info", async (request, reply) => {
+        let provider: AssetProviderConfig
+        try {
+            provider = getProvider()
+        } catch (error) {
+            return sendAssetRouteError(request, reply, "ASSET_SERVICE_ERROR", error, options.logError)
+        }
+        if (provider.mode === "client-owned") {
+            return reply.type("application/json").send({
+                data_headers: generateDataHeaders({ asset_update: false }),
+                data: {
+                    base_url: "",
+                    files_list: "",
+                    total_size: 0,
+                    delayed_assets_size: 0,
+                },
+            })
+        }
+
         let contentSnapshot: ContentSnapshot
         try {
             contentSnapshot = snapshot()
@@ -243,7 +206,7 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
         try {
             return reply.type("application/json").send({
                 data_headers: generateDataHeaders(),
-                data: getCdnVersionInfo(getCdnBase(env, resolveListenHost), contentSnapshot),
+                data: getCdnVersionInfo(provider.baseUrl, contentSnapshot),
             })
         } catch (error) {
             return sendAssetRouteError(request, reply, "ASSET_SERVICE_ERROR", error, options.logError)
@@ -267,6 +230,38 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
             })
         }
 
+        let provider: AssetProviderConfig
+        try {
+            provider = getProvider()
+        } catch (error) {
+            return sendAssetRouteError(request, reply, "ASSET_SERVICE_ERROR", error, options.logError)
+        }
+
+        const currentVersion = headerValue(request, "res_ver")
+        if (provider.mode === "client-owned") {
+            if (!isValidAssetVersion(currentVersion)) {
+                return reply.status(400).type("application/json").send({
+                    code: "INVALID_RES_VERSION",
+                    message: "a valid RES_VER header is required in client-owned asset mode",
+                })
+            }
+            return reply.status(200).type("application/json").send({
+                data_headers: generateDataHeaders({ asset_update: false }),
+                data: {
+                    info: {
+                        client_asset_version: currentVersion,
+                        target_asset_version: currentVersion,
+                        eventual_target_asset_version: currentVersion,
+                        is_initial: false,
+                    },
+                    full: null,
+                    diff: null,
+                    asset_version_hash: "",
+                    delayed_assets_size: 0,
+                },
+            })
+        }
+
         let contentSnapshot: ContentSnapshot
         try {
             contentSnapshot = snapshot()
@@ -280,7 +275,7 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
             )
         }
 
-        const currentVersion = headerValue(request, "res_ver") ?? null
+        const plannerCurrentVersion = currentVersion ?? null
         try {
             const body = request.body as { target_asset_version?: unknown } | null | undefined
             const clientTarget = body?.target_asset_version
@@ -294,15 +289,15 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
             }
 
             const plan = planCdnUpdate(contentSnapshot.cdn, {
-                currentVersion,
+                currentVersion: plannerCurrentVersion,
                 targetVersion: contentSnapshot.cdn.targetVersion,
                 platform: "android",
                 assetSizeKind: "fulfill",
-                isInitial: currentVersion === null,
+                isInitial: plannerCurrentVersion === null,
             })
             const data = serializeCdnUpdatePlan(plan, {
-                baseUrl: getCdnBase(env, resolveListenHost),
-                currentVersion,
+                baseUrl: provider.baseUrl,
+                currentVersion: plannerCurrentVersion,
                 targetVersion: contentSnapshot.cdn.targetVersion,
             })
             return reply.status(200).type("application/json").send({

@@ -90,6 +90,45 @@ for (const releaseState of ["版本未变化", "版本已变化并激活 Release
     })
 }
 
+test("显式 local 与默认模式一样先 sync 再启动 server", async () => {
+    const { runContentStartup } = loadBootstrap()
+    const harness = createHarness()
+    harness.dependencies.env = { ASSET_MODE: "local" }
+
+    const running = runContentStartup(harness.dependencies)
+    assert.equal(path.basename(harness.calls[0].args[0]), "content_sync.cjs")
+    await finishSync(harness)
+    assert.equal(path.basename(harness.calls[1].args[0]), "cn-server.js")
+    harness.children[1].emit("close", 0, null)
+    assert.deepEqual(await running, { code: 0, signal: null })
+})
+
+for (const mode of ["remote", "client-owned"]) {
+    test(`${mode} 直接启动 server 且不触碰本地 CDN 配置`, async () => {
+        const { runContentStartup } = loadBootstrap()
+        const harness = createHarness()
+        harness.dependencies.env = mode === "remote"
+            ? {
+                ASSET_MODE: mode,
+                CDN_BASE_URL: "https://cdn.example.test/patch/cn",
+                CDN_DIR: "must-be-ignored/cn",
+            }
+            : {
+                ASSET_MODE: mode,
+                CDN_BASE_URL: "not a URL",
+                CDN_DIR: "must-be-ignored/cn",
+            }
+
+        const running = runContentStartup(harness.dependencies)
+        assert.equal(harness.calls.length, 1)
+        assert.equal(path.basename(harness.calls[0].args[0]), "cn-server.js")
+        harness.children[0].emit("close", 0, null)
+
+        assert.deepEqual(await running, { code: 0, signal: null })
+        assert.equal(harness.calls.length, 1)
+    })
+}
+
 test("sync 非零退出时不启动 server 并透传退出码", async () => {
     const { runContentStartup } = loadBootstrap()
     const harness = createHarness()

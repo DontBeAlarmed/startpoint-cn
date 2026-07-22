@@ -45,6 +45,11 @@ export interface ResolveContentPathsOptions extends ResolvePathDependencies {
     readonly env?: ContentPathEnvironment
 }
 
+export interface ResolveContentRootDirOptions extends ResolvePathDependencies {
+    readonly projectRoot: string
+    readonly env?: ContentPathEnvironment
+}
+
 const defaultFsApi: PathFileSystem = {
     existsSync: filePath => fs.existsSync(filePath),
     realpathSync: filePath => fs.realpathSync(filePath),
@@ -163,6 +168,22 @@ export function resolveCnCdnRoot(
     const pathApi = dependencies.pathApi ?? path
     const fsApi = dependencies.fsApi ?? defaultFsApi
     return pathApi.join(resolveCdnDir(cdnDir, projectRoot, pathApi, fsApi), "cn")
+}
+
+export function resolveContentRootDir({
+    projectRoot,
+    env = process.env,
+    pathApi = path,
+    fsApi = defaultFsApi,
+}: ResolveContentRootDirOptions): string {
+    const root = requireAbsoluteProjectRoot(projectRoot, pathApi)
+    return resolveConfiguredPath(
+        env.CONTENT_DIR ?? ".content",
+        root,
+        "CONTENT_DIR",
+        pathApi,
+        fsApi,
+    )
 }
 
 function assertIsolatedContentPaths(

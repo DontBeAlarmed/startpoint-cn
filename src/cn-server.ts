@@ -7,14 +7,13 @@ import { existsSync, readFileSync } from "fs";
 import { getServerTime } from "./utils";
 import { restoreTimeOffset } from "./data/activeAccount";
 import { initializeContentSnapshot } from "./content/runtime/content-snapshot";
+import { parseAssetProviderConfig } from "./content/cdn/asset-mode";
 
 import versionCheckPlugin from "./routes/cn/versionCheck";
 import leitingAuthPlugin from "./routes/cn/leitingAuth";
 import cnToolPlugin from "./routes/cn/tool";
 import cnLoadPlugin from "./routes/cn/load";
-import cnAssetPlugin from "./routes/cn/asset";
-import cnAssetInTitlePlugin from "./routes/cn/assetInTitle";
-import cnCdnFilesPlugin from "./routes/cn/cdnFiles";
+import { registerCnAssetProviderRoutes } from "./routes/cn/asset-provider";
 import { registerCnMsgpackOnSend } from "./routes/cn/msgpack";
 import indexWebPlugin from "./routes/web";
 import indexWebApiPlugin from "./routes/web_api";
@@ -63,6 +62,9 @@ const fastify = Fastify({
         level: "info"
     },
     bodyLimit: 262144  // 256KB — covers /single_battle_quest/finish large battle stats
+});
+const assetProviderConfig = parseAssetProviderConfig({
+    projectRoot: path.resolve(__dirname, ".."),
 });
 
 // Restore saved time offset from active player on startup
@@ -116,9 +118,11 @@ fastify.register(versionCheckPlugin);
 fastify.register(leitingAuthPlugin, { prefix: "/api/index.php" });
 
 const apiPrefix = "/api/index.php";
-fastify.register(cnLoadPlugin, { prefix: apiPrefix });
-fastify.register(cnAssetPlugin, { prefix: `${apiPrefix}/asset` });
-fastify.register(cnAssetInTitlePlugin, { prefix: `${apiPrefix}/assetintitle` });
+fastify.register(cnLoadPlugin, {
+    prefix: apiPrefix,
+    assetProvider: assetProviderConfig,
+});
+registerCnAssetProviderRoutes(fastify, { config: assetProviderConfig });
 
 function stubMsgpackReply(reply: any, data: any) {
     const servertime = getServerTime()
@@ -320,8 +324,6 @@ fastify.register(indexWebPlugin);
 fastify.register(indexWebApiPlugin, { prefix: "/api" });
 fastify.register(seedsWebApiPlugin, { prefix: "/api/seeds" });
 
-fastify.register(cnCdnFilesPlugin);
-
 // Web static assets
 fastify.register(fastifyStatic, {
     root: path.join(__dirname, "..", "web", "public"),
@@ -360,7 +362,10 @@ const host = process.env.CN_LISTEN_HOST ?? "127.0.0.1";
 const port = parseInt(process.env.CN_LISTEN_PORT ?? "8001");
 
 async function bootstrap(): Promise<void> {
-    await initializeContentSnapshot();
+    await initializeContentSnapshot({
+        assetMode: assetProviderConfig.mode,
+        localCdn: assetProviderConfig.mode === "local",
+    });
     await fastify.listen({ port, host });
     console.log(`CN StarPoint listening on http://${host}:${port}`);
 

@@ -1,6 +1,7 @@
 import path from "node:path"
 
 import { deepFreeze } from "../deep-freeze"
+import type { AssetMode } from "../cdn/asset-mode"
 import { CdnCatalogLoader } from "../cdn/catalog-loader"
 import type { CdnCatalog } from "../cdn/types"
 import {
@@ -10,6 +11,7 @@ import {
 } from "./content-repository"
 import {
     resolveContentPaths,
+    resolveContentRootDir,
     type ContentPathEnvironment,
     type ContentPaths,
 } from "../paths"
@@ -149,6 +151,109 @@ export class ContentSnapshotProvider {
     }
 }
 
+export interface ContentSnapshotRuntimeConfiguration {
+    readonly assetMode: AssetMode
+    readonly localCdn: boolean
+}
+
+export interface InitializeContentSnapshotOptions {
+    readonly assetMode?: AssetMode
+    readonly localCdn?: boolean
+}
+
+export type ContentSnapshotConfigurationErrorCode =
+    | "CONTENT_SNAPSHOT_CONFIGURATION_CONFLICT"
+    | "CONTENT_SNAPSHOT_CONFIGURATION_INVALID"
+
+export class ContentSnapshotConfigurationError extends Error {
+    readonly code: ContentSnapshotConfigurationErrorCode
+
+    constructor(code: ContentSnapshotConfigurationErrorCode, message: string) {
+        super(message)
+        this.name = "ContentSnapshotConfigurationError"
+        this.code = code
+    }
+}
+
+export interface ConfiguredContentSnapshotProviderDependencies {
+    readonly createProvider: (
+        configuration: ContentSnapshotRuntimeConfiguration,
+    ) => ContentSnapshotProvider
+}
+
+interface ConfiguredContentSnapshotState {
+    configuration: ContentSnapshotRuntimeConfiguration | null
+    provider: ContentSnapshotProvider | null
+}
+
+function normalizeRuntimeConfiguration(
+    options: InitializeContentSnapshotOptions,
+): ContentSnapshotRuntimeConfiguration {
+    const assetMode = options.assetMode ?? "local"
+    const expectedLocalCdn = assetMode === "local"
+    const localCdn = options.localCdn ?? expectedLocalCdn
+    if (localCdn !== expectedLocalCdn) {
+        throw new ContentSnapshotConfigurationError(
+            "CONTENT_SNAPSHOT_CONFIGURATION_INVALID",
+            "content snapshot runtime configuration is invalid",
+        )
+    }
+    return Object.freeze({ assetMode, localCdn })
+}
+
+function lockRuntimeConfiguration(
+    state: ConfiguredContentSnapshotState,
+    requested: ContentSnapshotRuntimeConfiguration,
+): void {
+    const current = state.configuration
+    if (current === null) {
+        state.configuration = requested
+        return
+    }
+    if (current.assetMode !== requested.assetMode || current.localCdn !== requested.localCdn) {
+        throw new ContentSnapshotConfigurationError(
+            "CONTENT_SNAPSHOT_CONFIGURATION_CONFLICT",
+            "content snapshot runtime configuration is already locked",
+        )
+    }
+}
+
+export class ConfiguredContentSnapshotProvider extends ContentSnapshotProvider {
+    private readonly runtimeState: ConfiguredContentSnapshotState
+
+    constructor(dependencies: ConfiguredContentSnapshotProviderDependencies) {
+        const state: ConfiguredContentSnapshotState = {
+            configuration: null,
+            provider: null,
+        }
+        super({
+            snapshotSource: Object.freeze({
+                load(): Promise<ContentSnapshot> {
+                    if (state.configuration === null) {
+                        state.configuration = normalizeRuntimeConfiguration({})
+                    }
+                    if (state.provider === null) {
+                        state.provider = dependencies.createProvider(state.configuration)
+                    }
+                    return state.provider.initialize()
+                },
+            }),
+        })
+        this.runtimeState = state
+    }
+
+    initialize(options: InitializeContentSnapshotOptions = {}): Promise<ContentSnapshot> {
+        lockRuntimeConfiguration(this.runtimeState, normalizeRuntimeConfiguration(options))
+        return super.initialize()
+    }
+}
+
+export function createConfiguredContentSnapshotProvider(
+    dependencies: ConfiguredContentSnapshotProviderDependencies,
+): ConfiguredContentSnapshotProvider {
+    return new ConfiguredContentSnapshotProvider(dependencies)
+}
+
 async function loadSnapshotPair(
     loadCatalog: () => Promise<CdnCatalog>,
     loadRepository: () => Promise<ReadonlyContentRepository>,
@@ -179,7 +284,7 @@ export interface ProjectContentSnapshotProviderDependencies {
         readonly env: ContentPathEnvironment
     }) => ContentPaths
     readonly createStore?: (
-        paths: ContentPaths,
+        paths: Pick<ContentPaths, "contentRootDir">,
     ) => Pick<ContentObjectStore, "readCurrentReleaseSnapshot">
     readonly catalog?: CatalogLoaderDependencies
     readonly repository?: ContentRepositoryDependencies
@@ -188,24 +293,34 @@ export interface ProjectContentSnapshotProviderDependencies {
 export interface ProjectContentSnapshotProviderOptions {
     readonly projectRoot: string
     readonly env?: ContentPathEnvironment
+    readonly localCdn?: boolean
     readonly dependencies?: ProjectContentSnapshotProviderDependencies
 }
 
 export function createProjectContentSnapshotProvider({
     projectRoot,
     env = process.env,
+    localCdn = true,
     dependencies = {},
 }: ProjectContentSnapshotProviderOptions): ContentSnapshotProvider {
     const resolvedProjectRoot = path.resolve(projectRoot)
     const catalogLoader = new CdnCatalogLoader({
         projectRoot: resolvedProjectRoot,
         env,
+        localCdn,
         dependencies: dependencies.catalog,
     })
     const snapshotSource: ContentSnapshotSource = Object.freeze({
         async load(): Promise<ContentSnapshot> {
             const resolvePaths = dependencies.resolvePaths ?? resolveContentPaths
-            const paths = resolvePaths({ projectRoot: resolvedProjectRoot, env })
+            const paths = localCdn
+                ? resolvePaths({ projectRoot: resolvedProjectRoot, env })
+                : {
+                    contentRootDir: resolveContentRootDir({
+                        projectRoot: resolvedProjectRoot,
+                        env,
+                    }),
+                }
             const createStore = dependencies.createStore
                 ?? (resolved => new ContentObjectStore(resolved))
             const release: ContentCurrentReleaseSnapshot | null = await createStore(paths)
@@ -233,12 +348,19 @@ export const productionRepositorySource: ContentRepositorySource = Object.freeze
     }),
 })
 
-export const productionContentSnapshotProvider = createProjectContentSnapshotProvider({
-    projectRoot: resolveContentProjectRoot(__dirname),
+export const productionContentSnapshotProvider = createConfiguredContentSnapshotProvider({
+    createProvider: configuration => (
+        createProjectContentSnapshotProvider({
+            projectRoot: resolveContentProjectRoot(__dirname),
+            localCdn: configuration.localCdn,
+        })
+    ),
 })
 
-export function initializeContentSnapshot(): Promise<ContentSnapshot> {
-    return productionContentSnapshotProvider.initialize()
+export function initializeContentSnapshot(
+    options: InitializeContentSnapshotOptions = {},
+): Promise<ContentSnapshot> {
+    return productionContentSnapshotProvider.initialize(options)
 }
 
 export function getContentSnapshot(): ContentSnapshot {

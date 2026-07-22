@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import path from "node:path";
 import { generateDataHeaders, getServerTime, getServerDate } from "../../utils";
 import { collectPlayerDataPooledExpSync, dailyResetPlayerDataSync, getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getPlayerActiveQuestSync, updatePlayerActiveQuestEntryItemCountSync } from "../../data/domains/quest_active"
@@ -12,6 +13,11 @@ import { restoreActiveQuestFromStorage } from "../../lib/quest/entry-lifecycle";
 import { ActiveQuest, publishActiveQuest, runAbortActiveQuestTransaction } from "../../lib/quest/active-quest-service";
 import type { StartEntryCost } from "../../lib/quest/start-entry";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
+import {
+    parseAssetProviderConfig,
+    resolveAssetLoadState,
+    type AssetProviderConfig,
+} from "../../content/cdn/asset-mode";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
 
 interface CnLoadBody {
@@ -28,8 +34,8 @@ interface CnLoadBody {
     viewer_id?: number;
 }
 
-function wrapOptionFields(d: any, resVer?: string) {
-    d.available_asset_version = getContentSnapshot().cdn.targetVersion;
+function wrapOptionFields(d: any, availableAssetVersion: string) {
+    d.available_asset_version = availableAssetVersion;
 
     if (d.user_info) {
         if (typeof d.user_info.last_login_time === 'number') {
@@ -109,7 +115,15 @@ function wrapOptionFields(d: any, resVer?: string) {
     return d;
 }
 
-const routes = async (fastify: FastifyInstance) => {
+export interface CnLoadRouteOptions {
+    readonly assetProvider?: AssetProviderConfig;
+}
+
+const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => {
+    const assetProvider = options.assetProvider ?? parseAssetProviderConfig({
+        projectRoot: path.resolve(__dirname, "../../.."),
+    });
+
     fastify.post("/load", async (request: FastifyRequest, reply: FastifyReply) => {
         try {
         const body = request.body as CnLoadBody;
@@ -168,7 +182,11 @@ const routes = async (fastify: FastifyInstance) => {
 
         const resVer = request.headers['res_ver'] as string | undefined;
         console.log(`[CN-LOAD] res_ver=${resVer || '(not sent)'} account=${accountId} player=${playerId} party_slot=${clientData?.user_info?.party_slot}`);
-        wrapOptionFields(clientData, resVer);
+        const snapshotTargetVersion = assetProvider.mode === "client-owned"
+            ? ""
+            : getContentSnapshot().cdn.targetVersion;
+        const assetState = resolveAssetLoadState(assetProvider, resVer, snapshotTargetVersion);
+        wrapOptionFields(clientData, assetState.availableAssetVersion);
 
         // Inject unfinished quest lists for battle recovery
         if (activeQuest) {
@@ -188,7 +206,7 @@ const routes = async (fastify: FastifyInstance) => {
         reply.header("content-type", "application/x-msgpack");
         reply.status(200).send({
             data_headers: generateDataHeaders({
-                asset_update: true,
+                asset_update: assetState.assetUpdate,
                 viewer_id: accountId,
                 servertime: getServerTime(),
             }),

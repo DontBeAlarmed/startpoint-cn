@@ -944,15 +944,15 @@ test("content project root resolution is independent of cwd in src and out layou
 
 test("CN bootstrap initializes the content snapshot before listening", () => {
     const source = fs.readFileSync(path.join(__dirname, "../src/cn-server.ts"), "utf8")
-    const initializeIndex = source.indexOf("await initializeContentSnapshot()")
+    const initializeIndex = source.indexOf("await initializeContentSnapshot({")
     const listenIndex = source.indexOf("await fastify.listen(")
 
     assert.ok(initializeIndex >= 0)
     assert.ok(listenIndex >= 0)
     assert.ok(initializeIndex < listenIndex)
     assert.doesNotMatch(source, /^await\s/m)
-    assert.match(source, /fastify\.register\(cnAssetInTitlePlugin/)
-    assert.match(source, /fastify\.register\(cnCdnFilesPlugin\)/)
+    assert.match(source, /registerCnAssetProviderRoutes\(fastify/)
+    assert.doesNotMatch(source, /fastify\.register\(cnCdnFilesPlugin\)/)
     assert.doesNotMatch(source, /getCdnVersionInfo\(CDN_BASE_URL\)/)
     assert.doesNotMatch(source, /asset-patch\/active\/:file/)
     assert.doesNotMatch(source, /CDN_TOTAL_SIZE|ENTITY_LISTS_DIR/)

@@ -4,6 +4,7 @@ import path from "node:path"
 import { BUNDLED_CDN_CATALOG_VERSION } from "../constants"
 import {
     resolveContentPaths,
+    resolveContentRootDir,
     type ContentPathEnvironment,
     type ContentPaths,
 } from "../paths"
@@ -55,7 +56,7 @@ export interface CatalogLoaderDependencies {
     ) => Promise<void>
     readonly readPatchManifest?: (manifestPath: string) => Promise<unknown>
     readonly createStore?: (
-        paths: ContentPaths,
+        paths: Pick<ContentPaths, "contentRootDir">,
     ) => {
         readCurrentReleaseSnapshot():
             | ContentCurrentReleaseSnapshot
@@ -67,6 +68,7 @@ export interface CatalogLoaderDependencies {
 export interface CdnCatalogLoaderOptions {
     readonly projectRoot: string
     readonly env?: ContentPathEnvironment
+    readonly localCdn?: boolean
     readonly dependencies?: CatalogLoaderDependencies
 }
 
@@ -273,14 +275,21 @@ export function resolveCatalogProjectRoot(moduleDirectory: string): string {
 export class CdnCatalogLoader {
     private readonly projectRoot: string
     private readonly env: ContentPathEnvironment
+    private readonly localCdn: boolean
     private readonly dependencies: CatalogLoaderDependencies
     private catalog: CdnCatalog | null = null
     private initialLoad: Promise<CdnCatalog> | null = null
     private operationTail: Promise<void> | null = null
 
-    constructor({ projectRoot, env = process.env, dependencies = {} }: CdnCatalogLoaderOptions) {
+    constructor({
+        projectRoot,
+        env = process.env,
+        localCdn = true,
+        dependencies = {},
+    }: CdnCatalogLoaderOptions) {
         this.projectRoot = path.resolve(projectRoot)
         this.env = env
+        this.localCdn = localCdn
         this.dependencies = dependencies
     }
 
@@ -341,11 +350,19 @@ export class CdnCatalogLoader {
                 throw schemaError(`patch manifest ${manifestPath} is not valid JSON`, error)
             }
         })
-        const paths = resolvePaths({ projectRoot: this.projectRoot, env: this.env })
-        const createStore = this.dependencies.createStore
-            ?? (resolved => new ContentObjectStore(resolved))
+        const paths = this.localCdn
+            ? resolvePaths({ projectRoot: this.projectRoot, env: this.env })
+            : null
+        const storePaths = paths ?? {
+            contentRootDir: resolveContentRootDir({
+                projectRoot: this.projectRoot,
+                env: this.env,
+            }),
+        }
         const releaseCandidate = selection === undefined
-            ? createStore(paths).readCurrentReleaseSnapshot()
+            ? (this.dependencies.createStore
+                ?? (resolved => new ContentObjectStore(resolved)))(storePaths)
+                .readCurrentReleaseSnapshot()
             : selection.release
         const release: ContentCurrentReleaseSnapshot | null = isPromiseLike<
             ContentCurrentReleaseSnapshot | null
@@ -394,7 +411,7 @@ export class CdnCatalogLoader {
             )
         }
         const candidate = deepFreeze(build(runtimeManifest.catalogInput))
-        await validateRuntimeFiles(runtimeManifest, paths)
+        if (paths !== null) await validateRuntimeFiles(runtimeManifest, paths)
         const manifestPath = path.join(this.projectRoot, "assets", "asset-patch", "manifest.json")
         const manifest = parsePatchManifest(await readPatchManifest(manifestPath))
         validateEnabledPatches(candidate, manifest)
