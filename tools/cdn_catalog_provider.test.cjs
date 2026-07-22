@@ -942,23 +942,29 @@ test("content project root resolution is independent of cwd in src and out layou
     }
 })
 
-test("CN bootstrap initializes the content snapshot before listening", () => {
-    const source = fs.readFileSync(path.join(__dirname, "../src/cn-server.ts"), "utf8")
-    const initializeIndex = source.indexOf("await initializeContentSnapshot({")
-    const listenIndex = source.indexOf("await fastify.listen(")
+test("CN runtime coordinator initializes content before HTTP and TCP listening", () => {
+    const entrySource = fs.readFileSync(path.join(__dirname, "../src/cn-server.ts"), "utf8")
+    const lifecycleSource = fs.readFileSync(path.join(__dirname, "../src/runtime/lifecycle.ts"), "utf8")
+    const initializeIndex = lifecycleSource.indexOf("await this.dependencies.initializeContent(")
+    const configureIndex = lifecycleSource.indexOf("this.dependencies.configureHttp(")
+    const readyIndex = lifecycleSource.indexOf("await this.dependencies.readyHttp()")
+    const listenIndex = lifecycleSource.indexOf("await this.dependencies.listenHttp(")
+    const sessionIndex = lifecycleSource.indexOf("await this.dependencies.startTcp(")
 
     assert.ok(initializeIndex >= 0)
-    assert.ok(listenIndex >= 0)
-    assert.ok(initializeIndex < listenIndex)
-    assert.doesNotMatch(source, /^await\s/m)
-    assert.match(source, /registerCnAssetProviderRoutes\(fastify/)
-    assert.doesNotMatch(source, /fastify\.register\(cnCdnFilesPlugin\)/)
-    assert.doesNotMatch(source, /getCdnVersionInfo\(CDN_BASE_URL\)/)
-    assert.doesNotMatch(source, /asset-patch\/active\/:file/)
-    assert.doesNotMatch(source, /CDN_TOTAL_SIZE|ENTITY_LISTS_DIR/)
-    const sessionIndex = source.indexOf("await startSessionServer()")
-    assert.ok(sessionIndex >= 0)
+    assert.ok(initializeIndex < configureIndex)
+    assert.ok(configureIndex < readyIndex)
+    assert.ok(readyIndex < listenIndex)
     assert.ok(listenIndex < sessionIndex)
+    assert.doesNotMatch(entrySource, /^await\s/m)
+    assert.match(entrySource, /initializeContent:\s*config\s*=>\s*initializeContentSnapshot\(/)
+    assert.match(entrySource, /listenHttp:\s*config\s*=>\s*fastify\.listen\(/)
+    assert.match(entrySource, /startTcp:\s*\(config, onFatalError\)\s*=>\s*startSessionServer\(/)
+    assert.match(entrySource, /registerCnAssetProviderRoutes\(fastify/)
+    assert.doesNotMatch(entrySource, /fastify\.register\(cnCdnFilesPlugin\)/)
+    assert.doesNotMatch(entrySource, /getCdnVersionInfo\(CDN_BASE_URL\)/)
+    assert.doesNotMatch(entrySource, /asset-patch\/active\/:file/)
+    assert.doesNotMatch(entrySource, /CDN_TOTAL_SIZE|ENTITY_LISTS_DIR/)
 })
 
 test("legacy bootstrap initializes the content snapshot before listening and exits on failure", () => {

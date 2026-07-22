@@ -5,10 +5,22 @@ import fastifyStatic from "@fastify/static";
 import path from "path";
 import { existsSync, readFileSync } from "fs";
 import { getServerTime } from "./utils";
-import { initializeDatabase } from "./data";
+import getDatabase, {
+    checkpointDatabase,
+    closeDatabase,
+    Database,
+    getDatabaseStatus,
+    initializeDatabase,
+} from "./data";
 import { restoreTimeOffset } from "./data/activeAccount";
 import { initializeContentSnapshot } from "./content/runtime/content-snapshot";
-import { parseAssetProviderConfig } from "./content/cdn/asset-mode";
+import { parseCnRuntimeConfig } from "./runtime/config";
+import {
+    createRuntimeCoordinator,
+    RuntimeCoordinator,
+} from "./runtime/lifecycle";
+import { registerRuntimeHealthRoute } from "./runtime/health";
+import { loadBundleMetadata } from "./runtime/bundle-metadata";
 
 import versionCheckPlugin from "./routes/cn/versionCheck";
 import leitingAuthPlugin from "./routes/cn/leitingAuth";
@@ -56,7 +68,11 @@ import historyApiPlugin from "./routes/api/history";
 import comicApiPlugin from "./routes/api/comic";
 import questUnlockApiPlugin from "./routes/api/questUnlock";
 import itemApiPlugin from "./routes/api/item";
-import { startSessionServer } from "./multi";
+import {
+    isSessionServerListening,
+    startSessionServer,
+    stopSessionServer,
+} from "./multi";
 
 const fastify = Fastify({
     logger: {
@@ -64,9 +80,7 @@ const fastify = Fastify({
     },
     bodyLimit: 262144  // 256KB — covers /single_battle_quest/finish large battle stats
 });
-const assetProviderConfig = parseAssetProviderConfig({
-    projectRoot: path.resolve(__dirname, ".."),
-});
+let runtimeCoordinator: RuntimeCoordinator;
 
 // Simple in-memory rate limiter for /crash endpoint only.
 // /debug is excluded — game client sends heavy beacon traffic during normal startup.
@@ -88,6 +102,7 @@ fastify.addHook("onRequest", async (request, reply) => {
 });
 
 registerCnMsgpackOnSend(fastify);
+registerRuntimeHealthRoute(fastify, () => runtimeCoordinator.getHealthSnapshot());
 
 function jsonParser(_: FastifyRequest, body: string, done: ContentTypeParserDoneFunction) {
     try {
@@ -116,11 +131,6 @@ fastify.register(versionCheckPlugin);
 fastify.register(leitingAuthPlugin, { prefix: "/api/index.php" });
 
 const apiPrefix = "/api/index.php";
-fastify.register(cnLoadPlugin, {
-    prefix: apiPrefix,
-    assetProvider: assetProviderConfig,
-});
-registerCnAssetProviderRoutes(fastify, { config: assetProviderConfig });
 
 function stubMsgpackReply(reply: any, data: any) {
     const servertime = getServerTime()
@@ -356,24 +366,72 @@ fastify.setNotFoundHandler((request, reply) => {
     reply.status(404).send({ error: "Not Found" });
 });
 
-const host = process.env.CN_LISTEN_HOST ?? "127.0.0.1";
-const port = parseInt(process.env.CN_LISTEN_PORT ?? "8001");
-
-async function bootstrap(): Promise<void> {
-    initializeDatabase();
-    restoreTimeOffset();
-    await initializeContentSnapshot({
-        assetMode: assetProviderConfig.mode,
-        localCdn: assetProviderConfig.mode === "local",
+let runtimeHttpConfigured = false;
+function configureRuntimeHttp(config: ReturnType<typeof parseCnRuntimeConfig>): void {
+    if (runtimeHttpConfigured) return;
+    fastify.register(cnLoadPlugin, {
+        prefix: apiPrefix,
+        assetProvider: config.assetProvider,
     });
-    await fastify.listen({ port, host });
-    console.log(`CN StarPoint listening on http://${host}:${port}`);
-
-    // Start multi battle TCP session server
-    await startSessionServer();
+    registerCnAssetProviderRoutes(fastify, { config: config.assetProvider });
+    runtimeHttpConfigured = true;
 }
 
-void bootstrap().catch(error => {
-    console.error(error);
-    process.exit(1);
+function getRuntimeDatabaseHealth(): { ready: boolean; schema: number | null } {
+    const status = getDatabaseStatus();
+    if (!status.open || !status.ready || status.schema === null) {
+        return { ready: false, schema: null };
+    }
+    try {
+        const row = getDatabase(Database.WDFP_DATA)
+            .prepare("SELECT 1 AS value")
+            .get() as { value?: number } | undefined;
+        return { ready: row?.value === 1, schema: status.schema };
+    } catch {
+        return { ready: false, schema: status.schema };
+    }
+}
+
+const projectRoot = path.resolve(__dirname, "..");
+const bundleMetadata = loadBundleMetadata({ bundleRoot: projectRoot });
+runtimeCoordinator = createRuntimeCoordinator({
+    loadConfig: () => parseCnRuntimeConfig({ projectRoot }),
+    configureHttp: configureRuntimeHttp,
+    initializeDatabase,
+    restoreTimeOffset,
+    initializeContent: config => initializeContentSnapshot({
+        assetMode: config.assetProvider.mode,
+        localCdn: config.assetProvider.mode === "local",
+    }),
+    readyHttp: async () => { await fastify.ready(); },
+    listenHttp: config => fastify.listen({ ...config.http }),
+    closeHttp: () => fastify.close(),
+    forceCloseHttp: () => {
+        fastify.server.closeIdleConnections?.();
+        fastify.server.closeAllConnections?.();
+    },
+    startTcp: (config, onFatalError) => startSessionServer({
+        ...config.tcp,
+        onFatalError,
+    }),
+    stopTcp: stopSessionServer,
+    checkpointDatabase,
+    closeDatabase,
+    getDatabaseHealth: getRuntimeDatabaseHealth,
+    isHttpListening: () => fastify.server.listening,
+    isTcpListening: isSessionServerListening,
+    processTarget: process,
+    setExitCode: code => { process.exitCode = code; },
+    bundleVersion: bundleMetadata.version,
+    nodeVersion: process.version,
+    adminAvailable: adminSpaAvailable,
+    reportStartupFailure: stage => console.error(`[runtime] ${stage} startup failed`),
+    reportShutdownFailures: failures => console.error(
+        `[runtime] shutdown failed steps=${failures.map(failure => (
+            `${failure.step}:${failure.code ?? "UNKNOWN"}`
+        )).join(",")}`,
+    ),
+    reportShutdownComplete: () => console.log("[runtime] shutdown complete"),
 });
+
+void runtimeCoordinator.start();

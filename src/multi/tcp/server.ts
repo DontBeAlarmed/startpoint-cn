@@ -14,7 +14,7 @@ import { startRoomCleanup, stopRoomCleanup } from "../room/manager"
 import { startLobbyLifecycle, stopLobbyLifecycle } from "./lobby-lifecycle"
 
 export const SESSION_PORT = parseInt(process.env.SESSION_PORT || "8003")
-export const SESSION_HOST = process.env.SESSION_HOST || "0.0.0.0"
+export const SESSION_HOST = process.env.SESSION_HOST || "127.0.0.1"
 export const DEFAULT_SESSION_SHUTDOWN_TIMEOUT_MS = 5000
 
 export type SessionServerPhase = "stopped" | "starting" | "listening" | "stopping" | "failed"
@@ -44,6 +44,7 @@ export interface SessionServerOptions {
     ) => Promise<void>
     /** Maximum shutdown wait for this generation's handshakes before sockets are retired. */
     shutdownTimeoutMs?: number
+    onFatalError?: (failure: SessionServerFailure) => void
 }
 
 interface ServerContext {
@@ -51,6 +52,7 @@ interface ServerContext {
     readonly generation: number
     readonly shutdownTimeoutMs: number
     readonly onError: (error: Error) => void
+    readonly onFatalError?: (failure: SessionServerFailure) => void
     fatalStarted: boolean
     fatalSettled: boolean
     fatalTeardown: Promise<void> | null
@@ -90,7 +92,7 @@ function cleanupSession(socket: net.Socket): void {
     try {
         sessionManager.removeClientBySocket(socket)
     } catch (error) {
-        console.error("[TCP] session cleanup failed:", error)
+        console.error(`[TCP] session cleanup failed: code=${failureCode(error) ?? "UNKNOWN"}`)
     }
 }
 
@@ -126,7 +128,7 @@ function trackHandshake(
     tracked = Promise.resolve()
         .then(() => handshakeHandler(socket, data, lifecycle))
         .catch(error => {
-            console.error("[TCP] handshake failed:", error)
+            console.error(`[TCP] handshake failed: code=${failureCode(error) ?? "UNKNOWN"}`)
             socket.destroy()
         })
         .finally(() => {
@@ -183,7 +185,7 @@ function handleConnection(
                     }
                 }
             } catch (error) {
-                console.error(`[TCP] parse error from ${remoteAddress}:`, (error as Error).message)
+                console.error(`[TCP] parse error from ${remoteAddress}: code=${failureCode(error) ?? "UNKNOWN"}`)
             }
         }
     })
@@ -194,7 +196,7 @@ function handleConnection(
     })
 
     socket.on("error", error => {
-        console.error(`[TCP] socket error from ${remoteAddress}:`, error.message)
+        console.error(`[TCP] socket error from ${remoteAddress}: code=${failureCode(error) ?? "UNKNOWN"}`)
         cleanupAcceptedSocket(socket)
         socket.destroy()
     })
@@ -249,7 +251,7 @@ function handlePersistentServerError(context: ServerContext, error: Error): void
             void closeServer(context).then(
                 () => finalizeContext(context),
                 closeError => {
-                    console.error("[TCP] failed to close after startup error:", closeError)
+                    console.error(`[TCP] failed to close after startup error: code=${failureCode(closeError) ?? "UNKNOWN"}`)
                     if (!context.server.listening) finalizeContext(context)
                 },
             )
@@ -257,7 +259,9 @@ function handlePersistentServerError(context: ServerContext, error: Error): void
         return
     }
     if (phase === "listening") {
-        void beginFatalTeardown(context, error)
+        void beginFatalTeardown(context, error).catch(() => {
+            // Application lifecycle observes the same rejection through stopSessionServer().
+        })
         return
     }
     console.error(`[TCP] session server error: code=${failureCode(error) ?? "UNKNOWN"}`)
@@ -338,16 +342,22 @@ function beginFatalTeardown(context: ServerContext, error: Error): Promise<void>
         const closeResult = results[1]
         if (closeResult.status === "rejected") {
             console.error(`[TCP] fatal teardown close failed: code=${failureCode(closeResult.reason) ?? "UNKNOWN"}`)
+            if (!context.server.listening) finalizeContext(context)
+            throw closeResult.reason
         }
-        if (!context.server.listening) finalizeContext(context)
-    }).catch(teardownError => {
-        console.error(`[TCP] fatal teardown failed: code=${failureCode(teardownError) ?? "UNKNOWN"}`)
         if (!context.server.listening) finalizeContext(context)
     })
 
-    context.fatalTeardown = operation.then(() => {
+    context.fatalTeardown = operation.finally(() => {
         context.fatalSettled = true
     })
+    if (context.onFatalError && lastFailure?.stage === "runtime") {
+        try {
+            context.onFatalError(lastFailure)
+        } catch {
+            console.error("[TCP] application fatal callback failed")
+        }
+    }
     return context.fatalTeardown
 }
 
@@ -392,6 +402,7 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
         generation,
         shutdownTimeoutMs: options.shutdownTimeoutMs ?? DEFAULT_SESSION_SHUTDOWN_TIMEOUT_MS,
         onError,
+        onFatalError: options.onFatalError,
         fatalStarted: false,
         fatalSettled: false,
         fatalTeardown: null,
@@ -428,7 +439,7 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
                 void closeServer(context).then(
                     () => finalizeContext(context),
                     closeError => {
-                        console.error("[TCP] failed to close after lifecycle startup error:", closeError)
+                        console.error(`[TCP] failed to close after lifecycle startup error: code=${failureCode(closeError) ?? "UNKNOWN"}`)
                         if (!context.server.listening) finalizeContext(context)
                     },
                 )

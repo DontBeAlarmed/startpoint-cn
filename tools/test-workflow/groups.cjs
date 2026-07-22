@@ -10,6 +10,15 @@ const TEST_GROUPS = Object.freeze({
             "tools/test-workflow/verify-cn-build.test.cjs",
         ],
     },
+    "quick:runtime": {
+        execution: "parallel",
+        tests: [
+            "tools/runtime_bundle_metadata.test.cjs",
+            "tools/runtime_config.test.cjs",
+            "tools/runtime_health.test.cjs",
+            "tools/runtime_lifecycle.test.cjs",
+        ],
+    },
     "quick:gacha": {
         execution: "parallel",
         tests: [
@@ -72,6 +81,12 @@ const TEST_GROUPS = Object.freeze({
             "tools/quest_abort_route.test.cjs",
             "tools/score_attack_event.test.cjs",
             "tools/treasure_key_entry.test.cjs",
+        ],
+    },
+    "integration:runtime": {
+        execution: "serial",
+        tests: [
+            "tools/runtime_compiled_smoke.test.cjs",
         ],
     },
     "integration:content": {

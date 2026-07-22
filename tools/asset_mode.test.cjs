@@ -373,12 +373,14 @@ test("non-local snapshot initialization ignores CDN_DIR and uses bundled 1.4.54 
     assert.equal(localValidationCalls, 0)
 })
 
-test("CN server parses one provider and wires it through routes, load, and snapshot startup", () => {
-    const source = fs.readFileSync(path.join(projectRoot, "src/cn-server.ts"), "utf8")
+test("CN runtime parses one provider and wires it through routes, load, and content startup", () => {
+    const entry = fs.readFileSync(path.join(projectRoot, "src/cn-server.ts"), "utf8")
+    const config = fs.readFileSync(path.join(projectRoot, "src/runtime/config.ts"), "utf8")
 
-    assert.equal((source.match(/parseAssetProviderConfig\(/g) ?? []).length, 1)
-    assert.match(source, /registerCnAssetProviderRoutes\(fastify,\s*\{\s*config: assetProviderConfig/)
-    assert.match(source, /fastify\.register\(cnLoadPlugin,\s*\{[^}]*assetProvider: assetProviderConfig/s)
-    assert.match(source, /initializeContentSnapshot\(\{\s*assetMode: assetProviderConfig\.mode,\s*localCdn: assetProviderConfig\.mode === "local"/)
-    assert.doesNotMatch(source, /fastify\.register\(cnCdnFilesPlugin/)
+    assert.equal((config.match(/parseAssetProviderConfig\(/g) ?? []).length, 1)
+    assert.equal((entry.match(/parseCnRuntimeConfig\(/g) ?? []).length, 1)
+    assert.match(entry, /registerCnAssetProviderRoutes\(fastify,\s*\{\s*config: config\.assetProvider/)
+    assert.match(entry, /fastify\.register\(cnLoadPlugin,\s*\{[^}]*assetProvider: config\.assetProvider/s)
+    assert.match(entry, /initializeContentSnapshot\(\{\s*assetMode: config\.assetProvider\.mode,\s*localCdn: config\.assetProvider\.mode === "local"/)
+    assert.doesNotMatch(entry, /fastify\.register\(cnCdnFilesPlugin/)
 })

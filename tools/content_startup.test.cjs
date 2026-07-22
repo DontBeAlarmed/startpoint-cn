@@ -200,7 +200,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
         assert.deepEqual(harness.children[0].killCalls, [signal])
         harness.children[0].emit("close", 0, null)
 
-        assert.deepEqual(await running, { code: null, signal })
+        assert.deepEqual(await running, { code: 0, signal: null })
         assert.equal(harness.calls.length, 1)
     })
 
@@ -215,7 +215,8 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
         assert.deepEqual(harness.children[1].killCalls, [signal])
         harness.children[1].emit("close", 0, null)
 
-        assert.deepEqual(await running, { code: null, signal })
+        assert.deepEqual(await running, { code: 0, signal: null })
+        assert.match(harness.stderr.join(""), /\[startup\] CN server exited cleanly/)
         assert.equal(harness.calls.length, 2)
     })
 }
@@ -253,7 +254,7 @@ test("信号在 spawn 回调期间到达时绑定后只 kill 新子进程一次"
     const running = runContentStartup(harness.dependencies)
     harness.children[0].emit("close", 0, null)
 
-    assert.deepEqual(await running, { code: null, signal: "SIGTERM" })
+    assert.deepEqual(await running, { code: 0, signal: null })
     assert.equal(harness.calls.length, 1)
     assert.deepEqual(harness.children[0].killCalls, ["SIGTERM"])
     assertSignalListenersRemoved(harness.processTarget)
@@ -270,7 +271,7 @@ test("sync close 与 server spawn 之间收到信号时不启动 server", async 
 
     harness.children[0].emit("close", 0, null)
 
-    assert.deepEqual(await running, { code: null, signal: "SIGINT" })
+    assert.deepEqual(await running, { code: 0, signal: null })
     assert.equal(harness.calls.length, 1)
     assert.deepEqual(harness.children[0].killCalls, ["SIGINT"])
     assertSignalListenersRemoved(harness.processTarget)
@@ -288,7 +289,7 @@ test("async error 后立即收到信号时不启动 server 且 kill 幂等", asy
 
     harness.children[0].emit("error", new Error("spawn failed"))
 
-    assert.deepEqual(await running, { code: null, signal: "SIGTERM" })
+    assert.deepEqual(await running, { code: 1, signal: null })
     assert.equal(harness.calls.length, 1)
     assert.deepEqual(harness.children[0].killCalls, ["SIGTERM"])
     assertSignalListenersRemoved(harness.processTarget)

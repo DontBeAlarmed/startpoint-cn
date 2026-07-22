@@ -402,25 +402,35 @@ test("externally closed cached handle is cleared without closing it again", t =>
     }
 })
 
-test("CN and global bootstraps initialize database before content and listen", () => {
-    for (const [entrypoint, hasStateRestore] of [["cn-server.ts", true], ["server.ts", false]]) {
-        const source = fs.readFileSync(path.join(projectRoot, "src", entrypoint), "utf8")
-        assert.match(source, /import\s+\{\s*initializeDatabase\s*\}\s+from\s+["']\.\/data["']/)
-        const bootstrapStart = source.indexOf("async function bootstrap")
-        const beforeBootstrap = source.slice(0, bootstrapStart)
-        const bootstrap = source.slice(bootstrapStart)
-        const databaseIndex = bootstrap.indexOf("initializeDatabase(")
-        const contentIndex = bootstrap.indexOf("initializeContentSnapshot(")
-        const listenIndex = bootstrap.indexOf("fastify.listen(")
-        assert.ok(databaseIndex >= 0, entrypoint)
-        assert.ok(databaseIndex < contentIndex, entrypoint)
-        assert.ok(contentIndex < listenIndex, entrypoint)
-        assert.equal(beforeBootstrap.includes("initializeDatabase("), false, entrypoint)
-        if (hasStateRestore) {
-            const restoreIndex = bootstrap.indexOf("restoreTimeOffset(")
-            assert.ok(databaseIndex < restoreIndex, entrypoint)
-            assert.ok(restoreIndex < contentIndex, entrypoint)
-            assert.equal(beforeBootstrap.includes("restoreTimeOffset("), false)
-        }
-    }
+test("CN coordinator initializes database and time before content and HTTP", () => {
+    const entry = fs.readFileSync(path.join(projectRoot, "src/cn-server.ts"), "utf8")
+    const lifecycle = fs.readFileSync(path.join(projectRoot, "src/runtime/lifecycle.ts"), "utf8")
+    const databaseIndex = lifecycle.indexOf("this.dependencies.initializeDatabase()")
+    const restoreIndex = lifecycle.indexOf("this.dependencies.restoreTimeOffset()")
+    const contentIndex = lifecycle.indexOf("await this.dependencies.initializeContent(")
+    const configureIndex = lifecycle.indexOf("this.dependencies.configureHttp(")
+    const listenIndex = lifecycle.indexOf("await this.dependencies.listenHttp(")
+
+    assert.match(entry, /initializeDatabase,/)
+    assert.match(entry, /initializeDatabase,\s*\n\s*restoreTimeOffset,/)
+    assert.ok(databaseIndex >= 0)
+    assert.ok(databaseIndex < restoreIndex)
+    assert.ok(restoreIndex < contentIndex)
+    assert.ok(contentIndex < configureIndex)
+    assert.ok(configureIndex < listenIndex)
+})
+
+test("global bootstrap keeps explicit database initialization before content and listen", () => {
+    const source = fs.readFileSync(path.join(projectRoot, "src/server.ts"), "utf8")
+    assert.match(source, /import\s+\{\s*initializeDatabase\s*\}\s+from\s+["']\.\/data["']/)
+    const bootstrapStart = source.indexOf("async function bootstrap")
+    const beforeBootstrap = source.slice(0, bootstrapStart)
+    const bootstrap = source.slice(bootstrapStart)
+    const databaseIndex = bootstrap.indexOf("initializeDatabase(")
+    const contentIndex = bootstrap.indexOf("initializeContentSnapshot(")
+    const listenIndex = bootstrap.indexOf("fastify.listen(")
+    assert.ok(databaseIndex >= 0)
+    assert.ok(databaseIndex < contentIndex)
+    assert.ok(contentIndex < listenIndex)
+    assert.equal(beforeBootstrap.includes("initializeDatabase("), false)
 })

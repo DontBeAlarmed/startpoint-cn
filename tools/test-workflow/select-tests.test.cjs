@@ -37,7 +37,7 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/routes/cn/load.ts"]), ["full"])
     assert.deepEqual(
         selectTestGroups(["src/cn-server.ts"]),
-        ["full", "integration:cdn", "integration:database"],
+        ["full", "integration:cdn", "integration:database", "integration:runtime"],
     )
     assert.deepEqual(
         selectTestGroups(["src/server.ts"]),
@@ -48,6 +48,18 @@ test("maps representative source files to focused groups", () => {
         ["full", "integration:database"],
     )
     assert.deepEqual(selectTestGroups(["src/runtime/data-paths.ts"]), ["integration:database"])
+    assert.deepEqual(
+        selectTestGroups(["src/runtime/lifecycle.ts"]),
+        ["integration:runtime", "quick:runtime"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/content/startup/bootstrap.ts"]),
+        ["integration:runtime", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/multi/tcp/server.ts"]),
+        ["integration:runtime", "quick:protocol"],
+    )
     assert.deepEqual(selectTestGroups(["admin/src/App.tsx"]), ["admin"])
 })
 
@@ -132,6 +144,22 @@ test("full contains quick, integration, and admin but excludes generators", () =
         "tools/cdn_audit.test.cjs",
         "tools/cdn_files.test.cjs",
     ])
+})
+
+test("registers focused runtime state and socket smoke groups", () => {
+    assert.deepEqual(TEST_GROUPS["quick:runtime"], {
+        execution: "parallel",
+        tests: [
+            "tools/runtime_bundle_metadata.test.cjs",
+            "tools/runtime_config.test.cjs",
+            "tools/runtime_health.test.cjs",
+            "tools/runtime_lifecycle.test.cjs",
+        ],
+    })
+    assert.deepEqual(TEST_GROUPS["integration:runtime"], {
+        execution: "serial",
+        tests: ["tools/runtime_compiled_smoke.test.cjs"],
+    })
 })
 
 test("registers the focused CDN path contract", () => {
@@ -286,6 +314,7 @@ test("keeps isolated test groups parallel while infrastructure groups stay seria
         assert.equal(TEST_GROUPS[group].execution, "parallel")
     }
     assert.equal(TEST_GROUPS["integration:compiled"].execution, "parallel")
+    assert.equal(TEST_GROUPS["integration:runtime"].execution, "serial")
     assert.equal(TEST_GROUPS["integration:mission-compiled"].execution, "parallel")
     assert.equal(TEST_GROUPS["integration:rules"].execution, "parallel")
     assert.equal(TEST_GROUPS["integration:database"].execution, "serial")

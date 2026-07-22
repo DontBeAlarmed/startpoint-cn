@@ -116,7 +116,7 @@ export async function runContentStartup(
 
         const outcome = await outcomePromise
         if (activeChild === child) activeChild = null
-        return shutdownSignal === null ? outcome : { code: null, signal: shutdownSignal }
+        return outcome
     }
 
     try {
@@ -133,10 +133,14 @@ export async function runContentStartup(
                 return syncOutcome
             }
         }
-        return await runStage(
+        const serverOutcome = await runStage(
             "server",
             path.join(projectRoot, "out/cn-server.js"),
         )
+        if (shutdownSignal !== null && serverOutcome.code === 0 && serverOutcome.signal === null) {
+            stderr.write("[startup] CN server exited cleanly\n")
+        }
+        return serverOutcome
     } finally {
         processTarget.removeListener("SIGINT", onSigint)
         processTarget.removeListener("SIGTERM", onSigterm)

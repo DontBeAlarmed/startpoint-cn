@@ -631,6 +631,8 @@ test("handshake shutdown deadline is unrefed, cleared, and still settles stop", 
 
 test("runtime server errors perform fatal teardown, retain safe diagnostics, and allow restart", async () => {
     const handshake = deferred()
+    const fatalFailures = []
+    let applicationStopPromise
     let runtimeServer
     await startSessionServer({
         host: "127.0.0.1",
@@ -642,6 +644,12 @@ test("runtime server errors perform fatal teardown, retain safe diagnostics, and
         },
         async handleHandshake() {
             await handshake.promise
+        },
+        onFatalError(failure) {
+            fatalFailures.push(failure)
+            applicationStopPromise = stopSessionServer()
+            void applicationStopPromise.catch(() => {})
+            throw new Error("application fatal callback detail")
         },
     })
     const address = runtimeServer.address()
@@ -709,6 +717,12 @@ test("runtime server errors perform fatal teardown, retain safe diagnostics, and
     assert.equal(immediateStatus.listening, false)
     assert.deepEqual(immediateStatus.lastFailure, { stage: "runtime", code: "E_RUNTIME_TEST" })
     assert.equal(JSON.stringify(immediateStatus).includes(runtimeError.message), false)
+    assert.deepEqual(fatalFailures, [{ stage: "runtime", code: "E_RUNTIME_TEST" }])
+    assert.ok(applicationStopPromise)
+    await assert.rejects(
+        applicationStopPromise,
+        error => error.code === "E_RUNTIME_CLOSE_TEST",
+    )
     assert.equal(fatalCompleted, true)
     assert.deepEqual(failedStatus, {
         phase: "failed",
