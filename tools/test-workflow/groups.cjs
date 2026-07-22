@@ -3,6 +3,7 @@ const TEST_GROUPS = Object.freeze({
         execution: "parallel",
         tests: [
             "tools/test-workflow/benchmark.test.cjs",
+            "tools/test-workflow/build-cn.test.cjs",
             "tools/test-workflow/package-scripts.test.cjs",
             "tools/test-workflow/select-tests.test.cjs",
             "tools/test-workflow/run.test.cjs",
@@ -51,6 +52,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/gacha_repository.test.cjs",
             "tools/shop_repository.test.cjs",
             "tools/content_repository.test.cjs",
+            "tools/content_startup.test.cjs",
             "tools/content_sync.test.cjs",
             "tools/content_object_store.test.cjs",
             "tools/content_archive_index.test.cjs",

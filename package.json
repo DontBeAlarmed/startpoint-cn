@@ -6,7 +6,7 @@
   "scripts": {
     "build": "npm run build:legacy && npm run css",
     "typecheck": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit",
-    "build:server": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc -p tsconfig.cn.json && node tools/test-workflow/verify-cn-build.cjs",
+    "build:server": "node tools/test-workflow/build-cn.cjs",
     "build:legacy": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc -p tsconfig.json",
     "css": "npx tailwindcss -i ./src/input.css -o ./web/public/tailwind.css",
     "css:watch": "npx tailwindcss -i ./src/input.css -o ./web/public/tailwind.css --watch --poll",
@@ -15,7 +15,8 @@
     "unzip": "npm run build:legacy && node --env-file=.env out/unzip_cdn.js",
     "debug": "npm run css && npm run css:watch & npm run debug:ts-only",
     "debug:ts-only": "tsnd --inspect -- src/server.ts",
-    "dev:cn": "npm run build:server && node --env-file=.env out/cn-server.js",
+    "start:cn": "node tools/start_cn.cjs",
+    "dev:cn": "npm run build:server && node tools/start_cn.cjs",
     "debug:cn": "tsnd --env-file=.env -- src/cn-server.ts",
     "cdn:manifest": "node tools/generate_cdn_runtime_manifest.cjs",
     "content:sync": "node tools/content_sync.cjs",
@@ -56,6 +57,6 @@
     "unzipper": "^0.12.3"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.12.0"
   }
 }

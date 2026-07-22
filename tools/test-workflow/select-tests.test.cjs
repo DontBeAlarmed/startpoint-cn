@@ -287,6 +287,7 @@ test("splits isolated integration tests into focused domains", () => {
 test("quick workflow includes the package scripts contract", () => {
     assert.deepEqual(TEST_GROUPS["quick:workflow"].tests, [
         "tools/test-workflow/benchmark.test.cjs",
+        "tools/test-workflow/build-cn.test.cjs",
         "tools/test-workflow/package-scripts.test.cjs",
         "tools/test-workflow/select-tests.test.cjs",
         "tools/test-workflow/run.test.cjs",

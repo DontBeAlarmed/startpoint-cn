@@ -229,21 +229,23 @@ sudo netfilter-persistent save
 ## 8. 构建 & 启动
 
 ```bash
-# 一键构建 + 重启 + 日志
+# 前台执行：build:server + content:sync normal + 启动服务
 bash scripts/start-cn.sh
-
-# 查看日志确认启动成功
-tail -f /tmp/cn-server.log
-# 预期输出：CN StarPoint listening on http://127.0.0.1:8001
 ```
 
-### 手动方式（备选）
+`scripts/start-cn.sh` 会先完成 CN 服务端构建，再以前台方式进入 bootstrap。bootstrap 加载可选 `.env`，运行 `content:sync` normal；只有同步成功并激活当前 Release 后才启动游戏服务。服务日志直接写入标准输出和标准错误，`SIGINT` / `SIGTERM` 会转发给当前活动子进程。
+
+脚本不终止已有服务、不创建后台进程，也不写固定日志文件。需要后台运行时，由调用者或进程管理器托管上述前台命令，并负责进程生命周期与日志收集。
+
+### 低级调试入口
 
 ```bash
-npm run build
-pkill -f "cn-server.js"  2>/dev/null; sleep 1
-nohup node --env-file=.env out/cn-server.js > /tmp/cn-server.log 2>&1 &
+npm run build:server
+npm run content:sync
+node out/cn-server.js
 ```
+
+`node out/cn-server.js` 不会自动同步内容；它仅适合已明确准备并激活当前 Release 的高级调试场景。
 
 ### 管理面板访问
 
@@ -276,8 +278,8 @@ curl -s -o /dev/null -w "%{http_code}" https://<YOUR_DOMAIN>/api/index.php/tool/
 curl -s -o /dev/null -w "%{http_code}" https://<YOUR_DOMAIN>/
 # 预期：401 Unauthorized（需要 Basic Auth 密码）
 
-# 5. 服务端安全日志
-tail -20 /tmp/cn-server.log | grep -E "CN StarPoint|SEED|TCP|listen"
+# 5. 在前台终端或进程管理器中检查服务标准输出
+# 预期包含 CN StarPoint、SEED、TCP 和 listen 等启动信息
 ```
 
 ---

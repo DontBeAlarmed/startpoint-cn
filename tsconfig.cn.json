@@ -1,10 +1,12 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "incremental": true,
     "tsBuildInfoFile": "./out/.tsbuildinfo-cn"
   },
   "files": [
     "src/cn-server.ts",
+    "src/content/startup/bootstrap.ts",
     "src/multi/tcp/lobby.ts"
   ]
 }

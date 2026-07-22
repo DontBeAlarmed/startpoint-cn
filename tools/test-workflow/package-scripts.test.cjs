@@ -5,10 +5,16 @@ const test = require("node:test")
 
 const root = path.resolve(__dirname, "../..")
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"))
+const packageLock = JSON.parse(fs.readFileSync(path.join(root, "package-lock.json"), "utf8"))
 const cnTsconfig = JSON.parse(fs.readFileSync(path.join(root, "tsconfig.cn.json"), "utf8"))
 const { scripts } = packageJson
 
 const tsc = "node --max-old-space-size=4096 node_modules/typescript/bin/tsc"
+
+test("requires the Node version that provides process.loadEnvFile", () => {
+    assert.equal(packageJson.engines.node, ">=20.12.0")
+    assert.equal(packageLock.packages[""].engines.node, packageJson.engines.node)
+})
 
 test("runs typecheck through Node with the project memory limit", () => {
     assert.equal(scripts.typecheck, `${tsc} --noEmit`)
@@ -17,23 +23,27 @@ test("runs typecheck through Node with the project memory limit", () => {
 test("keeps CN server and legacy builds separate", () => {
     assert.equal(
         scripts["build:server"],
-        `${tsc} -p tsconfig.cn.json && node tools/test-workflow/verify-cn-build.cjs`,
+        "node tools/test-workflow/build-cn.cjs",
     )
     assert.equal(scripts["build:legacy"], `${tsc} -p tsconfig.json`)
     assert.doesNotMatch(scripts["build:server"], /admin|css/)
 })
 
 test("includes runtime-loaded CN modules as explicit compilation roots", () => {
+    assert.equal(cnTsconfig.compilerOptions.incremental, true)
+    assert.equal(cnTsconfig.compilerOptions.tsBuildInfoFile, "./out/.tsbuildinfo-cn")
     assert.deepEqual(cnTsconfig.files, [
         "src/cn-server.ts",
+        "src/content/startup/bootstrap.ts",
         "src/multi/tcp/lobby.ts",
     ])
 })
 
-test("builds the CN development server before starting it", () => {
+test("builds before the supported CN startup bootstrap", () => {
+    assert.equal(scripts["start:cn"], "node tools/start_cn.cjs")
     assert.equal(
         scripts["dev:cn"],
-        "npm run build:server && node --env-file=.env out/cn-server.js",
+        "npm run build:server && node tools/start_cn.cjs",
     )
 })
 

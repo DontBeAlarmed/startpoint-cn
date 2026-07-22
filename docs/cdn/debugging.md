@@ -210,8 +210,8 @@ for _, reward_wrapper in score_group.items():
 
 **通用流程：**
 ```
-1. 日志定位      grep "CRASH|ERR:|level\":50" /tmp/cn-server.log → 确定错误码和触发时机
-2. 端点验证      grep "POST.*url" /tmp/cn-server.log → 确认调用了哪些 API、返回状态码
+1. 日志定位      grep "CRASH|ERR:|level\":50" <SERVER_LOG> → 确定错误码和触发时机
+2. 端点验证      grep "POST.*url" <SERVER_LOG> → 确认调用了哪些 API、返回状态码
 3. 数据对比      diff <(python3 ... server_data) <(python3 ... cdn_data) → 找差异
 4. 客户端提取    adb pull → zlib 解压 → 有序映射解析 → 确认客户端本地表内容
 5. 修复          改 converter.py → 重新生成 assets/ JSON（或直接改 JSON）→ 构建重启
@@ -367,7 +367,7 @@ adb -s <DEVICE_IP>:5667 shell "cp \
   '.../download/production/upload/2d/5cb9b28d18f984a51b345a4d7aab03d77bddfc' \
   '.../bundle/production/android_bundle/db/69828cac33bfcdd1d4c65e8b354adf0e815e26'"
 # 6. 重启游戏，监控信标
-tail -f /tmp/cn-server.log | grep BEACON
+tail -f <SERVER_LOG> | grep BEACON
 ```
 
 **方案 B：零下载（手动推送最小文件集）** —— 适用于全新安装或 CDN 数据已丢失，只需推送几个文件（几 KB）。
@@ -439,6 +439,8 @@ adb -s <DEVICE_IP>:5667 shell "rm '.../dummy/info.json'"
 
 ### 6.1 服务端
 
+常规启动使用 `bash scripts/start-cn.sh` 以前台方式执行 build + bootstrap；bootstrap 会先同步并激活内容 Release，再启动服务。下列 `<SERVER_LOG>` 仅表示调用者或进程管理器收集的标准输出，启动脚本本身不创建日志文件。
+
 ```bash
 # 验证 get_path 响应
 curl -s -X POST http://localhost:8001/api/index.php/asset/get_path \
@@ -455,22 +457,24 @@ curl -s -o /dev/null -w "HTTP %{http_code}\n" \
   http://localhost:8001/patch/cn/archive-common-full/pinball-1.4.0-61-cc592e56.zip
 
 # 检查最近下载日志
-grep "pinball-1.4.0-61" /tmp/cn-server*.log
+grep "pinball-1.4.0-61" <SERVER_LOG>
 
-# 重启服务端
+# 常规启动：前台 build + bootstrap
 cd starpoint-cn
-kill $(lsof -ti :8001)
-npm run build
-node --env-file=.env out/cn-server.js > /tmp/cn-server.log 2>&1 &
+bash scripts/start-cn.sh
+```
 
-# 查看信标
-grep BEACON /tmp/cn-server.log | grep -v "servertime\|viewer_id"
+`node out/cn-server.js` 是 Release 已准备并激活后的低级调试入口，不会自动执行内容同步。
+
+```bash
+# 查看信标（另一个终端）
+grep BEACON <SERVER_LOG> | grep -v "servertime\|viewer_id"
 
 # 查看错误
-grep -E "ERR:|CRASH|C8601|8100|8102" /tmp/cn-server.log
+grep -E "ERR:|CRASH|C8601|8100|8102" <SERVER_LOG>
 
 # 查看下载进度
-grep -c "archive-common-full" /tmp/cn-server.log
+grep -c "archive-common-full" <SERVER_LOG>
 ```
 
 ### 6.2 手机端（需 root，仅 5667）
@@ -950,7 +954,7 @@ ANDROID_SERIAL=<DEVICE_IP>:5667 bash scripts/build-release.sh
 | `RMB:getIntMap entries=0` | 解析出 0 条目（格式不兼容） |
 | `RMB:getIntMap entries=505` | 解析出 505 条目（正常） |
 
-**监控命令**：`tail -f /tmp/cn-server.log | grep BEACON`
+**监控命令**：`tail -f <SERVER_LOG> | grep BEACON`（`<SERVER_LOG>` 由调用者或进程管理器提供）
 
 ### 12.7 当前构建配置
 

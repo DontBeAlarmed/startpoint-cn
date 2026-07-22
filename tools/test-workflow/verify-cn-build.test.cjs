@@ -8,14 +8,25 @@ const test = require("node:test")
 const verifier = path.resolve(__dirname, "verify-cn-build.cjs")
 const requiredFiles = [
     "cn-server.js",
+    "content/startup/bootstrap.js",
     "multi/tcp/lobby.js",
     "multi/npc/controller.js",
 ]
 
-function createFile(root, relativePath) {
+function createFile(root, relativePath, contents = "") {
     const filePath = path.join(root, relativePath)
     fs.mkdirSync(path.dirname(filePath), { recursive: true })
-    fs.writeFileSync(filePath, "")
+    fs.writeFileSync(filePath, contents)
+}
+
+function createRuntimeFiles(outputDirectory, bootstrapContents) {
+    for (const relativePath of requiredFiles) {
+        createFile(
+            outputDirectory,
+            relativePath,
+            relativePath === "content/startup/bootstrap.js" ? bootstrapContents : "",
+        )
+    }
 }
 
 test("fails and lists every missing CN runtime module", t => {
@@ -27,7 +38,9 @@ test("fails and lists every missing CN runtime module", t => {
     })
 
     assert.notEqual(result.status, 0)
+    assert.doesNotMatch(result.stderr, new RegExp(outputDirectory.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
     assert.match(result.stderr, /cn-server\.js/)
+    assert.match(result.stderr, /content\/startup\/bootstrap\.js/)
     assert.match(result.stderr, /multi\/tcp\/lobby\.js/)
     assert.match(result.stderr, /multi\/npc\/controller\.js/)
 })
@@ -35,9 +48,10 @@ test("fails and lists every missing CN runtime module", t => {
 test("accepts a complete default out directory", t => {
     const projectDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "verify-cn-build-complete-"))
     t.after(() => fs.rmSync(projectDirectory, { recursive: true, force: true }))
-    for (const relativePath of requiredFiles) {
-        createFile(path.join(projectDirectory, "out"), relativePath)
-    }
+    createRuntimeFiles(
+        path.join(projectDirectory, "out"),
+        "module.exports = { runContentStartup() {} }\n",
+    )
 
     const result = spawnSync(process.execPath, [verifier], {
         cwd: projectDirectory,
@@ -45,4 +59,24 @@ test("accepts a complete default out directory", t => {
     })
 
     assert.equal(result.status, 0, result.stderr)
+    assert.doesNotMatch(result.stdout, new RegExp(projectDirectory.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
 })
+
+for (const [name, bootstrapContents] of [
+    ["空 bootstrap", ""],
+    ["无 runContentStartup 导出的旧 bootstrap", "module.exports = {}\n"],
+]) {
+    test(`${name} 不能通过 CN build verifier`, t => {
+        const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "verify-cn-build-invalid-"))
+        t.after(() => fs.rmSync(outputDirectory, { recursive: true, force: true }))
+        createRuntimeFiles(outputDirectory, bootstrapContents)
+
+        const result = spawnSync(process.execPath, [verifier, outputDirectory], {
+            encoding: "utf8",
+        })
+
+        assert.equal(result.status, 1)
+        assert.match(result.stderr, /content\/startup\/bootstrap\.js/)
+        assert.doesNotMatch(result.stderr, new RegExp(outputDirectory.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+    })
+}

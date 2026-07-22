@@ -24,7 +24,7 @@
 
 ## 环境需求
 
-- Node.js（日常使用当前默认版本；`package.json` 的 `engines` 要求 >=20，仅在确认版本兼容问题时再区分具体版本） · 打补丁后的 CN 客户端 APK(见"客户端改造")
+- Node.js（日常使用当前默认版本；`package.json` 的 `engines` 要求 >=20.12.0） · 打补丁后的 CN 客户端 APK(见"客户端改造")
 - 一份 CN CDN 资源,放入 `.cdn/cn/`
 
 ### CDN 路径清单文件(PathFile)
@@ -57,7 +57,8 @@ npm run install:admin
 | 命令 | 边界 |
 |------|------|
 | `npm run build:server` | 仅编译 CN 服务端入口及其依赖，不构建 CSS 或管理后台 |
-| `npm run dev:cn` | 先执行 `build:server`，再启动 `out/cn-server.js` |
+| `npm run start:cn` | 使用已有构建，先执行 `content:sync` normal，成功后启动 CN 游戏服务 |
+| `npm run dev:cn` | 先执行 `build:server`，再执行与 `start:cn` 相同的同步和启动流程 |
 | `npm run build:legacy` | 使用原 `tsconfig.json` 编译 legacy 全量 TypeScript，不构建 CSS |
 | `npm run build` | 保留原有 legacy 全量 TypeScript + Tailwind CSS 构建语义 |
 | `npm run build:admin` | 仅构建管理后台，不安装依赖 |
@@ -69,7 +70,7 @@ npm run install:admin
 `.env.example` 的局域网区块默认激活，`cp .env.example .env` 后可直接启动：
 
 ```bash
-# 生产模式（build + 启动）
+# 前台模式（build + content:sync + 启动）
 bash scripts/start-cn.sh
 
 # 开发模式（热重载，无需 build）
@@ -109,8 +110,14 @@ bash scripts/start-cn.sh
 
 ### `.env` 加载说明
 
-- `npm run dev:cn` 与 `bash scripts/start-cn.sh` 经 `node --env-file=.env` **会**加载 `.env`。
-- `npm run debug:cn`(ts-node-dev)无 `--env-file`、代码也未引入 dotenv,因此**不会**自动读 `.env`;调试时需自行 export 环境变量,否则走代码默认值。
+- `npm run start:cn`、`npm run dev:cn` 与 `bash scripts/start-cn.sh` 通过 bootstrap 加载可选 `.env`；文件不存在时沿用当前环境。
+- `npm run debug:cn` 保留现有 ts-node-dev 热重载与 `--env-file=.env` 语义，不经过 bootstrap，也不会自动执行内容同步。
+
+### 启动入口边界
+
+受支持入口会先完成 `content:sync` normal，只有同步成功才启动游戏服务。`scripts/start-cn.sh` 在前台依次执行 `build:server` 和 bootstrap，不执行 `pkill`、不创建 `nohup` 后台进程，也不写固定日志文件；需要后台运行时由调用者或进程管理器托管该前台命令并收集标准输出和标准错误。
+
+`node out/cn-server.js` 是低级调试入口，不会自动同步；直接使用前必须自行确认当前内容 Release 已准备并激活。
 
 ## 关键配置(.env)
 

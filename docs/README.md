@@ -35,7 +35,7 @@
 - 完整分层、模块系统(CommonJS)、协议编码(MsgPack→Base64)、时间系统等见 [架构](./architecture.md)。
 
 ### Scripts(要点)
-- `scripts/start-cn.sh` — 一键构建并以生产方式重启 CN 服务。
+- `scripts/start-cn.sh` — 前台执行 CN 构建与 bootstrap；bootstrap 先同步内容，成功后才启动服务。脚本不负责终止旧进程或创建后台进程。
 - `scripts/cdn_download.py` — 下载官方 CDN 副本。
 - `scripts/converter.py` — 将游戏资源转换为服务器可读格式(`in/` → `out/`)。
 - `scripts/mitm-redirect-traffic.py` — mitmproxy 脚本,把游戏流量重定向到本服务。
