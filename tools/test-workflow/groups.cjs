@@ -47,7 +47,9 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/content_character_converter.test.cjs",
             "tools/content_gacha_converter.test.cjs",
+            "tools/content_shop_converter.test.cjs",
             "tools/gacha_repository.test.cjs",
+            "tools/shop_repository.test.cjs",
             "tools/content_repository.test.cjs",
             "tools/content_sync.test.cjs",
             "tools/content_object_store.test.cjs",
@@ -63,6 +65,12 @@ const TEST_GROUPS = Object.freeze({
             "tools/quest_abort_route.test.cjs",
             "tools/score_attack_event.test.cjs",
             "tools/treasure_key_entry.test.cjs",
+        ],
+    },
+    "integration:content": {
+        execution: "serial",
+        tests: [
+            "tools/shop_repository_integration.test.cjs",
         ],
     },
     "integration:mission-compiled": {

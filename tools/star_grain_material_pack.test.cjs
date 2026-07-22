@@ -6,12 +6,20 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
 const projectRoot = path.resolve(__dirname, "..");
+const dotGitPath = path.join(projectRoot, ".git");
+const mainRepositoryRoot = fs.statSync(dotGitPath).isDirectory()
+    ? projectRoot
+    : path.resolve(
+        projectRoot,
+        fs.readFileSync(dotGitPath, "utf8").trim().replace(/^gitdir:\s*/, ""),
+        "../../..",
+    );
 const serverAssetPath = path.resolve(projectRoot, "assets/star_grain_shop.json");
 const generatorPath = path.resolve(__dirname, "rebuild_star_grain_shop.ts");
 const tsNodePath = path.resolve(projectRoot, "node_modules/ts-node/dist/bin.js");
 const cnSourcePath = path.resolve(
-    __dirname,
-    "../../wf-assets-cn/orderedmap/shop/star_grain_shop.json",
+    mainRepositoryRoot,
+    "../wf-assets-cn/orderedmap/shop/star_grain_shop.json",
 );
 const serverShop = require(serverAssetPath);
 const cnShop = require(cnSourcePath);

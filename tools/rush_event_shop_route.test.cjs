@@ -5,6 +5,11 @@ const { pack, unpack } = require("msgpackr")
 
 require("ts-node/register/transpile-only")
 
+const { after } = require("node:test")
+const { installBundledShopSnapshot } = require("./helpers/install-bundled-shop-snapshot.cjs")
+const restoreBundledShopSnapshot = installBundledShopSnapshot()
+after(restoreBundledShopSnapshot)
+
 function stubModule(relativePath, exports) {
     const modulePath = require.resolve(relativePath)
     require.cache[modulePath] = {

@@ -31,14 +31,6 @@ import manaNodeAwake from "../../assets/mana_node_awake.json";
 import manaBoard from "../../assets/mana_board.json";
 import rareScoreRewards from "../../assets/rare_score_reward.json";
 import scoreRewards from "../../assets/score_reward.json";
-import bossCoinShopItems from "../../assets/boss_coin_shop.json";
-import bossCoinShopItemCategoryMap from "../../assets/boss_coin_shop_item_category_map.json";
-import eventItemShopItems from "../../assets/event_item_shop.json";
-import eventItemShopIdMap from "../../assets/event_item_shop_id_map.json";
-import generalShopItems from "../../assets/general_shop.json";
-import starGrainShopItems from "../../assets/star_grain_shop.json";
-import treasureShopItems from "../../assets/treasure_shop.json";
-import equipmentEnhancementShopItems from "../../assets/equipment_enhancement_shop.json";
 import rushEventQuestFolders from "../../assets/rush_event_quest_folder.json"
 import configData from "../../assets/config.json"
 import equipmentDissolveData from "../../assets/equipment_dissolve.json"
@@ -563,6 +555,18 @@ export function getGachaCampaignIdSync(
 
 // shop functions
 
+function getShopContentTable<T>(tableName: string): T {
+    return getContentSnapshot().repository.table<T>(tableName)
+}
+
+function getEventItemShopItems(): EventShopItems {
+    return getShopContentTable<EventShopItems>("event_item_shop.json")
+}
+
+function getBossCoinShopItems(): BossCoinShopItems {
+    return getShopContentTable<BossCoinShopItems>("boss_coin_shop.json")
+}
+
 interface RushCompatibilityEvent {
     sourceEventId: number
     availableFrom: string
@@ -623,13 +627,13 @@ export function getGenericShopItemsSync(
 ): ShopItems | null {
     switch (shopType) {
         case ShopType.TREASURE:
-            return treasureShopItems as ShopItems
+            return getShopContentTable<ShopItems>("treasure_shop.json")
         case ShopType.TREASURE_EQUIPMENT:
-            return equipmentEnhancementShopItems as ShopItems
+            return getShopContentTable<ShopItems>("equipment_enhancement_shop.json")
         case ShopType.GENERAL:
-            return generalShopItems as ShopItems
+            return getShopContentTable<ShopItems>("general_shop.json")
         case ShopType.STAR_GRAIN:
-            return starGrainShopItems as ShopItems
+            return getShopContentTable<ShopItems>("star_grain_shop.json")
     }
     return null
 }
@@ -645,7 +649,7 @@ export function getEventShopItemsSync(
     eventType: number | string,
     eventId: number | string
 ): ShopItems | null {
-    const typeSection = (eventItemShopItems as EventShopItems)[String(eventType)]
+    const typeSection = getEventItemShopItems()[String(eventType)]
     if (typeSection === undefined) return null;
 
     const exactItems = typeSection[String(eventId)]
@@ -669,7 +673,7 @@ export function getEventShopItemsSync(
 export function getBossCoinShopItemsSync(
     bossId: number | string
 ): ShopItems | null {
-    return (bossCoinShopItems as BossCoinShopItems)[String(bossId)] ?? null
+    return getBossCoinShopItems()[String(bossId)] ?? null
 }
 
 /**
@@ -685,21 +689,28 @@ export function getShopItemSync(
 ): ShopItem | null {
     switch(shopType) {
         case ShopType.TREASURE:
-            return (treasureShopItems as ShopItems)[String(itemId)] ?? null
+            return getShopContentTable<ShopItems>("treasure_shop.json")[String(itemId)] ?? null
         case ShopType.TREASURE_EQUIPMENT:
-            return (equipmentEnhancementShopItems as ShopItems)[String(itemId)] ?? null
+            return getShopContentTable<ShopItems>(
+                "equipment_enhancement_shop.json",
+            )[String(itemId)] ?? null
         case ShopType.GENERAL:
-            return (generalShopItems as ShopItems)[String(itemId)] ?? null
+            return getShopContentTable<ShopItems>("general_shop.json")[String(itemId)] ?? null
         case ShopType.STAR_GRAIN:
-            return (starGrainShopItems as ShopItems)[String(itemId)] ?? null
+            return getShopContentTable<ShopItems>("star_grain_shop.json")[String(itemId)] ?? null
         case ShopType.BOSS_COIN:
-            const category = (bossCoinShopItemCategoryMap as Record<string, number>)[itemId]
+            const category = getShopContentTable<Record<string, number>>(
+                "boss_coin_shop_item_category_map.json",
+            )[itemId]
             if (category === undefined) return null;
-            return (bossCoinShopItems as BossCoinShopItems)[category][itemId] ?? null
+            return getBossCoinShopItems()[category]?.[itemId] ?? null
         case ShopType.EVENT_ITEM:
-            const mapInfo = (eventItemShopIdMap as Record<string, EventItemShopIdMapItem>)[itemId]
+            const mapInfo = getShopContentTable<Record<string, EventItemShopIdMapItem>>(
+                "event_item_shop_id_map.json",
+            )[itemId]
             if (mapInfo === undefined) return null;
-            const eventItem = (eventItemShopItems as EventShopItems)[mapInfo.eventType][mapInfo.eventId][itemId]
+            const eventItems = getEventItemShopItems()
+            const eventItem = eventItems[mapInfo.eventType]?.[mapInfo.eventId]?.[itemId]
             if (eventItem === undefined) return null
             if (mapInfo.eventType !== 11) return eventItem
             const compatibilityTarget = Object.entries(RUSH_COMPATIBILITY_EVENTS).find(
@@ -707,7 +718,7 @@ export function getShopItemSync(
             )
             if (compatibilityTarget === undefined) return eventItem
             const [targetEventId, compatibilityEntry] = compatibilityTarget
-            const targetItems = (eventItemShopItems as EventShopItems)[String(mapInfo.eventType)]?.[targetEventId]
+            const targetItems = eventItems[String(mapInfo.eventType)]?.[targetEventId]
             return hasShopItems(targetItems)
                 ? eventItem
                 : addRushCompatibilityPeriod(eventItem, compatibilityEntry)

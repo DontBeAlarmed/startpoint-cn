@@ -1,5 +1,10 @@
 require("ts-node/register/transpile-only")
 
+const { after } = require("node:test")
+const { installBundledShopSnapshot } = require("./helpers/install-bundled-shop-snapshot.cjs")
+const restoreBundledShopSnapshot = installBundledShopSnapshot()
+after(restoreBundledShopSnapshot)
+
 const assert = require("node:assert/strict")
 const { resolveEventCurrencyId } = require("../src/lib/event-currency")
 

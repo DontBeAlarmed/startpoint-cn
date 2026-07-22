@@ -1,6 +1,7 @@
-import eventItemShop from "../../assets/event_item_shop.json"
 import itemLookup from "../../assets/item_lookup.json"
+import { getContentSnapshot } from "../content/runtime/content-snapshot"
 import { getServerDate } from "../utils"
+import type { EventShopItems } from "./types"
 
 interface GenerationWindow {
     id: number
@@ -9,7 +10,8 @@ interface GenerationWindow {
 }
 
 const lookup = itemLookup as Record<string, string>
-const familyByName = new Map<string, GenerationWindow[]>()
+let cachedEventItemShop: EventShopItems | null = null
+let cachedFamilyByName = new Map<string, GenerationWindow[]>()
 
 function parseShopDate(value: string | null | undefined, fallback: number): number {
     if (!value) return fallback
@@ -17,8 +19,9 @@ function parseShopDate(value: string | null | undefined, fallback: number): numb
     return Number.isNaN(time) ? fallback : time
 }
 
-;(function buildFamilies() {
+function buildFamilies(eventItemShop: EventShopItems): Map<string, GenerationWindow[]> {
     const windowsByName = new Map<string, Map<string, GenerationWindow>>()
+    const familyByName = new Map<string, GenerationWindow[]>()
 
     const walk = (node: unknown): void => {
         if (Array.isArray(node)) {
@@ -50,11 +53,23 @@ function parseShopDate(value: string | null | undefined, fallback: number): numb
             familyByName.set(name, values)
         }
     }
-})()
+    return familyByName
+}
+
+function getFamilyByName(): Map<string, GenerationWindow[]> {
+    const eventItemShop = getContentSnapshot().repository.table<EventShopItems>(
+        "event_item_shop.json",
+    )
+    if (eventItemShop !== cachedEventItemShop) {
+        cachedEventItemShop = eventItemShop
+        cachedFamilyByName = buildFamilies(eventItemShop)
+    }
+    return cachedFamilyByName
+}
 
 export function resolveEventCurrencyId(itemId: number, at: Date = getServerDate()): number {
     const name = lookup[String(itemId)]
-    const family = name ? familyByName.get(name) : undefined
+    const family = name ? getFamilyByName().get(name) : undefined
     if (!family) return itemId
 
     const time = at.getTime()

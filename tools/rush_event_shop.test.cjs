@@ -3,6 +3,11 @@ const Database = require("better-sqlite3")
 
 require("ts-node/register/transpile-only")
 
+const { after } = require("node:test")
+const { installBundledShopSnapshot } = require("./helpers/install-bundled-shop-snapshot.cjs")
+const restoreBundledShopSnapshot = installBundledShopSnapshot()
+after(restoreBundledShopSnapshot)
+
 const {
     getEventShopItemsSync,
     getRushEventFolderClearRewards,

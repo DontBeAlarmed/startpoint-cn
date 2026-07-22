@@ -63,14 +63,19 @@ const EXPECTED_CDN_TABLES = Object.freeze({
     "general_shop.json": ["shop", ["master/shop/general_shop.orderedmap"]],
     "event_item_shop.json": ["shop", ["master/shop/event_item_shop.orderedmap"]],
     "event_item_shop_id_map.json": ["shop", ["master/shop/event_item_shop.orderedmap"]],
-    "boss_coin_shop.json": ["shop", ["master/shop/boss_coin_shop.orderedmap"]],
+    "boss_coin_shop.json": ["shop", [
+        "master/shop/boss_coin_shop.orderedmap",
+        "master/shop/boss_coin_shop_category.orderedmap",
+    ]],
     "boss_coin_shop_item_category_map.json": ["shop", [
         "master/shop/boss_coin_shop.orderedmap",
+        "master/shop/boss_coin_shop_category.orderedmap",
     ]],
     "star_grain_shop.json": ["shop", ["master/shop/star_grain_shop.orderedmap"]],
     "treasure_shop.json": ["shop", ["master/shop/treasure_shop.orderedmap"]],
     "equipment_enhancement_shop.json": ["shop", [
         "master/equipment_enhancement/equipment_enhancement_shop.orderedmap",
+        "master/equipment_enhancement/equipment_enhancement_shop_category.orderedmap",
     ]],
 })
 

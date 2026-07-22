@@ -302,6 +302,29 @@ orderedmap 存在两种经过真实国服文件验证的二进制形态，不能
 
 仓库内 tracked `cdndata/gacha.json` 已知有 584 个卡池且与官方 extracted gacha rows 全量一致，tracked `gacha_campaign.json` 已知有 145 个映射且与 41 个官方 campaign outer rows 展开结果全量一致。普通自动测试只使用仓库内小型手写 fixture，不读取仓库外 `wf-assets-cn`，也不保存大型 odds golden。
 
+### 6.6 商店转换与 bundled/Release 边界
+
+商店 Release 转换器固定读取以下八个官方 orderedmap 来源；其中 category 是独立主数据，不允许只根据商品表中出现过的 category ID 反推分类域：
+
+| 来源 | 固定列数 | 运行时输出 |
+|---|---:|---|
+| `master/shop/general_shop.orderedmap` | 47 | `general_shop.json` |
+| `master/shop/event_item_shop.orderedmap` | 51 | `event_item_shop.json`、`event_item_shop_id_map.json` |
+| `master/shop/boss_coin_shop.orderedmap` | 50 | Boss 商品和商品 ID 映射 |
+| `master/shop/boss_coin_shop_category.orderedmap` | 13 | `boss_coin_shop.json` 的完整 category 域 |
+| `master/shop/star_grain_shop.orderedmap` | 43 | `star_grain_shop.json` |
+| `master/shop/treasure_shop.orderedmap` | 44 | `treasure_shop.json` |
+| `master/equipment_enhancement/equipment_enhancement_shop.orderedmap` | 50 | 装备强化商品及其 category ID |
+| `master/equipment_enhancement/equipment_enhancement_shop_category.orderedmap` | 10 | 装备强化的官方 category 域 |
+
+公共输出字段保持现有 `ShopItem` 形状。General 的价格、成本、时间、库存/交换次数和奖励列分别为 `9/10`、`12..19`、`20/21`、`23/24/25/27`、`29..46`；Event 为 `15/16`、`18..25`、`26/27`、`29/30/31`、`32..49`；Boss 为 `14/15`、`17..24`、`25/26`、`28/29/30/31`、`32..49`；Star Grain 为 `7/8`、`10..17`、`18/19`、`21/22/23/24`、`25..42`；Treasure 为 `7/8`、`10..17`、`18/19`、`21/22/23`、`24..41`。价格类型 `0/1/2` 对应星导石、玛纳、羁绊凭证；奖励类型 `0..4` 对应道具、经验、玛纳、角色、装备。货币奖励不输出伪造 ID。
+
+活动商品按 orderedmap 主键作为商品 ID，col1 作为 `eventId`，col2 作为服务端 `eventType`，同时生成嵌套商品表和 `event_item_shop_id_map`。Boss 商品使用 col0 引用独立 category 表。装备强化商品使用 col0/2/3 表示 `shopCategoryId/groupId/stage`，成本为 col14..21，时间为 col22/23，库存为 col25，装备 ID、强化上限和觉醒要求为 col29/30/31。官方 1.4.54 装备强化商品的 col25 全部为空，该 layout 单独把空库存转换为运行时无限库存 `-1`；其他商店的库存列仍必须是严格整数，不共享此例外。
+
+转换器严格检查 canonical key、重复行、CSV、固定列数和 category 引用形状，按数字 ID 稳定排序并深冻结输出；不进行 CDN 作者责任范围内的 ID 复用、删除策略或内容合理性修补。官方空表原样输出为空，不从其他活动复制商品。仓库内 bundled JSON 继续作为无 Release 时的历史兼容基线；Release 尤其按官方 Treasure col7/8 价格与 col24..41 奖励生成，不继承 bundled 的历史占位值。
+
+国服 1.4.54 中常驻 Rush `700011..700017` 没有独立 `event_item_shop` 行，转换器必须如实保持为空。当前 `700011..700017 -> 700001..700007` 的 `eventId - 10` 商品和文件夹奖励复用仍位于服务端业务层，是没有官方服务端抓包支持的推测实现，之后应由 CDN 补全或官方响应替换，绝不能写入转换器或 Release 对象。
+
 ## 七、完整逻辑快照与物理去重
 
 ### 7.1 选择完整快照

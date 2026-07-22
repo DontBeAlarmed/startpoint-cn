@@ -232,7 +232,10 @@ const definitionInputs: TableSourceInput[] = [
     {
         tableName: "boss_coin_shop.json",
         scope: "cdn",
-        sourceOrderedMaps: ["master/shop/boss_coin_shop.orderedmap"],
+        sourceOrderedMaps: [
+            "master/shop/boss_coin_shop.orderedmap",
+            "master/shop/boss_coin_shop_category.orderedmap",
+        ],
         converterId: "shop",
         converterVersion: 1,
         outputShapeVersion: 1,
@@ -240,7 +243,10 @@ const definitionInputs: TableSourceInput[] = [
     {
         tableName: "boss_coin_shop_item_category_map.json",
         scope: "cdn",
-        sourceOrderedMaps: ["master/shop/boss_coin_shop.orderedmap"],
+        sourceOrderedMaps: [
+            "master/shop/boss_coin_shop.orderedmap",
+            "master/shop/boss_coin_shop_category.orderedmap",
+        ],
         converterId: "shop",
         converterVersion: 1,
         outputShapeVersion: 1,
@@ -266,6 +272,7 @@ const definitionInputs: TableSourceInput[] = [
         scope: "cdn",
         sourceOrderedMaps: [
             "master/equipment_enhancement/equipment_enhancement_shop.orderedmap",
+            "master/equipment_enhancement/equipment_enhancement_shop_category.orderedmap",
         ],
         converterId: "shop",
         converterVersion: 1,
