@@ -228,7 +228,7 @@ outputShapeVersion
 
 `sourceOrderedMaps[]` 只能包含可直接按 SHA1+salt 定位的精确逻辑路径，禁止放入 `*` 等伪 glob。由固定表内容决定的动态依赖必须使用结构化 `dynamicSources[]`；Registry 将固定来源和动态描述按声明顺序合成为稳定的 `manifestSources`，原样进入 Release manifest 的 `sources`。
 
-`gacha.json` 的动态来源契约 `gacha-odds-references` 明确声明：从 `master/gacha/gacha.orderedmap` 的 col11 读取 rarity odds ID；以 col13 为 prize kind，角色池读取 col14/15/16，装备池读取 col22/23/24；引用先 trim，再跳过空字符串和 `(None)`；剩余 ID 按字典序确定性读取 `master/gacha_odds/{oddsId}.orderedmap`；任何非空引用缺失或不可读都失败。该契约是任务 11 builder 的输入元数据，不表示本阶段已经实现 builder 的动态提取执行。
+`gacha.json` 的动态来源契约 `gacha-odds-references` 明确声明：从 `master/gacha/gacha.orderedmap` 的 col11 读取 rarity odds ID；以 col13 为 prize kind，角色池读取 col14/15/16，装备池读取 col22/23/24；引用先 trim，再跳过空字符串和 `(None)`；剩余 ID 按字典序确定性读取 `master/gacha_odds/{oddsId}.orderedmap`；任何非空引用缺失或不可读都失败。Release builder 按该结构化契约扩展严格 logical path allowlist，不把描述符或通配符解释为物理 ZIP 路径。
 
 `scope` 分为：
 
@@ -550,9 +550,9 @@ Repository 在服务启动时固定数据来源。运行中修改 `current.json`
 
 ### 10.2 Catalog
 
-同步 Release 的 Catalog 取代固定 1.4.54 runtime manifest，成为该次启动的 Planner 和 CDN 文件 allowlist 来源。
+同步 Release 的 Catalog 取代固定 1.4.54 runtime manifest，成为该次启动的 Planner 和 CDN 文件 allowlist 来源。启动初始化只读取一次 `current.json` 对应的完整 Release snapshot，再由同一 snapshot 同时构造 Catalog 与 Repository；运行期间指针变化不会热切换。
 
-没有 `current.json` 时继续使用仓库跟踪的官方 1.4.54 manifest。动态 Catalog 接入稳定后：
+没有 `current.json` 时继续使用仓库跟踪的官方 1.4.54 manifest。有 current 时不得读取该 fallback；指针、Release 或 catalog 对象损坏必须启动失败。动态 Catalog 接入后：
 
 - 固定 manifest 保留为测试 fixture 和 bundled fallback。
 - `asset-patch/manifest.json` 不再参与 CN 运行时版本选择。

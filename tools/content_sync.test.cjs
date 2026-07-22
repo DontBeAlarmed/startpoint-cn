@@ -1,6 +1,7 @@
 "use strict"
 
 const assert = require("node:assert/strict")
+const childProcess = require("node:child_process")
 const crypto = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
@@ -10,8 +11,13 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const { buildCdnCatalog } = require("../src/content/cdn/catalog-builder")
+const { hashContentResourcePath } = require("../src/content/resource-path")
 const { ContentObjectStore } = require("../src/content/sync/object-store")
 const { TABLE_SOURCES } = require("../src/content/sync/table-registry")
+const {
+    hashResourcePath,
+    serializeOrderedMap,
+} = require("./orderedmap_serializer.cjs")
 const {
     ContentSyncLockCleanupError,
     ContentSyncLockError,
@@ -149,6 +155,317 @@ async function readCurrentRelease(store) {
     return current === null ? null : store.readRelease(current)
 }
 
+function converterOutput(converterId) {
+    return Object.fromEntries(TABLE_SOURCES
+        .filter(definition => definition.converterId === converterId)
+        .map(definition => [definition.tableName, {
+            converterId,
+            tableName: definition.tableName,
+        }]))
+}
+
+function gachaRow(overrides = {}) {
+    const columns = Array.from({ length: 47 }, () => "")
+    columns[11] = " rarity-main "
+    columns[13] = "0"
+    columns[14] = "z-character"
+    columns[15] = "(None)"
+    columns[16] = " a-character "
+    for (const [column, value] of Object.entries(overrides)) columns[Number(column)] = value
+    return columns.join(",")
+}
+
+function nestedOrderedMap(id) {
+    const inner = serializeOrderedMap([{ key: "1", row: "fixture" }])
+    return serializeOrderedMap([{ key: id, row: inner }])
+}
+
+function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}) {
+    const entries = new Map()
+    const logicalByPhysical = new Map()
+    for (const [logicalPath, bytes] of logicalEntries) {
+        const { relativePath } = hashResourcePath(logicalPath)
+        const physicalPath = `production/upload/${relativePath}`
+        entries.set(physicalPath, bytes)
+        logicalByPhysical.set(physicalPath, logicalPath)
+    }
+    return {
+        has(physicalPath) {
+            return entries.has(physicalPath)
+        },
+        async read(physicalPath) {
+            assert.match(physicalPath, /^production\/upload\/[a-f0-9]{2}\/[a-f0-9]{38}$/)
+            const logicalPath = logicalByPhysical.get(physicalPath) ?? physicalPath
+            reads.push(logicalPath)
+            const bytes = entries.get(physicalPath)
+            if (!bytes) throw new Error("/private/fixture/archive.zip is missing an entry")
+            await beforeRead(logicalPath)
+            return Buffer.from(bytes)
+        },
+    }
+}
+
+function defaultBuilderContext(archiveIndex) {
+    const scan = fakeScan({ cdnRoot: "/unused-cdn" })
+    return {
+        projectRoot,
+        paths: { cdnRoot: "/unused-cdn" },
+        scan,
+        catalog: fakeCatalog(scan.targetVersion),
+        archiveIndex,
+        definitions: TABLE_SOURCES,
+    }
+}
+
+test("orderedmap serializer hash stays equivalent to the production resource helper", () => {
+    for (const logicalPath of [
+        "master/character/character.orderedmap",
+        "/master//gacha\\gacha.orderedmap",
+        "master/gacha_odds/odds-01.orderedmap",
+    ]) {
+        assert.deepEqual(hashResourcePath(logicalPath), hashContentResourcePath(logicalPath))
+    }
+    assert.deepEqual(
+        hashResourcePath("master/config/config.orderedmap", "fixture-salt"),
+        hashContentResourcePath("master/config/config.orderedmap", "fixture-salt"),
+    )
+})
+
+test("orderedmap serializer loads as pure CJS without ts-node startup", () => {
+    const script = String.raw`
+        const Module = require("node:module");
+        const originalLoad = Module._load;
+        Module._load = function(request, ...args) {
+            if (request.startsWith("ts-node")) throw new Error("ts-node must not be loaded");
+            return originalLoad.call(this, request, ...args);
+        };
+        const serializer = require("./tools/orderedmap_serializer.cjs");
+        process.stdout.write(JSON.stringify(serializer.hashResourcePath("master/config/config.orderedmap")));
+    `
+    const startedAt = Date.now()
+    const child = childProcess.spawnSync(process.execPath, ["-e", script], {
+        cwd: projectRoot,
+        encoding: "utf8",
+        timeout: 2_500,
+    })
+    const elapsedMs = Date.now() - startedAt
+
+    assert.equal(child.status, 0, child.stderr)
+    assert.deepEqual(
+        JSON.parse(child.stdout),
+        hashContentResourcePath("master/config/config.orderedmap"),
+    )
+    assert.ok(elapsedMs < 2_500, `pure CJS require took ${elapsedMs}ms`)
+})
+
+test("default release builder closes all registry tables and runs each CDN converter once", async () => {
+    const { createDefaultContentTableBuilder } = require(
+        "../src/content/sync/release-builder"
+    )
+    const reads = []
+    const logicalEntries = new Map([
+        ["master/character/character.orderedmap", serializeOrderedMap([])],
+        ["master/character/character_text.orderedmap", serializeOrderedMap([])],
+        ["master/gacha/gacha.orderedmap", serializeOrderedMap([
+            { key: "1", row: gachaRow() },
+        ])],
+        ["master/gacha_odds/a-character.orderedmap", nestedOrderedMap("a-character")],
+        ["master/gacha_odds/rarity-main.orderedmap", nestedOrderedMap("rarity-main")],
+        ["master/gacha_odds/z-character.orderedmap", nestedOrderedMap("z-character")],
+    ])
+    const converterCalls = { character: 0, gacha: 0, shop: 0 }
+    let bundledImports = 0
+    const builder = createDefaultContentTableBuilder({
+        convertCharacters: async () => {
+            converterCalls.character++
+            return converterOutput("character")
+        },
+        convertGachas: async () => {
+            converterCalls.gacha++
+            return converterOutput("gacha")
+        },
+        convertShops: async () => {
+            converterCalls.shop++
+            return converterOutput("shop")
+        },
+        importBundledTable: async (_root, tableName) => {
+            bundledImports++
+            return { imported: tableName }
+        },
+    })
+
+    const built = await builder.build(defaultBuilderContext(
+        inMemoryArchiveIndex(logicalEntries, reads),
+    ))
+
+    assert.equal(built.size, TABLE_SOURCES.length)
+    assert.deepEqual([...built.keys()], TABLE_SOURCES.map(definition => definition.tableName))
+    assert.deepEqual(converterCalls, { character: 1, gacha: 1, shop: 1 })
+    assert.equal(
+        bundledImports,
+        TABLE_SOURCES.filter(definition => (
+            definition.converterId === "bundled-json"
+            || definition.converterId === "server-json"
+        )).length,
+    )
+    assert.deepEqual(reads.filter(logicalPath => (
+        logicalPath.startsWith("master/gacha_odds/")
+    )), [
+        "master/gacha_odds/a-character.orderedmap",
+        "master/gacha_odds/rarity-main.orderedmap",
+        "master/gacha_odds/z-character.orderedmap",
+    ])
+})
+
+test("default release builder fails explicitly for a missing dynamic gacha reference", async () => {
+    const { createDefaultContentTableBuilder } = require(
+        "../src/content/sync/release-builder"
+    )
+    const reads = []
+    const logicalEntries = new Map([
+        ["master/character/character.orderedmap", serializeOrderedMap([])],
+        ["master/character/character_text.orderedmap", serializeOrderedMap([])],
+        ["master/gacha/gacha.orderedmap", serializeOrderedMap([
+            { key: "1", row: gachaRow() },
+        ])],
+        ["master/gacha_odds/a-character.orderedmap", nestedOrderedMap("a-character")],
+        ["master/gacha_odds/rarity-main.orderedmap", nestedOrderedMap("rarity-main")],
+    ])
+    const builder = createDefaultContentTableBuilder({
+        convertCharacters: async () => converterOutput("character"),
+        convertGachas: async () => converterOutput("gacha"),
+        convertShops: async () => converterOutput("shop"),
+        importBundledTable: async (_root, tableName) => ({ imported: tableName }),
+    })
+
+    await assert.rejects(
+        builder.build(defaultBuilderContext(inMemoryArchiveIndex(logicalEntries, reads))),
+        error => (
+            /referenced gacha odds.*master\/gacha_odds\/z-character\.orderedmap/i.test(
+                error.message,
+            )
+            && !error.message.includes("/private/fixture")
+        ),
+    )
+    assert.equal(reads.includes("master/gacha_odds/(None).orderedmap"), false)
+})
+
+test("default release builder rejects an incomplete converter output", async () => {
+    const { createDefaultContentTableBuilder } = require(
+        "../src/content/sync/release-builder"
+    )
+    const logicalEntries = new Map([
+        ["master/character/character.orderedmap", serializeOrderedMap([])],
+        ["master/character/character_text.orderedmap", serializeOrderedMap([])],
+        ["master/gacha/gacha.orderedmap", serializeOrderedMap([
+            { key: "1", row: gachaRow() },
+        ])],
+        ["master/gacha_odds/a-character.orderedmap", nestedOrderedMap("a-character")],
+        ["master/gacha_odds/rarity-main.orderedmap", nestedOrderedMap("rarity-main")],
+        ["master/gacha_odds/z-character.orderedmap", nestedOrderedMap("z-character")],
+    ])
+    const incompleteCharacterOutput = converterOutput("character")
+    delete incompleteCharacterOutput["character.json"]
+    const builder = createDefaultContentTableBuilder({
+        convertCharacters: async () => incompleteCharacterOutput,
+        convertGachas: async () => converterOutput("gacha"),
+        convertShops: async () => converterOutput("shop"),
+        importBundledTable: async (_root, tableName) => ({ imported: tableName }),
+    })
+
+    await assert.rejects(
+        builder.build(defaultBuilderContext(inMemoryArchiveIndex(logicalEntries, []))),
+        /missing tables: character\.json/i,
+    )
+})
+
+test("default release builder bounds parallel reads and imports while preserving order", async () => {
+    const { createDefaultContentTableBuilder } = require(
+        "../src/content/sync/release-builder"
+    )
+    const gachaRows = []
+    const logicalEntries = new Map([
+        ["master/character/character.orderedmap", serializeOrderedMap([])],
+        ["master/character/character_text.orderedmap", serializeOrderedMap([])],
+    ])
+    const expectedOddsPaths = []
+    for (let index = 0; index < 12; index++) {
+        const suffix = String(index).padStart(2, "0")
+        const ids = [`a-${suffix}`, `b-${suffix}`, `c-${suffix}`, `r-${suffix}`]
+        gachaRows.push({
+            key: String(index + 1),
+            row: gachaRow({ 11: ids[3], 14: ids[0], 15: ids[1], 16: ids[2] }),
+        })
+        for (const id of ids) {
+            const logicalPath = `master/gacha_odds/${id}.orderedmap`
+            expectedOddsPaths.push(logicalPath)
+            logicalEntries.set(logicalPath, nestedOrderedMap(id))
+        }
+    }
+    logicalEntries.set("master/gacha/gacha.orderedmap", serializeOrderedMap(gachaRows))
+    expectedOddsPaths.sort()
+
+    let activeOddsReads = 0
+    let maxOddsReads = 0
+    let activeImports = 0
+    let maxImports = 0
+    const reads = []
+    const builder = createDefaultContentTableBuilder({
+        convertCharacters: async () => converterOutput("character"),
+        convertGachas: async () => converterOutput("gacha"),
+        convertShops: async () => converterOutput("shop"),
+        importBundledTable: async (_root, tableName) => {
+            activeImports++
+            maxImports = Math.max(maxImports, activeImports)
+            await new Promise(resolve => setTimeout(resolve, 5))
+            activeImports--
+            return { imported: tableName }
+        },
+    })
+    const archiveIndex = inMemoryArchiveIndex(logicalEntries, reads, async logicalPath => {
+        if (!logicalPath.startsWith("master/gacha_odds/")) return
+        activeOddsReads++
+        maxOddsReads = Math.max(maxOddsReads, activeOddsReads)
+        await new Promise(resolve => setTimeout(resolve, 5))
+        activeOddsReads--
+    })
+
+    const built = await builder.build(defaultBuilderContext(archiveIndex))
+
+    assert.equal(maxOddsReads, 8)
+    assert.equal(maxImports, 8)
+    assert.deepEqual(
+        reads.filter(logicalPath => logicalPath.startsWith("master/gacha_odds/")),
+        expectedOddsPaths,
+    )
+    assert.deepEqual([...built.keys()], TABLE_SOURCES.map(definition => definition.tableName))
+})
+
+test("default release builder rejects unknown converter ids before IO", async () => {
+    const { createDefaultContentTableBuilder } = require(
+        "../src/content/sync/release-builder"
+    )
+    const bundled = TABLE_SOURCES.find(definition => definition.converterId === "bundled-json")
+    const definitions = [{ ...bundled, converterId: "future-converter" }]
+    let imports = 0
+    const builder = createDefaultContentTableBuilder({
+        importBundledTable: async () => {
+            imports++
+            return {}
+        },
+    })
+    const context = {
+        ...defaultBuilderContext({
+            has: () => { throw new Error("archive index must not be read") },
+            read: async () => { throw new Error("archive index must not be read") },
+        }),
+        definitions,
+    }
+
+    await assert.rejects(builder.build(context), /unsupported converterId: future-converter/)
+    assert.equal(imports, 0)
+})
+
 test("check scans current metadata without locking, materializing, indexing, or writing", async t => {
     const fixture = engineFixture(t, {
         dependencies: {
@@ -273,8 +590,8 @@ test("missing or extra builder tables fail before activation", async t => {
     }
 })
 
-test("materialize, catalog build, archive index, table build, manifest, and activation failures preserve current", async t => {
-    const stages = ["materialize", "catalog", "index", "builder", "manifest", "activate"]
+test("materialize, catalog build, archive index, table build, object, manifest, and activation failures preserve current", async t => {
+    const stages = ["materialize", "catalog", "index", "builder", "object", "manifest", "activate"]
     for (const stage of stages) {
         await t.test(stage, async t => {
             const fixture = engineFixture(t)
@@ -286,10 +603,13 @@ test("materialize, catalog build, archive index, table build, manifest, and acti
             if (stage === "catalog") fixture.dependencies.buildCatalog = () => { throw new Error(stage) }
             if (stage === "index") fixture.dependencies.buildArchiveIndex = async () => { throw new Error(stage) }
             if (stage === "builder") fixture.dependencies.tableBuilder = { build: async () => { throw new Error(stage) } }
-            if (stage === "manifest" || stage === "activate") {
+            if (stage === "object" || stage === "manifest" || stage === "activate") {
                 fixture.dependencies.createStore = () => new Proxy(fixture.store, {
                     get(target, property) {
-                        if (property === (stage === "manifest" ? "writeRelease" : "activate")) {
+                        const failingMethod = stage === "object"
+                            ? "writeObject"
+                            : stage === "manifest" ? "writeRelease" : "activate"
+                        if (property === failingMethod) {
                             return async () => { throw new Error(stage) }
                         }
                         const value = Reflect.get(target, property, target)

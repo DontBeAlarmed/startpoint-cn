@@ -15,6 +15,7 @@ import {
     type ContentReleaseManifest,
     type ContentTableReference,
 } from "../sync/schema"
+import type { ContentCurrentReleaseSnapshot } from "../sync/object-store"
 import { findTableSource, TABLE_SOURCES } from "../sync/table-registry"
 
 export interface ContentRepositoryInfo {
@@ -107,6 +108,19 @@ export class ContentRepository {
         })
         const store = new ContentObjectStore(paths)
         const release = await store.readCurrentReleaseSnapshot()
+
+        return this.loadFromSnapshot(options, release, dependencies)
+    }
+
+    static async loadFromSnapshot(
+        options: ContentRepositoryOptions,
+        release: ContentCurrentReleaseSnapshot | null,
+        dependencies: ContentRepositoryDependencies = {},
+    ): Promise<ContentRepository> {
+        if (!options.projectRoot || !path.isAbsolute(options.projectRoot)) {
+            throw new TypeError("projectRoot must be an absolute path")
+        }
+        const projectRoot = path.resolve(options.projectRoot)
 
         if (release === null) {
             const importer = dependencies.importBundledTable ?? defaultImportBundledTable

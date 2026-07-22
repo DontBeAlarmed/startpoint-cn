@@ -8,6 +8,11 @@ import {
     type ContentPaths,
 } from "../paths"
 import { deepFreeze } from "../deep-freeze"
+import { canonicalJsonBuffer } from "../sync/canonical-json"
+import {
+    ContentObjectStore,
+    type ContentCurrentReleaseSnapshot,
+} from "../sync/object-store"
 import { buildCdnCatalog } from "./catalog-builder"
 import {
     parseCdnRuntimeManifest,
@@ -23,6 +28,7 @@ export type CatalogLoaderErrorCode =
     | "PATCH_MANIFEST_READ"
     | "PATCH_MANIFEST_SCHEMA"
     | "PATCH_CATALOG_MISMATCH"
+    | "RELEASE_CATALOG_SCHEMA"
 
 export class CatalogLoaderError extends Error {
     readonly code: CatalogLoaderErrorCode
@@ -48,6 +54,14 @@ export interface CatalogLoaderDependencies {
         paths: ContentPaths,
     ) => Promise<void>
     readonly readPatchManifest?: (manifestPath: string) => Promise<unknown>
+    readonly createStore?: (
+        paths: ContentPaths,
+    ) => {
+        readCurrentReleaseSnapshot():
+            | ContentCurrentReleaseSnapshot
+            | null
+            | Promise<ContentCurrentReleaseSnapshot | null>
+    }
 }
 
 export interface CdnCatalogLoaderOptions {
@@ -192,6 +206,66 @@ function validateEnabledPatches(catalog: CdnCatalog, manifest: PatchManifest): v
     }
 }
 
+function releaseCatalogError(message: string): CatalogLoaderError {
+    return new CatalogLoaderError("RELEASE_CATALOG_SCHEMA", message)
+}
+
+function isPromiseLike<T>(value: unknown): value is PromiseLike<T> {
+    return Boolean(value
+        && (typeof value === "object" || typeof value === "function")
+        && typeof (value as PromiseLike<T>).then === "function")
+}
+
+function parseReleaseCatalog(
+    value: unknown,
+    build: (input: CdnCatalogInput) => CdnCatalog,
+): CdnCatalog {
+    try {
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+            throw new Error("catalog must be an object")
+        }
+        const source = value as Record<string, unknown>
+        if (!Array.isArray(source.edges)) throw new Error("catalog edges must be an array")
+        const archives: CdnCatalogInput["archives"][number][] = []
+        for (const rawEdge of source.edges) {
+            if (!rawEdge || typeof rawEdge !== "object" || Array.isArray(rawEdge)) {
+                throw new Error("catalog edge must be an object")
+            }
+            const edge = rawEdge as Record<string, unknown>
+            if (edge.assetSizeKind !== "fulfill") continue
+            if (!Array.isArray(edge.archives)) throw new Error("catalog archives must be an array")
+            for (const rawArchive of edge.archives) {
+                if (!rawArchive || typeof rawArchive !== "object" || Array.isArray(rawArchive)) {
+                    throw new Error("catalog archive must be an object")
+                }
+                const archive = rawArchive as Record<string, unknown>
+                archives.push({
+                    kind: edge.fromVersion === null ? "full" : "diff",
+                    fromVersion: edge.fromVersion as string | null,
+                    toVersion: edge.toVersion as string,
+                    platform: edge.platform as "android",
+                    layer: archive.layer as CdnCatalogInput["archives"][number]["layer"],
+                    order: archive.order as number,
+                    relativePath: archive.relativePath as string,
+                    compressedBytes: archive.compressedBytes as number,
+                    sha256: archive.sha256 as string,
+                })
+            }
+        }
+        const candidate = build({
+            archives,
+            installedBytes: source.installedBytes as number,
+            entityListsRelativePath: source.entityListsRelativePath as string,
+        })
+        if (!canonicalJsonBuffer(candidate).equals(canonicalJsonBuffer(value))) {
+            throw new Error("catalog does not match its canonical derived form")
+        }
+        return candidate
+    } catch {
+        throw releaseCatalogError("release catalog object failed strict validation")
+    }
+}
+
 export function resolveCatalogProjectRoot(moduleDirectory: string): string {
     return path.resolve(moduleDirectory, "../../..")
 }
@@ -224,10 +298,16 @@ export class CdnCatalogLoader {
         return this.enqueueCandidate()
     }
 
-    private enqueueCandidate(): Promise<CdnCatalog> {
+    loadFromSnapshot(release: ContentCurrentReleaseSnapshot | null): Promise<CdnCatalog> {
+        return this.enqueueCandidate({ release })
+    }
+
+    private enqueueCandidate(
+        selection?: { readonly release: ContentCurrentReleaseSnapshot | null },
+    ): Promise<CdnCatalog> {
         const operation = this.operationTail
-            ? this.operationTail.then(() => this.buildCandidate())
-            : this.buildCandidate()
+            ? this.operationTail.then(() => this.buildCandidate(selection))
+            : this.buildCandidate(selection)
         const tail = operation.then(() => undefined, () => undefined)
         this.operationTail = tail
         void tail.then(() => {
@@ -236,7 +316,9 @@ export class CdnCatalogLoader {
         return operation
     }
 
-    private async buildCandidate(): Promise<CdnCatalog> {
+    private async buildCandidate(
+        selection?: { readonly release: ContentCurrentReleaseSnapshot | null },
+    ): Promise<CdnCatalog> {
         const resolvePaths = this.dependencies.resolvePaths ?? resolveContentPaths
         const build = this.dependencies.build ?? buildCdnCatalog
         const readRuntimeManifest = this.dependencies.readRuntimeManifest ?? readRuntimeManifestFile
@@ -260,6 +342,28 @@ export class CdnCatalogLoader {
             }
         })
         const paths = resolvePaths({ projectRoot: this.projectRoot, env: this.env })
+        const createStore = this.dependencies.createStore
+            ?? (resolved => new ContentObjectStore(resolved))
+        const releaseCandidate = selection === undefined
+            ? createStore(paths).readCurrentReleaseSnapshot()
+            : selection.release
+        const release: ContentCurrentReleaseSnapshot | null = isPromiseLike<
+            ContentCurrentReleaseSnapshot | null
+        >(releaseCandidate)
+            ? await releaseCandidate
+            : releaseCandidate
+        if (release !== null) {
+            const catalogObject = release.objects[release.manifest.catalog.object]
+            if (catalogObject === undefined) {
+                throw releaseCatalogError("release catalog object is missing")
+            }
+            const candidate = deepFreeze(parseReleaseCatalog(catalogObject, build))
+            if (candidate.targetVersion !== release.manifest.assetVersion) {
+                throw releaseCatalogError("release catalog target does not match assetVersion")
+            }
+            this.catalog = candidate
+            return candidate
+        }
         const runtimeManifestPath = path.join(this.projectRoot, RUNTIME_MANIFEST_RELATIVE_PATH)
         let runtimeManifestValue: unknown
         try {

@@ -5,8 +5,19 @@ import { CdnCatalogLoader } from "../cdn/catalog-loader"
 import type { CdnCatalog } from "../cdn/types"
 import {
     ContentRepository,
+    type ContentRepositoryDependencies,
     type ContentRepositoryInfo,
 } from "./content-repository"
+import {
+    resolveContentPaths,
+    type ContentPathEnvironment,
+    type ContentPaths,
+} from "../paths"
+import {
+    ContentObjectStore,
+    type ContentCurrentReleaseSnapshot,
+} from "../sync/object-store"
+import type { CatalogLoaderDependencies } from "../cdn/catalog-loader"
 
 export interface ReadonlyContentRepository {
     info(): ContentRepositoryInfo
@@ -49,8 +60,13 @@ export interface ContentRepositorySource {
 }
 
 export interface ContentSnapshotProviderOptions {
-    readonly catalogSource: ContentCatalogSource
-    readonly repositorySource: ContentRepositorySource
+    readonly catalogSource?: ContentCatalogSource
+    readonly repositorySource?: ContentRepositorySource
+    readonly snapshotSource?: ContentSnapshotSource
+}
+
+export interface ContentSnapshotSource {
+    load(): Promise<ContentSnapshot>
 }
 
 export function resolveContentProjectRoot(moduleDirectory: string): string {
@@ -75,39 +91,37 @@ function settle<T>(load: () => Promise<T>): Promise<Settled<T>> {
 }
 
 export class ContentSnapshotProvider {
-    private readonly catalogSource: ContentCatalogSource
-    private readonly repositorySource: ContentRepositorySource
+    private readonly catalogSource: ContentCatalogSource | null
+    private readonly repositorySource: ContentRepositorySource | null
+    private readonly snapshotSource: ContentSnapshotSource | null
     private snapshot: ContentSnapshot | null = null
     private initialization: Promise<ContentSnapshot> | null = null
 
-    constructor({ catalogSource, repositorySource }: ContentSnapshotProviderOptions) {
-        this.catalogSource = catalogSource
-        this.repositorySource = repositorySource
+    constructor(options: ContentSnapshotProviderOptions) {
+        const pairedSources = Boolean(options.catalogSource && options.repositorySource)
+        const directSource = Boolean(options.snapshotSource)
+        if (pairedSources === directSource
+            || Boolean(options.catalogSource) !== Boolean(options.repositorySource)) {
+            throw new TypeError(
+                "content snapshot provider requires either snapshotSource or both paired sources",
+            )
+        }
+        this.catalogSource = options.catalogSource ?? null
+        this.repositorySource = options.repositorySource ?? null
+        this.snapshotSource = options.snapshotSource ?? null
     }
 
     initialize(): Promise<ContentSnapshot> {
         if (this.snapshot) return Promise.resolve(this.snapshot)
         if (this.initialization) return this.initialization
 
-        const initialization = Promise.all([
-            settle(() => this.catalogSource.load()),
-            settle(() => this.repositorySource.load()),
-        ])
-            .then(([catalogResult, repositoryResult]) => {
-                const errors: unknown[] = []
-                if (catalogResult.status === "rejected") errors.push(catalogResult.reason)
-                if (repositoryResult.status === "rejected") errors.push(repositoryResult.reason)
-                if (errors.length === 1) throw errors[0]
-                if (errors.length === 2) throw new ContentSnapshotSourcesError(errors)
-                if (catalogResult.status !== "fulfilled"
-                    || repositoryResult.status !== "fulfilled") {
-                    throw new Error("content snapshot source settlement is inconsistent")
-                }
-                return deepFreeze({
-                    cdn: catalogResult.value,
-                    repository: repositoryResult.value,
-                })
-            })
+        const initialization = (this.snapshotSource
+            ? this.snapshotSource.load()
+            : loadSnapshotPair(
+                () => (this.catalogSource as ContentCatalogSource).load(),
+                () => (this.repositorySource as ContentRepositorySource).load(),
+            ))
+            .then(snapshot => deepFreeze(snapshot))
             .then(snapshot => {
                 this.snapshot = snapshot
                 return snapshot
@@ -135,6 +149,80 @@ export class ContentSnapshotProvider {
     }
 }
 
+async function loadSnapshotPair(
+    loadCatalog: () => Promise<CdnCatalog>,
+    loadRepository: () => Promise<ReadonlyContentRepository>,
+): Promise<ContentSnapshot> {
+    return Promise.all([
+        settle(loadCatalog),
+        settle(loadRepository),
+    ]).then(([catalogResult, repositoryResult]) => {
+        const errors: unknown[] = []
+        if (catalogResult.status === "rejected") errors.push(catalogResult.reason)
+        if (repositoryResult.status === "rejected") errors.push(repositoryResult.reason)
+        if (errors.length === 1) throw errors[0]
+        if (errors.length === 2) throw new ContentSnapshotSourcesError(errors)
+        if (catalogResult.status !== "fulfilled"
+            || repositoryResult.status !== "fulfilled") {
+            throw new Error("content snapshot source settlement is inconsistent")
+        }
+        return deepFreeze({
+            cdn: catalogResult.value,
+            repository: repositoryResult.value,
+        })
+    })
+}
+
+export interface ProjectContentSnapshotProviderDependencies {
+    readonly resolvePaths?: (options: {
+        readonly projectRoot: string
+        readonly env: ContentPathEnvironment
+    }) => ContentPaths
+    readonly createStore?: (
+        paths: ContentPaths,
+    ) => Pick<ContentObjectStore, "readCurrentReleaseSnapshot">
+    readonly catalog?: CatalogLoaderDependencies
+    readonly repository?: ContentRepositoryDependencies
+}
+
+export interface ProjectContentSnapshotProviderOptions {
+    readonly projectRoot: string
+    readonly env?: ContentPathEnvironment
+    readonly dependencies?: ProjectContentSnapshotProviderDependencies
+}
+
+export function createProjectContentSnapshotProvider({
+    projectRoot,
+    env = process.env,
+    dependencies = {},
+}: ProjectContentSnapshotProviderOptions): ContentSnapshotProvider {
+    const resolvedProjectRoot = path.resolve(projectRoot)
+    const catalogLoader = new CdnCatalogLoader({
+        projectRoot: resolvedProjectRoot,
+        env,
+        dependencies: dependencies.catalog,
+    })
+    const snapshotSource: ContentSnapshotSource = Object.freeze({
+        async load(): Promise<ContentSnapshot> {
+            const resolvePaths = dependencies.resolvePaths ?? resolveContentPaths
+            const paths = resolvePaths({ projectRoot: resolvedProjectRoot, env })
+            const createStore = dependencies.createStore
+                ?? (resolved => new ContentObjectStore(resolved))
+            const release: ContentCurrentReleaseSnapshot | null = await createStore(paths)
+                .readCurrentReleaseSnapshot()
+            return loadSnapshotPair(
+                () => catalogLoader.loadFromSnapshot(release),
+                () => ContentRepository.loadFromSnapshot(
+                    { projectRoot: resolvedProjectRoot, env },
+                    release,
+                    dependencies.repository,
+                ),
+            )
+        },
+    })
+    return new ContentSnapshotProvider({ snapshotSource })
+}
+
 export const productionCatalogLoader = new CdnCatalogLoader({
     projectRoot: resolveContentProjectRoot(__dirname),
 })
@@ -145,9 +233,8 @@ export const productionRepositorySource: ContentRepositorySource = Object.freeze
     }),
 })
 
-export const productionContentSnapshotProvider = new ContentSnapshotProvider({
-    catalogSource: productionCatalogLoader,
-    repositorySource: productionRepositorySource,
+export const productionContentSnapshotProvider = createProjectContentSnapshotProvider({
+    projectRoot: resolveContentProjectRoot(__dirname),
 })
 
 export function initializeContentSnapshot(): Promise<ContentSnapshot> {

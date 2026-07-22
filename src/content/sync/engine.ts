@@ -10,6 +10,7 @@ import {
 import { ArchiveIndex } from "./archive-index"
 import { acquireContentSyncLock, type ContentSyncLock } from "./lock"
 import { ContentObjectStore } from "./object-store"
+import { createDefaultContentTableBuilder } from "./release-builder"
 import {
     CONTENT_GENERATOR_VERSION,
     CONTENT_RUNTIME_SCHEMA_VERSION,
@@ -121,11 +122,7 @@ export interface ContentSyncDependencies {
     readonly tableSources?: readonly TableSourceDefinition[]
 }
 
-const defaultTableBuilder: ContentTableBuilder = Object.freeze({
-    async build(): Promise<ReadonlyMap<string, unknown>> {
-        throw new Error("content converters not configured")
-    },
-})
+const defaultTableBuilder = createDefaultContentTableBuilder()
 
 function requireMode(mode: ContentSyncMode): ContentSyncMode {
     if (mode !== "normal" && mode !== "check" && mode !== "force") {

@@ -70,6 +70,8 @@ const TEST_GROUPS = Object.freeze({
     "integration:content": {
         execution: "serial",
         tests: [
+            "tools/content_dynamic_catalog.test.cjs",
+            "tools/content_dynamic_catalog_integration.test.cjs",
             "tools/shop_repository_integration.test.cjs",
         ],
     },

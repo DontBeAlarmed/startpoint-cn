@@ -166,6 +166,7 @@ function injectedLoader({ read, build }) {
         env: {},
         dependencies: {
             resolvePaths: () => ({ cdnRoot: "/synthetic-cdn" }),
+            createStore: () => ({ readCurrentReleaseSnapshot: () => null }),
             readRuntimeManifest: async manifestPath => {
                 candidateInput = await read(manifestPath)
                 return runtimeManifest()
@@ -627,6 +628,7 @@ test("the repository disabled patch manifest preserves the 1.4.54 catalog baseli
         env: {},
         dependencies: {
             resolvePaths: () => ({ cdnRoot: "/unused-cdn-root" }),
+            createStore: () => ({ readCurrentReleaseSnapshot: () => null }),
             validateRuntimeFiles: async () => {},
         },
     })
@@ -689,6 +691,7 @@ test("injected runtime manifest read failures redact nested absolute paths", asy
         env: {},
         dependencies: {
             resolvePaths: () => ({ cdnRoot: "/unused-cdn-root" }),
+            createStore: () => ({ readCurrentReleaseSnapshot: () => null }),
             readRuntimeManifest: async () => { throw injectedError },
         },
     })

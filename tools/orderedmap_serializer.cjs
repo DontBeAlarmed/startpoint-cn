@@ -17,6 +17,8 @@ const zlib = require("zlib");
 const path = require("path");
 const fs = require("fs");
 
+const CONTENT_RESOURCE_PATH_SALT = "K6R9T9Hz22OpeIGEWB0ui6c6PYFQnJGy";
+
 function uint32LE(value) {
     const buf = Buffer.allocUnsafe(4);
     buf.writeUInt32LE(value, 0);
@@ -89,11 +91,11 @@ function writeOrderedMap(outPath, entries) {
  * @param {string} resourcePath - e.g. "orderedmap/gacha/gacha_feature_content.json"
  * @returns {{ logicalPath: string, relativePath: string }}
  */
-function hashResourcePath(resourcePath, salt = "K6R9T9Hz22OpeIGEWB0ui6c6PYFQnJGy") {
-    const normalized = resourcePath.replace(/[\/\\]+/g, "/").replace(/^\//, "");
-    const digest = crypto.createHash("sha1").update(normalized + salt).digest("hex");
+function hashResourcePath(resourcePath, salt = CONTENT_RESOURCE_PATH_SALT) {
+    const logicalPath = resourcePath.replace(/[\/\\]+/g, "/").replace(/^\//, "");
+    const digest = crypto.createHash("sha1").update(logicalPath + salt).digest("hex");
     return {
-        logicalPath: normalized,
+        logicalPath,
         relativePath: `${digest.slice(0, 2)}/${digest.slice(2)}`,
     };
 }
