@@ -49,6 +49,28 @@ function createRaw(indexPayload, body = Buffer.alloc(0)) {
     return Buffer.concat([uint32(indexBlock.length), indexBlock, body])
 }
 
+function createNestedOrderedMap(entries) {
+    const keyBuffers = entries.map(entry => Buffer.from(entry.key, "utf8"))
+    let keyEnd = 0
+    let rowEnd = 0
+    const pairs = entries.map((entry, index) => {
+        keyEnd += keyBuffers[index].length
+        rowEnd += entry.value.length
+        return { keyEnd, rowEnd }
+    })
+    const indexPayload = Buffer.concat([
+        uint32(entries.length),
+        ...pairs.map(pair => Buffer.concat([uint32(pair.keyEnd), uint32(pair.rowEnd)])),
+        ...keyBuffers,
+    ])
+    const indexBlock = zlib.deflateSync(indexPayload)
+    return Buffer.concat([
+        uint32(indexBlock.length),
+        indexBlock,
+        ...entries.map(entry => entry.value),
+    ])
+}
+
 function expectThrows(parser, raw, pattern, message) {
     assert.throws(
         () => parser(raw),
@@ -99,7 +121,7 @@ test("parses text and nested text orderedmaps", () => {
         { key: "first", value: Buffer.from("first text", "utf8") },
         { key: "second", value: Buffer.from("\u7b2c\u4e8c\u884c", "utf8") },
     ])
-    const raw = createOrderedMap([{ key: "outer-id", value: nested }])
+    const raw = createNestedOrderedMap([{ key: "outer-id", value: nested }])
 
     const textRows = parseTextOrderedMap(nested)
     assert.deepEqual(textRows, [
@@ -125,7 +147,7 @@ test("parses every outer key in a nested text orderedmap", () => {
     const second = createOrderedMap([
         { key: "1", value: Buffer.from('quoted,"row"', "utf8") },
     ])
-    const raw = createOrderedMap([
+    const raw = createNestedOrderedMap([
         { key: "10", value: first },
         { key: "20", value: second },
     ])
@@ -239,11 +261,11 @@ test("strictly rejects malformed orderedmap data", () => {
 
 test("nested text orderedmaps require one matching outer key", () => {
     const nested = createOrderedMap([{ key: "row", value: Buffer.from("text", "utf8") }])
-    const multiple = createOrderedMap([
+    const multiple = createNestedOrderedMap([
         { key: "one", value: nested },
         { key: "two", value: nested },
     ])
-    const wrongKey = createOrderedMap([{ key: "actual", value: nested }])
+    const wrongKey = createNestedOrderedMap([{ key: "actual", value: nested }])
 
     expectThrows(
         parseNestedTextOrderedMap,

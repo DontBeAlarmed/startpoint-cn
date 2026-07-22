@@ -116,7 +116,7 @@ function parseIndex(raw: Buffer): { readonly body: Buffer; readonly pairs: reado
     return { body, pairs, keys }
 }
 
-export function parseOrderedMap(raw: Buffer): readonly OrderedMapRow[] {
+function parseRows(raw: Buffer, compressedRows: boolean): readonly OrderedMapRow[] {
     requireBuffer(raw)
 
     const { body, keys, pairs } = parseIndex(raw)
@@ -128,13 +128,19 @@ export function parseOrderedMap(raw: Buffer): readonly OrderedMapRow[] {
         const compressed = body.subarray(previousRowEnd, rowEnd)
         const value = compressed.length === 0
             ? Buffer.alloc(0)
-            : inflate(compressed, `row ${rowIndex}`)
+            : compressedRows
+                ? inflate(compressed, `row ${rowIndex}`)
+                : Buffer.from(compressed)
 
         rows.push(Object.freeze({ key: keys[rowIndex], value }))
         previousRowEnd = rowEnd
     }
 
     return Object.freeze(rows)
+}
+
+export function parseOrderedMap(raw: Buffer): readonly OrderedMapRow[] {
+    return parseRows(raw, true)
 }
 
 export function parseTextOrderedMap(raw: Buffer): readonly OrderedMapTextRow[] {
@@ -148,7 +154,8 @@ export function parseTextOrderedMap(raw: Buffer): readonly OrderedMapTextRow[] {
 export function parseNestedTextOrderedMaps(
     raw: Buffer,
 ): readonly NestedOrderedMapTextRows[] {
-    const outerRows = parseOrderedMap(raw)
+    // Official nested maps store each inner orderedmap directly in the outer body.
+    const outerRows = parseRows(raw, false)
     return Object.freeze(outerRows.map(outerRow => Object.freeze({
         key: outerRow.key,
         rows: parseTextOrderedMap(outerRow.value),

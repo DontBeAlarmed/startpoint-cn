@@ -30,7 +30,7 @@ function uint32LE(value) {
  * @param {Array<{key: string, row: string}>} entries
  * @returns {Buffer}
  */
-function serializeOrderedMap(entries) {
+function serializeMap(entries, compressRows) {
     // Sort entries by key (numeric for gacha IDs)
     entries.sort((a, b) => {
         const na = parseInt(a.key, 10);
@@ -40,8 +40,10 @@ function serializeOrderedMap(entries) {
     });
 
     const keyBuffers = entries.map(e => Buffer.from(e.key, "utf8"));
-    const rowTextBuffers = entries.map(e => Buffer.from(e.row, "utf8"));
-    const rowBlocks = rowTextBuffers.map(r => zlib.deflateSync(r));
+    const rowTextBuffers = entries.map(e => Buffer.from(e.row));
+    const rowBlocks = compressRows
+        ? rowTextBuffers.map(row => zlib.deflateSync(row))
+        : rowTextBuffers;
 
     // Build index payload
     let keyPos = 0;
@@ -73,6 +75,15 @@ function serializeOrderedMap(entries) {
     ]);
 }
 
+function serializeOrderedMap(entries) {
+    return serializeMap(entries, true);
+}
+
+/** Official nested orderedmaps store each complete inner map directly in the outer body. */
+function serializeNestedOrderedMap(entries) {
+    return serializeMap(entries, false);
+}
+
 /**
  * Write entries as orderedmap file.
  * @param {string} outPath - output file path
@@ -101,6 +112,7 @@ function hashResourcePath(resourcePath, salt = CONTENT_RESOURCE_PATH_SALT) {
 }
 
 module.exports = {
+    serializeNestedOrderedMap,
     serializeOrderedMap,
     writeOrderedMap,
     hashResourcePath,

@@ -16,6 +16,7 @@ const { ContentObjectStore } = require("../src/content/sync/object-store")
 const { TABLE_SOURCES } = require("../src/content/sync/table-registry")
 const {
     hashResourcePath,
+    serializeNestedOrderedMap,
     serializeOrderedMap,
 } = require("./orderedmap_serializer.cjs")
 const {
@@ -177,7 +178,7 @@ function gachaRow(overrides = {}) {
 
 function nestedOrderedMap(id) {
     const inner = serializeOrderedMap([{ key: "1", row: "fixture" }])
-    return serializeOrderedMap([{ key: id, row: inner }])
+    return serializeNestedOrderedMap([{ key: id, row: inner }])
 }
 
 function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}) {
