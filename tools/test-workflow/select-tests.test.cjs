@@ -31,6 +31,7 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/lib/version.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/load.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/cn-server.ts"]), ["full", "integration:cdn"])
+    assert.deepEqual(selectTestGroups(["src/runtime/data-paths.ts"]), ["integration:database"])
     assert.deepEqual(selectTestGroups(["admin/src/App.tsx"]), ["admin"])
 })
 
@@ -271,6 +272,7 @@ test("keeps isolated test groups parallel while infrastructure groups stay seria
 test("splits isolated integration tests into focused domains", () => {
     assert.deepEqual(TEST_GROUPS["integration:database"].tests, [
         "tools/test-workflow/database-isolation.test.cjs",
+        "tools/test-workflow/runtime-data-paths.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS["integration:event"].tests, [
         "tools/carnival_rewards.test.cjs",

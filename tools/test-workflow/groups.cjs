@@ -98,6 +98,7 @@ const TEST_GROUPS = Object.freeze({
         execution: "serial",
         tests: [
             "tools/test-workflow/database-isolation.test.cjs",
+            "tools/test-workflow/runtime-data-paths.test.cjs",
         ],
     },
     "integration:event": {

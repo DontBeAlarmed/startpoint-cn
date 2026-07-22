@@ -1,13 +1,11 @@
 /**
  * Web 面板状态管理：当前活跃存档。
- * 持久化到 .database/active_account.json
+ * 持久化到运行时数据目录的 state/active_account.json。
  */
 import * as fs from "fs";
-import * as path from "path";
 import { setServerTimeOffset } from "../utils";
+import { prepareDataVolume } from "../runtime/data-paths";
 import { getAccountPlayersSync } from "./domains/account";
-
-const STATE_FILE = path.join(__dirname, "..", "..", ".database", "active_account.json");
 
 interface WebState {
     activePlayerId: number | null;
@@ -18,9 +16,10 @@ interface WebState {
 }
 
 function readState(): WebState {
+    const stateFile = prepareDataVolume().activeAccountFile;
     try {
-        if (fs.existsSync(STATE_FILE)) {
-            const raw = JSON.parse(fs.readFileSync(STATE_FILE, "utf-8"));
+        if (fs.existsSync(stateFile)) {
+            const raw = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
             return {
                 activePlayerId: raw.activePlayerId ?? null,
                 selectedAccountId: raw.selectedAccountId ?? null,
@@ -34,9 +33,8 @@ function readState(): WebState {
 }
 
 function writeState(state: WebState): void {
-    const dir = path.dirname(STATE_FILE);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(STATE_FILE, JSON.stringify(state));
+    const stateFile = prepareDataVolume().activeAccountFile;
+    fs.writeFileSync(stateFile, JSON.stringify(state));
 }
 
 export function getActivePlayerId(): number | null {

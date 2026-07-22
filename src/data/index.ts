@@ -1,22 +1,10 @@
 import sqlite3, { Database as BetterSqlite3Database } from 'better-sqlite3';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import path from "path";
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { updateBeforeInit as updateWdfpDataBefore, updateAfterInit as updateWdfpDataAfter} from "./updaters/wdfpData";
 import initWdfpData from "./initializers/wdfpData";
+import { prepareDataVolume } from "../runtime/data-paths";
 
-// Tests and isolated tools may redirect storage without changing the server default.
-const dataDir = process.env.WDFP_DATABASE_DIR
-    ? path.resolve(process.env.WDFP_DATABASE_DIR)
-    : path.resolve(__dirname, "../../.database")
-const versionFileExtension = ".version"
-if (!existsSync(dataDir)) {
-    // make the data directory since it doesn't exist
-    try {
-        mkdirSync(dataDir)
-    } catch (error) {
-        throw new Error(`Failed to create the data directory. Reason: ${(error as Error).message}`)
-    }
-}
+const runtimeDataPaths = prepareDataVolume()
 
 export const enum Database {
     WDFP_DATA
@@ -24,6 +12,7 @@ export const enum Database {
 
 interface DatabaseMetadata {
     path: string
+    versionPath: string
     latestVersion: number
     init?: (database: BetterSqlite3Database, exists: boolean) => void
     updateBefore?: (database: BetterSqlite3Database, currentVersion: number) => void
@@ -32,7 +21,8 @@ interface DatabaseMetadata {
 
 const databasesMetadata: {[key in Database]: DatabaseMetadata} = {
     [Database.WDFP_DATA]: {
-        path: "/wdfp_data.db",
+        path: runtimeDataPaths.databaseFile,
+        versionPath: runtimeDataPaths.databaseVersionFile,
         init: initWdfpData,
         updateBefore: updateWdfpDataBefore,
         updateAfter: updateWdfpDataAfter,
@@ -54,14 +44,13 @@ export default function getDatabase(
     // get metadata
     const metadata = databasesMetadata[database]
 
-    const relativeDatabasePath = metadata.path
-    const absoluteDatabasePath = path.join(dataDir, relativeDatabasePath)
+    const absoluteDatabasePath = metadata.path
     // check if the db already exists
     const dbExists = existsSync(absoluteDatabasePath)
 
     // get the database's version
     let currentVersion: number = 0
-    const versionFilePath = path.join(dataDir, `${relativeDatabasePath}${versionFileExtension}`)
+    const versionFilePath = metadata.versionPath
     if (dbExists && existsSync(versionFilePath)) {
         const fileContents = readFileSync(versionFilePath).toString('utf-8')
         const versionNumber = Number(fileContents)

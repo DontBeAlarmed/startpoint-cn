@@ -7,13 +7,19 @@ const os = require("node:os")
 const path = require("node:path")
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "mission-storage-db-"))
+const previousDataDirectory = process.env.DATA_DIR
+const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
+delete process.env.DATA_DIR
 process.env.WDFP_DATABASE_DIR = databaseDirectory
 let db
 
 function cleanupDatabase() {
     if (db?.open) db.close()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
-    delete process.env.WDFP_DATABASE_DIR
+    if (previousDataDirectory === undefined) delete process.env.DATA_DIR
+    else process.env.DATA_DIR = previousDataDirectory
+    if (previousDatabaseDirectory === undefined) delete process.env.WDFP_DATABASE_DIR
+    else process.env.WDFP_DATABASE_DIR = previousDatabaseDirectory
 }
 
 process.once("exit", cleanupDatabase)

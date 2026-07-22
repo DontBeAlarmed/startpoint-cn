@@ -1,12 +1,10 @@
 /**
  * 默认存档模板：管理员上传一份存档快照，作为「账户新建存档」时的初始内容。
- * 持久化到 .database/default_save.json（与 active_account.json 同目录，均 gitignored）。
+ * 持久化到运行时数据目录的 state/default_save.json（与 active_account.json 同目录）。
  * 快照格式与 GET /api/player/save 导出一致：{ schema:"starpoint-cn-save", version:1, exportedAt, playerId, data }。
  */
 import * as fs from "fs";
-import * as path from "path";
-
-const FILE = path.join(__dirname, "..", "..", ".database", "default_save.json");
+import { prepareDataVolume } from "../runtime/data-paths";
 
 export interface DefaultSaveSnapshot {
     schema: string;
@@ -24,23 +22,24 @@ export interface DefaultSaveMeta {
 }
 
 export function saveDefaultSaveTemplate(snapshot: DefaultSaveSnapshot): void {
-    const dir = path.dirname(FILE);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(FILE, JSON.stringify(snapshot), "utf-8");
+    const file = prepareDataVolume().defaultSaveFile;
+    fs.writeFileSync(file, JSON.stringify(snapshot), "utf-8");
 }
 
 export function loadDefaultSaveTemplate(): DefaultSaveSnapshot | null {
+    const file = prepareDataVolume().defaultSaveFile;
     try {
-        if (!fs.existsSync(FILE)) return null;
-        return JSON.parse(fs.readFileSync(FILE, "utf-8")) as DefaultSaveSnapshot;
+        if (!fs.existsSync(file)) return null;
+        return JSON.parse(fs.readFileSync(file, "utf-8")) as DefaultSaveSnapshot;
     } catch {
         return null;
     }
 }
 
 export function clearDefaultSaveTemplate(): boolean {
+    const file = prepareDataVolume().defaultSaveFile;
     try {
-        if (fs.existsSync(FILE)) { fs.unlinkSync(FILE); return true; }
+        if (fs.existsSync(file)) { fs.unlinkSync(file); return true; }
     } catch { /* ignore */ }
     return false;
 }

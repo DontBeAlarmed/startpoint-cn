@@ -26,6 +26,7 @@ const SOURCE_RULES = [
     },
     { pattern: /^src\/routes\/cn\/versionCheck\.ts$/, groups: ["full"] },
     { pattern: /^src\/routes\/web_api\//, groups: ["admin", "integration:database"] },
+    { pattern: /^src\/runtime\/data-paths\.ts$/, groups: ["integration:database"] },
     {
         pattern: /^src\/lib\/(?:gacha|gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-ticket)\.ts$/,
         groups: ["quick:gacha"],
