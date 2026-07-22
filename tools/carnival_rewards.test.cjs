@@ -1,6 +1,39 @@
 const assert = require("node:assert/strict")
 const Database = require("better-sqlite3")
+const fs = require("node:fs")
+const { after } = require("node:test")
+const os = require("node:os")
+const path = require("node:path")
 require("ts-node/register/transpile-only")
+
+const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "carnival-rewards-db-"))
+const previousDataDirectory = process.env.DATA_DIR
+const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
+process.env.DATA_DIR = databaseDirectory
+delete process.env.WDFP_DATABASE_DIR
+
+const { closeDatabase, initializeDatabase } = require("../src/data")
+let cleaned = false
+function cleanupDatabase() {
+    if (cleaned) return
+    try {
+        closeDatabase()
+    } finally {
+        fs.rmSync(databaseDirectory, { recursive: true, force: true })
+        if (previousDataDirectory === undefined) delete process.env.DATA_DIR
+        else process.env.DATA_DIR = previousDataDirectory
+        if (previousDatabaseDirectory === undefined) delete process.env.WDFP_DATABASE_DIR
+        else process.env.WDFP_DATABASE_DIR = previousDatabaseDirectory
+        cleaned = true
+    }
+}
+
+process.once("exit", cleanupDatabase)
+after(() => {
+    process.removeListener("exit", cleanupDatabase)
+    cleanupDatabase()
+})
+initializeDatabase()
 
 let carnivalRewards = {}
 let carnivalPersistence = {}

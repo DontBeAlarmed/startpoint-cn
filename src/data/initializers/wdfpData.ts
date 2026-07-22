@@ -1,6 +1,7 @@
 import { Database } from "better-sqlite3";
 import { ensureQuestHostFinishedStorageSync } from "../../lib/quest/host-finish-persistence";
 import { ensureActiveQuestEntryItemCountStorageSync } from "../../lib/quest/active-quest-persistence";
+import { ensureSchemaColumn } from "../schema";
 
 
 export default function init(
@@ -74,19 +75,19 @@ export default function init(
     )`).run();
 
     // migration: add tutorial_gacha_character_id to existing tables
-    try { database.prepare(`ALTER TABLE players ADD COLUMN tutorial_gacha_character_id INTEGER DEFAULT NULL`).run(); } catch { /* column already exists */ }
+    ensureSchemaColumn(database, "players.tutorial_gacha_character_id")
 
     // migration: add total_stamina_used for mission progress tracking
-    try { database.prepare(`ALTER TABLE players ADD COLUMN total_stamina_used INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
+    ensureSchemaColumn(database, "players.total_stamina_used")
 
     // migration: add powerflip/dash counters for mission progress
-    try { database.prepare(`ALTER TABLE players ADD COLUMN total_powerflips INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
-    try { database.prepare(`ALTER TABLE players ADD COLUMN total_dashes INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
+    ensureSchemaColumn(database, "players.total_powerflips")
+    ensureSchemaColumn(database, "players.total_dashes")
 
     // migration: add total_mana_obtained for mission progress tracking
-    try { database.prepare(`ALTER TABLE players ADD COLUMN total_mana_obtained INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
+    ensureSchemaColumn(database, "players.total_mana_obtained")
     // migration: max_combo_achieved was added to CREATE TABLE only — existing DBs need this ALTER
-    try { database.prepare(`ALTER TABLE players ADD COLUMN max_combo_achieved INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
+    ensureSchemaColumn(database, "players.max_combo_achieved")
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_character_quest_clears (
         player_id INTEGER NOT NULL,
@@ -101,24 +102,16 @@ export default function init(
     )`).run();
 
     // migration: add leader_clear_count for leader-specific awakening missions
-    try { database.prepare(`ALTER TABLE players_character_quest_clears ADD COLUMN leader_clear_count INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
+    ensureSchemaColumn(database, "players_character_quest_clears.leader_clear_count")
 
     // migration: add leader_multi_count for co-op leader tracking
-    try { database.prepare(`ALTER TABLE players_character_quest_clears ADD COLUMN leader_multi_count INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
-
-    // migration: add leader_character_id to quest_progress for quest-clear leader validation
-    try { database.prepare(`ALTER TABLE players_quest_progress ADD COLUMN leader_character_id INTEGER`).run(); } catch { /* column already exists */ }
-
-    // migration: add multi_clear_count for event mission multi-battle tracking
-    try { database.prepare(`ALTER TABLE players_quest_progress ADD COLUMN multi_clear_count INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
-    // migration: unlocked was added to CREATE TABLE only — existing DBs need this ALTER (else /load SELECT fails)
-    try { database.prepare(`ALTER TABLE players_quest_progress ADD COLUMN unlocked INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
+    ensureSchemaColumn(database, "players_character_quest_clears.leader_multi_count")
 
     // migration: add leader_power_flip_count for per-character powerflip missions
-    try { database.prepare(`ALTER TABLE players_character_quest_clears ADD COLUMN leader_power_flip_count INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
+    ensureSchemaColumn(database, "players_character_quest_clears.leader_power_flip_count")
 
     // migration: add total_login_days for weekly mission tracking
-    try { database.prepare(`ALTER TABLE players ADD COLUMN total_login_days INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
+    ensureSchemaColumn(database, "players.total_login_days")
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_party_member_co_clears (
         player_id INTEGER NOT NULL,
@@ -159,14 +152,7 @@ export default function init(
     )`).run();
 
     // migration: device_bindings.name for admin panel identification
-    try { database.prepare(`ALTER TABLE device_bindings ADD COLUMN name TEXT DEFAULT NULL`).run(); } catch { /* column already exists */ }
-
-    // migration: add awake_level for character awakening system
-    try { database.prepare(`ALTER TABLE players_characters_mana_nodes ADD COLUMN awake_level INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
-    // migration: ex_boost / illustration columns were added to CREATE TABLE only — existing DBs need these ALTERs
-    try { database.prepare(`ALTER TABLE players_characters ADD COLUMN ex_boost_status_id INTEGER`).run(); } catch { /* column already exists */ }
-    try { database.prepare(`ALTER TABLE players_characters ADD COLUMN ex_boost_ability_id_list TEXT`).run(); } catch { /* column already exists */ }
-    try { database.prepare(`ALTER TABLE players_characters ADD COLUMN illustration_settings TEXT`).run(); } catch { /* column already exists */ }
+    ensureSchemaColumn(database, "device_bindings.name")
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_options (
         key TEXT NOT NULL,
@@ -263,6 +249,11 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 
+    // migration: ex_boost / illustration columns were added to CREATE TABLE only
+    ensureSchemaColumn(database, "players_characters.ex_boost_status_id")
+    ensureSchemaColumn(database, "players_characters.ex_boost_ability_id_list")
+    ensureSchemaColumn(database, "players_characters.illustration_settings")
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_characters_bond_tokens (
         mana_board_index INTEGER NOT NULL,
         status INTEGER NOT NULL,
@@ -282,6 +273,9 @@ export default function init(
         FOREIGN KEY (character_id, player_id) REFERENCES players_characters (id, player_id) ON DELETE CASCADE,
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
+
+    // migration: add awake_level for character awakening system
+    ensureSchemaColumn(database, "players_characters_mana_nodes.awake_level")
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_character_awake_unlocks (
         player_id INTEGER NOT NULL,
@@ -329,8 +323,8 @@ export default function init(
     )`).run();
 
     // migration: add current_battle_power and before_battle_power to existing tables
-    try { database.prepare(`ALTER TABLE players_parties ADD COLUMN current_battle_power INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
-    try { database.prepare(`ALTER TABLE players_parties ADD COLUMN before_battle_power INTEGER NOT NULL DEFAULT 0`).run(); } catch { /* column already exists */ }
+    ensureSchemaColumn(database, "players_parties.current_battle_power")
+    ensureSchemaColumn(database, "players_parties.before_battle_power")
 
     // database.prepare(`CREATE TABLE IF NOT EXISTS players_party_options (
     //     allow_other_players_to_heal_me INTEGER NOT NULL,
@@ -369,6 +363,11 @@ export default function init(
         PRIMARY KEY (section, quest_id, player_id),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
+
+    // migrations for quest progress columns added after the original schema
+    ensureSchemaColumn(database, "players_quest_progress.leader_character_id")
+    ensureSchemaColumn(database, "players_quest_progress.multi_clear_count")
+    ensureSchemaColumn(database, "players_quest_progress.unlocked")
 
     ensureQuestHostFinishedStorageSync(database)
 

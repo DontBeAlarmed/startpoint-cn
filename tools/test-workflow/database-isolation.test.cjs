@@ -5,12 +5,6 @@ const os = require("node:os")
 const path = require("node:path")
 
 const projectRoot = path.resolve(__dirname, "../..")
-const dataSourcePath = path.join(projectRoot, "src/data/index.ts")
-const dataSource = fs.readFileSync(dataSourcePath, "utf8")
-const runtimePathsSource = fs.readFileSync(
-    path.join(projectRoot, "src/runtime/data-paths.ts"),
-    "utf8",
-)
 const defaultDatabaseDirectory = path.join(projectRoot, ".database")
 
 function snapshotDirectory(directory) {
@@ -35,44 +29,45 @@ function snapshotDirectory(directory) {
     return Object.fromEntries(visit(directory))
 }
 
-assert.match(
-    dataSource,
-    /prepareDataVolume\(\)/,
-    "data layer must prepare the centralized data volume before opening SQLite",
-)
-assert.match(
-    runtimePathsSource,
-    /environment\.WDFP_DATABASE_DIR/,
-    "runtime paths must retain WDFP_DATABASE_DIR compatibility",
-)
-
-const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "wdfp-database-"))
+const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "wdfp-database-import-"))
+const dataDirectory = path.join(temporaryParent, "data")
 const defaultDatabaseBefore = snapshotDirectory(defaultDatabaseDirectory)
 const previousDataDirectory = process.env.DATA_DIR
 const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
-delete process.env.DATA_DIR
-process.env.WDFP_DATABASE_DIR = temporaryDirectory
+process.env.DATA_DIR = dataDirectory
+delete process.env.WDFP_DATABASE_DIR
 require("ts-node/register/transpile-only")
 
-let db
 try {
+    const data = require("../../src/data")
     const { getDb } = require("../../src/data/db")
-    db = getDb()
-    assert.equal(db.prepare("SELECT 1 AS value").get().value, 1)
 
-    assert.equal(fs.existsSync(path.join(temporaryDirectory, "wdfp_data.db")), true)
-    assert.equal(fs.existsSync(path.join(temporaryDirectory, "wdfp_data.db.version")), true)
-    db.close()
-    db = null
+    assert.equal(
+        fs.existsSync(dataDirectory),
+        false,
+        "importing data modules must not prepare the volume or open SQLite",
+    )
+    assert.deepEqual(data.getDatabaseStatus(), { open: false, ready: false, schema: null })
+    assert.throws(() => getDb(), /not initialized/i)
+
+    data.initializeDatabase()
+    const db = getDb()
+    assert.equal(db.prepare("SELECT 1 AS value").get().value, 1)
+    assert.deepEqual(data.getDatabaseStatus(), { open: true, ready: true, schema: 4 })
+    assert.equal(fs.existsSync(path.join(dataDirectory, "wdfp_data.db")), true)
+    assert.equal(fs.readFileSync(path.join(dataDirectory, "wdfp_data.db.version"), "utf8"), "4")
+
+    assert.equal(data.closeDatabase(), true)
+    assert.equal(data.closeDatabase(), false)
+    assert.deepEqual(data.getDatabaseStatus(), { open: false, ready: false, schema: null })
     assert.deepEqual(
-        fs.readdirSync(temporaryDirectory).sort(),
+        fs.readdirSync(dataDirectory).sort(),
         ["state", "wdfp_data.db", "wdfp_data.db.version"],
     )
-    assert.deepEqual(fs.readdirSync(path.join(temporaryDirectory, "state")), [])
+    assert.deepEqual(fs.readdirSync(path.join(dataDirectory, "state")), [])
     console.log("database isolation tests passed")
 } finally {
-    if (db?.open) db.close()
-    fs.rmSync(temporaryDirectory, { recursive: true, force: true })
+    fs.rmSync(temporaryParent, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR
     else process.env.DATA_DIR = previousDataDirectory
     if (previousDatabaseDirectory === undefined) delete process.env.WDFP_DATABASE_DIR

@@ -28,6 +28,7 @@ const {
     mergeManaBoardAwakeMaps,
     validateManaBoardAwakeRequest,
 } = require("../src/lib/character-helpers")
+require("../src/data").initializeDatabase()
 db = require("../src/data/db").getDb()
 
 function testIndependentUnlockAndNodeStateAreMergedByMaximum() {

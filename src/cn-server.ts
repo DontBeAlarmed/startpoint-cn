@@ -5,6 +5,7 @@ import fastifyStatic from "@fastify/static";
 import path from "path";
 import { existsSync, readFileSync } from "fs";
 import { getServerTime } from "./utils";
+import { initializeDatabase } from "./data";
 import { restoreTimeOffset } from "./data/activeAccount";
 import { initializeContentSnapshot } from "./content/runtime/content-snapshot";
 import { parseAssetProviderConfig } from "./content/cdn/asset-mode";
@@ -66,9 +67,6 @@ const fastify = Fastify({
 const assetProviderConfig = parseAssetProviderConfig({
     projectRoot: path.resolve(__dirname, ".."),
 });
-
-// Restore saved time offset from active player on startup
-restoreTimeOffset();
 
 // Simple in-memory rate limiter for /crash endpoint only.
 // /debug is excluded — game client sends heavy beacon traffic during normal startup.
@@ -362,6 +360,8 @@ const host = process.env.CN_LISTEN_HOST ?? "127.0.0.1";
 const port = parseInt(process.env.CN_LISTEN_PORT ?? "8001");
 
 async function bootstrap(): Promise<void> {
+    initializeDatabase();
+    restoreTimeOffset();
     await initializeContentSnapshot({
         assetMode: assetProviderConfig.mode,
         localCdn: assetProviderConfig.mode === "local",

@@ -39,6 +39,7 @@ import indexWebApiPlugin from "./routes/web_api"
 import openapiPlugin from "./routes/openapi";
 import infodeskPlugin from "./routes/infodesk";
 import { initializeContentSnapshot } from "./content/runtime/content-snapshot";
+import { initializeDatabase } from "./data";
 
 // gc-openapi-zinny3.kakaogames.com
 // gc-infodesk-zinny3.kakaogames.com
@@ -157,6 +158,7 @@ const envListenPort = process.env.LISTEN_PORT === undefined ? 8000 : Number.pars
 const listenPort = isNaN(envListenPort) ? 8000 : envListenPort
 
 async function bootstrap(): Promise<void> {
+    initializeDatabase()
     await initializeContentSnapshot()
     await fastify.listen({ port: listenPort, host: listenHost })
     console.log(`StarPoint is listening on http://${listenHost}:${listenPort}`)

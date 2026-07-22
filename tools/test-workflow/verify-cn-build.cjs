@@ -6,6 +6,7 @@ const path = require("node:path")
 
 const requiredFiles = [
     "cn-server.js",
+    "server.js",
     "content/startup/bootstrap.js",
     "multi/tcp/lobby.js",
     "multi/npc/controller.js",

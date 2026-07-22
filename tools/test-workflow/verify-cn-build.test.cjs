@@ -8,6 +8,7 @@ const test = require("node:test")
 const verifier = path.resolve(__dirname, "verify-cn-build.cjs")
 const requiredFiles = [
     "cn-server.js",
+    "server.js",
     "content/startup/bootstrap.js",
     "multi/tcp/lobby.js",
     "multi/npc/controller.js",
@@ -40,9 +41,27 @@ test("fails and lists every missing CN runtime module", t => {
     assert.notEqual(result.status, 0)
     assert.doesNotMatch(result.stderr, new RegExp(outputDirectory.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
     assert.match(result.stderr, /cn-server\.js/)
+    assert.match(result.stderr, /^\s+- server\.js$/m)
     assert.match(result.stderr, /content\/startup\/bootstrap\.js/)
     assert.match(result.stderr, /multi\/tcp\/lobby\.js/)
     assert.match(result.stderr, /multi\/npc\/controller\.js/)
+})
+
+test("fails when the global server entrypoint is missing", t => {
+    const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "verify-global-build-missing-"))
+    t.after(() => fs.rmSync(outputDirectory, { recursive: true, force: true }))
+    createRuntimeFiles(
+        outputDirectory,
+        "module.exports = { runContentStartup() {} }\n",
+    )
+    fs.rmSync(path.join(outputDirectory, "server.js"))
+
+    const result = spawnSync(process.execPath, [verifier, outputDirectory], {
+        encoding: "utf8",
+    })
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /^\s+- server\.js$/m)
 })
 
 test("accepts a complete default out directory", t => {

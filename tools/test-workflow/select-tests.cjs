@@ -23,7 +23,14 @@ const SOURCE_RULES = [
     { pattern: /^src\/content\/deep-freeze\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/lib\/version\.ts$/, groups: ["full"] },
     { pattern: /^src\/routes\/cn\/load\.ts$/, groups: ["full"] },
-    { pattern: /^src\/cn-server\.ts$/, groups: ["integration:cdn", "full"] },
+    {
+        pattern: /^src\/cn-server\.ts$/,
+        groups: ["integration:cdn", "integration:database", "full"],
+    },
+    {
+        pattern: /^src\/server\.ts$/,
+        groups: ["integration:cdn", "integration:database", "full"],
+    },
     {
         pattern: /^src\/routes\/cn\/(?:asset|assetInTitle|asset-provider|cdnFiles|httpRange|msgpack)\.ts$/,
         groups: ["integration:cdn", "full"],
@@ -48,7 +55,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission", "integration:mission-compiled"],
     },
     { pattern: /^src\/multi\//, groups: ["quick:protocol"] },
-    { pattern: /^src\/data\//, groups: ["full"] },
+    { pattern: /^src\/data\//, groups: ["integration:database", "full"] },
     { pattern: /^src\/routes\/(?!api\/singleBattleQuest\.ts$|web_api\/)/, groups: ["full"] },
 ]
 

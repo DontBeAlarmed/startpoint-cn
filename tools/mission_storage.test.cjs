@@ -24,6 +24,7 @@ function cleanupDatabase() {
 
 process.once("exit", cleanupDatabase)
 
+const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
@@ -38,6 +39,7 @@ const {
     updatePlayerCategoryMissionSync,
 } = require("../src/data/domains/mission")
 
+initializeDatabase()
 db = getDb()
 
 db.exec("BEGIN")

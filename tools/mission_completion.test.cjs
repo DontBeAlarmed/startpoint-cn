@@ -36,6 +36,7 @@ const {
     validateMissionRewardClaims,
 } = require("../src/lib/mission")
 const { addMissionProgressDelta } = require("../src/lib/mission/progress")
+require("../src/data").initializeDatabase()
 db = require("../src/data/db").getDb()
 
 assert.equal(getComputer(10).name, "Regular")

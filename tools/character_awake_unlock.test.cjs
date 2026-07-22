@@ -651,6 +651,7 @@ const {
 const awakeUnlockModule = require("../src/lib/mission/awake-unlock")
 const missionRegistry = require("../src/lib/mission/registry")
 
+require("../src/data").initializeDatabase()
 db = getDb()
 const idpId = `character-awake-unlock-test-${randomUUID()}`
 

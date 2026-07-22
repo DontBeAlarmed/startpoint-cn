@@ -1,0 +1,125 @@
+import type { Database } from "better-sqlite3";
+
+const schemaColumns = {
+    "players.tutorial_gacha_character_id": {
+        table: "players",
+        column: "tutorial_gacha_character_id",
+        definition: "INTEGER DEFAULT NULL",
+    },
+    "players.total_stamina_used": {
+        table: "players",
+        column: "total_stamina_used",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players.total_powerflips": {
+        table: "players",
+        column: "total_powerflips",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players.total_dashes": {
+        table: "players",
+        column: "total_dashes",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players.total_mana_obtained": {
+        table: "players",
+        column: "total_mana_obtained",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players.max_combo_achieved": {
+        table: "players",
+        column: "max_combo_achieved",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players.total_login_days": {
+        table: "players",
+        column: "total_login_days",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_character_quest_clears.leader_clear_count": {
+        table: "players_character_quest_clears",
+        column: "leader_clear_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_character_quest_clears.leader_multi_count": {
+        table: "players_character_quest_clears",
+        column: "leader_multi_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_character_quest_clears.leader_power_flip_count": {
+        table: "players_character_quest_clears",
+        column: "leader_power_flip_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_quest_progress.leader_character_id": {
+        table: "players_quest_progress",
+        column: "leader_character_id",
+        definition: "INTEGER",
+    },
+    "players_quest_progress.multi_clear_count": {
+        table: "players_quest_progress",
+        column: "multi_clear_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_quest_progress.unlocked": {
+        table: "players_quest_progress",
+        column: "unlocked",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "device_bindings.name": {
+        table: "device_bindings",
+        column: "name",
+        definition: "TEXT DEFAULT NULL",
+    },
+    "players_characters_mana_nodes.awake_level": {
+        table: "players_characters_mana_nodes",
+        column: "awake_level",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_characters.ex_boost_status_id": {
+        table: "players_characters",
+        column: "ex_boost_status_id",
+        definition: "INTEGER",
+    },
+    "players_characters.ex_boost_ability_id_list": {
+        table: "players_characters",
+        column: "ex_boost_ability_id_list",
+        definition: "TEXT",
+    },
+    "players_characters.illustration_settings": {
+        table: "players_characters",
+        column: "illustration_settings",
+        definition: "TEXT",
+    },
+    "players_parties.current_battle_power": {
+        table: "players_parties",
+        column: "current_battle_power",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_parties.before_battle_power": {
+        table: "players_parties",
+        column: "before_battle_power",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+} as const;
+
+export type SchemaColumnKey = keyof typeof schemaColumns;
+
+export function ensureSchemaColumn(
+    database: Database,
+    key: SchemaColumnKey,
+): boolean {
+    if (!Object.prototype.hasOwnProperty.call(schemaColumns, key)) {
+        throw new Error("Unknown schema column");
+    }
+    const schema = schemaColumns[key];
+    const columns = database.prepare(`PRAGMA table_info("${schema.table}")`).all() as Array<{
+        name: string;
+    }>;
+    if (columns.some(column => column.name === schema.column)) return false;
+
+    database.prepare(
+        `ALTER TABLE "${schema.table}" ADD COLUMN "${schema.column}" ${schema.definition}`,
+    ).run();
+    return true;
+}

@@ -125,6 +125,7 @@ const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getAwakeMissionRewardStageDefinition } = require("../src/lib/mission/rewards")
 const awakeRewardMaster = require("../assets/mission_char_awake_reward.json")
 
+require("../src/data").initializeDatabase()
 db = getDb()
 const idpId = `character-awake-settlement-test-${randomUUID()}`
 const duplicateProgressIdpId = `${idpId}-duplicate-progress`

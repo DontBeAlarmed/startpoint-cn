@@ -34,6 +34,7 @@ test("includes runtime-loaded CN modules as explicit compilation roots", () => {
     assert.equal(cnTsconfig.compilerOptions.tsBuildInfoFile, "./out/.tsbuildinfo-cn")
     assert.deepEqual(cnTsconfig.files, [
         "src/cn-server.ts",
+        "src/server.ts",
         "src/content/startup/bootstrap.ts",
         "src/multi/tcp/lobby.ts",
     ])

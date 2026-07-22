@@ -6,6 +6,7 @@
   },
   "files": [
     "src/cn-server.ts",
+    "src/server.ts",
     "src/content/startup/bootstrap.ts",
     "src/multi/tcp/lobby.ts"
   ]
