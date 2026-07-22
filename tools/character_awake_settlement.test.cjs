@@ -1,10 +1,99 @@
 require("ts-node/register/transpile-only")
 
 const assert = require("node:assert/strict")
+const { spawnSync } = require("node:child_process")
 const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
+const { after } = require("node:test")
 const os = require("node:os")
 const path = require("node:path")
+
+const {
+    productionContentSnapshotProvider,
+} = require("../src/content/runtime/content-snapshot")
+const {
+    installBundledCharacterSnapshot,
+} = require("./helpers/install-bundled-character-snapshot.cjs")
+
+const previousContentSnapshot = productionContentSnapshotProvider.snapshot
+const restoreBundledCharacterSnapshot = installBundledCharacterSnapshot()
+function restoreBundledCharacterSnapshotOnExit() {
+    restoreBundledCharacterSnapshot()
+}
+process.once("exit", restoreBundledCharacterSnapshotOnExit)
+after(() => {
+    process.removeListener("exit", restoreBundledCharacterSnapshotOnExit)
+    restoreBundledCharacterSnapshot()
+    restoreBundledCharacterSnapshot()
+    assert.strictEqual(productionContentSnapshotProvider.snapshot, previousContentSnapshot)
+})
+const bundledCharacterSnapshot = productionContentSnapshotProvider.get()
+const bundledCharacterTable = bundledCharacterSnapshot.repository.table("character.json")
+assert.equal(Object.isFrozen(bundledCharacterSnapshot), true)
+assert.equal(Object.isFrozen(bundledCharacterTable), true)
+assert.equal(Object.isFrozen(bundledCharacterTable["341005"]), true)
+assert.strictEqual(
+    bundledCharacterSnapshot.repository.table("character.json"),
+    bundledCharacterTable
+)
+assert.throws(
+    () => bundledCharacterSnapshot.repository.table("gacha.json"),
+    /unexpected character table gacha\.json/
+)
+
+function testTopLevelFailureRestoresBundledCharacterSnapshot() {
+    const markerDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "awake-snapshot-restore-"))
+    const markerPath = path.join(markerDirectory, "restored")
+    const childSource = `
+        require("ts-node/register/transpile-only")
+        const assert = require("node:assert/strict")
+        const fs = require("node:fs")
+        const {
+            productionContentSnapshotProvider,
+        } = require(process.env.CONTENT_SNAPSHOT_RUNTIME_PATH)
+        const {
+            installBundledCharacterSnapshot,
+        } = require(process.env.BUNDLED_CHARACTER_HELPER_PATH)
+
+        const previousSnapshot = productionContentSnapshotProvider.snapshot
+        const restore = installBundledCharacterSnapshot({
+            onRestore() {
+                assert.strictEqual(productionContentSnapshotProvider.snapshot, previousSnapshot)
+                fs.writeFileSync(process.env.RESTORE_MARKER_PATH, "restored")
+            },
+        })
+        process.once("exit", restore)
+        throw new Error("synthetic top-level awake fixture failure")
+    `
+    const result = spawnSync(process.execPath, ["-e", childSource], {
+        cwd: path.join(__dirname, ".."),
+        encoding: "utf8",
+        env: {
+            ...process.env,
+            BUNDLED_CHARACTER_HELPER_PATH: path.join(
+                __dirname,
+                "helpers/install-bundled-character-snapshot.cjs"
+            ),
+            CONTENT_SNAPSHOT_RUNTIME_PATH: path.join(
+                __dirname,
+                "../src/content/runtime/content-snapshot"
+            ),
+            RESTORE_MARKER_PATH: markerPath,
+        },
+    })
+
+    try {
+        assert.equal(result.status, 1, `${result.stdout}${result.stderr}`)
+        assert.equal(result.signal, null)
+        assert.match(result.stderr, /synthetic top-level awake fixture failure/)
+        assert.equal(fs.existsSync(markerPath), true, "exit fallback must invoke restore")
+        assert.equal(fs.readFileSync(markerPath, "utf8"), "restored")
+    } finally {
+        fs.rmSync(markerDirectory, { recursive: true, force: true })
+    }
+}
+
+testTopLevelFailureRestoresBundledCharacterSnapshot()
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "awake-settlement-db-"))
 process.env.WDFP_DATABASE_DIR = databaseDirectory

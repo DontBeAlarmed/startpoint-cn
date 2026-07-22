@@ -3,10 +3,30 @@ require("ts-node/register/transpile-only")
 const assert = require("node:assert/strict")
 const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
+const { after } = require("node:test")
 const os = require("node:os")
 const path = require("node:path")
 const Database = require("better-sqlite3")
 const ts = require("typescript")
+
+const {
+    productionContentSnapshotProvider,
+} = require("../src/content/runtime/content-snapshot")
+const {
+    installBundledCharacterSnapshot,
+} = require("./helpers/install-bundled-character-snapshot.cjs")
+
+const previousContentSnapshot = productionContentSnapshotProvider.snapshot
+const restoreBundledCharacterSnapshot = installBundledCharacterSnapshot()
+function restoreBundledCharacterSnapshotOnExit() {
+    restoreBundledCharacterSnapshot()
+}
+process.once("exit", restoreBundledCharacterSnapshotOnExit)
+after(() => {
+    process.removeListener("exit", restoreBundledCharacterSnapshotOnExit)
+    restoreBundledCharacterSnapshot()
+    assert.strictEqual(productionContentSnapshotProvider.snapshot, previousContentSnapshot)
+})
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "awake-unlock-db-"))
 process.env.WDFP_DATABASE_DIR = databaseDirectory
