@@ -12,6 +12,11 @@ export interface OrderedMapTextRow {
     readonly text: string
 }
 
+export interface NestedOrderedMapTextRows {
+    readonly key: string
+    readonly rows: readonly OrderedMapTextRow[]
+}
+
 interface OrderedMapPair {
     readonly keyEnd: number
     readonly rowEnd: number
@@ -140,14 +145,24 @@ export function parseTextOrderedMap(raw: Buffer): readonly OrderedMapTextRow[] {
     })))
 }
 
+export function parseNestedTextOrderedMaps(
+    raw: Buffer,
+): readonly NestedOrderedMapTextRows[] {
+    const outerRows = parseOrderedMap(raw)
+    return Object.freeze(outerRows.map(outerRow => Object.freeze({
+        key: outerRow.key,
+        rows: parseTextOrderedMap(outerRow.value),
+    })))
+}
+
 export function parseNestedTextOrderedMap(
     raw: Buffer,
     expectedOuterKey?: string,
 ): readonly OrderedMapTextRow[] {
-    const outerRows = parseOrderedMap(raw)
+    const outerRows = parseNestedTextOrderedMaps(raw)
     if (outerRows.length !== 1) invalidOrderedMap("nested source must contain exactly one outer row")
     if (expectedOuterKey !== undefined && outerRows[0].key !== expectedOuterKey) {
         invalidOrderedMap(`nested outer key must be ${expectedOuterKey}`)
     }
-    return parseTextOrderedMap(outerRows[0].value)
+    return outerRows[0].rows
 }

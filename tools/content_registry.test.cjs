@@ -19,7 +19,30 @@ const {
     TABLE_SOURCES,
     findTableSource,
 } = require("../src/content/sync/table-registry")
+const {
+    CONTENT_RUNTIME_SCHEMA_VERSION,
+    CONTENT_SCHEMA_VERSION,
+    createReleaseManifest,
+    parseReleaseManifest,
+} = require("../src/content/sync/schema")
 const { importBundledTable } = require("../src/content/sync/bundled-importer")
+
+const TEST_DIGEST = `sha256:${"a".repeat(64)}`
+const EXPECTED_GACHA_ODDS_DYNAMIC_SOURCE = Object.freeze({
+    kind: "gacha-odds-references",
+    sourceOrderedMap: "master/gacha/gacha.orderedmap",
+    logicalPathTemplate: "master/gacha_odds/{oddsId}.orderedmap",
+    rarityOddsColumn: 11,
+    prizeKindColumn: 13,
+    poolOddsColumns: Object.freeze([
+        Object.freeze({ prizeKind: "0", columns: Object.freeze([14, 15, 16]) }),
+        Object.freeze({ prizeKind: "1", columns: Object.freeze([22, 23, 24]) }),
+    ]),
+    referenceNormalization: "trim",
+    skipReferences: Object.freeze(["", "(None)"]),
+    order: "lexicographic",
+    missingReference: "error",
+})
 
 const EXPECTED_CDN_TABLES = Object.freeze({
     "character.json": ["character", [
@@ -226,6 +249,44 @@ test("registry covers the first CDN converter tables with verified logical paths
         assert.equal(entry.converterId, converterId, tableName)
         assert.deepEqual(entry.sourceOrderedMaps, sources, tableName)
     }
+})
+
+test("registry and release manifest explicitly describe referenced gacha odds sources", () => {
+    const gacha = findTableSource("gacha.json")
+
+    assert.deepEqual(gacha.sourceOrderedMaps, ["master/gacha/gacha.orderedmap"])
+    assert.deepEqual(gacha.dynamicSources, [EXPECTED_GACHA_ODDS_DYNAMIC_SOURCE])
+    assert.deepEqual(gacha.manifestSources, [
+        "master/gacha/gacha.orderedmap",
+        EXPECTED_GACHA_ODDS_DYNAMIC_SOURCE,
+    ])
+    assert.ok(TABLE_SOURCES.every(entry => (
+        entry.sourceOrderedMaps.every(source => !source.includes("*"))
+    )))
+    assert.ok(TABLE_SOURCES
+        .filter(entry => entry.tableName !== "gacha.json")
+        .every(entry => entry.dynamicSources.length === 0))
+
+    const manifest = createReleaseManifest({
+        schemaVersion: CONTENT_SCHEMA_VERSION,
+        assetVersion: "1.4.55",
+        runtimeSchemaVersion: CONTENT_RUNTIME_SCHEMA_VERSION,
+        generatorVersion: 1,
+        tables: {
+            "gacha.json": {
+                object: TEST_DIGEST,
+                scope: gacha.scope,
+                converterId: gacha.converterId,
+                converterVersion: gacha.converterVersion,
+                sources: gacha.manifestSources,
+            },
+        },
+        catalog: { object: TEST_DIGEST },
+        summary: { object: TEST_DIGEST },
+    })
+    const parsed = parseReleaseManifest(JSON.parse(JSON.stringify(manifest)))
+    assert.deepEqual(parsed.tables["gacha.json"].sources, gacha.manifestSources)
+    assertDeepFrozen(parsed.tables["gacha.json"].sources)
 })
 
 test("registry closes over current static runtime tables", () => {

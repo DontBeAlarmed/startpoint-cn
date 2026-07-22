@@ -14,7 +14,7 @@ const {
     buildShortUpCharacterGachaTimeline,
 } = require("../src/lib/admin-clairvoyance")
 
-function repository(characterMeta, characterText) {
+function repository(characterMeta, characterText, gachas = bundledGachas) {
     return Object.freeze({
         info: () => Object.freeze({
             source: "release",
@@ -23,6 +23,7 @@ function repository(characterMeta, characterText) {
             releaseDigest: null,
         }),
         table: (tableName) => {
+            if (tableName === "gacha.json") return gachas
             if (tableName === "character.json") return characterMeta
             if (tableName === "cdndata/character_text.json") return characterText
             throw new Error(`unexpected content table: ${tableName}`)
@@ -71,11 +72,17 @@ try {
     const injectedTextRow = Array(12).fill("")
     injectedTextRow[0] = "Release角色名"
     injectedTextRow[3] = "Release角色称号"
+    const injectedGacha = structuredClone(bundledGachas["900002"])
+    injectedGacha.name = "Release卡池名"
+    const injectedGachaItems = Object.values(injectedGacha.pool)
+        .flat()
+        .filter(item => item.id === 121069)
     productionContentSnapshotProvider.snapshot = Object.freeze({
         cdn: Object.freeze({ targetVersion: "test-release" }),
         repository: repository(
             Object.freeze({ "121069": injectedCharacter }),
             Object.freeze({ "121069": Object.freeze([Object.freeze(injectedTextRow)]) }),
+            Object.freeze({ "900002": Object.freeze(injectedGacha) }),
         ),
     })
 
@@ -93,6 +100,7 @@ try {
     )
 
     for (const { item } of originalRarities) delete item.rarity
+    for (const item of injectedGachaItems) delete item.rarity
     const releaseTimeline = buildShortUpCharacterGachaTimeline(
         new Date("2021-10-18T14:00:00.000Z"),
     )
@@ -101,6 +109,11 @@ try {
         .rateUpCharacters
         .find(character => character.id === 121069)
     assert(releaseCharacter, "注入 Release 后仍应找到角色 #121069")
+    assert.strictEqual(
+        releaseTimeline.timeline.find(gacha => gacha.id === 900002).name,
+        "Release卡池名",
+        "admin 卡池定义必须与角色和文本来自同一 Repository",
+    )
     assert.strictEqual(releaseCharacter.name, "Release角色名")
     assert.strictEqual(releaseCharacter.title, "Release角色称号")
     assert.strictEqual(releaseCharacter.rarity, injectedCharacter.rarity)

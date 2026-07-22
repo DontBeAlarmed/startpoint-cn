@@ -11,6 +11,7 @@ import { importBundledTable as defaultImportBundledTable } from "../sync/bundled
 import { ContentObjectStore } from "../sync/object-store"
 import {
     CONTENT_GENERATOR_VERSION,
+    type ContentSourceReference,
     type ContentReleaseManifest,
     type ContentTableReference,
 } from "../sync/schema"
@@ -34,8 +35,13 @@ export interface ContentRepositoryDependencies {
 
 const BUNDLED_IMPORT_CONCURRENCY = 8
 
-function sameStrings(left: readonly string[], right: readonly string[]): boolean {
-    return left.length === right.length && left.every((value, index) => value === right[index])
+function sameSources(
+    left: readonly ContentSourceReference[],
+    right: readonly ContentSourceReference[],
+): boolean {
+    return left.length === right.length && left.every((value, index) => (
+        JSON.stringify(value) === JSON.stringify(right[index])
+    ))
 }
 
 function validateTableMetadata(
@@ -52,7 +58,7 @@ function validateTableMetadata(
     if (reference.converterVersion !== definition.converterVersion) {
         throw new Error(`content release table ${tableName} has mismatched converterVersion`)
     }
-    if (!sameStrings(reference.sources, definition.sourceOrderedMaps)) {
+    if (!sameSources(reference.sources, definition.manifestSources)) {
         throw new Error(`content release table ${tableName} has mismatched sources`)
     }
 }

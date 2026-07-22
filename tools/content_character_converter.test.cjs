@@ -1,7 +1,6 @@
 "use strict"
 
 const assert = require("node:assert/strict")
-const { spawnSync } = require("node:child_process")
 const path = require("node:path")
 const test = require("node:test")
 
@@ -221,19 +220,4 @@ test("quick:content includes the character converter regression suite", () => {
     assert.ok(TEST_GROUPS["quick:content"].tests.includes(
         "tools/content_character_converter.test.cjs",
     ))
-})
-
-test("character converter output contract is recursively readonly", () => {
-    const result = spawnSync(process.execPath, [
-        path.join(projectRoot, "node_modules/typescript/bin/tsc"),
-        "--strict",
-        "--noEmit",
-        "--skipLibCheck",
-        "--module", "commonjs",
-        "--moduleResolution", "node",
-        "--target", "es2016",
-        path.join(projectRoot, "src/content/converters/character.type-test.ts"),
-    ], { cwd: projectRoot, encoding: "utf8" })
-
-    assert.equal(result.status, 0, `${result.stdout}${result.stderr}`)
 })

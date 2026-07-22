@@ -262,7 +262,7 @@ async function synchronize(
             scope: definition.scope,
             converterId: definition.converterId,
             converterVersion: definition.converterVersion,
-            sources: definition.sourceOrderedMaps,
+            sources: definition.manifestSources,
         }
     }
     const catalogObject = await store.writeObject(catalog)

@@ -57,7 +57,7 @@ async function writeRelease(store, marker, options = {}) {
             scope: definition.scope,
             converterId: definition.converterId,
             converterVersion: definition.converterVersion,
-            sources: definition.sourceOrderedMaps,
+            sources: definition.manifestSources,
         },
     ]))
     options.mutateTables?.(tables, object)

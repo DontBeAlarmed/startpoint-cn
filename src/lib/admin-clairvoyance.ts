@@ -1,4 +1,3 @@
-import gachasJson from "../../assets/gacha.json"
 import { getContentSnapshot } from "../content/runtime/content-snapshot"
 
 const SHORT_TERM_MAX_DAYS = 60
@@ -70,8 +69,6 @@ export interface ClairvoyanceTimeline {
     timeline: ClairvoyanceGacha[]
     searchIndex: ClairvoyanceSearchRow[]
 }
-
-const gachas = gachasJson as Record<string, RawGacha>
 
 function parseCdnDate(value: string): Date {
     return new Date(`${value.replace(" ", "T")}+08:00`)
@@ -174,6 +171,7 @@ function buildSearchIndex(timeline: ClairvoyanceGacha[]): ClairvoyanceSearchRow[
 
 export function buildShortUpCharacterGachaTimeline(now: Date = new Date()): ClairvoyanceTimeline {
     const repository = getContentSnapshot().repository
+    const gachas = repository.table<Record<string, RawGacha>>("gacha.json")
     const characterMeta = repository.table<Record<string, CharacterMeta>>("character.json")
     const characterText = repository.table<CharacterTextRows>("cdndata/character_text.json")
     const timeline = Object.entries(gachas)

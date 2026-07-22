@@ -1,6 +1,7 @@
 import { deepFreeze } from "../deep-freeze"
 import type { OrderedMapTextRow } from "../sync/ordered-map"
 import type { Element } from "../../lib/types/quest"
+import { parseCsvLine } from "./csv"
 
 const CHARACTER_COLUMN_COUNT = 37
 const CHARACTER_TEXT_COLUMN_COUNT = 12
@@ -40,68 +41,6 @@ export interface CharacterConversionOutput {
 
 function invalidCharacter(reason: string): never {
     throw new Error(`invalid character content: ${reason}`)
-}
-
-function parseCsvLine(text: string, subject: string): string[] {
-    const fields: string[] = []
-    let field = ""
-    let state: "start" | "unquoted" | "quoted" | "after-quote" = "start"
-
-    for (let index = 0; index < text.length; index += 1) {
-        const character = text[index]
-        if (state === "start") {
-            if (character === "\r" || character === "\n") {
-                invalidCharacter(`${subject} must be a single CSV line outside quoted fields`)
-            }
-            if (character === ",") fields.push("")
-            else if (character === '"') state = "quoted"
-            else {
-                field = character
-                state = "unquoted"
-            }
-            continue
-        }
-        if (state === "unquoted") {
-            if (character === "\r" || character === "\n") {
-                invalidCharacter(`${subject} must be a single CSV line outside quoted fields`)
-            }
-            if (character === ",") {
-                fields.push(field)
-                field = ""
-                state = "start"
-            } else if (character === '"') {
-                invalidCharacter(`${subject} has an illegal quote`)
-            } else {
-                field += character
-            }
-            continue
-        }
-        if (state === "quoted") {
-            // 官方 1.4.54 的部分 character_text 字段在引号内包含真实换行。
-            if (character !== '"') {
-                field += character
-            } else if (text[index + 1] === '"') {
-                field += '"'
-                index += 1
-            } else {
-                state = "after-quote"
-            }
-            continue
-        }
-        if (character === "\r" || character === "\n") {
-            invalidCharacter(`${subject} must be a single CSV line outside quoted fields`)
-        }
-        if (character !== ",") {
-            invalidCharacter(`${subject} has data after a closing quote`)
-        }
-        fields.push(field)
-        field = ""
-        state = "start"
-    }
-
-    if (state === "quoted") invalidCharacter(`${subject} has an unclosed quote`)
-    fields.push(field)
-    return fields
 }
 
 function parseInteger(value: string, subject: string): number {
@@ -144,7 +83,7 @@ function requireRows(
         if (seen.has(row.key)) invalidCharacter(`${tableName} has duplicate key: ${row.key}`)
         seen.add(row.key)
 
-        const fields = parseCsvLine(row.text, `${tableName}[${row.key}]`)
+        const fields = parseCsvLine(row.text, `${tableName}[${row.key}]`, invalidCharacter)
         if (fields.length !== columnCount) {
             invalidCharacter(
                 `${tableName}[${row.key}] must have ${columnCount} columns, got ${fields.length}`,

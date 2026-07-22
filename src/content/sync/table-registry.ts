@@ -1,17 +1,44 @@
 import { deepFreeze } from "../deep-freeze"
-import type { TableScope } from "./schema"
+import type {
+    ContentSourceReference,
+    GachaOddsDynamicSourceReference,
+    TableScope,
+} from "./schema"
 
 export interface TableSourceDefinition {
     readonly tableName: string
     readonly scope: TableScope
     readonly sourceOrderedMaps: readonly string[]
+    readonly dynamicSources: readonly GachaOddsDynamicSourceReference[]
+    readonly manifestSources: readonly ContentSourceReference[]
     readonly bundledPath: string
     readonly converterId: string
     readonly converterVersion: number
     readonly outputShapeVersion: number
 }
 
-type TableSourceInput = Omit<TableSourceDefinition, "bundledPath">
+type TableSourceInput = Omit<
+    TableSourceDefinition,
+    "bundledPath" | "dynamicSources" | "manifestSources"
+> & {
+    readonly dynamicSources?: readonly GachaOddsDynamicSourceReference[]
+}
+
+const GACHA_ODDS_DYNAMIC_SOURCE: GachaOddsDynamicSourceReference = {
+    kind: "gacha-odds-references",
+    sourceOrderedMap: "master/gacha/gacha.orderedmap",
+    logicalPathTemplate: "master/gacha_odds/{oddsId}.orderedmap",
+    rarityOddsColumn: 11,
+    prizeKindColumn: 13,
+    poolOddsColumns: [
+        { prizeKind: "0", columns: [14, 15, 16] },
+        { prizeKind: "1", columns: [22, 23, 24] },
+    ],
+    referenceNormalization: "trim",
+    skipReferences: ["", "(None)"],
+    order: "lexicographic",
+    missingReference: "error",
+}
 
 const BUNDLED_TABLE_NAMES = [
     "advent_event_quest.json",
@@ -149,6 +176,7 @@ const definitionInputs: TableSourceInput[] = [
         tableName: "gacha.json",
         scope: "cdn",
         sourceOrderedMaps: ["master/gacha/gacha.orderedmap"],
+        dynamicSources: [GACHA_ODDS_DYNAMIC_SOURCE],
         converterId: "gacha",
         converterVersion: 1,
         outputShapeVersion: 1,
@@ -247,10 +275,15 @@ const definitionInputs: TableSourceInput[] = [
     ...SERVER_TABLE_NAMES.map(serverDefinition),
 ]
 
-const definitions: TableSourceDefinition[] = definitionInputs.map(definition => ({
-    ...definition,
-    bundledPath: `assets/${definition.tableName}`,
-}))
+const definitions: TableSourceDefinition[] = definitionInputs.map(definition => {
+    const dynamicSources = definition.dynamicSources ?? []
+    return {
+        ...definition,
+        dynamicSources,
+        manifestSources: [...definition.sourceOrderedMaps, ...dynamicSources],
+        bundledPath: `assets/${definition.tableName}`,
+    }
+})
 
 definitions.sort((left, right) => (
     left.tableName < right.tableName ? -1 : left.tableName > right.tableName ? 1 : 0

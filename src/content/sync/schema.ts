@@ -7,12 +7,32 @@ export const CONTENT_GENERATOR_VERSION = 1
 
 export type TableScope = "cdn" | "bundled" | "server"
 
+export interface GachaOddsPoolColumns {
+    readonly prizeKind: "0" | "1"
+    readonly columns: readonly number[]
+}
+
+export interface GachaOddsDynamicSourceReference {
+    readonly kind: "gacha-odds-references"
+    readonly sourceOrderedMap: string
+    readonly logicalPathTemplate: string
+    readonly rarityOddsColumn: number
+    readonly prizeKindColumn: number
+    readonly poolOddsColumns: readonly GachaOddsPoolColumns[]
+    readonly referenceNormalization: "trim"
+    readonly skipReferences: readonly ["", "(None)"]
+    readonly order: "lexicographic"
+    readonly missingReference: "error"
+}
+
+export type ContentSourceReference = string | GachaOddsDynamicSourceReference
+
 export interface ContentTableReference {
     readonly object: `sha256:${string}`
     readonly scope: TableScope
     readonly converterId: string
     readonly converterVersion: number
-    readonly sources: readonly string[]
+    readonly sources: readonly ContentSourceReference[]
 }
 
 export interface ContentReleaseManifest {
@@ -85,6 +105,13 @@ function requirePositiveInteger(value: unknown, field: string): number {
     return value as number
 }
 
+function requireNonNegativeInteger(value: unknown, field: string): number {
+    if (!Number.isSafeInteger(value) || (value as number) < 0) {
+        throw new TypeError(`${field} must be a non-negative safe integer`)
+    }
+    return value as number
+}
+
 function requireSemver(value: unknown, field: string): string {
     if (typeof value !== "string" || !SEMVER_PATTERN.test(value)) {
         throw new TypeError(`${field} must be a semantic version`)
@@ -112,6 +139,108 @@ function requireRelativePath(value: unknown, field: string): string {
         throw new TypeError(`${field} contains an invalid path segment`)
     }
     return value
+}
+
+function parseGachaOddsPoolColumns(
+    value: unknown,
+    index: number,
+    field: string,
+): GachaOddsPoolColumns {
+    const itemField = `${field}[${index}]`
+    const item = requireRecord(value, itemField)
+    requireExactKeys(item, ["prizeKind", "columns"], itemField)
+    const expectedPrizeKind = String(index) as "0" | "1"
+    if (index > 1 || item.prizeKind !== expectedPrizeKind) {
+        throw new TypeError(`${itemField}.prizeKind must be ${expectedPrizeKind}`)
+    }
+    if (!Array.isArray(item.columns) || item.columns.length !== 3) {
+        throw new TypeError(`${itemField}.columns must contain exactly three columns`)
+    }
+    return {
+        prizeKind: expectedPrizeKind,
+        columns: item.columns.map((column, columnIndex) => requireNonNegativeInteger(
+            column,
+            `${itemField}.columns[${columnIndex}]`,
+        )),
+    }
+}
+
+function parseGachaOddsDynamicSource(
+    value: unknown,
+    field: string,
+): GachaOddsDynamicSourceReference {
+    const source = requireRecord(value, field)
+    requireExactKeys(source, [
+        "kind",
+        "sourceOrderedMap",
+        "logicalPathTemplate",
+        "rarityOddsColumn",
+        "prizeKindColumn",
+        "poolOddsColumns",
+        "referenceNormalization",
+        "skipReferences",
+        "order",
+        "missingReference",
+    ], field)
+    if (source.kind !== "gacha-odds-references") {
+        throw new TypeError(`${field}.kind must be gacha-odds-references`)
+    }
+    const sourceOrderedMap = requireRelativePath(
+        source.sourceOrderedMap,
+        `${field}.sourceOrderedMap`,
+    )
+    const logicalPathTemplate = requireRelativePath(
+        source.logicalPathTemplate,
+        `${field}.logicalPathTemplate`,
+    )
+    if (logicalPathTemplate.split("{oddsId}").length !== 2
+        || logicalPathTemplate.includes("*")) {
+        throw new TypeError(`${field}.logicalPathTemplate must contain one {oddsId}`)
+    }
+    if (!Array.isArray(source.poolOddsColumns) || source.poolOddsColumns.length !== 2) {
+        throw new TypeError(`${field}.poolOddsColumns must describe prize kinds 0 and 1`)
+    }
+    const poolOddsColumns = source.poolOddsColumns.map((item, index) => (
+        parseGachaOddsPoolColumns(item, index, `${field}.poolOddsColumns`)
+    ))
+    if (source.referenceNormalization !== "trim") {
+        throw new TypeError(`${field}.referenceNormalization must be trim`)
+    }
+    if (!Array.isArray(source.skipReferences)
+        || source.skipReferences.length !== 2
+        || source.skipReferences[0] !== ""
+        || source.skipReferences[1] !== "(None)") {
+        throw new TypeError(`${field}.skipReferences must be blank and (None)`)
+    }
+    if (source.order !== "lexicographic") {
+        throw new TypeError(`${field}.order must be lexicographic`)
+    }
+    if (source.missingReference !== "error") {
+        throw new TypeError(`${field}.missingReference must be error`)
+    }
+    return {
+        kind: "gacha-odds-references",
+        sourceOrderedMap,
+        logicalPathTemplate,
+        rarityOddsColumn: requireNonNegativeInteger(
+            source.rarityOddsColumn,
+            `${field}.rarityOddsColumn`,
+        ),
+        prizeKindColumn: requireNonNegativeInteger(
+            source.prizeKindColumn,
+            `${field}.prizeKindColumn`,
+        ),
+        poolOddsColumns,
+        referenceNormalization: "trim",
+        skipReferences: ["", "(None)"],
+        order: "lexicographic",
+        missingReference: "error",
+    }
+}
+
+function parseContentSourceReference(value: unknown, field: string): ContentSourceReference {
+    if (typeof value === "string") return requireRelativePath(value, field)
+    return parseGachaOddsDynamicSource(value, field)
 }
 
 function requireTableName(value: string): void {
@@ -148,7 +277,7 @@ function parseTableReference(value: unknown, field: string): ContentTableReferen
     }
 
     const sources = reference.sources.map((source, index) => (
-        requireRelativePath(source, `${field}.sources[${index}]`)
+        parseContentSourceReference(source, `${field}.sources[${index}]`)
     ))
     if (reference.scope !== "server" && sources.length === 0) {
         throw new TypeError(`${field}.sources must not be empty for ${reference.scope} tables`)

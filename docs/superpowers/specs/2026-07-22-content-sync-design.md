@@ -220,10 +220,15 @@ Registry 是机器可读的服务端表来源清单。每项至少声明：
 tableName
 scope
 sourceOrderedMaps[]
+dynamicSources[]
 converterId
 converterVersion
 outputShapeVersion
 ```
+
+`sourceOrderedMaps[]` 只能包含可直接按 SHA1+salt 定位的精确逻辑路径，禁止放入 `*` 等伪 glob。由固定表内容决定的动态依赖必须使用结构化 `dynamicSources[]`；Registry 将固定来源和动态描述按声明顺序合成为稳定的 `manifestSources`，原样进入 Release manifest 的 `sources`。
+
+`gacha.json` 的动态来源契约 `gacha-odds-references` 明确声明：从 `master/gacha/gacha.orderedmap` 的 col11 读取 rarity odds ID；以 col13 为 prize kind，角色池读取 col14/15/16，装备池读取 col22/23/24；引用先 trim，再跳过空字符串和 `(None)`；剩余 ID 按字典序确定性读取 `master/gacha_odds/{oddsId}.orderedmap`；任何非空引用缺失或不可读都失败。该契约是任务 11 builder 的输入元数据，不表示本阶段已经实现 builder 的动态提取执行。
 
 `scope` 分为：
 
@@ -238,6 +243,14 @@ outputShapeVersion
 Extractor 使用现有 SHA1+salt 规则，把 Registry 中的 orderedmap 逻辑路径转换为物理哈希路径，再从 ArchiveIndex 读取最后版本的 entry。
 
 Extractor 只处理转换器需要的资源，不解压整个 CDN。解析结果先转换为统一中间表示，转换器不直接操作 ZIP。
+
+orderedmap 存在两种经过真实国服文件验证的二进制形态，不能统一假定 outer value 是文本：
+
+- `master/gacha/gacha.orderedmap` 与 `gacha_campaign.orderedmap` 是普通 map，outer key 直接对应一行 CSV 文本。
+- `master/gacha/gacha_feature_content.orderedmap` 是多 outer key 的 nested map；每个 outer value 都是另一份 orderedmap，而不是 CSV 文本。
+- `master/gacha_odds/<id>.orderedmap` 也是 nested map，但严格只有一个 outer key，且该 key 必须等于 `<id>`。
+
+因此 orderedmap parser 同时提供普通 text rows、单 outer nested rows 和“多个 outer key 各自对应 text rows”的严格表示。`GachaSourceReader.read()` 只读取普通 text rows；`readNested()` 读取 feature content 和 odds。两条路径都必须检查 zlib 尾随数据、边界、重复 key 与 UTF-8，不允许把 nested binary 当文本容错解析。
 
 ## 六、表转换器
 
@@ -278,6 +291,16 @@ Extractor 只处理转换器需要的资源，不解压整个 CDN。解析结果
 官方 1.4.54 的 `character` 与 `character_text` orderedmap 各有 505 个 key，转换后的两张 `cdndata` 表与仓库内 tracked 输出全量一致。`character.json` 的 `name`、`rarity`、`element` 也全量一致；`skill_count` 复现上游转换规则，严格解析 col36 后只统计值等于 `6` 的能力槽。
 
 仓库内 bundled `character.json` 是历史兼容基线，其中恰有 45 个角色保留 `skill_count=3`，而官方 1.4.54 重建值为 `6`；另有 12 个 `skill_count=2` 的特殊角色保持一致。没有 `current.json` 时继续保留 bundled 行为；同步 Release 以官方 CDN 为权威，不叠加历史 ID overlay。该 `3→6` 变化会让这些角色按现有规则获得第二张 mana board 的 bond token，属于已接受的数据源纠正，不额外修改觉醒业务逻辑。
+
+### 6.5 卡池转换与验证边界
+
+国服 `gacha` 官方行固定为 47 列。转换器严格移植既有 `gacha_odds_export.cjs` 与 `rebuild_gacha_from_odds.cjs` 的列映射和归一化规则：col13 决定角色池或装备池，col11 引用 rarity odds，角色 odds 位于 col14/15/16，装备 odds 位于 col22/23/24。rarity、角色和装备 odds 行分别严格为 2、7、6 列；整数、boolean、outer key 和非空引用必须合法。空白或 `(None)` 的可选 odds ID 跳过，非空引用缺失则终止构建，不生成残缺 pool。
+
+动态 odds 读取失败时，公开错误只包含逻辑路径、kind、odds ID 和 missing/unreadable 语义，不拼接底层文件路径或异常文本；原始错误只通过 `Error.cause` 保留给受控诊断。
+
+`cdndata/gacha.json` 保留稳定排序后的原始 47 列 CSV rows；`gacha.json` 生成运行时 metadata、`rankRates`、guarantee 与按原始权重归一化的角色/装备 pool。`gacha_campaign` 每个官方 campaign row 的 col5 是 gacha ID 列表，输出稳定的 `gachaId -> campaignId` 映射。feature content 保留官方 nested raw 结构，不叠加 bundled 历史修复。
+
+仓库内 tracked `cdndata/gacha.json` 已知有 584 个卡池且与官方 extracted gacha rows 全量一致，tracked `gacha_campaign.json` 已知有 145 个映射且与 41 个官方 campaign outer rows 展开结果全量一致。普通自动测试只使用仓库内小型手写 fixture，不读取仓库外 `wf-assets-cn`，也不保存大型 odds golden。
 
 ## 七、完整逻辑快照与物理去重
 
@@ -326,6 +349,30 @@ Release manifest 至少包含：
       "converterId": "character",
       "converterVersion": 1,
       "sources": ["orderedmap/character/character.json"]
+    },
+    "gacha.json": {
+      "object": "sha256:...",
+      "scope": "cdn",
+      "converterId": "gacha",
+      "converterVersion": 1,
+      "sources": [
+        "master/gacha/gacha.orderedmap",
+        {
+          "kind": "gacha-odds-references",
+          "sourceOrderedMap": "master/gacha/gacha.orderedmap",
+          "logicalPathTemplate": "master/gacha_odds/{oddsId}.orderedmap",
+          "rarityOddsColumn": 11,
+          "prizeKindColumn": 13,
+          "poolOddsColumns": [
+            { "prizeKind": "0", "columns": [14, 15, 16] },
+            { "prizeKind": "1", "columns": [22, 23, 24] }
+          ],
+          "referenceNormalization": "trim",
+          "skipReferences": ["", "(None)"],
+          "order": "lexicographic",
+          "missingReference": "error"
+        }
+      ]
     }
   },
   "catalog": {
@@ -547,6 +594,7 @@ Repository 在服务启动时固定数据来源。运行中修改 `current.json`
 - current 指针或对象损坏时服务启动明确失败。
 - Repository 的角色、卡池、商店数据与转换器输出一致。
 - 官方 1.4.54 真实 CDN 同步后，两张角色 `cdndata` 表和角色 `name`、`rarity`、`element` 与 bundled 基线一致；`skill_count` 保留 45 个已验证的 `3→6` 官方重建差异。
+- 小型卡池 fixture 覆盖角色池、装备池、rate-up、limited、exchangeable、trial reading、rarity rates、guarantee、campaign、nested feature、quoted CSV、空可选 odds 与非空引用缺失失败。
 - 同步和测试不修改原始 CDN、玩家 SQLite 或运行期种子文件。
 - 动态 Catalog 仍满足现有 latest、incremental、initial 和 Range 协议测试。
 
@@ -562,8 +610,8 @@ Repository 在服务启动时固定数据来源。运行中修改 `current.json`
 
 第一阶段：
 
-1. 使用当前官方 1.4.54 CDN 运行同步。
-2. 启动服务，验证角色 `cdndata`、大多数角色字段、卡池和商店行为与 bundled 基线一致，并确认 45 个角色的 `skill_count` 按官方数据从 3 重建为 6。
+1. 使用当前官方 1.4.54 CDN 运行阶段 13 smoke：从真实归档重建并全量比较 584 个 gacha raw rows、145 个 campaign 映射、全部被引用 odds 和官方 nested feature content。该 smoke 允许读取本地 CDN/`wf-assets-cn`，但不进入普通测试组。
+2. 启动服务，验证角色 `cdndata`、大多数角色字段、可抽取角色/装备的 ID 集合、数量、类型和权重与客户端一致，并确认 45 个角色的 `skill_count` 按官方数据从 3 重建为 6。
 3. 使用包含小范围角色、卡池或商店变更的测试 CDN 再次同步。
 4. 重启并确认服务端表和客户端内容同时变化。
 5. 验证版本相同跳过、`--force` 重建和回退流程。

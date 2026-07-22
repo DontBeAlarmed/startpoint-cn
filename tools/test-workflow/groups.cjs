@@ -46,6 +46,8 @@ const TEST_GROUPS = Object.freeze({
         timeoutMs: 60_000,
         tests: [
             "tools/content_character_converter.test.cjs",
+            "tools/content_gacha_converter.test.cjs",
+            "tools/gacha_repository.test.cjs",
             "tools/content_repository.test.cjs",
             "tools/content_sync.test.cjs",
             "tools/content_object_store.test.cjs",

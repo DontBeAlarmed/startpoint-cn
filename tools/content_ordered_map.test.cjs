@@ -7,6 +7,7 @@ const zlib = require("node:zlib")
 require("ts-node/register/transpile-only")
 
 const {
+    parseNestedTextOrderedMaps,
     parseNestedTextOrderedMap,
     parseOrderedMap,
     parseTextOrderedMap,
@@ -56,6 +57,13 @@ function expectThrows(parser, raw, pattern, message) {
     )
 }
 
+function assertDeepFrozen(value, seen = new Set()) {
+    if (!value || typeof value !== "object" || seen.has(value)) return
+    seen.add(value)
+    assert.equal(Object.isFrozen(value), true)
+    for (const key of Reflect.ownKeys(value)) assertDeepFrozen(value[key], seen)
+}
+
 test("parses orderedmap rows, including empty maps and rows", () => {
     const raw = createOrderedMap([
         { key: "alpha", value: Buffer.from("first", "utf8") },
@@ -102,6 +110,41 @@ test("parses text and nested text orderedmaps", () => {
     assert.ok(Object.isFrozen(textRows[0]))
 
     assert.deepEqual(parseNestedTextOrderedMap(raw, "outer-id"), textRows)
+})
+
+test("parses every outer key in a nested text orderedmap", () => {
+    assert.equal(
+        typeof parseNestedTextOrderedMaps,
+        "function",
+        "orderedmap parser should expose the multi-outer nested representation",
+    )
+    const first = createOrderedMap([
+        { key: "2", value: Buffer.from("second", "utf8") },
+        { key: "1", value: Buffer.from("first", "utf8") },
+    ])
+    const second = createOrderedMap([
+        { key: "1", value: Buffer.from('quoted,"row"', "utf8") },
+    ])
+    const raw = createOrderedMap([
+        { key: "10", value: first },
+        { key: "20", value: second },
+    ])
+
+    const nested = parseNestedTextOrderedMaps(raw)
+    assert.deepEqual(nested, [
+        {
+            key: "10",
+            rows: [
+                { key: "2", text: "second" },
+                { key: "1", text: "first" },
+            ],
+        },
+        {
+            key: "20",
+            rows: [{ key: "1", text: 'quoted,"row"' }],
+        },
+    ])
+    assertDeepFrozen(nested)
 })
 
 test("strictly rejects malformed orderedmap data", () => {

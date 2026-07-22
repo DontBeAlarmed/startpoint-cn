@@ -24,7 +24,6 @@ import exAbility from "../../assets/ex_ability.json";
 import exBoost from "../../assets/ex_boost.json";
 import exQuests from "../../assets/ex_quest.json";
 import exStatus from "../../assets/ex_status.json";
-import gachas from "../../assets/gacha.json";
 import mainQuests from "../../assets/main_quest.json";
 import practiceQuests from "../../assets/practice_quest.json";
 import manaNodes from "../../assets/mana_node.json";
@@ -32,7 +31,6 @@ import manaNodeAwake from "../../assets/mana_node_awake.json";
 import manaBoard from "../../assets/mana_board.json";
 import rareScoreRewards from "../../assets/rare_score_reward.json";
 import scoreRewards from "../../assets/score_reward.json";
-import gachaCampaigns from "../../assets/gacha_campaign.json";
 import bossCoinShopItems from "../../assets/boss_coin_shop.json";
 import bossCoinShopItemCategoryMap from "../../assets/boss_coin_shop_item_category_map.json";
 import eventItemShopItems from "../../assets/event_item_shop.json";
@@ -542,6 +540,7 @@ export function getBoxGachaSync(
 export function getGachaSync(
     id: string | number
 ): Gacha | null {
+    const gachas = getContentSnapshot().repository.table<Gachas>("gacha.json")
     const data = (gachas as Gachas)[String(id)];
     
     return data ?? null
@@ -556,6 +555,9 @@ export function getGachaSync(
 export function getGachaCampaignIdSync(
     gachaId: string | number
 ): number | null {
+    const gachaCampaigns = getContentSnapshot().repository.table<Record<string, number>>(
+        "gacha_campaign.json",
+    )
     return (gachaCampaigns as Record<string, number>)[String(gachaId)] ?? null
 }
 
