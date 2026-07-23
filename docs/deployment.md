@@ -54,7 +54,7 @@ ls .cdn/cn/
 # archive-*/         ← 版本化的 sha1+salt 命名归档
 ```
 
-受支持启动会先运行 `content:sync`，从 CDN 版本生成或复用 Content Release。目标版本、下载大小和归档清单由固定 Catalog 提供，不需要手工复制两套 EntityLists 文件名。详见 [`docs/cdn/content-sync.md`](./cdn/content-sync.md)。
+本节使用默认的 `ASSET_MODE=local`。该模式的受支持启动会先运行 `content:sync`，从 CDN 版本生成或复用 Content Release。`remote` 和 `client-owned` 模式不执行本地同步。目标版本、下载大小和归档清单由固定 Catalog 提供，不需要手工复制两套 EntityLists 文件名。详见 [`docs/cdn/content-sync.md`](./cdn/content-sync.md)。
 
 ---
 
@@ -221,11 +221,11 @@ sudo netfilter-persistent save
 ## 8. 构建 & 启动
 
 ```bash
-# 前台执行：build:server + content:sync normal + 启动服务
+# 前台执行：构建并按 ASSET_MODE 启动
 bash scripts/start-cn.sh
 ```
 
-`scripts/start-cn.sh` 会先完成 CN 服务端构建，再以前台方式进入 bootstrap。bootstrap 加载可选 `.env`，运行 `content:sync` normal；只有同步成功并激活当前 Release 后才启动游戏服务。服务日志直接写入标准输出和标准错误，`SIGINT` / `SIGTERM` 会转发给当前活动子进程。
+`scripts/start-cn.sh` 会先完成 CN 服务端构建，再以前台方式进入 bootstrap。bootstrap 加载可选 `.env`：`local` 模式运行 `content:sync` normal，只有同步成功并激活当前 Release 后才启动；`remote` 和 `client-owned` 模式跳过本地同步并直接启动。服务日志写入标准输出和标准错误，`SIGINT` / `SIGTERM` 会转发给当前活动子进程。
 
 脚本不终止已有服务、不创建后台进程，也不写固定日志文件。需要后台运行时，由调用者或进程管理器托管上述前台命令，并负责进程生命周期与日志收集。
 
@@ -233,6 +233,7 @@ bash scripts/start-cn.sh
 
 ```bash
 npm run build:server
+# 仅 ASSET_MODE=local 需要准备本地 Release
 npm run content:sync
 node out/cn-server.js
 ```

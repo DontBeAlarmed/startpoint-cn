@@ -1,10 +1,12 @@
 # 路由抓包索引
 
-> 状态: 参考资料(原始协议抓包,原样保留)   关键文件: src/routes/   相关端点: 见下表
+> 状态：参考资料（原始协议抓包，原样保留）　关键文件：`src/routes/`　相关端点：见下表
 
-本目录为各端点的原始请求/响应抓包,共 84 个。实现状态见 ../reference/routes-status.md。
+本目录保存 87 份端点请求与响应样本，以及 1 份跨端点系统补充参考。资料可能早于当前实现，功能完成度以[端点实现状态](../routes-status.md)为准。
 
-| 端点文档 | 首行标题 |
+## 端点请求与响应样本
+
+| 端点文档 | 端点/参考路径 |
 |---|---|
 | [active_mission_receive.md](./active_mission_receive.md) | /latest/api/index.php/active_mission/receive |
 | [asset_get_path.md](./asset_get_path.md) | /latest/api/index.php/asset/get_path |
@@ -21,6 +23,8 @@
 | [character_set_illustration_settings.md](./character_set_illustration_settings.md) | /latest/api/index.php/character/set_illustration_settings |
 | [encyclopedia_index.md](./encyclopedia_index.md) | /latest/api/index.php/encyclopedia/index |
 | [encyclopedia_read_keyword.md](./encyclopedia_read_keyword.md) | /latest/api/index.php/encyclopedia/read_keyword |
+| [equipment_bulk_sell_stack.md](./equipment_bulk_sell_stack.md) | /latest/api/index.php/equipment/bulk_sell_stack |
+| [equipment_bulk_upgrade.md](./equipment_bulk_upgrade.md) | /latest/api/index.php/equipment/bulk_upgrade |
 | [equipment_sell_equipment.md](./equipment_sell_equipment.md) | /latest/api/index.php/equipment/sell_equipment |
 | [equipment_sell_stack.md](./equipment_sell_stack.md) | /latest/api/index.php/equipment/sell_stack |
 | [equipment_set_protection.md](./equipment_set_protection.md) | /latest/api/index.php/equipment/set_protection |
@@ -28,6 +32,7 @@
 | [ex_boost_draw.md](./ex_boost_draw.md) | /latest/api/index.php/ex_boost/draw |
 | [ex_boost_first_draw.md](./ex_boost_first_draw.md) | /latest/api/index.php/ex_boost/first_draw |
 | [ex_boost_select.md](./ex_boost_select.md) | /latest/api/index.php/ex_boost/select |
+| [expod_bulk_stack_to_exp.md](./expod_bulk_stack_to_exp.md) | /latest/api/index.php/expod/bulk_stack_to_exp |
 | [expod_inject_exp.md](./expod_inject_exp.md) | /latest/api/index.php/expod/inject_exp |
 | [expod_stack_to_exp.md](./expod_stack_to_exp.md) | /latest/api/index.php/expod/stack_to_exp |
 | [follow_lists.md](./follow_lists.md) | /latest/api/index.php/follow/lists |
@@ -88,5 +93,9 @@
 | [tool_signup.md](./tool_signup.md) | /latest/api/index.php/tool/signup |
 | [tutorial_finish_trigger.md](./tutorial_finish_trigger.md) | /latest/api/index.php/tutorial/finish_trigger |
 | [tutorial_update_step.md](./tutorial_update_step.md) | /latest/api/index.php/tutorial/update_step |
-| [v2_app.md](./v2_app.md) | /v2/app?appId=561429&appVer=0.0.81&market=googlePlay&sdkVer=3.14.14&os=android&lang=en&deviceId=b84b4631-8d13-45af-949a-6b3d7f206049&osVer=12&country=us&whiteKey=06f0e655-07cc-4a10-873a-7ade0411e754 |
-| [v2_appGroup.md](./v2_appGroup.md) | /v2/appGroup?appGroupId=wdfp_service&appVer=0.0.81&market=googlePlay&sdkVer=3.14.14&os=android&lang=en&deviceId=b84b4631-8d13-45af-949a-6b3d7f206049&osVer=12&country=us&whiteKey=06f0e655-07cc-4a10-873a-7ade0411e754 |
+| [v2_app.md](./v2_app.md) | `/v2/app` |
+| [v2_appGroup.md](./v2_appGroup.md) | `/v2/appGroup` |
+
+## 补充系统参考
+
+- [装备系统参考](./equipment.md)：汇总多个装备端点的字段与行为，不计入端点样本数量。

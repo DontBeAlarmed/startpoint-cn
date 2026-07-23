@@ -1,174 +1,101 @@
 # StarPoint CN
 
-世界弹射物语(World Flipper)CN(雷霆 Leiting)版本的服务端模拟器。
+StarPoint CN 是《世界弹射物语》国服（雷霆）客户端的非官方服务端实现。项目聚焦于解析官方客户端请求、维护玩家状态，并向客户端提供运行所需的 API、联机服务和 CDN 归档。
 
-> `dev` 分支用于集成测试。自动测试和服务端构建通过不等于 CN 客户端全量验收完成；尚未验证的功能与流程以 [`docs/status/test-progress.md`](./docs/status/test-progress.md) 为准，稳定版本仍以 `main` 分支为准。
+> `dev` 是集成测试分支。自动测试和服务端构建通过不等于客户端全量验收完成；稳定版本仍以 `main` 为准。未验证流程见[测试进度](./docs/status/test-progress.md)。
 
-## 功能状态
+## 支持边界
 
-已实现(部分端点沿用国际服设计,对 CN 的通用性尚未验证):
+当前开发与验收基线为：
 
-- 账号:设备自动绑定(`device_id`)、Web 管理面板
-- 时间系统:统一服务器时间偏移(默认 2024-08-14,规避 CDN 报错；存档 `time_offset` 仅兼容旧数据库)
-- 关卡:主线 / 部分活动·Boss / 单人战斗结算
-- Gacha:角色·武器卡池、兑换、C3032 动画修复、抽卡种子验证
-- 多人联机(NPC 协战):Phase 2 — 建房 + NPC 招募 / 召唤 / 结算
-- 内容运行时:从官方 CN CDN 生成 Content Release，并在启动时固定加载同一份快照
-- 系统:狂热激战 · 体力 · 商店 · 漫画 · 邮件群发
-- 养成:升级 / 突破 / 魔晶板 / EX / 羁绊;武装:觉醒 / 熔解;编队 · 图鉴 · 教程
+- 官方 CN 1.8.1 客户端，仅修改登录跳过和服务器地址；
+- 官方 CN 1.4.54 CDN，完整放入 `.cdn/cn/`；
+- Node.js >= 20.12.0，日常使用当前默认版本；
+- SQLite 本地状态，默认写入 `.database/`。
 
-⚠️ 已知失效 / 注意:
+项目不保证兼容被修改的游戏逻辑、损坏或自制的 CDN、其他客户端版本，也不为这些输入提供自动修复。客户端 APK、官方 CDN 和漫画资源不随仓库分发。
 
-- 存档导入 / 导出:已修复 —— 采用 MergedPlayerData 快照格式(仅管理面板备份/恢复,非游戏客户端 load）。
-- 漫画资源**不随项目分发**,需自行导入。
-- 多个端点沿用国际服(global)设计,不保证对 CN 客户端通用。
+## 当前状态
 
-> 端点状态见 [docs](./docs/README.md) · [端点实现状态](./docs/reference/routes-status.md)
+服务端已经覆盖账号与存档、主要养成、单人关卡、部分特殊活动、抽卡、商店、邮件、NPC 协力及内容运行时，但仍有部分端点、任务分类和客户端流程尚未完成验收。
 
-## 环境需求
+- [测试进度](./docs/status/test-progress.md)：客户端实测范围与待测流程
+- [已知问题](./docs/status/known-issues.md)：当前未解决问题
+- [端点状态](./docs/reference/routes-status.md)：端点级实现概览
+- [完整文档入口](./docs/README.md)：按使用目标选择阅读路径
 
-- Node.js（日常使用当前默认版本；`package.json` 的 `engines` 要求 >=20.12.0） · 打补丁后的 CN 客户端 APK(见"客户端改造")
-- 一份 CN CDN 资源,放入 `.cdn/cn/`
+## 最短启动
 
-### CDN 与内容表
-
-官方 CDN 放在 `.cdn/cn/`。受支持启动会先执行 `content:sync`，根据 CDN 版本生成或复用 Content Release；服务端随后固定加载同一份 Content snapshot。客户端资源目标版本、下载大小和归档清单来自该 snapshot 的 Catalog，不由 `.env` 桩值或请求 Body 临时覆盖。当前 Recovery CSV 仅为兼容占位，不要求手工复制两套 EntityLists 文件名。
-
-职责与限制见 [`docs/cdn/content-sync.md`](./docs/cdn/content-sync.md) 和 [`docs/cdn/runtime-support.md`](./docs/cdn/runtime-support.md)。
-
-## 快速启动
-
-### 前置
+默认 `ASSET_MODE=local`。准备好官方 CDN 后：
 
 ```bash
-cd starpoint-cn
 npm install
 cp .env.example .env
+bash scripts/start-cn.sh
 ```
 
-管理后台依赖独立维护。首次安装，或 `admin/package-lock.json` 发生变化后，执行一次：
+启动脚本会先编译 CN 服务端，再按资源模式启动：`local` 先执行 `content:sync`，成功后启动；`remote` 和 `client-owned` 不执行本地内容同步，直接按该模式初始化并启动。详细准备、目录和故障排查见[运行服务](./docs/getting-started/README.md)。
+
+## 常用命令
+
+| 命令 | 用途 |
+|---|---|
+| `bash scripts/start-cn.sh` | 前台构建；`local` 同步后启动，其他资源模式直接启动 |
+| `npm run start:cn` | 使用已有构建；`local` 同步后启动，其他资源模式直接启动 |
+| `npm run dev:cn` | 构建服务端；`local` 同步后启动，其他资源模式直接启动 |
+| `npm run debug:cn` | TypeScript 热重载调试，不自动同步内容 |
+| `npm run content:sync` | 为本地 CDN 手动生成或复用 Content Release |
+| `npm run build:admin` | 构建 React 管理后台 |
+| `npm run test:changed` | 运行与当前改动相关的测试 |
+| `npm run verify:full` | 类型、完整测试、仓库卫生与服务端构建验证 |
+
+## 可选管理后台
+
+新版管理后台位于 `/admin/`，仍处于持续开发和验收阶段；兼容旧后台保留在 `/`、`/player` 和 `/mail`。
+
+首次构建新版后台，或 `admin/package-lock.json` 变化时，执行：
 
 ```bash
 npm run install:admin
+npm run build:admin
 ```
 
-日常构建不重复安装后台依赖，各命令边界如下：
+## 客户端补丁
 
-| 命令 | 边界 |
-|------|------|
-| `npm run build:server` | 仅编译 CN 服务端入口及其依赖，不构建 CSS 或管理后台 |
-| `npm run start:cn` | 使用已有构建，先执行 `content:sync` normal，成功后启动 CN 游戏服务 |
-| `npm run dev:cn` | 先执行 `build:server`，再执行与 `start:cn` 相同的同步和启动流程 |
-| `npm run build:legacy` | 使用原 `tsconfig.json` 编译 legacy 全量 TypeScript，不构建 CSS |
-| `npm run build` | 保留原有 legacy 全量 TypeScript + Tailwind CSS 构建语义 |
-| `npm run build:admin` | 仅构建管理后台，不安装依赖 |
-| `npm run build:bundle` | 构建 CN 服务端后生成可验证的薄 Server Bundle，不包含 Node、数据库或 CDN |
-| `npm run verify:bundle -- --data-schema 4` | 校验默认 Server Bundle 的 manifest、文件摘要和运行契约 |
-| `npm run content:sync` | 手动执行内容同步；支持 `--check` 或 `--force` |
-| `npm run content:smoke -- --cdn-root <CDN_PARENT> --content-root <TMP_ROOT>` | 在显式隔离目录执行真实 CDN force smoke，不启动服务 |
-| `npm run verify:full` | 依次执行类型检查、完整测试、仓库卫生检查和 CN 服务端构建 |
-| `npm run cdn` / `npm run unzip` | 先同步完成 legacy 编译，再运行对应 CDN 工具 |
+连接本服务需要在官方 CN 1.8.1 客户端中完成两项最小修改：
 
-### 本地局域网（开发/测试）
+1. 在 `pinball/config/core/DevConfig.as` 启用 SDK Dummy，跳过官方登录。
+2. 在 `pinball/config/gbits/DevConfig_gf_android.as` 将 API 地址改为本服务地址。
 
-`.env.example` 的局域网区块默认激活，`cp .env.example .env` 后可直接启动：
+仓库提供补丁脚本和说明，但不分发 APK：
 
 ```bash
-# 前台模式（build + content:sync + 启动）
-bash scripts/start-cn.sh
-
-# 开发模式（热重载，无需 build）
-npm run debug:cn
+bash client-patch/apply.sh <AS3_EXPORT_DIR> <SERVER_HOST>:8001
 ```
 
-如果客户端在**另一台设备**上，需编辑 `.env`：
-- `CN_LISTEN_HOST`=`你的 LAN IP`（如 `192.168.x.x`）
-- `CDN_BASE_URL`=`http://你的LAN_IP:8001/patch/cn`
+完整步骤见[客户端补丁说明](./client-patch/README.md)。
 
-### 公网云服务器
+## 项目结构
 
-1. 按 [`docs/deployment.md`](./docs/deployment.md) 配置 nginx 反向代理 + 防火墙
-2. 编辑 `.env`，激活公网区块：
+- `src/routes/`：CN 与通用 HTTP API、兼容后台 API
+- `src/multi/`：多人房间、NPC 队友和 TCP 会话
+- `src/data/`：SQLite 数据层及 22 个领域模块
+- `src/content/`：CDN 解析、Content Release 与运行时快照
+- `admin/`：新版 React 管理后台
+- `assets/`：服务端业务表和内置静态数据
+- `docs/`：当前架构、系统、协议、参考与状态文档
 
-```bash
-CN_LISTEN_HOST="127.0.0.1"                        # 仅监听本地
-CDN_BASE_URL="https://<你的域名>/patch/cn"        # 公网域名 + HTTPS
-SESSION_PUBLIC_HOST="<你的域名>"                  # 联机 TCP 公网地址
-```
+## 贡献
 
-3. 启动：
+提交功能前请先阅读[文档入口](./docs/README.md)和[验证工作流](./docs/development/verification-workflow.md)。新端点应以 CN 1.8.1 反编译代码和实际协议为依据，并同步更新端点状态或对应系统文档。
 
-```bash
-bash scripts/start-cn.sh
-```
+联机 NPC 昵称欢迎通过 PR 贡献。只需向 [`assets/server/npc_contributor_names.json`](./assets/server/npc_contributor_names.json) 添加昵称，不要提交 `playerId`；格式规则见[NPC 昵称贡献说明](./docs/systems/npc-contributor-names.md)。
 
-### 两种部署方式 `.env` 对比
+## 相关项目
 
-| 配置项 | 局域网 | 公网 |
-|--------|--------|------|
-| `CN_LISTEN_HOST` | `0.0.0.0` / LAN IP | `127.0.0.1` |
-| `CDN_BASE_URL` | `http://<LAN_IP>:8001/patch/cn` | `https://<域名>/patch/cn` |
-| `SESSION_HOST` | `0.0.0.0` | `127.0.0.1` |
-| `SESSION_PUBLIC_HOST` | 不设 | 公网域名 |
-| 前置层 | 无 | nginx + SSL + 防火墙 |
+- [Duosion/starpoint](https://github.com/Duosion/starpoint)：全球服服务端基础
+- [wdfp-extractor](https://github.com/ScripterSugar/wdfp-extractor)：资源提取
+- [wfax](https://github.com/blead/wfax)：资源转换与修改
+- [starview](https://github.com/duosii/starview)：APK 补丁工具
 
-### `.env` 加载说明
-
-- `npm run start:cn`、`npm run dev:cn` 与 `bash scripts/start-cn.sh` 通过 bootstrap 加载可选 `.env`；文件不存在时沿用当前环境。
-- `npm run debug:cn` 保留现有 ts-node-dev 热重载与 `--env-file=.env` 语义，不经过 bootstrap，也不会自动执行内容同步。
-
-### 启动入口边界
-
-受支持入口会先完成 `content:sync` normal，只有同步成功才启动游戏服务。`scripts/start-cn.sh` 在前台依次执行 `build:server` 和 bootstrap，不执行 `pkill`、不创建 `nohup` 后台进程，也不写固定日志文件；需要后台运行时由调用者或进程管理器托管该前台命令并收集标准输出和标准错误。
-
-`node out/cn-server.js` 是低级调试入口，不会自动同步；直接使用前必须自行确认当前内容 Release 已准备并激活。
-
-Content Sync 的 fallback、`check`/`force`、Release 布局、真实 CDN smoke 和错误回退步骤见 [`docs/cdn/content-sync.md`](./docs/cdn/content-sync.md)。
-
-## 关键配置(.env)
-
-- `CN_LISTEN_HOST` / `CN_LISTEN_PORT` — HTTP 绑定地址 + 联机 TCP 房间显示 IP;客户端在别的设备时设为你的 LAN IP(默认端口 8001)。
-- `CDN_BASE_URL` — `http://<你的LAN_IP>:<端口>/patch/cn`。
-- `DATA_DIR` — 数据库、Content Store、激活状态和 Asset Provider 可变数据根；默认 `.database`。
-- `DROP_MULTIPLIER` / `NPC_*` — 测试与联机调参。
-
-为 Android Launcher、桌面托管器或容器 Supervisor 打包时，遵循 [`docs/embedded-runtime-contract.md`](./docs/embedded-runtime-contract.md)。
-
-## 客户端改造(最小功能)
-
-连接本服务需对官方 APK 打两处改动(免登录 + 重定向到本服),详见 [`client-patch/`](./client-patch/README.md):
-
-- **免登录** — `pinball/config/core/DevConfig.as`:`sdkDummy = false` → `true`
-- **重定向到本服** — `pinball/config/gbits/DevConfig_gf_android.as`:域名 → 你的服务器,`"https"` → `"http"`
-
-用 FFDec 导出 APK 的 AS3 后执行:
-
-```bash
-bash client-patch/apply.sh <AS3_导出目录> <你的LAN_IP>:8001
-```
-
-再用 FFDec 回封、重打包签名。完整 APK / 反编译说明见本地环境文档 `docs/setup/`。
-
-## Web 管理面板(`http://<CN_LISTEN_HOST>:<端口>/`)
-
-- 新版 React 管理后台：`/admin/`（持续开发和验收中）
-- 兼容旧后台：`/` 时间设置 · `/player` 账号·存档·玩家 · `/player/:id` 玩家详情 · `/mail` 群发邮件
-
-> 面板对写入端点做**结构安全校验**(拒绝未知字段 / 类型错误 / 超 2³¹ 的非法值并明确报错),但不限制游戏平衡数值;重要操作仍建议先用「下载 JSON」导出备份。
-> 若误发非法邮件导致客户端在邮件界面崩溃,可用玩家详情页的**清空邮件箱**恢复。
-
-## FAQ
-
-- `H404` = 该功能 / 端点尚未实现。
-
-## 贡献联机 NPC 昵称
-
-贡献者只需要向 [`assets/server/npc_contributor_names.json`](./assets/server/npc_contributor_names.json) 的 `names` 数组增加昵称，不需要也不得提交 `playerId`。格式校验、长度限制和本地检查命令见 [`docs/systems/npc-contributor-names.md`](./docs/systems/npc-contributor-names.md)。
-
-## 致谢 / 相关项目
-
-- [wdfp-extractor](https://github.com/ScripterSugar/wdfp-extractor) — 资源提取
-- [wfax](https://github.com/blead/wfax) — 资源转换 / 修改
-- 上游 [Duosion/starpoint](https://github.com/Duosion/starpoint) — 全球服模拟器基础
-- [starview](https://github.com/duosii/starview) — APK 打补丁工具(基础;本仓库最小补丁见 [`client-patch/`](./client-patch/README.md))
-- [wf-2.1.125-cn-decompiled](https://github.com/dennis96292/wf-2.1.125-cn-decompiled) — CN 客户端反编译参考
+本项目采用 [GPL-3.0](./LICENSE) 许可证。
