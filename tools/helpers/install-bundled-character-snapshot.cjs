@@ -12,11 +12,15 @@ const {
 } = require("../../src/content/runtime/content-snapshot")
 
 const CHARACTER_TABLE_NAME = "character.json"
+const CHARACTER_CONTENT_TABLE_NAME = "cdndata/character.json"
 
 function installBundledCharacterSnapshot({ onRestore } = {}) {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     const characterTable = deepFreeze(structuredClone(
         require(path.join(projectRoot, "assets", CHARACTER_TABLE_NAME))
+    ))
+    const characterContentTable = deepFreeze(structuredClone(
+        require(path.join(projectRoot, "assets", CHARACTER_CONTENT_TABLE_NAME))
     ))
     const repositoryInfo = deepFreeze({
         source: "bundled",
@@ -27,10 +31,9 @@ function installBundledCharacterSnapshot({ onRestore } = {}) {
     const repository = deepFreeze({
         info: () => repositoryInfo,
         table(tableName) {
-            if (tableName !== CHARACTER_TABLE_NAME) {
-                throw new Error(`unexpected character table ${tableName}`)
-            }
-            return characterTable
+            if (tableName === CHARACTER_TABLE_NAME) return characterTable
+            if (tableName === CHARACTER_CONTENT_TABLE_NAME) return characterContentTable
+            throw new Error(`unexpected character table ${tableName}`)
         },
     })
 
