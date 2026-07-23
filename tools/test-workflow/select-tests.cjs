@@ -80,6 +80,10 @@ const SOURCE_RULES = [
         pattern: /^src\/lib\/mission\/awake-unlock\.ts$/,
         groups: ["integration:mission", "integration:mission-compiled"],
     },
+    {
+        pattern: /^(?:assets\/server\/npc_contributor_names\.json|tools\/npc_contributor_names(?:\.test)?\.cjs)$/,
+        groups: ["quick:protocol"],
+    },
     { pattern: /^src\/multi\//, groups: ["quick:protocol"] },
     { pattern: /^src\/multi\/tcp\/server\.ts$/, groups: ["integration:runtime"] },
     { pattern: /^src\/data\//, groups: ["integration:database", "full"] },

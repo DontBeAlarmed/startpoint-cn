@@ -50,6 +50,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/lobby_lifecycle.test.cjs",
             "tools/msgpack_compat.test.cjs",
             "tools/multi_player_context.test.cjs",
+            "tools/npc_contributor_names.test.cjs",
             "tools/room_cleanup_lifecycle.test.cjs",
             "tools/session_server_lifecycle.test.cjs",
         ],

@@ -12,6 +12,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate contributor NPC nicknames
+        run: node tools/npc_contributor_names.cjs
+
+      - name: Test contributor NPC nickname validator
+        run: node --test tools/npc_contributor_names.test.cjs
+
       - name: Hygiene scan (no personal IP / home path / personal email / .env / large binary)
         run: bash scripts/check-hygiene.sh --all
 

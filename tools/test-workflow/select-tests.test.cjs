@@ -84,6 +84,18 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/multi/tcp/server.ts"]),
         ["integration:runtime", "quick:protocol"],
     )
+    assert.deepEqual(
+        selectTestGroups(["assets/server/npc_contributor_names.json"]),
+        ["quick:protocol"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/npc_contributor_names.cjs"]),
+        ["quick:protocol"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/npc_contributor_names.test.cjs"]),
+        ["quick:protocol"],
+    )
     assert.deepEqual(selectTestGroups(["admin/src/App.tsx"]), ["admin"])
 })
 
@@ -433,6 +445,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/lobby_lifecycle.test.cjs",
         "tools/msgpack_compat.test.cjs",
         "tools/multi_player_context.test.cjs",
+        "tools/npc_contributor_names.test.cjs",
         "tools/room_cleanup_lifecycle.test.cjs",
         "tools/session_server_lifecycle.test.cjs",
     ])
