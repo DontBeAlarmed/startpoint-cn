@@ -18,6 +18,7 @@ function createFixture({
     stamina = 40,
     failDuringWrite = false,
     failDuringCommit = false,
+    failDuringAfterPersist = false,
 } = {}) {
     let databaseState = {
         itemCount,
@@ -87,6 +88,11 @@ function createFixture({
         },
         persistActiveQuest,
         publishActiveQuest,
+        afterPersist() {
+            assert.equal(transactionActive, true)
+            writes.push("afterPersist")
+            if (failDuringAfterPersist) throw new Error("simulated mission settlement failure")
+        },
         // Compatibility path proving the old implementation publishes before commit.
         insertActiveQuest(playerId, activeQuest) {
             persistActiveQuest(playerId, activeQuest)
@@ -104,6 +110,19 @@ function createFixture({
         getTransactionCount: () => transactionCount,
         writes,
     }
+}
+
+{
+    const fixture = createFixture({ failDuringAfterPersist: true })
+    assert.throws(
+        () => runStartEntryTransaction(createInput(), fixture.dependencies),
+        /simulated mission settlement failure/,
+    )
+    assert.equal(fixture.getState().itemCount, 4)
+    assert.equal(fixture.getState().player.stamina, 40)
+    assert.equal(fixture.getState().activeQuest, null)
+    assert.equal(fixture.getState().publishedActiveQuest, null)
+    assert.deepEqual(fixture.writes, ["item", "player", "dbActiveQuest", "afterPersist"])
 }
 
 function createInput() {
@@ -147,7 +166,7 @@ function createInput() {
     assert.equal(fixture.getState().player.partySlot, 1)
     assert.equal(fixture.getState().activeQuest, null)
     assert.equal(fixture.getState().publishedActiveQuest, null)
-    assert.deepEqual(fixture.writes, ["item", "player", "dbActiveQuest"])
+    assert.deepEqual(fixture.writes, ["item", "player", "dbActiveQuest", "afterPersist"])
 }
 
 {
@@ -209,7 +228,7 @@ function createInput() {
     assert.equal(fixture.getState().publishedActiveQuest.playId, "treasure-play-1")
     assert.deepEqual(
         fixture.writes,
-        Array(4).fill(["item", "player", "dbActiveQuest", "publishActiveQuest"]).flat(),
+        Array(4).fill(["item", "player", "dbActiveQuest", "afterPersist", "publishActiveQuest"]).flat(),
     )
 
     assert.throws(

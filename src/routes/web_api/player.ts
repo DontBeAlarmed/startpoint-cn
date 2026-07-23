@@ -11,7 +11,7 @@ import { getPlayerItemsSync, setPlayerItemSync, updatePlayerItemSync } from "../
 import { getPlayerQuestProgressSync, getPlayerDrawnQuestsSync } from "../../data/domains/quest"
 import { insertPlayerPartyGroupListSync } from "../../data/domains/party"
 import { PartyCategory } from "../../data/types";
-import { takeSnapshot } from "../../lib/mission/snapshot";
+import { buildPeriodicSnapshotData, takeSnapshot } from "../../lib/mission/snapshot";
 import { deletePlayerCategoryMissionsSync } from "../../data/domains/mission";
 import { getServerDate } from "../../utils";
 import dailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
@@ -443,17 +443,14 @@ const routes = async (fastify: FastifyInstance) => {
                 for (const qp of quests) {
                     if (qp.finished) {
                         totalClears++
-                        if (qp.clearRank === 6) ss++
-                        else if (qp.clearRank === 5) s++
-                        else if (qp.clearRank === 4) a++
-                        else if (qp.clearRank === 3) b++
+                        if (qp.clearRank === 5) ss++
+                        else if (qp.clearRank === 4) s++
+                        else if (qp.clearRank === 3) a++
+                        else if (qp.clearRank === 2) b++
                     }
                 }
             }
-            takeSnapshot(playerId, 'daily', {
-                questClears: totalClears, staminaUsed: player.totalStaminaUsed,
-                rankSs: ss, rankS: s, rankA: a, rankB: b,
-            })
+            takeSnapshot(playerId, 'daily', buildPeriodicSnapshotData(playerId, player, totalClears))
             deletePlayerCategoryMissionsSync(playerId, 2)
             return reply.status(200).send({ ok: true })
         } catch (e: any) { return reply.status(500).send({ error: e.message }) }
@@ -472,17 +469,14 @@ const routes = async (fastify: FastifyInstance) => {
                 for (const qp of quests) {
                     if (qp.finished) {
                         totalClears++
-                        if (qp.clearRank === 6) ss++
-                        else if (qp.clearRank === 5) s++
-                        else if (qp.clearRank === 4) a++
-                        else if (qp.clearRank === 3) b++
+                        if (qp.clearRank === 5) ss++
+                        else if (qp.clearRank === 4) s++
+                        else if (qp.clearRank === 3) a++
+                        else if (qp.clearRank === 2) b++
                     }
                 }
             }
-            takeSnapshot(playerId, 'weekly', {
-                questClears: totalClears, staminaUsed: player.totalStaminaUsed,
-                rankSs: ss, rankS: s, rankA: a, rankB: b,
-            })
+            takeSnapshot(playerId, 'weekly', buildPeriodicSnapshotData(playerId, player, totalClears))
             deletePlayerCategoryMissionsSync(playerId, 10)
             return reply.status(200).send({ ok: true })
         } catch (e: any) { return reply.status(500).send({ error: e.message }) }

@@ -98,10 +98,10 @@ function buildAwakeContext(playerId: number): AwakeContext {
             if (qp.finished) {
                 totalQuestClears++
                 if (section === '3') totalStories++
-                if (qp.clearRank === 6) ssClears++
-                else if (qp.clearRank === 5) sClears++
-                else if (qp.clearRank === 4) aClears++
-                else if (qp.clearRank === 3) bClears++
+                if (qp.clearRank === 5) ssClears++
+                else if (qp.clearRank === 4) sClears++
+                else if (qp.clearRank === 3) aClears++
+                else if (qp.clearRank === 2) bClears++
             }
         }
         questProgress[section] = list
@@ -136,6 +136,7 @@ function buildAwakeContext(playerId: number): AwakeContext {
     }
 
     return {
+        category: 9,
         playerId, player, questProgress,
         totalQuestClears, totalStories,
         rankCounts: { rank_ss: ssClears, rank_s: sClears, rank_a: aClears, rank_b: bClears },

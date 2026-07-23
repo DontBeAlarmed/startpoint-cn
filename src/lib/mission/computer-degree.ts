@@ -23,9 +23,10 @@ export function getTargetDegree(missionId: number): number | undefined {
     return degreeTargetMap[missionId]
 }
 
-function buildStats(playerId: number): CategoryContext {
+function buildStats(playerId: number, category: number): CategoryContext {
     const player = getPlayerSync(playerId)!
     return {
+        category,
         playerId,
         player,
         questProgress: {},
@@ -38,8 +39,8 @@ function buildStats(playerId: number): CategoryContext {
 export const DegreeComputer: MissionComputer = {
     name: "Degree",
 
-    buildContext(playerId: number, _category: number): CategoryContext {
-        return buildStats(playerId)
+    buildContext(playerId: number, category: number): CategoryContext {
+        return buildStats(playerId, category)
     },
 
     compute(missionId: number, ctx: CategoryContext, dbProgress: number): number {

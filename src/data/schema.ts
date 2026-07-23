@@ -101,6 +101,51 @@ const schemaColumns = {
         column: "before_battle_power",
         definition: "INTEGER NOT NULL DEFAULT 0",
     },
+    "players_periodic_snapshots.single_play_count": {
+        table: "players_periodic_snapshots",
+        column: "single_play_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_periodic_snapshots.single_clear_count": {
+        table: "players_periodic_snapshots",
+        column: "single_clear_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_periodic_snapshots.multi_play_count": {
+        table: "players_periodic_snapshots",
+        column: "multi_play_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_periodic_snapshots.multi_clear_count": {
+        table: "players_periodic_snapshots",
+        column: "multi_clear_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_periodic_snapshots.multi_host_clear_count": {
+        table: "players_periodic_snapshots",
+        column: "multi_host_clear_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_periodic_snapshots.multi_guest_clear_count": {
+        table: "players_periodic_snapshots",
+        column: "multi_guest_clear_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_periodic_snapshots.dash_count": {
+        table: "players_periodic_snapshots",
+        column: "dash_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_periodic_snapshots.power_flip_count": {
+        table: "players_periodic_snapshots",
+        column: "power_flip_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_periodic_snapshots.login_days": {
+        table: "players_periodic_snapshots",
+        column: "login_days",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
 } as const;
 
 export type SchemaColumnKey = keyof typeof schemaColumns;

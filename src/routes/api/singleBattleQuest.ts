@@ -3,6 +3,7 @@ import { deletePlayerActiveQuestSync, updatePlayerActiveQuestContinueCountSync }
 import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerRushEventSync } from "../../data/domains/rushEvent"
 import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
 import { getPlayerItemSync, givePlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
+import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync } from "../../data/domains/quest"
 import { getSession } from "../../data/domains/session"
 import { incrementPlayerCharacterClearSync } from "../../data/domains/character_clear"
@@ -43,7 +44,12 @@ import scoreAttackBorderRewards from "../../../assets/score_attack_border_reward
 import eventChallengePointMap from "../../../assets/event_challenge_point_map.json";
 
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
-import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import {
+    mergeMissionSettlementResponse,
+    reconcileAwakeUnlockCharacterList,
+    settleMissionCategories,
+} from "../../lib/mission";
+import type { MissionSettlementResult } from "../../lib/mission";
 import { getCarnivalRewardDefinitions, grantCarnivalRewards } from "../../lib/carnival-rewards";
 import { givePlayerDegreeSync } from "../../data/domains/degree";
 import { givePlayerEquipmentSync } from "../../lib/equipment";
@@ -420,6 +426,11 @@ const routes = async (fastify: FastifyInstance) => {
                 })
                 : null
             const scoreAttackRewardResult = scoreAttackFinishResult?.rewardResult
+            const missionSettlement = settleMissionCategories(
+                playerId,
+                [1, 2, 10],
+                new Date(getServerTime() * 1000),
+            )
             const itemList = {
                 ...(activeQuestData.entryItemId ? { [activeQuestData.entryItemId]: getPlayerItemSync(playerId, activeQuestData.entryItemId) ?? 0 } : {}),
                 ...scoreRewardsResult.items,
@@ -454,6 +465,7 @@ const routes = async (fastify: FastifyInstance) => {
                 characterList,
                 clearReward,
                 sPlusClearReward,
+                missionSettlement,
             }
         }
 
@@ -475,15 +487,14 @@ const routes = async (fastify: FastifyInstance) => {
             characterList,
             clearReward,
             sPlusClearReward,
+            missionSettlement,
         } = finishWrites
         delete activeQuests[playerId]
         const scoreAttackEventData = scoreAttackFinishResult?.scoreAttackEvent ?? null
 
         const dataHeaders = generateDataHeaders({ viewer_id: viewerId })
         reply.header("content-type", "application/x-msgpack")
-        return reply.status(200).send({
-            "data_headers": dataHeaders,
-            "data": {
+        const responseData: Record<string, any> = {
                 "user_info": {
                     "free_mana": newMana + (clearReward?.user_info.free_mana || 0) + (sPlusClearReward?.user_info.free_mana || 0) + scoreRewardsResult.user_info.free_mana + (scoreAttackRewardResult?.user_info.free_mana ?? 0) + (carnivalRewardResult?.user_info.free_mana ?? 0),
                     "exp_pool": rewardCharacterExpResult.exp_pool + (clearReward?.user_info.exp_pool || 0) + scoreRewardsResult.user_info.exp_pool + (scoreAttackRewardResult?.user_info.exp_pool ?? 0) + (carnivalRewardResult?.user_info.exp_pool ?? 0),
@@ -538,7 +549,12 @@ const routes = async (fastify: FastifyInstance) => {
                 "score_attack_event": scoreAttackEventData,
                 "user_daily_challenge_point_list": dailyChallengePointList ?? [],
                 "presigned_quest_category": []
-            }
+        }
+        mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)
+        responseData.mail_arrived = getPlayerMailCountSync(playerId, true) > 0
+        return reply.status(200).send({
+            "data_headers": dataHeaders,
+            "data": responseData,
         })
 
     })
@@ -629,6 +645,7 @@ const routes = async (fastify: FastifyInstance) => {
         }
         const startTime = new Date()
         let startResult
+        let missionSettlement: MissionSettlementResult | undefined
         try {
             startResult = runStartEntryTransaction({
                 playerId,
@@ -646,6 +663,13 @@ const routes = async (fastify: FastifyInstance) => {
                 updateItemCount: updatePlayerItemSync,
                 updatePlayer: updatePlayerSync,
                 persistActiveQuest,
+                afterPersist: () => {
+                    missionSettlement = settleMissionCategories(
+                        playerId,
+                        [1, 2, 10],
+                        new Date(getServerTime() * 1000),
+                    )
+                },
                 publishActiveQuest,
             })
         } catch (error) {
@@ -667,9 +691,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         reply.header("content-type", "application/x-msgpack")
-        return reply.status(200).send({
-            "data_headers": dataHeaders,
-            "data": {
+        const responseData: Record<string, any> = {
                 "user_info": {
                     "last_main_quest_id": body.quest_id,
                     "stamina": startResult.afterStamina,
@@ -680,7 +702,14 @@ const routes = async (fastify: FastifyInstance) => {
                 "is_multi": "single",
                 "start_time": dataHeaders['servertime'],
                 "quest_name": ""
-            }
+        }
+        if (missionSettlement) {
+            mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)
+        }
+        responseData.mail_arrived = getPlayerMailCountSync(playerId, true) > 0
+        return reply.status(200).send({
+            "data_headers": dataHeaders,
+            "data": responseData,
         })
     })
 

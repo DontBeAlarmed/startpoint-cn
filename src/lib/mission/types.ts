@@ -2,6 +2,7 @@
 
 import type { Player, PlayerCharacter, RawPlayerQuestProgress } from "../../data/types"
 import type { SnapshotData } from "./snapshot"
+import type { MissionBattleCounters } from "../../data/domains/mission_battle_facts"
 
 export interface PlayerQuestProgressEntry {
     questId: number
@@ -14,12 +15,14 @@ export interface PlayerQuestProgressEntry {
 
 /** Per-category pre-computed context — built once, read many times */
 export interface CategoryContext {
+    category: number
     playerId: number
     player: Player
     questProgress: Record<string, PlayerQuestProgressEntry[]>
     totalQuestClears: number
     totalStories: number
     rankCounts: Record<string, number>
+    battleCounters?: MissionBattleCounters
     snapshot?: SnapshotData | null
 }
 

@@ -27,9 +27,14 @@ import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync
 import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/stamina";
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import { getDb } from "../../data/db";
+import { getPlayerMailCountSync } from "../../data/domains/mail";
 import { recordMissionBattleFacts } from "../../lib/mission/battle-facts";
 import type { FinishContext } from "../../lib/quest/finish/types";
-import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import {
+    mergeMissionSettlementResponse,
+    reconcileAwakeUnlockCharacterList,
+    settleMissionCategories,
+} from "../../lib/mission";
 import { resolveHostFinished, resolveIsRoomHost } from "../../lib/quest/host-finish";
 import { resolveMultiPlayerContext } from "../player-context";
 
@@ -233,6 +238,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             questPreviouslyCompleted,
             questProgress,
             isMulti: true,
+            isMultiHost: isRoomHost,
         }
 
         const executeFinishWrites = () => {
@@ -295,6 +301,11 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 playerId, partyCharacterIdsArray, questData.characterExpReward || 0,
                 questData.fixedParty !== undefined
             );
+            const missionSettlement = settleMissionCategories(
+                playerId,
+                [1, 2, 10],
+                new Date(getServerTime() * 1000),
+            );
             const characterList = reconcileAwakeUnlockCharacterList(playerId, [
                 ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
                 ...((clearReward?.character_list || []) as Record<string, unknown>[]),
@@ -310,6 +321,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 rewardCharacterExpResult,
                 scoreRewardsResult,
                 sPlusClearReward,
+                missionSettlement,
             }
         }
         const {
@@ -319,6 +331,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             rewardCharacterExpResult,
             scoreRewardsResult,
             sPlusClearReward,
+            missionSettlement,
         } = getDb().transaction(executeFinishWrites)()
 
         delete activeQuests[playerId];
@@ -335,9 +348,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         const followInfo = await buildFinishFollowInfo(viewerId, matePlayerResult, activeQuestData.matePlayerIds || []);
 
         reply.header("content-type", "application/x-msgpack");
-        return reply.status(200).send({
-            "data_headers": dataHeaders,
-            "data": {
+        const responseData: Record<string, any> = {
                 "user_info": {
                     "free_mana": newMana + (clearReward?.user_info.free_mana || 0) + (sPlusClearReward?.user_info.free_mana || 0) + scoreRewardsResult.user_info.free_mana,
                     "exp_pool": rewardCharacterExpResult.exp_pool + (clearReward?.user_info.exp_pool || 0) + scoreRewardsResult.user_info.exp_pool,
@@ -388,7 +399,12 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 "contribution_score": (body as any).contribution_score ?? 0,
                 "host_finished": hostFinished,
                 "aborted_play_id": null,
-            }
+        };
+        mergeMissionSettlementResponse(responseData, missionSettlement, viewerId);
+        responseData.mail_arrived = getPlayerMailCountSync(playerId, true) > 0;
+        return reply.status(200).send({
+            "data_headers": dataHeaders,
+            "data": responseData,
         });
     });
 

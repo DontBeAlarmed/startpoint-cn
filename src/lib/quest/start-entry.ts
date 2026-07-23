@@ -31,6 +31,7 @@ export interface StartEntryDependencies<TActiveQuest> {
     updateItemCount(playerId: number, itemId: number, amount: number): void
     updatePlayer(update: Partial<StartEntryPlayer> & Pick<StartEntryPlayer, "id">): void
     persistActiveQuest(playerId: number, activeQuest: TActiveQuest): void
+    afterPersist?(playerId: number): void
     publishActiveQuest(playerId: number, activeQuest: TActiveQuest): void
 }
 
@@ -125,6 +126,7 @@ export function runStartEntryTransaction<TActiveQuest>(
         if (Object.keys(playerUpdate).length > 1) dependencies.updatePlayer(playerUpdate)
 
         dependencies.persistActiveQuest(input.playerId, input.activeQuest)
+        dependencies.afterPersist?.(input.playerId)
 
         return {
             afterStamina,

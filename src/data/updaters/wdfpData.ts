@@ -157,4 +157,94 @@ export function updateAfterInit(
             }
         })()
     }
+
+    if (4 >= currentVersion) {
+        const hasPeriodicSnapshots = database.prepare(`
+            SELECT 1 FROM sqlite_master
+            WHERE type = 'table' AND name = 'players_periodic_snapshots'
+        `).get()
+        if (!hasPeriodicSnapshots) return
+
+        database.prepare(`
+            INSERT OR IGNORE INTO players_periodic_snapshots (
+                player_id, period_type, quest_clears, stamina_used,
+                rank_ss, rank_s, rank_a, rank_b,
+                single_play_count, single_clear_count,
+                multi_play_count, multi_clear_count,
+                multi_host_clear_count, multi_guest_clear_count,
+                dash_count, power_flip_count, login_days, updated_at
+            )
+            SELECT player.id, period.period_type,
+                   0, player.total_stamina_used,
+                   COALESCE(counter.rank_ss_count, 0), COALESCE(counter.rank_s_count, 0),
+                   COALESCE(counter.rank_a_count, 0), COALESCE(counter.rank_b_count, 0),
+                   COALESCE(counter.single_play_count, 0), COALESCE(counter.single_clear_count, 0),
+                   COALESCE(counter.multi_play_count, 0), COALESCE(counter.multi_clear_count, 0),
+                   COALESCE(counter.multi_host_clear_count, 0), COALESCE(counter.multi_guest_clear_count, 0),
+                   player.total_dashes, player.total_powerflips, player.total_login_days,
+                   datetime('now')
+            FROM players AS player
+            CROSS JOIN (
+                SELECT 'daily' AS period_type
+                UNION ALL SELECT 'weekly'
+            ) AS period
+            LEFT JOIN players_mission_battle_counters AS counter
+              ON counter.player_id = player.id
+        `).run()
+        database.prepare(`
+            UPDATE players_periodic_snapshots
+            SET single_play_count = COALESCE((
+                    SELECT single_play_count FROM players_mission_battle_counters
+                    WHERE player_id = players_periodic_snapshots.player_id
+                ), 0),
+                single_clear_count = COALESCE((
+                    SELECT single_clear_count FROM players_mission_battle_counters
+                    WHERE player_id = players_periodic_snapshots.player_id
+                ), 0),
+                multi_play_count = COALESCE((
+                    SELECT multi_play_count FROM players_mission_battle_counters
+                    WHERE player_id = players_periodic_snapshots.player_id
+                ), 0),
+                multi_clear_count = COALESCE((
+                    SELECT multi_clear_count FROM players_mission_battle_counters
+                    WHERE player_id = players_periodic_snapshots.player_id
+                ), 0),
+                multi_host_clear_count = COALESCE((
+                    SELECT multi_host_clear_count FROM players_mission_battle_counters
+                    WHERE player_id = players_periodic_snapshots.player_id
+                ), 0),
+                multi_guest_clear_count = COALESCE((
+                    SELECT multi_guest_clear_count FROM players_mission_battle_counters
+                    WHERE player_id = players_periodic_snapshots.player_id
+                ), 0),
+                dash_count = COALESCE((
+                    SELECT total_dashes FROM players
+                    WHERE id = players_periodic_snapshots.player_id
+                ), 0),
+                power_flip_count = COALESCE((
+                    SELECT total_powerflips FROM players
+                    WHERE id = players_periodic_snapshots.player_id
+                ), 0),
+                login_days = COALESCE((
+                    SELECT total_login_days FROM players
+                    WHERE id = players_periodic_snapshots.player_id
+                ), 0),
+                rank_ss = COALESCE((
+                    SELECT rank_ss_count FROM players_mission_battle_counters
+                    WHERE player_id = players_periodic_snapshots.player_id
+                ), 0),
+                rank_s = COALESCE((
+                    SELECT rank_s_count FROM players_mission_battle_counters
+                    WHERE player_id = players_periodic_snapshots.player_id
+                ), 0),
+                rank_a = COALESCE((
+                    SELECT rank_a_count FROM players_mission_battle_counters
+                    WHERE player_id = players_periodic_snapshots.player_id
+                ), 0),
+                rank_b = COALESCE((
+                    SELECT rank_b_count FROM players_mission_battle_counters
+                    WHERE player_id = players_periodic_snapshots.player_id
+                ), 0)
+        `).run()
+    }
 }

@@ -134,7 +134,7 @@ test("builds a canonical reproducible thin server bundle with stable file metada
             minDataSchema: 0,
             node: ">=20.12.0",
             runtimeApi: 1,
-            targetDataSchema: 4,
+            targetDataSchema: 5,
         },
         schemaVersion: 2,
         serverVersion: "1.0.1",
@@ -422,12 +422,13 @@ test("verifier enforces runtime, Node, data schema, entry, and admin compatibili
         const fixture = buildFixture(t)
         assert.doesNotThrow(() => verifyServerBundle({ bundleRoot: fixture.outputRoot, dataSchema: 0 }))
         assert.doesNotThrow(() => verifyServerBundle({ bundleRoot: fixture.outputRoot, dataSchema: 4 }))
+        assert.doesNotThrow(() => verifyServerBundle({ bundleRoot: fixture.outputRoot, dataSchema: 5 }))
         assert.throws(
             () => verifyServerBundle({ bundleRoot: fixture.outputRoot, dataSchema: -1 }),
             /data schema/i,
         )
         assert.throws(
-            () => verifyServerBundle({ bundleRoot: fixture.outputRoot, dataSchema: 5 }),
+            () => verifyServerBundle({ bundleRoot: fixture.outputRoot, dataSchema: 6 }),
             /data schema/i,
         )
         rewriteManifest(fixture.outputRoot, manifest => { manifest.requires.minDataSchema = 2 })

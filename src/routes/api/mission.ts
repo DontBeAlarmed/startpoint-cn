@@ -5,8 +5,9 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerCategoryMissionsSync, incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
+import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { getComputer, getMissionIdsByCategory, getCurrentStage, getCharacterIdFromMission, isMissionEnabledAt, reconcileAwakeUnlockCharacterList, settleAwakeMissionRewards } from "../../lib/mission/index";
+import { getComputer, getMissionIdsByCategory, getCurrentStage, getCharacterIdFromMission, isMissionEnabledAt, mergeMissionSettlementResponse, reconcileAwakeUnlockCharacterList, settleAwakeMissionRewards, settleMissionCategories } from "../../lib/mission/index";
 import { resolveClientProgressTargets } from "../../lib/mission/client-progress";
 import type { AwakeMissionComputedProgress, AwakeMissionInfo } from "../../lib/mission/index";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -70,8 +71,12 @@ const routes = async (fastify: FastifyInstance) => {
 
         const requestList = body.category_list || [{ category: 1 }]
         const requestCategories = requestList.map(c => c.category)
-        const missionProgressList: any[] = []
         const evaluationTime = new Date(getServerTime() * 1000)
+        const automaticCategories = requestCategories.filter(category => [1, 2, 10].includes(category))
+        const automaticSettlement = automaticCategories.length > 0
+            ? settleMissionCategories(playerId, automaticCategories, evaluationTime)
+            : null
+        const missionProgressList: any[] = []
         const categoryMissionCache = new Map<number, ReturnType<typeof getPlayerCategoryMissionsSync>>()
         const awakeProgressByCharacter = new Map<string, AwakeMissionComputedProgress[]>()
 
@@ -142,9 +147,16 @@ const routes = async (fastify: FastifyInstance) => {
             character_list: characterList,
             equipment_list: equipmentList,
             degree_list: degreeIds.map(degreeId => ({ viewer_id: viewerId, degree_id: degreeId })),
-            mail_arrived: false,
         }
         if (userInfo) responseData.user_info = userInfo
+        if (automaticSettlement) {
+            mergeMissionSettlementResponse(
+                responseData,
+                automaticSettlement,
+                viewerId,
+            )
+        }
+        responseData.mail_arrived = getPlayerMailCountSync(playerId, true) > 0
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -204,7 +216,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "mission_info": [],
                 "degree_list": [],
                 character_list: characterList,
-                "mail_arrived": false
+                "mail_arrived": getPlayerMailCountSync(playerId, true) > 0
             }
         })
     })

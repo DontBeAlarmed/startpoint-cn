@@ -139,8 +139,42 @@ export default function init(
         rank_s INTEGER NOT NULL DEFAULT 0,
         rank_a INTEGER NOT NULL DEFAULT 0,
         rank_b INTEGER NOT NULL DEFAULT 0,
+        single_play_count INTEGER NOT NULL DEFAULT 0,
+        single_clear_count INTEGER NOT NULL DEFAULT 0,
+        multi_play_count INTEGER NOT NULL DEFAULT 0,
+        multi_clear_count INTEGER NOT NULL DEFAULT 0,
+        multi_host_clear_count INTEGER NOT NULL DEFAULT 0,
+        multi_guest_clear_count INTEGER NOT NULL DEFAULT 0,
+        dash_count INTEGER NOT NULL DEFAULT 0,
+        power_flip_count INTEGER NOT NULL DEFAULT 0,
+        login_days INTEGER NOT NULL DEFAULT 0,
         updated_at TEXT NOT NULL,
         PRIMARY KEY (player_id, period_type),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run();
+
+    ensureSchemaColumn(database, "players_periodic_snapshots.single_play_count")
+    ensureSchemaColumn(database, "players_periodic_snapshots.single_clear_count")
+    ensureSchemaColumn(database, "players_periodic_snapshots.multi_play_count")
+    ensureSchemaColumn(database, "players_periodic_snapshots.multi_clear_count")
+    ensureSchemaColumn(database, "players_periodic_snapshots.multi_host_clear_count")
+    ensureSchemaColumn(database, "players_periodic_snapshots.multi_guest_clear_count")
+    ensureSchemaColumn(database, "players_periodic_snapshots.dash_count")
+    ensureSchemaColumn(database, "players_periodic_snapshots.power_flip_count")
+    ensureSchemaColumn(database, "players_periodic_snapshots.login_days")
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_mission_battle_counters (
+        player_id INTEGER PRIMARY KEY,
+        single_play_count INTEGER NOT NULL DEFAULT 0,
+        single_clear_count INTEGER NOT NULL DEFAULT 0,
+        multi_play_count INTEGER NOT NULL DEFAULT 0,
+        multi_clear_count INTEGER NOT NULL DEFAULT 0,
+        multi_host_clear_count INTEGER NOT NULL DEFAULT 0,
+        multi_guest_clear_count INTEGER NOT NULL DEFAULT 0,
+        rank_ss_count INTEGER NOT NULL DEFAULT 0,
+        rank_s_count INTEGER NOT NULL DEFAULT 0,
+        rank_a_count INTEGER NOT NULL DEFAULT 0,
+        rank_b_count INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 

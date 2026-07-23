@@ -4,6 +4,7 @@ import { getPlayerActiveMissionsSync, updatePlayerActiveMissionStageSync } from 
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
+import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { reconcileAwakeUnlockCharacterList, validateMissionRewardClaims } from "../../lib/mission/index";
@@ -90,7 +91,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "equipment_list": granter.equipmentList,
                 "item_list": granter.itemList,
                 "degree_list": granter.degreeList.map(degreeId => ({ viewer_id: viewerId, degree_id: degreeId })),
-                "mail_arrived": false
+                "mail_arrived": getPlayerMailCountSync(playerId, true) > 0
             }
         })
     })

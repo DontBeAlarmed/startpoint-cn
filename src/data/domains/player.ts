@@ -5,7 +5,7 @@ import { getDefaultPlayerData, deserializeBoolean, serializeBoolean } from "../u
 import { getAccountSync } from "./account";
 import { getPlayerQuestProgressSync } from "./quest";
 import { isNewDay, isNewWeek } from "../../lib/time-utils";
-import { takeSnapshot } from "../../lib/mission/snapshot";
+import { buildPeriodicSnapshotData, initializePeriodicMissionSnapshots, takeSnapshot } from "../../lib/mission/snapshot";
 import dailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 
 type DailyChallengePointLookup = Record<string, { maxPoint: number, isRecovery: boolean, name: string }>
@@ -502,6 +502,7 @@ export function insertMergedPlayerDataSync(
     if (rushEventPlayedPartyList !== undefined) {
         insertPlayerRushEventPlayedPartyListSync(playerId, rushEventPlayedPartyList)
     }
+    initializePeriodicMissionSnapshots(playerId, player)
 }
 
 export function getDefaultPlayerPartyGroupsSync(
@@ -1026,6 +1027,9 @@ export function insertDefaultPlayerSync(
         }
     ])
 
+        initializePeriodicMissionSnapshots(playerId, player, {
+            countCurrentLoginDay: true,
+        })
         return playerId
     })
 
@@ -1238,27 +1242,19 @@ export function dailyResetPlayerDataSync(
             for (const qp of quests) {
                 if (qp.finished) {
                     totalClears++
-                    if (qp.clearRank === 6) ss++
-                    else if (qp.clearRank === 5) s++
-                    else if (qp.clearRank === 4) a++
-                    else if (qp.clearRank === 3) b++
+                    if (qp.clearRank === 5) ss++
+                    else if (qp.clearRank === 4) s++
+                    else if (qp.clearRank === 3) a++
+                    else if (qp.clearRank === 2) b++
                 }
             }
         }
-        takeSnapshot(playerId, 'daily', {
-            questClears: totalClears,
-            staminaUsed: player.totalStaminaUsed,
-            rankSs: ss, rankS: s, rankA: a, rankB: b,
-        })
+        takeSnapshot(playerId, 'daily', buildPeriodicSnapshotData(playerId, player, totalClears))
         deletePlayerCategoryMissionsSync(playerId, 2)
 
         // weekly reset
         if (crossedWeek) {
-            takeSnapshot(playerId, 'weekly', {
-                questClears: totalClears,
-                staminaUsed: player.totalStaminaUsed,
-                rankSs: ss, rankS: s, rankA: a, rankB: b,
-            })
+            takeSnapshot(playerId, 'weekly', buildPeriodicSnapshotData(playerId, player, totalClears))
             deletePlayerCategoryMissionsSync(playerId, 10)
         }
 

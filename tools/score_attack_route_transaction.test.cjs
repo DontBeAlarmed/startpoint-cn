@@ -164,6 +164,7 @@ stubModule("../src/data/domains/item", {
     },
     updatePlayerItemSync() {},
 })
+stubModule("../src/data/domains/mail", { getPlayerMailCountSync: () => 0 })
 stubModule("../src/data/domains/quest", {
     getPlayerSingleQuestProgressSync(playerId, category, questId) {
         const row = db.prepare("SELECT * FROM quest_progress WHERE player_id = ? AND category = ? AND quest_id = ?").get(playerId, category, questId)
@@ -178,6 +179,7 @@ stubModule("../src/data/domains/quest", {
     updatePlayerQuestProgressSync() {},
 })
 stubModule("../src/data/domains/character_clear", { incrementPlayerCharacterClearSync() {} })
+stubModule("../src/data/domains/mission_battle_facts", { recordMissionBattleResultSync() {} })
 stubModule("../src/data/domains/equipment", { updatePlayerEquipmentSync() {} })
 stubModule("../src/data/domains/session", { getSession: () => null })
 stubModule("../src/data/domains/rushEvent", {
@@ -245,7 +247,17 @@ stubModule("../src/lib/quest", {
 })
 stubModule("../src/routes/api/rushEvent", { rushEventFolderMaxRounds: {} })
 stubModule("../src/lib/rush", { getSerializedPlayerRushEventPlayedPartiesSync: () => ({ folderParties: null, endlessParties: null }) })
-stubModule("../src/lib/mission", { reconcileAwakeUnlockCharacterList: (_playerId, list) => list })
+stubModule("../src/lib/mission", {
+    reconcileAwakeUnlockCharacterList: (_playerId, list) => list,
+    settleMissionCategories: () => ({
+        missionInfo: [],
+        itemList: {},
+        characterList: [],
+        equipmentList: [],
+        degreeIds: [],
+    }),
+    mergeMissionSettlementResponse() {},
+})
 stubModule("../src/lib/carnival-rewards", { getCarnivalRewardDefinitions: () => [], grantCarnivalRewards: () => null })
 stubModule("../src/lib/equipment", { givePlayerEquipmentSync: () => ({}) })
 stubModule("../src/lib/stamina", {

@@ -59,7 +59,7 @@ test("packaged bundle reads server manifest metadata without an injected loader"
             node: ">=20.12.0",
             dependencyLock: `sha256:${"b".repeat(64)}`,
             minDataSchema: 0,
-            targetDataSchema: 4,
+            targetDataSchema: 5,
         },
         admin: { path: "web/dist", required: false },
         assets: {

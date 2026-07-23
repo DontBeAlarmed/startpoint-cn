@@ -130,7 +130,7 @@ min(room.npc_count, 3 - 当前真实玩家数)
 5. 延迟招募与真人进入交错时，房间不会超过三人。
 6. 房间解散后，新房间不会继承旧名册。
 
-构建验证运行 `npm run build:server`、`npm run build:bundle` 和 `npm run verify:bundle -- --data-schema 4`，确认服务端产物包含昵称池实现，且 Server Bundle manifest 包含昵称资产。
+构建验证运行 `npm run build:server`、`npm run build:bundle` 和 `npm run verify:bundle -- --data-schema 5`，确认服务端产物包含昵称池实现，且 Server Bundle manifest 包含昵称资产。
 
 ## 客户端验收步骤
 

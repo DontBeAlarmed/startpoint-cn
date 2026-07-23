@@ -30,4 +30,5 @@ export interface FinishContext {
     questPreviouslyCompleted: boolean
     questProgress: { bestElapsedTimeMs?: number | null; highScore?: number; clearRank?: number } | null
     isMulti?: boolean
+    isMultiHost?: boolean
 }

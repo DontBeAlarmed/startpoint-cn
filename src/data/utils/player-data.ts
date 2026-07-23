@@ -57,7 +57,7 @@ export function getDefaultPlayerData(): Omit<Player, 'id'> {
         totalDashes: 0,
         totalManaObtained: 0,
         maxComboAchieved: 0,
-        totalLoginDays: 0,
+        totalLoginDays: 1,
         tutorialStep: 0,
         tutorialSkipFlag: null,
         tutorialGachaCharacterId: null,

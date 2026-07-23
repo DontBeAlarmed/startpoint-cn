@@ -32,6 +32,11 @@ stubModule("../src/data/domains/quest", {
         calls.push(["multi", playerId, category, questId])
     },
 })
+stubModule("../src/data/domains/mission_battle_facts", {
+    recordMissionBattleResultSync: (playerId, result) => {
+        calls.push(["result", playerId, result])
+    },
+})
 
 const { recordMissionBattleFacts } = require("../src/lib/mission/battle-facts")
 
@@ -49,10 +54,27 @@ const baseContext = {
 }
 
 recordMissionBattleFacts({ ...baseContext, questAccomplished: false })
-assert.deepEqual(calls, [])
+assert.deepEqual(calls, [["result", 1, {
+    isMulti: false,
+    isHost: undefined,
+    accomplished: false,
+    clearRank: 1,
+}]])
 
-recordMissionBattleFacts({ ...baseContext, questAccomplished: true, isMulti: true })
+recordMissionBattleFacts({ ...baseContext, questAccomplished: true, isMulti: true, isMultiHost: true })
 assert.deepEqual(calls, [
+    ["result", 1, {
+        isMulti: false,
+        isHost: undefined,
+        accomplished: false,
+        clearRank: 1,
+    }],
+    ["result", 1, {
+        isMulti: true,
+        isHost: true,
+        accomplished: true,
+        clearRank: 1,
+    }],
     ["multi", 1, 1, 1001],
     ["character", 1001],
     ["leader-powerflip", 1001],
