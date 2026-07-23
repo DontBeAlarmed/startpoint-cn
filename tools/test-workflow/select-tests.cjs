@@ -53,6 +53,8 @@ const SOURCE_RULES = [
         pattern: /^src\/runtime\/(?:bundle-metadata|config|health|lifecycle)\.ts$/,
         groups: ["quick:runtime", "integration:runtime"],
     },
+    { pattern: /^tools\/server-bundle\//, groups: ["quick:runtime"] },
+    { pattern: /^docs\/runtime\/server-bundle\.md$/, groups: ["quick:runtime"] },
     {
         pattern: /^src\/content\/startup\/bootstrap\.ts$/,
         groups: ["quick:content", "integration:runtime"],

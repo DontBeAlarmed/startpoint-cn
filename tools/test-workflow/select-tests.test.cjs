@@ -73,6 +73,9 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/runtime/lifecycle.ts"]),
         ["integration:runtime", "quick:runtime"],
     )
+    assert.deepEqual(selectTestGroups(["tools/server-bundle/build.cjs"]), ["quick:runtime"])
+    assert.deepEqual(selectTestGroups(["tools/server-bundle/verify.cjs"]), ["quick:runtime"])
+    assert.deepEqual(selectTestGroups(["docs/runtime/server-bundle.md"]), ["quick:runtime"])
     assert.deepEqual(
         selectTestGroups(["src/content/startup/bootstrap.ts"]),
         ["integration:runtime", "quick:content"],
@@ -164,6 +167,7 @@ test("full contains quick, integration, and admin but excludes generators", () =
         "tools/cdn_runtime_manifest.test.cjs",
         "tools/cdn_audit.test.cjs",
         "tools/cdn_files.test.cjs",
+        "tools/legacy_asset_state.test.cjs",
     ])
 })
 
@@ -171,6 +175,7 @@ test("registers focused runtime state and socket smoke groups", () => {
     assert.deepEqual(TEST_GROUPS["quick:runtime"], {
         execution: "parallel",
         tests: [
+            "tools/server_bundle.test.cjs",
             "tools/runtime_bundle_metadata.test.cjs",
             "tools/runtime_config.test.cjs",
             "tools/runtime_health.test.cjs",

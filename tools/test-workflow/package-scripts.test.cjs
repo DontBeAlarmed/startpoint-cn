@@ -29,6 +29,17 @@ test("keeps CN server and legacy builds separate", () => {
     assert.doesNotMatch(scripts["build:server"], /admin|css/)
 })
 
+test("builds and verifies deterministic thin server bundles", () => {
+    assert.equal(
+        scripts["build:bundle"],
+        "npm run build:server && node tools/server-bundle/build.cjs",
+    )
+    assert.equal(
+        scripts["verify:bundle"],
+        "node tools/server-bundle/verify.cjs",
+    )
+})
+
 test("includes runtime-loaded CN modules as explicit compilation roots", () => {
     assert.equal(cnTsconfig.compilerOptions.incremental, true)
     assert.equal(cnTsconfig.compilerOptions.tsBuildInfoFile, "./out/.tsbuildinfo-cn")
