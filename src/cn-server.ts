@@ -211,16 +211,11 @@ function parseC3032Beacon(loc: string): void {
     const didPlay = playMatch ? playMatch[1] === '1' : null;
     const r = ballRarity - 3; // 0=★3, 1=★4, 2=★5
     if (didPlay !== null) seedValidator.recordPlay(movieId, badSeed, didPlay);  // record for flushAll
-    // C3032 = client-verified rarity → verifiedPool (superset of playPool/confirmPool)
+    // C3032 reports a client-verified rarity. Its final persistent state is verified.
     console.log(`[DBG-BCN] C3032 → moveToVerified [${movieId}] seed=${badSeed} ★${ballRarity}`);
     seedValidator.moveToVerified(movieId, badSeed, r);
-    if (didPlay === false) {
-        console.log(`[DBG-BCN] C3032 → confirm [${movieId}] seed=${badSeed} ★${ballRarity}`);
-        seedValidator.confirm(movieId, badSeed, r);  // play=0 → confirmPool
-    }
     const playStr = didPlay === true ? ' play=1' : didPlay === false ? ' play=0' : '';
-    console.log(`[BEACON] C3032 → ${didPlay === true ? 'play' : 'confirm'} seed ${badSeed} ★${ballRarity}${playStr} [${movieId}]`);
-    if (didPlay === null) { seedValidator.addPending(movieId, badSeed, r); }
+    console.log(`[BEACON] C3032 → verified seed ${badSeed} ★${ballRarity}${playStr} [${movieId}]`);
 }
 
 // PLAY beacon — every draw reports play=1|0 (APK 04e Patch 5)
@@ -239,9 +234,8 @@ function parsePlayBeacon(loc: string): void {
         if (didPlay) {
             const r = seedValidator.getSentR(movieId, seed);
             if (r !== undefined && r !== null) {
-                seedValidator.addPlay(movieId, seed, r, true);
-                seedValidator.moveToVerified(movieId, seed, r);
-                console.log(`[PLAY] playPool seed=${seed} movie=${movieId}`);
+                seedValidator.confirmPlayedAndVerify(movieId, seed, r);
+                console.log(`[PLAY] verified seed=${seed} movie=${movieId}`);
             } else {
                 console.log(`[PLAY] play=1 skipped seed=${seed} getSentR=${r === null ? 'null' : 'undefined'} (already cleaned up by prior beacon)`);
             }

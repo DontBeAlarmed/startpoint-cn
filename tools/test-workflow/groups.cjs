@@ -19,6 +19,13 @@ const TEST_GROUPS = Object.freeze({
             "tools/runtime_lifecycle.test.cjs",
         ],
     },
+    "quick:seed": {
+        execution: "parallel",
+        tests: [
+            "tools/seed_api.test.cjs",
+            "tools/seed_state.test.cjs",
+        ],
+    },
     "quick:gacha": {
         execution: "parallel",
         tests: [

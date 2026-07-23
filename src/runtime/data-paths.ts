@@ -8,6 +8,9 @@ type StateFileName = typeof STATE_FILES[number];
 export interface RuntimeDataPaths {
     dataDir: string;
     stateDir: string;
+    seedStateDir: string;
+    seedStateFile: string;
+    seedStateTemporaryFilePrefix: string;
     databaseFile: string;
     databaseVersionFile: string;
     activeAccountFile: string;
@@ -44,14 +47,32 @@ export function resolveRuntimeDataPaths(
         : path.join(PROJECT_ROOT, ".database");
     const stateDir = path.join(dataDir, "state");
 
+    const seedStateDir = path.join(stateDir, "seeds");
+
     return {
         dataDir,
         stateDir,
+        seedStateDir,
+        seedStateFile: path.join(seedStateDir, "seed-state.json"),
+        seedStateTemporaryFilePrefix: path.join(seedStateDir, ".seed-state.json."),
         databaseFile: path.join(dataDir, "wdfp_data.db"),
         databaseVersionFile: path.join(dataDir, "wdfp_data.db.version"),
         activeAccountFile: path.join(stateDir, "active_account.json"),
         defaultSaveFile: path.join(stateDir, "default_save.json"),
     };
+}
+
+export function prepareSeedStateDirectory(
+    paths: RuntimeDataPaths = resolveRuntimeDataPaths(),
+    fileSystem: DataVolumeFileSystem = fs,
+): string {
+    ensureDirectory(paths.dataDir, "Data volume root", fileSystem);
+    ensureDirectory(paths.stateDir, "Data volume state directory", fileSystem);
+    ensureDirectory(paths.seedStateDir, "Seed state directory", fileSystem);
+    assertReadableAndWritable(paths.dataDir, "Data volume root", fileSystem);
+    assertReadableAndWritable(paths.stateDir, "Data volume state directory", fileSystem);
+    assertReadableAndWritable(paths.seedStateDir, "Seed state directory", fileSystem);
+    return paths.seedStateDir;
 }
 
 function ensureDirectory(

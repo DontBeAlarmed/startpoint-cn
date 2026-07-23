@@ -8,6 +8,13 @@ const { selectTestGroups } = require("./select-tests.cjs")
 
 test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/lib/gacha.ts"]), ["quick:gacha"])
+    assert.deepEqual(
+        selectTestGroups(["src/lib/seed-validator.ts"]),
+        ["quick:gacha", "quick:seed"],
+    )
+    assert.deepEqual(selectTestGroups(["src/runtime/seed-state-store.ts"]), ["quick:seed"])
+    assert.deepEqual(selectTestGroups(["src/runtime/seed-state-schema.ts"]), ["quick:seed"])
+    assert.deepEqual(selectTestGroups(["docs/protocol/seed-verification.md"]), ["quick:seed"])
     assert.deepEqual(selectTestGroups(["src/lib/gacha-draw.ts"]), ["quick:gacha"])
     assert.deepEqual(selectTestGroups(["src/content/paths.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/types.ts"]), ["quick:cdn"])
@@ -48,6 +55,10 @@ test("maps representative source files to focused groups", () => {
         ["full", "integration:database"],
     )
     assert.deepEqual(selectTestGroups(["src/runtime/data-paths.ts"]), ["integration:database"])
+    assert.deepEqual(
+        selectTestGroups(["src/routes/web_api/seeds.ts"]),
+        ["admin", "integration:database", "quick:seed"],
+    )
     assert.deepEqual(
         selectTestGroups(["src/runtime/lifecycle.ts"]),
         ["integration:runtime", "quick:runtime"],
@@ -160,6 +171,18 @@ test("registers focused runtime state and socket smoke groups", () => {
         execution: "serial",
         tests: ["tools/runtime_compiled_smoke.test.cjs"],
     })
+})
+
+test("registers focused seed state and API regressions", () => {
+    assert.deepEqual(TEST_GROUPS["quick:seed"], {
+        execution: "parallel",
+        tests: [
+            "tools/seed_api.test.cjs",
+            "tools/seed_state.test.cjs",
+        ],
+    })
+    assert.deepEqual(selectTestGroups(["tools/seed_api.test.cjs"]), ["quick:seed"])
+    assert.deepEqual(selectTestGroups(["tools/seed_state.test.cjs"]), ["quick:seed"])
 })
 
 test("registers the focused CDN path contract", () => {

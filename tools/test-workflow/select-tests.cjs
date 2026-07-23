@@ -38,6 +38,7 @@ const SOURCE_RULES = [
     { pattern: /^src\/routes\/cn\/versionCheck\.ts$/, groups: ["full"] },
     { pattern: /^src\/routes\/web_api\//, groups: ["admin", "integration:database"] },
     { pattern: /^src\/runtime\/data-paths\.ts$/, groups: ["integration:database"] },
+    { pattern: /^src\/runtime\/seed-state-(?:schema|store)\.ts$/, groups: ["quick:seed"] },
     {
         pattern: /^src\/runtime\/(?:bundle-metadata|config|health|lifecycle)\.ts$/,
         groups: ["quick:runtime", "integration:runtime"],
@@ -50,6 +51,11 @@ const SOURCE_RULES = [
         pattern: /^src\/lib\/(?:gacha|gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-ticket)\.ts$/,
         groups: ["quick:gacha"],
     },
+    {
+        pattern: /^src\/lib\/seed-validator\.ts$/,
+        groups: ["quick:gacha", "quick:seed"],
+    },
+    { pattern: /^src\/routes\/web_api\/seeds\.ts$/, groups: ["quick:seed"] },
     {
         pattern: /^src\/routes\/api\/singleBattleQuest\.ts$/,
         groups: ["integration:compiled", "integration:quest", "quick:quest"],
@@ -89,6 +95,7 @@ function groupsForFile(filePath) {
     if (filePath === "docs/cdn/content-sync.md") {
         return ["integration:cdn", "integration:content"]
     }
+    if (filePath === "docs/protocol/seed-verification.md") return ["quick:seed"]
 
     const matchedGroups = SOURCE_RULES
         .filter(rule => rule.pattern.test(filePath))

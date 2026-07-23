@@ -57,6 +57,13 @@ test("DATA_DIR takes precedence over WDFP_DATABASE_DIR and resolves absolutely",
     assert.equal(paths.databaseFile, path.join(paths.dataDir, "wdfp_data.db"))
     assert.equal(paths.databaseVersionFile, path.join(paths.dataDir, "wdfp_data.db.version"))
     assert.equal(paths.stateDir, path.join(paths.dataDir, "state"))
+    assert.equal(paths.seedStateDir, path.join(paths.stateDir, "seeds"))
+    assert.equal(paths.seedStateFile, path.join(paths.seedStateDir, "seed-state.json"))
+    assert.equal(
+        paths.seedStateTemporaryFilePrefix,
+        path.join(paths.seedStateDir, ".seed-state.json."),
+    )
+    assert.equal(Object.hasOwn(paths, "seedStateTemporaryFile"), false)
     assert.equal(paths.activeAccountFile, path.join(paths.stateDir, "active_account.json"))
     assert.equal(paths.defaultSaveFile, path.join(paths.stateDir, "default_save.json"))
 })

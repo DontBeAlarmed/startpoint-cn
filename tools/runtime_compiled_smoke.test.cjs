@@ -1,6 +1,7 @@
 "use strict"
 
 const assert = require("node:assert/strict")
+const crypto = require("node:crypto")
 const { spawn, spawnSync } = require("node:child_process")
 const fs = require("node:fs")
 const net = require("node:net")
@@ -15,6 +16,22 @@ const {
 } = require("./test-workflow/benchmark.cjs")
 
 const projectRoot = path.resolve(__dirname, "..")
+const seedBundleFiles = [
+    "confirmed_seeds.json",
+    "purified_seeds.json",
+    "verified_seeds.json",
+    "pool_config.json",
+    "test_seeds.json",
+]
+
+function seedAssetDigests() {
+    return Object.fromEntries(seedBundleFiles.map(fileName => [
+        fileName,
+        crypto.createHash("sha256").update(fs.readFileSync(
+            path.join(projectRoot, "assets", fileName),
+        )).digest("hex"),
+    ]))
+}
 
 function listen(server, options) {
     return new Promise((resolve, reject) => {
@@ -282,4 +299,38 @@ test("compiled lifecycle order and metadata fallback survive an isolated bundle"
     })
     assert.equal(health.statusCode, 200)
     assert.equal(health.body.serverBundle.version, "unknown")
+
+    const seedDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "compiled-seed-state-"))
+    t.after(() => fs.rmSync(seedDataDir, { recursive: true, force: true }))
+    const previousDataDir = process.env.DATA_DIR
+    process.env.DATA_DIR = seedDataDir
+    t.after(() => {
+        if (previousDataDir === undefined) delete process.env.DATA_DIR
+        else process.env.DATA_DIR = previousDataDir
+    })
+    const beforeSeedAssets = seedAssetDigests()
+    const compiledSeedValidator = require(path.join(
+        projectRoot,
+        "out/lib/seed-validator.js",
+    )).default
+
+    compiledSeedValidator.confirm("fes", 214748301, 0)
+    compiledSeedValidator.addPlay("fes", 214748302, 1, true)
+    compiledSeedValidator.moveToVerified("fes", 214748303, 2)
+    compiledSeedValidator.setSelectedMovieId("normal")
+    compiledSeedValidator.setTestSeed("normal", 4, 10000304)
+
+    const seedStateDir = path.join(seedDataDir, "state", "seeds")
+    assert.deepEqual(fs.readdirSync(seedStateDir), ["seed-state.json"])
+    const persistedSeedState = JSON.parse(fs.readFileSync(
+        path.join(seedStateDir, "seed-state.json"),
+        "utf8",
+    ))
+    assert.equal(persistedSeedState.schemaVersion, 1)
+    assert.equal(persistedSeedState.config.selectedMovieId, "normal")
+    assert.equal(persistedSeedState.testSeeds[1], 10000304)
+    assert.equal(persistedSeedState.confirmed.fes[214748301], 0)
+    assert.equal(persistedSeedState.play.fes[214748302].r, 1)
+    assert.equal(persistedSeedState.verified.fes[214748303], 2)
+    assert.deepEqual(seedAssetDigests(), beforeSeedAssets)
 })
