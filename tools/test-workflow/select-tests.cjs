@@ -20,6 +20,10 @@ const SOURCE_RULES = [
         pattern: /^src\/content\/runtime\/content-snapshot\.ts$/,
         groups: ["integration:cdn", "quick:content"],
     },
+    {
+        pattern: /^src\/lib\/character-content\.ts$/,
+        groups: ["quick:content", "admin", "integration:quest"],
+    },
     { pattern: /^src\/content\/deep-freeze\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/lib\/version\.ts$/, groups: ["full"] },
     { pattern: /^src\/routes\/cn\/load\.ts$/, groups: ["full"] },

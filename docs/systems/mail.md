@@ -34,4 +34,4 @@
 
 - `assets/item_lookup.json`
 - `assets/equipment_lookup.json`
-- `docs/generated/character_table.json`
+- 当前 `ContentRepository` snapshot 中的 `character.json`、`cdndata/character.json` 与 `cdndata/character_text.json`

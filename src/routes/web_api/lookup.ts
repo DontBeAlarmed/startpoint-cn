@@ -1,18 +1,12 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import characterTable from "../../../docs/generated/character_table.json";
 import itemLookup from "../../../assets/item_lookup.json";
 import equipmentLookup from "../../../assets/equipment_lookup.json";
 import questLookup from "../../../assets/quest_lookup.json";
-
-interface CharEntry { id: number; name: string; title: string; rarity: string; element: string }
-const charMap: Record<number, { name: string; title: string; rarity: string; element: string }> = {}
-for (const c of (characterTable as CharEntry[])) {
-    charMap[c.id] = { name: c.name, title: c.title, rarity: c.rarity, element: c.element }
-}
+import { getCharacterLookup } from "../../lib/character-content";
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.get("/characters", async (_request: FastifyRequest, reply: FastifyReply) => {
-        return reply.send(charMap)
+        return reply.send(getCharacterLookup())
     })
 
     fastify.get("/items", async (_request: FastifyRequest, reply: FastifyReply) => {

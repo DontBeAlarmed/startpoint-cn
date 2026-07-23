@@ -30,6 +30,10 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/content/runtime/content-snapshot.ts"]),
         ["integration:cdn", "quick:content"],
     )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/character-content.ts"]),
+        ["admin", "integration:quest", "quick:content"],
+    )
     assert.deepEqual(selectTestGroups(["src/content/deep-freeze.ts"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/internal/types.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/protocol.ts"]), ["full", "integration:cdn"])

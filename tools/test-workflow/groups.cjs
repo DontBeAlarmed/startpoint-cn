@@ -66,6 +66,7 @@ const TEST_GROUPS = Object.freeze({
         execution: "parallel",
         timeoutMs: 60_000,
         tests: [
+            "tools/character_content.test.cjs",
             "tools/content_character_converter.test.cjs",
             "tools/content_gacha_converter.test.cjs",
             "tools/content_shop_converter.test.cjs",

@@ -145,6 +145,12 @@ Git binary diff 快照设置 64 MiB 输出上限；包含更大 dirty binary dif
 
 服务进程初始化时只读取一次 current snapshot，并用同一 snapshot 构造 Catalog 与 Repository。运行期间修改 `current.json` 不会热切换，必须重启才会加载新 Release。
 
+### 生产角色数据读取
+
+生产服务中的角色名称、称号、稀有度、元素和种族统一从启动时固定的 `ContentRepository` 读取。角色 lookup 使用同一 snapshot 内的 `character.json`、`cdndata/character.json` 和 `cdndata/character_text.json` 构造；任务结算使用的种族也直接读取该 Repository 的 `cdndata/character.json`。模块加载阶段不会读取角色表，后台请求或任务结算实际调用时才访问已初始化 snapshot。
+
+开发期角色表生成脚本及其生成文件只用于离线核对和数据维护，不属于 Bundle 或生产运行时依赖。部署产物不需要开发期生成目录，也不需要仓库外的 orderedmap 源目录；Release 与 bundled fallback 都必须通过 `ContentRepository` 提供运行时角色数据。
+
 ### 删除 `.content` 的影响
 
 删除 `.content` 会删除 current 指针、全部本地 Release/对象和摘要缓存，但不会删除 CDN、bundled JSON 或玩家数据库。

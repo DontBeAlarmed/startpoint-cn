@@ -11,16 +11,10 @@ import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
 import { getPlayerItemsSync } from "../../data/domains/item"
 import { SessionType } from "../../data/types";
 import { getActivePlayerId, getSelectedAccountId, getAccountDefaultPlayer } from "../../data/activeAccount";
-import characterTable from "../../../docs/generated/character_table.json";
 import itemLookup from "../../../assets/item_lookup.json";
 import equipmentLookup from "../../../assets/equipment_lookup.json";
 import questLookup from "../../../assets/quest_lookup.json";
-
-interface CharInfo { name: string; title: string; rarity: string; element: string }
-const charLookup: Record<number, CharInfo> = {}
-for (const c of (characterTable as { id: number; name: string; title: string; rarity: string; element: string }[])) {
-    charLookup[c.id] = { name: c.name, title: c.title, rarity: c.rarity, element: c.element }
-}
+import { getCharacterLookup } from "../../lib/character-content";
 
 function htmlEscape(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
@@ -194,6 +188,7 @@ const routes = async (fastify: FastifyInstance) => {
         html = html.replace("{{resourceCols}}", "grid-cols-4");
 
         // Character list — sorted by joinTime DESC
+        const charLookup = getCharacterLookup()
         const characters = getPlayerCharactersSync(parsedPlayerId);
         const charList = Object.entries(characters).sort((a, b) => b[1].joinTime.getTime() - a[1].joinTime.getTime());
         let charsHtml = '';
