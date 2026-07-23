@@ -335,7 +335,7 @@ fastify.register(fastifyStatic, {
 });
 
 // New admin SPA (React, built from admin/ into web/dist) — served at /admin.
-// Old pages at / stay untouched until the SPA fully replaces them (see docs/admin-refactor-plan.md).
+// Old pages at / remain available during migration; see docs/admin/README.md.
 const adminDistDir = path.join(__dirname, "..", "web", "dist");
 const adminSpaAvailable = existsSync(path.join(adminDistDir, "index.html"));
 if (adminSpaAvailable) {

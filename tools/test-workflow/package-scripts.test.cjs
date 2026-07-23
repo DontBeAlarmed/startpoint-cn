@@ -80,8 +80,12 @@ test("runs legacy CDN tools only after compilation completes", () => {
 
 test("defines the full verification pipeline", () => {
     assert.equal(
+        scripts["docs:check"],
+        "node tools/docs_check.cjs",
+    )
+    assert.equal(
         scripts["verify:full"],
-        "npm run typecheck && npm run test:full && npm run hygiene && npm run build:server",
+        "npm run typecheck && npm run docs:check && npm run test:full && npm run hygiene && npm run build:server",
     )
 })
 

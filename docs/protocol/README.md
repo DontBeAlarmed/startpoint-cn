@@ -8,7 +8,7 @@
 - [卡池生成](./gacha-pool-generation.md)
 - [种子验证](./seed-verification.md)
 
-游戏主 HTTP API 使用 Base64 包裹 MsgPack。路由级请求和响应样本见[路由参考资料](../reference/routes/README.md)。
+游戏主 HTTP API 使用 Base64 包裹 MsgPack。单端点协议以 CN 1.8.1 反编译代码、当前注册源码、测试和开发者本地自备的脱敏抓包交叉确认。
 
 ## 多人联机
 
@@ -17,4 +17,4 @@
 
 多人 TCP 使用 Typepacker 枚举数组和空字符分帧，与 HTTP MsgPack 管线不同。新增或修改协议字段前应同时检查反编译客户端、当前状态机和已有测试。
 
-原始抓包属于 reference，不代表当前实现状态；端点覆盖请查[端点状态](../reference/routes-status.md)。
+当前树不收录原始抓包；业务覆盖概览见[路由族覆盖矩阵](../reference/routes-status.md)，单端点最终以注册源码和测试为准。

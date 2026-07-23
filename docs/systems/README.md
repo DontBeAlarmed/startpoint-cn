@@ -1,6 +1,6 @@
 # 游戏系统文档
 
-本目录描述当前业务语义、持久状态和客户端对齐结论。系统行为变更时，应更新对应文档；单端点原始样本放在[参考资料](../reference/README.md)。
+本目录描述当前业务语义、持久状态和客户端对齐结论。系统行为变更时，应更新对应文档；路由族概览见[参考资料](../reference/README.md)，原始抓包仅在本地脱敏保存。
 
 ## 核心系统
 
@@ -15,7 +15,7 @@
 - [特殊关卡架构](./special-quest-architecture.md)
 - [狂热激战](./rush-event.md)
 - [土俑累计分奖励](./carnival-score-rewards.md)
-- [战阵与分数挑战](./score-attack-event.md)
+- [无限演武](./score-attack-event.md)
 - [歼灭者讨伐战解锁](./boss-epuration-unlock.md)
 - [活动扭蛋箱](./box-gacha.md)
 - [关卡入场道具](./quest-entry-items.md)
@@ -25,7 +25,6 @@
 - [任务完成度审计](./mission-completion-audit.md)
 - [任务与关卡映射](./mission-quest-mapping.md)
 - [角色觉醒任务](./character-awake-missions.md)
-- [角色觉醒对齐](./character-awake-alignment.md)
 - [角色觉醒刷新](./character-awake-refresh.md)
 - [角色分解审计](./character-stack-audit.md)
 

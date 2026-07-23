@@ -1,36 +1,73 @@
-# 存档导入/导出 & 写入校验 & 清空邮件箱
+# 存档导入、导出与写入校验
 
-> 状态: 已实现   关键文件: src/routes/web_api/{player.ts, validation.ts, mail.ts}, src/data/utils.ts   相关端点: /api/player/save, /api/player/:id/*, /api/mail/send
+当前管理 API 可以导出和替换 `MergedPlayerData` 覆盖的玩家领域，但不代表完整服务端状态快照。新增数据库领域时必须显式接入组装与恢复，否则会在往返后丢失。
 
-Web 管理面板对玩家数据的写入安全设计。核心原则:**只做结构安全校验,不卡游戏平衡**——挡住会真正坏档/崩溃的输入(未知字段、类型错误、整数 ≥ 2³¹、负的货币/数量),不限制数值大小;不合理的值靠"导出→微调→重导入"闭环纠正。
+## 快照格式
 
-## 存档导出 / 导入(MergedPlayerData 快照)
+`GET /api/player/save?id=<playerId>` 返回：
 
-- **导出 `GET /api/player/save?id=<pid>`**:`getMergedPlayerDataSync` 组装玩家完整服务端状态 → `{schema:"starpoint-cn-save", version:1, exportedAt, playerId, data}`,下载为 `save_<id>.json`。
-- **导入 `POST /api/player/save?id=<pid>`**:校验 `schema/version` → 复活 Date 字段(`player.{staminaHealTime,lastLoginTime,expPooledTime}`、`characterList[*].{joinTime,updateTime}`、`startDashExchangeCampaignList[*].{periodStartTime,periodEndTime}`)→ `replacePlayerDataSync`(删玩家 + `insertMergedPlayerDataSync`)。
-- 绕开游戏客户端的严格反序列化(`deserializePlayerData`,35 处 throw),往返同 schema、稳健;失败逐步明确报错。
-- 覆盖域:玩家行 + 角色/魔晶/装备/物品/编队/任务进度+已抽/抽卡 info+campaign/箱抽/狂热活动/任务清单/每日点数/教程/选项。
-- **仅用于管理面板备份/恢复**,不保证被游戏客户端直接 load。
+```json
+{
+  "schema": "starpoint-cn-save",
+  "version": 1,
+  "exportedAt": "...",
+  "playerId": 1,
+  "data": {}
+}
+```
 
-## 写入端点校验(`validation.ts`)
+`data` 由 `getMergedPlayerDataSync()` 组装。当前覆盖玩家主行、每日挑战点、教程、普通任务清单、角色、Mana Node、编队、物品、装备、关卡进度、抽卡信息、活动 campaign、Active Mission、分类任务、活动扭蛋箱、选项、狂热激战以及土俑分数/奖励/称号状态。
 
-违规一律 `400 + 明确中文报错`,不写库。整数硬上限 `MAX_INT = 2³¹-1`。
+`purchasedTimesList` 当前固定为空对象，不会往返商店购买历史。邮箱、邮件领取历史和进程内多人房间也不在快照中；这份列表不是对所有缺失领域的穷举。
 
-- `PATCH /:id/field`:字段**白名单**(`Player` 已知可编辑字段,`id` 禁改)+ 类型正确(uint 0~2³¹ / 字符串限长 name≤32·comment≤128 / 布尔 / 可空 / Date 可解析)。不卡平衡上限;不校验 leaderCharacterId 拥有(允许改存档加角色)。
-- `/:id/refill_resources`:amount 0 ~ 99,999,999。
-- `/:id/character`:characterId 校验存在于资源表(`character.json`);不设拥有上限。
-- `/:id/item`:itemId 校验存在;count 0 ~ 2³¹。
+## 导入行为
 
-## 邮件发信校验(`mail.ts`)
+`POST /api/player/save?id=<playerId>` 只接受：
 
-- type **白名单** `{1,3,4,5,6,7,8,9,10,11,12,15}`。
-- type_id:`{1 道具,5 角色,6 装备}` 必填且校验存在(`item_ids.json` / `character.json` / `equipment_ids.json`);其余类型忽略。
-- count:**角色(5)、装备(6)必须 = 1**;其余 1 ~ 2³¹。
-- subject ≤ 64、description ≤ 512。
+- `schema = starpoint-cn-save`；
+- `version = 1`；
+- 存在对象形态的 `data.player`。
 
-> `assets/equipment_ids.json` 由 `scripts/gen_equipment_ids.py` 从 `邮件附件对照表.xlsx` 第3页生成。
+导入会恢复已知 Date 字段，把 `data.player.id` 强制设为目标存档 ID，再调用 `replacePlayerDataSync()`。替换过程使用单一 SQLite 事务：删除目标玩家数据后重新插入当前 `MergedPlayerData` 支持的领域；任一插入失败会回滚原存档。
 
-## 清空邮件箱(误发非法邮件的兜底恢复)
+入口只做 schema/version 和基础对象检查，具体字段错误主要在恢复 Date 或数据库插入阶段暴露。它不是一套完整 JSON Schema 校验器，也不保证任意手工编辑文件都能安全导入。
 
-- `DELETE /api/player/:id/mail` → `deleteAllPlayerMailSync`(`DELETE FROM players_mails WHERE player_id=?`)。
-- 玩家详情页「清空邮件箱」按钮(二次确认)。用于误发会让客户端在邮件界面崩溃的非法邮件时恢复。
+快照仅供当前管理端备份、克隆和恢复，不是游戏客户端 `/load` 响应，不能直接交给客户端反序列化。
+
+## 部分完整性的影响
+
+由于快照是部分覆盖：
+
+- 导入前应保留数据库备份；
+- 先用测试存档验证目标版本；
+- 新领域表必须同时接入 `getMergedPlayerDataSync()`、`insertMergedPlayerDataSync()` 和专项测试；
+- 不能用一次导出/导入成功推断全部玩家状态都已往返；
+- 邮件、商店购买次数等缺失领域需要独立迁移或备份策略。
+
+## 管理写入校验
+
+`src/routes/web_api/validation.ts` 对玩家字段编辑提供结构安全白名单：
+
+- `id` 不可修改；
+- 无符号整数限制为 `0..2147483647`；
+- 名称和评论限制长度；
+- 布尔、可空值和 Date 必须能解析；
+- 未知字段被拒绝。
+
+角色与道具管理端点还会校验资源 ID；道具数量限制在 int32 安全范围。这里保护的是序列化和数据库结构，不对所有游戏平衡上限做官方规则推断。
+
+邮件附件有独立的类型、ID 与数量规则，见[邮件系统](./mail.md)。
+
+## 破坏性恢复操作
+
+管理 API 还提供清空邮箱、删除关卡进度、删除道具和重置部分任务状态等操作。这些端点不属于存档快照本身，执行前应确认目标存档并保留备份。
+
+## 已知边界
+
+- 没有覆盖所有玩家领域的完整端到端往返矩阵；
+- 快照版本只有 v1，尚无跨版本迁移层；
+- 导入入口不是完整 JSON Schema 验证；
+- 管理端破坏性操作尚无统一撤销机制；
+- 完整克隆、跨版本恢复和失败场景仍需系统验收。
+
+当前支持状态应标记为 Partial。

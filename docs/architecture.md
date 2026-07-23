@@ -1,6 +1,6 @@
 # StarPoint CN 当前运行时架构
 
-本文描述 `dev` 分支当前有效的服务端结构和运行边界。端点字段样本见[参考资料](./reference/README.md)，功能完成度见[状态文档](./status/README.md)。
+本文描述 `dev` 分支当前有效的服务端结构和运行边界。业务路由覆盖见[参考资料](./reference/README.md)，功能完成度见[状态文档](./status/README.md)。
 
 ## 1. 系统边界
 
@@ -90,6 +90,8 @@ HTTP 路由分为三组：
 
 两者通过 `src/routes/web_api/` 或既有领域 API 操作同一 SQLite 状态。后台是可选产物，缺失 `web/dist/index.html` 不阻止游戏服务启动，健康状态会反映后台是否可用。
 
+页面范围、构建边界和当前验收限制见[管理后台](./admin/README.md)。
+
 ## 8. 嵌入式运行契约
 
 Android 启动器、桌面壳、容器和 Supervisor 通过稳定的外部契约托管服务端，而不是依赖仓库内部路径：
@@ -100,7 +102,7 @@ Android 启动器、桌面壳、容器和 Supervisor 通过稳定的外部契约
 - 健康检查暴露进程阶段、数据库、内容、HTTP、TCP 和后台状态；
 - 退出信号触发有序关闭，启动阶段使用稳定退出码。
 
-完整约束见[嵌入式运行契约](./embedded-runtime-contract.md)和[Server Bundle](./runtime/server-bundle.md)。这些契约约束宿主与服务端的边界，不改变游戏客户端协议。
+完整约束从[运行时与宿主集成](./runtime/README.md)进入，核心文档为[嵌入式运行契约](./embedded-runtime-contract.md)和[Server Bundle](./runtime/server-bundle.md)。这些契约约束宿主与服务端的边界，不改变游戏客户端协议。
 
 ## 9. 维护原则
 

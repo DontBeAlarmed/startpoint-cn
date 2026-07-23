@@ -337,7 +337,10 @@ test("正式入口、测试组和 tracked 中文文档声明与 bootstrap 一致
     const lowLevelSource = fs.readFileSync(path.join(projectRoot, "src/cn-server.ts"), "utf8")
     const readme = fs.readFileSync(path.join(projectRoot, "README.md"), "utf8")
     const docsReadme = fs.readFileSync(path.join(projectRoot, "docs/README.md"), "utf8")
-    const deployment = fs.readFileSync(path.join(projectRoot, "docs/deployment.md"), "utf8")
+    const networkBoundary = fs.readFileSync(
+        path.join(projectRoot, "docs/getting-started/network-boundary.md"),
+        "utf8",
+    )
     const cdnDebugging = fs.readFileSync(path.join(projectRoot, "docs/cdn/debugging.md"), "utf8")
 
     assert.equal(packageJson.scripts["start:cn"], "node tools/start_cn.cjs")
@@ -354,8 +357,10 @@ test("正式入口、测试组和 tracked 中文文档声明与 bootstrap 一致
     assert.match(readme, /content:sync/)
     assert.match(readme, /node out\/cn-server\.js[^\n]*不会自动同步/)
     assert.match(docsReadme, /前台[^\n]*bootstrap/)
-    assert.match(deployment, /后台运行[^\n]*进程管理器/)
-    assert.doesNotMatch(deployment, /\/tmp\/cn-server\.log|nohup|pkill/)
+    assert.match(networkBoundary, /本机或受信任的局域网/)
+    assert.match(networkBoundary, /公网管理后台鉴权/)
+    assert.match(networkBoundary, /不属于项目支持范围/)
+    assert.doesNotMatch(networkBoundary, /nginx|iptables|certbot/i)
     assert.match(cdnDebugging, /常规启动[^\n]*bootstrap/)
     assert.match(cdnDebugging, /node out\/cn-server\.js[^\n]*低级调试入口/)
     assert.doesNotMatch(cdnDebugging, /node --env-file=\.env out\/cn-server\.js[^\n]*&/)

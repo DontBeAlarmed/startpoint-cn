@@ -15,13 +15,16 @@ StarPoint CN 是《世界弹射物语》国服（雷霆）客户端的非官方�
 
 项目不保证兼容被修改的游戏逻辑、损坏或自制的 CDN、其他客户端版本，也不为这些输入提供自动修复。客户端 APK、官方 CDN 和漫画资源不随仓库分发。
 
+网络运行范围为本机和受信任的局域网。服务端不提供公网管理后台鉴权、TCP TLS 或云安全承诺；变量语义和范围见[网络支持边界](./docs/getting-started/network-boundary.md)。
+
 ## 当前状态
 
 服务端已经覆盖账号与存档、主要养成、单人关卡、部分特殊活动、抽卡、商店、邮件、NPC 协力及内容运行时，但仍有部分端点、任务分类和客户端流程尚未完成验收。
 
-- [测试进度](./docs/status/test-progress.md)：客户端实测范围与待测流程
+- [支持矩阵](./docs/status/support-matrix.md)：逐模块区分实现、自动测试与人工验收
+- [测试进度](./docs/status/test-progress.md)：客户端、后台与宿主的实测范围和待测流程
 - [已知问题](./docs/status/known-issues.md)：当前未解决问题
-- [端点状态](./docs/reference/routes-status.md)：端点级实现概览
+- [路由族覆盖](./docs/reference/routes-status.md)：按业务路由族查看当前实现边界
 - [完整文档入口](./docs/README.md)：按使用目标选择阅读路径
 
 ## 最短启动
@@ -46,12 +49,15 @@ bash scripts/start-cn.sh
 | `npm run debug:cn` | TypeScript 热重载调试，不自动同步内容 |
 | `npm run content:sync` | 为本地 CDN 手动生成或复用 Content Release |
 | `npm run build:admin` | 构建 React 管理后台 |
+| `npm run docs:check` | 检查文档链接、目录入口和索引覆盖 |
 | `npm run test:changed` | 运行与当前改动相关的测试 |
 | `npm run verify:full` | 类型、完整测试、仓库卫生与服务端构建验证 |
 
+`node out/cn-server.js` 是不会自动同步内容的低级调试入口；常规运行应使用上表中的受支持启动命令。
+
 ## 可选管理后台
 
-新版管理后台位于 `/admin/`，仍处于持续开发和验收阶段；兼容旧后台保留在 `/`、`/player` 和 `/mail`。
+新版管理后台位于 `/admin/`，仍处于持续开发和验收阶段；兼容旧后台保留在 `/`、`/player`、`/mail` 和 `/seeds`。
 
 首次构建新版后台，或 `admin/package-lock.json` 变化时，执行：
 
@@ -87,7 +93,7 @@ bash client-patch/apply.sh <AS3_EXPORT_DIR> <SERVER_HOST>:8001
 
 ## 贡献
 
-提交功能前请先阅读[文档入口](./docs/README.md)和[验证工作流](./docs/development/verification-workflow.md)。新端点应以 CN 1.8.1 反编译代码和实际协议为依据，并同步更新端点状态或对应系统文档。
+提交功能前请先阅读[文档入口](./docs/README.md)和[验证工作流](./docs/development/verification-workflow.md)。新端点应以 CN 1.8.1 反编译代码、本地自备的脱敏抓包和当前实现为依据，并同步更新路由族覆盖或对应系统文档。
 
 联机 NPC 昵称欢迎通过 PR 贡献。只需向 [`assets/server/npc_contributor_names.json`](./assets/server/npc_contributor_names.json) 添加昵称，不要提交 `playerId`；格式规则见[NPC 昵称贡献说明](./docs/systems/npc-contributor-names.md)。
 

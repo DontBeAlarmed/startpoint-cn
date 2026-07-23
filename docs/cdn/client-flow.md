@@ -1,7 +1,7 @@
 # CDN 客户端资源下载逻辑
 > 状态: 客户端逆向   关键文件: GlobalLoading.applyLoad (client SWF)   相关端点: -
 
-> 基于 `wf-2.1.125-cn-decompiled` 反编译代码分析。服务端机制见 `overview.md`，排查/构建见 `debugging.md`。
+> 客户端字段以 CN 反编译参考为依据。服务端机制见 `overview.md`，当前故障诊断见 `debugging.md`。
 
 ---
 

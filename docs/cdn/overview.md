@@ -1,7 +1,7 @@
 # CDN 机制与架构总览
 > 状态: 核心机制   关键文件: src/routes/cn/asset.ts   相关端点: /asset/get_path, /asset/version_info
 
-World Flipper 国服（Leiting CN）CDN 私服的目录结构、文件寻址、版本链、服务端 API 与关键配置。客户端逆向下载流程见 `client-flow.md`，排查/构建/信标/已知问题见 `debugging.md`。
+World Flipper 国服（Leiting CN）CDN 私服的目录结构、文件寻址、版本链、服务端 API 与关键配置。客户端逆向下载流程见 `client-flow.md`，当前故障决策树见 `debugging.md`。
 
 ---
 
@@ -20,7 +20,7 @@ World Flipper 国服（Leiting CN）CDN 私服的目录结构、文件寻址、�
 | 服务端 | 基于 `starpoint/`（全球服）改造为 `starpoint-cn/` | — |
 | SWF 补丁 | `starview/` Rust + FFDec 工具链 | — |
 
-> 参考：官方完整 CDN（含全部语言/平台）约 ~30GB，每语言约 ~12GB（来自上游 Starpoint 全球服 `npm run cdn` / `download_cdn.bat` 下载工具，停服后已失效；CN 资料用 `wfax` 获取，见 debugging.md 数据对齐工具链）。
+> 参考：当前项目只支持本地准备的官方 CN 1.4.54 CDN；其他地区、版本和自制资源不属于运行支持范围。
 
 ### CN APK 版本对照
 
@@ -126,7 +126,7 @@ if (bundleFiles.contains(hash)) {
 path = root + "/production/" + prefix + "/" + hash
 ```
 
-> ⚠️ 这是 C8601 的机制根源：CharacterTable 的 bundle stub（`69828cac...`）在白名单中被**优先**加载，导致 CDN 中完整的 505 条目版本无法生效。详见 debugging.md 关键发现时间线。
+Bundle 白名单会影响同一路径在 bundle 与下载目录之间的读取优先级。出现 C8601 时按[排查手册](./debugging.md)先确认版本、Catalog、下载和解压边界，不把单一历史案例作为所有 C8601 的通用根因。
 
 ### CharacterTable 发现
 
@@ -298,21 +298,7 @@ const plan = planCdnUpdate(contentSnapshot.cdn, {
 | `/crash` | POST | 崩溃日志上报 | `cn-server.ts` 内置 |
 | `/debug?loc=<ext>` | GET | **信标上报**（Beacon 系统） | `cn-server.ts` 内置 |
 
-**教程相关：**
-
-| 端点 | 方法 | 调用时机 | 实现文件 |
-|------|------|------|------|
-| `/api/index.php/tutorial/update_step` | POST | 教程步骤推进 | `cn-server.ts` stub |
-| `/api/index.php/tutorial/finish_trigger` | POST | 教程完成 | `cn-server.ts` stub |
-
-**当前 stub 响应：**
-
-| 端点 | 响应 | 影响 |
-|------|------|------|
-| `tutorial/update_step` | `{ step, start_time, mail_arrived: false }` | 教程重播（未持久化，`enable_newbie=false` 缓解） |
-| `tutorial/finish_trigger` | `[]`（附带 viewer_id） | 教程完成未保存 |
-| `tool/custom_notify` | `{}` | 不影响主流程 |
-| `assetintitle/version_info_in_title` | 与 version_info 共用固定 Content snapshot | 无影响 |
+教程路由由 `src/routes/api/tutorial.ts` 注册并持久化当前步骤。`tool/custom_notify` 仍是兼容空响应；标题页 Asset 路由与主 Asset Provider 共用固定 Content snapshot。
 
 ### 服务端文件索引
 
@@ -322,9 +308,9 @@ const plan = planCdnUpdate(contentSnapshot.cdn, {
 | `src/routes/cn/assetInTitle.ts` | 标题页版本查询，共用 snapshot 和 Asset Provider |
 | `src/routes/cn/cdnFiles.ts` | local 模式 Catalog allowlist 文件供给与路径边界检查 |
 | `src/routes/cn/load.ts` | load 响应 + wrapOptionFields + available_asset_version |
-| `src/cn-server.ts` | 主入口 + 路由装配 + tutorial stub + /debug + /crash |
-| `src/routes/api/tutorial.ts` | 教程完整逻辑（已导入但 CN 版本未启用） |
-| `src/data/wdfpData.ts` | SQLite 玩家数据 |
+| `src/cn-server.ts` | 主入口、路由装配、`/debug` 与 `/crash` |
+| `src/routes/api/tutorial.ts` | 教程步骤与触发记录 |
+| `src/data/domains/` | SQLite 玩家领域数据 |
 
 ---
 
@@ -371,7 +357,6 @@ const plan = planCdnUpdate(contentSnapshot.cdn, {
 | `enableAssetSufficiencyCheck`（原始） | `true`（所有版本） |
 | `fullResourceVersion`（原始） | `"1.0.19"`（所有版本） |
 | `enable_newbie`（服务端） | `false`（修改后，避免教程重播） |
-| `ANDROID_SERIAL`（构建） | 必设，否则跳过安装 |
 
 ---
 
@@ -381,4 +366,4 @@ const plan = planCdnUpdate(contentSnapshot.cdn, {
 - **不支持多语言/多平台**：仅 CN Android 配置。
 - **CDN 来源**：`cn_cdn.rar` 来自 shijtswydl.leiting.com 官方 CDN（停止服务前下载）。两份 CN CDN dump（`cn_cdn.rar` 与 `cn_cdn_new/WF__CN2.zip`）byte-level 完全一致，唯一差异是目录名 `entities/` vs `EntityLists/`，换 CDN 不能解决任何缺失文件或兼容性问题。
 
-> C8601 / 键体系不匹配 / recovery 循环 / bundle stub 等**问题与修复状态**记录在 `debugging.md`（关键发现时间线 + 已知问题与修复状态）。
+CDN 同步、下载大小、Range、C8601 和业务表不一致的当前诊断顺序见[排查手册](./debugging.md)。

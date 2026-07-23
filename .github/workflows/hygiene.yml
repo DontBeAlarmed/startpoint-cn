@@ -16,6 +16,9 @@ jobs:
         with:
           node-version: 20
 
+      - name: Validate documentation structure and links
+        run: npm run docs:check
+
       - name: Validate contributor NPC nicknames
         run: node tools/npc_contributor_names.cjs
 

@@ -1,20 +1,51 @@
-# 漫画系统(Comic)
-> 状态: 已实现   关键文件: web/public/comic/, src/.../comic.ts
+# 漫画系统
 
-本文档描述漫画系统的实现:图片目录格式、源文件、处理流程及已知问题。
+当前仓库实现了漫画列表与图片路由，但不分发漫画内容。fresh clone 和 Server Bundle 在未另行准备本地图片时只会得到空列表或 404，因此该模块状态为 Partial。
 
-## Comic system
+## 路由
 
-Comics stored as processed images under `web/public/comic/{kind}/`:
+`src/routes/api/comic.ts` 注册：
 
-| Directory | Format | Size | Use |
-|-----------|--------|------|-----|
-| `main/` | PNG | ≤2048px high (GPU limit) | Detail page |
-| `thumbnail_l/` | JPEG | 984×623 | Header banner |
-| `thumbnail_s/` | JPEG | 298×256 | 3×3 grid tiles |
+| 端点 | 当前行为 |
+|---|---|
+| `POST /comic/get_list` | 校验 viewer，按 kind 和 page_index 返回每页最多 9 条 |
+| `GET /comic/image` | 按 kind、episode 和 size 返回 main、大小缩略图 |
 
-**Source**: `docs/漫画/【弹射小世界】漫画/` (409 files) + `docs/漫画/【史黛拉的弹射世界讲座】/` (13 files).
+列表按 episode 降序。响应图片 URL 使用当前请求 Host 构造，避免写死本机或局域网地址。
 
-**Processing**: Pillow script — resize to target width → top-crop `(0,0,w,h)` → RGBA→RGB for JPEG. `comic.ts` parses filenames by regex (`/第(\d+)[话课]/`) to extract episode number and title. Titles must NOT include episode prefix (client displays it separately).
+## 本地内容契约
 
-**Known issues**: F3766 if main exceeds 2048px (GPU texture limit), C2035 if `getLatestComicData()` can't find `episode=totalCount` on first page (must sort descending).
+漫画根目录为：
+
+```text
+web/public/comic/<kind>/
+```
+
+当前解析支持：
+
+- kind 0：根目录文件名 `第N话 标题.jpg`；
+- kind 1：根目录文件名包含 `第N课`，标题可从 `今日课程：...` 提取。
+
+根目录 JPG 用于枚举 episode 和标题。对应图片位于：
+
+```text
+web/public/comic/<kind>/main/
+web/public/comic/<kind>/thumbnail_l/
+web/public/comic/<kind>/thumbnail_s/
+```
+
+main 优先读取与根文件同名的 PNG，找不到时回退 JPG；缩略图使用与根文件同名的 JPG。缺少 kind 目录时列表返回空；缺少目标图片时返回 404。
+
+## 分发边界
+
+`web/public/comic/` 被 Git 忽略，不得提交漫画图片。Server Bundle 构建器也明确排除该目录，因此宿主或部署者必须在 Data/静态资源层另行准备合法内容。
+
+仓库当前没有漫画抓取或图片处理生成器，也不提供第三方漫画源目录。文档只定义服务端读取契约，不声称 fresh clone 自带可用漫画库。
+
+## 已知边界
+
+- 没有本地图片时只能返回空列表或 404；
+- 内容不进入 Server Bundle，嵌入式宿主需要额外挂载策略；
+- 文件名不匹配当前正则时 episode 会退化为 0 或无法按 episode 查图；
+- 未验证所有设备比例、纹理上限和完整翻页体验；
+- 当前没有漫画内容完整性与缩略图尺寸自动测试。

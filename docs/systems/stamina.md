@@ -1,135 +1,98 @@
-# 体力系统(Stamina)
-> 状态: 已实现   关键文件: assets/config.json, assets/quest_entry_costs.json, src/lib/stamina.ts, assets/cdndata/player_rank_full.json   相关端点: /shop/recover_stamina, /item/use_item
+# 体力系统
 
-本文档描述体力系统(2026-06-25 updated)的实现:恢复/消耗流程、体力配置、关卡进入消耗、道具使用、等级提升、遗留问题,以及关卡进入消耗 key 格式。
+本文描述当前体力上限、自然恢复、关卡消耗、活动折扣与升级补充规则。关卡门票和入场道具的事务边界见[关卡入场道具](./quest-entry-items.md)。
 
-## Stamina system (2026-06-25)
+## 数据来源
 
-### Max stamina by degree (2026-06-25)
-`assets/cdndata/player_rank_full.json` — 完整 0–250 级表，每级包含 `[maxStamina, total_rp_threshold, heal_rate]`。
+| 数据 | 位置 | 用途 |
+|---|---|---|
+| 玩家体力 | `players.stamina`、`players.stamina_heal_time` | 当前存量与恢复起点 |
+| 等级表 | `assets/cdndata/player_rank_full.json` | 等级阈值、自然上限与 `heal_rate` |
+| 体力配置 | `assets/config.json` | 每点恢复秒数、恢复道具和溢出上限 |
+| 关卡成本 | `assets/quest_entry_costs.json` | 按 `category_questId` 保存体力与道具成本 |
+| 活动折扣 | `assets/stamina_campaign.json` | 按关卡类别、ID 与服务器时间选择折扣率 |
 
-- **0～100 级**：用户实测数据（101 个点）
-- **101～250 级**：CDN `player_rank.json`（150 个点）
-- `getMaxStamina(degreeId)` 查表获取等级体力上限
-- `getRankDegree(rankPoint)` 二分搜索获取当前等级
-- 升级时体力回满 = `getMaxStamina(newDegreeId)`
-- 溢出上限固定 999（道具/星导石恢复的硬上限）
+`getRankDegree(rankPoint)` 从等级阈值计算当前 degree；`getMaxStamina(degree)` 返回该等级的自然体力上限。
 
-#### heal_rate 未对齐（2026-06-25）
-CDN 中 heal_rate 用于客户端计算显示恢复速度（公式：`300 × (1 - heal_rate)` 秒/点）。当前服务端采用**预计算模式**：`computeRealTimeStamina()` 用 `Date.now()` 真实时间 + 固定 300 秒/点计算恢复量，并在 `/load`/`start`/`finish` 响应中发送计算结果 + 当前 `stamina_heal_time`，强制客户端显示服务端计算的值。
+## 自然恢复
 
-**与官方的差异**：
-- 官方让客户端自行用 heal_rate 计算恢复 → `stamina_heal_time` 发 DB 旧时间
-- 我们预计算后发送 → `stamina_heal_time` 发当前时间，客户端 elapsed≈0
-- 1～100 级 heal_rate 目前全部填 `0.0`（不影响显示，服务端预计算覆盖）
+`computeRealTimeStamina()` 读取玩家体力、恢复时间、等级和 `heal_rate`：
 
-未来若改为官方模式，需要补全 1～100 级每级的真实 heal_rate 值。
-
-### Recovery/consumption flow
-Stamina is stored as `players.stamina` + `players.stamina_heal_time`. Server computes real-time recovery using `Date.now()`, but sends `stamina_heal_time: getServerTime()` to the client so client-side calculation yields `elapsed=0` and displays the server-computed value directly.
-
-### Fix: real-time recovery on /load (2026-06-25)
-Previously `/load` sent the raw DB `stamina` value without computing elapsed recovery, causing all offline stamina regen to be lost. Now `src/lib/stamina.ts:computeRealTimeStamina()` is called in `/load` (`src/data/utils.ts`) before building the response, and the computed value is persisted back to DB.
-
-### Rank level-up system (2026-06-25)
-- `degreeId` was previously never updated from `rankPoint` (stuck at 1). Now `getRankDegree(rankPoint)` queries `assets/cdndata/player_rank.json` to find the appropriate degree ID at `/finish`.
-- On level up, stamina is refilled to 999 (max overflow).
-- Multi battle: stamina deduction and level-up NOT implemented yet — deferred until co-op system is stable.
-
-Affected endpoints and their response `stamina_heal_time` format:
-| Endpoint | Format |
-|----------|--------|
-| `/load` | `computeRealTimeStamina()` + `getServerTime()` (virtual) |
-| `/single_battle_quest/start` | `computeRealTimeStamina()` → deduction + `getServerTime()` (virtual) |
-| `/single_battle_quest/finish` | `computeRealTimeStamina()` + `getServerTime()` (virtual) + degree update |
-| `/shop/recover_stamina` | `getServerTime()` (virtual) |
-| `/item/use_item` | `getServerTime()` (virtual) |
-
-### Stamina config
-`assets/config.json` — 51 config values, currently hardcoded (CDN binary `master/config/config.orderedmap` not extractable — salt `K6R9T9Hz22OpeIGEWB0ui6c6PYFQnJGy` hash doesn't match entity list, likely CN/GF version uses different salt).
-
-Key stamina config values:
-- `stamina_recovery_seconds`: 300 (5 min/pt)
-- `stamina_recovery_virtual_money`: 50 (stone cost)
-- `stamina_recovery_value`: 100 (recovery amount)
-- `max_stamina_overflow`: 999 (cap)
-- Min stamina: 0, Max: 999 (overflow), Natural cap: rank-based
-
-### Quest entry costs
-`assets/quest_entry_costs.json` — CDN 原值（无折扣），`scripts/gen_entry_costs.js` 自动校准索引生成。2018 quests total, 1629 with stamina > 0。
-
-#### 宝物域示宝金钥匙（2026-07-18）
-
-宝物域 ChallengeDungeon `2001～2006` 的入场成本直接来自 CN 主数据：字段 `56/57/58/70` 分别为道具使用模式、道具 ID、道具数量和体力。字段 `56` 只在生成时判断是否采用道具成本，运行资产继续使用统一的 `{itemId,itemCount,stamina}` 契约。六关均为模式 `Always(1)`、示宝金钥匙 `500000×1`、体力 `10`；生成器在写入资产前会逐关断言这组值，防止重建时再次遗漏钥匙成本。
-
-`/single_battle_quest/start` 每收到一次成功开战请求只扣 1 把钥匙，不按自动周回次数预扣。钥匙和体力的充足性会先完成校验，随后在同一个 SQLite 事务中扣除钥匙、扣除体力、更新当前队伍槽并持久化 active quest；任一校验、写入或事务提交失败时均不保留部分数据库修改。只有 SQLite 外层事务成功提交后，服务端才把 active quest 发布到内存，避免提交失败留下不可结算的内存状态。
-
-成功响应的 `data.item_list` 包含扣除后的钥匙余额。余额变为 `0` 时仍返回 `{"500000":0}`，使客户端立即刷新并移除已耗尽的库存项。
-
-### Stamina campaign discounts (2026-06-30)
-
-**数据流**：
-```
-/startsingle_battle_quest
-  → getStaminaCost(questKey)
-    → getActiveCampaignRate(category, questId, getServerDate())
-      → 遍历 stamina_campaign.json 453 条
-        → quest_type 匹配 category
-        → quest_ids 匹配 questId
-        → serverDate 在 [start, end] 内
-        → 多命中取 min(rate)
-    → cost = max(1, floor(baseCost × rate))
-  → 扣除 cost 体力
+```text
+recoverySeconds = config.stamina_recovery_seconds * (1 - healRate)
+recovered = floor((now - staminaHealTime) / recoverySeconds)
 ```
 
-**关键文件**：
+结果不会低于 0，也不会超过以下三个边界中的最小值：
 
-| 文件 | 作用 |
-|------|------|
-| `assets/stamina_campaign.json` | CN CDN 453 条 campaign，含 quest_type / quest_ids / start / end / rate |
-| `lib/stamina-campaign.ts` | 加载 campaign 数据，quest_type 映射（20 种），时间有效性 + quest_id 匹配 |
-| `lib/stamina-cost.ts` | `getStaminaCost()` 封装：baseCost 来自 `entry_costs.json`，rate 来自 campaign，折后 ≥ 1 |
+- 当前等级自然上限与玩家现有体力的较大值；
+- 恢复后的计算值；
+- 溢出硬上限 999。
 
-**折扣率**：`stamina_consumption_rate`（0.25=1/4, 0.5=半价）。无匹配 → rate=1 → 原价。
+这意味着自然恢复不会抹掉已有溢出体力，但也不会让体力继续自然增长超过当前存量或 999。`/load` 会计算并持久化离线恢复结果；相关响应把 `stamina_heal_time` 更新为当前服务器时间，避免客户端在服务端结果上再次累计同一段时间。
 
-### Item usage
-New endpoint `/item/use_item` (`src/routes/api/item.ts`). Handles `StaminaFixed(2)` and `StaminaRate(3)` effect items. CDN item data extracted to `assets/item_data.json` (100 items with effect info). Response `item_list` uses `IntMap<int>` format (`{itemId: count}`).
+## 单人关卡
 
-### DB path fix
-`src/data/index.ts` — replaced `process.cwd()` with `path.resolve(__dirname, "../../.database")`. DB always at `starpoint-cn/.database/wdfp_data.db` regardless of startup directory.
+`/single_battle_quest/start` 使用 `${category}_${questId}` 查找入场成本，再通过 `getStaminaCost()` 应用当前服务器时间内的活动折扣：
 
-### Payment
-`/payment/item_list` returns empty `[]` (IAP disabled). Leiting SDK payment flow cannot be completed without real Leiting store. Remaining payment endpoints (`/start`, `/finish`, `/report_purchase_result`, `/query_purcharge`) are stubs.
+```text
+cost = max(1, floor(baseCost * activeRate))
+```
 
-### Remaining issues
-1. Config values from CDN binary — need to find correct salt/path for GF version
-2. Mission system — 3 endpoints return empty (deferred)
-3. Multi battle stamina deduction + level-up — deferred until co-op stable
-4. Auto-repeat H400: 自动连战不检查体力，体力耗尽时客户端连续发 /start 被服务端 H400 拒绝 → 崩溃。需服务端对 `is_auto_start_mode=true` 返回非致命响应（待修复）
+没有体力成本时返回 0。成功开战在同一个 SQLite 事务中完成：
 
-## Mission progress system (2026-06-25)
+1. 计算实时体力；
+2. 校验体力与入场道具；
+3. 扣除体力和道具；
+4. 更新队伍槽；
+5. 持久化 active quest；
+6. 提交后发布内存 active quest。
 
-### Server-side computation
-Mission progress is fully computed server-side in `get_mission_progress`, aligned with official behavior:
-- **Degree missions** (8 rank growth): `progress = getRankDegree(rankPoint)`, target from CDN descriptions
-- **Quest clear missions**: progress = count of `finished=true` quests in `players_quest_progress`
-- **Stamina use missions**: progress = `players.total_stamina_used` (accumulated on `/start`)
-- **Rank evaluation missions** (SS/S/A/B): progress = count of quests with matching `clear_rank`
-- **Prefix matching**: covers all daily/event variants (`single_battle_play_2`, `single_battle_play_xm19`, etc.)
+任一步失败都不保留部分写入。成功响应立即返回扣除后的 `stamina` 和 `stamina_heal_time`。
 
-### Pattern coverage
-| Category | Missions | Computable | Notes |
-|----------|----------|------------|-------|
-| Regular (1) | 120 | ~5 (quest clear + rank) | |
-| Daily (2) | 656 | ~20 (quest clear + stamina) | Includes `_2`, `_3`, event-specific variants |
-| Event (3) | 2512 | 0 | Event missions depend on CDN event table |
-| Degree (5) | 1288 | 8 (rank growth) | Remaining 1280 are character/event-specific |
-| Weekly (10) | 2 | 0 | |
+单人结算增加 rank point 后重新计算 degree。跨级时，当前实现是在结算前体力上**增加** `getMaxStamina(newDegreeId)`，并重置恢复时间；它不是把体力直接设为 999，也不是简单设为新等级自然上限。
 
-### Known limitations
-- **No daily reset**: `totalQuestClears` and `totalStaminaUsed` are absolute totals, not daily counters. Daily missions appear permanently completed after first login.
-- **Event missions**: 4800+ event-specific missions cannot be computed without CDN event→quest mapping.
-- **heal_rate**: 1-100 levels set to `0.0` (server pre-computes recovery, client-side rate unused).
+## 多人关卡
 
-## Quest entry cost key format
-`quest_entry_costs.json` uses `{category}_{questId}` compound keys to avoid collisions between main story quests (category=1) and EX quests (category=4) that share the same questId (e.g., `1_1001001` = 0 stamina, `4_1001001` = 12 stamina).
+多人开战当前没有实现体力扣除，这是与单人流程的明确差异。
+
+多人结算已经实现 rank point 与 degree 更新。跨级时同样在当前体力上增加 `getMaxStamina(newDegreeId)` 并重置恢复时间，然后通过 `user_info` 返回新体力。不得再把“多人升级未实现”作为当前状态。
+
+## 活动折扣
+
+`getActiveCampaignRate()` 使用统一服务器时间匹配：
+
+- `quest_type` 对应关卡类别；
+- 可选 `quest_ids` 限制具体关卡；
+- 当前时间必须位于活动开放区间；
+- 多条规则同时命中时选择最低费率；
+- 未命中时费率为 1。
+
+折扣只影响体力，不替代门票或入场道具校验。
+
+## 恢复入口
+
+- `/shop/recover_stamina` 处理付费恢复；
+- `/item/use_item` 处理固定值与比例体力道具；
+- 恢复后的体力受配置中的溢出上限约束；
+- 支付服务只保留兼容边界，不提供真实雷霆商店结算。
+
+## 已知边界
+
+- 多人开战不扣体力；
+- 自动连战在体力不足时仍按普通入场返回 H400，客户端缺少官方的非致命停止语义；
+- 体力、门票与 active quest 已在单人 start 事务化，但普通 finish 的整体事务仍不完整；
+- 客户端显示和长时间离线恢复仍需结合服务器 `timeOffset` 做人工验收。
+
+当前项目不按存档单独应用 `time_offset`。活动折扣使用带全局 `timeOffset` 的 `getServerDate()`；自然恢复使用真实 `Date.now()` 计算经过秒数。两者是有意分离的时间来源，非零全局偏移不会加速或倒退玩家的自然恢复。
+
+## 验证入口
+
+主要相关测试：
+
+- `tools/quest_entry_lifecycle.test.cjs`；
+- `tools/treasure_key_entry.test.cjs`；
+- `tools/quest_host_finish.test.cjs`；
+- `tools/event_currency.test.cjs`。
+
+修改体力或关卡入场规则后运行 `npm run test:changed`，模块提交前运行 `npm run verify:full`。

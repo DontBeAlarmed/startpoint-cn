@@ -401,8 +401,9 @@ test("splits isolated integration tests into focused domains", () => {
     ])
 })
 
-test("quick workflow includes the package scripts contract", () => {
+test("quick workflow includes documentation and package script contracts", () => {
     assert.deepEqual(TEST_GROUPS["quick:workflow"].tests, [
+        "tools/docs_check.test.cjs",
         "tools/test-workflow/benchmark.test.cjs",
         "tools/test-workflow/build-cn.test.cjs",
         "tools/test-workflow/package-scripts.test.cjs",

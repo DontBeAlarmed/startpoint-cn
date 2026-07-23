@@ -35,11 +35,15 @@ npm run install:admin
 npm run build:admin
 ```
 
+## 网络范围
+
+当前支持本机和受信任的局域网运行。监听地址、客户端可达地址与明确不支持的公网能力见[网络支持边界](./network-boundary.md)。管理后台不具备公网鉴权，不能直接作为互联网管理控制台使用。
+
 ## 延伸阅读
 
 - [当前运行时架构](../architecture.md)
 - [CDN 与内容](../cdn/README.md)
-- [部署说明](../deployment.md)
+- [网络支持边界](./network-boundary.md)
 - [客户端测试进度](../status/test-progress.md)
 - [嵌入式运行契约](../embedded-runtime-contract.md)
 

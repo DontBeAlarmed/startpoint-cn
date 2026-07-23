@@ -1,37 +1,82 @@
-# 邮件系统（Mail）
-> 状态：游戏内流程已实现；管理后台搜索与定向发送待补全
-> 关键文件：`assets/item_ids.json`、`assets/character.json`、`assets/equipment_ids.json`
-> 相关端点：`/mail/send`、`/mail/index`、`/api/mail/send`
+# 邮件系统
 
-本文档描述游戏内邮件、管理后台发送、CDN 附件校验，以及邮件到达通知的动态计算。管理后台附件搜索和定向发送的完整分析见 `docs/superpowers/specs/2026-07-19-mail-search-and-targeting-design.md`。
+本文描述游戏内邮件列表与领取、管理后台发送目标、附件白名单和当前通知边界。管理页面本身见[管理后台](../admin/README.md)。
 
-## 邮件到达通知
+## 游戏内端点
 
-`mail_arrived` 根据当前存档在 `players_mails` 表中的未领取邮件数量动态计算。存在未领取邮件时为 `true`。
+| 端点 | 当前行为 |
+|---|---|
+| `/mail/index` | 按页返回当前存档邮件，默认每页最多 100 条 |
+| `/mail/receive` | 领取一封未领取邮件，发放附件并标记 receive time |
+| `/mail/receive_all` | 对请求中的未领取邮件逐封发奖，再批量标记已领取 |
 
-## 管理后台发送目标
+邮件是否未领取以 `receive_time = '0000-00-00 00:00:00'` 判断。领取记录会写入 `players_receive_history`。
 
-`POST /api/mail/send` 当前支持三种目标：
+当前领取顺序是先发放附件、再标记邮件，不是覆盖两者的单一总事务。`receive_all` 也会逐封发奖后再批量标记；中途异常仍存在部分状态风险，不能标记为完整原子流程。
 
-- `playerId`：指定一个存档。
-- `accountId`：指定账号下的全部存档。
-- 两者都不提供：全服全部存档。
+## 已支持附件
 
-旧 `/mail` 页面不提供目标控件，因此只能全服发送。新 `/admin/mail` 已有三档目标控件，但当前玩家列表默认只返回前 25 条，尚不能可靠覆盖全部存档。
+管理后台白名单与游戏领取分支当前共同覆盖 12 种：
 
-## CDN 附件校验
+| type | 附件 |
+|---:|---|
+| 1 | 道具 |
+| 3 | 付费星导石 |
+| 4 | 免费星导石 |
+| 5 | 角色 |
+| 6 | 装备 |
+| 7 | 星之粒 |
+| 8 | 免费玛纳 |
+| 9 | 经验池 |
+| 10 | 羁绊证 |
+| 11 | Boss boost point |
+| 12 | boost point |
+| 15 | rank point |
 
-管理后台发送邮件时会在写入前校验 `type_id`：
+`MailType` 枚举还定义了 13、14、16、17，但后台不允许发送，游戏领取也没有对应发奖分支，因此不属于当前支持类型。
 
-- 角色（`type=5`）：校验 `assets/character.json`，当前 505 个 ID。
-- 道具（`type=1`）：校验 `assets/item_ids.json`，当前 1284 个 ID。
-- 装备（`type=6`）：校验 `assets/equipment_ids.json`，当前 436 个 ID。
-- 非法 ID：返回错误，不写入邮件。
+`type_id` 只允许并要求用于道具、角色和装备；其他附件带 `type_id` 会被拒绝，不会静默忽略。三类 ID 分别按当前道具、角色和装备资源集合校验。
 
-`assets/item_ids.json` 来自 CN `orderedmap/item/item.json`。`assets/item_data.json` 只包含带使用效果的部分体力道具，供 `/item/use_item` 使用，不能作为邮件附件白名单。
+角色和装备每封只能发送 1 个。道具数量按 ID 范围应用不同上限；其他资源使用 int32 安全范围。最终规则以 `src/lib/admin-mail-rules.ts` 为唯一事实来源。
 
-中文名称查询复用以下只读数据：
+## 后台发送目标
 
-- `assets/item_lookup.json`
-- `assets/equipment_lookup.json`
-- 当前 `ContentRepository` snapshot 中的 `character.json`、`cdndata/character.json` 与 `cdndata/character_text.json`
+`POST /api/mail/send` 支持：
+
+1. `playerId`：只发送到指定存档；
+2. `accountId`：发送到账号下全部存档；
+3. 两者都不提供：发送到全部账号的全部存档。
+
+同时提供两者时 `playerId` 优先。目标不存在或输入非法时拒绝请求。全服发送逐存档插入，不是跨全部收件人的单一事务；单个插入失败会跳过该存档并继续。
+
+最近 20 条发送记录只保存在进程内，服务重启后清空，不属于审计日志。后台搜索使用道具、装备 lookup 和当前角色 Content snapshot 提供名称与 ID 匹配，不改变附件校验来源。
+
+## `mail_arrived`
+
+`/load`、`/mail/receive` 和 `/mail/receive_all` 会根据当前存档未领取邮件数动态计算 `mail_arrived`。
+
+装备、抽卡、商店、任务、关卡和养成等大量普通业务响应仍硬编码 `false`。因此“数据库中存在未领取邮件”与“任意下一次响应都会通知客户端”不是同一个能力；全局通知语义尚未统一。
+
+## 存档与恢复边界
+
+邮件保存在 `players_mails`，但当前管理端 MergedPlayerData 快照不包含邮箱和领取历史。导出/导入存档不能作为邮件备份。
+
+`DELETE /api/player/:id/mail` 可以清空指定存档邮箱，用于误发非法邮件后的管理恢复。该操作不可撤销，且不会回滚已经领取的附件。
+
+## 已知边界
+
+- 12 种支持附件尚无完整逐类型客户端验收矩阵；
+- 领取与标记未形成单一总事务；
+- 全局 `mail_arrived` 未统一；
+- 全服发送不是跨收件人事务，也没有持久审计历史；
+- 邮件不包含在当前存档导入导出中。
+
+## 验证入口
+
+主要相关测试：
+
+- `tests/admin-mail-rules.test.js`；
+- `tests/admin-mail-ui-source.test.js`；
+- `tools/inventory_rules.test.cjs`。
+
+修改附件或领取逻辑后运行相关测试，模块提交前运行 `npm run verify:full`。

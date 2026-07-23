@@ -1,21 +1,13 @@
-# Deploying StarPoint
+# 旧版部署兼容工具
 
-## DISCLAIMER
+本目录来自上游 StarPoint 的旧版部署与启动工具，供兼容既有脚本引用。它不属于 StarPoint CN 当前受支持的启动流程，也不作为公网部署指南维护。
 
-**While these scripts exist to facilitate ease of deployment, they are not a one-size-fits-all solution and may not work if not properly configured.**
+目录中可能保留 Nginx、systemd、DNS、自签名证书和旧安装脚本等上游文件。这些文件没有按当前 CN 服务端、管理后台、Content Runtime 或安全边界完成持续验证；存在不代表项目承诺其可用性、兼容性或公网安全。
 
-**THESE FILES ARE PROVIDED FOR PERSONAL USE AND NOT DESIGNED FOR CREATING PUBLICLY-AVAILABLE SERVICES. CREATING AND SERVING A PUBLICLY-AVAILABLE SERVER IS HIGHLY DISCOURAGED, ESPECIALLY WITH THESE FILES AS PROVIDED. NO AUTHOR NOR CONTRIBUTOR TO STARPOINT ENDORSES NOR ASSUMES RESPONSIBILITY OF ANY KIND FOR ANY CONSEQUENCES OF ANY KIND SHOULD ONE ATTEMPT TO MAKE AVAILABLE ANY SERVICES USING THIS REPOSITORY. BY RUNNING ANY PART OF THIS CODE, AN INDIVIDUAL AGREES TO RELEASE STARPOINT AND ITS CONTRIBUTORS OF ALL LIABILITY. VOLUNTARY ASSISTANCE WITH LOCAL SETUPS SHALL NOT BE CONSIDERED LIABILITY, NOR ENDORSEMENT.**
+CN 服务端唯一受支持的前台入口是：
 
-This folder currently contains configuration files for:
+```bash
+bash scripts/start-cn.sh
+```
 
-- Nginx reverse proxy configuration
-- SSL self-signed certificate and key generation script (for POSIX shell (Linux/Unix/Mac) and Windows) (requires installing OpenSSL)
-  - Automatic certificate installation for Linux systems, to the paths the nginx file expects
-- dnsmasq DNS redirection
-- systemd service file
-- Installation script
-- Utilities shell script file, to be imported by other scripts for extra functions
-
-Ensure you have the required dependencies for the scripts you want to run. Note that npm must be run on the target system to build dependencies. Running build tasks on another system and copying the output over may not work.
-
-Make sure to change the host address in .env to something other than localhost!
+本项目只支持本机和受信任的局域网运行。公网暴露、反向代理、TLS、防火墙、域名和云平台操作均由部署者自行负责，不在项目支持范围。当前网络变量与安全边界见[网络支持边界](../docs/getting-started/network-boundary.md)。
