@@ -55,13 +55,13 @@ test("corrupt current, release manifest, or catalog object fails without fallbac
             const current = await store.readCurrent()
             const manifest = await store.readRelease(current)
             if (corruption === "current") {
-                fs.writeFileSync(path.join(fixture.paths.contentRootDir, "current.json"), "{")
+                fs.writeFileSync(path.join(fixture.paths.contentStateDir, "current.json"), "{")
             } else if (corruption === "manifest") {
-                fs.writeFileSync(path.join(fixture.paths.contentRootDir, current.release), "{}")
+                fs.writeFileSync(path.join(fixture.paths.contentStoreDir, current.release), "{}")
             } else {
                 fs.writeFileSync(
                     path.join(
-                        fixture.paths.contentRootDir,
+                        fixture.paths.contentStoreDir,
                         "objects",
                         `${manifest.catalog.object.slice("sha256:".length)}.json`,
                     ),

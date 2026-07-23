@@ -19,6 +19,7 @@ const RELEASE_PATH_PATTERN = /^releases\/(.+)-([0-9a-f]{64})\/manifest\.json$/
 const NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0
 const DIRECTORY = fs.constants.O_DIRECTORY ?? 0
 const OBJECT_READ_CONCURRENCY = 8
+const SPLIT_ROOT_CONFLICT_MESSAGE = "contentStoreDir and contentStateDir must not be equal or nested"
 
 interface FileIdentity {
     readonly dev: number
@@ -38,6 +39,12 @@ export interface ContentObjectStoreDependencies {
     readonly rename?: (source: string, destination: string) => Promise<void>
 }
 
+type ModernContentObjectStorePaths = Pick<ContentPaths, "contentStoreDir" | "contentStateDir">
+type LegacyContentObjectStorePaths = Pick<ContentPaths, "contentRootDir">
+type ContentObjectStorePaths = ContentPaths
+    | ModernContentObjectStorePaths
+    | LegacyContentObjectStorePaths
+
 export interface ContentCurrentRelease {
     readonly current: ContentCurrentPointer
     readonly manifest: ContentReleaseManifest
@@ -54,6 +61,32 @@ export interface ContentCurrentReleaseSnapshot extends ContentCurrentRelease {
 
 function isMissing(error: unknown): error is NodeJS.ErrnoException {
     return Boolean(error && typeof error === "object" && (error as NodeJS.ErrnoException).code === "ENOENT")
+}
+
+function resolvePhysicalProjection(filePath: string, label: string): string {
+    const missingSegments: string[] = []
+    let existingAncestor = filePath
+
+    while (!fs.existsSync(existingAncestor)) {
+        try {
+            if (fs.lstatSync(existingAncestor).isSymbolicLink()) {
+                throw new TypeError(
+                    `${label} contains a dangling symbolic link: ${existingAncestor}`,
+                )
+            }
+        } catch (error) {
+            const code = (error as NodeJS.ErrnoException).code
+            if (code !== "ENOENT" && code !== "ENOTDIR") throw error
+        }
+        const parent = path.dirname(existingAncestor)
+        if (parent === existingAncestor) {
+            throw new TypeError(`cannot find an existing ancestor for ${label}`)
+        }
+        missingSegments.unshift(path.basename(existingAncestor))
+        existingAncestor = parent
+    }
+
+    return path.resolve(fs.realpathSync(existingAncestor), ...missingSegments)
 }
 
 function errorWithCause(message: string, cause: unknown): Error {
@@ -104,21 +137,125 @@ function referencedObjects(manifest: ContentReleaseManifest): ReadonlySet<`sha25
 }
 
 export class ContentObjectStore {
-    private readonly contentRootDir: string
+    private readonly contentStoreDir: string
+    private readonly contentStateDir: string
     private readonly rename: (source: string, destination: string) => Promise<void>
     readonly #directoryIdentities = new Map<string, DirectoryIdentity>()
 
     constructor(
-        paths: Pick<ContentPaths, "contentRootDir">,
+        paths: ContentObjectStorePaths,
         dependencies: ContentObjectStoreDependencies = {},
     ) {
-        if (!paths.contentRootDir || !path.isAbsolute(paths.contentRootDir)) {
-            throw new TypeError("contentRootDir must be an absolute path")
-        }
-        this.contentRootDir = path.resolve(paths.contentRootDir)
+        const resolved = ContentObjectStore.resolveRoots(paths)
+        this.contentStoreDir = resolved.contentStoreDir
+        this.contentStateDir = resolved.contentStateDir
         this.rename = dependencies.rename ?? ((source, destination) => (
             fs.promises.rename(source, destination)
         ))
+    }
+
+    private static resolveRoots(paths: ContentObjectStorePaths): ModernContentObjectStorePaths {
+        const candidate = paths as Partial<ContentPaths>
+        const hasRoot = candidate.contentRootDir !== undefined
+        const hasStore = candidate.contentStoreDir !== undefined
+        const hasState = candidate.contentStateDir !== undefined
+
+        if (hasStore !== hasState) {
+            throw new TypeError("contentStoreDir and contentStateDir must be configured together")
+        }
+        if (hasRoot && hasStore) {
+            if (!this.isCompleteContentPaths(candidate)) {
+                throw new TypeError(
+                    "legacy contentRootDir cannot be mixed with split roots outside complete ContentPaths",
+                )
+            }
+            if (candidate.layout === "modern") {
+                return this.requireIsolatedSplitRoots(candidate)
+            }
+            const root = this.requireAbsoluteRoot(candidate.contentRootDir)
+            const split = this.requireAbsoluteSplitRoots(candidate)
+            if (root === split.contentStoreDir && root === split.contentStateDir) {
+                return { contentStoreDir: root, contentStateDir: root }
+            }
+            throw new TypeError("legacy contentRootDir cannot be mixed with split contentStoreDir/contentStateDir")
+        }
+        if (hasStore) return this.requireIsolatedSplitRoots(candidate)
+        if (hasRoot) {
+            if (candidate.layout !== undefined) {
+                throw new TypeError("layout requires complete ContentPaths")
+            }
+            const root = this.requireAbsoluteRoot(candidate.contentRootDir)
+            return { contentStoreDir: root, contentStateDir: root }
+        }
+        throw new TypeError("content store paths must use split roots or an explicit legacy contentRootDir")
+    }
+
+    private static isCompleteContentPaths(paths: Partial<ContentPaths>): paths is ContentPaths {
+        return (paths.layout === "modern" || paths.layout === "legacy")
+            && [
+                paths.cdnDir,
+                paths.cdnRoot,
+                paths.contentRootDir,
+                paths.contentStoreDir,
+                paths.contentStateDir,
+                paths.contentRuntimeDir,
+            ].every(value => typeof value === "string" && value.length > 0)
+    }
+
+    private static requireAbsoluteRoot(root: string | undefined): string {
+        if (!root || !path.isAbsolute(root)) {
+            throw new TypeError("contentRootDir must be an absolute path")
+        }
+        return path.resolve(root)
+    }
+
+    private static requireAbsoluteSplitRoots(
+        paths: Partial<ModernContentObjectStorePaths>,
+    ): ModernContentObjectStorePaths {
+        if (!paths.contentStoreDir || !path.isAbsolute(paths.contentStoreDir)) {
+            throw new TypeError("contentStoreDir must be an absolute path")
+        }
+        if (!paths.contentStateDir || !path.isAbsolute(paths.contentStateDir)) {
+            throw new TypeError("contentStateDir must be an absolute path")
+        }
+        return {
+            contentStoreDir: path.resolve(paths.contentStoreDir),
+            contentStateDir: path.resolve(paths.contentStateDir),
+        }
+    }
+
+    private static requireIsolatedSplitRoots(
+        paths: Partial<ModernContentObjectStorePaths>,
+    ): ModernContentObjectStorePaths {
+        const resolved = this.requireAbsoluteSplitRoots(paths)
+        const physicalStoreDir = resolvePhysicalProjection(
+            resolved.contentStoreDir,
+            "contentStoreDir",
+        )
+        const physicalStateDir = resolvePhysicalProjection(
+            resolved.contentStateDir,
+            "contentStateDir",
+        )
+        const stateFromStore = path.relative(
+            physicalStoreDir,
+            physicalStateDir,
+        )
+        const storeFromState = path.relative(
+            physicalStateDir,
+            physicalStoreDir,
+        )
+        if (this.isSameOrDescendant(stateFromStore)
+            || this.isSameOrDescendant(storeFromState)) {
+            throw new TypeError(SPLIT_ROOT_CONFLICT_MESSAGE)
+        }
+        return resolved
+    }
+
+    private static isSameOrDescendant(relativePath: string): boolean {
+        return relativePath === ""
+            || (relativePath !== ".."
+                && !relativePath.startsWith(`..${path.sep}`)
+                && !path.isAbsolute(relativePath))
     }
 
     async writeObject(value: unknown): Promise<`sha256:${string}`> {
@@ -201,7 +338,7 @@ export class ContentObjectStore {
     private async readCurrentPointer(): Promise<ContentCurrentPointer | null> {
         let root: DirectoryIdentity
         try {
-            root = await this.secureRoot(false)
+            root = await this.secureStateRoot(false)
         } catch (error) {
             if (isMissing(error)) return null
             throw error
@@ -211,7 +348,7 @@ export class ContentObjectStore {
         try {
             bytes = await this.secureReadFile(
                 root,
-                path.join(this.contentRootDir, "current.json"),
+                path.join(this.contentStateDir, "current.json"),
                 "current pointer",
             )
         } catch (error) {
@@ -295,26 +432,31 @@ export class ContentObjectStore {
             assetVersion: parsed.assetVersion,
             release,
         })
-        const root = await this.secureRoot(true)
+        const root = await this.secureStateRoot(true)
         await this.atomicWrite(
             root,
-            path.join(this.contentRootDir, "current.json"),
+            path.join(this.contentStateDir, "current.json"),
             canonicalJsonBuffer(current),
             true,
         )
         return current
     }
 
-    private async secureRoot(create: boolean): Promise<DirectoryIdentity> {
-        if (create) await fs.promises.mkdir(this.contentRootDir, { recursive: true, mode: 0o700 })
-        return this.secureDirectory(this.contentRootDir, "content root")
+    private async secureStoreRoot(create: boolean): Promise<DirectoryIdentity> {
+        if (create) await fs.promises.mkdir(this.contentStoreDir, { recursive: true, mode: 0o700 })
+        return this.secureDirectory(this.contentStoreDir, "content store root")
+    }
+
+    private async secureStateRoot(create: boolean): Promise<DirectoryIdentity> {
+        if (create) await fs.promises.mkdir(this.contentStateDir, { recursive: true, mode: 0o700 })
+        return this.secureDirectory(this.contentStateDir, "content state root")
     }
 
     private async secureManagedDirectory(
         name: "objects" | "releases",
         create: boolean,
     ): Promise<DirectoryIdentity> {
-        const root = await this.secureRoot(create)
+        const root = await this.secureStoreRoot(create)
         return this.secureChildDirectory(root, name, create)
     }
 
@@ -474,9 +616,9 @@ export class ContentObjectStore {
 
         let relativePath = pointerOrManifestPath
         if (path.isAbsolute(relativePath)) {
-            const relative = path.relative(this.contentRootDir, path.resolve(relativePath))
+            const relative = path.relative(this.contentStoreDir, path.resolve(relativePath))
             if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-                throw new Error("release manifest path escapes contentRootDir")
+                throw new Error("release manifest path escapes contentStoreDir")
             }
             relativePath = relative.split(path.sep).join("/")
         }

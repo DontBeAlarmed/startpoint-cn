@@ -15,12 +15,14 @@ const MISSING_DIGEST = `sha256:${"f".repeat(64)}`
 
 function createFixture(t, prefix = "content-object-store-") {
     const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), prefix))
-    const contentRootDir = path.join(sandbox, ".content")
+    const contentStoreDir = path.join(sandbox, "store")
+    const contentStateDir = path.join(sandbox, "state")
     t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
     return {
-        contentRootDir,
+        contentStateDir,
+        contentStoreDir,
         sandbox,
-        store: new ContentObjectStore({ contentRootDir }),
+        store: new ContentObjectStore({ contentStoreDir, contentStateDir }),
     }
 }
 
@@ -37,9 +39,9 @@ function createDirectorySymlink(t, target, linkPath) {
     }
 }
 
-function releasePath(contentRootDir, manifest) {
+function releasePath(contentStoreDir, manifest) {
     return path.join(
-        contentRootDir,
+        contentStoreDir,
         "releases",
         `${manifest.assetVersion}-${manifest.releaseDigest.slice("sha256:".length)}`,
         "manifest.json",
@@ -119,14 +121,15 @@ function listTemporaryFiles(directory) {
 }
 
 test("canonical-equivalent objects share one physical file and reads are deeply frozen", async t => {
-    const { contentRootDir, store } = createFixture(t)
+    const { contentStateDir, contentStoreDir, store } = createFixture(t)
     const first = await store.writeObject({ z: 2, a: { second: true, first: false } })
     const second = await store.writeObject({ a: { first: false, second: true }, z: 2 })
 
     assert.equal(first, second)
-    assert.deepEqual(listJsonFiles(path.join(contentRootDir, "objects")), [
+    assert.deepEqual(listJsonFiles(path.join(contentStoreDir, "objects")), [
         `${first.slice("sha256:".length)}.json`,
     ])
+    assert.equal(fs.existsSync(contentStateDir), false)
     const value = await store.readObject(first)
     assert.deepEqual(value, { a: { first: false, second: true }, z: 2 })
     assert.ok(Object.isFrozen(value))
@@ -136,7 +139,7 @@ test("canonical-equivalent objects share one physical file and reads are deeply 
 })
 
 test("different releases reuse unchanged objects and manifests are deterministic", async t => {
-    const { contentRootDir, store } = createFixture(t)
+    const { contentStoreDir, store } = createFixture(t)
     const firstObjects = await writeReleaseObjects(store, "first")
     const first = await store.writeRelease(releaseInput(firstObjects))
     const reordered = await store.writeRelease({
@@ -159,9 +162,9 @@ test("different releases reuse unchanged objects and manifests are deterministic
 
     assert.equal(first.releaseDigest, reordered.releaseDigest)
     assert.notEqual(first.releaseDigest, second.releaseDigest)
-    assert.equal(listJsonFiles(path.join(contentRootDir, "objects")).length, 4)
-    assert.equal(listJsonFiles(path.join(contentRootDir, "releases")).length, 2)
-    assert.deepEqual(await store.readRelease(releasePath(contentRootDir, first)), first)
+    assert.equal(listJsonFiles(path.join(contentStoreDir, "objects")).length, 4)
+    assert.equal(listJsonFiles(path.join(contentStoreDir, "releases")).length, 2)
+    assert.deepEqual(await store.readRelease(releasePath(contentStoreDir, first)), first)
 })
 
 test("current release snapshot reads each unique object once and preserves references", async t => {
@@ -195,7 +198,7 @@ test("current release snapshot reads each unique object once and preserves refer
 })
 
 test("release snapshot bounds unique object reads and reads each digest once", async t => {
-    const { contentRootDir, store } = createFixture(t)
+    const { contentStoreDir, store } = createFixture(t)
     const { digests, manifest } = await writeManyObjectRelease(store)
     const readCounts = new Map()
     let active = 0
@@ -212,7 +215,7 @@ test("release snapshot bounds unique object reads and reads each digest once", a
         }
     }
 
-    const snapshot = await store.readReleaseSnapshot(releasePath(contentRootDir, manifest))
+    const snapshot = await store.readReleaseSnapshot(releasePath(contentStoreDir, manifest))
 
     assert.ok(maxActive > 1)
     assert.ok(maxActive <= 8, `maximum object read concurrency was ${maxActive}`)
@@ -223,7 +226,7 @@ test("release snapshot bounds unique object reads and reads each digest once", a
 })
 
 test("release snapshot waits for active object reads before rejecting", async t => {
-    const { contentRootDir, store } = createFixture(t)
+    const { contentStoreDir, store } = createFixture(t)
     const { digests, manifest } = await writeManyObjectRelease(store)
     const failure = new Error("controlled object read failure")
     const failingDigest = digests[0]
@@ -245,7 +248,7 @@ test("release snapshot waits for active object reads before rejecting", async t 
     }
 
     await assert.rejects(
-        store.readReleaseSnapshot(releasePath(contentRootDir, manifest)),
+        store.readReleaseSnapshot(releasePath(contentStoreDir, manifest)),
         error => error === failure,
     )
     assert.equal(active, 0)
@@ -253,13 +256,13 @@ test("release snapshot waits for active object reads before rejecting", async t 
 })
 
 test("activate atomically switches current and a rename failure preserves the old pointer", async t => {
-    const { contentRootDir, store } = createFixture(t)
+    const { contentStateDir, contentStoreDir, store } = createFixture(t)
     const first = await store.writeRelease(releaseInput(await writeReleaseObjects(store, "first")))
     const secondObjects = await writeReleaseObjects(store, "second")
     const second = await store.writeRelease(releaseInput(secondObjects, { assetVersion: "1.4.56" }))
     const oldCurrent = await store.activate(first)
 
-    const failingStore = new ContentObjectStore({ contentRootDir }, {
+    const failingStore = new ContentObjectStore({ contentStoreDir, contentStateDir }, {
         rename: async (source, destination) => {
             if (path.basename(destination) === "current.json") {
                 const error = new Error("injected current rename failure")
@@ -273,15 +276,16 @@ test("activate atomically switches current and a rename failure preserves the ol
 
     assert.deepEqual(await store.readCurrent(), oldCurrent)
     assert.equal(
-        fs.readdirSync(contentRootDir).some(name => name.includes(".tmp-")),
+        fs.readdirSync(contentStateDir).some(name => name.includes(".tmp-")),
         false,
     )
+    assert.deepEqual(listTemporaryFiles(contentStoreDir), [])
 })
 
 test("a failed release write leaves no loadable manifest and never updates current", async t => {
-    const { contentRootDir, store } = createFixture(t)
+    const { contentStateDir, contentStoreDir, store } = createFixture(t)
     const objects = await writeReleaseObjects(store)
-    const failingStore = new ContentObjectStore({ contentRootDir }, {
+    const failingStore = new ContentObjectStore({ contentStoreDir, contentStateDir }, {
         rename: async (source, destination) => {
             if (path.basename(destination) === "manifest.json") {
                 const error = new Error("injected manifest rename failure")
@@ -296,8 +300,9 @@ test("a failed release write leaves no loadable manifest and never updates curre
         failingStore.writeRelease(releaseInput(objects)),
         /injected manifest rename failure/,
     )
-    assert.deepEqual(listJsonFiles(path.join(contentRootDir, "releases")), [])
-    assert.deepEqual(listTemporaryFiles(contentRootDir), [])
+    assert.deepEqual(listJsonFiles(path.join(contentStoreDir, "releases")), [])
+    assert.deepEqual(listTemporaryFiles(contentStoreDir), [])
+    assert.equal(fs.existsSync(contentStateDir), false)
     assert.equal(await store.readCurrent(), null)
 })
 
@@ -314,8 +319,8 @@ test("readCurrent returns null only when absent and rejects corrupt or incomplet
     )
 
     const corrupt = createFixture(t, "content-current-corrupt-")
-    fs.mkdirSync(corrupt.contentRootDir, { recursive: true })
-    fs.writeFileSync(path.join(corrupt.contentRootDir, "current.json"), "not json\n")
+    fs.mkdirSync(corrupt.contentStateDir, { recursive: true })
+    fs.writeFileSync(path.join(corrupt.contentStateDir, "current.json"), "not json\n")
     await assert.rejects(corrupt.store.readCurrent(), /current|JSON|canonical/i)
 
     const missingManifest = createFixture(t, "content-current-manifest-")
@@ -323,7 +328,7 @@ test("readCurrent returns null only when absent and rejects corrupt or incomplet
         releaseInput(await writeReleaseObjects(missingManifest.store)),
     )
     await missingManifest.store.activate(manifest)
-    fs.unlinkSync(releasePath(missingManifest.contentRootDir, manifest))
+    fs.unlinkSync(releasePath(missingManifest.contentStoreDir, manifest))
     await assert.rejects(missingManifest.store.readCurrent(), /manifest|ENOENT|missing/i)
 
     const missingObject = createFixture(t, "content-current-object-")
@@ -331,7 +336,7 @@ test("readCurrent returns null only when absent and rejects corrupt or incomplet
     const objectManifest = await missingObject.store.writeRelease(releaseInput(objects))
     await missingObject.store.activate(objectManifest)
     fs.unlinkSync(path.join(
-        missingObject.contentRootDir,
+        missingObject.contentStoreDir,
         "objects",
         `${objects.table.slice("sha256:".length)}.json`,
     ))
@@ -339,11 +344,11 @@ test("readCurrent returns null only when absent and rejects corrupt or incomplet
 })
 
 test("existing object corruption is rejected instead of overwritten", async t => {
-    const { contentRootDir, store } = createFixture(t)
+    const { contentStoreDir, store } = createFixture(t)
     const value = { a: 1, nested: [true, false] }
     const digest = await store.writeObject(value)
     const objectPath = path.join(
-        contentRootDir,
+        contentStoreDir,
         "objects",
         `${digest.slice("sha256:".length)}.json`,
     )
@@ -353,28 +358,37 @@ test("existing object corruption is rejected instead of overwritten", async t =>
     await assert.rejects(store.writeObject(value), /digest|canonical|corrupt/i)
 })
 
-test("content root, objects, releases, object files, and current reject symlinks", async t => {
+test("store root, state root, objects, releases, object files, and current reject symlinks", async t => {
     const rootFixture = createFixture(t, "content-root-link-")
     const outsideRoot = path.join(rootFixture.sandbox, "outside-root")
     fs.mkdirSync(outsideRoot)
-    if (!createDirectorySymlink(t, outsideRoot, rootFixture.contentRootDir)) return
+    if (!createDirectorySymlink(t, outsideRoot, rootFixture.contentStoreDir)) return
     await assert.rejects(rootFixture.store.writeObject({ value: 1 }), /symlink/i)
 
+    const stateRootFixture = createFixture(t, "content-state-root-link-")
+    const stateManifest = await stateRootFixture.store.writeRelease(
+        releaseInput(await writeReleaseObjects(stateRootFixture.store)),
+    )
+    const outsideStateRoot = path.join(stateRootFixture.sandbox, "outside-state-root")
+    fs.mkdirSync(outsideStateRoot)
+    if (!createDirectorySymlink(t, outsideStateRoot, stateRootFixture.contentStateDir)) return
+    await assert.rejects(stateRootFixture.store.activate(stateManifest), /symlink/i)
+
     const objectsFixture = createFixture(t, "content-objects-link-")
-    fs.mkdirSync(objectsFixture.contentRootDir)
+    fs.mkdirSync(objectsFixture.contentStoreDir)
     const outsideObjects = path.join(objectsFixture.sandbox, "outside-objects")
     fs.mkdirSync(outsideObjects)
     if (!createDirectorySymlink(
         t,
         outsideObjects,
-        path.join(objectsFixture.contentRootDir, "objects"),
+        path.join(objectsFixture.contentStoreDir, "objects"),
     )) return
     await assert.rejects(objectsFixture.store.writeObject({ value: 2 }), /symlink/i)
 
     const fileFixture = createFixture(t, "content-object-link-")
     const expectedDigest = await fileFixture.store.writeObject({ value: 3 })
     const expectedPath = path.join(
-        fileFixture.contentRootDir,
+        fileFixture.contentStoreDir,
         "objects",
         `${expectedDigest.slice("sha256:".length)}.json`,
     )
@@ -392,7 +406,7 @@ test("content root, objects, releases, object files, and current reject symlinks
     if (!createDirectorySymlink(
         t,
         outsideReleases,
-        path.join(releasesFixture.contentRootDir, "releases"),
+        path.join(releasesFixture.contentStoreDir, "releases"),
     )) return
     await assert.rejects(
         releasesFixture.store.writeRelease(releaseInput(releaseObjects)),
@@ -409,29 +423,237 @@ test("content root, objects, releases, object files, and current reject symlinks
         assetVersion: currentManifest.assetVersion,
         release: `releases/${currentManifest.assetVersion}-${currentManifest.releaseDigest.slice(7)}/manifest.json`,
     }))
-    fs.symlinkSync(outsideCurrent, path.join(currentFixture.contentRootDir, "current.json"))
+    fs.mkdirSync(currentFixture.contentStateDir)
+    fs.symlinkSync(outsideCurrent, path.join(currentFixture.contentStateDir, "current.json"))
     await assert.rejects(currentFixture.store.readCurrent(), /symlink/i)
 })
 
 test("manifest and current persist only portable relative paths", async t => {
-    const { contentRootDir, store } = createFixture(t)
+    const { contentStateDir, contentStoreDir, store } = createFixture(t)
     const manifest = await store.writeRelease(releaseInput(await writeReleaseObjects(store)))
     const current = await store.activate(manifest)
-    const manifestBytes = fs.readFileSync(releasePath(contentRootDir, manifest), "utf8")
-    const currentBytes = fs.readFileSync(path.join(contentRootDir, "current.json"), "utf8")
+    const manifestBytes = fs.readFileSync(releasePath(contentStoreDir, manifest), "utf8")
+    const currentBytes = fs.readFileSync(path.join(contentStateDir, "current.json"), "utf8")
 
-    assert.equal(manifestBytes.includes(contentRootDir), false)
-    assert.equal(currentBytes.includes(contentRootDir), false)
+    assert.equal(manifestBytes.includes(contentStoreDir), false)
+    assert.equal(currentBytes.includes(contentStateDir), false)
     assert.equal(path.isAbsolute(current.release), false)
     assert.deepEqual(Object.keys(current).sort(), ["assetVersion", "release", "schemaVersion"])
 })
 
 test("writeRelease verifies every referenced object before publishing", async t => {
-    const { contentRootDir, store } = createFixture(t)
+    const { contentStoreDir, store } = createFixture(t)
     const objects = await writeReleaseObjects(store)
     await assert.rejects(
         store.writeRelease(releaseInput({ ...objects, table: MISSING_DIGEST })),
         /object|ENOENT|missing/i,
     )
-    assert.deepEqual(listJsonFiles(path.join(contentRootDir, "releases")), [])
+    assert.deepEqual(listJsonFiles(path.join(contentStoreDir, "releases")), [])
+})
+
+test("modern layout keeps immutable data in store and current state in state", async t => {
+    const { contentStateDir, contentStoreDir, store } = createFixture(t)
+    const manifest = await store.writeRelease(releaseInput(await writeReleaseObjects(store)))
+    const current = await store.activate(manifest)
+
+    assert.deepEqual(fs.readdirSync(contentStoreDir).sort(), ["objects", "releases"])
+    assert.deepEqual(fs.readdirSync(contentStateDir), ["current.json"])
+    assert.equal(current.release, `releases/${manifest.assetVersion}-${manifest.releaseDigest.slice(7)}/manifest.json`)
+    assert.deepEqual(await store.readCurrentRelease(), { current, manifest })
+})
+
+test("read-only and missing modern roots can be inspected without writes", async t => {
+    const fixture = createFixture(t, "content-read-only-")
+    assert.equal(await fixture.store.readCurrent(), null)
+    assert.equal(fs.existsSync(fixture.contentStoreDir), false)
+    assert.equal(fs.existsSync(fixture.contentStateDir), false)
+
+    const manifest = await fixture.store.writeRelease(
+        releaseInput(await writeReleaseObjects(fixture.store)),
+    )
+    await fixture.store.activate(manifest)
+    fs.chmodSync(fixture.contentStoreDir, 0o500)
+    fs.chmodSync(fixture.contentStateDir, 0o500)
+    try {
+        assert.deepEqual(await fixture.store.readCurrentRelease(), {
+            current: await fixture.store.readCurrent(),
+            manifest,
+        })
+    } finally {
+        fs.chmodSync(fixture.contentStoreDir, 0o700)
+        fs.chmodSync(fixture.contentStateDir, 0o700)
+    }
+})
+
+test("absolute release paths are accepted only beneath the store root", async t => {
+    const { contentStateDir, contentStoreDir, sandbox, store } = createFixture(t)
+    const manifest = await store.writeRelease(releaseInput(await writeReleaseObjects(store)))
+    const absoluteManifest = releasePath(contentStoreDir, manifest)
+
+    assert.deepEqual(await store.readRelease(absoluteManifest), manifest)
+    await assert.rejects(
+        store.readRelease(path.join(contentStateDir, path.relative(contentStoreDir, absoluteManifest))),
+        /escapes.*store|invalid release manifest path/i,
+    )
+    await assert.rejects(
+        store.readRelease(path.join(sandbox, "outside", "releases", path.basename(path.dirname(absoluteManifest)), "manifest.json")),
+        /escapes.*store|invalid release manifest path/i,
+    )
+})
+
+test("store and state roots cannot be replaced during a store lifetime", async t => {
+    const storeFixture = createFixture(t, "content-store-replaced-")
+    await storeFixture.store.writeObject({ first: true })
+    fs.renameSync(storeFixture.contentStoreDir, `${storeFixture.contentStoreDir}-old`)
+    fs.mkdirSync(storeFixture.contentStoreDir)
+    await assert.rejects(storeFixture.store.writeObject({ second: true }), /replaced|changed/i)
+
+    const stateFixture = createFixture(t, "content-state-replaced-")
+    const manifest = await stateFixture.store.writeRelease(
+        releaseInput(await writeReleaseObjects(stateFixture.store)),
+    )
+    await stateFixture.store.activate(manifest)
+    fs.renameSync(stateFixture.contentStateDir, `${stateFixture.contentStateDir}-old`)
+    fs.mkdirSync(stateFixture.contentStateDir)
+    await assert.rejects(stateFixture.store.readCurrent(), /replaced|changed/i)
+})
+
+test("supports explicit legacy single-root construction and rejects ambiguous mixed roots", async t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "content-legacy-store-"))
+    const contentRootDir = path.join(sandbox, "legacy")
+    t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+    const store = new ContentObjectStore({ contentRootDir })
+    const manifest = await store.writeRelease(releaseInput(await writeReleaseObjects(store)))
+    await store.activate(manifest)
+
+    assert.deepEqual(fs.readdirSync(contentRootDir).sort(), ["current.json", "objects", "releases"])
+    assert.throws(
+        () => new ContentObjectStore({
+            contentRootDir,
+            contentStoreDir: path.join(sandbox, "store"),
+            contentStateDir: path.join(sandbox, "state"),
+        }),
+        /contentRootDir.*contentStoreDir|legacy.*split|ambiguous/i,
+    )
+    assert.throws(
+        () => new ContentObjectStore({
+            layout: "legacy",
+            contentRootDir,
+            contentStoreDir: contentRootDir,
+            contentStateDir: contentRootDir,
+        }),
+        /legacy.*split|complete ContentPaths/i,
+    )
+})
+
+test("rejects equal or nested split roots after resolving paths", async t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "content-split-conflict-"))
+    t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+    const expectedMessage = "contentStoreDir and contentStateDir must not be equal or nested"
+    const cases = [
+        [
+            "equal",
+            path.join(sandbox, "shared"),
+            path.join(sandbox, "nested", "..", "shared"),
+        ],
+        [
+            "state nested in store",
+            path.join(sandbox, "store"),
+            path.join(sandbox, "store", "state"),
+        ],
+        [
+            "store nested in state",
+            path.join(sandbox, "state", "store"),
+            path.join(sandbox, "state"),
+        ],
+    ]
+
+    for (const [name, contentStoreDir, contentStateDir] of cases) {
+        await t.test(name, () => {
+            assert.throws(
+                () => new ContentObjectStore({ contentStoreDir, contentStateDir }),
+                error => error instanceof TypeError
+                    && error.message === expectedMessage,
+            )
+        })
+    }
+    assert.deepEqual(fs.readdirSync(sandbox), [])
+})
+
+test("rejects physically equal or nested split roots through symlink ancestors", async t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "content-physical-conflict-"))
+    const physicalRoot = path.join(sandbox, "physical")
+    const aliasRoot = path.join(sandbox, "alias")
+    fs.mkdirSync(physicalRoot)
+    t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+    if (!createDirectorySymlink(t, physicalRoot, aliasRoot)) return
+    const expectedMessage = "contentStoreDir and contentStateDir must not be equal or nested"
+
+    await t.test("same physical root with missing tails", () => {
+        assert.throws(
+            () => new ContentObjectStore({
+                contentStoreDir: path.join(physicalRoot, "future", "content"),
+                contentStateDir: path.join(aliasRoot, "future", "content"),
+            }),
+            error => error instanceof TypeError && error.message === expectedMessage,
+        )
+    })
+    await t.test("physically nested roots with missing tails", () => {
+        assert.throws(
+            () => new ContentObjectStore({
+                contentStoreDir: path.join(physicalRoot, "future", "content"),
+                contentStateDir: path.join(aliasRoot, "future", "content", "state"),
+            }),
+            error => error instanceof TypeError && error.message === expectedMessage,
+        )
+    })
+
+    const legacyRoot = path.join(aliasRoot, "legacy")
+    const legacyStore = new ContentObjectStore({ contentRootDir: legacyRoot })
+    const digest = await legacyStore.writeObject({ legacy: true })
+    assert.equal(fs.existsSync(path.join(
+        physicalRoot,
+        "legacy",
+        "objects",
+        `${digest.slice("sha256:".length)}.json`,
+    )), true)
+})
+
+test("rejects split roots containing a dangling symlink", t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "content-dangling-root-"))
+    const missingTarget = path.join(sandbox, "missing-target")
+    const danglingRoot = path.join(sandbox, "dangling")
+    t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+    if (!createDirectorySymlink(t, missingTarget, danglingRoot)) return
+
+    assert.throws(
+        () => new ContentObjectStore({
+            contentStoreDir: path.join(danglingRoot, "store"),
+            contentStateDir: path.join(sandbox, "state"),
+        }),
+        error => error instanceof TypeError
+            && error.message === `contentStoreDir contains a dangling symbolic link: ${danglingRoot}`,
+    )
+    assert.equal(fs.existsSync(missingTarget), false)
+})
+
+test("accepts complete legacy ContentPaths as one readable root", async t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "content-complete-legacy-"))
+    const contentRootDir = path.join(sandbox, "legacy")
+    const paths = {
+        layout: "legacy",
+        cdnDir: path.join(sandbox, "cdn"),
+        cdnRoot: path.join(sandbox, "cdn", "cn"),
+        contentRootDir,
+        contentStoreDir: contentRootDir,
+        contentStateDir: contentRootDir,
+        contentRuntimeDir: path.join(sandbox, "runtime"),
+    }
+    t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+    const store = new ContentObjectStore(paths)
+    const manifest = await store.writeRelease(releaseInput(await writeReleaseObjects(store)))
+    const current = await store.activate(manifest)
+
+    assert.deepEqual(fs.readdirSync(contentRootDir).sort(), ["current.json", "objects", "releases"])
+    assert.deepEqual(await store.readCurrentRelease(), { current, manifest })
 })

@@ -26,7 +26,7 @@ function assertDeepFrozen(value, seen = new Set()) {
     for (const key of Reflect.ownKeys(value)) assertDeepFrozen(value[key], seen)
 }
 
-function createLayout(t) {
+function createLegacyLayout(t) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "content-repository-"))
     const contentRootDir = path.join(root, "content")
     t.after(() => fs.rmSync(root, { force: true, recursive: true }))
@@ -73,7 +73,7 @@ async function writeRelease(store, marker, options = {}) {
 }
 
 test("missing current loads and freezes all 94 explicit bundled fallback tables", async t => {
-    const fixture = createLayout(t)
+    const fixture = createLegacyLayout(t)
     const repository = await ContentRepository.load(fixture.options)
 
     assert.equal(TABLE_SOURCES.length, 94)
@@ -97,7 +97,7 @@ test("missing current loads and freezes all 94 explicit bundled fallback tables"
 })
 
 test("bundled fallback imports all tables with bounded concurrency and stable ordering", async t => {
-    const fixture = createLayout(t)
+    const fixture = createLegacyLayout(t)
     const activeNames = new Set()
     const importedNames = []
     let maxActive = 0
@@ -125,7 +125,7 @@ test("bundled fallback imports all tables with bounded concurrency and stable or
 })
 
 test("bundled import failure drains workers before immediate retry", async t => {
-    const fixture = createLayout(t)
+    const fixture = createLegacyLayout(t)
     const failure = new Error("controlled bundled import failure")
     const failingTable = TABLE_SOURCES[0].tableName
     let shouldFail = true
@@ -167,7 +167,7 @@ test("bundled import failure drains workers before immediate retry", async t => 
 })
 
 test("release tables and info are deeply frozen and keep one cached reference", async t => {
-    const fixture = createLayout(t)
+    const fixture = createLegacyLayout(t)
     const { manifest } = await writeRelease(fixture.store, "release-a", {
         assetVersion: "1.4.55",
         generatorVersion: 7,
@@ -192,7 +192,7 @@ test("release tables and info are deeply frozen and keep one cached reference", 
 })
 
 test("repository exposes no own property containing its table storage", async t => {
-    const fixture = createLayout(t)
+    const fixture = createLegacyLayout(t)
     await writeRelease(fixture.store, "private-storage")
 
     const repository = await ContentRepository.load(fixture.options)
@@ -205,7 +205,7 @@ test("repository exposes no own property containing its table storage", async t 
 })
 
 test("release loading reads each unique closure object once without repository rereads", async t => {
-    const fixture = createLayout(t)
+    const fixture = createLegacyLayout(t)
     await writeRelease(fixture.store, "single-read")
     const originalReadObject = ContentObjectStore.prototype.readObject
     let objectReads = 0
@@ -221,12 +221,12 @@ test("release loading reads each unique closure object once without repository r
 })
 
 test("only a genuinely missing current pointer falls back to bundled tables", async t => {
-    const corrupt = createLayout(t)
+    const corrupt = createLegacyLayout(t)
     fs.mkdirSync(corrupt.contentRootDir, { recursive: true })
     fs.writeFileSync(path.join(corrupt.contentRootDir, "current.json"), "{")
     await assert.rejects(ContentRepository.load(corrupt.options), /current pointer is corrupt/i)
 
-    const missingRelease = createLayout(t)
+    const missingRelease = createLegacyLayout(t)
     const { manifest } = await writeRelease(missingRelease.store, "missing-release")
     fs.unlinkSync(path.join(
         missingRelease.contentRootDir,
@@ -236,7 +236,7 @@ test("only a genuinely missing current pointer falls back to bundled tables", as
     ))
     await assert.rejects(ContentRepository.load(missingRelease.options), /release manifest is missing/i)
 
-    const missingObject = createLayout(t)
+    const missingObject = createLegacyLayout(t)
     const release = await writeRelease(missingObject.store, "missing-object")
     fs.unlinkSync(path.join(
         missingObject.contentRootDir,
@@ -247,7 +247,7 @@ test("only a genuinely missing current pointer falls back to bundled tables", as
 })
 
 test("repository stays pinned when current switches to another release", async t => {
-    const fixture = createLayout(t)
+    const fixture = createLegacyLayout(t)
     const firstRelease = await writeRelease(fixture.store, "release-a", { assetVersion: "1.4.55" })
     const repository = await ContentRepository.load(fixture.options)
 
@@ -263,7 +263,7 @@ test("repository stays pinned when current switches to another release", async t
 })
 
 test("unregistered table names fail clearly", async t => {
-    const fixture = createLayout(t)
+    const fixture = createLegacyLayout(t)
     const repository = await ContentRepository.load(fixture.options, {
         importBundledTable: async (_projectRoot, tableName) => ({ tableName }),
     })
@@ -296,7 +296,7 @@ test("release manifest must exactly match all registered tables", async t => {
 
     for (const [name, mutateTables, expected] of cases) {
         await t.test(name, async t => {
-            const fixture = createLayout(t)
+            const fixture = createLegacyLayout(t)
             await writeRelease(fixture.store, name, { mutateTables })
             await assert.rejects(ContentRepository.load(fixture.options), expected)
         })
@@ -304,7 +304,7 @@ test("release manifest must exactly match all registered tables", async t => {
 })
 
 test("bundled fallback fails clearly when a registered file is missing", async t => {
-    const fixture = createLayout(t)
+    const fixture = createLegacyLayout(t)
     const temporaryProject = fs.mkdtempSync(path.join(os.tmpdir(), "content-repository-project-"))
     t.after(() => fs.rmSync(temporaryProject, { force: true, recursive: true }))
     fs.mkdirSync(path.join(temporaryProject, "assets"), { recursive: true })

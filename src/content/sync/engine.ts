@@ -106,7 +106,7 @@ export interface ContentSyncDependencies {
     readonly resolvePaths?: typeof resolveContentPaths
     readonly createStore?: (paths: ContentPaths) => ContentStore
     readonly acquireLock?: (
-        contentRootDir: string,
+        contentStateDir: string,
     ) => Promise<ContentSyncLock>
     readonly scanTarget?: typeof scanContentTarget
     readonly materializeCatalog?: (
@@ -312,7 +312,7 @@ export async function runContentSync(
     }
 
     const acquireLock = dependencies.acquireLock ?? acquireContentSyncLock
-    const lock = await acquireLock(paths.contentRootDir)
+    const lock = await acquireLock(paths.contentStateDir)
     let synchronizationError: unknown
     let synchronizationFailed = false
     try {

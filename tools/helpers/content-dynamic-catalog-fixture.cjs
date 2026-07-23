@@ -18,12 +18,13 @@ const { TABLE_SOURCES } = require("../../src/content/sync/table-registry")
 function createSandbox(t) {
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "content-dynamic-catalog-"))
     const paths = {
+        layout: "modern",
         cdnDir: path.join(projectRoot, ".cdn"),
         cdnRoot: path.join(projectRoot, ".cdn", "cn"),
         contentRootDir: path.join(projectRoot, ".content"),
-        contentStoreDir: path.join(projectRoot, ".content", "store"),
-        contentStateDir: path.join(projectRoot, ".content", "state"),
-        contentRuntimeDir: path.join(projectRoot, ".content", "runtime"),
+        contentStoreDir: path.join(projectRoot, ".database", "content", "store"),
+        contentStateDir: path.join(projectRoot, ".database", "state", "content"),
+        contentRuntimeDir: path.join(projectRoot, "assets"),
     }
     fs.mkdirSync(paths.cdnRoot, { recursive: true })
     t.after(() => fs.rmSync(projectRoot, { force: true, recursive: true }))

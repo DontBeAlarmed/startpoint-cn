@@ -43,6 +43,7 @@ const TEST_TABLE_SOURCES = TABLE_SOURCES.slice(0, 2)
 function createSandbox(t, prefix = "content-sync-") {
     const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), prefix))
     const paths = {
+        layout: "modern",
         cdnDir: path.join(sandbox, ".cdn"),
         cdnRoot: path.join(sandbox, ".cdn", "cn"),
         contentRootDir: path.join(sandbox, ".content"),
@@ -488,6 +489,8 @@ test("check scans current metadata without locking, materializing, indexing, or 
     assert.equal(fixture.calls.index, 0)
     assert.equal(fixture.calls.builder, 0)
     assert.equal(fs.existsSync(fixture.paths.contentRootDir), false)
+    assert.equal(fs.existsSync(fixture.paths.contentStoreDir), false)
+    assert.equal(fs.existsSync(fixture.paths.contentStateDir), false)
 })
 
 test("check consumes the store current release snapshot without rereading it", async t => {
@@ -536,6 +539,52 @@ test("normal sync creates a missing release and skips the same asset/generator",
         reason: "up-to-date",
     })
     assert.equal(fixture.calls.builder, 1)
+    assert.deepEqual(fs.readdirSync(fixture.paths.contentStoreDir).sort(), ["objects", "releases"])
+    assert.deepEqual(fs.readdirSync(fixture.paths.contentStateDir), ["current.json"])
+    assert.equal(fs.existsSync(fixture.paths.contentRootDir), false)
+})
+
+test("complete legacy ContentPaths keep content and sync lock in one readable root", async t => {
+    const { paths: modernPaths, sandbox } = createSandbox(t, "content-sync-legacy-paths-")
+    const contentRootDir = path.join(sandbox, "legacy")
+    const paths = {
+        ...modernPaths,
+        layout: "legacy",
+        contentRootDir,
+        contentStoreDir: contentRootDir,
+        contentStateDir: contentRootDir,
+    }
+    let lockWasInLegacyRoot = false
+    const result = await runContentSync({
+        projectRoot,
+        mode: "normal",
+        generatorVersion: 1,
+    }, {
+        resolvePaths: () => paths,
+        acquireLock: async lockRoot => {
+            assert.equal(lockRoot, contentRootDir)
+            const lock = await acquireContentSyncLock(lockRoot)
+            lockWasInLegacyRoot = fs.existsSync(path.join(contentRootDir, "sync.lock"))
+            return lock
+        },
+        scanTarget: async () => fakeScan(paths),
+        materializeCatalog: async scan => ({ targetVersion: scan.targetVersion }),
+        buildCatalog: input => fakeCatalog(input.targetVersion),
+        buildArchiveIndex: async () => ({ marker: "index" }),
+        tableBuilder: { build: async () => tableValues("legacy") },
+        tableSources: TEST_TABLE_SOURCES,
+    })
+    const store = new ContentObjectStore(paths)
+    const release = await store.readCurrentRelease()
+
+    assert.equal(result.status, "synchronized")
+    assert.equal(lockWasInLegacyRoot, true)
+    assert.deepEqual(fs.readdirSync(contentRootDir).sort(), ["current.json", "objects", "releases"])
+    assert.equal(release.manifest.releaseDigest, result.releaseDigest)
+    assert.deepEqual(
+        await store.readObject(release.manifest.tables[TEST_TABLE_SOURCES[0].tableName].object),
+        { marker: "legacy", tableName: TEST_TABLE_SOURCES[0].tableName },
+    )
 })
 
 test("generator changes, upgrades, explicit rollbacks, and force trigger rebuilds", async t => {
@@ -597,7 +646,7 @@ test("materialize, catalog build, archive index, table build, object, manifest, 
         await t.test(stage, async t => {
             const fixture = engineFixture(t)
             await sync(fixture)
-            const before = fs.readFileSync(path.join(fixture.paths.contentRootDir, "current.json"))
+            const before = fs.readFileSync(path.join(fixture.paths.contentStateDir, "current.json"))
             fixture.setTargetVersion("1.5.0")
 
             if (stage === "materialize") fixture.dependencies.materializeCatalog = async () => { throw new Error(stage) }
@@ -621,7 +670,7 @@ test("materialize, catalog build, archive index, table build, object, manifest, 
 
             await assert.rejects(sync(fixture), new RegExp(stage))
             assert.deepEqual(
-                fs.readFileSync(path.join(fixture.paths.contentRootDir, "current.json")),
+                fs.readFileSync(path.join(fixture.paths.contentStateDir, "current.json")),
                 before,
             )
         })
@@ -632,7 +681,7 @@ test("sync and lock release failures preserve both diagnostics", async t => {
     const fixture = engineFixture(t, {
         dependencies: {
             acquireLock: async () => ({
-                lockPath: path.join(fixture.paths.contentRootDir, "sync.lock"),
+                lockPath: path.join(fixture.paths.contentStateDir, "sync.lock"),
                 release: async () => { throw new Error("release failed") },
             }),
             tableBuilder: {
@@ -671,40 +720,47 @@ test("two concurrent normal syncs build once and the waiter rechecks after locki
     await entered
     const second = sync(fixture)
     await new Promise(resolve => setTimeout(resolve, 30))
-    assert.equal(fixture.calls.builder, 1)
+    const builderCallsWhileLocked = fixture.calls.builder
+    const stateLockExists = fs.existsSync(path.join(fixture.paths.contentStateDir, "sync.lock"))
+    const storeLockExists = fs.existsSync(path.join(fixture.paths.contentStoreDir, "sync.lock"))
+    const legacyLockExists = fs.existsSync(path.join(fixture.paths.contentRootDir, "sync.lock"))
     releaseBuilder()
 
     assert.equal((await first).status, "synchronized")
     assert.equal((await second).status, "skipped")
+    assert.equal(builderCallsWhileLocked, 1)
+    assert.equal(stateLockExists, true)
+    assert.equal(storeLockExists, false)
+    assert.equal(legacyLockExists, false)
     assert.equal(fixture.calls.builder, 1)
 })
 
 test("lock waits, times out clearly, releases by token and identity, and leaves no failed-create file", async t => {
     const { paths } = createSandbox(t, "content-sync-lock-")
-    const first = await acquireContentSyncLock(paths.contentRootDir, {
+    const first = await acquireContentSyncLock(paths.contentStateDir, {
         timeoutMs: 100,
         pollIntervalMs: 5,
     })
     await assert.rejects(
-        acquireContentSyncLock(paths.contentRootDir, { timeoutMs: 20, pollIntervalMs: 5 }),
+        acquireContentSyncLock(paths.contentStateDir, { timeoutMs: 20, pollIntervalMs: 5 }),
         error => error instanceof ContentSyncLockError
             && error.code === "CONTENT_SYNC_LOCK_TIMEOUT"
             && /remove.*manually|人工删除/i.test(error.message),
     )
     await first.release()
-    assert.equal(fs.existsSync(path.join(paths.contentRootDir, "sync.lock")), false)
+    assert.equal(fs.existsSync(path.join(paths.contentStateDir, "sync.lock")), false)
 
     await assert.rejects(
-        acquireContentSyncLock(paths.contentRootDir, {
+        acquireContentSyncLock(paths.contentStateDir, {
             timeoutMs: 20,
             writeLock: async () => { throw new Error("write failed") },
         }),
         /write failed/,
     )
-    assert.equal(fs.existsSync(path.join(paths.contentRootDir, "sync.lock")), false)
+    assert.equal(fs.existsSync(path.join(paths.contentStateDir, "sync.lock")), false)
 
-    const lock = await acquireContentSyncLock(paths.contentRootDir)
-    const lockPath = path.join(paths.contentRootDir, "sync.lock")
+    const lock = await acquireContentSyncLock(paths.contentStateDir)
+    const lockPath = path.join(paths.contentStateDir, "sync.lock")
     fs.unlinkSync(lockPath)
     fs.writeFileSync(lockPath, JSON.stringify({ schemaVersion: 1, token: "other", pid: 1 }))
     await assert.rejects(lock.release(), /identity|token|replaced/i)
@@ -713,12 +769,12 @@ test("lock waits, times out clearly, releases by token and identity, and leaves 
 
 test("lock rejects a symlink and reports an existing legacy lock", async t => {
     const { paths, sandbox } = createSandbox(t, "content-sync-lock-link-")
-    fs.mkdirSync(paths.contentRootDir)
+    fs.mkdirSync(paths.contentStateDir)
     const outside = path.join(sandbox, "outside.lock")
     fs.writeFileSync(outside, "outside")
-    fs.symlinkSync(outside, path.join(paths.contentRootDir, "sync.lock"))
+    fs.symlinkSync(outside, path.join(paths.contentStateDir, "sync.lock"))
     await assert.rejects(
-        acquireContentSyncLock(paths.contentRootDir, { timeoutMs: 10, pollIntervalMs: 2 }),
+        acquireContentSyncLock(paths.contentStateDir, { timeoutMs: 10, pollIntervalMs: 2 }),
         /symlink|symbolic/i,
     )
     assert.equal(fs.readFileSync(outside, "utf8"), "outside")
@@ -727,7 +783,7 @@ test("lock rejects a symlink and reports an existing legacy lock", async t => {
 test("lock creation preserves the operation error when handle cleanup also fails", async t => {
     const { paths } = createSandbox(t, "content-sync-lock-cleanup-")
     await assert.rejects(
-        acquireContentSyncLock(paths.contentRootDir, {
+        acquireContentSyncLock(paths.contentStateDir, {
             writeLock: async handle => {
                 const close = handle.close.bind(handle)
                 handle.close = async () => {
@@ -741,7 +797,7 @@ test("lock creation preserves the operation error when handle cleanup also fails
             && /write failed/.test(error.operationError.message)
             && error.cleanupErrors.some(item => /close failed/.test(item.message)),
     )
-    assert.equal(fs.existsSync(path.join(paths.contentRootDir, "sync.lock")), false)
+    assert.equal(fs.existsSync(path.join(paths.contentStateDir, "sync.lock")), false)
 })
 
 test("lock waits through the owner's create/write window and diagnoses legacy files", async t => {
@@ -750,7 +806,7 @@ test("lock waits through the owner's create/write window and diagnoses legacy fi
     const writeGate = new Promise(resolve => { finishWrite = resolve })
     let writeStarted
     const started = new Promise(resolve => { writeStarted = resolve })
-    const firstPromise = acquireContentSyncLock(paths.contentRootDir, {
+    const firstPromise = acquireContentSyncLock(paths.contentStateDir, {
         timeoutMs: 500,
         pollIntervalMs: 5,
         writeLock: async (handle, bytes) => {
@@ -760,7 +816,7 @@ test("lock waits through the owner's create/write window and diagnoses legacy fi
         },
     })
     await started
-    const secondPromise = acquireContentSyncLock(paths.contentRootDir, {
+    const secondPromise = acquireContentSyncLock(paths.contentStateDir, {
         timeoutMs: 500,
         pollIntervalMs: 5,
     })
@@ -771,9 +827,9 @@ test("lock waits through the owner's create/write window and diagnoses legacy fi
     const second = await secondPromise
     await second.release()
 
-    fs.writeFileSync(path.join(paths.contentRootDir, "sync.lock"), "old lock")
+    fs.writeFileSync(path.join(paths.contentStateDir, "sync.lock"), "old lock")
     await assert.rejects(
-        acquireContentSyncLock(paths.contentRootDir, { timeoutMs: 10, pollIntervalMs: 2 }),
+        acquireContentSyncLock(paths.contentStateDir, { timeoutMs: 10, pollIntervalMs: 2 }),
         error => error instanceof ContentSyncLockError
             && error.code === "CONTENT_SYNC_LOCK_LEGACY"
             && /remove|人工删除/i.test(error.message),
