@@ -12,7 +12,7 @@ export { getMissionIdsByCategory, getCurrentStage, getCompletedStageNumbers, get
 // Rewards
 export type { ActiveMissionReward, AwakeMissionRewardStageDefinition, AwakeMissionSpecialReward, MissionRewardStageDefinition } from "./rewards"
 export { getActiveMissionRewards, getAwakeMissionRewards, getAwakeMissionRewardStageDefinition, getCollectMissionRewards, getDailyMissionRewards, getDegreeMissionRewards, getEventMissionRewards, getMissionRewardStageDefinition, getRegularMissionRewards, getWeeklyMissionRewards } from "./rewards"
-export type { MissionSettlementInfo, MissionSettlementResult } from "./settlement"
+export type { MissionSettlementInfo, MissionSettlementResult, MissionSettlementScope } from "./settlement"
 export { settleMissionCategories } from "./settlement"
 export { mergeMissionSettlementResponse } from "./response"
 

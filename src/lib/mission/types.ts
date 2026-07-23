@@ -22,6 +22,14 @@ export interface CategoryContext {
     totalQuestClears: number
     totalStories: number
     rankCounts: Record<string, number>
+    collectedItemTotals?: Record<string, number>
+    degreeStats?: {
+        companionCount: number
+        overLimitCount: number
+        manaBoardCount: number
+        bondTokenCount: number
+        singleSsCount: number
+    }
     battleCounters?: MissionBattleCounters
     snapshot?: SnapshotData | null
 }

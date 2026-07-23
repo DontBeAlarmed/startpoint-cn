@@ -718,7 +718,7 @@ export interface ClientPlayerData {
     mail_arrived: boolean
     user_periodic_reward_point_list: PlayerPeriodicRewardPoint[]
     all_active_mission_list: Record<string, PlayerActiveMission>
-    cleared_collect_item_event_mission_list: unknown[]
+    cleared_collect_item_event_mission_list: Record<string, number>
     box_gacha_list: Record<string, UserBoxGacha[]>
     gacha_campaign_list: UserGachaCampaign[]
     purchased_times_list: Object

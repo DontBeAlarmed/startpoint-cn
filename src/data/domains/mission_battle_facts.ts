@@ -7,6 +7,7 @@ export interface MissionBattleCounters {
     multiClearCount: number
     multiHostClearCount: number
     multiGuestClearCount: number
+    singleRankSsCount: number
     rankSsCount: number
     rankSCount: number
     rankACount: number
@@ -27,6 +28,7 @@ const EMPTY_COUNTERS: Readonly<MissionBattleCounters> = Object.freeze({
     multiClearCount: 0,
     multiHostClearCount: 0,
     multiGuestClearCount: 0,
+    singleRankSsCount: 0,
     rankSsCount: 0,
     rankSCount: 0,
     rankACount: 0,
@@ -38,6 +40,7 @@ export function getMissionBattleCountersSync(playerId: number): MissionBattleCou
         SELECT single_play_count, single_clear_count,
                multi_play_count, multi_clear_count,
                multi_host_clear_count, multi_guest_clear_count,
+               single_rank_ss_count,
                rank_ss_count, rank_s_count, rank_a_count, rank_b_count
         FROM players_mission_battle_counters
         WHERE player_id = ?
@@ -50,6 +53,7 @@ export function getMissionBattleCountersSync(playerId: number): MissionBattleCou
         multiClearCount: row.multi_clear_count,
         multiHostClearCount: row.multi_host_clear_count,
         multiGuestClearCount: row.multi_guest_clear_count,
+        singleRankSsCount: row.single_rank_ss_count,
         rankSsCount: row.rank_ss_count,
         rankSCount: row.rank_s_count,
         rankACount: row.rank_a_count,
@@ -67,6 +71,7 @@ export function recordMissionBattleResultSync(
     const multiClear = result.isMulti && result.accomplished ? 1 : 0
     const multiHostClear = multiClear && result.isHost === true ? 1 : 0
     const multiGuestClear = multiClear && result.isHost === false ? 1 : 0
+    const singleRankSs = !result.isMulti && result.accomplished && result.clearRank === 5 ? 1 : 0
     const rankSs = result.accomplished && result.clearRank === 5 ? 1 : 0
     const rankS = result.accomplished && result.clearRank === 4 ? 1 : 0
     const rankA = result.accomplished && result.clearRank === 3 ? 1 : 0
@@ -77,8 +82,9 @@ export function recordMissionBattleResultSync(
             player_id, single_play_count, single_clear_count,
             multi_play_count, multi_clear_count,
             multi_host_clear_count, multi_guest_clear_count,
+            single_rank_ss_count,
             rank_ss_count, rank_s_count, rank_a_count, rank_b_count
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(player_id) DO UPDATE SET
             single_play_count = single_play_count + excluded.single_play_count,
             single_clear_count = single_clear_count + excluded.single_clear_count,
@@ -86,6 +92,7 @@ export function recordMissionBattleResultSync(
             multi_clear_count = multi_clear_count + excluded.multi_clear_count,
             multi_host_clear_count = multi_host_clear_count + excluded.multi_host_clear_count,
             multi_guest_clear_count = multi_guest_clear_count + excluded.multi_guest_clear_count,
+            single_rank_ss_count = single_rank_ss_count + excluded.single_rank_ss_count,
             rank_ss_count = rank_ss_count + excluded.rank_ss_count,
             rank_s_count = rank_s_count + excluded.rank_s_count,
             rank_a_count = rank_a_count + excluded.rank_a_count,
@@ -98,6 +105,7 @@ export function recordMissionBattleResultSync(
         multiClear,
         multiHostClear,
         multiGuestClear,
+        singleRankSs,
         rankSs,
         rankS,
         rankA,

@@ -72,9 +72,11 @@ const routes = async (fastify: FastifyInstance) => {
         const requestList = body.category_list || [{ category: 1 }]
         const requestCategories = requestList.map(c => c.category)
         const evaluationTime = new Date(getServerTime() * 1000)
-        const automaticCategories = requestCategories.filter(category => [1, 2, 10].includes(category))
-        const automaticSettlement = automaticCategories.length > 0
-            ? settleMissionCategories(playerId, automaticCategories, evaluationTime)
+        const automaticScopes = requestList
+            .filter(entry => [1, 2, 4, 5, 10].includes(entry.category))
+            .map(entry => ({ category: entry.category, eventId: entry.event_id }))
+        const automaticSettlement = automaticScopes.length > 0
+            ? settleMissionCategories(playerId, automaticScopes, evaluationTime)
             : null
         const missionProgressList: any[] = []
         const categoryMissionCache = new Map<number, ReturnType<typeof getPlayerCategoryMissionsSync>>()

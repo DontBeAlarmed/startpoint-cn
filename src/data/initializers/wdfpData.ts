@@ -171,12 +171,15 @@ export default function init(
         multi_clear_count INTEGER NOT NULL DEFAULT 0,
         multi_host_clear_count INTEGER NOT NULL DEFAULT 0,
         multi_guest_clear_count INTEGER NOT NULL DEFAULT 0,
+        single_rank_ss_count INTEGER NOT NULL DEFAULT 0,
         rank_ss_count INTEGER NOT NULL DEFAULT 0,
         rank_s_count INTEGER NOT NULL DEFAULT 0,
         rank_a_count INTEGER NOT NULL DEFAULT 0,
         rank_b_count INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
+
+    ensureSchemaColumn(database, "players_mission_battle_counters.single_rank_ss_count")
 
     database.prepare(`CREATE TABLE IF NOT EXISTS device_bindings (
         device_id INTEGER PRIMARY KEY,
@@ -243,6 +246,14 @@ export default function init(
         amount INTEGER NOT NULL,
         player_id INTEGER NOT NULL,
         PRIMARY KEY (id, player_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run();
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_collected_items (
+        player_id INTEGER NOT NULL,
+        item_id INTEGER NOT NULL,
+        total_obtained INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, item_id),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 

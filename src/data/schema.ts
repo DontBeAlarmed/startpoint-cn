@@ -146,6 +146,11 @@ const schemaColumns = {
         column: "login_days",
         definition: "INTEGER NOT NULL DEFAULT 0",
     },
+    "players_mission_battle_counters.single_rank_ss_count": {
+        table: "players_mission_battle_counters",
+        column: "single_rank_ss_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
 } as const;
 
 export type SchemaColumnKey = keyof typeof schemaColumns;

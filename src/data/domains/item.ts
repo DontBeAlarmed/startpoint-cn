@@ -46,6 +46,43 @@ export function getPlayerItemsSync(
     return output
 }
 
+export function getPlayerCollectedItemTotalSync(
+    playerId: number,
+    itemId: number | string
+): number {
+    const row = getDb().prepare(`
+    SELECT total_obtained
+    FROM players_collected_items
+    WHERE player_id = ? AND item_id = ?
+    `).get(playerId, Number(itemId)) as { total_obtained: number } | undefined
+    return row?.total_obtained ?? 0
+}
+
+export function getPlayerCollectedItemTotalsSync(
+    playerId: number
+): Record<string, number> {
+    const rows = getDb().prepare(`
+    SELECT item_id, total_obtained
+    FROM players_collected_items
+    WHERE player_id = ?
+    `).all(playerId) as { item_id: number; total_obtained: number }[]
+    return Object.fromEntries(rows.map(row => [String(row.item_id), row.total_obtained]))
+}
+
+function recordPlayerCollectedItemSync(
+    playerId: number,
+    itemId: number | string,
+    obtainedAmount: number
+): void {
+    if (!Number.isSafeInteger(obtainedAmount) || obtainedAmount <= 0) return
+    getDb().prepare(`
+    INSERT INTO players_collected_items (player_id, item_id, total_obtained)
+    VALUES (?, ?, ?)
+    ON CONFLICT(player_id, item_id) DO UPDATE SET
+        total_obtained = total_obtained + excluded.total_obtained
+    `).run(playerId, Number(itemId), obtainedAmount)
+}
+
 /**
  * Inserts a singular item into the player's inventory.
  * 
@@ -140,14 +177,12 @@ export function givePlayerItemSync(
     itemId: string | number,
     giveAmount: number
 ): number {
-    // check if the player owns the item
-    const ownedAmount = getPlayerItemSync(playerId, itemId)
-    if (ownedAmount === null) {
-        insertPlayerItemSync(playerId, itemId, giveAmount)
-        return giveAmount
-    } else {
-        const newAmount = ownedAmount + giveAmount
-        updatePlayerItemSync(playerId, itemId, newAmount)
+    return getDb().transaction(() => {
+        const ownedAmount = getPlayerItemSync(playerId, itemId)
+        const newAmount = (ownedAmount ?? 0) + giveAmount
+        if (ownedAmount === null) insertPlayerItemSync(playerId, itemId, newAmount)
+        else updatePlayerItemSync(playerId, itemId, newAmount)
+        recordPlayerCollectedItemSync(playerId, itemId, giveAmount)
         return newAmount
-    }
+    })()
 }

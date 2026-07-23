@@ -294,6 +294,19 @@ export function getPlayerCategoryMissionListSync(
     return result
 }
 
+export function getPlayerClearedCollectItemEventMissionListSync(
+    playerId: number
+): Record<string, number> {
+    const rows = getDb().prepare(`
+    SELECT mission_id, MAX(id) AS stage
+    FROM players_category_mission_stages
+    WHERE player_id = ? AND category = 4 AND status = 1
+    GROUP BY mission_id
+    ORDER BY mission_id
+    `).all(playerId) as { mission_id: number; stage: number }[]
+    return Object.fromEntries(rows.map(row => [String(row.mission_id), row.stage]))
+}
+
 export function insertPlayerCategoryMissionListSync(
     playerId: number,
     categories: Record<string, Record<string, PlayerActiveMission>>

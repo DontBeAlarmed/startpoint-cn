@@ -4,7 +4,7 @@ import { serializeBondTokenStatuses, serializePartyGroupList, serializeGachaCamp
 import { getDateFromServerTime, getServerTime, getServerDate, realToVirtual } from "../../utils"
 import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, Player, PlayerBoxGacha, PlayerCharacter, PlayerCharacterBondToken, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserCharacterBondTokenStatus, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "../types"
 import { deserializePlayerRushEventPlayedParty, deserializeRushEvent, getPlayerRushEventListClearedFoldersSync, getPlayerRushEventListPlayedPartiesSync, getPlayerRushEventListSync, serializePlayerRushEventPlayedParty } from "../domains/rushEvent"
-import { getPlayerActiveMissionsSync, getPlayerClearedRegularMissionListSync } from "../domains/mission"
+import { getPlayerActiveMissionsSync, getPlayerClearedCollectItemEventMissionListSync, getPlayerClearedRegularMissionListSync } from "../domains/mission"
 import { getPlayerBoxGachasSync } from "../domains/boxGacha"
 import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../domains/character"
 import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerSync } from "../domains/player"
@@ -246,7 +246,7 @@ export function serializePlayerData(
         "mail_arrived": getPlayerMailCountSync(toSerialize.player.id, true) > 0,
         "user_periodic_reward_point_list": toSerialize.periodicRewardPointList,
         "all_active_mission_list": toSerialize.allActiveMissionList,
-        "cleared_collect_item_event_mission_list": [],
+        "cleared_collect_item_event_mission_list": getPlayerClearedCollectItemEventMissionListSync(toSerialize.player.id),
         "box_gacha_list": userBoxGachaList,
         "gacha_campaign_list": toSerialize.gachaCampaignList.map(campaign => serializeGachaCampaign(campaign)),
         "purchased_times_list": {

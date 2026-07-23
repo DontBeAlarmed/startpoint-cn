@@ -4,13 +4,57 @@
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getPlayerSync } from "../../data/domains/player"
 import { getMissionPattern } from "./patterns"
+import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "./master-data"
 import questMap from "../../../assets/mission_event_quest_map.json"
+import eventRewards from "../../../assets/mission_event_reward.json"
 import type { MissionComputer, CategoryContext } from "./types"
+
+type EventCountMode = "single" | "multi" | "finish"
 
 interface QuestMapping {
     questIds: number[]
     categories: number[]
-    countMode: string  // "single" = finished-based, "multi" = multi_clear_count
+    countMode: EventCountMode
+}
+
+export interface EventMissionCoverageReport {
+    total: number
+    mapped: number
+    safeAutoSettlement: number
+    unsupported: number
+    activeUnsupported: number
+    countModes: Record<EventCountMode, number>
+    unsupportedPatterns: string[]
+}
+
+function getTargetClearTimeMs(missionId: number): number | undefined {
+    const stages = (eventRewards as Record<string, Record<string, unknown[]>>)[String(missionId)]
+    const firstStage = stages && Object.values(stages)[0]
+    const row = Array.isArray(firstStage) && Array.isArray(firstStage[0]) ? firstStage[0] : undefined
+    const seconds = Number(row?.[2])
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : undefined
+}
+
+export function getEventMissionCoverageReport(at: Date): EventMissionCoverageReport {
+    const definitions = getMissionMasterDefinitions(3)
+    const mappings = questMap as Record<string, QuestMapping>
+    const unsupportedDefinitions = definitions.filter(definition => mappings[definition.pattern] === undefined)
+    const countModes: Record<EventCountMode, number> = { single: 0, multi: 0, finish: 0 }
+    for (const definition of definitions) {
+        const mapping = mappings[definition.pattern]
+        if (mapping) countModes[mapping.countMode]++
+    }
+    return {
+        total: definitions.length,
+        mapped: definitions.length - unsupportedDefinitions.length,
+        safeAutoSettlement: 0,
+        unsupported: unsupportedDefinitions.length,
+        activeUnsupported: unsupportedDefinitions.filter(definition =>
+            isMissionDefinitionEnabledAt(definition, at)
+        ).length,
+        countModes,
+        unsupportedPatterns: unsupportedDefinitions.map(definition => definition.pattern),
+    }
 }
 
 function buildContext(playerId: number, category: number): CategoryContext {
@@ -63,7 +107,10 @@ export const EventComputer: MissionComputer = {
         const mapping = (questMap as Record<string, QuestMapping>)[pattern]
         if (!mapping) return dbProgress
 
-        const isMulti = mapping.countMode === "multi"
+        const targetClearTimeMs = mapping.countMode === "finish"
+            ? getTargetClearTimeMs(missionId)
+            : undefined
+        if (mapping.countMode === "finish" && targetClearTimeMs === undefined) return dbProgress
 
         let count = 0
         for (const cat of mapping.categories) {
@@ -71,10 +118,14 @@ export const EventComputer: MissionComputer = {
             if (!progress) continue
             for (const q of progress) {
                 if (!mapping.questIds.includes(q.questId)) continue
-                if (isMulti) {
+                if (mapping.countMode === "multi") {
                     count += q.multiClearCount ?? (q.finished ? 1 : 0)
-                } else {
-                    if (q.finished) count++
+                } else if (mapping.countMode === "finish") {
+                    if (q.finished
+                        && q.bestElapsedTimeMs !== undefined
+                        && q.bestElapsedTimeMs <= targetClearTimeMs!) count++
+                } else if (q.finished) {
+                    count++
                 }
             }
         }

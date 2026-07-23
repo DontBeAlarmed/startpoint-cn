@@ -37,6 +37,7 @@ const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
+const { givePlayerItemSync } = require("../src/data/domains/item")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
 const missionRoutes = require("../src/routes/api/mission").default
@@ -215,6 +216,30 @@ async function main() {
             [1],
         )
         assert.equal(weeklyData.mail_arrived, true)
+
+        setServerTimeOffset(Date.parse("2020-02-21T03:00:00.000Z") - Date.now())
+        givePlayerItemSync(playerId, 80001, 50)
+        const collectPage = await fastify.inject({
+            method: "POST",
+            url: "/api/index.php/mission/get_mission_progress",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            payload: encodeRequest({
+                viewer_id: viewerId,
+                api_count: 1,
+                category_list: [{ category: 4, event_id: 1 }],
+            }),
+        })
+        assert.equal(collectPage.statusCode, 200, collectPage.body)
+        const collectPageData = decodeResponse(collectPage).data
+        assert.deepEqual(collectPageData.mission_info, [{
+            mission_category_id: 4,
+            mission_id: 1500,
+            mission_reward_id: 1500001,
+        }])
+        assert.equal(
+            collectPageData.mission_progress_list.find(entry => entry.mission_id === 1500).progress_value,
+            50,
+        )
     } finally {
         await fastify.close()
         cleanup()

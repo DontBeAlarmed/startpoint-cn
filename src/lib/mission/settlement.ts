@@ -22,6 +22,11 @@ export interface MissionSettlementResult {
     userInfo?: Record<string, number>
 }
 
+export interface MissionSettlementScope {
+    category: number
+    eventId?: number
+}
+
 interface EvaluatedMission {
     category: number
     missionId: number
@@ -55,7 +60,7 @@ function applyDailyCompletionProgress(missions: EvaluatedMission[]): void {
 
 export function settleMissionCategories(
     playerId: number,
-    categories: readonly number[],
+    categories: readonly (number | MissionSettlementScope)[],
     evaluationTime: Date,
 ): MissionSettlementResult {
     return getDb().transaction(() => {
@@ -63,12 +68,21 @@ export function settleMissionCategories(
         if (!player) throw new Error(`Player ${playerId} not found during mission settlement.`)
 
         const evaluatedMissions: EvaluatedMission[] = []
-        for (const category of [...new Set(categories)]) {
+        const evaluatedMissionKeys = new Set<string>()
+        const scopes = new Map<string, MissionSettlementScope>()
+        for (const entry of categories) {
+            const scope = typeof entry === "number" ? { category: entry } : entry
+            scopes.set(`${scope.category}:${scope.eventId ?? ""}`, scope)
+        }
+        for (const { category, eventId } of scopes.values()) {
             const computer = getComputer(category)
             const context = computer.buildContext(playerId, category)
             const persisted = getPlayerCategoryMissionsSync(playerId, category)
             for (const missionId of getMissionIdsByCategory(category)) {
-                if (!isMissionEnabledAt(category, missionId, evaluationTime)) continue
+                if (!isMissionEnabledAt(category, missionId, evaluationTime, eventId)) continue
+                const missionKey = `${category}:${missionId}`
+                if (evaluatedMissionKeys.has(missionKey)) continue
+                evaluatedMissionKeys.add(missionKey)
                 const current = persisted[String(missionId)]
                 const dbProgress = current?.progress ?? 0
                 const computed = computer.compute(missionId, context, dbProgress)

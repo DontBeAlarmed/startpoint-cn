@@ -29,6 +29,7 @@ const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerCategoryMissionsSync, updatePlayerCategoryMissionSync } = require("../src/data/domains/mission")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { givePlayerItemSync } = require("../src/data/domains/item")
 const { settleMissionCategories } = require("../src/lib/mission/settlement")
 const { takeSnapshot } = require("../src/lib/mission/snapshot")
 
@@ -68,6 +69,42 @@ const repeated = settleMissionCategories(playerId, [1], evaluationTime)
 assert.deepEqual(repeated.missionInfo, [])
 assert.deepEqual(repeated.itemList, {})
 assert.equal(getPlayerSync(playerId).freeVmoney, initialVmoney + 15)
+
+const collectPlayerId = createPlayer("mission-collect-settlement")
+givePlayerItemSync(collectPlayerId, 80001, 50)
+const collectSettlement = settleMissionCategories(
+    collectPlayerId,
+    [{ category: 4, eventId: 1 }],
+    new Date("2020-02-21T03:00:00.000Z"),
+)
+assert.deepEqual(collectSettlement.missionInfo, [
+    { mission_category_id: 4, mission_id: 1500, mission_reward_id: 1500001 },
+])
+assert.deepEqual(getPlayerCategoryMissionsSync(collectPlayerId, 4)[1500], {
+    progress: 50,
+    stages: { 1: true },
+})
+
+const wrongEventPlayerId = createPlayer("mission-collect-wrong-event")
+givePlayerItemSync(wrongEventPlayerId, 80001, 50)
+const wrongEventSettlement = settleMissionCategories(
+    wrongEventPlayerId,
+    [{ category: 4, eventId: 2 }],
+    new Date("2020-02-21T03:00:00.000Z"),
+)
+assert.deepEqual(wrongEventSettlement.missionInfo, [])
+assert.equal(getPlayerCategoryMissionsSync(wrongEventPlayerId, 4)[1500], undefined)
+
+const duplicateScopePlayerId = createPlayer("mission-duplicate-scope")
+const duplicateScopeVmoney = getPlayerSync(duplicateScopePlayerId).freeVmoney
+updatePlayerCategoryMissionSync(duplicateScopePlayerId, 1, 1, 10)
+const duplicateScopeSettlement = settleMissionCategories(
+    duplicateScopePlayerId,
+    [{ category: 1, eventId: 1 }, { category: 1, eventId: 2 }],
+    evaluationTime,
+)
+assert.equal(duplicateScopeSettlement.missionInfo.length, 1)
+assert.equal(getPlayerSync(duplicateScopePlayerId).freeVmoney, duplicateScopeVmoney + 5)
 
 const periodicPlayerId = createPlayer("mission-periodic-nonnegative")
 takeSnapshot(periodicPlayerId, "daily", {
