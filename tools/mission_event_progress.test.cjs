@@ -56,7 +56,7 @@ const coverage = getEventMissionCoverageReport(new Date("2024-08-14T12:00:00.000
 assert.deepEqual(coverage.countModes, { single: 396, multi: 1679, finish: 230 })
 assert.equal(coverage.total, 2512)
 assert.equal(coverage.mapped, 2305)
-assert.equal(coverage.safeAutoSettlement, 0)
+assert.equal(coverage.safeAutoSettlement, 939)
 assert.equal(coverage.unsupported, 207)
 assert.equal(coverage.activeUnsupported, 0)
 assert.equal(coverage.unsupportedPatterns.includes("startdash_day1_1"), true)

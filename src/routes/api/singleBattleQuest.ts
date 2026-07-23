@@ -37,7 +37,7 @@ import {
 } from "../../lib/quest/finish/score-attack-handler";
 import { validateSessionAndPlayer } from "../../lib/quest/finish/session-validator";
 import { handleDailyChallengePoint } from "../../lib/quest/finish/challenge-point";
-import { recordMissionBattleFacts } from "../../lib/mission/battle-facts";
+import { BATTLE_SETTLEMENT_CATEGORIES, recordMissionBattleFacts } from "../../lib/mission/battle-facts";
 import type { FinishContext } from "../../lib/quest/finish/types";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
 import scoreAttackBorderRewards from "../../../assets/score_attack_border_reward.json";
@@ -428,7 +428,7 @@ const routes = async (fastify: FastifyInstance) => {
             const scoreAttackRewardResult = scoreAttackFinishResult?.rewardResult
             const missionSettlement = settleMissionCategories(
                 playerId,
-                [1, 2, 10],
+                BATTLE_SETTLEMENT_CATEGORIES,
                 new Date(getServerTime() * 1000),
             )
             const itemList = {

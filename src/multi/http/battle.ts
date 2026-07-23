@@ -28,7 +28,7 @@ import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import { getDb } from "../../data/db";
 import { getPlayerMailCountSync } from "../../data/domains/mail";
-import { recordMissionBattleFacts } from "../../lib/mission/battle-facts";
+import { BATTLE_SETTLEMENT_CATEGORIES, recordMissionBattleFacts } from "../../lib/mission/battle-facts";
 import type { FinishContext } from "../../lib/quest/finish/types";
 import {
     mergeMissionSettlementResponse,
@@ -303,7 +303,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             );
             const missionSettlement = settleMissionCategories(
                 playerId,
-                [1, 2, 10],
+                BATTLE_SETTLEMENT_CATEGORIES,
                 new Date(getServerTime() * 1000),
             );
             const characterList = reconcileAwakeUnlockCharacterList(playerId, [

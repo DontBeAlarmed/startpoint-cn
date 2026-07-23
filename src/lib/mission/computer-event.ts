@@ -8,6 +8,7 @@ import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "./mas
 import questMap from "../../../assets/mission_event_quest_map.json"
 import eventRewards from "../../../assets/mission_event_reward.json"
 import type { MissionComputer, CategoryContext } from "./types"
+import { getSafeEventBattleRuleCoverage } from "./event-battle-facts"
 
 type EventCountMode = "single" | "multi" | "finish"
 
@@ -47,7 +48,7 @@ export function getEventMissionCoverageReport(at: Date): EventMissionCoverageRep
     return {
         total: definitions.length,
         mapped: definitions.length - unsupportedDefinitions.length,
-        safeAutoSettlement: 0,
+        safeAutoSettlement: getSafeEventBattleRuleCoverage().safeMultiClearRules,
         unsupported: unsupportedDefinitions.length,
         activeUnsupported: unsupportedDefinitions.filter(definition =>
             isMissionDefinitionEnabledAt(definition, at)
