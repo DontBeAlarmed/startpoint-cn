@@ -3,11 +3,20 @@ import {
     AssetProviderConfig,
     parseAssetProviderConfig,
 } from "../content/cdn/asset-mode"
+import fs from "node:fs"
 import { isIP } from "node:net"
+import path from "node:path"
 
 export interface RuntimeEnvironment extends AssetModeEnvironment {
     readonly SESSION_HOST?: string
     readonly SESSION_PORT?: string
+    readonly EMBEDDED_RUNTIME?: string
+    readonly DATA_DIR?: string
+    readonly WDFP_DATABASE_DIR?: string
+    readonly CONTENT_DIR?: string
+    readonly CONTENT_STORE_DIR?: string
+    readonly CONTENT_STATE_DIR?: string
+    readonly CONTENT_RUNTIME_DIR?: string
 }
 
 export interface RuntimeNetworkServiceConfig {
@@ -64,6 +73,63 @@ function parsePort(value: string | undefined, fallback: number): number {
     return port
 }
 
+function resolvePhysicalPath(filePath: string): string {
+    const missing: string[] = []
+    let existing = path.resolve(filePath)
+    while (true) {
+        try {
+            return path.resolve(fs.realpathSync(existing), ...missing)
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") throw new RuntimeConfigError()
+            const parent = path.dirname(existing)
+            if (parent === existing) throw new RuntimeConfigError()
+            missing.unshift(path.basename(existing))
+            existing = parent
+        }
+    }
+}
+
+function pathsOverlap(left: string, right: string): boolean {
+    const isSameOrDescendant = (parent: string, candidate: string): boolean => {
+        const relative = path.relative(parent, candidate)
+        return relative === ""
+            || (!path.isAbsolute(relative)
+                && relative !== ".."
+                && !relative.startsWith(`..${path.sep}`))
+    }
+    return isSameOrDescendant(left, right) || isSameOrDescendant(right, left)
+}
+
+function validateEmbeddedRuntime(
+    env: RuntimeEnvironment,
+    projectRoot: string,
+    assetProvider: AssetProviderConfig,
+): void {
+    if (env.EMBEDDED_RUNTIME !== undefined
+        && env.EMBEDDED_RUNTIME !== "0"
+        && env.EMBEDDED_RUNTIME !== "1") throw new RuntimeConfigError()
+    if (env.EMBEDDED_RUNTIME !== "1") return
+    if (env.DATA_DIR === undefined || !path.isAbsolute(env.DATA_DIR)) {
+        throw new RuntimeConfigError()
+    }
+    if ([
+        env.WDFP_DATABASE_DIR,
+        env.CONTENT_DIR,
+        env.CONTENT_STORE_DIR,
+        env.CONTENT_STATE_DIR,
+        env.CONTENT_RUNTIME_DIR,
+    ].some(value => value !== undefined)) throw new RuntimeConfigError()
+
+    const dataDir = resolvePhysicalPath(env.DATA_DIR)
+    const protectedRoots = [resolvePhysicalPath(projectRoot)]
+    if (assetProvider.mode === "local") {
+        protectedRoots.push(resolvePhysicalPath(assetProvider.cdnRoot))
+    }
+    if (protectedRoots.some(protectedRoot => pathsOverlap(dataDir, protectedRoot))) {
+        throw new RuntimeConfigError()
+    }
+}
+
 export function parseCnRuntimeConfig({
     projectRoot,
     env = process.env,
@@ -77,5 +143,6 @@ export function parseCnRuntimeConfig({
         port: parsePort(env.SESSION_PORT, 8003),
     })
     const assetProvider = parseAssetProviderConfig({ projectRoot, env })
+    validateEmbeddedRuntime(env, projectRoot, assetProvider)
     return Object.freeze({ http, tcp, assetProvider })
 }

@@ -389,9 +389,21 @@ function getRuntimeDatabaseHealth(): { ready: boolean; schema: number | null } {
 }
 
 const projectRoot = path.resolve(__dirname, "..");
-const bundleMetadata = loadBundleMetadata({ bundleRoot: projectRoot });
+let bundleMetadataError = false;
+let bundleMetadata = { version: "unknown", bundleId: null as string | null };
+try {
+    bundleMetadata = loadBundleMetadata({
+        bundleRoot: projectRoot,
+        requireManifest: process.env.EMBEDDED_RUNTIME === "1",
+    });
+} catch {
+    bundleMetadataError = true;
+}
 runtimeCoordinator = createRuntimeCoordinator({
-    loadConfig: () => parseCnRuntimeConfig({ projectRoot }),
+    loadConfig: () => {
+        if (bundleMetadataError) throw new Error("invalid embedded bundle metadata");
+        return parseCnRuntimeConfig({ projectRoot });
+    },
     configureHttp: configureRuntimeHttp,
     initializeDatabase,
     restoreTimeOffset,

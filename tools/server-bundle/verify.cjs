@@ -96,10 +96,10 @@ function compareVersions(left, right) {
     return 0
 }
 
-function validateManifest(manifest, manifestBytes, dataSchema) {
+function validateManifest(manifest, manifestBytes, dataSchema, dependencyLock) {
     exactKeys(manifest, ROOT_KEYS, "manifest")
     if (!manifestBytes.equals(canonicalJsonBuffer(manifest))) fail("server manifest must be canonical JSON")
-    if (manifest.schemaVersion !== 1) fail("schemaVersion must be 1")
+    if (manifest.schemaVersion !== 2) fail("schemaVersion must be 2")
     if (manifest.name !== "starpoint-cn") fail("name must be starpoint-cn")
     if (typeof manifest.serverVersion !== "string"
         || !/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(manifest.serverVersion)) {
@@ -112,8 +112,25 @@ function validateManifest(manifest, manifestBytes, dataSchema) {
         fail("entry must be out/cn-server.js")
     }
 
-    exactKeys(manifest.requires, ["minDataSchema", "node", "runtimeApi", "targetDataSchema"], "requires")
+    exactKeys(
+        manifest.requires,
+        ["dependencyLock", "minDataSchema", "node", "runtimeApi", "targetDataSchema"],
+        "requires",
+    )
     if (manifest.requires.runtimeApi !== 1) fail("requires.runtimeApi must be 1")
+    if (typeof manifest.requires.dependencyLock !== "string"
+        || !/^sha256:[0-9a-f]{64}$/.test(manifest.requires.dependencyLock)) {
+        fail("requires.dependencyLock must be a lowercase SHA-256 digest")
+    }
+    if (dependencyLock !== undefined) {
+        if (typeof dependencyLock !== "string" || !/^sha256:[0-9a-f]{64}$/.test(dependencyLock)) {
+            fail("Runtime Pack dependencyLock must be a lowercase SHA-256 digest")
+        }
+        if (!crypto.timingSafeEqual(
+            Buffer.from(manifest.requires.dependencyLock),
+            Buffer.from(dependencyLock),
+        )) fail("Runtime Pack dependencyLock is incompatible")
+    }
     const requiredNode = parseNodeRequirement(manifest.requires.node)
     const currentMatch = process.versions.node.match(/^(\d+)\.(\d+)\.(\d+)/)
     if (!currentMatch) fail("current Node version is invalid")
@@ -243,7 +260,7 @@ function verifyServerBundle(options = {}) {
     } catch {
         fail("server manifest is invalid JSON")
     }
-    validateManifest(manifest, manifestBytes, options.dataSchema)
+    validateManifest(manifest, manifestBytes, options.dataSchema, options.dependencyLock)
 
     const actualFiles = collectBundleFiles(bundleRoot)
     const expectedPaths = new Set(manifest.files.map(file => file.path))
@@ -268,6 +285,7 @@ function verifyServerBundle(options = {}) {
 function parseArguments(argv) {
     let bundleRoot
     let dataSchema
+    let dependencyLock
     for (let index = 0; index < argv.length; index++) {
         const argument = argv[index]
         if (argument === "--data-schema") {
@@ -277,13 +295,21 @@ function parseArguments(argv) {
             const value = argv[++index]
             if (!/^(?:0|[1-9]\d*)$/.test(value)) throw new Error("--data-schema requires one non-negative integer")
             dataSchema = Number(value)
+        } else if (argument === "--dependency-lock") {
+            if (dependencyLock !== undefined || argv[index + 1] === undefined) {
+                throw new Error("--dependency-lock requires one SHA-256 digest")
+            }
+            dependencyLock = argv[++index]
+            if (!/^sha256:[0-9a-f]{64}$/.test(dependencyLock)) {
+                throw new Error("--dependency-lock requires one SHA-256 digest")
+            }
         } else if (!argument.startsWith("-") && bundleRoot === undefined) {
             bundleRoot = argument
         } else {
             throw new Error(`Unknown verifier argument: ${argument}`)
         }
     }
-    return { bundleRoot, dataSchema }
+    return { bundleRoot, dataSchema, dependencyLock }
 }
 
 if (require.main === module) {

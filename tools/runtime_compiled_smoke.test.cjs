@@ -214,6 +214,7 @@ test("[socket] official CN wrapper reports ready and releases resources on SIGTE
     assert.match(response.headers.get("content-type"), /^application\/json/)
     const health = await response.json()
     assert.equal(health.status, "ready")
+    assert.deepEqual(health.serverBundle, { version: "1.0.1", bundleId: null })
     assert.deepEqual(health.services, { http: true, tcp: true })
     assert.deepEqual(health.database, { ready: true, schema: 4 })
     assert.deepEqual(health.assets, {
@@ -252,6 +253,22 @@ test("compiled lifecycle order and metadata fallback survive an isolated bundle"
         { cwd: projectRoot, encoding: "utf8" },
     )
     assert.equal(build.status, 0, `build failed\n${build.stdout}\n${build.stderr}`)
+
+    const strictDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "embedded-manifest-required-"))
+    t.after(() => fs.rmSync(strictDataDir, { recursive: true, force: true }))
+    const strictRun = spawnSync(process.execPath, [path.join(projectRoot, "out/cn-server.js")], {
+        cwd: projectRoot,
+        encoding: "utf8",
+        timeout: 15_000,
+        env: {
+            ...process.env,
+            ASSET_MODE: "client-owned",
+            DATA_DIR: strictDataDir,
+            EMBEDDED_RUNTIME: "1",
+        },
+    })
+    assert.equal(strictRun.status, 10, `${strictRun.stdout}\n${strictRun.stderr}`)
+    assert.match(strictRun.stderr, /\[runtime\] config startup failed/)
 
     const lifecycleSource = fs.readFileSync(path.join(
         projectRoot,
@@ -334,4 +351,77 @@ test("compiled lifecycle order and metadata fallback survive an isolated bundle"
     assert.equal(persistedSeedState.play.fes[214748302].r, 1)
     assert.equal(persistedSeedState.verified.fes[214748303], 2)
     assert.deepEqual(seedAssetDigests(), beforeSeedAssets)
+})
+
+test("verified Server Bundle publishes its manifest identity through health", {
+    timeout: 90_000,
+}, async t => {
+    const build = spawnSync(
+        process.execPath,
+        [path.join(projectRoot, "tools/test-workflow/build-cn.cjs")],
+        { cwd: projectRoot, encoding: "utf8" },
+    )
+    assert.equal(build.status, 0, `build failed\n${build.stdout}\n${build.stderr}`)
+
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "embedded-bundle-smoke-"))
+    const bundleRoot = path.join(sandbox, "bundle")
+    const dataDir = path.join(sandbox, "data")
+    const { buildServerBundle } = require("./server-bundle/build.cjs")
+    const { verifyServerBundle } = require("./server-bundle/verify.cjs")
+    const manifest = buildServerBundle({ projectRoot, outputRoot: bundleRoot })
+    assert.deepEqual(verifyServerBundle({
+        bundleRoot,
+        dataSchema: 4,
+        dependencyLock: manifest.requires.dependencyLock,
+    }), manifest)
+
+    const [httpPort, tcpPort] = await reserveLoopbackPorts(2)
+    let stdout = ""
+    let stderr = ""
+    let child = null
+    let processTree = null
+    const output = () => `${stdout}\n${stderr}`
+    t.after(async () => {
+        if (child !== null && processTree !== null) {
+            await cleanupRuntimeSmoke({
+                child,
+                dataDir: sandbox,
+                output,
+                ports: [httpPort, tcpPort],
+                processTree,
+            })
+        } else {
+            fs.rmSync(sandbox, { recursive: true, force: true })
+        }
+    })
+
+    child = spawn(process.execPath, [path.join(bundleRoot, manifest.entry)], {
+        cwd: bundleRoot,
+        env: {
+            ...process.env,
+            ASSET_MODE: "client-owned",
+            DATA_DIR: dataDir,
+            EMBEDDED_RUNTIME: "1",
+            NODE_PATH: path.join(projectRoot, "node_modules"),
+            CN_LISTEN_HOST: "127.0.0.1",
+            CN_LISTEN_PORT: String(httpPort),
+            SESSION_HOST: "127.0.0.1",
+            SESSION_PORT: String(tcpPort),
+        },
+        detached: process.platform !== "win32",
+        stdio: ["ignore", "pipe", "pipe"],
+    })
+    processTree = { processGroupId: child.pid, processId: child.pid }
+    child.stdout.on("data", chunk => { stdout = (stdout + chunk).slice(-32_000) })
+    child.stderr.on("data", chunk => { stderr = (stderr + chunk).slice(-32_000) })
+
+    const response = await waitForHealth(`http://127.0.0.1:${httpPort}/healthz`, child, output)
+    const health = await response.json()
+    assert.deepEqual(health.serverBundle, {
+        version: manifest.serverVersion,
+        bundleId: manifest.bundleId,
+    })
+
+    assert.equal(child.kill("SIGTERM"), true)
+    assert.deepEqual(await waitForExit(child), { code: 0, signal: null }, output())
 })

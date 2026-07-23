@@ -36,6 +36,12 @@ function temporaryProject(t, { admin = false } = {}) {
         version: "1.0.1",
         engines: { node: ">=20.12.0" },
     }))
+    write(root, "package-lock.json", JSON.stringify({
+        name: "starpoint-cn",
+        version: "1.0.1",
+        lockfileVersion: 3,
+        packages: {},
+    }))
     write(root, "out/cn-server.js", "console.log('server')\n")
     write(root, "out/lib/runtime.js", "module.exports = 1\n")
     write(root, "out/.tsbuildinfo-cn", "incremental state")
@@ -122,12 +128,15 @@ test("builds a canonical reproducible thin server bundle with stable file metada
         name: "starpoint-cn",
         ports: { http: 8001, tcp: 8003 },
         requires: {
+            dependencyLock: `sha256:${crypto.createHash("sha256")
+                .update(fs.readFileSync(path.join(root, "package-lock.json")))
+                .digest("hex")}`,
             minDataSchema: 0,
             node: ">=20.12.0",
             runtimeApi: 1,
             targetDataSchema: 4,
         },
-        schemaVersion: 1,
+        schemaVersion: 2,
         serverVersion: "1.0.1",
     })
     assert.match(first.bundleId, /^sha256:[0-9a-f]{64}$/)
@@ -202,6 +211,15 @@ test("builder rejects unsafe input trees, input-contained output, and unowned ou
         assert.throws(
             () => buildServerBundle({ projectRoot: root, outputRoot: path.join(root, "dist/bundle") }),
             /entry/i,
+        )
+    })
+
+    await t.test("missing dependency lock", t => {
+        const root = temporaryProject(t)
+        fs.unlinkSync(path.join(root, "package-lock.json"))
+        assert.throws(
+            () => buildServerBundle({ projectRoot: root, outputRoot: path.join(root, "dist/bundle") }),
+            /dependency|lock/i,
         )
     })
 
@@ -371,6 +389,25 @@ test("verifier enforces runtime, Node, data schema, entry, and admin compatibili
         const fixture = buildFixture(t)
         rewriteManifest(fixture.outputRoot, manifest => { manifest.requires.runtimeApi = 2 })
         assert.throws(() => verifyServerBundle({ bundleRoot: fixture.outputRoot }), /runtimeApi/i)
+    })
+
+    await t.test("Runtime Pack dependency lock", t => {
+        const fixture = buildFixture(t)
+        assert.doesNotThrow(() => verifyServerBundle({
+            bundleRoot: fixture.outputRoot,
+            dependencyLock: fixture.manifest.requires.dependencyLock,
+        }))
+        assert.throws(() => verifyServerBundle({
+            bundleRoot: fixture.outputRoot,
+            dependencyLock: `sha256:${"f".repeat(64)}`,
+        }), /dependencyLock|Runtime Pack/i)
+        rewriteManifest(fixture.outputRoot, manifest => {
+            manifest.requires.dependencyLock = "invalid"
+        })
+        assert.throws(
+            () => verifyServerBundle({ bundleRoot: fixture.outputRoot }),
+            /dependencyLock/i,
+        )
     })
 
     await t.test("Node version", t => {

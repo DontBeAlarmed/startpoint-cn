@@ -168,11 +168,21 @@ function buildServerBundle(options = {}) {
     const projectRoot = path.resolve(options.projectRoot ?? path.resolve(__dirname, "../.."))
     const outputRoot = path.resolve(projectRoot, options.outputRoot ?? DEFAULT_OUTPUT)
     const packageBytes = readRegularFile(path.join(projectRoot, "package.json"), "Input package.json")
+    const dependencyLockBytes = readRegularFile(
+        path.join(projectRoot, "package-lock.json"),
+        "Input dependency lock",
+    )
     let packageJson
+    let dependencyLock
     try {
         packageJson = JSON.parse(packageBytes.toString("utf8"))
     } catch {
         throw new Error("Input package.json is invalid JSON")
+    }
+    try {
+        dependencyLock = JSON.parse(dependencyLockBytes.toString("utf8"))
+    } catch {
+        throw new Error("Input dependency lock is invalid JSON")
     }
     if (packageJson.name !== "starpoint-cn"
         || typeof packageJson.version !== "string"
@@ -180,6 +190,11 @@ function buildServerBundle(options = {}) {
         || typeof packageJson.engines?.node !== "string"
         || !/^>=(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(packageJson.engines.node)) {
         throw new Error("Input package.json has invalid server bundle metadata")
+    }
+    if (dependencyLock.name !== packageJson.name
+        || dependencyLock.version !== packageJson.version
+        || dependencyLock.lockfileVersion !== 3) {
+        throw new Error("Input dependency lock is incompatible with package metadata")
     }
 
     const adminRoot = inspectOptionalAdmin(projectRoot)
@@ -248,13 +263,14 @@ function buildServerBundle(options = {}) {
         }
 
         const digestInput = {
-            schemaVersion: 1,
+            schemaVersion: 2,
             name: "starpoint-cn",
             serverVersion: packageJson.version,
             entry: "out/cn-server.js",
             requires: {
                 runtimeApi: 1,
                 node: packageJson.engines.node,
+                dependencyLock: `sha256:${sha256Hex(dependencyLockBytes)}`,
                 minDataSchema: 0,
                 targetDataSchema: 4,
             },

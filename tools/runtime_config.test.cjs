@@ -1,6 +1,8 @@
 "use strict"
 
 const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 
@@ -37,6 +39,82 @@ test("runtime network accepts explicit wildcard hosts and boundary ports", () =>
 
     assert.deepEqual(config.http, { host: "0.0.0.0", port: 1 })
     assert.deepEqual(config.tcp, { host: "::", port: 65535 })
+})
+
+test("embedded runtime requires one absolute Data Volume and forbids content path escapes", () => {
+    const dataDir = path.join(path.dirname(projectRoot), ".embedded-data-test")
+    assert.doesNotThrow(() => parseCnRuntimeConfig({
+        projectRoot,
+        env: {
+            ASSET_MODE: "client-owned",
+            EMBEDDED_RUNTIME: "1",
+            DATA_DIR: dataDir,
+        },
+    }))
+
+    for (const env of [
+        { EMBEDDED_RUNTIME: "yes", DATA_DIR: dataDir },
+        { EMBEDDED_RUNTIME: "1" },
+        { EMBEDDED_RUNTIME: "1", DATA_DIR: "relative-data" },
+        { EMBEDDED_RUNTIME: "1", DATA_DIR: dataDir, CONTENT_DIR: path.join(projectRoot, "content") },
+        { EMBEDDED_RUNTIME: "1", DATA_DIR: dataDir, CONTENT_STORE_DIR: path.join(projectRoot, "store") },
+        { EMBEDDED_RUNTIME: "1", DATA_DIR: dataDir, CONTENT_STATE_DIR: path.join(projectRoot, "state") },
+        { EMBEDDED_RUNTIME: "1", DATA_DIR: dataDir, CONTENT_RUNTIME_DIR: path.join(projectRoot, "runtime") },
+        { EMBEDDED_RUNTIME: "1", DATA_DIR: dataDir, WDFP_DATABASE_DIR: path.join(projectRoot, "legacy") },
+    ]) {
+        assert.throws(
+            () => parseCnRuntimeConfig({
+                projectRoot,
+                env: { ASSET_MODE: "client-owned", ...env },
+            }),
+            error => error?.code === "INVALID_RUNTIME_CONFIG",
+        )
+    }
+})
+
+test("embedded Data Volume is physically isolated from the Bundle and local CDN", t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "embedded-runtime-paths-"))
+    t.after(() => fs.rmSync(sandbox, { recursive: true, force: true }))
+    const bundleRoot = path.join(sandbox, "bundle")
+    const dataRoot = path.join(sandbox, "data")
+    const cdnParent = path.join(sandbox, "cdn")
+    fs.mkdirSync(bundleRoot)
+    fs.mkdirSync(dataRoot)
+    fs.mkdirSync(path.join(cdnParent, "cn"), { recursive: true })
+
+    assert.doesNotThrow(() => parseCnRuntimeConfig({
+        projectRoot: bundleRoot,
+        env: {
+            ASSET_MODE: "local",
+            CDN_DIR: cdnParent,
+            DATA_DIR: dataRoot,
+            EMBEDDED_RUNTIME: "1",
+        },
+    }))
+
+    const bundleAlias = path.join(sandbox, "bundle-alias")
+    fs.symlinkSync(bundleRoot, bundleAlias)
+    for (const dataDir of [
+        bundleRoot,
+        path.join(bundleRoot, "data"),
+        sandbox,
+        path.join(bundleAlias, "missing-data"),
+        path.join(cdnParent, "cn", "data"),
+        cdnParent,
+    ]) {
+        assert.throws(
+            () => parseCnRuntimeConfig({
+                projectRoot: bundleRoot,
+                env: {
+                    ASSET_MODE: "local",
+                    CDN_DIR: cdnParent,
+                    DATA_DIR: dataDir,
+                    EMBEDDED_RUNTIME: "1",
+                },
+            }),
+            error => error?.code === "INVALID_RUNTIME_CONFIG",
+        )
+    }
 })
 
 for (const host of [

@@ -61,6 +61,17 @@ Runtime Pack 低频更新，至少包含：
 - 与 Node ABI、平台和 CPU ABI 匹配的 `better-sqlite3`；
 - Runtime Pack 自己的版本与摘要清单。
 
+规范布局：
+
+```text
+runtime-pack/
+  node/bin/node
+  node_modules/
+  runtime-pack-manifest.json
+```
+
+`runtime-pack-manifest.json` 至少记录 `schemaVersion=1`、`runtimeApi=1`、完整 Node 版本、`process.versions.modules`、平台、CPU 架构和 `dependencyLock`。`dependencyLock` 是构建 Runtime Pack 所用原始 `package-lock.json` 字节的小写 SHA256（带 `sha256:` 前缀）；生产依赖必须由这份 lock 执行 `npm ci --omit=dev` 得到。Supervisor 只有在 Runtime Pack 与 Server Bundle 的 `runtimeApi`、Node/ABI、平台/架构和 `dependencyLock` 全部兼容时才可启动。
+
 日常开发和普通服务器部署使用当前环境默认 Node.js，不维护 Node 20/22 两套命令。Runtime Pack 制作者仍必须记录实际打包的完整 Node 版本和 ABI；依赖或原生模块变化时发布新的 Runtime Pack。
 
 ### Server Bundle
@@ -112,7 +123,7 @@ Bundle 不包含：
     seeds/
 ```
 
-默认开发路径是项目根的 `.database`。嵌入模式必须显式传入由 Supervisor 管理的绝对 `DATA_DIR`。替换 Server Bundle 不得覆盖 Data Volume。
+默认开发路径是项目根的 `.database`。嵌入模式必须显式传入由 Supervisor 管理的绝对 `DATA_DIR`。服务端在打开数据库前解析现有祖先的物理路径，拒绝 Data Volume 与 Server Bundle 或 local CDN 相等、互为祖先/后代；通过祖先符号链接指回这些只读输入也会被拒绝。替换 Server Bundle 不得覆盖 Data Volume。
 
 数据库 schema 由服务端代码拥有。当前 Bundle 接受 schema `0..4`，启动时由服务端事务化迁移到 `4`，并拒绝高于 `4` 的数据库。Supervisor 只在停服后复制备份，不直接执行 SQL。
 
@@ -128,13 +139,13 @@ Bundle 不包含：
 
 Content Release / fallback Catalog 是 CN 目标版本和归档清单的唯一权威。Asset Provider 不负责补丁版本分配、候选发布或自动回滚。
 
-## Server Manifest v1
+## Server Manifest v2
 
 manifest 核心字段如下：
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "name": "starpoint-cn",
   "serverVersion": "1.0.1",
   "bundleId": "sha256:<digest>",
@@ -142,6 +153,7 @@ manifest 核心字段如下：
   "requires": {
     "runtimeApi": 1,
     "node": ">=20.12.0",
+    "dependencyLock": "sha256:<package-lock digest>",
     "minDataSchema": 0,
     "targetDataSchema": 4
   },
@@ -163,16 +175,16 @@ manifest 核心字段如下：
 
 正式 manifest 的 `files` 枚举除 manifest 自身外的全部 Bundle 文件。每项记录 POSIX 相对路径、字节数和小写 SHA256。`bundleId` 对移除 `bundleId` 后的 canonical manifest 求 SHA256，不包含构建时间、设备路径或操作者信息。
 
+`requires.dependencyLock` 由 Builder 从仓库根 `package-lock.json` 原始字节计算。Supervisor 调用 verifier 时必须传入 Runtime Pack manifest 的同名值；不一致时不得启动候选 Bundle。
+
 ## 启动配置
 
 Supervisor 以 Server Bundle 根为工作目录并执行 manifest `entry`。
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `DATA_DIR` | `.database` | 可写 Data Volume；嵌入模式显式传入 |
-| `CONTENT_RUNTIME_DIR` | `assets` | Bundle 内只读 bundled fallback |
-| `CONTENT_STORE_DIR` | `<DATA_DIR>/content/store` | 可选覆盖 Content Store |
-| `CONTENT_STATE_DIR` | `<DATA_DIR>/state/content` | 可选覆盖激活状态 |
+| `EMBEDDED_RUNTIME` | `0` | 嵌入模式必须设为 `1`，强制有效 manifest 和 Data Volume 边界 |
+| `DATA_DIR` | `.database` | 嵌入模式必须显式传入绝对路径 |
 | `CN_LISTEN_HOST` | `127.0.0.1` | HTTP 监听地址 |
 | `CN_LISTEN_PORT` | `8001` | HTTP 端口 |
 | `SESSION_HOST` | `127.0.0.1` | TCP 监听地址 |
@@ -182,7 +194,17 @@ Supervisor 以 Server Bundle 根为工作目录并执行 manifest `entry`。
 | `CDN_DIR` | `.cdn` | local 模式 CDN 父目录 |
 | `CDN_BASE_URL` | 无 | remote 必填；local 可覆盖公开地址 |
 
-默认监听回环地址。开放局域网或公网监听必须由部署者显式配置并承担访问控制。
+嵌入模式禁止设置旧 `WDFP_DATABASE_DIR`，也禁止设置 `CONTENT_DIR`、`CONTENT_STORE_DIR`、`CONTENT_STATE_DIR` 或 `CONTENT_RUNTIME_DIR`。Content Store、激活状态和 Asset Provider 可变数据因此都保留在唯一 `DATA_DIR`，bundled fallback 固定来自候选 Bundle 的 `assets/`；Supervisor 的一次停服备份可以覆盖全部可变状态。普通开发/服务器运行仍可使用这些兼容覆盖。
+
+默认监听回环地址。开放局域网或公网监听必须由部署者显式配置并承担访问控制。标准启动方式如下，`NODE_PATH` 是 Runtime Pack 与 CommonJS Bundle 之间唯一规范的模块解析桥梁：
+
+```bash
+cd <SERVER_BUNDLE>
+NODE_PATH=<RUNTIME_PACK>/node_modules \
+EMBEDDED_RUNTIME=1 \
+DATA_DIR=<ABSOLUTE_DATA_VOLUME> \
+<RUNTIME_PACK>/node/bin/node out/cn-server.js
+```
 
 ## 生命周期
 
@@ -195,7 +217,7 @@ Supervisor 以 Server Bundle 根为工作目录并执行 manifest `entry`。
 5. 监听 TCP Session；
 6. 健康状态切换为 `ready`。
 
-任一步失败都会清理已打开资源并设置非零退出码。退出码分类：
+任一步失败都会清理已打开资源并设置非零退出码。嵌入模式缺少或损坏 `server-manifest.json`、使用相对或与 Bundle/local CDN 重叠的 `DATA_DIR`，以及覆盖内容路径，均视为配置错误。退出码分类：
 
 | 退出码 | 含义 |
 |---:|---|
@@ -251,7 +273,7 @@ Supervisor 以 Server Bundle 根为工作目录并执行 manifest `entry`。
 }
 ```
 
-源码开发运行没有 manifest 时，`serverBundle.bundleId` 为 `null`，版本回退到 `package.json`。`admin.available=false` 和 client-owned 的资源 `unknown` 不阻止游戏服务进入 ready。
+源码开发运行没有 manifest 时，`serverBundle.bundleId` 为 `null`，版本回退到 `package.json`。嵌入模式不允许该回退。`admin.available=false` 和 client-owned 的资源 `unknown` 不阻止游戏服务进入 ready。
 
 ## 更新与回滚
 
@@ -268,10 +290,10 @@ Supervisor 以 Server Bundle 根为工作目录并执行 manifest `entry`。
 更新流程：
 
 1. 复制候选 Bundle 到独占 staging；
-2. 校验 manifest、文件摘要、Runtime API、Node 和数据 schema；
+2. 校验 manifest、文件摘要、Runtime API、Node、数据 schema，并以 `--dependency-lock` 核对 Runtime Pack；
 3. 优雅停止当前服务并备份 Data Volume；
 4. 注册不可变 Bundle，原子切换 Supervisor 自己的 active 指针；
-5. 启动候选并等待 `/healthz` 返回 `200`；
+5. 以 `EMBEDDED_RUNTIME=1` 启动候选，等待 `/healthz` 返回 `200`，并要求响应中的 `serverBundle.bundleId` 精确等于 staging verifier 得到的候选 ID；
 6. 失败时停止候选，恢复 previous 指针和匹配的 Data Volume 备份。
 
 Builder 和服务进程都不能自行操作这些指针。
@@ -296,6 +318,7 @@ Builder 和服务进程都不能自行操作这些指针。
 - 数据库失败即终止、稳定退出码和优雅停止；
 - `/healthz`；
 - 可重复 Server Bundle、canonical manifest 和独立 verifier；
+- Runtime Pack 依赖锁兼容校验与嵌入模式严格身份检查；
 - 可选管理后台产物。
 
 尚未属于服务端仓库的工作：
