@@ -36,6 +36,12 @@ export interface MultiMate {
 }
 
 
+export interface RoomNpcAssignment {
+    com_id: 1 | 2
+    name: string
+}
+
+
 export interface MultiRoom {
     room_number: string
     access_token: string
@@ -54,6 +60,7 @@ export interface MultiRoom {
     share_room_options: number
     is_npc_mode: boolean
     npc_count: number  // fixed NPC count per battle: 0=unrecruited, 1/2=fixed count
+    npc_roster: RoomNpcAssignment[]
 }
 
 
@@ -66,4 +73,3 @@ export interface NpcMateTemplate {
     rank: number
     degree_id: number
 }
-
