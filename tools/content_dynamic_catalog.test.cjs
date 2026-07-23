@@ -21,7 +21,6 @@ const {
 test("catalog loader preserves the official fallback only when current is absent", async t => {
     const fixture = createSandbox(t)
     let runtimeReads = 0
-    let patchReads = 0
     let validations = 0
     const loader = new CdnCatalogLoader({
         projectRoot: fixture.projectRoot,
@@ -33,16 +32,11 @@ test("catalog loader preserves the official fallback only when current is absent
                 return fallbackManifest()
             },
             validateRuntimeFiles: async () => { validations++ },
-            readPatchManifest: async () => {
-                patchReads++
-                return { cdn_version: "1.4.54", patches: [] }
-            },
         },
     })
 
     assert.equal((await loader.load()).targetVersion, "1.4.54")
     assert.equal(runtimeReads, 1)
-    assert.equal(patchReads, 1)
     assert.equal(validations, 1)
 })
 
@@ -77,10 +71,6 @@ test("corrupt current, release manifest, or catalog object fails without fallbac
                     readRuntimeManifest: async () => {
                         fallbackReads++
                         return fallbackManifest()
-                    },
-                    readPatchManifest: async () => {
-                        fallbackReads++
-                        return { cdn_version: "1.4.54", patches: [] }
                     },
                 },
             })
@@ -222,10 +212,6 @@ test("missing modern and legacy currents share one configured runtime fallback w
                     return fallbackManifest()
                 },
                 validateRuntimeFiles: async () => {},
-                readPatchManifest: async manifestPath => {
-                    manifestPaths.push(manifestPath)
-                    return { cdn_version: "1.4.54", patches: [] }
-                },
             },
             repository: {
                 importBundledTable: async (runtimeRoot, tableName) => {
@@ -243,7 +229,6 @@ test("missing modern and legacy currents share one configured runtime fallback w
     assert.deepEqual([...importerRoots], [fixture.paths.contentRuntimeDir])
     assert.deepEqual(manifestPaths, [
         path.join(fixture.paths.contentRuntimeDir, "cdn/catalog-cn-1.4.54.json"),
-        path.join(fixture.paths.contentRuntimeDir, "asset-patch/manifest.json"),
     ])
     assert.equal(fs.existsSync(fixture.paths.contentRootDir), false)
     assert.equal(fs.existsSync(fixture.paths.contentStoreDir), false)
@@ -261,7 +246,6 @@ test("missing legacy current ignores a residual non-directory legacy root", asyn
             catalog: {
                 readRuntimeManifest: async () => fallbackManifest(),
                 validateRuntimeFiles: async () => {},
-                readPatchManifest: async () => ({ cdn_version: "1.4.54", patches: [] }),
             },
             repository: {
                 importBundledTable: async (_runtimeRoot, tableName) => ({ tableName }),
@@ -297,10 +281,6 @@ for (const assetMode of ["remote", "client-owned"]) {
                         manifestPaths.push(manifestPath)
                         return fallbackManifest()
                     },
-                    readPatchManifest: async manifestPath => {
-                        manifestPaths.push(manifestPath)
-                        return { cdn_version: "1.4.54", patches: [] }
-                    },
                 },
                 repository: {
                     importBundledTable: async (runtimeRoot, tableName) => {
@@ -318,7 +298,6 @@ for (const assetMode of ["remote", "client-owned"]) {
         assert.deepEqual([...importerRoots], [fixture.paths.contentRuntimeDir])
         assert.deepEqual(manifestPaths, [
             path.join(fixture.paths.contentRuntimeDir, "cdn/catalog-cn-1.4.54.json"),
-            path.join(fixture.paths.contentRuntimeDir, "asset-patch/manifest.json"),
         ])
         assert.equal(fs.existsSync(fixture.paths.contentRootDir), false)
         assert.equal(fs.existsSync(fixture.paths.contentStoreDir), false)

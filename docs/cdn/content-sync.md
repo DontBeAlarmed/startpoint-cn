@@ -38,6 +38,28 @@ Registry 仍要求每个 Release 闭合全部 94 张表。阶段 A 中未迁移�
 
 商店还有两个已审计的 fallback 历史缺口。bundled Boss runtime 只有 6132 个 ID，因为旧生成器错误丢弃了 434 个奖励类型为经验/玛纳且官方 ID 为空的货币奖励商品；Release 按 tracked 官方 `cdndata/boss_coin_shop.json` 锁定 6566 个 ID 及 category，不为货币奖励伪造 ID。bundled Star Grain 有 74 个 ID，官方还包含单一 ID `9999`，Release 锁定为 75 个。General、Event 和 Equipment 的记录数及 ID 集合与 bundled 精确一致；Treasure 的 ID 集合一致，但官方价格和奖励值可以不同。
 
+## 运行时目录与 Asset Provider
+
+内容层和客户端资源供给使用三个相互独立的根：
+
+| 根 | 默认位置 | 职责 |
+|---|---|---|
+| `CDN_DIR/cn` | `<PROJECT_ROOT>/.cdn/cn` | 官方 CDN 归档与 `EntityLists`，local 模式只读供给客户端 |
+| `CONTENT_RUNTIME_DIR` | `<PROJECT_ROOT>/assets` | Bundle 内只读 bundled 表和官方 1.4.54 Catalog fallback |
+| `DATA_DIR/asset-provider` | `<PROJECT_ROOT>/.database/asset-provider` | 可变兼容 payload 和旧 global metadata |
+
+CN Catalog 的版本和版本边只来自当前 Content Release；没有 Release 时只来自 `CONTENT_RUNTIME_DIR/cdn/catalog-cn-1.4.54.json`。`assets/asset-patch/manifest.json` 不再参与 CN 启动、版本选择或后台版本展示，也不是第二份 Catalog 权威。
+
+local 模式保留 `/patch/cn/dummy/download/production/upload/<prefix>/<hash>` 兼容路由，其唯一 payload 根为：
+
+```text
+<DATA_DIR>/asset-provider/production/upload/<prefix>/<hash>
+```
+
+解析配置和启动服务不会创建该目录。目录或文件缺失时请求返回 404，不会回退读取 Bundle 内的 `assets/asset-patch`。remote 和 client-owned 模式不会解析、探测或创建 Asset Provider payload 根。
+
+旧部署若仍需保留兼容 payload，必须在停服后手工复制到上述 Data Volume 路径并核对文件集合；服务端不执行自动迁移、复制、版本分配或回滚。旧 global 资产路由的可变 metadata 位于 `<DATA_DIR>/asset-provider/legacy-metadata.json`，首次迁移前可只读使用旧 CDN 根的 `metadata.json`，后续写入只发生在 Data Volume。
+
 ## 自动启动同步
 
 受支持入口为：

@@ -24,11 +24,11 @@ CDN 下载/数据对齐问题的端到端排查 runbook：12 步流程、数据�
 | 2 | 手机→服务端 | POST `/api/index.php/tool/signup` | udid header |
 | 3 | 服务端→手机 | 返回 viewer_id + login_token | — |
 | 4 | 手机→服务端 | POST `/api/index.php/load` | res_ver header |
-| 5 | 服务端→手机 | `available_asset_version = res_ver` | `cn/load.ts:wrapOptionFields()` |
+| 5 | 服务端→手机 | 返回当前 Asset Provider 的 `available_asset_version` | `cn/load.ts:wrapOptionFields()` |
 | 6 | 手机 | `GlobalLoading.loadedHandler → applyLoad` | assetReadKind=2 |
 | 7 | 手机 | `isDownloaded()` → 读取 `info.json` | 首次为 false |
 | 8 | 手机→服务端 | POST `/api/index.php/asset/get_path` | res_ver + asset_size headers |
-| 9 | 服务端→手机 | 返回 `full.archive[]` + `diff[]` | `cn/asset.ts:buildArchiveList()` |
+| 9 | 服务端→手机 | 返回 Catalog planner 生成的 `full` + `diff` | `cn/asset.ts` |
 | 10 | 手机 | 下载所有 ZIP | GET `/patch/cn/archive-*/...zip` |
 | 11 | 手机 | 解压 ZIP → 编译 SQLite DB | `MasterSource.open()` |
 | 12 | 手机 | `GeneralCharacterLogic(1)` → C8601 | `MasterBinaryMap.getIndex(1)` |
@@ -973,8 +973,8 @@ ANDROID_SERIAL=<DEVICE_IP>:5667 bash scripts/build-release.sh
 | 变更 | 文件 |
 |------|------|
 | `enable_newbie = false` | `cn/load.ts` |
-| `files_list` → 正式 CSV | `cn/asset.ts` |
-| `TOTAL_SIZE` 动态计算 | `cn/asset.ts` |
+| `files_list` → Recovery 兼容 CSV | `cn/asset.ts` |
+| 下载大小与归档清单 → 固定 Catalog | `cn/asset.ts` |
 | tutorial stub（`update_step`/`finish_trigger`） | `cn-server.ts` |
 
 ### 12.8 构建文件索引
@@ -996,15 +996,15 @@ ANDROID_SERIAL=<DEVICE_IP>:5667 bash scripts/build-release.sh
 
 ```
 src/routes/cn/asset.ts:
-  is_initial: true
-  target_asset_version = resVer ?? highestDiff
-  client_asset_version = resVer ?? null
+  is_initial = RES_VER 不存在
+  target_asset_version = contentSnapshot.cdn.targetVersion
+  client_asset_version = RES_VER ?? ""
   full.version = "1.4.0"
-  sha256 = "" (不校验)
-  diff 独立于 full 列表
+  归档 size/sha256 来自固定 Catalog
+  full/diff 由 Catalog planner 生成，不扫描目录自动发现
 
 src/routes/cn/load.ts:
-  available_asset_version = resVer ?? "1.4.0"
+  available_asset_version = client-owned 的 RES_VER 或 local/remote 的 snapshot targetVersion
   dailyResetPlayerDataSync() ✅
   collectPlayerDataPooledExpSync() ✅
   wrapOptionFields() 补全 30+ CN 字段

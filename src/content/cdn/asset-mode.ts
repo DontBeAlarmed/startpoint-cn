@@ -2,6 +2,7 @@ import { isIP } from "node:net"
 import os from "node:os"
 
 import { resolveCnCdnRoot } from "../paths"
+import { resolveRuntimeDataPaths } from "../../runtime/data-paths"
 import { normalizeCdnBaseUrl } from "./protocol"
 
 export type AssetMode = "client-owned" | "local" | "remote"
@@ -12,6 +13,7 @@ export type AssetProviderConfig =
         readonly mode: "local"
         readonly baseUrl: string
         readonly cdnRoot: string
+        readonly patchUploadRoot: string
     }>
     | Readonly<{
         readonly mode: "remote"
@@ -23,6 +25,8 @@ export interface AssetModeEnvironment {
     readonly ASSET_MODE?: string
     readonly CDN_BASE_URL?: string
     readonly CDN_DIR?: string
+    readonly DATA_DIR?: string
+    readonly WDFP_DATABASE_DIR?: string
     readonly CN_LISTEN_HOST?: string
     readonly CN_LISTEN_PORT?: string
     readonly CN_PUBLIC_HOST?: string
@@ -175,5 +179,6 @@ export function parseAssetProviderConfig({
         mode,
         baseUrl: resolveLocalBaseUrl(env, resolveListenHost),
         cdnRoot: resolveCnCdnRoot(env.CDN_DIR ?? ".cdn", projectRoot),
+        patchUploadRoot: resolveRuntimeDataPaths(env, projectRoot).assetPatchUploadDir,
     })
 }

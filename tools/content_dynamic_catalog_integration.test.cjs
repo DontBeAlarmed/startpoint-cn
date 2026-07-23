@@ -25,10 +25,6 @@ test("full sync publishes the scanned catalog and release tables together", asyn
                 fallbackReads++
                 throw new Error("fallback runtime manifest must not be read")
             },
-            readPatchManifest: async () => {
-                fallbackReads++
-                throw new Error("fallback patch manifest must not be read")
-            },
             validateRuntimeFiles: async () => {
                 throw new Error("fallback files must not be validated")
             },

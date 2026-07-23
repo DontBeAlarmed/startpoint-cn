@@ -262,7 +262,9 @@ res_ver: string   // 客户端 CDN 本地版本（可选）
    ├─ user_info 缺失字段补全 (is_bought_fund_*, monthly_*, ...)
    ├─ user_option 补全 (episode_encyclopedia_suggest_show, ...)
    └─ CN 数组字段 (tower_dungeon_list, stars_gacha_campaign_list, ...)
-5. available_asset_version = res_ver ?? "1.4.0"
+5. 设置 available_asset_version
+   ├─ client-owned：使用客户端上报且格式合法的 res_ver
+   └─ local/remote：使用进程固定 Content snapshot 的 targetVersion
 ```
 
 响应 data：62 个顶层字段，含 `user_info`, `user_character_list`, `item_list`, `quest_progress`, `gacha_info_list`, `config` 等。
@@ -281,12 +283,14 @@ prefix: `/api/index.php/asset`，文件：`src/routes/cn/asset.ts`
 响应 data：
 ```json
 {
-  "base_url":             "http://{ip}:8001/patch/cn/EntityLists/",
-  "files_list":           "http://{ip}:8001/patch/cn/EntityLists/10939-android_medium.csv",
-  "total_size":           10500000000,
-  "delayed_assets_size":  7000000000
+  "base_url":             "http://{host}:8001/patch/cn/",
+  "files_list":           "http://{host}:8001/patch/cn/recovery/empty.csv",
+  "total_size":           734003200,
+  "delayed_assets_size":  0
 }
 ```
+
+`total_size` 示例值仅用于展示字段形状；真实值取自进程固定 Catalog 的 `installedBytes`，不使用固定的 700 MB 桩值。`client-owned` 模式不发布 CDN 地址，四个字段分别返回空字符串、空字符串、`0`、`0`。
 
 #### get_path
 
@@ -298,52 +302,45 @@ asset_size: string   // "fulfill"（全量）或空（部分）
 
 请求 Body：`{}`（可选含 `target_asset_version`）
 
-响应 `full-only`（默认）：
+初始请求示例（未上报 `RES_VER`）：
 ```json
 {
   "info": {
-    "client_asset_version":          null,
-    "target_asset_version":          "1.4.0",
-    "eventual_target_asset_version": "1.4.0",
-     "is_initial":                    true,
-    "latest_maj_first_version":      "1.4.0"
+    "client_asset_version":          "",
+    "target_asset_version":          "1.4.54",
+    "eventual_target_asset_version": "1.4.54",
+    "is_initial":                    true
   },
   "full": {
     "version": "1.4.0",
     "archive": [
-      { "location": "http://.../archive-common-full/pinball-1.4.0-N-hash.zip", "size": N, "sha256": "" }
+      { "location": "http://.../archive-common-full/pinball-1.4.0-N-hash.zip", "size": 123, "sha256": "..." }
     ]
-  },
-  "diff": [],
-  "asset_version_hash": ""
-}
-```
-
-响应 `full+diff`（当 diff 目录有文件时）：
-```json
-{
-  "info": {
-    "target_asset_version": "1.4.54"
   },
   "diff": [
     {
       "original_version": "1.4.0",
       "version": "1.4.1",
       "archive": [
-        { "location": "http://.../archive-common-diff/pinball-1.4.0-1.4.1-1-hash.zip", "size": N }
+        { "location": "http://.../archive-common-diff/pinball-1.4.0-1.4.1-1-hash.zip", "size": 123, "sha256": "..." }
       ]
     }
-  ]
+  ],
+  "asset_version_hash": "",
+  "delayed_assets_size": 0
 }
 ```
 
 版本决策逻辑：
 
 ```
-targetVer = res_ver ?? highestDiff   // 首次无 res_ver → 1.4.54
-client_asset_version = res_ver ?? null   // 匹配客户端已有版本
-is_initial = true                        // 强制全量下载
+targetVersion = contentSnapshot.cdn.targetVersion
+client_asset_version = RES_VER ?? ""
+is_initial = RES_VER 不存在
+downloadPlan = Catalog 中从 RES_VER（或 full base）到 targetVersion 的唯一可达路径
 ```
+
+服务端不会根据请求 Body 的 `target_asset_version` 改变目标版本，也不会在请求时扫描 diff 目录或自动发现 ZIP。客户端已处于目标版本时 `full` 和 `diff` 都为 `null`；增量请求只返回从当前版本继续前进所需的 Catalog 路径。未知当前版本、无可达路径或存在多条歧义路径时明确返回错误。`client-owned` 模式要求合法 `RES_VER`，不返回下载清单，并将 `asset_update` 保持为 `false`。
 
 ## 八、消息序列化细节
 
@@ -485,13 +482,13 @@ function stubMsgpackReply(reply: any, data: any) {
 
 | 字段 | EN (global starpoint) | CN (starpoint-cn) | 影响 |
 |------|:--:|:--:|------|
-| `is_initial` | `true` | `true` | 强制全量下载 |
-| `client_asset_version` | 空 (undefined) | `resVer \|\| null` | 匹配客户端已有版本 |
-| `target_asset_version` | `availableAssetVersion` (metadata.json) | `resVer \|\| highestDiff` | 动态匹配 |
+| `is_initial` | `true` | 未上报 `RES_VER` 时为 `true` | 决定全量或增量规划 |
+| `client_asset_version` | 空 (undefined) | 客户端上报的 `RES_VER`，初始请求为空字符串 | 表示客户端已有版本 |
+| `target_asset_version` | `availableAssetVersion` (metadata.json) | 进程固定 Content snapshot 的 `targetVersion` | Content Release/Catalog 为唯一权威 |
 | `full.version` | `"2.1.0"` | `"1.4.0"` | CDN 基准版本 |
-| `full.archive` | 预构建静态 JSON（357 条） | 动态扫描目录（490 条） | 文件来源不同 |
-| SHA256 | 真实 SHA256 值 | 空字符串 | EN 校验完整性 |
-| `diff` | 始终 `[]` | 54 组增量包 | CN 支持 diff |
+| `full.archive` | 预构建静态 JSON（357 条） | Catalog 固定归档清单 | CN 不在请求时扫描目录或自动发现 ZIP |
+| SHA256 | 真实 SHA256 值 | Catalog 记录的 SHA256 | 两端均返回归档摘要 |
+| `diff` | 始终 `[]` | Catalog 中从当前版本到目标版本的唯一可达路径 | CN 支持 Catalog 声明的 diff |
 | `device_lang` header | 必需，否则 400 | 忽略 | EN 多语言支持 |
 
 ---

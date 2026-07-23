@@ -11,20 +11,21 @@ import thAndroidFull from "../../../assets/asset_lists/th-android-full.json";
 import thAndroidShort from "../../../assets/asset_lists/th-android-short.json";
 import thIOSFull from "../../../assets/asset_lists/th-ios-full.json";
 import { Platform, generateDataHeaders, getRequestPlatformSync } from "../../utils";
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
-import { createHash } from "crypto";
+import { existsSync } from "fs";
 import path from "path";
+import { resolveRuntimeDataPaths } from "../../runtime/data-paths";
+import {
+    LegacyAssetArchive,
+    LegacyAssetMetadata,
+    loadLegacyAssetState,
+} from "./legacy-asset-state";
 
 interface GetPathBody {
     target_asset_version: string,
     viewer_id: number
 }
 
-interface PathListArchive {
-    location: string,
-    size: number,
-    sha256: string
-}
+type PathListArchive = LegacyAssetArchive
 
 interface PathList {
     info: {
@@ -36,16 +37,13 @@ interface PathList {
     },
     full: {
         version: string,
-        archive: PathListArchive[]
+        archive: readonly PathListArchive[]
     },
     diff: Object[],
     asset_version_hash: string
 }
 
-interface CDNMetadata {
-    version: number,
-    mods: PathListArchive[]
-}
+type CDNMetadata = LegacyAssetMetadata
 
 /**
  * Gets a base path list for a platform & language.
@@ -101,78 +99,32 @@ const enShortAvailable = existsSync(path.join(cdnDir, "en", "entities", "files")
 const koShortAvailable = existsSync(path.join(cdnDir, "ko", "entities", "files"))
 const thShortAvailable = existsSync(path.join(cdnDir, "th", "entities", "files"))
 
-// mod directory
-const modsDir = path.join(cdnDir, "mods")
-const modsExist = existsSync(modsDir)
-
 // metadata
-const cdnMetadataPath = path.join(envCdnDir, "metadata.json")
+const runtimeDataPaths = resolveRuntimeDataPaths(
+    process.env,
+    path.resolve(__dirname, "../../.."),
+)
 let cdnMetadata: CDNMetadata = {
     version: 125,
     mods: []
 }
 
-// load metadata
-if (existsSync(cdnMetadataPath)) {
-    try {
-        const data = readFileSync(cdnMetadataPath).toString('utf8')
-        cdnMetadata = JSON.parse(data)
-    } catch (error) {
-        console.log(`Error when reading CDN metadata: ${error}`)
-    }
-}
-
-// load mods
-if (modsExist) {
-    try {
-        const modZipNames = readdirSync(modsDir)
-        const loadedMods = cdnMetadata.mods
-
-        // check if we need to update the asset version (load new mods)
-        let update = loadedMods.length !== modZipNames.length
-        if (!update) {
-            for (const mod of loadedMods) {
-                const modPath = path.join(modsDir, "..", mod.location.replace("{$cdnAddress}", ""))
-                update = existsSync(modPath) ? createHash('sha256').update(readFileSync(modPath)).digest('base64') !== mod.sha256 : true
-                if (update) {
-                    break
-                }
-            }
-        }
-
-        if (update) {
-            console.log("Loading Mods...")
-            const newLoadedMods: PathListArchive[] = []
-            for (const modZipName of modZipNames) {
-                const modZipPath = path.join(modsDir, modZipName)
-                const stats = statSync(modZipPath)
-
-                // calculate hash
-                newLoadedMods.push({
-                    location: `{$cdnAddress}/mods/${modZipName}`,
-                    size: stats.size,
-                    sha256: createHash('sha256').update(readFileSync(modZipPath)).digest('base64')
-                })
-            }
-
-            cdnMetadata = {
-                version: cdnMetadata.version += 1,
-                mods: newLoadedMods
-            }
-
-            // save metadata
-            const toSave = JSON.stringify(cdnMetadata)
-            writeFileSync(cdnMetadataPath, toSave, { encoding: "utf-8" })
-        }
-
-        console.log(`${cdnMetadata.mods.length} Mods Loaded.`)
-    } catch (error) {
-        console.log(`Error when loading mods: ${error}`)
-    }
-}
-
 const latestMajFirstVersion: string = "2.1.0"
-export const availableAssetVersion = getCDNVersionString(cdnMetadata.version);
+export let availableAssetVersion = getCDNVersionString(cdnMetadata.version);
+
+export function getLegacyAvailableAssetVersion(): string {
+    return availableAssetVersion
+}
+
+export function initializeLegacyAssetState(): void {
+    const state = loadLegacyAssetState({
+        cdnDir,
+        assetProviderDir: runtimeDataPaths.assetProviderDir,
+        metadataFile: runtimeDataPaths.legacyAssetMetadataFile,
+    })
+    cdnMetadata = state.metadata
+    availableAssetVersion = state.availableAssetVersion
+}
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/version_info", async (request: FastifyRequest, reply: FastifyReply) => {

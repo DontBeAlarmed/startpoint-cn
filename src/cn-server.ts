@@ -13,7 +13,8 @@ import getDatabase, {
     initializeDatabase,
 } from "./data";
 import { restoreTimeOffset } from "./data/activeAccount";
-import { initializeContentSnapshot } from "./content/runtime/content-snapshot";
+import { getContentSnapshot, initializeContentSnapshot } from "./content/runtime/content-snapshot";
+import { configureSerializedAssetVersionProvider } from "./data/utils/serialized-asset-version";
 import { parseCnRuntimeConfig } from "./runtime/config";
 import {
     createRuntimeCoordinator,
@@ -363,6 +364,7 @@ fastify.setNotFoundHandler((request, reply) => {
 let runtimeHttpConfigured = false;
 function configureRuntimeHttp(config: ReturnType<typeof parseCnRuntimeConfig>): void {
     if (runtimeHttpConfigured) return;
+    configureSerializedAssetVersionProvider(() => getContentSnapshot().cdn.targetVersion);
     fastify.register(cnLoadPlugin, {
         prefix: apiPrefix,
         assetProvider: config.assetProvider,

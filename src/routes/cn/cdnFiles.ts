@@ -326,22 +326,25 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
         fileSystem,
     )
 
-    const patchUploadRoot = path.resolve(
-        options.patchUploadRoot
-            ?? path.resolve(__dirname, "../../../assets/asset-patch/production/upload"),
-    )
+    const patchUploadRoot = options.patchUploadRoot === undefined
+        ? null
+        : path.resolve(options.patchUploadRoot)
     let physicalPatchUploadRoot: string | null = null
-    try {
-        physicalPatchUploadRoot = await fileSystem.realpath(patchUploadRoot)
-    } catch {
-        // The compatibility patch store is optional.
+    if (patchUploadRoot !== null) {
+        try {
+            physicalPatchUploadRoot = await fileSystem.realpath(patchUploadRoot)
+        } catch {
+            // The compatibility patch store is optional.
+        }
     }
 
     fastify.route({
         method: ["GET", "HEAD"],
         url: "/patch/cn/dummy/download/production/upload/:prefix/:hash",
         handler: async (request, reply) => {
-            if (physicalPatchUploadRoot === null) return reply.status(404).send("Not Found")
+            if (physicalPatchUploadRoot === null || patchUploadRoot === null) {
+                return reply.status(404).send("Not Found")
+            }
             if ((request.raw.url?.split("?", 1)[0] ?? "").includes("%")) {
                 return reply.status(404).send("Not Found")
             }

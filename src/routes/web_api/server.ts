@@ -9,7 +9,7 @@ import { getPlayerCharactersSync } from "../../data/domains/character"
 import { getMergedPlayerDataSync, reviveMergedPlayerDates } from "../../data/utils";
 import { getActivePlayerId, setActivePlayerId, getSelectedAccountId, setSelectedAccountId, saveTimeOffset, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
 import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTemplate, getDefaultSaveMeta } from "../../data/defaultSave";
-import { detectCDNVersion, FULL_BASE, getEffectiveVersion, getPatchManifest } from "../../lib/version";
+import { detectCDNVersion, FULL_BASE, getEffectiveVersion } from "../../lib/version";
 import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance";
 import { wantsJson } from "./http";
 
@@ -60,9 +60,6 @@ const routes = async (fastify: FastifyInstance) => {
         const cdnDir = process.env.CDN_DIR || ".cdn"
         const cdnRoot = path.isAbsolute(cdnDir) ? path.join(cdnDir, "cn") : path.join(root, cdnDir, "cn")
         const archiveSummary = countZipFiles(cdnRoot)
-        const activePatchSummary = countZipFiles(path.join(root, "assets", "asset-patch", "active"))
-        const patchManifest = getPatchManifest()
-        const enabledPatches = patchManifest.patches.filter(p => p.enabled)
         const detectedVersion = detectCDNVersion()
         const effectiveVersion = getEffectiveVersion()
 
@@ -82,21 +79,21 @@ const routes = async (fastify: FastifyInstance) => {
                     mode: "fixed-cn-final",
                     source: "国服最终 CDN",
                     fullVersion: FULL_BASE,
-                    cnFinalVersion: patchManifest.cdn_version,
+                    cnFinalVersion: effectiveVersion,
                     detectedArchiveVersion: detectedVersion,
-                    manifestVersion: patchManifest.cdn_version,
+                    manifestVersion: effectiveVersion,
                     pinned: true,
                     dataScope: ["items", "characters", "events", "quests", "shops"],
                 },
                 extension: {
                     mode: "reserved-patch-version-layer",
-                    status: enabledPatches.length > 0 ? "manifest-enabled" : "reserved",
-                    runtimeEnabled: enabledPatches.length > 0,
+                    status: "reserved",
+                    runtimeEnabled: false,
                     effectiveVersionPreview: effectiveVersion,
-                    enabledPatchCount: enabledPatches.length,
-                    totalPatchCount: patchManifest.patches.length,
-                    activePatchArchiveCount: activePatchSummary.count,
-                    note: "Reserved for future custom characters and event patch imports.",
+                    enabledPatchCount: 0,
+                    totalPatchCount: 0,
+                    activePatchArchiveCount: 0,
+                    note: "CN Catalog is authoritative; patch metadata is not loaded.",
                 },
                 storage: {
                     configuredDir: cdnDir,
@@ -114,10 +111,10 @@ const routes = async (fastify: FastifyInstance) => {
                 fullVersion: FULL_BASE,
                 detectedVersion,
                 effectiveVersion,
-                manifestVersion: patchManifest.cdn_version,
-                enabledPatchCount: enabledPatches.length,
-                totalPatchCount: patchManifest.patches.length,
-                activePatchArchiveCount: activePatchSummary.count,
+                manifestVersion: effectiveVersion,
+                enabledPatchCount: 0,
+                totalPatchCount: 0,
+                activePatchArchiveCount: 0,
             },
         })
     })
@@ -179,9 +176,8 @@ const routes = async (fastify: FastifyInstance) => {
     })
 
     fastify.get("/clairvoyance/gacha", async (_request: FastifyRequest, reply: FastifyReply) => {
-        const patchManifest = getPatchManifest()
         return reply.status(200).send({
-            cdnVersion: patchManifest.cdn_version,
+            cdnVersion: getEffectiveVersion(),
             baseline: "fixed-cn-final",
             ...buildShortUpCharacterGachaTimeline(getServerDate()),
         })

@@ -15,12 +15,14 @@
 | 标准单区间 Range | 服务端已实现，客户端待验收 | 服务端返回 206 或 416；官方客户端原生 ANE 行为仍需抓包确认 |
 | Catalog ZIP allowlist 与路径边界 | 保证 | 拒绝 Catalog 外 ZIP、路径逃逸、Catalog ZIP 符号链接和根外解析路径 |
 | Recovery CSV | 兼容占位 | `/patch/cn/recovery/empty.csv` 返回 HTTP 200 的零字节 CSV |
+| dummy upload 兼容路由 | 可选 | 只从 `<DATA_DIR>/asset-provider/production/upload` 只读供给；目录或文件缺失返回 404，不创建目录、不回退 Bundle |
 | 客户端逐文件 Recovery | 不支持 | 当前没有可按 `base_url + hash` 完整供给的官方逐文件对象库 |
 | 启动时自动扫描或完整哈希 | 不支持且不执行 | 启动只严格解析/build manifest，并 `stat` 存在性、普通文件类型和大小 |
 | 请求级 SHA-256、spool 或缓存写入 | 不支持且不执行 | 文件通过边界检查后直接流式发送 |
 | 自动发现新增 ZIP | 不支持 | 未进入跟踪 manifest 的 ZIP 不会进入版本图或 ZIP allowlist |
 | CDN 自动修复、重新下载或回滚 | 不支持 | 缺失、类型错误或大小不一致时快速失败 |
 | active CDN 管理接口 | 当前不存在 | 没有管理 API 可以直接写入、替换或激活当前 CDN |
+| `asset-patch/manifest.json` | CN 运行时不使用 | 不参与 Catalog、目标版本、后台版本或 Content Release 选择 |
 
 ## 不支持的输入
 

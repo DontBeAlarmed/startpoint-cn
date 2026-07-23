@@ -11,6 +11,9 @@ export interface RuntimeDataPaths {
     seedStateDir: string;
     seedStateFile: string;
     seedStateTemporaryFilePrefix: string;
+    assetProviderDir: string;
+    assetPatchUploadDir: string;
+    legacyAssetMetadataFile: string;
     databaseFile: string;
     databaseVersionFile: string;
     activeAccountFile: string;
@@ -61,6 +64,7 @@ export function resolveRuntimeDataPaths(
     const stateDir = pathApi.join(dataDir, "state");
 
     const seedStateDir = pathApi.join(stateDir, "seeds");
+    const assetProviderDir = pathApi.join(dataDir, "asset-provider");
 
     return {
         dataDir,
@@ -68,6 +72,9 @@ export function resolveRuntimeDataPaths(
         seedStateDir,
         seedStateFile: pathApi.join(seedStateDir, "seed-state.json"),
         seedStateTemporaryFilePrefix: pathApi.join(seedStateDir, ".seed-state.json."),
+        assetProviderDir,
+        assetPatchUploadDir: pathApi.join(assetProviderDir, "production", "upload"),
+        legacyAssetMetadataFile: pathApi.join(assetProviderDir, "legacy-metadata.json"),
         databaseFile: pathApi.join(dataDir, "wdfp_data.db"),
         databaseVersionFile: pathApi.join(dataDir, "wdfp_data.db.version"),
         activeAccountFile: pathApi.join(stateDir, "active_account.json"),

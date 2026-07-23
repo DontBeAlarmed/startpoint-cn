@@ -1,8 +1,8 @@
 import { clientSerializeDate } from "./date"
+import { resolveSerializedAssetVersion } from "./serialized-asset-version"
 import { serializeBondTokenStatuses, serializePartyGroupList, serializeGachaCampaign, serializeRushEvent } from "./serialize-entities"
 import { getDateFromServerTime, getServerTime, getServerDate, realToVirtual } from "../../utils"
 import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, Player, PlayerBoxGacha, PlayerCharacter, PlayerCharacterBondToken, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserCharacterBondTokenStatus, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "../types"
-import { availableAssetVersion } from "../../routes/api/asset"
 import { deserializePlayerRushEventPlayedParty, deserializeRushEvent, getPlayerRushEventListClearedFoldersSync, getPlayerRushEventListPlayedPartiesSync, getPlayerRushEventListSync, serializePlayerRushEventPlayedParty } from "../domains/rushEvent"
 import { getPlayerActiveMissionsSync, getPlayerClearedRegularMissionListSync } from "../domains/mission"
 import { getPlayerBoxGachasSync } from "../domains/boxGacha"
@@ -24,6 +24,7 @@ export interface SerializePlayerDataOptions {
     viewerId?: number
     serializeRushEventData?: boolean // should rush event data be serialized?
     activeMissionList?: { mission_id: number; progress_value: number; stages: { stage: number; received: boolean }[] }[]
+    availableAssetVersion?: string
 }
 
 export function serializePlayerQuestProgress(progress: PlayerQuestProgress): UserQuestProgress {
@@ -231,7 +232,7 @@ export function serializePlayerData(
                 "gacha_exchange_point": gachaInfo.gachaExchangePoint
             }
         }),
-        "available_asset_version": availableAssetVersion,
+        "available_asset_version": resolveSerializedAssetVersion(options?.availableAssetVersion),
         "should_prompt_takeover_registration": false,
         "has_unread_news_item": false,
         "user_option": toSerialize.userOption,

@@ -5,7 +5,10 @@ import { pack, unpack } from "msgpackr";
 import path from "path";
 // api routes
 import apiPlugin from "./routes/api";
-import assetApiPlugin from "./routes/api/asset";
+import assetApiPlugin, {
+    getLegacyAvailableAssetVersion,
+    initializeLegacyAssetState,
+} from "./routes/api/asset";
 import toolApiPlugin from "./routes/api/tool";
 import reproduceApiPlugin from "./routes/api/reproduce"
 import tutorialApiPlugin from "./routes/api/tutorial"
@@ -40,6 +43,7 @@ import openapiPlugin from "./routes/openapi";
 import infodeskPlugin from "./routes/infodesk";
 import { initializeContentSnapshot } from "./content/runtime/content-snapshot";
 import { initializeDatabase } from "./data";
+import { configureSerializedAssetVersionProvider } from "./data/utils/serialized-asset-version";
 
 // gc-openapi-zinny3.kakaogames.com
 // gc-infodesk-zinny3.kakaogames.com
@@ -49,6 +53,7 @@ import { initializeDatabase } from "./data";
 const fastify = Fastify({
     logger: false
 })
+configureSerializedAssetVersionProvider(getLegacyAvailableAssetVersion)
 
 // serializers
 fastify.addHook('onSend', (_, reply, payload, done) => {
@@ -159,6 +164,7 @@ const listenPort = isNaN(envListenPort) ? 8000 : envListenPort
 
 async function bootstrap(): Promise<void> {
     initializeDatabase()
+    initializeLegacyAssetState()
     await initializeContentSnapshot()
     await fastify.listen({ port: listenPort, host: listenHost })
     console.log(`StarPoint is listening on http://${listenHost}:${listenPort}`)

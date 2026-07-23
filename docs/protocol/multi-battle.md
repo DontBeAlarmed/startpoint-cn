@@ -1142,15 +1142,11 @@ is_initial = !resVer  // 无 RES_VER 头 = 首次下载 = 弹出模式选择
 
 ### 12.5 `files_list` 校验规避
 
-`version_info` 响应的 `files_list` 返回空字符串 `""`。客户端 `AssetSufficiencyCheckLoading` 要求该字段为 String（否则 C8702），但空字符串意味着跳过所有文件完整性校验。
+`version_info` 响应的 `files_list` 指向 `/patch/cn/recovery/empty.csv`。local Asset Provider 返回零字节 CSV，保留跳过逐文件 Recovery 的兼容行为；client-owned 模式返回空字符串且不发布下载地址。
 
 ### 12.6 `total_size` 计算
 
-```typescript
-// FULL_SIZE = 仅全量包文件（archive-*-full/ 目录）
-// TOTAL_SIZE = FULL_SIZE + 全部差分包（用于显示）
-// version_info 使用 FULL_SIZE 作为下载大小预估
-```
+`version_info.total_size` 使用进程固定 Catalog 的 `installedBytes`。该值在内容构建阶段确定，请求路径不扫描归档目录或重新求和。
 
 ### 12.7 CDN 目录结构
 

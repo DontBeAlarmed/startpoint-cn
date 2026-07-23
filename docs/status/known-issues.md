@@ -231,7 +231,7 @@ CLOCK:checkClockState stateIdx=X avail=Y — 时钟状态检查
 | 🟡 **通行证完整实现** | PassCard 仅 MVP stub，后续需加载 master data + 发放奖励 | 待做 |
 | `versionCheck.ts` 返回官服地址 | 被 `sdkDummy=true` 跳过，实际不影响 | 低 |
 | `/tool/custom_notify` 返回空 `{}` | 可能触发客户端特殊逻辑 | 低 |
-| SHA256 字段为空 | CDN 文件无完整性校验（不影响） | 低 |
+| 客户端不做 ZIP 请求级 SHA256 校验 | 服务端仍返回 Catalog 摘要；文件路由不重复计算请求级哈希 | 已知边界 |
 | 不支持多语言/多平台 | 仅 CN Android | — |
 | `character_level_up_effect` 不在 CDN | CDN dump 不完整 | 中 |
 | 漫画详情图 F3766 | PNG 格式 + GPU 纹理 ≤2048px 限制 | ✅ |

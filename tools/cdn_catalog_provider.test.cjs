@@ -176,23 +176,8 @@ function injectedLoader({ read, build }) {
             },
             validateRuntimeFiles: async () => {},
             build: input => build(candidateInput, input),
-            readPatchManifest: async () => ({ cdn_version: "1.4.1", patches: [] }),
         },
     })
-}
-
-function patch(overrides = {}) {
-    return {
-        id: "fixture-patch",
-        type: "patch",
-        name: "fixture patch",
-        version: "1.4.54",
-        depends_on: "1.4.0",
-        enabled: true,
-        archive: "pinball-1.4.0-1.4.1-1-abcd.zip",
-        archive_size: 0,
-        ...overrides,
-    }
 }
 
 function deferred() {
@@ -315,7 +300,7 @@ test("loader reads the fixed trusted manifest path before validating runtime fil
     ])
 })
 
-test("loader reads runtime and patch manifests below CONTENT_RUNTIME_DIR", async t => {
+test("loader reads the runtime manifest below CONTENT_RUNTIME_DIR", async t => {
     const projectRoot = createProject(t)
     const runtimeRoot = path.join(projectRoot, "configured-runtime")
     fs.renameSync(path.join(projectRoot, "assets"), runtimeRoot)
@@ -329,54 +314,55 @@ test("loader reads runtime and patch manifests below CONTENT_RUNTIME_DIR", async
                 return runtimeManifest()
             },
             validateRuntimeFiles: async () => {},
-            readPatchManifest: async manifestPath => {
-                calls.push(manifestPath)
-                return { cdn_version: "1.4.54", patches: [] }
-            },
         },
     })
 
     assert.equal((await loader.load()).targetVersion, "1.4.54")
     assert.deepEqual(calls, [
         path.join(runtimeRoot, "cdn", "catalog-cn-1.4.54.json"),
-        path.join(runtimeRoot, "asset-patch", "manifest.json"),
     ])
 })
 
-for (const manifestKind of ["runtime", "patch"]) {
-    test(`loader rejects ${manifestKind} manifest symlink escapes from CONTENT_RUNTIME_DIR`, async t => {
-        const projectRoot = createProject(t)
-        const externalRoot = fs.mkdtempSync(path.join(os.tmpdir(), "content-runtime-external-"))
-        t.after(() => fs.rmSync(externalRoot, { force: true, recursive: true }))
-        const manifestPath = manifestKind === "runtime"
-            ? path.join(projectRoot, "assets/cdn/catalog-cn-1.4.54.json")
-            : path.join(projectRoot, "assets/asset-patch/manifest.json")
-        const externalPath = path.join(externalRoot, "manifest.json")
-        fs.copyFileSync(manifestPath, externalPath)
-        fs.unlinkSync(manifestPath)
-        try {
-            fs.symlinkSync(externalPath, manifestPath)
-        } catch (error) {
-            if (process.platform === "win32" && ["EACCES", "EPERM"].includes(error.code)) {
-                t.skip("file symlink creation is unavailable on this Windows host")
-                return
-            }
-            throw error
-        }
-
-        await assert.rejects(
-            new CdnCatalogLoader({ projectRoot, env: {} }).load(),
-            error => (
-                error instanceof CatalogLoaderError
-                && error.code === (manifestKind === "runtime"
-                    ? "RUNTIME_MANIFEST_READ"
-                    : "PATCH_MANIFEST_READ")
-                && !error.message.includes(projectRoot)
-                && !error.message.includes(externalRoot)
-            ),
-        )
+test("bundled catalog fallback does not require asset-patch metadata", async t => {
+    const projectRoot = createProject(t)
+    fs.rmSync(path.join(projectRoot, "assets", "asset-patch"), {
+        force: true,
+        recursive: true,
     })
-}
+
+    const loaded = await new CdnCatalogLoader({ projectRoot, env: {} }).load()
+
+    assert.equal(loaded.targetVersion, "1.4.54")
+})
+
+test("loader rejects runtime manifest symlink escapes from CONTENT_RUNTIME_DIR", async t => {
+    const projectRoot = createProject(t)
+    const externalRoot = fs.mkdtempSync(path.join(os.tmpdir(), "content-runtime-external-"))
+    t.after(() => fs.rmSync(externalRoot, { force: true, recursive: true }))
+    const manifestPath = path.join(projectRoot, "assets/cdn/catalog-cn-1.4.54.json")
+    const externalPath = path.join(externalRoot, "manifest.json")
+    fs.copyFileSync(manifestPath, externalPath)
+    fs.unlinkSync(manifestPath)
+    try {
+        fs.symlinkSync(externalPath, manifestPath)
+    } catch (error) {
+        if (process.platform === "win32" && ["EACCES", "EPERM"].includes(error.code)) {
+            t.skip("file symlink creation is unavailable on this Windows host")
+            return
+        }
+        throw error
+    }
+
+    await assert.rejects(
+        new CdnCatalogLoader({ projectRoot, env: {} }).load(),
+        error => (
+            error instanceof CatalogLoaderError
+            && error.code === "RUNTIME_MANIFEST_READ"
+            && !error.message.includes(projectRoot)
+            && !error.message.includes(externalRoot)
+        ),
+    )
+})
 
 test("default loader rejects missing and wrong-size referenced archives", async t => {
     const missingRoot = createProject(t)
@@ -629,60 +615,9 @@ test("concurrent reloads build serial candidates and publish in call order", asy
     assert.equal(loader.get().targetVersion, "1.4.3")
 })
 
-test("enabled patches must match one fulfill diff edge archive basename and size", async t => {
+test("legacy patch metadata never changes the CN catalog", async t => {
     const projectRoot = createProject(t)
-    const archivePath = path.join(
-        projectRoot,
-        ".cdn/cn/archive-android-diff/pinball-1.4.0-1.4.1-1-abcd.zip",
-    )
-    const archiveSize = fs.statSync(archivePath).size
-    writePatchManifest(projectRoot, [patch({ archive_size: archiveSize })])
-
-    const loader = new CdnCatalogLoader({ projectRoot, env: {} })
-    assert.equal((await loader.load()).targetVersion, "1.4.54")
-
-    for (const [overrides, detail] of [
-        [{ depends_on: "1.3.9" }, "missing edge"],
-        [{ archive: "pinball-other.zip" }, "archive basename"],
-        [{ archive_size: archiveSize + 1 }, "archive size"],
-    ]) {
-        writePatchManifest(projectRoot, [patch({ archive_size: archiveSize, ...overrides })])
-        await assert.rejects(
-            new CdnCatalogLoader({ projectRoot, env: {} }).load(),
-            error => (
-                error instanceof CatalogLoaderError
-                && error.code === "PATCH_CATALOG_MISMATCH"
-                && error.message.includes(detail)
-            ),
-        )
-    }
-})
-
-test("patch manifest rejects duplicate ids even when both entries match the catalog", async t => {
-    const projectRoot = createProject(t)
-    const archiveSize = fs.statSync(path.join(
-        projectRoot,
-        ".cdn/cn/archive-android-diff/pinball-1.4.0-1.4.1-1-abcd.zip",
-    )).size
-    const matchingPatch = patch({ archive_size: archiveSize })
-    writePatchManifest(projectRoot, [matchingPatch, { ...matchingPatch }])
-
-    await assert.rejects(
-        new CdnCatalogLoader({ projectRoot, env: {} }).load(),
-        error => (
-            error instanceof CatalogLoaderError
-            && error.code === "PATCH_MANIFEST_SCHEMA"
-            && error.message.includes("duplicate patch id fixture-patch")
-        ),
-    )
-})
-
-test("disabled patches and mods never raise the catalog target", async t => {
-    const projectRoot = createProject(t)
-    writePatchManifest(projectRoot, [
-        patch({ enabled: false, version: "9.9.9", depends_on: "9.9.8", archive: "missing.zip" }),
-        patch({ id: "fixture-mod", type: "mod", version: "8.8.8", depends_on: "8.8.7" }),
-    ])
+    fs.writeFileSync(path.join(projectRoot, "assets/asset-patch/manifest.json"), "{")
 
     const loaded = await new CdnCatalogLoader({ projectRoot, env: {} }).load()
     assert.equal(loaded.targetVersion, "1.4.54")
@@ -776,19 +711,6 @@ test("injected runtime manifest read failures redact nested absolute paths", asy
             "RUNTIME_MANIFEST_READ",
             [projectRoot, manifestPath],
         ),
-    )
-})
-
-test("patch manifest schema failures use a stable diagnostic loader error", async t => {
-    const projectRoot = createProject(t)
-    fs.writeFileSync(
-        path.join(projectRoot, "assets/asset-patch/manifest.json"),
-        JSON.stringify({ cdn_version: "1.4.1", patches: {} }),
-    )
-
-    await assert.rejects(
-        new CdnCatalogLoader({ projectRoot, env: {} }).load(),
-        error => error instanceof CatalogLoaderError && error.code === "PATCH_MANIFEST_SCHEMA",
     )
 })
 

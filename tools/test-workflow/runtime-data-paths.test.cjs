@@ -67,6 +67,15 @@ test("DATA_DIR takes precedence over WDFP_DATABASE_DIR and resolves absolutely",
     assert.equal(Object.hasOwn(paths, "seedStateTemporaryFile"), false)
     assert.equal(paths.activeAccountFile, path.join(paths.stateDir, "active_account.json"))
     assert.equal(paths.defaultSaveFile, path.join(paths.stateDir, "default_save.json"))
+    assert.equal(paths.assetProviderDir, path.join(paths.dataDir, "asset-provider"))
+    assert.equal(
+        paths.assetPatchUploadDir,
+        path.join(paths.assetProviderDir, "production", "upload"),
+    )
+    assert.equal(
+        paths.legacyAssetMetadataFile,
+        path.join(paths.assetProviderDir, "legacy-metadata.json"),
+    )
 })
 
 test("falls back to WDFP_DATABASE_DIR when DATA_DIR is unset", () => {

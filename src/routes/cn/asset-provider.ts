@@ -50,7 +50,7 @@ export function registerCnAssetProviderRoutes(
             paths: { cdnRoot: path.resolve(options.config.cdnRoot) },
             fileSystem: options.fileSystem,
             handleObserver: options.handleObserver,
-            patchUploadRoot: options.patchUploadRoot,
+            patchUploadRoot: options.patchUploadRoot ?? options.config.patchUploadRoot,
         })
     }
 }

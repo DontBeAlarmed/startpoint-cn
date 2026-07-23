@@ -76,6 +76,13 @@ test("ASSET_MODE defaults to a frozen local provider with the project CDN", () =
         mode: "local",
         baseUrl: "http://127.0.0.1:8001/patch/cn",
         cdnRoot: path.join(projectRoot, ".cdn", "cn"),
+        patchUploadRoot: path.join(
+            projectRoot,
+            ".database",
+            "asset-provider",
+            "production",
+            "upload",
+        ),
     })
     assert.equal(Object.isFrozen(config), true)
 })
@@ -111,6 +118,13 @@ test("local preserves parent-of-cn CDN_DIR semantics and validates only configur
         mode: "local",
         baseUrl: "https://cdn.example.test/patch/cn",
         cdnRoot: path.join(projectRoot, "runtime-cdn", "cn"),
+        patchUploadRoot: path.join(
+            projectRoot,
+            ".database",
+            "asset-provider",
+            "production",
+            "upload",
+        ),
     })
     assert.throws(
         () => parseAssetProviderConfig({
@@ -126,6 +140,20 @@ test("local preserves parent-of-cn CDN_DIR semantics and validates only configur
         }),
         /invalid CDN base URL configuration/,
     )
+})
+
+test("local patch payload follows DATA_DIR without creating it", () => {
+    const dataDir = path.join(os.tmpdir(), "asset-provider-data-volume")
+    const config = parseAssetProviderConfig({
+        projectRoot,
+        env: { ASSET_MODE: "local", DATA_DIR: dataDir },
+    })
+
+    assert.equal(
+        config.patchUploadRoot,
+        path.join(dataDir, "asset-provider", "production", "upload"),
+    )
+    assert.equal(fs.existsSync(config.patchUploadRoot), false)
 })
 
 test("remote requires a strict URL but ignores CDN_DIR without probing the network", () => {
@@ -205,6 +233,35 @@ test("only local registers the complete local patch route surface", async t => {
             }
         })
     }
+})
+
+test("local dummy patch route reads only the DATA_DIR payload root", async t => {
+    const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "asset-provider-payload-"))
+    t.after(() => fs.rmSync(temporaryRoot, { recursive: true, force: true }))
+    const cdnRoot = path.join(temporaryRoot, "cdn", "cn")
+    const dataDir = path.join(temporaryRoot, "data")
+    fs.mkdirSync(cdnRoot, { recursive: true })
+    const config = parseAssetProviderConfig({
+        projectRoot: temporaryRoot,
+        env: {
+            ASSET_MODE: "local",
+            CDN_DIR: path.join(temporaryRoot, "cdn"),
+            DATA_DIR: dataDir,
+        },
+    })
+    const payloadPath = path.join(config.patchUploadRoot, "ab", "fixture-hash")
+    fs.mkdirSync(path.dirname(payloadPath), { recursive: true })
+    fs.writeFileSync(payloadPath, "external payload")
+    const app = await createProviderApp(t, config)
+
+    const response = await app.inject({
+        method: "GET",
+        url: "/patch/cn/dummy/download/production/upload/ab/fixture-hash",
+    })
+
+    assert.equal(response.statusCode, 200)
+    assert.equal(response.body, "external payload")
+    assert.equal(fs.existsSync(path.join(temporaryRoot, "assets", "asset-patch")), false)
 })
 
 test("remote version_info and planner use only the frozen remote base URL", async t => {
@@ -382,5 +439,48 @@ test("CN runtime parses one provider and wires it through routes, load, and cont
     assert.match(entry, /registerCnAssetProviderRoutes\(fastify,\s*\{\s*config: config\.assetProvider/)
     assert.match(entry, /fastify\.register\(cnLoadPlugin,\s*\{[^}]*assetProvider: config\.assetProvider/s)
     assert.match(entry, /initializeContentSnapshot\(\{\s*assetMode: config\.assetProvider\.mode,\s*localCdn: config\.assetProvider\.mode === "local"/)
+    assert.match(entry, /configureSerializedAssetVersionProvider\(/)
     assert.doesNotMatch(entry, /fastify\.register\(cnCdnFilesPlugin/)
+})
+
+test("player serialization does not import the legacy asset route", () => {
+    const source = fs.readFileSync(
+        path.join(projectRoot, "src/data/utils/serialize-player.ts"),
+        "utf8",
+    )
+    assert.doesNotMatch(source, /routes\/api\/asset/)
+    assert.match(source, /resolveSerializedAssetVersion/)
+
+    const { resolveSerializedAssetVersion } = require(
+        "../src/data/utils/serialized-asset-version"
+    )
+    assert.equal(resolveSerializedAssetVersion("1.4.54"), "1.4.54")
+    assert.equal(resolveSerializedAssetVersion(), "2.1.125")
+})
+
+test("CN admin status derives versions from the snapshot without patch metadata", () => {
+    const statusSource = fs.readFileSync(
+        path.join(projectRoot, "src/routes/web_api/server.ts"),
+        "utf8",
+    )
+    const versionSource = fs.readFileSync(
+        path.join(projectRoot, "src/lib/version.ts"),
+        "utf8",
+    )
+
+    assert.doesNotMatch(statusSource, /asset-patch|getPatchManifest/)
+    assert.doesNotMatch(versionSource, /asset-patch|readFileSync/)
+    assert.match(statusSource, /enabledPatchCount:\s*0/)
+    assert.match(statusSource, /totalPatchCount:\s*0/)
+})
+
+test("legacy global asset metadata uses the external data volume", () => {
+    const source = fs.readFileSync(
+        path.join(projectRoot, "src/routes/api/asset.ts"),
+        "utf8",
+    )
+
+    assert.match(source, /resolveRuntimeDataPaths/)
+    assert.match(source, /legacyAssetMetadataFile/)
+    assert.doesNotMatch(source, /path\.join\(envCdnDir,\s*["']metadata\.json["']\)/)
 })
