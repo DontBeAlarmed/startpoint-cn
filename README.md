@@ -2,6 +2,8 @@
 
 世界弹射物语(World Flipper)CN(雷霆 Leiting)版本的服务端模拟器。
 
+> `dev` 分支用于集成测试。自动测试和服务端构建通过不等于 CN 客户端全量验收完成；尚未验证的功能与流程以 [`docs/status/test-progress.md`](./docs/status/test-progress.md) 为准，稳定版本仍以 `main` 分支为准。
+
 ## 功能状态
 
 已实现(部分端点沿用国际服设计,对 CN 的通用性尚未验证):
@@ -11,6 +13,7 @@
 - 关卡:主线 / 部分活动·Boss / 单人战斗结算
 - Gacha:角色·武器卡池、兑换、C3032 动画修复、抽卡种子验证
 - 多人联机(NPC 协战):Phase 2 — 建房 + NPC 招募 / 召唤 / 结算
+- 内容运行时:从官方 CN CDN 生成 Content Release，并在启动时固定加载同一份快照
 - 系统:狂热激战 · 体力 · 商店 · 漫画 · 邮件群发
 - 养成:升级 / 突破 / 魔晶板 / EX / 羁绊;武装:觉醒 / 熔解;编队 · 图鉴 · 教程
 
@@ -148,7 +151,8 @@ bash client-patch/apply.sh <AS3_导出目录> <你的LAN_IP>:8001
 
 ## Web 管理面板(`http://<CN_LISTEN_HOST>:<端口>/`)
 
-`/` 时间设置 · `/player` 账号·存档·玩家 · `/player/:id` 玩家详情 · `/mail` 群发邮件
+- 新版 React 管理后台：`/admin/`（持续开发和验收中）
+- 兼容旧后台：`/` 时间设置 · `/player` 账号·存档·玩家 · `/player/:id` 玩家详情 · `/mail` 群发邮件
 
 > 面板对写入端点做**结构安全校验**(拒绝未知字段 / 类型错误 / 超 2³¹ 的非法值并明确报错),但不限制游戏平衡数值;重要操作仍建议先用「下载 JSON」导出备份。
 > 若误发非法邮件导致客户端在邮件界面崩溃,可用玩家详情页的**清空邮件箱**恢复。
@@ -156,6 +160,10 @@ bash client-patch/apply.sh <AS3_导出目录> <你的LAN_IP>:8001
 ## FAQ
 
 - `H404` = 该功能 / 端点尚未实现。
+
+## 贡献联机 NPC 昵称
+
+贡献者只需要向 [`assets/server/npc_contributor_names.json`](./assets/server/npc_contributor_names.json) 的 `names` 数组增加昵称，不需要也不得提交 `playerId`。格式校验、长度限制和本地检查命令见 [`docs/systems/npc-contributor-names.md`](./docs/systems/npc-contributor-names.md)。
 
 ## 致谢 / 相关项目
 
