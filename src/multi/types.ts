@@ -6,6 +6,7 @@ export type {
     MultiMate,
     MultiRoom,
     NpcMateTemplate,
+    RoomNpcAssignment,
     QuestCategory,
 } from "../lib/types"
 

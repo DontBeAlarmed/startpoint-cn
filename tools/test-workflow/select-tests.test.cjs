@@ -446,6 +446,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/msgpack_compat.test.cjs",
         "tools/multi_player_context.test.cjs",
         "tools/npc_contributor_names.test.cjs",
+        "tools/npc_nickname_pool.test.cjs",
         "tools/room_cleanup_lifecycle.test.cjs",
         "tools/session_server_lifecycle.test.cjs",
     ])

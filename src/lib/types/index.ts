@@ -4,7 +4,7 @@ export { AddExpList, AddExpListItem, AssetCharacter, ClientReturnBondTokenStatus
 export { ConfigValues } from "./config"
 export { EquipmentCraftEntry, EquipmentDissolveEntry, ItemSaleEntry } from "./equipment-craft"
 export { CharacterGacha, Gacha, GachaCharacterDraw, GachaDrawResult, GachaDraws, GachaEquipmentDraw, GachaMovieSeeds, GachaMovieType, GachaPoolItem, GachaType, Gachas, RewardPlayerGachaDrawResult } from "./gacha"
-export { MultiMate, MultiMateEquipment, MultiMateParty, MultiMatePartyCharacter, MultiRoom, NpcMateTemplate } from "./multi"
+export { MultiMate, MultiMateEquipment, MultiMateParty, MultiMatePartyCharacter, MultiRoom, NpcMateTemplate, RoomNpcAssignment } from "./multi"
 export { BattleQuest, Element, QuestCategory, RawQuest, RawQuests, StoryQuest } from "./quest"
 export { CharacterReward, CharacterShopItemReward, ClearRewards, CommonScoreReward, CurrencyReward, CurrencyScoreReward, CurrencyShopItemReward, DropScoreRewardId, EquipmentItemReward, EquipmentItemShopItemReward, GivePlayerScoreRewardsResult, ItemScoreReward, PlayerRewardResult, RareScoreReward, RareScoreRewardGroup, RareScoreRewardGroups, Reward, RewardType, ScoreReward, ScoreRewardGroups, ScoreRewardType, ShopItemReward, ShopItemRewardType } from "./rewards"
 export { RushEventFolder, RushEventFolders, SerializedPlayerRushEventPlayedParties, SerializedPlayerRushEventPlayedPartyList } from "./rush"

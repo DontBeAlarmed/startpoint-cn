@@ -2,9 +2,11 @@ import * as net from "net"
 import { sessionManager, SessionClient } from "../state/SessionManager"
 import { getRoom, updateRoomState } from "../room/manager"
 import { NpcMateProvider } from "../npc/controller"
+import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
 import { buildRealParty } from "./handshake"
 import { PartyCategory } from "../../data/types"
 import { getPlayerPartyGroupListSync } from "../../data/domains/party"
+import type { MultiRoom } from "../../lib/types"
 import {
     getLobbyLifecycleGuard,
     LobbyLifecycleGuard,
@@ -13,6 +15,41 @@ import {
 
 const NPC_JOIN_DELAY_MS = parseInt(process.env.NPC_JOIN_DELAY_MS || "2000")
 const NPC_READY_DELAY_MS = parseInt(process.env.NPC_READY_DELAY_MS || "500")
+
+interface RoomRecruitmentState {
+    nextRequestId: number
+    committedRequestId: number
+    revision: number
+}
+
+const roomRecruitmentStates = new WeakMap<MultiRoom, RoomRecruitmentState>()
+
+function getRoomRecruitmentState(room: MultiRoom): RoomRecruitmentState {
+    let state = roomRecruitmentStates.get(room)
+    if (!state) {
+        state = { nextRequestId: 0, committedRequestId: 0, revision: 0 }
+        roomRecruitmentStates.set(room, state)
+    }
+    return state
+}
+
+function beginRecruitmentRequest(room: MultiRoom): number {
+    const state = getRoomRecruitmentState(room)
+    state.nextRequestId++
+    return state.nextRequestId
+}
+
+function commitRecruitmentRequest(room: MultiRoom, requestId: number): number | null {
+    const state = getRoomRecruitmentState(room)
+    if (requestId < state.committedRequestId) return null
+    state.committedRequestId = requestId
+    state.revision++
+    return state.revision
+}
+
+function isCommittedRecruitment(roomNumber: string, room: MultiRoom, revision: number): boolean {
+    return getRoom(roomNumber) === room && getRoomRecruitmentState(room).revision === revision
+}
 
 function findClientBySocket(socket: net.Socket): SessionClient | undefined {
     const clientsMap = (sessionManager as any).clients as Map<string, SessionClient> | undefined
@@ -38,6 +75,42 @@ function findHostClient(roomNumber: string): SessionClient | undefined {
 
 function countRealPlayers(mates: any[]): number {
     return mates.filter(m => !m.comId).length  // real player has no comId
+}
+
+function selectRealMates(mates: any[], hostViewerId: number): any[] {
+    const seenViewerIds = new Set<number>()
+    let hostMate: any | undefined
+    const guestMates: any[] = []
+    for (const mate of mates) {
+        if (mate.comId || seenViewerIds.has(mate.viewerId)) continue
+        seenViewerIds.add(mate.viewerId)
+        if (mate.viewerId === hostViewerId) hostMate = mate
+        else guestMates.push(mate)
+    }
+    return (hostMate ? [hostMate, ...guestMates] : guestMates).slice(0, 3)
+}
+
+function getConnectedRealMates(client: SessionClient, room: MultiRoom): any[] {
+    const connectedMates = sessionManager.getClientsInRoom(client.roomNumber)
+        .map(connectedClient => connectedClient.yourself)
+        .filter(mate => mate !== undefined)
+    return selectRealMates([...client.mates, ...connectedMates], room.host_viewer_id)
+}
+
+function limitLobbyMates(mates: any[], hostViewerId: number): any[] {
+    const realMates = selectRealMates(mates, hostViewerId)
+    const npcSlots = 3 - realMates.length
+    const npcMates = npcSlots > 0
+        ? mates.filter(mate => !!mate.comId).slice(-npcSlots)
+        : []
+    return [...realMates, ...npcMates]
+}
+
+function commitRoomMates(client: SessionClient, room: MultiRoom, mates: any[]): void {
+    client.mates = mates
+    const hostClient = findHostClient(client.roomNumber)
+    if (hostClient) hostClient.mates = client.mates
+    room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
 }
 
 export function checkHostAutoReady(roomNumber: string): void {
@@ -98,42 +171,41 @@ export function notifyRoomDisbanded(roomNumber: string): void {
 
 async function handleEnterComs(
     client: SessionClient,
-    coms: { name: string }[],
     lifecycle: LobbyLifecycleGuard = getLobbyLifecycleGuard(),
 ): Promise<void> {
     const room = getRoom(client.roomNumber)
     if (!room) return
     room.is_npc_mode = true
+    const requestId = beginRecruitmentRequest(room)
 
     const hostMate = client.yourself ?? client.mates[0]
     if (!hostMate) return
 
-    // Merge all connected (but not yet entered) real players into client.mates
-    const connectedClients = sessionManager.getClientsInRoom(client.roomNumber)
-    for (const c of connectedClients) {
-        if (c.yourself && !client.mates.find(m => m.viewerId === c.viewerId)) {
-            client.mates.push(c.yourself)
-        }
-    }
+    const initialRealMates = getConnectedRealMates(client, room)
 
-    const realMates = client.mates.filter(m => !m.comId)
-
-    // Determine NPC count: first recruit → calculate and store; rematch → restore fixed count
-    let needNPCs: number
+    // Assign the room roster synchronously so concurrent EnterComs calls share one binding.
     if (room.npc_count <= 0) {
-        needNPCs = 3 - realMates.length
-        room.npc_count = needNPCs  // persist for rematch
-    } else {
-        needNPCs = room.npc_count
+        room.npc_count = Math.max(0, 3 - initialRealMates.length)
     }
-    if (needNPCs <= 0) {
-        console.log(`[LOBBY] EnterComs: room full (${realMates.length} players), skip NPCs`)
+    ensureNpcRoster(room, room.npc_count)
+
+    const initialActiveCount = Math.max(0, Math.min(room.npc_count, 3 - initialRealMates.length))
+    if (initialActiveCount <= 0) {
+        commitRecruitmentRequest(room, requestId)
+        commitRoomMates(client, room, initialRealMates)
+        console.log(`[LOBBY] EnterComs: room full (${initialRealMates.length} players), skip NPCs`)
         return
     }
 
     const npcProvider = new NpcMateProvider()
     const recruitResult = await npcProvider.onRecruit(client.roomNumber, String(room?.host_viewer_id ?? 0))
-    if (!lifecycle.isActive()) return
+    if (!lifecycle.isActive() || getRoom(client.roomNumber) !== room) return
+    if (requestId < getRoomRecruitmentState(room).committedRequestId) return
+
+    // Real players may enter while the provider is pending. Rebuild from current room state.
+    const currentRealMates = getConnectedRealMates(client, room)
+    const activeCount = Math.max(0, Math.min(room.npc_count, 3 - currentRealMates.length))
+    const assignments = getActiveNpcRoster(room, activeCount)
 
     // Fetch NPC party data from player's DB (uses real equipment/character IDs)
     const npcParties: any[] = []
@@ -153,16 +225,18 @@ async function handleEnterComs(
     }
 
     const npcMates: any[] = []
-    for (let i = 0; i < needNPCs; i++) {
-        const recruited = recruitResult.recruitedMates[i] ?? null
-        const comId = recruited?.com_id ?? (i + 1)
-        const viewerId = recruited?.viewer_id ?? (900000000 + i + 1)
-        const party = npcParties[i] ?? npcParties[0] ?? hostMate.party
+    const recruitedByComId = new Map(recruitResult.recruitedMates.map(mate => [mate.com_id, mate]))
+    for (let i = 0; i < assignments.length; i++) {
+        const assignment = assignments[i]
+        const recruited = recruitedByComId.get(assignment.com_id)
+        const comId = assignment.com_id
+        const viewerId = recruited?.viewer_id ?? (900000000 + comId)
+        const party = npcParties[assignment.com_id - 1] ?? npcParties[0] ?? hostMate.party
 
         npcMates.push({
             viewerId: viewerId,
             comId: comId,
-            name: coms[i]?.name ?? `NPC${comId}`,
+            name: assignment.name,
             rank: hostMate.rank,
             degreeId: hostMate.degreeId,
             playerRoleKind: 99,
@@ -182,19 +256,17 @@ async function handleEnterComs(
         })
     }
 
-    client.mates = [...realMates, ...npcMates]
+    const committedRevision = commitRecruitmentRequest(room, requestId)
+    if (committedRevision === null) return
+    commitRoomMates(client, room, [...currentRealMates, ...npcMates])
 
-    const hostClient = findHostClient(client.roomNumber)
-    if (hostClient) hostClient.mates = client.mates
+    console.log(`[LOBBY] EnterComs: room=${client.roomNumber} real=${currentRealMates.length} npc=${npcMates.length} total=${client.mates.length}`)
 
-    if (room) {
-        room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
-    }
-
-    console.log(`[LOBBY] EnterComs: room=${client.roomNumber} real=${realMates.length} npc=${npcMates.length} total=${client.mates.length}`)
+    if (npcMates.length === 0) return
 
     scheduleLobbyTask(() => {
         try {
+            if (!isCommittedRecruitment(client.roomNumber, room, committedRevision)) return
             // Send Mates only to triggering client — others get theirs via handleEnter
             sessionManager.sendJson(client.socket, [1, [1, client.mates]])
         } catch (e) { console.error("[LOBBY] EnterComs send-mates error", e) }
@@ -202,11 +274,20 @@ async function handleEnterComs(
 
     scheduleLobbyTask(() => {
         try {
-            for (const npc of npcMates) {
+            if (!isCommittedRecruitment(client.roomNumber, room, committedRevision)) return
+            const currentHostClient = findHostClient(client.roomNumber)
+            if (!currentHostClient) return
+            const recruitedNpcKeys = new Set(npcMates.map(npc =>
+                `${npc.comId}:${npc.viewerId}:${npc.connectionId}`
+            ))
+            const currentNpcMates = currentHostClient.mates.filter(npc =>
+                recruitedNpcKeys.has(`${npc.comId}:${npc.viewerId}:${npc.connectionId}`)
+            )
+            for (const npc of currentNpcMates) {
                 npc.state = [1]
                 sessionManager.broadcastToRoom(client.roomNumber, [1, [2, npc.connectionId, [1]]])
             }
-            if (realMates.length === 1) checkHostAutoReady(client.roomNumber)
+            if (countRealPlayers(currentHostClient.mates) === 1) checkHostAutoReady(client.roomNumber)
         } catch (e) { console.error("[LOBBY] EnterComs npc-ready error", e) }
     }, NPC_JOIN_DELAY_MS + NPC_READY_DELAY_MS)
 }
@@ -256,21 +337,20 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
                 }
             }
         }
+        if (room) client.mates = selectRealMates(client.mates, room.host_viewer_id)
         if (room) room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
         if (client.mates.length > 1) {
             sessionManager.broadcastToRoom(client.roomNumber, [1, [1, client.mates]], `${client.viewerId}@${client.roomNumber}`)
         }
         if (room && room.npc_count > 0 && countRealPlayers(client.mates) < 3) {
-            scheduleLobbyTask(lifecycle => { handleEnterComs(client, [{ name: "开心超人" }, { name: "名字真难取" }], lifecycle).catch(e => console.error("[LOBBY] EnterComs (timer) error", e)); }, 500)
+            scheduleLobbyTask(lifecycle => { handleEnterComs(client, lifecycle).catch(e => console.error("[LOBBY] EnterComs (timer) error", e)); }, 500)
         }
     } else {
         if (hostClient && client.yourself) {
-            hostClient.mates.push(client.yourself)
-            while (hostClient.mates.length > 3) {
-                const npcIdx = hostClient.mates.findIndex(m => !!m.comId)
-                if (npcIdx >= 0) hostClient.mates.splice(npcIdx, 1)
-                else break
-            }
+            hostClient.mates = limitLobbyMates(
+                [...hostClient.mates, client.yourself],
+                room?.host_viewer_id ?? hostClient.viewerId,
+            )
             client.mates = [...hostClient.mates]
         } else {
             client.mates = [client.yourself!]
@@ -379,7 +459,7 @@ function handleNotify(socket: net.Socket, client: SessionClient, data: any[]): v
         case 4: handleHeartbeat(socket, client, notifyData); break
         case 5: case 7: case 8: case 9: break  // Suspend/ChangeAutoplay/ChangeAutoStart/Log — silently ignored
         case 6: handleStartBattle(socket, client, notifyData); break
-        case 10: handleEnterComs(client, notifyData[1] as any[]).catch(e => console.error("[LOBBY] EnterComs error", e)); break
+        case 10: handleEnterComs(client).catch(e => console.error("[LOBBY] EnterComs error", e)); break
         default:
             console.log(`[LOBBY] unhandled Notify: ${tag}`)
     }
