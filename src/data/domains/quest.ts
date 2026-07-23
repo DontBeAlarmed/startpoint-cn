@@ -174,6 +174,18 @@ export function updatePlayerQuestProgressSync(
         `).run([...values, Number(section), data.questId, playerId]);
 }
 
+export function incrementPlayerQuestMultiClearSync(
+    playerId: number,
+    section: number | string,
+    questId: number | string,
+): void {
+    getDb().prepare(`
+    UPDATE players_quest_progress
+    SET multi_clear_count = multi_clear_count + 1
+    WHERE player_id = ? AND section = ? AND quest_id = ?
+    `).run(playerId, Number(section), Number(questId))
+}
+
 /**
  * Converts a RawPlayerGachaInfo object into a PlayerGachaInfo object.
  * 

@@ -104,6 +104,7 @@ function updatePlayer(data) {
 }
 
 let writeAttempts = 0
+let failActiveDeleteAfterWrite = false
 const scoreQuest = {
     name: "无限演武",
     eventId: 1,
@@ -139,6 +140,7 @@ stubModule("../src/data/domains/quest_active", {
     deletePlayerActiveQuestSync(playerId) {
         writeAttempts++
         db.prepare("DELETE FROM players_active_quests WHERE player_id = ?").run(playerId)
+        if (failActiveDeleteAfterWrite) throw new Error("injected active delete post-write failure")
     },
     updatePlayerActiveQuestContinueCountSync() {},
 })
@@ -364,6 +366,40 @@ async function main() {
     assert.equal(activeQuests[17], undefined)
     const decoded = unpack(Buffer.from(succeeded.body, "base64"))
     assert.equal(decoded.data.item_list["40501"], 8)
+
+    activeQuests[17] = {
+        questId: 1101,
+        category: 1,
+        useBossBoostPoint: false,
+        useBoostPoint: false,
+        isAutoStartMode: false,
+        isMulti: false,
+        playId: "normal-play",
+        continueCount: 0,
+    }
+    db.prepare("INSERT INTO players_active_quests VALUES (?, ?, ?)").run(17, 1101, 1)
+    const beforeNormalFailure = {
+        player: db.prepare("SELECT * FROM player_state").get(),
+        character: db.prepare("SELECT * FROM character_state").get(),
+        mission: db.prepare("SELECT * FROM mission_state").get(),
+        item: db.prepare("SELECT * FROM item_state").get(),
+        questProgress: db.prepare("SELECT * FROM quest_progress ORDER BY category, quest_id").all(),
+    }
+
+    failActiveDeleteAfterWrite = true
+    const failedNormal = await finish(fastify)
+    failActiveDeleteAfterWrite = false
+    assert.equal(failedNormal.statusCode, 500)
+    assert.deepEqual(db.prepare("SELECT * FROM player_state").get(), beforeNormalFailure.player)
+    assert.deepEqual(db.prepare("SELECT * FROM character_state").get(), beforeNormalFailure.character)
+    assert.deepEqual(db.prepare("SELECT * FROM mission_state").get(), beforeNormalFailure.mission)
+    assert.deepEqual(db.prepare("SELECT * FROM item_state").get(), beforeNormalFailure.item)
+    assert.deepEqual(
+        db.prepare("SELECT * FROM quest_progress ORDER BY category, quest_id").all(),
+        beforeNormalFailure.questProgress,
+    )
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players_active_quests").get().count, 1)
+    assert.ok(activeQuests[17])
 
     await fastify.close()
     db.close()

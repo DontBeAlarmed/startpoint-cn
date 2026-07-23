@@ -36,10 +36,7 @@ import {
 } from "../../lib/quest/finish/score-attack-handler";
 import { validateSessionAndPlayer } from "../../lib/quest/finish/session-validator";
 import { handleDailyChallengePoint } from "../../lib/quest/finish/challenge-point";
-import { trackCharacterClears } from "../../lib/quest/finish/character-clear-tracker";
-import { trackPowerflip } from "../../lib/quest/finish/powerflip-tracker";
-import { trackLeaderPowerflip } from "../../lib/quest/finish/leader-powerflip-tracker";
-import { trackPartyCoClears } from "../../lib/quest/finish/party-co-clear-tracker";
+import { recordMissionBattleFacts } from "../../lib/mission/battle-facts";
 import type { FinishContext } from "../../lib/quest/finish/types";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
 import scoreAttackBorderRewards from "../../../assets/score_attack_border_reward.json";
@@ -207,11 +204,6 @@ const routes = async (fastify: FastifyInstance) => {
             })
             : calculateClearRank(clearTime, questData)
 
-        if (!isScoreAttackEvent) {
-            delete activeQuests[playerId]
-            deletePlayerActiveQuestSync(playerId)
-        }
-
         // calculate player rewards
         const newExpPool = playerData.expPool + questData.poolExpReward
         const beforeRankPoint = playerData.rankPoint
@@ -247,41 +239,7 @@ const routes = async (fastify: FastifyInstance) => {
             questAccomplished = body.score >= scoreAttackBorderTiers[0].score
         }
 
-        const clearReward = !isScoreAttackEvent && !questPreviouslyCompleted && questData.clearReward !== undefined
-            ? givePlayerRewardSync(playerId, questData.clearReward)
-            : null
-        const sPlusClearReward = !isScoreAttackEvent && (clearRank === 5) && (questProgress?.clearRank !== 5) && (questData.sPlusReward !== undefined)
-            ? givePlayerRewardSync(playerId, questData.sPlusReward)
-            : null
         const leaderId = body.statistics.party.characters[0]?.id
-        if (questAccomplished && !isScoreAttackEvent) {
-            // update quest progress
-            if (questPreviouslyCompleted) {
-                // simply update the quest progress if it already exists.
-                const updateData: any = {
-                    questId: questId,
-                    finished: true,
-                    bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
-                    highScore: questProgress.highScore === undefined ? body.score : Math.max(body.score, questProgress.highScore),
-                    leaderCharacterId: leaderId ?? null
-                }
-                if (clearRank !== null) {
-                    updateData.clearRank = questProgress.clearRank === undefined ? clearRank : Math.max(clearRank, questProgress.clearRank)
-                }
-                updatePlayerQuestProgressSync(playerId, questCategory, updateData)
-            } else {
-                // insert if it doesn't already exist.
-                const insertData: any = {
-                    questId: questId,
-                    finished: true,
-                    bestElapsedTimeMs: clearTime,
-                    highScore: body.score,
-                    clearRank: clearRank ?? 5,
-                    leaderCharacterId: leaderId ?? null
-                }
-                insertPlayerQuestProgressSync(playerId, questCategory, insertData)
-            }
-        }
 
         const bodyPartyStatistics = body.statistics.party
         const partyCharacterIds = [...bodyPartyStatistics.characters, ...bodyPartyStatistics.unison_characters]
@@ -303,6 +261,38 @@ const routes = async (fastify: FastifyInstance) => {
         const addExpAmount = questData.characterExpReward
 
         const executeFinishWrites = () => {
+            const clearReward = !isScoreAttackEvent && !questPreviouslyCompleted && questData.clearReward !== undefined
+                ? givePlayerRewardSync(playerId, questData.clearReward)
+                : null
+            const sPlusClearReward = !isScoreAttackEvent && (clearRank === 5) && (questProgress?.clearRank !== 5) && (questData.sPlusReward !== undefined)
+                ? givePlayerRewardSync(playerId, questData.sPlusReward)
+                : null
+
+            if (questAccomplished && !isScoreAttackEvent) {
+                if (questPreviouslyCompleted) {
+                    const updateData: any = {
+                        questId: questId,
+                        finished: true,
+                        bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
+                        highScore: questProgress.highScore === undefined ? body.score : Math.max(body.score, questProgress.highScore),
+                        leaderCharacterId: leaderId ?? undefined
+                    }
+                    if (clearRank !== null) {
+                        updateData.clearRank = questProgress.clearRank === undefined ? clearRank : Math.max(clearRank, questProgress.clearRank)
+                    }
+                    updatePlayerQuestProgressSync(playerId, questCategory, updateData)
+                } else {
+                    insertPlayerQuestProgressSync(playerId, questCategory, {
+                        questId: questId,
+                        finished: true,
+                        bestElapsedTimeMs: clearTime,
+                        highScore: body.score,
+                        clearRank: clearRank ?? 5,
+                        leaderCharacterId: leaderId ?? undefined
+                    })
+                }
+            }
+
             const oldRkDegree = getRankDegree(beforeRankPoint)
             const newDegreeId = getRankDegree(newRankPoint)
             const didLevelUp = newDegreeId > oldRkDegree
@@ -337,10 +327,7 @@ const routes = async (fastify: FastifyInstance) => {
             console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${questData.scoreRewardGroup?.length ?? 'null'} questId=${questId} category=${questCategory}`)
             const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element)
 
-            trackCharacterClears(finishCtx)
-            trackLeaderPowerflip(finishCtx)
-            trackPartyCoClears(finishCtx)
-            trackPowerflip(finishCtx)
+            recordMissionBattleFacts(finishCtx)
 
             const rewardCharacterExpResult = givePlayerCharactersExpSync(
                 playerId,
@@ -448,6 +435,8 @@ const routes = async (fastify: FastifyInstance) => {
                 ...((scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[]),
             ])
 
+            if (!isScoreAttackEvent) deletePlayerActiveQuestSync(playerId)
+
             return {
                 afterStamina,
                 afterStaminaHealTime,
@@ -463,12 +452,12 @@ const routes = async (fastify: FastifyInstance) => {
                 scoreAttackRewardResult,
                 itemList,
                 characterList,
+                clearReward,
+                sPlusClearReward,
             }
         }
 
-        const finishWrites = isScoreAttackEvent
-            ? getDb().transaction(executeFinishWrites)()
-            : executeFinishWrites()
+        const finishWrites = getDb().transaction(executeFinishWrites)()
         const {
             afterStamina,
             afterStaminaHealTime,
@@ -484,8 +473,10 @@ const routes = async (fastify: FastifyInstance) => {
             scoreAttackRewardResult,
             itemList,
             characterList,
+            clearReward,
+            sPlusClearReward,
         } = finishWrites
-        if (scoreAttackFinishResult !== null) delete activeQuests[playerId]
+        delete activeQuests[playerId]
         const scoreAttackEventData = scoreAttackFinishResult?.scoreAttackEvent ?? null
 
         const dataHeaders = generateDataHeaders({ viewer_id: viewerId })

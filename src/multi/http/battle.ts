@@ -27,10 +27,7 @@ import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync
 import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/stamina";
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import { getDb } from "../../data/db";
-import { trackCharacterClears } from "../../lib/quest/finish/character-clear-tracker";
-import { trackPowerflip } from "../../lib/quest/finish/powerflip-tracker";
-import { trackLeaderPowerflip } from "../../lib/quest/finish/leader-powerflip-tracker";
-import { trackPartyCoClears } from "../../lib/quest/finish/party-co-clear-tracker";
+import { recordMissionBattleFacts } from "../../lib/mission/battle-facts";
 import type { FinishContext } from "../../lib/quest/finish/types";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { resolveHostFinished, resolveIsRoomHost } from "../../lib/quest/host-finish";
@@ -178,26 +175,12 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             });
         }
 
-        delete activeQuests[playerId];
-        deletePlayerActiveQuestSync(playerId);
-
-        if (activeQuestData.roomNumber) {
-            sessionManager.clearBattleExpectedCount(activeQuestData.roomNumber);
-        }
-
         const room = activeQuestData.roomNumber ? getRoom(activeQuestData.roomNumber) : null;
         const isRoomHost = resolveIsRoomHost({
             roomHostPlayerId: room?.host_player_id ?? null,
             playerId,
         });
         console.log(`[MULTI] finish host context: roomHostPlayerId=${room?.host_player_id ?? "none"} playerId=${playerId} isRoomHost=${isRoomHost}`);
-        if (activeQuestData.roomNumber) {
-            if (isRoomHost && room) {
-                updateRoomState(room.room_number, 1);
-                console.log(`[MULTI] finish: room ${activeQuestData.roomNumber} reset to raising_state=1`);
-            }
-        }
-
         // calculate clear rank
         const clearTime = (body as any).elapsed_time_ms || 0;
         const hasRankThresholds = questData.bRankTime > 0;
@@ -230,62 +213,9 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         });
         const leaderId = ((body as any).statistics?.party || (body as any).quest_statistics?.party)?.characters?.[0]?.id
 
-        const clearReward = !questPreviouslyCompleted && (questData as any).clearReward !== undefined ? givePlayerRewardSync(playerId, (questData as any).clearReward) : null;
-        const sPlusClearReward = (clearRank === 5) && (questProgress?.clearRank !== 5) && ((questData as any).sPlusReward !== undefined) ? givePlayerRewardSync(playerId, (questData as any).sPlusReward) : null;
-        if (questAccomplished) {
-            if (questPreviouslyCompleted) {
-                const updateData: any = {
-                    questId: questId,
-                    finished: true,
-                    bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
-                    highScore: questProgress.highScore === undefined ? ((body as any).score || 0) : Math.max((body as any).score || 0, questProgress.highScore),
-                    leaderCharacterId: leaderId ?? null,
-                    hostFinished,
-                };
-                if (clearRank !== null) {
-                    updateData.clearRank = questProgress.clearRank === undefined ? clearRank : Math.max(clearRank, questProgress.clearRank);
-                }
-                updatePlayerQuestProgressSync(playerId, questCategory, updateData);
-            } else {
-                insertPlayerQuestProgressSync(playerId, questCategory, {
-                    questId: questId,
-                    finished: true,
-                    bestElapsedTimeMs: clearTime,
-                    highScore: (body as any).score || 0,
-                    clearRank: clearRank ?? 5,
-                    leaderCharacterId: leaderId ?? null,
-                    hostFinished,
-                });
-            }
-        }
-
         const oldRkDegree = getRankDegree(beforeRankPoint);
         const newDegreeId = getRankDegree(newRankPoint);
         const didLevelUp = newDegreeId > oldRkDegree;
-
-        // Increment multi clear count for event mission tracking
-        getDb().prepare(`
-        UPDATE players_quest_progress SET multi_clear_count = multi_clear_count + 1
-        WHERE player_id = ? AND section = ? AND quest_id = ?
-        `).run(playerId, Number(questCategory), Number(questId))
-        updatePlayerSync({
-            id: playerId,
-            freeMana: newMana,
-            expPool: newExpPool,
-            rankPoint: newRankPoint,
-            boostPoint: newBoostPoint,
-            bossBoostPoint: newBossBoostPoint,
-            totalManaObtained: (player.totalManaObtained ?? 0) + manaObtained,
-            maxComboAchieved: Math.max(player.maxComboAchieved ?? 0, (body as any).statistics?.max_combo_count ?? 0),
-            ...(didLevelUp ? { stamina: player.stamina + getMaxStamina(newDegreeId), staminaHealTime: new Date() } : {}),
-        });
-        const playerData = player;
-        if (didLevelUp) {
-            playerData.stamina = playerData.stamina + getMaxStamina(newDegreeId);
-            playerData.staminaHealTime = new Date();
-        }
-
-        const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, (questData as any).scoreRewardGroupId || 0, (questData as any).scoreRewardGroup, useBoostPoint, (questData as any).element);
 
         const bodyPartyStatistics = (body as any).statistics?.party || body.quest_statistics?.party || { characters: [], unison_characters: [] };
         const partyCharacterIdsArray: number[] = [];
@@ -293,7 +223,6 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             if (value !== null && (value as any).id !== null && (value as any).id !== undefined) partyCharacterIdsArray.push((value as any).id);
         }
 
-        // Track mission progress (decoupled from core quest mechanics)
         const finishCtx: FinishContext = {
             playerId, questCategory, questId,
             questAccomplished,
@@ -305,21 +234,101 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             questProgress,
             isMulti: true,
         }
-        trackCharacterClears(finishCtx)
-        trackLeaderPowerflip(finishCtx)
-        trackPartyCoClears(finishCtx)
-        trackPowerflip(finishCtx)
 
-        const rewardCharacterExpResult = givePlayerCharactersExpSync(
-            playerId, partyCharacterIdsArray, questData.characterExpReward || 0,
-            questData.fixedParty !== undefined
-        );
-        const characterList = reconcileAwakeUnlockCharacterList(playerId, [
-            ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
-            ...((clearReward?.character_list || []) as Record<string, unknown>[]),
-            ...((sPlusClearReward?.character_list || []) as Record<string, unknown>[]),
-            ...(scoreRewardsResult.character_list as Record<string, unknown>[])
-        ]);
+        const executeFinishWrites = () => {
+            const clearReward = !questPreviouslyCompleted && (questData as any).clearReward !== undefined
+                ? givePlayerRewardSync(playerId, (questData as any).clearReward)
+                : null;
+            const sPlusClearReward = (clearRank === 5)
+                && (questProgress?.clearRank !== 5)
+                && ((questData as any).sPlusReward !== undefined)
+                ? givePlayerRewardSync(playerId, (questData as any).sPlusReward)
+                : null;
+
+            if (questAccomplished) {
+                if (questPreviouslyCompleted) {
+                    const updateData: any = {
+                        questId: questId,
+                        finished: true,
+                        bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
+                        highScore: questProgress.highScore === undefined ? ((body as any).score || 0) : Math.max((body as any).score || 0, questProgress.highScore),
+                        leaderCharacterId: leaderId ?? null,
+                        hostFinished,
+                    };
+                    if (clearRank !== null) {
+                        updateData.clearRank = questProgress.clearRank === undefined ? clearRank : Math.max(clearRank, questProgress.clearRank);
+                    }
+                    updatePlayerQuestProgressSync(playerId, questCategory, updateData);
+                } else {
+                    insertPlayerQuestProgressSync(playerId, questCategory, {
+                        questId: questId,
+                        finished: true,
+                        bestElapsedTimeMs: clearTime,
+                        highScore: (body as any).score || 0,
+                        clearRank: clearRank ?? 5,
+                        leaderCharacterId: leaderId ?? null,
+                        hostFinished,
+                    });
+                }
+            }
+
+            updatePlayerSync({
+                id: playerId,
+                freeMana: newMana,
+                expPool: newExpPool,
+                rankPoint: newRankPoint,
+                boostPoint: newBoostPoint,
+                bossBoostPoint: newBossBoostPoint,
+                totalManaObtained: (player.totalManaObtained ?? 0) + manaObtained,
+                maxComboAchieved: Math.max(player.maxComboAchieved ?? 0, (body as any).statistics?.max_combo_count ?? 0),
+                ...(didLevelUp ? { stamina: player.stamina + getMaxStamina(newDegreeId), staminaHealTime: new Date() } : {}),
+            });
+            const playerData = player;
+            if (didLevelUp) {
+                playerData.stamina = playerData.stamina + getMaxStamina(newDegreeId);
+                playerData.staminaHealTime = new Date();
+            }
+
+            const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, (questData as any).scoreRewardGroupId || 0, (questData as any).scoreRewardGroup, useBoostPoint, (questData as any).element);
+            recordMissionBattleFacts(finishCtx)
+            const rewardCharacterExpResult = givePlayerCharactersExpSync(
+                playerId, partyCharacterIdsArray, questData.characterExpReward || 0,
+                questData.fixedParty !== undefined
+            );
+            const characterList = reconcileAwakeUnlockCharacterList(playerId, [
+                ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
+                ...((clearReward?.character_list || []) as Record<string, unknown>[]),
+                ...((sPlusClearReward?.character_list || []) as Record<string, unknown>[]),
+                ...(scoreRewardsResult.character_list as Record<string, unknown>[])
+            ]);
+            deletePlayerActiveQuestSync(playerId);
+
+            return {
+                characterList,
+                clearReward,
+                playerData,
+                rewardCharacterExpResult,
+                scoreRewardsResult,
+                sPlusClearReward,
+            }
+        }
+        const {
+            characterList,
+            clearReward,
+            playerData,
+            rewardCharacterExpResult,
+            scoreRewardsResult,
+            sPlusClearReward,
+        } = getDb().transaction(executeFinishWrites)()
+
+        delete activeQuests[playerId];
+        if (activeQuestData.roomNumber) {
+            sessionManager.clearBattleExpectedCount(activeQuestData.roomNumber);
+            if (isRoomHost && room) {
+                updateRoomState(room.room_number, 1);
+                console.log(`[MULTI] finish: room ${activeQuestData.roomNumber} reset to raising_state=1`);
+            }
+        }
 
         const dataHeaders = generateDataHeaders({ viewer_id: viewerId });
         const matePlayerResult = ((body as any).mate_player_result || []) as Array<{ viewer_id?: number }>;

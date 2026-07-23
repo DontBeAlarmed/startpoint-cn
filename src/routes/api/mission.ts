@@ -6,7 +6,8 @@ import { getPlayerCategoryMissionsSync, incrementPlayerCategoryMissionSync } fro
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { getComputer, getMissionIdsByCategory, getMissionsByPattern, getCurrentStage, getCharacterIdFromMission, isMissionEnabledAt, reconcileAwakeUnlockCharacterList, settleAwakeMissionRewards } from "../../lib/mission/index";
+import { getComputer, getMissionIdsByCategory, getCurrentStage, getCharacterIdFromMission, isMissionEnabledAt, reconcileAwakeUnlockCharacterList, settleAwakeMissionRewards } from "../../lib/mission/index";
+import { resolveClientProgressTargets } from "../../lib/mission/client-progress";
 import type { AwakeMissionComputedProgress, AwakeMissionInfo } from "../../lib/mission/index";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import type { CategoryContext } from "../../lib/mission/index";
@@ -176,12 +177,16 @@ const routes = async (fastify: FastifyInstance) => {
         // Update mission progress counters in DB (fire-and-forget from client)
         const missionParams = body.mission_param_list || []
         let updatedCount = 0
+        const evaluationTime = new Date(getServerTime() * 1000)
 
         getDb().transaction(() => {
             for (const param of missionParams) {
                 const delta = addMissionProgressDelta(0, param.progress_value)
                 if (typeof param.mission_pattern !== "string" || delta === null) continue
-                const matches = getMissionsByPattern(param.mission_pattern)
+                const matches = resolveClientProgressTargets(
+                    param.mission_pattern,
+                    evaluationTime,
+                )
                 for (const match of matches) {
                     incrementPlayerCategoryMissionSync(playerId, match.category, match.missionId, delta)
                     updatedCount++

@@ -213,7 +213,7 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
 
     const singleBattleCall = singleBattleSource.lastIndexOf("reconcileAwakeUnlockCharacterList(")
     assert.equal(countOccurrences(singleBattleSource, "reconcileAwakeUnlockCharacterList("), 1)
-    assert.equal(singleBattleCall > singleBattleSource.indexOf("trackCharacterClears(finishCtx)"), true)
+    assert.equal(singleBattleCall > singleBattleSource.indexOf("recordMissionBattleFacts(finishCtx)"), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("givePlayerCharactersExpSync("), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("handleRushEventFinish({"), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("handleCarnivalEventFinish({"), true)
@@ -343,15 +343,11 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.equal(multiCall.position > multiFinishBlock.indexOf("if (activeQuestData === undefined)"), true)
     assert.equal(multiCall.position > multiFinishBlock.indexOf("if (questData === null"), true)
     for (const persistenceCall of [
-        "deletePlayerActiveQuestSync",
         "insertPlayerQuestProgressSync",
         "updatePlayerQuestProgressSync",
         "updatePlayerSync",
         "givePlayerScoreRewardsSync",
-        "trackCharacterClears",
-        "trackLeaderPowerflip",
-        "trackPartyCoClears",
-        "trackPowerflip",
+        "recordMissionBattleFacts",
         "givePlayerCharactersExpSync",
     ]) {
         assert.equal(multiCall.position > getLastCallPosition(multiFinishBlock, persistenceCall), true)
