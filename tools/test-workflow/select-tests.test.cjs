@@ -16,7 +16,10 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/runtime/seed-state-schema.ts"]), ["quick:seed"])
     assert.deepEqual(selectTestGroups(["docs/protocol/seed-verification.md"]), ["quick:seed"])
     assert.deepEqual(selectTestGroups(["src/lib/gacha-draw.ts"]), ["quick:gacha"])
-    assert.deepEqual(selectTestGroups(["src/content/paths.ts"]), ["quick:cdn"])
+    assert.deepEqual(
+        selectTestGroups(["src/content/paths.ts"]),
+        ["quick:cdn", "quick:content"],
+    )
     assert.deepEqual(selectTestGroups(["src/content/cdn/types.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/catalog-builder.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/runtime-manifest.ts"]), ["integration:cdn"])
@@ -58,7 +61,10 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/data/index.ts"]),
         ["full", "integration:database"],
     )
-    assert.deepEqual(selectTestGroups(["src/runtime/data-paths.ts"]), ["integration:database"])
+    assert.deepEqual(
+        selectTestGroups(["src/runtime/data-paths.ts"]),
+        ["integration:database", "quick:cdn", "quick:content"],
+    )
     assert.deepEqual(
         selectTestGroups(["src/routes/web_api/seeds.ts"]),
         ["admin", "integration:database", "quick:seed"],

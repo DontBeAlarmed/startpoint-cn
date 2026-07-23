@@ -194,8 +194,6 @@ function resolveSmokePaths({ projectRoot, cdnRoot, contentRoot }) {
         env: {
             CDN_DIR: resolvedCdn,
             CONTENT_DIR: path.join(resolvedContent, "release"),
-            CONTENT_STORE_DIR: path.join(resolvedContent, "store"),
-            CONTENT_STATE_DIR: path.join(resolvedContent, "state"),
             CONTENT_RUNTIME_DIR: path.join(resolvedContent, "runtime"),
         },
     }
@@ -245,8 +243,6 @@ function prepareContentRoot(paths) {
     const derived = {}
     for (const [name, directory] of [
         ["release", paths.env.CONTENT_DIR],
-        ["store", paths.env.CONTENT_STORE_DIR],
-        ["state", paths.env.CONTENT_STATE_DIR],
         ["runtime", paths.env.CONTENT_RUNTIME_DIR],
     ]) {
         fs.mkdirSync(directory, { mode: 0o700 })

@@ -1,18 +1,26 @@
 import fs from "node:fs"
 import path from "node:path"
 
+import { resolveRuntimeDataPaths } from "../runtime/data-paths"
+
 export interface ContentPathEnvironment {
     readonly [name: string]: string | undefined
     readonly CDN_DIR?: string
+    readonly DATA_DIR?: string
     readonly CONTENT_DIR?: string
     readonly CONTENT_STORE_DIR?: string
     readonly CONTENT_STATE_DIR?: string
     readonly CONTENT_RUNTIME_DIR?: string
+    readonly WDFP_DATABASE_DIR?: string
 }
 
+export type ContentPathLayout = "modern" | "legacy"
+
 export interface ContentPaths {
+    readonly layout: ContentPathLayout
     readonly cdnDir: string
     readonly cdnRoot: string
+    /** Legacy object-store root. In modern layout this is a read-only probe candidate. */
     readonly contentRootDir: string
     readonly contentStoreDir: string
     readonly contentStateDir: string
@@ -48,6 +56,11 @@ export interface ResolveContentPathsOptions extends ResolvePathDependencies {
 export interface ResolveContentRootDirOptions extends ResolvePathDependencies {
     readonly projectRoot: string
     readonly env?: ContentPathEnvironment
+}
+
+interface ConfiguredDataRoot {
+    readonly value: string
+    readonly sourceLabel?: "DATA_DIR" | "WDFP_DATABASE_DIR"
 }
 
 const defaultFsApi: PathFileSystem = {
@@ -160,6 +173,14 @@ function resolveCdnDir(
     return resolvedCdnDir
 }
 
+function selectConfiguredDataRoot(env: ContentPathEnvironment): ConfiguredDataRoot {
+    if (env.DATA_DIR) return { value: env.DATA_DIR, sourceLabel: "DATA_DIR" }
+    if (env.WDFP_DATABASE_DIR) {
+        return { value: env.WDFP_DATABASE_DIR, sourceLabel: "WDFP_DATABASE_DIR" }
+    }
+    return { value: ".database" }
+}
+
 export function resolveCnCdnRoot(
     cdnDir: string,
     projectRoot: string,
@@ -214,57 +235,95 @@ export function resolveContentPaths({
     fsApi = defaultFsApi,
 }: ResolveContentPathsOptions): ContentPaths {
     const root = requireAbsoluteProjectRoot(projectRoot, pathApi)
-    const cdnDir = resolveCdnDir(env.CDN_DIR ?? ".cdn", root, pathApi, fsApi)
-    const paths: ContentPaths = {
-        cdnDir,
-        cdnRoot: pathApi.join(cdnDir, "cn"),
-        contentRootDir: resolveConfiguredPath(
-            env.CONTENT_DIR ?? ".content",
-            root,
-            "CONTENT_DIR",
-            pathApi,
-            fsApi,
-        ),
-        contentStoreDir: resolveConfiguredPath(
-            env.CONTENT_STORE_DIR ?? ".content/store",
-            root,
-            "CONTENT_STORE_DIR",
-            pathApi,
-            fsApi,
-        ),
-        contentStateDir: resolveConfiguredPath(
-            env.CONTENT_STATE_DIR ?? ".content/state",
-            root,
-            "CONTENT_STATE_DIR",
-            pathApi,
-            fsApi,
-        ),
-        contentRuntimeDir: resolveConfiguredPath(
-            env.CONTENT_RUNTIME_DIR ?? ".content/runtime",
-            root,
-            "CONTENT_RUNTIME_DIR",
-            pathApi,
-            fsApi,
-        ),
+    const hasLegacyRoot = env.CONTENT_DIR !== undefined
+    const splitVariables = ["CONTENT_STORE_DIR", "CONTENT_STATE_DIR"] as const
+    for (const variableName of splitVariables) {
+        if (hasLegacyRoot && env[variableName] !== undefined) {
+            throw new Error(`CONTENT_DIR and ${variableName} cannot be configured together`)
+        }
     }
 
-    assertIsolatedContentPaths([
-        ["CDN_DIR", paths.cdnDir],
-        ["CONTENT_STORE_DIR", paths.contentStoreDir],
-        ["CONTENT_STATE_DIR", paths.contentStateDir],
-        ["CONTENT_RUNTIME_DIR", paths.contentRuntimeDir],
-    ], pathApi, fsApi)
-    assertIsolatedContentPaths([
-        ["CDN_DIR", paths.cdnDir],
-        ["CONTENT_DIR", paths.contentRootDir],
-    ], pathApi, fsApi)
-    if (env.CONTENT_DIR !== undefined) {
-        assertIsolatedContentPaths([
+    const layout: ContentPathLayout = hasLegacyRoot ? "legacy" : "modern"
+    const cdnDir = resolveCdnDir(env.CDN_DIR ?? ".cdn", root, pathApi, fsApi)
+    const contentRootDir = resolveConfiguredPath(
+        env.CONTENT_DIR ?? ".content",
+        root,
+        "CONTENT_DIR",
+        pathApi,
+        fsApi,
+    )
+    const contentRuntimeDir = resolveConfiguredPath(
+        env.CONTENT_RUNTIME_DIR ?? "assets",
+        root,
+        "CONTENT_RUNTIME_DIR",
+        pathApi,
+        fsApi,
+    )
+    let contentStoreDir = contentRootDir
+    let contentStateDir = contentRootDir
+    if (layout === "modern") {
+        const configuredDataRoot = selectConfiguredDataRoot(env)
+        const absoluteDataDir = configuredDataRoot.sourceLabel !== undefined
+            && isFullyQualifiedAbsolute(configuredDataRoot.value, pathApi)
+        const dataDir = absoluteDataDir
+            ? resolveRuntimeDataPaths(env, root, pathApi).dataDir
+            : configuredDataRoot.value
+        const resolveGeneratedDataPath = (
+            segments: readonly string[],
+            fallbackLabel: string,
+        ): string => absoluteDataDir
+            ? pathApi.join(dataDir, ...segments)
+            : resolveConfiguredPath(
+                pathApi.join(dataDir, ...segments),
+                root,
+                configuredDataRoot.sourceLabel ?? fallbackLabel,
+                pathApi,
+                fsApi,
+            )
+
+        contentStoreDir = env.CONTENT_STORE_DIR === undefined
+            ? resolveGeneratedDataPath(["content", "store"], "CONTENT_STORE_DIR")
+            : resolveConfiguredPath(
+                env.CONTENT_STORE_DIR,
+                root,
+                "CONTENT_STORE_DIR",
+                pathApi,
+                fsApi,
+            )
+        contentStateDir = env.CONTENT_STATE_DIR === undefined
+            ? resolveGeneratedDataPath(["state", "content"], "CONTENT_STATE_DIR")
+            : resolveConfiguredPath(
+                env.CONTENT_STATE_DIR,
+                root,
+                "CONTENT_STATE_DIR",
+                pathApi,
+                fsApi,
+            )
+    }
+
+    const paths: ContentPaths = {
+        layout,
+        cdnDir,
+        cdnRoot: pathApi.join(cdnDir, "cn"),
+        contentRootDir,
+        contentStoreDir,
+        contentStateDir,
+        contentRuntimeDir,
+    }
+
+    const isolatedPaths: ReadonlyArray<readonly [name: string, filePath: string]> = layout === "legacy"
+        ? [
+            ["CDN_DIR", paths.cdnDir],
+            ["CONTENT_DIR", paths.contentRootDir],
+            ["CONTENT_RUNTIME_DIR", paths.contentRuntimeDir],
+        ]
+        : [
+            ["CDN_DIR", paths.cdnDir],
             ["CONTENT_DIR", paths.contentRootDir],
             ["CONTENT_STORE_DIR", paths.contentStoreDir],
             ["CONTENT_STATE_DIR", paths.contentStateDir],
             ["CONTENT_RUNTIME_DIR", paths.contentRuntimeDir],
-        ], pathApi, fsApi)
-    }
+        ]
+    assertIsolatedContentPaths(isolatedPaths, pathApi, fsApi)
     return paths
 }

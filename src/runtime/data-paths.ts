@@ -17,6 +17,17 @@ export interface RuntimeDataPaths {
     defaultSaveFile: string;
 }
 
+export interface RuntimeDataPathEnvironment {
+    readonly [name: string]: string | undefined;
+    readonly DATA_DIR?: string;
+    readonly WDFP_DATABASE_DIR?: string;
+}
+
+export interface RuntimeDataPathApi {
+    join(...paths: string[]): string;
+    resolve(...paths: string[]): string;
+}
+
 export interface DataVolumeFileSystem {
     constants: Pick<typeof fs.constants, "COPYFILE_EXCL" | "R_OK" | "W_OK">;
     accessSync(path: fs.PathLike, mode?: number): void;
@@ -39,26 +50,28 @@ function errorMessage(error: unknown): string {
 }
 
 export function resolveRuntimeDataPaths(
-    environment: NodeJS.ProcessEnv = process.env,
+    environment: RuntimeDataPathEnvironment = process.env,
+    projectRoot: string = PROJECT_ROOT,
+    pathApi: RuntimeDataPathApi = path,
 ): RuntimeDataPaths {
     const configuredDirectory = environment.DATA_DIR || environment.WDFP_DATABASE_DIR;
     const dataDir = configuredDirectory
-        ? path.resolve(configuredDirectory)
-        : path.join(PROJECT_ROOT, ".database");
-    const stateDir = path.join(dataDir, "state");
+        ? pathApi.resolve(projectRoot, configuredDirectory)
+        : pathApi.join(pathApi.resolve(projectRoot), ".database");
+    const stateDir = pathApi.join(dataDir, "state");
 
-    const seedStateDir = path.join(stateDir, "seeds");
+    const seedStateDir = pathApi.join(stateDir, "seeds");
 
     return {
         dataDir,
         stateDir,
         seedStateDir,
-        seedStateFile: path.join(seedStateDir, "seed-state.json"),
-        seedStateTemporaryFilePrefix: path.join(seedStateDir, ".seed-state.json."),
-        databaseFile: path.join(dataDir, "wdfp_data.db"),
-        databaseVersionFile: path.join(dataDir, "wdfp_data.db.version"),
-        activeAccountFile: path.join(stateDir, "active_account.json"),
-        defaultSaveFile: path.join(stateDir, "default_save.json"),
+        seedStateFile: pathApi.join(seedStateDir, "seed-state.json"),
+        seedStateTemporaryFilePrefix: pathApi.join(seedStateDir, ".seed-state.json."),
+        databaseFile: pathApi.join(dataDir, "wdfp_data.db"),
+        databaseVersionFile: pathApi.join(dataDir, "wdfp_data.db.version"),
+        activeAccountFile: pathApi.join(stateDir, "active_account.json"),
+        defaultSaveFile: pathApi.join(stateDir, "default_save.json"),
     };
 }
 

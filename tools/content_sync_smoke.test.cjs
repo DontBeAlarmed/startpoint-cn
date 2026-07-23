@@ -109,8 +109,8 @@ test("smoke 路径拒绝与 project、database、CDN 的物理重叠", t => {
     const resolved = smoke.resolveSmokePaths(fixture)
     assert.equal(resolved.env.CDN_DIR, fs.realpathSync(fixture.cdnRoot))
     assert.equal(resolved.env.CONTENT_DIR, path.join(fs.realpathSync(fixture.contentRoot), "release"))
-    assert.equal(resolved.env.CONTENT_STORE_DIR, path.join(fs.realpathSync(fixture.contentRoot), "store"))
-    assert.equal(resolved.env.CONTENT_STATE_DIR, path.join(fs.realpathSync(fixture.contentRoot), "state"))
+    assert.equal(Object.hasOwn(resolved.env, "CONTENT_STORE_DIR"), false)
+    assert.equal(Object.hasOwn(resolved.env, "CONTENT_STATE_DIR"), false)
     assert.equal(resolved.env.CONTENT_RUNTIME_DIR, path.join(fs.realpathSync(fixture.contentRoot), "runtime"))
 
     fs.chmodSync(fixture.projectRoot, 0o700)
@@ -239,12 +239,12 @@ test("content root 目录 identity 变化时在同步前拒绝", async t => {
 
 test("派生目录逃逸时在同步前拒绝", async t => {
     const fixture = makeLayout(t)
-    const outside = path.join(fixture.sandbox, "outside-state")
+    const outside = path.join(fixture.sandbox, "outside-runtime")
     fs.mkdirSync(outside, { mode: 0o700 })
     const workflow = isolatedWorkflowDependencies({
         beforeRunSync({ paths }) {
-            fs.rmdirSync(paths.env.CONTENT_STATE_DIR)
-            fs.symlinkSync(outside, paths.env.CONTENT_STATE_DIR)
+            fs.rmdirSync(paths.env.CONTENT_RUNTIME_DIR)
+            fs.symlinkSync(outside, paths.env.CONTENT_RUNTIME_DIR)
         },
     })
     await assert.rejects(

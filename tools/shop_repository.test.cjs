@@ -116,8 +116,6 @@ test("bundled ContentRepository exposes all eight controlled shop imports", asyn
         env: {
             CDN_DIR: path.join(root, "cdn"),
             CONTENT_DIR: path.join(root, "content"),
-            CONTENT_STORE_DIR: path.join(root, "store"),
-            CONTENT_STATE_DIR: path.join(root, "state"),
             CONTENT_RUNTIME_DIR: path.join(root, "runtime"),
         },
     }, {

@@ -12,6 +12,7 @@ const {
     prepareDataVolume,
     resolveRuntimeDataPaths,
 } = require("../../src/runtime/data-paths")
+const { resolveContentPaths } = require("../../src/content/paths")
 
 const STATE_CASES = [
     { fileName: "active_account.json", targetKey: "activeAccountFile" },
@@ -76,6 +77,33 @@ test("falls back to WDFP_DATABASE_DIR when DATA_DIR is unset", () => {
 test("defaults to the project .database directory", () => {
     const paths = resolveRuntimeDataPaths({})
     assert.equal(paths.dataDir, path.join(projectRoot, ".database"))
+})
+
+test("defaults to the supplied project root without changing existing callers", () => {
+    const suppliedProjectRoot = path.join(os.tmpdir(), "wdfp-supplied-project")
+    const paths = resolveRuntimeDataPaths({}, suppliedProjectRoot)
+
+    assert.equal(paths.dataDir, path.join(suppliedProjectRoot, ".database"))
+})
+
+test("resolves relative data roots from supplied projectRoot consistently with content paths", t => {
+    const suppliedProjectRoot = createTemporaryDirectory("wdfp-supplied-project-")
+    t.after(() => removeTemporaryDirectory(suppliedProjectRoot))
+    assert.notEqual(process.cwd(), suppliedProjectRoot)
+
+    for (const variable of ["DATA_DIR", "WDFP_DATABASE_DIR"]) {
+        const environment = { [variable]: "relative-data" }
+        const dataPaths = resolveRuntimeDataPaths(environment, suppliedProjectRoot)
+        const contentPaths = resolveContentPaths({
+            env: environment,
+            projectRoot: suppliedProjectRoot,
+        })
+
+        assert.equal(dataPaths.dataDir, path.join(suppliedProjectRoot, "relative-data"))
+        assert.equal(path.dirname(dataPaths.databaseFile), dataPaths.dataDir)
+        assert.equal(contentPaths.contentStoreDir, path.join(dataPaths.dataDir, "content", "store"))
+        assert.equal(contentPaths.contentStateDir, path.join(dataPaths.stateDir, "content"))
+    }
 })
 
 test("prepares the data root and state directory repeatedly", t => {

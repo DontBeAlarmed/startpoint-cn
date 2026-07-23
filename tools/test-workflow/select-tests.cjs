@@ -5,7 +5,10 @@ const { TEST_GROUPS } = require("./groups.cjs")
 const SOURCE_RULES = [
     { pattern: /^admin\//, groups: ["admin"] },
     { pattern: /^tests\/admin-/, groups: ["admin"] },
-    { pattern: /^src\/content\/paths\.ts$/, groups: ["quick:cdn"] },
+    {
+        pattern: /^src\/content\/paths\.ts$/,
+        groups: ["quick:cdn", "quick:content"],
+    },
     { pattern: /^src\/content\/cdn\/types\.ts$/, groups: ["quick:cdn"] },
     {
         pattern: /^src\/content\/cdn\/(?:catalog-builder|patch-graph|digest-cache|planner)\.ts$/,
@@ -41,7 +44,10 @@ const SOURCE_RULES = [
     },
     { pattern: /^src\/routes\/cn\/versionCheck\.ts$/, groups: ["full"] },
     { pattern: /^src\/routes\/web_api\//, groups: ["admin", "integration:database"] },
-    { pattern: /^src\/runtime\/data-paths\.ts$/, groups: ["integration:database"] },
+    {
+        pattern: /^src\/runtime\/data-paths\.ts$/,
+        groups: ["integration:database", "quick:cdn", "quick:content"],
+    },
     { pattern: /^src\/runtime\/seed-state-(?:schema|store)\.ts$/, groups: ["quick:seed"] },
     {
         pattern: /^src\/runtime\/(?:bundle-metadata|config|health|lifecycle)\.ts$/,

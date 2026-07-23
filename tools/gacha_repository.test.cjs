@@ -81,8 +81,6 @@ test("bundled ContentRepository keeps tracked gacha fallback behavior", async t 
         env: {
             CDN_DIR: path.join(root, "cdn"),
             CONTENT_DIR: path.join(root, "content"),
-            CONTENT_STORE_DIR: path.join(root, "store"),
-            CONTENT_STATE_DIR: path.join(root, "state"),
             CONTENT_RUNTIME_DIR: path.join(root, "runtime"),
         },
     }, {

@@ -37,8 +37,6 @@ function createLayout(t) {
             env: {
                 CDN_DIR: path.join(root, "cdn"),
                 CONTENT_DIR: contentRootDir,
-                CONTENT_STORE_DIR: path.join(root, "store"),
-                CONTENT_STATE_DIR: path.join(root, "state"),
                 CONTENT_RUNTIME_DIR: path.join(root, "runtime"),
             },
         },
