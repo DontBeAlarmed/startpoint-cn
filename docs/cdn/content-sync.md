@@ -124,7 +124,7 @@ npm run content:smoke -- \
 
 `content:smoke` 是同 UID 开发者手动离线工具，不是面向不受信任本地用户的安全边界。运行期间调用者必须保证没有同 UID 进程故意替换 content root、派生目录或祖先路径。现有 identity、symlink 和空目录检查用于防止误传，并发现检查时存在或留下可观察变化的并发修改；它们不构成同 UID 对抗性 TOCTOU 防护。本工具不使用轮询、文件系统 watch、额外锁文件或平台专用 API 尝试对抗同 UID 进程。
 
-smoke 创建或接受 root 后记录其 `dev`、`ino`、权限和 realpath，预先建立同为 `0700` 的 `release/`、`store/`、`state/` 和 `runtime/`。每个派生目录都必须是 root 的直接子目录且 identity 不变；在调用同步前和同步结束后都会复核 root、四个派生目录及 root 顶层项目集合。root 替换、派生目录符号链接或工具外顶层项目在检查时存在，或在后续复核时留下可观察变化时会失败；检查间隙由同 UID 对手完成并恢复的替换不在保护范围内。
+smoke 创建或接受 root 后记录其 `dev`、`ino`、权限和 realpath，并预先建立权限为 `0700` 的 `release/`。Release 是 smoke 唯一可写派生目录，必须是 root 的直接子目录且 identity 不变；阶段 A 尚未迁移的 bundled 表从项目只读 `assets/` 加载，并由下述 Git/seed 来源快照覆盖。在调用同步前和同步结束后都会复核 root、`release/` 及 root 顶层项目集合。root 替换、Release 符号链接或工具外顶层项目在检查时存在，或在后续复核时留下可观察变化时会失败；检查间隙由同 UID 对手完成并恢复的替换不在保护范围内。
 
 smoke 始终执行 force sync，并验证：
 

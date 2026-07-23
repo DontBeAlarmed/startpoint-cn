@@ -194,7 +194,7 @@ function resolveSmokePaths({ projectRoot, cdnRoot, contentRoot }) {
         env: {
             CDN_DIR: resolvedCdn,
             CONTENT_DIR: path.join(resolvedContent, "release"),
-            CONTENT_RUNTIME_DIR: path.join(resolvedContent, "runtime"),
+            CONTENT_RUNTIME_DIR: path.join(resolvedProject, "assets"),
         },
     }
 }
@@ -241,10 +241,7 @@ function prepareContentRoot(paths) {
         contentRootError("content root 在建立派生目录前必须为空")
     }
     const derived = {}
-    for (const [name, directory] of [
-        ["release", paths.env.CONTENT_DIR],
-        ["runtime", paths.env.CONTENT_RUNTIME_DIR],
-    ]) {
+    for (const [name, directory] of [["release", paths.env.CONTENT_DIR]]) {
         fs.mkdirSync(directory, { mode: 0o700 })
         const inspected = inspectPrivateDirectory(directory, `content ${name} 目录`)
         const relative = path.relative(root.realpath, inspected.realpath)
