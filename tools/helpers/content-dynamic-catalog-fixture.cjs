@@ -109,10 +109,12 @@ async function synchronizeRelease(fixture, targetVersion) {
     return catalog
 }
 
-async function installLightweightRelease(fixture, targetVersion) {
-    const store = new ContentObjectStore(fixture.paths)
+async function installLightweightRelease(fixture, targetVersion, options = {}) {
+    const store = options.store ?? new ContentObjectStore(fixture.paths)
     const catalog = buildCdnCatalog(catalogInput(targetVersion))
-    const tableObject = await store.writeObject({ fixture: targetVersion })
+    const tableObject = await store.writeObject({
+        fixture: options.marker ?? targetVersion,
+    })
     const catalogObject = await store.writeObject(catalog)
     const summaryObject = await store.writeObject({ targetVersion })
     const tables = Object.fromEntries(TABLE_SOURCES.map(definition => [

@@ -1,14 +1,15 @@
-import fs from "node:fs"
 import path from "node:path"
 
 import { BUNDLED_CDN_CATALOG_VERSION } from "../constants"
 import {
     resolveContentPaths,
-    resolveContentRootDir,
+    resolveContentRuntimePaths,
     type ContentPathEnvironment,
     type ContentPaths,
+    type ContentRuntimePaths,
 } from "../paths"
 import { deepFreeze } from "../deep-freeze"
+import { readContentRuntimeText } from "../runtime/runtime-file-reader"
 import { canonicalJsonBuffer } from "../sync/canonical-json"
 import {
     ContentObjectStore,
@@ -48,15 +49,19 @@ export interface CatalogLoaderDependencies {
         readonly projectRoot: string
         readonly env: ContentPathEnvironment
     }) => ContentPaths
+    readonly resolveRuntimePaths?: (options: {
+        readonly projectRoot: string
+        readonly env: ContentPathEnvironment
+    }) => ContentRuntimePaths
     readonly build?: (input: CdnCatalogInput) => CdnCatalog
     readonly readRuntimeManifest?: (manifestPath: string) => Promise<unknown>
     readonly validateRuntimeFiles?: (
         manifest: CdnRuntimeManifest,
-        paths: ContentPaths,
+        paths: ContentRuntimePaths & Pick<ContentPaths, "cdnRoot">,
     ) => Promise<void>
     readonly readPatchManifest?: (manifestPath: string) => Promise<unknown>
     readonly createStore?: (
-        paths: Pick<ContentPaths, "contentRootDir">,
+        paths: ContentRuntimePaths,
     ) => {
         readCurrentReleaseSnapshot():
             | ContentCurrentReleaseSnapshot
@@ -89,9 +94,8 @@ interface PatchManifest {
 }
 
 const VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
-const RUNTIME_MANIFEST_RELATIVE_PATH = (
-    `assets/cdn/catalog-cn-${BUNDLED_CDN_CATALOG_VERSION}.json`
-)
+const RUNTIME_MANIFEST_RELATIVE_PATH = `cdn/catalog-cn-${BUNDLED_CDN_CATALOG_VERSION}.json`
+const PATCH_MANIFEST_RELATIVE_PATH = "asset-patch/manifest.json"
 
 function runtimeManifestError(
     code: "RUNTIME_MANIFEST_READ" | "RUNTIME_MANIFEST_SCHEMA",
@@ -100,10 +104,21 @@ function runtimeManifestError(
     return new CatalogLoaderError(code, message)
 }
 
-async function readRuntimeManifestFile(manifestPath: string): Promise<unknown> {
+function hasCdnRoot(
+    paths: ContentRuntimePaths,
+): paths is ContentRuntimePaths & Pick<ContentPaths, "cdnRoot"> {
+    const candidate = paths as Partial<ContentPaths>
+    return typeof candidate.cdnRoot === "string"
+}
+
+async function readRuntimeManifestFile(contentRuntimeDir: string): Promise<unknown> {
     let content: string
     try {
-        content = await fs.promises.readFile(manifestPath, "utf8")
+        content = await readContentRuntimeText(
+            contentRuntimeDir,
+            RUNTIME_MANIFEST_RELATIVE_PATH,
+            "runtime catalog manifest",
+        )
     } catch {
         throw runtimeManifestError(
             "RUNTIME_MANIFEST_READ",
@@ -117,6 +132,27 @@ async function readRuntimeManifestFile(manifestPath: string): Promise<unknown> {
             "RUNTIME_MANIFEST_SCHEMA",
             `${RUNTIME_MANIFEST_RELATIVE_PATH} is not valid JSON`,
         )
+    }
+}
+
+async function readPatchManifestFile(contentRuntimeDir: string): Promise<unknown> {
+    let content: string
+    try {
+        content = await readContentRuntimeText(
+            contentRuntimeDir,
+            PATCH_MANIFEST_RELATIVE_PATH,
+            "patch manifest",
+        )
+    } catch {
+        throw new CatalogLoaderError(
+            "PATCH_MANIFEST_READ",
+            `cannot read ${PATCH_MANIFEST_RELATIVE_PATH}`,
+        )
+    }
+    try {
+        return JSON.parse(content)
+    } catch {
+        throw schemaError(`${PATCH_MANIFEST_RELATIVE_PATH} is not valid JSON`)
     }
 }
 
@@ -307,12 +343,18 @@ export class CdnCatalogLoader {
         return this.enqueueCandidate()
     }
 
-    loadFromSnapshot(release: ContentCurrentReleaseSnapshot | null): Promise<CdnCatalog> {
-        return this.enqueueCandidate({ release })
+    loadFromSnapshot(
+        release: ContentCurrentReleaseSnapshot | null,
+        paths?: ContentRuntimePaths,
+    ): Promise<CdnCatalog> {
+        return this.enqueueCandidate({ release, paths })
     }
 
     private enqueueCandidate(
-        selection?: { readonly release: ContentCurrentReleaseSnapshot | null },
+        selection?: {
+            readonly release: ContentCurrentReleaseSnapshot | null
+            readonly paths?: ContentRuntimePaths
+        },
     ): Promise<CdnCatalog> {
         const operation = this.operationTail
             ? this.operationTail.then(() => this.buildCandidate(selection))
@@ -326,42 +368,26 @@ export class CdnCatalogLoader {
     }
 
     private async buildCandidate(
-        selection?: { readonly release: ContentCurrentReleaseSnapshot | null },
+        selection?: {
+            readonly release: ContentCurrentReleaseSnapshot | null
+            readonly paths?: ContentRuntimePaths
+        },
     ): Promise<CdnCatalog> {
         const resolvePaths = this.dependencies.resolvePaths ?? resolveContentPaths
+        const resolveRuntimePaths = this.dependencies.resolveRuntimePaths
+            ?? resolveContentRuntimePaths
         const build = this.dependencies.build ?? buildCdnCatalog
-        const readRuntimeManifest = this.dependencies.readRuntimeManifest ?? readRuntimeManifestFile
         const validateRuntimeFiles = this.dependencies.validateRuntimeFiles
             ?? ((manifest, paths) => validateCdnRuntimeFiles(manifest, paths.cdnRoot))
-        const readPatchManifest = this.dependencies.readPatchManifest ?? (async manifestPath => {
-            let content: string
-            try {
-                content = await fs.promises.readFile(manifestPath, "utf8")
-            } catch (error) {
-                throw new CatalogLoaderError(
-                    "PATCH_MANIFEST_READ",
-                    `cannot read patch manifest ${manifestPath}`,
-                    error,
-                )
-            }
-            try {
-                return JSON.parse(content)
-            } catch (error) {
-                throw schemaError(`patch manifest ${manifestPath} is not valid JSON`, error)
-            }
-        })
-        const paths = this.localCdn
+        const paths = selection?.paths ?? (this.localCdn
             ? resolvePaths({ projectRoot: this.projectRoot, env: this.env })
-            : null
-        const storePaths = paths ?? {
-            contentRootDir: resolveContentRootDir({
+            : resolveRuntimePaths({
                 projectRoot: this.projectRoot,
-                env: this.env,
-            }),
-        }
+                env: { ...this.env, CDN_DIR: undefined },
+            }))
         const releaseCandidate = selection === undefined
             ? (this.dependencies.createStore
-                ?? (resolved => new ContentObjectStore(resolved)))(storePaths)
+                ?? (resolved => new ContentObjectStore(resolved)))(paths)
                 .readCurrentReleaseSnapshot()
             : selection.release
         const release: ContentCurrentReleaseSnapshot | null = isPromiseLike<
@@ -381,10 +407,15 @@ export class CdnCatalogLoader {
             this.catalog = candidate
             return candidate
         }
-        const runtimeManifestPath = path.join(this.projectRoot, RUNTIME_MANIFEST_RELATIVE_PATH)
+        const runtimeManifestPath = path.join(
+            paths.contentRuntimeDir,
+            RUNTIME_MANIFEST_RELATIVE_PATH,
+        )
         let runtimeManifestValue: unknown
         try {
-            runtimeManifestValue = await readRuntimeManifest(runtimeManifestPath)
+            runtimeManifestValue = this.dependencies.readRuntimeManifest
+                ? await this.dependencies.readRuntimeManifest(runtimeManifestPath)
+                : await readRuntimeManifestFile(paths.contentRuntimeDir)
         } catch (error) {
             if (error instanceof CatalogLoaderError
                 && (error.code === "RUNTIME_MANIFEST_READ"
@@ -411,9 +442,17 @@ export class CdnCatalogLoader {
             )
         }
         const candidate = deepFreeze(build(runtimeManifest.catalogInput))
-        if (paths !== null) await validateRuntimeFiles(runtimeManifest, paths)
-        const manifestPath = path.join(this.projectRoot, "assets", "asset-patch", "manifest.json")
-        const manifest = parsePatchManifest(await readPatchManifest(manifestPath))
+        if (this.localCdn) {
+            if (!hasCdnRoot(paths)) {
+                throw new Error("local CDN catalog requires resolved CDN paths")
+            }
+            await validateRuntimeFiles(runtimeManifest, paths)
+        }
+        const manifestPath = path.join(paths.contentRuntimeDir, PATCH_MANIFEST_RELATIVE_PATH)
+        const manifestValue = this.dependencies.readPatchManifest
+            ? await this.dependencies.readPatchManifest(manifestPath)
+            : await readPatchManifestFile(paths.contentRuntimeDir)
+        const manifest = parsePatchManifest(manifestValue)
         validateEnabledPatches(candidate, manifest)
         this.catalog = candidate
         return candidate

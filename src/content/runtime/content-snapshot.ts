@@ -1,3 +1,4 @@
+import fs from "node:fs"
 import path from "node:path"
 
 import { deepFreeze } from "../deep-freeze"
@@ -11,9 +12,10 @@ import {
 } from "./content-repository"
 import {
     resolveContentPaths,
-    resolveContentRootDir,
+    resolveContentRuntimePaths,
     type ContentPathEnvironment,
     type ContentPaths,
+    type ContentRuntimePaths,
 } from "../paths"
 import {
     ContentObjectStore,
@@ -283,11 +285,16 @@ export interface ProjectContentSnapshotProviderDependencies {
         readonly projectRoot: string
         readonly env: ContentPathEnvironment
     }) => ContentPaths
+    readonly resolveRuntimePaths?: (options: {
+        readonly projectRoot: string
+        readonly env: ContentPathEnvironment
+    }) => ContentRuntimePaths
     readonly createStore?: (
-        paths: Pick<ContentPaths, "contentRootDir">,
+        paths: ContentRuntimePaths | Pick<ContentRuntimePaths, "contentRootDir">,
     ) => Pick<ContentObjectStore, "readCurrentReleaseSnapshot">
     readonly catalog?: CatalogLoaderDependencies
     readonly repository?: ContentRepositoryDependencies
+    readonly warningSink?: Pick<NodeJS.WriteStream, "write">
 }
 
 export interface ProjectContentSnapshotProviderOptions {
@@ -295,6 +302,45 @@ export interface ProjectContentSnapshotProviderOptions {
     readonly env?: ContentPathEnvironment
     readonly localCdn?: boolean
     readonly dependencies?: ProjectContentSnapshotProviderDependencies
+}
+
+function isMissingPath(error: unknown): boolean {
+    return Boolean(error
+        && typeof error === "object"
+        && ((error as NodeJS.ErrnoException).code === "ENOENT"
+            || (error as NodeJS.ErrnoException).code === "ENOTDIR"))
+}
+
+async function legacyCurrentEntryExists(contentRootDir: string): Promise<boolean> {
+    try {
+        await fs.promises.lstat(path.join(contentRootDir, "current.json"))
+        return true
+    } catch (error) {
+        if (isMissingPath(error)) return false
+        throw error
+    }
+}
+
+async function selectProjectReleaseSnapshot(
+    paths: ContentRuntimePaths,
+    createStore: NonNullable<ProjectContentSnapshotProviderDependencies["createStore"]>,
+    warningSink: Pick<NodeJS.WriteStream, "write">,
+): Promise<ContentCurrentReleaseSnapshot | null> {
+    if (paths.layout === "legacy") {
+        return createStore(paths).readCurrentReleaseSnapshot()
+    }
+
+    const modern = await createStore(paths).readCurrentReleaseSnapshot()
+    if (modern !== null) {
+        if (await legacyCurrentEntryExists(paths.contentRootDir)) {
+            warningSink.write("警告 [CONTENT_LEGACY_CURRENT_IGNORED]：已忽略旧版内容快照\n")
+        }
+        return modern
+    }
+
+    if (!await legacyCurrentEntryExists(paths.contentRootDir)) return null
+    return createStore({ contentRootDir: paths.contentRootDir })
+        .readCurrentReleaseSnapshot()
 }
 
 export function createProjectContentSnapshotProvider({
@@ -313,24 +359,29 @@ export function createProjectContentSnapshotProvider({
     const snapshotSource: ContentSnapshotSource = Object.freeze({
         async load(): Promise<ContentSnapshot> {
             const resolvePaths = dependencies.resolvePaths ?? resolveContentPaths
+            const resolveRuntimePaths = dependencies.resolveRuntimePaths
+                ?? dependencies.resolvePaths
+                ?? resolveContentRuntimePaths
             const paths = localCdn
                 ? resolvePaths({ projectRoot: resolvedProjectRoot, env })
-                : {
-                    contentRootDir: resolveContentRootDir({
-                        projectRoot: resolvedProjectRoot,
-                        env,
-                    }),
-                }
+                : resolveRuntimePaths({
+                    projectRoot: resolvedProjectRoot,
+                    env: { ...env, CDN_DIR: undefined },
+                })
             const createStore = dependencies.createStore
                 ?? (resolved => new ContentObjectStore(resolved))
-            const release: ContentCurrentReleaseSnapshot | null = await createStore(paths)
-                .readCurrentReleaseSnapshot()
+            const release = await selectProjectReleaseSnapshot(
+                paths,
+                createStore,
+                dependencies.warningSink ?? process.stderr,
+            )
             return loadSnapshotPair(
-                () => catalogLoader.loadFromSnapshot(release),
+                () => catalogLoader.loadFromSnapshot(release, paths),
                 () => ContentRepository.loadFromSnapshot(
                     { projectRoot: resolvedProjectRoot, env },
                     release,
                     dependencies.repository,
+                    paths,
                 ),
             )
         },

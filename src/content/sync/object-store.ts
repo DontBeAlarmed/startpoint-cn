@@ -4,7 +4,7 @@ import path from "node:path"
 
 import { mapWithConcurrency } from "../concurrency"
 import { deepFreeze } from "../deep-freeze"
-import type { ContentPaths } from "../paths"
+import type { ContentRuntimePaths } from "../paths"
 import { canonicalJsonBuffer, sha256Object } from "./canonical-json"
 import {
     createReleaseManifest,
@@ -39,9 +39,9 @@ export interface ContentObjectStoreDependencies {
     readonly rename?: (source: string, destination: string) => Promise<void>
 }
 
-type ModernContentObjectStorePaths = Pick<ContentPaths, "contentStoreDir" | "contentStateDir">
-type LegacyContentObjectStorePaths = Pick<ContentPaths, "contentRootDir">
-type ContentObjectStorePaths = ContentPaths
+type ModernContentObjectStorePaths = Pick<ContentRuntimePaths, "contentStoreDir" | "contentStateDir">
+type LegacyContentObjectStorePaths = Pick<ContentRuntimePaths, "contentRootDir">
+type ContentObjectStorePaths = ContentRuntimePaths
     | ModernContentObjectStorePaths
     | LegacyContentObjectStorePaths
 
@@ -155,7 +155,7 @@ export class ContentObjectStore {
     }
 
     private static resolveRoots(paths: ContentObjectStorePaths): ModernContentObjectStorePaths {
-        const candidate = paths as Partial<ContentPaths>
+        const candidate = paths as Partial<ContentRuntimePaths>
         const hasRoot = candidate.contentRootDir !== undefined
         const hasStore = candidate.contentStoreDir !== undefined
         const hasState = candidate.contentStateDir !== undefined
@@ -190,11 +190,11 @@ export class ContentObjectStore {
         throw new TypeError("content store paths must use split roots or an explicit legacy contentRootDir")
     }
 
-    private static isCompleteContentPaths(paths: Partial<ContentPaths>): paths is ContentPaths {
+    private static isCompleteContentPaths(
+        paths: Partial<ContentRuntimePaths>,
+    ): paths is ContentRuntimePaths {
         return (paths.layout === "modern" || paths.layout === "legacy")
             && [
-                paths.cdnDir,
-                paths.cdnRoot,
                 paths.contentRootDir,
                 paths.contentStoreDir,
                 paths.contentStateDir,

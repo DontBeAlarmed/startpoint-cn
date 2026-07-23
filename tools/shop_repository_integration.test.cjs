@@ -45,7 +45,7 @@ test("ContentSnapshotProvider initializes and freezes all eight real bundled sho
                 env: {
                     CDN_DIR: path.join(root, "cdn"),
                     CONTENT_DIR: path.join(root, "content"),
-                    CONTENT_RUNTIME_DIR: path.join(root, "runtime"),
+                    CONTENT_RUNTIME_DIR: path.join(projectRoot, "assets"),
                 },
             }),
         },

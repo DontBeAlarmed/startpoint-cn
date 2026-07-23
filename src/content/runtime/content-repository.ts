@@ -109,18 +109,23 @@ export class ContentRepository {
         const store = new ContentObjectStore(paths)
         const release = await store.readCurrentReleaseSnapshot()
 
-        return this.loadFromSnapshot(options, release, dependencies)
+        return this.loadFromSnapshot(options, release, dependencies, paths)
     }
 
     static async loadFromSnapshot(
         options: ContentRepositoryOptions,
         release: ContentCurrentReleaseSnapshot | null,
         dependencies: ContentRepositoryDependencies = {},
+        resolvedPaths?: Pick<ReturnType<typeof resolveContentPaths>, "contentRuntimeDir">,
     ): Promise<ContentRepository> {
         if (!options.projectRoot || !path.isAbsolute(options.projectRoot)) {
             throw new TypeError("projectRoot must be an absolute path")
         }
         const projectRoot = path.resolve(options.projectRoot)
+        const paths = resolvedPaths ?? resolveContentPaths({
+            projectRoot,
+            env: options.env ?? process.env,
+        })
 
         if (release === null) {
             const importer = dependencies.importBundledTable ?? defaultImportBundledTable
@@ -130,7 +135,7 @@ export class ContentRepository {
                 async definition => (
                     [
                         definition.tableName,
-                        await importer(projectRoot, definition.tableName),
+                        await importer(paths.contentRuntimeDir, definition.tableName),
                     ] as const
                 ),
             )

@@ -37,10 +37,18 @@ function createLegacyLayout(t) {
             env: {
                 CDN_DIR: path.join(root, "cdn"),
                 CONTENT_DIR: contentRootDir,
-                CONTENT_RUNTIME_DIR: path.join(root, "runtime"),
+                CONTENT_RUNTIME_DIR: path.join(projectRoot, "assets"),
             },
         },
         store: new ContentObjectStore({ contentRootDir }),
+    }
+}
+
+function copyRegisteredRuntimeTables(runtimeRoot) {
+    for (const definition of TABLE_SOURCES) {
+        const destination = path.join(runtimeRoot, definition.tableName)
+        fs.mkdirSync(path.dirname(destination), { recursive: true })
+        fs.copyFileSync(path.join(projectRoot, definition.bundledPath), destination)
     }
 }
 
@@ -94,6 +102,33 @@ test("missing current loads and freezes all 94 explicit bundled fallback tables"
         repository.table("character.json"),
         JSON.parse(fs.readFileSync(path.join(projectRoot, "assets/character.json"), "utf8")),
     )
+})
+
+test("bundled fallback reads only the configured runtime root without writing it", async t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "content-repository-runtime-root-"))
+    const temporaryProject = path.join(root, "project")
+    const runtimeRoot = path.join(root, "runtime")
+    fs.mkdirSync(temporaryProject)
+    fs.mkdirSync(runtimeRoot)
+    copyRegisteredRuntimeTables(runtimeRoot)
+    t.after(() => fs.rmSync(root, { force: true, recursive: true }))
+    const before = fs.statSync(path.join(runtimeRoot, "news.json"))
+
+    const repository = await ContentRepository.load({
+        projectRoot: temporaryProject,
+        env: {
+            CDN_DIR: path.join(root, "cdn"),
+            CONTENT_DIR: path.join(root, "content"),
+            CONTENT_RUNTIME_DIR: runtimeRoot,
+        },
+    })
+
+    assert.equal(fs.existsSync(path.join(temporaryProject, "assets")), false)
+    assert.deepEqual(repository.table("news.json"), JSON.parse(
+        fs.readFileSync(path.join(runtimeRoot, "news.json"), "utf8"),
+    ))
+    assert.equal(fs.statSync(path.join(runtimeRoot, "news.json")).mtimeMs, before.mtimeMs)
+    assert.deepEqual(fs.readdirSync(root).sort(), ["project", "runtime"])
 })
 
 test("bundled fallback imports all tables with bounded concurrency and stable ordering", async t => {
@@ -310,7 +345,14 @@ test("bundled fallback fails clearly when a registered file is missing", async t
     fs.mkdirSync(path.join(temporaryProject, "assets"), { recursive: true })
 
     await assert.rejects(
-        ContentRepository.load({ ...fixture.options, projectRoot: temporaryProject }),
+        ContentRepository.load({
+            ...fixture.options,
+            projectRoot: temporaryProject,
+            env: {
+                ...fixture.options.env,
+                CONTENT_RUNTIME_DIR: path.join(temporaryProject, "assets"),
+            },
+        }),
         error => (
             /cannot read bundled table/i.test(error.message)
             && !error.message.includes(temporaryProject)

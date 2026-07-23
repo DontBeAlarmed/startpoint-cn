@@ -211,7 +211,10 @@ function defaultBuilderContext(archiveIndex) {
     const scan = fakeScan({ cdnRoot: "/unused-cdn" })
     return {
         projectRoot,
-        paths: { cdnRoot: "/unused-cdn" },
+        paths: {
+            cdnRoot: "/unused-cdn",
+            contentRuntimeDir: "/configured-runtime",
+        },
         scan,
         catalog: fakeCatalog(scan.targetVersion),
         archiveIndex,
@@ -277,6 +280,7 @@ test("default release builder closes all registry tables and runs each CDN conve
     ])
     const converterCalls = { character: 0, gacha: 0, shop: 0 }
     let bundledImports = 0
+    const bundledRoots = new Set()
     const builder = createDefaultContentTableBuilder({
         convertCharacters: async () => {
             converterCalls.character++
@@ -290,7 +294,8 @@ test("default release builder closes all registry tables and runs each CDN conve
             converterCalls.shop++
             return converterOutput("shop")
         },
-        importBundledTable: async (_root, tableName) => {
+        importBundledTable: async (root, tableName) => {
+            bundledRoots.add(root)
             bundledImports++
             return { imported: tableName }
         },
@@ -310,6 +315,7 @@ test("default release builder closes all registry tables and runs each CDN conve
             || definition.converterId === "server-json"
         )).length,
     )
+    assert.deepEqual([...bundledRoots], ["/configured-runtime"])
     assert.deepEqual(reads.filter(logicalPath => (
         logicalPath.startsWith("master/gacha_odds/")
     )), [

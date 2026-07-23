@@ -165,7 +165,10 @@ function injectedLoader({ read, build }) {
         projectRoot: path.resolve("/synthetic-project"),
         env: {},
         dependencies: {
-            resolvePaths: () => ({ cdnRoot: "/synthetic-cdn" }),
+            resolvePaths: () => ({
+                cdnRoot: "/synthetic-cdn",
+                contentRuntimeDir: "/synthetic-runtime",
+            }),
             createStore: () => ({ readCurrentReleaseSnapshot: () => null }),
             readRuntimeManifest: async manifestPath => {
                 candidateInput = await read(manifestPath)
@@ -311,6 +314,69 @@ test("loader reads the fixed trusted manifest path before validating runtime fil
         ["validate", "cn-1.4.54", path.join(projectRoot, ".cdn", "cn")],
     ])
 })
+
+test("loader reads runtime and patch manifests below CONTENT_RUNTIME_DIR", async t => {
+    const projectRoot = createProject(t)
+    const runtimeRoot = path.join(projectRoot, "configured-runtime")
+    fs.renameSync(path.join(projectRoot, "assets"), runtimeRoot)
+    const calls = []
+    const loader = new CdnCatalogLoader({
+        projectRoot,
+        env: { CONTENT_RUNTIME_DIR: runtimeRoot },
+        dependencies: {
+            readRuntimeManifest: async manifestPath => {
+                calls.push(manifestPath)
+                return runtimeManifest()
+            },
+            validateRuntimeFiles: async () => {},
+            readPatchManifest: async manifestPath => {
+                calls.push(manifestPath)
+                return { cdn_version: "1.4.54", patches: [] }
+            },
+        },
+    })
+
+    assert.equal((await loader.load()).targetVersion, "1.4.54")
+    assert.deepEqual(calls, [
+        path.join(runtimeRoot, "cdn", "catalog-cn-1.4.54.json"),
+        path.join(runtimeRoot, "asset-patch", "manifest.json"),
+    ])
+})
+
+for (const manifestKind of ["runtime", "patch"]) {
+    test(`loader rejects ${manifestKind} manifest symlink escapes from CONTENT_RUNTIME_DIR`, async t => {
+        const projectRoot = createProject(t)
+        const externalRoot = fs.mkdtempSync(path.join(os.tmpdir(), "content-runtime-external-"))
+        t.after(() => fs.rmSync(externalRoot, { force: true, recursive: true }))
+        const manifestPath = manifestKind === "runtime"
+            ? path.join(projectRoot, "assets/cdn/catalog-cn-1.4.54.json")
+            : path.join(projectRoot, "assets/asset-patch/manifest.json")
+        const externalPath = path.join(externalRoot, "manifest.json")
+        fs.copyFileSync(manifestPath, externalPath)
+        fs.unlinkSync(manifestPath)
+        try {
+            fs.symlinkSync(externalPath, manifestPath)
+        } catch (error) {
+            if (process.platform === "win32" && ["EACCES", "EPERM"].includes(error.code)) {
+                t.skip("file symlink creation is unavailable on this Windows host")
+                return
+            }
+            throw error
+        }
+
+        await assert.rejects(
+            new CdnCatalogLoader({ projectRoot, env: {} }).load(),
+            error => (
+                error instanceof CatalogLoaderError
+                && error.code === (manifestKind === "runtime"
+                    ? "RUNTIME_MANIFEST_READ"
+                    : "PATCH_MANIFEST_READ")
+                && !error.message.includes(projectRoot)
+                && !error.message.includes(externalRoot)
+            ),
+        )
+    })
+}
 
 test("default loader rejects missing and wrong-size referenced archives", async t => {
     const missingRoot = createProject(t)
@@ -623,11 +689,15 @@ test("disabled patches and mods never raise the catalog target", async t => {
 })
 
 test("the repository disabled patch manifest preserves the 1.4.54 catalog baseline", async () => {
+    const projectRoot = path.join(__dirname, "..")
     const loader = new CdnCatalogLoader({
-        projectRoot: path.join(__dirname, ".."),
+        projectRoot,
         env: {},
         dependencies: {
-            resolvePaths: () => ({ cdnRoot: "/unused-cdn-root" }),
+            resolvePaths: () => ({
+                cdnRoot: "/unused-cdn-root",
+                contentRuntimeDir: path.join(projectRoot, "assets"),
+            }),
             createStore: () => ({ readCurrentReleaseSnapshot: () => null }),
             validateRuntimeFiles: async () => {},
         },
@@ -690,7 +760,10 @@ test("injected runtime manifest read failures redact nested absolute paths", asy
         projectRoot,
         env: {},
         dependencies: {
-            resolvePaths: () => ({ cdnRoot: "/unused-cdn-root" }),
+            resolvePaths: () => ({
+                cdnRoot: "/unused-cdn-root",
+                contentRuntimeDir: path.join(projectRoot, "assets"),
+            }),
             createStore: () => ({ readCurrentReleaseSnapshot: () => null }),
             readRuntimeManifest: async () => { throw injectedError },
         },

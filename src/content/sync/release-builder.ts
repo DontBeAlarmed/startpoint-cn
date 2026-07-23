@@ -303,7 +303,10 @@ export function createDefaultContentTableBuilder(
                 RELEASE_BUILD_IO_CONCURRENCY,
                 async definition => ([
                     definition.tableName,
-                    await bundledImporter(context.projectRoot, definition.tableName),
+                    await bundledImporter(
+                        context.paths.contentRuntimeDir,
+                        definition.tableName,
+                    ),
                 ] as const),
             )
             for (const [tableName, value] of importedEntries) {

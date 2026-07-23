@@ -365,7 +365,7 @@ test("bundled importer samples CDN, bundled, and server registry scopes", async 
 
     for (const [tableName, scope] of samples) {
         assert.equal(findTableSource(tableName).scope, scope)
-        assertDeepFrozen(await importBundledTable(projectRoot, tableName))
+        assertDeepFrozen(await importBundledTable(path.join(projectRoot, "assets"), tableName))
     }
 })
 
@@ -378,7 +378,7 @@ test("runtime state and non-table assets are excluded", () => {
 test("registry lookup and bundled imports reject unsupported tables", async () => {
     assert.throws(() => findTableSource("not_registered.json"), /not registered/i)
     await assert.rejects(
-        importBundledTable(projectRoot, "not_registered.json"),
+        importBundledTable(path.join(projectRoot, "assets"), "not_registered.json"),
         /not registered/i,
     )
 })
@@ -389,9 +389,24 @@ test("bundled importer reads and freezes a valid temporary JSON table", async t 
     fs.mkdirSync(path.join(temporaryRoot, "assets"))
     fs.writeFileSync(path.join(temporaryRoot, "assets", "news.json"), '{"nested":{"value":1}}')
 
-    const value = await importBundledTable(temporaryRoot, "news.json")
+    const value = await importBundledTable(path.join(temporaryRoot, "assets"), "news.json")
     assert.deepEqual(value, { nested: { value: 1 } })
     assertDeepFrozen(value)
+})
+
+test("bundled importer maps registry assets paths below a configured runtime root", async t => {
+    const temporaryProject = fs.mkdtempSync(path.join(os.tmpdir(), "content-registry-project-"))
+    const runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "content-registry-runtime-"))
+    t.after(() => fs.rmSync(temporaryProject, { recursive: true, force: true }))
+    t.after(() => fs.rmSync(runtimeRoot, { recursive: true, force: true }))
+    fs.writeFileSync(path.join(runtimeRoot, "news.json"), '{"source":"configured-runtime"}')
+
+    assert.equal(fs.existsSync(path.join(temporaryProject, "assets")), false)
+    assert.deepEqual(
+        await importBundledTable(runtimeRoot, "news.json"),
+        { source: "configured-runtime" },
+    )
+    assert.deepEqual(fs.readdirSync(runtimeRoot), ["news.json"])
 })
 
 test("bundled importer rejects damaged JSON and symlink escapes", async t => {
@@ -402,7 +417,7 @@ test("bundled importer rejects damaged JSON and symlink escapes", async t => {
     fs.mkdirSync(path.join(temporaryRoot, "assets"))
 
     await assert.rejects(
-        importBundledTable(temporaryRoot, "news.json"),
+        importBundledTable(path.join(temporaryRoot, "assets"), "news.json"),
         error => (
             /cannot read bundled table news\.json/i.test(error.message)
             && !containsSensitivePath(error, temporaryRoot)
@@ -412,7 +427,7 @@ test("bundled importer rejects damaged JSON and symlink escapes", async t => {
 
     fs.writeFileSync(path.join(temporaryRoot, "assets", "news.json"), "{")
     await assert.rejects(
-        importBundledTable(temporaryRoot, "news.json"),
+        importBundledTable(path.join(temporaryRoot, "assets"), "news.json"),
         error => (
             /invalid JSON in bundled table news\.json/i.test(error.message)
             && !containsSensitivePath(error, temporaryRoot)
@@ -426,7 +441,7 @@ test("bundled importer rejects damaged JSON and symlink escapes", async t => {
         path.join(temporaryRoot, "assets", "payment_products.json"),
     )
     await assert.rejects(
-        importBundledTable(temporaryRoot, "payment_products.json"),
+        importBundledTable(path.join(temporaryRoot, "assets"), "payment_products.json"),
         /outside.*assets|symlink/i,
     )
 })
@@ -448,7 +463,7 @@ test("bundled importer redacts nested absolute paths from open failures", async 
     })
 
     await assert.rejects(
-        importBundledTable(temporaryRoot, "news.json"),
+        importBundledTable(path.join(temporaryRoot, "assets"), "news.json"),
         error => (
             /cannot safely open bundled table news\.json/i.test(error.message)
             && !containsSensitivePath(error, temporaryRoot)
@@ -483,7 +498,10 @@ test("bundled importer rejects a symlink swapped in after realpath validation", 
         return resolved
     }
 
-    await assert.rejects(importBundledTable(temporaryRoot, "news.json"), /symlink|changed/i)
+    await assert.rejects(
+        importBundledTable(path.join(temporaryRoot, "assets"), "news.json"),
+        /symlink|changed/i,
+    )
 })
 
 test("registry work never modifies confirmed seed state", () => {

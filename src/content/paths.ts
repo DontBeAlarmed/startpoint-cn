@@ -16,15 +16,18 @@ export interface ContentPathEnvironment {
 
 export type ContentPathLayout = "modern" | "legacy"
 
-export interface ContentPaths {
+export interface ContentRuntimePaths {
     readonly layout: ContentPathLayout
-    readonly cdnDir: string
-    readonly cdnRoot: string
     /** Legacy object-store root. In modern layout this is a read-only probe candidate. */
     readonly contentRootDir: string
     readonly contentStoreDir: string
     readonly contentStateDir: string
     readonly contentRuntimeDir: string
+}
+
+export interface ContentPaths extends ContentRuntimePaths {
+    readonly cdnDir: string
+    readonly cdnRoot: string
 }
 
 export interface PathApi {
@@ -52,6 +55,8 @@ export interface ResolveContentPathsOptions extends ResolvePathDependencies {
     readonly projectRoot: string
     readonly env?: ContentPathEnvironment
 }
+
+export type ResolveContentRuntimePathsOptions = ResolveContentPathsOptions
 
 export interface ResolveContentRootDirOptions extends ResolvePathDependencies {
     readonly projectRoot: string
@@ -228,13 +233,12 @@ function assertIsolatedContentPaths(
     }
 }
 
-export function resolveContentPaths({
-    projectRoot,
-    env = process.env,
-    pathApi = path,
-    fsApi = defaultFsApi,
-}: ResolveContentPathsOptions): ContentPaths {
-    const root = requireAbsoluteProjectRoot(projectRoot, pathApi)
+function resolveRuntimePaths(
+    root: string,
+    env: ContentPathEnvironment,
+    pathApi: PathApi,
+    fsApi: PathFileSystem,
+): ContentRuntimePaths {
     const hasLegacyRoot = env.CONTENT_DIR !== undefined
     const splitVariables = ["CONTENT_STORE_DIR", "CONTENT_STATE_DIR"] as const
     for (const variableName of splitVariables) {
@@ -244,7 +248,6 @@ export function resolveContentPaths({
     }
 
     const layout: ContentPathLayout = hasLegacyRoot ? "legacy" : "modern"
-    const cdnDir = resolveCdnDir(env.CDN_DIR ?? ".cdn", root, pathApi, fsApi)
     const contentRootDir = resolveConfiguredPath(
         env.CONTENT_DIR ?? ".content",
         root,
@@ -301,29 +304,62 @@ export function resolveContentPaths({
             )
     }
 
-    const paths: ContentPaths = {
+    return {
         layout,
-        cdnDir,
-        cdnRoot: pathApi.join(cdnDir, "cn"),
         contentRootDir,
         contentStoreDir,
         contentStateDir,
         contentRuntimeDir,
     }
+}
 
-    const isolatedPaths: ReadonlyArray<readonly [name: string, filePath: string]> = layout === "legacy"
+function runtimeIsolationEntries(
+    paths: ContentRuntimePaths,
+): ReadonlyArray<readonly [name: string, filePath: string]> {
+    return paths.layout === "legacy"
         ? [
-            ["CDN_DIR", paths.cdnDir],
             ["CONTENT_DIR", paths.contentRootDir],
             ["CONTENT_RUNTIME_DIR", paths.contentRuntimeDir],
         ]
         : [
-            ["CDN_DIR", paths.cdnDir],
             ["CONTENT_DIR", paths.contentRootDir],
             ["CONTENT_STORE_DIR", paths.contentStoreDir],
             ["CONTENT_STATE_DIR", paths.contentStateDir],
             ["CONTENT_RUNTIME_DIR", paths.contentRuntimeDir],
         ]
+}
+
+export function resolveContentRuntimePaths({
+    projectRoot,
+    env = process.env,
+    pathApi = path,
+    fsApi = defaultFsApi,
+}: ResolveContentRuntimePathsOptions): ContentRuntimePaths {
+    const root = requireAbsoluteProjectRoot(projectRoot, pathApi)
+    const paths = resolveRuntimePaths(root, env, pathApi, fsApi)
+    assertIsolatedContentPaths(runtimeIsolationEntries(paths), pathApi, fsApi)
+    return paths
+}
+
+export function resolveContentPaths({
+    projectRoot,
+    env = process.env,
+    pathApi = path,
+    fsApi = defaultFsApi,
+}: ResolveContentPathsOptions): ContentPaths {
+    const root = requireAbsoluteProjectRoot(projectRoot, pathApi)
+    const runtimePaths = resolveRuntimePaths(root, env, pathApi, fsApi)
+    const cdnDir = resolveCdnDir(env.CDN_DIR ?? ".cdn", root, pathApi, fsApi)
+    const paths: ContentPaths = {
+        ...runtimePaths,
+        cdnDir,
+        cdnRoot: pathApi.join(cdnDir, "cn"),
+    }
+
+    const isolatedPaths: ReadonlyArray<readonly [name: string, filePath: string]> = [
+        ["CDN_DIR", paths.cdnDir],
+        ...runtimeIsolationEntries(paths),
+    ]
     assertIsolatedContentPaths(isolatedPaths, pathApi, fsApi)
     return paths
 }
