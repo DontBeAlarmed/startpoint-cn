@@ -419,6 +419,7 @@ runtimeCoordinator = createRuntimeCoordinator({
     processTarget: process,
     setExitCode: code => { process.exitCode = code; },
     bundleVersion: bundleMetadata.version,
+    bundleId: bundleMetadata.bundleId,
     nodeVersion: process.version,
     adminAvailable: adminSpaAvailable,
     reportStartupFailure: stage => console.error(`[runtime] ${stage} startup failed`),

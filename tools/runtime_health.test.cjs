@@ -16,6 +16,7 @@ function state(overrides = {}) {
     return {
         phase: "ready",
         bundleVersion: "1.0.1",
+        bundleId: `sha256:${"b".repeat(64)}`,
         nodeVersion: "v20.12.0",
         database: { ready: true, schema: 4 },
         contentInitialized: true,
@@ -34,7 +35,7 @@ test("ready health exposes only the embedded contract fields", () => {
     assert.deepEqual(result.body, {
         contractVersion: 1,
         status: "ready",
-        serverBundle: { version: "1.0.1", bundleId: null },
+        serverBundle: { version: "1.0.1", bundleId: `sha256:${"b".repeat(64)}` },
         runtime: { api: 1, node: "v20.12.0" },
         database: { ready: true, schema: 4 },
         services: { http: true, tcp: true },

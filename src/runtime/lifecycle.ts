@@ -46,6 +46,7 @@ export interface RuntimeCoordinatorDependencies {
     readonly processTarget: RuntimeSignalTarget
     readonly setExitCode: (code: number) => void
     readonly bundleVersion: string
+    readonly bundleId: string | null
     readonly nodeVersion: string
     readonly adminAvailable: boolean
     readonly shutdownStepTimeoutMs?: number
@@ -166,6 +167,7 @@ class Coordinator implements RuntimeCoordinator {
         return createRuntimeHealthSnapshot({
             phase: this.phase,
             bundleVersion: this.dependencies.bundleVersion,
+            bundleId: this.dependencies.bundleId,
             nodeVersion: this.dependencies.nodeVersion,
             database,
             contentInitialized: this.contentInitialized,

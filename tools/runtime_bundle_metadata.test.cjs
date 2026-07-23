@@ -33,6 +33,37 @@ test("future server manifest metadata takes priority over development package me
     })
 })
 
+test("packaged bundle reads server manifest metadata without an injected loader", t => {
+    const bundleRoot = temporaryBundle(t)
+    fs.writeFileSync(path.join(bundleRoot, "server-manifest.json"), JSON.stringify({
+        schemaVersion: 1,
+        name: "starpoint-cn",
+        serverVersion: "1.4.2",
+        bundleId: `sha256:${"a".repeat(64)}`,
+    }))
+
+    assert.deepEqual(loadBundleMetadata({ bundleRoot }), {
+        version: "1.4.2",
+        bundleId: `sha256:${"a".repeat(64)}`,
+    })
+})
+
+test("invalid packaged manifest metadata falls back to development package metadata", t => {
+    const bundleRoot = temporaryBundle(t)
+    fs.writeFileSync(path.join(bundleRoot, "server-manifest.json"), JSON.stringify({
+        schemaVersion: 1,
+        name: "starpoint-cn",
+        serverVersion: "1.4.2",
+        bundleId: "not-a-digest",
+    }))
+    fs.writeFileSync(path.join(bundleRoot, "package.json"), JSON.stringify({ version: "1.0.1" }))
+
+    assert.deepEqual(loadBundleMetadata({ bundleRoot }), {
+        version: "1.0.1",
+        bundleId: null,
+    })
+})
+
 test("development bundle reads a safe package version", t => {
     const bundleRoot = temporaryBundle(t)
     fs.writeFileSync(path.join(bundleRoot, "package.json"), JSON.stringify({ version: "1.0.1" }))

@@ -60,6 +60,7 @@ function createHarness(overrides = {}) {
         processTarget,
         setExitCode(code) { exitCodes.push(code) },
         bundleVersion: "1.0.1",
+        bundleId: "sha256:test-bundle",
         nodeVersion: "v20.12.0",
         adminAvailable: false,
         shutdownStepTimeoutMs: 25,

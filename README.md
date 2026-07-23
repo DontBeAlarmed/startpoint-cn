@@ -7,7 +7,7 @@
 已实现(部分端点沿用国际服设计,对 CN 的通用性尚未验证):
 
 - 账号:设备自动绑定(`device_id`)、Web 管理面板
-- 时间系统:全局 / 按存档时间偏移(默认 2024-08-14,规避 CDN 报错)
+- 时间系统:统一服务器时间偏移(默认 2024-08-14,规避 CDN 报错；存档 `time_offset` 仅兼容旧数据库)
 - 关卡:主线 / 部分活动·Boss / 单人战斗结算
 - Gacha:角色·武器卡池、兑换、C3032 动画修复、抽卡种子验证
 - 多人联机(NPC 协战):Phase 2 — 建房 + NPC 招募 / 召唤 / 结算
@@ -27,14 +27,11 @@
 - Node.js（日常使用当前默认版本；`package.json` 的 `engines` 要求 >=20.12.0） · 打补丁后的 CN 客户端 APK(见"客户端改造")
 - 一份 CN CDN 资源,放入 `.cdn/cn/`
 
-### CDN 路径清单文件(PathFile)
+### CDN 与内容表
 
-客户端经 EntityLists 的"路径清单文件"获取全部资源路径。**服务端对它使用了两套命名且不做归一处理**:
+官方 CDN 放在 `.cdn/cn/`。受支持启动会先执行 `content:sync`，根据 CDN 版本生成或复用 Content Release；服务端随后固定加载同一份 Content snapshot。客户端资源目标版本、下载大小和归档清单来自该 snapshot 的 Catalog，不由 `.env` 桩值或请求 Body 临时覆盖。当前 Recovery CSV 仅为兼容占位，不要求手工复制两套 EntityLists 文件名。
 
-- `src/routes/cn/asset.ts` 的 version_info → `EntityLists/PathFile`
-- `src/cn-server.ts` → `EntityLists/10939-android_medium.csv`
-
-不同来源的 CDN 该文件名 / 位置可能不同(内容一致)。请确保 `.cdn/cn/EntityLists/` 下**同时存在** `PathFile` 与 `10939-android_medium.csv`(复制一份改名即可),否则按命中端点不同可能出现资源 404。
+职责与限制见 [`docs/cdn/content-sync.md`](./docs/cdn/content-sync.md) 和 [`docs/cdn/runtime-support.md`](./docs/cdn/runtime-support.md)。
 
 ## 快速启动
 
@@ -62,6 +59,8 @@ npm run install:admin
 | `npm run build:legacy` | 使用原 `tsconfig.json` 编译 legacy 全量 TypeScript，不构建 CSS |
 | `npm run build` | 保留原有 legacy 全量 TypeScript + Tailwind CSS 构建语义 |
 | `npm run build:admin` | 仅构建管理后台，不安装依赖 |
+| `npm run build:bundle` | 构建 CN 服务端后生成可验证的薄 Server Bundle，不包含 Node、数据库或 CDN |
+| `npm run verify:bundle -- --data-schema 4` | 校验默认 Server Bundle 的 manifest、文件摘要和运行契约 |
 | `npm run content:sync` | 手动执行内容同步；支持 `--check` 或 `--force` |
 | `npm run content:smoke -- --cdn-root <CDN_PARENT> --content-root <TMP_ROOT>` | 在显式隔离目录执行真实 CDN force smoke，不启动服务 |
 | `npm run verify:full` | 依次执行类型检查、完整测试、仓库卫生检查和 CN 服务端构建 |
@@ -127,8 +126,10 @@ Content Sync 的 fallback、`check`/`force`、Release 布局、真实 CDN smoke 
 
 - `CN_LISTEN_HOST` / `CN_LISTEN_PORT` — HTTP 绑定地址 + 联机 TCP 房间显示 IP;客户端在别的设备时设为你的 LAN IP(默认端口 8001)。
 - `CDN_BASE_URL` — `http://<你的LAN_IP>:<端口>/patch/cn`。
-- `CN_RES_VERSION` — 须与客户端 resourceVersion 一致(当前 1.4.54)。
+- `DATA_DIR` — 数据库、Content Store、激活状态和 Asset Provider 可变数据根；默认 `.database`。
 - `DROP_MULTIPLIER` / `NPC_*` — 测试与联机调参。
+
+为 Android Launcher、桌面托管器或容器 Supervisor 打包时，遵循 [`docs/embedded-runtime-contract.md`](./docs/embedded-runtime-contract.md)。
 
 ## 客户端改造(最小功能)
 

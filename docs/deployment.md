@@ -49,20 +49,12 @@ npm install
 ```bash
 # 确保以下结构存在
 ls .cdn/cn/
-# EntityLists/       ← 必须同时有 PathFile 和 10939-android_medium.csv
+# EntityLists/       ← 官方提取文件
 # production/        ← 所有 CDN 资源文件
 # archive-*/         ← 版本化的 sha1+salt 命名归档
 ```
 
-`EntityLists/` 目录需要两套命名的同内容文件：
-
-```bash
-cd .cdn/cn/EntityLists/
-# 如果只有 PathFile，复制一份改名
-cp PathFile 10939-android_medium.csv   # 反之亦然
-```
-
-> 详见 [`docs/cdn/overview.md`](./cdn/overview.md)
+受支持启动会先运行 `content:sync`，从 CDN 版本生成或复用 Content Release。目标版本、下载大小和归档清单由固定 Catalog 提供，不需要手工复制两套 EntityLists 文件名。详见 [`docs/cdn/content-sync.md`](./cdn/content-sync.md)。
 
 ---
 
@@ -247,6 +239,17 @@ node out/cn-server.js
 
 `node out/cn-server.js` 不会自动同步内容；它仅适合已明确准备并激活当前 Release 的高级调试场景。
 
+### Server Bundle
+
+嵌入 Android Launcher、桌面托管器或容器 Supervisor 时，生成不含 Node、依赖、数据库和 CDN 的薄 Bundle：
+
+```bash
+npm run build:bundle
+npm run verify:bundle -- --data-schema 4
+```
+
+默认产物位于 `dist/server-bundle`。这是离线构建输出，不是运行中 active 目录；Supervisor 必须先复制到独占 staging、完成 verifier 校验，再导入不可变版本目录。完整契约见 [`docs/embedded-runtime-contract.md`](./embedded-runtime-contract.md)。
+
 ### 管理面板访问
 
 通过 VPN 或 SSH 隧道访问管理面板：
@@ -280,6 +283,10 @@ curl -s -o /dev/null -w "%{http_code}" https://<YOUR_DOMAIN>/
 
 # 5. 在前台终端或进程管理器中检查服务标准输出
 # 预期包含 CN StarPoint、SEED、TCP 和 listen 等启动信息
+
+# 6. 健康接口（仅在受信网络或本机访问）
+curl -s http://127.0.0.1:8001/healthz
+# 预期 status=ready；打包运行时 serverBundle.bundleId 为 sha256:...
 ```
 
 ---

@@ -7,6 +7,7 @@ export type RuntimePhase = "starting" | "ready" | "stopping" | "failed" | "stopp
 export interface RuntimeHealthState {
     readonly phase: RuntimePhase
     readonly bundleVersion: string
+    readonly bundleId: string | null
     readonly nodeVersion: string
     readonly database: {
         readonly ready: boolean
@@ -24,7 +25,7 @@ export interface RuntimeHealthBody {
     readonly status: RuntimePhase
     readonly serverBundle: {
         readonly version: string
-        readonly bundleId: null
+        readonly bundleId: string | null
     }
     readonly runtime: {
         readonly api: 1
@@ -68,7 +69,10 @@ export function createRuntimeHealthSnapshot(state: RuntimeHealthState): RuntimeH
         body: Object.freeze({
             contractVersion: 1,
             status,
-            serverBundle: Object.freeze({ version: state.bundleVersion, bundleId: null }),
+            serverBundle: Object.freeze({
+                version: state.bundleVersion,
+                bundleId: state.bundleId,
+            }),
             runtime: Object.freeze({ api: 1, node: state.nodeVersion }),
             database: Object.freeze({ ...state.database }),
             services: Object.freeze({

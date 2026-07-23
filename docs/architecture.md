@@ -14,6 +14,8 @@
 
 日常开发直接使用 `node` / `npm`，不维护不同 Node 主版本的两套命令。切换 Node 主版本后，如果 `better-sqlite3` 报 `NODE_MODULE_VERSION` 或 `ERR_DLOPEN_FAILED`，执行 `npm rebuild better-sqlite3`；仍未恢复时重装依赖。
 
+嵌入 Android、桌面托管器或容器 Supervisor 时，稳定的进程、Data Volume、Server Bundle、健康检查和更新边界见 [`embedded-runtime-contract.md`](./embedded-runtime-contract.md)。
+
 ## 服务入口
 
 ### cn-server.ts

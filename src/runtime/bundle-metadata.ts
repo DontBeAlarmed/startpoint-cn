@@ -28,15 +28,34 @@ function normalizeMetadata(value: BundleMetadata | null): BundleMetadata | null 
     return Object.freeze({ version: value.version, bundleId: value.bundleId })
 }
 
+function readDefaultServerManifest(
+    bundleRoot: string,
+    readFileSync: (filePath: string, encoding: "utf8") => string,
+): BundleMetadata | null {
+    const value = JSON.parse(readFileSync(path.join(bundleRoot, "server-manifest.json"), "utf8"))
+    if (value?.schemaVersion !== 1
+        || value?.name !== "starpoint-cn"
+        || typeof value.serverVersion !== "string"
+        || !/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(value.serverVersion)
+        || typeof value.bundleId !== "string"
+        || !/^sha256:[0-9a-f]{64}$/.test(value.bundleId)) return null
+    return {
+        version: value.serverVersion,
+        bundleId: value.bundleId,
+    }
+}
+
 export function loadBundleMetadata({
     bundleRoot,
     loadServerManifest,
     readFileSync = fs.readFileSync,
 }: LoadBundleMetadataOptions): BundleMetadata {
     try {
-        const manifest = normalizeMetadata(loadServerManifest?.() ?? null)
+        const manifest = normalizeMetadata(
+            loadServerManifest?.() ?? readDefaultServerManifest(bundleRoot, readFileSync),
+        )
         if (manifest !== null) return manifest
-    } catch { /* future manifest is optional until its contract is implemented */ }
+    } catch { /* development checkouts may not contain a server manifest */ }
 
     try {
         const packageJson = JSON.parse(readFileSync(path.join(bundleRoot, "package.json"), "utf8"))

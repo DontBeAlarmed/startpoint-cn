@@ -289,6 +289,7 @@ test("compiled lifecycle order and metadata fallback survive an isolated bundle"
     const health = createRuntimeHealthSnapshot({
         phase: "ready",
         bundleVersion: metadata.version,
+        bundleId: metadata.bundleId,
         nodeVersion: process.version,
         database: { ready: true, schema: 4 },
         contentInitialized: true,
