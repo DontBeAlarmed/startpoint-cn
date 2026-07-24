@@ -33,7 +33,10 @@ const {
 } = require("../src/data/domains/character")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
-const { insertPlayerQuestProgressSync } = require("../src/data/domains/quest")
+const {
+    countFinishedPlayerQuestsByCategorySync,
+    insertPlayerQuestProgressSync,
+} = require("../src/data/domains/quest")
 const {
     DegreeComputer,
     getDegreeMissionCoverageReport,
@@ -85,6 +88,17 @@ insertPlayerQuestProgressSync(playerId, 3, { questId: 300001, finished: true })
 insertPlayerQuestProgressSync(playerId, 3, { questId: 300002, finished: true })
 insertPlayerQuestProgressSync(playerId, 3, { questId: 300003, finished: false })
 insertPlayerQuestProgressSync(playerId, 1, { questId: 100001, finished: true })
+
+const degreeComputerSource = fs.readFileSync(
+    path.join(__dirname, "../src/lib/mission/computer-degree.ts"),
+    "utf8",
+)
+assert.match(degreeComputerSource, /countFinishedPlayerQuestsByCategorySync\(playerId, 3\)/)
+assert.doesNotMatch(degreeComputerSource, /getPlayerQuestProgressSync/)
+
+assert.equal(countFinishedPlayerQuestsByCategorySync(playerId, 3), 2)
+assert.equal(countFinishedPlayerQuestsByCategorySync(playerId, 1), 1)
+assert.equal(countFinishedPlayerQuestsByCategorySync(playerId, 99), 0)
 
 const context = DegreeComputer.buildContext(playerId, 5)
 assert.equal(DegreeComputer.compute(1000, context, 0), 250)

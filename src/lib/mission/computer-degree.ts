@@ -3,7 +3,7 @@
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../../data/domains/character"
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
-import { getPlayerQuestProgressSync } from "../../data/domains/quest"
+import { countFinishedPlayerQuestsByCategorySync } from "../../data/domains/quest"
 import { getRankDegree } from "../stamina"
 import { getMissionMasterDefinition, getMissionMasterDefinitions } from "./master-data"
 import { getMissionPattern } from "./patterns"
@@ -33,7 +33,6 @@ function buildStats(playerId: number, category: number): CategoryContext {
     const characters = getPlayerCharactersSync(playerId)
     const manaNodes = getPlayerCharactersManaNodesSync(playerId)
     const battleCounters = getMissionBattleCountersSync(playerId)
-    const questProgress = getPlayerQuestProgressSync(playerId)
     return {
         category,
         playerId,
@@ -55,8 +54,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
             singleSsCount: battleCounters.singleRankSsCount,
             multiClearCount: battleCounters.multiClearCount,
             multiHostClearCount: battleCounters.multiHostClearCount,
-            episodeClearCount: (questProgress["3"] || [])
-                .filter(progress => progress.finished).length,
+            episodeClearCount: countFinishedPlayerQuestsByCategorySync(playerId, 3),
             bondedCharacterIds: new Set(Object.entries(characters)
                 .filter(([, character]) => character.bondTokenList.some(token => token.status >= 1))
                 .map(([characterId]) => Number(characterId))),

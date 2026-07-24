@@ -57,6 +57,19 @@ export function getPlayerQuestProgressSync(
     return mapped
 }
 
+export function countFinishedPlayerQuestsByCategorySync(
+    playerId: number,
+    category: number,
+): number {
+    const row = getDb().prepare(`
+    SELECT COUNT(*) AS count
+    FROM players_quest_progress
+    WHERE player_id = ? AND section = ? AND finished = 1
+    `).get(playerId, category) as { count?: unknown } | undefined
+    const count = Number(row?.count)
+    return Number.isSafeInteger(count) && count >= 0 ? count : 0
+}
+
 /**
  * Gets the progress of a singular quest for a player..
  * 
