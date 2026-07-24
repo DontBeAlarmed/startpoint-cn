@@ -1,9 +1,9 @@
 // ─── Active mission ID filter (C8601 prevention) ────────────────────────
 
-import activeRewards from "../../../assets/mission_active_reward.json"
+import { getActiveMissionMasterDefinitions } from "./active-master-data"
 
 const activeMissionIdSet: Set<number> = new Set(
-    Object.keys(activeRewards as Record<string, any>).map(Number)
+    getActiveMissionMasterDefinitions().map(definition => definition.missionId)
 )
 
 export function isActiveMissionId(id: number | string): boolean {

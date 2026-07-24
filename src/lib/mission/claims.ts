@@ -1,5 +1,6 @@
 import { getMissionRewardStageDefinition } from "./rewards"
 import type { ActiveMissionReward } from "./rewards"
+import { getActiveMissionMasterDefinition } from "./active-master-data"
 
 interface MissionClaimState {
     progress: number
@@ -34,6 +35,10 @@ export function validateMissionRewardClaims(
         const missionId = Number(entry.mission_id)
         if (!Number.isInteger(missionId) || missionId <= 0 || !Array.isArray(entry.stages)) {
             return { ok: false, message: "Invalid active mission claim." }
+        }
+
+        if (!getActiveMissionMasterDefinition(missionId)) {
+            return { ok: false, message: "Unknown active mission." }
         }
 
         const mission = activeMissions[String(missionId)]

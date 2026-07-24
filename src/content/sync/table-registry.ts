@@ -78,6 +78,8 @@ const BUNDLED_TABLE_NAMES = [
     "mana_board.json",
     "mana_node.json",
     "mana_node_awake.json",
+    "mission_active.json",
+    "mission_active_event.json",
     "mission_active_reward.json",
     "mission_char_awake.json",
     "mission_char_awake_reward.json",

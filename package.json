@@ -24,6 +24,7 @@
     "content:smoke": "node tools/content_sync_smoke.cjs",
     "content:mission-event-rules": "node scripts/gen_mission_event_battle_rules.js",
     "content:pass": "node scripts/gen_pass_mission_data.js",
+    "content:active-mission": "node scripts/gen_active_mission_data.js",
     "verify:bundle": "node tools/server-bundle/verify.cjs",
     "install:admin": "npm --prefix admin ci",
     "build:admin": "npm --prefix admin run build",

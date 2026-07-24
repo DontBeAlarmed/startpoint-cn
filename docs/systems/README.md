@@ -23,6 +23,7 @@
 ## 任务与角色
 
 - [任务完成度审计](./mission-completion-audit.md)
+- [Active Mission](./active-mission.md)
 - [修行之道（Pass Card）](./pass-card.md)
 - [任务与关卡映射](./mission-quest-mapping.md)
 - [角色觉醒任务](./character-awake-missions.md)

@@ -112,6 +112,13 @@ test("exposes the reproducible strict event battle rule generator", () => {
     )
 })
 
+test("exposes the official Active Mission table generator", () => {
+    assert.equal(
+        scripts["content:active-mission"],
+        "node scripts/gen_active_mission_data.js",
+    )
+})
+
 test("exposes the explicit real-CDN content smoke without adding it to normal tests", () => {
     assert.equal(
         scripts["content:smoke"],

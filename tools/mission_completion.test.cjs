@@ -118,6 +118,14 @@ const alreadyReceived = validateMissionRewardClaims(
 )
 assert.deepEqual(alreadyReceived, { ok: true, claims: [] })
 
+assert.deepEqual(
+    validateMissionRewardClaims(
+        { 999999: { progress: 1, stages: [] } },
+        [{ mission_id: 999999, stages: [1] }],
+    ),
+    { ok: false, message: "Unknown active mission." },
+)
+
 console.log("mission completion tests passed")
 cleanupDatabase()
 process.removeListener("exit", cleanupDatabase)
