@@ -470,6 +470,13 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_active_mission_counters (
+        player_id INTEGER PRIMARY KEY,
+        total_used_mana_count INTEGER NOT NULL DEFAULT 0,
+        total_gacha_character_count INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_category_missions (
         category INTEGER NOT NULL,
         id INTEGER NOT NULL,

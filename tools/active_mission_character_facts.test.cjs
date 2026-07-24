@@ -35,6 +35,8 @@ const state = {
     partyAbilitySoulCount: 1,
     treasureShopPurchaseCount: 2,
     bossCoinShopPurchaseCount: 3,
+    totalUsedManaCount: 120,
+    totalGachaCharacterCount: 5,
 }
 
 const row = (characterId = "(None)") => {
@@ -58,6 +60,8 @@ assert.equal(computeActiveMissionFactProgress(34, row(), state), 2)
 assert.equal(computeActiveMissionFactProgress(35, row(), state), 1)
 assert.equal(computeActiveMissionFactProgress(45, row(), state), 2)
 assert.equal(computeActiveMissionFactProgress(64, row(), state), 3)
+assert.equal(computeActiveMissionFactProgress(46, row(), state), 120)
+assert.equal(computeActiveMissionFactProgress(78, row(), state), 5)
 assert.equal(
     computeActiveMissionFactProgress(21, row(), {
         ...state,

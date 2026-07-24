@@ -9,6 +9,7 @@ import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../..
 import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
 import { getPlayerShopPurchasesMapSync } from "../../data/domains/shopPurchase"
 import { getPlayerPartyGroupListSync } from "../../data/domains/party"
+import { getActiveMissionCountersSync } from "../../data/domains/active_mission_counters"
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import {
@@ -47,6 +48,8 @@ const PATTERN_UPGRADE_EQUIPMENT_COUNT = 34
 const PATTERN_SET_SOUL_SPHERE_COUNT = 35
 const PATTERN_TREASURE_SHOP_BOUGHT_ITEM_COUNT = 45
 const PATTERN_TRADED_COUNT_TO_EQUIPMENT_BY_BOSS_COIN = 64
+const PATTERN_TOTAL_USED_MANA_COUNT = 46
+const PATTERN_TOTAL_GACHA_CHARACTER_COUNT = 78
 const COME_BACK_EVENT_STRING_ID = "come_back_mission"
 
 export interface ActiveMissionEventEligibilityContext {
@@ -83,6 +86,8 @@ export interface ActiveMissionFactState {
     readonly partyAbilitySoulCount: number
     readonly treasureShopPurchaseCount: number
     readonly bossCoinShopPurchaseCount: number
+    readonly totalUsedManaCount: number
+    readonly totalGachaCharacterCount: number
 }
 
 function parseInteger(value: unknown, field: string): number {
@@ -197,6 +202,10 @@ export function computeActiveMissionFactProgress(
             return Math.max(0, state.player.totalLoginDays)
         case PATTERN_USED_STAMINA_COUNT:
             return Math.max(0, state.player.totalStaminaUsed)
+        case PATTERN_TOTAL_USED_MANA_COUNT:
+            return state.totalUsedManaCount
+        case PATTERN_TOTAL_GACHA_CHARACTER_COUNT:
+            return state.totalGachaCharacterCount
         case PATTERN_EPISODE_CLEAR_COUNT: {
             const storyQuestIds = new Set(
                 characters.flatMap(([characterId]) => state.characterStoryQuestIds[characterId] ?? []),
@@ -305,6 +314,7 @@ function buildActiveMissionFactState(
         })(),
     }))
     const purchases = getPlayerShopPurchasesMapSync(playerId)
+    const counters = getActiveMissionCountersSync(playerId)
     const treasureShopItemIds = new Set(Object.keys(readRepositoryTable<Record<string, unknown>>(
         repository,
         "treasure_shop.json",
@@ -337,6 +347,8 @@ function buildActiveMissionFactState(
         bossCoinShopPurchaseCount: Object.entries(purchases).reduce((total, [itemId, count]) => (
             bossCoinShopItemIds.has(itemId) ? total + Math.max(0, count) : total
         ), 0),
+        totalUsedManaCount: counters.totalUsedManaCount,
+        totalGachaCharacterCount: counters.totalGachaCharacterCount,
     }
 }
 
