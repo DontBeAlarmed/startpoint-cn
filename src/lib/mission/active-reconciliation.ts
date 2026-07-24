@@ -59,6 +59,7 @@ const PATTERN_INJECTED_EXP_FIRST_TIME = 63
 const PATTERN_GACHA_CAMPAIGN = 83
 const PATTERN_BATTLE_CLEAR_COUNT = 23
 const PATTERN_SS_RANK_COUNT = 26
+const PATTERN_CHAPTER_COMPLETE = 66
 const COME_BACK_EVENT_STRING_ID = "come_back_mission"
 
 const QUEST_CATEGORY_BY_RANGE_KIND: Readonly<Record<number, number | readonly number[]>> = Object.freeze({
@@ -112,6 +113,7 @@ export interface ActiveMissionFactState {
     readonly battleCounters: Readonly<ReturnType<typeof getMissionBattleCountersSync>>
     readonly finishedQuestIds: ReadonlySet<number>
     readonly questProgress: readonly ActiveMissionFactQuestProgress[]
+    readonly chapterQuestIds: Readonly<Record<string, readonly number[]>>
     readonly characterStoryQuestIds: Readonly<Record<string, readonly number[]>>
     readonly characters: Readonly<Record<string, ActiveMissionFactCharacter>>
     readonly equipment: readonly { readonly level: number, readonly maxLevel: number, readonly enhancementLevel?: number }[]
@@ -135,6 +137,7 @@ export interface ActiveMissionFactQuestProgress {
     readonly category: number
     readonly questId: number
     readonly finished: boolean
+    readonly clearRank?: number
     readonly multiClearCount: number
 }
 
@@ -203,8 +206,12 @@ function matchesQuestIdRange(
     if (!categories.includes(category)) return false
 
     if (rangeKind === 0 || rangeKind === 1 || rangeKind === 2) {
-        const first = Math.floor(questId / 1_000_000)
-        const remainder = questId % 1_000_000
+        const normalizedQuestId = rangeKind === 1 && questId < 10_000_000
+            ? questId + 10_000_000
+            : questId
+        const rangeQuestId = rangeKind === 1 ? normalizedQuestId - 10_000_000 : normalizedQuestId
+        const first = Math.floor(rangeQuestId / 1_000_000)
+        const remainder = rangeQuestId % 1_000_000
         const second = Math.floor(remainder / 1_000)
         const third = remainder % 1_000
         return matchesOptionalSelector(parseOptionalIntegerList(row[35], "quest range first"), first)
@@ -269,6 +276,28 @@ function countSsRankFacts(
         return Math.max(0, state.battleCounters.rankSsCount - state.battleCounters.singleRankSsCount)
     }
     return state.battleCounters.rankSsCount
+}
+
+function normalizeActiveMissionQuestId(category: number, questId: number): number {
+    return category === 4 && questId < 10_000_000 ? questId + 10_000_000 : questId
+}
+
+function computeChapterCompleteFact(
+    row: readonly unknown[],
+    state: ActiveMissionFactState,
+): number | null {
+    const rangeKind = parseInteger(row[34], "quest range kind")
+    const category = rangeKind === 0 ? 1 : rangeKind === 1 ? 4 : null
+    if (category === null) return null
+    const targetQuestIds = (state.chapterQuestIds[String(category)] ?? []).filter(questId => (
+        matchesActiveMissionQuestRange(row, category, questId)
+    ))
+    if (targetQuestIds.length === 0) return null
+
+    const clearRankByQuestId = new Map(state.questProgress
+        .filter(progress => progress.category === category)
+        .map(progress => [normalizeActiveMissionQuestId(category, progress.questId), progress.clearRank]))
+    return targetQuestIds.every(questId => clearRankByQuestId.get(questId) === 5) ? 1 : 0
 }
 
 /** 按 CN 1.8.1 ActiveMissionValues 的 row[34..37] 解析 QuestRangeReferenceIdKind。 */
@@ -367,6 +396,8 @@ export function computeActiveMissionFactProgress(
             return countBattleClearFacts(row, state.questProgress)
         case PATTERN_SS_RANK_COUNT:
             return countSsRankFacts(row, state)
+        case PATTERN_CHAPTER_COMPLETE:
+            return computeChapterCompleteFact(row, state)
         case PATTERN_EPISODE_CLEAR_COUNT: {
             const storyQuestIds = new Set(
                 characters.flatMap(([characterId]) => state.characterStoryQuestIds[characterId] ?? []),
@@ -437,6 +468,18 @@ function buildActiveMissionFactState(
     repository: ReadonlyContentRepository,
 ): ActiveMissionFactState {
     const characterList = getPlayerCharactersSync(playerId)
+    const mainQuestTable = readRepositoryTable<Record<string, unknown>>(repository, "main_quest.json")
+    const exQuestTable = readRepositoryTable<Record<string, unknown>>(repository, "ex_quest.json")
+    const battleQuestIds = (table: Readonly<Record<string, unknown>>, offset: number): number[] => (
+        Object.entries(table).flatMap(([questId, quest]) => {
+            const parsedQuestId = Number(questId)
+            if (!Number.isSafeInteger(parsedQuestId)
+                || quest === null
+                || typeof quest !== "object"
+                || !("rankPointReward" in quest)) return []
+            return [parsedQuestId + offset]
+        })
+    )
     const characterTable = readRepositoryTable<Record<string, { readonly rarity?: number }>>(
         repository,
         "character.json",
@@ -509,6 +552,10 @@ function buildActiveMissionFactState(
         battleCounters,
         finishedQuestIds,
         questProgress,
+        chapterQuestIds: {
+            "1": battleQuestIds(mainQuestTable, 0),
+            "4": battleQuestIds(exQuestTable, 10_000_000),
+        },
         characterStoryQuestIds: Object.fromEntries(Object.keys(characters).map(characterId => [
             characterId,
             getCharacterStoryQuestIds(characterId),
@@ -618,6 +665,7 @@ export function reconcileActiveMissionFacts(
             category: Number(category),
             questId: progress.questId,
             finished: progress.finished,
+            clearRank: progress.clearRank,
             multiClearCount: Math.max(0, progress.multiClearCount ?? 0),
         })))
         const finishedQuestIds = new Set(Object.values(questProgress).flatMap(progressList => (
