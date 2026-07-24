@@ -20,8 +20,27 @@ export { mergeMissionSettlementResponse } from "./response"
 export type { PatternMatch } from "./patterns"
 export { getMissionsByPattern, getMissionDefinition, getMissionPattern, isComputablePattern, isMissionEnabledAt } from "./patterns"
 
-export type { MissionRewardClaimValidation, ValidatedMissionRewardClaim } from "./claims"
+export type { MissionRewardClaimContext, MissionRewardClaimValidation, ValidatedMissionRewardClaim } from "./claims"
 export { validateMissionRewardClaims } from "./claims"
+
+export type {
+    ActiveMissionAvailabilityContext,
+    ActiveMissionProgressSettlement,
+    ActiveMissionProgressSettlementOptions,
+    ActiveMissionProgressState,
+    ParsedActiveMissionDefinition,
+    ParsedActiveMissionEventDefinition,
+} from "./active-core"
+export {
+    getActiveMissionEventReleasePhase,
+    isActiveMissionAvailable,
+    isActiveMissionClaimable,
+    parseActiveMissionDefinition,
+    parseActiveMissionEventDefinition,
+    parseCnMasterDateTime,
+    parseJstDateTime,
+    settleActiveMissionProgress,
+} from "./active-core"
 
 // Character queries
 export { getCharacterStoryQuestIds, getCharacterIdFromMission } from "./character-queries"

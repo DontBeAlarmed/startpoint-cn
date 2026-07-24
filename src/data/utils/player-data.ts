@@ -19,6 +19,7 @@ import { computeAwakeSummary, filterToActiveMissions, reconcileAwakeUnlocksFromP
 import { computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps } from "../../lib/character-helpers"
 import { getDb } from "../db"
 import { getCarnivalSaveStateSync } from "../../lib/carnival-save-state"
+import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 
 /**
  * Generates default player data.
@@ -119,7 +120,10 @@ export function getClientSerializedData(
         gachaCampaignList: getPlayerGachaCampaignListSync(playerId),
         drawnQuestList: getPlayerDrawnQuestsSync(playerId),
         periodicRewardPointList: getPlayerPeriodicRewardPointsSync(playerId),
-        allActiveMissionList: filterToActiveMissions(getPlayerActiveMissionsSync(playerId)),
+        allActiveMissionList: filterToActiveMissions(
+            getPlayerActiveMissionsSync(playerId),
+            getContentSnapshot().repository,
+        ),
         boxGachaList: getPlayerBoxGachasSync(playerId),
         purchasedTimesList: {},
         startDashExchangeCampaignList: getPlayerStartDashExchangeCampaignsSync(playerId),

@@ -5,10 +5,12 @@ import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
+import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { reconcileAwakeUnlockCharacterList, validateMissionRewardClaims } from "../../lib/mission/index";
 import { MissionRewardGranter } from "../../lib/mission/grants";
+import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/receive", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -44,7 +46,11 @@ const routes = async (fastify: FastifyInstance) => {
 
         const activeMissions = getPlayerActiveMissionsSync(playerId)
         const requestList = body.active_mission_list || []
-        const validation = validateMissionRewardClaims(activeMissions, requestList)
+        const validation = validateMissionRewardClaims(activeMissions, requestList, {
+            repository: getContentSnapshot().repository,
+            now: getServerTime() * 1000,
+            questProgress: getPlayerQuestProgressSync(playerId),
+        })
         if (!validation.ok) return reply.status(400).send({
             "error": "Bad Request",
             "message": validation.message

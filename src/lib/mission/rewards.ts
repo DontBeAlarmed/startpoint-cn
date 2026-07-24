@@ -11,6 +11,7 @@ import charAwakeRewards from "../../../assets/mission_char_awake_reward.json"
 import passDailyRewards from "../../../assets/mission_pass_daily_reward.json"
 import passWeekRewards from "../../../assets/mission_pass_week_reward.json"
 import passEventRewards from "../../../assets/mission_pass_event_reward.json"
+import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 
 export interface ActiveMissionReward {
     kind: number
@@ -87,13 +88,29 @@ function parseMissionRewardSlots(row: any[], firstKindIndex: number, slotCount =
     return result
 }
 
-export function getActiveMissionRewards(missionId: number, stage: number): ActiveMissionReward[] {
-    const row = getRewardRow(activeRewards as Record<string, Record<string, any[]>>, missionId, stage)
+function getActiveRewardTable(
+    repository?: ReadonlyContentRepository,
+): Record<string, Record<string, any[]>> {
+    return repository
+        ? repository.table<Record<string, Record<string, any[]>>>("mission_active_reward.json")
+        : activeRewards as Record<string, Record<string, any[]>>
+}
+
+export function getActiveMissionRewards(
+    missionId: number,
+    stage: number,
+    repository?: ReadonlyContentRepository,
+): ActiveMissionReward[] {
+    const row = getRewardRow(getActiveRewardTable(repository), missionId, stage)
     return row ? parseMissionRewardSlots(row, 7) : []
 }
 
-export function getMissionRewardStageDefinition(missionId: number, stage: number): MissionRewardStageDefinition | null {
-    const row = getRewardRow(activeRewards as Record<string, Record<string, any[]>>, missionId, stage)
+export function getMissionRewardStageDefinition(
+    missionId: number,
+    stage: number,
+    repository?: ReadonlyContentRepository,
+): MissionRewardStageDefinition | null {
+    const row = getRewardRow(getActiveRewardTable(repository), missionId, stage)
     if (!row) return null
     const targetProgress = Number.parseFloat(String(row[3]))
     if (!Number.isFinite(targetProgress)) return null
