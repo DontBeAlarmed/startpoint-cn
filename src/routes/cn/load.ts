@@ -19,6 +19,7 @@ import {
     type AssetProviderConfig,
 } from "../../content/cdn/asset-mode";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
+import { reconcileActiveMissionFacts } from "../../lib/mission/active-reconciliation";
 
 interface CnLoadBody {
     device_id: number;
@@ -175,6 +176,13 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             }
         }
 
+        const contentSnapshot = getContentSnapshot();
+        reconcileActiveMissionFacts({
+            playerId,
+            repository: contentSnapshot.repository,
+            now: getServerTime() * 1000,
+        });
+
         const clientData = getClientSerializedData(playerId, { viewerId: accountId }) as any;
         if (clientData === null) {
             return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
@@ -184,7 +192,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         console.log(`[CN-LOAD] res_ver=${resVer || '(not sent)'} account=${accountId} player=${playerId} party_slot=${clientData?.user_info?.party_slot}`);
         const snapshotTargetVersion = assetProvider.mode === "client-owned"
             ? ""
-            : getContentSnapshot().cdn.targetVersion;
+            : contentSnapshot.cdn.targetVersion;
         const assetState = resolveAssetLoadState(assetProvider, resVer, snapshotTargetVersion);
         wrapOptionFields(clientData, assetState.availableAssetVersion);
 

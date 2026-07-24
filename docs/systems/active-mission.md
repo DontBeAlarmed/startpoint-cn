@@ -44,9 +44,21 @@ Content Release；这一步只补齐服务端解释 Active Mission 所需的定�
 - 返回标准 `active_mission_list` 增量供 CN 客户端通用层立即合并，不在该入口发奖；奖励仍由
   `/api/index.php/active_mission/receive` 领取。
 
-上述能力构成内容解释、首任务生产、可用性判定、安全领奖和存储链。当前仅接入 96 条业务事实中的 Contents Guide
-首任务，其他 95 条仍没有权威业务入口；除该首任务、存档导入或既有数据库记录外，`players_active_missions` 不会自行生成
-完整进度。因此 Active Mission 仍是部分完成，不能只因首任务与领奖接口可用就标记为完整。
+`/load` 在序列化玩家数据前会使用当前 Content snapshot 重算并持久化一组可由服务端状态证明的事实：
+
+- `quest_clear`：依据 CN 1.8.1 的 `QuestRangeReferenceIdKind` 支持 Main、Ex 和 WorldStoryEvent；
+- `target_mission_clear`：目标任务全部奖励阶段达到目标进度即可完成，不要求目标奖励已经领取；
+- `total_login_days` 和 `used_stamina_count`：使用玩家存档中的绝对累计值，只增不减；
+- 任务前置与 phase 会在同一次请求内固定点推进，数据库写入使用单一 SQLite 事务，失败整体回滚；
+- 回归活动通过 event `string_id` 中的 `come_back_mission` 识别；当前没有回归资格生产者时 fail closed，不会把 250xx
+  任务发给普通玩家。普通 `kind=1` 事件不因此被误判为回归活动。
+
+这组状态事实只写入 `all_active_mission_list`，不会写入角色觉醒使用的 category 9 `active_mission_list`。
+
+上述能力构成内容解释、首任务生产、状态事实校准、可用性判定、安全领奖和存储链。当前已接入 96 条定义中的
+20 条状态/累计事实计算（其中回归活动事实仍需资格回调才能生产），其余 75 条业务事实仍没有权威生产入口；除已接入
+事实、Contents Guide 首任务、存档导入或既有数据库记录外，`players_active_missions` 不会自行生成完整进度。因此
+Active Mission 仍是部分完成，不能只因状态校准、首任务与领奖接口可用就标记为完整。
 
 ## 后续实现原则
 

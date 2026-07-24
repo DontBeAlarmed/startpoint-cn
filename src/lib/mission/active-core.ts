@@ -183,7 +183,7 @@ export function parseActiveMissionEventDefinition(
     }
 }
 
-function getRewardStageIds(
+export function getActiveMissionRewardStageIds(
     missionId: number,
     repository: ReadonlyContentRepository,
 ): number[] {
@@ -201,7 +201,7 @@ function isMissionCurrentStageComplete(
     state: ActiveMissionProgressState | undefined,
     repository: ReadonlyContentRepository,
 ): boolean {
-    const stageIds = getRewardStageIds(missionId, repository)
+    const stageIds = getActiveMissionRewardStageIds(missionId, repository)
     if (stageIds.length === 0) return false
     const progress = state?.progress ?? 0
     for (const stage of stageIds) {
@@ -335,7 +335,7 @@ export function settleActiveMissionProgress(
     const stages: Record<string, boolean> = { ...(currentState?.stages ?? {}) }
     const completedStages: { stage: number, received: false }[] = []
     const stageIds = options.repository
-        ? getRewardStageIds(missionId, options.repository)
+        ? getActiveMissionRewardStageIds(missionId, options.repository)
         : Object.keys(requireBundledRewardStages(missionId)).map(Number).sort((a, b) => a - b)
     for (const stage of stageIds) {
         const stageKey = String(stage)
