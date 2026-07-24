@@ -7,6 +7,8 @@ import {
 } from "../../data/domains/mission"
 import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../../data/domains/character"
 import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
+import { getPlayerShopPurchasesMapSync } from "../../data/domains/shopPurchase"
+import { getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import {
@@ -41,6 +43,10 @@ const PATTERN_TOTAL_RELEASED_ABILITY_NODE_COUNT = 62
 const PATTERN_MANA_BOARD_2ND_COMPLETE_COUNT = 48
 const PATTERN_QUEST_CLEAR = 57
 const PATTERN_EVOLVED_CHARACTER_COUNT = 61
+const PATTERN_UPGRADE_EQUIPMENT_COUNT = 34
+const PATTERN_SET_SOUL_SPHERE_COUNT = 35
+const PATTERN_TREASURE_SHOP_BOUGHT_ITEM_COUNT = 45
+const PATTERN_TRADED_COUNT_TO_EQUIPMENT_BY_BOSS_COIN = 64
 const COME_BACK_EVENT_STRING_ID = "come_back_mission"
 
 export interface ActiveMissionEventEligibilityContext {
@@ -70,10 +76,13 @@ export interface ActiveMissionFactState {
     readonly finishedQuestIds: ReadonlySet<number>
     readonly characterStoryQuestIds: Readonly<Record<string, readonly number[]>>
     readonly characters: Readonly<Record<string, ActiveMissionFactCharacter>>
-    readonly equipment: readonly { readonly level: number, readonly maxLevel: number }[]
+    readonly equipment: readonly { readonly level: number, readonly maxLevel: number, readonly enhancementLevel?: number }[]
     readonly manaNodes: Readonly<Record<string, readonly number[]>>
     readonly manaBoardNodes: Readonly<Record<string, Readonly<Record<string, readonly number[]>>>>
     readonly manaNodeSlots: Readonly<Record<string, Readonly<Record<string, number>>>>
+    readonly partyAbilitySoulCount: number
+    readonly treasureShopPurchaseCount: number
+    readonly bossCoinShopPurchaseCount: number
 }
 
 function parseInteger(value: unknown, field: string): number {
@@ -213,6 +222,14 @@ export function computeActiveMissionFactProgress(
             return characters.filter(([, character]) => character.evolutionLevel > 0).length
         case PATTERN_LEVEL_MAX_EQUIPMENT_COUNT:
             return state.equipment.filter(equipment => equipment.level >= equipment.maxLevel).length
+        case PATTERN_UPGRADE_EQUIPMENT_COUNT:
+            return state.equipment.reduce((total, equipment) => total + Math.max(0, equipment.enhancementLevel ?? 0), 0)
+        case PATTERN_SET_SOUL_SPHERE_COUNT:
+            return state.partyAbilitySoulCount
+        case PATTERN_TREASURE_SHOP_BOUGHT_ITEM_COUNT:
+            return state.treasureShopPurchaseCount
+        case PATTERN_TRADED_COUNT_TO_EQUIPMENT_BY_BOSS_COIN:
+            return state.bossCoinShopPurchaseCount
         case PATTERN_OVER_LIMIT_TOTAL_COUNT:
             return characters.reduce((total, [, character]) => total + Math.max(0, character.overLimitStep), 0)
         case PATTERN_TOTAL_OBTAINED_BOND_TOKEN_COUNT:
@@ -278,6 +295,7 @@ function buildActiveMissionFactState(
     }
     const equipment = Object.entries(getPlayerEquipmentListSync(playerId)).map(([equipmentId, item]) => ({
         level: item.level,
+        enhancementLevel: item.enhancementLevel,
         maxLevel: (() => {
             const row = readRepositoryTable<Record<string, { readonly max_level?: number }>>(
                 repository,
@@ -286,6 +304,20 @@ function buildActiveMissionFactState(
             return row?.max_level ?? 5
         })(),
     }))
+    const purchases = getPlayerShopPurchasesMapSync(playerId)
+    const treasureShopItemIds = new Set(Object.keys(readRepositoryTable<Record<string, unknown>>(
+        repository,
+        "treasure_shop.json",
+    )))
+    const bossCoinShopItemIds = new Set(Object.keys(readRepositoryTable<Record<string, unknown>>(
+        repository,
+        "boss_coin_shop_item_category_map.json",
+    )))
+    const partyAbilitySoulCount = Object.values(getPlayerPartyGroupListSync(playerId)).reduce((total, group) => (
+        total + Object.values(group.list ?? {}).reduce((partyTotal, party) => (
+            partyTotal + (party.abilitySoulIds ?? []).filter(id => id !== null && id !== undefined).length
+        ), 0)
+    ), 0)
     return {
         player,
         finishedQuestIds,
@@ -298,6 +330,13 @@ function buildActiveMissionFactState(
         manaNodes,
         manaBoardNodes,
         manaNodeSlots,
+        partyAbilitySoulCount,
+        treasureShopPurchaseCount: Object.entries(purchases).reduce((total, [itemId, count]) => (
+            treasureShopItemIds.has(itemId) ? total + Math.max(0, count) : total
+        ), 0),
+        bossCoinShopPurchaseCount: Object.entries(purchases).reduce((total, [itemId, count]) => (
+            bossCoinShopItemIds.has(itemId) ? total + Math.max(0, count) : total
+        ), 0),
     }
 }
 

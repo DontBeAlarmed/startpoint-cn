@@ -25,10 +25,16 @@ const state = {
             bondTokenList: [{ status: 1 }],
         },
     },
-    equipment: [{ level: 5, maxLevel: 5 }, { level: 1, maxLevel: 5 }],
+    equipment: [
+        { level: 5, maxLevel: 5, enhancementLevel: 2 },
+        { level: 1, maxLevel: 5, enhancementLevel: 0 },
+    ],
     manaNodes: { "1": [101, 102, 201, 202] },
     manaBoardNodes: { "1": { "2": [201, 202] } },
     manaNodeSlots: { "1": { "101": 1, "102": 4, "201": 2, "202": 4 } },
+    partyAbilitySoulCount: 1,
+    treasureShopPurchaseCount: 2,
+    bossCoinShopPurchaseCount: 3,
 }
 
 const row = (characterId = "(None)") => {
@@ -48,6 +54,10 @@ assert.equal(computeActiveMissionFactProgress(9, row(), state), 3)
 assert.equal(computeActiveMissionFactProgress(8, row(), state), 2)
 assert.equal(computeActiveMissionFactProgress(62, row(), state), 2)
 assert.equal(computeActiveMissionFactProgress(7, row(), state), 4)
+assert.equal(computeActiveMissionFactProgress(34, row(), state), 2)
+assert.equal(computeActiveMissionFactProgress(35, row(), state), 1)
+assert.equal(computeActiveMissionFactProgress(45, row(), state), 2)
+assert.equal(computeActiveMissionFactProgress(64, row(), state), 3)
 assert.equal(
     computeActiveMissionFactProgress(21, row(), {
         ...state,
