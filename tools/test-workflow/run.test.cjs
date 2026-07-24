@@ -12,6 +12,7 @@ const {
     buildGitCommands,
     classifyTestOutput,
     executeTestGroups,
+    expandGroupNames,
     installSignalHandlers,
     main,
     mergeChangedFiles,
@@ -59,6 +60,14 @@ function createDeferred() {
     })
     return { promise, reject, resolve }
 }
+
+test("aggregate names take precedence over same-named leaves", () => {
+    assert.deepEqual(expandGroupNames(
+        ["generator"],
+        { generator: {}, "generator:mission-event": {} },
+        { generator: ["generator", "generator:mission-event"] },
+    ), ["generator", "generator:mission-event"])
+})
 
 async function waitForCondition(condition, timeoutMs = 1000) {
     const deadline = Date.now() + timeoutMs

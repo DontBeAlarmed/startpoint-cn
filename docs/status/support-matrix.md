@@ -17,7 +17,7 @@
 | 无限演武 | category 27、评级、跨档奖励、事务和持久化已实现；履历端点仍为空 | 服务层与真实 Fastify/SQLite 事务覆盖较强 | 待客户端重新验收 | [无限演武](../systems/score-attack-event.md) |
 | 战阵 | 本地三队 Raid、独立配队、start 和 finish 已实现；事件级分数奖励缺失 | 配队和基础流程有覆盖，缺少完整协议端到端测试 | 待客户端重新验收 | [特殊关卡架构](../systems/special-quest-architecture.md) |
 | 歼灭者讨伐战 | 房主解锁、门票预扣、abort 返还和重启恢复已实现 | 房主/成员身份与门票生命周期有覆盖 | 房主解锁已通过；成员不解锁降为低优先级；门票待验收 | [歼灭者解锁](../systems/boss-epuration-unlock.md) |
-| 任务系统 | 部分完成：普通/每日/每周、收集、23 条称号、活动协力首批规则、Pass 三分类与等级奖励、觉醒和 Active Mission 已有；复杂活动规则、称号剩余项、Pass 少量 pattern 与购买流程未完成 | Pass 主数据、周期、点数、指定协力、等级领奖，以及既有任务事务、回滚和幂等已有覆盖；复杂活动谓词与其他称号缺完整协议矩阵 | 觉醒核心时序已通过；Pass 与其他未验收分类仍需客户端全流程测试 | [任务完成度审计](../systems/mission-completion-audit.md)、[修行之道](../systems/pass-card.md) |
+| 任务系统 | 部分完成：普通/每日/每周、收集、23 条称号、805 条严格活动协力规则、Pass 三分类与等级奖励、觉醒和 Active Mission 已有；旧 939 条不安全空 selector 规则已移除，mission 1807 等继续 fallback，Attention 禁用 | 805 条规则的生成重现、有限/全范围 QuestRange、Host/Guest 三态、开放期、事务结算和奖励已有覆盖；复杂活动谓词与其他称号缺完整协议矩阵 | 觉醒核心时序已通过；严格活动规则、Pass 与其他未验收分类仍需客户端全流程测试 | [任务完成度审计](../systems/mission-completion-audit.md)、[任务-关卡映射](../systems/mission-quest-mapping.md)、[修行之道](../systems/pass-card.md) |
 | 角色觉醒 | 核心解锁与领奖时序已实现并解耦；144 条任务条件不能标记为全部正确 | 解锁、结算、刷新、迁移与幂等覆盖较强；部分条件缺真实端点测试 | “完成后立即解锁、回第一页领奖”的核心时序已通过；条件全集待复核 | [角色觉醒任务](../systems/character-awake-missions.md)、[刷新与解锁时序](../systems/character-awake-refresh.md) |
 | 角色与装备养成 | 广泛实现；角色分解、特殊装备升级和追忆装备阶段强化已修复 | 角色 stack、装备强化和库存规则有专项测试 | 上述三个重点流程已通过；其余养成尚无统一验收矩阵 | [角色分解审计](../systems/character-stack-audit.md)、[装备强化审计](../systems/equipment-upgrade-audit.md) |
 | 嵌入式运行契约 | 契约 v1、Bundle v2、Data Volume、生命周期和健康接口已实现 | manifest、Bundle、配置、健康与生命周期覆盖较强 | 不属于 CN 客户端验收；真实 Android 或桌面 Supervisor 集成待做 | [嵌入式运行契约](../embedded-runtime-contract.md)、[Server Bundle](../runtime/server-bundle.md) |

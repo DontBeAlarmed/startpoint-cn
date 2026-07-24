@@ -105,6 +105,13 @@ test("runs content sync through the TypeScript entry without a prebuild", () => 
     assert.doesNotMatch(scripts["content:sync"], /--env-file/)
 })
 
+test("exposes the reproducible strict event battle rule generator", () => {
+    assert.equal(
+        scripts["content:mission-event-rules"],
+        "node scripts/gen_mission_event_battle_rules.js",
+    )
+})
+
 test("exposes the explicit real-CDN content smoke without adding it to normal tests", () => {
     assert.equal(
         scripts["content:smoke"],

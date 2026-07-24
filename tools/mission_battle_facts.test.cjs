@@ -106,5 +106,24 @@ assert.equal(multiFactCall > multiTransactionStart, true)
 assert.equal(multiTransactionCall > multiFactCall, true, "任务事实必须在事务体执行后统一提交")
 assert.equal(multiActiveDelete > multiTransactionCall, true, "事务成功前不得清除多人 active quest 内存")
 assert.equal(multiRoomReset > multiTransactionCall, true, "事务成功前不得重置多人房间状态")
+assert.match(
+    multiBattleSource,
+    /const finishCtx: FinishContext = \{[\s\S]*?isMultiHost: isRoomHost,[\s\S]*?\}/,
+    "多人路由必须把 resolveIsRoomHost 的 true/false/undefined 原样写入 FinishContext",
+)
+
+recordMissionBattleFacts({
+    ...baseContext,
+    questAccomplished: true,
+    isMulti: true,
+    isMultiHost: undefined,
+})
+const unknownHostResult = calls.filter(([kind]) => kind === "result").at(-1)[2]
+assert.deepEqual(unknownHostResult, {
+    isMulti: true,
+    isHost: undefined,
+    accomplished: true,
+    clearRank: 1,
+})
 
 console.log("mission battle facts tests passed")

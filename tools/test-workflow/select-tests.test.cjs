@@ -7,6 +7,18 @@ const { AGGREGATE_GROUPS, TEST_GROUPS } = require("./groups.cjs")
 const { selectTestGroups } = require("./select-tests.cjs")
 
 test("maps representative source files to focused groups", () => {
+    assert.deepEqual(
+        selectTestGroups(["scripts/gen_mission_event_battle_rules.js"]),
+        ["generator:mission-event"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["assets/mission_event_battle_rules.json"]),
+        ["generator:mission-event", "integration:mission", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/event-battle-facts.ts"]),
+        ["integration:mission"],
+    )
     assert.deepEqual(selectTestGroups(["src/lib/gacha.ts"]), ["quick:gacha"])
     assert.deepEqual(
         selectTestGroups(["src/lib/seed-validator.ts"]),
@@ -164,12 +176,22 @@ test("deduplicates and stably sorts selected groups", () => {
     )
 })
 
-test("full contains quick, integration, and admin but excludes generators", () => {
+test("generator aggregate includes both leaves while full only adds the self-contained leaf", () => {
+    assert.deepEqual(
+        AGGREGATE_GROUPS.generator,
+        ["generator", "generator:mission-event"],
+    )
     assert.deepEqual(
         AGGREGATE_GROUPS.full,
-        [...AGGREGATE_GROUPS.quick, ...AGGREGATE_GROUPS.integration, "admin"],
+        [
+            ...AGGREGATE_GROUPS.quick,
+            ...AGGREGATE_GROUPS.integration,
+            "admin",
+            "generator:mission-event",
+        ],
     )
     assert.equal(AGGREGATE_GROUPS.full.includes("generator"), false)
+    assert.equal(AGGREGATE_GROUPS.full.includes("generator:mission-event"), true)
     assert.deepEqual(TEST_GROUPS["integration:cdn"].tests, [
         "tools/asset_mode.test.cjs",
         "tools/asset_mode_compiled_smoke.test.cjs",
@@ -181,6 +203,20 @@ test("full contains quick, integration, and admin but excludes generators", () =
         "tools/cdn_files.test.cjs",
         "tools/legacy_asset_state.test.cjs",
     ])
+})
+
+test("registers strict event battle generation separately from runtime facts", () => {
+    assert.deepEqual(TEST_GROUPS["generator:mission-event"], {
+        execution: "serial",
+        tests: ["tools/mission_event_battle_rules.test.cjs"],
+    })
+    assert.equal(TEST_GROUPS.generator.tests.includes(
+        "tools/mission_event_battle_rules.test.cjs",
+    ), false)
+    assert.equal(
+        TEST_GROUPS["integration:mission"].tests.includes("tools/mission_event_battle_facts.test.cjs"),
+        true,
+    )
 })
 
 test("registers focused runtime state and socket smoke groups", () => {
@@ -279,12 +315,12 @@ test("registers every test in exactly one leaf group and full covers runtime reg
         assert.deepEqual(leafMembership.get(file), [selectTestGroups([file])[0]], file)
     }
 
-    const generatorTests = new Set(TEST_GROUPS.generator.tests)
-    const runtimeTests = allTests.filter(file => !generatorTests.has(file))
+    const externalGeneratorTests = new Set(TEST_GROUPS.generator.tests)
+    const fullExpectedTests = allTests.filter(file => !externalGeneratorTests.has(file))
     const fullTests = AGGREGATE_GROUPS.full
         .flatMap(group => TEST_GROUPS[group].tests)
         .sort()
-    assert.deepEqual(fullTests, runtimeTests)
+    assert.deepEqual(fullTests, fullExpectedTests)
 
     const externalDataMarkers = [
         ["wf-assets", "-cn"].join(""),

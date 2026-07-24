@@ -220,6 +220,12 @@ const TEST_GROUPS = Object.freeze({
             "tools/treasure_key_entry_data.test.cjs",
         ],
     },
+    "generator:mission-event": {
+        execution: "serial",
+        tests: [
+            "tools/mission_event_battle_rules.test.cjs",
+        ],
+    },
 })
 
 const quickGroups = Object.keys(TEST_GROUPS).filter(name => name.startsWith("quick:"))
@@ -229,8 +235,13 @@ const AGGREGATE_GROUPS = Object.freeze({
     quick: Object.freeze(quickGroups),
     integration: Object.freeze(integrationGroups),
     admin: Object.freeze(["admin"]),
-    generator: Object.freeze(["generator"]),
-    full: Object.freeze([...quickGroups, ...integrationGroups, "admin"]),
+    generator: Object.freeze(["generator", "generator:mission-event"]),
+    full: Object.freeze([
+        ...quickGroups,
+        ...integrationGroups,
+        "admin",
+        "generator:mission-event",
+    ]),
 })
 
 module.exports = {

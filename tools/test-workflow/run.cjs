@@ -109,9 +109,8 @@ function expandGroupNames(names, testGroups = TEST_GROUPS, aggregateGroups = AGG
     const seen = new Set()
 
     for (const name of names) {
-        const leafNames = testGroups[name]
-            ? [name]
-            : aggregateGroups[name]
+        const leafNames = aggregateGroups[name]
+            ?? (testGroups[name] ? [name] : undefined)
         if (!leafNames) throw new Error(`unknown group: ${name}`)
 
         for (const leafName of leafNames) {

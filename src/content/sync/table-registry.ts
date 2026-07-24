@@ -88,6 +88,7 @@ const BUNDLED_TABLE_NAMES = [
     "mission_degree.json",
     "mission_degree_reward.json",
     "mission_event.json",
+    "mission_event_battle_rules.json",
     "mission_event_quest_map.json",
     "mission_event_reward.json",
     "mission_pass_daily.json",

@@ -1,16 +1,16 @@
 export function resolveIsRoomHost(params: {
     roomHostPlayerId: number | null
     playerId: number
-}): boolean {
-    return params.roomHostPlayerId !== null
-        && params.roomHostPlayerId === params.playerId
+}): boolean | undefined {
+    if (params.roomHostPlayerId === null) return undefined
+    return params.roomHostPlayerId === params.playerId
 }
 
 export function resolveHostFinished(params: {
     previouslyHostFinished: boolean
     questAccomplished: boolean
-    isRoomHost: boolean
+    isRoomHost: boolean | undefined
 }): boolean {
     return params.previouslyHostFinished
-        || (params.questAccomplished && params.isRoomHost)
+        || (params.questAccomplished && params.isRoomHost === true)
 }

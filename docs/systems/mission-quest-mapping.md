@@ -1,12 +1,46 @@
-# 任务-关卡映射表 (Mission → Quest Map)
+# 任务-关卡映射与严格规则
 
-> 生成脚本: `scripts/gen_mission_event_quest_map.js`
-> 输出文件: `assets/mission_event_quest_map.json`
-> 覆盖范围: cat3 活动任务 2512 条，9 种 col[7] 类型
+> 历史审计生成器: `scripts/gen_mission_event_quest_map.js`
+> 历史审计资产: `assets/mission_event_quest_map.json`
+> 严格规则生成器: `scripts/gen_mission_event_battle_rules.js`
+> 运行时资产: `assets/mission_event_battle_rules.json`
+> 覆盖范围: cat3 活动任务 2512 条；当前严格自动事实 805 条
+
+`mission_event_quest_map.json` 是按 pattern 展开的旧映射，只供 `computer-event.ts` 历史审计。它没有完整表达
+QuestRange selector、QuestRank、Host/Guest 和 Attention 来源，不能驱动自动事实。旧 939 条自动规则已从
+`event-battle-facts.ts` 移除，但审计资产本身保留。
+
+## 严格 QuestRange 规则
+
+CN 1.8.1 的权威语义如下：
+
+| `row[2]` | 事实 | 严格 role |
+|:---:|------|------|
+| 16 | 任意协力成功 | `any`，仍要求 `isMulti=true` |
+| 17 | 房主协力成功 | `host`，只接受 `isMultiHost=true` |
+| 18 | 成员协力成功 | `guest`，只接受 `isMultiHost=false` |
+| 20 | Attention/救援 | 禁用，`FinishContext` 没有权威来源 |
+
+`isMultiHost=undefined` 对 Host 和 Guest 都关闭匹配。普通 Guest 不得推断为 Attention。
+
+| QuestRange | quest category | 结构化 quest ID 来源 |
+|------|:---:|------|
+| BossBattle | 2 | `boss_battle_quest.json` |
+| Advent | 7 | `advent_event_quest.json`，绝不扩展到 category 8 |
+| WorldStoryEventBossBattle | 19 | `world_story_event_boss_battle_quest.json` |
+| `(None)` | `all` | 全 category、全 quest |
+
+`row[10]=""` 解码为 `Within([])`，因此严格无匹配；`row[10]="(None)"` 才解码为 `All`。`row[11]` 是
+QuestRank，不是 `clearRank`，当前 805 条启用规则的 `rank` 均为 `null`。生成器用数值复合 ID 分量匹配 event/group/
+difficulty，不从文案推断，也不切割 quest ID 字符串。
+
+严格资产按数值 mission ID 排序，覆盖 type 16 的 792 条（692 条有限 `questIds`、100 条全范围）、type 17 Host
+的 12 条和 type 18 Guest 的 1 条，共 805 条。运行时只加载 `compatibility=null` 且枚举、selector、rank 均已知的规则；
+未知值逐条 fail closed。mission 1400、1811 和 1807 等旧空 selector 任务不在资产中，1807 继续走持久化 fallback。
 
 ---
 
-## 一、映射规则
+## 一、历史审计映射规则
 
 ### 通用原理
 
@@ -33,7 +67,7 @@ CDN quest 文件的 row[0] = quest_id → 收集所有 difficulty 的 quest_id
 | col[7] | CDN 文件 | 映射键 | quest_category |
 |:---:|------|:---:|:---:|
 | 2 | `boss_battle_quest.json` | col[9]=stage_group | [2] |
-| 5 | `advent_event_quest.json` | col[8]=stage_group | [7, 8] |
+| 5 | `advent_event_quest.json` | col[8]=stage_group | [7, 8]（旧审计近似；严格规则仅 7） |
 | 7 | `challenge_dungeon_event_quest.json` | 全部 quest | [13] |
 | 8 | `ranking_event_single_quest.json` | col[8]=key | [11] |
 | 10 | `world_story_event_boss_battle_quest.json` | col[8]=event_id | [19] |
@@ -83,7 +117,7 @@ CDN quest 文件的 row[0] = quest_id → 收集所有 difficulty 的 quest_id
 
 荒龙系列 col[8] 对照：6(灼炎复刻), 7(凶暗), 10(雷废龙), 12(水废龙), 13(歼风), 18(凶暗复刻), 3000(灼炎再复刻), 3001(光废龙复刻)。
 
-quest_category = [7, 8]（单人+多人都查）。
+旧审计 map 使用 quest_category = [7, 8]。这不是 CN 1.8.1 QuestRange 的精确语义；严格自动事实仅使用 category 7。
 
 ### C — CHALLENGE_DUNGEON (col[7]=7, ~106 条)
 
@@ -188,5 +222,6 @@ DB 源表:
 计算层:
   lib/mission/computer-*.ts        — 8 个 MissionComputer
   lib/mission/registry.ts          — registry dispatch
-  assets/mission_event_quest_map.json — cat3 预生成映射
+  assets/mission_event_quest_map.json — cat3 历史审计映射
+  assets/mission_event_battle_rules.json — 805 条按 mission ID 的严格自动事实
 ```

@@ -8,7 +8,7 @@ import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "./mas
 import questMap from "../../../assets/mission_event_quest_map.json"
 import eventRewards from "../../../assets/mission_event_reward.json"
 import type { MissionComputer, CategoryContext } from "./types"
-import { getSafeEventBattleRuleCoverage } from "./event-battle-facts"
+import { getExactEventBattleRuleCoverage } from "./event-battle-facts"
 
 type EventCountMode = "single" | "multi" | "finish"
 
@@ -21,7 +21,8 @@ interface QuestMapping {
 export interface EventMissionCoverageReport {
     total: number
     mapped: number
-    safeAutoSettlement: number
+    exactMultiRules: number
+    exactMultiRulesByRole: Record<"any" | "host" | "guest", number>
     unsupported: number
     activeUnsupported: number
     countModes: Record<EventCountMode, number>
@@ -39,6 +40,7 @@ function getTargetClearTimeMs(missionId: number): number | undefined {
 export function getEventMissionCoverageReport(at: Date): EventMissionCoverageReport {
     const definitions = getMissionMasterDefinitions(3)
     const mappings = questMap as Record<string, QuestMapping>
+    const exactCoverage = getExactEventBattleRuleCoverage()
     const unsupportedDefinitions = definitions.filter(definition => mappings[definition.pattern] === undefined)
     const countModes: Record<EventCountMode, number> = { single: 0, multi: 0, finish: 0 }
     for (const definition of definitions) {
@@ -48,7 +50,8 @@ export function getEventMissionCoverageReport(at: Date): EventMissionCoverageRep
     return {
         total: definitions.length,
         mapped: definitions.length - unsupportedDefinitions.length,
-        safeAutoSettlement: getSafeEventBattleRuleCoverage().safeMultiClearRules,
+        exactMultiRules: exactCoverage.exactMultiRules,
+        exactMultiRulesByRole: exactCoverage.roles,
         unsupported: unsupportedDefinitions.length,
         activeUnsupported: unsupportedDefinitions.filter(definition =>
             isMissionDefinitionEnabledAt(definition, at)

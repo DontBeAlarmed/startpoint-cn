@@ -213,7 +213,7 @@ function testAdventHostFinishState() {
     assert.equal(hostFinish.resolveIsRoomHost({
         roomHostPlayerId: null,
         playerId: 17,
-    }), false)
+    }), undefined)
 
     assert.equal(hostFinish.resolveHostFinished({
         previouslyHostFinished: false,
@@ -224,6 +224,11 @@ function testAdventHostFinishState() {
         previouslyHostFinished: false,
         questAccomplished: true,
         isRoomHost: false,
+    }), false)
+    assert.equal(hostFinish.resolveHostFinished({
+        previouslyHostFinished: false,
+        questAccomplished: true,
+        isRoomHost: undefined,
     }), false)
     assert.equal(hostFinish.resolveHostFinished({
         previouslyHostFinished: false,

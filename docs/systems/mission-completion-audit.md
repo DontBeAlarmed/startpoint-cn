@@ -67,13 +67,20 @@
 - category 3 共 2512 条，旧 `mission_event_quest_map.json` 名义映射 2305 条，缺失 207 条；默认
   `2024-08-14 12:00 UTC` 时没有正在开放的缺失项。映射中 `single/multi/finish` 数量分别为 396/1679/230。
 - 旧 map 只展开关卡 ID，未完整保留活动期、难度、评级、房主/成员、救援来源、阶段和客户端战斗检查等维度；
-  1034 条已映射任务仍带有未应用的关卡或评级过滤。它不能作为安全发奖依据。
+  1034 条已映射任务仍带有未应用的关卡或评级过滤。它只供 `computer-event.ts` 历史审计，不能作为自动事实或安全发奖依据。
 - 230 条 `finish` 实为限时通关任务，审计计算器已按奖励表秒数和最佳毫秒记录修正，不再把一次普通通关判定为全部档位完成。
   该计算器只用于审计和后续规则迁移。
-- 第一批名义 939 条协力累计规则已接入成功多人 finish、quest ID 和开放期过滤，并在同一战斗事务内结算；
-  但后续 QuestRange 审计发现其中 18 条 Advent category 映射和空 selector 兼容语义仍需修正，因此暂不把该批次标为
-  “精确完成”。失败、单人、错误关卡、历史期与未来期均不写入；schema 6 上线前的全历史协力次数不回填。
-- 其余 1573 条 category 3 仍使用持久化 fallback。任务页不从全历史 quest progress 推算，也不使用旧 map 自动发奖；
+- 旧 939 条自动规则都把 `row[10]=""` 错当作通配，现已全部移除；1400、1811 和 1807 等任务不再由该批规则增长。
+  `mission_event_quest_map.json` 保留以便复核历史审计结果，不删除、不参与 `event-battle-facts.ts`。
+- 新 `mission_event_battle_rules.json` 按 mission ID 保存 805 条严格规则：type 16 共 792 条，其中 692 条有限
+  `questIds`、100 条全 QuestRange；type 17 Host 12 条；type 18 Guest 1 条。规则只在成功多人 finish、role、category、
+  quest ID 与开放期全部匹配后原子增量。Host 只接受 `isMultiHost=true`，Guest 只接受 `false`，`undefined` 关闭匹配；
+  type 16 不要求房主标记。
+- CN 1.8.1 QuestRange 中 BossBattle、Advent、WorldStoryEventBossBattle 分别只对应 category 2、7、19；Advent 不含
+  category 8。`row[10]=""` 是 `Within([])` 且严格无匹配，`(None)` 才是 `All`；`row[11]` 是 QuestRank，当前启用
+  规则均为 `null`。type 20 Attention 因 `FinishContext` 没有权威救援来源而保持 0 条，普通 Guest 不冒充 Attention。
+- 其余 1707 条 category 3（包括 mission 1807）仍使用持久化 fallback。任务页不从全历史 quest progress 推算，
+  也不使用旧 map 自动发奖；
   后续必须补全 quest range、评级、房主/成员、救援、阶段和 client check 等谓词后逐批启用。
 
 ## Pass 分类与等级奖励
@@ -110,8 +117,8 @@
 
 - category 4 已形成累计获得量、活动隔离、结算、发奖和 load 映射；category 5 已接入上述 23 条权威事实。
   两类仍需 CN 客户端验证提示、奖励和重启持久化；category 5 的其余任务需逐族补事实。
-- category 3 的第一批协力累计规则已启用，但 QuestRange 复核发现 Advent category 与空 selector 兼容语义仍需收口；
-  其余复杂规则继续补类型化事实，旧 map 仍不作为计算器或发奖依据。
+- category 3 已启用 805 条按 mission ID 的严格协力规则；其余复杂规则继续补类型化事实，旧 map 只作历史审计，
+  不作为自动事实或发奖依据。Attention 在缺少权威来源前保持禁用。
 - Pass 的救援、表情、type 23 和购买流程尚未完成，三分类与等级奖励主链已具备自动测试，仍需 CN 客户端验收。
 - 角色觉醒的配对、竞速进度仍依赖已记录的本地计数器与映射；奖励结算与最终特殊奖励触发已按
   CN 1.8.1 主数据实现。

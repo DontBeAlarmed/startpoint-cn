@@ -5,6 +5,11 @@ require("ts-node/register/transpile-only")
 
 const { resolveIsRoomHost } = require("../src/lib/quest/host-finish")
 
+assert.equal(resolveIsRoomHost({
+    roomHostPlayerId: null,
+    playerId: 17,
+}), undefined, "缺失房间时房主身份必须保持未知")
+
 function stubModule(relativePath, exports) {
     const modulePath = require.resolve(relativePath)
     require.cache[modulePath] = {

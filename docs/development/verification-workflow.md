@@ -28,8 +28,10 @@ node tools/test-workflow/run.cjs --files tools/example.test.cjs
 - `quick:*`：工作流、运行时纯逻辑、seed、抽卡、关卡、联机协议、CDN 与 Content 单元测试；
 - `integration:*`：编译路由、运行时生命周期、内容快照、数据库、活动、任务、关卡和 CDN 集成测试；
 - `admin`：管理后台源码与接口契约测试；
-- `generator`：只在生成或重建对应数据时单独运行，不属于普通 `full`；
-- `full`：全部 quick、integration 和 admin 测试。
+- `generator:mission-event`：完全使用 tracked 资产、可快速复现的活动任务规则生成器测试，属于普通 `full`；
+- `TEST_GROUPS.generator`：依赖仓库外原始数据的旧 external generator 叶组，不进入 `full`；
+- `AGGREGATE_GROUPS.generator`：显式运行生成器总组时同时展开旧 external 叶组和 `generator:mission-event`；
+- `full`：全部 quick、integration、admin 以及自包含的 `generator:mission-event`，仍不包含旧 external generator。
 
 并行只用于已经确认使用独立进程、内存状态或唯一临时数据库的分组。依赖回环端口、共享生命周期或顺序状态的测试保持串行。测试必须使用临时数据目录，不得修改真实 `.database/`、Content Release、seed 状态或玩家存档。
 

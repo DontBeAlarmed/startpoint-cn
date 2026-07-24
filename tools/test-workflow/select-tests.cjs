@@ -6,6 +6,14 @@ const SOURCE_RULES = [
     { pattern: /^admin\//, groups: ["admin"] },
     { pattern: /^tests\/admin-/, groups: ["admin"] },
     {
+        pattern: /^assets\/(?:mission_event|mission_event_battle_rules|boss_battle_quest|advent_event_quest|world_story_event_boss_battle_quest)\.json$/,
+        groups: ["generator:mission-event", "integration:mission", "quick:content"],
+    },
+    {
+        pattern: /^scripts\/gen_mission_event_battle_rules\.js$/,
+        groups: ["generator:mission-event"],
+    },
+    {
         pattern: /^src\/content\/paths\.ts$/,
         groups: ["quick:cdn", "quick:content"],
     },
@@ -79,6 +87,10 @@ const SOURCE_RULES = [
     {
         pattern: /^src\/lib\/mission\/awake-unlock\.ts$/,
         groups: ["integration:mission", "integration:mission-compiled"],
+    },
+    {
+        pattern: /^src\/lib\/mission\/(?:event-battle-facts|computer-event)\.ts$/,
+        groups: ["integration:mission"],
     },
     {
         pattern: /^(?:assets\/server\/npc_contributor_names\.json|tools\/npc_contributor_names(?:\.test)?\.cjs)$/,
