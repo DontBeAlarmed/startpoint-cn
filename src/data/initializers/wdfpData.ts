@@ -483,6 +483,15 @@ export default function init(
     ensureSchemaColumn(database, "players_active_mission_counters.total_gacha_campaign_count")
     ensureSchemaColumn(database, "players_active_mission_counters.practice_quest_challenge_count")
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_active_mission_battle_condition_facts (
+        player_id INTEGER NOT NULL,
+        pattern INTEGER NOT NULL,
+        character_id INTEGER NOT NULL,
+        progress INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, pattern, character_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_category_missions (
         category INTEGER NOT NULL,
         id INTEGER NOT NULL,

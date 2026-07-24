@@ -17,6 +17,7 @@ import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
 import { getPlayerCharacterClearSync } from "../../data/domains/character_clear"
+import { getActiveMissionConditionalBattleFactsSync } from "../../data/domains/active_mission_battle_condition_facts"
 import {
     getActiveMissionEventMasterDefinition,
     getActiveMissionMasterDefinitions,
@@ -66,6 +67,9 @@ const PATTERN_SS_RANK_COUNT = 26
 const PATTERN_CHAPTER_COMPLETE = 66
 const PATTERN_QUEST_CHALLENGE = 65
 const PATTERN_BATTLE_CLEAR_WITH_SPECIFIC_PARTY = 70
+const PATTERN_BATTLE_CLEAR_WITH_MANA_BOARD_2ND = 71
+const PATTERN_BATTLE_CLEAR_WITH_LEVEL_80_CHARACTER = 72
+const PATTERN_BATTLE_CLEAR_WITH_LEVEL_100_CHARACTER = 73
 const COME_BACK_EVENT_STRING_ID = "come_back_mission"
 
 const QUEST_CATEGORY_BY_RANGE_KIND: Readonly<Record<number, number | readonly number[]>> = Object.freeze({
@@ -122,6 +126,7 @@ export interface ActiveMissionFactState {
     readonly chapterQuestIds: Readonly<Record<string, readonly number[]>>
     readonly practiceQuestChallengeCount: number
     readonly leaderClearCounts: Readonly<Record<string, Readonly<{ readonly all: number, readonly multi: number }>>>
+    readonly conditionalBattleFacts: Readonly<Record<string, number>>
     readonly characterStoryQuestIds: Readonly<Record<string, readonly number[]>>
     readonly characters: Readonly<Record<string, ActiveMissionFactCharacter>>
     readonly equipment: readonly { readonly level: number, readonly maxLevel: number, readonly enhancementLevel?: number }[]
@@ -378,7 +383,7 @@ function isMissionComplete(
     })
 }
 
-function estimateCharacterLevel(character: ActiveMissionFactCharacter): number {
+export function estimateActiveMissionCharacterLevel(character: ActiveMissionFactCharacter): number {
     const rarity = character.rarity
     if (rarity === undefined) return 0
     const caps = characterExpCaps[rarity]
@@ -434,6 +439,12 @@ export function computeActiveMissionFactProgress(
             return row[34] === "11" ? state.practiceQuestChallengeCount : null
         case PATTERN_BATTLE_CLEAR_WITH_SPECIFIC_PARTY:
             return computeSpecificPartyClearFact(row, state)
+        case PATTERN_BATTLE_CLEAR_WITH_MANA_BOARD_2ND:
+        case PATTERN_BATTLE_CLEAR_WITH_LEVEL_80_CHARACTER:
+        case PATTERN_BATTLE_CLEAR_WITH_LEVEL_100_CHARACTER: {
+            const characterId = parseInteger(row[43], "conditional battle character id")
+            return state.conditionalBattleFacts[`${pattern}:${characterId}`] ?? 0
+        }
         case PATTERN_EPISODE_CLEAR_COUNT: {
             const storyQuestIds = new Set(
                 characters.flatMap(([characterId]) => state.characterStoryQuestIds[characterId] ?? []),
@@ -446,7 +457,7 @@ export function computeActiveMissionFactProgress(
         }
         case PATTERN_CHARACTER_LEVEL_ACHIEVEMENT:
             return characters.reduce((maximum, [, character]) => (
-                Math.max(maximum, estimateCharacterLevel(character))
+                Math.max(maximum, estimateActiveMissionCharacterLevel(character))
             ), 0)
         case PATTERN_CHARACTERS_COUNT: {
             const targetCharacterId = row[43]
@@ -600,6 +611,7 @@ function buildActiveMissionFactState(
                 multi: Math.max(0, clears.leader_multi_count),
             }]
         })),
+        conditionalBattleFacts: getActiveMissionConditionalBattleFactsSync(playerId),
         characterStoryQuestIds: Object.fromEntries(Object.keys(characters).map(characterId => [
             characterId,
             getCharacterStoryQuestIds(characterId),

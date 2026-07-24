@@ -66,6 +66,7 @@ Content Release；这一步只补齐服务端解释 Active Mission 所需的定�
 - pattern 66（`chapter_complete`）从当前 Content snapshot 的主线/高难关卡表建立指定章节的完整战斗关卡集合，并要求每关历史最佳评价均为 SS；只有带 `rankPointReward` 的可挑战关卡参与判定。高难关卡按客户端 Active Mission 的 `+10,000,000` 命名空间归一化，空集合和非 Main/Ex 范围继续 fail closed。
 - pattern 65（`quest_challenge`）在单人 `/start` 成功持久化练习战斗时累计专用事实，不等待通关，也不从 `players_quest_progress` 反推。该计数与体力/门票扣除、active quest 持久化和普通任务结算处于同一事务；入场失败或事务回滚不会留下挑战次数。当前仅接受官方定义使用的 Practice QuestRange，其他范围 fail closed。
 - pattern 70（`battle_clear_with_specific_party`）从 `row[46]` 读取指定队长。无 QuestRange 时按 `leader_clear_count` 与 `leader_multi_count` 严格区分单人、协力和任意通关；带 QuestRange 的官方定义仅接受单人模式，并从对应关卡历史记录核对 `leader_character_id`。带范围的协力定义因无法证明历史最佳记录来自哪种战斗模式而 fail closed。
+- pattern 71/72/73 在成功结算时检查 `row[43]` 指定角色是否实际位于本次主位或连携队伍，并按 `row[32]` 与 QuestRange 校验战斗类型和关卡。pattern 71 要求通关当时已经释放第二玛纳板的全部能力节点，pattern 72/73 分别要求当时等级达到 80/100；匹配结果写入通用 `(pattern, character_id)` 条件事实表，与原战斗奖励处于同一事务。`/load` 只读取已记录事实，不会用后续养成状态补配旧通关。
 - 旧存档无法可靠回填上述历史。教程赠送、兑换角色和尚未接入的玛纳消费入口不伪造计数，事务失败也不会留下计数。
 - 任务前置与 phase 会在同一次请求内固定点推进，数据库写入使用单一 SQLite 事务，失败整体回滚；
 - 回归活动通过 event `string_id` 中的 `come_back_mission` 识别；当前没有回归资格生产者时 fail closed，不会把 250xx
@@ -73,8 +74,8 @@ Content Release；这一步只补齐服务端解释 Active Mission 所需的定�
 
 这组状态事实只写入 `all_active_mission_list`，不会写入角色觉醒使用的 category 9 `active_mission_list`。
 
-上述能力构成内容解释、首任务生产、状态事实校准、可用性判定、安全领奖和存储链。当前已接入 34 个实际使用的 pattern，
-对应 76 条定义；其中 15 条回归定义仍需资格回调才能生产。其余 20 条定义仍没有权威生产入口；除已接入
+上述能力构成内容解释、首任务生产、状态事实校准、可用性判定、安全领奖和存储链。当前已接入 37 个实际使用的 pattern，
+对应 79 条定义；其中 15 条回归定义仍需资格回调才能生产。其余 17 条定义仍没有权威生产入口；除已接入
 事实、Contents Guide 首任务、存档导入或既有数据库记录外，`players_active_missions` 不会自行生成完整进度。因此
 Active Mission 仍是部分完成，不能只因状态校准、首任务与领奖接口可用就标记为完整。
 
