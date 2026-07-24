@@ -106,3 +106,21 @@ export function incrementActiveMissionGachaCampaignCountSync(playerId: number): 
             total_gacha_campaign_count = total_gacha_campaign_count + 1
     `).run(playerId)
 }
+
+export function getActiveMissionPracticeQuestChallengeCountSync(playerId: number): number {
+    const row = getDb().prepare(`
+        SELECT practice_quest_challenge_count
+        FROM players_active_mission_counters
+        WHERE player_id = ?
+    `).get(playerId) as { practice_quest_challenge_count: number } | undefined
+    return Math.max(0, row?.practice_quest_challenge_count ?? 0)
+}
+
+export function incrementActiveMissionPracticeQuestChallengeCountSync(playerId: number): void {
+    getDb().prepare(`
+        INSERT INTO players_active_mission_counters (player_id, practice_quest_challenge_count)
+        VALUES (?, 1)
+        ON CONFLICT(player_id) DO UPDATE SET
+            practice_quest_challenge_count = practice_quest_challenge_count + 1
+    `).run(playerId)
+}

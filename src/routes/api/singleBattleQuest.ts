@@ -69,6 +69,7 @@ import {
     publishActiveQuest,
     runAbortActiveQuestTransaction,
 } from "../../lib/quest/active-quest-service";
+import { recordActiveMissionQuestChallengeFactSync } from "../../lib/mission/active-entry-facts";
 
 interface StartBody {
     quest_id: number
@@ -664,6 +665,7 @@ const routes = async (fastify: FastifyInstance) => {
                 updatePlayer: updatePlayerSync,
                 persistActiveQuest,
                 afterPersist: () => {
+                    recordActiveMissionQuestChallengeFactSync(playerId, category)
                     missionSettlement = settleMissionCategories(
                         playerId,
                         [1, 2, 10],

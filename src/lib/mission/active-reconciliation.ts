@@ -9,7 +9,10 @@ import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../..
 import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
 import { getPlayerShopPurchasesMapSync } from "../../data/domains/shopPurchase"
 import { getPlayerPartyGroupListSync } from "../../data/domains/party"
-import { getActiveMissionCountersSync } from "../../data/domains/active_mission_counters"
+import {
+    getActiveMissionCountersSync,
+    getActiveMissionPracticeQuestChallengeCountSync,
+} from "../../data/domains/active_mission_counters"
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
@@ -60,6 +63,7 @@ const PATTERN_GACHA_CAMPAIGN = 83
 const PATTERN_BATTLE_CLEAR_COUNT = 23
 const PATTERN_SS_RANK_COUNT = 26
 const PATTERN_CHAPTER_COMPLETE = 66
+const PATTERN_QUEST_CHALLENGE = 65
 const COME_BACK_EVENT_STRING_ID = "come_back_mission"
 
 const QUEST_CATEGORY_BY_RANGE_KIND: Readonly<Record<number, number | readonly number[]>> = Object.freeze({
@@ -114,6 +118,7 @@ export interface ActiveMissionFactState {
     readonly finishedQuestIds: ReadonlySet<number>
     readonly questProgress: readonly ActiveMissionFactQuestProgress[]
     readonly chapterQuestIds: Readonly<Record<string, readonly number[]>>
+    readonly practiceQuestChallengeCount: number
     readonly characterStoryQuestIds: Readonly<Record<string, readonly number[]>>
     readonly characters: Readonly<Record<string, ActiveMissionFactCharacter>>
     readonly equipment: readonly { readonly level: number, readonly maxLevel: number, readonly enhancementLevel?: number }[]
@@ -398,6 +403,8 @@ export function computeActiveMissionFactProgress(
             return countSsRankFacts(row, state)
         case PATTERN_CHAPTER_COMPLETE:
             return computeChapterCompleteFact(row, state)
+        case PATTERN_QUEST_CHALLENGE:
+            return row[34] === "11" ? state.practiceQuestChallengeCount : null
         case PATTERN_EPISODE_CLEAR_COUNT: {
             const storyQuestIds = new Set(
                 characters.flatMap(([characterId]) => state.characterStoryQuestIds[characterId] ?? []),
@@ -556,6 +563,7 @@ function buildActiveMissionFactState(
             "1": battleQuestIds(mainQuestTable, 0),
             "4": battleQuestIds(exQuestTable, 10_000_000),
         },
+        practiceQuestChallengeCount: getActiveMissionPracticeQuestChallengeCountSync(playerId),
         characterStoryQuestIds: Object.fromEntries(Object.keys(characters).map(characterId => [
             characterId,
             getCharacterStoryQuestIds(characterId),
