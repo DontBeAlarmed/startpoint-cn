@@ -10,6 +10,7 @@ import { getCharacterDataSync, getCharacterManaNodesSync, getManaNodeAwakeCost }
 import { clientSerializeDate } from "../../../data/utils";
 import { resolvePlayerIdSync } from "../../../data/activeAccount";
 import { getDb } from "../../../data/db";
+import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/active_mission_counters"
 import { validateSessionAndPlayer, validateCharacterOwnership, computeManaDeduction, computeItemDeductions, buildCharacterListEntry, sendCharacterResponse, computeBondTokenAndEvolution, validateManaBoardAwakeRequest } from "../../../lib/character-helpers";
 
 interface LearnManaNodeBody {
@@ -97,6 +98,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         // Apply deductions
         updatePlayerSync({ id: playerId, freeMana: newFreeMana, paidMana: newPaidMana })
+        incrementActiveMissionUsedManaCountSync(playerId, manaCost)
         for (const [itemId, newAmount] of Object.entries(newItemAmounts)) {
             updatePlayerItemSync(playerId, itemId, newAmount)
         }
@@ -244,6 +246,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         getDb().transaction(() => {
             updatePlayerSync({ id: playerId, freeMana: newFreeMana, paidMana: newPaidMana })
+            incrementActiveMissionUsedManaCountSync(playerId, manaCost)
             for (const [itemId, newAmount] of Object.entries(newItemAmounts)) {
                 updatePlayerItemSync(playerId, itemId, newAmount)
             }
