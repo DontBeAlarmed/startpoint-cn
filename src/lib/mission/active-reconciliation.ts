@@ -16,6 +16,7 @@ import {
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
+import { getPlayerCharacterClearSync } from "../../data/domains/character_clear"
 import {
     getActiveMissionEventMasterDefinition,
     getActiveMissionMasterDefinitions,
@@ -64,6 +65,7 @@ const PATTERN_BATTLE_CLEAR_COUNT = 23
 const PATTERN_SS_RANK_COUNT = 26
 const PATTERN_CHAPTER_COMPLETE = 66
 const PATTERN_QUEST_CHALLENGE = 65
+const PATTERN_BATTLE_CLEAR_WITH_SPECIFIC_PARTY = 70
 const COME_BACK_EVENT_STRING_ID = "come_back_mission"
 
 const QUEST_CATEGORY_BY_RANGE_KIND: Readonly<Record<number, number | readonly number[]>> = Object.freeze({
@@ -119,6 +121,7 @@ export interface ActiveMissionFactState {
     readonly questProgress: readonly ActiveMissionFactQuestProgress[]
     readonly chapterQuestIds: Readonly<Record<string, readonly number[]>>
     readonly practiceQuestChallengeCount: number
+    readonly leaderClearCounts: Readonly<Record<string, Readonly<{ readonly all: number, readonly multi: number }>>>
     readonly characterStoryQuestIds: Readonly<Record<string, readonly number[]>>
     readonly characters: Readonly<Record<string, ActiveMissionFactCharacter>>
     readonly equipment: readonly { readonly level: number, readonly maxLevel: number, readonly enhancementLevel?: number }[]
@@ -143,6 +146,7 @@ export interface ActiveMissionFactQuestProgress {
     readonly questId: number
     readonly finished: boolean
     readonly clearRank?: number
+    readonly leaderCharacterId?: number
     readonly multiClearCount: number
 }
 
@@ -305,6 +309,29 @@ function computeChapterCompleteFact(
     return targetQuestIds.every(questId => clearRankByQuestId.get(questId) === 5) ? 1 : 0
 }
 
+function computeSpecificPartyClearFact(
+    row: readonly unknown[],
+    state: ActiveMissionFactState,
+): number | null {
+    const characterId = parseInteger(row[46], "specific leader character id")
+    const battleKind = parseInteger(row[32], "battle kind")
+    if (![1, 2, 3].includes(battleKind)) throw new TypeError(`Unsupported Active Mission battle kind ${battleKind}.`)
+    const hasRange = row[34] !== undefined && row[34] !== null && row[34] !== "(None)"
+    if (!hasRange) {
+        const clears = state.leaderClearCounts[String(characterId)] ?? { all: 0, multi: 0 }
+        if (battleKind === 1) return Math.max(0, clears.all - clears.multi)
+        if (battleKind === 2) return clears.multi
+        return clears.all
+    }
+
+    if (battleKind !== 1) return null
+    return state.questProgress.filter(progress => (
+        progress.finished
+        && progress.leaderCharacterId === characterId
+        && matchesActiveMissionQuestRange(row, progress.category, progress.questId)
+    )).length
+}
+
 /** 按 CN 1.8.1 ActiveMissionValues 的 row[34..37] 解析 QuestRangeReferenceIdKind。 */
 export function resolveActiveMissionQuestIds(row: readonly unknown[]): number[] {
     const kind = parseInteger(row[34], "quest range kind")
@@ -405,6 +432,8 @@ export function computeActiveMissionFactProgress(
             return computeChapterCompleteFact(row, state)
         case PATTERN_QUEST_CHALLENGE:
             return row[34] === "11" ? state.practiceQuestChallengeCount : null
+        case PATTERN_BATTLE_CLEAR_WITH_SPECIFIC_PARTY:
+            return computeSpecificPartyClearFact(row, state)
         case PATTERN_EPISODE_CLEAR_COUNT: {
             const storyQuestIds = new Set(
                 characters.flatMap(([characterId]) => state.characterStoryQuestIds[characterId] ?? []),
@@ -564,6 +593,13 @@ function buildActiveMissionFactState(
             "4": battleQuestIds(exQuestTable, 10_000_000),
         },
         practiceQuestChallengeCount: getActiveMissionPracticeQuestChallengeCountSync(playerId),
+        leaderClearCounts: Object.fromEntries(Object.keys(characters).map(characterId => {
+            const clears = getPlayerCharacterClearSync(playerId, Number(characterId))
+            return [characterId, {
+                all: Math.max(0, clears.leader_clear_count),
+                multi: Math.max(0, clears.leader_multi_count),
+            }]
+        })),
         characterStoryQuestIds: Object.fromEntries(Object.keys(characters).map(characterId => [
             characterId,
             getCharacterStoryQuestIds(characterId),
@@ -674,6 +710,7 @@ export function reconcileActiveMissionFacts(
             questId: progress.questId,
             finished: progress.finished,
             clearRank: progress.clearRank,
+            leaderCharacterId: progress.leaderCharacterId,
             multiClearCount: Math.max(0, progress.multiClearCount ?? 0),
         })))
         const finishedQuestIds = new Set(Object.values(questProgress).flatMap(progressList => (
