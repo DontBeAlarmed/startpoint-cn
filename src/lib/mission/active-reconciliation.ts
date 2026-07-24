@@ -5,6 +5,8 @@ import {
     updatePlayerActiveMissionStageSync,
     updatePlayerActiveMissionSync,
 } from "../../data/domains/mission"
+import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../../data/domains/character"
+import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import {
@@ -21,11 +23,24 @@ import {
     settleActiveMissionProgress,
 } from "./active-core"
 import { getMissionRewardStageDefinition } from "./rewards"
+import { getCharacterStoryQuestIds } from "./character-queries"
+import { characterExpCaps } from "../character"
+import { getCharacterManaNodesSync } from "../assets"
 
 const PATTERN_TOTAL_LOGIN_DAYS = 0
+const PATTERN_CHARACTERS_COUNT = 4
+const PATTERN_CHARACTER_LEVEL_ACHIEVEMENT = 5
+const PATTERN_TOTAL_OBTAINED_BOND_TOKEN_COUNT = 8
+const PATTERN_OVER_LIMIT_TOTAL_COUNT = 9
 const PATTERN_TARGET_MISSION_CLEAR = 13
 const PATTERN_USED_STAMINA_COUNT = 39
+const PATTERN_EPISODE_CLEAR_COUNT = 21
+const PATTERN_LEVEL_MAX_EQUIPMENT_COUNT = 36
+const PATTERN_TOTAL_RELEASED_MANA_NODE_COUNT = 7
+const PATTERN_TOTAL_RELEASED_ABILITY_NODE_COUNT = 62
+const PATTERN_MANA_BOARD_2ND_COMPLETE_COUNT = 48
 const PATTERN_QUEST_CLEAR = 57
+const PATTERN_EVOLVED_CHARACTER_COUNT = 61
 const COME_BACK_EVENT_STRING_ID = "come_back_mission"
 
 export interface ActiveMissionEventEligibilityContext {
@@ -40,6 +55,25 @@ export interface ReconcileActiveMissionFactsInput {
     readonly repository: ReadonlyContentRepository
     readonly now: number | Date
     readonly isEventEligible?: (context: ActiveMissionEventEligibilityContext) => boolean
+}
+
+export interface ActiveMissionFactCharacter {
+    readonly rarity?: number
+    readonly exp: number
+    readonly evolutionLevel: number
+    readonly overLimitStep: number
+    readonly bondTokenList: readonly { readonly status: number }[]
+}
+
+export interface ActiveMissionFactState {
+    readonly player: Readonly<{ readonly totalLoginDays: number, readonly totalStaminaUsed: number }>
+    readonly finishedQuestIds: ReadonlySet<number>
+    readonly characterStoryQuestIds: Readonly<Record<string, readonly number[]>>
+    readonly characters: Readonly<Record<string, ActiveMissionFactCharacter>>
+    readonly equipment: readonly { readonly level: number, readonly maxLevel: number }[]
+    readonly manaNodes: Readonly<Record<string, readonly number[]>>
+    readonly manaBoardNodes: Readonly<Record<string, Readonly<Record<string, readonly number[]>>>>
+    readonly manaNodeSlots: Readonly<Record<string, Readonly<Record<string, number>>>>
 }
 
 function parseInteger(value: unknown, field: string): number {
@@ -128,16 +162,167 @@ function isMissionComplete(
     })
 }
 
+function estimateCharacterLevel(character: ActiveMissionFactCharacter): number {
+    const rarity = character.rarity
+    if (rarity === undefined) return 0
+    const caps = characterExpCaps[rarity]
+    if (!caps || caps.length === 0) return 0
+    const baseLevel = 40 + (rarity - 1) * 10
+    let level = baseLevel - 1
+    for (let index = 0; index < caps.length; index++) {
+        if (character.exp < caps[index]) break
+        level = baseLevel + index * 5
+    }
+    return level
+}
+
+/** 根据存档状态重算官方 Active Mission 的可证明事实；未知 pattern 返回 null。 */
+export function computeActiveMissionFactProgress(
+    pattern: number,
+    row: readonly unknown[],
+    state: ActiveMissionFactState,
+): number | null {
+    const characters = Object.entries(state.characters)
+    switch (pattern) {
+        case PATTERN_TOTAL_LOGIN_DAYS:
+            return Math.max(0, state.player.totalLoginDays)
+        case PATTERN_USED_STAMINA_COUNT:
+            return Math.max(0, state.player.totalStaminaUsed)
+        case PATTERN_EPISODE_CLEAR_COUNT: {
+            const storyQuestIds = new Set(
+                characters.flatMap(([characterId]) => state.characterStoryQuestIds[characterId] ?? []),
+            )
+            let count = 0
+            for (const questId of storyQuestIds) {
+                if (state.finishedQuestIds.has(questId)) count++
+            }
+            return count
+        }
+        case PATTERN_CHARACTER_LEVEL_ACHIEVEMENT:
+            return characters.reduce((maximum, [, character]) => (
+                Math.max(maximum, estimateCharacterLevel(character))
+            ), 0)
+        case PATTERN_CHARACTERS_COUNT: {
+            const targetCharacterId = row[43]
+            if (targetCharacterId === undefined || targetCharacterId === null || targetCharacterId === "(None)") {
+                return characters.length
+            }
+            return state.characters[String(targetCharacterId)] === undefined ? 0 : 1
+        }
+        case PATTERN_EVOLVED_CHARACTER_COUNT:
+            return characters.filter(([, character]) => character.evolutionLevel > 0).length
+        case PATTERN_LEVEL_MAX_EQUIPMENT_COUNT:
+            return state.equipment.filter(equipment => equipment.level >= equipment.maxLevel).length
+        case PATTERN_OVER_LIMIT_TOTAL_COUNT:
+            return characters.reduce((total, [, character]) => total + Math.max(0, character.overLimitStep), 0)
+        case PATTERN_TOTAL_OBTAINED_BOND_TOKEN_COUNT:
+            return characters.reduce((total, [, character]) => (
+                total + character.bondTokenList.filter(token => token.status >= 1).length
+            ), 0)
+        case PATTERN_TOTAL_RELEASED_MANA_NODE_COUNT:
+            return Object.values(state.manaNodes).reduce((total, nodes) => total + nodes.length, 0)
+        case PATTERN_TOTAL_RELEASED_ABILITY_NODE_COUNT:
+            return Object.entries(state.manaNodes).reduce((total, [characterId, nodes]) => {
+                const slots = state.manaNodeSlots[characterId] ?? {}
+                return total + nodes.filter(nodeId => {
+                    const slot = slots[String(nodeId)]
+                    return slot !== undefined && slot >= 1 && slot <= 3
+                }).length
+            }, 0)
+        case PATTERN_MANA_BOARD_2ND_COMPLETE_COUNT:
+            return Object.entries(state.manaBoardNodes).filter(([characterId, boards]) => {
+                const secondBoard = boards["2"] ?? []
+                const unlocked = new Set(state.manaNodes[characterId] ?? [])
+                return secondBoard.length > 0 && secondBoard.every(nodeId => unlocked.has(nodeId))
+            }).length
+        default:
+            return null
+    }
+}
+
+function buildActiveMissionFactState(
+    playerId: number,
+    player: NonNullable<ReturnType<typeof getPlayerSync>>,
+    finishedQuestIds: ReadonlySet<number>,
+    repository: ReadonlyContentRepository,
+): ActiveMissionFactState {
+    const characterList = getPlayerCharactersSync(playerId)
+    const characterTable = readRepositoryTable<Record<string, { readonly rarity?: number }>>(
+        repository,
+        "character.json",
+    )
+    const characters = Object.fromEntries(Object.entries(characterList).map(([characterId, character]) => [
+        characterId,
+        {
+            ...character,
+            rarity: characterTable[characterId]?.rarity,
+        },
+    ]))
+    const manaNodes = getPlayerCharactersManaNodesSync(playerId)
+    const manaBoardNodes: Record<string, Record<string, number[]>> = {}
+    const manaNodeSlots: Record<string, Record<string, number>> = {}
+    for (const characterId of Object.keys(characters)) {
+        const boards: Record<string, number[]> = {}
+        const slots: Record<string, number> = {}
+        for (let level = 1; level <= 2; level++) {
+            const board = getCharacterManaNodesSync(characterId, level)
+            if (!board) continue
+            boards[String(level)] = Object.keys(board).map(Number)
+            for (const [nodeId, node] of Object.entries(board)) {
+                const slot = node.field6 === "1" ? 1 : node.field6 === "2" ? 2 : node.field6 === "3" ? 3 : 4
+                slots[nodeId] = slot
+            }
+        }
+        manaBoardNodes[characterId] = boards
+        manaNodeSlots[characterId] = slots
+    }
+    const equipment = Object.entries(getPlayerEquipmentListSync(playerId)).map(([equipmentId, item]) => ({
+        level: item.level,
+        maxLevel: (() => {
+            const row = readRepositoryTable<Record<string, { readonly max_level?: number }>>(
+                repository,
+                "equipment_dissolve.json",
+            )[equipmentId]
+            return row?.max_level ?? 5
+        })(),
+    }))
+    return {
+        player,
+        finishedQuestIds,
+        characterStoryQuestIds: Object.fromEntries(Object.keys(characters).map(characterId => [
+            characterId,
+            getCharacterStoryQuestIds(characterId),
+        ])),
+        characters,
+        equipment,
+        manaNodes,
+        manaBoardNodes,
+        manaNodeSlots,
+    }
+}
+
+function readRepositoryTable<T>(
+    repository: ReadonlyContentRepository,
+    tableName: string,
+): T {
+    try {
+        return repository.table<T>(tableName)
+    } catch {
+        return {} as T
+    }
+}
+
 function computeAuthoritativeProgress(
     row: readonly unknown[],
     player: NonNullable<ReturnType<typeof getPlayerSync>>,
     finishedQuestIds: ReadonlySet<number>,
     activeMissions: Readonly<Record<string, ActiveMissionProgressState>>,
     repository: ReadonlyContentRepository,
+    factState: ActiveMissionFactState,
 ): number | null {
     const pattern = parseInteger(row[29], "mission pattern")
-    if (pattern === PATTERN_TOTAL_LOGIN_DAYS) return Math.max(0, player.totalLoginDays ?? 0)
-    if (pattern === PATTERN_USED_STAMINA_COUNT) return Math.max(0, player.totalStaminaUsed ?? 0)
+    const factProgress = computeActiveMissionFactProgress(pattern, row, factState)
+    if (factProgress !== null) return factProgress
     if (pattern === PATTERN_QUEST_CLEAR) {
         return resolveActiveMissionQuestIds(row).filter(questId => finishedQuestIds.has(questId)).length
     }
@@ -196,6 +381,7 @@ export function reconcileActiveMissionFacts(
             progressList.filter(progress => progress.finished).map(progress => progress.questId)
         )))
         const activeMissions = normalizeActiveMissions(getPlayerActiveMissionsSync(input.playerId))
+        const factState = buildActiveMissionFactState(input.playerId, player, finishedQuestIds, input.repository)
         const definitions = [...getActiveMissionMasterDefinitions(input.repository)]
             .sort((left, right) => left.missionId - right.missionId)
         const deltas = new Map<number, { progress: number, stages: Set<number> }>()
@@ -220,6 +406,7 @@ export function reconcileActiveMissionFacts(
                         finishedQuestIds,
                         activeMissions,
                         input.repository,
+                        factState,
                     )
                 } catch {
                     continue
