@@ -164,6 +164,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/expod_inject_exp_route.test.cjs",
             "tools/active_mission_reconciliation.test.cjs",
             "tools/active_mission_character_facts.test.cjs",
+            "tools/active_mission_battle_facts.test.cjs",
             "tools/active_mission_receive_route.test.cjs",
             "tools/contents_guide_start_route.test.cjs",
             "tools/mission_master_data.test.cjs",

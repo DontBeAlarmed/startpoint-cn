@@ -57,7 +57,32 @@ const PATTERN_SET_UNISON_FIRST_TIME = 59
 const PATTERN_SET_PARTY_CHARACTER = 60
 const PATTERN_INJECTED_EXP_FIRST_TIME = 63
 const PATTERN_GACHA_CAMPAIGN = 83
+const PATTERN_BATTLE_CLEAR_COUNT = 23
 const COME_BACK_EVENT_STRING_ID = "come_back_mission"
+
+const QUEST_CATEGORY_BY_RANGE_KIND: Readonly<Record<number, number | readonly number[]>> = Object.freeze({
+    0: 1,
+    1: 4,
+    2: 2,
+    3: 6,
+    4: 14,
+    5: 7,
+    6: 10,
+    7: 13,
+    8: 11,
+    9: 18,
+    10: 19,
+    11: 15,
+    12: [6, 14, 13, 20],
+    13: 20,
+    14: 21,
+    15: 22,
+    16: 23,
+    17: 24,
+    18: 25,
+    19: 26,
+    20: 27,
+})
 
 export interface ActiveMissionEventEligibilityContext {
     readonly playerId: number
@@ -85,6 +110,7 @@ export interface ActiveMissionFactState {
     readonly player: Readonly<{ readonly totalLoginDays: number, readonly totalStaminaUsed: number }>
     readonly battleCounters: Readonly<ReturnType<typeof getMissionBattleCountersSync>>
     readonly finishedQuestIds: ReadonlySet<number>
+    readonly questProgress: readonly ActiveMissionFactQuestProgress[]
     readonly characterStoryQuestIds: Readonly<Record<string, readonly number[]>>
     readonly characters: Readonly<Record<string, ActiveMissionFactCharacter>>
     readonly equipment: readonly { readonly level: number, readonly maxLevel: number, readonly enhancementLevel?: number }[]
@@ -104,6 +130,13 @@ export interface ActiveMissionFactState {
     readonly totalGachaCampaignCount: number
 }
 
+export interface ActiveMissionFactQuestProgress {
+    readonly category: number
+    readonly questId: number
+    readonly finished: boolean
+    readonly multiClearCount: number
+}
+
 function parseInteger(value: unknown, field: string): number {
     const parsed = Number(value)
     if (!Number.isSafeInteger(parsed) || parsed < 0) {
@@ -120,6 +153,15 @@ function parseIntegerList(value: unknown, field: string): number[] {
     const text = String(value)
     if (text.length === 0) return []
     return text.split(",").map(item => parseInteger(item, field))
+}
+
+function parseOptionalIntegerList(value: unknown, field: string): readonly number[] | null {
+    if (value === undefined || value === null || value === "(None)") return null
+    if (typeof value !== "string" && typeof value !== "number") {
+        throw new TypeError(`Invalid Active Mission ${field}.`)
+    }
+    if (String(value).length === 0) return []
+    return String(value).split(",").map(item => parseInteger(item, field))
 }
 
 function requireNonEmpty(values: readonly number[], field: string): readonly number[] {
@@ -142,6 +184,75 @@ function cartesianQuestIds(
         }
     }
     return ids
+}
+
+function matchesOptionalSelector(selector: readonly number[] | null, value: number): boolean {
+    return selector === null || selector.includes(value)
+}
+
+function matchesQuestIdRange(
+    rangeKind: number,
+    row: readonly unknown[],
+    category: number,
+    questId: number,
+): boolean {
+    const rangeCategories = QUEST_CATEGORY_BY_RANGE_KIND[rangeKind]
+    if (rangeCategories === undefined) return false
+    const categories = Array.isArray(rangeCategories) ? rangeCategories : [rangeCategories]
+    if (!categories.includes(category)) return false
+
+    if (rangeKind === 0 || rangeKind === 1 || rangeKind === 2) {
+        const first = Math.floor(questId / 1_000_000)
+        const remainder = questId % 1_000_000
+        const second = Math.floor(remainder / 1_000)
+        const third = remainder % 1_000
+        return matchesOptionalSelector(parseOptionalIntegerList(row[35], "quest range first"), first)
+            && matchesOptionalSelector(parseOptionalIntegerList(row[36], "quest range second"), second)
+            && matchesOptionalSelector(parseOptionalIntegerList(row[37], "quest range third"), third)
+    }
+
+    if (rangeKind === 12) return true
+
+    const eventId = parseOptionalIntegerList(row[35], "quest event id")
+    const questNumbers = parseOptionalIntegerList(row[37], "quest numbers")
+    const encodedEventId = Math.floor(questId / 1_000)
+    const questNumber = questId % 1_000
+    return matchesOptionalSelector(eventId, encodedEventId)
+        && matchesOptionalSelector(questNumbers, questNumber)
+}
+
+/** 判断一条存档关卡记录是否属于 Active Mission 的 QuestRange。 */
+export function matchesActiveMissionQuestRange(
+    row: readonly unknown[],
+    category: number,
+    questId: number,
+): boolean {
+    const rawKind = row[34]
+    if (rawKind === undefined || rawKind === null || rawKind === "(None)") return true
+    const rangeKind = parseInteger(rawKind, "quest range kind")
+    return matchesQuestIdRange(rangeKind, row, category, questId)
+}
+
+function countBattleClearFacts(
+    row: readonly unknown[],
+    progress: readonly ActiveMissionFactQuestProgress[],
+): number {
+    const battleKind = parseInteger(row[32], "battle kind")
+    if (![1, 2, 3].includes(battleKind)) throw new TypeError(`Unsupported Active Mission battle kind ${battleKind}.`)
+    let count = 0
+    for (const quest of progress) {
+        if (!matchesActiveMissionQuestRange(row, quest.category, quest.questId)) continue
+        if (battleKind === 1) {
+            count += quest.finished ? 1 : 0
+        } else if (battleKind === 2) {
+            count += quest.multiClearCount
+        } else {
+            // `finished` is the durable any-clear bit; multi_clear_count preserves
+            // repeated co-op clears without counting the first clear twice.
+            count += Math.max(quest.finished ? 1 : 0, quest.multiClearCount)
+        }
+    }
+    return count
 }
 
 /** 按 CN 1.8.1 ActiveMissionValues 的 row[34..37] 解析 QuestRangeReferenceIdKind。 */
@@ -236,6 +347,8 @@ export function computeActiveMissionFactProgress(
             return state.totalInjectedExpCount
         case PATTERN_GACHA_CAMPAIGN:
             return state.totalGachaCampaignCount
+        case PATTERN_BATTLE_CLEAR_COUNT:
+            return countBattleClearFacts(row, state.questProgress)
         case PATTERN_EPISODE_CLEAR_COUNT: {
             const storyQuestIds = new Set(
                 characters.flatMap(([characterId]) => state.characterStoryQuestIds[characterId] ?? []),
@@ -302,6 +415,7 @@ function buildActiveMissionFactState(
     playerId: number,
     player: NonNullable<ReturnType<typeof getPlayerSync>>,
     finishedQuestIds: ReadonlySet<number>,
+    questProgress: readonly ActiveMissionFactQuestProgress[],
     repository: ReadonlyContentRepository,
 ): ActiveMissionFactState {
     const characterList = getPlayerCharactersSync(playerId)
@@ -376,6 +490,7 @@ function buildActiveMissionFactState(
         player,
         battleCounters,
         finishedQuestIds,
+        questProgress,
         characterStoryQuestIds: Object.fromEntries(Object.keys(characters).map(characterId => [
             characterId,
             getCharacterStoryQuestIds(characterId),
@@ -481,11 +596,23 @@ export function reconcileActiveMissionFacts(
         if (!player) throw new Error(`Player ${input.playerId} does not exist.`)
 
         const questProgress = getPlayerQuestProgressSync(input.playerId)
+        const questProgressFacts = Object.entries(questProgress).flatMap(([category, progressList]) => progressList.map(progress => ({
+            category: Number(category),
+            questId: progress.questId,
+            finished: progress.finished,
+            multiClearCount: Math.max(0, progress.multiClearCount ?? 0),
+        })))
         const finishedQuestIds = new Set(Object.values(questProgress).flatMap(progressList => (
             progressList.filter(progress => progress.finished).map(progress => progress.questId)
         )))
         const activeMissions = normalizeActiveMissions(getPlayerActiveMissionsSync(input.playerId))
-        const factState = buildActiveMissionFactState(input.playerId, player, finishedQuestIds, input.repository)
+        const factState = buildActiveMissionFactState(
+            input.playerId,
+            player,
+            finishedQuestIds,
+            questProgressFacts,
+            input.repository,
+        )
         const definitions = [...getActiveMissionMasterDefinitions(input.repository)]
             .sort((left, right) => left.missionId - right.missionId)
         const deltas = new Map<number, { progress: number, stages: Set<number> }>()
