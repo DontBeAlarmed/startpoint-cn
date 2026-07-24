@@ -58,6 +58,7 @@ const PATTERN_SET_PARTY_CHARACTER = 60
 const PATTERN_INJECTED_EXP_FIRST_TIME = 63
 const PATTERN_GACHA_CAMPAIGN = 83
 const PATTERN_BATTLE_CLEAR_COUNT = 23
+const PATTERN_SS_RANK_COUNT = 26
 const COME_BACK_EVENT_STRING_ID = "come_back_mission"
 
 const QUEST_CATEGORY_BY_RANGE_KIND: Readonly<Record<number, number | readonly number[]>> = Object.freeze({
@@ -255,6 +256,21 @@ function countBattleClearFacts(
     return count
 }
 
+function countSsRankFacts(
+    row: readonly unknown[],
+    state: ActiveMissionFactState,
+): number | null {
+    const battleKind = parseInteger(row[32], "battle kind")
+    if (![1, 2, 3].includes(battleKind)) throw new TypeError(`Unsupported Active Mission battle kind ${battleKind}.`)
+    const hasRange = row[34] !== undefined && row[34] !== null && row[34] !== "(None)"
+    if (hasRange) return null
+    if (battleKind === 1) return state.battleCounters.singleRankSsCount
+    if (battleKind === 2) {
+        return Math.max(0, state.battleCounters.rankSsCount - state.battleCounters.singleRankSsCount)
+    }
+    return state.battleCounters.rankSsCount
+}
+
 /** 按 CN 1.8.1 ActiveMissionValues 的 row[34..37] 解析 QuestRangeReferenceIdKind。 */
 export function resolveActiveMissionQuestIds(row: readonly unknown[]): number[] {
     const kind = parseInteger(row[34], "quest range kind")
@@ -349,6 +365,8 @@ export function computeActiveMissionFactProgress(
             return state.totalGachaCampaignCount
         case PATTERN_BATTLE_CLEAR_COUNT:
             return countBattleClearFacts(row, state.questProgress)
+        case PATTERN_SS_RANK_COUNT:
+            return countSsRankFacts(row, state)
         case PATTERN_EPISODE_CLEAR_COUNT: {
             const storyQuestIds = new Set(
                 characters.flatMap(([characterId]) => state.characterStoryQuestIds[characterId] ?? []),

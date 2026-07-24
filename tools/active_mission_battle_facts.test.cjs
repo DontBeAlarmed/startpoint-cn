@@ -20,6 +20,8 @@ const state = {
         singleClearCount: 99,
         multiClearCount: 99,
         multiHostClearCount: 99,
+        singleRankSsCount: 2,
+        rankSsCount: 5,
     },
     finishedQuestIds: new Set(),
     questProgress: [
@@ -85,5 +87,10 @@ assert.equal(computeActiveMissionFactProgress(23, row({
     first: "1",
     third: "8,10",
 }), state), 0)
+
+assert.equal(computeActiveMissionFactProgress(26, row({ battleKind: 1 }), state), 2)
+assert.equal(computeActiveMissionFactProgress(26, row({ battleKind: 2 }), state), 3)
+assert.equal(computeActiveMissionFactProgress(26, row({ battleKind: 3 }), state), 5)
+assert.equal(computeActiveMissionFactProgress(26, row({ battleKind: 3, rangeKind: 2 }), state), null)
 
 console.log("active mission battle fact tests passed")
