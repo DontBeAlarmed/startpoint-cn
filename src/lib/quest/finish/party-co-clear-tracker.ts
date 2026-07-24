@@ -4,8 +4,7 @@
 import { getDb } from "../../../data/db"
 import { incrementPlayerCategoryMissionSync } from "../../../data/domains/mission"
 import {
-    getMatchedAwakeRaceMissionIds,
-    getMatchedAwakeQuestPartyMissionIds,
+    getMatchedAwakeDirectBattleMissionIds,
     normalizeCharacterPair,
 } from "../../mission/awake-battle-rules"
 import { getCharacterRaces, getRaceKeyString } from "./race-utils"
@@ -59,10 +58,7 @@ export function trackPartyCoClears(ctx: FinishContext): void {
         `).run(ctx.playerId, raceKey)
     }
 
-    for (const missionId of getMatchedAwakeRaceMissionIds(ctx, raceKey)) {
-        incrementPlayerCategoryMissionSync(ctx.playerId, 9, missionId, 1)
-    }
-    for (const missionId of getMatchedAwakeQuestPartyMissionIds(ctx)) {
+    for (const missionId of getMatchedAwakeDirectBattleMissionIds(ctx, raceKey)) {
         incrementPlayerCategoryMissionSync(ctx.playerId, 9, missionId, 1)
     }
 }

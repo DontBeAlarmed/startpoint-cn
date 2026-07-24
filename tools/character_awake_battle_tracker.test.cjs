@@ -39,12 +39,13 @@ stubModule("../src/lib/quest/finish/race-utils", {
 
 const { trackPartyCoClears } = require("../src/lib/quest/finish/party-co-clear-tracker")
 
-function context(category, questId, ids, isMulti = false) {
+function context(category, questId, ids, isMulti = false, statistics) {
     return {
         playerId: 17,
         questCategory: category,
         questId,
         isMulti,
+        statistics,
         party: {
             characters: ids.map(id => ({ id })),
             unison_characters: [],
@@ -73,5 +74,23 @@ assert.deepEqual(missionWrites, [
     [17, 9, 3310032, 1],
     [17, 9, 2310012, 1],
 ])
+
+trackPartyCoClears(context(6, 9001, [321013]))
+assert.deepEqual(missionWrites.slice(-1), [[17, 9, 3210132, 1]])
+
+trackPartyCoClears(context(13, 2001, [321013]))
+assert.deepEqual(missionWrites.slice(-2), [
+    [17, 9, 3210132, 1],
+    [17, 9, 3210133, 1],
+])
+
+trackPartyCoClears(context(13, 1040, [341001]))
+assert.deepEqual(missionWrites.slice(-2), [
+    [17, 9, 3410012, 1],
+    [17, 9, 3410013, 1],
+])
+
+trackPartyCoClears(context(1, 1, [161002], false, { zones: [{ encoffin_count: 0 }] }))
+assert.deepEqual(missionWrites.slice(-1), [[17, 9, 1610022, 1]])
 
 console.log("character awake battle tracker tests passed")

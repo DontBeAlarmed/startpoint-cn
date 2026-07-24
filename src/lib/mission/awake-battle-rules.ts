@@ -22,6 +22,22 @@ interface QuestPartyFactContext {
         characters: readonly ({ id?: number | null } | null)[]
         unison_characters: readonly ({ id?: number | null } | null)[]
     }
+    statistics?: {
+        zones?: readonly { encoffin_count?: unknown }[]
+    }
+}
+
+interface QuestRangeRule {
+    missionId: number
+    categories: readonly number[]
+    questIds?: readonly number[]
+    requiredCharacterId: number
+    singleOnly: boolean
+}
+
+interface NoDeathRule {
+    missionId: number
+    leaderCharacterId: number
 }
 
 const QUEST_PARTY_RULES: readonly QuestPartyRule[] = Object.freeze([
@@ -41,6 +57,40 @@ const QUEST_PARTY_RULES: readonly QuestPartyRule[] = Object.freeze([
     },
 ])
 
+const QUEST_RANGE_RULES: readonly QuestRangeRule[] = Object.freeze([
+    {
+        missionId: 3210132,
+        categories: [6, 13, 14, 20],
+        requiredCharacterId: 321013,
+        singleOnly: true,
+    },
+    {
+        missionId: 3210133,
+        categories: [13],
+        questIds: [2001, 2002, 2003, 2004, 2005, 2006],
+        requiredCharacterId: 321013,
+        singleOnly: true,
+    },
+    {
+        missionId: 3410012,
+        categories: [6, 13, 14, 20],
+        requiredCharacterId: 341001,
+        singleOnly: true,
+    },
+    {
+        missionId: 3410013,
+        categories: [13],
+        questIds: [1040],
+        requiredCharacterId: 341001,
+        singleOnly: true,
+    },
+])
+
+const NO_DEATH_RULES: readonly NoDeathRule[] = Object.freeze([
+    { missionId: 1610022, leaderCharacterId: 161002 },
+    { missionId: 2610072, leaderCharacterId: 261007 },
+])
+
 export const AWAKE_QUEST_PARTY_MISSION_IDS = new Set(
     QUEST_PARTY_RULES.map(rule => rule.missionId),
 )
@@ -52,6 +102,8 @@ export const AWAKE_RACE_MISSION_KEYS = new Map<number, string>([
 export const AWAKE_DIRECT_BATTLE_MISSION_IDS = new Set([
     ...AWAKE_QUEST_PARTY_MISSION_IDS,
     ...AWAKE_RACE_MISSION_KEYS.keys(),
+    ...QUEST_RANGE_RULES.map(rule => rule.missionId),
+    ...NO_DEATH_RULES.map(rule => rule.missionId),
 ])
 
 export function normalizeCharacterPair(a: number, b: number): readonly [number, number] {
@@ -86,6 +138,46 @@ export function getMatchedAwakeQuestPartyMissionIds(
         .filter(rule => !rule.singleOnly || !ctx.isMulti)
         .filter(rule => rule.requiredCharacterIds.every(id => partyCharacterIds.has(id)))
         .map(rule => rule.missionId)
+}
+
+export function getMatchedAwakeDirectBattleMissionIds(
+    ctx: QuestPartyFactContext,
+    raceKey: string,
+): number[] {
+    const matched = [
+        ...getMatchedAwakeRaceMissionIds(ctx, raceKey),
+        ...getMatchedAwakeQuestPartyMissionIds(ctx),
+    ]
+    const partyCharacterIds = new Set<number>()
+    for (const character of [...ctx.party.characters, ...ctx.party.unison_characters]) {
+        if (character?.id) partyCharacterIds.add(character.id)
+    }
+
+    for (const rule of QUEST_RANGE_RULES) {
+        if (!rule.categories.includes(ctx.questCategory)) continue
+        if (rule.questIds && !rule.questIds.includes(ctx.questId)) continue
+        if (rule.singleOnly && ctx.isMulti === true) continue
+        if (partyCharacterIds.has(rule.requiredCharacterId)) matched.push(rule.missionId)
+    }
+
+    const zones = ctx.statistics?.zones
+    if (zones !== undefined && zones.length > 0 && zones.every(zone => (
+        Number.isSafeInteger(zone.encoffin_count)
+        && (zone.encoffin_count as number) >= 0
+    ))) {
+        const totalEncoffinCount = zones.reduce(
+            (total, zone) => total + (zone.encoffin_count as number),
+            0,
+        )
+        if (totalEncoffinCount === 0) {
+            const leaderId = ctx.party.characters[0]?.id
+            for (const rule of NO_DEATH_RULES) {
+                if (leaderId === rule.leaderCharacterId) matched.push(rule.missionId)
+            }
+        }
+    }
+
+    return matched
 }
 
 export function getMatchedAwakeRaceMissionIds(
