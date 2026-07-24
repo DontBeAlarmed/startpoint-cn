@@ -4,7 +4,7 @@ import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../../data/domains/character"
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
 import { getRankDegree } from "../stamina"
-import { getMissionMasterDefinitions } from "./master-data"
+import { getMissionMasterDefinition, getMissionMasterDefinitions } from "./master-data"
 import { getMissionPattern } from "./patterns"
 import type { MissionComputer, CategoryContext } from "./types"
 
@@ -49,8 +49,11 @@ function buildStats(playerId: number, category: number): CategoryContext {
                 .reduce((total, nodes) => total + nodes.length, 0),
             bondTokenCount: Object.values(characters)
                 .reduce((total, character) => total
-                    + character.bondTokenList.filter(token => token.status === 1).length, 0),
+                    + character.bondTokenList.filter(token => token.status >= 1).length, 0),
             singleSsCount: battleCounters.singleRankSsCount,
+            bondedCharacterIds: new Set(Object.entries(characters)
+                .filter(([, character]) => character.bondTokenList.some(token => token.status >= 1))
+                .map(([characterId]) => Number(characterId))),
         },
     }
 }
@@ -66,12 +69,19 @@ const SUPPORTED_FAMILIES = {
 
 export function getDegreeMissionCoverageReport() {
     const definitions = getMissionMasterDefinitions(5)
-    const supportedFamilies = Object.fromEntries(
+    const prefixFamilies = Object.fromEntries(
         Object.entries(SUPPORTED_FAMILIES).map(([name, prefix]) => [
             name,
             definitions.filter(definition => definition.pattern.startsWith(prefix)).length,
         ]),
     ) as Record<keyof typeof SUPPORTED_FAMILIES, number>
+    const supportedFamilies = {
+        ...prefixFamilies,
+        specificCharacterBond: definitions.filter(definition => (
+            Number(definition.row[3]) === 44
+            && getSpecificCharacterBondId(definition.missionId) !== undefined
+        )).length,
+    }
     const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
     return {
         total: definitions.length,
@@ -79,6 +89,13 @@ export function getDegreeMissionCoverageReport() {
         unsupported: definitions.length - serverComputed,
         supportedFamilies,
     }
+}
+
+export function getSpecificCharacterBondId(missionId: number): number | undefined {
+    const definition = getMissionMasterDefinition(5, missionId)
+    if (!definition || Number(definition.row[3]) !== 44) return undefined
+    const characterId = Number(definition.row[15])
+    return Number.isSafeInteger(characterId) && characterId > 0 ? characterId : undefined
 }
 
 export const DegreeComputer: MissionComputer = {
@@ -93,6 +110,10 @@ export const DegreeComputer: MissionComputer = {
         const stats = ctx.degreeStats
         if (pattern.startsWith(SUPPORTED_FAMILIES.playerRank)) return getRankDegree(ctx.player.rankPoint)
         if (!stats) return dbProgress
+        const bondCharacterId = getSpecificCharacterBondId(missionId)
+        if (bondCharacterId !== undefined) {
+            return Math.max(dbProgress, stats.bondedCharacterIds.has(bondCharacterId) ? 1 : 0)
+        }
         if (pattern.startsWith(SUPPORTED_FAMILIES.companionCount)) return stats.companionCount
         if (pattern.startsWith(SUPPORTED_FAMILIES.overLimitCount)) return stats.overLimitCount
         if (pattern.startsWith(SUPPORTED_FAMILIES.manaBoardCount)) return stats.manaBoardCount
