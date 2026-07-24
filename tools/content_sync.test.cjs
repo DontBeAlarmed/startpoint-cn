@@ -507,7 +507,19 @@ test("check consumes the store current release snapshot without rereading it", a
         assetVersion: "1.4.54",
         release: `releases/1.4.54-${"a".repeat(64)}/manifest.json`,
     }
-    const manifest = { assetVersion: "1.4.54", generatorVersion: 1 }
+    const manifest = {
+        assetVersion: "1.4.54",
+        generatorVersion: 1,
+        tables: Object.fromEntries(TEST_TABLE_SOURCES.map(definition => [
+            definition.tableName,
+            {
+                scope: definition.scope,
+                converterId: definition.converterId,
+                converterVersion: definition.converterVersion,
+                sources: definition.manifestSources,
+            },
+        ])),
+    }
     const result = await runContentSync({
         projectRoot,
         mode: "check",
@@ -515,6 +527,7 @@ test("check consumes the store current release snapshot without rereading it", a
     }, {
         resolvePaths: () => paths,
         scanTarget: async () => fakeScan(paths),
+        tableSources: TEST_TABLE_SOURCES,
         createStore: () => ({
             readCurrentRelease: async () => {
                 snapshotReads++
@@ -548,6 +561,59 @@ test("normal sync creates a missing release and skips the same asset/generator",
     assert.deepEqual(fs.readdirSync(fixture.paths.contentStoreDir).sort(), ["objects", "releases"])
     assert.deepEqual(fs.readdirSync(fixture.paths.contentStateDir), ["current.json"])
     assert.equal(fs.existsSync(fixture.paths.contentRootDir), false)
+})
+
+test("normal sync rebuilds when the registered table contract changes", async t => {
+    const cases = [
+        {
+            name: "registered table added",
+            initial: [TEST_TABLE_SOURCES[0]],
+            current: TEST_TABLE_SOURCES,
+        },
+        {
+            name: "registered table removed",
+            initial: TEST_TABLE_SOURCES,
+            current: [TEST_TABLE_SOURCES[0]],
+        },
+        {
+            name: "converter version changed",
+            initial: [TEST_TABLE_SOURCES[0]],
+            current: [{
+                ...TEST_TABLE_SOURCES[0],
+                converterVersion: TEST_TABLE_SOURCES[0].converterVersion + 1,
+            }],
+        },
+    ]
+
+    for (const scenario of cases) {
+        await t.test(scenario.name, async t => {
+            const fixture = engineFixture(t, {
+                tableSources: scenario.initial,
+                builderValues: tableValues("initial", scenario.initial),
+            })
+            await sync(fixture)
+            fixture.dependencies.tableSources = scenario.current
+            fixture.setBuilderValues(tableValues("current", scenario.current))
+
+            const result = await sync(fixture)
+            const manifest = await readCurrentRelease(fixture.store)
+
+            assert.equal(result.status, "synchronized")
+            assert.equal(result.action, "synchronize")
+            assert.equal(result.reason, "table-registry")
+            assert.equal(fixture.calls.builder, 2)
+            assert.deepEqual(
+                Object.keys(manifest.tables),
+                scenario.current.map(definition => definition.tableName),
+            )
+            for (const definition of scenario.current) {
+                assert.equal(
+                    manifest.tables[definition.tableName].converterVersion,
+                    definition.converterVersion,
+                )
+            }
+        })
+    }
 })
 
 test("complete legacy ContentPaths keep content and sync lock in one readable root", async t => {

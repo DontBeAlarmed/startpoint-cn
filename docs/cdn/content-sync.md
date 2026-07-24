@@ -21,7 +21,7 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 | 卡池 | `gacha.json`、`gacha_campaign.json`、两张 `cdndata/gacha*.json`，并读取全部非空 odds 引用 |
 | 商店 | General、Event、Boss、Star Grain、Treasure、Equipment 共 8 张运行时表 |
 
-Registry 仍要求每个 Release 闭合全部 94 张表。阶段 A 中未迁移领域从仓库内 bundled/server JSON 导入 Release；它们不会因为 CDN orderedmap 改动而自动变化。全表 CDN 转换属于阶段 B，必须在阶段 A 验收后另行实施。
+Registry 仍要求每个 Release 闭合当前全部注册表。阶段 A 中未迁移领域从仓库内 bundled/server JSON 导入 Release；它们不会因为 CDN orderedmap 改动而自动变化。全表 CDN 转换属于阶段 B，必须在阶段 A 验收后另行实施。
 
 ## 受支持输入
 
@@ -92,7 +92,9 @@ normal 模式：
 npm run content:sync
 ```
 
-normal 比较 CDN `assetVersion`、current Release 和 `generatorVersion`。版本与生成器均相同时快速跳过。
+normal 依次检查 current Release 是否存在、CDN `assetVersion`、全局 `generatorVersion`，以及 Release 表集合与当前 Registry 是否兼容。注册表新增、移除，或任一表的 `scope`、`converterId`、`converterVersion`、`sources` 变化时，normal 返回 `table-registry` 并自动重建；完全兼容时才快速跳过。
+
+这项判断只读取 manifest 元数据，不读取表对象，也不会在每次启动时执行完整转换。转换器内部算法改变但注册元数据不变时，开发者仍必须递增对应 `converterVersion`；影响全部内容生成的规则变化使用 `generatorVersion`。运行时继续执行同一套严格 Registry 校验，作为最后的加载防线。
 
 只检查是否需要同步，不建立 ArchiveIndex、不转换 orderedmap、不写内容：
 
@@ -106,7 +108,7 @@ npm run content:sync -- --check
 npm run content:sync -- --force
 ```
 
-CDN 在同一个 `assetVersion` 下被原地修改时，normal 无法仅凭版本号发现业务内容变化，必须使用 `--force`。更改客户端资源时仍应优先发布新的资源版本；`--force` 只重建服务端 Release，不会迫使客户端重新下载同版本资源。
+CDN 在同一个 `assetVersion` 下被原地修改，且服务端生成契约也没有变化时，normal 不检查原始文件内容差异，必须使用 `--force`。更改客户端资源时仍应优先发布新的资源版本；`--force` 只重建服务端 Release，不会迫使客户端重新下载同版本资源。
 
 ## 真实 CDN smoke
 
@@ -128,7 +130,7 @@ smoke 创建或接受 root 后记录其 `dev`、`ino`、权限和 realpath，并
 
 smoke 始终执行 force sync，并验证：
 
-- Release、Repository、Catalog 都是 1.4.54；Registry 94 表及所有对象引用闭合；
+- Release、Repository、Catalog 都是 1.4.54；当前 Registry 全部表及所有对象引用闭合；
 - 两张角色 cdndata 各 505 行，运行时 505 个角色；名称、稀有度、属性与 bundled 一致；
 - 只允许已记录的 45 个 `skill_count` 从 3 变为 6，12 个 `skill_count=2` 保持不变；
 - 卡池 raw row 为 584、campaign 为 145，全部非空 odds 已成功读取；
@@ -163,7 +165,7 @@ Git binary diff 快照设置 64 MiB 输出上限；包含更大 dirty binary dif
 `-- runtime/
 ```
 
-`manifest.json` 完整列出 94 张表、Catalog 和 summary 对象。多个 Release 可以引用同一个内容寻址对象；相同对象不会重复保存。`current.json` 只保存当前资源版本和 Release manifest 相对路径，使用原子替换激活。
+`manifest.json` 完整列出当前 Registry 的全部表、Catalog 和 summary 对象。多个 Release 可以引用同一个内容寻址对象；相同对象不会重复保存。`current.json` 只保存当前资源版本和 Release manifest 相对路径，使用原子替换激活。
 
 服务进程初始化时只读取一次 current snapshot，并用同一 snapshot 构造 Catalog 与 Repository。运行期间修改 `current.json` 不会热切换，必须重启才会加载新 Release。
 

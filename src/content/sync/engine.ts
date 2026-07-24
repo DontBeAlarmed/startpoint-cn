@@ -25,12 +25,14 @@ import {
     type ContentTargetScan,
 } from "./scanner"
 import { TABLE_SOURCES, type TableSourceDefinition } from "./table-registry"
+import { getReleaseTableRegistryError } from "./table-contract"
 
 export type ContentSyncMode = "normal" | "check" | "force"
 export type ContentSyncReason =
     | "missing"
     | "asset-version"
     | "generator-version"
+    | "table-registry"
     | "forced"
     | "up-to-date"
 
@@ -150,11 +152,13 @@ function decideReason(
     targetVersion: string,
     current: CurrentRelease | null,
     generatorVersion: number,
+    definitions: readonly TableSourceDefinition[],
 ): ContentSyncReason {
     if (mode === "force") return "forced"
     if (current === null) return "missing"
     if (current.manifest.assetVersion !== targetVersion) return "asset-version"
     if (current.manifest.generatorVersion !== generatorVersion) return "generator-version"
+    if (getReleaseTableRegistryError(current.manifest, definitions) !== null) return "table-registry"
     return "up-to-date"
 }
 
@@ -303,11 +307,12 @@ export async function runContentSync(
     const createStore = dependencies.createStore ?? (resolved => new ContentObjectStore(resolved))
     const store = createStore(paths)
     const scanTarget = dependencies.scanTarget ?? scanContentTarget
+    const definitions = dependencies.tableSources ?? TABLE_SOURCES
 
     if (mode === "check") {
         const scan = await scanTarget(paths)
         const current = await readCurrentRelease(store)
-        const reason = decideReason(mode, scan.targetVersion, current, generatorVersion)
+        const reason = decideReason(mode, scan.targetVersion, current, generatorVersion, definitions)
         return resultWithoutRelease("check", scan.targetVersion, current, reason)
     }
 
@@ -318,7 +323,7 @@ export async function runContentSync(
     try {
         const scan = await scanTarget(paths)
         const current = await readCurrentRelease(store)
-        const reason = decideReason(mode, scan.targetVersion, current, generatorVersion)
+        const reason = decideReason(mode, scan.targetVersion, current, generatorVersion, definitions)
         if (reason === "up-to-date") {
             return resultWithoutRelease("skipped", scan.targetVersion, current, reason)
         }

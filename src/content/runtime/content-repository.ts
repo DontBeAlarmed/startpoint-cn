@@ -11,12 +11,10 @@ import { importBundledTable as defaultImportBundledTable } from "../sync/bundled
 import { ContentObjectStore } from "../sync/object-store"
 import {
     CONTENT_GENERATOR_VERSION,
-    type ContentSourceReference,
-    type ContentReleaseManifest,
-    type ContentTableReference,
 } from "../sync/schema"
 import type { ContentCurrentReleaseSnapshot } from "../sync/object-store"
 import { findTableSource, TABLE_SOURCES } from "../sync/table-registry"
+import { assertReleaseTableRegistry } from "../sync/table-contract"
 
 export interface ContentRepositoryInfo {
     readonly source: "bundled" | "release"
@@ -35,52 +33,6 @@ export interface ContentRepositoryDependencies {
 }
 
 const BUNDLED_IMPORT_CONCURRENCY = 8
-
-function sameSources(
-    left: readonly ContentSourceReference[],
-    right: readonly ContentSourceReference[],
-): boolean {
-    return left.length === right.length && left.every((value, index) => (
-        JSON.stringify(value) === JSON.stringify(right[index])
-    ))
-}
-
-function validateTableMetadata(
-    tableName: string,
-    reference: ContentTableReference,
-): void {
-    const definition = findTableSource(tableName)
-    if (reference.scope !== definition.scope) {
-        throw new Error(`content release table ${tableName} has mismatched scope`)
-    }
-    if (reference.converterId !== definition.converterId) {
-        throw new Error(`content release table ${tableName} has mismatched converterId`)
-    }
-    if (reference.converterVersion !== definition.converterVersion) {
-        throw new Error(`content release table ${tableName} has mismatched converterVersion`)
-    }
-    if (!sameSources(reference.sources, definition.manifestSources)) {
-        throw new Error(`content release table ${tableName} has mismatched sources`)
-    }
-}
-
-function validateReleaseTables(manifest: ContentReleaseManifest): void {
-    const registeredNames = new Set(TABLE_SOURCES.map(definition => definition.tableName))
-    const releaseNames = Object.keys(manifest.tables)
-    const missing = [...registeredNames].filter(tableName => !(tableName in manifest.tables)).sort()
-    const extra = releaseNames.filter(tableName => !registeredNames.has(tableName)).sort()
-    if (missing.length > 0 || extra.length > 0) {
-        const details = [
-            ...(missing.length === 0 ? [] : [`missing tables: ${missing.join(", ")}`]),
-            ...(extra.length === 0 ? [] : [`extra tables: ${extra.join(", ")}`]),
-        ]
-        throw new Error(`content release tables do not match registry (${details.join("; ")})`)
-    }
-
-    for (const definition of TABLE_SOURCES) {
-        validateTableMetadata(definition.tableName, manifest.tables[definition.tableName])
-    }
-}
 
 export class ContentRepository {
     readonly #repositoryInfo: ContentRepositoryInfo
@@ -150,7 +102,7 @@ export class ContentRepository {
             ))
         }
 
-        validateReleaseTables(release.manifest)
+        assertReleaseTableRegistry(release.manifest)
         const entries = TABLE_SOURCES.map(definition => (
             [
                 definition.tableName,

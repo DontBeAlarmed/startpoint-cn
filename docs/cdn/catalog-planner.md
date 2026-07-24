@@ -22,13 +22,13 @@ Android Catalog 范围缺失、不完整、被修改、重新打包或自制的 
 
 1. `resolveContentPaths` 解析 CDN 和内容目录。`CDN_DIR` 必须指向包含 `cn` 子目录的父目录，不能直接指向末尾的 `cn`。
 2. `ContentSnapshotProvider` 只读取一次 `.content/current.json` 对应的完整 Release snapshot。
-3. current 存在时，`CdnCatalogLoader` 从该 snapshot 的 Catalog 对象构建 Catalog，`ContentRepository` 从同一 snapshot 加载全部 94 张表；两者版本必须一致。
+3. current 存在时，`CdnCatalogLoader` 从该 snapshot 的 Catalog 对象构建 Catalog，`ContentRepository` 从同一 snapshot 加载当前 Registry 的全部表；两者版本必须一致。
 4. current 不存在时，两者一起退回 tracked 官方 1.4.54 Catalog 与 bundled JSON。current、manifest 或对象损坏时明确失败，不静默 fallback。
 5. Catalog 严格校验 schema、版本、归档层、顺序、相对路径、大小、版本图、重复项、分叉、环和缺失层。
 6. 运行时逐项 `stat` Catalog 引用的归档和 `EntityLists`，只确认路径存在、是普通文件且大小与 `compressedBytes` 一致。
 7. `ContentSnapshotProvider` 将 Catalog 与 Repository 深度冻结为统一 `ContentSnapshot`，随后各路由只读取该 snapshot；运行期间 current 变化不会热切换。
 
-游戏服务初始化本身不会扫描 CDN、读取全部 ZIP 计算 SHA-256、写 digest cache 或生成 Release。受支持入口在它之前执行的 Content Sync 会做目标扫描；只有版本或生成器变化、current 缺失或显式 `--force` 时才建立 ArchiveIndex 并转换内容。目录中新增 ZIP 不会被已经运行的服务热加载。
+游戏服务初始化本身不会扫描 CDN、读取全部 ZIP 计算 SHA-256、写 digest cache 或生成 Release。受支持入口在它之前执行的 Content Sync 会做目标扫描；只有 CDN 版本、生成器版本或表注册契约变化、current 缺失或显式 `--force` 时才建立 ArchiveIndex 并转换内容。目录中新增 ZIP 不会被已经运行的服务热加载。
 
 ## 统一 Snapshot 与更新计划
 

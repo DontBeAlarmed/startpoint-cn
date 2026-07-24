@@ -14,9 +14,9 @@
 ## 职责边界
 
 - CDN 保存客户端资源归档和可提取的内容源。
-- `content:sync` 根据受支持输入生成或复用 Content Release。
+- `content:sync` 根据受支持输入生成或复用 Content Release；CDN 版本、生成器版本或服务端表注册契约变化时自动重建。
 - Content Runtime 在进程启动时加载固定 snapshot，向业务模块提供已接入的运行表。
 - 服务端通过 Catalog 向客户端声明版本、大小和下载归档。
 - SQLite 保存玩家状态，不保存或替代 CDN 内容定义。
 
-当前只有已注册转换器的表会由 CDN 动态生成，其余 `assets/` 仍是版本内置数据。加入新 CDN 并不等于任意业务表都会自动更新。
+当前只有已注册转换器的表会由 CDN 动态生成，其余 `assets/` 仍是版本内置数据。加入新 CDN 并不等于任意业务表都会自动更新；但服务端新增、移除注册表或调整表转换元数据后，下一次 normal sync 会自动生成兼容的新 Release，不要求部署者手动 `--force`。
