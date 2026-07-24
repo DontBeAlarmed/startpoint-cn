@@ -34,9 +34,19 @@ Content Release；这一步只补齐服务端解释 Active Mission 所需的定�
 - 返回角色觉醒校准、邮件状态和各类库存变化；
 - `/load`、存档导入导出和数据库层可持久化 `all_active_mission_list`。
 
-上述能力构成内容解释、可用性判定、安全领奖和存储链。当前尚没有通用业务入口依据 `mission_active.json` 的 pattern 自动创建并更新
-96 条任务进度；除存档导入或既有数据库记录外，`players_active_missions` 不会自行生成完整进度。因此 Active Mission
-仍是部分完成，不能只因领奖接口可用就标记为完整。
+`/api/index.php/contents_guide/start` 已接通 Contents Guide 首任务的生产链：
+
+- 使用请求 `event_id` 在当前 Content snapshot 中查找唯一的 `string_id = contents_guide_start` 任务，且事件必须为
+  `ContentsGuide`（kind 2）；缺失、重复、类型不符或主表异常均以 400 拒绝；
+- 使用全局服务器时间、玩家关卡进度和 Active Mission 统一可用性核心校验事件开放期、event 2 前置关卡
+  `1008004`、phase、`need` 与 `show`；
+- 在单一 SQLite 事务内读取任务状态、以权威绝对进度 1 幂等结算，并持久化进度与新完成的待领取阶段；数据库错误会整体回滚；
+- 返回标准 `active_mission_list` 增量供 CN 客户端通用层立即合并，不在该入口发奖；奖励仍由
+  `/api/index.php/active_mission/receive` 领取。
+
+上述能力构成内容解释、首任务生产、可用性判定、安全领奖和存储链。当前仅接入 96 条业务事实中的 Contents Guide
+首任务，其他 95 条仍没有权威业务入口；除该首任务、存档导入或既有数据库记录外，`players_active_missions` 不会自行生成
+完整进度。因此 Active Mission 仍是部分完成，不能只因首任务与领奖接口可用就标记为完整。
 
 ## 后续实现原则
 
