@@ -41,7 +41,7 @@ GeneralShop 额外通过 `cdn_general_shop_whitelist.json` 过滤客户端主数
 3. 校验 Mana、星导石、羁绊证或道具成本；
 4. 扣除货币和道具；
 5. 按购买数量展开并发放全部奖励；
-6. 累加 `players_shop_purchases`；
+6. 累加 `players_shop_purchases`；若支付类型为玛纳，同时累计 Active Mission 的实际玛纳消费量；
 7. 返回最终玩家、物品、角色与装备状态。
 
 任一步失败都回滚整个购买，不保留“已扣成本但未发奖”或“已发奖但未记库存”的部分状态。购买数量必须是正安全整数；库存按累计购买数限制。
@@ -55,6 +55,7 @@ GeneralShop 额外通过 `cdn_general_shop_whitelist.json` 过滤客户端主数
 - 商品描述目标装备、阶段与 `enhancementMaxLevel`；
 - `planEquipmentEnhancementPurchase()` 根据当前强化等级计算目标等级；
 - 材料、货币、装备等级与购买记录在同一事务中更新；
+- 商品存在玛纳价格时，同一事务还会累计 Active Mission 的实际玛纳消费量；当前 1.4.54 官方表没有这类价格，逻辑用于保持动态 Content 表兼容；
 - 响应返回 `equipment_list` 的最终强化等级；
 - 该流程不会套用普通装备强化的逐级素材模型。
 

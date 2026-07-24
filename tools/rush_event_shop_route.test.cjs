@@ -41,9 +41,22 @@ db.exec(`
         count INTEGER NOT NULL,
         PRIMARY KEY (player_id, shop_item_id)
     );
+    CREATE TABLE mission_counter_state (
+        player_id INTEGER PRIMARY KEY,
+        used_mana INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE equipment_state (
+        player_id INTEGER NOT NULL,
+        equipment_id INTEGER NOT NULL,
+        level INTEGER NOT NULL,
+        enhancement_level INTEGER NOT NULL,
+        PRIMARY KEY (player_id, equipment_id)
+    );
     INSERT INTO player_state VALUES (17, 1000, 100, 20, 50);
     INSERT INTO item_state VALUES (17, 2370001, 1000);
     INSERT INTO item_state VALUES (17, 49100, 3);
+    INSERT INTO item_state VALUES (17, 40401, 5);
+    INSERT INTO equipment_state VALUES (17, 5020042, 5, 0);
 `)
 
 function getPlayer(playerId) {
@@ -74,7 +87,15 @@ function snapshot() {
         players: db.prepare("SELECT * FROM player_state ORDER BY id").all(),
         items: db.prepare("SELECT * FROM item_state ORDER BY item_id").all(),
         purchases: db.prepare("SELECT * FROM purchase_state ORDER BY shop_item_id").all(),
+        missionCounters: db.prepare("SELECT * FROM mission_counter_state ORDER BY player_id").all(),
+        equipments: db.prepare("SELECT * FROM equipment_state ORDER BY equipment_id").all(),
     }
+}
+
+function getUsedManaCount(playerId) {
+    return db.prepare(
+        "SELECT used_mana FROM mission_counter_state WHERE player_id = ?",
+    ).get(playerId)?.used_mana ?? 0
 }
 
 let globalNowSeconds = Date.parse("2023-12-01T00:00:00+09:00") / 1000
@@ -96,14 +117,36 @@ stubModule("../src/data/domains/shopPurchase", {
         return getPurchaseCount(playerId, shopItemId)
     },
     addPlayerShopPurchaseSync(playerId, shopItemId) {
-        return this.addPlayerShopPurchaseCountSync(playerId, shopItemId, 1)
+        db.prepare(`
+            INSERT INTO purchase_state VALUES (?, ?, 1)
+            ON CONFLICT(player_id, shop_item_id) DO UPDATE SET count = count + 1
+        `).run(playerId, shopItemId)
+        return getPurchaseCount(playerId, shopItemId)
     },
 })
 stubModule("../src/data/domains/account", { getAccountPlayers: () => [] })
 stubModule("../src/data/domains/equipment", {
-    getPlayerEquipmentSync: () => null,
-    playerOwnsEquipmentSync: () => false,
-    updatePlayerEquipmentSync() {},
+    getPlayerEquipmentSync(playerId, equipmentId) {
+        const row = db.prepare(
+            "SELECT * FROM equipment_state WHERE player_id = ? AND equipment_id = ?",
+        ).get(playerId, equipmentId)
+        return row === undefined ? null : {
+            level: row.level,
+            enhancementLevel: row.enhancement_level,
+        }
+    },
+    playerOwnsEquipmentSync(playerId, equipmentId) {
+        return db.prepare(
+            "SELECT 1 FROM equipment_state WHERE player_id = ? AND equipment_id = ?",
+        ).get(playerId, equipmentId) !== undefined
+    },
+    updatePlayerEquipmentSync(playerId, equipmentId, patch) {
+        db.prepare(`
+            UPDATE equipment_state
+            SET enhancement_level = ?
+            WHERE player_id = ? AND equipment_id = ?
+        `).run(patch.enhancementLevel, playerId, equipmentId)
+    },
 })
 stubModule("../src/data/domains/item", {
     getPlayerItemSync: getItem,
@@ -135,6 +178,14 @@ stubModule("../src/data/domains/session", {
     getSession: async viewerId => viewerId === "123" ? { accountId: 9 } : null,
 })
 stubModule("../src/data/activeAccount", { resolvePlayerIdSync: () => 17 })
+stubModule("../src/data/domains/active_mission_counters", {
+    incrementActiveMissionUsedManaCountSync(playerId, amount) {
+        db.prepare(`
+            INSERT INTO mission_counter_state VALUES (?, ?)
+            ON CONFLICT(player_id) DO UPDATE SET used_mana = used_mana + excluded.used_mana
+        `).run(playerId, amount)
+    },
+})
 stubModule("../src/utils", {
     generateDataHeaders(values = {}) {
         return { viewer_id: values.viewer_id ?? 0, result_code: values.result_code ?? 1 }
@@ -179,7 +230,9 @@ stubModule("../src/lib/quest", {
 stubModule("../src/lib/stamina", { computeRealTimeStamina: () => 100 })
 stubModule("../src/lib/equipment", { clientSerializeEquipment: value => value })
 stubModule("../src/lib/equipment-enhancement", {
-    planEquipmentEnhancementPurchase: () => ({ ok: false, message: "unused" }),
+    planEquipmentEnhancementPurchase(currentLevel, purchaseAmount) {
+        return { ok: true, newLevel: currentLevel + purchaseAmount }
+    },
 })
 stubModule("../src/lib/mission", {
     reconcileAwakeUnlockCharacterList: (_playerId, list) => list,
@@ -187,6 +240,7 @@ stubModule("../src/lib/mission", {
 
 const shopRoutes = require("../src/routes/api/shop.ts").default
 const eventItemShopAsset = require("../assets/event_item_shop.json")
+const equipmentEnhancementShopAsset = require("../assets/equipment_enhancement_shop.json")
 
 async function createServer() {
     const fastify = Fastify()
@@ -338,6 +392,32 @@ async function main() {
         assert.equal(successBody.data.item_list[2370001], 600)
         assert.equal(successBody.data.item_list[49100], 5)
         assert.equal(getPurchaseCount(17, 700000), 2)
+
+        const manaPurchase = await fastify.inject({
+            method: "POST",
+            url: "/buy",
+            payload: { viewer_id: 123, shop_type: 2, shop_item_id: 200001, number: 1 },
+        })
+        assert.equal(manaPurchase.statusCode, 200)
+        assert.equal(getUsedManaCount(17), 1, "通用商店路由必须累计实际消费的玛纳")
+
+        const enhancementItem = equipmentEnhancementShopAsset["2001"]
+        enhancementItem.userCost = { type: 1, amount: 30 }
+        try {
+            const enhancementPurchase = await fastify.inject({
+                method: "POST",
+                url: "/buy",
+                payload: { viewer_id: 123, shop_type: 10, shop_item_id: 2001, number: 1 },
+            })
+            assert.equal(enhancementPurchase.statusCode, 200, enhancementPurchase.body)
+            assert.equal(
+                getUsedManaCount(17),
+                31,
+                "追忆强化独立事务也必须累计实际消费的玛纳",
+            )
+        } finally {
+            delete enhancementItem.userCost
+        }
 
         const reloadedServer = await createServer()
         try {

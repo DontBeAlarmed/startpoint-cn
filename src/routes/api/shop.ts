@@ -5,6 +5,7 @@ import { addPlayerShopPurchaseCountSync, addPlayerShopPurchaseSync, getPlayerSho
 import { getAccountPlayers } from "../../data/domains/account"
 import { getPlayerEquipmentSync, playerOwnsEquipmentSync, updatePlayerEquipmentSync } from "../../data/domains/equipment"
 import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
+import { incrementActiveMissionUsedManaCountSync } from "../../data/domains/active_mission_counters";
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
@@ -272,6 +273,7 @@ const routes = async (fastify: FastifyInstance) => {
 
             const equipmentId = enhancementEquipmentId!
             const newLevel = enhancementNewLevel!
+            const manaSpent = player.freeMana - freeMana
             getDb().transaction(() => {
                 for (const [itemId, nextAmount] of Object.entries(itemList)) {
                     updatePlayerItemSync(playerId, itemId, nextAmount)
@@ -283,6 +285,7 @@ const routes = async (fastify: FastifyInstance) => {
                     bondToken: bondTokens,
                 })
                 updatePlayerEquipmentSync(playerId, equipmentId, { enhancementLevel: newLevel })
+                incrementActiveMissionUsedManaCountSync(playerId, manaSpent)
                 for (let i = 0; i < purchaseAmount; i++) {
                     addPlayerShopPurchaseSync(playerId, shopItemId)
                 }
@@ -326,6 +329,7 @@ const routes = async (fastify: FastifyInstance) => {
                 setItem: updatePlayerItemSync,
                 getPurchaseCount: getPlayerShopPurchaseCountSync,
                 addPurchaseCount: addPlayerShopPurchaseCountSync,
+                recordManaSpent: incrementActiveMissionUsedManaCountSync,
                 grantRewards: givePlayerRewardsSync,
             })
         } catch (error) {

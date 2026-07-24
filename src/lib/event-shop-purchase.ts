@@ -40,6 +40,7 @@ export interface GenericShopPurchaseDependencies {
     setItem(playerId: number, itemId: number, amount: number): void
     getPurchaseCount(playerId: number, shopItemId: number): number
     addPurchaseCount(playerId: number, shopItemId: number, amount: number): number
+    recordManaSpent(playerId: number, amount: number): void
     grantRewards(playerId: number, rewards: Reward[]): PlayerRewardResult | null
 }
 
@@ -251,6 +252,12 @@ export function executeGenericShopPurchaseSync(
             input.shopItemId,
             purchaseAmount,
         )
+        if (userCost?.type === ShopItemUserCostType.MANA) {
+            dependencies.recordManaSpent(
+                input.playerId,
+                userCost.amount * purchaseAmount,
+            )
+        }
         const finalPlayer = dependencies.getPlayer(input.playerId)
         if (finalPlayer === null) throw new ShopPurchaseError("Player disappeared during purchase.")
 

@@ -181,6 +181,10 @@ function createPurchaseHarness(options = {}) {
             count INTEGER NOT NULL,
             PRIMARY KEY (player_id, shop_item_id)
         );
+        CREATE TABLE mission_counter_state (
+            player_id INTEGER PRIMARY KEY,
+            used_mana INTEGER NOT NULL DEFAULT 0
+        );
         INSERT INTO player_state VALUES (17, 1000, 100, 20, 50);
         INSERT INTO item_state VALUES (17, 2370001, 1000);
         INSERT INTO item_state VALUES (17, 49100, 3);
@@ -235,6 +239,13 @@ function createPurchaseHarness(options = {}) {
             maybeFail("purchase")
             return this.getPurchaseCount(playerId, shopItemId)
         },
+        recordManaSpent(playerId, amount) {
+            db.prepare(`
+                INSERT INTO mission_counter_state VALUES (?, ?)
+                ON CONFLICT(player_id) DO UPDATE SET used_mana = used_mana + excluded.used_mana
+            `).run(playerId, amount)
+            maybeFail("counter")
+        },
         grantRewards(playerId, rewards) {
             const items = {}
             let mana = 0
@@ -276,6 +287,7 @@ function createPurchaseHarness(options = {}) {
                 player: db.prepare("SELECT * FROM player_state ORDER BY id").all(),
                 items: db.prepare("SELECT * FROM item_state ORDER BY item_id").all(),
                 purchases: db.prepare("SELECT * FROM purchase_state ORDER BY shop_item_id").all(),
+                missionCounters: db.prepare("SELECT * FROM mission_counter_state ORDER BY player_id").all(),
             }
         },
     }
@@ -292,6 +304,50 @@ const shopItem = {
     stock: 3,
 }
 const activeTime = parseShopJstTimestamp("2023-12-01 00:00:00")
+
+{
+    const harness = createPurchaseHarness()
+    executeGenericShopPurchaseSync({
+        playerId: 17,
+        shopItemId: 800001,
+        purchaseAmount: 2,
+        shopItem: {
+            ...shopItem,
+            costs: [],
+            rewards: [],
+            userCost: { type: 1, amount: 120 },
+        },
+        nowMs: activeTime,
+        enforcePeriod: false,
+    }, harness.dependencies)
+    assert.deepEqual(
+        harness.snapshot().missionCounters,
+        [{ player_id: 17, used_mana: 240 }],
+        "玛纳购买必须按实际消费量累计 Active Mission 历史计数",
+    )
+}
+
+for (const userCostType of [0, 2]) {
+    const harness = createPurchaseHarness()
+    executeGenericShopPurchaseSync({
+        playerId: 17,
+        shopItemId: 800002 + userCostType,
+        purchaseAmount: 1,
+        shopItem: {
+            ...shopItem,
+            costs: [],
+            rewards: [],
+            userCost: { type: userCostType, amount: 10 },
+        },
+        nowMs: activeTime,
+        enforcePeriod: false,
+    }, harness.dependencies)
+    assert.deepEqual(
+        harness.snapshot().missionCounters,
+        [],
+        "星导石和羁绊卷轴购买不能计入玛纳消费",
+    )
+}
 
 {
     const harness = createPurchaseHarness()
@@ -364,14 +420,17 @@ const activeTime = parseShopJstTimestamp("2023-12-01 00:00:00")
     assert.deepEqual(harness.snapshot(), before)
 }
 
-for (const failAt of ["cost", "reward", "purchase"]) {
+for (const failAt of ["cost", "reward", "purchase", "counter"]) {
     const harness = createPurchaseHarness({ failAt })
     const before = harness.snapshot()
     assert.throws(() => executeGenericShopPurchaseSync({
         playerId: 17,
         shopItemId: 700000,
         purchaseAmount: 1,
-        shopItem,
+        shopItem: {
+            ...shopItem,
+            userCost: { type: 1, amount: 10 },
+        },
         nowMs: activeTime,
         enforcePeriod: true,
     }, harness.dependencies), new RegExp(`injected ${failAt} failure`))
