@@ -178,6 +178,9 @@ assert.deepEqual(
 )
 for (const statistics of [
     undefined,
+    { zones: null },
+    { zones: { length: 1 } },
+    { zones: [null] },
     { zones: [] },
     { zones: [{ encoffin_count: 1 }] },
     { zones: [{ encoffin_count: -1 }] },

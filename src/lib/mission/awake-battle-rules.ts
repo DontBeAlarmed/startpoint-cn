@@ -24,7 +24,7 @@ interface QuestPartyFactContext {
         unison_characters: readonly ({ id?: number | null } | null)[]
     }
     statistics?: {
-        zones?: readonly { encoffin_count?: unknown }[]
+        zones?: unknown
     }
 }
 
@@ -170,12 +170,9 @@ export function getMatchedAwakeDirectBattleMissionIds(
     }
 
     const zones = ctx.statistics?.zones
-    if (zones !== undefined && zones.length > 0 && zones.every(zone => (
-        Number.isSafeInteger(zone.encoffin_count)
-        && (zone.encoffin_count as number) >= 0
-    ))) {
+    if (Array.isArray(zones) && zones.length > 0 && zones.every(isValidNoDeathZone)) {
         const totalEncoffinCount = zones.reduce(
-            (total, zone) => total + (zone.encoffin_count as number),
+            (total, zone) => total + zone.encoffin_count,
             0,
         )
         if (totalEncoffinCount === 0) {
@@ -187,6 +184,12 @@ export function getMatchedAwakeDirectBattleMissionIds(
     }
 
     return matched
+}
+
+function isValidNoDeathZone(zone: unknown): zone is { encoffin_count: number } {
+    if (zone === null || typeof zone !== "object") return false
+    const encoffinCount = (zone as { encoffin_count?: unknown }).encoffin_count
+    return Number.isSafeInteger(encoffinCount) && (encoffinCount as number) >= 0
 }
 
 export function getMatchedAwakeRaceMissionIds(
