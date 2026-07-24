@@ -11,6 +11,7 @@ import { GachaType } from "../../lib/types";
 import { serializeGachaCampaign } from "../../data/utils";
 import { PlayerGachaCampaign, UserGachaCampaign } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
+import { incrementActiveMissionGachaCharacterCountSync } from "../../data/domains/active_mission_counters"
 import { givePlayerCharacterSync } from "../../lib/character";
 import { givePlayerEquipmentSync } from "../../lib/equipment";
 import { buildGachaExecPlan } from "../../lib/gacha-exec-plan";
@@ -364,6 +365,9 @@ const routes = async (fastify: FastifyInstance) => {
         const drawMetadata = drawGachaWithMetadataSync(gachaData, pullCount)
         const drawResult = drawMetadata.map((draw) => draw.id)
         const rewardResult = rewardPlayerGachaDrawResultSync(playerId, gachaData, drawResult, drawMetadata)
+        if (isCharacterGacha) {
+            incrementActiveMissionGachaCharacterCountSync(playerId, drawResult.length)
+        }
 
         // Log each drawn item in history
         const historyType = isCharacterGacha ? MailType.CHARACTER : MailType.EQUIPMENT
