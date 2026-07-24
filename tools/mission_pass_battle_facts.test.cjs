@@ -78,6 +78,37 @@ assert.equal(getPlayerCategoryMissionsSync(playerId, 8)[15]?.progress, 1)
 recordMissionBattleFacts(context({ questCategory: 2, questId: 1025001 }), evaluationTime)
 assert.equal(getPlayerCategoryMissionsSync(playerId, 8)[16]?.progress, 1)
 
+const raidPassTime = new Date("2024-06-03T12:00:00.000Z")
+recordMissionBattleFacts(context({
+    questCategory: 23,
+    questId: 4001,
+    isMulti: false,
+    isMultiHost: undefined,
+}), raidPassTime)
+assert.equal(getPlayerCategoryMissionsSync(playerId, 8)[2]?.progress, 1)
+recordMissionBattleFacts(context({
+    questCategory: 23,
+    questId: 4001,
+    isMulti: true,
+}), raidPassTime)
+assert.equal(getPlayerCategoryMissionsSync(playerId, 8)[2]?.progress, 1)
+
+const rushPassTime = new Date("2024-07-10T12:00:00.000Z")
+recordMissionBattleFacts(context({
+    questCategory: 24,
+    questId: 700004001,
+    isMulti: false,
+    isMultiHost: undefined,
+}), rushPassTime)
+assert.equal(getPlayerCategoryMissionsSync(playerId, 8)[9]?.progress, 1)
+recordMissionBattleFacts(context({
+    questCategory: 24,
+    questId: 700005001,
+    isMulti: false,
+    isMultiHost: undefined,
+}), rushPassTime)
+assert.equal(getPlayerCategoryMissionsSync(playerId, 8)[9]?.progress, 1)
+
 console.log("mission pass battle fact tests passed")
 cleanup()
 process.removeListener("exit", cleanup)

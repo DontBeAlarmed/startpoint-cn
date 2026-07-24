@@ -15,7 +15,7 @@
 
 ## Pass 剩余边界
 
-PassDaily、PassWeek、PassEvent 主数据、核心进度、点数和等级奖励已经接入。周常 type 20 救援、type 85 战斗表情、6 条 type 23 活动任务及购买流程仍未实现，且尚未通过 CN 客户端全流程验收。详见[修行之道](../systems/pass-card.md)。
+PassDaily、PassWeek、PassEvent 主数据、核心进度、点数、6 条 type 23 活动任务和等级奖励已经接入。周常 type 20 救援、type 85 战斗表情和购买流程仍未实现，且尚未通过 CN 客户端全流程验收。详见[修行之道](../systems/pass-card.md)。
 
 ## 邮件通知未统一
 

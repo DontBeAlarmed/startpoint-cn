@@ -49,12 +49,20 @@ export function recordPassMissionBattleFacts(
     context: FinishContext,
     evaluationTime: Date,
 ): number[] {
-    if (!context.questAccomplished || context.isMulti !== true) return []
+    if (!context.questAccomplished) return []
 
     const matchedMissionIds: number[] = []
     for (const definition of getMissionMasterDefinitions(8)) {
-        if (definition.patternType !== 16
-            || !isMissionDefinitionEnabledAt(definition, evaluationTime)
+        const patternType = definition.patternType
+        if (patternType !== 16 && patternType !== 23) continue
+        if (patternType === 16 && context.isMulti !== true) continue
+        if (patternType === 23) {
+            const battleKind = Number(definition.row[6])
+            if (battleKind !== 3
+                && !(battleKind === 2 && context.isMulti === true)
+                && !(battleKind === 1 && context.isMulti !== true)) continue
+        }
+        if (!isMissionDefinitionEnabledAt(definition, evaluationTime)
             || !matchesQuestRange(definition.row, context.questCategory, context.questId)) continue
         incrementPlayerCategoryMissionSync(context.playerId, 8, definition.missionId, 1)
         matchedMissionIds.push(definition.missionId)
