@@ -7,11 +7,13 @@ import { AwakeComputer } from "./computer-awake"
 import { CollectComputer } from "./collect-progress"
 import { FallbackComputer } from "./computer-fallback"
 import { PassComputer } from "./pass"
+import { EventSafeComputer } from "./computer-event-safe"
 
 const REGISTRY: ComputerRegistry = new Map([
     [1, RegularComputer],
     [2, RegularComputer],
     [10, RegularComputer],
+    [3, EventSafeComputer],
     [4, CollectComputer],
     [5, DegreeComputer],
     [6, PassComputer],

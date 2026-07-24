@@ -76,10 +76,14 @@
   `questIds`、100 条全 QuestRange；type 17 Host 12 条；type 18 Guest 1 条。规则只在成功多人 finish、role、category、
   quest ID 与开放期全部匹配后原子增量。Host 只接受 `isMultiHost=true`，Guest 只接受 `false`，`undefined` 关闭匹配；
   type 16 不要求房主标记。
+- type 37 `get_item_count` 的 40 条交易商人任务使用 `row[12]` 的物品 ID 和
+  `players_collected_items` 累计获得量计算。当前 40 条均指向官方物品 `80111`；只在任务页请求 category 3 且任务处于
+  开放期时结算和发奖。category 3 的运行时计算器只白名单该类型，其他任务保持持久化进度，旧 map 不会被重新启用。
 - CN 1.8.1 QuestRange 中 BossBattle、Advent、WorldStoryEventBossBattle 分别只对应 category 2、7、19；Advent 不含
   category 8。`row[10]=""` 是 `Within([])` 且严格无匹配，`(None)` 才是 `All`；`row[11]` 是 QuestRank，当前启用
   规则均为 `null`。type 20 Attention 因 `FinishContext` 没有权威救援来源而保持 0 条，普通 Guest 不冒充 Attention。
-- 其余 1707 条 category 3（包括 mission 1807）仍使用持久化 fallback。任务页不从全历史 quest progress 推算，
+- 当前 category 3 共启用 845 条严格事实：805 条协力规则和 40 条累计物品规则。其余 1667 条（包括 mission 1807）
+  仍使用持久化 fallback。任务页不从全历史 quest progress 推算，
   也不使用旧 map 自动发奖；
   后续必须补全 quest range、评级、房主/成员、救援、阶段和 client check 等谓词后逐批启用。
 
@@ -117,7 +121,7 @@
 
 - category 4 已形成累计获得量、活动隔离、结算、发奖和 load 映射；category 5 已接入上述 23 条权威事实。
   两类仍需 CN 客户端验证提示、奖励和重启持久化；category 5 的其余任务需逐族补事实。
-- category 3 已启用 805 条按 mission ID 的严格协力规则；其余复杂规则继续补类型化事实，旧 map 只作历史审计，
+- category 3 已启用 805 条按 mission ID 的严格协力规则和 40 条累计物品规则；其余复杂规则继续补类型化事实，旧 map 只作历史审计，
   不作为自动事实或发奖依据。Attention 在缺少权威来源前保持禁用。
 - Pass 的救援、表情、type 23 和购买流程尚未完成，三分类与等级奖励主链已具备自动测试，仍需 CN 客户端验收。
 - 角色觉醒的配对、竞速进度仍依赖已记录的本地计数器与映射；奖励结算与最终特殊奖励触发已按

@@ -240,6 +240,31 @@ async function main() {
             collectPageData.mission_progress_list.find(entry => entry.mission_id === 1500).progress_value,
             50,
         )
+
+        setServerTimeOffset(Date.parse("2023-12-01T04:00:00.000Z") - Date.now())
+        givePlayerItemSync(playerId, 80111, 10)
+        const eventItemPage = await fastify.inject({
+            method: "POST",
+            url: "/api/index.php/mission/get_mission_progress",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            payload: encodeRequest({
+                viewer_id: viewerId,
+                api_count: 1,
+                category_list: [{ category: 3 }],
+            }),
+        })
+        assert.equal(eventItemPage.statusCode, 200, eventItemPage.body)
+        const eventItemPageData = decodeResponse(eventItemPage).data
+        assert.deepEqual(eventItemPageData.mission_info, [{
+            mission_category_id: 3,
+            mission_id: 2316,
+            mission_reward_id: 2316001,
+        }])
+        assert.equal(
+            eventItemPageData.mission_progress_list.find(entry => entry.mission_id === 2316).progress_value,
+            10,
+        )
+        assert.equal(eventItemPageData.item_list[224], 5)
     } finally {
         await fastify.close()
         cleanup()

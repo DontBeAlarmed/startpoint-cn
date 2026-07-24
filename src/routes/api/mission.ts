@@ -73,7 +73,7 @@ const routes = async (fastify: FastifyInstance) => {
         const requestCategories = requestList.map(c => c.category)
         const evaluationTime = new Date(getServerTime() * 1000)
         const automaticScopes = requestList
-            .filter(entry => [1, 2, 4, 5, 6, 7, 8, 10].includes(entry.category))
+            .filter(entry => [1, 2, 3, 4, 5, 6, 7, 8, 10].includes(entry.category))
             .map(entry => ({ category: entry.category, eventId: entry.event_id }))
         const automaticSettlement = automaticScopes.length > 0
             ? settleMissionCategories(playerId, automaticScopes, evaluationTime)

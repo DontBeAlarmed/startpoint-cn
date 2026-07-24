@@ -4,7 +4,7 @@
 > 历史审计资产: `assets/mission_event_quest_map.json`
 > 严格规则生成器: `scripts/gen_mission_event_battle_rules.js`
 > 运行时资产: `assets/mission_event_battle_rules.json`
-> 覆盖范围: cat3 活动任务 2512 条；当前严格自动事实 805 条
+> 覆盖范围: cat3 活动任务 2512 条；QuestRange 严格规则 805 条，另有 40 条累计物品规则
 
 `mission_event_quest_map.json` 是按 pattern 展开的旧映射，只供 `computer-event.ts` 历史审计。它没有完整表达
 QuestRange selector、QuestRank、Host/Guest 和 Attention 来源，不能驱动自动事实。旧 939 条自动规则已从
@@ -37,6 +37,10 @@ difficulty，不从文案推断，也不切割 quest ID 字符串。
 严格资产按数值 mission ID 排序，覆盖 type 16 的 792 条（692 条有限 `questIds`、100 条全范围）、type 17 Host
 的 12 条和 type 18 Guest 的 1 条，共 805 条。运行时只加载 `compatibility=null` 且枚举、selector、rank 均已知的规则；
 未知值逐条 fail closed。mission 1400、1811 和 1807 等旧空 selector 任务不在资产中，1807 继续走持久化 fallback。
+
+category 3 的 type 37 不依赖 QuestRange 资产。运行时从 `row[12]` 读取物品 ID，以
+`players_collected_items` 的累计获得量结算 40 条交易商人任务；该白名单由 `computer-event-safe.ts` 承载。
+其他活动任务继续返回数据库持久化进度，`computer-event.ts` 和旧 quest map 仍只用于离线审计。
 
 ---
 

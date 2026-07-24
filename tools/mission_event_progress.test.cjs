@@ -6,6 +6,10 @@ const {
     EventComputer,
     getEventMissionCoverageReport,
 } = require("../src/lib/mission/computer-event")
+const {
+    EventSafeComputer,
+    getEventItemMissionItemId,
+} = require("../src/lib/mission/computer-event-safe")
 const { getComputer } = require("../src/lib/mission/registry")
 
 function context(questProgress) {
@@ -61,6 +65,17 @@ assert.deepEqual(coverage.exactMultiRulesByRole, { any: 792, host: 12, guest: 1 
 assert.equal(coverage.unsupported, 207)
 assert.equal(coverage.activeUnsupported, 0)
 assert.equal(coverage.unsupportedPatterns.includes("startdash_day1_1"), true)
-assert.equal(getComputer(3).name, "Fallback", "旧活动 map 未完成规则化前不得驱动客户端进度或发奖")
+assert.equal(getComputer(3).name, "EventSafe", "category 3 只能注册严格白名单计算器")
+assert.equal(getEventItemMissionItemId(2316), 80111)
+assert.equal(getEventItemMissionItemId(1400), undefined)
+assert.equal(EventSafeComputer.compute(2316, {
+    ...context({}),
+    collectedItemTotals: { 80111: 12 },
+}, 3), 12)
+assert.equal(
+    EventSafeComputer.compute(1400, { ...context({}), collectedItemTotals: { 80111: 12 } }, 7),
+    7,
+    "非白名单活动任务必须保留持久化进度",
+)
 
 console.log("mission event progress tests passed")
