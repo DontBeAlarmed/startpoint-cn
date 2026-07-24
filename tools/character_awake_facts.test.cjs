@@ -74,6 +74,18 @@ assert.deepEqual(
     getMatchedAwakeQuestPartyMissionIds(questPartyContext(2, 1010004, [10, 331003], true)),
     [],
 )
+assert.deepEqual(
+    getMatchedAwakeQuestPartyMissionIds(questPartyContext(1, 9999, [151006, 263002])),
+    [1510062],
+)
+assert.deepEqual(
+    getMatchedAwakeQuestPartyMissionIds(questPartyContext(1, 9999, [263002, 151006])),
+    [],
+)
+assert.deepEqual(
+    getMatchedAwakeQuestPartyMissionIds(questPartyContext(1, 9999, [151006])),
+    [],
+)
 
 assert.equal(isBondTokenMissionComplete([]), false)
 assert.equal(isBondTokenMissionComplete([{ status: 2 }, { status: 3 }]), true)
@@ -192,18 +204,32 @@ const slotFourMissionIds = new Set(Object.keys(require("../assets/mission_char_a
 const existingExplicitMissionIds = new Set([
     12, 13,
     1110013, 1210012, 1210013, 1310052, 1310053, 1410032, 1410033,
-    1510063, 2110012, 2110013, 2210042, 2210043, 2310012, 2310013,
+    1510062, 1510063, 1610023, 2110012, 2110013, 2210042, 2210043,
+    2310012, 2310013,
     2410632, 2410633, 2510032, 2510033, 2510042, 2510043, 2610073,
     2630022, 2630023, 3310032, 3310033,
 ])
 const directAwakeMissionIds = new Set([3210132, 3210133, 3410012, 3410013, 1610022, 2610072])
+const awakeDefs = require("../assets/mission_char_awake.json")
 const awakeFallbackMissionIds = Object.keys(require("../assets/mission_char_awake.json"))
     .map(Number)
     .filter(missionId => !storyMissionIds.has(missionId))
     .filter(missionId => !slotFourMissionIds.has(missionId))
     .filter(missionId => !existingExplicitMissionIds.has(missionId))
     .filter(missionId => !directAwakeMissionIds.has(missionId))
-assert.equal(awakeFallbackMissionIds.length, 57)
+assert.equal(awakeFallbackMissionIds.length, 55)
+for (const missionId of awakeFallbackMissionIds) {
+    const row = awakeDefs[missionId][0]
+    assert.equal(row[4], "93", `fallback mission ${missionId} must use specific-character pattern`)
+    assert.deepEqual(row.slice(5, 24), [
+        "", "", "3", "", "(None)", "", "", "", "(None)",
+        "(None)", "(None)", "(None)", "(None)", "", "", "(None)",
+        "(None)", "(None)", "(None)",
+    ])
+    assert.equal(row[24], row[1], `fallback mission ${missionId} must target its character_ids field`)
+    assert.match(row[3], /^队伍中编有.+通关任意关卡(?::|::x_count::次)?$/)
+    assert.doesNotMatch(row[3], /队长|共斗|限时|分钟|且|、|种族|连击|强化弹射|信赖/)
+}
 
 const awakeComputer = getComputer(9)
 assert.equal(awakeComputer.compute(2110012, {
@@ -227,6 +253,19 @@ assert.equal(awakeComputer.compute(1610022, {
     categoryMissionProgress: new Map([[1610022, 2]]),
     leaderClears: new Map([["161002", 99]]),
 }, 0), 2)
+for (const [missionId, directProgress, fallbackKey] of [
+    [3210133, 3, "321013"],
+    [3410012, 4, "341001"],
+    [3410013, 5, "341001"],
+    [2610072, 6, "261007"],
+    [1510062, 7, "151006"],
+]) {
+    assert.equal(awakeComputer.compute(missionId, {
+        categoryMissionProgress: new Map([[missionId, directProgress]]),
+        charClears: new Map([[fallbackKey, 99]]),
+        leaderClears: new Map([[fallbackKey, 98]]),
+    }, 0), directProgress)
+}
 
 assert.equal(awakeComputer.compute(1410033, {
     charData: new Map([["141003", { bondTokenList: [] }]]),

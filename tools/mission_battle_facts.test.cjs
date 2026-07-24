@@ -60,6 +60,7 @@ assert.deepEqual(calls, [["result", 1, {
     accomplished: false,
     clearRank: 1,
 }]])
+assert.equal(calls.some(([kind]) => kind === "party"), false, "failed settlement must not call direct awake tracker")
 
 recordMissionBattleFacts({ ...baseContext, questAccomplished: true, isMulti: true, isMultiHost: true })
 assert.deepEqual(calls, [

@@ -90,6 +90,9 @@ assert.deepEqual(missionWrites.slice(-2), [
     [17, 9, 3410013, 1],
 ])
 
+trackPartyCoClears(context(1, 9001, [151006, 263002]))
+assert.deepEqual(missionWrites.slice(-1), [[17, 9, 1510062, 1]])
+
 trackPartyCoClears(context(1, 1, [161002], false, { zones: [{ encoffin_count: 0 }] }))
 assert.deepEqual(missionWrites.slice(-1), [[17, 9, 1610022, 1]])
 

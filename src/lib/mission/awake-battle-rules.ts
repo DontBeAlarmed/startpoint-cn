@@ -8,10 +8,11 @@ export interface PartyCoClearRow {
 
 interface QuestPartyRule {
     missionId: number
-    category: number
-    questIds: readonly number[]
+    category?: number
+    questIds?: readonly number[]
     requiredCharacterIds: readonly number[]
     singleOnly: boolean
+    leaderCharacterId?: number
 }
 
 interface QuestPartyFactContext {
@@ -41,6 +42,12 @@ interface NoDeathRule {
 }
 
 const QUEST_PARTY_RULES: readonly QuestPartyRule[] = Object.freeze([
+    {
+        missionId: 1510062,
+        requiredCharacterIds: [151006, 263002],
+        singleOnly: false,
+        leaderCharacterId: 151006,
+    },
     {
         missionId: 3310032,
         category: 15,
@@ -133,9 +140,11 @@ export function getMatchedAwakeQuestPartyMissionIds(
     }
 
     return QUEST_PARTY_RULES
-        .filter(rule => rule.category === ctx.questCategory)
-        .filter(rule => rule.questIds.includes(ctx.questId))
+        .filter(rule => rule.category === undefined || rule.category === ctx.questCategory)
+        .filter(rule => rule.questIds === undefined || rule.questIds.includes(ctx.questId))
         .filter(rule => !rule.singleOnly || !ctx.isMulti)
+        .filter(rule => rule.leaderCharacterId === undefined
+            || ctx.party.characters[0]?.id === rule.leaderCharacterId)
         .filter(rule => rule.requiredCharacterIds.every(id => partyCharacterIds.has(id)))
         .map(rule => rule.missionId)
 }
