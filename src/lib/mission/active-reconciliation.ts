@@ -48,6 +48,7 @@ const PATTERN_UPGRADE_EQUIPMENT_COUNT = 34
 const PATTERN_SET_SOUL_SPHERE_COUNT = 35
 const PATTERN_TREASURE_SHOP_BOUGHT_ITEM_COUNT = 45
 const PATTERN_TRADED_COUNT_TO_EQUIPMENT_BY_BOSS_COIN = 64
+const PATTERN_BOSS_COIN_EXCHANGE = 84
 const PATTERN_TOTAL_USED_MANA_COUNT = 46
 const PATTERN_TOTAL_GACHA_CHARACTER_COUNT = 78
 const COME_BACK_EVENT_STRING_ID = "come_back_mission"
@@ -238,6 +239,8 @@ export function computeActiveMissionFactProgress(
         case PATTERN_TREASURE_SHOP_BOUGHT_ITEM_COUNT:
             return state.treasureShopPurchaseCount
         case PATTERN_TRADED_COUNT_TO_EQUIPMENT_BY_BOSS_COIN:
+            return state.bossCoinShopPurchaseCount
+        case PATTERN_BOSS_COIN_EXCHANGE:
             return state.bossCoinShopPurchaseCount
         case PATTERN_OVER_LIMIT_TOTAL_COUNT:
             return characters.reduce((total, [, character]) => total + Math.max(0, character.overLimitStep), 0)
