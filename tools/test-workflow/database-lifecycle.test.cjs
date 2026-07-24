@@ -226,6 +226,72 @@ test("database initializer uses schema checks instead of broad ALTER catches", (
     assert.ok(source.split("ensureSchemaColumn(").length - 1 >= 20)
 })
 
+test("default schema migration preserves v6 players and creates cascading Pass tables", t => {
+    const paths = temporaryPaths(t)
+    data.initializeDatabase({ paths })
+    const { insertAccountSync } = require("../../src/data/domains/account")
+    const { insertDefaultPlayerSync } = require("../../src/data/domains/player")
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: "schema-v6-pass-migration",
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    getDb().prepare("UPDATE players SET name = ? WHERE id = ?").run("schema-v6-player", playerId)
+    data.closeDatabase()
+
+    const schemaV6 = new Sqlite(paths.databaseFile)
+    schemaV6.exec("DROP TABLE players_pass_card_rewards; DROP TABLE players_pass_cards")
+    schemaV6.pragma("user_version = 6")
+    assert.equal(schemaV6.pragma("user_version", { simple: true }), 6)
+    assert.equal(schemaV6.prepare("SELECT name FROM players WHERE id = ?").get(playerId).name, "schema-v6-player")
+    assert.deepEqual(
+        schemaV6.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'players_pass_card%'").all(),
+        [],
+    )
+    schemaV6.close()
+    fs.writeFileSync(paths.databaseVersionFile, "6")
+
+    data.initializeDatabase({ paths })
+    const migrated = getDb()
+    assert.equal(migrated.pragma("user_version", { simple: true }), 7)
+    assert.equal(migrated.prepare("SELECT name FROM players WHERE id = ?").get(playerId).name, "schema-v6-player")
+    assert.deepEqual(
+        migrated.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'players_pass_card%'")
+            .all().map(row => row.name).sort(),
+        ["players_pass_card_rewards", "players_pass_cards"],
+    )
+    assert.equal(
+        migrated.pragma("foreign_key_list(players_pass_cards)")
+            .some(foreignKey => foreignKey.table === "players" && foreignKey.on_delete === "CASCADE"),
+        true,
+    )
+    assert.equal(
+        migrated.pragma("foreign_key_list(players_pass_card_rewards)")
+            .filter(foreignKey => foreignKey.table === "players_pass_cards" && foreignKey.on_delete === "CASCADE")
+            .length,
+        2,
+    )
+
+    const insertPassRows = () => {
+        migrated.prepare("INSERT INTO players_pass_cards (player_id, event_id) VALUES (?, 3)").run(playerId)
+        migrated.prepare(`
+            INSERT INTO players_pass_card_rewards (player_id, event_id, reward_id)
+            VALUES (?, 3, 121)
+        `).run(playerId)
+    }
+    insertPassRows()
+    migrated.prepare("DELETE FROM players_pass_cards WHERE player_id = ? AND event_id = 3").run(playerId)
+    assert.equal(migrated.prepare("SELECT COUNT(*) AS count FROM players_pass_card_rewards").get().count, 0)
+
+    insertPassRows()
+    migrated.prepare("DELETE FROM players WHERE id = ?").run(playerId)
+    assert.equal(migrated.prepare("SELECT COUNT(*) AS count FROM players_pass_cards").get().count, 0)
+    assert.equal(migrated.prepare("SELECT COUNT(*) AS count FROM players_pass_card_rewards").get().count, 0)
+})
+
 test("non-duplicate ALTER failure rolls back and leaves user_version unchanged", t => {
     const { ensureSchemaColumn } = require("../../src/data/schema")
     const paths = temporaryPaths(t)

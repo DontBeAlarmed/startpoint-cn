@@ -8,6 +8,9 @@ import degreeRewards from "../../../assets/mission_degree_reward.json"
 import collectRewards from "../../../assets/mission_collect_item_reward.json"
 import weeklyRewards from "../../../assets/mission_weekly_reward.json"
 import charAwakeRewards from "../../../assets/mission_char_awake_reward.json"
+import passDailyRewards from "../../../assets/mission_pass_daily_reward.json"
+import passWeekRewards from "../../../assets/mission_pass_week_reward.json"
+import passEventRewards from "../../../assets/mission_pass_event_reward.json"
 
 export interface ActiveMissionReward {
     kind: number
@@ -179,6 +182,9 @@ const categoryRewardTables: Readonly<Record<number, {
     3: { table: eventRewards as Record<string, Record<string, any[]>>, targetProgressIndex: 1, firstKindIndex: 5 },
     4: { table: collectRewards as Record<string, Record<string, any[]>>, targetProgressIndex: 2, firstKindIndex: 6 },
     5: { table: degreeRewards as Record<string, Record<string, any[]>>, targetProgressIndex: 1, firstKindIndex: 5 },
+    6: { table: passDailyRewards as Record<string, Record<string, any[]>>, targetProgressIndex: 1, firstKindIndex: 5 },
+    7: { table: passWeekRewards as Record<string, Record<string, any[]>>, targetProgressIndex: 1, firstKindIndex: 5 },
+    8: { table: passEventRewards as Record<string, Record<string, any[]>>, targetProgressIndex: 1, firstKindIndex: 5 },
     10: { table: weeklyRewards as Record<string, Record<string, any[]>>, targetProgressIndex: 1, firstKindIndex: 5 },
 }
 

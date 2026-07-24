@@ -7,8 +7,9 @@ import { trackPowerflip } from "../quest/finish/powerflip-tracker"
 import type { FinishContext } from "../quest/finish/types"
 import { getServerTime } from "../../utils"
 import { recordEventMissionBattleFacts } from "./event-battle-facts"
+import { recordPassMissionBattleFacts } from "./pass-battle-facts"
 
-export const BATTLE_SETTLEMENT_CATEGORIES = Object.freeze([1, 2, 3, 10])
+export const BATTLE_SETTLEMENT_CATEGORIES = Object.freeze([1, 2, 3, 6, 7, 8, 10])
 
 export function recordMissionBattleFacts(
     ctx: FinishContext,
@@ -22,6 +23,7 @@ export function recordMissionBattleFacts(
     })
     if (!ctx.questAccomplished) return
     recordEventMissionBattleFacts(ctx, evaluationTime)
+    recordPassMissionBattleFacts(ctx, evaluationTime)
     if (ctx.isMulti) {
         incrementPlayerQuestMultiClearSync(ctx.playerId, ctx.questCategory, ctx.questId)
     }

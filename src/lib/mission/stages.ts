@@ -7,6 +7,9 @@ import degreeRewards from "../../../assets/mission_degree_reward.json"
 import collectItemRewards from "../../../assets/mission_collect_item_reward.json"
 import weeklyRewards from "../../../assets/mission_weekly_reward.json"
 import charAwakeRewards from "../../../assets/mission_char_awake_reward.json"
+import passDailyRewards from "../../../assets/mission_pass_daily_reward.json"
+import passWeekRewards from "../../../assets/mission_pass_week_reward.json"
+import passEventRewards from "../../../assets/mission_pass_event_reward.json"
 
 interface MissionStage {
     stage: number
@@ -38,6 +41,9 @@ const missionStageLookup: Record<number, Record<string, MissionStage[]>> = {
     3: buildLookup(eventRewards as any, 1),
     4: buildLookup(collectItemRewards as any, 2),
     5: buildLookup(degreeRewards as any, 1),
+    6: buildLookup(passDailyRewards as any, 1),
+    7: buildLookup(passWeekRewards as any, 1),
+    8: buildLookup(passEventRewards as any, 1),
     9: buildLookup(charAwakeRewards as any, 5),
     10: buildLookup(weeklyRewards as any, 1),
 }

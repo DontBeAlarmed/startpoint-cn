@@ -38,6 +38,6 @@ test("full sync publishes the scanned catalog and release tables together", asyn
     assert.deepEqual(loaded, synchronizedCatalog)
     assert.deepEqual(release.objects[release.manifest.catalog.object], synchronizedCatalog)
     assert.equal(loaded.targetVersion, release.manifest.assetVersion)
-    assert.equal(Object.keys(release.manifest.tables).length, 94)
+    assert.equal(Object.keys(release.manifest.tables).length, 102)
     assert.equal(fallbackReads, 0)
 })

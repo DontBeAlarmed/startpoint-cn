@@ -74,7 +74,7 @@ assert.deepEqual(getSafeEventBattleRuleCoverage(), {
     totalEventMissions: 2512,
     safeMultiClearRules: 939,
 })
-assert.deepEqual(BATTLE_SETTLEMENT_CATEGORIES, [1, 2, 3, 10])
+assert.deepEqual(BATTLE_SETTLEMENT_CATEGORIES, [1, 2, 3, 6, 7, 8, 10])
 
 const activeTime = new Date("2020-01-01T03:00:00.000Z")
 const firstMatches = recordEventMissionBattleFacts(finishContext(), activeTime)
@@ -109,7 +109,7 @@ assert.equal(
     "通用 finish 事实入口必须同时记录安全活动任务事实",
 )
 
-const oneClearEventTime = new Date("2020-03-01T03:00:00.000Z")
+const oneClearEventTime = new Date("2020-03-01T04:00:00.000Z")
 recordMissionBattleFacts(finishContext(), oneClearEventTime)
 const settlement = settleMissionCategories(playerId, [3], oneClearEventTime)
 assert.equal(settlement.missionInfo.some(info => info.mission_id === 1407), true)

@@ -7,6 +7,7 @@ import { getCharacterIdFromMission } from "./character-queries"
 import { getComputer } from "./registry"
 import { getAwakeMissionRewardStageDefinition } from "./rewards"
 import { getCompletedStageNumbers, getMissionIdsByCategory } from "./stages"
+import { getServerDate } from "../../utils"
 
 export interface AwakeUnlockReconciliationResult {
     all: CharacterAwakeUnlockMap
@@ -65,7 +66,7 @@ export function reconcileAwakeUnlocks(
     const persistedMissions = getPlayerCategoryMissionsSync(playerId, 9)
     const candidateIds = candidateCharacterIds ? new Set(candidateCharacterIds.map(String)) : null
     const computer = getComputer(9)
-    const context = computer.buildContext(playerId, 9)
+    const context = computer.buildContext(playerId, 9, getServerDate())
     const progressList: AwakeUnlockProgress[] = []
 
     for (const missionId of getMissionIdsByCategory(9)) {

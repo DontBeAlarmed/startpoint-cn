@@ -8,6 +8,7 @@ import { getComputer } from "./registry"
 import { getMissionIdsByCategory, getMissionStageIds } from "./stages"
 import { getCharacterIdFromMission } from "./character-queries"
 import type { CategoryContext } from "./types"
+import { getServerDate } from "../../utils"
 
 export interface AwakeMissionEntry {
     mission_id: number
@@ -33,7 +34,7 @@ export function computeAwakeSummary(playerId: number): AwakeSummary {
     }
 
     const computer = getComputer(9)
-    const ctx = computer.buildContext(playerId, 9) as CategoryContext
+    const ctx = computer.buildContext(playerId, 9, getServerDate()) as CategoryContext
 
     const activeMissionList: AwakeMissionEntry[] = []
     const manaBoardAwakeMap = getPlayerCharacterAwakeUnlocksSync(playerId)

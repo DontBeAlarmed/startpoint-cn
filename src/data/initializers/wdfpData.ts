@@ -491,6 +491,28 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_pass_cards (
+        player_id INTEGER NOT NULL,
+        event_id INTEGER NOT NULL,
+        point INTEGER NOT NULL DEFAULT 0,
+        is_buy INTEGER NOT NULL DEFAULT 0,
+        login_baseline INTEGER,
+        PRIMARY KEY (player_id, event_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_pass_card_rewards (
+        player_id INTEGER NOT NULL,
+        event_id INTEGER NOT NULL,
+        reward_id INTEGER NOT NULL,
+        is_received_1 INTEGER NOT NULL DEFAULT 0,
+        is_received_2 INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, event_id, reward_id),
+        FOREIGN KEY (player_id, event_id)
+            REFERENCES players_pass_cards (player_id, event_id) ON DELETE CASCADE,
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_box_gacha (
         id INTEGER NOT NULL,
         box_id INTEGER NOT NULL,

@@ -58,6 +58,7 @@ import mailApiPlugin from "./routes/api/mail";
 import rankingEventApiPlugin from "./routes/api/rankingEvent";
 import missionApiPlugin from "./routes/api/mission";
 import activeMissionApiPlugin from "./routes/api/activeMission";
+import passCardApiPlugin from "./routes/api/passCard";
 import paymentApiPlugin from "./routes/api/payment";
 import newsApiPlugin from "./routes/api/news";
 import raidEventApiPlugin from "./routes/api/raidEvent";
@@ -169,16 +170,6 @@ fastify.post(`${apiPrefix}/channels/channel_leiting_pay/query_purcharge`, async 
 
 fastify.post(`${apiPrefix}/channels/channel_leiting_pay/set_unfinish_order_status`, async (_request, reply) => {
     stubMsgpackReply(reply, {});
-});
-
-// PassCard (修行之道): get current pass card data
-fastify.post(`${apiPrefix}/Pass_card/get_pass_card`, async (_request, reply) => {
-    stubMsgpackReply(reply, { point: 0, is_buy: false, all_received_record: [] });
-});
-
-// PassCard: claim all available rewards
-fastify.post(`${apiPrefix}/Pass_card/receive_all`, async (_request, reply) => {
-    stubMsgpackReply(reply, { all_received_record: [] });
 });
 
 // Episode trial reading: finish stub (character story trial)
@@ -310,6 +301,7 @@ fastify.register(mailApiPlugin, { prefix: `${apiPrefix}/mail` });
 fastify.register(rankingEventApiPlugin, { prefix: `${apiPrefix}/ranking_event` });
 fastify.register(missionApiPlugin, { prefix: `${apiPrefix}/mission` });
 fastify.register(activeMissionApiPlugin, { prefix: `${apiPrefix}/active_mission` });
+fastify.register(passCardApiPlugin, { prefix: `${apiPrefix}/Pass_card` });
 fastify.register(paymentApiPlugin, { prefix: `${apiPrefix}/payment` });
 fastify.register(newsApiPlugin, { prefix: `${apiPrefix}/news` });
 fastify.register(raidEventApiPlugin, { prefix: `${apiPrefix}/event/raid` });

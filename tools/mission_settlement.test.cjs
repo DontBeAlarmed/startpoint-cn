@@ -75,7 +75,7 @@ givePlayerItemSync(collectPlayerId, 80001, 50)
 const collectSettlement = settleMissionCategories(
     collectPlayerId,
     [{ category: 4, eventId: 1 }],
-    new Date("2020-02-21T03:00:00.000Z"),
+    new Date("2020-02-21T04:00:00.000Z"),
 )
 assert.deepEqual(collectSettlement.missionInfo, [
     { mission_category_id: 4, mission_id: 1500, mission_reward_id: 1500001 },
@@ -90,7 +90,7 @@ givePlayerItemSync(wrongEventPlayerId, 80001, 50)
 const wrongEventSettlement = settleMissionCategories(
     wrongEventPlayerId,
     [{ category: 4, eventId: 2 }],
-    new Date("2020-02-21T03:00:00.000Z"),
+    new Date("2020-02-21T04:00:00.000Z"),
 )
 assert.deepEqual(wrongEventSettlement.missionInfo, [])
 assert.equal(getPlayerCategoryMissionsSync(wrongEventPlayerId, 4)[1500], undefined)

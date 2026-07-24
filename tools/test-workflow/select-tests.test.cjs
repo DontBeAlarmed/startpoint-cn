@@ -400,11 +400,18 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_event_battle_facts.test.cjs",
         "tools/mission_event_progress.test.cjs",
         "tools/mission_master_data.test.cjs",
+        "tools/mission_pass.test.cjs",
+        "tools/mission_pass_battle_facts.test.cjs",
+        "tools/mission_pass_content.test.cjs",
+        "tools/mission_pass_route.test.cjs",
+        "tools/mission_pass_settlement.test.cjs",
         "tools/mission_progress_route.test.cjs",
         "tools/mission_regular_facts.test.cjs",
         "tools/mission_response_merge.test.cjs",
         "tools/mission_settlement.test.cjs",
         "tools/mission_storage.test.cjs",
+        "tools/mission_time_utils.test.cjs",
+        "tools/pass_card_route.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS["integration:quest"].tests, [
         "tools/quest_entry_lifecycle.test.cjs",

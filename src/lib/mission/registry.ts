@@ -6,6 +6,7 @@ import { DegreeComputer } from "./computer-degree"
 import { AwakeComputer } from "./computer-awake"
 import { CollectComputer } from "./collect-progress"
 import { FallbackComputer } from "./computer-fallback"
+import { PassComputer } from "./pass"
 
 const REGISTRY: ComputerRegistry = new Map([
     [1, RegularComputer],
@@ -13,8 +14,10 @@ const REGISTRY: ComputerRegistry = new Map([
     [10, RegularComputer],
     [4, CollectComputer],
     [5, DegreeComputer],
+    [6, PassComputer],
+    [7, PassComputer],
+    [8, PassComputer],
     [9, AwakeComputer],
-    // Categories 6,7,8 → Fallback (DB-stored progress)
 ])
 
 export function getComputer(category: number): MissionComputer {

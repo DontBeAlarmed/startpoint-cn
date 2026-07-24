@@ -55,11 +55,11 @@ assert.equal(awakeComputer.compute(3410054, { charClears: new Map([["341005", 3]
 assert.equal(awakeComputer.compute(3410054, { charClears: new Map([["341005", 5]]) }, 0), 3)
 
 assert.equal(
-    isMissionEnabledAt(2, 3, new Date("2019-11-28T02:59:59.999Z")),
+    isMissionEnabledAt(2, 3, new Date("2019-11-28T03:59:59.999Z")),
     false
 )
 assert.equal(
-    isMissionEnabledAt(2, 3, new Date("2019-11-28T03:00:00.000Z")),
+    isMissionEnabledAt(2, 3, new Date("2019-11-28T04:00:00.000Z")),
     true
 )
 assert.equal(

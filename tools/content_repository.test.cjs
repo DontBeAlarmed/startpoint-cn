@@ -80,11 +80,11 @@ async function writeRelease(store, marker, options = {}) {
     return { manifest, object }
 }
 
-test("missing current loads and freezes all 94 explicit bundled fallback tables", async t => {
+test("missing current loads and freezes all 102 explicit bundled fallback tables", async t => {
     const fixture = createLegacyLayout(t)
     const repository = await ContentRepository.load(fixture.options)
 
-    assert.equal(TABLE_SOURCES.length, 94)
+    assert.equal(TABLE_SOURCES.length, 102)
     assert.deepEqual(repository.info(), {
         source: "bundled",
         assetVersion: "1.4.54",

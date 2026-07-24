@@ -28,9 +28,9 @@ assert.equal(awake.enableEnd, "2099-04-13 11:59:59")
 
 const regular = getMissionMasterDefinition(1, 107)
 assert.equal(regular.pattern, "twitter_check_mission_001")
-assert.equal(isMissionDefinitionEnabledAt(regular, new Date("2099-12-30T03:00:00.000Z")), true)
-assert.equal(isMissionDefinitionEnabledAt(regular, new Date("2099-12-31T02:59:59.000Z")), true)
-assert.equal(isMissionDefinitionEnabledAt(regular, new Date("2099-12-31T02:59:59.001Z")), false)
+assert.equal(isMissionDefinitionEnabledAt(regular, new Date("2099-12-30T04:00:00.000Z")), true)
+assert.equal(isMissionDefinitionEnabledAt(regular, new Date("2099-12-31T03:59:59.000Z")), true)
+assert.equal(isMissionDefinitionEnabledAt(regular, new Date("2099-12-31T03:59:59.001Z")), false)
 
 const daily = getMissionMasterDefinition(2, 1)
 assert.equal(daily.pattern, "single_battle_play")
@@ -48,15 +48,17 @@ assert.equal(weekly.enableStart, "2024-07-18 12:00:00")
 assert.equal(weekly.enableEnd, "2050-05-31 12:00:00")
 
 assert.equal(
-    isMissionDefinitionEnabledAt(collect, new Date("2020-02-21T03:00:00.000Z"), 1),
+    isMissionDefinitionEnabledAt(collect, new Date("2020-02-21T04:00:00.000Z"), 1),
     true,
 )
 assert.equal(
-    isMissionDefinitionEnabledAt(collect, new Date("2020-02-21T03:00:00.000Z"), 2),
+    isMissionDefinitionEnabledAt(collect, new Date("2020-02-21T04:00:00.000Z"), 2),
     false,
 )
 
-assert.throws(() => getMissionMasterDefinition(6, 1), /unsupported mission category/)
+assert.equal(getMissionMasterDefinition(6, 1).eventId, 1)
+assert.equal(getMissionMasterDefinition(7, 1).eventId, 1)
+assert.equal(getMissionMasterDefinition(8, 1).eventId, 1)
 
 const syntheticEvaluationTime = new Date("2024-08-14T12:00:00.000Z")
 const syntheticDefinitions = [

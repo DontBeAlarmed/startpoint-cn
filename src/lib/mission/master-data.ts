@@ -5,20 +5,28 @@ import collectItemDefinitions from "../../../assets/mission_collect_item.json"
 import degreeDefinitions from "../../../assets/mission_degree.json"
 import characterAwakeDefinitions from "../../../assets/mission_char_awake.json"
 import weeklyDefinitions from "../../../assets/mission_weekly_def.json"
+import passDailyDefinitions from "../../../assets/mission_pass_daily.json"
+import passWeekDefinitions from "../../../assets/mission_pass_week.json"
+import passEventDefinitions from "../../../assets/mission_pass_event.json"
 
 interface CategoryLayout {
     pattern: number
     start: number
     end: number
     eventId?: number
+    patternType?: number
+    requiresEventScope?: boolean
 }
 
 const CATEGORY_LAYOUT: Readonly<Record<number, CategoryLayout>> = {
     1: { pattern: 0, start: 25, end: 26 },
     2: { pattern: 0, start: 25, end: 26 },
     3: { pattern: 0, start: 25, end: 26 },
-    4: { eventId: 0, pattern: 2, start: 27, end: 28 },
+    4: { eventId: 0, pattern: 2, start: 27, end: 28, requiresEventScope: true },
     5: { pattern: 1, start: 26, end: 27 },
+    6: { eventId: 0, pattern: 1, patternType: 3, start: 26, end: 27 },
+    7: { eventId: 0, pattern: 1, patternType: 3, start: 26, end: 27 },
+    8: { eventId: 0, pattern: 1, patternType: 3, start: 26, end: 27 },
     9: { pattern: 2, start: 27, end: 28 },
     10: { pattern: 0, start: 25, end: 26 },
 }
@@ -31,6 +39,9 @@ const TABLE_BY_CATEGORY: Readonly<Record<number, RawMissionTable>> = {
     3: eventDefinitions,
     4: collectItemDefinitions,
     5: degreeDefinitions,
+    6: passDailyDefinitions,
+    7: passWeekDefinitions,
+    8: passEventDefinitions,
     9: characterAwakeDefinitions,
     10: weeklyDefinitions,
 }
@@ -40,6 +51,8 @@ export interface MissionMasterDefinition {
     missionId: number
     pattern: string
     eventId?: number
+    patternType?: number
+    requiresEventScope?: boolean
     enableStart?: string
     enableEnd?: string
     row: readonly unknown[]
@@ -57,9 +70,9 @@ function getFirstRow(value: unknown): readonly unknown[] | undefined {
     return value[0]
 }
 
-function parseMasterJstTime(value: string | undefined): number | undefined {
+function parseMasterCnTime(value: string | undefined): number | undefined {
     if (value === undefined) return undefined
-    return Date.parse(`${value.replace(" ", "T")}+09:00`)
+    return Date.parse(`${value.replace(" ", "T")}+08:00`)
 }
 
 export function getMissionMasterDefinitions(category: number): readonly MissionMasterDefinition[] {
@@ -79,11 +92,14 @@ export function getMissionMasterDefinitions(category: number): readonly MissionM
         if (!Number.isInteger(missionId) || pattern === undefined) continue
 
         const eventIdValue = layout.eventId === undefined ? undefined : Number(row[layout.eventId])
+        const patternTypeValue = layout.patternType === undefined ? undefined : Number(row[layout.patternType])
         definitions.push(Object.freeze({
             category,
             missionId,
             pattern,
             ...(Number.isInteger(eventIdValue) ? { eventId: eventIdValue } : {}),
+            ...(Number.isInteger(patternTypeValue) ? { patternType: patternTypeValue } : {}),
+            ...(layout.requiresEventScope ? { requiresEventScope: true } : {}),
             enableStart: optionalMasterString(row[layout.start]),
             enableEnd: optionalMasterString(row[layout.end]),
             row,
@@ -106,11 +122,11 @@ export function isMissionDefinitionEnabledAt(
     at: Date,
     eventId?: number,
 ): boolean {
-    if (definition.eventId !== undefined && definition.eventId !== eventId) return false
+    if (definition.requiresEventScope && definition.eventId !== eventId) return false
 
     const now = at.getTime()
-    const start = parseMasterJstTime(definition.enableStart)
-    const end = parseMasterJstTime(definition.enableEnd)
+    const start = parseMasterCnTime(definition.enableStart)
+    const end = parseMasterCnTime(definition.enableEnd)
     if (!Number.isFinite(now)) return false
     if (start !== undefined && (!Number.isFinite(start) || start > now)) return false
     if (end !== undefined && (!Number.isFinite(end) || now > end)) return false

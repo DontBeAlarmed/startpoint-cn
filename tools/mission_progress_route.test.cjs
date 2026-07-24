@@ -112,7 +112,7 @@ async function main() {
             "未知、非法、非白名单和未开放任务不得写库",
         )
 
-        setServerTime("2099-12-30T03:00:00.000Z")
+        setServerTime("2099-12-30T04:00:00.000Z")
         await postProgress(fastify, "twitter_check", 1)
         assert.equal(getPlayerCategoryMissionsSync(playerId, 1)[107].progress, 1)
 

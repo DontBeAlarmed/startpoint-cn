@@ -32,6 +32,7 @@ export interface CategoryContext {
     }
     battleCounters?: MissionBattleCounters
     snapshot?: SnapshotData | null
+    passEventLoginProgress?: Record<number, number>
 }
 
 /** A mission computer handles one or more categories */
@@ -42,7 +43,7 @@ export interface MissionComputer {
      * Build pre-cached context for this category.
      * All DB I/O happens here — compute() must be pure.
      */
-    buildContext(playerId: number, category: number): CategoryContext
+    buildContext(playerId: number, category: number, evaluationTime: Date): CategoryContext
 
     /**
      * Compute progress for a single mission.

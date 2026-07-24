@@ -22,6 +22,10 @@ export interface SnapshotData {
     loginDays: number
 }
 
+export function getPassWeekSnapshotType(eventId: number): string {
+    return `pass-week:${eventId}`
+}
+
 export function buildPeriodicSnapshotData(
     playerId: number,
     player: Pick<Player, "totalStaminaUsed" | "totalDashes" | "totalPowerflips" | "totalLoginDays">,
@@ -62,7 +66,7 @@ export function initializePeriodicMissionSnapshots(
     })
 }
 
-export function takeSnapshot(playerId: number, periodType: 'daily' | 'weekly', data: SnapshotData): void {
+export function takeSnapshot(playerId: number, periodType: string, data: SnapshotData): void {
     getDb().prepare(`
     INSERT OR REPLACE INTO players_periodic_snapshots
         (player_id, period_type, quest_clears, stamina_used, rank_ss, rank_s, rank_a, rank_b,
@@ -81,7 +85,7 @@ export function takeSnapshot(playerId: number, periodType: 'daily' | 'weekly', d
     )
 }
 
-export function getSnapshot(playerId: number, periodType: 'daily' | 'weekly'): SnapshotData | null {
+export function getSnapshot(playerId: number, periodType: string): SnapshotData | null {
     const row = getDb().prepare(`
     SELECT quest_clears, stamina_used, rank_ss, rank_s, rank_a, rank_b,
            single_play_count, single_clear_count, multi_play_count, multi_clear_count,

@@ -6,16 +6,16 @@
 
 任务模块当前仍只能标记为“部分完成”：
 
-1. category 3、4、5 的活动、收集和称号任务缺少完整自动结算链；活动限定任务必须按 event ID 隔离。
-2. Collect-item 缺少完整的库存或累计获得量模型，Degree 只覆盖少量等级任务，`/load` 的收集任务清单仍不完整。
+1. category 3 的复杂活动谓词仍未全部实现；QuestRange、评级、房主/成员、救援来源和客户端检查必须逐项对齐。
+2. Collect-item 已使用累计获得量并按 event ID 隔离；Degree 仍只覆盖 23 条有权威事实的任务。
 3. category 1、2、10 的普通、每日、每周自动结算已有服务端测试，但奖励提示、跨日/跨周重置和重启持久化尚未通过 CN 客户端验收。
 4. 角色觉醒已知配对、种族、指定关卡和空羁绊错误已经修正，但 144 条任务条件仍不能标记为全部正确。
 
 角色觉醒的“立即解锁第二页、手动回第一页领奖”核心时序已经通过客户端验收，但这不代表 144 条觉醒任务条件全部正确。详见[任务完成度审计](../systems/mission-completion-audit.md)与[角色觉醒任务](../systems/character-awake-missions.md)。
 
-## Pass 任务缺失
+## Pass 剩余边界
 
-客户端存在 PassDaily、PassWeek、PassEvent，即 category 6、7、8。当前缺少完整主数据转换、进度计算、阶段奖励和协议返回，只保留不足以形成完整玩法的基础响应。Pass 不能标记为已实现。
+PassDaily、PassWeek、PassEvent 主数据、核心进度、点数和等级奖励已经接入。周常 type 20 救援、type 85 战斗表情、6 条 type 23 活动任务及购买流程仍未实现，且尚未通过 CN 客户端全流程验收。详见[修行之道](../systems/pass-card.md)。
 
 ## 邮件通知未统一
 

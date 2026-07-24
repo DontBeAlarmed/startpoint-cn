@@ -5,7 +5,9 @@ import { getDefaultPlayerData, deserializeBoolean, serializeBoolean } from "../u
 import { getAccountSync } from "./account";
 import { getPlayerQuestProgressSync } from "./quest";
 import { isNewDay, isNewWeek } from "../../lib/time-utils";
-import { buildPeriodicSnapshotData, initializePeriodicMissionSnapshots, takeSnapshot } from "../../lib/mission/snapshot";
+import { buildPeriodicSnapshotData, getPassWeekSnapshotType, getSnapshot, initializePeriodicMissionSnapshots, takeSnapshot } from "../../lib/mission/snapshot";
+import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "../../lib/mission/master-data";
+import { ensurePlayerPassCardLoginProgressSync } from "./pass-card";
 import dailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 
 type DailyChallengePointLookup = Record<string, { maxPoint: number, isRecovery: boolean, name: string }>
@@ -21,6 +23,45 @@ function getDailyChallengePointDefaults(): DailyChallengePointListEntry[] {
         })
     }
     return entries
+}
+
+function initializeCurrentPassWeekSnapshot(
+    playerId: number,
+    player: Pick<Player, "totalStaminaUsed" | "totalDashes" | "totalPowerflips" | "totalLoginDays">,
+    evaluationTime: Date,
+    questClears: number,
+): void {
+    const eventId = getMissionMasterDefinitions(7).find(definition =>
+        definition.eventId !== undefined
+        && isMissionDefinitionEnabledAt(definition, evaluationTime)
+    )?.eventId
+    if (eventId === undefined) return
+    const snapshotType = getPassWeekSnapshotType(eventId)
+    if (getSnapshot(playerId, snapshotType)) return
+    takeSnapshot(
+        playerId,
+        snapshotType,
+        buildPeriodicSnapshotData(playerId, player, questClears),
+    )
+}
+
+function recordCurrentPassLogin(
+    playerId: number,
+    totalLoginDays: number,
+    evaluationTime: Date,
+): void {
+    const eventIds = new Set(
+        getMissionMasterDefinitions(8)
+            .filter(definition =>
+                definition.patternType === 0
+                && definition.eventId !== undefined
+                && isMissionDefinitionEnabledAt(definition, evaluationTime)
+            )
+            .map(definition => definition.eventId!),
+    )
+    for (const eventId of eventIds) {
+        ensurePlayerPassCardLoginProgressSync(playerId, eventId, totalLoginDays)
+    }
 }
 
 const expPoolMax = 100000;
@@ -1030,6 +1071,8 @@ export function insertDefaultPlayerSync(
         initializePeriodicMissionSnapshots(playerId, player, {
             countCurrentLoginDay: true,
         })
+        initializeCurrentPassWeekSnapshot(playerId, player, getServerDate(), 0)
+        recordCurrentPassLogin(playerId, player.totalLoginDays ?? 0, getServerDate())
         return playerId
     })
 
@@ -1192,73 +1235,94 @@ export function dailyResetPlayerDataSync(
     const crossedWeek = isNewWeek(loginDate, lastLoginTime)
 
     if (crossedDay) {
-        updatePlayerSync({
-            id: playerId,
-            lastLoginTime: loginDate,
-            bossBoostPoint: 3,
-            boostPoint: 3,
-            totalLoginDays: (player.totalLoginDays ?? 0) + 1
-        })
-
-        // Reset daily challenge points — sync with CDN and rebuild if missing
-        const dcEntries = getPlayerDailyChallengePointListSync(playerId)
-        const defaults = getDailyChallengePointDefaults()
-        if (dcEntries.length === 0) {
-            insertPlayerDailyChallengePointListSync(playerId, defaults)
-        } else {
-            // Reset existing entries to CDN max
-            for (const entry of dcEntries) {
-                const cdn = (dailyChallengePointLookup as DailyChallengePointLookup)[String(entry.id)]
-                const maxPoint = cdn?.maxPoint ?? entry.point
-                updatePlayerDailyChallengePointSync(playerId, entry.id, maxPoint + entry.campaignList.reduce((s, c) => s + c.additionalPoint, 0))
-            }
-            // Add any new CDN entries not yet in player's list
-            const existingIds = new Set(dcEntries.map(e => e.id))
-            const missing = defaults.filter(e => !existingIds.has(e.id))
-            if (missing.length > 0) {
-                insertPlayerDailyChallengePointListSync(playerId, missing)
-            }
-        }
-
-        // reset gacha "isDailyFirst" values.
-        const gachaInfo = getPlayerGachaInfoListSync(playerId)
-        for (const gacha of gachaInfo) {
-            updatePlayerGachaInfoSync(playerId, {
-                gachaId: gacha.gachaId,
-                isDailyFirst: true
+        return getDb().transaction(() => {
+            updatePlayerSync({
+                id: playerId,
+                lastLoginTime: loginDate,
+                bossBoostPoint: 3,
+                boostPoint: 3,
+                totalLoginDays: (player.totalLoginDays ?? 0) + 1
             })
-        }
+            recordCurrentPassLogin(
+                playerId,
+                (player.totalLoginDays ?? 0) + 1,
+                loginDate,
+            )
 
-        // reset campaigns
-        const gachaCampaigns = getPlayerGachaCampaignListSync(playerId)
-        for (const campaign of gachaCampaigns) {
-            updatePlayerGachaCampaignSync(playerId, campaign.gachaId, campaign.campaignId, 1)
-        }
-
-        // Daily mission reset: take snapshot + wipe cache
-        const questProgress = getPlayerQuestProgressSync(playerId)
-        let totalClears = 0, ss = 0, s = 0, a = 0, b = 0
-        for (const [section, quests] of Object.entries(questProgress)) {
-            for (const qp of quests) {
-                if (qp.finished) {
-                    totalClears++
-                    if (qp.clearRank === 5) ss++
-                    else if (qp.clearRank === 4) s++
-                    else if (qp.clearRank === 3) a++
-                    else if (qp.clearRank === 2) b++
+            // Reset daily challenge points — sync with CDN and rebuild if missing
+            const dcEntries = getPlayerDailyChallengePointListSync(playerId)
+            const defaults = getDailyChallengePointDefaults()
+            if (dcEntries.length === 0) {
+                insertPlayerDailyChallengePointListSync(playerId, defaults)
+            } else {
+                // Reset existing entries to CDN max
+                for (const entry of dcEntries) {
+                    const cdn = (dailyChallengePointLookup as DailyChallengePointLookup)[String(entry.id)]
+                    const maxPoint = cdn?.maxPoint ?? entry.point
+                    updatePlayerDailyChallengePointSync(playerId, entry.id, maxPoint + entry.campaignList.reduce((s, c) => s + c.additionalPoint, 0))
+                }
+                // Add any new CDN entries not yet in player's list
+                const existingIds = new Set(dcEntries.map(e => e.id))
+                const missing = defaults.filter(e => !existingIds.has(e.id))
+                if (missing.length > 0) {
+                    insertPlayerDailyChallengePointListSync(playerId, missing)
                 }
             }
-        }
-        takeSnapshot(playerId, 'daily', buildPeriodicSnapshotData(playerId, player, totalClears))
-        deletePlayerCategoryMissionsSync(playerId, 2)
 
-        // weekly reset
-        if (crossedWeek) {
-            takeSnapshot(playerId, 'weekly', buildPeriodicSnapshotData(playerId, player, totalClears))
-            deletePlayerCategoryMissionsSync(playerId, 10)
-        }
+            // reset gacha "isDailyFirst" values.
+            const gachaInfo = getPlayerGachaInfoListSync(playerId)
+            for (const gacha of gachaInfo) {
+                updatePlayerGachaInfoSync(playerId, {
+                    gachaId: gacha.gachaId,
+                    isDailyFirst: true
+                })
+            }
 
-        return true
+            // reset campaigns
+            const gachaCampaigns = getPlayerGachaCampaignListSync(playerId)
+            for (const campaign of gachaCampaigns) {
+                updatePlayerGachaCampaignSync(playerId, campaign.gachaId, campaign.campaignId, 1)
+            }
+
+            // Daily mission reset: take snapshot + wipe cache
+            const questProgress = getPlayerQuestProgressSync(playerId)
+            let totalClears = 0, ss = 0, s = 0, a = 0, b = 0
+            for (const [section, quests] of Object.entries(questProgress)) {
+                for (const qp of quests) {
+                    if (qp.finished) {
+                        totalClears++
+                        if (qp.clearRank === 5) ss++
+                        else if (qp.clearRank === 4) s++
+                        else if (qp.clearRank === 3) a++
+                        else if (qp.clearRank === 2) b++
+                    }
+                }
+            }
+            const periodicBaseline = buildPeriodicSnapshotData(playerId, player, totalClears)
+            takeSnapshot(playerId, 'daily', periodicBaseline)
+            deletePlayerCategoryMissionsSync(playerId, 2)
+            deletePlayerCategoryMissionsSync(playerId, 6)
+
+            const activePassWeekEventId = getMissionMasterDefinitions(7).find(definition =>
+                definition.eventId !== undefined
+                && isMissionDefinitionEnabledAt(definition, loginDate)
+            )?.eventId
+            if (activePassWeekEventId !== undefined) {
+                const snapshotType = getPassWeekSnapshotType(activePassWeekEventId)
+                if (crossedWeek || !getSnapshot(playerId, snapshotType)) {
+                    takeSnapshot(playerId, snapshotType, periodicBaseline)
+                }
+            }
+
+            // weekly reset
+            if (crossedWeek) {
+                takeSnapshot(playerId, 'weekly', periodicBaseline)
+                deletePlayerCategoryMissionsSync(playerId, 7)
+                deletePlayerCategoryMissionsSync(playerId, 10)
+            }
+
+            return true
+        })()
     } else {
         updatePlayerSync({
             id: playerId,

@@ -40,9 +40,9 @@ function buildStats(playerId: number, category: number): CategoryContext {
         questProgress[section] = list
     }
 
-    const snapshot = category === 2
+    const snapshot = category === 2 || category === 6
         ? getSnapshot(playerId, "daily")
-        : category === 10
+        : category === 7 || category === 10
             ? getSnapshot(playerId, "weekly")
             : null
 

@@ -6,6 +6,7 @@ import { getCategoryMissionRewardStageDefinition } from "./rewards"
 import { getCompletedStageNumbers, getMissionIdsByCategory, isMissionProgressComplete } from "./stages"
 import { getMissionPattern, isMissionEnabledAt } from "./patterns"
 import { MissionRewardGranter } from "./grants"
+import { getMissionMasterDefinition } from "./master-data"
 
 export interface MissionSettlementInfo {
     mission_category_id: number
@@ -19,6 +20,7 @@ export interface MissionSettlementResult {
     characterList: Object[]
     equipmentList: Object[]
     degreeIds: number[]
+    passCardPoints: Record<string, number>
     userInfo?: Record<string, number>
 }
 
@@ -76,7 +78,7 @@ export function settleMissionCategories(
         }
         for (const { category, eventId } of scopes.values()) {
             const computer = getComputer(category)
-            const context = computer.buildContext(playerId, category)
+            const context = computer.buildContext(playerId, category, evaluationTime)
             const persisted = getPlayerCategoryMissionsSync(playerId, category)
             for (const missionId of getMissionIdsByCategory(category)) {
                 if (!isMissionEnabledAt(category, missionId, evaluationTime, eventId)) continue
@@ -131,7 +133,10 @@ export function settleMissionCategories(
                     mission.missionId,
                     true,
                 )
-                granter.grant(definition.rewards)
+                const passCardEventId = mission.category >= 6 && mission.category <= 8
+                    ? getMissionMasterDefinition(mission.category, mission.missionId)?.eventId
+                    : undefined
+                granter.grant(definition.rewards, { passCardEventId })
                 missionInfo.push({
                     mission_category_id: mission.category,
                     mission_id: mission.missionId,
@@ -146,6 +151,7 @@ export function settleMissionCategories(
             characterList: granter.characterList,
             equipmentList: granter.equipmentList,
             degreeIds: granter.degreeList,
+            passCardPoints: granter.passCardPoints,
             ...(granter.hasPlayerChanges() ? { userInfo: granter.getUserInfo() } : {}),
         }
     })()

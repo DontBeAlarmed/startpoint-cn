@@ -217,7 +217,7 @@ async function main() {
         )
         assert.equal(weeklyData.mail_arrived, true)
 
-        setServerTimeOffset(Date.parse("2020-02-21T03:00:00.000Z") - Date.now())
+        setServerTimeOffset(Date.parse("2020-02-21T04:00:00.000Z") - Date.now())
         givePlayerItemSync(playerId, 80001, 50)
         const collectPage = await fastify.inject({
             method: "POST",

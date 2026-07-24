@@ -5,10 +5,17 @@ import { givePlayerCharacterSync } from "../character"
 import { givePlayerEquipmentSync } from "../equipment"
 import type { ActiveMissionReward } from "./rewards"
 import { givePlayerDegreeSync } from "../../data/domains/degree"
+import { addPlayerPassCardPointSync } from "../../data/domains/pass-card"
+import { getPassCardEventDefinition } from "../pass-card"
+
+interface MissionRewardGrantContext {
+    passCardEventId?: number
+}
 
 export class MissionRewardGranter {
     readonly itemList: Record<string, number> = {}
     readonly degreeList: number[] = []
+    readonly passCardPoints: Record<string, number> = {}
     private readonly characterMap = new Map<number, Object>()
     private readonly equipmentMap = new Map<number, Object>()
     private freeVmoney: number
@@ -23,7 +30,7 @@ export class MissionRewardGranter {
         this.expPool = player.expPool
     }
 
-    grant(rewards: ActiveMissionReward[]): void {
+    grant(rewards: ActiveMissionReward[], context: MissionRewardGrantContext = {}): void {
         for (const reward of rewards) {
             switch (reward.kind) {
                 case 0:
@@ -65,6 +72,21 @@ export class MissionRewardGranter {
                         this.degreeList.push(reward.degreeId)
                         this.latestDegreeId = reward.degreeId
                     }
+                    break
+                case 7:
+                    if (context.passCardEventId === undefined) {
+                        throw new Error("Pass card point reward is missing its event scope.")
+                    }
+                    const passCardEvent = getPassCardEventDefinition(context.passCardEventId)
+                    if (!passCardEvent) {
+                        throw new Error(`Pass card event ${context.passCardEventId} is missing.`)
+                    }
+                    this.passCardPoints[String(context.passCardEventId)] = addPlayerPassCardPointSync(
+                        this.playerId,
+                        context.passCardEventId,
+                        reward.amount,
+                        passCardEvent.thresholdPoint,
+                    )
                     break
             }
         }
