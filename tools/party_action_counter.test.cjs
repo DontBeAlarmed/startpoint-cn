@@ -23,7 +23,8 @@ db.exec(`
         total_gacha_character_count INTEGER NOT NULL DEFAULT 0,
         total_equipment_equip_count INTEGER NOT NULL DEFAULT 0,
         total_unison_set_count INTEGER NOT NULL DEFAULT 0,
-        total_party_character_set_count INTEGER NOT NULL DEFAULT 0
+        total_party_character_set_count INTEGER NOT NULL DEFAULT 0,
+        total_injected_exp_count INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE party_state (
         player_id INTEGER NOT NULL,
@@ -129,6 +130,7 @@ async function main() {
             totalEquipmentEquipCount: 1,
             totalUnisonSetCount: 1,
             totalPartyCharacterSetCount: 1,
+            totalInjectedExpCount: 0,
         })
 
         const beforeEmptyEdit = getActiveMissionCountersSync(7)
