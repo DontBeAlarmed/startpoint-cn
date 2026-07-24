@@ -33,6 +33,7 @@ const {
 } = require("../src/data/domains/character")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
+const { insertPlayerQuestProgressSync } = require("../src/data/domains/quest")
 const {
     DegreeComputer,
     getDegreeMissionCoverageReport,
@@ -76,8 +77,14 @@ insertPlayerCharacterManaNodesSync(playerId, 900001, [201, 202])
 insertPlayerCharacterManaNodesSync(playerId, 900002, [301])
 
 recordMissionBattleResultSync(playerId, { isMulti: true, isHost: true, accomplished: true, clearRank: 5 })
+recordMissionBattleResultSync(playerId, { isMulti: true, isHost: false, accomplished: true, clearRank: 5 })
+recordMissionBattleResultSync(playerId, { isMulti: true, isHost: true, accomplished: false, clearRank: 5 })
 recordMissionBattleResultSync(playerId, { isMulti: false, accomplished: true, clearRank: 5 })
-recordMissionBattleResultSync(playerId, { isMulti: false, accomplished: true, clearRank: 5 })
+
+insertPlayerQuestProgressSync(playerId, 3, { questId: 300001, finished: true })
+insertPlayerQuestProgressSync(playerId, 3, { questId: 300002, finished: true })
+insertPlayerQuestProgressSync(playerId, 3, { questId: 300003, finished: false })
+insertPlayerQuestProgressSync(playerId, 1, { questId: 100001, finished: true })
 
 const context = DegreeComputer.buildContext(playerId, 5)
 assert.equal(DegreeComputer.compute(1000, context, 0), 250)
@@ -85,24 +92,42 @@ assert.equal(DegreeComputer.compute(2000, context, 0), 6)
 assert.equal(DegreeComputer.compute(4000, context, 0), 5)
 assert.equal(DegreeComputer.compute(5000, context, 0), 4)
 assert.equal(DegreeComputer.compute(6000, context, 0), 4)
-assert.equal(DegreeComputer.compute(13000, context, 0), 2, "多人 SS 不得计入单人 SS 称号")
+assert.equal(DegreeComputer.compute(13000, context, 0), 1, "多人 SS 不得计入单人 SS 称号")
 assert.equal(DegreeComputer.compute(3000, context, 7), 7, "缺少完整等级曲线时保留已有进度")
 assert.equal(DegreeComputer.compute(111001, context, 0), 1, "指定角色获得信赖之证后应完成称号")
 assert.equal(DegreeComputer.compute(111002, context, 0), 0, "未获得信赖之证的角色不得完成称号")
 assert.equal(DegreeComputer.compute(111003, context, 0), 1, "已领取信赖之证后称号仍必须保持完成")
 
+for (const missionId of [23000, 23010, 23020]) {
+    assert.equal(DegreeComputer.compute(missionId, context, 0), 2, `${missionId} 应读取协力成功总数`)
+    assert.equal(DegreeComputer.compute(missionId, context, 9), 9, `${missionId} 不得降低旧进度`)
+}
+for (const missionId of [24000, 24010, 24020]) {
+    assert.equal(DegreeComputer.compute(missionId, context, 0), 1, `${missionId} 应只读取房主协力成功数`)
+    assert.equal(DegreeComputer.compute(missionId, context, 9), 9, `${missionId} 不得降低旧进度`)
+}
+for (const missionId of [7000, 7010, 7020]) {
+    assert.equal(DegreeComputer.compute(missionId, context, 0), 2, `${missionId} 应只统计已完成角色剧情`)
+    assert.equal(DegreeComputer.compute(missionId, context, 9), 9, `${missionId} 不得降低旧进度`)
+}
+
 const coverage = getDegreeMissionCoverageReport()
-assert.equal(coverage.total, 1288)
-assert.equal(coverage.serverComputed, 507)
-assert.equal(coverage.unsupported, 781)
-assert.deepEqual(coverage.supportedFamilies, {
-    playerRank: 8,
-    companionCount: 3,
-    overLimitCount: 3,
-    manaBoardCount: 3,
-    bondTokenCount: 3,
-    singleSsCount: 3,
-    specificCharacterBond: 484,
+assert.deepEqual(coverage, {
+    total: 1288,
+    serverComputed: 516,
+    unsupported: 772,
+    supportedFamilies: {
+        playerRank: 8,
+        companionCount: 3,
+        overLimitCount: 3,
+        manaBoardCount: 3,
+        bondTokenCount: 3,
+        singleSsCount: 3,
+        multiClearCount: 3,
+        multiHostClearCount: 3,
+        episodeClearCount: 3,
+        specificCharacterBond: 484,
+    },
 })
 
 console.log("mission degree progress tests passed")

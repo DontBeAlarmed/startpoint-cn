@@ -29,6 +29,9 @@ export interface CategoryContext {
         manaBoardCount: number
         bondTokenCount: number
         singleSsCount: number
+        multiClearCount: number
+        multiHostClearCount: number
+        episodeClearCount: number
         bondedCharacterIds: ReadonlySet<number>
     }
     battleCounters?: MissionBattleCounters

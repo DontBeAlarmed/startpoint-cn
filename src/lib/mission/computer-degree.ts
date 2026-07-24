@@ -3,6 +3,7 @@
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../../data/domains/character"
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
+import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getRankDegree } from "../stamina"
 import { getMissionMasterDefinition, getMissionMasterDefinitions } from "./master-data"
 import { getMissionPattern } from "./patterns"
@@ -32,6 +33,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
     const characters = getPlayerCharactersSync(playerId)
     const manaNodes = getPlayerCharactersManaNodesSync(playerId)
     const battleCounters = getMissionBattleCountersSync(playerId)
+    const questProgress = getPlayerQuestProgressSync(playerId)
     return {
         category,
         playerId,
@@ -51,6 +53,10 @@ function buildStats(playerId: number, category: number): CategoryContext {
                 .reduce((total, character) => total
                     + character.bondTokenList.filter(token => token.status >= 1).length, 0),
             singleSsCount: battleCounters.singleRankSsCount,
+            multiClearCount: battleCounters.multiClearCount,
+            multiHostClearCount: battleCounters.multiHostClearCount,
+            episodeClearCount: (questProgress["3"] || [])
+                .filter(progress => progress.finished).length,
             bondedCharacterIds: new Set(Object.entries(characters)
                 .filter(([, character]) => character.bondTokenList.some(token => token.status >= 1))
                 .map(([characterId]) => Number(characterId))),
@@ -65,6 +71,9 @@ const SUPPORTED_FAMILIES = {
     manaBoardCount: "degree_manaboard_growth_",
     bondTokenCount: "degree_proof_of_bond_get_",
     singleSsCount: "degree_rank_ss_clear_single_",
+    multiClearCount: "degree_multi_battle_clear_",
+    multiHostClearCount: "degree_multi_battle_by_host_clear_",
+    episodeClearCount: "degree_character_episode_read_",
 } as const
 
 export function getDegreeMissionCoverageReport() {
@@ -119,6 +128,15 @@ export const DegreeComputer: MissionComputer = {
         if (pattern.startsWith(SUPPORTED_FAMILIES.manaBoardCount)) return stats.manaBoardCount
         if (pattern.startsWith(SUPPORTED_FAMILIES.bondTokenCount)) return stats.bondTokenCount
         if (pattern.startsWith(SUPPORTED_FAMILIES.singleSsCount)) return stats.singleSsCount
+        if (pattern.startsWith(SUPPORTED_FAMILIES.multiClearCount)) {
+            return Math.max(dbProgress, stats.multiClearCount)
+        }
+        if (pattern.startsWith(SUPPORTED_FAMILIES.multiHostClearCount)) {
+            return Math.max(dbProgress, stats.multiHostClearCount)
+        }
+        if (pattern.startsWith(SUPPORTED_FAMILIES.episodeClearCount)) {
+            return Math.max(dbProgress, stats.episodeClearCount)
+        }
         return dbProgress
     },
 }
