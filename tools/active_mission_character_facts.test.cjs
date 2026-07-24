@@ -7,6 +7,11 @@ const {
 
 const state = {
     player: { totalLoginDays: 1, totalStaminaUsed: 0 },
+    battleCounters: {
+        singleClearCount: 2,
+        multiClearCount: 3,
+        multiHostClearCount: 1,
+    },
     finishedQuestIds: new Set([101, 102]),
     characterStoryQuestIds: { "1": [101, 102, 103] },
     characters: {
@@ -52,6 +57,9 @@ const row = (characterId = "(None)") => {
 }
 
 assert.equal(computeActiveMissionFactProgress(21, row(), state), 2)
+assert.equal(computeActiveMissionFactProgress(14, row(), state), 2)
+assert.equal(computeActiveMissionFactProgress(16, row(), state), 3)
+assert.equal(computeActiveMissionFactProgress(17, row(), state), 1)
 assert.equal(computeActiveMissionFactProgress(5, row(), state), 40)
 assert.equal(computeActiveMissionFactProgress(4, row(1), state), 1)
 assert.equal(computeActiveMissionFactProgress(4, row(999), state), 0)

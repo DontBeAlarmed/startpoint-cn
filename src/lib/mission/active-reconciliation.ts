@@ -12,6 +12,7 @@ import { getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getActiveMissionCountersSync } from "../../data/domains/active_mission_counters"
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
+import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
 import {
     getActiveMissionEventMasterDefinition,
     getActiveMissionMasterDefinitions,
@@ -82,6 +83,7 @@ export interface ActiveMissionFactCharacter {
 
 export interface ActiveMissionFactState {
     readonly player: Readonly<{ readonly totalLoginDays: number, readonly totalStaminaUsed: number }>
+    readonly battleCounters: Readonly<ReturnType<typeof getMissionBattleCountersSync>>
     readonly finishedQuestIds: ReadonlySet<number>
     readonly characterStoryQuestIds: Readonly<Record<string, readonly number[]>>
     readonly characters: Readonly<Record<string, ActiveMissionFactCharacter>>
@@ -218,6 +220,12 @@ export function computeActiveMissionFactProgress(
             return state.totalUsedManaCount
         case PATTERN_TOTAL_GACHA_CHARACTER_COUNT:
             return state.totalGachaCharacterCount
+        case 14:
+            return state.battleCounters.singleClearCount
+        case 16:
+            return state.battleCounters.multiClearCount
+        case 17:
+            return state.battleCounters.multiHostClearCount
         case PATTERN_EQUIPPED_FIRST_TIME:
             return state.totalEquipmentEquipCount
         case PATTERN_SET_UNISON_FIRST_TIME:
@@ -339,6 +347,7 @@ function buildActiveMissionFactState(
     }))
     const purchases = getPlayerShopPurchasesMapSync(playerId)
     const counters = getActiveMissionCountersSync(playerId)
+    const battleCounters = getMissionBattleCountersSync(playerId)
     const treasureShopItemIds = new Set(Object.keys(readRepositoryTable<Record<string, unknown>>(
         repository,
         "treasure_shop.json",
@@ -365,6 +374,7 @@ function buildActiveMissionFactState(
     ), 0)
     return {
         player,
+        battleCounters,
         finishedQuestIds,
         characterStoryQuestIds: Object.fromEntries(Object.keys(characters).map(characterId => [
             characterId,
