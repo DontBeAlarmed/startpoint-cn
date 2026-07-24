@@ -18,6 +18,7 @@ import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
 import { getPlayerCharacterClearSync } from "../../data/domains/character_clear"
 import { getActiveMissionConditionalBattleFactsSync } from "../../data/domains/active_mission_battle_condition_facts"
+import { getActiveMissionBattleFactsSync } from "../../data/domains/active_mission_battle_facts"
 import {
     getActiveMissionEventMasterDefinition,
     getActiveMissionMasterDefinitions,
@@ -70,6 +71,7 @@ const PATTERN_BATTLE_CLEAR_WITH_SPECIFIC_PARTY = 70
 const PATTERN_BATTLE_CLEAR_WITH_MANA_BOARD_2ND = 71
 const PATTERN_BATTLE_CLEAR_WITH_LEVEL_80_CHARACTER = 72
 const PATTERN_BATTLE_CLEAR_WITH_LEVEL_100_CHARACTER = 73
+const PATTERN_BATTLE_CLEAR_WITH_SPECIFIC_CHARACTER = 89
 const COME_BACK_EVENT_STRING_ID = "come_back_mission"
 
 const QUEST_CATEGORY_BY_RANGE_KIND: Readonly<Record<number, number | readonly number[]>> = Object.freeze({
@@ -127,6 +129,7 @@ export interface ActiveMissionFactState {
     readonly practiceQuestChallengeCount: number
     readonly leaderClearCounts: Readonly<Record<string, Readonly<{ readonly all: number, readonly multi: number }>>>
     readonly conditionalBattleFacts: Readonly<Record<string, number>>
+    readonly loadoutBattleFacts: Readonly<Record<string, number>>
     readonly characterStoryQuestIds: Readonly<Record<string, readonly number[]>>
     readonly characters: Readonly<Record<string, ActiveMissionFactCharacter>>
     readonly equipment: readonly { readonly level: number, readonly maxLevel: number, readonly enhancementLevel?: number }[]
@@ -402,6 +405,7 @@ export function computeActiveMissionFactProgress(
     pattern: number,
     row: readonly unknown[],
     state: ActiveMissionFactState,
+    missionId?: number,
 ): number | null {
     const characters = Object.entries(state.characters)
     switch (pattern) {
@@ -445,6 +449,8 @@ export function computeActiveMissionFactProgress(
             const characterId = parseInteger(row[43], "conditional battle character id")
             return state.conditionalBattleFacts[`${pattern}:${characterId}`] ?? 0
         }
+        case PATTERN_BATTLE_CLEAR_WITH_SPECIFIC_CHARACTER:
+            return missionId === undefined ? null : state.loadoutBattleFacts[String(missionId)] ?? 0
         case PATTERN_EPISODE_CLEAR_COUNT: {
             const storyQuestIds = new Set(
                 characters.flatMap(([characterId]) => state.characterStoryQuestIds[characterId] ?? []),
@@ -612,6 +618,7 @@ function buildActiveMissionFactState(
             }]
         })),
         conditionalBattleFacts: getActiveMissionConditionalBattleFactsSync(playerId),
+        loadoutBattleFacts: getActiveMissionBattleFactsSync(playerId),
         characterStoryQuestIds: Object.fromEntries(Object.keys(characters).map(characterId => [
             characterId,
             getCharacterStoryQuestIds(characterId),
@@ -653,6 +660,7 @@ function readRepositoryTable<T>(
 }
 
 function computeAuthoritativeProgress(
+    missionId: number,
     row: readonly unknown[],
     player: NonNullable<ReturnType<typeof getPlayerSync>>,
     finishedQuestIds: ReadonlySet<number>,
@@ -661,7 +669,7 @@ function computeAuthoritativeProgress(
     factState: ActiveMissionFactState,
 ): number | null {
     const pattern = parseInteger(row[29], "mission pattern")
-    const factProgress = computeActiveMissionFactProgress(pattern, row, factState)
+    const factProgress = computeActiveMissionFactProgress(pattern, row, factState, missionId)
     if (factProgress !== null) return factProgress
     if (pattern === PATTERN_QUEST_CLEAR) {
         return resolveActiveMissionQuestIds(row).filter(questId => finishedQuestIds.has(questId)).length
@@ -755,6 +763,7 @@ export function reconcileActiveMissionFacts(
                         questProgress,
                     })) continue
                     authoritativeProgress = computeAuthoritativeProgress(
+                        definition.missionId,
                         definition.row,
                         player,
                         finishedQuestIds,

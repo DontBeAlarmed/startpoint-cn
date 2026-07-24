@@ -492,6 +492,14 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_active_mission_battle_facts (
+        player_id INTEGER NOT NULL,
+        mission_id INTEGER NOT NULL,
+        progress INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, mission_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_category_missions (
         category INTEGER NOT NULL,
         id INTEGER NOT NULL,

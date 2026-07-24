@@ -74,32 +74,38 @@ Content Release；这一步只补齐服务端解释 Active Mission 所需的定�
 
 这组状态事实只写入 `all_active_mission_list`，不会写入角色觉醒使用的 category 9 `active_mission_list`。
 
-上述能力构成内容解释、首任务生产、状态事实校准、可用性判定、安全领奖和存储链。当前已接入 37 个实际使用的 pattern，
-对应 79 条定义；其中 15 条回归定义仍需资格回调才能生产。其余 17 条定义仍未接入服务端事实生产者，
+上述能力构成内容解释、首任务生产、状态事实校准、可用性判定、安全领奖和存储链。当前已接入 38 个实际使用的 pattern，
+对应 83 条定义；其中 15 条回归定义仍需资格回调才能生产。其余 13 条定义仍未接入服务端事实生产者，
 但它们并不都缺少客户端依据：CN 1.8.1 的战斗结算协议明确包含 `equipment_element`、分区统计中的
 `skill_point_over_on_start`，以及 `client_checks` 字段。除已接入事实、Contents Guide 首任务、存档导入或既有数据库记录外，
 `players_active_missions` 不会自行生成完整进度。因此 Active Mission 仍是部分完成，不能只因状态校准、首任务与领奖接口可用
 就标记为完整。
 
-## 剩余 17 条定义的证据审计
+## 剩余 13 条定义的证据审计
 
-### Contents Guide：20011～20017（7 条）
+### 已完成：Contents Guide 20011～20014（4 条）
 
-这 7 条定义均属于 event 2、`battle_kind=3` 的任意战斗，并通过任务前置关系依次开放。
+服务端在成功战斗结算事务中记录 pattern 89 的 mission-specific 历史事实：
+
+- 20011/20013 从队伍角色 ID 查当前 Content snapshot 的角色元素；
+- 20012/20014 同时检查角色元素和客户端结算请求中的 `equipment_element`；
+- 主数据元素条件使用 `ElementTargetKind`（1-based），结算请求的装备元素使用 `ElementKind`（0-based），服务端显式转换；
+- 每个 mission 独立累计；失败战斗、模式不匹配和事务回滚不会写入；
+- `/load` 只读取 `players_active_mission_battle_facts`，不根据当前队伍补算历史。
+
+### Contents Guide：20015～20017（3 条）
+
+这 3 条定义均属于 event 2、`battle_kind=3` 的任意战斗，并通过任务前置关系依次开放。
 
 | 任务 | 主数据条件 | 当前判断 |
 |---|---|---|
-| 20011 | `character_element=1` | 可由角色主数据和本次队伍角色 ID 判定；1 是客户端的火属性目标值 |
-| 20012 | `character_element=1`、`equipment_element=1` | 角色条件可判定；装备条件应使用客户端结算上传的 `equipment_element`，不能从装备 ID 猜属性 |
-| 20013 | `character_element=3` | 可由角色主数据和本次队伍角色 ID 判定；3 是客户端的雷属性目标值 |
-| 20014 | `character_element=3`、`equipment_element=3` | 角色条件可判定；装备条件同 20012 |
 | 20015 | `action_effects=ACToleranceOfElement_Down`、排除 `depraved_monk` | 仍需解析技能/动作效果主数据，不能只按角色名称硬编码 |
 | 20016 | `action_effects=CreateNormalHeal,CreateRatioHeal,ACRegeneration`、排除 `compliment_oiran` | 仍需解析技能/动作效果主数据，不能只按角色名称硬编码 |
 | 20017 | pattern 91，开局技能槽充满 | 结算协议有 `zones[].skill_point_over_on_start`，需确认计数语义和三名主位角色的对应关系后实现 |
 
 客户端 `BattleQuestFinishRemoteUtil` 会在结算请求中发送 `equipment_element`；客户端统计类型还声明了
-`skill_point_over_on_start` 和 `client_checks`。因此 20011～20014、20017 不应再被描述为“没有协议字段”，
-而应分别补齐队伍元素事实、装备元素透传与开局技能统计解析。20015～20016 的阻塞点是服务端当前没有
+`skill_point_over_on_start` 和 `client_checks`。因此 20017 不应再被描述为“没有协议字段”，
+而应补齐开局技能统计解析。20015～20016 的阻塞点是服务端当前没有
 技能动作效果索引，不是任务主数据缺失。
 
 ### 外部活动：21030（1 条）
@@ -122,7 +128,6 @@ Content Release；这一步只补齐服务端解释 Active Mission 所需的定�
 3. 进度创建、增量、领奖和奖励发放保持幂等；领取接口以数据库进度和当前 Content snapshot 的有效性共同校验。
 4. 不修改客户端，不把旧 Active Mission 存储与 category 9 角色觉醒任务重新混用。
 
-单人体验优先顺序为：先实现并测试 20011/20013 的角色元素条件，再补 20012/20014 的客户端
-`equipment_element` 透传与判定；随后确认 `skill_point_over_on_start` 的计数语义并处理 20017。
+单人体验优先顺序为：先对 20011～20014 做客户端验收；随后确认 `skill_point_over_on_start` 的计数语义并处理 20017。
 20015/20016 要等技能动作效果索引准备好后再实现。21030、回归资格和 Pass type 20 继续保持低优先级，
 不使用推测值完成任务。

@@ -9,6 +9,7 @@ import { getServerTime } from "../../utils"
 import { recordEventMissionBattleFacts } from "./event-battle-facts"
 import { recordPassMissionBattleFacts } from "./pass-battle-facts"
 import { recordActiveMissionConditionalBattleFactsSync } from "./active-conditional-battle-facts"
+import { recordActiveMissionLoadoutBattleFactsSync } from "./active-loadout-battle-facts"
 
 export const BATTLE_SETTLEMENT_CATEGORIES = Object.freeze([1, 2, 3, 6, 7, 8, 10])
 
@@ -25,6 +26,7 @@ export function recordMissionBattleFacts(
     if (!ctx.questAccomplished) return
     recordEventMissionBattleFacts(ctx, evaluationTime)
     recordPassMissionBattleFacts(ctx, evaluationTime)
+    recordActiveMissionLoadoutBattleFactsSync(ctx)
     recordActiveMissionConditionalBattleFactsSync(ctx)
     if (ctx.isMulti) {
         incrementPlayerQuestMultiClearSync(ctx.playerId, ctx.questCategory, ctx.questId)

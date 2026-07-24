@@ -26,6 +26,7 @@ export interface FinishContext {
     clearRank: number | null
     party: QuestStatistics['party']
     statistics: QuestStatistics
+    equipmentElements?: readonly number[]
     player: Player
     questPreviouslyCompleted: boolean
     questProgress: { bestElapsedTimeMs?: number | null; highScore?: number; clearRank?: number } | null

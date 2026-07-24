@@ -234,6 +234,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             clearTime, clearRank,
             party: bodyPartyStatistics as any,
             statistics: (body as any).statistics || (body as any).quest_statistics || {},
+            equipmentElements: (body as any).equipment_element,
             player,
             questPreviouslyCompleted,
             questProgress,

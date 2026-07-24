@@ -93,6 +93,10 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
+        pattern: /^src\/lib\/mission\/active-loadout-battle-facts\.ts$/,
+        groups: ["integration:mission"],
+    },
+    {
         pattern: /^(?:assets\/server\/npc_contributor_names\.json|tools\/npc_contributor_names(?:\.test)?\.cjs)$/,
         groups: ["quick:protocol"],
     },

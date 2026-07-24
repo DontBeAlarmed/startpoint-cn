@@ -111,6 +111,7 @@ export interface FinishBody {
     add_mana: number
     is_accomplished: boolean
     statistics: QuestStatistics
+    equipment_element?: number[]
     api_count: number
 }
 
@@ -257,6 +258,7 @@ const routes = async (fastify: FastifyInstance) => {
             clearRank,
             party: body.statistics.party as any,
             statistics: (body as any).statistics,
+            equipmentElements: body.equipment_element,
             player: playerData,
             questPreviouslyCompleted,
             questProgress,
