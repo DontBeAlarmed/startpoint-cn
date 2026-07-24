@@ -32,7 +32,12 @@ const {
     recordMissionBattleResultSync,
 } = require("../src/data/domains/mission_battle_facts")
 const { insertPlayerQuestProgressSync } = require("../src/data/domains/quest")
-const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
+const {
+    dailyResetPlayerDataSync,
+    getPlayerSync,
+    insertDefaultPlayerSync,
+    updatePlayerSync,
+} = require("../src/data/domains/player")
 const { getComputer } = require("../src/lib/mission/registry")
 const { settleMissionCategories } = require("../src/lib/mission/settlement")
 const { getSnapshot, takeSnapshot } = require("../src/lib/mission/snapshot")
@@ -173,6 +178,21 @@ const weeklyContext = weekly.buildContext(playerId, 10)
 assert.equal(weekly.compute(1, weeklyContext, 0), 3, "每周登录必须读取 category 10 自身主数据")
 assert.equal(weekly.compute(2, weeklyContext, 0), 15, "每周协力必须读取本周期累计通关")
 
+const weeklySettlement = settleMissionCategories(playerId, [10], new Date("2024-08-14T12:00:00.000Z"))
+assert.deepEqual(
+    weeklySettlement.missionInfo.map(entry => entry.mission_id),
+    [1, 2],
+    "每周只应结算现有的登录与协力两条任务",
+)
+const reloadedWeeklyContext = getComputer(10).buildContext(playerId, 10)
+assert.equal(weekly.compute(1, reloadedWeeklyContext, 0), 3, "重新读取仍应保留本周登录进度")
+assert.equal(weekly.compute(2, reloadedWeeklyContext, 0), 15, "重新读取仍应保留本周协力进度")
+assert.deepEqual(
+    settleMissionCategories(playerId, [10], new Date("2024-08-14T12:00:00.000Z")).missionInfo,
+    [],
+    "重复结算不得再次发放每周任务奖励",
+)
+
 const evaluationTime = new Date("2024-08-14T12:00:00.000Z")
 const dailySettlement = settleMissionCategories(playerId, [2], evaluationTime)
 assert.deepEqual(
@@ -181,6 +201,69 @@ assert.deepEqual(
         .map(entry => entry.mission_id),
     [11, 13, 14, 16, 17],
     "四项基础每日任务应在同一次结算中触发全部完成任务",
+)
+
+const boundaryAccount = insertAccountSync({
+    appId: "wf_cn",
+    idpAlias: "",
+    idpCode: "test",
+    idpId: `mission-weekly-boundary-${randomUUID()}`,
+    status: "normal",
+})
+const boundaryPlayerId = insertDefaultPlayerSync(boundaryAccount.id).id
+updatePlayerSync({
+    id: boundaryPlayerId,
+    lastLoginTime: new Date("2024-08-18T20:00:00.000Z"),
+})
+for (let index = 0; index < 2; index++) {
+    recordMissionBattleResultSync(boundaryPlayerId, {
+        isMulti: true,
+        isHost: false,
+        accomplished: true,
+    })
+}
+
+assert.equal(
+    dailyResetPlayerDataSync(
+        getPlayerSync(boundaryPlayerId),
+        new Date("2024-08-18T20:59:59.999Z"),
+    ),
+    false,
+    "北京时间周一 05:00 前不得重置周常",
+)
+assert.equal(getSnapshot(boundaryPlayerId, "weekly").multiClearCount, 0)
+assert.equal(
+    dailyResetPlayerDataSync(
+        getPlayerSync(boundaryPlayerId),
+        new Date("2024-08-18T21:00:00.000Z"),
+    ),
+    true,
+    "北京时间周一 05:00 必须生成新的周常快照",
+)
+assert.equal(getSnapshot(boundaryPlayerId, "weekly").multiClearCount, 2)
+
+for (let index = 0; index < 3; index++) {
+    recordMissionBattleResultSync(boundaryPlayerId, {
+        isMulti: true,
+        isHost: false,
+        accomplished: true,
+    })
+}
+const boundaryWeeklyContext = getComputer(10).buildContext(boundaryPlayerId, 10)
+assert.equal(getComputer(10).compute(2, boundaryWeeklyContext, 0), 3)
+assert.equal(
+    dailyResetPlayerDataSync(
+        getPlayerSync(boundaryPlayerId),
+        new Date("2024-08-18T21:00:01.000Z"),
+    ),
+    false,
+    "同一周重复 load 不得再次重置",
+)
+const repeatedLoadContext = getComputer(10).buildContext(boundaryPlayerId, 10)
+assert.equal(
+    getComputer(10).compute(2, repeatedLoadContext, 0),
+    3,
+    "重复 load 后本周协力进度必须保持",
 )
 
 const replacement = getMergedPlayerDataSync(playerId)

@@ -10,6 +10,7 @@ import { recordEventMissionBattleFacts } from "./event-battle-facts"
 import { recordPassMissionBattleFacts } from "./pass-battle-facts"
 import { recordActiveMissionConditionalBattleFactsSync } from "./active-conditional-battle-facts"
 import { recordActiveMissionLoadoutBattleFactsSync } from "./active-loadout-battle-facts"
+import { recordDailyMissionBattleFacts } from "./daily-battle-facts"
 
 export const BATTLE_SETTLEMENT_CATEGORIES = Object.freeze([1, 2, 3, 6, 7, 8, 10])
 
@@ -24,6 +25,7 @@ export function recordMissionBattleFacts(
         clearRank: ctx.clearRank,
     })
     if (!ctx.questAccomplished) return
+    recordDailyMissionBattleFacts(ctx, evaluationTime)
     recordEventMissionBattleFacts(ctx, evaluationTime)
     recordPassMissionBattleFacts(ctx, evaluationTime)
     recordActiveMissionLoadoutBattleFactsSync(ctx)
