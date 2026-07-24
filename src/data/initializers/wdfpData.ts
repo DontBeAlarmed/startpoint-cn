@@ -409,6 +409,10 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_players_quest_progress_player_section_finished
+        ON players_quest_progress (player_id, section, finished)
+    `).run()
+
     // migrations for quest progress columns added after the original schema
     ensureSchemaColumn(database, "players_quest_progress.leader_character_id")
     ensureSchemaColumn(database, "players_quest_progress.multi_clear_count")

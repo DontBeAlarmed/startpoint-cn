@@ -24,7 +24,7 @@ function cleanup() {
 
 process.once("exit", cleanup)
 
-const { initializeDatabase } = require("../src/data")
+const { closeDatabase, initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const {
@@ -42,8 +42,38 @@ const {
     getDegreeMissionCoverageReport,
 } = require("../src/lib/mission/computer-degree")
 
+const questProgressCountIndex = "idx_players_quest_progress_player_section_finished"
+const initializerSource = fs.readFileSync(
+    path.join(__dirname, "../src/data/initializers/wdfpData.ts"),
+    "utf8",
+)
+assert.match(
+    initializerSource,
+    /CREATE INDEX IF NOT EXISTS idx_players_quest_progress_player_section_finished[\s\S]*?ON players_quest_progress \(player_id, section, finished\)/,
+)
+
 initializeDatabase()
 db = getDb()
+assert.equal(
+    db.prepare("PRAGMA index_list('players_quest_progress')")
+        .all().some(index => index.name === questProgressCountIndex),
+    true,
+)
+db.prepare(`DROP INDEX ${questProgressCountIndex}`).run()
+assert.equal(
+    db.prepare("PRAGMA index_list('players_quest_progress')")
+        .all().some(index => index.name === questProgressCountIndex),
+    false,
+)
+closeDatabase()
+initializeDatabase()
+db = getDb()
+assert.equal(
+    db.prepare("PRAGMA index_list('players_quest_progress')")
+        .all().some(index => index.name === questProgressCountIndex),
+    true,
+    "已有数据库重新启动时应恢复任务进度计数索引",
+)
 const account = insertAccountSync({
     appId: "wf_cn",
     idpAlias: "",
@@ -99,6 +129,19 @@ assert.doesNotMatch(degreeComputerSource, /getPlayerQuestProgressSync/)
 assert.equal(countFinishedPlayerQuestsByCategorySync(playerId, 3), 2)
 assert.equal(countFinishedPlayerQuestsByCategorySync(playerId, 1), 1)
 assert.equal(countFinishedPlayerQuestsByCategorySync(playerId, 99), 0)
+
+const episodeCountQueryPlan = db.prepare(`
+    EXPLAIN QUERY PLAN
+    SELECT COUNT(*) AS count
+    FROM players_quest_progress
+    WHERE player_id = ? AND section = ? AND finished = 1
+`).all(playerId, 3)
+assert.equal(
+    episodeCountQueryPlan.some(row => String(row.detail)
+        .includes(`USING COVERING INDEX ${questProgressCountIndex}`)),
+    true,
+    JSON.stringify(episodeCountQueryPlan),
+)
 
 const context = DegreeComputer.buildContext(playerId, 5)
 assert.equal(DegreeComputer.compute(1000, context, 0), 250)
