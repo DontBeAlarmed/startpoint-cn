@@ -243,6 +243,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         }
 
         const executeFinishWrites = () => {
+            const missionEvaluationTime = new Date(getServerTime() * 1000);
             const clearReward = !questPreviouslyCompleted && (questData as any).clearReward !== undefined
                 ? givePlayerRewardSync(playerId, (questData as any).clearReward)
                 : null;
@@ -297,7 +298,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             }
 
             const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, (questData as any).scoreRewardGroupId || 0, (questData as any).scoreRewardGroup, useBoostPoint, (questData as any).element);
-            recordMissionBattleFacts(finishCtx)
+            recordMissionBattleFacts(finishCtx, missionEvaluationTime)
             const rewardCharacterExpResult = givePlayerCharactersExpSync(
                 playerId, partyCharacterIdsArray, questData.characterExpReward || 0,
                 questData.fixedParty !== undefined
@@ -305,7 +306,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             const missionSettlement = settleMissionCategories(
                 playerId,
                 BATTLE_SETTLEMENT_CATEGORIES,
-                new Date(getServerTime() * 1000),
+                missionEvaluationTime,
             );
             const characterList = reconcileAwakeUnlockCharacterList(playerId, [
                 ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],

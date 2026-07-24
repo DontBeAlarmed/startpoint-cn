@@ -87,6 +87,22 @@ const singleBattleSource = fs.readFileSync(
     path.join(__dirname, "../src/routes/api/singleBattleQuest.ts"),
     "utf8",
 )
+const singleTransactionStart = singleBattleSource.indexOf("const executeFinishWrites = () => {")
+const singleEvaluationTime = singleBattleSource.indexOf(
+    "const missionEvaluationTime = new Date(getServerTime() * 1000)",
+    singleTransactionStart,
+)
+const singleFactCall = singleBattleSource.indexOf(
+    "recordMissionBattleFacts(finishCtx, missionEvaluationTime)",
+    singleEvaluationTime,
+)
+const singleSettlementTime = singleBattleSource.indexOf(
+    "BATTLE_SETTLEMENT_CATEGORIES,\n                missionEvaluationTime,",
+    singleFactCall,
+)
+assert.equal(singleEvaluationTime > singleTransactionStart, true, "单人 finish 必须在事务体内固定任务时间")
+assert.equal(singleFactCall > singleEvaluationTime, true, "单人任务事实必须使用事务时间")
+assert.equal(singleSettlementTime > singleFactCall, true, "单人任务结算必须复用事实记录的时间")
 assert.equal(
     singleBattleSource.includes("const finishWrites = getDb().transaction(executeFinishWrites)()"),
     true,
@@ -98,12 +114,25 @@ const multiBattleSource = fs.readFileSync(
     "utf8",
 )
 const multiTransactionStart = multiBattleSource.indexOf("const executeFinishWrites = () => {")
-const multiFactCall = multiBattleSource.indexOf("recordMissionBattleFacts(finishCtx)")
+const multiEvaluationTime = multiBattleSource.indexOf(
+    "const missionEvaluationTime = new Date(getServerTime() * 1000)",
+    multiTransactionStart,
+)
+const multiFactCall = multiBattleSource.indexOf(
+    "recordMissionBattleFacts(finishCtx, missionEvaluationTime)",
+    multiEvaluationTime,
+)
+const multiSettlementTime = multiBattleSource.indexOf(
+    "BATTLE_SETTLEMENT_CATEGORIES,\n                missionEvaluationTime,",
+    multiFactCall,
+)
 const multiTransactionCall = multiBattleSource.indexOf("getDb().transaction(executeFinishWrites)()")
 const multiActiveDelete = multiBattleSource.indexOf("delete activeQuests[playerId]", multiTransactionCall)
 const multiRoomReset = multiBattleSource.indexOf("updateRoomState(room.room_number, 1)", multiTransactionCall)
 assert.equal(multiTransactionStart >= 0, true, "多人 finish 必须定义同步结算事务体")
+assert.equal(multiEvaluationTime > multiTransactionStart, true, "多人 finish 必须在事务体内固定任务时间")
 assert.equal(multiFactCall > multiTransactionStart, true)
+assert.equal(multiSettlementTime > multiFactCall, true, "多人任务结算必须复用事实记录的时间")
 assert.equal(multiTransactionCall > multiFactCall, true, "任务事实必须在事务体执行后统一提交")
 assert.equal(multiActiveDelete > multiTransactionCall, true, "事务成功前不得清除多人 active quest 内存")
 assert.equal(multiRoomReset > multiTransactionCall, true, "事务成功前不得重置多人房间状态")

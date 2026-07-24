@@ -270,6 +270,7 @@ const routes = async (fastify: FastifyInstance) => {
         const addExpAmount = questData.characterExpReward
 
         const executeFinishWrites = () => {
+            const missionEvaluationTime = new Date(getServerTime() * 1000)
             const clearReward = !isScoreAttackEvent && !questPreviouslyCompleted && questData.clearReward !== undefined
                 ? givePlayerRewardSync(playerId, questData.clearReward)
                 : null
@@ -336,7 +337,7 @@ const routes = async (fastify: FastifyInstance) => {
             console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${questData.scoreRewardGroup?.length ?? 'null'} questId=${questId} category=${questCategory}`)
             const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element)
 
-            recordMissionBattleFacts(finishCtx)
+            recordMissionBattleFacts(finishCtx, missionEvaluationTime)
 
             const rewardCharacterExpResult = givePlayerCharactersExpSync(
                 playerId,
@@ -432,7 +433,7 @@ const routes = async (fastify: FastifyInstance) => {
             const missionSettlement = settleMissionCategories(
                 playerId,
                 BATTLE_SETTLEMENT_CATEGORIES,
-                new Date(getServerTime() * 1000),
+                missionEvaluationTime,
             )
             const itemList = {
                 ...(activeQuestData.entryItemId ? { [activeQuestData.entryItemId]: getPlayerItemSync(playerId, activeQuestData.entryItemId) ?? 0 } : {}),
