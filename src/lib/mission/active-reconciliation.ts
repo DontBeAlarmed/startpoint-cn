@@ -51,6 +51,9 @@ const PATTERN_TRADED_COUNT_TO_EQUIPMENT_BY_BOSS_COIN = 64
 const PATTERN_BOSS_COIN_EXCHANGE = 84
 const PATTERN_TOTAL_USED_MANA_COUNT = 46
 const PATTERN_TOTAL_GACHA_CHARACTER_COUNT = 78
+const PATTERN_EQUIPPED_FIRST_TIME = 58
+const PATTERN_SET_UNISON_FIRST_TIME = 59
+const PATTERN_SET_PARTY_CHARACTER = 60
 const COME_BACK_EVENT_STRING_ID = "come_back_mission"
 
 export interface ActiveMissionEventEligibilityContext {
@@ -90,6 +93,9 @@ export interface ActiveMissionFactState {
     readonly bossCoinEquipmentShopPurchaseCount: number
     readonly totalUsedManaCount: number
     readonly totalGachaCharacterCount: number
+    readonly totalEquipmentEquipCount: number
+    readonly totalUnisonSetCount: number
+    readonly totalPartyCharacterSetCount: number
 }
 
 function parseInteger(value: unknown, field: string): number {
@@ -208,6 +214,12 @@ export function computeActiveMissionFactProgress(
             return state.totalUsedManaCount
         case PATTERN_TOTAL_GACHA_CHARACTER_COUNT:
             return state.totalGachaCharacterCount
+        case PATTERN_EQUIPPED_FIRST_TIME:
+            return state.totalEquipmentEquipCount
+        case PATTERN_SET_UNISON_FIRST_TIME:
+            return state.totalUnisonSetCount
+        case PATTERN_SET_PARTY_CHARACTER:
+            return state.totalPartyCharacterSetCount
         case PATTERN_EPISODE_CLEAR_COUNT: {
             const storyQuestIds = new Set(
                 characters.flatMap(([characterId]) => state.characterStoryQuestIds[characterId] ?? []),
@@ -367,6 +379,9 @@ function buildActiveMissionFactState(
         ), 0),
         totalUsedManaCount: counters.totalUsedManaCount,
         totalGachaCharacterCount: counters.totalGachaCharacterCount,
+        totalEquipmentEquipCount: counters.totalEquipmentEquipCount,
+        totalUnisonSetCount: counters.totalUnisonSetCount,
+        totalPartyCharacterSetCount: counters.totalPartyCharacterSetCount,
     }
 }
 

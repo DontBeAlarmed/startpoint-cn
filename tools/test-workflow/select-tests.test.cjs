@@ -438,6 +438,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_active_content.test.cjs",
         "tools/mission_active_core.test.cjs",
         "tools/active_mission_counter_storage.test.cjs",
+        "tools/party_action_counter.test.cjs",
         "tools/active_mission_reconciliation.test.cjs",
         "tools/active_mission_character_facts.test.cjs",
         "tools/active_mission_receive_route.test.cjs",

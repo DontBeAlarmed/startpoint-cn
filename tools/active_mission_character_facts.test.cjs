@@ -38,6 +38,9 @@ const state = {
     bossCoinEquipmentShopPurchaseCount: 1,
     totalUsedManaCount: 120,
     totalGachaCharacterCount: 5,
+    totalEquipmentEquipCount: 1,
+    totalUnisonSetCount: 1,
+    totalPartyCharacterSetCount: 1,
 }
 
 const row = (characterId = "(None)") => {
@@ -60,6 +63,9 @@ assert.equal(computeActiveMissionFactProgress(7, row(), state), 4)
 assert.equal(computeActiveMissionFactProgress(34, row(), state), 4)
 assert.equal(computeActiveMissionFactProgress(35, row(), state), 1)
 assert.equal(computeActiveMissionFactProgress(45, row(), state), 2)
+assert.equal(computeActiveMissionFactProgress(58, row(), state), 1)
+assert.equal(computeActiveMissionFactProgress(59, row(), state), 1)
+assert.equal(computeActiveMissionFactProgress(60, row(), state), 1)
 assert.equal(computeActiveMissionFactProgress(64, row(), state), 1)
 assert.equal(computeActiveMissionFactProgress(84, row(), state), 3)
 assert.equal(computeActiveMissionFactProgress(46, row(), state), 120)

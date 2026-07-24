@@ -4,6 +4,8 @@ import { getSession } from "../../data/domains/session"
 import { playerOwnsCharacterSync } from "../../data/domains/character"
 import { playerOwnsEquipmentSync } from "../../data/domains/equipment"
 import { updatePlayerPartySync } from "../../data/domains/party"
+import { getDb } from "../../data/db"
+import { incrementActiveMissionPartyActionCountsSync } from "../../data/domains/active_mission_counters"
 import { generateDataHeaders } from "../../utils";
 import { PartyCategory } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -443,14 +445,6 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No players bound to account."
         })
 
-        // store full global PartyId so /load returns the correct group+slot combo
-        if (player.partySlot !== body.main_party_id) {
-            updatePlayerSync({
-                id: playerId,
-                partySlot: body.main_party_id
-            })
-        }
-
         // update each slot
         const characterOwnedMap: Record<number, boolean> = {}
         const equipmentOwnedMap: Record<number, boolean> = {}
@@ -480,13 +474,12 @@ const routes = async (fastify: FastifyInstance) => {
             return isOwned ? equipmentId : null
         }
 
-        for (const updateInfo of body.party_info_list) {
+        const mappedParties = body.party_info_list.map(updateInfo => {
             const parsed = parseGlobalPartyId(updateInfo.party_id)!
             console.log(`[PARTY] edit: player=${playerId} id=${updateInfo.party_id} -> group=${parsed.groupId} slot=${parsed.slot} name="${updateInfo.party_name}" chars=${updateInfo.character_ids?.filter(Boolean).length || 0}`)
-            updatePlayerPartySync(
-                playerId,
-                parsed.slot,
-                {
+            return {
+                parsed,
+                party: {
                     name: updateInfo.party_name,
                     unisonCharacterIds: updateInfo.unison_character_ids.map(mapOwnedCharacters),
                     characterIds: updateInfo.character_ids.map(mapOwnedCharacters),
@@ -496,11 +489,28 @@ const routes = async (fastify: FastifyInstance) => {
                     edited: updateInfo.party_edited,
                     category: updateInfo.party_category as PartyCategory,
                     currentBattlePower: updateInfo.current_battle_power ?? 0,
-                    beforeBattlePower: updateInfo.before_battle_power ?? 0
+                    beforeBattlePower: updateInfo.before_battle_power ?? 0,
                 },
-                parsed.groupId
-            )
-        }
+            }
+        })
+
+        getDb().transaction(() => {
+            // store full global PartyId so /load returns the correct group+slot combo
+            if (player.partySlot !== body.main_party_id) {
+                updatePlayerSync({
+                    id: playerId,
+                    partySlot: body.main_party_id,
+                })
+            }
+            for (const { parsed, party } of mappedParties) {
+                updatePlayerPartySync(playerId, parsed.slot, party, parsed.groupId)
+            }
+            incrementActiveMissionPartyActionCountsSync(playerId, {
+                equipmentEquipCount: mappedParties.some(({ party }) => party.equipmentIds.some(id => id !== null)) ? 1 : 0,
+                unisonSetCount: mappedParties.some(({ party }) => party.unisonCharacterIds.some(id => id !== null)) ? 1 : 0,
+                partyCharacterSetCount: mappedParties.some(({ party }) => party.characterIds.some(id => id !== null)) ? 1 : 0,
+            })
+        })()
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

@@ -476,6 +476,9 @@ export default function init(
         total_gacha_character_count INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
+    ensureSchemaColumn(database, "players_active_mission_counters.total_equipment_equip_count")
+    ensureSchemaColumn(database, "players_active_mission_counters.total_unison_set_count")
+    ensureSchemaColumn(database, "players_active_mission_counters.total_party_character_set_count")
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_category_missions (
         category INTEGER NOT NULL,

@@ -151,6 +151,21 @@ const schemaColumns = {
         column: "single_rank_ss_count",
         definition: "INTEGER NOT NULL DEFAULT 0",
     },
+    "players_active_mission_counters.total_equipment_equip_count": {
+        table: "players_active_mission_counters",
+        column: "total_equipment_equip_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_active_mission_counters.total_unison_set_count": {
+        table: "players_active_mission_counters",
+        column: "total_unison_set_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "players_active_mission_counters.total_party_character_set_count": {
+        table: "players_active_mission_counters",
+        column: "total_party_character_set_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
 } as const;
 
 export type SchemaColumnKey = keyof typeof schemaColumns;
