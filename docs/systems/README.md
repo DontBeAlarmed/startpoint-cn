@@ -23,6 +23,7 @@
 ## 任务与角色
 
 - [任务完成度审计](./mission-completion-audit.md)
+- [任务模块优先补全设计](./mission-priority-completion.md)
 - [Active Mission](./active-mission.md)
 - [修行之道（Pass Card）](./pass-card.md)
 - [任务与关卡映射](./mission-quest-mapping.md)
