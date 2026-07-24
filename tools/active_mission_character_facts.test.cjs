@@ -26,8 +26,8 @@ const state = {
         },
     },
     equipment: [
-        { level: 5, maxLevel: 5, enhancementLevel: 2 },
-        { level: 1, maxLevel: 5, enhancementLevel: 0 },
+        { level: 5, maxLevel: 5, enhancementLevel: 20 },
+        { level: 1, maxLevel: 5, enhancementLevel: 8 },
     ],
     manaNodes: { "1": [101, 102, 201, 202] },
     manaBoardNodes: { "1": { "2": [201, 202] } },
@@ -35,6 +35,7 @@ const state = {
     partyAbilitySoulCount: 1,
     treasureShopPurchaseCount: 2,
     bossCoinShopPurchaseCount: 3,
+    bossCoinEquipmentShopPurchaseCount: 1,
     totalUsedManaCount: 120,
     totalGachaCharacterCount: 5,
 }
@@ -56,10 +57,10 @@ assert.equal(computeActiveMissionFactProgress(9, row(), state), 3)
 assert.equal(computeActiveMissionFactProgress(8, row(), state), 2)
 assert.equal(computeActiveMissionFactProgress(62, row(), state), 2)
 assert.equal(computeActiveMissionFactProgress(7, row(), state), 4)
-assert.equal(computeActiveMissionFactProgress(34, row(), state), 2)
+assert.equal(computeActiveMissionFactProgress(34, row(), state), 4)
 assert.equal(computeActiveMissionFactProgress(35, row(), state), 1)
 assert.equal(computeActiveMissionFactProgress(45, row(), state), 2)
-assert.equal(computeActiveMissionFactProgress(64, row(), state), 3)
+assert.equal(computeActiveMissionFactProgress(64, row(), state), 1)
 assert.equal(computeActiveMissionFactProgress(84, row(), state), 3)
 assert.equal(computeActiveMissionFactProgress(46, row(), state), 120)
 assert.equal(computeActiveMissionFactProgress(78, row(), state), 5)

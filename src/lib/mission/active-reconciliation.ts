@@ -87,6 +87,7 @@ export interface ActiveMissionFactState {
     readonly partyAbilitySoulCount: number
     readonly treasureShopPurchaseCount: number
     readonly bossCoinShopPurchaseCount: number
+    readonly bossCoinEquipmentShopPurchaseCount: number
     readonly totalUsedManaCount: number
     readonly totalGachaCharacterCount: number
 }
@@ -233,13 +234,13 @@ export function computeActiveMissionFactProgress(
         case PATTERN_LEVEL_MAX_EQUIPMENT_COUNT:
             return state.equipment.filter(equipment => equipment.level >= equipment.maxLevel).length
         case PATTERN_UPGRADE_EQUIPMENT_COUNT:
-            return state.equipment.reduce((total, equipment) => total + Math.max(0, equipment.enhancementLevel ?? 0), 0)
+            return state.equipment.reduce((total, equipment) => total + Math.max(0, equipment.level - 1), 0)
         case PATTERN_SET_SOUL_SPHERE_COUNT:
             return state.partyAbilitySoulCount
         case PATTERN_TREASURE_SHOP_BOUGHT_ITEM_COUNT:
             return state.treasureShopPurchaseCount
         case PATTERN_TRADED_COUNT_TO_EQUIPMENT_BY_BOSS_COIN:
-            return state.bossCoinShopPurchaseCount
+            return state.bossCoinEquipmentShopPurchaseCount
         case PATTERN_BOSS_COIN_EXCHANGE:
             return state.bossCoinShopPurchaseCount
         case PATTERN_OVER_LIMIT_TOTAL_COUNT:
@@ -326,6 +327,17 @@ function buildActiveMissionFactState(
         repository,
         "boss_coin_shop_item_category_map.json",
     )))
+    const bossCoinShopItems = readRepositoryTable<Record<string, Record<string, {
+        readonly rewards?: readonly { readonly type?: number }[]
+    }>>>(repository, "boss_coin_shop.json")
+    const bossCoinEquipmentShopItemIds = new Set<string>()
+    for (const category of Object.values(bossCoinShopItems)) {
+        for (const [itemId, item] of Object.entries(category ?? {})) {
+            if (item.rewards?.some(reward => reward.type === 4)) {
+                bossCoinEquipmentShopItemIds.add(itemId)
+            }
+        }
+    }
     const partyAbilitySoulCount = Object.values(getPlayerPartyGroupListSync(playerId)).reduce((total, group) => (
         total + Object.values(group.list ?? {}).reduce((partyTotal, party) => (
             partyTotal + (party.abilitySoulIds ?? []).filter(id => id !== null && id !== undefined).length
@@ -349,6 +361,9 @@ function buildActiveMissionFactState(
         ), 0),
         bossCoinShopPurchaseCount: Object.entries(purchases).reduce((total, [itemId, count]) => (
             bossCoinShopItemIds.has(itemId) ? total + Math.max(0, count) : total
+        ), 0),
+        bossCoinEquipmentShopPurchaseCount: Object.entries(purchases).reduce((total, [itemId, count]) => (
+            bossCoinEquipmentShopItemIds.has(itemId) ? total + Math.max(0, count) : total
         ), 0),
         totalUsedManaCount: counters.totalUsedManaCount,
         totalGachaCharacterCount: counters.totalGachaCharacterCount,
