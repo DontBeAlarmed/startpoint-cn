@@ -75,9 +75,43 @@ Content Release；这一步只补齐服务端解释 Active Mission 所需的定�
 这组状态事实只写入 `all_active_mission_list`，不会写入角色觉醒使用的 category 9 `active_mission_list`。
 
 上述能力构成内容解释、首任务生产、状态事实校准、可用性判定、安全领奖和存储链。当前已接入 37 个实际使用的 pattern，
-对应 79 条定义；其中 15 条回归定义仍需资格回调才能生产。其余 17 条定义仍没有权威生产入口；除已接入
-事实、Contents Guide 首任务、存档导入或既有数据库记录外，`players_active_missions` 不会自行生成完整进度。因此
-Active Mission 仍是部分完成，不能只因状态校准、首任务与领奖接口可用就标记为完整。
+对应 79 条定义；其中 15 条回归定义仍需资格回调才能生产。其余 17 条定义仍未接入服务端事实生产者，
+但它们并不都缺少客户端依据：CN 1.8.1 的战斗结算协议明确包含 `equipment_element`、分区统计中的
+`skill_point_over_on_start`，以及 `client_checks` 字段。除已接入事实、Contents Guide 首任务、存档导入或既有数据库记录外，
+`players_active_missions` 不会自行生成完整进度。因此 Active Mission 仍是部分完成，不能只因状态校准、首任务与领奖接口可用
+就标记为完整。
+
+## 剩余 17 条定义的证据审计
+
+### Contents Guide：20011～20017（7 条）
+
+这 7 条定义均属于 event 2、`battle_kind=3` 的任意战斗，并通过任务前置关系依次开放。
+
+| 任务 | 主数据条件 | 当前判断 |
+|---|---|---|
+| 20011 | `character_element=1` | 可由角色主数据和本次队伍角色 ID 判定；1 是客户端的火属性目标值 |
+| 20012 | `character_element=1`、`equipment_element=1` | 角色条件可判定；装备条件应使用客户端结算上传的 `equipment_element`，不能从装备 ID 猜属性 |
+| 20013 | `character_element=3` | 可由角色主数据和本次队伍角色 ID 判定；3 是客户端的雷属性目标值 |
+| 20014 | `character_element=3`、`equipment_element=3` | 角色条件可判定；装备条件同 20012 |
+| 20015 | `action_effects=ACToleranceOfElement_Down`、排除 `depraved_monk` | 仍需解析技能/动作效果主数据，不能只按角色名称硬编码 |
+| 20016 | `action_effects=CreateNormalHeal,CreateRatioHeal,ACRegeneration`、排除 `compliment_oiran` | 仍需解析技能/动作效果主数据，不能只按角色名称硬编码 |
+| 20017 | pattern 91，开局技能槽充满 | 结算协议有 `zones[].skill_point_over_on_start`，需确认计数语义和三名主位角色的对应关系后实现 |
+
+客户端 `BattleQuestFinishRemoteUtil` 会在结算请求中发送 `equipment_element`；客户端统计类型还声明了
+`skill_point_over_on_start` 和 `client_checks`。因此 20011～20014、20017 不应再被描述为“没有协议字段”，
+而应分别补齐队伍元素事实、装备元素透传与开局技能统计解析。20015～20016 的阻塞点是服务端当前没有
+技能动作效果索引，不是任务主数据缺失。
+
+### 外部活动：21030（1 条）
+
+`real_incentive_1_multi_special_exchange` 对应 2022 年限时的“大家一起选”活动，属于 `multi_special_exchange`
+交互，不是普通单人战斗。当前没有对应活动入口，暂不实现。
+
+### 回归活动：25009～25022 中的 9 条未接入定义
+
+这些定义属于 event 150，`string_id` 含 `come_back_mission`，包括消灭敌人、冲刺、破坏弱点、强化弹射、发动技能、
+技能连锁、战力和 10 秒内通关等条件。部分战斗统计字段已经存在，但当前没有回归资格生产者；资格层会 `fail closed`，
+不会把回归任务发给普通玩家。它们应在回归资格协议明确后再逐项接入。
 
 ## 后续实现原则
 
@@ -87,3 +121,8 @@ Active Mission 仍是部分完成，不能只因状态校准、首任务与领�
 2. 事件开放期、前置任务和分组关系从 `mission_active.json`、`mission_active_event.json` 读取，不从中文文案推测。
 3. 进度创建、增量、领奖和奖励发放保持幂等；领取接口以数据库进度和当前 Content snapshot 的有效性共同校验。
 4. 不修改客户端，不把旧 Active Mission 存储与 category 9 角色觉醒任务重新混用。
+
+单人体验优先顺序为：先实现并测试 20011/20013 的角色元素条件，再补 20012/20014 的客户端
+`equipment_element` 透传与判定；随后确认 `skill_point_over_on_start` 的计数语义并处理 20017。
+20015/20016 要等技能动作效果索引准备好后再实现。21030、回归资格和 Pass type 20 继续保持低优先级，
+不使用推测值完成任务。
