@@ -171,6 +171,11 @@ const schemaColumns = {
         column: "total_injected_exp_count",
         definition: "INTEGER NOT NULL DEFAULT 0",
     },
+    "players_active_mission_counters.total_gacha_campaign_count": {
+        table: "players_active_mission_counters",
+        column: "total_gacha_campaign_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
 } as const;
 
 export type SchemaColumnKey = keyof typeof schemaColumns;

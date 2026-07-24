@@ -28,6 +28,7 @@ const {
     incrementActiveMissionGachaCharacterCountSync,
     incrementActiveMissionPartyActionCountsSync,
     incrementActiveMissionInjectedExpCountSync,
+    incrementActiveMissionGachaCampaignCountSync,
     incrementActiveMissionUsedManaCountSync,
 } = require("../src/data/domains/active_mission_counters")
 
@@ -49,6 +50,7 @@ assert.deepEqual(getActiveMissionCountersSync(playerId), {
     totalUnisonSetCount: 0,
     totalPartyCharacterSetCount: 0,
     totalInjectedExpCount: 0,
+    totalGachaCampaignCount: 0,
 })
 incrementActiveMissionUsedManaCountSync(playerId, 120)
 incrementActiveMissionGachaCharacterCountSync(playerId, 3)
@@ -59,6 +61,7 @@ incrementActiveMissionPartyActionCountsSync(playerId, {
     partyCharacterSetCount: 1,
 })
 incrementActiveMissionInjectedExpCountSync(playerId)
+incrementActiveMissionGachaCampaignCountSync(playerId)
 assert.deepEqual(getActiveMissionCountersSync(playerId), {
     totalUsedManaCount: 120,
     totalGachaCharacterCount: 5,
@@ -66,6 +69,7 @@ assert.deepEqual(getActiveMissionCountersSync(playerId), {
     totalUnisonSetCount: 1,
     totalPartyCharacterSetCount: 1,
     totalInjectedExpCount: 1,
+    totalGachaCampaignCount: 1,
 })
 
 console.log("active mission counter storage tests passed")
