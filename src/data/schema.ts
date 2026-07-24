@@ -166,6 +166,11 @@ const schemaColumns = {
         column: "total_party_character_set_count",
         definition: "INTEGER NOT NULL DEFAULT 0",
     },
+    "players_active_mission_counters.total_injected_exp_count": {
+        table: "players_active_mission_counters",
+        column: "total_injected_exp_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
 } as const;
 
 export type SchemaColumnKey = keyof typeof schemaColumns;

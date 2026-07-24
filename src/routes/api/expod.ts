@@ -13,6 +13,7 @@ import { getCharacterDataSync } from "../../lib/assets";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
+import { incrementActiveMissionInjectedExpCountSync } from "../../data/domains/active_mission_counters"
 import { validateCharacterStackConversion } from "../../lib/character-stack";
 
 interface InjectExpBody {
@@ -307,14 +308,16 @@ const routes = async (fastify: FastifyInstance) => {
         
         const playerAfterExpPool = player.expPool - addExp
 
-        // decrease player exp
-        updatePlayerSync({
-            id: playerId,
-            expPool: playerAfterExpPool
-        })
-
-        // add exp to the character
-        const rewardResult = givePlayerCharactersExpSync(playerId, [characterId], addExp, false)
+        const rewardResult = getDb().transaction(() => {
+            // 经验池扣除、角色经验写入和首次注入动作计数必须原子提交。
+            updatePlayerSync({
+                id: playerId,
+                expPool: playerAfterExpPool,
+            })
+            const result = givePlayerCharactersExpSync(playerId, [characterId], addExp, false)
+            incrementActiveMissionInjectedExpCountSync(playerId)
+            return result
+        })()
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

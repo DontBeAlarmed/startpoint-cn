@@ -41,6 +41,7 @@ const state = {
     totalEquipmentEquipCount: 1,
     totalUnisonSetCount: 1,
     totalPartyCharacterSetCount: 1,
+    totalInjectedExpCount: 1,
 }
 
 const row = (characterId = "(None)") => {
@@ -66,6 +67,7 @@ assert.equal(computeActiveMissionFactProgress(45, row(), state), 2)
 assert.equal(computeActiveMissionFactProgress(58, row(), state), 1)
 assert.equal(computeActiveMissionFactProgress(59, row(), state), 1)
 assert.equal(computeActiveMissionFactProgress(60, row(), state), 1)
+assert.equal(computeActiveMissionFactProgress(63, row(), state), 1)
 assert.equal(computeActiveMissionFactProgress(64, row(), state), 1)
 assert.equal(computeActiveMissionFactProgress(84, row(), state), 3)
 assert.equal(computeActiveMissionFactProgress(46, row(), state), 120)

@@ -479,6 +479,7 @@ export default function init(
     ensureSchemaColumn(database, "players_active_mission_counters.total_equipment_equip_count")
     ensureSchemaColumn(database, "players_active_mission_counters.total_unison_set_count")
     ensureSchemaColumn(database, "players_active_mission_counters.total_party_character_set_count")
+    ensureSchemaColumn(database, "players_active_mission_counters.total_injected_exp_count")
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_category_missions (
         category INTEGER NOT NULL,

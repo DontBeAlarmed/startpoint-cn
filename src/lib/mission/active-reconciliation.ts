@@ -54,6 +54,7 @@ const PATTERN_TOTAL_GACHA_CHARACTER_COUNT = 78
 const PATTERN_EQUIPPED_FIRST_TIME = 58
 const PATTERN_SET_UNISON_FIRST_TIME = 59
 const PATTERN_SET_PARTY_CHARACTER = 60
+const PATTERN_INJECTED_EXP_FIRST_TIME = 63
 const COME_BACK_EVENT_STRING_ID = "come_back_mission"
 
 export interface ActiveMissionEventEligibilityContext {
@@ -96,6 +97,7 @@ export interface ActiveMissionFactState {
     readonly totalEquipmentEquipCount: number
     readonly totalUnisonSetCount: number
     readonly totalPartyCharacterSetCount: number
+    readonly totalInjectedExpCount: number
 }
 
 function parseInteger(value: unknown, field: string): number {
@@ -220,6 +222,8 @@ export function computeActiveMissionFactProgress(
             return state.totalUnisonSetCount
         case PATTERN_SET_PARTY_CHARACTER:
             return state.totalPartyCharacterSetCount
+        case PATTERN_INJECTED_EXP_FIRST_TIME:
+            return state.totalInjectedExpCount
         case PATTERN_EPISODE_CLEAR_COUNT: {
             const storyQuestIds = new Set(
                 characters.flatMap(([characterId]) => state.characterStoryQuestIds[characterId] ?? []),
@@ -382,6 +386,7 @@ function buildActiveMissionFactState(
         totalEquipmentEquipCount: counters.totalEquipmentEquipCount,
         totalUnisonSetCount: counters.totalUnisonSetCount,
         totalPartyCharacterSetCount: counters.totalPartyCharacterSetCount,
+        totalInjectedExpCount: counters.totalInjectedExpCount,
     }
 }
 
