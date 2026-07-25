@@ -132,6 +132,19 @@ insertPlayerQuestProgressSync(playerId, 3, { questId: 300002, finished: true })
 insertPlayerQuestProgressSync(playerId, 3, { questId: 300003, finished: false })
 insertPlayerQuestProgressSync(playerId, 1, { questId: 100001, finished: true })
 
+const mainQuests = require("../assets/main_quest.json")
+const exQuests = require("../assets/ex_quest.json")
+function insertChapterProgress(chapter, unfinishedQuestId = null) {
+    for (const [table, section] of [[mainQuests, 1], [exQuests, 4]]) {
+        for (const questId of Object.keys(table)) {
+            if (Math.floor(Number(questId) / 1_000_000) !== chapter) continue
+            insertPlayerQuestProgressSync(playerId, section, {
+                questId: Number(questId),
+                finished: Number(questId) !== unfinishedQuestId,
+            })
+        }
+    }
+}
 const degreeComputerSource = fs.readFileSync(
     path.join(__dirname, "../src/lib/mission/computer-degree.ts"),
     "utf8",
@@ -142,6 +155,9 @@ assert.doesNotMatch(degreeComputerSource, /getPlayerQuestProgressSync/)
 assert.equal(countFinishedPlayerQuestsByCategorySync(playerId, 3), 2)
 assert.equal(countFinishedPlayerQuestsByCategorySync(playerId, 1), 1)
 assert.equal(countFinishedPlayerQuestsByCategorySync(playerId, 99), 0)
+
+insertChapterProgress(1)
+insertChapterProgress(2, 2001001)
 
 const episodeCountQueryPlan = db.prepare(`
     EXPLAIN QUERY PLAN
@@ -168,6 +184,9 @@ assert.equal(DegreeComputer.compute(52000, context, 0), 5000, "应读取玩家�
 assert.equal(DegreeComputer.compute(52010, context, 9000), 9000, "体力称号旧进度不得倒退")
 assert.equal(DegreeComputer.compute(53000, context, 0), 30, "应读取玩家累计登录天数")
 assert.equal(DegreeComputer.compute(53010, context, 40), 40, "登录称号旧进度不得倒退")
+assert.equal(DegreeComputer.compute(9000, context, 0), 1, "主线和高难全部完成后应完成章节称号")
+assert.equal(DegreeComputer.compute(9010, context, 0), 0, "章节缺少一个高难关卡时不得完成章节称号")
+assert.equal(DegreeComputer.compute(9110, context, 0), 0, "没有主线与高难记录的章节不得完成章节称号")
 assert.equal(DegreeComputer.compute(111001, context, 0), 1, "指定角色获得信赖之证后应完成称号")
 assert.equal(DegreeComputer.compute(111002, context, 0), 0, "未获得信赖之证的角色不得完成称号")
 assert.equal(DegreeComputer.compute(111003, context, 0), 1, "已领取信赖之证后称号仍必须保持完成")
@@ -205,8 +224,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 997,
-    unsupported: 291,
+    serverComputed: 1009,
+    unsupported: 279,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -222,6 +241,7 @@ assert.deepEqual(coverage, {
         secondManaBoardCompletion: 472,
         staminaUseCount: 3,
         loginCount: 3,
+        episodeChapterCompletion: 12,
     },
 })
 

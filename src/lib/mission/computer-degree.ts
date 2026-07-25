@@ -3,9 +3,14 @@
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../../data/domains/character"
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
-import { countFinishedPlayerQuestsByCategorySync } from "../../data/domains/quest"
+import {
+    countFinishedPlayerQuestsByCategorySync,
+    getFinishedPlayerQuestIdsBySectionsSync,
+} from "../../data/domains/quest"
 import { getRankDegree } from "../stamina"
 import bundledManaBoard from "../../../assets/mana_board.json"
+import bundledMainQuests from "../../../assets/main_quest.json"
+import bundledExQuests from "../../../assets/ex_quest.json"
 import {
     ContentSnapshotError,
     getContentSnapshot,
@@ -35,18 +40,22 @@ export function getTargetDegree(missionId: number): number | undefined {
 
 type RawManaBoard = Record<string, Record<string, Record<string, readonly unknown[][]>>>
 
-function getManaBoardTable(): RawManaBoard {
+type RawQuestTable = Record<string, unknown>
+
+function getRuntimeTable<T>(tableName: string, bundled: T): T {
     try {
-        return getContentSnapshot().repository.table<RawManaBoard>("mana_board.json")
+        return getContentSnapshot().repository.table<T>(tableName)
     } catch (error) {
-        // Keep legacy bundled startup and direct unit tests compatible before
-        // the runtime content snapshot has been initialized.
         if (error instanceof ContentSnapshotError
             && error.code === "CONTENT_SNAPSHOT_NOT_INITIALIZED") {
-            return bundledManaBoard as RawManaBoard
+            return bundled
         }
         throw error
     }
+}
+
+function getManaBoardTable(): RawManaBoard {
+    return getRuntimeTable("mana_board.json", bundledManaBoard as RawManaBoard)
 }
 
 function getSecondManaBoardNodeIds(characterId: string): ReadonlySet<number> | null {
@@ -94,11 +103,43 @@ function getSecondManaBoardStats(
     return { nodeCount, completedCharacterIds }
 }
 
+function getCompletedEpisodeChapters(playerId: number): ReadonlySet<number> {
+    const mainQuests = getRuntimeTable<RawQuestTable>("main_quest.json", bundledMainQuests)
+    const exQuests = getRuntimeTable<RawQuestTable>("ex_quest.json", bundledExQuests)
+    const finished = getFinishedPlayerQuestIdsBySectionsSync(playerId, [1, 4])
+    const mainFinished = finished[1] ?? new Set<number>()
+    const exFinished = finished[4] ?? new Set<number>()
+    const chapters = new Set<number>()
+
+    for (const questId of [...Object.keys(mainQuests), ...Object.keys(exQuests)]) {
+        const numericQuestId = Number(questId)
+        const chapter = Math.floor(numericQuestId / 1_000_000)
+        if (Number.isSafeInteger(chapter) && chapter >= 1 && chapter <= 12) chapters.add(chapter)
+    }
+
+    const completed = new Set<number>()
+    for (const chapter of chapters) {
+        const mainIds = Object.keys(mainQuests)
+            .map(Number)
+            .filter(questId => Math.floor(questId / 1_000_000) === chapter)
+        const exIds = Object.keys(exQuests)
+            .map(Number)
+            .filter(questId => Math.floor(questId / 1_000_000) === chapter)
+        if (mainIds.length === 0 || exIds.length === 0) continue
+        if (mainIds.every(questId => mainFinished.has(questId))
+            && exIds.every(questId => exFinished.has(questId))) {
+            completed.add(chapter)
+        }
+    }
+    return completed
+}
+
 function buildStats(playerId: number, category: number): CategoryContext {
     const player = getPlayerSync(playerId)!
     const characters = getPlayerCharactersSync(playerId)
     const manaNodes = getPlayerCharactersManaNodesSync(playerId)
     const battleCounters = getMissionBattleCountersSync(playerId)
+    const episodeCompletedChapters = getCompletedEpisodeChapters(playerId)
     return {
         category,
         playerId,
@@ -131,6 +172,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
                     secondManaBoardCompletedCharacterIds: secondManaBoard.completedCharacterIds,
                 }
             })(),
+            episodeCompletedChapters,
         },
     }
 }
@@ -165,6 +207,15 @@ function isSecondManaBoardAggregateMission(missionId: number): boolean {
     )
 }
 
+function getEpisodeChapter(missionId: number): number | undefined {
+    const definition = getMissionMasterDefinition(5, missionId)
+    if (!definition
+        || Number(definition.row[3]) !== 22
+        || !definition.pattern.startsWith("degree_all_episode_quest_clear_")) return undefined
+    const chapter = Number(definition.row[9])
+    return Number.isSafeInteger(chapter) && chapter > 0 ? chapter : undefined
+}
+
 export function getDegreeMissionCoverageReport() {
     const definitions = getMissionMasterDefinitions(5)
     const prefixFamilies = Object.fromEntries(
@@ -184,6 +235,9 @@ export function getDegreeMissionCoverageReport() {
         )).length,
         secondManaBoardCompletion: definitions.filter(definition => (
             getSecondManaBoardCharacterId(definition.missionId) !== undefined
+        )).length,
+        episodeChapterCompletion: definitions.filter(definition => (
+            getEpisodeChapter(definition.missionId) !== undefined
         )).length,
     }
     const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
@@ -227,6 +281,10 @@ export const DegreeComputer: MissionComputer = {
         }
         if (isSecondManaBoardAggregateMission(missionId)) {
             return Math.max(dbProgress, stats.secondManaBoardNodeCount)
+        }
+        const episodeChapter = getEpisodeChapter(missionId)
+        if (episodeChapter !== undefined) {
+            return Math.max(dbProgress, stats.episodeCompletedChapters.has(episodeChapter) ? 1 : 0)
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.companionCount)) return stats.companionCount
         if (pattern.startsWith(SUPPORTED_FAMILIES.overLimitCount)) return stats.overLimitCount

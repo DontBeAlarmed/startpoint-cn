@@ -35,6 +35,7 @@ export interface CategoryContext {
         bondedCharacterIds: ReadonlySet<number>
         secondManaBoardNodeCount: number
         secondManaBoardCompletedCharacterIds: ReadonlySet<number>
+        episodeCompletedChapters: ReadonlySet<number>
     }
     battleCounters?: MissionBattleCounters
     snapshot?: SnapshotData | null

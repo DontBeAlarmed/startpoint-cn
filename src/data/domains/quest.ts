@@ -70,6 +70,27 @@ export function countFinishedPlayerQuestsByCategorySync(
     return Number.isSafeInteger(count) && count >= 0 ? count : 0
 }
 
+export function getFinishedPlayerQuestIdsBySectionsSync(
+    playerId: number,
+    sections: readonly number[],
+): Record<number, ReadonlySet<number>> {
+    const normalizedSections = [...new Set(sections.map(Number))]
+        .filter(section => Number.isSafeInteger(section))
+    if (normalizedSections.length === 0) return {}
+
+    const placeholders = normalizedSections.map(() => "?").join(", ")
+    const rows = getDb().prepare(`
+        SELECT section, quest_id
+        FROM players_quest_progress
+        WHERE player_id = ? AND finished = 1 AND section IN (${placeholders})
+    `).all(playerId, ...normalizedSections) as { section: number, quest_id: number }[]
+
+    const result: Record<number, Set<number>> = {}
+    for (const section of normalizedSections) result[section] = new Set<number>()
+    for (const row of rows) result[row.section]?.add(row.quest_id)
+    return result
+}
+
 /**
  * Gets the progress of a singular quest for a player..
  * 
