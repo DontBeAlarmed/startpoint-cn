@@ -70,6 +70,10 @@ import {
     publishActiveQuest,
     runAbortActiveQuestTransaction,
 } from "../../lib/quest/active-quest-service";
+import {
+    AUTO_START_STOP_RESULT_CODE,
+    shouldStopAutoStartForStamina,
+} from "../../lib/quest/auto-start-stop"
 import { recordActiveMissionQuestChallengeFactSync } from "../../lib/mission/active-entry-facts";
 
 interface StartBody {
@@ -691,6 +695,17 @@ const routes = async (fastify: FastifyInstance) => {
                 || error instanceof InsufficientStaminaError
                 || error instanceof PlayerNotFoundError) {
                 console.warn(`[BATTLE-START] player ${playerId}: ${error.message}`)
+                if (error instanceof InsufficientStaminaError
+                    && shouldStopAutoStartForStamina(isAutoStartMode, true)) {
+                    reply.header("content-type", "application/x-msgpack")
+                    return reply.status(200).send({
+                        "data_headers": generateDataHeaders({
+                            viewer_id: viewerId,
+                            result_code: AUTO_START_STOP_RESULT_CODE,
+                        }),
+                        "data": {},
+                    })
+                }
                 return reply.status(400).send({
                     "error": "Bad Request",
                     "message": error.message,
