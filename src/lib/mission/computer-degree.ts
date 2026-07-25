@@ -145,6 +145,8 @@ const SUPPORTED_FAMILIES = {
     multiClearCount: "degree_multi_battle_clear_",
     multiHostClearCount: "degree_multi_battle_by_host_clear_",
     episodeClearCount: "degree_character_episode_read_",
+    staminaUseCount: "degree_stamina_use_",
+    loginCount: "degree_login_count_",
 } as const
 
 function getSecondManaBoardCharacterId(missionId: number): number | undefined {
@@ -239,6 +241,12 @@ export const DegreeComputer: MissionComputer = {
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.episodeClearCount)) {
             return Math.max(dbProgress, stats.episodeClearCount)
+        }
+        if (pattern.startsWith(SUPPORTED_FAMILIES.staminaUseCount)) {
+            return Math.max(dbProgress, ctx.player.totalStaminaUsed ?? 0)
+        }
+        if (pattern.startsWith(SUPPORTED_FAMILIES.loginCount)) {
+            return Math.max(dbProgress, ctx.player.totalLoginDays ?? 0)
         }
         return dbProgress
     },

@@ -82,7 +82,12 @@ const account = insertAccountSync({
     status: "normal",
 })
 const playerId = insertDefaultPlayerSync(account.id).id
-updatePlayerSync({ id: playerId, rankPoint: Number.MAX_SAFE_INTEGER })
+updatePlayerSync({
+    id: playerId,
+    rankPoint: Number.MAX_SAFE_INTEGER,
+    totalStaminaUsed: 5000,
+    totalLoginDays: 30,
+})
 
 function insertCharacter(characterId, overLimitStep, bondStatus) {
     const now = new Date("2024-01-01T00:00:00.000Z")
@@ -159,6 +164,10 @@ assert.equal(DegreeComputer.compute(5000, context, 0), 42)
 assert.equal(DegreeComputer.compute(6000, context, 0), 4)
 assert.equal(DegreeComputer.compute(13000, context, 0), 1, "多人 SS 不得计入单人 SS 称号")
 assert.equal(DegreeComputer.compute(3000, context, 7), 7, "缺少完整等级曲线时保留已有进度")
+assert.equal(DegreeComputer.compute(52000, context, 0), 5000, "应读取玩家累计消耗体力")
+assert.equal(DegreeComputer.compute(52010, context, 9000), 9000, "体力称号旧进度不得倒退")
+assert.equal(DegreeComputer.compute(53000, context, 0), 30, "应读取玩家累计登录天数")
+assert.equal(DegreeComputer.compute(53010, context, 40), 40, "登录称号旧进度不得倒退")
 assert.equal(DegreeComputer.compute(111001, context, 0), 1, "指定角色获得信赖之证后应完成称号")
 assert.equal(DegreeComputer.compute(111002, context, 0), 0, "未获得信赖之证的角色不得完成称号")
 assert.equal(DegreeComputer.compute(111003, context, 0), 1, "已领取信赖之证后称号仍必须保持完成")
@@ -196,8 +205,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 991,
-    unsupported: 297,
+    serverComputed: 997,
+    unsupported: 291,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -211,6 +220,8 @@ assert.deepEqual(coverage, {
         specificCharacterBond: 484,
         secondManaBoardNodeCount: 3,
         secondManaBoardCompletion: 472,
+        staminaUseCount: 3,
+        loginCount: 3,
     },
 })
 
