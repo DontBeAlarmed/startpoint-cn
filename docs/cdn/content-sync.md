@@ -13,13 +13,23 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 
 同步器负责严格解析、引用闭包、稳定输出和文件系统安全，不负责判断 CDN 作者给出的 ID、赔率、奖励、价格或资源内容是否合理。服务端不会替 CDN 作者猜测缺失内容、复制其他活动数据、修复非法主数据或自动生成客户端补丁。
 
-阶段 A 只动态转换三个领域：
+阶段 A 只动态转换四个领域：
 
 | 领域 | 动态输出 |
 |---|---|
 | 角色 | `character.json`、两张 `cdndata/character*.json` |
 | 卡池 | `gacha.json`、`gacha_campaign.json`、两张 `cdndata/gacha*.json`，并读取全部非空 odds 引用 |
 | 商店 | General、Event、Boss、Star Grain、Treasure、Equipment 共 8 张运行时表 |
+| 任务技能效果 | `cdndata/active_mission_skill_effects.json`；读取角色、技能 orderedmap 和 Action DSL |
+
+任务技能效果索引只记录 CDN 能直接证明的角色技能效果。服务端在同步阶段解压并解析
+`*.action.dsl.amf3.deflate`，识别 `CreateNormalHeal`、`CreateRatioHeal`、`ACRegeneration`，以及
+负值 `ACToleranceOfElement` 对应的 `ACToleranceOfElement_Down`。无法读取或解码的程序会进入表内
+`unresolved`，不会猜测效果，也不会阻止其他角色生成索引。运行时只读取生成表，不读取 DSL 原文件。
+
+仓库内的 `assets/cdndata/active_mission_skill_effects.json` 只是一份空结构兼容 fallback；没有执行
+Content Sync 时，20015/20016 会保持 fail closed。使用官方 CDN 执行同步后，当前 Release 才会包含实际
+角色效果索引。
 
 Registry 仍要求每个 Release 闭合当前全部注册表。阶段 A 中未迁移领域从仓库内 bundled/server JSON 导入 Release；它们不会因为 CDN orderedmap 改动而自动变化。全表 CDN 转换属于阶段 B，必须在阶段 A 验收后另行实施。
 

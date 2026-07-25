@@ -217,6 +217,18 @@ const definitionInputs: TableSourceInput[] = [
         outputShapeVersion: 1,
     },
     {
+        tableName: "cdndata/active_mission_skill_effects.json",
+        scope: "cdn",
+        sourceOrderedMaps: [
+            "master/character/character.orderedmap",
+            "master/skill/action_skill.orderedmap",
+            "master/skill/switched_action_skill.orderedmap",
+        ],
+        converterId: "skill-effects",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    },
+    {
         tableName: "general_shop.json",
         scope: "cdn",
         sourceOrderedMaps: ["master/shop/general_shop.orderedmap"],

@@ -54,6 +54,16 @@ function skillStartDefinition(missionId, battleKind = 3) {
     return { missionId, row }
 }
 
+function skillEffectDefinition(missionId, effects, ignored = "(None)") {
+    const row = []
+    row[29] = "90"
+    row[32] = "3"
+    row[34] = "(None)"
+    row[69] = effects
+    row[70] = ignored
+    return { missionId, row }
+}
+
 function mainQuestSkillStartDefinition(missionId, questId = 1001001) {
     const definition = skillStartDefinition(missionId)
     definition.row[34] = "0"
@@ -188,6 +198,35 @@ assert.deepEqual(collectActiveMissionSpecificBattleFacts([
     questId: 1001002,
     partyCharacterIds: [1, 2, 3],
     zones: [{ skill_point_over_on_start: 3 }],
+}, {}), [])
+
+const skillEffects = {
+    "1": { stringId: "ordinary", unisonable: false, effects: ["Other"] },
+    "2": { stringId: "valid_resistance_down", unisonable: true, effects: ["ACToleranceOfElement_Down"] },
+    "3": { stringId: "compliment_oiran", unisonable: true, effects: ["CreateRatioHeal"] },
+}
+assert.deepEqual(collectActiveMissionSpecificBattleFacts([
+    skillEffectDefinition(20015, "ACToleranceOfElement_Down"),
+    skillEffectDefinition(20016, "CreateNormalHeal,CreateRatioHeal,ACRegeneration"),
+], {
+    questAccomplished: true,
+    isMulti: false,
+    questCategory: 1,
+    questId: 1001001,
+    partyCharacterIds: [1],
+    unisonCharacterIds: [2],
+    skillEffects,
+}, {}), [{ missionId: 20015 }])
+assert.deepEqual(collectActiveMissionSpecificBattleFacts([
+    skillEffectDefinition(20016, "CreateNormalHeal,CreateRatioHeal,ACRegeneration", "compliment_oiran"),
+], {
+    questAccomplished: true,
+    isMulti: false,
+    questCategory: 1,
+    questId: 1001001,
+    partyCharacterIds: [3],
+    unisonCharacterIds: [],
+    skillEffects,
 }, {}), [])
 
 const malformedRange = skillStartDefinition(20017)

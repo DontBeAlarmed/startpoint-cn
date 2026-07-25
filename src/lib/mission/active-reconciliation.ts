@@ -72,6 +72,7 @@ const PATTERN_BATTLE_CLEAR_WITH_MANA_BOARD_2ND = 71
 const PATTERN_BATTLE_CLEAR_WITH_LEVEL_80_CHARACTER = 72
 const PATTERN_BATTLE_CLEAR_WITH_LEVEL_100_CHARACTER = 73
 const PATTERN_BATTLE_CLEAR_WITH_SPECIFIC_CHARACTER = 89
+const PATTERN_BATTLE_CLEAR_WITH_SPECIFIC_SKILL = 90
 const PATTERN_BATTLE_CLEAR_WITH_FULL_SKILL_START = 91
 const COME_BACK_EVENT_STRING_ID = "come_back_mission"
 
@@ -451,6 +452,7 @@ export function computeActiveMissionFactProgress(
             return state.conditionalBattleFacts[`${pattern}:${characterId}`] ?? 0
         }
         case PATTERN_BATTLE_CLEAR_WITH_SPECIFIC_CHARACTER:
+        case PATTERN_BATTLE_CLEAR_WITH_SPECIFIC_SKILL:
         case PATTERN_BATTLE_CLEAR_WITH_FULL_SKILL_START:
             return missionId === undefined ? null : state.loadoutBattleFacts[String(missionId)] ?? 0
         case PATTERN_EPISODE_CLEAR_COUNT: {

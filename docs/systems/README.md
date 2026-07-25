@@ -26,6 +26,7 @@
 - [任务模块优先补全设计](./mission-priority-completion.md)
 - [任务系统后续路线图](./mission-roadmap.md)
 - [Active Mission](./active-mission.md)
+- [任务模块待审阅实现记录](./mission-implementation-assumptions.md)
 - [修行之道（Pass Card）](./pass-card.md)
 - [任务与关卡映射](./mission-quest-mapping.md)
 - [角色觉醒任务](./character-awake-missions.md)

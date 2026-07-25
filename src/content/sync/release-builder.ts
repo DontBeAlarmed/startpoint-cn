@@ -13,6 +13,11 @@ import {
     type ShopConversionOutput,
     type ShopSourceReader,
 } from "../converters/shop"
+import {
+    convertSkillEffects,
+    type SkillEffectConversionInput,
+    type SkillEffectConversionOutput,
+} from "../converters/skill-effects"
 import { parseCsvLine } from "../converters/csv"
 import { mapWithConcurrency } from "../concurrency"
 import { hashContentResourcePath } from "../resource-path"
@@ -34,6 +39,7 @@ const SUPPORTED_CONVERTER_IDS = new Set([
     "character",
     "gacha",
     "shop",
+    "skill-effects",
     "bundled-json",
     "server-json",
 ])
@@ -48,6 +54,9 @@ export interface DefaultContentTableBuilderDependencies {
     readonly convertShops?: (
         reader: ShopSourceReader,
     ) => ShopConversionOutput | Promise<ShopConversionOutput>
+    readonly convertSkillEffects?: (
+        input: SkillEffectConversionInput,
+    ) => SkillEffectConversionOutput | Promise<SkillEffectConversionOutput>
     readonly importBundledTable?: typeof importBundledTable
 }
 
@@ -94,6 +103,11 @@ class StrictOrderedMapReader implements GachaSourceReader, ShopSourceReader {
         const parsed = parseTextOrderedMap(await this.readRaw(normalized))
         this.flatCache.set(normalized, parsed)
         return parsed
+    }
+
+    async readDynamic(logicalPath: string): Promise<Buffer> {
+        const normalized = this.requireAllowed(logicalPath)
+        return this.readRaw(normalized)
     }
 
     async readNested(logicalPath: string): Promise<readonly NestedOrderedMapTextRows[]> {
@@ -251,12 +265,31 @@ async function runCharacterConverter(
     return convert({ characterRows, characterTextRows })
 }
 
+async function runSkillEffectConverter(
+    reader: StrictOrderedMapReader,
+    convert: NonNullable<DefaultContentTableBuilderDependencies["convertSkillEffects"]>,
+): Promise<Awaited<ReturnType<typeof convertSkillEffects>>> {
+    const [characterRows, actionSkillRows, switchedActionSkillRows] = await Promise.all([
+        reader.read("master/character/character.orderedmap"),
+        reader.readNested("master/skill/action_skill.orderedmap"),
+        reader.readNested("master/skill/switched_action_skill.orderedmap"),
+    ])
+    return convert({
+        characterRows,
+        actionSkillRows,
+        switchedActionSkillRows,
+        readDynamic: logicalPath => reader.readDynamic(logicalPath),
+        allowDynamic: logicalPaths => reader.allow(logicalPaths),
+    })
+}
+
 export function createDefaultContentTableBuilder(
     dependencies: DefaultContentTableBuilderDependencies = {},
 ): ContentTableBuilder {
     const characterConverter = dependencies.convertCharacters ?? convertCharacters
     const gachaConverter = dependencies.convertGachas ?? convertGachas
     const shopConverter = dependencies.convertShops ?? convertShops
+    const skillEffectConverter = dependencies.convertSkillEffects ?? convertSkillEffects
     const bundledImporter = dependencies.importBundledTable ?? importBundledTable
 
     return Object.freeze({
@@ -272,6 +305,7 @@ export function createDefaultContentTableBuilder(
                 definition.converterId === "character"
                     || definition.converterId === "gacha"
                     || definition.converterId === "shop"
+                    || definition.converterId === "skill-effects"
                     ? definition.sourceOrderedMaps
                     : []
             ))
@@ -292,6 +326,13 @@ export function createDefaultContentTableBuilder(
             }
             if (converterIds.has("shop")) {
                 addConverterOutput(values, "shop", await shopConverter(reader))
+            }
+            if (converterIds.has("skill-effects")) {
+                addConverterOutput(
+                    values,
+                    "skill-effects",
+                    await runSkillEffectConverter(reader, skillEffectConverter),
+                )
             }
 
             const importedDefinitions = context.definitions.filter(definition => (

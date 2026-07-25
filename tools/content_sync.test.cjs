@@ -271,6 +271,8 @@ test("default release builder closes all registry tables and runs each CDN conve
     const logicalEntries = new Map([
         ["master/character/character.orderedmap", serializeOrderedMap([])],
         ["master/character/character_text.orderedmap", serializeOrderedMap([])],
+        ["master/skill/action_skill.orderedmap", serializeNestedOrderedMap([])],
+        ["master/skill/switched_action_skill.orderedmap", serializeNestedOrderedMap([])],
         ["master/gacha/gacha.orderedmap", serializeOrderedMap([
             { key: "1", row: gachaRow() },
         ])],
@@ -278,7 +280,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         ["master/gacha_odds/rarity-main.orderedmap", nestedOrderedMap("rarity-main")],
         ["master/gacha_odds/z-character.orderedmap", nestedOrderedMap("z-character")],
     ])
-    const converterCalls = { character: 0, gacha: 0, shop: 0 }
+    const converterCalls = { character: 0, gacha: 0, shop: 0, skillEffects: 0 }
     let bundledImports = 0
     const bundledRoots = new Set()
     const builder = createDefaultContentTableBuilder({
@@ -294,6 +296,10 @@ test("default release builder closes all registry tables and runs each CDN conve
             converterCalls.shop++
             return converterOutput("shop")
         },
+        convertSkillEffects: async () => {
+            converterCalls.skillEffects++
+            return converterOutput("skill-effects")
+        },
         importBundledTable: async (root, tableName) => {
             bundledRoots.add(root)
             bundledImports++
@@ -307,7 +313,7 @@ test("default release builder closes all registry tables and runs each CDN conve
 
     assert.equal(built.size, TABLE_SOURCES.length)
     assert.deepEqual([...built.keys()], TABLE_SOURCES.map(definition => definition.tableName))
-    assert.deepEqual(converterCalls, { character: 1, gacha: 1, shop: 1 })
+    assert.deepEqual(converterCalls, { character: 1, gacha: 1, shop: 1, skillEffects: 1 })
     assert.equal(
         bundledImports,
         TABLE_SOURCES.filter(definition => (
@@ -343,6 +349,7 @@ test("default release builder fails explicitly for a missing dynamic gacha refer
         convertCharacters: async () => converterOutput("character"),
         convertGachas: async () => converterOutput("gacha"),
         convertShops: async () => converterOutput("shop"),
+        convertSkillEffects: async () => converterOutput("skill-effects"),
         importBundledTable: async (_root, tableName) => ({ imported: tableName }),
     })
 
@@ -365,6 +372,8 @@ test("default release builder rejects an incomplete converter output", async () 
     const logicalEntries = new Map([
         ["master/character/character.orderedmap", serializeOrderedMap([])],
         ["master/character/character_text.orderedmap", serializeOrderedMap([])],
+        ["master/skill/action_skill.orderedmap", serializeNestedOrderedMap([])],
+        ["master/skill/switched_action_skill.orderedmap", serializeNestedOrderedMap([])],
         ["master/gacha/gacha.orderedmap", serializeOrderedMap([
             { key: "1", row: gachaRow() },
         ])],
@@ -378,6 +387,7 @@ test("default release builder rejects an incomplete converter output", async () 
         convertCharacters: async () => incompleteCharacterOutput,
         convertGachas: async () => converterOutput("gacha"),
         convertShops: async () => converterOutput("shop"),
+        convertSkillEffects: async () => converterOutput("skill-effects"),
         importBundledTable: async (_root, tableName) => ({ imported: tableName }),
     })
 
@@ -395,6 +405,8 @@ test("default release builder bounds parallel reads and imports while preserving
     const logicalEntries = new Map([
         ["master/character/character.orderedmap", serializeOrderedMap([])],
         ["master/character/character_text.orderedmap", serializeOrderedMap([])],
+        ["master/skill/action_skill.orderedmap", serializeNestedOrderedMap([])],
+        ["master/skill/switched_action_skill.orderedmap", serializeNestedOrderedMap([])],
     ])
     const expectedOddsPaths = []
     for (let index = 0; index < 12; index++) {
@@ -422,6 +434,7 @@ test("default release builder bounds parallel reads and imports while preserving
         convertCharacters: async () => converterOutput("character"),
         convertGachas: async () => converterOutput("gacha"),
         convertShops: async () => converterOutput("shop"),
+        convertSkillEffects: async () => converterOutput("skill-effects"),
         importBundledTable: async (_root, tableName) => {
             activeImports++
             maxImports = Math.max(maxImports, activeImports)

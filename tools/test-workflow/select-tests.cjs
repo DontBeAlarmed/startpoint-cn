@@ -68,6 +68,10 @@ const SOURCE_RULES = [
         groups: ["quick:content", "integration:runtime"],
     },
     {
+        pattern: /^src\/content\/(?:converters\/skill-effects|sync\/amf3)\.ts$/,
+        groups: ["quick:content"],
+    },
+    {
         pattern: /^src\/lib\/(?:gacha|gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-ticket)\.ts$/,
         groups: ["quick:gacha"],
     },
