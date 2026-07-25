@@ -24,6 +24,7 @@ export function recordMissionBattleFacts(
         isHost: ctx.isMultiHost,
         accomplished: ctx.questAccomplished,
         clearRank: ctx.clearRank,
+        score: ctx.score,
     })
     if (!ctx.questAccomplished) return
     recordDailyMissionBattleFacts(ctx, evaluationTime)

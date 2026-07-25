@@ -25,6 +25,7 @@ import type { MissionComputer, CategoryContext } from "./types"
 
 // Degree mission target lookup
 const degreeTargetMap: Record<number, number> = {}
+const degreeScoreTargetMap: Record<number, number> = {}
 {
     // Note: this import is resolved at module load time via the patterns file's data
     // but we use the same degreeDefs. For simplicity, inline the regex.
@@ -35,11 +36,17 @@ const degreeTargetMap: Record<number, number> = {}
         if (!row || !row[2]) continue
         const match = descRegex.exec(String(row[2]))
         if (match) degreeTargetMap[parseInt(mid)] = parseInt(match[1])
+        const scoreMatch = /单人战斗获得\s*(\d+)\s*以上的分数/.exec(String(row[2]))
+        if (scoreMatch) degreeScoreTargetMap[parseInt(mid)] = parseInt(scoreMatch[1])
     }
 }
 
 export function getTargetDegree(missionId: number): number | undefined {
     return degreeTargetMap[missionId]
+}
+
+function getTargetScore(missionId: number): number | undefined {
+    return degreeScoreTargetMap[missionId]
 }
 
 type RawManaBoard = Record<string, Record<string, Record<string, readonly unknown[][]>>>
@@ -234,6 +241,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
             bossBattleSuperQuestByMission,
             bossBattleClearQuestIds: finishedQuestIds,
             challengeDungeonClearCount: battleCounters.challengeDungeonClearCount,
+            singleScoreMax: battleCounters.singleScoreMax,
         },
     }
 }
@@ -251,6 +259,7 @@ const SUPPORTED_FAMILIES = {
     staminaUseCount: "degree_stamina_use_",
     loginCount: "degree_login_count_",
     challengeDungeonClear: "degree_challenge_dungeon_clear_",
+    scoreClearSingle: "degree_score_clear_single_",
 } as const
 
 function getSecondManaBoardCharacterId(missionId: number): number | undefined {
@@ -313,6 +322,10 @@ export function getDegreeMissionCoverageReport() {
         )).length,
         challengeDungeonClear: definitions.filter(definition => (
             definition.pattern.startsWith(SUPPORTED_FAMILIES.challengeDungeonClear)
+        )).length,
+        scoreClearSingle: definitions.filter(definition => (
+            definition.pattern.startsWith(SUPPORTED_FAMILIES.scoreClearSingle)
+            && getTargetScore(definition.missionId) !== undefined
         )).length,
     }
     const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
@@ -398,6 +411,12 @@ export const DegreeComputer: MissionComputer = {
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.challengeDungeonClear)) {
             return Math.max(dbProgress, stats.challengeDungeonClearCount)
+        }
+        if (pattern.startsWith(SUPPORTED_FAMILIES.scoreClearSingle)) {
+            const target = getTargetScore(missionId)
+            return target === undefined
+                ? dbProgress
+                : Math.max(dbProgress, stats.singleScoreMax >= target ? 1 : 0)
         }
         return dbProgress
     },

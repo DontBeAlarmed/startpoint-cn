@@ -262,6 +262,7 @@ const routes = async (fastify: FastifyInstance) => {
             questAccomplished,
             clearTime: body.elapsed_time_ms,
             clearRank,
+            score: body.score,
             party: body.statistics.party as any,
             statistics: (body as any).statistics,
             equipmentElements: body.equipment_element,

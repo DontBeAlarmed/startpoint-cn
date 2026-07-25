@@ -29,6 +29,7 @@ export interface FinishContext {
     questAccomplished: boolean
     clearTime: number
     clearRank: number | null
+    score?: number
     party: QuestStatistics['party']
     statistics: QuestStatistics
     equipmentElements?: readonly number[]
