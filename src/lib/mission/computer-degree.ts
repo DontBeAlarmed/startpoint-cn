@@ -446,7 +446,7 @@ export const DegreeComputer: MissionComputer = {
             const target = getTargetScore(missionId)
             return target === undefined
                 ? dbProgress
-                : Math.max(dbProgress, stats.singleScoreMax >= target ? 1 : 0)
+                : Math.max(dbProgress, stats.singleScoreMax)
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.timeClearSingle)) {
             const target = getTargetTime(missionId)
