@@ -5,6 +5,11 @@ import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../..
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
 import { countFinishedPlayerQuestsByCategorySync } from "../../data/domains/quest"
 import { getRankDegree } from "../stamina"
+import bundledManaBoard from "../../../assets/mana_board.json"
+import {
+    ContentSnapshotError,
+    getContentSnapshot,
+} from "../../content/runtime/content-snapshot"
 import { getMissionMasterDefinition, getMissionMasterDefinitions } from "./master-data"
 import { getMissionPattern } from "./patterns"
 import type { MissionComputer, CategoryContext } from "./types"
@@ -26,6 +31,67 @@ const degreeTargetMap: Record<number, number> = {}
 
 export function getTargetDegree(missionId: number): number | undefined {
     return degreeTargetMap[missionId]
+}
+
+type RawManaBoard = Record<string, Record<string, Record<string, readonly unknown[][]>>>
+
+function getManaBoardTable(): RawManaBoard {
+    try {
+        return getContentSnapshot().repository.table<RawManaBoard>("mana_board.json")
+    } catch (error) {
+        // Keep legacy bundled startup and direct unit tests compatible before
+        // the runtime content snapshot has been initialized.
+        if (error instanceof ContentSnapshotError
+            && error.code === "CONTENT_SNAPSHOT_NOT_INITIALIZED") {
+            return bundledManaBoard as RawManaBoard
+        }
+        throw error
+    }
+}
+
+function getSecondManaBoardNodeIds(characterId: string): ReadonlySet<number> | null {
+    const board = getManaBoardTable()[characterId]?.["2"]
+    if (!board || Object.keys(board).length === 0) return null
+
+    const nodeIds = new Set<number>()
+    for (const rows of Object.values(board)) {
+        const row = rows[0]
+        const nodeId = Number(row?.[0])
+        if (!Number.isSafeInteger(nodeId) || nodeId <= 0) return null
+        nodeIds.add(nodeId)
+    }
+    return nodeIds.size > 0 ? nodeIds : null
+}
+
+function getSecondManaBoardStats(
+    characters: Record<string, unknown>,
+    manaNodes: Record<string, number[]>,
+): {
+    nodeCount: number
+    completedCharacterIds: ReadonlySet<number>
+} {
+    let nodeCount = 0
+    const completedCharacterIds = new Set<number>()
+
+    for (const characterId of Object.keys(characters)) {
+        const nodeIds = getSecondManaBoardNodeIds(characterId)
+        if (nodeIds === null) continue
+
+        const learned = new Set(manaNodes[characterId] ?? [])
+        let learnedSecondBoardNodes = 0
+        for (const nodeId of nodeIds) {
+            if (learned.has(nodeId)) learnedSecondBoardNodes++
+        }
+        nodeCount += learnedSecondBoardNodes
+        if (learnedSecondBoardNodes === nodeIds.size) {
+            const numericCharacterId = Number(characterId)
+            if (Number.isSafeInteger(numericCharacterId)) {
+                completedCharacterIds.add(numericCharacterId)
+            }
+        }
+    }
+
+    return { nodeCount, completedCharacterIds }
 }
 
 function buildStats(playerId: number, category: number): CategoryContext {
@@ -58,6 +124,13 @@ function buildStats(playerId: number, category: number): CategoryContext {
             bondedCharacterIds: new Set(Object.entries(characters)
                 .filter(([, character]) => character.bondTokenList.some(token => token.status >= 1))
                 .map(([characterId]) => Number(characterId))),
+            ...(() => {
+                const secondManaBoard = getSecondManaBoardStats(characters, manaNodes)
+                return {
+                    secondManaBoardNodeCount: secondManaBoard.nodeCount,
+                    secondManaBoardCompletedCharacterIds: secondManaBoard.completedCharacterIds,
+                }
+            })(),
         },
     }
 }
@@ -74,6 +147,22 @@ const SUPPORTED_FAMILIES = {
     episodeClearCount: "degree_character_episode_read_",
 } as const
 
+function getSecondManaBoardCharacterId(missionId: number): number | undefined {
+    const definition = getMissionMasterDefinition(5, missionId)
+    if (!definition || Number(definition.row[3]) !== 48) return undefined
+    const characterId = Number(definition.row[15])
+    return Number.isSafeInteger(characterId) && characterId > 0 ? characterId : undefined
+}
+
+function isSecondManaBoardAggregateMission(missionId: number): boolean {
+    const definition = getMissionMasterDefinition(5, missionId)
+    return Boolean(
+        definition
+        && Number(definition.row[3]) === 48
+        && definition.pattern.startsWith("degree_manaboard_all_growth_"),
+    )
+}
+
 export function getDegreeMissionCoverageReport() {
     const definitions = getMissionMasterDefinitions(5)
     const prefixFamilies = Object.fromEntries(
@@ -87,6 +176,12 @@ export function getDegreeMissionCoverageReport() {
         specificCharacterBond: definitions.filter(definition => (
             Number(definition.row[3]) === 44
             && getSpecificCharacterBondId(definition.missionId) !== undefined
+        )).length,
+        secondManaBoardNodeCount: definitions.filter(definition => (
+            isSecondManaBoardAggregateMission(definition.missionId)
+        )).length,
+        secondManaBoardCompletion: definitions.filter(definition => (
+            getSecondManaBoardCharacterId(definition.missionId) !== undefined
         )).length,
     }
     const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
@@ -120,6 +215,16 @@ export const DegreeComputer: MissionComputer = {
         const bondCharacterId = getSpecificCharacterBondId(missionId)
         if (bondCharacterId !== undefined) {
             return Math.max(dbProgress, stats.bondedCharacterIds.has(bondCharacterId) ? 1 : 0)
+        }
+        const secondManaBoardCharacterId = getSecondManaBoardCharacterId(missionId)
+        if (secondManaBoardCharacterId !== undefined) {
+            return Math.max(
+                dbProgress,
+                stats.secondManaBoardCompletedCharacterIds.has(secondManaBoardCharacterId) ? 1 : 0,
+            )
+        }
+        if (isSecondManaBoardAggregateMission(missionId)) {
+            return Math.max(dbProgress, stats.secondManaBoardNodeCount)
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.companionCount)) return stats.companionCount
         if (pattern.startsWith(SUPPORTED_FAMILIES.overLimitCount)) return stats.overLimitCount

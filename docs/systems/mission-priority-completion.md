@@ -9,7 +9,7 @@
 | 角色觉醒（category 9） | 144 | 144/144；其中 55 条使用经主数据审计的通用角色通关回退 | 核心流程已通过客户端；144 条条件待逐条客户端验收 |
 | 每日（category 2） | 历史总表 656 | 默认服务器时间下开放 11 条，当前 11/11 | 常驻 5 条与活动 6 条均已自动计算，不宣称支持全部历史定义 |
 | 每周（category 10） | 2 | 2/2 | 服务端已实现，待 CN 客户端跨周完整验收 |
-| 称号（category 5） | 1288 | 516，约 40.1% | 新增 9 条简单称号；unsupported 772 条继续持久化 fallback |
+| 称号（category 5） | 1288 | 991，约 76.9% | 新增第二玛纳板条件族；unsupported 297 条继续持久化 fallback |
 
 历史活动每日不作为当前体验的完成率分母。本轮只处理默认服务器时间 `2024-08-14` 下客户端会显示的任务，不把 656 条历史定义一次性全部启用或宣称全部支持。
 
@@ -84,7 +84,13 @@ kind 12 的四个 category 来自 CN 1.8.1 `QuestCategory_Impl_`：DailyWeekEven
 | `degree_multi_battle_by_host_clear_*` | 3 | `players_mission_battle_counters.multi_host_clear_count` |
 | `degree_character_episode_read_*` | 3 | category 3 已成功角色剧情关卡的数量 |
 
-称号自动计算覆盖现为 `516/1288`，约 `40.1%`，unsupported 为 772 条。计算结果与已有持久进度取最大值，避免旧存档倒退；角色剧情使用 SQL `COUNT(*)` 统计 category 3 已完成关卡，并由 `idx_players_quest_progress_player_section_finished` covering index 支持。其余复杂条件继续保留持久化 fallback。
+称号自动计算覆盖现为 `991/1288`，约 `76.9%`，unsupported 为 297 条。计算结果与已有持久进度取最大值，避免旧存档倒退；角色剧情使用 SQL `COUNT(*)` 统计 category 3 已完成关卡，并由 `idx_players_quest_progress_player_section_finished` covering index 支持。第二玛纳板使用 `mana_board.json` 的第二板节点集合与玩家节点记录求交集；无法确认节点归属时不计入。其余复杂条件继续保留持久化 fallback。
+
+### 第二玛纳板称号
+
+`pattern=48` 的 475 条定义已接入：3 条全局累计称号统计所有已确认第二板的已强化节点，472 条角色称号按 `mission_degree.row[15]` 指定角色，并要求该角色第二板的全部 CDN 节点都已出现在玩家存档中。重复角色任务不会按 mission ID 猜角色；同一角色的不同称号定义分别读取各自主数据目标。
+
+当前实现不把 bond token、角色当前 `mana_board_index`、觉醒等级或当前角色持有数量当作第二板完成的替代证据。角色不存在、第二板表缺失或节点行异常时保持未完成；已有持久进度仍保留，避免存档回退。客户端尚未逐条确认“强化”的显示语义和出售角色后的历史规则，详见[待审阅实现记录](mission-implementation-assumptions.md)。
 
 以下条件暂不纳入第一批：
 

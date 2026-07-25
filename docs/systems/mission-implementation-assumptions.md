@@ -13,6 +13,14 @@
 
 `assets/cdndata/active_mission_skill_effects.json` 是空结构兼容 fallback，不包含推测角色效果。未执行 Content Sync 或当前 Release 不含该表时，20015/20016 不推进；官方 CDN 同步成功后才使用动态生成的索引。
 
+## 称号 type 48：第二玛纳板
+
+- 角色称号的目标角色使用 `mission_degree` 的 `row[15]`，不根据 mission ID 或中文名称推测。重复角色、不同版本角色和联动角色因此各自按主数据指定的角色 ID 判断。
+- “第二枚玛纳板全部强化完成”被解释为：该角色在 `mana_board.json` 的 `board_index=2` 中定义的全部节点 ID，都出现在玩家的 `players_characters_mana_nodes` 中。这里统计的是节点已强化/解锁状态，不把 bond token、觉醒等级或 `mana_board_index` 字段当作替代证据。
+- 全局 `degree_manaboard_all_growth_*` 只统计能在同一份 `mana_board.json` 中确认属于第二板的已强化节点；未知角色、缺失第二板、空表和格式异常均不计入。已有数据库进度仍取最大值，避免旧存档因内容缺失倒退。
+- 运行时优先读取启动时固定的 Content snapshot；直接调用且 snapshot 尚未初始化时才回退到仓库内 bundled `assets/mana_board.json`。这只是兼容旧调用路径，不会在已初始化的 Release 上叠加两份表。
+- 当前未有客户端逐条验证“强化”的中文显示是否还包含其他状态，也没有证明出售角色后服务端应重新计算还是只保留历史完成；实现按已持久化进度取最大值处理，相关边界留待审阅。
+
 ## 审阅方式
 
 审阅时优先检查：

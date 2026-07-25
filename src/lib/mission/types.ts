@@ -33,6 +33,8 @@ export interface CategoryContext {
         multiHostClearCount: number
         episodeClearCount: number
         bondedCharacterIds: ReadonlySet<number>
+        secondManaBoardNodeCount: number
+        secondManaBoardCompletedCharacterIds: ReadonlySet<number>
     }
     battleCounters?: MissionBattleCounters
     snapshot?: SnapshotData | null

@@ -109,6 +109,14 @@ insertPlayerCharacterManaNodesSync(playerId, 1, [101])
 insertPlayerCharacterManaNodesSync(playerId, 900001, [201, 202])
 insertPlayerCharacterManaNodesSync(playerId, 900002, [301])
 
+const manaBoard = require("../assets/mana_board.json")
+const secondBoardNodeIds = characterId => Object.values(manaBoard[String(characterId)]["2"])
+    .map(rows => Number(rows[0][0]))
+assert.equal(secondBoardNodeIds(111001).length, 18)
+insertPlayerCharacterManaNodesSync(playerId, 111001, secondBoardNodeIds(111001).slice(0, 2))
+insertPlayerCharacterManaNodesSync(playerId, 111002, secondBoardNodeIds(111002))
+insertPlayerCharacterManaNodesSync(playerId, 111003, secondBoardNodeIds(111003))
+
 recordMissionBattleResultSync(playerId, { isMulti: true, isHost: true, accomplished: true, clearRank: 5 })
 recordMissionBattleResultSync(playerId, { isMulti: true, isHost: false, accomplished: true, clearRank: 5 })
 recordMissionBattleResultSync(playerId, { isMulti: true, isHost: true, accomplished: false, clearRank: 5 })
@@ -147,13 +155,30 @@ const context = DegreeComputer.buildContext(playerId, 5)
 assert.equal(DegreeComputer.compute(1000, context, 0), 250)
 assert.equal(DegreeComputer.compute(2000, context, 0), 6)
 assert.equal(DegreeComputer.compute(4000, context, 0), 5)
-assert.equal(DegreeComputer.compute(5000, context, 0), 4)
+assert.equal(DegreeComputer.compute(5000, context, 0), 42)
 assert.equal(DegreeComputer.compute(6000, context, 0), 4)
 assert.equal(DegreeComputer.compute(13000, context, 0), 1, "多人 SS 不得计入单人 SS 称号")
 assert.equal(DegreeComputer.compute(3000, context, 7), 7, "缺少完整等级曲线时保留已有进度")
 assert.equal(DegreeComputer.compute(111001, context, 0), 1, "指定角色获得信赖之证后应完成称号")
 assert.equal(DegreeComputer.compute(111002, context, 0), 0, "未获得信赖之证的角色不得完成称号")
 assert.equal(DegreeComputer.compute(111003, context, 0), 1, "已领取信赖之证后称号仍必须保持完成")
+assert.equal(
+    DegreeComputer.compute(1111001, context, 0),
+    0,
+    "第二玛纳板未全部强化时不得完成指定角色称号",
+)
+assert.equal(
+    DegreeComputer.compute(1111002, context, 0),
+    1,
+    "第二玛纳板全部强化后应完成指定角色称号",
+)
+assert.equal(
+    DegreeComputer.compute(55000, context, 0),
+    38,
+    "应统计所有已确认的第二玛纳板节点，未知角色节点不得计入",
+)
+assert.equal(DegreeComputer.compute(55010, context, 0), 38, "全局第二板节点数应可用于 50 次阈值")
+assert.equal(DegreeComputer.compute(55020, context, 200), 200, "旧称号进度不得因当前可见节点不足而倒退")
 
 for (const missionId of [23000, 23010, 23020]) {
     assert.equal(DegreeComputer.compute(missionId, context, 0), 2, `${missionId} 应读取协力成功总数`)
@@ -171,8 +196,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 516,
-    unsupported: 772,
+    serverComputed: 991,
+    unsupported: 297,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -184,6 +209,8 @@ assert.deepEqual(coverage, {
         multiHostClearCount: 3,
         episodeClearCount: 3,
         specificCharacterBond: 484,
+        secondManaBoardNodeCount: 3,
+        secondManaBoardCompletion: 472,
     },
 })
 
