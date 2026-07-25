@@ -53,9 +53,11 @@
 
 ## `mail_arrived`
 
-`/load`、`/mail/receive` 和 `/mail/receive_all` 会根据当前存档未领取邮件数动态计算 `mail_arrived`。装备、抽卡、商店、任务、关卡、角色/装备养成、兑换、活动扭蛋箱、队伍和解锁等业务响应统一调用 `getMailArrivedSync(playerId)`，不再各自硬编码 `false`。
+`/load`、`/mail/receive` 和 `/mail/receive_all` 会根据当前存档未领取邮件数动态计算 `mail_arrived`。装备、抽卡、商店、任务、关卡、角色/装备养成、兑换、活动扭蛋箱、队伍和解锁等主要成功写响应统一调用 `getMailArrivedSync(playerId)`，不再各自硬编码 `false`。其中经验注入、体力道具使用、商店体力恢复和装备保护设置也属于该范围。
 
 该字段只表示响应时是否仍存在未领取邮件，不代表本次业务一定产生了邮件，也不代表客户端已经打开过邮件页。发送新邮件后，下一次带该字段的业务响应会看到动态状态；领取最后一封未领取邮件后，下一次响应会变为 `false`。
+
+读取响应、尚未实现的 stub，以及携带非成功 `result_code` 的兼容错误响应不保证返回 `mail_arrived`。客户端将缺失字段视为不更新当前通知状态；这些响应不属于“主要成功写响应已统一”的范围。
 
 ## 存档与恢复边界
 
@@ -67,7 +69,7 @@
 
 - 12 种支持附件尚无完整逐类型客户端验收矩阵；
 - 领取与标记未形成单一总事务；
-- `mail_arrived` 已在主要业务响应统一，仍需客户端逐类确认提示刷新；
+- `mail_arrived` 已在主要成功写响应统一；读取、stub 和非成功 `result_code` 响应仍可能不携带该字段，且客户端提示刷新仍需逐类确认；
 - 全服发送不是跨收件人事务，也没有持久审计历史；
 - 邮件不包含在当前存档导入导出中。
 
@@ -77,6 +79,10 @@
 
 - `tests/admin-mail-rules.test.js`；
 - `tests/admin-mail-ui-source.test.js`；
-- `tools/inventory_rules.test.cjs`。
+- `tools/inventory_rules.test.cjs`；
+- `tools/mail_notification.test.cjs`；
+- `tools/mail_notification_write_routes.test.cjs`；
+- `tools/expod_inject_exp_route.test.cjs`；
+- `tools/rush_event_shop_route.test.cjs`。
 
 修改附件或领取逻辑后运行相关测试，模块提交前运行 `npm run verify:full`。

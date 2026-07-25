@@ -126,6 +126,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/equipment_enhancement.test.cjs",
             "tools/event_currency.test.cjs",
             "tools/inventory_rules.test.cjs",
+            "tools/mail_notification.test.cjs",
+            "tools/mail_notification_write_routes.test.cjs",
         ],
     },
     "integration:database": {

@@ -502,6 +502,8 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/equipment_enhancement.test.cjs",
         "tools/event_currency.test.cjs",
         "tools/inventory_rules.test.cjs",
+        "tools/mail_notification.test.cjs",
+        "tools/mail_notification_write_routes.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS.generator.tests, [
         "tools/box_gacha_reset.test.cjs",

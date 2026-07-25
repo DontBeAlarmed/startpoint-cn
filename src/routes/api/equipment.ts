@@ -236,7 +236,7 @@ const routes = async (fastify: FastifyInstance) => {
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {}
+            "data": { "mail_arrived": getMailArrivedSync(playerId) }
         })
     })
 }

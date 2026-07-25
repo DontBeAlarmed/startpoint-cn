@@ -332,6 +332,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "exp_pool": rewardResult.exp_pool,
                     "exp_pooled_time": getServerTime(player.expPooledTime)
                 },
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
     })

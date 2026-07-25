@@ -149,7 +149,8 @@ const routes = async (fastify: FastifyInstance) => {
                     "stamina": afterStamina,
                     "stamina_heal_time": realToVirtual(new Date())
                 },
-                "item_list": itemListMap
+                "item_list": itemListMap,
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
     })

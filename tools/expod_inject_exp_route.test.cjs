@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict")
 const Database = require("better-sqlite3")
 const Fastify = require("fastify")
-const { pack } = require("msgpackr")
+const { pack, unpack } = require("msgpackr")
 
 require("ts-node/register/transpile-only")
 
@@ -37,8 +37,13 @@ db.exec(`
         exp INTEGER NOT NULL,
         PRIMARY KEY (player_id, character_id)
     );
+    CREATE TABLE players_mails (
+        player_id INTEGER NOT NULL,
+        receive_time TEXT NOT NULL
+    );
     INSERT INTO player_state VALUES (7, 2000);
     INSERT INTO character_state VALUES (7, 100001, 0);
+    INSERT INTO players_mails VALUES (7, '0000-00-00 00:00:00');
 `)
 
 let failExpWrite = false
@@ -129,6 +134,7 @@ async function main() {
             payload: { viewer_id: 123, character_id: 100001, exp: 1000 },
         })
         assert.equal(success.statusCode, 200, success.body)
+        assert.equal(unpack(success.rawPayload).data.mail_arrived, true)
         assert.equal(state().expPool, 1000)
         assert.equal(state().characterExp, 1000)
         assert.equal(state().counters.totalInjectedExpCount, 1)

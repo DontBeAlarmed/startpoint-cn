@@ -52,11 +52,16 @@ db.exec(`
         enhancement_level INTEGER NOT NULL,
         PRIMARY KEY (player_id, equipment_id)
     );
+    CREATE TABLE players_mails (
+        player_id INTEGER NOT NULL,
+        receive_time TEXT NOT NULL
+    );
     INSERT INTO player_state VALUES (17, 1000, 100, 20, 50);
     INSERT INTO item_state VALUES (17, 2370001, 1000);
     INSERT INTO item_state VALUES (17, 49100, 3);
     INSERT INTO item_state VALUES (17, 40401, 5);
     INSERT INTO equipment_state VALUES (17, 5020042, 5, 0);
+    INSERT INTO players_mails VALUES (17, '0000-00-00 00:00:00');
 `)
 
 function getPlayer(playerId) {
@@ -326,6 +331,14 @@ async function main() {
         } finally {
             delete eventItemShopAsset["11"]["700011"]
         }
+
+        const staminaRecovery = await fastify.inject({
+            method: "POST",
+            url: "/recover_stamina",
+            payload: { viewer_id: 123 },
+        })
+        assert.equal(staminaRecovery.statusCode, 200, staminaRecovery.body)
+        assert.equal(decode(staminaRecovery).data.mail_arrived, true)
 
         globalNowSeconds = Date.parse("2025-06-26T11:59:59+09:00") / 1000
         assert.equal((await getRushSales(fastify, 11, 700011)).length, 0)
