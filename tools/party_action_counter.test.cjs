@@ -36,6 +36,10 @@ db.exec(`
         character_count INTEGER NOT NULL,
         PRIMARY KEY (player_id, group_id, slot)
     );
+    CREATE TABLE players_mails (
+        player_id INTEGER NOT NULL,
+        receive_time TEXT NOT NULL
+    );
 `)
 
 const players = new Map([[7, { id: 7, partySlot: 1 }]])
