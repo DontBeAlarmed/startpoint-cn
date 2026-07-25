@@ -61,6 +61,7 @@ assert.deepEqual(calls, [["result", 1, {
     accomplished: false,
     clearRank: 1,
     score: undefined,
+    clearTime: 1000,
 }]])
 assert.equal(calls.some(([kind]) => kind === "party"), false, "failed settlement must not call direct awake tracker")
 
@@ -73,6 +74,7 @@ assert.deepEqual(calls, [
         accomplished: false,
         clearRank: 1,
         score: undefined,
+        clearTime: 1000,
     }],
     ["result", 1, {
         isMulti: true,
@@ -81,6 +83,7 @@ assert.deepEqual(calls, [
         accomplished: true,
         clearRank: 1,
         score: undefined,
+        clearTime: 1000,
     }],
     ["multi", 1, 1, 1001],
     ["character", 1001],
@@ -162,6 +165,7 @@ assert.deepEqual(unknownHostResult, {
     accomplished: true,
     clearRank: 1,
     score: undefined,
+    clearTime: 1000,
 })
 
 console.log("mission battle facts tests passed")

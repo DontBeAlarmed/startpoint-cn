@@ -14,6 +14,7 @@ export interface MissionBattleCounters {
     rankBCount: number
     challengeDungeonClearCount: number
     singleScoreMax: number
+    singleClearTimeMin: number
 }
 
 export interface MissionBattleResult {
@@ -23,6 +24,7 @@ export interface MissionBattleResult {
     clearRank?: number | null
     questCategory?: number
     score?: number
+    clearTime?: number
 }
 
 const EMPTY_COUNTERS: Readonly<MissionBattleCounters> = Object.freeze({
@@ -39,6 +41,7 @@ const EMPTY_COUNTERS: Readonly<MissionBattleCounters> = Object.freeze({
     rankBCount: 0,
     challengeDungeonClearCount: 0,
     singleScoreMax: 0,
+    singleClearTimeMin: 0,
 })
 
 export function getMissionBattleCountersSync(playerId: number): MissionBattleCounters {
@@ -48,7 +51,7 @@ export function getMissionBattleCountersSync(playerId: number): MissionBattleCou
                multi_host_clear_count, multi_guest_clear_count,
                single_rank_ss_count,
                rank_ss_count, rank_s_count, rank_a_count, rank_b_count,
-               challenge_dungeon_clear_count, single_score_max
+               challenge_dungeon_clear_count, single_score_max, single_clear_time_min
         FROM players_mission_battle_counters
         WHERE player_id = ?
     `).get(playerId) as Record<string, number> | undefined
@@ -67,6 +70,7 @@ export function getMissionBattleCountersSync(playerId: number): MissionBattleCou
         rankBCount: row.rank_b_count,
         challengeDungeonClearCount: row.challenge_dungeon_clear_count,
         singleScoreMax: row.single_score_max,
+        singleClearTimeMin: row.single_clear_time_min,
     }
 }
 
@@ -93,6 +97,13 @@ export function recordMissionBattleResultSync(
         && result.score >= 0
         ? result.score
         : 0
+    const singleClearTime = !result.isMulti
+        && result.accomplished
+        && typeof result.clearTime === "number"
+        && Number.isSafeInteger(result.clearTime)
+        && result.clearTime > 0
+        ? result.clearTime
+        : 0
 
     getDb().prepare(`
         INSERT INTO players_mission_battle_counters (
@@ -101,8 +112,8 @@ export function recordMissionBattleResultSync(
             multi_host_clear_count, multi_guest_clear_count,
             single_rank_ss_count,
             rank_ss_count, rank_s_count, rank_a_count, rank_b_count,
-            challenge_dungeon_clear_count, single_score_max
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            challenge_dungeon_clear_count, single_score_max, single_clear_time_min
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(player_id) DO UPDATE SET
             single_play_count = single_play_count + excluded.single_play_count,
             single_clear_count = single_clear_count + excluded.single_clear_count,
@@ -117,7 +128,12 @@ export function recordMissionBattleResultSync(
             rank_b_count = rank_b_count + excluded.rank_b_count,
             challenge_dungeon_clear_count = challenge_dungeon_clear_count
                 + excluded.challenge_dungeon_clear_count,
-            single_score_max = MAX(single_score_max, excluded.single_score_max)
+            single_score_max = MAX(single_score_max, excluded.single_score_max),
+            single_clear_time_min = CASE
+                WHEN single_clear_time_min = 0 THEN excluded.single_clear_time_min
+                WHEN excluded.single_clear_time_min = 0 THEN single_clear_time_min
+                ELSE MIN(single_clear_time_min, excluded.single_clear_time_min)
+            END
     `).run(
         playerId,
         singlePlay,
@@ -133,5 +149,6 @@ export function recordMissionBattleResultSync(
         rankB,
         challengeDungeonClear,
         singleScore,
+        singleClearTime,
     )
 }

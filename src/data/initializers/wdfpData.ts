@@ -178,12 +178,14 @@ export default function init(
         rank_b_count INTEGER NOT NULL DEFAULT 0,
         challenge_dungeon_clear_count INTEGER NOT NULL DEFAULT 0,
         single_score_max INTEGER NOT NULL DEFAULT 0,
+        single_clear_time_min INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 
     ensureSchemaColumn(database, "players_mission_battle_counters.single_rank_ss_count")
     ensureSchemaColumn(database, "players_mission_battle_counters.challenge_dungeon_clear_count")
     ensureSchemaColumn(database, "players_mission_battle_counters.single_score_max")
+    ensureSchemaColumn(database, "players_mission_battle_counters.single_clear_time_min")
 
     database.prepare(`CREATE TABLE IF NOT EXISTS device_bindings (
         device_id INTEGER PRIMARY KEY,

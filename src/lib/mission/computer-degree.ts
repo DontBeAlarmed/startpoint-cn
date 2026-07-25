@@ -26,6 +26,7 @@ import type { MissionComputer, CategoryContext } from "./types"
 // Degree mission target lookup
 const degreeTargetMap: Record<number, number> = {}
 const degreeScoreTargetMap: Record<number, number> = {}
+const degreeTimeTargetMap: Record<number, number> = {}
 {
     // Note: this import is resolved at module load time via the patterns file's data
     // but we use the same degreeDefs. For simplicity, inline the regex.
@@ -38,6 +39,8 @@ const degreeScoreTargetMap: Record<number, number> = {}
         if (match) degreeTargetMap[parseInt(mid)] = parseInt(match[1])
         const scoreMatch = /单人战斗获得\s*(\d+)\s*以上的分数/.exec(String(row[2]))
         if (scoreMatch) degreeScoreTargetMap[parseInt(mid)] = parseInt(scoreMatch[1])
+        const timeMatch = /单人战斗\s*(\d+)\s*秒以内通关/.exec(String(row[2]))
+        if (timeMatch) degreeTimeTargetMap[parseInt(mid)] = parseInt(timeMatch[1]) * 1000
     }
 }
 
@@ -47,6 +50,10 @@ export function getTargetDegree(missionId: number): number | undefined {
 
 function getTargetScore(missionId: number): number | undefined {
     return degreeScoreTargetMap[missionId]
+}
+
+function getTargetTime(missionId: number): number | undefined {
+    return degreeTimeTargetMap[missionId]
 }
 
 type RawManaBoard = Record<string, Record<string, Record<string, readonly unknown[][]>>>
@@ -242,6 +249,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
             bossBattleClearQuestIds: finishedQuestIds,
             challengeDungeonClearCount: battleCounters.challengeDungeonClearCount,
             singleScoreMax: battleCounters.singleScoreMax,
+            singleClearTimeMin: battleCounters.singleClearTimeMin,
         },
     }
 }
@@ -260,6 +268,7 @@ const SUPPORTED_FAMILIES = {
     loginCount: "degree_login_count_",
     challengeDungeonClear: "degree_challenge_dungeon_clear_",
     scoreClearSingle: "degree_score_clear_single_",
+    timeClearSingle: "degree_time_clear_single_",
 } as const
 
 function getSecondManaBoardCharacterId(missionId: number): number | undefined {
@@ -326,6 +335,10 @@ export function getDegreeMissionCoverageReport() {
         scoreClearSingle: definitions.filter(definition => (
             definition.pattern.startsWith(SUPPORTED_FAMILIES.scoreClearSingle)
             && getTargetScore(definition.missionId) !== undefined
+        )).length,
+        timeClearSingle: definitions.filter(definition => (
+            definition.pattern.startsWith(SUPPORTED_FAMILIES.timeClearSingle)
+            && getTargetTime(definition.missionId) !== undefined
         )).length,
     }
     const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
@@ -417,6 +430,12 @@ export const DegreeComputer: MissionComputer = {
             return target === undefined
                 ? dbProgress
                 : Math.max(dbProgress, stats.singleScoreMax >= target ? 1 : 0)
+        }
+        if (pattern.startsWith(SUPPORTED_FAMILIES.timeClearSingle)) {
+            const target = getTargetTime(missionId)
+            return target === undefined || stats.singleClearTimeMin <= 0
+                ? dbProgress
+                : Math.max(dbProgress, stats.singleClearTimeMin <= target ? 1 : 0)
         }
         return dbProgress
     },

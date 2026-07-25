@@ -25,6 +25,7 @@ export function recordMissionBattleFacts(
         accomplished: ctx.questAccomplished,
         clearRank: ctx.clearRank,
         score: ctx.score,
+        clearTime: ctx.clearTime,
     })
     if (!ctx.questAccomplished) return
     recordDailyMissionBattleFacts(ctx, evaluationTime)

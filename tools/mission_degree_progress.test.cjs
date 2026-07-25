@@ -133,6 +133,7 @@ recordMissionBattleResultSync(playerId, {
     questCategory: 1,
     accomplished: true,
     score: 60_000_000,
+    clearTime: 4_000,
 })
 for (let index = 0; index < 99; index++) {
     recordMissionBattleResultSync(playerId, {
@@ -256,6 +257,9 @@ assert.equal(DegreeComputer.compute(14000, context, 0), 1, "单人分数称号�
 assert.equal(DegreeComputer.compute(14010, context, 0), 1, "单人分数称号应支持更高阈值")
 assert.equal(DegreeComputer.compute(14020, context, 0), 0, "单人最高分不足时不得完成最高分称号")
 assert.equal(DegreeComputer.compute(14020, context, 1), 1, "单人分数称号旧进度不得倒退")
+assert.equal(DegreeComputer.compute(15000, context, 0), 1, "单人时间称号应读取最快成功时间")
+assert.equal(DegreeComputer.compute(15010, context, 0), 1, "单人时间称号应支持更高阈值")
+assert.equal(DegreeComputer.compute(15020, context, 0), 1, "单人时间称号应支持最高阈值")
 
 for (const missionId of [23000, 23010, 23020]) {
     assert.equal(DegreeComputer.compute(missionId, context, 0), 2, `${missionId} 应读取协力成功总数`)
@@ -273,8 +277,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1036,
-    unsupported: 252,
+    serverComputed: 1039,
+    unsupported: 249,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -296,6 +300,7 @@ assert.deepEqual(coverage, {
         bossBattleExClearSingle: 13,
     challengeDungeonClear: 3,
     scoreClearSingle: 3,
+    timeClearSingle: 3,
     },
 })
 

@@ -78,6 +78,7 @@ assert.deepEqual(getMissionBattleCountersSync(playerId), {
     rankBCount: 0,
     challengeDungeonClearCount: 0,
     singleScoreMax: 0,
+    singleClearTimeMin: 0,
 })
 
 recordMissionBattleResultSync(playerId, {
@@ -128,6 +129,7 @@ assert.deepEqual(getMissionBattleCountersSync(playerId), {
     rankBCount: 0,
     challengeDungeonClearCount: 18,
     singleScoreMax: 0,
+    singleClearTimeMin: 0,
 })
 
 assert.throws(() => {
@@ -341,10 +343,39 @@ recordMissionBattleResultSync(playerId, {
     accomplished: false,
     score: 99_999_999,
 })
+recordMissionBattleResultSync(playerId, {
+    isMulti: false,
+    questCategory: 1,
+    accomplished: true,
+    clearTime: 12_000,
+})
+recordMissionBattleResultSync(playerId, {
+    isMulti: false,
+    questCategory: 1,
+    accomplished: true,
+    clearTime: 4_000,
+})
+recordMissionBattleResultSync(playerId, {
+    isMulti: true,
+    questCategory: 1,
+    accomplished: true,
+    clearTime: 1,
+})
+recordMissionBattleResultSync(playerId, {
+    isMulti: false,
+    questCategory: 1,
+    accomplished: false,
+    clearTime: 1,
+})
 assert.equal(
     getMissionBattleCountersSync(playerId).singleScoreMax,
     50_000_000,
     "单人最高分应保留成功战斗中的最大分数",
+)
+assert.equal(
+    getMissionBattleCountersSync(playerId).singleClearTimeMin,
+    4_000,
+    "单人最快成功时间应保留最小耗时",
 )
 
 const replacement = getMergedPlayerDataSync(playerId)
