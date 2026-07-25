@@ -13,6 +13,7 @@ import { insertActiveQuest } from "../../lib/quest/active-quest-service";
 import { getQuestFromCategorySync } from "../../lib/assets";
 import { BattleQuest, QuestCategory } from "../../lib/types";
 import { ensureSpecialEventPartyGroupsSync, resolvePartyGroupColorId } from "../../lib/special-event-parties";
+import { getPlayerRaidEventSync } from "../../data/domains/raidEvent";
 
 const raidEventIds: Record<number, number> = {}
 
@@ -83,15 +84,23 @@ const routes = async (fastify: FastifyInstance) => {
         const serializedPlayedParties = getSerializedPlayerRushEventPlayedPartiesSync(playerId, eventId)
         console.log(`[RAID] summary: folderParties=${Object.keys(serializedPlayedParties.folderParties ?? {}).length} endlessParties=${Object.keys(serializedPlayedParties.endlessParties ?? {}).length}`)
 
+        const raidEventState = getPlayerRaidEventSync(playerId, eventId)
+
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
                 "aggregated_time": clientSerializeDate(getServerDate()),
                 "auto_start_point": 0,
-                "kill_count_reward_data": { "received_up_to": 0, "reward_list": [] },
+                "kill_count_reward_data": {
+                    "received_up_to": raidEventState?.receivedUpTo ?? 0,
+                    "reward_list": [],
+                },
                 "quest_list": {},
-                "raid_boss": { "hp_percentage": 100, "total_kill_count": 0 },
+                "raid_boss": {
+                    "hp_percentage": 100,
+                    "total_kill_count": raidEventState?.totalKillCount ?? 0,
+                },
                 "endless_battle_next_round": rushEventData.endlessBattleNextRound,
                 "active_rush_battle_folder_id": rushEventData.activeRushBattleFolderId,
                 "endless_battle_played_max_round": rushEventData.endlessBattleNextRound,

@@ -640,6 +640,15 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_raid_events (
+        player_id INTEGER NOT NULL,
+        event_id INTEGER NOT NULL,
+        total_kill_count INTEGER NOT NULL DEFAULT 0,
+        received_up_to INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, event_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_carnival_event_records (
         player_id INTEGER NOT NULL,
         event_id INTEGER NOT NULL,

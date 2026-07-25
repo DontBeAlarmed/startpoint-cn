@@ -1,11 +1,18 @@
 import { RushEventBattleType } from "../../../data/types"
 import { QuestCategory } from "../../types"
+import type { PlayerRewardResult } from "../../types"
+import { getRaidEventOverallRewardDefinitions, selectRaidEventOverallRewards, toPlayerReward, toRaidEventRewardResponse } from "./raid-overall-rewards"
 
 export interface RaidEventFinishData {
     auto_start_point: number
     is_out_of_period: boolean
     quest_boss: { kill_count: number }
     raid_boss: { hp_percentage: number, total_kill_count: number }
+    kill_count_reward_data?: {
+        received_up_to: number
+        reward_list: { kind: number, kind_id: number, number: number }[]
+    }
+    rewardResult?: PlayerRewardResult
 }
 
 export function handleRaidEventFinish(params: {
@@ -27,8 +34,22 @@ export function handleRaidEventFinish(params: {
         battleType: RushEventBattleType
         round: number
     }) => void
+    getRaidEventStateFn?: (playerId: number, eventId: number) => {
+        totalKillCount: number
+        receivedUpTo: number
+    } | null
+    updateRaidEventStateFn?: (
+        playerId: number,
+        eventId: number,
+        totalKillCount: number,
+        receivedUpTo: number,
+    ) => void
+    giveRewardsFn?: (playerId: number, rewards: ReturnType<typeof toPlayerReward>[]) => PlayerRewardResult | null
 }): RaidEventFinishData | null {
-    const { questCategory, questAccomplished, activeEventId, killCountWeight, party, playerId, questId, getEvoLevelsFn, insertPartyFn } = params
+    const {
+        questCategory, questAccomplished, activeEventId, killCountWeight, party, playerId, questId,
+        getEvoLevelsFn, insertPartyFn, getRaidEventStateFn, updateRaidEventStateFn, giveRewardsFn,
+    } = params
 
     if (questCategory !== QuestCategory.RAID_EVENT || !questAccomplished || activeEventId === undefined) return null
 
@@ -47,10 +68,37 @@ export function handleRaidEventFinish(params: {
         round: questId
     })
 
+    const contribution = Number.isSafeInteger(killCountWeight) && (killCountWeight ?? 0) > 0
+        ? killCountWeight!
+        : 1
+    const previousState = getRaidEventStateFn?.(playerId, activeEventId)
+    const previousTotalKillCount = previousState?.totalKillCount ?? 0
+    const previousReceivedUpTo = previousState?.receivedUpTo ?? previousTotalKillCount
+    const totalKillCount = previousTotalKillCount + contribution
+    const grants = getRaidEventStateFn && updateRaidEventStateFn && giveRewardsFn
+        ? selectRaidEventOverallRewards(
+            getRaidEventOverallRewardDefinitions(activeEventId),
+            previousReceivedUpTo,
+            totalKillCount,
+            contribution,
+        )
+        : []
+    const rewardResult = grants.length > 0 && giveRewardsFn
+        ? giveRewardsFn(playerId, grants.map(toPlayerReward)) ?? undefined
+        : undefined
+    updateRaidEventStateFn?.(playerId, activeEventId, totalKillCount, totalKillCount)
+
     return {
         auto_start_point: 0,
         is_out_of_period: false,
         quest_boss: { kill_count: killCountWeight ?? 1 },
-        raid_boss: { hp_percentage: 100, total_kill_count: 0 }
+        raid_boss: { hp_percentage: 100, total_kill_count: totalKillCount },
+        ...(getRaidEventStateFn && updateRaidEventStateFn && giveRewardsFn ? {
+            kill_count_reward_data: {
+                received_up_to: totalKillCount,
+                reward_list: grants.map(toRaidEventRewardResponse),
+            },
+            ...(rewardResult ? { rewardResult } : {}),
+        } : {}),
     }
 }

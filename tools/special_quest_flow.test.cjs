@@ -281,6 +281,61 @@ function testRushEndlessProgressAndRaidResponse() {
     assert.equal(raid.is_out_of_period, false)
 }
 
+function testRaidOverallRewardsPersistAndDoNotRepeatThresholds() {
+    let state = null
+    const granted = []
+    const runFinish = (killCountWeight) => handleRaidEventFinish({
+        questCategory: QuestCategory.RAID_EVENT,
+        questAccomplished: true,
+        activeEventId: 4,
+        killCountWeight,
+        party,
+        playerId: 7,
+        questId: 4001,
+        getEvoLevelsFn: () => [1, 1, null],
+        insertPartyFn: () => {},
+        getRaidEventStateFn: () => state,
+        updateRaidEventStateFn: (_pid, eventId, totalKillCount, receivedUpTo) => {
+            state = { eventId, totalKillCount, receivedUpTo }
+        },
+        giveRewardsFn: (_pid, rewards) => {
+            granted.push(rewards)
+            return {
+                user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
+                character_list: [],
+                joined_character_id_list: [],
+                equipment_list: [],
+                items: { "2370001": 5 },
+            }
+        },
+    })
+
+    const first = runFinish(1)
+    assert.equal(first.raid_boss.total_kill_count, 1)
+    assert.equal(first.kill_count_reward_data.received_up_to, 1)
+    assert.deepEqual(first.kill_count_reward_data.reward_list, [
+        { kind: 8, kind_id: 0, number: 500 },
+    ])
+    assert.equal(granted.length, 1)
+    assert.deepEqual(state, { eventId: 4, totalKillCount: 1, receivedUpTo: 1 })
+
+    const crossing = runFinish(49)
+    assert.equal(crossing.raid_boss.total_kill_count, 50)
+    assert.deepEqual(crossing.kill_count_reward_data.reward_list, [
+        { kind: 1, kind_id: 49100, number: 5 },
+        { kind: 8, kind_id: 0, number: 24500 },
+    ])
+    assert.equal(granted.length, 2)
+
+    const repeatedThreshold = runFinish(0)
+    assert.equal(repeatedThreshold.raid_boss.total_kill_count, 51)
+    assert.deepEqual(repeatedThreshold.kill_count_reward_data.reward_list, [
+        { kind: 8, kind_id: 0, number: 500 },
+    ])
+    assert.equal(granted.length, 3)
+    assert.equal(state.receivedUpTo, 51)
+}
+
 function testRushFolderRewardsAreGrantedOnlyOnFirstClear() {
     let firstClear = true
     let grantCount = 0
@@ -346,5 +401,6 @@ testCarnivalUnclaimedRewardsAreGrantedAtomically()
 testFailedSpecialQuestsDoNotProgress()
 testAdventHostFinishState()
 testRushEndlessProgressAndRaidResponse()
+testRaidOverallRewardsPersistAndDoNotRepeatThresholds()
 testRushFolderRewardsAreGrantedOnlyOnFirstClear()
 console.log("special quest flow tests passed")
