@@ -28,6 +28,7 @@ const degreeTargetMap: Record<number, number> = {}
 const degreeScoreTargetMap: Record<number, number> = {}
 const degreeTimeTargetMap: Record<number, number> = {}
 const degreeDashTargetMap: Record<number, number> = {}
+const degreeComboTargetMap: Record<number, number> = {}
 {
     // Note: this import is resolved at module load time via the patterns file's data
     // but we use the same degreeDefs. For simplicity, inline the regex.
@@ -44,6 +45,8 @@ const degreeDashTargetMap: Record<number, number> = {}
         if (timeMatch) degreeTimeTargetMap[parseInt(mid)] = parseInt(timeMatch[1]) * 1000
         const dashMatch = /使用\s*(\d+)\s*次冲刺/.exec(String(row[2]))
         if (dashMatch) degreeDashTargetMap[parseInt(mid)] = parseInt(dashMatch[1])
+        const comboMatch = /单次战斗中达成\s*(\d+)\s*连击/.exec(String(row[2]))
+        if (comboMatch) degreeComboTargetMap[parseInt(mid)] = parseInt(comboMatch[1])
     }
 }
 
@@ -61,6 +64,10 @@ function getTargetTime(missionId: number): number | undefined {
 
 function getTargetDash(missionId: number): number | undefined {
     return degreeDashTargetMap[missionId]
+}
+
+function getTargetCombo(missionId: number): number | undefined {
+    return degreeComboTargetMap[missionId]
 }
 
 type RawManaBoard = Record<string, Record<string, Record<string, readonly unknown[][]>>>
@@ -279,6 +286,7 @@ const SUPPORTED_FAMILIES = {
     timeClearSingle: "degree_time_clear_single_",
     bossBattleClear: "degree_boss_battle_clear_",
     dashUse: "degree_dash_use_",
+    comboOneTime: "degree_combo_onetime_",
 } as const
 
 function getSecondManaBoardCharacterId(missionId: number): number | undefined {
@@ -356,6 +364,10 @@ export function getDegreeMissionCoverageReport() {
         dashUse: definitions.filter(definition => (
             definition.pattern.startsWith(SUPPORTED_FAMILIES.dashUse)
             && getTargetDash(definition.missionId) !== undefined
+        )).length,
+        comboOneTime: definitions.filter(definition => (
+            definition.pattern.startsWith(SUPPORTED_FAMILIES.comboOneTime)
+            && getTargetCombo(definition.missionId) !== undefined
         )).length,
     }
     const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
@@ -459,6 +471,9 @@ export const DegreeComputer: MissionComputer = {
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.dashUse)) {
             return Math.max(dbProgress, ctx.player.totalDashes ?? 0)
+        }
+        if (pattern.startsWith(SUPPORTED_FAMILIES.comboOneTime)) {
+            return Math.max(dbProgress, ctx.player.maxComboAchieved ?? 0)
         }
         return dbProgress
     },
