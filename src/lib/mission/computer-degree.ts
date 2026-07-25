@@ -14,6 +14,7 @@ import bundledManaBoard from "../../../assets/mana_board.json"
 import bundledMainQuests from "../../../assets/main_quest.json"
 import bundledExQuests from "../../../assets/ex_quest.json"
 import bundledTreasureShop from "../../../assets/treasure_shop.json"
+import bundledBossBattleQuests from "../../../assets/boss_battle_quest.json"
 import {
     ContentSnapshotError,
     getContentSnapshot,
@@ -158,6 +159,24 @@ function getTreasureShopPurchaseCount(playerId: number): number {
     ), 0)
 }
 
+function getBossBattleSuperQuestId(
+    missionId: number,
+    bossBattleQuests: RawQuestTable = getRuntimeTable("boss_battle_quest.json", bundledBossBattleQuests),
+): number | undefined {
+    const definition = getMissionMasterDefinition(5, missionId)
+    if (!definition
+        || Number(definition.row[3]) !== 14
+        || !definition.pattern.startsWith("degree_boss_battle_ex_clear_single_")) return undefined
+    const stageGroup = Number(definition.row[10])
+    const difficulty = Number(definition.row[12])
+    if (!Number.isSafeInteger(stageGroup) || !Number.isSafeInteger(difficulty)) return undefined
+    const questId = Object.keys(bossBattleQuests).map(Number).find(candidate => (
+        Math.floor(candidate / 1_000) % 1_000 === stageGroup
+        && candidate % 1_000 === difficulty
+    ))
+    return questId
+}
+
 function buildStats(playerId: number, category: number): CategoryContext {
     const player = getPlayerSync(playerId)!
     const characters = getPlayerCharactersSync(playerId)
@@ -166,6 +185,13 @@ function buildStats(playerId: number, category: number): CategoryContext {
     const episodeCompletedChapters = getCompletedEpisodeChapters(playerId)
     const practiceClearRanks = getPlayerQuestClearRanksBySectionsSync(playerId, [15])[15] ?? new Map()
     const treasureShopPurchaseCount = getTreasureShopPurchaseCount(playerId)
+    const bossBattleQuests = getRuntimeTable<RawQuestTable>("boss_battle_quest.json", bundledBossBattleQuests)
+    const bossBattleSuperQuestByMission = new Map<number, number>()
+    for (const definition of getMissionMasterDefinitions(5)) {
+        const questId = getBossBattleSuperQuestId(definition.missionId, bossBattleQuests)
+        if (questId !== undefined) bossBattleSuperQuestByMission.set(definition.missionId, questId)
+    }
+    const finishedQuestIds = getFinishedPlayerQuestIdsBySectionsSync(playerId, [2])[2] ?? new Set()
     return {
         category,
         playerId,
@@ -205,6 +231,8 @@ function buildStats(playerId: number, category: number): CategoryContext {
                     .map(([questId]) => questId),
             ),
             treasureShopPurchaseCount,
+            bossBattleSuperQuestByMission,
+            bossBattleClearQuestIds: finishedQuestIds,
         },
     }
 }
@@ -278,6 +306,9 @@ export function getDegreeMissionCoverageReport() {
             Number(definition.row[3]) === 45
             && definition.pattern.startsWith("degree_treasure_shop_buy_count_")
         )).length,
+        bossBattleExClearSingle: definitions.filter(definition => (
+            getBossBattleSuperQuestId(definition.missionId) !== undefined
+        )).length,
     }
     const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
     return {
@@ -335,6 +366,10 @@ export const DegreeComputer: MissionComputer = {
         if (Number(getMissionMasterDefinition(5, missionId)?.row[3]) === 45
             && pattern.startsWith("degree_treasure_shop_buy_count_")) {
             return Math.max(dbProgress, stats.treasureShopPurchaseCount)
+        }
+        const bossBattleSuperQuestId = stats.bossBattleSuperQuestByMission.get(missionId)
+        if (bossBattleSuperQuestId !== undefined) {
+            return Math.max(dbProgress, stats.bossBattleClearQuestIds.has(bossBattleSuperQuestId) ? 1 : 0)
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.companionCount)) return stats.companionCount
         if (pattern.startsWith(SUPPORTED_FAMILIES.overLimitCount)) return stats.overLimitCount

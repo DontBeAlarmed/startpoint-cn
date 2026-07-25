@@ -38,6 +38,8 @@ export interface CategoryContext {
         episodeCompletedChapters: ReadonlySet<number>
         practiceSsQuestIds: ReadonlySet<number>
         treasureShopPurchaseCount: number
+        bossBattleSuperQuestByMission: ReadonlyMap<number, number>
+        bossBattleClearQuestIds: ReadonlySet<number>
     }
     battleCounters?: MissionBattleCounters
     snapshot?: SnapshotData | null

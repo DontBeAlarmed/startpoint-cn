@@ -9,7 +9,7 @@
 | 角色觉醒（category 9） | 144 | 144/144；其中 55 条使用经主数据审计的通用角色通关回退 | 核心流程已通过客户端；144 条条件待逐条客户端验收 |
 | 每日（category 2） | 历史总表 656 | 默认服务器时间下开放 11 条，当前 11/11 | 常驻 5 条与活动 6 条均已自动计算，不宣称支持全部历史定义 |
 | 每周（category 10） | 2 | 2/2 | 服务端已实现，待 CN 客户端跨周完整验收 |
-| 称号（category 5） | 1288 | 1017，约 79.0% | 新增第二玛纳板、累计体力、累计登录、章节全通、练习关卡 SS 和珍品商店购买条件族；unsupported 271 条继续持久化 fallback |
+| 称号（category 5） | 1288 | 1030，约 80.0% | 新增第二玛纳板、累计体力、累计登录、章节全通、练习关卡 SS、珍品商店购买和指定 Boss 超级难度条件族；unsupported 258 条继续持久化 fallback |
 
 历史活动每日不作为当前体验的完成率分母。本轮只处理默认服务器时间 `2024-08-14` 下客户端会显示的任务，不把 656 条历史定义一次性全部启用或宣称全部支持。
 
@@ -84,7 +84,7 @@ kind 12 的四个 category 来自 CN 1.8.1 `QuestCategory_Impl_`：DailyWeekEven
 | `degree_multi_battle_by_host_clear_*` | 3 | `players_mission_battle_counters.multi_host_clear_count` |
 | `degree_character_episode_read_*` | 3 | category 3 已成功角色剧情关卡的数量 |
 
-称号自动计算覆盖现为 `1017/1288`，约 `79.0%`，unsupported 为 271 条。计算结果与已有持久进度取最大值，避免旧存档倒退；角色剧情使用 SQL `COUNT(*)` 统计 category 3 已完成关卡，并由 `idx_players_quest_progress_player_section_finished` covering index 支持。第二玛纳板使用 `mana_board.json` 的第二板节点集合与玩家节点记录求交集；无法确认节点归属时不计入。累计消耗体力和累计登录直接读取玩家主表的权威累计字段。练习关卡 SS 使用主数据列出的 category 15 目标集合及持久化 `clear_rank=5`。珍品商店购买只累计 `treasure_shop.json` 中商品 ID 的持久化购买次数，不把其他商店或当前库存当作事实。其余复杂条件继续保留持久化 fallback。
+称号自动计算覆盖现为 `1030/1288`，约 `80.0%`，unsupported 为 258 条。计算结果与已有持久进度取最大值，避免旧存档倒退；角色剧情使用 SQL `COUNT(*)` 统计 category 3 已完成关卡，并由 `idx_players_quest_progress_player_section_finished` covering index 支持。第二玛纳板使用 `mana_board.json` 的第二板节点集合与玩家节点记录求交集；无法确认节点归属时不计入。累计消耗体力和累计登录直接读取玩家主表的权威累计字段。练习关卡 SS 使用主数据列出的 category 15 目标集合及持久化 `clear_rank=5`。珍品商店购买只累计 `treasure_shop.json` 中商品 ID 的持久化购买次数，不把其他商店或当前库存当作事实。指定 Boss 超级难度只接受主数据和 CDN 关卡表的精确映射。其余复杂条件继续保留持久化 fallback。
 
 ### 第二玛纳板称号
 
@@ -104,12 +104,15 @@ kind 12 的四个 category 来自 CN 1.8.1 `QuestCategory_Impl_`：DailyWeekEven
 
 3 条 `degree_treasure_shop_buy_count_*` 汇总 `players_shop_purchases` 中属于 `treasure_shop.json` 的商品 ID 购买次数。非珍品商店商品、当前库存和商店刷新状态不计入；珍品商店消耗玛纳仍因缺少累计消费记录保持 fallback。
 
+### 指定 Boss 超级难度称号
+
+14 条定义中有 13 条能解析出主数据 stage group + difficulty 对应的 category 2 关卡，完成对应关卡即可完成称号。大蛇定义 `11080` 的 difficulty 4 在当前 CDN 中缺失，因此保持 fallback，详见[待审阅实现记录](mission-implementation-assumptions.md)。
+
 以下条件暂不纳入第一批：
 
 - 能力魂珠使用次数：当前没有累计使用事实；
 - 摇曳迷宫累计通关次数：不同关卡的历史最佳记录不能代替累计次数；
 - MVP、救援、复杂战斗状态：缺少完整权威来源；
-- 指定 Boss：需要先完成官方 QuestRange/章节映射审计，作为下一批独立提交。
 - “接取救援请求”保持低优先级，暂不实现。
 
 ## 数据流与事务

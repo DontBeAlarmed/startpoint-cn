@@ -21,6 +21,11 @@
 - 运行时优先读取启动时固定的 Content snapshot；直接调用且 snapshot 尚未初始化时才回退到仓库内 bundled `assets/mana_board.json`。这只是兼容旧调用路径，不会在已初始化的 Release 上叠加两份表。
 - 当前未有客户端逐条验证“强化”的中文显示是否还包含其他状态，也没有证明出售角色后服务端应重新计算还是只保留历史完成；实现按已持久化进度取最大值处理，相关边界留待审阅。
 
+## 称号指定 Boss 超级难度
+
+- 13 条 `degree_boss_battle_ex_clear_single_*` 可以由主数据的 stage group + difficulty 与 `boss_battle_quest.json` 精确闭合，服务端只接受对应 category 2 关卡的 `finished=1` 记录。
+- `11080`（大蛇）主数据要求 difficulty `4`，但官方表中该 stage group 只有 difficulty `1..3`。当前不把现有最高难度 3 推测为目标 4，保持持久化 fallback；如果后续 CDN 补齐 difficulty 4，才会自动进入计算路径。
+
 ## 审阅方式
 
 审阅时优先检查：

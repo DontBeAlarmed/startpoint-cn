@@ -160,6 +160,7 @@ assert.equal(countFinishedPlayerQuestsByCategorySync(playerId, 99), 0)
 
 insertChapterProgress(1)
 insertChapterProgress(2, 2001001)
+insertPlayerQuestProgressSync(playerId, 2, { questId: 1003004, finished: true })
 
 function insertPracticeProgress(questIds, clearRank = 5) {
     for (const questId of questIds) {
@@ -212,6 +213,9 @@ assert.equal(DegreeComputer.compute(12010, context, 0), 0, "练习关卡缺少 S
 assert.equal(DegreeComputer.compute(12010, context, 1), 1, "练习称号旧进度不得倒退")
 assert.equal(DegreeComputer.compute(46000, context, 0), 100, "应累计珍品商店商品购买次数")
 assert.equal(DegreeComputer.compute(46010, context, 150), 150, "珍品商店称号旧进度不得倒退")
+assert.equal(DegreeComputer.compute(11010, context, 0), 1, "指定 Boss 超级关卡完成后应完成称号")
+assert.equal(DegreeComputer.compute(11020, context, 0), 0, "未完成指定 Boss 超级关卡时不得完成称号")
+assert.equal(DegreeComputer.compute(11080, context, 7), 7, "CDN 缺少指定难度映射时应保留持久化 fallback")
 assert.equal(DegreeComputer.compute(111001, context, 0), 1, "指定角色获得信赖之证后应完成称号")
 assert.equal(DegreeComputer.compute(111002, context, 0), 0, "未获得信赖之证的角色不得完成称号")
 assert.equal(DegreeComputer.compute(111003, context, 0), 1, "已领取信赖之证后称号仍必须保持完成")
@@ -249,8 +253,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1017,
-    unsupported: 271,
+    serverComputed: 1030,
+    unsupported: 258,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -269,6 +273,7 @@ assert.deepEqual(coverage, {
         episodeChapterCompletion: 12,
         practiceRankSs: 5,
         treasureShopPurchaseCount: 3,
+        bossBattleExClearSingle: 13,
     },
 })
 
