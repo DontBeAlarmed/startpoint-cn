@@ -80,6 +80,7 @@ assert.deepEqual(getMissionBattleCountersSync(playerId), {
     singleScoreMax: 0,
     singleClearTimeMin: 0,
     bossBattleClearCount: 0,
+    skillUseCount: 0,
 })
 
 recordMissionBattleResultSync(playerId, {
@@ -132,6 +133,7 @@ assert.deepEqual(getMissionBattleCountersSync(playerId), {
     singleScoreMax: 0,
     singleClearTimeMin: 0,
     bossBattleClearCount: 0,
+    skillUseCount: 0,
 })
 
 assert.throws(() => {
@@ -398,6 +400,26 @@ assert.equal(
     getMissionBattleCountersSync(playerId).bossBattleClearCount,
     2,
     "领主战累计只应统计 category 2 的成功结算",
+)
+recordMissionBattleResultSync(playerId, {
+    isMulti: false,
+    accomplished: true,
+    skillUseCount: 25,
+})
+recordMissionBattleResultSync(playerId, {
+    isMulti: true,
+    accomplished: true,
+    skillUseCount: 75,
+})
+recordMissionBattleResultSync(playerId, {
+    isMulti: false,
+    accomplished: false,
+    skillUseCount: 1000,
+})
+assert.equal(
+    getMissionBattleCountersSync(playerId).skillUseCount,
+    100,
+    "技能使用累计只应统计成功结算中的合法次数",
 )
 assert.throws(() => {
     db.transaction(() => {

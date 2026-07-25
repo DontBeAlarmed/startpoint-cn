@@ -277,6 +277,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
             singleClearTimeMin: battleCounters.singleClearTimeMin,
             bossBattleClearCount: battleCounters.bossBattleClearCount,
             craftPointObtainedCount,
+            skillUseCount: battleCounters.skillUseCount,
         },
     }
 }
@@ -300,6 +301,7 @@ const SUPPORTED_FAMILIES = {
     dashUse: "degree_dash_use_",
     comboOneTime: "degree_combo_onetime_",
     craftPointGet: "degree_craft_point_get_",
+    skillUse: "degree_skill_use_",
 } as const
 
 function getSecondManaBoardCharacterId(missionId: number): number | undefined {
@@ -385,6 +387,9 @@ export function getDegreeMissionCoverageReport() {
         craftPointGet: definitions.filter(definition => (
             definition.pattern.startsWith(SUPPORTED_FAMILIES.craftPointGet)
             && getTargetCraftPoint(definition.missionId) !== undefined
+        )).length,
+        skillUse: definitions.filter(definition => (
+            definition.pattern.startsWith(SUPPORTED_FAMILIES.skillUse)
         )).length,
     }
     const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
@@ -494,6 +499,9 @@ export const DegreeComputer: MissionComputer = {
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.craftPointGet)) {
             return Math.max(dbProgress, stats.craftPointObtainedCount)
+        }
+        if (pattern.startsWith(SUPPORTED_FAMILIES.skillUse)) {
+            return Math.max(dbProgress, stats.skillUseCount)
         }
         return dbProgress
     },

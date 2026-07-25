@@ -171,6 +171,11 @@ const schemaColumns = {
         column: "boss_battle_clear_count",
         definition: "INTEGER NOT NULL DEFAULT 0",
     },
+    "players_mission_battle_counters.skill_use_count": {
+        table: "players_mission_battle_counters",
+        column: "skill_use_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
     "players_active_mission_counters.total_equipment_equip_count": {
         table: "players_active_mission_counters",
         column: "total_equipment_equip_count",

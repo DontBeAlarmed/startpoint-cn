@@ -16,6 +16,7 @@ export interface MissionBattleCounters {
     singleScoreMax: number
     singleClearTimeMin: number
     bossBattleClearCount: number
+    skillUseCount: number
 }
 
 export interface MissionBattleResult {
@@ -26,6 +27,7 @@ export interface MissionBattleResult {
     questCategory?: number
     score?: number
     clearTime?: number
+    skillUseCount?: number
 }
 
 const EMPTY_COUNTERS: Readonly<MissionBattleCounters> = Object.freeze({
@@ -44,6 +46,7 @@ const EMPTY_COUNTERS: Readonly<MissionBattleCounters> = Object.freeze({
     singleScoreMax: 0,
     singleClearTimeMin: 0,
     bossBattleClearCount: 0,
+    skillUseCount: 0,
 })
 
 export function getMissionBattleCountersSync(playerId: number): MissionBattleCounters {
@@ -54,7 +57,7 @@ export function getMissionBattleCountersSync(playerId: number): MissionBattleCou
                single_rank_ss_count,
                rank_ss_count, rank_s_count, rank_a_count, rank_b_count,
                challenge_dungeon_clear_count, single_score_max, single_clear_time_min,
-               boss_battle_clear_count
+               boss_battle_clear_count, skill_use_count
         FROM players_mission_battle_counters
         WHERE player_id = ?
     `).get(playerId) as Record<string, number> | undefined
@@ -75,6 +78,7 @@ export function getMissionBattleCountersSync(playerId: number): MissionBattleCou
         singleScoreMax: row.single_score_max,
         singleClearTimeMin: row.single_clear_time_min,
         bossBattleClearCount: row.boss_battle_clear_count,
+        skillUseCount: row.skill_use_count,
     }
 }
 
@@ -109,6 +113,12 @@ export function recordMissionBattleResultSync(
         ? result.clearTime
         : 0
     const bossBattleClear = result.questCategory === 2 && result.accomplished ? 1 : 0
+    const skillUseCount = result.accomplished
+        && typeof result.skillUseCount === "number"
+        && Number.isSafeInteger(result.skillUseCount)
+        && result.skillUseCount >= 0
+        ? result.skillUseCount
+        : 0
 
     getDb().prepare(`
         INSERT INTO players_mission_battle_counters (
@@ -118,8 +128,8 @@ export function recordMissionBattleResultSync(
             single_rank_ss_count,
             rank_ss_count, rank_s_count, rank_a_count, rank_b_count,
             challenge_dungeon_clear_count, single_score_max, single_clear_time_min,
-            boss_battle_clear_count
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            boss_battle_clear_count, skill_use_count
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(player_id) DO UPDATE SET
             single_play_count = single_play_count + excluded.single_play_count,
             single_clear_count = single_clear_count + excluded.single_clear_count,
@@ -140,7 +150,8 @@ export function recordMissionBattleResultSync(
                 WHEN excluded.single_clear_time_min = 0 THEN single_clear_time_min
                 ELSE MIN(single_clear_time_min, excluded.single_clear_time_min)
             END,
-            boss_battle_clear_count = boss_battle_clear_count + excluded.boss_battle_clear_count
+            boss_battle_clear_count = boss_battle_clear_count + excluded.boss_battle_clear_count,
+            skill_use_count = skill_use_count + excluded.skill_use_count
     `).run(
         playerId,
         singlePlay,
@@ -158,5 +169,6 @@ export function recordMissionBattleResultSync(
         singleScore,
         singleClearTime,
         bossBattleClear,
+        skillUseCount,
     )
 }

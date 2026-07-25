@@ -47,7 +47,11 @@ const baseContext = {
     clearTime: 1000,
     clearRank: 1,
     party: { characters: [], unison_characters: [] },
-    statistics: { clear_phase: 0, party: { characters: [], unison_characters: [] } },
+    statistics: {
+        clear_phase: 0,
+        party: { characters: [], unison_characters: [] },
+        zones: [{ use_skill_count: 2 }, { use_skill_count: 3 }],
+    },
     player: {},
     questPreviouslyCompleted: false,
     questProgress: null,
@@ -62,6 +66,7 @@ assert.deepEqual(calls, [["result", 1, {
     clearRank: 1,
     score: undefined,
     clearTime: 1000,
+    skillUseCount: 0,
 }]])
 assert.equal(calls.some(([kind]) => kind === "party"), false, "failed settlement must not call direct awake tracker")
 
@@ -75,6 +80,7 @@ assert.deepEqual(calls, [
         clearRank: 1,
         score: undefined,
         clearTime: 1000,
+        skillUseCount: 0,
     }],
     ["result", 1, {
         isMulti: true,
@@ -84,6 +90,7 @@ assert.deepEqual(calls, [
         clearRank: 1,
         score: undefined,
         clearTime: 1000,
+        skillUseCount: 5,
     }],
     ["multi", 1, 1, 1001],
     ["character", 1001],
@@ -166,6 +173,21 @@ assert.deepEqual(unknownHostResult, {
     clearRank: 1,
     score: undefined,
     clearTime: 1000,
+    skillUseCount: 5,
 })
+
+recordMissionBattleFacts({
+    ...baseContext,
+    questAccomplished: true,
+    statistics: {
+        ...baseContext.statistics,
+        zones: [{ use_skill_count: 2 }, { use_skill_count: -1 }],
+    },
+})
+assert.equal(
+    calls.filter(([kind]) => kind === "result").at(-1)[2].skillUseCount,
+    0,
+    "任一 zone 技能统计非法时整场事实必须 fail closed",
+)
 
 console.log("mission battle facts tests passed")

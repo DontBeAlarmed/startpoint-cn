@@ -137,6 +137,7 @@ recordMissionBattleResultSync(playerId, {
     accomplished: true,
     score: 60_000_000,
     clearTime: 4_000,
+    skillUseCount: 600,
 })
 for (let index = 0; index < 99; index++) {
     recordMissionBattleResultSync(playerId, {
@@ -284,6 +285,9 @@ assert.equal(DegreeComputer.compute(34020, context, 700), 700, "单次连击称�
 assert.equal(DegreeComputer.compute(41000, context, 0), 1500, "锻造石称号应读取累计获得量")
 assert.equal(DegreeComputer.compute(41010, context, 0), 1500, "锻造石称号应支持更高阈值")
 assert.equal(DegreeComputer.compute(41020, context, 3000), 3000, "锻造石称号旧进度不得倒退")
+assert.equal(DegreeComputer.compute(33000, context, 0), 600, "技能使用称号应读取成功战斗累计")
+assert.equal(DegreeComputer.compute(33010, context, 0), 600, "技能使用称号应支持更高阈值")
+assert.equal(DegreeComputer.compute(33020, context, 700), 700, "技能使用称号旧进度不得倒退")
 
 for (const missionId of [23000, 23010, 23020]) {
     assert.equal(DegreeComputer.compute(missionId, context, 0), 2, `${missionId} 应读取协力成功总数`)
@@ -301,8 +305,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1051,
-    unsupported: 237,
+    serverComputed: 1054,
+    unsupported: 234,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -329,6 +333,7 @@ assert.deepEqual(coverage, {
     dashUse: 3,
     comboOneTime: 3,
     craftPointGet: 3,
+    skillUse: 3,
     },
 })
 

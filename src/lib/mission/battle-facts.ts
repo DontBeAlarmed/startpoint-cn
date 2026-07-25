@@ -14,6 +14,19 @@ import { recordDailyMissionBattleFacts } from "./daily-battle-facts"
 
 export const BATTLE_SETTLEMENT_CATEGORIES = Object.freeze([1, 2, 3, 6, 7, 8, 10])
 
+function getSkillUseCount(ctx: FinishContext): number {
+    if (!ctx.questAccomplished) return 0
+    let total = 0
+    for (const zone of ctx.statistics.zones ?? []) {
+        const value = zone.use_skill_count
+        if (value === undefined) continue
+        if (!Number.isSafeInteger(value) || value < 0) return 0
+        total += value
+        if (!Number.isSafeInteger(total)) return 0
+    }
+    return total
+}
+
 export function recordMissionBattleFacts(
     ctx: FinishContext,
     evaluationTime: Date = new Date(getServerTime() * 1000),
@@ -26,6 +39,7 @@ export function recordMissionBattleFacts(
         clearRank: ctx.clearRank,
         score: ctx.score,
         clearTime: ctx.clearTime,
+        skillUseCount: getSkillUseCount(ctx),
     })
     if (!ctx.questAccomplished) return
     recordDailyMissionBattleFacts(ctx, evaluationTime)
