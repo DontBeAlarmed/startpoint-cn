@@ -88,6 +88,7 @@ updatePlayerSync({
     id: playerId,
     rankPoint: Number.MAX_SAFE_INTEGER,
     totalStaminaUsed: 5000,
+    totalDashes: 5000,
     totalLoginDays: 30,
 })
 
@@ -270,6 +271,9 @@ assert.equal(DegreeComputer.compute(15020, context, 0), 1, "单人时间称号�
 assert.equal(DegreeComputer.compute(30000, context, 0), 10, "领主战称号应读取 category 2 成功累计")
 assert.equal(DegreeComputer.compute(30010, context, 0), 10, "领主战称号应支持更高阈值")
 assert.equal(DegreeComputer.compute(30020, context, 1), 10, "领主战称号旧进度与新事实取最大值")
+assert.equal(DegreeComputer.compute(37000, context, 0), 5000, "冲刺称号应读取玩家累计冲刺次数")
+assert.equal(DegreeComputer.compute(37010, context, 0), 5000, "冲刺称号应支持更高阈值")
+assert.equal(DegreeComputer.compute(37020, context, 7000), 7000, "冲刺称号旧进度不得倒退")
 
 for (const missionId of [23000, 23010, 23020]) {
     assert.equal(DegreeComputer.compute(missionId, context, 0), 2, `${missionId} 应读取协力成功总数`)
@@ -287,8 +291,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1042,
-    unsupported: 246,
+    serverComputed: 1045,
+    unsupported: 243,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -312,6 +316,7 @@ assert.deepEqual(coverage, {
     scoreClearSingle: 3,
     timeClearSingle: 3,
     bossBattleClear: 3,
+    dashUse: 3,
     },
 })
 

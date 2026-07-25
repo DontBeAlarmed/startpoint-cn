@@ -27,6 +27,7 @@ import type { MissionComputer, CategoryContext } from "./types"
 const degreeTargetMap: Record<number, number> = {}
 const degreeScoreTargetMap: Record<number, number> = {}
 const degreeTimeTargetMap: Record<number, number> = {}
+const degreeDashTargetMap: Record<number, number> = {}
 {
     // Note: this import is resolved at module load time via the patterns file's data
     // but we use the same degreeDefs. For simplicity, inline the regex.
@@ -41,6 +42,8 @@ const degreeTimeTargetMap: Record<number, number> = {}
         if (scoreMatch) degreeScoreTargetMap[parseInt(mid)] = parseInt(scoreMatch[1])
         const timeMatch = /单人战斗\s*(\d+)\s*秒以内通关/.exec(String(row[2]))
         if (timeMatch) degreeTimeTargetMap[parseInt(mid)] = parseInt(timeMatch[1]) * 1000
+        const dashMatch = /使用\s*(\d+)\s*次冲刺/.exec(String(row[2]))
+        if (dashMatch) degreeDashTargetMap[parseInt(mid)] = parseInt(dashMatch[1])
     }
 }
 
@@ -54,6 +57,10 @@ function getTargetScore(missionId: number): number | undefined {
 
 function getTargetTime(missionId: number): number | undefined {
     return degreeTimeTargetMap[missionId]
+}
+
+function getTargetDash(missionId: number): number | undefined {
+    return degreeDashTargetMap[missionId]
 }
 
 type RawManaBoard = Record<string, Record<string, Record<string, readonly unknown[][]>>>
@@ -271,6 +278,7 @@ const SUPPORTED_FAMILIES = {
     scoreClearSingle: "degree_score_clear_single_",
     timeClearSingle: "degree_time_clear_single_",
     bossBattleClear: "degree_boss_battle_clear_",
+    dashUse: "degree_dash_use_",
 } as const
 
 function getSecondManaBoardCharacterId(missionId: number): number | undefined {
@@ -344,6 +352,10 @@ export function getDegreeMissionCoverageReport() {
         )).length,
         bossBattleClear: definitions.filter(definition => (
             definition.pattern.startsWith(SUPPORTED_FAMILIES.bossBattleClear)
+        )).length,
+        dashUse: definitions.filter(definition => (
+            definition.pattern.startsWith(SUPPORTED_FAMILIES.dashUse)
+            && getTargetDash(definition.missionId) !== undefined
         )).length,
     }
     const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
@@ -444,6 +456,9 @@ export const DegreeComputer: MissionComputer = {
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.bossBattleClear)) {
             return Math.max(dbProgress, stats.bossBattleClearCount)
+        }
+        if (pattern.startsWith(SUPPORTED_FAMILIES.dashUse)) {
+            return Math.max(dbProgress, ctx.player.totalDashes ?? 0)
         }
         return dbProgress
     },
