@@ -6,6 +6,7 @@ import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_
 import {
     countFinishedPlayerQuestsByCategorySync,
     getFinishedPlayerQuestIdsBySectionsSync,
+    getPlayerQuestClearRanksBySectionsSync,
 } from "../../data/domains/quest"
 import { getRankDegree } from "../stamina"
 import bundledManaBoard from "../../../assets/mana_board.json"
@@ -134,12 +135,26 @@ function getCompletedEpisodeChapters(playerId: number): ReadonlySet<number> {
     return completed
 }
 
+function getPracticeQuestIds(missionId: number): readonly number[] | null {
+    const definition = getMissionMasterDefinition(5, missionId)
+    if (!definition
+        || Number(definition.row[3]) !== 26
+        || !definition.pattern.startsWith("degree_practice_rank_ss_clear_")) return null
+    const value = definition.row[11]
+    if (value === undefined || value === null || value === "" || value === "(None)") return null
+    const questIds = String(value).split(",").map(Number)
+    return questIds.every(questId => Number.isSafeInteger(questId) && questId > 0)
+        ? questIds
+        : null
+}
+
 function buildStats(playerId: number, category: number): CategoryContext {
     const player = getPlayerSync(playerId)!
     const characters = getPlayerCharactersSync(playerId)
     const manaNodes = getPlayerCharactersManaNodesSync(playerId)
     const battleCounters = getMissionBattleCountersSync(playerId)
     const episodeCompletedChapters = getCompletedEpisodeChapters(playerId)
+    const practiceClearRanks = getPlayerQuestClearRanksBySectionsSync(playerId, [15])[15] ?? new Map()
     return {
         category,
         playerId,
@@ -173,6 +188,11 @@ function buildStats(playerId: number, category: number): CategoryContext {
                 }
             })(),
             episodeCompletedChapters,
+            practiceSsQuestIds: new Set(
+                [...practiceClearRanks.entries()]
+                    .filter(([, clearRank]) => clearRank === 5)
+                    .map(([questId]) => questId),
+            ),
         },
     }
 }
@@ -239,6 +259,9 @@ export function getDegreeMissionCoverageReport() {
         episodeChapterCompletion: definitions.filter(definition => (
             getEpisodeChapter(definition.missionId) !== undefined
         )).length,
+        practiceRankSs: definitions.filter(definition => (
+            getPracticeQuestIds(definition.missionId) !== null
+        )).length,
     }
     const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
     return {
@@ -285,6 +308,13 @@ export const DegreeComputer: MissionComputer = {
         const episodeChapter = getEpisodeChapter(missionId)
         if (episodeChapter !== undefined) {
             return Math.max(dbProgress, stats.episodeCompletedChapters.has(episodeChapter) ? 1 : 0)
+        }
+        const practiceQuestIds = getPracticeQuestIds(missionId)
+        if (practiceQuestIds !== null) {
+            return Math.max(
+                dbProgress,
+                practiceQuestIds.every(questId => stats.practiceSsQuestIds.has(questId)) ? 1 : 0,
+            )
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.companionCount)) return stats.companionCount
         if (pattern.startsWith(SUPPORTED_FAMILIES.overLimitCount)) return stats.overLimitCount

@@ -9,7 +9,7 @@
 | 角色觉醒（category 9） | 144 | 144/144；其中 55 条使用经主数据审计的通用角色通关回退 | 核心流程已通过客户端；144 条条件待逐条客户端验收 |
 | 每日（category 2） | 历史总表 656 | 默认服务器时间下开放 11 条，当前 11/11 | 常驻 5 条与活动 6 条均已自动计算，不宣称支持全部历史定义 |
 | 每周（category 10） | 2 | 2/2 | 服务端已实现，待 CN 客户端跨周完整验收 |
-| 称号（category 5） | 1288 | 1009，约 78.3% | 新增第二玛纳板、累计体力、累计登录和章节全通条件族；unsupported 279 条继续持久化 fallback |
+| 称号（category 5） | 1288 | 1014，约 78.7% | 新增第二玛纳板、累计体力、累计登录、章节全通和练习关卡 SS 条件族；unsupported 274 条继续持久化 fallback |
 
 历史活动每日不作为当前体验的完成率分母。本轮只处理默认服务器时间 `2024-08-14` 下客户端会显示的任务，不把 656 条历史定义一次性全部启用或宣称全部支持。
 
@@ -84,7 +84,7 @@ kind 12 的四个 category 来自 CN 1.8.1 `QuestCategory_Impl_`：DailyWeekEven
 | `degree_multi_battle_by_host_clear_*` | 3 | `players_mission_battle_counters.multi_host_clear_count` |
 | `degree_character_episode_read_*` | 3 | category 3 已成功角色剧情关卡的数量 |
 
-称号自动计算覆盖现为 `1009/1288`，约 `78.3%`，unsupported 为 279 条。计算结果与已有持久进度取最大值，避免旧存档倒退；角色剧情使用 SQL `COUNT(*)` 统计 category 3 已完成关卡，并由 `idx_players_quest_progress_player_section_finished` covering index 支持。第二玛纳板使用 `mana_board.json` 的第二板节点集合与玩家节点记录求交集；无法确认节点归属时不计入。累计消耗体力和累计登录直接读取玩家主表的权威累计字段。其余复杂条件继续保留持久化 fallback。
+称号自动计算覆盖现为 `1014/1288`，约 `78.7%`，unsupported 为 274 条。计算结果与已有持久进度取最大值，避免旧存档倒退；角色剧情使用 SQL `COUNT(*)` 统计 category 3 已完成关卡，并由 `idx_players_quest_progress_player_section_finished` covering index 支持。第二玛纳板使用 `mana_board.json` 的第二板节点集合与玩家节点记录求交集；无法确认节点归属时不计入。累计消耗体力和累计登录直接读取玩家主表的权威累计字段。练习关卡 SS 使用主数据列出的 category 15 目标集合及持久化 `clear_rank=5`。其余复杂条件继续保留持久化 fallback。
 
 ### 第二玛纳板称号
 
@@ -96,13 +96,16 @@ kind 12 的四个 category 来自 CN 1.8.1 `QuestCategory_Impl_`：DailyWeekEven
 
 12 条 `degree_all_episode_quest_clear_*` 读取主数据中的章节号，并按 `floor(quest_id / 1,000,000)` 从 `main_quest.json` 与 `ex_quest.json` 构造完整关卡集合。只有两类集合都非空且每个关卡均有玩家 `finished=1` 记录时才完成；缺任意一关、只有主线记录或内容集合为空都保持未完成。该逻辑不使用最后主线关卡字段替代全量证明。
 
+### 练习关卡 SS 称号
+
+5 条 `degree_practice_rank_ss_clear_*` 从 `mission_degree.row[11]` 读取目标关卡 ID，查询 category 15 已完成记录，要求每个目标的 `clear_rank=5`。目标集合缺失、记录未完成或评级低于 SS 时都保持未完成。
+
 以下条件暂不纳入第一批：
 
 - 能力魂珠使用次数：当前没有累计使用事实；
 - 摇曳迷宫累计通关次数：不同关卡的历史最佳记录不能代替累计次数；
-- 练习关卡指定 SS：当前没有按练习关卡拆分的评级事实；
 - MVP、救援、复杂战斗状态：缺少完整权威来源；
-- 指定 Boss 与章节全通：需要先完成官方 QuestRange/章节映射审计，作为下一批独立提交。
+- 指定 Boss：需要先完成官方 QuestRange/章节映射审计，作为下一批独立提交。
 - “接取救援请求”保持低优先级，暂不实现。
 
 ## 数据流与事务

@@ -36,6 +36,7 @@ const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domai
 const {
     countFinishedPlayerQuestsByCategorySync,
     insertPlayerQuestProgressSync,
+    updatePlayerQuestProgressSync,
 } = require("../src/data/domains/quest")
 const {
     DegreeComputer,
@@ -159,6 +160,19 @@ assert.equal(countFinishedPlayerQuestsByCategorySync(playerId, 99), 0)
 insertChapterProgress(1)
 insertChapterProgress(2, 2001001)
 
+function insertPracticeProgress(questIds, clearRank = 5) {
+    for (const questId of questIds) {
+        insertPlayerQuestProgressSync(playerId, 15, {
+            questId,
+            finished: true,
+            clearRank,
+        })
+    }
+}
+insertPracticeProgress([5, 15, 25, 35, 45, 55])
+insertPracticeProgress([4, 14, 24, 34, 44, 54], 5)
+updatePlayerQuestProgressSync(playerId, 15, { questId: 54, clearRank: 4 })
+
 const episodeCountQueryPlan = db.prepare(`
     EXPLAIN QUERY PLAN
     SELECT COUNT(*) AS count
@@ -187,6 +201,9 @@ assert.equal(DegreeComputer.compute(53010, context, 40), 40, "登录称号旧进
 assert.equal(DegreeComputer.compute(9000, context, 0), 1, "主线和高难全部完成后应完成章节称号")
 assert.equal(DegreeComputer.compute(9010, context, 0), 0, "章节缺少一个高难关卡时不得完成章节称号")
 assert.equal(DegreeComputer.compute(9110, context, 0), 0, "没有主线与高难记录的章节不得完成章节称号")
+assert.equal(DegreeComputer.compute(12000, context, 0), 1, "练习关卡全部达到 SS 后应完成称号")
+assert.equal(DegreeComputer.compute(12010, context, 0), 0, "练习关卡缺少 SS 时不得完成称号")
+assert.equal(DegreeComputer.compute(12010, context, 1), 1, "练习称号旧进度不得倒退")
 assert.equal(DegreeComputer.compute(111001, context, 0), 1, "指定角色获得信赖之证后应完成称号")
 assert.equal(DegreeComputer.compute(111002, context, 0), 0, "未获得信赖之证的角色不得完成称号")
 assert.equal(DegreeComputer.compute(111003, context, 0), 1, "已领取信赖之证后称号仍必须保持完成")
@@ -224,8 +241,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1009,
-    unsupported: 279,
+    serverComputed: 1014,
+    unsupported: 274,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -242,6 +259,7 @@ assert.deepEqual(coverage, {
         staminaUseCount: 3,
         loginCount: 3,
         episodeChapterCompletion: 12,
+        practiceRankSs: 5,
     },
 })
 

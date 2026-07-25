@@ -91,6 +91,32 @@ export function getFinishedPlayerQuestIdsBySectionsSync(
     return result
 }
 
+export function getPlayerQuestClearRanksBySectionsSync(
+    playerId: number,
+    sections: readonly number[],
+): Record<number, ReadonlyMap<number, number>> {
+    const normalizedSections = [...new Set(sections.map(Number))]
+        .filter(section => Number.isSafeInteger(section))
+    if (normalizedSections.length === 0) return {}
+
+    const placeholders = normalizedSections.map(() => "?").join(", ")
+    const rows = getDb().prepare(`
+        SELECT section, quest_id, clear_rank
+        FROM players_quest_progress
+        WHERE player_id = ? AND finished = 1 AND clear_rank IS NOT NULL
+            AND section IN (${placeholders})
+    `).all(playerId, ...normalizedSections) as {
+        section: number
+        quest_id: number
+        clear_rank: number
+    }[]
+
+    const result: Record<number, Map<number, number>> = {}
+    for (const section of normalizedSections) result[section] = new Map<number, number>()
+    for (const row of rows) result[row.section]?.set(row.quest_id, row.clear_rank)
+    return result
+}
+
 /**
  * Gets the progress of a singular quest for a player..
  * 
