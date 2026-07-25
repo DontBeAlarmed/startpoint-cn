@@ -1,21 +1,30 @@
 import { getPlayerCollectedItemTotalsSync } from "../../data/domains/item"
 import { getPlayerCategoryMissionsSync } from "../../data/domains/mission"
 import { getPlayerSync } from "../../data/domains/player"
+import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getMissionMasterDefinition, getMissionMasterDefinitions } from "./master-data"
 import questMap from "../../../assets/mission_event_quest_map.json"
 import carnivalEventQuests from "../../../assets/carnival_event_quest.json"
 import challengeDungeonEventQuests from "../../../assets/challenge_dungeon_event_quest.json"
+import rankingEventSingleQuests from "../../../assets/ranking_event_single_quest.json"
+import eventRewards from "../../../assets/mission_event_reward.json"
 import type { CategoryContext, MissionComputer } from "./types"
 
 const GET_ITEM_COUNT_PATTERN_TYPE = 37
 const TARGET_MISSION_CLEAR_PATTERN_TYPE = 13
 const SINGLE_BATTLE_CLEAR_PATTERN_TYPE = 14
 const CARNIVAL_BATTLE_PATTERN_TYPE = 23
+const TIME_CLEAR_PATTERN_TYPE = 15
 
 interface SafeQuestMapping {
     readonly questIds: readonly number[]
     readonly categories: readonly number[]
     readonly countMode: "single"
+}
+
+interface SafeTimeClearMapping {
+    readonly questId: number
+    readonly targetTimeMs: number
 }
 
 function parsePositiveIntegerList(value: unknown): number[] | null {
@@ -43,6 +52,39 @@ function getSafeQuestMapping(missionId: number): SafeQuestMapping | null {
         || categories.length === 0
         || questIds.length === 0) return null
     return { categories, questIds, countMode: "single" }
+}
+
+function getSafeTimeClearMapping(missionId: number): SafeTimeClearMapping | null {
+    const definition = getMissionMasterDefinition(3, missionId)
+    if (!definition
+        || Number(definition.row[2]) !== TIME_CLEAR_PATTERN_TYPE
+        || Number(definition.row[7]) !== 8) return null
+
+    const eventId = Number(definition.row[8])
+    const questSuffix = Number(definition.row[10])
+    if (!Number.isSafeInteger(eventId) || eventId <= 0
+        || !Number.isSafeInteger(questSuffix) || questSuffix <= 0) return null
+    const questId = eventId * 1000 + questSuffix
+    if (!Object.prototype.hasOwnProperty.call(rankingEventSingleQuests, String(questId))) return null
+
+    const raw = (questMap as Record<string, unknown>)[definition.pattern]
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null
+    const mapping = raw as Record<string, unknown>
+    if (mapping.countMode !== "finish"
+        || !Array.isArray(mapping.categories)
+        || mapping.categories.length !== 1
+        || mapping.categories[0] !== 11
+        || !Array.isArray(mapping.questIds)
+        || mapping.questIds.length !== 1
+        || mapping.questIds[0] !== questId) return null
+
+    const stages = (eventRewards as Record<string, Record<string, unknown[]>>)[String(missionId)]
+    const firstStage = stages && Object.values(stages)[0]
+    const row = Array.isArray(firstStage) && Array.isArray(firstStage[0]) ? firstStage[0] : undefined
+    const seconds = Number(row?.[2])
+    return Number.isFinite(seconds) && seconds >= 0
+        ? { questId, targetTimeMs: seconds * 1000 }
+        : null
 }
 
 function getSafeCarnivalQuestId(missionId: number): number | undefined {
@@ -109,6 +151,16 @@ function computeTargetMissionClear(
     if (!definition) return undefined
     visiting.add(missionId)
     try {
+        const timeClearMapping = getSafeTimeClearMapping(missionId)
+        if (timeClearMapping !== null) {
+            return (ctx.questProgress["11"] ?? []).some(progress => (
+                progress.questId === timeClearMapping.questId
+                && progress.finished
+                && progress.bestElapsedTimeMs !== undefined
+                && progress.bestElapsedTimeMs <= timeClearMapping.targetTimeMs
+            )) ? 1 : 0
+        }
+
         const challengeQuestIds = getSafeChallengeDungeonQuestIds(missionId)
         if (challengeQuestIds !== undefined) {
             const targetIds = new Set(challengeQuestIds)
@@ -147,7 +199,8 @@ function isSafeEventMission(missionId: number, visiting: Set<number>): boolean {
     if (visiting.has(missionId)) return false
     if (getEventItemMissionItemId(missionId) !== undefined
         || getSafeCarnivalQuestId(missionId) !== undefined
-        || getSafeChallengeDungeonQuestIds(missionId) !== undefined) return true
+        || getSafeChallengeDungeonQuestIds(missionId) !== undefined
+        || getSafeTimeClearMapping(missionId) !== null) return true
 
     const definition = getMissionMasterDefinition(3, missionId)
     if (!definition || Number(definition.row[2]) !== TARGET_MISSION_CLEAR_PATTERN_TYPE) return false
@@ -183,11 +236,20 @@ export const EventSafeComputer: MissionComputer = {
     buildContext(playerId: number, category: number): CategoryContext {
         const player = getPlayerSync(playerId)
         if (!player) throw new Error(`Player ${playerId} not found during event mission evaluation.`)
+        const rawProgress = getPlayerQuestProgressSync(playerId)
+        const rankingProgress = (rawProgress["11"] ?? []).map(progress => ({
+            questId: progress.questId,
+            finished: progress.finished,
+            clearRank: progress.clearRank,
+            bestElapsedTimeMs: progress.bestElapsedTimeMs,
+            leaderCharacterId: progress.leaderCharacterId,
+            multiClearCount: progress.multiClearCount,
+        }))
         return {
             category,
             playerId,
             player,
-            questProgress: {},
+            questProgress: { "11": rankingProgress },
             totalQuestClears: 0,
             totalStories: 0,
             rankCounts: {},

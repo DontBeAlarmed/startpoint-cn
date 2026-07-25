@@ -79,6 +79,25 @@ assert.equal(
     7,
     "非白名单活动任务必须保留持久化进度",
 )
+assert.equal(
+    EventSafeComputer.compute(2008342, context({
+        11: [{ ...timeAttackQuest, bestElapsedTimeMs: 49_000 }],
+    }), 0),
+    1,
+    "精确竞速关卡在奖励秒数内通关时应完成",
+)
+assert.equal(
+    EventSafeComputer.compute(2008342, context({ 11: [timeAttackQuest] }), 0),
+    0,
+    "精确竞速关卡超过奖励秒数时不得完成",
+)
+assert.equal(
+    EventSafeComputer.compute(700012, context({
+        24: [{ ...timeAttackQuest, questId: 700002008, bestElapsedTimeMs: 1_000 }],
+    }), 6),
+    6,
+    "狂热激战旧映射把单关扩成整期关卡，必须继续 fallback",
+)
 
 const haniwaMediumQuests = [4001, 4004, 4007].map(questId => ({
     questId,
@@ -132,6 +151,6 @@ assert.equal(
     6,
     "崩坏域庆贺的聚合任务应按已完成子任务数量计算",
 )
-assert.equal(getEventSafeMissionIds().length, 156, "活动安全计算器应登记 156 条关卡事实任务")
+assert.equal(getEventSafeMissionIds().length, 344, "活动安全计算器应登记 156 条关卡事实与 188 条竞速任务")
 
 console.log("mission event progress tests passed")
