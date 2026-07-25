@@ -44,6 +44,8 @@ export interface CategoryContext {
     battleCounters?: MissionBattleCounters
     snapshot?: SnapshotData | null
     passEventLoginProgress?: Record<number, number>
+    /** Persisted category 3 progress used only by explicit aggregate event missions. */
+    eventMissionProgress?: ReadonlyMap<number, number>
 }
 
 /** A mission computer handles one or more categories */

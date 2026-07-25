@@ -8,6 +8,7 @@ const {
 } = require("../src/lib/mission/computer-event")
 const {
     EventSafeComputer,
+    getEventSafeMissionIds,
     getEventItemMissionItemId,
 } = require("../src/lib/mission/computer-event-safe")
 const { getComputer } = require("../src/lib/mission/registry")
@@ -21,6 +22,7 @@ function context(questProgress) {
         totalQuestClears: 0,
         totalStories: 0,
         rankCounts: {},
+        eventMissionProgress: new Map(),
     }
 }
 
@@ -77,5 +79,59 @@ assert.equal(
     7,
     "非白名单活动任务必须保留持久化进度",
 )
+
+const haniwaMediumQuests = [4001, 4004, 4007].map(questId => ({
+    questId,
+    finished: true,
+    clearRank: 5,
+    bestElapsedTimeMs: undefined,
+    leaderCharacterId: undefined,
+    multiClearCount: undefined,
+}))
+assert.equal(
+    EventSafeComputer.compute(500004, context({ 22: haniwaMediumQuests }), 0),
+    3,
+    "土俑通关所有中级关卡应按 CDN 子关卡完成数计算",
+)
+assert.equal(
+    EventSafeComputer.compute(500004, context({ 22: haniwaMediumQuests.slice(0, 2) }), 4),
+    4,
+    "活动任务计算不得覆盖已有更高的持久进度",
+)
+assert.equal(
+    EventSafeComputer.compute(500004, context({ 22: haniwaMediumQuests.slice(0, 2) }), 0),
+    2,
+    "未完成全部子关卡时只能返回已完成数量",
+)
+assert.equal(
+    EventSafeComputer.compute(999999999, context({ 22: haniwaMediumQuests }), 6),
+    6,
+    "未知或未白名单活动任务必须保留持久化进度",
+)
+
+const deepDomainQuests = [1002, 1005, 1008, 1011, 1014, 1017].map(questId => ({
+    questId,
+    finished: true,
+    clearRank: 5,
+    bestElapsedTimeMs: undefined,
+    leaderCharacterId: undefined,
+    multiClearCount: undefined,
+}))
+assert.equal(
+    EventSafeComputer.compute(1448, context({ 13: [deepDomainQuests[0]] }), 0),
+    1,
+    "崩坏域庆贺的单属性任务应按 CDN 关卡精确计算",
+)
+assert.equal(
+    EventSafeComputer.compute(1447, context({ 13: deepDomainQuests.slice(0, 2) }), 0),
+    2,
+    "崩坏域庆贺的全属性任务应只统计对应挑战关卡",
+)
+assert.equal(
+    EventSafeComputer.compute(1454, context({ 13: deepDomainQuests }), 0),
+    6,
+    "崩坏域庆贺的聚合任务应按已完成子任务数量计算",
+)
+assert.equal(getEventSafeMissionIds().length, 156, "活动安全计算器应登记 156 条关卡事实任务")
 
 console.log("mission event progress tests passed")

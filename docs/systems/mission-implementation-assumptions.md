@@ -21,6 +21,15 @@
 - 运行时优先读取启动时固定的 Content snapshot；直接调用且 snapshot 尚未初始化时才回退到仓库内 bundled `assets/mana_board.json`。这只是兼容旧调用路径，不会在已初始化的 Release 上叠加两份表。
 - 当前未有客户端逐条验证“强化”的中文显示是否还包含其他状态，也没有证明出售角色后服务端应重新计算还是只保留历史完成；实现按已持久化进度取最大值处理，相关边界留待审阅。
 
+## category 3：关卡目标任务
+
+- 土俑嘉年华单关卡使用 `mission_event.json` 的 `event_id + quest suffix` 与 `carnival_event_quest.json` 的精确关卡 ID
+  对齐；聚合任务只引用同一活动的子任务 ID。当前实现不使用旧 `mission_event_quest_map.json` 对土俑关卡的宽泛集合。
+- 崩坏域庆贺单关卡使用 `challenge_dungeon_event_quest.json` 中的真实关卡键；`row[10]` 为空时表示该挑战事件表的全部关卡，
+  非空时按 `event_id * 1000 + suffix` 精确定位。聚合任务只在所有子任务都有可证明关卡来源时启用。
+- 这批规则仍依赖 `players_quest_progress.finished` 的历史最佳记录。数据库没有单次战斗时间线，因此没有把“必须在活动开放期内完成”
+  作为额外条件；关卡 ID 本身必须由官方 CDN 表确认存在。客户端战斗检查、评级、Attention 救援和无法从表闭合的活动任务继续 fallback。
+
 ## 称号指定 Boss 超级难度
 
 - 13 条 `degree_boss_battle_ex_clear_single_*` 可以由主数据的 stage group + difficulty 与 `boss_battle_quest.json` 精确闭合，服务端只接受对应 category 2 关卡的 `finished=1` 记录。
