@@ -56,6 +56,7 @@ const baseContext = {
 recordMissionBattleFacts({ ...baseContext, questAccomplished: false })
 assert.deepEqual(calls, [["result", 1, {
     isMulti: false,
+    questCategory: 1,
     isHost: undefined,
     accomplished: false,
     clearRank: 1,
@@ -66,12 +67,14 @@ recordMissionBattleFacts({ ...baseContext, questAccomplished: true, isMulti: tru
 assert.deepEqual(calls, [
     ["result", 1, {
         isMulti: false,
+        questCategory: 1,
         isHost: undefined,
         accomplished: false,
         clearRank: 1,
     }],
     ["result", 1, {
         isMulti: true,
+        questCategory: 1,
         isHost: true,
         accomplished: true,
         clearRank: 1,
@@ -151,6 +154,7 @@ recordMissionBattleFacts({
 const unknownHostResult = calls.filter(([kind]) => kind === "result").at(-1)[2]
 assert.deepEqual(unknownHostResult, {
     isMulti: true,
+    questCategory: 1,
     isHost: undefined,
     accomplished: true,
     clearRank: 1,

@@ -40,6 +40,7 @@ export interface CategoryContext {
         treasureShopPurchaseCount: number
         bossBattleSuperQuestByMission: ReadonlyMap<number, number>
         bossBattleClearQuestIds: ReadonlySet<number>
+        challengeDungeonClearCount: number
     }
     battleCounters?: MissionBattleCounters
     snapshot?: SnapshotData | null

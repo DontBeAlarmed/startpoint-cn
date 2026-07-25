@@ -35,6 +35,12 @@
 - 13 条 `degree_boss_battle_ex_clear_single_*` 可以由主数据的 stage group + difficulty 与 `boss_battle_quest.json` 精确闭合，服务端只接受对应 category 2 关卡的 `finished=1` 记录。
 - `11080`（大蛇）主数据要求 difficulty `4`，但官方表中该 stage group 只有 difficulty `1..3`。当前不把现有最高难度 3 推测为目标 4，保持持久化 fallback；如果后续 CDN 补齐 difficulty 4，才会自动进入计算路径。
 
+## 称号挑战副本累计通关
+
+- `10000/10010/10020` 的 pattern 分别要求 100、500、3000 次挑战副本成功通关。服务端按 CN 关卡类别枚举将挑战副本识别为 category 13，并在成功 finish 事务中增加独立的 `challenge_dungeon_clear_count`。
+- 该计数不从 `players_quest_progress` 的唯一关卡行数反推，因此重复挑战同一关会正确累计；失败、普通关卡和事务回滚不会增加。
+- 当前数据库迁移会为旧的 `players_mission_battle_counters` 表补列，但既有存档替换/导入格式没有该事实表。由于本项目暂不扩展数据库导入导出，替换后无法恢复这项新增历史事实；服务端不会根据库存或关卡快照猜测回填。
+
 ## 审阅方式
 
 审阅时优先检查：

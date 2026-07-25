@@ -128,6 +128,13 @@ recordMissionBattleResultSync(playerId, { isMulti: true, isHost: true, accomplis
 recordMissionBattleResultSync(playerId, { isMulti: true, isHost: false, accomplished: true, clearRank: 5 })
 recordMissionBattleResultSync(playerId, { isMulti: true, isHost: true, accomplished: false, clearRank: 5 })
 recordMissionBattleResultSync(playerId, { isMulti: false, accomplished: true, clearRank: 5 })
+for (let index = 0; index < 99; index++) {
+    recordMissionBattleResultSync(playerId, {
+        isMulti: false,
+        questCategory: 13,
+        accomplished: true,
+    })
+}
 
 insertPlayerQuestProgressSync(playerId, 3, { questId: 300001, finished: true })
 insertPlayerQuestProgressSync(playerId, 3, { questId: 300002, finished: true })
@@ -236,6 +243,9 @@ assert.equal(
 )
 assert.equal(DegreeComputer.compute(55010, context, 0), 38, "全局第二板节点数应可用于 50 次阈值")
 assert.equal(DegreeComputer.compute(55020, context, 200), 200, "旧称号进度不得因当前可见节点不足而倒退")
+assert.equal(DegreeComputer.compute(10000, context, 0), 99, "挑战副本称号应读取成功通关累计次数")
+assert.equal(DegreeComputer.compute(10010, context, 0), 99, "挑战副本累计次数应可用于更高阈值")
+assert.equal(DegreeComputer.compute(10020, context, 120), 120, "挑战副本称号旧进度不得倒退")
 
 for (const missionId of [23000, 23010, 23020]) {
     assert.equal(DegreeComputer.compute(missionId, context, 0), 2, `${missionId} 应读取协力成功总数`)
@@ -253,8 +263,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1030,
-    unsupported: 258,
+    serverComputed: 1033,
+    unsupported: 255,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -274,6 +284,7 @@ assert.deepEqual(coverage, {
         practiceRankSs: 5,
         treasureShopPurchaseCount: 3,
         bossBattleExClearSingle: 13,
+        challengeDungeonClear: 3,
     },
 })
 

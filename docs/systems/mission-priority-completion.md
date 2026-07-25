@@ -9,7 +9,7 @@
 | 角色觉醒（category 9） | 144 | 144/144；其中 55 条使用经主数据审计的通用角色通关回退 | 核心流程已通过客户端；144 条条件待逐条客户端验收 |
 | 每日（category 2） | 历史总表 656 | 默认服务器时间下开放 11 条，当前 11/11 | 常驻 5 条与活动 6 条均已自动计算，不宣称支持全部历史定义 |
 | 每周（category 10） | 2 | 2/2 | 服务端已实现，待 CN 客户端跨周完整验收 |
-| 称号（category 5） | 1288 | 1030，约 80.0% | 新增第二玛纳板、累计体力、累计登录、章节全通、练习关卡 SS、珍品商店购买和指定 Boss 超级难度条件族；unsupported 258 条继续持久化 fallback |
+| 称号（category 5） | 1288 | 1033，约 80.2% | 新增挑战副本累计通关、第二玛纳板、累计体力、累计登录、章节全通、练习关卡 SS、珍品商店购买和指定 Boss 超级难度条件族；unsupported 255 条继续持久化 fallback |
 
 历史活动每日不作为当前体验的完成率分母。本轮只处理默认服务器时间 `2024-08-14` 下客户端会显示的任务，不把 656 条历史定义一次性全部启用或宣称全部支持。
 
@@ -76,15 +76,20 @@ kind 12 的四个 category 来自 CN 1.8.1 `QuestCategory_Impl_`：DailyWeekEven
 
 ## 首批简单称号
 
-第一批已增加 9 条：
+第一批已增加 12 条：
 
 | 条件族 | 数量 | 权威来源 |
 |---|---:|---|
 | `degree_multi_battle_clear_*` | 3 | `players_mission_battle_counters.multi_clear_count` |
 | `degree_multi_battle_by_host_clear_*` | 3 | `players_mission_battle_counters.multi_host_clear_count` |
 | `degree_character_episode_read_*` | 3 | category 3 已成功角色剧情关卡的数量 |
+| `degree_challenge_dungeon_clear_*` | 3 | `players_mission_battle_counters.challenge_dungeon_clear_count` |
 
-称号自动计算覆盖现为 `1030/1288`，约 `80.0%`，unsupported 为 258 条。计算结果与已有持久进度取最大值，避免旧存档倒退；角色剧情使用 SQL `COUNT(*)` 统计 category 3 已完成关卡，并由 `idx_players_quest_progress_player_section_finished` covering index 支持。第二玛纳板使用 `mana_board.json` 的第二板节点集合与玩家节点记录求交集；无法确认节点归属时不计入。累计消耗体力和累计登录直接读取玩家主表的权威累计字段。练习关卡 SS 使用主数据列出的 category 15 目标集合及持久化 `clear_rank=5`。珍品商店购买只累计 `treasure_shop.json` 中商品 ID 的持久化购买次数，不把其他商店或当前库存当作事实。指定 Boss 超级难度只接受主数据和 CDN 关卡表的精确映射。其余复杂条件继续保留持久化 fallback。
+称号自动计算覆盖现为 `1033/1288`，约 `80.2%`，unsupported 为 255 条。计算结果与已有持久进度取最大值，避免旧存档倒退；角色剧情使用 SQL `COUNT(*)` 统计 category 3 已完成关卡，并由 `idx_players_quest_progress_player_section_finished` covering index 支持。挑战副本累计通关称号 `degree_challenge_dungeon_clear_*` 使用独立的 `challenge_dungeon_clear_count` 事实，只在 category 13 成功结算时增加，重复通关同一关也会累计；失败、普通关卡和事务回滚不会增加。该计数属于数据库运行事实，当前存档替换/导入格式不在本任务扩展范围内。第二玛纳板使用 `mana_board.json` 的第二板节点集合与玩家节点记录求交集；无法确认节点归属时不计入。累计消耗体力和累计登录直接读取玩家主表的权威累计字段。练习关卡 SS 使用主数据列出的 category 15 目标集合及持久化 `clear_rank=5`。珍品商店购买只累计 `treasure_shop.json` 中商品 ID 的持久化购买次数，不把其他商店或当前库存当作事实。指定 Boss 超级难度只接受主数据和 CDN 关卡表的精确映射。其余复杂条件继续保留持久化 fallback。
+
+### 挑战副本累计通关称号
+
+`10000/10010/10020` 的主数据 pattern 分别要求通关 100、500、3000 次摇曳的迷宫。服务端使用 `players_mission_battle_counters.challenge_dungeon_clear_count` 记录成功结算次数，按 `questCategory=13` 严格隔离；它不依赖 `players_quest_progress` 的唯一关卡记录，也不把普通 category 1 或其他活动关卡混入。旧数据库启动时通过 schema migration 补列，旧存档没有可证明的历史次数时不会回填猜测值。
 
 ### 第二玛纳板称号
 
@@ -135,5 +140,5 @@ start 保存 active quest
 - 角色觉醒：四条 QuestRange 正反例、两条无阵亡正反例、失败战斗、错误队长、错误角色、异常统计与事务回滚。
 - 每日：六条活动任务的正确关卡、错误活动、单人/协力差异、开放期、重复 finish、三档并行增长、事务时间快照复用和常驻全部完成隔离。
 - 每周：周一 05:00 边界、首次登录、跨周重置、重复读取和重新 load。
-- 称号：协力/房主计数区分、成员通关不污染房主计数、角色剧情只计算完成关卡、旧持久进度不回退。
+- 称号：协力/房主计数区分、成员通关不污染房主计数、角色剧情只计算完成关卡、挑战副本重复通关累计、旧持久进度不回退。
 - 上述自动测试已覆盖服务端规则，但自动测试通过不等于官方客户端已验收。角色觉醒 144 条条件仍待逐条验收，每周任务仍待跨周完整验收。

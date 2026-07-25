@@ -20,6 +20,7 @@ export function recordMissionBattleFacts(
 ): void {
     recordMissionBattleResultSync(ctx.playerId, {
         isMulti: ctx.isMulti === true,
+        questCategory: ctx.questCategory,
         isHost: ctx.isMultiHost,
         accomplished: ctx.questAccomplished,
         clearRank: ctx.clearRank,

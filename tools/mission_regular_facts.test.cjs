@@ -76,20 +76,41 @@ assert.deepEqual(getMissionBattleCountersSync(playerId), {
     rankSCount: 0,
     rankACount: 0,
     rankBCount: 0,
+    challengeDungeonClearCount: 0,
 })
 
-recordMissionBattleResultSync(playerId, { isMulti: false, accomplished: false })
+recordMissionBattleResultSync(playerId, {
+    isMulti: false,
+    questCategory: 13,
+    accomplished: false,
+})
 for (let index = 0; index < 3; index++) {
     recordMissionBattleResultSync(playerId, {
         isMulti: false,
+        questCategory: 13,
         accomplished: true,
         clearRank: index === 0 ? 5 : 4,
     })
 }
-recordMissionBattleResultSync(playerId, { isMulti: true, isHost: true, accomplished: true })
-recordMissionBattleResultSync(playerId, { isMulti: true, isHost: false, accomplished: false })
+recordMissionBattleResultSync(playerId, {
+    isMulti: true,
+    questCategory: 13,
+    isHost: true,
+    accomplished: true,
+})
+recordMissionBattleResultSync(playerId, {
+    isMulti: true,
+    questCategory: 13,
+    isHost: false,
+    accomplished: false,
+})
 for (let index = 0; index < 14; index++) {
-    recordMissionBattleResultSync(playerId, { isMulti: true, isHost: false, accomplished: true })
+    recordMissionBattleResultSync(playerId, {
+        isMulti: true,
+        questCategory: 13,
+        isHost: false,
+        accomplished: true,
+    })
 }
 
 assert.deepEqual(getMissionBattleCountersSync(playerId), {
@@ -104,7 +125,24 @@ assert.deepEqual(getMissionBattleCountersSync(playerId), {
     rankSCount: 2,
     rankACount: 0,
     rankBCount: 0,
+    challengeDungeonClearCount: 18,
 })
+
+assert.throws(() => {
+    db.transaction(() => {
+        recordMissionBattleResultSync(playerId, {
+            isMulti: false,
+            questCategory: 13,
+            accomplished: true,
+        })
+        throw new Error("rollback challenge dungeon fact")
+    })()
+}, /rollback challenge dungeon fact/)
+assert.equal(
+    getMissionBattleCountersSync(playerId).challengeDungeonClearCount,
+    18,
+    "结算事务回滚后不得留下挑战副本累计次数",
+)
 
 insertPlayerQuestProgressSync(playerId, 1, {
     questId: 101,
@@ -264,6 +302,17 @@ assert.equal(
     getComputer(10).compute(2, repeatedLoadContext, 0),
     3,
     "重复 load 后本周协力进度必须保持",
+)
+
+recordMissionBattleResultSync(playerId, {
+    isMulti: false,
+    questCategory: 1,
+    accomplished: true,
+})
+assert.equal(
+    getMissionBattleCountersSync(playerId).challengeDungeonClearCount,
+    18,
+    "普通关卡成功不得污染挑战副本累计次数",
 )
 
 const replacement = getMergedPlayerDataSync(playerId)

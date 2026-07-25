@@ -233,6 +233,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
             treasureShopPurchaseCount,
             bossBattleSuperQuestByMission,
             bossBattleClearQuestIds: finishedQuestIds,
+            challengeDungeonClearCount: battleCounters.challengeDungeonClearCount,
         },
     }
 }
@@ -249,6 +250,7 @@ const SUPPORTED_FAMILIES = {
     episodeClearCount: "degree_character_episode_read_",
     staminaUseCount: "degree_stamina_use_",
     loginCount: "degree_login_count_",
+    challengeDungeonClear: "degree_challenge_dungeon_clear_",
 } as const
 
 function getSecondManaBoardCharacterId(missionId: number): number | undefined {
@@ -308,6 +310,9 @@ export function getDegreeMissionCoverageReport() {
         )).length,
         bossBattleExClearSingle: definitions.filter(definition => (
             getBossBattleSuperQuestId(definition.missionId) !== undefined
+        )).length,
+        challengeDungeonClear: definitions.filter(definition => (
+            definition.pattern.startsWith(SUPPORTED_FAMILIES.challengeDungeonClear)
         )).length,
     }
     const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
@@ -390,6 +395,9 @@ export const DegreeComputer: MissionComputer = {
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.loginCount)) {
             return Math.max(dbProgress, ctx.player.totalLoginDays ?? 0)
+        }
+        if (pattern.startsWith(SUPPORTED_FAMILIES.challengeDungeonClear)) {
+            return Math.max(dbProgress, stats.challengeDungeonClearCount)
         }
         return dbProgress
     },
