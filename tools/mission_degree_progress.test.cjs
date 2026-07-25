@@ -32,6 +32,7 @@ const {
     insertPlayerCharacterSync,
 } = require("../src/data/domains/character")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
+const { addPlayerShopPurchaseCountSync } = require("../src/data/domains/shopPurchase")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
     countFinishedPlayerQuestsByCategorySync,
@@ -173,6 +174,11 @@ insertPracticeProgress([5, 15, 25, 35, 45, 55])
 insertPracticeProgress([4, 14, 24, 34, 44, 54], 5)
 updatePlayerQuestProgressSync(playerId, 15, { questId: 54, clearRank: 4 })
 
+const treasureShopItemIds = Object.keys(require("../assets/treasure_shop.json")).map(Number)
+addPlayerShopPurchaseCountSync(playerId, treasureShopItemIds[0], 40)
+addPlayerShopPurchaseCountSync(playerId, treasureShopItemIds[1], 60)
+addPlayerShopPurchaseCountSync(playerId, 999999, 100)
+
 const episodeCountQueryPlan = db.prepare(`
     EXPLAIN QUERY PLAN
     SELECT COUNT(*) AS count
@@ -204,6 +210,8 @@ assert.equal(DegreeComputer.compute(9110, context, 0), 0, "没有主线与高难
 assert.equal(DegreeComputer.compute(12000, context, 0), 1, "练习关卡全部达到 SS 后应完成称号")
 assert.equal(DegreeComputer.compute(12010, context, 0), 0, "练习关卡缺少 SS 时不得完成称号")
 assert.equal(DegreeComputer.compute(12010, context, 1), 1, "练习称号旧进度不得倒退")
+assert.equal(DegreeComputer.compute(46000, context, 0), 100, "应累计珍品商店商品购买次数")
+assert.equal(DegreeComputer.compute(46010, context, 150), 150, "珍品商店称号旧进度不得倒退")
 assert.equal(DegreeComputer.compute(111001, context, 0), 1, "指定角色获得信赖之证后应完成称号")
 assert.equal(DegreeComputer.compute(111002, context, 0), 0, "未获得信赖之证的角色不得完成称号")
 assert.equal(DegreeComputer.compute(111003, context, 0), 1, "已领取信赖之证后称号仍必须保持完成")
@@ -241,8 +249,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1014,
-    unsupported: 274,
+    serverComputed: 1017,
+    unsupported: 271,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -260,6 +268,7 @@ assert.deepEqual(coverage, {
         loginCount: 3,
         episodeChapterCompletion: 12,
         practiceRankSs: 5,
+        treasureShopPurchaseCount: 3,
     },
 })
 

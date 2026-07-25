@@ -3,6 +3,7 @@
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../../data/domains/character"
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
+import { getPlayerShopPurchasesMapSync } from "../../data/domains/shopPurchase"
 import {
     countFinishedPlayerQuestsByCategorySync,
     getFinishedPlayerQuestIdsBySectionsSync,
@@ -12,6 +13,7 @@ import { getRankDegree } from "../stamina"
 import bundledManaBoard from "../../../assets/mana_board.json"
 import bundledMainQuests from "../../../assets/main_quest.json"
 import bundledExQuests from "../../../assets/ex_quest.json"
+import bundledTreasureShop from "../../../assets/treasure_shop.json"
 import {
     ContentSnapshotError,
     getContentSnapshot,
@@ -148,6 +150,14 @@ function getPracticeQuestIds(missionId: number): readonly number[] | null {
         : null
 }
 
+function getTreasureShopPurchaseCount(playerId: number): number {
+    const treasureShop = getRuntimeTable<RawQuestTable>("treasure_shop.json", bundledTreasureShop)
+    const purchases = getPlayerShopPurchasesMapSync(playerId)
+    return Object.entries(purchases).reduce((total, [itemId, count]) => (
+        treasureShop[itemId] === undefined ? total : total + Math.max(0, count)
+    ), 0)
+}
+
 function buildStats(playerId: number, category: number): CategoryContext {
     const player = getPlayerSync(playerId)!
     const characters = getPlayerCharactersSync(playerId)
@@ -155,6 +165,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
     const battleCounters = getMissionBattleCountersSync(playerId)
     const episodeCompletedChapters = getCompletedEpisodeChapters(playerId)
     const practiceClearRanks = getPlayerQuestClearRanksBySectionsSync(playerId, [15])[15] ?? new Map()
+    const treasureShopPurchaseCount = getTreasureShopPurchaseCount(playerId)
     return {
         category,
         playerId,
@@ -193,6 +204,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
                     .filter(([, clearRank]) => clearRank === 5)
                     .map(([questId]) => questId),
             ),
+            treasureShopPurchaseCount,
         },
     }
 }
@@ -262,6 +274,10 @@ export function getDegreeMissionCoverageReport() {
         practiceRankSs: definitions.filter(definition => (
             getPracticeQuestIds(definition.missionId) !== null
         )).length,
+        treasureShopPurchaseCount: definitions.filter(definition => (
+            Number(definition.row[3]) === 45
+            && definition.pattern.startsWith("degree_treasure_shop_buy_count_")
+        )).length,
     }
     const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
     return {
@@ -315,6 +331,10 @@ export const DegreeComputer: MissionComputer = {
                 dbProgress,
                 practiceQuestIds.every(questId => stats.practiceSsQuestIds.has(questId)) ? 1 : 0,
             )
+        }
+        if (Number(getMissionMasterDefinition(5, missionId)?.row[3]) === 45
+            && pattern.startsWith("degree_treasure_shop_buy_count_")) {
+            return Math.max(dbProgress, stats.treasureShopPurchaseCount)
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.companionCount)) return stats.companionCount
         if (pattern.startsWith(SUPPORTED_FAMILIES.overLimitCount)) return stats.overLimitCount

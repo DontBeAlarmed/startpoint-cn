@@ -37,6 +37,7 @@ export interface CategoryContext {
         secondManaBoardCompletedCharacterIds: ReadonlySet<number>
         episodeCompletedChapters: ReadonlySet<number>
         practiceSsQuestIds: ReadonlySet<number>
+        treasureShopPurchaseCount: number
     }
     battleCounters?: MissionBattleCounters
     snapshot?: SnapshotData | null
