@@ -44,6 +44,7 @@ export interface CategoryContext {
         singleScoreMax: number
         singleClearTimeMin: number
         bossBattleClearCount: number
+        craftPointObtainedCount: number
     }
     battleCounters?: MissionBattleCounters
     snapshot?: SnapshotData | null

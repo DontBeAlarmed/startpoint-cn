@@ -33,6 +33,7 @@ const {
 } = require("../src/data/domains/character")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
 const { addPlayerShopPurchaseCountSync } = require("../src/data/domains/shopPurchase")
+const { givePlayerItemSync } = require("../src/data/domains/item")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
     countFinishedPlayerQuestsByCategorySync,
@@ -202,6 +203,8 @@ const treasureShopItemIds = Object.keys(require("../assets/treasure_shop.json"))
 addPlayerShopPurchaseCountSync(playerId, treasureShopItemIds[0], 40)
 addPlayerShopPurchaseCountSync(playerId, treasureShopItemIds[1], 60)
 addPlayerShopPurchaseCountSync(playerId, 999999, 100)
+givePlayerItemSync(playerId, 100000, 1500)
+givePlayerItemSync(playerId, 999999, 5000)
 
 const episodeCountQueryPlan = db.prepare(`
     EXPLAIN QUERY PLAN
@@ -278,6 +281,9 @@ assert.equal(DegreeComputer.compute(37020, context, 7000), 7000, "冲刺称号�
 assert.equal(DegreeComputer.compute(34000, context, 0), 500, "单次连击称号应读取历史最高连击")
 assert.equal(DegreeComputer.compute(34010, context, 0), 500, "单次连击称号应支持更高阈值")
 assert.equal(DegreeComputer.compute(34020, context, 700), 700, "单次连击称号旧进度不得倒退")
+assert.equal(DegreeComputer.compute(41000, context, 0), 1500, "锻造石称号应读取累计获得量")
+assert.equal(DegreeComputer.compute(41010, context, 0), 1500, "锻造石称号应支持更高阈值")
+assert.equal(DegreeComputer.compute(41020, context, 3000), 3000, "锻造石称号旧进度不得倒退")
 
 for (const missionId of [23000, 23010, 23020]) {
     assert.equal(DegreeComputer.compute(missionId, context, 0), 2, `${missionId} 应读取协力成功总数`)
@@ -295,8 +301,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1048,
-    unsupported: 240,
+    serverComputed: 1051,
+    unsupported: 237,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -322,6 +328,7 @@ assert.deepEqual(coverage, {
     bossBattleClear: 3,
     dashUse: 3,
     comboOneTime: 3,
+    craftPointGet: 3,
     },
 })
 

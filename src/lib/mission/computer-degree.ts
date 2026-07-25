@@ -4,12 +4,14 @@ import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../../data/domains/character"
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
 import { getPlayerShopPurchasesMapSync } from "../../data/domains/shopPurchase"
+import { getPlayerCollectedItemTotalSync } from "../../data/domains/item"
 import {
     countFinishedPlayerQuestsByCategorySync,
     getFinishedPlayerQuestIdsBySectionsSync,
     getPlayerQuestClearRanksBySectionsSync,
 } from "../../data/domains/quest"
 import { getRankDegree } from "../stamina"
+import { getConfigSync } from "../assets"
 import bundledManaBoard from "../../../assets/mana_board.json"
 import bundledMainQuests from "../../../assets/main_quest.json"
 import bundledExQuests from "../../../assets/ex_quest.json"
@@ -29,6 +31,7 @@ const degreeScoreTargetMap: Record<number, number> = {}
 const degreeTimeTargetMap: Record<number, number> = {}
 const degreeDashTargetMap: Record<number, number> = {}
 const degreeComboTargetMap: Record<number, number> = {}
+const degreeCraftPointTargetMap: Record<number, number> = {}
 {
     // Note: this import is resolved at module load time via the patterns file's data
     // but we use the same degreeDefs. For simplicity, inline the regex.
@@ -47,6 +50,8 @@ const degreeComboTargetMap: Record<number, number> = {}
         if (dashMatch) degreeDashTargetMap[parseInt(mid)] = parseInt(dashMatch[1])
         const comboMatch = /单次战斗中达成\s*(\d+)\s*连击/.exec(String(row[2]))
         if (comboMatch) degreeComboTargetMap[parseInt(mid)] = parseInt(comboMatch[1])
+        const craftPointMatch = /累计获得\s*(\d+)\s*个锻造石/.exec(String(row[2]))
+        if (craftPointMatch) degreeCraftPointTargetMap[parseInt(mid)] = parseInt(craftPointMatch[1])
     }
 }
 
@@ -68,6 +73,10 @@ function getTargetDash(missionId: number): number | undefined {
 
 function getTargetCombo(missionId: number): number | undefined {
     return degreeComboTargetMap[missionId]
+}
+
+function getTargetCraftPoint(missionId: number): number | undefined {
+    return degreeCraftPointTargetMap[missionId]
 }
 
 type RawManaBoard = Record<string, Record<string, Record<string, readonly unknown[][]>>>
@@ -213,6 +222,8 @@ function buildStats(playerId: number, category: number): CategoryContext {
     const episodeCompletedChapters = getCompletedEpisodeChapters(playerId)
     const practiceClearRanks = getPlayerQuestClearRanksBySectionsSync(playerId, [15])[15] ?? new Map()
     const treasureShopPurchaseCount = getTreasureShopPurchaseCount(playerId)
+    const craftPointItemId = getConfigSync().craft_point_item_id || 100000
+    const craftPointObtainedCount = getPlayerCollectedItemTotalSync(playerId, craftPointItemId)
     const bossBattleQuests = getRuntimeTable<RawQuestTable>("boss_battle_quest.json", bundledBossBattleQuests)
     const bossBattleSuperQuestByMission = new Map<number, number>()
     for (const definition of getMissionMasterDefinitions(5)) {
@@ -265,6 +276,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
             singleScoreMax: battleCounters.singleScoreMax,
             singleClearTimeMin: battleCounters.singleClearTimeMin,
             bossBattleClearCount: battleCounters.bossBattleClearCount,
+            craftPointObtainedCount,
         },
     }
 }
@@ -287,6 +299,7 @@ const SUPPORTED_FAMILIES = {
     bossBattleClear: "degree_boss_battle_clear_",
     dashUse: "degree_dash_use_",
     comboOneTime: "degree_combo_onetime_",
+    craftPointGet: "degree_craft_point_get_",
 } as const
 
 function getSecondManaBoardCharacterId(missionId: number): number | undefined {
@@ -368,6 +381,10 @@ export function getDegreeMissionCoverageReport() {
         comboOneTime: definitions.filter(definition => (
             definition.pattern.startsWith(SUPPORTED_FAMILIES.comboOneTime)
             && getTargetCombo(definition.missionId) !== undefined
+        )).length,
+        craftPointGet: definitions.filter(definition => (
+            definition.pattern.startsWith(SUPPORTED_FAMILIES.craftPointGet)
+            && getTargetCraftPoint(definition.missionId) !== undefined
         )).length,
     }
     const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
@@ -474,6 +491,9 @@ export const DegreeComputer: MissionComputer = {
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.comboOneTime)) {
             return Math.max(dbProgress, ctx.player.maxComboAchieved ?? 0)
+        }
+        if (pattern.startsWith(SUPPORTED_FAMILIES.craftPointGet)) {
+            return Math.max(dbProgress, stats.craftPointObtainedCount)
         }
         return dbProgress
     },

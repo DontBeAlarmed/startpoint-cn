@@ -9,7 +9,7 @@
 | 角色觉醒（category 9） | 144 | 144/144；其中 55 条使用经主数据审计的通用角色通关回退 | 核心流程已通过客户端；144 条条件待逐条客户端验收 |
 | 每日（category 2） | 历史总表 656 | 默认服务器时间下开放 11 条，当前 11/11 | 常驻 5 条与活动 6 条均已自动计算，不宣称支持全部历史定义 |
 | 每周（category 10） | 2 | 2/2 | 服务端已实现，待 CN 客户端跨周完整验收 |
-| 称号（category 5） | 1288 | 1048，约 81.4% | 新增单次最高连击、累计冲刺、领主战累计通关、单人最高分、单人限时通关、挑战副本累计通关、第二玛纳板、累计体力、累计登录、章节全通、练习关卡 SS、珍品商店购买和指定 Boss 超级难度条件族；unsupported 240 条继续持久化 fallback |
+| 称号（category 5） | 1288 | 1051，约 81.6% | 新增累计获得锻造石、单次最高连击、累计冲刺、领主战累计通关、单人最高分、单人限时通关、挑战副本累计通关、第二玛纳板、累计体力、累计登录、章节全通、练习关卡 SS、珍品商店购买和指定 Boss 超级难度条件族；unsupported 237 条继续持久化 fallback |
 
 历史活动每日不作为当前体验的完成率分母。本轮只处理默认服务器时间 `2024-08-14` 下客户端会显示的任务，不把 656 条历史定义一次性全部启用或宣称全部支持。
 
@@ -76,7 +76,7 @@ kind 12 的四个 category 来自 CN 1.8.1 `QuestCategory_Impl_`：DailyWeekEven
 
 ## 首批简单称号
 
-第一批已增加 24 条：
+第一批已增加 27 条：
 
 | 条件族 | 数量 | 权威来源 |
 |---|---:|---|
@@ -89,8 +89,9 @@ kind 12 的四个 category 来自 CN 1.8.1 `QuestCategory_Impl_`：DailyWeekEven
 | `degree_boss_battle_clear_*` | 3 | `players_mission_battle_counters.boss_battle_clear_count` 与 category 2 成功结算 |
 | `degree_dash_use_*` | 3 | `players.total_dashes` |
 | `degree_combo_onetime_*` | 3 | `players.max_combo_achieved` |
+| `degree_craft_point_get_*` | 3 | `players_collected_items` 中配置的锻造石累计获得量 |
 
-称号自动计算覆盖现为 `1048/1288`，约 `81.4%`，unsupported 为 240 条。计算结果与已有持久进度取最大值，避免旧存档倒退；角色剧情使用 SQL `COUNT(*)` 统计 category 3 已完成关卡，并由 `idx_players_quest_progress_player_section_finished` covering index 支持。单次最高连击称号 `degree_combo_onetime_*` 直接读取原有 `players.max_combo_achieved`，奖励阶段再比较 100/500/1000 目标；累计冲刺称号 `degree_dash_use_*` 直接读取原有 `players.total_dashes` 累计事实，不新增表或从当前战斗快照反推；领主战称号 `degree_boss_battle_clear_*` 使用 category 2 成功结算的独立累计次数，单人和协力均计入；失败及其他 category 不计入。单人分数称号 `degree_score_clear_single_*` 使用成功单人 finish 请求中的 `score`，只保留并返回最高分原值，由奖励阶段中的 10000000/50000000/99999999 目标判定完成；协力、失败、负数、非安全整数不会计入。该值来自官方客户端提交的战斗统计，服务端不重算战斗分数，故仍需客户端协议验收。单人限时称号 `degree_time_clear_single_*` 使用成功单人 finish 请求中的 `elapsed_time_ms`，只保留最短有效耗时并按主数据描述的 60/10/5 秒阈值返回 0/1；缺失、零值、非法值、协力和失败结算不会计入，同样不做战斗时间重算。挑战副本累计通关称号 `degree_challenge_dungeon_clear_*` 使用独立的 `challenge_dungeon_clear_count` 事实，只在 category 13 成功结算时增加，重复通关同一关也会累计；失败、普通关卡和事务回滚不会增加。该计数属于数据库运行事实，当前存档替换/导入格式不在本任务扩展范围内。第二玛纳板使用 `mana_board.json` 的第二板节点集合与玩家节点记录求交集；无法确认节点归属时不计入。累计消耗体力和累计登录直接读取玩家主表的权威累计字段。练习关卡 SS 使用主数据列出的 category 15 目标集合及持久化 `clear_rank=5`。珍品商店购买只累计 `treasure_shop.json` 中商品 ID 的持久化购买次数，不把其他商店或当前库存当作事实。指定 Boss 超级难度只接受主数据和 CDN 关卡表的精确映射。其余复杂条件继续保留持久化 fallback。
+称号自动计算覆盖现为 `1051/1288`，约 `81.6%`，unsupported 为 237 条。计算结果与已有持久进度取最大值，避免旧存档倒退；角色剧情使用 SQL `COUNT(*)` 统计 category 3 已完成关卡，并由 `idx_players_quest_progress_player_section_finished` covering index 支持。锻造石累计获得称号 `degree_craft_point_get_*` 读取配置中的 `craft_point_item_id` 在 `players_collected_items` 的累计获得量，不读取当前库存；单次最高连击称号 `degree_combo_onetime_*` 直接读取原有 `players.max_combo_achieved`，奖励阶段再比较 100/500/1000 目标；累计冲刺称号 `degree_dash_use_*` 直接读取原有 `players.total_dashes` 累计事实，不新增表或从当前战斗快照反推；领主战称号 `degree_boss_battle_clear_*` 使用 category 2 成功结算的独立累计次数，单人和协力均计入；失败及其他 category 不计入。单人分数称号 `degree_score_clear_single_*` 使用成功单人 finish 请求中的 `score`，只保留并返回最高分原值，由奖励阶段中的 10000000/50000000/99999999 目标判定完成；协力、失败、负数、非安全整数不会计入。该值来自官方客户端提交的战斗统计，服务端不重算战斗分数，故仍需客户端协议验收。单人限时称号 `degree_time_clear_single_*` 使用成功单人 finish 请求中的 `elapsed_time_ms`，只保留最短有效耗时并按主数据描述的 60/10/5 秒阈值返回 0/1；缺失、零值、非法值、协力和失败结算不会计入，同样不做战斗时间重算。挑战副本累计通关称号 `degree_challenge_dungeon_clear_*` 使用独立的 `challenge_dungeon_clear_count` 事实，只在 category 13 成功结算时增加，重复通关同一关也会累计；失败、普通关卡和事务回滚不会增加。该计数属于数据库运行事实，当前存档替换/导入格式不在本任务扩展范围内。第二玛纳板使用 `mana_board.json` 的第二板节点集合与玩家节点记录求交集；无法确认节点归属时不计入。累计消耗体力和累计登录直接读取玩家主表的权威累计字段。练习关卡 SS 使用主数据列出的 category 15 目标集合及持久化 `clear_rank=5`。珍品商店购买只累计 `treasure_shop.json` 中商品 ID 的持久化购买次数，不把其他商店或当前库存当作事实。指定 Boss 超级难度只接受主数据和 CDN 关卡表的精确映射。其余复杂条件继续保留持久化 fallback。
 
 ### 挑战副本累计通关称号
 
