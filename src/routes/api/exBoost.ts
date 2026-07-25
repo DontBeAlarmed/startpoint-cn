@@ -13,6 +13,7 @@ import { clientSerializeDate } from "../../data/utils"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { characterMaxOverLimits } from "./character"
 import orderedExAbility from "../../../assets/ex_ability.json"
+import { getMailArrivedSync } from "../../lib/mail-notification";
 
 interface ExBoostDrawBody {
     character_id: number,
@@ -252,7 +253,7 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
                     join_time: clientSerializeDate(characterData.joinTime),
                 }],
                 item_list: { [String(costItemId)]: afterCostItemAmount },
-                mail_arrived: false,
+                mail_arrived: getMailArrivedSync(playerId),
             },
         })
     } else {
@@ -263,7 +264,7 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
                 character_id: characterId,
                 draw_result: { status_id: drawResult.statusId, ability_id_list: drawResult.abilityIdList },
                 item_list: { [String(costItemId)]: afterCostItemAmount },
-                mail_arrived: false,
+                mail_arrived: getMailArrivedSync(playerId),
             },
         })
     }
@@ -292,7 +293,7 @@ const routes = async (fastify: FastifyInstance) => {
         const headers = generateDataHeaders({ viewer_id: viewerId })
         delete playerDraws[playerId]
         if (!isConfirm) {
-            return reply.status(200).send({ data_headers: headers, data: { mail_arrived: false } })
+            return reply.status(200).send({ data_headers: headers, data: { mail_arrived: getMailArrivedSync(playerId) } })
         }
         const characterId = drawResult.characterId
         const characterData = getPlayerCharacterSync(playerId, characterId)
@@ -321,7 +322,7 @@ const routes = async (fastify: FastifyInstance) => {
                     update_time: clientSerializeDate(new Date()),
                     join_time: clientSerializeDate(characterData.joinTime),
                 }],
-                mail_arrived: false,
+                mail_arrived: getMailArrivedSync(playerId),
             },
         })
     })

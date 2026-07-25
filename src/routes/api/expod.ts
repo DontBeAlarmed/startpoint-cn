@@ -15,6 +15,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
 import { incrementActiveMissionInjectedExpCountSync } from "../../data/domains/active_mission_counters"
 import { validateCharacterStackConversion } from "../../lib/character-stack";
+import { getMailArrivedSync } from "../../lib/mail-notification";
 
 interface InjectExpBody {
     character_id: number,
@@ -150,7 +151,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "item_list": {
                     [rewardItemId]: afterItemCount
                 },
-                "mail_arrived": false
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
     })
@@ -230,7 +231,7 @@ const routes = async (fastify: FastifyInstance) => {
                         "exp_pool": player.expPool,
                         "exp_pooled_time": getServerTime(player.expPooledTime)
                     },
-                    "mail_arrived": false
+                    "mail_arrived": getMailArrivedSync(playerId)
                 }
             })
         }
@@ -261,7 +262,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "exp_pool": newExpPool,
                     "exp_pooled_time": getServerTime(player.expPooledTime)
                 },
-                "mail_arrived": false
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
     })

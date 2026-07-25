@@ -11,6 +11,7 @@ import { AccountId, PlayerId } from "../../lib/types";
 import { computeRealTimeStamina } from "../../lib/stamina";
 import itemData from "../../../assets/item_data.json";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import { getMailArrivedSync } from "../../lib/mail-notification";
 
 interface ItemEffectInfo {
     effectKind: number
@@ -188,7 +189,7 @@ const routes = async (fastify: FastifyInstance) => {
         const responseData: Record<string, unknown> = {
             "item_list": { [itemId]: result.newCount },
             "user_info": { "free_mana": result.freeMana },
-            "mail_arrived": false
+            "mail_arrived": getMailArrivedSync(playerId)
         }
         if (characterList.length > 0) responseData.character_list = characterList
 

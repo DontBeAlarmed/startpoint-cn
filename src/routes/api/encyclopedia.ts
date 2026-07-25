@@ -3,6 +3,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getSession } from "../../data/domains/session"
 import { generateDataHeaders } from "../../utils";
+import { resolvePlayerIdSync } from "../../data/activeAccount";
+import { getMailArrivedSync } from "../../lib/mail-notification";
 import encyclopedia from "../../../assets/encyclopedia.json";
 
 interface IndexBody {
@@ -31,7 +33,6 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Bad Request",
             "message": "Invalid viewer id."
         })
-
         const encyclopediaList: Record<string, object> = {}
         for (const id of encyclopediaIds) {
             encyclopediaList[id] = {
@@ -64,6 +65,11 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Bad Request",
             "message": "Invalid viewer id."
         })
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)
+        if (playerId === null) return reply.status(500).send({
+            "error": "Internal Server Error",
+            "message": "No player bound to account.",
+        })
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -72,7 +78,7 @@ const routes = async (fastify: FastifyInstance) => {
             }),
             "data": {
                 "encyclopedia_list": encyclopedia,
-                "mail_arrived": false
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
     })

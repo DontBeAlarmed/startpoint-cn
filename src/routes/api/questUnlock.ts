@@ -7,6 +7,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getQuestFromCategorySync } from "../../lib/assets";
 import { generateDataHeaders } from "../../utils";
 import questUnlockCosts from "../../../assets/quest_unlock_costs.json";
+import { getMailArrivedSync } from "../../lib/mail-notification";
 
 interface UnlockBody {
     category: number
@@ -107,7 +108,7 @@ const routes = async (fastify: FastifyInstance) => {
             }),
             "data": {
                 "item_list": itemList,
-                "mail_arrived": false
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
     })

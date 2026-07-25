@@ -74,6 +74,7 @@ import {
     AUTO_START_STOP_RESULT_CODE,
     shouldStopAutoStartForStamina,
 } from "../../lib/quest/auto-start-stop"
+import { getMailArrivedSync } from "../../lib/mail-notification"
 import { recordActiveMissionQuestChallengeFactSync } from "../../lib/mission/active-entry-facts";
 
 interface StartBody {
@@ -794,7 +795,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "free_vmoney": setNewFreeVmoney,
                     "vmoney": newVmoney
                 },
-                "mail_arrived": false
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
 

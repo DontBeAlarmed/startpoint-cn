@@ -11,6 +11,7 @@ import { characterExpCaps, givePlayerCharacterSync } from "../../lib/character";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import { getMailArrivedSync } from "../../lib/mail-notification";
 
 interface OverLimitBody {
     viewer_id: number
@@ -199,7 +200,7 @@ const routes = async (fastify: FastifyInstance) => {
                     }
                 ],
                 "item_list": item_list,
-                "mail_arrived": false
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
     })
@@ -266,7 +267,7 @@ const routes = async (fastify: FastifyInstance) => {
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
                 character_list: characterList,
-                mail_arrived: false,
+                mail_arrived: getMailArrivedSync(playerId),
             },
         })
     })
@@ -306,7 +307,7 @@ const routes = async (fastify: FastifyInstance) => {
             "data": {
                 "character_list": characterList,
                 "item_list": itemList,
-                "mail_arrived": false
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
     })

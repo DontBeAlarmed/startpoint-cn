@@ -12,6 +12,7 @@ import { generateDataHeaders } from "../../utils";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { givePlayerEquipmentSync } from "../../lib/equipment";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import { getMailArrivedSync } from "../../lib/mail-notification";
 import starCrumbExchange from "../../../assets/star_crumb_exchange.json";
 import starCrumbExchangeCost from "../../../assets/star_crumb_exchange_cost.json";
 
@@ -138,7 +139,7 @@ const routes = async (fastify: FastifyInstance) => {
                 active_mission_list: null,
                 mission_info: null,
                 over_max: null,
-                mail_arrived: false,
+                mail_arrived: getMailArrivedSync(playerId),
                 config: null,
                 user_daily_challenge_point_list: null,
                 encyclopedia_info: null,

@@ -11,6 +11,7 @@ import { resolvePlayerIdSync } from "../../../data/activeAccount";
 import { validateSessionAndPlayer, validateCharacterOwnership, buildCharacterListEntry, sendCharacterResponse } from "../../../lib/character-helpers";
 import { characterExpCaps } from "../../../lib/character";
 import { reconcileAwakeUnlockCharacterList } from "../../../lib/mission";
+import { getMailArrivedSync } from "../../../lib/mail-notification";
 
 interface ReceiveBondTokenBody {
     character_id: number,
@@ -64,7 +65,7 @@ const routes = async (fastify: FastifyInstance) => {
                 user_character_mana_node_list: {},
                 item_list: {},
                 evolution: [],
-                mail_arrived: false,
+                mail_arrived: getMailArrivedSync(playerId),
             })
         }
 
@@ -87,7 +88,7 @@ const routes = async (fastify: FastifyInstance) => {
             user_character_mana_node_list: {},
             item_list: {},
             evolution: [],
-            mail_arrived: false,
+            mail_arrived: getMailArrivedSync(playerId),
         })
     })
 
@@ -169,7 +170,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "update_time": clientSerializeDate(characterData.updateTime),
                     "join_time": clientSerializeDate(characterData.joinTime)
                 }],
-                "mail_arrived": false
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
     })

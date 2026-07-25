@@ -17,6 +17,7 @@ import { AccountId, PlayerId } from "../../lib/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
 import { canUseEquipmentAwakeningCrystal } from "../../lib/equipment-upgrade";
+import { getMailArrivedSync } from "../../lib/mail-notification";
 
 interface SetProtectionBody {
     protection: boolean
@@ -123,7 +124,7 @@ const routes = async (fastify: FastifyInstance) => {
             "data": {
                 "equipment_list": returnEquipmentList,
                 "item_list": returnItemList,
-                "mail_arrived": false
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
     })
@@ -171,7 +172,7 @@ const routes = async (fastify: FastifyInstance) => {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-                "data": { "equipment_list": [], "item_list": {}, "mail_arrived": false }
+                "data": { "equipment_list": [], "item_list": {}, "mail_arrived": getMailArrivedSync(playerId) }
             })
         }
 
@@ -205,7 +206,7 @@ const routes = async (fastify: FastifyInstance) => {
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": { "equipment_list": returnEquipmentList, "item_list": returnItemList, "mail_arrived": false }
+            "data": { "equipment_list": returnEquipmentList, "item_list": returnItemList, "mail_arrived": getMailArrivedSync(playerId) }
         })
     })
 

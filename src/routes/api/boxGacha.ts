@@ -17,6 +17,7 @@ import { BoxGachaInvalidPeriodError, BoxGachaResetError, resetBoxGachaSync } fro
 import { drawBoxGachaSync, rewardPlayerBoxGachaResultSync } from "../../lib/gacha";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { BoxGachaBoxes } from "../../lib/types";
+import { getMailArrivedSync } from "../../lib/mail-notification";
 
 interface GetBoxListBody {
     box_gacha_id: number
@@ -409,7 +410,7 @@ const routes = async (fastify: FastifyInstance) => {
                     [pullCurrencyId]: newPullCurrency,
                     ...(rewardResult?.items ?? {})
                 },
-                "mail_arrived": false
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
     })

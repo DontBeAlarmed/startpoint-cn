@@ -12,6 +12,7 @@ import { resolvePlayerIdSync } from "../../../data/activeAccount";
 import { getDb } from "../../../data/db";
 import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/active_mission_counters"
 import { validateSessionAndPlayer, validateCharacterOwnership, computeManaDeduction, computeItemDeductions, buildCharacterListEntry, sendCharacterResponse, computeBondTokenAndEvolution, validateManaBoardAwakeRequest } from "../../../lib/character-helpers";
+import { getMailArrivedSync } from "../../../lib/mail-notification";
 
 interface LearnManaNodeBody {
     viewer_id: number,
@@ -129,7 +130,7 @@ const routes = async (fastify: FastifyInstance) => {
             user_character_mana_node_list: { [String(characterId)]: userCharacterManaNodeListItem as { multiplied_id: number; awake_level: number }[] },
             item_list: newItemAmounts,
             evolution: evolutionData,
-            mail_arrived: false,
+            mail_arrived: getMailArrivedSync(playerId),
         })
     })
 
@@ -230,7 +231,7 @@ const routes = async (fastify: FastifyInstance) => {
                 user_character_mana_node_list: { [String(characterId)]: userCharacterManaNodeListItem as { multiplied_id: number; awake_level: number }[] },
                 item_list: {},
                 evolution: [],
-                mail_arrived: false,
+                mail_arrived: getMailArrivedSync(playerId),
             })
         }
 
@@ -282,7 +283,7 @@ const routes = async (fastify: FastifyInstance) => {
             user_character_mana_node_list: { [String(characterId)]: userCharacterManaNodeListItem as { multiplied_id: number; awake_level: number }[] },
             item_list: newItemAmounts,
             evolution: [],
-            mail_arrived: false,
+            mail_arrived: getMailArrivedSync(playerId),
         })
     })
 }

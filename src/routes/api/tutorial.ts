@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { MailType, insertMailSync, insertReceiveHistorySync } from "../../data/domains/mail"
+import { getMailArrivedSync } from "../../lib/mail-notification"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getPlayerTriggeredTutorialsSync, insertPlayerTriggeredTutorialSync } from "../../data/domains/tutorial"
 import { getSession } from "../../data/domains/session"
@@ -189,7 +190,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "character_list": characterList,
                     "item_list": rewardResult.items,
                     "encyclopedia_info": [],
-                    "mail_arrived": false,
+                    "mail_arrived": getMailArrivedSync(playerId),
                     "start_time": getServerTime()
                 }
             })

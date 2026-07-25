@@ -20,6 +20,7 @@ import { planEquipmentEnhancementPurchase } from "../../lib/equipment-enhancemen
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { executeGenericShopPurchaseSync, isShopItemAvailable, ShopPeriodError, ShopPurchaseError, validateShopPurchaseAmount } from "../../lib/event-shop-purchase";
 import CDN_GENERAL_SHOP_WHITELIST from "../../../assets/cdn_general_shop_whitelist.json";
+import { getMailArrivedSync } from "../../lib/mail-notification";
 
 const GENERAL_SHOP_CDN_KEYS: Set<number> = new Set(CDN_GENERAL_SHOP_WHITELIST);
 
@@ -307,7 +308,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "character_list": [],
                     "equipment_list": [clientSerializeEquipment(equipmentId, currentEquipment)],
                     "item_list": itemList,
-                    "mail_arrived": false
+                    "mail_arrived": getMailArrivedSync(playerId)
                 }
             })
         }
@@ -376,7 +377,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "character_list": characterList,
                 "equipment_list": rewardResult.equipment_list,
                 "item_list": purchaseResult.itemList,
-                "mail_arrived": false
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
     })

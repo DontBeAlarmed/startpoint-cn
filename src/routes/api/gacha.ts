@@ -20,6 +20,7 @@ import { givePlayerEquipmentSync } from "../../lib/equipment";
 import { buildGachaExecPlan } from "../../lib/gacha-exec-plan";
 import { getExchangeableGachaItem } from "../../lib/gacha-rules";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import { getMailArrivedSync } from "../../lib/mail-notification";
 
 interface ExecBody {
     api_count: number,
@@ -147,7 +148,7 @@ const routes = async (fastify: FastifyInstance) => {
                     }
                 ],
                 "encyclopedia_info": [],
-                "mail_arrived": false
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
 
@@ -240,7 +241,7 @@ const routes = async (fastify: FastifyInstance) => {
                     }
                 ],
                 "encyclopedia_info": [],
-                "mail_arrived": false
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
 
@@ -440,7 +441,7 @@ const routes = async (fastify: FastifyInstance) => {
                         }
                     ],
                     "encyclopedia_info": [],
-                    "mail_arrived": false
+                    "mail_arrived": getMailArrivedSync(playerId)
                 }
             })
         } else {
@@ -469,7 +470,7 @@ const routes = async (fastify: FastifyInstance) => {
                         }
                     ],
                     "encyclopedia_info": [],
-                    "mail_arrived": false
+                    "mail_arrived": getMailArrivedSync(playerId)
                 }
             })
         }

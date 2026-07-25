@@ -10,6 +10,7 @@ import { generateDataHeaders } from "../../utils";
 import { PartyCategory } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { hasValidPartyCategory, parseGlobalPartyId } from "../../lib/special-event-parties";
+import { getMailArrivedSync } from "../../lib/mail-notification";
 
 interface PartyInfoListItem {
     party_edited: boolean
@@ -518,7 +519,7 @@ const routes = async (fastify: FastifyInstance) => {
                 viewer_id: viewerId
             }),
             "data": {
-                "mail_arrived": false
+                "mail_arrived": getMailArrivedSync(playerId)
             }
         })
     })
