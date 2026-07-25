@@ -5,22 +5,26 @@ import type { FinishContext } from "../quest/finish/types"
 import { getActiveMissionMasterDefinitions, type ActiveMissionMasterDefinition } from "./active-master-data"
 import { matchesActiveMissionQuestRange } from "./active-reconciliation"
 
-const LOADOUT_PATTERNS = new Set([89])
+const LOADOUT_PATTERN = 89
+const FULL_SKILL_START_PATTERN = 91
 
-export interface LoadoutBattleCharacterState {
+export interface ActiveMissionBattleCharacterState {
     readonly element: number
 }
 
-export interface LoadoutBattleContext {
+export interface ActiveMissionBattleContext {
     readonly questAccomplished: boolean
     readonly isMulti: boolean
     readonly questCategory: number
     readonly questId: number
     readonly partyCharacterIds: readonly number[]
     readonly equipmentElements?: readonly number[]
+    readonly zones?: readonly {
+        readonly skill_point_over_on_start?: number
+    }[]
 }
 
-export interface LoadoutBattleFact {
+export interface ActiveMissionBattleFact {
     readonly missionId: number
 }
 
@@ -36,7 +40,7 @@ function parseTargetElement(value: unknown): number | null {
 function matchesCharacterElement(
     targetElement: number | null,
     partyCharacterIds: ReadonlySet<number>,
-    characters: Readonly<Record<string, LoadoutBattleCharacterState>>,
+    characters: Readonly<Record<string, ActiveMissionBattleCharacterState>>,
 ): boolean {
     if (targetElement === null) return false
     for (const characterId of partyCharacterIds) {
@@ -57,29 +61,47 @@ function matchesEquipmentElement(
     return equipmentElements.some(element => Number(element) + 1 === targetElement)
 }
 
-export function collectActiveMissionLoadoutBattleFacts(
+function hasThreeFullSkillGaugesOnStart(
+    zones: ActiveMissionBattleContext["zones"],
+): boolean {
+    if (!Array.isArray(zones) || zones.length === 0) return false
+    let total = 0
+    for (const zone of zones) {
+        const count = zone?.skill_point_over_on_start
+        if (!Number.isSafeInteger(count) || count < 0 || count > 3) return false
+        total += count
+        if (total > 3) return false
+    }
+    return total === 3
+}
+
+export function collectActiveMissionSpecificBattleFacts(
     definitions: readonly ActiveMissionMasterDefinition[],
-    context: LoadoutBattleContext,
-    characters: Readonly<Record<string, LoadoutBattleCharacterState>>,
-): LoadoutBattleFact[] {
+    context: ActiveMissionBattleContext,
+    characters: Readonly<Record<string, ActiveMissionBattleCharacterState>>,
+): ActiveMissionBattleFact[] {
     if (!context.questAccomplished) return []
     const partyCharacterIds = new Set(context.partyCharacterIds)
-    const matched: LoadoutBattleFact[] = []
+    const matched: ActiveMissionBattleFact[] = []
     for (const definition of definitions) {
         try {
             const pattern = Number(definition.row[29])
             const battleKind = Number(definition.row[32])
-            if (!LOADOUT_PATTERNS.has(pattern)
-                || !Number.isSafeInteger(battleKind)
+            if (!Number.isSafeInteger(battleKind)
                 || !matchesBattleKind(battleKind, context.isMulti)
-                || !matchesActiveMissionQuestRange(definition.row, context.questCategory, context.questId)
-                || !matchesCharacterElement(
+                || !matchesActiveMissionQuestRange(definition.row, context.questCategory, context.questId)) continue
+            if (pattern === LOADOUT_PATTERN
+                && matchesCharacterElement(
                     parseTargetElement(definition.row[69]),
                     partyCharacterIds,
                     characters,
                 )
-                || !matchesEquipmentElement(definition.row[70], context.equipmentElements)) continue
-            matched.push({ missionId: definition.missionId })
+                && matchesEquipmentElement(definition.row[70], context.equipmentElements)) {
+                matched.push({ missionId: definition.missionId })
+            } else if (pattern === FULL_SKILL_START_PATTERN
+                && hasThreeFullSkillGaugesOnStart(context.zones)) {
+                matched.push({ missionId: definition.missionId })
+            }
         } catch {
             continue
         }
@@ -106,7 +128,7 @@ function resolveDefinitions(
     }
 }
 
-export function recordActiveMissionLoadoutBattleFactsSync(context: FinishContext): void {
+export function recordActiveMissionSpecificBattleFactsSync(context: FinishContext): void {
     if (!context.questAccomplished) return
     const repository = resolveRepository()
     const definitions = resolveDefinitions(repository)
@@ -115,7 +137,7 @@ export function recordActiveMissionLoadoutBattleFactsSync(context: FinishContext
     const targetCharacterIds = new Set(definitions.flatMap(definition => {
         const pattern = Number(definition.row[29])
         const targetElement = parseTargetElement(definition.row[69])
-        return LOADOUT_PATTERNS.has(pattern) && targetElement !== null
+        return pattern === LOADOUT_PATTERN && targetElement !== null
             ? partyCharacterIds
             : []
     }))
@@ -124,21 +146,22 @@ export function recordActiveMissionLoadoutBattleFactsSync(context: FinishContext
         try {
             characterTable = repository.table<Record<string, { readonly element?: number }>>("character.json")
         } catch {
-            return
+            characterTable = {}
         }
     }
-    const characters: Record<string, LoadoutBattleCharacterState> = {}
+    const characters: Record<string, ActiveMissionBattleCharacterState> = {}
     for (const characterId of targetCharacterIds) {
         const element = characterTable?.[String(characterId)]?.element
         if (Number.isSafeInteger(element)) characters[String(characterId)] = { element: element as number }
     }
-    const facts = collectActiveMissionLoadoutBattleFacts(definitions, {
+    const facts = collectActiveMissionSpecificBattleFacts(definitions, {
         questAccomplished: context.questAccomplished,
         isMulti: context.isMulti === true,
         questCategory: context.questCategory,
         questId: context.questId,
         partyCharacterIds,
         equipmentElements: context.equipmentElements,
+        zones: context.statistics.zones,
     }, characters)
     for (const fact of facts) {
         incrementActiveMissionBattleFactSync(context.playerId, fact.missionId)

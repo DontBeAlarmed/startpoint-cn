@@ -93,7 +93,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^src\/lib\/mission\/active-loadout-battle-facts\.ts$/,
+        pattern: /^src\/lib\/mission\/active-mission-specific-battle-facts\.ts$/,
         groups: ["integration:mission"],
     },
     {

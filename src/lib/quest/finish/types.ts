@@ -16,6 +16,7 @@ export interface QuestStatistics {
         use_power_flip_count?: number
         use_dash_count?: number
         encoffin_count?: number
+        skill_point_over_on_start?: number
     }[]
     max_combo_count?: number
     [key: string]: any

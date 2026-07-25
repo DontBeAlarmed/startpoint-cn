@@ -103,6 +103,9 @@ export interface QuestStatisticsParty {
 export interface QuestStatistics {
     clear_phase: number
     party: QuestStatisticsParty
+    zones?: {
+        skill_point_over_on_start?: number
+    }[]
 }
 
 export interface MultiFinishBody {

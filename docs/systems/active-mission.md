@@ -67,6 +67,7 @@ Content Release；这一步只补齐服务端解释 Active Mission 所需的定�
 - pattern 65（`quest_challenge`）在单人 `/start` 成功持久化练习战斗时累计专用事实，不等待通关，也不从 `players_quest_progress` 反推。该计数与体力/门票扣除、active quest 持久化和普通任务结算处于同一事务；入场失败或事务回滚不会留下挑战次数。当前仅接受官方定义使用的 Practice QuestRange，其他范围 fail closed。
 - pattern 70（`battle_clear_with_specific_party`）从 `row[46]` 读取指定队长。无 QuestRange 时按 `leader_clear_count` 与 `leader_multi_count` 严格区分单人、协力和任意通关；带 QuestRange 的官方定义仅接受单人模式，并从对应关卡历史记录核对 `leader_character_id`。带范围的协力定义因无法证明历史最佳记录来自哪种战斗模式而 fail closed。
 - pattern 71/72/73 在成功结算时检查 `row[43]` 指定角色是否实际位于本次主位或连携队伍，并按 `row[32]` 与 QuestRange 校验战斗类型和关卡。pattern 71 要求通关当时已经释放第二玛纳板的全部能力节点，pattern 72/73 分别要求当时等级达到 80/100；匹配结果写入通用 `(pattern, character_id)` 条件事实表，与原战斗奖励处于同一事务。`/load` 只读取已记录事实，不会用后续养成状态补配旧通关。
+- pattern 91 汇总成功结算请求中各战区的 `skill_point_over_on_start`。CN 1.8.1 会在每名主位角色第一次弹射前检查一次技能槽是否已满，因此整场合法累计为 `0～3`；只有累计恰好为 3 时才按 mission ID 记录一次完成。字段缺失、非整数、负数、单区超过 3 或整场超过 3 时均 fail closed。
 - 旧存档无法可靠回填上述历史。教程赠送、兑换角色和尚未接入的玛纳消费入口不伪造计数，事务失败也不会留下计数。
 - 任务前置与 phase 会在同一次请求内固定点推进，数据库写入使用单一 SQLite 事务，失败整体回滚；
 - 回归活动通过 event `string_id` 中的 `come_back_mission` 识别；当前没有回归资格生产者时 fail closed，不会把 250xx
@@ -74,8 +75,8 @@ Content Release；这一步只补齐服务端解释 Active Mission 所需的定�
 
 这组状态事实只写入 `all_active_mission_list`，不会写入角色觉醒使用的 category 9 `active_mission_list`。
 
-上述能力构成内容解释、首任务生产、状态事实校准、可用性判定、安全领奖和存储链。当前已接入 38 个实际使用的 pattern，
-对应 83 条定义；其中 15 条回归定义仍需资格回调才能生产。其余 13 条定义仍未接入服务端事实生产者，
+上述能力构成内容解释、首任务生产、状态事实校准、可用性判定、安全领奖和存储链。当前已接入 39 个实际使用的 pattern，
+对应 84 条定义；其中 15 条回归定义仍需资格回调才能生产。其余 12 条定义仍未接入服务端事实生产者，
 但它们并不都缺少客户端依据：CN 1.8.1 的战斗结算协议明确包含 `equipment_element`、分区统计中的
 `skill_point_over_on_start`，以及 `client_checks` 字段。除已接入事实、Contents Guide 首任务、存档导入或既有数据库记录外，
 `players_active_missions` 不会自行生成完整进度。因此 Active Mission 仍是部分完成，不能只因状态校准、首任务与领奖接口可用
@@ -93,19 +94,22 @@ Content Release；这一步只补齐服务端解释 Active Mission 所需的定�
 - 每个 mission 独立累计；失败战斗、模式不匹配和事务回滚不会写入；
 - `/load` 只读取 `players_active_mission_battle_facts`，不根据当前队伍补算历史。
 
-### Contents Guide：20015～20017（3 条）
+### 已完成：Contents Guide 20017（1 条）
 
-这 3 条定义均属于 event 2、`battle_kind=3` 的任意战斗，并通过任务前置关系依次开放。
+客户端的 `MemberImpl` 会在每名主位角色第一次弹射前检查技能槽是否达到上限，并向当前战区的
+`skill_point_over_on_start` 加一；该标志不会在阶段切换时重置。服务端据此汇总所有战区，合法总数必须位于
+`0～3`，总数为 3 时记录 20017。事实写入、战斗奖励和任务结算共享原有 SQLite 事务。
+
+### Contents Guide：20015～20016（2 条）
+
+这 2 条定义均属于 event 2、`battle_kind=3` 的任意战斗，并通过任务前置关系依次开放。
 
 | 任务 | 主数据条件 | 当前判断 |
 |---|---|---|
 | 20015 | `action_effects=ACToleranceOfElement_Down`、排除 `depraved_monk` | 仍需解析技能/动作效果主数据，不能只按角色名称硬编码 |
 | 20016 | `action_effects=CreateNormalHeal,CreateRatioHeal,ACRegeneration`、排除 `compliment_oiran` | 仍需解析技能/动作效果主数据，不能只按角色名称硬编码 |
-| 20017 | pattern 91，开局技能槽充满 | 结算协议有 `zones[].skill_point_over_on_start`，需确认计数语义和三名主位角色的对应关系后实现 |
-
-客户端 `BattleQuestFinishRemoteUtil` 会在结算请求中发送 `equipment_element`；客户端统计类型还声明了
-`skill_point_over_on_start` 和 `client_checks`。因此 20017 不应再被描述为“没有协议字段”，
-而应补齐开局技能统计解析。20015～20016 的阻塞点是服务端当前没有
+客户端 `BattleQuestFinishRemoteUtil` 会在结算请求中发送 `equipment_element`，战斗统计结构会发送
+`skill_point_over_on_start` 和 `client_checks`。20015～20016 的阻塞点是服务端当前没有
 技能动作效果索引，不是任务主数据缺失。
 
 ### 外部活动：21030（1 条）
@@ -128,6 +132,6 @@ Content Release；这一步只补齐服务端解释 Active Mission 所需的定�
 3. 进度创建、增量、领奖和奖励发放保持幂等；领取接口以数据库进度和当前 Content snapshot 的有效性共同校验。
 4. 不修改客户端，不把旧 Active Mission 存储与 category 9 角色觉醒任务重新混用。
 
-单人体验优先顺序为：先对 20011～20014 做客户端验收；随后确认 `skill_point_over_on_start` 的计数语义并处理 20017。
-20015/20016 要等技能动作效果索引准备好后再实现。21030、回归资格和 Pass type 20 继续保持低优先级，
+开发顺序不再受客户端验收阻塞：20017 已完成，下一步建立技能动作效果索引并实现 20015/20016。
+21030、回归资格和 Pass type 20 继续保持低优先级，
 不使用推测值完成任务。
