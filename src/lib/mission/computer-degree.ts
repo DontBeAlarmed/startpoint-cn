@@ -250,6 +250,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
             challengeDungeonClearCount: battleCounters.challengeDungeonClearCount,
             singleScoreMax: battleCounters.singleScoreMax,
             singleClearTimeMin: battleCounters.singleClearTimeMin,
+            bossBattleClearCount: battleCounters.bossBattleClearCount,
         },
     }
 }
@@ -269,6 +270,7 @@ const SUPPORTED_FAMILIES = {
     challengeDungeonClear: "degree_challenge_dungeon_clear_",
     scoreClearSingle: "degree_score_clear_single_",
     timeClearSingle: "degree_time_clear_single_",
+    bossBattleClear: "degree_boss_battle_clear_",
 } as const
 
 function getSecondManaBoardCharacterId(missionId: number): number | undefined {
@@ -339,6 +341,9 @@ export function getDegreeMissionCoverageReport() {
         timeClearSingle: definitions.filter(definition => (
             definition.pattern.startsWith(SUPPORTED_FAMILIES.timeClearSingle)
             && getTargetTime(definition.missionId) !== undefined
+        )).length,
+        bossBattleClear: definitions.filter(definition => (
+            definition.pattern.startsWith(SUPPORTED_FAMILIES.bossBattleClear)
         )).length,
     }
     const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
@@ -436,6 +441,9 @@ export const DegreeComputer: MissionComputer = {
             return target === undefined || stats.singleClearTimeMin <= 0
                 ? dbProgress
                 : Math.max(dbProgress, stats.singleClearTimeMin <= target ? 1 : 0)
+        }
+        if (pattern.startsWith(SUPPORTED_FAMILIES.bossBattleClear)) {
+            return Math.max(dbProgress, stats.bossBattleClearCount)
         }
         return dbProgress
     },

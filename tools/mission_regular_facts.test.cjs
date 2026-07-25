@@ -79,6 +79,7 @@ assert.deepEqual(getMissionBattleCountersSync(playerId), {
     challengeDungeonClearCount: 0,
     singleScoreMax: 0,
     singleClearTimeMin: 0,
+    bossBattleClearCount: 0,
 })
 
 recordMissionBattleResultSync(playerId, {
@@ -130,6 +131,7 @@ assert.deepEqual(getMissionBattleCountersSync(playerId), {
     challengeDungeonClearCount: 18,
     singleScoreMax: 0,
     singleClearTimeMin: 0,
+    bossBattleClearCount: 0,
 })
 
 assert.throws(() => {
@@ -367,6 +369,21 @@ recordMissionBattleResultSync(playerId, {
     accomplished: false,
     clearTime: 1,
 })
+recordMissionBattleResultSync(playerId, {
+    isMulti: false,
+    questCategory: 2,
+    accomplished: true,
+})
+recordMissionBattleResultSync(playerId, {
+    isMulti: true,
+    questCategory: 2,
+    accomplished: true,
+})
+recordMissionBattleResultSync(playerId, {
+    isMulti: false,
+    questCategory: 2,
+    accomplished: false,
+})
 assert.equal(
     getMissionBattleCountersSync(playerId).singleScoreMax,
     50_000_000,
@@ -376,6 +393,26 @@ assert.equal(
     getMissionBattleCountersSync(playerId).singleClearTimeMin,
     4_000,
     "单人最快成功时间应保留最小耗时",
+)
+assert.equal(
+    getMissionBattleCountersSync(playerId).bossBattleClearCount,
+    2,
+    "领主战累计只应统计 category 2 的成功结算",
+)
+assert.throws(() => {
+    db.transaction(() => {
+        recordMissionBattleResultSync(playerId, {
+            isMulti: false,
+            questCategory: 2,
+            accomplished: true,
+        })
+        throw new Error("rollback boss battle fact")
+    })()
+}, /rollback boss battle fact/)
+assert.equal(
+    getMissionBattleCountersSync(playerId).bossBattleClearCount,
+    2,
+    "领主战事实事务回滚后不得留下累计次数",
 )
 
 const replacement = getMergedPlayerDataSync(playerId)

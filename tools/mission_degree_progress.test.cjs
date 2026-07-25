@@ -142,6 +142,13 @@ for (let index = 0; index < 99; index++) {
         accomplished: true,
     })
 }
+for (let index = 0; index < 10; index++) {
+    recordMissionBattleResultSync(playerId, {
+        isMulti: false,
+        questCategory: 2,
+        accomplished: true,
+    })
+}
 
 insertPlayerQuestProgressSync(playerId, 3, { questId: 300001, finished: true })
 insertPlayerQuestProgressSync(playerId, 3, { questId: 300002, finished: true })
@@ -260,6 +267,9 @@ assert.equal(DegreeComputer.compute(14020, context, 1), 1, "单人分数称号�
 assert.equal(DegreeComputer.compute(15000, context, 0), 1, "单人时间称号应读取最快成功时间")
 assert.equal(DegreeComputer.compute(15010, context, 0), 1, "单人时间称号应支持更高阈值")
 assert.equal(DegreeComputer.compute(15020, context, 0), 1, "单人时间称号应支持最高阈值")
+assert.equal(DegreeComputer.compute(30000, context, 0), 10, "领主战称号应读取 category 2 成功累计")
+assert.equal(DegreeComputer.compute(30010, context, 0), 10, "领主战称号应支持更高阈值")
+assert.equal(DegreeComputer.compute(30020, context, 1), 10, "领主战称号旧进度与新事实取最大值")
 
 for (const missionId of [23000, 23010, 23020]) {
     assert.equal(DegreeComputer.compute(missionId, context, 0), 2, `${missionId} 应读取协力成功总数`)
@@ -277,8 +287,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1039,
-    unsupported: 249,
+    serverComputed: 1042,
+    unsupported: 246,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -301,6 +311,7 @@ assert.deepEqual(coverage, {
     challengeDungeonClear: 3,
     scoreClearSingle: 3,
     timeClearSingle: 3,
+    bossBattleClear: 3,
     },
 })
 
