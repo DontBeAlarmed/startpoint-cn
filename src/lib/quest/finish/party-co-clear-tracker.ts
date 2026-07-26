@@ -1,10 +1,12 @@
-// Tracks party member co-clears (pairwise) for multi-character awake missions
-// When 3+ specific characters must be in the same party, this tracks their co-appearances
+// Tracks pairwise party history and writes atomic Character Awake battle facts.
 
 import { getDb } from "../../../data/db"
-import { incrementPlayerCategoryMissionSync } from "../../../data/domains/mission"
 import {
-    getMatchedAwakeDirectBattleMissionIds,
+    ensurePlayerCategoryMissionProgressSync,
+    incrementPlayerCategoryMissionsIfSafeSync,
+} from "../../../data/domains/mission"
+import {
+    getAwakeBattleProgressFacts,
     normalizeCharacterPair,
 } from "../../mission/awake-battle-rules"
 import { getCharacterRaces, getRaceKeyString } from "./race-utils"
@@ -58,7 +60,11 @@ export function trackPartyCoClears(ctx: FinishContext): void {
         `).run(ctx.playerId, raceKey)
     }
 
-    for (const missionId of getMatchedAwakeDirectBattleMissionIds(ctx, raceKey)) {
-        incrementPlayerCategoryMissionSync(ctx.playerId, 9, missionId, 1)
+    const facts = getAwakeBattleProgressFacts(ctx)
+    if (facts.increments.length > 0) {
+        incrementPlayerCategoryMissionsIfSafeSync(ctx.playerId, 9, facts.increments)
+    }
+    for (const fact of facts.maxima) {
+        ensurePlayerCategoryMissionProgressSync(ctx.playerId, 9, fact.missionId, fact.progress)
     }
 }

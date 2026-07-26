@@ -10,20 +10,17 @@ import { getCharacterStoryQuestIds, getCharacterIdFromMission } from "./characte
 import { isMissionProgressComplete } from "./stages"
 import type { MissionComputer, CategoryContext } from "./types"
 import type { PlayerCharacter } from "../../data/types"
-import charAwakeDefs from "../../../assets/mission_char_awake.json"
 import {
     AWAKE_DIRECT_BATTLE_MISSION_IDS,
+    AWAKE_GENERIC_CHARACTER_CLEAR_MISSION_IDS,
     getCharacterPairKey,
     isBondTokenMissionComplete,
     mergePartyCoClearRows,
 } from "./awake-battle-rules"
+import { getAwakeMissionIdsByFamily } from "./awake-rule-catalog"
 
 // Slot 1 missions that count story reading (not party clears)
-const STORY_MISSION_IDS = new Set<number>(
-    Object.entries(charAwakeDefs)
-        .filter(([, rows]) => /阅读|剧情/.test(rows[0][3]))
-        .map(([mid]) => Number(mid))
-)
+const STORY_MISSION_IDS = new Set(getAwakeMissionIdsByFamily("story-read"))
 
 // ─── Awake-specific context (extends base) ───
 
@@ -32,7 +29,6 @@ interface AwakeContext extends CategoryContext {
     leaderClears: Map<string, number>
     multiClears: Map<string, number>
     leaderMultiClears: Map<string, number>
-    leaderPowerflips: Map<string, number>
     coClears: Map<string, number>
     charData: Map<string, PlayerCharacter>
     categoryMissionProgress: Map<number, number>
@@ -48,28 +44,18 @@ interface QuestClearTarget {
 }
 
 const QUEST_CLEAR_MAP: Map<number, QuestClearTarget> = new Map([
-    [1110013, { category: 2, questIds: [1028004], leaderCharId: 111001 }],
-    [1310052, { category: 15, questIds: [96], leaderCharId: 131005 }],
     [1410032, { category: 2, questIds: [1020003] }],
-    [2110013, { category: 2, questIds: [1028004], leaderCharId: 211001 }],
-    [2310013, { category: 2, questIds: [1010004], timeLimitMs: 90000, leaderCharId: 231001 }],
-    [2510032, { category: 13, questIds: [1020, 1023, 1026, 1029, 1032, 1035, 1038], leaderCharId: 251003 }],
-    [2510033, { category: 13, questIds: [1020, 1023, 1026, 1029, 1032, 1035, 1038], timeLimitMs: 180000, leaderCharId: 251003 }],
-    [2630023, { category: 19, questIds: [100100004, 100401004], leaderCharId: 151006 }],
 ])
 
 const BOND_TOKEN_MISSION_IDS = new Set([1410033, 2210043, 2510043, 2610073])
-const LEADER_REQUIRED_IDS = new Set([1510062, 1610022, 1610023, 2610072])
+const LEADER_REQUIRED_IDS = new Set([1610023])
 const COOP_MISSION_IDS = new Set([1310053, 1510063])
-const COMBO_MISSION_IDS = new Set([1210013])
-const POWERFLIP_CHAR_IDS = new Set([1210012])
 
 // Multi-character party missions: mission_id → required character IDs (from col[24])
 const MULTI_CHAR_MISSIONS: Map<number, number[]> = new Map([
     [2110012, [211001, 231001]],
     [2210042, [10, 221004]],
     [2410632, [241063, 243007]],
-    [2410633, [241063, 243007, 361009]],
     [2510042, [251004, 1]],
 ])
 
@@ -114,7 +100,6 @@ export function buildAwakeContext(
     const leaderClears = new Map<string, number>()
     const multiClears = new Map<string, number>()
     const leaderMultiClears = new Map<string, number>()
-    const leaderPowerflips = new Map<string, number>()
     const charData = new Map<string, PlayerCharacter>()
     for (const [cid, char] of Object.entries(allChars)) {
         charData.set(cid, char)
@@ -129,7 +114,6 @@ export function buildAwakeContext(
         leaderClears.set(cid, row.leader_clear_count)
         multiClears.set(cid, row.multi_count)
         leaderMultiClears.set(cid, row.leader_multi_count)
-        leaderPowerflips.set(cid, row.leader_power_flip_count)
     }
 
     // Pre-fetch co-clear counts for multi-char missions
@@ -150,7 +134,7 @@ export function buildAwakeContext(
         totalQuestClears, totalStories,
         rankCounts: { rank_ss: ssClears, rank_s: sClears, rank_a: aClears, rank_b: bClears },
         charClears, leaderClears, multiClears, leaderMultiClears,
-        leaderPowerflips, coClears, charData, categoryMissionProgress,
+        coClears, charData, categoryMissionProgress,
     }
 }
 
@@ -170,25 +154,25 @@ export const AwakeComputer: MissionComputer = {
         const qc = QUEST_CLEAR_MAP.get(missionId)
         if (qc) {
             const progress = ctx.questProgress[String(qc.category)]
-            if (!progress) return 0
+            if (!progress) return dbProgress
             const matches = progress.filter(q => qc.questIds.includes(q.questId) && q.finished)
-            if (matches.length === 0) return 0
+            if (matches.length === 0) return dbProgress
             if (qc.timeLimitMs) {
                 const limit = qc.timeLimitMs
-                if (!matches.some(q => (q.bestElapsedTimeMs ?? Infinity) <= limit)) return 0
+                if (!matches.some(q => (q.bestElapsedTimeMs ?? Infinity) <= limit)) return dbProgress
             }
             if (qc.leaderCharId) {
-                if (!matches.some(q => q.leaderCharacterId === qc.leaderCharId)) return 0
+                if (!matches.some(q => q.leaderCharacterId === qc.leaderCharId)) return dbProgress
             }
-            return 1
+            return Math.max(dbProgress, 1)
         }
 
-        // Race-composition missions (e.g., 人+龙+魔)
+        // Per-finish atomic facts and unresolved families both read persisted progress.
         if (AWAKE_DIRECT_BATTLE_MISSION_IDS.has(missionId)) {
-            return actx.categoryMissionProgress.get(missionId) ?? 0
+            return actx.categoryMissionProgress?.get(missionId) ?? dbProgress
         }
 
-        // Multi-character party missions
+        // Two-character co-clear missions can use their pairwise same-battle counter.
         const reqChars = MULTI_CHAR_MISSIONS.get(missionId)
         if (reqChars) {
             // Check min co_clear_count across all pairs
@@ -199,7 +183,7 @@ export const AwakeComputer: MissionComputer = {
                     if (count < minCo) minCo = count
                 }
             }
-            return minCo === Infinity ? 0 : minCo
+            return minCo === Infinity ? dbProgress : Math.max(dbProgress, minCo)
         }
 
         const isLeaderRequired = LEADER_REQUIRED_IDS.has(missionId)
@@ -211,13 +195,13 @@ export const AwakeComputer: MissionComputer = {
             case AwakeType.PARTY_OR_SPECIAL:
                 if (charId === '1') return ctx.totalStories
                 if (charId === '263002') return ctx.player.totalManaObtained ?? 0
-                if (POWERFLIP_CHAR_IDS.has(missionId)) return actx.leaderPowerflips.get(charId) ?? 0
+                if (!AWAKE_GENERIC_CHARACTER_CLEAR_MISSION_IDS.has(missionId)
+                    && !isLeaderRequired) return dbProgress
                 return isLeaderRequired
                     ? actx.leaderClears.get(charId) ?? 0
                     : actx.charClears.get(charId) ?? 0
 
             case AwakeType.SPECIAL:
-                if (charId === '1') return ctx.player.totalPowerflips ?? 0
                 if (BOND_TOKEN_MISSION_IDS.has(missionId)) {
                     const char = actx.charData.get(charId)
                     return isBondTokenMissionComplete(char?.bondTokenList) ? 1 : 0
@@ -225,9 +209,8 @@ export const AwakeComputer: MissionComputer = {
                 if (COOP_MISSION_IDS.has(missionId)) {
                     return actx.leaderMultiClears.get(charId) ?? 0
                 }
-                if (COMBO_MISSION_IDS.has(missionId)) {
-                    return ctx.player.maxComboAchieved ?? 0
-                }
+                if (!AWAKE_GENERIC_CHARACTER_CLEAR_MISSION_IDS.has(missionId)
+                    && !isLeaderRequired) return dbProgress
                 return isLeaderRequired
                     ? actx.leaderClears.get(charId) ?? 0
                     : actx.charClears.get(charId) ?? 0
@@ -261,6 +244,9 @@ function computeStoryOrParty(missionId: number, actx: AwakeContext, charId: stri
             if (actx.questProgress['3']?.find(q => q.questId === qid)?.finished) count++
         }
         return count
+    }
+    if (!AWAKE_GENERIC_CHARACTER_CLEAR_MISSION_IDS.has(missionId)) {
+        return actx.categoryMissionProgress?.get(missionId) ?? 0
     }
     return actx.charClears.get(charId) ?? 0
 }
