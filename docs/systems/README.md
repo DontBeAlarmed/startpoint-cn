@@ -8,6 +8,7 @@
 - [商店](./shop.md)
 - [邮件](./mail.md)
 - [存档与输入校验](./save-validation.md)
+- [经验池边界](./exp-pool.md)
 - [漫画](./comic.md)
 
 ## 关卡与活动

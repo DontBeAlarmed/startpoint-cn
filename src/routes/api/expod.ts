@@ -300,7 +300,13 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // make sure that the player has enough exp
-        const addExp = Math.abs(body.exp)
+        // The client sends a positive integer amount. Do not use Math.abs here:
+        // accepting a negative amount would turn an invalid request into a spend.
+        const addExp = body.exp
+        if (typeof addExp !== "number" || !Number.isSafeInteger(addExp) || addExp <= 0) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid exp amount."
+        })
         const playerExpPool = player.expPool
         if (addExp > playerExpPool) return reply.status(400).send({
             "error": "Internal Server Error",

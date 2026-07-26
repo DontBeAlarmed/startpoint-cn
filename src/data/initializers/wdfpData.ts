@@ -89,6 +89,16 @@ export default function init(
     // migration: max_combo_achieved was added to CREATE TABLE only — existing DBs need this ALTER
     ensureSchemaColumn(database, "players.max_combo_achieved")
 
+    // Historical saves may contain a negative experience pool from an invalid
+    // reward or import. The client renders it as zero, so repair it before any
+    // player data is served and keep future writes guarded in the player domain.
+    const repairedExpPools = database.prepare(
+        "UPDATE players SET exp_pool = 0 WHERE exp_pool < 0",
+    ).run()
+    if (repairedExpPools.changes > 0) {
+        console.warn(`[DB] repaired ${repairedExpPools.changes} negative exp_pool value(s)`)
+    }
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_character_quest_clears (
         player_id INTEGER NOT NULL,
         character_id INTEGER NOT NULL,

@@ -64,7 +64,6 @@ function recordCurrentPassLogin(
     }
 }
 
-const expPoolMax = 100000;
 import { insertPlayerTriggeredTutorialsSync } from "./tutorial";
 import { insertPlayerOptionsSync } from "./option";
 import { insertPlayerItemsSync } from "./item";
@@ -79,6 +78,14 @@ import { insertPlayerRushEventListSync, insertPlayerRushEventClearedFolderListSy
 import { deletePlayerCategoryMissionsSync, insertPlayerCategoryMissionListSync, insertPlayerClearedRegularMissionListSync, insertPlayerActiveMissionsSync } from "./mission";
 import { insertPlayerPeriodicRewardPointsListSync, insertPlayerStartDashExchangeCampaignsSync, insertPlayerMultiSpecialExchangeCampaignsSync } from "./campaign";
 import { insertCarnivalSaveStateSync } from "../../lib/carnival-save-state";
+
+const expPoolMax = 100000;
+
+function assertValidExpPool(expPool: number, context: string): void {
+    if (!Number.isSafeInteger(expPool) || expPool < 0) {
+        throw new Error(`[PLAYER] invalid exp_pool=${String(expPool)} during ${context}`)
+    }
+}
 
 /**
  * Gets a player's daily challenge point list based on their id.
@@ -426,6 +433,7 @@ export function insertPlayerSync(
 ): number {
     const playerId = player.id
     const playerIdGiven = playerId !== undefined
+    assertValidExpPool(player.expPool, "insert")
 
     const params: Record<string, any> = {
         stamina: player.stamina,
@@ -1098,6 +1106,10 @@ export function updatePlayerSync(
     player: Partial<Player> & Pick<Player, 'id'>
 ) {
     const id = player.id
+
+    if (player.expPool !== undefined) {
+        assertValidExpPool(player.expPool, "update")
+    }
 
     const fieldMap: Record<string, string> = {
         'stamina': 'stamina',

@@ -116,6 +116,10 @@ function state() {
     }
 }
 
+function setExpPool(value) {
+    db.prepare("UPDATE player_state SET exp_pool = ? WHERE id = 7").run(value)
+}
+
 async function main() {
     const fastify = Fastify()
     fastify.addHook("onSend", (_request, reply, payload, done) => {
@@ -149,6 +153,36 @@ async function main() {
         failExpWrite = false
         assert.equal(failed.statusCode, 500)
         assert.deepEqual(state(), beforeFailure, "角色经验写入失败必须回滚经验池和 Active Mission 计数")
+
+        const exact = await fastify.inject({
+            method: "POST",
+            url: "/inject_exp",
+            payload: { viewer_id: 123, character_id: 100001, exp: 1000 },
+        })
+        assert.equal(exact.statusCode, 200, exact.body)
+        assert.equal(unpack(exact.rawPayload).data.user_info.exp_pool, 0)
+        assert.equal(state().expPool, 0, "正好花完经验池必须写入 0，而不是负数")
+
+        setExpPool(1000)
+        const invalidInputs = [-1, 0, 1.5, Number.MAX_SAFE_INTEGER + 1]
+        for (const exp of invalidInputs) {
+            const beforeInvalid = state()
+            const invalid = await fastify.inject({
+                method: "POST",
+                url: "/inject_exp",
+                payload: { viewer_id: 123, character_id: 100001, exp },
+            })
+            assert.equal(invalid.statusCode, 400, `exp=${String(exp)} 应被拒绝`)
+            assert.deepEqual(state(), beforeInvalid, `exp=${String(exp)} 不得修改存档`)
+        }
+
+        const over = await fastify.inject({
+            method: "POST",
+            url: "/inject_exp",
+            payload: { viewer_id: 123, character_id: 100001, exp: 1001 },
+        })
+        assert.equal(over.statusCode, 400)
+        assert.equal(state().expPool, 1000, "超额消费必须拒绝且保持余额")
     } finally {
         await fastify.close()
         db.close()

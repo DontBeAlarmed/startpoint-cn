@@ -226,6 +226,31 @@ test("database initializer uses schema checks instead of broad ALTER catches", (
     assert.ok(source.split("ensureSchemaColumn(").length - 1 >= 20)
 })
 
+test("database initializer repairs legacy negative experience pools", t => {
+    const paths = temporaryPaths(t)
+    data.initializeDatabase({ paths })
+    const { insertAccountSync } = require("../../src/data/domains/account")
+    const { insertDefaultPlayerSync, updatePlayerSync } = require("../../src/data/domains/player")
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: "negative-exp-pool-repair",
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    getDb().prepare("UPDATE players SET exp_pool = ? WHERE id = ?").run(-500000, playerId)
+    data.closeDatabase()
+
+    data.initializeDatabase({ paths })
+    assert.equal(getDb().prepare("SELECT exp_pool FROM players WHERE id = ?").get(playerId).exp_pool, 0)
+    assert.throws(
+        () => updatePlayerSync({ id: playerId, expPool: -1 }),
+        /invalid exp_pool/i,
+        "后续领域写入也必须拒绝负经验池",
+    )
+})
+
 test("default schema migration preserves v6 players and creates cascading Pass tables", t => {
     const paths = temporaryPaths(t)
     data.initializeDatabase({ paths })
