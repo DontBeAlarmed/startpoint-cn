@@ -21,6 +21,14 @@ const TEST_GROUPS = Object.freeze({
             "tools/runtime_lifecycle.test.cjs",
         ],
     },
+    "quick:modes": {
+        execution: "parallel",
+        tests: [
+            "tools/modes_loader.test.cjs",
+            "tools/modes_contract.test.cjs",
+            "tools/modes_integration.test.cjs",
+        ],
+    },
     "quick:seed": {
         execution: "parallel",
         tests: [

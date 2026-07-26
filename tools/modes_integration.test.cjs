@@ -1,8 +1,9 @@
 "use strict"
 
-// Real wiring: an installed fixture module must actually receive events from
-// the production code path, and boot must register modules before the server
-// starts listening. Fixtures live in a temp dir — nothing ships in modes.d/.
+// Real wiring, not a re-creation of it: these tests drive the same
+// initializeContentAndModes() composition cn-server hands to the runtime
+// coordinator, the production played-party read path, and a real transaction.
+// Fixture modules live in temp dirs — modes.d/ ships empty.
 
 require("ts-node/register/transpile-only")
 
@@ -12,7 +13,6 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const { createHash } = require("node:crypto")
-const { EventEmitter } = require("node:events")
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "wf-modes-integration-db-"))
 const previousDataDirectory = process.env.DATA_DIR
@@ -38,13 +38,13 @@ const {
 } = require("../src/data/domains/rushEvent")
 const { getSerializedPlayerRushEventPlayedPartiesSync } = require("../src/lib/rush")
 const registry = require("../src/modes/registry")
-const { loadModes } = require("../src/modes/loader")
-const { createRuntimeCoordinator } = require("../src/runtime/lifecycle")
+const { initializeContentAndModes } = require("../src/modes/boot")
 
 initializeDatabase()
 db = getDb()
 
 const EVENT_ID = 700099
+let playerSeq = 0
 
 function installModule(dir, fileName, source) {
     fs.writeFileSync(path.join(dir, fileName), source)
@@ -62,12 +62,39 @@ function tempDir(prefix) {
     return dir
 }
 
-test("an installed module rewrites played parties on the production read path", async () => {
+function moduleSource(name, body) {
+    return `export const modeManifest = {
+    apiVersion: ${registry.MODE_API_VERSION},
+    name: ${JSON.stringify(name)},
+    capability: ${JSON.stringify(name + "@1")},
+}
+
+export function register() {
+    return {
+        ${body}
+    }
+}
+`
+}
+
+/** Boots through the exact composition cn-server uses. */
+async function boot(dir, { snapshot = async () => {}, log = () => {} } = {}) {
+    registry.resetModesForTest()
+    return initializeContentAndModes({
+        projectRoot: dir,
+        initializeContentSnapshot: snapshot,
+        env: { MODES_DIR: dir },
+        log,
+    })
+}
+
+function seedPlayerWithPlayedParty() {
+    playerSeq += 1
     const account = insertAccountSync({
         appId: "wf_cn",
         idpAlias: "",
         idpCode: "test",
-        idpId: `modes-integration-${Date.now()}`,
+        idpId: `modes-integration-${Date.now()}-${playerSeq}`,
         status: "normal",
     })
     const playerId = insertDefaultPlayerSync(account.id).id
@@ -90,90 +117,94 @@ test("an installed module rewrites played parties on the production read path", 
         evolutionImgLevels: [null, null, null],
         unisonEvolutionImgLevels: [null, null, null],
     })
+    return playerId
+}
 
-    // Baseline: with no module installed the ids reach the client untouched.
+test("the boot composition loads modules only after the content snapshot", async () => {
+    const dir = tempDir("wf-modes-boot-")
+    installModule(dir, "boot.mjs", moduleSource("boot-fixture", ""))
+    const order = []
+    const loaded = await boot(dir, {
+        snapshot: async () => { order.push("snapshot") },
+        log: () => { order.push("module-log") },
+    })
+    assert.deepEqual(loaded, ["boot-fixture"])
+    assert.equal(order[0], "snapshot", "snapshot must be ready before modules register")
+    assert.deepEqual(registry.listModeCapabilities(), ["boot-fixture@1"])
     registry.resetModesForTest()
-    const before = getSerializedPlayerRushEventPlayedPartiesSync(playerId, EVENT_ID)
-    const beforeEntries = Object.values(before.folderParties)
-    assert.equal(beforeEntries.length, 1)
-    assert.equal(beforeEntries[0].character_id_1, 111)
+})
 
-    const dir = tempDir("wf-modes-integration-")
-    installModule(dir, "unlock.mjs", `export function register() {
-    return {
-        apiVersion: ${registry.MODE_API_VERSION},
-        name: "unlock-fixture",
-        capability: "unlock-fixture@1",
+test("an empty modes dir boots clean and leaves every dispatch a no-op", async () => {
+    const dir = tempDir("wf-modes-empty-")
+    const logs = []
+    const loaded = await boot(dir, { log: m => logs.push(m) })
+    assert.deepEqual(loaded, [])
+    assert.deepEqual(registry.listModeCapabilities(), [])
+    assert.deepEqual(logs, [])
+
+    const playerId = seedPlayerWithPlayedParty()
+    const entries = Object.values(
+        getSerializedPlayerRushEventPlayedPartiesSync(playerId, EVENT_ID).folderParties,
+    )
+    assert.equal(entries.length, 1)
+    assert.equal(entries[0].character_id_1, 111, "no module → response untouched")
+})
+
+test("an installed module rewrites played parties on the production read path", async () => {
+    const playerId = seedPlayerWithPlayedParty()
+
+    registry.resetModesForTest()
+    const before = Object.values(
+        getSerializedPlayerRushEventPlayedPartiesSync(playerId, EVENT_ID).folderParties,
+    )
+    assert.equal(before[0].character_id_1, 111)
+
+    const dir = tempDir("wf-modes-parties-")
+    installModule(dir, "unlock.mjs", moduleSource("unlock-fixture", `
         onRushPartiesSerialized(context) {
             for (const party of Object.values(context.folderParties)) {
                 party.character_id_1 = null
                 party.character_id_2 = null
             }
-        },
-    }
-}
-`)
-    registry.resetModesForTest()
-    const loaded = await loadModes({ projectRoot: dir, env: { MODES_DIR: dir }, log: () => {} })
-    assert.deepEqual(loaded, ["unlock-fixture"])
+        },`))
+    assert.deepEqual(await boot(dir), ["unlock-fixture"])
 
-    const after = getSerializedPlayerRushEventPlayedPartiesSync(playerId, EVENT_ID)
-    const afterEntries = Object.values(after.folderParties)
+    const after = Object.values(
+        getSerializedPlayerRushEventPlayedPartiesSync(playerId, EVENT_ID).folderParties,
+    )
     // Ids cleared by the module, entry count preserved: the client derives
     // both character locking and the round number from this list.
-    assert.equal(afterEntries.length, 1)
-    assert.equal(afterEntries[0].character_id_1, null)
-    assert.equal(afterEntries[0].character_id_2, null)
+    assert.equal(after.length, 1)
+    assert.equal(after[0].character_id_1, null)
+    assert.equal(after[0].character_id_2, null)
     registry.resetModesForTest()
 })
 
-test("boot registers modules before the server starts listening", async () => {
-    const dir = tempDir("wf-modes-boot-")
-    installModule(dir, "boot.mjs", `export function register() {
-    return {
-        apiVersion: ${registry.MODE_API_VERSION},
-        name: "boot-fixture",
-        capability: "boot-fixture@1",
-    }
-}
-`)
-    registry.resetModesForTest()
+test("a settlement module throwing rolls back writes made in the same transaction", async () => {
+    const playerId = seedPlayerWithPlayedParty()
+    const dir = tempDir("wf-modes-rollback-")
+    installModule(dir, "rollback.mjs", moduleSource("rollback-fixture", `
+        onRushFinish() { throw new Error("settlement bug") },`))
+    assert.deepEqual(await boot(dir), ["rollback-fixture"])
 
-    const order = []
-    const config = { assetProvider: { mode: "local" }, http: {}, tcp: {} }
-    const coordinator = createRuntimeCoordinator({
-        loadConfig: () => config,
-        configureHttp: () => {},
-        initializeDatabase: () => {},
-        restoreTimeOffset: () => {},
-        // Same composition shape as cn-server: snapshot first, then modules.
-        initializeContent: async () => {
-            order.push("content")
-            await loadModes({ projectRoot: dir, env: { MODES_DIR: dir }, log: () => {} })
-            order.push(`modes:${registry.listModeCapabilities().join(",")}`)
-        },
-        readyHttp: async () => {},
-        listenHttp: async () => {
-            order.push(`listen:${registry.listModeCapabilities().join(",")}`)
-        },
-        closeHttp: async () => {},
-        forceCloseHttp: () => {},
-        startTcp: async () => {
-            order.push("tcp")
-            return { close: () => {} }
-        },
-        stopTcp: async () => {},
-        processTarget: new EventEmitter(),
-        setExitCode: () => {},
-        log: () => {},
-    })
+    const readName = () => db
+        .prepare("SELECT name FROM players WHERE id = ?").get(playerId).name
+    const original = readName()
 
-    await coordinator.start()
-    assert.deepEqual(order.slice(0, 3), [
-        "content",
-        "modes:boot-fixture@1",
-        "listen:boot-fixture@1",
-    ])
-    await coordinator.stop?.()
+    // Mirrors the finish handler: base writes and the mode dispatch share one
+    // transaction, so a module fault must undo the base writes too.
+    assert.throws(() => {
+        getDb().transaction(() => {
+            db.prepare("UPDATE players SET name = ? WHERE id = ?").run("written-by-base", playerId)
+            registry.dispatchModeRushFinish({}, {
+                apiVersion: registry.MODE_API_VERSION,
+                table: () => { throw new Error("unused") },
+                log: () => {},
+                server: {},
+            })
+        })()
+    }, /settlement bug/)
+
+    assert.equal(readName(), original, "base write must have rolled back with the module fault")
     registry.resetModesForTest()
 })

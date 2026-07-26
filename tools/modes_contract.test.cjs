@@ -37,12 +37,16 @@ function installFixture(dir, fileName, source, { allowlist = true, digest } = {}
     fs.writeFileSync(listPath, JSON.stringify(current))
 }
 
-function modeSource({ name, apiVersion = API, body = "" }) {
-    return `export function register(host) {
+function modeSource({ name, apiVersion = API, body = "", registerBody = "" }) {
+    return `export const modeManifest = {
+    apiVersion: ${apiVersion},
+    name: ${JSON.stringify(name)},
+    capability: ${JSON.stringify(name + "@1")},
+}
+
+export function register(host) {
+    ${registerBody}
     return {
-        apiVersion: ${apiVersion},
-        name: ${JSON.stringify(name)},
-        capability: ${JSON.stringify(name + "@1")},
         ${body}
     }
 }
@@ -60,8 +64,7 @@ function hostStub(tables = {}) {
         logs,
         host: {
             apiVersion: API,
-            table: name => (name in tables ? tables[name] : null),
-            requireTable: name => {
+            table: name => {
                 if (name in tables) return tables[name]
                 throw new Error(`content table is not registered: ${name}`)
             },
@@ -71,18 +74,45 @@ function hostStub(tables = {}) {
     }
 }
 
-test("refuses a module built against a different mode API version", async () => {
+test("refuses a mismatched module before its register() can touch a host", async () => {
     const dir = tempModesDir()
-    installFixture(dir, "stale.mjs", modeSource({ name: "stale", apiVersion: API + 1 }))
+    const marker = path.join(dir, "register-ran.marker").replace(/\\/g, "/")
+    // Writes a marker if register runs at all. The gate reads the static
+    // manifest, so an incompatible module must never reach this point.
+    const source = `import { writeFileSync } from "node:fs"
+
+export const modeManifest = {
+    apiVersion: ${API + 1},
+    name: "stale",
+    capability: "stale@1",
+}
+
+export function register() {
+    writeFileSync(${JSON.stringify(marker)}, "ran")
+    return {}
+}
+`
+    installFixture(dir, "stale.mjs", source)
     const logs = []
-    const loaded = await load(dir, m => logs.push(m))
-    assert.deepEqual(loaded, [])
+    assert.deepEqual(await load(dir, m => logs.push(m)), [])
     assert.match(logs.join("\n"), /stale\.mjs.*mode API/s)
+    assert.equal(fs.existsSync(marker), false, "register() must not run for a mismatched module")
+})
+
+test("refuses a module with no statically readable manifest", async () => {
+    const dir = tempModesDir()
+    installFixture(dir, "bare.mjs", "export function register() { return {} }\n")
+    const logs = []
+    assert.deepEqual(await load(dir, m => logs.push(m)), [])
+    assert.match(logs.join("\n"), /bare\.mjs.*modeManifest/s)
 })
 
 test("an allowlisted module that fails to load does not stop the others", async () => {
     const dir = tempModesDir()
-    installFixture(dir, "a-broken.mjs", "export function register() { throw new Error('boom') }\n")
+    installFixture(dir, "a-broken.mjs", modeSource({
+        name: "broken",
+        registerBody: `throw new Error("boom")`,
+    }))
     installFixture(dir, "b-good.mjs", modeSource({ name: "good" }))
     const logs = []
     const loaded = await load(dir, m => logs.push(m))
@@ -115,11 +145,12 @@ test("a duplicate mode name is refused and leaves the first registration intact"
     assert.match(logs.join("\n"), /second\.mjs.*already registered/s)
 })
 
-test("host.table yields null for an unpublished table, requireTable throws", () => {
-    const { host } = hostStub({ "present.json": { ok: true } })
-    assert.deepEqual(host.table("present.json"), { ok: true })
-    assert.equal(host.table("absent.json"), null)
-    assert.throws(() => host.requireTable("absent.json"), /not registered/)
+test("host.table serves base-registered tables and refuses anything else", () => {
+    const { host } = hostStub({ "character.json": { ok: true } })
+    assert.deepEqual(host.table("character.json"), { ok: true })
+    // Mode-private tables are not hosted here; a mode's own switches belong
+    // in its manifest or its own files.
+    assert.throws(() => host.table("mode_private.json"), /not registered/)
 })
 
 test("quest start is a veto chain: first throw wins and later modules are skipped", async () => {
@@ -141,23 +172,41 @@ test("quest start is a veto chain: first throw wins and later modules are skippe
     assert.deepEqual(logs, [])
 })
 
-test("settlement is fail-soft: a throwing module is skipped, the rest still contribute", async () => {
+test("settlement propagates so the enclosing transaction rolls back", async () => {
     const dir = tempModesDir()
     installFixture(dir, "a-bad.mjs", modeSource({
         name: "bad",
         body: `onRushFinish() { throw new Error("settlement bug") },`,
     }))
-    installFixture(dir, "b-ok.mjs", modeSource({
-        name: "ok",
+    await load(dir, () => {})
+    const { host } = hostStub()
+    // The hook runs inside the finish transaction: swallowing here would let
+    // a module's partial writes commit, so the throw must reach the caller.
+    assert.throws(() => registry.dispatchModeRushFinish({}, host), /settlement bug/)
+})
+
+test("settlement concatenates rewards from every module in registration order", async () => {
+    const dir = tempModesDir()
+    installFixture(dir, "a-first.mjs", modeSource({
+        name: "first",
         body: `onRushFinish() {
-            return { rush_battle_reward_list: [{ kind: 1, kind_id: 7, number: 2 }] }
+            return { rush_battle_reward_list: [{ kind: 1, kind_id: 1, number: 1 }] }
+        },`,
+    }))
+    installFixture(dir, "b-second.mjs", modeSource({
+        name: "second",
+        body: `onRushFinish() {
+            return { rush_battle_reward_list: [{ kind: 6, kind_id: 2, number: 3 }] }
         },`,
     }))
     await load(dir, () => {})
-    const { host, logs } = hostStub()
-    const extension = registry.dispatchModeRushFinish({}, host)
-    assert.deepEqual(extension, { rush_battle_reward_list: [{ kind: 1, kind_id: 7, number: 2 }] })
-    assert.match(logs.join("\n"), /bad failed and was skipped: settlement bug/)
+    const { host } = hostStub()
+    assert.deepEqual(registry.dispatchModeRushFinish({}, host), {
+        rush_battle_reward_list: [
+            { kind: 1, kind_id: 1, number: 1 },
+            { kind: 6, kind_id: 2, number: 3 },
+        ],
+    })
 })
 
 test("played-party rewrites compose across modules and survive a faulty one", async () => {

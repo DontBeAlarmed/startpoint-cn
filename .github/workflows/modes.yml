@@ -1,0 +1,35 @@
+name: modes
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  modes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Loader, contract and real-wiring tests for the gameplay mode seam.
+      - name: Mode seam tests
+        run: node --test tools/modes_loader.test.cjs tools/modes_contract.test.cjs tools/modes_integration.test.cjs
+
+      # Guard: modes.d/ is an operator-owned directory. Neither fixtures nor
+      # concrete gameplay modules may ship in it.
+      - name: Assert no modules ship in modes.d/
+        run: |
+          if compgen -G "modes.d/*" > /dev/null; then
+            echo "modes.d/ must ship empty; found:" && ls -la modes.d/
+            exit 1
+          fi

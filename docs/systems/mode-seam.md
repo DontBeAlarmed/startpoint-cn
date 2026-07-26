@@ -29,8 +29,8 @@
 
 ## 契约版本
 
-`MODE_API_VERSION`(当前 `1`)。模块定义必须声明相同的 `apiVersion`,否则装载器
-拒绝该模块并打日志——宁可不装,也不让旧模块撞上变过的 host 形状。
+`MODE_API_VERSION`(当前 `1`)。模块必须**静态导出** `modeManifest`,装载器在
+**把 host 交给模块之前**就读它校验版本——不兼容的模块因此永远没有机会调用 host。
 `host.apiVersion` 让模块自己也能分支。
 
 ## 模块契约
@@ -38,11 +38,15 @@
 模块是一个 ESM 文件，导出 `register(host)`，返回模块定义：
 
 ```js
+// 静态导出:装载器先读它做版本门禁,再决定是否执行 register
+export const modeManifest = {
+    apiVersion: 1,
+    name: "example",
+    capability: "example-settlement@1",
+}
+
 export function register(host) {
     return {
-        apiVersion: 1,
-        name: "example",
-        capability: "example-settlement@1",
         onRushFinish(params, host) { /* 可选 */ },
         onQuestStart(context, host) { /* 可选,抛错即拒绝进本 */ },
         onRushPartiesSerialized(context, host) { /* 可选,可原地改写 */ },
@@ -50,15 +54,30 @@ export function register(host) {
 }
 ```
 
-`host` 提供：
+`host` 分两种,**按事务上下文授予能力**:
 
-- `host.table(name)` —— 读取进程内容快照的运行表;**快照没有该表时返回 `null`**,
-  所以激活表尚未下发的模块保持惰性而不是抛错
-- `host.requireTable(name)` —— 同上但缺表抛错(用于硬依赖)
-- `host.log(message)`
-- `host.apiVersion`
-- `host.server` —— 精选的服务端原语（角色元素查询、装备写入、角色经验授予），
-  模块不直接 import 服务端内部实现
+| host | 交给谁 | 内容 |
+|---|---|---|
+| `ModeHost`(只读) | 不在事务里的挂点 | `apiVersion` / `table` / `log` |
+| `ModeTransactionHost` | 在显式事务里的挂点 | 以上 + `server` 写入原语 |
+
+不在事务里的挂点**拿不到任何写入原语**,因此无法修改玩家存档——这是类型层面的
+保证,不是约定。
+
+- `host.table(name)` —— 只读**基座已注册**的运行表;其他名字一律抛错。
+  **模块私有的配置/开关不放在这里**,见下节;
+- `host.log(message)`、`host.apiVersion`;
+- `host.server`(仅事务 host)—— 精选的服务端原语（角色元素查询、装备写入、
+  角色经验授予）,模块不直接 import 服务端内部实现。写入经由它发出,
+  自动参与调用方的事务,因而随之回滚。
+
+## 模块自己的配置放哪
+
+**不放在内容注册表里。** 基座的 Content Registry 是基座的,装载缝不会为某个具体
+Mod 扩展它,`host.table` 也读不到未注册的表。模块的开关与配置有两个去处:
+
+1. 写进 `modeManifest`(简单开关、版本、能力声明);
+2. 放在模块自带的文件里,由模块自己经 `import.meta.url` 定位读取。
 
 ## 多模块:顺序与冲突
 
@@ -71,14 +90,18 @@ export function register(host) {
 
 ## 失败模型与事务边界
 
-| 挂点 | 抛错含义 | 处理 |
-|---|---|---|
-| `onQuestStart` | **有意否决**(进本规则) | 传播:首个抛错者拒绝进本,后续模块不再执行,错误信息回传客户端 |
-| `onRushFinish` | 模块缺陷 | **fail-soft**:记日志、跳过该模块,基座流程继续。结算此时已提交基座奖励,中止请求会把它们丢掉 |
-| `onRushPartiesSerialized` | 模块缺陷 | 同上,已完成的改写保留 |
+| 挂点 | 事务上下文 | host | 抛错后果 |
+|---|---|---|---|
+| `onQuestStart` | 无(进本之前) | 只读 | **有意否决**:传播,首个抛错者拒绝进本,后续模块不执行,错误信息回传客户端 |
+| `onRushFinish` | **在结算事务内** | 可写 | **整次结算回滚**:异常向上传播 |
+| `onRushPartiesSerialized` | 无(读路径) | 只读 | 记日志跳过该模块,已完成的改写保留 |
 
-模块在结算期间写玩家数据时,**必须走注入 params 上的 `transaction` 原语**;
-在它之外发出的写入不会在后续步骤失败时回滚。
+`onRushFinish` 之所以传播而不是 fail-soft:它跑在 finish 事务**内部**
+(`executeFinishWrites` 体内),吞掉异常会让模块写了一半的数据随事务一起提交。
+回滚整次结算是唯一不会留下撕裂存档的选择。
+
+不在事务里的两个挂点拿的是只读 host,**根本不具备写入能力**,所以跳过它们不会
+留下部分状态。
 
 ## 三个挂点
 
@@ -101,8 +124,12 @@ export function register(host) {
 - `tools/modes_contract.test.cjs` —— apiVersion 不符拒装、被授权模块加载失败不影响
   其他模块、码点序分派、重名拒绝、`table` 缺表返回 null 而 `requireTable` 抛错、
   进本否决链短路、结算与队伍改写 fail-soft、无模块时全部 no-op;
-- `tools/modes_integration.test.cjs` —— 真实接线:装入临时 fixture 模块后,
-  生产读路径 `getSerializedPlayerRushEventPlayedPartiesSync` 的返回确实被改写
-  (条目数保持不变),以及启动编排中模块在 `listenHttp` 之前完成注册。
+- `tools/modes_integration.test.cjs` —— **真实接线**:全部经 `initializeContentAndModes()`
+  (cn-server 交给运行时协调器的同一个组合函数,不是测试自己拼的顺序)驱动:
+  快照先于模块注册、空目录干净启动且响应不被改动、装入模块后生产读路径
+  `getSerializedPlayerRushEventPlayedPartiesSync` 的返回确实被改写(条目数不变)、
+  以及**结算模块抛错时同一事务内的基座写入一并回滚**。
 
 三个测试的 fixture 模块都写在临时目录,发行目录 `modes.d/` 始终为空。
+CI(`.github/workflows/modes.yml`)跑 typecheck + 三个套件,并硬性断言
+`modes.d/` 不含任何文件;`quick:modes` 分组让它们同时进入 `npm run test:quick`。

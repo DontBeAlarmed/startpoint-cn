@@ -19,11 +19,14 @@ const {
     MODE_API_VERSION,
 } = require("../src/modes/registry")
 
-const MODULE_SOURCE = `export function register(host) {
+const MODULE_SOURCE = `export const modeManifest = {
+    apiVersion: ${MODE_API_VERSION},
+    name: "fixture-mode",
+    capability: "fixture@1",
+}
+
+export function register(host) {
     return {
-        apiVersion: ${MODE_API_VERSION},
-        name: "fixture-mode",
-        capability: "fixture@1",
         onRushFinish() { return { rush_battle_reward_list: [{ kind: 1, kind_id: 5, number: 2 }] } },
         onQuestStart(context) { if (context.questId === 999) throw new Error("blocked by fixture") },
     }
@@ -110,5 +113,5 @@ test("registry rejects duplicate and malformed registrations", t => {
     const base = { apiVersion: MODE_API_VERSION }
     registerMode({ ...base, name: "a", capability: "a@1" })
     assert.throws(() => registerMode({ ...base, name: "a", capability: "a@2" }), /already registered/)
-    assert.throws(() => registerMode({ ...base, name: "", capability: "x" }), /requires a name/)
+    assert.throws(() => registerMode({ ...base, name: "", capability: "x" }), /requires apiVersion, name and capability/)
 })

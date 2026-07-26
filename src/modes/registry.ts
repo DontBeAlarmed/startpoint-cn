@@ -1,35 +1,42 @@
 /**
- * Mode seam registry (fork/dev-base).
+ * Mode seam registry.
  *
  * The base server carries no gameplay-mode logic. Modes ship as separately
  * installed modules (see loader.ts) and register handlers here. With no
  * modules installed every dispatch is a no-op, keeping base behaviour
- * byte-identical to upstream.
+ * byte-identical to a server built without the seam.
  *
- * Contract for handlers: activation is content-keyed — a handler must read
- * its activation table from the content snapshot (via ModeHost.table) as its
- * first step and return null/undefined when the table is absent or disabled.
- * ModeHost.table returns null for a table the snapshot does not carry, so an
- * unpublished activation table leaves the module inert rather than throwing.
+ * Where a module's own configuration lives: in the module, not here. The
+ * content registry belongs to the base server, and the seam does not extend
+ * it for a mode's private tables — `ModeHost.table` reads base-registered
+ * tables only. A module declares itself through its exported manifest and
+ * may read files it ships alongside itself.
  *
- * Ordering and failure model:
- * - Modules run in registration order, which the loader fixes to the
- *   code-point order of their file names, so a given modes.d/ always
- *   produces the same sequence.
- * - onQuestStart is a veto chain: the first module to throw rejects the
- *   start, later modules do not run, and the message reaches the client.
- * - onRushFinish and onRushPartiesSerialized are fail-soft: a module that
- *   throws is logged and skipped, and the base flow continues. Settlement
- *   has already committed the base rewards by then, so aborting the request
- *   would lose them.
- * - A module that writes player data during settlement must do so through
- *   the transaction primitive on the injected params object. Writes issued
- *   outside it are not rolled back when a later step fails.
+ * Capability follows transaction context. Hooks that run inside an explicit
+ * database transaction receive a `ModeTransactionHost` carrying write
+ * primitives; hooks that run outside one receive a read-only `ModeHost` and
+ * therefore cannot modify player data at all:
+ *
+ * | hook                    | transaction         | host      | throw means            |
+ * | ----------------------- | ------------------- | --------- | ---------------------- |
+ * | onQuestStart            | none (before entry) | read-only | deliberate veto        |
+ * | onRushFinish            | inside finish tx    | writable  | roll back the whole tx |
+ * | onRushPartiesSerialized | none (read path)    | read-only | skip this module       |
+ *
+ * onRushFinish deliberately propagates: it runs inside the settlement
+ * transaction, so swallowing an error would let a module's partial writes
+ * commit. Rolling the settlement back is the only outcome that cannot leave
+ * torn player state.
+ *
+ * Ordering: modules run in registration order, which the loader fixes to the
+ * code-point order of their file names, so a given modes.d/ always produces
+ * the same sequence.
  */
 
 /**
- * Contract version. The loader refuses modules built against another major
- * version rather than letting a stale module see a changed host shape.
+ * Contract version. The loader reads a module's exported manifest and
+ * refuses a mismatched module *before* handing it a host, so an
+ * incompatible module never gets to call one.
  */
 export const MODE_API_VERSION = 1
 
@@ -43,19 +50,24 @@ export interface ModeHostServerApi {
     ) => unknown
 }
 
+/** Read-only host. Handed to hooks that do not run inside a transaction. */
 export interface ModeHost {
-    /** The host's MODE_API_VERSION, so a module can branch on it. */
     readonly apiVersion: number
     /**
-     * Reads a table from the process content snapshot, or null when the
-     * snapshot does not carry it. A module whose activation table is absent
-     * is expected to stay inert rather than fail.
+     * Reads a table the base server has registered in its content registry.
+     * Throws for anything else: the seam does not host mode-private tables,
+     * and a mode's own switches belong in its manifest or its own files.
      */
-    readonly table: <T>(tableName: string) => T | null
-    /** Same, but throws when the table is absent (use for hard dependencies). */
-    readonly requireTable: <T>(tableName: string) => T
+    readonly table: <T>(tableName: string) => T
     readonly log: (message: string) => void
-    /** Curated server primitives for mode modules (assembled by the loader). */
+}
+
+/**
+ * Host for hooks that run inside an explicit transaction. Write primitives
+ * exist only here, so a hook running outside a transaction cannot reach
+ * player data even by accident.
+ */
+export interface ModeTransactionHost extends ModeHost {
     readonly server: ModeHostServerApi
 }
 
@@ -83,29 +95,41 @@ export interface RushPartiesContext {
     readonly endlessParties: Record<number, Record<string, unknown>>
 }
 
-export interface ModeDefinition {
-    /** Must equal MODE_API_VERSION; mismatched modules are refused. */
+/**
+ * Statically exported by a module as `modeManifest`, so the loader can check
+ * compatibility before executing any module code that touches a host.
+ */
+export interface ModeManifest {
     readonly apiVersion: number
     readonly name: string
     readonly capability: string
+}
+
+/** Returned by a module's register(host); every hook is optional. */
+export interface ModeHooks {
     /**
-     * Runs inside the same request as handleRushEventFinish, after it, and
-     * receives the exact dependency-injected params object the base handler
-     * received (domain primitives included). Side effects go through those
-     * injected primitives; the returned reward list is appended to the
-     * client-visible rush_battle_reward_list.
+     * Runs before quest entry, outside any transaction, with a read-only
+     * host. Throwing rejects the start; the message reaches the client and
+     * later modules do not run.
+     */
+    readonly onQuestStart?: (context: QuestStartContext, host: ModeHost) => void
+    /**
+     * Runs inside the settlement transaction, immediately after
+     * handleRushEventFinish, and receives the exact dependency-injected
+     * params object the base handler received. Writes go through the
+     * transaction host or those injected primitives, so they join the same
+     * transaction. Throwing rolls the whole settlement back.
      */
     readonly onRushFinish?: (
         params: unknown,
-        host: ModeHost,
+        host: ModeTransactionHost,
     ) => RushFinishExtension | null | undefined
-    /** May throw to reject the quest start; the message reaches the client. */
-    readonly onQuestStart?: (context: QuestStartContext, host: ModeHost) => void
     /**
-     * Runs just before played parties are returned to the client, and may
+     * Runs just before played parties are returned to the client and may
      * mutate the records in place. Client-side character locking is derived
      * purely from these lists, so a mode can release the lock here while
      * keeping the entry count (and therefore round progression) intact.
+     * Read-only host: this is a read path with no transaction.
      */
     readonly onRushPartiesSerialized?: (
         context: RushPartiesContext,
@@ -113,12 +137,21 @@ export interface ModeDefinition {
     ) => void
 }
 
+export interface ModeDefinition extends ModeManifest, ModeHooks {}
+
 const modes: ModeDefinition[] = []
 
+export function isModeManifest(value: unknown): value is ModeManifest {
+    if (typeof value !== "object" || value === null) return false
+    const candidate = value as Record<string, unknown>
+    return typeof candidate.name === "string" && candidate.name !== ""
+        && typeof candidate.capability === "string" && candidate.capability !== ""
+        && typeof candidate.apiVersion === "number"
+}
+
 export function registerMode(mode: ModeDefinition): void {
-    if (!mode || typeof mode.name !== "string" || !mode.name
-        || typeof mode.capability !== "string" || !mode.capability) {
-        throw new Error("mode definition requires a name and a capability")
+    if (!isModeManifest(mode)) {
+        throw new Error("mode definition requires apiVersion, name and capability")
     }
     if (mode.apiVersion !== MODE_API_VERSION) {
         throw new Error(
@@ -141,41 +174,8 @@ export function listModeCapabilities(): readonly string[] {
 }
 
 /**
- * Fail-soft hook invocation: a throwing module is reported and skipped so a
- * faulty module cannot take down a settlement the base server already
- * committed. Used for every hook except the quest-start veto.
- */
-function runFailSoft(mode: ModeDefinition, host: ModeHost, run: () => void): void {
-    try {
-        run()
-    } catch (error) {
-        host.log(
-            `[modes] ${mode.name} failed and was skipped: `
-            + `${(error as Error)?.message ?? String(error)}`,
-        )
-    }
-}
-
-export function dispatchModeRushFinish(
-    params: unknown,
-    host: ModeHost,
-): RushFinishExtension | null {
-    const rewards: ModeRewardEntry[] = []
-    for (const mode of modes) {
-        if (!mode.onRushFinish) continue
-        runFailSoft(mode, host, () => {
-            const extension = mode.onRushFinish?.(params, host)
-            if (extension?.rush_battle_reward_list?.length) {
-                rewards.push(...extension.rush_battle_reward_list)
-            }
-        })
-    }
-    return rewards.length > 0 ? { rush_battle_reward_list: rewards } : null
-}
-
-/**
- * Veto chain: the first module to throw rejects the start and later modules
- * do not run. This is the one hook where a throw is a deliberate signal
+ * Veto chain, outside any transaction: the first module to throw rejects the
+ * start and later modules do not run. A throw here is a deliberate signal
  * rather than a fault, so it propagates to the caller.
  */
 export function dispatchModeQuestStart(context: QuestStartContext, host: ModeHost): void {
@@ -184,9 +184,40 @@ export function dispatchModeQuestStart(context: QuestStartContext, host: ModeHos
     }
 }
 
+/**
+ * Runs inside the settlement transaction. Exceptions propagate so the
+ * transaction rolls back: a module that fails midway may already have
+ * written, and completing the commit would persist that partial state.
+ */
+export function dispatchModeRushFinish(
+    params: unknown,
+    host: ModeTransactionHost,
+): RushFinishExtension | null {
+    const rewards: ModeRewardEntry[] = []
+    for (const mode of modes) {
+        const extension = mode.onRushFinish?.(params, host)
+        if (extension?.rush_battle_reward_list?.length) {
+            rewards.push(...extension.rush_battle_reward_list)
+        }
+    }
+    return rewards.length > 0 ? { rush_battle_reward_list: rewards } : null
+}
+
+/**
+ * Read path with no transaction and a read-only host, so a throwing module
+ * cannot have left partial state: it is reported and skipped, and the
+ * response keeps whatever earlier modules produced.
+ */
 export function dispatchModeRushParties(context: RushPartiesContext, host: ModeHost): void {
     for (const mode of modes) {
         if (!mode.onRushPartiesSerialized) continue
-        runFailSoft(mode, host, () => mode.onRushPartiesSerialized?.(context, host))
+        try {
+            mode.onRushPartiesSerialized(context, host)
+        } catch (error) {
+            host.log(
+                `[modes] ${mode.name} failed and was skipped: `
+                + `${(error as Error)?.message ?? String(error)}`,
+            )
+        }
     }
 }

@@ -33,9 +33,12 @@ import { getStaminaCost } from "../../lib/stamina-cost";
 import { handleCarnivalEventFinish } from "../../lib/quest/finish/carnival-handler";
 import { handleRushEventFinish } from "../../lib/quest/finish/rush-handler";
 import { dispatchModeQuestStart, dispatchModeRushFinish } from "../../modes/registry";
-import { createModeHost } from "../../modes/loader";
+import { createModeHost, createModeTransactionHost } from "../../modes/loader";
 
+// Read-only host for the pre-entry hook (no transaction is open there) and a
+// writable one for settlement, which runs inside the finish transaction.
 const singleBattleModeHost = createModeHost(message => console.log(message));
+const settlementModeHost = createModeTransactionHost(message => console.log(message));
 import { handleRaidEventFinish } from "../../lib/quest/finish/raid-handler";
 import { calculateClearRank } from "../../lib/quest/finish/quest-calc";
 import {
@@ -399,7 +402,7 @@ const routes = async (fastify: FastifyInstance) => {
             const { rushEventData, rushEventRewardsResult } = handleRushEventFinish(rushFinishParams)
             // Mode seam: installed mode modules may extend the rush settlement
             // using the same injected primitives; no modules → no-op.
-            const modeRushExtension = dispatchModeRushFinish(rushFinishParams, singleBattleModeHost)
+            const modeRushExtension = dispatchModeRushFinish(rushFinishParams, settlementModeHost)
             if (modeRushExtension?.rush_battle_reward_list?.length && rushEventData) {
                 rushEventData.rush_battle_reward_list.push(...modeRushExtension.rush_battle_reward_list)
             }

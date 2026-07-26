@@ -21,11 +21,14 @@ import { getCharacterDataSync } from "../lib/assets"
 import { givePlayerCharactersExpSync } from "../lib/character"
 import { updatePlayerEquipmentSync } from "../data/domains/equipment"
 import {
+    isModeManifest,
     listModeCapabilities,
     MODE_API_VERSION,
     registerMode,
-    type ModeDefinition,
+    type ModeHooks,
     type ModeHost,
+    type ModeManifest,
+    type ModeTransactionHost,
 } from "./registry"
 
 export interface LoadModesOptions {
@@ -35,24 +38,32 @@ export interface LoadModesOptions {
     readonly importModule?: (url: string) => Promise<unknown>
 }
 
+/**
+ * Read-only host for hooks that run outside a transaction. It deliberately
+ * carries no write primitive, so such a hook cannot modify player data.
+ */
 export function createModeHost(log: (message: string) => void): ModeHost {
-    const requireTable = <T>(tableName: string): T => (
-        getContentSnapshot().repository.table<T>(tableName)
-    )
     return Object.freeze({
         apiVersion: MODE_API_VERSION,
-        // Absent table → null, so a module whose activation table has not been
-        // published stays inert instead of throwing. Hard dependencies use
-        // requireTable.
-        table: <T>(tableName: string): T | null => {
-            try {
-                return requireTable<T>(tableName)
-            } catch {
-                return null
-            }
-        },
-        requireTable,
+        // Base-registered tables only; unknown names throw. Mode-private
+        // configuration does not live in the content registry.
+        table: <T>(tableName: string): T => (
+            getContentSnapshot().repository.table<T>(tableName)
+        ),
         log,
+    })
+}
+
+/**
+ * Host for hooks that run inside an explicit transaction. Writes issued
+ * through these primitives join the caller's transaction, so they roll back
+ * with it.
+ */
+export function createModeTransactionHost(
+    log: (message: string) => void,
+): ModeTransactionHost {
+    return Object.freeze({
+        ...createModeHost(log),
         server: Object.freeze({
             getCharacterElement: (characterId: number) => {
                 const element = Number(getCharacterDataSync(characterId)?.element)
@@ -129,18 +140,33 @@ export async function loadModes(options: LoadModesOptions): Promise<readonly str
         try {
             const imported = await importModule(pathToFileURL(absolute).href)
             const moduleExports = isRecord(imported) ? imported : {}
-            const register = (isRecord(moduleExports.default)
-                ? (moduleExports.default as Record<string, unknown>).register
-                : undefined) ?? moduleExports.register
+            const fromDefault = isRecord(moduleExports.default)
+                ? moduleExports.default as Record<string, unknown>
+                : {}
+            const manifest = moduleExports.modeManifest ?? fromDefault.modeManifest
+            // Compatibility is decided from the statically exported manifest,
+            // before any module code receives a host: an incompatible module
+            // must never get the chance to call one.
+            if (!isModeManifest(manifest)) {
+                log(`[modes] SKIP ${fileName}: no usable modeManifest export`)
+                continue
+            }
+            if (manifest.apiVersion !== MODE_API_VERSION) {
+                log(
+                    `[modes] SKIP ${fileName}: targets mode API `
+                    + `${String(manifest.apiVersion)}, this server provides ${MODE_API_VERSION}`,
+                )
+                continue
+            }
+            const register = fromDefault.register ?? moduleExports.register
             if (typeof register !== "function") {
                 log(`[modes] SKIP ${fileName}: no register(host) export`)
                 continue
             }
-            const host = createModeHost(log)
-            const definition = await register(host) as ModeDefinition
-            registerMode(definition)
-            log(`[modes] loaded ${definition.name} (${definition.capability}) sha256=${digest.slice(0, 12)}…`)
-            loaded.push(definition.name)
+            const hooks = (await register(createModeHost(log)) ?? {}) as ModeHooks
+            registerMode({ ...(manifest as ModeManifest), ...hooks })
+            log(`[modes] loaded ${manifest.name} (${manifest.capability}) sha256=${digest.slice(0, 12)}…`)
+            loaded.push(manifest.name)
         } catch (error) {
             log(`[modes] SKIP ${fileName}: ${(error as Error)?.message ?? String(error)}`)
         }

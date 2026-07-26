@@ -14,7 +14,7 @@ import getDatabase, {
 } from "./data";
 import { restoreTimeOffset } from "./data/activeAccount";
 import { getContentSnapshot, initializeContentSnapshot } from "./content/runtime/content-snapshot";
-import { loadModes } from "./modes/loader";
+import { initializeContentAndModes } from "./modes/boot";
 import { configureSerializedAssetVersionProvider } from "./data/utils/serialized-asset-version";
 import { parseCnRuntimeConfig } from "./runtime/config";
 import {
@@ -400,15 +400,15 @@ runtimeCoordinator = createRuntimeCoordinator({
     configureHttp: configureRuntimeHttp,
     initializeDatabase,
     restoreTimeOffset,
-    initializeContent: async config => {
-        await initializeContentSnapshot({
+    // Content snapshot, then operator-installed gameplay modules (modes.d/).
+    // Shared with the boot tests so they exercise this exact composition.
+    initializeContent: config => initializeContentAndModes({
+        projectRoot,
+        initializeContentSnapshot: () => initializeContentSnapshot({
             assetMode: config.assetProvider.mode,
             localCdn: config.assetProvider.mode === "local",
-        });
-        // Mode seam: operator-installed gameplay modules (modes.d/), loaded
-        // once after the content snapshot exists. No modules → no-op.
-        await loadModes({ projectRoot });
-    },
+        }),
+    }),
     readyHttp: async () => { await fastify.ready(); },
     listenHttp: config => fastify.listen({ ...config.http }),
     closeHttp: () => fastify.close(),
