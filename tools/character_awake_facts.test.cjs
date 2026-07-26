@@ -471,4 +471,42 @@ assert.equal(awakeComputer.compute(2310014, {
     questProgress: ramsStoryProgress,
 }, 0), 3, "three genuinely completed children must complete the parent")
 
+function emptyImportedAwakeContext() {
+    return {
+        categoryMissionProgress: new Map(),
+        charClears: new Map(),
+        leaderClears: new Map(),
+        leaderMultiClears: new Map(),
+        coClears: new Map(),
+        charData: new Map(),
+        questProgress: {},
+        totalStories: 0,
+        player: { totalManaObtained: 0 },
+    }
+}
+
+const importedProgress = 5
+assert.equal(AWAKE_MISSION_RULE_FAMILIES.length, 18)
+for (const family of AWAKE_MISSION_RULE_FAMILIES) {
+    for (const missionId of family.missionIds) {
+        const computed = awakeComputer.compute(
+            missionId,
+            emptyImportedAwakeContext(),
+            importedProgress,
+        )
+        assert.equal(
+            computed >= importedProgress,
+            true,
+            `${family.family} mission ${missionId} must preserve imported progress`,
+        )
+    }
+}
+for (const missionId of [1610022, 2310012, 2610072]) {
+    assert.equal(
+        awakeComputer.compute(missionId, emptyImportedAwakeContext(), importedProgress),
+        importedProgress,
+        `fail-closed mission ${missionId} must preserve imported progress`,
+    )
+}
+
 console.log("character awake fact tests passed")

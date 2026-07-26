@@ -146,92 +146,86 @@ export const AwakeComputer: MissionComputer = {
     },
 
     compute(missionId: number, ctx: CategoryContext, dbProgress: number): number {
-        const actx = ctx as AwakeContext
-        const charId = getCharacterIdFromMission(missionId)
-        const lastDigit = missionId % 10
-
-        // Quest-clear missions (checked first, independent of lastDigit)
-        const qc = QUEST_CLEAR_MAP.get(missionId)
-        if (qc) {
-            const progress = ctx.questProgress[String(qc.category)]
-            if (!progress) return dbProgress
-            const matches = progress.filter(q => qc.questIds.includes(q.questId) && q.finished)
-            if (matches.length === 0) return dbProgress
-            if (qc.timeLimitMs) {
-                const limit = qc.timeLimitMs
-                if (!matches.some(q => (q.bestElapsedTimeMs ?? Infinity) <= limit)) return dbProgress
-            }
-            if (qc.leaderCharId) {
-                if (!matches.some(q => q.leaderCharacterId === qc.leaderCharId)) return dbProgress
-            }
-            return Math.max(dbProgress, 1)
-        }
-
-        // Per-finish atomic facts and unresolved families both read persisted progress.
-        if (AWAKE_DIRECT_BATTLE_MISSION_IDS.has(missionId)) {
-            return actx.categoryMissionProgress?.get(missionId) ?? dbProgress
-        }
-
-        // Two-character co-clear missions can use their pairwise same-battle counter.
-        const reqChars = MULTI_CHAR_MISSIONS.get(missionId)
-        if (reqChars) {
-            // Check min co_clear_count across all pairs
-            let minCo = Infinity
-            for (let i = 0; i < reqChars.length - 1; i++) {
-                for (let j = i + 1; j < reqChars.length; j++) {
-                    const count = actx.coClears.get(coClearKey(reqChars[i], reqChars[j])) ?? 0
-                    if (count < minCo) minCo = count
-                }
-            }
-            return minCo === Infinity ? dbProgress : Math.max(dbProgress, minCo)
-        }
-
-        const isLeaderRequired = LEADER_REQUIRED_IDS.has(missionId)
-
-        switch (lastDigit) {
-            case AwakeType.STORY_READ:
-                return computeStoryOrParty(missionId, actx, charId)
-
-            case AwakeType.PARTY_OR_SPECIAL:
-                if (charId === '1') return ctx.totalStories
-                if (charId === '263002') return ctx.player.totalManaObtained ?? 0
-                if (!AWAKE_GENERIC_CHARACTER_CLEAR_MISSION_IDS.has(missionId)
-                    && !isLeaderRequired) return dbProgress
-                return isLeaderRequired
-                    ? actx.leaderClears.get(charId) ?? 0
-                    : actx.charClears.get(charId) ?? 0
-
-            case AwakeType.SPECIAL:
-                if (BOND_TOKEN_MISSION_IDS.has(missionId)) {
-                    const char = actx.charData.get(charId)
-                    return isBondTokenMissionComplete(char?.bondTokenList) ? 1 : 0
-                }
-                if (COOP_MISSION_IDS.has(missionId)) {
-                    return actx.leaderMultiClears.get(charId) ?? 0
-                }
-                if (!AWAKE_GENERIC_CHARACTER_CLEAR_MISSION_IDS.has(missionId)
-                    && !isLeaderRequired) return dbProgress
-                return isLeaderRequired
-                    ? actx.leaderClears.get(charId) ?? 0
-                    : actx.charClears.get(charId) ?? 0
-
-            case AwakeType.ALL_COMPLETE: {
-                let completedCount = 0
-                for (const childMissionId of [missionId - 3, missionId - 2, missionId - 1]) {
-                    const childDbProgress = actx.categoryMissionProgress?.get(childMissionId) ?? 0
-                    const childProgress = AwakeComputer.compute(childMissionId, ctx, childDbProgress)
-                    if (isMissionProgressComplete(
-                        9,
-                        childMissionId,
-                        Math.max(childDbProgress, childProgress),
-                    )) completedCount++
-                }
-                return Math.max(dbProgress, completedCount)
-            }
-        }
-
-        return dbProgress
+        const computed = computeAwakeDerivedProgress(missionId, ctx as AwakeContext)
+        return Math.max(dbProgress, Number.isFinite(computed) ? computed : 0)
     },
+}
+
+function computeAwakeDerivedProgress(missionId: number, actx: AwakeContext): number {
+    const charId = getCharacterIdFromMission(missionId)
+
+    const qc = QUEST_CLEAR_MAP.get(missionId)
+    if (qc) {
+        const progress = actx.questProgress[String(qc.category)]
+        if (!progress) return 0
+        const matches = progress.filter(q => qc.questIds.includes(q.questId) && q.finished)
+        if (matches.length === 0) return 0
+        const timeLimitMs = qc.timeLimitMs
+        if (timeLimitMs !== undefined
+            && !matches.some(q => (q.bestElapsedTimeMs ?? Infinity) <= timeLimitMs)) return 0
+        if (qc.leaderCharId
+            && !matches.some(q => q.leaderCharacterId === qc.leaderCharId)) return 0
+        return 1
+    }
+
+    // Per-finish atomic facts and unresolved families both read persisted progress.
+    if (AWAKE_DIRECT_BATTLE_MISSION_IDS.has(missionId)) {
+        return actx.categoryMissionProgress?.get(missionId) ?? 0
+    }
+
+    // Two-character co-clear missions can use their pairwise same-battle counter.
+    const reqChars = MULTI_CHAR_MISSIONS.get(missionId)
+    if (reqChars) {
+        let minCo = Infinity
+        for (let i = 0; i < reqChars.length - 1; i++) {
+            for (let j = i + 1; j < reqChars.length; j++) {
+                const count = actx.coClears.get(coClearKey(reqChars[i], reqChars[j])) ?? 0
+                if (count < minCo) minCo = count
+            }
+        }
+        return minCo === Infinity ? 0 : minCo
+    }
+
+    const isLeaderRequired = LEADER_REQUIRED_IDS.has(missionId)
+    switch (missionId % 10) {
+        case AwakeType.STORY_READ:
+            return computeStoryOrParty(missionId, actx, charId)
+
+        case AwakeType.PARTY_OR_SPECIAL:
+            if (charId === '1') return actx.totalStories
+            if (charId === '263002') return actx.player.totalManaObtained ?? 0
+            if (!AWAKE_GENERIC_CHARACTER_CLEAR_MISSION_IDS.has(missionId)
+                && !isLeaderRequired) return 0
+            return isLeaderRequired
+                ? actx.leaderClears.get(charId) ?? 0
+                : actx.charClears.get(charId) ?? 0
+
+        case AwakeType.SPECIAL:
+            if (BOND_TOKEN_MISSION_IDS.has(missionId)) {
+                const char = actx.charData.get(charId)
+                return isBondTokenMissionComplete(char?.bondTokenList) ? 1 : 0
+            }
+            if (COOP_MISSION_IDS.has(missionId)) {
+                return actx.leaderMultiClears.get(charId) ?? 0
+            }
+            if (!AWAKE_GENERIC_CHARACTER_CLEAR_MISSION_IDS.has(missionId)
+                && !isLeaderRequired) return 0
+            return isLeaderRequired
+                ? actx.leaderClears.get(charId) ?? 0
+                : actx.charClears.get(charId) ?? 0
+
+        case AwakeType.ALL_COMPLETE: {
+            let completedCount = 0
+            for (const childMissionId of [missionId - 3, missionId - 2, missionId - 1]) {
+                const childDbProgress = actx.categoryMissionProgress?.get(childMissionId) ?? 0
+                const childProgress = AwakeComputer.compute(childMissionId, actx, childDbProgress)
+                if (isMissionProgressComplete(9, childMissionId, childProgress)) completedCount++
+            }
+            return completedCount
+        }
+    }
+
+    return 0
 }
 
 enum AwakeType {
