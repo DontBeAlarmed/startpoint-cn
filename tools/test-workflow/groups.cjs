@@ -29,6 +29,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/modes_integration.test.cjs",
             "tools/modes_routes.test.cjs",
             "tools/modes_lifecycle.test.cjs",
+            "tools/modes_wiring.test.cjs",
         ],
     },
     "quick:seed": {

@@ -129,6 +129,12 @@ Mod 扩展它,`host.table` 也读不到未注册的表。模块的开关与配�
   `createContentLifecycleDependencies()`(cn-server 展开进协调器依赖的同一个组合)
   驱动真实 coordinator,snapshot/HTTP listen/TCP start 用 spy 不占端口,断言顺序为
   **内容快照 → 模块注册完成 → HTTP listen → TCP start**,空目录同序且零注册;
+- `tools/modes_wiring.test.cjs` —— **接线契约**:cn-server 导入即自动 `start()`,测试
+  无法安全导入它,因此改为对其**真实 AST** 断言:必须 import 该工厂、必须把工厂调用
+  **展开进** `createRuntimeCoordinator({...})` 依赖、且展开之后不得再出现会覆盖它的
+  `initializeContent` 键;并自带一项"守卫的守卫"——按 AST 区间删掉该展开后,前述断言
+  必须失败。已用真实变异验证:移除生产接线后本套件转红,而仅有顺序断言的
+  lifecycle 套件仍全绿,正是这条契约要堵的盲区;
 - `tools/modes_routes.test.cjs` —— **路由级**:真实 fastify handler 上,模块否决
   `/start` 返回 400 且消息即模块所抛;**无模块时 `/start` 精确断言 200 + 解码响应
   结构 + active quest 已创建**;`/finish` 结算故障时响应可追溯到 fixture 的唯一错误

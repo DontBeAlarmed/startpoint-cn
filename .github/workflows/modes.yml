@@ -23,7 +23,7 @@ jobs:
 
       # Loader, contract and real-wiring tests for the gameplay mode seam.
       - name: Mode seam tests
-        run: node --test tools/modes_loader.test.cjs tools/modes_contract.test.cjs tools/modes_integration.test.cjs tools/modes_lifecycle.test.cjs
+        run: node --test tools/modes_loader.test.cjs tools/modes_contract.test.cjs tools/modes_integration.test.cjs tools/modes_lifecycle.test.cjs tools/modes_wiring.test.cjs
 
       # Route-level: /start veto and /finish settlement rollback through the
       # real fastify handlers.
