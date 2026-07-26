@@ -39,7 +39,7 @@ test("ready health exposes only the embedded contract fields", () => {
         runtime: { api: 1, node: "v20.12.0" },
         database: { ready: true, schema: 4 },
         services: { http: true, tcp: true },
-        admin: { available: true },
+        admin: { required: true, available: true },
         assets: {
             mode: "local",
             status: "ready",
@@ -63,6 +63,7 @@ for (const overrides of [
     { contentInitialized: false },
     { httpListening: false },
     { tcpListening: false },
+    { adminAvailable: false },
 ]) {
     test(`ready phase still requires ${Object.keys(overrides)[0]}`, () => {
         const result = createRuntimeHealthSnapshot(state(overrides))
@@ -71,15 +72,14 @@ for (const overrides of [
     })
 }
 
-test("admin absence and client-owned unknown assets do not block readiness", () => {
+test("client-owned unknown assets do not block readiness", () => {
     const result = createRuntimeHealthSnapshot(state({
-        adminAvailable: false,
         assetMode: "client-owned",
     }))
 
     assert.equal(result.statusCode, 200)
     assert.equal(result.body.status, "ready")
-    assert.deepEqual(result.body.admin, { available: false })
+    assert.deepEqual(result.body.admin, { required: true, available: true })
     assert.deepEqual(result.body.assets, {
         mode: "client-owned",
         status: "unknown",

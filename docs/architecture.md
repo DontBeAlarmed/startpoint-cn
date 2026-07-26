@@ -24,7 +24,7 @@ CN 客户端 -> TCP 会话 -> 进程内房间与联机状态机
 
 受支持的前台入口是 `bash scripts/start-cn.sh`：
 
-1. `build:server` 编译 CN 服务端入口及其依赖。
+1. 根 `build` 与启动脚本统一进入 `build:server`，先构建并校验 React 管理后台，再编译 CN 服务端入口及其依赖。
 2. bootstrap 读取 `ASSET_MODE`。
 3. `local` 模式先执行 `content:sync`，成功后启动 `out/cn-server.js`；同步失败则不启动。
 4. `remote` 和 `client-owned` 模式跳过本地 `content:sync`，直接启动 `out/cn-server.js`。
@@ -43,7 +43,7 @@ SIGINT 或 SIGTERM 会进入统一关闭流程：停止接收 HTTP、停止 TCP�
 
 CN 客户端不能正确处理部分 `uint32` 标记，响应层会把安全范围内的 MsgPack `0xCE` 标记改写为等长的 `int32` 标记 `0xD2`。端点不得绕过统一响应管线自行拼接近似格式。
 
-版本检查、静态资源、健康检查和后台页面不使用游戏主 API 的 MsgPack 包装；具体格式由各自路由定义。
+版本检查、CDN 资源、漫画图片、健康检查和后台页面不使用游戏主 API 的 MsgPack 包装；具体格式由各自路由定义。漫画图片由 `/api/index.php/comic/image` 业务接口从本地 `web/public/comic/` 读取，不存在通用 `/public` 静态挂载。
 
 ### 3.2 TCP 联机
 
@@ -83,12 +83,9 @@ HTTP 路由分为三组：
 
 ## 7. 管理后台
 
-服务端同时保留两套管理界面：
+React 后台是唯一管理界面，由 `admin/` 构建到 `web/dist/`，在 `/admin/` 提供静态资源和客户端路由。`/` 与旧管理路径只做兼容重定向，不再存在服务器渲染的旧 HTML。
 
-- React 新后台由 `admin/` 构建到 `web/dist/`，服务端在产物存在时挂载到 `/admin/`；
-- 兼容旧后台由 `src/routes/web/` 提供，继续服务 `/`、`/player` 和 `/mail`。
-
-两者通过 `src/routes/web_api/` 或既有领域 API 操作同一 SQLite 状态。后台是可选产物，缺失 `web/dist/index.html` 不阻止游戏服务启动，健康状态会反映后台是否可用。
+后台通过 `src/routes/web_api/` 或既有领域 API 操作同一 SQLite 状态。`web/dist/index.html` 是构建、运行时初始化和 Server Bundle 的共同硬前置；缺失时构建或启动失败。SPA fallback 只处理 `/admin/*` 中不带扩展名且接受 HTML 的 GET 客户端路由；`/admin/assets/*`、带扩展名路径、游戏 API、管理 API 和 `/healthz` 均不进入 fallback。
 
 页面范围、构建边界和当前验收限制见[管理后台](./admin/README.md)。
 

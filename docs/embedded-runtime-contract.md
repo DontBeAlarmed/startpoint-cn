@@ -83,9 +83,7 @@ server-bundle/
   out/
   assets/
   web/
-    pages/
-    public/
-    dist/                 # 可选
+    dist/                 # 必需管理后台产物
   LICENSE
   NOTICE
   server-manifest.json
@@ -97,7 +95,9 @@ Bundle 不包含：
 - 玩家数据库和运行状态；
 - Content Store / 激活指针；
 - CDN 归档和 `asset-patch` payload；
-- 日志、APK、签名材料和漫画大图。
+- 日志、APK、签名材料和 `web/public/` 本地内容（包括漫画大图）。
+
+漫画由部署者在 Bundle 外准备，并通过 `/api/index.php/comic/image` 业务接口读取本地 `web/public/comic/` 约定目录；Server Bundle 不提供通用 `/public` 静态根。
 
 构建、清单和 verifier 见 [`runtime/server-bundle.md`](./runtime/server-bundle.md)。Supervisor 必须在执行 `out/cn-server.js` 前运行等价的完整校验。服务进程只读取 manifest 的版本和 `bundleId` 用于健康报告，不在每次启动时重复哈希整个 Bundle。
 
@@ -159,7 +159,7 @@ manifest 核心字段如下：
   },
   "admin": {
     "path": "web/dist",
-    "required": false
+    "required": true
   },
   "assets": {
     "supportedModes": ["client-owned", "local", "remote"],
@@ -234,7 +234,7 @@ DATA_DIR=<ABSOLUTE_DATA_VOLUME> \
 
 ## 健康接口
 
-`GET /healthz` 是普通 JSON，不依赖管理后台：
+`GET /healthz` 是普通 JSON，不经过管理后台 SPA fallback：
 
 - `200`：HTTP、TCP、数据库和 Content snapshot 全部就绪；
 - `503`：仍在启动、正在停止或关键组件不可用。
@@ -262,7 +262,8 @@ DATA_DIR=<ABSOLUTE_DATA_VOLUME> \
     "tcp": true
   },
   "admin": {
-    "available": false
+    "required": true,
+    "available": true
   },
   "assets": {
     "mode": "client-owned",
@@ -273,7 +274,7 @@ DATA_DIR=<ABSOLUTE_DATA_VOLUME> \
 }
 ```
 
-源码开发运行没有 manifest 时，`serverBundle.bundleId` 为 `null`，版本回退到 `package.json`。嵌入模式不允许该回退。`admin.available=false` 和 client-owned 的资源 `unknown` 不阻止游戏服务进入 ready。
+源码开发运行没有 manifest 时，`serverBundle.bundleId` 为 `null`，版本回退到 `package.json`。嵌入模式不允许该回退。后台是必需组件：缺少 `web/dist/index.html` 时运行时拒绝初始化，`admin.available=false` 也会阻止健康状态进入 ready；client-owned 的资源 `unknown` 仍不阻止 ready。
 
 ## 更新与回滚
 
@@ -319,7 +320,7 @@ Builder 和服务进程都不能自行操作这些指针。
 - `/healthz`；
 - 可重复 Server Bundle、canonical manifest 和独立 verifier；
 - Runtime Pack 依赖锁兼容校验与嵌入模式严格身份检查；
-- 可选管理后台产物。
+- 必需管理后台产物。
 
 尚未属于服务端仓库的工作：
 

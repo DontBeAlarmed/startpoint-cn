@@ -2,7 +2,7 @@
 
 本目录描述服务端作为独立运行产物被 Android 启动器、桌面壳、容器或进程管理器托管时的稳定边界。
 
-- [Server Bundle](./server-bundle.md)：可验证服务端代码包、manifest、可选后台产物和校验规则。
+- [Server Bundle](./server-bundle.md)：可验证服务端代码包、manifest、必需后台产物和校验规则。
 - [嵌入式运行契约](../embedded-runtime-contract.md)：Data Volume、启动配置、健康检查、退出和回滚职责。
 - [当前运行时架构](../architecture.md)：普通开发启动与 Content Runtime 生命周期。
 

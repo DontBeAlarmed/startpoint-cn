@@ -258,6 +258,7 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/server_bundle.test.cjs",
             "tools/runtime_bundle_metadata.test.cjs",
             "tools/runtime_config.test.cjs",
+            "tools/runtime_admin.test.cjs",
             "tools/runtime_health.test.cjs",
             "tools/runtime_lifecycle.test.cjs",
         ],

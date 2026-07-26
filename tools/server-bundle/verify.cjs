@@ -52,8 +52,6 @@ function requireOwnedBundlePath(relativePath, directory) {
     if (!directory && (relativePath === "LICENSE" || relativePath === "NOTICE")) return
     if (isWithin(relativePath, "out") && !isWithin(relativePath, "out/.tsbuildinfo-cn")) return
     if (isWithin(relativePath, "assets") && !isWithin(relativePath, "assets/asset-patch")) return
-    if (isWithin(relativePath, "web/pages")) return
-    if (isWithin(relativePath, "web/public") && !isWithin(relativePath, "web/public/comic")) return
     if (isWithin(relativePath, "web/dist")) return
     if (directory && relativePath === "web") return
     fail(`bundle path "${relativePath}" is not an allowed owned path`)
@@ -152,7 +150,7 @@ function validateManifest(manifest, manifestBytes, dataSchema, dependencyLock) {
     if (safeRelativePath(manifest.admin.path, "admin.path") !== "web/dist") {
         fail("admin.path must be web/dist")
     }
-    if (typeof manifest.admin.required !== "boolean") fail("admin.required must be boolean")
+    if (manifest.admin.required !== true) fail("admin.required must be true")
 
     exactKeys(manifest.assets, ["minClientAssetVersion", "supportedModes"], "assets")
     if (manifest.assets.minClientAssetVersion !== "1.4.54") {
@@ -192,8 +190,7 @@ function validateManifest(manifest, manifestBytes, dataSchema, dependencyLock) {
         if (!seen.has(requiredFile)) fail(`${requiredFile} is required in files`)
     }
     const adminIndex = `${manifest.admin.path}/index.html`
-    const hasAdminFiles = manifest.files.some(file => file.path.startsWith(`${manifest.admin.path}/`))
-    if ((manifest.admin.required || hasAdminFiles) && !seen.has(adminIndex)) {
+    if (!seen.has(adminIndex)) {
         fail("required admin index is missing")
     }
 

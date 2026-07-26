@@ -62,7 +62,7 @@ function createHarness(overrides = {}) {
         bundleVersion: "1.0.1",
         bundleId: "sha256:test-bundle",
         nodeVersion: "v20.12.0",
-        adminAvailable: false,
+        adminAvailable: true,
         shutdownStepTimeoutMs: 25,
         reportShutdownFailures(failures) { calls.push(["shutdown-failures", failures]) },
         ...overrides,

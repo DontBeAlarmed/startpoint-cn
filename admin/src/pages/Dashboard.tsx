@@ -162,8 +162,8 @@ export default function Dashboard() {
                 <Alert
                     type="info"
                     showIcon
-                    message="新版 React 管理后台"
-                    description="当前阶段优先统一应用壳、视觉系统和响应式体验；旧后台页面保持冻结。"
+                    message="唯一内置管理后台"
+                    description="此管理后台随服务端一同构建，用于统一查看运行状态并执行日常管理操作。"
                 />
 
                 <div className="admin-card-grid">

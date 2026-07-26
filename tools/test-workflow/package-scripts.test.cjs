@@ -6,6 +6,7 @@ const test = require("node:test")
 const root = path.resolve(__dirname, "../..")
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"))
 const packageLock = JSON.parse(fs.readFileSync(path.join(root, "package-lock.json"), "utf8"))
+const adminPackageJson = JSON.parse(fs.readFileSync(path.join(root, "admin/package.json"), "utf8"))
 const cnTsconfig = JSON.parse(fs.readFileSync(path.join(root, "tsconfig.cn.json"), "utf8"))
 const { scripts } = packageJson
 
@@ -18,15 +19,19 @@ test("requires the Node version that provides process.loadEnvFile", () => {
 
 test("runs typecheck through Node with the project memory limit", () => {
     assert.equal(scripts.typecheck, `${tsc} --noEmit`)
+    assert.equal(packageJson.devDependencies.typescript, "5.4.5")
+    assert.equal(packageLock.packages["node_modules/typescript"].version, "5.4.5")
 })
 
 test("keeps CN server and legacy builds separate", () => {
+    assert.equal(scripts.build, "npm run build:server")
     assert.equal(
         scripts["build:server"],
         "node tools/test-workflow/build-cn.cjs",
     )
     assert.equal(scripts["build:legacy"], `${tsc} -p tsconfig.json`)
-    assert.doesNotMatch(scripts["build:server"], /admin|css/)
+    assert.doesNotMatch(scripts["build:server"], /css/)
+    assert.equal(scripts.dev, "npm run build:server && node --env-file=.env out/server.js")
 })
 
 test("builds and verifies deterministic thin server bundles", () => {
@@ -59,9 +64,14 @@ test("builds before the supported CN startup bootstrap", () => {
     )
 })
 
-test("separates reproducible admin installation from its build", () => {
-    assert.equal(scripts["install:admin"], "npm --prefix admin ci")
-    assert.equal(scripts["build:admin"], "npm --prefix admin run build")
+test("installs and builds admin through the root workspace lock", () => {
+    assert.deepEqual(packageJson.workspaces, ["admin"])
+    assert.equal(packageLock.packages[""].workspaces[0], "admin")
+    assert.equal(packageLock.packages.admin.name, adminPackageJson.name)
+    assert.equal(packageLock.packages.admin.version, adminPackageJson.version)
+    assert.equal(fs.existsSync(path.join(root, "admin/package-lock.json")), false)
+    assert.equal(scripts["install:admin"], undefined)
+    assert.equal(scripts["build:admin"], "npm run build --workspace=starpoint-admin")
     assert.doesNotMatch(scripts["build:admin"], /\b(?:install|ci)\b/)
 })
 

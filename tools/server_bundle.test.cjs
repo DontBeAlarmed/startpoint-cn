@@ -27,7 +27,7 @@ function write(root, relativePath, contents) {
     fs.writeFileSync(destination, contents)
 }
 
-function temporaryProject(t, { admin = false } = {}) {
+function temporaryProject(t, { admin = true } = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "server-bundle-project-"))
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))
 
@@ -48,9 +48,6 @@ function temporaryProject(t, { admin = false } = {}) {
     write(root, "assets/base.json", "{\"base\":true}\n")
     write(root, "assets/nested/table.json", "{\"table\":true}\n")
     write(root, "assets/asset-patch/archive/large.zip", "excluded patch")
-    write(root, "web/pages/player.html", "<main>player</main>\n")
-    write(root, "web/public/app.css", "body {}\n")
-    write(root, "web/public/comic/large.jpg", "excluded comic")
     write(root, "LICENSE", "GPL-3.0-or-later\n")
     write(root, "NOTICE", "notice\n")
     write(root, "node_modules/pkg/index.js", "excluded dependency")
@@ -99,9 +96,10 @@ function buildFixture(t, options) {
     return { manifest, outputRoot, root }
 }
 
-test("builds a canonical reproducible thin server bundle with stable file metadata", t => {
+test("builds a canonical reproducible thin server bundle without web/public", t => {
     const { buildServerBundle } = loadImplementations()
     const root = temporaryProject(t)
+    assert.equal(fs.existsSync(path.join(root, "web/public")), false)
     const firstOutput = path.join(root, "dist/server-bundle")
     const secondOutput = path.join(root, "dist/server-bundle-copy")
 
@@ -117,7 +115,7 @@ test("builds a canonical reproducible thin server bundle with stable file metada
     assert.deepEqual(rebuiltBytes, firstBytes)
     assert.deepEqual(secondBytes, firstBytes)
     assert.deepEqual(first, {
-        admin: { path: "web/dist", required: false },
+        admin: { path: "web/dist", required: true },
         assets: {
             minClientAssetVersion: "1.4.54",
             supportedModes: ["client-owned", "local", "remote"],
@@ -149,8 +147,8 @@ test("builds a canonical reproducible thin server bundle with stable file metada
             "assets/nested/table.json",
             "out/cn-server.js",
             "out/lib/runtime.js",
-            "web/pages/player.html",
-            "web/public/app.css",
+            "web/dist/assets/admin.js",
+            "web/dist/index.html",
         ],
     )
     assert.equal(first.files.some(file => file.path === "server-manifest.json"), false)
@@ -162,15 +160,27 @@ test("builds a canonical reproducible thin server bundle with stable file metada
     assert.deepEqual(firstBytes, canonicalBuffer(first))
 })
 
-test("treats the optional admin build as absent without index.html and includes it when present", t => {
-    const absent = buildFixture(t)
-    assert.equal(absent.manifest.files.some(file => file.path.startsWith("web/dist/")), false)
+test("requires a complete admin build and excludes legacy pages", t => {
+    const { buildServerBundle } = loadImplementations()
+    const absentRoot = temporaryProject(t, { admin: false })
+    assert.throws(
+        () => buildServerBundle({ projectRoot: absentRoot, outputRoot: path.join(absentRoot, "dist/bundle") }),
+        /admin.*(?:missing|index)/i,
+    )
 
-    const present = buildFixture(t, { admin: true })
+    const missingIndexRoot = temporaryProject(t)
+    fs.unlinkSync(path.join(missingIndexRoot, "web/dist/index.html"))
+    assert.throws(
+        () => buildServerBundle({ projectRoot: missingIndexRoot, outputRoot: path.join(missingIndexRoot, "dist/bundle") }),
+        /admin.*index/i,
+    )
+
+    const present = buildFixture(t)
     assert.deepEqual(
         present.manifest.files.filter(file => file.path.startsWith("web/dist/")).map(file => file.path),
         ["web/dist/assets/admin.js", "web/dist/index.html"],
     )
+    assert.equal(present.manifest.files.some(file => file.path.startsWith("web/pages/")), false)
 })
 
 test("builder rejects unsafe input trees, input-contained output, and unowned output", async t => {
@@ -194,6 +204,15 @@ test("builder rejects unsafe input trees, input-contained output, and unowned ou
         assert.throws(
             () => buildServerBundle({ projectRoot: root, outputRoot: path.join(root, "dist/bundle") }),
             /regular file|directory/i,
+        )
+    })
+
+    await t.test("legacy web pages input", t => {
+        const root = temporaryProject(t)
+        write(root, "web/pages/player.html", "<main>legacy admin</main>\n")
+        assert.throws(
+            () => buildServerBundle({ projectRoot: root, outputRoot: path.join(root, "dist/bundle") }),
+            /web\/pages|legacy admin/i,
         )
     })
 
@@ -304,7 +323,8 @@ test("verifier rejects self-consistent files outside the owned bundle roots", as
         ".cdn/archive.zip",
         "apk/client.apk",
         "assets/asset-patch/archive/patch.zip",
-        "web/public/comic/page.png",
+        "web/public/injected.txt",
+        "web/pages/player.html",
         "out/.tsbuildinfo-cn",
     ]) {
         await t.test(relativePath, t => {
@@ -448,20 +468,19 @@ test("verifier enforces runtime, Node, data schema, entry, and admin compatibili
         assert.throws(() => verifyServerBundle({ bundleRoot: fixture.outputRoot }), /entry|missing/i)
     })
 
-    await t.test("required admin absent", t => {
+    await t.test("admin cannot be marked optional", t => {
         const fixture = buildFixture(t)
-        rewriteManifest(fixture.outputRoot, manifest => { manifest.admin.required = true })
+        rewriteManifest(fixture.outputRoot, manifest => { manifest.admin.required = false })
         assert.throws(() => verifyServerBundle({ bundleRoot: fixture.outputRoot }), /admin/i)
     })
 
     await t.test("required admin present", t => {
-        const fixture = buildFixture(t, { admin: true })
-        rewriteManifest(fixture.outputRoot, manifest => { manifest.admin.required = true })
+        const fixture = buildFixture(t)
         assert.doesNotThrow(() => verifyServerBundle({ bundleRoot: fixture.outputRoot }))
     })
 
     await t.test("required admin without index", t => {
-        const fixture = buildFixture(t, { admin: true })
+        const fixture = buildFixture(t)
         fs.unlinkSync(path.join(fixture.outputRoot, "web/dist/index.html"))
         rewriteManifest(fixture.outputRoot, manifest => {
             manifest.admin.required = true
@@ -470,14 +489,6 @@ test("verifier enforces runtime, Node, data schema, entry, and admin compatibili
         assert.throws(() => verifyServerBundle({ bundleRoot: fixture.outputRoot }), /admin.*index/i)
     })
 
-    await t.test("optional admin files without index", t => {
-        const fixture = buildFixture(t, { admin: true })
-        fs.unlinkSync(path.join(fixture.outputRoot, "web/dist/index.html"))
-        rewriteManifest(fixture.outputRoot, manifest => {
-            manifest.files = manifest.files.filter(file => file.path !== "web/dist/index.html")
-        })
-        assert.throws(() => verifyServerBundle({ bundleRoot: fixture.outputRoot }), /admin.*index/i)
-    })
 })
 
 test("verifier keeps traversal and validation independent from the builder", () => {

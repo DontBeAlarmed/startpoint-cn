@@ -46,10 +46,6 @@
 				"python.terminal.activateEnvironment": false,
 				//Required for phone connection. Should work regardless of local instance setting
 				"remote.localPortHost":"allInterfaces",
-				"files.associations": {
-					//Since we are never not using tailwind, allow all CSS files to be linted with the tailwind extension
-					"css":"tailwindcss"
-				},
 				"[css]": {
 					"editor.quickSuggestions": {
 						//TODO: Turn this off if determined to be too annoying.
@@ -93,7 +89,6 @@
 				"ms-python.debugpy",
 				"yzhang.markdown-all-in-one",
 				"DavidAnson.vscode-markdownlint",
-				"bradlc.vscode-tailwindcss",
 				"mikestead.dotenv",
 				"eamodio.gitlens",
 				"christian-kohler.npm-intellisense",

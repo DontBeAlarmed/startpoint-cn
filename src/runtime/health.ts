@@ -37,6 +37,7 @@ export interface RuntimeHealthBody {
         readonly tcp: boolean
     }
     readonly admin: {
+        readonly required: true
         readonly available: boolean
     }
     readonly assets: {
@@ -59,6 +60,7 @@ export function createRuntimeHealthSnapshot(state: RuntimeHealthState): RuntimeH
         && state.contentInitialized
         && state.httpListening
         && state.tcpListening
+        && state.adminAvailable
     const status = state.phase === "ready" && !ready ? "failed" : state.phase
     const assetStatus = state.assetMode === "client-owned"
         ? "unknown"
@@ -79,7 +81,7 @@ export function createRuntimeHealthSnapshot(state: RuntimeHealthState): RuntimeH
                 http: state.httpListening,
                 tcp: state.tcpListening,
             }),
-            admin: Object.freeze({ available: state.adminAvailable }),
+            admin: Object.freeze({ required: true as const, available: state.adminAvailable }),
             assets: Object.freeze({
                 mode: state.assetMode,
                 status: assetStatus,

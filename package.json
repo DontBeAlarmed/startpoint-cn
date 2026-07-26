@@ -3,18 +3,19 @@
   "version": "1.0.1",
   "description": "世界弹射物语(World Flipper)CN(雷霆)版本服务端模拟器",
   "main": "server.ts",
+  "workspaces": [
+    "admin"
+  ],
   "scripts": {
-    "build": "npm run build:legacy && npm run css",
+    "build": "npm run build:server",
     "typecheck": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit",
     "build:server": "node tools/test-workflow/build-cn.cjs",
     "build:bundle": "npm run build:server && node tools/server-bundle/build.cjs",
     "build:legacy": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc -p tsconfig.json",
-    "css": "npx tailwindcss -i ./src/input.css -o ./web/public/tailwind.css",
-    "css:watch": "npx tailwindcss -i ./src/input.css -o ./web/public/tailwind.css --watch --poll",
-    "dev": "npm run build && node --env-file=.env out/server.js",
+    "dev": "npm run build:server && node --env-file=.env out/server.js",
     "cdn": "npm run build:legacy && node --env-file=.env out/validate_cdn.js",
     "unzip": "npm run build:legacy && node --env-file=.env out/unzip_cdn.js",
-    "debug": "npm run css && npm run css:watch & npm run debug:ts-only",
+    "debug": "npm run debug:ts-only",
     "debug:ts-only": "tsnd --inspect -- src/server.ts",
     "start:cn": "node tools/start_cn.cjs",
     "dev:cn": "npm run build:server && node tools/start_cn.cjs",
@@ -27,9 +28,8 @@
     "content:pass": "node scripts/gen_pass_mission_data.js",
     "content:active-mission": "node scripts/gen_active_mission_data.js",
     "verify:bundle": "node tools/server-bundle/verify.cjs",
-    "install:admin": "npm --prefix admin ci",
-    "build:admin": "npm --prefix admin run build",
-    "dev:admin": "cd admin && npm run dev",
+    "build:admin": "npm run build --workspace=starpoint-admin",
+    "dev:admin": "npm run dev --workspace=starpoint-admin",
     "test:quick": "node tools/test-workflow/run.cjs --group quick",
     "test:changed": "node tools/test-workflow/run.cjs --changed",
     "test:integration": "node tools/test-workflow/run.cjs --group integration",
@@ -50,7 +50,7 @@
     "@types/unzipper": "^0.10.9",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.4.5"
+    "typescript": "5.4.5"
   },
   "dependencies": {
     "@fastify/multipart": "^9.0.0",
@@ -61,7 +61,6 @@
     "fastify": "^5.0.0",
     "msgpackr": "^1.11.0",
     "readline-sync": "^1.4.10",
-    "tailwindcss": "^3.2.0",
     "unzipper": "^0.12.3"
   },
   "engines": {

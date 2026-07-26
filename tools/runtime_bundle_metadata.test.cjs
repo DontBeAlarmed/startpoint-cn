@@ -157,7 +157,7 @@ test("missing or invalid metadata uses a safe explicit fallback", async t => {
             contentInitialized: true,
             httpListening: true,
             tcpListening: true,
-            adminAvailable: false,
+            adminAvailable: true,
             assetMode: "client-owned",
         })
         assert.equal(health.statusCode, 200)

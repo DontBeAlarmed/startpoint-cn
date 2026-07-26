@@ -32,7 +32,7 @@ StarPoint CN 是《世界弹射物语》国服（雷霆）客户端的非官方�
 默认 `ASSET_MODE=local`。准备好官方 CDN 后：
 
 ```bash
-npm install
+npm ci
 cp .env.example .env
 bash scripts/start-cn.sh
 ```
@@ -43,6 +43,7 @@ bash scripts/start-cn.sh
 
 | 命令 | 用途 |
 |---|---|
+| `npm run build` | 构建必需的 React 后台与服务端（等价于 `build:server`） |
 | `bash scripts/start-cn.sh` | 前台构建；`local` 同步后启动，其他资源模式直接启动 |
 | `npm run start:cn` | 使用已有构建；`local` 同步后启动，其他资源模式直接启动 |
 | `npm run dev:cn` | 构建服务端；`local` 同步后启动，其他资源模式直接启动 |
@@ -56,16 +57,18 @@ bash scripts/start-cn.sh
 
 `node out/cn-server.js` 是不会自动同步内容的低级调试入口；常规运行应使用上表中的受支持启动命令。
 
-## 可选管理后台
+## 管理后台
 
-新版管理后台位于 `/admin/`，仍处于持续开发和验收阶段；兼容旧后台保留在 `/`、`/player`、`/mail` 和 `/seeds`。
+React 管理后台是服务端内置的唯一管理界面，位于 `/admin/`。`/` 会进入该后台，`/player`、`/player/:id`、`/mail` 和 `/seeds` 只保留到对应 SPA 页面的一次兼容重定向。
 
-首次构建新版后台，或 `admin/package-lock.json` 变化时，执行：
+根目录 `package-lock.json` 同时锁定服务端与 `admin` workspace 的依赖。安装和构建使用：
 
 ```bash
-npm run install:admin
-npm run build:admin
+npm ci
+npm run build
 ```
+
+根 `build` 委托给 `build:server`：先构建后台并确认 `web/dist/index.html`，再编译服务端；任一步失败都不会产生受支持的无后台服务端构建。`build:legacy` 只供 CDN 校验和解包工具使用。
 
 ## 客户端补丁
 
@@ -84,11 +87,11 @@ bash client-patch/apply.sh <AS3_EXPORT_DIR> <SERVER_HOST>:8001
 
 ## 项目结构
 
-- `src/routes/`：CN 与通用 HTTP API、兼容后台 API
+- `src/routes/`：CN 与通用 HTTP API、管理后台 API
 - `src/multi/`：多人房间、NPC 队友和 TCP 会话
 - `src/data/`：SQLite 数据层及 22 个领域模块
 - `src/content/`：CDN 解析、Content Release 与运行时快照
-- `admin/`：新版 React 管理后台
+- `admin/`：React 管理后台
 - `assets/`：服务端业务表和内置静态数据
 - `docs/`：当前架构、系统、协议、参考与状态文档
 

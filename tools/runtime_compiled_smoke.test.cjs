@@ -312,11 +312,12 @@ test("compiled lifecycle order and metadata fallback survive an isolated bundle"
         contentInitialized: true,
         httpListening: true,
         tcpListening: true,
-        adminAvailable: false,
+        adminAvailable: true,
         assetMode: "client-owned",
     })
     assert.equal(health.statusCode, 200)
     assert.equal(health.body.serverBundle.version, "unknown")
+    assert.deepEqual(health.body.admin, { required: true, available: true })
 
     const seedDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "compiled-seed-state-"))
     t.after(() => fs.rmSync(seedDataDir, { recursive: true, force: true }))

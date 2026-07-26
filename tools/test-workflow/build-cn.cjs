@@ -10,13 +10,25 @@ function processStatus(result) {
     return result.status
 }
 
+function hasRequiredAdminBuild(projectRoot) {
+    try {
+        const status = fs.lstatSync(path.join(projectRoot, "web/dist/index.html"))
+        return status.isFile() && !status.isSymbolicLink()
+    } catch {
+        return false
+    }
+}
+
 function runCnBuild(dependencies = {}) {
     const projectRoot = path.resolve(dependencies.projectRoot ?? path.resolve(__dirname, "../.."))
     const executable = dependencies.executable ?? process.execPath
+    const npmExecutable = dependencies.npmExecutable ?? (process.platform === "win32" ? "npm.cmd" : "npm")
     const spawn = dependencies.spawnSync ?? spawnSync
     const stderr = dependencies.stderr ?? process.stderr
     const removeBuildInfo = dependencies.removeBuildInfo
         ?? (filePath => fs.rmSync(filePath, { force: true }))
+    const verifyAdminBuild = dependencies.verifyAdminBuild
+        ?? (() => hasRequiredAdminBuild(projectRoot))
     const spawnOptions = {
         cwd: projectRoot,
         shell: false,
@@ -33,13 +45,26 @@ function runCnBuild(dependencies = {}) {
         path.join(projectRoot, "out"),
     ]
 
-    const run = (stage, args) => {
+    const run = (stage, args, command = executable) => {
         try {
-            return processStatus(spawn(executable, args, spawnOptions))
+            return processStatus(spawn(command, args, spawnOptions))
         } catch {
             stderr.write(`CN build ${stage} process failed to start\n`)
             return 1
         }
+    }
+
+    const adminBuildStatus = run("admin", ["run", "build:admin"], npmExecutable)
+    if (adminBuildStatus !== 0) return adminBuildStatus
+    let adminReady = false
+    try {
+        adminReady = verifyAdminBuild()
+    } catch {
+        adminReady = false
+    }
+    if (!adminReady) {
+        stderr.write("CN build admin output invalid: web/dist/index.html is required\n")
+        return 1
     }
 
     const firstCompileStatus = run("TypeScript", tscArgs)
@@ -65,4 +90,4 @@ if (require.main === module) {
     process.exitCode = runCnBuild()
 }
 
-module.exports = { runCnBuild }
+module.exports = { hasRequiredAdminBuild, runCnBuild }

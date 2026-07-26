@@ -34,8 +34,6 @@ import paymentApiPlugin from "./routes/api/payment"
 import newsApiPlugin from "./routes/api/news"
 import raidEventApiPlugin from "./routes/api/raidEvent"
 import rushEventApiPlugin from "./routes/api/rushEvent"
-// web routes
-import indexWebPlugin from "./routes/web"
 // web api routes
 import indexWebApiPlugin from "./routes/web_api"
 // misc routes
@@ -44,6 +42,7 @@ import infodeskPlugin from "./routes/infodesk";
 import { initializeContentSnapshot } from "./content/runtime/content-snapshot";
 import { initializeDatabase } from "./data";
 import { configureSerializedAssetVersionProvider } from "./data/utils/serialized-asset-version";
+import { registerAdminUi } from "./runtime/admin";
 
 // gc-openapi-zinny3.kakaogames.com
 // gc-infodesk-zinny3.kakaogames.com
@@ -53,6 +52,7 @@ import { configureSerializedAssetVersionProvider } from "./data/utils/serialized
 const fastify = Fastify({
     logger: false
 })
+const projectRoot = path.resolve(__dirname, "..")
 configureSerializedAssetVersionProvider(getLegacyAvailableAssetVersion)
 
 // serializers
@@ -135,18 +135,10 @@ fastify.register(openapiPlugin, { prefix: "/openapi/service" })
 // infodesk
 fastify.register(infodeskPlugin, { prefix: "/infodesk" })
 
-// web routes
-fastify.register(indexWebPlugin, { prefix: "/" })
-
 // web api routes
 fastify.register(indexWebApiPlugin, { prefix: "/api" })
 
-// web static
-fastify.register(fastifyStatic, {
-    root: path.join(__dirname, "..", "web/public"),
-    prefix: "/public",
-    decorateReply: false
-})
+registerAdminUi(fastify, { projectRoot })
 
 // static CDN
 const cdnDir = process.env.CDN_DIR || ".cdn"

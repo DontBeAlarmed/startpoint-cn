@@ -13,7 +13,7 @@
 5. 使用 `bash scripts/start-cn.sh` 前台启动。
 
 ```bash
-npm install
+npm ci
 cp .env.example .env
 bash scripts/start-cn.sh
 ```
@@ -26,14 +26,16 @@ bash scripts/start-cn.sh
 | `remote` | 跳过本地 `content:sync`，使用配置的远程资源地址启动 |
 | `client-owned` | 跳过本地 `content:sync`，不向客户端发布资源更新地址 |
 
-## 可选管理后台
+## 管理后台
 
-游戏服务不依赖新版后台。需要使用 `/admin/` 时，首次构建或 `admin/package-lock.json` 变化后执行：
+React 管理后台是服务端唯一管理界面，也是受支持构建和启动的必需产物。根目录 `npm ci` 会按同一份 `package-lock.json` 安装服务端与 `admin` workspace 依赖；标准 `build` 和受支持的启动入口都会通过 `build:server` 先生成并校验 `web/dist/index.html`。
 
 ```bash
-npm run install:admin
-npm run build:admin
+npm ci
+npm run build
 ```
+
+缺少后台入口文件时，服务端会在初始化阶段明确拒绝启动。`/` 和旧管理路径只重定向到 `/admin/` 下的对应 SPA 页面，不再提供旧 HTML。
 
 ## 网络范围
 

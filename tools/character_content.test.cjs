@@ -154,19 +154,9 @@ test("character content is not read while adapter, race utilities, and routes ar
             "cdndata/character.json",
             "cdndata/character_text.json",
         ])
-
-        const playerRouteSource = fs.readFileSync(
-            path.join(projectRoot, "src/routes/web/player.ts"),
-            "utf8",
-        )
-        assert(
-            playerRouteSource.indexOf("getCharacterLookup()")
-                > playerRouteSource.indexOf('fastify.get("/:playerId"'),
-            "player route must read character content inside its request handler",
-        )
     } finally {
         productionContentSnapshotProvider.snapshot = previousSnapshot
-    }
+}
 })
 
 test("production TypeScript has no external character data dependency", () => {

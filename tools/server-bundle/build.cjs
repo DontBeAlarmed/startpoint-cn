@@ -117,18 +117,16 @@ function copySingleFile({ sourcePath, destinationRoot, bundleRelative, files }) 
     files.push({ path: bundleRelative, bytes: bytes.length, sha256: sha256Hex(bytes) })
 }
 
-function inspectOptionalAdmin(projectRoot) {
+function inspectRequiredAdmin(projectRoot) {
     const adminRoot = path.join(projectRoot, "web/dist")
-    const rootStatus = lstat(adminRoot, "Optional admin input", { optional: true })
-    if (rootStatus === null) return null
-    if (rootStatus.isSymbolicLink()) throw new Error("Optional admin input must not be a symbolic link")
-    if (!rootStatus.isDirectory()) throw new Error("Optional admin input must be a directory")
+    const rootStatus = lstat(adminRoot, "Required admin input")
+    if (rootStatus.isSymbolicLink()) throw new Error("Required admin input must not be a symbolic link")
+    if (!rootStatus.isDirectory()) throw new Error("Required admin input must be a directory")
 
     const indexPath = path.join(adminRoot, "index.html")
-    const indexStatus = lstat(indexPath, "Optional admin index", { optional: true })
-    if (indexStatus === null) return null
-    if (indexStatus.isSymbolicLink()) throw new Error("Optional admin index must not be a symbolic link")
-    if (!indexStatus.isFile()) throw new Error("Optional admin index must be a regular file")
+    const indexStatus = lstat(indexPath, "Required admin index")
+    if (indexStatus.isSymbolicLink()) throw new Error("Required admin index must not be a symbolic link")
+    if (!indexStatus.isFile()) throw new Error("Required admin index must be a regular file")
     return adminRoot
 }
 
@@ -167,6 +165,10 @@ function publishBundle(temporaryRoot, outputRoot, hadExistingOutput) {
 function buildServerBundle(options = {}) {
     const projectRoot = path.resolve(options.projectRoot ?? path.resolve(__dirname, "../.."))
     const outputRoot = path.resolve(projectRoot, options.outputRoot ?? DEFAULT_OUTPUT)
+    const legacyAdminRoot = path.join(projectRoot, "web/pages")
+    if (lstat(legacyAdminRoot, "Legacy admin source web/pages", { optional: true }) !== null) {
+        throw new Error("Legacy admin source web/pages must be removed before building a server bundle")
+    }
     const packageBytes = readRegularFile(path.join(projectRoot, "package.json"), "Input package.json")
     const dependencyLockBytes = readRegularFile(
         path.join(projectRoot, "package-lock.json"),
@@ -197,13 +199,11 @@ function buildServerBundle(options = {}) {
         throw new Error("Input dependency lock is incompatible with package metadata")
     }
 
-    const adminRoot = inspectOptionalAdmin(projectRoot)
+    const adminRoot = inspectRequiredAdmin(projectRoot)
     const inputs = [
         path.join(projectRoot, "out"),
         path.join(projectRoot, "assets"),
-        path.join(projectRoot, "web/pages"),
-        path.join(projectRoot, "web/public"),
-        ...(adminRoot === null ? [] : [adminRoot]),
+        adminRoot,
     ].map(input => path.resolve(input))
     for (const input of inputs) {
         if (isContainedBy(outputRoot, input)) {
@@ -233,28 +233,12 @@ function buildServerBundle(options = {}) {
             files,
         })
         copyTree({
-            sourceRoot: path.join(projectRoot, "web/pages"),
+            sourceRoot: adminRoot,
             destinationRoot: temporaryRoot,
-            destinationPrefix: "web/pages",
+            destinationPrefix: "web/dist",
             exclude: () => false,
             files,
         })
-        copyTree({
-            sourceRoot: path.join(projectRoot, "web/public"),
-            destinationRoot: temporaryRoot,
-            destinationPrefix: "web/public",
-            exclude: relative => relative === "comic" || relative.startsWith("comic/"),
-            files,
-        })
-        if (adminRoot !== null) {
-            copyTree({
-                sourceRoot: adminRoot,
-                destinationRoot: temporaryRoot,
-                destinationPrefix: "web/dist",
-                exclude: () => false,
-                files,
-            })
-        }
         copySingleFile({ sourcePath: path.join(projectRoot, "LICENSE"), destinationRoot: temporaryRoot, bundleRelative: "LICENSE", files })
         copySingleFile({ sourcePath: path.join(projectRoot, "NOTICE"), destinationRoot: temporaryRoot, bundleRelative: "NOTICE", files })
         files.sort((left, right) => compareRelativePaths(left.path, right.path))
@@ -274,7 +258,7 @@ function buildServerBundle(options = {}) {
                 minDataSchema: 0,
                 targetDataSchema: 6,
             },
-            admin: { path: "web/dist", required: false },
+            admin: { path: "web/dist", required: true },
             assets: {
                 supportedModes: ["client-owned", "local", "remote"],
                 minClientAssetVersion: "1.4.54",
