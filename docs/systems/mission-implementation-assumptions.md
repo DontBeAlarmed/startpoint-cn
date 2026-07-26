@@ -51,6 +51,15 @@
 - 1225 在 Active Mission reconcile 与响应构建成功后，才在 reply 上登记 request-local pending commit；生产 CN MsgPack `onSend` 完成实际编码后执行独立的 `BEGIN IMMEDIATE` 记录事务。reconcile、响应构建或实际 onSend 编码失败不计数，多连接竞争同日 marker 只有一个连接成功；编码成功后交给网络栈的传输错误不属于该事务边界，也不声称能够回滚已提交事实。
 - type 79 使用嵌套 SQLite 保存点参与 Raid summary：成功时随 summary 外层事务提交；任务事实写入异常时保存点先完整回滚，再记录包含 player/event/mission 的告警并继续原有 summary。该可选事实不得把既有 summary 变成错误响应，也不得留下部分任务写入；其他 summary 奖励或状态异常仍按原外层事务整体回滚。
 
+## 每日任务：无限演武空 selector
+
+- `10075` 的官方名称明确为“【无限演武】通关任意一个关卡”，QuestRange kind 为 20、event selector 为 1，
+  但本地关卡 selector `row[10]` 是空字符串。CN 1.8.1 会把它解析为 `Option.Some([])`，按通用
+  `QuestRangeReferenceIdKindTools` 无法匹配任何本地关卡；该行与任务文案及长期开放用途不一致。
+- 当前实现不改变通用空 selector 语义，只对白名单 mission `10075` 校验 type 14、kind 20、event 1、空 selector、
+  category 27 和官方 `score_attack_event_quest.eventId=1` 后计一次成功单人结算。这是为官方异常行设置的精确兼容，
+  若后续 Content 修正 selector 或任务 ID 变化，不会自动扩展到其他任务。
+
 ## category 3：当前状态任务
 
 - `1201/1202/1203/1204/1205/1206/1207/1212/1217/1218/1219/1220/1305/1306/1307` 仅在精确 mission ID、`mission_event` pattern type、所需 QuestRange 字段以及 `mission_event_reward` 全部阶段 target 与已审计结构一致时启用。任何字段缺失、类型错误、stage 不连续或 target 改变都会 fail closed，并保留数据库 progress。
