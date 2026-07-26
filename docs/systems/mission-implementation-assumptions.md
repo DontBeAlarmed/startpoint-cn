@@ -37,6 +37,7 @@
   `rush_event_quest.rushEventId` 精确闭合，只读取 category 24 对应单关的历史最佳时间。
 - 历史最佳时间来自客户端 finish 请求并由服务端保存；服务端不模拟战斗或重算计时。这一事实链保证协议闭合，
   不提供反作弊证明，也不能证明活动开放前完成的历史记录是否应计入。
+- 257 条 type 23 累计通关任务只覆盖 Advent、StoryEventSingle、ChallengeDungeon、Raid 和 Rush 五种可由官方表闭合的 QuestRange。battle kind 1 只累计单人成功，battle kind 3 同时累计单人和多人成功；每次合法 finish 增加 1，历史唯一完成记录不用于反推重复次数。
 
 ## 称号指定 Boss 超级难度
 

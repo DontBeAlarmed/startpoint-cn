@@ -5,6 +5,10 @@ import ruleAsset from "../../../assets/mission_event_battle_rules.json"
 import bossBattleQuests from "../../../assets/boss_battle_quest.json"
 import adventEventQuests from "../../../assets/advent_event_quest.json"
 import worldStoryBossQuests from "../../../assets/world_story_event_boss_battle_quest.json"
+import storyEventSingleQuests from "../../../assets/story_event_single_quest.json"
+import challengeDungeonQuests from "../../../assets/challenge_dungeon_event_quest.json"
+import raidEventQuests from "../../../assets/raid_event_quest.json"
+import rushEventQuests from "../../../assets/rush_event_quest.json"
 
 type MultiRole = "any" | "host" | "guest"
 type QuestRange = "All" | "BossBattle" | "AdventEvent" | "WorldStoryEventBossBattle"
@@ -25,6 +29,14 @@ interface ExactMultiRule {
     readonly role: MultiRole
     readonly categories: "all" | ReadonlySet<number>
     readonly questIds: "all" | ReadonlySet<number>
+    readonly definition: ReturnType<typeof getMissionMasterDefinitions>[number]
+}
+
+interface ExactClearRule {
+    readonly missionId: number
+    readonly battleKind: 1 | 3
+    readonly category: number
+    readonly questIds: ReadonlySet<number>
     readonly definition: ReturnType<typeof getMissionMasterDefinitions>[number]
 }
 
@@ -247,6 +259,53 @@ export function loadExactEventBattleRules(assetValue: unknown): readonly ExactMu
 
 const exactMultiRules = loadExactEventBattleRules(ruleAsset)
 
+const CLEAR_RULE_SOURCES: Record<string, {
+    readonly category: number
+    readonly quests: Record<string, unknown>
+}> = {
+    "5": { category: 7, quests: adventEventQuests },
+    "6": { category: 10, quests: storyEventSingleQuests },
+    "7": { category: 13, quests: challengeDungeonQuests },
+    "16": { category: 23, quests: raidEventQuests },
+    "17": { category: 24, quests: rushEventQuests },
+}
+
+function parseExactQuestSuffixes(value: unknown): number[] | null {
+    if (typeof value !== "string" || value === "" || value === "(None)") return null
+    const values = value.split(",").map(Number)
+    return values.length > 0 && values.every((entry, index) => (
+        Number.isSafeInteger(entry)
+        && entry > 0
+        && (index === 0 || entry > values[index - 1])
+    )) ? values : null
+}
+
+function buildExactClearRules(): readonly ExactClearRule[] {
+    const rules: ExactClearRule[] = []
+    for (const definition of getMissionMasterDefinitions(3)) {
+        if (Number(definition.row[2]) !== 23 || definition.row[11] !== "(None)") continue
+        const battleKind = Number(definition.row[5])
+        if (battleKind !== 1 && battleKind !== 3) continue
+        const source = CLEAR_RULE_SOURCES[String(definition.row[7])]
+        if (!source) continue
+        const eventId = Number(definition.row[8])
+        const suffixes = parseExactQuestSuffixes(definition.row[10])
+        if (!Number.isSafeInteger(eventId) || eventId <= 0 || suffixes === null) continue
+        const questIds = suffixes.map(suffix => eventId * 1000 + suffix)
+        if (questIds.some(questId => source.quests[String(questId)] === undefined)) continue
+        rules.push({
+            missionId: definition.missionId,
+            battleKind,
+            category: source.category,
+            questIds: new Set(questIds),
+            definition,
+        })
+    }
+    return Object.freeze(rules)
+}
+
+const exactClearRules = buildExactClearRules()
+
 function matchesRole(role: MultiRole, isMultiHost: boolean | undefined): boolean {
     if (role === "any") return true
     if (role === "host") return isMultiHost === true
@@ -263,6 +322,11 @@ export function getExactEventBattleRuleCoverage() {
         totalEventMissions: getMissionMasterDefinitions(3).length,
         exactMultiRules: exactMultiRules.length,
         roles,
+        exactClearRules: exactClearRules.length,
+        clearRulesByCategory: exactClearRules.reduce((counts, rule) => {
+            counts[rule.category] = (counts[rule.category] ?? 0) + 1
+            return counts
+        }, {} as Record<number, number>),
     }
 }
 
@@ -270,13 +334,22 @@ export function recordEventMissionBattleFacts(
     ctx: FinishContext,
     evaluationTime: Date,
 ): number[] {
-    if (!ctx.questAccomplished || ctx.isMulti !== true) return []
+    if (!ctx.questAccomplished) return []
 
     const matchedMissionIds: number[] = []
-    for (const rule of exactMultiRules) {
-        if (!matchesRole(rule.role, ctx.isMultiHost)) continue
-        if (rule.categories !== "all" && !rule.categories.has(ctx.questCategory)) continue
-        if (rule.questIds !== "all" && !rule.questIds.has(ctx.questId)) continue
+    if (ctx.isMulti === true) {
+        for (const rule of exactMultiRules) {
+            if (!matchesRole(rule.role, ctx.isMultiHost)) continue
+            if (rule.categories !== "all" && !rule.categories.has(ctx.questCategory)) continue
+            if (rule.questIds !== "all" && !rule.questIds.has(ctx.questId)) continue
+            if (!isMissionDefinitionEnabledAt(rule.definition, evaluationTime)) continue
+            incrementPlayerCategoryMissionSync(ctx.playerId, 3, rule.missionId, 1)
+            matchedMissionIds.push(rule.missionId)
+        }
+    }
+    for (const rule of exactClearRules) {
+        if (rule.battleKind === 1 && ctx.isMulti) continue
+        if (rule.category !== ctx.questCategory || !rule.questIds.has(ctx.questId)) continue
         if (!isMissionDefinitionEnabledAt(rule.definition, evaluationTime)) continue
         incrementPlayerCategoryMissionSync(ctx.playerId, 3, rule.missionId, 1)
         matchedMissionIds.push(rule.missionId)

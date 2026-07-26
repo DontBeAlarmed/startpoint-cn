@@ -217,6 +217,8 @@ assert.deepEqual(getExactEventBattleRuleCoverage(), {
     totalEventMissions: 2512,
     exactMultiRules: 805,
     roles: { any: 792, host: 12, guest: 1 },
+    exactClearRules: 257,
+    clearRulesByCategory: { 7: 63, 10: 7, 13: 60, 23: 80, 24: 47 },
 })
 assert.deepEqual(BATTLE_SETTLEMENT_CATEGORIES, [1, 2, 3, 6, 7, 8, 10])
 
@@ -227,6 +229,37 @@ function missionProgress(missionId) {
 const legacyTime = new Date("2020-01-01T03:00:00.000Z")
 assert.equal(recordEventMissionBattleFacts(finishContext(), legacyTime).includes(1400), false)
 assert.equal(missionProgress(1400), 0, "空 selector 的旧 939 规则不得再自动增长")
+
+const raidClearTime = new Date("2023-09-10T04:00:00.000Z")
+const raidClearContext = finishContext({
+    questCategory: 23,
+    questId: 1001,
+    isMulti: false,
+    isMultiHost: undefined,
+})
+assert.equal(recordEventMissionBattleFacts(raidClearContext, raidClearTime).includes(400001), true)
+assert.equal(missionProgress(400001), 1, "Raid type23 必须按精确单人关卡增长")
+assert.equal(recordEventMissionBattleFacts(
+    { ...raidClearContext, isMulti: true },
+    raidClearTime,
+).includes(400001), false, "battle_kind=1 不得接受多人结算")
+assert.equal(recordEventMissionBattleFacts(
+    { ...raidClearContext, questId: 1005 },
+    raidClearTime,
+).includes(400001), false, "同活动错误 suffix 不得增长")
+
+const adventClearTime = new Date("2022-08-06T04:00:00.000Z")
+const adventClearContext = finishContext({
+    questCategory: 7,
+    questId: 9003,
+    isMulti: false,
+    isMultiHost: undefined,
+})
+assert.equal(recordEventMissionBattleFacts(adventClearContext, adventClearTime).includes(1652), true)
+assert.equal(recordEventMissionBattleFacts(
+    { ...adventClearContext, isMulti: true },
+    adventClearTime,
+).includes(1652), true, "battle_kind=3 应接受单人和多人成功结算")
 
 const finiteTime = new Date("2020-08-14T03:00:00.000Z")
 const finiteContext = finishContext({

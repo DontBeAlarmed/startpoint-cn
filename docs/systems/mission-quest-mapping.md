@@ -4,7 +4,7 @@
 > 历史审计资产: `assets/mission_event_quest_map.json`
 > 严格规则生成器: `scripts/gen_mission_event_battle_rules.js`
 > 运行时资产: `assets/mission_event_battle_rules.json`
-> 覆盖范围: cat3 活动任务 2512 条；QuestRange 严格规则 805 条，另有 386 条关卡/物品/竞速安全规则
+> 覆盖范围: cat3 活动任务 2512 条；QuestRange 严格协力规则 805 条、type 23 精确通关规则 257 条，另有 386 条关卡/物品/竞速安全规则
 
 `mission_event_quest_map.json` 是按 pattern 展开的旧映射，只供 `computer-event.ts` 历史审计。它没有完整表达
 QuestRange selector、QuestRank、Host/Guest 和 Attention 来源，不能驱动自动事实。旧 939 条自动规则已从
@@ -47,6 +47,13 @@ category 3 的 type 37 不依赖 QuestRange 资产。运行时从 `row[12]` 读�
 精确关卡、唯一旧映射和官方奖励秒数，并使用历史最佳毫秒值判断。狂热激战 category 24 的 42 条限时任务不使用
 会把单关扩展为整期 8 个关卡的旧映射，而是由 QuestRange kind 17、精确 suffix 和 `rush_event_quest` 唯一闭合。
 其他活动任务继续返回数据库持久化进度，`computer-event.ts` 和旧 quest map 仍只用于离线审计。
+
+## Type 23 精确通关规则
+
+257 条 type 23 任务由运行时直接验证主数据和官方关卡表，不读取旧 quest map：Advent 63 条、StoryEventSingle 7 条、
+ChallengeDungeon 60 条、Raid 80 条、Rush 47 条。规则要求 `row[11]=(None)`，并按 `event_id * 1000 + suffix`
+验证每个目标关卡真实存在；battle kind 1 只接受单人成功结算，battle kind 3 接受单人或多人成功结算。
+错误 category、错误 suffix、失败和任务开放期外结算均不增长。
 
 ---
 
