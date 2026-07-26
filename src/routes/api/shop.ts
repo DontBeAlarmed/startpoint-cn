@@ -21,6 +21,7 @@ import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { executeGenericShopPurchaseSync, isShopItemAvailable, ShopPeriodError, ShopPurchaseError, validateShopPurchaseAmount } from "../../lib/event-shop-purchase";
 import CDN_GENERAL_SHOP_WHITELIST from "../../../assets/cdn_general_shop_whitelist.json";
 import { getMailArrivedSync } from "../../lib/mail-notification";
+import { recordDegreeOperationFactsSync } from "../../lib/mission/degree-operation-facts";
 
 const GENERAL_SHOP_CDN_KEYS: Set<number> = new Set(CDN_GENERAL_SHOP_WHITELIST);
 
@@ -330,7 +331,12 @@ const routes = async (fastify: FastifyInstance) => {
                 setItem: updatePlayerItemSync,
                 getPurchaseCount: getPlayerShopPurchaseCountSync,
                 addPurchaseCount: addPlayerShopPurchaseCountSync,
-                recordManaSpent: incrementActiveMissionUsedManaCountSync,
+                recordManaSpent: (id, amount) => {
+                    incrementActiveMissionUsedManaCountSync(id, amount)
+                    if (shopType === ShopType.TREASURE) {
+                        recordDegreeOperationFactsSync(id, "treasure_mana", amount)
+                    }
+                },
                 grantRewards: givePlayerRewardsSync,
             })
         } catch (error) {

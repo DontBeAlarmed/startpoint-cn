@@ -55,6 +55,10 @@ const {
     recordDegreeMissionBattleFacts,
 } = require("../src/lib/mission/degree-battle-facts")
 const { recordDegreeBattleStatisticsSync } = require("../src/lib/mission/degree-battle-stat-facts")
+const {
+    getDegreeOperationRuleCount,
+    recordDegreeOperationFactsSync,
+} = require("../src/lib/mission/degree-operation-facts")
 
 const questProgressCountIndex = "idx_players_quest_progress_player_section_finished"
 const initializerSource = fs.readFileSync(
@@ -166,6 +170,9 @@ for (let index = 0; index < 10; index++) {
 }
 updatePlayerCategoryMissionSync(playerId, 5, 31010, 9)
 updatePlayerCategoryMissionSync(playerId, 5, 59210, 5)
+updatePlayerCategoryMissionSync(playerId, 5, 45010, 10)
+recordDegreeOperationFactsSync(playerId, "treasure_mana", 100)
+recordDegreeOperationFactsSync(playerId, "equipment_upgrade", 4)
 recordMissionBattleResultSync(playerId, {
     isMulti: false,
     questCategory: 2,
@@ -528,6 +535,10 @@ assert.equal(DegreeComputer.compute(39000, context, 0), 10, "复活棺柩数应�
 assert.equal(DegreeComputer.compute(32000, context, 0), 8000, "队伍战力应取历史最大")
 assert.equal(DegreeComputer.compute(27000, context, 0), 7, "技能连锁数应取历史最大")
 assert.equal(DegreeComputer.compute(26000, context, 4), 4, "缺少权威 MVP 聚合时必须保留 fallback")
+assert.equal(DegreeComputer.compute(45000, context, degreeProgress(45000)), 100)
+assert.equal(DegreeComputer.compute(45010, context, degreeProgress(45010)), 110)
+assert.equal(DegreeComputer.compute(42000, context, degreeProgress(42000)), 4)
+assert.equal(DegreeComputer.compute(8000, context, 3), 3, "魂珠验证未闭合时必须保留 fallback")
 
 for (const missionId of [23000, 23010, 23020]) {
     assert.equal(DegreeComputer.compute(missionId, context, 0), 4, `${missionId} 应读取协力成功总数`)
@@ -544,10 +555,11 @@ for (const missionId of [7000, 7010, 7020]) {
 
 const coverage = getDegreeMissionCoverageReport()
 assert.equal(getExactDegreeQuestClearRuleCount(), 84)
+assert.equal(getDegreeOperationRuleCount(), 6)
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1262,
-    unsupported: 26,
+    serverComputed: 1268,
+    unsupported: 20,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -589,6 +601,7 @@ assert.deepEqual(coverage, {
         revivalCoffinMax: 1,
         partyPowerMax: 3,
         skillChainMax: 3,
+        operationFacts: 6,
         challengeDungeonClear: 3,
         scoreClearSingle: 3,
         timeClearSingle: 3,
