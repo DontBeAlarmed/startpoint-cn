@@ -15,6 +15,7 @@ const {
     normalizeCharacterPair,
 } = require("../src/lib/mission/awake-battle-rules")
 const { getComputer } = require("../src/lib/mission")
+const { getCharacterStoryQuestIds } = require("../src/lib/mission/character-queries")
 
 assert.deepEqual(normalizeCharacterPair(231001, 211001), [211001, 231001])
 assert.deepEqual(
@@ -439,5 +440,35 @@ assert.equal(awakeComputer.compute(2310013, {
     categoryMissionProgress: new Map(),
     questProgress: {},
 }, 2), 2, "existing persisted progress remains the lower bound")
+
+const ramsStoryProgress = {
+    3: getCharacterStoryQuestIds("231001").map(questId => ({
+        questId,
+        finished: true,
+    })),
+}
+assert.equal(awakeComputer.compute(2310014, {
+    categoryMissionProgress: new Map([
+        [2310011, 999],
+        [2310012, 1],
+        [2310013, 1],
+    ]),
+    questProgress: {},
+}, 0), 3, "all-complete must evaluate every child with that child's persisted progress")
+assert.equal(awakeComputer.compute(2310014, {
+    categoryMissionProgress: new Map([[2310014, 1]]),
+    questProgress: ramsStoryProgress,
+}, 1), 1, "parent progress must not complete fail-closed or atomic children")
+assert.equal(awakeComputer.compute(2310014, {
+    categoryMissionProgress: new Map([[2310014, 3]]),
+    questProgress: {},
+}, 3), 3, "all-complete must preserve the persisted parent progress")
+assert.equal(awakeComputer.compute(2310014, {
+    categoryMissionProgress: new Map([
+        [2310012, 1],
+        [2310013, 1],
+    ]),
+    questProgress: ramsStoryProgress,
+}, 0), 3, "three genuinely completed children must complete the parent")
 
 console.log("character awake fact tests passed")

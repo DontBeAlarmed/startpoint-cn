@@ -218,10 +218,15 @@ export const AwakeComputer: MissionComputer = {
             case AwakeType.ALL_COMPLETE: {
                 let completedCount = 0
                 for (const childMissionId of [missionId - 3, missionId - 2, missionId - 1]) {
-                    const childProgress = AwakeComputer.compute(childMissionId, ctx, dbProgress)
-                    if (isMissionProgressComplete(9, childMissionId, childProgress)) completedCount++
+                    const childDbProgress = actx.categoryMissionProgress?.get(childMissionId) ?? 0
+                    const childProgress = AwakeComputer.compute(childMissionId, ctx, childDbProgress)
+                    if (isMissionProgressComplete(
+                        9,
+                        childMissionId,
+                        Math.max(childDbProgress, childProgress),
+                    )) completedCount++
                 }
-                return completedCount
+                return Math.max(dbProgress, completedCount)
             }
         }
 
