@@ -54,6 +54,11 @@ const unusedRouteDependencies = [
     "../assets/score_attack_border_reward.json",
 ]
 for (const dependency of unusedRouteDependencies) stubModule(dependency, {})
+stubModule("../src/data/domains/quest_active", {
+    deletePlayerActiveQuestSync() {},
+    getPlayerActiveQuestSync: () => null,
+    updatePlayerActiveQuestContinueCountSync() {},
+})
 stubModule("../src/utils", {
     generateDataHeaders: () => ({ servertime: "2026-07-20T00:00:00.000Z" }),
 })
@@ -110,6 +115,26 @@ async function main() {
         questId: 200076009,
         category: 7,
     }]])
+
+    const recoveryAbortResponse = await fastify.inject({
+        method: "POST",
+        url: "/abort",
+        payload: {
+            viewer_id: 800000007,
+            api_count: 2,
+        },
+    })
+
+    assert.equal(recoveryAbortResponse.statusCode, 200)
+    const recoveryAbortBody = Buffer.from(recoveryAbortResponse.body, "base64")
+    assert.equal(
+        recoveryAbortBody.includes(Buffer.from([0xd4])),
+        false,
+        "abort recovery responses must not encode undefined as MsgPack fixext",
+    )
+    const recoveryDecoded = unpack(recoveryAbortBody)
+    assert.deepEqual(recoveryDecoded.data.item_list, {})
+    assert.equal(recoveryDecoded.data.category_id, 0)
     await fastify.close()
 }
 

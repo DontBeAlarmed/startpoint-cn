@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { deletePlayerActiveQuestSync, updatePlayerActiveQuestContinueCountSync } from "../../data/domains/quest_active"
+import { deletePlayerActiveQuestSync, getPlayerActiveQuestSync, updatePlayerActiveQuestContinueCountSync } from "../../data/domains/quest_active"
 import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerRushEventSync } from "../../data/domains/rushEvent"
 import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
 import { getPlayerItemSync, givePlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
@@ -168,6 +168,16 @@ interface ReturnRushEvent {
     best_elapsed_time_ms: number | null,
     old_endless_battle_max_round: number | null,
     old_best_elapsed_time_ms: number | null
+}
+
+function optionalNumber(value: unknown): number | null {
+    return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
+function summarizeItemList(itemList: Record<string, number>): string {
+    const entries = Object.entries(itemList)
+    if (entries.length === 0) return "none"
+    return entries.map(([itemId, amount]) => `${itemId}:${amount}`).join(",")
 }
 
 const continueVmoneyCost = 50;
@@ -625,18 +635,37 @@ const routes = async (fastify: FastifyInstance) => {
 
         const headers = generateDataHeaders({ viewer_id: body.viewer_id })
 
+        const activeQuest = getPlayerActiveQuestSync(playerId)
+        const playId = typeof body.play_id === "string" && body.play_id.length > 0
+            ? body.play_id
+            : activeQuest?.playId ?? ""
+        const questId = optionalNumber(body.quest_id) ?? activeQuest?.questId ?? 0
+        const category = optionalNumber(body.category) ?? activeQuest?.category ?? 0
+
         const abortResult = runAbortActiveQuestTransaction(playerId, {
-            playId: body.play_id,
-            questId: body.quest_id,
-            category: body.category,
+            playId,
+            questId,
+            category,
         })
+        console.log([
+            "[SINGLE_ABORT]",
+            `player=${playerId}`,
+            `viewer=${viewerId}`,
+            `missing_play=${typeof body.play_id !== "string" || body.play_id.length === 0}`,
+            `missing_quest=${optionalNumber(body.quest_id) === null}`,
+            `missing_category=${optionalNumber(body.category) === null}`,
+            `active=${activeQuest ? `${activeQuest.category}_${activeQuest.questId}` : "none"}`,
+            `resolved=${category}_${questId}`,
+            `cancelled=${abortResult.cancelled}`,
+            `refund=${summarizeItemList(abortResult.itemList)}`,
+        ].join(" "))
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": headers,
             "data": {
                 "user_info": {},
-                "category_id": body.category,
+                "category_id": category,
                 "is_multi": "single",
                 "start_time": headers['servertime'],
                 "quest_name": "",
