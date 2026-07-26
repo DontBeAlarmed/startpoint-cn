@@ -101,6 +101,7 @@ function rewardRow(targetProgress = 1) {
 }
 
 const tables = {
+    "character.json": require("../assets/character.json"),
     "mission_active.json": {
         90001: [missionRow({ eventId: 901, pattern: 57, questKind: 0, questA: 1, questB: 8, questC: 4 })],
         90002: [missionRow({ eventId: 901, pattern: 57, questKind: 1, questA: 1, questB: 8, questC: 1 })],

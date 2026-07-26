@@ -35,8 +35,14 @@ import {
 import { getMissionMasterDefinition, getMissionMasterDefinitions } from "./master-data"
 import { getMissionPattern } from "./patterns"
 import type { MissionComputer, CategoryContext } from "./types"
-import { getExactDegreeQuestClearRuleCount } from "./degree-battle-facts"
-import { getDegreeOperationRuleCount } from "./degree-operation-facts"
+import {
+    getExactDegreeQuestClearMissionIds,
+    getExactDegreeQuestClearRuleCount,
+} from "./degree-battle-facts"
+import {
+    getDegreeOperationMissionIds,
+    getDegreeOperationRuleCount,
+} from "./degree-operation-facts"
 
 // Degree mission target lookup
 const degreeTargetMap: Record<number, number> = {}
@@ -550,13 +556,97 @@ export function getDegreeMissionCoverageReport() {
             definition.pattern.startsWith(SUPPORTED_FAMILIES.skillUse)
         )).length,
     }
-    const serverComputed = Object.values(supportedFamilies).reduce((sum, count) => sum + count, 0)
+    const serverComputed = getDegreeComputedMissionIds().length
     return {
         total: definitions.length,
         serverComputed,
         unsupported: definitions.length - serverComputed,
         supportedFamilies,
     }
+}
+
+const SIMPLE_SUPPORTED_PREFIXES = [
+    SUPPORTED_FAMILIES.playerRank,
+    SUPPORTED_FAMILIES.companionCount,
+    SUPPORTED_FAMILIES.overLimitCount,
+    SUPPORTED_FAMILIES.manaBoardCount,
+    SUPPORTED_FAMILIES.bondTokenCount,
+    SUPPORTED_FAMILIES.singleSsCount,
+    SUPPORTED_FAMILIES.multiClearCount,
+    SUPPORTED_FAMILIES.multiHostClearCount,
+    SUPPORTED_FAMILIES.episodeClearCount,
+    SUPPORTED_FAMILIES.staminaUseCount,
+    SUPPORTED_FAMILIES.loginCount,
+    SUPPORTED_FAMILIES.challengeDungeonClear,
+    SUPPORTED_FAMILIES.bossBattleClear,
+    SUPPORTED_FAMILIES.skillUse,
+    SUPPORTED_FAMILIES.feverCount,
+    SUPPORTED_FAMILIES.feverTime,
+    SUPPORTED_FAMILIES.debuffEnemy,
+    SUPPORTED_FAMILIES.clearEnemyBuff,
+    SUPPORTED_FAMILIES.clearSelfDebuff,
+    SUPPORTED_FAMILIES.buffParty,
+    SUPPORTED_FAMILIES.healParty,
+    SUPPORTED_FAMILIES.emotionUse,
+    SUPPORTED_FAMILIES.enemyKill,
+    SUPPORTED_FAMILIES.weakPointAttack,
+    SUPPORTED_FAMILIES.powerFlipLv3,
+    SUPPORTED_FAMILIES.coffinReduced,
+    SUPPORTED_FAMILIES.damageMax,
+    SUPPORTED_FAMILIES.revivalCoffinMax,
+    SUPPORTED_FAMILIES.partyPowerMax,
+    SUPPORTED_FAMILIES.skillChainMax,
+] as const
+
+function isDegreeDefinitionComputed(
+    definition: ReturnType<typeof getMissionMasterDefinitions>[number],
+    factMissionIds: ReadonlySet<number>,
+): boolean {
+    const { missionId, pattern } = definition
+    if (factMissionIds.has(missionId)
+        || SIMPLE_SUPPORTED_PREFIXES.some(prefix => pattern.startsWith(prefix))) return true
+    if (pattern.startsWith(SUPPORTED_FAMILIES.scoreClearSingle)) {
+        return getTargetScore(missionId) !== undefined
+    }
+    if (pattern.startsWith(SUPPORTED_FAMILIES.timeClearSingle)) {
+        return getTargetTime(missionId) !== undefined
+    }
+    if (pattern.startsWith(SUPPORTED_FAMILIES.dashUse)) {
+        return getTargetDash(missionId) !== undefined
+    }
+    if (pattern.startsWith(SUPPORTED_FAMILIES.comboOneTime)) {
+        return getTargetCombo(missionId) !== undefined
+    }
+    if (pattern.startsWith(SUPPORTED_FAMILIES.craftPointGet)) {
+        return getTargetCraftPoint(missionId) !== undefined
+    }
+    return getSpecificCharacterBondId(missionId) !== undefined
+        || isSecondManaBoardAggregateMission(missionId)
+        || getSecondManaBoardCharacterId(missionId) !== undefined
+        || getEpisodeChapter(missionId) !== undefined
+        || getPracticeQuestIds(missionId) !== null
+        || (Number(definition.row[3]) === 45
+            && pattern.startsWith("degree_treasure_shop_buy_count_"))
+        || getBossBattleSuperQuestId(missionId) !== undefined
+        || getExpertSingleQuestId(missionId) !== undefined
+        || getWorldStoryQuestId(missionId) !== undefined
+        || getAdventQuestId(missionId) !== undefined
+        || getCarnivalQuestId(missionId) !== undefined
+        || getHardMultiQuestId(missionId) !== undefined
+        || getDegreeCollectedItemId(missionId) !== undefined
+        || (Number(definition.row[3]) === 36
+            && pattern.startsWith("degree_equipment_lv5_get_"))
+}
+
+export function getDegreeComputedMissionIds(): readonly number[] {
+    const factMissionIds = new Set([
+        ...getExactDegreeQuestClearMissionIds(),
+        ...getDegreeOperationMissionIds(),
+    ])
+    return Object.freeze(getMissionMasterDefinitions(5)
+        .filter(definition => isDegreeDefinitionComputed(definition, factMissionIds))
+        .map(definition => definition.missionId)
+        .sort((left, right) => left - right))
 }
 
 export function getSpecificCharacterBondId(missionId: number): number | undefined {

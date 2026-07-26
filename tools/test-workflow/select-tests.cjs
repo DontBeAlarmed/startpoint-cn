@@ -94,7 +94,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission", "integration:mission-compiled"],
     },
     {
-        pattern: /^src\/lib\/mission\/(?:event-battle-facts|computer-event)\.ts$/,
+        pattern: /^src\/lib\/mission\/(?:event-battle-facts|computer-event|coverage-audit|computer-degree|degree-battle-facts|degree-operation-facts)\.ts$/,
         groups: ["integration:mission"],
     },
     {

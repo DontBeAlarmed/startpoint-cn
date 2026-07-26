@@ -69,6 +69,10 @@ export function getExactDegreeQuestClearRuleCount(): number {
     return exactDegreeQuestClearRules.length
 }
 
+export function getExactDegreeQuestClearMissionIds(): readonly number[] {
+    return Object.freeze(exactDegreeQuestClearRules.map(rule => rule.missionId))
+}
+
 export function recordDegreeMissionBattleFacts(
     context: DegreeBattleFactContext,
     evaluationTime: Date,

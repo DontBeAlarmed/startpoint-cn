@@ -367,6 +367,15 @@ export function getExactEventBattleRuleCoverage() {
     }
 }
 
+export function getExactEventBattleMissionIds(): readonly number[] {
+    return Object.freeze([...new Set([
+        ...exactMultiRules.map(rule => rule.missionId),
+        ...exactClearRules.map(rule => rule.missionId),
+        ...exactPhaseRules.map(rule => rule.missionId),
+        ...exactEventSingleClearRules.map(rule => rule.missionId),
+    ])].sort((left, right) => left - right))
+}
+
 export function recordEventMissionBattleFacts(
     ctx: FinishContext,
     evaluationTime: Date,

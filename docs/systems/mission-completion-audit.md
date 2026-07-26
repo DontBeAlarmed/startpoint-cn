@@ -75,6 +75,7 @@
   使用 SQL `COUNT(*)` 直接统计 category 3 已完成关卡，并由
   `idx_players_quest_progress_player_section_finished` covering index 支持。
 - 当前称号覆盖为 `1268/1288`，约 `98.4%`；unsupported 为 20 条。84 条指定 Boss/Advent 累计通关称号按主数据 selector 和官方关卡表精确匹配；46 条称号读取成功 finish 的分 battle kind zone 累计、单场最大战斗统计；珍品商店 Mana 和装备觉醒 6 条从业务事务增长。MVP 与魂珠设置等缺少权威事实的任务继续 fallback。
+- 20 条 fallback 已由 `coverage-audit.ts` 按 ID 固定分类：角色等级 3 条、魂珠设置 3 条、主数据不存在的指定 Boss 难度 1 条、Attention 3 条、MVP 3 条、客户端展示/点击类 4 条、协力新手 3 条。每条均携带机器可读原因；新增事实族必须同时改变 ID 分区测试，不能只改文档数字。
 - 其余已实现称号只读取对应的持久化角色、装备、关卡、库存、商店或成功结算事实，并与旧进度取最大值。未知主数据、非法客户端统计和缺少权威生产者的条件继续 fallback，不根据中文描述或相邻任务推算。
 - 角色等级称号暂不自动计算：当前服务端资产没有完整 EXP 到等级曲线，只保存角色累计 EXP 和上限突破状态；
   在 CDN 转换器补齐权威曲线前不使用近似阈值。
@@ -107,6 +108,7 @@
   其余 1027 条（包括 mission 1807）仍使用持久化 fallback。
   任务页不从旧 `mission_event_quest_map.json` 直接推算；只有通过 `computer-event-safe.ts` 白名单的精确规则才会自动计算和发奖。安全计算器当前登记 392 条，其中 6 条目标为 1 的 type 14 任务可从历史完成记录回填；它们同时拥有 finish 生产者，因此不在 1485 条总覆盖中重复计数。生产上下文保留数据库返回的全部关卡 category，不再只装载 Ranking/Rush 两类。
   后续仍需补全活动范围、评级、房主/成员、救援、阶段和 client check 等谓词后逐批启用。
+- 1027 条 fallback 中，948 条 type 16 的 QuestRange 至少一个列表 selector 为 `""`。CN 1.8.1 `EventMissionValues` 将它解析为 `Option.Some([])`，不是 `Option.None`；客户端 QuestRange 匹配测试证明空集合不等于通配。因此这 948 条不得扩成“该活动全部关卡”。另有 27 条 type 20 缺少 Attention 救援来源，其余 52 条按 pattern type 保留明确的权威事实缺口。
 
 ## Pass 分类与等级奖励
 
@@ -114,6 +116,7 @@
   已由 `content:pass` 生成服务端资产；不再使用“官方主数据缺失”的旧结论。
 - category 6 已接入单人、协力、冲刺和体力；category 7 已接入协力和体力，救援与表情仍保留持久化 fallback；
   category 8 已接入活动登录、type 16 指定协力关卡和 6 条按 `battle_kind`/QuestRange 匹配的 type 23 活动关卡。
+- Pass 覆盖分区为 `229/267`：category 6 的 76 条、category 7 的协力/体力 38 条和 category 8 的 115 条已有事实；category 7 的救援 19 条及战斗表情 19 条保留 fallback。
 - Pass 周常使用活动专属基线，避免月中开放时计入开放前行为。任务阶段结算会按任务定义中的活动 ID 原子增加 Pass 点数。
 - `Pass_card/get_pass_card` 和 `receive_all` 已从固定空响应改为真实点数、等级、免费/付费双轨领取和防重复事务。
   当前没有 Pass 购买流程，付费轨保持锁定。详细契约见[修行之道](./pass-card.md)。
@@ -139,6 +142,8 @@
 [角色觉醒刷新与解锁时序](./character-awake-refresh.md)。
 
 ## 尚未完成的分类
+
+`src/lib/mission/coverage-audit.ts` 是覆盖数字和剩余 ID 的唯一机器清单。`tools/mission_coverage_audit.test.cjs` 锁定 category 3 `1485/2512`、Degree `1268/1288`、觉醒路由 `144/144` 和 Pass `229/267`，并要求 automated/fallback 分区无交集且每个 fallback 都有原因。该报告证明代码路由和事实生产者覆盖，不等价于 CN 客户端验收。
 
 - category 4 已形成累计获得量、活动隔离、结算、发奖和 load 映射；category 5 已接入上述 1268 条权威事实。
   两类仍需 CN 客户端验证提示、奖励和重启持久化；category 5 的其余任务需逐族补事实。

@@ -23,6 +23,8 @@
 
 ## category 3：关卡目标任务
 
+- `coverage-audit.ts` 当前列出 948 条 type 16 空 QuestRange selector。CN 1.8.1 `EventMissionValues` 把 `""` 解析为 `Option.Some([])`，而 `(None)` 才解析为 `Option.None`；客户端 `QuestRangeReferenceIdKindToolsTest` 的匹配契约也区分空集合与无约束。因此服务端不把这批历史定义推测为活动全关卡，也不重新启用旧生成器的通配行为。
+
 - 土俑嘉年华单关卡使用 `mission_event.json` 的 `event_id + quest suffix` 与 `carnival_event_quest.json` 的精确关卡 ID
   对齐；聚合任务只引用同一活动的子任务 ID。当前实现不使用旧 `mission_event_quest_map.json` 对土俑关卡的宽泛集合。
 - 崩坏域庆贺单关卡使用 `challenge_dungeon_event_quest.json` 中的真实关卡键；`row[10]` 为空时表示该挑战事件表的全部关卡，

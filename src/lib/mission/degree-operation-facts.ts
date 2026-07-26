@@ -23,6 +23,13 @@ export function getDegreeOperationRuleCount(): number {
     return validMissionIds("treasure_mana").length + validMissionIds("equipment_upgrade").length
 }
 
+export function getDegreeOperationMissionIds(): readonly number[] {
+    return Object.freeze([
+        ...validMissionIds("treasure_mana"),
+        ...validMissionIds("equipment_upgrade"),
+    ].sort((left, right) => left - right))
+}
+
 export function recordDegreeOperationFactsSync(
     playerId: number,
     kind: DegreeOperationKind,
