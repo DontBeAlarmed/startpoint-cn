@@ -21,7 +21,7 @@ import {
     insertPlayerQuestProgressSync,
     updatePlayerQuestProgressSync,
 } from "../../data/domains/quest";
-import { getQuestFromCategorySync } from "../../lib/assets";
+import { getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
 import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/stamina";
@@ -37,6 +37,7 @@ import {
 } from "../../lib/mission";
 import { resolveHostFinished, resolveIsRoomHost } from "../../lib/quest/host-finish";
 import { resolveMultiPlayerContext } from "../player-context";
+import { resolveQuestRewardEligibility } from "../../lib/quest/first-clear-reward";
 
 async function buildFinishFollowInfo(
     viewerId: number,
@@ -98,7 +99,14 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             });
         }
 
-        const questData = getQuestFromCategorySync(category, quest_id) as BattleQuest | null;
+        let questData: BattleQuest | null;
+        try {
+            questData = getQuestFromCategorySync(category, quest_id);
+        } catch (error) {
+            const configurationError = getQuestConfigurationErrorResponse(error);
+            if (configurationError !== null) return reply.status(500).send(configurationError);
+            throw error;
+        }
         if (questData === null || !('rankPointReward' in questData)) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Quest doesn't exist."
@@ -173,7 +181,14 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
 
         const questCategory = activeQuestData.category;
         const questId = activeQuestData.questId;
-        const questData = getQuestFromCategorySync(questCategory, questId) as BattleQuest | null;
+        let questData: BattleQuest | null;
+        try {
+            questData = getQuestFromCategorySync(questCategory, questId);
+        } catch (error) {
+            const configurationError = getQuestConfigurationErrorResponse(error);
+            if (configurationError !== null) return reply.status(500).send(configurationError);
+            throw error;
+        }
         if (questData === null || !('rankPointReward' in questData)) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Quest doesn't exist."
@@ -209,7 +224,8 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
 
         // quest progress
         const questProgress = getPlayerSingleQuestProgressSync(playerId, questCategory, questId);
-        const questPreviouslyCompleted = questProgress !== null;
+        const questProgressExists = questProgress !== null;
+        const questPreviouslyCompleted = questProgress?.finished === true;
         const questAccomplished = (body as any).is_accomplished;
         const hostFinished = resolveHostFinished({
             previouslyHostFinished: questProgress?.hostFinished ?? false,
@@ -217,6 +233,11 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             isRoomHost,
         });
         const leaderId = ((body as any).statistics?.party || (body as any).quest_statistics?.party)?.characters?.[0]?.id
+        const rewardEligibility = resolveQuestRewardEligibility({
+            questAccomplished,
+            clearRank,
+            questProgress,
+        })
 
         const oldRkDegree = getRankDegree(beforeRankPoint);
         const newDegreeId = getRankDegree(newRankPoint);
@@ -245,17 +266,16 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
 
         const executeFinishWrites = () => {
             const missionEvaluationTime = new Date(getServerTime() * 1000);
-            const clearReward = !questPreviouslyCompleted && (questData as any).clearReward !== undefined
+            const clearReward = rewardEligibility.firstClear && (questData as any).clearReward !== undefined
                 ? givePlayerRewardSync(playerId, (questData as any).clearReward)
                 : null;
-            const sPlusClearReward = (clearRank === 5)
-                && (questProgress?.clearRank !== 5)
+            const sPlusClearReward = rewardEligibility.sPlus
                 && ((questData as any).sPlusReward !== undefined)
                 ? givePlayerRewardSync(playerId, (questData as any).sPlusReward)
                 : null;
 
             if (questAccomplished) {
-                if (questPreviouslyCompleted) {
+                if (questProgressExists) {
                     const updateData: any = {
                         questId: questId,
                         finished: true,

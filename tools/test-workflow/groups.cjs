@@ -87,6 +87,9 @@ const TEST_GROUPS = Object.freeze({
             "tools/content_ordered_map.test.cjs",
             "tools/content_registry.test.cjs",
             "tools/content_schema.test.cjs",
+            "tools/quest_reward_configuration.test.cjs",
+            "tools/quest_reward_route_boundary.test.cjs",
+            "tools/first_clear_reward.test.cjs",
         ],
     },
     "integration:compiled": {
@@ -240,6 +243,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/box_gacha_reset.test.cjs",
             "tools/gacha_odds_export.test.cjs",
+            "tools/hard_multi_event_quest.test.cjs",
             "tools/rebuild_gacha_from_odds.test.cjs",
             "tools/score_attack_event_data.test.cjs",
             "tools/star_grain_material_pack.test.cjs",

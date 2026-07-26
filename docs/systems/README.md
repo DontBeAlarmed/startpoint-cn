@@ -20,6 +20,7 @@
 - [歼灭者讨伐战解锁](./boss-epuration-unlock.md)
 - [活动扭蛋箱](./box-gacha.md)
 - [关卡入场道具](./quest-entry-items.md)
+- [Hard Multi 首通奖励](./hard-multi-first-clear-reward.md)
 
 ## 任务与角色
 

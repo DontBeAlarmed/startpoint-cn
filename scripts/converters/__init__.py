@@ -8,7 +8,7 @@ from .quests import (
     convert_solo_time_attack_event_quest, convert_tower_dungeon_event_quest,
     convert_expert_single_event_quest, convert_carnival_event_quest,
     convert_raid_event_quest, convert_rush_event_quest,
-    convert_score_attack_event_quest, convert_character_quests,
+    convert_score_attack_event_quest, convert_character_quests, convert_hard_multi_event_quest,
 )
 from .shop import (
     convert_general_shop, convert_boss_coin_shop, convert_event_item_shop,

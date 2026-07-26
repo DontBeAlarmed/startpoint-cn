@@ -20,7 +20,7 @@ import {
     runCarnivalEventTransactionSync,
     upsertPlayerCarnivalEventRecordSync,
 } from "../../data/domains/carnivalEvent"
-import { getQuestFromCategorySync, getRushEventFolderClearRewards } from "../../lib/assets";
+import { getQuestConfigurationErrorResponse, getQuestFromCategorySync, getRushEventFolderClearRewards } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
@@ -81,6 +81,7 @@ import {
 import { getMailArrivedSync } from "../../lib/mail-notification"
 import { recordActiveMissionQuestChallengeFactSync } from "../../lib/mission/active-entry-facts";
 import { getRaidEventRequiredKillCount } from "../../lib/raid-event-master";
+import { resolveQuestRewardEligibility } from "../../lib/quest/first-clear-reward";
 
 interface StartBody {
     quest_id: number
@@ -191,7 +192,14 @@ const routes = async (fastify: FastifyInstance) => {
         const questCategory = activeQuestData.category
         const questId = activeQuestData.questId
         console.log(`[FINISH] active: category=${questCategory} questId=${questId}`)
-        const questData = getQuestFromCategorySync(questCategory, questId) as BattleQuest | null
+        let questData: BattleQuest | null
+        try {
+            questData = getQuestFromCategorySync(questCategory, questId)
+        } catch (error) {
+            const configurationError = getQuestConfigurationErrorResponse(error)
+            if (configurationError !== null) return reply.status(500).send(configurationError)
+            throw error
+        }
         if (questData === null || !('rankPointReward' in questData)) {
             console.log(`[BATTLE] finish failed: category=${questCategory} questId=${questId} found=${!!questData} hasRankReward=${questData ? ('rankPointReward' in questData) : 'N/A'}`)
             return reply.status(400).send({
@@ -237,7 +245,8 @@ const routes = async (fastify: FastifyInstance) => {
 
         // check current quest progress
         const questProgress = getPlayerSingleQuestProgressSync(playerId, questCategory, questId);
-        const questPreviouslyCompleted = questProgress !== null
+        const questProgressExists = questProgress !== null
+        const questPreviouslyCompleted = questProgress?.finished === true
 
         let questAccomplished = body.is_accomplished
         let scoreAttackBorderTiers: ScoreAttackBorderTier[] = []
@@ -257,6 +266,11 @@ const routes = async (fastify: FastifyInstance) => {
             }
             questAccomplished = body.score >= scoreAttackBorderTiers[0].score
         }
+        const rewardEligibility = resolveQuestRewardEligibility({
+            questAccomplished,
+            clearRank,
+            questProgress,
+        })
 
         const leaderId = body.statistics.party.characters[0]?.id
 
@@ -283,15 +297,15 @@ const routes = async (fastify: FastifyInstance) => {
 
         const executeFinishWrites = () => {
             const missionEvaluationTime = new Date(getServerTime() * 1000)
-            const clearReward = !isScoreAttackEvent && !questPreviouslyCompleted && questData.clearReward !== undefined
+            const clearReward = !isScoreAttackEvent && rewardEligibility.firstClear && questData.clearReward !== undefined
                 ? givePlayerRewardSync(playerId, questData.clearReward)
                 : null
-            const sPlusClearReward = !isScoreAttackEvent && (clearRank === 5) && (questProgress?.clearRank !== 5) && (questData.sPlusReward !== undefined)
+            const sPlusClearReward = !isScoreAttackEvent && rewardEligibility.sPlus && questData.sPlusReward !== undefined
                 ? givePlayerRewardSync(playerId, questData.sPlusReward)
                 : null
 
             if (questAccomplished && !isScoreAttackEvent) {
-                if (questPreviouslyCompleted) {
+                if (questProgressExists) {
                     const updateData: any = {
                         questId: questId,
                         finished: true,
@@ -638,7 +652,14 @@ const routes = async (fastify: FastifyInstance) => {
         const { playerId, playerData: player } = sessionResult
 
         // get quest data
-        const questData = getQuestFromCategorySync(category, questId) as BattleQuest | null
+        let questData: BattleQuest | null
+        try {
+            questData = getQuestFromCategorySync(category, questId)
+        } catch (error) {
+            const configurationError = getQuestConfigurationErrorResponse(error)
+            if (configurationError !== null) return reply.status(500).send(configurationError)
+            throw error
+        }
         if (questData === null || !('rankPointReward' in questData)) {
             console.log(`[BATTLE] start failed: category=${category} questId=${questId} found=${!!questData} hasRankReward=${questData ? ('rankPointReward' in questData) : 'N/A'}`)
             return reply.status(400).send({

@@ -515,6 +515,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
     assert.deepEqual(TEST_GROUPS.generator.tests, [
         "tools/box_gacha_reset.test.cjs",
         "tools/gacha_odds_export.test.cjs",
+        "tools/hard_multi_event_quest.test.cjs",
         "tools/rebuild_gacha_from_odds.test.cjs",
         "tools/score_attack_event_data.test.cjs",
         "tools/star_grain_material_pack.test.cjs",

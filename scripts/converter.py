@@ -11,7 +11,7 @@ from converters import (
     convert_solo_time_attack_event_quest, convert_tower_dungeon_event_quest,
     convert_expert_single_event_quest, convert_carnival_event_quest,
     convert_raid_event_quest, convert_rush_event_quest,
-    convert_score_attack_event_quest, convert_character_quests,
+    convert_score_attack_event_quest, convert_character_quests, convert_hard_multi_event_quest,
     # rewards
     convert_score_attack_border_reward, convert_clear_rewards,
     convert_score_reward, convert_rare_score_reward,
@@ -67,6 +67,7 @@ to_convert_files = {
     "rush_event_quest": convert_rush_event_quest,
     "raid_event_quest": convert_raid_event_quest,
     "score_attack_event_quest": convert_score_attack_event_quest,
+    "hard_multi_event_quest": convert_hard_multi_event_quest,
     "score_attack_border_reward": convert_score_attack_border_reward,
     "box_reward": convert_box_rewards,
     "box_gacha": convert_box_gacha,

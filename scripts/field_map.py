@@ -242,6 +242,23 @@ SCORE_ATTACK = {
     'story_check':   NOT_USED,
 }
 
+HARD_MULTI = {
+    'quest_id':      0,
+    # HardMultiEventQuestValues.as: row[4] = first_time_clear_reward_id.
+    'clear_reward':  4,
+    # HardMultiEventQuestValues.as: row[72] = s_plus_clear_reward_id.
+    's_plus_reward': 72,
+    'rank_b':        85,
+    'rank_a':        86,
+    'rank_s':        87,
+    'rank_sp':       88,
+    'rank_point':    94,
+    'char_exp':      95,
+    'mana':          96,
+    'pool_exp':      97,
+    'name':          2,
+}
+
 # ─── Group 7: Special ────────────────────────────────────────────────────
 RANKING = {
     'quest_id':      0,
@@ -331,5 +348,6 @@ TYPE_MAP = {
     'rush_event_quest':                  {'layout': RUSH,               'cat': 24},
     'raid_event_quest':                  {'layout': RAID,               'cat': 23},
     'score_attack_event_quest':          {'layout': SCORE_ATTACK,       'cat': 27},
+    'hard_multi_event_quest':            {'layout': HARD_MULTI,          'cat': 26},
     'character_quest':                   {'layout': CHARACTER,          'cat': 3},
 }
