@@ -19,6 +19,7 @@ import { getPlayerPartyGroupListSync } from "../domains/party"
 import { getPlayerTriggeredTutorialsSync } from "../domains/tutorial"
 import { kIdToBusinessCode, businessCodeToKId } from "../codeMap"
 import { computeRealTimeStamina } from "../../lib/stamina"
+import { isStartTutorialActive } from "../../lib/start-tutorial-state"
 
 export interface SerializePlayerDataOptions {
     viewerId?: number
@@ -136,14 +137,15 @@ export function serializePlayerData(
     let userTutorial: UserTutorial | null = null
     const playerData = toSerialize.player
     const tutorialStep = playerData.tutorialStep
-    if (tutorialStep !== null && toSerialize.triggeredTutorial.find((value: number) => value === 12) === undefined) {
+    if (isStartTutorialActive(tutorialStep, playerData.tutorialSkipFlag)) {
+        const activeTutorialStep = tutorialStep as number
         userTutorial = {
             "viewer_id": options?.viewerId ?? 0,
-            "tutorial_step": tutorialStep,
+            "tutorial_step": activeTutorialStep,
             "skip_flag": playerData.tutorialSkipFlag
         }
 
-        if (tutorialStep >= 1) {
+        if (activeTutorialStep >= 1) {
             userTutorial["powerflip_failure"] = 0
         }
     }

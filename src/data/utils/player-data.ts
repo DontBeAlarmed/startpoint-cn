@@ -21,6 +21,7 @@ import { getDb } from "../db"
 import { getCarnivalSaveStateSync } from "../../lib/carnival-save-state"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getPlayerCharacterAwakeUnlockRecordSync } from "../domains/character_awake"
+import { reconcileInterruptedStartTutorialSync } from "../../lib/start-tutorial-state"
 
 /**
  * Generates default player data.
@@ -81,6 +82,7 @@ export function getClientSerializedData(
     options: SerializePlayerDataOptions
 ): ClientPlayerData | null {
 
+    reconcileInterruptedStartTutorialSync(playerId)
     const playerData = getPlayerSync(playerId)
     if (playerData === null) return null
 

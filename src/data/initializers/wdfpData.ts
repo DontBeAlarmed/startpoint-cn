@@ -275,6 +275,14 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_tutorial_step_receipts (
+        player_id INTEGER PRIMARY KEY,
+        completed_step INTEGER NOT NULL,
+        skip INTEGER NOT NULL,
+        response_data TEXT NOT NULL,
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run();
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_mails (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         player_id INTEGER NOT NULL,

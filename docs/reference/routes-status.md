@@ -29,7 +29,7 @@
 | 商店与兑换 | **Partial** | 普通商店、星之粒、活动兑换及部分特殊兑换已有实现；数据来源、组合奖励和活动期覆盖仍按各系统边界处理 | `src/routes/api/shop.ts`、`src/routes/api/exchange.ts`、`src/data/domains/shopPurchase.ts` | [商店](../systems/shop.md) |
 | 活动 | **Partial** | 土俑、狂热激战、无限演武、战阵、歼灭者和活动扭蛋箱完成度不同；不得用单一活动代表整个路由族 | `src/routes/api/carnivalEvent.ts`、`src/routes/api/rushEvent.ts`、`src/routes/api/raidEvent.ts`、`src/routes/api/rankingEvent.ts`、`src/routes/api/boxGacha.ts` | [特殊关卡架构](../systems/special-quest-architecture.md)、[支持矩阵](../status/support-matrix.md) |
 | 多人联机 | **Partial** | NPC 房主基础流程和超级猫头鹰双场景状态机可用；真人匹配、双客户端完整验收和进程重启恢复缺失 | `src/multi/http/`、`src/multi/tcp/`、`src/multi/room/`、`src/multi/state/` | [多人联机协议](../protocol/multi-battle.md) |
-| 教程、工具与外围兼容 | **Stub** | 一部分路由有真实持久状态，另一部分仅返回维持 CN 客户端启动或菜单流程所需的空响应；必须逐注册源码确认 | `src/routes/api/tutorial.ts`、`src/routes/api/tool.ts`、`src/cn-server.ts` | [当前架构](../architecture.md)、[已知问题](../status/known-issues.md) |
+| 教程、工具与外围兼容 | **Partial** | 首次教程已实现事务推进、重复请求和中断恢复；工具及其他外围路由仍可能只是维持 CN 客户端流程的空响应，必须逐注册源码确认 | `src/routes/api/tutorial.ts`、`src/routes/api/tool.ts`、`src/cn-server.ts` | [首次教程](../systems/start-tutorial.md)、[当前架构](../architecture.md)、[已知问题](../status/known-issues.md) |
 | 礼包码兑换 | **Missing** | 客户端入口可以显示，但没有真实礼包码校验、次数限制、奖励配置与持久化 | `src/cn-server.ts` | [已知问题](../status/known-issues.md) |
 
 ## 管理端路由族

@@ -178,6 +178,7 @@ test("selects only the direct single battle route regressions", () => {
         "tools/auto_start_stamina_stop.test.cjs",
         "tools/quest_entry_lifecycle.test.cjs",
         "tools/quest_host_finish.test.cjs",
+        "tools/tutorial_update_step.test.cjs",
         "tools/active_quest_service_import.test.cjs",
         "tools/special_quest_flow.test.cjs",
     ])
@@ -512,6 +513,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/auto_start_stamina_stop.test.cjs",
         "tools/quest_entry_lifecycle.test.cjs",
         "tools/quest_host_finish.test.cjs",
+        "tools/tutorial_update_step.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS["integration:party"].tests, [
         "tools/special_quest_party.test.cjs",
