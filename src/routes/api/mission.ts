@@ -7,12 +7,13 @@ import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { getComputer, getMissionIdsByCategory, getCurrentStage, getCharacterIdFromMission, isMissionEnabledAt, mergeMissionSettlementResponse, reconcileAwakeUnlockCharacterList, settleAwakeMissionRewards, settleMissionCategories } from "../../lib/mission/index";
+import { createCharacterAwakeEligibilityResolver, getComputer, getMissionIdsByCategory, getCurrentStage, getCharacterIdFromMission, isMissionEnabledAt, mergeMissionSettlementResponse, reconcileAwakeUnlockCharacterList, settleAwakeMissionRewards, settleMissionCategories } from "../../lib/mission/index";
 import { resolveClientProgressTargets } from "../../lib/mission/client-progress";
 import type { AwakeMissionComputedProgress, AwakeMissionInfo } from "../../lib/mission/index";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import type { CategoryContext } from "../../lib/mission/index";
 import { addMissionProgressDelta } from "../../lib/mission/progress";
+import { buildAwakeContext } from "../../lib/mission/computer-awake";
 
 interface GetMissionProgressBody {
     api_count: number,
@@ -62,7 +63,9 @@ const routes = async (fastify: FastifyInstance) => {
             let entry = computerCache.get(category)
             if (!entry) {
                 const computer = getComputer(category)
-                const ctx = computer.buildContext(playerId, category, evaluationTime) as CategoryContext
+                const ctx = category === 9 && awakeEligibility
+                    ? buildAwakeContext(playerId, awakeEligibility.characters) as CategoryContext
+                    : computer.buildContext(playerId, category, evaluationTime) as CategoryContext
                 entry = { ctx }
                 computerCache.set(category, entry)
             }
@@ -72,6 +75,9 @@ const routes = async (fastify: FastifyInstance) => {
         const requestList = body.category_list || [{ category: 1 }]
         const requestCategories = requestList.map(c => c.category)
         const evaluationTime = new Date(getServerTime() * 1000)
+        const awakeEligibility = requestList.some(entry => entry.category === 9)
+            ? createCharacterAwakeEligibilityResolver(playerId, evaluationTime)
+            : null
         const automaticScopes = requestList
             .filter(entry => [1, 2, 3, 4, 5, 6, 7, 8, 10].includes(entry.category))
             .map(entry => ({ category: entry.category, eventId: entry.event_id }))
@@ -91,17 +97,21 @@ const routes = async (fastify: FastifyInstance) => {
                 categoryMissions = getPlayerCategoryMissionsSync(playerId, category)
                 categoryMissionCache.set(category, categoryMissions)
             }
-            const allIds = getMissionIdsByCategory(category).filter(missionId =>
-                isMissionEnabledAt(category, missionId, evaluationTime, requestEntry.event_id)
-            )
             const charId = requestEntry.character_id === undefined ? undefined : String(requestEntry.character_id)
+            const candidateIds = category === 9 && charId !== undefined
+                ? getMissionIdsByCategory(category).filter(missionId =>
+                    getCharacterIdFromMission(missionId) === charId
+                )
+                : getMissionIdsByCategory(category)
+            const allIds = candidateIds.filter(missionId =>
+                isMissionEnabledAt(category, missionId, evaluationTime, requestEntry.event_id)
+                && (category !== 9 || awakeEligibility!.isNewUnlockEligible(
+                    Number(getCharacterIdFromMission(missionId)),
+                    missionId,
+                ))
+            )
 
             for (const missionId of allIds) {
-                // Character-awake: filter by character_id
-                if (charId && category === 9) {
-                    if (getCharacterIdFromMission(missionId) !== charId) continue
-                }
-
                 const dbProgress = categoryMissions[String(missionId)]?.progress ?? 0
                 const progress = computer.compute(missionId, ctx, dbProgress)
                 const stage = getCurrentStage(category, missionId, progress)
@@ -131,7 +141,7 @@ const routes = async (fastify: FastifyInstance) => {
         let userInfo: Record<string, number> | undefined
 
         for (const awakeProgress of awakeProgressByCharacter.values()) {
-            const settlement = settleAwakeMissionRewards(playerId, awakeProgress)
+            const settlement = settleAwakeMissionRewards(playerId, awakeProgress, awakeEligibility!)
             missionInfo.push(...settlement.missionInfo)
             Object.assign(itemList, settlement.itemList)
             characterList.push(...settlement.characterList)

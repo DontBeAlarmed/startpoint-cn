@@ -116,12 +116,18 @@ process.once("exit", cleanupDatabase)
 const { getDb } = require("../src/data/db")
 const { computeAwakeSummary, reconcileAwakeUnlocks, settleAwakeMissionRewards } = require("../src/lib/mission")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { insertDefaultPlayerCharacterSync } = require("../src/data/domains/character")
+const {
+    insertDefaultPlayerCharacterSync,
+    insertPlayerCharacterManaNodesSync,
+    updatePlayerCharacterSync,
+} = require("../src/data/domains/character")
 const characterAwakeDomain = require("../src/data/domains/character_awake")
 const { getPlayerCharacterAwakeUnlocksSync } = characterAwakeDomain
 const { getPlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
+const { characterExpCaps } = require("../src/lib/character")
 const { getAwakeMissionRewardStageDefinition } = require("../src/lib/mission/rewards")
 const awakeRewardMaster = require("../assets/mission_char_awake_reward.json")
 
@@ -131,6 +137,17 @@ const idpId = `character-awake-settlement-test-${randomUUID()}`
 const duplicateProgressIdpId = `${idpId}-duplicate-progress`
 const unreceivedFinalStageRecoveryIdpId = `${idpId}-unreceived-final-stage-recovery`
 const faultIdpId = `${idpId}-fault`
+
+function makeAwakeEligible(playerId) {
+    const characterId = 341005
+    const rarity = getCharacterDataSync(characterId).rarity
+    updatePlayerCharacterSync(playerId, characterId, { exp: characterExpCaps[rarity][0] })
+    insertPlayerCharacterManaNodesSync(
+        playerId,
+        characterId,
+        Object.keys(getCharacterManaNodesSync(characterId, 1)).map(Number),
+    )
+}
 
 function assertNoCharacterRewardConflictsWithSpecialUnlock() {
     let specialRewardCount = 0
@@ -245,6 +262,7 @@ try {
     })
     const playerId = insertDefaultPlayerSync(account.id).id
     insertDefaultPlayerCharacterSync(playerId, 341005)
+    makeAwakeEligible(playerId)
 
     db.prepare("DELETE FROM players_category_mission_stages WHERE player_id = ? AND category = 9").run(playerId)
     db.prepare("DELETE FROM players_category_missions WHERE player_id = ? AND category = 9").run(playerId)
@@ -321,6 +339,8 @@ try {
         status: "normal",
     })
     const duplicateProgressPlayerId = insertDefaultPlayerSync(duplicateProgressAccount.id).id
+    insertDefaultPlayerCharacterSync(duplicateProgressPlayerId, 341005)
+    makeAwakeEligible(duplicateProgressPlayerId)
     testDuplicateProgressUsesMaximum(duplicateProgressPlayerId)
 
     const unreceivedFinalStageRecoveryAccount = insertAccountSync({
@@ -332,6 +352,7 @@ try {
     })
     const unreceivedFinalStageRecoveryPlayerId = insertDefaultPlayerSync(unreceivedFinalStageRecoveryAccount.id).id
     insertDefaultPlayerCharacterSync(unreceivedFinalStageRecoveryPlayerId, 341005)
+    makeAwakeEligible(unreceivedFinalStageRecoveryPlayerId)
     db.prepare("DELETE FROM players_category_mission_stages WHERE player_id = ? AND category = 9")
         .run(unreceivedFinalStageRecoveryPlayerId)
     db.prepare("DELETE FROM players_category_missions WHERE player_id = ? AND category = 9")
@@ -349,6 +370,7 @@ try {
     })
     const faultPlayerId = insertDefaultPlayerSync(faultAccount.id).id
     insertDefaultPlayerCharacterSync(faultPlayerId, 341005)
+    makeAwakeEligible(faultPlayerId)
     db.prepare("DELETE FROM players_category_mission_stages WHERE player_id = ? AND category = 9").run(faultPlayerId)
     db.prepare("DELETE FROM players_category_missions WHERE player_id = ? AND category = 9").run(faultPlayerId)
     db.prepare("DELETE FROM players_character_awake_unlocks WHERE player_id = ?").run(faultPlayerId)

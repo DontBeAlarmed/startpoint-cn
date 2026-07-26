@@ -1,4 +1,3 @@
-import { getPlayerCharactersSync } from "../../data/domains/character"
 import { upsertPlayerCharacterAwakeUnlockSync } from "../../data/domains/character_awake"
 import {
     getPlayerCategoryMissionsSync,
@@ -11,6 +10,9 @@ import { buildManaBoardAwakeCharacterList } from "../character-helpers"
 import { MissionRewardGranter } from "./grants"
 import { getAwakeMissionRewardStageDefinition } from "./rewards"
 import { getCompletedStageNumbers } from "./stages"
+import { getCharacterIdFromMission } from "./character-queries"
+import { createCharacterAwakeEligibilityResolver } from "./awake-eligibility"
+import type { CharacterAwakeEligibilityResolver } from "./awake-eligibility"
 
 export interface AwakeMissionComputedProgress {
     missionId: number
@@ -34,7 +36,8 @@ export interface AwakeMissionSettlementResult {
 
 export function settleAwakeMissionRewards(
     playerId: number,
-    progressList: AwakeMissionComputedProgress[]
+    progressList: AwakeMissionComputedProgress[],
+    resolver: CharacterAwakeEligibilityResolver = createCharacterAwakeEligibilityResolver(playerId),
 ): AwakeMissionSettlementResult {
     const progressByMissionId = new Map<number, number>()
     for (const entry of progressList) {
@@ -43,10 +46,12 @@ export function settleAwakeMissionRewards(
             progressByMissionId.set(entry.missionId, entry.progress)
         }
     }
-    const aggregatedProgressList = [...progressByMissionId].map(([missionId, progress]) => ({
-        missionId,
-        progress,
-    }))
+    const aggregatedProgressList = [...progressByMissionId]
+        .map(([missionId, progress]) => ({ missionId, progress }))
+        .filter(({ missionId }) => resolver.isNewUnlockEligible(
+            Number(getCharacterIdFromMission(missionId)),
+            missionId,
+        ))
 
     const player = getPlayerSync(playerId)
     if (!player) throw new Error(`Player ${playerId} not found during CharacterAwake settlement.`)
@@ -97,7 +102,7 @@ export function settleAwakeMissionRewards(
     })()
 
     const unlockCharacterList = buildManaBoardAwakeCharacterList(
-        getPlayerCharactersSync(playerId),
+        resolver.characters,
         unlockMap
     )
     const characterList = [

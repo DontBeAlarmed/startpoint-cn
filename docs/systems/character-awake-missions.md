@@ -33,6 +33,36 @@
 
 完整 P0 清单见[当前已知问题](../status/known-issues.md)。在这些问题修复并完成条件级测试前，不再维护“0 条错误”或“全部完成”的统计。
 
+### 官方入口资格与服务端门控（2026-07-26）
+
+角色觉醒任务的官方入口资格必须同时满足：玩家持有角色、对应 category 9 活动在服务器时间开放、角色达到
+当前稀有度的基础等级上限、第一块玛纳板的全部节点已经学习。**不要求第二块玛纳板已学习或完成。**
+基础资格区分 `ready / not-ready / unknown`。角色 asset 缺失，或第一块玛纳板主数据缺失、为空时为
+`unknown`；新任务显示、奖励结算和解锁创建均 fail closed。
+
+服务端为每个 player 请求创建一次 eligibility resolver，批量读取角色、已学习节点与节点觉醒等级，按角色缓存
+基础资格和 asset 读取；角色/任务对应关系与活动开放时间也由 resolver 统一判断。以下所有会显示任务、结算
+奖励或新建解锁的路径均复用同一请求级 resolver：
+
+- `/load` 的 `computeAwakeSummary` 与解锁校准；
+- `mission/get_mission_progress` 的摘要、任务阶段结算和特殊奖励；
+- `mission/update_mission_progress` 写入事实后的新解锁校准与响应发布；
+- 各权威业务端点状态落库后的 `reconcileAwakeUnlockCharacterList`；
+- 根据显式进度恢复解锁的 `reconcileAwakeUnlocksFromProgress`。
+
+单角色 `mission/get_mission_progress` 在 eligibility 前先按 `requestEntry.character_id` 缩小 category 9 mission
+ID，避免遍历其他角色任务。旧 unlock cleanup 只在基础资格可确认是 `not-ready` 且没有正数节点觉醒等级时
+删除；`unknown` 只阻止新解锁，不触发清理，活动关闭也始终不是 cleanup 条件。调和结果分别返回当前全量
+`all`、本次新增或提高的 `changed`，以及按角色和板记录的 `removed`。业务增量响应仅在 `changed` 与
+`removed` 同时为空时原样返回；清理事件会保留既有角色条目的进化、信赖证等字段，并用权威空对象
+`mana_board_awake: {}` 覆盖客户端旧值。若响应中原本没有该角色，则追加只含角色 ID 和空对象的最小更新。
+`/load` 不发布增删事件，继续使用 `all` 重建完整状态。
+
+底层战斗事实、终身统计或其他共享权威事实可以在角色满足入口资格之前累计，资格满足后计算器可以读取这些
+既有事实；这是服务端为兼容旧存档和避免丢失历史行为采用的策略。它不表示已经从 CN 客户端证明“官方客户端
+一定允许资格前累计”。`update_mission_progress` 的事实写入也沿用该策略；写入后只有满足 helper 的角色才能
+显示任务、结算奖励或发布新解锁。
+
 ---
 
 ## 已实现特性
@@ -191,6 +221,7 @@ lib/mission/
 ├── registry.ts        分类→MissionComputer 分发表
 ├── stages.ts          阶段阈值 (getCurrentStage, getCompletedStageNumbers)
 ├── rewards.ts         奖励、奖励 ID 和 AwakeManaBoard 特殊奖励解析
+├── awake-eligibility.ts  官方入口基础资格与新解锁统一门控
 ├── awake-settlement.ts  category 9 进入页面时的幂等奖励结算
 ├── patterns.ts        pattern→mission 索引 (getMissionsByPattern)
 ├── character-queries.ts  角色→任务映射
@@ -202,7 +233,9 @@ lib/mission/
 
 - `MissionComputer` 接口：`buildContext()` 一次预取 DB → `compute()` 纯计算
 - 新分类只需实现接口 + 注册到 `registry.ts` 一行
-- cat9 预缓存：`getPlayerCharactersSync` + `getPlayerCharacterClearSync` 批量预取，消除 144 次 per-mission DB 查询
+- cat9 请求级预缓存：eligibility resolver 一次读取 `getPlayerCharactersSync` 与
+  `getPlayerCharactersManaNodesSync`，角色通关事实由 `getPlayerCharacterClearsSync` 批量读取；单角色请求先缩小
+  mission ID，再按角色缓存资格与 asset，消除 per-mission DB 查询
 
 - **队长**（characters[0]）：单独追踪，"以X为队长"任务
 - **队员**（characters[1+], unison）：批量追踪，"队伍中编有X"任务
@@ -239,3 +272,29 @@ lib/mission/
 - 真实 MsgPack+Base64 Fastify 回归从普通单人 `/finish` 开始：最后一次成功通关会立即在战斗响应的
   `character_list` 发布 `mana_board_awake`，但不领取第一页奖励；随后手动进入第一页一次返回四条
   `mission_info` 和奖励，重复请求不再发奖，也不会重复返回角色解锁。
+
+四条觉醒任务全部完成后，即使普通任务奖励仍全部处于未领取状态，权威状态变更端点也可以先持久化并发布
+三板（觉醒板）解锁。客户端收到 `mana_board_awake[1] > 0` 后，会把第一块玛纳板切换为 Awake 状态；这不是
+要求玩家先完成第二块玛纳板。若最后一个入口条件来自 `learn_mana_node`，服务端会先写入该节点，再在同一响应
+的既有角色条目上合并 `mana_board_awake`，保留进化等级、信赖证等原有响应字段并即时发布解锁。
+
+### 持久表与 JSON 存档（2026-07-26）
+
+角色觉醒核心状态由以下五类表/字段共同表达：
+
+| 表 | 关键字段 | 用途 |
+|---|---|---|
+| `players_characters` | `id`、`exp`、`mana_board_index` | 角色所有权、基础等级与当前板索引 |
+| `players_characters_mana_nodes` | `value`、`awake_level` | 已学习节点及每个既有节点的觉醒等级 |
+| `players_character_awake_unlocks` | `character_id`、`board_index`、`awake_level` | 与领奖独立的持久三板解锁 |
+| `players_category_missions` | `category`、`id`、`progress` | category 9 任务权威进度 |
+| `players_category_mission_stages` | `category`、`mission_id`、`id`、`status` | 各奖励阶段是否已领取 |
+
+战斗组合、通关计数和终身统计仍保存在各自事实表/玩家字段中，由觉醒计算器汇总；它们不替代上述解锁与领奖
+状态。服务器侧 `MergedPlayerData` 的 JSON 存档额外包含可选字段 `characterAwakeUnlocks` 与
+`characterManaNodeAwakeLevels`。导出后 JSON roundtrip 会保留两者；旧存档缺少字段时按“无持久解锁、已存在
+节点的 `awake_level=0`”载入，不会报错。恢复节点觉醒等级只执行 `UPDATE`，只作用于已经由
+`characterManaNodeList` 创建的节点。`characterAwakeUnlocks` 必须是 plain object，角色 ID、板索引和等级必须为
+正 safe integer；`characterManaNodeAwakeLevels` 的角色/节点 ID 必须为正 safe integer，等级必须为非负 safe
+integer。未知角色、未知节点或 `UPDATE changes=0` 会明确拒绝导入，并由 replace transaction 回滚，不能静默
+忽略或部分替换原存档。

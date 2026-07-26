@@ -53,6 +53,8 @@ export type { AwakeMissionComputedProgress, AwakeMissionInfo, AwakeMissionSettle
 export { settleAwakeMissionRewards } from "./awake-settlement"
 export type { AwakeUnlockProgress, AwakeUnlockReconciliationResult } from "./awake-unlock"
 export { reconcileAwakeUnlocks, reconcileAwakeUnlocksFromProgress } from "./awake-unlock"
+export type { CharacterAwakeBaseReadiness, CharacterAwakeEligibilityResolver } from "./awake-eligibility"
+export { createCharacterAwakeEligibilityResolver, getCharacterAwakeBaseReadiness, isCharacterAwakeBaseReady, isCharacterAwakeNewUnlockEligible } from "./awake-eligibility"
 export { reconcileAwakeUnlockCharacterList } from "./awake-unlock-response"
 
 // Degree helpers

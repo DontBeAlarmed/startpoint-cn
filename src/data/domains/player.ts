@@ -70,7 +70,8 @@ import { insertPlayerOptionsSync } from "./option";
 import { insertPlayerItemsSync } from "./item";
 import { insertPlayerEquipmentListSync } from "./equipment";
 import { insertPlayerPartyGroupListSync } from "./party";
-import { insertPlayerCharactersSync, insertPlayerCharactersManaNodesSync } from "./character";
+import { insertPlayerCharactersSync, insertPlayerCharactersManaNodesSync, updatePlayerCharactersManaNodeAwakeLevelsSync } from "./character";
+import { insertPlayerCharacterAwakeUnlocksSync } from "./character_awake";
 import { insertPlayerDrawnQuestsSync, insertPlayerQuestProgressListSync } from "./quest";
 import { insertPlayerGachaInfoListSync, insertPlayerGachaCampaignListSync , getPlayerGachaInfoListSync, updatePlayerGachaInfoSync, getPlayerGachaCampaignListSync, updatePlayerGachaCampaignSync } from "./gacha";
 import { insertPlayerBoxGachasSync } from "./boxGacha";
@@ -510,6 +511,12 @@ export function insertMergedPlayerDataSync(
     insertPlayerClearedRegularMissionListSync(playerId, toInsert.clearedRegularMissionList)
     insertPlayerCharactersSync(playerId, toInsert.characterList)
     insertPlayerCharactersManaNodesSync(playerId, toInsert.characterManaNodeList)
+    if (toInsert.characterManaNodeAwakeLevels !== undefined) {
+        updatePlayerCharactersManaNodeAwakeLevelsSync(playerId, toInsert.characterManaNodeAwakeLevels)
+    }
+    if (toInsert.characterAwakeUnlocks !== undefined) {
+        insertPlayerCharacterAwakeUnlocksSync(playerId, toInsert.characterAwakeUnlocks)
+    }
     insertPlayerPartyGroupListSync(playerId, toInsert.partyGroupList)
     insertPlayerItemsSync(playerId, toInsert.itemList)
     insertPlayerEquipmentListSync(playerId, toInsert.equipmentList)

@@ -8,6 +8,9 @@ CN 1.8.1 客户端在 `CharacterAwakeScene.preparation()` 中读取并缓存
 - 缓存值为 `0` 时，场景默认进入第一页并禁用第二页；
 - 缓存值大于 `0` 时，场景默认进入第二页，并将该值作为目标觉醒等级。
 
+这里的键 `1` 指第一块玛纳板。`mana_board_awake[1] > 0` 会让客户端把一板切换为 Awake 状态，从而进入
+三板（觉醒板）流程；它不表示第二块玛纳板必须先学习或完成。
+
 `afterTransition()` 会根据初始页签决定是否请求任务。未解锁角色进入第一页后，客户端自动通过
 `MissionGetProgressProcessingFlow` 请求 category 9 的
 `mission/get_mission_progress`；已经解锁、直接进入第二页时不会自动请求任务。
@@ -26,7 +29,17 @@ CN 1.8.1 客户端在 `CharacterAwakeScene.preparation()` 中读取并缓存
 - `players_character_awake_unlocks` 保存第二页的持久解锁；
 - `players_category_mission_stages.status` 保存 category 9 各阶段是否已经领奖。
 
-角色所有权是持久解锁的最终门槛。即使任务条件已经满足，玩家尚未持有对应角色时也不得创建解锁行；获得角色并完成权威状态写入后，后续校准才能发布该角色的解锁状态。
+官方入口资格必须同时满足：category 9 对应活动开放、玩家持有角色、角色达到当前稀有度的基础等级上限、
+第一块玛纳板的全部节点已经学习；不要求第二块玛纳板。
+
+基础资格使用 `ready / not-ready / unknown` 三态：角色主数据缺失，或第一块玛纳板主数据缺失、为空时为
+`unknown`；角色未持有、基础等级不足或已知的一板未全学时为 `not-ready`。`unknown` 与 `not-ready` 都会
+fail closed，阻止显示任务、结算奖励或创建新解锁。
+
+每个 player 请求创建一次 eligibility resolver。resolver 一次批量读取 `getPlayerCharactersSync`、
+`getPlayerCharactersManaNodesSync` 与节点觉醒等级，按角色缓存基础资格和 asset 读取。任务摘要、category 9
+请求过滤、领奖结算、显式进度恢复和所有业务端点解锁校准复用同一 resolver。单角色 category 9 请求会先按
+`requestEntry.character_id` 缩小任务 ID，再执行 eligibility，不评估其他角色任务。
 
 ### 任务尚未全部完成
 
@@ -46,6 +59,10 @@ CN 1.8.1 客户端在 `CharacterAwakeScene.preparation()` 中读取并缓存
    `mission_info`，但不会再次发布已经存在的解锁条目。
 6. 重复切换页签、重复请求或再次进入都不会重复发奖，也不会重复返回 `mission_info`。
 
+四条任务全部完成时，普通奖励可以仍未领取；持久三板解锁与 `character_list.mana_board_awake` 的发布不等待
+普通奖励领取。若最后一个入口条件是学习一板最后节点，`learn_mana_node` 会先写入节点，再在同一响应内校准
+解锁；合并逻辑保留该角色条目已有的进化、信赖证等字段，同时加入 `mana_board_awake`。
+
 `mission/update_mission_progress` 只累计客户端上报的任务增量，不执行奖励结算，也不调用
 `computeAwakeSummary`。写入进度后它会调用 `reconcileAwakeUnlockCharacterList`，因此若该权威增量刚好完成最终条件，
 可以在同一响应中发布新的持久解锁。
@@ -53,9 +70,22 @@ CN 1.8.1 客户端在 `CharacterAwakeScene.preparation()` 中读取并缓存
 当前所有调用 `reconcileAwakeUnlockCharacterList` 的业务入口都会在状态落库后执行校准，覆盖：单人和多人战斗结算、剧情结算、普通与兑换抽卡、BoxGacha、星粒 exchange、商店购买、城镇或角色获得、教程步骤 15/16、邮件领取、物品出售、信赖证领取、任务进度更新和 Active Mission 领奖。新增角色来源或新增觉醒条件时必须重新反向审计调用点，不能假定未来端点会自动覆盖。
 `/load` 会对持有角色执行同样的持久化校准，并把持久解锁与已经觉醒的节点等级按每块板的最大值合并序列化。
 
+底层共享战斗事实、终身统计等可以在满足官方入口资格之前累计，并在资格满足后参与计算。这是服务端兼容旧
+存档和历史行为的策略，不应写成已经由客户端反编译或实机证明的官方行为。`update_mission_progress` 可以先写入
+兼容事实，但同一响应中的新解锁校准仍使用资格 helper；任务显示和领奖同样不会绕过资格。
+
 ## 异常恢复边界
 
 解锁状态和领取记录可能因旧版本迁移、异常中断或人工修改出现不一致。恢复只补齐可从权威进度推导出的解锁状态，不反向重放已经登记的奖励。
+
+校准还会清理旧版本错误创建的解锁，但边界严格限定为：基础资格可确认是 `not-ready`，且该角色不存在任何
+`awake_level > 0` 的节点。`unknown` 主数据状态只阻止新解锁，不触发清理。活动关闭也不是删除条件；仅因
+活动过期不得移除已经存在的解锁。只要存在正数节点觉醒进度，即使角色等级或一板状态异常，也保留解锁，
+避免把已经进入实际觉醒流程的存档降级。
+
+清理产生的业务响应必须返回对应角色，并以 `mana_board_awake: {}` 权威覆盖客户端旧解锁，不能与旧值做
+最大值合并。既有角色条目的进化、信赖证等字段保持不变；没有既有条目时返回最小角色更新。`/load` 则继续
+读取调和后的 `all`，与真实节点觉醒等级按板取最大值后发布完整状态。
 
 | 解锁行 | 最终特殊阶段 | 处理方式 |
 |---|---|---|
@@ -93,3 +123,17 @@ CN 1.8.1 客户端在 `CharacterAwakeScene.preparation()` 中读取并缓存
 `/character/awake_mana_node` 使用持久解锁校验请求，不依赖 category 9 是否已经领奖。
 请求还必须满足目标等级一致、基础板全部学习、请求节点均属于板 1、节点列表非空且无重复等条件。
 玛纳、物品与节点觉醒等级在同一个 SQLite 事务中提交。
+
+## 数据库存储与存档兼容
+
+核心状态分布在五类表/字段：`players_characters.exp` 表示基础等级，
+`players_characters_mana_nodes(value, awake_level)` 表示已学习节点及节点觉醒等级，
+`players_character_awake_unlocks(character_id, board_index, awake_level)` 表示持久三板解锁，
+`players_category_missions(category, id, progress)` 表示 category 9 任务进度，
+`players_category_mission_stages(category, mission_id, id, status)` 表示奖励阶段领取状态。
+
+服务器 `MergedPlayerData` JSON 使用可选字段 `characterAwakeUnlocks` 和
+`characterManaNodeAwakeLevels` 保存后两类觉醒状态。新存档导出/导入 roundtrip 会完整保留；旧存档缺少任一
+字段时仍可载入，缺失解锁按空集合处理，已学习节点的缺失觉醒等级按 `0` 处理。导入节点觉醒等级只更新
+`characterManaNodeList` 已创建的节点；未知角色或节点 ID 会明确拒绝导入并回滚整个 replace transaction，
+不会静默忽略或部分替换原存档。两类字段都要求 plain object，ID 与等级必须是对应范围内的 safe integer。

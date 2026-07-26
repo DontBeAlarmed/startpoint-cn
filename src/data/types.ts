@@ -740,6 +740,7 @@ export interface MergedPlayerData {
     characterList: Record<string, PlayerCharacter>,
     characterManaNodeList: Record<string, number[]>,
     characterManaNodeAwakeLevels?: Record<string, Record<number, number>>,
+    characterAwakeUnlocks?: Record<string, Record<number, number>>,
     manaBoardAwakeMap?: Map<string, Record<number, number>>,
     partyGroupList: Record<string, PlayerPartyGroup>,
     itemList: Record<string, number>,

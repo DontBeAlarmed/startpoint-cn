@@ -1,7 +1,7 @@
 // Character awakening mission computer (category 9)
 
-import { getPlayerCharacterClearSync } from "../../data/domains/character_clear"
-import { getPlayerCharacterSync, getPlayerCharactersSync } from "../../data/domains/character"
+import { getPlayerCharacterClearsSync } from "../../data/domains/character_clear"
+import { getPlayerCharactersSync } from "../../data/domains/character"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getPlayerCategoryMissionsSync } from "../../data/domains/mission"
 import { getPlayerSync } from "../../data/domains/player"
@@ -79,10 +79,13 @@ function coClearKey(a: number, b: number): string {
     return getCharacterPairKey(a, b)
 }
 
-function buildAwakeContext(playerId: number): AwakeContext {
+export function buildAwakeContext(
+    playerId: number,
+    allChars: Record<string, PlayerCharacter> = getPlayerCharactersSync(playerId),
+): AwakeContext {
     const player = getPlayerSync(playerId)!
     const questProgressRaw = getPlayerQuestProgressSync(playerId)
-    const allChars = getPlayerCharactersSync(playerId)
+    const characterClears = getPlayerCharacterClearsSync(playerId)
 
     let totalQuestClears = 0, ssClears = 0, sClears = 0, aClears = 0, bClears = 0, totalStories = 0
     const questProgress: CategoryContext["questProgress"] = {}
@@ -115,7 +118,13 @@ function buildAwakeContext(playerId: number): AwakeContext {
     const charData = new Map<string, PlayerCharacter>()
     for (const [cid, char] of Object.entries(allChars)) {
         charData.set(cid, char)
-        const row = getPlayerCharacterClearSync(playerId, Number(cid))
+        const row = characterClears[cid] ?? {
+            clear_count: 0,
+            multi_count: 0,
+            leader_clear_count: 0,
+            leader_multi_count: 0,
+            leader_power_flip_count: 0,
+        }
         charClears.set(cid, row.clear_count)
         leaderClears.set(cid, row.leader_clear_count)
         multiClears.set(cid, row.multi_count)

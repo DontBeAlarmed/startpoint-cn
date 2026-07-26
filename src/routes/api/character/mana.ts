@@ -13,6 +13,7 @@ import { getDb } from "../../../data/db";
 import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/active_mission_counters"
 import { validateSessionAndPlayer, validateCharacterOwnership, computeManaDeduction, computeItemDeductions, buildCharacterListEntry, sendCharacterResponse, computeBondTokenAndEvolution, validateManaBoardAwakeRequest } from "../../../lib/character-helpers";
 import { getMailArrivedSync } from "../../../lib/mail-notification";
+import { reconcileAwakeUnlockCharacterList } from "../../../lib/mission";
 
 interface LearnManaNodeBody {
     viewer_id: number,
@@ -119,14 +120,17 @@ const routes = async (fastify: FastifyInstance) => {
         console.log(`[MANA] learn_mana_node done: boardComplete=${isBoardComplete} bondGiven=${!!bondTokenList.length} evoLevel=${characterEvolutionLevel}`)
 
         insertPlayerCharacterManaNodesSync(playerId, characterId, toUnlockNodeIds)
-
-        return sendCharacterResponse(reply, viewerId, {
-            user_info: { free_mana: newFreeMana, paid_mana: newPaidMana },
-            character_list: [buildCharacterListEntry(characterId, characterData, {
+        const characterList = reconcileAwakeUnlockCharacterList(playerId, [
+            buildCharacterListEntry(characterId, characterData, {
                 evolution_level: characterEvolutionLevel,
                 evolution_img_level: characterEvolutionLevel,
                 bond_token_list: bondTokenList,
-            })],
+            }),
+        ])
+
+        return sendCharacterResponse(reply, viewerId, {
+            user_info: { free_mana: newFreeMana, paid_mana: newPaidMana },
+            character_list: characterList,
             user_character_mana_node_list: { [String(characterId)]: userCharacterManaNodeListItem as { multiplied_id: number; awake_level: number }[] },
             item_list: newItemAmounts,
             evolution: evolutionData,

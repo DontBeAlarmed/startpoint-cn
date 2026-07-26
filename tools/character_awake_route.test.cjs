@@ -38,10 +38,17 @@ restoreContentSnapshot = installBundledCharacterSnapshot()
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { insertDefaultPlayerCharacterSync } = require("../src/data/domains/character")
+const {
+    insertDefaultPlayerCharacterSync,
+    insertPlayerCharacterManaNodesSync,
+    updatePlayerCharacterSync,
+} = require("../src/data/domains/character")
 const { getPlayerCharacterAwakeUnlocksSync } = require("../src/data/domains/character_awake")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const characterAssets = require("../src/lib/assets")
+const { getCharacterDataSync, getCharacterManaNodesSync } = characterAssets
+const { characterExpCaps } = require("../src/lib/character")
 const { insertActiveQuest } = require("../src/lib/quest/active-quest-service")
 const missionRoutes = require("../src/routes/api/mission").default
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
@@ -62,6 +69,13 @@ const account = insertAccountSync({
 })
 const playerId = insertDefaultPlayerSync(account.id).id
 insertDefaultPlayerCharacterSync(playerId, 341005)
+const rarity = getCharacterDataSync(341005).rarity
+updatePlayerCharacterSync(playerId, 341005, { exp: characterExpCaps[rarity][0] })
+insertPlayerCharacterManaNodesSync(
+    playerId,
+    341005,
+    Object.keys(getCharacterManaNodesSync(341005, 1)).map(Number),
+)
 const viewerId = 800000099
 db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
     .run(String(viewerId), account.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 2)
@@ -166,8 +180,54 @@ async function main() {
         assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 1 })
         assert.deepEqual(getPlayerCategoryMissionsSync(playerId, 9), {})
 
-        const first = await requestAwakePage(fastify)
+        const originalPrepare = db.prepare.bind(db)
+        const originalGetCharacterDataSync = characterAssets.getCharacterDataSync
+        const evaluatedCharacterIds = new Set()
+        const queryCounts = {
+            characterBatch: 0,
+            manaNodeBatch: 0,
+            characterSingle: 0,
+            manaNodeSingle: 0,
+            characterClearSingle: 0,
+        }
+        db.prepare = sql => {
+            const normalized = String(sql).replace(/\s+/g, " ").trim()
+            if (normalized.includes("FROM players_characters WHERE player_id = ? AND id = ?")) {
+                queryCounts.characterSingle++
+            } else if (normalized.includes("FROM players_characters WHERE player_id = ?")) {
+                queryCounts.characterBatch++
+            }
+            if (normalized.includes("FROM players_characters_mana_nodes WHERE character_id = ? AND player_id = ?")) {
+                queryCounts.manaNodeSingle++
+            } else if (normalized.startsWith("SELECT value, character_id FROM players_characters_mana_nodes WHERE player_id = ?")) {
+                queryCounts.manaNodeBatch++
+            }
+            if (normalized.includes("FROM players_character_quest_clears WHERE player_id = ? AND character_id = ?")) {
+                queryCounts.characterClearSingle++
+            }
+            return originalPrepare(sql)
+        }
+        characterAssets.getCharacterDataSync = candidateCharacterId => {
+            evaluatedCharacterIds.add(Number(candidateCharacterId))
+            return originalGetCharacterDataSync(candidateCharacterId)
+        }
+
+        let first
+        try {
+            first = await requestAwakePage(fastify)
+        } finally {
+            db.prepare = originalPrepare
+            characterAssets.getCharacterDataSync = originalGetCharacterDataSync
+        }
         assert.equal(first.statusCode, 200)
+        assert.deepEqual([...evaluatedCharacterIds], [341005])
+        assert.deepEqual(queryCounts, {
+            characterBatch: 1,
+            manaNodeBatch: 1,
+            characterSingle: 0,
+            manaNodeSingle: 0,
+            characterClearSingle: 0,
+        })
         const firstData = decodeResponse(first).data
         assert.deepEqual(
             firstData.mission_progress_list.map(entry => entry.mission_id),

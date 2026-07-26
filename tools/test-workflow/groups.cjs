@@ -44,6 +44,13 @@ const TEST_GROUPS = Object.freeze({
             "tools/special_quest_flow.test.cjs",
         ],
     },
+    "quick:character": {
+        execution: "parallel",
+        tests: [
+            "tools/character_awake_eligibility.test.cjs",
+            "tools/player_awake_save_roundtrip.test.cjs",
+        ],
+    },
     "quick:protocol": {
         execution: "parallel",
         tests: [

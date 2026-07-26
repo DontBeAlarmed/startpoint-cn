@@ -636,9 +636,14 @@ const {
 } = require("../src/data/domains/character_awake")
 const { getPlayerItemSync } = require("../src/data/domains/item")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { insertDefaultPlayerCharacterSync } = require("../src/data/domains/character")
+const {
+    insertDefaultPlayerCharacterSync,
+    insertPlayerCharacterManaNodesSync,
+    updatePlayerCharacterSync,
+} = require("../src/data/domains/character")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
-const { givePlayerCharacterSync } = require("../src/lib/character")
+const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
+const { characterExpCaps, givePlayerCharacterSync } = require("../src/lib/character")
 const {
     reconcileAwakeUnlockCharacterList,
     reconcileAwakeUnlocks,
@@ -696,6 +701,13 @@ try {
 
     const ownershipGrant = givePlayerCharacterSync(playerId, 341005)
     assert.notEqual(ownershipGrant, null)
+    const rarity = getCharacterDataSync(341005).rarity
+    updatePlayerCharacterSync(playerId, 341005, { exp: characterExpCaps[rarity][0] })
+    insertPlayerCharacterManaNodesSync(
+        playerId,
+        341005,
+        Object.keys(getCharacterManaNodesSync(341005, 1)).map(Number),
+    )
     const afterOwnershipCharacterList = reconcileAwakeUnlockCharacterList(
         playerId,
         ownershipGrant.character ? [ownershipGrant.character] : []
@@ -957,6 +969,7 @@ try {
             ["341006", { 1: 1 }],
             ["999999", { 1: 1 }],
         ]),
+        removed: new Map(),
     })
     try {
         assert.deepEqual(reconcileAwakeUnlockCharacterList(playerId, []), [])

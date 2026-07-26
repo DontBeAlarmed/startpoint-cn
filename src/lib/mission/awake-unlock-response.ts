@@ -1,6 +1,6 @@
-import { getPlayerCharactersSync } from "../../data/domains/character"
 import { buildManaBoardAwakeCharacterList } from "../character-helpers"
 import { reconcileAwakeUnlocks } from "./awake-unlock"
+import { createCharacterAwakeEligibilityResolver } from "./awake-eligibility"
 
 function mergeManaBoardAwake(...values: unknown[]): Record<number, number> {
     const merged: Record<number, number> = {}
@@ -26,11 +26,12 @@ export function reconcileAwakeUnlockCharacterList(
     existing: Record<string, unknown>[]
 ): Record<string, unknown>[] {
     try {
-        const changed = reconcileAwakeUnlocks(playerId).changed
-        if (changed.size === 0) return existing
+        const resolver = createCharacterAwakeEligibilityResolver(playerId)
+        const { changed, removed } = reconcileAwakeUnlocks(playerId, undefined, resolver)
+        if (changed.size === 0 && removed.size === 0) return existing
 
         const updates = buildManaBoardAwakeCharacterList(
-            getPlayerCharactersSync(playerId),
+            resolver.characters,
             changed
         )
         const merged: Record<string, unknown>[] = []
@@ -80,6 +81,23 @@ export function reconcileAwakeUnlockCharacterList(
                     merged[index].mana_board_awake,
                     update.mana_board_awake
                 ),
+            }
+        }
+
+        for (const characterId of removed.keys()) {
+            const index = indexByCharacterId.get(characterId)
+            if (index === undefined) {
+                indexByCharacterId.set(characterId, merged.length)
+                merged.push({
+                    character_id: Number(characterId),
+                    mana_board_awake: {},
+                })
+                continue
+            }
+
+            merged[index] = {
+                ...merged[index],
+                mana_board_awake: {},
             }
         }
 

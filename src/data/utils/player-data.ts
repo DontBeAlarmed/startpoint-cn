@@ -15,11 +15,12 @@ import { getPlayerMultiSpecialExchangeCampaignsSync, getPlayerPeriodicRewardPoin
 import { getPlayerOptionsSync } from "../domains/option"
 import { getPlayerPartyGroupListSync } from "../domains/party"
 import { getPlayerTriggeredTutorialsSync } from "../domains/tutorial"
-import { computeAwakeSummary, filterToActiveMissions, reconcileAwakeUnlocksFromProgress } from "../../lib/mission/index"
+import { computeAwakeSummary, createCharacterAwakeEligibilityResolver, filterToActiveMissions, reconcileAwakeUnlocksFromProgress } from "../../lib/mission/index"
 import { computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps } from "../../lib/character-helpers"
 import { getDb } from "../db"
 import { getCarnivalSaveStateSync } from "../../lib/carnival-save-state"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
+import { getPlayerCharacterAwakeUnlockRecordSync } from "../domains/character_awake"
 
 /**
  * Generates default player data.
@@ -86,18 +87,20 @@ export function getClientSerializedData(
     const doSerializeRushEventData = options.serializeRushEventData ?? false
 
     // Compute awake mission summary for /load injection
-    const awakeSummary = computeAwakeSummary(playerId)
+    const awakeEligibility = createCharacterAwakeEligibilityResolver(playerId)
+    const awakeSummary = computeAwakeSummary(playerId, awakeEligibility)
     awakeSummary.manaBoardAwakeMap = reconcileAwakeUnlocksFromProgress(
         playerId,
         awakeSummary.activeMissionList.map(mission => ({
             missionId: mission.mission_id,
             progress: mission.progress_value,
-        }))
+        })),
+        awakeEligibility,
     ).all
 
     // The client uses mana_board_awake both to unlock the Awake tab and as the
     // target node-awake level. Keep mission unlocks and persisted node state.
-    const nodeAwakeLevels = getPlayerCharactersManaNodeAwakeLevelsSync(playerId)
+    const nodeAwakeLevels = awakeEligibility.manaNodeAwakeLevels
     const manaBoardAwakeMap = mergeManaBoardAwakeMaps(
         awakeSummary.manaBoardAwakeMap,
         computeManaBoardAwakeFromNodes(nodeAwakeLevels)
@@ -108,8 +111,8 @@ export function getClientSerializedData(
         dailyChallengePointList: getPlayerDailyChallengePointListSync(playerId),
         triggeredTutorial: getPlayerTriggeredTutorialsSync(playerId),
         clearedRegularMissionList: getPlayerClearedRegularMissionListSync(playerId),
-        characterList: getPlayerCharactersSync(playerId),
-        characterManaNodeList: getPlayerCharactersManaNodesSync(playerId),
+        characterList: awakeEligibility.characters,
+        characterManaNodeList: awakeEligibility.manaNodes,
         characterManaNodeAwakeLevels: nodeAwakeLevels,
         manaBoardAwakeMap,
         partyGroupList: getPlayerPartyGroupListSync(playerId),
@@ -156,6 +159,8 @@ export function getMergedPlayerDataSync(
         clearedRegularMissionList: getPlayerClearedRegularMissionListSync(playerId),
         characterList: getPlayerCharactersSync(playerId),
         characterManaNodeList: getPlayerCharactersManaNodesSync(playerId),
+        characterManaNodeAwakeLevels: getPlayerCharactersManaNodeAwakeLevelsSync(playerId),
+        characterAwakeUnlocks: getPlayerCharacterAwakeUnlockRecordSync(playerId),
         partyGroupList: getPlayerPartyGroupListSync(playerId),
         itemList: getPlayerItemsSync(playerId),
         equipmentList: getPlayerEquipmentListSync(playerId),
