@@ -25,9 +25,9 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.event)
     assert.deepEqual(
         { total: report.event.total, automated: report.event.automated, fallback: report.event.fallback },
-        { total: 2512, automated: 1485, fallback: 1027 },
+        { total: 2512, automated: 1492, fallback: 1020 },
     )
-    assert.equal(report.event.fallbackMissions.find(entry => entry.missionId === 1200)?.patternType, 28)
+    assert.equal(report.event.automatedMissions.filter(entry => [1200, 1208, 1209, 1210, 1211, 1216, 1223].includes(entry.missionId)).length, 7)
     assert.equal(report.event.fallbackMissions.find(entry => entry.missionId === 1400)?.reason, "empty-quest-selector")
 
     assertPartition(report.degree)

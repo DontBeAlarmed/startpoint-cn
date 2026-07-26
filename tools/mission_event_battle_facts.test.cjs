@@ -27,7 +27,10 @@ process.once("exit", cleanup)
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
+const {
+    getPlayerCategoryMissionsSync,
+    updatePlayerCategoryMissionSync,
+} = require("../src/data/domains/mission")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const {
     BATTLE_SETTLEMENT_CATEGORIES,
@@ -35,6 +38,7 @@ const {
 } = require("../src/lib/mission/battle-facts")
 const {
     getExactEventBattleRuleCoverage,
+    getExactEventBattleMissionIds,
     loadExactEventBattleRules,
     recordEventMissionBattleFacts,
 } = require("../src/lib/mission/event-battle-facts")
@@ -53,6 +57,11 @@ const playerId = insertDefaultPlayerSync(account.id).id
 const player = getPlayerSync(playerId)
 
 assert.equal(typeof loadExactEventBattleRules, "function")
+assert.deepEqual(
+    getExactEventBattleMissionIds().filter(missionId => [1200, 1208, 1209, 1210, 1211, 1216, 1223].includes(missionId)),
+    [1200, 1208, 1209, 1210, 1211, 1216, 1223],
+    "7 个权威统计事实必须进入机器覆盖",
+)
 const checkedInRules = require("../assets/mission_event_battle_rules.json")
 const firstRule = checkedInRules.rules[0]
 const bossRule = checkedInRules.rules.find(rule => rule.missionId === 1416)
@@ -221,8 +230,145 @@ assert.deepEqual(getExactEventBattleRuleCoverage(), {
     clearRulesByCategory: { 7: 63, 10: 7, 13: 60, 23: 80, 24: 47 },
     exactPhaseRules: 29,
     exactSingleClearRules: 8,
+    exactStatisticsRules: 7,
+    exactStatisticsRuleMissionIds: [1200, 1208, 1209, 1210, 1211, 1216, 1223],
 })
 assert.deepEqual(BATTLE_SETTLEMENT_CATEGORIES, [1, 2, 3, 6, 7, 8, 10])
+
+const statisticEventTime = new Date("2019-12-04T04:00:00.000Z")
+const statisticBattleContext = finishContext({
+    clearRank: 5,
+    statistics: {
+        clear_phase: 1,
+        max_power: 12345,
+        zones: [{ use_dash_count: 2 }, { use_dash_count: 3 }],
+        party: { characters: [], unison_characters: [] },
+    },
+})
+assert.deepEqual(
+    recordEventMissionBattleFacts(statisticBattleContext, statisticEventTime)
+        .filter(missionId => [1200, 1208, 1209, 1210, 1211, 1216, 1223].includes(missionId))
+        .sort((left, right) => left - right),
+    [1200, 1208, 1209, 1210, 1211, 1216, 1223],
+    "type26/27/28 的 7 条权威统计事实必须匹配成功结算",
+)
+for (const missionId of [1200, 1211, 1223]) assert.equal(missionProgress(missionId), 5)
+for (const missionId of [1208, 1209, 1210]) assert.equal(missionProgress(missionId), 1)
+assert.equal(missionProgress(1216), 12345)
+
+const statisticSingleContext = {
+    ...statisticBattleContext,
+    isMulti: false,
+    isMultiHost: undefined,
+    clearRank: 4,
+    statistics: {
+        ...statisticBattleContext.statistics,
+        max_power: 20000,
+        zones: [{ use_dash_count: 1 }],
+    },
+}
+const statisticSingleMatches = recordEventMissionBattleFacts(statisticSingleContext, statisticEventTime)
+assert.deepEqual(
+    statisticSingleMatches.filter(missionId => [1200, 1208, 1209, 1210, 1211, 1216, 1223].includes(missionId))
+        .sort((left, right) => left - right),
+    [1200, 1211, 1216, 1223],
+    "battle_kind=3 必须接受成功单人结算，type26 不应误读 clearRank=4",
+)
+for (const missionId of [1200, 1211, 1223]) assert.equal(missionProgress(missionId), 6)
+for (const missionId of [1208, 1209, 1210]) assert.equal(missionProgress(missionId), 1)
+assert.equal(missionProgress(1216), 20000, "type27 必须用 ensure/max 保留单场最大战力")
+recordEventMissionBattleFacts({
+    ...statisticSingleContext,
+    statistics: { ...statisticSingleContext.statistics, max_power: 1000, zones: [{ use_dash_count: 0 }] },
+}, statisticEventTime)
+assert.equal(missionProgress(1216), 20000, "type27 的较低 max_power 不得覆盖历史最大值")
+
+const singleSsBefore = missionProgress(1208)
+assert.equal(recordEventMissionBattleFacts({ ...statisticBattleContext, isMulti: false, isMultiHost: undefined }, statisticEventTime).includes(1208), true)
+assert.equal(missionProgress(1208), singleSsBefore + 1, "单人成功 SS 必须持久化增加 type26")
+for (const invalidContext of [
+    { ...statisticBattleContext, isMulti: false, isMultiHost: undefined, questAccomplished: false },
+    { ...statisticBattleContext, isMulti: false, isMultiHost: undefined, clearRank: 4 },
+]) {
+    recordEventMissionBattleFacts(invalidContext, statisticEventTime)
+    assert.equal(missionProgress(1208), singleSsBefore + 1, "失败或错误 rank 不得改变 type26 持久化进度")
+}
+for (const outsideTime of [
+    new Date("2019-11-27T20:59:59.000Z"),
+    new Date("2019-12-16T12:00:00.000Z"),
+]) {
+    recordEventMissionBattleFacts({ ...statisticBattleContext, isMulti: false, isMultiHost: undefined }, outsideTime)
+    assert.equal(missionProgress(1208), singleSsBefore + 1, "开放期外不得改变 type26 持久化进度")
+}
+
+const nearMaxProgress = Number.MAX_SAFE_INTEGER
+updatePlayerCategoryMissionSync(playerId, 3, 1200, nearMaxProgress)
+for (const missionId of [1211, 1223]) updatePlayerCategoryMissionSync(playerId, 3, missionId, 10)
+const overflowMatches = recordEventMissionBattleFacts({
+    ...statisticBattleContext,
+    statistics: { ...statisticBattleContext.statistics, zones: [{ use_dash_count: 1 }] },
+}, statisticEventTime)
+for (const missionId of [1200, 1211, 1223]) {
+    assert.equal(overflowMatches.includes(missionId), false, "type28 批次溢出时不得计入 matched")
+}
+assert.equal(missionProgress(1200), nearMaxProgress, "混合 type28 批次溢出时 1200 不得改变")
+assert.equal(missionProgress(1211), 10, "混合 type28 批次溢出时 1211 不得改变")
+assert.equal(missionProgress(1223), 10, "混合 type28 批次溢出时 1223 不得改变")
+
+db.prepare(`
+    DELETE FROM players_category_missions
+    WHERE player_id = ? AND category = 3 AND id IN (?, ?, ?)
+`).run(playerId, 1200, 1211, 1223)
+const zeroDashMatches = recordEventMissionBattleFacts({
+    ...statisticBattleContext,
+    statistics: { ...statisticBattleContext.statistics, zones: [{ use_dash_count: 0 }] },
+}, statisticEventTime)
+for (const missionId of [1200, 1211, 1223]) {
+    assert.equal(zeroDashMatches.includes(missionId), false, "zero dash 合计不得加入 matched")
+    assert.equal(missionProgress(missionId), 0, "zero dash 合计不得创建或改变 progress")
+}
+
+const statisticsMissionIds = [1200, 1208, 1209, 1210, 1211, 1216, 1223]
+assert.deepEqual(
+    recordEventMissionBattleFacts({ ...statisticBattleContext, questAccomplished: false }, statisticEventTime)
+        .filter(missionId => statisticsMissionIds.includes(missionId)),
+    [],
+    "失败结算不得匹配新增事实",
+)
+const wrongRankMatches = recordEventMissionBattleFacts(
+    { ...statisticBattleContext, clearRank: 4 },
+    statisticEventTime,
+).filter(missionId => statisticsMissionIds.includes(missionId))
+assert.equal(wrongRankMatches.some(missionId => [1208, 1209, 1210].includes(missionId)), false)
+
+const maxPowerBeforeInvalid = missionProgress(1216)
+for (const maxPower of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    recordEventMissionBattleFacts({
+        ...statisticBattleContext,
+        statistics: { ...statisticBattleContext.statistics, max_power: maxPower },
+    }, statisticEventTime)
+}
+assert.equal(missionProgress(1216), maxPowerBeforeInvalid, "非法 max_power 不得写入 type27")
+
+const dashProgressBeforeInvalid = missionProgress(1200)
+for (const zones of [
+    [{ use_dash_count: -1 }],
+    [{ use_dash_count: 1.5 }],
+    [{ use_dash_count: Number.MAX_SAFE_INTEGER }, { use_dash_count: 1 }],
+    [{ use_dash_count: 1 }, {}],
+]) {
+    recordEventMissionBattleFacts({
+        ...statisticBattleContext,
+        statistics: { ...statisticBattleContext.statistics, zones },
+    }, statisticEventTime)
+}
+assert.equal(missionProgress(1200), dashProgressBeforeInvalid, "非法或溢出 dash 统计不得写入 type28")
+assert.deepEqual(
+    recordEventMissionBattleFacts(statisticBattleContext, new Date("2019-12-16T12:00:00.000Z"))
+        .filter(missionId => [1200, 1208, 1209, 1210, 1211, 1216, 1223].includes(missionId)),
+    [],
+    "开放期外不得匹配新增事实",
+)
 
 function missionProgress(missionId) {
     return getPlayerCategoryMissionsSync(playerId, 3)[missionId]?.progress ?? 0

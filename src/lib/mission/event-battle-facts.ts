@@ -1,9 +1,11 @@
 import {
     ensurePlayerCategoryMissionProgressSync,
+    incrementPlayerCategoryMissionsIfSafeSync,
+    incrementPlayerCategoryMissionIfSafeSync,
     incrementPlayerCategoryMissionSync,
 } from "../../data/domains/mission"
 import type { FinishContext } from "../quest/finish/types"
-import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "./master-data"
+import { getMissionMasterDefinition, getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "./master-data"
 import { exactEventSingleClearRules } from "./event-single-clear-rules"
 import ruleAsset from "../../../assets/mission_event_battle_rules.json"
 import bossBattleQuests from "../../../assets/boss_battle_quest.json"
@@ -49,6 +51,14 @@ interface ExactPhaseRule {
     readonly missionId: number
     readonly questId: number
     readonly requiredPhase: 1 | 2 | 3 | 4
+    readonly definition: ReturnType<typeof getMissionMasterDefinitions>[number]
+}
+
+interface ExactStatisticsRule {
+    readonly missionId: number
+    readonly patternType: 26 | 27 | 28
+    readonly battleKind: 3
+    readonly statisticsCode: 2 | null
     readonly definition: ReturnType<typeof getMissionMasterDefinitions>[number]
 }
 
@@ -341,6 +351,49 @@ function buildExactPhaseRules(): readonly ExactPhaseRule[] {
 
 const exactPhaseRules = buildExactPhaseRules()
 
+const EXACT_EVENT_STATISTICS_MISSION_IDS = Object.freeze([
+    1200, 1208, 1209, 1210, 1211, 1216, 1223,
+])
+
+const EVENT_STATISTICS_RULES: Readonly<Record<number, {
+    readonly patternType: 26 | 27 | 28
+    readonly statisticsCode: 2 | null
+}>> = {
+    1200: { patternType: 28, statisticsCode: 2 },
+    1208: { patternType: 26, statisticsCode: null },
+    1209: { patternType: 26, statisticsCode: null },
+    1210: { patternType: 26, statisticsCode: null },
+    1211: { patternType: 28, statisticsCode: 2 },
+    1216: { patternType: 27, statisticsCode: null },
+    1223: { patternType: 28, statisticsCode: 2 },
+}
+
+function buildExactStatisticsRules(): readonly ExactStatisticsRule[] {
+    const rules: ExactStatisticsRule[] = []
+    for (const missionId of EXACT_EVENT_STATISTICS_MISSION_IDS) {
+        const expected = EVENT_STATISTICS_RULES[missionId]
+        const definition = getMissionMasterDefinition(3, missionId)
+        if (!expected || !definition
+            || definition.missionId !== missionId
+            || Number(definition.row[2]) !== expected.patternType
+            || Number(definition.row[5]) !== 3
+            || definition.row[11] !== "(None)"
+            || (expected.statisticsCode === null
+                ? definition.row[3] !== ""
+                : Number(definition.row[3]) !== expected.statisticsCode)) continue
+        rules.push({
+            missionId,
+            patternType: expected.patternType,
+            battleKind: 3,
+            statisticsCode: expected.statisticsCode,
+            definition,
+        })
+    }
+    return Object.freeze(rules)
+}
+
+const exactStatisticsRules = buildExactStatisticsRules()
+
 function matchesRole(role: MultiRole, isMultiHost: boolean | undefined): boolean {
     if (role === "any") return true
     if (role === "host") return isMultiHost === true
@@ -364,6 +417,8 @@ export function getExactEventBattleRuleCoverage() {
         }, {} as Record<number, number>),
         exactPhaseRules: exactPhaseRules.length,
         exactSingleClearRules: exactEventSingleClearRules.length,
+        exactStatisticsRules: exactStatisticsRules.length,
+        exactStatisticsRuleMissionIds: exactStatisticsRules.map(rule => rule.missionId),
     }
 }
 
@@ -372,8 +427,81 @@ export function getExactEventBattleMissionIds(): readonly number[] {
         ...exactMultiRules.map(rule => rule.missionId),
         ...exactClearRules.map(rule => rule.missionId),
         ...exactPhaseRules.map(rule => rule.missionId),
+        ...exactStatisticsRules.map(rule => rule.missionId),
         ...exactEventSingleClearRules.map(rule => rule.missionId),
     ])].sort((left, right) => left - right))
+}
+
+function isSafeNonNegativeInteger(value: unknown): value is number {
+    return Number.isSafeInteger(value) && (value as number) >= 0
+}
+
+function sumZoneStatistic(
+    ctx: FinishContext,
+    statisticCode: 2,
+): number | null {
+    const zones = ctx.statistics?.zones
+    if (!Array.isArray(zones)) return null
+    let total = 0
+    for (const zone of zones) {
+        if (!isPlainRecord(zone) || !isSafeNonNegativeInteger(zone.use_dash_count)) return null
+        total += zone.use_dash_count
+        if (!Number.isSafeInteger(total)) return null
+    }
+    return total
+}
+
+function recordExactStatisticsRule(
+    ctx: FinishContext,
+    rule: ExactStatisticsRule,
+    evaluationTime: Date,
+): number | null {
+    if (rule.battleKind !== 3
+        || (ctx.isMulti !== true && ctx.isMulti !== false && ctx.isMulti !== undefined)
+        || !isMissionDefinitionEnabledAt(rule.definition, evaluationTime)) return null
+    if (rule.patternType === 26) {
+        if (ctx.clearRank !== 5) return null
+        return incrementPlayerCategoryMissionIfSafeSync(ctx.playerId, 3, rule.missionId, 1)
+            ? rule.missionId
+            : null
+    }
+    if (rule.patternType === 27) {
+        if (!isSafeNonNegativeInteger(ctx.statistics?.max_power)) return null
+        ensurePlayerCategoryMissionProgressSync(ctx.playerId, 3, rule.missionId, ctx.statistics.max_power)
+        return rule.missionId
+    }
+    return null
+}
+
+function recordExactStatisticsRules(
+    ctx: FinishContext,
+    evaluationTime: Date,
+): number[] {
+    const matchedMissionIds: number[] = []
+    const type28Rules: ExactStatisticsRule[] = []
+    for (const rule of exactStatisticsRules) {
+        if (rule.battleKind !== 3
+            || (ctx.isMulti !== true && ctx.isMulti !== false && ctx.isMulti !== undefined)
+            || !isMissionDefinitionEnabledAt(rule.definition, evaluationTime)) continue
+        if (rule.patternType === 28) {
+            type28Rules.push(rule)
+            continue
+        }
+        const missionId = recordExactStatisticsRule(ctx, rule, evaluationTime)
+        if (missionId !== null) matchedMissionIds.push(missionId)
+    }
+
+    if (type28Rules.length === 0) return matchedMissionIds
+    if (type28Rules.some(rule => rule.statisticsCode !== 2)) return matchedMissionIds
+    const dashCount = sumZoneStatistic(ctx, 2)
+    if (dashCount === null) return matchedMissionIds
+    if (incrementPlayerCategoryMissionsIfSafeSync(ctx.playerId, 3, type28Rules.map(rule => ({
+        missionId: rule.missionId,
+        delta: dashCount,
+    })))) {
+        matchedMissionIds.push(...type28Rules.map(rule => rule.missionId))
+    }
+    return matchedMissionIds
 }
 
 export function recordEventMissionBattleFacts(
@@ -422,5 +550,6 @@ export function recordEventMissionBattleFacts(
             matchedMissionIds.push(rule.missionId)
         }
     }
+    matchedMissionIds.push(...recordExactStatisticsRules(ctx, evaluationTime))
     return matchedMissionIds
 }

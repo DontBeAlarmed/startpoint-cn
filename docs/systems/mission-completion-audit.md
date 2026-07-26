@@ -101,14 +101,14 @@
   category 8。`row[10]=""` 是 `Within([])` 且严格无匹配，`(None)` 才是 `All`；`row[11]` 是 QuestRank，当前启用
   规则均为 `null`。type 20 Attention 因 `FinishContext` 没有权威救援来源而保持 0 条，普通 Guest 不冒充 Attention。
 - “接取救援请求”保持低优先级，暂不实现；在获得可区分 Attention 的权威来源前，不以普通 Guest 代替。
-- 当前 category 3 共启用 1485 条严格事实：805 条 QuestRange 协力规则、257 条 type 23 精确通关规则和 423 条关卡/物品/竞速/阶段/单人累计规则。其中 29 条 Ranking Phase 任务只接受 category 11 的成功单人结算，按官方关卡表精确匹配 quest ID，并以合法整数 `clear_phase` 完成不高于本次阶段的任务；另有 8 条 type 14 任务按摇曳迷宫、EX 和崩坏域的权威 QuestRange 逐次累计成功单人结算。
+- 当前 category 3 共启用 1492 条严格事实：805 条 QuestRange 协力规则、257 条 type 23 精确通关规则和 430 条关卡/物品/竞速/阶段/单人累计规则。其中新增的 7 条战斗结算事实来自官方主数据 pattern 26/27/28：1208/1209/1210 只在 battle_kind=3 的成功 SS 结算中逐场增加；1216 读取成功结算的 `statistics.max_power`，仅接受非负安全整数并以最大值写入；1200/1211/1223 校验官方 row[3]=2 后读取 `zones[].use_dash_count`，三条适用规则以同一批次逐场累加非负安全整数总和，任一 zone 非法、统计求和溢出，或历史持久化 progress 加本次 delta 超过 `Number.MAX_SAFE_INTEGER`，则三条整批不增长。非负统计输入仍是合法格式，但合计为 0 时是 no-op，不写入 progress，也不视为 matched。7 条规则均由精确 mission ID 白名单逐条取主数据，动态校验 pattern、battle kind、statistics code，并受任务开放期限制；battle_kind=3 同时接受单人和多人。另有 29 条 Ranking Phase 任务只接受 category 11 的成功单人结算，按官方关卡表精确匹配 quest ID，并以合法整数 `clear_phase` 完成不高于本次阶段的任务；另有 8 条 type 14 任务按摇曳迷宫、EX 和崩坏域的权威 QuestRange 逐次累计成功单人结算。
   其中包括 40 条 `get_item_count`、54 条土俑单关卡、18 条土俑聚合任务、37 条崩坏域庆贺单关卡
   和 7 条崩坏域庆贺聚合任务。土俑与崩坏域任务均由 CDN 关卡表、活动任务主数据和持久化关卡完成记录闭合，
   不读取客户端自报计数。另有 188 条 category 11 与 42 条 category 24 竞速任务由精确关卡、官方奖励秒数和历史最佳时间闭合。
-  其余 1027 条（包括 mission 1807）仍使用持久化 fallback。
-  任务页不从旧 `mission_event_quest_map.json` 直接推算；只有通过 `computer-event-safe.ts` 白名单的精确规则才会自动计算和发奖。安全计算器当前登记 392 条，其中 6 条目标为 1 的 type 14 任务可从历史完成记录回填；它们同时拥有 finish 生产者，因此不在 1485 条总覆盖中重复计数。生产上下文保留数据库返回的全部关卡 category，不再只装载 Ranking/Rush 两类。
+  其余 1020 条（包括 mission 1807）仍使用持久化 fallback。
+  任务页不从旧 `mission_event_quest_map.json` 直接推算；只有通过 `computer-event-safe.ts` 白名单的精确规则才会自动计算和发奖。安全计算器当前登记 392 条，其中 6 条目标为 1 的 type 14 任务可从历史完成记录回填；它们同时拥有 finish 生产者，因此不在 1492 条总覆盖中重复计数。生产上下文保留数据库返回的全部关卡 category，不再只装载 Ranking/Rush 两类。
   后续仍需补全活动范围、评级、房主/成员、救援、阶段和 client check 等谓词后逐批启用。
-- 1027 条 fallback 中，948 条 type 16 的 QuestRange 至少一个列表 selector 为 `""`。CN 1.8.1 `EventMissionValues` 将它解析为 `Option.Some([])`，不是 `Option.None`；客户端 QuestRange 匹配测试证明空集合不等于通配。因此这 948 条不得扩成“该活动全部关卡”。另有 27 条 type 20 缺少 Attention 救援来源，其余 52 条按 pattern type 保留明确的权威事实缺口。
+- 1020 条 fallback 中，948 条 type 16 的 QuestRange 至少一个列表 selector 为 `""`。CN 1.8.1 `EventMissionValues` 将它解析为 `Option.Some([])`，不是 `Option.None`；客户端 QuestRange 匹配测试证明空集合不等于通配。因此这 948 条不得扩成“该活动全部关卡”。另有 27 条 type 20 缺少 Attention 救援来源，其余 45 条按 pattern type 保留明确的权威事实缺口。
 
 ## Pass 分类与等级奖励
 
@@ -143,11 +143,11 @@
 
 ## 尚未完成的分类
 
-`src/lib/mission/coverage-audit.ts` 是覆盖数字和剩余 ID 的唯一机器清单。`tools/mission_coverage_audit.test.cjs` 锁定 category 3 `1485/2512`、Degree `1268/1288`、觉醒路由 `144/144` 和 Pass `229/267`，并要求 automated/fallback 分区无交集且每个 fallback 都有原因。该报告证明代码路由和事实生产者覆盖，不等价于 CN 客户端验收。
+`src/lib/mission/coverage-audit.ts` 是覆盖数字和剩余 ID 的唯一机器清单。`tools/mission_coverage_audit.test.cjs` 锁定 category 3 `1492/2512`、Degree `1268/1288`、觉醒路由 `144/144` 和 Pass `229/267`，并要求 automated/fallback 分区无交集且每个 fallback 都有原因。该报告证明代码路由和事实生产者覆盖，不等价于 CN 客户端验收。
 
 - category 4 已形成累计获得量、活动隔离、结算、发奖和 load 映射；category 5 已接入上述 1268 条权威事实。
   两类仍需 CN 客户端验证提示、奖励和重启持久化；category 5 的其余任务需逐族补事实。
-- category 3 已启用 805 条按 mission ID 的严格协力规则、257 条 type 23 精确通关规则和 423 条关卡/物品/竞速/阶段/单人累计规则；其余 1027 条复杂规则继续补类型化事实，
+- category 3 已启用 805 条按 mission ID 的严格协力规则、257 条 type 23 精确通关规则和 430 条关卡/物品/竞速/阶段/单人累计规则；其中 7 条 pattern 26/27/28 已接入官方战斗统计事实，严格拒绝失败、type26 错误 rank、开放期外、非法或溢出统计。其余 1020 条复杂规则继续补类型化事实，
   旧 map 只作历史审计，不作为自动事实或发奖依据。Attention 在缺少权威来源前保持禁用。
 - Pass 的救援、表情和购买流程尚未完成，三分类、活动关卡累计和等级奖励主链已具备自动测试，仍需 CN 客户端验收。
 - 角色觉醒的配对、竞速进度仍依赖已记录的本地计数器与映射；奖励结算与最终特殊奖励触发已按

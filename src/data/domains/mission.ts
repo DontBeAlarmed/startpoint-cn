@@ -352,6 +352,70 @@ export function incrementPlayerCategoryMissionSync(
     `).run(category, Number(missionId), delta, playerId)
 }
 
+export interface CategoryMissionIncrement {
+    readonly missionId: number | string
+    readonly delta: number
+}
+
+export function incrementPlayerCategoryMissionsIfSafeSync(
+    playerId: number,
+    category: number,
+    increments: readonly CategoryMissionIncrement[],
+): boolean {
+    if (!Array.isArray(increments) || increments.length === 0) return false
+
+    const normalized: { readonly missionId: number; readonly delta: number }[] = []
+    const missionIds = new Set<number>()
+    for (const increment of increments) {
+        if (!increment || typeof increment !== "object") return false
+        const missionId = Number(increment.missionId)
+        if (!Number.isSafeInteger(missionId)
+            || missionId <= 0
+            || missionIds.has(missionId)
+            || !Number.isSafeInteger(increment.delta)
+            || increment.delta <= 0) return false
+        missionIds.add(missionId)
+        normalized.push({ missionId, delta: increment.delta })
+    }
+
+    return getDb().transaction(() => {
+        const ids = normalized.map(increment => increment.missionId)
+        const placeholders = ids.map(() => "?").join(", ")
+        const rows = getDb().prepare(`
+            SELECT id, progress
+            FROM players_category_missions
+            WHERE player_id = ? AND category = ? AND id IN (${placeholders})
+        `).all(playerId, category, ...ids) as { id: number; progress: number }[]
+        const progressByMissionId = new Map(rows.map(row => [row.id, row.progress]))
+
+        for (const increment of normalized) {
+            const current = progressByMissionId.get(increment.missionId) ?? 0
+            if (!Number.isSafeInteger(current)
+                || current < 0
+                || current > Number.MAX_SAFE_INTEGER - increment.delta) return false
+        }
+
+        const statement = getDb().prepare(`
+            INSERT INTO players_category_missions (category, id, progress, player_id)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(category, id, player_id) DO UPDATE SET progress = progress + excluded.progress
+        `)
+        for (const increment of normalized) {
+            statement.run(category, increment.missionId, increment.delta, playerId)
+        }
+        return true
+    })()
+}
+
+export function incrementPlayerCategoryMissionIfSafeSync(
+    playerId: number,
+    category: number,
+    missionId: number | string,
+    delta: number,
+): boolean {
+    return incrementPlayerCategoryMissionsIfSafeSync(playerId, category, [{ missionId, delta }])
+}
+
 export function ensurePlayerCategoryMissionProgressSync(
     playerId: number,
     category: number,
