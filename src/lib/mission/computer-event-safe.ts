@@ -7,6 +7,7 @@ import questMap from "../../../assets/mission_event_quest_map.json"
 import carnivalEventQuests from "../../../assets/carnival_event_quest.json"
 import challengeDungeonEventQuests from "../../../assets/challenge_dungeon_event_quest.json"
 import rankingEventSingleQuests from "../../../assets/ranking_event_single_quest.json"
+import rushEventQuests from "../../../assets/rush_event_quest.json"
 import eventRewards from "../../../assets/mission_event_reward.json"
 import type { CategoryContext, MissionComputer } from "./types"
 
@@ -23,6 +24,7 @@ interface SafeQuestMapping {
 }
 
 interface SafeTimeClearMapping {
+    readonly questCategory: number
     readonly questId: number
     readonly targetTimeMs: number
 }
@@ -56,34 +58,42 @@ function getSafeQuestMapping(missionId: number): SafeQuestMapping | null {
 
 function getSafeTimeClearMapping(missionId: number): SafeTimeClearMapping | null {
     const definition = getMissionMasterDefinition(3, missionId)
-    if (!definition
-        || Number(definition.row[2]) !== TIME_CLEAR_PATTERN_TYPE
-        || Number(definition.row[7]) !== 8) return null
+    if (!definition || Number(definition.row[2]) !== TIME_CLEAR_PATTERN_TYPE) return null
+
+    const rangeKind = Number(definition.row[7])
+    if (rangeKind !== 8 && rangeKind !== 17) return null
 
     const eventId = Number(definition.row[8])
     const questSuffix = Number(definition.row[10])
     if (!Number.isSafeInteger(eventId) || eventId <= 0
         || !Number.isSafeInteger(questSuffix) || questSuffix <= 0) return null
     const questId = eventId * 1000 + questSuffix
-    if (!Object.prototype.hasOwnProperty.call(rankingEventSingleQuests, String(questId))) return null
-
-    const raw = (questMap as Record<string, unknown>)[definition.pattern]
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null
-    const mapping = raw as Record<string, unknown>
-    if (mapping.countMode !== "finish"
-        || !Array.isArray(mapping.categories)
-        || mapping.categories.length !== 1
-        || mapping.categories[0] !== 11
-        || !Array.isArray(mapping.questIds)
-        || mapping.questIds.length !== 1
-        || mapping.questIds[0] !== questId) return null
+    let questCategory: number
+    if (rangeKind === 8) {
+        if (!Object.prototype.hasOwnProperty.call(rankingEventSingleQuests, String(questId))) return null
+        const raw = (questMap as Record<string, unknown>)[definition.pattern]
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null
+        const mapping = raw as Record<string, unknown>
+        if (mapping.countMode !== "finish"
+            || !Array.isArray(mapping.categories)
+            || mapping.categories.length !== 1
+            || mapping.categories[0] !== 11
+            || !Array.isArray(mapping.questIds)
+            || mapping.questIds.length !== 1
+            || mapping.questIds[0] !== questId) return null
+        questCategory = 11
+    } else {
+        const quest = (rushEventQuests as Record<string, { rushEventId?: unknown }>)[String(questId)]
+        if (!quest || Number(quest.rushEventId) !== eventId) return null
+        questCategory = 24
+    }
 
     const stages = (eventRewards as Record<string, Record<string, unknown[]>>)[String(missionId)]
     const firstStage = stages && Object.values(stages)[0]
     const row = Array.isArray(firstStage) && Array.isArray(firstStage[0]) ? firstStage[0] : undefined
     const seconds = Number(row?.[2])
     return Number.isFinite(seconds) && seconds >= 0
-        ? { questId, targetTimeMs: seconds * 1000 }
+        ? { questCategory, questId, targetTimeMs: seconds * 1000 }
         : null
 }
 
@@ -153,7 +163,7 @@ function computeTargetMissionClear(
     try {
         const timeClearMapping = getSafeTimeClearMapping(missionId)
         if (timeClearMapping !== null) {
-            return (ctx.questProgress["11"] ?? []).some(progress => (
+            return (ctx.questProgress[String(timeClearMapping.questCategory)] ?? []).some(progress => (
                 progress.questId === timeClearMapping.questId
                 && progress.finished
                 && progress.bestElapsedTimeMs !== undefined
@@ -237,19 +247,23 @@ export const EventSafeComputer: MissionComputer = {
         const player = getPlayerSync(playerId)
         if (!player) throw new Error(`Player ${playerId} not found during event mission evaluation.`)
         const rawProgress = getPlayerQuestProgressSync(playerId)
-        const rankingProgress = (rawProgress["11"] ?? []).map(progress => ({
-            questId: progress.questId,
-            finished: progress.finished,
-            clearRank: progress.clearRank,
-            bestElapsedTimeMs: progress.bestElapsedTimeMs,
-            leaderCharacterId: progress.leaderCharacterId,
-            multiClearCount: progress.multiClearCount,
-        }))
+        const selectProgress = (questCategory: number) => (rawProgress[String(questCategory)] ?? [])
+            .map(progress => ({
+                questId: progress.questId,
+                finished: progress.finished,
+                clearRank: progress.clearRank,
+                bestElapsedTimeMs: progress.bestElapsedTimeMs,
+                leaderCharacterId: progress.leaderCharacterId,
+                multiClearCount: progress.multiClearCount,
+            }))
         return {
             category,
             playerId,
             player,
-            questProgress: { "11": rankingProgress },
+            questProgress: {
+                "11": selectProgress(11),
+                "24": selectProgress(24),
+            },
             totalQuestClears: 0,
             totalStories: 0,
             rankCounts: {},

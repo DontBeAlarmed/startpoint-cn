@@ -32,8 +32,9 @@
 - 188 条 category 11 竞速任务只在 type 15、QuestRange kind 8、`event_id * 1000 + quest suffix`、
   `ranking_event_single_quest.json` 和唯一旧映射全部指向同一关卡时启用。目标时间取官方 `mission_event_reward.json`
   的奖励阶段秒数，玩家必须已有成功通关且历史最佳毫秒值不超过该阈值。
-- category 24 的 42 条狂热激战限时任务没有启用。旧映射会把“第 N 战”扩展为同一期全部 8 个关卡，例如
-  mission `700012` 的映射包含 `700002001` 至 `700002008`；在取得精确关卡语义前，它们继续保留持久化 fallback。
+- category 24 的 42 条狂热激战限时任务不再使用旧映射。旧映射会把“第 N 战”扩展为同一期全部 8 个关卡，例如
+  mission `700012` 的映射包含 `700002001` 至 `700002008`；当前改为按 QuestRange kind 17、`event_id * 1000 + suffix` 和
+  `rush_event_quest.rushEventId` 精确闭合，只读取 category 24 对应单关的历史最佳时间。
 - 历史最佳时间来自客户端 finish 请求并由服务端保存；服务端不模拟战斗或重算计时。这一事实链保证协议闭合，
   不提供反作弊证明，也不能证明活动开放前完成的历史记录是否应计入。
 

@@ -98,6 +98,13 @@ assert.equal(
     6,
     "狂热激战旧映射把单关扩成整期关卡，必须继续 fallback",
 )
+assert.equal(
+    EventSafeComputer.compute(700012, context({
+        24: [{ ...timeAttackQuest, questId: 700002001, bestElapsedTimeMs: 9_000 }],
+    }), 0),
+    1,
+    "狂热激战限时任务应只接受 event 与 suffix 精确组成的单关",
+)
 
 const haniwaMediumQuests = [4001, 4004, 4007].map(questId => ({
     questId,
@@ -151,6 +158,6 @@ assert.equal(
     6,
     "崩坏域庆贺的聚合任务应按已完成子任务数量计算",
 )
-assert.equal(getEventSafeMissionIds().length, 344, "活动安全计算器应登记 156 条关卡事实与 188 条竞速任务")
+assert.equal(getEventSafeMissionIds().length, 386, "活动安全计算器应登记关卡事实及 Ranking/Rush 精确竞速任务")
 
 console.log("mission event progress tests passed")
