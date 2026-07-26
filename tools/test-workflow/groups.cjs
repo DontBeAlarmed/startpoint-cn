@@ -195,6 +195,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_event_battle_facts.test.cjs",
             "tools/mission_event_current_state.test.cjs",
             "tools/mission_event_entry_facts.test.cjs",
+            "tools/mission_raid_set_party_route.test.cjs",
             "tools/mission_event_login_route.test.cjs",
             "tools/mission_event_progress.test.cjs",
             "tools/mission_raid_summary_route.test.cjs",

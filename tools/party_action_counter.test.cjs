@@ -86,6 +86,7 @@ stubModule("../src/lib/special-event-parties", {
 })
 stubModule("../src/utils", {
     generateDataHeaders: values => ({ viewer_id: values.viewer_id, result_code: values.result_code ?? 1 }),
+    getServerTime: () => Date.parse("2024-05-23T04:00:00.000Z") / 1000,
 })
 
 const {

@@ -106,6 +106,10 @@ const SOURCE_RULES = [
         groups: ["integration:event", "integration:mission"],
     },
     {
+        pattern: /^src\/routes\/api\/party\.ts$/,
+        groups: ["integration:mission", "integration:party"],
+    },
+    {
         pattern: /^src\/data\/domains\/event_mission_entry_facts\.ts$/,
         groups: ["integration:mission"],
     },

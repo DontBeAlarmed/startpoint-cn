@@ -84,6 +84,10 @@ test("maps representative source files to focused groups", () => {
         ["full", "integration:event", "integration:mission"],
     )
     assert.deepEqual(
+        selectTestGroups(["src/routes/api/party.ts"]),
+        ["full", "integration:mission", "integration:party"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/data/domains/event_mission_entry_facts.ts"]),
         ["full", "integration:database", "integration:mission"],
     )
@@ -478,6 +482,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_event_battle_facts.test.cjs",
         "tools/mission_event_current_state.test.cjs",
         "tools/mission_event_entry_facts.test.cjs",
+        "tools/mission_raid_set_party_route.test.cjs",
         "tools/mission_event_login_route.test.cjs",
         "tools/mission_event_progress.test.cjs",
         "tools/mission_raid_summary_route.test.cjs",

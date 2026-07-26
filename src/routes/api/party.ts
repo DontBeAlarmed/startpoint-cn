@@ -6,11 +6,12 @@ import { playerOwnsEquipmentSync } from "../../data/domains/equipment"
 import { updatePlayerPartySync } from "../../data/domains/party"
 import { getDb } from "../../data/db"
 import { incrementActiveMissionPartyActionCountsSync } from "../../data/domains/active_mission_counters"
-import { generateDataHeaders } from "../../utils";
+import { generateDataHeaders, getServerTime } from "../../utils";
 import { PartyCategory } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { hasValidPartyCategory, parseGlobalPartyId } from "../../lib/special-event-parties";
 import { getMailArrivedSync } from "../../lib/mail-notification";
+import { recordRaidSetEditMissionFactsSync } from "../../lib/mission/event-entry-facts";
 
 interface PartyInfoListItem {
     party_edited: boolean
@@ -511,6 +512,16 @@ const routes = async (fastify: FastifyInstance) => {
                 unisonSetCount: mappedParties.some(({ party }) => party.unisonCharacterIds.some(id => id !== null)) ? 1 : 0,
                 partyCharacterSetCount: mappedParties.some(({ party }) => party.characterIds.some(id => id !== null)) ? 1 : 0,
             })
+            recordRaidSetEditMissionFactsSync(
+                playerId,
+                body.use_party_group_edit,
+                mappedParties.map(({ parsed, party }) => ({
+                    category: party.category,
+                    groupId: parsed.groupId,
+                    slot: parsed.slot,
+                })),
+                new Date(getServerTime() * 1000),
+            )
         })()
 
         reply.header("content-type", "application/x-msgpack")

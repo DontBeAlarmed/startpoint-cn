@@ -3,6 +3,9 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
+const {
+    getProducerBackedEventEntryMissionIds,
+} = require("../src/lib/mission/event-entry-facts")
 const { getMissionCoverageAudit } = require("../src/lib/mission/coverage-audit")
 
 function assertPartition(section) {
@@ -25,15 +28,27 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.event)
     assert.deepEqual(
         { total: report.event.total, automated: report.event.automated, fallback: report.event.fallback },
-        { total: 2512, automated: 1512, fallback: 1000 },
+        { total: 2512, automated: 1524, fallback: 988 },
     )
     assert.equal(report.event.automatedMissions.filter(entry => [1200, 1208, 1209, 1210, 1211, 1216, 1223].includes(entry.missionId)).length, 7)
     assert.deepEqual(
         report.event.automatedMissions
-            .filter(entry => [1225, 400053, 400071, 400089, 400093].includes(entry.missionId))
+            .filter(entry => [
+                1225,
+                400053, 400054, 400055, 400056,
+                400071, 400072, 400073, 400074,
+                400089, 400090, 400091, 400092,
+                400093, 400094, 400095, 400096,
+            ].includes(entry.missionId))
             .map(entry => entry.missionId),
-        [1225, 400053, 400071, 400089, 400093],
-        "Event 登录与 Raid summary 五条任务必须全部进入权威自动覆盖",
+        [
+            1225,
+            400053, 400054, 400055, 400056,
+            400071, 400072, 400073, 400074,
+            400089, 400090, 400091, 400092,
+            400093, 400094, 400095, 400096,
+        ],
+        "Event 登录、Raid summary 与 RAID SET 保存事实必须全部进入权威自动覆盖",
     )
     const currentStateMissionIds = [
         1201, 1202, 1203, 1204, 1205, 1206, 1207,
@@ -47,6 +62,20 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
         "15 条 Event 当前状态任务必须全部进入权威自动覆盖",
     )
     assert.equal(report.event.fallbackMissions.find(entry => entry.missionId === 1400)?.reason, "empty-quest-selector")
+    assert.deepEqual(
+        report.event.fallbackMissions.reduce((counts, entry) => {
+            counts[entry.reason] = (counts[entry.reason] ?? 0) + 1
+            return counts
+        }, {}),
+        {
+            "empty-quest-selector": 948,
+            "rescue-source-unavailable": 27,
+            "authoritative-event-fact-unavailable:type-68": 1,
+            "authoritative-event-fact-unavailable:type-86": 2,
+            "authoritative-event-fact-unavailable:type-87": 10,
+        },
+        "type 80/81/82 的 12 条 RAID SET 任务不得继续留在 fallback 原因分区",
+    )
 
     assertPartition(report.degree)
     assert.deepEqual(
@@ -128,4 +157,14 @@ test("mission coverage audit leaves no ID in both sides of a partition", () => {
             automated.has(`${entry.category}:${entry.missionId}`)
         )), false)
     }
+})
+
+test("mission coverage audit includes the complete producer-backed Event entry contract", () => {
+    const automated = new Set(getMissionCoverageAudit().event.automatedMissions.map(entry => (
+        entry.missionId
+    )))
+    assert.deepEqual(
+        getProducerBackedEventEntryMissionIds().filter(missionId => automated.has(missionId)),
+        getProducerBackedEventEntryMissionIds(),
+    )
 })

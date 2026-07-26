@@ -1,7 +1,7 @@
 import { getDegreeComputedMissionIds } from "./computer-degree"
 import { getEventSafeMissionIds } from "./computer-event-safe"
 import { getExactEventBattleMissionIds } from "./event-battle-facts"
-import { getAuthoritativeEventEntryMissionIds } from "./event-entry-facts"
+import { getProducerBackedEventEntryMissionIds } from "./event-entry-facts"
 import { getMissionMasterDefinitions } from "./master-data"
 import { AWAKE_MISSION_RULE_FAMILIES } from "./awake-rule-catalog"
 import type { AwakeMissionRuleFamilyName } from "./awake-rule-catalog"
@@ -119,7 +119,7 @@ function eventPartition(): MissionCoveragePartition {
     const ids = new Set([
         ...getEventSafeMissionIds(),
         ...getExactEventBattleMissionIds(),
-        ...getAuthoritativeEventEntryMissionIds(),
+        ...getProducerBackedEventEntryMissionIds(),
     ])
     return createPartition(
         [{ category: 3, definitions: getMissionMasterDefinitions(3) }],

@@ -48,12 +48,12 @@
 - 257 条 type 23 累计通关任务只覆盖 Advent、StoryEventSingle、ChallengeDungeon、Raid 和 Rush 五种可由官方表闭合的 QuestRange。battle kind 1 只累计单人成功，battle kind 3 同时累计单人和多人成功；每次合法 finish 增加 1，历史唯一完成记录不用于反推重复次数。
 - Ranking Phase 29 条任务以成功单人 finish 的 `statistics.clear_phase` 为事实。当前反编译协议能确认字段与主数据 pattern 的阶段语义，但服务端不会重演战斗来验证客户端提交值；多人、非整数、0、5 及错误关卡均不推进。该协议边界需后续 CN 客户端样本验收。
 
-## category 3：Event 登录与 Raid summary
+## category 3：Event 登录、Raid summary 与 RAID SET 保存
 
 - mission 1225 的 CN 1.8.1 pattern type 0 解析为 `total_login_days`，客户端没有独立任务上报请求。服务端把认证会话后的 `/load` 作为登录事实，只使用全局 `getServerDate()` 的 CN UTC+8 自然日，不读取玩家 `time_offset`，也不沿用每日任务 05:00 reset bucket。
 - 1225 只在自身 `enable_start_time..enable_end_time` 内计数。事实表仅保存最后计数日；当前日不晚于已保存日时不增长，因此多设备、重复请求和服务器时间回拨保持幂等。跳过多日后一次 load 只增加 1，升级前和活动期内未记录的历史登录无法可靠重建，不做补算。
 - CN 1.8.1 将 type 79 解析为 `raid_event_top_check`。`RaidEventLoadingTask` 在进入 Raid top、quest select 等 Raid 场景前先请求 `event/raid/summary(event_id)`，成功后才请求 party 并进入页面；因此 400053/400071/400089/400093 只由对应 eventId 4/5/6/7 的真实 summary 请求完成。普通 load、战斗 finish、错误 event 和其他 Raid API 不产生该事实。
-- 五条规则同时校验官方 mission ID、string pattern、严格十进制 pattern type/奖励 target/QuestRange selector/eventId token，以及严格 `YYYY-MM-DD HH:mm:ss` UTC+8 日历开放期。空串不能表示 type 0，整数 token 不接受空白、符号、小数或溢出，日期会逐字段校验闰年与每月天数；结构不一致时保持既有 progress，不猜测替代映射。type 79 只幂等确保 progress 至少为 1，不在 summary 响应中加入 `mission_info`；任务奖励仍由既有 mission 页面结算协议发放。
+- 17 条规则同时校验官方 mission ID、string pattern、严格十进制 pattern type/奖励 target、QuestRange selector/eventId token、保留空字段，以及精确 `YYYY-MM-DD HH:mm:ss` UTC+8 日历开放期。空串不能表示 type 0，整数 token 不接受空白、符号、小数或溢出，日期会逐字段校验闰年与每月天数；结构不一致时保持既有 progress，不猜测替代映射。type 79 与 type 80/81/82 均只幂等确保 progress 至少为 1，不在业务响应中加入 `mission_info`；任务奖励仍由既有 mission 页面结算协议发放。
 - 1225 在 Active Mission reconcile 与响应构建成功后，才在 reply 上登记 request-local pending commit；生产 CN MsgPack `onSend` 完成实际编码后执行独立的 `BEGIN IMMEDIATE` 记录事务。reconcile、响应构建或实际 onSend 编码失败不计数，多连接竞争同日 marker 只有一个连接成功；编码成功后交给网络栈的传输错误不属于该事务边界，也不声称能够回滚已提交事实。
 - type 79 使用嵌套 SQLite 保存点参与 Raid summary：成功时随 summary 外层事务提交；任务事实写入异常时保存点先完整回滚，再记录包含 player/event/mission 的告警并继续原有 summary。该可选事实不得把既有 summary 变成错误响应，也不得留下部分任务写入；其他 summary 奖励或状态异常仍按原外层事务整体回滚。
 
@@ -114,6 +114,13 @@
 - 装备觉醒 3 条按实际 `upgrade_count` 增长：单件水晶/stack 路径和批量去重后的总升级级数都在材料扣除与装备更新事务内记录，no-op 与失败请求不增长。
 - 魂珠设置 3 条继续 fallback。当前 `/party/edit` 尚未完整校验魂珠所有权、可用副本、物品 category 和重复 party key；在补齐这些验证前，不把任意客户端快照差异计为权威操作。
 - type 14 的 8 条累计任务从成功单人 finish 精确累计。目标仅为 1 的 `1213/1214/1215/1221/1303/1304` 同时允许由匹配的历史 `finished` 记录回填到 1；目标包含重复次数的 `1222/1300` 无法由数据库唯一关卡完成行重建，当前保留既有任务进度作为下限，只从升级后的新结算继续累计。
+
+## 活动任务：战阵 SET 保存
+
+- event 4～7 的 12 条 type 80/81/82 逐 ID 校验官方 pattern、QuestRange kind 16、event ID、保留空字段、精确开放期和唯一奖励阶段 target 1。任一主数据字段漂移即整族 fail closed。
+- `/party/edit` 只在 `use_party_group_edit=true` 且成功映射并保存 `PartyCategory.RAID`、第 1 组、槽位 1/2/3 时，分别把对应主队伍、副 1、副 2 任务幂等完成到 1。同请求重复槽位先去重；普通编辑、其他队伍类别、其他组、槽位 4～10、非开放期及多个活动族重叠开放均不增长。
+- 任务事实与队伍更新、主队伍选择和 Active Mission 队伍动作计数处于同一数据库事务；任务 SQL 失败会向外传播并整体回滚。成功响应不额外返回 `mission_info`，任务页继续通过现有进度接口读取。
+- 这条事实只能证明玩家从 SET 编辑器成功保存了目标槽位。即使官方中文文案写着“复制替换”，服务端请求也不能证明用户点击过复制按钮，因此不能把它解释为复制按钮行为追踪。
 
 ## 称号指定 Boss 超级难度
 
