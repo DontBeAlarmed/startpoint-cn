@@ -109,6 +109,8 @@ const BUNDLED_TABLE_NAMES = [
     "quest_entry_costs.json",
     "quest_lookup.json",
     "quest_unlock_costs.json",
+    "raid_event.json",
+    "raid_event_overall_reward.json",
     "raid_event_quest.json",
     "ranking_event_single_quest.json",
     "rare_score_reward.json",

@@ -149,6 +149,7 @@ test("selects only the direct single battle route regressions", () => {
         "tools/quest_abort_route.test.cjs",
         "tools/score_attack_event.test.cjs",
         "tools/treasure_key_entry.test.cjs",
+        "tools/auto_start_stamina_stop.test.cjs",
         "tools/quest_entry_lifecycle.test.cjs",
         "tools/quest_host_finish.test.cjs",
         "tools/active_quest_service_import.test.cjs",
@@ -419,6 +420,11 @@ test("splits isolated integration tests into focused domains", () => {
     ])
     assert.deepEqual(TEST_GROUPS["integration:event"].tests, [
         "tools/carnival_rewards.test.cjs",
+        "tools/raid_event_master.test.cjs",
+        "tools/raid_event_overall_rewards.test.cjs",
+        "tools/raid_event_state.test.cjs",
+        "tools/raid_event_summary.test.cjs",
+        "tools/raid_event_summary_route.test.cjs",
         "tools/rush_event_shop.test.cjs",
         "tools/rush_event_shop_route.test.cjs",
         "tools/score_attack_route_transaction.test.cjs",
@@ -466,6 +472,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/pass_card_route.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS["integration:quest"].tests, [
+        "tools/auto_start_stamina_stop.test.cjs",
         "tools/quest_entry_lifecycle.test.cjs",
         "tools/quest_host_finish.test.cjs",
     ])

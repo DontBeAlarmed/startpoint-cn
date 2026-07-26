@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { deletePlayerRushEventPlayedPartiesUntilSync, deletePlayerRushEventPlayedPartyListSync, deletePlayerRushEventPlayedPartySync, getDefaultPlayerRushEventSync, getPlayerRushEventClearedFoldersSync, getPlayerRushEventSync, insertPlayerRushEventSync, updatePlayerRushEventSync } from "../../data/domains/rushEvent"
-import { getDefaultPlayerPartyGroupsSync } from "../../data/domains/player"
+import { getDefaultPlayerPartyGroupsSync, getPlayerSync } from "../../data/domains/player"
 import { getPlayerCharactersSync } from "../../data/domains/character"
 import { ensurePlayerPartyGroupListSync, getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getSession } from "../../data/domains/session"
@@ -13,7 +13,22 @@ import { insertActiveQuest } from "../../lib/quest/active-quest-service";
 import { getQuestFromCategorySync } from "../../lib/assets";
 import { BattleQuest, QuestCategory } from "../../lib/types";
 import { ensureSpecialEventPartyGroupsSync, resolvePartyGroupColorId } from "../../lib/special-event-parties";
-import { getPlayerRaidEventSync } from "../../data/domains/raidEvent";
+import {
+    getPlayerRaidEventQuestCountsSync,
+    getPlayerRaidEventSync,
+    getRaidEventBossStateSync,
+    upsertPlayerRaidEventSync,
+} from "../../data/domains/raidEvent";
+import { getDb } from "../../data/db";
+import { givePlayerRewardsSync } from "../../lib/quest";
+import {
+    getRaidEventOverallRewardDefinitions,
+    toRaidEventRewardResponse,
+} from "../../lib/quest/finish/raid-overall-rewards";
+import { settleRaidEventSummary } from "../../lib/raid-event-summary";
+import { getRaidEventRequiredKillCount } from "../../lib/raid-event-master";
+import { getRaidBossHpPercentage } from "../../lib/quest/finish/raid-handler";
+import { getMailArrivedSync } from "../../lib/mail-notification";
 
 const raidEventIds: Record<number, number> = {}
 
@@ -73,6 +88,11 @@ const routes = async (fastify: FastifyInstance) => {
         if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error", "message": "No player bound to account."
         })
+        const requiredKillCount = getRaidEventRequiredKillCount(eventId)
+        if (requiredKillCount === undefined) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid raid event id."
+        })
+        const rewardDefinitions = getRaidEventOverallRewardDefinitions(eventId)
 
         // Rush event data for played party tracking
         let rushEventData = getPlayerRushEventSync(playerId, eventId)
@@ -84,7 +104,37 @@ const routes = async (fastify: FastifyInstance) => {
         const serializedPlayedParties = getSerializedPlayerRushEventPlayedPartiesSync(playerId, eventId)
         console.log(`[RAID] summary: folderParties=${Object.keys(serializedPlayedParties.folderParties ?? {}).length} endlessParties=${Object.keys(serializedPlayedParties.endlessParties ?? {}).length}`)
 
-        const raidEventState = getPlayerRaidEventSync(playerId, eventId)
+        const summary = getDb().transaction(() => {
+            const raidBossState = getRaidEventBossStateSync(eventId)
+                ?? { weightedKillCount: 0, totalKillCount: 0 }
+            const playerState = getPlayerRaidEventSync(playerId, eventId)
+            const settlement = settleRaidEventSummary({
+                playerId,
+                totalKillCount: raidBossState.totalKillCount,
+                receivedUpTo: playerState?.receivedUpTo ?? 0,
+                definitions: rewardDefinitions,
+                giveRewards: (pid, rewards) => givePlayerRewardsSync(pid, rewards),
+                updateReceivedUpTo: receivedUpTo => {
+                    upsertPlayerRaidEventSync(
+                        playerId,
+                        eventId,
+                        raidBossState.totalKillCount,
+                        receivedUpTo,
+                    )
+                },
+            })
+            return {
+                raidBossState,
+                settlement,
+                questCounts: getPlayerRaidEventQuestCountsSync(playerId, eventId),
+                player: getPlayerSync(playerId),
+            }
+        })()
+        if (!summary.player) throw new Error(`player ${playerId} disappeared during raid summary`)
+        const questList = Object.fromEntries(Object.entries(summary.questCounts).map(([questId, killCount]) => [
+            questId,
+            { kill_count: killCount },
+        ]))
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
@@ -93,14 +143,26 @@ const routes = async (fastify: FastifyInstance) => {
                 "aggregated_time": clientSerializeDate(getServerDate()),
                 "auto_start_point": 0,
                 "kill_count_reward_data": {
-                    "received_up_to": raidEventState?.receivedUpTo ?? 0,
-                    "reward_list": [],
+                    "received_up_to": summary.raidBossState.totalKillCount,
+                    "reward_list": summary.settlement.grants.map(toRaidEventRewardResponse),
                 },
-                "quest_list": {},
+                "quest_list": questList,
                 "raid_boss": {
-                    "hp_percentage": 100,
-                    "total_kill_count": raidEventState?.totalKillCount ?? 0,
+                    "hp_percentage": getRaidBossHpPercentage(summary.raidBossState, requiredKillCount),
+                    "total_kill_count": summary.raidBossState.totalKillCount,
                 },
+                ...(summary.settlement.rewardResult ? {
+                    "user_info": {
+                        "free_mana": summary.player.freeMana,
+                        "free_vmoney": summary.player.freeVmoney,
+                        "exp_pool": summary.player.expPool,
+                    },
+                    "character_list": summary.settlement.rewardResult.character_list,
+                    "joined_character_id_list": summary.settlement.rewardResult.joined_character_id_list,
+                    "equipment_list": summary.settlement.rewardResult.equipment_list,
+                    "item_list": summary.settlement.rewardResult.items,
+                } : {}),
+                "mail_arrived": getMailArrivedSync(playerId),
                 "endless_battle_next_round": rushEventData.endlessBattleNextRound,
                 "active_rush_battle_folder_id": rushEventData.activeRushBattleFolderId,
                 "endless_battle_played_max_round": rushEventData.endlessBattleNextRound,
@@ -116,17 +178,29 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/get_boss", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as EventIdBody;
         const viewerId = body.viewer_id;
+        const eventId = body.event_id;
         if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         });
+
+        const viewerIdSession = await getSession(viewerId.toString())
+        if (!viewerIdSession) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid viewer id."
+        })
+        const requiredKillCount = getRaidEventRequiredKillCount(eventId)
+        if (requiredKillCount === undefined) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid raid event id."
+        })
+        const raidBossState = getRaidEventBossStateSync(eventId)
+            ?? { weightedKillCount: 0, totalKillCount: 0 }
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
                 "raid_boss": {
-                    "hp_percentage": 100,
-                    "total_kill_count": 0
+                    "hp_percentage": getRaidBossHpPercentage(raidBossState, requiredKillCount),
+                    "total_kill_count": raidBossState.totalKillCount
                 }
             }
         });

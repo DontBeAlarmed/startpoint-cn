@@ -142,6 +142,11 @@ const TEST_GROUPS = Object.freeze({
         execution: "parallel",
         tests: [
             "tools/carnival_rewards.test.cjs",
+            "tools/raid_event_master.test.cjs",
+            "tools/raid_event_overall_rewards.test.cjs",
+            "tools/raid_event_state.test.cjs",
+            "tools/raid_event_summary.test.cjs",
+            "tools/raid_event_summary_route.test.cjs",
             "tools/rush_event_shop.test.cjs",
             "tools/rush_event_shop_route.test.cjs",
             "tools/score_attack_route_transaction.test.cjs",
@@ -195,6 +200,7 @@ const TEST_GROUPS = Object.freeze({
     "integration:quest": {
         execution: "parallel",
         tests: [
+            "tools/auto_start_stamina_stop.test.cjs",
             "tools/quest_entry_lifecycle.test.cjs",
             "tools/quest_host_finish.test.cjs",
         ],

@@ -659,6 +659,36 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
 
+    const hadRaidEventBossStates = database.prepare(`
+        SELECT 1
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'raid_event_boss_states'
+    `).get() !== undefined
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS raid_event_boss_states (
+        event_id INTEGER PRIMARY KEY,
+        weighted_kill_count INTEGER NOT NULL DEFAULT 0,
+        total_kill_count INTEGER NOT NULL DEFAULT 0
+    )`).run()
+
+    if (!hadRaidEventBossStates) {
+        // Old builds stored cumulative quest weight in these fields. It cannot
+        // be converted into a shared Boss total without fabricating progress.
+        database.prepare(`
+            UPDATE players_raid_events
+            SET total_kill_count = 0, received_up_to = 0
+        `).run()
+    }
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_raid_event_quests (
+        player_id INTEGER NOT NULL,
+        event_id INTEGER NOT NULL,
+        quest_id INTEGER NOT NULL,
+        kill_count INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, event_id, quest_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_carnival_event_records (
         player_id INTEGER NOT NULL,
         event_id INTEGER NOT NULL,

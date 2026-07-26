@@ -153,6 +153,8 @@ const EXPECTED_BUNDLED_TABLES = Object.freeze([
     "quest_entry_costs.json",
     "quest_lookup.json",
     "quest_unlock_costs.json",
+    "raid_event.json",
+    "raid_event_overall_reward.json",
     "raid_event_quest.json",
     "ranking_event_single_quest.json",
     "rare_score_reward.json",
@@ -358,7 +360,7 @@ test("registry independently covers static CN runtime JSON references", () => {
 })
 
 test("every registry table has an explicit existing bundled fallback", () => {
-    assert.equal(TABLE_SOURCES.length, 106)
+    assert.equal(TABLE_SOURCES.length, 108)
     for (const entry of TABLE_SOURCES) {
         const sourcePath = path.resolve(projectRoot, entry.bundledPath)
         assert.ok(fs.existsSync(sourcePath), `${entry.tableName} source must exist`)

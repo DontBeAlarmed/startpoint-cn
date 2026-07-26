@@ -266,6 +266,7 @@ function testRushEndlessProgressAndRaidResponse() {
     assert.equal(rush.rushEventData.endless_battle_next_round, 2)
     assert.equal(rush.rushEventData.endless_battle_max_round, 1)
 
+    let raidState
     const raid = handleRaidEventFinish({
         questCategory: QuestCategory.RAID_EVENT,
         questAccomplished: true,
@@ -276,14 +277,21 @@ function testRushEndlessProgressAndRaidResponse() {
         questId: 3001,
         getEvoLevelsFn: () => [1, 1, null],
         insertPartyFn: () => {},
+        getRequiredKillCountFn: () => 100,
+        getRaidBossStateFn: () => ({ weightedKillCount: 20, totalKillCount: 7 }),
+        updateRaidBossStateFn: (_eventId, state) => { raidState = state },
+        incrementQuestKillCountFn: () => 4,
     })
-    assert.equal(raid.quest_boss.kill_count, 5)
+    assert.equal(raid.quest_boss.kill_count, 4)
+    assert.deepEqual(raid.raid_boss, { hp_percentage: 75, total_kill_count: 7 })
+    assert.deepEqual(raidState, { weightedKillCount: 25, totalKillCount: 7 })
     assert.equal(raid.is_out_of_period, false)
+    assert.equal("kill_count_reward_data" in raid, false, "finish 响应不得携带客户端不读取的事件奖励")
 }
 
-function testRaidOverallRewardsPersistAndDoNotRepeatThresholds() {
-    let state = null
-    const granted = []
+function testRaidWeightedBossProgress() {
+    let state = { weightedKillCount: 499_900, totalKillCount: 1 }
+    let questKillCount = 0
     const runFinish = (killCountWeight) => handleRaidEventFinish({
         questCategory: QuestCategory.RAID_EVENT,
         questAccomplished: true,
@@ -294,46 +302,37 @@ function testRaidOverallRewardsPersistAndDoNotRepeatThresholds() {
         questId: 4001,
         getEvoLevelsFn: () => [1, 1, null],
         insertPartyFn: () => {},
-        getRaidEventStateFn: () => state,
-        updateRaidEventStateFn: (_pid, eventId, totalKillCount, receivedUpTo) => {
-            state = { eventId, totalKillCount, receivedUpTo }
-        },
-        giveRewardsFn: (_pid, rewards) => {
-            granted.push(rewards)
-            return {
-                user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
-                character_list: [],
-                joined_character_id_list: [],
-                equipment_list: [],
-                items: { "2370001": 5 },
-            }
-        },
+        getRequiredKillCountFn: () => 500_000,
+        getRaidBossStateFn: () => state,
+        updateRaidBossStateFn: (_eventId, nextState) => { state = nextState },
+        incrementQuestKillCountFn: () => ++questKillCount,
     })
 
-    const first = runFinish(1)
-    assert.equal(first.raid_boss.total_kill_count, 1)
-    assert.equal(first.kill_count_reward_data.received_up_to, 1)
-    assert.deepEqual(first.kill_count_reward_data.reward_list, [
-        { kind: 8, kind_id: 0, number: 500 },
-    ])
-    assert.equal(granted.length, 1)
-    assert.deepEqual(state, { eventId: 4, totalKillCount: 1, receivedUpTo: 1 })
+    const crossing = runFinish(200)
+    assert.deepEqual(state, { weightedKillCount: 0, totalKillCount: 2 })
+    assert.deepEqual(crossing.raid_boss, { hp_percentage: 100, total_kill_count: 2 })
+    assert.equal(crossing.quest_boss.kill_count, 1)
 
-    const crossing = runFinish(49)
-    assert.equal(crossing.raid_boss.total_kill_count, 50)
-    assert.deepEqual(crossing.kill_count_reward_data.reward_list, [
-        { kind: 1, kind_id: 49100, number: 5 },
-        { kind: 8, kind_id: 0, number: 24500 },
-    ])
-    assert.equal(granted.length, 2)
+    const next = runFinish(200)
+    assert.deepEqual(state, { weightedKillCount: 200, totalKillCount: 2 })
+    assert.deepEqual(next.raid_boss, { hp_percentage: 100, total_kill_count: 2 })
+    assert.equal(next.quest_boss.kill_count, 2)
 
-    const repeatedThreshold = runFinish(0)
-    assert.equal(repeatedThreshold.raid_boss.total_kill_count, 51)
-    assert.deepEqual(repeatedThreshold.kill_count_reward_data.reward_list, [
-        { kind: 8, kind_id: 0, number: 500 },
-    ])
-    assert.equal(granted.length, 3)
-    assert.equal(state.receivedUpTo, 51)
+    assert.throws(() => handleRaidEventFinish({
+        questCategory: QuestCategory.RAID_EVENT,
+        questAccomplished: true,
+        activeEventId: 4,
+        killCountWeight: undefined,
+        party,
+        playerId: 7,
+        questId: 4001,
+        getEvoLevelsFn: () => [1, 1, null],
+        insertPartyFn: () => {},
+        getRequiredKillCountFn: () => 500_000,
+        getRaidBossStateFn: () => state,
+        updateRaidBossStateFn: () => assert.fail("非法权重不得写 Boss 状态"),
+        incrementQuestKillCountFn: () => assert.fail("非法权重不得增加关卡次数"),
+    }), /invalid raid quest kill count weight/)
 }
 
 function testRushFolderRewardsAreGrantedOnlyOnFirstClear() {
@@ -401,6 +400,6 @@ testCarnivalUnclaimedRewardsAreGrantedAtomically()
 testFailedSpecialQuestsDoNotProgress()
 testAdventHostFinishState()
 testRushEndlessProgressAndRaidResponse()
-testRaidOverallRewardsPersistAndDoNotRepeatThresholds()
+    testRaidWeightedBossProgress()
 testRushFolderRewardsAreGrantedOnlyOnFirstClear()
 console.log("special quest flow tests passed")

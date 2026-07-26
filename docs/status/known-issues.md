@@ -31,7 +31,7 @@ PassDaily、PassWeek、PassEvent 主数据、核心进度、点数、6 条 type 
 
 ### 战阵事件级奖励待客户端验收
 
-战阵的本地三队配队、开始和基础结算，以及官方 `raid_event_overall_reward` 表驱动的累计击破奖励已经接入。奖励发放、累计击破、阈值幂等和重启持久化由同一个单人结算事务处理，但尚未完成客户端奖励动画、数量和页面刷新验收。无起始值的每击破奖励按 `kill_count_weight` 计算仍属于待确认实现，详见[战阵事件级奖励](../systems/raid-event-overall-rewards.md)。
+战阵的本地三队配队、开始、基础结算和官方 `raid_event_overall_reward` 表驱动的累计击破奖励已经接入。finish 按 `required_kill_count` 推进共享 Boss 权重和分关卡次数，summary 在独立事务中发奖并推进玩家游标；10 个奖励槽、重复 summary 和事务回滚已有专项测试。客户端奖励动画、页面刷新和官方全服状态在单实例私服中的体验仍待验收；旧错误状态迁移及 summary 发奖时点见[战阵事件级奖励](../systems/raid-event-overall-rewards.md)。
 
 ### 超级猫头鹰多场景联机未实现
 

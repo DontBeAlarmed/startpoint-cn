@@ -45,7 +45,7 @@
 - Carnival 分数使用主数据第 104 列的真实 `difficulty_score`。
 - Carnival 第 100 列 `battle_time_limit` 按客户端逻辑从 60 FPS 帧数换算为毫秒；禁止直接作为毫秒使用。
 - Carnival 累计分奖励使用独立主数据和领取表，在事务中完成最佳分更新、奖励发放和领取登记。
-- Raid 修正列偏移，并在结算返回客户端必需的 `raid_event`；事件级累计击破奖励已接入官方 `raid_event_overall_reward` 表、玩家状态和单人结算事务。当前仍需客户端确认奖励数量与动画语义。
+- Raid 修正列偏移，并在结算返回客户端必需的 `raid_event`；finish 按官方权重模型推进共享 Boss 和分关卡次数，事件级累计击破奖励由 summary 按玩家游标原子发放并完整解析 10 个奖励槽。当前仍需客户端确认奖励数量、动画和页面刷新。
 - Rush/Raid 失败结算不再推进模式进度。
 - Rush endless 下一轮按 round 排序。
 - 特殊关卡配队按 Carnival=2、Raid=3、Rush=4 独立保存和读取；配队组颜色使用请求分类更新并在页面重载时返回持久化值。

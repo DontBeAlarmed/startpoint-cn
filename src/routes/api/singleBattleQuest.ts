@@ -4,7 +4,11 @@ import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventPlayedParti
 import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
 import { getPlayerItemSync, givePlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
-import { getPlayerRaidEventSync, upsertPlayerRaidEventSync } from "../../data/domains/raidEvent"
+import {
+    getRaidEventBossStateSync,
+    incrementPlayerRaidEventQuestKillCountSync,
+    upsertRaidEventBossStateSync,
+} from "../../data/domains/raidEvent"
 import { getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync } from "../../data/domains/quest"
 import { getSession } from "../../data/domains/session"
 import { incrementPlayerCharacterClearSync } from "../../data/domains/character_clear"
@@ -76,6 +80,7 @@ import {
 } from "../../lib/quest/auto-start-stop"
 import { getMailArrivedSync } from "../../lib/mail-notification"
 import { recordActiveMissionQuestChallengeFactSync } from "../../lib/mission/active-entry-facts";
+import { getRaidEventRequiredKillCount } from "../../lib/raid-event-master";
 
 interface StartBody {
     quest_id: number
@@ -384,11 +389,12 @@ const routes = async (fastify: FastifyInstance) => {
                 questId,
                 getEvoLevelsFn: (pid, chars) => getCharactersEvolutionImgLevels(pid, chars),
                 insertPartyFn: (pid, eid, p) => insertPlayerRushEventPlayedPartySync(pid, eid, p),
-                getRaidEventStateFn: (pid, eid) => getPlayerRaidEventSync(pid, eid),
-                updateRaidEventStateFn: (pid, eid, totalKillCount, receivedUpTo) => {
-                    upsertPlayerRaidEventSync(pid, eid, totalKillCount, receivedUpTo)
-                },
-                giveRewardsFn: (pid, rewards) => givePlayerRewardsSync(pid, rewards),
+                getRequiredKillCountFn: eid => getRaidEventRequiredKillCount(eid),
+                getRaidBossStateFn: eid => getRaidEventBossStateSync(eid),
+                updateRaidBossStateFn: (eid, state) => upsertRaidEventBossStateSync(eid, state),
+                incrementQuestKillCountFn: (pid, eid, qid) => (
+                    incrementPlayerRaidEventQuestKillCountSync(pid, eid, qid)
+                ),
             })
 
             const carnivalFinishResult = handleCarnivalEventFinish({
@@ -453,7 +459,6 @@ const routes = async (fastify: FastifyInstance) => {
                 ...(scoreAttackRewardResult?.items ?? {}),
                 ...(rushEventRewardsResult?.items ?? {}),
                 ...(carnivalRewardResult?.item_list ?? {}),
-                ...(raidEventData?.rewardResult?.items ?? {}),
             }
             const characterList = reconcileAwakeUnlockCharacterList(playerId, [
                 ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
@@ -461,7 +466,6 @@ const routes = async (fastify: FastifyInstance) => {
                 ...((sPlusClearReward?.character_list || []) as Record<string, unknown>[]),
                 ...(scoreRewardsResult.character_list as Record<string, unknown>[]),
                 ...((scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[]),
-                ...((raidEventData?.rewardResult?.character_list ?? []) as Record<string, unknown>[]),
             ])
 
             if (!isScoreAttackEvent) deletePlayerActiveQuestSync(playerId)
@@ -514,10 +518,10 @@ const routes = async (fastify: FastifyInstance) => {
         reply.header("content-type", "application/x-msgpack")
         const responseData: Record<string, any> = {
                 "user_info": {
-                    "free_mana": newMana + (clearReward?.user_info.free_mana || 0) + (sPlusClearReward?.user_info.free_mana || 0) + scoreRewardsResult.user_info.free_mana + (scoreAttackRewardResult?.user_info.free_mana ?? 0) + (carnivalRewardResult?.user_info.free_mana ?? 0) + (raidEventData?.rewardResult?.user_info.free_mana ?? 0),
-                    "exp_pool": rewardCharacterExpResult.exp_pool + (clearReward?.user_info.exp_pool || 0) + scoreRewardsResult.user_info.exp_pool + (scoreAttackRewardResult?.user_info.exp_pool ?? 0) + (carnivalRewardResult?.user_info.exp_pool ?? 0) + (raidEventData?.rewardResult?.user_info.exp_pool ?? 0),
+                    "free_mana": newMana + (clearReward?.user_info.free_mana || 0) + (sPlusClearReward?.user_info.free_mana || 0) + scoreRewardsResult.user_info.free_mana + (scoreAttackRewardResult?.user_info.free_mana ?? 0) + (carnivalRewardResult?.user_info.free_mana ?? 0),
+                    "exp_pool": rewardCharacterExpResult.exp_pool + (clearReward?.user_info.exp_pool || 0) + scoreRewardsResult.user_info.exp_pool + (scoreAttackRewardResult?.user_info.exp_pool ?? 0) + (carnivalRewardResult?.user_info.exp_pool ?? 0),
                     "exp_pooled_time": getServerTime(playerData.expPooledTime),
-                    "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney + (scoreAttackRewardResult?.user_info.free_vmoney ?? 0) + (carnivalRewardResult?.user_info.free_vmoney ?? 0) + (raidEventData?.rewardResult?.user_info.free_vmoney ?? 0),
+                    "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney + (scoreAttackRewardResult?.user_info.free_vmoney ?? 0) + (carnivalRewardResult?.user_info.free_vmoney ?? 0),
                     "rank_point": newRankPoint,
                     "degree_id": playerData.degreeId,
                     "stamina": afterStamina,
@@ -555,7 +559,6 @@ const routes = async (fastify: FastifyInstance) => {
                     ...(rushEventRewardsResult?.equipment_list || []),
                     ...(scoreAttackRewardResult?.equipment_list ?? []),
                     ...(carnivalRewardResult?.equipment_list ?? []),
-                    ...(raidEventData?.rewardResult?.equipment_list ?? []),
                 ],
                 "category_id": body.category,
                 "start_time": dataHeaders['servertime'],
