@@ -17,6 +17,7 @@ const SOURCE_RULES = [
         pattern: /^src\/content\/paths\.ts$/,
         groups: ["quick:cdn", "quick:content"],
     },
+    { pattern: /^src\/content\/audit\//, groups: ["quick:content"] },
     { pattern: /^src\/content\/cdn\/types\.ts$/, groups: ["quick:cdn"] },
     {
         pattern: /^src\/content\/cdn\/(?:catalog-builder|patch-graph|digest-cache|planner)\.ts$/,
@@ -126,6 +127,7 @@ function groupsForFile(filePath) {
     if (filePath === "tools/test-workflow/groups.cjs") return ["full"]
     if (filePath.startsWith("tools/test-workflow/")) return ["quick:workflow"]
     if (filePath === "tools/content_sync_smoke.cjs") return ["integration:content"]
+    if (filePath === "tools/content_asset_audit.cjs") return ["quick:content"]
     if (filePath === "tools/audit_cdn_catalog.cjs") return ["integration:cdn"]
     if (filePath === "docs/cdn/catalog-planner.md") return ["integration:cdn"]
     if (filePath === "docs/cdn/content-sync.md") {

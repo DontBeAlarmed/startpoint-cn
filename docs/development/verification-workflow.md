@@ -9,6 +9,7 @@
 | 修改少量源码 | `npm run test:changed` | 按 Git 变更选择相关测试；未知路径自动提升到 `full` |
 | 修改纯逻辑或工具 | `npm run test:quick` | 运行可并行、无共享运行时状态的快速测试 |
 | 修改数据库、路由、CDN 或运行时 | `npm run test:integration` | 运行需要编译产物、临时数据库或回环端口的集成测试 |
+| 发布运行资产 | `npm run content:audit -- --source-root <WF_ASSETS_CN_ROOT>` | 只读检查 Registry 表、任务关键表来源一致性与奖励引用闭包 |
 | 修改文档 | `npm run docs:check` | 检查链接、目录入口、current 索引和禁止提交的文档路径 |
 | 修改 TypeScript | `npm run typecheck` | 执行严格类型检查，不生成构建产物 |
 | 模块提交前 | `npm run verify:full` | 类型、文档、全量测试、卫生检查和 CN build 总门禁 |

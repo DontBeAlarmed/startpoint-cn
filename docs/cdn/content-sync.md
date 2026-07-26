@@ -120,6 +120,26 @@ npm run content:sync -- --force
 
 CDN 在同一个 `assetVersion` 下被原地修改，且服务端生成契约也没有变化时，normal 不检查原始文件内容差异，必须使用 `--force`。更改客户端资源时仍应优先发布新的资源版本；`--force` 只重建服务端 Release，不会迫使客户端重新下载同版本资源。
 
+## 运行资产审计
+
+`content:sync` 负责生成 Release，不负责证明仓库内历史 bundled 表没有手工遗漏。发布前可显式运行只读审计：
+
+```bash
+npm run content:audit -- --source-root <WF_ASSETS_CN_ROOT>
+npm run content:audit -- --source-root <WF_ASSETS_CN_ROOT> --format json
+```
+
+`--source-root` 可指向 `wf-assets-cn` 根或其 `orderedmap/`。当前只接受 `VERSION=1.4.54`；其他版本必须先更新项目支持契约和审计基线。默认运行表根为项目 `assets/`，需要审计其他 Bundle 时可显式提供 `--runtime-root <ASSETS_ROOT>`。
+
+当前审计分两层：
+
+1. Content Registry 的 108 张运行表必须存在、是普通文件且可解析为 JSON；
+2. 普通、每日、每周、称号、活动、角色觉醒、收集、Active Mission 和 Pass 共 25 张关键表与官方提取源按解析后的完整 JSON 深度比较，并校验 11 组任务/奖励 ID、144 条觉醒任务四元组和 Pass 活动奖励引用闭包。
+
+官方 1.4.54 基线为 108 张 Registry 表、25 张深度对比表、13327 个深度对比顶层键、36 个觉醒角色组、19 个 Pass 活动及 1140 条 Pass 等级奖励。格式和对象键顺序不构成差异，数组顺序、ID 集合和嵌套值差异会失败。
+
+该命令不写 CDN、`assets/`、`.content/` 或玩家数据库，不生成修复数据，也不由 `start:cn`、`dev:cn` 或 `content:sync` 自动调用。单个 JSON 通过文件描述符读取并在前后核对身份；108 张运行表各读取一次后作为本次内存快照复用于后续检查。该工具不提供跨 108 个文件的原子文件系统快照，发布者必须在停止内容写入后运行；同 UID 对抗性进程在检查间隙替换并恢复路径不属于保护边界。完整 CDN 归档合法性仍由 `content:smoke` 负责，两项工具不能互相替代。
+
 ## 真实 CDN smoke
 
 `integration:content` 自动组包含离线 fixture，用小型临时数据覆盖参数、路径、基线和失败摘要，不读取真实 CDN。真实 CDN smoke 仍必须手动运行，并显式提供 CDN 父目录和隔离的临时 content root：

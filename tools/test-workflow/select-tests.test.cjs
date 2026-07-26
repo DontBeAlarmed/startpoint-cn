@@ -40,6 +40,8 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/content/cdn/catalog.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/planner.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/audit.ts"]), ["integration:cdn"])
+    assert.deepEqual(selectTestGroups(["src/content/audit/runner.ts"]), ["quick:content"])
+    assert.deepEqual(selectTestGroups(["tools/content_asset_audit.cjs"]), ["quick:content"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/catalog-loader.ts"]), ["integration:cdn"])
     assert.deepEqual(
         selectTestGroups(["src/content/runtime/content-snapshot.ts"]),

@@ -48,6 +48,7 @@ bash scripts/start-cn.sh
 | `npm run dev:cn` | 构建服务端；`local` 同步后启动，其他资源模式直接启动 |
 | `npm run debug:cn` | TypeScript 热重载调试，不自动同步内容 |
 | `npm run content:sync` | 为本地 CDN 手动生成或复用 Content Release |
+| `npm run content:audit -- --source-root <WF_ASSETS_CN_ROOT>` | 只读核对 Registry 运行表与任务关键表来源 |
 | `npm run build:admin` | 构建 React 管理后台 |
 | `npm run docs:check` | 检查文档链接、目录入口和索引覆盖 |
 | `npm run test:changed` | 运行与当前改动相关的测试 |

@@ -21,6 +21,7 @@
     "debug:cn": "tsnd --env-file=.env -- src/cn-server.ts",
     "cdn:manifest": "node tools/generate_cdn_runtime_manifest.cjs",
     "content:sync": "node tools/content_sync.cjs",
+    "content:audit": "node tools/content_asset_audit.cjs",
     "content:smoke": "node tools/content_sync_smoke.cjs",
     "content:mission-event-rules": "node scripts/gen_mission_event_battle_rules.js",
     "content:pass": "node scripts/gen_pass_mission_data.js",

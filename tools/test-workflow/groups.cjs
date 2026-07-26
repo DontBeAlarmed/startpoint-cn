@@ -79,6 +79,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/character_content.test.cjs",
             "tools/content_character_converter.test.cjs",
+            "tools/content_asset_audit.test.cjs",
             "tools/content_skill_effects_converter.test.cjs",
             "tools/content_amf3.test.cjs",
             "tools/content_gacha_converter.test.cjs",

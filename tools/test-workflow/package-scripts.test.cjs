@@ -105,6 +105,15 @@ test("runs content sync through the TypeScript entry without a prebuild", () => 
     assert.doesNotMatch(scripts["content:sync"], /--env-file/)
 })
 
+test("runs content asset audit explicitly without adding it to startup", () => {
+    assert.equal(
+        scripts["content:audit"],
+        "node tools/content_asset_audit.cjs",
+    )
+    assert.doesNotMatch(scripts["content:audit"], /build|start:cn/)
+    assert.doesNotMatch(scripts["start:cn"], /content:audit/)
+})
+
 test("exposes the reproducible strict event battle rule generator", () => {
     assert.equal(
         scripts["content:mission-event-rules"],

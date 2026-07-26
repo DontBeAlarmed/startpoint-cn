@@ -15,6 +15,7 @@
 
 - CDN 保存客户端资源归档和可提取的内容源。
 - `content:sync` 根据受支持输入生成或复用 Content Release；CDN 版本、生成器版本或服务端表注册契约变化时自动重建。
+- `content:audit` 是显式运行的只读发布门禁：检查全部 Registry 运行表，并对任务关键表执行官方提取源一致性与引用闭包校验；它不参与服务启动。
 - Content Runtime 在进程启动时加载固定 snapshot，向业务模块提供已接入的运行表。
 - 服务端通过 Catalog 向客户端声明版本、大小和下载归档。
 - SQLite 保存玩家状态，不保存或替代 CDN 内容定义。
