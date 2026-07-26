@@ -43,7 +43,12 @@ process.once("exit", cleanup)
 const QUEST_ID = 700001001
 const QUEST_CATEGORY = 24 // QuestCategory.RUSH_EVENT
 
-const tables = {}
+// Base-registered tables the finish path happens to consult; empty is fine,
+// the seam tests do not depend on their contents.
+const tables = {
+    "character.json": {},
+    "cdndata/character.json": {},
+}
 
 const { productionContentSnapshotProvider } = require("../src/content/runtime/content-snapshot")
 const previousSnapshot = productionContentSnapshotProvider.snapshot
@@ -66,6 +71,7 @@ restoreSnapshot = () => {
     productionContentSnapshotProvider.snapshot = previousSnapshot
 }
 
+const { activeQuests } = require("../src/lib/quest/active-quest-service")
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
@@ -162,6 +168,30 @@ function post(fastify, route, body) {
     })
 }
 
+const ROLLBACK_MARKER = "settlement-fixture-fault-4f2a"
+
+function finishBody() {
+    return {
+        is_restored: false,
+        continue_count: 0,
+        elapsed_time_ms: 1000,
+        quest_id: QUEST_ID,
+        category: QUEST_CATEGORY,
+        score: 100,
+        viewer_id: viewerId,
+        add_mana: 50,
+        is_accomplished: true,
+        statistics: {
+            clear_phase: 1,
+            party: {
+                characters: [], unison_characters: [], equipments: [],
+                ability_soul_ids: [],
+            },
+        },
+        api_count: 2,
+    }
+}
+
 function startBody() {
     return {
         quest_id: QUEST_ID,
@@ -185,8 +215,27 @@ function replyMessage(response) {
     }
 }
 
-function readPlayerName() {
-    return db.prepare("SELECT name FROM players WHERE id = ?").get(playerId).name
+function decodeSuccess(response) {
+    return unpack(Buffer.from(response.body, "base64"))
+}
+
+/**
+ * State a normal rush settlement is guaranteed to move, so asserting it is
+ * unchanged actually proves the settlement did not commit. players.name is
+ * useless here — settlement never writes it.
+ */
+function settlementState() {
+    const player = db
+        .prepare("SELECT total_mana_obtained, free_mana FROM players WHERE id = ?")
+        .get(playerId)
+    const progress = db
+        .prepare("SELECT COUNT(*) AS rows FROM players_quest_progress WHERE player_id = ?")
+        .get(playerId)
+    return {
+        totalManaObtained: player.total_mana_obtained ?? 0,
+        freeMana: player.free_mana ?? 0,
+        questProgressRows: progress.rows,
+    }
 }
 
 async function main() {
@@ -202,45 +251,66 @@ async function main() {
         assert.equal(vetoed.statusCode, 400, vetoed.body)
         assert.equal(replyMessage(vetoed), "blocked by fixture module")
 
-        // --- without the module the same request is not vetoed ----------
+        // --- without a module /start must actually succeed ---------------
+        // Asserting "no such error message" would also pass on a 500, so
+        // assert the success itself: status, decoded payload and the active
+        // quest the route is required to create.
         registry.resetModesForTest()
-        const notVetoed = await post(fastify, "start", startBody())
-        assert.notEqual(
-            replyMessage(notVetoed),
-            "blocked by fixture module",
-            "no module installed → the seam must not reject the start",
-        )
+        delete activeQuests[playerId]
+        const started = await post(fastify, "start", startBody())
+        assert.equal(started.statusCode, 200, started.body)
+        const startPayload = decodeSuccess(started)
+        assert.ok(startPayload.data_headers, "success reply carries data_headers")
+        assert.equal(startPayload.data_headers.result_code, 1)
+        assert.ok(startPayload.data, "success reply carries a data section")
+        assert.ok(activeQuests[playerId], "a successful start must create the active quest")
+        assert.equal(activeQuests[playerId].questId, QUEST_ID)
 
-        // --- /finish settlement fault rolls the transaction back --------
+        // --- /finish settlement fault rolls real settlement state back ---
         const rollbackDir = tempModesDir("wf-modes-route-rollback-")
         installModule(rollbackDir, "rollback.mjs", "rollback-fixture",
-            `onRushFinish() { throw new Error("settlement fixture fault") },`)
+            `onRushFinish() { throw new Error("${ROLLBACK_MARKER}") },`)
         assert.deepEqual(await bootModes(rollbackDir), ["rollback-fixture"])
 
-        const before = readPlayerName()
-        const finished = await post(fastify, "finish", {
-            is_restored: false,
-            continue_count: 0,
-            elapsed_time_ms: 1000,
-            quest_id: QUEST_ID,
-            category: QUEST_CATEGORY,
-            score: 0,
-            viewer_id: viewerId,
-            add_mana: 10,
-            is_accomplished: true,
-            statistics: {
-                clear_phase: 1,
-                party: {
-                    characters: [], unison_characters: [], equipments: [],
-                    ability_soul_ids: [],
-                },
-            },
-            api_count: 2,
-        })
-        // Whatever the route reports, the invariant is that a module fault
-        // inside the settlement transaction leaves no partial player state.
-        assert.notEqual(finished.statusCode, 200, finished.body)
-        assert.equal(readPlayerName(), before, "settlement must have rolled back")
+        // The active quest from the successful start above is the valid
+        // precondition for finishing.
+        assert.ok(activeQuests[playerId], "finish needs the active quest from /start")
+        const before = settlementState()
+
+        const finished = await post(fastify, "finish", finishBody())
+
+        // The response must be traceable to the fixture's unique error, which
+        // is what proves the handler reached the hook at all.
+        const failureText = `${finished.statusCode} ${finished.body}`
+        assert.ok(
+            failureText.includes(ROLLBACK_MARKER),
+            `finish must fail with the fixture error; got ${failureText}`,
+        )
+        assert.deepEqual(
+            settlementState(),
+            before,
+            "settlement state a normal finish would change must be unchanged",
+        )
+        assert.ok(
+            activeQuests[playerId],
+            "a failed settlement must not consume the active quest",
+        )
+
+        // --- control: the same finish without a module DOES settle -------
+        // Without this, "state unchanged" could pass vacuously if the chosen
+        // state simply never moves during settlement.
+        registry.resetModesForTest()
+        delete activeQuests[playerId]
+        const controlStart = await post(fastify, "start", startBody())
+        assert.equal(controlStart.statusCode, 200, controlStart.body)
+        const beforeControl = settlementState()
+        const controlFinish = await post(fastify, "finish", finishBody())
+        assert.equal(controlFinish.statusCode, 200, controlFinish.body)
+        assert.notDeepEqual(
+            settlementState(),
+            beforeControl,
+            "a normal settlement must move the state the rollback assertion watches",
+        )
 
         console.log("modes route-level checks passed")
     } finally {

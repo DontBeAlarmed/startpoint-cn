@@ -121,9 +121,20 @@ Mod 扩展它,`host.table` 也读不到未注册的表。模块的开关与配�
 
 - `tools/modes_loader.test.cjs` —— allowlist 命中装载、未登记跳过、哈希不符跳过、
   `MODES_ENABLED=0`、目录缺失静默无操作、重复/非法注册被拒;
-- `tools/modes_contract.test.cjs` —— apiVersion 不符拒装、被授权模块加载失败不影响
-  其他模块、码点序分派、重名拒绝、`table` 缺表返回 null 而 `requireTable` 抛错、
-  进本否决链短路、结算与队伍改写 fail-soft、无模块时全部 no-op;
+- `tools/modes_contract.test.cjs` —— 版本不符在 `register()` 执行前即拒装、缺 manifest
+  拒装、被授权模块加载失败不影响其他模块、码点序分派、重名拒绝、
+  `table` 只服务基座已注册表、进本否决链短路、结算传播、队伍改写 fail-soft、
+  无模块时全部 no-op;
+- `tools/modes_lifecycle.test.cjs` —— **生产启动顺序**:经
+  `createContentLifecycleDependencies()`(cn-server 展开进协调器依赖的同一个组合)
+  驱动真实 coordinator,snapshot/HTTP listen/TCP start 用 spy 不占端口,断言顺序为
+  **内容快照 → 模块注册完成 → HTTP listen → TCP start**,空目录同序且零注册;
+- `tools/modes_routes.test.cjs` —— **路由级**:真实 fastify handler 上,模块否决
+  `/start` 返回 400 且消息即模块所抛;**无模块时 `/start` 精确断言 200 + 解码响应
+  结构 + active quest 已创建**;`/finish` 结算故障时响应可追溯到 fixture 的唯一错误
+  (证明确实执行到挂点)、**正常结算必改的持久状态(total_mana_obtained/free_mana/
+  关卡进度行数)保持原值**、active quest 未被误删;并有**对照组**证明同一结算在无
+  模块时确实会改动这些状态(断言非空洞);
 - `tools/modes_integration.test.cjs` —— **真实接线**:全部经 `initializeContentAndModes()`
   (cn-server 交给运行时协调器的同一个组合函数,不是测试自己拼的顺序)驱动:
   快照先于模块注册、空目录干净启动且响应不被改动、装入模块后生产读路径

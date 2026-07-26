@@ -14,7 +14,7 @@ import getDatabase, {
 } from "./data";
 import { restoreTimeOffset } from "./data/activeAccount";
 import { getContentSnapshot, initializeContentSnapshot } from "./content/runtime/content-snapshot";
-import { initializeContentAndModes } from "./modes/boot";
+import { createContentLifecycleDependencies } from "./modes/cn-lifecycle";
 import { configureSerializedAssetVersionProvider } from "./data/utils/serialized-asset-version";
 import { parseCnRuntimeConfig } from "./runtime/config";
 import {
@@ -401,10 +401,11 @@ runtimeCoordinator = createRuntimeCoordinator({
     initializeDatabase,
     restoreTimeOffset,
     // Content snapshot, then operator-installed gameplay modules (modes.d/).
-    // Shared with the boot tests so they exercise this exact composition.
-    initializeContent: config => initializeContentAndModes({
+    // Composed by the seam so the lifecycle test drives this exact entry
+    // point instead of re-creating the ordering.
+    ...createContentLifecycleDependencies<ReturnType<typeof parseCnRuntimeConfig>>({
         projectRoot,
-        initializeContentSnapshot: () => initializeContentSnapshot({
+        initializeContentSnapshot: config => initializeContentSnapshot({
             assetMode: config.assetProvider.mode,
             localCdn: config.assetProvider.mode === "local",
         }),
