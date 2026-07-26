@@ -17,6 +17,8 @@
   category 4 同时读取 `row[0]` 的 event ID 与 `row[2]` 的 pattern，category 5 使用 `row[1]`，
   category 6/7/8 使用 `row[0]` 的 Pass 活动 ID、`row[1]` 的 pattern 和 `row[3]` 的 pattern type，
   category 9 使用 `row[2]`。开放期统一按国服 UTC+8 解释，不再由各计算器分别猜测列号。
+- Degree 的四条客户端进度不把 `row[1]` 的内部任务名当请求 pattern；它们按 CN 1.8.1
+  `DegreeMissionValues` 对 `row[3]` 的严格 selector `40/41/42/43` 解析客户端字段。其他 token、数值类型和近似字段名均不匹配。
 - CN 1.8.1 的 `MissionCounterLogic` 只静默发送五种客户端行为：角色详情插画停留一分钟、角色点阵动作、
   主页点击城镇角色、主页切换语音和主页推特确认。`update_mission_progress` 只接受这五种白名单，
   并只写入服务器时间下已开放的匹配任务；未知、非正整数、历史期和未来期输入均不写库。
@@ -65,17 +67,17 @@
   不再固定为空数组。
 - 当前存档导入导出格式尚未包含 `players_collected_items`。替换存档后不能从当前库存反推历史累计值；这是已知边界，
   本轮按需求不扩展完整数据库导入导出。
-- category 5 共 1288 条。当前自动计算 1268 条有权威服务端事实的任务：玩家等级 8 条、持有角色数 3 条、
+- category 5 共 1288 条。当前自动计算 1272 条有权威服务端事实的任务：玩家等级 8 条、持有角色数 3 条、
   上限突破总次数 3 条、玛纳板节点数 3 条、信赖之证数 3 条、单人 SS 次数 3 条、累计使用技能 3 条、累计获得锻造石 3 条、单次最高连击 3 条、累计冲刺 3 条、领主战累计通关 3 条、单人最高分 3 条、单人限时通关 3 条、挑战副本累计通关 3 条、第二玛纳板累计节点数 3 条、第二玛纳板指定角色完成 472 条、累计消耗体力 3 条、累计登录 3 条、章节主线与高难全通 12 条、练习关卡 SS 5 条、珍品商店购买次数 3 条、指定 Boss 超级难度 13 条。
-  指定 Boss/Advent 累计通关 84 条、ExpertSingle 精确单关 12 条、WorldStory 精确单关 27 条、Advent 精确单关 1 条、Carnival 精确单关 27 条、HardMulti 精确单关 6 条、活动累计物品 2 条、满级装备 3 条。另外 484 条 type 44 从主数据 `row[15]` 读取指定角色 ID；该角色已有 `status>=1` 的信赖之证时进度为 1。
+  指定 Boss/Advent 累计通关 84 条、ExpertSingle 精确单关 12 条、WorldStory 精确单关 27 条、Advent 精确单关 1 条、Carnival 精确单关 27 条、HardMulti 精确单关 6 条、活动累计物品 2 条、满级装备 3 条，以及 Degree 客户端进度 4 条。另外 484 条 type 44 从主数据 `row[15]` 读取指定角色 ID；该角色已有 `status>=1` 的信赖之证时进度为 1。
   在本项目受支持的官方客户端养成流程中，信赖之证状态是该条件达成后的持久标志，因此这里不使用缺失的 EXP 等级曲线重复推算等级。
   `status=1` 表示待领取，`status=2` 表示已领取，两者都属于已经获得；总数称号和指定角色称号均不会因领取后状态变化而倒退。
   单人 SS 使用独立计数，协力 SS 不会污染；schema 6 升级前混合累计的旧 SS 无法可靠拆分，因此不回填。
 - 已接入的简单称号族包括协力成功总数 3 条、作为房主的协力成功总数 3 条、已完成角色剧情数 3 条、挑战副本累计通关 3 条、单人最高分 3 条和单人限时通关 3 条。角色剧情
   使用 SQL `COUNT(*)` 直接统计 category 3 已完成关卡，并由
   `idx_players_quest_progress_player_section_finished` covering index 支持。
-- 当前称号覆盖为 `1268/1288`，约 `98.4%`；unsupported 为 20 条。84 条指定 Boss/Advent 累计通关称号按主数据 selector 和官方关卡表精确匹配；46 条称号读取成功 finish 的分 battle kind zone 累计、单场最大战斗统计；珍品商店 Mana 和装备觉醒 6 条从业务事务增长。MVP 与魂珠设置等缺少权威事实的任务继续 fallback。
-- 20 条 fallback 已由 `coverage-audit.ts` 按 ID 固定分类：角色等级 3 条、魂珠设置 3 条、主数据不存在的指定 Boss 难度 1 条、Attention 3 条、MVP 3 条、客户端展示/点击类 4 条、协力新手 3 条。每条均携带机器可读原因；新增事实族必须同时改变 ID 分区测试，不能只改文档数字。
+- 当前称号覆盖为 `1272/1288`，约 `98.8%`；unsupported 为 16 条。84 条指定 Boss/Advent 累计通关称号按主数据 selector 和官方关卡表精确匹配；46 条称号读取成功 finish 的分 battle kind zone 累计、单场最大战斗统计；珍品商店 Mana 和装备觉醒 6 条从业务事务增长；4 条展示/点击称号读取官方客户端静默请求。MVP 与魂珠设置等缺少权威事实的任务继续 fallback。
+- 16 条 fallback 已由 `coverage-audit.ts` 按 ID 固定分类：角色等级 3 条、魂珠设置 3 条、主数据不存在的指定 Boss 难度 1 条、Attention 3 条、MVP 3 条、协力新手 3 条。每条均携带机器可读原因；新增事实族必须同时改变 ID 分区测试，不能只改文档数字。
 - 其余已实现称号只读取对应的持久化角色、装备、关卡、库存、商店或成功结算事实，并与旧进度取最大值。未知主数据、非法客户端统计和缺少权威生产者的条件继续 fallback，不根据中文描述或相邻任务推算。
 - 角色等级称号暂不自动计算：当前服务端资产没有完整 EXP 到等级曲线，只保存角色累计 EXP 和上限突破状态；
   在 CDN 转换器补齐权威曲线前不使用近似阈值。
@@ -146,9 +148,9 @@
 
 ## 尚未完成的分类
 
-`src/lib/mission/coverage-audit.ts` 是覆盖数字和剩余 ID 的唯一机器清单。`tools/mission_coverage_audit.test.cjs` 锁定 category 3 `1512/2512`、Degree `1268/1288`、觉醒路由 `144/144` 和 Pass `229/267`，并要求 automated/fallback 分区无交集且每个 fallback 都有原因。该报告证明代码路由和事实生产者覆盖，不等价于 CN 客户端验收。
+`src/lib/mission/coverage-audit.ts` 是覆盖数字和剩余 ID 的唯一机器清单。`tools/mission_coverage_audit.test.cjs` 锁定 category 3 `1512/2512`、Degree `1272/1288`、觉醒路由 `144/144` 和 Pass `229/267`，并要求 automated/fallback 分区无交集且每个 fallback 都有原因。该报告证明代码路由和事实生产者覆盖，不等价于 CN 客户端验收。
 
-- category 4 已形成累计获得量、活动隔离、结算、发奖和 load 映射；category 5 已接入上述 1268 条权威事实。
+- category 4 已形成累计获得量、活动隔离、结算、发奖和 load 映射；category 5 已接入上述 1272 条权威事实。
   两类仍需 CN 客户端验证提示、奖励和重启持久化；category 5 的其余任务需逐族补事实。
 - category 3 已启用 805 条按 mission ID 的严格协力规则、257 条 type 23 精确通关规则、445 条关卡、物品、竞速、阶段、当前状态及单人累计规则，以及 5 条 Event 登录/Raid summary 入口事实；其中 7 条 pattern 26/27/28 已接入官方战斗统计事实，严格拒绝失败、type26 错误 rank、开放期外、非法或溢出统计。其余 1000 条复杂规则继续补类型化事实，
   旧 map 只作历史审计，不作为自动事实或发奖依据。Attention 在缺少权威来源前保持禁用。

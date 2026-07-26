@@ -51,7 +51,14 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.degree)
     assert.deepEqual(
         { total: report.degree.total, automated: report.degree.automated, fallback: report.degree.fallback },
-        { total: 1288, automated: 1268, fallback: 20 },
+        { total: 1288, automated: 1272, fallback: 16 },
+    )
+    assert.deepEqual(
+        report.degree.automatedMissions
+            .filter(entry => [47000, 48000, 49000, 50000].includes(entry.missionId))
+            .map(entry => entry.missionId),
+        [47000, 48000, 49000, 50000],
+        "四条 Degree 客户端进度必须全部进入权威自动覆盖",
     )
     assert.equal(report.degree.fallbackMissions.find(entry => entry.missionId === 3000)?.patternType, 5)
 

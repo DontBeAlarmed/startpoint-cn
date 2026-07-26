@@ -539,6 +539,10 @@ assert.equal(DegreeComputer.compute(45000, context, degreeProgress(45000)), 100)
 assert.equal(DegreeComputer.compute(45010, context, degreeProgress(45010)), 110)
 assert.equal(DegreeComputer.compute(42000, context, degreeProgress(42000)), 4)
 assert.equal(DegreeComputer.compute(8000, context, 3), 3, "魂珠验证未闭合时必须保留 fallback")
+for (const missionId of [47000, 48000, 49000, 50000]) {
+    assert.equal(DegreeComputer.compute(missionId, context, 0), 0)
+    assert.equal(DegreeComputer.compute(missionId, context, 7), 7, `${missionId} 客户端进度必须保持单调`)
+}
 
 for (const missionId of [23000, 23010, 23020]) {
     assert.equal(DegreeComputer.compute(missionId, context, 0), 4, `${missionId} 应读取协力成功总数`)
@@ -558,8 +562,8 @@ assert.equal(getExactDegreeQuestClearRuleCount(), 84)
 assert.equal(getDegreeOperationRuleCount(), 6)
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1268,
-    unsupported: 20,
+    serverComputed: 1272,
+    unsupported: 16,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -612,6 +616,7 @@ assert.deepEqual(coverage, {
         eventCollectItem: 2,
         maxLevelEquipment: 3,
         skillUse: 3,
+        clientProgress: 4,
     },
 })
 

@@ -6,6 +6,7 @@ const Fastify = require("fastify")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
+const { pack, unpack } = require("msgpackr")
 
 function stubModule(relativePath, exports) {
     const modulePath = require.resolve(relativePath)
@@ -42,18 +43,21 @@ stubModule("../src/lib/mission/index", {
         buildContext: () => ({}),
         compute: (_missionId, _ctx, dbProgress) => dbProgress,
     }),
-    getMissionIdsByCategory: () => [],
+    getMissionIdsByCategory: category => category === 5
+        ? [47000, 48000, 49000, 50000]
+        : [],
     getCurrentStage: () => 0,
     getCharacterIdFromMission: () => "",
-    isMissionEnabledAt: () => false,
+    isMissionEnabledAt: () => true,
     reconcileAwakeUnlockCharacterList: (_playerId, list) => list,
     settleAwakeMissionRewards: () => ({
         missionInfo: [], itemList: {}, characterList: [], equipmentList: [], degreeIds: [],
     }),
+    settleMissionCategories: () => null,
 })
 
 const missionRoutes = require("../src/routes/api/mission").default
-const { initializeDatabase } = require("../src/data")
+const { closeDatabase, initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
@@ -95,9 +99,24 @@ async function postProgress(fastify, missionPattern, progressValue) {
     })
 }
 
+async function postPayload(fastify, payload) {
+    return fastify.inject({
+        method: "POST",
+        url: "/update_mission_progress",
+        payload,
+    })
+}
+
 async function main() {
     setServerTime("2024-08-14T12:00:00.000Z")
     const fastify = Fastify()
+    fastify.addHook("onSend", (_request, reply, payload, done) => {
+        if (String(reply.getHeader("content-type") ?? "").includes("application/x-msgpack")) {
+            done(null, pack(payload))
+            return
+        }
+        done(null, payload)
+    })
     await fastify.register(missionRoutes)
     await fastify.ready()
 
@@ -118,6 +137,103 @@ async function main() {
 
         await postProgress(fastify, "twitter_check", Number.NaN)
         assert.equal(getPlayerCategoryMissionsSync(playerId, 1)[107].progress, 1)
+
+        setServerTime("2024-08-14T12:00:00.000Z")
+        const degreeCases = [
+            ["character_detail_zoom_illust_for_1min_count", 47000],
+            ["character_detail_play_dot_sp_motion_count", 48000],
+            ["home_tap_town_character_count", 49000],
+            ["home_change_voice_count", 50000],
+        ]
+        for (const [missionPattern, missionId] of degreeCases) {
+            const response = await postProgress(fastify, missionPattern, 1)
+            assert.equal(response.statusCode, 200, response.body)
+            const progress = getPlayerCategoryMissionsSync(playerId, 5)
+            assert.equal(progress[missionId]?.progress, 1, `${missionPattern} 必须只累计对应 Degree`)
+        }
+
+        await postProgress(fastify, "character_detail_zoom_illust_for_1min_count", 2)
+        assert.equal(getPlayerCategoryMissionsSync(playerId, 5)[47000].progress, 3)
+
+        for (const wrongAction of [
+            "home_voice_change_count",
+            "degree_sukimono_1",
+            "twitter_check",
+        ]) {
+            await postProgress(fastify, wrongAction, 7)
+        }
+        assert.deepEqual(
+            Object.fromEntries(Object.entries(getPlayerCategoryMissionsSync(playerId, 5))
+                .map(([missionId, mission]) => [missionId, mission.progress])),
+            { 47000: 3, 48000: 1, 49000: 1, 50000: 1 },
+            "错误动作或近似字段不得污染四条 Degree 进度",
+        )
+
+        for (const missionParamList of [
+            { mission_pattern: "home_change_voice_count", progress_value: 99 },
+            [null, 1, {}, { mission_pattern: 42, progress_value: 99 }],
+        ]) {
+            const response = await postPayload(fastify, {
+                viewer_id: viewerId,
+                api_count: 1,
+                mission_param_list: missionParamList,
+            })
+            assert.equal(response.statusCode, 200)
+        }
+        assert.equal(getPlayerCategoryMissionsSync(playerId, 5)[50000].progress, 1)
+
+        await postProgress(fastify, "home_change_voice_count", Number.MAX_SAFE_INTEGER)
+        assert.equal(
+            getPlayerCategoryMissionsSync(playerId, 5)[50000].progress,
+            1,
+            "溢出增量必须 fail closed，不能让进度倒退或失去安全整数精度",
+        )
+
+        const orphanAccount = insertAccountSync({
+            appId: "wf_cn",
+            idpAlias: "",
+            idpCode: "test",
+            idpId: `mission-progress-route-orphan-${randomUUID()}`,
+            status: "normal",
+        })
+        const orphanViewerId = viewerId + 1
+        db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
+            .run(String(orphanViewerId), orphanAccount.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 2)
+        const orphanResponse = await postPayload(fastify, {
+            viewer_id: orphanViewerId,
+            api_count: 1,
+            mission_param_list: [{
+                mission_pattern: "home_change_voice_count",
+                progress_value: 99,
+            }],
+        })
+        assert.equal(orphanResponse.statusCode, 500)
+
+        closeDatabase()
+        initializeDatabase()
+        db = getDb()
+        assert.deepEqual(
+            Object.fromEntries(Object.entries(getPlayerCategoryMissionsSync(playerId, 5))
+                .map(([missionId, mission]) => [missionId, mission.progress])),
+            { 47000: 3, 48000: 1, 49000: 1, 50000: 1 },
+            "服务重启后必须保留客户端进度事实",
+        )
+        const loadResponse = await fastify.inject({
+            method: "POST",
+            url: "/get_mission_progress",
+            payload: {
+                viewer_id: viewerId,
+                api_count: 1,
+                category_list: [{ category: 5 }],
+            },
+        })
+        assert.equal(loadResponse.statusCode, 200)
+        assert.deepEqual(
+            Object.fromEntries(unpack(loadResponse.rawPayload).data.mission_progress_list
+                .map(mission => [mission.mission_id, mission.progress_value])),
+            { 47000: 3, 48000: 1, 49000: 1, 50000: 1 },
+            "重启后的任务 load 必须返回持久化事实",
+        )
     } finally {
         await fastify.close()
         cleanupDatabase()

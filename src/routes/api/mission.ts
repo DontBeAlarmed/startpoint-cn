@@ -2,7 +2,10 @@
 // Uses lib/mission/ computer registry for compute dispatch
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getPlayerCategoryMissionsSync, incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
+import {
+    getPlayerCategoryMissionsSync,
+    incrementPlayerCategoryMissionIfSafeSync,
+} from "../../data/domains/mission"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
@@ -178,10 +181,18 @@ const routes = async (fastify: FastifyInstance) => {
     })
 
     fastify.post("/update_mission_progress", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as UpdateMissionProgressBody
+        if (request.body === null
+            || typeof request.body !== "object"
+            || Array.isArray(request.body)) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid request body."
+        })
+        const body = request.body as Partial<UpdateMissionProgressBody>
 
         const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+        if (typeof viewerId !== "number"
+            || !Number.isSafeInteger(viewerId)
+            || viewerId <= 0) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
         })
@@ -192,19 +203,22 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "Invalid viewer id."
         })
 
-        const playerId = resolvePlayerIdSync(session.accountId)!
+        const playerId = resolvePlayerIdSync(session.accountId)
         if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No players bound to account."
         })
 
         // Update mission progress counters in DB (fire-and-forget from client)
-        const missionParams = body.mission_param_list || []
+        const missionParams = Array.isArray(body.mission_param_list)
+            ? body.mission_param_list
+            : []
         let updatedCount = 0
         const evaluationTime = new Date(getServerTime() * 1000)
 
         getDb().transaction(() => {
             for (const param of missionParams) {
+                if (param === null || typeof param !== "object" || Array.isArray(param)) continue
                 const delta = addMissionProgressDelta(0, param.progress_value)
                 if (typeof param.mission_pattern !== "string" || delta === null) continue
                 const matches = resolveClientProgressTargets(
@@ -212,8 +226,12 @@ const routes = async (fastify: FastifyInstance) => {
                     evaluationTime,
                 )
                 for (const match of matches) {
-                    incrementPlayerCategoryMissionSync(playerId, match.category, match.missionId, delta)
-                    updatedCount++
+                    if (incrementPlayerCategoryMissionIfSafeSync(
+                        playerId,
+                        match.category,
+                        match.missionId,
+                        delta,
+                    )) updatedCount++
                 }
             }
         })()

@@ -63,6 +63,24 @@
 - `integration:mission` 保持并行执行，但每个测试文件显式使用 60 秒 timeout。默认 30 秒在全组并发、类型转译和临时 SQLite 初始化竞争下曾接近或超过上限；新 current-state fixture 的专项运行约 6 秒，完整组验证用于区分环境资源竞争与本提交的真实性能回归。
 - 上述 15 条均可从升级时已有的当前存档状态回溯一个安全下界，不新增累计表。与之不同，type 23 重复通关、战斗统计和业务操作次数只能从升级后的成功事务继续累计；历史唯一完成行或当前库存不能替代行为时间线。Event 开放期仍由既有 reconciliation 和主数据时间过滤处理，不读取存档 `time_offset`。
 
+## 称号：客户端静默进度
+
+- `47000/48000/49000/50000` 只依据官方 Degree row selector 接入。CN 1.8.1
+  `DegreeMissionValues` 将严格字符串 token `40/41/42/43` 依次解析为
+  `character_detail_zoom_illust_for_1min_count`、`character_detail_play_dot_sp_motion_count`、
+  `home_tap_town_character_count`、`home_change_voice_count`。这里没有按中文描述、mission ID 末位或
+  `row[1]` 的 `degree_*` 内部名称推测；尤其 50000 的权威字段不是 `home_voice_change_count`。
+- 客户端事实链来自 CN 1.8.1 实际调用：插画放大测量达到 3600 帧后计 1，角色详情像素特殊动作播完计 1，
+  星见镇角色或商人点击计 1，首页切换后的语音播放完成计 1。`MissionCounterLogic.send()` 只遍历五种白名单行为，
+  将本地累计批次作为 `mission_param_list[].progress_value` 请求
+  `mission/update_mission_progress`，随后清空本地计数；因此服务端按正增量累计，重复真实请求遵循既有累加语义。
+- 服务端只接受白名单中的精确字段、正安全整数和当前开放的无 event scope 任务，并在现有
+  `players_category_missions` 事务链中安全增量。非数组列表、非法元素、未知或近似字段、无存档账户、非正值、
+  非安全整数和溢出均不增长；数据库重开后仍由 category 5 load 返回原进度。Degree computer 只纯读取持久化值，
+  不在计算阶段写库，旧进度和新请求事实都不会倒退。
+- 这四条证明的是官方客户端确实由对应 UI 动作产生并提交请求，不是服务端独立重演 UI，也不提供反作弊保证。
+  升级前未保存的展示/点击历史无法从当前角色、首页或其他存档快照回填，服务端不补造历史次数。
+
 ## 称号：指定关卡累计通关
 
 - 84 条 type 23 称号只接受主数据可精确闭合的 BossBattle stage group 和 Advent event。成功单人或协力 finish 会直接增加所有匹配的 category 5 任务进度；失败、缺少合法 category/quest ID 和非目标关卡不计入。

@@ -76,4 +76,45 @@ assert.deepEqual(
     "没有 event_id 的静默请求不得写入任何活动作用域任务",
 )
 
+const degreeClientProgressCases = [
+    ["character_detail_zoom_illust_for_1min_count", 47000],
+    ["character_detail_play_dot_sp_motion_count", 48000],
+    ["home_tap_town_character_count", 49000],
+    ["home_change_voice_count", 50000],
+]
+for (const [clientPattern, missionId] of degreeClientProgressCases) {
+    assert.deepEqual(
+        resolveClientProgressTargetsFromDefinitions(
+            clientPattern,
+            syntheticEvaluationTime,
+            [getMissionMasterDefinition(5, missionId)],
+        ),
+        [{ category: 5, missionId }],
+        `${clientPattern} 必须通过 Degree row selector 精确定位任务`,
+    )
+}
+assert.deepEqual(
+    resolveClientProgressTargetsFromDefinitions(
+        "home_voice_change_count",
+        syntheticEvaluationTime,
+        degreeClientProgressCases.map(([, missionId]) => getMissionMasterDefinition(5, missionId)),
+    ),
+    [],
+    "非 CN 1.8.1 客户端字段不得通过近似名称匹配",
+)
+const malformedDegreeRow = [...getMissionMasterDefinition(5, 47000).row]
+malformedDegreeRow[3] = "40.0"
+assert.deepEqual(
+    resolveClientProgressTargetsFromDefinitions(
+        "character_detail_zoom_illust_for_1min_count",
+        syntheticEvaluationTime,
+        [{
+            ...getMissionMasterDefinition(5, 47000),
+            row: malformedDegreeRow,
+        }],
+    ),
+    [],
+    "非法 Degree selector token 必须 fail closed",
+)
+
 console.log("mission master data tests passed")

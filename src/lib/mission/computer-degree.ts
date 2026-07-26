@@ -43,6 +43,7 @@ import {
     getDegreeOperationMissionIds,
     getDegreeOperationRuleCount,
 } from "./degree-operation-facts"
+import { getDegreeClientProgressPattern } from "./client-progress"
 
 // Degree mission target lookup
 const degreeTargetMap: Record<number, number> = {}
@@ -555,6 +556,9 @@ export function getDegreeMissionCoverageReport() {
         skillUse: definitions.filter(definition => (
             definition.pattern.startsWith(SUPPORTED_FAMILIES.skillUse)
         )).length,
+        clientProgress: definitions.filter(definition => (
+            getDegreeClientProgressPattern(definition) !== undefined
+        )).length,
     }
     const serverComputed = getDegreeComputedMissionIds().length
     return {
@@ -605,6 +609,7 @@ function isDegreeDefinitionComputed(
     const { missionId, pattern } = definition
     if (factMissionIds.has(missionId)
         || SIMPLE_SUPPORTED_PREFIXES.some(prefix => pattern.startsWith(prefix))) return true
+    if (getDegreeClientProgressPattern(definition) !== undefined) return true
     if (pattern.startsWith(SUPPORTED_FAMILIES.scoreClearSingle)) {
         return getTargetScore(missionId) !== undefined
     }
