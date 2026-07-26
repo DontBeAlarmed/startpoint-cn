@@ -34,6 +34,7 @@ import {
 import { getMissionMasterDefinition, getMissionMasterDefinitions } from "./master-data"
 import { getMissionPattern } from "./patterns"
 import type { MissionComputer, CategoryContext } from "./types"
+import { getExactDegreeQuestClearRuleCount } from "./degree-battle-facts"
 
 // Degree mission target lookup
 const degreeTargetMap: Record<number, number> = {}
@@ -491,6 +492,7 @@ export function getDegreeMissionCoverageReport() {
         hardMultiQuestClear: definitions.filter(definition => (
             getHardMultiQuestId(definition.missionId) !== undefined
         )).length,
+        specifiedQuestClearCount: getExactDegreeQuestClearRuleCount(),
         eventCollectItem: definitions.filter(definition => (
             getDegreeCollectedItemId(definition.missionId) !== undefined
         )).length,

@@ -39,6 +39,12 @@
   不提供反作弊证明，也不能证明活动开放前完成的历史记录是否应计入。
 - 257 条 type 23 累计通关任务只覆盖 Advent、StoryEventSingle、ChallengeDungeon、Raid 和 Rush 五种可由官方表闭合的 QuestRange。battle kind 1 只累计单人成功，battle kind 3 同时累计单人和多人成功；每次合法 finish 增加 1，历史唯一完成记录不用于反推重复次数。
 - Ranking Phase 29 条任务以成功单人 finish 的 `statistics.clear_phase` 为事实。当前反编译协议能确认字段与主数据 pattern 的阶段语义，但服务端不会重演战斗来验证客户端提交值；多人、非整数、0、5 及错误关卡均不推进。该协议边界需后续 CN 客户端样本验收。
+
+## 称号：指定关卡累计通关
+
+- 84 条 type 23 称号只接受主数据可精确闭合的 BossBattle stage group 和 Advent event。成功单人或协力 finish 会直接增加所有匹配的 category 5 任务进度；失败、缺少合法 category/quest ID 和非目标关卡不计入。
+- finish 在原有结算事务中直接增加匹配的 category 5 任务进度，不建立第二份累计表；因此升级前已有进度会自然继续增长。服务端不从 `players_quest_progress.finished` 或 `multi_clear_count` 反推历史总次数，避免把唯一完成状态和部分协力次数混成累计事实。
+- 这批规则暂与 `mission_degree.json` 一样使用仓库 bundled 1.4.54 主数据，并配套使用同版本 Boss/Advent 表，避免混用不同 Content snapshot。任务主数据切换到运行时 Content Release 属于后续统一改造，本批不单独制造半动态路径。
 - type 14 的 8 条累计任务从成功单人 finish 精确累计。目标仅为 1 的 `1213/1214/1215/1221/1303/1304` 同时允许由匹配的历史 `finished` 记录回填到 1；目标包含重复次数的 `1222/1300` 无法由数据库唯一关卡完成行重建，当前保留既有任务进度作为下限，只从升级后的新结算继续累计。
 
 ## 称号指定 Boss 超级难度

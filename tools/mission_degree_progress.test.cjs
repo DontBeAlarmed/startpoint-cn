@@ -32,6 +32,10 @@ const {
     insertPlayerCharacterSync,
 } = require("../src/data/domains/character")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
+const {
+    getPlayerCategoryMissionsSync,
+    updatePlayerCategoryMissionSync,
+} = require("../src/data/domains/mission")
 const { addPlayerShopPurchaseCountSync } = require("../src/data/domains/shopPurchase")
 const { insertPlayerEquipmentSync } = require("../src/data/domains/equipment")
 const { givePlayerItemSync } = require("../src/data/domains/item")
@@ -45,6 +49,10 @@ const {
     DegreeComputer,
     getDegreeMissionCoverageReport,
 } = require("../src/lib/mission/computer-degree")
+const {
+    getExactDegreeQuestClearRuleCount,
+    recordDegreeMissionBattleFacts,
+} = require("../src/lib/mission/degree-battle-facts")
 
 const questProgressCountIndex = "idx_players_quest_progress_player_section_finished"
 const initializerSource = fs.readFileSync(
@@ -153,6 +161,59 @@ for (let index = 0; index < 10; index++) {
         questCategory: 2,
         accomplished: true,
     })
+}
+updatePlayerCategoryMissionSync(playerId, 5, 31010, 9)
+updatePlayerCategoryMissionSync(playerId, 5, 59210, 5)
+recordMissionBattleResultSync(playerId, {
+    isMulti: false,
+    questCategory: 2,
+    questId: 1025001,
+    accomplished: true,
+})
+recordDegreeMissionBattleFacts({
+    playerId,
+    questCategory: 2,
+    questId: 1025001,
+    questAccomplished: true,
+}, new Date("2024-08-14T12:00:00.000Z"))
+recordMissionBattleResultSync(playerId, {
+    isMulti: true,
+    isHost: false,
+    questCategory: 2,
+    questId: 1025002,
+    accomplished: true,
+})
+recordDegreeMissionBattleFacts({
+    playerId,
+    questCategory: 2,
+    questId: 1025002,
+    questAccomplished: true,
+}, new Date("2024-08-14T12:00:00.000Z"))
+recordMissionBattleResultSync(playerId, {
+    isMulti: false,
+    questCategory: 2,
+    questId: 1025003,
+    accomplished: false,
+})
+recordDegreeMissionBattleFacts({
+    playerId,
+    questCategory: 2,
+    questId: 1025003,
+    questAccomplished: false,
+}, new Date("2024-08-14T12:00:00.000Z"))
+for (let index = 0; index < 3; index++) {
+    recordMissionBattleResultSync(playerId, {
+        isMulti: index % 2 === 1,
+        questCategory: 7,
+        questId: 200006001 + index,
+        accomplished: true,
+    })
+    recordDegreeMissionBattleFacts({
+        playerId,
+        questCategory: 7,
+        questId: 200006001 + index,
+        questAccomplished: true,
+    }, new Date("2024-08-14T12:00:00.000Z"))
 }
 
 insertPlayerQuestProgressSync(playerId, 3, { questId: 300001, finished: true })
@@ -312,9 +373,9 @@ assert.equal(DegreeComputer.compute(14020, context, 70_000_000), 70_000_000, "�
 assert.equal(DegreeComputer.compute(15000, context, 0), 1, "单人时间称号应读取最快成功时间")
 assert.equal(DegreeComputer.compute(15010, context, 0), 1, "单人时间称号应支持更高阈值")
 assert.equal(DegreeComputer.compute(15020, context, 0), 1, "单人时间称号应支持最高阈值")
-assert.equal(DegreeComputer.compute(30000, context, 0), 10, "领主战称号应读取 category 2 成功累计")
-assert.equal(DegreeComputer.compute(30010, context, 0), 10, "领主战称号应支持更高阈值")
-assert.equal(DegreeComputer.compute(30020, context, 1), 10, "领主战称号旧进度与新事实取最大值")
+assert.equal(DegreeComputer.compute(30000, context, 0), 12, "领主战称号应读取 category 2 成功累计")
+assert.equal(DegreeComputer.compute(30010, context, 0), 12, "领主战称号应支持更高阈值")
+assert.equal(DegreeComputer.compute(30020, context, 1), 12, "领主战称号旧进度与新事实取最大值")
 assert.equal(DegreeComputer.compute(37000, context, 0), 5000, "冲刺称号应读取玩家累计冲刺次数")
 assert.equal(DegreeComputer.compute(37010, context, 0), 5000, "冲刺称号应支持更高阈值")
 assert.equal(DegreeComputer.compute(37020, context, 7000), 7000, "冲刺称号旧进度不得倒退")
@@ -331,9 +392,15 @@ assert.equal(DegreeComputer.compute(43010, context, 8), 8, "满级装备称号�
 assert.equal(DegreeComputer.compute(33000, context, 0), 600, "技能使用称号应读取成功战斗累计")
 assert.equal(DegreeComputer.compute(33010, context, 0), 600, "技能使用称号应支持更高阈值")
 assert.equal(DegreeComputer.compute(33020, context, 700), 700, "技能使用称号旧进度不得倒退")
+const degreeProgress = missionId => getPlayerCategoryMissionsSync(playerId, 5)[missionId]?.progress ?? 0
+assert.equal(DegreeComputer.compute(31000, context, degreeProgress(31000)), 2, "指定 Boss 组应累计单人与协力成功结算")
+assert.equal(DegreeComputer.compute(31010, context, degreeProgress(31010)), 11, "指定 Boss 累计称号应从旧进度继续增长")
+assert.equal(DegreeComputer.compute(31100, context, 0), 0, "其他 Boss 组不得计入指定组")
+assert.equal(DegreeComputer.compute(59200, context, degreeProgress(59200)), 3, "指定 Advent 活动应累计全部目标关卡")
+assert.equal(DegreeComputer.compute(59210, context, degreeProgress(59210)), 8, "指定 Advent 累计称号应从旧进度继续增长")
 
 for (const missionId of [23000, 23010, 23020]) {
-    assert.equal(DegreeComputer.compute(missionId, context, 0), 2, `${missionId} 应读取协力成功总数`)
+    assert.equal(DegreeComputer.compute(missionId, context, 0), 4, `${missionId} 应读取协力成功总数`)
     assert.equal(DegreeComputer.compute(missionId, context, 9), 9, `${missionId} 不得降低旧进度`)
 }
 for (const missionId of [24000, 24010, 24020]) {
@@ -346,10 +413,11 @@ for (const missionId of [7000, 7010, 7020]) {
 }
 
 const coverage = getDegreeMissionCoverageReport()
+assert.equal(getExactDegreeQuestClearRuleCount(), 84)
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1132,
-    unsupported: 156,
+    serverComputed: 1216,
+    unsupported: 72,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -374,6 +442,7 @@ assert.deepEqual(coverage, {
         adventQuestClear: 1,
         carnivalQuestClear: 27,
         hardMultiQuestClear: 6,
+        specifiedQuestClearCount: 84,
         challengeDungeonClear: 3,
         scoreClearSingle: 3,
         timeClearSingle: 3,
