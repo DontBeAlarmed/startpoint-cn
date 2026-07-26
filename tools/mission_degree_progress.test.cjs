@@ -220,6 +220,8 @@ addPlayerShopPurchaseCountSync(playerId, treasureShopItemIds[1], 60)
 addPlayerShopPurchaseCountSync(playerId, 999999, 100)
 givePlayerItemSync(playerId, 100000, 1500)
 givePlayerItemSync(playerId, 999999, 5000)
+givePlayerItemSync(playerId, 70014, 3000)
+givePlayerItemSync(playerId, 70048, 1000)
 
 const episodeCountQueryPlan = db.prepare(`
     EXPLAIN QUERY PLAN
@@ -308,6 +310,8 @@ assert.equal(DegreeComputer.compute(34020, context, 700), 700, "单次连击称�
 assert.equal(DegreeComputer.compute(41000, context, 0), 1500, "锻造石称号应读取累计获得量")
 assert.equal(DegreeComputer.compute(41010, context, 0), 1500, "锻造石称号应支持更高阈值")
 assert.equal(DegreeComputer.compute(41020, context, 3000), 3000, "锻造石称号旧进度不得倒退")
+assert.equal(DegreeComputer.compute(70000, context, 0), 3000, "活动累计物品称号应读取历史获得量")
+assert.equal(DegreeComputer.compute(70010, context, 2000), 2000, "活动累计物品称号旧进度不得倒退")
 assert.equal(DegreeComputer.compute(33000, context, 0), 600, "技能使用称号应读取成功战斗累计")
 assert.equal(DegreeComputer.compute(33010, context, 0), 600, "技能使用称号应支持更高阈值")
 assert.equal(DegreeComputer.compute(33020, context, 700), 700, "技能使用称号旧进度不得倒退")
@@ -328,8 +332,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1127,
-    unsupported: 161,
+    serverComputed: 1129,
+    unsupported: 159,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -361,6 +365,7 @@ assert.deepEqual(coverage, {
         dashUse: 3,
         comboOneTime: 3,
         craftPointGet: 3,
+        eventCollectItem: 2,
         skillUse: 3,
     },
 })

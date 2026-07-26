@@ -50,6 +50,7 @@ export interface CategoryContext {
         singleClearTimeMin: number
         bossBattleClearCount: number
         craftPointObtainedCount: number
+        collectedItemTotals: Readonly<Record<string, number>>
         skillUseCount: number
     }
     battleCounters?: MissionBattleCounters

@@ -4,7 +4,10 @@ import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../../data/domains/character"
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
 import { getPlayerShopPurchasesMapSync } from "../../data/domains/shopPurchase"
-import { getPlayerCollectedItemTotalSync } from "../../data/domains/item"
+import {
+    getPlayerCollectedItemTotalSync,
+    getPlayerCollectedItemTotalsSync,
+} from "../../data/domains/item"
 import {
     countFinishedPlayerQuestsByCategorySync,
     getFinishedPlayerQuestIdsBySectionsSync,
@@ -269,6 +272,15 @@ function getAdventQuestId(missionId: number): number | undefined {
     )
 }
 
+function getDegreeCollectedItemId(missionId: number): number | undefined {
+    const definition = getMissionMasterDefinition(5, missionId)
+    if (!definition
+        || Number(definition.row[3]) !== 37
+        || !definition.pattern.startsWith("degree_collect_item_event_")) return undefined
+    const itemId = Number(definition.row[13])
+    return Number.isSafeInteger(itemId) && itemId > 0 ? itemId : undefined
+}
+
 function getCarnivalQuestId(missionId: number): number | undefined {
     return getExactDegreeQuestId(
         missionId,
@@ -361,6 +373,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
             singleClearTimeMin: battleCounters.singleClearTimeMin,
             bossBattleClearCount: battleCounters.bossBattleClearCount,
             craftPointObtainedCount,
+            collectedItemTotals: getPlayerCollectedItemTotalsSync(playerId),
             skillUseCount: battleCounters.skillUseCount,
         },
     }
@@ -460,6 +473,9 @@ export function getDegreeMissionCoverageReport() {
         )).length,
         hardMultiQuestClear: definitions.filter(definition => (
             getHardMultiQuestId(definition.missionId) !== undefined
+        )).length,
+        eventCollectItem: definitions.filter(definition => (
+            getDegreeCollectedItemId(definition.missionId) !== undefined
         )).length,
         challengeDungeonClear: definitions.filter(definition => (
             definition.pattern.startsWith(SUPPORTED_FAMILIES.challengeDungeonClear)
@@ -585,6 +601,13 @@ export const DegreeComputer: MissionComputer = {
             return Math.max(
                 dbProgress,
                 stats.hardMultiFinishedQuestIds.has(hardMultiQuestId) ? 1 : 0,
+            )
+        }
+        const collectedItemId = getDegreeCollectedItemId(missionId)
+        if (collectedItemId !== undefined) {
+            return Math.max(
+                dbProgress,
+                stats.collectedItemTotals[String(collectedItemId)] ?? 0,
             )
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.companionCount)) return stats.companionCount

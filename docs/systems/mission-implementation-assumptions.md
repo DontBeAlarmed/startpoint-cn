@@ -49,6 +49,7 @@
 - 该族奖励目标均为 1，因此历史唯一通关记录足够证明完成；没有用它推算重复通关次数或活动开放期内的时间线。
 - 同一精确闭合规则也用于 27 条 QuestRange kind 9 的 WorldStory 任务和 1 条 QuestRange kind 5 的 Advent 任务；它们分别只读取 category 18 与 category 7 的完成记录，并要求目标存在于对应官方关卡表。
 - 27 条 Carnival 与 6 条 HardMulti 的 type 23 称号奖励目标均为 1；服务端分别按 QuestRange kind 15/19、官方关卡表和 category 22/26 的唯一完成记录判断。它们不用于推算同类累计通关称号。
+- `70000/70010` 两条 type 37 称号从主数据 `row[13]` 读取物品 `70014/70048`，并使用 `players_collected_items.total_obtained`。消费物品不会降低进度；累计事实表出现前的历史和存档导入缺失仍不猜测回填。
 
 ## 称号挑战副本累计通关
 
