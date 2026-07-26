@@ -14,6 +14,7 @@ import getDatabase, {
 } from "./data";
 import { restoreTimeOffset } from "./data/activeAccount";
 import { getContentSnapshot, initializeContentSnapshot } from "./content/runtime/content-snapshot";
+import { createContentLifecycleDependencies } from "./modes/cn-lifecycle";
 import { configureSerializedAssetVersionProvider } from "./data/utils/serialized-asset-version";
 import { parseCnRuntimeConfig } from "./runtime/config";
 import {
@@ -399,9 +400,15 @@ runtimeCoordinator = createRuntimeCoordinator({
     configureHttp: configureRuntimeHttp,
     initializeDatabase,
     restoreTimeOffset,
-    initializeContent: config => initializeContentSnapshot({
-        assetMode: config.assetProvider.mode,
-        localCdn: config.assetProvider.mode === "local",
+    // Content snapshot, then operator-installed gameplay modules (modes.d/).
+    // Composed by the seam so the lifecycle test drives this exact entry
+    // point instead of re-creating the ordering.
+    ...createContentLifecycleDependencies<ReturnType<typeof parseCnRuntimeConfig>>({
+        projectRoot,
+        initializeContentSnapshot: config => initializeContentSnapshot({
+            assetMode: config.assetProvider.mode,
+            localCdn: config.assetProvider.mode === "local",
+        }),
     }),
     readyHttp: async () => { await fastify.ready(); },
     listenHttp: config => fastify.listen({ ...config.http }),

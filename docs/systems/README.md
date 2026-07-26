@@ -43,4 +43,8 @@
 - [早期活动代币修复](./event-currency-fix.md)
 - [NPC 昵称贡献](./npc-contributor-names.md)
 
+## 扩展机制
+
+- [玩法模块装载缝](./mode-seam.md)
+
 文档中的“已实现”只描述服务端代码状态；是否通过官方客户端验证，以[测试进度](../status/test-progress.md)为准。
