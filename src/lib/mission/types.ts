@@ -41,6 +41,8 @@ export interface CategoryContext {
         bossBattleSuperQuestByMission: ReadonlyMap<number, number>
         bossBattleClearQuestIds: ReadonlySet<number>
         expertSingleFinishedQuestIds: ReadonlySet<number>
+        worldStoryFinishedQuestIds: ReadonlySet<number>
+        adventFinishedQuestIds: ReadonlySet<number>
         challengeDungeonClearCount: number
         singleScoreMax: number
         singleClearTimeMin: number

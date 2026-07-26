@@ -47,6 +47,7 @@
 - `57010` 至 `57120` 共 12 条只在 type 14、QuestRange kind 14、event ID 1 和 suffix 1 至 12 精确闭合时启用；目标关卡 `1001` 至 `1012` 必须存在于当前 Content snapshot 的 `expert_single_event_quest.json`。
 - 玩家事实只读取 category 21 的 `players_quest_progress.finished=1`。其他 category 中相同 quest ID、未完成记录和缺失关卡均不计入，已有持久化进度仍取最大值。
 - 该族奖励目标均为 1，因此历史唯一通关记录足够证明完成；没有用它推算重复通关次数或活动开放期内的时间线。
+- 同一精确闭合规则也用于 27 条 QuestRange kind 9 的 WorldStory 任务和 1 条 QuestRange kind 5 的 Advent 任务；它们分别只读取 category 18 与 category 7 的完成记录，并要求目标存在于对应官方关卡表。
 
 ## 称号挑战副本累计通关
 

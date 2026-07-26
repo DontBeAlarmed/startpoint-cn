@@ -194,6 +194,9 @@ for (let suffix = 1; suffix <= 12; suffix++) {
     })
 }
 insertPlayerQuestProgressSync(playerId, 1, { questId: 1002, finished: true })
+insertPlayerQuestProgressSync(playerId, 18, { questId: 400004101, finished: true })
+insertPlayerQuestProgressSync(playerId, 18, { questId: 400004103, finished: false })
+insertPlayerQuestProgressSync(playerId, 7, { questId: 200050009, finished: true })
 
 function insertPracticeProgress(questIds, clearRank = 5) {
     for (const questId of questIds) {
@@ -254,6 +257,9 @@ assert.equal(DegreeComputer.compute(11080, context, 7), 7, "CDN 缺少指定难�
 assert.equal(DegreeComputer.compute(57010, context, 0), 1, "ExpertSingle 精确关卡完成后应达成称号")
 assert.equal(DegreeComputer.compute(57020, context, 0), 0, "其他 category 的同 ID 不得完成 ExpertSingle 称号")
 assert.equal(DegreeComputer.compute(57020, context, 3), 3, "ExpertSingle 称号旧进度不得倒退")
+assert.equal(DegreeComputer.compute(58000, context, 0), 1, "WorldStory 精确关卡完成后应达成称号")
+assert.equal(DegreeComputer.compute(58010, context, 0), 0, "WorldStory 未完成关卡不得达成称号")
+assert.equal(DegreeComputer.compute(68000, context, 0), 1, "Advent 精确单人关卡完成后应达成称号")
 assert.equal(DegreeComputer.compute(111001, context, 0), 1, "指定角色获得信赖之证后应完成称号")
 assert.equal(DegreeComputer.compute(111002, context, 0), 0, "未获得信赖之证的角色不得完成称号")
 assert.equal(DegreeComputer.compute(111003, context, 0), 1, "已领取信赖之证后称号仍必须保持完成")
@@ -316,8 +322,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1066,
-    unsupported: 222,
+    serverComputed: 1094,
+    unsupported: 194,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -338,6 +344,8 @@ assert.deepEqual(coverage, {
         treasureShopPurchaseCount: 3,
         bossBattleExClearSingle: 13,
         expertSingleQuestClear: 12,
+        worldStoryQuestClear: 27,
+        adventQuestClear: 1,
         challengeDungeonClear: 3,
         scoreClearSingle: 3,
         timeClearSingle: 3,

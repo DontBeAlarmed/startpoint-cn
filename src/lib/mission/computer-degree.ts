@@ -18,6 +18,8 @@ import bundledExQuests from "../../../assets/ex_quest.json"
 import bundledTreasureShop from "../../../assets/treasure_shop.json"
 import bundledBossBattleQuests from "../../../assets/boss_battle_quest.json"
 import bundledExpertSingleEventQuests from "../../../assets/expert_single_event_quest.json"
+import bundledWorldStoryEventQuests from "../../../assets/world_story_event_quest.json"
+import bundledAdventEventQuests from "../../../assets/advent_event_quest.json"
 import {
     ContentSnapshotError,
     getContentSnapshot,
@@ -215,21 +217,50 @@ function getBossBattleSuperQuestId(
     return questId
 }
 
-function getExpertSingleQuestId(missionId: number): number | undefined {
+function getExactDegreeQuestId(
+    missionId: number,
+    rangeKind: number,
+    tableName: string,
+    bundledTable: RawQuestTable,
+): number | undefined {
     const definition = getMissionMasterDefinition(5, missionId)
     if (!definition
         || Number(definition.row[3]) !== 14
-        || Number(definition.row[8]) !== 14) return undefined
+        || Number(definition.row[8]) !== rangeKind) return undefined
     const eventId = Number(definition.row[9])
     const suffix = Number(definition.row[11])
     if (!Number.isSafeInteger(eventId) || eventId <= 0
         || !Number.isSafeInteger(suffix) || suffix <= 0) return undefined
     const questId = eventId * 1000 + suffix
-    const quests = getRuntimeTable<RawQuestTable>(
+    const quests = getRuntimeTable<RawQuestTable>(tableName, bundledTable)
+    return quests[String(questId)] === undefined ? undefined : questId
+}
+
+function getExpertSingleQuestId(missionId: number): number | undefined {
+    return getExactDegreeQuestId(
+        missionId,
+        14,
         "expert_single_event_quest.json",
         bundledExpertSingleEventQuests,
     )
-    return quests[String(questId)] === undefined ? undefined : questId
+}
+
+function getWorldStoryQuestId(missionId: number): number | undefined {
+    return getExactDegreeQuestId(
+        missionId,
+        9,
+        "world_story_event_quest.json",
+        bundledWorldStoryEventQuests,
+    )
+}
+
+function getAdventQuestId(missionId: number): number | undefined {
+    return getExactDegreeQuestId(
+        missionId,
+        5,
+        "advent_event_quest.json",
+        bundledAdventEventQuests,
+    )
 }
 
 function buildStats(playerId: number, category: number): CategoryContext {
@@ -248,7 +279,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
         const questId = getBossBattleSuperQuestId(definition.missionId, bossBattleQuests)
         if (questId !== undefined) bossBattleSuperQuestByMission.set(definition.missionId, questId)
     }
-    const finishedQuestIdsBySection = getFinishedPlayerQuestIdsBySectionsSync(playerId, [2, 21])
+    const finishedQuestIdsBySection = getFinishedPlayerQuestIdsBySectionsSync(playerId, [2, 7, 18, 21])
     const finishedQuestIds = finishedQuestIdsBySection[2] ?? new Set()
     return {
         category,
@@ -292,6 +323,8 @@ function buildStats(playerId: number, category: number): CategoryContext {
             bossBattleSuperQuestByMission,
             bossBattleClearQuestIds: finishedQuestIds,
             expertSingleFinishedQuestIds: finishedQuestIdsBySection[21] ?? new Set(),
+            worldStoryFinishedQuestIds: finishedQuestIdsBySection[18] ?? new Set(),
+            adventFinishedQuestIds: finishedQuestIdsBySection[7] ?? new Set(),
             challengeDungeonClearCount: battleCounters.challengeDungeonClearCount,
             singleScoreMax: battleCounters.singleScoreMax,
             singleClearTimeMin: battleCounters.singleClearTimeMin,
@@ -384,6 +417,12 @@ export function getDegreeMissionCoverageReport() {
         )).length,
         expertSingleQuestClear: definitions.filter(definition => (
             getExpertSingleQuestId(definition.missionId) !== undefined
+        )).length,
+        worldStoryQuestClear: definitions.filter(definition => (
+            getWorldStoryQuestId(definition.missionId) !== undefined
+        )).length,
+        adventQuestClear: definitions.filter(definition => (
+            getAdventQuestId(definition.missionId) !== undefined
         )).length,
         challengeDungeonClear: definitions.filter(definition => (
             definition.pattern.startsWith(SUPPORTED_FAMILIES.challengeDungeonClear)
@@ -481,6 +520,20 @@ export const DegreeComputer: MissionComputer = {
             return Math.max(
                 dbProgress,
                 stats.expertSingleFinishedQuestIds.has(expertSingleQuestId) ? 1 : 0,
+            )
+        }
+        const worldStoryQuestId = getWorldStoryQuestId(missionId)
+        if (worldStoryQuestId !== undefined) {
+            return Math.max(
+                dbProgress,
+                stats.worldStoryFinishedQuestIds.has(worldStoryQuestId) ? 1 : 0,
+            )
+        }
+        const adventQuestId = getAdventQuestId(missionId)
+        if (adventQuestId !== undefined) {
+            return Math.max(
+                dbProgress,
+                stats.adventFinishedQuestIds.has(adventQuestId) ? 1 : 0,
             )
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.companionCount)) return stats.companionCount
