@@ -20,6 +20,8 @@ import {
 } from "../../content/cdn/asset-mode";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
 import { reconcileActiveMissionFacts } from "../../lib/mission/active-reconciliation";
+import { recordEventLoginMissionFactSync } from "../../lib/mission/event-entry-facts";
+import { setCnMsgpackPendingCommit } from "./msgpack";
 
 interface CnLoadBody {
     device_id: number;
@@ -183,43 +185,49 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             now: getServerTime() * 1000,
         });
 
-        const clientData = getClientSerializedData(playerId, { viewerId: accountId }) as any;
-        if (clientData === null) {
-            return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
-        }
+        const responsePayload = (() => {
+            const clientData = getClientSerializedData(playerId, { viewerId: accountId }) as any;
+            if (clientData === null) throw new Error("No player data.");
 
-        const resVer = request.headers['res_ver'] as string | undefined;
-        console.log(`[CN-LOAD] res_ver=${resVer || '(not sent)'} account=${accountId} player=${playerId} party_slot=${clientData?.user_info?.party_slot}`);
-        const snapshotTargetVersion = assetProvider.mode === "client-owned"
-            ? ""
-            : contentSnapshot.cdn.targetVersion;
-        const assetState = resolveAssetLoadState(assetProvider, resVer, snapshotTargetVersion);
-        wrapOptionFields(clientData, assetState.availableAssetVersion);
+            const resVer = request.headers['res_ver'] as string | undefined;
+            console.log(`[CN-LOAD] res_ver=${resVer || '(not sent)'} account=${accountId} player=${playerId} party_slot=${clientData?.user_info?.party_slot}`);
+            const snapshotTargetVersion = assetProvider.mode === "client-owned"
+                ? ""
+                : contentSnapshot.cdn.targetVersion;
+            const assetState = resolveAssetLoadState(assetProvider, resVer, snapshotTargetVersion);
+            wrapOptionFields(clientData, assetState.availableAssetVersion);
 
-        // Inject unfinished quest lists for battle recovery
-        if (activeQuest) {
-            const entry = { play_id: activeQuest.playId, continue_count: activeQuest.continueCount };
-            if (activeQuest.isMulti) {
-                clientData.unfinished_quest_list = [];
-                clientData.unfinished_multi_quest_list = [entry];
+            // Inject unfinished quest lists for battle recovery
+            if (activeQuest) {
+                const entry = { play_id: activeQuest.playId, continue_count: activeQuest.continueCount };
+                if (activeQuest.isMulti) {
+                    clientData.unfinished_quest_list = [];
+                    clientData.unfinished_multi_quest_list = [entry];
+                } else {
+                    clientData.unfinished_quest_list = [entry];
+                    clientData.unfinished_multi_quest_list = [];
+                }
             } else {
-                clientData.unfinished_quest_list = [entry];
+                clientData.unfinished_quest_list = [];
                 clientData.unfinished_multi_quest_list = [];
             }
-        } else {
-            clientData.unfinished_quest_list = [];
-            clientData.unfinished_multi_quest_list = [];
-        }
+
+            const payload = {
+                data_headers: generateDataHeaders({
+                    asset_update: assetState.assetUpdate,
+                    viewer_id: accountId,
+                    servertime: getServerTime(),
+                }),
+                data: clientData
+            };
+            return payload;
+        })();
 
         reply.header("content-type", "application/x-msgpack");
-        reply.status(200).send({
-            data_headers: generateDataHeaders({
-                asset_update: assetState.assetUpdate,
-                viewer_id: accountId,
-                servertime: getServerTime(),
-            }),
-            data: clientData
+        setCnMsgpackPendingCommit(reply, () => {
+            recordEventLoginMissionFactSync(playerId, now);
         });
+        reply.status(200).send(responsePayload);
         } catch(e: any) {
             console.error(`[CN-LOAD] ERROR:`, e.message, e.stack);
             return reply.status(500).send({ error: "Internal Server Error", message: e.message });

@@ -42,6 +42,15 @@
 - 257 条 type 23 累计通关任务只覆盖 Advent、StoryEventSingle、ChallengeDungeon、Raid 和 Rush 五种可由官方表闭合的 QuestRange。battle kind 1 只累计单人成功，battle kind 3 同时累计单人和多人成功；每次合法 finish 增加 1，历史唯一完成记录不用于反推重复次数。
 - Ranking Phase 29 条任务以成功单人 finish 的 `statistics.clear_phase` 为事实。当前反编译协议能确认字段与主数据 pattern 的阶段语义，但服务端不会重演战斗来验证客户端提交值；多人、非整数、0、5 及错误关卡均不推进。该协议边界需后续 CN 客户端样本验收。
 
+## category 3：Event 登录与 Raid summary
+
+- mission 1225 的 CN 1.8.1 pattern type 0 解析为 `total_login_days`，客户端没有独立任务上报请求。服务端把认证会话后的 `/load` 作为登录事实，只使用全局 `getServerDate()` 的 CN UTC+8 自然日，不读取玩家 `time_offset`，也不沿用每日任务 05:00 reset bucket。
+- 1225 只在自身 `enable_start_time..enable_end_time` 内计数。事实表仅保存最后计数日；当前日不晚于已保存日时不增长，因此多设备、重复请求和服务器时间回拨保持幂等。跳过多日后一次 load 只增加 1，升级前和活动期内未记录的历史登录无法可靠重建，不做补算。
+- CN 1.8.1 将 type 79 解析为 `raid_event_top_check`。`RaidEventLoadingTask` 在进入 Raid top、quest select 等 Raid 场景前先请求 `event/raid/summary(event_id)`，成功后才请求 party 并进入页面；因此 400053/400071/400089/400093 只由对应 eventId 4/5/6/7 的真实 summary 请求完成。普通 load、战斗 finish、错误 event 和其他 Raid API 不产生该事实。
+- 五条规则同时校验官方 mission ID、string pattern、严格十进制 pattern type/奖励 target/QuestRange selector/eventId token，以及严格 `YYYY-MM-DD HH:mm:ss` UTC+8 日历开放期。空串不能表示 type 0，整数 token 不接受空白、符号、小数或溢出，日期会逐字段校验闰年与每月天数；结构不一致时保持既有 progress，不猜测替代映射。type 79 只幂等确保 progress 至少为 1，不在 summary 响应中加入 `mission_info`；任务奖励仍由既有 mission 页面结算协议发放。
+- 1225 在 Active Mission reconcile 与响应构建成功后，才在 reply 上登记 request-local pending commit；生产 CN MsgPack `onSend` 完成实际编码后执行独立的 `BEGIN IMMEDIATE` 记录事务。reconcile、响应构建或实际 onSend 编码失败不计数，多连接竞争同日 marker 只有一个连接成功；编码成功后交给网络栈的传输错误不属于该事务边界，也不声称能够回滚已提交事实。
+- type 79 使用嵌套 SQLite 保存点参与 Raid summary：成功时随 summary 外层事务提交；任务事实写入异常时保存点先完整回滚，再记录包含 player/event/mission 的告警并继续原有 summary。该可选事实不得把既有 summary 变成错误响应，也不得留下部分任务写入；其他 summary 奖励或状态异常仍按原外层事务整体回滚。
+
 ## category 3：当前状态任务
 
 - `1201/1202/1203/1204/1205/1206/1207/1212/1217/1218/1219/1220/1305/1306/1307` 仅在精确 mission ID、`mission_event` pattern type、所需 QuestRange 字段以及 `mission_event_reward` 全部阶段 target 与已审计结构一致时启用。任何字段缺失、类型错误、stage 不连续或 target 改变都会 fail closed，并保留数据库 progress。

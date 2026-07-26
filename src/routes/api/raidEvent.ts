@@ -29,6 +29,7 @@ import { settleRaidEventSummary } from "../../lib/raid-event-summary";
 import { getRaidEventRequiredKillCount } from "../../lib/raid-event-master";
 import { getRaidBossHpPercentage } from "../../lib/quest/finish/raid-handler";
 import { getMailArrivedSync } from "../../lib/mail-notification";
+import { recordRaidSummaryMissionFactFailSoftSync } from "../../lib/mission/event-entry-facts";
 
 const raidEventIds: Record<number, number> = {}
 
@@ -93,6 +94,7 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Bad Request", "message": "Invalid raid event id."
         })
         const rewardDefinitions = getRaidEventOverallRewardDefinitions(eventId)
+        const evaluationTime = getServerDate()
 
         // Rush event data for played party tracking
         let rushEventData = getPlayerRushEventSync(playerId, eventId)
@@ -105,6 +107,7 @@ const routes = async (fastify: FastifyInstance) => {
         console.log(`[RAID] summary: folderParties=${Object.keys(serializedPlayedParties.folderParties ?? {}).length} endlessParties=${Object.keys(serializedPlayedParties.endlessParties ?? {}).length}`)
 
         const summary = getDb().transaction(() => {
+            recordRaidSummaryMissionFactFailSoftSync(playerId, eventId, evaluationTime)
             const raidBossState = getRaidEventBossStateSync(eventId)
                 ?? { weightedKillCount: 0, totalKillCount: 0 }
             const playerState = getPlayerRaidEventSync(playerId, eventId)

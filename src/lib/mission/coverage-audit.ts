@@ -1,6 +1,7 @@
 import { getDegreeComputedMissionIds } from "./computer-degree"
 import { getEventSafeMissionIds } from "./computer-event-safe"
 import { getExactEventBattleMissionIds } from "./event-battle-facts"
+import { getAuthoritativeEventEntryMissionIds } from "./event-entry-facts"
 import { getMissionMasterDefinitions } from "./master-data"
 
 export interface MissionCoverageEntry {
@@ -102,6 +103,7 @@ function eventPartition(): MissionCoveragePartition {
     const ids = new Set([
         ...getEventSafeMissionIds(),
         ...getExactEventBattleMissionIds(),
+        ...getAuthoritativeEventEntryMissionIds(),
     ])
     return createPartition(
         [{ category: 3, definitions: getMissionMasterDefinitions(3) }],

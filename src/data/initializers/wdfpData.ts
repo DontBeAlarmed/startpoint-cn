@@ -556,6 +556,14 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_event_mission_login_days (
+        player_id INTEGER NOT NULL,
+        mission_id INTEGER NOT NULL,
+        last_counted_day INTEGER NOT NULL,
+        PRIMARY KEY (player_id, mission_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_pass_cards (
         player_id INTEGER NOT NULL,
         event_id INTEGER NOT NULL,

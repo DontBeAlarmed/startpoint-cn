@@ -38,7 +38,7 @@ const SOURCE_RULES = [
     },
     { pattern: /^src\/content\/deep-freeze\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/lib\/version\.ts$/, groups: ["full"] },
-    { pattern: /^src\/routes\/cn\/load\.ts$/, groups: ["full"] },
+    { pattern: /^src\/routes\/cn\/load\.ts$/, groups: ["full", "integration:mission"] },
     {
         pattern: /^src\/cn-server\.ts$/,
         groups: ["integration:cdn", "integration:database", "integration:runtime", "full"],
@@ -94,7 +94,15 @@ const SOURCE_RULES = [
         groups: ["integration:mission", "integration:mission-compiled"],
     },
     {
-        pattern: /^src\/lib\/mission\/(?:event-battle-facts|computer-event|coverage-audit|computer-degree|degree-battle-facts|degree-operation-facts)\.ts$/,
+        pattern: /^src\/lib\/mission\/(?:event-battle-facts|event-entry-facts|computer-event|coverage-audit|computer-degree|degree-battle-facts|degree-operation-facts)\.ts$/,
+        groups: ["integration:mission"],
+    },
+    {
+        pattern: /^src\/routes\/api\/raidEvent\.ts$/,
+        groups: ["integration:event", "integration:mission"],
+    },
+    {
+        pattern: /^src\/data\/domains\/event_mission_entry_facts\.ts$/,
         groups: ["integration:mission"],
     },
     {

@@ -25,9 +25,16 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.event)
     assert.deepEqual(
         { total: report.event.total, automated: report.event.automated, fallback: report.event.fallback },
-        { total: 2512, automated: 1507, fallback: 1005 },
+        { total: 2512, automated: 1512, fallback: 1000 },
     )
     assert.equal(report.event.automatedMissions.filter(entry => [1200, 1208, 1209, 1210, 1211, 1216, 1223].includes(entry.missionId)).length, 7)
+    assert.deepEqual(
+        report.event.automatedMissions
+            .filter(entry => [1225, 400053, 400071, 400089, 400093].includes(entry.missionId))
+            .map(entry => entry.missionId),
+        [1225, 400053, 400071, 400089, 400093],
+        "Event 登录与 Raid summary 五条任务必须全部进入权威自动覆盖",
+    )
     const currentStateMissionIds = [
         1201, 1202, 1203, 1204, 1205, 1206, 1207,
         1212, 1217, 1218, 1219, 1220, 1305, 1306, 1307,
