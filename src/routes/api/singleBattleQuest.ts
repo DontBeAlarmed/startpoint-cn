@@ -32,6 +32,10 @@ import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/
 import { getStaminaCost } from "../../lib/stamina-cost";
 import { handleCarnivalEventFinish } from "../../lib/quest/finish/carnival-handler";
 import { handleRushEventFinish } from "../../lib/quest/finish/rush-handler";
+import { dispatchModeQuestStart, dispatchModeRushFinish } from "../../modes/registry";
+import { createModeHost } from "../../modes/loader";
+
+const singleBattleModeHost = createModeHost(message => console.log(message));
 import { handleRaidEventFinish } from "../../lib/quest/finish/raid-handler";
 import { calculateClearRank } from "../../lib/quest/finish/quest-calc";
 import {
@@ -372,7 +376,7 @@ const routes = async (fastify: FastifyInstance) => {
                 questData.fixedParty !== undefined
             )
 
-            const { rushEventData, rushEventRewardsResult } = handleRushEventFinish({
+            const rushFinishParams = {
                 questCategory,
                 questAccomplished,
                 questData,
@@ -380,18 +384,25 @@ const routes = async (fastify: FastifyInstance) => {
                 party: bodyPartyStatistics,
                 playerId,
                 questId,
-                getEvoLevels: (pid, chars) => getCharactersEvolutionImgLevels(pid, chars),
+                getEvoLevels: (pid: number, chars: (number | null)[]) => getCharactersEvolutionImgLevels(pid, chars),
                 folderMaxRounds: rushEventFolderMaxRounds,
-                getRushEvent: (pid, eid) => getPlayerRushEventSync(pid, eid),
-                updateRushEvent: (pid, data) => updatePlayerRushEventSync(pid, data),
-                insertParty: (pid, eid, p) => insertPlayerRushEventPlayedPartySync(pid, eid, p),
-                insertClearedFolder: (pid, eid, fid) => insertPlayerRushEventClearedFolderSync(pid, eid, fid),
-                deletePartyList: (pid, eid, bt) => deletePlayerRushEventPlayedPartyListSync(pid, eid, bt),
-                getSerializedParties: (pid, eid) => getSerializedPlayerRushEventPlayedPartiesSync(pid, eid),
-                getFolderRewards: (eid, fid) => getRushEventFolderClearRewards(eid, fid),
-                giveRewards: (pid, r) => givePlayerRewardsSync(pid, r),
-                transaction: operation => getDb().transaction(operation)(),
-            })
+                getRushEvent: (pid: number, eid: number) => getPlayerRushEventSync(pid, eid),
+                updateRushEvent: (pid: number, data: any) => updatePlayerRushEventSync(pid, data),
+                insertParty: (pid: number, eid: number, p: any) => insertPlayerRushEventPlayedPartySync(pid, eid, p),
+                insertClearedFolder: (pid: number, eid: number, fid: number) => insertPlayerRushEventClearedFolderSync(pid, eid, fid),
+                deletePartyList: (pid: number, eid: number, bt: number) => deletePlayerRushEventPlayedPartyListSync(pid, eid, bt),
+                getSerializedParties: (pid: number, eid: number) => getSerializedPlayerRushEventPlayedPartiesSync(pid, eid),
+                getFolderRewards: (eid: number, fid: number) => getRushEventFolderClearRewards(eid, fid),
+                giveRewards: (pid: number, r: any[]) => givePlayerRewardsSync(pid, r),
+                transaction: (operation: () => any) => getDb().transaction(operation)(),
+            }
+            const { rushEventData, rushEventRewardsResult } = handleRushEventFinish(rushFinishParams)
+            // Mode seam: installed mode modules may extend the rush settlement
+            // using the same injected primitives; no modules → no-op.
+            const modeRushExtension = dispatchModeRushFinish(rushFinishParams, singleBattleModeHost)
+            if (modeRushExtension?.rush_battle_reward_list?.length && rushEventData) {
+                rushEventData.rush_battle_reward_list.push(...modeRushExtension.rush_battle_reward_list)
+            }
 
             const raidEventData = handleRaidEventFinish({
                 questCategory,
@@ -665,6 +676,16 @@ const routes = async (fastify: FastifyInstance) => {
             return reply.status(400).send({
                 "error": "Bad Request",
                 "message": "Quest doesn't exist."
+            })
+        }
+
+        // Mode seam: installed mode modules may veto the start (entry rules).
+        try {
+            dispatchModeQuestStart({ playerId, questId, questCategory: category }, singleBattleModeHost)
+        } catch (error) {
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": (error as Error).message,
             })
         }
 
