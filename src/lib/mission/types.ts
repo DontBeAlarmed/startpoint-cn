@@ -61,6 +61,16 @@ export interface CategoryContext {
     passEventLoginProgress?: Record<number, number>
     /** Persisted category 3 progress used only by explicit aggregate event missions. */
     eventMissionProgress?: ReadonlyMap<number, number>
+    /** Lower-bound facts reconstructed from the player's current authoritative state. */
+    eventCurrentState?: {
+        readonly maxCharacterLevel: number | null
+        readonly manaBoardNodeCount: number | null
+        readonly overLimitCount: number | null
+        readonly characterEpisodeClearCount: number | null
+        readonly clearedMainChapters: ReadonlySet<number> | null
+        readonly equipmentAwakeningCount: number | null
+        readonly hasEquippedAbilitySoul: boolean | null
+    }
 }
 
 /** A mission computer handles one or more categories */

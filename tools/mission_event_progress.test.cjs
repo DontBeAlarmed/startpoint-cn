@@ -9,6 +9,7 @@ const {
 const {
     buildEventSafeQuestProgress,
     EventSafeComputer,
+    getEventCurrentStateMissionIds,
     getEventSafeMissionIds,
     getEventItemMissionItemId,
 } = require("../src/lib/mission/computer-event-safe")
@@ -205,6 +206,86 @@ assert.equal(
     12,
     "重复目标任务 1300 必须保留已有进度且不按唯一完成行补账",
 )
-assert.equal(getEventSafeMissionIds().length, 392, "活动安全计算器应登记关卡、竞速及可证明的首次通关事实")
+
+const currentStateContext = {
+    ...context({}),
+    eventCurrentState: {
+        maxCharacterLevel: 65,
+        manaBoardNodeCount: 15,
+        overLimitCount: 2,
+        characterEpisodeClearCount: 4,
+        clearedMainChapters: new Set([1, 3]),
+        equipmentAwakeningCount: 3,
+        hasEquippedAbilitySoul: true,
+    },
+}
+const currentStateCases = [
+    [1305, 65],
+    [1205, 15],
+    [1206, 15],
+    [1207, 15],
+    [1217, 15],
+    [1218, 15],
+    [1219, 15],
+    [1306, 2],
+    [1204, 4],
+    [1201, 1],
+    [1202, 0],
+    [1203, 1],
+    [1212, 3],
+    [1307, 3],
+    [1220, 1],
+]
+for (const [missionId, expected] of currentStateCases) {
+    assert.equal(
+        EventSafeComputer.compute(missionId, currentStateContext, 0),
+        expected,
+        `活动当前状态任务 ${missionId} 应按权威事实计算`,
+    )
+}
+assert.deepEqual(
+    getEventCurrentStateMissionIds(),
+    currentStateCases.map(([missionId]) => missionId).sort((left, right) => left - right),
+    "当前状态白名单必须只包含经 pattern、字段和奖励 target 校验的 15 条任务",
+)
+assert.equal(
+    EventSafeComputer.compute(1202, currentStateContext, 5),
+    5,
+    "章节当前状态降低时必须保留更高的持久化进度",
+)
+assert.equal(
+    EventSafeComputer.compute(1307, {
+        ...currentStateContext,
+        eventCurrentState: {
+            ...currentStateContext.eventCurrentState,
+            equipmentAwakeningCount: Number.NaN,
+        },
+    }, 2),
+    2,
+    "非法装备觉醒事实必须 fail closed 并保留持久化进度",
+)
+assert.equal(
+    EventSafeComputer.compute(1220, {
+        ...currentStateContext,
+        eventCurrentState: {
+            ...currentStateContext.eventCurrentState,
+            hasEquippedAbilitySoul: null,
+        },
+    }, 0),
+    0,
+    "无法证明当前魂珠装备状态时必须 fallback",
+)
+assert.equal(
+    EventSafeComputer.compute(1220, {
+        ...currentStateContext,
+        eventCurrentState: {
+            ...currentStateContext.eventCurrentState,
+            hasEquippedAbilitySoul: false,
+        },
+    }, 1),
+    1,
+    "魂珠从队伍卸下后不得降低历史进度",
+)
+assert.equal(getEventSafeMissionIds().length, 407, "活动安全计算器应包含新增的 15 条当前状态事实")
 
 console.log("mission event progress tests passed")

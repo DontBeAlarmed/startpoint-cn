@@ -165,6 +165,7 @@ const TEST_GROUPS = Object.freeze({
     },
     "integration:mission": {
         execution: "parallel",
+        timeoutMs: 60_000,
         tests: [
             "tools/character_awake_battle_tracker.test.cjs",
             "tools/character_awake_facts.test.cjs",
@@ -178,6 +179,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_daily_battle_facts.test.cjs",
             "tools/mission_degree_progress.test.cjs",
             "tools/mission_event_battle_facts.test.cjs",
+            "tools/mission_event_current_state.test.cjs",
             "tools/mission_event_progress.test.cjs",
             "tools/mission_active_content.test.cjs",
             "tools/mission_active_core.test.cjs",

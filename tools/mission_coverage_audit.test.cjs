@@ -25,9 +25,20 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.event)
     assert.deepEqual(
         { total: report.event.total, automated: report.event.automated, fallback: report.event.fallback },
-        { total: 2512, automated: 1492, fallback: 1020 },
+        { total: 2512, automated: 1507, fallback: 1005 },
     )
     assert.equal(report.event.automatedMissions.filter(entry => [1200, 1208, 1209, 1210, 1211, 1216, 1223].includes(entry.missionId)).length, 7)
+    const currentStateMissionIds = [
+        1201, 1202, 1203, 1204, 1205, 1206, 1207,
+        1212, 1217, 1218, 1219, 1220, 1305, 1306, 1307,
+    ]
+    assert.deepEqual(
+        report.event.automatedMissions
+            .filter(entry => currentStateMissionIds.includes(entry.missionId))
+            .map(entry => entry.missionId),
+        currentStateMissionIds,
+        "15 条 Event 当前状态任务必须全部进入权威自动覆盖",
+    )
     assert.equal(report.event.fallbackMissions.find(entry => entry.missionId === 1400)?.reason, "empty-quest-selector")
 
     assertPartition(report.degree)

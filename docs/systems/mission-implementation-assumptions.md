@@ -42,6 +42,18 @@
 - 257 条 type 23 累计通关任务只覆盖 Advent、StoryEventSingle、ChallengeDungeon、Raid 和 Rush 五种可由官方表闭合的 QuestRange。battle kind 1 只累计单人成功，battle kind 3 同时累计单人和多人成功；每次合法 finish 增加 1，历史唯一完成记录不用于反推重复次数。
 - Ranking Phase 29 条任务以成功单人 finish 的 `statistics.clear_phase` 为事实。当前反编译协议能确认字段与主数据 pattern 的阶段语义，但服务端不会重演战斗来验证客户端提交值；多人、非整数、0、5 及错误关卡均不推进。该协议边界需后续 CN 客户端样本验收。
 
+## category 3：当前状态任务
+
+- `1201/1202/1203/1204/1205/1206/1207/1212/1217/1218/1219/1220/1305/1306/1307` 仅在精确 mission ID、`mission_event` pattern type、所需 QuestRange 字段以及 `mission_event_reward` 全部阶段 target 与已审计结构一致时启用。任何字段缺失、类型错误、stage 不连续或 target 改变都会 fail closed，并保留数据库 progress。
+- type 5 的 1305 不使用中文文案阈值，也不使用 Active Mission 的中间等级近似。服务端只根据角色 rarity、累计 EXP 和现有官方等级上限 EXP 表证明 50、60、70 这些奖励 target 的等级下界；无法取得 rarity、EXP 非法或阈值表异常时不回填。
+- type 7 的六条任务读取 `players_characters_mana_nodes` 当前已解锁节点数，但每个 node 必须是对应角色 `mana_board.json` 各板 row 中的官方 multiplied ID；孤立、重复、非法或错角色的玩家节点只被忽略，其他合法节点继续形成安全下界。type 9 的 1306 从 `character.json` 读取 rarity，并以该 rarity 的官方等级上限 EXP 档位数校验 `0 <= over_limit_step <= max_over_limit_count` 后汇总；非法玩家角色或步数只跳过该角色。type 21 的 1204 按 CN 1.8.1 `CharacterQuestValues.character_1/2/3` 对应的 `character_quest_lookup` row[0..2] 建立精确映射，再与当前持有角色和 category 3 已完成关卡取交集；不再使用字符串前缀，`1410031` 因 row[0] 为 `141004`，不会错误归给角色 `141003`。
+- type 22 的 1201/1202/1203 按 CN 1.8.1 `QuestRangeReferenceIdKind.Main` 的第一个 selector 精确绑定主线章节 1/2/3，后两个 selector 必须为 `(None)`。章节完成要求 `main_quest.json` 中该章节的全部官方关卡均有 category 1 `finished=1`；不是任意关卡完成数，也不要求 EX 章节或 SS 完成。主线表键异常或目标章节为空时不产生事实。
+- type 34 的 1212/1307 使用当前装备记录的觉醒级数总和，即每种已持有装备的 `level - 1`。每个装备 ID 必须存在于当前 `equipment_dissolve.json`，官方 `max_level` 必须为正整数，且存档必须满足 `1 <= level <= max_level`；非法玩家装备只跳过自身，其他合法装备继续形成安全下界。它不统计装备持有数、stack 或 `enhancement_level`。装备被删除后当前值可能降低，因此所有计算仍与已持久化 progress 取最大值；这能回溯当前仍可见的觉醒状态，但不能重建已删除装备的历史觉醒次数。
+- type 35 的 1220 只因官方唯一 target 为 1 而启用：每个普通 party preset 独立校验，非空魂珠 ID 必须在当前 `item_sale.json` 中属于 category 5，且同一 party 内同 ID 使用数不得超过 `players_items` 正整数持有量。不同 party 是可切换预设，不合并占用库存；一枚魂珠出现在两个不同 party、库存为 1 时，两者可分别合法。伪造、错误类型、未拥有或同 party 超额使用只使该 party 无效，不污染其他合法 party；存在至少一个合法非空 party 即证明进度至少为 1。该事实不是魂珠库存总数、不是队伍槽总数，也不是历史设置次数；魂珠已全部卸下时只能依赖已有 progress，若未来 target 大于 1 则规则自动关闭。
+- `character.json`、`character_quest_lookup.json`、`mana_board.json`、`main_quest.json`、`equipment_dissolve.json` 和 `item_sale.json` 的派生索引按当前冻结 Content repository 对象缓存在进程内；任一官方表行无法解析时，只有对应事实族整体 fail closed。evaluationTime 下 15 条任务全部关闭时，`buildContext` 不读取这些索引，也不执行新增角色、玛纳节点、装备、物品或 party 查询。项目不支持运行时 Content 热更新，因此不增加失效协议。
+- `integration:mission` 保持并行执行，但每个测试文件显式使用 60 秒 timeout。默认 30 秒在全组并发、类型转译和临时 SQLite 初始化竞争下曾接近或超过上限；新 current-state fixture 的专项运行约 6 秒，完整组验证用于区分环境资源竞争与本提交的真实性能回归。
+- 上述 15 条均可从升级时已有的当前存档状态回溯一个安全下界，不新增累计表。与之不同，type 23 重复通关、战斗统计和业务操作次数只能从升级后的成功事务继续累计；历史唯一完成行或当前库存不能替代行为时间线。Event 开放期仍由既有 reconciliation 和主数据时间过滤处理，不读取存档 `time_offset`。
+
 ## 称号：指定关卡累计通关
 
 - 84 条 type 23 称号只接受主数据可精确闭合的 BossBattle stage group 和 Advent event。成功单人或协力 finish 会直接增加所有匹配的 category 5 任务进度；失败、缺少合法 category/quest ID 和非目标关卡不计入。
