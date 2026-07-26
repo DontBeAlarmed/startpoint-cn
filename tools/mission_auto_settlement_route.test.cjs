@@ -40,6 +40,7 @@ const { recordMissionBattleResultSync } = require("../src/data/domains/mission_b
 const { givePlayerItemSync } = require("../src/data/domains/item")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
+const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
 const missionRoutes = require("../src/routes/api/mission").default
 const { getTimeOffset, setServerTimeOffset } = require("../src/utils")
@@ -136,31 +137,50 @@ async function main() {
         )
         assert.equal(startData.mail_arrived, true)
 
+        const finishPayload = {
+            viewer_id: viewerId,
+            api_count: 1,
+            quest_id: 2001,
+            category: 22,
+            score: 0,
+            elapsed_time_ms: 1000,
+            add_mana: 0,
+            is_accomplished: true,
+            statistics: {
+                clear_phase: 1,
+                max_combo_count: 0,
+                zones: [{ use_power_flip_count: 5 }],
+                party: {
+                    characters: [{ id: 1 }, null, null],
+                    unison_characters: [null, null, null],
+                    equipments: [null, null, null],
+                    ability_soul_ids: [null, null, null],
+                },
+            },
+        }
+        db.exec(`
+            CREATE TRIGGER fail_awake_fact_finish
+            AFTER DELETE ON players_active_quests
+            BEGIN
+                SELECT RAISE(ABORT, 'injected awake fact rollback');
+            END;
+        `)
+        const rolledBackFinish = await fastify.inject({
+            method: "POST",
+            url: "/api/index.php/single_battle_quest/finish",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            payload: encodeRequest(finishPayload),
+        })
+        assert.equal(rolledBackFinish.statusCode, 500)
+        assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[13], undefined)
+        assert.notEqual(getPlayerActiveQuestSync(playerId), null)
+        db.exec("DROP TRIGGER fail_awake_fact_finish")
+
         const finish = await fastify.inject({
             method: "POST",
             url: "/api/index.php/single_battle_quest/finish",
             headers: { "content-type": "application/x-www-form-urlencoded" },
-            payload: encodeRequest({
-                viewer_id: viewerId,
-                api_count: 1,
-                quest_id: 2001,
-                category: 22,
-                score: 0,
-                elapsed_time_ms: 1000,
-                add_mana: 0,
-                is_accomplished: true,
-                statistics: {
-                    clear_phase: 1,
-                    max_combo_count: 0,
-                    zones: [],
-                    party: {
-                        characters: [null, null, null],
-                        unison_characters: [null, null, null],
-                        equipments: [null, null, null],
-                        ability_soul_ids: [null, null, null],
-                    },
-                },
-            }),
+            payload: encodeRequest(finishPayload),
         })
         assert.equal(finish.statusCode, 200, finish.body)
         const finishData = decodeResponse(finish).data
@@ -171,6 +191,16 @@ async function main() {
             [11, 17],
         )
         assert.equal(finishData.mail_arrived, true)
+        assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[13].progress, 5)
+
+        const duplicateFinish = await fastify.inject({
+            method: "POST",
+            url: "/api/index.php/single_battle_quest/finish",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            payload: encodeRequest(finishPayload),
+        })
+        assert.equal(duplicateFinish.statusCode, 400)
+        assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[13].progress, 5)
 
         updatePlayerSync({
             id: playerId,

@@ -3,6 +3,8 @@ import { getEventSafeMissionIds } from "./computer-event-safe"
 import { getExactEventBattleMissionIds } from "./event-battle-facts"
 import { getAuthoritativeEventEntryMissionIds } from "./event-entry-facts"
 import { getMissionMasterDefinitions } from "./master-data"
+import { AWAKE_MISSION_RULE_FAMILIES } from "./awake-rule-catalog"
+import type { AwakeMissionRuleFamilyName } from "./awake-rule-catalog"
 
 export interface MissionCoverageEntry {
     readonly category: number
@@ -30,6 +32,14 @@ export interface MissionCoverageAudit {
     readonly awake: {
         readonly total: number
         readonly routed: number
+        readonly resolved: number
+        readonly failClosed: number
+        readonly families: readonly {
+            readonly family: AwakeMissionRuleFamilyName
+            readonly status: "resolved" | "fail-closed"
+            readonly missionIds: readonly number[]
+            readonly reason: string
+        }[]
         readonly unresolvedMissionIds: readonly number[]
     }
     readonly pass: MissionCoveragePartition
@@ -152,16 +162,25 @@ function passPartition(): MissionCoveragePartition {
 
 function awakeCoverage(): MissionCoverageAudit["awake"] {
     const definitions = getMissionMasterDefinitions(9)
-    const unresolvedMissionIds = definitions
-        .filter(definition => {
-            const suffix = definition.missionId % 10
-            return suffix < 1 || suffix > 4
-        })
-        .map(definition => definition.missionId)
+    const families = AWAKE_MISSION_RULE_FAMILIES.map(family => Object.freeze({
+        family: family.family,
+        status: family.status,
+        missionIds: Object.freeze([...family.missionIds]),
+        reason: family.reason ?? "",
+    }))
+    const unresolvedMissionIds = families
+        .filter(family => family.status === "fail-closed")
+        .flatMap(family => family.missionIds)
         .sort((left, right) => left - right)
+    const resolved = families
+        .filter(family => family.status === "resolved")
+        .reduce((total, family) => total + family.missionIds.length, 0)
     return Object.freeze({
         total: definitions.length,
-        routed: definitions.length - unresolvedMissionIds.length,
+        routed: families.reduce((total, family) => total + family.missionIds.length, 0),
+        resolved,
+        failClosed: unresolvedMissionIds.length,
+        families: Object.freeze(families),
         unresolvedMissionIds: Object.freeze(unresolvedMissionIds),
     })
 }

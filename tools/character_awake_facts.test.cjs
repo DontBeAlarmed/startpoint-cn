@@ -3,8 +3,10 @@ require("ts-node/register/transpile-only")
 const assert = require("node:assert/strict")
 
 const {
-    AWAKE_RACE_MISSION_KEYS,
+    AWAKE_GENERIC_CHARACTER_CLEAR_RULES,
+    AWAKE_MISSION_RULE_FAMILIES,
     AWAKE_DIRECT_BATTLE_MISSION_IDS,
+    getAwakeBattleProgressFacts,
     getMatchedAwakeDirectBattleMissionIds,
     getMatchedAwakeRaceMissionIds,
     getMatchedAwakeQuestPartyMissionIds,
@@ -12,8 +14,8 @@ const {
     mergePartyCoClearRows,
     normalizeCharacterPair,
 } = require("../src/lib/mission/awake-battle-rules")
-const { getRaceKeyString } = require("../src/lib/quest/finish/race-utils")
 const { getComputer } = require("../src/lib/mission")
+const { getCharacterStoryQuestIds } = require("../src/lib/mission/character-queries")
 
 assert.deepEqual(normalizeCharacterPair(231001, 211001), [211001, 231001])
 assert.deepEqual(
@@ -24,22 +26,70 @@ assert.deepEqual(
     new Map([["211001_231001", 5]]),
 )
 
-const expectedRaceKey = getRaceKeyString(["Human", "Dragon", "Devil"])
-assert.equal(AWAKE_RACE_MISSION_KEYS.get(2310012), expectedRaceKey)
-assert.equal(expectedRaceKey.includes("Beast"), false)
 assert.deepEqual(
     getMatchedAwakeRaceMissionIds(
         questPartyContext(1, 1, [231001, 1, 999]),
-        expectedRaceKey,
+        "Devil+Dragon+Human",
     ),
-    [2310012],
+    [],
 )
 assert.deepEqual(
     getMatchedAwakeRaceMissionIds(
         questPartyContext(1, 1, [1, 231001, 999]),
-        expectedRaceKey,
+        "Devil+Dragon+Human",
     ),
     [],
+)
+
+const expectedFamilyCounts = {
+    "all-complete": 36,
+    "bond-token": 4,
+    "exact-quest-atomic": 7,
+    "exact-quest-history": 1,
+    "generic-character-clear": 55,
+    "leader-clear": 1,
+    "leader-combo": 1,
+    "leader-coop": 2,
+    "leader-powerflip": 2,
+    "mana-total": 1,
+    "quest-range-character": 4,
+    "race-selector-unresolved": 1,
+    "same-party-quest": 3,
+    "same-party-three": 1,
+    "same-party-two": 4,
+    "statistics-17-unresolved": 2,
+    "story-read": 18,
+    "total-story-read": 1,
+}
+assert.deepEqual(
+    Object.fromEntries(AWAKE_MISSION_RULE_FAMILIES.map(family => [
+        family.family,
+        family.missionIds.length,
+    ])),
+    expectedFamilyCounts,
+)
+const partitionedMissionIds = AWAKE_MISSION_RULE_FAMILIES.flatMap(family => family.missionIds)
+assert.equal(partitionedMissionIds.length, 144)
+assert.equal(new Set(partitionedMissionIds).size, 144)
+assert.deepEqual(
+    [...partitionedMissionIds].sort((left, right) => left - right),
+    Object.keys(require("../assets/mission_char_awake.json")).map(Number).sort((left, right) => left - right),
+)
+
+const expectedGenericMissionIds = [
+    1110012, 1110031, 1110032, 1110033, 1210051, 1210052, 1210053,
+    1310041, 1310042, 1310043, 1410011, 1410012, 1410013,
+    1510071, 1510072, 1510073, 1610011, 1610012, 1610013,
+    2110021, 2110022, 2110023, 2210011, 2210012, 2210013,
+    2310061, 2310062, 2310063, 2410021, 2410022, 2410023,
+    2510061, 2510062, 2510063, 2610031, 2610032, 2610033,
+    3110021, 3110022, 3110023, 3210091, 3210092, 3210093,
+    3310021, 3310022, 3310023, 3410051, 3410052, 3410053,
+    3510011, 3510012, 3510013, 3610021, 3610022, 3610023,
+]
+assert.deepEqual(
+    AWAKE_GENERIC_CHARACTER_CLEAR_RULES.map(rule => rule.missionId),
+    expectedGenericMissionIds,
 )
 
 function questPartyContext(category, questId, ids, isMulti = false) {
@@ -170,11 +220,11 @@ for (const missionId of [3210132, 3210133, 3410012, 3410013, 1610022, 2610072]) 
 const noDeathStatistics = { zones: [{ encoffin_count: 0 }, { encoffin_count: 0 }], continue_count: 99 }
 assert.deepEqual(
     getMatchedAwakeDirectBattleMissionIds(directBattleContext(1, 1, [161002], { statistics: noDeathStatistics }), ""),
-    [1610022],
+    [],
 )
 assert.deepEqual(
     getMatchedAwakeDirectBattleMissionIds(directBattleContext(1, 1, [261007], { statistics: { zones: [{ encoffin_count: 0 }] } }), ""),
-    [2610072],
+    [],
 )
 for (const statistics of [
     undefined,
@@ -198,41 +248,128 @@ assert.deepEqual(
     [],
 )
 
-const storyMissionIds = new Set(Object.entries(require("../assets/mission_char_awake.json"))
-    .filter(([, rows]) => /阅读|剧情/.test(rows[0][3]))
-    .map(([missionId]) => Number(missionId)))
-const slotFourMissionIds = new Set(Object.keys(require("../assets/mission_char_awake.json"))
-    .map(Number)
-    .filter(missionId => missionId % 10 === 4))
-const existingExplicitMissionIds = new Set([
-    12, 13,
-    1110013, 1210012, 1210013, 1310052, 1310053, 1410032, 1410033,
-    1510062, 1510063, 1610023, 2110012, 2110013, 2210042, 2210043,
-    2310012, 2310013,
-    2410632, 2410633, 2510032, 2510033, 2510042, 2510043, 2610073,
-    2630022, 2630023, 3310032, 3310033,
-])
-const directAwakeMissionIds = new Set([3210132, 3210133, 3410012, 3410013, 1610022, 2610072])
 const awakeDefs = require("../assets/mission_char_awake.json")
-const awakeFallbackMissionIds = Object.keys(require("../assets/mission_char_awake.json"))
-    .map(Number)
-    .filter(missionId => !storyMissionIds.has(missionId))
-    .filter(missionId => !slotFourMissionIds.has(missionId))
-    .filter(missionId => !existingExplicitMissionIds.has(missionId))
-    .filter(missionId => !directAwakeMissionIds.has(missionId))
-assert.equal(awakeFallbackMissionIds.length, 55)
-for (const missionId of awakeFallbackMissionIds) {
+assert.equal(AWAKE_GENERIC_CHARACTER_CLEAR_RULES.length, 55)
+for (const { missionId, characterId } of AWAKE_GENERIC_CHARACTER_CLEAR_RULES) {
     const row = awakeDefs[missionId][0]
-    assert.equal(row[4], "93", `fallback mission ${missionId} must use specific-character pattern`)
+    assert.equal(row[4], "93", `generic mission ${missionId} must use specific-character pattern`)
     assert.deepEqual(row.slice(5, 24), [
         "", "", "3", "", "(None)", "", "", "", "(None)",
         "(None)", "(None)", "(None)", "(None)", "", "", "(None)",
         "(None)", "(None)", "(None)",
     ])
-    assert.equal(row[24], row[1], `fallback mission ${missionId} must target its character_ids field`)
+    assert.equal(Number(row[1]), characterId)
+    assert.equal(row[24], row[1], `generic mission ${missionId} must target its owning character`)
+    assert.equal(row[25], "")
+    assert.equal(row[26], "")
     assert.match(row[3], /^队伍中编有.+通关任意关卡(?::|::x_count::次)?$/)
     assert.doesNotMatch(row[3], /队长|共斗|限时|分钟|且|、|种族|连击|强化弹射|信赖/)
 }
+
+function battleFactContext({
+    category = 1,
+    questId = 1,
+    ids = [],
+    isMulti = false,
+    accomplished = true,
+    clearTime = 1000,
+    statistics = {},
+} = {}) {
+    return {
+        questCategory: category,
+        questId,
+        isMulti,
+        questAccomplished: accomplished,
+        clearTime,
+        party: {
+            characters: ids.map(id => ({ id })),
+            unison_characters: [],
+        },
+        statistics,
+    }
+}
+
+assert.deepEqual(getAwakeBattleProgressFacts(battleFactContext({
+    ids: [1],
+    statistics: { zones: [{ use_power_flip_count: 2 }, { use_power_flip_count: 3 }] },
+})), {
+    increments: [{ missionId: 13, delta: 5 }],
+    maxima: [],
+})
+for (const context of [
+    battleFactContext({ ids: [999, 1], statistics: { zones: [{ use_power_flip_count: 5 }] } }),
+    battleFactContext({ ids: [1], accomplished: false, statistics: { zones: [{ use_power_flip_count: 5 }] } }),
+    battleFactContext({ ids: [1], statistics: { zones: [{ use_power_flip_count: -1 }] } }),
+]) {
+    assert.deepEqual(getAwakeBattleProgressFacts(context), { increments: [], maxima: [] })
+}
+assert.deepEqual(getAwakeBattleProgressFacts(battleFactContext({
+    ids: [121001],
+    isMulti: true,
+    statistics: { zones: [{ use_power_flip_count: 4 }] },
+})), {
+    increments: [{ missionId: 1210012, delta: 4 }],
+    maxima: [],
+})
+
+assert.deepEqual(getAwakeBattleProgressFacts(battleFactContext({
+    ids: [121001],
+    statistics: { max_combo_count: 37 },
+})), {
+    increments: [],
+    maxima: [{ missionId: 1210013, progress: 37 }],
+})
+assert.deepEqual(getAwakeBattleProgressFacts(battleFactContext({
+    ids: [999, 121001],
+    statistics: { max_combo_count: 999 },
+})), { increments: [], maxima: [] })
+
+assert.deepEqual(getAwakeBattleProgressFacts(battleFactContext({
+    ids: [241063, 243007, 361009],
+})), {
+    increments: [{ missionId: 2410633, delta: 1 }],
+    maxima: [],
+})
+assert.deepEqual(getAwakeBattleProgressFacts(battleFactContext({
+    ids: [241063, 243007],
+})), { increments: [], maxima: [] })
+
+for (const [missionIds, category, questId, leaderId, clearTime, isMulti] of [
+    [[1110013], 2, 1028004, 111001, 1000, false],
+    [[1310052], 15, 96, 131005, 1000, false],
+    [[2110013], 2, 1028004, 211001, 1000, true],
+    [[2310013], 2, 1010004, 231001, 90000, false],
+    [[2510032, 2510033], 13, 1020, 251003, 1000, false],
+    [[2510032, 2510033], 13, 1020, 251003, 180000, false],
+    [[2630023], 19, 100100004, 151006, 1000, false],
+]) {
+    assert.deepEqual(getAwakeBattleProgressFacts(battleFactContext({
+        category,
+        questId,
+        ids: [leaderId],
+        clearTime,
+        isMulti,
+    })), {
+        increments: missionIds.map(missionId => ({ missionId, delta: 1 })),
+        maxima: [],
+    })
+}
+for (const context of [
+    battleFactContext({ category: 2, questId: 1028004, ids: [999, 111001] }),
+    battleFactContext({ category: 2, questId: 1028005, ids: [111001] }),
+    battleFactContext({ category: 2, questId: 1028004, ids: [111001], isMulti: true }),
+    battleFactContext({ category: 2, questId: 1010004, ids: [231001], clearTime: 90001 }),
+]) {
+    assert.deepEqual(getAwakeBattleProgressFacts(context), { increments: [], maxima: [] })
+}
+
+assert.deepEqual(
+    getMatchedAwakeDirectBattleMissionIds(directBattleContext(1, 1, [161002], {
+        statistics: noDeathStatistics,
+    }), ""),
+    [],
+    "statistics 17 lacks an authoritative field mapping and must fail closed",
+)
 
 const awakeComputer = getComputer(9)
 assert.equal(awakeComputer.compute(2110012, {
@@ -273,5 +410,103 @@ for (const [missionId, directProgress, fallbackKey] of [
 assert.equal(awakeComputer.compute(1410033, {
     charData: new Map([["141003", { bondTokenList: [] }]]),
 }, 0), 0)
+
+assert.equal(awakeComputer.compute(13, {
+    categoryMissionProgress: new Map([[13, 4]]),
+    player: { totalPowerflips: 999 },
+}, 0), 4)
+assert.equal(awakeComputer.compute(1210013, {
+    categoryMissionProgress: new Map([[1210013, 37]]),
+    player: { maxComboAchieved: 999 },
+}, 0), 37)
+assert.equal(awakeComputer.compute(2410633, {
+    categoryMissionProgress: new Map(),
+    coClears: new Map([
+        ["241063_243007", 5],
+        ["241063_361009", 5],
+        ["243007_361009", 5],
+    ]),
+}, 0), 0)
+assert.equal(awakeComputer.compute(2310013, {
+    categoryMissionProgress: new Map(),
+    questProgress: {
+        2: [
+            { questId: 1010004, finished: true, bestElapsedTimeMs: 80000, leaderCharacterId: 999 },
+            { questId: 1010005, finished: true, bestElapsedTimeMs: 70000, leaderCharacterId: 231001 },
+        ],
+    },
+}, 0), 0)
+assert.equal(awakeComputer.compute(2310013, {
+    categoryMissionProgress: new Map(),
+    questProgress: {},
+}, 2), 2, "existing persisted progress remains the lower bound")
+
+const ramsStoryProgress = {
+    3: getCharacterStoryQuestIds("231001").map(questId => ({
+        questId,
+        finished: true,
+    })),
+}
+assert.equal(awakeComputer.compute(2310014, {
+    categoryMissionProgress: new Map([
+        [2310011, 999],
+        [2310012, 1],
+        [2310013, 1],
+    ]),
+    questProgress: {},
+}, 0), 3, "all-complete must evaluate every child with that child's persisted progress")
+assert.equal(awakeComputer.compute(2310014, {
+    categoryMissionProgress: new Map([[2310014, 1]]),
+    questProgress: ramsStoryProgress,
+}, 1), 1, "parent progress must not complete fail-closed or atomic children")
+assert.equal(awakeComputer.compute(2310014, {
+    categoryMissionProgress: new Map([[2310014, 3]]),
+    questProgress: {},
+}, 3), 3, "all-complete must preserve the persisted parent progress")
+assert.equal(awakeComputer.compute(2310014, {
+    categoryMissionProgress: new Map([
+        [2310012, 1],
+        [2310013, 1],
+    ]),
+    questProgress: ramsStoryProgress,
+}, 0), 3, "three genuinely completed children must complete the parent")
+
+function emptyImportedAwakeContext() {
+    return {
+        categoryMissionProgress: new Map(),
+        charClears: new Map(),
+        leaderClears: new Map(),
+        leaderMultiClears: new Map(),
+        coClears: new Map(),
+        charData: new Map(),
+        questProgress: {},
+        totalStories: 0,
+        player: { totalManaObtained: 0 },
+    }
+}
+
+const importedProgress = 5
+assert.equal(AWAKE_MISSION_RULE_FAMILIES.length, 18)
+for (const family of AWAKE_MISSION_RULE_FAMILIES) {
+    for (const missionId of family.missionIds) {
+        const computed = awakeComputer.compute(
+            missionId,
+            emptyImportedAwakeContext(),
+            importedProgress,
+        )
+        assert.equal(
+            computed >= importedProgress,
+            true,
+            `${family.family} mission ${missionId} must preserve imported progress`,
+        )
+    }
+}
+for (const missionId of [1610022, 2310012, 2610072]) {
+    assert.equal(
+        awakeComputer.compute(missionId, emptyImportedAwakeContext(), importedProgress),
+        importedProgress,
+        `fail-closed mission ${missionId} must preserve imported progress`,
+    )
+}
 
 console.log("character awake fact tests passed")

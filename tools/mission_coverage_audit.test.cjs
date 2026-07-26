@@ -85,11 +85,24 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
         "称号 fallback 必须按真实外部阻塞原因分类",
     )
 
-    assert.deepEqual(report.awake, {
-        total: 144,
-        routed: 144,
-        unresolvedMissionIds: [],
-    })
+    assert.equal(report.awake.total, 144)
+    assert.equal(report.awake.routed, 144)
+    assert.equal(report.awake.resolved, 141)
+    assert.equal(report.awake.failClosed, 3)
+    assert.deepEqual(report.awake.unresolvedMissionIds, [1610022, 2310012, 2610072])
+    assert.deepEqual(
+        report.awake.families
+            .filter(family => family.status === "fail-closed")
+            .map(family => family.family),
+        ["race-selector-unresolved", "statistics-17-unresolved"],
+    )
+    const awakeMissionIds = report.awake.families.flatMap(family => family.missionIds)
+    assert.equal(awakeMissionIds.length, 144)
+    assert.equal(new Set(awakeMissionIds).size, 144)
+    assert.equal(report.awake.families.every(family => (
+        family.missionIds.length > 0
+        && (family.status === "resolved" || family.reason.length > 0)
+    )), true)
 
     assertPartition(report.pass)
     assert.deepEqual(

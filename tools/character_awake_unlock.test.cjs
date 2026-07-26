@@ -485,9 +485,13 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
 
     const tutorialFinishBlock = getRouteBlock(tutorialSource, "/finish_trigger", "/update_step")
     const tutorialUpdateBlock = getRouteBlock(tutorialSource, "/update_step")
-    const step15Start = tutorialUpdateBlock.indexOf("if (nextStep === 15")
-    const step16Start = tutorialUpdateBlock.indexOf("} else if (nextStep === 16)")
-    const otherStepStart = tutorialUpdateBlock.indexOf("} else {", step16Start)
+    const step15Start = tutorialUpdateBlock.lastIndexOf(
+        "if (effectiveNextStep === TUTORIAL_GACHA_EFFECTIVE_STEP)",
+    )
+    const step16Start = tutorialUpdateBlock.lastIndexOf(
+        "if (effectiveNextStep === TUTORIAL_PRESENT_EFFECTIVE_STEP)",
+    )
+    const otherStepStart = tutorialUpdateBlock.indexOf("const isTutorialEnd", step16Start)
     const tutorialStep15Block = tutorialUpdateBlock.slice(step15Start, step16Start)
     const tutorialStep16Block = tutorialUpdateBlock.slice(step16Start, otherStepStart)
     const tutorialOtherStepBlock = tutorialUpdateBlock.slice(otherStepStart)

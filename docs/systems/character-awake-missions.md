@@ -1,21 +1,18 @@
 # 角色觉醒任务覆盖文档
 
-> 状态：部分完成。核心解锁与领奖时序已经通过官方 CN 客户端验收，服务端 144 条任务均可计算；144 条任务条件仍未由客户端逐条验收，自动测试通过不能替代该验收。
+> 状态：部分完成。核心解锁与领奖时序已经通过官方 CN 客户端验收；144 条任务已按真实条件族唯一分区，其中 141 条有权威计算路径，3 条因语义证据不足 fail closed。自动测试通过不能替代逐条客户端验收。
 
 ## 概览
 
 - **144 条任务**（36 个角色 × 4 个槽位）
 - **Category 9**，请求格式 `{"character_id": N, "category": 9}`
-- `get_mission_progress` 中按 `lastDigit` 分发计算
+- `get_mission_progress` 由主数据校验后的显式条件族分发，不再用 mission ID suffix 证明规则覆盖
 
 ### 槽位含义
 
-| lastDigit | 含义 | 计算方式 |
-|-----------|------|---------|
-| 1 | 阅读个人剧情 / 队伍中编有X通关 | 故事计数 或 `clears.clear_count`（fallback） |
-| 2 | 累计阅读故事（Alk）/ 累计玛纳（拉芙）/ 队长或队伍通关 | Alk=`totalStories`，拉芙=`totalManaObtained`，其他=`clears.clear_count` |
-| 3 | 强化弹射（Alk）/ 信赖证 / 共斗/限时 | Alk=`totalPowerflips`，信赖证要求列表非空且 `every(status>=2)`，其他=`clears.clear_count` |
-| 4 | 完成全部觉醒任务 | 按各槽位 CDN `target_progress` 统计已完成任务数 |
+`lastDigit` 仅保留为最终三子任务汇总等旧计算结构的输入，不再作为条件正确性的 coverage 依据。规则目录
+`awake-rule-catalog.ts` 按 18 个条件族覆盖全部 144 条主数据定义，并在模块加载时检查唯一分区和关键字段。
+其中 55 条“指定角色通关任意关卡”使用固定 mission ID 白名单，不再通过排除所有特殊任务后得到。
 
 ### 总任务完成判定
 
@@ -23,13 +20,35 @@
 
 例如缪（`341005`）的三个子任务目标分别为通关 `1`、`3`、`5` 次。通关一次时三个任务的原始进度都可能是 1，但只有第一个任务达到目标，因此总任务进度必须为 1，不能为 3。服务端使用 `mission_char_awake_reward` 中各子任务的 `target_progress` 判定完成状态。
 
+汇总时每个子任务必须读取自身 mission ID 的 category 9 持久进度，再与该子任务的实时计算值取最大；父任务
+持久进度只能作为父结果的下限，不能传入子任务或替代 fail-closed/同场事实。这样既阻止父进度补齐缺失子条件，
+也保证旧父进度不会因当前事实不足而回退。
+
+JSON 存档导入会恢复 `categoryMissionList`，但不保证同时恢复角色通关、队长通关、共斗等衍生事实表。因此
+`AwakeComputer.compute` 的所有条件族都必须以当前任务 `dbProgress` 为下限；缺失衍生事实只能阻止新增进度，
+不得让后续 `awake-settlement` 把已经导入的 category 9 进度覆盖为更小值。
+
 ### 当前审计口径
 
-下文记录已经接入的数据源和实现路径，不等于每条任务条件都已逐项完成客户端验证。配对计数排序、
-`2310012` 种族组合、`3310032/3310033` 指定关卡同场条件、空信赖证列表和失败战斗写入等已知错误
-已经由自动测试固定。新增显式特殊条件覆盖 `3210132/3210133/3410012/3410013/1610022/2610072`，
-并补齐 `1510062` 的队长与拉芙同场条件。其余纯通用角色通关回退已按 CN 主数据逐条审计，当前为 55 条，
-客户端仍需按条件矩阵验收全部 144 条任务。
+下文记录已经接入的数据源和实现路径，不等于每条任务条件都已逐项完成客户端验证。已确认的同场条件直接从
+一次成功 finish 产生 category 9 持久事实；计算器不再把不同战斗的历史摘要拼接为同一场。`2310012` 的种族
+selector 尚不能从 CN 1.8.1 客户端确认是“包含”还是“精确集合”；`1610022/2610072` 的 statistics 17 尚不能
+权威映射到具体 finish 字段。这 3 条停止新增进度，只读取既有 category 9 持久进度作为下限。
+
+### 条件族分区（2026-07-27）
+
+| 状态 | 条件族 | 数量 |
+|---|---|---:|
+| 已闭合 | 全部完成、剧情阅读、通用指定角色通关 | 36 + 18 + 55 |
+| 已闭合 | 指定队长强化弹射、指定队长单场连击 | 2 + 1 |
+| 已闭合 | 指定关卡原子匹配、无队长指定关卡历史 | 7 + 1 |
+| 已闭合 | 双角色同队、三角色同队、指定队伍+关卡 | 4 + 1 + 3 |
+| 已闭合 | 指定队长共斗、指定队长通关、QuestRange | 2 + 1 + 4 |
+| 已闭合 | 信赖证、累计玛纳、累计角色剧情 | 4 + 1 + 1 |
+| fail closed | 种族 selector、statistics 17 | 1 + 2 |
+
+测试要求 144 个 mission ID 在这些条件族中出现且只出现一次。任何主数据 pattern、battle kind、队长、
+`character_ids` 或 QuestRange selector 漂移都会使启动期 schema 校验失败，不能静默落入其他规则。
 
 完整 P0 清单见[当前已知问题](../status/known-issues.md)。在这些问题修复并完成条件级测试前，不再维护“0 条错误”或“全部完成”的统计。
 
@@ -67,12 +86,12 @@ ID，避免遍历其他角色任务。旧 unlock cleanup 只在基础资格可�
 
 ## 已实现特性
 
-### 强化弹射计数器（2026-06-26）✅
+### 指定队长强化弹射（2026-07-27）
 
-- Alk type_3 使用 `player.totalPowerflips`
-- 来源：`/finish` 的 `statistics.zones[].use_power_flip_count`
-- 累计到 `players.total_powerflips`
-- SELECT 需包含 `total_stamina_used, total_powerflips, total_dashes`
+- `13` 只在阿尔克位于本场队长位时累计本场 `statistics.zones[].use_power_flip_count`。
+- `1210012` 同样要求索妮雅位于本场队长位；两条主数据均为 `battle_kind=3`，接受成功单人或协力结算。
+- 任一负数、非安全整数或求和溢出均令本场该事实 fail closed；失败战斗不写入。
+- 计算器只读 category 9 持久进度，不读全局 `players.total_powerflips`，错误队长的历史强化弹射不能补齐任务。
 
 ### 弹射/冲刺数据源（2026-06-26）
 
@@ -99,9 +118,10 @@ ID，避免遍历其他角色任务。旧 unlock cleanup 只在基础资格可�
   - 觉醒任务自奖励：`src/routes/api/mission.ts`
   - 物品出售：`item-sell.ts`
 
-### 特定关卡通关（2026-06-28）✅
+### 特定关卡通关（2026-07-27）
 
-普通指定关卡任务通过 `ctx.questProgress[category]` 检测关卡完成状态：
+7 条带指定队长的任务由本次成功 finish 原子匹配；只有无队长条件的 `1410032` 通过
+`ctx.questProgress[category]` 检测既有完成状态：
 
 | mission_id | 角色 | 关卡 | quest_id | category |
 |------------|------|------|----------|:---:|
@@ -109,11 +129,13 @@ ID，避免遍历其他角色任务。旧 unlock cleanup 只在基础资格可�
 | 1310052 | 巴拉克 | 结实假人·水 | 96 | 15 |
 | 1410032 | 丛云 | 八岐大蛇(最高) | 1020003 | 2 |
 | 2110013 | 阿赛尔 | 伊尔格拉乌 超级 | 1028004 | 2 |
+| 2310013 | 拉姆斯 | 寄居蟹船长 地狱级 | 1010004 | 2 |
 | 2510032 | 艾莉亚 | 临境域 深渊之兽 | 1020 等多周期 | 13 |
+| 2510033 | 艾莉亚 | 临境域 深渊之兽(限时) | 1020 等多周期 | 13 |
 | 2630023 | 贝瑞塔 | 女王拉芙 超级+ | 100100004/100401004 | 19 |
 
-映射常量 `QUEST_CLEAR_MAP` 在 `src/lib/mission/computer-awake.ts` 中定义，
-`AwakeComputer.compute` 在 `lastDigit` 分支之前优先检测。
+原子规则定义在 `awake-battle-rules.ts`；`QUEST_CLEAR_MAP` 只保留 `1410032`。计算器在通用分支前读取对应
+category 9 持久事实，旧持久进度始终为下限。
 
 `3310032` 与 `3310033` 还要求指定角色组合和指定关卡在同一场成功战斗中同时成立，不能把不同场次的
 配对累计与关卡进度拼接：
@@ -126,11 +148,12 @@ ID，避免遍历其他角色任务。旧 unlock cleanup 只在基础资格可�
 成功结算通过 `awake-battle-rules.ts` 匹配后直接增加对应 category 9 持久进度；失败战斗、错误关卡、
 缺少角色或联机结算均不写入。计算器读取该持久事实，不再从跨场累计配对推测完成状态。
 
-### 配对与种族组合（2026-07-24）✅
+### 配对与三角色同场（2026-07-27）
 
 - 配对写入前按角色数值 ID 排序，`2110012` 不再受队伍位置影响。
 - 读取旧存档时把 `a,b` 与 `b,a` 归一为同一个键并累加，兼容历史反序记录。
-- `2310012` 使用 CN 主数据的 `Human`、`Dragon`、`Devil`，不再把“魔”映射为 `Beast`；同时要求拉姆斯位于队长位。队长与三种族必须在同一场成功战斗中成立，才增加 category 9 持久进度。
+- `2410633` 不再取三组 pairwise 历史次数的最小值。凉月、鹄、梅利露必须在同一次成功 finish 的实际主位或合击位队伍中共存，才增加一次持久进度。
+- `2310012` 只能确认主数据列出 `Human,Dragon,Devil` 且指定拉姆斯为队长，无法确认 selector 是包含还是精确集合；当前 fail closed，旧持久进度不回退。
 - 信赖证任务要求 `bondTokenList` 至少有一项且全部达到已领取状态，空列表不会完成任务。
 
 ### 显式特殊战斗条件（2026-07-24）
@@ -143,32 +166,31 @@ ID，避免遍历其他角色任务。旧 unlock cleanup 只在基础资格可�
 | 3210133 | 莉塔通关摇曳迷宫宝物域 | QuestRange kind 7，category 13，quest ID `2001..2006` |
 | 3410012 | 伊凡通关任意摇曳迷宫 | QuestRange kind 12，category `6/13/14/20` 的成功单人关卡 |
 | 3410013 | 伊凡通关临境域深渊之兽·极 | QuestRange kind 7，category 13，quest ID `1040` |
-| 1610022 | 威隆作为队长且全场无阵亡 | pattern 95、statistics 17，所有 `zones[].encoffin_count` 总和为 0 |
-| 2610072 | 赛吉尔作为队长且全场无阵亡 | pattern 95、statistics 17，所有 `zones[].encoffin_count` 总和为 0 |
 | 1510062 | 以贝瑞塔为队长并编入拉芙通关 | 队长 `151006` 与拉芙 `263002` 必须在同一场成功战斗中出现 |
 
-无阵亡规则对异常输入 fail closed：`statistics.zones` 缺失、空数组，或任一
-`encoffin_count` 为缺失、负数、非整数、非有限值时均不增加进度。失败战斗、错误角色、错误队长和
-QuestRange 不匹配同样不写入持久事实。
+`1610022/2610072` 的主数据只证明 pattern 95、statistics 17、指定队长与 `battle_kind=3`。当前反编译证据没有
+把 statistics 17 权威闭合到 `encoffin_count` 或其他 finish 字段，因此不再猜测；两条任务停写新事实并保持旧
+category 9 进度。失败战斗、错误角色、错误队长和 QuestRange 不匹配同样不写入已闭合规则的持久事实。
 
-### 通用角色通关回退审计（2026-07-24）
+### 通用角色通关白名单（2026-07-27）
 
-CN 主数据逐条审计确认 55 条任务可以使用“队伍中编有指定角色并成功通关”的通用累计值。这些任务的
-pattern、目标角色和附加条件均由测试固定；不符合纯通用语义的任务必须进入显式规则，不能沉默落入回退。
+CN 主数据逐条审计确认 55 条任务可以使用“队伍中编有指定角色并成功通关”的通用累计值。固定白名单逐条
+要求 pattern 93、battle kind 3、无附加 selector，且 `character_ids` 等于所属角色。单人和协力成功均可累计；
+失败 finish 不累计。不在白名单且没有显式规则的任务只保留旧持久进度，不能沉默落入通用回退。
 
 ### 队长追踪（2026-06-28）✅
 
 `players_character_quest_clears` 新增 `leader_clear_count` 列，`/finish` 中 `characters[0]` 传 `isLeader=true`。
 
-- `LEADER_REQUIRED_IDS` 集合：`{1510062, 1610022, 1610023, 2610072}`
+- `LEADER_REQUIRED_IDS` 仅保留无附加条件的 `1610023`。
 - 需要指定队长的通用计算路径使用 `leader_clear_count`（纯队长出场），其他通用任务使用 `clear_count`（任意位置）
-- `1510062` 另由显式战斗事实同时校验贝瑞塔队长与拉芙同场；`1610022/2610072` 另校验全场无阵亡，不能只凭队长累计完成
-- `2310012` 不使用通用 `leader_clear_count`；它由战斗事实规则同时校验拉姆斯队长和 Human、Dragon、Devil 组合。
+- `1510062` 由显式战斗事实同时校验贝瑞塔队长与拉芙同场。
+- `1610022/2610072` 与 `2310012` 不使用通用 `leader_clear_count`；由于权威语义未闭合，当前保持 fail closed。
 - 1610023（威隆队长通关）⚠️→✅
 
 ### 时间追踪（2026-06-28）✅
 
-`QUEST_CLEAR_MAP` 扩展 `timeLimitMs` 字段，检查 `bestElapsedTimeMs <= timeLimitMs`：
+限时任务在本次成功 finish 内检查 `clearTime <= timeLimitMs`，不再读取 `players_quest_progress.bestElapsedTimeMs`：
 
 | mission | 关卡 | quest_id | timeLimitMs |
 |---------|------|----------|-------------|
@@ -181,23 +203,23 @@ pattern、目标角色和附加条件均由测试固定；不符合纯通用语�
 - `AwakeContext.multiClears` 预缓存 `multi_count`
 - `COOP_MISSION_IDS` 使用 `leader_multi_count`，要求指定角色作为联机队长完成。
 
-### 连击追踪（2026-06-28）✅
+### 指定队长单场连击（2026-07-27）
 
-1210013（索妮雅队长达成连击）通过 `players.max_combo_achieved` 追踪。
-`statistics.max_combo_count` 来自客户端 `ComboCalculatorImpl.getMaxCombo()`，
-`/finish` 时 `maxComboAchieved = max(old, body.statistics.max_combo_count)`。
+`1210013` 只在索妮雅位于本场队长位且战斗成功时读取本场 `statistics.max_combo_count`，以 category 9 任务进度
+保存历史最大值。错误队长、失败战斗和非法统计不写入；后续较低或不匹配的战斗不会回退。计算器不读取全局
+`players.max_combo_achieved`。
 
 ### 关卡队长校验（2026-06-28）✅
 
-`players_quest_progress` 新增 `leader_character_id` 列，
-`/finish` 写入 `characters[0].id`。
-`QUEST_CLEAR_MAP` 扩展 `leaderCharId` 字段；关卡通关映射共 8 条任务，其中配置了队长的任务会精确校验：
+带指定队长的 7 条关卡/限时任务改为本次成功 finish 原子匹配队长、关卡、模式与用时。历史
+`players_quest_progress.leader_character_id` 和 `best_elapsed_time_ms` 不再参与这些任务计算，避免把不同战斗拼接。
+无队长要求的 `1410032` 仍可读取已完成关卡历史：
 
 | mission | quest | leaderCharId |
 |---------|-------|:---:|
 | 1110013 | 伊尔格拉乌 超级 | 111001 |
 | 2110013 | 伊尔格拉乌 超级 | 211001 |
-| 2410032 | 八岐大蛇 | — |
+| 1410032 | 八岐大蛇 | — |
 | 2510032 | 深渊之兽 | 251003 |
 | 2510033 | 深渊之兽(限时) | 251003 |
 | 2310013 | 寄居蟹船长(限时) | 231001 |
