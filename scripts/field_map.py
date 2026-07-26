@@ -27,7 +27,12 @@ STANDARD = {
     'story_check':   84,
 }
 
-BOSS = {**STANDARD, 'clear_reward': 4, 'fixed_party': NOT_USED}
+BOSS = {
+    **STANDARD,
+    'clear_reward': 4,
+    'fixed_party': NOT_USED,
+    'is_both_boss': 122,
+}
 
 # ─── Group 2: World Story Event ─────────────────────────────────────────
 WORLD_STORY = {

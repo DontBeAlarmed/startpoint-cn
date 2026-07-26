@@ -6,6 +6,7 @@
 // HandshakeResult: Accept=0, Denied=1, Reconnect=2, Exception=3, Complete=4
 
 import * as net from "net"
+import { getRoom } from "../room/manager"
 import {
     getPlayerPartyGroupListSync,
 } from "../../data/domains/party"
@@ -175,9 +176,26 @@ export async function handleHandshake(
         }
 
         if (!lifecycle.isAccepting()) return
-        const battleClient = sessionManager.createClient(socket, 0, String(roomNumber), String(connectionId), null)
+        const normalizedRoomNumber = String(roomNumber)
+        const normalizedConnectionId = String(connectionId)
+        const room = getRoom(normalizedRoomNumber)
+        const participant = room?.raising_state === 4
+            ? sessionManager.getBattleParticipant(normalizedRoomNumber, normalizedConnectionId)
+            : undefined
+        if (!participant || sessionManager.getBattleClient(normalizedConnectionId)) {
+            sessionManager.sendJson(socket, [3, "HANDSHAKE_DENIED"])
+            socket.end()
+            return
+        }
+        const battleClient = sessionManager.createClient(
+            socket,
+            participant.viewerId,
+            normalizedRoomNumber,
+            normalizedConnectionId,
+            participant.playerId,
+        )
         battleClient.isBattle = true
-        sessionManager.addBattleClient(String(connectionId), battleClient)
+        sessionManager.addBattleClient(normalizedConnectionId, battleClient)
         sessionManager.sendJson(socket, [0, roomNumber, ""])
         return
     }

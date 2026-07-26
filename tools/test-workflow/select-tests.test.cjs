@@ -541,6 +541,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/mail_notification_write_routes.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS.generator.tests, [
+        "tools/boss_battle_multiscene_content.test.cjs",
         "tools/box_gacha_reset.test.cjs",
         "tools/gacha_odds_export.test.cjs",
         "tools/hard_multi_event_quest.test.cjs",
@@ -556,6 +557,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/handshake_lifecycle.test.cjs",
         "tools/lobby_lifecycle.test.cjs",
         "tools/msgpack_compat.test.cjs",
+        "tools/multi_battle_multiscene.test.cjs",
         "tools/multi_player_context.test.cjs",
         "tools/npc_contributor_names.test.cjs",
         "tools/npc_nickname_pool.test.cjs",

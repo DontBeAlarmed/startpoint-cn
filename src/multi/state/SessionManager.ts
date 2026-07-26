@@ -23,13 +23,23 @@ export interface SessionClient {
     battleState: BattleState
 }
 
+export interface BattleParticipant {
+    viewerId: number
+    playerId: number
+}
+
 export class SessionManager {
     private clients = new Map<string, SessionClient>()
     private roomClients = new Map<string, Set<string>>()
     private battleClients = new Map<string, Set<string>>()
     private cidToBattleClient = new Map<string, SessionClient>()
     private sceneReadyClients = new Map<string, Set<string>>()
+    private sceneTransitionClients = new Map<string, Set<string>>()
+    private battleStartDeliveredClients = new Map<string, Map<number, Set<string>>>()
     private battleExpectedCount = new Map<string, number>()
+    private battleParticipants = new Map<string, Map<string, BattleParticipant>>()
+    private battleSceneGeneration = new Map<string, number>()
+    private finalizedBattlePlayerIds = new Map<string, Set<number>>()
     private roomStates = new Map<string, RoomStateMachine>()
 
     private addr(viewerId: number, roomNumber: string): string {
@@ -71,7 +81,6 @@ export class SessionManager {
 
     removeClient(client: SessionClient): Result<void> {
         const addr = this.addr(client.viewerId, client.roomNumber)
-        this.clients.delete(addr)
 
         if (client.isBattle) {
             const bSet = this.battleClients.get(client.roomNumber)
@@ -88,8 +97,18 @@ export class SessionManager {
             this.sceneReadyClients.get(client.roomNumber)?.delete(client.connectionId)
             const exp = this.battleExpectedCount.get(client.roomNumber)
             if (exp && exp > 1) this.battleExpectedCount.set(client.roomNumber, exp - 1)
+            if (this.isSceneBarrierComplete(client.roomNumber)) {
+                this.broadcastBattleStart(client.roomNumber)
+            }
+            if ((this.battleClients.get(client.roomNumber)?.size ?? 0) === 0) {
+                const { getRoom } = require("../room/manager")
+                const room = getRoom(client.roomNumber)
+                if (room && room.raising_state !== 4) this.clearBattleSceneState(client.roomNumber)
+            }
+            return { ok: true, value: undefined }
         }
 
+        this.clients.delete(addr)
         const set = this.roomClients.get(client.roomNumber)
         if (set) {
             set.delete(addr)
@@ -178,6 +197,7 @@ export class SessionManager {
         if (client) {
             this.battleClients.get(client.roomNumber)?.delete(connectionId)
             this.sceneReadyClients.get(client.roomNumber)?.delete(connectionId)
+            this.sceneTransitionClients.get(client.roomNumber)?.delete(connectionId)
         }
         this.cidToBattleClient.delete(connectionId)
     }
@@ -186,21 +206,186 @@ export class SessionManager {
         return this.cidToBattleClient.get(connectionId)
     }
 
+    getBattleClientsInRoom(roomNumber: string): SessionClient[] {
+        const clients: SessionClient[] = []
+        for (const connectionId of this.battleClients.get(roomNumber) ?? []) {
+            const client = this.cidToBattleClient.get(connectionId)
+            if (client) clients.push(client)
+        }
+        return clients
+    }
+
+    getBattleParticipant(roomNumber: string, connectionId: string): BattleParticipant | undefined {
+        return this.battleParticipants.get(roomNumber)?.get(connectionId)
+    }
+
+    removeBattlePlayer(roomNumber: string, playerId: number): boolean {
+        const participants = this.battleParticipants.get(roomNumber)
+        const connectionIds = participants
+            ? [...participants.entries()]
+                .filter(([, participant]) => participant.playerId === playerId)
+                .map(([connectionId]) => connectionId)
+            : []
+
+        let removed = false
+        for (const connectionId of connectionIds) {
+            const battleClient = this.cidToBattleClient.get(connectionId)
+            if (battleClient?.playerId === playerId) {
+                this.removeClient(battleClient)
+            } else {
+                this.sceneReadyClients.get(roomNumber)?.delete(connectionId)
+                this.sceneTransitionClients.get(roomNumber)?.delete(connectionId)
+                const expected = this.battleExpectedCount.get(roomNumber)
+                if (expected !== undefined && expected > 1) {
+                    this.battleExpectedCount.set(roomNumber, expected - 1)
+                }
+                if (this.isSceneBarrierComplete(roomNumber)) {
+                    this.broadcastBattleStart(roomNumber)
+                }
+            }
+            participants?.delete(connectionId)
+            removed = true
+        }
+        if (participants?.size === 0) this.battleParticipants.delete(roomNumber)
+
+        const finalized = this.finalizedBattlePlayerIds.get(roomNumber)
+        if (finalized?.delete(playerId)) removed = true
+        if (finalized?.size === 0) this.finalizedBattlePlayerIds.delete(roomNumber)
+        return removed
+    }
+
+    broadcastToBattleRoom(roomNumber: string, data: unknown): void {
+        for (const client of this.getBattleClientsInRoom(roomNumber)) {
+            this.sendJson(client.socket, data)
+        }
+    }
+
+    broadcastBattleStart(roomNumber: string): void {
+        const generation = this.battleSceneGeneration.get(roomNumber) ?? -1
+        if (generation < 0) return
+        let deliveredByGeneration = this.battleStartDeliveredClients.get(roomNumber)
+        if (!deliveredByGeneration) {
+            deliveredByGeneration = new Map()
+            this.battleStartDeliveredClients.set(roomNumber, deliveredByGeneration)
+        }
+        let delivered = deliveredByGeneration.get(generation)
+        if (!delivered) {
+            delivered = new Set()
+            deliveredByGeneration.set(generation, delivered)
+        }
+        for (const client of this.getBattleClientsInRoom(roomNumber)) {
+            if (this.sendJson(client.socket, [1, [1]])) {
+                delivered.add(client.connectionId)
+            }
+        }
+    }
+
+    replayBattleStartIfNeeded(connectionId: string, roomNumber: string): boolean {
+        const currentGeneration = this.battleSceneGeneration.get(roomNumber) ?? -1
+        if (currentGeneration < 0) return false
+        const client = this.cidToBattleClient.get(connectionId)
+        if (!client) return false
+
+        let deliveredByGeneration = this.battleStartDeliveredClients.get(roomNumber)
+        for (let generation = 0; generation <= currentGeneration; generation++) {
+            if (deliveredByGeneration?.get(generation)?.has(connectionId)) continue
+            if (generation === currentGeneration) {
+                if ((this.battleExpectedCount.get(roomNumber) ?? -1) !== 0) return false
+                if (generation === 1
+                    && !this.sceneTransitionClients.get(roomNumber)?.has(connectionId)) return false
+            }
+            if (!deliveredByGeneration) {
+                deliveredByGeneration = new Map()
+                this.battleStartDeliveredClients.set(roomNumber, deliveredByGeneration)
+            }
+            let delivered = deliveredByGeneration.get(generation)
+            if (!delivered) {
+                delivered = new Set()
+                deliveredByGeneration.set(generation, delivered)
+            }
+            if (!this.sendJson(client.socket, [1, [1]])) return false
+            delivered.add(connectionId)
+            return true
+        }
+        return false
+    }
+
+    private isSceneBarrierComplete(roomNumber: string): boolean {
+        const expected = this.battleExpectedCount.get(roomNumber) ?? 0
+        if (expected <= 0) return false
+        const ready = this.sceneReadyClients.get(roomNumber)?.size ?? 0
+        const connected = this.battleClients.get(roomNumber)?.size ?? 0
+        if (ready < expected || ready < connected) return false
+        this.battleExpectedCount.set(roomNumber, 0)
+        return true
+    }
+
     markSceneReady(connectionId: string, roomNumber: string): boolean {
         const expected = this.battleExpectedCount.get(roomNumber) ?? 0
         if (expected <= 0) return false
+        if ((this.battleSceneGeneration.get(roomNumber) ?? 0) === 1
+            && !this.sceneTransitionClients.get(roomNumber)?.has(connectionId)) return false
         let readySet = this.sceneReadyClients.get(roomNumber)
         if (!readySet) {
             readySet = new Set()
             this.sceneReadyClients.set(roomNumber, readySet)
         }
         readySet.add(connectionId)
-        const connected = this.battleClients.get(roomNumber)?.size ?? 0
-        if (readySet.size >= expected && readySet.size >= connected) {
-            this.battleExpectedCount.set(roomNumber, 0)
-            return true
+        return this.isSceneBarrierComplete(roomNumber)
+    }
+
+    beginNextBattleScene(connectionId: string, roomNumber: string): boolean {
+        const generation = this.battleSceneGeneration.get(roomNumber) ?? -1
+        const expected = this.battleExpectedCount.get(roomNumber) ?? -1
+        if (generation === 1) {
+            this.sceneTransitionClients.get(roomNumber)?.add(connectionId)
+            return false
         }
-        return false
+        if (generation !== 0 || expected !== 0) return false
+        const connected = this.battleClients.get(roomNumber)?.size ?? 0
+        if (connected <= 0) return false
+        this.battleSceneGeneration.set(roomNumber, 1)
+        this.sceneTransitionClients.set(roomNumber, new Set([connectionId]))
+        this.sceneReadyClients.set(roomNumber, new Set())
+        this.battleExpectedCount.set(roomNumber, connected)
+        return true
+    }
+
+    canFinalizeBattle(roomNumber: string, requiresNextScene: boolean): boolean {
+        if ((this.battleExpectedCount.get(roomNumber) ?? -1) !== 0) return false
+        const generation = this.battleSceneGeneration.get(roomNumber) ?? -1
+        return generation === (requiresNextScene ? 1 : 0)
+    }
+
+    markBattleFinalized(connectionId: string, roomNumber: string): boolean {
+        const playerId = this.cidToBattleClient.get(connectionId)?.playerId
+        if (playerId === undefined || playerId === null) return false
+        this.markPlayerFinalizedBattle(roomNumber, playerId)
+        return true
+    }
+
+    markPlayerFinalizedBattle(roomNumber: string, playerId: number): void {
+        let finalized = this.finalizedBattlePlayerIds.get(roomNumber)
+        if (!finalized) {
+            finalized = new Set()
+            this.finalizedBattlePlayerIds.set(roomNumber, finalized)
+        }
+        finalized.add(playerId)
+    }
+
+    hasPlayerFinalizedBattle(roomNumber: string, playerId: number): boolean {
+        return this.finalizedBattlePlayerIds.get(roomNumber)?.has(playerId) === true
+    }
+
+    consumePlayerFinalizedBattle(roomNumber: string, playerId: number): boolean {
+        const finalized = this.finalizedBattlePlayerIds.get(roomNumber)
+        if (!finalized?.delete(playerId)) return false
+        if (finalized.size === 0) this.finalizedBattlePlayerIds.delete(roomNumber)
+        return true
+    }
+
+    hasBattleClients(roomNumber: string): boolean {
+        return (this.battleClients.get(roomNumber)?.size ?? 0) > 0
     }
 
     clearSceneReady(roomNumber: string): void {
@@ -208,11 +393,47 @@ export class SessionManager {
     }
 
     setBattleExpectedCount(roomNumber: string, count: number): void {
+        this.battleParticipants.delete(roomNumber)
+        this.resetBattleScene(roomNumber, count)
+    }
+
+    setBattleParticipants(
+        roomNumber: string,
+        participants: Array<{ connectionId: string, viewerId: number, playerId: number | null }>,
+    ): void {
+        const participantMap = new Map<string, BattleParticipant>()
+        for (const participant of participants) {
+            if (!participant.connectionId || participant.playerId === null) continue
+            participantMap.set(participant.connectionId, {
+                viewerId: participant.viewerId,
+                playerId: participant.playerId,
+            })
+        }
+        this.battleParticipants.set(roomNumber, participantMap)
+        this.resetBattleScene(roomNumber, participantMap.size)
+    }
+
+    private resetBattleScene(roomNumber: string, count: number): void {
+        this.sceneReadyClients.delete(roomNumber)
+        this.sceneTransitionClients.delete(roomNumber)
+        this.battleStartDeliveredClients.delete(roomNumber)
+        this.finalizedBattlePlayerIds.delete(roomNumber)
+        this.battleSceneGeneration.set(roomNumber, 0)
         this.battleExpectedCount.set(roomNumber, count)
     }
 
-    clearBattleExpectedCount(roomNumber: string): void {
+    clearBattleSceneState(roomNumber: string): void {
         this.battleExpectedCount.delete(roomNumber)
+        this.sceneReadyClients.delete(roomNumber)
+        this.sceneTransitionClients.delete(roomNumber)
+        this.battleStartDeliveredClients.delete(roomNumber)
+        this.battleSceneGeneration.delete(roomNumber)
+    }
+
+    clearBattleExpectedCount(roomNumber: string): void {
+        this.clearBattleSceneState(roomNumber)
+        this.battleParticipants.delete(roomNumber)
+        this.finalizedBattlePlayerIds.delete(roomNumber)
     }
 
     getRoomState(roomNumber: string): RoomStateMachine {
@@ -226,11 +447,13 @@ export class SessionManager {
 
     removeRoomState(roomNumber: string): void {
         this.roomStates.delete(roomNumber)
+        this.clearBattleExpectedCount(roomNumber)
     }
 
-    sendJson(socket: net.Socket, data: any): void {
-        if (!socket.writable) return
+    sendJson(socket: net.Socket, data: any): boolean {
+        if (!socket.writable) return false
         socket.write(JSON.stringify(data) + "\0")
+        return true
     }
 
     broadcastToRoom(roomNumber: string, data: any, excludeAddr?: string): void {

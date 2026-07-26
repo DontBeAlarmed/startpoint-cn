@@ -1,6 +1,11 @@
 import * as net from "net"
+import { getQuestFromCategorySync } from "../../lib/assets"
+import { QuestCategory } from "../../lib/types"
+import { getRoom } from "../room/manager"
 import { sessionManager, SessionClient } from "../state/SessionManager"
 import { relayToBattleRoom } from "./relay"
+
+const BATTLE_MEASUREMENT_WARNING_THRESHOLD_MS = 2000
 
 function findBattleClientBySocket(socket: net.Socket): SessionClient | undefined {
     const map = (sessionManager as any).cidToBattleClient as Map<string, SessionClient> | undefined
@@ -9,6 +14,17 @@ function findBattleClientBySocket(socket: net.Socket): SessionClient | undefined
         if (client.socket === socket) return client
     }
     return undefined
+}
+
+function getRoomQuest(client: SessionClient) {
+    const room = getRoom(client.roomNumber)
+    if (!room) return undefined
+    try {
+        const quest = getQuestFromCategorySync(room.category, room.quest_id)
+        return quest ? { quest, room } : undefined
+    } catch {
+        return undefined
+    }
 }
 
 function handleBattleNotify(socket: net.Socket, data: unknown): void {
@@ -21,31 +37,48 @@ function handleBattleNotify(socket: net.Socket, data: unknown): void {
             if (!client) break
             const allReady = sessionManager.markSceneReady(client.connectionId, client.roomNumber)
             if (allReady) {
-                const bSet = (sessionManager as any).battleClients?.get?.(client.roomNumber) as Set<string> | undefined
-                if (bSet) {
-                    for (const cid of bSet) {
-                        const c = sessionManager.getBattleClient(cid)
-                        if (c) sessionManager.sendJson(c.socket, [1, [1]])
-                    }
-                }
+                sessionManager.broadcastBattleStart(client.roomNumber)
+            } else {
+                sessionManager.replayBattleStartIfNeeded(client.connectionId, client.roomNumber)
             }
             break
         }
-        case 1: { // Finalize
-            if (client) sessionManager.sendJson(client.socket, [1, [2]])
+        case 1: { // LevelNext
+            if (!client) break
+            const context = getRoomQuest(client)
+            if (context?.room.category === QuestCategory.BOSS_BATTLE
+                && context.quest.isBothBoss === true) {
+                sessionManager.beginNextBattleScene(client.connectionId, client.roomNumber)
+            }
             break
         }
-        case 2: { // Measurement
+        case 2: { // Finalize
+            if (!client) break
+            const context = getRoomQuest(client)
+            if (context && sessionManager.canFinalizeBattle(
+                client.roomNumber,
+                context.room.category === QuestCategory.BOSS_BATTLE
+                    && context.quest.isBothBoss === true,
+            ) && sessionManager.markBattleFinalized(client.connectionId, client.roomNumber)) {
+                sessionManager.sendJson(client.socket, [1, [2]])
+            }
+            break
+        }
+        case 3: { // Measurement
             if (client) {
-                const params = data[1]
-                const frame = params?.[0] ?? 0
-                const clientTime = params?.[1] ?? 0
-                sessionManager.sendJson(client.socket, [1, [3, frame, clientTime, Date.now()]])
+                const frame = data[1] ?? 0
+                const clientTime = data[2] ?? 0
+                sessionManager.sendJson(client.socket, [1, [3, frame, clientTime, BATTLE_MEASUREMENT_WARNING_THRESHOLD_MS]])
             }
             break
         }
-        case 4: // Heartbeat
-            if (client) sessionManager.sendJson(client.socket, [1, [3, 0, 0, Date.now()]])
+        case 4: { // LineSpeedWarning
+            if (client) {
+                sessionManager.broadcastToBattleRoom(client.roomNumber, [1, [4, client.connectionId, data[1] ?? 0]])
+            }
+            break
+        }
+        case 5: // Heartbeat is a keepalive notification and has no response frame.
             break
         default:
             break

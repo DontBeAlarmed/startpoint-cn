@@ -33,9 +33,9 @@ PassDaily、PassWeek、PassEvent 主数据、核心进度、点数、6 条 type 
 
 战阵的本地三队配队、开始、基础结算和官方 `raid_event_overall_reward` 表驱动的累计击破奖励已经接入。finish 按 `required_kill_count` 推进共享 Boss 权重和分关卡次数，summary 在独立事务中发奖并推进玩家游标；10 个奖励槽、重复 summary 和事务回滚已有专项测试。客户端奖励动画、页面刷新和官方全服状态在单实例私服中的体验仍待验收；旧错误状态迁移及 summary 发奖时点见[战阵事件级奖励](../systems/raid-event-overall-rewards.md)。
 
-### 超级猫头鹰多场景联机未实现
+### 超级猫头鹰多场景联机待客户端验收
 
-普通联机以一次 Boss 战后结算为主；超级猫头鹰 `BothBoss` 关卡需要在同一战斗会话内处理 `LevelNext`、下一场景 SceneReady 屏障和第二个 Boss。当前帧协议只具备基础 SceneReady，中间场景切换与恢复尚未补齐。详见[多场景联机分析](../protocol/super-owl-multiscene.md)。
+服务端已在同一 active quest 内实现 `LevelNext`、第二代 SceneReady、第二次 BattleStart 和最终 Finalize，并按 CDN 字段限制 BothBoss 入口。当前缺口是 CN 客户端的 NPC/真人完整切场、第二 Boss、最终结算和异常断线体验验证；进程重启后的原房间与场景恢复仍不支持。详见[多场景联机分析](../protocol/super-owl-multiscene.md)。
 
 ### 自动连战体力耗尽
 

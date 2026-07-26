@@ -28,6 +28,17 @@ def optional_float_ms(row, idx):
         return None
     return floor(float(val) * 1000)
 
+def required_bool(row, idx, field):
+    """Return a strict boolean from the generated master-data spelling."""
+    if idx < 0 or idx >= len(row):
+        raise ValueError(f'missing {field}')
+    val = row[idx]
+    if val in ('true', 'True', 'TRUE'):
+        return True
+    if val in ('false', 'False', 'FALSE'):
+        return False
+    raise ValueError(f'invalid {field}: {val}')
+
 def extract_rank_times(row, layout):
     """Return {bRankTime, aRankTime, sRankTime, sPlusRankTime} dict."""
     result = {}
@@ -281,6 +292,10 @@ def convert_4level_with_story(obj, layout, story_clear_reward=None):
                     fp = extract_fixed_party(row, layout)
                     if fp is not None:
                         q['fixedParty'] = fp
+                    both_boss = layout.get('is_both_boss')
+                    if both_boss is not None and both_boss >= 0 \
+                            and required_bool(row, both_boss, 'is_both_boss'):
+                        q['isBothBoss'] = True
                     q['sPlusRewardId'] = 1
                     converted[qid] = q
     return converted

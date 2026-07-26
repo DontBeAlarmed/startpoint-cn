@@ -27,7 +27,8 @@
         "characterExpReward": 1415,
         "manaReward": 1290,
         "poolExpReward": 1415,
-        "element": 0
+        "element": 0,
+        "isBothBoss": true
     },
     "1001003": {
         "name": "",
@@ -42,7 +43,8 @@
         "characterExpReward": 1620,
         "manaReward": 1560,
         "poolExpReward": 1620,
-        "element": 0
+        "element": 0,
+        "isBothBoss": true
     },
     "1001004": {
         "name": "",

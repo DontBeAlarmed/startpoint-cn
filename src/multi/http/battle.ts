@@ -78,6 +78,25 @@ async function buildFinishFollowInfo(
     return followInfo;
 }
 
+export function canFinishMultiBattleQuest(
+    quest: Pick<BattleQuest, "isBothBoss">,
+    roomNumber: string | null | undefined,
+    playerId: number,
+): boolean {
+    return quest.isBothBoss !== true
+        || (roomNumber != null
+            && sessionManager.hasPlayerFinalizedBattle(roomNumber, playerId))
+}
+
+export function cleanupAbortedMultiBattle(roomNumber: string, playerId: number): boolean {
+    const room = getRoom(roomNumber);
+    if (room?.host_player_id === playerId) {
+        return disbandRoom(roomNumber);
+    }
+    sessionManager.removeBattlePlayer(roomNumber, playerId);
+    return false;
+}
+
 export function registerBattleRoutes(fastify: FastifyInstance): void {
 
     // ---- start ----
@@ -196,6 +215,11 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         }
 
         const room = activeQuestData.roomNumber ? getRoom(activeQuestData.roomNumber) : null;
+        if (!canFinishMultiBattleQuest(questData, activeQuestData.roomNumber, playerId)) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Battle is not finalized."
+            });
+        }
         const isRoomHost = resolveIsRoomHost({
             roomHostPlayerId: room?.host_player_id ?? null,
             playerId,
@@ -347,6 +371,26 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 missionSettlement,
             }
         }
+        const bothBossRoomNumber = questData.isBothBoss === true
+            && typeof activeQuestData.roomNumber === "string"
+            ? activeQuestData.roomNumber
+            : undefined
+        if (bothBossRoomNumber !== undefined
+            && !sessionManager.consumePlayerFinalizedBattle(bothBossRoomNumber, playerId)) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Battle is not finalized."
+            });
+        }
+
+        let finishWrites: ReturnType<typeof executeFinishWrites>
+        try {
+            finishWrites = getDb().transaction(executeFinishWrites)()
+        } catch (error) {
+            if (bothBossRoomNumber !== undefined) {
+                sessionManager.markPlayerFinalizedBattle(bothBossRoomNumber, playerId)
+            }
+            throw error
+        }
         const {
             characterList,
             clearReward,
@@ -355,13 +399,15 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             scoreRewardsResult,
             sPlusClearReward,
             missionSettlement,
-        } = getDb().transaction(executeFinishWrites)()
+        } = finishWrites
 
         delete activeQuests[playerId];
         if (activeQuestData.roomNumber) {
-            sessionManager.clearBattleExpectedCount(activeQuestData.roomNumber);
             if (isRoomHost && room) {
                 updateRoomState(room.room_number, 1);
+                if (!sessionManager.hasBattleClients(activeQuestData.roomNumber)) {
+                    sessionManager.clearBattleSceneState(activeQuestData.roomNumber);
+                }
                 console.log(`[MULTI] finish: room ${activeQuestData.roomNumber} reset to raising_state=1`);
             }
         }
@@ -461,13 +507,11 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         if (abortResult.cancelled && activeQuestData) {
             if (activeQuestData.roomNumber) {
                 const room = getRoom(activeQuestData.roomNumber);
-                if (room && room.host_player_id === playerId) {
-                    disbandRoom(activeQuestData.roomNumber);
+                if (cleanupAbortedMultiBattle(activeQuestData.roomNumber, playerId)) {
                     console.log(`[MULTI] abort: room ${activeQuestData.roomNumber} disbanded (host abandoned)`);
+                } else if (room) {
+                    console.log(`[MULTI] abort: player ${playerId} removed from room ${activeQuestData.roomNumber}`);
                 }
-            }
-            if (activeQuestData.roomNumber) {
-                sessionManager.clearBattleExpectedCount(activeQuestData.roomNumber);
             }
         }
 

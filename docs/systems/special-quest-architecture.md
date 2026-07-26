@@ -58,5 +58,6 @@
 - 无限演武 11,100 条分数奖励保留奖励行 ID、分数线、原因 ID 和最多 6 个奖励槽；结算按 `(旧最高分, 新最高分]` 发放全部跨越档位。
 - 无限演武按 B/A/S/SS 分数阈值计算 C/B/A/S/SS 评级，并返回客户端必需的 `score_attack_event.main_character_ids/reward_ids`。
 - 当前 11,100 行奖励 kind 扫描结果仅为 `{0}`；运行逻辑完整支持当前道具奖励，其他未出现 kind 明确拒绝并回滚，不推测未来类型。
+- 超级猫头鹰是 category 2 的普通 Boss Battle 扩展，不并入四种活动模式。内容转换器从 `boss_battle_quest` 第 122 列识别 `1001002`、`1001003` 两个 BothBoss 入口；联机 TCP 在同一 active quest 内完成两代 SceneReady 和 LevelNext，最终仍只执行一次 HTTP finish。
 
 以上属于代码和资产检查结果，不代表客户端进入、配队和结算已经验收通过。

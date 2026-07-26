@@ -68,6 +68,7 @@ export interface RawQuest {
     manaReward?: number,
     poolExpReward?: number,
     fixedParty?: number,
+    isBothBoss?: boolean,
     rushEventId?: number
     rushEventFolderId?: number
     rushEventRound?: number
@@ -106,6 +107,7 @@ export interface BattleQuest {
     manaReward: number,
     poolExpReward: number,
     fixedParty?: number,
+    isBothBoss?: boolean,
     rushEventId?: number
     rushEventFolderId?: RushEventFolder
     rushEventRound?: number

@@ -434,16 +434,22 @@ function handleHeartbeat(socket: net.Socket, client: SessionClient, _data: any[]
 }
 
 function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: any[]): void {
+    const room = getRoom(client.roomNumber)
+    if (!room || room.host_viewer_id !== client.viewerId) return
     if ((sessionManager as any).battleExpectedCount?.has?.(client.roomNumber)) return
 
-    const expectedCount = countRealPlayers(client.mates)
-    sessionManager.setBattleExpectedCount(client.roomNumber, expectedCount)
+    const realMembers = client.mates.filter(mate => !mate.comId)
+    sessionManager.setBattleParticipants(client.roomNumber, realMembers.map(mate => ({
+        connectionId: String(mate.connectionId ?? ""),
+        viewerId: Number(mate.viewerId),
+        playerId: Number.isSafeInteger(mate.playerId) ? mate.playerId : null,
+    })))
     updateRoomState(client.roomNumber, 4)
 
     autoStartingRooms.delete(client.roomNumber)
     const members = [...client.mates]
     sessionManager.broadcastToRoom(client.roomNumber, [1, [5, members]])
-    console.log(`[LOBBY] StartBattle: room=${client.roomNumber} mates=${client.mates.length} expected=${expectedCount}`)
+    console.log(`[LOBBY] StartBattle: room=${client.roomNumber} mates=${client.mates.length} expected=${realMembers.length}`)
 }
 
 function handleNotify(socket: net.Socket, client: SessionClient, data: any[]): void {

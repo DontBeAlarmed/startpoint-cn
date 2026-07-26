@@ -163,6 +163,7 @@ function getQuestSync(
         manaReward: quest.manaReward ?? 0,
         poolExpReward: quest.poolExpReward ?? 0,
         fixedParty: quest.fixedParty,
+        isBothBoss: quest.isBothBoss,
         rushEventId: quest.rushEventId,
         rushEventFolderId: quest.rushEventFolderId,
         rushEventRound: quest.rushEventRound

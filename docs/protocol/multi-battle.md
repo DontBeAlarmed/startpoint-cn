@@ -10,6 +10,7 @@
 - 房主招募 NPC、准备、开始战斗和提交结算；
 - lobby 内的 Welcome、Mates、Ready、Start 和心跳；
 - battle TCP 的 SceneReady 屏障和普通 Broadcast/Send 中继；
+- 超级猫头鹰 BothBoss 的 LevelNext、第二代 SceneReady 和最终 Finalize；
 - 多人 active quest 写入 SQLite，并在 `/load` 中返回未完成关卡；
 - 房主结算后把现有房间恢复到可重赛状态；
 - NPC 昵称从项目维护的昵称池分配，并在房间生命周期内保持稳定。
@@ -17,8 +18,7 @@
 当前不完整或缺失的能力：
 
 - 真人随机匹配和完整的双客户端流程；
-- 多场景 `LevelNext`、第二次 SceneReady 屏障和超级猫头鹰流程；
-- `Finalize`、`Measurement`、battle `Heartbeat` 等帧的完整 CN 校准；
+- 多场景进程重启恢复和客户端完整异常链；
 - 进程重启后的房间和 TCP 会话恢复；
 - 真人成员、重赛、昵称显示和 TCP 中断的完整客户端回归矩阵。
 
@@ -167,7 +167,7 @@ JSON.stringify(message) + "\0"
 
 ### 6.2 Battle socket 握手
 
-客户端使用 `socklet=cooperation_battle` 和 connection ID 建立 battle socket。服务端将该连接登记到房间的 battle client 集合，并返回：
+客户端使用 `socklet=cooperation_battle` 和 connection ID 建立 battle socket。只有房主的 lobby StartBattle 可以固化当局真人成员的 connection ID/viewer ID/player ID 快照；服务端要求房间已进入战斗状态、请求身份属于该快照且尚未注册 battle socket。快照不依赖 lobby 或 battle socket 持续在线，合法成员断线后仍保留当局重连资格；每代 BattleStart 的送达记录也按 connection ID 保留，重连者只补收自己遗漏的代次。校验通过后继承快照中的 viewer/player 身份，登记到 battle client 集合并返回。战斗开始后临时建立但未进入当局成员快照的 lobby 连接会被拒绝：
 
 ```text
 [0, roomNumber, ""]
@@ -304,7 +304,7 @@ create_room
 
 - 房主 `abort` 成功取消 active quest 时解散房间；
 - `disband_room` 广播 Disbanded 并删除房间；
-- 非房主 abort 只处理其自身 active quest，不应替房主删除房间。
+- 非房主 abort 只处理其自身 active quest，并移除自身 battle 连接、屏障资格和未消费的 Finalize 凭证，不删除房间或其他玩家的结算状态。
 
 ### 10.3 连接断开
 
@@ -342,15 +342,11 @@ SceneReady 当前可用：
 1. lobby StartBattle 记录预期真人 battle client 数量；
 2. 每个 battle client 发送 SceneReady；
 3. 达到预期数量后，服务端向已连接 battle client 发送 BattleStart；
-4. 当前屏障只覆盖首次场景进入。
+4. BothBoss 关卡的合法 LevelNext 会开启第二代屏障，并在第二次全员就绪后再次发送 BattleStart。
 
-以下帧仍是部分实现：
+CN Notify 索引已经按 `SceneReady=0`、`LevelNext=1`、`Finalize=2`、`Measurement=3`、`LineSpeedWarning=4`、`Heartbeat=5` 分派。LevelNext 只允许主数据 `isBothBoss=true` 的 Boss Battle 入口；普通关卡和隐藏配置不能开启第二场景。第二代只接受已发送 LevelNext 的连接进入 SceneReady，重复消息保持幂等；BothBoss 提前 Finalize/HTTP finish 会被拒绝，等待期间 battle client 断线会缩减屏障人数。
 
-- `LevelNext` 没有完整重置下一场景 SceneReady 屏障；
-- `Finalize` 的枚举与回包仍需按 CN 1.8.1 校准；
-- `Measurement` 目前只提供基础时间响应；
-- battle `Heartbeat` 仍复用基础 Measurement 形态；
-- 多场景中断、恢复和第二个 Boss 尚无完整状态机。
+当前仍不恢复进程重启后丢失的场景 generation 或 TCP socket；Measurement 和线路告警只实现协议所需的基础响应/广播，没有网络质量统计系统。
 
 普通 Broadcast 可中继不等于协议覆盖全部战斗场景。超级猫头鹰边界见[多场景联机分析](./super-owl-multiscene.md)。
 
@@ -365,7 +361,7 @@ SceneReady 当前可用：
 | TCP 中断与恢复 | 服务端有清理测试，客户端完整矩阵待验收 |
 | 真人双客户端 | 服务端连接与广播基础存在，缺少完整验收条件 |
 | 真人随机匹配 | 缺失 |
-| 超级猫头鹰多场景 | 缺失 |
+| 超级猫头鹰多场景 | 服务端状态机已实现，CN 客户端待验收 |
 
 全项目人工状态以[测试进度](../status/test-progress.md)和[支持矩阵](../status/support-matrix.md)为准。自动测试通过不得写成客户端已经通过。
 
