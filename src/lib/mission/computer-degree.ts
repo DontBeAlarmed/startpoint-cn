@@ -17,6 +17,7 @@ import bundledMainQuests from "../../../assets/main_quest.json"
 import bundledExQuests from "../../../assets/ex_quest.json"
 import bundledTreasureShop from "../../../assets/treasure_shop.json"
 import bundledBossBattleQuests from "../../../assets/boss_battle_quest.json"
+import bundledExpertSingleEventQuests from "../../../assets/expert_single_event_quest.json"
 import {
     ContentSnapshotError,
     getContentSnapshot,
@@ -214,6 +215,23 @@ function getBossBattleSuperQuestId(
     return questId
 }
 
+function getExpertSingleQuestId(missionId: number): number | undefined {
+    const definition = getMissionMasterDefinition(5, missionId)
+    if (!definition
+        || Number(definition.row[3]) !== 14
+        || Number(definition.row[8]) !== 14) return undefined
+    const eventId = Number(definition.row[9])
+    const suffix = Number(definition.row[11])
+    if (!Number.isSafeInteger(eventId) || eventId <= 0
+        || !Number.isSafeInteger(suffix) || suffix <= 0) return undefined
+    const questId = eventId * 1000 + suffix
+    const quests = getRuntimeTable<RawQuestTable>(
+        "expert_single_event_quest.json",
+        bundledExpertSingleEventQuests,
+    )
+    return quests[String(questId)] === undefined ? undefined : questId
+}
+
 function buildStats(playerId: number, category: number): CategoryContext {
     const player = getPlayerSync(playerId)!
     const characters = getPlayerCharactersSync(playerId)
@@ -230,7 +248,8 @@ function buildStats(playerId: number, category: number): CategoryContext {
         const questId = getBossBattleSuperQuestId(definition.missionId, bossBattleQuests)
         if (questId !== undefined) bossBattleSuperQuestByMission.set(definition.missionId, questId)
     }
-    const finishedQuestIds = getFinishedPlayerQuestIdsBySectionsSync(playerId, [2])[2] ?? new Set()
+    const finishedQuestIdsBySection = getFinishedPlayerQuestIdsBySectionsSync(playerId, [2, 21])
+    const finishedQuestIds = finishedQuestIdsBySection[2] ?? new Set()
     return {
         category,
         playerId,
@@ -272,6 +291,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
             treasureShopPurchaseCount,
             bossBattleSuperQuestByMission,
             bossBattleClearQuestIds: finishedQuestIds,
+            expertSingleFinishedQuestIds: finishedQuestIdsBySection[21] ?? new Set(),
             challengeDungeonClearCount: battleCounters.challengeDungeonClearCount,
             singleScoreMax: battleCounters.singleScoreMax,
             singleClearTimeMin: battleCounters.singleClearTimeMin,
@@ -361,6 +381,9 @@ export function getDegreeMissionCoverageReport() {
         )).length,
         bossBattleExClearSingle: definitions.filter(definition => (
             getBossBattleSuperQuestId(definition.missionId) !== undefined
+        )).length,
+        expertSingleQuestClear: definitions.filter(definition => (
+            getExpertSingleQuestId(definition.missionId) !== undefined
         )).length,
         challengeDungeonClear: definitions.filter(definition => (
             definition.pattern.startsWith(SUPPORTED_FAMILIES.challengeDungeonClear)
@@ -452,6 +475,13 @@ export const DegreeComputer: MissionComputer = {
         const bossBattleSuperQuestId = stats.bossBattleSuperQuestByMission.get(missionId)
         if (bossBattleSuperQuestId !== undefined) {
             return Math.max(dbProgress, stats.bossBattleClearQuestIds.has(bossBattleSuperQuestId) ? 1 : 0)
+        }
+        const expertSingleQuestId = getExpertSingleQuestId(missionId)
+        if (expertSingleQuestId !== undefined) {
+            return Math.max(
+                dbProgress,
+                stats.expertSingleFinishedQuestIds.has(expertSingleQuestId) ? 1 : 0,
+            )
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.companionCount)) return stats.companionCount
         if (pattern.startsWith(SUPPORTED_FAMILIES.overLimitCount)) return stats.overLimitCount

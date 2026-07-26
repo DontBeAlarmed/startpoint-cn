@@ -42,6 +42,12 @@
 - 13 条 `degree_boss_battle_ex_clear_single_*` 可以由主数据的 stage group + difficulty 与 `boss_battle_quest.json` 精确闭合，服务端只接受对应 category 2 关卡的 `finished=1` 记录。
 - `11080`（大蛇）主数据要求 difficulty `4`，但官方表中该 stage group 只有 difficulty `1..3`。当前不把现有最高难度 3 推测为目标 4，保持持久化 fallback；如果后续 CDN 补齐 difficulty 4，才会自动进入计算路径。
 
+## 称号 ExpertSingle 精确单关
+
+- `57010` 至 `57120` 共 12 条只在 type 14、QuestRange kind 14、event ID 1 和 suffix 1 至 12 精确闭合时启用；目标关卡 `1001` 至 `1012` 必须存在于当前 Content snapshot 的 `expert_single_event_quest.json`。
+- 玩家事实只读取 category 21 的 `players_quest_progress.finished=1`。其他 category 中相同 quest ID、未完成记录和缺失关卡均不计入，已有持久化进度仍取最大值。
+- 该族奖励目标均为 1，因此历史唯一通关记录足够证明完成；没有用它推算重复通关次数或活动开放期内的时间线。
+
 ## 称号挑战副本累计通关
 
 - `10000/10010/10020` 的 pattern 分别要求 100、500、3000 次挑战副本成功通关。服务端按 CN 关卡类别枚举将挑战副本识别为 category 13，并在成功 finish 事务中增加独立的 `challenge_dungeon_clear_count`。

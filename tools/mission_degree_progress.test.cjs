@@ -187,6 +187,14 @@ insertChapterProgress(1)
 insertChapterProgress(2, 2001001)
 insertPlayerQuestProgressSync(playerId, 2, { questId: 1003004, finished: true })
 
+for (let suffix = 1; suffix <= 12; suffix++) {
+    insertPlayerQuestProgressSync(playerId, 21, {
+        questId: 1000 + suffix,
+        finished: suffix !== 2,
+    })
+}
+insertPlayerQuestProgressSync(playerId, 1, { questId: 1002, finished: true })
+
 function insertPracticeProgress(questIds, clearRank = 5) {
     for (const questId of questIds) {
         insertPlayerQuestProgressSync(playerId, 15, {
@@ -243,6 +251,9 @@ assert.equal(DegreeComputer.compute(46010, context, 150), 150, "珍品商店称�
 assert.equal(DegreeComputer.compute(11010, context, 0), 1, "指定 Boss 超级关卡完成后应完成称号")
 assert.equal(DegreeComputer.compute(11020, context, 0), 0, "未完成指定 Boss 超级关卡时不得完成称号")
 assert.equal(DegreeComputer.compute(11080, context, 7), 7, "CDN 缺少指定难度映射时应保留持久化 fallback")
+assert.equal(DegreeComputer.compute(57010, context, 0), 1, "ExpertSingle 精确关卡完成后应达成称号")
+assert.equal(DegreeComputer.compute(57020, context, 0), 0, "其他 category 的同 ID 不得完成 ExpertSingle 称号")
+assert.equal(DegreeComputer.compute(57020, context, 3), 3, "ExpertSingle 称号旧进度不得倒退")
 assert.equal(DegreeComputer.compute(111001, context, 0), 1, "指定角色获得信赖之证后应完成称号")
 assert.equal(DegreeComputer.compute(111002, context, 0), 0, "未获得信赖之证的角色不得完成称号")
 assert.equal(DegreeComputer.compute(111003, context, 0), 1, "已领取信赖之证后称号仍必须保持完成")
@@ -305,8 +316,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1054,
-    unsupported: 234,
+    serverComputed: 1066,
+    unsupported: 222,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -326,14 +337,15 @@ assert.deepEqual(coverage, {
         practiceRankSs: 5,
         treasureShopPurchaseCount: 3,
         bossBattleExClearSingle: 13,
-    challengeDungeonClear: 3,
-    scoreClearSingle: 3,
-    timeClearSingle: 3,
-    bossBattleClear: 3,
-    dashUse: 3,
-    comboOneTime: 3,
-    craftPointGet: 3,
-    skillUse: 3,
+        expertSingleQuestClear: 12,
+        challengeDungeonClear: 3,
+        scoreClearSingle: 3,
+        timeClearSingle: 3,
+        bossBattleClear: 3,
+        dashUse: 3,
+        comboOneTime: 3,
+        craftPointGet: 3,
+        skillUse: 3,
     },
 })
 
