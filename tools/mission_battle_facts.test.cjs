@@ -40,6 +40,24 @@ stubModule("../src/data/domains/mission_battle_facts", {
 stubModule("../src/lib/mission/degree-battle-stat-facts", {
     recordDegreeBattleStatisticsSync: ctx => calls.push(["degree-stats", ctx.questId]),
 })
+stubModule("../src/lib/mission/daily-battle-facts", {
+    recordDailyMissionBattleFacts: ctx => calls.push(["daily", ctx.questId]),
+})
+stubModule("../src/lib/mission/event-battle-facts", {
+    recordEventMissionBattleFacts: ctx => calls.push(["event", ctx.questId]),
+})
+stubModule("../src/lib/mission/degree-battle-facts", {
+    recordDegreeMissionBattleFacts: ctx => calls.push(["degree", ctx.questId]),
+})
+stubModule("../src/lib/mission/pass-battle-facts", {
+    recordPassMissionBattleFacts: ctx => calls.push(["pass", ctx.questId]),
+})
+stubModule("../src/lib/mission/active-mission-specific-battle-facts", {
+    recordActiveMissionSpecificBattleFactsSync: ctx => calls.push(["active-specific", ctx.questId]),
+})
+stubModule("../src/lib/mission/active-conditional-battle-facts", {
+    recordActiveMissionConditionalBattleFactsSync: ctx => calls.push(["active-conditional", ctx.questId]),
+})
 
 const { recordMissionBattleFacts } = require("../src/lib/mission/battle-facts")
 
@@ -96,6 +114,12 @@ assert.deepEqual(calls, [
         skillUseCount: 5,
     }],
     ["degree-stats", 1001],
+    ["daily", 1001],
+    ["event", 1001],
+    ["degree", 1001],
+    ["pass", 1001],
+    ["active-specific", 1001],
+    ["active-conditional", 1001],
     ["multi", 1, 1, 1001],
     ["character", 1001],
     ["leader-powerflip", 1001],
