@@ -100,12 +100,12 @@
   category 8。`row[10]=""` 是 `Within([])` 且严格无匹配，`(None)` 才是 `All`；`row[11]` 是 QuestRank，当前启用
   规则均为 `null`。type 20 Attention 因 `FinishContext` 没有权威救援来源而保持 0 条，普通 Guest 不冒充 Attention。
 - “接取救援请求”保持低优先级，暂不实现；在获得可区分 Attention 的权威来源前，不以普通 Guest 代替。
-- 当前 category 3 共启用 1477 条严格事实：805 条 QuestRange 协力规则、257 条 type 23 精确通关规则和 415 条关卡/物品/竞速/阶段规则。其中 29 条 Ranking Phase 任务只接受 category 11 的成功单人结算，按官方关卡表精确匹配 quest ID，并以合法整数 `clear_phase` 完成不高于本次阶段的任务。
+- 当前 category 3 共启用 1485 条严格事实：805 条 QuestRange 协力规则、257 条 type 23 精确通关规则和 423 条关卡/物品/竞速/阶段/单人累计规则。其中 29 条 Ranking Phase 任务只接受 category 11 的成功单人结算，按官方关卡表精确匹配 quest ID，并以合法整数 `clear_phase` 完成不高于本次阶段的任务；另有 8 条 type 14 任务按摇曳迷宫、EX 和崩坏域的权威 QuestRange 逐次累计成功单人结算。
   其中包括 40 条 `get_item_count`、54 条土俑单关卡、18 条土俑聚合任务、37 条崩坏域庆贺单关卡
   和 7 条崩坏域庆贺聚合任务。土俑与崩坏域任务均由 CDN 关卡表、活动任务主数据和持久化关卡完成记录闭合，
   不读取客户端自报计数。另有 188 条 category 11 与 42 条 category 24 竞速任务由精确关卡、官方奖励秒数和历史最佳时间闭合。
-  其余 1035 条（包括 mission 1807）仍使用持久化 fallback。
-  任务页不从旧 `mission_event_quest_map.json` 直接推算；只有通过 `computer-event-safe.ts` 白名单的精确规则才会自动计算和发奖。
+  其余 1027 条（包括 mission 1807）仍使用持久化 fallback。
+  任务页不从旧 `mission_event_quest_map.json` 直接推算；只有通过 `computer-event-safe.ts` 白名单的精确规则才会自动计算和发奖。安全计算器当前登记 392 条，其中 6 条目标为 1 的 type 14 任务可从历史完成记录回填；它们同时拥有 finish 生产者，因此不在 1485 条总覆盖中重复计数。生产上下文保留数据库返回的全部关卡 category，不再只装载 Ranking/Rush 两类。
   后续仍需补全活动范围、评级、房主/成员、救援、阶段和 client check 等谓词后逐批启用。
 
 ## Pass 分类与等级奖励
@@ -142,7 +142,7 @@
 
 - category 4 已形成累计获得量、活动隔离、结算、发奖和 load 映射；category 5 已接入上述 1132 条权威事实。
   两类仍需 CN 客户端验证提示、奖励和重启持久化；category 5 的其余任务需逐族补事实。
-- category 3 已启用 805 条按 mission ID 的严格协力规则、257 条 type 23 精确通关规则和 415 条关卡/物品/竞速/阶段规则；其余 1035 条复杂规则继续补类型化事实，
+- category 3 已启用 805 条按 mission ID 的严格协力规则、257 条 type 23 精确通关规则和 423 条关卡/物品/竞速/阶段/单人累计规则；其余 1027 条复杂规则继续补类型化事实，
   旧 map 只作历史审计，不作为自动事实或发奖依据。Attention 在缺少权威来源前保持禁用。
 - Pass 的救援、表情和购买流程尚未完成，三分类、活动关卡累计和等级奖励主链已具备自动测试，仍需 CN 客户端验收。
 - 角色觉醒的配对、竞速进度仍依赖已记录的本地计数器与映射；奖励结算与最终特殊奖励触发已按

@@ -4,7 +4,7 @@
 > 历史审计资产: `assets/mission_event_quest_map.json`
 > 严格规则生成器: `scripts/gen_mission_event_battle_rules.js`
 > 运行时资产: `assets/mission_event_battle_rules.json`
-> 覆盖范围: cat3 活动任务 2512 条；QuestRange 严格协力规则 805 条、type 23 精确通关规则 257 条，另有 415 条关卡/物品/竞速/阶段安全规则
+> 覆盖范围: cat3 活动任务 2512 条；QuestRange 严格协力规则 805 条、type 23 精确通关规则 257 条，另有 423 条关卡/物品/竞速/阶段/单人累计安全规则
 
 `mission_event_quest_map.json` 是按 pattern 展开的旧映射，只供 `computer-event.ts` 历史审计。它没有完整表达
 QuestRange selector、QuestRank、Host/Guest 和 Attention 来源，不能驱动自动事实。旧 939 条自动规则已从
@@ -49,6 +49,10 @@ category 3 的 type 37 不依赖 QuestRange 资产。运行时从 `row[12]` 读�
 Ranking Phase 的 type 49～52 分别对应 Phase 1～4。服务端只接受 category 11 的成功单人结算，以
 `eventId * 1000 + suffix` 精确定位 `ranking_event_single_quest.json` 中的关卡，并要求 `clear_phase` 为 1～4 的整数；
 完成 Phase N 会推进同关卡不高于 N 的阶段任务。该字段来自官方 finish 请求，服务端不重算战斗阶段。
+type 14 的 8 条单人累计任务只白名单摇曳迷宫 QuestRange kind 12（category 6/13/14/20）、EX kind 1
+（category 4）以及崩坏域 kind 7（category 13 的精确 event/suffix）。每次成功单人 finish 增加 1；多人、错误
+category、错误关卡和非开放期均不推进。目标为 1 的六条规则还可由相同范围内的历史 `finished` 回填，重复目标
+`1222/1300` 不根据唯一关卡完成行猜测次数。
 其他活动任务继续返回数据库持久化进度，`computer-event.ts` 和旧 quest map 仍只用于离线审计。
 
 ## Type 23 精确通关规则

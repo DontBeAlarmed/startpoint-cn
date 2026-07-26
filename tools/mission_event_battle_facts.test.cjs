@@ -220,6 +220,7 @@ assert.deepEqual(getExactEventBattleRuleCoverage(), {
     exactClearRules: 257,
     clearRulesByCategory: { 7: 63, 10: 7, 13: 60, 23: 80, 24: 47 },
     exactPhaseRules: 29,
+    exactSingleClearRules: 8,
 })
 assert.deepEqual(BATTLE_SETTLEMENT_CATEGORIES, [1, 2, 3, 6, 7, 8, 10])
 
@@ -304,6 +305,50 @@ assert.equal(
     "非开放期不得推进 Ranking Phase",
 )
 
+const singleClearTime = new Date("2019-12-03T04:00:00.000Z")
+const labyrinthContext = finishContext({
+    questCategory: 6,
+    questId: 1001,
+    isMulti: undefined,
+    isMultiHost: undefined,
+})
+assert.equal(recordEventMissionBattleFacts(labyrinthContext, singleClearTime).includes(1300), true)
+assert.equal(recordEventMissionBattleFacts(labyrinthContext, singleClearTime).includes(1300), true)
+assert.equal(missionProgress(1300), 2, "摇曳迷宫累计任务必须逐次记录成功单人结算")
+assert.equal(recordEventMissionBattleFacts(
+    { ...labyrinthContext, isMulti: true, isMultiHost: true },
+    singleClearTime,
+).includes(1300), false)
+assert.equal(missionProgress(1300), 2, "多人结算不得推进单人累计任务")
+assert.equal(recordEventMissionBattleFacts(
+    { ...labyrinthContext, questCategory: 7 },
+    singleClearTime,
+).includes(1300), false)
+
+assert.equal(recordEventMissionBattleFacts({
+    ...labyrinthContext,
+    questCategory: 4,
+}, singleClearTime).includes(1221), true, "EX 全范围规则应接受成功单人结算")
+assert.equal(recordEventMissionBattleFacts({
+    ...labyrinthContext,
+    questCategory: 13,
+    questId: 1001,
+}, singleClearTime).includes(1303), true)
+assert.equal(recordEventMissionBattleFacts({
+    ...labyrinthContext,
+    questCategory: 13,
+    questId: 1002,
+}, singleClearTime).includes(1304), true)
+assert.equal(recordEventMissionBattleFacts({
+    ...labyrinthContext,
+    questCategory: 13,
+    questId: 1003,
+}, singleClearTime).some(missionId => missionId === 1303 || missionId === 1304), false)
+assert.equal(recordEventMissionBattleFacts(
+    labyrinthContext,
+    new Date("2024-08-14T12:00:00.000Z"),
+).includes(1300), false, "非开放期不得推进单人累计任务")
+
 const finiteTime = new Date("2020-08-14T03:00:00.000Z")
 const finiteContext = finishContext({
     questCategory: 7,
@@ -319,8 +364,13 @@ const allRangeContext = finishContext({
     questId: 987654321,
     isMultiHost: undefined,
 })
+const allRangeBefore = missionProgress(1224)
 assert.equal(recordEventMissionBattleFacts(allRangeContext, allRangeTime).includes(1224), true)
-assert.equal(missionProgress(1224), 1, "quest_kind=(None) 的 type16 必须匹配任意多人关卡")
+assert.equal(
+    missionProgress(1224),
+    allRangeBefore + 1,
+    "quest_kind=(None) 的 type16 必须匹配任意多人关卡",
+)
 
 const hostTime = new Date("2020-04-01T03:00:00.000Z")
 const hostContext = finishContext({ questCategory: 7, questId: 3002 })

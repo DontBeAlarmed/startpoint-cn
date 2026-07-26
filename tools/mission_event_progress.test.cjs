@@ -7,6 +7,7 @@ const {
     getEventMissionCoverageReport,
 } = require("../src/lib/mission/computer-event")
 const {
+    buildEventSafeQuestProgress,
     EventSafeComputer,
     getEventSafeMissionIds,
     getEventItemMissionItemId,
@@ -25,6 +26,16 @@ function context(questProgress) {
         eventMissionProgress: new Map(),
     }
 }
+
+assert.deepEqual(
+    Object.keys(buildEventSafeQuestProgress({
+        4: [{ questId: 1, finished: true }],
+        13: [{ questId: 1001, finished: true }],
+        22: [{ questId: 4001, finished: true }],
+    })).sort(),
+    ["13", "22", "4"],
+    "生产上下文必须保留安全规则所需的全部关卡 category",
+)
 
 const timeAttackQuest = {
     questId: 2001,
@@ -158,6 +169,42 @@ assert.equal(
     6,
     "崩坏域庆贺的聚合任务应按已完成子任务数量计算",
 )
-assert.equal(getEventSafeMissionIds().length, 386, "活动安全计算器应登记关卡事实及 Ranking/Rush 精确竞速任务")
+
+const historicalSingleClearCases = [
+    [1213, { 6: [{ ...timeAttackQuest, questId: 1 }] }],
+    [1214, { 13: [{ ...timeAttackQuest, questId: 1 }] }],
+    [1215, { 14: [{ ...timeAttackQuest, questId: 1 }] }],
+    [1221, { 4: [{ ...timeAttackQuest, questId: 1 }] }],
+    [1303, { 13: [{ ...timeAttackQuest, questId: 1001 }] }],
+    [1304, { 13: [{ ...timeAttackQuest, questId: 1002 }] }],
+]
+for (const [missionId, progress] of historicalSingleClearCases) {
+    assert.equal(
+        EventSafeComputer.compute(missionId, context(progress), 0),
+        1,
+        `目标为 1 的 type 14 任务 ${missionId} 应从历史 finished 回填`,
+    )
+}
+assert.equal(
+    EventSafeComputer.compute(1303, context({ 13: [{ ...timeAttackQuest, questId: 1002 }] }), 0),
+    0,
+    "1303 不得接受同事件错误 suffix",
+)
+assert.equal(
+    EventSafeComputer.compute(1304, context({ 13: [{ ...timeAttackQuest, questId: 1001 }] }), 0),
+    0,
+    "1304 不得接受同事件错误 suffix",
+)
+assert.equal(
+    EventSafeComputer.compute(1222, context({ 6: [{ ...timeAttackQuest, questId: 1 }] }), 2),
+    2,
+    "重复目标任务 1222 不得从唯一历史完成行推测次数",
+)
+assert.equal(
+    EventSafeComputer.compute(1300, context({ 13: deepDomainQuests }), 12),
+    12,
+    "重复目标任务 1300 必须保留已有进度且不按唯一完成行补账",
+)
+assert.equal(getEventSafeMissionIds().length, 392, "活动安全计算器应登记关卡、竞速及可证明的首次通关事实")
 
 console.log("mission event progress tests passed")

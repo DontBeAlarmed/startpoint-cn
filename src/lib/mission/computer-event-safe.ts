@@ -3,6 +3,7 @@ import { getPlayerCategoryMissionsSync } from "../../data/domains/mission"
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getMissionMasterDefinition, getMissionMasterDefinitions } from "./master-data"
+import { exactEventSingleClearRules } from "./event-single-clear-rules"
 import questMap from "../../../assets/mission_event_quest_map.json"
 import carnivalEventQuests from "../../../assets/carnival_event_quest.json"
 import challengeDungeonEventQuests from "../../../assets/challenge_dungeon_event_quest.json"
@@ -27,6 +28,33 @@ interface SafeTimeClearMapping {
     readonly questCategory: number
     readonly questId: number
     readonly targetTimeMs: number
+}
+
+function hasSingleCompletionReward(missionId: number): boolean {
+    const stages = (eventRewards as Record<string, Record<string, unknown[]>>)[String(missionId)]
+    if (!stages || Object.keys(stages).length !== 1) return false
+    const stage = Object.values(stages)[0]
+    const row = Array.isArray(stage) && Array.isArray(stage[0]) ? stage[0] : undefined
+    return Number(row?.[1]) === 1
+}
+
+function getHistoricalSingleClearRule(missionId: number) {
+    if (!hasSingleCompletionReward(missionId)) return undefined
+    return exactEventSingleClearRules.find(rule => rule.missionId === missionId)
+}
+
+function computeHistoricalSingleClear(
+    missionId: number,
+    ctx: CategoryContext,
+): number | undefined {
+    const rule = getHistoricalSingleClearRule(missionId)
+    if (!rule) return undefined
+    return rule.categories.some(category => (
+        ctx.questProgress[String(category)] ?? []
+    ).some(progress => (
+        progress.finished
+        && (rule.questIds === "all" || rule.questIds.includes(progress.questId))
+    ))) ? 1 : 0
 }
 
 function parsePositiveIntegerList(value: unknown): number[] | null {
@@ -207,7 +235,8 @@ function computeTargetMissionClear(
 
 function isSafeEventMission(missionId: number, visiting: Set<number>): boolean {
     if (visiting.has(missionId)) return false
-    if (getEventItemMissionItemId(missionId) !== undefined
+    if (getHistoricalSingleClearRule(missionId) !== undefined
+        || getEventItemMissionItemId(missionId) !== undefined
         || getSafeCarnivalQuestId(missionId) !== undefined
         || getSafeChallengeDungeonQuestIds(missionId) !== undefined
         || getSafeTimeClearMapping(missionId) !== null) return true
@@ -240,6 +269,22 @@ export function getEventItemMissionItemId(missionId: number): number | undefined
     return Number.isSafeInteger(itemId) && itemId > 0 ? itemId : undefined
 }
 
+export function buildEventSafeQuestProgress(
+    rawProgress: ReturnType<typeof getPlayerQuestProgressSync>,
+): CategoryContext["questProgress"] {
+    return Object.fromEntries(Object.entries(rawProgress).map(([category, progress]) => [
+        category,
+        progress.map(entry => ({
+            questId: entry.questId,
+            finished: entry.finished,
+            clearRank: entry.clearRank,
+            bestElapsedTimeMs: entry.bestElapsedTimeMs,
+            leaderCharacterId: entry.leaderCharacterId,
+            multiClearCount: entry.multiClearCount,
+        })),
+    ]))
+}
+
 export const EventSafeComputer: MissionComputer = {
     name: "EventSafe",
 
@@ -247,23 +292,11 @@ export const EventSafeComputer: MissionComputer = {
         const player = getPlayerSync(playerId)
         if (!player) throw new Error(`Player ${playerId} not found during event mission evaluation.`)
         const rawProgress = getPlayerQuestProgressSync(playerId)
-        const selectProgress = (questCategory: number) => (rawProgress[String(questCategory)] ?? [])
-            .map(progress => ({
-                questId: progress.questId,
-                finished: progress.finished,
-                clearRank: progress.clearRank,
-                bestElapsedTimeMs: progress.bestElapsedTimeMs,
-                leaderCharacterId: progress.leaderCharacterId,
-                multiClearCount: progress.multiClearCount,
-            }))
         return {
             category,
             playerId,
             player,
-            questProgress: {
-                "11": selectProgress(11),
-                "24": selectProgress(24),
-            },
+            questProgress: buildEventSafeQuestProgress(rawProgress),
             totalQuestClears: 0,
             totalStories: 0,
             rankCounts: {},
@@ -276,6 +309,10 @@ export const EventSafeComputer: MissionComputer = {
     },
 
     compute(missionId: number, ctx: CategoryContext, dbProgress: number): number {
+        const historicalSingleClear = computeHistoricalSingleClear(missionId, ctx)
+        if (historicalSingleClear !== undefined) {
+            return Math.max(dbProgress, historicalSingleClear)
+        }
         const itemId = getEventItemMissionItemId(missionId)
         if (itemId !== undefined) {
             return Math.max(dbProgress, ctx.collectedItemTotals?.[String(itemId)] ?? 0)

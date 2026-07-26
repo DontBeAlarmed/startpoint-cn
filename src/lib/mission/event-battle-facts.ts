@@ -4,6 +4,7 @@ import {
 } from "../../data/domains/mission"
 import type { FinishContext } from "../quest/finish/types"
 import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "./master-data"
+import { exactEventSingleClearRules } from "./event-single-clear-rules"
 import ruleAsset from "../../../assets/mission_event_battle_rules.json"
 import bossBattleQuests from "../../../assets/boss_battle_quest.json"
 import adventEventQuests from "../../../assets/advent_event_quest.json"
@@ -362,6 +363,7 @@ export function getExactEventBattleRuleCoverage() {
             return counts
         }, {} as Record<number, number>),
         exactPhaseRules: exactPhaseRules.length,
+        exactSingleClearRules: exactEventSingleClearRules.length,
     }
 }
 
@@ -388,6 +390,15 @@ export function recordEventMissionBattleFacts(
         if (!isMissionDefinitionEnabledAt(rule.definition, evaluationTime)) continue
         incrementPlayerCategoryMissionSync(ctx.playerId, 3, rule.missionId, 1)
         matchedMissionIds.push(rule.missionId)
+    }
+    if (ctx.isMulti !== true) {
+        for (const rule of exactEventSingleClearRules) {
+            if (!rule.categories.includes(ctx.questCategory)) continue
+            if (rule.questIds !== "all" && !rule.questIds.includes(ctx.questId)) continue
+            if (!isMissionDefinitionEnabledAt(rule.definition, evaluationTime)) continue
+            incrementPlayerCategoryMissionSync(ctx.playerId, 3, rule.missionId, 1)
+            matchedMissionIds.push(rule.missionId)
+        }
     }
     const clearPhase = ctx.statistics.clear_phase
     if (ctx.isMulti !== true
