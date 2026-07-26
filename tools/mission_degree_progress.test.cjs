@@ -197,6 +197,9 @@ insertPlayerQuestProgressSync(playerId, 1, { questId: 1002, finished: true })
 insertPlayerQuestProgressSync(playerId, 18, { questId: 400004101, finished: true })
 insertPlayerQuestProgressSync(playerId, 18, { questId: 400004103, finished: false })
 insertPlayerQuestProgressSync(playerId, 7, { questId: 200050009, finished: true })
+insertPlayerQuestProgressSync(playerId, 22, { questId: 1003, finished: true })
+insertPlayerQuestProgressSync(playerId, 22, { questId: 1006, finished: false })
+insertPlayerQuestProgressSync(playerId, 26, { questId: 1001001, finished: true })
 
 function insertPracticeProgress(questIds, clearRank = 5) {
     for (const questId of questIds) {
@@ -260,6 +263,9 @@ assert.equal(DegreeComputer.compute(57020, context, 3), 3, "ExpertSingle 称号�
 assert.equal(DegreeComputer.compute(58000, context, 0), 1, "WorldStory 精确关卡完成后应达成称号")
 assert.equal(DegreeComputer.compute(58010, context, 0), 0, "WorldStory 未完成关卡不得达成称号")
 assert.equal(DegreeComputer.compute(68000, context, 0), 1, "Advent 精确单人关卡完成后应达成称号")
+assert.equal(DegreeComputer.compute(61040, context, 0), 1, "Carnival 精确关卡完成后应达成称号")
+assert.equal(DegreeComputer.compute(61050, context, 0), 0, "Carnival 未完成关卡不得达成称号")
+assert.equal(DegreeComputer.compute(62330, context, 0), 1, "HardMulti 精确关卡完成后应达成称号")
 assert.equal(DegreeComputer.compute(111001, context, 0), 1, "指定角色获得信赖之证后应完成称号")
 assert.equal(DegreeComputer.compute(111002, context, 0), 0, "未获得信赖之证的角色不得完成称号")
 assert.equal(DegreeComputer.compute(111003, context, 0), 1, "已领取信赖之证后称号仍必须保持完成")
@@ -322,8 +328,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1094,
-    unsupported: 194,
+    serverComputed: 1127,
+    unsupported: 161,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -346,6 +352,8 @@ assert.deepEqual(coverage, {
         expertSingleQuestClear: 12,
         worldStoryQuestClear: 27,
         adventQuestClear: 1,
+        carnivalQuestClear: 27,
+        hardMultiQuestClear: 6,
         challengeDungeonClear: 3,
         scoreClearSingle: 3,
         timeClearSingle: 3,

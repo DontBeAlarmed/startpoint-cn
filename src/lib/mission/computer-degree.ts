@@ -20,6 +20,8 @@ import bundledBossBattleQuests from "../../../assets/boss_battle_quest.json"
 import bundledExpertSingleEventQuests from "../../../assets/expert_single_event_quest.json"
 import bundledWorldStoryEventQuests from "../../../assets/world_story_event_quest.json"
 import bundledAdventEventQuests from "../../../assets/advent_event_quest.json"
+import bundledCarnivalEventQuests from "../../../assets/carnival_event_quest.json"
+import bundledHardMultiEventQuests from "../../../assets/hard_multi_event_quest.json"
 import {
     ContentSnapshotError,
     getContentSnapshot,
@@ -219,13 +221,14 @@ function getBossBattleSuperQuestId(
 
 function getExactDegreeQuestId(
     missionId: number,
+    missionType: number,
     rangeKind: number,
     tableName: string,
     bundledTable: RawQuestTable,
 ): number | undefined {
     const definition = getMissionMasterDefinition(5, missionId)
     if (!definition
-        || Number(definition.row[3]) !== 14
+        || Number(definition.row[3]) !== missionType
         || Number(definition.row[8]) !== rangeKind) return undefined
     const eventId = Number(definition.row[9])
     const suffix = Number(definition.row[11])
@@ -240,6 +243,7 @@ function getExpertSingleQuestId(missionId: number): number | undefined {
     return getExactDegreeQuestId(
         missionId,
         14,
+        14,
         "expert_single_event_quest.json",
         bundledExpertSingleEventQuests,
     )
@@ -248,6 +252,7 @@ function getExpertSingleQuestId(missionId: number): number | undefined {
 function getWorldStoryQuestId(missionId: number): number | undefined {
     return getExactDegreeQuestId(
         missionId,
+        14,
         9,
         "world_story_event_quest.json",
         bundledWorldStoryEventQuests,
@@ -257,9 +262,30 @@ function getWorldStoryQuestId(missionId: number): number | undefined {
 function getAdventQuestId(missionId: number): number | undefined {
     return getExactDegreeQuestId(
         missionId,
+        14,
         5,
         "advent_event_quest.json",
         bundledAdventEventQuests,
+    )
+}
+
+function getCarnivalQuestId(missionId: number): number | undefined {
+    return getExactDegreeQuestId(
+        missionId,
+        23,
+        15,
+        "carnival_event_quest.json",
+        bundledCarnivalEventQuests,
+    )
+}
+
+function getHardMultiQuestId(missionId: number): number | undefined {
+    return getExactDegreeQuestId(
+        missionId,
+        23,
+        19,
+        "hard_multi_event_quest.json",
+        bundledHardMultiEventQuests,
     )
 }
 
@@ -279,7 +305,10 @@ function buildStats(playerId: number, category: number): CategoryContext {
         const questId = getBossBattleSuperQuestId(definition.missionId, bossBattleQuests)
         if (questId !== undefined) bossBattleSuperQuestByMission.set(definition.missionId, questId)
     }
-    const finishedQuestIdsBySection = getFinishedPlayerQuestIdsBySectionsSync(playerId, [2, 7, 18, 21])
+    const finishedQuestIdsBySection = getFinishedPlayerQuestIdsBySectionsSync(
+        playerId,
+        [2, 7, 18, 21, 22, 26],
+    )
     const finishedQuestIds = finishedQuestIdsBySection[2] ?? new Set()
     return {
         category,
@@ -325,6 +354,8 @@ function buildStats(playerId: number, category: number): CategoryContext {
             expertSingleFinishedQuestIds: finishedQuestIdsBySection[21] ?? new Set(),
             worldStoryFinishedQuestIds: finishedQuestIdsBySection[18] ?? new Set(),
             adventFinishedQuestIds: finishedQuestIdsBySection[7] ?? new Set(),
+            carnivalFinishedQuestIds: finishedQuestIdsBySection[22] ?? new Set(),
+            hardMultiFinishedQuestIds: finishedQuestIdsBySection[26] ?? new Set(),
             challengeDungeonClearCount: battleCounters.challengeDungeonClearCount,
             singleScoreMax: battleCounters.singleScoreMax,
             singleClearTimeMin: battleCounters.singleClearTimeMin,
@@ -423,6 +454,12 @@ export function getDegreeMissionCoverageReport() {
         )).length,
         adventQuestClear: definitions.filter(definition => (
             getAdventQuestId(definition.missionId) !== undefined
+        )).length,
+        carnivalQuestClear: definitions.filter(definition => (
+            getCarnivalQuestId(definition.missionId) !== undefined
+        )).length,
+        hardMultiQuestClear: definitions.filter(definition => (
+            getHardMultiQuestId(definition.missionId) !== undefined
         )).length,
         challengeDungeonClear: definitions.filter(definition => (
             definition.pattern.startsWith(SUPPORTED_FAMILIES.challengeDungeonClear)
@@ -534,6 +571,20 @@ export const DegreeComputer: MissionComputer = {
             return Math.max(
                 dbProgress,
                 stats.adventFinishedQuestIds.has(adventQuestId) ? 1 : 0,
+            )
+        }
+        const carnivalQuestId = getCarnivalQuestId(missionId)
+        if (carnivalQuestId !== undefined) {
+            return Math.max(
+                dbProgress,
+                stats.carnivalFinishedQuestIds.has(carnivalQuestId) ? 1 : 0,
+            )
+        }
+        const hardMultiQuestId = getHardMultiQuestId(missionId)
+        if (hardMultiQuestId !== undefined) {
+            return Math.max(
+                dbProgress,
+                stats.hardMultiFinishedQuestIds.has(hardMultiQuestId) ? 1 : 0,
             )
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.companionCount)) return stats.companionCount

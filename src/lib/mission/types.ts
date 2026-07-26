@@ -43,6 +43,8 @@ export interface CategoryContext {
         expertSingleFinishedQuestIds: ReadonlySet<number>
         worldStoryFinishedQuestIds: ReadonlySet<number>
         adventFinishedQuestIds: ReadonlySet<number>
+        carnivalFinishedQuestIds: ReadonlySet<number>
+        hardMultiFinishedQuestIds: ReadonlySet<number>
         challengeDungeonClearCount: number
         singleScoreMax: number
         singleClearTimeMin: number
