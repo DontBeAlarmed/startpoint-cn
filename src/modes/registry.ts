@@ -9,7 +9,29 @@
  * Contract for handlers: activation is content-keyed — a handler must read
  * its activation table from the content snapshot (via ModeHost.table) as its
  * first step and return null/undefined when the table is absent or disabled.
+ * ModeHost.table returns null for a table the snapshot does not carry, so an
+ * unpublished activation table leaves the module inert rather than throwing.
+ *
+ * Ordering and failure model:
+ * - Modules run in registration order, which the loader fixes to the
+ *   code-point order of their file names, so a given modes.d/ always
+ *   produces the same sequence.
+ * - onQuestStart is a veto chain: the first module to throw rejects the
+ *   start, later modules do not run, and the message reaches the client.
+ * - onRushFinish and onRushPartiesSerialized are fail-soft: a module that
+ *   throws is logged and skipped, and the base flow continues. Settlement
+ *   has already committed the base rewards by then, so aborting the request
+ *   would lose them.
+ * - A module that writes player data during settlement must do so through
+ *   the transaction primitive on the injected params object. Writes issued
+ *   outside it are not rolled back when a later step fails.
  */
+
+/**
+ * Contract version. The loader refuses modules built against another major
+ * version rather than letting a stale module see a changed host shape.
+ */
+export const MODE_API_VERSION = 1
 
 export interface ModeHostServerApi {
     readonly getCharacterElement: (characterId: number) => number | null
@@ -22,8 +44,16 @@ export interface ModeHostServerApi {
 }
 
 export interface ModeHost {
-    /** Reads a table from the process content snapshot (throws if missing). */
-    readonly table: <T>(tableName: string) => T
+    /** The host's MODE_API_VERSION, so a module can branch on it. */
+    readonly apiVersion: number
+    /**
+     * Reads a table from the process content snapshot, or null when the
+     * snapshot does not carry it. A module whose activation table is absent
+     * is expected to stay inert rather than fail.
+     */
+    readonly table: <T>(tableName: string) => T | null
+    /** Same, but throws when the table is absent (use for hard dependencies). */
+    readonly requireTable: <T>(tableName: string) => T
     readonly log: (message: string) => void
     /** Curated server primitives for mode modules (assembled by the loader). */
     readonly server: ModeHostServerApi
@@ -54,6 +84,8 @@ export interface RushPartiesContext {
 }
 
 export interface ModeDefinition {
+    /** Must equal MODE_API_VERSION; mismatched modules are refused. */
+    readonly apiVersion: number
     readonly name: string
     readonly capability: string
     /**
@@ -88,6 +120,12 @@ export function registerMode(mode: ModeDefinition): void {
         || typeof mode.capability !== "string" || !mode.capability) {
         throw new Error("mode definition requires a name and a capability")
     }
+    if (mode.apiVersion !== MODE_API_VERSION) {
+        throw new Error(
+            `mode ${mode.name} targets mode API ${String(mode.apiVersion)}, `
+            + `this server provides ${MODE_API_VERSION}`,
+        )
+    }
     if (modes.some(existing => existing.name === mode.name)) {
         throw new Error(`mode is already registered: ${mode.name}`)
     }
@@ -102,6 +140,22 @@ export function listModeCapabilities(): readonly string[] {
     return modes.map(mode => mode.capability)
 }
 
+/**
+ * Fail-soft hook invocation: a throwing module is reported and skipped so a
+ * faulty module cannot take down a settlement the base server already
+ * committed. Used for every hook except the quest-start veto.
+ */
+function runFailSoft(mode: ModeDefinition, host: ModeHost, run: () => void): void {
+    try {
+        run()
+    } catch (error) {
+        host.log(
+            `[modes] ${mode.name} failed and was skipped: `
+            + `${(error as Error)?.message ?? String(error)}`,
+        )
+    }
+}
+
 export function dispatchModeRushFinish(
     params: unknown,
     host: ModeHost,
@@ -109,14 +163,21 @@ export function dispatchModeRushFinish(
     const rewards: ModeRewardEntry[] = []
     for (const mode of modes) {
         if (!mode.onRushFinish) continue
-        const extension = mode.onRushFinish(params, host)
-        if (extension?.rush_battle_reward_list?.length) {
-            rewards.push(...extension.rush_battle_reward_list)
-        }
+        runFailSoft(mode, host, () => {
+            const extension = mode.onRushFinish?.(params, host)
+            if (extension?.rush_battle_reward_list?.length) {
+                rewards.push(...extension.rush_battle_reward_list)
+            }
+        })
     }
     return rewards.length > 0 ? { rush_battle_reward_list: rewards } : null
 }
 
+/**
+ * Veto chain: the first module to throw rejects the start and later modules
+ * do not run. This is the one hook where a throw is a deliberate signal
+ * rather than a fault, so it propagates to the caller.
+ */
 export function dispatchModeQuestStart(context: QuestStartContext, host: ModeHost): void {
     for (const mode of modes) {
         mode.onQuestStart?.(context, host)
@@ -125,6 +186,7 @@ export function dispatchModeQuestStart(context: QuestStartContext, host: ModeHos
 
 export function dispatchModeRushParties(context: RushPartiesContext, host: ModeHost): void {
     for (const mode of modes) {
-        mode.onRushPartiesSerialized?.(context, host)
+        if (!mode.onRushPartiesSerialized) continue
+        runFailSoft(mode, host, () => mode.onRushPartiesSerialized?.(context, host))
     }
 }

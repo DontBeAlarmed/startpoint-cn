@@ -16,10 +16,12 @@ const {
     listModeCapabilities,
     registerMode,
     resetModesForTest,
+    MODE_API_VERSION,
 } = require("../src/modes/registry")
 
 const MODULE_SOURCE = `export function register(host) {
     return {
+        apiVersion: ${MODE_API_VERSION},
         name: "fixture-mode",
         capability: "fixture@1",
         onRushFinish() { return { rush_battle_reward_list: [{ kind: 1, kind_id: 5, number: 2 }] } },
@@ -105,7 +107,8 @@ test("MODES_ENABLED=0 disables loading; missing dir is a silent no-op", async t 
 test("registry rejects duplicate and malformed registrations", t => {
     resetModesForTest()
     t.after(resetModesForTest)
-    registerMode({ name: "a", capability: "a@1" })
-    assert.throws(() => registerMode({ name: "a", capability: "a@2" }), /already registered/)
-    assert.throws(() => registerMode({ name: "", capability: "x" }), /requires a name/)
+    const base = { apiVersion: MODE_API_VERSION }
+    registerMode({ ...base, name: "a", capability: "a@1" })
+    assert.throws(() => registerMode({ ...base, name: "a", capability: "a@2" }), /already registered/)
+    assert.throws(() => registerMode({ ...base, name: "", capability: "x" }), /requires a name/)
 })

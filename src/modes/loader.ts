@@ -22,6 +22,7 @@ import { givePlayerCharactersExpSync } from "../lib/character"
 import { updatePlayerEquipmentSync } from "../data/domains/equipment"
 import {
     listModeCapabilities,
+    MODE_API_VERSION,
     registerMode,
     type ModeDefinition,
     type ModeHost,
@@ -35,10 +36,22 @@ export interface LoadModesOptions {
 }
 
 export function createModeHost(log: (message: string) => void): ModeHost {
+    const requireTable = <T>(tableName: string): T => (
+        getContentSnapshot().repository.table<T>(tableName)
+    )
     return Object.freeze({
-        table: <T>(tableName: string): T => (
-            getContentSnapshot().repository.table<T>(tableName)
-        ),
+        apiVersion: MODE_API_VERSION,
+        // Absent table → null, so a module whose activation table has not been
+        // published stays inert instead of throwing. Hard dependencies use
+        // requireTable.
+        table: <T>(tableName: string): T | null => {
+            try {
+                return requireTable<T>(tableName)
+            } catch {
+                return null
+            }
+        },
+        requireTable,
         log,
         server: Object.freeze({
             getCharacterElement: (characterId: number) => {
@@ -69,7 +82,11 @@ export async function loadModes(options: LoadModesOptions): Promise<readonly str
     const modesDir = env.MODES_DIR ?? path.join(options.projectRoot, "modes.d")
     let entries: string[]
     try {
-        entries = (await fs.readdir(modesDir)).filter(name => name.endsWith(".mjs")).sort()
+        // Code-point order, not locale order: the dispatch sequence must be
+        // identical on every machine for a given modes.d/.
+        entries = (await fs.readdir(modesDir))
+            .filter(name => name.endsWith(".mjs"))
+            .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
     } catch (error) {
         if ((error as NodeJS.ErrnoException).code === "ENOENT") return []
         throw error
@@ -106,20 +123,27 @@ export async function loadModes(options: LoadModesOptions): Promise<readonly str
             log(`[modes] SKIP ${fileName}: sha256 mismatch (file ${digest})`)
             continue
         }
-        const imported = await importModule(pathToFileURL(absolute).href)
-        const moduleExports = isRecord(imported) ? imported : {}
-        const register = (isRecord(moduleExports.default)
-            ? (moduleExports.default as Record<string, unknown>).register
-            : undefined) ?? moduleExports.register
-        if (typeof register !== "function") {
-            log(`[modes] SKIP ${fileName}: no register(host) export`)
-            continue
+        // An allowlisted module that fails to import, register or declare a
+        // usable definition is reported and skipped. Boot continues: one bad
+        // module must not deny service for everything else.
+        try {
+            const imported = await importModule(pathToFileURL(absolute).href)
+            const moduleExports = isRecord(imported) ? imported : {}
+            const register = (isRecord(moduleExports.default)
+                ? (moduleExports.default as Record<string, unknown>).register
+                : undefined) ?? moduleExports.register
+            if (typeof register !== "function") {
+                log(`[modes] SKIP ${fileName}: no register(host) export`)
+                continue
+            }
+            const host = createModeHost(log)
+            const definition = await register(host) as ModeDefinition
+            registerMode(definition)
+            log(`[modes] loaded ${definition.name} (${definition.capability}) sha256=${digest.slice(0, 12)}…`)
+            loaded.push(definition.name)
+        } catch (error) {
+            log(`[modes] SKIP ${fileName}: ${(error as Error)?.message ?? String(error)}`)
         }
-        const host = createModeHost(log)
-        const definition = await register(host) as ModeDefinition
-        registerMode(definition)
-        log(`[modes] loaded ${definition.name} (${definition.capability}) sha256=${digest.slice(0, 12)}…`)
-        loaded.push(definition.name)
     }
     if (loaded.length > 0) {
         log(`[modes] capabilities: ${listModeCapabilities().join(", ")}`)
