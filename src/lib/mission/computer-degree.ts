@@ -25,6 +25,8 @@ import bundledWorldStoryEventQuests from "../../../assets/world_story_event_ques
 import bundledAdventEventQuests from "../../../assets/advent_event_quest.json"
 import bundledCarnivalEventQuests from "../../../assets/carnival_event_quest.json"
 import bundledHardMultiEventQuests from "../../../assets/hard_multi_event_quest.json"
+import bundledEquipmentDissolve from "../../../assets/equipment_dissolve.json"
+import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
 import {
     ContentSnapshotError,
     getContentSnapshot,
@@ -281,6 +283,20 @@ function getDegreeCollectedItemId(missionId: number): number | undefined {
     return Number.isSafeInteger(itemId) && itemId > 0 ? itemId : undefined
 }
 
+function getMaxLevelEquipmentCount(playerId: number): number {
+    const equipment = getPlayerEquipmentListSync(playerId)
+    const definitions = getRuntimeTable<Record<string, { readonly max_level?: number }>>(
+        "equipment_dissolve.json",
+        bundledEquipmentDissolve,
+    )
+    return Object.entries(equipment).reduce((count, [equipmentId, item]) => {
+        const maxLevel = definitions[equipmentId]?.max_level
+        return Number.isSafeInteger(maxLevel) && (maxLevel ?? 0) > 0 && item.level >= maxLevel!
+            ? count + 1
+            : count
+    }, 0)
+}
+
 function getCarnivalQuestId(missionId: number): number | undefined {
     return getExactDegreeQuestId(
         missionId,
@@ -374,6 +390,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
             bossBattleClearCount: battleCounters.bossBattleClearCount,
             craftPointObtainedCount,
             collectedItemTotals: getPlayerCollectedItemTotalsSync(playerId),
+            maxLevelEquipmentCount: getMaxLevelEquipmentCount(playerId),
             skillUseCount: battleCounters.skillUseCount,
         },
     }
@@ -476,6 +493,10 @@ export function getDegreeMissionCoverageReport() {
         )).length,
         eventCollectItem: definitions.filter(definition => (
             getDegreeCollectedItemId(definition.missionId) !== undefined
+        )).length,
+        maxLevelEquipment: definitions.filter(definition => (
+            Number(definition.row[3]) === 36
+            && definition.pattern.startsWith("degree_equipment_lv5_get_")
         )).length,
         challengeDungeonClear: definitions.filter(definition => (
             definition.pattern.startsWith(SUPPORTED_FAMILIES.challengeDungeonClear)
@@ -609,6 +630,10 @@ export const DegreeComputer: MissionComputer = {
                 dbProgress,
                 stats.collectedItemTotals[String(collectedItemId)] ?? 0,
             )
+        }
+        if (Number(getMissionMasterDefinition(5, missionId)?.row[3]) === 36
+            && pattern.startsWith("degree_equipment_lv5_get_")) {
+            return Math.max(dbProgress, stats.maxLevelEquipmentCount)
         }
         if (pattern.startsWith(SUPPORTED_FAMILIES.companionCount)) return stats.companionCount
         if (pattern.startsWith(SUPPORTED_FAMILIES.overLimitCount)) return stats.overLimitCount

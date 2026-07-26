@@ -33,6 +33,7 @@ const {
 } = require("../src/data/domains/character")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
 const { addPlayerShopPurchaseCountSync } = require("../src/data/domains/shopPurchase")
+const { insertPlayerEquipmentSync } = require("../src/data/domains/equipment")
 const { givePlayerItemSync } = require("../src/data/domains/item")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
@@ -223,6 +224,19 @@ givePlayerItemSync(playerId, 999999, 5000)
 givePlayerItemSync(playerId, 70014, 3000)
 givePlayerItemSync(playerId, 70048, 1000)
 
+const equipmentDissolve = require("../assets/equipment_dissolve.json")
+const maxLevelEquipmentIds = Object.entries(equipmentDissolve)
+    .filter(([, row]) => Number.isSafeInteger(row.max_level) && row.max_level > 0)
+    .slice(-6)
+for (const [index, [equipmentId, row]] of maxLevelEquipmentIds.entries()) {
+    insertPlayerEquipmentSync(playerId, equipmentId, {
+        level: index < 5 ? row.max_level : Math.max(1, row.max_level - 1),
+        enhancementLevel: 0,
+        protection: false,
+        stack: 0,
+    })
+}
+
 const episodeCountQueryPlan = db.prepare(`
     EXPLAIN QUERY PLAN
     SELECT COUNT(*) AS count
@@ -312,6 +326,8 @@ assert.equal(DegreeComputer.compute(41010, context, 0), 1500, "锻造石称号�
 assert.equal(DegreeComputer.compute(41020, context, 3000), 3000, "锻造石称号旧进度不得倒退")
 assert.equal(DegreeComputer.compute(70000, context, 0), 3000, "活动累计物品称号应读取历史获得量")
 assert.equal(DegreeComputer.compute(70010, context, 2000), 2000, "活动累计物品称号旧进度不得倒退")
+assert.equal(DegreeComputer.compute(43000, context, 0), 5, "满级装备称号应按权威 max_level 统计")
+assert.equal(DegreeComputer.compute(43010, context, 8), 8, "满级装备称号旧进度不得倒退")
 assert.equal(DegreeComputer.compute(33000, context, 0), 600, "技能使用称号应读取成功战斗累计")
 assert.equal(DegreeComputer.compute(33010, context, 0), 600, "技能使用称号应支持更高阈值")
 assert.equal(DegreeComputer.compute(33020, context, 700), 700, "技能使用称号旧进度不得倒退")
@@ -332,8 +348,8 @@ for (const missionId of [7000, 7010, 7020]) {
 const coverage = getDegreeMissionCoverageReport()
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1129,
-    unsupported: 159,
+    serverComputed: 1132,
+    unsupported: 156,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -366,6 +382,7 @@ assert.deepEqual(coverage, {
         comboOneTime: 3,
         craftPointGet: 3,
         eventCollectItem: 2,
+        maxLevelEquipment: 3,
         skillUse: 3,
     },
 })
