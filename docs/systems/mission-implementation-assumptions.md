@@ -21,6 +21,12 @@
 - 运行时优先读取启动时固定的 Content snapshot；直接调用且 snapshot 尚未初始化时才回退到仓库内 bundled `assets/mana_board.json`。这只是兼容旧调用路径，不会在已初始化的 Release 上叠加两份表。
 - 当前未有客户端逐条验证“强化”的中文显示是否还包含其他状态，也没有证明出售角色后服务端应重新计算还是只保留历史完成；实现按已持久化进度取最大值处理，相关边界留待审阅。
 
+## 称号：角色等级
+
+- `3010/3020` 的官方奖励目标分别为 80 和 100。服务端按角色官方 rarity 选择现有 `characterExpCaps`，只在累计 EXP 达到对应上限阈值时证明该档等级，并返回所有当前角色中可证明的最高等级；非法 EXP、未知角色或未知 rarity 不参与计算。
+- 该计算与旧 category 5 进度取最大值，因此角色数据变化不会让已保存进度倒退。Lv80/Lv100 阈值对五种 rarity 都存在，可精确判断这两条称号是否完成。
+- `3000` 的目标为 Lv60，但四星和五星阈值表分别从 Lv70、Lv80 开始；达到更高等级只能提供保守下界，无法在实际 Lv60 时准时完成。该任务继续持久化 fallback，不能用相邻 rarity 或中文描述插值。
+
 ## category 3：关卡目标任务
 
 - `coverage-audit.ts` 当前列出 948 条 type 16 空 QuestRange selector。CN 1.8.1 `EventMissionValues` 把 `""` 解析为 `Option.Some([])`，而 `(None)` 才解析为 `Option.None`；客户端 `QuestRangeReferenceIdKindToolsTest` 的匹配契约也区分空集合与无约束。因此服务端不把这批历史定义推测为活动全关卡，也不重新启用旧生成器的通配行为。

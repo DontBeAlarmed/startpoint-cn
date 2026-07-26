@@ -9,7 +9,7 @@
 | 角色觉醒（category 9） | 144 | 144/144；其中 55 条使用经主数据审计的通用角色通关回退 | 核心流程已通过客户端；144 条条件待逐条客户端验收 |
 | 每日（category 2） | 历史总表 656 | 默认服务器时间下开放 11 条，当前 11/11 | 常驻 5 条与活动 6 条均已自动计算，不宣称支持全部历史定义 |
 | 每周（category 10） | 2 | 2/2 | 服务端已实现，待 CN 客户端跨周完整验收 |
-| 称号（category 5） | 1288 | 1272，约 98.8% | 新增 84 条指定 Boss/Advent 累计通关、46 条权威战斗统计、珍品商店 Mana 与装备觉醒 6 条；unsupported 16 条继续 fallback |
+| 称号（category 5） | 1288 | 1274，约 98.9% | 新增 84 条指定 Boss/Advent 累计通关、46 条权威战斗统计、珍品商店 Mana 与装备觉醒 6 条、角色等级 2 条；unsupported 14 条继续 fallback |
 
 历史活动每日不作为当前体验的完成率分母。本轮只处理默认服务器时间 `2024-08-14` 下客户端会显示的任务，不把 656 条历史定义一次性全部启用或宣称全部支持。
 
@@ -96,7 +96,7 @@ kind 12 的四个 category 来自 CN 1.8.1 `QuestCategory_Impl_`：DailyWeekEven
 | `degree_craft_point_get_*` | 3 | `players_collected_items` 中配置的锻造石累计获得量 |
 | `degree_skill_use_*` | 3 | 成功 finish 的 `statistics.zones[].use_skill_count` 累计 |
 
-称号自动计算覆盖现为 `1272/1288`，约 `98.8%`，unsupported 为 16 条。84 条指定 Boss/Advent 累计通关从成功 finish 增长；46 条战斗统计按 battle kind 读取 zone 累计和历史最大值；珍品商店 Mana 与装备觉醒 6 条在业务事务内增长。MVP 与魂珠设置继续 fallback，完整边界见[待审阅实现记录](mission-implementation-assumptions.md)。
+称号自动计算覆盖现为 `1274/1288`，约 `98.9%`，unsupported 为 14 条。84 条指定 Boss/Advent 累计通关从成功 finish 增长；46 条战斗统计按 battle kind 读取 zone 累计和历史最大值；珍品商店 Mana 与装备觉醒 6 条在业务事务内增长；角色等级 2 条读取官方 Lv80/Lv100 EXP 阈值。MVP 与魂珠设置继续 fallback，完整边界见[待审阅实现记录](mission-implementation-assumptions.md)。
 
 ### 挑战副本累计通关称号
 

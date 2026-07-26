@@ -16,6 +16,8 @@ import {
 } from "../../data/domains/quest"
 import { getRankDegree } from "../stamina"
 import { getConfigSync } from "../assets"
+import { characterExpCaps } from "../character"
+import bundledCharacters from "../../../assets/character.json"
 import bundledManaBoard from "../../../assets/mana_board.json"
 import bundledMainQuests from "../../../assets/main_quest.json"
 import bundledExQuests from "../../../assets/ex_quest.json"
@@ -44,6 +46,7 @@ import {
     getDegreeOperationRuleCount,
 } from "./degree-operation-facts"
 import { getDegreeClientProgressPattern } from "./client-progress"
+import { getCategoryMissionRewardStageDefinition } from "./rewards"
 
 // Degree mission target lookup
 const degreeTargetMap: Record<number, number> = {}
@@ -102,6 +105,20 @@ function getTargetCraftPoint(missionId: number): number | undefined {
 type RawManaBoard = Record<string, Record<string, Record<string, readonly unknown[][]>>>
 
 type RawQuestTable = Record<string, unknown>
+type RawCharacterTable = Record<string, { readonly rarity?: unknown }>
+
+function getProvenCharacterLevel(rarity: number, experience: number): number | null {
+    const thresholds = characterExpCaps[rarity]
+    if (!Array.isArray(thresholds)
+        || !Number.isSafeInteger(experience)
+        || experience < 0) return null
+    const baseLevel = 40 + (rarity - 1) * 10
+    let provenLevel = 0
+    for (let index = 0; index < thresholds.length; index++) {
+        if (experience >= thresholds[index]) provenLevel = baseLevel + index * 5
+    }
+    return provenLevel
+}
 
 function getRuntimeTable<T>(tableName: string, bundled: T): T {
     try {
@@ -348,6 +365,17 @@ function buildStats(playerId: number, category: number): CategoryContext {
         [2, 7, 18, 21, 22, 26],
     )
     const finishedQuestIds = finishedQuestIdsBySection[2] ?? new Set()
+    const characterDefinitions = getRuntimeTable<RawCharacterTable>(
+        "character.json",
+        bundledCharacters as RawCharacterTable,
+    )
+    let maxCharacterLevel = 0
+    for (const [characterId, character] of Object.entries(characters)) {
+        const rarity = characterDefinitions[characterId]?.rarity
+        if (!Number.isSafeInteger(rarity) || (rarity as number) <= 0) continue
+        const level = getProvenCharacterLevel(rarity as number, character.exp)
+        if (level !== null) maxCharacterLevel = Math.max(maxCharacterLevel, level)
+    }
     return {
         category,
         playerId,
@@ -358,6 +386,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
         rankCounts: {},
         battleCounters,
         degreeStats: {
+            maxCharacterLevel,
             companionCount: Object.keys(characters).length,
             overLimitCount: Object.values(characters)
                 .reduce((total, character) => total + character.overLimitStep, 0),
@@ -445,6 +474,27 @@ const SUPPORTED_FAMILIES = {
     skillChainMax: "degree_skill_chain_condition_",
 } as const
 
+const AUTHORITATIVE_CHARACTER_LEVEL_MISSIONS: ReadonlyMap<number, {
+    readonly pattern: string
+    readonly target: number
+}> = new Map([
+    [3010, { pattern: "degree_character_lv_growth_2", target: 80 }],
+    [3020, { pattern: "degree_character_lv_growth_3", target: 100 }],
+] as const)
+
+function isAuthoritativeCharacterLevelMission(missionId: number): boolean {
+    const expected = AUTHORITATIVE_CHARACTER_LEVEL_MISSIONS.get(missionId)
+    if (!expected) return false
+    const definition = getMissionMasterDefinition(5, missionId)
+    const reward = getCategoryMissionRewardStageDefinition(5, missionId, 1)
+    return Boolean(
+        definition
+        && Number(definition.row[3]) === 5
+        && definition.pattern === expected.pattern
+        && reward?.targetProgress === expected.target
+    )
+}
+
 function getSecondManaBoardCharacterId(missionId: number): number | undefined {
     const definition = getMissionMasterDefinition(5, missionId)
     if (!definition || Number(definition.row[3]) !== 48) return undefined
@@ -480,6 +530,9 @@ export function getDegreeMissionCoverageReport() {
     ) as Record<keyof typeof SUPPORTED_FAMILIES, number>
     const supportedFamilies = {
         ...prefixFamilies,
+        characterLevel: definitions.filter(definition => (
+            isAuthoritativeCharacterLevelMission(definition.missionId)
+        )).length,
         specificCharacterBond: definitions.filter(definition => (
             Number(definition.row[3]) === 44
             && getSpecificCharacterBondId(definition.missionId) !== undefined
@@ -609,6 +662,7 @@ function isDegreeDefinitionComputed(
     const { missionId, pattern } = definition
     if (factMissionIds.has(missionId)
         || SIMPLE_SUPPORTED_PREFIXES.some(prefix => pattern.startsWith(prefix))) return true
+    if (isAuthoritativeCharacterLevelMission(missionId)) return true
     if (getDegreeClientProgressPattern(definition) !== undefined) return true
     if (pattern.startsWith(SUPPORTED_FAMILIES.scoreClearSingle)) {
         return getTargetScore(missionId) !== undefined
@@ -673,6 +727,9 @@ export const DegreeComputer: MissionComputer = {
         const stats = ctx.degreeStats
         if (pattern.startsWith(SUPPORTED_FAMILIES.playerRank)) return getRankDegree(ctx.player.rankPoint)
         if (!stats) return dbProgress
+        if (isAuthoritativeCharacterLevelMission(missionId)) {
+            return Math.max(dbProgress, stats.maxCharacterLevel)
+        }
         const bondCharacterId = getSpecificCharacterBondId(missionId)
         if (bondCharacterId !== undefined) {
             return Math.max(dbProgress, stats.bondedCharacterIds.has(bondCharacterId) ? 1 : 0)
