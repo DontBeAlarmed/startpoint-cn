@@ -49,9 +49,15 @@ function eventFallbackReason(row: readonly unknown[]): string {
 
 function degreeFallbackReason(pattern: string): string {
     if (pattern.includes("mvp")) return "mvp-result-unavailable"
+    if (pattern.includes("character_lv")) return "character-level-curve-incomplete"
     if (pattern.includes("ability_soul") || pattern.includes("soul")) {
-        return "ability-soul-ownership-unavailable"
+        return "ability-soul-operation-semantics-unverified"
     }
+    if (pattern.includes("boss_battle_ex_clear_single")) {
+        return "boss-difficulty-master-data-unavailable"
+    }
+    if (pattern.includes("attention")) return "attention-source-unavailable"
+    if (pattern.includes("multi_battle_newbie")) return "newbie-classification-unavailable"
     return "authoritative-degree-fact-unavailable"
 }
 

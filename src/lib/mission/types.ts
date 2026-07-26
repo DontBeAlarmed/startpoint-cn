@@ -25,6 +25,7 @@ export interface CategoryContext {
     rankCounts: Record<string, number>
     collectedItemTotals?: Record<string, number>
     degreeStats?: {
+        maxCharacterLevel: number
         companionCount: number
         overLimitCount: number
         manaBoardCount: number

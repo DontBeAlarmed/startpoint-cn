@@ -30,6 +30,7 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const {
     insertPlayerCharacterManaNodesSync,
     insertPlayerCharacterSync,
+    updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
 const { getDegreeBattleStatsSync } = require("../src/data/domains/degree_battle_stats")
@@ -557,15 +558,46 @@ for (const missionId of [7000, 7010, 7020]) {
     assert.equal(DegreeComputer.compute(missionId, context, 9), 9, `${missionId} 不得降低旧进度`)
 }
 
+const levelAccount = insertAccountSync({
+    appId: "wf_cn",
+    idpAlias: "",
+    idpCode: "test",
+    idpId: `mission-degree-character-level-${randomUUID()}`,
+    status: "normal",
+})
+const levelPlayerId = insertDefaultPlayerSync(levelAccount.id).id
+insertPlayerCharacterSync(levelPlayerId, 111001, {
+    entryCount: 1,
+    evolutionLevel: 0,
+    overLimitStep: 0,
+    protection: false,
+    joinTime: new Date("2024-01-01T00:00:00.000Z"),
+    updateTime: new Date("2024-01-01T00:00:00.000Z"),
+    exp: 153988,
+    stack: 0,
+    manaBoardIndex: 1,
+    bondTokenList: [{ manaBoardIndex: 1, status: 0 }],
+})
+const level80Context = DegreeComputer.buildContext(levelPlayerId, 5)
+assert.equal(DegreeComputer.compute(3000, level80Context, 7), 7, "Lv60 缺少完整曲线时必须继续保留 fallback")
+assert.equal(DegreeComputer.compute(3010, level80Context, 0), 80, "五星角色达到官方 Lv80 EXP 阈值时应完成称号")
+assert.equal(DegreeComputer.compute(3020, level80Context, 7), 80, "Lv100 称号应显示当前已证明的最高等级")
+
+updatePlayerCharacterSync(levelPlayerId, 111001, { exp: 379988, overLimitStep: 4 })
+const level100Context = DegreeComputer.buildContext(levelPlayerId, 5)
+assert.equal(DegreeComputer.compute(3010, level100Context, 90), 100, "角色等级称号进度不得低于已证明等级")
+assert.equal(DegreeComputer.compute(3020, level100Context, 0), 100, "五星角色达到官方 Lv100 EXP 阈值时应完成称号")
+
 const coverage = getDegreeMissionCoverageReport()
 assert.equal(getExactDegreeQuestClearRuleCount(), 84)
 assert.equal(getDegreeOperationRuleCount(), 6)
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1272,
-    unsupported: 16,
+    serverComputed: 1274,
+    unsupported: 14,
     supportedFamilies: {
         playerRank: 8,
+        characterLevel: 2,
         companionCount: 3,
         overLimitCount: 3,
         manaBoardCount: 3,

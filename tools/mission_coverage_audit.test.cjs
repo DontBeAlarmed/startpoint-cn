@@ -51,7 +51,14 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.degree)
     assert.deepEqual(
         { total: report.degree.total, automated: report.degree.automated, fallback: report.degree.fallback },
-        { total: 1288, automated: 1272, fallback: 16 },
+        { total: 1288, automated: 1274, fallback: 14 },
+    )
+    assert.deepEqual(
+        report.degree.automatedMissions
+            .filter(entry => [3010, 3020].includes(entry.missionId))
+            .map(entry => entry.missionId),
+        [3010, 3020],
+        "Lv80/Lv100 角色等级称号必须进入权威自动覆盖",
     )
     assert.deepEqual(
         report.degree.automatedMissions
@@ -61,6 +68,22 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
         "四条 Degree 客户端进度必须全部进入权威自动覆盖",
     )
     assert.equal(report.degree.fallbackMissions.find(entry => entry.missionId === 3000)?.patternType, 5)
+    assert.equal(report.degree.fallbackMissions.some(entry => [3010, 3020].includes(entry.missionId)), false)
+    assert.deepEqual(
+        report.degree.fallbackMissions.reduce((counts, entry) => {
+            counts[entry.reason] = (counts[entry.reason] ?? 0) + 1
+            return counts
+        }, {}),
+        {
+            "character-level-curve-incomplete": 1,
+            "ability-soul-operation-semantics-unverified": 3,
+            "boss-difficulty-master-data-unavailable": 1,
+            "attention-source-unavailable": 3,
+            "mvp-result-unavailable": 3,
+            "newbie-classification-unavailable": 3,
+        },
+        "称号 fallback 必须按真实外部阻塞原因分类",
+    )
 
     assert.deepEqual(report.awake, {
         total: 144,
