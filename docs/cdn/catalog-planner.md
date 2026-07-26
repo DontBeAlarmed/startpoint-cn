@@ -118,7 +118,7 @@ node tools/audit_cdn_catalog.cjs --json \
 | 差分边数 | 54 |
 | 归档数 | 677 |
 | 全部归档压缩字节 | 10,735,093,396 字节 |
-| `EntityLists` 相对路径 | `EntityLists/10939-android_medium.csv` |
+| 资源清单相对路径 | `EntityLists/10939-android_medium.csv`；另一份官方布局对应 `entities/10939-android_medium.csv` |
 | 分叉、环、重复、缺失路径、缺失层 | 均为 0 |
 
 | 场景 | full | 连续差分 | 本次下载字节 |

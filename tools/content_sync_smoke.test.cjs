@@ -756,6 +756,25 @@ test("来源快照检测 EntityLists 内容变化", t => {
     assertSourceMutation(before, after)
 })
 
+test("来源快照检测小写 entities 官方布局的内容变化", t => {
+    const fixture = makeSourceLayout(t)
+    fs.renameSync(
+        path.join(fixture.cdnRoot, "cn", "EntityLists"),
+        path.join(fixture.cdnRoot, "cn", "entities"),
+    )
+    const entityList = path.join(
+        fixture.cdnRoot,
+        "cn",
+        "entities",
+        "fixture-android_medium.csv",
+    )
+    const before = smoke.captureEnvironment(fixture.paths)
+    fs.appendFileSync(entityList, "changed\n")
+    const after = smoke.captureEnvironment(fixture.paths)
+    assert.notDeepEqual(before.cdn.entityLists, after.cdn.entityLists)
+    assertSourceMutation(before, after)
+})
+
 test("archive-* symlink 或非目录不会被静默跳过", async t => {
     await t.test("symlink", () => {
         const fixture = makeSourceLayout(t)

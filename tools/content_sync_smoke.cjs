@@ -930,11 +930,13 @@ function databaseSnapshot(projectRoot) {
 }
 
 function entityListsSnapshot(cdnRoot) {
-    const entityRoot = path.join(cdnRoot, "cn", "EntityLists")
-    return directorySnapshot(entityRoot, {
-        predicate: (_relativePath, entry) => entry.isFile(),
-        includeTimes: true,
-    })
+    return Object.fromEntries(["EntityLists", "entities"].map(directoryName => [
+        directoryName,
+        directorySnapshot(path.join(cdnRoot, "cn", directoryName), {
+            predicate: (_relativePath, entry) => entry.isFile(),
+            includeTimes: true,
+        }),
+    ]))
 }
 
 function captureEnvironment(paths) {

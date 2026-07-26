@@ -26,7 +26,7 @@ bash scripts/start-cn.sh
 
 ### `content:sync` 失败
 
-1. 确认 `.cdn/cn/`、EntityLists 和归档目录存在；
+1. 确认 `.cdn/cn/`、`EntityLists/` 或 `entities/` 资源清单目录以及归档目录存在；
 2. 直接运行 `npm run content:sync`，保留第一条错误及其路径；
 3. 检查 `CONTENT_RELEASES_DIR`、`CONTENT_ACTIVE_RELEASE_FILE` 等路径是否可写；
 4. 运行 `npm run content:smoke` 验证同步产物能否被当前运行时加载；

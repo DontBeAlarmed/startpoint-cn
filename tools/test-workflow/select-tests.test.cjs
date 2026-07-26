@@ -42,6 +42,14 @@ test("maps representative source files to focused groups", () => {
     )
     assert.deepEqual(selectTestGroups(["src/content/cdn/types.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/catalog-builder.ts"]), ["quick:cdn"])
+    assert.deepEqual(
+        selectTestGroups(["src/content/cdn/entity-lists-directory.ts"]),
+        ["quick:cdn", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/content/sync/scanner.ts"]),
+        ["quick:cdn", "quick:content"],
+    )
     assert.deepEqual(selectTestGroups(["src/content/cdn/runtime-manifest.ts"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/patch-graph.ts"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/digest-cache.ts"]), ["quick:cdn"])

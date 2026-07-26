@@ -1,7 +1,7 @@
 # CDN 客户端资源下载逻辑
 > 状态: 客户端逆向   关键文件: GlobalLoading.applyLoad (client SWF)   相关端点: -
 
-> 客户端字段以 CN 反编译参考为依据。服务端机制见 `overview.md`，当前故障诊断见 `debugging.md`。
+> 客户端字段以 CN 反编译参考为依据。本文中的 `EntityLists/` URL 是客户端原生 Recovery 流程示例；当前服务端固定返回 `recovery/empty.csv`，官方 dump 的物理资源清单目录可以是 `EntityLists/` 或 `entities/`。服务端机制见 `overview.md`，当前故障诊断见 `debugging.md`。
 
 ---
 

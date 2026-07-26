@@ -11,6 +11,7 @@ import {
     type ParsedDiffArchiveName,
 } from "../cdn/catalog-builder"
 import type { DigestFileHandle } from "../cdn/digest-cache"
+import { resolveEntityListsDirectoryName } from "../cdn/entity-lists-directory"
 import { parseCdnRuntimeManifest } from "../cdn/runtime-manifest"
 import type { ArchiveLayer, CdnCatalogArchiveInput, CdnCatalogInput, CdnPlatform } from "../cdn/types"
 import { deepFreeze } from "../deep-freeze"
@@ -273,12 +274,13 @@ export async function scanContentTarget(
         ignoredPaths.push(fileName)
     }
 
-    const entityDirectory = path.join(cdnRoot, "EntityLists")
-    await assertDirectoryInsideRoot(cdnRoot, cdnRealRoot, "EntityLists", dependencies)
+    const entityDirectoryName = await resolveEntityListsDirectoryName(cdnRoot)
+    const entityDirectory = path.join(cdnRoot, entityDirectoryName)
+    await assertDirectoryInsideRoot(cdnRoot, cdnRealRoot, entityDirectoryName, dependencies)
     const entityFileNames = await regularFileNames(entityDirectory, dependencies)
     const entityCandidates = entityFileNames.filter(fileName => /-android_medium\.csv$/.test(fileName))
     for (const fileName of entityFileNames) {
-        if (!entityCandidates.includes(fileName)) ignoredPaths.push(`EntityLists/${fileName}`)
+        if (!entityCandidates.includes(fileName)) ignoredPaths.push(`${entityDirectoryName}/${fileName}`)
     }
     if (entityCandidates.length === 0) {
         throw validationError("MISSING_PATH", "missing Android medium EntityLists CSV")
@@ -289,7 +291,7 @@ export async function scanContentTarget(
             `multiple Android medium EntityLists CSV files: ${entityCandidates.join(", ")}`,
         )
     }
-    const entityListsRelativePath = `EntityLists/${entityCandidates[0]}`
+    const entityListsRelativePath = `${entityDirectoryName}/${entityCandidates[0]}`
     const entitySnapshot = await secureSnapshot(
         cdnRoot,
         cdnRealRoot,

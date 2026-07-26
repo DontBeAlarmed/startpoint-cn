@@ -153,6 +153,35 @@ test("target scan reads no archive or EntityLists body and returns frozen determ
     assert.ok(Object.isFrozen(scan.archives[0]))
 })
 
+test("target scan accepts the lowercase entities directory used by the alternate official dump", async t => {
+    const { paths } = createScannerFixture(t)
+    fs.renameSync(
+        path.join(paths.cdnRoot, "EntityLists"),
+        path.join(paths.cdnRoot, "entities"),
+    )
+
+    const scan = await scanContentTarget(paths)
+
+    assert.equal(scan.entityListsRelativePath, "entities/1.4.54-android_medium.csv")
+    assert.equal(
+        scan.entityListsFingerprint.physicalPath,
+        fs.realpathSync(path.join(paths.cdnRoot, "entities", "1.4.54-android_medium.csv")),
+    )
+})
+
+test("target scan keeps EntityLists precedence when both official directory names exist", async t => {
+    const { paths } = createScannerFixture(t)
+    fs.cpSync(
+        path.join(paths.cdnRoot, "EntityLists"),
+        path.join(paths.cdnRoot, "entities"),
+        { recursive: true },
+    )
+
+    const scan = await scanContentTarget(paths)
+
+    assert.equal(scan.entityListsRelativePath, "EntityLists/1.4.54-android_medium.csv")
+})
+
 test("materialization reuses a complete baseline and hashes only archives added for a new target", async t => {
     const { paths } = createScannerFixture(t)
     const firstScan = await scanContentTarget(paths)

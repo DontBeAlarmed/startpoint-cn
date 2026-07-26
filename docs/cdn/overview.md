@@ -40,7 +40,7 @@ World Flipper 国服（Leiting CN）CDN 私服的目录结构、文件寻址、�
 
 ```
 .cdn/cn/
-├── EntityLists/
+├── EntityLists/ 或 entities/
 │   ├── 10939-android_medium.csv   — Android 中画质资源清单（137,820 行，16.3MB）
 │   ├── 10939-ios_medium.csv       — iOS 中画质资源清单（16.2MB）
 │   ├── PathFile                   — 官方 get_path 响应快照（167KB，JSON，参考用）
@@ -364,6 +364,6 @@ const plan = planCdnUpdate(contentSnapshot.cdn, {
 
 - **不做请求级哈希**：归档 SHA256 在 Catalog 中固定记录并随清单返回；文件请求只执行边界、类型和大小检查，不在每次下载时重新计算摘要。
 - **不支持多语言/多平台**：仅 CN Android 配置。
-- **CDN 来源**：`cn_cdn.rar` 来自 shijtswydl.leiting.com 官方 CDN（停止服务前下载）。两份 CN CDN dump（`cn_cdn.rar` 与 `cn_cdn_new/WF__CN2.zip`）byte-level 完全一致，唯一差异是目录名 `entities/` vs `EntityLists/`，换 CDN 不能解决任何缺失文件或兼容性问题。
+- **CDN 来源与目录兼容**：`cn_cdn.rar` 来自 shijtswydl.leiting.com 官方 CDN（停止服务前下载）。两份 CN CDN dump（`cn_cdn.rar` 与 `cn_cdn_new/WF__CN2.zip`）byte-level 完全一致，唯一差异是目录名 `entities/` vs `EntityLists/`。Content Sync 和离线 Catalog 生成均支持两种名称；两者同时存在时确定性优先 `EntityLists/`。换 CDN 不能解决任何文件内容缺失问题。
 
 CDN 同步、下载大小、Range、C8601 和业务表不一致的当前诊断顺序见[排查手册](./debugging.md)。

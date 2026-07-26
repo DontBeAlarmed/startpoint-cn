@@ -7,7 +7,7 @@
 | 输入或能力 | 状态 | 当前边界 |
 |---|---|---|
 | 官方 CN 1.8.1 客户端，仅修改服务器 IP 和跳过登录 | 保证 | 唯一保证的客户端；协议与行为以该版本为准 |
-| 停服前从官方 CDN 主机下载的 CN 1.4.54 dump | 有限保证 | 物理 dump 有 692 个 ZIP；运行时只保证 tracked manifest 引用的 677 个 Android common、medium（Catalog `quality` 层）和 platform 归档完整，不使用 15 个 iOS 归档 |
+| 停服前从官方 CDN 主机下载的 CN 1.4.54 dump | 有限保证 | 支持资源清单目录为 `EntityLists/` 或 `entities/` 的两种已知官方布局；物理 dump 有 692 个 ZIP，运行时只保证 tracked manifest 引用的 677 个 Android common、medium（Catalog `quality` 层）和 platform 归档完整，不使用 15 个 iOS 归档 |
 | latest 更新计划 | 保证 | 当前版本等于 1.4.54 时返回 `full=null`、`diff=null` |
 | incremental 更新计划 | 有限保证 | 只保证 manifest 已知节点 1.4.0 至 1.4.53 到 1.4.54 的唯一连续差分链；未知版本返回 `UNKNOWN_CURRENT_VERSION` |
 | initial 更新计划 | 保证 | 返回 1.4.0 full 和到 1.4.54 的连续差分链 |
@@ -33,7 +33,7 @@
 - 官方 1.4.54 之外的资源版本；
 - CN 1.8.1 之外的客户端；
 - 除服务器 IP 和跳过登录外，还修改资源下载器、战斗逻辑或其他客户端行为的包；
-- 只向目录写入 ZIP、但没有匹配版本边、`EntityLists`、服务端 runtime 数据和完整 release manifest 的内容。
+- 只向目录写入 ZIP、但没有匹配版本边、`EntityLists/` 或 `entities/` 资源清单、服务端 runtime 数据和完整 release manifest 的内容。
 
 运行时不会为这些输入降级安全边界、猜测版本图或自动生成缺失数据。完整 SHA-256 的实际命令、参数和目录约束统一见 [`catalog-planner.md` 的“显式离线 SHA-256”章节](catalog-planner.md#显式离线-sha-256)，本页不重复维护命令副本。
 

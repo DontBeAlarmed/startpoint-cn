@@ -54,7 +54,7 @@ Registry 仍要求每个 Release 闭合当前全部注册表。阶段 A 中未�
 
 | 根 | 默认位置 | 职责 |
 |---|---|---|
-| `CDN_DIR/cn` | `<PROJECT_ROOT>/.cdn/cn` | 官方 CDN 归档与 `EntityLists`，local 模式只读供给客户端 |
+| `CDN_DIR/cn` | `<PROJECT_ROOT>/.cdn/cn` | 官方 CDN 归档与 `EntityLists/` 或 `entities/`，local 模式只读供给客户端 |
 | `CONTENT_RUNTIME_DIR` | `<PROJECT_ROOT>/assets` | Bundle 内只读 bundled 表和官方 1.4.54 Catalog fallback |
 | `DATA_DIR/asset-provider` | `<PROJECT_ROOT>/.database/asset-provider` | 可变兼容 payload 和旧 global metadata |
 
@@ -172,9 +172,9 @@ smoke 始终执行 force sync，并验证：
 - `git ls-files --others --exclude-standard` 返回的全部 untracked 文件保持同一稳定路径和内容摘要；若 Git 将未跟踪嵌套仓库或目录作为目录项返回，smoke 直接以来源不安全拒绝，不递归扫描不明目录；
 - `assets/` 下所有实际 seed 状态文件以及 `confirmed_seeds.json`、`pending_seeds.json` 的存在/缺失状态不变；
 - `.database/` 内全部普通文件的集合与内容 SHA-256 不变，smoke 不写玩家数据库；
-- 每个 `archive-*` 项必须是非符号链接目录，原始 ZIP 的 inode/大小/权限/mtime/ctime 元数据不变；`EntityLists/` 普通文件的集合、内容 SHA-256 和元数据不变。
+- 每个 `archive-*` 项必须是非符号链接目录，原始 ZIP 的 inode/大小/权限/mtime/ctime 元数据不变；`EntityLists/` 与 `entities/` 两个受支持位置的普通文件集合、内容 SHA-256 和元数据不变。
 
-smoke 不对约 10GB 归档再做一遍全量 SHA-256。同步自身可在临时 state 写摘要缓存；原始归档只读，前后以元数据清单证明未发生可观察修改。EntityLists、seed、untracked 和 database 文件以分块方式读取内容摘要，不写回来源。
+smoke 不对约 10GB 归档再做一遍全量 SHA-256。同步自身可在临时 state 写摘要缓存；原始归档只读，前后以元数据清单证明未发生可观察修改。两种资源清单目录、seed、untracked 和 database 文件以分块方式读取内容摘要，不写回来源。
 
 Git binary diff 快照设置 64 MiB 输出上限；包含更大 dirty binary diff 的工作树不受本工具支持，会以 `CONTENT_SYNC_SMOKE_GIT_TOO_LARGE` 明确失败，需先在可信位置保存或清理该临时改动再运行。成功输出 `DONE [CONTENT_SYNC_SMOKE_OK]`；参数错误退出码为 2，其他同步、基线或来源变化错误输出稳定的 `BLOCKED [错误码]` 并以退出码 1 结束。公开摘要只报告变化类别，不打印绝对路径或具体文件名；未知异常只输出固定的“内容 smoke 失败”。
 
@@ -220,7 +220,7 @@ Git binary diff 快照设置 64 MiB 输出上限；包含更大 dirty binary dif
 错误 CDN 不由服务端自动修复。回退必须由 CDN 作者或部署者完成：
 
 1. 停止使用受支持启动入口继续尝试启动，确认没有同步进程持锁。
-2. 删除错误 CDN 归档，恢复目标版本对应的正确归档和 EntityLists；不要只改服务端 JSON。
+2. 删除错误 CDN 归档，恢复目标版本对应的正确归档和 `EntityLists/` 或 `entities/` 资源清单；不要只改服务端 JSON。
 3. 执行 `npm run content:sync -- --force`，从恢复后的 CDN 重建并激活 Release。
 4. 运行真实 smoke 或对应离线审计，确认 Catalog、Repository 和来源不变检查通过。
 5. 再使用受支持入口启动服务。

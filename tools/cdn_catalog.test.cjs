@@ -402,6 +402,25 @@ test("scanner reads only fixed CDN directories and reuses an atomic digest cache
     assert.equal(fs.readdirSync(contentStateDir).some(name => name.includes(".tmp-")), false)
 })
 
+test("catalog scanner accepts the lowercase entities directory used by the alternate official dump", async t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "cdn-catalog-lowercase-"))
+    const cdnRoot = path.join(sandbox, "cdn")
+    fs.cpSync(fixtureRoot, cdnRoot, { recursive: true })
+    fs.renameSync(path.join(cdnRoot, "EntityLists"), path.join(cdnRoot, "entities"))
+    t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
+
+    const input = await scanCdnCatalogInput({
+        cdnDir: sandbox,
+        cdnRoot,
+        contentStoreDir: path.join(sandbox, "store"),
+        contentStateDir: path.join(sandbox, "state"),
+        contentRuntimeDir: path.join(sandbox, "runtime"),
+    })
+
+    assert.equal(input.entityListsRelativePath, "entities/fixture-android_medium.csv")
+    assert.equal(input.installedBytes, 30)
+})
+
 test("default digest loop hashes archive bytes and closes every file handle", async t => {
     const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "cdn-catalog-default-digest-"))
     const cdnRoot = path.join(sandbox, "cdn")

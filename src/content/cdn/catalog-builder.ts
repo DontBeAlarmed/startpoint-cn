@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 
+import { resolveEntityListsDirectoryName } from "./entity-lists-directory"
 import type { ContentPaths } from "../paths"
 import {
     resolveDigestCache,
@@ -534,7 +535,8 @@ export async function scanCdnCatalogInput(
 ): Promise<CdnCatalogInput> {
     const readdir = dependencies.readdir ?? (directory => fs.promises.readdir(directory, { withFileTypes: true }))
     const readEntityList = dependencies.readEntityList ?? (filePath => fs.promises.readFile(filePath))
-    const entityListsDirectory = path.join(paths.cdnRoot, "EntityLists")
+    const entityListsDirectoryName = await resolveEntityListsDirectoryName(paths.cdnRoot)
+    const entityListsDirectory = path.join(paths.cdnRoot, entityListsDirectoryName)
     const entityCandidates = fileNames(await readDirectory(entityListsDirectory, readdir))
         .filter(fileName => /-android_medium\.csv$/.test(fileName))
     if (entityCandidates.length === 0) {
@@ -546,7 +548,7 @@ export async function scanCdnCatalogInput(
             `multiple Android medium EntityLists CSV files: ${entityCandidates.join(", ")}`,
         )
     }
-    const entityListsRelativePath = `EntityLists/${entityCandidates[0]}`
+    const entityListsRelativePath = `${entityListsDirectoryName}/${entityCandidates[0]}`
     const entityListContent = await readEntityList(path.join(paths.cdnRoot, entityListsRelativePath))
     const installedBytes = parseEntityListInstalledBytes(entityListContent)
     const pendingArchives: Array<{
