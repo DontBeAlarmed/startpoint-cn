@@ -180,6 +180,7 @@ stubModule("../src/data/domains/quest", {
 })
 stubModule("../src/data/domains/character_clear", { incrementPlayerCharacterClearSync() {} })
 stubModule("../src/data/domains/mission_battle_facts", { recordMissionBattleResultSync() {} })
+stubModule("../src/lib/mission/degree-battle-stat-facts", { recordDegreeBattleStatisticsSync() {} })
 stubModule("../src/data/domains/equipment", { updatePlayerEquipmentSync() {} })
 stubModule("../src/data/domains/session", { getSession: () => null })
 stubModule("../src/data/domains/rushEvent", {

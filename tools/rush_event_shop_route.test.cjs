@@ -183,6 +183,7 @@ stubModule("../src/data/domains/session", {
     getSession: async viewerId => viewerId === "123" ? { accountId: 9 } : null,
 })
 stubModule("../src/data/activeAccount", { resolvePlayerIdSync: () => 17 })
+const degreeOperationCalls = []
 stubModule("../src/data/domains/active_mission_counters", {
     incrementActiveMissionUsedManaCountSync(playerId, amount) {
         db.prepare(`
@@ -190,6 +191,9 @@ stubModule("../src/data/domains/active_mission_counters", {
             ON CONFLICT(player_id) DO UPDATE SET used_mana = used_mana + excluded.used_mana
         `).run(playerId, amount)
     },
+})
+stubModule("../src/lib/mission/degree-operation-facts", {
+    recordDegreeOperationFactsSync: (...args) => degreeOperationCalls.push(args),
 })
 stubModule("../src/utils", {
     generateDataHeaders(values = {}) {
@@ -413,6 +417,7 @@ async function main() {
         })
         assert.equal(manaPurchase.statusCode, 200)
         assert.equal(getUsedManaCount(17), 1, "通用商店路由必须累计实际消费的玛纳")
+        assert.deepEqual(degreeOperationCalls.at(-1), [17, "treasure_mana", 1])
 
         const enhancementItem = equipmentEnhancementShopAsset["2001"]
         enhancementItem.userCost = { type: 1, amount: 30 }
