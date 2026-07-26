@@ -39,6 +39,7 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
 const { givePlayerItemSync } = require("../src/data/domains/item")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
+const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
 const missionRoutes = require("../src/routes/api/mission").default
 const { getTimeOffset, setServerTimeOffset } = require("../src/utils")
@@ -170,6 +171,52 @@ async function main() {
             [11, 17],
         )
         assert.equal(finishData.mail_arrived, true)
+
+        updatePlayerSync({
+            id: playerId,
+            stamina: 0,
+            staminaHealTime: new Date("2099-12-31T23:59:59.000Z"),
+        })
+        const exhaustedAutoStart = await fastify.inject({
+            method: "POST",
+            url: "/api/index.php/single_battle_quest/start",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            payload: encodeRequest({
+                viewer_id: viewerId,
+                api_count: 2,
+                quest_id: 1001002,
+                category: 1,
+                party_id: 1,
+                use_boost_point: false,
+                use_boss_boost_point: false,
+                is_auto_start_mode: true,
+                play_id: "auto-stamina-exhausted",
+            }),
+        })
+        assert.equal(exhaustedAutoStart.statusCode, 200, exhaustedAutoStart.body)
+        const exhaustedAutoData = decodeResponse(exhaustedAutoStart)
+        assert.equal(exhaustedAutoData.data_headers.result_code, 4050)
+        assert.deepEqual(exhaustedAutoData.data, {})
+        assert.equal(getPlayerActiveQuestSync(playerId), null)
+
+        const exhaustedManualStart = await fastify.inject({
+            method: "POST",
+            url: "/api/index.php/single_battle_quest/start",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            payload: encodeRequest({
+                viewer_id: viewerId,
+                api_count: 3,
+                quest_id: 1001002,
+                category: 1,
+                party_id: 1,
+                use_boost_point: false,
+                use_boss_boost_point: false,
+                is_auto_start_mode: false,
+                play_id: "manual-stamina-exhausted",
+            }),
+        })
+        assert.equal(exhaustedManualStart.statusCode, 400)
+        assert.equal(getPlayerActiveQuestSync(playerId), null)
 
         db.prepare(`
             DELETE FROM players_category_mission_stages

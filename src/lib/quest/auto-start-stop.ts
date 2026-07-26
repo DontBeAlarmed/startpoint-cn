@@ -1,7 +1,7 @@
 /**
- * The CN client already treats 4050 as a non-fatal return-to-party-select
- * result for quest start. It is the only client-compatible stop signal that
- * does not require a client change.
+ * The CN client handles 4050 inside quest start instead of its global HTTP
+ * error path. Its native meaning is QuestOutOfPeriod, so this remains a
+ * compatibility fallback rather than the client's normal auto-finish state.
  */
 export const AUTO_START_STOP_RESULT_CODE = 4050
 
