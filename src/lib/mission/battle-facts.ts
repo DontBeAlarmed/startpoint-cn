@@ -12,6 +12,7 @@ import { recordActiveMissionConditionalBattleFactsSync } from "./active-conditio
 import { recordActiveMissionSpecificBattleFactsSync } from "./active-mission-specific-battle-facts"
 import { recordDailyMissionBattleFacts } from "./daily-battle-facts"
 import { recordDegreeMissionBattleFacts } from "./degree-battle-facts"
+import { recordDegreeBattleStatisticsSync } from "./degree-battle-stat-facts"
 
 export const BATTLE_SETTLEMENT_CATEGORIES = Object.freeze([1, 2, 3, 6, 7, 8, 10])
 
@@ -43,6 +44,7 @@ export function recordMissionBattleFacts(
         skillUseCount: getSkillUseCount(ctx),
     })
     if (!ctx.questAccomplished) return
+    recordDegreeBattleStatisticsSync(ctx)
     recordDailyMissionBattleFacts(ctx, evaluationTime)
     recordEventMissionBattleFacts(ctx, evaluationTime)
     recordDegreeMissionBattleFacts(ctx, evaluationTime)

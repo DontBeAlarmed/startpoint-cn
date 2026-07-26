@@ -32,6 +32,7 @@ const {
     insertPlayerCharacterSync,
 } = require("../src/data/domains/character")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
+const { getDegreeBattleStatsSync } = require("../src/data/domains/degree_battle_stats")
 const {
     getPlayerCategoryMissionsSync,
     updatePlayerCategoryMissionSync,
@@ -53,6 +54,7 @@ const {
     getExactDegreeQuestClearRuleCount,
     recordDegreeMissionBattleFacts,
 } = require("../src/lib/mission/degree-battle-facts")
+const { recordDegreeBattleStatisticsSync } = require("../src/lib/mission/degree-battle-stat-facts")
 
 const questProgressCountIndex = "idx_players_quest_progress_player_section_finished"
 const initializerSource = fs.readFileSync(
@@ -285,6 +287,117 @@ givePlayerItemSync(playerId, 999999, 5000)
 givePlayerItemSync(playerId, 70014, 3000)
 givePlayerItemSync(playerId, 70048, 1000)
 
+recordDegreeBattleStatisticsSync({
+    playerId,
+    questAccomplished: true,
+    isMulti: false,
+    statistics: {
+        zones: [
+            {
+                fever_count: 2,
+                fever_ms: 100,
+                use_debuff_to_enemy_count: 3,
+                clear_buff_of_enemy_count: 4,
+                clear_debuff_of_self_count: 5,
+                enemy_kill_count: 6,
+                weak_point_attack_count: 7,
+                use_power_flip_lv3_count: 8,
+                coffin_count_reduced_count: 9,
+                damage_deal_max: 1_000_000,
+                max_coffin_count_by_revival: 10,
+                use_buff_to_all_party_members: 999,
+                use_emotion_count: 999,
+            },
+            {
+                fever_count: 3,
+                fever_ms: 200,
+                enemy_kill_count: 4,
+                damage_deal_max: 5_000_000,
+            },
+        ],
+        max_power: 7500,
+        max_skill_chain_count: 7,
+    },
+})
+recordDegreeBattleStatisticsSync({
+    playerId,
+    questAccomplished: true,
+    isMulti: true,
+    statistics: {
+        zones: [{
+            use_buff_to_all_party_members: 11,
+            use_heal_to_all_party_members: 12.5,
+            use_emotion_count: 2,
+            enemy_kill_count: 13,
+            weak_point_attack_count: 14,
+            use_power_flip_lv3_count: 15,
+            coffin_count_reduced_count: 16,
+            damage_deal_max: 4_000_000,
+            max_coffin_count_by_revival: 9,
+            fever_count: 999,
+            clear_buff_of_enemy_count: 999,
+        }],
+        max_power: 8000,
+        max_skill_chain_count: 6,
+    },
+})
+recordDegreeBattleStatisticsSync({
+    playerId,
+    questAccomplished: false,
+    isMulti: false,
+    statistics: { zones: [{ fever_count: 999 }] },
+})
+recordDegreeBattleStatisticsSync({
+    playerId,
+    questAccomplished: true,
+    isMulti: false,
+    statistics: {
+        zones: [
+            {
+                fever_count: -1,
+                fever_ms: 1.5,
+                enemy_kill_count: Number.MAX_SAFE_INTEGER,
+                damage_deal_max: Number.POSITIVE_INFINITY,
+                max_coffin_count_by_revival: -1,
+            },
+            { enemy_kill_count: 1 },
+        ],
+        max_power: 1.5,
+        max_skill_chain_count: -1,
+    },
+})
+recordDegreeBattleStatisticsSync({
+    playerId,
+    questAccomplished: true,
+    isMulti: true,
+    statistics: { zones: [{ use_heal_to_all_party_members: Number.NaN }] },
+})
+
+const overflowAccount = insertAccountSync({
+    appId: "wf_cn",
+    idpAlias: "",
+    idpCode: "test",
+    idpId: `mission-degree-overflow-${randomUUID()}`,
+    status: "normal",
+})
+const overflowPlayerId = insertDefaultPlayerSync(overflowAccount.id).id
+for (const value of [Number.MAX_SAFE_INTEGER, 1]) {
+    recordDegreeBattleStatisticsSync({
+        playerId: overflowPlayerId,
+        questAccomplished: true,
+        isMulti: false,
+        statistics: { zones: [{ fever_count: value }] },
+    })
+    recordDegreeBattleStatisticsSync({
+        playerId: overflowPlayerId,
+        questAccomplished: true,
+        isMulti: true,
+        statistics: { zones: [{ use_heal_to_all_party_members: value }] },
+    })
+}
+assert.equal(getDegreeBattleStatsSync(overflowPlayerId).feverCount, Number.MAX_SAFE_INTEGER)
+assert.equal(getDegreeBattleStatsSync(overflowPlayerId).healPartyCount, Number.MAX_SAFE_INTEGER)
+
 const equipmentDissolve = require("../assets/equipment_dissolve.json")
 const maxLevelEquipmentIds = Object.entries(equipmentDissolve)
     .filter(([, row]) => Number.isSafeInteger(row.max_level) && row.max_level > 0)
@@ -398,6 +511,23 @@ assert.equal(DegreeComputer.compute(31010, context, degreeProgress(31010)), 11, 
 assert.equal(DegreeComputer.compute(31100, context, 0), 0, "其他 Boss 组不得计入指定组")
 assert.equal(DegreeComputer.compute(59200, context, degreeProgress(59200)), 3, "指定 Advent 活动应累计全部目标关卡")
 assert.equal(DegreeComputer.compute(59210, context, degreeProgress(59210)), 8, "指定 Advent 累计称号应从旧进度继续增长")
+assert.equal(DegreeComputer.compute(16000, context, 0), 5, "单人 FEVER 次数应跨 zone 累计")
+assert.equal(DegreeComputer.compute(17000, context, 0), 300, "单人 FEVER 时间应累计毫秒")
+assert.equal(DegreeComputer.compute(18000, context, 0), 3, "单人弱化敌人次数应累计")
+assert.equal(DegreeComputer.compute(19000, context, 0), 4, "单人消除敌人强化次数应累计")
+assert.equal(DegreeComputer.compute(20000, context, 0), 5, "单人净化自身弱化次数应累计")
+assert.equal(DegreeComputer.compute(21000, context, 0), 11, "协力全队强化次数应累计")
+assert.equal(DegreeComputer.compute(22000, context, 0), 12.5, "协力全队回复量应保留合法 Float")
+assert.equal(DegreeComputer.compute(28000, context, 0), 2, "协力表情次数应累计")
+assert.equal(DegreeComputer.compute(29000, context, 0), 23, "击杀数应累计单人与协力")
+assert.equal(DegreeComputer.compute(36000, context, 0), 21, "弱点破坏应累计单人与协力")
+assert.equal(DegreeComputer.compute(38000, context, 0), 23, "Lv3 PF 应累计单人与协力")
+assert.equal(DegreeComputer.compute(40000, context, 0), 25, "棺柩减少数应累计单人与协力")
+assert.equal(DegreeComputer.compute(35000, context, 0), 5_000_000, "单次伤害应取历史最大")
+assert.equal(DegreeComputer.compute(39000, context, 0), 10, "复活棺柩数应取历史最大")
+assert.equal(DegreeComputer.compute(32000, context, 0), 8000, "队伍战力应取历史最大")
+assert.equal(DegreeComputer.compute(27000, context, 0), 7, "技能连锁数应取历史最大")
+assert.equal(DegreeComputer.compute(26000, context, 4), 4, "缺少权威 MVP 聚合时必须保留 fallback")
 
 for (const missionId of [23000, 23010, 23020]) {
     assert.equal(DegreeComputer.compute(missionId, context, 0), 4, `${missionId} 应读取协力成功总数`)
@@ -416,8 +546,8 @@ const coverage = getDegreeMissionCoverageReport()
 assert.equal(getExactDegreeQuestClearRuleCount(), 84)
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1216,
-    unsupported: 72,
+    serverComputed: 1262,
+    unsupported: 26,
     supportedFamilies: {
         playerRank: 8,
         companionCount: 3,
@@ -443,6 +573,22 @@ assert.deepEqual(coverage, {
         carnivalQuestClear: 27,
         hardMultiQuestClear: 6,
         specifiedQuestClearCount: 84,
+        feverCount: 3,
+        feverTime: 3,
+        debuffEnemy: 3,
+        clearEnemyBuff: 3,
+        clearSelfDebuff: 3,
+        buffParty: 3,
+        healParty: 3,
+        emotionUse: 3,
+        enemyKill: 3,
+        weakPointAttack: 3,
+        powerFlipLv3: 3,
+        coffinReduced: 3,
+        damageMax: 3,
+        revivalCoffinMax: 1,
+        partyPowerMax: 3,
+        skillChainMax: 3,
         challengeDungeonClear: 3,
         scoreClearSingle: 3,
         timeClearSingle: 3,

@@ -45,6 +45,12 @@
 - 84 条 type 23 称号只接受主数据可精确闭合的 BossBattle stage group 和 Advent event。成功单人或协力 finish 会直接增加所有匹配的 category 5 任务进度；失败、缺少合法 category/quest ID 和非目标关卡不计入。
 - finish 在原有结算事务中直接增加匹配的 category 5 任务进度，不建立第二份累计表；因此升级前已有进度会自然继续增长。服务端不从 `players_quest_progress.finished` 或 `multi_clear_count` 反推历史总次数，避免把唯一完成状态和部分协力次数混成累计事实。
 - 这批规则暂与 `mission_degree.json` 一样使用仓库 bundled 1.4.54 主数据，并配套使用同版本 Boss/Advent 表，避免混用不同 Content snapshot。任务主数据切换到运行时 Content Release 属于后续统一改造，本批不单独制造半动态路径。
+
+## 称号：战斗统计
+
+- 46 条称号只记录成功 finish：单人专属、协力专属和两者通用字段按 `battle_kind` 分流；累计字段逐 zone 求和，单场最大字段先取 zone 最大再与历史最大比较。整数必须为非负安全整数，Float 必须有限且非负；非法值只关闭对应统计族。
+- `players_degree_battle_stats` 从升级后的新结算开始记录，现有 category 5 持久化进度继续作为下限。服务端不从历史关卡完成行推算 FEVER、伤害或技能链等战斗细节。
+- MVP 三条继续 fallback：客户端只提交 `is_mvp`，请求不含全员 MVP 分数，当前房间状态也无法验证唯一性或并列结果，服务端不把客户端自报值冒充权威事实。
 - type 14 的 8 条累计任务从成功单人 finish 精确累计。目标仅为 1 的 `1213/1214/1215/1221/1303/1304` 同时允许由匹配的历史 `finished` 记录回填到 1；目标包含重复次数的 `1222/1300` 无法由数据库唯一关卡完成行重建，当前保留既有任务进度作为下限，只从升级后的新结算继续累计。
 
 ## 称号指定 Boss 超级难度

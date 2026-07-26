@@ -191,6 +191,27 @@ export default function init(
     ensureSchemaColumn(database, "players_mission_battle_counters.boss_battle_clear_count")
     ensureSchemaColumn(database, "players_mission_battle_counters.skill_use_count")
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_degree_battle_stats (
+        player_id INTEGER PRIMARY KEY,
+        fever_count INTEGER NOT NULL DEFAULT 0,
+        fever_ms INTEGER NOT NULL DEFAULT 0,
+        debuff_enemy_count INTEGER NOT NULL DEFAULT 0,
+        clear_enemy_buff_count INTEGER NOT NULL DEFAULT 0,
+        clear_self_debuff_count INTEGER NOT NULL DEFAULT 0,
+        buff_party_count INTEGER NOT NULL DEFAULT 0,
+        heal_party_count REAL NOT NULL DEFAULT 0,
+        emotion_count INTEGER NOT NULL DEFAULT 0,
+        enemy_kill_count INTEGER NOT NULL DEFAULT 0,
+        weak_point_attack_count INTEGER NOT NULL DEFAULT 0,
+        power_flip_lv3_count INTEGER NOT NULL DEFAULT 0,
+        coffin_reduced_count INTEGER NOT NULL DEFAULT 0,
+        damage_deal_max REAL NOT NULL DEFAULT 0,
+        revival_coffin_max INTEGER NOT NULL DEFAULT 0,
+        party_power_max INTEGER NOT NULL DEFAULT 0,
+        skill_chain_max INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run();
+
     database.prepare(`CREATE TABLE IF NOT EXISTS device_bindings (
         device_id INTEGER PRIMARY KEY,
         account_id INTEGER NOT NULL,

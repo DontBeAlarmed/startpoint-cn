@@ -37,6 +37,9 @@ stubModule("../src/data/domains/mission_battle_facts", {
         calls.push(["result", playerId, result])
     },
 })
+stubModule("../src/lib/mission/degree-battle-stat-facts", {
+    recordDegreeBattleStatisticsSync: ctx => calls.push(["degree-stats", ctx.questId]),
+})
 
 const { recordMissionBattleFacts } = require("../src/lib/mission/battle-facts")
 
@@ -92,6 +95,7 @@ assert.deepEqual(calls, [
         clearTime: 1000,
         skillUseCount: 5,
     }],
+    ["degree-stats", 1001],
     ["multi", 1, 1, 1001],
     ["character", 1001],
     ["leader-powerflip", 1001],

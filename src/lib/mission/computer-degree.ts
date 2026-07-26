@@ -3,6 +3,7 @@
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../../data/domains/character"
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
+import { getDegreeBattleStatsSync } from "../../data/domains/degree_battle_stats"
 import { getPlayerShopPurchasesMapSync } from "../../data/domains/shopPurchase"
 import {
     getPlayerCollectedItemTotalSync,
@@ -393,6 +394,7 @@ function buildStats(playerId: number, category: number): CategoryContext {
             collectedItemTotals: getPlayerCollectedItemTotalsSync(playerId),
             maxLevelEquipmentCount: getMaxLevelEquipmentCount(playerId),
             skillUseCount: battleCounters.skillUseCount,
+            degreeBattleStats: getDegreeBattleStatsSync(playerId),
         },
     }
 }
@@ -417,6 +419,22 @@ const SUPPORTED_FAMILIES = {
     comboOneTime: "degree_combo_onetime_",
     craftPointGet: "degree_craft_point_get_",
     skillUse: "degree_skill_use_",
+    feverCount: "degree_fever_condition_single_",
+    feverTime: "degree_time_fever_elapse_single_",
+    debuffEnemy: "degree_weak_enemy_use_single_",
+    clearEnemyBuff: "degree_debuff_enemy_use_single_",
+    clearSelfDebuff: "degree_deweak_myself_use_single_",
+    buffParty: "degree_buff_companion_use_",
+    healParty: "degree_recovery_hp_companion_",
+    emotionUse: "degree_emotion_multi_battle_use_",
+    enemyKill: "degree_kill_enemy_",
+    weakPointAttack: "degree_destruction_weak_point_",
+    powerFlipLv3: "degree_power_flip_lv3_use_",
+    coffinReduced: "degree_coffin_count_sub_",
+    damageMax: "degree_damage_onetime_",
+    revivalCoffinMax: "degree_return_coffin_count_30over_",
+    partyPowerMax: "degree_condition_party_force_",
+    skillChainMax: "degree_skill_chain_condition_",
 } as const
 
 function getSecondManaBoardCharacterId(missionId: number): number | undefined {
@@ -687,6 +705,23 @@ export const DegreeComputer: MissionComputer = {
         if (pattern.startsWith(SUPPORTED_FAMILIES.skillUse)) {
             return Math.max(dbProgress, stats.skillUseCount)
         }
+        const battleStats = stats.degreeBattleStats
+        if (pattern.startsWith(SUPPORTED_FAMILIES.feverCount)) return Math.max(dbProgress, battleStats.feverCount)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.feverTime)) return Math.max(dbProgress, battleStats.feverMs)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.debuffEnemy)) return Math.max(dbProgress, battleStats.debuffEnemyCount)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.clearEnemyBuff)) return Math.max(dbProgress, battleStats.clearEnemyBuffCount)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.clearSelfDebuff)) return Math.max(dbProgress, battleStats.clearSelfDebuffCount)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.buffParty)) return Math.max(dbProgress, battleStats.buffPartyCount)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.healParty)) return Math.max(dbProgress, battleStats.healPartyCount)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.emotionUse)) return Math.max(dbProgress, battleStats.emotionCount)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.enemyKill)) return Math.max(dbProgress, battleStats.enemyKillCount)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.weakPointAttack)) return Math.max(dbProgress, battleStats.weakPointAttackCount)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.powerFlipLv3)) return Math.max(dbProgress, battleStats.powerFlipLv3Count)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.coffinReduced)) return Math.max(dbProgress, battleStats.coffinReducedCount)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.damageMax)) return Math.max(dbProgress, battleStats.damageDealMax)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.revivalCoffinMax)) return Math.max(dbProgress, battleStats.revivalCoffinMax)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.partyPowerMax)) return Math.max(dbProgress, battleStats.partyPowerMax)
+        if (pattern.startsWith(SUPPORTED_FAMILIES.skillChainMax)) return Math.max(dbProgress, battleStats.skillChainMax)
         return dbProgress
     },
 }
