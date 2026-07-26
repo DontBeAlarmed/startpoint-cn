@@ -3,12 +3,40 @@ import { ensureQuestHostFinishedStorageSync } from "../../lib/quest/host-finish-
 import { ensureActiveQuestEntryItemCountStorageSync } from "../../lib/quest/active-quest-persistence";
 import { ensureSchemaColumn } from "../schema";
 
+function getInitialDropMultiplier(): number {
+    const configured = process.env.DROP_MULTIPLIER
+    if (configured === undefined) return 1
+    if (!/^\d+$/.test(configured)) {
+        throw new Error("DROP_MULTIPLIER must be an integer between 1 and 10")
+    }
+    const multiplier = Number(configured)
+    if (!Number.isSafeInteger(multiplier) || multiplier < 1 || multiplier > 10) {
+        throw new Error("DROP_MULTIPLIER must be an integer between 1 and 10")
+    }
+    return multiplier
+}
+
 
 export default function init(
     database: Database,
     exists: Boolean
 ) {
     // initialize the database
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS server_gameplay_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        drop_multiplier INTEGER NOT NULL CHECK (drop_multiplier BETWEEN 1 AND 10),
+        updated_at TEXT NOT NULL
+    )`).run()
+    const gameplaySettingsExist = database.prepare(
+        "SELECT 1 FROM server_gameplay_settings WHERE id = 1",
+    ).get() !== undefined
+    if (!gameplaySettingsExist) {
+        database.prepare(`
+            INSERT INTO server_gameplay_settings (id, drop_multiplier, updated_at)
+            VALUES (1, ?, ?)
+        `).run(getInitialDropMultiplier(), new Date().toISOString())
+    }
 
     // create players table
     database.prepare(`CREATE TABLE IF NOT EXISTS accounts (

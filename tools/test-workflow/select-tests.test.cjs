@@ -445,6 +445,7 @@ test("keeps isolated test groups parallel while infrastructure groups stay seria
 
 test("splits isolated integration tests into focused domains", () => {
     assert.deepEqual(TEST_GROUPS["integration:database"].tests, [
+        "tools/server_gameplay_settings.test.cjs",
         "tools/test-workflow/database-isolation.test.cjs",
         "tools/test-workflow/database-lifecycle.test.cjs",
         "tools/test-workflow/runtime-data-paths.test.cjs",

@@ -156,6 +156,7 @@ const TEST_GROUPS = Object.freeze({
     "integration:database": {
         execution: "serial",
         tests: [
+            "tools/server_gameplay_settings.test.cjs",
             "tools/test-workflow/database-isolation.test.cjs",
             "tools/test-workflow/database-lifecycle.test.cjs",
             "tools/test-workflow/runtime-data-paths.test.cjs",
@@ -259,6 +260,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tests/admin-account-save-ui.test.js",
             "tests/admin-clairvoyance.test.js",
+            "tests/admin-gameplay-settings-ui-source.test.js",
             "tests/admin-mail-rules.test.js",
             "tests/admin-mail-ui-source.test.js",
             "tests/admin-time-clairvoyance-ui-source.test.js",
