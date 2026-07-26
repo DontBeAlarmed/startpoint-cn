@@ -219,6 +219,7 @@ assert.deepEqual(getExactEventBattleRuleCoverage(), {
     roles: { any: 792, host: 12, guest: 1 },
     exactClearRules: 257,
     clearRulesByCategory: { 7: 63, 10: 7, 13: 60, 23: 80, 24: 47 },
+    exactPhaseRules: 29,
 })
 assert.deepEqual(BATTLE_SETTLEMENT_CATEGORIES, [1, 2, 3, 6, 7, 8, 10])
 
@@ -260,6 +261,48 @@ assert.equal(recordEventMissionBattleFacts(
     { ...adventClearContext, isMulti: true },
     adventClearTime,
 ).includes(1652), true, "battle_kind=3 应接受单人和多人成功结算")
+
+const phaseTime = new Date("2020-11-02T04:00:00.000Z")
+const phaseContext = finishContext({
+    questCategory: 11,
+    questId: 2001,
+    isMulti: false,
+    isMultiHost: undefined,
+    statistics: { clear_phase: 4, party: { characters: [], unison_characters: [] } },
+})
+const phaseMatches = recordEventMissionBattleFacts(phaseContext, phaseTime)
+assert.equal(phaseMatches.includes(200831), true)
+assert.equal(phaseMatches.includes(2008341), true, "clear_phase=4 应完成同关卡 Phase 1 至 4")
+assert.equal(
+    recordEventMissionBattleFacts({ ...phaseContext, isMulti: undefined }, phaseTime)
+        .includes(2008341),
+    true,
+    "真实单人 finish 未设置 isMulti 时仍应推进 Ranking Phase",
+)
+assert.equal(missionProgress(2008341), 1, "Ranking Phase 重复结算必须保持幂等")
+const phaseMissionIds = [200831, 200832, 200833, 2008341]
+for (const invalidContext of [
+    { ...phaseContext, questAccomplished: false },
+    { ...phaseContext, isMulti: true, isMultiHost: true },
+    { ...phaseContext, questCategory: 10 },
+    { ...phaseContext, questId: 2002 },
+    { ...phaseContext, statistics: { ...phaseContext.statistics, clear_phase: 0 } },
+    { ...phaseContext, statistics: { ...phaseContext.statistics, clear_phase: 4.5 } },
+    { ...phaseContext, statistics: { ...phaseContext.statistics, clear_phase: 5 } },
+]) {
+    assert.equal(
+        recordEventMissionBattleFacts(invalidContext, phaseTime)
+            .some(missionId => phaseMissionIds.includes(missionId)),
+        false,
+        "失败、多人、错误关卡/category 和非法 phase 均不得推进 Ranking Phase",
+    )
+}
+assert.equal(
+    recordEventMissionBattleFacts(phaseContext, new Date("2024-08-14T12:00:00.000Z"))
+        .some(missionId => phaseMissionIds.includes(missionId)),
+    false,
+    "非开放期不得推进 Ranking Phase",
+)
 
 const finiteTime = new Date("2020-08-14T03:00:00.000Z")
 const finiteContext = finishContext({

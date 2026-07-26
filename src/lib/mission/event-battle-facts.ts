@@ -1,4 +1,7 @@
-import { incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
+import {
+    ensurePlayerCategoryMissionProgressSync,
+    incrementPlayerCategoryMissionSync,
+} from "../../data/domains/mission"
 import type { FinishContext } from "../quest/finish/types"
 import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "./master-data"
 import ruleAsset from "../../../assets/mission_event_battle_rules.json"
@@ -9,6 +12,7 @@ import storyEventSingleQuests from "../../../assets/story_event_single_quest.jso
 import challengeDungeonQuests from "../../../assets/challenge_dungeon_event_quest.json"
 import raidEventQuests from "../../../assets/raid_event_quest.json"
 import rushEventQuests from "../../../assets/rush_event_quest.json"
+import rankingEventSingleQuests from "../../../assets/ranking_event_single_quest.json"
 
 type MultiRole = "any" | "host" | "guest"
 type QuestRange = "All" | "BossBattle" | "AdventEvent" | "WorldStoryEventBossBattle"
@@ -37,6 +41,13 @@ interface ExactClearRule {
     readonly battleKind: 1 | 3
     readonly category: number
     readonly questIds: ReadonlySet<number>
+    readonly definition: ReturnType<typeof getMissionMasterDefinitions>[number]
+}
+
+interface ExactPhaseRule {
+    readonly missionId: number
+    readonly questId: number
+    readonly requiredPhase: 1 | 2 | 3 | 4
     readonly definition: ReturnType<typeof getMissionMasterDefinitions>[number]
 }
 
@@ -306,6 +317,29 @@ function buildExactClearRules(): readonly ExactClearRule[] {
 
 const exactClearRules = buildExactClearRules()
 
+function buildExactPhaseRules(): readonly ExactPhaseRule[] {
+    const rules: ExactPhaseRule[] = []
+    for (const definition of getMissionMasterDefinitions(3)) {
+        const patternType = Number(definition.row[2])
+        if (patternType < 49 || patternType > 52 || Number(definition.row[7]) !== 8) continue
+        const eventId = Number(definition.row[8])
+        const suffix = Number(definition.row[10])
+        if (!Number.isSafeInteger(eventId) || eventId <= 0
+            || !Number.isSafeInteger(suffix) || suffix <= 0) continue
+        const questId = eventId * 1000 + suffix
+        if ((rankingEventSingleQuests as Record<string, unknown>)[String(questId)] === undefined) continue
+        rules.push({
+            missionId: definition.missionId,
+            questId,
+            requiredPhase: (patternType - 48) as 1 | 2 | 3 | 4,
+            definition,
+        })
+    }
+    return Object.freeze(rules)
+}
+
+const exactPhaseRules = buildExactPhaseRules()
+
 function matchesRole(role: MultiRole, isMultiHost: boolean | undefined): boolean {
     if (role === "any") return true
     if (role === "host") return isMultiHost === true
@@ -327,6 +361,7 @@ export function getExactEventBattleRuleCoverage() {
             counts[rule.category] = (counts[rule.category] ?? 0) + 1
             return counts
         }, {} as Record<number, number>),
+        exactPhaseRules: exactPhaseRules.length,
     }
 }
 
@@ -353,6 +388,19 @@ export function recordEventMissionBattleFacts(
         if (!isMissionDefinitionEnabledAt(rule.definition, evaluationTime)) continue
         incrementPlayerCategoryMissionSync(ctx.playerId, 3, rule.missionId, 1)
         matchedMissionIds.push(rule.missionId)
+    }
+    const clearPhase = ctx.statistics.clear_phase
+    if (ctx.isMulti !== true
+        && ctx.questCategory === 11
+        && Number.isSafeInteger(clearPhase)
+        && clearPhase >= 1
+        && clearPhase <= 4) {
+        for (const rule of exactPhaseRules) {
+            if (rule.questId !== ctx.questId || clearPhase < rule.requiredPhase) continue
+            if (!isMissionDefinitionEnabledAt(rule.definition, evaluationTime)) continue
+            ensurePlayerCategoryMissionProgressSync(ctx.playerId, 3, rule.missionId, 1)
+            matchedMissionIds.push(rule.missionId)
+        }
     }
     return matchedMissionIds
 }

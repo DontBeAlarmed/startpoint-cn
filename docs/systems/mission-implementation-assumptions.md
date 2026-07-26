@@ -38,6 +38,7 @@
 - 历史最佳时间来自客户端 finish 请求并由服务端保存；服务端不模拟战斗或重算计时。这一事实链保证协议闭合，
   不提供反作弊证明，也不能证明活动开放前完成的历史记录是否应计入。
 - 257 条 type 23 累计通关任务只覆盖 Advent、StoryEventSingle、ChallengeDungeon、Raid 和 Rush 五种可由官方表闭合的 QuestRange。battle kind 1 只累计单人成功，battle kind 3 同时累计单人和多人成功；每次合法 finish 增加 1，历史唯一完成记录不用于反推重复次数。
+- Ranking Phase 29 条任务以成功单人 finish 的 `statistics.clear_phase` 为事实。当前反编译协议能确认字段与主数据 pattern 的阶段语义，但服务端不会重演战斗来验证客户端提交值；多人、非整数、0、5 及错误关卡均不推进。该协议边界需后续 CN 客户端样本验收。
 
 ## 称号指定 Boss 超级难度
 

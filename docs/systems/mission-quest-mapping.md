@@ -4,7 +4,7 @@
 > 历史审计资产: `assets/mission_event_quest_map.json`
 > 严格规则生成器: `scripts/gen_mission_event_battle_rules.js`
 > 运行时资产: `assets/mission_event_battle_rules.json`
-> 覆盖范围: cat3 活动任务 2512 条；QuestRange 严格协力规则 805 条、type 23 精确通关规则 257 条，另有 386 条关卡/物品/竞速安全规则
+> 覆盖范围: cat3 活动任务 2512 条；QuestRange 严格协力规则 805 条、type 23 精确通关规则 257 条，另有 415 条关卡/物品/竞速/阶段安全规则
 
 `mission_event_quest_map.json` 是按 pattern 展开的旧映射，只供 `computer-event.ts` 历史审计。它没有完整表达
 QuestRange selector、QuestRank、Host/Guest 和 Attention 来源，不能驱动自动事实。旧 939 条自动规则已从
@@ -46,6 +46,9 @@ category 3 的 type 37 不依赖 QuestRange 资产。运行时从 `row[12]` 读�
 此外，188 条 category 11 竞速任务必须同时满足 type 15、QuestRange kind 8、`event_id * 1000 + suffix`
 精确关卡、唯一旧映射和官方奖励秒数，并使用历史最佳毫秒值判断。狂热激战 category 24 的 42 条限时任务不使用
 会把单关扩展为整期 8 个关卡的旧映射，而是由 QuestRange kind 17、精确 suffix 和 `rush_event_quest` 唯一闭合。
+Ranking Phase 的 type 49～52 分别对应 Phase 1～4。服务端只接受 category 11 的成功单人结算，以
+`eventId * 1000 + suffix` 精确定位 `ranking_event_single_quest.json` 中的关卡，并要求 `clear_phase` 为 1～4 的整数；
+完成 Phase N 会推进同关卡不高于 N 的阶段任务。该字段来自官方 finish 请求，服务端不重算战斗阶段。
 其他活动任务继续返回数据库持久化进度，`computer-event.ts` 和旧 quest map 仍只用于离线审计。
 
 ## Type 23 精确通关规则

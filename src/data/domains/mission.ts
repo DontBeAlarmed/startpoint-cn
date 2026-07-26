@@ -352,6 +352,19 @@ export function incrementPlayerCategoryMissionSync(
     `).run(category, Number(missionId), delta, playerId)
 }
 
+export function ensurePlayerCategoryMissionProgressSync(
+    playerId: number,
+    category: number,
+    missionId: number | string,
+    progress: number
+) {
+    getDb().prepare(`
+    INSERT INTO players_category_missions (category, id, progress, player_id)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(category, id, player_id) DO UPDATE SET progress = MAX(progress, excluded.progress)
+    `).run(category, Number(missionId), progress, playerId)
+}
+
 export function updatePlayerCategoryMissionStageSync(
     playerId: number,
     category: number,
