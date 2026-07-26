@@ -25,6 +25,11 @@ jobs:
       - name: Mode seam tests
         run: node --test tools/modes_loader.test.cjs tools/modes_contract.test.cjs tools/modes_integration.test.cjs
 
+      # Route-level: /start veto and /finish settlement rollback through the
+      # real fastify handlers.
+      - name: Mode seam route tests
+        run: node tools/modes_routes.test.cjs
+
       # Guard: modes.d/ is an operator-owned directory. Neither fixtures nor
       # concrete gameplay modules may ship in it.
       - name: Assert no modules ship in modes.d/
