@@ -38,6 +38,9 @@ const TEST_GROUPS = Object.freeze({
     "quick:seed": {
         execution: "parallel",
         tests: [
+            "tools/gacha_faithful_inspect.test.cjs",
+            "tools/gacha_seed_catalog_builder.test.cjs",
+            "tools/gacha_seed_catalog_cli.test.cjs",
             "tools/seed_api.test.cjs",
             "tools/seed_state.test.cjs",
         ],

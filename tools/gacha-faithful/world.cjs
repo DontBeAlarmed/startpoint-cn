@@ -1405,6 +1405,69 @@ function cfgFor(m) {
   return c;
 }
 
+function getConfigSnapshot() {
+  return JSON.parse(JSON.stringify({ base: BASE, movies: MOVIES }));
+}
+
+function precalculate(seed, movie) {
+  var config = cfgFor(movie);
+  var threshold = config.threshold;
+  var random = new MersenneTwister(seed);
+
+  random.randomRangeFloat(config.ball.initialXMin, config.ball.initialXMax);
+  random.randomRangeFloat(config.ball.ejectionAngleMin, config.ball.ejectionAngleMax);
+  var ballProbability = random.randomRangeFloat(0, 1);
+
+  var pinCount = random.randomRange(config.pin.totalCountMin, config.pin.totalCountMax);
+  chooseNumbers({ random: random }, 0, config.pin.countPerLine * config.pin.lineCount - 1, pinCount);
+
+  var circleIds = chooseNumbers(
+    { random: random },
+    0,
+    config.amulet.countPerLine * config.amulet.lineCount - 1,
+    config.amulet.totalCount
+  );
+  var amulets = [];
+  for (var i = 0; i < circleIds.length; i++) {
+    amulets.push({
+      placeIndex: PLACE_CIRCLE,
+      probability: random.randomRangeFloat(0, 1),
+      twoUpProbability: random.randomRangeFloat(0, 1)
+    });
+  }
+
+  var barIds = chooseNumbers(
+    { random: random },
+    0,
+    config.barAmulet.lineCount - 1,
+    config.barAmulet.totalCount
+  );
+  for (var j = 0; j < barIds.length; j++) {
+    amulets.push({
+      placeIndex: PLACE_BAR,
+      probability: random.randomRangeFloat(0, 1),
+      twoUpProbability: 0
+    });
+  }
+
+  var playProbability = random.randomRangeFloat(0, 1);
+  var initialRarity = ballProbability > threshold.ballStar4 ? 1 : 0;
+  var moviePlayable = playProbability >= threshold.playMovie;
+  if (threshold.isRarity5 != null && Boolean(threshold.isRarity5)) {
+    initialRarity = 2;
+    moviePlayable = false;
+  }
+
+  return {
+    seed: seed,
+    movieId: movie,
+    initialRarity: initialRarity,
+    finalRarity: moviePlayable ? null : initialRarity,
+    moviePlayable: moviePlayable,
+    playProbability: playProbability
+  };
+}
+
 // AmuletPlaceId.index: Circle=0, Bar=1
 var PLACE_CIRCLE = 0, PLACE_BAR = 1;
 
@@ -1452,6 +1515,8 @@ function initField(seed, movie) {
   sim.ball.rarity = sim.ball.probability > threshold.ballStar4 ? 1 : 0;
   // initAmuletRarity
   initAmuletRarity(sim);
+  sim.initialRarity = sim.ball.rarity;
+  sim.rarityUpgradeCount = 0;
   // moviePlayable
   sim.moviePlayable = sim.playProbability >= threshold.playMovie;
   if (threshold.isRarity5 != null && Boolean(threshold.isRarity5)) {
@@ -1673,6 +1738,7 @@ function performAmuletContacted(sim, param1) {
   if (sim.ball.rarity > 2) {
     sim.ball.rarity = 2;
   }
+  sim.rarityUpgradeCount += sim.ball.rarity - _loc2_;
   if (_loc2_ < 2 && sim.ball.rarity === 2) {
     performAllAmuletAndPinContacted(sim);
   }
@@ -1778,16 +1844,56 @@ function worldStep(sim) {
 // simulate
 // ===========================================================================
 function simulate(seed, movie) {
-  var sim = initField(seed, movie);
-  if (!sim.moviePlayable) {
-    return sim.ball.rarity;
+  var precomputed = precalculate(seed, movie);
+  if (!precomputed.moviePlayable) {
+    return precomputed.initialRarity;
   }
+  var sim = initField(seed, movie);
   var guard = 0;
   while (!sim.finished && guard < 20000) {
     worldStep(sim);
     guard++;
   }
   return sim.ball.rarity;
+}
+
+function inspect(seed, movie) {
+  var precomputed = precalculate(seed, movie);
+  if (!precomputed.moviePlayable) {
+    return {
+      seed: seed,
+      movieId: movie,
+      initialRarity: precomputed.initialRarity,
+      finalRarity: precomputed.initialRarity,
+      moviePlayable: false,
+      playProbability: precomputed.playProbability,
+      frameCount: 0,
+      pinContactCount: 0,
+      amuletContactCount: 0,
+      rarityUpgradeCount: 0,
+      finished: true
+    };
+  }
+
+  var sim = initField(seed, movie);
+  var guard = 0;
+  while (!sim.finished && guard < 20000) {
+    worldStep(sim);
+    guard++;
+  }
+  return {
+    seed: seed,
+    movieId: movie,
+    initialRarity: sim.initialRarity,
+    finalRarity: sim.ball.rarity,
+    moviePlayable: true,
+    playProbability: sim.playProbability,
+    frameCount: sim.frameCount,
+    pinContactCount: sim.pins.filter(function (pin) { return pin.contacted; }).length,
+    amuletContactCount: sim.ball.amuletContactCount,
+    rarityUpgradeCount: sim.rarityUpgradeCount,
+    finished: sim.finished
+  };
 }
 
 // Run full physics regardless of moviePlayable (per task metric).
@@ -1801,4 +1907,12 @@ function simulateFull(seed, movie) {
   return sim.ball.rarity;
 }
 
-module.exports = { simulate: simulate, simulateFull: simulateFull, initField: initField, worldStep: worldStep };
+module.exports = {
+  getConfigSnapshot: getConfigSnapshot,
+  inspect: inspect,
+  simulate: simulate,
+  simulateFull: simulateFull,
+  precalculate: precalculate,
+  initField: initField,
+  worldStep: worldStep
+};

@@ -74,9 +74,17 @@ function decodeFile(path) {
 }
 
 if (require.main === module) {
-  const dir = 'D:/gacha_analysis/reference/configs/gacha_movie_configs';
-  const which = process.argv[2] || 'fes';
-  const obj = decodeFile(dir + '/' + which + '.amf3');
-  console.log(JSON.stringify(obj, null, 1));
+  const input = process.argv[2];
+  if (!input) {
+    console.error('usage: node amf3_decode.cjs <decompressed-config.amf3>');
+    process.exitCode = 1;
+  } else {
+    try {
+      console.log(JSON.stringify(decodeFile(input), null, 2));
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
+  }
 }
 module.exports = { decodeFile };

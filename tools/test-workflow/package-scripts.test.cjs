@@ -110,6 +110,25 @@ test("exposes the workflow benchmark command", () => {
     )
 })
 
+test("exposes the offline faithful gacha seed catalog workflow", () => {
+    assert.equal(
+        scripts["gacha:seeds:extract-config"],
+        "node tools/gacha-faithful/amf3_decode.cjs",
+    )
+    assert.equal(
+        scripts["gacha:seeds:build"],
+        "node tools/gacha-faithful/build_catalog.cjs",
+    )
+    assert.equal(
+        scripts["gacha:seeds:verify"],
+        "node tools/gacha-faithful/verify_catalog.cjs",
+    )
+    assert.equal(
+        scripts["gacha:seeds:audit"],
+        "node tools/gacha-faithful/audit_catalog.cjs",
+    )
+})
+
 test("runs content sync through the TypeScript entry without a prebuild", () => {
     assert.equal(
         scripts["content:sync"],

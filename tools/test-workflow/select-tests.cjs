@@ -62,6 +62,8 @@ const SOURCE_RULES = [
         groups: ["integration:database", "quick:cdn", "quick:content"],
     },
     { pattern: /^src\/runtime\/seed-state-(?:schema|store)\.ts$/, groups: ["quick:seed"] },
+    { pattern: /^tools\/gacha-faithful\//, groups: ["quick:seed"] },
+    { pattern: /^assets\/gacha-seed-catalog\//, groups: ["quick:seed"] },
     {
         pattern: /^src\/runtime\/(?:bundle-metadata|config|health|lifecycle)\.ts$/,
         groups: ["quick:runtime", "integration:runtime"],
