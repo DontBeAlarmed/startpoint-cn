@@ -1,7 +1,10 @@
 // Handles the insertion of mana into characters.
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { addPlayerShopPurchaseCountSync, addPlayerShopPurchaseSync, getPlayerShopPurchaseCountSync, getPlayerShopPurchasesMapSync } from "../../data/domains/shopPurchase"
+import {
+    addPlayerShopPurchaseCountsByTypeSync,
+    getPlayerShopPurchaseCountsByTypeSync,
+} from "../../data/domains/shopPurchase"
 import { getAccountPlayers } from "../../data/domains/account"
 import { getPlayerEquipmentSync, playerOwnsEquipmentSync, updatePlayerEquipmentSync } from "../../data/domains/equipment"
 import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
@@ -18,7 +21,16 @@ import { computeRealTimeStamina } from "../../lib/stamina";
 import { clientSerializeEquipment } from "../../lib/equipment";
 import { planEquipmentEnhancementPurchase } from "../../lib/equipment-enhancement";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
-import { executeGenericShopBatchPurchaseSync, executeGenericShopPurchaseSync, isShopItemAvailable, ShopPeriodError, ShopPurchaseError, validateShopPurchaseAmount } from "../../lib/event-shop-purchase";
+import {
+    calculateShopStockQuantity,
+    executeGenericShopBatchPurchaseSync,
+    executeGenericShopPurchaseSync,
+    getShopPurchasePeriodKeys,
+    isShopItemAvailable,
+    ShopPeriodError,
+    ShopPurchaseError,
+    validateShopPurchaseAmount,
+} from "../../lib/event-shop-purchase";
 import CDN_GENERAL_SHOP_WHITELIST from "../../../assets/cdn_general_shop_whitelist.json";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { recordDegreeOperationFactsSync } from "../../lib/mission/degree-operation-facts";
@@ -184,15 +196,12 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "Shop item with specified id does not exist."
         })
 
-        // validate stock limit
-        if (shopType !== ShopType.EVENT_ITEM && shopItemData.stock !== undefined && shopItemData.stock > 0) {
-            const purchased = getPlayerShopPurchaseCountSync(playerId, shopItemId)
-            if (purchased + purchaseAmount > shopItemData.stock) {
-                return reply.status(400).send({
-                    "error": "Bad Request",
-                    "message": "Shop item purchase limit reached."
-                })
-            }
+        // buy_max_count is a per-request limit, not lifetime stock.
+        if (shopItemData.stock >= 0 && purchaseAmount > shopItemData.stock) {
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Shop item purchase limit reached."
+            })
         }
 
         let enhancementEquipmentId: number | null = null
@@ -297,7 +306,13 @@ const routes = async (fastify: FastifyInstance) => {
                 updatePlayerEquipmentSync(playerId, equipmentId, { enhancementLevel: newLevel })
                 incrementActiveMissionUsedManaCountSync(playerId, manaSpent)
                 for (let i = 0; i < purchaseAmount; i++) {
-                    addPlayerShopPurchaseSync(playerId, shopItemId)
+                    addPlayerShopPurchaseCountsByTypeSync(
+                        playerId,
+                        shopType,
+                        shopItemId,
+                        1,
+                        getShopPurchasePeriodKeys(getServerTime() * 1000, shopItemData.specifiedMonths),
+                    )
                 }
             })()
 
@@ -326,6 +341,7 @@ const routes = async (fastify: FastifyInstance) => {
         try {
             purchaseResult = executeGenericShopPurchaseSync({
                 playerId,
+                shopType,
                 shopItemId,
                 purchaseAmount,
                 shopItem: shopItemData,
@@ -337,8 +353,8 @@ const routes = async (fastify: FastifyInstance) => {
                 updatePlayer: nextPlayer => updatePlayerSync(nextPlayer),
                 getItem: (id, itemId) => getPlayerItemSync(id, itemId) ?? 0,
                 setItem: updatePlayerItemSync,
-                getPurchaseCount: getPlayerShopPurchaseCountSync,
-                addPurchaseCount: addPlayerShopPurchaseCountSync,
+                getPurchaseCounts: getPlayerShopPurchaseCountsByTypeSync,
+                addPurchaseCounts: addPlayerShopPurchaseCountsByTypeSync,
                 recordManaSpent: (id, amount) => {
                     incrementActiveMissionUsedManaCountSync(id, amount)
                     if (shopType === ShopType.TREASURE) {
@@ -454,11 +470,6 @@ const routes = async (fastify: FastifyInstance) => {
         // parse shop items
         const salesList: Object[] = []
 
-        // Load purchase history for stock tracking
-        const purchasedMap = getPlayerShopPurchasesMapSync(playerId)
-        const totalPurchased = Object.values(purchasedMap).reduce((a, b) => a + b, 0)
-        console.log(`[shop:get_sales] player=${playerId} purchasedKeys=${Object.keys(purchasedMap).length} totalPurchased=${totalPurchased}`)
-
         let filteredCdnCount = 0
         const nowMs = getServerTime() * 1000
 
@@ -489,18 +500,23 @@ const routes = async (fastify: FastifyInstance) => {
                     continue
                 }
 
-                const purchased = purchasedMap[Number(itemId)] ?? 0
-                const stock = item.stock
-                const stockQuantity = stock !== undefined ? Math.max(0, stock - purchased) : -1
+                const periodKeys = getShopPurchasePeriodKeys(nowMs, item.specifiedMonths)
+                const counts = getPlayerShopPurchaseCountsByTypeSync(
+                    playerId,
+                    shopTypeNum,
+                    Number(itemId),
+                    periodKeys,
+                )
+                const stockQuantity = calculateShopStockQuantity(item, counts)
                 salesList.push({
                     "shop_item_id": Number(itemId),
                     "stock_quantity": stockQuantity,
-                    "today_purchase_num": purchased,
-                    "this_month_purchase_num": purchased,
-                    "total_purchase_num": purchased,
+                    "today_purchase_num": item.dailyStock === undefined ? 0 : counts.daily,
+                    "this_month_purchase_num": item.monthlyStock === undefined ? null : counts.monthly,
+                    "total_purchase_num": counts.total,
                     "group_info": {
                         "group_total_stock_quantity": stockQuantity,
-                        "group_total_purchase_num": purchased,
+                        "group_total_purchase_num": counts.total,
                         "multi_stage": false
                     },
                     "shop_type": Number(shopType)
@@ -649,9 +665,6 @@ const routes = async (fastify: FastifyInstance) => {
                 const purchaseAmount = validateShopPurchaseAmount(rawAmount)
                 const shopItem = getShopItemSync(shopType, shopItemId)
                 if (shopItem === null) throw new ShopPurchaseError("Shop item with specified id does not exist.")
-                if (shopItem.dailyStock !== undefined || shopItem.monthlyStock !== undefined) {
-                    throw new ShopPurchaseError("Bulk purchase does not support periodic stock items.")
-                }
                 purchases.push({ shopItemId, purchaseAmount, shopItem })
             }
         } catch (error) {
@@ -665,6 +678,7 @@ const routes = async (fastify: FastifyInstance) => {
         try {
             purchaseResult = executeGenericShopBatchPurchaseSync({
                 playerId,
+                shopType,
                 purchases,
                 nowMs: getServerTime() * 1000,
                 enforcePeriod: shopType === ShopType.EVENT_ITEM,
@@ -674,8 +688,8 @@ const routes = async (fastify: FastifyInstance) => {
                 updatePlayer: nextPlayer => updatePlayerSync(nextPlayer),
                 getItem: (id, itemId) => getPlayerItemSync(id, itemId) ?? 0,
                 setItem: updatePlayerItemSync,
-                getPurchaseCount: getPlayerShopPurchaseCountSync,
-                addPurchaseCount: addPlayerShopPurchaseCountSync,
+                getPurchaseCounts: getPlayerShopPurchaseCountsByTypeSync,
+                addPurchaseCounts: addPlayerShopPurchaseCountsByTypeSync,
                 recordManaSpent: incrementActiveMissionUsedManaCountSync,
                 grantRewards: givePlayerRewardsSync,
             })

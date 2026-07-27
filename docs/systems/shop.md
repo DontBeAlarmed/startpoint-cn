@@ -11,7 +11,7 @@
 | `assets/boss_coin_shop.json` | Boss 币分类商品 |
 | `assets/star_grain_shop.json` | 星之粒商店与组合奖励 |
 | `assets/equipment_enhancement_shop.json` | 追忆装备阶段强化商品 |
-| `src/data/domains/shopPurchase.ts` | 玩家累计购买次数 |
+| `src/data/domains/shopPurchase.ts` | 玩家按商店类型、日/月周期和总量记录购买次数 |
 | `src/lib/event-shop-purchase.ts` | 通用购买校验与事务 |
 | `src/routes/api/shop.ts` | 列表与购买端点 |
 
@@ -26,7 +26,7 @@
 3. `boss_coin_shop_category_ids` 按 Boss 分类合并商品；
 4. `equipment_enhancement_shop_category_ids` 限制追忆装备强化分类；
 5. 使用统一服务器时间过滤尚未开放或已经结束的商品；
-6. 读取玩家购买记录，计算剩余库存和累计购买次数。
+6. 读取玩家购买记录，计算当前日、当前月、总累计及最终剩余库存。
 
 GeneralShop 额外通过 `cdn_general_shop_whitelist.json` 过滤客户端主数据中不存在的商品，避免返回未知 ID 触发 C8601。该白名单只用于 GeneralShop；其他类型依赖各自的受控运行资产。
 
@@ -41,10 +41,14 @@ GeneralShop 额外通过 `cdn_general_shop_whitelist.json` 过滤客户端主数
 3. 校验 Mana、星导石、羁绊证或道具成本；
 4. 扣除货币和道具；
 5. 按购买数量展开并发放全部奖励；
-6. 累加 `players_shop_purchases`；若支付类型为玛纳，同时累计 Active Mission 的实际玛纳消费量；
+6. 按商店类型累加当前日、当前月和总购买次数；若支付类型为玛纳，同时累计 Active Mission 的实际玛纳消费量；
 7. 返回最终玩家、物品、角色与装备状态。
 
-任一步失败都回滚整个购买，不保留“已扣成本但未发奖”或“已发奖但未记库存”的部分状态。购买数量必须是正安全整数；库存按累计购买数限制。
+任一步失败都回滚整个购买，不保留“已扣成本但未发奖”或“已发奖但未记库存”的部分状态。购买数量必须是正安全整数。
+
+官方表中的 `buy_max_count` 只限制单次请求数量，不是永久库存。总次数限制来自 `max_frequency`，周期限制来自 `daily_stock` 和 `monthly_stock`；列表中的 `stock_quantity` 取三个剩余限制的最小值，三者都未配置时返回 `-1`。日库存按北京时间每日 05:00 重置，月库存按每月 1 日北京时间 05:00 重置；General Shop 的 `specified_months` 会把月周期锚定到指定月份。商品 ID 在不同商店类型之间允许重名，所有计数都以 `shop_type + shop_item_id` 隔离。
+
+升级前的 `players_shop_purchases` 没有商店类型。服务端会先保留为未知类型的兼容累计，并在该商品首次于某个明确商店购买时一次性迁入该类型；迁入后删除旧源记录，避免重启后重复导入。旧数据本身无法证明重名商品属于哪个商店，因此首次迁入前仍属于兼容边界。
 
 支持的通用奖励包括道具、经验池、玛纳、角色和装备。角色响应会经过觉醒解锁发布协调，避免商店获得角色时丢失当前应公开的 `mana_board_awake` 状态。
 
@@ -52,9 +56,9 @@ GeneralShop 额外通过 `cdn_general_shop_whitelist.json` 过滤客户端主数
 
 `/shop/bulk_buy` 接受客户端的 `shop_type` 与 `buy_item_list` 映射。当前只开放国服 1.8.1 客户端确认使用批量入口的活动道具商店（type 4）和 Boss Coin 商店（type 7）；General、星之粒与追忆装备强化继续走各自单品或专用流程。
 
-批次先使用同一个服务器时间快照解析全部商品，并汇总货币成本、道具成本、库存与奖励。所有余额校验都基于批次开始时的库存，因此本批商品奖励不能反过来支付本批另一件商品的成本。预检通过后，成本扣除、全部奖励、每件商品的累计购买数、玛纳任务事实和响应状态在同一 SQLite 事务内提交；任一商品失败会回滚整批。
+批次先使用同一个服务器时间快照解析全部商品，并汇总货币成本、道具成本、单次上限、日/月/总库存与奖励。所有余额校验都基于批次开始时的库存，因此本批商品奖励不能反过来支付本批另一件商品的成本。预检通过后，成本扣除、全部奖励、每件商品的周期购买数、玛纳任务事实和响应状态在同一 SQLite 事务内提交；任一商品失败会回滚整批。
 
-活动商品过期沿用客户端已确认的 `2053`。商品不存在、数量非法、库存不足或余额不足沿用 HTTP 400，不猜测国服专用业务错误码。当前玩家购买表只有累计维度，遇到带 daily/monthly stock 的未来商品时批量入口会明确拒绝，直到引入按日、按月购买记录，避免把周期库存误当总库存。
+活动商品过期沿用客户端已确认的 `2053`。商品不存在、数量非法、库存不足或余额不足沿用 HTTP 400，不猜测国服专用业务错误码。单品与批量入口共用同一周期键和库存校验，不会把 `daily_stock` 或 `monthly_stock` 误当永久库存。
 
 ## 追忆装备强化
 
@@ -110,6 +114,7 @@ Boss 币列表严格按客户端传入的 category ID 查询 `boss_coin_shop.jso
 - `tools/rush_event_shop.test.cjs`；
 - `tools/rush_event_shop_route.test.cjs`；
 - `tools/shop_bulk_purchase.test.cjs`；
+- `tools/shop_purchase_period_storage.test.cjs`；
 - `tools/star_grain_material_pack.test.cjs`；
 - `tools/equipment_enhancement.test.cjs`。
 

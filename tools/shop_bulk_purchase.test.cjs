@@ -5,11 +5,14 @@ require("ts-node/register/transpile-only")
 
 const {
     ShopBalanceError,
+    ShopStockError,
+    calculateShopStockQuantity,
     executeGenericShopBatchPurchaseSync,
 } = require("../src/lib/event-shop-purchase")
 const {
     ShopItemRewardType,
     ShopItemUserCostType,
+    ShopType,
 } = require("../src/lib/types")
 
 function createHarness(itemBalance = 20) {
@@ -30,9 +33,12 @@ function createHarness(itemBalance = 20) {
         );
         CREATE TABLE purchase_state (
             player_id INTEGER NOT NULL,
+            shop_type INTEGER NOT NULL,
             shop_item_id INTEGER NOT NULL,
+            period_type TEXT NOT NULL,
+            period_key TEXT NOT NULL,
             count INTEGER NOT NULL,
-            PRIMARY KEY (player_id, shop_item_id)
+            PRIMARY KEY (player_id, shop_type, shop_item_id, period_type, period_key)
         );
         INSERT INTO player_state VALUES (7, 500, 20, 3, 0);
         INSERT INTO item_state VALUES (7, 10, ${itemBalance});
@@ -53,9 +59,29 @@ function createHarness(itemBalance = 20) {
     const getItem = (playerId, itemId) => db.prepare(
         "SELECT amount FROM item_state WHERE player_id = ? AND item_id = ?",
     ).get(playerId, itemId)?.amount ?? 0
-    const getPurchaseCount = (playerId, shopItemId) => db.prepare(
-        "SELECT count FROM purchase_state WHERE player_id = ? AND shop_item_id = ?",
-    ).get(playerId, shopItemId)?.count ?? 0
+    const getPurchaseCounts = (playerId, shopType, shopItemId, keys) => {
+        const get = (periodType, periodKey) => db.prepare(`
+            SELECT count FROM purchase_state
+            WHERE player_id = ? AND shop_type = ? AND shop_item_id = ?
+              AND period_type = ? AND period_key = ?
+        `).get(playerId, shopType, shopItemId, periodType, periodKey)?.count ?? 0
+        return {
+            daily: get("daily", keys.daily),
+            monthly: get("monthly", keys.monthly),
+            total: get("total", ""),
+        }
+    }
+    const addPurchaseCounts = (playerId, shopType, shopItemId, amount, keys) => {
+        const add = (periodType, periodKey) => db.prepare(`
+            INSERT INTO purchase_state VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(player_id, shop_type, shop_item_id, period_type, period_key)
+            DO UPDATE SET count = count + excluded.count
+        `).run(playerId, shopType, shopItemId, periodType, periodKey, amount)
+        add("daily", keys.daily)
+        add("monthly", keys.monthly)
+        add("total", "")
+        return getPurchaseCounts(playerId, shopType, shopItemId, keys)
+    }
 
     return {
         db,
@@ -76,14 +102,8 @@ function createHarness(itemBalance = 20) {
                     ON CONFLICT(player_id, item_id) DO UPDATE SET amount = excluded.amount
                 `).run(playerId, itemId, amount)
             },
-            getPurchaseCount,
-            addPurchaseCount(playerId, shopItemId, amount) {
-                db.prepare(`
-                    INSERT INTO purchase_state VALUES (?, ?, ?)
-                    ON CONFLICT(player_id, shop_item_id) DO UPDATE SET count = count + excluded.count
-                `).run(playerId, shopItemId, amount)
-                return getPurchaseCount(playerId, shopItemId)
-            },
+            getPurchaseCounts,
+            addPurchaseCounts,
             recordManaSpent(_playerId, amount) { manaSpent += amount },
             grantRewards(playerId, rewards) {
                 if (failGrant) throw new Error("injected reward failure")
@@ -105,7 +125,7 @@ function createHarness(itemBalance = 20) {
         },
         getPlayer,
         getItem,
-        getPurchaseCount,
+        getPurchaseCounts,
         getManaSpent: () => manaSpent,
         failGrant: () => { failGrant = true },
     }
@@ -117,6 +137,9 @@ const itemA = {
     availableFrom: "2024-01-01 00:00:00",
     availableUntil: null,
     stock: 3,
+    maxFrequency: 4,
+    dailyStock: 2,
+    monthlyStock: 3,
 }
 const itemB = {
     costs: [{ id: 10, amount: 5 }],
@@ -127,10 +150,14 @@ const itemB = {
     stock: 1,
 }
 
+assert.equal(calculateShopStockQuantity(itemA, { daily: 1, monthly: 1, total: 1 }), 1)
+assert.equal(calculateShopStockQuantity(itemB, { daily: 0, monthly: 0, total: 0 }), -1)
+
 {
     const harness = createHarness()
     const result = executeGenericShopBatchPurchaseSync({
         playerId: 7,
+        shopType: ShopType.EVENT_ITEM,
         purchases: [
             { shopItemId: 101, purchaseAmount: 2, shopItem: itemA },
             { shopItemId: 102, purchaseAmount: 1, shopItem: itemB },
@@ -152,6 +179,7 @@ const itemB = {
     const harness = createHarness(10)
     assert.throws(() => executeGenericShopBatchPurchaseSync({
         playerId: 7,
+        shopType: ShopType.EVENT_ITEM,
         purchases: [
             { shopItemId: 101, purchaseAmount: 1, shopItem: itemA },
             { shopItemId: 102, purchaseAmount: 1, shopItem: itemB },
@@ -161,7 +189,9 @@ const itemB = {
     }, harness.dependencies), ShopBalanceError)
     assert.equal(harness.getItem(7, 10), 10, "本批奖励不能支付本批成本")
     assert.equal(harness.getItem(7, 20), 0)
-    assert.equal(harness.getPurchaseCount(7, 101), 0)
+    assert.equal(harness.getPurchaseCounts(7, ShopType.EVENT_ITEM, 101, {
+        daily: "2024-02-01", monthly: "2024-02",
+    }).total, 0)
     assert.equal(harness.getPlayer(7).freeMana, 500)
     harness.db.close()
 }
@@ -171,12 +201,47 @@ const itemB = {
     harness.failGrant()
     assert.throws(() => executeGenericShopBatchPurchaseSync({
         playerId: 7,
+        shopType: ShopType.EVENT_ITEM,
         purchases: [{ shopItemId: 101, purchaseAmount: 1, shopItem: itemA }],
         nowMs: Date.parse("2024-02-01T00:00:00Z"),
         enforcePeriod: true,
     }, harness.dependencies), /injected reward failure/)
     assert.equal(harness.getItem(7, 10), 20)
-    assert.equal(harness.getPurchaseCount(7, 101), 0)
+    assert.equal(harness.getPurchaseCounts(7, ShopType.EVENT_ITEM, 101, {
+        daily: "2024-02-01", monthly: "2024-02",
+    }).total, 0)
+    harness.db.close()
+}
+
+{
+    const harness = createHarness(100)
+    executeGenericShopBatchPurchaseSync({
+        playerId: 7,
+        shopType: ShopType.EVENT_ITEM,
+        purchases: [{ shopItemId: 101, purchaseAmount: 2, shopItem: itemA }],
+        nowMs: Date.parse("2024-02-01T00:00:00Z"),
+        enforcePeriod: true,
+    }, harness.dependencies)
+    assert.throws(() => executeGenericShopBatchPurchaseSync({
+        playerId: 7,
+        shopType: ShopType.EVENT_ITEM,
+        purchases: [{ shopItemId: 101, purchaseAmount: 1, shopItem: itemA }],
+        nowMs: Date.parse("2024-02-01T01:00:00Z"),
+        enforcePeriod: true,
+    }, harness.dependencies), ShopStockError)
+    executeGenericShopBatchPurchaseSync({
+        playerId: 7,
+        shopType: ShopType.EVENT_ITEM,
+        purchases: [{ shopItemId: 101, purchaseAmount: 1, shopItem: itemA }],
+        nowMs: Date.parse("2024-02-01T21:00:00Z"),
+        enforcePeriod: true,
+    }, harness.dependencies)
+    assert.equal(harness.getPurchaseCounts(7, ShopType.EVENT_ITEM, 101, {
+        daily: "2024-02-02", monthly: "2024-02",
+    }).daily, 1)
+    assert.equal(harness.getPurchaseCounts(7, ShopType.EVENT_ITEM, 101, {
+        daily: "2024-02-02", monthly: "2024-02",
+    }).monthly, 3)
     harness.db.close()
 }
 

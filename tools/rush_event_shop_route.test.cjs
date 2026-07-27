@@ -115,6 +115,16 @@ stubModule("../src/data/domains/shopPurchase", {
         ).all(playerId).map(row => [row.shop_item_id, row.count]))
     },
     getPlayerShopPurchaseCountSync: getPurchaseCount,
+    getPlayerShopPurchaseCountsByTypeSync(playerId, _shopType, shopItemId) {
+        return { daily: 0, monthly: 0, total: getPurchaseCount(playerId, shopItemId) }
+    },
+    addPlayerShopPurchaseCountsByTypeSync(playerId, _shopType, shopItemId, amount) {
+        db.prepare(`
+            INSERT INTO purchase_state VALUES (?, ?, ?)
+            ON CONFLICT(player_id, shop_item_id) DO UPDATE SET count = count + excluded.count
+        `).run(playerId, shopItemId, amount)
+        return { daily: 0, monthly: 0, total: getPurchaseCount(playerId, shopItemId) }
+    },
     addPlayerShopPurchaseCountSync(playerId, shopItemId, amount) {
         db.prepare(`
             INSERT INTO purchase_state VALUES (?, ?, ?)
@@ -508,7 +518,11 @@ async function main() {
             const reloadedSales = await getRushSales(reloadedServer, 11, 700001)
             const purchasedItem = reloadedSales.find(item => item.shop_item_id === 700000)
             assert.equal(purchasedItem.total_purchase_num, 2)
-            assert.equal(purchasedItem.stock_quantity, 3)
+            assert.equal(
+                purchasedItem.stock_quantity,
+                3,
+                "buy_max_count 只限制单次购买，剩余库存由官方 max_frequency 计算",
+            )
         } finally {
             await reloadedServer.close()
         }

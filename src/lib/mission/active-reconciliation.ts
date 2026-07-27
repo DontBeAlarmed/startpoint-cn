@@ -17,6 +17,7 @@ import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
 import { getPlayerCharacterClearSync } from "../../data/domains/character_clear"
+import { ShopType } from "../types"
 import { getActiveMissionConditionalBattleFactsSync } from "../../data/domains/active_mission_battle_condition_facts"
 import { getActiveMissionBattleFactsSync } from "../../data/domains/active_mission_battle_facts"
 import {
@@ -577,7 +578,8 @@ function buildActiveMissionFactState(
             return row?.max_level ?? 5
         })(),
     }))
-    const purchases = getPlayerShopPurchasesMapSync(playerId)
+    const treasurePurchases = getPlayerShopPurchasesMapSync(playerId, ShopType.TREASURE)
+    const bossCoinPurchases = getPlayerShopPurchasesMapSync(playerId, ShopType.BOSS_COIN)
     const counters = getActiveMissionCountersSync(playerId)
     const battleCounters = getMissionBattleCountersSync(playerId)
     const treasureShopItemIds = new Set(Object.keys(readRepositoryTable<Record<string, unknown>>(
@@ -633,13 +635,13 @@ function buildActiveMissionFactState(
         manaBoardNodes,
         manaNodeSlots,
         partyAbilitySoulCount,
-        treasureShopPurchaseCount: Object.entries(purchases).reduce((total, [itemId, count]) => (
+        treasureShopPurchaseCount: Object.entries(treasurePurchases).reduce((total, [itemId, count]) => (
             treasureShopItemIds.has(itemId) ? total + Math.max(0, count) : total
         ), 0),
-        bossCoinShopPurchaseCount: Object.entries(purchases).reduce((total, [itemId, count]) => (
+        bossCoinShopPurchaseCount: Object.entries(bossCoinPurchases).reduce((total, [itemId, count]) => (
             bossCoinShopItemIds.has(itemId) ? total + Math.max(0, count) : total
         ), 0),
-        bossCoinEquipmentShopPurchaseCount: Object.entries(purchases).reduce((total, [itemId, count]) => (
+        bossCoinEquipmentShopPurchaseCount: Object.entries(bossCoinPurchases).reduce((total, [itemId, count]) => (
             bossCoinEquipmentShopItemIds.has(itemId) ? total + Math.max(0, count) : total
         ), 0),
         totalUsedManaCount: counters.totalUsedManaCount,

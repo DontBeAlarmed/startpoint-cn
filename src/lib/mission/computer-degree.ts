@@ -37,6 +37,7 @@ import {
 import { getMissionMasterDefinition, getMissionMasterDefinitions } from "./master-data"
 import { getMissionPattern } from "./patterns"
 import type { MissionComputer, CategoryContext } from "./types"
+import { ShopType } from "../types"
 import {
     getExactDegreeQuestClearMissionIds,
     getExactDegreeQuestClearRuleCount,
@@ -227,7 +228,7 @@ function getPracticeQuestIds(missionId: number): readonly number[] | null {
 
 function getTreasureShopPurchaseCount(playerId: number): number {
     const treasureShop = getRuntimeTable<RawQuestTable>("treasure_shop.json", bundledTreasureShop)
-    const purchases = getPlayerShopPurchasesMapSync(playerId)
+    const purchases = getPlayerShopPurchasesMapSync(playerId, ShopType.TREASURE)
     return Object.entries(purchases).reduce((total, [itemId, count]) => (
         treasureShop[itemId] === undefined ? total : total + Math.max(0, count)
     ), 0)

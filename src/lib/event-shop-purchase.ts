@@ -25,6 +25,7 @@ export interface GenericShopPlayerState {
 
 export interface GenericShopPurchaseInput {
     playerId: number
+    shopType: number
     shopItemId: number
     purchaseAmount: number
     shopItem: ShopItem
@@ -38,8 +39,19 @@ export interface GenericShopPurchaseDependencies {
     updatePlayer(player: GenericShopPlayerState): void
     getItem(playerId: number, itemId: number): number
     setItem(playerId: number, itemId: number, amount: number): void
-    getPurchaseCount(playerId: number, shopItemId: number): number
-    addPurchaseCount(playerId: number, shopItemId: number, amount: number): number
+    getPurchaseCounts(
+        playerId: number,
+        shopType: number,
+        shopItemId: number,
+        keys: ShopPurchasePeriodKeys,
+    ): ShopPurchaseCounts
+    addPurchaseCounts(
+        playerId: number,
+        shopType: number,
+        shopItemId: number,
+        amount: number,
+        keys: ShopPurchasePeriodKeys,
+    ): ShopPurchaseCounts
     recordManaSpent(playerId: number, amount: number): void
     grantRewards(playerId: number, rewards: Reward[]): PlayerRewardResult | null
 }
@@ -59,6 +71,7 @@ export interface GenericShopBatchPurchaseEntry {
 
 export interface GenericShopBatchPurchaseInput {
     playerId: number
+    shopType: number
     purchases: readonly GenericShopBatchPurchaseEntry[]
     nowMs: number
     enforcePeriod: boolean
@@ -101,6 +114,70 @@ export class ShopBalanceError extends ShopPurchaseError {
         super(message)
         this.name = "ShopBalanceError"
     }
+}
+
+export interface ShopPurchaseCounts {
+    readonly daily: number
+    readonly monthly: number
+    readonly total: number
+}
+
+export interface ShopPurchasePeriodKeys {
+    readonly daily: string
+    readonly monthly: string
+}
+
+function pad2(value: number): string {
+    return String(value).padStart(2, "0")
+}
+
+export function getShopPurchasePeriodKeys(
+    nowMs: number,
+    specifiedMonths: readonly number[] | undefined,
+): ShopPurchasePeriodKeys {
+    // CN daily/monthly shop counters reset at 05:00 in UTC+8.
+    const shifted = new Date(nowMs + 3 * 60 * 60 * 1000)
+    const year = shifted.getUTCFullYear()
+    const month = shifted.getUTCMonth() + 1
+    const daily = `${year}-${pad2(month)}-${pad2(shifted.getUTCDate())}`
+    if (!specifiedMonths || specifiedMonths.length === 0) {
+        return { daily, monthly: `${year}-${pad2(month)}` }
+    }
+    const validMonths = specifiedMonths.filter(value => (
+        Number.isSafeInteger(value) && value >= 1 && value <= 12
+    ))
+    if (validMonths.length !== specifiedMonths.length) {
+        throw new ShopPurchaseError("Shop specified months are invalid.")
+    }
+    const previous = [...validMonths].reverse().find(value => value <= month)
+    const periodYear = previous === undefined ? year - 1 : year
+    const periodMonth = previous ?? validMonths[validMonths.length - 1]
+    return { daily, monthly: `specified:${periodYear}-${pad2(periodMonth)}` }
+}
+
+export function validateShopStock(
+    shopItem: ShopItem,
+    purchaseAmount: number,
+    counts: ShopPurchaseCounts,
+): void {
+    if (shopItem.stock >= 0 && purchaseAmount > shopItem.stock) throw new ShopStockError()
+    if (shopItem.dailyStock !== undefined
+        && counts.daily + purchaseAmount > shopItem.dailyStock) throw new ShopStockError()
+    if (shopItem.monthlyStock !== undefined
+        && counts.monthly + purchaseAmount > shopItem.monthlyStock) throw new ShopStockError()
+    if (shopItem.maxFrequency !== undefined
+        && counts.total + purchaseAmount > shopItem.maxFrequency) throw new ShopStockError()
+}
+
+export function calculateShopStockQuantity(
+    shopItem: ShopItem,
+    counts: ShopPurchaseCounts,
+): number {
+    const remaining: number[] = []
+    if (shopItem.dailyStock !== undefined) remaining.push(shopItem.dailyStock - counts.daily)
+    if (shopItem.monthlyStock !== undefined) remaining.push(shopItem.monthlyStock - counts.monthly)
+    if (shopItem.maxFrequency !== undefined) remaining.push(shopItem.maxFrequency - counts.total)
+    return remaining.length === 0 ? -1 : Math.max(0, Math.min(...remaining))
 }
 
 export function validateShopPurchaseAmount(value: unknown): number {
@@ -217,10 +294,11 @@ export function executeGenericShopPurchaseSync(
         const player = dependencies.getPlayer(input.playerId)
         if (player === null) throw new ShopPurchaseError("Player not found.")
 
-        const purchased = dependencies.getPurchaseCount(input.playerId, input.shopItemId)
-        if (input.shopItem.stock > 0 && purchased + purchaseAmount > input.shopItem.stock) {
-            throw new ShopStockError()
-        }
+        const periodKeys = getShopPurchasePeriodKeys(input.nowMs, input.shopItem.specifiedMonths)
+        const counts = dependencies.getPurchaseCounts(
+            input.playerId, input.shopType, input.shopItemId, periodKeys,
+        )
+        validateShopStock(input.shopItem, purchaseAmount, counts)
 
         const nextPlayer = { ...player }
         const userCost = input.shopItem.userCost
@@ -267,11 +345,13 @@ export function executeGenericShopPurchaseSync(
         )
         if (rewardResult === null) throw new ShopPurchaseError("Failed to grant shop rewards.")
 
-        const purchaseCount = dependencies.addPurchaseCount(
+        const purchaseCount = dependencies.addPurchaseCounts(
             input.playerId,
+            input.shopType,
             input.shopItemId,
             purchaseAmount,
-        )
+            periodKeys,
+        ).total
         if (userCost?.type === ShopItemUserCostType.MANA) {
             dependencies.recordManaSpent(
                 input.playerId,
@@ -327,11 +407,11 @@ export function executeGenericShopBatchPurchaseSync(
         let manaSpent = 0
 
         for (const entry of normalized) {
-            const purchased = dependencies.getPurchaseCount(input.playerId, entry.shopItemId)
-            if (entry.shopItem.stock > 0
-                && purchased + entry.purchaseAmount > entry.shopItem.stock) {
-                throw new ShopStockError()
-            }
+            const periodKeys = getShopPurchasePeriodKeys(input.nowMs, entry.shopItem.specifiedMonths)
+            const counts = dependencies.getPurchaseCounts(
+                input.playerId, input.shopType, entry.shopItemId, periodKeys,
+            )
+            validateShopStock(entry.shopItem, entry.purchaseAmount, counts)
 
             const userCost = entry.shopItem.userCost
             if (userCost !== undefined) {
@@ -379,11 +459,14 @@ export function executeGenericShopBatchPurchaseSync(
 
         const purchaseCounts: Record<string, number> = {}
         for (const entry of normalized) {
-            purchaseCounts[String(entry.shopItemId)] = dependencies.addPurchaseCount(
+            const periodKeys = getShopPurchasePeriodKeys(input.nowMs, entry.shopItem.specifiedMonths)
+            purchaseCounts[String(entry.shopItemId)] = dependencies.addPurchaseCounts(
                 input.playerId,
+                input.shopType,
                 entry.shopItemId,
                 entry.purchaseAmount,
-            )
+                periodKeys,
+            ).total
         }
         if (manaSpent > 0) dependencies.recordManaSpent(input.playerId, manaSpent)
 

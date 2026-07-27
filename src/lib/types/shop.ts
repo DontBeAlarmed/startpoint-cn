@@ -54,6 +54,7 @@ export interface ShopItem {
     maxFrequency?: number
     dailyStock?: number
     monthlyStock?: number
+    specifiedMonths?: number[]
     compatibilityPeriods?: ShopItemAvailabilityPeriod[]
 }
 

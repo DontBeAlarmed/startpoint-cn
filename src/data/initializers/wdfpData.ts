@@ -808,6 +808,24 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_shop_purchase_counters (
+        player_id INTEGER NOT NULL,
+        shop_type INTEGER NOT NULL,
+        shop_item_id INTEGER NOT NULL,
+        period_type TEXT NOT NULL,
+        period_key TEXT NOT NULL,
+        count INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, shop_type, shop_item_id, period_type, period_key),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+    database.prepare(`
+        INSERT OR IGNORE INTO players_shop_purchase_counters (
+            player_id, shop_type, shop_item_id, period_type, period_key, count
+        )
+        SELECT player_id, -1, shop_item_id, 'total', '', count
+        FROM players_shop_purchases
+    `).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_active_quests (
         player_id INTEGER PRIMARY KEY,
         play_id TEXT NOT NULL,

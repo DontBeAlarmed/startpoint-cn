@@ -182,6 +182,7 @@ const TEST_GROUPS = Object.freeze({
         execution: "serial",
         tests: [
             "tools/server_gameplay_settings.test.cjs",
+            "tools/shop_purchase_period_storage.test.cjs",
             "tools/test-workflow/database-isolation.test.cjs",
             "tools/test-workflow/database-lifecycle.test.cjs",
             "tools/test-workflow/runtime-data-paths.test.cjs",

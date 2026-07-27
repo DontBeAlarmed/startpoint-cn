@@ -15,7 +15,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200002": {
     "costs": [],
@@ -33,7 +34,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200003": {
     "costs": [],
@@ -51,7 +53,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200004": {
     "costs": [],
@@ -69,7 +72,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200005": {
     "costs": [],
@@ -87,7 +91,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200006": {
     "costs": [],
@@ -105,7 +110,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200007": {
     "costs": [],
@@ -123,7 +129,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200008": {
     "costs": [],
@@ -141,7 +148,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200009": {
     "costs": [],
@@ -159,7 +167,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200010": {
     "costs": [],
@@ -177,7 +186,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200011": {
     "costs": [],
@@ -195,7 +205,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200012": {
     "costs": [],
@@ -213,7 +224,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200013": {
     "costs": [],
@@ -231,7 +243,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200014": {
     "costs": [],
@@ -249,7 +262,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200015": {
     "costs": [],
@@ -267,7 +281,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200016": {
     "costs": [],
@@ -285,7 +300,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200017": {
     "costs": [],
@@ -303,7 +319,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200018": {
     "costs": [],
@@ -321,7 +338,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200019": {
     "costs": [],
@@ -339,7 +357,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200020": {
     "costs": [],
@@ -357,7 +376,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200021": {
     "costs": [],
@@ -375,7 +395,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200022": {
     "costs": [],
@@ -393,7 +414,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200023": {
     "costs": [],
@@ -411,7 +433,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200024": {
     "costs": [],
@@ -429,7 +452,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200025": {
     "costs": [],
@@ -447,7 +471,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200026": {
     "costs": [],
@@ -465,7 +490,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200027": {
     "costs": [],
@@ -483,7 +509,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200028": {
     "costs": [],
@@ -501,7 +528,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200029": {
     "costs": [],
@@ -519,7 +547,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200030": {
     "costs": [],
@@ -537,7 +566,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 1
   },
   "200031": {
     "costs": [],
@@ -555,7 +585,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 30
   },
   "200032": {
     "costs": [],
@@ -573,7 +604,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200033": {
     "costs": [],
@@ -591,7 +623,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200034": {
     "costs": [],
@@ -609,7 +642,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 30
   },
   "200035": {
     "costs": [],
@@ -627,7 +661,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200036": {
     "costs": [],
@@ -645,7 +680,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200037": {
     "costs": [],
@@ -663,7 +699,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 30
   },
   "200038": {
     "costs": [],
@@ -681,7 +718,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200039": {
     "costs": [],
@@ -699,7 +737,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200040": {
     "costs": [],
@@ -717,7 +756,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 30
   },
   "200041": {
     "costs": [],
@@ -735,7 +775,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200042": {
     "costs": [],
@@ -753,7 +794,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200043": {
     "costs": [],
@@ -771,7 +813,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 30
   },
   "200044": {
     "costs": [],
@@ -789,7 +832,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200045": {
     "costs": [],
@@ -807,7 +851,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200046": {
     "costs": [],
@@ -825,7 +870,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 30
   },
   "200047": {
     "costs": [],
@@ -843,7 +889,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200048": {
     "costs": [],
@@ -861,7 +908,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200049": {
     "costs": [],
@@ -879,7 +927,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 30
   },
   "200050": {
     "costs": [],
@@ -897,7 +946,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200051": {
     "costs": [],
@@ -915,7 +965,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200052": {
     "costs": [],
@@ -933,7 +984,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200053": {
     "costs": [],
@@ -951,7 +1003,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200054": {
     "costs": [],
@@ -969,7 +1022,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 3
   },
   "200055": {
     "costs": [],
@@ -987,7 +1041,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200056": {
     "costs": [],
@@ -1005,7 +1060,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200057": {
     "costs": [],
@@ -1023,7 +1079,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 3
   },
   "200058": {
     "costs": [],
@@ -1041,7 +1098,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200059": {
     "costs": [],
@@ -1059,7 +1117,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200060": {
     "costs": [],
@@ -1077,7 +1136,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 3
   },
   "200061": {
     "costs": [],
@@ -1095,7 +1155,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200062": {
     "costs": [],
@@ -1113,7 +1174,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200063": {
     "costs": [],
@@ -1131,7 +1193,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 3
   },
   "200064": {
     "costs": [],
@@ -1149,7 +1212,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200065": {
     "costs": [],
@@ -1167,7 +1231,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200066": {
     "costs": [],
@@ -1185,7 +1250,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 3
   },
   "200067": {
     "costs": [],
@@ -1203,7 +1269,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200068": {
     "costs": [],
@@ -1221,7 +1288,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200069": {
     "costs": [],
@@ -1239,7 +1307,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 3
   },
   "200070": {
     "costs": [],
@@ -1257,7 +1326,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 30
   },
   "200071": {
     "costs": [],
@@ -1275,7 +1345,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200072": {
     "costs": [],
@@ -1293,7 +1364,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200073": {
     "costs": [],
@@ -1311,7 +1383,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 30
   },
   "200074": {
     "costs": [],
@@ -1329,7 +1402,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200075": {
     "costs": [],
@@ -1347,7 +1421,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200076": {
     "costs": [],
@@ -1365,7 +1440,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 30
   },
   "200077": {
     "costs": [],
@@ -1383,7 +1459,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200078": {
     "costs": [],
@@ -1401,7 +1478,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200079": {
     "costs": [],
@@ -1419,7 +1497,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 30
   },
   "200080": {
     "costs": [],
@@ -1437,7 +1516,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200081": {
     "costs": [],
@@ -1455,7 +1535,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200082": {
     "costs": [],
@@ -1473,7 +1554,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 30
   },
   "200083": {
     "costs": [],
@@ -1491,7 +1573,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200084": {
     "costs": [],
@@ -1509,7 +1592,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200085": {
     "costs": [],
@@ -1527,7 +1611,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 30
   },
   "200086": {
     "costs": [],
@@ -1545,7 +1630,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200087": {
     "costs": [],
@@ -1563,7 +1649,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200088": {
     "costs": [],
@@ -1581,7 +1668,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 30
   },
   "200089": {
     "costs": [],
@@ -1599,7 +1687,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 10
   },
   "200090": {
     "costs": [],
@@ -1617,7 +1706,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200091": {
     "costs": [],
@@ -1635,7 +1725,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200092": {
     "costs": [],
@@ -1653,7 +1744,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 4
   },
   "200093": {
     "costs": [],
@@ -1671,7 +1763,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 3
   },
   "200094": {
     "costs": [],
@@ -1689,7 +1782,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200095": {
     "costs": [],
@@ -1707,7 +1801,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 4
   },
   "200096": {
     "costs": [],
@@ -1725,7 +1820,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 3
   },
   "200097": {
     "costs": [],
@@ -1743,7 +1839,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200098": {
     "costs": [],
@@ -1761,7 +1858,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 4
   },
   "200099": {
     "costs": [],
@@ -1779,7 +1877,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 3
   },
   "200100": {
     "costs": [],
@@ -1797,7 +1896,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200101": {
     "costs": [],
@@ -1815,7 +1915,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 4
   },
   "200102": {
     "costs": [],
@@ -1833,7 +1934,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 3
   },
   "200103": {
     "costs": [],
@@ -1851,7 +1953,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200104": {
     "costs": [],
@@ -1869,7 +1972,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 4
   },
   "200105": {
     "costs": [],
@@ -1887,7 +1991,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 3
   },
   "200106": {
     "costs": [],
@@ -1905,7 +2010,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 5
   },
   "200107": {
     "costs": [],
@@ -1923,7 +2029,8 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 4
   },
   "200108": {
     "costs": [],
@@ -1941,6 +2048,7 @@
       "type": 1,
       "id": 1,
       "amount": 1
-    }
+    },
+    "dailyStock": 3
   }
 }

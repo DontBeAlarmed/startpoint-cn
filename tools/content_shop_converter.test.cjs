@@ -57,6 +57,7 @@ function createFixture() {
             23: 9,
             24: 2,
             25: 1,
+            26: "1,4,7,10",
             27: 5,
             29: 0,
             30: 100,
@@ -189,6 +190,7 @@ test("shop converter reads all verified sources and emits runtime-compatible tab
             userCost: { type: 2, amount: 7 },
             maxFrequency: 2,
             dailyStock: 1,
+            specifiedMonths: [1, 4, 7, 10],
             monthlyStock: 5,
         },
     })
@@ -338,6 +340,20 @@ test("shop converter rejects duplicate keys, malformed shapes, and unknown categ
         fixture.sources.set(PATHS.equipmentCategory, [])
         await assert.rejects(convertShops(fixture.reader), /equipment_enhancement_shop.*category.*3/i)
     })
+})
+
+test("bundled 1.4.54 fallback preserves authoritative total and periodic limits", () => {
+    const general = require("../assets/general_shop.json")
+    const event = require("../assets/event_item_shop.json")
+    const boss = require("../assets/boss_coin_shop.json")
+    const starGrain = require("../assets/star_grain_shop.json")
+    const treasure = require("../assets/treasure_shop.json")
+
+    assert.equal(general[100001].maxFrequency, 1)
+    assert.equal(event[2][100006][310194].maxFrequency, 10)
+    assert.equal(boss[1][200101].monthlyStock, 1)
+    assert.equal(starGrain[100000].maxFrequency, 7)
+    assert.equal(treasure[200001].dailyStock, 10)
 })
 
 test("quick:content includes the shop converter regression suite", () => {

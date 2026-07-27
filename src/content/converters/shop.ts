@@ -60,6 +60,7 @@ interface ShopLayout {
     }
     readonly maxFrequency?: number
     readonly dailyStock?: number
+    readonly specifiedMonths?: number
     readonly monthlyStock?: number
     readonly rewardStarts: readonly number[]
 }
@@ -76,6 +77,7 @@ const GENERAL_LAYOUT: ShopLayout = {
     stock: { column: 23 },
     maxFrequency: 24,
     dailyStock: 25,
+    specifiedMonths: 26,
     monthlyStock: 27,
     rewardStarts: [29, 32, 35, 38, 41, 44],
 }
@@ -193,6 +195,20 @@ function parseOptionalInteger(value: string, subject: string): number | undefine
     return value === "" || value === "(None)" ? undefined : parseInteger(value, subject)
 }
 
+function parseOptionalMonths(value: string, subject: string): number[] | undefined {
+    if (value === "" || value === "(None)") return undefined
+    const months = value.split(",").map((part, index) => {
+        const month = parseInteger(part, `${subject}[${index}]`)
+        if (month < 1 || month > 12) invalidShop(`${subject}[${index}] must be 1 through 12`)
+        return month
+    })
+    if (new Set(months).size !== months.length) invalidShop(`${subject} contains duplicates`)
+    if (months.some((month, index) => index > 0 && month <= months[index - 1])) {
+        invalidShop(`${subject} must be strictly ascending`)
+    }
+    return months
+}
+
 function parseDate(value: string, subject: string): string {
     const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
     if (match === null) {
@@ -296,6 +312,13 @@ function parseShopItem(fields: readonly string[], layout: ShopLayout, id: string
         if (column === undefined) continue
         const value = parseOptionalInteger(fields[column], `${subject}.${fieldName}`)
         if (value !== undefined) item[fieldName] = value
+    }
+    if (layout.specifiedMonths !== undefined) {
+        const specifiedMonths = parseOptionalMonths(
+            fields[layout.specifiedMonths],
+            `${subject}.specifiedMonths`,
+        )
+        if (specifiedMonths !== undefined) item.specifiedMonths = specifiedMonths
     }
     return item
 }
