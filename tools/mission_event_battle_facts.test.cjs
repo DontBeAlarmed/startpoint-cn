@@ -39,10 +39,12 @@ const {
 const {
     getExactEventBattleRuleCoverage,
     getExactEventBattleMissionIds,
+    hasSingleEventMissionTarget,
     loadExactEventBattleRules,
     recordEventMissionBattleFacts,
 } = require("../src/lib/mission/event-battle-facts")
 const { settleMissionCategories } = require("../src/lib/mission/settlement")
+const eventMissionRewards = require("../assets/mission_event_reward.json")
 
 initializeDatabase()
 db = getDb()
@@ -62,6 +64,24 @@ assert.deepEqual(
     [1200, 1208, 1209, 1210, 1211, 1216, 1223],
     "7 个权威统计事实必须进入机器覆盖",
 )
+assert.deepEqual(
+    getExactEventBattleMissionIds().filter(missionId => [600001, 900809].includes(missionId)),
+    [600001, 900809],
+    "两条 type86 歼灭者 SS 条件必须进入机器覆盖",
+)
+for (const missionId of [600001, 900809]) {
+    assert.equal(hasSingleEventMissionTarget(eventMissionRewards[String(missionId)]), true)
+}
+for (const rewards of [
+    null,
+    [],
+    {},
+    { "1": [] },
+    { "1": [["600001001", "2"]] },
+    { "1": [["600001001", "1"]], "2": [["600001002", "2"]] },
+]) {
+    assert.equal(hasSingleEventMissionTarget(rewards), false, "type86 只接受单阶段目标 1")
+}
 const checkedInRules = require("../assets/mission_event_battle_rules.json")
 const firstRule = checkedInRules.rules[0]
 const bossRule = checkedInRules.rules.find(rule => rule.missionId === 1416)
@@ -232,6 +252,8 @@ assert.deepEqual(getExactEventBattleRuleCoverage(), {
     exactSingleClearRules: 8,
     exactStatisticsRules: 7,
     exactStatisticsRuleMissionIds: [1200, 1208, 1209, 1210, 1211, 1216, 1223],
+    exactResistanceDebuffRules: 2,
+    exactResistanceDebuffRuleMissionIds: [600001, 900809],
 })
 assert.deepEqual(BATTLE_SETTLEMENT_CATEGORIES, [1, 2, 3, 6, 7, 8, 10])
 
@@ -369,6 +391,125 @@ assert.deepEqual(
     [],
     "开放期外不得匹配新增事实",
 )
+
+function resistanceDebuffContext(overrides = {}) {
+    return finishContext({
+        questCategory: 26,
+        questId: 1001,
+        clearTime: 120_000,
+        clearRank: 5,
+        statistics: {
+            clear_phase: 0,
+            party: { characters: [], unison_characters: [] },
+            zones: [
+                { members: [{ debuff_r: 0 }, { debuff_r: 0 }, { debuff_r: 0 }] },
+                { members: [{ debuff_r: 0 }, null, { debuff_r: 0 }] },
+            ],
+        },
+        ...overrides,
+    })
+}
+
+const limitedHardMultiTime = new Date("2024-08-20T04:00:00.000Z")
+assert.equal(
+    recordEventMissionBattleFacts(resistanceDebuffContext(), limitedHardMultiTime).includes(600001),
+    true,
+    "限定歼灭者任务必须在全部 zone/member 未收到抗性下降且 SS 时完成",
+)
+assert.equal(missionProgress(600001), 1)
+recordEventMissionBattleFacts(resistanceDebuffContext(), limitedHardMultiTime)
+assert.equal(missionProgress(600001), 1, "type86 重复成功结算必须幂等")
+
+const permanentHardMultiTime = new Date("2025-07-20T04:00:00.000Z")
+updatePlayerCategoryMissionSync(playerId, 3, 900809, -1)
+assert.equal(recordEventMissionBattleFacts(resistanceDebuffContext({
+    questId: 1001001,
+}), permanentHardMultiTime).includes(900809), false)
+assert.equal(missionProgress(900809), -1, "非法负进度不得被 type86 静默修复")
+db.prepare(`
+    DELETE FROM players_category_missions
+    WHERE player_id = ? AND category = 3 AND id = 900809
+`).run(playerId)
+assert.equal(recordEventMissionBattleFacts(resistanceDebuffContext({
+    questId: 1001001,
+}), permanentHardMultiTime).includes(900809), true)
+assert.equal(missionProgress(900809), 1)
+db.prepare(`
+    DELETE FROM players_category_missions
+    WHERE player_id = ? AND category = 3 AND id = 900809
+`).run(playerId)
+assert.equal(recordEventMissionBattleFacts(resistanceDebuffContext({
+    questId: 1001002,
+}), permanentHardMultiTime).includes(900809), false)
+assert.equal(missionProgress(900809), 0, "同活动的相邻关卡不得命中固定 type86 兼容规则")
+
+for (const invalidContext of [
+    resistanceDebuffContext({ questAccomplished: false }),
+    resistanceDebuffContext({ questAccomplished: 1 }),
+    resistanceDebuffContext({ questAccomplished: "true" }),
+    resistanceDebuffContext({ isMulti: false, isMultiHost: undefined }),
+    resistanceDebuffContext({ isMulti: undefined, isMultiHost: undefined }),
+    resistanceDebuffContext({ clearRank: 4 }),
+    resistanceDebuffContext({ clearRank: null }),
+    resistanceDebuffContext({ questCategory: 25 }),
+    resistanceDebuffContext({ questId: 2001 }),
+    resistanceDebuffContext({ questId: 1002 }),
+    resistanceDebuffContext({ clearTime: undefined }),
+    resistanceDebuffContext({ clearTime: 0 }),
+    resistanceDebuffContext({ clearTime: -1 }),
+    resistanceDebuffContext({ clearTime: 1.5 }),
+    resistanceDebuffContext({ statistics: { clear_phase: 0, party: { characters: [], unison_characters: [] } } }),
+    resistanceDebuffContext({ statistics: { clear_phase: 0, party: { characters: [], unison_characters: [] }, zones: [] } }),
+    resistanceDebuffContext({ statistics: { clear_phase: 0, party: { characters: [], unison_characters: [] }, zones: [null] } }),
+    resistanceDebuffContext({ statistics: { clear_phase: 0, party: { characters: [], unison_characters: [] }, zones: [{}] } }),
+    resistanceDebuffContext({ statistics: { clear_phase: 0, party: { characters: [], unison_characters: [] }, zones: [{ members: [] }] } }),
+    resistanceDebuffContext({ statistics: { clear_phase: 0, party: { characters: [], unison_characters: [] }, zones: [{ members: [null] }] } }),
+    resistanceDebuffContext({
+        statistics: {
+            clear_phase: 0,
+            party: { characters: [], unison_characters: [] },
+            zones: [
+                { members: [{ debuff_r: 0 }, { debuff_r: 0 }] },
+                { members: [{ debuff_r: 0 }, null, { debuff_r: 1 }] },
+            ],
+        },
+    }),
+    ...[undefined, -1, 0.5, Number.NaN, Number.POSITIVE_INFINITY, 1].map(debuffR => (
+        resistanceDebuffContext({
+            statistics: {
+                clear_phase: 0,
+                party: { characters: [], unison_characters: [] },
+                zones: [{ members: [{ ...(debuffR === undefined ? {} : { debuff_r: debuffR }) }] }],
+            },
+        })
+    )),
+]) {
+    db.prepare(`
+        DELETE FROM players_category_missions
+        WHERE player_id = ? AND category = 3 AND id = 600001
+    `).run(playerId)
+    assert.equal(
+        recordEventMissionBattleFacts(invalidContext, limitedHardMultiTime).includes(600001),
+        false,
+        "失败、非多人、非 SS、错误关卡或非法 debuff_r 统计均不得推进 type86",
+    )
+    assert.equal(missionProgress(600001), 0, "非法 type86 输入不得写入任务进度")
+}
+for (const outsideTime of [
+    new Date("2024-08-16T03:59:59.000Z"),
+    new Date("2024-08-29T16:00:00.000Z"),
+]) {
+    db.prepare(`
+        DELETE FROM players_category_missions
+        WHERE player_id = ? AND category = 3 AND id = 600001
+    `).run(playerId)
+    assert.equal(
+        recordEventMissionBattleFacts(resistanceDebuffContext(), outsideTime).includes(600001),
+        false,
+        "开放期外不得推进限定 type86",
+    )
+    assert.equal(missionProgress(600001), 0)
+}
 
 function missionProgress(missionId) {
     return getPlayerCategoryMissionsSync(playerId, 3)[missionId]?.progress ?? 0

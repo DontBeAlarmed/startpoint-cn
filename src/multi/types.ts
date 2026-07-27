@@ -105,6 +105,10 @@ export interface QuestStatistics {
     party: QuestStatisticsParty
     zones?: {
         skill_point_over_on_start?: number
+        members?: ({
+            debuff_r?: number
+            [key: string]: any
+        } | null)[]
     }[]
 }
 

@@ -115,6 +115,10 @@ interface QuestStatistics {
         use_power_flip_count?: number
         use_dash_count?: number
         use_skill_count?: number
+        members?: ({
+            debuff_r?: number
+            [key: string]: any
+        } | null)[]
         [key: string]: any
     }[]
 }

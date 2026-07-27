@@ -18,6 +18,10 @@ export interface QuestStatistics {
         use_skill_count?: number
         encoffin_count?: number
         skill_point_over_on_start?: number
+        members?: ({
+            debuff_r?: number
+            [key: string]: any
+        } | null)[]
     }[]
     max_combo_count?: number
     [key: string]: any

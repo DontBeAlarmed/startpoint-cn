@@ -16,6 +16,9 @@ import challengeDungeonQuests from "../../../assets/challenge_dungeon_event_ques
 import raidEventQuests from "../../../assets/raid_event_quest.json"
 import rushEventQuests from "../../../assets/rush_event_quest.json"
 import rankingEventSingleQuests from "../../../assets/ranking_event_single_quest.json"
+import hardMultiEventQuests from "../../../assets/hard_multi_event_quest.json"
+import eventMissionRewards from "../../../assets/mission_event_reward.json"
+import { completePlayerEventMissionFactSync } from "../../data/domains/event_mission_entry_facts"
 
 type MultiRole = "any" | "host" | "guest"
 type QuestRange = "All" | "BossBattle" | "AdventEvent" | "WorldStoryEventBossBattle"
@@ -59,6 +62,14 @@ interface ExactStatisticsRule {
     readonly patternType: 26 | 27 | 28
     readonly battleKind: 3
     readonly statisticsCode: 2 | null
+    readonly definition: ReturnType<typeof getMissionMasterDefinitions>[number]
+}
+
+interface ExactResistanceDebuffRule {
+    readonly missionId: number
+    readonly battleKind: 2
+    readonly category: 26
+    readonly questIds: ReadonlySet<number>
     readonly definition: ReturnType<typeof getMissionMasterDefinitions>[number]
 }
 
@@ -394,6 +405,65 @@ function buildExactStatisticsRules(): readonly ExactStatisticsRule[] {
 
 const exactStatisticsRules = buildExactStatisticsRules()
 
+const EXACT_RESISTANCE_DEBUFF_RULES: Readonly<Record<number, {
+    readonly eventId: number
+    readonly pattern: string
+    readonly questId: number
+}>> = Object.freeze({
+    600001: {
+        eventId: 1,
+        pattern: "hard_multi_steam_robot_fire_clear_01",
+        questId: 1001,
+    },
+    900809: {
+        eventId: 1001,
+        pattern: "hard_multi_steam_robot_fire_clear_01_constant",
+        questId: 1001001,
+    },
+})
+
+export function hasSingleEventMissionTarget(value: unknown): boolean {
+    if (!isPlainRecord(value) || Object.keys(value).length !== 1) return false
+    const rows = value["1"]
+    return Array.isArray(rows)
+        && rows.length === 1
+        && Array.isArray(rows[0])
+        && rows[0][1] === "1"
+}
+
+function buildExactResistanceDebuffRules(): readonly ExactResistanceDebuffRule[] {
+    const sourceQuestIds = trackedQuestIds(hardMultiEventQuests)
+    if (sourceQuestIds === null) return Object.freeze([])
+    const rules: ExactResistanceDebuffRule[] = []
+    for (const [missionIdToken, expected] of Object.entries(EXACT_RESISTANCE_DEBUFF_RULES)) {
+        const missionId = Number(missionIdToken)
+        const definition = getMissionMasterDefinition(3, missionId)
+        if (!definition
+            || definition.pattern !== expected.pattern
+            || Number(definition.row[2]) !== 86
+            || Number(definition.row[5]) !== 2
+            || Number(definition.row[7]) !== 19
+            || Number(definition.row[8]) !== expected.eventId
+            || definition.row[10] !== ""
+            || definition.row[11] !== "(None)"
+            || !hasSingleEventMissionTarget(
+                (eventMissionRewards as Record<string, unknown>)[missionIdToken],
+            )) continue
+        if (!sourceQuestIds.includes(expected.questId)
+            || Math.trunc(expected.questId / 1_000) !== expected.eventId) continue
+        rules.push({
+            missionId,
+            battleKind: 2,
+            category: 26,
+            questIds: new Set([expected.questId]),
+            definition,
+        })
+    }
+    return Object.freeze(rules)
+}
+
+const exactResistanceDebuffRules = buildExactResistanceDebuffRules()
+
 function matchesRole(role: MultiRole, isMultiHost: boolean | undefined): boolean {
     if (role === "any") return true
     if (role === "host") return isMultiHost === true
@@ -419,6 +489,8 @@ export function getExactEventBattleRuleCoverage() {
         exactSingleClearRules: exactEventSingleClearRules.length,
         exactStatisticsRules: exactStatisticsRules.length,
         exactStatisticsRuleMissionIds: exactStatisticsRules.map(rule => rule.missionId),
+        exactResistanceDebuffRules: exactResistanceDebuffRules.length,
+        exactResistanceDebuffRuleMissionIds: exactResistanceDebuffRules.map(rule => rule.missionId),
     }
 }
 
@@ -428,8 +500,48 @@ export function getExactEventBattleMissionIds(): readonly number[] {
         ...exactClearRules.map(rule => rule.missionId),
         ...exactPhaseRules.map(rule => rule.missionId),
         ...exactStatisticsRules.map(rule => rule.missionId),
+        ...exactResistanceDebuffRules.map(rule => rule.missionId),
         ...exactEventSingleClearRules.map(rule => rule.missionId),
     ])].sort((left, right) => left - right))
+}
+
+function hasNoReceivedResistanceDebuff(ctx: FinishContext): boolean {
+    const zones = ctx.statistics?.zones
+    if (!Array.isArray(zones) || zones.length === 0) return false
+    return zones.every(zone => {
+        if (!isPlainRecord(zone) || !Array.isArray(zone.members) || zone.members.length === 0) {
+            return false
+        }
+        const members = zone.members.filter(member => member !== null)
+        return members.length > 0 && members.every(member => (
+            isPlainRecord(member)
+            && isSafeNonNegativeInteger(member.debuff_r)
+            && member.debuff_r === 0
+        ))
+    })
+}
+
+function recordExactResistanceDebuffRules(
+    ctx: FinishContext,
+    evaluationTime: Date,
+): number[] {
+    if (ctx.questAccomplished !== true
+        || ctx.isMulti !== true
+        || ctx.clearRank !== 5
+        || !Number.isSafeInteger(ctx.clearTime)
+        || ctx.clearTime <= 0
+        || !hasNoReceivedResistanceDebuff(ctx)) return []
+    const matchedMissionIds: number[] = []
+    for (const rule of exactResistanceDebuffRules) {
+        if (rule.battleKind !== 2
+            || rule.category !== ctx.questCategory
+            || !rule.questIds.has(ctx.questId)
+            || !isMissionDefinitionEnabledAt(rule.definition, evaluationTime)) continue
+        if (completePlayerEventMissionFactSync(ctx.playerId, rule.missionId)) {
+            matchedMissionIds.push(rule.missionId)
+        }
+    }
+    return matchedMissionIds
 }
 
 function isSafeNonNegativeInteger(value: unknown): value is number {
@@ -551,5 +663,6 @@ export function recordEventMissionBattleFacts(
         }
     }
     matchedMissionIds.push(...recordExactStatisticsRules(ctx, evaluationTime))
+    matchedMissionIds.push(...recordExactResistanceDebuffRules(ctx, evaluationTime))
     return matchedMissionIds
 }

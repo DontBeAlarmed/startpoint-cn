@@ -28,7 +28,7 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.event)
     assert.deepEqual(
         { total: report.event.total, automated: report.event.automated, fallback: report.event.fallback },
-        { total: 2512, automated: 1525, fallback: 987 },
+        { total: 2512, automated: 1527, fallback: 985 },
     )
     assert.equal(report.event.automatedMissions.filter(entry => [1200, 1208, 1209, 1210, 1211, 1216, 1223].includes(entry.missionId)).length, 7)
     assert.deepEqual(
@@ -72,7 +72,6 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
         {
             "empty-quest-selector": 948,
             "rescue-source-unavailable": 27,
-            "authoritative-event-fact-unavailable:type-86": 2,
             "authoritative-event-fact-unavailable:type-87": 10,
         },
         "type 80/81/82 的 12 条 RAID SET 任务不得继续留在 fallback 原因分区",
