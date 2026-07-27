@@ -167,6 +167,7 @@ const EXPECTED_ITEM_EQUIPMENT_CDN_TABLES = Object.freeze({
     ],
     "equipment_dissolve.json": ["master/item/equipment.orderedmap"],
     "equipment_ids.json": ["master/item/equipment.orderedmap"],
+    "equipment_lookup.json": ["master/item/equipment.orderedmap"],
     "item_data.json": ["master/item/item.orderedmap"],
     "item_ids.json": ["master/item/item.orderedmap"],
     "item_lookup.json": ["master/item/item.orderedmap"],
@@ -437,7 +438,10 @@ test("registry derives item and equipment runtime tables from official OrderedMa
         assert.equal(entry.converterId, "item-equipment", tableName)
         assert.deepEqual(entry.sourceOrderedMaps, sources, tableName)
     }
-    assert.equal(findTableSource("equipment_lookup.json").scope, "bundled")
+    assert.deepEqual(
+        findTableSource("equipment_lookup.json").bundledSources,
+        ["assets/equipment_lookup.json"],
+    )
 })
 
 test("registry derives authoritative quest tables from official OrderedMap sources", () => {

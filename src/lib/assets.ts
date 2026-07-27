@@ -11,6 +11,7 @@ import manaBoard from "../../assets/mana_board.json";
 import configData from "../../assets/config.json"
 import equipmentDissolveData from "../../assets/equipment_dissolve.json"
 import equipmentIdsData from "../../assets/equipment_ids.json"
+import equipmentLookupData from "../../assets/equipment_lookup.json"
 import itemSaleData from "../../assets/item_sale.json"
 import itemData from "../../assets/item_data.json"
 import itemIdsData from "../../assets/item_ids.json"
@@ -951,6 +952,19 @@ export function getEquipmentIdsSync(): readonly number[] {
     return getRuntimeContentTableSync(
         "equipment_ids.json",
         equipmentIdsData as number[],
+    )
+}
+
+export interface EquipmentLookupEntry {
+    readonly name: string
+    readonly rarity: string
+    readonly category: string
+}
+
+export function getEquipmentLookupSync(): Readonly<Record<string, EquipmentLookupEntry>> {
+    return getRuntimeContentTableSync(
+        "equipment_lookup.json",
+        equipmentLookupData as Record<string, EquipmentLookupEntry>,
     )
 }
 

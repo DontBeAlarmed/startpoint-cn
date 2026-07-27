@@ -1042,12 +1042,25 @@ function validateItemEquipmentTables({
     readBundled,
     readRelease,
     expectedItemDataExtra,
+    expectedEquipmentLookup,
 }) {
     const itemEquipmentDefinitions = definitions.filter(definition => (
         definition.converterId === "item-equipment"
     ))
     for (const definition of itemEquipmentDefinitions) {
         const bundled = readBundled(definition.tableName)
+        if (definition.tableName === "equipment_lookup.json") {
+            const lookup = readRelease(definition.tableName)
+            if (!lookup || typeof lookup !== "object" || Array.isArray(lookup)
+                || Object.keys(lookup).length !== expectedEquipmentLookup.entries
+                || jsonDigest(lookup) !== expectedEquipmentLookup.digest) {
+                baselineError(
+                    "CONTENT_SYNC_SMOKE_ITEM_EQUIPMENT_BASELINE",
+                    "equipment_lookup.json 与官方装备展示基线不一致",
+                )
+            }
+            continue
+        }
         const expected = definition.tableName === "item_data.json"
             ? { ...bundled, ...expectedItemDataExtra }
             : bundled
@@ -1060,6 +1073,7 @@ function validateItemEquipmentTables({
     }
     return {
         tables: itemEquipmentDefinitions.length,
+        equipmentLookupEntries: expectedEquipmentLookup.entries,
         itemEffects: Object.keys(readRelease("item_data.json")).length,
         officialItemEffectAdditions: Object.keys(expectedItemDataExtra).length,
     }
@@ -1352,6 +1366,10 @@ async function validateSynchronizedContent({ paths, syncResult }) {
             paths.projectRoot,
             "tools/fixtures/content-item-equipment/differences-1.4.54.json",
         ),
+        expectedEquipmentLookup: readJson(
+            paths.projectRoot,
+            "tools/fixtures/content-item-equipment/equipment-lookup-1.4.54.json",
+        ),
     })
     const questStats = validateQuestTables({
         definitions: runtime.TABLE_SOURCES,
@@ -1457,6 +1475,7 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         gameplayTables: gameplayStats.tables,
         manaNodeTables: manaNodeStats.tables,
         itemEquipmentTables: itemEquipmentStats.tables,
+        equipmentLookupEntries: itemEquipmentStats.equipmentLookupEntries,
         itemEffects: itemEquipmentStats.itemEffects,
         officialItemEffectAdditions: itemEquipmentStats.officialItemEffectAdditions,
         questTables: questStats.tables,

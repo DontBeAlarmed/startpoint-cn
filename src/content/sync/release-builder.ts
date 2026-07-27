@@ -31,6 +31,7 @@ import {
 import {
     convertItemEquipmentTables,
     type ItemEquipmentConversionOutput,
+    type ItemEquipmentConversionCompatibility,
     type ItemEquipmentSourceReader,
 } from "../converters/item-equipment"
 import {
@@ -113,6 +114,7 @@ export interface DefaultContentTableBuilderDependencies {
     ) => ManaNodeConversionOutput | Promise<ManaNodeConversionOutput>
     readonly convertItemEquipmentTables?: (
         reader: ItemEquipmentSourceReader,
+        compatibility: ItemEquipmentConversionCompatibility,
     ) => ItemEquipmentConversionOutput | Promise<ItemEquipmentConversionOutput>
     readonly convertShops?: (
         reader: ShopSourceReader,
@@ -460,7 +462,11 @@ export function createDefaultContentTableBuilder(
                 addConverterOutput(
                     values,
                     "item-equipment",
-                    await itemEquipmentConverter(reader),
+                    await itemEquipmentConverter(reader, {
+                        equipmentLookup: await readBundled("equipment_lookup.json") as Readonly<
+                            Record<string, { readonly category?: unknown }>
+                        >,
+                    }),
                 )
             }
             if (converterIds.has("mana-node")) {

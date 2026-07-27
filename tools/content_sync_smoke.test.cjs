@@ -352,15 +352,19 @@ test("玩法派生表必须逐张等于 bundled 官方基线", () => {
     ))
 })
 
-test("物品装备派生表只允许 item_data 出现已审计的官方补全", () => {
+test("物品装备派生表只允许已审计的 item_data 和 equipment_lookup 差异", () => {
     assert.equal(typeof smoke.validateItemEquipmentTables, "function")
     const definitions = [
         { tableName: "equipment_ids.json", converterId: "item-equipment" },
+        { tableName: "equipment_lookup.json", converterId: "item-equipment" },
         { tableName: "item_data.json", converterId: "item-equipment" },
-        { tableName: "equipment_lookup.json", converterId: "bundled-json" },
     ]
     const bundled = {
         "equipment_ids.json": [1, 2],
+        "equipment_lookup.json": {
+            "1": { name: "旧名称", rarity: "0", category: "剑" },
+            "2": { name: "新增装备", rarity: "0", category: "未分类" },
+        },
         "item_data.json": { "100": { effectKind: 2, effectValue: 25 } },
     }
     const expectedItemDataExtra = {
@@ -368,10 +372,27 @@ test("物品装备派生表只允许 item_data 出现已审计的官方补全", 
     }
     const release = {
         "equipment_ids.json": [1, 2],
+        "equipment_lookup.json": {
+            "1": { name: "官方名称", rarity: "5", category: "剑" },
+            "2": { name: "新增装备", rarity: "4", category: "未分类" },
+        },
         "item_data.json": {
             ...bundled["item_data.json"],
             ...expectedItemDataExtra,
         },
+    }
+    const expectedEquipmentLookup = {
+        entries: 2,
+        digest: `sha256:${crypto.createHash("sha256")
+            .update(JSON.stringify(Object.fromEntries(
+                Object.entries(release["equipment_lookup.json"]).map(([id, row]) => [
+                    id,
+                    Object.fromEntries(Object.entries(row).sort(([left], [right]) => (
+                        left.localeCompare(right)
+                    ))),
+                ]),
+            )))
+            .digest("hex")}`,
     }
 
     assert.deepEqual(smoke.validateItemEquipmentTables({
@@ -379,7 +400,13 @@ test("物品装备派生表只允许 item_data 出现已审计的官方补全", 
         readBundled: tableName => bundled[tableName],
         readRelease: tableName => release[tableName],
         expectedItemDataExtra,
-    }), { tables: 2, itemEffects: 2, officialItemEffectAdditions: 1 })
+        expectedEquipmentLookup,
+    }), {
+        tables: 3,
+        equipmentLookupEntries: 2,
+        itemEffects: 2,
+        officialItemEffectAdditions: 1,
+    })
 
     release["item_data.json"][102] = { effectKind: 2, effectValue: 1 }
     assert.throws(() => smoke.validateItemEquipmentTables({
@@ -387,6 +414,7 @@ test("物品装备派生表只允许 item_data 出现已审计的官方补全", 
         readBundled: tableName => bundled[tableName],
         readRelease: tableName => release[tableName],
         expectedItemDataExtra,
+        expectedEquipmentLookup,
     }), error => (
         error?.code === "CONTENT_SYNC_SMOKE_ITEM_EQUIPMENT_BASELINE"
         && error.message.includes("item_data.json")

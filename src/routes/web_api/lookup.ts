@@ -1,8 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import equipmentLookup from "../../../assets/equipment_lookup.json";
 import bundledQuestLookup from "../../../assets/quest_lookup.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
-import { getItemLookupSync } from "../../lib/assets";
+import { getEquipmentLookupSync, getItemLookupSync } from "../../lib/assets";
 import { getCharacterLookup } from "../../lib/character-content";
 
 const routes = async (fastify: FastifyInstance) => {
@@ -15,7 +14,7 @@ const routes = async (fastify: FastifyInstance) => {
     })
 
     fastify.get("/equipment", async (_request: FastifyRequest, reply: FastifyReply) => {
-        return reply.send(equipmentLookup)
+        return reply.send(getEquipmentLookupSync())
     })
 
     fastify.get("/quests", async (_request: FastifyRequest, reply: FastifyReply) => {

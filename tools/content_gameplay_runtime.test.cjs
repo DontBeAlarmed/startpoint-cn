@@ -75,6 +75,9 @@ test("gameplay readers use the active Content snapshot instead of static bundled
                 },
             },
             "equipment_ids.json": [9950001],
+            "equipment_lookup.json": {
+                "9950001": { name: "快照装备", rarity: "5", category: "未分类" },
+            },
             "item_data.json": {
                 "990100": { effectKind: 3, effectValue: 75 },
             },
@@ -158,6 +161,9 @@ test("gameplay readers use the active Content snapshot instead of static bundled
         sellable: true,
     })
     assert.deepEqual(assets.getEquipmentIdsSync(), [9950001])
+    assert.deepEqual(assets.getEquipmentLookupSync(), {
+        "9950001": { name: "快照装备", rarity: "5", category: "未分类" },
+    })
     assert.deepEqual(assets.getItemIdsSync(), [990100])
     assert.deepEqual(assets.getItemLookupSync(), { "990100": "快照体力药" })
     assert.deepEqual(assets.getCharacterManaNodesSync(99101, 1), {

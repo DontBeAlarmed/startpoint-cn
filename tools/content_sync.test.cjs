@@ -471,10 +471,13 @@ test("default release builder closes all registry tables and runs each CDN conve
     })
     assert.equal(
         bundledImports,
-        TABLE_SOURCES.filter(definition => (
-            definition.converterId === "bundled-json"
-            || definition.converterId === "server-json"
-        )).length,
+        new Set(TABLE_SOURCES.flatMap(definition => [
+            ...(definition.converterId === "bundled-json"
+                || definition.converterId === "server-json"
+                ? [definition.tableName]
+                : []),
+            ...definition.bundledSources.map(source => source.replace(/^assets\//, "")),
+        ])).size,
     )
     assert.deepEqual([...bundledRoots], ["/configured-runtime"])
     assert.deepEqual(reads.filter(logicalPath => (

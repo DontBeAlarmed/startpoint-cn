@@ -135,6 +135,11 @@ const ITEM_EQUIPMENT_TABLES = [
     ],
     ["equipment_dissolve.json", ["master/item/equipment.orderedmap"]],
     ["equipment_ids.json", ["master/item/equipment.orderedmap"]],
+    [
+        "equipment_lookup.json",
+        ["master/item/equipment.orderedmap"],
+        ["assets/equipment_lookup.json"],
+    ],
     ["item_data.json", ["master/item/item.orderedmap"]],
     ["item_ids.json", ["master/item/item.orderedmap"]],
     ["item_lookup.json", ["master/item/item.orderedmap"]],
@@ -144,7 +149,6 @@ const ITEM_EQUIPMENT_TABLES = [
 const BUNDLED_TABLE_NAMES = [
     "cdndata/player_rank_full.json",
     "encyclopedia.json",
-    "equipment_lookup.json",
     "mission_event_battle_rules.json",
     "mission_event_quest_map.json",
     "practice_quest.json",
@@ -233,11 +237,13 @@ function manaNodeDefinition(tableName: string, sourceOrderedMaps: readonly strin
 function itemEquipmentDefinition(
     tableName: string,
     sourceOrderedMaps: readonly string[],
+    bundledSources: readonly string[] = [],
 ): TableSourceInput {
     return {
         tableName,
         scope: "cdn",
         sourceOrderedMaps,
+        bundledSources,
         converterId: "item-equipment",
         converterVersion: 1,
         outputShapeVersion: 1,
@@ -453,8 +459,8 @@ const definitionInputs: TableSourceInput[] = [
     ...MANA_NODE_TABLES.map(([tableName, sourceOrderedMaps]) => (
         manaNodeDefinition(tableName, sourceOrderedMaps)
     )),
-    ...ITEM_EQUIPMENT_TABLES.map(([tableName, sourceOrderedMaps]) => (
-        itemEquipmentDefinition(tableName, sourceOrderedMaps)
+    ...ITEM_EQUIPMENT_TABLES.map(([tableName, sourceOrderedMaps, bundledSources]) => (
+        itemEquipmentDefinition(tableName, sourceOrderedMaps, bundledSources)
     )),
     ...(Object.keys(QUEST_TABLE_SOURCES) as QuestTableName[]).map(questDefinition),
     questDerivedDefinition(

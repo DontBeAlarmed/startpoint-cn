@@ -18,10 +18,17 @@ export interface ItemEquipmentConversionOutput {
     readonly "equipment_craft.json": Readonly<Record<string, unknown>>
     readonly "equipment_dissolve.json": Readonly<Record<string, unknown>>
     readonly "equipment_ids.json": readonly number[]
+    readonly "equipment_lookup.json": Readonly<Record<string, unknown>>
     readonly "item_data.json": Readonly<Record<string, unknown>>
     readonly "item_ids.json": readonly number[]
     readonly "item_lookup.json": Readonly<Record<string, string>>
     readonly "item_sale.json": Readonly<Record<string, unknown>>
+}
+
+export interface ItemEquipmentConversionCompatibility {
+    readonly equipmentLookup: Readonly<Record<string, {
+        readonly category?: unknown
+    }>>
 }
 
 type ParsedRow = readonly [string, readonly string[]]
@@ -104,12 +111,15 @@ function requireText(value: string, subject: string): string {
 
 function convertEquipment(
     rows: readonly OrderedMapTextRow[],
+    compatibility: ItemEquipmentConversionCompatibility,
 ): {
     readonly dissolve: Record<string, unknown>
     readonly ids: number[]
+    readonly lookup: Record<string, unknown>
 } {
     const dissolve: Record<string, unknown> = {}
     const ids: number[] = []
+    const lookup: Record<string, unknown> = {}
     for (const [id, fields] of parseRows(rows, "equipment", 16)) {
         ids.push(Number(id))
         dissolve[id] = {
@@ -127,8 +137,16 @@ function convertEquipment(
             ),
             max_level: parsePositiveInteger(fields[8], `equipment[${id}].maxLevel`),
         }
+        const configuredCategory = compatibility.equipmentLookup[id]?.category
+        lookup[id] = {
+            name: requireText(fields[1], `equipment[${id}].name`),
+            rarity: String(parsePositiveInteger(fields[11], `equipment[${id}].rarity`)),
+            category: typeof configuredCategory === "string" && configuredCategory.length > 0
+                ? configuredCategory
+                : "未分类",
+        }
     }
-    return { dissolve, ids }
+    return { dissolve, ids, lookup }
 }
 
 function convertEquipmentCraft(
@@ -200,6 +218,7 @@ function convertItems(rows: readonly OrderedMapTextRow[]): {
 
 export async function convertItemEquipmentTables(
     reader: ItemEquipmentSourceReader,
+    compatibility: ItemEquipmentConversionCompatibility = { equipmentLookup: {} },
 ): Promise<ItemEquipmentConversionOutput> {
     const [equipmentRows, craftRows, dissolveRateRows, itemRows] = await Promise.all([
         reader.read(EQUIPMENT_PATH),
@@ -207,12 +226,13 @@ export async function convertItemEquipmentTables(
         reader.read(EQUIPMENT_DISSOLVE_RATE_PATH),
         reader.read(ITEM_PATH),
     ])
-    const equipment = convertEquipment(equipmentRows)
+    const equipment = convertEquipment(equipmentRows, compatibility)
     const items = convertItems(itemRows)
     return deepFreeze({
         "equipment_craft.json": convertEquipmentCraft(craftRows, dissolveRateRows),
         "equipment_dissolve.json": equipment.dissolve,
         "equipment_ids.json": equipment.ids,
+        "equipment_lookup.json": equipment.lookup,
         "item_data.json": items.data,
         "item_ids.json": items.ids,
         "item_lookup.json": items.lookup,

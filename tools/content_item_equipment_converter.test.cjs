@@ -44,7 +44,16 @@ function itemFields(overrides = {}) {
 
 function fixture(overrides = {}) {
     const tables = new Map([
-        [SOURCES.equipment, [row("5010001", equipmentFields())]],
+        [SOURCES.equipment, [
+            row("5010001", equipmentFields()),
+            row("5029999", equipmentFields({
+                0: "new_equipment",
+                1: "新增装备",
+                9: "false",
+                10: "5029999",
+                11: "4",
+            })),
+        ]],
         [SOURCES.craft, [
             row("1", ["1", "5"]),
             row("2", ["2", "10"]),
@@ -87,10 +96,14 @@ function assertDeepFrozen(value, seen = new Set()) {
     for (const key of Reflect.ownKeys(value)) assertDeepFrozen(value[key], seen)
 }
 
-test("item and equipment converter derives the seven authoritative runtime tables", async () => {
+test("item and equipment converter derives the eight authoritative runtime tables", async () => {
     assert.equal(typeof convertItemEquipmentTables, "function", "应导出 convertItemEquipmentTables")
     const source = fixture()
-    const output = await convertItemEquipmentTables(source.reader)
+    const output = await convertItemEquipmentTables(source.reader, {
+        equipmentLookup: {
+            "5010001": { name: "旧名称", rarity: "0", category: "剑" },
+        },
+    })
 
     assert.deepEqual(source.requested.sort(), Object.values(SOURCES).sort())
     assert.deepEqual(output, {
@@ -108,8 +121,18 @@ test("item and equipment converter derives the seven authoritative runtime table
                 generate_ability_soul: true,
                 max_level: 5,
             },
+            "5029999": {
+                ability_soul_id: 5029999,
+                obtain_source: 0,
+                generate_ability_soul: false,
+                max_level: 5,
+            },
         },
-        "equipment_ids.json": [5010001],
+        "equipment_ids.json": [5010001, 5029999],
+        "equipment_lookup.json": {
+            "5010001": { name: "测试剑", rarity: "5", category: "剑" },
+            "5029999": { name: "新增装备", rarity: "4", category: "未分类" },
+        },
         "item_data.json": {
             "100": { effectKind: 2, effectValue: 25 },
             "102": { effectKind: 3, effectValue: 50 },
