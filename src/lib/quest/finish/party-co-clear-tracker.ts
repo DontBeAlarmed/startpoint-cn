@@ -60,7 +60,7 @@ export function trackPartyCoClears(ctx: FinishContext): void {
         `).run(ctx.playerId, raceKey)
     }
 
-    const facts = getAwakeBattleProgressFacts(ctx)
+    const facts = getAwakeBattleProgressFacts(ctx, raceKey)
     if (facts.increments.length > 0) {
         incrementPlayerCategoryMissionsIfSafeSync(ctx.playerId, 9, facts.increments)
     }

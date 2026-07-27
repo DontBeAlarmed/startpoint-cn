@@ -31,7 +31,14 @@ assert.deepEqual(
         questPartyContext(1, 1, [231001, 1, 999]),
         "Devil+Dragon+Human",
     ),
-    [],
+    [2310012],
+)
+assert.deepEqual(
+    getMatchedAwakeRaceMissionIds(
+        questPartyContext(1, 1, [231001, 1, 999]),
+        "Beast+Devil+Dragon+Human",
+    ),
+    [2310012],
 )
 assert.deepEqual(
     getMatchedAwakeRaceMissionIds(
@@ -53,11 +60,11 @@ const expectedFamilyCounts = {
     "leader-powerflip": 2,
     "mana-total": 1,
     "quest-range-character": 4,
-    "race-selector-unresolved": 1,
+    "race-selector": 1,
     "same-party-quest": 3,
     "same-party-three": 1,
     "same-party-two": 4,
-    "statistics-17-unresolved": 2,
+    "no-death": 2,
     "story-read": 18,
     "total-story-read": 1,
 }
@@ -217,14 +224,21 @@ for (const missionId of [3210132, 3210133, 3410012, 3410013, 1610022, 2610072]) 
     assert.equal(AWAKE_DIRECT_BATTLE_MISSION_IDS.has(missionId), true)
 }
 
-const noDeathStatistics = { zones: [{ encoffin_count: 0 }, { encoffin_count: 0 }], continue_count: 99 }
+const noDeathStatistics = { zones: [{ encoffinment_count: 0 }, { encoffinment_count: 0 }], continue_count: 99 }
 assert.deepEqual(
     getMatchedAwakeDirectBattleMissionIds(directBattleContext(1, 1, [161002], { statistics: noDeathStatistics }), ""),
-    [],
+    [1610022],
 )
 assert.deepEqual(
-    getMatchedAwakeDirectBattleMissionIds(directBattleContext(1, 1, [261007], { statistics: { zones: [{ encoffin_count: 0 }] } }), ""),
-    [],
+    getMatchedAwakeDirectBattleMissionIds(directBattleContext(1, 1, [261007], { statistics: { zones: [{ encoffinment_count: 0 }] } }), ""),
+    [2610072],
+)
+assert.deepEqual(
+    getMatchedAwakeDirectBattleMissionIds(directBattleContext(1, 1, [161002], {
+        isMulti: true,
+        statistics: noDeathStatistics,
+    }), ""),
+    [1610022],
 )
 for (const statistics of [
     undefined,
@@ -232,11 +246,13 @@ for (const statistics of [
     { zones: { length: 1 } },
     { zones: [null] },
     { zones: [] },
-    { zones: [{ encoffin_count: 1 }] },
-    { zones: [{ encoffin_count: -1 }] },
-    { zones: [{ encoffin_count: 0.5 }] },
-    { zones: [{ encoffin_count: NaN }] },
-    { zones: [{ encoffin_count: Infinity }] },
+    { zones: [{ encoffin_count: 0 }] },
+    { zones: [{ members: [{ encoffin_count: 0 }] }] },
+    { zones: [{ encoffinment_count: 0 }, { encoffinment_count: 1 }] },
+    { zones: [{ encoffinment_count: -1 }] },
+    { zones: [{ encoffinment_count: 0.5 }] },
+    { zones: [{ encoffinment_count: NaN }] },
+    { zones: [{ encoffinment_count: Infinity }] },
 ]) {
     assert.deepEqual(
         getMatchedAwakeDirectBattleMissionIds(directBattleContext(1, 1, [161002], { statistics }), ""),
@@ -364,11 +380,19 @@ for (const context of [
 }
 
 assert.deepEqual(
-    getMatchedAwakeDirectBattleMissionIds(directBattleContext(1, 1, [161002], {
+    getAwakeBattleProgressFacts(battleFactContext({
+        ids: [161002],
         statistics: noDeathStatistics,
-    }), ""),
-    [],
-    "statistics 17 lacks an authoritative field mapping and must fail closed",
+    })),
+    { increments: [{ missionId: 1610022, delta: 1 }], maxima: [] },
+)
+assert.deepEqual(
+    getAwakeBattleProgressFacts(battleFactContext({
+        ids: [161002],
+        accomplished: false,
+        statistics: noDeathStatistics,
+    })),
+    { increments: [], maxima: [] },
 )
 
 const awakeComputer = getComputer(9)
@@ -458,7 +482,7 @@ assert.equal(awakeComputer.compute(2310014, {
 assert.equal(awakeComputer.compute(2310014, {
     categoryMissionProgress: new Map([[2310014, 1]]),
     questProgress: ramsStoryProgress,
-}, 1), 1, "parent progress must not complete fail-closed or atomic children")
+}, 1), 1, "parent progress must not complete unresolved atomic children")
 assert.equal(awakeComputer.compute(2310014, {
     categoryMissionProgress: new Map([[2310014, 3]]),
     questProgress: {},
@@ -505,7 +529,7 @@ for (const missionId of [1610022, 2310012, 2610072]) {
     assert.equal(
         awakeComputer.compute(missionId, emptyImportedAwakeContext(), importedProgress),
         importedProgress,
-        `fail-closed mission ${missionId} must preserve imported progress`,
+        `direct battle mission ${missionId} must preserve imported progress`,
     )
 }
 

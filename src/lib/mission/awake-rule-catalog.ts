@@ -11,12 +11,12 @@ export type AwakeMissionRuleFamilyName =
     | "leader-coop"
     | "leader-powerflip"
     | "mana-total"
+    | "no-death"
     | "quest-range-character"
-    | "race-selector-unresolved"
+    | "race-selector"
     | "same-party-quest"
     | "same-party-three"
     | "same-party-two"
-    | "statistics-17-unresolved"
     | "story-read"
     | "total-story-read"
 
@@ -79,11 +79,11 @@ export const AWAKE_MISSION_RULE_FAMILIES: readonly AwakeMissionRuleFamily[] = Ob
     family("leader-powerflip", [13, 1210012]),
     family("mana-total", [2630022]),
     family("quest-range-character", [3210132, 3210133, 3410012, 3410013]),
-    family("race-selector-unresolved", [2310012], "specific-races-selector-semantics-unverified"),
+    family("race-selector", [2310012]),
     family("same-party-quest", [1510062, 3310032, 3310033]),
     family("same-party-three", [2410633]),
     family("same-party-two", [2110012, 2210042, 2410632, 2510042]),
-    family("statistics-17-unresolved", [1610022, 2610072], "statistics-17-field-semantics-unverified"),
+    family("no-death", [1610022, 2610072]),
     family("story-read", getMissionIdsByPattern("96")),
     family("total-story-read", [12]),
 ])
@@ -171,8 +171,13 @@ function validateRulePartition(): void {
     }
 
     assertAwakeMissionFields(2310012, { 4: "94", 7: "3", 23: "231001", 25: "Human,Dragon,Devil" })
-    for (const missionId of [1610022, 2610072]) {
-        assertAwakeMissionFields(missionId, { 4: "95", 5: "17", 7: "3" })
+    for (const [missionId, leaderCharacterId] of [[1610022, 161002], [2610072, 261007]]) {
+        assertAwakeMissionFields(missionId, {
+            4: "95",
+            5: "17",
+            7: "3",
+            23: String(leaderCharacterId),
+        })
     }
 }
 

@@ -1,6 +1,5 @@
 import {
     assertAwakeMissionFields,
-    AWAKE_FAIL_CLOSED_MISSION_IDS,
 } from "./awake-rule-catalog"
 
 export {
@@ -69,6 +68,11 @@ interface ExactQuestRule {
     leaderCharacterId: number
     singleOnly: boolean
     timeLimitMs?: number
+}
+
+interface NoDeathRule {
+    missionId: number
+    leaderCharacterId: number
 }
 
 const QUEST_PARTY_RULES: readonly QuestPartyRule[] = Object.freeze([
@@ -147,6 +151,17 @@ const LEADER_COMBO_RULES = new Map<number, number>([
     [121001, 1210013],
 ])
 
+const REQUIRED_RACE_MISSION = Object.freeze({
+    missionId: 2310012,
+    leaderCharacterId: 231001,
+    requiredRaces: Object.freeze(["Human", "Dragon", "Devil"]),
+})
+
+const NO_DEATH_RULES: readonly NoDeathRule[] = Object.freeze([
+    { missionId: 1610022, leaderCharacterId: 161002 },
+    { missionId: 2610072, leaderCharacterId: 261007 },
+])
+
 export const AWAKE_QUEST_PARTY_MISSION_IDS = new Set(
     QUEST_PARTY_RULES.map(rule => rule.missionId),
 )
@@ -158,7 +173,8 @@ export const AWAKE_DIRECT_BATTLE_MISSION_IDS = new Set([
     THREE_CHARACTER_RULE.missionId,
     ...LEADER_POWERFLIP_RULES.values(),
     ...LEADER_COMBO_RULES.values(),
-    ...AWAKE_FAIL_CLOSED_MISSION_IDS,
+    REQUIRED_RACE_MISSION.missionId,
+    ...NO_DEATH_RULES.map(rule => rule.missionId),
 ])
 
 export function normalizeCharacterPair(a: number, b: number): readonly [number, number] {
@@ -199,9 +215,10 @@ export function getMatchedAwakeQuestPartyMissionIds(
 
 export function getMatchedAwakeDirectBattleMissionIds(
     ctx: QuestPartyFactContext,
-    _raceKey: string,
+    raceKey: string,
 ): number[] {
     const matched = [
+        ...getMatchedAwakeRaceMissionIds(ctx, raceKey),
         ...getMatchedAwakeQuestPartyMissionIds(ctx),
     ]
     const partyCharacterIds = new Set<number>()
@@ -231,15 +248,23 @@ export function getMatchedAwakeDirectBattleMissionIds(
         matched.push(THREE_CHARACTER_RULE.missionId)
     }
 
+    if (hasZeroTotalZoneStatistic(ctx.statistics?.zones, "encoffinment_count")) {
+        const leaderId = ctx.party.characters[0]?.id
+        for (const rule of NO_DEATH_RULES) {
+            if (leaderId === rule.leaderCharacterId) matched.push(rule.missionId)
+        }
+    }
+
     return matched
 }
 
 export function getAwakeBattleProgressFacts(
     ctx: AwakeBattleFactContext,
+    raceKey = "",
 ): AwakeBattleProgressFacts {
     if (ctx.questAccomplished !== true) return { increments: [], maxima: [] }
 
-    const increments = getMatchedAwakeDirectBattleMissionIds(ctx, "")
+    const increments = getMatchedAwakeDirectBattleMissionIds(ctx, raceKey)
         .map(missionId => ({ missionId, delta: 1 }))
     const maxima: { missionId: number; progress: number }[] = []
     const leaderId = ctx.party.characters[0]?.id
@@ -277,11 +302,28 @@ function sumNonNegativeZoneStatistic(zones: unknown, key: string): number | null
     return total
 }
 
+function hasZeroTotalZoneStatistic(zones: unknown, key: string): boolean {
+    if (!Array.isArray(zones) || zones.length === 0) return false
+    let total = 0
+    for (const zone of zones) {
+        if (zone === null || typeof zone !== "object") return false
+        const value = (zone as Record<string, unknown>)[key]
+        if (!Number.isSafeInteger(value) || (value as number) < 0) return false
+        if (total > Number.MAX_SAFE_INTEGER - (value as number)) return false
+        total += value as number
+    }
+    return total === 0
+}
+
 export function getMatchedAwakeRaceMissionIds(
-    _ctx: QuestPartyFactContext,
-    _raceKey: string,
+    ctx: QuestPartyFactContext,
+    raceKey: string,
 ): number[] {
-    return []
+    if (ctx.party.characters[0]?.id !== REQUIRED_RACE_MISSION.leaderCharacterId) return []
+    const partyRaces = new Set(raceKey.split("+").filter(Boolean))
+    return REQUIRED_RACE_MISSION.requiredRaces.every(race => partyRaces.has(race))
+        ? [REQUIRED_RACE_MISSION.missionId]
+        : []
 }
 
 export function isBondTokenMissionComplete(

@@ -116,14 +116,14 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
 
     assert.equal(report.awake.total, 144)
     assert.equal(report.awake.routed, 144)
-    assert.equal(report.awake.resolved, 141)
-    assert.equal(report.awake.failClosed, 3)
-    assert.deepEqual(report.awake.unresolvedMissionIds, [1610022, 2310012, 2610072])
+    assert.equal(report.awake.resolved, 144)
+    assert.equal(report.awake.failClosed, 0)
+    assert.deepEqual(report.awake.unresolvedMissionIds, [])
     assert.deepEqual(
         report.awake.families
             .filter(family => family.status === "fail-closed")
             .map(family => family.family),
-        ["race-selector-unresolved", "statistics-17-unresolved"],
+        [],
     )
     const awakeMissionIds = report.awake.families.flatMap(family => family.missionIds)
     assert.equal(awakeMissionIds.length, 144)

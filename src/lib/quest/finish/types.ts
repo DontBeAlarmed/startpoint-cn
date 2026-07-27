@@ -16,7 +16,7 @@ export interface QuestStatistics {
         use_power_flip_count?: number
         use_dash_count?: number
         use_skill_count?: number
-        encoffin_count?: number
+        encoffinment_count?: number
         skill_point_over_on_start?: number
         members?: ({
             debuff_r?: number
