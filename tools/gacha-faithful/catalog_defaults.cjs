@@ -1,0 +1,7 @@
+const DEFAULT_SEED_START = 10_000_000
+const DEFAULT_SEED_END = 10_019_999
+
+module.exports = {
+    DEFAULT_SEED_END,
+    DEFAULT_SEED_START,
+}

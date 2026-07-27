@@ -3,6 +3,7 @@ const path = require("node:path")
 const { Worker } = require("node:worker_threads")
 
 const { buildSeedCatalogFromPools, writeSeedCatalog } = require("./catalog.cjs")
+const { DEFAULT_SEED_END, DEFAULT_SEED_START } = require("./catalog_defaults.cjs")
 const { currentCatalogMetadata } = require("./catalog_metadata.cjs")
 const { integerArgument, parseArguments } = require("./cli.cjs")
 
@@ -67,8 +68,8 @@ function mergePools(movieIds, results) {
 async function main(argv) {
     const args = parseArguments(argv)
     const output = path.resolve(args.output ?? path.join(ROOT, "assets", "gacha-seed-catalog"))
-    const seedStart = integerArgument(args, "seed-start", 10_000_000)
-    const seedEnd = integerArgument(args, "seed-end", 10_099_999)
+    const seedStart = integerArgument(args, "seed-start", DEFAULT_SEED_START)
+    const seedEnd = integerArgument(args, "seed-end", DEFAULT_SEED_END)
     const movieIds = (args.movies ?? DEFAULT_MOVIES.join(","))
         .split(",")
         .map(value => value.trim())

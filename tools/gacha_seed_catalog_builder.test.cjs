@@ -10,6 +10,10 @@ const {
     verifySeedCatalog,
     writeSeedCatalog,
 } = require("./gacha-faithful/catalog.cjs")
+const {
+    DEFAULT_SEED_END,
+    DEFAULT_SEED_START,
+} = require("./gacha-faithful/catalog_defaults.cjs")
 
 const MOVIE_RESULTS = Object.freeze({
     normal: [1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0],
@@ -34,6 +38,19 @@ function buildFixture() {
 }
 
 const catalog = buildFixture()
+
+const committedManifest = JSON.parse(fs.readFileSync(
+    path.join(__dirname, "..", "assets", "gacha-seed-catalog", "manifest.json"),
+    "utf8",
+))
+assert.deepStrictEqual(committedManifest.seedRange, {
+    start: DEFAULT_SEED_START,
+    end: DEFAULT_SEED_END,
+})
+const smallestFiveStarPool = Math.min(
+    ...Object.values(committedManifest.rarityCounts).map(counts => counts["5"]),
+)
+assert.ok(smallestFiveStarPool >= 900 && smallestFiveStarPool <= 1_100)
 
 assert.deepStrictEqual(catalog.manifest.seedRange, { start: 1, end: 12 })
 assert.equal(catalog.manifest.seedCountPerMovie, 12)
