@@ -27,36 +27,33 @@ entry_count
 4. 在门票、活动次数和角色存档写入前，为整批结果完成动画规划；
 5. 从 faithful catalog 的 `movie_id + rarity` 桶中均匀选择 seed；
 6. 使用本次请求内的 `usedSeeds` 集合避免十连重复 seed；
-7. 调用 `markSent()` 保留当前反馈关联，再把结果发送给客户端。
+7. 在进程内登记最近发送的 `movie_id + seed`，再把结果发送给客户端。
 
 `rarity_5_guarantee` 的配置包含 `isRarity5`，客户端会直接强制 ★5 并跳过普通物理校验。该路径以 `characterId * 1000` 为占位 seed 起点；同一请求重复角色时顺延到下一个未使用值，只适用于这一明确分支。
 
 普通物理分支找不到对应 seed 时会明确失败，不再回退到未经验证的 `characterId * 1000`。该占位值只允许用于 `rarity_5_guarantee` 的客户端强制五星分支。
 
-## 兼容状态
+## 本机 Quarantine
 
-`src/lib/seed-validator.ts` 仍暂存历史反馈状态和三种后台模式：
+运行时不再学习或重分类 seed。`src/lib/gacha-seed-quarantine.ts` 只维护：
 
-| 模式 | 历史用途 | 当前生产影响 |
-|---|---|---|
-| `natural` | 默认运行 | 不影响 catalog 选择 |
-| `play` | 动画验证 | 不影响 catalog 选择 |
-| `test` | 定向测试 | 不影响 catalog 选择 |
+- 进程内最近 10 分钟发送记录；
+- `<DATA_DIR>/state/seeds/quarantine.json` 中的本机禁用集合。
 
-这些状态只为当前反馈关联与迁移兼容保留，不再向 faithful catalog 注入 seed，也不能重分类或提升 catalog seed。后续最小反馈边界见[种子验证](./seed-verification.md)。
+C3032 上报必须同时匹配最近发送的 `movie_id + seed` 才能进入 quarantine。任意上报、过期上报、错 movie 上报和重复上报都不会改变状态。quarantine 只能从 catalog 选择中排除 seed，不能增加、提升、重分类或跨 movie 注入 seed。
 
-运行时 seed 状态属于玩家环境数据，不应提交到 Git。仓库中的 JSON 只提供可复现基线；确认、净化、测试和发送中的状态由 Runtime Data 保存。
+quarantine 属于本机 Runtime Data，不应提交到 Git。完整状态与恢复边界见[种子验证](./seed-verification.md)。
+该可选文件损坏时服务端会告警并以空 quarantine 启动，不让兜底状态阻断游戏服务；收到新的可信 C3032 后才会发布新快照。
 
 ## 信标与错误反馈
 
-服务端的 `/debug` 兼容端点可以解析客户端补丁上报的 C3032 和 `play=` 信标：
+服务端的 `/debug` 与 `/crash` 兼容端点可以解析客户端补丁上报的 C3032：
 
-- C3032 反馈把种子移出错误稀有度路径并进入待确认状态；
-- `play=0` 可以确认稀有度正确但没有播放；
-- `play=1` 可以确认种子实际播放，并在有稀有度证据时进入更高可信池；
-- 发送记录在处理反馈后清理，避免跨抽卡误关联。
+- 匹配最近发送记录：加入本机 quarantine，并从后续 catalog 选择中排除；
+- 不匹配最近发送记录：忽略；
+- PLAY 信标：不再处理。
 
-没有信标的官方客户端仍可以使用基线种子池，但服务端无法从该客户端自动获得本次物理结果。自动净化是可选反馈能力，不是角色抽取结果本身的业务依赖。
+官方客户端不发送项目自定义信标，但仍直接使用离线完整验证过的 catalog。quarantine 只是异常兜底，不是 seed 正确性的来源。
 
 ## 排查顺序
 

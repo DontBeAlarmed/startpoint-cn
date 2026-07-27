@@ -87,6 +87,14 @@ try {
         /digest mismatch/i,
     )
 
+    writeFixture(temporaryRoot)
+    const filtered = new GachaSeedCatalog({
+        catalogDir: temporaryRoot,
+        isQuarantined: (movieId, seed) => movieId === "normal" && seed === 102,
+        randomInt: maxExclusive => maxExclusive - 1,
+    })
+    assert.equal(filtered.select("normal", 5, new Set()), 101)
+
     const placeholders = new Set()
     assert.equal(reserveUniquePlaceholderSeed(9000, placeholders), 9000)
     assert.equal(reserveUniquePlaceholderSeed(9000, placeholders), 9001)

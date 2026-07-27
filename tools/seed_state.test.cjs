@@ -300,18 +300,14 @@ test("failed PLAY=1 confirmation rolls back memory and persisted state", t => {
     assert.equal(store.snapshot, null)
 })
 
-test("CN beacon handlers use one persistent seed mutation per verified result", () => {
+test("CN beacon handlers only quarantine recently sent C3032 seeds", () => {
     const source = fs.readFileSync(path.join(projectRoot, "src/cn-server.ts"), "utf8")
     const c3032Start = source.indexOf("function parseC3032Beacon")
-    const playStart = source.indexOf("function parsePlayBeacon")
-    const postDebugStart = source.indexOf('fastify.post("/debug"', playStart)
-    const c3032Handler = source.slice(c3032Start, playStart)
-    const playHandler = source.slice(playStart, postDebugStart)
+    const postDebugStart = source.indexOf('fastify.post("/debug"', c3032Start)
+    const c3032Handler = source.slice(c3032Start, postDebugStart)
 
-    assert.match(playHandler, /seedValidator\.confirmPlayedAndVerify\(/)
-    assert.doesNotMatch(playHandler, /seedValidator\.(?:addPlay|moveToVerified)\(/)
-    assert.equal((c3032Handler.match(/seedValidator\.moveToVerified\(/g) ?? []).length, 1)
-    assert.doesNotMatch(c3032Handler, /seedValidator\.(?:confirm|addPending)\(/)
+    assert.match(c3032Handler, /gachaSeedQuarantine\.quarantineIfRecentlySent\(/)
+    assert.doesNotMatch(source, /function parsePlayBeacon|seedValidator\./)
 })
 
 test("verified remains authoritative within one movie after lower-priority mutations and restart", t => {

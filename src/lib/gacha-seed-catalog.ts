@@ -2,6 +2,8 @@ import { createHash, randomInt as cryptoRandomInt } from "crypto"
 import { readFileSync } from "fs"
 import { join } from "path"
 
+import { getDefaultGachaSeedQuarantine } from "./gacha-seed-quarantine"
+
 type SeedPool = Record<string, Record<string, number[]>>
 
 interface SeedCatalogManifest {
@@ -14,6 +16,7 @@ export interface GachaSeedCatalogOptions {
     catalogDir?: string
     readFile?: (filePath: string) => string
     randomInt?: (maxExclusive: number) => number
+    isQuarantined?: (movieId: string, seed: number) => boolean
 }
 
 const DEFAULT_CATALOG_DIR = join(__dirname, "..", "..", "assets", "gacha-seed-catalog")
@@ -103,11 +106,13 @@ function parsePool(value: unknown, movieId: string): SeedPool {
 export class GachaSeedCatalog {
     private readonly pools = new Map<string, SeedPool>()
     private readonly chooseIndex: (maxExclusive: number) => number
+    private readonly isQuarantined: (movieId: string, seed: number) => boolean
 
     constructor(options: GachaSeedCatalogOptions = {}) {
         const catalogDir = options.catalogDir ?? DEFAULT_CATALOG_DIR
         const readFile = options.readFile ?? (filePath => readFileSync(filePath, "utf8"))
         this.chooseIndex = options.randomInt ?? (maxExclusive => cryptoRandomInt(maxExclusive))
+        this.isQuarantined = options.isQuarantined ?? (() => false)
 
         const manifest = parseManifest(parseJson(
             readFile(join(catalogDir, "manifest.json")),
@@ -133,7 +138,9 @@ export class GachaSeedCatalog {
         }
 
         const rarityKey = String(6 - rarity)
-        const available = pool[rarityKey]["0"].filter(seed => !usedSeeds.has(seed))
+        const available = pool[rarityKey]["0"].filter(
+            seed => !usedSeeds.has(seed) && !this.isQuarantined(movieId, seed),
+        )
         if (available.length === 0) {
             throw new Error(`No available gacha seed for ${movieId} rarity ${rarity}`)
         }
@@ -150,6 +157,11 @@ export class GachaSeedCatalog {
 let defaultCatalog: GachaSeedCatalog | null = null
 
 export function getDefaultGachaSeedCatalog(): GachaSeedCatalog {
-    if (defaultCatalog === null) defaultCatalog = new GachaSeedCatalog()
+    if (defaultCatalog === null) {
+        const quarantine = getDefaultGachaSeedQuarantine()
+        defaultCatalog = new GachaSeedCatalog({
+            isQuarantined: (movieId, seed) => quarantine.isQuarantined(movieId, seed),
+        })
+    }
     return defaultCatalog
 }

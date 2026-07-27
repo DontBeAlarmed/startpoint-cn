@@ -3,9 +3,9 @@
  */
 
 import { randomInt } from "crypto";
-import seedValidator from "./seed-validator";
 import { MOVIE_CONFIGS } from "./gacha-physics";
 import { getDefaultGachaSeedCatalog, reserveUniquePlaceholderSeed } from "./gacha-seed-catalog";
+import { getDefaultGachaSeedQuarantine } from "./gacha-seed-quarantine";
 import { PlayerBoxGachaDrawnReward } from "../data/types";
 import { givePlayerCharacterSync } from "./character";
 import { givePlayerEquipmentSync } from "./equipment";
@@ -20,6 +20,7 @@ export { drawGachaSync, drawGachaWithMetadataSync, selectWeightedIndexByRoll } f
 export type { GachaDrawMetadata } from "./gacha-draw";
 
 const gachaSeedCatalog = getDefaultGachaSeedCatalog();
+const gachaSeedQuarantine = getDefaultGachaSeedQuarantine();
 
 const rankMovieRates = [
     [ // 5*
@@ -109,9 +110,6 @@ export function rewardPlayerGachaDrawResultSync(
     gachaDrawMetadata?: GachaDrawMetadata[],
     plannedCharacterMovies?: PlannedCharacterGachaMovie[],
 ): RewardPlayerGachaDrawResult {
-
-    seedValidator.flushAll();  // Clean up stale sentSeeds from previous draws
-
     const draws: GachaDraws = []
     const characters: Map<number, Object> = new Map()
     const equipment: Map<number, Object> = new Map()
@@ -151,8 +149,7 @@ export function rewardPlayerGachaDrawResultSync(
                     continue
                 }
 
-                // Mark seed as TESTING (pending verification)
-                seedValidator.markSent(movieId, seed, rarity)
+                gachaSeedQuarantine.markSent(movieId, seed, rarity)
 
                 console.log(`[GACHA] rarity=${rarity}★ seed=${seed} movie=${movieId} charId=${characterId}`)
 
