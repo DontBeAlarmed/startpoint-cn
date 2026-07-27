@@ -28,7 +28,7 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.event)
     assert.deepEqual(
         { total: report.event.total, automated: report.event.automated, fallback: report.event.fallback },
-        { total: 2512, automated: 1527, fallback: 985 },
+        { total: 2512, automated: 2475, fallback: 37 },
     )
     assert.equal(report.event.automatedMissions.filter(entry => [1200, 1208, 1209, 1210, 1211, 1216, 1223].includes(entry.missionId)).length, 7)
     assert.deepEqual(
@@ -63,14 +63,17 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
         currentStateMissionIds,
         "15 条 Event 当前状态任务必须全部进入权威自动覆盖",
     )
-    assert.equal(report.event.fallbackMissions.find(entry => entry.missionId === 1400)?.reason, "empty-quest-selector")
+    assert.equal(
+        report.event.automatedMissions.some(entry => entry.missionId === 1400),
+        true,
+        "经过审计的 type16 空 selector 任务必须进入兼容事实覆盖",
+    )
     assert.deepEqual(
         report.event.fallbackMissions.reduce((counts, entry) => {
             counts[entry.reason] = (counts[entry.reason] ?? 0) + 1
             return counts
         }, {}),
         {
-            "empty-quest-selector": 948,
             "rescue-source-unavailable": 27,
             "authoritative-event-fact-unavailable:type-87": 10,
         },

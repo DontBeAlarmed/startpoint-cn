@@ -30,24 +30,88 @@ assert.deepEqual(singleIdSelector("3"), { kind: "Within", values: [3] })
 
 const generated = buildMissionEventBattleRules()
 assert.equal(generated.schemaVersion, 1)
-assert.equal(generated.rules.length, 805)
+assert.equal(generated.rules.length, 1753)
 assert.deepEqual(
     generated.rules.reduce((counts, rule) => {
         counts[rule.role]++
         return counts
     }, { any: 0, host: 0, guest: 0 }),
-    { any: 792, host: 12, guest: 1 },
+    { any: 1740, host: 12, guest: 1 },
 )
 assert.deepEqual(
     generated.rules.map(rule => rule.missionId),
     generated.rules.map(rule => rule.missionId).toSorted((left, right) => left - right),
 )
 assert.equal(generated.rules.some(rule => rule.patternType === 20), false)
-assert.equal(generated.rules.some(rule => rule.missionId === 1400), false)
-assert.equal(generated.rules.some(rule => rule.missionId === 1811), false)
 assert.equal(generated.rules.some(rule => (
     Array.isArray(rule.categories) && rule.categories.includes(8)
 )), false)
+
+const emptySelectorCompatibilityRules = generated.rules.filter(rule => (
+    rule.compatibility === "type16-empty-selector-wildcard"
+))
+assert.equal(emptySelectorCompatibilityRules.length, 948)
+assert.deepEqual(
+    emptySelectorCompatibilityRules.reduce((counts, rule) => {
+        counts[rule.selector.range] = (counts[rule.selector.range] ?? 0) + 1
+        return counts
+    }, {}),
+    { BossBattle: 588, WorldStoryEventBossBattle: 342, AdventEvent: 18 },
+)
+assert.equal(
+    generated.rules.filter(rule => rule.compatibility === null).length,
+    805,
+    "既有严格规则不得被空 selector 兼容规则改写",
+)
+
+assert.deepEqual(generated.rules.find(rule => rule.missionId === 1400), {
+    missionId: 1400,
+    patternType: 16,
+    role: "any",
+    categories: [2],
+    selector: {
+        range: "BossBattle",
+        keys: [{ kind: "All" }, { kind: "All" }, { kind: "All" }],
+    },
+    questIds: "all",
+    rank: null,
+    compatibility: "type16-empty-selector-wildcard",
+})
+
+assert.deepEqual(generated.rules.find(rule => rule.missionId === 2491), {
+    missionId: 2491,
+    patternType: 16,
+    role: "any",
+    categories: [2],
+    selector: {
+        range: "BossBattle",
+        keys: [
+            { kind: "Within", values: [1] },
+            { kind: "Within", values: [20] },
+            { kind: "All" },
+        ],
+    },
+    questIds: [1020001, 1020002, 1020003],
+    rank: null,
+    compatibility: "type16-empty-selector-wildcard",
+})
+
+assert.deepEqual(generated.rules.find(rule => rule.missionId === 1811), {
+    missionId: 1811,
+    patternType: 16,
+    role: "any",
+    categories: [7],
+    selector: {
+        range: "AdventEvent",
+        keys: [
+            { kind: "Within", values: [100002] },
+            { kind: "All" },
+        ],
+    },
+    questIds: [100002001, 100002002, 100002003, 100002004, 100002005, 100002006, 100002007],
+    rank: null,
+    compatibility: "type16-empty-selector-wildcard",
+})
 
 const allRange = generated.rules.find(rule => rule.missionId === 1224)
 assert.deepEqual(allRange, {

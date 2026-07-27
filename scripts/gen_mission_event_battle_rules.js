@@ -5,6 +5,7 @@ const path = require("node:path")
 const PROJECT_ROOT = path.resolve(__dirname, "..")
 const DEFAULT_ASSET_DIRECTORY = path.join(PROJECT_ROOT, "assets")
 const DEFAULT_OUTPUT_PATH = path.join(DEFAULT_ASSET_DIRECTORY, "mission_event_battle_rules.json")
+const TYPE16_EMPTY_SELECTOR_COMPATIBILITY = "type16-empty-selector-wildcard"
 
 const QUEST_SOURCES = Object.freeze({
     "2": {
@@ -138,21 +139,50 @@ function queryMatches(query, value) {
     return query.kind === "All" || query.values.includes(value)
 }
 
-function questIdsForRange(row, questTables) {
+function type16EmptySelectorForRow(row) {
+    const questKind = String(row[7])
+    if (questKind === "2") {
+        if (row[8] === "" && row[9] === "" && row[10] === "") {
+            return [{ kind: "All" }, { kind: "All" }, { kind: "All" }]
+        }
+        if (row[8] !== "" && row[8] !== "(None)"
+            && row[9] !== "" && row[9] !== "(None)"
+            && row[10] === "") {
+            return [decodeQuestSelector(row[8]), decodeQuestSelector(row[9]), { kind: "All" }]
+        }
+        return null
+    }
+    if ((questKind === "5" || questKind === "10")
+        && row[8] !== "" && row[8] !== "(None)"
+        && row[10] === "") {
+        return [singleIdSelector(row[8]), { kind: "All" }]
+    }
+    return null
+}
+
+function questIdsForRange(row, questTables, patternType) {
     const questKind = String(row[7])
     if (questKind === "(None)") {
         return {
             categories: "all",
             selector: { range: "All", keys: [] },
             questIds: "all",
+            compatibility: null,
         }
     }
 
     const source = QUEST_SOURCES[questKind]
     if (!source) return null
 
-    const keys = source.selectorForRow(row)
-    if (keys.some(query => query.kind === "Within" && query.values.length === 0)) return null
+    let keys = source.selectorForRow(row)
+    let compatibility = null
+    if (keys.some(query => query.kind === "Within" && query.values.length === 0)) {
+        if (patternType !== 16) return null
+        const compatibleKeys = type16EmptySelectorForRow(row)
+        if (compatibleKeys === null) return null
+        keys = compatibleKeys
+        compatibility = TYPE16_EMPTY_SELECTOR_COMPATIBILITY
+    }
     const questIds = Object.keys(questTables[source.fileName])
         .map(questId => parseInteger(questId, "quest ID"))
         .filter(questId => source.valuesForQuestId(questId)
@@ -160,36 +190,45 @@ function questIdsForRange(row, questTables) {
         .sort((left, right) => left - right)
 
     if (questIds.length === 0) return null
+    const usesCategoryWideBossWildcard = compatibility === TYPE16_EMPTY_SELECTOR_COMPATIBILITY
+        && source.range === "BossBattle"
+        && keys.every(query => query.kind === "All")
     return {
         categories: source.categories,
         selector: { range: source.range, keys },
-        questIds,
+        questIds: usesCategoryWideBossWildcard ? "all" : questIds,
+        compatibility,
     }
 }
 
 function assertGeneratedRules(rules) {
-    assert.equal(rules.length, 805, "exact event battle rule count")
+    assert.equal(rules.length, 1753, "exact event battle rule count")
     assert.deepEqual(
         rules.reduce((counts, rule) => {
             counts[rule.role]++
             return counts
         }, { any: 0, host: 0, guest: 0 }),
-        { any: 792, host: 12, guest: 1 },
+        { any: 1740, host: 12, guest: 1 },
         "exact event battle role partition",
     )
     assert.equal(
-        rules.filter(rule => rule.patternType === 16 && rule.questIds === "all").length,
+        rules.filter(rule => rule.patternType === 16 && rule.selector.range === "All").length,
         100,
         "type 16 all-range rule count",
     )
     assert.equal(
-        rules.filter(rule => rule.patternType === 16 && rule.questIds !== "all").length,
-        692,
-        "type 16 finite rule count",
+        rules.filter(rule => rule.patternType === 16 && rule.selector.range !== "All").length,
+        1640,
+        "type 16 scoped rule count",
+    )
+    assert.equal(
+        rules.filter(rule => rule.compatibility === TYPE16_EMPTY_SELECTOR_COMPATIBILITY).length,
+        948,
+        "audited type 16 empty-selector compatibility count",
     )
     assert.equal(rules.some(rule => rule.patternType === 20), false, "Attention rules stay disabled")
-    assert.equal(rules.some(rule => rule.missionId === 1400), false, "legacy empty selector 1400")
-    assert.equal(rules.some(rule => rule.missionId === 1811), false, "legacy empty selector 1811")
+    assert.equal(rules.some(rule => rule.missionId === 1400), true, "boss wildcard compatibility 1400")
+    assert.equal(rules.some(rule => rule.missionId === 1811), true, "advent wildcard compatibility 1811")
     assert.equal(rules.some(rule => (
         Array.isArray(rule.categories) && rule.categories.includes(8)
     )), false, "Advent only uses category 7")
@@ -225,7 +264,7 @@ function buildMissionEventBattleRules(assetDirectory = DEFAULT_ASSET_DIRECTORY) 
         const role = getRole(patternType)
         if (role === null || row[11] !== "(None)") continue
 
-        const questRange = questIdsForRange(row, questTables)
+        const questRange = questIdsForRange(row, questTables, patternType)
         if (questRange === null) continue
 
         rules.push({
@@ -236,7 +275,7 @@ function buildMissionEventBattleRules(assetDirectory = DEFAULT_ASSET_DIRECTORY) 
             selector: questRange.selector,
             questIds: questRange.questIds,
             rank: null,
-            compatibility: null,
+            compatibility: questRange.compatibility,
         })
     }
 

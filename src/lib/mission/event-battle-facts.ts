@@ -14,6 +14,7 @@ import { getQuestContentTableSync } from "../assets"
 
 type MultiRole = "any" | "host" | "guest"
 type QuestRange = "All" | "BossBattle" | "AdventEvent" | "WorldStoryEventBossBattle"
+const TYPE16_EMPTY_SELECTOR_COMPATIBILITY = "type16-empty-selector-wildcard"
 
 interface KeyQuery {
     readonly kind: "All" | "Within"
@@ -132,7 +133,50 @@ function parseMasterQuery(value: unknown, single: boolean = false): KeyQuery | n
     return { kind: "Within", values }
 }
 
-function selectorFromDefinition(row: readonly unknown[]): ExactSelector | null {
+function type16EmptySelectorFromDefinition(row: readonly unknown[]): ExactSelector | null {
+    if (Number(row[2]) !== 16) return null
+    const questKind = String(row[7])
+    if (questKind === "2") {
+        if (row[8] === "" && row[9] === "" && row[10] === "") {
+            return {
+                range: "BossBattle",
+                keys: [{ kind: "All" }, { kind: "All" }, { kind: "All" }],
+            }
+        }
+        if (row[8] !== "" && row[8] !== "(None)"
+            && row[9] !== "" && row[9] !== "(None)"
+            && row[10] === "") {
+            const first = parseMasterQuery(row[8])
+            const second = parseMasterQuery(row[9])
+            if (first === null || second === null) return null
+            return {
+                range: "BossBattle",
+                keys: [first, second, { kind: "All" }],
+            }
+        }
+        return null
+    }
+    if ((questKind === "5" || questKind === "10")
+        && row[8] !== "" && row[8] !== "(None)"
+        && row[10] === "") {
+        const eventId = parseMasterQuery(row[8], true)
+        if (eventId === null) return null
+        return {
+            range: questKind === "5" ? "AdventEvent" : "WorldStoryEventBossBattle",
+            keys: [eventId, { kind: "All" }],
+        }
+    }
+    return null
+}
+
+function selectorFromDefinition(
+    row: readonly unknown[],
+    compatibility: unknown = null,
+): ExactSelector | null {
+    if (compatibility === TYPE16_EMPTY_SELECTOR_COMPATIBILITY) {
+        return type16EmptySelectorFromDefinition(row)
+    }
+    if (compatibility !== null) return null
     const questKind = String(row[7])
     if (questKind === "(None)") return { range: "All", keys: [] }
 
@@ -202,6 +246,7 @@ function hasMatchingRangeData(
     selector: ExactSelector,
     categories: unknown,
     questIds: unknown,
+    compatibility: unknown,
 ): categories is number[] | "all" {
     if (selector.range === "All") {
         return categories === "all" && questIds === "all" && selector.keys.length === 0
@@ -214,11 +259,16 @@ function hasMatchingRangeData(
     }
     if (!isStrictPositiveIntegerList(categories)
         || categories.length !== 1
-        || categories[0] !== categoryByRange[selector.range]
-        || !isStrictPositiveIntegerList(questIds)) return false
+        || categories[0] !== categoryByRange[selector.range]) return false
 
     const sourceQuestIds = getTrackedQuestIds()[selector.range]
-    if (sourceQuestIds === null) return false
+    if (sourceQuestIds === null || sourceQuestIds.length === 0) return false
+    if (compatibility === TYPE16_EMPTY_SELECTOR_COMPATIBILITY
+        && selector.range === "BossBattle"
+        && selector.keys.every(query => query.kind === "All")) {
+        return questIds === "all"
+    }
+    if (!isStrictPositiveIntegerList(questIds)) return false
     const expectedQuestIds = sourceQuestIds.filter(questId => {
         const values = questIdValues(selector.range, questId)
         return values !== null
@@ -265,14 +315,22 @@ export function loadExactEventBattleRules(assetValue: unknown): readonly ExactMu
         const missionId = raw.missionId as number
         const patternType = raw.patternType as number
         if (!hasMatchingRole(patternType, raw.role)) continue
-        if (raw.compatibility !== null || raw.rank !== null || !isKnownSelector(raw.selector)) continue
-        if (!hasMatchingRangeData(raw.selector, raw.categories, raw.questIds)) continue
+        if ((raw.compatibility !== null
+            && raw.compatibility !== TYPE16_EMPTY_SELECTOR_COMPATIBILITY)
+            || raw.rank !== null
+            || !isKnownSelector(raw.selector)) continue
+        if (!hasMatchingRangeData(
+            raw.selector,
+            raw.categories,
+            raw.questIds,
+            raw.compatibility,
+        )) continue
 
         const definition = definitions.get(missionId)
         if (!definition
             || Number(definition.row[2]) !== patternType
             || definition.row[11] !== "(None)") continue
-        const masterSelector = selectorFromDefinition(definition.row)
+        const masterSelector = selectorFromDefinition(definition.row, raw.compatibility)
         if (masterSelector === null || !selectorsEqual(raw.selector, masterSelector)) continue
         rules.push({
             missionId,

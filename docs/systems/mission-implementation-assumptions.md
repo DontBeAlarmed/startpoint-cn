@@ -29,7 +29,8 @@
 
 ## category 3：关卡目标任务
 
-- `coverage-audit.ts` 当前列出 948 条 type 16 空 QuestRange selector。CN 1.8.1 `EventMissionValues` 把 `""` 解析为 `Option.Some([])`，而 `(None)` 才解析为 `Option.None`；客户端 `QuestRangeReferenceIdKindToolsTest` 的匹配契约也区分空集合与无约束。因此服务端不把这批历史定义推测为活动全关卡，也不重新启用旧生成器的通配行为。
+- 948 条 type 16 使用空 QuestRange selector。CN 1.8.1 `EventMissionValues` 把 `""` 解析为 `Option.Some([])`，而 `(None)` 才解析为 `Option.None`；客户端通用匹配仍区分空集合与无约束。但 GL 可交叉任务中 612 条保留相同空字段，任务文案与外层 event/group 也持续表达范围内任意协力战，说明它更可能依赖官方后端约定，而不是 CN 提取损坏。
+- 服务端经需求确认只对白名单形状采用 `type16-empty-selector-wildcard`：579 条全 BossBattle、9 条指定 Boss group、342 条指定 WorldStory event、18 条指定 Advent event。生成器从当前关卡表展开明确 quest ID；运行时重新校验原始行、兼容标记和完整 ID 集。该实现属于高可信兼容，不宣称复原了官方后端源码；其他 pattern、其他空字段形状和未知兼容标记仍 fail closed。
 
 - 土俑嘉年华单关卡使用 `mission_event.json` 的 `event_id + quest suffix` 与 `carnival_event_quest.json` 的精确关卡 ID
   对齐；聚合任务只引用同一活动的子任务 ID。当前实现不使用旧 `mission_event_quest_map.json` 对土俑关卡的宽泛集合。

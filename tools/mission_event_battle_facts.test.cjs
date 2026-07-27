@@ -86,8 +86,14 @@ const checkedInRules = require("../assets/mission_event_battle_rules.json")
 const firstRule = checkedInRules.rules[0]
 const bossRule = checkedInRules.rules.find(rule => rule.missionId === 1416)
 const adventRule = checkedInRules.rules.find(rule => rule.missionId === 1625)
+const emptyBossCompatibilityRule = checkedInRules.rules.find(rule => rule.missionId === 1400)
 
 assert.equal(loadExactEventBattleRules({ schemaVersion: 1, rules: [firstRule] }).length, 1)
+assert.equal(
+    loadExactEventBattleRules({ schemaVersion: 1, rules: [emptyBossCompatibilityRule] }).length,
+    1,
+    "经过审计的 type16 空 selector 兼容规则必须可加载",
+)
 assert.deepEqual(
     loadExactEventBattleRules({ schemaVersion: 1, rules: [firstRule], extra: true }),
     [],
@@ -140,6 +146,20 @@ for (const invalidRule of [
         },
     },
     { ...firstRule, compatibility: "legacy" },
+    { ...emptyBossCompatibilityRule, compatibility: null },
+    { ...emptyBossCompatibilityRule, compatibility: "legacy" },
+    { ...emptyBossCompatibilityRule, questIds: [1001001] },
+    {
+        ...emptyBossCompatibilityRule,
+        selector: {
+            ...emptyBossCompatibilityRule.selector,
+            keys: [
+                { kind: "Within", values: [1] },
+                emptyBossCompatibilityRule.selector.keys[1],
+                emptyBossCompatibilityRule.selector.keys[2],
+            ],
+        },
+    },
     { ...firstRule, rank: 5 },
     { ...firstRule, categories: [2] },
     { ...firstRule, questIds: [1001001] },
@@ -244,8 +264,8 @@ function finishContext(overrides = {}) {
 
 assert.deepEqual(getExactEventBattleRuleCoverage(), {
     totalEventMissions: 2512,
-    exactMultiRules: 805,
-    roles: { any: 792, host: 12, guest: 1 },
+    exactMultiRules: 1753,
+    roles: { any: 1740, host: 12, guest: 1 },
     exactClearRules: 257,
     clearRulesByCategory: { 7: 63, 10: 7, 13: 60, 23: 80, 24: 47 },
     exactPhaseRules: 29,
@@ -516,8 +536,13 @@ function missionProgress(missionId) {
 }
 
 const legacyTime = new Date("2020-01-01T03:00:00.000Z")
-assert.equal(recordEventMissionBattleFacts(finishContext(), legacyTime).includes(1400), false)
-assert.equal(missionProgress(1400), 0, "空 selector 的旧 939 规则不得再自动增长")
+assert.equal(recordEventMissionBattleFacts(finishContext(), legacyTime).includes(1400), true)
+assert.equal(missionProgress(1400), 1, "type16 空 selector 兼容规则必须接受活动期内的领主协力战")
+assert.equal(recordEventMissionBattleFacts(finishContext({
+    questCategory: 7,
+    questId: 1001,
+}), legacyTime).includes(1400), false)
+assert.equal(missionProgress(1400), 1, "type16 领主通配不得越过 quest category")
 
 const raidClearTime = new Date("2023-09-10T04:00:00.000Z")
 const raidClearContext = finishContext({

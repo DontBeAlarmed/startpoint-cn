@@ -4,7 +4,7 @@
 > 历史审计资产: `assets/mission_event_quest_map.json`
 > 严格规则生成器: `scripts/gen_mission_event_battle_rules.js`
 > 运行时资产: `assets/mission_event_battle_rules.json`
-> 覆盖范围: cat3 活动任务 2512 条；QuestRange 严格协力规则 805 条、type 23 精确通关规则 257 条、445 条关卡/物品/竞速/阶段/当前状态/单人累计规则、18 条 Event 入口/SET/投票事实及 2 条歼灭者 type 86，共 1527 条
+> 覆盖范围: cat3 活动任务 2512 条；QuestRange 协力规则 1753 条、type 23 精确通关规则 257 条、445 条关卡/物品/竞速/阶段/当前状态/单人累计规则、18 条 Event 入口/SET/投票事实及 2 条歼灭者 type 86，共 2475 条
 
 `mission_event_quest_map.json` 是按 pattern 展开的旧映射，只供 `computer-event.ts` 历史审计。它没有完整表达
 QuestRange selector、QuestRank、Host/Guest 和 Attention 来源，不能驱动自动事实。旧 939 条自动规则已从
@@ -30,13 +30,16 @@ CN 1.8.1 的权威语义如下：
 | WorldStoryEventBossBattle | 19 | `world_story_event_boss_battle_quest.json` |
 | `(None)` | `all` | 全 category、全 quest |
 
-`row[10]=""` 解码为 `Within([])`，因此严格无匹配；`row[10]="(None)"` 才解码为 `All`。`row[11]` 是
-QuestRank，不是 `clearRank`，当前 805 条启用规则的 `rank` 均为 `null`。生成器用数值复合 ID 分量匹配 event/group/
-difficulty，不从文案推断，也不切割 quest ID 字符串。
+`row[10]=""` 在 CN 1.8.1 客户端仍解码为 `Within([])`；`row[10]="(None)"` 才解码为 `All`。但 948 条
+历史 type 16 在 CN 与可交叉检查的 GL 主数据中持续使用空 selector，文案和外层 event/group 又明确表达“该范围内的
+协力战”。项目因此只对白名单结构生成 `type16-empty-selector-wildcard` 服务端兼容规则：579 条全 BossBattle、
+9 条指定 Boss group、342 条指定 WorldStory event、18 条指定 Advent event。该标记是高可信兼容约定，不宣称来自
+官方后端源码，也不改变其他 pattern 的空 selector 语义。`row[11]` 是 QuestRank，不是 `clearRank`；当前规则的
+`rank` 均为 `null`。生成器用数值复合 ID 分量匹配 event/group/difficulty，不切割 quest ID 字符串。
 
-严格资产按数值 mission ID 排序，覆盖 type 16 的 792 条（692 条有限 `questIds`、100 条全范围）、type 17 Host
-的 12 条和 type 18 Guest 的 1 条，共 805 条。运行时只加载 `compatibility=null` 且枚举、selector、rank 均已知的规则；
-未知值逐条 fail closed。mission 1400、1811 和 1807 等旧空 selector 任务不在资产中，1807 继续走持久化 fallback。
+资产按数值 mission ID 排序，覆盖 type 16 的 1740 条（1061 条明确 `questIds`、579 条 category 2 全 BossBattle、100 条全 QuestRange）、type 17 Host
+的 12 条和 type 18 Guest 的 1 条，共 1753 条。其中 805 条保持 `compatibility=null`，948 条必须携带上述唯一兼容标记。
+运行时会重新对照原始 mission 行、selector 形状和当前关卡表；未知标记、字段漂移、虚构或缺失 quest ID 均 fail closed。
 
 category 3 的 type 37 不依赖 QuestRange 资产。运行时从 `row[12]` 读取物品 ID，以
 `players_collected_items` 的累计获得量结算 40 条交易商人任务；该白名单由 `computer-event-safe.ts` 承载。
@@ -247,5 +250,5 @@ DB 源表:
   lib/mission/computer-*.ts        — 8 个 MissionComputer
   lib/mission/registry.ts          — registry dispatch
   assets/mission_event_quest_map.json — cat3 历史审计映射
-  assets/mission_event_battle_rules.json — 805 条按 mission ID 的严格自动事实
+  assets/mission_event_battle_rules.json — 1753 条按 mission ID 的严格或已标记兼容事实
 ```
