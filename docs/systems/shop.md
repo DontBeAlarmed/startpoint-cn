@@ -48,6 +48,14 @@ GeneralShop 额外通过 `cdn_general_shop_whitelist.json` 过滤客户端主数
 
 支持的通用奖励包括道具、经验池、玛纳、角色和装备。角色响应会经过觉醒解锁发布协调，避免商店获得角色时丢失当前应公开的 `mana_board_awake` 状态。
 
+## 批量购买
+
+`/shop/bulk_buy` 接受客户端的 `shop_type` 与 `buy_item_list` 映射。当前只开放国服 1.8.1 客户端确认使用批量入口的活动道具商店（type 4）和 Boss Coin 商店（type 7）；General、星之粒与追忆装备强化继续走各自单品或专用流程。
+
+批次先使用同一个服务器时间快照解析全部商品，并汇总货币成本、道具成本、库存与奖励。所有余额校验都基于批次开始时的库存，因此本批商品奖励不能反过来支付本批另一件商品的成本。预检通过后，成本扣除、全部奖励、每件商品的累计购买数、玛纳任务事实和响应状态在同一 SQLite 事务内提交；任一商品失败会回滚整批。
+
+活动商品过期沿用客户端已确认的 `2053`。商品不存在、数量非法、库存不足或余额不足沿用 HTTP 400，不猜测国服专用业务错误码。当前玩家购买表只有累计维度，遇到带 daily/monthly stock 的未来商品时批量入口会明确拒绝，直到引入按日、按月购买记录，避免把周期库存误当总库存。
+
 ## 追忆装备强化
 
 `ShopType.TREASURE_EQUIPMENT` 使用独立路径：
@@ -101,6 +109,7 @@ Boss 币列表严格按客户端传入的 category ID 查询 `boss_coin_shop.jso
 - `tools/shop_repository_integration.test.cjs`；
 - `tools/rush_event_shop.test.cjs`；
 - `tools/rush_event_shop_route.test.cjs`；
+- `tools/shop_bulk_purchase.test.cjs`；
 - `tools/star_grain_material_pack.test.cjs`；
 - `tools/equipment_enhancement.test.cjs`。
 

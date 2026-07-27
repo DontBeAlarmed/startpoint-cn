@@ -60,6 +60,7 @@ db.exec(`
     INSERT INTO item_state VALUES (17, 2370001, 1000);
     INSERT INTO item_state VALUES (17, 49100, 3);
     INSERT INTO item_state VALUES (17, 40401, 5);
+    INSERT INTO item_state VALUES (17, 40000, 100);
     INSERT INTO equipment_state VALUES (17, 5020042, 5, 0);
     INSERT INTO players_mails VALUES (17, '0000-00-00 00:00:00');
 `)
@@ -370,6 +371,19 @@ async function main() {
         assert.equal(decode(expired).data_headers.result_code, 2053)
         assert.deepEqual(snapshot(), beforeExpired)
 
+        const expiredBulk = await fastify.inject({
+            method: "POST",
+            url: "/bulk_buy",
+            payload: {
+                viewer_id: 123,
+                shop_type: 4,
+                buy_item_list: { 700000: 1, 700001: 1 },
+            },
+        })
+        assert.equal(expiredBulk.statusCode, 200)
+        assert.equal(decode(expiredBulk).data_headers.result_code, 2053)
+        assert.deepEqual(snapshot(), beforeExpired)
+
         db.prepare(`
             INSERT INTO purchase_state VALUES (?, ?, ?)
             ON CONFLICT(player_id, shop_item_id) DO UPDATE SET count = excluded.count
@@ -409,6 +423,58 @@ async function main() {
         assert.equal(successBody.data.item_list[2370001], 600)
         assert.equal(successBody.data.item_list[49100], 5)
         assert.equal(getPurchaseCount(17, 700000), 2)
+
+        db.prepare("UPDATE item_state SET amount = 2000 WHERE player_id = ? AND item_id = ?")
+            .run(17, 2370001)
+        const bulkSuccess = await fastify.inject({
+            method: "POST",
+            url: "/bulk_buy",
+            payload: {
+                viewer_id: 123,
+                shop_type: 4,
+                buy_item_list: { 700001: 1, 700002: 1 },
+            },
+        })
+        assert.equal(bulkSuccess.statusCode, 200, bulkSuccess.body)
+        const bulkBody = decode(bulkSuccess)
+        assert.equal(bulkBody.data.item_list[2370001], 600)
+        assert.equal(getPurchaseCount(17, 700001), 1)
+        assert.equal(getPurchaseCount(17, 700002), 1)
+        assert.equal(bulkBody.data.mail_arrived, true)
+
+        const beforeInsufficientBulk = snapshot()
+        const insufficientBulk = await fastify.inject({
+            method: "POST",
+            url: "/bulk_buy",
+            payload: {
+                viewer_id: 123,
+                shop_type: 4,
+                buy_item_list: { 700003: 1, 700004: 1 },
+            },
+        })
+        assert.equal(insufficientBulk.statusCode, 400)
+        assert.deepEqual(snapshot(), beforeInsufficientBulk)
+
+        const bossBulk = await fastify.inject({
+            method: "POST",
+            url: "/bulk_buy",
+            payload: {
+                viewer_id: 123,
+                shop_type: 7,
+                buy_item_list: { 200101: 1, 200102: 1 },
+            },
+        })
+        assert.equal(bossBulk.statusCode, 200, bossBulk.body)
+        assert.equal(decode(bossBulk).data.item_list[40000], 40)
+        assert.equal(getPurchaseCount(17, 200101), 1)
+        assert.equal(getPurchaseCount(17, 200102), 1)
+
+        const unsupportedBulk = await fastify.inject({
+            method: "POST",
+            url: "/bulk_buy",
+            payload: { viewer_id: 123, shop_type: 8, buy_item_list: { 1: 1 } },
+        })
+        assert.equal(unsupportedBulk.statusCode, 400)
 
         const manaPurchase = await fastify.inject({
             method: "POST",

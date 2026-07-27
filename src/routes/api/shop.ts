@@ -18,7 +18,7 @@ import { computeRealTimeStamina } from "../../lib/stamina";
 import { clientSerializeEquipment } from "../../lib/equipment";
 import { planEquipmentEnhancementPurchase } from "../../lib/equipment-enhancement";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
-import { executeGenericShopPurchaseSync, isShopItemAvailable, ShopPeriodError, ShopPurchaseError, validateShopPurchaseAmount } from "../../lib/event-shop-purchase";
+import { executeGenericShopBatchPurchaseSync, executeGenericShopPurchaseSync, isShopItemAvailable, ShopPeriodError, ShopPurchaseError, validateShopPurchaseAmount } from "../../lib/event-shop-purchase";
 import CDN_GENERAL_SHOP_WHITELIST from "../../../assets/cdn_general_shop_whitelist.json";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { recordDegreeOperationFactsSync } from "../../lib/mission/degree-operation-facts";
@@ -129,6 +129,14 @@ interface BuyBody {
     shop_item_id: number,
     number: number,
     viewer_id: number
+}
+
+interface BulkBuyBody {
+    shop_type: number
+    buy_item_list: Record<string, unknown>
+    viewer_id: number
+    api_count?: number
+    retry_count?: number
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -606,17 +614,109 @@ const routes = async (fastify: FastifyInstance) => {
         })
     })
 
-    // bulk_buy — stub, returns empty (TODO: implement multi-item purchase)
     fastify.post("/bulk_buy", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as any
+        const body = request.body as BulkBuyBody
         const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+        const shopType = body.shop_type
+        if (!Number.isSafeInteger(viewerId) || viewerId <= 0
+            || (shopType !== ShopType.EVENT_ITEM && shopType !== ShopType.BOSS_COIN)
+            || body.buy_item_list === null
+            || typeof body.buy_item_list !== "object"
+            || Array.isArray(body.buy_item_list)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         })
+
+        const rawEntries = Object.entries(body.buy_item_list)
+        if (rawEntries.length === 0) return reply.status(400).send({
+            "error": "Bad Request", "message": "Bulk purchase must contain at least one item."
+        })
+
+        const viewerIdSession = await getSession(viewerId.toString())
+        if (!viewerIdSession) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid viewer id."
+        })
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)
+        if (playerId === null) return reply.status(500).send({
+            "error": "Internal Server Error", "message": "No players bound to account."
+        })
+
+        const purchases: Array<{ shopItemId: number, purchaseAmount: number, shopItem: ShopItem }> = []
+        try {
+            for (const [shopItemIdText, rawAmount] of rawEntries) {
+                if (!/^[1-9]\d*$/.test(shopItemIdText)) throw new ShopPurchaseError("Invalid shop item id.")
+                const shopItemId = Number(shopItemIdText)
+                if (!Number.isSafeInteger(shopItemId)) throw new ShopPurchaseError("Invalid shop item id.")
+                const purchaseAmount = validateShopPurchaseAmount(rawAmount)
+                const shopItem = getShopItemSync(shopType, shopItemId)
+                if (shopItem === null) throw new ShopPurchaseError("Shop item with specified id does not exist.")
+                if (shopItem.dailyStock !== undefined || shopItem.monthlyStock !== undefined) {
+                    throw new ShopPurchaseError("Bulk purchase does not support periodic stock items.")
+                }
+                purchases.push({ shopItemId, purchaseAmount, shopItem })
+            }
+        } catch (error) {
+            if (error instanceof ShopPurchaseError) return reply.status(400).send({
+                "error": "Bad Request", "message": error.message,
+            })
+            throw error
+        }
+
+        let purchaseResult
+        try {
+            purchaseResult = executeGenericShopBatchPurchaseSync({
+                playerId,
+                purchases,
+                nowMs: getServerTime() * 1000,
+                enforcePeriod: shopType === ShopType.EVENT_ITEM,
+            }, {
+                transaction: operation => getDb().transaction(operation)(),
+                getPlayer: getPlayerSync,
+                updatePlayer: nextPlayer => updatePlayerSync(nextPlayer),
+                getItem: (id, itemId) => getPlayerItemSync(id, itemId) ?? 0,
+                setItem: updatePlayerItemSync,
+                getPurchaseCount: getPlayerShopPurchaseCountSync,
+                addPurchaseCount: addPlayerShopPurchaseCountSync,
+                recordManaSpent: incrementActiveMissionUsedManaCountSync,
+                grantRewards: givePlayerRewardsSync,
+            })
+        } catch (error) {
+            if (error instanceof ShopPeriodError) {
+                reply.header("content-type", "application/x-msgpack")
+                return reply.status(200).send({
+                    "data_headers": generateDataHeaders({
+                        viewer_id: viewerId,
+                        result_code: error.resultCode,
+                    }),
+                    "data": {},
+                })
+            }
+            if (error instanceof ShopPurchaseError) return reply.status(400).send({
+                "error": "Bad Request", "message": error.message,
+            })
+            throw error
+        }
+
+        const afterPlayer = purchaseResult.player
+        const rewardResult = purchaseResult.rewardResult
+        const characterList = reconcileAwakeUnlockCharacterList(
+            playerId,
+            rewardResult.character_list as Record<string, unknown>[],
+        )
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {}
+            "data": {
+                "user_info": {
+                    "free_vmoney": afterPlayer.freeVmoney,
+                    "free_mana": afterPlayer.freeMana,
+                    "bond_token": afterPlayer.bondToken,
+                    "exp_pool": afterPlayer.expPool,
+                },
+                "character_list": characterList,
+                "equipment_list": rewardResult.equipment_list,
+                "item_list": purchaseResult.itemList,
+                "mail_arrived": getMailArrivedSync(playerId),
+            }
         })
     })
 

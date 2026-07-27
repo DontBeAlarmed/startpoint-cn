@@ -51,6 +51,26 @@ export interface GenericShopPurchaseResult {
     purchaseCount: number
 }
 
+export interface GenericShopBatchPurchaseEntry {
+    shopItemId: number
+    purchaseAmount: number
+    shopItem: ShopItem
+}
+
+export interface GenericShopBatchPurchaseInput {
+    playerId: number
+    purchases: readonly GenericShopBatchPurchaseEntry[]
+    nowMs: number
+    enforcePeriod: boolean
+}
+
+export interface GenericShopBatchPurchaseResult {
+    player: GenericShopPlayerState
+    rewardResult: PlayerRewardResult
+    itemList: Record<string, number>
+    purchaseCounts: Record<string, number>
+}
+
 export class ShopPurchaseError extends Error {}
 
 export class InvalidShopPurchaseAmountError extends ShopPurchaseError {
@@ -269,6 +289,111 @@ export function executeGenericShopPurchaseSync(
                 ...rewardResult.items,
             },
             purchaseCount,
+        }
+    })
+}
+
+export function executeGenericShopBatchPurchaseSync(
+    input: GenericShopBatchPurchaseInput,
+    dependencies: GenericShopPurchaseDependencies,
+): GenericShopBatchPurchaseResult {
+    if (!Array.isArray(input.purchases) || input.purchases.length === 0) {
+        throw new ShopPurchaseError("Shop batch must contain at least one item.")
+    }
+
+    const normalized = input.purchases.map(entry => ({
+        ...entry,
+        purchaseAmount: validateShopPurchaseAmount(entry.purchaseAmount),
+    }))
+    const itemIds = new Set<number>()
+    for (const entry of normalized) {
+        if (!Number.isSafeInteger(entry.shopItemId) || entry.shopItemId <= 0
+            || itemIds.has(entry.shopItemId)) {
+            throw new ShopPurchaseError("Shop batch contains an invalid or duplicate item id.")
+        }
+        itemIds.add(entry.shopItemId)
+        if (input.enforcePeriod && !isShopItemAvailable(entry.shopItem, input.nowMs)) {
+            throw new ShopPeriodError()
+        }
+    }
+
+    return dependencies.transaction(() => {
+        const player = dependencies.getPlayer(input.playerId)
+        if (player === null) throw new ShopPurchaseError("Player not found.")
+
+        const nextPlayer = { ...player }
+        const itemCosts = new Map<number, number>()
+        const rewards: Reward[] = []
+        let manaSpent = 0
+
+        for (const entry of normalized) {
+            const purchased = dependencies.getPurchaseCount(input.playerId, entry.shopItemId)
+            if (entry.shopItem.stock > 0
+                && purchased + entry.purchaseAmount > entry.shopItem.stock) {
+                throw new ShopStockError()
+            }
+
+            const userCost = entry.shopItem.userCost
+            if (userCost !== undefined) {
+                const cost = userCost.amount * entry.purchaseAmount
+                switch (userCost.type) {
+                    case ShopItemUserCostType.MANA:
+                        nextPlayer.freeMana -= cost
+                        manaSpent += cost
+                        break
+                    case ShopItemUserCostType.BEADS:
+                        nextPlayer.freeVmoney -= cost
+                        break
+                    case ShopItemUserCostType.AMITY_SCROLL:
+                        nextPlayer.bondToken -= cost
+                        break
+                }
+            }
+            for (const cost of entry.shopItem.costs) {
+                itemCosts.set(
+                    cost.id,
+                    (itemCosts.get(cost.id) ?? 0) + cost.amount * entry.purchaseAmount,
+                )
+            }
+            rewards.push(...buildRewards(entry.shopItem, entry.purchaseAmount))
+        }
+
+        if (nextPlayer.freeMana < 0) throw new ShopBalanceError("Not enough mana.")
+        if (nextPlayer.freeVmoney < 0) throw new ShopBalanceError("Not enough beads.")
+        if (nextPlayer.bondToken < 0) throw new ShopBalanceError("Not enough amity scrolls.")
+
+        const itemList: Record<string, number> = {}
+        for (const [itemId, cost] of itemCosts) {
+            const nextAmount = dependencies.getItem(input.playerId, itemId) - cost
+            if (nextAmount < 0) throw new ShopBalanceError(`Not enough of item ${itemId}.`)
+            itemList[String(itemId)] = nextAmount
+        }
+
+        dependencies.updatePlayer(nextPlayer)
+        for (const [itemId, nextAmount] of Object.entries(itemList)) {
+            dependencies.setItem(input.playerId, Number(itemId), nextAmount)
+        }
+
+        const rewardResult = dependencies.grantRewards(input.playerId, rewards)
+        if (rewardResult === null) throw new ShopPurchaseError("Failed to grant shop rewards.")
+
+        const purchaseCounts: Record<string, number> = {}
+        for (const entry of normalized) {
+            purchaseCounts[String(entry.shopItemId)] = dependencies.addPurchaseCount(
+                input.playerId,
+                entry.shopItemId,
+                entry.purchaseAmount,
+            )
+        }
+        if (manaSpent > 0) dependencies.recordManaSpent(input.playerId, manaSpent)
+
+        const finalPlayer = dependencies.getPlayer(input.playerId)
+        if (finalPlayer === null) throw new ShopPurchaseError("Player disappeared during purchase.")
+        return {
+            player: finalPlayer,
+            rewardResult,
+            itemList: { ...itemList, ...rewardResult.items },
+            purchaseCounts,
         }
     })
 }
