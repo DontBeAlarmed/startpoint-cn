@@ -23,6 +23,7 @@ import {
 import { getQuestConfigurationErrorResponse, getQuestFromCategorySync, getRushEventFolderClearRewards, getScoreAttackBorderRewards } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
+import { getCommonScoreRewardCount } from "../../lib/score-reward-lottery";
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
 import { rushEventFolderMaxRounds } from "./rushEvent";
@@ -385,7 +386,14 @@ const routes = async (fastify: FastifyInstance) => {
             })
 
             console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${questData.scoreRewardGroup?.length ?? 'null'} questId=${questId} category=${questCategory}`)
-            const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element)
+            const scoreRewardsResult = givePlayerScoreRewardsSync(
+                playerId,
+                questData.scoreRewardGroupId,
+                questData.scoreRewardGroup,
+                useBoostPoint,
+                questData.element,
+                { commonRewardCount: getCommonScoreRewardCount(questData, clearRank) ?? undefined },
+            )
 
             recordMissionBattleFacts(finishCtx, missionEvaluationTime)
 

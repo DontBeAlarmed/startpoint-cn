@@ -101,8 +101,8 @@ test("reward converter restores all six runtime reward projections", async () =>
     })
     assert.deepEqual(output["rare_score_reward.json"], {
         2101: [
-            { name: "", type: 4, count: 100, rarity: 0.25 },
-            { name: "", type: 0, id: 42, count: 3, rarity: 0.75 },
+            { name: "", position: 1, type: 4, count: 100, rarity: 0.25 },
+            { name: "", position: 2, type: 0, id: 42, count: 3, rarity: 0.75 },
         ],
     })
     assert.deepEqual(output["score_attack_border_reward.json"], {

@@ -167,6 +167,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/event_currency.test.cjs",
             "tools/inventory_rules.test.cjs",
             "tools/party_loadout_validation.test.cjs",
+            "tools/score_reward_lottery.test.cjs",
+            "tools/quest_score_reward_settlement.test.cjs",
             "tools/mail_notification.test.cjs",
             "tools/mail_notification_write_routes.test.cjs",
         ],

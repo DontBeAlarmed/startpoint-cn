@@ -146,6 +146,7 @@ function convertRareScoreRewards(groups: readonly NestedOrderedMapTextRows[]): R
             const fields = parseRow(row, `rare_score_reward[${group.key}]`, 6)
             const reward: Record<string, unknown> = {
                 name: "",
+                position: parsePositiveInteger(row.key, "rare score reward position"),
                 type: parseInteger(fields[1], `rare_score_reward[${group.key}][${row.key}].type`),
                 rarity: parseFiniteNumber(fields[4], `rare_score_reward[${group.key}][${row.key}].rarity`),
             }

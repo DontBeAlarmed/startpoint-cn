@@ -49,7 +49,8 @@ export interface CurrencyReward extends Reward {
 
 
 export interface RareScoreReward extends Reward {
-    rarity: number
+    rarity: number,
+    position?: number
 }
 
 
@@ -140,4 +141,3 @@ export interface GivePlayerScoreRewardsResult extends PlayerRewardResult {
     drop_score_reward_ids: DropScoreRewardId[]
     drop_rare_reward_ids: DropScoreRewardId[]
 }
-

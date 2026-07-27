@@ -21,7 +21,7 @@ import {
     insertPlayerQuestProgressSync,
     updatePlayerQuestProgressSync,
 } from "../../data/domains/quest";
-import { getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "../../lib/assets";
+import { getConfigSync, getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
 import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/stamina";
@@ -38,6 +38,7 @@ import {
 import { resolveHostFinished, resolveIsRoomHost } from "../../lib/quest/host-finish";
 import { resolveMultiPlayerContext } from "../player-context";
 import { resolveQuestRewardEligibility } from "../../lib/quest/first-clear-reward";
+import { getCommonScoreRewardCount } from "../../lib/score-reward-lottery";
 
 async function buildFinishFollowInfo(
     viewerId: number,
@@ -342,7 +343,20 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 playerData.staminaHealTime = new Date();
             }
 
-            const scoreRewardsResult = givePlayerScoreRewardsSync(playerId, (questData as any).scoreRewardGroupId || 0, (questData as any).scoreRewardGroup, useBoostPoint, (questData as any).element);
+            const scoreRewardsResult = givePlayerScoreRewardsSync(
+                playerId,
+                questData.scoreRewardGroupId || 0,
+                questData.scoreRewardGroup,
+                useBoostPoint,
+                questData.element,
+                {
+                    commonRewardCount: getCommonScoreRewardCount(
+                        questData,
+                        clearRank,
+                        getConfigSync().common_reward_multiplier_by_multi_play_mode,
+                    ) ?? undefined,
+                },
+            );
             recordMissionBattleFacts(finishCtx, missionEvaluationTime)
             const rewardCharacterExpResult = givePlayerCharactersExpSync(
                 playerId, partyCharacterIdsArray, questData.characterExpReward || 0,

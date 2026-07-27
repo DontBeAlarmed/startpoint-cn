@@ -147,6 +147,8 @@ function getQuestSync(
         sPlusReward,
         scoreRewardGroupId: quest.scoreRewardGroupId ?? undefined,
         scoreRewardGroup: quest.scoreRewardGroupId != null ? getScoreRewardGroup(quest.scoreRewardGroupId) ?? undefined : undefined,
+        commonRewardCount: quest.commonRewardCount,
+        commonRewardCounts: quest.commonRewardCounts,
         element: quest.element,
         eventId: quest.eventId,
         folderId: quest.folderId,

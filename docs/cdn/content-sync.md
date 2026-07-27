@@ -25,7 +25,7 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 
 在此基础上，35 张与官方提取 JSON 可机器证明完全相等的表已改用通用递归 OrderedMap 转换器。转换器按 Registry 声明的一至三层嵌套深度还原 CSV 树，不改字段、不补 ID，也不叠加 bundled 数据。范围包括 Active Mission、角色觉醒、收集、普通/每日/每周/称号/活动任务、Pass 任务及奖励表，以及玩家等级、角色剧情 lookup、EX Ability、Mana Board、Raid 总体奖励、奖励属性映射、体力活动和星屑兑换等直接表。
 
-奖励领域另有 6 张派生表从官方 OrderedMap 动态生成：Clear、Score、Rare Score、Score Attack Border、Rush Folder 和 Rush Ranking。转换器保留原始位置、概率、数量和多奖励槽，并修正历史 bundled 的 5 条 Clear Reward 字段误复制及 82 个无意义 `id:null`。早期活动代币中另有 47 行官方 ID 与 bundled 世代 ID 不同；smoke 只在 `item_lookup` 名称一致时视为同一代币族，实际发奖仍由业务层按服务器时间选择开放期 ID。
+奖励领域另有 6 张派生表从官方 OrderedMap 动态生成：Clear、Score、Rare Score、Score Attack Border、Rush Folder 和 Rush Ranking。转换器保留原始位置、概率、数量和多奖励槽；关卡转换器同时导出普通掉落的固定或五档抽取次数。Reward 与 Quest 的输出结构版本变化会触发同版本快照自动重建。历史 bundled 的 5 条 Clear Reward 字段误复制及 82 个无意义 `id:null` 已修正。早期活动代币中另有 47 行官方 ID 与 bundled 世代 ID 不同；smoke 只在 `item_lookup` 名称一致时视为同一代币族，实际发奖仍由业务层按服务器时间选择开放期 ID。
 
 玩法领域新增 5 张派生表：土俑累计分奖励、装备抽卡动画概率、EX Boost 消耗道具、EX Status 稀有度池和 Raid 活动总击破阈值。它们分别从官方 Carnival、Gacha、EX Boost 和 Raid OrderedMap 严格转换；官方 CN 1.4.54 的 1451、1、21、3、7 条输出逐字段等于 bundled 基线。土俑结算、装备抽卡动画、EX Boost 和 Raid 运行时均从当前 Content snapshot 读取这些表，只有 snapshot 尚未初始化的低级测试环境才使用 bundled fallback。
 

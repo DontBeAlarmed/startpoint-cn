@@ -65,6 +65,7 @@ interface StandardLayout {
     readonly sPlusReward?: number
     readonly storyClearReward?: number
     readonly scoreGroup?: number
+    readonly commonRewardCount?: number | readonly [number, number, number, number, number]
     readonly element?: number
     readonly rankTimes: readonly [number, number, number, number] | "zero"
     readonly rewards: readonly [number, number, number, number]
@@ -110,6 +111,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         clearReward: 3,
         sPlusReward: 71,
         scoreGroup: 70,
+        commonRewardCount: [88, 89, 90, 91, 92],
         element: 72,
         rankTimes: [84, 85, 86, 87],
         rewards: [93, 94, 95, 96],
@@ -121,6 +123,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         clearReward: 3,
         sPlusReward: 71,
         scoreGroup: 70,
+        commonRewardCount: [88, 89, 90, 91, 92],
         element: 72,
         rankTimes: [84, 85, 86, 87],
         rewards: [93, 94, 95, 96],
@@ -133,6 +136,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         sPlusReward: 71,
         storyClearReward: 3,
         scoreGroup: 70,
+        commonRewardCount: [88, 89, 90, 91, 92],
         element: 72,
         rankTimes: [84, 85, 86, 87],
         rewards: [93, 94, 95, 96],
@@ -144,6 +148,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         clearReward: 4,
         sPlusReward: 72,
         scoreGroup: 71,
+        commonRewardCount: [89, 90, 91, 92, 93],
         element: 73,
         rankTimes: [85, 86, 87, 88],
         rewards: [94, 95, 96, 97],
@@ -155,6 +160,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         clearReward: 4,
         sPlusReward: 71,
         scoreGroup: 70,
+        commonRewardCount: [88, 89, 90, 91, 92],
         element: 72,
         rankTimes: [84, 85, 86, 87],
         rewards: [93, 94, 95, 96],
@@ -164,6 +170,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         clearReward: 4,
         sPlusReward: 77,
         scoreGroup: 76,
+        commonRewardCount: [94, 95, 96, 97, 98],
         element: 78,
         rankTimes: [90, 91, 92, 93],
         rewards: [99, 100, 101, 102],
@@ -173,6 +180,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         minimumColumns: 72,
         clearReward: 4,
         scoreGroup: 66,
+        commonRewardCount: 67,
         rankTimes: "zero",
         rewards: [68, 69, 70, 71],
     },
@@ -180,6 +188,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         minimumColumns: 71,
         clearReward: 3,
         scoreGroup: 65,
+        commonRewardCount: 66,
         rankTimes: "zero",
         rewards: [67, 68, 69, 70],
     },
@@ -188,6 +197,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         clearReward: 4,
         sPlusReward: 72,
         scoreGroup: 71,
+        commonRewardCount: [89, 90, 91, 92, 93],
         element: 73,
         rankTimes: [85, 86, 87, 88],
         rewards: [94, 95, 96, 97],
@@ -197,6 +207,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         clearReward: 4,
         sPlusReward: 73,
         scoreGroup: 72,
+        commonRewardCount: [90, 91, 92, 93, 94],
         element: 74,
         rankTimes: [86, 87, 88, 89],
         rewards: [95, 96, 97, 98],
@@ -206,6 +217,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         minimumColumns: 89,
         clearReward: 5,
         scoreGroup: 71,
+        commonRewardCount: 84,
         element: 72,
         rankTimes: [51, 52, 53, 54],
         rewards: [85, 86, 87, 88],
@@ -214,6 +226,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         minimumColumns: 87,
         clearReward: 4,
         scoreGroup: 69,
+        commonRewardCount: 82,
         element: 70,
         rankTimes: "zero",
         rewards: [83, 84, 85, 86],
@@ -223,6 +236,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         clearReward: 6,
         sPlusReward: 74,
         scoreGroup: 73,
+        commonRewardCount: [91, 92, 93, 94, 95],
         element: 75,
         rankTimes: [87, 88, 89, 90],
         rewards: [96, 97, 98, 99],
@@ -231,6 +245,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         minimumColumns: 87,
         clearReward: 6,
         scoreGroup: 69,
+        commonRewardCount: 82,
         element: 70,
         rankTimes: "zero",
         rewards: [83, 84, 85, 86],
@@ -377,11 +392,29 @@ function standardQuest(
     if (story) return output
 
     if (layout.scoreGroup !== undefined) {
-        addOptional(
-            output,
+        const scoreRewardGroupId = optionalInteger(
+            tableName,
+            fields[layout.scoreGroup],
             "scoreRewardGroupId",
-            optionalInteger(tableName, fields[layout.scoreGroup], "scoreRewardGroupId"),
         )
+        addOptional(output, "scoreRewardGroupId", scoreRewardGroupId)
+        if (scoreRewardGroupId !== undefined && layout.commonRewardCount !== undefined) {
+            if (typeof layout.commonRewardCount === "number") {
+                output.commonRewardCount = parseNonNegativeInteger(
+                    tableName,
+                    fields[layout.commonRewardCount],
+                    "commonRewardCount",
+                )
+            } else {
+                output.commonRewardCounts = layout.commonRewardCount.map((column, rank) => (
+                    parseNonNegativeInteger(
+                        tableName,
+                        fields[column],
+                        `commonRewardCounts[${rank}]`,
+                    )
+                ))
+            }
+        }
     }
     const rankFields = ["bRankTime", "aRankTime", "sRankTime", "sPlusRankTime"] as const
     if (layout.rankTimes === "zero") {
@@ -484,6 +517,11 @@ function specialQuest(tableName: QuestTableName, row: QuestRow): Record<string, 
             "scoreRewardGroupId",
             optionalInteger(tableName, fields[71], "scoreRewardGroupId"),
         )
+        if (output.scoreRewardGroupId !== undefined) {
+            output.commonRewardCounts = [89, 90, 91, 92, 93].map((column, rank) => (
+                parseNonNegativeInteger(tableName, fields[column], `commonRewardCounts[${rank}]`)
+            ))
+        }
         return output
     }
     if (tableName === "rush_event_quest.json") {
@@ -508,6 +546,11 @@ function specialQuest(tableName: QuestTableName, row: QuestRow): Record<string, 
             "scoreRewardGroupId",
             optionalInteger(tableName, fields[68], "scoreRewardGroupId"),
         )
+        if (output.scoreRewardGroupId !== undefined) {
+            output.commonRewardCount = parseNonNegativeInteger(
+                tableName, fields[81], "commonRewardCount",
+            )
+        }
         addOptional(output, "element", optionalInteger(tableName, fields[69], "element"))
         return output
     }
@@ -535,6 +578,11 @@ function specialQuest(tableName: QuestTableName, row: QuestRow): Record<string, 
             "scoreRewardGroupId",
             optionalInteger(tableName, fields[68], "scoreRewardGroupId"),
         )
+        if (output.scoreRewardGroupId !== undefined) {
+            output.commonRewardCount = parseNonNegativeInteger(
+                tableName, fields[81], "commonRewardCount",
+            )
+        }
         return output
     }
     if (tableName === "score_attack_event_quest.json") {
@@ -561,6 +609,11 @@ function specialQuest(tableName: QuestTableName, row: QuestRow): Record<string, 
             "scoreRewardGroupId",
             optionalInteger(tableName, fields[72], "scoreRewardGroupId"),
         )
+        if (output.scoreRewardGroupId !== undefined) {
+            output.commonRewardCount = parseNonNegativeInteger(
+                tableName, fields[85], "commonRewardCount",
+            )
+        }
         return output
     }
     return invalidQuest(tableName, "converter is not configured")

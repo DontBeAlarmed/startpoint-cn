@@ -193,8 +193,8 @@ function rewardDefinition(tableName: string, sourceOrderedMap: string): TableSou
         scope: "cdn",
         sourceOrderedMaps: [sourceOrderedMap],
         converterId: "reward",
-        converterVersion: 1,
-        outputShapeVersion: 1,
+        converterVersion: 2,
+        outputShapeVersion: 2,
     }
 }
 
@@ -256,8 +256,8 @@ function questDefinition(tableName: QuestTableName): TableSourceInput {
         scope: "cdn",
         sourceOrderedMaps: [QUEST_TABLE_SOURCES[tableName].logicalPath],
         converterId: "quest",
-        converterVersion: 1,
-        outputShapeVersion: 1,
+        converterVersion: 2,
+        outputShapeVersion: 2,
     }
 }
 

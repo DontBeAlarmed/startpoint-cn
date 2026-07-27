@@ -48,6 +48,11 @@ test("standard quest conversion separates story rows from battle rows", () => {
         85: 10,
         86: 8.5,
         87: 7,
+        88: 1,
+        89: 2,
+        90: 3,
+        91: 4,
+        92: 5,
         93: 20,
         94: 30,
         95: 40,
@@ -68,6 +73,7 @@ test("standard quest conversion separates story rows from battle rows", () => {
             aRankTime: 10000,
             sRankTime: 8500,
             sPlusRankTime: 7000,
+            commonRewardCounts: [1, 2, 3, 4, 5],
             rankPointReward: 20,
             characterExpReward: 30,
             manaReward: 40,
@@ -79,7 +85,7 @@ test("standard quest conversion separates story rows from battle rows", () => {
     })
 })
 
-test("authoritative reward columns are not copied from the legacy extractor", () => {
+test("authoritative reward and common-drop count columns are preserved", () => {
     const advent = row(103, {
         0: 200013009,
         2: "降临",
@@ -92,8 +98,11 @@ test("authoritative reward columns are not copied from the legacy extractor", ()
         91: 20,
         92: 10,
         93: 5,
-        97: 9001,
-        98: 9002,
+        94: 1,
+        95: 2,
+        96: 3,
+        97: 4,
+        98: 5,
         99: 101,
         100: 102,
         101: 103,
@@ -109,6 +118,7 @@ test("authoritative reward columns are not copied from the legacy extractor", ()
         aRankTime: 20000,
         sRankTime: 10000,
         sPlusRankTime: 5000,
+        commonRewardCounts: [1, 2, 3, 4, 5],
         rankPointReward: 101,
         characterExpReward: 102,
         manaReward: 103,
@@ -129,8 +139,11 @@ test("authoritative reward columns are not copied from the legacy extractor", ()
         86: 30,
         87: 20,
         88: 10,
-        92: 8001,
-        93: 8002,
+        89: 1,
+        90: 2,
+        91: 3,
+        92: 4,
+        93: 5,
         94: 201,
         95: 202,
         96: 203,
@@ -146,6 +159,7 @@ test("authoritative reward columns are not copied from the legacy extractor", ()
         aRankTime: 30000,
         sRankTime: 20000,
         sPlusRankTime: 10000,
+        commonRewardCounts: [1, 2, 3, 4, 5],
         rankPointReward: 201,
         characterExpReward: 202,
         manaReward: 203,
@@ -203,6 +217,7 @@ test("score attack and carnival conversions preserve event-local metadata", () =
         55: 4000,
         72: 500,
         73: 3,
+        85: 6,
         86: 10,
         87: 20,
         88: 30,
@@ -229,6 +244,7 @@ test("score attack and carnival conversions preserve event-local metadata", () =
             folderId: 2,
             clearRewardId: 11,
             scoreRewardGroupId: 500,
+            commonRewardCount: 6,
         },
     })
 
