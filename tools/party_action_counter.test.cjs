@@ -59,8 +59,12 @@ stubModule("../src/data/domains/character", {
     playerOwnsCharacterSync: (_playerId, characterId) => characterId !== null,
 })
 stubModule("../src/data/domains/equipment", {
-    playerOwnsEquipmentSync: (_playerId, equipmentId) => equipmentId !== null,
+    getPlayerEquipmentListSync: () => ({
+        "500001": { stack: 0 },
+        "500002": { stack: 0 },
+    }),
 })
+stubModule("../src/data/domains/item", { getPlayerItemsSync: () => ({}) })
 stubModule("../src/data/domains/party", {
     updatePlayerPartySync(playerId, slot, party, groupId) {
         db.prepare(`
@@ -151,6 +155,20 @@ async function main() {
             },
         })
         assert.equal(emptyEdit.statusCode, 200)
+        assert.deepEqual(getActiveMissionCountersSync(7), beforeEmptyEdit)
+
+        const beforeInvalidLoadout = db.prepare("SELECT * FROM party_state WHERE player_id = 7").all()
+        const invalidLoadout = await fastify.inject({
+            method: "POST",
+            url: "/edit",
+            payload: {
+                viewer_id: 123,
+                main_party_id: 1001,
+                party_info_list: [partyInfo({ equipment: [500001, 500001, null] })],
+            },
+        })
+        assert.equal(invalidLoadout.statusCode, 400)
+        assert.deepEqual(db.prepare("SELECT * FROM party_state WHERE player_id = 7").all(), beforeInvalidLoadout)
         assert.deepEqual(getActiveMissionCountersSync(7), beforeEmptyEdit)
 
         const beforeFailure = getActiveMissionCountersSync(7)

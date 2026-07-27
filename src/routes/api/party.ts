@@ -2,7 +2,8 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { playerOwnsCharacterSync } from "../../data/domains/character"
-import { playerOwnsEquipmentSync } from "../../data/domains/equipment"
+import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
+import { getPlayerItemsSync } from "../../data/domains/item"
 import { updatePlayerPartySync } from "../../data/domains/party"
 import { getDb } from "../../data/db"
 import { incrementActiveMissionPartyActionCountsSync } from "../../data/domains/active_mission_counters"
@@ -12,6 +13,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { hasValidPartyCategory, parseGlobalPartyId } from "../../lib/special-event-parties";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { recordRaidSetEditMissionFactsSync } from "../../lib/mission/event-entry-facts";
+import { validatePartyLoadouts } from "../../lib/party-loadout-validation";
 
 interface PartyInfoListItem {
     party_edited: boolean
@@ -449,7 +451,6 @@ const routes = async (fastify: FastifyInstance) => {
 
         // update each slot
         const characterOwnedMap: Record<number, boolean> = {}
-        const equipmentOwnedMap: Record<number, boolean> = {}
         const editCategories: number[] = []
         for (const updateInfo of body.party_info_list) {
             editCategories.push(updateInfo.party_category)
@@ -466,15 +467,14 @@ const routes = async (fastify: FastifyInstance) => {
             return isOwned ? characterId : null
         }
 
-        const mapOwnedEquipment = (equipmentId: number | null): number | null => {
-            let isOwned = equipmentId === null ? false : equipmentOwnedMap[equipmentId]
-            if (isOwned === undefined) {
-                isOwned = playerOwnsEquipmentSync(playerId, equipmentId as number)
-                equipmentOwnedMap[equipmentId as number] = isOwned
-            }
-            
-            return isOwned ? equipmentId : null
-        }
+        const loadoutValidation = validatePartyLoadouts(body.party_info_list, {
+            equipments: getPlayerEquipmentListSync(playerId),
+            items: getPlayerItemsSync(playerId),
+        })
+        if (!loadoutValidation.ok) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid party equipment or ability soul inventory.",
+        })
 
         const mappedParties = body.party_info_list.map(updateInfo => {
             const parsed = parseGlobalPartyId(updateInfo.party_id)!
@@ -485,7 +485,7 @@ const routes = async (fastify: FastifyInstance) => {
                     name: updateInfo.party_name,
                     unisonCharacterIds: updateInfo.unison_character_ids.map(mapOwnedCharacters),
                     characterIds: updateInfo.character_ids.map(mapOwnedCharacters),
-                    equipmentIds: updateInfo.equipment_ids.map(mapOwnedEquipment), // TODO: Implement stack checking, to see if more equipment is being equipped than is owned.
+                    equipmentIds: [...updateInfo.equipment_ids],
                     abilitySoulIds: updateInfo.ability_soul_ids,
                     options: { allowOtherPlayersToHealMe: updateInfo.options.allow_other_players_to_heal_me },
                     edited: updateInfo.party_edited,

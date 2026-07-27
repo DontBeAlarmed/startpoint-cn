@@ -62,8 +62,14 @@ stubModule("../src/data/domains/character", {
     playerOwnsCharacterSync: (_playerId, characterId) => characterId !== null,
 })
 stubModule("../src/data/domains/equipment", {
-    playerOwnsEquipmentSync: (_playerId, equipmentId) => equipmentId !== null,
+    getPlayerEquipmentListSync: () => ({
+        "500001": { stack: 0 },
+        "500002": { stack: 0 },
+        "500010": { stack: 0 },
+        "500011": { stack: 0 },
+    }),
 })
+stubModule("../src/data/domains/item", { getPlayerItemsSync: () => ({}) })
 stubModule("../src/data/domains/party", {
     updatePlayerPartySync(playerId, slot, party, groupId) {
         db.prepare(`

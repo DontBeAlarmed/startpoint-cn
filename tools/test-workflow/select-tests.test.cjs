@@ -557,6 +557,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/equipment_enhancement.test.cjs",
         "tools/event_currency.test.cjs",
         "tools/inventory_rules.test.cjs",
+        "tools/party_loadout_validation.test.cjs",
         "tools/mail_notification.test.cjs",
         "tools/mail_notification_write_routes.test.cjs",
     ])
