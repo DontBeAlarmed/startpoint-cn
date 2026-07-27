@@ -24,6 +24,7 @@ import {
     type SkillEffectConversionOutput,
 } from "../converters/skill-effects"
 import { parseCsvLine } from "../converters/csv"
+import { convertOrderedMapJson } from "../converters/ordered-map-json"
 import { mapWithConcurrency } from "../concurrency"
 import { hashContentResourcePath } from "../resource-path"
 import { importBundledTable } from "./bundled-importer"
@@ -40,12 +41,16 @@ import type { TableSourceDefinition } from "./table-registry"
 type ConverterOutput = object
 
 const RELEASE_BUILD_IO_CONCURRENCY = 8
+const DIRECT_ORDERED_MAP_CONVERTER = /^ordered-map-json-([1-3])$/
 const SUPPORTED_CONVERTER_IDS = new Set([
     "character",
     "character-election",
     "gacha",
     "shop",
     "skill-effects",
+    "ordered-map-json-1",
+    "ordered-map-json-2",
+    "ordered-map-json-3",
     "bundled-json",
     "server-json",
 ])
@@ -263,6 +268,11 @@ function addConverterOutput(
     }
 }
 
+function directOrderedMapDepth(converterId: string): number | null {
+    const match = DIRECT_ORDERED_MAP_CONVERTER.exec(converterId)
+    return match ? Number(match[1]) : null
+}
+
 async function runCharacterConverter(
     reader: StrictOrderedMapReader,
     convert: NonNullable<DefaultContentTableBuilderDependencies["convertCharacters"]>,
@@ -331,6 +341,7 @@ export function createDefaultContentTableBuilder(
                     || definition.converterId === "gacha"
                     || definition.converterId === "shop"
                     || definition.converterId === "skill-effects"
+                    || directOrderedMapDepth(definition.converterId) !== null
                     ? definition.sourceOrderedMaps
                     : []
             ))
@@ -365,6 +376,36 @@ export function createDefaultContentTableBuilder(
                     "skill-effects",
                     await runSkillEffectConverter(reader, skillEffectConverter),
                 )
+            }
+
+            const directDefinitions = context.definitions.filter(definition => (
+                directOrderedMapDepth(definition.converterId) !== null
+            ))
+            const directEntries = await mapWithConcurrency(
+                directDefinitions,
+                RELEASE_BUILD_IO_CONCURRENCY,
+                async definition => {
+                    if (definition.sourceOrderedMaps.length !== 1) {
+                        throw new Error(
+                            `direct OrderedMap table must declare one source: ${definition.tableName}`,
+                        )
+                    }
+                    const depth = directOrderedMapDepth(definition.converterId)
+                    if (depth === null) throw new Error(`invalid direct converter: ${definition.converterId}`)
+                    return [
+                        definition.tableName,
+                        convertOrderedMapJson(
+                            await reader.readDynamic(definition.sourceOrderedMaps[0]),
+                            depth,
+                        ),
+                    ] as const
+                },
+            )
+            for (const [tableName, value] of directEntries) {
+                if (values.has(tableName)) {
+                    throw new Error(`content table was produced twice: ${tableName}`)
+                }
+                values.set(tableName, value)
             }
 
             const importedDefinitions = context.definitions.filter(definition => (

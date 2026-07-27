@@ -7,6 +7,7 @@ require("ts-node/register/transpile-only")
 
 const { CdnCatalogLoader } = require("../src/content/cdn/catalog-loader")
 const { ContentObjectStore } = require("../src/content/sync/object-store")
+const { TABLE_SOURCES } = require("../src/content/sync/table-registry")
 const {
     createSandbox,
     synchronizeRelease,
@@ -38,6 +39,6 @@ test("full sync publishes the scanned catalog and release tables together", asyn
     assert.deepEqual(loaded, synchronizedCatalog)
     assert.deepEqual(release.objects[release.manifest.catalog.object], synchronizedCatalog)
     assert.equal(loaded.targetVersion, release.manifest.assetVersion)
-    assert.equal(Object.keys(release.manifest.tables).length, 105)
+    assert.equal(Object.keys(release.manifest.tables).length, TABLE_SOURCES.length)
     assert.equal(fallbackReads, 0)
 })

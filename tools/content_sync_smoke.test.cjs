@@ -288,6 +288,36 @@ test("角色基线只接受列明的 skill_count 3 到 6 差异，并保留 skil
     }), error => error?.code === "CONTENT_SYNC_SMOKE_CHARACTER_BASELINE")
 })
 
+test("直接 OrderedMap 表必须逐张等于 bundled 官方基线", () => {
+    assert.equal(typeof smoke.validateDirectOrderedMapTables, "function")
+    const definitions = [
+        { tableName: "direct-a.json", converterId: "ordered-map-json-1" },
+        { tableName: "derived.json", converterId: "mission-derived" },
+        { tableName: "direct-b.json", converterId: "ordered-map-json-3" },
+    ]
+    const bundled = {
+        "direct-a.json": { 1: [["a"]] },
+        "direct-b.json": { 2: { 3: { 4: [["b"]] } } },
+    }
+    const release = structuredClone(bundled)
+
+    assert.deepEqual(smoke.validateDirectOrderedMapTables({
+        definitions,
+        readBundled: tableName => bundled[tableName],
+        readRelease: tableName => release[tableName],
+    }), { tables: 2 })
+
+    release["direct-b.json"][2][3][4][0][0] = "changed"
+    assert.throws(() => smoke.validateDirectOrderedMapTables({
+        definitions,
+        readBundled: tableName => bundled[tableName],
+        readRelease: tableName => release[tableName],
+    }), error => (
+        error?.code === "CONTENT_SYNC_SMOKE_DIRECT_TABLE_BASELINE"
+        && error.message.includes("direct-b.json")
+    ))
+})
+
 test("失败摘要使用稳定错误码、中文状态且不泄露绝对路径", async () => {
     let stdout = ""
     let stderr = ""

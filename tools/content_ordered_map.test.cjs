@@ -12,6 +12,7 @@ const {
     parseOrderedMap,
     parseTextOrderedMap,
 } = require("../src/content/sync/ordered-map")
+const { convertOrderedMapJson } = require("../src/content/converters/ordered-map-json")
 
 function uint32(value) {
     const output = Buffer.allocUnsafe(4)
@@ -167,6 +168,44 @@ test("parses every outer key in a nested text orderedmap", () => {
         },
     ])
     assertDeepFrozen(nested)
+})
+
+test("parses flat and recursively nested orderedmaps into extracted CSV trees", () => {
+    assert.equal(
+        typeof convertOrderedMapJson,
+        "function",
+        "orderedmap parser should expose the recursive CSV tree representation",
+    )
+
+    const leaf = createOrderedMap([
+        { key: "2", value: Buffer.from('second,"quoted,value"', "utf8") },
+        { key: "1", value: Buffer.from("first,", "utf8") },
+    ])
+    assert.deepEqual(convertOrderedMapJson(leaf, 1), {
+        1: [["first", ""]],
+        2: [["second", "quoted,value"]],
+    })
+
+    const middle = createNestedOrderedMap([{ key: "20", value: leaf }])
+    const outer = createNestedOrderedMap([{ key: "100", value: middle }])
+    assert.deepEqual(convertOrderedMapJson(outer, 3), {
+        100: {
+            20: {
+                1: [["first", ""]],
+                2: [["second", "quoted,value"]],
+            },
+        },
+    })
+    assertDeepFrozen(convertOrderedMapJson(outer, 3))
+
+    assert.throws(
+        () => convertOrderedMapJson(leaf, 0),
+        /nesting depth must be a positive integer/,
+    )
+    assert.throws(
+        () => convertOrderedMapJson(leaf, 2),
+        /nested row [12] is invalid/,
+    )
 })
 
 test("strictly rejects malformed orderedmap data", () => {

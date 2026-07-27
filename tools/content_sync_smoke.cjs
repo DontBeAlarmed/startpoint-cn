@@ -965,6 +965,24 @@ function requireRawCharacterBaseline(release, bundled, tableName) {
     }
 }
 
+function validateDirectOrderedMapTables({ definitions, readBundled, readRelease }) {
+    const directDefinitions = definitions.filter(definition => (
+        /^ordered-map-json-[1-3]$/.test(definition.converterId)
+    ))
+    for (const definition of directDefinitions) {
+        if (!isDeepStrictEqual(
+            readRelease(definition.tableName),
+            readBundled(definition.tableName),
+        )) {
+            baselineError(
+                "CONTENT_SYNC_SMOKE_DIRECT_TABLE_BASELINE",
+                `${definition.tableName} 与 bundled 官方基线不一致`,
+            )
+        }
+    }
+    return { tables: directDefinitions.length }
+}
+
 function loadContentRuntime(projectRoot) {
     require("ts-node").register({
         project: path.join(projectRoot, "tsconfig.json"),
@@ -1010,6 +1028,12 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         registryNames: runtime.TABLE_SOURCES.map(definition => definition.tableName),
         expectedVersion: EXPECTED_VERSION,
         expectedTableCount: EXPECTED_TABLE_COUNT,
+    })
+
+    const directStats = validateDirectOrderedMapTables({
+        definitions: runtime.TABLE_SOURCES,
+        readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
+        readRelease: tableName => repository.table(tableName),
     })
 
     const bundledCharacter = readJson(paths.projectRoot, "assets/character.json")
@@ -1081,6 +1105,7 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         gachas: gachaStats.gachas,
         campaigns: gachaStats.campaigns,
         featureEntries: gachaStats.featureEntries,
+        directTables: directStats.tables,
         shops: Object.values(shopStats).reduce((sum, count) => sum + count, 0),
     }
 }
@@ -1229,6 +1254,7 @@ module.exports = {
     runContentSyncSmoke,
     runContentSyncSmokeCli,
     validateCharacters,
+    validateDirectOrderedMapTables,
     validateGachas,
     validateReleaseClosure,
     validateShops,

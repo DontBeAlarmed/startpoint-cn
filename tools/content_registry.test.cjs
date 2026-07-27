@@ -90,6 +90,44 @@ const EXPECTED_CDN_TABLES = Object.freeze({
     ]],
 })
 
+const EXPECTED_DIRECT_CDN_TABLES = Object.freeze({
+    "cdndata/player_rank.json": [1, "master/player/player_rank.orderedmap"],
+    "character_quest_lookup.json": [1, "master/quest/character_quest.orderedmap"],
+    "ex_ability.json": [1, "master/ex_boost/ex_ability.orderedmap"],
+    "mana_board.json": [3, "master/generated/mana_board.orderedmap"],
+    "mana_node_awake.json": [3, "master/mana_board/mana_node_awake.orderedmap"],
+    "mission_active.json": [1, "master/active_mission/active_mission.orderedmap"],
+    "mission_active_event.json": [1, "master/active_mission/active_mission_event.orderedmap"],
+    "mission_active_reward.json": [2, "master/active_mission/active_mission_reward.orderedmap"],
+    "mission_char_awake.json": [1, "master/mission/character_awake_mission.orderedmap"],
+    "mission_char_awake_reward.json": [2, "master/mission/character_awake_mission_reward.orderedmap"],
+    "mission_collect_item.json": [1, "master/mission/collect_item_event_mission.orderedmap"],
+    "mission_collect_item_reward.json": [2, "master/mission/collect_item_event_mission_reward.orderedmap"],
+    "mission_daily.json": [1, "master/mission/daily_mission.orderedmap"],
+    "mission_daily_reward.json": [2, "master/mission/daily_mission_reward.orderedmap"],
+    "mission_degree.json": [1, "master/mission/degree_mission.orderedmap"],
+    "mission_degree_reward.json": [2, "master/mission/degree_mission_reward.orderedmap"],
+    "mission_event.json": [1, "master/mission/event_mission.orderedmap"],
+    "mission_event_reward.json": [2, "master/mission/event_mission_reward.orderedmap"],
+    "mission_pass_daily.json": [1, "master/pass_card/pass_card_daily_mission.orderedmap"],
+    "mission_pass_daily_reward.json": [2, "master/pass_card/pass_card_daily_mission_reward.orderedmap"],
+    "mission_pass_event.json": [1, "master/pass_card/pass_card_event_mission.orderedmap"],
+    "mission_pass_event_reward.json": [2, "master/pass_card/pass_card_event_mission_reward.orderedmap"],
+    "mission_pass_week.json": [1, "master/pass_card/pass_card_week_mission.orderedmap"],
+    "mission_pass_week_reward.json": [2, "master/pass_card/pass_card_week_mission_reward.orderedmap"],
+    "mission_regular.json": [1, "master/mission/regular_mission.orderedmap"],
+    "mission_regular_reward.json": [2, "master/mission/regular_mission_reward.orderedmap"],
+    "mission_weekly_def.json": [1, "master/mission/weekly_mission.orderedmap"],
+    "mission_weekly_reward.json": [2, "master/mission/weekly_mission_reward.orderedmap"],
+    "pass_card_event.json": [1, "master/pass_card/pass_card_event.orderedmap"],
+    "pass_card_reward.json": [1, "master/pass_card/pass_card_reward.orderedmap"],
+    "raid_event_overall_reward.json": [1, "master/quest/event/raid_event_overall_reward.orderedmap"],
+    "reward_element_map.json": [3, "master/reward/reward_element_map.orderedmap"],
+    "stamina_campaign.json": [1, "master/campaign/stamina_campaign.orderedmap"],
+    "star_crumb_exchange.json": [1, "master/shop/star_crumb_exchange.orderedmap"],
+    "star_crumb_exchange_cost.json": [1, "master/shop/star_crumb_exchange_cost.orderedmap"],
+})
+
 const EXPECTED_BUNDLED_TABLES = Object.freeze([
     "advent_event_quest.json",
     "boss_battle_quest.json",
@@ -280,6 +318,16 @@ test("registry covers the first CDN converter tables with verified logical paths
     }
 })
 
+test("registry dynamically restores tables that exactly match official OrderedMap trees", () => {
+    assert.equal(Object.keys(EXPECTED_DIRECT_CDN_TABLES).length, 35)
+    for (const [tableName, [depth, source]] of Object.entries(EXPECTED_DIRECT_CDN_TABLES)) {
+        const entry = findTableSource(tableName)
+        assert.equal(entry.scope, "cdn", tableName)
+        assert.equal(entry.converterId, `ordered-map-json-${depth}`, tableName)
+        assert.deepEqual(entry.sourceOrderedMaps, [source], tableName)
+    }
+})
+
 test("registry and release manifest explicitly describe referenced gacha odds sources", () => {
     const gacha = findTableSource("gacha.json")
 
@@ -326,7 +374,9 @@ test("registry closes over current static runtime tables", () => {
 
     assert.deepEqual(
         bundled,
-        [...EXPECTED_BUNDLED_TABLES].sort(),
+        EXPECTED_BUNDLED_TABLES
+            .filter(tableName => !(tableName in EXPECTED_DIRECT_CDN_TABLES))
+            .sort(),
     )
     assert.deepEqual(
         server,

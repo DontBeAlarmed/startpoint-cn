@@ -1,6 +1,6 @@
 # Content Sync 与内容 Release
 
-本文说明 CN 服务的内容同步职责、操作命令、生成布局、回退方式和阶段 A 支持边界。CDN Catalog 与客户端更新计划详见 [`catalog-planner.md`](catalog-planner.md)。
+本文说明 CN 服务的内容同步职责、操作命令、生成布局、回退方式和阶段 B 支持边界。CDN Catalog 与客户端更新计划详见 [`catalog-planner.md`](catalog-planner.md)。
 
 ## 职责边界
 
@@ -13,7 +13,7 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 
 同步器负责严格解析、引用闭包、稳定输出和文件系统安全，不负责判断 CDN 作者给出的 ID、赔率、奖励、价格或资源内容是否合理。服务端不会替 CDN 作者猜测缺失内容、复制其他活动数据、修复非法主数据或自动生成客户端补丁。
 
-阶段 A 只动态转换五个领域：
+阶段 B 当前把 Registry 的 109 张表分为 `52 CDN + 53 bundled + 4 server`。原阶段 A 的五个动态领域为：
 
 | 领域 | 动态输出 |
 |---|---|
@@ -22,6 +22,8 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 | 卡池 | `gacha.json`、`gacha_campaign.json`、两张 `cdndata/gacha*.json`，并读取全部非空 odds 引用 |
 | 商店 | General、Event、Boss、Star Grain、Treasure、Equipment 共 8 张运行时表 |
 | 任务技能效果 | `cdndata/active_mission_skill_effects.json`；读取角色、技能 orderedmap 和 Action DSL |
+
+在此基础上，35 张与官方提取 JSON 可机器证明完全相等的表已改用通用递归 OrderedMap 转换器。转换器按 Registry 声明的一至三层嵌套深度还原 CSV 树，不改字段、不补 ID，也不叠加 bundled 数据。范围包括 Active Mission、角色觉醒、收集、普通/每日/每周/称号/活动任务、Pass 任务及奖励表，以及玩家等级、角色剧情 lookup、EX Ability、Mana Board、Raid 总体奖励、奖励属性映射、体力活动和星屑兑换等直接表。
 
 任务技能效果索引只记录 CDN 能直接证明的角色技能效果。服务端在同步阶段解压并解析
 `*.action.dsl.amf3.deflate`，识别 `CreateNormalHeal`、`CreateRatioHeal`、`ACRegeneration`，以及
@@ -32,7 +34,7 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 Content Sync 时，20015/20016 会保持 fail closed。使用官方 CDN 执行同步后，当前 Release 才会包含实际
 角色效果索引。
 
-Registry 仍要求每个 Release 闭合当前全部注册表。阶段 A 中未迁移领域从仓库内 bundled/server JSON 导入 Release；它们不会因为 CDN orderedmap 改动而自动变化。全表 CDN 转换属于阶段 B，必须在阶段 A 验收后另行实施。
+Registry 仍要求每个 Release 闭合当前全部注册表。剩余 53 张 bundled 表中，51 张有官方来源但需要业务派生结构、跨表 lookup 或服务端索引转换；`cdndata/player_rank_full.json` 的 `0..100` 等级数据来自历史实测，`quest_unlock_costs.json` 仍有 6 项无法由官方 1.4.54 主数据闭合，这两张缺少完整权威来源，继续保留兼容 fallback。上述表不会因为 CDN OrderedMap 改动而自动变化。迁移时必须逐表证明来源、字段映射和输出闭包，不能把文件名相近当作可直接复制的证据。4 张 `server` 表为服务端配置或后台内容，不属于 CDN 转换范围。
 
 ## 受支持输入
 
@@ -157,11 +159,12 @@ npm run content:smoke -- \
 
 `content:smoke` 是同 UID 开发者手动离线工具，不是面向不受信任本地用户的安全边界。运行期间调用者必须保证没有同 UID 进程故意替换 content root、派生目录或祖先路径。现有 identity、symlink 和空目录检查用于防止误传，并发现检查时存在或留下可观察变化的并发修改；它们不构成同 UID 对抗性 TOCTOU 防护。本工具不使用轮询、文件系统 watch、额外锁文件或平台专用 API 尝试对抗同 UID 进程。
 
-smoke 创建或接受 root 后记录其 `dev`、`ino`、权限和 realpath，并预先建立权限为 `0700` 的 `release/`。Release 是 smoke 唯一可写派生目录，必须是 root 的直接子目录且 identity 不变；阶段 A 尚未迁移的 bundled 表从项目只读 `assets/` 加载，并由下述 Git/seed 来源快照覆盖。在调用同步前和同步结束后都会复核 root、`release/` 及 root 顶层项目集合。root 替换、Release 符号链接或工具外顶层项目在检查时存在，或在后续复核时留下可观察变化时会失败；检查间隙由同 UID 对手完成并恢复的替换不在保护范围内。
+smoke 创建或接受 root 后记录其 `dev`、`ino`、权限和 realpath，并预先建立权限为 `0700` 的 `release/`。Release 是 smoke 唯一可写派生目录，必须是 root 的直接子目录且 identity 不变；阶段 B 尚未迁移的 bundled 表从项目只读 `assets/` 加载，并由下述 Git/seed 来源快照覆盖。在调用同步前和同步结束后都会复核 root、`release/` 及 root 顶层项目集合。root 替换、Release 符号链接或工具外顶层项目在检查时存在，或在后续复核时留下可观察变化时会失败；检查间隙由同 UID 对手完成并恢复的替换不在保护范围内。
 
 smoke 始终执行 force sync，并验证：
 
 - Release、Repository、Catalog 都是 1.4.54；当前 Registry 全部表及所有对象引用闭合；
+- 35 张通用递归 OrderedMap 表逐张与 bundled 官方 1.4.54 基线深度相等；
 - 两张角色 cdndata 各 505 行，运行时 505 个角色；名称、稀有度、属性与 bundled 一致；
 - 只允许已记录的 45 个 `skill_count` 从 3 变为 6，12 个 `skill_count=2` 保持不变；
 - 卡池 raw row 为 584、campaign 为 145，全部非空 odds 已成功读取；

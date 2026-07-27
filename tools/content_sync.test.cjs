@@ -182,7 +182,24 @@ function nestedOrderedMap(id) {
     return serializeNestedOrderedMap([{ key: id, row: inner }])
 }
 
+function directOrderedMapFixture(depth) {
+    let raw = serializeOrderedMap([{ key: "1", row: "fixture" }])
+    for (let level = 1; level < depth; level++) {
+        raw = serializeNestedOrderedMap([{ key: "1", row: raw }])
+    }
+    return raw
+}
+
 function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}) {
+    logicalEntries = new Map(logicalEntries)
+    for (const definition of TABLE_SOURCES) {
+        const match = /^ordered-map-json-([1-3])$/.exec(definition.converterId)
+        if (!match) continue
+        const logicalPath = definition.sourceOrderedMaps[0]
+        if (!logicalEntries.has(logicalPath)) {
+            logicalEntries.set(logicalPath, directOrderedMapFixture(Number(match[1])))
+        }
+    }
     const entries = new Map()
     const logicalByPhysical = new Map()
     for (const [logicalPath, bytes] of logicalEntries) {
@@ -513,6 +530,43 @@ test("default release builder rejects unknown converter ids before IO", async ()
 
     await assert.rejects(builder.build(context), /unsupported converterId: future-converter/)
     assert.equal(imports, 0)
+})
+
+test("default release builder rejects missing or ambiguous direct OrderedMap sources", async () => {
+    const { createDefaultContentTableBuilder } = require(
+        "../src/content/sync/release-builder"
+    )
+    const direct = TABLE_SOURCES.find(definition => (
+        definition.converterId === "ordered-map-json-1"
+    ))
+    const builder = createDefaultContentTableBuilder()
+    const missingContext = {
+        ...defaultBuilderContext({
+            has: () => false,
+            read: async () => { throw new Error("archive must not be read") },
+        }),
+        definitions: [direct],
+    }
+    await assert.rejects(
+        builder.build(missingContext),
+        /orderedmap source is missing/i,
+    )
+
+    const ambiguous = {
+        ...direct,
+        sourceOrderedMaps: [
+            ...direct.sourceOrderedMaps,
+            "master/fixture/extra.orderedmap",
+        ],
+    }
+    const ambiguousContext = {
+        ...defaultBuilderContext(inMemoryArchiveIndex(new Map(), [])),
+        definitions: [ambiguous],
+    }
+    await assert.rejects(
+        builder.build(ambiguousContext),
+        /direct OrderedMap table must declare one source/i,
+    )
 })
 
 test("check scans current metadata without locking, materializing, indexing, or writing", async t => {

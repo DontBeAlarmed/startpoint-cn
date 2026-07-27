@@ -162,6 +162,10 @@ export function parseNestedTextOrderedMaps(
     })))
 }
 
+export function parseNestedOrderedMapRows(raw: Buffer): readonly OrderedMapRow[] {
+    return parseRows(raw, false)
+}
+
 export function parseNestedTextOrderedMap(
     raw: Buffer,
     expectedOuterKey?: string,
