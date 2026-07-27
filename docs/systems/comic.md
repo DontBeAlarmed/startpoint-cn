@@ -38,7 +38,7 @@ main 优先读取与根文件同名的 PNG，找不到时回退 JPG；缩略图�
 
 ## 分发边界
 
-`web/public/comic/` 被 Git 忽略，不得提交漫画图片。Server Bundle 构建器完全不读取 `web/public/`，verifier 也拒绝该 Bundle 根，因此宿主或部署者必须在 Bundle 外另行准备合法的本地内容。漫画仅通过 `/api/index.php/comic/image` 业务接口提供，不存在通用 `/public` 静态挂载。
+`web/public/comic/` 被 Git 忽略，不得提交漫画图片。Server Bundle 构建器完全不读取 `web/public/`，verifier 也拒绝该 Bundle 根。普通开发默认读取该路径；嵌入模式必须通过绝对 `COMIC_DIR` 挂载与 Bundle、Data Volume 和 local CDN 隔离的外置目录，未配置时列表为空、图片返回 404。漫画仅通过 `/api/index.php/comic/image` 业务接口提供，不存在通用 `/public` 静态挂载。
 
 仓库当前没有漫画抓取或图片处理生成器，也不提供第三方漫画源目录。文档只定义服务端读取契约，不声称 fresh clone 自带可用漫画库。
 

@@ -311,7 +311,6 @@ fastify.register(carnivalEventApiPlugin, { prefix: `${apiPrefix}/carnival_event`
 fastify.register(contentsGuideApiPlugin, { prefix: `${apiPrefix}/contents_guide` });
 fastify.register(profileApiPlugin, { prefix: `${apiPrefix}/profile` });
 fastify.register(historyApiPlugin, { prefix: `${apiPrefix}/history` });
-fastify.register(comicApiPlugin, { prefix: `${apiPrefix}/comic` });
 fastify.register(questUnlockApiPlugin, { prefix: `${apiPrefix}/quest` });
 fastify.register(itemApiPlugin, { prefix: `${apiPrefix}/item` });
 fastify.register(characterElectionApiPlugin, { prefix: `${apiPrefix}/character_election` });
@@ -328,6 +327,10 @@ function configureRuntimeHttp(config: ReturnType<typeof parseCnRuntimeConfig>): 
     fastify.register(cnLoadPlugin, {
         prefix: apiPrefix,
         assetProvider: config.assetProvider,
+    });
+    fastify.register(comicApiPlugin, {
+        prefix: `${apiPrefix}/comic`,
+        comicDir: config.comicDir,
     });
     registerCnAssetProviderRoutes(fastify, { config: config.assetProvider });
     runtimeHttpConfigured = true;

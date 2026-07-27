@@ -25,6 +25,61 @@ test("runtime network defaults are loopback-only and stable", () => {
     assert.equal(Object.isFrozen(config.tcp), true)
 })
 
+test("embedded runtime disables bundled comics unless an isolated COMIC_DIR is provided", () => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "embedded-runtime-comic-"))
+    const bundleRoot = path.join(sandbox, "bundle")
+    const dataRoot = path.join(sandbox, "data")
+    const comicRoot = path.join(sandbox, "comic")
+    fs.mkdirSync(bundleRoot)
+    fs.mkdirSync(dataRoot)
+    fs.mkdirSync(comicRoot)
+
+    const disabled = parseCnRuntimeConfig({
+        projectRoot: bundleRoot,
+        env: { EMBEDDED_RUNTIME: "1", DATA_DIR: dataRoot, ASSET_MODE: "client-owned" },
+    })
+    assert.equal(disabled.comicDir, null)
+
+    const configured = parseCnRuntimeConfig({
+        projectRoot: bundleRoot,
+        env: {
+            EMBEDDED_RUNTIME: "1",
+            DATA_DIR: dataRoot,
+            COMIC_DIR: comicRoot,
+            ASSET_MODE: "client-owned",
+        },
+    })
+    assert.equal(configured.comicDir, fs.realpathSync(comicRoot))
+    fs.rmSync(sandbox, { recursive: true, force: true })
+})
+
+test("embedded runtime rejects a COMIC_DIR that overlaps protected inputs", () => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "embedded-runtime-comic-overlap-"))
+    const bundleRoot = path.join(sandbox, "bundle")
+    const dataRoot = path.join(sandbox, "data")
+    fs.mkdirSync(path.join(bundleRoot, "web", "public", "comic"), { recursive: true })
+    fs.mkdirSync(dataRoot)
+
+    for (const comicDir of [
+        path.join(bundleRoot, "web", "public", "comic"),
+        dataRoot,
+    ]) {
+        assert.throws(
+            () => parseCnRuntimeConfig({
+                projectRoot: bundleRoot,
+                env: {
+                    EMBEDDED_RUNTIME: "1",
+                    DATA_DIR: dataRoot,
+                    COMIC_DIR: comicDir,
+                    ASSET_MODE: "client-owned",
+                },
+            }),
+            error => error?.code === "INVALID_RUNTIME_CONFIG",
+        )
+    }
+    fs.rmSync(sandbox, { recursive: true, force: true })
+})
+
 test("runtime network accepts explicit wildcard hosts and boundary ports", () => {
     const config = parseCnRuntimeConfig({
         projectRoot,

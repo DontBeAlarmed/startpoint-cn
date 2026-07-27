@@ -43,6 +43,10 @@ test("builds and verifies deterministic thin server bundles", () => {
         scripts["verify:bundle"],
         "node tools/server-bundle/verify.cjs",
     )
+    assert.equal(
+        scripts["verify:runtime-pack"],
+        "node tools/runtime-pack/verify.cjs",
+    )
 })
 
 test("includes runtime-loaded CN modules as explicit compilation roots", () => {

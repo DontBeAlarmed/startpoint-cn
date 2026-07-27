@@ -1,6 +1,6 @@
 /**
  * Comic / Manga API — get_list + image serving.
- * Comics stored in web/public/comic/{kind}/ directory.
+ * Comics are supplied by the runtime's optional external comic directory.
  */
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getSession } from "../../data/domains/session"
@@ -8,7 +8,9 @@ import { generateDataHeaders } from "../../utils";
 import { readdirSync, readFileSync, existsSync } from "fs";
 import path from "path";
 
-const COMIC_DIR = path.join(__dirname, "..", "..", "..", "web", "public", "comic")
+interface ComicRouteOptions {
+    readonly comicDir?: string | null
+}
 
 // Kind 1: 史黛拉的弹射世界讲座 (Stella's Classroom)
 function parseKind1(filename: string): { episode: number, title: string } | null {
@@ -28,8 +30,9 @@ function parseKind0(filename: string): { episode: number, title: string } | null
     return { episode: parseInt(match[1]), title: match[2] }
 }
 
-function getComicList(kind: number): { episode: number, title: string, filename: string }[] {
-    const dir = path.join(COMIC_DIR, String(kind))
+function getComicList(comicDir: string | null, kind: number): { episode: number, title: string, filename: string }[] {
+    if (comicDir === null) return []
+    const dir = path.join(comicDir, String(kind))
     let files: string[] = []
     try { files = readdirSync(dir) } catch { return [] }
 
@@ -43,7 +46,8 @@ function getComicList(kind: number): { episode: number, title: string, filename:
         .sort((a, b) => b.episode - a.episode)  // descending, newest first for getLatestComicData
 }
 
-const routes = async (fastify: FastifyInstance) => {
+const routes = async (fastify: FastifyInstance, options: ComicRouteOptions) => {
+    const comicDir = options.comicDir ?? null
     // Serve comic image by kind + episode (avoids filename encoding issues)
     fastify.get("/image", async (request: FastifyRequest, reply: FastifyReply) => {
         const { kind, episode, size } = request.query as any
@@ -51,7 +55,8 @@ const routes = async (fastify: FastifyInstance) => {
         const ep = parseInt(episode || "0")
         if (!ep) return reply.status(400).send({ error: "Missing episode" })
 
-        const dir = path.join(COMIC_DIR, String(k))
+        if (comicDir === null) return reply.status(404).send({ error: "Not found" })
+        const dir = path.join(comicDir, String(k))
         let files: string[] = []
         try { files = readdirSync(dir) } catch { return reply.status(404).send({ error: "Not found" }) }
 
@@ -108,7 +113,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         const kind = body.kind || 0
-        const comics = getComicList(kind)
+        const comics = getComicList(comicDir, kind)
         const pageIndex = body.page_index ?? 0
         const perPage = 9
         const start = pageIndex * perPage

@@ -12,6 +12,7 @@ export interface RuntimeEnvironment extends AssetModeEnvironment {
     readonly SESSION_PORT?: string
     readonly EMBEDDED_RUNTIME?: string
     readonly DATA_DIR?: string
+    readonly COMIC_DIR?: string
     readonly WDFP_DATABASE_DIR?: string
     readonly CONTENT_DIR?: string
     readonly CONTENT_STORE_DIR?: string
@@ -28,6 +29,7 @@ export interface CnRuntimeConfig {
     readonly http: RuntimeNetworkServiceConfig
     readonly tcp: RuntimeNetworkServiceConfig
     readonly assetProvider: AssetProviderConfig
+    readonly comicDir: string | null
 }
 
 export interface ParseCnRuntimeConfigOptions {
@@ -104,6 +106,7 @@ function validateEmbeddedRuntime(
     env: RuntimeEnvironment,
     projectRoot: string,
     assetProvider: AssetProviderConfig,
+    comicDir: string | null,
 ): void {
     if (env.EMBEDDED_RUNTIME !== undefined
         && env.EMBEDDED_RUNTIME !== "0"
@@ -128,6 +131,23 @@ function validateEmbeddedRuntime(
     if (protectedRoots.some(protectedRoot => pathsOverlap(dataDir, protectedRoot))) {
         throw new RuntimeConfigError()
     }
+    if (comicDir !== null) {
+        const resolvedComicDir = resolvePhysicalPath(comicDir)
+        if (protectedRoots.some(protectedRoot => pathsOverlap(resolvedComicDir, protectedRoot))
+            || pathsOverlap(resolvedComicDir, dataDir)) {
+            throw new RuntimeConfigError()
+        }
+    }
+}
+
+function resolveComicDir(env: RuntimeEnvironment, projectRoot: string): string | null {
+    if (env.COMIC_DIR !== undefined) {
+        if (!path.isAbsolute(env.COMIC_DIR)) throw new RuntimeConfigError()
+        return resolvePhysicalPath(env.COMIC_DIR)
+    }
+    return env.EMBEDDED_RUNTIME === "1"
+        ? null
+        : path.join(projectRoot, "web", "public", "comic")
 }
 
 export function parseCnRuntimeConfig({
@@ -143,6 +163,7 @@ export function parseCnRuntimeConfig({
         port: parsePort(env.SESSION_PORT, 8003),
     })
     const assetProvider = parseAssetProviderConfig({ projectRoot, env })
-    validateEmbeddedRuntime(env, projectRoot, assetProvider)
-    return Object.freeze({ http, tcp, assetProvider })
+    const comicDir = resolveComicDir(env, projectRoot)
+    validateEmbeddedRuntime(env, projectRoot, assetProvider, comicDir)
+    return Object.freeze({ http, tcp, assetProvider, comicDir })
 }

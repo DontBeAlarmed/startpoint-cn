@@ -260,8 +260,10 @@ test("registers focused runtime state and socket smoke groups", () => {
         execution: "parallel",
         tests: [
             "tools/server_bundle.test.cjs",
+            "tools/runtime_pack.test.cjs",
             "tools/runtime_bundle_metadata.test.cjs",
             "tools/runtime_config.test.cjs",
+            "tools/comic_route.test.cjs",
             "tools/runtime_admin.test.cjs",
             "tools/runtime_health.test.cjs",
             "tools/runtime_lifecycle.test.cjs",

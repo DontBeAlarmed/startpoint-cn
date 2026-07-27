@@ -28,6 +28,7 @@
     "content:pass": "node scripts/gen_pass_mission_data.js",
     "content:active-mission": "node scripts/gen_active_mission_data.js",
     "verify:bundle": "node tools/server-bundle/verify.cjs",
+    "verify:runtime-pack": "node tools/runtime-pack/verify.cjs",
     "build:admin": "npm run build --workspace=starpoint-admin",
     "dev:admin": "npm run dev --workspace=starpoint-admin",
     "test:quick": "node tools/test-workflow/run.cjs --group quick",

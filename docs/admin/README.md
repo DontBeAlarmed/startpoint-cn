@@ -8,7 +8,7 @@
 
 `/player`、`/player/:id`、`/mail` 和 `/seeds` 仅保留到 `/admin/` 对应页面的兼容重定向。旧 `src/routes/web/` 和 `web/pages/` 已删除，不再提供服务器渲染 HTML。缺少或损坏 `web/dist/index.html` 时，运行时会在初始化阶段拒绝启动；游戏 API、管理 API 和 `/healthz` 不进入 SPA fallback。服务端不再挂载通用 `/public` 静态根。
 
-本地 `web/public/comic/` 仅保留为漫画业务接口的外置内容约定，图片由 `/api/index.php/comic/image` 读取。该目录不属于后台构建产物，也不进入 Server Bundle。
+普通开发默认从本地 `web/public/comic/` 读取漫画；嵌入模式通过绝对 `COMIC_DIR` 挂载外置漫画目录，未配置时漫画不可用。图片由 `/api/index.php/comic/image` 读取，该目录不属于后台构建产物，也不进入 Server Bundle。
 
 ## Web API
 

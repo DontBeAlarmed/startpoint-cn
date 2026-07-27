@@ -70,7 +70,9 @@ runtime-pack/
   runtime-pack-manifest.json
 ```
 
-`runtime-pack-manifest.json` 至少记录 `schemaVersion=1`、`runtimeApi=1`、完整 Node 版本、`process.versions.modules`、平台、CPU 架构和 `dependencyLock`。`dependencyLock` 是构建 Runtime Pack 所用原始 `package-lock.json` 字节的小写 SHA256（带 `sha256:` 前缀）；生产依赖必须由这份 lock 执行 `npm ci --omit=dev` 得到。Supervisor 只有在 Runtime Pack 与 Server Bundle 的 `runtimeApi`、Node/ABI、平台/架构和 `dependencyLock` 全部兼容时才可启动。
+`runtime-pack-manifest.json` 固定记录 `runtimeId`、`schemaVersion=1`、`runtimeApi=1`、完整 Node 版本、`process.versions.modules`、平台、CPU 架构、`dependencyLock`、可执行文件和完整文件摘要清单。`runtimeId` 是移除自身后的 canonical manifest SHA256；`dependencyLock` 是构建 Runtime Pack 所用原始 `package-lock.json` 字节的小写 SHA256（均带 `sha256:` 前缀）。生产依赖必须由这份 lock 执行 `npm ci --omit=dev` 得到。完整格式和独立 verifier 见 [`runtime/runtime-pack.md`](./runtime/runtime-pack.md)。
+
+Supervisor 必须先验证 Runtime Pack 文件集合、摘要、平台/架构和 Node ABI，再核对 Runtime Pack 与 Server Bundle 的 `runtimeApi`、Node 版本和 `dependencyLock`；任一条件不兼容时不得执行运行入口。
 
 日常开发和普通服务器部署使用当前环境默认 Node.js，不维护 Node 20/22 两套命令。Runtime Pack 制作者仍必须记录实际打包的完整 Node 版本和 ABI；依赖或原生模块变化时发布新的 Runtime Pack。
 
@@ -97,7 +99,7 @@ Bundle 不包含：
 - CDN 归档和 `asset-patch` payload；
 - 日志、APK、签名材料和 `web/public/` 本地内容（包括漫画大图）。
 
-漫画由部署者在 Bundle 外准备，并通过 `/api/index.php/comic/image` 业务接口读取本地 `web/public/comic/` 约定目录；Server Bundle 不提供通用 `/public` 静态根。
+漫画由部署者在 Bundle 外准备，并通过绝对 `COMIC_DIR` 显式挂载；未配置时嵌入模式不提供漫画图片。图片仍只通过 `/api/index.php/comic/image` 业务接口读取，Server Bundle 不提供通用 `/public` 静态根。
 
 构建、清单和 verifier 见 [`runtime/server-bundle.md`](./runtime/server-bundle.md)。Supervisor 必须在执行 `out/cn-server.js` 前运行等价的完整校验。服务进程只读取 manifest 的版本和 `bundleId` 用于健康报告，不在每次启动时重复哈希整个 Bundle。
 
@@ -193,6 +195,7 @@ Supervisor 以 Server Bundle 根为工作目录并执行 manifest `entry`。
 | `ASSET_MODE` | `local` | `client-owned` / `local` / `remote` |
 | `CDN_DIR` | `.cdn` | local 模式 CDN 父目录 |
 | `CDN_BASE_URL` | 无 | remote 必填；local 可覆盖公开地址 |
+| `COMIC_DIR` | 嵌入模式无 | 可选外置漫画根目录；设置时必须是与 Bundle、Data Volume、local CDN 隔离的绝对路径 |
 
 嵌入模式禁止设置旧 `WDFP_DATABASE_DIR`，也禁止设置 `CONTENT_DIR`、`CONTENT_STORE_DIR`、`CONTENT_STATE_DIR` 或 `CONTENT_RUNTIME_DIR`。Content Store、激活状态和 Asset Provider 可变数据因此都保留在唯一 `DATA_DIR`，bundled fallback 固定来自候选 Bundle 的 `assets/`；Supervisor 的一次停服备份可以覆盖全部可变状态。普通开发/服务器运行仍可使用这些兼容覆盖。
 
@@ -255,7 +258,7 @@ DATA_DIR=<ABSOLUTE_DATA_VOLUME> \
   },
   "database": {
     "ready": true,
-    "schema": 4
+    "schema": 10
   },
   "services": {
     "http": true,
@@ -276,9 +279,38 @@ DATA_DIR=<ABSOLUTE_DATA_VOLUME> \
 
 源码开发运行没有 manifest 时，`serverBundle.bundleId` 为 `null`，版本回退到 `package.json`。嵌入模式不允许该回退。后台是必需组件：缺少 `web/dist/index.html` 时运行时拒绝初始化，`admin.available=false` 也会阻止健康状态进入 ready；client-owned 的资源 `unknown` 仍不阻止 ready。
 
+## 日志流
+
+服务端 stdout、stderr 都是 UTF-8 字节流，以 `\n` 分隔记录；Supervisor 必须保留跨读取块的未完成行，并兼容最后一行没有换行的进程退出。stdout 用于普通运行信息，stderr 用于需要关注或导致失败的信息，但流本身不等价于最终日志级别。
+
+服务端现有普通文本是稳定兼容输入。逐步结构化的记录使用单行 JSON Lines：
+
+```json
+{"time":"2026-07-22T00:00:00.000Z","level":"info","source":"server","message":"ready"}
+```
+
+只有同时满足以下条件的行才按结构化日志解析：顶层是 JSON 对象，`time` 是 ISO-8601 字符串，`level` 是 `debug`、`info`、`warn`、`error` 之一，`source` 和 `message` 是字符串。解析失败或字段不完整时必须保留原始文本，不得丢弃。Supervisor 可以为普通文本补充接收时间，并根据来源流或已知前缀推导显示级别，但导出时必须保留原始行。
+
+服务端不负责长期保存进程日志。Launcher/Supervisor 负责容量限制、脱敏和导出；Android Launcher 的五分钟环形缓冲和错误快照策略见 [`runtime/android-launcher.md`](./runtime/android-launcher.md)。错误快照至少附带 Runtime Pack `runtimeId` 和 Node 版本、Server Bundle version 和 `bundleId`、数据库 schema、`ASSET_MODE`、退出码及最后一次健康状态。
+
 ## 更新与回滚
 
-契约 v1 只定义本地导入，不定义联网更新。推荐 Supervisor 布局：
+契约 v1 只定义本地导入，不定义联网更新。可验证对象始终是解包后的目录；用于文件选择器和跨设备传输时，标准容器是 ZIP：
+
+```text
+starpoint-cn-server-<serverVersion>.zip
+  server-bundle/
+    server-manifest.json
+    out/
+    assets/
+    web/dist/
+    LICENSE
+    NOTICE
+```
+
+ZIP 必须只有一个顶层 `server-bundle/` 目录，不得加密，不得包含符号链接、特殊文件、绝对路径、`..`、反斜杠路径或重复规范化路径。Supervisor 必须在解包前限制压缩包字节数、条目数和总解压字节数，在独占 staging 内解包，再对 `server-bundle/` 运行完整 verifier；不能直接从 ZIP 执行入口。具体上限属于宿主资源策略，必须在开始解包前配置，不能依赖 ZIP 声明值无限分配空间。
+
+推荐 Supervisor 布局：
 
 ```text
 <EMBEDDED_ROOT>/server/
@@ -320,6 +352,8 @@ Builder 和服务进程都不能自行操作这些指针。
 - `/healthz`；
 - 可重复 Server Bundle、canonical manifest 和独立 verifier；
 - Runtime Pack 依赖锁兼容校验与嵌入模式严格身份检查；
+- Runtime Pack canonical manifest 和独立 verifier；
+- 可选外置 `COMIC_DIR`，嵌入模式不再依赖 Bundle 内的 `web/public/`；
 - 必需管理后台产物。
 
 尚未属于服务端仓库的工作：

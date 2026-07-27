@@ -19,4 +19,6 @@ npm run verify:bundle -- /path/to/server-bundle --dependency-lock sha256:<runtim
 
 verifier 仅依赖 Node 内置模块和独立 canonical JSON 小模块。它会重新遍历 Bundle，并把 `out`、`assets`、`web/dist`、`LICENSE`、`NOTICE` 作为唯一允许的文件集合；即使伪造的 manifest 与额外文件彼此自洽，`web/public`、`web/pages`、`node_modules`、数据库、内容状态、CDN、APK、`asset-patch`、漫画和增量编译状态仍会被拒绝。它同时拒绝未知字段、不安全或重复路径、错序清单、符号链接、特殊文件、文件集合差异、摘要错误、`admin.required` 不为 `true`、缺少 admin 入口，以及不兼容的 runtime API、Node、Runtime Pack dependency lock 或可选数据 schema。
 
-漫画是宿主或部署者另行准备的外置本地内容，开发约定仍为 `web/public/comic/`，服务端仅通过 `/api/index.php/comic/image` 业务接口读取。该目录不作为通用 `/public` 静态根，也不进入 Server Bundle。
+漫画是宿主或部署者另行准备的外置本地内容。普通开发默认读取项目根 `web/public/comic/`；嵌入模式必须通过绝对 `COMIC_DIR` 显式挂载，未配置时漫画接口返回空列表或 404。该目录不作为通用 `/public` 静态根，也不进入 Server Bundle。
+
+Server Bundle 的可验证形态始终是目录。跨设备本地导入使用只有一个顶层 `server-bundle/` 的 ZIP，解包安全规则、staging 和回滚顺序以[嵌入式运行契约](../embedded-runtime-contract.md)为准；ZIP 自身不替代 manifest 和解包后 verifier。

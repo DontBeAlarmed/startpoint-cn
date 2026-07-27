@@ -49,7 +49,8 @@
 
 1. 阅读[嵌入式运行契约](./embedded-runtime-contract.md)。
 2. 从[运行时与宿主集成](./runtime/README.md)进入 Server Bundle、校验和启动职责。
-3. 宿主只依赖稳定契约，不应调用内部调试入口或直接修改运行时状态文件。
+3. Android 壳的产品边界和客户端补丁规则见 [Android Launcher 契约](./runtime/android-launcher.md)。
+4. 宿主只依赖稳定契约，不应调用内部调试入口或直接修改运行时状态文件。
 
 ## 文档规则
 
