@@ -28,8 +28,12 @@ function cleanup() {
 
 process.once("exit", cleanup)
 
-const { installBundledCharacterAndRewardSnapshot } = require("./helpers/install-bundled-character-reward-snapshot.cjs")
-restoreContentSnapshot = installBundledCharacterAndRewardSnapshot()
+const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const hardMultiQuests = structuredClone(require("../assets/hard_multi_event_quest.json"))
+hardMultiQuests["100002001"].clearRewardId = 999999999
+restoreContentSnapshot = installBundledGameplaySnapshot({
+    tableOverrides: { "hard_multi_event_quest.json": hardMultiQuests },
+})
 
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
@@ -40,7 +44,6 @@ const { activeQuests } = require("../src/lib/quest/active-quest-service")
 const { QuestCategory } = require("../src/lib/types")
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
 const { registerBattleRoutes } = require("../src/multi/http/battle")
-const hardMultiQuests = require("../assets/hard_multi_event_quest.json")
 
 initializeDatabase()
 db = getDb()
@@ -58,7 +61,6 @@ db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?
 
 const questId = 100002001
 const category = QuestCategory.HARD_MULTI_EVENT
-const originalQuest = { ...hardMultiQuests[String(questId)] }
 
 function activeQuest(isMulti) {
     return {
@@ -101,7 +103,6 @@ async function main() {
     await app.register(async instance => registerBattleRoutes(instance), { prefix: "/multi" })
     await app.ready()
 
-    hardMultiQuests[String(questId)].clearRewardId = 999999999
     const before = stateSnapshot()
 
     try {
@@ -161,7 +162,6 @@ async function main() {
         assert.deepEqual(stateSnapshot(), before, "联机 finish 配置错误不得写入")
         assert.deepEqual(activeQuests[playerId], activeQuest(true), "联机 active quest 必须保留")
     } finally {
-        hardMultiQuests[String(questId)] = originalQuest
         delete activeQuests[playerId]
         await app.close()
         cleanup()

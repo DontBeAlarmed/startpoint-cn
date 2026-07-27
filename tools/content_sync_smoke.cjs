@@ -983,6 +983,148 @@ function validateDirectOrderedMapTables({ definitions, readBundled, readRelease 
     return { tables: directDefinitions.length }
 }
 
+const QUEST_TABLE_CATEGORIES = Object.freeze({
+    "main_quest.json": 1,
+    "boss_battle_quest.json": 2,
+    "character_quest.json": 3,
+    "ex_quest.json": 4,
+    "daily_week_event_quest.json": 6,
+    "advent_event_quest.json": 7,
+    "story_event_single_quest.json": 10,
+    "ranking_event_single_quest.json": 11,
+    "challenge_dungeon_event_quest.json": 13,
+    "daily_exp_mana_event_quest.json": 14,
+    "world_story_event_quest.json": 18,
+    "world_story_event_boss_battle_quest.json": 19,
+    "tower_dungeon_event_quest.json": 20,
+    "expert_single_event_quest.json": 21,
+    "carnival_event_quest.json": 22,
+    "raid_event_quest.json": 23,
+    "rush_event_quest.json": 24,
+    "solo_time_attack_event_quest.json": 25,
+    "hard_multi_event_quest.json": 26,
+    "score_attack_event_quest.json": 27,
+})
+
+function canonicalJsonValue(value) {
+    if (Array.isArray(value)) return value.map(canonicalJsonValue)
+    if (!value || typeof value !== "object") return value
+    return Object.fromEntries(Object.keys(value).sort().map(key => (
+        [key, canonicalJsonValue(value[key])]
+    )))
+}
+
+function jsonDigest(value) {
+    return `sha256:${createHash("sha256")
+        .update(JSON.stringify(canonicalJsonValue(value)))
+        .digest("hex")}`
+}
+
+function validateQuestTables({ definitions, readRelease, expectedBaseline }) {
+    const fail = message => baselineError("CONTENT_SYNC_SMOKE_QUEST_BASELINE", message)
+    const questDefinitions = definitions.filter(definition => definition.converterId === "quest")
+    const expectedNames = Object.keys(expectedBaseline).sort()
+    const definitionNames = questDefinitions.map(definition => definition.tableName).sort()
+    if (!isDeepStrictEqual(definitionNames, expectedNames)) {
+        fail("关卡 Registry 与官方摘要表集合不一致")
+    }
+
+    for (const definition of questDefinitions) {
+        const table = readRelease(definition.tableName)
+        const expected = expectedBaseline[definition.tableName]
+        if (!table || typeof table !== "object" || Array.isArray(table)
+            || Object.keys(table).length !== expected.entries
+            || jsonDigest(table) !== expected.digest) {
+            fail(`${definition.tableName} 与 CN 1.4.54 官方关卡摘要不一致`)
+        }
+    }
+
+    const clearRewards = readRelease("clear_reward.json")
+    const scoreRewards = readRelease("score_reward.json")
+    const knownQuestKeys = new Set()
+    const knownQuestIds = new Set()
+    for (const [tableName, category] of Object.entries(QUEST_TABLE_CATEGORIES)) {
+        if (!expectedBaseline[tableName]) continue
+        const table = readRelease(tableName)
+        for (const [questId, quest] of Object.entries(table)) {
+            const key = `${category}_${questId}`
+            knownQuestKeys.add(key)
+            knownQuestIds.add(questId)
+            if (!quest || typeof quest !== "object" || typeof quest.name !== "string"
+                || quest.name.length === 0) {
+                fail(`${tableName}[${questId}] 缺少官方关卡名称`)
+            }
+            if (quest.element !== undefined
+                && (!Number.isSafeInteger(quest.element) || quest.element < 0 || quest.element > 5)) {
+                fail(`${tableName}[${questId}] 的推荐属性越界`)
+            }
+            for (const field of ["clearRewardId", "sPlusRewardId"]) {
+                const rewardId = quest[field]
+                if (rewardId !== undefined && !clearRewards[String(rewardId)]) {
+                    fail(`${tableName}[${questId}].${field} 未闭合到 clear_reward`)
+                }
+            }
+            if (quest.scoreRewardGroupId !== undefined
+                && !scoreRewards[String(quest.scoreRewardGroupId)]) {
+                fail(`${tableName}[${questId}].scoreRewardGroupId 未闭合到 score_reward`)
+            }
+        }
+    }
+
+    if (expectedBaseline["quest_lookup.json"]) {
+        const lookup = readRelease("quest_lookup.json")
+        for (const key of knownQuestKeys) {
+            if (typeof lookup[key] !== "string" || lookup[key].length === 0) {
+                fail(`quest_lookup.json 缺少 ${key}`)
+            }
+        }
+        const practiceQuests = readRelease("practice_quest.json")
+        for (const questId of Object.keys(practiceQuests)) {
+            if (typeof lookup[`15_${questId}`] !== "string") {
+                fail(`quest_lookup.json 缺少兼容练习关卡 15_${questId}`)
+            }
+        }
+    }
+    if (expectedBaseline["daily_challenge_point_lookup.json"]
+        && expectedBaseline["event_challenge_point_map.json"]) {
+        const dailyChallengePoints = readRelease("daily_challenge_point_lookup.json")
+        for (const [eventKey, challengePointId] of Object.entries(
+            readRelease("event_challenge_point_map.json"),
+        )) {
+            if (!Number.isSafeInteger(challengePointId)
+                || challengePointId <= 0
+                || !Object.hasOwn(dailyChallengePoints, String(challengePointId))) {
+                fail(`event_challenge_point_map.json[${eventKey}] 未闭合到每日挑战点`)
+            }
+        }
+    }
+    if (expectedBaseline["quest_entry_costs.json"]) {
+        for (const [key, cost] of Object.entries(readRelease("quest_entry_costs.json"))) {
+            if (!knownQuestKeys.has(key)
+                || !cost || typeof cost !== "object"
+                || !Number.isSafeInteger(cost.stamina) || cost.stamina < 0
+                || !Number.isSafeInteger(cost.itemId) || cost.itemId < 0
+                || !Number.isSafeInteger(cost.itemCount) || cost.itemCount < 0
+                || ((cost.itemId === 0) !== (cost.itemCount === 0))) {
+                fail(`quest_entry_costs.json[${key}] 非法或没有对应关卡`)
+            }
+        }
+    }
+    if (expectedBaseline["quest_unlock_costs.json"]) {
+        for (const [questId, cost] of Object.entries(readRelease("quest_unlock_costs.json"))) {
+            if (!knownQuestIds.has(questId)
+                || !cost || typeof cost !== "object"
+                || !Array.isArray(cost.itemIds) || !Array.isArray(cost.itemCounts)
+                || cost.itemIds.length === 0 || cost.itemIds.length !== cost.itemCounts.length
+                || cost.itemIds.some(value => !Number.isSafeInteger(value) || value <= 0)
+                || cost.itemCounts.some(value => !Number.isSafeInteger(value) || value <= 0)) {
+                fail(`quest_unlock_costs.json[${questId}] 非法或没有对应关卡`)
+            }
+        }
+    }
+    return { tables: questDefinitions.length }
+}
+
 function validateRewardTables({
     bundled,
     release,
@@ -1105,6 +1247,14 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
         readRelease: tableName => repository.table(tableName),
     })
+    const questStats = validateQuestTables({
+        definitions: runtime.TABLE_SOURCES,
+        readRelease: tableName => repository.table(tableName),
+        expectedBaseline: readJson(
+            paths.projectRoot,
+            "tools/fixtures/content-quest/baseline-1.4.54.json",
+        ),
+    })
     const rewardTableNames = [
         "clear_reward.json",
         "score_reward.json",
@@ -1197,6 +1347,7 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         campaigns: gachaStats.campaigns,
         featureEntries: gachaStats.featureEntries,
         directTables: directStats.tables,
+        questTables: questStats.tables,
         rewardTables: rewardStats.tables,
         shops: Object.values(shopStats).reduce((sum, count) => sum + count, 0),
     }
@@ -1348,6 +1499,7 @@ module.exports = {
     validateCharacters,
     validateDirectOrderedMapTables,
     validateGachas,
+    validateQuestTables,
     validateReleaseClosure,
     validateRewardTables,
     validateShops,

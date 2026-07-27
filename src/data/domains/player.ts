@@ -8,12 +8,16 @@ import { isNewDay, isNewWeek } from "../../lib/time-utils";
 import { buildPeriodicSnapshotData, getPassWeekSnapshotType, getSnapshot, initializePeriodicMissionSnapshots, takeSnapshot } from "../../lib/mission/snapshot";
 import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "../../lib/mission/master-data";
 import { ensurePlayerPassCardLoginProgressSync } from "./pass-card";
-import dailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
+import bundledDailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 
 type DailyChallengePointLookup = Record<string, { maxPoint: number, isRecovery: boolean, name: string }>
 
 function getDailyChallengePointDefaults(): DailyChallengePointListEntry[] {
-    const lookup = dailyChallengePointLookup as DailyChallengePointLookup
+    const lookup = getRuntimeContentTableSync(
+        "daily_challenge_point_lookup.json",
+        bundledDailyChallengePointLookup as DailyChallengePointLookup,
+    )
     const entries: DailyChallengePointListEntry[] = []
     for (const [idStr, data] of Object.entries(lookup)) {
         entries.push({
@@ -1276,7 +1280,10 @@ export function dailyResetPlayerDataSync(
             } else {
                 // Reset existing entries to CDN max
                 for (const entry of dcEntries) {
-                    const cdn = (dailyChallengePointLookup as DailyChallengePointLookup)[String(entry.id)]
+                    const cdn = getRuntimeContentTableSync(
+                        "daily_challenge_point_lookup.json",
+                        bundledDailyChallengePointLookup as DailyChallengePointLookup,
+                    )[String(entry.id)]
                     const maxPoint = cdn?.maxPoint ?? entry.point
                     updatePlayerDailyChallengePointSync(playerId, entry.id, maxPoint + entry.campaignList.reduce((s, c) => s + c.additionalPoint, 0))
                 }

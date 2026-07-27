@@ -300,6 +300,7 @@ function withContentTables(overrides, callback) {
         "item_sale.json": itemSale,
         "main_quest.json": mainQuests,
         "mana_board.json": manaBoard,
+        "challenge_dungeon_event_quest.json": require("../assets/challenge_dungeon_event_quest.json"),
         ...overrides,
     }
     productionContentSnapshotProvider.snapshot = {

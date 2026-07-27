@@ -1,4 +1,10 @@
 import { deepFreeze } from "../deep-freeze"
+import {
+    QUEST_AUXILIARY_SOURCES,
+    QUEST_TABLE_SOURCES,
+    type QuestDerivedTableName,
+    type QuestTableName,
+} from "../converters/quest"
 import type {
     ContentSourceReference,
     GachaOddsDynamicSourceReference,
@@ -9,6 +15,7 @@ export interface TableSourceDefinition {
     readonly tableName: string
     readonly scope: TableScope
     readonly sourceOrderedMaps: readonly string[]
+    readonly bundledSources: readonly string[]
     readonly dynamicSources: readonly GachaOddsDynamicSourceReference[]
     readonly manifestSources: readonly ContentSourceReference[]
     readonly bundledPath: string
@@ -19,8 +26,9 @@ export interface TableSourceDefinition {
 
 type TableSourceInput = Omit<
     TableSourceDefinition,
-    "bundledPath" | "dynamicSources" | "manifestSources"
+    "bundledPath" | "bundledSources" | "dynamicSources" | "manifestSources"
 > & {
+    readonly bundledSources?: readonly string[]
     readonly dynamicSources?: readonly GachaOddsDynamicSourceReference[]
 }
 
@@ -88,53 +96,28 @@ const REWARD_TABLES = [
 ] as const
 
 const BUNDLED_TABLE_NAMES = [
-    "advent_event_quest.json",
-    "boss_battle_quest.json",
     "box_gacha.json",
     "box_gacha_box_settings.json",
     "box_reward.json",
-    "carnival_event_quest.json",
     "carnival_event_total_score_reward.json",
     "cdndata/player_rank_full.json",
-    "challenge_dungeon_event_quest.json",
-    "character_quest.json",
-    "daily_challenge_point_lookup.json",
-    "daily_exp_mana_event_quest.json",
-    "daily_week_event_quest.json",
     "encyclopedia.json",
     "equipment_craft.json",
     "equipment_dissolve.json",
     "equipment_gacha_movie_probability.json",
     "equipment_ids.json",
     "equipment_lookup.json",
-    "event_challenge_point_map.json",
     "ex_boost.json",
-    "ex_quest.json",
     "ex_status.json",
-    "expert_single_event_quest.json",
-    "hard_multi_event_quest.json",
     "item_data.json",
     "item_ids.json",
     "item_lookup.json",
     "item_sale.json",
-    "main_quest.json",
     "mana_node.json",
     "mission_event_battle_rules.json",
     "mission_event_quest_map.json",
     "practice_quest.json",
-    "quest_entry_costs.json",
-    "quest_lookup.json",
-    "quest_unlock_costs.json",
     "raid_event.json",
-    "raid_event_quest.json",
-    "ranking_event_single_quest.json",
-    "rush_event_quest.json",
-    "score_attack_event_quest.json",
-    "solo_time_attack_event_quest.json",
-    "story_event_single_quest.json",
-    "tower_dungeon_event_quest.json",
-    "world_story_event_boss_battle_quest.json",
-    "world_story_event_quest.json",
 ] as const
 
 const SERVER_TABLE_NAMES = [
@@ -176,6 +159,33 @@ function rewardDefinition(tableName: string, sourceOrderedMap: string): TableSou
         scope: "cdn",
         sourceOrderedMaps: [sourceOrderedMap],
         converterId: "reward",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    }
+}
+
+function questDefinition(tableName: QuestTableName): TableSourceInput {
+    return {
+        tableName,
+        scope: "cdn",
+        sourceOrderedMaps: [QUEST_TABLE_SOURCES[tableName].logicalPath],
+        converterId: "quest",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    }
+}
+
+function questDerivedDefinition(
+    tableName: QuestDerivedTableName,
+    sourceOrderedMaps: readonly string[],
+    bundledSources: readonly string[] = [],
+): TableSourceInput {
+    return {
+        tableName,
+        scope: "cdn",
+        sourceOrderedMaps,
+        bundledSources,
+        converterId: "quest",
         converterVersion: 1,
         outputShapeVersion: 1,
     }
@@ -354,16 +364,50 @@ const definitionInputs: TableSourceInput[] = [
     ...REWARD_TABLES.map(([tableName, sourceOrderedMap]) => (
         rewardDefinition(tableName, sourceOrderedMap)
     )),
+    ...(Object.keys(QUEST_TABLE_SOURCES) as QuestTableName[]).map(questDefinition),
+    questDerivedDefinition(
+        "daily_challenge_point_lookup.json",
+        [QUEST_AUXILIARY_SOURCES.dailyChallengePoint],
+    ),
+    questDerivedDefinition(
+        "event_challenge_point_map.json",
+        [
+            QUEST_AUXILIARY_SOURCES.expertSingleEvent,
+            QUEST_AUXILIARY_SOURCES.soloTimeAttackEvent,
+        ],
+    ),
+    questDerivedDefinition(
+        "quest_entry_costs.json",
+        Object.values(QUEST_TABLE_SOURCES).map(source => source.logicalPath),
+    ),
+    questDerivedDefinition(
+        "quest_lookup.json",
+        [
+            ...Object.values(QUEST_TABLE_SOURCES).map(source => source.logicalPath),
+            QUEST_AUXILIARY_SOURCES.practiceQuest,
+        ],
+        ["assets/practice_quest.json"],
+    ),
+    questDerivedDefinition(
+        "quest_unlock_costs.json",
+        Object.values(QUEST_TABLE_SOURCES).map(source => source.logicalPath),
+    ),
     ...BUNDLED_TABLE_NAMES.map(bundledDefinition),
     ...SERVER_TABLE_NAMES.map(serverDefinition),
 ]
 
 const definitions: TableSourceDefinition[] = definitionInputs.map(definition => {
+    const bundledSources = definition.bundledSources ?? []
     const dynamicSources = definition.dynamicSources ?? []
     return {
         ...definition,
+        bundledSources,
         dynamicSources,
-        manifestSources: [...definition.sourceOrderedMaps, ...dynamicSources],
+        manifestSources: [
+            ...definition.sourceOrderedMaps,
+            ...bundledSources,
+            ...dynamicSources,
+        ],
         bundledPath: `assets/${definition.tableName}`,
     }
 })

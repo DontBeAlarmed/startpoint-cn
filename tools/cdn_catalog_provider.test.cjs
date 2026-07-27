@@ -908,7 +908,8 @@ test("legacy version facade derives every runtime version from the pinned snapsh
 
 test("CN load publishes available_asset_version from the same content snapshot", () => {
     const source = fs.readFileSync(path.join(__dirname, "../src/routes/cn/load.ts"), "utf8")
-    assert.match(source, /getContentSnapshot\(\)\.cdn\.targetVersion/)
+    assert.match(source, /const contentSnapshot = getContentSnapshot\(\)/)
+    assert.match(source, /contentSnapshot\.cdn\.targetVersion/)
     assert.doesNotMatch(source, /getEffectiveVersion/)
     assert.doesNotMatch(source, /detectCDNVersion/)
     assert.doesNotMatch(source, /scanCdnCatalogInput/)
@@ -952,7 +953,8 @@ test("CN runtime coordinator initializes content before HTTP and TCP listening",
     assert.ok(readyIndex < listenIndex)
     assert.ok(listenIndex < sessionIndex)
     assert.doesNotMatch(entrySource, /^await\s/m)
-    assert.match(entrySource, /initializeContent:\s*config\s*=>\s*initializeContentSnapshot\(/)
+    assert.match(entrySource, /createContentLifecycleDependencies/)
+    assert.match(entrySource, /initializeContentSnapshot:\s*config\s*=>\s*initializeContentSnapshot\(/)
     assert.match(entrySource, /listenHttp:\s*config\s*=>\s*fastify\.listen\(/)
     assert.match(entrySource, /startTcp:\s*\(config, onFatalError\)\s*=>\s*startSessionServer\(/)
     assert.match(entrySource, /registerCnAssetProviderRoutes\(fastify/)

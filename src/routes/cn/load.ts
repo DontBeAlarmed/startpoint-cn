@@ -18,7 +18,8 @@ import {
     resolveAssetLoadState,
     type AssetProviderConfig,
 } from "../../content/cdn/asset-mode";
-import questEntryCosts from "../../../assets/quest_entry_costs.json";
+import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { reconcileActiveMissionFacts } from "../../lib/mission/active-reconciliation";
 import { recordEventLoginMissionFactSync } from "../../lib/mission/event-entry-facts";
 import { setCnMsgpackPendingCommit } from "./msgpack";
@@ -170,7 +171,10 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             } else {
                 activeQuest = restoreActiveQuestFromStorage(playerId, activeQuest, {
                     getEntryCost: (category, questId) => (
-                        questEntryCosts as Record<string, StartEntryCost>
+                        getRuntimeContentTableSync(
+                            "quest_entry_costs.json",
+                            bundledQuestEntryCosts as Record<string, StartEntryCost>,
+                        )
                     )[`${category}_${questId}`],
                     persistEntryItemCount: updatePlayerActiveQuestEntryItemCountSync,
                     publishActiveQuest,

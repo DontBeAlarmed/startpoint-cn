@@ -5,7 +5,7 @@
 | 模块 | 服务端实现 | 自动测试 | CN 客户端 / 宿主验收 | 权威文档 |
 |---|---|---|---|---|
 | 运行时启动 | 基本完成：构建、资源模式、Content snapshot、HTTP/TCP 生命周期、信号退出和健康检查已接线 | 启动顺序、失败清理、信号和编译产物覆盖较强 | CN 客户端可登录和运行；资源模式组合仍需按部署环境复核 | [当前架构](../architecture.md)、[运行服务](../getting-started/README.md) |
-| CDN Content Sync | 阶段 B 进行中：109 张表中 58 张由 CDN 动态转换、47 张派生表继续 bundled、4 张为 server 内容；直接表支持一至三层 OrderedMap 递归还原，奖励域 6 张已派生 | 转换器、Release、Catalog、snapshot 和启动同步覆盖较强；35 张直接表与 6 张奖励表已纳入真实 CDN 基线，完整 smoke 仍为手工流程 | 官方 CN 1.4.54 基线可运行；Range、断点续传和不同部署模式待专项复核 | [Content Sync](../cdn/content-sync.md)、[运行支持边界](../cdn/runtime-support.md) |
+| CDN Content Sync | 阶段 B 进行中：109 张表中 83 张由 CDN 动态转换、22 张继续 bundled、4 张为 server 内容；直接表 35 张、奖励域 6 张、关卡域 20+5 张已动态化 | 转换器、Release、Catalog、snapshot 和启动同步覆盖较强；真实 1.4.54 CDN smoke 锁定关卡 canonical 摘要、奖励引用、元素、入场和解锁索引闭包 | 官方 CN 1.4.54 基线可运行；Range、断点续传和不同部署模式待专项复核 | [Content Sync](../cdn/content-sync.md)、[运行支持边界](../cdn/runtime-support.md) |
 | 账号与存档 | 设备绑定、多存档、默认存档、导入、导出和克隆已实现；完整性仍是部分完成 | 数据层和部分后台行为有覆盖，缺少完整导入导出端到端矩阵 | 日常登录与存档选择有实际使用；完整导入、恢复和克隆仍待系统复核 | [存档与输入校验](../systems/save-validation.md) |
 | 邮件 | 列表、单领、全领、后台定向发送已实现；主要装备、抽卡、商店、养成、任务和关卡成功写响应统一动态返回 `mail_arrived`，读取、stub 和非成功 `result_code` 响应不保证携带 | 附件规则、通知 helper、四类核心写响应接线和部分后台逻辑有覆盖，缺少全部支持类型与通知链路测试 | 若干附件问题已实测修复；当前 12 种支持附件、各业务响应后的未读刷新和异常回滚待完整验收 | [邮件](../systems/mail.md) |
 | 管理后台 | React/Vite 是唯一界面且为构建、运行和 Bundle 必需产物，Web API 已接入；旧路径仅兼容重定向 | workspace 构建、路由隔离、运行时硬失败、Bundle/verifier、部分 API helper 与源码契约有覆盖，无完整浏览器交互测试 | 不属于 CN 客户端验收；手机、平板、电脑和破坏性操作人工验收未完成 | [管理后台](../admin/README.md) |

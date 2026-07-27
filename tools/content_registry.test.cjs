@@ -137,6 +137,45 @@ const EXPECTED_REWARD_CDN_TABLES = Object.freeze({
     "rush_event_ranking_reward.json": "master/quest/event/rush_event_ranking_reward.orderedmap",
 })
 
+const EXPECTED_QUEST_CDN_TABLES = Object.freeze({
+    "main_quest.json": "master/quest/main_quest.orderedmap",
+    "ex_quest.json": "master/quest/ex_quest.orderedmap",
+    "boss_battle_quest.json": "master/quest/boss_battle_quest.orderedmap",
+    "character_quest.json": "master/quest/character_quest.orderedmap",
+    "world_story_event_quest.json": "master/quest/event/world_story_event_quest.orderedmap",
+    "world_story_event_boss_battle_quest.json": "master/quest/event/world_story_event_boss_battle_quest.orderedmap",
+    "advent_event_quest.json": "master/quest/event/advent_event_quest.orderedmap",
+    "daily_exp_mana_event_quest.json": "master/quest/event/daily_exp_mana_event_quest.orderedmap",
+    "daily_week_event_quest.json": "master/quest/event/daily_week_event_quest.orderedmap",
+    "challenge_dungeon_event_quest.json": "master/quest/event/challenge_dungeon_event_quest.orderedmap",
+    "story_event_single_quest.json": "master/quest/event/story_event_single_quest.orderedmap",
+    "ranking_event_single_quest.json": "master/quest/event/ranking_event_single_quest.orderedmap",
+    "solo_time_attack_event_quest.json": "master/quest/event/solo_time_attack_event_quest.orderedmap",
+    "tower_dungeon_event_quest.json": "master/quest/event/tower_dungeon_event_quest.orderedmap",
+    "expert_single_event_quest.json": "master/quest/event/expert_single_event_quest.orderedmap",
+    "carnival_event_quest.json": "master/quest/event/carnival_event_quest.orderedmap",
+    "rush_event_quest.json": "master/quest/event/rush_event_quest.orderedmap",
+    "raid_event_quest.json": "master/quest/event/raid_event_quest.orderedmap",
+    "score_attack_event_quest.json": "master/quest/event/score_attack_event_quest.orderedmap",
+    "hard_multi_event_quest.json": "master/quest/event/hard_multi_event_quest.orderedmap",
+})
+
+const EXPECTED_QUEST_DERIVED_CDN_TABLES = Object.freeze({
+    "daily_challenge_point_lookup.json": [
+        "master/quest/event/daily_challenge_point.orderedmap",
+    ],
+    "event_challenge_point_map.json": [
+        "master/quest/event/expert_single_event.orderedmap",
+        "master/quest/event/solo_time_attack_event.orderedmap",
+    ],
+    "quest_entry_costs.json": Object.values(EXPECTED_QUEST_CDN_TABLES),
+    "quest_lookup.json": [
+        ...Object.values(EXPECTED_QUEST_CDN_TABLES),
+        "master/quest/practice/practice_quest.orderedmap",
+    ],
+    "quest_unlock_costs.json": Object.values(EXPECTED_QUEST_CDN_TABLES),
+})
+
 const EXPECTED_BUNDLED_TABLES = Object.freeze([
     "advent_event_quest.json",
     "boss_battle_quest.json",
@@ -346,6 +385,22 @@ test("registry derives reward tables from their official OrderedMap sources", ()
     }
 })
 
+test("registry derives authoritative quest tables from official OrderedMap sources", () => {
+    for (const [tableName, source] of Object.entries(EXPECTED_QUEST_CDN_TABLES)) {
+        const entry = findTableSource(tableName)
+        assert.equal(entry.scope, "cdn", tableName)
+        assert.equal(entry.converterId, "quest", tableName)
+        assert.deepEqual(entry.sourceOrderedMaps, [source], tableName)
+    }
+    for (const [tableName, sources] of Object.entries(EXPECTED_QUEST_DERIVED_CDN_TABLES)) {
+        const entry = findTableSource(tableName)
+        assert.equal(entry.scope, "cdn", tableName)
+        assert.equal(entry.converterId, "quest", tableName)
+        assert.deepEqual(entry.sourceOrderedMaps, sources, tableName)
+    }
+    assert.equal(findTableSource("practice_quest.json").scope, "bundled")
+})
+
 test("registry and release manifest explicitly describe referenced gacha odds sources", () => {
     const gacha = findTableSource("gacha.json")
 
@@ -396,6 +451,8 @@ test("registry closes over current static runtime tables", () => {
             .filter(tableName => (
                 !(tableName in EXPECTED_DIRECT_CDN_TABLES)
                 && !(tableName in EXPECTED_REWARD_CDN_TABLES)
+                && !(tableName in EXPECTED_QUEST_CDN_TABLES)
+                && !(tableName in EXPECTED_QUEST_DERIVED_CDN_TABLES)
             ))
             .sort(),
     )

@@ -13,7 +13,7 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 
 同步器负责严格解析、引用闭包、稳定输出和文件系统安全，不负责判断 CDN 作者给出的 ID、赔率、奖励、价格或资源内容是否合理。服务端不会替 CDN 作者猜测缺失内容、复制其他活动数据、修复非法主数据或自动生成客户端补丁。
 
-阶段 B 当前把 Registry 的 109 张表分为 `58 CDN + 47 bundled + 4 server`。原阶段 A 的五个动态领域为：
+阶段 B 当前把 Registry 的 109 张表分为 `83 CDN + 22 bundled + 4 server`。原阶段 A 的五个动态领域为：
 
 | 领域 | 动态输出 |
 |---|---|
@@ -27,6 +27,15 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 
 奖励领域另有 6 张派生表从官方 OrderedMap 动态生成：Clear、Score、Rare Score、Score Attack Border、Rush Folder 和 Rush Ranking。转换器保留原始位置、概率、数量和多奖励槽，并修正历史 bundled 的 5 条 Clear Reward 字段误复制及 82 个无意义 `id:null`。早期活动代币中另有 47 行官方 ID 与 bundled 世代 ID 不同；smoke 只在 `item_lookup` 名称一致时视为同一代币族，实际发奖仍由业务层按服务器时间选择开放期 ID。
 
+关卡领域从 20 张官方 Quest OrderedMap 动态生成 20 张运行关卡表，并在同一转换批次生成
+`quest_entry_costs.json`、`quest_unlock_costs.json`、`quest_lookup.json`、
+`daily_challenge_point_lookup.json` 和 `event_challenge_point_map.json`。运行时的关卡名称、首通/SS
+奖励、普通掉落组、推荐属性、体力、Always 门票、Once 解锁道具和挑战点都来自同一 Release，
+不会把新版关卡与旧 bundled 索引混用。转换器按 CN 1.8.1 生成类校正了 Advent、Story、
+Challenge、Tower、Hard Multi 等历史列偏移；其中 Hard Multi 体力列为 `70`，不是旧脚本猜测的
+`69`。官方 1.4.54 基线为 5159 条动态关卡、3045 条入场成本、9 条 Once 解锁成本、5257 条
+后台关卡名称（含 98 个 bundled 兼容练习关卡）、282 条每日挑战点和 3 条活动挑战点映射。
+
 任务技能效果索引只记录 CDN 能直接证明的角色技能效果。服务端在同步阶段解压并解析
 `*.action.dsl.amf3.deflate`，识别 `CreateNormalHeal`、`CreateRatioHeal`、`ACRegeneration`，以及
 负值 `ACToleranceOfElement` 对应的 `ACToleranceOfElement_Down`。无法读取或解码的程序会进入表内
@@ -36,7 +45,7 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 Content Sync 时，20015/20016 会保持 fail closed。使用官方 CDN 执行同步后，当前 Release 才会包含实际
 角色效果索引。
 
-Registry 仍要求每个 Release 闭合当前全部注册表。剩余 47 张 bundled 表中，45 张有官方来源但需要业务派生结构、跨表 lookup 或服务端索引转换；`cdndata/player_rank_full.json` 的 `0..100` 等级数据来自历史实测，`quest_unlock_costs.json` 仍有 6 项无法由官方 1.4.54 主数据闭合，这两张缺少完整权威来源，继续保留兼容 fallback。上述表不会因为 CDN OrderedMap 改动而自动变化。迁移时必须逐表证明来源、字段映射和输出闭包，不能把文件名相近当作可直接复制的证据。4 张 `server` 表为服务端配置或后台内容，不属于 CDN 转换范围。
+Registry 仍要求每个 Release 闭合当前全部注册表。剩余 22 张 bundled 表继续作为待迁移业务派生结构或兼容数据；其中 `cdndata/player_rank_full.json` 的 `0..100` 等级数据来自历史实测，`practice_quest.json` 还保留 7 个官方 1.4.54 OrderedMap 不包含的兼容 ID，因此不能伪装成完整 CDN 转换结果。上述表不会因为 CDN OrderedMap 改动而自动变化。迁移时必须逐表证明来源、字段映射和输出闭包，不能把文件名相近当作可直接复制的证据。4 张 `server` 表为服务端配置或后台内容，不属于 CDN 转换范围。
 
 ## 受支持输入
 
@@ -168,6 +177,7 @@ smoke 始终执行 force sync，并验证：
 - Release、Repository、Catalog 都是 1.4.54；当前 Registry 全部表及所有对象引用闭合；
 - 35 张通用递归 OrderedMap 表逐张与 bundled 官方 1.4.54 基线深度相等；
 - 6 张奖励派生表逐张闭合；按 `differences-1.4.54.json` 的具体键、位置与 ID 元组，只接受 5 条 Clear 字段修正、82 个空 id 清理和 47 个同名活动代币别名；
+- 20 张关卡表和 5 张关卡派生表匹配固定 canonical 摘要；名称非空、推荐属性为 `0..5`，Clear/SS 与普通掉落组全部闭合到同一 Release 的奖励表，入场和解锁索引只能引用当前关卡；98 个 bundled 兼容练习关卡必须全部进入名称索引，活动挑战点必须引用同一 Release 的每日挑战点；
 - 两张角色 cdndata 各 505 行，运行时 505 个角色；名称、稀有度、属性与 bundled 一致；
 - 只允许已记录的 45 个 `skill_count` 从 3 变为 6，12 个 `skill_count=2` 保持不变；
 - 卡池 raw row 为 584、campaign 为 145，全部非空 odds 已成功读取；

@@ -12,11 +12,11 @@ const {
     productionContentSnapshotProvider,
 } = require("../src/content/runtime/content-snapshot")
 const {
-    installBundledCharacterAndRewardSnapshot,
-} = require("./helpers/install-bundled-character-reward-snapshot.cjs")
+    installBundledGameplaySnapshot,
+} = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 
 const previousContentSnapshot = productionContentSnapshotProvider.snapshot
-const restoreBundledCharacterSnapshot = installBundledCharacterAndRewardSnapshot()
+const restoreBundledCharacterSnapshot = installBundledGameplaySnapshot()
 function restoreBundledCharacterSnapshotOnExit() {
     restoreBundledCharacterSnapshot()
 }
@@ -38,7 +38,7 @@ assert.strictEqual(
 )
 assert.throws(
     () => bundledCharacterSnapshot.repository.table("gacha.json"),
-    /unexpected character\/reward table gacha\.json/
+    /unexpected gameplay table gacha\.json/
 )
 
 function testTopLevelFailureRestoresBundledCharacterSnapshot() {
@@ -52,11 +52,11 @@ function testTopLevelFailureRestoresBundledCharacterSnapshot() {
             productionContentSnapshotProvider,
         } = require(process.env.CONTENT_SNAPSHOT_RUNTIME_PATH)
         const {
-            installBundledCharacterAndRewardSnapshot,
+            installBundledGameplaySnapshot,
         } = require(process.env.BUNDLED_CHARACTER_HELPER_PATH)
 
         const previousSnapshot = productionContentSnapshotProvider.snapshot
-        const restore = installBundledCharacterAndRewardSnapshot({
+        const restore = installBundledGameplaySnapshot({
             onRestore() {
                 assert.strictEqual(productionContentSnapshotProvider.snapshot, previousSnapshot)
                 fs.writeFileSync(process.env.RESTORE_MARKER_PATH, "restored")
@@ -72,7 +72,7 @@ function testTopLevelFailureRestoresBundledCharacterSnapshot() {
             ...process.env,
             BUNDLED_CHARACTER_HELPER_PATH: path.join(
                 __dirname,
-                "helpers/install-bundled-character-reward-snapshot.cjs"
+                "helpers/install-bundled-gameplay-snapshot.cjs"
             ),
             CONTENT_SNAPSHOT_RUNTIME_PATH: path.join(
                 __dirname,

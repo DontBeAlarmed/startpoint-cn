@@ -318,6 +318,100 @@ test("直接 OrderedMap 表必须逐张等于 bundled 官方基线", () => {
     ))
 })
 
+test("关卡派生表必须匹配官方摘要且奖励引用闭合", () => {
+    function canonical(value) {
+        if (Array.isArray(value)) return value.map(canonical)
+        if (!value || typeof value !== "object") return value
+        return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]))
+    }
+    const definitions = [
+        { tableName: "main_quest.json", converterId: "quest" },
+        { tableName: "practice_quest.json", converterId: "bundled-json" },
+    ]
+    const release = {
+        "main_quest.json": {
+            1: { name: "关卡", clearRewardId: 10, rankPointReward: 10, element: 0 },
+        },
+        "clear_reward.json": { 10: { reward_type: 4, count: 1 } },
+        "score_reward.json": {},
+    }
+    const expectedBaseline = {
+        "main_quest.json": {
+            entries: 1,
+            digest: `sha256:${crypto.createHash("sha256")
+                .update(JSON.stringify(canonical(release["main_quest.json"])))
+                .digest("hex")}`,
+        },
+    }
+    assert.deepEqual(smoke.validateQuestTables({
+        definitions,
+        readRelease: tableName => release[tableName],
+        expectedBaseline,
+    }), { tables: 1 })
+
+    release["main_quest.json"][1].rankPointReward = 11
+    assert.throws(() => smoke.validateQuestTables({
+        definitions,
+        readRelease: tableName => release[tableName],
+        expectedBaseline,
+    }), error => error?.code === "CONTENT_SYNC_SMOKE_QUEST_BASELINE")
+})
+
+test("关卡派生引用必须闭合到练习关卡与每日挑战点", () => {
+    const definitions = [
+        "daily_challenge_point_lookup.json",
+        "event_challenge_point_map.json",
+        "quest_lookup.json",
+    ].map(tableName => ({ tableName, converterId: "quest" }))
+    function canonical(value) {
+        if (Array.isArray(value)) return value.map(canonical)
+        if (!value || typeof value !== "object") return value
+        return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]))
+    }
+    function expectedBaseline(release) {
+        return Object.fromEntries(definitions.map(({ tableName }) => {
+            const table = release[tableName]
+            return [tableName, {
+                entries: Object.keys(table).length,
+                digest: `sha256:${crypto.createHash("sha256")
+                    .update(JSON.stringify(canonical(table)))
+                    .digest("hex")}`,
+            }]
+        }))
+    }
+    const release = {
+        "daily_challenge_point_lookup.json": {
+            1: { maxPoint: 1, isRecovery: false, name: "挑战次数" },
+        },
+        "event_challenge_point_map.json": { expert_1: 1 },
+        "quest_lookup.json": { "15_91": "" },
+        "practice_quest.json": { 91: { name: "" } },
+        "clear_reward.json": {},
+        "score_reward.json": {},
+    }
+    assert.deepEqual(smoke.validateQuestTables({
+        definitions,
+        readRelease: tableName => release[tableName],
+        expectedBaseline: expectedBaseline(release),
+    }), { tables: 3 })
+
+    const missingPractice = structuredClone(release)
+    delete missingPractice["quest_lookup.json"]["15_91"]
+    assert.throws(() => smoke.validateQuestTables({
+        definitions,
+        readRelease: tableName => missingPractice[tableName],
+        expectedBaseline: expectedBaseline(missingPractice),
+    }), error => error?.code === "CONTENT_SYNC_SMOKE_QUEST_BASELINE")
+
+    const danglingChallengePoint = structuredClone(release)
+    danglingChallengePoint["event_challenge_point_map.json"].expert_1 = 251
+    assert.throws(() => smoke.validateQuestTables({
+        definitions,
+        readRelease: tableName => danglingChallengePoint[tableName],
+        expectedBaseline: expectedBaseline(danglingChallengePoint),
+    }), error => error?.code === "CONTENT_SYNC_SMOKE_QUEST_BASELINE")
+})
+
 test("奖励表比较只接受已锁定的 bundled 空 id 与 clear reward 误复制", () => {
     assert.equal(typeof smoke.validateRewardTables, "function")
     const expectedDifferences = {

@@ -6,7 +6,8 @@ import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getQuestFromCategorySync } from "../../lib/assets";
 import { generateDataHeaders } from "../../utils";
-import questUnlockCosts from "../../../assets/quest_unlock_costs.json";
+import bundledQuestUnlockCosts from "../../../assets/quest_unlock_costs.json";
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 
 interface UnlockBody {
@@ -76,7 +77,10 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         // Deduct unlock items
-        const unlockCost = (questUnlockCosts as Record<string, {itemIds: number[], itemCounts: number[]}>)[String(questId)]
+        const unlockCost = getRuntimeContentTableSync(
+            "quest_unlock_costs.json",
+            bundledQuestUnlockCosts as Record<string, { itemIds: number[], itemCounts: number[] }>,
+        )[String(questId)]
         const itemList: Record<string, number> = {}
         if (unlockCost) {
             for (let i = 0; i < unlockCost.itemIds.length; i++) {

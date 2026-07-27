@@ -38,38 +38,13 @@ function cleanup() {
 
 process.once("exit", cleanup)
 
-// A real bundled rush quest: this route resolves quests through the
-// repo-bundled asset, not the content snapshot.
+// A real bundled rush quest installed through the same gameplay snapshot
+// contract used by the runtime.
 const QUEST_ID = 700001001
 const QUEST_CATEGORY = 24 // QuestCategory.RUSH_EVENT
 
-// Base-registered tables the finish path happens to consult; empty is fine,
-// the seam tests do not depend on their contents.
-const tables = {
-    "character.json": {},
-    "cdndata/character.json": {},
-}
-
-const { productionContentSnapshotProvider } = require("../src/content/runtime/content-snapshot")
-const previousSnapshot = productionContentSnapshotProvider.snapshot
-productionContentSnapshotProvider.snapshot = {
-    cdn: { targetVersion: "test" },
-    repository: {
-        info: () => ({
-            source: "release",
-            assetVersion: "test",
-            generatorVersion: 1,
-            releaseDigest: "sha256:test",
-        }),
-        table: tableName => {
-            if (!(tableName in tables)) throw new Error(`unexpected table ${tableName}`)
-            return tables[tableName]
-        },
-    },
-}
-restoreSnapshot = () => {
-    productionContentSnapshotProvider.snapshot = previousSnapshot
-}
+const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+restoreSnapshot = installBundledGameplaySnapshot()
 
 const { activeQuests } = require("../src/lib/quest/active-quest-service")
 const { initializeDatabase } = require("../src/data")

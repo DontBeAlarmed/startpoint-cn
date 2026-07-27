@@ -1,6 +1,5 @@
 import { incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
-import bossBattleQuests from "../../../assets/boss_battle_quest.json"
-import adventEventQuests from "../../../assets/advent_event_quest.json"
+import { getQuestContentTableSync } from "../assets"
 import {
     getMissionMasterDefinitions,
     isMissionDefinitionEnabledAt,
@@ -22,6 +21,8 @@ interface ExactDegreeQuestClearRule {
 
 function buildExactDegreeQuestClearRules(): readonly ExactDegreeQuestClearRule[] {
     const rules: ExactDegreeQuestClearRule[] = []
+    const bossBattleQuests = getQuestContentTableSync("boss_battle_quest.json")
+    const adventEventQuests = getQuestContentTableSync("advent_event_quest.json")
     for (const definition of getMissionMasterDefinitions(5)) {
         if (Number(definition.row[3]) !== 23
             || definition.row[11] !== ""
@@ -63,14 +64,12 @@ function buildExactDegreeQuestClearRules(): readonly ExactDegreeQuestClearRule[]
     return Object.freeze(rules)
 }
 
-const exactDegreeQuestClearRules = buildExactDegreeQuestClearRules()
-
 export function getExactDegreeQuestClearRuleCount(): number {
-    return exactDegreeQuestClearRules.length
+    return buildExactDegreeQuestClearRules().length
 }
 
 export function getExactDegreeQuestClearMissionIds(): readonly number[] {
-    return Object.freeze(exactDegreeQuestClearRules.map(rule => rule.missionId))
+    return Object.freeze(buildExactDegreeQuestClearRules().map(rule => rule.missionId))
 }
 
 export function recordDegreeMissionBattleFacts(
@@ -79,7 +78,7 @@ export function recordDegreeMissionBattleFacts(
 ): number[] {
     if (!context.questAccomplished) return []
     const matchedMissionIds: number[] = []
-    for (const rule of exactDegreeQuestClearRules) {
+    for (const rule of buildExactDegreeQuestClearRules()) {
         if (rule.category !== context.questCategory || !rule.questIds.has(context.questId)) continue
         if (!isMissionDefinitionEnabledAt(rule.definition, evaluationTime)) continue
         incrementPlayerCategoryMissionSync(context.playerId, 5, rule.missionId, 1)

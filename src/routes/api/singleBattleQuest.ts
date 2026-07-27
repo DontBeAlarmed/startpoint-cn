@@ -51,8 +51,9 @@ import { validateSessionAndPlayer } from "../../lib/quest/finish/session-validat
 import { handleDailyChallengePoint } from "../../lib/quest/finish/challenge-point";
 import { BATTLE_SETTLEMENT_CATEGORIES, recordMissionBattleFacts } from "../../lib/mission/battle-facts";
 import type { FinishContext } from "../../lib/quest/finish/types";
-import questEntryCosts from "../../../assets/quest_entry_costs.json";
-import eventChallengePointMap from "../../../assets/event_challenge_point_map.json";
+import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
+import bundledEventChallengePointMap from "../../../assets/event_challenge_point_map.json";
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import {
@@ -375,7 +376,10 @@ const routes = async (fastify: FastifyInstance) => {
                 questCategory,
                 eventId: questData.eventId,
                 playerId,
-                challengePointMap: eventChallengePointMap as Record<string, number>,
+                challengePointMap: getRuntimeContentTableSync(
+                    "event_challenge_point_map.json",
+                    bundledEventChallengePointMap as Record<string, number>,
+                ),
                 getEntries: (pid) => getPlayerDailyChallengePointListSync(pid),
                 updatePoint: (pid, id, pt) => updatePlayerDailyChallengePointSync(pid, id, pt),
             })
@@ -726,7 +730,10 @@ const routes = async (fastify: FastifyInstance) => {
 
         // Validate and persist all quest-start state atomically.
         const questKey = `${category}_${questId}`
-        const entryCost = (questEntryCosts as Record<string, StartEntryCost>)[questKey]
+        const entryCost = getRuntimeContentTableSync(
+            "quest_entry_costs.json",
+            bundledQuestEntryCosts as Record<string, StartEntryCost>,
+        )[questKey]
         const staminaInfo = getStaminaCost(questKey)
         console.log(`[BATTLE] start entry: questId=${questId} questKey=${questKey} entryCost=${JSON.stringify(entryCost)} discountRate=${staminaInfo.rate} baseStamina=${staminaInfo.baseCost}→${staminaInfo.cost}`)
         const staminaCost = staminaInfo.cost

@@ -54,6 +54,7 @@ rewardRow[7] = "0"
 rewardRow[8] = "5"
 
 const tables = {
+    "daily_challenge_point_lookup.json": require("../assets/daily_challenge_point_lookup.json"),
     "mission_active.json": { 99001: [missionRow] },
     "mission_active_event.json": { 99: [eventRow] },
     "mission_active_reward.json": { 99001: { 1: [rewardRow] } },

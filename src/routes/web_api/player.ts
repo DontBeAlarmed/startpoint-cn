@@ -14,7 +14,8 @@ import { PartyCategory } from "../../data/types";
 import { buildPeriodicSnapshotData, takeSnapshot } from "../../lib/mission/snapshot";
 import { deletePlayerCategoryMissionsSync } from "../../data/domains/mission";
 import { getServerDate } from "../../utils";
-import dailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
+import bundledDailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 
 interface SaveQuery {
     id: string | undefined
@@ -398,7 +399,10 @@ const routes = async (fastify: FastifyInstance) => {
         if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid params" })
         try {
             const entries = getPlayerDailyChallengePointListSync(playerId)
-            const lookup = dailyChallengePointLookup as Record<string, { maxPoint: number }>
+            const lookup = getRuntimeContentTableSync(
+                "daily_challenge_point_lookup.json",
+                bundledDailyChallengePointLookup as Record<string, { maxPoint: number }>,
+            )
             if (entries.length === 0) {
                 // No entries yet — create all 282 from CDN
                 const defaults = Object.entries(lookup).map(([idStr, data]) => ({

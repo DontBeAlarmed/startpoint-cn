@@ -15,6 +15,10 @@ const { hashContentResourcePath } = require("../src/content/resource-path")
 const { ContentObjectStore } = require("../src/content/sync/object-store")
 const { TABLE_SOURCES } = require("../src/content/sync/table-registry")
 const {
+    QUEST_AUXILIARY_SOURCES,
+    QUEST_TABLE_SOURCES,
+} = require("../src/content/converters/quest")
+const {
     hashResourcePath,
     serializeNestedOrderedMap,
     serializeOrderedMap,
@@ -190,6 +194,12 @@ function directOrderedMapFixture(depth) {
     return raw
 }
 
+function characterQuestFixture() {
+    const columns = Array.from({ length: 99 }, () => "")
+    columns[5] = "1"
+    return serializeOrderedMap([{ key: "1", row: columns.join(",") }])
+}
+
 function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}) {
     logicalEntries = new Map(logicalEntries)
     for (const definition of TABLE_SOURCES) {
@@ -197,7 +207,12 @@ function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}
         if (!match) continue
         const logicalPath = definition.sourceOrderedMaps[0]
         if (!logicalEntries.has(logicalPath)) {
-            logicalEntries.set(logicalPath, directOrderedMapFixture(Number(match[1])))
+            logicalEntries.set(
+                logicalPath,
+                logicalPath === "master/quest/character_quest.orderedmap"
+                    ? characterQuestFixture()
+                    : directOrderedMapFixture(Number(match[1])),
+            )
         }
     }
     const flatRewardSources = new Set([
@@ -212,6 +227,23 @@ function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}
                 flatRewardSources.has(logicalPath)
                     ? serializeOrderedMap([])
                     : serializeNestedOrderedMap([]),
+            )
+        }
+    }
+    const questDepths = new Map(Object.values(QUEST_TABLE_SOURCES).map(source => (
+        [source.logicalPath, source.nestingDepth]
+    )))
+    for (const logicalPath of Object.values(QUEST_AUXILIARY_SOURCES)) {
+        questDepths.set(logicalPath, 1)
+    }
+    for (const definition of TABLE_SOURCES.filter(entry => entry.converterId === "quest")) {
+        for (const logicalPath of definition.sourceOrderedMaps) {
+            if (logicalEntries.has(logicalPath)) continue
+            const depth = questDepths.get(logicalPath)
+            assert.ok(depth, `missing quest fixture depth: ${logicalPath}`)
+            logicalEntries.set(
+                logicalPath,
+                depth === 1 ? serializeOrderedMap([]) : serializeNestedOrderedMap([]),
             )
         }
     }
@@ -322,6 +354,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         shop: 0,
         skillEffects: 0,
         reward: 0,
+        quest: 0,
     }
     let bundledImports = 0
     const bundledRoots = new Set()
@@ -350,6 +383,10 @@ test("default release builder closes all registry tables and runs each CDN conve
             converterCalls.reward++
             return converterOutput("reward")
         },
+        convertQuests: async () => {
+            converterCalls.quest++
+            return converterOutput("quest")
+        },
         importBundledTable: async (root, tableName) => {
             bundledRoots.add(root)
             bundledImports++
@@ -370,6 +407,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         shop: 1,
         skillEffects: 1,
         reward: 1,
+        quest: 1,
     })
     assert.equal(
         bundledImports,

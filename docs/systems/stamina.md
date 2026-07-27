@@ -9,7 +9,7 @@
 | 玩家体力 | `players.stamina`、`players.stamina_heal_time` | 当前存量与恢复起点 |
 | 等级表 | `assets/cdndata/player_rank_full.json` | 等级阈值、自然上限与 `heal_rate` |
 | 体力配置 | `assets/config.json` | 每点恢复秒数、恢复道具和溢出上限 |
-| 关卡成本 | `assets/quest_entry_costs.json` | 按 `category_questId` 保存体力与道具成本 |
+| 关卡成本 | Content snapshot 的 `quest_entry_costs.json`；`assets/` 仅为兼容 fallback | 按 `category_questId` 保存体力与 Always 道具成本 |
 | 活动折扣 | `assets/stamina_campaign.json` | 按关卡类别、ID 与服务器时间选择折扣率 |
 
 `getRankDegree(rankPoint)` 从等级阈值计算当前 degree；`getMaxStamina(degree)` 返回该等级的自然体力上限。

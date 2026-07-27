@@ -30,6 +30,12 @@ import {
     type RewardConversionOutput,
     type RewardSourceReader,
 } from "../converters/reward"
+import {
+    convertQuests,
+    type QuestConversionCompatibility,
+    type QuestConversionOutput,
+    type QuestSourceReader,
+} from "../converters/quest"
 import { mapWithConcurrency } from "../concurrency"
 import { hashContentResourcePath } from "../resource-path"
 import { importBundledTable } from "./bundled-importer"
@@ -57,6 +63,7 @@ const SUPPORTED_CONVERTER_IDS = new Set([
     "ordered-map-json-2",
     "ordered-map-json-3",
     "reward",
+    "quest",
     "bundled-json",
     "server-json",
 ])
@@ -80,6 +87,10 @@ export interface DefaultContentTableBuilderDependencies {
     readonly convertRewards?: (
         reader: RewardSourceReader,
     ) => RewardConversionOutput | Promise<RewardConversionOutput>
+    readonly convertQuests?: (
+        reader: QuestSourceReader,
+        compatibility: QuestConversionCompatibility,
+    ) => QuestConversionOutput | Promise<QuestConversionOutput>
     readonly importBundledTable?: typeof importBundledTable
 }
 
@@ -103,7 +114,7 @@ function requireLogicalPath(logicalPath: string): string {
     return logicalPath
 }
 
-class StrictOrderedMapReader implements GachaSourceReader, ShopSourceReader, RewardSourceReader {
+class StrictOrderedMapReader implements GachaSourceReader, ShopSourceReader, RewardSourceReader, QuestSourceReader {
     private readonly context: ContentTableBuildContext
     private readonly allowed = new Set<string>()
     private readonly rawCache = new Map<string, Buffer>()
@@ -334,6 +345,7 @@ export function createDefaultContentTableBuilder(
     const shopConverter = dependencies.convertShops ?? convertShops
     const skillEffectConverter = dependencies.convertSkillEffects ?? convertSkillEffects
     const rewardConverter = dependencies.convertRewards ?? convertRewards
+    const questConverter = dependencies.convertQuests ?? convertQuests
     const bundledImporter = dependencies.importBundledTable ?? importBundledTable
 
     return Object.freeze({
@@ -352,6 +364,7 @@ export function createDefaultContentTableBuilder(
                     || definition.converterId === "shop"
                     || definition.converterId === "skill-effects"
                     || definition.converterId === "reward"
+                    || definition.converterId === "quest"
                     || directOrderedMapDepth(definition.converterId) !== null
                     ? definition.sourceOrderedMaps
                     : []
@@ -361,6 +374,14 @@ export function createDefaultContentTableBuilder(
 
             const values = new Map<string, unknown>()
             const converterIds = new Set(context.definitions.map(definition => definition.converterId))
+            const bundledCache = new Map<string, Promise<unknown>>()
+            const readBundled = (tableName: string): Promise<unknown> => {
+                const cached = bundledCache.get(tableName)
+                if (cached) return cached
+                const pending = bundledImporter(context.paths.contentRuntimeDir, tableName)
+                bundledCache.set(tableName, pending)
+                return pending
+            }
             if (converterIds.has("character")) {
                 addConverterOutput(
                     values,
@@ -390,6 +411,13 @@ export function createDefaultContentTableBuilder(
             }
             if (converterIds.has("reward")) {
                 addConverterOutput(values, "reward", await rewardConverter(reader))
+            }
+            if (converterIds.has("quest")) {
+                addConverterOutput(values, "quest", await questConverter(reader, {
+                    practiceQuests: await readBundled("practice_quest.json") as Readonly<
+                        Record<string, { readonly name?: unknown }>
+                    >,
+                }))
             }
 
             const directDefinitions = context.definitions.filter(definition => (
@@ -431,10 +459,7 @@ export function createDefaultContentTableBuilder(
                 RELEASE_BUILD_IO_CONCURRENCY,
                 async definition => ([
                     definition.tableName,
-                    await bundledImporter(
-                        context.paths.contentRuntimeDir,
-                        definition.tableName,
-                    ),
+                    await readBundled(definition.tableName),
                 ] as const),
             )
             for (const [tableName, value] of importedEntries) {

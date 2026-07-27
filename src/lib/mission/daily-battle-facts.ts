@@ -1,6 +1,5 @@
-import adventEventQuests from "../../../assets/advent_event_quest.json"
-import scoreAttackEventQuests from "../../../assets/score_attack_event_quest.json"
 import { incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
+import { getQuestContentTableSync } from "../assets"
 import type { FinishContext } from "../quest/finish/types"
 import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "./master-data"
 
@@ -25,16 +24,13 @@ const ANY_BATTLE_KIND = 3
 const SCORE_ATTACK_DAILY_MISSION_ID = 10075
 const ANY_BATTLE_DAILY_MISSION_ID = 800392
 
-const adventQuestIds = new Set(
-    Object.keys(adventEventQuests).map(Number).filter(Number.isSafeInteger),
-)
-
 function matchesAdventEvent(
     row: readonly unknown[],
     questCategory: number,
     questId: number,
 ): boolean {
-    if (questCategory !== 7 || !adventQuestIds.has(questId)) return false
+    const adventQuestIds = Object.keys(getQuestContentTableSync("advent_event_quest.json"))
+    if (questCategory !== 7 || !adventQuestIds.includes(String(questId))) return false
     const eventSelector = Number(row[8])
     return Number.isSafeInteger(eventSelector)
         && eventSelector > 0
@@ -67,7 +63,9 @@ function matchesScoreAttackDailyMission(
         || context.questCategory !== 27) return false
 
     const eventId = Number(row[8])
-    const quest = (scoreAttackEventQuests as Record<string, { eventId?: number }>)[String(context.questId)]
+    const quest = (getQuestContentTableSync(
+        "score_attack_event_quest.json",
+    ) as Record<string, { eventId?: number }>)[String(context.questId)]
     return Number.isSafeInteger(eventId)
         && eventId > 0
         && quest?.eventId === eventId

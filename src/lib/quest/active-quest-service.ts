@@ -5,7 +5,8 @@ import {
     insertPlayerActiveQuestSync,
 } from "../../data/domains/quest_active"
 import { getPlayerItemSync, setPlayerItemSync } from "../../data/domains/item"
-import questEntryCosts from "../../../assets/quest_entry_costs.json"
+import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json"
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 import { runAbortEntryTransaction } from "./entry-lifecycle"
 import type { StartEntryCost } from "./start-entry"
 
@@ -73,7 +74,10 @@ export function runAbortActiveQuestTransaction(
         deleteActiveQuest: deletePlayerActiveQuestSync,
         clearActiveQuest: id => { delete activeQuests[id] },
         getEntryCost: (category, questId) => (
-            questEntryCosts as Record<string, StartEntryCost>
+            getRuntimeContentTableSync(
+                "quest_entry_costs.json",
+                bundledQuestEntryCosts as Record<string, StartEntryCost>,
+            )
         )[`${category}_${questId}`],
     })
 }

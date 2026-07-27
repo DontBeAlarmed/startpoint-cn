@@ -3,6 +3,8 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
+const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const restoreContentSnapshot = installBundledGameplaySnapshot()
 const { QuestCategory } = require("../src/lib/types")
 const { canFinishMultiBattleQuest, cleanupAbortedMultiBattle } = require("../src/multi/http/battle")
 const { createRoom, disbandRoom } = require("../src/multi/room/manager")
@@ -64,6 +66,8 @@ test.afterEach(() => {
         disbandRoom(room.room_number)
     }
 })
+
+test.after(() => restoreContentSnapshot())
 
 test("BothBoss performs a second SceneReady barrier and finalizes only after index 2", () => {
     const battle = createBattle(1001002, 2)

@@ -30,7 +30,7 @@ Advent 字段来自原始行 `61/62/63/75`，挑战迷宫与宝物域字段来�
 1. Advent 没有配置门票列，5 个最高难度被生成成 `itemId=0`、`itemCount=0`。
 2. 生成条件只接受体力大于 0，导致 `1038`～`1040` 三个纯门票关完全缺失。
 
-修复后，只要关卡具有正体力成本或 `Always` 门票成本就会生成入口记录。回归测试逐条对比国服原始表，避免列索引或零体力过滤再次造成免费入场。
+Content Sync 现在直接从 20 张官方关卡表生成入口记录：只要关卡具有正体力成本或 `Always` 门票成本就会进入 `quest_entry_costs.json`。当前 Release 共 3045 条成本，其中 14 条含 Always 道具成本。回归测试逐条对比国服原始表，避免列索引或零体力过滤再次造成免费入场。
 
 ## 预扣生命周期
 
@@ -52,4 +52,6 @@ abort 路由显式返回 `application/x-msgpack`，由 CN 服务的 `onSend` hoo
 
 ## Once 关卡
 
-9 个外传关卡 `400001102`～`400009102` 使用 `60001 ×1` 解锁。它们不进入 start 的每次预扣逻辑，由 `/quest/unlock` 独立处理。
+9 个外传关卡 `400001102`～`400009102` 使用 `60001 ×1` 解锁。它们不进入 start 的每次预扣逻辑，由 `/quest/unlock` 独立处理。`quest_unlock_costs.json` 与关卡表在同一 Content Release 中生成；历史 bundled 还包含 6 条 `1001`～`1006`，实际来源是 Daily 表的普通奖励组而非 Once 模式，现已从动态结果删除。
+
+仓库内同名 `assets/*.json` 只用于 Content snapshot 尚未初始化的低级测试和无 Release 兼容启动；正常服务初始化后，start、abort、load、unlock 和体力计算统一读取当前 snapshot，Release 缺表或损坏时不会静默回退旧门票数据。

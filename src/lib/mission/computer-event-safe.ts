@@ -16,12 +16,8 @@ import {
     getMissionMasterDefinitions,
     isMissionDefinitionEnabledAt,
 } from "./master-data"
-import { exactEventSingleClearRules } from "./event-single-clear-rules"
+import { getExactEventSingleClearRules } from "./event-single-clear-rules"
 import questMap from "../../../assets/mission_event_quest_map.json"
-import carnivalEventQuests from "../../../assets/carnival_event_quest.json"
-import challengeDungeonEventQuests from "../../../assets/challenge_dungeon_event_quest.json"
-import rankingEventSingleQuests from "../../../assets/ranking_event_single_quest.json"
-import rushEventQuests from "../../../assets/rush_event_quest.json"
 import eventRewards from "../../../assets/mission_event_reward.json"
 import bundledCharacters from "../../../assets/character.json"
 import bundledCharacterQuests from "../../../assets/character_quest_lookup.json"
@@ -29,6 +25,7 @@ import bundledEquipmentDissolve from "../../../assets/equipment_dissolve.json"
 import bundledItemSale from "../../../assets/item_sale.json"
 import bundledMainQuests from "../../../assets/main_quest.json"
 import bundledManaBoard from "../../../assets/mana_board.json"
+import { getQuestContentTableSync } from "../assets"
 import type { CategoryContext, MissionComputer } from "./types"
 
 const GET_ITEM_COUNT_PATTERN_TYPE = 37
@@ -509,7 +506,7 @@ function hasSingleCompletionReward(missionId: number): boolean {
 
 function getHistoricalSingleClearRule(missionId: number) {
     if (!hasSingleCompletionReward(missionId)) return undefined
-    return exactEventSingleClearRules.find(rule => rule.missionId === missionId)
+    return getExactEventSingleClearRules().find(rule => rule.missionId === missionId)
 }
 
 function computeHistoricalSingleClear(
@@ -567,6 +564,9 @@ function getSafeTimeClearMapping(missionId: number): SafeTimeClearMapping | null
     const questId = eventId * 1000 + questSuffix
     let questCategory: number
     if (rangeKind === 8) {
+        const rankingEventSingleQuests = getQuestContentTableSync(
+            "ranking_event_single_quest.json",
+        )
         if (!Object.prototype.hasOwnProperty.call(rankingEventSingleQuests, String(questId))) return null
         const raw = (questMap as Record<string, unknown>)[definition.pattern]
         if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null
@@ -580,6 +580,7 @@ function getSafeTimeClearMapping(missionId: number): SafeTimeClearMapping | null
             || mapping.questIds[0] !== questId) return null
         questCategory = 11
     } else {
+        const rushEventQuests = getQuestContentTableSync("rush_event_quest.json")
         const quest = (rushEventQuests as Record<string, { rushEventId?: unknown }>)[String(questId)]
         if (!quest || Number(quest.rushEventId) !== eventId) return null
         questCategory = 24
@@ -605,6 +606,7 @@ function getSafeCarnivalQuestId(missionId: number): number | undefined {
         || !Number.isSafeInteger(questSuffix) || questSuffix <= 0) return undefined
 
     const questId = eventId * 1000 + questSuffix
+    const carnivalEventQuests = getQuestContentTableSync("carnival_event_quest.json")
     const quest = (carnivalEventQuests as Record<string, { eventId?: unknown }>)[String(questId)]
     return quest && Number(quest.eventId) === eventId ? questId : undefined
 }
@@ -618,6 +620,9 @@ function getSafeChallengeDungeonQuestIds(missionId: number): number[] | undefine
     const eventId = Number(definition.row[8])
     if (!Number.isSafeInteger(eventId) || eventId <= 0) return undefined
     const rawSuffix = String(definition.row[10] ?? "").trim()
+    const challengeDungeonEventQuests = getQuestContentTableSync(
+        "challenge_dungeon_event_quest.json",
+    )
     const questIds = rawSuffix === ""
         ? Object.keys(challengeDungeonEventQuests).map(Number)
         : (parsePositiveIntegerList(rawSuffix) ?? []).map(suffix => eventId * 1000 + suffix)

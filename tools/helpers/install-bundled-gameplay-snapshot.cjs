@@ -21,8 +21,35 @@ const REWARD_TABLE_NAMES = [
     "score_attack_border_reward.json",
     "rush_event_ranking_reward.json",
 ]
+const QUEST_TABLE_NAMES = [
+    "main_quest.json",
+    "ex_quest.json",
+    "boss_battle_quest.json",
+    "character_quest.json",
+    "world_story_event_quest.json",
+    "world_story_event_boss_battle_quest.json",
+    "advent_event_quest.json",
+    "daily_exp_mana_event_quest.json",
+    "daily_week_event_quest.json",
+    "challenge_dungeon_event_quest.json",
+    "story_event_single_quest.json",
+    "ranking_event_single_quest.json",
+    "solo_time_attack_event_quest.json",
+    "tower_dungeon_event_quest.json",
+    "expert_single_event_quest.json",
+    "carnival_event_quest.json",
+    "rush_event_quest.json",
+    "raid_event_quest.json",
+    "score_attack_event_quest.json",
+    "hard_multi_event_quest.json",
+    "daily_challenge_point_lookup.json",
+    "event_challenge_point_map.json",
+    "quest_entry_costs.json",
+    "quest_lookup.json",
+    "quest_unlock_costs.json",
+]
 
-function installBundledCharacterAndRewardSnapshot({ onRestore } = {}) {
+function installBundledGameplaySnapshot({ onRestore, tableOverrides = {} } = {}) {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     const characterTable = deepFreeze(structuredClone(
         require(path.join(projectRoot, "assets", CHARACTER_TABLE_NAME))
@@ -30,10 +57,16 @@ function installBundledCharacterAndRewardSnapshot({ onRestore } = {}) {
     const characterContentTable = deepFreeze(structuredClone(
         require(path.join(projectRoot, "assets", CHARACTER_CONTENT_TABLE_NAME))
     ))
-    const rewardTables = Object.fromEntries(REWARD_TABLE_NAMES.map(tableName => [
+    const gameplayTables = Object.fromEntries(
+        [...REWARD_TABLE_NAMES, ...QUEST_TABLE_NAMES].map(tableName => [
         tableName,
-        deepFreeze(structuredClone(require(path.join(projectRoot, "assets", tableName)))),
-    ]))
+        deepFreeze(structuredClone(
+            Object.prototype.hasOwnProperty.call(tableOverrides, tableName)
+                ? tableOverrides[tableName]
+                : require(path.join(projectRoot, "assets", tableName)),
+        )),
+        ]),
+    )
     const repositoryInfo = deepFreeze({
         source: "bundled",
         assetVersion: BUNDLED_CDN_CATALOG_VERSION,
@@ -45,8 +78,8 @@ function installBundledCharacterAndRewardSnapshot({ onRestore } = {}) {
         table(tableName) {
             if (tableName === CHARACTER_TABLE_NAME) return characterTable
             if (tableName === CHARACTER_CONTENT_TABLE_NAME) return characterContentTable
-            if (tableName in rewardTables) return rewardTables[tableName]
-            throw new Error(`unexpected character/reward table ${tableName}`)
+            if (tableName in gameplayTables) return gameplayTables[tableName]
+            throw new Error(`unexpected gameplay table ${tableName}`)
         },
     })
 
@@ -64,4 +97,4 @@ function installBundledCharacterAndRewardSnapshot({ onRestore } = {}) {
     }
 }
 
-module.exports = { installBundledCharacterAndRewardSnapshot }
+module.exports = { installBundledGameplaySnapshot }

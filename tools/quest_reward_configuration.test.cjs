@@ -6,20 +6,8 @@ const {
     QuestConfigurationError,
 } = require("../src/lib/assets")
 const { QuestCategory } = require("../src/lib/types")
+const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 const hardMultiQuests = require("../assets/hard_multi_event_quest.json")
-const { installBundledCharacterAndRewardSnapshot } = require("./helpers/install-bundled-character-reward-snapshot.cjs")
-const restoreContentSnapshot = installBundledCharacterAndRewardSnapshot()
-
-const validQuest = getQuestFromCategorySync(QuestCategory.HARD_MULTI_EVENT, 100002001)
-assert.ok(validQuest)
-assert.equal(validQuest.clearReward?.type, 3)
-assert.equal(validQuest.clearReward?.id, undefined)
-assert.equal(validQuest.clearReward?.count, 30)
-assert.equal(validQuest.sPlusReward?.type, 3)
-assert.equal(validQuest.sPlusReward?.id, undefined)
-assert.equal(validQuest.sPlusReward?.count, 30)
-
-const originalQuest = { ...hardMultiQuests["100002001"] }
 
 function assertConfigurationError(operation, expected) {
     assert.throws(operation, error => {
@@ -33,22 +21,42 @@ function assertConfigurationError(operation, expected) {
     })
 }
 
-try {
-    hardMultiQuests["100002001"].clearRewardId = 999999999
+function withHardMultiOverride(patch, operation) {
+    const quests = structuredClone(hardMultiQuests)
+    Object.assign(quests["100002001"], patch)
+    const restore = installBundledGameplaySnapshot({
+        tableOverrides: { "hard_multi_event_quest.json": quests },
+    })
+    try {
+        return operation()
+    } finally {
+        restore()
+    }
+}
+
+withHardMultiOverride({}, () => {
+    const validQuest = getQuestFromCategorySync(QuestCategory.HARD_MULTI_EVENT, 100002001)
+    assert.ok(validQuest)
+    assert.equal(validQuest.clearReward?.type, 3)
+    assert.equal(validQuest.clearReward?.id, undefined)
+    assert.equal(validQuest.clearReward?.count, 30)
+    assert.equal(validQuest.sPlusReward?.type, 3)
+    assert.equal(validQuest.sPlusReward?.id, undefined)
+    assert.equal(validQuest.sPlusReward?.count, 30)
+})
+
+withHardMultiOverride({ clearRewardId: 999999999 }, () => {
     assertConfigurationError(
         () => getQuestFromCategorySync(QuestCategory.HARD_MULTI_EVENT, 100002001),
         { rewardId: 999999999, field: "clearRewardId" },
     )
+})
 
-    hardMultiQuests["100002001"].clearRewardId = originalQuest.clearRewardId
-    hardMultiQuests["100002001"].sPlusRewardId = 999999998
+withHardMultiOverride({ sPlusRewardId: 999999998 }, () => {
     assertConfigurationError(
         () => getQuestFromCategorySync(QuestCategory.HARD_MULTI_EVENT, 100002001),
         { rewardId: 999999998, field: "sPlusRewardId" },
     )
-} finally {
-    hardMultiQuests["100002001"] = originalQuest
-    restoreContentSnapshot()
-}
+})
 
 console.log("quest reward configuration tests passed")

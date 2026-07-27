@@ -424,7 +424,7 @@ test("non-local snapshot initialization ignores CDN_DIR and uses bundled 1.4.54 
     assert.deepEqual(snapshot.repository.info(), {
         source: "bundled",
         assetVersion: "1.4.54",
-        generatorVersion: 1,
+        generatorVersion: 2,
         releaseDigest: null,
     })
     assert.equal(localValidationCalls, 0)
