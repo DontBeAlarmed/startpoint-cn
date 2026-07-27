@@ -14,6 +14,11 @@ import {
     type GachaSourceReader,
 } from "../converters/gacha"
 import {
+    convertGameplayTables,
+    type GameplayConversionOutput,
+    type GameplaySourceReader,
+} from "../converters/gameplay"
+import {
     convertShops,
     type ShopConversionOutput,
     type ShopSourceReader,
@@ -57,6 +62,7 @@ const SUPPORTED_CONVERTER_IDS = new Set([
     "character",
     "character-election",
     "gacha",
+    "gameplay",
     "shop",
     "skill-effects",
     "ordered-map-json-1",
@@ -78,6 +84,9 @@ export interface DefaultContentTableBuilderDependencies {
     readonly convertGachas?: (
         reader: GachaSourceReader,
     ) => GachaConversionOutput | Promise<GachaConversionOutput>
+    readonly convertGameplayTables?: (
+        reader: GameplaySourceReader,
+    ) => GameplayConversionOutput | Promise<GameplayConversionOutput>
     readonly convertShops?: (
         reader: ShopSourceReader,
     ) => ShopConversionOutput | Promise<ShopConversionOutput>
@@ -114,7 +123,8 @@ function requireLogicalPath(logicalPath: string): string {
     return logicalPath
 }
 
-class StrictOrderedMapReader implements GachaSourceReader, ShopSourceReader, RewardSourceReader, QuestSourceReader {
+class StrictOrderedMapReader implements GachaSourceReader, GameplaySourceReader, ShopSourceReader,
+    RewardSourceReader, QuestSourceReader {
     private readonly context: ContentTableBuildContext
     private readonly allowed = new Set<string>()
     private readonly rawCache = new Map<string, Buffer>()
@@ -342,6 +352,7 @@ export function createDefaultContentTableBuilder(
     const characterElectionConverter = dependencies.convertCharacterElections
         ?? convertCharacterElections
     const gachaConverter = dependencies.convertGachas ?? convertGachas
+    const gameplayConverter = dependencies.convertGameplayTables ?? convertGameplayTables
     const shopConverter = dependencies.convertShops ?? convertShops
     const skillEffectConverter = dependencies.convertSkillEffects ?? convertSkillEffects
     const rewardConverter = dependencies.convertRewards ?? convertRewards
@@ -361,6 +372,7 @@ export function createDefaultContentTableBuilder(
                 definition.converterId === "character"
                     || definition.converterId === "character-election"
                     || definition.converterId === "gacha"
+                    || definition.converterId === "gameplay"
                     || definition.converterId === "shop"
                     || definition.converterId === "skill-effects"
                     || definition.converterId === "reward"
@@ -398,6 +410,9 @@ export function createDefaultContentTableBuilder(
             }
             if (converterIds.has("gacha")) {
                 addConverterOutput(values, "gacha", await gachaConverter(reader))
+            }
+            if (converterIds.has("gameplay")) {
+                addConverterOutput(values, "gameplay", await gameplayConverter(reader))
             }
             if (converterIds.has("shop")) {
                 addConverterOutput(values, "shop", await shopConverter(reader))

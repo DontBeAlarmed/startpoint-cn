@@ -983,6 +983,24 @@ function validateDirectOrderedMapTables({ definitions, readBundled, readRelease 
     return { tables: directDefinitions.length }
 }
 
+function validateGameplayTables({ definitions, readBundled, readRelease }) {
+    const gameplayDefinitions = definitions.filter(definition => (
+        definition.converterId === "gameplay"
+    ))
+    for (const definition of gameplayDefinitions) {
+        if (!isDeepStrictEqual(
+            readRelease(definition.tableName),
+            readBundled(definition.tableName),
+        )) {
+            baselineError(
+                "CONTENT_SYNC_SMOKE_GAMEPLAY_TABLE_BASELINE",
+                `${definition.tableName} 与 bundled 官方玩法基线不一致`,
+            )
+        }
+    }
+    return { tables: gameplayDefinitions.length }
+}
+
 const QUEST_TABLE_CATEGORIES = Object.freeze({
     "main_quest.json": 1,
     "boss_battle_quest.json": 2,
@@ -1247,6 +1265,11 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
         readRelease: tableName => repository.table(tableName),
     })
+    const gameplayStats = validateGameplayTables({
+        definitions: runtime.TABLE_SOURCES,
+        readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
+        readRelease: tableName => repository.table(tableName),
+    })
     const questStats = validateQuestTables({
         definitions: runtime.TABLE_SOURCES,
         readRelease: tableName => repository.table(tableName),
@@ -1347,6 +1370,7 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         campaigns: gachaStats.campaigns,
         featureEntries: gachaStats.featureEntries,
         directTables: directStats.tables,
+        gameplayTables: gameplayStats.tables,
         questTables: questStats.tables,
         rewardTables: rewardStats.tables,
         shops: Object.values(shopStats).reduce((sum, count) => sum + count, 0),
@@ -1499,6 +1523,7 @@ module.exports = {
     validateCharacters,
     validateDirectOrderedMapTables,
     validateGachas,
+    validateGameplayTables,
     validateQuestTables,
     validateReleaseClosure,
     validateRewardTables,

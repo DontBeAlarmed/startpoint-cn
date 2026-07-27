@@ -48,6 +48,13 @@ const QUEST_TABLE_NAMES = [
     "quest_lookup.json",
     "quest_unlock_costs.json",
 ]
+const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
+    "carnival_event_total_score_reward.json",
+    "equipment_gacha_movie_probability.json",
+    "ex_boost.json",
+    "ex_status.json",
+    "raid_event.json",
+]
 
 function installBundledGameplaySnapshot({ onRestore, tableOverrides = {} } = {}) {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
@@ -58,7 +65,8 @@ function installBundledGameplaySnapshot({ onRestore, tableOverrides = {} } = {})
         require(path.join(projectRoot, "assets", CHARACTER_CONTENT_TABLE_NAME))
     ))
     const gameplayTables = Object.fromEntries(
-        [...REWARD_TABLE_NAMES, ...QUEST_TABLE_NAMES].map(tableName => [
+        [...REWARD_TABLE_NAMES, ...QUEST_TABLE_NAMES, ...GAMEPLAY_DYNAMIC_TABLE_NAMES]
+            .map(tableName => [
         tableName,
         deepFreeze(structuredClone(
             Object.prototype.hasOwnProperty.call(tableOverrides, tableName)

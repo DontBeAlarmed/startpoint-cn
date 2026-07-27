@@ -1,4 +1,5 @@
 import carnivalRewardData from "../../assets/carnival_event_total_score_reward.json"
+import { getRuntimeContentTableSync } from "../content/runtime/table-access"
 import type { CarnivalRewardDefinition } from "./carnival-reward-parser"
 
 export { parseCarnivalRewardRow } from "./carnival-reward-parser"
@@ -34,11 +35,11 @@ interface CarnivalRewardDependencies {
     }) => void
 }
 
-const carnivalRewardDefinitions = Object.values(
-    carnivalRewardData as Record<string, CarnivalRewardDefinition>,
-)
-
 export function getCarnivalRewardDefinitions(eventId?: number): CarnivalRewardDefinition[] {
+    const carnivalRewardDefinitions = Object.values(getRuntimeContentTableSync(
+        "carnival_event_total_score_reward.json",
+        carnivalRewardData as Record<string, CarnivalRewardDefinition>,
+    ))
     return eventId === undefined
         ? carnivalRewardDefinitions
         : carnivalRewardDefinitions.filter(definition => definition.eventId === eventId)

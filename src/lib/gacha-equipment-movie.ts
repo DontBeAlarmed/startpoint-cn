@@ -1,4 +1,5 @@
 import equipmentGachaMovieProbability from "../../assets/equipment_gacha_movie_probability.json"
+import { getRuntimeContentTableSync } from "../content/runtime/table-access"
 
 export interface EquipmentMovieDrawInput {
     id: number
@@ -38,7 +39,10 @@ export function getEquipmentGachaMovieProbabilitySync(
 ): EquipmentGachaMovieProbability | null {
     if (id === undefined) return null
 
-    const table = equipmentGachaMovieProbability as Record<string, EquipmentGachaMovieProbability>
+    const table = getRuntimeContentTableSync(
+        "equipment_gacha_movie_probability.json",
+        equipmentGachaMovieProbability as Record<string, EquipmentGachaMovieProbability>,
+    )
     return table[String(id)] ?? null
 }
 

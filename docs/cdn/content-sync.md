@@ -13,7 +13,7 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 
 同步器负责严格解析、引用闭包、稳定输出和文件系统安全，不负责判断 CDN 作者给出的 ID、赔率、奖励、价格或资源内容是否合理。服务端不会替 CDN 作者猜测缺失内容、复制其他活动数据、修复非法主数据或自动生成客户端补丁。
 
-阶段 B 当前把 Registry 的 109 张表分为 `83 CDN + 22 bundled + 4 server`。原阶段 A 的五个动态领域为：
+阶段 B 当前把 Registry 的 109 张表分为 `88 CDN + 17 bundled + 4 server`。原阶段 A 的五个动态领域为：
 
 | 领域 | 动态输出 |
 |---|---|
@@ -26,6 +26,8 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 在此基础上，35 张与官方提取 JSON 可机器证明完全相等的表已改用通用递归 OrderedMap 转换器。转换器按 Registry 声明的一至三层嵌套深度还原 CSV 树，不改字段、不补 ID，也不叠加 bundled 数据。范围包括 Active Mission、角色觉醒、收集、普通/每日/每周/称号/活动任务、Pass 任务及奖励表，以及玩家等级、角色剧情 lookup、EX Ability、Mana Board、Raid 总体奖励、奖励属性映射、体力活动和星屑兑换等直接表。
 
 奖励领域另有 6 张派生表从官方 OrderedMap 动态生成：Clear、Score、Rare Score、Score Attack Border、Rush Folder 和 Rush Ranking。转换器保留原始位置、概率、数量和多奖励槽，并修正历史 bundled 的 5 条 Clear Reward 字段误复制及 82 个无意义 `id:null`。早期活动代币中另有 47 行官方 ID 与 bundled 世代 ID 不同；smoke 只在 `item_lookup` 名称一致时视为同一代币族，实际发奖仍由业务层按服务器时间选择开放期 ID。
+
+玩法领域新增 5 张派生表：土俑累计分奖励、装备抽卡动画概率、EX Boost 消耗道具、EX Status 稀有度池和 Raid 活动总击破阈值。它们分别从官方 Carnival、Gacha、EX Boost 和 Raid OrderedMap 严格转换；官方 CN 1.4.54 的 1451、1、21、3、7 条输出逐字段等于 bundled 基线。土俑结算、装备抽卡动画、EX Boost 和 Raid 运行时均从当前 Content snapshot 读取这些表，只有 snapshot 尚未初始化的低级测试环境才使用 bundled fallback。
 
 关卡领域从 20 张官方 Quest OrderedMap 动态生成 20 张运行关卡表，并在同一转换批次生成
 `quest_entry_costs.json`、`quest_unlock_costs.json`、`quest_lookup.json`、
@@ -45,7 +47,7 @@ Challenge、Tower、Hard Multi 等历史列偏移；其中 Hard Multi 体力列�
 Content Sync 时，20015/20016 会保持 fail closed。使用官方 CDN 执行同步后，当前 Release 才会包含实际
 角色效果索引。
 
-Registry 仍要求每个 Release 闭合当前全部注册表。剩余 22 张 bundled 表继续作为待迁移业务派生结构或兼容数据；其中 `cdndata/player_rank_full.json` 的 `0..100` 等级数据来自历史实测，`practice_quest.json` 还保留 7 个官方 1.4.54 OrderedMap 不包含的兼容 ID，因此不能伪装成完整 CDN 转换结果。上述表不会因为 CDN OrderedMap 改动而自动变化。迁移时必须逐表证明来源、字段映射和输出闭包，不能把文件名相近当作可直接复制的证据。4 张 `server` 表为服务端配置或后台内容，不属于 CDN 转换范围。
+Registry 仍要求每个 Release 闭合当前全部注册表。剩余 17 张 bundled 表继续作为待迁移业务派生结构或兼容数据；其中 `cdndata/player_rank_full.json` 的 `0..100` 等级数据来自历史实测，`practice_quest.json` 还保留 7 个官方 1.4.54 OrderedMap 不包含的兼容 ID，因此不能伪装成完整 CDN 转换结果。`encyclopedia.json` 的官方 1.4.54 提取源有 1977 条，bundled 只有 1551 条且存在 427 条官方独有、1 条 bundled 独有记录；在客户端显示和解锁语义审计完成前继续保留 bundled。上述表不会因为 CDN OrderedMap 改动而自动变化。迁移时必须逐表证明来源、字段映射和输出闭包，不能把文件名相近当作可直接复制的证据。4 张 `server` 表为服务端配置或后台内容，不属于 CDN 转换范围。
 
 ## 受支持输入
 

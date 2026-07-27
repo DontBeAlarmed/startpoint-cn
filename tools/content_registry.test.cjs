@@ -137,6 +137,16 @@ const EXPECTED_REWARD_CDN_TABLES = Object.freeze({
     "rush_event_ranking_reward.json": "master/quest/event/rush_event_ranking_reward.orderedmap",
 })
 
+const EXPECTED_GAMEPLAY_CDN_TABLES = Object.freeze({
+    "carnival_event_total_score_reward.json":
+        "master/quest/event/carnival_event_total_score_reward.orderedmap",
+    "equipment_gacha_movie_probability.json":
+        "master/gacha/equipment_gacha_movie_probability.orderedmap",
+    "ex_boost.json": "master/ex_boost/ex_boost.orderedmap",
+    "ex_status.json": "master/ex_boost/ex_status.orderedmap",
+    "raid_event.json": "master/quest/event/raid_event.orderedmap",
+})
+
 const EXPECTED_QUEST_CDN_TABLES = Object.freeze({
     "main_quest.json": "master/quest/main_quest.orderedmap",
     "ex_quest.json": "master/quest/ex_quest.orderedmap",
@@ -367,6 +377,15 @@ test("registry derives reward tables from their official OrderedMap sources", ()
     }
 })
 
+test("registry derives gameplay tables from their official OrderedMap sources", () => {
+    for (const [tableName, source] of Object.entries(EXPECTED_GAMEPLAY_CDN_TABLES)) {
+        const entry = findTableSource(tableName)
+        assert.equal(entry.scope, "cdn", tableName)
+        assert.equal(entry.converterId, "gameplay", tableName)
+        assert.deepEqual(entry.sourceOrderedMaps, [source], tableName)
+    }
+})
+
 test("registry derives authoritative quest tables from official OrderedMap sources", () => {
     for (const [tableName, source] of Object.entries(EXPECTED_QUEST_CDN_TABLES)) {
         const entry = findTableSource(tableName)
@@ -433,6 +452,7 @@ test("registry closes over current static runtime tables", () => {
             .filter(tableName => (
                 !(tableName in EXPECTED_DIRECT_CDN_TABLES)
                 && !(tableName in EXPECTED_REWARD_CDN_TABLES)
+                && !(tableName in EXPECTED_GAMEPLAY_CDN_TABLES)
                 && !(tableName in EXPECTED_QUEST_CDN_TABLES)
                 && !(tableName in EXPECTED_QUEST_DERIVED_CDN_TABLES)
             ))

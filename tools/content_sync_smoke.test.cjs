@@ -322,6 +322,36 @@ test("直接 OrderedMap 表必须逐张等于 bundled 官方基线", () => {
     ))
 })
 
+test("玩法派生表必须逐张等于 bundled 官方基线", () => {
+    assert.equal(typeof smoke.validateGameplayTables, "function")
+    const definitions = [
+        { tableName: "ex_boost.json", converterId: "gameplay" },
+        { tableName: "raid_event.json", converterId: "gameplay" },
+        { tableName: "other.json", converterId: "bundled-json" },
+    ]
+    const bundled = {
+        "ex_boost.json": { 1: { tier: 1, count: 5 } },
+        "raid_event.json": { 1: { requiredKillCount: 10 } },
+    }
+    const release = structuredClone(bundled)
+
+    assert.deepEqual(smoke.validateGameplayTables({
+        definitions,
+        readBundled: tableName => bundled[tableName],
+        readRelease: tableName => release[tableName],
+    }), { tables: 2 })
+
+    release["raid_event.json"][1].requiredKillCount = 11
+    assert.throws(() => smoke.validateGameplayTables({
+        definitions,
+        readBundled: tableName => bundled[tableName],
+        readRelease: tableName => release[tableName],
+    }), error => (
+        error?.code === "CONTENT_SYNC_SMOKE_GAMEPLAY_TABLE_BASELINE"
+        && error.message.includes("raid_event.json")
+    ))
+})
+
 test("关卡派生表必须匹配官方摘要且奖励引用闭合", () => {
     function canonical(value) {
         if (Array.isArray(value)) return value.map(canonical)

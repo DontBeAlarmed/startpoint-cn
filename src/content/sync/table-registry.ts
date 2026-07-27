@@ -95,20 +95,30 @@ const REWARD_TABLES = [
     ["rush_event_ranking_reward.json", "master/quest/event/rush_event_ranking_reward.orderedmap"],
 ] as const
 
+const GAMEPLAY_TABLES = [
+    [
+        "carnival_event_total_score_reward.json",
+        "master/quest/event/carnival_event_total_score_reward.orderedmap",
+    ],
+    [
+        "equipment_gacha_movie_probability.json",
+        "master/gacha/equipment_gacha_movie_probability.orderedmap",
+    ],
+    ["ex_boost.json", "master/ex_boost/ex_boost.orderedmap"],
+    ["ex_status.json", "master/ex_boost/ex_status.orderedmap"],
+    ["raid_event.json", "master/quest/event/raid_event.orderedmap"],
+] as const
+
 const BUNDLED_TABLE_NAMES = [
     "box_gacha.json",
     "box_gacha_box_settings.json",
     "box_reward.json",
-    "carnival_event_total_score_reward.json",
     "cdndata/player_rank_full.json",
     "encyclopedia.json",
     "equipment_craft.json",
     "equipment_dissolve.json",
-    "equipment_gacha_movie_probability.json",
     "equipment_ids.json",
     "equipment_lookup.json",
-    "ex_boost.json",
-    "ex_status.json",
     "item_data.json",
     "item_ids.json",
     "item_lookup.json",
@@ -117,7 +127,6 @@ const BUNDLED_TABLE_NAMES = [
     "mission_event_battle_rules.json",
     "mission_event_quest_map.json",
     "practice_quest.json",
-    "raid_event.json",
 ] as const
 
 const SERVER_TABLE_NAMES = [
@@ -159,6 +168,17 @@ function rewardDefinition(tableName: string, sourceOrderedMap: string): TableSou
         scope: "cdn",
         sourceOrderedMaps: [sourceOrderedMap],
         converterId: "reward",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    }
+}
+
+function gameplayDefinition(tableName: string, sourceOrderedMap: string): TableSourceInput {
+    return {
+        tableName,
+        scope: "cdn",
+        sourceOrderedMaps: [sourceOrderedMap],
+        converterId: "gameplay",
         converterVersion: 1,
         outputShapeVersion: 1,
     }
@@ -363,6 +383,9 @@ const definitionInputs: TableSourceInput[] = [
     )),
     ...REWARD_TABLES.map(([tableName, sourceOrderedMap]) => (
         rewardDefinition(tableName, sourceOrderedMap)
+    )),
+    ...GAMEPLAY_TABLES.map(([tableName, sourceOrderedMap]) => (
+        gameplayDefinition(tableName, sourceOrderedMap)
     )),
     ...(Object.keys(QUEST_TABLE_SOURCES) as QuestTableName[]).map(questDefinition),
     questDerivedDefinition(

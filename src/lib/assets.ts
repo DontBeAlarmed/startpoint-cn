@@ -20,6 +20,7 @@ import {
 } from "../content/runtime/content-snapshot";
 import type { ScoreAttackBorderTier } from "./quest/finish/score-attack-handler";
 import type { QuestTableName } from "../content/converters/quest";
+import { getRuntimeContentTableSync } from "../content/runtime/table-access";
 
 export class QuestConfigurationError extends Error {
     constructor(
@@ -513,7 +514,10 @@ export function getExAbilityPoolsSync(): ExAbilities {
 export function getExStatusPoolSync(
     tier: string | number
 ): number[] | null {
-    const pool = (exStatus as ExStatus)[String(tier)]
+    const pool = getRuntimeContentTableSync(
+        "ex_status.json",
+        exStatus as ExStatus,
+    )[String(tier)]
     return pool === undefined ? null : pool
 }
 
@@ -526,7 +530,10 @@ export function getExStatusPoolSync(
 export function getExBoostItemSync(
     itemId: string | number
 ): ExBoostItem | null {
-    const item = (exBoost as ExBoostItems)[String(itemId)]
+    const item = getRuntimeContentTableSync(
+        "ex_boost.json",
+        exBoost as ExBoostItems,
+    )[String(itemId)]
 
     return item === undefined ? null : item
 }

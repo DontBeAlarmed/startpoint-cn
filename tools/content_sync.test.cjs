@@ -230,6 +230,12 @@ function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}
             )
         }
     }
+    for (const definition of TABLE_SOURCES.filter(entry => entry.converterId === "gameplay")) {
+        const logicalPath = definition.sourceOrderedMaps[0]
+        if (!logicalEntries.has(logicalPath)) {
+            logicalEntries.set(logicalPath, serializeOrderedMap([]))
+        }
+    }
     const questDepths = new Map(Object.values(QUEST_TABLE_SOURCES).map(source => (
         [source.logicalPath, source.nestingDepth]
     )))
@@ -351,6 +357,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         character: 0,
         characterElection: 0,
         gacha: 0,
+        gameplay: 0,
         shop: 0,
         skillEffects: 0,
         reward: 0,
@@ -370,6 +377,10 @@ test("default release builder closes all registry tables and runs each CDN conve
         convertGachas: async () => {
             converterCalls.gacha++
             return converterOutput("gacha")
+        },
+        convertGameplayTables: async () => {
+            converterCalls.gameplay++
+            return converterOutput("gameplay")
         },
         convertShops: async () => {
             converterCalls.shop++
@@ -404,6 +415,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         character: 1,
         characterElection: 1,
         gacha: 1,
+        gameplay: 1,
         shop: 1,
         skillEffects: 1,
         reward: 1,
