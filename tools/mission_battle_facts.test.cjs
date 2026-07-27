@@ -133,15 +133,15 @@ const singleBattleSource = fs.readFileSync(
 )
 const singleTransactionStart = singleBattleSource.indexOf("const executeFinishWrites = () => {")
 const singleEvaluationTime = singleBattleSource.indexOf(
-    "const missionEvaluationTime = new Date(getServerTime() * 1000)",
+    "const settlementTime = new Date(getServerTime() * 1000)",
     singleTransactionStart,
 )
 const singleFactCall = singleBattleSource.indexOf(
-    "recordMissionBattleFacts(finishCtx, missionEvaluationTime)",
+    "recordMissionBattleFacts(finishCtx, settlementTime)",
     singleEvaluationTime,
 )
 const singleSettlementTime = singleBattleSource.indexOf(
-    "BATTLE_SETTLEMENT_CATEGORIES,\n                missionEvaluationTime,",
+    "BATTLE_SETTLEMENT_CATEGORIES,\n                settlementTime,",
     singleFactCall,
 )
 assert.equal(singleEvaluationTime > singleTransactionStart, true, "单人 finish 必须在事务体内固定任务时间")
@@ -159,15 +159,15 @@ const multiBattleSource = fs.readFileSync(
 )
 const multiTransactionStart = multiBattleSource.indexOf("const executeFinishWrites = () => {")
 const multiEvaluationTime = multiBattleSource.indexOf(
-    "const missionEvaluationTime = new Date(getServerTime() * 1000)",
+    "const settlementTime = new Date(getServerTime() * 1000)",
     multiTransactionStart,
 )
 const multiFactCall = multiBattleSource.indexOf(
-    "recordMissionBattleFacts(finishCtx, missionEvaluationTime)",
+    "recordMissionBattleFacts(finishCtx, settlementTime)",
     multiEvaluationTime,
 )
 const multiSettlementTime = multiBattleSource.indexOf(
-    "BATTLE_SETTLEMENT_CATEGORIES,\n                missionEvaluationTime,",
+    "BATTLE_SETTLEMENT_CATEGORIES,\n                settlementTime,",
     multiFactCall,
 )
 const multiTransactionCall = multiBattleSource.indexOf("getDb().transaction(executeFinishWrites)()")

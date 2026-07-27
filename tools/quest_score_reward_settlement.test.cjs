@@ -13,6 +13,7 @@ function stubModule(relativePath, exports) {
 }
 
 const itemTotals = new Map()
+const rewardElementMap = require("../assets/reward_element_map.json")
 stubModule("../src/data/domains/character", { getPlayerCharacterSync: () => null })
 stubModule("../src/data/domains/player", {
     getPlayerSync: () => ({ freeMana: 0, totalManaObtained: 0, expPool: 0 }),
@@ -29,6 +30,8 @@ stubModule("../src/lib/assets", {
     getRareScoreRewardGroup: groupId => groupId === 3013 ? [
         { position: 1, type: 0, id: 443001, count: 1, rarity: 0.3 },
         { position: 2, type: 0, id: 443002, count: 2, rarity: 0.7 },
+    ] : groupId === 3014 ? [
+        { position: 1, type: 6, id: 4, count: 2, rarity: 1 },
     ] : null,
 })
 stubModule("../src/lib/character", { givePlayerCharacterSync: () => null })
@@ -36,7 +39,7 @@ stubModule("../src/lib/equipment", { givePlayerEquipmentSync: () => ({}) })
 stubModule("../src/lib/event-currency", { resolveEventCurrencyId: id => id })
 stubModule("../src/utils", {
     getDateFromServerTime: () => new Date("2024-08-14T12:00:00.000Z"),
-    getServerTime: () => Date.parse("2024-08-14T12:00:00.000Z") / 1000,
+    getServerTime: () => { throw new Error("结算已提供时间时不得再次读取服务器时间") },
 })
 stubModule("../src/data/domains/server-settings", {
     getServerGameplaySettingsSync: () => ({ dropMultiplier: 1 }),
@@ -68,6 +71,7 @@ const scoreRewards = [
         field5: 90,
     },
     { position: 3, type: ScoreRewardType.RARE_POOL, id: 3013, rarity: 0.5 },
+    { position: 4, type: ScoreRewardType.RARE_POOL, id: 3014, rarity: 1 },
 ]
 
 const result = givePlayerScoreRewardsSync(
@@ -76,14 +80,25 @@ const result = givePlayerScoreRewardsSync(
     scoreRewards,
     false,
     0,
-    { commonRewardCount: 1, random: sequence([0.6, 0, 0.699999]) },
+    {
+        commonRewardCount: 1,
+        random: sequence([0.6, 0, 0.699999, 0, 0]),
+        rewardCampaignRates: { item: 1.5, exp: 2, mana: 1 },
+        rewardDate: new Date("2024-08-14T12:00:00.000Z"),
+    },
 )
 
-assert.deepEqual(result.drop_score_reward_ids, [{ group_id: 8001, index: 2, number: 3 }])
-assert.deepEqual(result.drop_rare_reward_ids, [{ group_id: 3013, index: 2, number: 2 }])
+assert.deepEqual(result.drop_score_reward_ids, [{ group_id: 8001, index: 2, number: 4 }])
+assert.deepEqual(result.drop_rare_reward_ids, [
+    { group_id: 3014, index: 1, number: 3 },
+    { group_id: 3013, index: 2, number: 3 },
+])
 assert.equal(itemTotals.get(400001), undefined)
-assert.equal(itemTotals.get(400002), 3)
+assert.equal(itemTotals.get(400002), 4)
 assert.equal(itemTotals.get(443001), undefined)
-assert.equal(itemTotals.get(443002), 2)
+assert.equal(itemTotals.get(443002), 3)
+const elementItemId = Number(rewardElementMap["1"]["4"]["3"][0][0])
+assert.equal(itemTotals.get(4), undefined)
+assert.equal(itemTotals.get(elementItemId), 3)
 
 console.log("quest score reward settlement tests passed")

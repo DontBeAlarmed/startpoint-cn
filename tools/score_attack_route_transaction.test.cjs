@@ -105,6 +105,9 @@ function updatePlayer(data) {
 
 let writeAttempts = 0
 let failActiveDeleteAfterWrite = false
+const rewardCampaignCalls = []
+let scoreRewardOptions = null
+const rewardCampaignLogic = require("../src/lib/reward-campaign")
 const scoreQuest = {
     name: "无限演武",
     eventId: 1,
@@ -229,7 +232,9 @@ stubModule("../src/lib/character", {
 })
 stubModule("../src/lib/quest", {
     givePlayerRewardSync: () => null,
-    givePlayerScoreRewardsSync: () => ({
+    givePlayerScoreRewardsSync: (...args) => {
+        scoreRewardOptions = args[5]
+        return ({
         drop_score_reward_ids: [],
         drop_rare_reward_ids: [],
         user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
@@ -237,7 +242,8 @@ stubModule("../src/lib/quest", {
         joined_character_id_list: [],
         equipment_list: [],
         items: {},
-    }),
+        })
+    },
     givePlayerRewardsSync(playerId, rewards) {
         const items = {}
         for (const reward of rewards) {
@@ -252,6 +258,14 @@ stubModule("../src/lib/quest", {
             equipment_list: [],
             items,
         }
+    },
+})
+stubModule("../src/lib/reward-campaign", {
+    calculateCharacterBattleExp: rewardCampaignLogic.calculateCharacterBattleExp,
+    calculateFixedQuestMana: rewardCampaignLogic.calculateFixedQuestMana,
+    getRewardCampaignRates(category, questId, now) {
+        rewardCampaignCalls.push({ category, questId, now })
+        return { item: 2, exp: 2, mana: 2 }
     },
 })
 stubModule("../src/routes/api/rushEvent", { rushEventFolderMaxRounds: {} })
@@ -316,7 +330,7 @@ async function finish(fastify) {
             category: 27,
             score: 1_500_000,
             elapsed_time_ms: 90000,
-            add_mana: 0,
+            add_mana: 5,
             is_accomplished: true,
             is_restored: false,
             continue_count: 0,
@@ -374,12 +388,14 @@ async function main() {
 
     db.exec("DROP TRIGGER fail_score_attack_active_delete")
     writeAttempts = 0
+    rewardCampaignCalls.length = 0
+    scoreRewardOptions = null
     const succeeded = await finish(fastify)
     assert.equal(succeeded.statusCode, 200, succeeded.body)
-    assert.equal(db.prepare("SELECT free_mana FROM player_state WHERE player_id = 17").get().free_mana, 1015)
+    assert.equal(db.prepare("SELECT free_mana FROM player_state WHERE player_id = 17").get().free_mana, 1035)
     assert.equal(db.prepare("SELECT exp_pool FROM player_state WHERE player_id = 17").get().exp_pool, 2015)
     assert.equal(db.prepare("SELECT rank_point FROM player_state WHERE player_id = 17").get().rank_point, 3010)
-    assert.equal(db.prepare("SELECT exp FROM character_state WHERE player_id = 17 AND character_id = 101").get().exp, 115)
+    assert.equal(db.prepare("SELECT exp FROM character_state WHERE player_id = 17 AND character_id = 101").get().exp, 130)
     assert.equal(db.prepare("SELECT clear_count FROM mission_state WHERE player_id = 17").get().clear_count, 1)
     assert.equal(db.prepare("SELECT count FROM item_state WHERE player_id = 17 AND item_id = 40501").get().count, 8)
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM quest_progress").get().count, 1)
@@ -387,6 +403,19 @@ async function main() {
     assert.equal(activeQuests[17], undefined)
     const decoded = unpack(Buffer.from(succeeded.body, "base64"))
     assert.equal(decoded.data.item_list["40501"], 8)
+    assert.deepEqual(decoded.data.rewards, {
+        overflow_pool_exp: 0,
+        converted_pool_exp: 0,
+        reward_pool_exp: 15,
+        reward_mana: 30,
+        field_mana: 5,
+    })
+    assert.equal(decoded.data.user_info.free_mana, 1035)
+    assert.equal(rewardCampaignCalls.length, 1)
+    assert.equal(rewardCampaignCalls[0].category, 27)
+    assert.equal(rewardCampaignCalls[0].questId, 1101)
+    assert.equal(scoreRewardOptions.rewardDate, rewardCampaignCalls[0].now)
+    assert.deepEqual(scoreRewardOptions.rewardCampaignRates, { item: 2, exp: 2, mana: 2 })
 
     activeQuests[17] = {
         questId: 1101,

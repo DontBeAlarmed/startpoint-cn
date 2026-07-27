@@ -20,6 +20,8 @@
 
 组内不是均匀随机。服务端保留 `rare_score_reward` 的原始 index，并将它写入 `drop_rare_reward_ids`；不再把排序后位置误当作协议 index。随机数使用 32 位单位区间，不再把概率压缩为百分之一精度。
 
+Rare 的 ELEMENT/AETHER 行中 `id` 表示素材稀有度，不是背包物品 ID；发奖前会结合关卡属性转换为实际素材 ID，与普通掉落保持一致。
+
 ## 仍独立处理的机制
 
-`additional_reward`、固定关卡 Mana、角色战斗 EXP 和 campaign 倍率不是本模块的抽取概率。它们分别在对应结算链路处理，不能与 Rare Score Reward 的 `rarity` 混用。
+`additional_reward` 不是本模块的抽取概率。固定关卡 Mana、角色战斗 EXP 和 campaign 倍率由 [奖励活动倍率](./reward-campaign.md) 在结算链路处理，不能与 Rare Score Reward 的 `rarity` 混用。

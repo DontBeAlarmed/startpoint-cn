@@ -39,6 +39,11 @@ import { resolveHostFinished, resolveIsRoomHost } from "../../lib/quest/host-fin
 import { resolveMultiPlayerContext } from "../player-context";
 import { resolveQuestRewardEligibility } from "../../lib/quest/first-clear-reward";
 import { getCommonScoreRewardCount } from "../../lib/score-reward-lottery";
+import {
+    calculateCharacterBattleExp,
+    calculateFixedQuestMana,
+    getRewardCampaignRates,
+} from "../../lib/reward-campaign";
 
 async function buildFinishFollowInfo(
     viewerId: number,
@@ -239,8 +244,6 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
 
         const beforeRankPoint = player.rankPoint;
         const newRankPoint = beforeRankPoint + questData.rankPointReward;
-        const newMana = player.freeMana + questData.manaReward + ((body as any).add_mana || 0);
-        const manaObtained = questData.manaReward + ((body as any).add_mana || 0);
         const newExpPool = player.expPool + questData.poolExpReward;
 
         let newBoostPoint = player.boostPoint - (activeQuestData.useBoostPoint ? 1 : 0);
@@ -290,7 +293,23 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         }
 
         const executeFinishWrites = () => {
-            const missionEvaluationTime = new Date(getServerTime() * 1000);
+            const settlementTime = new Date(getServerTime() * 1000)
+            const rewardCampaignRates = getRewardCampaignRates(
+                questCategory,
+                questId,
+                settlementTime,
+            )
+            const fixedManaReward = calculateFixedQuestMana(
+                questData.manaReward,
+                rewardCampaignRates,
+            )
+            const characterBattleExp = calculateCharacterBattleExp(
+                questData.characterExpReward || 0,
+                rewardCampaignRates,
+            )
+            const fieldMana = (body as any).add_mana || 0
+            const newMana = player.freeMana + fixedManaReward + fieldMana;
+            const manaObtained = fixedManaReward + fieldMana;
             const clearReward = rewardEligibility.firstClear && (questData as any).clearReward !== undefined
                 ? givePlayerRewardSync(playerId, (questData as any).clearReward)
                 : null;
@@ -355,17 +374,19 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                         clearRank,
                         getConfigSync().common_reward_multiplier_by_multi_play_mode,
                     ) ?? undefined,
+                    rewardCampaignRates,
+                    rewardDate: settlementTime,
                 },
             );
-            recordMissionBattleFacts(finishCtx, missionEvaluationTime)
+            recordMissionBattleFacts(finishCtx, settlementTime)
             const rewardCharacterExpResult = givePlayerCharactersExpSync(
-                playerId, partyCharacterIdsArray, questData.characterExpReward || 0,
+                playerId, partyCharacterIdsArray, characterBattleExp,
                 questData.fixedParty !== undefined
             );
             const missionSettlement = settleMissionCategories(
                 playerId,
                 BATTLE_SETTLEMENT_CATEGORIES,
-                missionEvaluationTime,
+                settlementTime,
             );
             const characterList = reconcileAwakeUnlockCharacterList(playerId, [
                 ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
@@ -383,6 +404,9 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 scoreRewardsResult,
                 sPlusClearReward,
                 missionSettlement,
+                fieldMana,
+                fixedManaReward,
+                newMana,
             }
         }
         const bothBossRoomNumber = questData.isBothBoss === true
@@ -413,6 +437,9 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             scoreRewardsResult,
             sPlusClearReward,
             missionSettlement,
+            fieldMana,
+            fixedManaReward,
+            newMana,
         } = finishWrites
 
         delete activeQuests[playerId];
@@ -451,8 +478,8 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                     "overflow_pool_exp": 0,
                     "converted_pool_exp": 0,
                     "reward_pool_exp": questData.poolExpReward,
-                    "reward_mana": questData.manaReward,
-                    "field_mana": (body as any).add_mana || 0
+                    "reward_mana": fixedManaReward,
+                    "field_mana": fieldMana
                 },
                 "old_high_score": questProgress === null ? 0 : questProgress.highScore || 0,
                 "joined_character_id_list": [

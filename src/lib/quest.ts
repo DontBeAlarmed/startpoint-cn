@@ -11,6 +11,10 @@ import { resolveEventCurrencyId } from "./event-currency";
 import { getDateFromServerTime, getServerTime } from "../utils";
 import { getServerGameplaySettingsSync } from "../data/domains/server-settings";
 import { selectCommonScoreRewards, selectRareScoreRewards, UnitRandom } from "./score-reward-lottery";
+import {
+    calculateScoreRewardAmount,
+    type RewardCampaignRates,
+} from "./reward-campaign";
 
 const ELEMENT_TO_ENEMY_MAP: Record<number, number> = {
     0: 3, 1: 0, 2: 1, 3: 2, 4: 5, 5: 4,
@@ -42,7 +46,12 @@ export function givePlayerScoreRewardsSync(
     scoreRewards?: ScoreReward[],
     boostPointUsed: boolean = false,
     questElement?: number,
-    lottery?: { commonRewardCount?: number, random?: UnitRandom },
+    lottery?: {
+        commonRewardCount?: number,
+        random?: UnitRandom,
+        rewardCampaignRates?: RewardCampaignRates,
+        rewardDate?: Date,
+    },
 ): GivePlayerScoreRewardsResult {
 
     const dropScoreRewardIds: DropScoreRewardId[] = []
@@ -58,7 +67,8 @@ export function givePlayerScoreRewardsSync(
 
     if (scoreRewards != null && groupId != null) {
         const dropMultiplier = getServerGameplaySettingsSync().dropMultiplier
-        const rewardDate = getDateFromServerTime(getServerTime())
+        const campaignRates = lottery?.rewardCampaignRates ?? { item: 1, exp: 1, mana: 1 }
+        const rewardDate = lottery?.rewardDate ?? getDateFromServerTime(getServerTime())
         console.log(`[QUEST] givePlayerScoreRewards group=${groupId} items=${scoreRewards.length} pid=${playerId}`)
         const commonRewards = lottery?.commonRewardCount === undefined
             ? scoreRewards.filter((reward): reward is CommonScoreReward => reward.type === ScoreRewardType.ITEM)
@@ -71,7 +81,10 @@ export function givePlayerScoreRewardsSync(
                 case RewardType.ITEM: {
                     const itemReward = reward as ItemScoreReward
                     const itemId = resolveEventCurrencyId(itemReward.id, rewardDate)
-                    rewardAmount = itemReward.count * dropMultiplier * (boostPointUsed ? 2 : 1)
+                    rewardAmount = calculateScoreRewardAmount(
+                        itemReward.count, reward.reward_type, campaignRates,
+                        boostPointUsed, dropMultiplier,
+                    )
                     items[String(itemId)] = givePlayerItemSync(playerId, itemId, rewardAmount)
                     console.log(`[QUEST-ITEM] id=${itemId} cdnCount=${itemReward.count} ×drop=${dropMultiplier} ×boost=${boostPointUsed ? 2 : 1} → ${rewardAmount}`)
                     break
@@ -79,7 +92,10 @@ export function givePlayerScoreRewardsSync(
                 case RewardType.MANA: {
                     const player = getPlayerSync(playerId)
                     const currencyReward = reward as CurrencyScoreReward
-                    rewardAmount = currencyReward.count * dropMultiplier * (boostPointUsed ? 2 : 1)
+                    rewardAmount = calculateScoreRewardAmount(
+                        currencyReward.count, reward.reward_type, campaignRates,
+                        boostPointUsed, dropMultiplier,
+                    )
                     mana += rewardAmount
                     updatePlayerSync({
                         id: playerId,
@@ -91,7 +107,10 @@ export function givePlayerScoreRewardsSync(
                 case RewardType.EXP: {
                     const player = getPlayerSync(playerId)
                     const currencyReward = reward as CurrencyScoreReward
-                    rewardAmount = currencyReward.count * dropMultiplier * (boostPointUsed ? 2 : 1)
+                    rewardAmount = calculateScoreRewardAmount(
+                        currencyReward.count, reward.reward_type, campaignRates,
+                        boostPointUsed, dropMultiplier,
+                    )
                     expPool += rewardAmount
                     updatePlayerSync({
                         id: playerId,
@@ -102,7 +121,10 @@ export function givePlayerScoreRewardsSync(
                 case RewardType.ELEMENT: {
                     const itemReward = reward as ItemScoreReward
                     const itemId = resolveElementItemId(itemReward.id, questElement)
-                    rewardAmount = itemReward.count * dropMultiplier * (boostPointUsed ? 2 : 1)
+                    rewardAmount = calculateScoreRewardAmount(
+                        itemReward.count, reward.reward_type, campaignRates,
+                        boostPointUsed, dropMultiplier,
+                    )
                     items[String(itemId)] = givePlayerItemSync(playerId, itemId, rewardAmount)
                     console.log(`[QUEST-ELEMENT] rarity=${itemReward.id} →id=${itemId} cdnCount=${itemReward.count} ×drop=${dropMultiplier} ×boost=${boostPointUsed ? 2 : 1} → ${rewardAmount}`)
                     break
@@ -110,7 +132,10 @@ export function givePlayerScoreRewardsSync(
                 case RewardType.AETHER: {
                     const itemReward = reward as ItemScoreReward
                     const itemId = resolveAetherItemId(itemReward.id, questElement)
-                    rewardAmount = itemReward.count * dropMultiplier * (boostPointUsed ? 2 : 1)
+                    rewardAmount = calculateScoreRewardAmount(
+                        itemReward.count, reward.reward_type, campaignRates,
+                        boostPointUsed, dropMultiplier,
+                    )
                     items[String(itemId)] = givePlayerItemSync(playerId, itemId, rewardAmount)
                     console.log(`[QUEST-AETHER] rarity=${itemReward.id} →id=${itemId} cdnCount=${itemReward.count} ×drop=${dropMultiplier} ×boost=${boostPointUsed ? 2 : 1} → ${rewardAmount}`)
                     break
@@ -131,7 +156,26 @@ export function givePlayerScoreRewardsSync(
         )
         for (const selected of rareRewards) {
             const reward = selected.reward
-            const result = givePlayerRewardSync(playerId, reward)
+            const hasCount = "count" in reward && typeof reward.count === "number"
+            const rewardAmount = hasCount
+                ? calculateScoreRewardAmount(
+                    reward.count as number,
+                    reward.type,
+                    campaignRates,
+                    boostPointUsed,
+                    dropMultiplier,
+                )
+                : 1
+            const adjustedReward = hasCount
+                ? { ...reward, count: rewardAmount }
+                : reward
+            const adjustedItemReward = adjustedReward as EquipmentItemReward
+            const contextualReward = adjustedReward.type === RewardType.ELEMENT
+                ? { ...adjustedReward, id: resolveElementItemId(adjustedItemReward.id, questElement) }
+                : adjustedReward.type === RewardType.AETHER
+                    ? { ...adjustedReward, id: resolveAetherItemId(adjustedItemReward.id, questElement) }
+                    : adjustedReward
+            const result = givePlayerRewardSync(playerId, contextualReward)
             if (!result) continue
 
             mana += result.user_info.free_mana
@@ -143,28 +187,10 @@ export function givePlayerScoreRewardsSync(
                 items[itemId] = count
             }
 
-            let number = 0
-            switch (reward.type) {
-                case RewardType.ITEM:
-                case RewardType.EQUIPMENT:
-                case RewardType.ELEMENT:
-                case RewardType.AETHER:
-                    number = (reward as Reward as EquipmentItemReward).count
-                    break
-                case RewardType.CHARACTER:
-                    number = 1
-                    break
-                case RewardType.BEADS:
-                case RewardType.EXP:
-                case RewardType.MANA:
-                    number = (reward as Reward as CurrencyReward).count
-                    break
-            }
-
             dropRareRewardIds.push({
                 group_id: selected.groupId,
                 index: selected.index,
-                number,
+                number: rewardAmount,
             })
         }
     }

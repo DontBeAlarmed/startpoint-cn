@@ -202,6 +202,12 @@ function characterQuestFixture() {
 
 function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}) {
     logicalEntries = new Map(logicalEntries)
+    if (!logicalEntries.has("master/campaign/reward_campaign.orderedmap")) {
+        logicalEntries.set(
+            "master/campaign/reward_campaign.orderedmap",
+            serializeOrderedMap([]),
+        )
+    }
     for (const definition of TABLE_SOURCES) {
         const match = /^ordered-map-json-([1-3])$/.exec(definition.converterId)
         if (!match) continue
@@ -395,6 +401,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         skillEffects: 0,
         reward: 0,
         quest: 0,
+        rewardCampaign: 0,
     }
     let bundledImports = 0
     const bundledRoots = new Set()
@@ -443,6 +450,10 @@ test("default release builder closes all registry tables and runs each CDN conve
             converterCalls.quest++
             return converterOutput("quest")
         },
+        convertRewardCampaigns: async () => {
+            converterCalls.rewardCampaign++
+            return converterOutput("reward-campaign")
+        },
         importBundledTable: async (root, tableName) => {
             bundledRoots.add(root)
             bundledImports++
@@ -468,6 +479,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         skillEffects: 1,
         reward: 1,
         quest: 1,
+        rewardCampaign: 1,
     })
     assert.equal(
         bundledImports,

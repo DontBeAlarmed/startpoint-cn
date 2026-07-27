@@ -52,6 +52,11 @@ import {
     type RewardSourceReader,
 } from "../converters/reward"
 import {
+    convertRewardCampaigns,
+    type RewardCampaignConversionOutput,
+    type RewardCampaignSourceReader,
+} from "../converters/reward-campaign"
+import {
     convertQuests,
     type QuestConversionCompatibility,
     type QuestConversionOutput,
@@ -88,6 +93,7 @@ const SUPPORTED_CONVERTER_IDS = new Set([
     "ordered-map-json-2",
     "ordered-map-json-3",
     "reward",
+    "reward-campaign",
     "quest",
     "bundled-json",
     "server-json",
@@ -125,6 +131,9 @@ export interface DefaultContentTableBuilderDependencies {
     readonly convertRewards?: (
         reader: RewardSourceReader,
     ) => RewardConversionOutput | Promise<RewardConversionOutput>
+    readonly convertRewardCampaigns?: (
+        reader: RewardCampaignSourceReader,
+    ) => RewardCampaignConversionOutput | Promise<RewardCampaignConversionOutput>
     readonly convertQuests?: (
         reader: QuestSourceReader,
         compatibility: QuestConversionCompatibility,
@@ -394,6 +403,7 @@ export function createDefaultContentTableBuilder(
     const shopConverter = dependencies.convertShops ?? convertShops
     const skillEffectConverter = dependencies.convertSkillEffects ?? convertSkillEffects
     const rewardConverter = dependencies.convertRewards ?? convertRewards
+    const rewardCampaignConverter = dependencies.convertRewardCampaigns ?? convertRewardCampaigns
     const questConverter = dependencies.convertQuests ?? convertQuests
     const bundledImporter = dependencies.importBundledTable ?? importBundledTable
 
@@ -417,6 +427,7 @@ export function createDefaultContentTableBuilder(
                     || definition.converterId === "shop"
                     || definition.converterId === "skill-effects"
                     || definition.converterId === "reward"
+                    || definition.converterId === "reward-campaign"
                     || definition.converterId === "quest"
                     || directOrderedMapDepth(definition.converterId) !== null
                     ? definition.sourceOrderedMaps
@@ -484,6 +495,13 @@ export function createDefaultContentTableBuilder(
             }
             if (converterIds.has("reward")) {
                 addConverterOutput(values, "reward", await rewardConverter(reader))
+            }
+            if (converterIds.has("reward-campaign")) {
+                addConverterOutput(
+                    values,
+                    "reward-campaign",
+                    await rewardCampaignConverter(reader),
+                )
             }
             if (converterIds.has("quest")) {
                 addConverterOutput(values, "quest", await questConverter(reader, {

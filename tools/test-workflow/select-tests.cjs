@@ -75,7 +75,15 @@ const SOURCE_RULES = [
         groups: ["quick:content", "integration:runtime"],
     },
     {
-        pattern: /^src\/content\/(?:converters\/(?:box-gacha|gameplay|item-equipment|mana-node|skill-effects)|sync\/amf3)\.ts$/,
+        pattern: /^src\/content\/(?:converters\/(?:box-gacha|gameplay|item-equipment|mana-node|reward-campaign|skill-effects)|sync\/amf3)\.ts$/,
+        groups: ["quick:content"],
+    },
+    {
+        pattern: /^src\/lib\/reward-campaign\.ts$/,
+        groups: ["integration:rules", "quick:content", "quick:quest"],
+    },
+    {
+        pattern: /^assets\/reward_campaign\.json$/,
         groups: ["quick:content"],
     },
     {

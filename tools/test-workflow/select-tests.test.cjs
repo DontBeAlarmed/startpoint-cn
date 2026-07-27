@@ -182,6 +182,7 @@ test("selects only the direct single battle route regressions", () => {
         "tools/quest_host_finish.test.cjs",
         "tools/tutorial_update_step.test.cjs",
         "tools/active_quest_service_import.test.cjs",
+        "tools/reward_campaign_routes.test.cjs",
         "tools/special_quest_flow.test.cjs",
     ])
 })
@@ -560,6 +561,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/party_loadout_validation.test.cjs",
         "tools/score_reward_lottery.test.cjs",
         "tools/quest_score_reward_settlement.test.cjs",
+        "tools/reward_campaign.test.cjs",
         "tools/shop_bulk_purchase.test.cjs",
         "tools/mail_notification.test.cjs",
         "tools/mail_notification_write_routes.test.cjs",

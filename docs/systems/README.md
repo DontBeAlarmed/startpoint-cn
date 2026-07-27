@@ -24,6 +24,7 @@
 - [活动扭蛋箱](./box-gacha.md)
 - [关卡入场道具](./quest-entry-items.md)
 - [关卡普通与稀有掉落](./quest-score-rewards.md)
+- [奖励活动倍率](./reward-campaign.md)
 - [Hard Multi 首通奖励](./hard-multi-first-clear-reward.md)
 
 ## 任务与角色

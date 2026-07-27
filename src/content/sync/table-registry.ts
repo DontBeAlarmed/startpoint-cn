@@ -95,6 +95,8 @@ const REWARD_TABLES = [
     ["rush_event_ranking_reward.json", "master/quest/event/rush_event_ranking_reward.orderedmap"],
 ] as const
 
+const REWARD_CAMPAIGN_SOURCE = "master/campaign/reward_campaign.orderedmap"
+
 const GAMEPLAY_TABLES = [
     [
         "carnival_event_total_score_reward.json",
@@ -340,6 +342,14 @@ const definitionInputs: TableSourceInput[] = [
         scope: "cdn",
         sourceOrderedMaps: ["master/gacha/gacha_campaign.orderedmap"],
         converterId: "gacha",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    },
+    {
+        tableName: "reward_campaign.json",
+        scope: "cdn",
+        sourceOrderedMaps: [REWARD_CAMPAIGN_SOURCE],
+        converterId: "reward-campaign",
         converterVersion: 1,
         outputShapeVersion: 1,
     },

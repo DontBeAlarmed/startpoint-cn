@@ -24,6 +24,11 @@ import { getQuestConfigurationErrorResponse, getQuestFromCategorySync, getRushEv
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
 import { getCommonScoreRewardCount } from "../../lib/score-reward-lottery";
+import {
+    calculateCharacterBattleExp,
+    calculateFixedQuestMana,
+    getRewardCampaignRates,
+} from "../../lib/reward-campaign";
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
 import { rushEventFolderMaxRounds } from "./rushEvent";
@@ -257,8 +262,6 @@ const routes = async (fastify: FastifyInstance) => {
         const newExpPool = playerData.expPool + questData.poolExpReward
         const beforeRankPoint = playerData.rankPoint
         const newRankPoint = beforeRankPoint + questData.rankPointReward
-        let newMana = playerData.freeMana + questData.manaReward + body.add_mana
-        const manaObtained = questData.manaReward + body.add_mana
 
         // calculate boost point
         let newBoostPoint = playerData.boostPoint - (activeQuestData.useBoostPoint ? 1 : 0)
@@ -315,10 +318,23 @@ const routes = async (fastify: FastifyInstance) => {
         for (const value of partyCharacterIds.values()) {
             if (value !== null && value.id !== null) partyCharacterIdsArray.push(value.id);
         }
-        const addExpAmount = questData.characterExpReward
-
         const executeFinishWrites = () => {
-            const missionEvaluationTime = new Date(getServerTime() * 1000)
+            const settlementTime = new Date(getServerTime() * 1000)
+            const rewardCampaignRates = getRewardCampaignRates(
+                questCategory,
+                questId,
+                settlementTime,
+            )
+            const fixedManaReward = calculateFixedQuestMana(
+                questData.manaReward,
+                rewardCampaignRates,
+            )
+            const addExpAmount = calculateCharacterBattleExp(
+                questData.characterExpReward,
+                rewardCampaignRates,
+            )
+            const newMana = playerData.freeMana + fixedManaReward + body.add_mana
+            const manaObtained = fixedManaReward + body.add_mana
             const clearReward = !isScoreAttackEvent && rewardEligibility.firstClear && questData.clearReward !== undefined
                 ? givePlayerRewardSync(playerId, questData.clearReward)
                 : null
@@ -392,10 +408,14 @@ const routes = async (fastify: FastifyInstance) => {
                 questData.scoreRewardGroup,
                 useBoostPoint,
                 questData.element,
-                { commonRewardCount: getCommonScoreRewardCount(questData, clearRank) ?? undefined },
+                {
+                    commonRewardCount: getCommonScoreRewardCount(questData, clearRank) ?? undefined,
+                    rewardCampaignRates,
+                    rewardDate: settlementTime,
+                },
             )
 
-            recordMissionBattleFacts(finishCtx, missionEvaluationTime)
+            recordMissionBattleFacts(finishCtx, settlementTime)
 
             const rewardCharacterExpResult = givePlayerCharactersExpSync(
                 playerId,
@@ -504,7 +524,7 @@ const routes = async (fastify: FastifyInstance) => {
             const missionSettlement = settleMissionCategories(
                 playerId,
                 BATTLE_SETTLEMENT_CATEGORIES,
-                missionEvaluationTime,
+                settlementTime,
             )
             const itemList = {
                 ...(activeQuestData.entryItemId ? { [activeQuestData.entryItemId]: getPlayerItemSync(playerId, activeQuestData.entryItemId) ?? 0 } : {}),
@@ -541,6 +561,8 @@ const routes = async (fastify: FastifyInstance) => {
                 clearReward,
                 sPlusClearReward,
                 missionSettlement,
+                fixedManaReward,
+                newMana,
             }
         }
 
@@ -563,6 +585,8 @@ const routes = async (fastify: FastifyInstance) => {
             clearReward,
             sPlusClearReward,
             missionSettlement,
+            fixedManaReward,
+            newMana,
         } = finishWrites
         delete activeQuests[playerId]
         const scoreAttackEventData = scoreAttackFinishResult?.scoreAttackEvent ?? null
@@ -589,7 +613,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "overflow_pool_exp": 0,
                     "converted_pool_exp": 0,
                     "reward_pool_exp": questData.poolExpReward,
-                    "reward_mana": questData.manaReward,
+                    "reward_mana": fixedManaReward,
                     "field_mana": body.add_mana
                 },
                 "old_high_score": scoreAttackFinishResult?.oldHighScore ?? (questProgress === null ? 0 : questProgress.highScore || 0),
