@@ -17,20 +17,40 @@ function digest(value) {
 
 function writeFixture(directory) {
     const pools = {
+        fes: {
+            "1": { "0": [101, 102] },
+            "2": { "0": [103, 104] },
+            "3": { "0": [105, 106] },
+        },
+        fes_guarantee: {
+            "1": { "0": [101, 102] },
+            "2": { "0": [103, 104] },
+            "3": { "0": [105, 106] },
+        },
         normal: {
             "1": { "0": [101, 102] },
-            "2": { "0": [201, 202] },
-            "3": { "0": [301, 302] },
+            "2": { "0": [103, 104] },
+            "3": { "0": [105, 106] },
         },
         normal_guarantee: {
-            "1": { "0": [401, 402] },
-            "2": { "0": [501, 502] },
-            "3": { "0": [] },
+            "1": { "0": [101, 102] },
+            "2": { "0": [103, 104] },
+            "3": { "0": [105, 106] },
         },
     }
     const manifest = {
         schemaVersion: 1,
+        clientVersion: "1.8.1",
+        cdnVersion: "1.4.54",
+        configDigest: "a".repeat(64),
+        predictorDigest: "b".repeat(64),
+        seedRange: { start: 101, end: 106 },
         movieIds: Object.keys(pools),
+        seedCountPerMovie: 6,
+        totalSeedCount: 24,
+        rarityCounts: Object.fromEntries(
+            Object.keys(pools).map(movieId => [movieId, { "3": 2, "4": 2, "5": 2 }]),
+        ),
         poolDigests: Object.fromEntries(
             Object.entries(pools).map(([movieId, pool]) => [movieId, digest(pool)]),
         ),
@@ -56,22 +76,31 @@ try {
         },
     })
 
-    assert.equal(readCount, 3)
+    assert.equal(readCount, 5)
+    assert.deepStrictEqual(catalog.status(), {
+        schemaVersion: 1,
+        clientVersion: "1.8.1",
+        cdnVersion: "1.4.54",
+        seedRange: { start: 101, end: 106 },
+        totalSeedCount: 24,
+        movies: [
+            { movieId: "fes", rarityCounts: { "3": 2, "4": 2, "5": 2 } },
+            { movieId: "fes_guarantee", rarityCounts: { "3": 2, "4": 2, "5": 2 } },
+            { movieId: "normal", rarityCounts: { "3": 2, "4": 2, "5": 2 } },
+            { movieId: "normal_guarantee", rarityCounts: { "3": 2, "4": 2, "5": 2 } },
+        ],
+    })
     const used = new Set()
     assert.equal(catalog.select("normal", 5, used), 102)
     assert.equal(catalog.select("normal", 5, used), 101)
     assert.deepStrictEqual([...used], [102, 101])
-    assert.equal(catalog.select("normal", 4, used), 202)
-    assert.equal(catalog.select("normal_guarantee", 5, new Set()), 402)
-    assert.equal(readCount, 3, "selection must use the startup cache")
+    assert.equal(catalog.select("normal", 4, used), 104)
+    assert.equal(catalog.select("normal_guarantee", 5, new Set()), 102)
+    assert.equal(readCount, 5, "selection must use the startup cache")
 
     assert.throws(
         () => catalog.select("normal", 5, used),
         /no available.*normal.*rarity 5/i,
-    )
-    assert.throws(
-        () => catalog.select("normal_guarantee", 3, new Set()),
-        /no available.*normal_guarantee.*rarity 3/i,
     )
     assert.throws(
         () => catalog.select("unknown", 4, new Set()),
@@ -80,7 +109,7 @@ try {
 
     const normalPath = path.join(temporaryRoot, "normal.json")
     const changed = JSON.parse(fs.readFileSync(normalPath, "utf8"))
-    changed["1"]["0"].push(999)
+    changed["1"]["0"].reverse()
     fs.writeFileSync(normalPath, JSON.stringify(changed))
     assert.throws(
         () => new GachaSeedCatalog({ catalogDir: temporaryRoot }),
@@ -95,6 +124,47 @@ try {
     })
     assert.equal(filtered.select("normal", 5, new Set()), 101)
 
+    const manifestPath = path.join(temporaryRoot, "manifest.json")
+    const mutateManifest = mutator => {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"))
+        mutator(manifest)
+        fs.writeFileSync(manifestPath, JSON.stringify(manifest))
+    }
+
+    writeFixture(temporaryRoot)
+    mutateManifest(manifest => { manifest.configDigest = "invalid" })
+    assert.throws(() => new GachaSeedCatalog({ catalogDir: temporaryRoot }), /digest/i)
+
+    writeFixture(temporaryRoot)
+    mutateManifest(manifest => { manifest.seedRange.end = 100 })
+    assert.throws(() => new GachaSeedCatalog({ catalogDir: temporaryRoot }), /range/i)
+
+    writeFixture(temporaryRoot)
+    mutateManifest(manifest => {
+        manifest.movieIds = manifest.movieIds.slice(1)
+        manifest.totalSeedCount = 18
+    })
+    assert.throws(() => new GachaSeedCatalog({ catalogDir: temporaryRoot }), /movie/i)
+
+    writeFixture(temporaryRoot)
+    mutateManifest(manifest => { manifest.seedCountPerMovie = 5 })
+    assert.throws(() => new GachaSeedCatalog({ catalogDir: temporaryRoot }), /seed count/i)
+
+    writeFixture(temporaryRoot)
+    mutateManifest(manifest => { manifest.rarityCounts.normal["5"] = 1 })
+    assert.throws(() => new GachaSeedCatalog({ catalogDir: temporaryRoot }), /rarity count/i)
+
+    writeFixture(temporaryRoot)
+    const outOfRangePool = JSON.parse(fs.readFileSync(path.join(temporaryRoot, "normal.json"), "utf8"))
+    outOfRangePool["3"]["0"][1] = 999
+    fs.writeFileSync(path.join(temporaryRoot, "normal.json"), JSON.stringify(outOfRangePool))
+    mutateManifest(manifest => { manifest.poolDigests.normal = digest(outOfRangePool) })
+    assert.throws(() => new GachaSeedCatalog({ catalogDir: temporaryRoot }), /outside.*range|missing seed/i)
+
+    writeFixture(temporaryRoot)
+    mutateManifest(manifest => { manifest.clientVersion = "1.8.2" })
+    assert.throws(() => new GachaSeedCatalog({ catalogDir: temporaryRoot }), /client version/i)
+
     const placeholders = new Set()
     assert.equal(reserveUniquePlaceholderSeed(9000, placeholders), 9000)
     assert.equal(reserveUniquePlaceholderSeed(9000, placeholders), 9001)
@@ -105,6 +175,8 @@ try {
 
 const gachaSource = fs.readFileSync(path.join(__dirname, "..", "src", "lib", "gacha.ts"), "utf8")
 assert.match(gachaSource, /getDefaultGachaSeedCatalog\(\)/)
+assert.doesNotMatch(gachaSource, /gacha-physics/)
+assert.match(gachaSource, /movieId !== "rarity_5_guarantee"/)
 assert.match(gachaSource, /const usedSeeds = new Set<number>\(\)/)
 assert.match(gachaSource, /gachaSeedCatalog\.select\(movieId, rarity, usedSeeds\)/)
 assert.match(gachaSource, /planCharacterGachaMovies/)

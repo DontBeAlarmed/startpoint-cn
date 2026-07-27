@@ -30,7 +30,7 @@ const menuItems = [
     { key: "/time", icon: <Clock3 size={18} />, label: "时间 / 千里眼" },
     { key: "/accounts", icon: <Users size={18} />, label: "账号 / 存档" },
     { key: "/mail", icon: <MailIcon size={18} />, label: "邮件" },
-    { key: "/seeds", icon: <Database size={18} />, label: "种子管理" },
+    { key: "/seeds", icon: <Database size={18} />, label: "动画种子" },
     { key: "/settings", icon: <Settings2 size={18} />, label: "游戏设置" },
 ]
 
@@ -39,7 +39,7 @@ const pageTitles: Record<string, string> = {
     "/time": "时间 / 千里眼",
     "/accounts": "账号 / 存档",
     "/mail": "邮件",
-    "/seeds": "种子管理",
+    "/seeds": "动画种子",
     "/settings": "游戏设置",
 }
 

@@ -919,7 +919,7 @@ function archiveMetadataDigest(cdnRoot) {
 function seedSnapshot(projectRoot) {
     return directorySnapshot(path.join(projectRoot, "assets"), {
         predicate: relativePath => relativePath.toLowerCase().includes("seed"),
-        sentinels: ["confirmed_seeds.json", "pending_seeds.json"],
+        sentinels: ["gacha-seed-catalog/manifest.json"],
     })
 }
 

@@ -53,7 +53,7 @@ quarantine 属于本机 Runtime Data，不应提交到 Git。完整状态与恢�
 - 不匹配最近发送记录：忽略；
 - PLAY 信标：不再处理。
 
-官方客户端不发送项目自定义信标，但仍直接使用离线完整验证过的 catalog。quarantine 只是异常兜底，不是 seed 正确性的来源。
+官方客户端不发送项目自定义信标，但仍直接使用 faithful 预测器全量复算过的 catalog。真实客户端历史语料只作为独立回归；quarantine 只是异常兜底，不是 seed 正确性的来源。
 
 ## 排查顺序
 
@@ -79,7 +79,7 @@ quarantine 属于本机 Runtime Data，不应提交到 Git。完整状态与恢�
 | `tools/gacha_rules.test.cjs` | 抽卡规则和结果构造 |
 | `tools/gacha_seed_catalog_runtime.test.cjs` | catalog 启动缓存、摘要、选择与空桶失败 |
 | `tools/gacha_seed_catalog_builder.test.cjs` | 离线范围完整性与 manifest |
-| `tools/seed_state.test.cjs` | seed 状态存储与数据契约 |
-| `tools/seed_api.test.cjs` | 管理 API 与模式切换 |
+| `tools/gacha_seed_quarantine.test.cjs` | 最近发送关联、隔离持久化与有界样本 |
+| `tools/seed_api.test.cjs` | 只读管理 API、全量计数与样本上限 |
 
 模块提交前仍运行 `npm run verify:full`。自动测试无法替代客户端物理动画的人工验收。

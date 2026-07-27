@@ -187,7 +187,7 @@ smoke 始终执行 force sync，并验证：
 - Rush `700011..700017` 官方独立商品保持为空，`eventId-10` 推测映射只留在业务层；
 - 调用前后 Git HEAD、相对 HEAD 的 tracked binary diff、staged binary diff、unstaged binary diff 均不变；已有 dirty 内容可以存在，但 smoke 期间不能继续变化；
 - `git ls-files --others --exclude-standard` 返回的全部 untracked 文件保持同一稳定路径和内容摘要；若 Git 将未跟踪嵌套仓库或目录作为目录项返回，smoke 直接以来源不安全拒绝，不递归扫描不明目录；
-- `assets/` 下所有实际 seed 状态文件以及 `confirmed_seeds.json`、`pending_seeds.json` 的存在/缺失状态不变；
+- `assets/gacha-seed-catalog/` 的文件与摘要保持不变；抽卡动画 catalog 不属于 CDN 业务表同步范围；
 - `.database/` 内全部普通文件的集合与内容 SHA-256 不变，smoke 不写玩家数据库；
 - 每个 `archive-*` 项必须是非符号链接目录，原始 ZIP 的 inode/大小/权限/mtime/ctime 元数据不变；`EntityLists/` 与 `entities/` 两个受支持位置的普通文件集合、内容 SHA-256 和元数据不变。
 

@@ -38,9 +38,9 @@ const {
 } = require("../src/content/sync/cli")
 
 const projectRoot = path.resolve(__dirname, "..")
-const confirmedSeedsPath = path.join(projectRoot, "assets", "confirmed_seeds.json")
-const confirmedSeedsDigest = crypto.createHash("sha256")
-    .update(fs.readFileSync(confirmedSeedsPath))
+const seedCatalogManifestPath = path.join(projectRoot, "assets", "gacha-seed-catalog", "manifest.json")
+const seedCatalogManifestDigest = crypto.createHash("sha256")
+    .update(fs.readFileSync(seedCatalogManifestPath))
     .digest("hex")
 const TEST_TABLE_SOURCES = TABLE_SOURCES.slice(0, 2)
 
@@ -1170,9 +1170,9 @@ test("content sync bootstrap hides initialization paths", async () => {
     assert.equal(stderr.includes("/private/secret-config"), false)
 })
 
-test("content sync never modifies confirmed seeds", () => {
+test("content sync never modifies the gacha seed catalog", () => {
     const currentDigest = crypto.createHash("sha256")
-        .update(fs.readFileSync(confirmedSeedsPath))
+        .update(fs.readFileSync(seedCatalogManifestPath))
         .digest("hex")
-    assert.equal(currentDigest, confirmedSeedsDigest)
+    assert.equal(currentDigest, seedCatalogManifestDigest)
 })

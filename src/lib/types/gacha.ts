@@ -93,6 +93,5 @@ export interface GachaEquipmentDraw {
 export type GachaDraws = (GachaCharacterDraw | GachaEquipmentDraw)[]
 
 
-export type GachaMovieSeeds = Record<string, Record<string, number[]>>
 
 // shops

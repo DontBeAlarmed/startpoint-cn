@@ -100,7 +100,8 @@ export class GachaSeedQuarantine {
                 }
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error)
-                ;(options.logger ?? console).warn(
+                const logger = options.logger ?? console
+                logger.warn(
                     `[GACHA-SEED] Ignoring invalid quarantine state: ${message}`,
                 )
             }
@@ -180,6 +181,15 @@ export class GachaSeedQuarantine {
             total += count
         }
         return { total, movies }
+    }
+
+    samples(limit: number): Record<string, number[]> {
+        if (!Number.isSafeInteger(limit) || limit < 1) {
+            throw new Error("Invalid gacha quarantine sample limit")
+        }
+        return Object.fromEntries(Object.entries(this.snapshot().movies).map(([movieId, seeds]) => (
+            [movieId, seeds.slice(0, limit)]
+        )))
     }
 }
 

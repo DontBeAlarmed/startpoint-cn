@@ -9,8 +9,6 @@ export interface RuntimeDataPaths {
     dataDir: string;
     stateDir: string;
     seedStateDir: string;
-    seedStateFile: string;
-    seedStateTemporaryFilePrefix: string;
     assetProviderDir: string;
     assetPatchUploadDir: string;
     legacyAssetMetadataFile: string;
@@ -70,8 +68,6 @@ export function resolveRuntimeDataPaths(
         dataDir,
         stateDir,
         seedStateDir,
-        seedStateFile: pathApi.join(seedStateDir, "seed-state.json"),
-        seedStateTemporaryFilePrefix: pathApi.join(seedStateDir, ".seed-state.json."),
         assetProviderDir,
         assetPatchUploadDir: pathApi.join(assetProviderDir, "production", "upload"),
         legacyAssetMetadataFile: pathApi.join(assetProviderDir, "legacy-metadata.json"),
@@ -80,19 +76,6 @@ export function resolveRuntimeDataPaths(
         activeAccountFile: pathApi.join(stateDir, "active_account.json"),
         defaultSaveFile: pathApi.join(stateDir, "default_save.json"),
     };
-}
-
-export function prepareSeedStateDirectory(
-    paths: RuntimeDataPaths = resolveRuntimeDataPaths(),
-    fileSystem: DataVolumeFileSystem = fs,
-): string {
-    ensureDirectory(paths.dataDir, "Data volume root", fileSystem);
-    ensureDirectory(paths.stateDir, "Data volume state directory", fileSystem);
-    ensureDirectory(paths.seedStateDir, "Seed state directory", fileSystem);
-    assertReadableAndWritable(paths.dataDir, "Data volume root", fileSystem);
-    assertReadableAndWritable(paths.stateDir, "Data volume state directory", fileSystem);
-    assertReadableAndWritable(paths.seedStateDir, "Seed state directory", fileSystem);
-    return paths.seedStateDir;
 }
 
 function ensureDirectory(

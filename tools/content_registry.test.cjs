@@ -10,9 +10,9 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const projectRoot = path.resolve(__dirname, "..")
-const confirmedSeedsPath = path.join(projectRoot, "assets", "confirmed_seeds.json")
-const confirmedSeedsDigest = crypto.createHash("sha256")
-    .update(fs.readFileSync(confirmedSeedsPath))
+const seedCatalogManifestPath = path.join(projectRoot, "assets", "gacha-seed-catalog", "manifest.json")
+const seedCatalogManifestDigest = crypto.createHash("sha256")
+    .update(fs.readFileSync(seedCatalogManifestPath))
     .digest("hex")
 
 const {
@@ -275,24 +275,6 @@ const EXPECTED_SERVER_TABLES = Object.freeze([
 ])
 
 const EXCLUDED_TABLES = Object.freeze([
-    "confirmed_seeds.json",
-    "pending_seeds.json",
-    "blocked_seeds.json",
-    "device_seeds.json",
-    "purified_seeds.json",
-    "test_seeds.json",
-    "verified_seeds.json",
-    "gacha_movie_seeds.json",
-    "gacha_movie_seeds_fes.json",
-    "gacha_movie_seeds_fes_guarantee.json",
-    "gacha_movie_seeds_normal.json",
-    "gacha_movie_seeds_normal_guarantee.json",
-    "gacha_rate_up_movie_seeds.json",
-    "gacha_rate_up_movie_seeds_fes.json",
-    "gacha_rate_up_movie_seeds_fes_guarantee.json",
-    "gacha_rate_up_movie_seeds_normal.json",
-    "gacha_rate_up_movie_seeds_normal_guarantee.json",
-    "pool_config.json",
     "save_data.json",
     "rare_score_reward_synthetic_new.json",
     "rare_score_reward_synthetic_review.json",
@@ -524,7 +506,7 @@ test("bundled importer samples CDN, bundled, and server registry scopes", async 
 test("runtime state and non-table assets are excluded", () => {
     const names = new Set(TABLE_SOURCES.map(entry => entry.tableName))
     for (const tableName of EXCLUDED_TABLES) assert.equal(names.has(tableName), false, tableName)
-    assert.equal(names.has("confirmed_seeds.json"), false)
+    assert.equal(names.has("gacha-seed-catalog/manifest.json"), false)
 })
 
 test("registry lookup and bundled imports reject unsupported tables", async () => {
@@ -656,9 +638,9 @@ test("bundled importer rejects a symlink swapped in after realpath validation", 
     )
 })
 
-test("registry work never modifies confirmed seed state", () => {
+test("registry work never modifies the gacha seed catalog", () => {
     const currentDigest = crypto.createHash("sha256")
-        .update(fs.readFileSync(confirmedSeedsPath))
+        .update(fs.readFileSync(seedCatalogManifestPath))
         .digest("hex")
-    assert.equal(currentDigest, confirmedSeedsDigest)
+    assert.equal(currentDigest, seedCatalogManifestDigest)
 })

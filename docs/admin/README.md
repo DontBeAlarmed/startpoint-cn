@@ -19,7 +19,7 @@
 - `/api/player`：玩家详情、资源、角色、道具、关卡和重置操作；
 - `/api/mail`：定向邮件发送与发送历史；
 - `/api/lookup`：角色、道具、装备和关卡查询；
-- `/api/seeds`：抽卡动画种子状态与管理。
+- `/api/seeds/status`：只读抽卡动画 catalog、本机 quarantine 全量计数与每 movie 20 个样本。
 
 后台请求携带 `Accept: application/json`。新增后台功能应提供明确的 JSON 请求和响应，不在 React 页面中直接访问 SQLite。
 

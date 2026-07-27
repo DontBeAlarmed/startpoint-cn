@@ -279,7 +279,7 @@ export default function Dashboard() {
                         <Space wrap>
                             <Button icon={<TeamOutlined />} onClick={() => navigate("/accounts")}>账号 / 存档</Button>
                             <Button icon={<MailOutlined />} onClick={() => navigate("/mail")}>邮件</Button>
-                            <Button icon={<ExperimentOutlined />} onClick={() => navigate("/seeds")}>种子管理</Button>
+                            <Button icon={<ExperimentOutlined />} onClick={() => navigate("/seeds")}>动画种子</Button>
                         </Space>
                     </Card>
 

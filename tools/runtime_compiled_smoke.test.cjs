@@ -17,12 +17,28 @@ const {
 
 const projectRoot = path.resolve(__dirname, "..")
 const seedBundleFiles = [
-    "confirmed_seeds.json",
-    "purified_seeds.json",
-    "verified_seeds.json",
-    "pool_config.json",
-    "test_seeds.json",
+    "gacha-seed-catalog/manifest.json",
+    "gacha-seed-catalog/normal.json",
+    "gacha-seed-catalog/normal_guarantee.json",
+    "gacha-seed-catalog/fes.json",
+    "gacha-seed-catalog/fes_guarantee.json",
 ]
+const retiredSeedModules = [
+    "lib/gacha-physics.js",
+    "lib/seed-validator.js",
+    "runtime/seed-state-schema.js",
+    "runtime/seed-state-store.js",
+]
+
+function assertRetiredSeedModulesAbsent(root, prefix = "out") {
+    for (const relativePath of retiredSeedModules) {
+        assert.equal(
+            fs.existsSync(path.join(root, prefix, relativePath)),
+            false,
+            `${prefix}/${relativePath} must not be published`,
+        )
+    }
+}
 
 function seedAssetDigests() {
     return Object.fromEntries(seedBundleFiles.map(fileName => [
@@ -253,6 +269,7 @@ test("compiled lifecycle order and metadata fallback survive an isolated bundle"
         { cwd: projectRoot, encoding: "utf8" },
     )
     assert.equal(build.status, 0, `build failed\n${build.stdout}\n${build.stderr}`)
+    assertRetiredSeedModulesAbsent(projectRoot)
 
     const strictDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "embedded-manifest-required-"))
     t.after(() => fs.rmSync(strictDataDir, { recursive: true, force: true }))
@@ -328,29 +345,25 @@ test("compiled lifecycle order and metadata fallback survive an isolated bundle"
         else process.env.DATA_DIR = previousDataDir
     })
     const beforeSeedAssets = seedAssetDigests()
-    const compiledSeedValidator = require(path.join(
+    const { GachaSeedQuarantine } = require(path.join(
         projectRoot,
-        "out/lib/seed-validator.js",
-    )).default
-
-    compiledSeedValidator.confirm("fes", 214748301, 0)
-    compiledSeedValidator.addPlay("fes", 214748302, 1, true)
-    compiledSeedValidator.moveToVerified("fes", 214748303, 2)
-    compiledSeedValidator.setSelectedMovieId("normal")
-    compiledSeedValidator.setTestSeed("normal", 4, 10000304)
+        "out/lib/gacha-seed-quarantine.js",
+    ))
 
     const seedStateDir = path.join(seedDataDir, "state", "seeds")
-    assert.deepEqual(fs.readdirSync(seedStateDir), ["seed-state.json"])
+    const quarantine = new GachaSeedQuarantine({
+        stateFile: path.join(seedStateDir, "quarantine.json"),
+    })
+    quarantine.markSent("fes", 214748301, 5)
+    assert.equal(quarantine.quarantineIfRecentlySent("fes", 214748301), true)
+
+    assert.deepEqual(fs.readdirSync(seedStateDir), ["quarantine.json"])
     const persistedSeedState = JSON.parse(fs.readFileSync(
-        path.join(seedStateDir, "seed-state.json"),
+        path.join(seedStateDir, "quarantine.json"),
         "utf8",
     ))
     assert.equal(persistedSeedState.schemaVersion, 1)
-    assert.equal(persistedSeedState.config.selectedMovieId, "normal")
-    assert.equal(persistedSeedState.testSeeds[1], 10000304)
-    assert.equal(persistedSeedState.confirmed.fes[214748301], 0)
-    assert.equal(persistedSeedState.play.fes[214748302].r, 1)
-    assert.equal(persistedSeedState.verified.fes[214748303], 2)
+    assert.deepEqual(persistedSeedState.movies, { fes: [214748301] })
     assert.deepEqual(seedAssetDigests(), beforeSeedAssets)
 })
 
@@ -370,6 +383,7 @@ test("verified Server Bundle publishes its manifest identity through health", {
     const { buildServerBundle } = require("./server-bundle/build.cjs")
     const { verifyServerBundle } = require("./server-bundle/verify.cjs")
     const manifest = buildServerBundle({ projectRoot, outputRoot: bundleRoot })
+    assertRetiredSeedModulesAbsent(bundleRoot)
     assert.deepEqual(verifyServerBundle({
         bundleRoot,
         dataSchema: 5,

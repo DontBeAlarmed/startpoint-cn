@@ -48,6 +48,16 @@ try {
         movies: { normal: 1 },
     })
 
+    const sampleStateFile = path.join(temporaryRoot, "sampled.json")
+    fs.writeFileSync(sampleStateFile, JSON.stringify({
+        schemaVersion: 1,
+        movies: { normal: Array.from({ length: 25 }, (_, index) => 125 - index) },
+    }))
+    const sampled = new GachaSeedQuarantine({ stateFile: sampleStateFile })
+    assert.deepStrictEqual(sampled.samples(20), {
+        normal: Array.from({ length: 20 }, (_, index) => 101 + index),
+    })
+
     let failWrite = true
     const retryable = new GachaSeedQuarantine({
         stateFile: path.join(temporaryRoot, "retryable.json"),

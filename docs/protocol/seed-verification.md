@@ -1,94 +1,81 @@
-# 抽卡种子验证
+# 抽卡动画种子验证
 
-本文描述 `src/lib/seed-validator.ts` 当前的种子状态、选择模式、持久化和客户端信标反馈。C3032 与抽卡结果构造见[抽卡动画与 C3032](./gacha-c3032.md)。
+角色抽卡先由 CDN 卡池权重确定角色和稀有度，再选择只负责客户端演出的 seed。seed 不参与中奖概率。C3032 的客户端校验与响应字段见[抽卡动画与 C3032](./gacha-c3032.md)。
 
-## 状态分层
+## 权威来源
 
-每个 `movie_id` 维护独立的种子池：
-
-| 池 | 当前含义 |
-|---|---|
-| `verifiedPool` | 客户端证据已确认稀有度；同 movie 中优先级最高 |
-| `playPool` | 客户端报告 `play=1`，保存稀有度和人工标签 |
-| `confirmPool` | 客户端报告 `play=0` 或其他路径确认稀有度 |
-| `pendingPool` | 已发送但缺少完整反馈，等待后续重测 |
-| `sentSeeds` | 本进程刚发送、尚未结算反馈的临时关联 |
-
-持久池在同一个 movie 内按 `verified > play > confirmed > pending` 去重；不同 movie 可以保存相同数字 seed，因为客户端物理配置不同。
-
-允许的 movie ID 固定为：
+生产环境的只读产物位于 `assets/gacha-seed-catalog/`：
 
 ```text
-normal
-normal_guarantee
-fes
-fes_guarantee
-rarity_5_guarantee
+manifest.json
+normal.json
+normal_guarantee.json
+fes.json
+fes_guarantee.json
+audit.json
 ```
 
-运行时 seed 必须是 `0..2147483647` 的安全整数。后台 test seed 进一步限制在当前 CN 动画语料范围 `10000000..10399999`。
+服务启动只读取 manifest 和四个 movie 池；`audit.json` 是离线审计报告。catalog 由 `tools/gacha-faithful/world.cjs` 离线从连续 seed 范围直接分类。manifest 固定记录客户端/CDN 版本、配置与预测器 SHA256、seed 范围、稀有度数量及每个池的摘要。
 
-## 选择模式
+服务初始化时读取并校验一次 manifest 和四个池，严格要求 CN 客户端 `1.8.1`、CDN `1.4.54`、四种官方 movie、完整连续范围、稀有度计数和 SHA256 闭包一致；后续抽卡只访问内存缓存。每次角色抽卡请求维护一个 `usedSeeds` 集合，从对应 `movie_id + rarity` 桶中均匀无放回选择。普通物理桶为空、摘要不符或 movie 未知时明确失败，不使用未经验证的占位回退。
 
-| 模式 | 当前选择行为 |
-|---|---|
-| `natural` | 第一抽优先匹配稀有度的 verified seed；后续按当前概率使用 verified，再依次尝试 confirmed、pending、unknown |
-| `play` | 优先匹配 `playPool` 中对应稀有度的种子，再走通用回退链 |
-| `test` | 优先测试 seed，其次未 verified 的 play、pending、unknown |
+`rarity_5_guarantee` 是客户端明确强制五星且跳过物理的特殊分支，不进入四个物理 catalog。
 
-三种模式都优先使用为目标稀有度设置的 test seed。运行模式本身重启后回到 `natural`；selected movie、test seed 和各持久池由运行时快照保存。
+## 离线验证
 
-所有候选都不可用时，`getSeed()` 返回 `characterId * 1000`。该值只是最后回退，不代表通过物理验证。
+```bash
+npm run gacha:seeds:extract-config -- <decompressed-config.amf3>
+npm run gacha:seeds:build
+npm run gacha:seeds:verify
+npm run gacha:seeds:audit
+```
 
-## 反馈流程
+- `build`：默认扫描 2 万个唯一 seed，并在四种 movie 下生成 8 万条分类记录；
+- `verify`：使用同一 faithful 预测器重新模拟每条记录，检查范围完整、无重复、稀有度、manifest 与摘要；
+- `audit`：汇总播放率、帧数、碰撞数和升星步数；
+- `extract-config`：仅用于已经解压的官方 AMF3 配置取证，不参与服务启动。
 
-`gacha.ts` 发送结果前调用 `markSent(movieId, seed, rarity)`。带信标的客户端补丁可以向 `/debug` 上报：
+真实客户端历史语料位于 `tools/gacha-faithful/fixtures/verified_seeds.json`，只用于预测器离线回归，不是生产 seed 池。当前原始记录为 `759/760` 一致，唯一差异是保证动画中结构上不可能出现的三星记录；这项证据不等同于当前 8 万条记录都经过真实客户端逐条执行。
+
+## 最小 Quarantine
+
+运行时只保留一个可选兜底文件：
 
 ```text
-PLAY|play=0|seed=...|movie_id=...
-PLAY|play=1|seed=...|movie_id=...
-C3032 ... seed=... movie_id=... play=...
+<DATA_DIR>/state/seeds/quarantine.json
 ```
 
-服务端当前处理：
+服务在内存中短暂关联最近 10 分钟发送的 `movie_id + seed`。`/debug` 或 `/crash` 收到 C3032 时，只有精确匹配且未过期的记录才加入本机 quarantine；任意上报、错 movie、过期和重复上报都不改变状态。
 
-- `play=0`：把发送时记录的稀有度写入 `confirmPool`；
-- `play=1`：有发送稀有度时进入 verified；只有播放信息时保留相应 play 证据；
-- C3032：客户端报告的球稀有度写入 `verifiedPool`，并清理同 movie 的低优先级状态；
-- 下一次角色抽取开始时，`flushAll()` 将仍未收敛的发送记录按已有 `play` 标志归类，无反馈的进入 pending。
+quarantine 的权限只有“从选择中排除”：
 
-信标关联依赖同一进程中的 `sentSeeds`。服务重启、反馈丢失或客户端不带补丁时，不会凭空推断本次动画结果。
+- 不能增加 catalog seed；
+- 不能改变 seed 稀有度；
+- 不能跨 movie 注入；
+- 不处理 PLAY 信标；
+- 不参与卡池概率。
 
-## 基线与运行时快照
+写入采用临时文件加原子 `rename`。写入失败会同时回滚 quarantine 和最近发送关联。文件损坏时告警并以空 quarantine 启动；该可选兜底状态不会阻止游戏服务。
 
-以下 tracked JSON 只作为首次部署 baseline：
+## 后台边界
 
-- `assets/confirmed_seeds.json`；
-- `assets/purified_seeds.json`；
-- `assets/verified_seeds.json`；
-- `assets/pool_config.json`；
-- `assets/test_seeds.json`。
+`GET /api/seeds/status` 只读返回：
 
-当 `<DATA_DIR>/state/seeds/seed-state.json` 已存在时，运行时只从该快照加载持久状态，不再把已删除的 baseline seed 合并回来。
+- catalog 客户端/CDN 版本、seed 范围与四种 movie 的稀有度数量；
+- 本机 quarantine 全量计数，以及每种 movie 排序后的前 20 个 seed 样本。
 
-状态保存使用同目录临时文件、文件 `fsync` 和原子 `rename` 发布。保存失败时回滚本次内存修改；损坏或结构不合法的权威快照会阻止启动，不会自动覆盖。目录 `fsync` 当前未实现，因此不承诺存储设备突然掉电后的绝对持久性。
+后台不再提供模式切换、标签、test seed、人工提升或在线净化接口。`/seeds` 页面只展示上述状态。
 
-运行时状态不得提交到 Git。管理后台修改模式、标签或 test seed 时操作的是 Runtime Data，不回写 `assets/` baseline。
+## 已删除的旧架构
 
-## 输入边界
+以下内容不再属于运行时：
 
-- movie ID、seed、rarity、标签和 test seed 都在 schema/store 边界校验；
-- 未知 movie 的只读查询返回空结果，不创建新池；
-- 状态文件、临时文件和目录为符号链接或错误文件类型时保存失败；
-- 基线任一文件损坏时记录告警，并禁止发布由不完整基线生成的快照；
-- `gacha_movie_seeds*.json` 是只读动画语料，不迁移到运行时状态。
+- `confirmed/pending/play/verified` 多层池；
+- `natural/play/test` 选择模式；
+- test seed 与人工标签；
+- PLAY 信标学习；
+- 每次抽卡重读 JSON；
+- 简化版 TypeScript 物理生成器；
+- 以客户端反馈净化错误池的 baseline 文件。
 
-## 验证入口
-
-主要自动测试：
-
-- `tools/seed_state.test.cjs`；
-- `tools/seed_api.test.cjs`；
-- `tools/gacha_rules.test.cjs`。
-
-自动测试验证选择和持久化契约，但不能证明每个 seed 在真实客户端物理中的动画结果。涉及种子语料或信标解析的修改仍需客户端抽卡回归。
+离线 faithful 预测器是唯一物理分类实现，quarantine 只作为异常隔离兜底。

@@ -61,7 +61,6 @@ const SOURCE_RULES = [
         pattern: /^src\/runtime\/data-paths\.ts$/,
         groups: ["integration:database", "quick:cdn", "quick:content"],
     },
-    { pattern: /^src\/runtime\/seed-state-(?:schema|store)\.ts$/, groups: ["quick:seed"] },
     { pattern: /^src\/lib\/gacha-seed-quarantine\.ts$/, groups: ["quick:seed", "quick:gacha"] },
     { pattern: /^tools\/gacha-faithful\//, groups: ["quick:seed"] },
     { pattern: /^assets\/gacha-seed-catalog\//, groups: ["quick:seed"] },
@@ -82,10 +81,6 @@ const SOURCE_RULES = [
     {
         pattern: /^src\/lib\/(?:gacha|gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-seed-catalog|gacha-ticket)\.ts$/,
         groups: ["quick:gacha"],
-    },
-    {
-        pattern: /^src\/lib\/seed-validator\.ts$/,
-        groups: ["quick:gacha", "quick:seed"],
     },
     { pattern: /^src\/routes\/web_api\/seeds\.ts$/, groups: ["quick:seed"] },
     {

@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 
@@ -17,11 +18,14 @@ function result(status) {
 
 function createHarness(statuses, { adminReady = true } = {}) {
     const calls = []
+    const cleaned = []
     const removed = []
     const stderr = []
     return {
         calls,
+        cleaned,
         dependencies: {
+            cleanOrphanCompiledFiles: () => cleaned.push("cleaned"),
             executable: "/runtime/node",
             npmExecutable: "/runtime/npm",
             projectRoot: "/project",
@@ -74,6 +78,7 @@ test("正常构建先完成 admin，再运行一次 tsc 和 verifier", () => {
 
     assert.equal(runCnBuild(harness.dependencies), 0)
     assert.deepEqual(harness.calls, [adminCall, tscCall, verifierCall])
+    assert.deepEqual(harness.cleaned, ["cleaned"])
     assert.deepEqual(harness.removed, [])
 })
 
@@ -83,6 +88,7 @@ test("首次 verifier 失败时仅删除独立 build info 并完整重跑", () =
 
     assert.equal(runCnBuild(harness.dependencies), 0)
     assert.deepEqual(harness.calls, [adminCall, tscCall, verifierCall, tscCall, verifierCall])
+    assert.deepEqual(harness.cleaned, ["cleaned", "cleaned"])
     assert.deepEqual(harness.removed, ["/project/out/.tsbuildinfo-cn"])
     assert.doesNotMatch(harness.stderr.join(""), /\/project/)
 })
@@ -136,4 +142,38 @@ test("默认项目根路径由 orchestrator 位置决定", () => {
     }), 0)
     assert.equal(calls[0].options.cwd, projectRoot)
     assert.equal(calls[1].executable, process.execPath)
+})
+
+test("删除没有对应 TypeScript 源文件的过期编译输出及其 sidecar", t => {
+    const { removeOrphanCompiledFiles } = loadOrchestrator()
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "build-cn-orphans-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+
+    const sourceDirectory = path.join(root, "src")
+    const outputDirectory = path.join(root, "out")
+    fs.mkdirSync(path.join(sourceDirectory, "lib"), { recursive: true })
+    fs.mkdirSync(path.join(outputDirectory, "lib"), { recursive: true })
+    fs.writeFileSync(path.join(sourceDirectory, "lib", "current.ts"), "export const current = true\n")
+    for (const relativePath of [
+        "lib/current.js",
+        "lib/current.js.map",
+        "lib/orphan.js",
+        "lib/orphan.js.map",
+        "lib/orphan.d.ts",
+        "lib/orphan.d.ts.map",
+        ".tsbuildinfo-cn",
+        "runtime.json",
+    ]) {
+        fs.writeFileSync(path.join(outputDirectory, relativePath), relativePath)
+    }
+
+    assert.deepEqual(removeOrphanCompiledFiles(sourceDirectory, outputDirectory), [
+        "lib/orphan.d.ts",
+        "lib/orphan.d.ts.map",
+        "lib/orphan.js",
+        "lib/orphan.js.map",
+    ])
+    assert.equal(fs.existsSync(path.join(outputDirectory, "lib", "current.js")), true)
+    assert.equal(fs.existsSync(path.join(outputDirectory, ".tsbuildinfo-cn")), true)
+    assert.equal(fs.existsSync(path.join(outputDirectory, "runtime.json")), true)
 })

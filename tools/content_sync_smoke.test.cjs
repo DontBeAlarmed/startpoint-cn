@@ -46,10 +46,14 @@ function runGit(projectRoot, args) {
 function makeSourceLayout(t) {
     const fixture = makeLayout(t)
     fs.mkdirSync(path.join(fixture.projectRoot, "assets"), { recursive: true })
+    fs.mkdirSync(path.join(fixture.projectRoot, "assets", "gacha-seed-catalog"), { recursive: true })
     fs.mkdirSync(path.join(fixture.cdnRoot, "cn", "archive-common-full"), { recursive: true })
     fs.mkdirSync(path.join(fixture.cdnRoot, "cn", "EntityLists"), { recursive: true })
     fs.writeFileSync(path.join(fixture.projectRoot, "tracked.txt"), "tracked\n")
-    fs.writeFileSync(path.join(fixture.projectRoot, "assets", "confirmed_seeds.json"), "{}\n")
+    fs.writeFileSync(
+        path.join(fixture.projectRoot, "assets", "gacha-seed-catalog", "manifest.json"),
+        "{}\n",
+    )
     fs.writeFileSync(path.join(fixture.projectRoot, ".database", "players.sqlite"), "db-v1")
     fs.writeFileSync(
         path.join(fixture.cdnRoot, "cn", "archive-common-full", "fixture.zip"),
@@ -901,9 +905,9 @@ test("Git untracked 嵌套仓库目录项被明确拒绝", t => {
     )
 })
 
-test("来源快照覆盖 pending seed 的创建与修改", t => {
+test("来源快照覆盖 seed catalog 文件的创建与修改", t => {
     const fixture = makeSourceLayout(t)
-    const pending = path.join(fixture.projectRoot, "assets", "pending_seeds.json")
+    const pending = path.join(fixture.projectRoot, "assets", "gacha-seed-catalog", "normal.json")
     const missing = smoke.captureEnvironment(fixture.paths)
     fs.writeFileSync(pending, "[]\n")
     const created = smoke.captureEnvironment(fixture.paths)

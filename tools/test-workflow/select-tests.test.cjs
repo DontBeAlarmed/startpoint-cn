@@ -29,11 +29,9 @@ test("maps representative source files to focused groups", () => {
     )
     assert.deepEqual(selectTestGroups(["src/lib/gacha.ts"]), ["quick:gacha"])
     assert.deepEqual(
-        selectTestGroups(["src/lib/seed-validator.ts"]),
+        selectTestGroups(["src/lib/gacha-seed-quarantine.ts"]),
         ["quick:gacha", "quick:seed"],
     )
-    assert.deepEqual(selectTestGroups(["src/runtime/seed-state-store.ts"]), ["quick:seed"])
-    assert.deepEqual(selectTestGroups(["src/runtime/seed-state-schema.ts"]), ["quick:seed"])
     assert.deepEqual(selectTestGroups(["docs/protocol/seed-verification.md"]), ["quick:seed"])
     assert.deepEqual(selectTestGroups(["src/lib/gacha-draw.ts"]), ["quick:gacha"])
     assert.deepEqual(
@@ -284,11 +282,9 @@ test("registers focused seed state and API regressions", () => {
             "tools/gacha_seed_catalog_cli.test.cjs",
             "tools/gacha_seed_quarantine.test.cjs",
             "tools/seed_api.test.cjs",
-            "tools/seed_state.test.cjs",
         ],
     })
     assert.deepEqual(selectTestGroups(["tools/seed_api.test.cjs"]), ["quick:seed"])
-    assert.deepEqual(selectTestGroups(["tools/seed_state.test.cjs"]), ["quick:seed"])
 })
 
 test("registers the focused CDN path contract", () => {

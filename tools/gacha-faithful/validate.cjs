@@ -1,15 +1,15 @@
 // validate.cjs — measure the faithful predictor against the real-client ground truth.
 //
-// assets/verified_seeds.json holds (seed -> ball rarity) the REAL client computed,
-// captured from actual C3032 reports via seed-validator.moveToVerified. This checks
+// fixtures/verified_seeds.json holds (seed -> ball rarity) captured from the real client.
+// This checks
 // world.cjs (client-faithful gated simulate) against it.
 //
 // Usage:  node validate.cjs [assetsDir]
 const fs = require("fs"), path = require("path");
 const w = require("./world.cjs");
 
-const ASSETS = process.argv[2] || path.join(__dirname, "..", "..", "assets");
-const V = JSON.parse(fs.readFileSync(path.join(ASSETS, "verified_seeds.json"), "utf-8"));
+const fixture = process.argv[2] || path.join(__dirname, "fixtures", "verified_seeds.json");
+const V = JSON.parse(fs.readFileSync(fixture, "utf-8"));
 
 let ok = 0, total = 0, byMovie = {};
 for (const [movie, seeds] of Object.entries(V)) {
