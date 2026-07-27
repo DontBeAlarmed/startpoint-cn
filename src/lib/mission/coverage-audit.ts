@@ -57,18 +57,26 @@ function eventFallbackReason(row: readonly unknown[]): string {
     return `authoritative-event-fact-unavailable:type-${Number.isSafeInteger(patternType) ? patternType : "unknown"}`
 }
 
-function degreeFallbackReason(pattern: string): string {
-    if (pattern.includes("mvp")) return "mvp-result-unavailable"
-    if (pattern.includes("character_lv")) return "character-level-curve-incomplete"
-    if (pattern.includes("ability_soul") || pattern.includes("soul")) {
-        return "ability-soul-operation-semantics-unverified"
-    }
-    if (pattern.includes("boss_battle_ex_clear_single")) {
-        return "boss-difficulty-master-data-unavailable"
-    }
-    if (pattern.includes("attention")) return "attention-source-unavailable"
-    if (pattern.includes("multi_battle_newbie")) return "newbie-classification-unavailable"
-    return "authoritative-degree-fact-unavailable"
+const DEFERRED_DEGREE_REASON_BY_MISSION_ID: ReadonlyMap<number, string> = new Map([
+    [3000, "character-level-curve-incomplete"],
+    [8000, "ability-soul-operation-semantics-unverified"],
+    [8010, "ability-soul-operation-semantics-unverified"],
+    [8020, "ability-soul-operation-semantics-unverified"],
+    [11080, "boss-difficulty-master-data-unavailable"],
+    [25000, "attention-source-unavailable"],
+    [25010, "attention-source-unavailable"],
+    [25020, "attention-source-unavailable"],
+    [26000, "mvp-result-unavailable"],
+    [26010, "mvp-result-unavailable"],
+    [26020, "mvp-result-unavailable"],
+    [70004, "newbie-classification-unavailable"],
+    [70005, "newbie-classification-unavailable"],
+    [70006, "newbie-classification-unavailable"],
+])
+
+function degreeFallbackReason(missionId: number): string {
+    return DEFERRED_DEGREE_REASON_BY_MISSION_ID.get(missionId)
+        ?? "authoritative-degree-fact-unavailable"
 }
 
 function createPartition(
@@ -132,7 +140,7 @@ function degreePartition(): MissionCoveragePartition {
     return createPartition(
         [{ category: 5, definitions: getMissionMasterDefinitions(5) }],
         missionKeys(5, getDegreeComputedMissionIds()),
-        (_category, definition) => degreeFallbackReason(definition.pattern),
+        (_category, definition) => degreeFallbackReason(definition.missionId),
     )
 }
 

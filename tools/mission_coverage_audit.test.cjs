@@ -125,6 +125,26 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
         },
         "称号 fallback 必须按真实外部阻塞原因分类",
     )
+    assert.deepEqual(
+        report.degree.fallbackMissions.map(entry => [entry.missionId, entry.reason]),
+        [
+            [3000, "character-level-curve-incomplete"],
+            [8000, "ability-soul-operation-semantics-unverified"],
+            [8010, "ability-soul-operation-semantics-unverified"],
+            [8020, "ability-soul-operation-semantics-unverified"],
+            [11080, "boss-difficulty-master-data-unavailable"],
+            [25000, "attention-source-unavailable"],
+            [25010, "attention-source-unavailable"],
+            [25020, "attention-source-unavailable"],
+            [26000, "mvp-result-unavailable"],
+            [26010, "mvp-result-unavailable"],
+            [26020, "mvp-result-unavailable"],
+            [70004, "newbie-classification-unavailable"],
+            [70005, "newbie-classification-unavailable"],
+            [70006, "newbie-classification-unavailable"],
+        ],
+        "14 条延期称号必须按精确 ID 固定，不能因文案相似被误归类",
+    )
 
     assert.equal(report.awake.total, 144)
     assert.equal(report.awake.routed, 144)
