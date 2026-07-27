@@ -79,7 +79,7 @@ const SOURCE_RULES = [
         groups: ["quick:content"],
     },
     {
-        pattern: /^src\/lib\/(?:gacha|gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-ticket)\.ts$/,
+        pattern: /^src\/lib\/(?:gacha|gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-seed-catalog|gacha-ticket)\.ts$/,
         groups: ["quick:gacha"],
     },
     {

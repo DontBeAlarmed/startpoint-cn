@@ -52,6 +52,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/gacha_equipment_movie.test.cjs",
             "tools/gacha_exec_plan.test.cjs",
             "tools/gacha_rules.test.cjs",
+            "tools/gacha_seed_catalog_runtime.test.cjs",
         ],
     },
     "quick:quest": {

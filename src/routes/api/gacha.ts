@@ -5,9 +5,9 @@ import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { generateDataHeaders } from "../../utils";
-import { drawGachaWithMetadataSync, rewardPlayerGachaDrawResultSync } from "../../lib/gacha";
+import { drawGachaWithMetadataSync, planCharacterGachaMovies, rewardPlayerGachaDrawResultSync } from "../../lib/gacha";
 import { getGachaCampaignIdSync, getGachaSync } from "../../lib/assets";
-import { GachaType } from "../../lib/types";
+import { CharacterGacha, GachaType } from "../../lib/types";
 import { serializeGachaCampaign } from "../../data/utils";
 import { PlayerGachaCampaign, UserGachaCampaign } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -344,6 +344,12 @@ const routes = async (fastify: FastifyInstance) => {
         const playerPaidVmoney = execPlan.paidVmoney
         const playerFreeVmoney = execPlan.freeVmoney
 
+        const drawMetadata = drawGachaWithMetadataSync(gachaData, pullCount)
+        const drawResult = drawMetadata.map((draw) => draw.id)
+        const characterMoviePlan = isCharacterGacha
+            ? planCharacterGachaMovies(gachaData as CharacterGacha, drawResult)
+            : undefined
+
         if (execPlan.ticket) {
             items[execPlan.ticket.itemId] = execPlan.ticket.afterCount
             updatePlayerItemSync(playerId, execPlan.ticket.itemId, execPlan.ticket.afterCount)
@@ -366,9 +372,13 @@ const routes = async (fastify: FastifyInstance) => {
             gachaCampaigns.push(serializeGachaCampaign(campaignData))
         }
 
-        const drawMetadata = drawGachaWithMetadataSync(gachaData, pullCount)
-        const drawResult = drawMetadata.map((draw) => draw.id)
-        const rewardResult = rewardPlayerGachaDrawResultSync(playerId, gachaData, drawResult, drawMetadata)
+        const rewardResult = rewardPlayerGachaDrawResultSync(
+            playerId,
+            gachaData,
+            drawResult,
+            drawMetadata,
+            characterMoviePlan,
+        )
 
         // Log each drawn item in history
         const historyType = isCharacterGacha ? MailType.CHARACTER : MailType.EQUIPMENT

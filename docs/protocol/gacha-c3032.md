@@ -19,31 +19,31 @@ entry_count
 
 ## 当前服务端流程
 
-`src/lib/gacha.ts` 对每次角色抽取执行：
+`src/lib/gacha.ts` 在模块初始化时加载并校验一次 `assets/gacha-seed-catalog/`，后续抽取只访问内存缓存。每次角色抽取执行：
 
 1. 从当前角色内容仓库读取真实稀有度；
 2. ★3 只选择普通动画类型；★4、★5 按当前 `rankMovieRates` 在普通与保证动画间选择；
 3. 从卡池的 `movieName` 或 `guaranteeMovieName` 得到 `movie_id`，缺失时回退到 `normal`；
-4. 加载 `assets/gacha_movie_seeds_<movie_id>.json`，不存在时回退到通用种子表；
-5. 按稀有度和动画类型选择基础池，并合并已确认可播放的跨池种子；
-6. 交给 `seedValidator` 按当前模式选择种子；
-7. 调用 `markSent()` 记录本次待验证种子，再把结果发送给客户端。
+4. 在门票、活动次数和角色存档写入前，为整批结果完成动画规划；
+5. 从 faithful catalog 的 `movie_id + rarity` 桶中均匀选择 seed；
+6. 使用本次请求内的 `usedSeeds` 集合避免十连重复 seed；
+7. 调用 `markSent()` 保留当前反馈关联，再把结果发送给客户端。
 
-`rarity_5_guarantee` 的配置包含 `isRarity5`，客户端会直接强制 ★5 并跳过普通物理校验。该路径使用 `characterId * 1000` 作为无语义占位种子，只适用于这一明确分支。
+`rarity_5_guarantee` 的配置包含 `isRarity5`，客户端会直接强制 ★5 并跳过普通物理校验。该路径以 `characterId * 1000` 为占位 seed 起点；同一请求重复角色时顺延到下一个未使用值，只适用于这一明确分支。
 
-当普通物理分支找不到任何可用种子时，代码仍会回退到 `characterId * 1000`。这是保证响应可构造的最后回退，不代表该种子已通过客户端物理验证；出现这种情况应补齐对应 movie/rarity 种子池。
+普通物理分支找不到对应 seed 时会明确失败，不再回退到未经验证的 `characterId * 1000`。该占位值只允许用于 `rarity_5_guarantee` 的客户端强制五星分支。
 
-## 种子池模式
+## 兼容状态
 
-`src/lib/seed-validator.ts` 支持三种运行模式：
+`src/lib/seed-validator.ts` 仍暂存历史反馈状态和三种后台模式：
 
-| 模式 | 用途 | 选择倾向 |
+| 模式 | 历史用途 | 当前生产影响 |
 |---|---|---|
-| `natural` | 默认运行 | 在可播放、已验证、已确认和候选池之间按当前优先级选择 |
-| `play` | 动画验证 | 优先选择已知会播放动画的种子 |
-| `test` | 定向测试 | 优先测试种子、待确认种子和未知种子 |
+| `natural` | 默认运行 | 不影响 catalog 选择 |
+| `play` | 动画验证 | 不影响 catalog 选择 |
+| `test` | 定向测试 | 不影响 catalog 选择 |
 
-池的准确字段、优先级、状态迁移和运行时数据目录以[种子验证](./seed-verification.md)及 `src/lib/seed-validator.ts` 为准，不在本文复制一份容易过期的完整算法。
+这些状态只为当前反馈关联与迁移兼容保留，不再向 faithful catalog 注入 seed，也不能重分类或提升 catalog seed。后续最小反馈边界见[种子验证](./seed-verification.md)。
 
 运行时 seed 状态属于玩家环境数据，不应提交到 Git。仓库中的 JSON 只提供可复现基线；确认、净化、测试和发送中的状态由 Runtime Data 保存。
 
@@ -65,11 +65,10 @@ entry_count
 1. 记录角色 ID、真实稀有度、`movie_id` 和 `seed`；
 2. 确认角色稀有度来自当前 Content snapshot，而不是由 ID 位数推测；
 3. 确认卡池的普通/保证动画名与客户端实际配置一致；
-4. 检查对应 movie-specific 种子文件是否存在；
-5. 检查该稀有度与动画类型的基础池是否为空；
-6. 检查 `seedValidator` 当前模式和运行时池状态；
-7. 确认是否走到了 `characterId * 1000` 的普通物理回退；
-8. 有信标时核对发送记录、C3032 反馈与 `play=` 反馈是否属于同一次抽取。
+4. 检查 `assets/gacha-seed-catalog/manifest.json` 的版本和摘要；
+5. 运行 `npm run gacha:seeds:verify` 全量复算对应 catalog；
+6. 确认对应 `movie_id + rarity` 桶非空；
+7. 有信标时核对发送记录与 C3032 反馈是否属于同一次抽取。
 
 不要通过把全部 `movie_id` 固定为 `normal` 来掩盖错误，也不要把固定角色种子当作普通动画的永久方案。
 
@@ -81,6 +80,8 @@ entry_count
 |---|---|
 | `tools/gacha_draw_weights.test.cjs` | 角色/装备权重与十连保证位 |
 | `tools/gacha_rules.test.cjs` | 抽卡规则和结果构造 |
+| `tools/gacha_seed_catalog_runtime.test.cjs` | catalog 启动缓存、摘要、选择与空桶失败 |
+| `tools/gacha_seed_catalog_builder.test.cjs` | 离线范围完整性与 manifest |
 | `tools/seed_state.test.cjs` | seed 状态存储与数据契约 |
 | `tools/seed_api.test.cjs` | 管理 API 与模式切换 |
 
