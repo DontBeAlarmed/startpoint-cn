@@ -1,6 +1,6 @@
-import itemLookup from "../../assets/item_lookup.json"
 import { getContentSnapshot } from "../content/runtime/content-snapshot"
 import { getServerDate } from "../utils"
+import { getItemLookupSync } from "./assets"
 import type { EventShopItems } from "./types"
 
 interface GenerationWindow {
@@ -9,8 +9,8 @@ interface GenerationWindow {
     until: number
 }
 
-const lookup = itemLookup as Record<string, string>
 let cachedEventItemShop: EventShopItems | null = null
+let cachedItemLookup: Readonly<Record<string, string>> | null = null
 let cachedFamilyByName = new Map<string, GenerationWindow[]>()
 
 function parseShopDate(value: string | null | undefined, fallback: number): number {
@@ -19,7 +19,10 @@ function parseShopDate(value: string | null | undefined, fallback: number): numb
     return Number.isNaN(time) ? fallback : time
 }
 
-function buildFamilies(eventItemShop: EventShopItems): Map<string, GenerationWindow[]> {
+function buildFamilies(
+    eventItemShop: EventShopItems,
+    lookup: Readonly<Record<string, string>>,
+): Map<string, GenerationWindow[]> {
     const windowsByName = new Map<string, Map<string, GenerationWindow>>()
     const familyByName = new Map<string, GenerationWindow[]>()
 
@@ -60,15 +63,17 @@ function getFamilyByName(): Map<string, GenerationWindow[]> {
     const eventItemShop = getContentSnapshot().repository.table<EventShopItems>(
         "event_item_shop.json",
     )
-    if (eventItemShop !== cachedEventItemShop) {
+    const itemLookup = getItemLookupSync()
+    if (eventItemShop !== cachedEventItemShop || itemLookup !== cachedItemLookup) {
         cachedEventItemShop = eventItemShop
-        cachedFamilyByName = buildFamilies(eventItemShop)
+        cachedItemLookup = itemLookup
+        cachedFamilyByName = buildFamilies(eventItemShop, itemLookup)
     }
     return cachedFamilyByName
 }
 
 export function resolveEventCurrencyId(itemId: number, at: Date = getServerDate()): number {
-    const name = lookup[String(itemId)]
+    const name = getItemLookupSync()[String(itemId)]
     const family = name ? getFamilyByName().get(name) : undefined
     if (!family) return itemId
 

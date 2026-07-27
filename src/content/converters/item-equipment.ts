@@ -1,0 +1,221 @@
+import { deepFreeze } from "../deep-freeze"
+import type { OrderedMapTextRow } from "../sync/ordered-map"
+import { parseCsvLine } from "./csv"
+
+const EQUIPMENT_PATH = "master/item/equipment.orderedmap"
+const EQUIPMENT_CRAFT_PATH = "master/item/equipment_craft_point_exchange.orderedmap"
+const EQUIPMENT_DISSOLVE_RATE_PATH = "master/item/equipment_dissolve_rate.orderedmap"
+const ITEM_PATH = "master/item/item.orderedmap"
+
+const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/
+const NON_NEGATIVE_INTEGER_PATTERN = /^(?:0|[1-9]\d*)$/
+
+export interface ItemEquipmentSourceReader {
+    read(logicalPath: string): Promise<readonly OrderedMapTextRow[]>
+}
+
+export interface ItemEquipmentConversionOutput {
+    readonly "equipment_craft.json": Readonly<Record<string, unknown>>
+    readonly "equipment_dissolve.json": Readonly<Record<string, unknown>>
+    readonly "equipment_ids.json": readonly number[]
+    readonly "item_data.json": Readonly<Record<string, unknown>>
+    readonly "item_ids.json": readonly number[]
+    readonly "item_lookup.json": Readonly<Record<string, string>>
+    readonly "item_sale.json": Readonly<Record<string, unknown>>
+}
+
+type ParsedRow = readonly [string, readonly string[]]
+
+function invalidItemEquipment(reason: string): never {
+    throw new Error(`invalid item/equipment content: ${reason}`)
+}
+
+function compareIds(left: string, right: string): number {
+    return left.length - right.length || (left < right ? -1 : left > right ? 1 : 0)
+}
+
+function parseRows(
+    rows: readonly OrderedMapTextRow[],
+    tableName: string,
+    columnCount: number,
+): ParsedRow[] {
+    const seen = new Set<string>()
+    return [...rows]
+        .sort((left, right) => compareIds(left.key, right.key))
+        .map(row => {
+            if (!POSITIVE_INTEGER_PATTERN.test(row.key)
+                || !Number.isSafeInteger(Number(row.key))) {
+                invalidItemEquipment(
+                    `${tableName} key must be a canonical positive integer: ${row.key}`,
+                )
+            }
+            if (seen.has(row.key)) {
+                invalidItemEquipment(`${tableName} has duplicate key: ${row.key}`)
+            }
+            seen.add(row.key)
+            const fields = parseCsvLine(
+                row.text,
+                `${tableName}[${row.key}]`,
+                invalidItemEquipment,
+            )
+            if (fields.length !== columnCount) {
+                invalidItemEquipment(
+                    `${tableName}[${row.key}] must have ${columnCount} columns, got ${fields.length}`,
+                )
+            }
+            return [row.key, fields] as const
+        })
+}
+
+function parseNonNegativeInteger(value: string, subject: string): number {
+    if (!NON_NEGATIVE_INTEGER_PATTERN.test(value)) {
+        invalidItemEquipment(`${subject} must be a non-negative integer: ${value}`)
+    }
+    const parsed = Number(value)
+    if (!Number.isSafeInteger(parsed)) {
+        invalidItemEquipment(`${subject} must be a safe integer: ${value}`)
+    }
+    return parsed
+}
+
+function parsePositiveInteger(value: string, subject: string): number {
+    if (!POSITIVE_INTEGER_PATTERN.test(value)) {
+        invalidItemEquipment(`${subject} must be a positive integer: ${value}`)
+    }
+    const parsed = Number(value)
+    if (!Number.isSafeInteger(parsed)) {
+        invalidItemEquipment(`${subject} must be a safe integer: ${value}`)
+    }
+    return parsed
+}
+
+function parseBoolean(value: string, subject: string): boolean {
+    if (/^true$/i.test(value)) return true
+    if (/^false$/i.test(value)) return false
+    invalidItemEquipment(`${subject} must be a boolean: ${value}`)
+}
+
+function requireText(value: string, subject: string): string {
+    if (value === "" || value === "(None)") {
+        invalidItemEquipment(`${subject} must be present`)
+    }
+    return value
+}
+
+function convertEquipment(
+    rows: readonly OrderedMapTextRow[],
+): {
+    readonly dissolve: Record<string, unknown>
+    readonly ids: number[]
+} {
+    const dissolve: Record<string, unknown> = {}
+    const ids: number[] = []
+    for (const [id, fields] of parseRows(rows, "equipment", 16)) {
+        ids.push(Number(id))
+        dissolve[id] = {
+            ability_soul_id: parsePositiveInteger(
+                fields[10],
+                `equipment[${id}].abilitySoulId`,
+            ),
+            obtain_source: parseNonNegativeInteger(
+                fields[15],
+                `equipment[${id}].obtainSource`,
+            ),
+            generate_ability_soul: parseBoolean(
+                fields[9],
+                `equipment[${id}].generateAbilitySoul`,
+            ),
+            max_level: parsePositiveInteger(fields[8], `equipment[${id}].maxLevel`),
+        }
+    }
+    return { dissolve, ids }
+}
+
+function convertEquipmentCraft(
+    craftRows: readonly OrderedMapTextRow[],
+    dissolveRateRows: readonly OrderedMapTextRow[],
+): Record<string, unknown> {
+    const craft = parseRows(craftRows, "equipment_craft_point_exchange", 2)
+    const dissolveRates = parseRows(dissolveRateRows, "equipment_dissolve_rate", 1)
+    const craftKeys = craft.map(([id]) => id)
+    const dissolveRateKeys = dissolveRates.map(([id]) => id)
+    if (craftKeys.length !== dissolveRateKeys.length
+        || craftKeys.some((id, index) => id !== dissolveRateKeys[index])) {
+        invalidItemEquipment("equipment craft rarity keys do not match dissolve rates")
+    }
+
+    const dissolveByRarity = new Map(dissolveRates)
+    const output: Record<string, unknown> = {}
+    for (const [rarity, fields] of craft) {
+        const dissolveFields = dissolveByRarity.get(rarity)
+        if (!dissolveFields) {
+            invalidItemEquipment("equipment craft rarity keys do not match dissolve rates")
+        }
+        output[rarity] = {
+            dissolve_craft: parseNonNegativeInteger(
+                fields[0],
+                `equipment_craft_point_exchange[${rarity}].dissolveCraft`,
+            ),
+            awakening_craft: parseNonNegativeInteger(
+                fields[1],
+                `equipment_craft_point_exchange[${rarity}].awakeningCraft`,
+            ),
+            dissolve_star: parseNonNegativeInteger(
+                dissolveFields[0],
+                `equipment_dissolve_rate[${rarity}].dissolveStar`,
+            ),
+        }
+    }
+    return output
+}
+
+function convertItems(rows: readonly OrderedMapTextRow[]): {
+    readonly data: Record<string, unknown>
+    readonly ids: number[]
+    readonly lookup: Record<string, string>
+    readonly sale: Record<string, unknown>
+} {
+    const data: Record<string, unknown> = {}
+    const ids: number[] = []
+    const lookup: Record<string, string> = {}
+    const sale: Record<string, unknown> = {}
+    for (const [id, fields] of parseRows(rows, "item", 23)) {
+        ids.push(Number(id))
+        lookup[id] = requireText(fields[2], `item[${id}].name`)
+        const effectKind = parseNonNegativeInteger(fields[6], `item[${id}].effectKind`)
+        if (effectKind === 2 || effectKind === 3) {
+            data[id] = {
+                effectKind,
+                effectValue: parsePositiveInteger(fields[7], `item[${id}].effectValue`),
+            }
+        }
+        sale[id] = {
+            category: parseNonNegativeInteger(fields[14], `item[${id}].category`),
+            sale_price: parseNonNegativeInteger(fields[16], `item[${id}].salePrice`),
+            sellable: parseBoolean(fields[21], `item[${id}].sellable`),
+        }
+    }
+    return { data, ids, lookup, sale }
+}
+
+export async function convertItemEquipmentTables(
+    reader: ItemEquipmentSourceReader,
+): Promise<ItemEquipmentConversionOutput> {
+    const [equipmentRows, craftRows, dissolveRateRows, itemRows] = await Promise.all([
+        reader.read(EQUIPMENT_PATH),
+        reader.read(EQUIPMENT_CRAFT_PATH),
+        reader.read(EQUIPMENT_DISSOLVE_RATE_PATH),
+        reader.read(ITEM_PATH),
+    ])
+    const equipment = convertEquipment(equipmentRows)
+    const items = convertItems(itemRows)
+    return deepFreeze({
+        "equipment_craft.json": convertEquipmentCraft(craftRows, dissolveRateRows),
+        "equipment_dissolve.json": equipment.dissolve,
+        "equipment_ids.json": equipment.ids,
+        "item_data.json": items.data,
+        "item_ids.json": items.ids,
+        "item_lookup.json": items.lookup,
+        "item_sale.json": items.sale,
+    })
+}

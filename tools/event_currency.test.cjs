@@ -2,7 +2,9 @@ require("ts-node/register/transpile-only")
 
 const { after } = require("node:test")
 const { installBundledShopSnapshot } = require("./helpers/install-bundled-shop-snapshot.cjs")
-const restoreBundledShopSnapshot = installBundledShopSnapshot()
+const restoreBundledShopSnapshot = installBundledShopSnapshot({
+    additionalTableNames: ["item_lookup.json"],
+})
 after(restoreBundledShopSnapshot)
 
 const assert = require("node:assert/strict")

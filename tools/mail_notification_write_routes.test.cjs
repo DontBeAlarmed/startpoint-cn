@@ -45,6 +45,9 @@ stubModule("../src/data/domains/equipment", {
 })
 stubModule("../src/lib/assets", {
     getConfigSync: () => ({ max_stamina_overflow: 999, craft_point_item_id: 100000 }),
+    getItemEffectSync: itemId => itemId === 100
+        ? { effectKind: 2, effectValue: 1 }
+        : null,
     getEquipmentCraftSync: () => null,
     getEquipmentDissolveSync: () => null,
 })

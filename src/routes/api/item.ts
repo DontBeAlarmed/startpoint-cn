@@ -9,16 +9,9 @@ import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
 import { sellItemSync } from "../../lib/item-sell";
 import { AccountId, PlayerId } from "../../lib/types";
 import { computeRealTimeStamina } from "../../lib/stamina";
-import itemData from "../../../assets/item_data.json";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { getMailArrivedSync } from "../../lib/mail-notification";
-
-interface ItemEffectInfo {
-    effectKind: number
-    effectValue: number
-}
-
-const ITEM_EFFECTS: Record<number, ItemEffectInfo> = itemData as Record<number, ItemEffectInfo>
+import { getItemEffectSync } from "../../lib/assets";
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/use_item", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -63,7 +56,7 @@ const routes = async (fastify: FastifyInstance) => {
                 continue
             }
 
-            const effectInfo = ITEM_EFFECTS[itemId]
+            const effectInfo = getItemEffectSync(itemId)
             if (!effectInfo) {
                 console.warn(`[ITEM-USE] item ${itemId} not in effect table, skipping`)
                 continue

@@ -259,6 +259,13 @@ function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}
             }
         }
     }
+    for (const definition of TABLE_SOURCES.filter(entry => entry.converterId === "item-equipment")) {
+        for (const logicalPath of definition.sourceOrderedMaps) {
+            if (!logicalEntries.has(logicalPath)) {
+                logicalEntries.set(logicalPath, serializeOrderedMap([]))
+            }
+        }
+    }
     const questDepths = new Map(Object.values(QUEST_TABLE_SOURCES).map(source => (
         [source.logicalPath, source.nestingDepth]
     )))
@@ -382,6 +389,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         characterElection: 0,
         gacha: 0,
         gameplay: 0,
+        itemEquipment: 0,
         manaNode: 0,
         shop: 0,
         skillEffects: 0,
@@ -410,6 +418,10 @@ test("default release builder closes all registry tables and runs each CDN conve
         convertGameplayTables: async () => {
             converterCalls.gameplay++
             return converterOutput("gameplay")
+        },
+        convertItemEquipmentTables: async () => {
+            converterCalls.itemEquipment++
+            return converterOutput("item-equipment")
         },
         convertManaNodes: async () => {
             converterCalls.manaNode++
@@ -450,6 +462,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         characterElection: 1,
         gacha: 1,
         gameplay: 1,
+        itemEquipment: 1,
         manaNode: 1,
         shop: 1,
         skillEffects: 1,

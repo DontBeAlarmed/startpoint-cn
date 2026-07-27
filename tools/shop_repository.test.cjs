@@ -31,6 +31,7 @@ const SHOP_TABLES = Object.freeze([
     "treasure_shop.json",
     "equipment_enhancement_shop.json",
 ])
+const SHOP_RUNTIME_TABLES = Object.freeze([...SHOP_TABLES, "item_lookup.json"])
 
 test("shop runtime facades read all eight tables from one initialized snapshot", () => {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
@@ -61,6 +62,7 @@ test("shop runtime facades read all eight tables from one initialized snapshot",
         "star_grain_shop.json": Object.freeze({ "104": item }),
         "treasure_shop.json": Object.freeze({ "105": item }),
         "equipment_enhancement_shop.json": Object.freeze({ "106": item }),
+        "item_lookup.json": Object.freeze({ "70001": "活动代币" }),
     })
     const repository = Object.freeze({
         info: () => Object.freeze({
@@ -96,8 +98,8 @@ test("shop runtime facades read all eight tables from one initialized snapshot",
         }])
         assert.strictEqual(getShopItemSync(ShopType.BOSS_COIN, 103), item)
         assert.equal(resolveEventCurrencyId(70001, new Date("2024-01-02T00:00:00Z")), 70001)
-        assert.deepEqual(new Set(requested), new Set(SHOP_TABLES))
-        assert.ok(requested.length >= SHOP_TABLES.length)
+        assert.deepEqual(new Set(requested), new Set(SHOP_RUNTIME_TABLES))
+        assert.ok(requested.length >= SHOP_RUNTIME_TABLES.length)
         assert.strictEqual(productionContentSnapshotProvider.snapshot.repository, repository)
     } finally {
         productionContentSnapshotProvider.snapshot = previousSnapshot

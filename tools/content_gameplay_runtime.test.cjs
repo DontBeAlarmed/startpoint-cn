@@ -63,6 +63,28 @@ test("gameplay readers use the active Content snapshot instead of static bundled
                 "2": [992],
                 "3": [993],
             },
+            "equipment_craft.json": {
+                "5": { dissolve_craft: 91, awakening_craft: 92, dissolve_star: 93 },
+            },
+            "equipment_dissolve.json": {
+                "9950001": {
+                    ability_soul_id: 9950002,
+                    obtain_source: 0,
+                    generate_ability_soul: true,
+                    max_level: 5,
+                },
+            },
+            "equipment_ids.json": [9950001],
+            "item_data.json": {
+                "990100": { effectKind: 3, effectValue: 75 },
+            },
+            "item_ids.json": [990100],
+            "item_lookup.json": {
+                "990100": "快照体力药",
+            },
+            "item_sale.json": {
+                "990100": { category: 9, sale_price: 77, sellable: true },
+            },
             "mana_node.json": {
                 "99101": {
                     "1": {
@@ -118,6 +140,26 @@ test("gameplay readers use the active Content snapshot instead of static bundled
     assert.deepEqual(assets.getExBoostItemSync(99001), { tier: 3, count: 2, element: 4 })
     assert.equal(assets.getExBoostItemSync(10001), null)
     assert.deepEqual(assets.getExStatusPoolSync(2), [992])
+    assert.deepEqual(assets.getEquipmentCraftSync(5), {
+        dissolve_craft: 91,
+        awakening_craft: 92,
+        dissolve_star: 93,
+    })
+    assert.deepEqual(assets.getEquipmentDissolveSync(9950001), {
+        ability_soul_id: 9950002,
+        obtain_source: 0,
+        generate_ability_soul: true,
+        max_level: 5,
+    })
+    assert.deepEqual(assets.getItemEffectSync(990100), { effectKind: 3, effectValue: 75 })
+    assert.deepEqual(assets.getItemSaleSync(990100), {
+        category: 9,
+        sale_price: 77,
+        sellable: true,
+    })
+    assert.deepEqual(assets.getEquipmentIdsSync(), [9950001])
+    assert.deepEqual(assets.getItemIdsSync(), [990100])
+    assert.deepEqual(assets.getItemLookupSync(), { "990100": "快照体力药" })
     assert.deepEqual(assets.getCharacterManaNodesSync(99101, 1), {
         "9910101": {
             items: { "1": 3 },

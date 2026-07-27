@@ -4,8 +4,7 @@ import { insertMailSync } from "../../data/domains/mail"
 import { getPlayerSync } from "../../data/domains/player"
 import { wantsJson } from "./http"
 import characterData from "../../../assets/character.json"
-import itemIds from "../../../assets/item_ids.json"
-import equipmentIds from "../../../assets/equipment_ids.json"
+import { getEquipmentIdsSync, getItemIdsSync } from "../../lib/assets"
 import {
     ADMIN_MAIL_MAX_INT,
     parseAdminMailInteger,
@@ -14,8 +13,6 @@ import {
 
 // Pre-built CDN validation sets
 const CDN_CHAR_IDS: Set<number> = new Set(Object.keys(characterData).map(Number))
-const CDN_ITEM_IDS: Set<number> = new Set(itemIds as number[])
-const CDN_EQUIP_IDS: Set<number> = new Set(equipmentIds as number[])
 const VALID_MAIL_TYPES: Set<number> = new Set([1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15])
 
 interface SendMailBody {
@@ -75,10 +72,10 @@ const routes = async (fastify: FastifyInstance) => {
             if (mailType === 5 && !CDN_CHAR_IDS.has(typeId)) {
                 return fail(`角色 ID ${typeId} 不存在于 CDN 数据中`)
             }
-            if (mailType === 1 && !CDN_ITEM_IDS.has(typeId)) {
+            if (mailType === 1 && !getItemIdsSync().includes(typeId)) {
                 return fail(`道具 ID ${typeId} 不存在于 CDN 数据中`)
             }
-            if (mailType === 6 && !CDN_EQUIP_IDS.has(typeId)) {
+            if (mailType === 6 && !getEquipmentIdsSync().includes(typeId)) {
                 return fail(`装备 ID ${typeId} 不存在于 CDN 数据中`)
             }
         }

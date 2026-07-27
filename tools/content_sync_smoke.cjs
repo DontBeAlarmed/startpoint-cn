@@ -1037,6 +1037,34 @@ function validateManaNodeTables({ definitions, readBundled, readRelease }) {
     return { tables: manaNodeDefinitions.length }
 }
 
+function validateItemEquipmentTables({
+    definitions,
+    readBundled,
+    readRelease,
+    expectedItemDataExtra,
+}) {
+    const itemEquipmentDefinitions = definitions.filter(definition => (
+        definition.converterId === "item-equipment"
+    ))
+    for (const definition of itemEquipmentDefinitions) {
+        const bundled = readBundled(definition.tableName)
+        const expected = definition.tableName === "item_data.json"
+            ? { ...bundled, ...expectedItemDataExtra }
+            : bundled
+        if (!isDeepStrictEqual(readRelease(definition.tableName), expected)) {
+            baselineError(
+                "CONTENT_SYNC_SMOKE_ITEM_EQUIPMENT_BASELINE",
+                `${definition.tableName} 与已审计的官方物品装备基线不一致`,
+            )
+        }
+    }
+    return {
+        tables: itemEquipmentDefinitions.length,
+        itemEffects: Object.keys(readRelease("item_data.json")).length,
+        officialItemEffectAdditions: Object.keys(expectedItemDataExtra).length,
+    }
+}
+
 const QUEST_TABLE_CATEGORIES = Object.freeze({
     "main_quest.json": 1,
     "boss_battle_quest.json": 2,
@@ -1316,6 +1344,15 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
         readRelease: tableName => repository.table(tableName),
     })
+    const itemEquipmentStats = validateItemEquipmentTables({
+        definitions: runtime.TABLE_SOURCES,
+        readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
+        readRelease: tableName => repository.table(tableName),
+        expectedItemDataExtra: readJson(
+            paths.projectRoot,
+            "tools/fixtures/content-item-equipment/differences-1.4.54.json",
+        ),
+    })
     const questStats = validateQuestTables({
         definitions: runtime.TABLE_SOURCES,
         readRelease: tableName => repository.table(tableName),
@@ -1419,6 +1456,9 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         boxGachaTables: boxGachaStats.tables,
         gameplayTables: gameplayStats.tables,
         manaNodeTables: manaNodeStats.tables,
+        itemEquipmentTables: itemEquipmentStats.tables,
+        itemEffects: itemEquipmentStats.itemEffects,
+        officialItemEffectAdditions: itemEquipmentStats.officialItemEffectAdditions,
         questTables: questStats.tables,
         rewardTables: rewardStats.tables,
         shops: Object.values(shopStats).reduce((sum, count) => sum + count, 0),
@@ -1573,6 +1613,7 @@ module.exports = {
     validateDirectOrderedMapTables,
     validateGachas,
     validateGameplayTables,
+    validateItemEquipmentTables,
     validateManaNodeTables,
     validateQuestTables,
     validateReleaseClosure,

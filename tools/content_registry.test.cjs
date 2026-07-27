@@ -160,6 +160,19 @@ const EXPECTED_MANA_NODE_CDN_TABLES = Object.freeze({
     "mana_node.json": ["master/mana_board/mana_node.orderedmap"],
 })
 
+const EXPECTED_ITEM_EQUIPMENT_CDN_TABLES = Object.freeze({
+    "equipment_craft.json": [
+        "master/item/equipment_craft_point_exchange.orderedmap",
+        "master/item/equipment_dissolve_rate.orderedmap",
+    ],
+    "equipment_dissolve.json": ["master/item/equipment.orderedmap"],
+    "equipment_ids.json": ["master/item/equipment.orderedmap"],
+    "item_data.json": ["master/item/item.orderedmap"],
+    "item_ids.json": ["master/item/item.orderedmap"],
+    "item_lookup.json": ["master/item/item.orderedmap"],
+    "item_sale.json": ["master/item/item.orderedmap"],
+})
+
 const EXPECTED_QUEST_CDN_TABLES = Object.freeze({
     "main_quest.json": "master/quest/main_quest.orderedmap",
     "ex_quest.json": "master/quest/ex_quest.orderedmap",
@@ -417,6 +430,16 @@ test("registry derives mana node costs from the official nested map", () => {
     }
 })
 
+test("registry derives item and equipment runtime tables from official OrderedMaps", () => {
+    for (const [tableName, sources] of Object.entries(EXPECTED_ITEM_EQUIPMENT_CDN_TABLES)) {
+        const entry = findTableSource(tableName)
+        assert.equal(entry.scope, "cdn", tableName)
+        assert.equal(entry.converterId, "item-equipment", tableName)
+        assert.deepEqual(entry.sourceOrderedMaps, sources, tableName)
+    }
+    assert.equal(findTableSource("equipment_lookup.json").scope, "bundled")
+})
+
 test("registry derives authoritative quest tables from official OrderedMap sources", () => {
     for (const [tableName, source] of Object.entries(EXPECTED_QUEST_CDN_TABLES)) {
         const entry = findTableSource(tableName)
@@ -486,6 +509,7 @@ test("registry closes over current static runtime tables", () => {
                 && !(tableName in EXPECTED_GAMEPLAY_CDN_TABLES)
                 && !(tableName in EXPECTED_BOX_GACHA_CDN_TABLES)
                 && !(tableName in EXPECTED_MANA_NODE_CDN_TABLES)
+                && !(tableName in EXPECTED_ITEM_EQUIPMENT_CDN_TABLES)
                 && !(tableName in EXPECTED_QUEST_CDN_TABLES)
                 && !(tableName in EXPECTED_QUEST_DERIVED_CDN_TABLES)
             ))
@@ -546,7 +570,7 @@ test("every registry table has an explicit existing bundled fallback", () => {
 test("bundled importer samples CDN, bundled, and server registry scopes", async () => {
     const samples = [
         ["gacha_campaign.json", "cdn"],
-        ["equipment_ids.json", "bundled"],
+        ["equipment_ids.json", "cdn"],
         ["news.json", "server"],
     ]
 

@@ -352,6 +352,47 @@ test("玩法派生表必须逐张等于 bundled 官方基线", () => {
     ))
 })
 
+test("物品装备派生表只允许 item_data 出现已审计的官方补全", () => {
+    assert.equal(typeof smoke.validateItemEquipmentTables, "function")
+    const definitions = [
+        { tableName: "equipment_ids.json", converterId: "item-equipment" },
+        { tableName: "item_data.json", converterId: "item-equipment" },
+        { tableName: "equipment_lookup.json", converterId: "bundled-json" },
+    ]
+    const bundled = {
+        "equipment_ids.json": [1, 2],
+        "item_data.json": { "100": { effectKind: 2, effectValue: 25 } },
+    }
+    const expectedItemDataExtra = {
+        "101": { effectKind: 3, effectValue: 50 },
+    }
+    const release = {
+        "equipment_ids.json": [1, 2],
+        "item_data.json": {
+            ...bundled["item_data.json"],
+            ...expectedItemDataExtra,
+        },
+    }
+
+    assert.deepEqual(smoke.validateItemEquipmentTables({
+        definitions,
+        readBundled: tableName => bundled[tableName],
+        readRelease: tableName => release[tableName],
+        expectedItemDataExtra,
+    }), { tables: 2, itemEffects: 2, officialItemEffectAdditions: 1 })
+
+    release["item_data.json"][102] = { effectKind: 2, effectValue: 1 }
+    assert.throws(() => smoke.validateItemEquipmentTables({
+        definitions,
+        readBundled: tableName => bundled[tableName],
+        readRelease: tableName => release[tableName],
+        expectedItemDataExtra,
+    }), error => (
+        error?.code === "CONTENT_SYNC_SMOKE_ITEM_EQUIPMENT_BASELINE"
+        && error.message.includes("item_data.json")
+    ))
+})
+
 test("活动扭蛋箱闭包必须逐张等于 bundled 官方基线", () => {
     assert.equal(typeof smoke.validateBoxGachaTables, "function")
     const definitions = [
