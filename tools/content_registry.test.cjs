@@ -128,6 +128,15 @@ const EXPECTED_DIRECT_CDN_TABLES = Object.freeze({
     "star_crumb_exchange_cost.json": [1, "master/shop/star_crumb_exchange_cost.orderedmap"],
 })
 
+const EXPECTED_REWARD_CDN_TABLES = Object.freeze({
+    "clear_reward.json": "master/reward/clear_reward.orderedmap",
+    "score_reward.json": "master/reward/score_reward.orderedmap",
+    "rare_score_reward.json": "master/reward/rare_score_reward.orderedmap",
+    "score_attack_border_reward.json": "master/quest/event/score_attack_border_reward.orderedmap",
+    "rush_event_quest_folder.json": "master/quest/event/rush_event_quest_folder.orderedmap",
+    "rush_event_ranking_reward.json": "master/quest/event/rush_event_ranking_reward.orderedmap",
+})
+
 const EXPECTED_BUNDLED_TABLES = Object.freeze([
     "advent_event_quest.json",
     "boss_battle_quest.json",
@@ -328,6 +337,15 @@ test("registry dynamically restores tables that exactly match official OrderedMa
     }
 })
 
+test("registry derives reward tables from their official OrderedMap sources", () => {
+    for (const [tableName, source] of Object.entries(EXPECTED_REWARD_CDN_TABLES)) {
+        const entry = findTableSource(tableName)
+        assert.equal(entry.scope, "cdn", tableName)
+        assert.equal(entry.converterId, "reward", tableName)
+        assert.deepEqual(entry.sourceOrderedMaps, [source], tableName)
+    }
+})
+
 test("registry and release manifest explicitly describe referenced gacha odds sources", () => {
     const gacha = findTableSource("gacha.json")
 
@@ -375,7 +393,10 @@ test("registry closes over current static runtime tables", () => {
     assert.deepEqual(
         bundled,
         EXPECTED_BUNDLED_TABLES
-            .filter(tableName => !(tableName in EXPECTED_DIRECT_CDN_TABLES))
+            .filter(tableName => (
+                !(tableName in EXPECTED_DIRECT_CDN_TABLES)
+                && !(tableName in EXPECTED_REWARD_CDN_TABLES)
+            ))
             .sort(),
     )
     assert.deepEqual(

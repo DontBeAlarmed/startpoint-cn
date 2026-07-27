@@ -20,7 +20,7 @@ import {
     runCarnivalEventTransactionSync,
     upsertPlayerCarnivalEventRecordSync,
 } from "../../data/domains/carnivalEvent"
-import { getQuestConfigurationErrorResponse, getQuestFromCategorySync, getRushEventFolderClearRewards } from "../../lib/assets";
+import { getQuestConfigurationErrorResponse, getQuestFromCategorySync, getRushEventFolderClearRewards, getScoreAttackBorderRewards } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
@@ -52,7 +52,6 @@ import { handleDailyChallengePoint } from "../../lib/quest/finish/challenge-poin
 import { BATTLE_SETTLEMENT_CATEGORIES, recordMissionBattleFacts } from "../../lib/mission/battle-facts";
 import type { FinishContext } from "../../lib/quest/finish/types";
 import questEntryCosts from "../../../assets/quest_entry_costs.json";
-import scoreAttackBorderRewards from "../../../assets/score_attack_border_reward.json";
 import eventChallengePointMap from "../../../assets/event_challenge_point_map.json";
 
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
@@ -276,7 +275,7 @@ const routes = async (fastify: FastifyInstance) => {
                 scoreAttackBorderTiers = resolveScoreAttackBorderTiers(
                     questData.eventId,
                     questData.scoreAttackQuestId,
-                    scoreAttackBorderRewards as Record<string, ScoreAttackBorderTier[]>,
+                    getScoreAttackBorderRewards(),
                 )
             } catch (error) {
                 console.error(`[SCORE_ATTACK] invalid configuration: ${(error as Error).message}`)

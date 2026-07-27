@@ -4,7 +4,6 @@ import boxGacha from "../../assets/box_gacha.json";
 import boxGachaBoxSettings from "../../assets/box_gacha_box_settings.json";
 import boxReward from "../../assets/box_reward.json";
 import characterQuests from "../../assets/character_quest.json";
-import clearRewards from "../../assets/clear_reward.json";
 import dailyExpManaEventQuests from "../../assets/daily_exp_mana_event_quest.json";
 import dailyWeekEventQuests from "../../assets/daily_week_event_quest.json";
 import worldStoryEventBossBattleQuests from "../../assets/world_story_event_boss_battle_quest.json";
@@ -29,9 +28,6 @@ import practiceQuests from "../../assets/practice_quest.json";
 import manaNodes from "../../assets/mana_node.json";
 import manaNodeAwake from "../../assets/mana_node_awake.json";
 import manaBoard from "../../assets/mana_board.json";
-import rareScoreRewards from "../../assets/rare_score_reward.json";
-import scoreRewards from "../../assets/score_reward.json";
-import rushEventQuestFolders from "../../assets/rush_event_quest_folder.json"
 import configData from "../../assets/config.json"
 import equipmentDissolveData from "../../assets/equipment_dissolve.json"
 import itemSaleData from "../../assets/item_sale.json"
@@ -39,6 +35,7 @@ import equipmentCraftData from "../../assets/equipment_craft.json"
 import { AssetCharacter, BattleQuest, BossCoinShopItems, BoxGacha, ClearRewards, ConfigValues, EquipmentCraftEntry, EquipmentDissolveEntry, EventItemShopIdMapItem, EventShopItems, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, Gachas, ItemSaleEntry, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopItem, ShopItems, ShopType, StoryQuest } from "./types";
 import { RawBoxGachaSettings } from "./types/box-gacha";
 import { getContentSnapshot } from "../content/runtime/content-snapshot";
+import type { ScoreAttackBorderTier } from "./quest/finish/score-attack-handler";
 
 export class QuestConfigurationError extends Error {
     constructor(
@@ -86,7 +83,9 @@ export function getQuestConfigurationErrorResponse(error: unknown): Record<strin
 export function getClearRewardSync(
     clearRewardId: string | number
 ): Reward | null {
-    const clearReward = (clearRewards as ClearRewards)[String(clearRewardId)]
+    const clearReward = getContentSnapshot().repository.table<ClearRewards>(
+        "clear_reward.json",
+    )[String(clearRewardId)]
     return clearReward ? clearReward as Reward : null
 }
 
@@ -99,7 +98,9 @@ export function getClearRewardSync(
 export function getRareScoreRewardGroup(
     groupId: string | number
 ): RareScoreReward[] | null {
-    const group = (rareScoreRewards as RareScoreRewardGroups)[String(groupId)]
+    const group = getContentSnapshot().repository.table<RareScoreRewardGroups>(
+        "rare_score_reward.json",
+    )[String(groupId)]
     return group ? group as RareScoreReward[] : null
 }
 
@@ -112,7 +113,9 @@ export function getRareScoreRewardGroup(
 export function getScoreRewardGroup(
     groupId: string | number
 ): ScoreReward[] | null {
-    const group = (scoreRewards as ScoreRewardGroups)[String(groupId)]
+    const group = getContentSnapshot().repository.table<ScoreRewardGroups>(
+        "score_reward.json",
+    )[String(groupId)]
     return group ? group as ScoreReward[] : null
 }
 
@@ -780,14 +783,42 @@ export function getRushEventFolderClearRewards(
     rushEventId: number,
     folderId: number
 ): Reward[] | null {
-    const folders = (rushEventQuestFolders as RushEventFolders)[rushEventId]
+    const rushEventQuestFolders = getContentSnapshot().repository.table<RushEventFolders>(
+        "rush_event_quest_folder.json",
+    )
+    const folders = rushEventQuestFolders[rushEventId]
     const rewards = folders?.[folderId]
     if (Array.isArray(rewards) && rewards.length > 0) return rewards
 
     const compatibility = getRushCompatibilityEvent(rushEventId)
     if (compatibility === null) return null
-    const fallbackRewards = (rushEventQuestFolders as RushEventFolders)[compatibility.sourceEventId]?.[folderId]
+    const fallbackRewards = rushEventQuestFolders[compatibility.sourceEventId]?.[folderId]
     return Array.isArray(fallbackRewards) && fallbackRewards.length > 0 ? fallbackRewards : null
+}
+
+export function getScoreAttackBorderRewards(): Record<string, ScoreAttackBorderTier[]> {
+    return getContentSnapshot().repository.table<Record<string, ScoreAttackBorderTier[]>>(
+        "score_attack_border_reward.json",
+    )
+}
+
+export interface RushEventRankingRewardEntry {
+    fromRank: number
+    toRank: number
+    kind: number
+    kindId: number
+    number: number
+}
+
+export type RushEventRankingRewards = Record<
+    string,
+    Record<string, RushEventRankingRewardEntry[]>
+>
+
+export function getRushEventRankingRewards(): RushEventRankingRewards {
+    return getContentSnapshot().repository.table<RushEventRankingRewards>(
+        "rush_event_ranking_reward.json",
+    )
 }
 
 // TODO: 待从CDN二进制 config.orderedmap 提取真实数据

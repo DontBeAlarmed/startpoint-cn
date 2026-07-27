@@ -31,9 +31,9 @@ function cleanup() {
 process.once("exit", cleanup)
 
 const {
-    installBundledCharacterSnapshot,
-} = require("./helpers/install-bundled-character-snapshot.cjs")
-restoreContentSnapshot = installBundledCharacterSnapshot()
+    installBundledCharacterAndRewardSnapshot,
+} = require("./helpers/install-bundled-character-reward-snapshot.cjs")
+restoreContentSnapshot = installBundledCharacterAndRewardSnapshot()
 
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")

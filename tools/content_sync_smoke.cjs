@@ -983,6 +983,76 @@ function validateDirectOrderedMapTables({ definitions, readBundled, readRelease 
     return { tables: directDefinitions.length }
 }
 
+function validateRewardTables({
+    bundled,
+    release,
+    itemNames,
+    expectedDifferences,
+}) {
+    const fail = message => baselineError("CONTENT_SYNC_SMOKE_REWARD_BASELINE", message)
+    const expected = structuredClone(bundled)
+
+    for (const correction of expectedDifferences.clearCorrections) {
+        const reward = expected["clear_reward.json"][correction.key]
+        if (reward?.[correction.field] !== correction.value) {
+            fail(`clear_reward.json[${correction.key}].${correction.field} 基线不一致`)
+        }
+        delete reward[correction.field]
+    }
+
+    function scoreReward(groupId, position, side) {
+        const group = side["score_reward.json"][String(groupId)]
+        const matches = Array.isArray(group)
+            ? group.filter(reward => reward?.position === Number(position))
+            : []
+        if (matches.length !== 1) {
+            fail(`score_reward.json[${groupId}] position=${position} 必须唯一`)
+        }
+        return matches[0]
+    }
+
+    for (const entry of expectedDifferences.scoreNullIds) {
+        const [groupId, position, extra] = String(entry).split(":")
+        if (extra !== undefined) fail(`非法 scoreNullIds 定义：${entry}`)
+        const reward = scoreReward(groupId, position, expected)
+        if (reward.id !== null) {
+            fail(`score_reward.json[${groupId}] position=${position} 空 id 基线不一致`)
+        }
+        delete reward.id
+    }
+
+    for (const alias of expectedDifferences.scoreAliases) {
+        const expectedReward = scoreReward(alias.group, alias.position, expected)
+        const releaseReward = scoreReward(alias.group, alias.position, release)
+        if (expectedReward.id !== alias.bundledId
+            || releaseReward.id !== alias.releaseId
+            || !itemNames[String(alias.bundledId)]
+            || itemNames[String(alias.bundledId)] !== itemNames[String(alias.releaseId)]) {
+            fail(`score_reward.json[${alias.group}] position=${alias.position} 代币别名基线不一致`)
+        }
+        expectedReward.id = alias.releaseId
+    }
+
+    for (const tableName of [
+        "clear_reward.json",
+        "score_reward.json",
+        "rare_score_reward.json",
+        "score_attack_border_reward.json",
+        "rush_event_quest_folder.json",
+        "rush_event_ranking_reward.json",
+    ]) {
+        if (!isDeepStrictEqual(release[tableName], expected[tableName])) {
+            fail(`${tableName} 与官方奖励转换基线不一致`)
+        }
+    }
+    return {
+        tables: 6,
+        clearCorrections: expectedDifferences.clearCorrections.length,
+        scoreNullIds: expectedDifferences.scoreNullIds.length,
+        scoreAliases: expectedDifferences.scoreAliases.length,
+    }
+}
+
 function loadContentRuntime(projectRoot) {
     require("ts-node").register({
         project: path.join(projectRoot, "tsconfig.json"),
@@ -1034,6 +1104,27 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         definitions: runtime.TABLE_SOURCES,
         readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
         readRelease: tableName => repository.table(tableName),
+    })
+    const rewardTableNames = [
+        "clear_reward.json",
+        "score_reward.json",
+        "rare_score_reward.json",
+        "score_attack_border_reward.json",
+        "rush_event_quest_folder.json",
+        "rush_event_ranking_reward.json",
+    ]
+    const rewardStats = validateRewardTables({
+        bundled: Object.fromEntries(rewardTableNames.map(tableName => (
+            [tableName, readJson(paths.projectRoot, `assets/${tableName}`)]
+        ))),
+        release: Object.fromEntries(rewardTableNames.map(tableName => (
+            [tableName, repository.table(tableName)]
+        ))),
+        itemNames: readJson(paths.projectRoot, "assets/item_lookup.json"),
+        expectedDifferences: readJson(
+            paths.projectRoot,
+            "tools/fixtures/content-reward/differences-1.4.54.json",
+        ),
     })
 
     const bundledCharacter = readJson(paths.projectRoot, "assets/character.json")
@@ -1106,6 +1197,7 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         campaigns: gachaStats.campaigns,
         featureEntries: gachaStats.featureEntries,
         directTables: directStats.tables,
+        rewardTables: rewardStats.tables,
         shops: Object.values(shopStats).reduce((sum, count) => sum + count, 0),
     }
 }
@@ -1257,5 +1349,6 @@ module.exports = {
     validateDirectOrderedMapTables,
     validateGachas,
     validateReleaseClosure,
+    validateRewardTables,
     validateShops,
 }

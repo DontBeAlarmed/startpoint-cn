@@ -13,8 +13,16 @@ const {
 
 const CHARACTER_TABLE_NAME = "character.json"
 const CHARACTER_CONTENT_TABLE_NAME = "cdndata/character.json"
+const REWARD_TABLE_NAMES = [
+    "clear_reward.json",
+    "score_reward.json",
+    "rare_score_reward.json",
+    "rush_event_quest_folder.json",
+    "score_attack_border_reward.json",
+    "rush_event_ranking_reward.json",
+]
 
-function installBundledCharacterSnapshot({ onRestore } = {}) {
+function installBundledCharacterAndRewardSnapshot({ onRestore } = {}) {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     const characterTable = deepFreeze(structuredClone(
         require(path.join(projectRoot, "assets", CHARACTER_TABLE_NAME))
@@ -22,6 +30,10 @@ function installBundledCharacterSnapshot({ onRestore } = {}) {
     const characterContentTable = deepFreeze(structuredClone(
         require(path.join(projectRoot, "assets", CHARACTER_CONTENT_TABLE_NAME))
     ))
+    const rewardTables = Object.fromEntries(REWARD_TABLE_NAMES.map(tableName => [
+        tableName,
+        deepFreeze(structuredClone(require(path.join(projectRoot, "assets", tableName)))),
+    ]))
     const repositoryInfo = deepFreeze({
         source: "bundled",
         assetVersion: BUNDLED_CDN_CATALOG_VERSION,
@@ -33,7 +45,8 @@ function installBundledCharacterSnapshot({ onRestore } = {}) {
         table(tableName) {
             if (tableName === CHARACTER_TABLE_NAME) return characterTable
             if (tableName === CHARACTER_CONTENT_TABLE_NAME) return characterContentTable
-            throw new Error(`unexpected character table ${tableName}`)
+            if (tableName in rewardTables) return rewardTables[tableName]
+            throw new Error(`unexpected character/reward table ${tableName}`)
         },
     })
 
@@ -51,4 +64,4 @@ function installBundledCharacterSnapshot({ onRestore } = {}) {
     }
 }
 
-module.exports = { installBundledCharacterSnapshot }
+module.exports = { installBundledCharacterAndRewardSnapshot }

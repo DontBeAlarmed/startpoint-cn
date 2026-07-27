@@ -318,6 +318,74 @@ test("直接 OrderedMap 表必须逐张等于 bundled 官方基线", () => {
     ))
 })
 
+test("奖励表比较只接受已锁定的 bundled 空 id 与 clear reward 误复制", () => {
+    assert.equal(typeof smoke.validateRewardTables, "function")
+    const expectedDifferences = {
+        clearCorrections: [
+            { key: "1", field: "count", value: 123001 },
+            { key: "2", field: "id", value: 200 },
+        ],
+        scoreNullIds: ["10:1"],
+        scoreAliases: [
+            { group: 10, position: 2, bundledId: 999800, releaseId: 40236 },
+        ],
+    }
+    const bundled = {
+        "clear_reward.json": {
+            1: { name: "", type: 2, id: 123001, count: 123001 },
+            2: { name: "", type: 3, id: 200, count: 200 },
+        },
+        "score_reward.json": {
+            10: [
+                { position: 1, type: 0, reward_type: 4, count: 20, field5: 500, id: null },
+                { position: 2, type: 0, reward_type: 0, count: 2, field5: 100, id: 999800 },
+                { position: 3, type: 0, reward_type: 0, count: 1, field5: 100, id: 999801 },
+            ],
+        },
+        "rare_score_reward.json": { 20: [{ type: 0, id: 42, count: 1 }] },
+        "score_attack_border_reward.json": { "1_1": [{ id: 1 }] },
+        "rush_event_quest_folder.json": { 1: { 1: [] } },
+        "rush_event_ranking_reward.json": { 1: { 1: [] } },
+    }
+    const release = structuredClone(bundled)
+    delete release["clear_reward.json"][1].count
+    delete release["clear_reward.json"][2].id
+    delete release["score_reward.json"][10][0].id
+    release["score_reward.json"][10][1].id = 40236
+
+    assert.deepEqual(smoke.validateRewardTables({
+        bundled,
+        release,
+        itemNames: { 40236: "活动银币", 999800: "活动银币" },
+        expectedDifferences,
+    }), { tables: 6, clearCorrections: 2, scoreNullIds: 1, scoreAliases: 1 })
+
+    const shiftedAliasRelease = structuredClone(bundled)
+    delete shiftedAliasRelease["clear_reward.json"][1].count
+    delete shiftedAliasRelease["clear_reward.json"][2].id
+    delete shiftedAliasRelease["score_reward.json"][10][0].id
+    shiftedAliasRelease["score_reward.json"][10][2].id = 40237
+    assert.throws(() => smoke.validateRewardTables({
+        bundled,
+        release: shiftedAliasRelease,
+        itemNames: {
+            40236: "活动银币",
+            40237: "活动银币",
+            999800: "活动银币",
+            999801: "活动银币",
+        },
+        expectedDifferences,
+    }), error => error?.code === "CONTENT_SYNC_SMOKE_REWARD_BASELINE")
+
+    release["rare_score_reward.json"][20][0].count = 2
+    assert.throws(() => smoke.validateRewardTables({
+        bundled,
+        release,
+        itemNames: { 40236: "活动银币", 999800: "活动银币" },
+        expectedDifferences,
+    }), error => error?.code === "CONTENT_SYNC_SMOKE_REWARD_BASELINE")
+})
+
 test("失败摘要使用稳定错误码、中文状态且不泄露绝对路径", async () => {
     let stdout = ""
     let stderr = ""

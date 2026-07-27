@@ -13,7 +13,7 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 
 同步器负责严格解析、引用闭包、稳定输出和文件系统安全，不负责判断 CDN 作者给出的 ID、赔率、奖励、价格或资源内容是否合理。服务端不会替 CDN 作者猜测缺失内容、复制其他活动数据、修复非法主数据或自动生成客户端补丁。
 
-阶段 B 当前把 Registry 的 109 张表分为 `52 CDN + 53 bundled + 4 server`。原阶段 A 的五个动态领域为：
+阶段 B 当前把 Registry 的 109 张表分为 `58 CDN + 47 bundled + 4 server`。原阶段 A 的五个动态领域为：
 
 | 领域 | 动态输出 |
 |---|---|
@@ -25,6 +25,8 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 
 在此基础上，35 张与官方提取 JSON 可机器证明完全相等的表已改用通用递归 OrderedMap 转换器。转换器按 Registry 声明的一至三层嵌套深度还原 CSV 树，不改字段、不补 ID，也不叠加 bundled 数据。范围包括 Active Mission、角色觉醒、收集、普通/每日/每周/称号/活动任务、Pass 任务及奖励表，以及玩家等级、角色剧情 lookup、EX Ability、Mana Board、Raid 总体奖励、奖励属性映射、体力活动和星屑兑换等直接表。
 
+奖励领域另有 6 张派生表从官方 OrderedMap 动态生成：Clear、Score、Rare Score、Score Attack Border、Rush Folder 和 Rush Ranking。转换器保留原始位置、概率、数量和多奖励槽，并修正历史 bundled 的 5 条 Clear Reward 字段误复制及 82 个无意义 `id:null`。早期活动代币中另有 47 行官方 ID 与 bundled 世代 ID 不同；smoke 只在 `item_lookup` 名称一致时视为同一代币族，实际发奖仍由业务层按服务器时间选择开放期 ID。
+
 任务技能效果索引只记录 CDN 能直接证明的角色技能效果。服务端在同步阶段解压并解析
 `*.action.dsl.amf3.deflate`，识别 `CreateNormalHeal`、`CreateRatioHeal`、`ACRegeneration`，以及
 负值 `ACToleranceOfElement` 对应的 `ACToleranceOfElement_Down`。无法读取或解码的程序会进入表内
@@ -34,7 +36,7 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 Content Sync 时，20015/20016 会保持 fail closed。使用官方 CDN 执行同步后，当前 Release 才会包含实际
 角色效果索引。
 
-Registry 仍要求每个 Release 闭合当前全部注册表。剩余 53 张 bundled 表中，51 张有官方来源但需要业务派生结构、跨表 lookup 或服务端索引转换；`cdndata/player_rank_full.json` 的 `0..100` 等级数据来自历史实测，`quest_unlock_costs.json` 仍有 6 项无法由官方 1.4.54 主数据闭合，这两张缺少完整权威来源，继续保留兼容 fallback。上述表不会因为 CDN OrderedMap 改动而自动变化。迁移时必须逐表证明来源、字段映射和输出闭包，不能把文件名相近当作可直接复制的证据。4 张 `server` 表为服务端配置或后台内容，不属于 CDN 转换范围。
+Registry 仍要求每个 Release 闭合当前全部注册表。剩余 47 张 bundled 表中，45 张有官方来源但需要业务派生结构、跨表 lookup 或服务端索引转换；`cdndata/player_rank_full.json` 的 `0..100` 等级数据来自历史实测，`quest_unlock_costs.json` 仍有 6 项无法由官方 1.4.54 主数据闭合，这两张缺少完整权威来源，继续保留兼容 fallback。上述表不会因为 CDN OrderedMap 改动而自动变化。迁移时必须逐表证明来源、字段映射和输出闭包，不能把文件名相近当作可直接复制的证据。4 张 `server` 表为服务端配置或后台内容，不属于 CDN 转换范围。
 
 ## 受支持输入
 
@@ -165,6 +167,7 @@ smoke 始终执行 force sync，并验证：
 
 - Release、Repository、Catalog 都是 1.4.54；当前 Registry 全部表及所有对象引用闭合；
 - 35 张通用递归 OrderedMap 表逐张与 bundled 官方 1.4.54 基线深度相等；
+- 6 张奖励派生表逐张闭合；按 `differences-1.4.54.json` 的具体键、位置与 ID 元组，只接受 5 条 Clear 字段修正、82 个空 id 清理和 47 个同名活动代币别名；
 - 两张角色 cdndata 各 505 行，运行时 505 个角色；名称、稀有度、属性与 bundled 一致；
 - 只允许已记录的 45 个 `skill_count` 从 3 变为 6，12 个 `skill_count=2` 保持不变；
 - 卡池 raw row 为 584、campaign 为 145，全部非空 odds 已成功读取；

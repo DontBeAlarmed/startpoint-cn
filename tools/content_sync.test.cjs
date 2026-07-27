@@ -200,6 +200,21 @@ function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}
             logicalEntries.set(logicalPath, directOrderedMapFixture(Number(match[1])))
         }
     }
+    const flatRewardSources = new Set([
+        "master/reward/clear_reward.orderedmap",
+        "master/quest/event/score_attack_border_reward.orderedmap",
+    ])
+    for (const definition of TABLE_SOURCES.filter(entry => entry.converterId === "reward")) {
+        const logicalPath = definition.sourceOrderedMaps[0]
+        if (!logicalEntries.has(logicalPath)) {
+            logicalEntries.set(
+                logicalPath,
+                flatRewardSources.has(logicalPath)
+                    ? serializeOrderedMap([])
+                    : serializeNestedOrderedMap([]),
+            )
+        }
+    }
     const entries = new Map()
     const logicalByPhysical = new Map()
     for (const [logicalPath, bytes] of logicalEntries) {
@@ -306,6 +321,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         gacha: 0,
         shop: 0,
         skillEffects: 0,
+        reward: 0,
     }
     let bundledImports = 0
     const bundledRoots = new Set()
@@ -330,6 +346,10 @@ test("default release builder closes all registry tables and runs each CDN conve
             converterCalls.skillEffects++
             return converterOutput("skill-effects")
         },
+        convertRewards: async () => {
+            converterCalls.reward++
+            return converterOutput("reward")
+        },
         importBundledTable: async (root, tableName) => {
             bundledRoots.add(root)
             bundledImports++
@@ -349,6 +369,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         gacha: 1,
         shop: 1,
         skillEffects: 1,
+        reward: 1,
     })
     assert.equal(
         bundledImports,

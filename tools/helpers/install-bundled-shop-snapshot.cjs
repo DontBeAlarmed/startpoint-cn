@@ -18,9 +18,9 @@ const tableNames = [
     "equipment_enhancement_shop.json",
 ]
 
-function installBundledShopSnapshot() {
+function installBundledShopSnapshot({ additionalTableNames = [] } = {}) {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
-    const tables = Object.fromEntries(tableNames.map(tableName => [
+    const tables = Object.fromEntries([...tableNames, ...additionalTableNames].map(tableName => [
         tableName,
         require(path.join(projectRoot, "assets", tableName)),
     ]))

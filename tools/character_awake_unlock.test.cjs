@@ -13,11 +13,11 @@ const {
     productionContentSnapshotProvider,
 } = require("../src/content/runtime/content-snapshot")
 const {
-    installBundledCharacterSnapshot,
-} = require("./helpers/install-bundled-character-snapshot.cjs")
+    installBundledCharacterAndRewardSnapshot,
+} = require("./helpers/install-bundled-character-reward-snapshot.cjs")
 
 const previousContentSnapshot = productionContentSnapshotProvider.snapshot
-const restoreBundledCharacterSnapshot = installBundledCharacterSnapshot()
+const restoreBundledCharacterSnapshot = installBundledCharacterAndRewardSnapshot()
 function restoreBundledCharacterSnapshotOnExit() {
     restoreBundledCharacterSnapshot()
 }

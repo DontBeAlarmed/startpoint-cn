@@ -7,6 +7,8 @@ const {
 } = require("../src/lib/assets")
 const { QuestCategory } = require("../src/lib/types")
 const hardMultiQuests = require("../assets/hard_multi_event_quest.json")
+const { installBundledCharacterAndRewardSnapshot } = require("./helpers/install-bundled-character-reward-snapshot.cjs")
+const restoreContentSnapshot = installBundledCharacterAndRewardSnapshot()
 
 const validQuest = getQuestFromCategorySync(QuestCategory.HARD_MULTI_EVENT, 100002001)
 assert.ok(validQuest)
@@ -46,6 +48,7 @@ try {
     )
 } finally {
     hardMultiQuests["100002001"] = originalQuest
+    restoreContentSnapshot()
 }
 
 console.log("quest reward configuration tests passed")

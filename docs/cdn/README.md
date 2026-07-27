@@ -20,4 +20,4 @@
 - 服务端通过 Catalog 向客户端声明版本、大小和下载归档。
 - SQLite 保存玩家状态，不保存或替代 CDN 内容定义。
 
-当前 Registry 为 `52 CDN + 53 bundled + 4 server`。只有已注册 CDN 转换器的表会动态生成，其中 35 张直接表按一至三层 OrderedMap 结构原样还原；其余 `assets/` 仍是版本内置派生数据。加入新 CDN 并不等于任意业务表都会自动更新；但服务端新增、移除注册表或调整表转换元数据后，下一次 normal sync 会自动生成兼容的新 Release，不要求部署者手动 `--force`。
+当前 Registry 为 `58 CDN + 47 bundled + 4 server`。只有已注册 CDN 转换器的表会动态生成，其中 35 张直接表按一至三层 OrderedMap 结构原样还原，6 张奖励表按权威字段映射派生；其余 `assets/` 仍是版本内置派生数据。加入新 CDN 并不等于任意业务表都会自动更新；但服务端新增、移除注册表或调整表转换元数据后，下一次 normal sync 会自动生成兼容的新 Release，不要求部署者手动 `--force`。

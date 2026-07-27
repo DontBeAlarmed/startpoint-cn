@@ -5,7 +5,9 @@ require("ts-node/register/transpile-only")
 
 const { after } = require("node:test")
 const { installBundledShopSnapshot } = require("./helpers/install-bundled-shop-snapshot.cjs")
-const restoreBundledShopSnapshot = installBundledShopSnapshot()
+const restoreBundledShopSnapshot = installBundledShopSnapshot({
+    additionalTableNames: ["rush_event_quest_folder.json"],
+})
 after(restoreBundledShopSnapshot)
 
 const {

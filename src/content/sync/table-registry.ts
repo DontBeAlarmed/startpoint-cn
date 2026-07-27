@@ -78,6 +78,15 @@ const DIRECT_ORDERED_MAP_TABLES = [
     ["star_crumb_exchange_cost.json", 1, "master/shop/star_crumb_exchange_cost.orderedmap"],
 ] as const satisfies ReadonlyArray<readonly [string, 1 | 2 | 3, string]>
 
+const REWARD_TABLES = [
+    ["clear_reward.json", "master/reward/clear_reward.orderedmap"],
+    ["score_reward.json", "master/reward/score_reward.orderedmap"],
+    ["rare_score_reward.json", "master/reward/rare_score_reward.orderedmap"],
+    ["score_attack_border_reward.json", "master/quest/event/score_attack_border_reward.orderedmap"],
+    ["rush_event_quest_folder.json", "master/quest/event/rush_event_quest_folder.orderedmap"],
+    ["rush_event_ranking_reward.json", "master/quest/event/rush_event_ranking_reward.orderedmap"],
+] as const
+
 const BUNDLED_TABLE_NAMES = [
     "advent_event_quest.json",
     "boss_battle_quest.json",
@@ -89,7 +98,6 @@ const BUNDLED_TABLE_NAMES = [
     "cdndata/player_rank_full.json",
     "challenge_dungeon_event_quest.json",
     "character_quest.json",
-    "clear_reward.json",
     "daily_challenge_point_lookup.json",
     "daily_exp_mana_event_quest.json",
     "daily_week_event_quest.json",
@@ -120,13 +128,8 @@ const BUNDLED_TABLE_NAMES = [
     "raid_event.json",
     "raid_event_quest.json",
     "ranking_event_single_quest.json",
-    "rare_score_reward.json",
     "rush_event_quest.json",
-    "rush_event_quest_folder.json",
-    "rush_event_ranking_reward.json",
-    "score_attack_border_reward.json",
     "score_attack_event_quest.json",
-    "score_reward.json",
     "solo_time_attack_event_quest.json",
     "story_event_single_quest.json",
     "tower_dungeon_event_quest.json",
@@ -162,6 +165,17 @@ function directOrderedMapDefinition(
         scope: "cdn",
         sourceOrderedMaps: [sourceOrderedMap],
         converterId: `ordered-map-json-${nestingDepth}`,
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    }
+}
+
+function rewardDefinition(tableName: string, sourceOrderedMap: string): TableSourceInput {
+    return {
+        tableName,
+        scope: "cdn",
+        sourceOrderedMaps: [sourceOrderedMap],
+        converterId: "reward",
         converterVersion: 1,
         outputShapeVersion: 1,
     }
@@ -336,6 +350,9 @@ const definitionInputs: TableSourceInput[] = [
     },
     ...DIRECT_ORDERED_MAP_TABLES.map(([tableName, nestingDepth, sourceOrderedMap]) => (
         directOrderedMapDefinition(tableName, nestingDepth, sourceOrderedMap)
+    )),
+    ...REWARD_TABLES.map(([tableName, sourceOrderedMap]) => (
+        rewardDefinition(tableName, sourceOrderedMap)
     )),
     ...BUNDLED_TABLE_NAMES.map(bundledDefinition),
     ...SERVER_TABLE_NAMES.map(serverDefinition),

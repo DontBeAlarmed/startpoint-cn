@@ -97,6 +97,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/content_skill_effects_converter.test.cjs",
             "tools/content_amf3.test.cjs",
             "tools/content_gacha_converter.test.cjs",
+            "tools/content_reward_converter.test.cjs",
+            "tools/content_reward_repository.test.cjs",
             "tools/content_shop_converter.test.cjs",
             "tools/gacha_repository.test.cjs",
             "tools/shop_repository.test.cjs",

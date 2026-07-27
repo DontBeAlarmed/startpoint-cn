@@ -181,6 +181,13 @@ stubModule("../src/data/domains/quest", {
 stubModule("../src/data/domains/character_clear", { incrementPlayerCharacterClearSync() {} })
 stubModule("../src/data/domains/mission_battle_facts", { recordMissionBattleResultSync() {} })
 stubModule("../src/lib/mission/degree-battle-stat-facts", { recordDegreeBattleStatisticsSync() {} })
+stubModule("../src/lib/mission/battle-facts", {
+    BATTLE_SETTLEMENT_CATEGORIES: [],
+    recordMissionBattleFacts() {
+        writeAttempts++
+        db.prepare("UPDATE mission_state SET clear_count = clear_count + 1 WHERE player_id = 17").run()
+    },
+})
 stubModule("../src/data/domains/equipment", { updatePlayerEquipmentSync() {} })
 stubModule("../src/data/domains/session", { getSession: () => null })
 stubModule("../src/data/domains/rushEvent", {
@@ -203,6 +210,7 @@ stubModule("../src/data/activeAccount", { resolvePlayerIdSync: () => 17 })
 stubModule("../src/lib/assets", {
     getQuestFromCategorySync: () => scoreQuest,
     getRushEventFolderClearRewards: () => [],
+    getScoreAttackBorderRewards: () => require("../assets/score_attack_border_reward.json"),
 })
 stubModule("../src/lib/character", {
     getCharactersEvolutionImgLevels: () => [1],
@@ -367,7 +375,7 @@ async function main() {
     db.exec("DROP TRIGGER fail_score_attack_active_delete")
     writeAttempts = 0
     const succeeded = await finish(fastify)
-    assert.equal(succeeded.statusCode, 200)
+    assert.equal(succeeded.statusCode, 200, succeeded.body)
     assert.equal(db.prepare("SELECT free_mana FROM player_state WHERE player_id = 17").get().free_mana, 1015)
     assert.equal(db.prepare("SELECT exp_pool FROM player_state WHERE player_id = 17").get().exp_pool, 2015)
     assert.equal(db.prepare("SELECT rank_point FROM player_state WHERE player_id = 17").get().rank_point, 3010)

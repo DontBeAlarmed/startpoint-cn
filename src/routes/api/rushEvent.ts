@@ -8,7 +8,11 @@ import { getDefaultPlayerPartyGroupsSync } from "../../data/domains/player"
 import { getPlayerCharacterSync } from "../../data/domains/character"
 import { ensurePlayerPartyGroupListSync, getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getSession } from "../../data/domains/session"
-import { getQuestFromCategorySync } from "../../lib/assets";
+import {
+    getQuestFromCategorySync,
+    getRushEventRankingRewards,
+    type RushEventRankingRewardEntry,
+} from "../../lib/assets";
 import { BattleQuest, QuestCategory, RushEventFolder } from "../../lib/types";
 import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
 import type { FinishBody } from "./singleBattleQuest";
@@ -16,7 +20,6 @@ import { insertActiveQuest } from "../../lib/quest/active-quest-service";
 import { getPlayerRushEventEndlessBattleRankingSync, getRushEventEndlessBattleRankPlayedPartyListSync, getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import rushEventRankingRewards from "../../../assets/rush_event_ranking_reward.json";
 import { ensureSpecialEventPartyGroupsSync, getGlobalPartyId } from "../../lib/special-event-parties";
 
 interface SummaryBody {
@@ -69,18 +72,6 @@ enum ResetQuestType {
     FOLDER,
     ENDLESS
 }
-
-interface RushEventRankingRewardEntry {
-    fromRank: number,
-    toRank: number,
-    kind: number,
-    kindId: number,
-    number: number
-}
-
-type RushEventRankingRewards = Record<string, Record<string, RushEventRankingRewardEntry[]>>
-
-const rankingRewards = rushEventRankingRewards as RushEventRankingRewards
 
 interface RushParty {
     ability_soul_ids: (number | null)[],
@@ -565,7 +556,7 @@ const routes = async (fastify: FastifyInstance) => {
         const rankNumber = myRanking?.rank_number ?? null
 
         // find matching reward tier
-        const rewards = rankingRewards[String(eventId)] ?? {}
+        const rewards = getRushEventRankingRewards()[String(eventId)] ?? {}
         let rewardList: RushEventRankingRewardEntry[] = []
         if (rankNumber !== null && rankNumber > 0) {
             for (const entries of Object.values(rewards)) {

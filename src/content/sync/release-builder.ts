@@ -25,6 +25,11 @@ import {
 } from "../converters/skill-effects"
 import { parseCsvLine } from "../converters/csv"
 import { convertOrderedMapJson } from "../converters/ordered-map-json"
+import {
+    convertRewards,
+    type RewardConversionOutput,
+    type RewardSourceReader,
+} from "../converters/reward"
 import { mapWithConcurrency } from "../concurrency"
 import { hashContentResourcePath } from "../resource-path"
 import { importBundledTable } from "./bundled-importer"
@@ -51,6 +56,7 @@ const SUPPORTED_CONVERTER_IDS = new Set([
     "ordered-map-json-1",
     "ordered-map-json-2",
     "ordered-map-json-3",
+    "reward",
     "bundled-json",
     "server-json",
 ])
@@ -71,6 +77,9 @@ export interface DefaultContentTableBuilderDependencies {
     readonly convertSkillEffects?: (
         input: SkillEffectConversionInput,
     ) => SkillEffectConversionOutput | Promise<SkillEffectConversionOutput>
+    readonly convertRewards?: (
+        reader: RewardSourceReader,
+    ) => RewardConversionOutput | Promise<RewardConversionOutput>
     readonly importBundledTable?: typeof importBundledTable
 }
 
@@ -94,7 +103,7 @@ function requireLogicalPath(logicalPath: string): string {
     return logicalPath
 }
 
-class StrictOrderedMapReader implements GachaSourceReader, ShopSourceReader {
+class StrictOrderedMapReader implements GachaSourceReader, ShopSourceReader, RewardSourceReader {
     private readonly context: ContentTableBuildContext
     private readonly allowed = new Set<string>()
     private readonly rawCache = new Map<string, Buffer>()
@@ -324,6 +333,7 @@ export function createDefaultContentTableBuilder(
     const gachaConverter = dependencies.convertGachas ?? convertGachas
     const shopConverter = dependencies.convertShops ?? convertShops
     const skillEffectConverter = dependencies.convertSkillEffects ?? convertSkillEffects
+    const rewardConverter = dependencies.convertRewards ?? convertRewards
     const bundledImporter = dependencies.importBundledTable ?? importBundledTable
 
     return Object.freeze({
@@ -341,6 +351,7 @@ export function createDefaultContentTableBuilder(
                     || definition.converterId === "gacha"
                     || definition.converterId === "shop"
                     || definition.converterId === "skill-effects"
+                    || definition.converterId === "reward"
                     || directOrderedMapDepth(definition.converterId) !== null
                     ? definition.sourceOrderedMaps
                     : []
@@ -376,6 +387,9 @@ export function createDefaultContentTableBuilder(
                     "skill-effects",
                     await runSkillEffectConverter(reader, skillEffectConverter),
                 )
+            }
+            if (converterIds.has("reward")) {
+                addConverterOutput(values, "reward", await rewardConverter(reader))
             }
 
             const directDefinitions = context.definitions.filter(definition => (
