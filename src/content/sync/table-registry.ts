@@ -121,6 +121,10 @@ const BOX_GACHA_TABLES = [
     ["box_reward.json", ["master/box_gacha/box_reward.orderedmap"]],
 ] as const
 
+const MANA_NODE_TABLES = [
+    ["mana_node.json", ["master/mana_board/mana_node.orderedmap"]],
+] as const
+
 const BUNDLED_TABLE_NAMES = [
     "cdndata/player_rank_full.json",
     "encyclopedia.json",
@@ -132,7 +136,6 @@ const BUNDLED_TABLE_NAMES = [
     "item_ids.json",
     "item_lookup.json",
     "item_sale.json",
-    "mana_node.json",
     "mission_event_battle_rules.json",
     "mission_event_quest_map.json",
     "practice_quest.json",
@@ -202,6 +205,17 @@ function boxGachaDefinition(
         scope: "cdn",
         sourceOrderedMaps,
         converterId: "box-gacha",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    }
+}
+
+function manaNodeDefinition(tableName: string, sourceOrderedMaps: readonly string[]): TableSourceInput {
+    return {
+        tableName,
+        scope: "cdn",
+        sourceOrderedMaps,
+        converterId: "mana-node",
         converterVersion: 1,
         outputShapeVersion: 1,
     }
@@ -412,6 +426,9 @@ const definitionInputs: TableSourceInput[] = [
     )),
     ...BOX_GACHA_TABLES.map(([tableName, sourceOrderedMaps]) => (
         boxGachaDefinition(tableName, sourceOrderedMaps)
+    )),
+    ...MANA_NODE_TABLES.map(([tableName, sourceOrderedMaps]) => (
+        manaNodeDefinition(tableName, sourceOrderedMaps)
     )),
     ...(Object.keys(QUEST_TABLE_SOURCES) as QuestTableName[]).map(questDefinition),
     questDerivedDefinition(

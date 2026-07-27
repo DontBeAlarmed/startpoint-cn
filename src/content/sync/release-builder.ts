@@ -24,6 +24,11 @@ import {
     type GameplaySourceReader,
 } from "../converters/gameplay"
 import {
+    convertManaNodes,
+    type ManaNodeConversionOutput,
+    type ManaNodeSourceReader,
+} from "../converters/mana-node"
+import {
     convertShops,
     type ShopConversionOutput,
     type ShopSourceReader,
@@ -69,6 +74,7 @@ const SUPPORTED_CONVERTER_IDS = new Set([
     "box-gacha",
     "gacha",
     "gameplay",
+    "mana-node",
     "shop",
     "skill-effects",
     "ordered-map-json-1",
@@ -96,6 +102,9 @@ export interface DefaultContentTableBuilderDependencies {
     readonly convertGameplayTables?: (
         reader: GameplaySourceReader,
     ) => GameplayConversionOutput | Promise<GameplayConversionOutput>
+    readonly convertManaNodes?: (
+        reader: ManaNodeSourceReader,
+    ) => ManaNodeConversionOutput | Promise<ManaNodeConversionOutput>
     readonly convertShops?: (
         reader: ShopSourceReader,
     ) => ShopConversionOutput | Promise<ShopConversionOutput>
@@ -133,7 +142,7 @@ function requireLogicalPath(logicalPath: string): string {
 }
 
 class StrictOrderedMapReader implements BoxGachaSourceReader, GachaSourceReader, GameplaySourceReader,
-    ShopSourceReader, RewardSourceReader, QuestSourceReader {
+    ManaNodeSourceReader, ShopSourceReader, RewardSourceReader, QuestSourceReader {
     private readonly context: ContentTableBuildContext
     private readonly allowed = new Set<string>()
     private readonly rawCache = new Map<string, Buffer>()
@@ -367,6 +376,7 @@ export function createDefaultContentTableBuilder(
         ?? convertCharacterElections
     const gachaConverter = dependencies.convertGachas ?? convertGachas
     const gameplayConverter = dependencies.convertGameplayTables ?? convertGameplayTables
+    const manaNodeConverter = dependencies.convertManaNodes ?? convertManaNodes
     const shopConverter = dependencies.convertShops ?? convertShops
     const skillEffectConverter = dependencies.convertSkillEffects ?? convertSkillEffects
     const rewardConverter = dependencies.convertRewards ?? convertRewards
@@ -388,6 +398,7 @@ export function createDefaultContentTableBuilder(
                     || definition.converterId === "box-gacha"
                     || definition.converterId === "gacha"
                     || definition.converterId === "gameplay"
+                    || definition.converterId === "mana-node"
                     || definition.converterId === "shop"
                     || definition.converterId === "skill-effects"
                     || definition.converterId === "reward"
@@ -431,6 +442,9 @@ export function createDefaultContentTableBuilder(
             }
             if (converterIds.has("gameplay")) {
                 addConverterOutput(values, "gameplay", await gameplayConverter(reader))
+            }
+            if (converterIds.has("mana-node")) {
+                addConverterOutput(values, "mana-node", await manaNodeConverter(reader))
             }
             if (converterIds.has("shop")) {
                 addConverterOutput(values, "shop", await shopConverter(reader))

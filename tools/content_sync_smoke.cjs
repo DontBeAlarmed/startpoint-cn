@@ -1019,6 +1019,24 @@ function validateGameplayTables({ definitions, readBundled, readRelease }) {
     return { tables: gameplayDefinitions.length }
 }
 
+function validateManaNodeTables({ definitions, readBundled, readRelease }) {
+    const manaNodeDefinitions = definitions.filter(definition => (
+        definition.converterId === "mana-node"
+    ))
+    for (const definition of manaNodeDefinitions) {
+        if (!isDeepStrictEqual(
+            readRelease(definition.tableName),
+            readBundled(definition.tableName),
+        )) {
+            baselineError(
+                "CONTENT_SYNC_SMOKE_MANA_NODE_BASELINE",
+                `${definition.tableName} 与 bundled 官方玛纳节点基线不一致`,
+            )
+        }
+    }
+    return { tables: manaNodeDefinitions.length }
+}
+
 const QUEST_TABLE_CATEGORIES = Object.freeze({
     "main_quest.json": 1,
     "boss_battle_quest.json": 2,
@@ -1293,6 +1311,11 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
         readRelease: tableName => repository.table(tableName),
     })
+    const manaNodeStats = validateManaNodeTables({
+        definitions: runtime.TABLE_SOURCES,
+        readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
+        readRelease: tableName => repository.table(tableName),
+    })
     const questStats = validateQuestTables({
         definitions: runtime.TABLE_SOURCES,
         readRelease: tableName => repository.table(tableName),
@@ -1395,6 +1418,7 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         directTables: directStats.tables,
         boxGachaTables: boxGachaStats.tables,
         gameplayTables: gameplayStats.tables,
+        manaNodeTables: manaNodeStats.tables,
         questTables: questStats.tables,
         rewardTables: rewardStats.tables,
         shops: Object.values(shopStats).reduce((sum, count) => sum + count, 0),
@@ -1549,6 +1573,7 @@ module.exports = {
     validateDirectOrderedMapTables,
     validateGachas,
     validateGameplayTables,
+    validateManaNodeTables,
     validateQuestTables,
     validateReleaseClosure,
     validateRewardTables,

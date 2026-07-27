@@ -56,6 +56,9 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "equipment_gacha_movie_probability.json",
     "ex_boost.json",
     "ex_status.json",
+    "mana_board.json",
+    "mana_node.json",
+    "mana_node_awake.json",
     "raid_event.json",
 ]
 

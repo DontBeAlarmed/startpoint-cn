@@ -156,6 +156,10 @@ const EXPECTED_BOX_GACHA_CDN_TABLES = Object.freeze({
     "box_reward.json": ["master/box_gacha/box_reward.orderedmap"],
 })
 
+const EXPECTED_MANA_NODE_CDN_TABLES = Object.freeze({
+    "mana_node.json": ["master/mana_board/mana_node.orderedmap"],
+})
+
 const EXPECTED_QUEST_CDN_TABLES = Object.freeze({
     "main_quest.json": "master/quest/main_quest.orderedmap",
     "ex_quest.json": "master/quest/ex_quest.orderedmap",
@@ -404,6 +408,15 @@ test("registry derives box gacha tables as one authoritative closure", () => {
     }
 })
 
+test("registry derives mana node costs from the official nested map", () => {
+    for (const [tableName, sources] of Object.entries(EXPECTED_MANA_NODE_CDN_TABLES)) {
+        const entry = findTableSource(tableName)
+        assert.equal(entry.scope, "cdn", tableName)
+        assert.equal(entry.converterId, "mana-node", tableName)
+        assert.deepEqual(entry.sourceOrderedMaps, sources, tableName)
+    }
+})
+
 test("registry derives authoritative quest tables from official OrderedMap sources", () => {
     for (const [tableName, source] of Object.entries(EXPECTED_QUEST_CDN_TABLES)) {
         const entry = findTableSource(tableName)
@@ -472,6 +485,7 @@ test("registry closes over current static runtime tables", () => {
                 && !(tableName in EXPECTED_REWARD_CDN_TABLES)
                 && !(tableName in EXPECTED_GAMEPLAY_CDN_TABLES)
                 && !(tableName in EXPECTED_BOX_GACHA_CDN_TABLES)
+                && !(tableName in EXPECTED_MANA_NODE_CDN_TABLES)
                 && !(tableName in EXPECTED_QUEST_CDN_TABLES)
                 && !(tableName in EXPECTED_QUEST_DERIVED_CDN_TABLES)
             ))

@@ -365,7 +365,10 @@ export function getCharacterManaNodesSync(
     characterId: string | number,
     level: string | number,
 ): Record<string, ManaNode> | null{
-    const characterManaNodes = (manaNodes as ManaNodes)[String(characterId)]
+    const characterManaNodes = getRuntimeContentTableSync(
+        "mana_node.json",
+        manaNodes as ManaNodes,
+    )[String(characterId)]
     if (!characterManaNodes) return null;
 
     return characterManaNodes[String(level)] || null
@@ -377,7 +380,10 @@ export function getCharacterManaNodesSync(
 export function getCharacterManaBoardCountSync(
     characterId: string | number
 ): number {
-    const characterManaNodes = (manaNodes as ManaNodes)[String(characterId)]
+    const characterManaNodes = getRuntimeContentTableSync(
+        "mana_node.json",
+        manaNodes as ManaNodes,
+    )[String(characterId)]
     if (!characterManaNodes) return 0
     return Object.keys(characterManaNodes).length
 }
@@ -410,7 +416,10 @@ function getManaNodeSlot(
     characterId: string | number,
     manaNodeId: string | number
 ): number {
-    const charData = (manaNodes as ManaNodes)[String(characterId)]
+    const charData = getRuntimeContentTableSync(
+        "mana_node.json",
+        manaNodes as ManaNodes,
+    )[String(characterId)]
     if (!charData) return 0
     for (const level of Object.keys(charData)) {
         const node = charData[level]?.[String(manaNodeId)]
@@ -433,7 +442,10 @@ function getManaNodePedestalSize(
     characterId: string | number,
     manaNodeId: string | number
 ): number {
-    const charBoard = (manaBoard as Record<string, any>)[String(characterId)]
+    const charBoard = getRuntimeContentTableSync(
+        "mana_board.json",
+        manaBoard as Record<string, any>,
+    )[String(characterId)]
     if (!charBoard) return -1
     for (const level of Object.keys(charBoard)) {
         const nodes = charBoard[level]
@@ -467,7 +479,10 @@ export function getManaNodeAwakeCost(
     const pedestalSize = getManaNodePedestalSize(characterId, manaNodeId)
     if (pedestalSize < 0) return null
 
-    const rarityData = (manaNodeAwake as Record<string, any>)[String(rarity)]
+    const rarityData = getRuntimeContentTableSync(
+        "mana_node_awake.json",
+        manaNodeAwake as Record<string, any>,
+    )[String(rarity)]
     if (!rarityData) return null
 
     const slotData = rarityData[String(slot)]

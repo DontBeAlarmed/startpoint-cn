@@ -378,6 +378,28 @@ test("活动扭蛋箱闭包必须逐张等于 bundled 官方基线", () => {
     }), error => error?.code === "CONTENT_SYNC_SMOKE_BOX_GACHA_BASELINE")
 })
 
+test("玛纳节点成本表必须等于 bundled 官方基线", () => {
+    assert.equal(typeof smoke.validateManaNodeTables, "function")
+    const definitions = [
+        { tableName: "mana_node.json", converterId: "mana-node" },
+    ]
+    const bundled = { "mana_node.json": { 1: { 1: { 10: { manaCost: 60 } } } } }
+    const release = structuredClone(bundled)
+
+    assert.deepEqual(smoke.validateManaNodeTables({
+        definitions,
+        readBundled: tableName => bundled[tableName],
+        readRelease: tableName => release[tableName],
+    }), { tables: 1 })
+
+    release["mana_node.json"][1][1][10].manaCost = 61
+    assert.throws(() => smoke.validateManaNodeTables({
+        definitions,
+        readBundled: tableName => bundled[tableName],
+        readRelease: tableName => release[tableName],
+    }), error => error?.code === "CONTENT_SYNC_SMOKE_MANA_NODE_BASELINE")
+})
+
 test("关卡派生表必须匹配官方摘要且奖励引用闭合", () => {
     function canonical(value) {
         if (Array.isArray(value)) return value.map(canonical)

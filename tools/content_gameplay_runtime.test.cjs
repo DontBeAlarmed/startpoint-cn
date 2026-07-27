@@ -63,6 +63,33 @@ test("gameplay readers use the active Content snapshot instead of static bundled
                 "2": [992],
                 "3": [993],
             },
+            "mana_node.json": {
+                "99101": {
+                    "1": {
+                        "9910101": {
+                            items: { "1": 3 },
+                            manaCost: 60,
+                            field1: "0",
+                            field5: "0",
+                            field6: "1",
+                        },
+                    },
+                },
+            },
+            "mana_board.json": {
+                "99101": {
+                    "1": {
+                        "1": [["9910101", "", "", "", "2"]],
+                    },
+                },
+            },
+            "mana_node_awake.json": {
+                "5": {
+                    "1": {
+                        "2": [["1", "3", "100"]],
+                    },
+                },
+            },
             "raid_event.json": {
                 "77": { requiredKillCount: 321 },
             },
@@ -91,6 +118,21 @@ test("gameplay readers use the active Content snapshot instead of static bundled
     assert.deepEqual(assets.getExBoostItemSync(99001), { tier: 3, count: 2, element: 4 })
     assert.equal(assets.getExBoostItemSync(10001), null)
     assert.deepEqual(assets.getExStatusPoolSync(2), [992])
+    assert.deepEqual(assets.getCharacterManaNodesSync(99101, 1), {
+        "9910101": {
+            items: { "1": 3 },
+            manaCost: 60,
+            field1: "0",
+            field5: "0",
+            field6: "1",
+        },
+    })
+    assert.equal(assets.getCharacterManaBoardCountSync(99101), 1)
+    assert.equal(assets.getCharacterManaNodesSync(1, 1), null)
+    assert.deepEqual(assets.getManaNodeAwakeCost(99101, 9910101, 5), {
+        items: { "1": 3 },
+        manaAmount: 100,
+    })
     assert.deepEqual(assets.getBoxGachaSync(77), {
         redeemItemId: 70077,
         redeemItemCount: 10,
