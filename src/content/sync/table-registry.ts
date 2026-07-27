@@ -170,6 +170,19 @@ const definitionInputs: TableSourceInput[] = [
         outputShapeVersion: 1,
     },
     {
+        tableName: "character_election.json",
+        scope: "cdn",
+        sourceOrderedMaps: [
+            "master/character_election/character_election.orderedmap",
+            "master/character_election/character_election_exclude.orderedmap",
+            "master/character/character.orderedmap",
+            "master/encyclopedia/encyclopedia.orderedmap",
+        ],
+        converterId: "character-election",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    },
+    {
         tableName: "cdndata/character.json",
         scope: "cdn",
         sourceOrderedMaps: ["master/character/character.orderedmap"],

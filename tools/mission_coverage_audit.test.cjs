@@ -28,13 +28,14 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.event)
     assert.deepEqual(
         { total: report.event.total, automated: report.event.automated, fallback: report.event.fallback },
-        { total: 2512, automated: 1524, fallback: 988 },
+        { total: 2512, automated: 1525, fallback: 987 },
     )
     assert.equal(report.event.automatedMissions.filter(entry => [1200, 1208, 1209, 1210, 1211, 1216, 1223].includes(entry.missionId)).length, 7)
     assert.deepEqual(
         report.event.automatedMissions
             .filter(entry => [
                 1225,
+                2389,
                 400053, 400054, 400055, 400056,
                 400071, 400072, 400073, 400074,
                 400089, 400090, 400091, 400092,
@@ -43,12 +44,13 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
             .map(entry => entry.missionId),
         [
             1225,
+            2389,
             400053, 400054, 400055, 400056,
             400071, 400072, 400073, 400074,
             400089, 400090, 400091, 400092,
             400093, 400094, 400095, 400096,
         ],
-        "Event 登录、Raid summary 与 RAID SET 保存事实必须全部进入权威自动覆盖",
+        "Event 登录、角色投票、Raid summary 与 RAID SET 保存事实必须全部进入权威自动覆盖",
     )
     const currentStateMissionIds = [
         1201, 1202, 1203, 1204, 1205, 1206, 1207,
@@ -70,7 +72,6 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
         {
             "empty-quest-selector": 948,
             "rescue-source-unavailable": 27,
-            "authoritative-event-fact-unavailable:type-68": 1,
             "authoritative-event-fact-unavailable:type-86": 2,
             "authoritative-event-fact-unavailable:type-87": 10,
         },

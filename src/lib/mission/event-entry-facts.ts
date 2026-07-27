@@ -11,7 +11,11 @@ import {
     type MissionMasterDefinition,
 } from "./master-data"
 
-export type EventEntryRuleProducer = "login" | "raid-summary" | "raid-set-edit"
+export type EventEntryRuleProducer =
+    | "login"
+    | "raid-summary"
+    | "raid-set-edit"
+    | "character-election-vote"
 
 export interface EventEntryRuleSpec {
     readonly producer: EventEntryRuleProducer
@@ -34,6 +38,15 @@ const EVENT_ENTRY_RULES: readonly EventEntryRuleSpec[] = Object.freeze([
         targets: Object.freeze([1, 2, 3, 4, 5, 6]),
         enableStart: "2019-11-27 12:00:00",
         enableEnd: "2019-12-16 11:59:59",
+    },
+    {
+        producer: "character-election-vote",
+        missionId: 2389,
+        pattern: "chara_election_01",
+        patternType: 68,
+        targets: Object.freeze([1]),
+        enableStart: "2022-05-02 12:00:00",
+        enableEnd: "2022-05-13 23:59:59",
     },
     {
         producer: "raid-summary",
@@ -418,6 +431,26 @@ export function recordEventLoginMissionFactSync(playerId: number, evaluationTime
     if (!definition || naturalDay === undefined
         || !isMissionDefinitionEnabledAt(definition, evaluationTime)) return false
     return recordPlayerEventMissionLoginDaySync(playerId, spec.missionId, naturalDay)
+}
+
+export function getOpenCharacterElectionVoteMissionId(
+    stringId: string,
+    enableStart: string,
+    enableEnd: string,
+    evaluationTime: Date,
+): number | null {
+    if (!(evaluationTime instanceof Date) || !Number.isFinite(evaluationTime.getTime())) return null
+    const specs = EVENT_ENTRY_RULES.filter(rule => (
+        rule.producer === "character-election-vote"
+        && rule.pattern === stringId
+        && rule.enableStart === enableStart
+        && rule.enableEnd === enableEnd
+    ))
+    if (specs.length !== 1) return null
+    const definition = getValidatedRule(specs[0])
+    return definition && isMissionDefinitionEnabledAt(definition, evaluationTime)
+        ? definition.missionId
+        : null
 }
 
 function getRaidSummaryRule(eventId: number): EventEntryRuleSpec | undefined {

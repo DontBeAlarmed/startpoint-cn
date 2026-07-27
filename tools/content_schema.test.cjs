@@ -65,7 +65,7 @@ function validManifest() {
 test("exports the initial content schema versions", () => {
     assert.equal(CONTENT_SCHEMA_VERSION, 1)
     assert.equal(CONTENT_RUNTIME_SCHEMA_VERSION, 1)
-    assert.equal(CONTENT_GENERATOR_VERSION, 1)
+    assert.equal(CONTENT_GENERATOR_VERSION, 2)
 })
 
 test("canonical JSON recursively sorts object keys and preserves array order", () => {
@@ -194,8 +194,8 @@ test("accepts historical or future positive generator versions", () => {
         generatorVersion: CONTENT_GENERATOR_VERSION + 1,
     })
 
-    assert.equal(CONTENT_GENERATOR_VERSION, 1)
-    assert.equal(parseReleaseManifest(manifest).generatorVersion, 2)
+    assert.equal(CONTENT_GENERATOR_VERSION, 2)
+    assert.equal(parseReleaseManifest(manifest).generatorVersion, 3)
 })
 
 test("strictly rejects malformed release manifests", () => {

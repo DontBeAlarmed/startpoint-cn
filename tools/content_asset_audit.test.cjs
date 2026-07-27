@@ -229,7 +229,7 @@ test("mission asset contracts reject broken awake groups and pass event referenc
 
 test("asset audit verifies all Content Registry runtime tables", () => {
     const result = auditRuntimeRegistryTables(path.join(__dirname, "../assets"))
-    assert.deepEqual(result, { registryTableCount: 108, readableRuntimeTableCount: 108 })
+    assert.deepEqual(result, { registryTableCount: 109, readableRuntimeTableCount: 109 })
 })
 
 test("asset audit runner produces a stable report without writing sources", t => {
@@ -336,8 +336,8 @@ test("asset audit report formats text and canonical JSON without absolute paths"
     const report = {
         schemaVersion: 1,
         sourceVersion: "1.4.54",
-        registryTableCount: 108,
-        readableRuntimeTableCount: 108,
+        registryTableCount: 109,
+        readableRuntimeTableCount: 109,
         deepComparedTableCount: 25,
         deepComparedKeyCount: 7441,
         missionContracts: {
@@ -347,7 +347,7 @@ test("asset audit report formats text and canonical JSON without absolute paths"
             passCardRewardCount: 1140,
         },
     }
-    assert.match(formatContentAssetAuditReport(report, "text"), /25\/25.*108\/108/s)
+    assert.match(formatContentAssetAuditReport(report, "text"), /25\/25.*109\/109/s)
     assert.deepEqual(JSON.parse(formatContentAssetAuditReport(report, "json")), report)
 })
 

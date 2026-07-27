@@ -92,6 +92,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/character_content.test.cjs",
             "tools/content_character_converter.test.cjs",
+            "tools/content_character_election_converter.test.cjs",
             "tools/content_asset_audit.test.cjs",
             "tools/content_skill_effects_converter.test.cjs",
             "tools/content_amf3.test.cjs",
@@ -186,6 +187,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/character_awake_route.test.cjs",
             "tools/character_awake_settlement.test.cjs",
             "tools/character_awake_unlock.test.cjs",
+            "tools/character_election_route.test.cjs",
             "tools/mission_battle_facts.test.cjs",
             "tools/mission_auto_settlement_route.test.cjs",
             "tools/mission_collect_progress.test.cjs",

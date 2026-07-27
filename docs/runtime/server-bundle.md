@@ -7,7 +7,7 @@ v2 将 `requires.dependencyLock` 设为必需字段，因此不会把缺少依�
 ```bash
 npm run build:bundle
 npm run verify:bundle
-npm run verify:bundle -- /path/to/server-bundle --data-schema 6
+npm run verify:bundle -- /path/to/server-bundle --data-schema 10
 npm run verify:bundle -- /path/to/server-bundle --dependency-lock sha256:<runtime-pack-lock>
 ```
 

@@ -69,6 +69,7 @@ import historyApiPlugin from "./routes/api/history";
 import comicApiPlugin from "./routes/api/comic";
 import questUnlockApiPlugin from "./routes/api/questUnlock";
 import itemApiPlugin from "./routes/api/item";
+import characterElectionApiPlugin from "./routes/api/characterElection";
 import {
     isSessionServerListening,
     startSessionServer,
@@ -313,6 +314,7 @@ fastify.register(historyApiPlugin, { prefix: `${apiPrefix}/history` });
 fastify.register(comicApiPlugin, { prefix: `${apiPrefix}/comic` });
 fastify.register(questUnlockApiPlugin, { prefix: `${apiPrefix}/quest` });
 fastify.register(itemApiPlugin, { prefix: `${apiPrefix}/item` });
+fastify.register(characterElectionApiPlugin, { prefix: `${apiPrefix}/character_election` });
 
 fastify.register(indexWebApiPlugin, { prefix: "/api" });
 fastify.register(seedsWebApiPlugin, { prefix: "/api/seeds" });

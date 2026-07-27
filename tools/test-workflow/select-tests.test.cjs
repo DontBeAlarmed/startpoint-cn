@@ -473,6 +473,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/character_awake_route.test.cjs",
         "tools/character_awake_settlement.test.cjs",
         "tools/character_awake_unlock.test.cjs",
+        "tools/character_election_route.test.cjs",
         "tools/mission_battle_facts.test.cjs",
         "tools/mission_auto_settlement_route.test.cjs",
         "tools/mission_collect_progress.test.cjs",

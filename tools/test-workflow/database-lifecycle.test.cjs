@@ -281,7 +281,11 @@ test("default schema migration preserves v6 players and creates cascading Pass t
 
     data.initializeDatabase({ paths })
     const migrated = getDb()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 9)
+    assert.equal(migrated.pragma("user_version", { simple: true }), 10)
+    assert.deepEqual(
+        migrated.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_character_election_votes'").get(),
+        { name: "players_character_election_votes" },
+    )
     assert.equal(migrated.prepare("SELECT name FROM players WHERE id = ?").get(playerId).name, "schema-v6-player")
     assert.deepEqual(
         migrated.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'players_pass_card%'")

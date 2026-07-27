@@ -271,6 +271,9 @@ test("default release builder closes all registry tables and runs each CDN conve
     const logicalEntries = new Map([
         ["master/character/character.orderedmap", serializeOrderedMap([])],
         ["master/character/character_text.orderedmap", serializeOrderedMap([])],
+        ["master/character_election/character_election.orderedmap", serializeOrderedMap([])],
+        ["master/character_election/character_election_exclude.orderedmap", serializeOrderedMap([])],
+        ["master/encyclopedia/encyclopedia.orderedmap", serializeNestedOrderedMap([])],
         ["master/skill/action_skill.orderedmap", serializeNestedOrderedMap([])],
         ["master/skill/switched_action_skill.orderedmap", serializeNestedOrderedMap([])],
         ["master/gacha/gacha.orderedmap", serializeOrderedMap([
@@ -280,13 +283,23 @@ test("default release builder closes all registry tables and runs each CDN conve
         ["master/gacha_odds/rarity-main.orderedmap", nestedOrderedMap("rarity-main")],
         ["master/gacha_odds/z-character.orderedmap", nestedOrderedMap("z-character")],
     ])
-    const converterCalls = { character: 0, gacha: 0, shop: 0, skillEffects: 0 }
+    const converterCalls = {
+        character: 0,
+        characterElection: 0,
+        gacha: 0,
+        shop: 0,
+        skillEffects: 0,
+    }
     let bundledImports = 0
     const bundledRoots = new Set()
     const builder = createDefaultContentTableBuilder({
         convertCharacters: async () => {
             converterCalls.character++
             return converterOutput("character")
+        },
+        convertCharacterElections: async () => {
+            converterCalls.characterElection++
+            return converterOutput("character-election")
         },
         convertGachas: async () => {
             converterCalls.gacha++
@@ -313,7 +326,13 @@ test("default release builder closes all registry tables and runs each CDN conve
 
     assert.equal(built.size, TABLE_SOURCES.length)
     assert.deepEqual([...built.keys()], TABLE_SOURCES.map(definition => definition.tableName))
-    assert.deepEqual(converterCalls, { character: 1, gacha: 1, shop: 1, skillEffects: 1 })
+    assert.deepEqual(converterCalls, {
+        character: 1,
+        characterElection: 1,
+        gacha: 1,
+        shop: 1,
+        skillEffects: 1,
+    })
     assert.equal(
         bundledImports,
         TABLE_SOURCES.filter(definition => (
@@ -347,6 +366,7 @@ test("default release builder fails explicitly for a missing dynamic gacha refer
     ])
     const builder = createDefaultContentTableBuilder({
         convertCharacters: async () => converterOutput("character"),
+        convertCharacterElections: async () => converterOutput("character-election"),
         convertGachas: async () => converterOutput("gacha"),
         convertShops: async () => converterOutput("shop"),
         convertSkillEffects: async () => converterOutput("skill-effects"),
@@ -372,6 +392,9 @@ test("default release builder rejects an incomplete converter output", async () 
     const logicalEntries = new Map([
         ["master/character/character.orderedmap", serializeOrderedMap([])],
         ["master/character/character_text.orderedmap", serializeOrderedMap([])],
+        ["master/character_election/character_election.orderedmap", serializeOrderedMap([])],
+        ["master/character_election/character_election_exclude.orderedmap", serializeOrderedMap([])],
+        ["master/encyclopedia/encyclopedia.orderedmap", serializeNestedOrderedMap([])],
         ["master/skill/action_skill.orderedmap", serializeNestedOrderedMap([])],
         ["master/skill/switched_action_skill.orderedmap", serializeNestedOrderedMap([])],
         ["master/gacha/gacha.orderedmap", serializeOrderedMap([
@@ -385,6 +408,7 @@ test("default release builder rejects an incomplete converter output", async () 
     delete incompleteCharacterOutput["character.json"]
     const builder = createDefaultContentTableBuilder({
         convertCharacters: async () => incompleteCharacterOutput,
+        convertCharacterElections: async () => converterOutput("character-election"),
         convertGachas: async () => converterOutput("gacha"),
         convertShops: async () => converterOutput("shop"),
         convertSkillEffects: async () => converterOutput("skill-effects"),
@@ -405,6 +429,9 @@ test("default release builder bounds parallel reads and imports while preserving
     const logicalEntries = new Map([
         ["master/character/character.orderedmap", serializeOrderedMap([])],
         ["master/character/character_text.orderedmap", serializeOrderedMap([])],
+        ["master/character_election/character_election.orderedmap", serializeOrderedMap([])],
+        ["master/character_election/character_election_exclude.orderedmap", serializeOrderedMap([])],
+        ["master/encyclopedia/encyclopedia.orderedmap", serializeNestedOrderedMap([])],
         ["master/skill/action_skill.orderedmap", serializeNestedOrderedMap([])],
         ["master/skill/switched_action_skill.orderedmap", serializeNestedOrderedMap([])],
     ])
@@ -432,6 +459,7 @@ test("default release builder bounds parallel reads and imports while preserving
     const reads = []
     const builder = createDefaultContentTableBuilder({
         convertCharacters: async () => converterOutput("character"),
+        convertCharacterElections: async () => converterOutput("character-election"),
         convertGachas: async () => converterOutput("gacha"),
         convertShops: async () => converterOutput("shop"),
         convertSkillEffects: async () => converterOutput("skill-effects"),

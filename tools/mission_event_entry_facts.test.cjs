@@ -32,6 +32,7 @@ const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const {
     getAuthoritativeEventEntryMissionIds,
+    getOpenCharacterElectionVoteMissionId,
     getProducerBackedEventEntryMissionIds,
     recordEventLoginMissionFactSync,
     recordRaidSetEditMissionFactsSync,
@@ -103,6 +104,7 @@ test("authoritative Event entry rules match official pattern, selector, period, 
     ]
     assert.deepEqual(getAuthoritativeEventEntryMissionIds(), [
         1225,
+        2389,
         400053, 400054, 400055, 400056,
         400071, 400072, 400073, 400074,
         400089, 400090, 400091, 400092,
@@ -270,6 +272,7 @@ test("authoritative Event entry rules match official pattern, selector, period, 
 
 test("Event entry producer contract exposes only missions backed by each recorder", () => {
     assert.deepEqual(getProducerBackedEventEntryMissionIds("login"), [1225])
+    assert.deepEqual(getProducerBackedEventEntryMissionIds("character-election-vote"), [2389])
     assert.deepEqual(getProducerBackedEventEntryMissionIds("raid-summary"), [
         400053, 400071, 400089, 400093,
     ])
@@ -281,6 +284,7 @@ test("Event entry producer contract exposes only missions backed by each recorde
     ])
     assert.deepEqual(getProducerBackedEventEntryMissionIds(), [
         1225,
+        2389,
         400053, 400054, 400055, 400056,
         400071, 400072, 400073, 400074,
         400089, 400090, 400091, 400092,
@@ -289,6 +293,25 @@ test("Event entry producer contract exposes only missions backed by each recorde
     assert.equal(getProducerBackedEventEntryMissionIds("raid-summary").every(missionId => (
         Number(getMissionMasterDefinition(3, missionId).row[2]) === 79
     )), true, "Raid summary producer 必须精确绑定 type79，不受同 eventId 其他规则顺序影响")
+
+    assert.equal(getOpenCharacterElectionVoteMissionId(
+        "chara_election_01",
+        "2022-05-02 12:00:00",
+        "2022-05-13 23:59:59",
+        new Date("2022-05-05T04:00:00.000Z"),
+    ), 2389)
+    assert.equal(getOpenCharacterElectionVoteMissionId(
+        "chara_election_01",
+        "2022-05-02 12:00:00",
+        "2022-05-13 23:59:59",
+        new Date("2022-05-14T00:00:00.000Z"),
+    ), null)
+    assert.equal(getOpenCharacterElectionVoteMissionId(
+        "chara_election_01",
+        "2022-05-02 12:00:01",
+        "2022-05-13 23:59:59",
+        new Date("2022-05-05T04:00:00.000Z"),
+    ), null, "CDN 选举开放期与任务开放期不一致时必须 fail closed")
 })
 
 test("Raid SET edits complete only deduplicated RAID group-1 slots in the unique open event family", () => {

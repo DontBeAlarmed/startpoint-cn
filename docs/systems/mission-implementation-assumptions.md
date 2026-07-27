@@ -57,6 +57,14 @@
 - 1225 在 Active Mission reconcile 与响应构建成功后，才在 reply 上登记 request-local pending commit；生产 CN MsgPack `onSend` 完成实际编码后执行独立的 `BEGIN IMMEDIATE` 记录事务。reconcile、响应构建或实际 onSend 编码失败不计数，多连接竞争同日 marker 只有一个连接成功；编码成功后交给网络栈的传输错误不属于该事务边界，也不声称能够回滚已提交事实。
 - type 79 使用嵌套 SQLite 保存点参与 Raid summary：成功时随 summary 外层事务提交；任务事实写入异常时保存点先完整回滚，再记录包含 player/event/mission 的告警并继续原有 summary。该可选事实不得把既有 summary 变成错误响应，也不得留下部分任务写入；其他 summary 奖励或状态异常仍按原外层事务整体回滚。
 
+## category 3：角色总选举投票
+
+- mission `2389` 的 type 68 由客户端 `character_election/vote` 请求产生，成功响应不读取业务字段；`get_vote_status` 只读取严格布尔值 `is_voted`。两个接口在选举开放期外都使用客户端已知的 `result_code=11003`。
+- `character_election.json` 由 Content Sync 从选举、排除、图鉴和角色 orderedmap 生成。候选过滤照 CN 1.8.1 `CharacterElectionLogic`：接受非隐藏的 NPC，以及非隐藏、身份角色自身的普通 Character；其他 kind 不进入候选，并移除该期 exclude 表中的 keyword ID。路由不接受任意正整数，也不把候选表硬编码在 TypeScript 中。
+- 首次投票写入 `players_character_election_votes`，并在同一个 `BEGIN IMMEDIATE` 事务内把 mission 2389 幂等完成到 1；任务写入异常会回滚投票。状态查询按玩家与 election ID 隔离，数据库 schema 10 保存首次 keyword ID 和投票时刻。
+- 重复请求当前采用传输重试兼容语义：返回成功、保留第一次选择、不重复增长任务。客户端正常流程会先查询 `is_voted`，反编译源码没有提供重复投票专用业务错误码；因此这里不把幂等成功描述为官方重复投票行为。若后续脱敏抓包证明官方返回其他错误，应只调整重复分支，不改变首次投票事务。
+- 选举表的 string ID、开放期与 mission 2389 的 pattern、开放期、type 68 和唯一奖励 target 1 必须同时吻合；任一来源漂移时投票任务 fail closed。当前自动测试与真实 1.4.54 CDN smoke 证明服务端链路闭合，但尚未记为 CN 客户端人工验收通过。
+
 ## 每日任务：无限演武空 selector
 
 - `10075` 的官方名称明确为“【无限演武】通关任意一个关卡”，QuestRange kind 为 20、event selector 为 1，

@@ -197,7 +197,7 @@ function isolatedWorkflowDependencies(overrides = {}) {
             },
             validateSynchronizedContent: async () => ({
                 version: "1.4.54",
-                tables: 94,
+                tables: 109,
                 characters: 505,
                 gachas: 584,
                 shops: 15762,
@@ -899,7 +899,7 @@ test("smoke workflow 在隔离目录执行 force sync 并前后核对来源快�
             calls.push(["validate", context.syncResult.targetVersion])
             return {
                 version: "1.4.54",
-                tables: 94,
+                tables: 109,
                 characters: 505,
                 gachas: 584,
                 shops: 15219,
@@ -910,7 +910,7 @@ test("smoke workflow 在隔离目录执行 force sync 并前后核对来源快�
     assert.deepEqual(calls.map(call => call[0]), ["capture", "sync", "validate", "capture"])
     assert.equal(calls[1][1].mode, "force")
     assert.equal(calls[1][1].env.CDN_DIR, fs.realpathSync(fixture.cdnRoot))
-    assert.match(summary, /版本 1\.4\.54；Registry 94；角色 505；卡池 584；商店记录 15219/)
+    assert.match(summary, /版本 1\.4\.54；Registry 109；角色 505；卡池 584；商店记录 15219/)
     assert.equal(summary.includes(fixture.sandbox), false)
 })
 

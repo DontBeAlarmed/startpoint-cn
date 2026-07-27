@@ -256,7 +256,7 @@ function buildServerBundle(options = {}) {
                 node: packageJson.engines.node,
                 dependencyLock: `sha256:${sha256Hex(dependencyLockBytes)}`,
                 minDataSchema: 0,
-                targetDataSchema: 6,
+                targetDataSchema: 10,
             },
             admin: { path: "web/dist", required: true },
             assets: {

@@ -4,6 +4,11 @@ import {
     type CharacterConversionOutput,
 } from "../converters/character"
 import {
+    convertCharacterElections,
+    type CharacterElectionConversionInput,
+    type CharacterElectionConversionOutput,
+} from "../converters/character-election"
+import {
     convertGachas,
     type GachaConversionOutput,
     type GachaSourceReader,
@@ -37,6 +42,7 @@ type ConverterOutput = object
 const RELEASE_BUILD_IO_CONCURRENCY = 8
 const SUPPORTED_CONVERTER_IDS = new Set([
     "character",
+    "character-election",
     "gacha",
     "shop",
     "skill-effects",
@@ -48,6 +54,9 @@ export interface DefaultContentTableBuilderDependencies {
     readonly convertCharacters?: (
         input: CharacterConversionInput,
     ) => CharacterConversionOutput | Promise<CharacterConversionOutput>
+    readonly convertCharacterElections?: (
+        input: CharacterElectionConversionInput,
+    ) => CharacterElectionConversionOutput | Promise<CharacterElectionConversionOutput>
     readonly convertGachas?: (
         reader: GachaSourceReader,
     ) => GachaConversionOutput | Promise<GachaConversionOutput>
@@ -265,6 +274,19 @@ async function runCharacterConverter(
     return convert({ characterRows, characterTextRows })
 }
 
+async function runCharacterElectionConverter(
+    reader: StrictOrderedMapReader,
+    convert: NonNullable<DefaultContentTableBuilderDependencies["convertCharacterElections"]>,
+): Promise<CharacterElectionConversionOutput> {
+    const [electionRows, excludeRows, characterRows, encyclopediaRows] = await Promise.all([
+        reader.read("master/character_election/character_election.orderedmap"),
+        reader.read("master/character_election/character_election_exclude.orderedmap"),
+        reader.read("master/character/character.orderedmap"),
+        reader.readNested("master/encyclopedia/encyclopedia.orderedmap"),
+    ])
+    return convert({ electionRows, excludeRows, characterRows, encyclopediaRows })
+}
+
 async function runSkillEffectConverter(
     reader: StrictOrderedMapReader,
     convert: NonNullable<DefaultContentTableBuilderDependencies["convertSkillEffects"]>,
@@ -287,6 +309,8 @@ export function createDefaultContentTableBuilder(
     dependencies: DefaultContentTableBuilderDependencies = {},
 ): ContentTableBuilder {
     const characterConverter = dependencies.convertCharacters ?? convertCharacters
+    const characterElectionConverter = dependencies.convertCharacterElections
+        ?? convertCharacterElections
     const gachaConverter = dependencies.convertGachas ?? convertGachas
     const shopConverter = dependencies.convertShops ?? convertShops
     const skillEffectConverter = dependencies.convertSkillEffects ?? convertSkillEffects
@@ -303,6 +327,7 @@ export function createDefaultContentTableBuilder(
             }
             const staticPaths = context.definitions.flatMap(definition => (
                 definition.converterId === "character"
+                    || definition.converterId === "character-election"
                     || definition.converterId === "gacha"
                     || definition.converterId === "shop"
                     || definition.converterId === "skill-effects"
@@ -319,6 +344,13 @@ export function createDefaultContentTableBuilder(
                     values,
                     "character",
                     await runCharacterConverter(reader, characterConverter),
+                )
+            }
+            if (converterIds.has("character-election")) {
+                addConverterOutput(
+                    values,
+                    "character-election",
+                    await runCharacterElectionConverter(reader, characterElectionConverter),
                 )
             }
             if (converterIds.has("gacha")) {
