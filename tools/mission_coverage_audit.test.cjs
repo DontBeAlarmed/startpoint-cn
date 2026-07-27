@@ -28,7 +28,7 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.event)
     assert.deepEqual(
         { total: report.event.total, automated: report.event.automated, fallback: report.event.fallback },
-        { total: 2512, automated: 2475, fallback: 37 },
+        { total: 2512, automated: 2485, fallback: 27 },
     )
     assert.equal(report.event.automatedMissions.filter(entry => [1200, 1208, 1209, 1210, 1211, 1216, 1223].includes(entry.missionId)).length, 7)
     assert.deepEqual(
@@ -69,13 +69,22 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
         "经过审计的 type16 空 selector 任务必须进入兼容事实覆盖",
     )
     assert.deepEqual(
+        report.event.automatedMissions
+            .filter(entry => [
+                600002, 600003, 900653, 900728, 900793,
+                900810, 900811, 900812, 900813, 900814,
+            ].includes(entry.missionId))
+            .map(entry => entry.missionId),
+        [600002, 600003, 900653, 900728, 900793, 900810, 900811, 900812, 900813, 900814],
+        "10 条 type87 client check 必须进入自动事实覆盖",
+    )
+    assert.deepEqual(
         report.event.fallbackMissions.reduce((counts, entry) => {
             counts[entry.reason] = (counts[entry.reason] ?? 0) + 1
             return counts
         }, {}),
         {
             "rescue-source-unavailable": 27,
-            "authoritative-event-fact-unavailable:type-87": 10,
         },
         "type 80/81/82 的 12 条 RAID SET 任务不得继续留在 fallback 原因分区",
     )

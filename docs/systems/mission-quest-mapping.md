@@ -4,7 +4,7 @@
 > 历史审计资产: `assets/mission_event_quest_map.json`
 > 严格规则生成器: `scripts/gen_mission_event_battle_rules.js`
 > 运行时资产: `assets/mission_event_battle_rules.json`
-> 覆盖范围: cat3 活动任务 2512 条；QuestRange 协力规则 1753 条、type 23 精确通关规则 257 条、445 条关卡/物品/竞速/阶段/当前状态/单人累计规则、18 条 Event 入口/SET/投票事实及 2 条歼灭者 type 86，共 2475 条
+> 覆盖范围: cat3 活动任务 2512 条；QuestRange 协力规则 1753 条、type 23 精确通关规则 257 条、445 条关卡/物品/竞速/阶段/当前状态/单人累计规则、18 条 Event 入口/SET/投票事实、2 条歼灭者 type 86 及 10 条 type 87，共 2485 条
 
 `mission_event_quest_map.json` 是按 pattern 展开的旧映射，只供 `computer-event.ts` 历史审计。它没有完整表达
 QuestRange selector、QuestRank、Host/Guest 和 Attention 来源，不能驱动自动事实。旧 939 条自动规则已从
@@ -40,6 +40,17 @@ CN 1.8.1 的权威语义如下：
 资产按数值 mission ID 排序，覆盖 type 16 的 1740 条（1061 条明确 `questIds`、579 条 category 2 全 BossBattle、100 条全 QuestRange）、type 17 Host
 的 12 条和 type 18 Guest 的 1 条，共 1753 条。其中 805 条保持 `compatibility=null`，948 条必须携带上述唯一兼容标记。
 运行时会重新对照原始 mission 行、selector 形状和当前关卡表；未知标记、字段漂移、虚构或缺失 quest ID 均 fail closed。
+
+## Type 87 客户端战斗检查
+
+10 条 type 87 只接受 category 26 对应 HardMulti 关卡的成功多人 SS 结算。规则逐 ID 校验 pattern type 87、
+`battle_kind=2`、QuestRange kind 19、event ID、空 suffix、`row[11]=(None)`、唯一奖励 target 1 和关卡表中的
+`eventId * 1000 + 1`。`statistics.client_checks` 必须是非空、无重复、无空白项的字符串数组，并包含该任务 `row[6]`；
+允许同时携带其他合法检查 ID。所有规则要求正安全整数耗时；600002 与 900812 另要求 `clearTime <= 180000`。
+
+服务端不重演攻击力下降、麻痹、属性耐性下降或棺柩过程；这些条件由官方 finish 协议的 client check ID 表达。
+当前自动测试证明字段校验、任务写入、幂等、开放期和错误上下文边界，但仍需真实 CN HardMulti 结算确认客户端会提交
+非空 `client_checks`。
 
 category 3 的 type 37 不依赖 QuestRange 资产。运行时从 `row[12]` 读取物品 ID，以
 `players_collected_items` 的累计获得量结算 40 条交易商人任务；该白名单由 `computer-event-safe.ts` 承载。

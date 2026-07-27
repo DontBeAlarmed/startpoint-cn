@@ -23,6 +23,7 @@ export interface QuestStatistics {
             [key: string]: any
         } | null)[]
     }[]
+    client_checks?: string[]
     max_combo_count?: number
     [key: string]: any
 }
