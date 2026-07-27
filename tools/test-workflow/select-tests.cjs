@@ -75,7 +75,7 @@ const SOURCE_RULES = [
         groups: ["quick:content", "integration:runtime"],
     },
     {
-        pattern: /^src\/content\/(?:converters\/(?:gameplay|skill-effects)|sync\/amf3)\.ts$/,
+        pattern: /^src\/content\/(?:converters\/(?:box-gacha|gameplay|skill-effects)|sync\/amf3)\.ts$/,
         groups: ["quick:content"],
     },
     {

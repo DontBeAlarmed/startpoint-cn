@@ -147,6 +147,15 @@ const EXPECTED_GAMEPLAY_CDN_TABLES = Object.freeze({
     "raid_event.json": "master/quest/event/raid_event.orderedmap",
 })
 
+const EXPECTED_BOX_GACHA_CDN_TABLES = Object.freeze({
+    "box_gacha.json": [
+        "master/box_gacha/box_gacha.orderedmap",
+        "master/box_gacha/box_reward.orderedmap",
+    ],
+    "box_gacha_box_settings.json": ["master/box_gacha/box.orderedmap"],
+    "box_reward.json": ["master/box_gacha/box_reward.orderedmap"],
+})
+
 const EXPECTED_QUEST_CDN_TABLES = Object.freeze({
     "main_quest.json": "master/quest/main_quest.orderedmap",
     "ex_quest.json": "master/quest/ex_quest.orderedmap",
@@ -386,6 +395,15 @@ test("registry derives gameplay tables from their official OrderedMap sources", 
     }
 })
 
+test("registry derives box gacha tables as one authoritative closure", () => {
+    for (const [tableName, sources] of Object.entries(EXPECTED_BOX_GACHA_CDN_TABLES)) {
+        const entry = findTableSource(tableName)
+        assert.equal(entry.scope, "cdn", tableName)
+        assert.equal(entry.converterId, "box-gacha", tableName)
+        assert.deepEqual(entry.sourceOrderedMaps, sources, tableName)
+    }
+})
+
 test("registry derives authoritative quest tables from official OrderedMap sources", () => {
     for (const [tableName, source] of Object.entries(EXPECTED_QUEST_CDN_TABLES)) {
         const entry = findTableSource(tableName)
@@ -453,6 +471,7 @@ test("registry closes over current static runtime tables", () => {
                 !(tableName in EXPECTED_DIRECT_CDN_TABLES)
                 && !(tableName in EXPECTED_REWARD_CDN_TABLES)
                 && !(tableName in EXPECTED_GAMEPLAY_CDN_TABLES)
+                && !(tableName in EXPECTED_BOX_GACHA_CDN_TABLES)
                 && !(tableName in EXPECTED_QUEST_CDN_TABLES)
                 && !(tableName in EXPECTED_QUEST_DERIVED_CDN_TABLES)
             ))

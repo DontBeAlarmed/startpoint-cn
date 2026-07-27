@@ -236,6 +236,22 @@ function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}
             logicalEntries.set(logicalPath, serializeOrderedMap([]))
         }
     }
+    const boxGachaDepths = new Map([
+        ["master/box_gacha/box_gacha.orderedmap", 1],
+        ["master/box_gacha/box_reward.orderedmap", 3],
+        ["master/box_gacha/box.orderedmap", 2],
+    ])
+    for (const definition of TABLE_SOURCES.filter(entry => entry.converterId === "box-gacha")) {
+        for (const logicalPath of definition.sourceOrderedMaps) {
+            if (logicalEntries.has(logicalPath)) continue
+            const depth = boxGachaDepths.get(logicalPath)
+            assert.ok(depth, `missing box gacha fixture depth: ${logicalPath}`)
+            logicalEntries.set(
+                logicalPath,
+                depth === 1 ? serializeOrderedMap([]) : serializeNestedOrderedMap([]),
+            )
+        }
+    }
     const questDepths = new Map(Object.values(QUEST_TABLE_SOURCES).map(source => (
         [source.logicalPath, source.nestingDepth]
     )))
@@ -354,6 +370,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         ["master/gacha_odds/z-character.orderedmap", nestedOrderedMap("z-character")],
     ])
     const converterCalls = {
+        boxGacha: 0,
         character: 0,
         characterElection: 0,
         gacha: 0,
@@ -366,6 +383,10 @@ test("default release builder closes all registry tables and runs each CDN conve
     let bundledImports = 0
     const bundledRoots = new Set()
     const builder = createDefaultContentTableBuilder({
+        convertBoxGachaTables: async () => {
+            converterCalls.boxGacha++
+            return converterOutput("box-gacha")
+        },
         convertCharacters: async () => {
             converterCalls.character++
             return converterOutput("character")
@@ -412,6 +433,7 @@ test("default release builder closes all registry tables and runs each CDN conve
     assert.equal(built.size, TABLE_SOURCES.length)
     assert.deepEqual([...built.keys()], TABLE_SOURCES.map(definition => definition.tableName))
     assert.deepEqual(converterCalls, {
+        boxGacha: 1,
         character: 1,
         characterElection: 1,
         gacha: 1,

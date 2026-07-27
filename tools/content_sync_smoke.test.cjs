@@ -352,6 +352,32 @@ test("玩法派生表必须逐张等于 bundled 官方基线", () => {
     ))
 })
 
+test("活动扭蛋箱闭包必须逐张等于 bundled 官方基线", () => {
+    assert.equal(typeof smoke.validateBoxGachaTables, "function")
+    const definitions = [
+        { tableName: "box_gacha.json", converterId: "box-gacha" },
+        { tableName: "box_reward.json", converterId: "box-gacha" },
+    ]
+    const bundled = {
+        "box_gacha.json": { 1: { availableCounts: { 1: 5 } } },
+        "box_reward.json": { 1: { 1: { 10: { available: 5 } } } },
+    }
+    const release = structuredClone(bundled)
+
+    assert.deepEqual(smoke.validateBoxGachaTables({
+        definitions,
+        readBundled: tableName => bundled[tableName],
+        readRelease: tableName => release[tableName],
+    }), { tables: 2 })
+
+    release["box_gacha.json"][1].availableCounts[1] = 4
+    assert.throws(() => smoke.validateBoxGachaTables({
+        definitions,
+        readBundled: tableName => bundled[tableName],
+        readRelease: tableName => release[tableName],
+    }), error => error?.code === "CONTENT_SYNC_SMOKE_BOX_GACHA_BASELINE")
+})
+
 test("关卡派生表必须匹配官方摘要且奖励引用闭合", () => {
     function canonical(value) {
         if (Array.isArray(value)) return value.map(canonical)

@@ -2,12 +2,23 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
+const { execFileSync, spawnSync } = require("node:child_process");
 
 const projectRoot = path.resolve(__dirname, "..");
-const sourcePath = path.resolve(
+const directWorkspaceRoot = path.resolve(projectRoot, "..");
+const gitCommonDirectory = path.resolve(
     projectRoot,
-    "../wf-assets-cn/orderedmap/box_gacha/box.json",
+    execFileSync("git", ["rev-parse", "--git-common-dir"], {
+        cwd: projectRoot,
+        encoding: "utf8",
+    }).trim(),
+);
+const workspaceRoot = fs.existsSync(path.join(directWorkspaceRoot, "wf-assets-cn"))
+    ? directWorkspaceRoot
+    : path.resolve(path.dirname(gitCommonDirectory), "..");
+const sourcePath = path.resolve(
+    workspaceRoot,
+    "wf-assets-cn/orderedmap/box_gacha/box.json",
 );
 const settingsPath = path.resolve(
     projectRoot,

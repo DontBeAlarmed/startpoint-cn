@@ -16,13 +16,13 @@
 
 ## 数据来源
 
-- `assets/box_gacha.json`：抽取道具、单抽费用和每箱总库存。
-- `assets/box_reward.json`：每箱奖励构成。
-- `assets/box_gacha_box_settings.json`：由国服 `orderedmap/box_gacha/box.json` 确定性生成的前置箱、重置方式、次数限制和开放期。
+- 当前 Content snapshot 的 `box_gacha.json`：从官方活动与奖励主数据生成抽取道具、单抽费用和每箱总库存。
+- 当前 Content snapshot 的 `box_reward.json`：每箱奖励构成；总库存由各奖励的 `available` 求和。
+- 当前 Content snapshot 的 `box_gacha_box_settings.json`：由官方 `box_gacha/box` 主数据生成前置箱、重置方式、次数限制和开放期。
 - `players_box_gacha`：玩家每个箱的剩余库存、关闭状态和重置次数。
 - `players_box_gacha_drawn_rewards`：按 `player_id + gacha_id + box_id` 保存已抽奖励数量。
 
-路由必须读取规则资产，不能用“最后一个箱”或固定 `box_id` 推断是否允许重置。
+三张表由同一 Content Release 提供；snapshot 尚未初始化的低级测试才回退仓库内 bundled JSON。路由必须读取规则表，不能用“最后一个箱”或固定 `box_id` 推断是否允许重置。
 
 ## 空箱重置
 

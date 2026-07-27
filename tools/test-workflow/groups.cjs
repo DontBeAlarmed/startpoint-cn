@@ -102,6 +102,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/content_asset_audit.test.cjs",
             "tools/content_skill_effects_converter.test.cjs",
             "tools/content_amf3.test.cjs",
+            "tools/content_box_gacha_converter.test.cjs",
             "tools/content_gacha_converter.test.cjs",
             "tools/content_gameplay_converter.test.cjs",
             "tools/content_gameplay_runtime.test.cjs",

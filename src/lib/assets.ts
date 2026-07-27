@@ -550,14 +550,23 @@ export function getBoxGachaSync(
 
     const idString = String(id)
     // get redeem item data
-    const redeemItemData = (boxGacha as RawBoxGachas)[idString]
+    const redeemItemData = getRuntimeContentTableSync(
+        "box_gacha.json",
+        boxGacha as RawBoxGachas,
+    )[idString]
     if (redeemItemData === undefined) return null;
 
     // get boxes
-    const boxes = (boxReward as RawBoxRewards)[idString]
+    const boxes = getRuntimeContentTableSync(
+        "box_reward.json",
+        boxReward as RawBoxRewards,
+    )[idString]
     if (boxes === undefined) return null;
 
-    const boxSettings = (boxGachaBoxSettings as RawBoxGachaSettings)[idString]
+    const boxSettings = getRuntimeContentTableSync(
+        "box_gacha_box_settings.json",
+        boxGachaBoxSettings as RawBoxGachaSettings,
+    )[idString]
     if (boxSettings === undefined) return null;
 
     // build box gacha

@@ -983,6 +983,24 @@ function validateDirectOrderedMapTables({ definitions, readBundled, readRelease 
     return { tables: directDefinitions.length }
 }
 
+function validateBoxGachaTables({ definitions, readBundled, readRelease }) {
+    const boxGachaDefinitions = definitions.filter(definition => (
+        definition.converterId === "box-gacha"
+    ))
+    for (const definition of boxGachaDefinitions) {
+        if (!isDeepStrictEqual(
+            readRelease(definition.tableName),
+            readBundled(definition.tableName),
+        )) {
+            baselineError(
+                "CONTENT_SYNC_SMOKE_BOX_GACHA_BASELINE",
+                `${definition.tableName} 与 bundled 官方活动扭蛋箱基线不一致`,
+            )
+        }
+    }
+    return { tables: boxGachaDefinitions.length }
+}
+
 function validateGameplayTables({ definitions, readBundled, readRelease }) {
     const gameplayDefinitions = definitions.filter(definition => (
         definition.converterId === "gameplay"
@@ -1265,6 +1283,11 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
         readRelease: tableName => repository.table(tableName),
     })
+    const boxGachaStats = validateBoxGachaTables({
+        definitions: runtime.TABLE_SOURCES,
+        readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
+        readRelease: tableName => repository.table(tableName),
+    })
     const gameplayStats = validateGameplayTables({
         definitions: runtime.TABLE_SOURCES,
         readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
@@ -1370,6 +1393,7 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         campaigns: gachaStats.campaigns,
         featureEntries: gachaStats.featureEntries,
         directTables: directStats.tables,
+        boxGachaTables: boxGachaStats.tables,
         gameplayTables: gameplayStats.tables,
         questTables: questStats.tables,
         rewardTables: rewardStats.tables,
@@ -1521,6 +1545,7 @@ module.exports = {
     runContentSyncSmoke,
     runContentSyncSmokeCli,
     validateCharacters,
+    validateBoxGachaTables,
     validateDirectOrderedMapTables,
     validateGachas,
     validateGameplayTables,

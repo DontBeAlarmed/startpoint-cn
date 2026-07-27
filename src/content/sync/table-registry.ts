@@ -109,10 +109,19 @@ const GAMEPLAY_TABLES = [
     ["raid_event.json", "master/quest/event/raid_event.orderedmap"],
 ] as const
 
+const BOX_GACHA_TABLES = [
+    [
+        "box_gacha.json",
+        [
+            "master/box_gacha/box_gacha.orderedmap",
+            "master/box_gacha/box_reward.orderedmap",
+        ],
+    ],
+    ["box_gacha_box_settings.json", ["master/box_gacha/box.orderedmap"]],
+    ["box_reward.json", ["master/box_gacha/box_reward.orderedmap"]],
+] as const
+
 const BUNDLED_TABLE_NAMES = [
-    "box_gacha.json",
-    "box_gacha_box_settings.json",
-    "box_reward.json",
     "cdndata/player_rank_full.json",
     "encyclopedia.json",
     "equipment_craft.json",
@@ -179,6 +188,20 @@ function gameplayDefinition(tableName: string, sourceOrderedMap: string): TableS
         scope: "cdn",
         sourceOrderedMaps: [sourceOrderedMap],
         converterId: "gameplay",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    }
+}
+
+function boxGachaDefinition(
+    tableName: string,
+    sourceOrderedMaps: readonly string[],
+): TableSourceInput {
+    return {
+        tableName,
+        scope: "cdn",
+        sourceOrderedMaps,
+        converterId: "box-gacha",
         converterVersion: 1,
         outputShapeVersion: 1,
     }
@@ -386,6 +409,9 @@ const definitionInputs: TableSourceInput[] = [
     )),
     ...GAMEPLAY_TABLES.map(([tableName, sourceOrderedMap]) => (
         gameplayDefinition(tableName, sourceOrderedMap)
+    )),
+    ...BOX_GACHA_TABLES.map(([tableName, sourceOrderedMaps]) => (
+        boxGachaDefinition(tableName, sourceOrderedMaps)
     )),
     ...(Object.keys(QUEST_TABLE_SOURCES) as QuestTableName[]).map(questDefinition),
     questDerivedDefinition(

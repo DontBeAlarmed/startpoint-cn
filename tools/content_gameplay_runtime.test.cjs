@@ -12,6 +12,28 @@ const {
 test("gameplay readers use the active Content snapshot instead of static bundled tables", t => {
     const restore = installBundledGameplaySnapshot({
         tableOverrides: {
+            "box_gacha.json": {
+                "77": { itemId: 70077, count: 10, availableCounts: { "1": 2 } },
+            },
+            "box_gacha_box_settings.json": {
+                "77": {
+                    "1": {
+                        requiredBoxId: null,
+                        resetKind: 2,
+                        resetLimit: null,
+                        availableFrom: "2025-01-01 05:00:00",
+                        availableUntil: null,
+                        closeKind: 1,
+                    },
+                },
+            },
+            "box_reward.json": {
+                "77": {
+                    "1": {
+                        "77001": { type: 0, id: 70001, count: 1, available: 2, tier: 2 },
+                    },
+                },
+            },
             "carnival_event_total_score_reward.json": {
                 "9001": {
                     id: 9001,
@@ -69,5 +91,26 @@ test("gameplay readers use the active Content snapshot instead of static bundled
     assert.deepEqual(assets.getExBoostItemSync(99001), { tier: 3, count: 2, element: 4 })
     assert.equal(assets.getExBoostItemSync(10001), null)
     assert.deepEqual(assets.getExStatusPoolSync(2), [992])
+    assert.deepEqual(assets.getBoxGachaSync(77), {
+        redeemItemId: 70077,
+        redeemItemCount: 10,
+        boxes: {
+            "1": {
+                "77001": { type: 0, id: 70001, count: 1, available: 2, tier: 2 },
+            },
+        },
+        availableCounts: { "1": 2 },
+        boxSettings: {
+            "1": {
+                requiredBoxId: null,
+                resetKind: 2,
+                resetLimit: null,
+                availableFrom: "2025-01-01 05:00:00",
+                availableUntil: null,
+                closeKind: 1,
+            },
+        },
+    })
+    assert.equal(assets.getBoxGachaSync(1), null)
     assert.equal(raid.getRaidEventRequiredKillCount(77), 321)
 })

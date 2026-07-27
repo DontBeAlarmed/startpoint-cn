@@ -4,6 +4,11 @@ import {
     type CharacterConversionOutput,
 } from "../converters/character"
 import {
+    convertBoxGachaTables,
+    type BoxGachaConversionOutput,
+    type BoxGachaSourceReader,
+} from "../converters/box-gacha"
+import {
     convertCharacterElections,
     type CharacterElectionConversionInput,
     type CharacterElectionConversionOutput,
@@ -61,6 +66,7 @@ const DIRECT_ORDERED_MAP_CONVERTER = /^ordered-map-json-([1-3])$/
 const SUPPORTED_CONVERTER_IDS = new Set([
     "character",
     "character-election",
+    "box-gacha",
     "gacha",
     "gameplay",
     "shop",
@@ -75,6 +81,9 @@ const SUPPORTED_CONVERTER_IDS = new Set([
 ])
 
 export interface DefaultContentTableBuilderDependencies {
+    readonly convertBoxGachaTables?: (
+        reader: BoxGachaSourceReader,
+    ) => BoxGachaConversionOutput | Promise<BoxGachaConversionOutput>
     readonly convertCharacters?: (
         input: CharacterConversionInput,
     ) => CharacterConversionOutput | Promise<CharacterConversionOutput>
@@ -123,8 +132,8 @@ function requireLogicalPath(logicalPath: string): string {
     return logicalPath
 }
 
-class StrictOrderedMapReader implements GachaSourceReader, GameplaySourceReader, ShopSourceReader,
-    RewardSourceReader, QuestSourceReader {
+class StrictOrderedMapReader implements BoxGachaSourceReader, GachaSourceReader, GameplaySourceReader,
+    ShopSourceReader, RewardSourceReader, QuestSourceReader {
     private readonly context: ContentTableBuildContext
     private readonly allowed = new Set<string>()
     private readonly rawCache = new Map<string, Buffer>()
@@ -152,6 +161,10 @@ class StrictOrderedMapReader implements GachaSourceReader, GameplaySourceReader,
     async readDynamic(logicalPath: string): Promise<Buffer> {
         const normalized = this.requireAllowed(logicalPath)
         return this.readRaw(normalized)
+    }
+
+    async readBytes(logicalPath: string): Promise<Buffer> {
+        return this.readDynamic(logicalPath)
     }
 
     async readNested(logicalPath: string): Promise<readonly NestedOrderedMapTextRows[]> {
@@ -348,6 +361,7 @@ async function runSkillEffectConverter(
 export function createDefaultContentTableBuilder(
     dependencies: DefaultContentTableBuilderDependencies = {},
 ): ContentTableBuilder {
+    const boxGachaConverter = dependencies.convertBoxGachaTables ?? convertBoxGachaTables
     const characterConverter = dependencies.convertCharacters ?? convertCharacters
     const characterElectionConverter = dependencies.convertCharacterElections
         ?? convertCharacterElections
@@ -371,6 +385,7 @@ export function createDefaultContentTableBuilder(
             const staticPaths = context.definitions.flatMap(definition => (
                 definition.converterId === "character"
                     || definition.converterId === "character-election"
+                    || definition.converterId === "box-gacha"
                     || definition.converterId === "gacha"
                     || definition.converterId === "gameplay"
                     || definition.converterId === "shop"
@@ -393,6 +408,9 @@ export function createDefaultContentTableBuilder(
                 const pending = bundledImporter(context.paths.contentRuntimeDir, tableName)
                 bundledCache.set(tableName, pending)
                 return pending
+            }
+            if (converterIds.has("box-gacha")) {
+                addConverterOutput(values, "box-gacha", await boxGachaConverter(reader))
             }
             if (converterIds.has("character")) {
                 addConverterOutput(

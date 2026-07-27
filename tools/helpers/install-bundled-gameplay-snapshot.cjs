@@ -49,6 +49,9 @@ const QUEST_TABLE_NAMES = [
     "quest_unlock_costs.json",
 ]
 const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
+    "box_gacha.json",
+    "box_gacha_box_settings.json",
+    "box_reward.json",
     "carnival_event_total_score_reward.json",
     "equipment_gacha_movie_probability.json",
     "ex_boost.json",
