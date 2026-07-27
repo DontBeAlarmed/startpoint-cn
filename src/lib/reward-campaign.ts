@@ -4,8 +4,11 @@ import { getRuntimeContentTableSync } from "../content/runtime/table-access"
 
 export interface RewardCampaignEntry {
     readonly id: number
+    readonly repeatKind?: "once" | "weekly"
     readonly startAtMs: number
     readonly endAtMs: number
+    readonly dayOfWeek?: number
+    readonly resetTimeMs?: number
     readonly rewardKind: 0 | 1 | 2
     readonly rate: number
     readonly categories: readonly number[]
@@ -40,6 +43,18 @@ function matchesCampaign(entry: RewardCampaignEntry, category: number, questId: 
     return true
 }
 
+function matchesRepeat(entry: RewardCampaignEntry, nowMs: number): boolean {
+    if (entry.repeatKind !== "weekly") return true
+    if (!Number.isSafeInteger(entry.dayOfWeek)
+        || entry.dayOfWeek! < 0
+        || entry.dayOfWeek! > 6
+        || !Number.isSafeInteger(entry.resetTimeMs)
+        || entry.resetTimeMs! < 0
+        || entry.resetTimeMs! >= 24 * 60 * 60 * 1000) return false
+    const shifted = new Date(nowMs + 8 * 60 * 60 * 1000 - entry.resetTimeMs!)
+    return shifted.getUTCDay() === entry.dayOfWeek
+}
+
 export function resolveRewardCampaignRates(
     campaigns: RewardCampaignTable,
     category: number,
@@ -50,6 +65,7 @@ export function resolveRewardCampaignRates(
     const rates = { ...DEFAULT_RATES }
     for (const entry of Object.values(campaigns)) {
         if (nowMs < entry.startAtMs || nowMs > entry.endAtMs
+            || !matchesRepeat(entry, nowMs)
             || !matchesCampaign(entry, category, questId)) continue
         if (entry.rewardKind === 0) rates.item = Math.max(rates.item, entry.rate)
         else if (entry.rewardKind === 1) rates.exp = Math.max(rates.exp, entry.rate)
@@ -109,6 +125,15 @@ export function calculateCharacterBattleExp(
 export function calculateFixedQuestMana(
     baseAmount: number,
     rates: RewardCampaignRates,
+    boostPointUsed = false,
 ): number {
-    return Math.floor(baseAmount * rates.mana + 2e-10)
+    return Math.floor(baseAmount * (rates.mana + (boostPointUsed ? 1 : 0)) + 2e-10)
+}
+
+export function calculateFixedQuestPoolExp(
+    baseAmount: number,
+    rates: RewardCampaignRates,
+    boostPointUsed: boolean,
+): number {
+    return Math.floor(baseAmount * (rates.exp + (boostPointUsed ? 1 : 0)) + 2e-10)
 }

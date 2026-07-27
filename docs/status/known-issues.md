@@ -45,7 +45,7 @@ PassDaily、PassWeek、PassEvent 主数据、核心进度、点数、6 条 type 
 
 ### 奖励活动倍率待客户端验收
 
-官方 `reward_campaign` 的道具、角色战斗经验和固定关卡 Mana 倍率已经接入单人、联机结算，普通与 Rare Score Reward、Boost 加法、取整、服务器掉落倍率和事务回滚均有自动测试。当前仍需在活动时间内用 CN 客户端确认掉落数量、结算显示和动画；`additional_reward`、Weekly 周期和 `poolExpReward` 倍率继续延期。详见[奖励活动倍率](../systems/reward-campaign.md)。
+官方 `reward_campaign` 的道具、角色战斗经验、固定经验池和固定关卡 Mana 倍率已经接入单人、联机结算，普通与 Rare Score Reward、Weekly 周期、Boost 加法、取整、服务器掉落倍率和事务回滚均有自动测试。当前仍需在活动时间内用 CN 客户端确认掉落数量、结算显示和动画；`additional_reward` 继续延期。详见[奖励活动倍率](../systems/reward-campaign.md)。
 
 ## 账号、存档与入口功能
 

@@ -350,8 +350,8 @@ const definitionInputs: TableSourceInput[] = [
         scope: "cdn",
         sourceOrderedMaps: [REWARD_CAMPAIGN_SOURCE],
         converterId: "reward-campaign",
-        converterVersion: 1,
-        outputShapeVersion: 1,
+        converterVersion: 2,
+        outputShapeVersion: 2,
     },
     {
         tableName: "cdndata/gacha.json",

@@ -42,6 +42,7 @@ import { getCommonScoreRewardCount } from "../../lib/score-reward-lottery";
 import {
     calculateCharacterBattleExp,
     calculateFixedQuestMana,
+    calculateFixedQuestPoolExp,
     getRewardCampaignRates,
 } from "../../lib/reward-campaign";
 
@@ -244,7 +245,6 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
 
         const beforeRankPoint = player.rankPoint;
         const newRankPoint = beforeRankPoint + questData.rankPointReward;
-        const newExpPool = player.expPool + questData.poolExpReward;
 
         let newBoostPoint = player.boostPoint - (activeQuestData.useBoostPoint ? 1 : 0);
         let newBossBoostPoint = player.bossBoostPoint - (activeQuestData.useBossBoostPoint ? 1 : 0);
@@ -302,6 +302,12 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             const fixedManaReward = calculateFixedQuestMana(
                 questData.manaReward,
                 rewardCampaignRates,
+                useBoostPoint,
+            )
+            const fixedPoolExpReward = calculateFixedQuestPoolExp(
+                questData.poolExpReward,
+                rewardCampaignRates,
+                useBoostPoint,
             )
             const characterBattleExp = calculateCharacterBattleExp(
                 questData.characterExpReward || 0,
@@ -348,7 +354,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             updatePlayerSync({
                 id: playerId,
                 freeMana: newMana,
-                expPool: newExpPool,
+                expPool: player.expPool + fixedPoolExpReward,
                 rankPoint: newRankPoint,
                 boostPoint: newBoostPoint,
                 bossBoostPoint: newBossBoostPoint,
@@ -406,6 +412,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 missionSettlement,
                 fieldMana,
                 fixedManaReward,
+                fixedPoolExpReward,
                 newMana,
             }
         }
@@ -439,6 +446,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             missionSettlement,
             fieldMana,
             fixedManaReward,
+            fixedPoolExpReward,
             newMana,
         } = finishWrites
 
@@ -477,7 +485,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 "rewards": {
                     "overflow_pool_exp": 0,
                     "converted_pool_exp": 0,
-                    "reward_pool_exp": questData.poolExpReward,
+                    "reward_pool_exp": fixedPoolExpReward,
                     "reward_mana": fixedManaReward,
                     "field_mana": fieldMana
                 },

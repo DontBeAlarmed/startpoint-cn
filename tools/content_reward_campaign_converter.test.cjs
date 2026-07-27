@@ -42,8 +42,9 @@ test("reward campaign converter preserves time, reward kind and quest range quer
     assert.deepEqual(output["reward_campaign.json"], {
         1: {
             id: 1,
-            startAtMs: Date.parse("2024-07-11T12:00:00+09:00"),
-            endAtMs: Date.parse("2024-08-01T23:59:59+09:00"),
+            repeatKind: "once",
+            startAtMs: Date.parse("2024-07-11T12:00:00+08:00"),
+            endAtMs: Date.parse("2024-08-01T23:59:59+08:00"),
             rewardKind: 0,
             rate: 2,
             categories: [1],
@@ -51,8 +52,9 @@ test("reward campaign converter preserves time, reward kind and quest range quer
         },
         2: {
             id: 2,
-            startAtMs: Date.parse("2024-07-11T12:00:00+09:00"),
-            endAtMs: Date.parse("2024-08-01T23:59:59+09:00"),
+            repeatKind: "once",
+            startAtMs: Date.parse("2024-07-11T12:00:00+08:00"),
+            endAtMs: Date.parse("2024-08-01T23:59:59+08:00"),
             rewardKind: 0,
             rate: 1.5,
             categories: [13],
@@ -60,8 +62,9 @@ test("reward campaign converter preserves time, reward kind and quest range quer
         },
         3: {
             id: 3,
-            startAtMs: Date.parse("2024-07-11T12:00:00+09:00"),
-            endAtMs: Date.parse("2024-08-01T23:59:59+09:00"),
+            repeatKind: "once",
+            startAtMs: Date.parse("2024-07-11T12:00:00+08:00"),
+            endAtMs: Date.parse("2024-08-01T23:59:59+08:00"),
             rewardKind: 1,
             rate: 2,
             categories: [6, 14, 13, 20],
@@ -70,14 +73,34 @@ test("reward campaign converter preserves time, reward kind and quest range quer
     })
 })
 
-test("reward campaign converter rejects unsupported recurrence and malformed rates", async () => {
+test("reward campaign converter preserves weekly day and reset time", async () => {
+    const output = await convertRewardCampaigns({ read: async () => [row(1, {
+        0: 1, 1: "2024-07-11 12:00:00", 2: "2024-08-01 23:59:59",
+        3: 1, 4: "05:00:00", 5: 0, 6: 2, 7: 0,
+        8: "(None)", 9: "(None)", 10: "(None)",
+    })] })
+    assert.deepEqual(output["reward_campaign.json"][1], {
+        id: 1,
+        repeatKind: "weekly",
+        startAtMs: Date.parse("2024-07-11T12:00:00+08:00"),
+        endAtMs: Date.parse("2024-08-01T23:59:59+08:00"),
+        dayOfWeek: 1,
+        resetTimeMs: 5 * 60 * 60 * 1000,
+        rewardKind: 0,
+        rate: 2,
+        categories: [1],
+        keyQueries: [null, null, null],
+    })
+})
+
+test("reward campaign converter rejects malformed recurrence and rates", async () => {
     await assert.rejects(
         convertRewardCampaigns({ read: async () => [row(1, {
             0: 1, 1: "2024-07-11 12:00:00", 2: "2024-08-01 23:59:59",
-            3: 1, 4: "01:00:00", 5: 0, 6: 2, 7: 0,
+            3: 7, 4: "05:00:00", 5: 0, 6: 2, 7: 0,
             8: "(None)", 9: "(None)", 10: "(None)",
         })] }),
-        /weekly.*not supported/i,
+        /dayOfWeek.*0.*6/i,
     )
     await assert.rejects(
         convertRewardCampaigns({ read: async () => [row(1, {

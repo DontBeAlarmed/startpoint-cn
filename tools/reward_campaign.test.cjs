@@ -5,6 +5,7 @@ require("ts-node/register/transpile-only")
 const {
     calculateCharacterBattleExp,
     calculateFixedQuestMana,
+    calculateFixedQuestPoolExp,
     calculateScoreRewardAmount,
     resolveRewardCampaignRates,
 } = require("../src/lib/reward-campaign")
@@ -16,15 +17,34 @@ const window = {
     endAtMs: Date.parse("2024-07-31T23:59:59Z"),
 }
 const campaigns = {
-    1: { id: 1, ...window, rewardKind: 0, rate: 1.5, categories: [13], keyQueries: [[1], [1, 2]] },
-    2: { id: 2, ...window, rewardKind: 0, rate: 2, categories: [13], keyQueries: [[1], [2]] },
-    3: { id: 3, ...window, rewardKind: 1, rate: 1.5, categories: [13], keyQueries: [[1], null] },
-    4: { id: 4, ...window, rewardKind: 2, rate: 2, categories: [6, 14, 13, 20], keyQueries: [] },
+    1: { id: 1, repeatKind: "once", ...window, rewardKind: 0, rate: 1.5, categories: [13], keyQueries: [[1], [1, 2]] },
+    2: { id: 2, repeatKind: "once", ...window, rewardKind: 0, rate: 2, categories: [13], keyQueries: [[1], [2]] },
+    3: { id: 3, repeatKind: "once", ...window, rewardKind: 1, rate: 1.5, categories: [13], keyQueries: [[1], null] },
+    4: { id: 4, repeatKind: "once", ...window, rewardKind: 2, rate: 2, categories: [6, 14, 13, 20], keyQueries: [] },
+    5: {
+        id: 5,
+        repeatKind: "weekly",
+        ...window,
+        dayOfWeek: 1,
+        resetTimeMs: 5 * 60 * 60 * 1000,
+        rewardKind: 0,
+        rate: 3,
+        categories: [13],
+        keyQueries: [[1], [2]],
+    },
 }
 
 assert.deepEqual(
     resolveRewardCampaignRates(campaigns, 13, 1002, new Date("2024-07-15T00:00:00Z")),
+    { item: 3, exp: 1.5, mana: 2 },
+)
+assert.deepEqual(
+    resolveRewardCampaignRates(campaigns, 13, 1002, new Date("2024-07-14T20:59:59Z")),
     { item: 2, exp: 1.5, mana: 2 },
+)
+assert.deepEqual(
+    resolveRewardCampaignRates(campaigns, 13, 1002, new Date("2024-07-14T21:00:00Z")),
+    { item: 3, exp: 1.5, mana: 2 },
 )
 assert.deepEqual(
     resolveRewardCampaignRates(campaigns, 13, 2002, new Date("2024-07-15T00:00:00Z")),
@@ -47,6 +67,9 @@ assert.equal(
 )
 assert.equal(calculateCharacterBattleExp(3, rates), 5)
 assert.equal(calculateFixedQuestMana(3, rates), 6)
+assert.equal(calculateFixedQuestMana(3, rates, true), 9)
+assert.equal(calculateFixedQuestPoolExp(3, rates, false), 4)
+assert.equal(calculateFixedQuestPoolExp(3, rates, true), 7)
 
 assert.deepEqual(
     resolveRewardCampaignRates(

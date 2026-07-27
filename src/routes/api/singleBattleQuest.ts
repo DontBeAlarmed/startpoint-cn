@@ -27,6 +27,7 @@ import { getCommonScoreRewardCount } from "../../lib/score-reward-lottery";
 import {
     calculateCharacterBattleExp,
     calculateFixedQuestMana,
+    calculateFixedQuestPoolExp,
     getRewardCampaignRates,
 } from "../../lib/reward-campaign";
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
@@ -259,7 +260,6 @@ const routes = async (fastify: FastifyInstance) => {
             : calculateClearRank(clearTime, questData)
 
         // calculate player rewards
-        const newExpPool = playerData.expPool + questData.poolExpReward
         const beforeRankPoint = playerData.rankPoint
         const newRankPoint = beforeRankPoint + questData.rankPointReward
 
@@ -328,6 +328,12 @@ const routes = async (fastify: FastifyInstance) => {
             const fixedManaReward = calculateFixedQuestMana(
                 questData.manaReward,
                 rewardCampaignRates,
+                useBoostPoint,
+            )
+            const fixedPoolExpReward = calculateFixedQuestPoolExp(
+                questData.poolExpReward,
+                rewardCampaignRates,
+                useBoostPoint,
             )
             const addExpAmount = calculateCharacterBattleExp(
                 questData.characterExpReward,
@@ -377,7 +383,7 @@ const routes = async (fastify: FastifyInstance) => {
             updatePlayerSync({
                 id: playerId,
                 freeMana: newMana,
-                expPool: newExpPool,
+                expPool: playerData.expPool + fixedPoolExpReward,
                 rankPoint: newRankPoint,
                 boostPoint: newBoostPoint,
                 bossBoostPoint: newBossBoostPoint,
@@ -562,6 +568,7 @@ const routes = async (fastify: FastifyInstance) => {
                 sPlusClearReward,
                 missionSettlement,
                 fixedManaReward,
+                fixedPoolExpReward,
                 newMana,
             }
         }
@@ -586,6 +593,7 @@ const routes = async (fastify: FastifyInstance) => {
             sPlusClearReward,
             missionSettlement,
             fixedManaReward,
+            fixedPoolExpReward,
             newMana,
         } = finishWrites
         delete activeQuests[playerId]
@@ -612,7 +620,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "rewards": {
                     "overflow_pool_exp": 0,
                     "converted_pool_exp": 0,
-                    "reward_pool_exp": questData.poolExpReward,
+                    "reward_pool_exp": fixedPoolExpReward,
                     "reward_mana": fixedManaReward,
                     "field_mana": body.add_mana
                 },

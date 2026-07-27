@@ -20,7 +20,11 @@ for (const [name, relativePath] of [
         )
         assert.match(
             source,
-            /calculateFixedQuestMana\(\s*questData\.manaReward,\s*rewardCampaignRates,?\s*\)/,
+            /calculateFixedQuestMana\(\s*questData\.manaReward,\s*rewardCampaignRates,\s*useBoostPoint,?\s*\)/,
+        )
+        assert.match(
+            source,
+            /calculateFixedQuestPoolExp\(\s*questData\.poolExpReward,\s*rewardCampaignRates,\s*useBoostPoint,?\s*\)/,
         )
         assert.match(
             source,
@@ -29,5 +33,7 @@ for (const [name, relativePath] of [
         assert.match(source, /rewardCampaignRates[,\n]/)
         assert.match(source, /rewardDate:\s*settlementTime/)
         assert.match(source, /recordMissionBattleFacts\(finishCtx, settlementTime\)/)
+        assert.match(source, /expPool:\s*[^,\n]+\+\s*fixedPoolExpReward/)
+        assert.match(source, /"reward_pool_exp":\s*fixedPoolExpReward/)
     })
 }

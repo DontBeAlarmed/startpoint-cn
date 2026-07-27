@@ -49,7 +49,18 @@ function parseJstTimestamp(value: string, subject: string): number {
     if (parts.some((part, index) => part !== normalized[index])) {
         return invalidCampaign(`${subject} is not a real timestamp`)
     }
-    return utc.getTime() - 9 * 60 * 60 * 1000
+    // CN keeps the upstream JST symbol names but initializes AppTime to UTC+8.
+    return utc.getTime() - 8 * 60 * 60 * 1000
+}
+
+function parseTimeSpan(value: string, subject: string): number {
+    const match = /^(\d{2}):(\d{2}):(\d{2})$/.exec(value)
+    if (match === null) invalidCampaign(`${subject} must be HH:MM:SS`)
+    const [hour, minute, second] = match.slice(1).map(Number)
+    if (hour > 23 || minute > 59 || second > 59) {
+        invalidCampaign(`${subject} must be a valid time of day`)
+    }
+    return ((hour * 60 + minute) * 60 + second) * 1000
 }
 
 function parseOptionalList(value: string, subject: string): readonly number[] | null {
@@ -115,7 +126,9 @@ export async function convertRewardCampaigns(
             invalidCampaign(`reward_campaign[${row.key}] must have 11 columns`)
         }
         const repeatKind = parseInteger(fields[0], `reward_campaign[${row.key}].repeatKind`)
-        if (repeatKind !== 0) invalidCampaign("weekly campaigns are not supported")
+        if (repeatKind !== 0 && repeatKind !== 1) {
+            invalidCampaign(`reward_campaign[${row.key}].repeatKind must be 0 or 1`)
+        }
         const startAtMs = parseJstTimestamp(fields[1], `reward_campaign[${row.key}].startAt`)
         const endAtMs = parseJstTimestamp(fields[2], `reward_campaign[${row.key}].endAt`)
         if (endAtMs < startAtMs) invalidCampaign(`reward_campaign[${row.key}] has an inverted period`)
@@ -125,8 +138,28 @@ export async function convertRewardCampaigns(
         if (!Number.isFinite(rate) || rate < 1) invalidCampaign("campaign rate must be at least 1")
         const questKind = parseInteger(fields[7], `reward_campaign[${row.key}].questKind`)
         const range = questRange(fields, questKind)
+        const repeat = repeatKind === 0
+            ? { repeatKind: "once" as const }
+            : (() => {
+                const dayOfWeek = parseInteger(
+                    fields[3],
+                    `reward_campaign[${row.key}].dayOfWeek`,
+                )
+                if (dayOfWeek < 0 || dayOfWeek > 6) {
+                    invalidCampaign(`reward_campaign[${row.key}].dayOfWeek must be 0 through 6`)
+                }
+                return {
+                    repeatKind: "weekly" as const,
+                    dayOfWeek,
+                    resetTimeMs: parseTimeSpan(
+                        fields[4],
+                        `reward_campaign[${row.key}].resetTime`,
+                    ),
+                }
+            })()
         output[row.key] = {
             id: Number(row.key),
+            ...repeat,
             startAtMs,
             endAtMs,
             rewardKind,

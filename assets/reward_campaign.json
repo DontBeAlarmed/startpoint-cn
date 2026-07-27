@@ -1,8 +1,8 @@
 {
   "10000000": {
     "id": 10000000,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -11,12 +11,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000001": {
     "id": 10000001,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 1,
     "rate": 2,
     "categories": [
@@ -25,12 +26,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000002": {
     "id": 10000002,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 2,
     "rate": 2,
     "categories": [
@@ -39,12 +41,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000003": {
     "id": 10000003,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -57,12 +60,13 @@
       [
         1
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000004": {
     "id": 10000004,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -75,12 +79,13 @@
       [
         2
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000005": {
     "id": 10000005,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -93,12 +98,13 @@
       [
         3
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000006": {
     "id": 10000006,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -111,12 +117,13 @@
       [
         4
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000007": {
     "id": 10000007,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -129,12 +136,13 @@
       [
         5
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000008": {
     "id": 10000008,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -147,12 +155,13 @@
       [
         6
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000009": {
     "id": 10000009,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -165,12 +174,13 @@
       [
         7
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000010": {
     "id": 10000010,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -183,12 +193,13 @@
       [
         8
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000011": {
     "id": 10000011,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -201,12 +212,13 @@
       [
         9
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000012": {
     "id": 10000012,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -219,12 +231,13 @@
       [
         10
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000013": {
     "id": 10000013,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -237,12 +250,13 @@
       [
         11
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000014": {
     "id": 10000014,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -255,12 +269,13 @@
       [
         12
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000015": {
     "id": 10000015,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -273,12 +288,13 @@
       [
         13
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000016": {
     "id": 10000016,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -291,12 +307,13 @@
       [
         14
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000017": {
     "id": 10000017,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -309,12 +326,13 @@
       [
         15
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000018": {
     "id": 10000018,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -327,12 +345,13 @@
       [
         16
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000019": {
     "id": 10000019,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -345,12 +364,13 @@
       [
         17
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000020": {
     "id": 10000020,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -363,12 +383,13 @@
       [
         18
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000021": {
     "id": 10000021,
-    "startAtMs": 1739415600000,
-    "endAtMs": 1740668399000,
+    "startAtMs": 1739419200000,
+    "endAtMs": 1740671999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -381,12 +402,13 @@
       [
         19
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000022": {
     "id": 10000022,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -395,12 +417,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000023": {
     "id": 10000023,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 1,
     "rate": 2,
     "categories": [
@@ -409,12 +432,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000024": {
     "id": 10000024,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 2,
     "rate": 2,
     "categories": [
@@ -423,12 +447,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000025": {
     "id": 10000025,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -441,12 +466,13 @@
       [
         1
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000026": {
     "id": 10000026,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -459,12 +485,13 @@
       [
         2
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000027": {
     "id": 10000027,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -477,12 +504,13 @@
       [
         3
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000028": {
     "id": 10000028,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -495,12 +523,13 @@
       [
         4
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000029": {
     "id": 10000029,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -513,12 +542,13 @@
       [
         5
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000030": {
     "id": 10000030,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -531,12 +561,13 @@
       [
         6
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000031": {
     "id": 10000031,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -549,12 +580,13 @@
       [
         7
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000032": {
     "id": 10000032,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -567,12 +599,13 @@
       [
         8
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000033": {
     "id": 10000033,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -585,12 +618,13 @@
       [
         9
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000034": {
     "id": 10000034,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -603,12 +637,13 @@
       [
         10
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000035": {
     "id": 10000035,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -621,12 +656,13 @@
       [
         11
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000036": {
     "id": 10000036,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -639,12 +675,13 @@
       [
         12
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000037": {
     "id": 10000037,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -657,12 +694,13 @@
       [
         13
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000038": {
     "id": 10000038,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -675,12 +713,13 @@
       [
         14
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000039": {
     "id": 10000039,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -693,12 +732,13 @@
       [
         15
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000040": {
     "id": 10000040,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -711,12 +751,13 @@
       [
         16
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000041": {
     "id": 10000041,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -729,12 +770,13 @@
       [
         17
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000042": {
     "id": 10000042,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -747,12 +789,13 @@
       [
         18
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000043": {
     "id": 10000043,
-    "startAtMs": 1747882800000,
-    "endAtMs": 1749135599000,
+    "startAtMs": 1747886400000,
+    "endAtMs": 1749139199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -765,12 +808,13 @@
       [
         19
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000044": {
     "id": 10000044,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -779,12 +823,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000045": {
     "id": 10000045,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 1,
     "rate": 2,
     "categories": [
@@ -793,12 +838,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000046": {
     "id": 10000046,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 2,
     "rate": 2,
     "categories": [
@@ -807,12 +853,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000047": {
     "id": 10000047,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -825,12 +872,13 @@
       [
         1
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000048": {
     "id": 10000048,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -843,12 +891,13 @@
       [
         2
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000049": {
     "id": 10000049,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -861,12 +910,13 @@
       [
         3
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000050": {
     "id": 10000050,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -879,12 +929,13 @@
       [
         4
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000051": {
     "id": 10000051,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -897,12 +948,13 @@
       [
         5
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000052": {
     "id": 10000052,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -915,12 +967,13 @@
       [
         6
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000053": {
     "id": 10000053,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -933,12 +986,13 @@
       [
         7
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000054": {
     "id": 10000054,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -951,12 +1005,13 @@
       [
         8
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000055": {
     "id": 10000055,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -969,12 +1024,13 @@
       [
         9
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000056": {
     "id": 10000056,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -987,12 +1043,13 @@
       [
         10
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000057": {
     "id": 10000057,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1005,12 +1062,13 @@
       [
         11
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000058": {
     "id": 10000058,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1023,12 +1081,13 @@
       [
         12
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000059": {
     "id": 10000059,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1041,12 +1100,13 @@
       [
         13
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000060": {
     "id": 10000060,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1059,12 +1119,13 @@
       [
         14
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000061": {
     "id": 10000061,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1077,12 +1138,13 @@
       [
         15
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000062": {
     "id": 10000062,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1095,12 +1157,13 @@
       [
         16
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000063": {
     "id": 10000063,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1113,12 +1176,13 @@
       [
         17
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000064": {
     "id": 10000064,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1131,12 +1195,13 @@
       [
         18
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "10000065": {
     "id": 10000065,
-    "startAtMs": 1750302000000,
-    "endAtMs": 1751727599000,
+    "startAtMs": 1750305600000,
+    "endAtMs": 1751731199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1149,12 +1214,13 @@
       [
         19
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "20121801": {
     "id": 20121801,
-    "startAtMs": 1608260400000,
-    "endAtMs": 1608865199000,
+    "startAtMs": 1608264000000,
+    "endAtMs": 1608868799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1163,12 +1229,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21020901": {
     "id": 21020901,
-    "startAtMs": 1612839600000,
-    "endAtMs": 1613476799000,
+    "startAtMs": 1612843200000,
+    "endAtMs": 1613480399000,
     "rewardKind": 0,
     "rate": 1.5,
     "categories": [
@@ -1177,12 +1244,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21020902": {
     "id": 21020902,
-    "startAtMs": 1612839600000,
-    "endAtMs": 1613476799000,
+    "startAtMs": 1612843200000,
+    "endAtMs": 1613480399000,
     "rewardKind": 0,
     "rate": 1.5,
     "categories": [
@@ -1212,12 +1280,13 @@
         18,
         19
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21032601": {
     "id": 21032601,
-    "startAtMs": 1616727600000,
-    "endAtMs": 1617191999000,
+    "startAtMs": 1616731200000,
+    "endAtMs": 1617195599000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1226,12 +1295,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21042601": {
     "id": 21042601,
-    "startAtMs": 1676516400000,
-    "endAtMs": 1677725999000,
+    "startAtMs": 1676520000000,
+    "endAtMs": 1677729599000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1240,12 +1310,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21081201": {
     "id": 21081201,
-    "startAtMs": 1685588400000,
-    "endAtMs": 1687402799000,
+    "startAtMs": 1685592000000,
+    "endAtMs": 1687406399000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1254,12 +1325,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21081202": {
     "id": 21081202,
-    "startAtMs": 1685588400000,
-    "endAtMs": 1687402799000,
+    "startAtMs": 1685592000000,
+    "endAtMs": 1687406399000,
     "rewardKind": 1,
     "rate": 2,
     "categories": [
@@ -1268,12 +1340,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21081203": {
     "id": 21081203,
-    "startAtMs": 1685588400000,
-    "endAtMs": 1687402799000,
+    "startAtMs": 1685592000000,
+    "endAtMs": 1687406399000,
     "rewardKind": 2,
     "rate": 2,
     "categories": [
@@ -1282,12 +1355,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21093001": {
     "id": 21093001,
-    "startAtMs": 1689822000000,
-    "endAtMs": 1691636399000,
+    "startAtMs": 1689825600000,
+    "endAtMs": 1691639999000,
     "rewardKind": 0,
     "rate": 1.5,
     "categories": [
@@ -1296,12 +1370,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21093002": {
     "id": 21093002,
-    "startAtMs": 1689822000000,
-    "endAtMs": 1691636399000,
+    "startAtMs": 1689825600000,
+    "endAtMs": 1691639999000,
     "rewardKind": 0,
     "rate": 1.5,
     "categories": [
@@ -1331,12 +1406,13 @@
         18,
         19
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21093003": {
     "id": 21093003,
-    "startAtMs": 1689822000000,
-    "endAtMs": 1691636399000,
+    "startAtMs": 1689825600000,
+    "endAtMs": 1691639999000,
     "rewardKind": 1,
     "rate": 1.5,
     "categories": [
@@ -1345,12 +1421,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21093004": {
     "id": 21093004,
-    "startAtMs": 1689822000000,
-    "endAtMs": 1691636399000,
+    "startAtMs": 1689825600000,
+    "endAtMs": 1691639999000,
     "rewardKind": 2,
     "rate": 1.5,
     "categories": [
@@ -1359,12 +1436,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21112701": {
     "id": 21112701,
-    "startAtMs": 1693450800000,
-    "endAtMs": 1695265199000,
+    "startAtMs": 1693454400000,
+    "endAtMs": 1695268799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1374,12 +1452,13 @@
       null,
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21112702": {
     "id": 21112702,
-    "startAtMs": 1693450800000,
-    "endAtMs": 1695265199000,
+    "startAtMs": 1693454400000,
+    "endAtMs": 1695268799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1388,12 +1467,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21112703": {
     "id": 21112703,
-    "startAtMs": 1693450800000,
-    "endAtMs": 1695265199000,
+    "startAtMs": 1693454400000,
+    "endAtMs": 1695268799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1404,12 +1484,13 @@
         1
       ],
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21112704": {
     "id": 21112704,
-    "startAtMs": 1693450800000,
-    "endAtMs": 1695265199000,
+    "startAtMs": 1693454400000,
+    "endAtMs": 1695268799000,
     "rewardKind": 1,
     "rate": 2,
     "categories": [
@@ -1418,12 +1499,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "21112705": {
     "id": 21112705,
-    "startAtMs": 1693450800000,
-    "endAtMs": 1695265199000,
+    "startAtMs": 1693454400000,
+    "endAtMs": 1695268799000,
     "rewardKind": 2,
     "rate": 2,
     "categories": [
@@ -1432,12 +1514,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22013101": {
     "id": 22013101,
-    "startAtMs": 1699498800000,
-    "endAtMs": 1700708399000,
+    "startAtMs": 1699502400000,
+    "endAtMs": 1700711999000,
     "rewardKind": 0,
     "rate": 1.5,
     "categories": [
@@ -1446,12 +1529,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22013102": {
     "id": 22013102,
-    "startAtMs": 1699498800000,
-    "endAtMs": 1700708399000,
+    "startAtMs": 1699502400000,
+    "endAtMs": 1700711999000,
     "rewardKind": 0,
     "rate": 1.5,
     "categories": [
@@ -1481,12 +1565,13 @@
         18,
         19
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22013103": {
     "id": 22013103,
-    "startAtMs": 1699498800000,
-    "endAtMs": 1700708399000,
+    "startAtMs": 1699502400000,
+    "endAtMs": 1700711999000,
     "rewardKind": 1,
     "rate": 1.5,
     "categories": [
@@ -1495,12 +1580,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22013104": {
     "id": 22013104,
-    "startAtMs": 1699498800000,
-    "endAtMs": 1700708399000,
+    "startAtMs": 1699502400000,
+    "endAtMs": 1700711999000,
     "rewardKind": 2,
     "rate": 1.5,
     "categories": [
@@ -1509,12 +1595,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042901": {
     "id": 22042901,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1523,12 +1610,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042902": {
     "id": 22042902,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 1,
     "rate": 2,
     "categories": [
@@ -1537,12 +1625,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042903": {
     "id": 22042903,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 2,
     "rate": 2,
     "categories": [
@@ -1551,12 +1640,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042904": {
     "id": 22042904,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1569,12 +1659,13 @@
       [
         1
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042905": {
     "id": 22042905,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1587,12 +1678,13 @@
       [
         2
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042906": {
     "id": 22042906,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1605,12 +1697,13 @@
       [
         3
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042907": {
     "id": 22042907,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1623,12 +1716,13 @@
       [
         4
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042908": {
     "id": 22042908,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1641,12 +1735,13 @@
       [
         5
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042909": {
     "id": 22042909,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1659,12 +1754,13 @@
       [
         6
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042910": {
     "id": 22042910,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1677,12 +1773,13 @@
       [
         7
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042911": {
     "id": 22042911,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1695,12 +1792,13 @@
       [
         8
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042912": {
     "id": 22042912,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1713,12 +1811,13 @@
       [
         9
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042913": {
     "id": 22042913,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1731,12 +1830,13 @@
       [
         10
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042914": {
     "id": 22042914,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1749,12 +1849,13 @@
       [
         11
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042915": {
     "id": 22042915,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1767,12 +1868,13 @@
       [
         12
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042916": {
     "id": 22042916,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1785,12 +1887,13 @@
       [
         13
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042917": {
     "id": 22042917,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1803,12 +1906,13 @@
       [
         14
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042918": {
     "id": 22042918,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1821,12 +1925,13 @@
       [
         15
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042919": {
     "id": 22042919,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1839,12 +1944,13 @@
       [
         16
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042920": {
     "id": 22042920,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1857,12 +1963,13 @@
       [
         17
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042921": {
     "id": 22042921,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1875,12 +1982,13 @@
       [
         18
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22042922": {
     "id": 22042922,
-    "startAtMs": 1706151600000,
-    "endAtMs": 1707404399000,
+    "startAtMs": 1706155200000,
+    "endAtMs": 1707407999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1893,12 +2001,13 @@
       [
         19
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071501": {
     "id": 22071501,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1908,12 +2017,13 @@
       null,
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071502": {
     "id": 22071502,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1922,12 +2032,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071503": {
     "id": 22071503,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 1,
     "rate": 2,
     "categories": [
@@ -1936,12 +2047,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071504": {
     "id": 22071504,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 2,
     "rate": 2,
     "categories": [
@@ -1950,12 +2062,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071505": {
     "id": 22071505,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1968,12 +2081,13 @@
       [
         1
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071506": {
     "id": 22071506,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -1986,12 +2100,13 @@
       [
         2
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071507": {
     "id": 22071507,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2004,12 +2119,13 @@
       [
         3
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071508": {
     "id": 22071508,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2022,12 +2138,13 @@
       [
         4
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071509": {
     "id": 22071509,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2040,12 +2157,13 @@
       [
         5
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071510": {
     "id": 22071510,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2058,12 +2176,13 @@
       [
         6
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071511": {
     "id": 22071511,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2076,12 +2195,13 @@
       [
         7
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071512": {
     "id": 22071512,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2094,12 +2214,13 @@
       [
         8
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071513": {
     "id": 22071513,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2112,12 +2233,13 @@
       [
         9
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071514": {
     "id": 22071514,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2130,12 +2252,13 @@
       [
         10
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071515": {
     "id": 22071515,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2148,12 +2271,13 @@
       [
         11
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071516": {
     "id": 22071516,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2166,12 +2290,13 @@
       [
         12
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071517": {
     "id": 22071517,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2184,12 +2309,13 @@
       [
         13
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071518": {
     "id": 22071518,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2202,12 +2328,13 @@
       [
         14
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071519": {
     "id": 22071519,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2220,12 +2347,13 @@
       [
         15
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071520": {
     "id": 22071520,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2238,12 +2366,13 @@
       [
         16
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071521": {
     "id": 22071521,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2256,12 +2385,13 @@
       [
         17
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071522": {
     "id": 22071522,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2274,12 +2404,13 @@
       [
         18
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22071523": {
     "id": 22071523,
-    "startAtMs": 1711594800000,
-    "endAtMs": 1712847599000,
+    "startAtMs": 1711598400000,
+    "endAtMs": 1712851199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2292,12 +2423,13 @@
       [
         19
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103101": {
     "id": 22103101,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2306,12 +2438,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103102": {
     "id": 22103102,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 1,
     "rate": 2,
     "categories": [
@@ -2320,12 +2453,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103103": {
     "id": 22103103,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 2,
     "rate": 2,
     "categories": [
@@ -2334,12 +2468,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103104": {
     "id": 22103104,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2352,12 +2487,13 @@
       [
         1
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103105": {
     "id": 22103105,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2370,12 +2506,13 @@
       [
         2
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103106": {
     "id": 22103106,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2388,12 +2525,13 @@
       [
         3
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103107": {
     "id": 22103107,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2406,12 +2544,13 @@
       [
         4
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103108": {
     "id": 22103108,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2424,12 +2563,13 @@
       [
         5
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103109": {
     "id": 22103109,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2442,12 +2582,13 @@
       [
         6
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103110": {
     "id": 22103110,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2460,12 +2601,13 @@
       [
         7
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103111": {
     "id": 22103111,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2478,12 +2620,13 @@
       [
         8
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103112": {
     "id": 22103112,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2496,12 +2639,13 @@
       [
         9
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103113": {
     "id": 22103113,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2514,12 +2658,13 @@
       [
         10
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103114": {
     "id": 22103114,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2532,12 +2677,13 @@
       [
         11
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103115": {
     "id": 22103115,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2550,12 +2696,13 @@
       [
         12
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103116": {
     "id": 22103116,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2568,12 +2715,13 @@
       [
         13
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103117": {
     "id": 22103117,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2586,12 +2734,13 @@
       [
         14
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103118": {
     "id": 22103118,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2604,12 +2753,13 @@
       [
         15
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103119": {
     "id": 22103119,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2622,12 +2772,13 @@
       [
         16
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103120": {
     "id": 22103120,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2640,12 +2791,13 @@
       [
         17
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103121": {
     "id": 22103121,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2658,12 +2810,13 @@
       [
         18
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22103122": {
     "id": 22103122,
-    "startAtMs": 1718852400000,
-    "endAtMs": 1720105199000,
+    "startAtMs": 1718856000000,
+    "endAtMs": 1720108799000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2676,12 +2829,13 @@
       [
         19
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22111001": {
     "id": 22111001,
-    "startAtMs": 1668049200000,
-    "endAtMs": 1668653999000,
+    "startAtMs": 1668052800000,
+    "endAtMs": 1668657599000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2690,12 +2844,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112801": {
     "id": 22112801,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2705,12 +2860,13 @@
       null,
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112802": {
     "id": 22112802,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2719,12 +2875,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112803": {
     "id": 22112803,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 1,
     "rate": 2,
     "categories": [
@@ -2733,12 +2890,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112804": {
     "id": 22112804,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 2,
     "rate": 2,
     "categories": [
@@ -2747,12 +2905,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112805": {
     "id": 22112805,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2765,12 +2924,13 @@
       [
         1
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112806": {
     "id": 22112806,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2783,12 +2943,13 @@
       [
         2
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112807": {
     "id": 22112807,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2801,12 +2962,13 @@
       [
         3
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112808": {
     "id": 22112808,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2819,12 +2981,13 @@
       [
         4
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112809": {
     "id": 22112809,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2837,12 +3000,13 @@
       [
         5
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112810": {
     "id": 22112810,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2855,12 +3019,13 @@
       [
         6
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112811": {
     "id": 22112811,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2873,12 +3038,13 @@
       [
         7
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112812": {
     "id": 22112812,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2891,12 +3057,13 @@
       [
         8
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112813": {
     "id": 22112813,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2909,12 +3076,13 @@
       [
         9
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112814": {
     "id": 22112814,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2927,12 +3095,13 @@
       [
         10
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112815": {
     "id": 22112815,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2945,12 +3114,13 @@
       [
         11
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112816": {
     "id": 22112816,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2963,12 +3133,13 @@
       [
         12
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112817": {
     "id": 22112817,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2981,12 +3152,13 @@
       [
         13
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112818": {
     "id": 22112818,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -2999,12 +3171,13 @@
       [
         14
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112819": {
     "id": 22112819,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3017,12 +3190,13 @@
       [
         15
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112820": {
     "id": 22112820,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3035,12 +3209,13 @@
       [
         16
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112821": {
     "id": 22112821,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3053,12 +3228,13 @@
       [
         17
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112822": {
     "id": 22112822,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3071,12 +3247,13 @@
       [
         18
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22112823": {
     "id": 22112823,
-    "startAtMs": 1720666800000,
-    "endAtMs": 1722524399000,
+    "startAtMs": 1720670400000,
+    "endAtMs": 1722527999000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3089,12 +3266,13 @@
       [
         19
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123001": {
     "id": 22123001,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3103,12 +3281,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123002": {
     "id": 22123002,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 1,
     "rate": 2,
     "categories": [
@@ -3117,12 +3296,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123003": {
     "id": 22123003,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 2,
     "rate": 2,
     "categories": [
@@ -3131,12 +3311,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123004": {
     "id": 22123004,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3149,12 +3330,13 @@
       [
         1
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123005": {
     "id": 22123005,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3167,12 +3349,13 @@
       [
         2
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123006": {
     "id": 22123006,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3185,12 +3368,13 @@
       [
         3
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123007": {
     "id": 22123007,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3203,12 +3387,13 @@
       [
         4
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123008": {
     "id": 22123008,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3221,12 +3406,13 @@
       [
         5
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123009": {
     "id": 22123009,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3239,12 +3425,13 @@
       [
         6
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123010": {
     "id": 22123010,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3257,12 +3444,13 @@
       [
         7
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123011": {
     "id": 22123011,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3275,12 +3463,13 @@
       [
         8
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123012": {
     "id": 22123012,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3293,12 +3482,13 @@
       [
         9
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123013": {
     "id": 22123013,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3311,12 +3501,13 @@
       [
         10
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123014": {
     "id": 22123014,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3329,12 +3520,13 @@
       [
         11
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123015": {
     "id": 22123015,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3347,12 +3539,13 @@
       [
         12
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123016": {
     "id": 22123016,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3365,12 +3558,13 @@
       [
         13
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123017": {
     "id": 22123017,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3383,12 +3577,13 @@
       [
         14
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123018": {
     "id": 22123018,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3401,12 +3596,13 @@
       [
         15
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123019": {
     "id": 22123019,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3419,12 +3615,13 @@
       [
         16
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123020": {
     "id": 22123020,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3437,12 +3634,13 @@
       [
         17
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123021": {
     "id": 22123021,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3455,12 +3653,13 @@
       [
         18
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "22123022": {
     "id": 22123022,
-    "startAtMs": 1723777200000,
-    "endAtMs": 1724943599000,
+    "startAtMs": 1723780800000,
+    "endAtMs": 1724947199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3473,12 +3672,13 @@
       [
         19
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "101020901": {
     "id": 101020901,
-    "startAtMs": 1671678000000,
-    "endAtMs": 1672282799000,
+    "startAtMs": 1671681600000,
+    "endAtMs": 1672286399000,
     "rewardKind": 0,
     "rate": 1.5,
     "categories": [
@@ -3487,12 +3687,13 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   },
   "101020902": {
     "id": 101020902,
-    "startAtMs": 1671678000000,
-    "endAtMs": 1672282799000,
+    "startAtMs": 1671681600000,
+    "endAtMs": 1672286399000,
     "rewardKind": 0,
     "rate": 1.5,
     "categories": [
@@ -3522,12 +3723,13 @@
         18,
         19
       ]
-    ]
+    ],
+    "repeatKind": "once"
   },
   "101032601": {
     "id": 101032601,
-    "startAtMs": 1675306800000,
-    "endAtMs": 1675911599000,
+    "startAtMs": 1675310400000,
+    "endAtMs": 1675915199000,
     "rewardKind": 0,
     "rate": 2,
     "categories": [
@@ -3536,6 +3738,7 @@
     "keyQueries": [
       null,
       null
-    ]
+    ],
+    "repeatKind": "once"
   }
 }
