@@ -38,9 +38,24 @@ Mana 三类倍率。1.4.54 主数据共有 203 条：道具 179 条、经验 12 
 - `CampaignLogicBase.as`：同类型重叠取最大倍率；
 - `CommonBattleFinishDummyRemoteProcess.as`：Score Reward 取整、Boost 加法、固定 Mana 与角色经验处理。
 
-## 其他奖励边界
+## Additional Reward
 
-以下内容没有足够权威证据或不属于本次已验证范围，继续明确延期：
+服务端还从六张官方 OrderedMap 生成 `additional_reward_rules.json`，并在单人、联机
+finish 的同一 SQLite 事务中结算追加奖励：
 
-- `additional_reward` 当前官方表全部是单候选，可按确定性奖励实现；未来多候选组在没有权威抽签证据时必须 fail closed；
-- 客户端未使用的其他奖励结算入口。
+- Collect Item Event 同时校验活动期、前置关卡和 `QuestRange`；
+- 敌人等级按 `enemyLevelMin <= enemyLevel` 的全部档位累计发放，不只取最高档；
+- Boss Pickup 只允许联机结算触发；
+- 道具数量继续应用 Item Campaign、Boost 加法和后台掉落倍率；
+- 响应同时返回发奖后的 `item_list` 与动画使用的
+  `drop_additional_reward_ids[{group_id,index,number}]`；
+- 发奖、关卡进度、任务事实和 active quest 删除共享一个事务，失败时整体回滚。
+
+官方 1.4.54 数据共有 378 个奖励组，每组恰好一个 `Item` 候选且 `weight=1`，因此当前
+实现可以确定性发放。未来 CDN 若出现多候选组或非 `Item` 候选，服务端会 fail closed，不
+推测随机抽签或其他奖励类型语义。当前 Boss Pickup 的 594 条 schedule 均未配置奖励组，
+所以 1.4.54 实际触发源只有 Collect Item Event；`available_rank` 保留在生成表中，但没有
+权威证据表明它是服务端发奖门槛，当前不参与判断。
+
+客户端仍需实机确认追加奖励到账、动画、Boost 显示以及单人/联机结算表现。客户端未使用的
+其他奖励结算入口不在当前支持范围。

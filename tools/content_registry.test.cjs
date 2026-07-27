@@ -45,6 +45,14 @@ const EXPECTED_GACHA_ODDS_DYNAMIC_SOURCE = Object.freeze({
 })
 
 const EXPECTED_CDN_TABLES = Object.freeze({
+    "additional_reward_rules.json": ["additional-reward", [
+        "master/reward/event/additional_reward.orderedmap",
+        "master/reward/event/collect_item_event.orderedmap",
+        "master/reward/event/collect_item_event_quest_relation.orderedmap",
+        "master/reward/event/collect_item_event_reward_relation.orderedmap",
+        "master/quest/boss_battle/boss_battle_multi_pickup_event.orderedmap",
+        "master/quest/boss_battle/boss_battle_multi_pickup_event_schedule.orderedmap",
+    ]],
     "character.json": ["character", [
         "master/character/character.orderedmap",
     ]],
@@ -560,7 +568,7 @@ test("registry independently covers static CN runtime JSON references", () => {
 })
 
 test("every registry table has an explicit existing bundled fallback", () => {
-    assert.equal(TABLE_SOURCES.length, 110)
+    assert.equal(TABLE_SOURCES.length, 111)
     for (const entry of TABLE_SOURCES) {
         const sourcePath = path.resolve(projectRoot, entry.bundledPath)
         assert.ok(fs.existsSync(sourcePath), `${entry.tableName} source must exist`)

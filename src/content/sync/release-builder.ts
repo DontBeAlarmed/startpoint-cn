@@ -1,4 +1,9 @@
 import {
+    convertAdditionalRewards,
+    type AdditionalRewardConversionOutput,
+    type AdditionalRewardSourceReader,
+} from "../converters/additional-reward"
+import {
     convertCharacters,
     type CharacterConversionInput,
     type CharacterConversionOutput,
@@ -80,6 +85,7 @@ type ConverterOutput = object
 const RELEASE_BUILD_IO_CONCURRENCY = 8
 const DIRECT_ORDERED_MAP_CONVERTER = /^ordered-map-json-([1-3])$/
 const SUPPORTED_CONVERTER_IDS = new Set([
+    "additional-reward",
     "character",
     "character-election",
     "box-gacha",
@@ -100,6 +106,9 @@ const SUPPORTED_CONVERTER_IDS = new Set([
 ])
 
 export interface DefaultContentTableBuilderDependencies {
+    readonly convertAdditionalRewards?: (
+        reader: AdditionalRewardSourceReader,
+    ) => AdditionalRewardConversionOutput | Promise<AdditionalRewardConversionOutput>
     readonly convertBoxGachaTables?: (
         reader: BoxGachaSourceReader,
     ) => BoxGachaConversionOutput | Promise<BoxGachaConversionOutput>
@@ -162,7 +171,8 @@ function requireLogicalPath(logicalPath: string): string {
 }
 
 class StrictOrderedMapReader implements BoxGachaSourceReader, GachaSourceReader, GameplaySourceReader,
-    ItemEquipmentSourceReader, ManaNodeSourceReader, ShopSourceReader, RewardSourceReader,
+    AdditionalRewardSourceReader, ItemEquipmentSourceReader, ManaNodeSourceReader,
+    ShopSourceReader, RewardSourceReader,
     QuestSourceReader {
     private readonly context: ContentTableBuildContext
     private readonly allowed = new Set<string>()
@@ -391,6 +401,8 @@ async function runSkillEffectConverter(
 export function createDefaultContentTableBuilder(
     dependencies: DefaultContentTableBuilderDependencies = {},
 ): ContentTableBuilder {
+    const additionalRewardConverter = dependencies.convertAdditionalRewards
+        ?? convertAdditionalRewards
     const boxGachaConverter = dependencies.convertBoxGachaTables ?? convertBoxGachaTables
     const characterConverter = dependencies.convertCharacters ?? convertCharacters
     const characterElectionConverter = dependencies.convertCharacterElections
@@ -418,6 +430,7 @@ export function createDefaultContentTableBuilder(
             }
             const staticPaths = context.definitions.flatMap(definition => (
                 definition.converterId === "character"
+                    || definition.converterId === "additional-reward"
                     || definition.converterId === "character-election"
                     || definition.converterId === "box-gacha"
                     || definition.converterId === "gacha"
@@ -445,6 +458,13 @@ export function createDefaultContentTableBuilder(
                 const pending = bundledImporter(context.paths.contentRuntimeDir, tableName)
                 bundledCache.set(tableName, pending)
                 return pending
+            }
+            if (converterIds.has("additional-reward")) {
+                addConverterOutput(
+                    values,
+                    "additional-reward",
+                    await additionalRewardConverter(reader),
+                )
             }
             if (converterIds.has("box-gacha")) {
                 addConverterOutput(values, "box-gacha", await boxGachaConverter(reader))

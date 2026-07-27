@@ -28,6 +28,7 @@ import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import { getDb } from "../../data/db";
 import { getPlayerMailCountSync } from "../../data/domains/mail";
+import { getServerGameplaySettingsSync } from "../../data/domains/server-settings";
 import { BATTLE_SETTLEMENT_CATEGORIES, recordMissionBattleFacts } from "../../lib/mission/battle-facts";
 import type { FinishContext } from "../../lib/quest/finish/types";
 import {
@@ -45,6 +46,12 @@ import {
     calculateFixedQuestPoolExp,
     getRewardCampaignRates,
 } from "../../lib/reward-campaign";
+import bundledAdditionalRewardRules from "../../../assets/additional_reward_rules.json";
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
+import {
+    settleAdditionalRewardsSync,
+    type AdditionalRewardTable,
+} from "../../lib/additional-reward";
 
 async function buildFinishFollowInfo(
     viewerId: number,
@@ -384,6 +391,32 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                     rewardDate: settlementTime,
                 },
             );
+            const additionalRewardSettlement = questAccomplished
+                ? settleAdditionalRewardsSync(
+                    getRuntimeContentTableSync(
+                        "additional_reward_rules.json",
+                        bundledAdditionalRewardRules as AdditionalRewardTable,
+                    ),
+                    {
+                        questCategory,
+                        questId,
+                        enemyLevel: questData.enemyLevel,
+                        nowMs: settlementTime.getTime(),
+                        isMulti: true,
+                        isQuestCleared: (category, requiredQuestId) => (
+                            getPlayerSingleQuestProgressSync(
+                                playerId,
+                                category,
+                                requiredQuestId,
+                            )?.finished === true
+                        ),
+                        rewardCampaignRates,
+                        boostPointUsed: useBoostPoint,
+                        serverDropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
+                    },
+                    { grantRewards: rewards => givePlayerRewardsSync(playerId, rewards) },
+                )
+                : { dropAdditionalRewardIds: [], rewardResult: null };
             recordMissionBattleFacts(finishCtx, settlementTime)
             const rewardCharacterExpResult = givePlayerCharactersExpSync(
                 playerId, partyCharacterIdsArray, characterBattleExp,
@@ -408,6 +441,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 playerData,
                 rewardCharacterExpResult,
                 scoreRewardsResult,
+                additionalRewardSettlement,
                 sPlusClearReward,
                 missionSettlement,
                 fieldMana,
@@ -442,6 +476,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             playerData,
             rewardCharacterExpResult,
             scoreRewardsResult,
+            additionalRewardSettlement,
             sPlusClearReward,
             missionSettlement,
             fieldMana,
@@ -499,7 +534,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 "clear_rank": clearRank ?? 5,
                 "drop_score_reward_ids": scoreRewardsResult.drop_score_reward_ids,
                 "drop_rare_reward_ids": scoreRewardsResult.drop_rare_reward_ids,
-                "drop_additional_reward_ids": [],
+                "drop_additional_reward_ids": additionalRewardSettlement.dropAdditionalRewardIds,
                 "drop_periodic_reward_ids": [],
                 "equipment_list": [
                     ...scoreRewardsResult.equipment_list,
@@ -510,7 +545,10 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 "start_time": dataHeaders['servertime'],
                 "is_multi": "multi",
                 "quest_name": "",
-                "item_list": scoreRewardsResult.items,
+                "item_list": {
+                    ...scoreRewardsResult.items,
+                    ...(additionalRewardSettlement.rewardResult?.items ?? {}),
+                },
                 "presigned_quest_category": [],
                 "mate_player_result": matePlayerResult,
                 "follow_info": followInfo,

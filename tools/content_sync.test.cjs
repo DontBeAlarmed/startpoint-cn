@@ -390,6 +390,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         ["master/gacha_odds/z-character.orderedmap", nestedOrderedMap("z-character")],
     ])
     const converterCalls = {
+        additionalReward: 0,
         boxGacha: 0,
         character: 0,
         characterElection: 0,
@@ -406,6 +407,10 @@ test("default release builder closes all registry tables and runs each CDN conve
     let bundledImports = 0
     const bundledRoots = new Set()
     const builder = createDefaultContentTableBuilder({
+        convertAdditionalRewards: async () => {
+            converterCalls.additionalReward++
+            return converterOutput("additional-reward")
+        },
         convertBoxGachaTables: async () => {
             converterCalls.boxGacha++
             return converterOutput("box-gacha")
@@ -468,6 +473,7 @@ test("default release builder closes all registry tables and runs each CDN conve
     assert.equal(built.size, TABLE_SOURCES.length)
     assert.deepEqual([...built.keys()], TABLE_SOURCES.map(definition => definition.tableName))
     assert.deepEqual(converterCalls, {
+        additionalReward: 1,
         boxGacha: 1,
         character: 1,
         characterElection: 1,
@@ -558,6 +564,7 @@ test("default release builder rejects an incomplete converter output", async () 
     const incompleteCharacterOutput = converterOutput("character")
     delete incompleteCharacterOutput["character.json"]
     const builder = createDefaultContentTableBuilder({
+        convertAdditionalRewards: async () => converterOutput("additional-reward"),
         convertCharacters: async () => incompleteCharacterOutput,
         convertCharacterElections: async () => converterOutput("character-election"),
         convertGachas: async () => converterOutput("gacha"),
@@ -609,6 +616,7 @@ test("default release builder bounds parallel reads and imports while preserving
     let maxImports = 0
     const reads = []
     const builder = createDefaultContentTableBuilder({
+        convertAdditionalRewards: async () => converterOutput("additional-reward"),
         convertCharacters: async () => converterOutput("character"),
         convertCharacterElections: async () => converterOutput("character-election"),
         convertGachas: async () => converterOutput("gacha"),

@@ -49,6 +49,7 @@ const QUEST_TABLE_NAMES = [
     "quest_unlock_costs.json",
 ]
 const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
+    "additional_reward_rules.json",
     "box_gacha.json",
     "box_gacha_box_settings.json",
     "box_reward.json",
@@ -68,6 +69,7 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "mana_node.json",
     "mana_node_awake.json",
     "raid_event.json",
+    "reward_campaign.json",
 ]
 
 function installBundledGameplaySnapshot({ onRestore, tableOverrides = {} } = {}) {

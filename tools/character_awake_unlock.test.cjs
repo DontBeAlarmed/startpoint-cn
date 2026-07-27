@@ -302,7 +302,9 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         shopBuyBlock.indexOf("let purchaseResult")
     )
     const shopReadOnlyBlock = shopSource.split('fastify.post("/get_sales_list"')[1]
-    assert.equal(countOccurrences(shopSource, "reconcileAwakeUnlockCharacterList("), 1)
+        .split('fastify.post("/bulk_buy"')[0]
+    const shopBulkBuyBlock = shopSource.split('fastify.post("/bulk_buy"')[1]
+    assert.equal(countOccurrences(shopSource, "reconcileAwakeUnlockCharacterList("), 2)
     assert.equal(enhancementBlock.includes("reconcileAwakeUnlockCharacterList("), false)
     assert.equal(
         shopBuyBlock.indexOf("reconcileAwakeUnlockCharacterList(")
@@ -310,12 +312,17 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         true
     )
     assert.equal(
-        shopPurchaseSource.indexOf("dependencies.addPurchaseCount(")
+        shopPurchaseSource.indexOf("dependencies.addPurchaseCounts(")
             > shopPurchaseSource.indexOf("dependencies.grantRewards("),
         true
     )
     assert.equal(shopBuyBlock.includes("grantRewards: givePlayerRewardsSync"), true)
     assert.equal(shopReadOnlyBlock.includes("reconcileAwakeUnlockCharacterList("), false)
+    assert.equal(
+        shopBulkBuyBlock.indexOf("reconcileAwakeUnlockCharacterList(")
+            > shopBulkBuyBlock.indexOf("executeGenericShopBatchPurchaseSync("),
+        true
+    )
 
     for (const source of routeSources.filter(source => source !== missionSource)) {
         assert.equal(source.includes("settleAwakeMissionRewards"), false)

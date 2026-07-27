@@ -110,6 +110,7 @@ let scoreRewardOptions = null
 const rewardCampaignLogic = require("../src/lib/reward-campaign")
 const scoreQuest = {
     name: "无限演武",
+    enemyLevel: 60,
     eventId: 1,
     scoreAttackQuestId: 999999,
     bRankScore: 100,
@@ -139,6 +140,29 @@ const activeQuests = {
 }
 
 stubModule("../src/data/db", { getDb: () => db })
+stubModule("../src/data/domains/server-settings", {
+    getServerGameplaySettingsSync: () => ({ dropMultiplier: 3 }),
+})
+stubModule("../src/content/runtime/table-access", {
+    getRuntimeContentTableSync(tableName, fallback) {
+        if (tableName !== "additional_reward_rules.json") return fallback
+        return {
+            groups: {
+                9001: [{ index: 1, groupStringId: "test", type: 0, id: 40502, number: 2, weight: 1 }],
+            },
+            collectItemRules: [{
+                eventId: 1,
+                startAtMs: 0,
+                endAtMs: 4_102_444_800_000,
+                prerequisite: null,
+                categories: [27],
+                keyQueries: [null, null],
+                thresholds: [{ enemyLevelMin: 60, groupId: 9001 }],
+            }],
+            bossPickupRules: [],
+        }
+    },
+})
 stubModule("../src/data/domains/quest_active", {
     deletePlayerActiveQuestSync(playerId) {
         writeAttempts++
@@ -263,6 +287,8 @@ stubModule("../src/lib/quest", {
 stubModule("../src/lib/reward-campaign", {
     calculateCharacterBattleExp: rewardCampaignLogic.calculateCharacterBattleExp,
     calculateFixedQuestMana: rewardCampaignLogic.calculateFixedQuestMana,
+    calculateFixedQuestPoolExp: rewardCampaignLogic.calculateFixedQuestPoolExp,
+    calculateScoreRewardAmount: rewardCampaignLogic.calculateScoreRewardAmount,
     getRewardCampaignRates(category, questId, now) {
         rewardCampaignCalls.push({ category, questId, now })
         return { item: 2, exp: 2, mana: 2 }
@@ -384,7 +410,7 @@ async function main() {
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM quest_progress").get().count, 0)
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players_active_quests").get().count, 1)
     assert.ok(activeQuests[17])
-    assert.ok(writeAttempts > 0)
+    assert.ok(writeAttempts > 0, failed.body)
 
     db.exec("DROP TRIGGER fail_score_attack_active_delete")
     writeAttempts = 0
@@ -393,20 +419,25 @@ async function main() {
     const succeeded = await finish(fastify)
     assert.equal(succeeded.statusCode, 200, succeeded.body)
     assert.equal(db.prepare("SELECT free_mana FROM player_state WHERE player_id = 17").get().free_mana, 1035)
-    assert.equal(db.prepare("SELECT exp_pool FROM player_state WHERE player_id = 17").get().exp_pool, 2015)
+    assert.equal(db.prepare("SELECT exp_pool FROM player_state WHERE player_id = 17").get().exp_pool, 2030)
     assert.equal(db.prepare("SELECT rank_point FROM player_state WHERE player_id = 17").get().rank_point, 3010)
     assert.equal(db.prepare("SELECT exp FROM character_state WHERE player_id = 17 AND character_id = 101").get().exp, 130)
     assert.equal(db.prepare("SELECT clear_count FROM mission_state WHERE player_id = 17").get().clear_count, 1)
     assert.equal(db.prepare("SELECT count FROM item_state WHERE player_id = 17 AND item_id = 40501").get().count, 8)
+    assert.equal(db.prepare("SELECT count FROM item_state WHERE player_id = 17 AND item_id = 40502").get().count, 12)
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM quest_progress").get().count, 1)
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players_active_quests").get().count, 0)
     assert.equal(activeQuests[17], undefined)
     const decoded = unpack(Buffer.from(succeeded.body, "base64"))
     assert.equal(decoded.data.item_list["40501"], 8)
+    assert.equal(decoded.data.item_list["40502"], 12)
+    assert.deepEqual(decoded.data.drop_additional_reward_ids, [
+        { group_id: 9001, index: 1, number: 12 },
+    ])
     assert.deepEqual(decoded.data.rewards, {
         overflow_pool_exp: 0,
         converted_pool_exp: 0,
-        reward_pool_exp: 15,
+        reward_pool_exp: 30,
         reward_mana: 30,
         field_mana: 5,
     })

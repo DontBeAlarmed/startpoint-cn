@@ -228,18 +228,19 @@ function createPurchaseHarness(options = {}) {
             `).run(playerId, itemId, amount)
             maybeFail("cost")
         },
-        getPurchaseCount(playerId, shopItemId) {
-            return db.prepare(
+        getPurchaseCounts(playerId, _shopType, shopItemId, _keys) {
+            const total = db.prepare(
                 "SELECT count FROM purchase_state WHERE player_id = ? AND shop_item_id = ?",
             ).get(playerId, shopItemId)?.count ?? 0
+            return { daily: 0, monthly: 0, total }
         },
-        addPurchaseCount(playerId, shopItemId, amount) {
+        addPurchaseCounts(playerId, _shopType, shopItemId, amount, keys) {
             db.prepare(`
                 INSERT INTO purchase_state VALUES (?, ?, ?)
                 ON CONFLICT(player_id, shop_item_id) DO UPDATE SET count = count + excluded.count
             `).run(playerId, shopItemId, amount)
             maybeFail("purchase")
-            return this.getPurchaseCount(playerId, shopItemId)
+            return this.getPurchaseCounts(playerId, 0, shopItemId, keys)
         },
         recordManaSpent(playerId, amount) {
             db.prepare(`
@@ -304,6 +305,7 @@ const shopItem = {
     availableFrom: "2023-11-23 12:00:00",
     availableUntil: "2023-12-18 11:59:59",
     stock: 3,
+    maxFrequency: 3,
 }
 const activeTime = parseShopJstTimestamp("2023-12-01 00:00:00")
 
@@ -375,7 +377,12 @@ for (const userCostType of [0, 2]) {
         nowMs: activeTime,
         enforcePeriod: true,
     }, harness.dependencies)
-    assert.equal(harness.dependencies.getPurchaseCount(17, 700000), 3)
+    assert.equal(harness.dependencies.getPurchaseCounts(
+        17,
+        0,
+        700000,
+        { daily: "", monthly: "" },
+    ).total, 3)
 }
 
 {

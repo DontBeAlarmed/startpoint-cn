@@ -205,6 +205,33 @@ test("hard multi conversion preserves first-clear and S+ reward ids", () => {
     })
 })
 
+test("quest conversion preserves battle enemy levels used by additional rewards", () => {
+    const main = row(119, {
+        0: 1004002,
+        1: "主线战斗",
+        3: 1,
+        84: 1,
+        106: 60,
+    })
+    const hardMulti = row(130, {
+        0: 100002001,
+        2: "决战级",
+        73: 2,
+        85: 1,
+        86: 1,
+        87: 1,
+        88: 1,
+        107: 80,
+    })
+
+    assert.equal(convertQuestTree("main_quest.json", {
+        1: { 4: { 2: [main] } },
+    })[1004002].enemyLevel, 60)
+    assert.equal(convertQuestTree("hard_multi_event_quest.json", {
+        100002: { 1: [hardMulti] },
+    })[100002001].enemyLevel, 80)
+})
+
 test("score attack and carnival conversions preserve event-local metadata", () => {
     const scoreAttack = row(105, {
         0: 1101,

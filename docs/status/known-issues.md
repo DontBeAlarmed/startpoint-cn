@@ -45,7 +45,7 @@ PassDaily、PassWeek、PassEvent 主数据、核心进度、点数、6 条 type 
 
 ### 奖励活动倍率待客户端验收
 
-官方 `reward_campaign` 的道具、角色战斗经验、固定经验池和固定关卡 Mana 倍率已经接入单人、联机结算，普通与 Rare Score Reward、Weekly 周期、Boost 加法、取整、服务器掉落倍率和事务回滚均有自动测试。当前仍需在活动时间内用 CN 客户端确认掉落数量、结算显示和动画；`additional_reward` 继续延期。详见[奖励活动倍率](../systems/reward-campaign.md)。
+官方 `reward_campaign` 的道具、角色战斗经验、固定经验池和固定关卡 Mana 倍率已经接入单人、联机结算，普通与 Rare Score Reward、Weekly 周期、Boost 加法、取整、服务器掉落倍率和事务回滚均有自动测试。`additional_reward` 的官方单候选 Item、活动期、前置关卡、QuestRange、敌人等级累计阈值和单人/联机响应也已接入；多候选和非 Item 继续 fail closed，1.4.54 的 Boss Pickup schedule 没有可发奖励组。当前仍需在活动时间内用 CN 客户端确认掉落数量、结算显示和动画。详见[奖励活动倍率](../systems/reward-campaign.md)。
 
 ## 账号、存档与入口功能
 
@@ -91,7 +91,7 @@ PassDaily、PassWeek、PassEvent 主数据、核心进度、点数、6 条 type 
 - 无限演武的体力、评级、跨档奖励、动画响应和 load 持久化；
 - 战阵的三队配队、start、事件级奖励与基础 finish；
 - 歼灭者最高难度门票预扣、abort 返还和重启恢复；
-- 奖励活动倍率的普通/Rare 掉落、固定 Mana、角色经验和结算显示；
+- 奖励活动倍率及 Additional Reward 的到账、动画和结算显示；
 - NPC 贡献昵称的客户端显示和重赛稳定性；
 - 新管理后台的浏览器与多设备人工验收；
 - 嵌入式契约与真实 Android、桌面宿主的集成。

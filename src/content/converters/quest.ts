@@ -67,6 +67,7 @@ interface StandardLayout {
     readonly scoreGroup?: number
     readonly commonRewardCount?: number | readonly [number, number, number, number, number]
     readonly element?: number
+    readonly enemyLevel?: number
     readonly rankTimes: readonly [number, number, number, number] | "zero"
     readonly rewards: readonly [number, number, number, number]
     readonly fixedParty?: number
@@ -113,6 +114,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         scoreGroup: 70,
         commonRewardCount: [88, 89, 90, 91, 92],
         element: 72,
+        enemyLevel: 106,
         rankTimes: [84, 85, 86, 87],
         rewards: [93, 94, 95, 96],
         fixedParty: 118,
@@ -125,6 +127,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         scoreGroup: 70,
         commonRewardCount: [88, 89, 90, 91, 92],
         element: 72,
+        enemyLevel: 106,
         rankTimes: [84, 85, 86, 87],
         rewards: [93, 94, 95, 96],
         fixedParty: 118,
@@ -138,6 +141,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         scoreGroup: 70,
         commonRewardCount: [88, 89, 90, 91, 92],
         element: 72,
+        enemyLevel: 106,
         rankTimes: [84, 85, 86, 87],
         rewards: [93, 94, 95, 96],
         storyCheck: 84,
@@ -150,6 +154,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         scoreGroup: 71,
         commonRewardCount: [89, 90, 91, 92, 93],
         element: 73,
+        enemyLevel: 107,
         rankTimes: [85, 86, 87, 88],
         rewards: [94, 95, 96, 97],
         fixedParty: 119,
@@ -162,6 +167,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         scoreGroup: 70,
         commonRewardCount: [88, 89, 90, 91, 92],
         element: 72,
+        enemyLevel: 106,
         rankTimes: [84, 85, 86, 87],
         rewards: [93, 94, 95, 96],
     },
@@ -172,6 +178,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         scoreGroup: 76,
         commonRewardCount: [94, 95, 96, 97, 98],
         element: 78,
+        enemyLevel: 112,
         rankTimes: [90, 91, 92, 93],
         rewards: [99, 100, 101, 102],
         storyCheck: 90,
@@ -199,6 +206,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         scoreGroup: 71,
         commonRewardCount: [89, 90, 91, 92, 93],
         element: 73,
+        enemyLevel: 107,
         rankTimes: [85, 86, 87, 88],
         rewards: [94, 95, 96, 97],
     },
@@ -209,6 +217,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         scoreGroup: 72,
         commonRewardCount: [90, 91, 92, 93, 94],
         element: 74,
+        enemyLevel: 108,
         rankTimes: [86, 87, 88, 89],
         rewards: [95, 96, 97, 98],
         storyCheck: 86,
@@ -219,6 +228,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         scoreGroup: 71,
         commonRewardCount: 84,
         element: 72,
+        enemyLevel: 98,
         rankTimes: [51, 52, 53, 54],
         rewards: [85, 86, 87, 88],
     },
@@ -228,6 +238,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         scoreGroup: 69,
         commonRewardCount: 82,
         element: 70,
+        enemyLevel: 96,
         rankTimes: "zero",
         rewards: [83, 84, 85, 86],
     },
@@ -238,6 +249,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         scoreGroup: 73,
         commonRewardCount: [91, 92, 93, 94, 95],
         element: 75,
+        enemyLevel: 109,
         rankTimes: [87, 88, 89, 90],
         rewards: [96, 97, 98, 99],
     },
@@ -247,6 +259,7 @@ const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>
         scoreGroup: 69,
         commonRewardCount: 82,
         element: 70,
+        enemyLevel: 96,
         rankTimes: "zero",
         rewards: [83, 84, 85, 86],
     },
@@ -391,6 +404,14 @@ function standardQuest(
     }
     if (story) return output
 
+    if (layout.enemyLevel !== undefined) {
+        addOptional(
+            output,
+            "enemyLevel",
+            optionalInteger(tableName, fields[layout.enemyLevel], "enemyLevel"),
+        )
+    }
+
     if (layout.scoreGroup !== undefined) {
         const scoreRewardGroupId = optionalInteger(
             tableName,
@@ -493,6 +514,7 @@ function specialQuest(tableName: QuestTableName, row: QuestRow): Record<string, 
             poolExpReward: 0,
             element: parseInteger(tableName, fields[68], "element"),
         }
+        addOptional(output, "enemyLevel", optionalInteger(tableName, fields[89], "enemyLevel"))
         addOptional(output, "clearRewardId", optionalInteger(tableName, fields[4], "clearRewardId"))
         return output
     }
@@ -510,6 +532,7 @@ function specialQuest(tableName: QuestTableName, row: QuestRow): Record<string, 
             poolExpReward: optionalInteger(tableName, fields[97], "poolExpReward") ?? 0,
             element: parseInteger(tableName, fields[73], "element"),
         }
+        addOptional(output, "enemyLevel", optionalInteger(tableName, fields[107], "enemyLevel"))
         addOptional(output, "clearRewardId", optionalInteger(tableName, fields[4], "clearRewardId"))
         addOptional(output, "sPlusRewardId", optionalInteger(tableName, fields[72], "sPlusRewardId"))
         addOptional(
@@ -540,6 +563,7 @@ function specialQuest(tableName: QuestTableName, row: QuestRow): Record<string, 
             rushEventFolderId: parseInteger(tableName, fields[1], "rushEventFolderId"),
             rushEventRound: parseInteger(tableName, fields[2], "rushEventRound"),
         }
+        addOptional(output, "enemyLevel", optionalInteger(tableName, fields[95], "enemyLevel"))
         addOptional(output, "clearRewardId", optionalInteger(tableName, fields[6], "clearRewardId"))
         addOptional(
             output,
@@ -572,6 +596,7 @@ function specialQuest(tableName: QuestTableName, row: QuestRow): Record<string, 
             timeLimitMs: Math.round(parseInteger(tableName, fields[100], "timeLimit") * 1000 / 60),
             difficultyScore: parseNumericInteger(tableName, fields[104], "difficultyScore"),
         }
+        addOptional(output, "enemyLevel", optionalInteger(tableName, fields[95], "enemyLevel"))
         addOptional(output, "clearRewardId", optionalInteger(tableName, fields[6], "clearRewardId"))
         addOptional(
             output,
@@ -602,6 +627,7 @@ function specialQuest(tableName: QuestTableName, row: QuestRow): Record<string, 
             element: parseInteger(tableName, fields[73], "element"),
             timeLimitMs: Math.round(parseInteger(tableName, fields[104], "timeLimit") * 1000 / 60),
         }
+        addOptional(output, "enemyLevel", optionalInteger(tableName, fields[99], "enemyLevel"))
         addOptional(output, "folderId", optionalInteger(tableName, fields[1], "folderId"))
         addOptional(output, "clearRewardId", optionalInteger(tableName, fields[6], "clearRewardId"))
         addOptional(

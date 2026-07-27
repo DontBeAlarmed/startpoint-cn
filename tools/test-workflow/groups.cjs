@@ -59,6 +59,7 @@ const TEST_GROUPS = Object.freeze({
         execution: "parallel",
         tests: [
             "tools/active_quest_service_import.test.cjs",
+            "tools/additional_reward_routes.test.cjs",
             "tools/reward_campaign_routes.test.cjs",
             "tools/special_quest_flow.test.cjs",
         ],
@@ -101,6 +102,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/content_character_converter.test.cjs",
             "tools/content_character_election_converter.test.cjs",
             "tools/content_asset_audit.test.cjs",
+            "tools/content_additional_reward_converter.test.cjs",
             "tools/content_skill_effects_converter.test.cjs",
             "tools/content_amf3.test.cjs",
             "tools/content_box_gacha_converter.test.cjs",
@@ -165,6 +167,7 @@ const TEST_GROUPS = Object.freeze({
     "integration:rules": {
         execution: "parallel",
         tests: [
+            "tools/additional_reward.test.cjs",
             "tools/character_stack.test.cjs",
             "tools/equipment_enhancement.test.cjs",
             "tools/event_currency.test.cjs",

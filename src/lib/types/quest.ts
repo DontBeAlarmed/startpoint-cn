@@ -46,6 +46,7 @@ export enum Element {
 
 export interface RawQuest {
     name: string,
+    enemyLevel?: number,
     clearRewardId?: number,
     sPlusRewardId?: number,
     scoreRewardGroupId?: number,
@@ -86,6 +87,7 @@ export interface StoryQuest {
 
 export interface BattleQuest {
     name: string,
+    enemyLevel: number,
     clearReward?: Reward,
     sPlusReward?: Reward,
     scoreRewardGroupId?: number,

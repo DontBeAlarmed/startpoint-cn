@@ -182,6 +182,7 @@ test("selects only the direct single battle route regressions", () => {
         "tools/quest_host_finish.test.cjs",
         "tools/tutorial_update_step.test.cjs",
         "tools/active_quest_service_import.test.cjs",
+        "tools/additional_reward_routes.test.cjs",
         "tools/reward_campaign_routes.test.cjs",
         "tools/special_quest_flow.test.cjs",
     ])
@@ -455,6 +456,7 @@ test("keeps isolated test groups parallel while infrastructure groups stay seria
 test("splits isolated integration tests into focused domains", () => {
     assert.deepEqual(TEST_GROUPS["integration:database"].tests, [
         "tools/server_gameplay_settings.test.cjs",
+        "tools/shop_purchase_period_storage.test.cjs",
         "tools/test-workflow/database-isolation.test.cjs",
         "tools/test-workflow/database-lifecycle.test.cjs",
         "tools/test-workflow/runtime-data-paths.test.cjs",
@@ -554,6 +556,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/mission_completion.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS["integration:rules"].tests, [
+        "tools/additional_reward.test.cjs",
         "tools/character_stack.test.cjs",
         "tools/equipment_enhancement.test.cjs",
         "tools/event_currency.test.cjs",

@@ -4,6 +4,7 @@ import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventPlayedParti
 import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
 import { getPlayerItemSync, givePlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
+import { getServerGameplaySettingsSync } from "../../data/domains/server-settings"
 import {
     getRaidEventBossStateSync,
     incrementPlayerRaidEventQuestKillCountSync,
@@ -60,7 +61,12 @@ import { BATTLE_SETTLEMENT_CATEGORIES, recordMissionBattleFacts } from "../../li
 import type { FinishContext } from "../../lib/quest/finish/types";
 import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
 import bundledEventChallengePointMap from "../../../assets/event_challenge_point_map.json";
+import bundledAdditionalRewardRules from "../../../assets/additional_reward_rules.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
+import {
+    settleAdditionalRewardsSync,
+    type AdditionalRewardTable,
+} from "../../lib/additional-reward";
 
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import {
@@ -420,6 +426,32 @@ const routes = async (fastify: FastifyInstance) => {
                     rewardDate: settlementTime,
                 },
             )
+            const additionalRewardSettlement = questAccomplished
+                ? settleAdditionalRewardsSync(
+                    getRuntimeContentTableSync(
+                        "additional_reward_rules.json",
+                        bundledAdditionalRewardRules as AdditionalRewardTable,
+                    ),
+                    {
+                        questCategory,
+                        questId,
+                        enemyLevel: questData.enemyLevel,
+                        nowMs: settlementTime.getTime(),
+                        isMulti: false,
+                        isQuestCleared: (category, requiredQuestId) => (
+                            getPlayerSingleQuestProgressSync(
+                                playerId,
+                                category,
+                                requiredQuestId,
+                            )?.finished === true
+                        ),
+                        rewardCampaignRates,
+                        boostPointUsed: useBoostPoint,
+                        serverDropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
+                    },
+                    { grantRewards: rewards => givePlayerRewardsSync(playerId, rewards) },
+                )
+                : { dropAdditionalRewardIds: [], rewardResult: null }
 
             recordMissionBattleFacts(finishCtx, settlementTime)
 
@@ -535,6 +567,7 @@ const routes = async (fastify: FastifyInstance) => {
             const itemList = {
                 ...(activeQuestData.entryItemId ? { [activeQuestData.entryItemId]: getPlayerItemSync(playerId, activeQuestData.entryItemId) ?? 0 } : {}),
                 ...scoreRewardsResult.items,
+                ...(additionalRewardSettlement.rewardResult?.items ?? {}),
                 ...(scoreAttackRewardResult?.items ?? {}),
                 ...(rushEventRewardsResult?.items ?? {}),
                 ...(carnivalRewardResult?.item_list ?? {}),
@@ -554,6 +587,7 @@ const routes = async (fastify: FastifyInstance) => {
                 afterStaminaHealTime,
                 dailyChallengePointList,
                 scoreRewardsResult,
+                additionalRewardSettlement,
                 rewardCharacterExpResult,
                 rushEventData,
                 rushEventRewardsResult,
@@ -579,6 +613,7 @@ const routes = async (fastify: FastifyInstance) => {
             afterStaminaHealTime,
             dailyChallengePointList,
             scoreRewardsResult,
+            additionalRewardSettlement,
             rewardCharacterExpResult,
             rushEventData,
             rushEventRewardsResult,
@@ -635,7 +670,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "clear_rank": clearRank ?? 5,
                 "drop_score_reward_ids": scoreRewardsResult.drop_score_reward_ids,
                 "drop_rare_reward_ids": scoreRewardsResult.drop_rare_reward_ids,
-                "drop_additional_reward_ids": [],
+                "drop_additional_reward_ids": additionalRewardSettlement.dropAdditionalRewardIds,
                 "drop_periodic_reward_ids": [],
                 "equipment_list": [
                     ...scoreRewardsResult.equipment_list,

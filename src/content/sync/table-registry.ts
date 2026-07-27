@@ -1,4 +1,5 @@
 import { deepFreeze } from "../deep-freeze"
+import { ADDITIONAL_REWARD_PATHS } from "../converters/additional-reward"
 import {
     QUEST_AUXILIARY_SOURCES,
     QUEST_TABLE_SOURCES,
@@ -258,8 +259,8 @@ function questDefinition(tableName: QuestTableName): TableSourceInput {
         scope: "cdn",
         sourceOrderedMaps: [QUEST_TABLE_SOURCES[tableName].logicalPath],
         converterId: "quest",
-        converterVersion: 2,
-        outputShapeVersion: 2,
+        converterVersion: 3,
+        outputShapeVersion: 3,
     }
 }
 
@@ -291,6 +292,14 @@ function serverDefinition(tableName: string): TableSourceInput {
 }
 
 const definitionInputs: TableSourceInput[] = [
+    {
+        tableName: "additional_reward_rules.json",
+        scope: "cdn",
+        sourceOrderedMaps: Object.values(ADDITIONAL_REWARD_PATHS),
+        converterId: "additional-reward",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    },
     {
         tableName: "character.json",
         scope: "cdn",

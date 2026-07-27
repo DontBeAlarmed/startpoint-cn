@@ -143,6 +143,7 @@ function getQuestSync(
     // always return BattleQuest; missing fields default to 0
     return {
         name: quest.name,
+        enemyLevel: quest.enemyLevel ?? 0,
         clearReward,
         sPlusReward,
         scoreRewardGroupId: quest.scoreRewardGroupId ?? undefined,
