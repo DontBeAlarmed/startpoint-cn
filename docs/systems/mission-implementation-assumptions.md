@@ -145,8 +145,8 @@
 
 ## 称号指定 Boss 超级难度
 
-- 13 条 `degree_boss_battle_ex_clear_single_*` 可以由主数据的 stage group + difficulty 与 `boss_battle_quest.json` 精确闭合，服务端只接受对应 category 2 关卡的 `finished=1` 记录。
-- `11080`（大蛇）主数据要求 difficulty `4`，但官方表中该 stage group 只有 difficulty `1..3`。当前不把现有最高难度 3 推测为目标 4，保持持久化 fallback；如果后续 CDN 补齐 difficulty 4，才会自动进入计算路径。
+- 14 条 `degree_boss_battle_ex_clear_single_*` 均可由主数据的 stage group + difficulty、`quest_rank` 的敌人等级区间和 `boss_battle_quest.json` 精确闭合，服务端只接受对应 category 2 关卡的 `finished=1` 记录。
+- difficulty 是显示难度语义，不是关卡 ID 后缀。官方 `quest_rank` 将 difficulty `4` 定义为“超级”、敌人等级 `80～89`；因此废墟魔像解析为 `1006003`，大蛇解析为 `1020003`。大蛇只有高级、高级+、超级三档，`1020002` 是高级+，不能完成 `11080`。
 
 ## 称号 ExpertSingle 精确单关
 

@@ -92,7 +92,7 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.degree)
     assert.deepEqual(
         { total: report.degree.total, automated: report.degree.automated, fallback: report.degree.fallback },
-        { total: 1288, automated: 1274, fallback: 14 },
+        { total: 1288, automated: 1275, fallback: 13 },
     )
     assert.deepEqual(
         report.degree.automatedMissions
@@ -118,7 +118,6 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
         {
             "character-level-curve-incomplete": 1,
             "ability-soul-operation-semantics-unverified": 3,
-            "boss-difficulty-master-data-unavailable": 1,
             "attention-source-unavailable": 3,
             "mvp-result-unavailable": 3,
             "newbie-classification-unavailable": 3,
@@ -132,7 +131,6 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
             [8000, "ability-soul-operation-semantics-unverified"],
             [8010, "ability-soul-operation-semantics-unverified"],
             [8020, "ability-soul-operation-semantics-unverified"],
-            [11080, "boss-difficulty-master-data-unavailable"],
             [25000, "attention-source-unavailable"],
             [25010, "attention-source-unavailable"],
             [25020, "attention-source-unavailable"],
@@ -143,7 +141,7 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
             [70005, "newbie-classification-unavailable"],
             [70006, "newbie-classification-unavailable"],
         ],
-        "14 条延期称号必须按精确 ID 固定，不能因文案相似被误归类",
+        "13 条延期称号必须按精确 ID 固定，不能因文案相似被误归类",
     )
 
     assert.equal(report.awake.total, 144)

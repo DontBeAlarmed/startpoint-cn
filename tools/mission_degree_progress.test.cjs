@@ -49,6 +49,7 @@ const {
 } = require("../src/data/domains/quest")
 const {
     DegreeComputer,
+    getBossBattleSuperQuestId,
     getDegreeMissionCoverageReport,
 } = require("../src/lib/mission/computer-degree")
 const {
@@ -230,6 +231,8 @@ insertPlayerQuestProgressSync(playerId, 3, { questId: 300001, finished: true })
 insertPlayerQuestProgressSync(playerId, 3, { questId: 300002, finished: true })
 insertPlayerQuestProgressSync(playerId, 3, { questId: 300003, finished: false })
 insertPlayerQuestProgressSync(playerId, 1, { questId: 100001, finished: true })
+insertPlayerQuestProgressSync(playerId, 2, { questId: 1006004, finished: true })
+insertPlayerQuestProgressSync(playerId, 2, { questId: 1020002, finished: true })
 
 const mainQuests = require("../assets/main_quest.json")
 const exQuests = require("../assets/ex_quest.json")
@@ -454,7 +457,37 @@ assert.equal(DegreeComputer.compute(46000, context, 0), 100, "应累计珍品商
 assert.equal(DegreeComputer.compute(46010, context, 150), 150, "珍品商店称号旧进度不得倒退")
 assert.equal(DegreeComputer.compute(11010, context, 0), 1, "指定 Boss 超级关卡完成后应完成称号")
 assert.equal(DegreeComputer.compute(11020, context, 0), 0, "未完成指定 Boss 超级关卡时不得完成称号")
-assert.equal(DegreeComputer.compute(11080, context, 7), 7, "CDN 缺少指定难度映射时应保留持久化 fallback")
+assert.equal(DegreeComputer.compute(11080, context, 0), 0, "大蛇高级+不得完成超级难度称号")
+insertPlayerQuestProgressSync(playerId, 2, { questId: 1006003, finished: true })
+insertPlayerQuestProgressSync(playerId, 2, { questId: 1020003, finished: true })
+const exceptionalBossContext = DegreeComputer.buildContext(playerId, 5)
+assert.equal(
+    DegreeComputer.compute(11020, exceptionalBossContext, 0),
+    1,
+    "废墟魔像应按官方难度等级识别 ID 后缀为 3 的超级关卡",
+)
+assert.equal(
+    DegreeComputer.compute(11080, exceptionalBossContext, 0),
+    1,
+    "大蛇应按官方难度等级识别 ID 后缀为 3 的超级关卡",
+)
+assert.equal(
+    getBossBattleSuperQuestId(11080, {
+        1020001: { enemyLevel: 70 },
+        1020002: { enemyLevel: 70 },
+        1020003: { enemyLevel: 80 },
+    }),
+    1020003,
+    "Content Release 应按 quest_rank 的等级区间识别大蛇超级关卡",
+)
+assert.equal(
+    getBossBattleSuperQuestId(11020, {
+        1006003: { enemyLevel: 80 },
+        1006004: { enemyLevel: 70 },
+    }),
+    1006003,
+    "Content Release 不得把 ID 后缀当成语义难度",
+)
 assert.equal(DegreeComputer.compute(57010, context, 0), 1, "ExpertSingle 精确关卡完成后应达成称号")
 assert.equal(DegreeComputer.compute(57020, context, 0), 0, "其他 category 的同 ID 不得完成 ExpertSingle 称号")
 assert.equal(DegreeComputer.compute(57020, context, 3), 3, "ExpertSingle 称号旧进度不得倒退")
@@ -593,8 +626,8 @@ assert.equal(getExactDegreeQuestClearRuleCount(), 84)
 assert.equal(getDegreeOperationRuleCount(), 6)
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1274,
-    unsupported: 14,
+    serverComputed: 1275,
+    unsupported: 13,
     supportedFamilies: {
         playerRank: 8,
         characterLevel: 2,
@@ -614,7 +647,7 @@ assert.deepEqual(coverage, {
         episodeChapterCompletion: 12,
         practiceRankSs: 5,
         treasureShopPurchaseCount: 3,
-        bossBattleExClearSingle: 13,
+        bossBattleExClearSingle: 14,
         expertSingleQuestClear: 12,
         worldStoryQuestClear: 27,
         adventQuestClear: 1,

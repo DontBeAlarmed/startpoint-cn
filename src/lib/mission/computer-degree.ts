@@ -105,8 +105,25 @@ function getTargetCraftPoint(missionId: number): number | undefined {
 
 type RawManaBoard = Record<string, Record<string, Record<string, readonly unknown[][]>>>
 
-type RawQuestTable = Record<string, unknown>
+type RawQuestDefinition = { readonly enemyLevel?: unknown }
+type RawQuestTable = Record<string, RawQuestDefinition | unknown>
 type RawCharacterTable = Record<string, { readonly rarity?: unknown }>
+
+const QUEST_RANK_LEVEL_RANGE_BY_DIFFICULTY: ReadonlyMap<number, readonly [number, number]> = new Map([
+    [1, [1, 19]],
+    [2, [20, 39]],
+    [3, [40, 69]],
+    [4, [80, 89]],
+    [5, [70, 79]],
+    [6, [90, 99]],
+    [7, [100, 100]],
+])
+
+// The historical bundled table predates enemyLevel; keep only the two verified nonstandard IDs.
+const BUNDLED_SUPER_QUEST_ID_BY_GROUP: ReadonlyMap<string, number> = new Map([
+    ["1:6", 1006003],
+    ["1:20", 1020003],
+])
 
 function getProvenCharacterLevel(rarity: number, experience: number): number | null {
     const thresholds = characterExpCaps[rarity]
@@ -234,7 +251,7 @@ function getTreasureShopPurchaseCount(playerId: number): number {
     ), 0)
 }
 
-function getBossBattleSuperQuestId(
+export function getBossBattleSuperQuestId(
     missionId: number,
     bossBattleQuests: RawQuestTable = getRuntimeTable("boss_battle_quest.json", bundledBossBattleQuests),
 ): number | undefined {
@@ -244,12 +261,32 @@ function getBossBattleSuperQuestId(
         || !definition.pattern.startsWith("degree_boss_battle_ex_clear_single_")) return undefined
     const stageGroup = Number(definition.row[10])
     const difficulty = Number(definition.row[12])
-    if (!Number.isSafeInteger(stageGroup) || !Number.isSafeInteger(difficulty)) return undefined
-    const questId = Object.keys(bossBattleQuests).map(Number).find(candidate => (
-        Math.floor(candidate / 1_000) % 1_000 === stageGroup
-        && candidate % 1_000 === difficulty
-    ))
-    return questId
+    const family = Number(definition.row[9])
+    const levelRange = QUEST_RANK_LEVEL_RANGE_BY_DIFFICULTY.get(difficulty)
+    if (!Number.isSafeInteger(stageGroup)
+        || !Number.isSafeInteger(family)
+        || !levelRange) return undefined
+
+    const candidates = Object.entries(bossBattleQuests).flatMap(([rawQuestId, rawQuest]) => {
+        const questId = Number(rawQuestId)
+        if (!Number.isSafeInteger(questId)
+            || Math.floor(questId / 1_000_000) !== family
+            || Math.floor(questId / 1_000) % 1_000 !== stageGroup) return []
+        const enemyLevel = Number((rawQuest as RawQuestDefinition)?.enemyLevel)
+        return [{ questId, enemyLevel }]
+    })
+    const candidatesWithLevel = candidates.filter(candidate => Number.isSafeInteger(candidate.enemyLevel))
+    if (candidatesWithLevel.length > 0) {
+        const [minimumLevel, maximumLevel] = levelRange
+        const matches = candidatesWithLevel.filter(candidate => (
+            candidate.enemyLevel >= minimumLevel && candidate.enemyLevel <= maximumLevel
+        ))
+        return matches.length === 1 ? matches[0].questId : undefined
+    }
+
+    const questId = BUNDLED_SUPER_QUEST_ID_BY_GROUP.get(`${family}:${stageGroup}`)
+        ?? family * 1_000_000 + stageGroup * 1_000 + difficulty
+    return bossBattleQuests[String(questId)] === undefined ? undefined : questId
 }
 
 function getExactDegreeQuestId(

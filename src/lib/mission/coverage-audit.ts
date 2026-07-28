@@ -62,7 +62,6 @@ const DEFERRED_DEGREE_REASON_BY_MISSION_ID: ReadonlyMap<number, string> = new Ma
     [8000, "ability-soul-operation-semantics-unverified"],
     [8010, "ability-soul-operation-semantics-unverified"],
     [8020, "ability-soul-operation-semantics-unverified"],
-    [11080, "boss-difficulty-master-data-unavailable"],
     [25000, "attention-source-unavailable"],
     [25010, "attention-source-unavailable"],
     [25020, "attention-source-unavailable"],
