@@ -76,7 +76,7 @@ function parseCnTimestamp(value: string): number {
     return timestamp
 }
 
-function validatePeriod(settings: BoxGachaBoxSettings, nowMs: number): void {
+export function validateBoxGachaPeriod(settings: BoxGachaBoxSettings, nowMs: number): void {
     const availableFromMs = parseCnTimestamp(settings.availableFrom)
     const availableUntilMs = settings.availableUntil === null
         ? Infinity
@@ -90,7 +90,7 @@ export function resetBoxGachaSync(
     input: BoxGachaResetInput,
     dependencies: BoxGachaResetDependencies,
 ): PlayerBoxGacha {
-    validatePeriod(input.settings, input.nowMs)
+    validateBoxGachaPeriod(input.settings, input.nowMs)
 
     return dependencies.transaction(() => {
         const currentBox = dependencies.getBox(input.playerId, input.boxGachaId, input.boxId)

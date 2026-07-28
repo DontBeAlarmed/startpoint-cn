@@ -156,6 +156,10 @@ const SOURCE_RULES = [
         groups: ["integration:event", "integration:mission"],
     },
     {
+        pattern: /^src\/routes\/api\/boxGacha\.ts$/,
+        groups: ["integration:event"],
+    },
+    {
         pattern: /^src\/routes\/api\/party\.ts$/,
         groups: ["integration:mission", "integration:party"],
     },

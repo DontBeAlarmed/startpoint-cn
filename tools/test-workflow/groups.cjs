@@ -206,7 +206,9 @@ const TEST_GROUPS = Object.freeze({
     },
     "integration:event": {
         execution: "parallel",
+        timeoutMs: 60_000,
         tests: [
+            "tools/box_gacha_exec_transaction.test.cjs",
             "tools/carnival_rewards.test.cjs",
             "tools/practice_battle_history.test.cjs",
             "tools/practice_battle_history_route.test.cjs",
