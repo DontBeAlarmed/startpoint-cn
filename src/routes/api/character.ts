@@ -10,8 +10,10 @@ import { getCharacterDataSync } from "../../lib/assets";
 import { characterExpCaps, givePlayerCharacterSync } from "../../lib/character";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
+import { getDb } from "../../data/db";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { getMailArrivedSync } from "../../lib/mail-notification";
+import { canClaimTownStoryCharacter } from "../../lib/story-join-character";
 
 interface OverLimitBody {
     viewer_id: number
@@ -290,7 +292,13 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Internal Server Error", "message": "No player bound to account."
         })
 
-        const giveResult = givePlayerCharacterSync(playerId, characterId)
+        const giveResult = getDb().transaction(() => {
+            if (!canClaimTownStoryCharacter(playerId, characterId)) return null
+            return givePlayerCharacterSync(playerId, characterId)
+        })()
+        if (!giveResult?.character) return reply.status(400).send({
+            "error": "Bad Request", "message": "Character is not available from town."
+        })
         const existingCharacterList: Record<string, unknown>[] = giveResult?.character
             ? [giveResult.character as Record<string, unknown>]
             : []

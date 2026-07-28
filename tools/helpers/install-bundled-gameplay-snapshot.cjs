@@ -70,6 +70,7 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "mana_node_awake.json",
     "raid_event.json",
     "reward_campaign.json",
+    "story_join_character.json",
 ]
 
 function installBundledGameplaySnapshot({ onRestore, tableOverrides = {} } = {}) {

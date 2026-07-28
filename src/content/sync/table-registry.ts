@@ -50,6 +50,7 @@ const GACHA_ODDS_DYNAMIC_SOURCE: GachaOddsDynamicSourceReference = {
 }
 
 const DIRECT_ORDERED_MAP_TABLES = [
+    ["story_join_character.json", 1, "master/character/story_join_character.orderedmap"],
     ["cdndata/player_rank.json", 1, "master/player/player_rank.orderedmap"],
     ["character_quest_lookup.json", 1, "master/quest/character_quest.orderedmap"],
     ["ex_ability.json", 1, "master/ex_boost/ex_ability.orderedmap"],

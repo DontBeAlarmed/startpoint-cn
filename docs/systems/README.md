@@ -15,6 +15,7 @@
 
 ## 关卡与活动
 
+- [普通剧情结算与剧情角色入队](./story-quest-settlement.md)
 - [特殊关卡架构](./special-quest-architecture.md)
 - [战阵事件级奖励](./raid-event-overall-rewards.md)
 - [狂热激战](./rush-event.md)

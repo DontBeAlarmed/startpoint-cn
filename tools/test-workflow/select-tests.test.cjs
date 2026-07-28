@@ -107,6 +107,10 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/lib/quest/active-quest-service.ts"]),
         ["integration:quest", "quick:quest"],
     )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/story-join-character.ts"]),
+        ["integration:quest", "quick:content"],
+    )
     assert.deepEqual(selectTestGroups(["docs/systems/save-validation.md"]), ["integration:database"])
     assert.deepEqual(
         selectTestGroups(["src/runtime/data-paths.ts"]),
@@ -187,6 +191,7 @@ test("selects only the direct single battle route regressions", () => {
         "tools/auto_start_stamina_stop.test.cjs",
         "tools/quest_entry_lifecycle.test.cjs",
         "tools/quest_host_finish.test.cjs",
+        "tools/story_quest_finish.test.cjs",
         "tools/tutorial_update_step.test.cjs",
         "tools/active_quest_service_import.test.cjs",
         "tools/additional_reward_routes.test.cjs",
@@ -271,6 +276,7 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/runtime_bundle_metadata.test.cjs",
             "tools/runtime_config.test.cjs",
             "tools/comic_route.test.cjs",
+            "tools/cn_tool_capabilities.test.cjs",
             "tools/runtime_admin.test.cjs",
             "tools/runtime_health.test.cjs",
             "tools/runtime_lifecycle.test.cjs",
@@ -473,6 +479,8 @@ test("splits isolated integration tests into focused domains", () => {
     ])
     assert.deepEqual(TEST_GROUPS["integration:event"].tests, [
         "tools/carnival_rewards.test.cjs",
+        "tools/practice_battle_history.test.cjs",
+        "tools/practice_battle_history_route.test.cjs",
         "tools/raid_event_master.test.cjs",
         "tools/raid_event_overall_rewards.test.cjs",
         "tools/raid_event_state.test.cjs",
@@ -538,6 +546,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/auto_start_stamina_stop.test.cjs",
         "tools/quest_entry_lifecycle.test.cjs",
         "tools/quest_host_finish.test.cjs",
+        "tools/story_quest_finish.test.cjs",
         "tools/tutorial_update_step.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS["integration:party"].tests, [

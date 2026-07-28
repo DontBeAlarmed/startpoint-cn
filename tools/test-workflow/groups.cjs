@@ -273,6 +273,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/auto_start_stamina_stop.test.cjs",
             "tools/quest_entry_lifecycle.test.cjs",
             "tools/quest_host_finish.test.cjs",
+            "tools/story_quest_finish.test.cjs",
             "tools/tutorial_update_step.test.cjs",
         ],
     },
