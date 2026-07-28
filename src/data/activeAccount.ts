@@ -9,7 +9,6 @@ import { getAccountPlayersSync } from "./domains/account";
 
 interface WebState {
     activePlayerId: number | null;
-    selectedAccountId: number | null;
     timeOffset: number | null;
     lastSetTime: string | null;
     defaultPlayers: Record<number, number>;
@@ -22,14 +21,13 @@ function readState(): WebState {
             const raw = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
             return {
                 activePlayerId: raw.activePlayerId ?? null,
-                selectedAccountId: raw.selectedAccountId ?? null,
                 timeOffset: raw.timeOffset ?? null,
                 lastSetTime: raw.lastSetTime ?? null,
                 defaultPlayers: raw.defaultPlayers ?? {},
             };
         }
     } catch { /* ignore corrupt file */ }
-    return { activePlayerId: null, selectedAccountId: null, timeOffset: null, lastSetTime: null, defaultPlayers: {} };
+    return { activePlayerId: null, timeOffset: null, lastSetTime: null, defaultPlayers: {} };
 }
 
 function writeState(state: WebState): void {
@@ -44,16 +42,6 @@ export function getActivePlayerId(): number | null {
 export function setActivePlayerId(id: number | null): void {
     const state = readState();
     state.activePlayerId = id;
-    writeState(state);
-}
-
-export function getSelectedAccountId(): number | null {
-    return readState().selectedAccountId;
-}
-
-export function setSelectedAccountId(id: number | null): void {
-    const state = readState();
-    state.selectedAccountId = id;
     writeState(state);
 }
 

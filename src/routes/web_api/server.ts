@@ -6,7 +6,7 @@ import { deleteAccountSync, getAccountPlayersSync, getAllAccountsSync } from "..
 import { deletePlayerSync, getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getAllDeviceBindingsSync, updateDeviceBindingNameSync } from "../../data/domains/session"
 import { getPlayerCharactersSync } from "../../data/domains/character"
-import { getActivePlayerId, setActivePlayerId, getSelectedAccountId, setSelectedAccountId, saveTimeOffset, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
+import { getActivePlayerId, setActivePlayerId, saveTimeOffset, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
 import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTemplate, getDefaultSaveMeta } from "../../data/defaultSave";
 import { detectCDNVersion, FULL_BASE, getEffectiveVersion } from "../../lib/version";
 import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance";
@@ -193,6 +193,12 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.get("/accounts", async (_request: FastifyRequest, reply: FastifyReply) => {
         const accounts = getAllAccountsSync()
         const activePlayerId = getActivePlayerId()
+        const devicesByAccount = new Map<number, Array<{ deviceId: number; name: string | null }>>()
+        for (const binding of getAllDeviceBindingsSync()) {
+            const devices = devicesByAccount.get(binding.account_id) ?? []
+            devices.push({ deviceId: binding.device_id, name: binding.name })
+            devicesByAccount.set(binding.account_id, devices)
+        }
         const result = accounts.map(acc => {
             const playerIds = getAccountPlayersSync(acc.id)
             const savedDefaultPid = getAccountDefaultPlayer(acc.id)
@@ -206,6 +212,7 @@ const routes = async (fastify: FastifyInstance) => {
                 defaultPlayerId: defaultPid,
                 defaultPlayerName: defaultPlayer?.name ?? null,
                 activePlayerId,
+                devices: devicesByAccount.get(acc.id) ?? [],
                 players: playerIds.map(pid => {
                     const player = getPlayerSync(pid)
                     return {
@@ -257,19 +264,6 @@ const routes = async (fastify: FastifyInstance) => {
     })
 
     // === Account & Save management (device-binding based) ===
-
-    // Select account to view saves
-    fastify.post("/selectAccount", async (request: FastifyRequest, reply: FastifyReply) => {
-        const { accountId } = (request.query || {}) as any
-        const aid = parseInt(accountId)
-        if (isNaN(aid)) {
-            if (wantsJson(request)) return reply.status(400).send({ error: "Invalid accountId" })
-            return reply.redirect('/player')
-        }
-        setSelectedAccountId(aid)
-        if (wantsJson(request)) return reply.send({ ok: true, accountId: aid })
-        return reply.redirect('/player')
-    })
 
     // Switch active save
     fastify.post("/activateSave", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -422,12 +416,24 @@ const routes = async (fastify: FastifyInstance) => {
 
     // Device binding rename
     fastify.post("/device/rename", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as { device_id: number; name: string }
-        const deviceId = body.device_id
-        if (!deviceId) return reply.status(400).send({ error: "Missing device_id" })
-
-        updateDeviceBindingNameSync(deviceId, body.name || null)
-        return reply.status(200).send({ ok: true })
+        const body = request.body as { deviceId?: unknown; name?: unknown }
+        const deviceId = body.deviceId
+        if (!Number.isSafeInteger(deviceId) || (deviceId as number) <= 0) {
+            return reply.status(400).send({ error: "Invalid deviceId" })
+        }
+        if (body.name !== undefined && typeof body.name !== "string") {
+            return reply.status(400).send({ error: "Invalid device name" })
+        }
+        const name = typeof body.name === "string" && body.name.trim() !== ""
+            ? body.name.trim()
+            : null
+        if (name !== null && name.length > 64) {
+            return reply.status(400).send({ error: "Device name must not exceed 64 characters" })
+        }
+        if (!updateDeviceBindingNameSync(deviceId as number, name)) {
+            return reply.status(404).send({ error: "Device binding not found" })
+        }
+        return reply.status(200).send({ ok: true, deviceId, name })
     })
 }
 

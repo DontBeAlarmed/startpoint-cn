@@ -37,8 +37,8 @@
 
 | 路由族 | 状态 | 当前边界 | 注册或源码入口 | Current 文档 |
 |---|---|---|---|---|
-| 管理 Web API | **Partial** | 玩家、存档、邮件、查询、服务状态和抽卡种子接口已接入；破坏性操作和完整浏览器矩阵尚未验收 | `src/routes/web_api/` | [管理后台](../admin/README.md) |
-| React 管理后台 | **Partial** | 服务端唯一管理界面；`build:server`、运行时和 Bundle 均强制要求 `/admin/` 产物，旧路径只做 SPA 兼容重定向；页面功能、响应式设备和真实操作仍处于人工验收阶段 | `admin/`、`web/dist/`、`src/runtime/admin.ts` | [管理后台](../admin/README.md) |
+| 管理 Web API | **Partial** | 玩家、存档、设备备注、邮件、查询、服务状态和抽卡种子接口已接入；EX 能力清除有持久化契约测试，每日/每周任务强制重置明确不支持；破坏性操作和完整浏览器矩阵尚未验收 | `src/routes/web_api/` | [管理后台](../admin/README.md) |
+| React 管理后台 | **Partial** | 服务端唯一管理界面；`build:server`、运行时和 Bundle 均强制要求 `/admin/` 产物，入口引用资源会在启动时校验，旧路径只做 SPA 兼容重定向；手机、平板和真实破坏性操作仍处于人工验收阶段 | `admin/`、`web/dist/`、`src/runtime/admin.ts` | [管理后台](../admin/README.md) |
 
 ## 使用规则
 

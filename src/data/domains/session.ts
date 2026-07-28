@@ -101,8 +101,8 @@ export function getAllDeviceBindingsSync(): { device_id: number, account_id: num
     return getDb().prepare(`SELECT device_id, account_id, name FROM device_bindings`).all() as any[]
 }
 
-export function updateDeviceBindingNameSync(deviceId: number, name: string | null): void {
-    getDb().prepare(`UPDATE device_bindings SET name = ? WHERE device_id = ?`).run(name, deviceId)
+export function updateDeviceBindingNameSync(deviceId: number, name: string | null): boolean {
+    return getDb().prepare(`UPDATE device_bindings SET name = ? WHERE device_id = ?`).run(name, deviceId).changes === 1
 }
 
 /**

@@ -22,8 +22,15 @@ function projectFixture(t, { withIndex = true } = {}) {
     t.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }))
     const distDir = path.join(projectRoot, "web/dist")
     fs.mkdirSync(path.join(distDir, "assets"), { recursive: true })
-    if (withIndex) fs.writeFileSync(path.join(distDir, "index.html"), "<main>admin shell</main>")
+    if (withIndex) fs.writeFileSync(path.join(distDir, "index.html"), `
+        <link rel="icon" href="/admin/assets/logo.png">
+        <link rel="stylesheet" href="/admin/assets/app.css">
+        <main>admin shell</main>
+        <script type="module" src="/admin/assets/app.js"></script>
+    `)
     fs.writeFileSync(path.join(distDir, "assets/app.js"), "globalThis.admin = true")
+    fs.writeFileSync(path.join(distDir, "assets/app.css"), "main { display: block }")
+    fs.writeFileSync(path.join(distDir, "assets/logo.png"), "logo")
     return projectRoot
 }
 
@@ -32,6 +39,17 @@ test("runtime rejects startup when the required admin index is missing", t => {
     const missingRoot = projectFixture(t, { withIndex: false })
 
     assert.throws(() => requireAdminBuild(missingRoot), /admin.*web\/dist\/index\.html/i)
+})
+
+test("runtime rejects startup when an admin entry asset is missing", t => {
+    const { requireAdminBuild } = loadAdminRuntime()
+    const projectRoot = projectFixture(t)
+    fs.unlinkSync(path.join(projectRoot, "web/dist/assets/app.js"))
+
+    assert.throws(
+        () => requireAdminBuild(projectRoot),
+        /admin.*assets\/app\.js/i,
+    )
 })
 
 test("admin UI owns root, compatibility redirects, assets, and client routes", async t => {

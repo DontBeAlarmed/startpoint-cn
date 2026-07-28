@@ -28,14 +28,14 @@ bash scripts/start-cn.sh
 
 ## 管理后台
 
-React 管理后台是服务端唯一管理界面，也是受支持构建和启动的必需产物。根目录 `npm ci` 会按同一份 `package-lock.json` 安装服务端与 `admin` workspace 依赖；标准 `build` 和受支持的启动入口都会通过 `build:server` 先生成并校验 `web/dist/index.html`。
+React 管理后台是服务端唯一管理界面，也是受支持构建和启动的必需产物。根目录 `npm ci` 会按同一份 `package-lock.json` 安装服务端与 `admin` workspace 依赖。标准 `build`、`bash scripts/start-cn.sh` 和 `npm run dev:cn` 都会通过 `build:server` 先生成后台；`npm run start:cn` 明确复用已有构建，适用于已经完成构建的部署目录。运行时会校验 `web/dist/index.html` 及其引用的本地入口资源。
 
 ```bash
 npm ci
 npm run build
 ```
 
-缺少后台入口文件时，服务端会在初始化阶段明确拒绝启动。`/` 和旧管理路径只重定向到 `/admin/` 下的对应 SPA 页面，不再提供旧 HTML。
+缺少后台入口文件或入口引用的脚本、样式、图标时，服务端会在初始化阶段明确拒绝启动。`/` 和旧管理路径只重定向到 `/admin/` 下的对应 SPA 页面，不再提供旧 HTML。
 
 ## 网络范围
 

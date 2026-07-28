@@ -90,6 +90,7 @@ export default function PlayerDetail() {
     })
 
     const refresh = () => qc.invalidateQueries({ queryKey: ["playerDetail", pid] })
+    const showMutationError = (error: Error) => message.error(error.message)
 
     const editField = useMutation({
         mutationFn: ({ field, value }: { field: string; value: any }) =>
@@ -105,6 +106,7 @@ export default function PlayerDetail() {
     const delChar = useMutation({
         mutationFn: (code: number) => apiDelete(`/api/player/${pid}/character/${code}`),
         onSuccess: () => { message.success("角色已删除"); refresh() },
+        onError: showMutationError,
     })
 
     const addItem = useMutation({
@@ -117,33 +119,42 @@ export default function PlayerDetail() {
     const delItem = useMutation({
         mutationFn: (itemId: number) => apiDelete(`/api/player/${pid}/item/${itemId}`),
         onSuccess: () => { message.success("道具已删除"); refresh() },
+        onError: showMutationError,
     })
 
     const delQuestProgress = useMutation({
         mutationFn: ({ section, questId }: { section: number; questId: number }) =>
             apiDelete(`/api/player/${pid}/quest_progress/${section}/${questId}`),
         onSuccess: () => { message.success("关卡记录已删除"); refresh() },
+        onError: showMutationError,
     })
 
     const clearAllQuestProgress = useMutation({
         mutationFn: () => apiDelete(`/api/player/${pid}/quest_progress`),
         onSuccess: () => { message.success("全部关卡记录已清除"); refresh() },
+        onError: showMutationError,
     })
 
     const delDrawnQuest = useMutation({
         mutationFn: ({ category, questId }: { category: number; questId: number }) =>
             apiDelete(`/api/player/${pid}/drawn_quest/${category}/${questId}`),
         onSuccess: () => { message.success("抽选记录已删除"); refresh() },
+        onError: showMutationError,
     })
 
     const clearAllDrawnQuests = useMutation({
         mutationFn: () => apiDelete(`/api/player/${pid}/drawn_quest`),
         onSuccess: () => { message.success("全部抽选记录已清除"); refresh() },
+        onError: showMutationError,
     })
 
     const clearExBoost = useMutation({
-        mutationFn: () => apiPost(`/api/player/${pid}/clear_ex_boost`),
-        onSuccess: () => { message.success("EX Boost 已清除"); refresh() },
+        mutationFn: () => apiPost<{ ok: boolean; clearedCharacters: number }>(`/api/player/${pid}/clear_ex_boost`),
+        onSuccess: ({ clearedCharacters }) => {
+            message.success(`已清除 ${clearedCharacters} 个角色的 EX 能力`)
+            refresh()
+        },
+        onError: showMutationError,
     })
 
     const clearReceiveHistory = useMutation({
@@ -155,16 +166,19 @@ export default function PlayerDetail() {
     const resetParties = useMutation({
         mutationFn: () => apiPost(`/api/player/${pid}/reset_parties`),
         onSuccess: () => { message.success("编队已重置"); refresh() },
+        onError: showMutationError,
     })
 
     const clearMail = useMutation({
         mutationFn: () => apiDelete(`/api/player/${pid}/mail`),
         onSuccess: () => { message.success("邮箱已清空"); refresh() },
+        onError: showMutationError,
     })
 
     const resetChallenge = useMutation({
         mutationFn: () => apiPost(`/api/player/${pid}/reset_challenge`),
         onSuccess: () => { message.success("每日挑战已重置"); refresh() },
+        onError: showMutationError,
     })
 
     const importSave = useMutation({
@@ -425,7 +439,7 @@ export default function PlayerDetail() {
                     <Card title="工具操作" size="small">
                         <Space wrap>
                             <Popconfirm title="清除全部 EX Boost？" onConfirm={() => clearExBoost.mutate()} okText="确认" cancelText="取消">
-                                <Button size="small">清除 EX Boost</Button>
+                                <Button size="small" loading={clearExBoost.isPending}>清除 EX Boost</Button>
                             </Popconfirm>
                             <Popconfirm title="重置编队到默认？" onConfirm={() => resetParties.mutate()} okText="确认" cancelText="取消">
                                 <Button size="small" icon={<UndoOutlined />}>重置编队</Button>

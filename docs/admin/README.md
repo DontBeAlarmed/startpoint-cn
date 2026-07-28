@@ -6,7 +6,7 @@
 
 管理后台源码位于 `admin/`，使用 React、TypeScript、Vite、Ant Design 和 React Query，并构建到 `web/dist/`。服务端始终在 `/admin/` 挂载静态产物，为 `/admin/*` 中不带扩展名的客户端路由回退到同一个 `index.html`；`/admin/assets/*` 和带扩展名路径缺失时返回 404。访问 `/` 或 `/admin` 会进入 `/admin/`。
 
-`/player`、`/player/:id`、`/mail` 和 `/seeds` 仅保留到 `/admin/` 对应页面的兼容重定向。旧 `src/routes/web/` 和 `web/pages/` 已删除，不再提供服务器渲染 HTML。缺少或损坏 `web/dist/index.html` 时，运行时会在初始化阶段拒绝启动；游戏 API、管理 API 和 `/healthz` 不进入 SPA fallback。服务端不再挂载通用 `/public` 静态根。
+`/player`、`/player/:id`、`/mail` 和 `/seeds` 仅保留到 `/admin/` 对应页面的兼容重定向。旧 `src/routes/web/` 和 `web/pages/` 已删除，不再提供服务器渲染 HTML。缺少或损坏 `web/dist/index.html`，或入口引用的本地脚本、样式、图标缺失时，运行时会在初始化阶段拒绝启动；游戏 API、管理 API和 `/healthz` 不进入 SPA fallback。服务端不再挂载通用 `/public` 静态根。
 
 普通开发默认从本地 `web/public/comic/` 读取漫画；嵌入模式通过绝对 `COMIC_DIR` 挂载外置漫画目录，未配置时漫画不可用。图片由 `/api/index.php/comic/image` 读取，该目录不属于后台构建产物，也不进入 Server Bundle。
 
@@ -23,6 +23,10 @@
 
 后台请求携带 `Accept: application/json`。新增后台功能应提供明确的 JSON 请求和响应，不在 React 页面中直接访问 SQLite。
 
+账号页同时展示账号的设备绑定。设备名称只用于管理员识别本地设备，空名称表示清除备注，不改变 `device_id -> account_id` 绑定。玩家页的“清除 EX 能力”会同时清空该玩家所有角色的 EX 状态 ID 和能力列表，并返回实际受影响的角色数量；重复执行是成功的零修改操作，不返还任何养成材料。
+
+每日任务和每周任务的管理员强制重置不属于新后台支持范围。周期切换仍由任务系统根据全局服务器时间处理，后台只保留“重置每日挑战”这一独立的挑战次数恢复操作。清空邮箱统一使用 `DELETE /api/player/:id/mail`，不再保留旧 SSR 专用的重复接口；账号页选择状态只存在于浏览器，不写入服务端运行状态。
+
 ## 构建边界
 
 根 `package.json` 将 `admin` 声明为 npm workspace，根 `package-lock.json` 是服务端和后台的唯一依赖锁。可复现安装与受支持构建为：
@@ -38,7 +42,7 @@ Server Bundle 始终打包完整 `web/dist/`，manifest 固定为 `admin.require
 
 ## 当前页面与验收边界
 
-后台目前包含总览、时间与千里眼、账号与存档、玩家详情、邮件、种子管理和游戏设置页面。源码级测试覆盖部分 API 契约、表单规则和页面接线；尚未建立完整的浏览器交互、响应式设备和破坏性操作回归。
+后台目前包含总览、时间与千里眼、账号与存档、玩家详情、邮件、种子管理和游戏设置页面。账号与存档页已接入设备名称修改，所有 React Query 写操作都提供成功和失败反馈。源码级测试覆盖 API 契约、EX 能力清除、设备修改、表单规则和页面接线；电脑浏览器的完整破坏性操作回归，以及手机和平板布局验收仍延期。
 
 ## 运行时游戏设置
 

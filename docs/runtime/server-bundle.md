@@ -11,9 +11,9 @@ npm run verify:bundle -- /path/to/server-bundle --data-schema 12
 npm run verify:bundle -- /path/to/server-bundle --dependency-lock sha256:<runtime-pack-lock>
 ```
 
-构建器收集 `out/`、业务基线 `assets/`、必需的 `web/dist/`，以及 `LICENSE`、`NOTICE`。它排除 TypeScript 增量状态和 `assets/asset-patch/`，并且完全不读取 `web/public/`；fresh clone 中该目录不存在也不影响构建。`web/dist/index.html` 不存在或不是普通文件时构建失败，manifest 固定写入 `admin.required=true`；源码中存在遗留 `web/pages` 目录时也会明确拒绝构建。
+构建器收集 `out/`、业务基线 `assets/`、必需的 `web/dist/`，以及 `LICENSE`、`NOTICE`。它排除 TypeScript 增量状态和 `assets/asset-patch/`，并且完全不读取 `web/public/`；fresh clone 中该目录不存在也不影响构建。`web/dist/index.html` 不存在或不是普通文件时构建失败，manifest 固定写入 `admin.required=true`；源码中存在遗留 `web/pages` 目录时也会明确拒绝构建。服务启动还会检查 `index.html` 实际引用的本地 `/admin/` 入口资源是否为普通文件，但不重复执行 Bundle 的全文件 SHA256 校验。
 
-`dist/server-bundle` 是离线构建输出，不是 Supervisor 的 active Bundle 指针，也不能用于运行中热替换。构建和校验期间调用者必须独占源码输入或导入 staging，不能让其他进程并发改名、替换目录或文件。已有输出只有先通过完整 verifier 才会被构建器认作自身产物；伪造简化 manifest、混入个人文件或损坏的旧目录都会被保留并拒绝覆盖。Supervisor 应把验证完成的 Bundle 导入自己的不可变版本目录，再切换其管理的 active 指针。
+`dist/server-bundle` 是离线构建输出，不是 Supervisor 的 active Bundle 指针，也不能用于运行中热替换。构建和校验期间调用者必须独占源码输入或导入 staging，不能让其他进程并发改名、替换目录或文件。已有输出只有先通过当前完整 verifier 才会被构建器认作自身产物；早期契约 Bundle、伪造简化 manifest、混入个人文件或损坏目录都会被保留并拒绝覆盖。升级构建器后应由操作者移走旧离线产物再重新构建，不为生成目录维护跨契约迁移逻辑。Supervisor 应把验证完成的 Bundle 导入自己的不可变版本目录，再切换其管理的 active 指针。
 
 `server-manifest.json` 使用递归键排序的 UTF-8 canonical JSON，并以换行结尾。`files` 按 POSIX 相对路径稳定排序，记录普通文件的字节数和小写 SHA256。manifest 自身不进入 `files`，避免摘要递归；`bundleId` 是移除 `bundleId` 后 canonical manifest 的 SHA256。`requires.dependencyLock` 是构建输入 `package-lock.json` 原始字节的 SHA256；Runtime Pack 必须用同一 lock 执行 `npm ci --omit=dev`，Supervisor 再通过 verifier 的 `--dependency-lock` 做依赖锁兼容校验。Node ABI、平台、CPU 架构和原生模块仍由 Supervisor 按 Runtime Pack manifest 独立校验。
 

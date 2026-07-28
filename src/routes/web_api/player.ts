@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { validatePlayerField, VALID_CHARACTER_IDS, isValidItemId, MAX_INT } from "./validation";
 import { wantsJson } from "./http";
-import { dailyResetPlayerDataSync, getAllPlayersSync, getDefaultPlayerPartyGroupsSync, getPlayerDailyChallengePointListSync, getPlayerSync, insertPlayerDailyChallengePointListSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
+import { getAllPlayersSync, getDefaultPlayerPartyGroupsSync, getPlayerDailyChallengePointListSync, getPlayerSync, insertPlayerDailyChallengePointListSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
 import { deleteAllPlayerMailSync } from "../../data/domains/mail"
 import { getDb } from "../../data/db"
 import { getPlayerCharactersSync, insertDefaultPlayerCharacterSync, insertPlayerCharacterSync } from "../../data/domains/character"
@@ -10,9 +10,6 @@ import { getPlayerItemsSync, setPlayerItemSync, updatePlayerItemSync } from "../
 import { getPlayerQuestProgressSync, getPlayerDrawnQuestsSync } from "../../data/domains/quest"
 import { insertPlayerPartyGroupListSync } from "../../data/domains/party"
 import { PartyCategory } from "../../data/types";
-import { buildPeriodicSnapshotData, takeSnapshot } from "../../lib/mission/snapshot";
-import { deletePlayerCategoryMissionsSync } from "../../data/domains/mission";
-import { getServerDate } from "../../utils";
 import bundledDailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import {
@@ -236,10 +233,17 @@ const routes = async (fastify: FastifyInstance) => {
     // Clear all EX boost data for all characters
     fastify.post("/:id/clear_ex_boost", async (request: FastifyRequest, reply: FastifyReply) => {
         const playerId = Number((request.params as any).id)
-        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
-        getDb().prepare(`UPDATE players_characters SET ex_boost_status_id = NULL, ex_boost_ability_id_list = NULL WHERE player_id = ?`).run(playerId)
-        if (wantsJson(request)) return reply.status(200).send({ ok: true })
-        return reply.redirect(`/player/${playerId}#actions`)
+        if (!Number.isSafeInteger(playerId) || playerId <= 0) {
+            return reply.status(400).send({ error: "Invalid player ID" })
+        }
+        if (!getPlayerSync(playerId)) return reply.status(404).send({ error: "Player not found" })
+        const result = getDb().prepare(`
+            UPDATE players_characters
+            SET ex_boost_status_id = NULL, ex_boost_ability_id_list = NULL
+            WHERE player_id = ?
+              AND (ex_boost_status_id IS NOT NULL OR ex_boost_ability_id_list IS NOT NULL)
+        `).run(playerId)
+        return reply.status(200).send({ ok: true, clearedCharacters: result.changes })
     })
 
     // Reset parties to defaults
@@ -250,14 +254,6 @@ const routes = async (fastify: FastifyInstance) => {
         getDb().prepare(`DELETE FROM players_party_groups WHERE player_id = ?`).run(playerId)
         insertPlayerPartyGroupListSync(playerId, getDefaultPlayerPartyGroupsSync(PartyCategory.NORMAL))
         if (wantsJson(request)) return reply.status(200).send({ ok: true })
-        return reply.redirect(`/player/${playerId}#actions`)
-    })
-
-    // Clear all mails
-    fastify.post("/:id/clear_mail", async (request: FastifyRequest, reply: FastifyReply) => {
-        const playerId = Number((request.params as any).id)
-        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
-        deleteAllPlayerMailSync(playerId)
         return reply.redirect(`/player/${playerId}#actions`)
     })
 
@@ -439,57 +435,6 @@ const routes = async (fastify: FastifyInstance) => {
         }
     })
 
-    // Admin: force daily mission reset (snapshot + wipe cache)
-    fastify.post("/:id/daily_reset", async (request: FastifyRequest, reply: FastifyReply) => {
-        const playerId = Number((request.params as any).id)
-        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
-        const player = getPlayerSync(playerId)
-        if (!player) return reply.status(404).send({ error: "Player not found" })
-        try {
-            const questProgress = getPlayerQuestProgressSync(playerId)
-            let totalClears = 0, ss = 0, s = 0, a = 0, b = 0
-            for (const [, quests] of Object.entries(questProgress)) {
-                for (const qp of quests) {
-                    if (qp.finished) {
-                        totalClears++
-                        if (qp.clearRank === 5) ss++
-                        else if (qp.clearRank === 4) s++
-                        else if (qp.clearRank === 3) a++
-                        else if (qp.clearRank === 2) b++
-                    }
-                }
-            }
-            takeSnapshot(playerId, 'daily', buildPeriodicSnapshotData(playerId, player, totalClears))
-            deletePlayerCategoryMissionsSync(playerId, 2)
-            return reply.status(200).send({ ok: true })
-        } catch (e: any) { return reply.status(500).send({ error: e.message }) }
-    })
-
-    // Admin: force weekly mission reset (snapshot + wipe cache)
-    fastify.post("/:id/weekly_reset", async (request: FastifyRequest, reply: FastifyReply) => {
-        const playerId = Number((request.params as any).id)
-        if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid player ID" })
-        const player = getPlayerSync(playerId)
-        if (!player) return reply.status(404).send({ error: "Player not found" })
-        try {
-            const questProgress = getPlayerQuestProgressSync(playerId)
-            let totalClears = 0, ss = 0, s = 0, a = 0, b = 0
-            for (const [, quests] of Object.entries(questProgress)) {
-                for (const qp of quests) {
-                    if (qp.finished) {
-                        totalClears++
-                        if (qp.clearRank === 5) ss++
-                        else if (qp.clearRank === 4) s++
-                        else if (qp.clearRank === 3) a++
-                        else if (qp.clearRank === 2) b++
-                    }
-                }
-            }
-            takeSnapshot(playerId, 'weekly', buildPeriodicSnapshotData(playerId, player, totalClears))
-            deletePlayerCategoryMissionsSync(playerId, 10)
-            return reply.status(200).send({ ok: true })
-        } catch (e: any) { return reply.status(500).send({ error: e.message }) }
-    })
 }
 
 export default routes;

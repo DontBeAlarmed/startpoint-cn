@@ -12,8 +12,14 @@ interface AccountRow {
     defaultPlayerId: number | null
     defaultPlayerName: string | null
     activePlayerId: number | null
+    devices: DeviceBinding[]
     players: PlayerBrief[]
     playerIds: number[]
+}
+
+interface DeviceBinding {
+    deviceId: number
+    name: string | null
 }
 
 interface PlayerBrief {
@@ -31,6 +37,8 @@ export default function Accounts() {
     const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
     const [renameId, setRenameId] = useState<number | null>(null)
     const [renameName, setRenameName] = useState("")
+    const [renameDeviceId, setRenameDeviceId] = useState<number | null>(null)
+    const [renameDeviceName, setRenameDeviceName] = useState("")
 
     const { data: accounts = [], isLoading } = useQuery({
         queryKey: ["accounts"],
@@ -43,20 +51,24 @@ export default function Accounts() {
     const refresh = () => {
         qc.invalidateQueries({ queryKey: ["accounts"] })
     }
+    const showMutationError = (error: Error) => message.error(error.message)
 
     const activateSave = useMutation({
         mutationFn: (playerId: number) => apiPost("/api/server/activateSave?playerId=" + playerId),
         onSuccess: () => { message.success("已切换生效存档"); refresh() },
+        onError: showMutationError,
     })
 
     const newSave = useMutation({
         mutationFn: (accountId: number) => apiPost("/api/server/newSave?accountId=" + accountId),
         onSuccess: () => { message.success("新存档已创建"); refresh() },
+        onError: showMutationError,
     })
 
     const deleteSave = useMutation({
         mutationFn: (playerId: number) => apiPost("/api/server/deleteSave?playerId=" + playerId),
         onSuccess: () => { message.success("存档已删除"); refresh() },
+        onError: showMutationError,
     })
 
     const deleteAccount = useMutation({
@@ -66,18 +78,35 @@ export default function Accounts() {
             if (selectedAccountId === (deleteAccount.variables as number)) setSelectedAccountId(null)
             refresh()
         },
+        onError: showMutationError,
     })
 
     const renameSave = useMutation({
         mutationFn: ({ playerId, name }: { playerId: number; name: string }) =>
             apiPost("/api/server/renameSave", { playerId, name }),
         onSuccess: () => { message.success("已改名"); setRenameId(null); refresh() },
+        onError: showMutationError,
     })
 
     const cloneSave = useMutation({
         mutationFn: ({ playerId, accountId }: { playerId: number; accountId: number }) =>
             apiPost(`/api/server/cloneSave?playerId=${playerId}&accountId=${accountId}`),
         onSuccess: () => { message.success("存档已复制"); refresh() },
+        onError: showMutationError,
+    })
+
+    const renameDevice = useMutation({
+        mutationFn: ({ deviceId, name }: { deviceId: number; name: string }) =>
+            apiPost<{ ok: boolean; deviceId: number; name: string | null }>(
+                "/api/server/device/rename",
+                { deviceId, name },
+            ),
+        onSuccess: ({ name }) => {
+            message.success(name === null ? "设备名称已清除" : "设备名称已更新")
+            setRenameDeviceId(null)
+            refresh()
+        },
+        onError: showMutationError,
     })
 
     const accountColumns = [
@@ -95,6 +124,53 @@ export default function Accounts() {
                     </Space>
                 )
             },
+        },
+        {
+            title: "绑定设备", width: 230,
+            render: (_: unknown, row: AccountRow) => row.devices.length === 0 ? <Tag>无</Tag> : (
+                <Space direction="vertical" size={4}>
+                    {row.devices.map(device => renameDeviceId === device.deviceId ? (
+                        <div className="admin-edit-compact" key={device.deviceId}>
+                            <Input
+                                size="small"
+                                value={renameDeviceName}
+                                maxLength={64}
+                                placeholder={`设备 ${device.deviceId}`}
+                                onChange={event => setRenameDeviceName(event.target.value)}
+                                onPressEnter={() => renameDevice.mutate({
+                                    deviceId: device.deviceId,
+                                    name: renameDeviceName,
+                                })}
+                                style={{ width: 120 }}
+                            />
+                            <Button
+                                size="small"
+                                type="primary"
+                                loading={renameDevice.isPending}
+                                onClick={() => renameDevice.mutate({
+                                    deviceId: device.deviceId,
+                                    name: renameDeviceName,
+                                })}
+                            >确定</Button>
+                            <Button size="small" onClick={() => setRenameDeviceId(null)}>取消</Button>
+                        </div>
+                    ) : (
+                        <Space size={4} key={device.deviceId}>
+                            <Tag>{device.name ?? `设备 ${device.deviceId}`}</Tag>
+                            <Button
+                                type="text"
+                                size="small"
+                                title="修改设备名称"
+                                icon={<EditOutlined />}
+                                onClick={() => {
+                                    setRenameDeviceId(device.deviceId)
+                                    setRenameDeviceName(device.name ?? "")
+                                }}
+                            />
+                        </Space>
+                    ))}
+                </Space>
+            ),
         },
         {
             title: "操作", width: 250,
