@@ -88,7 +88,7 @@ cost = max(1, floor(baseCost * activeRate))
 
 - 多人开战不扣体力；
 - 自动连战在体力不足时仍按普通入场返回 H400，客户端缺少官方的非致命停止语义；
-- 体力、门票与 active quest 已在单人 start 事务化，但普通 finish 的整体事务仍不完整；
+- 体力、门票与 active quest 已在单人 start 事务化；单人和协力 finish 的数据库写入也已有总事务，详见[战斗关卡结算事务](./quest-finish-transactions.md)；
 - 客户端显示和长时间离线恢复仍需结合服务器 `timeOffset` 做人工验收。
 
 当前项目不按存档单独应用 `time_offset`。活动折扣使用带全局 `timeOffset` 的 `getServerDate()`；自然恢复使用真实 `Date.now()` 计算经过秒数。两者是有意分离的时间来源，非零全局偏移不会加速或倒退玩家的自然恢复。

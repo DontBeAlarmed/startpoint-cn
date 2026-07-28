@@ -52,45 +52,7 @@ import {
     settleAdditionalRewardsSync,
     type AdditionalRewardTable,
 } from "../../lib/additional-reward";
-
-async function buildFinishFollowInfo(
-    viewerId: number,
-    mateResults: Array<{ viewer_id?: number }>,
-    fallbackMateIds: number[] = [],
-) {
-    const ids = new Set<number>();
-    for (const result of mateResults) {
-        const mateViewerId = Number(result?.viewer_id);
-        if (Number.isFinite(mateViewerId)) ids.add(mateViewerId);
-    }
-    for (const mateViewerId of fallbackMateIds) {
-        if (Number.isFinite(mateViewerId)) ids.add(Number(mateViewerId));
-    }
-
-    const followInfo = [];
-    for (const mateViewerId of ids) {
-        if (mateViewerId === viewerId || mateViewerId >= 900000000) continue;
-
-        const mateCtx = await resolveMultiPlayerContext(mateViewerId);
-        if (!mateCtx) continue;
-
-        followInfo.push({
-            viewer_id: mateViewerId,
-            name: mateCtx.player.name,
-            last_login_time: getServerTime(new Date()),
-            rank: getRankDegree(mateCtx.player.rankPoint || 0),
-            comment: "",
-            role: mateCtx.player.role || 1,
-            degree_id: mateCtx.player.degreeId || 1,
-            follow_state: 0,
-            follow_time: null,
-            followed_time: null,
-            profile_image_url: null,
-        });
-    }
-
-    return followInfo;
-}
+import { buildFinishFollowInfo } from "../../lib/quest/finish/follow-info";
 
 export function canFinishMultiBattleQuest(
     quest: Pick<BattleQuest, "isBothBoss">,
