@@ -51,6 +51,7 @@
 
 - [装备强化审计](./equipment-upgrade-audit.md)
 - [扭蛋赔率修复](./gacha-odds-fix.md)
+- [抽卡写入事务](./gacha-transactions.md)
 - [早期活动代币修复](./event-currency-fix.md)
 - [NPC 昵称贡献](./npc-contributor-names.md)
 

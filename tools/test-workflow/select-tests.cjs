@@ -106,6 +106,10 @@ const SOURCE_RULES = [
         pattern: /^src\/lib\/(?:gacha|gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-seed-catalog|gacha-ticket)\.ts$/,
         groups: ["quick:gacha"],
     },
+    {
+        pattern: /^src\/routes\/api\/gacha\.ts$/,
+        groups: ["integration:rules", "quick:gacha"],
+    },
     { pattern: /^src\/routes\/web_api\/seeds\.ts$/, groups: ["quick:seed"] },
     {
         pattern: /^src\/routes\/api\/singleBattleQuest\.ts$/,

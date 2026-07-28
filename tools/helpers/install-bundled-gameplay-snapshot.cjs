@@ -74,7 +74,11 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "story_join_character.json",
 ]
 
-function installBundledGameplaySnapshot({ onRestore, tableOverrides = {} } = {}) {
+function installBundledGameplaySnapshot({
+    onRestore,
+    tableOverrides = {},
+    additionalTableNames = [],
+} = {}) {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     const characterTable = deepFreeze(structuredClone(
         require(path.join(projectRoot, "assets", CHARACTER_TABLE_NAME))
@@ -83,7 +87,7 @@ function installBundledGameplaySnapshot({ onRestore, tableOverrides = {} } = {})
         require(path.join(projectRoot, "assets", CHARACTER_CONTENT_TABLE_NAME))
     ))
     const gameplayTables = Object.fromEntries(
-        [...REWARD_TABLE_NAMES, ...QUEST_TABLE_NAMES, ...GAMEPLAY_DYNAMIC_TABLE_NAMES]
+        [...REWARD_TABLE_NAMES, ...QUEST_TABLE_NAMES, ...GAMEPLAY_DYNAMIC_TABLE_NAMES, ...additionalTableNames]
             .map(tableName => [
         tableName,
         deepFreeze(structuredClone(
