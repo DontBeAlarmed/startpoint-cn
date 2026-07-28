@@ -7,12 +7,12 @@
 | 端点 | 当前行为 |
 |---|---|
 | `/mail/index` | 按页返回当前存档邮件，默认每页最多 100 条 |
-| `/mail/receive` | 领取一封未领取邮件，发放附件并标记 receive time |
-| `/mail/receive_all` | 对请求中的未领取邮件逐封发奖，再批量标记已领取 |
+| `/mail/receive` | 在单一事务中校验并发放一封附件、写领取历史、标记 receive time |
+| `/mail/receive_all` | 对请求 ID 去重，并在单一事务中完成全部附件、历史和领取标记 |
 
 邮件是否未领取以 `receive_time = '0000-00-00 00:00:00'` 判断。领取记录会写入 `players_receive_history`。
 
-当前领取顺序是先发放附件、再标记邮件，不是覆盖两者的单一总事务。`receive_all` 也会逐封发奖后再批量标记；中途异常仍存在部分状态风险，不能标记为完整原子流程。
+单领和全领都以 SQLite 外层事务覆盖附件发放、`players_receive_history`、邮件领取时间和角色觉醒解锁响应。任一步骤异常会回滚整个请求；批量请求中的重复 `mail_id` 只处理一次，不会重复发奖。已经领取或不存在的 ID 仍计入 `already_mail_count`，不会使其他合法邮件失败。
 
 ## 已支持附件
 
@@ -33,11 +33,11 @@
 | 12 | boost point |
 | 15 | rank point |
 
-`MailType` 枚举还定义了 13、14、16、17，但后台不允许发送，游戏领取也没有对应发奖分支，因此不属于当前支持类型。
+`MailType` 枚举还定义了 13、14、16、17，但后台不允许发送，游戏领取也没有对应发奖分支，因此不属于当前支持类型。存档中若因旧数据或手工写入出现不支持类型，领取接口返回明确错误并保留未领取状态，不再把邮件静默标记为已领取。
 
 `type_id` 只允许并要求用于道具、角色和装备；其他附件带 `type_id` 会被拒绝，不会静默忽略。三类 ID 分别按当前道具、角色和装备资源集合校验。
 
-角色和装备每封只能发送 1 个。道具数量按 ID 范围应用不同上限；其他资源使用 int32 安全范围。最终规则以 `src/lib/admin-mail-rules.ts` 为唯一事实来源。
+角色和装备每封只能发送 1 个。道具数量按 ID 范围应用不同上限；其他资源使用 int32 安全范围。最终规则以 `src/lib/admin-mail-rules.ts` 为唯一事实来源。角色附件统一调用正常角色发放器：重复角色增加 `stack` 并发放对应重复素材，不再错误增加 `entry_count`。
 
 ## 后台发送目标
 
@@ -61,17 +61,16 @@
 
 ## 存档与恢复边界
 
-邮件保存在 `players_mails`，但当前管理端 MergedPlayerData 快照不包含邮箱和领取历史。导出/导入存档不能作为邮件备份。
+V2 完整存档快照通过玩家领域 Registry 包含 `players_mails` 和 `players_receive_history`，导入、克隆与恢复会一并处理。旧 V1 快照明确标记为 `legacyPartial=true`，不会覆盖这些新领域，不能作为邮件完整备份。
 
 `DELETE /api/player/:id/mail` 可以清空指定存档邮箱，用于误发非法邮件后的管理恢复。该操作不可撤销，且不会回滚已经领取的附件。
 
 ## 已知边界
 
-- 12 种支持附件尚无完整逐类型客户端验收矩阵；
-- 领取与标记未形成单一总事务；
+- 12 种支持附件尚无完整逐类型客户端验收矩阵；13、14、16、17 继续明确拒绝，不推测发奖语义；
 - `mail_arrived` 已在主要成功写响应统一；读取、stub 和非成功 `result_code` 响应仍可能不携带该字段，且客户端提示刷新仍需逐类确认；
 - 全服发送不是跨收件人事务，也没有持久审计历史；
-- 邮件不包含在当前存档导入导出中。
+- V2 已覆盖邮件，旧 V1 仍是部分恢复格式。
 
 ## 验证入口
 
@@ -82,6 +81,7 @@
 - `tools/inventory_rules.test.cjs`；
 - `tools/mail_notification.test.cjs`；
 - `tools/mail_notification_write_routes.test.cjs`；
+- `tools/mail_receive_transaction.test.cjs`；
 - `tools/expod_inject_exp_route.test.cjs`；
 - `tools/rush_event_shop_route.test.cjs`。
 
