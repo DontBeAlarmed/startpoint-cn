@@ -19,6 +19,8 @@ const SHOP_TABLES = Object.freeze([
     "event_item_shop_id_map.json",
     "boss_coin_shop.json",
     "boss_coin_shop_item_category_map.json",
+    "shop_item_campaign.json",
+    "shop_select_item_campaign.json",
     "star_grain_shop.json",
     "treasure_shop.json",
     "equipment_enhancement_shop.json",
@@ -31,7 +33,7 @@ function assertDeepFrozen(value, seen = new Set()) {
     for (const key of Reflect.ownKeys(value)) assertDeepFrozen(value[key], seen)
 }
 
-test("ContentSnapshotProvider initializes and freezes all eight real bundled shop tables", async t => {
+test("ContentSnapshotProvider initializes and freezes all ten real bundled shop tables", async t => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "shop-snapshot-provider-"))
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))
     const projectRoot = path.resolve(__dirname, "..")

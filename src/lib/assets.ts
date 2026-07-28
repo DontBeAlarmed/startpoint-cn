@@ -17,7 +17,7 @@ import itemData from "../../assets/item_data.json"
 import itemIdsData from "../../assets/item_ids.json"
 import itemLookupData from "../../assets/item_lookup.json"
 import equipmentCraftData from "../../assets/equipment_craft.json"
-import { AssetCharacter, BattleQuest, BossCoinShopItems, BoxGacha, ClearRewards, ConfigValues, EquipmentCraftEntry, EquipmentDissolveEntry, EventItemShopIdMapItem, EventShopItems, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, Gachas, ItemSaleEntry, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopItem, ShopItems, ShopType, StoryQuest } from "./types";
+import { AssetCharacter, BattleQuest, BossCoinShopItems, BoxGacha, ClearRewards, ConfigValues, EquipmentCraftEntry, EquipmentDissolveEntry, EventItemShopIdMapItem, EventShopItems, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, Gachas, ItemSaleEntry, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopItem, ShopItemCampaignMap, ShopItemCampaignReference, ShopItems, ShopSelectItemCampaigns, ShopType, StoryQuest } from "./types";
 import { RawBoxGachaSettings } from "./types/box-gacha";
 import {
     ContentSnapshotError,
@@ -646,6 +646,44 @@ function getBossCoinShopItems(): BossCoinShopItems {
     return getShopContentTable<BossCoinShopItems>("boss_coin_shop.json")
 }
 
+export function getShopSelectItemCampaignsSync(): ShopSelectItemCampaigns {
+    return getShopContentTable<ShopSelectItemCampaigns>("shop_select_item_campaign.json")
+}
+
+function addShopItemCampaignReference(
+    item: ShopItem,
+    itemId: number | string,
+    references: Readonly<Record<string, ShopItemCampaignReference>>,
+): ShopItem {
+    if (item.campaignId !== undefined) return item
+    const reference = references[String(itemId)]
+    return reference === undefined ? item : { ...item, ...reference }
+}
+
+function addShopItemCampaignReferences(
+    items: ShopItems,
+    shopType: ShopType,
+): ShopItems {
+    const references = getShopContentTable<ShopItemCampaignMap>(
+        "shop_item_campaign.json",
+    )[String(shopType)] ?? {}
+    return Object.fromEntries(Object.entries(items).map(([itemId, item]) => [
+        itemId,
+        addShopItemCampaignReference(item, itemId, references),
+    ]))
+}
+
+function addSingleShopItemCampaignReference(
+    item: ShopItem,
+    shopType: ShopType,
+    itemId: number | string,
+): ShopItem {
+    const references = getShopContentTable<ShopItemCampaignMap>(
+        "shop_item_campaign.json",
+    )[String(shopType)] ?? {}
+    return addShopItemCampaignReference(item, itemId, references)
+}
+
 interface RushCompatibilityEvent {
     sourceEventId: number
     availableFrom: string
@@ -732,7 +770,9 @@ export function getEventShopItemsSync(
     if (typeSection === undefined) return null;
 
     const exactItems = typeSection[String(eventId)]
-    if (hasShopItems(exactItems)) return exactItems
+    if (hasShopItems(exactItems)) {
+        return addShopItemCampaignReferences(exactItems, ShopType.EVENT_ITEM)
+    }
 
     // CN v1.4.54 has no standalone constant-Rush shop rows. Keep this
     // compatibility fallback until a CDN patch or official response replaces it.
@@ -740,7 +780,12 @@ export function getEventShopItemsSync(
     const compatibility = getRushCompatibilityEvent(eventId)
     if (compatibility === null) return null
     const sourceItems = typeSection[String(compatibility.sourceEventId)]
-    return !hasShopItems(sourceItems) ? null : addRushCompatibilityPeriods(sourceItems, compatibility)
+    return !hasShopItems(sourceItems)
+        ? null
+        : addShopItemCampaignReferences(
+            addRushCompatibilityPeriods(sourceItems, compatibility),
+            ShopType.EVENT_ITEM,
+        )
 }
 
 /**
@@ -752,7 +797,10 @@ export function getEventShopItemsSync(
 export function getBossCoinShopItemsSync(
     bossId: number | string
 ): ShopItems | null {
-    return getBossCoinShopItems()[String(bossId)] ?? null
+    const items = getBossCoinShopItems()[String(bossId)]
+    return items === undefined
+        ? null
+        : addShopItemCampaignReferences(items, ShopType.BOSS_COIN)
 }
 
 /**
@@ -782,7 +830,10 @@ export function getShopItemSync(
                 "boss_coin_shop_item_category_map.json",
             )[itemId]
             if (category === undefined) return null;
-            return getBossCoinShopItems()[category]?.[itemId] ?? null
+            const bossItem = getBossCoinShopItems()[category]?.[itemId]
+            return bossItem === undefined
+                ? null
+                : addSingleShopItemCampaignReference(bossItem, ShopType.BOSS_COIN, itemId)
         case ShopType.EVENT_ITEM:
             const mapInfo = getShopContentTable<Record<string, EventItemShopIdMapItem>>(
                 "event_item_shop_id_map.json",
@@ -791,16 +842,29 @@ export function getShopItemSync(
             const eventItems = getEventItemShopItems()
             const eventItem = eventItems[mapInfo.eventType]?.[mapInfo.eventId]?.[itemId]
             if (eventItem === undefined) return null
-            if (mapInfo.eventType !== 11) return eventItem
+            if (mapInfo.eventType !== 11) {
+                return addSingleShopItemCampaignReference(eventItem, ShopType.EVENT_ITEM, itemId)
+            }
             const compatibilityTarget = Object.entries(RUSH_COMPATIBILITY_EVENTS).find(
                 ([, entry]) => entry.sourceEventId === mapInfo.eventId,
             )
-            if (compatibilityTarget === undefined) return eventItem
+            if (compatibilityTarget === undefined) {
+                return addSingleShopItemCampaignReference(
+                    eventItem,
+                    ShopType.EVENT_ITEM,
+                    itemId,
+                )
+            }
             const [targetEventId, compatibilityEntry] = compatibilityTarget
             const targetItems = eventItems[String(mapInfo.eventType)]?.[targetEventId]
-            return hasShopItems(targetItems)
+            const compatibleEventItem = hasShopItems(targetItems)
                 ? eventItem
                 : addRushCompatibilityPeriod(eventItem, compatibilityEntry)
+            return addSingleShopItemCampaignReference(
+                compatibleEventItem,
+                ShopType.EVENT_ITEM,
+                itemId,
+            )
         default:
             return null
     }

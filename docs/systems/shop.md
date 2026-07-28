@@ -9,9 +9,11 @@
 | `assets/general_shop.json` | 通用商店 |
 | `assets/cdn_general_shop_whitelist.json` | 当前客户端确实存在的 GeneralShop ID |
 | `assets/boss_coin_shop.json` | Boss 币分类商品 |
+| `assets/shop_select_item_campaign.json` | 选择式商店活动的开放期和合法 lineup |
 | `assets/star_grain_shop.json` | 星之粒商店与组合奖励 |
 | `assets/equipment_enhancement_shop.json` | 追忆装备阶段强化商品 |
 | `src/data/domains/shopPurchase.ts` | 玩家按商店类型、日/月周期和总量记录购买次数 |
+| `src/data/domains/shop-campaign-lineup.ts` | 玩家首次选择的 campaign lineup |
 | `src/lib/event-shop-purchase.ts` | 通用购买校验与事务 |
 | `src/routes/api/shop.ts` | 列表与购买端点 |
 
@@ -85,6 +87,21 @@ Boss 币列表严格按客户端传入的 category ID 查询 `boss_coin_shop.jso
 
 活动商店的开放期使用统一服务器时间。列表过滤开放期，购买时再次校验，避免客户端持有旧列表后购买已经关闭的商品。狂热激战部分活动在官方 CN 数据中缺少完整商品与代币定义，当前兼容来源和推测性边界单独记录在[狂热激战](./rush-event.md)。
 
+## 选择式 Campaign Lineup
+
+`/shop/get_campaign_lineup_id` 与 `/shop/set_campaign_lineup_id` 只接受 Event Item Shop（type 4）和 Boss Coin Shop（type 7）。Content Sync 同时读取以下官方表，并生成统一的 `shop_select_item_campaign.json`：
+
+- `event_shop_select_item_campaign.orderedmap`；
+- `event_shop_select_item_campaign_lineup.orderedmap`；
+- `boss_coin_shop_select_item_campaign.orderedmap`；
+- `boss_coin_shop_select_item_campaign_lineup.orderedmap`。
+
+商品转换保留 `campaignId` 和可选的 `lineupId`。没有 campaign 的普通商品以及有 campaign、无 lineup 的公共商品始终进入候选；带 lineup 的商品只有在玩家为同一 `shop_type + campaign_id` 选择了该 lineup 后才会出现在列表中。`/buy` 与 `/bulk_buy` 会再次执行相同授权，不能通过手写商品 ID 绕过列表过滤。
+
+玩家选择保存在 `players_shop_campaign_lineups`。首次选择写入；相同值的传输重试幂等成功；不同值拒绝且不覆盖第一次选择。国服客户端只明确处理活动期外码 `1652`，因此服务端只在已知 campaign 期外返回该码；非法 campaign、非法 lineup 和重复改选使用 HTTP 400，不虚构未知业务码。开放期按国服 UTC+8 解释，首尾均包含，并统一使用全局服务器时间。
+
+CN 1.4.54 的 Event Shop 共有 6 个选择活动、27 个 lineup，bundled fallback 中 246 个相关商品已从官方表回填，其中 111 个是公共商品、135 个属于指定 lineup。同期 Boss Coin 选择活动和 lineup 表均为空，服务端原样生成空表，不推测补充。后续 CDN 出现合法 Boss Coin 定义时，Content Sync 会按同一规则自动生成。
+
 ## 玩家序列化边界
 
 商店购买可能同时改变玩家货币、物品、角色和装备。响应字段使用各领域的统一客户端序列化器；商店文档不定义 Mana Node 的 `/load` 结构。
@@ -113,6 +130,7 @@ Boss 币列表严格按客户端传入的 category ID 查询 `boss_coin_shop.jso
 - `tools/shop_repository_integration.test.cjs`；
 - `tools/rush_event_shop.test.cjs`；
 - `tools/rush_event_shop_route.test.cjs`；
+- `tools/shop_campaign_lineup.test.cjs`；
 - `tools/shop_bulk_purchase.test.cjs`；
 - `tools/shop_purchase_period_storage.test.cjs`；
 - `tools/star_grain_material_pack.test.cjs`；

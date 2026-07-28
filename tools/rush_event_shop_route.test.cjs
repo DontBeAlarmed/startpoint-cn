@@ -56,6 +56,13 @@ db.exec(`
         player_id INTEGER NOT NULL,
         receive_time TEXT NOT NULL
     );
+    CREATE TABLE campaign_selection_state (
+        player_id INTEGER NOT NULL,
+        shop_type INTEGER NOT NULL,
+        campaign_id INTEGER NOT NULL,
+        lineup_id INTEGER NOT NULL,
+        PRIMARY KEY (player_id, shop_type, campaign_id)
+    );
     INSERT INTO player_state VALUES (17, 1000, 100, 20, 50);
     INSERT INTO item_state VALUES (17, 2370001, 1000);
     INSERT INTO item_state VALUES (17, 49100, 3);
@@ -95,6 +102,9 @@ function snapshot() {
         purchases: db.prepare("SELECT * FROM purchase_state ORDER BY shop_item_id").all(),
         missionCounters: db.prepare("SELECT * FROM mission_counter_state ORDER BY player_id").all(),
         equipments: db.prepare("SELECT * FROM equipment_state ORDER BY equipment_id").all(),
+        campaignSelections: db.prepare(`
+            SELECT * FROM campaign_selection_state ORDER BY shop_type, campaign_id
+        `).all(),
     }
 }
 
@@ -192,6 +202,31 @@ stubModule("../src/data/domains/player", {
 })
 stubModule("../src/data/domains/session", {
     getSession: async viewerId => viewerId === "123" ? { accountId: 9 } : null,
+})
+stubModule("../src/data/domains/shop-campaign-lineup", {
+    getPlayerShopCampaignLineupSync(playerId, shopType, campaignId) {
+        return db.prepare(`
+            SELECT lineup_id FROM campaign_selection_state
+            WHERE player_id = ? AND shop_type = ? AND campaign_id = ?
+        `).get(playerId, shopType, campaignId)?.lineup_id ?? null
+    },
+    getPlayerShopCampaignLineupsSync(playerId) {
+        return Object.fromEntries(db.prepare(`
+            SELECT shop_type, campaign_id, lineup_id FROM campaign_selection_state
+            WHERE player_id = ? ORDER BY shop_type, campaign_id
+        `).all(playerId).map(row => [`${row.shop_type}:${row.campaign_id}`, row.lineup_id]))
+    },
+    selectPlayerShopCampaignLineupSync(playerId, shopType, campaignId, lineupId) {
+        const inserted = db.prepare(`
+            INSERT OR IGNORE INTO campaign_selection_state VALUES (?, ?, ?, ?)
+        `).run(playerId, shopType, campaignId, lineupId).changes === 1
+        if (inserted) return "inserted"
+        const selected = db.prepare(`
+            SELECT lineup_id FROM campaign_selection_state
+            WHERE player_id = ? AND shop_type = ? AND campaign_id = ?
+        `).get(playerId, shopType, campaignId).lineup_id
+        return selected === lineupId ? "unchanged" : "conflict"
+    },
 })
 stubModule("../src/data/activeAccount", { resolvePlayerIdSync: () => 17 })
 const degreeOperationCalls = []
@@ -299,6 +334,68 @@ async function getRushSales(fastify, eventType, eventId) {
 async function main() {
     const fastify = await createServer()
     try {
+        globalNowSeconds = Date.parse("2022-12-23T12:00:00+08:00") / 1000
+        const campaignBefore = await fastify.inject({
+            method: "POST",
+            url: "/get_campaign_lineup_id",
+            payload: { viewer_id: 123, shop_type: 4, campaign_id: 10 },
+        })
+        assert.equal(campaignBefore.statusCode, 200)
+        assert.equal(decode(campaignBefore).data.lineup_id, null)
+
+        const campaignSalesBefore = await getRushSales(fastify, 4, 1)
+        assert.equal(campaignSalesBefore.some(item => item.shop_item_id === 100030), true)
+        assert.equal(campaignSalesBefore.some(item => item.shop_item_id === 100010), false)
+        assert.equal(campaignSalesBefore.some(item => item.shop_item_id === 100020), false)
+
+        const selectCampaign = await fastify.inject({
+            method: "POST",
+            url: "/set_campaign_lineup_id",
+            payload: { viewer_id: 123, shop_type: 4, campaign_id: 10, lineup_id: 1010 },
+        })
+        assert.equal(selectCampaign.statusCode, 200, selectCampaign.body)
+        const retryCampaign = await fastify.inject({
+            method: "POST",
+            url: "/set_campaign_lineup_id",
+            payload: { viewer_id: 123, shop_type: 4, campaign_id: 10, lineup_id: 1010 },
+        })
+        assert.equal(retryCampaign.statusCode, 200)
+        const conflictingCampaign = await fastify.inject({
+            method: "POST",
+            url: "/set_campaign_lineup_id",
+            payload: { viewer_id: 123, shop_type: 4, campaign_id: 10, lineup_id: 1020 },
+        })
+        assert.equal(conflictingCampaign.statusCode, 400)
+
+        const campaignAfter = await fastify.inject({
+            method: "POST",
+            url: "/get_campaign_lineup_id",
+            payload: { viewer_id: 123, shop_type: 4, campaign_id: 10 },
+        })
+        assert.equal(decode(campaignAfter).data.lineup_id, 1010)
+        const campaignSalesAfter = await getRushSales(fastify, 4, 1)
+        assert.equal(campaignSalesAfter.some(item => item.shop_item_id === 100030), true)
+        assert.equal(campaignSalesAfter.some(item => item.shop_item_id === 100010), true)
+        assert.equal(campaignSalesAfter.some(item => item.shop_item_id === 100020), false)
+
+        const beforeUnauthorizedCampaignBuy = snapshot()
+        const unauthorizedCampaignBuy = await fastify.inject({
+            method: "POST",
+            url: "/buy",
+            payload: { viewer_id: 123, shop_type: 4, shop_item_id: 100020, number: 1 },
+        })
+        assert.equal(unauthorizedCampaignBuy.statusCode, 400)
+        assert.deepEqual(snapshot(), beforeUnauthorizedCampaignBuy)
+
+        globalNowSeconds = Date.parse("2023-01-06T12:00:00+08:00") / 1000
+        const expiredCampaign = await fastify.inject({
+            method: "POST",
+            url: "/get_campaign_lineup_id",
+            payload: { viewer_id: 123, shop_type: 4, campaign_id: 10 },
+        })
+        assert.equal(expiredCampaign.statusCode, 200)
+        assert.equal(decode(expiredCampaign).data_headers.result_code, 1652)
+
         globalNowSeconds = Date.parse("2023-12-01T00:00:00+08:00") / 1000
         assert.equal((await getRushSales(fastify, 11, 700001)).length, 33)
         assert.equal((await getRushSales(fastify, 6, 700001)).length, 0)

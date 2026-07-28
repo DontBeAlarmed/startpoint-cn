@@ -15,8 +15,12 @@ try {
 const PATHS = Object.freeze({
     general: "master/shop/general_shop.orderedmap",
     event: "master/shop/event_item_shop.orderedmap",
+    eventCampaign: "master/quest/event/event_shop_select_item_campaign.orderedmap",
+    eventLineup: "master/quest/event/event_shop_select_item_campaign_lineup.orderedmap",
     boss: "master/shop/boss_coin_shop.orderedmap",
     bossCategory: "master/shop/boss_coin_shop_category.orderedmap",
+    bossCampaign: "master/shop/boss_coin_shop_select_item_campaign.orderedmap",
+    bossLineup: "master/shop/boss_coin_shop_select_item_campaign_lineup.orderedmap",
     starGrain: "master/shop/star_grain_shop.orderedmap",
     treasure: "master/shop/treasure_shop.orderedmap",
     equipment: "master/equipment_enhancement/equipment_enhancement_shop.orderedmap",
@@ -70,6 +74,8 @@ function createFixture() {
             0: 6,
             1: 700001,
             2: 11,
+            4: 10,
+            5: 1010,
             18: 70010,
             19: 5,
             26: "2024-02-01 12:00:00",
@@ -82,8 +88,23 @@ function createFixture() {
             34: 1000,
             50: false,
         }))]],
+        [PATHS.eventCampaign, [row("10", fields(13, {
+            0: "challenge_dungeon_campaign_01",
+            1: 4,
+            2: 1,
+            6: "2022-12-22 12:00:00",
+            7: "2022-12-29 11:59:59",
+            8: "2023-01-06 11:59:59",
+        }))]],
+        [PATHS.eventLineup, [row("1010", fields(3, {
+            0: 10,
+            1: 1,
+            2: 5020025,
+        }))]],
         [PATHS.boss, [row("40", fields(50, {
             0: 5,
+            3: 20,
+            4: 2010,
             17: 40000,
             18: 10,
             25: "2024-03-01 12:00:00",
@@ -100,6 +121,22 @@ function createFixture() {
             row("8", fields(13, { 0: "empty", 1: 8, 12: false })),
             row("5", fields(13, { 0: "fixture", 1: 5, 12: false })),
         ]],
+        [PATHS.bossCampaign, [row("20", fields(13, {
+            0: "boss_campaign_01",
+            1: 999,
+            2: 5,
+            6: "2024-03-01 12:00:00",
+            7: "2024-03-08 11:59:59",
+            8: "2024-03-15 11:59:59",
+        }))]],
+        [PATHS.bossLineup, [row("2010", fields(6, {
+            0: 20,
+            1: "(None)",
+            2: 1,
+            3: 5010001,
+            4: "Boss 装备",
+            5: "装备",
+        }))]],
         [PATHS.starGrain, [row("50", fields(43, {
             10: 990008,
             11: 30,
@@ -205,6 +242,8 @@ test("shop converter reads all verified sources and emits runtime-compatible tab
                     stock: 10,
                     maxFrequency: 3,
                     dailyStock: 2,
+                    campaignId: 10,
+                    lineupId: 1010,
                 },
             },
         },
@@ -223,11 +262,33 @@ test("shop converter reads all verified sources and emits runtime-compatible tab
                 maxFrequency: 7,
                 dailyStock: 1,
                 monthlyStock: 2,
+                campaignId: 20,
+                lineupId: 2010,
             },
         },
         "8": {},
     })
     assert.deepEqual(output["boss_coin_shop_item_category_map.json"], { "40": 5 })
+    assert.deepEqual(output["shop_select_item_campaign.json"], {
+        "4": {
+            "10": {
+                availableFrom: "2022-12-22 12:00:00",
+                availableUntil: "2023-01-06 11:59:59",
+                lineupIds: [1010],
+            },
+        },
+        "7": {
+            "20": {
+                availableFrom: "2024-03-01 12:00:00",
+                availableUntil: "2024-03-15 11:59:59",
+                lineupIds: [2010],
+            },
+        },
+    })
+    assert.deepEqual(output["shop_item_campaign.json"], {
+        "4": { "30": { campaignId: 10, lineupId: 1010 } },
+        "7": { "40": { campaignId: 20, lineupId: 2010 } },
+    })
     assert.deepEqual(output["star_grain_shop.json"]["50"].rewards, [
         { type: 0, id: 10001, count: 1 },
         { type: 0, id: 1, count: 175 },
@@ -275,13 +336,15 @@ test("shop converter preserves empty official shops without synthesizing rows", 
         "event_item_shop_id_map.json": {},
         "boss_coin_shop.json": {},
         "boss_coin_shop_item_category_map.json": {},
+        "shop_select_item_campaign.json": { "4": {}, "7": {} },
+        "shop_item_campaign.json": { "4": {}, "7": {} },
         "star_grain_shop.json": {},
         "treasure_shop.json": {},
         "equipment_enhancement_shop.json": {},
     })
 })
 
-test("shop converter validates JST calendar values without local timezone normalization", async t => {
+test("shop converter validates CN calendar values without local timezone normalization", async t => {
     const generalRowWithDate = value => row("20", fields(47, {
         20: value,
         21: "(None)",
@@ -294,7 +357,7 @@ test("shop converter validates JST calendar values without local timezone normal
             fixture.sources.set(PATHS.general, [generalRowWithDate(value)])
             await assert.rejects(
                 convertShops(fixture.reader),
-                /general_shop.*availableFrom.*JST date-time/i,
+                /general_shop.*availableFrom.*CN date-time/i,
             )
         })
     }
@@ -348,12 +411,21 @@ test("bundled 1.4.54 fallback preserves authoritative total and periodic limits"
     const boss = require("../assets/boss_coin_shop.json")
     const starGrain = require("../assets/star_grain_shop.json")
     const treasure = require("../assets/treasure_shop.json")
+    const itemCampaigns = require("../assets/shop_item_campaign.json")
+    const selectCampaigns = require("../assets/shop_select_item_campaign.json")
 
     assert.equal(general[100001].maxFrequency, 1)
     assert.equal(event[2][100006][310194].maxFrequency, 10)
     assert.equal(boss[1][200101].monthlyStock, 1)
     assert.equal(starGrain[100000].maxFrequency, 7)
     assert.equal(treasure[200001].dailyStock, 10)
+    assert.equal(Object.keys(itemCampaigns[4]).length, 246)
+    assert.equal(Object.values(itemCampaigns[4]).filter(item => item.lineupId === undefined).length, 111)
+    assert.equal(Object.values(itemCampaigns[4]).filter(item => item.lineupId !== undefined).length, 135)
+    assert.deepEqual(itemCampaigns[7], {})
+    assert.equal(Object.keys(selectCampaigns[4]).length, 6)
+    assert.equal(Object.values(selectCampaigns[4]).flatMap(campaign => campaign.lineupIds).length, 27)
+    assert.deepEqual(selectCampaigns[7], {})
 })
 
 test("quick:content includes the shop converter regression suite", () => {

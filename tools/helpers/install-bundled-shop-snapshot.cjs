@@ -13,6 +13,8 @@ const tableNames = [
     "event_item_shop_id_map.json",
     "boss_coin_shop.json",
     "boss_coin_shop_item_category_map.json",
+    "shop_select_item_campaign.json",
+    "shop_item_campaign.json",
     "star_grain_shop.json",
     "treasure_shop.json",
     "equipment_enhancement_shop.json",

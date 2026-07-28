@@ -531,6 +531,16 @@ export default function init(
         ON players_score_attack_battle_history (player_id, event_id, id DESC)
     `).run()
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_shop_campaign_lineups (
+        player_id INTEGER NOT NULL,
+        shop_type INTEGER NOT NULL,
+        campaign_id INTEGER NOT NULL,
+        lineup_id INTEGER NOT NULL,
+        selected_at TEXT NOT NULL,
+        PRIMARY KEY (player_id, shop_type, campaign_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
     // migrations for quest progress columns added after the original schema
     ensureSchemaColumn(database, "players_quest_progress.leader_character_id")
     ensureSchemaColumn(database, "players_quest_progress.multi_clear_count")

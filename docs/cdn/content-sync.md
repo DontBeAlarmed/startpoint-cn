@@ -13,14 +13,14 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 
 同步器负责严格解析、引用闭包、稳定输出和文件系统安全，不负责判断 CDN 作者给出的 ID、赔率、奖励、价格或资源内容是否合理。服务端不会替 CDN 作者猜测缺失内容、复制其他活动数据、修复非法主数据或自动生成客户端补丁。
 
-阶段 B 当前把 Registry 的 111 张表分为 `102 CDN + 5 bundled + 4 server`。原阶段 A 的五个动态领域为：
+阶段 B 当前把 Registry 的 113 张表分为 `104 CDN + 5 bundled + 4 server`。原阶段 A 的五个动态领域为：
 
 | 领域 | 动态输出 |
 |---|---|
 | 角色 | `character.json`、两张 `cdndata/character*.json` |
 | 角色投票 | `character_election.json`；从选举、排除、图鉴与角色表生成服务端候选白名单和开放期 |
 | 卡池 | `gacha.json`、`gacha_campaign.json`、两张 `cdndata/gacha*.json`，并读取全部非空 odds 引用 |
-| 商店 | General、Event、Boss、Star Grain、Treasure、Equipment 共 8 张运行时表 |
+| 商店 | General、Event、Boss、Star Grain、Treasure、Equipment 及选择式 campaign 共 10 张运行时表 |
 | 任务技能效果 | `cdndata/active_mission_skill_effects.json`；读取角色、技能 orderedmap 和 Action DSL |
 
 在此基础上，35 张与官方提取 JSON 可机器证明完全相等的表已改用通用递归 OrderedMap 转换器。转换器按 Registry 声明的一至三层嵌套深度还原 CSV 树，不改字段、不补 ID，也不叠加 bundled 数据。范围包括 Active Mission、角色觉醒、收集、普通/每日/每周/称号/活动任务、Pass 任务及奖励表，以及玩家等级、角色剧情 lookup、EX Ability、Mana Board、Raid 总体奖励、奖励属性映射、体力活动和星屑兑换等直接表。
@@ -161,12 +161,12 @@ npm run content:audit -- --source-root <WF_ASSETS_CN_ROOT> --format json
 
 当前审计分两层：
 
-1. Content Registry 的 111 张运行表必须存在、是普通文件且可解析为 JSON；
+1. Content Registry 的 113 张运行表必须存在、是普通文件且可解析为 JSON；
 2. 普通、每日、每周、称号、活动、角色觉醒、收集、Active Mission 和 Pass 共 25 张关键表与官方提取源按解析后的完整 JSON 深度比较，并校验 11 组任务/奖励 ID、144 条觉醒任务四元组和 Pass 活动奖励引用闭包。
 
-官方 1.4.54 基线为 111 张 Registry 表、25 张深度对比表、13327 个深度对比顶层键、36 个觉醒角色组、19 个 Pass 活动及 1140 条 Pass 等级奖励。格式和对象键顺序不构成差异，数组顺序、ID 集合和嵌套值差异会失败。
+官方 1.4.54 基线为 113 张 Registry 表、25 张深度对比表、13327 个深度对比顶层键、36 个觉醒角色组、19 个 Pass 活动及 1140 条 Pass 等级奖励。格式和对象键顺序不构成差异，数组顺序、ID 集合和嵌套值差异会失败。
 
-该命令不写 CDN、`assets/`、`.content/` 或玩家数据库，不生成修复数据，也不由 `start:cn`、`dev:cn` 或 `content:sync` 自动调用。单个 JSON 通过文件描述符读取并在前后核对身份；111 张运行表各读取一次后作为本次内存快照复用于后续检查。该工具不提供跨 111 个文件的原子文件系统快照，发布者必须在停止内容写入后运行；同 UID 对抗性进程在检查间隙替换并恢复路径不属于保护边界。完整 CDN 归档合法性仍由 `content:smoke` 负责，两项工具不能互相替代。
+该命令不写 CDN、`assets/`、`.content/` 或玩家数据库，不生成修复数据，也不由 `start:cn`、`dev:cn` 或 `content:sync` 自动调用。单个 JSON 通过文件描述符读取并在前后核对身份；113 张运行表各读取一次后作为本次内存快照复用于后续检查。该工具不提供跨 113 个文件的原子文件系统快照，发布者必须在停止内容写入后运行；同 UID 对抗性进程在检查间隙替换并恢复路径不属于保护边界。完整 CDN 归档合法性仍由 `content:smoke` 负责，两项工具不能互相替代。
 
 ## 真实 CDN smoke
 

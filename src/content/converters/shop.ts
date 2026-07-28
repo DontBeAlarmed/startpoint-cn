@@ -4,14 +4,24 @@ import type {
     BossCoinShopItems,
     EventShopItems,
     ShopItem,
+    ShopItemCampaignMap,
     ShopItems,
+    ShopSelectItemCampaigns,
 } from "../../lib/types/shop"
 import { parseCsvLine } from "./csv"
 
 const GENERAL_SHOP_PATH = "master/shop/general_shop.orderedmap"
 const EVENT_ITEM_SHOP_PATH = "master/shop/event_item_shop.orderedmap"
+const EVENT_SELECT_CAMPAIGN_PATH =
+    "master/quest/event/event_shop_select_item_campaign.orderedmap"
+const EVENT_SELECT_LINEUP_PATH =
+    "master/quest/event/event_shop_select_item_campaign_lineup.orderedmap"
 const BOSS_COIN_SHOP_PATH = "master/shop/boss_coin_shop.orderedmap"
 const BOSS_COIN_SHOP_CATEGORY_PATH = "master/shop/boss_coin_shop_category.orderedmap"
+const BOSS_SELECT_CAMPAIGN_PATH =
+    "master/shop/boss_coin_shop_select_item_campaign.orderedmap"
+const BOSS_SELECT_LINEUP_PATH =
+    "master/shop/boss_coin_shop_select_item_campaign_lineup.orderedmap"
 const STAR_GRAIN_SHOP_PATH = "master/shop/star_grain_shop.orderedmap"
 const TREASURE_SHOP_PATH = "master/shop/treasure_shop.orderedmap"
 const EQUIPMENT_ENHANCEMENT_SHOP_PATH =
@@ -42,6 +52,8 @@ export interface ShopConversionOutput {
     >
     readonly "boss_coin_shop.json": DeepReadonly<BossCoinShopItems>
     readonly "boss_coin_shop_item_category_map.json": Readonly<Record<string, number>>
+    readonly "shop_select_item_campaign.json": DeepReadonly<ShopSelectItemCampaigns>
+    readonly "shop_item_campaign.json": DeepReadonly<ShopItemCampaignMap>
     readonly "star_grain_shop.json": DeepReadonly<ShopItems>
     readonly "treasure_shop.json": DeepReadonly<ShopItems>
     readonly "equipment_enhancement_shop.json": DeepReadonly<ShopItems>
@@ -212,7 +224,7 @@ function parseOptionalMonths(value: string, subject: string): number[] | undefin
 function parseDate(value: string, subject: string): string {
     const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
     if (match === null) {
-        invalidShop(`${subject} must be a JST date-time: ${value}`)
+        invalidShop(`${subject} must be a CN date-time: ${value}`)
     }
     const parts = match.slice(1).map(Number)
     const [year, month, day, hour, minute, second] = parts
@@ -228,7 +240,7 @@ function parseDate(value: string, subject: string): string {
         normalized.getUTCSeconds(),
     ]
     if (parts.some((part, index) => part !== normalizedParts[index])) {
-        invalidShop(`${subject} must be a valid JST date-time: ${value}`)
+        invalidShop(`${subject} must be a valid CN date-time: ${value}`)
     }
     return value
 }
@@ -341,14 +353,97 @@ function requireCategory(
     }
 }
 
+function parseCampaignReference(
+    fields: readonly string[],
+    campaignColumn: number,
+    lineupColumn: number,
+    subject: string,
+): Pick<ShopItem, "campaignId" | "lineupId"> {
+    const campaignId = parseOptionalInteger(fields[campaignColumn], `${subject}.campaignId`)
+    const lineupId = parseOptionalInteger(fields[lineupColumn], `${subject}.lineupId`)
+    if (campaignId === undefined && lineupId === undefined) return {}
+    if (campaignId === undefined) {
+        invalidShop(`${subject}.lineupId requires campaignId`)
+    }
+    return lineupId === undefined ? { campaignId } : { campaignId, lineupId }
+}
+
+function convertSelectCampaigns(
+    campaignRows: readonly ParsedRow[],
+    lineupRows: readonly ParsedRow[],
+    tableName: string,
+): Record<string, { availableFrom: string; availableUntil: string; lineupIds: number[] }> {
+    const campaigns: Record<
+        string,
+        { availableFrom: string; availableUntil: string; lineupIds: number[] }
+    > = {}
+    for (const [campaignId, fields] of campaignRows) {
+        const exchangeableUntil = parseOptionalDate(
+            fields[8],
+            `${tableName}[${campaignId}].exchangeableUntil`,
+        )
+        campaigns[campaignId] = {
+            availableFrom: parseDate(fields[6], `${tableName}[${campaignId}].availableFrom`),
+            availableUntil: exchangeableUntil
+                ?? parseDate(fields[7], `${tableName}[${campaignId}].availableUntil`),
+            lineupIds: [],
+        }
+    }
+    for (const [lineupId, fields] of lineupRows) {
+        const campaignId = String(parseInteger(
+            fields[0],
+            `${tableName}_lineup[${lineupId}].campaignId`,
+        ))
+        const campaign = campaigns[campaignId]
+        if (campaign === undefined) {
+            invalidShop(`${tableName}_lineup[${lineupId}] references campaign ${campaignId}`)
+        }
+        campaign.lineupIds.push(parseInteger(lineupId, `${tableName}_lineup.lineupId`))
+    }
+    return campaigns
+}
+
+function requireCampaignItemReference(
+    item: ShopItem,
+    campaigns: Readonly<Record<string, { readonly lineupIds: readonly number[] }>>,
+    subject: string,
+): void {
+    if (item.campaignId === undefined && item.lineupId === undefined) return
+    const campaign = campaigns[String(item.campaignId)]
+    if (campaign === undefined
+        || (item.lineupId !== undefined && !campaign.lineupIds.includes(item.lineupId))) {
+        invalidShop(`${subject} references an unknown campaign lineup`)
+    }
+}
+
 export async function convertShops(reader: ShopSourceReader): Promise<ShopConversionOutput> {
     const generalRows = requireRows(await reader.read(GENERAL_SHOP_PATH), "general_shop", 47)
     const eventRows = requireRows(await reader.read(EVENT_ITEM_SHOP_PATH), "event_item_shop", 51)
+    const eventCampaignRows = requireRows(
+        await reader.read(EVENT_SELECT_CAMPAIGN_PATH),
+        "event_shop_select_item_campaign",
+        13,
+    )
+    const eventLineupRows = requireRows(
+        await reader.read(EVENT_SELECT_LINEUP_PATH),
+        "event_shop_select_item_campaign_lineup",
+        3,
+    )
     const bossRows = requireRows(await reader.read(BOSS_COIN_SHOP_PATH), "boss_coin_shop", 50)
     const bossCategoryRows = requireRows(
         await reader.read(BOSS_COIN_SHOP_CATEGORY_PATH),
         "boss_coin_shop_category",
         13,
+    )
+    const bossCampaignRows = requireRows(
+        await reader.read(BOSS_SELECT_CAMPAIGN_PATH),
+        "boss_coin_shop_select_item_campaign",
+        13,
+    )
+    const bossLineupRows = requireRows(
+        await reader.read(BOSS_SELECT_LINEUP_PATH),
+        "boss_coin_shop_select_item_campaign_lineup",
+        6,
     )
     const starGrainRows = requireRows(
         await reader.read(STAR_GRAIN_SHOP_PATH),
@@ -371,6 +466,19 @@ export async function convertShops(reader: ShopSourceReader): Promise<ShopConver
         10,
     )
 
+    const shopSelectItemCampaigns: ShopSelectItemCampaigns = {
+        "4": convertSelectCampaigns(
+            eventCampaignRows,
+            eventLineupRows,
+            "event_shop_select_item_campaign",
+        ),
+        "7": convertSelectCampaigns(
+            bossCampaignRows,
+            bossLineupRows,
+            "boss_coin_shop_select_item_campaign",
+        ),
+    }
+    const shopItemCampaignMap: ShopItemCampaignMap = { "4": {}, "7": {} }
     const eventItemShop: EventShopItems = {}
     const eventItemShopIdMap: Record<string, { eventType: number; eventId: number }> = {}
     for (const [id, fields] of eventRows) {
@@ -378,11 +486,19 @@ export async function convertShops(reader: ShopSourceReader): Promise<ShopConver
         const eventType = parseInteger(fields[2], `event_item_shop[${id}].eventType`)
         eventItemShop[String(eventType)] ??= {}
         eventItemShop[String(eventType)][String(eventId)] ??= {}
-        eventItemShop[String(eventType)][String(eventId)][id] = parseShopItem(
+        const item = parseShopItem(
             fields,
             EVENT_LAYOUT,
             id,
         )
+        Object.assign(item, parseCampaignReference(fields, 4, 5, `event_item_shop[${id}]`))
+        requireCampaignItemReference(item, shopSelectItemCampaigns["4"], `event_item_shop[${id}]`)
+        if (item.campaignId !== undefined) {
+            shopItemCampaignMap["4"][id] = item.lineupId === undefined
+                ? { campaignId: item.campaignId }
+                : { campaignId: item.campaignId, lineupId: item.lineupId }
+        }
+        eventItemShop[String(eventType)][String(eventId)][id] = item
         eventItemShopIdMap[id] = { eventType, eventId }
     }
 
@@ -394,7 +510,15 @@ export async function convertShops(reader: ShopSourceReader): Promise<ShopConver
     for (const [id, fields] of bossRows) {
         const categoryId = fields[0]
         requireCategory(bossCategories, categoryId, "boss_coin_shop")
-        bossCoinShop[categoryId][id] = parseShopItem(fields, BOSS_LAYOUT, id)
+        const item = parseShopItem(fields, BOSS_LAYOUT, id)
+        Object.assign(item, parseCampaignReference(fields, 3, 4, `boss_coin_shop[${id}]`))
+        requireCampaignItemReference(item, shopSelectItemCampaigns["7"], `boss_coin_shop[${id}]`)
+        if (item.campaignId !== undefined) {
+            shopItemCampaignMap["7"][id] = item.lineupId === undefined
+                ? { campaignId: item.campaignId }
+                : { campaignId: item.campaignId, lineupId: item.lineupId }
+        }
+        bossCoinShop[categoryId][id] = item
         bossCoinShopItemCategoryMap[id] = parseInteger(
             categoryId,
             `boss_coin_shop[${id}].category`,
@@ -440,6 +564,8 @@ export async function convertShops(reader: ShopSourceReader): Promise<ShopConver
         "event_item_shop_id_map.json": eventItemShopIdMap,
         "boss_coin_shop.json": bossCoinShop,
         "boss_coin_shop_item_category_map.json": bossCoinShopItemCategoryMap,
+        "shop_select_item_campaign.json": shopSelectItemCampaigns,
+        "shop_item_campaign.json": shopItemCampaignMap,
         "star_grain_shop.json": convertFlatShop(starGrainRows, STAR_GRAIN_LAYOUT),
         "treasure_shop.json": convertFlatShop(treasureRows, TREASURE_LAYOUT),
         "equipment_enhancement_shop.json": equipmentEnhancementShop,

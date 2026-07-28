@@ -1,0 +1,878 @@
+{
+  "4": {
+    "100010": {
+      "campaignId": 10,
+      "lineupId": 1010
+    },
+    "100011": {
+      "campaignId": 10,
+      "lineupId": 1010
+    },
+    "100012": {
+      "campaignId": 10,
+      "lineupId": 1010
+    },
+    "100013": {
+      "campaignId": 10,
+      "lineupId": 1010
+    },
+    "100014": {
+      "campaignId": 10,
+      "lineupId": 1010
+    },
+    "100020": {
+      "campaignId": 10,
+      "lineupId": 1020
+    },
+    "100021": {
+      "campaignId": 10,
+      "lineupId": 1020
+    },
+    "100022": {
+      "campaignId": 10,
+      "lineupId": 1020
+    },
+    "100023": {
+      "campaignId": 10,
+      "lineupId": 1020
+    },
+    "100024": {
+      "campaignId": 10,
+      "lineupId": 1020
+    },
+    "100030": {
+      "campaignId": 10
+    },
+    "100040": {
+      "campaignId": 10
+    },
+    "100050": {
+      "campaignId": 10
+    },
+    "100060": {
+      "campaignId": 10
+    },
+    "100070": {
+      "campaignId": 10
+    },
+    "100080": {
+      "campaignId": 10
+    },
+    "100090": {
+      "campaignId": 10
+    },
+    "100100": {
+      "campaignId": 10
+    },
+    "100110": {
+      "campaignId": 10
+    },
+    "100120": {
+      "campaignId": 10
+    },
+    "100130": {
+      "campaignId": 10
+    },
+    "100140": {
+      "campaignId": 10
+    },
+    "100150": {
+      "campaignId": 10
+    },
+    "100160": {
+      "campaignId": 10
+    },
+    "100170": {
+      "campaignId": 10
+    },
+    "100180": {
+      "campaignId": 10
+    },
+    "101000": {
+      "campaignId": 11,
+      "lineupId": 1050
+    },
+    "101001": {
+      "campaignId": 11,
+      "lineupId": 1050
+    },
+    "101002": {
+      "campaignId": 11,
+      "lineupId": 1050
+    },
+    "101003": {
+      "campaignId": 11,
+      "lineupId": 1050
+    },
+    "101004": {
+      "campaignId": 11,
+      "lineupId": 1050
+    },
+    "101010": {
+      "campaignId": 11,
+      "lineupId": 1030
+    },
+    "101011": {
+      "campaignId": 11,
+      "lineupId": 1030
+    },
+    "101012": {
+      "campaignId": 11,
+      "lineupId": 1030
+    },
+    "101013": {
+      "campaignId": 11,
+      "lineupId": 1030
+    },
+    "101014": {
+      "campaignId": 11,
+      "lineupId": 1030
+    },
+    "101020": {
+      "campaignId": 11,
+      "lineupId": 1040
+    },
+    "101021": {
+      "campaignId": 11,
+      "lineupId": 1040
+    },
+    "101022": {
+      "campaignId": 11,
+      "lineupId": 1040
+    },
+    "101023": {
+      "campaignId": 11,
+      "lineupId": 1040
+    },
+    "101024": {
+      "campaignId": 11,
+      "lineupId": 1040
+    },
+    "101030": {
+      "campaignId": 11
+    },
+    "101040": {
+      "campaignId": 11
+    },
+    "101050": {
+      "campaignId": 11
+    },
+    "101060": {
+      "campaignId": 11
+    },
+    "101070": {
+      "campaignId": 11
+    },
+    "101080": {
+      "campaignId": 11
+    },
+    "101090": {
+      "campaignId": 11
+    },
+    "101100": {
+      "campaignId": 11
+    },
+    "101110": {
+      "campaignId": 11
+    },
+    "101120": {
+      "campaignId": 11
+    },
+    "101130": {
+      "campaignId": 11
+    },
+    "101140": {
+      "campaignId": 11
+    },
+    "101150": {
+      "campaignId": 11
+    },
+    "101160": {
+      "campaignId": 11
+    },
+    "101170": {
+      "campaignId": 11
+    },
+    "101180": {
+      "campaignId": 11
+    },
+    "101190": {
+      "campaignId": 11
+    },
+    "101200": {
+      "campaignId": 11
+    },
+    "101210": {
+      "campaignId": 11
+    },
+    "102000": {
+      "campaignId": 12,
+      "lineupId": 1080
+    },
+    "102001": {
+      "campaignId": 12,
+      "lineupId": 1080
+    },
+    "102002": {
+      "campaignId": 12,
+      "lineupId": 1080
+    },
+    "102003": {
+      "campaignId": 12,
+      "lineupId": 1080
+    },
+    "102004": {
+      "campaignId": 12,
+      "lineupId": 1080
+    },
+    "102010": {
+      "campaignId": 12,
+      "lineupId": 1060
+    },
+    "102011": {
+      "campaignId": 12,
+      "lineupId": 1060
+    },
+    "102012": {
+      "campaignId": 12,
+      "lineupId": 1060
+    },
+    "102013": {
+      "campaignId": 12,
+      "lineupId": 1060
+    },
+    "102014": {
+      "campaignId": 12,
+      "lineupId": 1060
+    },
+    "102020": {
+      "campaignId": 12,
+      "lineupId": 1070
+    },
+    "102021": {
+      "campaignId": 12,
+      "lineupId": 1070
+    },
+    "102022": {
+      "campaignId": 12,
+      "lineupId": 1070
+    },
+    "102023": {
+      "campaignId": 12,
+      "lineupId": 1070
+    },
+    "102024": {
+      "campaignId": 12,
+      "lineupId": 1070
+    },
+    "102030": {
+      "campaignId": 12,
+      "lineupId": 1090
+    },
+    "102031": {
+      "campaignId": 12,
+      "lineupId": 1090
+    },
+    "102032": {
+      "campaignId": 12,
+      "lineupId": 1090
+    },
+    "102033": {
+      "campaignId": 12,
+      "lineupId": 1090
+    },
+    "102034": {
+      "campaignId": 12,
+      "lineupId": 1090
+    },
+    "102040": {
+      "campaignId": 12
+    },
+    "102050": {
+      "campaignId": 12
+    },
+    "102060": {
+      "campaignId": 12
+    },
+    "102070": {
+      "campaignId": 12
+    },
+    "102080": {
+      "campaignId": 12
+    },
+    "102090": {
+      "campaignId": 12
+    },
+    "102100": {
+      "campaignId": 12
+    },
+    "102110": {
+      "campaignId": 12
+    },
+    "102120": {
+      "campaignId": 12
+    },
+    "102130": {
+      "campaignId": 12
+    },
+    "102140": {
+      "campaignId": 12
+    },
+    "102150": {
+      "campaignId": 12
+    },
+    "102160": {
+      "campaignId": 12
+    },
+    "102170": {
+      "campaignId": 12
+    },
+    "102180": {
+      "campaignId": 12
+    },
+    "102190": {
+      "campaignId": 12
+    },
+    "102200": {
+      "campaignId": 12
+    },
+    "102210": {
+      "campaignId": 12
+    },
+    "102220": {
+      "campaignId": 12
+    },
+    "103000": {
+      "campaignId": 13,
+      "lineupId": 1120
+    },
+    "103001": {
+      "campaignId": 13,
+      "lineupId": 1120
+    },
+    "103002": {
+      "campaignId": 13,
+      "lineupId": 1120
+    },
+    "103003": {
+      "campaignId": 13,
+      "lineupId": 1120
+    },
+    "103004": {
+      "campaignId": 13,
+      "lineupId": 1120
+    },
+    "103010": {
+      "campaignId": 13,
+      "lineupId": 1100
+    },
+    "103011": {
+      "campaignId": 13,
+      "lineupId": 1100
+    },
+    "103012": {
+      "campaignId": 13,
+      "lineupId": 1100
+    },
+    "103013": {
+      "campaignId": 13,
+      "lineupId": 1100
+    },
+    "103014": {
+      "campaignId": 13,
+      "lineupId": 1100
+    },
+    "103020": {
+      "campaignId": 13,
+      "lineupId": 1110
+    },
+    "103021": {
+      "campaignId": 13,
+      "lineupId": 1110
+    },
+    "103022": {
+      "campaignId": 13,
+      "lineupId": 1110
+    },
+    "103023": {
+      "campaignId": 13,
+      "lineupId": 1110
+    },
+    "103024": {
+      "campaignId": 13,
+      "lineupId": 1110
+    },
+    "103030": {
+      "campaignId": 13,
+      "lineupId": 1130
+    },
+    "103031": {
+      "campaignId": 13,
+      "lineupId": 1130
+    },
+    "103032": {
+      "campaignId": 13,
+      "lineupId": 1130
+    },
+    "103033": {
+      "campaignId": 13,
+      "lineupId": 1130
+    },
+    "103034": {
+      "campaignId": 13,
+      "lineupId": 1130
+    },
+    "103040": {
+      "campaignId": 13,
+      "lineupId": 1140
+    },
+    "103041": {
+      "campaignId": 13,
+      "lineupId": 1140
+    },
+    "103042": {
+      "campaignId": 13,
+      "lineupId": 1140
+    },
+    "103043": {
+      "campaignId": 13,
+      "lineupId": 1140
+    },
+    "103044": {
+      "campaignId": 13,
+      "lineupId": 1140
+    },
+    "103050": {
+      "campaignId": 13
+    },
+    "103060": {
+      "campaignId": 13
+    },
+    "103070": {
+      "campaignId": 13
+    },
+    "103080": {
+      "campaignId": 13
+    },
+    "103090": {
+      "campaignId": 13
+    },
+    "103100": {
+      "campaignId": 13
+    },
+    "103110": {
+      "campaignId": 13
+    },
+    "103120": {
+      "campaignId": 13
+    },
+    "103130": {
+      "campaignId": 13
+    },
+    "103140": {
+      "campaignId": 13
+    },
+    "103150": {
+      "campaignId": 13
+    },
+    "103160": {
+      "campaignId": 13
+    },
+    "103170": {
+      "campaignId": 13
+    },
+    "103180": {
+      "campaignId": 13
+    },
+    "103190": {
+      "campaignId": 13
+    },
+    "103200": {
+      "campaignId": 13
+    },
+    "103210": {
+      "campaignId": 13
+    },
+    "103220": {
+      "campaignId": 13
+    },
+    "103230": {
+      "campaignId": 13
+    },
+    "104000": {
+      "campaignId": 14,
+      "lineupId": 1170
+    },
+    "104001": {
+      "campaignId": 14,
+      "lineupId": 1170
+    },
+    "104002": {
+      "campaignId": 14,
+      "lineupId": 1170
+    },
+    "104003": {
+      "campaignId": 14,
+      "lineupId": 1170
+    },
+    "104004": {
+      "campaignId": 14,
+      "lineupId": 1170
+    },
+    "104010": {
+      "campaignId": 14,
+      "lineupId": 1150
+    },
+    "104011": {
+      "campaignId": 14,
+      "lineupId": 1150
+    },
+    "104012": {
+      "campaignId": 14,
+      "lineupId": 1150
+    },
+    "104013": {
+      "campaignId": 14,
+      "lineupId": 1150
+    },
+    "104014": {
+      "campaignId": 14,
+      "lineupId": 1150
+    },
+    "104020": {
+      "campaignId": 14,
+      "lineupId": 1160
+    },
+    "104021": {
+      "campaignId": 14,
+      "lineupId": 1160
+    },
+    "104022": {
+      "campaignId": 14,
+      "lineupId": 1160
+    },
+    "104023": {
+      "campaignId": 14,
+      "lineupId": 1160
+    },
+    "104024": {
+      "campaignId": 14,
+      "lineupId": 1160
+    },
+    "104030": {
+      "campaignId": 14,
+      "lineupId": 1180
+    },
+    "104031": {
+      "campaignId": 14,
+      "lineupId": 1180
+    },
+    "104032": {
+      "campaignId": 14,
+      "lineupId": 1180
+    },
+    "104033": {
+      "campaignId": 14,
+      "lineupId": 1180
+    },
+    "104034": {
+      "campaignId": 14,
+      "lineupId": 1180
+    },
+    "104040": {
+      "campaignId": 14,
+      "lineupId": 1190
+    },
+    "104041": {
+      "campaignId": 14,
+      "lineupId": 1190
+    },
+    "104042": {
+      "campaignId": 14,
+      "lineupId": 1190
+    },
+    "104043": {
+      "campaignId": 14,
+      "lineupId": 1190
+    },
+    "104044": {
+      "campaignId": 14,
+      "lineupId": 1190
+    },
+    "104050": {
+      "campaignId": 14,
+      "lineupId": 1200
+    },
+    "104051": {
+      "campaignId": 14,
+      "lineupId": 1200
+    },
+    "104052": {
+      "campaignId": 14,
+      "lineupId": 1200
+    },
+    "104053": {
+      "campaignId": 14,
+      "lineupId": 1200
+    },
+    "104054": {
+      "campaignId": 14,
+      "lineupId": 1200
+    },
+    "104060": {
+      "campaignId": 14
+    },
+    "104070": {
+      "campaignId": 14
+    },
+    "104080": {
+      "campaignId": 14
+    },
+    "104090": {
+      "campaignId": 14
+    },
+    "104100": {
+      "campaignId": 14
+    },
+    "104110": {
+      "campaignId": 14
+    },
+    "104120": {
+      "campaignId": 14
+    },
+    "104130": {
+      "campaignId": 14
+    },
+    "104140": {
+      "campaignId": 14
+    },
+    "104150": {
+      "campaignId": 14
+    },
+    "104160": {
+      "campaignId": 14
+    },
+    "104170": {
+      "campaignId": 14
+    },
+    "104180": {
+      "campaignId": 14
+    },
+    "104190": {
+      "campaignId": 14
+    },
+    "104200": {
+      "campaignId": 14
+    },
+    "104210": {
+      "campaignId": 14
+    },
+    "104220": {
+      "campaignId": 14
+    },
+    "104230": {
+      "campaignId": 14
+    },
+    "104240": {
+      "campaignId": 14
+    },
+    "105000": {
+      "campaignId": 15,
+      "lineupId": 1230
+    },
+    "105001": {
+      "campaignId": 15,
+      "lineupId": 1230
+    },
+    "105002": {
+      "campaignId": 15,
+      "lineupId": 1230
+    },
+    "105003": {
+      "campaignId": 15,
+      "lineupId": 1230
+    },
+    "105004": {
+      "campaignId": 15,
+      "lineupId": 1230
+    },
+    "105010": {
+      "campaignId": 15,
+      "lineupId": 1210
+    },
+    "105011": {
+      "campaignId": 15,
+      "lineupId": 1210
+    },
+    "105012": {
+      "campaignId": 15,
+      "lineupId": 1210
+    },
+    "105013": {
+      "campaignId": 15,
+      "lineupId": 1210
+    },
+    "105014": {
+      "campaignId": 15,
+      "lineupId": 1210
+    },
+    "105020": {
+      "campaignId": 15,
+      "lineupId": 1220
+    },
+    "105021": {
+      "campaignId": 15,
+      "lineupId": 1220
+    },
+    "105022": {
+      "campaignId": 15,
+      "lineupId": 1220
+    },
+    "105023": {
+      "campaignId": 15,
+      "lineupId": 1220
+    },
+    "105024": {
+      "campaignId": 15,
+      "lineupId": 1220
+    },
+    "105030": {
+      "campaignId": 15,
+      "lineupId": 1240
+    },
+    "105031": {
+      "campaignId": 15,
+      "lineupId": 1240
+    },
+    "105032": {
+      "campaignId": 15,
+      "lineupId": 1240
+    },
+    "105033": {
+      "campaignId": 15,
+      "lineupId": 1240
+    },
+    "105034": {
+      "campaignId": 15,
+      "lineupId": 1240
+    },
+    "105040": {
+      "campaignId": 15,
+      "lineupId": 1250
+    },
+    "105041": {
+      "campaignId": 15,
+      "lineupId": 1250
+    },
+    "105042": {
+      "campaignId": 15,
+      "lineupId": 1250
+    },
+    "105043": {
+      "campaignId": 15,
+      "lineupId": 1250
+    },
+    "105044": {
+      "campaignId": 15,
+      "lineupId": 1250
+    },
+    "105050": {
+      "campaignId": 15,
+      "lineupId": 1260
+    },
+    "105051": {
+      "campaignId": 15,
+      "lineupId": 1260
+    },
+    "105052": {
+      "campaignId": 15,
+      "lineupId": 1260
+    },
+    "105053": {
+      "campaignId": 15,
+      "lineupId": 1260
+    },
+    "105054": {
+      "campaignId": 15,
+      "lineupId": 1260
+    },
+    "105060": {
+      "campaignId": 15,
+      "lineupId": 1270
+    },
+    "105061": {
+      "campaignId": 15,
+      "lineupId": 1270
+    },
+    "105062": {
+      "campaignId": 15,
+      "lineupId": 1270
+    },
+    "105063": {
+      "campaignId": 15,
+      "lineupId": 1270
+    },
+    "105064": {
+      "campaignId": 15,
+      "lineupId": 1270
+    },
+    "105070": {
+      "campaignId": 15
+    },
+    "105080": {
+      "campaignId": 15
+    },
+    "105090": {
+      "campaignId": 15
+    },
+    "105100": {
+      "campaignId": 15
+    },
+    "105110": {
+      "campaignId": 15
+    },
+    "105120": {
+      "campaignId": 15
+    },
+    "105130": {
+      "campaignId": 15
+    },
+    "105140": {
+      "campaignId": 15
+    },
+    "105150": {
+      "campaignId": 15
+    },
+    "105160": {
+      "campaignId": 15
+    },
+    "105170": {
+      "campaignId": 15
+    },
+    "105180": {
+      "campaignId": 15
+    },
+    "105190": {
+      "campaignId": 15
+    },
+    "105200": {
+      "campaignId": 15
+    },
+    "105210": {
+      "campaignId": 15
+    },
+    "105220": {
+      "campaignId": 15
+    },
+    "105230": {
+      "campaignId": 15
+    },
+    "105240": {
+      "campaignId": 15
+    },
+    "105250": {
+      "campaignId": 15
+    }
+  },
+  "7": {}
+}

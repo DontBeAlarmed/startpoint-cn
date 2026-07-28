@@ -56,7 +56,30 @@ export interface ShopItem {
     monthlyStock?: number
     specifiedMonths?: number[]
     compatibilityPeriods?: ShopItemAvailabilityPeriod[]
+    campaignId?: number
+    lineupId?: number
 }
+
+export interface ShopSelectItemCampaign {
+    availableFrom: string
+    availableUntil: string
+    lineupIds: number[]
+}
+
+export type ShopSelectItemCampaigns = Record<
+    string,
+    Record<string, ShopSelectItemCampaign>
+>
+
+export interface ShopItemCampaignReference {
+    campaignId: number
+    lineupId?: number
+}
+
+export type ShopItemCampaignMap = Record<
+    string,
+    Record<string, ShopItemCampaignReference>
+>
 
 
 export interface EventItemShopIdMapItem {

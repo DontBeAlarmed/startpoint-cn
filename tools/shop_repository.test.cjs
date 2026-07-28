@@ -17,6 +17,7 @@ const {
     getEventShopItemsSync,
     getGenericShopItemsSync,
     getShopItemSync,
+    getShopSelectItemCampaignsSync,
 } = require("../src/lib/assets")
 const { resolveEventCurrencyId } = require("../src/lib/event-currency")
 const { ShopType } = require("../src/lib/types")
@@ -27,13 +28,15 @@ const SHOP_TABLES = Object.freeze([
     "event_item_shop_id_map.json",
     "boss_coin_shop.json",
     "boss_coin_shop_item_category_map.json",
+    "shop_item_campaign.json",
+    "shop_select_item_campaign.json",
     "star_grain_shop.json",
     "treasure_shop.json",
     "equipment_enhancement_shop.json",
 ])
 const SHOP_RUNTIME_TABLES = Object.freeze([...SHOP_TABLES, "item_lookup.json"])
 
-test("shop runtime facades read all eight tables from one initialized snapshot", () => {
+test("shop runtime facades read all ten tables from one initialized snapshot", () => {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     const requested = []
     const item = Object.freeze({
@@ -59,6 +62,8 @@ test("shop runtime facades read all eight tables from one initialized snapshot",
             "5": Object.freeze({ "103": item }),
         }),
         "boss_coin_shop_item_category_map.json": Object.freeze({ "103": 5 }),
+        "shop_item_campaign.json": Object.freeze({ "4": Object.freeze({}), "7": Object.freeze({}) }),
+        "shop_select_item_campaign.json": Object.freeze({ "4": Object.freeze({}), "7": Object.freeze({}) }),
         "star_grain_shop.json": Object.freeze({ "104": item }),
         "treasure_shop.json": Object.freeze({ "105": item }),
         "equipment_enhancement_shop.json": Object.freeze({ "106": item }),
@@ -97,6 +102,7 @@ test("shop runtime facades read all eight tables from one initialized snapshot",
             availableUntil: "2025-08-14 23:59:59",
         }])
         assert.strictEqual(getShopItemSync(ShopType.BOSS_COIN, 103), item)
+        assert.deepEqual(getShopSelectItemCampaignsSync(), { "4": {}, "7": {} })
         assert.equal(resolveEventCurrencyId(70001, new Date("2024-01-02T00:00:00Z")), 70001)
         assert.deepEqual(new Set(requested), new Set(SHOP_RUNTIME_TABLES))
         assert.ok(requested.length >= SHOP_RUNTIME_TABLES.length)
@@ -106,7 +112,7 @@ test("shop runtime facades read all eight tables from one initialized snapshot",
     }
 })
 
-test("bundled ContentRepository exposes all eight controlled shop imports", async t => {
+test("bundled ContentRepository exposes all ten controlled shop imports", async t => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "shop-repository-"))
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))
     const controlled = Object.fromEntries(SHOP_TABLES.map((tableName, index) => [

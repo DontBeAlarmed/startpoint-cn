@@ -403,8 +403,8 @@ const definitionInputs: TableSourceInput[] = [
         scope: "cdn",
         sourceOrderedMaps: ["master/shop/event_item_shop.orderedmap"],
         converterId: "shop",
-        converterVersion: 2,
-        outputShapeVersion: 2,
+        converterVersion: 3,
+        outputShapeVersion: 3,
     },
     {
         tableName: "event_item_shop_id_map.json",
@@ -422,8 +422,8 @@ const definitionInputs: TableSourceInput[] = [
             "master/shop/boss_coin_shop_category.orderedmap",
         ],
         converterId: "shop",
-        converterVersion: 2,
-        outputShapeVersion: 2,
+        converterVersion: 3,
+        outputShapeVersion: 3,
     },
     {
         tableName: "boss_coin_shop_item_category_map.json",
@@ -435,6 +435,30 @@ const definitionInputs: TableSourceInput[] = [
         converterId: "shop",
         converterVersion: 2,
         outputShapeVersion: 2,
+    },
+    {
+        tableName: "shop_select_item_campaign.json",
+        scope: "cdn",
+        sourceOrderedMaps: [
+            "master/quest/event/event_shop_select_item_campaign.orderedmap",
+            "master/quest/event/event_shop_select_item_campaign_lineup.orderedmap",
+            "master/shop/boss_coin_shop_select_item_campaign.orderedmap",
+            "master/shop/boss_coin_shop_select_item_campaign_lineup.orderedmap",
+        ],
+        converterId: "shop",
+        converterVersion: 3,
+        outputShapeVersion: 3,
+    },
+    {
+        tableName: "shop_item_campaign.json",
+        scope: "cdn",
+        sourceOrderedMaps: [
+            "master/shop/event_item_shop.orderedmap",
+            "master/shop/boss_coin_shop.orderedmap",
+        ],
+        converterId: "shop",
+        converterVersion: 3,
+        outputShapeVersion: 3,
     },
     {
         tableName: "star_grain_shop.json",

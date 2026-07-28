@@ -5,6 +5,11 @@ import {
     addPlayerShopPurchaseCountsByTypeSync,
     getPlayerShopPurchaseCountsByTypeSync,
 } from "../../data/domains/shopPurchase"
+import {
+    getPlayerShopCampaignLineupSync,
+    getPlayerShopCampaignLineupsSync,
+    selectPlayerShopCampaignLineupSync,
+} from "../../data/domains/shop-campaign-lineup"
 import { getAccountPlayers } from "../../data/domains/account"
 import { getPlayerEquipmentSync, playerOwnsEquipmentSync, updatePlayerEquipmentSync } from "../../data/domains/equipment"
 import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
@@ -13,7 +18,7 @@ import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getBossCoinShopItemsSync, getConfigSync, getEventShopItemsSync, getGenericShopItemsSync, getShopItemSync } from "../../lib/assets";
+import { getBossCoinShopItemsSync, getConfigSync, getEventShopItemsSync, getGenericShopItemsSync, getShopItemSync, getShopSelectItemCampaignsSync } from "../../lib/assets";
 import { ShopItem, ShopItems, ShopItemUserCostType, ShopType } from "../../lib/types";
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
 import { givePlayerRewardsSync } from "../../lib/quest";
@@ -34,6 +39,12 @@ import {
 import CDN_GENERAL_SHOP_WHITELIST from "../../../assets/cdn_general_shop_whitelist.json";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { recordDegreeOperationFactsSync } from "../../lib/mission/degree-operation-facts";
+import {
+    isShopItemVisibleForCampaign,
+    requireAvailableShopCampaign,
+    ShopCampaignPeriodError,
+    ShopCampaignValidationError,
+} from "../../lib/shop-select-campaign";
 
 const GENERAL_SHOP_CDN_KEYS: Set<number> = new Set(CDN_GENERAL_SHOP_WHITELIST);
 
@@ -194,6 +205,14 @@ const routes = async (fastify: FastifyInstance) => {
         if (shopItemData === null) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Shop item with specified id does not exist."
+        })
+        if (!isShopItemVisibleForCampaign(
+            shopItemData,
+            shopType,
+            getPlayerShopCampaignLineupsSync(playerId),
+        )) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Shop campaign lineup is not selected."
         })
 
         // buy_max_count is a per-request limit, not lifetime stock.
@@ -472,6 +491,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         let filteredCdnCount = 0
         const nowMs = getServerTime() * 1000
+        const campaignLineups = getPlayerShopCampaignLineupsSync(playerId)
 
         // Collect enhancement shop items for group-level processing
         const enhancementItems: ShopItems = {}
@@ -493,6 +513,7 @@ const routes = async (fastify: FastifyInstance) => {
                 }
 
                 if (!isShopItemAvailable(item, nowMs)) continue
+                if (!isShopItemVisibleForCampaign(item, shopTypeNum, campaignLineups)) continue
 
                 if (shopTypeNum === ShopType.TREASURE_EQUIPMENT) {
                     // Collect for group-level processing later
@@ -657,6 +678,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         const purchases: Array<{ shopItemId: number, purchaseAmount: number, shopItem: ShopItem }> = []
+        const campaignLineups = getPlayerShopCampaignLineupsSync(playerId)
         try {
             for (const [shopItemIdText, rawAmount] of rawEntries) {
                 if (!/^[1-9]\d*$/.test(shopItemIdText)) throw new ShopPurchaseError("Invalid shop item id.")
@@ -665,6 +687,11 @@ const routes = async (fastify: FastifyInstance) => {
                 const purchaseAmount = validateShopPurchaseAmount(rawAmount)
                 const shopItem = getShopItemSync(shopType, shopItemId)
                 if (shopItem === null) throw new ShopPurchaseError("Shop item with specified id does not exist.")
+                if (!isShopItemVisibleForCampaign(
+                    shopItem,
+                    shopType,
+                    campaignLineups,
+                )) throw new ShopPurchaseError("Shop campaign lineup is not selected.")
                 purchases.push({ shopItemId, purchaseAmount, shopItem })
             }
         } catch (error) {
@@ -734,26 +761,127 @@ const routes = async (fastify: FastifyInstance) => {
         })
     })
 
-    // get_campaign_lineup_id — stub
     fastify.post("/get_campaign_lineup_id", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as any
+        const body = request.body as {
+            viewer_id?: number
+            shop_type?: number
+            campaign_id?: number
+        }
         const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+        const shopType = body.shop_type
+        const campaignId = body.campaign_id
+        if (!Number.isSafeInteger(viewerId) || viewerId! <= 0
+            || (shopType !== ShopType.EVENT_ITEM && shopType !== ShopType.BOSS_COIN)
+            || !Number.isSafeInteger(campaignId) || campaignId! <= 0) {
+            return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
+            })
+        }
+        const session = await getSession(String(viewerId))
+        if (!session) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid viewer id."
         })
+        const playerId = resolvePlayerIdSync(session.accountId)
+        if (playerId === null) return reply.status(500).send({
+            "error": "Internal Server Error", "message": "No players bound to account."
+        })
+        try {
+            requireAvailableShopCampaign(
+                getShopSelectItemCampaignsSync(),
+                shopType,
+                campaignId!,
+                null,
+                getServerTime() * 1000,
+            )
+        } catch (error) {
+            if (error instanceof ShopCampaignPeriodError) {
+                reply.header("content-type", "application/x-msgpack")
+                return reply.status(200).send({
+                    "data_headers": generateDataHeaders({
+                        viewer_id: viewerId,
+                        result_code: error.resultCode,
+                    }),
+                    "data": {},
+                })
+            }
+            if (error instanceof ShopCampaignValidationError) return reply.status(400).send({
+                "error": "Bad Request", "message": error.message,
+            })
+            throw error
+        }
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": { "lineup_id": null }
+            "data": {
+                "lineup_id": getPlayerShopCampaignLineupSync(playerId, shopType, campaignId!),
+            }
         })
     })
 
-    // set_campaign_lineup_id — stub
     fastify.post("/set_campaign_lineup_id", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as any
+        const body = request.body as {
+            viewer_id?: number
+            shop_type?: number
+            campaign_id?: number
+            lineup_id?: number
+        }
         const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+        const shopType = body.shop_type
+        const campaignId = body.campaign_id
+        const lineupId = body.lineup_id
+        if (!Number.isSafeInteger(viewerId) || viewerId! <= 0
+            || (shopType !== ShopType.EVENT_ITEM && shopType !== ShopType.BOSS_COIN)
+            || !Number.isSafeInteger(campaignId) || campaignId! <= 0
+            || !Number.isSafeInteger(lineupId) || lineupId! <= 0) {
+            return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
+            })
+        }
+        const session = await getSession(String(viewerId))
+        if (!session) return reply.status(400).send({
+            "error": "Bad Request", "message": "Invalid viewer id."
+        })
+        const playerId = resolvePlayerIdSync(session.accountId)
+        if (playerId === null) return reply.status(500).send({
+            "error": "Internal Server Error", "message": "No players bound to account."
+        })
+        try {
+            requireAvailableShopCampaign(
+                getShopSelectItemCampaignsSync(),
+                shopType,
+                campaignId!,
+                lineupId!,
+                getServerTime() * 1000,
+            )
+        } catch (error) {
+            if (error instanceof ShopCampaignPeriodError) {
+                reply.header("content-type", "application/x-msgpack")
+                return reply.status(200).send({
+                    "data_headers": generateDataHeaders({
+                        viewer_id: viewerId,
+                        result_code: error.resultCode,
+                    }),
+                    "data": {},
+                })
+            }
+            if (error instanceof ShopCampaignValidationError) return reply.status(400).send({
+                "error": "Bad Request", "message": error.message,
+            })
+            throw error
+        }
+        const selectedAt = new Date(getServerTime() * 1000)
+        const selectionResult = getDb().transaction(() => (
+            selectPlayerShopCampaignLineupSync(
+                playerId,
+                shopType,
+                campaignId!,
+                lineupId!,
+                selectedAt,
+            )
+        ))()
+        if (selectionResult === "conflict") return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Shop campaign lineup has already been selected."
         })
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
