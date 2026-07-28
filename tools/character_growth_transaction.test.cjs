@@ -33,6 +33,7 @@ const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const {
     getPlayerCharacterSync,
+    insertDefaultPlayerCharacterSync,
     updatePlayerCharacterBondTokenSync,
     updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
@@ -43,6 +44,8 @@ const { SessionType } = require("../src/data/types")
 const { characterExpCaps } = require("../src/lib/character")
 const manaRoutes = require("../src/routes/api/character/mana").default
 const bondRoutes = require("../src/routes/api/character/bond").default
+const characterRoutes = require("../src/routes/api/character").default
+const exBoostRoutes = require("../src/routes/api/exBoost").default
 
 async function createPlayer(sequence) {
     const account = insertAccountSync({
@@ -96,6 +99,8 @@ async function main() {
     })
     await app.register(manaRoutes, { prefix: "/mana" })
     await app.register(bondRoutes, { prefix: "/bond" })
+    await app.register(characterRoutes, { prefix: "/character" })
+    await app.register(exBoostRoutes, { prefix: "/ex" })
     await app.ready()
 
     const learn = await createPlayer(1)
@@ -172,6 +177,99 @@ async function main() {
     })
     assert.equal(openResponse.statusCode, 500)
     assert.deepEqual(characterState(open.playerId), beforeOpen)
+
+    const overLimit = await createPlayer(4)
+    givePlayerItemSync(overLimit.playerId, 10002, 1)
+    const beforeOverLimit = getPlayerCharacterSync(overLimit.playerId, 1)
+    db.exec(`
+        CREATE TRIGGER reject_over_limit
+        BEFORE UPDATE OF over_limit_step ON players_characters
+        WHEN OLD.player_id = ${overLimit.playerId} AND OLD.id = 1
+        BEGIN SELECT RAISE(ABORT, 'forced over limit failure'); END;
+    `)
+    const overLimitResponse = await app.inject({
+        method: "POST",
+        url: "/character/over_limit",
+        payload: {
+            viewer_id: overLimit.viewerId,
+            character_id: 1,
+            use_stack: false,
+            item_id: 10002,
+            over_limit_count: 1,
+        },
+    })
+    assert.equal(overLimitResponse.statusCode, 500)
+    assert.equal(getPlayerItemSync(overLimit.playerId, 10002), 1)
+    assert.deepEqual(getPlayerCharacterSync(overLimit.playerId, 1), beforeOverLimit)
+
+    const bulk = await createPlayer(5)
+    insertDefaultPlayerCharacterSync(bulk.playerId, 10)
+    updatePlayerCharacterSync(bulk.playerId, 1, { stack: 1 })
+    updatePlayerCharacterSync(bulk.playerId, 10, { stack: 1 })
+    const beforeBulkFirst = getPlayerCharacterSync(bulk.playerId, 1)
+    const beforeBulkSecond = getPlayerCharacterSync(bulk.playerId, 10)
+    db.exec(`
+        CREATE TRIGGER reject_bulk_over_limit
+        BEFORE UPDATE OF over_limit_step ON players_characters
+        WHEN OLD.player_id = ${bulk.playerId} AND OLD.id = 10
+        BEGIN SELECT RAISE(ABORT, 'forced bulk over limit failure'); END;
+    `)
+    const bulkResponse = await app.inject({
+        method: "POST",
+        url: "/character/bulk_over_limit",
+        payload: { viewer_id: bulk.viewerId },
+    })
+    assert.equal(bulkResponse.statusCode, 500)
+    assert.deepEqual(getPlayerCharacterSync(bulk.playerId, 1), beforeBulkFirst)
+    assert.deepEqual(getPlayerCharacterSync(bulk.playerId, 10), beforeBulkSecond)
+
+    const firstDraw = await createPlayer(6)
+    updatePlayerCharacterSync(firstDraw.playerId, 1, { overLimitStep: 6 })
+    givePlayerItemSync(firstDraw.playerId, 10002, 1)
+    const beforeFirstDraw = getPlayerCharacterSync(firstDraw.playerId, 1)
+    db.exec(`
+        CREATE TRIGGER reject_first_ex_boost
+        BEFORE UPDATE OF ex_boost_status_id ON players_characters
+        WHEN OLD.player_id = ${firstDraw.playerId} AND OLD.id = 1
+        BEGIN SELECT RAISE(ABORT, 'forced first ex boost failure'); END;
+    `)
+    const firstDrawResponse = await app.inject({
+        method: "POST",
+        url: "/ex/first_draw",
+        payload: { viewer_id: firstDraw.viewerId, character_id: 1, cost_item_id: 10002 },
+    })
+    assert.equal(firstDrawResponse.statusCode, 500)
+    assert.equal(getPlayerItemSync(firstDraw.playerId, 10002), 1)
+    assert.deepEqual(getPlayerCharacterSync(firstDraw.playerId, 1), beforeFirstDraw)
+
+    const select = await createPlayer(7)
+    updatePlayerCharacterSync(select.playerId, 1, { overLimitStep: 6 })
+    givePlayerItemSync(select.playerId, 10002, 1)
+    const drawResponse = await app.inject({
+        method: "POST",
+        url: "/ex/draw",
+        payload: { viewer_id: select.viewerId, character_id: 1, cost_item_id: 10002 },
+    })
+    assert.equal(drawResponse.statusCode, 200)
+    db.exec(`
+        CREATE TRIGGER reject_selected_ex_boost
+        BEFORE UPDATE OF ex_boost_status_id ON players_characters
+        WHEN OLD.player_id = ${select.playerId} AND OLD.id = 1
+        BEGIN SELECT RAISE(ABORT, 'forced selected ex boost failure'); END;
+    `)
+    const failedSelectResponse = await app.inject({
+        method: "POST",
+        url: "/ex/select",
+        payload: { viewer_id: select.viewerId, is_confirm: true },
+    })
+    assert.equal(failedSelectResponse.statusCode, 500)
+    db.exec("DROP TRIGGER reject_selected_ex_boost")
+    const retrySelectResponse = await app.inject({
+        method: "POST",
+        url: "/ex/select",
+        payload: { viewer_id: select.viewerId, is_confirm: true },
+    })
+    assert.equal(retrySelectResponse.statusCode, 200)
 
     await app.close()
     cleanup()

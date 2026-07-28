@@ -11,6 +11,7 @@
 - [存档与输入校验](./save-validation.md)
 - [配队装备与魂珠校验](./party-loadout-validation.md)
 - [经验池边界](./exp-pool.md)
+- [背包与装备写入事务](./inventory-write-transactions.md)
 - [漫画](./comic.md)
 
 ## 关卡与活动
@@ -43,6 +44,7 @@
 - [角色觉醒刷新](./character-awake-refresh.md)
 - [第二玛纳板开放期](./mana-board-availability.md)
 - [角色养成事务边界](./character-growth-transactions.md)
+- [EX 能力抽取状态](./ex-boost.md)
 - [角色分解审计](./character-stack-audit.md)
 
 ## 装备、抽卡与内容修复

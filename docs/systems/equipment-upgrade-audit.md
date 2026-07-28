@@ -68,3 +68,4 @@ CN `ItemTable` 中只有两个 `EquipmentAwakingCrystal`：
 - `upgrade_count` 必须为正整数，`use_stack` 必须是布尔值。
 - 单件与批量觉醒的库存写入均使用 SQLite 事务。
 - `use_stack=true` 继续只扣装备 stack；`use_stack=false` 每级扣 1 个合法星铁钢；两者都按 CDN `awakening_craft` 扣锻造石。
+- 装备保护的批量更新、三种装备分解的 stack 扣除与全部分解奖励也已纳入各自总事务；详见[背包与装备写入事务](./inventory-write-transactions.md)。

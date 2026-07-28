@@ -33,6 +33,16 @@ token 行，与角色 `mana_board_index` 更新处于同一个事务；索引更
 节点觉醒原有实现已经把玛纳、材料、Active Mission 玛纳消费事实和全部节点觉醒等级放在一个事务，本轮保持
 该边界，不重复改写。
 
+### `over_limit` 与 `bulk_over_limit`
+
+使用突破材料时，材料扣除和角色突破次数更新共享事务。重复角色自动突破会先为全部角色计算目标
+`over_limit_step` 与 stack，再一次提交；任一角色更新失败时，之前的角色不会保留部分突破。
+
+### EX 能力
+
+`first_draw` 的材料扣除与角色 EX 能力写入共享事务。普通 `draw` 的材料扣除与待选择结果持久化同成同败；
+`select` 确认时，角色能力更新与待选结果删除也处于同一事务。详细恢复语义见[EX 能力抽取状态](./ex-boost.md)。
+
 ## 故障注入
 
 `tools/character_growth_transaction.test.cjs` 使用独立 SQLite 数据库和真实 Fastify 路由，分别用 trigger 阻止：
@@ -40,6 +50,8 @@ token 行，与角色 `mana_board_index` 更新处于同一个事务；索引更
 - 学习节点的最终 INSERT；
 - 信赖证领取状态 UPDATE；
 - 开板索引 UPDATE。
+- 道具突破和批量突破中的角色 UPDATE；
+- EX 首抽与 EX 选择确认中的角色 UPDATE。
 
-三种请求都必须返回失败，且请求前后的玩家货币、材料、角色、bond token 和节点快照完全一致。该测试验证的是
+这些请求都必须返回失败，且请求前后的玩家货币、材料、角色、bond token 和节点快照完全一致。该测试验证的是
 数据库原子性，不替代客户端对动画、提示、玛纳板显示与觉醒页面切换的人工验收。

@@ -128,6 +128,14 @@ const SOURCE_RULES = [
         groups: ["quick:character", "quick:content"],
     },
     {
+        pattern: /^(?:src\/routes\/api\/(?:character|exBoost)\.ts|src\/data\/domains\/ex_boost\.ts)$/,
+        groups: ["quick:character", "integration:database"],
+    },
+    {
+        pattern: /^(?:src\/routes\/api\/(?:equipment|item|sell)\.ts|src\/lib\/item-sell\.ts)$/,
+        groups: ["integration:rules"],
+    },
+    {
         pattern: /^src\/lib\/mission\/(?:event-battle-facts|event-entry-facts|computer-event|coverage-audit|computer-degree|degree-battle-facts|degree-operation-facts)\.ts$/,
         groups: ["integration:mission"],
     },

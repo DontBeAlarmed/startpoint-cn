@@ -234,11 +234,13 @@ const routes = async (fastify: FastifyInstance) => {
         if (!player) return reply.status(500).send({ "error": "Internal Server Error", "message": "No players bound to account." })
 
         const newProtection = body.protection
-        for (const equipmentId of body.equipment_ids) {
-            if (playerOwnsEquipmentSync(playerId, equipmentId)) {
-                updatePlayerEquipmentSync(playerId, equipmentId, { protection: newProtection })
+        getDb().transaction(() => {
+            for (const equipmentId of body.equipment_ids) {
+                if (playerOwnsEquipmentSync(playerId, equipmentId)) {
+                    updatePlayerEquipmentSync(playerId, equipmentId, { protection: newProtection })
+                }
             }
-        }
+        })()
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

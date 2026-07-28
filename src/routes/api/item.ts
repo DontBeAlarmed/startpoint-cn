@@ -12,6 +12,7 @@ import { computeRealTimeStamina } from "../../lib/stamina";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getItemEffectSync } from "../../lib/assets";
+import { getDb } from "../../data/db";
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/use_item", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -43,6 +44,7 @@ const routes = async (fastify: FastifyInstance) => {
         const itemUpdates: { id: number; newCount: number }[] = []
         let hasStaminaItem = false
 
+        const requestedCounts = new Map<number, number>()
         for (const itemReq of body.items) {
             const itemId = itemReq.id
             const requestCount = itemReq.number
@@ -55,6 +57,10 @@ const routes = async (fastify: FastifyInstance) => {
                 console.warn(`[ITEM-USE] invalid count: ${requestCount} for item ${itemId}`)
                 continue
             }
+            requestedCounts.set(itemId, (requestedCounts.get(itemId) ?? 0) + requestCount)
+        }
+
+        for (const [itemId, requestCount] of requestedCounts) {
 
             const effectInfo = getItemEffectSync(itemId)
             if (!effectInfo) {
@@ -116,15 +122,16 @@ const routes = async (fastify: FastifyInstance) => {
 
         const afterStamina = Math.min(currentStamina + totalStaminaRecovery, maxOverflow)
 
-        // Batch update
-        for (const upd of itemUpdates) {
-            updatePlayerItemSync(playerId, upd.id, upd.newCount)
-        }
-        updatePlayerSync({
-            id: playerId,
-            stamina: afterStamina,
-            staminaHealTime: new Date()
-        })
+        getDb().transaction(() => {
+            for (const upd of itemUpdates) {
+                updatePlayerItemSync(playerId, upd.id, upd.newCount)
+            }
+            updatePlayerSync({
+                id: playerId,
+                stamina: afterStamina,
+                staminaHealTime: new Date()
+            })
+        })()
 
         console.log(`[ITEM-USE] player ${playerId}: stamina ${currentStamina}->${afterStamina} (+${totalStaminaRecovery}), items: ${JSON.stringify(itemUpdates)}`)
 

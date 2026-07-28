@@ -31,7 +31,7 @@ schema 13 新增 `players_practice_battle_history`：
 
 ## 存档边界
 
-`players_practice_battle_history` 登记在存档 V2 的 `events` 领域，导出、恢复和克隆均覆盖；克隆时自增 `id` 重新分配。新增表使玩家数据库版本升级到 schema 13，Server Bundle 的目标数据版本同步为 13。
+`players_practice_battle_history` 登记在存档 V2 的 `events` 领域，导出、恢复和克隆均覆盖；克隆时自增 `id` 重新分配。该表在 schema 13 引入；当前 Server Bundle 目标数据版本已随 EX 待选结果持久化升级为 14。
 
 ## 未覆盖边界
 
@@ -47,7 +47,6 @@ schema 13 新增 `players_practice_battle_history`：
 - 插入幂等、查询顺序和玩家隔离；
 - Fastify 查询响应与非法 viewer；
 - finish 总事务成功与回滚；
-- schema 13、存档 V2 和 Server Bundle 数据版本契约。
+- schema 13 引入、schema 14 当前兼容、存档 V2 和 Server Bundle 数据版本契约。
 
 CN 客户端仍需验证练习战履历列表、详情弹窗、失败记录显示以及重新登录后的持久化。
-

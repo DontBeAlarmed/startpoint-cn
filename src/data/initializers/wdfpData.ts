@@ -376,6 +376,15 @@ export default function init(
     ensureSchemaColumn(database, "players_characters.ex_boost_ability_id_list")
     ensureSchemaColumn(database, "players_characters.illustration_settings")
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_ex_boost_pending_draws (
+        player_id INTEGER PRIMARY KEY,
+        character_id INTEGER NOT NULL,
+        status_id INTEGER NOT NULL,
+        ability_id_list TEXT NOT NULL,
+        FOREIGN KEY (character_id, player_id) REFERENCES players_characters (id, player_id) ON DELETE CASCADE,
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_characters_bond_tokens (
         mana_board_index INTEGER NOT NULL,
         status INTEGER NOT NULL,

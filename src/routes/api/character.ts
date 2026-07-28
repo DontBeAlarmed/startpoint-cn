@@ -175,14 +175,13 @@ const routes = async (fastify: FastifyInstance) => {
                 "message": "Not enough of item to uncap."
             })
 
-            // update the item count
-            updatePlayerItemSync(playerId, itemId, newAmount)
-            item_list[itemId] = newAmount // add to items table
-
-            // update the character
-            updatePlayerCharacterSync(playerId, characterId, {
-                overLimitStep: newOverLimit
-            })
+            getDb().transaction(() => {
+                updatePlayerItemSync(playerId, itemId, newAmount)
+                updatePlayerCharacterSync(playerId, characterId, {
+                    overLimitStep: newOverLimit
+                })
+            })()
+            item_list[itemId] = newAmount
         }
 
         reply.header("content-type", "application/x-msgpack")
@@ -230,6 +229,7 @@ const routes = async (fastify: FastifyInstance) => {
         console.log(`[bulk_over_limit] player=${playerId} totalChars=${Object.keys(characters).length}`)
 
         const characterList: any[] = []
+        const updates: Array<{ characterId: number, overLimitStep: number, stack: number }> = []
 
         for (const [charId, charData] of Object.entries(characters)) {
             if (charData.stack <= 0) continue
@@ -247,7 +247,8 @@ const routes = async (fastify: FastifyInstance) => {
             const newOverLimit = charData.overLimitStep + count
             const newStack = charData.stack - count
 
-            updatePlayerCharacterSync(playerId, Number(charId), {
+            updates.push({
+                characterId: Number(charId),
                 overLimitStep: newOverLimit,
                 stack: newStack,
             })
@@ -261,6 +262,15 @@ const routes = async (fastify: FastifyInstance) => {
                 join_time: clientSerializeDate(charData.joinTime),
             })
         }
+
+        getDb().transaction(() => {
+            for (const update of updates) {
+                updatePlayerCharacterSync(playerId, update.characterId, {
+                    overLimitStep: update.overLimitStep,
+                    stack: update.stack,
+                })
+            }
+        })()
 
         console.log(`[bulk_over_limit] done: ${characterList.length} characters modified`)
 

@@ -582,6 +582,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/character_stack.test.cjs",
         "tools/equipment_enhancement.test.cjs",
         "tools/event_currency.test.cjs",
+        "tools/inventory_write_transaction.test.cjs",
         "tools/inventory_rules.test.cjs",
         "tools/party_loadout_validation.test.cjs",
         "tools/score_reward_lottery.test.cjs",
@@ -622,6 +623,7 @@ test("quick character includes growth transaction rollback coverage", () => {
     assert.deepEqual(TEST_GROUPS["quick:character"].tests, [
         "tools/character_awake_eligibility.test.cjs",
         "tools/character_growth_transaction.test.cjs",
+        "tools/ex_boost_pending_draw.test.cjs",
         "tools/mana_board_availability.test.cjs",
         "tools/player_awake_save_roundtrip.test.cjs",
     ])

@@ -22,6 +22,7 @@ export const PLAYER_SAVE_TABLES: readonly PlayerSaveTableDefinition[] = [
     table("players_triggered_tutorials", "core"),
     table("players_tutorial_step_receipts", "core", 9, undefined, "clear"),
     table("players_characters", "core"),
+    table("players_ex_boost_pending_draws", "core", 14),
     table("players_characters_bond_tokens", "core"),
     table("players_characters_mana_nodes", "core"),
     table("players_character_awake_unlocks", "core", 4),

@@ -59,7 +59,9 @@ stubModule("../src/lib/equipment", {
     clientSerializeEquipment: value => value,
 })
 stubModule("../src/lib/equipment-upgrade", { canUseEquipmentAwakeningCrystal: () => false })
-stubModule("../src/data/db", { getDb: () => { throw new Error("unexpected database access") } })
+stubModule("../src/data/db", {
+    getDb: () => ({ transaction: operation => operation }),
+})
 stubModule("../src/lib/mail-notification", {
     getMailArrivedSync(playerId) {
         mailLookups.push(playerId)

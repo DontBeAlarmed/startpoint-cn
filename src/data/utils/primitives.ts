@@ -46,10 +46,10 @@ export function serializeNumberList(
 export function deserializeNumberList(
     toDeserialize: string
 ): number[] {
+    if (toDeserialize.length === 0) return []
     try {
         return toDeserialize.split(",").map(str => Number(str))
     } catch (error) {
         return []
     }
 }
-

@@ -14,6 +14,7 @@ import { asAccountId, asPlayerId, AccountId, PlayerId } from "../../lib/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getConfigSync } from "../../lib/assets";
 import { getMailArrivedSync } from "../../lib/mail-notification";
+import { getDb } from "../../data/db";
 
 interface SellEquipmentListItem {
     equipment_id: number
@@ -61,9 +62,12 @@ const routes = async (fastify: FastifyInstance) => {
         let totalStarGrains = 0
         const totalAbilitySouls: Record<number, number> = {}
         const soldIds: number[] = []
+        const seen = new Set<number>()
 
         for (const toSell of toSellEquipmentList) {
             const equipmentId = toSell.equipment_id
+            if (seen.has(equipmentId)) continue
+            seen.add(equipmentId)
             const equipment = getPlayerEquipmentSync(playerId, equipmentId)
             if (!equipment) {
                 return reply.status(400).send({ "error": "Bad Request", "message": "Player does not own equipment." })
@@ -80,20 +84,24 @@ const routes = async (fastify: FastifyInstance) => {
                 totalAbilitySouls[parseInt(soulId)] = (totalAbilitySouls[parseInt(soulId)] ?? 0) + count
             }
 
-            updatePlayerEquipmentSync(playerId, equipmentId, { stack: 0 })
             soldIds.push(equipmentId)
         }
 
         const returnItemList: Record<number, number> = {}
-        if (totalCraftPoints > 0) {
-            returnItemList[wrightpieceItemId()] = givePlayerItemSync(playerId, wrightpieceItemId(), totalCraftPoints)
-        }
-        if (totalStarGrains > 0) {
-            returnItemList[starGrainItemId()] = givePlayerItemSync(playerId, starGrainItemId(), totalStarGrains)
-        }
-        for (const [soulId, count] of Object.entries(totalAbilitySouls)) {
-            returnItemList[parseInt(soulId)] = givePlayerItemSync(playerId, parseInt(soulId), count)
-        }
+        getDb().transaction(() => {
+            for (const equipmentId of soldIds) {
+                updatePlayerEquipmentSync(playerId, equipmentId, { stack: 0 })
+            }
+            if (totalCraftPoints > 0) {
+                returnItemList[wrightpieceItemId()] = givePlayerItemSync(playerId, wrightpieceItemId(), totalCraftPoints)
+            }
+            if (totalStarGrains > 0) {
+                returnItemList[starGrainItemId()] = givePlayerItemSync(playerId, starGrainItemId(), totalStarGrains)
+            }
+            for (const [soulId, count] of Object.entries(totalAbilitySouls)) {
+                returnItemList[parseInt(soulId)] = givePlayerItemSync(playerId, parseInt(soulId), count)
+            }
+        })()
 
         const returnEquipmentList = buildFullEquipmentList(playerId)
 
@@ -134,10 +142,20 @@ const routes = async (fastify: FastifyInstance) => {
         let totalCraftPoints = 0
         let totalStarGrains = 0
         const totalAbilitySouls: Record<number, number> = {}
-
+        const requestedCounts = new Map<number, number>()
         for (const toSell of toSellEquipmentList) {
-            const equipmentId = toSell.equipment_id
-            const sellCount = Math.max(1, (toSell as SellStackEquipmentListItem).number)
+            const sellCount = (toSell as SellStackEquipmentListItem).number
+            if (!Number.isInteger(sellCount) || sellCount <= 0) {
+                return reply.status(400).send({ "error": "Bad Request", "message": "Invalid sell count." })
+            }
+            requestedCounts.set(
+                toSell.equipment_id,
+                (requestedCounts.get(toSell.equipment_id) ?? 0) + sellCount,
+            )
+        }
+        const stackUpdates: Array<{ equipmentId: number, newStack: number }> = []
+
+        for (const [equipmentId, sellCount] of requestedCounts) {
             const equipment = getPlayerEquipmentSync(playerId, equipmentId)
             if (!equipment) {
                 return reply.status(400).send({ "error": "Bad Request", "message": "Player does not own equipment." })
@@ -155,20 +173,24 @@ const routes = async (fastify: FastifyInstance) => {
                 totalAbilitySouls[parseInt(soulId)] = (totalAbilitySouls[parseInt(soulId)] ?? 0) + count
             }
 
-            equipment.stack = newStack
-            updatePlayerEquipmentSync(playerId, equipmentId, { stack: newStack })
+            stackUpdates.push({ equipmentId, newStack })
         }
 
         const returnItemList: Record<number, number> = {}
-        if (totalCraftPoints > 0) {
-            returnItemList[wrightpieceItemId()] = givePlayerItemSync(playerId, wrightpieceItemId(), totalCraftPoints)
-        }
-        if (totalStarGrains > 0) {
-            returnItemList[starGrainItemId()] = givePlayerItemSync(playerId, starGrainItemId(), totalStarGrains)
-        }
-        for (const [soulId, count] of Object.entries(totalAbilitySouls)) {
-            returnItemList[parseInt(soulId)] = givePlayerItemSync(playerId, parseInt(soulId), count)
-        }
+        getDb().transaction(() => {
+            for (const update of stackUpdates) {
+                updatePlayerEquipmentSync(playerId, update.equipmentId, { stack: update.newStack })
+            }
+            if (totalCraftPoints > 0) {
+                returnItemList[wrightpieceItemId()] = givePlayerItemSync(playerId, wrightpieceItemId(), totalCraftPoints)
+            }
+            if (totalStarGrains > 0) {
+                returnItemList[starGrainItemId()] = givePlayerItemSync(playerId, starGrainItemId(), totalStarGrains)
+            }
+            for (const [soulId, count] of Object.entries(totalAbilitySouls)) {
+                returnItemList[parseInt(soulId)] = givePlayerItemSync(playerId, parseInt(soulId), count)
+            }
+        })()
 
         const returnEquipmentList = buildFullEquipmentList(playerId)
 
@@ -239,21 +261,21 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
-        // Phase 2: set stack to 0 (persist equipment row), give items
-        for (const equipmentId of toSell) {
-            updatePlayerEquipmentSync(playerId, equipmentId, { stack: 0 })
-        }
-
         const returnItemList: Record<number, number> = {}
-        if (totalCraftPoints > 0) {
-            returnItemList[wrightpieceItemId()] = givePlayerItemSync(playerId, wrightpieceItemId(), totalCraftPoints)
-        }
-        if (totalStarGrains > 0) {
-            returnItemList[starGrainItemId()] = givePlayerItemSync(playerId, starGrainItemId(), totalStarGrains)
-        }
-        for (const [soulId, count] of Object.entries(totalAbilitySouls)) {
-            returnItemList[parseInt(soulId)] = givePlayerItemSync(playerId, parseInt(soulId), count)
-        }
+        getDb().transaction(() => {
+            for (const equipmentId of toSell) {
+                updatePlayerEquipmentSync(playerId, equipmentId, { stack: 0 })
+            }
+            if (totalCraftPoints > 0) {
+                returnItemList[wrightpieceItemId()] = givePlayerItemSync(playerId, wrightpieceItemId(), totalCraftPoints)
+            }
+            if (totalStarGrains > 0) {
+                returnItemList[starGrainItemId()] = givePlayerItemSync(playerId, starGrainItemId(), totalStarGrains)
+            }
+            for (const [soulId, count] of Object.entries(totalAbilitySouls)) {
+                returnItemList[parseInt(soulId)] = givePlayerItemSync(playerId, parseInt(soulId), count)
+            }
+        })()
 
         const returnEquipmentList = buildFullEquipmentList(playerId)
 
