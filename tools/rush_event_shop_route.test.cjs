@@ -104,7 +104,7 @@ function getUsedManaCount(playerId) {
     ).get(playerId)?.used_mana ?? 0
 }
 
-let globalNowSeconds = Date.parse("2023-12-01T00:00:00+09:00") / 1000
+let globalNowSeconds = Date.parse("2023-12-01T00:00:00+08:00") / 1000
 let failRewardAfterWrite = false
 
 stubModule("../src/data/db", { getDb: () => db })
@@ -299,7 +299,7 @@ async function getRushSales(fastify, eventType, eventId) {
 async function main() {
     const fastify = await createServer()
     try {
-        globalNowSeconds = Date.parse("2023-12-01T00:00:00+09:00") / 1000
+        globalNowSeconds = Date.parse("2023-12-01T00:00:00+08:00") / 1000
         assert.equal((await getRushSales(fastify, 11, 700001)).length, 33)
         assert.equal((await getRushSales(fastify, 6, 700001)).length, 0)
         assert.equal(
@@ -308,7 +308,7 @@ async function main() {
             "常驻 Rush 商店必须在原始批次商品开放期内兼容复用商品",
         )
 
-        globalNowSeconds = Date.parse("2025-07-12T12:00:00+09:00") / 1000
+        globalNowSeconds = Date.parse("2025-07-12T12:00:00+08:00") / 1000
         assert.equal(
             (await getRushSales(fastify, 11, 700011)).length,
             33,
@@ -355,16 +355,16 @@ async function main() {
         assert.equal(staminaRecovery.statusCode, 200, staminaRecovery.body)
         assert.equal(decode(staminaRecovery).data.mail_arrived, true)
 
-        globalNowSeconds = Date.parse("2025-06-26T11:59:59+09:00") / 1000
+        globalNowSeconds = Date.parse("2025-06-26T11:59:59+08:00") / 1000
         assert.equal((await getRushSales(fastify, 11, 700011)).length, 0)
-        globalNowSeconds = Date.parse("2025-06-26T12:00:00+09:00") / 1000
+        globalNowSeconds = Date.parse("2025-06-26T12:00:00+08:00") / 1000
         assert.equal((await getRushSales(fastify, 11, 700011)).length, 33)
-        globalNowSeconds = Date.parse("2025-08-14T23:59:59+09:00") / 1000
+        globalNowSeconds = Date.parse("2025-08-14T23:59:59+08:00") / 1000
         assert.equal((await getRushSales(fastify, 11, 700011)).length, 33)
-        globalNowSeconds = Date.parse("2025-08-15T00:00:00+09:00") / 1000
+        globalNowSeconds = Date.parse("2025-08-15T00:00:00+08:00") / 1000
         assert.equal((await getRushSales(fastify, 11, 700011)).length, 0)
 
-        globalNowSeconds = Date.parse("2023-12-18T12:00:00+09:00") / 1000
+        globalNowSeconds = Date.parse("2023-12-18T12:00:00+08:00") / 1000
         assert.equal(
             (await getRushSales(fastify, 11, 700001)).length,
             0,
@@ -422,7 +422,7 @@ async function main() {
             assert.equal(response.statusCode, 400, `购买数量 ${invalidNumber} 必须被路由拒绝`)
         }
 
-        globalNowSeconds = Date.parse("2023-12-01T00:00:00+09:00") / 1000
+        globalNowSeconds = Date.parse("2023-12-01T00:00:00+08:00") / 1000
         const success = await fastify.inject({
             method: "POST",
             url: "/buy",

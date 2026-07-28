@@ -131,7 +131,7 @@ const {
     ShopStockError,
     executeGenericShopPurchaseSync,
     isShopItemAvailable,
-    parseShopJstTimestamp,
+    parseShopCnTimestamp,
     validateShopPurchaseAmount,
 } = require("../src/lib/event-shop-purchase.ts")
 
@@ -151,11 +151,11 @@ const periodItem = {
     availableUntil: "2023-12-18 11:59:59",
     stock: 1,
 }
-const periodStart = parseShopJstTimestamp(periodItem.availableFrom)
-const periodEnd = parseShopJstTimestamp(periodItem.availableUntil)
-assert.equal(periodStart, Date.parse("2023-11-23T12:00:00+09:00"))
-assert.throws(() => parseShopJstTimestamp("2025-02-31 12:00:00"), /Invalid shop period/)
-assert.throws(() => parseShopJstTimestamp("2025-01-01 24:00:00"), /Invalid shop period/)
+const periodStart = parseShopCnTimestamp(periodItem.availableFrom)
+const periodEnd = parseShopCnTimestamp(periodItem.availableUntil)
+assert.equal(periodStart, Date.parse("2023-11-23T12:00:00+08:00"))
+assert.throws(() => parseShopCnTimestamp("2025-02-31 12:00:00"), /Invalid shop period/)
+assert.throws(() => parseShopCnTimestamp("2025-01-01 24:00:00"), /Invalid shop period/)
 assert.equal(isShopItemAvailable(periodItem, periodStart - 1), false)
 assert.equal(isShopItemAvailable(periodItem, periodStart), true, "开放起点必须包含")
 assert.equal(isShopItemAvailable(periodItem, periodEnd), true, "开放终点必须包含")
@@ -307,7 +307,7 @@ const shopItem = {
     stock: 3,
     maxFrequency: 3,
 }
-const activeTime = parseShopJstTimestamp("2023-12-01 00:00:00")
+const activeTime = parseShopCnTimestamp("2023-12-01 00:00:00")
 
 {
     const harness = createPurchaseHarness()

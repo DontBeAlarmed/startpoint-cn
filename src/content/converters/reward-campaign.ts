@@ -34,9 +34,9 @@ function parsePositiveInteger(value: string, subject: string): number {
     return parsed
 }
 
-function parseJstTimestamp(value: string, subject: string): number {
+function parseCnTimestamp(value: string, subject: string): number {
     const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
-    if (match === null) return invalidCampaign(`${subject} must be a JST timestamp`)
+    if (match === null) return invalidCampaign(`${subject} must be a CN timestamp`)
     const parts = match.slice(1).map(Number)
     const [year, month, day, hour, minute, second] = parts
     const utc = new Date(0)
@@ -129,8 +129,8 @@ export async function convertRewardCampaigns(
         if (repeatKind !== 0 && repeatKind !== 1) {
             invalidCampaign(`reward_campaign[${row.key}].repeatKind must be 0 or 1`)
         }
-        const startAtMs = parseJstTimestamp(fields[1], `reward_campaign[${row.key}].startAt`)
-        const endAtMs = parseJstTimestamp(fields[2], `reward_campaign[${row.key}].endAt`)
+        const startAtMs = parseCnTimestamp(fields[1], `reward_campaign[${row.key}].startAt`)
+        const endAtMs = parseCnTimestamp(fields[2], `reward_campaign[${row.key}].endAt`)
         if (endAtMs < startAtMs) invalidCampaign(`reward_campaign[${row.key}] has an inverted period`)
         const rewardKind = parseInteger(fields[5], `reward_campaign[${row.key}].rewardKind`)
         if (rewardKind < 0 || rewardKind > 2) invalidCampaign(`reward kind is unsupported: ${rewardKind}`)

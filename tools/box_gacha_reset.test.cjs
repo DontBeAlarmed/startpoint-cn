@@ -301,7 +301,7 @@ const PLAYER_ID = 18;
 const BOX_GACHA_ID = 28;
 const BOX_ID = 5;
 const AVAILABLE_COUNT = 2732;
-const NOW_MS = Date.parse("2025-06-26T13:00:00+09:00");
+const NOW_MS = Date.parse("2025-06-26T13:00:00+08:00");
 
 function boxKey(playerId, boxGachaId, boxId) {
     return `${playerId}:${boxGachaId}:${boxId}`;
@@ -508,9 +508,9 @@ function assertResetFailsWithoutMutation(harness, input, ErrorType) {
 }
 
 for (const input of [
-    createInput({ nowMs: Date.parse("2025-06-26T11:59:59+09:00") }),
+    createInput({ nowMs: Date.parse("2025-06-26T11:59:59+08:00") }),
     createInput({
-        nowMs: Date.parse("2025-06-26T14:00:01+09:00"),
+        nowMs: Date.parse("2025-06-26T14:00:01+08:00"),
         settings: {
             ...settings["28"]["5"],
             availableUntil: "2025-06-26 14:00:00",

@@ -187,7 +187,7 @@ export function validateShopPurchaseAmount(value: unknown): number {
     return value as number
 }
 
-export function parseShopJstTimestamp(value: string): number {
+export function parseShopCnTimestamp(value: string): number {
     const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
     if (match === null) {
         throw new ShopPurchaseError(`Invalid shop period: ${value}.`)
@@ -210,7 +210,7 @@ export function parseShopJstTimestamp(value: string): number {
     if (parts.some((part, index) => part !== normalized[index])) {
         throw new ShopPurchaseError(`Invalid shop period: ${value}.`)
     }
-    return localDate.getTime() - (9 * 60 * 60 * 1000)
+    return localDate.getTime() - (8 * 60 * 60 * 1000)
 }
 
 export function isShopItemAvailable(shopItem: ShopItem, nowMs: number): boolean {
@@ -220,10 +220,10 @@ export function isShopItemAvailable(shopItem: ShopItem, nowMs: number): boolean 
     }, ...(shopItem.compatibilityPeriods ?? [])]
 
     return periods.some(period => {
-        const availableFromMs = parseShopJstTimestamp(period.availableFrom)
+        const availableFromMs = parseShopCnTimestamp(period.availableFrom)
         const availableUntilMs = period.availableUntil === null
             ? Infinity
-            : parseShopJstTimestamp(period.availableUntil)
+            : parseShopCnTimestamp(period.availableUntil)
         return nowMs >= availableFromMs && nowMs <= availableUntilMs
     })
 }

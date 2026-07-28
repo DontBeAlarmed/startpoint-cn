@@ -68,8 +68,8 @@ export class BoxGachaNotEmptyError extends BoxGachaResetError {
     }
 }
 
-function parseJstTimestamp(value: string): number {
-    const timestamp = Date.parse(`${value.replace(" ", "T")}+09:00`)
+function parseCnTimestamp(value: string): number {
+    const timestamp = Date.parse(`${value.replace(" ", "T")}+08:00`)
     if (!Number.isFinite(timestamp)) {
         throw new BoxGachaResetError(`Invalid box gacha period: ${value}.`)
     }
@@ -77,10 +77,10 @@ function parseJstTimestamp(value: string): number {
 }
 
 function validatePeriod(settings: BoxGachaBoxSettings, nowMs: number): void {
-    const availableFromMs = parseJstTimestamp(settings.availableFrom)
+    const availableFromMs = parseCnTimestamp(settings.availableFrom)
     const availableUntilMs = settings.availableUntil === null
         ? Infinity
-        : parseJstTimestamp(settings.availableUntil)
+        : parseCnTimestamp(settings.availableUntil)
     if (nowMs < availableFromMs || nowMs > availableUntilMs) {
         throw new BoxGachaInvalidPeriodError()
     }
