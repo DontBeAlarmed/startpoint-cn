@@ -67,6 +67,80 @@ function context(overrides = {}) {
     }
 }
 
+recordMissionBattleFacts(context({
+    questAccomplished: false,
+    isMulti: false,
+    isMultiHost: undefined,
+    statistics: {
+        clear_phase: 1,
+        party: { characters: [], unison_characters: [] },
+        zones: [{ send_emotion_count: 10 }],
+    },
+}), evaluationTime)
+assert.equal(
+    getPlayerCategoryMissionsSync(playerId, 7)[11],
+    undefined,
+    "单人战斗不得推进仅在协力界面可发送的表情周常",
+)
+
+recordMissionBattleFacts(context({
+    questAccomplished: false,
+    statistics: {
+        clear_phase: 1,
+        party: { characters: [], unison_characters: [] },
+        zones: [{ use_emotion_count: 10 }],
+    },
+}), evaluationTime)
+assert.equal(
+    getPlayerCategoryMissionsSync(playerId, 7)[11],
+    undefined,
+    "收到或执行表情的 use_emotion_count 不得冒充主动发送次数",
+)
+
+recordMissionBattleFacts(context({
+    questAccomplished: false,
+    statistics: {
+        clear_phase: 1,
+        party: { characters: [], unison_characters: [] },
+        zones: [{ send_emotion_count: 4 }, { send_emotion_count: -1 }],
+    },
+}), evaluationTime)
+assert.equal(
+    getPlayerCategoryMissionsSync(playerId, 7)[11],
+    undefined,
+    "任一场景表情统计非法时整次事实必须 fail closed",
+)
+
+recordMissionBattleFacts(context({
+    questAccomplished: false,
+    statistics: {
+        clear_phase: 1,
+        party: { characters: [], unison_characters: [] },
+        zones: [{ send_emotion_count: 4 }, { send_emotion_count: 6 }],
+    },
+}), evaluationTime)
+assert.equal(
+    getPlayerCategoryMissionsSync(playerId, 7)[11]?.progress,
+    10,
+    "表情周常应累计所有 zone 的主动发送次数且不要求通关",
+)
+assert.throws(() => db.transaction(() => {
+    recordMissionBattleFacts(context({
+        questAccomplished: false,
+        statistics: {
+            clear_phase: 1,
+            party: { characters: [], unison_characters: [] },
+            zones: [{ send_emotion_count: 2 }],
+        },
+    }), evaluationTime)
+    throw new Error("rollback-pass-emotion")
+})(), /rollback-pass-emotion/)
+assert.equal(
+    getPlayerCategoryMissionsSync(playerId, 7)[11]?.progress,
+    10,
+    "外层结算事务回滚时不得留下表情任务进度",
+)
+
 recordMissionBattleFacts(context(), evaluationTime)
 assert.equal(getPlayerCategoryMissionsSync(playerId, 8)[15]?.progress, 1)
 

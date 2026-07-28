@@ -45,13 +45,40 @@ function matchesQuestRange(row: readonly unknown[], questCategory: number, quest
         && matchesSelector(parseSelector(row[11]), second)
 }
 
+function getSendEmotionCount(context: FinishContext): number | null {
+    if (context.isMulti !== true) return null
+    let total = 0
+    for (const zone of context.statistics.zones ?? []) {
+        const value = zone.send_emotion_count
+        if (value === undefined) continue
+        if (!Number.isSafeInteger(value) || value < 0) return null
+        total += value
+        if (!Number.isSafeInteger(total)) return null
+    }
+    return total
+}
+
 export function recordPassMissionBattleFacts(
     context: FinishContext,
     evaluationTime: Date,
 ): number[] {
-    if (!context.questAccomplished) return []
-
     const matchedMissionIds: number[] = []
+    const sendEmotionCount = getSendEmotionCount(context)
+    if (sendEmotionCount !== null && sendEmotionCount > 0) {
+        for (const definition of getMissionMasterDefinitions(7)) {
+            if (definition.patternType !== 85
+                || !isMissionDefinitionEnabledAt(definition, evaluationTime)) continue
+            incrementPlayerCategoryMissionSync(
+                context.playerId,
+                7,
+                definition.missionId,
+                sendEmotionCount,
+            )
+            matchedMissionIds.push(definition.missionId)
+        }
+    }
+    if (!context.questAccomplished) return matchedMissionIds
+
     for (const definition of getMissionMasterDefinitions(8)) {
         const patternType = definition.patternType
         if (patternType !== 16 && patternType !== 23) continue

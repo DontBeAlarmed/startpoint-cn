@@ -43,12 +43,12 @@ export function recordMissionBattleFacts(
         clearTime: ctx.clearTime,
         skillUseCount: getSkillUseCount(ctx),
     })
+    recordPassMissionBattleFacts(ctx, evaluationTime)
     if (!ctx.questAccomplished) return
     recordDegreeBattleStatisticsSync(ctx)
     recordDailyMissionBattleFacts(ctx, evaluationTime)
     recordEventMissionBattleFacts(ctx, evaluationTime)
     recordDegreeMissionBattleFacts(ctx, evaluationTime)
-    recordPassMissionBattleFacts(ctx, evaluationTime)
     recordActiveMissionSpecificBattleFactsSync(ctx)
     recordActiveMissionConditionalBattleFactsSync(ctx)
     if (ctx.isMulti) {

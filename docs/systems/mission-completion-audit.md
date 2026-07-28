@@ -131,7 +131,7 @@
   已由 `content:pass` 生成服务端资产；不再使用“官方主数据缺失”的旧结论。
 - category 6 已接入单人、协力、冲刺和体力；category 7 已接入协力和体力，救援与表情仍保留持久化 fallback；
   category 8 已接入活动登录、type 16 指定协力关卡和 6 条按 `battle_kind`/QuestRange 匹配的 type 23 活动关卡。
-- Pass 覆盖分区为 `229/267`：category 6 的 76 条、category 7 的协力/体力 38 条和 category 8 的 115 条已有事实；category 7 的救援 19 条及战斗表情 19 条保留 fallback。
+- Pass 覆盖分区为 `248/267`：category 6 的 76 条、category 7 的协力/体力/主动发送表情 57 条和 category 8 的 115 条已有事实；category 7 的救援 19 条保留 fallback。
 - Pass 周常使用活动专属基线，避免月中开放时计入开放前行为。任务阶段结算会按任务定义中的活动 ID 原子增加 Pass 点数。
 - `Pass_card/get_pass_card` 和 `receive_all` 已从固定空响应改为真实点数、等级、免费/付费双轨领取和防重复事务。
   当前没有 Pass 购买流程，付费轨保持锁定。详细契约见[修行之道](./pass-card.md)。
@@ -158,13 +158,13 @@
 
 ## 尚未完成的分类
 
-`src/lib/mission/coverage-audit.ts` 是覆盖数字和剩余 ID 的唯一机器清单。`tools/mission_coverage_audit.test.cjs` 锁定 category 3 `2485/2512`、Degree `1275/1288`、觉醒条件族 `144/144`（resolved 144、fail closed 0）和 Pass `229/267`，并要求分区无交集且每个 fallback/fail-closed 条目都有原因。该报告证明代码路由和事实生产者覆盖，不等价于 CN 客户端验收。
+`src/lib/mission/coverage-audit.ts` 是覆盖数字和剩余 ID 的唯一机器清单。`tools/mission_coverage_audit.test.cjs` 锁定 category 3 `2485/2512`、Degree `1275/1288`、觉醒条件族 `144/144`（resolved 144、fail closed 0）和 Pass `248/267`，并要求分区无交集且每个 fallback/fail-closed 条目都有原因。该报告证明代码路由和事实生产者覆盖，不等价于 CN 客户端验收。
 
 - category 4 已形成累计获得量、活动隔离、结算、发奖和 load 映射；category 5 已接入上述 1275 条权威事实。
   两类仍需 CN 客户端验证提示、奖励和重启持久化；category 5 的其余任务需逐族补事实。
 - category 3 已启用 805 条原生严格协力规则、948 条空 selector 兼容规则、257 条 type 23 精确通关规则、445 条关卡、物品、竞速、阶段、当前状态及单人累计规则、18 条 Event 登录/Raid summary/RAID SET/角色投票事实、2 条歼灭者 type 86 及 10 条 type 87；其中 7 条 pattern 26/27/28 已接入官方战斗统计事实，严格拒绝失败、type26 错误 rank、开放期外、非法或溢出统计。type 86 仅按 mission ID 兼容闭合到 category 26 的 `1001`、`1001001`，要求多人成功 SS、正整数耗时，并检查每个 zone 的所有非空本地 member 都明确满足 `debuff_r=0`。其余 27 条 Attention 等待权威来源，
   旧 map 只作历史审计，不作为自动事实或发奖依据。Attention 在缺少权威来源前保持禁用。
-- Pass 的救援、表情和购买流程尚未完成，三分类、活动关卡累计和等级奖励主链已具备自动测试，仍需 CN 客户端验收。
+- Pass 的救援和购买流程尚未完成，三分类、活动关卡累计、主动发送表情和等级奖励主链已具备自动测试，仍需 CN 客户端验收。
 - 角色觉醒的双角色配对与无队长指定关卡仍依赖已记录的本地计数器/历史；奖励结算与最终特殊奖励触发已按
   CN 1.8.1 主数据实现。statistics 17 与种族合集已补齐自动测试，但尚未由客户端逐条验收。
 

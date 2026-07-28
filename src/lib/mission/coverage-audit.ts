@@ -153,7 +153,7 @@ function passPartition(): MissionCoveragePartition {
         for (const definition of entries) {
             const type = definition.patternType
             const supported = category === 6 && [14, 16, 28, 39].includes(type ?? -1)
-                || category === 7 && [16, 39].includes(type ?? -1)
+                || category === 7 && [16, 39, 85].includes(type ?? -1)
                 || category === 8 && [0, 16, 23].includes(type ?? -1)
             if (supported) automated.add(`${category}:${definition.missionId}`)
         }
