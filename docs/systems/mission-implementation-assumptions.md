@@ -73,7 +73,7 @@
 
 - mission `2389` 的 type 68 由客户端 `character_election/vote` 请求产生，成功响应不读取业务字段；`get_vote_status` 只读取严格布尔值 `is_voted`。两个接口在选举开放期外都使用客户端已知的 `result_code=11003`。
 - `character_election.json` 由 Content Sync 从选举、排除、图鉴和角色 orderedmap 生成。候选过滤照 CN 1.8.1 `CharacterElectionLogic`：接受非隐藏的 NPC，以及非隐藏、身份角色自身的普通 Character；其他 kind 不进入候选，并移除该期 exclude 表中的 keyword ID。路由不接受任意正整数，也不把候选表硬编码在 TypeScript 中。
-- 首次投票写入 `players_character_election_votes`，并在同一个 `BEGIN IMMEDIATE` 事务内把 mission 2389 幂等完成到 1；任务写入异常会回滚投票。状态查询按玩家与 election ID 隔离，数据库 schema 10 保存首次 keyword ID 和投票时刻。
+- 首次投票写入 `players_character_election_votes`，并在同一个 `BEGIN IMMEDIATE` 事务内把 mission 2389 幂等完成到 1；任务写入异常会回滚投票。状态查询按玩家与 election ID 隔离，数据库 schema 11 继续保存首次 keyword ID 和投票时刻。
 - Event mission 600001 与 900809 的 type 86 只在多人 category 26 的 `1001`、`1001001` 成功取得 SS 时判断。两条官方 selector 的关卡后缀均为 `""`，客户端会解析成不可达的 `Within([])`；这里按 mission ID 和官方 1.4.54 中各自唯一存在的关卡做显式兼容闭合，不建立“空 selector 等于活动任意关卡”的通用规则。`debuff_r` 来自客户端结算的 `statistics.zones[].members[]`，表示该本地成员收到的敌方元素抗性下降次数；每个 zone 至少要有一个非空成员，空成员槽位跳过，所有非空成员都必须携带非负整数 0。缺字段、空数组、非法数字或任一正数均 fail closed。服务端不使用当前玩家的本地统计推断其他真人队友，也不把这项安全策略描述成已知官方后端实现。
 - 重复请求当前采用传输重试兼容语义：返回成功、保留第一次选择、不重复增长任务。客户端正常流程会先查询 `is_voted`，反编译源码没有提供重复投票专用业务错误码；因此这里不把幂等成功描述为官方重复投票行为。若后续脱敏抓包证明官方返回其他错误，应只调整重复分支，不改变首次投票事务。
 - 选举表的 string ID、开放期与 mission 2389 的 pattern、开放期、type 68 和唯一奖励 target 1 必须同时吻合；任一来源漂移时投票任务 fail closed。当前自动测试与真实 1.4.54 CDN smoke 证明服务端链路闭合，但尚未记为 CN 客户端人工验收通过。

@@ -54,6 +54,13 @@ CREATE TABLE players_active_quests (
     quest_id INTEGER NOT NULL,
     category INTEGER NOT NULL
 );
+CREATE TABLE score_history (
+    player_id INTEGER NOT NULL,
+    play_id TEXT NOT NULL,
+    total_damage REAL NOT NULL,
+    score REAL,
+    UNIQUE (player_id, play_id)
+);
 INSERT INTO player_state VALUES (17, 1000, 2000, 3000, 0, 0);
 INSERT INTO character_state VALUES (17, 101, 100);
 INSERT INTO mission_state VALUES (17, 0);
@@ -215,7 +222,19 @@ stubModule("../src/lib/mission/battle-facts", {
         db.prepare("UPDATE mission_state SET clear_count = clear_count + 1 WHERE player_id = 17").run()
     },
 })
-stubModule("../src/data/domains/equipment", { updatePlayerEquipmentSync() {} })
+stubModule("../src/data/domains/equipment", {
+    getPlayerEquipmentListSync: () => ({}),
+    updatePlayerEquipmentSync() {},
+})
+stubModule("../src/data/domains/score-attack-history", {
+    insertPlayerScoreAttackBattleHistorySync(record) {
+        writeAttempts++
+        return db.prepare(`
+            INSERT OR IGNORE INTO score_history (player_id, play_id, total_damage, score)
+            VALUES (?, ?, ?, ?)
+        `).run(record.playerId, record.playId, record.total_damage, record.score).changes === 1
+    },
+})
 stubModule("../src/data/domains/session", { getSession: () => null })
 stubModule("../src/data/domains/rushEvent", {
     deletePlayerRushEventPlayedPartyListSync() {},
@@ -370,7 +389,12 @@ async function finish(fastify) {
                     equipments: [null, null, null],
                     ability_soul_ids: [null, null, null],
                 },
-                zones: [{ use_power_flip_count: 1, use_dash_count: 0 }],
+                zones: [{
+                    use_power_flip_count: 1,
+                    use_dash_count: 0,
+                    damage_deal_total: 1234.5,
+                    members: [{ origin_damage: 1234.5 }, null, null],
+                }],
             },
         },
     })
@@ -396,6 +420,7 @@ async function main() {
     assert.deepEqual(db.prepare("SELECT * FROM mission_state").get(), initialState.mission)
     assert.deepEqual(db.prepare("SELECT * FROM item_state").get(), initialState.item)
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM quest_progress").get().count, 0)
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM score_history").get().count, 0)
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players_active_quests").get().count, 1)
     assert.ok(activeQuests[17])
 
@@ -408,6 +433,7 @@ async function main() {
     assert.deepEqual(db.prepare("SELECT * FROM mission_state").get(), initialState.mission)
     assert.deepEqual(db.prepare("SELECT * FROM item_state").get(), initialState.item)
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM quest_progress").get().count, 0)
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM score_history").get().count, 0)
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players_active_quests").get().count, 1)
     assert.ok(activeQuests[17])
     assert.ok(writeAttempts > 0, failed.body)
@@ -426,6 +452,12 @@ async function main() {
     assert.equal(db.prepare("SELECT count FROM item_state WHERE player_id = 17 AND item_id = 40501").get().count, 8)
     assert.equal(db.prepare("SELECT count FROM item_state WHERE player_id = 17 AND item_id = 40502").get().count, 12)
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM quest_progress").get().count, 1)
+    assert.deepEqual(db.prepare("SELECT * FROM score_history").all(), [{
+        player_id: 17,
+        play_id: "score-play",
+        total_damage: 1234.5,
+        score: 1_500_000,
+    }])
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players_active_quests").get().count, 0)
     assert.equal(activeQuests[17], undefined)
     const decoded = unpack(Buffer.from(succeeded.body, "base64"))

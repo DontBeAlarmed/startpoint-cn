@@ -5,7 +5,7 @@
 - 官方关卡 category 为 `27`；category `9` 是教程关卡，与无限演武无关。
 - 开战、结算和放弃分别复用 `/single_battle_quest/start`、`/finish`、`/abort`。
 - 结算专用字段为 `score_attack_event.main_character_ids` 和 `score_attack_event.reward_ids`；`reward_ids` 保存分数奖励行 ID，不是道具 ID。
-- `/history/score_attack_event_battle` 不参与核心结算，当前保持空履历，等待完整协议依据。
+- `/history/score_attack_event_battle` 返回逐次战斗履历，不从最高分 progress 拼接；新版本只记录上线后的真实 finish，旧存档历史保持为空。
 
 ## 主数据
 
@@ -36,7 +36,9 @@
 - 提高最高分时只补发新增区间内的档位。
 - 结算响应显示本次主位角色；重新 load 后最高分和最高评级保持。
 
-当前状态：服务端专项测试通过，客户端待重新验收。履历页面不属于本轮范围。
+当前状态：服务端专项测试通过，客户端待重新验收。履历按 `event_id` 隔离，保存结算当时的三组角色、Sub、装备、魂珠、装备等级、强化阶段、分数、耗时及伤害快照；同一 `play_id` 重试不会重复写入。履历写入与奖励、最高分 progress 和 active quest 删除共享结算事务。
+
+客户端 abort 也可以携带战斗统计，但目前没有官方服务端证据证明何种中止会进入履历。当前只记录 finish；abort、恢复清理和旧 progress 均不生成推测记录。
 
 服务端事务回归使用真实 Fastify `/finish` 与内存 SQLite：先允许 progress 正常写入，再由 `players_active_quests` 的 `AFTER DELETE` trigger 在删除阶段抛错，确认玩家字段、角色经验、任务统计、档位奖励、progress 和 DB active 全部回滚且内存 active 保留；移除 trigger 后以同一请求重试，所有奖励与计数只写入一次。
 

@@ -14,7 +14,7 @@
 | 多人联机 | NPC 建房、招募、TCP、开始与结算可用；超级猫头鹰双场景状态机已实现；真人匹配和进程重启恢复未完成 | 房间生命周期、清理、身份、房主状态、双代 SceneReady、Notify 索引和内容入口有专项测试 | 基础 NPC 房主流程已有实际使用；超级猫头鹰、重赛、昵称显示和 TCP 中断完整矩阵待验收；真人双客户端流程缺少验收条件 | [多人联机协议](../protocol/multi-battle.md) |
 | 土俑 | 分数、独立配队、累计奖励、动画所需字段、幂等和存档恢复已实现 | 资产、结算、奖励和配队有专项测试 | 已通过客户端验收 | [土俑累计分奖励](../systems/carnival-score-rewards.md) |
 | 狂热激战 | 基础流程、独立配队、结算事务和常驻批次推测回退已实现 | 商店、事务、首次与重复通关有覆盖 | 全流程待客户端验收；推测回退缺少官方服务端证据 | [狂热激战](../systems/rush-event.md) |
-| 无限演武 | category 27、评级、跨档奖励、事务和持久化已实现；履历端点仍为空 | 服务层与真实 Fastify/SQLite 事务覆盖较强 | 待客户端重新验收 | [无限演武](../systems/score-attack-event.md) |
+| 无限演武 | category 27、评级、跨档奖励、事务、逐次履历和持久化已实现 | 服务层、履历协议与真实 Fastify/SQLite 事务覆盖较强 | 待客户端重新验收，包含履历列表和详情 | [无限演武](../systems/score-attack-event.md) |
 | 战阵 | 本地三队 Raid、独立配队、start、权重推进、分关卡次数、summary 事件级累计击破奖励和 finish 已实现 | required kill、10 槽解析、阈值选择、重复 summary、事务回滚和状态持久化有专项测试 | 待客户端重新验收，重点确认奖励数量、动画和页面刷新 | [战阵事件级奖励](../systems/raid-event-overall-rewards.md) |
 | 歼灭者讨伐战 | 房主解锁、门票预扣、abort 返还和重启恢复已实现 | 房主/成员身份与门票生命周期有覆盖 | 房主解锁已通过；成员不解锁降为低优先级；门票待验收 | [歼灭者解锁](../systems/boss-epuration-unlock.md) |
 | 任务系统 | 部分完成：普通/每日/每周、收集、1275 条称号、category 3 事实 2485 条、Pass 三分类与等级奖励、觉醒已有；Active Mission 已接入 20015/20016/20017 等权威事实链 | 指定 Boss/Advent 累计通关、权威战斗统计、歼灭者 type 86、type 87 client check、6 条业务操作、QuestRange、948 条已审计空 selector 兼容、活动关卡、Ranking Phase、战阵 SET、角色投票、角色/装备/库存/养成及 Active Mission 核心已有自动测试；称号 13 条已按精确 ID 延期，category 3 其余 27 条救援继续 fallback | 觉醒核心时序已通过；本轮不继续 category 3 救援、每日/每周完整流程和觉醒条件全集验收 | [任务完成度审计](../systems/mission-completion-audit.md)、[任务路线图](../systems/mission-roadmap.md)、[Active Mission](../systems/active-mission.md)、[修行之道](../systems/pass-card.md) |

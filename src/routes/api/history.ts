@@ -1,7 +1,9 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getReceiveHistorySync } from "../../data/domains/mail"
+import { getPlayerScoreAttackBattleHistorySync } from "../../data/domains/score-attack-history"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
+import { getQuestContentTableSync } from "../../lib/assets";
 import { generateDataHeaders } from "../../utils";
 
 const routes = async (fastify: FastifyInstance) => {
@@ -59,13 +61,29 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/score_attack_event_battle", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as any
         const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+        const eventId = body.event_id
+        if (!viewerId || isNaN(viewerId)
+            || !Number.isSafeInteger(eventId) || eventId <= 0) return reply.status(400).send({
             error: "Bad Request", message: "Invalid request body."
         })
+        const session = await getSession(viewerId.toString())
+        if (!session) return reply.status(400).send({
+            error: "Bad Request", message: "Invalid viewer id."
+        })
+        const playerId = resolvePlayerIdSync(session.accountId)
+        if (playerId === null) return reply.status(400).send({
+            error: "Bad Request", message: "No player bound to account."
+        })
+        const eventExists = Object.values(getQuestContentTableSync("score_attack_event_quest.json"))
+            .some(quest => quest.eventId === eventId)
+        if (!eventExists) return reply.status(400).send({
+            error: "Bad Request", message: "Score attack event doesn't exist."
+        })
+        const history = getPlayerScoreAttackBattleHistorySync(playerId, eventId)
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
-            data: { history: [] }
+            data: { history }
         })
     })
 }

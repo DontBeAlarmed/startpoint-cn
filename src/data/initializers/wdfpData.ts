@@ -490,6 +490,47 @@ export default function init(
         ON players_quest_progress (player_id, section, finished)
     `).run()
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_score_attack_battle_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id INTEGER NOT NULL,
+        event_id INTEGER NOT NULL,
+        play_id TEXT NOT NULL,
+        ability_soul_id_1 INTEGER,
+        ability_soul_id_2 INTEGER,
+        ability_soul_id_3 INTEGER,
+        category_id INTEGER NOT NULL,
+        character_1_total_damage REAL,
+        character_2_total_damage REAL,
+        character_3_total_damage REAL,
+        character_id_1 INTEGER,
+        character_id_2 INTEGER,
+        character_id_3 INTEGER,
+        clear_rank INTEGER,
+        create_time TEXT NOT NULL,
+        elapsed_time_ms REAL NOT NULL,
+        enhancement_level_1 INTEGER,
+        enhancement_level_2 INTEGER,
+        enhancement_level_3 INTEGER,
+        equipment1_id INTEGER,
+        equipment2_id INTEGER,
+        equipment3_id INTEGER,
+        equipment_level_1 INTEGER,
+        equipment_level_2 INTEGER,
+        equipment_level_3 INTEGER,
+        finish_kind INTEGER NOT NULL,
+        quest_id INTEGER NOT NULL,
+        score REAL,
+        total_damage REAL NOT NULL,
+        unison_character_id_1 INTEGER,
+        unison_character_id_2 INTEGER,
+        unison_character_id_3 INTEGER,
+        UNIQUE (player_id, play_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_score_attack_history_player_event_id
+        ON players_score_attack_battle_history (player_id, event_id, id DESC)
+    `).run()
+
     // migrations for quest progress columns added after the original schema
     ensureSchemaColumn(database, "players_quest_progress.leader_character_id")
     ensureSchemaColumn(database, "players_quest_progress.multi_clear_count")

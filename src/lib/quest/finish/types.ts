@@ -19,8 +19,10 @@ export interface QuestStatistics {
         send_emotion_count?: number
         encoffinment_count?: number
         skill_point_over_on_start?: number
+        damage_deal_total?: number
         members?: ({
             debuff_r?: number
+            origin_damage?: number
             [key: string]: any
         } | null)[]
     }[]

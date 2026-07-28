@@ -13,7 +13,8 @@ import {
 import { getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync } from "../../data/domains/quest"
 import { getSession } from "../../data/domains/session"
 import { incrementPlayerCharacterClearSync } from "../../data/domains/character_clear"
-import { updatePlayerEquipmentSync } from "../../data/domains/equipment"
+import { getPlayerEquipmentListSync, updatePlayerEquipmentSync } from "../../data/domains/equipment"
+import { insertPlayerScoreAttackBattleHistorySync } from "../../data/domains/score-attack-history"
 import {
     getPlayerCarnivalEventRecordsSync,
     getPlayerClaimedCarnivalRewardIdsSync,
@@ -102,6 +103,7 @@ import { getMailArrivedSync } from "../../lib/mail-notification"
 import { recordActiveMissionQuestChallengeFactSync } from "../../lib/mission/active-entry-facts";
 import { getRaidEventRequiredKillCount } from "../../lib/raid-event-master";
 import { resolveQuestRewardEligibility } from "../../lib/quest/first-clear-reward";
+import { buildScoreAttackBattleHistoryRecord } from "../../lib/quest/score-attack-history";
 
 interface StartBody {
     quest_id: number
@@ -128,8 +130,10 @@ interface QuestStatistics {
         use_power_flip_count?: number
         use_dash_count?: number
         use_skill_count?: number
+        damage_deal_total?: number
         members?: ({
             debuff_r?: number
+            origin_damage?: number
             [key: string]: any
         } | null)[]
         [key: string]: any
@@ -533,6 +537,23 @@ const routes = async (fastify: FastifyInstance) => {
             const carnivalEventData = carnivalFinishResult?.carnivalEventData ?? null
             const carnivalRewardResult = carnivalFinishResult?.rewardResult
 
+            if (isScoreAttackEvent) {
+                insertPlayerScoreAttackBattleHistorySync(buildScoreAttackBattleHistoryRecord({
+                    playerId,
+                    eventId: questData.eventId!,
+                    playId: activeQuestData.playId,
+                    categoryId: questCategory,
+                    questId,
+                    finishKind: 0,
+                    createdAt: settlementTime,
+                    elapsedTimeMs: clearTime,
+                    score: body.score,
+                    clearRank,
+                    party: bodyPartyStatistics,
+                    statistics: body.statistics,
+                    equipmentList: getPlayerEquipmentListSync(playerId),
+                }))
+            }
             const scoreAttackFinishResult = isScoreAttackEvent
                 ? handleScoreAttackEventFinish({
                     playerId,
