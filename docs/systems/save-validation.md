@@ -1,73 +1,111 @@
-# 存档导入、导出与写入校验
+# 存档 v2：导出、恢复与克隆
 
-当前管理 API 可以导出和替换 `MergedPlayerData` 覆盖的玩家领域，但不代表完整服务端状态快照。新增数据库领域时必须显式接入组装与恢复，否则会在往返后丢失。
+管理 API 使用 `starpoint-cn-save` 快照备份玩家状态。格式 v2 直接保存 SQLite 玩家领域行，不再依赖面向客户端的 `MergedPlayerData`，因此能覆盖邮件、商店、活动履历和后续新增的玩家表。
 
 ## 快照格式
 
-`GET /api/player/save?id=<playerId>` 返回：
+`GET /api/player/save?id=<playerId>` 导出：
+
+```json
+{
+  "schema": "starpoint-cn-save",
+  "version": 2,
+  "formatVersion": 2,
+  "mode": "backup",
+  "exportedAt": "...",
+  "playerId": 1,
+  "producer": {
+    "serverVersion": "1.0.1",
+    "dbSchemaVersion": 12,
+    "contentVersion": "1.4.54"
+  },
+  "domains": {
+    "core": { "version": 1, "tables": {} },
+    "missions": { "version": 1, "tables": {} },
+    "events": { "version": 1, "tables": {} },
+    "economy": { "version": 1, "tables": {} },
+    "mailbox": { "version": 1, "tables": {} }
+  },
+  "excludedDomains": ["account", "session", "serverConfig", "activeQuest"]
+}
+```
+
+`version` 是旧管理端兼容字段；v2 解析以 `formatVersion` 为准。`producer` 记录生成快照时的服务端、数据库 schema 和 Content 版本，用于拒绝不能安全向后恢复的数据。
+
+## 覆盖范围
+
+schema 12 共有 57 张可从 `players` 外键图发现的玩家关联表：
+
+- 56 张登记到 `core`、`missions`、`events`、`economy`、`mailbox`；
+- `players_active_quests` 是唯一排除的玩家表；
+- 邮件、领取历史、活动扭蛋箱明细、Pass、Raid、商店购买计数、campaign lineup 和无限演武战斗履历均可往返。
+
+注册表位于 `src/data/player-save/registry.ts`。测试会动态遍历当前 SQLite 外键图，并要求发现结果与“已登记 + 明确排除”完全相等。以后新增玩家表但未登记时，CI 会失败，不再静默漏出快照。
+
+以下状态不属于单玩家存档：
+
+| 表或领域 | 原因 |
+|---|---|
+| `accounts` | 账号身份和认证 |
+| `sessions` | 登录令牌 |
+| `device_bindings` | 设备绑定 |
+| `server_gameplay_settings` | 服务端全局配置 |
+| `raid_event_boss_states` | 全服 Raid 共享状态 |
+| `players_active_quests` | 进行中战斗、房间和预扣资源 |
+
+恢复和克隆都会清理目标玩家的 `players_active_quests`。数据库事务成功后还会清除进程内 `activeQuests`；事务失败时两处状态均保留。这样旧战斗不能在已经替换的背包、体力或门票状态上继续结算。
+
+## Restore 与 Clone
+
+恢复写入现有玩家：
+
+- 保留目标 `players.id` 和 `account_id`；
+- 替换所有已登记玩家领域；
+- 不复制账号、设备、会话和服务器配置；
+- `players.time_offset` 统一写为 `NULL`，运行时只使用全局服务器时间；
+- 整个操作在单一 SQLite 事务中执行，任一表失败即回滚。
+
+克隆先在目标账号创建新玩家，再使用独立策略写入：
+
+- 新玩家 ID 和目标账号关系由服务器分配；
+- `players_mails`、`players_receive_history`、`players_score_attack_battle_history` 的自增 ID 重新生成；
+- `players_tutorial_step_receipts` 不复制，避免向新玩家重放源存档缓存的旧教程响应；
+- 业务主键和玩家进度按原值复制。
+
+## 跨版本规则
+
+- 来源 `dbSchemaVersion` 高于当前服务器：拒绝导入，防止未知表或字段被静默丢弃。
+- 来源版本较旧：允许缺少在来源 schema 之后才引入的表，并按空表处理。
+- 来源版本当时已经存在的登记表缺失：拒绝导入。
+- 来源包含当前数据库未知的表或列：拒绝导入。
+- 目标数据库新增列时，快照按列名映射；来源未提供的列保留目标默认值或当前值。
+
+结构兼容不等于 Content 兼容。角色、装备、任务、商店和活动记录都含 Content ID；把快照导入缺少对应 ID 的 CDN/Content 版本，可能产生不可用状态。当前项目只保证官方客户端和对应官方 CDN 环境，不为修改后的 Content 做恢复兜底。
+
+## v1 兼容
+
+旧格式仍可导入：
 
 ```json
 {
   "schema": "starpoint-cn-save",
   "version": 1,
-  "exportedAt": "...",
-  "playerId": 1,
-  "data": {}
+  "data": { "player": {} }
 }
 ```
 
-`data` 由 `getMergedPlayerDataSync()` 组装。当前覆盖玩家主行、每日挑战点、教程、普通任务清单、角色、Mana Node、编队、物品、装备、关卡进度、抽卡信息、活动 campaign、Active Mission、分类任务、活动扭蛋箱、选项、狂热激战以及土俑分数/奖励/称号状态。
+v1 明确标记为 `legacyPartial=true`，不能作为完整备份。它只更新旧 `MergedPlayerData` 能完整表达的领域；邮件、商店计数、Pass、Raid、履历等新领域会保留目标玩家导入前的状态，不再被旧导入流程级联清空。活动扭蛋箱的父表和已抽奖励明细也会整体保留，因为 v1 只有父表，单独恢复父表会造成奖池不一致或外键失败。
 
-`purchasedTimesList` 当前固定为空对象，不会往返商店购买历史。邮箱、邮件领取历史和进程内多人房间也不在快照中；这份列表不是对所有缺失领域的穷举。
+默认存档模板同时接受 v1 和 v2。新模板应使用管理端当前导出的 v2；v1 仅用于兼容历史文件。
 
-## 导入行为
+默认模板应用到新存档时使用 clone 策略，因此不会复制 `players_tutorial_step_receipts` 中缓存的源玩家教程响应。
 
-`POST /api/player/save?id=<playerId>` 只接受：
+模板上传会先做结构校验，再在事务中的临时账号与玩家上完整试恢复，最后主动回滚。主键、唯一约束或外键不一致会在上传时返回错误，不会保存成一个以后只能静默退回空存档的模板。
 
-- `schema = starpoint-cn-save`；
-- `version = 1`；
-- 存在对象形态的 `data.player`。
+## 管理写入边界
 
-导入会恢复已知 Date 字段，把 `data.player.id` 强制设为目标存档 ID，再调用 `replacePlayerDataSync()`。替换过程使用单一 SQLite 事务：删除目标玩家数据后重新插入当前 `MergedPlayerData` 支持的领域；任一插入失败会回滚原存档。
+快照恢复面向管理员的可信备份，不是任意编辑器或 Mod 数据接口。结构校验会拒绝未知表、未知列、外来 `player_id` 和不支持的 JSON 值，但不会重新计算每个业务字段的游戏平衡约束。
 
-入口只做 schema/version 和基础对象检查，具体字段错误主要在恢复 Date 或数据库插入阶段暴露。它不是一套完整 JSON Schema 校验器，也不保证任意手工编辑文件都能安全导入。
+快照也不是游戏客户端 `/load` 响应，不能交给客户端反序列化。存档恢复后仍应通过正常登录和 `/load` 流程完成客户端状态刷新。
 
-快照仅供当前管理端备份、克隆和恢复，不是游戏客户端 `/load` 响应，不能直接交给客户端反序列化。
-
-## 部分完整性的影响
-
-由于快照是部分覆盖：
-
-- 导入前应保留数据库备份；
-- 先用测试存档验证目标版本；
-- 新领域表必须同时接入 `getMergedPlayerDataSync()`、`insertMergedPlayerDataSync()` 和专项测试；
-- 不能用一次导出/导入成功推断全部玩家状态都已往返；
-- 邮件、商店购买次数等缺失领域需要独立迁移或备份策略。
-
-## 管理写入校验
-
-`src/routes/web_api/validation.ts` 对玩家字段编辑提供结构安全白名单：
-
-- `id` 不可修改；
-- 无符号整数限制为 `0..2147483647`；
-- 名称和评论限制长度；
-- 布尔、可空值和 Date 必须能解析；
-- 未知字段被拒绝。
-
-角色与道具管理端点还会校验资源 ID；道具数量限制在 int32 安全范围。这里保护的是序列化和数据库结构，不对所有游戏平衡上限做官方规则推断。
-
-邮件附件有独立的类型、ID 与数量规则，见[邮件系统](./mail.md)。
-
-## 破坏性恢复操作
-
-管理 API 还提供清空邮箱、删除关卡进度、删除道具和重置部分任务状态等操作。这些端点不属于存档快照本身，执行前应确认目标存档并保留备份。
-
-## 已知边界
-
-- 没有覆盖所有玩家领域的完整端到端往返矩阵；
-- 快照版本只有 v1，尚无跨版本迁移层；
-- 导入入口不是完整 JSON Schema 验证；
-- 管理端破坏性操作尚无统一撤销机制；
-- 完整克隆、跨版本恢复和失败场景仍需系统验收。
-
-当前支持状态应标记为 Partial。
+管理 API 的单文件上传上限为 64 MiB，高于旧版 5 MB 限制，用于容纳邮件、领取历史和战斗履历。导出使用同一字节上限，超限时返回明确错误；因此管理 API 成功导出的文件一定处于上传可接受范围。该上限仍是内存与滥用保护；超大历史存档需要先缩减历史数据，当前不提供流式快照格式。

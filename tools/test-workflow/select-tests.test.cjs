@@ -101,6 +101,13 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/data/index.ts"]),
         ["full", "integration:database"],
     )
+    assert.deepEqual(selectTestGroups(["src/data/player-save/v2.ts"]), ["integration:database"])
+    assert.deepEqual(selectTestGroups(["src/data/defaultSave.ts"]), ["integration:database"])
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/active-quest-service.ts"]),
+        ["integration:quest", "quick:quest"],
+    )
+    assert.deepEqual(selectTestGroups(["docs/systems/save-validation.md"]), ["integration:database"])
     assert.deepEqual(
         selectTestGroups(["src/runtime/data-paths.ts"]),
         ["integration:database", "quick:cdn", "quick:content"],
@@ -455,6 +462,7 @@ test("keeps isolated test groups parallel while infrastructure groups stay seria
 
 test("splits isolated integration tests into focused domains", () => {
     assert.deepEqual(TEST_GROUPS["integration:database"].tests, [
+        "tools/player_save_v2.test.cjs",
         "tools/server_gameplay_settings.test.cjs",
         "tools/shop_purchase_period_storage.test.cjs",
         "tools/test-workflow/database-isolation.test.cjs",

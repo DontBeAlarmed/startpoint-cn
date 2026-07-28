@@ -58,6 +58,18 @@ const SOURCE_RULES = [
     { pattern: /^src\/routes\/cn\/versionCheck\.ts$/, groups: ["full"] },
     { pattern: /^src\/routes\/web_api\//, groups: ["admin", "integration:database"] },
     {
+        pattern: /^src\/data\/(?:player-save\/|defaultSave\.ts$)/,
+        groups: ["integration:database"],
+    },
+    {
+        pattern: /^src\/lib\/quest\/active-quest-service\.ts$/,
+        groups: ["integration:quest", "quick:quest"],
+    },
+    {
+        pattern: /^docs\/systems\/save-validation\.md$/,
+        groups: ["integration:database"],
+    },
+    {
         pattern: /^src\/runtime\/data-paths\.ts$/,
         groups: ["integration:database", "quick:cdn", "quick:content"],
     },
@@ -133,7 +145,10 @@ const SOURCE_RULES = [
     },
     { pattern: /^src\/multi\//, groups: ["quick:protocol"] },
     { pattern: /^src\/multi\/tcp\/server\.ts$/, groups: ["integration:runtime"] },
-    { pattern: /^src\/data\//, groups: ["integration:database", "full"] },
+    {
+        pattern: /^src\/data\/(?!player-save\/|defaultSave\.ts$)/,
+        groups: ["integration:database", "full"],
+    },
     { pattern: /^src\/routes\/(?!api\/singleBattleQuest\.ts$|web_api\/)/, groups: ["full"] },
 ]
 

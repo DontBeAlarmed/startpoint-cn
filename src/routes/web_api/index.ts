@@ -4,6 +4,9 @@ import serverApiPlugin from "./server"
 import mailApiPlugin from "./mail"
 import lookupApiPlugin from "./lookup"
 import settingsApiPlugin from "./settings"
+import { ADMIN_UPLOAD_FILE_SIZE_LIMIT } from "./upload-limits"
+
+export { ADMIN_UPLOAD_FILE_SIZE_LIMIT } from "./upload-limits"
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.register(require('@fastify/multipart'), {
@@ -11,7 +14,7 @@ const routes = async (fastify: FastifyInstance) => {
             fieldNameSize: 100, // Max field name size in bytes
             fieldSize: 100,     // Max field value size in bytes
             fields: 10,         // Max number of non-file fields
-            fileSize: 5000000,  // For multipart forms, the max file size in bytes
+            fileSize: ADMIN_UPLOAD_FILE_SIZE_LIMIT,
             files: 1,           // Max number of file fields
             headerPairs: 2000,  // Max number of header key=>value pairs
             parts: 1000         // For multipart forms, the max number of parts (fields + files)

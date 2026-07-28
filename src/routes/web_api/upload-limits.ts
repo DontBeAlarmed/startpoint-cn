@@ -1,0 +1,1 @@
+export const ADMIN_UPLOAD_FILE_SIZE_LIMIT = 64 * 1024 * 1024

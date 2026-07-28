@@ -57,6 +57,10 @@ export function publishActiveQuest(playerId: number, quest: ActiveQuest): void {
     activeQuests[playerId] = quest
 }
 
+export function clearPublishedActiveQuest(playerId: number): void {
+    delete activeQuests[playerId]
+}
+
 export function insertActiveQuest(playerId: number, quest: ActiveQuest): void {
     persistActiveQuest(playerId, quest)
     publishActiveQuest(playerId, quest)
@@ -72,7 +76,7 @@ export function runAbortActiveQuestTransaction(
         getItemCount: getPlayerItemSync,
         setItemCount: setPlayerItemSync,
         deleteActiveQuest: deletePlayerActiveQuestSync,
-        clearActiveQuest: id => { delete activeQuests[id] },
+        clearActiveQuest: clearPublishedActiveQuest,
         getEntryCost: (category, questId) => (
             getRuntimeContentTableSync(
                 "quest_entry_costs.json",

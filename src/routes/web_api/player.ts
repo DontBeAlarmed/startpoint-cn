@@ -1,8 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getMergedPlayerDataSync, reviveMergedPlayerDates } from "../../data/utils";
 import { validatePlayerField, VALID_CHARACTER_IDS, isValidItemId, MAX_INT } from "./validation";
 import { wantsJson } from "./http";
-import { dailyResetPlayerDataSync, getAllPlayersSync, getDefaultPlayerPartyGroupsSync, getPlayerDailyChallengePointListSync, getPlayerSync, insertPlayerDailyChallengePointListSync, replacePlayerDataSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
+import { dailyResetPlayerDataSync, getAllPlayersSync, getDefaultPlayerPartyGroupsSync, getPlayerDailyChallengePointListSync, getPlayerSync, insertPlayerDailyChallengePointListSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
 import { deleteAllPlayerMailSync } from "../../data/domains/mail"
 import { getDb } from "../../data/db"
 import { getPlayerCharactersSync, insertDefaultPlayerCharacterSync, insertPlayerCharacterSync } from "../../data/domains/character"
@@ -16,6 +15,15 @@ import { deletePlayerCategoryMissionsSync } from "../../data/domains/mission";
 import { getServerDate } from "../../utils";
 import bundledDailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
+import {
+    exportPlayerSaveV2Sync,
+    restorePlayerSaveSnapshotSync,
+    validatePlayerSaveSnapshotSync,
+} from "../../data/player-save";
+import {
+    PlayerSaveDownloadTooLargeError,
+    serializePlayerSaveDownload,
+} from "./player-save-download";
 
 interface SaveQuery {
     id: string | undefined
@@ -132,19 +140,23 @@ const routes = async (fastify: FastifyInstance) => {
         const { id } = request.query as SaveQuery
         const playerId = Number(id)
         if (isNaN(playerId)) return reply.redirect("/player");
+        const json = wantsJson(request)
+        if (getPlayerSync(playerId) === null) {
+            return json ? reply.status(404).send({ error: "Player not found" }) : reply.redirect("/player")
+        }
 
-        const data = getMergedPlayerDataSync(playerId)
-        if (data === null) return reply.redirect("/player");
-
-        const snapshot = {
-            schema: "starpoint-cn-save",
-            version: 1,
-            exportedAt: new Date().toISOString(),
-            playerId,
-            data
+        let serialized
+        try {
+            serialized = serializePlayerSaveDownload(exportPlayerSaveV2Sync(playerId))
+        } catch (error: any) {
+            const message = `存档导出失败：${error?.message ?? error}`
+            const status = error instanceof PlayerSaveDownloadTooLargeError ? 413 : 500
+            return json
+                ? reply.status(status).send({ error: message })
+                : reply.redirect(`/player/${playerId}?error=${encodeURIComponent(message)}`)
         }
         reply.header("content-disposition", `attachment; filename="save_${playerId}.json"`)
-        reply.type('application/json').send(JSON.stringify(snapshot))
+        reply.type('application/json').send(serialized)
     })
 
     fastify.post("/save", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -169,24 +181,17 @@ const routes = async (fastify: FastifyInstance) => {
                 return fail("文件不是有效的 JSON")
             }
 
-            if (parsed === null || typeof parsed !== 'object' || parsed.schema !== 'starpoint-cn-save') {
-                return fail("不是有效的存档快照（schema 不符，请使用本面板导出的存档）")
-            }
-            if (parsed.version !== 1) {
-                return fail(`不支持的存档版本：${parsed.version}`)
-            }
-            const data = parsed.data
-            if (!data || typeof data !== 'object' || !data.player) {
-                return fail("存档数据缺失 player 字段")
+            try {
+                validatePlayerSaveSnapshotSync(parsed)
+            } catch (error: any) {
+                return fail(`存档校验失败：${error?.message ?? error}`)
             }
 
-            reviveMergedPlayerDates(data)
-            data.player.id = playerId
-            replacePlayerDataSync(data)
+            const result = restorePlayerSaveSnapshotSync(parsed, playerId)
+            if (json) return reply.status(200).send({ ok: true, ...result })
         } catch (error: any) {
             return fail(`恢复失败：${error?.message ?? error}`, 500)
         }
-        if (json) return reply.status(200).send({ ok: true, playerId })
         return reply.redirect(`/player/${id}`);
     })
 

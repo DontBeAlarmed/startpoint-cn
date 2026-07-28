@@ -3,15 +3,20 @@ import { existsSync, readdirSync, statSync } from "fs";
 import path from "path";
 import { getServerTime, getServerDate, setServerTime, getTimeOffset } from "../../utils";
 import { deleteAccountSync, getAccountPlayersSync, getAllAccountsSync } from "../../data/domains/account"
-import { deletePlayerSync, getPlayerSync, insertDefaultPlayerSync, replacePlayerDataSync, updatePlayerSync } from "../../data/domains/player"
+import { deletePlayerSync, getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getAllDeviceBindingsSync, updateDeviceBindingNameSync } from "../../data/domains/session"
 import { getPlayerCharactersSync } from "../../data/domains/character"
-import { getMergedPlayerDataSync, reviveMergedPlayerDates } from "../../data/utils";
 import { getActivePlayerId, setActivePlayerId, getSelectedAccountId, setSelectedAccountId, saveTimeOffset, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
 import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTemplate, getDefaultSaveMeta } from "../../data/defaultSave";
 import { detectCDNVersion, FULL_BASE, getEffectiveVersion } from "../../lib/version";
 import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance";
 import { wantsJson } from "./http";
+import {
+    applyPlayerSaveTemplateSync,
+    clonePlayerSaveV2Sync,
+    exportPlayerSaveV2Sync,
+    validatePlayerSaveTemplateSync,
+} from "../../data/player-save";
 
 interface TimeQuery {
     time: string | undefined
@@ -233,12 +238,11 @@ const routes = async (fastify: FastifyInstance) => {
             const text = (await file.toBuffer()).toString("utf-8")
             let parsed: any
             try { parsed = JSON.parse(text) } catch { return reply.status(400).send({ error: "文件不是有效的 JSON" }) }
-            if (!parsed || typeof parsed !== "object" || parsed.schema !== "starpoint-cn-save")
-                return reply.status(400).send({ error: "不是有效的存档快照（请使用本面板导出的存档）" })
-            if (parsed.version !== 1)
-                return reply.status(400).send({ error: `不支持的存档版本：${parsed.version}` })
-            if (!parsed.data || typeof parsed.data !== "object" || !parsed.data.player)
-                return reply.status(400).send({ error: "存档数据缺失 player 字段" })
+            try {
+                validatePlayerSaveTemplateSync(parsed)
+            } catch (error: any) {
+                return reply.status(400).send({ error: `存档校验失败：${error?.message ?? error}` })
+            }
             saveDefaultSaveTemplate(parsed)
             return reply.send({ ok: true, ...getDefaultSaveMeta() })
         } catch (e: any) {
@@ -300,10 +304,8 @@ const routes = async (fastify: FastifyInstance) => {
         let appliedTemplate = false
         try {
             const template = loadDefaultSaveTemplate()
-            if (template?.data?.player) {
-                const data = reviveMergedPlayerDates(template.data)
-                data.player.id = player.id
-                replacePlayerDataSync(data)
+            if (template) {
+                applyPlayerSaveTemplateSync(template, player.id)
                 appliedTemplate = true
             }
         } catch (_) { /* 模板损坏则退回空存档 */ }
@@ -396,20 +398,25 @@ const routes = async (fastify: FastifyInstance) => {
             return reply.redirect('/player')
         }
 
-        const mergedData = getMergedPlayerDataSync(playerId)
-        if (!mergedData) {
+        if (getPlayerSync(playerId) === null) {
             if (wantsJson(request)) return reply.status(404).send({ error: "Source player not found" })
             return reply.redirect('/player')
         }
 
-        const newPlayer = insertDefaultPlayerSync(accountId)
-        setActivePlayerId(newPlayer.id)
+        let snapshot
+        try {
+            snapshot = exportPlayerSaveV2Sync(playerId)
+        } catch (error: any) {
+            const message = `存档导出失败：${error?.message ?? error}`
+            if (wantsJson(request)) return reply.status(500).send({ error: message })
+            return reply.redirect(`/player/${playerId}?error=${encodeURIComponent(message)}`)
+        }
 
-        mergedData.player.id = newPlayer.id
-        replacePlayerDataSync(mergedData)
+        const cloned = clonePlayerSaveV2Sync(snapshot, accountId)
+        setActivePlayerId(cloned.playerId)
 
-        saveAccountDefaultPlayer(accountId, newPlayer.id)
-        if (wantsJson(request)) return reply.send({ ok: true, newPlayerId: newPlayer.id })
+        saveAccountDefaultPlayer(accountId, cloned.playerId)
+        if (wantsJson(request)) return reply.send({ ok: true, newPlayerId: cloned.playerId })
         return reply.redirect('/player')
     })
 
