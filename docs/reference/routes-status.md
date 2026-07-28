@@ -1,6 +1,6 @@
 # 路由族覆盖矩阵
 
-本文按业务路由族概括当前服务端覆盖情况，帮助开发者找到注册源码、测试和 current 系统文档。它不是逐端点完备表，也不替代客户端验收。
+本文按业务路由族概括当前服务端覆盖情况，帮助开发者找到注册源码、测试和 current 系统文档。它不是逐端点完备表，也不替代客户端验收。固定值、空对象和空列表的逐端点分类见[兼容空响应与未实现路由审计](./stub-route-audit.md)。
 
 单端点的最终状态必须以 `src/cn-server.ts`、对应 Fastify 插件的实际注册代码和自动测试为准。路由文件存在不代表其全部分支、事务、通知或客户端流程已经完成。
 
@@ -31,7 +31,7 @@
 | 角色总选举 | **Complete** | 状态查询、开放期 `11003`、CDN 候选白名单、首次投票持久化及 type 68 任务事实已闭合；重复请求幂等保留首次选择，尚缺官方重复投票错误样本 | `src/routes/api/characterElection.ts`、`src/data/domains/character_election.ts`、`src/content/converters/character-election.ts` | [任务待审阅实现](../systems/mission-implementation-assumptions.md) |
 | 多人联机 | **Partial** | NPC 房主基础流程和超级猫头鹰双场景状态机可用；真人匹配、双客户端完整验收和进程重启恢复缺失 | `src/multi/http/`、`src/multi/tcp/`、`src/multi/room/`、`src/multi/state/` | [多人联机协议](../protocol/multi-battle.md) |
 | 教程、工具与外围兼容 | **Partial** | 首次教程已实现事务推进、重复请求和中断恢复；工具及其他外围路由仍可能只是维持 CN 客户端流程的空响应，必须逐注册源码确认 | `src/routes/api/tutorial.ts`、`src/routes/api/tool.ts`、`src/cn-server.ts` | [首次教程](../systems/start-tutorial.md)、[当前架构](../architecture.md)、[已知问题](../status/known-issues.md) |
-| 礼包码兑换 | **Missing** | 客户端入口可以显示，但没有真实礼包码校验、次数限制、奖励配置与持久化 | `src/cn-server.ts` | [已知问题](../status/known-issues.md) |
+| 礼包码兑换 | **Missing** | 服务端主动关闭客户端入口；没有真实礼包码校验、次数限制、奖励配置与持久化 | `src/cn-server.ts` | [兼容空响应与未实现路由审计](./stub-route-audit.md) |
 
 ## 管理端路由族
 
