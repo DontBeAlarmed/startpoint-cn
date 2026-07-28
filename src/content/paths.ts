@@ -28,6 +28,7 @@ export interface ContentRuntimePaths {
 export interface ContentPaths extends ContentRuntimePaths {
     readonly cdnDir: string
     readonly cdnRoot: string
+    readonly patchesRoot: string
 }
 
 export interface PathApi {
@@ -354,6 +355,7 @@ export function resolveContentPaths({
         ...runtimePaths,
         cdnDir,
         cdnRoot: pathApi.join(cdnDir, "cn"),
+        patchesRoot: pathApi.join(cdnDir, "patches"),
     }
 
     const isolatedPaths: ReadonlyArray<readonly [name: string, filePath: string]> = [

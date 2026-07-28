@@ -105,11 +105,29 @@ test("uses split modern defaults rooted at the supplied project", () => {
         layout: "modern",
         cdnDir: path.posix.join(projectRoot, ".cdn"),
         cdnRoot: path.posix.join(projectRoot, ".cdn/cn"),
+        patchesRoot: path.posix.join(projectRoot, ".cdn/patches"),
         contentRootDir: path.posix.join(projectRoot, ".content"),
         contentStoreDir: path.posix.join(projectRoot, ".database/content/store"),
         contentStateDir: path.posix.join(projectRoot, ".database/state/content"),
         contentRuntimeDir: path.posix.join(projectRoot, "assets"),
     })
+})
+
+test("derives patchesRoot from the configured CDN parent", () => {
+    const projectRoot = path.posix.resolve("/repo/project")
+
+    assert.equal(
+        resolveContentPaths({ projectRoot, env: {}, ...posixDependencies }).patchesRoot,
+        path.posix.join(projectRoot, ".cdn", "patches"),
+    )
+    assert.equal(
+        resolveContentPaths({
+            projectRoot,
+            env: { CDN_DIR: "/srv/wf-cdn" },
+            ...posixDependencies,
+        }).patchesRoot,
+        "/srv/wf-cdn/patches",
+    )
 })
 
 test("uses DATA_DIR before WDFP_DATABASE_DIR for modern store and state", () => {
@@ -168,6 +186,7 @@ test("resolves explicit modern store, state, and bundled runtime roots", () => {
         layout: "modern",
         cdnDir: path.posix.join(projectRoot, "var/cdn"),
         cdnRoot: path.posix.join(projectRoot, "var/cdn/cn"),
+        patchesRoot: path.posix.join(projectRoot, "var/cdn/patches"),
         contentRootDir: path.posix.join(projectRoot, ".content"),
         contentStoreDir: path.posix.join(projectRoot, "var/content-store"),
         contentStateDir: "/srv/content-state",
@@ -187,6 +206,7 @@ test("uses an explicit CONTENT_DIR as the legacy store and state root", () => {
         layout: "legacy",
         cdnDir: path.posix.join(projectRoot, ".cdn"),
         cdnRoot: path.posix.join(projectRoot, ".cdn/cn"),
+        patchesRoot: path.posix.join(projectRoot, ".cdn/patches"),
         contentRootDir: "/srv/content",
         contentStoreDir: "/srv/content",
         contentStateDir: "/srv/content",
@@ -240,6 +260,7 @@ test("resolves Windows and UNC roots with the injected path API", () => {
         layout: "modern",
         cdnDir: path.win32.join(projectRoot, "cache", "cdn-parent"),
         cdnRoot: path.win32.join(projectRoot, "cache", "cdn-parent", "cn"),
+        patchesRoot: path.win32.join(projectRoot, "cache", "cdn-parent", "patches"),
         contentRootDir: path.win32.join(projectRoot, ".content"),
         contentStoreDir: path.win32.join("D:\\data", "content", "store"),
         contentStateDir: path.win32.join("D:\\data", "state", "content"),
