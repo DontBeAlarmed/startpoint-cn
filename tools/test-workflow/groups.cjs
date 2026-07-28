@@ -69,6 +69,7 @@ const TEST_GROUPS = Object.freeze({
         execution: "parallel",
         tests: [
             "tools/character_awake_eligibility.test.cjs",
+            "tools/character_growth_transaction.test.cjs",
             "tools/mana_board_availability.test.cjs",
             "tools/player_awake_save_roundtrip.test.cjs",
         ],
@@ -80,6 +81,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/lobby_lifecycle.test.cjs",
             "tools/msgpack_compat.test.cjs",
             "tools/multi_battle_multiscene.test.cjs",
+            "tools/multi_finish_follow_info.test.cjs",
             "tools/multi_player_context.test.cjs",
             "tools/npc_contributor_names.test.cjs",
             "tools/npc_nickname_pool.test.cjs",

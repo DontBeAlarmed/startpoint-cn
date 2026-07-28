@@ -609,10 +609,20 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/lobby_lifecycle.test.cjs",
         "tools/msgpack_compat.test.cjs",
         "tools/multi_battle_multiscene.test.cjs",
+        "tools/multi_finish_follow_info.test.cjs",
         "tools/multi_player_context.test.cjs",
         "tools/npc_contributor_names.test.cjs",
         "tools/npc_nickname_pool.test.cjs",
         "tools/room_cleanup_lifecycle.test.cjs",
         "tools/session_server_lifecycle.test.cjs",
+    ])
+})
+
+test("quick character includes growth transaction rollback coverage", () => {
+    assert.deepEqual(TEST_GROUPS["quick:character"].tests, [
+        "tools/character_awake_eligibility.test.cjs",
+        "tools/character_growth_transaction.test.cjs",
+        "tools/mana_board_availability.test.cjs",
+        "tools/player_awake_save_roundtrip.test.cjs",
     ])
 })

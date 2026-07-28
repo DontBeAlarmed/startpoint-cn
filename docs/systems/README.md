@@ -16,6 +16,7 @@
 ## 关卡与活动
 
 - [普通剧情结算与剧情角色入队](./story-quest-settlement.md)
+- [战斗关卡结算事务](./quest-finish-transactions.md)
 - [特殊关卡架构](./special-quest-architecture.md)
 - [战阵事件级奖励](./raid-event-overall-rewards.md)
 - [狂热激战](./rush-event.md)
@@ -41,6 +42,7 @@
 - [角色觉醒任务](./character-awake-missions.md)
 - [角色觉醒刷新](./character-awake-refresh.md)
 - [第二玛纳板开放期](./mana-board-availability.md)
+- [角色养成事务边界](./character-growth-transactions.md)
 - [角色分解审计](./character-stack-audit.md)
 
 ## 装备、抽卡与内容修复
