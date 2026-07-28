@@ -14,6 +14,7 @@ import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/a
 import { validateSessionAndPlayer, validateCharacterOwnership, computeManaDeduction, computeItemDeductions, buildCharacterListEntry, sendCharacterResponse, computeBondTokenAndEvolution, validateManaBoardAwakeRequest } from "../../../lib/character-helpers";
 import { getMailArrivedSync } from "../../../lib/mail-notification";
 import { reconcileAwakeUnlockCharacterList } from "../../../lib/mission";
+import { isCharacterSecondManaBoardAvailable } from "../../../lib/mana-board-availability";
 
 interface LearnManaNodeBody {
     viewer_id: number,
@@ -56,6 +57,11 @@ const routes = async (fastify: FastifyInstance) => {
         const userCharacterManaNodeListItem: Object[] = []
 
         const currentManaNodeIndex = characterData.manaBoardIndex;
+        if (currentManaNodeIndex === 2 && !isCharacterSecondManaBoardAvailable(characterId)) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Second mana board is not available."
+            })
+        }
         const characterManaNodes = getCharacterManaNodesSync(characterId, currentManaNodeIndex)
         if (characterManaNodes === null) return reply.status(400).send({
             "error": "Bad Request", "message": `Character does not have mana nodes of index '${currentManaNodeIndex}'.`

@@ -71,7 +71,7 @@ PassDaily、PassWeek、PassEvent 主数据、核心进度、点数、6 条 type 
 
 ### Mana Board 时间窗
 
-部分角色的第二块玛纳板受 `mana_board2_open_condition` 时间窗控制。如果存档已经持有板二状态，但服务器时间早于开放时间，CN 客户端可能在切换板层时触发 F1009。当前运行时间应与存档进度保持一致；服务端尚未为所有角色实施按时间降级过滤。
+第二块玛纳板已按官方 `mana_board2_open_condition` 和统一服务器时间过滤；跨时间存档只在 load 响应中临时降级当前板索引，不清理板二节点或改写数据库。实现边界见[第二玛纳板开放期](../systems/mana-board-availability.md)。
 
 ## 待复核现象
 

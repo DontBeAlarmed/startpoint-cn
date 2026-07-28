@@ -69,6 +69,7 @@ const TEST_GROUPS = Object.freeze({
         execution: "parallel",
         tests: [
             "tools/character_awake_eligibility.test.cjs",
+            "tools/mana_board_availability.test.cjs",
             "tools/player_awake_save_roundtrip.test.cjs",
         ],
     },

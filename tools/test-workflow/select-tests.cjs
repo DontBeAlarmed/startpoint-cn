@@ -124,6 +124,10 @@ const SOURCE_RULES = [
         groups: ["integration:mission", "integration:mission-compiled"],
     },
     {
+        pattern: /^(?:assets\/mana_board2_open_condition\.json|src\/lib\/mana-board-availability\.ts|src\/routes\/api\/character\/(?:mana|bond)\.ts|src\/data\/utils\/serialize-player\.ts)$/,
+        groups: ["quick:character", "quick:content"],
+    },
+    {
         pattern: /^src\/lib\/mission\/(?:event-battle-facts|event-entry-facts|computer-event|coverage-audit|computer-degree|degree-battle-facts|degree-operation-facts)\.ts$/,
         groups: ["integration:mission"],
     },

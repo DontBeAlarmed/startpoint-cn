@@ -12,6 +12,7 @@ import { validateSessionAndPlayer, validateCharacterOwnership, buildCharacterLis
 import { characterExpCaps } from "../../../lib/character";
 import { reconcileAwakeUnlockCharacterList } from "../../../lib/mission";
 import { getMailArrivedSync } from "../../../lib/mail-notification";
+import { isCharacterSecondManaBoardAvailable } from "../../../lib/mana-board-availability";
 
 interface ReceiveBondTokenBody {
     character_id: number,
@@ -49,6 +50,12 @@ const routes = async (fastify: FastifyInstance) => {
 
         const characterData = validateCharacterOwnership(playerId, characterId, reply)
         if (!characterData) return
+
+        if (manaBoardIndex === 2 && !isCharacterSecondManaBoardAvailable(characterId)) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Second mana board is not available."
+            })
+        }
 
         const bondToken = characterData.bondTokenList[manaBoardIndex - 1]
         if (!bondToken || bondToken.status === 0) return reply.status(400).send({
@@ -125,9 +132,20 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Internal Server Error", "message": "No character asset data found."
         })
 
+        const boardCount = getCharacterManaBoardCountSync(characterId)
+        if (!Number.isInteger(manaBoardIndex) || manaBoardIndex < 2 || manaBoardIndex > boardCount) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Mana board index is not openable."
+            })
+        }
+        if (manaBoardIndex === 2 && !isCharacterSecondManaBoardAvailable(characterId)) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Second mana board is not available."
+            })
+        }
+
         // make sure that the mana board index is valid, auto-create missing bond tokens
         if (!characterData.bondTokenList[manaBoardIndex - 1]) {
-            const boardCount = getCharacterManaBoardCountSync(characterId)
             console.log(`[MANA] open_mana_board: auto-creating bond tokens, bondListLen=${characterData.bondTokenList.length} boardCount=${boardCount}`)
             for (let i = characterData.bondTokenList.length + 1; i <= boardCount; i++) {
                 insertPlayerCharacterBondTokenSync(playerId, characterId, { manaBoardIndex: i, status: 0 })

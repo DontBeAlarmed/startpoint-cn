@@ -18,6 +18,7 @@ import { getPlayerOptionsSync } from "../domains/option"
 import { getPlayerPartyGroupListSync } from "../domains/party"
 import { getPlayerTriggeredTutorialsSync } from "../domains/tutorial"
 import { kIdToBusinessCode, businessCodeToKId } from "../codeMap"
+import { getCharacterVisibleManaBoardIndex } from "../../lib/mana-board-availability"
 import { computeRealTimeStamina } from "../../lib/stamina"
 import { isStartTutorialActive } from "../../lib/start-tutorial-state"
 
@@ -72,7 +73,7 @@ export function serializePlayerData(
             "exp": character.exp,
             "stack": character.stack,
             "bond_token_list": bondTokenList,
-            "mana_board_index": character.manaBoardIndex
+            "mana_board_index": getCharacterVisibleManaBoardIndex(character.manaBoardIndex, kId)
         }
 
         const exBoost = character.exBoost

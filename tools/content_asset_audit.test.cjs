@@ -229,7 +229,7 @@ test("mission asset contracts reject broken awake groups and pass event referenc
 
 test("asset audit verifies all Content Registry runtime tables", () => {
     const result = auditRuntimeRegistryTables(path.join(__dirname, "../assets"))
-    assert.deepEqual(result, { registryTableCount: 114, readableRuntimeTableCount: 114 })
+    assert.deepEqual(result, { registryTableCount: 115, readableRuntimeTableCount: 115 })
 })
 
 test("asset audit runner produces a stable report without writing sources", t => {

@@ -40,6 +40,7 @@
 - [任务与关卡映射](./mission-quest-mapping.md)
 - [角色觉醒任务](./character-awake-missions.md)
 - [角色觉醒刷新](./character-awake-refresh.md)
+- [第二玛纳板开放期](./mana-board-availability.md)
 - [角色分解审计](./character-stack-audit.md)
 
 ## 装备、抽卡与内容修复
