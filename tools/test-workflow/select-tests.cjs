@@ -112,6 +112,10 @@ const SOURCE_RULES = [
         groups: ["integration:compiled", "integration:quest", "quick:quest"],
     },
     {
+        pattern: /^src\/routes\/api\/questUnlock\.ts$/,
+        groups: ["integration:rules", "quick:quest"],
+    },
+    {
         pattern: /^(?:assets\/story_join_character\.json|src\/lib\/story-join-character\.ts|src\/routes\/api\/(?:storyQuest|character)\.ts)$/,
         groups: ["integration:quest", "quick:content"],
     },

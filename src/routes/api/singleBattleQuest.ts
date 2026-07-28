@@ -162,9 +162,19 @@ interface PlayContinueBody {
     payment_type: number,
     quest_id: number,
     viewer_id: number,
-    paly_id: string,
-    category: number
+    play_id: string,
+    category: number,
+    statistics?: QuestStatistics
 }
+
+type ContinueTransactionResult =
+    | {
+        ok: true
+        freeVmoney: number
+        vmoney: number
+        continueCount: number
+    }
+    | { ok: false, message: string }
 
 interface AbortBody {
     api_count: number,
@@ -949,7 +959,14 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as PlayContinueBody
 
         const viewerId = body.viewer_id
-        if (isNaN(viewerId)) return reply.status(400).send({
+        if (
+            !Number.isSafeInteger(viewerId)
+            || !Number.isSafeInteger(body.quest_id)
+            || !Number.isSafeInteger(body.category)
+            || typeof body.play_id !== "string"
+            || body.play_id.length === 0
+            || body.payment_type !== 1
+        ) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         })
 
@@ -957,7 +974,7 @@ const routes = async (fastify: FastifyInstance) => {
         if (!sessionResult) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid viewer id."
         })
-        const { playerId, playerData: player } = sessionResult
+        const { playerId } = sessionResult
 
         // get active quest data
         const activeQuestData = activeQuests[playerId]
@@ -965,27 +982,52 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Bad Request",
             "message": "No active quest to continue."
         })
-
-        const freeVmoney = player.freeVmoney
-        const newFreeVmoney = freeVmoney - continueVmoneyCost
-        const vmoney = player.vmoney
-        const newVmoney = 0 > newFreeVmoney ? vmoney - continueVmoneyCost : vmoney
-        if (0 > newFreeVmoney && 0 > newVmoney) return reply.status(400).send({
+        if (
+            activeQuestData.playId !== body.play_id
+            || activeQuestData.questId !== body.quest_id
+            || activeQuestData.category !== body.category
+        ) return reply.status(400).send({
             "error": "Bad Request",
-            "message": "Not enough vmoney to continue"
+            "message": "Active quest does not match continue request."
         })
 
-        // update the player's vmoney balances
-        const setNewFreeVmoney = 0 > newFreeVmoney ? freeVmoney : newFreeVmoney
-        updatePlayerSync({
-            id: playerId,
-            freeVmoney: setNewFreeVmoney,
-            vmoney: newVmoney
-        })
+        const continueResult = getDb().transaction((): ContinueTransactionResult => {
+            const currentPlayer = getPlayerSync(playerId)
+            const persistedQuest = getPlayerActiveQuestSync(playerId)
+            if (!currentPlayer || !persistedQuest) {
+                return { ok: false, message: "No persisted active quest to continue." }
+            }
+            if (
+                persistedQuest.isMulti
+                || persistedQuest.playId !== body.play_id
+                || persistedQuest.questId !== body.quest_id
+                || persistedQuest.category !== body.category
+            ) {
+                return { ok: false, message: "Persisted active quest does not match continue request." }
+            }
 
-        // increment continue count for battle recovery
-        activeQuestData.continueCount++
-        updatePlayerActiveQuestContinueCountSync(playerId, activeQuestData.continueCount)
+            const freeSpent = Math.min(currentPlayer.freeVmoney, continueVmoneyCost)
+            const paidCost = continueVmoneyCost - freeSpent
+            if (currentPlayer.vmoney < paidCost) {
+                return { ok: false, message: "Not enough vmoney to continue" }
+            }
+
+            const freeVmoney = currentPlayer.freeVmoney - freeSpent
+            const vmoney = currentPlayer.vmoney - paidCost
+            const continueCount = persistedQuest.continueCount + 1
+            updatePlayerSync({
+                id: playerId,
+                freeVmoney,
+                vmoney,
+            })
+            updatePlayerActiveQuestContinueCountSync(playerId, continueCount)
+            return { ok: true, freeVmoney, vmoney, continueCount }
+        })()
+        if (!continueResult.ok) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": continueResult.message,
+        })
+        activeQuestData.continueCount = continueResult.continueCount
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -994,8 +1036,8 @@ const routes = async (fastify: FastifyInstance) => {
             }),
             "data": {
                 "user_info": {
-                    "free_vmoney": setNewFreeVmoney,
-                    "vmoney": newVmoney
+                    "free_vmoney": continueResult.freeVmoney,
+                    "vmoney": continueResult.vmoney
                 },
                 "mail_arrived": getMailArrivedSync(playerId)
             }
