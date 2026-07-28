@@ -23,6 +23,25 @@
 | `/news/system_index`、`/news/latest_forced*` | 返回空系统公告或无强制弹窗 | 当前没有对应配置源时为空是合法结果；普通 `/news/index` 仍读取 `assets/news.json` |
 | `/episode_trial_reading/finish` | 返回空对象 | CN 客户端请求只携带 `character_id`、`quest_id`，完成回调不合并持久字段；它是卡池角色剧情试读，不是普通角色剧情阅读记录 |
 | `/patch/cn/recovery/empty.csv` | 返回恢复流程所需空文件 | CDN 恢复协议兼容资源，不代表缺少业务实现 |
+| `/reproduce/post` | 接受后丢弃设备诊断日志 | 项目不收集玩家设备日志；属于隐私边界内的兼容接收，不是存档恢复能力 |
+| 联机 `/micro_community`、`/publish_room`、`/share_room` | 返回空对象，不发布到外部社区 | 外部社区和系统分享关闭；房间创建、搜索、恢复和解散使用独立的本地状态，不依赖这些入口 |
+
+## 空响应但业务已执行
+
+以下路由的空对象或空数组是成功回调形状，不能因响应为空标记为 Stub：
+
+| 路由族 | 空响应前已经完成的状态 |
+|---|---|
+| `/tool/get_header_response`、`/tool/signup` | 会话和公共头已生成；业务数据位于 `data_headers` |
+| `/tutorial/finish_trigger` | 教程触发 ID 已去重持久化 |
+| `/party_group/edit` | 编队组颜色和分类已经写入 |
+| 战阵、狂热激战的 `/battle/start`、`/select_folder`、`/reset` | 活跃关卡、当前文件夹或已用队伍状态已经更新 |
+| `/shop/set_campaign_lineup_id` | 选择结果已按玩家、商店、活动持久化并检查冲突 |
+| `/character/set_illustration_settings` | 角色插画设置已经写入 |
+| 联机 `/disband_room` | 已广播解散消息并清理房间；空对象只是 HTTP 确认 |
+
+商店和自动连战的部分错误分支也会返回空 `data`，但同时通过 `data_headers.result_code` 传递客户端协议结果；
+审计时必须同时读取响应头对象，不能只搜索 `data: {}`。
 
 ## 明确的兼容取舍
 
@@ -74,5 +93,9 @@
 
 1. 普通关卡结算：继续检查剩余分类的发奖、进度、任务事实和响应是否处于同一事务。
 2. 支付边界：由项目职责决定完全关闭还是保留本地模拟，不在路由层继续堆叠兼容分支。
+
+2026-07-28 对 `src/routes/` 与 `src/multi/` 的 198 个 Fastify 注册点完成空对象、空数组、TODO 和 Stub
+复扫。除上表新增的外围关闭能力外，没有发现新的“宣告可用但完全不写状态”核心单人路由；该结论不替代普通
+关卡内部事务、活动各分支和客户端人工验收。
 
 练习战 finish 履历、查询和持久化已完成，手动 abort 的耗时证据缺口见[练习战履历](../systems/practice-battle-history.md)。
