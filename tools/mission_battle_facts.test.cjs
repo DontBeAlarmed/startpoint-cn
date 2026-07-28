@@ -88,7 +88,7 @@ assert.deepEqual(calls, [["result", 1, {
     score: undefined,
     clearTime: 1000,
     skillUseCount: 0,
-}]])
+}], ["pass", 1001]])
 assert.equal(calls.some(([kind]) => kind === "party"), false, "failed settlement must not call direct awake tracker")
 
 recordMissionBattleFacts({ ...baseContext, questAccomplished: true, isMulti: true, isMultiHost: true })
@@ -103,6 +103,7 @@ assert.deepEqual(calls, [
         clearTime: 1000,
         skillUseCount: 0,
     }],
+    ["pass", 1001],
     ["result", 1, {
         isMulti: true,
         questCategory: 1,
@@ -113,11 +114,11 @@ assert.deepEqual(calls, [
         clearTime: 1000,
         skillUseCount: 5,
     }],
+    ["pass", 1001],
     ["degree-stats", 1001],
     ["daily", 1001],
     ["event", 1001],
     ["degree", 1001],
-    ["pass", 1001],
     ["active-specific", 1001],
     ["active-conditional", 1001],
     ["multi", 1, 1, 1001],
