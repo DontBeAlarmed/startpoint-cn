@@ -149,9 +149,9 @@ fastify.post(`${apiPrefix}/tool/check_social_link_enable`, async (_request, repl
     stubMsgpackReply(reply, { enable: false });
 });
 
-// Gift code exchange (礼包码兑换): enable button in menu, exchange not implemented
+// Gift code exchange is not implemented, so do not advertise the client entry.
 fastify.post(`${apiPrefix}/tool/check_enable_gift`, async (_request, reply) => {
-    stubMsgpackReply(reply, { enable_gift: true });
+    stubMsgpackReply(reply, { enable_gift: false });
 });
 
 fastify.post(`${apiPrefix}/tool/contact_active`, async (_request, reply) => {

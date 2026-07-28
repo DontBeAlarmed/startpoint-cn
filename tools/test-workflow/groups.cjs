@@ -19,6 +19,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/runtime_bundle_metadata.test.cjs",
             "tools/runtime_config.test.cjs",
             "tools/comic_route.test.cjs",
+            "tools/cn_tool_capabilities.test.cjs",
             "tools/runtime_admin.test.cjs",
             "tools/runtime_health.test.cjs",
             "tools/runtime_lifecycle.test.cjs",
