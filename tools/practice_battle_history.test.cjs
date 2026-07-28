@@ -5,11 +5,16 @@ const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
+const Database = require("better-sqlite3")
 
-const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "score-attack-history-db-"))
+const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "practice-history-db-"))
 const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
 let db
+
+const schema12Database = new Database(path.join(databaseDirectory, "wdfp_data.db"))
+schema12Database.pragma("user_version = 12")
+schema12Database.close()
 
 function cleanup() {
     if (db?.open) db.close()
@@ -24,12 +29,12 @@ const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const {
-    getPlayerScoreAttackBattleHistorySync,
-    insertPlayerScoreAttackBattleHistorySync,
-} = require("../src/data/domains/score-attack-history")
+    getPlayerPracticeBattleHistorySync,
+    insertPlayerPracticeBattleHistorySync,
+} = require("../src/data/domains/practice-battle-history")
 const {
-    buildScoreAttackBattleHistoryRecord,
-} = require("../src/lib/quest/score-attack-history")
+    buildPracticeBattleHistoryRecord,
+} = require("../src/lib/quest/practice-battle-history")
 
 db = initializeDatabase()
 assert.equal(db.pragma("user_version", { simple: true }), 13)
@@ -38,21 +43,20 @@ const account = insertAccountSync({
     appId: "wf_cn",
     idpAlias: "",
     idpCode: "test",
-    idpId: `score-history-${randomUUID()}`,
+    idpId: `practice-history-${randomUUID()}`,
     status: "normal",
 })
 const playerId = insertDefaultPlayerSync(account.id).id
 
-const record = buildScoreAttackBattleHistoryRecord({
+const record = buildPracticeBattleHistoryRecord({
     playerId,
-    eventId: 1,
-    playId: "score-history-play-1",
-    categoryId: 27,
-    questId: 1001,
+    playId: "practice-history-play-1",
+    categoryId: 15,
+    questId: 1,
     finishKind: 0,
     createdAt: new Date("2024-08-14T12:34:56.000Z"),
     elapsedTimeMs: 90_000,
-    score: 2_426_000_000,
+    score: 12_345,
     clearRank: 5,
     party: {
         characters: [{ id: 101 }, { id: 102 }, null],
@@ -77,61 +81,48 @@ const record = buildScoreAttackBattleHistoryRecord({
     },
 })
 
-assert.deepEqual(record, {
-    playerId,
-    eventId: 1,
-    playId: "score-history-play-1",
-    ability_soul_id_1: 401,
-    ability_soul_id_2: null,
-    ability_soul_id_3: null,
-    category_id: 27,
-    character_1_total_damage: 130,
-    character_2_total_damage: 50,
-    character_3_total_damage: null,
-    character_id_1: 101,
-    character_id_2: 102,
-    character_id_3: null,
-    clear_rank: 5,
-    create_time: "2024-08-14 12:34:56",
-    elapsed_time_ms: 90_000,
-    enhancement_level_1: 4,
-    enhancement_level_2: null,
-    enhancement_level_3: null,
-    equipment1_id: 301,
-    equipment2_id: null,
-    equipment3_id: null,
-    equipment_level_1: 3,
-    equipment_level_2: null,
-    equipment_level_3: null,
-    finish_kind: 0,
-    quest_id: 1001,
-    score: 2_426_000_000,
-    total_damage: 300.5,
-    unison_character_id_1: 201,
-    unison_character_id_2: null,
-    unison_character_id_3: null,
+assert.equal(record.category_id, 15)
+assert.equal(record.total_damage, 300.5)
+assert.equal(record.character_1_total_damage, 130)
+assert.equal(record.character_2_total_damage, 50)
+assert.equal(record.equipment_level_1, 3)
+assert.equal(record.enhancement_level_1, 4)
+assert.equal(record.create_time, "2024-08-14 12:34:56")
+
+assert.equal(insertPlayerPracticeBattleHistorySync(record), true)
+assert.equal(insertPlayerPracticeBattleHistorySync(record), false)
+assert.equal(insertPlayerPracticeBattleHistorySync({
+    ...record,
+    playId: "practice-history-play-2",
+    quest_id: 2,
+    create_time: "2024-08-14 12:35:56",
+}), true)
+const history = getPlayerPracticeBattleHistorySync(playerId)
+assert.equal(history.length, 2)
+assert.equal(Object.keys(history[0]).length, 29)
+assert.equal(history[0].quest_id, 2)
+assert.equal("playerId" in history[0], false)
+assert.equal("playId" in history[0], false)
+
+const otherAccount = insertAccountSync({
+    appId: "wf_cn",
+    idpAlias: "",
+    idpCode: "test",
+    idpId: `practice-history-other-${randomUUID()}`,
+    status: "normal",
 })
+const otherPlayerId = insertDefaultPlayerSync(otherAccount.id).id
+assert.deepEqual(getPlayerPracticeBattleHistorySync(otherPlayerId), [])
 
-assert.equal(insertPlayerScoreAttackBattleHistorySync(record), true)
-assert.equal(insertPlayerScoreAttackBattleHistorySync(record), false)
-assert.deepEqual(getPlayerScoreAttackBattleHistorySync(playerId, 1), [
-    Object.fromEntries(Object.entries(record).filter(([key]) => !["playerId", "eventId", "playId"].includes(key))),
-])
-assert.deepEqual(getPlayerScoreAttackBattleHistorySync(playerId, 2), [])
-
-assert.throws(() => buildScoreAttackBattleHistoryRecord({
+assert.throws(() => buildPracticeBattleHistoryRecord({
     ...record,
     categoryId: 27,
-    questId: 1001,
-    finishKind: 0,
-    elapsedTimeMs: 90_000,
-    clearRank: 5,
     createdAt: new Date("2024-08-14T12:34:56.000Z"),
     party: { characters: [], unison_characters: [], equipments: [], ability_soul_ids: [] },
-    statistics: { zones: [{ damage_deal_total: -1 }] },
+    statistics: { zones: [{ damage_deal_total: 1 }] },
     equipmentList: {},
-}), /damage_deal_total/)
+}), /category|identity/)
 
-console.log("score attack history tests passed")
+console.log("practice battle history tests passed")
 cleanup()
 process.removeListener("exit", cleanup)

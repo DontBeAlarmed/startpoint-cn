@@ -16,7 +16,7 @@
   "playerId": 1,
   "producer": {
     "serverVersion": "1.0.1",
-    "dbSchemaVersion": 12,
+    "dbSchemaVersion": 13,
     "contentVersion": "1.4.54"
   },
   "domains": {
@@ -34,11 +34,11 @@
 
 ## 覆盖范围
 
-schema 12 共有 57 张可从 `players` 外键图发现的玩家关联表：
+schema 13 共有 58 张可从 `players` 外键图发现的玩家关联表：
 
-- 56 张登记到 `core`、`missions`、`events`、`economy`、`mailbox`；
+- 57 张登记到 `core`、`missions`、`events`、`economy`、`mailbox`；
 - `players_active_quests` 是唯一排除的玩家表；
-- 邮件、领取历史、活动扭蛋箱明细、Pass、Raid、商店购买计数、campaign lineup 和无限演武战斗履历均可往返。
+- 邮件、领取历史、活动扭蛋箱明细、Pass、Raid、商店购买计数、campaign lineup、练习战和无限演武战斗履历均可往返。
 
 注册表位于 `src/data/player-save/registry.ts`。测试会动态遍历当前 SQLite 外键图，并要求发现结果与“已登记 + 明确排除”完全相等。以后新增玩家表但未登记时，CI 会失败，不再静默漏出快照。
 
@@ -68,7 +68,7 @@ schema 12 共有 57 张可从 `players` 外键图发现的玩家关联表：
 克隆先在目标账号创建新玩家，再使用独立策略写入：
 
 - 新玩家 ID 和目标账号关系由服务器分配；
-- `players_mails`、`players_receive_history`、`players_score_attack_battle_history` 的自增 ID 重新生成；
+- `players_mails`、`players_receive_history`、`players_practice_battle_history`、`players_score_attack_battle_history` 的自增 ID 重新生成；
 - `players_tutorial_step_receipts` 不复制，避免向新玩家重放源存档缓存的旧教程响应；
 - 业务主键和玩家进度按原值复制。
 

@@ -15,6 +15,7 @@ import { getSession } from "../../data/domains/session"
 import { incrementPlayerCharacterClearSync } from "../../data/domains/character_clear"
 import { getPlayerEquipmentListSync, updatePlayerEquipmentSync } from "../../data/domains/equipment"
 import { insertPlayerScoreAttackBattleHistorySync } from "../../data/domains/score-attack-history"
+import { insertPlayerPracticeBattleHistorySync } from "../../data/domains/practice-battle-history"
 import {
     getPlayerCarnivalEventRecordsSync,
     getPlayerClaimedCarnivalRewardIdsSync,
@@ -104,6 +105,7 @@ import { recordActiveMissionQuestChallengeFactSync } from "../../lib/mission/act
 import { getRaidEventRequiredKillCount } from "../../lib/raid-event-master";
 import { resolveQuestRewardEligibility } from "../../lib/quest/first-clear-reward";
 import { buildScoreAttackBattleHistoryRecord } from "../../lib/quest/score-attack-history";
+import { buildPracticeBattleHistoryRecord } from "../../lib/quest/practice-battle-history";
 
 interface StartBody {
     quest_id: number
@@ -549,6 +551,22 @@ const routes = async (fastify: FastifyInstance) => {
                     elapsedTimeMs: clearTime,
                     score: body.score,
                     clearRank,
+                    party: bodyPartyStatistics,
+                    statistics: body.statistics,
+                    equipmentList: getPlayerEquipmentListSync(playerId),
+                }))
+            }
+            if (questCategory === QuestCategory.PRACTICE) {
+                insertPlayerPracticeBattleHistorySync(buildPracticeBattleHistoryRecord({
+                    playerId,
+                    playId: activeQuestData.playId,
+                    categoryId: questCategory,
+                    questId,
+                    finishKind: questAccomplished ? 0 : 1,
+                    createdAt: settlementTime,
+                    elapsedTimeMs: clearTime,
+                    score: body.score,
+                    clearRank: questAccomplished ? clearRank : null,
                     party: bodyPartyStatistics,
                     statistics: body.statistics,
                     equipmentList: getPlayerEquipmentListSync(playerId),

@@ -1,8 +1,8 @@
 import { Database } from "better-sqlite3"
-import packageInfo from "../../../package.json"
 import { BUNDLED_CDN_CATALOG_VERSION } from "../../content/constants"
 import { getEffectiveVersion } from "../../lib/version"
 import { clearPublishedActiveQuest } from "../../lib/quest/active-quest-service"
+import { loadCurrentBundleMetadata } from "../../runtime/bundle-metadata"
 import { getDb } from "../db"
 import { insertDefaultPlayerSync, replacePlayerDataSync } from "../domains/player"
 import { reviveMergedPlayerDates } from "../utils/date"
@@ -47,6 +47,7 @@ const LEGACY_V1_UNMANAGED_TABLES = new Set([
     "players_raid_events",
     "players_raid_event_quests",
     "players_score_attack_battle_history",
+    "players_practice_battle_history",
     "players_shop_purchases",
     "players_shop_purchase_counters",
     "players_shop_campaign_lineups",
@@ -164,7 +165,7 @@ export function exportPlayerSaveV2Sync(
         exportedAt: new Date().toISOString(),
         playerId,
         producer: {
-            serverVersion: packageInfo.version,
+            serverVersion: loadCurrentBundleMetadata().version,
             dbSchemaVersion: getCurrentSchemaVersion(database),
             contentVersion: getSnapshotContentVersion(),
         },

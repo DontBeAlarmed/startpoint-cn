@@ -53,7 +53,7 @@ export class DatabaseLifecycleError extends Error {
 }
 
 const defaultMigrations: DatabaseMigrations = {
-    latestVersion: 12,
+    latestVersion: 13,
     init: initWdfpData,
     updateBefore: updateWdfpDataBefore,
     updateAfter: updateWdfpDataAfter,

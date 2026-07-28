@@ -66,6 +66,7 @@ export const PLAYER_SAVE_TABLES: readonly PlayerSaveTableDefinition[] = [
     table("players_pass_cards", "events", 7),
     table("players_pass_card_rewards", "events", 7),
     table("players_score_attack_battle_history", "events", 11, ["id"]),
+    table("players_practice_battle_history", "events", 13, ["id"]),
 
     table("players_gacha_info", "economy"),
     table("players_gacha_campaigns", "economy"),

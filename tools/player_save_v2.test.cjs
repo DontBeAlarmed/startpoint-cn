@@ -252,7 +252,7 @@ test("v2 export includes all registered domains and excludes transient battle st
     assert.equal(snapshot.formatVersion, 2)
     assert.equal(snapshot.version, 2)
     assert.equal(snapshot.mode, "backup")
-    assert.equal(snapshot.producer.dbSchemaVersion, 12)
+    assert.equal(snapshot.producer.dbSchemaVersion, 13)
     assert.equal(snapshot.playerId, playerId)
     assert.equal(tables.players_mails[0].subject, "backup-mail")
     assert.equal(tables.players_box_gacha_drawn_rewards[0].number, 3)
@@ -335,18 +335,30 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     const snapshot = exportPlayerSaveV2Sync(playerId)
 
     const future = cloneJson(snapshot)
-    future.producer.dbSchemaVersion = 13
+    future.producer.dbSchemaVersion = 14
     assert.throws(() => restorePlayerSaveV2Sync(future, playerId), /newer.*schema|future.*schema/i)
 
     const missingCurrent = cloneJson(snapshot)
     delete missingCurrent.domains.economy.tables.players_shop_purchases
     assert.throws(() => restorePlayerSaveV2Sync(missingCurrent, playerId), /players_shop_purchases.*missing/i)
 
+    const missingPracticeHistory = cloneJson(snapshot)
+    delete missingPracticeHistory.domains.events.tables.players_practice_battle_history
+    assert.throws(
+        () => restorePlayerSaveV2Sync(missingPracticeHistory, playerId),
+        /players_practice_battle_history.*missing/i,
+    )
+
     const older = cloneJson(snapshot)
     older.producer.dbSchemaVersion = 10
     delete older.domains.events.tables.players_score_attack_battle_history
     delete older.domains.economy.tables.players_shop_campaign_lineups
     assert.doesNotThrow(() => restorePlayerSaveV2Sync(older, playerId))
+
+    const schema12 = cloneJson(snapshot)
+    schema12.producer.dbSchemaVersion = 12
+    delete schema12.domains.events.tables.players_practice_battle_history
+    assert.doesNotThrow(() => restorePlayerSaveV2Sync(schema12, playerId))
 
     const conflictingVersion = cloneJson(snapshot)
     conflictingVersion.version = 1

@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getReceiveHistorySync } from "../../data/domains/mail"
 import { getPlayerScoreAttackBattleHistorySync } from "../../data/domains/score-attack-history"
+import { getPlayerPracticeBattleHistorySync } from "../../data/domains/practice-battle-history"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getQuestContentTableSync } from "../../lib/assets";
@@ -51,10 +52,19 @@ const routes = async (fastify: FastifyInstance) => {
         if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
             error: "Bad Request", message: "Invalid request body."
         })
+        const session = await getSession(viewerId.toString())
+        if (!session) return reply.status(400).send({
+            error: "Bad Request", message: "Invalid viewer id."
+        })
+        const playerId = resolvePlayerIdSync(session.accountId)
+        if (playerId === null) return reply.status(400).send({
+            error: "Bad Request", message: "No player bound to account."
+        })
+        const history = getPlayerPracticeBattleHistorySync(playerId)
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
-            data: { history: [] }
+            data: { history }
         })
     })
 

@@ -199,6 +199,8 @@ const TEST_GROUPS = Object.freeze({
         execution: "parallel",
         tests: [
             "tools/carnival_rewards.test.cjs",
+            "tools/practice_battle_history.test.cjs",
+            "tools/practice_battle_history_route.test.cjs",
             "tools/raid_event_master.test.cjs",
             "tools/raid_event_overall_rewards.test.cjs",
             "tools/raid_event_state.test.cjs",

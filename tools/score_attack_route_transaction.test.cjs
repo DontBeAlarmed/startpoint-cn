@@ -61,6 +61,13 @@ CREATE TABLE score_history (
     score REAL,
     UNIQUE (player_id, play_id)
 );
+CREATE TABLE practice_history (
+    player_id INTEGER NOT NULL,
+    play_id TEXT NOT NULL,
+    total_damage REAL NOT NULL,
+    score REAL,
+    UNIQUE (player_id, play_id)
+);
 INSERT INTO player_state VALUES (17, 1000, 2000, 3000, 0, 0);
 INSERT INTO character_state VALUES (17, 101, 100);
 INSERT INTO mission_state VALUES (17, 0);
@@ -231,6 +238,15 @@ stubModule("../src/data/domains/score-attack-history", {
         writeAttempts++
         return db.prepare(`
             INSERT OR IGNORE INTO score_history (player_id, play_id, total_damage, score)
+            VALUES (?, ?, ?, ?)
+        `).run(record.playerId, record.playId, record.total_damage, record.score).changes === 1
+    },
+})
+stubModule("../src/data/domains/practice-battle-history", {
+    insertPlayerPracticeBattleHistorySync(record) {
+        writeAttempts++
+        return db.prepare(`
+            INSERT OR IGNORE INTO practice_history (player_id, play_id, total_damage, score)
             VALUES (?, ?, ?, ?)
         `).run(record.playerId, record.playId, record.total_damage, record.score).changes === 1
     },
@@ -513,6 +529,26 @@ async function main() {
     )
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players_active_quests").get().count, 1)
     assert.ok(activeQuests[17])
+
+    activeQuests[17] = {
+        questId: 1101,
+        category: 15,
+        useBossBoostPoint: false,
+        useBoostPoint: false,
+        isAutoStartMode: false,
+        isMulti: false,
+        playId: "practice-play",
+        continueCount: 0,
+    }
+    db.prepare("UPDATE players_active_quests SET category = 15 WHERE player_id = 17").run()
+    const practiceFinished = await finish(fastify)
+    assert.equal(practiceFinished.statusCode, 200, practiceFinished.body)
+    assert.deepEqual(db.prepare("SELECT * FROM practice_history").all(), [{
+        player_id: 17,
+        play_id: "practice-play",
+        total_damage: 1234.5,
+        score: 1_500_000,
+    }])
 
     await fastify.close()
     db.close()

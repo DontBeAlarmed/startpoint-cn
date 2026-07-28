@@ -61,7 +61,7 @@ function readDefaultServerManifest(
         || typeof value.requires?.dependencyLock !== "string"
         || !BUNDLE_ID.test(value.requires.dependencyLock)
         || value.requires?.minDataSchema !== 0
-        || value.requires?.targetDataSchema !== 12) return null
+        || value.requires?.targetDataSchema !== 13) return null
     return {
         version: value.serverVersion,
         bundleId: value.bundleId,
@@ -92,4 +92,8 @@ export function loadBundleMetadata({
     } catch { /* packaged bundles may intentionally omit package.json */ }
 
     return Object.freeze({ version: FALLBACK_BUNDLE_VERSION, bundleId: null })
+}
+
+export function loadCurrentBundleMetadata(): BundleMetadata {
+    return loadBundleMetadata({ bundleRoot: path.resolve(__dirname, "../..") })
 }

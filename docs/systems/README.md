@@ -20,6 +20,7 @@
 - [狂热激战](./rush-event.md)
 - [土俑累计分奖励](./carnival-score-rewards.md)
 - [无限演武](./score-attack-event.md)
+- [练习战履历](./practice-battle-history.md)
 - [歼灭者讨伐战解锁](./boss-epuration-unlock.md)
 - [活动扭蛋箱](./box-gacha.md)
 - [关卡入场道具](./quest-entry-items.md)
