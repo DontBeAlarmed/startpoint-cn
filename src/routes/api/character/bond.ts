@@ -13,6 +13,7 @@ import { characterExpCaps } from "../../../lib/character";
 import { reconcileAwakeUnlockCharacterList } from "../../../lib/mission";
 import { getMailArrivedSync } from "../../../lib/mail-notification";
 import { isCharacterSecondManaBoardAvailable } from "../../../lib/mana-board-availability";
+import { getDb } from "../../../data/db";
 
 interface ReceiveBondTokenBody {
     character_id: number,
@@ -76,18 +77,18 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
-        // Claim the bond token
         const newBondTokens = player.bondToken + 1
-        updatePlayerSync({ id: playerId, bondToken: newBondTokens })
-        updatePlayerCharacterBondTokenSync(playerId, characterId, { manaBoardIndex, status: 2 })
-
         const bondTokenList: Object[] = []
         for (const entry of characterData.bondTokenList) {
             bondTokenList.push({ "mana_board_index": entry.manaBoardIndex, "status": entry.manaBoardIndex === manaBoardIndex ? 2 : entry.status })
         }
-        const characterList = reconcileAwakeUnlockCharacterList(playerId, [
-            buildCharacterListEntry(characterId, characterData, { bond_token_list: bondTokenList })
-        ])
+        const characterList = getDb().transaction(() => {
+            updatePlayerSync({ id: playerId, bondToken: newBondTokens })
+            updatePlayerCharacterBondTokenSync(playerId, characterId, { manaBoardIndex, status: 2 })
+            return reconcileAwakeUnlockCharacterList(playerId, [
+                buildCharacterListEntry(characterId, characterData, { bond_token_list: bondTokenList })
+            ])
+        })()
 
         return sendCharacterResponse(reply, viewerId, {
             user_info: { bond_token: newBondTokens },
@@ -144,15 +145,6 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
-        // make sure that the mana board index is valid, auto-create missing bond tokens
-        if (!characterData.bondTokenList[manaBoardIndex - 1]) {
-            console.log(`[MANA] open_mana_board: auto-creating bond tokens, bondListLen=${characterData.bondTokenList.length} boardCount=${boardCount}`)
-            for (let i = characterData.bondTokenList.length + 1; i <= boardCount; i++) {
-                insertPlayerCharacterBondTokenSync(playerId, characterId, { manaBoardIndex: i, status: 0 })
-                characterData.bondTokenList.push({ manaBoardIndex: i, status: 0 })
-            }
-        }
-
         // ensure that the mana board can be opened
         const requiredLevelExp = openManaBoardRequiredExp[characterAssetData.rarity]
         if (requiredLevelExp !== undefined && requiredLevelExp > characterData.exp) {
@@ -174,7 +166,26 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
-        updatePlayerCharacterSync(playerId, characterId, { manaBoardIndex: manaBoardIndex })
+        const existingBondTokenIndices = new Set(
+            characterData.bondTokenList.map(entry => entry.manaBoardIndex)
+        )
+        const missingBondTokenIndices: number[] = []
+        for (let index = 1; index <= boardCount; index++) {
+            if (!existingBondTokenIndices.has(index)) missingBondTokenIndices.push(index)
+        }
+        if (missingBondTokenIndices.length > 0) {
+            console.log(`[MANA] open_mana_board: auto-creating bond tokens, missing=${missingBondTokenIndices.join(",")} boardCount=${boardCount}`)
+        }
+
+        getDb().transaction(() => {
+            for (const index of missingBondTokenIndices) {
+                insertPlayerCharacterBondTokenSync(playerId, characterId, {
+                    manaBoardIndex: index,
+                    status: 0,
+                })
+            }
+            updatePlayerCharacterSync(playerId, characterId, { manaBoardIndex })
+        })()
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

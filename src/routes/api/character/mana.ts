@@ -104,35 +104,36 @@ const routes = async (fastify: FastifyInstance) => {
         if (!itemResult) return
         const newItemAmounts = itemResult
 
-        // Apply deductions
-        updatePlayerSync({ id: playerId, freeMana: newFreeMana, paidMana: newPaidMana })
-        incrementActiveMissionUsedManaCountSync(playerId, manaCost)
-        for (const [itemId, newAmount] of Object.entries(newItemAmounts)) {
-            updatePlayerItemSync(playerId, itemId, newAmount)
-        }
-
-        let characterEvolutionLevel = characterData.evolutionLevel
-        let evolutionData: Object = []
-        let bondTokenList: Object[] = []
         const isBoardComplete = (indexUnlockedNodesCount + toUnlockNodeIds.length) === Object.keys(characterManaNodes).length
+        const transactionResult = getDb().transaction(() => {
+            updatePlayerSync({ id: playerId, freeMana: newFreeMana, paidMana: newPaidMana })
+            incrementActiveMissionUsedManaCountSync(playerId, manaCost)
+            for (const [itemId, newAmount] of Object.entries(newItemAmounts)) {
+                updatePlayerItemSync(playerId, itemId, newAmount)
+            }
 
-        const bond = computeBondTokenAndEvolution(
-            playerId, characterId, characterData, currentManaNodeIndex, isBoardComplete
-        )
-        characterEvolutionLevel = bond.characterEvolutionLevel
-        evolutionData = bond.evolutionData
-        bondTokenList = bond.bondTokenList
+            const bond = computeBondTokenAndEvolution(
+                playerId, characterId, characterData, currentManaNodeIndex, isBoardComplete
+            )
+            insertPlayerCharacterManaNodesSync(playerId, characterId, toUnlockNodeIds)
+            const characterList = reconcileAwakeUnlockCharacterList(playerId, [
+                buildCharacterListEntry(characterId, characterData, {
+                    evolution_level: bond.characterEvolutionLevel,
+                    evolution_img_level: bond.characterEvolutionLevel,
+                    bond_token_list: bond.bondTokenList,
+                }),
+            ])
+
+            return { ...bond, characterList }
+        })()
+        const {
+            characterEvolutionLevel,
+            evolutionData,
+            bondTokenList,
+            characterList,
+        } = transactionResult
 
         console.log(`[MANA] learn_mana_node done: boardComplete=${isBoardComplete} bondGiven=${!!bondTokenList.length} evoLevel=${characterEvolutionLevel}`)
-
-        insertPlayerCharacterManaNodesSync(playerId, characterId, toUnlockNodeIds)
-        const characterList = reconcileAwakeUnlockCharacterList(playerId, [
-            buildCharacterListEntry(characterId, characterData, {
-                evolution_level: characterEvolutionLevel,
-                evolution_img_level: characterEvolutionLevel,
-                bond_token_list: bondTokenList,
-            }),
-        ])
 
         return sendCharacterResponse(reply, viewerId, {
             user_info: { free_mana: newFreeMana, paid_mana: newPaidMana },

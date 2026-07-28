@@ -16,6 +16,9 @@ CN 客户端通过 `master/mana_board/mana_board2_open_condition.orderedmap` 决
 - `/character/open_mana_board` 在开放期前拒绝打开板二，且在创建 bond token 前完成校验；
 - `/character/learn_mana_node` 和 `/character/receive_bond_token` 不能借旧存档索引绕过板二开放期。
 
+三个写入口同时遵循[角色养成事务边界](./character-growth-transactions.md)：旧存档缺失 bond token 时，补行与
+`mana_board_index` 更新同成同败；节点学习和信赖证领取也不会在后续写入失败时留下已扣资源或重复货币。
+
 这项过滤不删除已学习节点、不重写 bond token，也不清理跨时间存档。节点数据可以留在服务端，客户端只在官方
 可见期内操作板二。
 
