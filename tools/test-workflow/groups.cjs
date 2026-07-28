@@ -171,10 +171,12 @@ const TEST_GROUPS = Object.freeze({
     },
     "integration:rules": {
         execution: "parallel",
+        timeoutMs: 60_000,
         tests: [
             "tools/additional_reward.test.cjs",
             "tools/character_stack.test.cjs",
             "tools/equipment_enhancement.test.cjs",
+            "tools/economy_write_transaction.test.cjs",
             "tools/event_currency.test.cjs",
             "tools/inventory_write_transaction.test.cjs",
             "tools/inventory_rules.test.cjs",

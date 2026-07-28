@@ -15,11 +15,29 @@ import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import starCrumbExchange from "../../../assets/star_crumb_exchange.json";
 import starCrumbExchangeCost from "../../../assets/star_crumb_exchange_cost.json";
+import { getDb } from "../../data/db";
 
 interface ExchangeBody {
     viewer_id: number;
     exchange_id: number;
     api_count: number;
+}
+
+class StarCrumbExchangeError extends Error {
+    constructor(
+        public readonly statusCode: 400 | 500,
+        message: string,
+    ) {
+        super(message)
+        this.name = "StarCrumbExchangeError"
+    }
+}
+
+interface StarCrumbExchangeSettlement {
+    newStarCrumb: number
+    characterList: Record<string, unknown>[]
+    itemList: Record<string, number>
+    equipmentList: any[]
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -75,55 +93,64 @@ const routes = async (fastify: FastifyInstance) => {
 
         console.log(`[exchange:star_crumb] player=${playerId} exch=${exchangeId} kind=${kind} id=${targetId} rarity=${rarity} cost=${cost}`);
 
-        // Validate balance
-        if (player.starCrumb < cost) return reply.status(400).send({
-            error: "Bad Request",
-            message: "Not enough star_crumb.",
-        });
-
-        // Validate ownership
-        if (kind === 0 && playerOwnsCharacterSync(playerId, targetId)) {
-            return reply.status(400).send({ error: "Bad Request", message: "Character already owned." });
-        }
-        if (kind === 2 && playerOwnsEquipmentSync(playerId, targetId)) {
-            return reply.status(400).send({ error: "Bad Request", message: "Equipment already owned." });
-        }
-
-        // Deduct
-        const newStarCrumb = player.starCrumb - cost;
-        updatePlayerSync({ id: playerId, starCrumb: newStarCrumb });
-
-        // Give reward
-        let characterList: Record<string, unknown>[] = [];
-        const itemList: Record<string, number> = {};
-        const equipmentList: any[] = [];
-
-        switch (kind) {
-            case 0: { // Character
-                const result = givePlayerCharacterSync(playerId, targetId);
-                if (!result) {
-                    updatePlayerSync({ id: playerId, starCrumb: player.starCrumb });
-                    return reply.status(500).send({ error: "Internal Server Error", message: "Failed to give character." });
+        let settlement: StarCrumbExchangeSettlement
+        try {
+            settlement = getDb().transaction((): StarCrumbExchangeSettlement => {
+                const currentPlayer = getPlayerSync(playerId)
+                if (!currentPlayer) {
+                    throw new StarCrumbExchangeError(500, "No players bound to account.")
                 }
-                if (result.character) characterList.push(result.character as Record<string, unknown>);
-                break;
-            }
-            case 1: { // Item
-                const newCount = givePlayerItemSync(playerId, targetId, 1);
-                itemList[String(targetId)] = newCount;
-                break;
-            }
-            case 2: { // Equipment
-                const result = givePlayerEquipmentSync(playerId, targetId, 1);
-                if (!result) {
-                    updatePlayerSync({ id: playerId, starCrumb: player.starCrumb });
-                    return reply.status(500).send({ error: "Internal Server Error", message: "Failed to give equipment." });
+                if (currentPlayer.starCrumb < cost) {
+                    throw new StarCrumbExchangeError(400, "Not enough star_crumb.")
                 }
-                equipmentList.push(result);
-                break;
+                if (kind === 0 && playerOwnsCharacterSync(playerId, targetId)) {
+                    throw new StarCrumbExchangeError(400, "Character already owned.")
+                }
+                if (kind === 2 && playerOwnsEquipmentSync(playerId, targetId)) {
+                    throw new StarCrumbExchangeError(400, "Equipment already owned.")
+                }
+
+                const newStarCrumb = currentPlayer.starCrumb - cost
+                updatePlayerSync({ id: playerId, starCrumb: newStarCrumb })
+
+                const characterList: Record<string, unknown>[] = []
+                const itemList: Record<string, number> = {}
+                const equipmentList: any[] = []
+
+                switch (kind) {
+                    case 0: {
+                        const result = givePlayerCharacterSync(playerId, targetId)
+                        if (!result) {
+                            throw new StarCrumbExchangeError(500, "Failed to give character.")
+                        }
+                        if (result.character) characterList.push(result.character as Record<string, unknown>)
+                        break
+                    }
+                    case 1: {
+                        itemList[String(targetId)] = givePlayerItemSync(playerId, targetId, 1)
+                        break
+                    }
+                    case 2: {
+                        equipmentList.push(givePlayerEquipmentSync(playerId, targetId, 1))
+                        break
+                    }
+                    default:
+                        throw new StarCrumbExchangeError(500, `Unsupported exchange kind ${kind}.`)
+                }
+
+                return { newStarCrumb, characterList, itemList, equipmentList }
+            })()
+        } catch (error) {
+            if (error instanceof StarCrumbExchangeError) {
+                return reply.status(error.statusCode).send({
+                    error: error.statusCode === 400 ? "Bad Request" : "Internal Server Error",
+                    message: error.message,
+                })
             }
+            throw error
         }
 
+        let characterList = settlement.characterList
         characterList = characterList.length > 0
             ? reconcileAwakeUnlockCharacterList(playerId, characterList)
             : characterList;
@@ -132,10 +159,10 @@ const routes = async (fastify: FastifyInstance) => {
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
-                user_info: { star_crumb: newStarCrumb },
+                user_info: { star_crumb: settlement.newStarCrumb },
                 character_list: characterList,
-                item_list: itemList,
-                equipment_list: equipmentList,
+                item_list: settlement.itemList,
+                equipment_list: settlement.equipmentList,
                 active_mission_list: null,
                 mission_info: null,
                 over_max: null,

@@ -36,6 +36,11 @@ interface BulkStackToExpBody {
     api_count: number
 }
 
+interface BulkStackConversionPlan {
+    characterId: number
+    character: ReturnType<typeof getPlayerCharacterSync> & {}
+}
+
 const rarityStackConvertItemCount: Record<number, number> = {
     [1]: 2,
     [2]: 2,
@@ -179,10 +184,9 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         const allCharacters = getPlayerCharactersSync(playerId)
-        const modifiedCharacters: Object[] = []
+        const conversionPlan: BulkStackConversionPlan[] = []
         let totalExp = 0
         let totalStarGrains = 0
-        let processedCount = 0
 
         for (const [characterIdStr, character] of Object.entries(allCharacters)) {
             const characterId = parseInt(characterIdStr)
@@ -201,25 +205,10 @@ const routes = async (fastify: FastifyInstance) => {
 
             totalExp += addExp
             totalStarGrains += addStarGrain
-
-            updatePlayerCharacterSync(playerId, characterId, { stack: 0 })
-            character.stack = 0
-
-            modifiedCharacters.push({
-                "viewer_id": viewerId,
-                "character_id": characterId,
-                "stack": 0,
-                "over_limit_step": character.overLimitStep,
-                "exp": character.exp,
-                "exp_total": character.exp,
-                "create_time": clientSerializeDate(character.joinTime),
-                "update_time": clientSerializeDate(character.updateTime),
-                "join_time": clientSerializeDate(character.joinTime)
-            })
-            processedCount++
+            conversionPlan.push({ characterId, character })
         }
 
-        if (processedCount === 0) {
+        if (conversionPlan.length === 0) {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -237,19 +226,34 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         const newExpPool = player.expPool + totalExp
-        updatePlayerSync({ id: playerId, expPool: newExpPool })
+        const newStarGrainTotal = getDb().transaction((): number => {
+            for (const entry of conversionPlan) {
+                updatePlayerCharacterSync(playerId, entry.characterId, { stack: 0 })
+            }
+            updatePlayerSync({ id: playerId, expPool: newExpPool })
+            return totalStarGrains > 0
+                ? givePlayerItemSync(playerId, rewardItemId, totalStarGrains)
+                : 0
+        })()
 
-        let newStarGrainTotal = 0
-        if (totalStarGrains > 0) {
-            newStarGrainTotal = givePlayerItemSync(playerId, rewardItemId, totalStarGrains)
-        }
+        const modifiedCharacters: Object[] = conversionPlan.map(({ characterId, character }) => ({
+            "viewer_id": viewerId,
+            "character_id": characterId,
+            "stack": 0,
+            "over_limit_step": character.overLimitStep,
+            "exp": character.exp,
+            "exp_total": character.exp,
+            "create_time": clientSerializeDate(character.joinTime),
+            "update_time": clientSerializeDate(character.updateTime),
+            "join_time": clientSerializeDate(character.joinTime)
+        }))
 
         const items = getPlayerItemsSync(playerId)
         if (totalStarGrains > 0) {
             items[String(rewardItemId)] = newStarGrainTotal
         }
 
-        console.log(`[BULK_STACK_EXP] player ${playerId}: ${processedCount} characters converted, exp +${totalExp}, starGrain +${totalStarGrains}, expPool ${player.expPool}→${newExpPool}`)
+        console.log(`[BULK_STACK_EXP] player ${playerId}: ${conversionPlan.length} characters converted, exp +${totalExp}, starGrain +${totalStarGrains}, expPool ${player.expPool}→${newExpPool}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

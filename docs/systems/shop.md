@@ -81,6 +81,12 @@ GeneralShop 额外通过 `cdn_general_shop_whitelist.json` 过滤客户端主数
 
 重建工具 `tools/rebuild_star_grain_shop.ts` 从 CN 主数据的六组奖励槽生成运行资产。非法或部分填写的槽位会使生成失败，不静默丢弃奖励。生成器属于数据维护工具，普通服务启动不会自动执行它。
 
+## 星之粒角色与装备兑换
+
+`/exchange/star_crumb` 根据 `star_crumb_exchange.json` 与 `star_crumb_exchange_cost.json` 解析兑换目标和成本。事务内重新读取玩家星之粒余额与角色/装备持有状态，再统一完成扣款、角色/道具/装备发放及道具累计获得记录；角色内部的 bond token 写入也受同一外层事务保护。任一步抛错都会整体回滚，不使用可能遗漏异常分支的手工退款。
+
+新角色成功入库后仍经过觉醒解锁响应协调。该协调位于兑换事务提交后且为 fail-soft，不改变兑换扣款与奖励的原子结果。
+
 ## Boss 币与活动商店
 
 Boss 币列表严格按客户端传入的 category ID 查询 `boss_coin_shop.json`。分类不存在时返回空集合，不猜测相邻分类，也不把其他活动商品混入。
