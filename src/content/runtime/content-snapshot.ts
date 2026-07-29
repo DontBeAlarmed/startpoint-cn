@@ -283,7 +283,9 @@ async function loadSnapshotPair(
         }
         const archiveSources = loadArchiveSources
             ? await loadArchiveSources(catalogResult.value)
-            : createBaselineArchiveSourceManifest(catalogResult.value)
+            : Array.isArray(catalogResult.value.edges)
+                ? createBaselineArchiveSourceManifest(catalogResult.value)
+                : deepFreeze({ schemaVersion: 1 as const, archives: [] })
         return deepFreeze({
             cdn: catalogResult.value,
             archiveSources,

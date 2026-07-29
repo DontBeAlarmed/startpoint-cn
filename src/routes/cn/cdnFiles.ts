@@ -4,7 +4,11 @@ import path from "node:path"
 import type { Readable } from "node:stream"
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { resolveContentPaths, type ContentPaths } from "../../content/paths"
-import { sourceFor, sourceRoot } from "../../content/cdn/archive-sources"
+import {
+    createBaselineArchiveSourceManifest,
+    sourceFor,
+    sourceRoot,
+} from "../../content/cdn/archive-sources"
 import type { ContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { parseHttpByteRange, type HttpByteRange } from "./httpRange"
@@ -146,6 +150,8 @@ async function buildCatalogZipAllowlist(
     paths: Pick<ContentPaths, "cdnRoot" | "patchesRoot">,
     fileSystem: CdnFileSystem,
 ): Promise<ReadonlyMap<string, CatalogZipLocation>> {
+    const archiveSources = snapshot.archiveSources
+        ?? createBaselineArchiveSourceManifest(snapshot.cdn)
     const candidates = new Map<string, number>()
     const conflicts = new Set<string>()
     for (const edge of snapshot.cdn.edges) {
@@ -166,7 +172,7 @@ async function buildCatalogZipAllowlist(
     for (const [rawRelativePath, expectedSize] of candidates) {
         const relativePath = catalogRelativePath(rawRelativePath)
         if (relativePath === null) continue
-        const source = sourceFor(snapshot.archiveSources, relativePath)
+        const source = sourceFor(archiveSources, relativePath)
         const logicalRoot = path.resolve(sourceRoot(paths, source))
         let physicalRoot: string
         try {
