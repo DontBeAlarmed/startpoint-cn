@@ -6,6 +6,7 @@ const os = require("node:os")
 const path = require("node:path")
 
 const { buildCdnCatalog } = require("../../src/content/cdn/catalog-builder")
+const { createBaselineArchiveSourceManifest } = require("../../src/content/cdn/archive-sources")
 const { createCdnRuntimeManifest } = require("../../src/content/cdn/runtime-manifest")
 const { runContentSync } = require("../../src/content/sync/engine")
 const { ContentObjectStore } = require("../../src/content/sync/object-store")
@@ -116,7 +117,10 @@ async function installLightweightRelease(fixture, targetVersion, options = {}) {
         fixture: options.marker ?? targetVersion,
     })
     const catalogObject = await store.writeObject(catalog)
-    const summaryObject = await store.writeObject({ targetVersion })
+    const summaryObject = await store.writeObject({
+        targetVersion,
+        archiveSources: createBaselineArchiveSourceManifest(catalog),
+    })
     const tables = Object.fromEntries(TABLE_SOURCES.map(definition => [
         definition.tableName,
         {

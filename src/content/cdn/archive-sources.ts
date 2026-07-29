@@ -18,6 +18,8 @@ export interface ArchiveSourceManifest {
     readonly archives: readonly ArchiveSourceEntry[]
 }
 
+export const ARCHIVE_SOURCE_SUMMARY_GENERATOR_VERSION = 3
+
 const VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
 
 function fail(code: "ARCHIVE_SOURCE_SCHEMA" | "ARCHIVE_SOURCE_COVERAGE" | "ARCHIVE_SOURCE_PATH" | "ARCHIVE_SOURCE_VERSION", message: string): never {
@@ -121,6 +123,35 @@ export function createArchiveSourceManifest(
         source: parseSource(sources.get(relativePath)),
     }))
     return deepFreeze({ schemaVersion: 1, archives })
+}
+
+export function createBaselineArchiveSourceManifest(
+    catalog: CdnCatalog,
+): ArchiveSourceManifest {
+    return createArchiveSourceManifest(
+        catalog,
+        new Map(catalogArchivePaths(catalog).map(relativePath => [
+            relativePath,
+            { kind: "baseline" as const },
+        ])),
+    )
+}
+
+export function parseArchiveSourceSummary(
+    summary: unknown,
+    catalog: CdnCatalog,
+    allowLegacyBaselineFallback = false,
+): ArchiveSourceManifest {
+    if (isRecord(summary) && Object.prototype.hasOwnProperty.call(summary, "archiveSources")) {
+        return parseArchiveSourceManifest(summary.archiveSources, catalog)
+    }
+    if (!allowLegacyBaselineFallback || catalog.targetVersion !== "1.4.54") {
+        return fail(
+            "ARCHIVE_SOURCE_SCHEMA",
+            "release summary without archiveSources is only valid for the 1.4.54 baseline",
+        )
+    }
+    return createBaselineArchiveSourceManifest(catalog)
 }
 
 export function parseArchiveSourceManifest(

@@ -1,6 +1,7 @@
 import path from "node:path"
 
 import { buildCdnCatalog } from "../cdn/catalog-builder"
+import { createArchiveSourceManifest } from "../cdn/archive-sources"
 import type { CdnCatalog, CdnCatalogInput } from "../cdn/types"
 import {
     resolveContentPaths,
@@ -118,7 +119,8 @@ export interface ContentSyncDependencies {
     readonly buildCatalog?: (input: CdnCatalogInput) => CdnCatalog
     readonly buildArchiveIndex?: (
         catalog: CdnCatalog,
-        cdnRoot: string,
+        paths: Pick<ContentPaths, "cdnRoot" | "patchesRoot">,
+        archiveSources: ReturnType<typeof createArchiveSourceManifest>,
     ) => Promise<ArchiveIndex>
     readonly tableBuilder?: ContentTableBuilder
     readonly tableSources?: readonly TableSourceDefinition[]
@@ -207,6 +209,7 @@ function validateBuiltTables(
 
 function createSummary(
     scan: ContentTargetScan,
+    archiveSources: ReturnType<typeof createArchiveSourceManifest>,
     generatorVersion: number,
     tableCount: number,
 ): unknown {
@@ -215,6 +218,7 @@ function createSummary(
         assetVersion: scan.targetVersion,
         generatorVersion,
         entityListsRelativePath: scan.entityListsRelativePath,
+        archiveSources,
         counts: {
             archives: scan.archives.length,
             ignoredPaths: scan.ignoredPaths.length,
@@ -236,7 +240,7 @@ async function synchronize(
     const materialize = dependencies.materializeCatalog ?? materializeContentCatalogInput
     const buildCatalog = dependencies.buildCatalog ?? buildCdnCatalog
     const buildArchiveIndex = dependencies.buildArchiveIndex
-        ?? ((catalog, cdnRoot) => ArchiveIndex.build(catalog, cdnRoot))
+        ?? ((catalog, paths, archiveSources) => ArchiveIndex.build(catalog, paths, archiveSources))
     const definitions = dependencies.tableSources ?? TABLE_SOURCES
     const tableBuilder = dependencies.tableBuilder ?? defaultTableBuilder
 
@@ -245,7 +249,17 @@ async function synchronize(
     if (catalog.targetVersion !== scan.targetVersion) {
         throw new Error("materialized catalog target does not match scanned target")
     }
-    const archiveIndex = await buildArchiveIndex(catalog, paths.cdnRoot)
+    const archiveSources = createArchiveSourceManifest(
+        catalog,
+        new Map([
+            ...catalog.edges.flatMap(edge => edge.archives.map(archive => [
+                archive.relativePath,
+                { kind: "baseline" as const },
+            ] as const)),
+            ...scan.archives.map(archive => [archive.relativePath, archive.source] as const),
+        ]),
+    )
+    const archiveIndex = await buildArchiveIndex(catalog, paths, archiveSources)
     const built = validateBuiltTables(await tableBuilder.build({
         projectRoot,
         paths,
@@ -268,7 +282,7 @@ async function synchronize(
     }
     const catalogObject = await store.writeObject(catalog)
     const summaryObject = await store.writeObject(
-        createSummary(scan, generatorVersion, definitions.length),
+        createSummary(scan, archiveSources, generatorVersion, definitions.length),
     )
     const manifest = await store.writeRelease({
         schemaVersion: CONTENT_SCHEMA_VERSION,

@@ -3,8 +3,16 @@ import path from "node:path"
 import unzipper from "unzipper"
 
 import { planCdnUpdate } from "../cdn/planner"
+import {
+    createBaselineArchiveSourceManifest,
+    parseArchiveSourceManifest,
+    sourceFor,
+    sourceRoot,
+    type ArchiveSourceManifest,
+} from "../cdn/archive-sources"
 import type { CatalogArchive, CdnCatalog } from "../cdn/types"
 import { deepFreeze } from "../deep-freeze"
+import type { ContentPaths } from "../paths"
 
 const PHYSICAL_PATH_PATTERN = /^production\/upload\/[a-f0-9]{2}\/[a-f0-9]{38}$/
 
@@ -33,6 +41,10 @@ export interface ArchiveIndexDependencies {
     readonly openArchive?: (archivePath: string) => Promise<OpenedArchiveIndex>
     readonly realpath?: (filePath: string) => Promise<string>
     readonly stat?: (filePath: string) => Promise<ArchiveFileStat>
+    readonly lstat?: (filePath: string) => Promise<ArchiveFileStat & {
+        isDirectory(): boolean
+        isSymbolicLink(): boolean
+    }>
 }
 
 export interface ArchiveEntryLocation {
@@ -53,6 +65,9 @@ interface ArchiveSnapshot {
 interface IndexedEntry {
     readonly location: ArchiveEntryLocation
     readonly archive: CatalogArchive
+    readonly lexicalRoot: string
+    readonly physicalRoot: string
+    readonly archiveSnapshot: ArchiveSnapshot
 }
 
 function isSameOrDescendant(parent: string, candidate: string): boolean {
@@ -132,6 +147,24 @@ async function secureArchiveSnapshot(
     if (!isSameOrDescendant(cdnRoot, absolutePath)) {
         throw new Error(`archive escapes cdnRoot: ${archive.relativePath}`)
     }
+    const lstat = dependencies.lstat
+        ?? (filePath => fs.promises.lstat(filePath, { bigint: true }))
+    const rootStat = await lstat(cdnRoot)
+    if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
+        throw new Error(`archive source root is not a regular directory: ${archive.relativePath}`)
+    }
+    let componentPath = cdnRoot
+    for (const [index, segment] of archive.relativePath.split("/").entries()) {
+        componentPath = path.join(componentPath, segment)
+        const component = await lstat(componentPath)
+        if (component.isSymbolicLink()) {
+            throw new Error(`archive path contains a symbolic link: ${archive.relativePath}`)
+        }
+        const isLeaf = index === archive.relativePath.split("/").length - 1
+        if ((!isLeaf && !component.isDirectory()) || (isLeaf && !component.isFile())) {
+            throw new Error(`archive path has the wrong file type: ${archive.relativePath}`)
+        }
+    }
     const realpath = dependencies.realpath ?? (filePath => fs.promises.realpath(filePath))
     const physicalPath = path.resolve(await realpath(absolutePath))
     if (!isSameOrDescendant(cdnRealRoot, physicalPath)) {
@@ -170,30 +203,36 @@ function assertEntrySize(entry: ArchiveIndexEntry): number {
 
 export class ArchiveIndex {
     readonly #entries: ReadonlyMap<string, IndexedEntry>
-    private readonly cdnRoot: string
-    private readonly cdnRealRoot: string
     private readonly dependencies: ArchiveIndexDependencies
 
     private constructor(
         entries: ReadonlyMap<string, IndexedEntry>,
-        cdnRoot: string,
-        cdnRealRoot: string,
         dependencies: ArchiveIndexDependencies,
     ) {
         this.#entries = entries
-        this.cdnRoot = cdnRoot
-        this.cdnRealRoot = cdnRealRoot
         this.dependencies = dependencies
     }
 
     static async build(
         catalog: CdnCatalog,
-        cdnRoot: string,
-        dependencies: ArchiveIndexDependencies = {},
+        pathsOrRoot: Pick<ContentPaths, "cdnRoot" | "patchesRoot"> | string,
+        archiveSourcesOrDependencies: ArchiveSourceManifest | ArchiveIndexDependencies = {},
+        maybeDependencies: ArchiveIndexDependencies = {},
     ): Promise<ArchiveIndex> {
-        const lexicalRoot = path.resolve(cdnRoot)
+        const legacy = typeof pathsOrRoot === "string"
+        const paths: Pick<ContentPaths, "cdnRoot" | "patchesRoot"> = legacy
+            ? {
+                cdnRoot: pathsOrRoot,
+                patchesRoot: path.join(path.dirname(pathsOrRoot), "patches"),
+            }
+            : pathsOrRoot
+        const dependencies = legacy
+            ? archiveSourcesOrDependencies as ArchiveIndexDependencies
+            : maybeDependencies
+        const archiveSources = legacy
+            ? createBaselineArchiveSourceManifest(catalog)
+            : parseArchiveSourceManifest(archiveSourcesOrDependencies, catalog)
         const realpath = dependencies.realpath ?? (filePath => fs.promises.realpath(filePath))
-        const physicalRoot = path.resolve(await realpath(lexicalRoot))
         const openArchive = dependencies.openArchive
             ?? (archivePath => unzipper.Open.file(archivePath))
         const plan = planCdnUpdate(catalog, {
@@ -211,6 +250,9 @@ export class ArchiveIndex {
 
         for (const edge of edges) {
             for (const archive of edge.archives) {
+                const source = sourceFor(archiveSources, archive.relativePath)
+                const lexicalRoot = path.resolve(sourceRoot(paths, source))
+                const physicalRoot = path.resolve(await realpath(lexicalRoot))
                 const before = await secureArchiveSnapshot(
                     lexicalRoot,
                     physicalRoot,
@@ -233,11 +275,17 @@ export class ArchiveIndex {
                         entryName: entry.path,
                         uncompressedBytes: assertEntrySize(entry),
                     })
-                    indexed.set(entry.path, { location, archive })
+                    indexed.set(entry.path, {
+                        location,
+                        archive,
+                        lexicalRoot,
+                        physicalRoot,
+                        archiveSnapshot: before,
+                    })
                 }
                 const after = await secureArchiveSnapshot(
                     lexicalRoot,
-                    physicalRoot,
+                    path.resolve(await realpath(lexicalRoot)),
                     archive,
                     dependencies,
                 )
@@ -245,7 +293,7 @@ export class ArchiveIndex {
             }
         }
 
-        const index = new ArchiveIndex(indexed, lexicalRoot, physicalRoot, dependencies)
+        const index = new ArchiveIndex(indexed, dependencies)
         Object.freeze(index)
         return index
     }
@@ -267,11 +315,12 @@ export class ArchiveIndex {
         if (!indexed) throw new Error(`physical path not found in archive index: ${physicalPath}`)
 
         const before = await secureArchiveSnapshot(
-            this.cdnRoot,
-            this.cdnRealRoot,
+            indexed.lexicalRoot,
+            indexed.physicalRoot,
             indexed.archive,
             this.dependencies,
         )
+        assertStableArchive(indexed.archiveSnapshot, before, indexed.archive.relativePath)
         const openArchive = this.dependencies.openArchive
             ?? (archivePath => unzipper.Open.file(archivePath))
         const opened = await openArchive(before.physicalPath)
@@ -298,8 +347,8 @@ export class ArchiveIndex {
             )
         }
         const after = await secureArchiveSnapshot(
-            this.cdnRoot,
-            this.cdnRealRoot,
+            indexed.lexicalRoot,
+            indexed.physicalRoot,
             indexed.archive,
             this.dependencies,
         )

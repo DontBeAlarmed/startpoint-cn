@@ -12,6 +12,7 @@ const unzipper = require("unzipper")
 require("ts-node/register/transpile-only")
 
 const { buildCdnCatalog, CatalogValidationError } = require("../src/content/cdn/catalog-builder")
+const { createArchiveSourceManifest } = require("../src/content/cdn/archive-sources")
 const { ArchiveIndex } = require("../src/content/sync/archive-index")
 const {
     materializeContentCatalogInput,
@@ -594,10 +595,11 @@ function catalogForArchiveSet(cdnRoot, { includeDiff = true } = {}) {
 function createArchiveFixture(t, options = {}) {
     const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "archive-index-"))
     const cdnRoot = path.join(sandbox, "cdn")
+    const patchesRoot = path.join(sandbox, "patches")
     createArchiveSet(cdnRoot, options)
     const catalog = catalogForArchiveSet(cdnRoot, options)
     t.after(() => fs.rmSync(sandbox, { force: true, recursive: true }))
-    return { catalog, cdnRoot, sandbox }
+    return { catalog, cdnRoot, patchesRoot, sandbox }
 }
 
 test("ArchiveIndex builds from central directories and applies full then diff archive order", async t => {
@@ -649,6 +651,59 @@ test("ArchiveIndex builds from central directories and applies full then diff ar
     assert.equal(bodyReads, 2)
     await assert.rejects(index.read(`production/upload/ab/${"0".repeat(38)}`), /not found/)
     await assert.rejects(index.read("../outside"), /invalid physical path/)
+})
+
+test("ArchiveIndex reads a manifest-selected archive from the patch root", async t => {
+    const fixture = createArchiveFixture(t, { asZip: true })
+    const patchVersion = "1.4.1"
+    const relativePath = `archive-android-diff/${archiveFileName("archive-android-diff", "1.4.0", patchVersion)}`
+    const sourcePath = path.join(fixture.cdnRoot, relativePath)
+    const patchPath = path.join(fixture.patchesRoot, patchVersion, relativePath)
+    fs.mkdirSync(path.dirname(patchPath), { recursive: true })
+    fs.copyFileSync(sourcePath, patchPath)
+    const sources = createArchiveSourceManifest(
+        fixture.catalog,
+        new Map(fixture.catalog.edges.flatMap(edge => edge.archives.map(archive => [
+            archive.relativePath,
+            archive.relativePath === relativePath
+                ? { kind: "patch", targetVersion: patchVersion }
+                : { kind: "baseline" },
+        ]))),
+    )
+    const openedPaths = []
+    await assert.rejects(
+        ArchiveIndex.build(
+            fixture.catalog,
+            { cdnRoot: fixture.cdnRoot, patchesRoot: fixture.patchesRoot },
+            { schemaVersion: 1, archives: null },
+        ),
+        /ARCHIVE_SOURCE_SCHEMA/,
+    )
+    const index = await ArchiveIndex.build(
+        fixture.catalog,
+        { cdnRoot: fixture.cdnRoot, patchesRoot: fixture.patchesRoot },
+        sources,
+        {
+            openArchive: async archivePath => {
+                openedPaths.push(archivePath)
+                return unzipper.Open.file(archivePath)
+            },
+        },
+    )
+    assert.equal(index.has(PHYSICAL_A), true)
+    assert.equal((await index.read(PHYSICAL_A)).toString(), "diff-platform")
+    assert.ok(
+        openedPaths.some(filePath => filePath.includes(
+            `${path.sep}patches${path.sep}${patchVersion}${path.sep}`,
+        )),
+        openedPaths.join("\n"),
+    )
+
+    const replacement = path.join(fixture.sandbox, "replacement.zip")
+    writeZip(replacement, { [PHYSICAL_A]: "evil-platform" })
+    assert.equal(fs.statSync(replacement).size, fs.statSync(patchPath).size)
+    fs.renameSync(replacement, patchPath)
+    await assert.rejects(index.read(PHYSICAL_A), /changed during index build or read/)
 })
 
 test("ArchiveIndex rejects every unsafe ZIP entry path before filtering entries", async t => {
@@ -718,7 +773,7 @@ test("ArchiveIndex rejects archive symlink escapes, mutation during build, and c
         ArchiveIndex.build(symlinkCatalog, symlinkFixture.cdnRoot, {
             openArchive: async () => ({ files: [] }),
         }),
-        /outside cdnRoot/,
+        /outside cdnRoot|symbolic link/,
     )
 
     const mutationFixture = createArchiveFixture(t)

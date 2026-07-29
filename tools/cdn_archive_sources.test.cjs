@@ -6,7 +6,9 @@ require("ts-node/register/transpile-only")
 
 const {
     createArchiveSourceManifest,
+    createBaselineArchiveSourceManifest,
     parseArchiveSourceManifest,
+    parseArchiveSourceSummary,
     sourceFor,
     sourceRoot,
 } = require("../src/content/cdn/archive-sources")
@@ -60,6 +62,27 @@ test("creates, parses, and queries immutable baseline and patch archive sources"
         sourceRoot({ cdnRoot: "/cdn/cn", patchesRoot: "/cdn/patches" }, sourceFor(parsed, "updates/patch.zip")),
         path.join("/cdn/patches", "1.4.55"),
     )
+})
+
+test("restores release sources and limits legacy fallback to the 1.4.54 baseline", () => {
+    const catalog = createCatalog()
+    assert.deepEqual(
+        parseArchiveSourceSummary({ archiveSources: validManifest() }, catalog),
+        validManifest(),
+    )
+    assert.throws(
+        () => parseArchiveSourceSummary({ targetVersion: "1.4.55" }, catalog),
+        /ARCHIVE_SOURCE_SCHEMA/,
+    )
+
+    const baselineCatalog = { ...catalog, targetVersion: "1.4.54" }
+    assert.throws(
+        () => parseArchiveSourceSummary({}, baselineCatalog),
+        /ARCHIVE_SOURCE_SCHEMA/,
+    )
+    const fallback = parseArchiveSourceSummary({}, baselineCatalog, true)
+    assert.deepEqual(fallback, createBaselineArchiveSourceManifest(baselineCatalog))
+    assert.ok(fallback.archives.every(entry => entry.source.kind === "baseline"))
 })
 
 test("rejects source manifest schema, coverage, path, and version violations", () => {

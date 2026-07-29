@@ -933,6 +933,39 @@ test("catalog, tables, and summary are stored without physical or absolute paths
     assert.equal(JSON.stringify(summary).includes("physicalPath"), false)
     assert.equal(JSON.stringify(summary).includes("cdnRoot"), false)
     assert.equal(path.isAbsolute(summary.entityListsRelativePath), false)
+    assert.deepEqual(summary.archiveSources, { schemaVersion: 1, archives: [] })
+})
+
+test("release summary persists exact baseline and patch archive sources", async t => {
+    const fixture = engineFixture(t)
+    const baselineArchive = { relativePath: "archive-common-full/base.zip" }
+    const patchArchive = { relativePath: "archive-common-diff/p55.zip" }
+    const catalog = {
+        targetVersion: "1.4.55",
+        versions: ["1.4.54", "1.4.55"],
+        edges: [{ archives: [baselineArchive, patchArchive] }],
+        installedBytes: 1,
+        entityListsRelativePath: "EntityLists/1.4.55-android_medium.csv",
+    }
+    fixture.dependencies.scanTarget = async () => ({
+        ...fakeScan(fixture.paths, "1.4.55"),
+        archives: [
+            { ...baselineArchive, source: { kind: "baseline" } },
+            { ...patchArchive, source: { kind: "patch", targetVersion: "1.4.55" } },
+        ],
+    })
+    fixture.dependencies.buildCatalog = () => catalog
+
+    await sync(fixture)
+    const manifest = await readCurrentRelease(fixture.store)
+    const summary = await fixture.store.readObject(manifest.summary.object)
+    assert.deepEqual(summary.archiveSources, {
+        schemaVersion: 1,
+        archives: [
+            { relativePath: baselineArchive.relativePath, source: { kind: "baseline" } },
+            { relativePath: patchArchive.relativePath, source: { kind: "patch", targetVersion: "1.4.55" } },
+        ],
+    })
 })
 
 test("missing or extra builder tables fail before activation", async t => {

@@ -6,6 +6,12 @@ import type { AssetMode } from "../cdn/asset-mode"
 import { CdnCatalogLoader } from "../cdn/catalog-loader"
 import type { CdnCatalog } from "../cdn/types"
 import {
+    ARCHIVE_SOURCE_SUMMARY_GENERATOR_VERSION,
+    createBaselineArchiveSourceManifest,
+    parseArchiveSourceSummary,
+    type ArchiveSourceManifest,
+} from "../cdn/archive-sources"
+import {
     ContentRepository,
     type ContentRepositoryDependencies,
     type ContentRepositoryInfo,
@@ -30,6 +36,7 @@ export interface ReadonlyContentRepository {
 
 export interface ContentSnapshot {
     readonly cdn: CdnCatalog
+    readonly archiveSources: ArchiveSourceManifest
     readonly repository: ReadonlyContentRepository
 }
 
@@ -259,11 +266,12 @@ export function createConfiguredContentSnapshotProvider(
 async function loadSnapshotPair(
     loadCatalog: () => Promise<CdnCatalog>,
     loadRepository: () => Promise<ReadonlyContentRepository>,
+    loadArchiveSources?: (catalog: CdnCatalog) => Promise<ArchiveSourceManifest>,
 ): Promise<ContentSnapshot> {
     return Promise.all([
         settle(loadCatalog),
         settle(loadRepository),
-    ]).then(([catalogResult, repositoryResult]) => {
+    ]).then(async ([catalogResult, repositoryResult]) => {
         const errors: unknown[] = []
         if (catalogResult.status === "rejected") errors.push(catalogResult.reason)
         if (repositoryResult.status === "rejected") errors.push(repositoryResult.reason)
@@ -273,8 +281,12 @@ async function loadSnapshotPair(
             || repositoryResult.status !== "fulfilled") {
             throw new Error("content snapshot source settlement is inconsistent")
         }
+        const archiveSources = loadArchiveSources
+            ? await loadArchiveSources(catalogResult.value)
+            : createBaselineArchiveSourceManifest(catalogResult.value)
         return deepFreeze({
             cdn: catalogResult.value,
+            archiveSources,
             repository: repositoryResult.value,
         })
     })
@@ -382,6 +394,12 @@ export function createProjectContentSnapshotProvider({
                     release,
                     dependencies.repository,
                     paths,
+                ),
+                async catalog => parseArchiveSourceSummary(
+                    release?.objects[release.manifest.summary.object],
+                    catalog,
+                    release === null
+                        || release.manifest.generatorVersion < ARCHIVE_SOURCE_SUMMARY_GENERATOR_VERSION,
                 ),
             )
         },

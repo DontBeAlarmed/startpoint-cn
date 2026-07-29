@@ -3,7 +3,7 @@ import { deepFreeze } from "../deep-freeze"
 
 export const CONTENT_SCHEMA_VERSION = 1
 export const CONTENT_RUNTIME_SCHEMA_VERSION = 1
-export const CONTENT_GENERATOR_VERSION = 2
+export const CONTENT_GENERATOR_VERSION = 3
 
 export type TableScope = "cdn" | "bundled" | "server"
 
