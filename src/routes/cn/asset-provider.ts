@@ -47,7 +47,10 @@ export function registerCnAssetProviderRoutes(
     if (options.config.mode === "local") {
         fastify.register(cdnFilesPlugin, {
             getSnapshot,
-            paths: { cdnRoot: path.resolve(options.config.cdnRoot) },
+            paths: {
+                cdnRoot: path.resolve(options.config.cdnRoot),
+                patchesRoot: path.resolve(path.dirname(options.config.cdnRoot), "patches"),
+            },
             fileSystem: options.fileSystem,
             handleObserver: options.handleObserver,
             patchUploadRoot: options.patchUploadRoot ?? options.config.patchUploadRoot,

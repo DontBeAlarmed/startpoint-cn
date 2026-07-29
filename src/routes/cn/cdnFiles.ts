@@ -4,6 +4,7 @@ import path from "node:path"
 import type { Readable } from "node:stream"
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { resolveContentPaths, type ContentPaths } from "../../content/paths"
+import { sourceFor, sourceRoot } from "../../content/cdn/archive-sources"
 import type { ContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { parseHttpByteRange, type HttpByteRange } from "./httpRange"
@@ -21,7 +22,7 @@ export interface CdnFileHandleObserver {
 
 export interface CnCdnFilesRouteOptions {
     readonly getSnapshot?: () => ContentSnapshot
-    readonly paths?: Pick<ContentPaths, "cdnRoot">
+    readonly paths?: Pick<ContentPaths, "cdnRoot" | "patchesRoot">
     readonly patchUploadRoot?: string
     readonly fileSystem?: CdnFileSystem
     readonly handleObserver?: CdnFileHandleObserver
@@ -30,6 +31,12 @@ export interface CnCdnFilesRouteOptions {
 interface OpenedFile {
     readonly handle: FileHandle
     readonly size: number
+}
+
+interface CatalogZipLocation {
+    readonly logicalRoot: string
+    readonly physicalRoot: string
+    readonly expectedSize: number
 }
 
 const defaultFileSystem: CdnFileSystem = { realpath, lstat, open }
@@ -136,10 +143,9 @@ async function closeObserved(
 
 async function buildCatalogZipAllowlist(
     snapshot: ContentSnapshot,
-    logicalRoot: string,
-    physicalRoot: string,
+    paths: Pick<ContentPaths, "cdnRoot" | "patchesRoot">,
     fileSystem: CdnFileSystem,
-): Promise<ReadonlyMap<string, number>> {
+): Promise<ReadonlyMap<string, CatalogZipLocation>> {
     const candidates = new Map<string, number>()
     const conflicts = new Set<string>()
     for (const edge of snapshot.cdn.edges) {
@@ -156,10 +162,18 @@ async function buildCatalogZipAllowlist(
         }
     }
 
-    const allowlist = new Map<string, number>()
+    const allowlist = new Map<string, CatalogZipLocation>()
     for (const [rawRelativePath, expectedSize] of candidates) {
         const relativePath = catalogRelativePath(rawRelativePath)
         if (relativePath === null) continue
+        const source = sourceFor(snapshot.archiveSources, relativePath)
+        const logicalRoot = path.resolve(sourceRoot(paths, source))
+        let physicalRoot: string
+        try {
+            physicalRoot = await fileSystem.realpath(logicalRoot)
+        } catch {
+            continue
+        }
         const logicalPath = path.resolve(logicalRoot, ...relativePath.split("/"))
         if (!isDescendant(logicalRoot, logicalPath)) continue
 
@@ -170,7 +184,7 @@ async function buildCatalogZipAllowlist(
             const logicalStat = await fileSystem.lstat(logicalPath)
             const physicalStat = await fileSystem.lstat(physicalPath)
             if (logicalStat.size !== expectedSize || !sameFileIdentity(logicalStat, physicalStat)) continue
-            allowlist.set(relativePath, expectedSize)
+            allowlist.set(relativePath, { logicalRoot, physicalRoot, expectedSize })
         } catch {
             // Missing, symlinked, and unstable Catalog files are unavailable in this snapshot.
         }
@@ -321,8 +335,7 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
     const physicalRoot = await fileSystem.realpath(logicalRoot)
     const zipAllowlist = await buildCatalogZipAllowlist(
         snapshot,
-        logicalRoot,
-        physicalRoot,
+        paths,
         fileSystem,
     )
 
@@ -379,18 +392,18 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
             const relativePath = requestRelativePath(request)
             if (relativePath === null) return reply.status(404).send("Not Found")
             if (path.posix.extname(relativePath).toLowerCase() === ".zip") {
-                const expectedSize = zipAllowlist.get(relativePath)
-                return expectedSize === undefined
+                const location = zipAllowlist.get(relativePath)
+                return location === undefined
                     ? reply.status(404).send("Not Found")
                     : sendFile(
                         request,
                         reply,
-                        logicalRoot,
-                        physicalRoot,
+                        location.logicalRoot,
+                        location.physicalRoot,
                         relativePath,
                         fileSystem,
                         observer,
-                        expectedSize,
+                        location.expectedSize,
                         true,
                     )
             }

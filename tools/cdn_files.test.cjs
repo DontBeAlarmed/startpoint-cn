@@ -25,7 +25,7 @@ function archive(relativePath, compressedBytes, order = 1) {
     }
 }
 
-function snapshot(archives) {
+function snapshot(archives, sources = new Map()) {
     return Object.freeze({
         cdn: Object.freeze({
             schemaVersion: 1,
@@ -40,6 +40,13 @@ function snapshot(archives) {
                 assetSizeKind: "fulfill",
                 archives: Object.freeze(archives),
             }]),
+        }),
+        archiveSources: Object.freeze({
+            schemaVersion: 1,
+            archives: Object.freeze(archives.map(item => Object.freeze({
+                relativePath: item.relativePath,
+                source: Object.freeze(sources.get(item.relativePath) ?? { kind: "baseline" }),
+            }))),
         }),
     })
 }
@@ -79,6 +86,7 @@ async function captureUnhandledErrors(run) {
 async function createFixture(t, options = {}) {
     const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "cn-cdn-files-"))
     const cdnRoot = path.join(sandbox, "cdn")
+    const patchesRoot = path.join(sandbox, "patches")
     const patchUploadRoot = path.join(sandbox, "patch-upload")
     const contentStateDir = path.join(sandbox, "must-not-exist")
     const outsideRoot = path.join(sandbox, "outside")
@@ -100,7 +108,7 @@ async function createFixture(t, options = {}) {
     fs.writeFileSync(path.join(outsideRoot, "outside.zip"), zipBytes)
     fs.symlinkSync(path.join(outsideRoot, "outside.bin"), path.join(cdnRoot, "objects", "outside.bin"))
     fs.symlinkSync(path.join(outsideRoot, "outside.zip"), path.join(cdnRoot, "archive-common-full", "outside.zip"))
-    options.setup?.({ cdnRoot, outsideRoot, zipBytes })
+    options.setup?.({ cdnRoot, patchesRoot, outsideRoot, zipBytes })
 
     const observer = { opened: 0, closed: 0 }
     const app = Fastify({ logger: false })
@@ -108,11 +116,14 @@ async function createFixture(t, options = {}) {
     const previousContentStateDir = process.env.CONTENT_STATE_DIR
     process.env.CONTENT_STATE_DIR = contentStateDir
     app.register(cdnFilesPlugin, {
-        getSnapshot: () => snapshot(options.archives?.({ cdnRoot, outsideRoot, zipBytes }) ?? [
-            archive("archive-common-full/base.zip", zipBytes.length),
-            archive("archive-common-full/outside.zip", zipBytes.length, 2),
-        ]),
-        paths: { cdnRoot },
+        getSnapshot: () => {
+            const archives = options.archives?.({ cdnRoot, patchesRoot, outsideRoot, zipBytes }) ?? [
+                archive("archive-common-full/base.zip", zipBytes.length),
+                archive("archive-common-full/outside.zip", zipBytes.length, 2),
+            ]
+            return snapshot(archives, options.sources?.(archives) ?? new Map())
+        },
+        paths: { cdnRoot, patchesRoot },
         patchUploadRoot,
         ...(options.fileSystemFactory
             ? { fileSystem: options.fileSystemFactory({ cdnRoot }) }
@@ -135,7 +146,7 @@ async function createFixture(t, options = {}) {
         await app.close()
         fs.rmSync(sandbox, { recursive: true, force: true })
     })
-    return { app, cdnRoot, contentStateDir, observer, outsideRoot, zipBytes }
+    return { app, cdnRoot, patchesRoot, contentStateDir, observer, outsideRoot, zipBytes }
 }
 
 test("parseHttpByteRange supports full, closed, open, suffix, and truncated ranges", () => {
@@ -197,6 +208,37 @@ test("serves complete responses with byte metadata", async t => {
     assert.equal(response.headers["accept-ranges"], "bytes")
     assert.equal(response.headers["content-length"], String(zipBytes.length))
     assert.deepEqual(response.rawPayload, zipBytes)
+    await waitForBalancedHandles(observer)
+})
+
+test("serves manifest-selected patch ZIPs with GET, HEAD, and Range", async t => {
+    const relativePath = "archive-common-diff/p55.zip"
+    const bytes = Buffer.from("0123456789")
+    const { app, observer } = await createFixture(t, {
+        setup: ({ patchesRoot }) => {
+            const packageRoot = path.join(patchesRoot, "1.4.55")
+            fs.mkdirSync(path.join(packageRoot, "archive-common-diff"), { recursive: true })
+            fs.writeFileSync(path.join(packageRoot, relativePath), bytes)
+            fs.writeFileSync(path.join(packageRoot, "outer.zip"), "ignored")
+        },
+        archives: () => [archive(relativePath, bytes.length)],
+        sources: () => new Map([[relativePath, { kind: "patch", targetVersion: "1.4.55" }]]),
+    })
+
+    const full = await app.inject({ method: "GET", url: `/patch/cn/${relativePath}` })
+    assert.equal(full.statusCode, 200)
+    assert.equal(full.body, "0123456789")
+    const head = await app.inject({ method: "HEAD", url: `/patch/cn/${relativePath}` })
+    assert.equal(head.statusCode, 200)
+    assert.equal(head.headers["content-length"], "10")
+    const range = await app.inject({
+        method: "GET",
+        url: `/patch/cn/${relativePath}`,
+        headers: { range: "bytes=2-5" },
+    })
+    assert.equal(range.statusCode, 206)
+    assert.equal(range.body, "2345")
+    assert.equal((await app.inject({ method: "GET", url: "/patch/cn/outer.zip" })).statusCode, 404)
     await waitForBalancedHandles(observer)
 })
 
