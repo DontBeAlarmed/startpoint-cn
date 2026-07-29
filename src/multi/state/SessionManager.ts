@@ -114,19 +114,6 @@ export class SessionManager {
             set.delete(addr)
             if (set.size === 0) {
                 this.roomClients.delete(client.roomNumber)
-                // OLD: auto-disband empty non-battle rooms
-                // But check if battle clients still exist first
-                const bSet = this.battleClients.get(client.roomNumber)
-                if (!bSet || bSet.size === 0) {
-                    if (!client.isBattle) {
-                        const { getRoom, disbandRoom } = require("../room/manager")
-                        const room = getRoom(client.roomNumber)
-                        if (room && room.raising_state !== 4) {
-                            this.broadcastToRoom(client.roomNumber, [1, [6, "multibattle_room_dismissed"]])
-                            disbandRoom(client.roomNumber)
-                        }
-                    }
-                }
             } else {
                 // OLD: if room still has clients, re-evaluate host auto-ready
                 if (!client.isBattle) {

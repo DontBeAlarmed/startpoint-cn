@@ -36,6 +36,7 @@ stubModule("../src/data/domains/equipment", {
 })
 
 const { sessionManager } = require("../src/multi/state/SessionManager")
+const { createRoom, disbandRoom } = require("../src/multi/room/manager")
 const { handleHandshake } = require("../src/multi/tcp/handshake")
 
 class FakeSocket extends EventEmitter {
@@ -47,12 +48,20 @@ class FakeSocket extends EventEmitter {
     end() { this.writable = false }
 }
 
-test("room handshake checks the lifecycle guard after async player resolution", async () => {
+test("room handshake checks the lifecycle guard after async player resolution", async t => {
     const socket = new FakeSocket()
+    const room = createRoom(93, 193, 1, 1, 293, 0, 393)
+    t.after(() => disbandRoom(room.room_number))
     let accepting = true
     const handshake = handleHandshake(
         socket,
-        { socklet: "cooperation_room", viewerId: 93, room_number: "guard-room" },
+        {
+            socklet: "cooperation_room",
+            viewerId: 93,
+            room_number: room.room_number,
+            questCategory: room.category,
+            questId: room.quest_id,
+        },
         { generation: 7, isAccepting: () => accepting },
     )
 
@@ -63,7 +72,7 @@ test("room handshake checks the lifecycle guard after async player resolution", 
     })
     await handshake
 
-    assert.equal(sessionManager.getClient(93, "guard-room"), undefined)
+    assert.equal(sessionManager.getClient(93, room.room_number), undefined)
 })
 
 test("battle handshake refuses registration when its lifecycle generation is inactive", async () => {

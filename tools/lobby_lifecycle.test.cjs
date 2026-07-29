@@ -5,7 +5,7 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const { sessionManager } = require("../src/multi/state/SessionManager")
-const { createRoom, disbandRoom } = require("../src/multi/room/manager")
+const { addRoomMember, createRoom, disbandRoom, getRoom, isRoomMember } = require("../src/multi/room/manager")
 let lobbyLifecycle = {}
 try {
     lobbyLifecycle = require("../src/multi/tcp/lobby-lifecycle")
@@ -92,6 +92,33 @@ function stubRecruitment(t, recruitedMates) {
 
 test.afterEach(() => {
     if (typeof stopLobbyLifecycle === "function") stopLobbyLifecycle()
+})
+
+test("an explicit guest Bye releases the persistent room membership", t => {
+    const { room, guests } = createLobbyRoom(t, 500, [600])
+    const guest = guests[0]
+    addRoomMember(room.room_number, guest.client.viewerId)
+    assert.equal(isRoomMember(room, guest.client.viewerId), true)
+
+    handleMessage(guest.socket, [0, [1]])
+
+    assert.equal(isRoomMember(room, guest.client.viewerId), false)
+})
+
+test("a transport disconnect preserves the room for restore", t => {
+    const { room, host } = createLobbyRoom(t, 499)
+
+    sessionManager.removeClient(host.client)
+
+    assert.equal(getRoom(room.room_number), room)
+})
+
+test("an explicit host Bye disbands the room even while guests remain", t => {
+    const { room, host } = createLobbyRoom(t, 498, [598])
+
+    handleMessage(host.socket, [0, [1]])
+
+    assert.equal(getRoom(room.room_number), undefined)
 })
 
 test("all three lobby timeout paths are unrefed, cancelled, and inert after stop", async t => {

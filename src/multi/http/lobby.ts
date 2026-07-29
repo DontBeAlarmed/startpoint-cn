@@ -4,8 +4,8 @@ import { getSession } from "../../data/domains/session"
 import { getQuestFromCategorySync } from "../../lib/assets"
 import { generateDataHeaders } from "../../utils"
 import { resolveMultiPlayerContext } from "../player-context"
-import { createRoom, getRoom, getRoomByToken, getRooms } from "../room/manager"
-import { serializeRoom, serializeRoomConnection } from "../room/serializer"
+import { createRoom, getRoom, getRoomByToken } from "../room/manager"
+import { serializeRoomConnection } from "../room/serializer"
 import { sessionManager } from "../state/SessionManager"
 
 export function registerLobbyRoutes(fastify: FastifyInstance): void {
@@ -21,15 +21,10 @@ export function registerLobbyRoutes(fastify: FastifyInstance): void {
             "error": "Bad Request", "message": "Invalid viewer id."
         })
 
-        const rooms = getRooms(body.category_id, body.event_id)
-            .filter(r => r.host_viewer_id === viewerId)
-            .filter(r => sessionManager.hasRoomClients(r.room_number))
-            .map(serializeRoom)
-
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": { "rooms": rooms }
+            "data": { "rooms": [] }
         })
     })
 

@@ -6,7 +6,7 @@
 // HandshakeResult: Accept=0, Denied=1, Reconnect=2, Exception=3, Complete=4
 
 import * as net from "net"
-import { getRoom } from "../room/manager"
+import { addRoomMember, getRoom, isRoomMember } from "../room/manager"
 import {
     getPlayerPartyGroupListSync,
 } from "../../data/domains/party"
@@ -21,9 +21,7 @@ import { PartyCategory, PlayerParty } from "../../data/types"
 import { sessionManager } from "../state/SessionManager"
 import type { SessionClient } from "../state/SessionManager"
 import { ClientState } from "../types"
-import { resolveMultiPlayerContext } from "../player-context"
-
-const playerRankTable = require("../../../assets/cdndata/player_rank.json")
+import { getPlayerRankLevel, resolveMultiPlayerContext } from "../player-context"
 
 export interface HandshakeLifecycleGuard {
     /** Identifies the session-server generation that accepted this socket. */
@@ -36,15 +34,6 @@ const unmanagedLifecycle: HandshakeLifecycleGuard = Object.freeze({
     generation: 0,
     isAccepting: () => true,
 })
-
-function getRankLevel(rankPoint: number): number {
-    let level = 1
-    for (const [lvl, data] of Object.entries(playerRankTable as Record<string, any>)) {
-        const threshold = parseInt(data[0][1])
-        if (rankPoint >= threshold) level = parseInt(lvl)
-    }
-    return level
-}
 
 export function buildRealParty(playerId: number, targetParty?: PlayerParty): any {
     const emptyChar = [1]
@@ -208,7 +197,26 @@ export async function handleHandshake(
             return
         }
 
-        const ctx = await resolveMultiPlayerContext(Number(viewerId))
+        const normalizedRoomNumber = String(roomNumber)
+        const normalizedViewerId = Number(viewerId)
+        const room = getRoom(normalizedRoomNumber)
+        const categoryMatches = data.questCategory === undefined
+            || Number(data.questCategory) === room?.category
+        const questMatches = data.questId === undefined
+            || Number(data.questId) === room?.quest_id
+        const occupiedRealPlayerSlots = room?.member_viewer_ids.length ?? 0
+        const existingMember = room ? isRoomMember(room, normalizedViewerId) : false
+        if (!room
+            || (room.raising_state !== 1 && room.raising_state !== 2)
+            || !categoryMatches
+            || !questMatches
+            || (!existingMember && occupiedRealPlayerSlots >= 3)) {
+            sessionManager.sendJson(socket, [3, "HANDSHAKE_DENIED"])
+            socket.end()
+            return
+        }
+
+        const ctx = await resolveMultiPlayerContext(normalizedViewerId)
         if (!ctx) {
             sessionManager.sendJson(socket, [3, "HANDSHAKE_DENIED"])
             socket.end()
@@ -219,22 +227,22 @@ export async function handleHandshake(
 
         const { playerId, player } = ctx
         const connectionId = data.connection_id || data.connectionId || `${socket.remoteAddress}:${socket.remotePort}`
-        const client = sessionManager.createClient(socket, Number(viewerId), String(roomNumber), String(connectionId), playerId)
+        const client = sessionManager.createClient(socket, normalizedViewerId, normalizedRoomNumber, String(connectionId), playerId)
         client.clientState.tryTransition(ClientState.Handshaking)
 
         const party = buildRealParty(playerId)
         const yourSelf = {
-            viewerId: Number(viewerId),
+            viewerId: normalizedViewerId,
             playerId: playerId,
             name: player.name,
-            rank: getRankLevel(player.rankPoint || 0),
+            rank: getPlayerRankLevel(player.rankPoint || 0),
             degreeId: player.degreeId || 1,
             mainCharacterId: player.leaderCharacterId,
             party,
             connectionId,
             playerRoleKind: player.role || 1,
             isNewbie: !!player.tutorialStep,
-            isHost: true,
+            isHost: normalizedViewerId === room.host_viewer_id,
             entryTime: Date.now(),
             currentPartyId: player.partySlot || 1,
             autoplayMode: false,
@@ -249,6 +257,7 @@ export async function handleHandshake(
         client.yourself = yourSelf
 
         if (!lifecycle.isAccepting()) return
+        addRoomMember(normalizedRoomNumber, normalizedViewerId)
         sessionManager.addClientToRoom(client)
         sessionManager.sendJson(socket, [0, connectionId, roomNumber])
         return

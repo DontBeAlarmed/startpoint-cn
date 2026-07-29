@@ -56,6 +56,7 @@ export interface MultiRoom {
     raising_state: number
     room_sequence: number
     host_entry_time: number
+    member_viewer_ids: number[]
     mates: Array<{ viewer_id: number | null, com_id: number, player_id?: number }>
     share_room_options: number
     is_npc_mode: boolean

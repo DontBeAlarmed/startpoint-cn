@@ -1,4 +1,4 @@
-import { randomInt } from "crypto";
+import { randomBytes, randomInt } from "crypto";
 import { MultiRoom, QuestCategory, RoomState } from "../types";
 import { getServerTime } from "../../utils";
 import { sessionManager } from "../state/SessionManager";
@@ -88,10 +88,16 @@ export function getRoomCleanupStatus(): RoomCleanupStatus {
     return Object.freeze({ running: cleanupTimer !== null });
 }
 
-export const STATIC_ACCESS_TOKEN = "multi_battle_quest_access_token";
-
 export function generateRoomNumber(): string {
     return String(randomInt(100000, 999999));
+}
+
+export function generateRoomAccessToken(): string {
+    let token: string;
+    do {
+        token = randomBytes(24).toString("base64url");
+    } while (getRoomByToken(token));
+    return token;
 }
 
 export function createRoom(
@@ -107,7 +113,7 @@ export function createRoom(
     const roomNumber = generateRoomNumber();
     const room: MultiRoom = {
         room_number: roomNumber,
-        access_token: STATIC_ACCESS_TOKEN,
+        access_token: generateRoomAccessToken(),
         category,
         quest_id: questId,
         host_viewer_id: hostViewerId,
@@ -119,6 +125,7 @@ export function createRoom(
         raising_state: 2,
         room_sequence: roomSequence++,
         host_entry_time: getServerTime(),
+        member_viewer_ids: [hostViewerId],
         mates: [],
         share_room_options: 0,
         is_npc_mode: isNpcMode,
@@ -151,6 +158,26 @@ export function getRooms(categoryId: number, eventId?: number): MultiRoom[] {
         }
     }
     return result;
+}
+
+export function isRoomMember(room: MultiRoom, viewerId: number): boolean {
+    return room.member_viewer_ids.includes(viewerId);
+}
+
+export function addRoomMember(roomNumber: string, viewerId: number): boolean {
+    const room = rooms.get(roomNumber);
+    if (!room) return false;
+    if (!room.member_viewer_ids.includes(viewerId)) room.member_viewer_ids.push(viewerId);
+    return true;
+}
+
+export function removeRoomMember(roomNumber: string, viewerId: number): boolean {
+    const room = rooms.get(roomNumber);
+    if (!room || viewerId === room.host_viewer_id) return false;
+    const index = room.member_viewer_ids.indexOf(viewerId);
+    if (index < 0) return false;
+    room.member_viewer_ids.splice(index, 1);
+    return true;
 }
 
 export function updateRoomState(roomNumber: string, state: number): boolean {

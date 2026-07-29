@@ -24,7 +24,9 @@
 | `/episode_trial_reading/finish` | 返回空对象 | CN 客户端请求只携带 `character_id`、`quest_id`，完成回调不合并持久字段；它是卡池角色剧情试读，不是普通角色剧情阅读记录 |
 | `/patch/cn/recovery/empty.csv` | 返回恢复流程所需空文件 | CDN 恢复协议兼容资源，不代表缺少业务实现 |
 | `/reproduce/post` | 接受后丢弃设备诊断日志 | 项目不收集玩家设备日志；属于隐私边界内的兼容接收，不是存档恢复能力 |
-| 联机 `/micro_community`、`/publish_room`、`/share_room` | 返回空对象，不发布到外部社区 | 外部社区和系统分享关闭；房间创建、搜索、恢复和解散使用独立的本地状态，不依赖这些入口 |
+| 联机 `/micro_community` | 返回空对象，不发布到外部社区 | 外部社区关闭；本地房间不依赖该入口 |
+| 联机 `/publish_room` | 返回 `success: false` | 客户端会读取该布尔值，不能用空对象伪造发布成功 |
+| 联机 `/share_room` | 仅房主可调用并返回空成功对象 | 客户端成功回调不读取业务字段；本地 room number 和随机 token 由房间模块维护 |
 
 ## 空响应但业务已执行
 

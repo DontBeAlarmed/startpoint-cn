@@ -1,6 +1,6 @@
 import * as net from "net"
 import { sessionManager, SessionClient } from "../state/SessionManager"
-import { getRoom, updateRoomState } from "../room/manager"
+import { disbandRoom, getRoom, removeRoomMember, updateRoomState } from "../room/manager"
 import { NpcMateProvider } from "../npc/controller"
 import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
 import { buildRealParty } from "./handshake"
@@ -372,6 +372,11 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
 }
 
 function handleBye(_socket: net.Socket, client: SessionClient, _data: any[]): void {
+    const room = getRoom(client.roomNumber)
+    const isHost = room?.host_viewer_id === client.viewerId
+    if (isHost) {
+        sessionManager.broadcastToRoom(client.roomNumber, [1, [6, "multibattle_room_dismissed"]])
+    }
     const set = (sessionManager as any).roomClients?.get?.(client.roomNumber) as Set<string> | undefined
     if (set) {
         const clientsMap = (sessionManager as any).clients as Map<string, SessionClient> | undefined
@@ -385,7 +390,9 @@ function handleBye(_socket: net.Socket, client: SessionClient, _data: any[]): vo
         }
     }
     const hostClient = findHostClient(client.roomNumber)
+    removeRoomMember(client.roomNumber, client.viewerId)
     sessionManager.removeClient(client)
+    if (isHost) disbandRoom(client.roomNumber)
     // Only refresh the mate list if the room still exists AND a *different* client is the host (i.e. a
     // guest left but the room lives on). If the room was disbanded (host left / went empty), the
     // [6, dismissed] broadcast already tore it down — pushing a stale/empty mate list here makes the

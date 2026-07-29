@@ -13,6 +13,7 @@
 - 超级猫头鹰 BothBoss 的 LevelNext、第二代 SceneReady 和最终 Finalize；
 - 多人 active quest 写入 SQLite，并在 `/load` 中返回未完成关卡；
 - 房主结算后把现有房间恢复到可重赛状态；
+- 房间级随机 access token、房主权限和断线成员恢复边界；
 - NPC 昵称从项目维护的昵称池分配，并在房间生命周期内保持稳定。
 
 当前不完整或缺失的能力：
@@ -39,7 +40,7 @@
 
 房间与 TCP 会话只保存在 Node.js 进程内：
 
-- `room/manager.ts` 保存 room number、房主、成员摘要和 `raising_state`；
+- `room/manager.ts` 保存 room number、随机 access token、房主、成员资格、成员摘要和 `raising_state`；
 - `SessionManager` 保存 lobby client、battle client、connection ID 和 SceneReady 状态；
 - 服务进程停止后，这些结构全部消失，不尝试恢复。
 
@@ -98,8 +99,8 @@ JSON.stringify(message) + "\0"
 
 | 路由 | 当前职责 |
 |---|---|
-| `get_rooms` | 返回当前 viewer 作为房主且仍有 lobby client 的房间 |
-| `create_room` | 校验玩家与关卡，创建进程内房间和 room number |
+| `get_rooms` | 真人随机匹配未实现时返回合法空列表，不把自己的房间伪装成匹配结果 |
+| `create_room` | 校验玩家与关卡，创建进程内房间、room number 和房间级随机 access token |
 | `search_room` | 按 room number 返回房间是否存在及基础房主信息 |
 | `select_room` | 返回 TCP 地址、端口和房间状态；房间缺失时返回状态 9 |
 
@@ -107,11 +108,11 @@ JSON.stringify(message) + "\0"
 
 | 路由 | 当前职责 |
 |---|---|
-| `prepare` | 刷新房主进入时间并返回 TCP 连接信息 |
-| `summon` | 返回静态 NPC mate 模板，用于客户端招募响应 |
-| `restore_room` | 查询仍在进程内的房间；缺失时返回状态 9 |
-| `share_room` | 兼容响应，不提供真实分享或匹配队列 |
-| `disband_room` | 广播 Disbanded 并删除进程内房间 |
+| `prepare` | 校验 viewer session、房间和关卡后返回 TCP 连接信息；这是首次加入前入口，不要求已有成员资格 |
+| `summon` | 仅房主可请求静态 NPC mate 模板 |
+| `restore_room` | 已记录成员可恢复仍在进程内的房间；陌生玩家返回状态 13，缺失房间返回状态 9 |
+| `share_room` | 仅房主可提交，成功响应不含业务字段，也不提供真实分享或匹配队列 |
+| `disband_room` | 仅房主可广播 Disbanded 并删除进程内房间 |
 
 ### 4.3 战斗生命周期
 
@@ -126,15 +127,15 @@ JSON.stringify(message) + "\0"
 
 | 路由 | 当前职责 |
 |---|---|
-| `verify_access_token` | 返回兼容校验结果，不代表真实外部令牌服务 |
+| `verify_access_token` | 按房间级随机 token 查询本地房间；有效时返回客户端要求的房主、关卡和房间字段，无效时返回 `room_exists: false` |
 | `micro_community` | CN 社区兼容空响应 |
-| `publish_room` | CN 分享兼容空响应 |
+| `publish_room` | 外部社区未实现，明确返回 `success: false` |
 
 单端点字段和最终状态以 `src/multi/http/` 注册源码及测试为准，不在本文复制完整请求体。
 
 ## 5. RoomState 语义
 
-当前服务端只写入 1、2、4 三个房间状态；9 只用于 HTTP 返回。
+当前服务端只写入 1、2、4 三个房间状态；9 和 13 只用于 HTTP 返回。
 
 | 值 | 当前语义 | 写入或返回时机 |
 |---:|---|---|
@@ -142,6 +143,7 @@ JSON.stringify(message) + "\0"
 | 2 | Waiting | 新建房间初态；房主尚未进入时客人继续轮询 |
 | 4 | Battle | StartBattle 或 HTTP start 后进入战斗 |
 | 9 | Missing | `select_room`、`prepare` 或 `restore_room` 找不到房间时返回 |
+| 13 | NotMate | `restore_room` 的 viewer 不是该房间已记录成员时返回 |
 
 状态 9 不会存入房间。客户端收到它时应把目标房间视为不存在或已经过期。
 
@@ -153,17 +155,20 @@ JSON.stringify(message) + "\0"
 
 客户端使用 `socklet=cooperation_room` 连接 TCP，并提供 viewer、room number 和 connection ID。服务端执行：
 
-1. 校验 viewer 与 room number；
-2. 通过 viewer session 解析当前玩家和存档；
-3. 从数据库构建真实玩家 party；
-4. 注册 lobby client；
-5. 返回 Accept 数组：
+1. 校验房间存在，状态为 Waiting/Ready，握手关卡与房间一致；
+2. 新成员加入时按真人成员资格校验房间仍有空位；NPC 槽位可被真人替换，已记录成员也不受满员判断影响，可以断线重连；
+3. 通过 viewer session 解析当前玩家和存档；
+4. 从数据库构建真实玩家 party；
+5. 按 `room.host_viewer_id` 写入本连接的 `isHost`，并记录房间成员资格；
+6. 注册 lobby client并返回 Accept 数组：
 
 ```text
 [0, connectionId, roomNumber]
 ```
 
 握手阶段只完成连接注册。Welcome 和 Mates 在客户端随后发送 Enter notify 后进入 lobby 流程。
+
+成员资格与 socket 在线状态分开保存：普通网络断开只移除连接，房间保留到恢复、主动解散或过期清理，因此成员仍有 `restore_room` 资格；非房主主动发送 Bye 时释放自身成员资格，房主主动发送 Bye 时立即广播解散并销毁整个房间。
 
 ### 6.2 Battle socket 握手
 
@@ -190,7 +195,7 @@ SceneReady 只统计已登记的 battle client。
 | Index | 名称 | 当前行为 |
 |---:|---|---|
 | 0 | Enter | 更新本人 party，发送 Welcome，并同步 Mates |
-| 1 | Bye | 移除 lobby client，必要时解散空房间 |
+| 1 | Bye | 移除 lobby client 和非房主成员资格，必要时解散空房间 |
 | 2 | ChangeParty | 更新当前 party 并广播 Mates |
 | 3 | Ready | 更新准备状态并广播 StateChanged |
 | 4 | Heartbeat | 回 AckHeartbeat |
@@ -374,6 +379,8 @@ CN Notify 索引已经按 `SceneReady=0`、`LevelNext=1`、`Finalize=2`、`Measu
 | 测试 | 关注点 |
 |---|---|
 | `tools/handshake_lifecycle.test.cjs` | 握手生命周期与停止竞态 |
+| `tools/multi_room_handshake_identity.test.cjs` | room socket 的存在性、状态、满员、关卡和房主身份边界 |
+| `tools/multi_room_identity.test.cjs` | 随机 token、HTTP 权限、成员恢复和外部社区关闭响应 |
 | `tools/lobby_lifecycle.test.cjs` | NPC 招募、成员、准备和重赛状态 |
 | `tools/room_cleanup_lifecycle.test.cjs` | 15/30 分钟清理与 state 4 跳过 |
 | `tools/session_server_lifecycle.test.cjs` | TCP 启停和会话生命周期 |
