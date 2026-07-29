@@ -31,10 +31,43 @@ function createPaths(sandbox) {
     return {
         cdnDir: sandbox,
         cdnRoot: path.join(sandbox, "cdn"),
+        patchesRoot: path.join(sandbox, "patches"),
         contentStoreDir: path.join(sandbox, "store"),
         contentStateDir: path.join(sandbox, "state"),
         contentRuntimeDir: path.join(sandbox, "runtime"),
     }
+}
+
+function addPatchEdge(paths, fromVersion, toVersion, options = {}) {
+    const packageRoot = path.join(paths.patchesRoot, toVersion)
+    const layerDirectories = [
+        ["common", "archive-common-diff"],
+        ["medium", "archive-medium-diff"],
+        ["android", "archive-android-diff"],
+    ]
+    const archives = []
+    for (const [layer, directory] of layerDirectories) {
+        const bytes = Buffer.from(`${fromVersion}-${toVersion}-${layer}`)
+        const digest = crypto.createHash("sha256").update(bytes).digest("hex")
+        const fileName = `pinball-${fromVersion}-${toVersion}-1-${digest.slice(0, 8)}.zip`
+        const relativePath = `${directory}/${fileName}`
+        fs.mkdirSync(path.join(packageRoot, directory), { recursive: true })
+        fs.writeFileSync(path.join(packageRoot, relativePath), bytes)
+        archives.push({
+            relativePath,
+            layer,
+            order: 1,
+            bytes: bytes.length,
+            sha256: options.wrongDigest && layer === "common" ? "f".repeat(64) : digest,
+        })
+    }
+    fs.writeFileSync(path.join(packageRoot, "patch-manifest.json"), JSON.stringify({
+        schema: 1,
+        baseVersion: "1.4.54",
+        targetVersion: toVersion,
+        compatibleClient: "CN 1.8.1",
+        archives,
+    }))
 }
 
 function archiveFileName(directory, fromVersion, toVersion) {
@@ -153,6 +186,108 @@ test("target scan reads no archive or EntityLists body and returns frozen determ
     assert.ok(Object.isFrozen(scan.archives[0]))
 })
 
+test("target scan and materialization merge manifest-declared patch archives without changing baseline paths", async t => {
+    const { paths } = createScannerFixture(t)
+    const baselineScan = await scanContentTarget(paths)
+    const baselineInput = baselineForScan(baselineScan)
+    addPatchEdge(paths, "1.4.54", "1.4.55")
+
+    const scan = await scanContentTarget(paths)
+    const input = await materializeContentCatalogInput(scan, {
+        baselineInput,
+        digestArchive: digestHandle,
+    })
+    const catalog = buildCdnCatalog(input)
+
+    assert.equal(scan.targetVersion, "1.4.55")
+    assert.equal(catalog.targetVersion, "1.4.55")
+    assert.equal(scan.archives.filter(item => item.source.kind === "patch").length, 3)
+    const physicalBaselineRoot = fs.realpathSync(paths.cdnRoot)
+    const physicalPatchesRoot = fs.realpathSync(paths.patchesRoot)
+    assert.ok(scan.archives
+        .filter(item => item.source.kind === "baseline")
+        .every(item => item.physicalPath.startsWith(physicalBaselineRoot)))
+    assert.ok(scan.archives
+        .filter(item => item.source.kind === "patch")
+        .every(item => item.physicalPath.startsWith(physicalPatchesRoot)))
+})
+
+test("materialization rejects a stable patch archive whose digest differs from manifest", async t => {
+    const { paths } = createScannerFixture(t)
+    const baselineScan = await scanContentTarget(paths)
+    const baselineInput = baselineForScan(baselineScan)
+    addPatchEdge(paths, "1.4.54", "1.4.55", { wrongDigest: true })
+    const scan = await scanContentTarget(paths)
+
+    await assert.rejects(
+        () => materializeContentCatalogInput(scan, { baselineInput, digestArchive: digestHandle }),
+        /PATCH_ARCHIVE_HASH_MISMATCH/,
+    )
+})
+
+test("materialization rejects a patch manifest changed after target scan", async t => {
+    const mutations = {
+        deleted(manifestPath) {
+            fs.unlinkSync(manifestPath)
+        },
+        replaced(manifestPath) {
+            const replacement = `${manifestPath}.replacement`
+            fs.copyFileSync(manifestPath, replacement)
+            fs.renameSync(replacement, manifestPath)
+        },
+        symlinked(manifestPath) {
+            const target = `${manifestPath}.target`
+            fs.copyFileSync(manifestPath, target)
+            fs.unlinkSync(manifestPath)
+            fs.symlinkSync(path.basename(target), manifestPath)
+        },
+        modified(manifestPath) {
+            fs.appendFileSync(manifestPath, "\n")
+        },
+    }
+
+    for (const [name, mutate] of Object.entries(mutations)) {
+        await t.test(name, async t => {
+            const { paths } = createScannerFixture(t)
+            const baselineScan = await scanContentTarget(paths)
+            const baselineInput = baselineForScan(baselineScan)
+            addPatchEdge(paths, "1.4.54", "1.4.55")
+            const scan = await scanContentTarget(paths)
+            const manifestPath = path.join(paths.patchesRoot, "1.4.55", "patch-manifest.json")
+            mutate(manifestPath)
+
+            await assert.rejects(
+                () => materializeContentCatalogInput(scan, { baselineInput, digestArchive: digestHandle }),
+                /PATCH_/,
+            )
+        })
+    }
+})
+
+test("materialization rejects a patch manifest changed while patch archives are hashed", async t => {
+    const { paths } = createScannerFixture(t)
+    const baselineScan = await scanContentTarget(paths)
+    const baselineInput = baselineForScan(baselineScan)
+    addPatchEdge(paths, "1.4.54", "1.4.55")
+    const scan = await scanContentTarget(paths)
+    const manifestPath = path.join(paths.patchesRoot, "1.4.55", "patch-manifest.json")
+    let changed = false
+
+    await assert.rejects(
+        () => materializeContentCatalogInput(scan, {
+            baselineInput,
+            digestArchive: async fileHandle => {
+                if (!changed) {
+                    changed = true
+                    fs.appendFileSync(manifestPath, "\n")
+                }
+                return digestHandle(fileHandle)
+            },
+        }),
+        /PATCH_ARCHIVE_HASH_MISMATCH/,
+    )
+})
+
 test("target scan accepts the lowercase entities directory used by the alternate official dump", async t => {
     const { paths } = createScannerFixture(t)
     fs.renameSync(
@@ -233,6 +368,8 @@ test("materialization loads the tracked official baseline by default without reh
     const entityBody = Buffer.from("path,version,size,hash,layer\na,1,24,h,common\n")
     const entityPhysicalPath = path.join(cdnRoot, entityListsRelativePath)
     const archives = manifest.catalogInput.archives.map((archive, index) => ({
+        source: { kind: "baseline" },
+        expectedSha256: null,
         kind: archive.kind,
         fromVersion: archive.fromVersion,
         toVersion: archive.toVersion,
@@ -266,6 +403,7 @@ test("materialization loads the tracked official baseline by default without reh
     }
     const scan = {
         cdnRoot,
+        patchesRoot: path.resolve(os.tmpdir(), "virtual-content-baseline-patches"),
         targetVersion: "1.4.54",
         entityListsRelativePath,
         entityListsFingerprint: {
@@ -276,6 +414,7 @@ test("materialization loads the tracked official baseline by default without reh
             dev: "1",
             ino: "1",
         },
+        patchManifests: [],
         archives,
         ignoredPaths: [],
     }

@@ -14,6 +14,14 @@ import type { DigestFileHandle } from "../cdn/digest-cache"
 import { resolveEntityListsDirectoryName } from "../cdn/entity-lists-directory"
 import { parseCdnRuntimeManifest } from "../cdn/runtime-manifest"
 import type { ArchiveLayer, CdnCatalogArchiveInput, CdnCatalogInput, CdnPlatform } from "../cdn/types"
+import type { ArchiveSource } from "../cdn/archive-sources"
+import {
+    PatchOverlayError,
+    scanPatchOverlay,
+    verifyPatchManifestFingerprint,
+    type PatchManifestFingerprint,
+    type PatchOverlayDependencies,
+} from "../cdn/patch-overlay"
 import { deepFreeze } from "../deep-freeze"
 import type { ContentPaths } from "../paths"
 
@@ -64,6 +72,8 @@ export interface ContentFileFingerprint {
 }
 
 export interface ContentArchiveDescriptor extends ContentFileFingerprint {
+    readonly source: ArchiveSource
+    readonly expectedSha256: string | null
     readonly kind: "full" | "diff"
     readonly fromVersion: string | null
     readonly toVersion: string
@@ -75,9 +85,11 @@ export interface ContentArchiveDescriptor extends ContentFileFingerprint {
 
 export interface ContentTargetScan {
     readonly cdnRoot: string
+    readonly patchesRoot: string
     readonly targetVersion: string
     readonly entityListsRelativePath: string
     readonly entityListsFingerprint: ContentFileFingerprint
+    readonly patchManifests: readonly PatchManifestFingerprint[]
     readonly archives: readonly ContentArchiveDescriptor[]
     readonly ignoredPaths: readonly string[]
 }
@@ -86,6 +98,8 @@ export interface ContentScannerDependencies {
     readonly readdir?: (directory: string) => Promise<ReadonlyArray<string | ScanDirectoryEntry>>
     readonly stat?: (filePath: string) => Promise<FileSnapshotStat>
     readonly realpath?: (filePath: string) => Promise<string>
+    readonly lstat?: PatchOverlayDependencies["lstat"]
+    readonly readFile?: PatchOverlayDependencies["readFile"]
     readonly readEntityList?: (
         fileHandle: DigestFileHandle,
         filePath: string,
@@ -321,6 +335,8 @@ export async function scanContentTarget(
             }
             const snapshot = await secureSnapshot(cdnRoot, cdnRealRoot, relativePath, dependencies)
             archives.push({
+                source: { kind: "baseline" },
+                expectedSha256: null,
                 kind: directory.kind,
                 fromVersion: directory.kind === "full"
                     ? null
@@ -336,6 +352,24 @@ export async function scanContentTarget(
     }
     archives.sort((left, right) => left.relativePath.localeCompare(right.relativePath))
 
+    const baselineStructuralInput: CdnCatalogInput = {
+        archives: archives.map(archive => descriptorInput(archive, PLACEHOLDER_DIGEST)),
+        installedBytes: 0,
+        entityListsRelativePath,
+    }
+    const baselineCatalog = buildCdnCatalog(baselineStructuralInput)
+    const patchScan = await scanPatchOverlay(paths, baselineCatalog, {
+        realpath: dependencies.realpath,
+        lstat: dependencies.lstat,
+        readFile: dependencies.readFile,
+    })
+    archives.push(...patchScan.archives)
+    archives.sort((left, right) => (
+        left.toVersion.localeCompare(right.toVersion)
+        || left.relativePath.localeCompare(right.relativePath)
+    ))
+    ignoredPaths.push(...patchScan.ignoredPaths.map(relativePath => `patches/${relativePath}`))
+
     const structuralInput: CdnCatalogInput = {
         archives: archives.map(archive => descriptorInput(archive, PLACEHOLDER_DIGEST)),
         installedBytes: 0,
@@ -344,9 +378,11 @@ export async function scanContentTarget(
     const catalog = buildCdnCatalog(structuralInput)
     return deepFreeze({
         cdnRoot,
+        patchesRoot: path.resolve(paths.patchesRoot),
         targetVersion: catalog.targetVersion,
         entityListsRelativePath,
         entityListsFingerprint: entitySnapshot.fingerprint,
+        patchManifests: patchScan.manifests,
         archives,
         ignoredPaths: [...new Set(ignoredPaths)].sort((left, right) => left.localeCompare(right)),
     })
@@ -421,6 +457,14 @@ export async function materializeContentCatalogInput(
     buildCdnCatalog(baseline)
     const baselineByPath = new Map(baseline.archives.map(archive => [archive.relativePath, archive]))
 
+    for (const manifest of scan.patchManifests) {
+        await verifyPatchManifestFingerprint(scan.patchesRoot, manifest, {
+            realpath: options.realpath,
+            lstat: options.lstat,
+            readFile: options.readFile,
+        })
+    }
+
     const openFile = options.openFile ?? (filePath => fs.promises.open(
         filePath,
         fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0),
@@ -464,9 +508,22 @@ export async function materializeContentCatalogInput(
     const digestArchive = options.digestArchive ?? defaultDigestArchive
     const archives: CdnCatalogArchiveInput[] = []
     for (const descriptor of scan.archives) {
-        const before = await secureSnapshot(cdnRoot, cdnRealRoot, descriptor.relativePath, options)
+        const archiveRoot = descriptor.source.kind === "baseline"
+            ? cdnRoot
+            : path.resolve(scan.patchesRoot, descriptor.source.targetVersion)
+        const archiveRealRoot = descriptor.source.kind === "baseline"
+            ? cdnRealRoot
+            : path.resolve(await realpath(archiveRoot))
+        const before = await secureSnapshot(
+            archiveRoot,
+            archiveRealRoot,
+            descriptor.relativePath,
+            options,
+        )
         assertUnchanged(descriptor, before.fingerprint, descriptor.relativePath)
-        const tracked = baselineByPath.get(descriptor.relativePath)
+        const tracked = descriptor.source.kind === "baseline"
+            ? baselineByPath.get(descriptor.relativePath)
+            : undefined
         let sha256: string
         if (tracked && tracked.compressedBytes === descriptor.compressedBytes) {
             sha256 = tracked.sha256
@@ -497,9 +554,29 @@ export async function materializeContentCatalogInput(
                 descriptor.relativePath,
             )
         }
-        const after = await secureSnapshot(cdnRoot, cdnRealRoot, descriptor.relativePath, options)
+        if (descriptor.expectedSha256 !== null && sha256 !== descriptor.expectedSha256) {
+            throw new PatchOverlayError(
+                "PATCH_ARCHIVE_HASH_MISMATCH",
+                descriptor.source.kind === "patch" ? descriptor.source.targetVersion : descriptor.toVersion,
+                "archive SHA-256 does not match manifest",
+                descriptor.relativePath,
+            )
+        }
+        const after = await secureSnapshot(
+            archiveRoot,
+            archiveRealRoot,
+            descriptor.relativePath,
+            options,
+        )
         assertUnchanged(descriptor, after.fingerprint, descriptor.relativePath)
         archives.push(descriptorInput(descriptor, sha256))
+    }
+    for (const manifest of scan.patchManifests) {
+        await verifyPatchManifestFingerprint(scan.patchesRoot, manifest, {
+            realpath: options.realpath,
+            lstat: options.lstat,
+            readFile: options.readFile,
+        })
     }
 
     const input: CdnCatalogInput = {
