@@ -1,21 +1,22 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { MultiStartBody, MultiFinishBody, MultiAbortBody, PlayContinueBody } from "../types";
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
-import { getRoom, setRoomBattle, disbandRoom, updateRoomState } from "../room/manager";
+import { getRoom, setRoomBattle, disbandRoom, updateRoomState, isRoomMember } from "../room/manager";
 import { sessionManager } from "../state/SessionManager";
 import {
     activeQuests,
-    insertActiveQuest,
+    persistActiveQuest,
+    publishActiveQuest,
     runAbortActiveQuestTransaction,
+    runContinueActiveQuestTransaction,
 } from "../../lib/quest/active-quest-service";
-import {
-    deletePlayerActiveQuestSync,
-    updatePlayerActiveQuestContinueCountSync,
-} from "../../data/domains/quest_active";
+import { deletePlayerActiveQuestSync } from "../../data/domains/quest_active";
 import { incrementPlayerCharacterClearSync } from "../../data/domains/character_clear";
 import {
+    getPlayerSync,
     updatePlayerSync,
 } from "../../data/domains/player";
+import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item";
 import {
     getPlayerSingleQuestProgressSync,
     insertPlayerQuestProgressSync,
@@ -25,6 +26,7 @@ import { getConfigSync, getQuestConfigurationErrorResponse, getQuestFromCategory
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
 import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/stamina";
+import { getStaminaCost } from "../../lib/stamina-cost";
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import { getDb } from "../../data/db";
 import { getPlayerMailCountSync } from "../../data/domains/mail";
@@ -53,6 +55,19 @@ import {
     type AdditionalRewardTable,
 } from "../../lib/additional-reward";
 import { buildFinishFollowInfo } from "../../lib/quest/finish/follow-info";
+import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
+import {
+    buildStartEntryItemList,
+    InsufficientEntryItemError,
+    InsufficientStaminaError,
+    PlayerNotFoundError,
+    runStartEntryTransaction,
+    type StartEntryCost,
+} from "../../lib/quest/start-entry";
+import {
+    validateMultiFinishRequest,
+    validateMultiStartRequest,
+} from "../../lib/quest/multi-battle-validation";
 
 export function canFinishMultiBattleQuest(
     quest: Pick<BattleQuest, "isBothBoss">,
@@ -81,9 +96,22 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         const { viewer_id, quest_id, category, party_id, use_boost_point, use_boss_boost_point, is_auto_start_mode, room_number, mate_player_ids, play_id } = body;
         console.log(`[MULTI] start: viewer=${viewer_id} quest=${quest_id} category=${category} party=${party_id} room=${room_number}`);
 
-        if (isNaN(viewer_id) || isNaN(party_id) || isNaN(quest_id) || isNaN(category) || use_boost_point === undefined || use_boss_boost_point === undefined || is_auto_start_mode === undefined) {
+        const requestValidation = validateMultiStartRequest({
+            viewerId: viewer_id,
+            partyId: party_id,
+            questId: quest_id,
+            category,
+            playId: play_id,
+            useBoostPoint: use_boost_point,
+            useBossBoostPoint: use_boss_boost_point,
+            isAutoStartMode: is_auto_start_mode,
+            isRoomMember: true,
+            roomCategory: category,
+            roomQuestId: quest_id,
+        });
+        if (!requestValidation.ok) {
             return reply.status(400).send({
-                "error": "Bad Request", "message": "Invalid request body."
+                "error": "Bad Request", "message": requestValidation.message,
             });
         }
 
@@ -115,10 +143,36 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             });
         }
 
-        setRoomBattle(room_number);
+        const roomValidation = validateMultiStartRequest({
+            viewerId: viewer_id,
+            partyId: party_id,
+            questId: quest_id,
+            category,
+            playId: play_id,
+            useBoostPoint: use_boost_point,
+            useBossBoostPoint: use_boss_boost_point,
+            isAutoStartMode: is_auto_start_mode,
+            isRoomMember: isRoomMember(room, viewer_id),
+            roomCategory: room.category,
+            roomQuestId: room.quest_id,
+        });
+        if (!roomValidation.ok) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": roomValidation.message,
+            });
+        }
 
         const mateComIds = room.mates.map(m => m.com_id);
-        insertActiveQuest(ctx.playerId, {
+        const isRoomHost = room.host_player_id === ctx.playerId;
+        const questKey = `${category}_${quest_id}`;
+        const entryCost = isRoomHost
+            ? getRuntimeContentTableSync(
+                "quest_entry_costs.json",
+                bundledQuestEntryCosts as Record<string, StartEntryCost>,
+            )[questKey]
+            : undefined;
+        const staminaCost = isRoomHost ? getStaminaCost(questKey).cost : 0;
+        const activeQuest = {
             questId: quest_id,
             category,
             useBoostPoint: use_boost_point,
@@ -126,15 +180,44 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             isAutoStartMode: is_auto_start_mode,
             isMulti: true,
             roomNumber: room_number,
-            matePlayerIds: mate_player_ids,
+            matePlayerIds: Array.isArray(mate_player_ids) ? mate_player_ids : [],
             mateComIds,
+            entryItemId: entryCost && entryCost.itemId > 0 ? entryCost.itemId : undefined,
+            entryItemCount: entryCost && entryCost.itemCount > 0 ? entryCost.itemCount : undefined,
             playId: play_id,
             continueCount: 0,
-        });
-
-        if (questData.fixedParty === undefined) {
-            updatePlayerSync({ id: ctx.playerId, partySlot: party_id });
+        };
+        let startResult;
+        try {
+            startResult = runStartEntryTransaction({
+                playerId: ctx.playerId,
+                entryCost,
+                staminaCost,
+                partyId: party_id,
+                updatePartySlot: questData.fixedParty === undefined,
+                activeQuest,
+                now: new Date(),
+            }, {
+                transaction: operation => getDb().transaction(operation)(),
+                getPlayer: getPlayerSync,
+                computeStamina: computeRealTimeStamina,
+                getItemCount: getPlayerItemSync,
+                updateItemCount: updatePlayerItemSync,
+                updatePlayer: updatePlayerSync,
+                persistActiveQuest,
+                publishActiveQuest,
+            });
+        } catch (error) {
+            if (error instanceof InsufficientEntryItemError
+                || error instanceof InsufficientStaminaError
+                || error instanceof PlayerNotFoundError) {
+                return reply.status(400).send({
+                    "error": "Bad Request", "message": error.message,
+                });
+            }
+            throw error;
         }
+        setRoomBattle(room_number);
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
@@ -142,6 +225,11 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             "data": {
                 "is_multi": "multi",
                 "play_id": play_id,
+                "user_info": {
+                    "stamina": startResult.afterStamina,
+                    "stamina_heal_time": realToVirtual(new Date()),
+                },
+                "item_list": buildStartEntryItemList(startResult),
             }
         });
     });
@@ -190,6 +278,20 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             });
         }
 
+        const finishValidation = validateMultiFinishRequest(
+            body as unknown as Record<string, unknown>,
+            activeQuestData,
+            {
+                boostPoint: player.boostPoint,
+                bossBoostPoint: player.bossBoostPoint,
+            },
+        );
+        if (!finishValidation.ok) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": finishValidation.message,
+            });
+        }
+
         const room = activeQuestData.roomNumber ? getRoom(activeQuestData.roomNumber) : null;
         if (!canFinishMultiBattleQuest(questData, activeQuestData.roomNumber, playerId)) {
             return reply.status(400).send({
@@ -202,7 +304,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         });
         console.log(`[MULTI] finish host context: roomHostPlayerId=${room?.host_player_id ?? "none"} playerId=${playerId} isRoomHost=${isRoomHost}`);
         // calculate clear rank
-        const clearTime = (body as any).elapsed_time_ms || 0;
+        const clearTime = finishValidation.elapsedTimeMs;
         const hasRankThresholds = questData.bRankTime > 0;
         const clearRank = hasRankThresholds ? (
             questData.sPlusRankTime >= clearTime ? 5
@@ -215,21 +317,21 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         const beforeRankPoint = player.rankPoint;
         const newRankPoint = beforeRankPoint + questData.rankPointReward;
 
-        let newBoostPoint = player.boostPoint - (activeQuestData.useBoostPoint ? 1 : 0);
-        let newBossBoostPoint = player.bossBoostPoint - (activeQuestData.useBossBoostPoint ? 1 : 0);
-        const useBoostPoint = (activeQuestData.useBoostPoint && (newBoostPoint >= 0)) || (activeQuestData.useBossBoostPoint && (newBossBoostPoint >= 0));
+        const newBoostPoint = player.boostPoint - (activeQuestData.useBoostPoint ? 1 : 0);
+        const newBossBoostPoint = player.bossBoostPoint - (activeQuestData.useBossBoostPoint ? 1 : 0);
+        const useBoostPoint = activeQuestData.useBoostPoint || activeQuestData.useBossBoostPoint;
 
         // quest progress
         const questProgress = getPlayerSingleQuestProgressSync(playerId, questCategory, questId);
         const questProgressExists = questProgress !== null;
         const questPreviouslyCompleted = questProgress?.finished === true;
-        const questAccomplished = (body as any).is_accomplished;
+        const questAccomplished = body.is_accomplished;
         const hostFinished = resolveHostFinished({
             previouslyHostFinished: questProgress?.hostFinished ?? false,
             questAccomplished,
             isRoomHost,
         });
-        const leaderId = ((body as any).statistics?.party || (body as any).quest_statistics?.party)?.characters?.[0]?.id
+        const leaderId = (finishValidation.statistics as any).party?.characters?.[0]?.id
         const rewardEligibility = resolveQuestRewardEligibility({
             questAccomplished,
             clearRank,
@@ -240,7 +342,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         const newDegreeId = getRankDegree(newRankPoint);
         const didLevelUp = newDegreeId > oldRkDegree;
 
-        const bodyPartyStatistics = (body as any).statistics?.party || body.quest_statistics?.party || { characters: [], unison_characters: [] };
+        const bodyPartyStatistics = (finishValidation.statistics as any).party || { characters: [], unison_characters: [] };
         const partyCharacterIdsArray: number[] = [];
         for (const value of [...(bodyPartyStatistics.characters || []), ...(bodyPartyStatistics.unison_characters || [])]) {
             if (value !== null && (value as any).id !== null && (value as any).id !== undefined) partyCharacterIdsArray.push((value as any).id);
@@ -250,9 +352,9 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             playerId, questCategory, questId,
             questAccomplished,
             clearTime, clearRank,
-            score: (body as any).score,
+            score: finishValidation.score,
             party: bodyPartyStatistics as any,
-            statistics: (body as any).statistics || (body as any).quest_statistics || {},
+            statistics: finishValidation.statistics as any,
             equipmentElements: (body as any).equipment_element,
             player,
             questPreviouslyCompleted,
@@ -282,7 +384,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 questData.characterExpReward || 0,
                 rewardCampaignRates,
             )
-            const fieldMana = (body as any).add_mana || 0
+            const fieldMana = finishValidation.addMana
             const newMana = player.freeMana + fixedManaReward + fieldMana;
             const manaObtained = fixedManaReward + fieldMana;
             const clearReward = rewardEligibility.firstClear && (questData as any).clearReward !== undefined
@@ -299,7 +401,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                         questId: questId,
                         finished: true,
                         bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
-                        highScore: questProgress.highScore === undefined ? ((body as any).score || 0) : Math.max((body as any).score || 0, questProgress.highScore),
+                        highScore: questProgress.highScore === undefined ? finishValidation.score : Math.max(finishValidation.score, questProgress.highScore),
                         leaderCharacterId: leaderId ?? null,
                         hostFinished,
                     };
@@ -312,7 +414,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                         questId: questId,
                         finished: true,
                         bestElapsedTimeMs: clearTime,
-                        highScore: (body as any).score || 0,
+                        highScore: finishValidation.score,
                         clearRank: clearRank ?? 5,
                         leaderCharacterId: leaderId ?? null,
                         hostFinished,
@@ -328,10 +430,10 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
                 boostPoint: newBoostPoint,
                 bossBoostPoint: newBossBoostPoint,
                 totalManaObtained: (player.totalManaObtained ?? 0) + manaObtained,
-                maxComboAchieved: Math.max(player.maxComboAchieved ?? 0, (body as any).statistics?.max_combo_count ?? 0),
+                maxComboAchieved: Math.max(player.maxComboAchieved ?? 0, (finishValidation.statistics as any).max_combo_count ?? 0),
                 ...(didLevelUp ? { stamina: player.stamina + getMaxStamina(newDegreeId), staminaHealTime: new Date() } : {}),
             });
-            const playerData = player;
+            const playerData = { ...player };
             if (didLevelUp) {
                 playerData.stamina = playerData.stamina + getMaxStamina(newDegreeId);
                 playerData.staminaHealTime = new Date();
@@ -611,14 +713,22 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         }
 
         const activeData = activeQuests[playerId];
-        activeData.continueCount++;
-        updatePlayerActiveQuestContinueCountSync(playerId, activeData.continueCount);
+        const continueCount = runContinueActiveQuestTransaction(playerId, activeData, {
+            playId: body.play_id,
+            questId: body.quest_id,
+            category: body.category,
+        });
+        if (continueCount === null) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Active quest does not match continue request."
+            });
+        }
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
-                continue_count: activeData.continueCount,
+                continue_count: continueCount,
             }
         });
     });

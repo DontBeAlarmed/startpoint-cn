@@ -551,6 +551,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/tutorial_update_step.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS["integration:party"].tests, [
+        "tools/multi_battle_lifecycle.test.cjs",
         "tools/multi_room_handshake_identity.test.cjs",
         "tools/multi_room_identity.test.cjs",
         "tools/special_quest_party.test.cjs",

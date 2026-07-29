@@ -291,6 +291,7 @@ const TEST_GROUPS = Object.freeze({
     "integration:party": {
         execution: "parallel",
         tests: [
+            "tools/multi_battle_lifecycle.test.cjs",
             "tools/multi_room_handshake_identity.test.cjs",
             "tools/multi_room_identity.test.cjs",
             "tools/special_quest_party.test.cjs",

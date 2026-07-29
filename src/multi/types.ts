@@ -116,10 +116,22 @@ export interface MultiFinishBody {
     viewer_id: number
     quest_id: number
     category: number
-    room_number: string
-    clear_phase: number
-    quest_statistics: QuestStatistics
+    room_number?: string
+    clear_phase?: number
+    statistics: QuestStatistics & Record<string, unknown>
+    quest_statistics?: QuestStatistics
     play_id: string
+    add_mana: number
+    score: number
+    continue_count: number
+    elapsed_time_ms: number
+    is_accomplished: boolean
+    is_restored: boolean
+    equipment_element?: unknown
+    contribution_score?: number
+    mate_player_result?: Array<{ viewer_id?: number }>
+    isolated?: boolean
+    priority_factors?: unknown
     battle_time: number
     battle_ended_at: number
     api_count: number
@@ -146,6 +158,8 @@ export interface PlayContinueBody {
     category: number
     room_number: string
     play_id: string
+    statistics?: Record<string, unknown>
+    payment_type?: number
     api_count: number
 }
 

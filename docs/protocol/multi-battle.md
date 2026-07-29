@@ -118,10 +118,14 @@ JSON.stringify(message) + "\0"
 
 | 路由 | 当前职责 |
 |---|---|
-| `start` | 校验玩家、关卡和房间，设置状态 4 并写入 active quest |
-| `finish` | 结算玩家奖励和进度，清理 active quest；房主把房间恢复为状态 1 |
+| `start` | 校验玩家为房间成员且请求关卡与房间一致；每位真人分别写入 active quest，仅房主预扣体力和 Always 门票；事务提交后才把房间设置为状态 4 |
+| `finish` | 按 `play_id + category + quest_id` 校验多人 active quest，并拒绝负 Mana、非法分数/耗时、continue 次数或 Boost 余额不一致；结算玩家奖励和进度后清理 active quest，房主把房间恢复为状态 1 |
 | `abort` | 事务化取消 active quest；房主放弃时解散房间 |
-| `play_continue` | 处理多人关卡续关消耗和 continue count |
+| `play_continue` | 同时核对内存与 SQLite active quest；SQLite 提交成功后才更新内存 continue count。当前多人续关不扣星导石 |
+
+多人客户端会让每位真人分别请求 `start`，因此 active quest 是玩家级状态，不由房主记录替代成员记录。房主身份使用服务端房间中的 `host_player_id` 判断，不能由请求字段声明。成员 start 的入场成本固定为 0，但仍会保存自己的 `play_id`、房间号和关卡身份，以供 finish、abort、重连与多场景结束校验使用。
+
+`finish` 请求不要求携带 `room_number`；服务端从 active quest 恢复房间身份。`statistics` 必须是非空对象，`elapsed_time_ms` 必须为正安全整数，`add_mana`、`score` 和 `continue_count` 不得为负。Boost 点在 finish 时确认扣除，余额不足时整个结算拒绝，不会写成负数。
 
 ### 4.4 兼容路由
 

@@ -3,6 +3,7 @@ import {
     deletePlayerActiveQuestSync,
     getPlayerActiveQuestSync,
     insertPlayerActiveQuestSync,
+    updatePlayerActiveQuestContinueCountSync,
 } from "../../data/domains/quest_active"
 import { getPlayerItemSync, setPlayerItemSync } from "../../data/domains/item"
 import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json"
@@ -64,6 +65,48 @@ export function clearPublishedActiveQuest(playerId: number): void {
 export function insertActiveQuest(playerId: number, quest: ActiveQuest): void {
     persistActiveQuest(playerId, quest)
     publishActiveQuest(playerId, quest)
+}
+
+export interface ContinueActiveQuestDependencies {
+    transaction<T>(operation: () => T): T
+    getStoredActiveQuest(playerId: number): ActiveQuest | null
+    updateStoredContinueCount(playerId: number, continueCount: number): void
+}
+
+const continueActiveQuestDependencies: ContinueActiveQuestDependencies = {
+    transaction: operation => getDb().transaction(operation)(),
+    getStoredActiveQuest: getPlayerActiveQuestSync,
+    updateStoredContinueCount: updatePlayerActiveQuestContinueCountSync,
+}
+
+function matchesActiveQuestIdentity(
+    quest: Pick<ActiveQuest, "playId" | "questId" | "category" | "isMulti">,
+    identity: ActiveQuestIdentity,
+): boolean {
+    return quest.isMulti
+        && quest.playId === identity.playId
+        && quest.questId === identity.questId
+        && quest.category === identity.category
+}
+
+export function runContinueActiveQuestTransaction(
+    playerId: number,
+    memoryQuest: ActiveQuest,
+    identity: ActiveQuestIdentity,
+    dependencies: ContinueActiveQuestDependencies = continueActiveQuestDependencies,
+): number | null {
+    if (!matchesActiveQuestIdentity(memoryQuest, identity)) return null
+
+    const continueCount = dependencies.transaction(() => {
+        const storedQuest = dependencies.getStoredActiveQuest(playerId)
+        if (!storedQuest || !matchesActiveQuestIdentity(storedQuest, identity)) return null
+        const nextCount = storedQuest.continueCount + 1
+        dependencies.updateStoredContinueCount(playerId, nextCount)
+        return nextCount
+    })
+    if (continueCount === null) return null
+    memoryQuest.continueCount = continueCount
+    return continueCount
 }
 
 export function runAbortActiveQuestTransaction(

@@ -44,7 +44,7 @@ Content Sync 现在直接从 20 张官方关卡表生成入口记录：只要关
 
 abort 路由显式返回 `application/x-msgpack`，由 CN 服务的 `onSend` hook 执行 MsgPack 打包和 Base64 编码。active quest 的 registry、持久化与取消事务位于独立 service，load 和各战斗路由不再互相导入。
 
-多人战斗 start 当前不读取 `quest_entry_costs`，也不会写入 `entry_item_id/count`，因此正常多人 abort 没有门票可返还；失效房间清理仍统一走取消事务，以兼容可能存在的历史或异常记录。
+多人战斗同样读取当前 Content snapshot 的 `quest_entry_costs`，但入场成本只由房主承担：房主 start 在一个事务内预扣体力和 Always 门票、保存 `entry_item_id/count` 与 active quest；成员 start 以零成本保存各自的 active quest。事务提交后才更新内存 active quest 和房间战斗状态，因此扣除或写库失败不会把房间提前卡进战斗态。房主 abort 按同一规则返还门票但不返体力，成员没有入场道具可返还。
 
 ## 剩余风险
 
