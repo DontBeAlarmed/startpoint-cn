@@ -20,6 +20,14 @@ const SOURCE_RULES = [
     { pattern: /^src\/content\/audit\//, groups: ["quick:content"] },
     { pattern: /^src\/content\/cdn\/types\.ts$/, groups: ["quick:cdn"] },
     {
+        pattern: /^src\/content\/cdn\/(?:archive-sources|patch-manifest)\.ts$/,
+        groups: ["quick:cdn"],
+    },
+    {
+        pattern: /^src\/content\/cdn\/patch-overlay\.ts$/,
+        groups: ["quick:cdn", "quick:content"],
+    },
+    {
         pattern: /^src\/content\/cdn\/(?:catalog-builder|patch-graph|digest-cache|planner)\.ts$/,
         groups: ["quick:cdn"],
     },

@@ -308,12 +308,18 @@ test("registers the focused CDN path contract", () => {
         execution: "parallel",
         tests: [
             "tools/cdn_catalog.test.cjs",
+            "tools/cdn_archive_sources.test.cjs",
+            "tools/cdn_patch_manifest.test.cjs",
+            "tools/cdn_patch_overlay.test.cjs",
             "tools/cdn_paths.test.cjs",
             "tools/cdn_planner.test.cjs",
             "tools/cdn_types.test.cjs",
         ],
     })
     assert.deepEqual(selectTestGroups(["tools/cdn_catalog.test.cjs"]), ["quick:cdn"])
+    assert.deepEqual(selectTestGroups(["src/content/cdn/archive-sources.ts"]), ["quick:cdn"])
+    assert.deepEqual(selectTestGroups(["src/content/cdn/patch-manifest.ts"]), ["quick:cdn"])
+    assert.deepEqual(selectTestGroups(["src/content/cdn/patch-overlay.ts"]), ["quick:cdn", "quick:content"])
     assert.deepEqual(selectTestGroups(["tools/cdn_paths.test.cjs"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_planner.test.cjs"]), ["quick:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_types.test.cjs"]), ["quick:cdn"])
