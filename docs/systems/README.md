@@ -45,6 +45,7 @@
 - [第二玛纳板开放期](./mana-board-availability.md)
 - [角色养成事务边界](./character-growth-transactions.md)
 - [EX 能力抽取状态](./ex-boost.md)
+- [小型状态写入边界](./small-write-boundaries.md)
 - [角色分解审计](./character-stack-audit.md)
 
 ## 装备、抽卡与内容修复

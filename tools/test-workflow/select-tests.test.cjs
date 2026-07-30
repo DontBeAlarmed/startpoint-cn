@@ -627,10 +627,12 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
 })
 
 test("quick character includes growth transaction rollback coverage", () => {
+    assert.equal(TEST_GROUPS["quick:character"].timeoutMs, 60_000)
     assert.deepEqual(TEST_GROUPS["quick:character"].tests, [
         "tools/character_awake_eligibility.test.cjs",
         "tools/character_growth_transaction.test.cjs",
         "tools/ex_boost_pending_draw.test.cjs",
+        "tools/small_write_route_boundaries.test.cjs",
         "tools/mana_board_availability.test.cjs",
         "tools/player_awake_save_roundtrip.test.cjs",
     ])

@@ -46,7 +46,13 @@ const routes = async (fastify: FastifyInstance) => {
         const viewerId = body.viewer_id
         const characterId = body.character_id
         const illustration_settings = body.illustration_settings
-        if (isNaN(viewerId) || isNaN(characterId) || !illustration_settings) return reply.status(400).send({
+        if (!Number.isSafeInteger(viewerId)
+            || viewerId <= 0
+            || !Number.isSafeInteger(characterId)
+            || characterId <= 0
+            || !Array.isArray(illustration_settings)
+            || illustration_settings.length !== 6
+            || illustration_settings.some(value => !Number.isSafeInteger(value) || value < 0)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
         })
@@ -59,14 +65,19 @@ const routes = async (fastify: FastifyInstance) => {
 
         // get player id
         const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
-        if (playerId === undefined) return reply.status(500).send({
+        if (playerId === null) return reply.status(500).send({
             "error": "Internal Server Error",
             "message": "No players bound to account."
         })
 
+        if (getPlayerCharacterSync(playerId, characterId) === null) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Character not owned."
+        })
+
         // update character
         updatePlayerCharacterSync(playerId, characterId, {
-            illustrationSettings: illustration_settings.slice(0, 6)
+            illustrationSettings: illustration_settings
         })
 
         reply.header("content-type", "application/x-msgpack")

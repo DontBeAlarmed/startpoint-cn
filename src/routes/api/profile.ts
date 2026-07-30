@@ -11,6 +11,26 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 // removed getAccountPlayers "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
 import { getOwnedPlayerDegreeIdsSync } from "../../data/domains/degree";
+import {
+    getPlayerProfileSettingsSync,
+    updatePlayerProfileSettingsSync,
+} from "../../data/domains/option";
+
+const PROFILE_SETTING_FIELDS = [
+    "show_opened_mana_board_second_count",
+    "show_owned_character_count",
+    "show_owned_degree_count",
+] as const
+
+function serializeProfileSettings(
+    settings: ReturnType<typeof getPlayerProfileSettingsSync>,
+) {
+    return {
+        show_opened_mana_board_second_count: settings.showOpenedManaBoardSecondCount,
+        show_owned_character_count: settings.showOwnedCharacterCount,
+        show_owned_degree_count: settings.showOwnedDegreeCount,
+    }
+}
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/get_my_profile", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -39,6 +59,7 @@ const routes = async (fastify: FastifyInstance) => {
         const characters = getPlayerCharactersSync(playerId)
         const charCount = Object.keys(characters).length
         const degreeCount = getOwnedPlayerDegreeIdsSync(playerId, player.degreeId).length
+        const profileSettings = getPlayerProfileSettingsSync(playerId)
 
         // Build party group list (map from DB format to client format)
         const partyGroups = getPlayerPartyGroupListSync(playerId)
@@ -99,11 +120,7 @@ const routes = async (fastify: FastifyInstance) => {
                     owned_character_count: charCount,
                     owned_degree_count: degreeCount,
                 },
-                profile_settings: {
-                    show_opened_mana_board_second_count: false,
-                    show_owned_character_count: true,
-                    show_owned_degree_count: true,
-                },
+                profile_settings: serializeProfileSettings(profileSettings),
                 user_party_group_list: partyGroupList,
             }
         })
@@ -211,7 +228,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
     })
 
-    // Update profile visibility settings (echo back, don't persist)
+    // Update profile visibility settings.
     fastify.post("/update_profile_settings", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as any
         const viewerId = body.viewer_id
@@ -226,16 +243,38 @@ const routes = async (fastify: FastifyInstance) => {
             message: "Invalid viewer id."
         })
 
-        const settings = body.profile_settings || {}
+        const settings = body.profile_settings
+        if (settings === null || typeof settings !== "object" || Array.isArray(settings)
+            || !PROFILE_SETTING_FIELDS.some(field => Object.prototype.hasOwnProperty.call(settings, field))
+            || PROFILE_SETTING_FIELDS.some(field => (
+                Object.prototype.hasOwnProperty.call(settings, field)
+                && typeof settings[field] !== "boolean"
+            ))) return reply.status(400).send({
+            error: "Bad Request",
+            message: "Invalid profile settings.",
+        })
+
+        const playerId = resolvePlayerIdSync(session.accountId)!
+        if (playerId === null) return reply.status(400).send({
+            error: "Bad Request",
+            message: "No player bound to account.",
+        })
+        const updated = updatePlayerProfileSettingsSync(playerId, {
+            ...(typeof settings.show_opened_mana_board_second_count === "boolean"
+                ? { showOpenedManaBoardSecondCount: settings.show_opened_mana_board_second_count }
+                : {}),
+            ...(typeof settings.show_owned_character_count === "boolean"
+                ? { showOwnedCharacterCount: settings.show_owned_character_count }
+                : {}),
+            ...(typeof settings.show_owned_degree_count === "boolean"
+                ? { showOwnedDegreeCount: settings.show_owned_degree_count }
+                : {}),
+        })
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
-                profile_settings: {
-                    show_opened_mana_board_second_count: settings.show_opened_mana_board_second_count ?? false,
-                    show_owned_character_count: settings.show_owned_character_count ?? false,
-                    show_owned_degree_count: settings.show_owned_degree_count ?? false,
-                }
+                profile_settings: serializeProfileSettings(updated),
             }
         })
     })

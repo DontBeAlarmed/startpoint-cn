@@ -44,7 +44,10 @@ const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerMailCountSync } = require("../src/data/domains/mail")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
-const { insertPlayerTriggeredTutorialSync } = require("../src/data/domains/tutorial")
+const {
+    getPlayerTriggeredTutorialsSync,
+    insertPlayerTriggeredTutorialSync,
+} = require("../src/data/domains/tutorial")
 const { getClientSerializedData } = require("../src/data/utils/player-data")
 const { givePlayerCharacterSync } = require("../src/lib/character")
 const tutorialRoutes = require("../src/routes/api/tutorial").default
@@ -89,6 +92,19 @@ async function updateStep(fastify, viewerId, body) {
     })
 }
 
+async function finishTrigger(fastify, viewerId, tutorialIds) {
+    return fastify.inject({
+        method: "POST",
+        url: "/api/index.php/tutorial/finish_trigger",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: encodeRequest({
+            viewer_id: viewerId,
+            api_count: 1,
+            tutorial_ids: tutorialIds,
+        }),
+    })
+}
+
 async function main() {
     const fastify = Fastify()
     fastify.addContentTypeParser(
@@ -107,6 +123,27 @@ async function main() {
     await fastify.ready()
 
     try {
+        const triggerViewerId = 800000209
+        const triggerPlayerId = createPlayer(triggerViewerId)
+        const invalidTrigger = await finishTrigger(fastify, triggerViewerId, [101, -1])
+        assert.equal(invalidTrigger.statusCode, 400)
+        assert.deepEqual(getPlayerTriggeredTutorialsSync(triggerPlayerId), [])
+
+        const duplicateTrigger = await finishTrigger(fastify, triggerViewerId, [101, 101, 102])
+        assert.equal(duplicateTrigger.statusCode, 200, duplicateTrigger.body)
+        assert.deepEqual(getPlayerTriggeredTutorialsSync(triggerPlayerId).sort((a, b) => a - b), [101, 102])
+
+        db.exec(`
+            CREATE TRIGGER fail_tutorial_trigger_batch
+            BEFORE INSERT ON players_triggered_tutorials
+            WHEN NEW.player_id = ${triggerPlayerId} AND NEW.id = 202
+            BEGIN SELECT RAISE(ABORT, 'forced tutorial trigger failure'); END;
+        `)
+        const failedTrigger = await finishTrigger(fastify, triggerViewerId, [201, 202])
+        assert.equal(failedTrigger.statusCode, 500)
+        assert.deepEqual(getPlayerTriggeredTutorialsSync(triggerPlayerId).sort((a, b) => a - b), [101, 102])
+        db.exec("DROP TRIGGER fail_tutorial_trigger_batch")
+
         const viewerId = 800000201
         const playerId = createPlayer(viewerId)
         updatePlayerSync({ id: playerId, tutorialStep: 14, tutorialSkipFlag: false, freeVmoney: 1000 })

@@ -35,11 +35,11 @@
 | 路由族 | 空响应前已经完成的状态 |
 |---|---|
 | `/tool/get_header_response`、`/tool/signup` | 会话和公共头已生成；业务数据位于 `data_headers` |
-| `/tutorial/finish_trigger` | 教程触发 ID 已去重持久化 |
-| `/party_group/edit` | 编队组颜色和分类已经写入 |
+| `/tutorial/finish_trigger` | 教程触发 ID 已校验、去重并在一个事务内持久化 |
+| `/party_group/edit` | 编队组颜色在一个事务内写入，未知组不返回成功 |
 | 战阵、狂热激战的 `/battle/start`、`/select_folder`、`/reset` | 活跃关卡、当前文件夹或已用队伍状态已经更新 |
 | `/shop/set_campaign_lineup_id` | 选择结果已按玩家、商店、活动持久化并检查冲突 |
-| `/character/set_illustration_settings` | 角色插画设置已经写入 |
+| `/character/set_illustration_settings` | 已校验六项数组与角色所有权后写入插画设置 |
 | 联机 `/disband_room` | 已广播解散消息并清理房间；空对象只是 HTTP 确认 |
 
 商店和自动连战的部分错误分支也会返回空 `data`，但同时通过 `data_headers.result_code` 传递客户端协议结果；

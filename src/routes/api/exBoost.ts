@@ -199,6 +199,61 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
         "error": "Bad Request", "message": "Attempt to use wrong item with different element from character."
     })
 
+    const pendingDraw = getPendingExBoostDrawSync(playerId)
+    if (pendingDraw !== null) {
+        if (autoAccept || pendingDraw.characterId !== characterId) return reply.status(400).send({
+            "error": "Bad Request", "message": "An EX boost draw is already pending."
+        })
+        const currentCostItemAmount = getPlayerItemSync(playerId, costItemId) ?? 0
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            data_headers: generateDataHeaders({ viewer_id: viewerId }),
+            data: {
+                character_id: characterId,
+                draw_result: {
+                    status_id: pendingDraw.statusId,
+                    ability_id_list: pendingDraw.abilityIdList,
+                },
+                item_list: { [String(costItemId)]: currentCostItemAmount },
+                mail_arrived: getMailArrivedSync(playerId),
+            },
+        })
+    }
+
+    if (autoAccept && characterData.exBoost !== undefined) {
+        const currentCostItemAmount = getPlayerItemSync(playerId, costItemId) ?? 0
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            data_headers: generateDataHeaders({ viewer_id: viewerId }),
+            data: {
+                character_list: [{
+                    character_id: characterId,
+                    viewer_id: viewerId,
+                    entry_count: characterData.entryCount,
+                    evolution_level: characterData.evolutionLevel,
+                    over_limit_step: characterData.overLimitStep,
+                    protection: characterData.protection,
+                    exp: characterData.exp,
+                    stack: characterData.stack,
+                    mana_board_index: characterData.manaBoardIndex,
+                    bond_token_list: characterData.bondTokenList.map(bt => ({
+                        mana_board_index: bt.manaBoardIndex,
+                        status: bt.status,
+                    })),
+                    ex_boost: {
+                        status_id: characterData.exBoost.statusId,
+                        ability_id_list: characterData.exBoost.abilityIdList,
+                    },
+                    create_time: clientSerializeDate(characterData.joinTime),
+                    update_time: clientSerializeDate(characterData.joinTime),
+                    join_time: clientSerializeDate(characterData.joinTime),
+                }],
+                item_list: { [String(costItemId)]: currentCostItemAmount },
+                mail_arrived: getMailArrivedSync(playerId),
+            },
+        })
+    }
+
     const costItemAmount = getPlayerItemSync(playerId, costItemId)
     if (costItemAmount === null) return reply.status(400).send({
         "error": "Bad Request", "message": "You do not own item."
@@ -282,7 +337,7 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as ExBoostSelectBody
         const viewerId = body.viewer_id
         const isConfirm = body.is_confirm
-        if (isNaN(viewerId)) return reply.status(400).send({
+        if (!Number.isSafeInteger(viewerId) || viewerId <= 0 || typeof isConfirm !== "boolean") return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         })
         const viewerIdSession = await getSession(viewerId.toString())

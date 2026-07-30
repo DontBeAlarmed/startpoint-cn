@@ -145,12 +145,13 @@ export function updatePlayerPartySync(playerId: number, slot: number, party: Pla
 export function updatePlayerPartyGroupSync(
     playerId: number, groupId: number, colorId: number,
     category: PartyCategory = PartyCategory.NORMAL
-) {
+): boolean {
     const db = getDb();
-    db.prepare(`
+    const result = db.prepare(`
     UPDATE players_party_groups SET color_id = ?
     WHERE id = ? AND player_id = ? AND category = ?
     `).run(colorId, groupId, playerId, category)
+    return result.changes === 1
 }
 
 /**

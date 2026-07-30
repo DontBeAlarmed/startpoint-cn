@@ -67,10 +67,12 @@ const TEST_GROUPS = Object.freeze({
     },
     "quick:character": {
         execution: "parallel",
+        timeoutMs: 60_000,
         tests: [
             "tools/character_awake_eligibility.test.cjs",
             "tools/character_growth_transaction.test.cjs",
             "tools/ex_boost_pending_draw.test.cjs",
+            "tools/small_write_route_boundaries.test.cjs",
             "tools/mana_board_availability.test.cjs",
             "tools/player_awake_save_roundtrip.test.cjs",
         ],

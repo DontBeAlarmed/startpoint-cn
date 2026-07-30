@@ -5,7 +5,7 @@ import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import {
     getPlayerTriggeredTutorialsSync,
     getTutorialStepReceiptSync,
-    insertPlayerTriggeredTutorialSync,
+    insertPlayerTriggeredTutorialsSync,
     upsertTutorialStepReceiptSync,
 } from "../../data/domains/tutorial"
 import { getPlayerCharacterSync } from "../../data/domains/character"
@@ -158,7 +158,10 @@ const routes = async (fastify: FastifyInstance) => {
 
         const viewerId = body.viewer_id
         const tutorialIds = body.tutorial_ids
-        if (!viewerId || isNaN(viewerId) || !tutorialIds || !(tutorialIds instanceof Array)) return reply.status(400).send({
+        if (!Number.isSafeInteger(viewerId)
+            || viewerId <= 0
+            || !Array.isArray(tutorialIds)
+            || tutorialIds.some(tutorialId => !Number.isSafeInteger(tutorialId) || tutorialId <= 0)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
         })
@@ -177,12 +180,9 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // Mark tutorial as having been completed (skip already triggered)
-        const existing = getPlayerTriggeredTutorialsSync(playerId)
-        for (const tutorialId of tutorialIds) {
-            if (!existing.find((v: number) => v === tutorialId)) {
-                insertPlayerTriggeredTutorialSync(playerId, tutorialId)
-            }
-        }
+        const existing = new Set(getPlayerTriggeredTutorialsSync(playerId))
+        const pending = [...new Set(tutorialIds)].filter(tutorialId => !existing.has(tutorialId))
+        if (pending.length > 0) insertPlayerTriggeredTutorialsSync(playerId, pending)
 
         reply.header("content-type", "application/x-msgpack")
         reply.status(200).send({

@@ -8,6 +8,7 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const Fastify = require("fastify")
+const { unpack } = require("msgpackr")
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "ex-boost-pending-"))
 const previousDataDirectory = process.env.DATA_DIR
@@ -18,7 +19,8 @@ const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snaps
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerCharacterSync, updatePlayerCharacterSync } = require("../src/data/domains/character")
-const { givePlayerItemSync } = require("../src/data/domains/item")
+const { givePlayerItemSync, getPlayerItemSync } = require("../src/data/domains/item")
+const { getPendingExBoostDrawSync } = require("../src/data/domains/ex_boost")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
@@ -63,16 +65,69 @@ async function main() {
         payload: { viewer_id: viewerId, character_id: 1, cost_item_id: 10002 },
     })
     assert.equal(drawResponse.statusCode, 200, drawResponse.body)
+    const firstDrawData = unpack(Buffer.from(drawResponse.body, "base64")).data
+    const pendingAfterFirstDraw = getPendingExBoostDrawSync(playerId)
+    const itemAfterFirstDraw = getPlayerItemSync(playerId, 10002)
+
+    const repeatedDrawResponse = await drawApp.inject({
+        method: "POST",
+        url: "/ex/draw",
+        payload: { viewer_id: viewerId, character_id: 1, cost_item_id: 10002 },
+    })
+    assert.equal(repeatedDrawResponse.statusCode, 200, repeatedDrawResponse.body)
+    assert.deepEqual(
+        unpack(Buffer.from(repeatedDrawResponse.body, "base64")).data.draw_result,
+        firstDrawData.draw_result,
+    )
+    assert.deepEqual(getPendingExBoostDrawSync(playerId), pendingAfterFirstDraw)
+    assert.equal(getPlayerItemSync(playerId, 10002), itemAfterFirstDraw)
     await drawApp.close()
 
     const selectApp = await createApp()
+    const firstDrawWhilePending = await selectApp.inject({
+        method: "POST",
+        url: "/ex/first_draw",
+        payload: { viewer_id: viewerId, character_id: 1, cost_item_id: 10002 },
+    })
+    assert.equal(firstDrawWhilePending.statusCode, 400)
+    assert.deepEqual(getPendingExBoostDrawSync(playerId), pendingAfterFirstDraw)
+    assert.equal(getPlayerItemSync(playerId, 10002), itemAfterFirstDraw)
+
+    const invalidSelectResponse = await selectApp.inject({
+        method: "POST",
+        url: "/ex/select",
+        payload: { viewer_id: viewerId, is_confirm: 1 },
+    })
+    assert.equal(invalidSelectResponse.statusCode, 400)
+    assert.deepEqual(getPendingExBoostDrawSync(playerId), pendingAfterFirstDraw)
+
     const selectResponse = await selectApp.inject({
         method: "POST",
         url: "/ex/select",
         payload: { viewer_id: viewerId, is_confirm: true },
     })
     assert.equal(selectResponse.statusCode, 200, selectResponse.body)
-    assert.notEqual(getPlayerCharacterSync(playerId, 1).exBoost, undefined)
+    const selectedExBoost = getPlayerCharacterSync(playerId, 1).exBoost
+    assert.notEqual(selectedExBoost, undefined)
+
+    givePlayerItemSync(playerId, 10002, 1)
+    const firstDrawReplay = await selectApp.inject({
+        method: "POST",
+        url: "/ex/first_draw",
+        payload: { viewer_id: viewerId, character_id: 1, cost_item_id: 10002 },
+    })
+    assert.equal(firstDrawReplay.statusCode, 200, firstDrawReplay.body)
+    assert.equal(getPlayerItemSync(playerId, 10002), 1)
+    assert.deepEqual(getPlayerCharacterSync(playerId, 1).exBoost, selectedExBoost)
+
+    const repeatedFirstDrawReplay = await selectApp.inject({
+        method: "POST",
+        url: "/ex/first_draw",
+        payload: { viewer_id: viewerId, character_id: 1, cost_item_id: 10002 },
+    })
+    assert.equal(repeatedFirstDrawReplay.statusCode, 200, repeatedFirstDrawReplay.body)
+    assert.equal(getPlayerItemSync(playerId, 10002), 1)
+    assert.deepEqual(getPlayerCharacterSync(playerId, 1).exBoost, selectedExBoost)
     await selectApp.close()
 
     data.closeDatabase()
