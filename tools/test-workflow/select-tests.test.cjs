@@ -481,6 +481,7 @@ test("splits isolated integration tests into focused domains", () => {
     assert.deepEqual(TEST_GROUPS["integration:event"].tests, [
         "tools/box_gacha_exec_transaction.test.cjs",
         "tools/carnival_rewards.test.cjs",
+        "tools/event_route_reachability.test.cjs",
         "tools/practice_battle_history.test.cjs",
         "tools/practice_battle_history_route.test.cjs",
         "tools/raid_event_master.test.cjs",
@@ -488,6 +489,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/raid_event_state.test.cjs",
         "tools/raid_event_summary.test.cjs",
         "tools/raid_event_summary_route.test.cjs",
+        "tools/ranking_event_route.test.cjs",
         "tools/rush_event_shop.test.cjs",
         "tools/rush_event_shop_route.test.cjs",
         "tools/rush_event_reset_route.test.cjs",

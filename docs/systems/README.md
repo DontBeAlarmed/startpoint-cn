@@ -21,6 +21,7 @@
 - [特殊关卡架构](./special-quest-architecture.md)
 - [战阵事件级奖励](./raid-event-overall-rewards.md)
 - [狂热激战](./rush-event.md)
+- [排名活动](./ranking-event.md)
 - [土俑累计分奖励](./carnival-score-rewards.md)
 - [无限演武](./score-attack-event.md)
 - [练习战履历](./practice-battle-history.md)

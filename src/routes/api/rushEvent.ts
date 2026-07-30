@@ -2,7 +2,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { PartyCategory, RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
-import { deletePlayerRushEventPlayedPartiesUntilSync, deletePlayerRushEventPlayedPartyListSync, deletePlayerRushEventPlayedPartySync, getDefaultPlayerRushEventSync, getPlayerRushEventClearedFoldersSync, getPlayerRushEventNextEndlessBattleRoundSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, getRushEventEndlessRankingListSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, insertPlayerRushEventSync, serializePlayerRushEventPlayedParty, updatePlayerRushEventSync } from "../../data/domains/rushEvent"
+import { deletePlayerRushEventPlayedPartiesUntilSync, deletePlayerRushEventPlayedPartyListSync, deletePlayerRushEventPlayedPartySync, getDefaultPlayerRushEventSync, getPlayerRushEventClearedFoldersSync, getPlayerRushEventNextEndlessBattleRoundSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, insertPlayerRushEventSync, serializePlayerRushEventPlayedParty, updatePlayerRushEventSync } from "../../data/domains/rushEvent"
 import { getAccountPlayers } from "../../data/domains/account"
 import { getDefaultPlayerPartyGroupsSync } from "../../data/domains/player"
 import { getPlayerCharacterSync } from "../../data/domains/character"
@@ -17,7 +17,7 @@ import { BattleQuest, QuestCategory, RushEventFolder } from "../../lib/types";
 import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
 import type { FinishBody } from "./singleBattleQuest";
 import { insertActiveQuest } from "../../lib/quest/active-quest-service";
-import { getPlayerRushEventEndlessBattleRankingSync, getRushEventEndlessBattleRankPlayedPartyListSync, getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
+import { getPlayerRushEventEndlessBattleRankingSync, getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { ensureSpecialEventPartyGroupsSync, getGlobalPartyId } from "../../lib/special-event-parties";
@@ -52,20 +52,6 @@ interface ResetBody {
     viewer_id: number,
     reset_target_id?: number,
     is_reset_after_target_round?: boolean
-}
-
-interface RankingBody {
-    viewer_id: number,
-    event_id: number,
-    page?: number,
-    aggregated_time?: string
-}
-
-interface RankingPlayedPartyBody {
-    viewer_id: number,
-    rank_number: number,
-    aggregated_time: string,
-    event_id: number
 }
 
 enum ResetQuestType {
@@ -211,90 +197,6 @@ const routes = async (fastify: FastifyInstance) => {
             "data": {
                 "folder_id": folderId,
                 "event_id": eventId
-            }
-        })
-    })
-
-    fastify.post("/ranking", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as RankingBody
-
-        const viewerId = body.viewer_id
-        const eventId = body.event_id
-        const page = body.page ?? 0
-        console.log(`[RUSH] ranking: viewer=${viewerId} eventId=${eventId} page=${page}`)
-        if (isNaN(viewerId) || isNaN(eventId)) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid request body."
-        })
-
-        const viewerIdSession = await getSession(viewerId.toString())
-        if (!viewerIdSession) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid viewer id."
-        })
-
-        // get player
-        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
-        if (playerId === null) return reply.status(500).send({
-            "error": "Internal Server Error",
-            "message": "No player bound to account."
-        })
-
-        // get player endless rank
-        const endlessRanking = getPlayerRushEventEndlessBattleRankingSync(playerId, eventId)
-
-        // get all rankings for page
-        const rankings = getRushEventEndlessRankingListSync(eventId, page);
-
-        reply.header("content-type", "application/x-msgpack")
-        return reply.status(200).send({
-            "data_headers": generateDataHeaders({
-                viewer_id: viewerId
-            }),
-            "data": {
-                "aggregated_time": clientSerializeDate(getServerDate()),
-                "current_page": page + 1,
-                "page_max": rankings.pageMax,
-                "my_data": endlessRanking,
-                "ranking_data": rankings.list
-            }
-        })
-    })
-
-    fastify.post("/ranking/played_party", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as RankingPlayedPartyBody
-
-        const viewerId = body.viewer_id
-        const eventId = body.event_id
-        const rankNumber = body.rank_number
-        if (isNaN(viewerId) || isNaN(eventId) || isNaN(rankNumber)) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid request body."
-        })
-
-        const viewerIdSession = await getSession(viewerId.toString())
-        if (!viewerIdSession) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid viewer id."
-        })
-
-        // get player
-        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
-        if (playerId === null) return reply.status(500).send({
-            "error": "Internal Server Error",
-            "message": "No player bound to account."
-        })
-
-        // get party list
-        const partyList = getRushEventEndlessBattleRankPlayedPartyListSync(rankNumber, eventId) ?? []
-
-        reply.header("content-type", "application/x-msgpack")
-        return reply.status(200).send({
-            "data_headers": generateDataHeaders({
-                viewer_id: viewerId
-            }),
-            "data": {
-                "rush_ranking_party": partyList
             }
         })
     })

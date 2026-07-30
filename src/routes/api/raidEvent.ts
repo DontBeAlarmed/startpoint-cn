@@ -1,12 +1,12 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { deletePlayerRushEventPlayedPartiesUntilSync, deletePlayerRushEventPlayedPartyListSync, deletePlayerRushEventPlayedPartySync, getDefaultPlayerRushEventSync, getPlayerRushEventClearedFoldersSync, getPlayerRushEventSync, insertPlayerRushEventSync, updatePlayerRushEventSync } from "../../data/domains/rushEvent"
+import { getDefaultPlayerRushEventSync, getPlayerRushEventClearedFoldersSync, getPlayerRushEventSync, insertPlayerRushEventSync } from "../../data/domains/rushEvent"
 import { getDefaultPlayerPartyGroupsSync, getPlayerSync } from "../../data/domains/player"
 import { getPlayerCharactersSync } from "../../data/domains/character"
 import { ensurePlayerPartyGroupListSync, getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerDate } from "../../utils";
-import { PartyCategory, RushEventBattleType } from "../../data/types";
+import { PartyCategory } from "../../data/types";
 import { clientSerializeDate } from "../../data/utils";
 import { getSerializedPlayerRushEventPlayedPartiesSync, getPlayerRushEventEndlessBattleRankingSync } from "../../lib/rush";
 import { insertActiveQuest } from "../../lib/quest/active-quest-service";
@@ -31,8 +31,6 @@ import { getRaidBossHpPercentage } from "../../lib/quest/finish/raid-handler";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { recordRaidSummaryMissionFactFailSoftSync } from "../../lib/mission/event-entry-facts";
 
-const raidEventIds: Record<number, number> = {}
-
 interface EventIdBody {
     event_id: number,
     viewer_id: number,
@@ -54,20 +52,6 @@ interface RushParty {
     party_edited: boolean,
     party_id: number,
     party_name: string
-}
-
-enum ResetQuestType {
-    EMPTY,
-    FOLDER,
-    ENDLESS
-}
-
-interface ResetBody {
-    quest_type: ResetQuestType,
-    event_id: number,
-    viewer_id: number,
-    reset_target_id?: number,
-    is_reset_after_target_round?: boolean
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -209,24 +193,6 @@ const routes = async (fastify: FastifyInstance) => {
         });
     });
 
-    // ---- ranking_reward ----
-    fastify.post("/ranking_reward", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as EventIdBody;
-        const viewerId = body.viewer_id;
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
-            "error": "Bad Request", "message": "Invalid request body."
-        });
-
-        reply.header("content-type", "application/x-msgpack");
-        return reply.status(200).send({
-            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "reward_list": [],
-                "status": 0
-            }
-        });
-    });
-
     // ---- party (get event party groups) ----
     fastify.post("/party", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as { viewer_id: number, api_count: number };
@@ -316,48 +282,6 @@ const routes = async (fastify: FastifyInstance) => {
         });
     });
 
-    // ---- ranking ----
-    fastify.post("/ranking", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as {
-            event_id?: number, quest_id?: number,
-            page?: number, aggregated_time?: string,
-            viewer_id: number, api_count: number
-        };
-        const viewerId = body.viewer_id;
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
-            "error": "Bad Request", "message": "Invalid request body."
-        });
-
-        reply.header("content-type", "application/x-msgpack");
-        return reply.status(200).send({
-            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "aggregated_time": "",
-                "quest_list": {}
-            }
-        });
-    });
-
-    // ---- ranking/party (view other player's party) ----
-    fastify.post("/ranking/party", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as {
-            quest_id: number, aggregated_time: string, rank_number: number,
-            viewer_id: number, api_count: number
-        };
-        const viewerId = body.viewer_id;
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
-            "error": "Bad Request", "message": "Invalid request body."
-        });
-
-        reply.header("content-type", "application/x-msgpack");
-        return reply.status(200).send({
-            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "raid_ranking_party": []
-            }
-        });
-    });
-
     // ---- battle/start ----
     fastify.post("/battle/start", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as {
@@ -409,64 +333,6 @@ const routes = async (fastify: FastifyInstance) => {
         });
     });
 
-    // ---- select_folder ----
-    fastify.post("/select_folder", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as { folder_id: number, event_id: number, viewer_id: number };
-        const viewerId = body.viewer_id;
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
-            "error": "Bad Request", "message": "Invalid request body."
-        });
-        const viewerIdSession = await getSession(viewerId.toString())
-        if (!viewerIdSession) return reply.status(400).send({
-            "error": "Bad Request", "message": "Invalid viewer id."
-        })
-        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
-        if (playerId === null) return reply.status(500).send({
-            "error": "Internal Server Error", "message": "No player bound to account."
-        })
-        updatePlayerRushEventSync(playerId, { eventId: body.event_id, activeRushBattleFolderId: body.folder_id })
-        raidEventIds[playerId] = body.event_id
-        reply.header("content-type", "application/x-msgpack");
-        return reply.status(200).send({ "data_headers": generateDataHeaders({ viewer_id: viewerId }), "data": {} });
-    });
-
-    // ---- reset ----
-    fastify.post("/reset", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as ResetBody;
-        const viewerId = body.viewer_id;
-        const eventId = body.event_id;
-        const questType = body.quest_type;
-        const resetTargetId = body.reset_target_id;
-        const isResetAfterTargetRound = body.is_reset_after_target_round;
-        console.log(`[RAID] reset: eventId=${eventId} questType=${questType}`)
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
-            "error": "Bad Request", "message": "Invalid request body."
-        });
-        const viewerIdSession = await getSession(viewerId.toString())
-        if (!viewerIdSession) return reply.status(400).send({
-            "error": "Bad Request", "message": "Invalid viewer id."
-        })
-        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
-        if (playerId === null) return reply.status(500).send({
-            "error": "Internal Server Error", "message": "No player bound to account."
-        })
-        if (questType === ResetQuestType.FOLDER) {
-            if (resetTargetId !== undefined) {
-                deletePlayerRushEventPlayedPartiesUntilSync(playerId, eventId, RushEventBattleType.FOLDER, resetTargetId)
-            } else {
-                updatePlayerRushEventSync(playerId, { eventId: eventId, activeRushBattleFolderId: null })
-                deletePlayerRushEventPlayedPartyListSync(playerId, eventId, RushEventBattleType.FOLDER)
-            }
-        } else if (resetTargetId !== undefined) {
-            if (isResetAfterTargetRound) {
-                deletePlayerRushEventPlayedPartiesUntilSync(playerId, eventId, RushEventBattleType.ENDLESS, resetTargetId)
-            } else {
-                deletePlayerRushEventPlayedPartySync(playerId, eventId, resetTargetId, RushEventBattleType.ENDLESS)
-            }
-        }
-        reply.header("content-type", "application/x-msgpack");
-        return reply.status(200).send({ "data_headers": generateDataHeaders({ viewer_id: viewerId }), "data": {} });
-    });
 };
 
 export default routes;

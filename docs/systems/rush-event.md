@@ -25,7 +25,6 @@
 | `/single_battle_quest/finish` | 关卡结算 | 返回 `rush_event` 专用字段 |
 | `/event/rush/endless_battle` | 无限轮次状态 | 从玩家 Rush 状态读取 |
 | `/event/rush/reset` | 重置普通或无限进度 | `quest_type=1` 为普通，`2` 为无限 |
-| `/event/rush/ranking` | 排名 | 返回 `ranking_data` |
 | `/event/rush/reward` | 排名奖励 | 按主数据档位处理 |
 
 普通难度流程为：`summary -> select_folder -> battle/start -> single_battle_quest/finish`。文件夹通关奖励优先读取当前活动 ID 的非空奖励；`700011-700017` 的精确奖励为空时，兼容读取对应 `700001-700007` 的奖励。

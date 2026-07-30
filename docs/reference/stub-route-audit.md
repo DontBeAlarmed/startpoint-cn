@@ -37,7 +37,7 @@
 | `/tool/get_header_response`、`/tool/signup` | 会话和公共头已生成；业务数据位于 `data_headers` |
 | `/tutorial/finish_trigger` | 教程触发 ID 已校验、去重并在一个事务内持久化 |
 | `/party_group/edit` | 编队组颜色在一个事务内写入，未知组不返回成功 |
-| 战阵、狂热激战的 `/battle/start`、`/select_folder`、`/reset` | 活跃关卡、当前文件夹或已用队伍状态已经更新 |
+| 狂热激战的 `/battle/start`、`/select_folder`、`/reset`，战阵的 `/battle/start` | 活跃关卡、当前文件夹或已用队伍状态已经更新 |
 | `/shop/set_campaign_lineup_id` | 选择结果已按玩家、商店、活动持久化并检查冲突 |
 | `/character/set_illustration_settings` | 已校验六项数组与角色所有权后写入插画设置 |
 | 联机 `/disband_room` | 已广播解散消息并清理房间；空对象只是 HTTP 确认 |
@@ -71,12 +71,11 @@
 |---|---|---|
 | `/attention/action` | 只返回零分，没有真人匹配队列 | 低；依赖真人联机阶段，不影响 NPC 联机 |
 | `/attention/logger` | 丢弃客户端 attention 日志 | 低；只有实现真人匹配诊断时才需要持久化 |
-| `/event/raid/ranking` | 固定返回空排名 | 低；战阵本地三队流程可用，真实排行榜需要跨玩家聚合与周期快照 |
-| `/event/raid/ranking/party` | 固定返回空队伍 | 低；依赖真实排行榜条目和其他玩家编队快照 |
-| `/event/raid/ranking_reward` | 固定返回无奖励 | 低；依赖排行榜结算、幂等领取和奖励周期 |
+| `/ranking_event/receive_reward` | 已移除无发奖的 `status=1` 假成功，当前 H404 | 中；依赖周期表、冻结排名、静态奖励、唯一领取状态和事务发奖 |
 | 礼包码兑换 | 没有兑换路由、配置、次数限制或领取状态 | 低；`load` 与 `/tool/check_enable_gift` 现已统一关闭入口 |
 
-战阵排名接口不能用本地 NPC 数据伪造。排行、排行编队和排行奖励应作为同一个模块实现，不能分别填空列表来宣称完成。
+CN 1.8.1 没有 Rush 排名 Remote，也没有 Raid 的选择文件夹、重置或排名 Remote；旧服务端多出的 7 个路由已删除，
+不再把客户端不可达接口列为待补功能。Ranking Event 的只读本服摘要与奖励边界见[排名活动](../systems/ranking-event.md)。
 
 ## 本轮修正
 

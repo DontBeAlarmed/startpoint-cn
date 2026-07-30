@@ -142,6 +142,51 @@ export function getPlayerSingleQuestProgressSync(
     return buildPlayerQuestProgress(rawProgress)
 }
 
+export function getPlayerQuestLocalRankPercentageSync(
+    playerId: number,
+    section: number,
+    questId: number,
+): number | null {
+    const current = getDb().prepare(`
+        SELECT best_elapsed_time_ms, high_score
+        FROM players_quest_progress
+        WHERE player_id = ? AND section = ? AND quest_id = ?
+            AND (best_elapsed_time_ms IS NOT NULL OR high_score IS NOT NULL)
+    `).get(playerId, section, questId) as {
+        best_elapsed_time_ms: number | null
+        high_score: number | null
+    } | undefined
+    if (current === undefined) return null
+
+    const total = getDb().prepare(`
+        SELECT COUNT(*) AS count
+        FROM players_quest_progress
+        WHERE section = ? AND quest_id = ?
+            AND (best_elapsed_time_ms IS NOT NULL OR high_score IS NOT NULL)
+    `).get(section, questId) as { count: number }
+    if (!Number.isSafeInteger(total.count) || total.count <= 0) return null
+
+    const better = current.best_elapsed_time_ms !== null
+        ? getDb().prepare(`
+            SELECT COUNT(*) AS count
+            FROM players_quest_progress
+            WHERE section = ? AND quest_id = ?
+                AND best_elapsed_time_ms IS NOT NULL
+                AND best_elapsed_time_ms < ?
+        `).get(section, questId, current.best_elapsed_time_ms) as { count: number }
+        : getDb().prepare(`
+            SELECT COUNT(*) AS count
+            FROM players_quest_progress
+            WHERE section = ? AND quest_id = ?
+                AND (
+                    best_elapsed_time_ms IS NOT NULL
+                    OR (best_elapsed_time_ms IS NULL AND high_score > ?)
+                )
+        `).get(section, questId, current.high_score ?? 0) as { count: number }
+    if (!Number.isSafeInteger(better.count) || better.count < 0) return null
+    return better.count / total.count * 100
+}
+
 /**
  * Inserts a singular quest progress into the database.
  * 
