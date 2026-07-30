@@ -188,13 +188,38 @@ export function insertReceiveHistorySync(
 export function getReceiveHistorySync(
     playerId: number,
     sinceDays: number = 7,
-    limit: number = 500
+    limit: number = 500,
+    offset: number = 0,
 ): RawReceiveHistory[] {
     const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString().replace("T", " ").substring(0, 19)
     return getDb().prepare(`
         SELECT * FROM players_receive_history
         WHERE player_id = ? AND create_time >= ?
-        ORDER BY create_time DESC
-        LIMIT ?
-    `).all(playerId, since, limit) as RawReceiveHistory[]
+        ORDER BY create_time DESC, id DESC
+        LIMIT ? OFFSET ?
+    `).all(playerId, since, limit, offset) as RawReceiveHistory[]
+}
+
+export function getReceiveHistoryPageSync(
+    playerId: number,
+    page: number,
+    pageSize: number = 100,
+    sinceDays: number = 7,
+): { records: RawReceiveHistory[], totalCount: number } {
+    const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000)
+        .toISOString().replace("T", " ").substring(0, 19)
+    return getDb().transaction(() => {
+        const records = getDb().prepare(`
+            SELECT * FROM players_receive_history
+            WHERE player_id = ? AND create_time >= ?
+            ORDER BY create_time DESC, id DESC
+            LIMIT ? OFFSET ?
+        `).all(playerId, since, pageSize, (page - 1) * pageSize) as RawReceiveHistory[]
+        const row = getDb().prepare(`
+            SELECT COUNT(*) AS count
+            FROM players_receive_history
+            WHERE player_id = ? AND create_time >= ?
+        `).get(playerId, since) as { count: number }
+        return { records, totalCount: row.count }
+    })()
 }

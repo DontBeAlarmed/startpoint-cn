@@ -197,6 +197,7 @@ const TEST_GROUPS = Object.freeze({
         execution: "serial",
         tests: [
             "tools/admin_player_actions.test.cjs",
+            "tools/history_receive_route.test.cjs",
             "tools/mail_receive_transaction.test.cjs",
             "tools/player_save_v2.test.cjs",
             "tools/server_gameplay_settings.test.cjs",
@@ -239,6 +240,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/character_election_route.test.cjs",
             "tools/mission_battle_facts.test.cjs",
             "tools/mission_auto_settlement_route.test.cjs",
+            "tools/mission_get_progress_transaction.test.cjs",
             "tools/mission_collect_progress.test.cjs",
             "tools/mission_coverage_audit.test.cjs",
             "tools/mission_daily_battle_facts.test.cjs",

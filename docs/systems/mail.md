@@ -9,10 +9,14 @@
 | `/mail/index` | 按页返回当前存档邮件，默认每页最多 100 条 |
 | `/mail/receive` | 在单一事务中校验并发放一封附件、写领取历史、标记 receive time |
 | `/mail/receive_all` | 对请求 ID 去重，并在单一事务中完成全部附件、历史和领取标记 |
+| `/history/receive` | 按 `page` 返回最近 7 天领取记录，固定每页 100 条，并返回该时间窗内真实总数 |
 
 邮件是否未领取以 `receive_time = '0000-00-00 00:00:00'` 判断。领取记录会写入 `players_receive_history`。
 
 单领和全领都以 SQLite 外层事务覆盖附件发放、`players_receive_history`、邮件领取时间和角色觉醒解锁响应。任一步骤异常会回滚整个请求；批量请求中的重复 `mail_id` 只处理一次，不会重复发奖。已经领取或不存在的 ID 仍计入 `already_mail_count`，不会使其他合法邮件失败。
+
+领取历史页码从 1 开始；零、负数、小数或字符串页码会被拒绝。分页按 `create_time DESC, id DESC` 稳定排序，
+记录查询和总数统计共享同一数据库读事务，避免并发写入时同一响应的列表与总数来自不同快照。
 
 ## 已支持附件
 
@@ -79,6 +83,7 @@ V2 完整存档快照通过玩家领域 Registry 包含 `players_mails` 和 `pla
 - `tests/admin-mail-rules.test.js`；
 - `tests/admin-mail-ui-source.test.js`；
 - `tools/inventory_rules.test.cjs`；
+- `tools/history_receive_route.test.cjs`；
 - `tools/mail_notification.test.cjs`；
 - `tools/mail_notification_write_routes.test.cjs`；
 - `tools/mail_receive_transaction.test.cjs`；
