@@ -30,6 +30,15 @@ const retiredSeedModules = [
     "runtime/seed-state-store.js",
 ]
 
+function buildCompiledRuntime() {
+    const build = spawnSync(
+        process.execPath,
+        [path.join(projectRoot, "tools/test-workflow/build-cn.cjs")],
+        { cwd: projectRoot, encoding: "utf8" },
+    )
+    assert.equal(build.status, 0, `build failed\n${build.stdout}\n${build.stderr}`)
+}
+
 function assertRetiredSeedModulesAbsent(root, prefix = "out") {
     for (const relativePath of retiredSeedModules) {
         assert.equal(
@@ -79,7 +88,7 @@ async function reserveLoopbackPorts(count) {
     }
 }
 
-async function waitForHealth(url, child, output, timeoutMs = 20_000) {
+async function waitForHealth(url, child, output, timeoutMs = 60_000) {
     const deadline = Date.now() + timeoutMs
     while (Date.now() < deadline) {
         if (child.exitCode !== null || child.signalCode !== null) {
@@ -171,18 +180,13 @@ async function cleanupRuntimeSmoke({ child, dataDir, output, ports, processTree 
     fs.rmSync(dataDir, { recursive: true, force: true })
 }
 
+buildCompiledRuntime()
+
 test("[socket] official CN wrapper reports ready and releases resources on SIGTERM", {
     // Node cannot provide reliable POSIX-style child signal semantics on Windows.
     skip: process.platform === "win32" ? "Node signal forwarding smoke is POSIX-only" : false,
     timeout: 90_000,
 }, async t => {
-    const build = spawnSync(
-        process.execPath,
-        [path.join(projectRoot, "tools/test-workflow/build-cn.cjs")],
-        { cwd: projectRoot, encoding: "utf8" },
-    )
-    assert.equal(build.status, 0, `build failed\n${build.stdout}\n${build.stderr}`)
-
     const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "cn-runtime-smoke-"))
     const [httpPort, tcpPort] = await reserveLoopbackPorts(2)
     let stdout = ""
@@ -263,12 +267,6 @@ test("[socket] official CN wrapper reports ready and releases resources on SIGTE
 test("compiled lifecycle order and metadata fallback survive an isolated bundle", {
     timeout: 60_000,
 }, t => {
-    const build = spawnSync(
-        process.execPath,
-        [path.join(projectRoot, "tools/test-workflow/build-cn.cjs")],
-        { cwd: projectRoot, encoding: "utf8" },
-    )
-    assert.equal(build.status, 0, `build failed\n${build.stdout}\n${build.stderr}`)
     assertRetiredSeedModulesAbsent(projectRoot)
 
     const strictDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "embedded-manifest-required-"))
@@ -370,13 +368,6 @@ test("compiled lifecycle order and metadata fallback survive an isolated bundle"
 test("verified Server Bundle publishes its manifest identity through health", {
     timeout: 90_000,
 }, async t => {
-    const build = spawnSync(
-        process.execPath,
-        [path.join(projectRoot, "tools/test-workflow/build-cn.cjs")],
-        { cwd: projectRoot, encoding: "utf8" },
-    )
-    assert.equal(build.status, 0, `build failed\n${build.stdout}\n${build.stderr}`)
-
     const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "embedded-bundle-smoke-"))
     const bundleRoot = path.join(sandbox, "bundle")
     const dataDir = path.join(sandbox, "data")

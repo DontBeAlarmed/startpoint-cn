@@ -12,9 +12,11 @@ const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
 process.env.DATA_DIR = databaseDirectory
 delete process.env.WDFP_DATABASE_DIR
 let db
+let restoreContentSnapshot = () => {}
 
 function cleanup() {
     if (db?.open) db.close()
+    restoreContentSnapshot()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR
     else process.env.DATA_DIR = previousDataDirectory
@@ -24,6 +26,8 @@ function cleanup() {
 
 process.once("exit", cleanup)
 
+const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+restoreContentSnapshot = installBundledGameplaySnapshot()
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")

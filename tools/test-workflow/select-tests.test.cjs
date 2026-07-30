@@ -284,6 +284,7 @@ test("registers focused runtime state and socket smoke groups", () => {
     })
     assert.deepEqual(TEST_GROUPS["integration:runtime"], {
         execution: "serial",
+        timeoutMs: 360_000,
         tests: ["tools/runtime_compiled_smoke.test.cjs"],
     })
 })
@@ -617,6 +618,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
 })
 
 test("quick protocol includes multi runtime lifecycle coverage", () => {
+    assert.equal(TEST_GROUPS["quick:protocol"].timeoutMs, 60_000)
     assert.deepEqual(TEST_GROUPS["quick:protocol"].tests, [
         "tools/handshake_lifecycle.test.cjs",
         "tools/lobby_lifecycle.test.cjs",

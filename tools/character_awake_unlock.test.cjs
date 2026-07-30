@@ -235,17 +235,19 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.equal(countOccurrences(storySource, "reconcileAwakeUnlockCharacterList("), 1)
     assert.equal(storyCall > storySource.indexOf("insertPlayerQuestProgressSync("), true)
     assert.equal(storyCall > storySource.indexOf("updatePlayerQuestProgressSync("), true)
-    assert.equal(storySource.includes("if (finished) return { data: [] }"), true)
+    assert.equal(storySource.includes("return getDb().transaction(() =>"), true)
+    assert.equal(storySource.includes("const firstClear = questProgress?.finished !== true"), true)
+    assert.equal(storySource.includes("const rewardResult = firstClear &&"), true)
+    assert.equal(storySource.includes("if (firstClear)"), true)
 
     const bondReceiveBlock = bondSource.split('fastify.post("/receive_bond_token"')[1]
         .split('fastify.post("/open_mana_board"')[0]
-    const bondAlreadyClaimedBlock = bondReceiveBlock.split("// Claim the bond token")[0]
-    const bondMutationBlock = bondReceiveBlock.split("// Claim the bond token")[1]
+    const bondReconcileCall = getOnlyCall(bondReceiveBlock, "reconcileAwakeUnlockCharacterList")
     assert.equal(countOccurrences(bondSource, "reconcileAwakeUnlockCharacterList("), 1)
-    assert.equal(bondAlreadyClaimedBlock.includes("reconcileAwakeUnlockCharacterList("), false)
+    assert.equal(bondReconcileCall.enclosingTransactionCallbacks.length, 1)
     assert.equal(
-        bondMutationBlock.indexOf("reconcileAwakeUnlockCharacterList(")
-            > bondMutationBlock.indexOf("updatePlayerCharacterBondTokenSync("),
+        bondReconcileCall.position
+            > getLastCallPosition(bondReceiveBlock, "updatePlayerCharacterBondTokenSync"),
         true
     )
 
@@ -396,7 +398,7 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     ]) {
         assert.equal(boxGachaCall.position > getLastCallPosition(boxExecBlock, persistenceCall), true)
     }
-    assert.deepEqual(boxGachaCall.conditionalConditions, ["drawnRewards.length > 0"])
+    assert.deepEqual(boxGachaCall.conditionalConditions, ["settlement.drawnRewards.length > 0"])
     assert.deepEqual(boxGachaCall.enclosingLoops, [])
     assert.deepEqual(findPropertyAssignmentValues(boxExecBlock, "character_list"), ["characterList"])
     assert.equal(findCalls(boxCloseBlock, "reconcileAwakeUnlockCharacterList").length, 0)

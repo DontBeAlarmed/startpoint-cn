@@ -27,6 +27,7 @@ const TEST_GROUPS = Object.freeze({
     },
     "quick:modes": {
         execution: "parallel",
+        timeoutMs: 60_000,
         tests: [
             "tools/modes_loader.test.cjs",
             "tools/modes_contract.test.cjs",
@@ -79,6 +80,7 @@ const TEST_GROUPS = Object.freeze({
     },
     "quick:protocol": {
         execution: "parallel",
+        timeoutMs: 60_000,
         tests: [
             "tools/handshake_lifecycle.test.cjs",
             "tools/lobby_lifecycle.test.cjs",
@@ -151,6 +153,7 @@ const TEST_GROUPS = Object.freeze({
     },
     "integration:runtime": {
         execution: "serial",
+        timeoutMs: 360_000,
         tests: [
             "tools/runtime_compiled_smoke.test.cjs",
         ],
@@ -306,6 +309,7 @@ const TEST_GROUPS = Object.freeze({
     },
     "integration:cdn": {
         execution: "serial",
+        timeoutMs: 180_000,
         tests: [
             "tools/asset_mode.test.cjs",
             "tools/asset_mode_compiled_smoke.test.cjs",

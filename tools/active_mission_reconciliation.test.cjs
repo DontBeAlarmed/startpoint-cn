@@ -104,6 +104,7 @@ const tables = {
     "daily_challenge_point_lookup.json": require("../assets/daily_challenge_point_lookup.json"),
     "character.json": require("../assets/character.json"),
     "mana_node.json": {},
+    "mana_board2_open_condition.json": {},
     "mission_active.json": {
         90001: [missionRow({ eventId: 901, pattern: 57, questKind: 0, questA: 1, questB: 8, questC: 4 })],
         90002: [missionRow({ eventId: 901, pattern: 57, questKind: 1, questA: 1, questB: 8, questC: 1 })],
