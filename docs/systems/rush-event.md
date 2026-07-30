@@ -30,6 +30,11 @@
 
 普通难度流程为：`summary -> select_folder -> battle/start -> single_battle_quest/finish`。文件夹通关奖励优先读取当前活动 ID 的非空奖励；`700011-700017` 的精确奖励为空时，兼容读取对应 `700001-700007` 的奖励。
 
+重置接口严格对应 CN 1.8.1 的两种请求：普通模式的 `reset_target_id` 是当前文件夹内的关卡 ID，省略目标表示放弃整个文件夹；
+无限模式的目标是正整数轮次，并必须携带 `is_reset_after_target_round` 布尔值。未知 `quest_type`、跨活动或无限关卡 ID、
+非当前文件夹目标、未出战轮次和错误字段类型都会被拒绝且不修改存档。普通部分重置按主数据中的文件夹与轮次删除，
+不会因关卡 ID 较大而误删其他文件夹的残留记录；整组放弃时，清空文件夹选择和删除已用队伍共享同一 SQLite 事务。
+
 文件夹奖励按 `player_id + event_id + folder_id` 只结算一次。最终回合会在同一 SQLite 事务内首次写入通关记录、清理当前文件夹状态并发放完整奖励；重复通关只清理流程状态，不再次发奖。任一写入或发奖失败时整组操作回滚。
 
 ## 商店协议
@@ -86,6 +91,7 @@
 
 - `tools/rush_event_shop.test.cjs`：主数据数量、兼容映射、空/非空精确数据覆盖、文件夹通关奖励（代币及配套素材）、UTC+8 边界与非法日期、数量校验、库存/余额和事务回滚。
 - `tools/rush_event_shop_route.test.cjs`：真实 Fastify 路由、常驻开放期列表和购买、全局时间过滤、`2053` 协议及 SQLite 回滚。
+- `tools/rush_event_reset_route.test.cjs`：普通/无限重置字段、跨活动目标、文件夹隔离和整组放弃回滚。
 - `tools/special_quest_flow.test.cjs`：文件夹首次通关发奖、重复通关不发奖，以及事务调用边界。
 
 ## 关卡掉落

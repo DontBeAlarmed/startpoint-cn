@@ -21,6 +21,7 @@ import { getPlayerRushEventEndlessBattleRankingSync, getRushEventEndlessBattleRa
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { ensureSpecialEventPartyGroupsSync, getGlobalPartyId } from "../../lib/special-event-parties";
+import { getDb } from "../../data/db";
 
 interface SummaryBody {
     event_id: number,
@@ -469,6 +470,12 @@ const routes = async (fastify: FastifyInstance) => {
     })
 
     fastify.post("/reset", async (request: FastifyRequest, reply: FastifyReply) => {
+        if (request.body === null
+            || typeof request.body !== "object"
+            || Array.isArray(request.body)) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid request body."
+        })
         const body = request.body as ResetBody
 
         const viewerId = body.viewer_id
@@ -477,7 +484,14 @@ const routes = async (fastify: FastifyInstance) => {
         const resetTargetId: number | undefined = body.reset_target_id
         const isResetAfterTargetRound: boolean | undefined = body.is_reset_after_target_round
         console.log(`[RUSH] reset: viewer=${viewerId} eventId=${eventId} questType=${questType} resetTargetId=${resetTargetId} isResetAfterTarget=${isResetAfterTargetRound}`)
-        if (isNaN(viewerId) || isNaN(eventId) || isNaN(questType)) return reply.status(400).send({
+        if (!Number.isSafeInteger(viewerId) || viewerId <= 0
+            || !Number.isSafeInteger(eventId) || eventId <= 0
+            || (questType !== ResetQuestType.FOLDER && questType !== ResetQuestType.ENDLESS)
+            || (resetTargetId !== undefined
+                && (!Number.isSafeInteger(resetTargetId) || resetTargetId <= 0))
+            || (questType === ResetQuestType.FOLDER && isResetAfterTargetRound !== undefined)
+            || (questType === ResetQuestType.ENDLESS
+                && (resetTargetId === undefined || typeof isResetAfterTargetRound !== "boolean"))) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
         })
@@ -495,31 +509,84 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No player bound to account."
         })
 
+        const rushEventData = getPlayerRushEventSync(playerId, eventId)
+        if (rushEventData === null) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Rush event progress does not exist."
+        })
+        const playedParties = getPlayerRushEventPlayedPartiesSync(playerId, eventId)
+
         if (questType === ResetQuestType.FOLDER) {
-
-            // if reset target was provided, we're not resetting the entire folder
             if (resetTargetId !== undefined) {
-                deletePlayerRushEventPlayedPartiesUntilSync(playerId, eventId, RushEventBattleType.FOLDER, resetTargetId)
-            } else {
-                // reset entire folder
-                // update the active folder value
-                updatePlayerRushEventSync(playerId, {
-                    eventId: eventId,
-                    activeRushBattleFolderId: null
+                const targetQuest = getQuestFromCategorySync(QuestCategory.RUSH_EVENT, resetTargetId) as BattleQuest | null
+                if (targetQuest === null
+                    || targetQuest.rushEventId !== eventId
+                    || targetQuest.rushEventFolderId === undefined
+                    || targetQuest.rushEventRound === undefined
+                    || targetQuest.rushEventRound <= 0
+                    || rushEventData.activeRushBattleFolderId !== targetQuest.rushEventFolderId
+                    || !playedParties.some(party =>
+                        party.battleType === RushEventBattleType.FOLDER
+                        && party.round === resetTargetId
+                    )) return reply.status(400).send({
+                    "error": "Bad Request",
+                    "message": "Invalid rush battle reset target."
                 })
-                // delete played parties
-                deletePlayerRushEventPlayedPartyListSync(playerId, eventId, RushEventBattleType.FOLDER)
-            }
 
-        } else if (resetTargetId !== undefined) {
-            // endless battle resetting
-            if (isResetAfterTargetRound) {
-                // "reset up until here"
-                deletePlayerRushEventPlayedPartiesUntilSync(playerId, eventId, RushEventBattleType.ENDLESS, resetTargetId)
+                const targetIds = playedParties.flatMap(party => {
+                    if (party.battleType !== RushEventBattleType.FOLDER) return []
+                    const quest = getQuestFromCategorySync(QuestCategory.RUSH_EVENT, party.round) as BattleQuest | null
+                    if (quest === null
+                        || quest.rushEventId !== eventId
+                        || quest.rushEventFolderId !== targetQuest.rushEventFolderId
+                        || quest.rushEventRound === undefined
+                        || quest.rushEventRound < targetQuest.rushEventRound!) return []
+                    return [party.round]
+                })
+                getDb().transaction(() => {
+                    for (const questId of targetIds) {
+                        deletePlayerRushEventPlayedPartySync(
+                            playerId,
+                            eventId,
+                            questId,
+                            RushEventBattleType.FOLDER,
+                        )
+                    }
+                })()
             } else {
-                // "reset only here"
-                deletePlayerRushEventPlayedPartySync(playerId, eventId, resetTargetId, RushEventBattleType.ENDLESS)
+                getDb().transaction(() => {
+                    updatePlayerRushEventSync(playerId, {
+                        eventId: eventId,
+                        activeRushBattleFolderId: null
+                    })
+                    deletePlayerRushEventPlayedPartyListSync(playerId, eventId, RushEventBattleType.FOLDER)
+                })()
             }
+        } else {
+            if (!playedParties.some(party =>
+                party.battleType === RushEventBattleType.ENDLESS
+                && party.round === resetTargetId
+            )) return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Invalid endless battle reset target."
+            })
+            getDb().transaction(() => {
+                if (isResetAfterTargetRound) {
+                    deletePlayerRushEventPlayedPartiesUntilSync(
+                        playerId,
+                        eventId,
+                        RushEventBattleType.ENDLESS,
+                        resetTargetId!,
+                    )
+                } else {
+                    deletePlayerRushEventPlayedPartySync(
+                        playerId,
+                        eventId,
+                        resetTargetId!,
+                        RushEventBattleType.ENDLESS,
+                    )
+                }
+            })()
         }
         
         reply.header("content-type", "application/x-msgpack")
