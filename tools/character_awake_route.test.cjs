@@ -137,7 +137,10 @@ async function finishAwakeBattle(fastify) {
             statistics: {
                 clear_phase: 1,
                 max_combo_count: 0,
-                zones: [],
+                zones: [{
+                    damage_deal_total: 0,
+                    members: [{ origin_damage: 0 }, null, null],
+                }],
                 party: {
                     characters: [{ id: 341005 }, null, null],
                     unison_characters: [null, null, null],
