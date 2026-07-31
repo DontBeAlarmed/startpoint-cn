@@ -11,6 +11,7 @@ import {
     resolveRuntimeDataPaths,
     RuntimeDataPaths,
 } from "../runtime/data-paths";
+import { createBetterSqlite3Database } from "../runtime/native-binding";
 
 export const enum Database {
     WDFP_DATA,
@@ -132,7 +133,7 @@ export function initializeDatabase(
         const databaseExists = fs.existsSync(paths.databaseFile);
 
         const databaseFactory = options.databaseFactory
-            ?? ((databasePath: string) => new sqlite3(databasePath));
+            ?? ((databasePath: string) => createBetterSqlite3Database(sqlite3, databasePath));
         database = databaseFactory(paths.databaseFile);
 
         const userVersion = readUserVersion(database);
