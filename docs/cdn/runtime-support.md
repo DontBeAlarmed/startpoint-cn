@@ -8,18 +8,18 @@
 |---|---|---|
 | 官方 CN 1.8.1 客户端，仅修改服务器 IP 和跳过登录 | 保证 | 唯一保证的客户端；协议与行为以该版本为准 |
 | 停服前从官方 CDN 主机下载的 CN 1.4.54 dump | 有限保证 | 支持资源清单目录为 `EntityLists/` 或 `entities/` 的两种已知官方布局；物理 dump 有 692 个 ZIP，运行时只保证 tracked manifest 引用的 677 个 Android common、medium（Catalog `quality` 层）和 platform 归档完整，不使用 15 个 iOS 归档 |
-| latest 更新计划 | 保证 | 当前版本等于 1.4.54 时返回 `full=null`、`diff=null` |
-| incremental 更新计划 | 有限保证 | 只保证 manifest 已知节点 1.4.0 至 1.4.53 到 1.4.54 的唯一连续差分链；未知版本返回 `UNKNOWN_CURRENT_VERSION` |
-| initial 更新计划 | 保证 | 返回 1.4.0 full 和到 1.4.54 的连续差分链 |
+| latest 更新计划 | 保证 | 当前版本等于 active Catalog 目标版本时返回 `full=null`、`diff=null`；无补丁时目标为 1.4.54，安装合法补丁后以 Overlay 计算出的唯一末端为目标 |
+| incremental 更新计划 | 有限保证 | 官方 manifest 提供 1.4.0 至 1.4.54 的基线链；合法 patch manifest 声明的 inner ZIP 可继续形成唯一、允许跳号的后续链；未知或不可达版本返回错误 |
+| initial 更新计划 | 保证 | 返回 1.4.0 full 和到 active Catalog 目标版本的唯一链 |
 | 完整归档下载 | 保证 | 从文件句柄直接流式返回 HTTP 200 |
 | 标准单区间 Range | 服务端已实现，客户端待验收 | 服务端返回 206 或 416；官方客户端原生 ANE 行为仍需抓包确认 |
 | Catalog ZIP allowlist 与路径边界 | 保证 | 拒绝 Catalog 外 ZIP、路径逃逸、Catalog ZIP 符号链接和根外解析路径 |
 | Recovery CSV | 兼容占位 | `/patch/cn/recovery/empty.csv` 返回 HTTP 200 的零字节 CSV |
 | dummy upload 兼容路由 | 可选 | 只从 `<DATA_DIR>/asset-provider/production/upload` 只读供给；目录或文件缺失返回 404，不创建目录、不回退 Bundle |
 | 客户端逐文件 Recovery | 不支持 | 当前没有可按 `base_url + hash` 完整供给的官方逐文件对象库 |
-| 启动时自动扫描或完整哈希 | 不支持且不执行 | 启动只严格解析/build manifest，并 `stat` 存在性、普通文件类型和大小 |
+| 启动时补丁扫描与完整哈希 | 保证 | 官方基线继续使用 tracked manifest 的存在性、类型和大小门禁；每个已激活 patch manifest 的 inner ZIP 在同步前校验完整 SHA-256、路径和文件身份 |
 | 请求级 SHA-256、spool 或缓存写入 | 不支持且不执行 | 文件通过边界检查后直接流式发送 |
-| 自动发现新增 ZIP | 不支持 | 未进入跟踪 manifest 的 ZIP 不会进入版本图或 ZIP allowlist |
+| 自动发现补丁 inner ZIP | 有限保证 | 只发现 `patches/<version>/patch-manifest.json` 明确声明的 inner ZIP；外层 ZIP、未知 ZIP和无 manifest 目录忽略 |
 | CDN 自动修复、重新下载或回滚 | 不支持 | 缺失、类型错误或大小不一致时快速失败 |
 | active CDN 管理接口 | 当前不存在 | 没有管理 API 可以直接写入、替换或激活当前 CDN |
 | `asset-patch/manifest.json` | CN 运行时不使用 | 不参与 Catalog、目标版本、后台版本或 Content Release 选择 |
@@ -30,10 +30,10 @@
 
 - 缺失、不完整、损坏、被原地改写或重新打包的官方 CDN；
 - 非法来源、自制或手工拼接的 CDN；
-- 官方 1.4.54 之外的资源版本；
+- 非官方 CN 1.4.54 基线；合法 Overlay 补丁目标版本不受此条限制；
 - CN 1.8.1 之外的客户端；
 - 除服务器 IP 和跳过登录外，还修改资源下载器、战斗逻辑或其他客户端行为的包；
-- 只向目录写入 ZIP、但没有匹配版本边、`EntityLists/` 或 `entities/` 资源清单、服务端 runtime 数据和完整 release manifest 的内容。
+- 只向 `cn` 写入 ZIP，或放入 `patches` 但没有合法 patch manifest、匹配版本边和三层 inner ZIP 的内容。
 
 运行时不会为这些输入降级安全边界、猜测版本图或自动生成缺失数据。完整 SHA-256 的实际命令、参数和目录约束统一见 [`catalog-planner.md` 的“显式离线 SHA-256”章节](catalog-planner.md#显式离线-sha-256)，本页不重复维护命令副本。
 
@@ -60,6 +60,12 @@
 5. 经认证和人工确认后，再由未来的激活流程切换统一 snapshot。
 
 当前仓库没有 active CDN 管理接口，现有管理页面或 API 不能直接覆盖运行中的 CDN，也不能把任意 ZIP 自动提升为 active release。
+
+## 已实现的 Patch Overlay
+
+项目支持 `CDN_DIR/cn + CDN_DIR/patches/<version>` 多根 Overlay。运行时只接受版本目录内 `patch-manifest.json` 明确声明且通过完整校验的 inner ZIP；外层分发 ZIP、未知 ZIP和没有 manifest 的目录不会自动激活。manifest 一旦出现，目录版本、内容依赖、三层归档、字节数、SHA-256 或升级图不合法都会阻止受支持入口启动。完整的安装、版本、失败关闭和组件边界见 [`patch-overlay.md`](./patch-overlay.md)。
+
+框架支持合法的连续或跳号唯一链，但仓库不提供补丁包、配方或专用生成工具，也不为第三方补丁内容提供业务兼容保证。
 
 ## Range 客户端验收
 

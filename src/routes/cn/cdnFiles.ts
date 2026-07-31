@@ -41,6 +41,15 @@ interface CatalogZipLocation {
     readonly logicalRoot: string
     readonly physicalRoot: string
     readonly expectedSize: number
+    readonly expectedIdentity: CdnFileIdentity
+}
+
+interface CdnFileIdentity {
+    readonly dev: string
+    readonly ino: string
+    readonly size: string
+    readonly mtimeMs: string
+    readonly ctimeMs: string
 }
 
 const defaultFileSystem: CdnFileSystem = { realpath, lstat, open }
@@ -102,6 +111,26 @@ function sameFileIdentity(left: Stats, right: Stats): boolean {
         && left.dev === right.dev
         && left.ino === right.ino
         && left.size === right.size
+}
+
+function fileIdentity(stat: Stats): CdnFileIdentity {
+    return {
+        dev: String(stat.dev),
+        ino: String(stat.ino),
+        size: String(stat.size),
+        mtimeMs: String(stat.mtimeMs),
+        ctimeMs: String(stat.ctimeMs),
+    }
+}
+
+function matchesFileIdentity(stat: Stats, expected: CdnFileIdentity): boolean {
+    const actual = fileIdentity(stat)
+    return stat.isFile()
+        && actual.dev === expected.dev
+        && actual.ino === expected.ino
+        && actual.size === expected.size
+        && actual.mtimeMs === expected.mtimeMs
+        && actual.ctimeMs === expected.ctimeMs
 }
 
 function contentType(relativePath: string): string {
@@ -190,7 +219,12 @@ async function buildCatalogZipAllowlist(
             const logicalStat = await fileSystem.lstat(logicalPath)
             const physicalStat = await fileSystem.lstat(physicalPath)
             if (logicalStat.size !== expectedSize || !sameFileIdentity(logicalStat, physicalStat)) continue
-            allowlist.set(relativePath, { logicalRoot, physicalRoot, expectedSize })
+            allowlist.set(relativePath, {
+                logicalRoot,
+                physicalRoot,
+                expectedSize,
+                expectedIdentity: fileIdentity(physicalStat),
+            })
         } catch {
             // Missing, symlinked, and unstable Catalog files are unavailable in this snapshot.
         }
@@ -205,6 +239,7 @@ async function openSafeFile(
     fileSystem: CdnFileSystem,
     observer: CdnFileHandleObserver | undefined,
     expectedSize?: number,
+    expectedIdentity?: CdnFileIdentity,
     rejectSymlinks = false,
 ): Promise<OpenedFile> {
     const logicalPath = path.resolve(logicalRoot, ...relativePath.split("/"))
@@ -227,7 +262,8 @@ async function openSafeFile(
         }
         const pathStat = await fileSystem.lstat(currentPhysicalPath)
         if (!sameFileIdentity(fileStat, pathStat)
-            || expectedSize !== undefined && fileStat.size !== expectedSize) {
+            || expectedSize !== undefined && fileStat.size !== expectedSize
+            || expectedIdentity !== undefined && !matchesFileIdentity(fileStat, expectedIdentity)) {
             throw new Error("file identity or size changed while opening")
         }
         return { handle, size: fileStat.size }
@@ -312,6 +348,7 @@ async function sendFile(
     fileSystem: CdnFileSystem,
     observer: CdnFileHandleObserver | undefined,
     expectedSize?: number,
+    expectedIdentity?: CdnFileIdentity,
     rejectSymlinks = false,
 ) {
     try {
@@ -322,6 +359,7 @@ async function sendFile(
             fileSystem,
             observer,
             expectedSize,
+            expectedIdentity,
             rejectSymlinks,
         )
         return sendOpenedFile(request, reply, relativePath, openedFile, observer)
@@ -410,6 +448,7 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
                         fileSystem,
                         observer,
                         location.expectedSize,
+                        location.expectedIdentity,
                         true,
                     )
             }

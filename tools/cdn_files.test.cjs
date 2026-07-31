@@ -471,6 +471,29 @@ test("rejects a Catalog ZIP path replaced by a symlink after route registration"
     await waitForBalancedHandles(observer)
 })
 
+test("rejects a same-size Catalog ZIP replaced after route registration", async t => {
+    const replacementBody = "abcdefghij"
+    const { app, cdnRoot, observer } = await createFixture(t)
+    const archivePath = path.join(cdnRoot, "archive-common-full", "base.zip")
+    fs.renameSync(archivePath, `${archivePath}.registered`)
+    fs.writeFileSync(archivePath, replacementBody)
+
+    const head = await app.inject({
+        method: "HEAD",
+        url: "/patch/cn/archive-common-full/base.zip",
+    })
+    assert.equal(head.statusCode, 404)
+    assert.equal(head.body.includes(replacementBody), false)
+
+    const get = await app.inject({
+        method: "GET",
+        url: "/patch/cn/archive-common-full/base.zip",
+    })
+    assert.equal(get.statusCode, 404)
+    assert.equal(get.body.includes(replacementBody), false)
+    await waitForBalancedHandles(observer)
+})
+
 test("rejects a Catalog ZIP replaced while its opened handle is validated", async t => {
     const replacementBody = "abcdefghij"
     let swapped = false

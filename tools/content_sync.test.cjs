@@ -968,6 +968,78 @@ test("release summary persists exact baseline and patch archive sources", async 
     })
 })
 
+test("same-version patch identity changes rebuild instead of reusing the old release", async t => {
+    const fixture = engineFixture(t)
+    const relativePath = "archive-common-diff/p55.zip"
+    let manifestSha256 = "a".repeat(64)
+    let archiveMtime = "1"
+    const catalogArchive = {
+        relativePath,
+        compressedBytes: 10,
+        sha256: "b".repeat(64),
+        layer: "common",
+        order: 1,
+    }
+    const catalog = {
+        targetVersion: "1.4.55",
+        versions: ["1.4.54", "1.4.55"],
+        edges: [{
+            fromVersion: "1.4.54",
+            toVersion: "1.4.55",
+            platform: "android",
+            assetSizeKind: "fulfill",
+            archives: [catalogArchive],
+        }],
+        installedBytes: 1,
+        entityListsRelativePath: "EntityLists/1.4.55-android_medium.csv",
+    }
+    fixture.dependencies.scanTarget = async () => ({
+        ...fakeScan(fixture.paths, "1.4.55"),
+        patchesRoot: path.join(fixture.paths.cdnDir, "patches"),
+        patchManifests: [{
+            targetVersion: "1.4.55",
+            relativePath: "patch-manifest.json",
+            physicalPath: path.join(fixture.paths.cdnDir, "patches", "1.4.55", "patch-manifest.json"),
+            compressedBytes: 100,
+            mtimeMs: "1",
+            ctimeMs: "1",
+            dev: "2",
+            ino: "manifest",
+            sha256: manifestSha256,
+            patchesRoot: { physicalPath: path.join(fixture.paths.cdnDir, "patches"), mtimeMs: "1", ctimeMs: "1", dev: "2", ino: "root" },
+            packageRoot: { physicalPath: path.join(fixture.paths.cdnDir, "patches", "1.4.55"), mtimeMs: "1", ctimeMs: "1", dev: "2", ino: "package" },
+        }],
+        archives: [{
+            ...catalogArchive,
+            source: { kind: "patch", targetVersion: "1.4.55" },
+            expectedSha256: catalogArchive.sha256,
+            kind: "diff",
+            fromVersion: "1.4.54",
+            toVersion: "1.4.55",
+            platform: "android",
+            physicalPath: path.join(fixture.paths.cdnDir, "patches", "1.4.55", relativePath),
+            mtimeMs: archiveMtime,
+            ctimeMs: archiveMtime,
+            dev: "2",
+            ino: "archive",
+        }],
+    })
+    fixture.dependencies.buildCatalog = () => catalog
+
+    const initial = await sync(fixture)
+    const unchanged = await sync(fixture)
+    archiveMtime = "2"
+    const replacedArchive = await sync(fixture)
+    manifestSha256 = "c".repeat(64)
+    const replacedManifest = await sync(fixture)
+
+    assert.equal(initial.reason, "missing")
+    assert.equal(unchanged.reason, "up-to-date")
+    assert.equal(replacedArchive.reason, "source-state")
+    assert.equal(replacedManifest.reason, "source-state")
+    assert.equal(fixture.calls.builder, 3)
+})
+
 test("missing or extra builder tables fail before activation", async t => {
     for (const kind of ["missing", "extra"]) {
         await t.test(kind, async t => {

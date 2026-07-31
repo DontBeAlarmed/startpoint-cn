@@ -30,6 +30,8 @@ Android Catalog 范围缺失、不完整、被修改、重新打包或自制的 
 
 游戏服务初始化本身不会扫描 CDN、读取全部 ZIP 计算 SHA-256、写 digest cache 或生成 Release。受支持入口在它之前执行的 Content Sync 会做目标扫描；只有 CDN 版本、生成器版本或表注册契约变化、current 缺失或显式 `--force` 时才建立 ArchiveIndex 并转换内容。目录中新增 ZIP 不会被已经运行的服务热加载。
 
+已实现的多根 Patch Overlay 会把 manifest 声明并通过完整校验的补丁 inner ZIP 加入同一 Catalog，同时保持固定 Snapshot 和不热加载语义。`baseVersion` 只作为内容依赖，客户端升级边仍由 inner ZIP 推导；详细契约见 [`patch-overlay.md`](./patch-overlay.md)。本页的官方 1.4.54 数字仍是无补丁基线；安装合法补丁后，active Catalog 和 Planner 以 Overlay 计算出的唯一末端为目标。
+
 ## 统一 Snapshot 与更新计划
 
 `/load`、`version_info`、`get_path`、标题页版本信息和 ZIP allowlist 使用同一份固定 `ContentSnapshot`：

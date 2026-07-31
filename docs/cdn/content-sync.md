@@ -130,7 +130,7 @@ normal 模式：
 npm run content:sync
 ```
 
-normal 依次检查 current Release 是否存在、CDN `assetVersion`、全局 `generatorVersion`，以及 Release 表集合与当前 Registry 是否兼容。注册表新增、移除，或任一表的 `scope`、`converterId`、`converterVersion`、`sources` 变化时，normal 返回 `table-registry` 并自动重建；完全兼容时才快速跳过。
+normal 依次检查 current Release 是否存在、CDN `assetVersion`、全局 `generatorVersion`、已安装补丁来源状态，以及 Release 表集合与当前 Registry 是否兼容。补丁 manifest 或 inner ZIP 文件身份在同一目标版本下变化时返回 `source-state`，随后完整校验摘要并重建或失败关闭；注册表新增、移除，或任一表的 `scope`、`converterId`、`converterVersion`、`sources` 变化时返回 `table-registry` 并自动重建。所有状态完全一致时才快速跳过。
 
 这项契约判断本身只使用 manifest 元数据；当前 `ContentObjectStore` 读取 current Release 时仍会先校验并读取该 Release 的对象闭包，因此 `--check` 也会检查对象可读性，但不会执行 orderedmap 转换或重建。转换器内部算法改变但注册元数据不变时，开发者仍必须递增对应 `converterVersion`；影响全部内容生成的规则变化使用 `generatorVersion`。运行时继续执行同一套严格 Registry 校验，作为最后的加载防线。
 
@@ -265,7 +265,7 @@ Git binary diff 快照设置 64 MiB 输出上限；包含更大 dirty binary dif
 
 | 现象 | 处理 |
 |---|---|
-| normal 显示 `up-to-date`，但同版本 CDN 已修改 | 使用 `--force` |
+| normal 显示 `up-to-date`，但同版本官方基线已修改 | 官方基线不支持原地修改；恢复官方字节后使用 `--force`。补丁 manifest 或 inner ZIP 变化应自动返回 `source-state`，否则按缺陷处理 |
 | 必需 orderedmap 或 odds 缺失/不可读 | 恢复对应官方归档，不要复制其他表代替 |
 | current、manifest 或对象损坏 | 恢复完整 `.content` 备份，或删除整套 `.content` 后从正确 CDN 重建 |
 | smoke 报来源变化 | 停止使用该结果，检查工作树、seeds 和 CDN 是否被并发修改 |

@@ -9,6 +9,7 @@ import {
     type ContentPaths,
 } from "../paths"
 import { ArchiveIndex } from "./archive-index"
+import { canonicalJsonBuffer, sha256Object } from "./canonical-json"
 import { acquireContentSyncLock, type ContentSyncLock } from "./lock"
 import { ContentObjectStore } from "./object-store"
 import { createDefaultContentTableBuilder } from "./release-builder"
@@ -33,6 +34,7 @@ export type ContentSyncReason =
     | "missing"
     | "asset-version"
     | "generator-version"
+    | "source-state"
     | "table-registry"
     | "forced"
     | "up-to-date"
@@ -92,12 +94,14 @@ export interface ContentSyncResult {
 interface CurrentRelease {
     readonly current: ContentCurrentPointer
     readonly manifest: ContentReleaseManifest
+    readonly summary?: unknown
 }
 
 interface ContentStore {
     readCurrentRelease?(): Promise<CurrentRelease | null>
     readCurrent(): Promise<ContentCurrentPointer | null>
     readRelease(pointer: ContentCurrentPointer | string): Promise<ContentReleaseManifest>
+    readObject?(digest: string): Promise<unknown>
     writeObject(value: unknown): Promise<`sha256:${string}`>
     writeRelease(
         input: Omit<ContentReleaseManifest, "releaseDigest">,
@@ -143,23 +147,76 @@ function requireGeneratorVersion(version: number): number {
 }
 
 async function readCurrentRelease(store: ContentStore): Promise<CurrentRelease | null> {
-    if (store.readCurrentRelease) return store.readCurrentRelease()
-    const current = await store.readCurrent()
-    if (current === null) return null
-    return { current, manifest: await store.readRelease(current) }
+    const release = store.readCurrentRelease
+        ? await store.readCurrentRelease()
+        : await (async () => {
+            const current = await store.readCurrent()
+            if (current === null) return null
+            return { current, manifest: await store.readRelease(current) }
+        })()
+    if (release === null) return null
+    const summary = store.readObject
+        ? await store.readObject(release.manifest.summary.object)
+        : null
+    return { ...release, summary }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+function patchSourceDigest(scan: ContentTargetScan): `sha256:${string}` | null {
+    const manifests = (scan.patchManifests ?? []).map(manifest => ({
+        targetVersion: manifest.targetVersion,
+        relativePath: manifest.relativePath,
+        physicalPath: manifest.physicalPath ?? null,
+        compressedBytes: manifest.compressedBytes ?? null,
+        mtimeMs: manifest.mtimeMs ?? null,
+        ctimeMs: manifest.ctimeMs ?? null,
+        dev: manifest.dev ?? null,
+        ino: manifest.ino ?? null,
+        sha256: manifest.sha256 ?? null,
+        patchesRoot: manifest.patchesRoot ?? null,
+        packageRoot: manifest.packageRoot ?? null,
+    }))
+    const archives = (scan.archives ?? []).flatMap(archive => (
+        archive.source.kind === "patch"
+            ? [{
+                targetVersion: archive.source.targetVersion,
+                relativePath: archive.relativePath,
+                physicalPath: archive.physicalPath ?? null,
+                compressedBytes: archive.compressedBytes ?? null,
+                mtimeMs: archive.mtimeMs ?? null,
+                ctimeMs: archive.ctimeMs ?? null,
+                dev: archive.dev ?? null,
+                ino: archive.ino ?? null,
+                expectedSha256: archive.expectedSha256 ?? null,
+            }]
+            : []
+    ))
+    if (manifests.length === 0 && archives.length === 0) return null
+    return sha256Object(canonicalJsonBuffer({ archives, manifests }))
+}
+
+function summaryPatchSourceDigest(summary: unknown): `sha256:${string}` | null {
+    if (!isRecord(summary)
+        || typeof summary.patchSourceDigest !== "string"
+        || !/^sha256:[a-f0-9]{64}$/.test(summary.patchSourceDigest)) return null
+    return summary.patchSourceDigest as `sha256:${string}`
 }
 
 function decideReason(
     mode: ContentSyncMode,
-    targetVersion: string,
+    scan: ContentTargetScan,
     current: CurrentRelease | null,
     generatorVersion: number,
     definitions: readonly TableSourceDefinition[],
 ): ContentSyncReason {
     if (mode === "force") return "forced"
     if (current === null) return "missing"
-    if (current.manifest.assetVersion !== targetVersion) return "asset-version"
+    if (current.manifest.assetVersion !== scan.targetVersion) return "asset-version"
     if (current.manifest.generatorVersion !== generatorVersion) return "generator-version"
+    if (summaryPatchSourceDigest(current.summary) !== patchSourceDigest(scan)) return "source-state"
     if (getReleaseTableRegistryError(current.manifest, definitions) !== null) return "table-registry"
     return "up-to-date"
 }
@@ -219,6 +276,7 @@ function createSummary(
         generatorVersion,
         entityListsRelativePath: scan.entityListsRelativePath,
         archiveSources,
+        patchSourceDigest: patchSourceDigest(scan),
         counts: {
             archives: scan.archives.length,
             ignoredPaths: scan.ignoredPaths.length,
@@ -326,7 +384,7 @@ export async function runContentSync(
     if (mode === "check") {
         const scan = await scanTarget(paths)
         const current = await readCurrentRelease(store)
-        const reason = decideReason(mode, scan.targetVersion, current, generatorVersion, definitions)
+        const reason = decideReason(mode, scan, current, generatorVersion, definitions)
         return resultWithoutRelease("check", scan.targetVersion, current, reason)
     }
 
@@ -337,7 +395,7 @@ export async function runContentSync(
     try {
         const scan = await scanTarget(paths)
         const current = await readCurrentRelease(store)
-        const reason = decideReason(mode, scan.targetVersion, current, generatorVersion, definitions)
+        const reason = decideReason(mode, scan, current, generatorVersion, definitions)
         if (reason === "up-to-date") {
             return resultWithoutRelease("skipped", scan.targetVersion, current, reason)
         }

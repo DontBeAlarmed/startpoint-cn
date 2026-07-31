@@ -130,6 +130,27 @@ test("discovers only manifest archives and ignores outer ZIPs and incomplete dir
     assert.ok(result.ignoredPaths.includes("1.4.55/README.md"))
 })
 
+test("manifest schema errors include patch version and relative path context", async t => {
+    const { paths } = createFixture(t)
+    const { packageRoot } = writePackage(paths, {
+        baseVersion: "1.4.54",
+        fromVersion: "1.4.54",
+        targetVersion: "1.4.55",
+    })
+    const manifestPath = path.join(packageRoot, "patch-manifest.json")
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"))
+    fs.writeFileSync(manifestPath, JSON.stringify({ ...manifest, schema: 2 }))
+
+    await assert.rejects(
+        scanPatchOverlay(paths, baselineCatalog()),
+        error => error instanceof PatchOverlayError
+            && error.code === "PATCH_MANIFEST_SCHEMA"
+            && error.patchVersion === "1.4.55"
+            && error.relativePath === "patch-manifest.json"
+            && /patch 1\.4\.55/.test(error.message),
+    )
+})
+
 test("rejects a patch version directory replaced by a symlink after root discovery", async t => {
     const { paths } = createFixture(t)
     writePackage(paths, {

@@ -25,8 +25,8 @@ function manifest(overrides = {}) {
         baseVersion: "1.4.54",
         targetVersion: "1.4.55",
         compatibleClient: "CN 1.8.1",
-        generator: "starpoint-cn-gacha-patch-v1",
-        targetGachaIds: [44],
+        buildTool: "cdn-author-tool-v1",
+        authorNotes: ["example"],
         archives: [archive()],
         ...overrides,
     }
@@ -50,8 +50,8 @@ test("parses runtime fields and discards top-level audit extensions", () => {
         compatibleClient: "CN 1.8.1",
         archives: [archive()],
     })
-    assert.equal(Object.hasOwn(parsed, "generator"), false)
-    assert.equal(Object.hasOwn(parsed, "targetGachaIds"), false)
+    assert.equal(Object.hasOwn(parsed, "buildTool"), false)
+    assert.equal(Object.hasOwn(parsed, "authorNotes"), false)
     assert.equal(Object.isFrozen(parsed), true)
     assert.equal(Object.isFrozen(parsed.archives), true)
     assert.equal(Object.isFrozen(parsed.archives[0]), true)

@@ -6,9 +6,14 @@ import type { ContentPaths } from "../paths"
 import { deepFreeze } from "../deep-freeze"
 import { parseDiffArchiveName } from "./catalog-builder"
 import type { ArchiveLayer, CdnCatalog } from "./types"
-import { parsePatchManifest, type PatchManifest } from "./patch-manifest"
+import {
+    PatchManifestError,
+    parsePatchManifest,
+    type PatchManifest,
+    type PatchManifestErrorCode,
+} from "./patch-manifest"
 
-export type PatchOverlayErrorCode =
+export type PatchOverlayErrorCode = PatchManifestErrorCode
     | "PATCH_DIRECTORY_VERSION_MISMATCH"
     | "PATCH_BASE_VERSION_MISSING"
     | "PATCH_BASE_VERSION_CYCLE"
@@ -489,7 +494,21 @@ async function readPackage(
         "patches root",
         dependencies,
     )
-    const manifest = parsePatchManifest(manifestValue)
+    let manifest: PatchManifest
+    try {
+        manifest = parsePatchManifest(manifestValue)
+    } catch (error) {
+        if (error instanceof PatchManifestError) {
+            const prefix = `${error.code}: `
+            throw new PatchOverlayError(
+                error.code,
+                directoryName,
+                error.message.startsWith(prefix) ? error.message.slice(prefix.length) : error.message,
+                "patch-manifest.json",
+            )
+        }
+        throw error
+    }
     if (manifest.targetVersion !== directoryName) {
         fail(
             "PATCH_DIRECTORY_VERSION_MISMATCH",
