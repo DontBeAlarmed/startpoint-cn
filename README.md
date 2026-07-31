@@ -39,6 +39,12 @@ bash scripts/start-cn.sh
 
 启动脚本会先编译 CN 服务端，再按资源模式启动：`local` 先执行 `content:sync`，成功后启动；`remote` 和 `client-owned` 不执行本地内容同步，直接按该模式初始化并启动。详细准备、目录和故障排查见[运行服务](./docs/getting-started/README.md)。
 
+## 安装 CDN 增量补丁
+
+CDN 补丁不随仓库分发。安装单独取得的补丁 ZIP 时，保持现有 `CDN_DIR/cn` 不变，手动创建与补丁目标版本一致的目录，例如 `CDN_DIR/patches/1.4.55/`，再用图形界面把 ZIP 内容解压到该目录。解压后，`patch-manifest.json` 和 `archive-*-diff/` 应直接位于版本目录内。
+
+使用受支持的启动命令重启服务后，启动前 Content Sync 会自动发现、校验并加载补丁。只复制外层 ZIP 而不解压时，服务端会将其忽略；完整的目录示例、安装依赖和失败处理见 [CDN 补丁 Overlay 文档](./docs/cdn/patch-overlay.md)。
+
 ## 常用命令
 
 | 命令 | 用途 |
