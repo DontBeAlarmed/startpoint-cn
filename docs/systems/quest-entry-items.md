@@ -46,9 +46,12 @@ abort 路由显式返回 `application/x-msgpack`，由 CN 服务的 `onSend` hoo
 
 多人战斗同样读取当前 Content snapshot 的 `quest_entry_costs`，但入场成本只由房主承担：房主 start 在一个事务内预扣体力和 Always 门票、保存 `entry_item_id/count` 与 active quest；成员 start 以零成本保存各自的 active quest。事务提交后才更新内存 active quest 和房间战斗状态，因此扣除或写库失败不会把房间提前卡进战斗态。房主 abort 按同一规则返还门票但不返体力，成员没有入场道具可返还。
 
-## 剩余风险
+## finish 事务边界
 
-单人 finish 仍沿用原有顺序：先删除 active quest，再执行较长的奖励与进度写入流程。若删除后发生异常，战斗不能通过 active quest 重试。此次没有将整个 finish 纳入总事务，避免在缺少完整幂等设计时引入重复奖励；后续应作为独立结算原子化模块处理。
+单人 finish 已把通用奖励、活动专用结算、进度、任务事实和数据库 active quest 删除纳入同一个外层 SQLite
+事务。任一持久写入失败时全部回滚，数据库与内存 active quest 都保留，客户端可以使用原请求重试；只有事务
+提交成功后才清除进程内 active quest。成功 finish 保留 start 阶段已经预扣的 `Always` 门票，不会重复扣除或
+返还。完整范围与回归约束见[战斗关卡结算事务](./quest-finish-transactions.md)。
 
 ## Once 关卡
 
