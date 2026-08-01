@@ -45,8 +45,10 @@ function temporaryProject(t, { admin = true } = {}) {
     write(root, "out/cn-server.js", "console.log('server')\n")
     write(root, "out/lib/runtime.js", "module.exports = 1\n")
     write(root, "out/.tsbuildinfo-cn", "incremental state")
+    write(root, "out/.gitignore", "runtime-only-ignore\n")
     write(root, "assets/base.json", "{\"base\":true}\n")
     write(root, "assets/nested/table.json", "{\"table\":true}\n")
+    write(root, "assets/.gitignore", "runtime-only-ignore\n")
     write(root, "assets/asset-patch/archive/large.zip", "excluded patch")
     write(root, "LICENSE", "GPL-3.0-or-later\n")
     write(root, "NOTICE", "notice\n")
@@ -60,6 +62,7 @@ function temporaryProject(t, { admin = true } = {}) {
     if (admin) {
         write(root, "web/dist/index.html", "<main>admin</main>\n")
         write(root, "web/dist/assets/admin.js", "console.log('admin')\n")
+        write(root, "web/dist/.gitignore", "runtime-only-ignore\n")
     }
 
     return root
@@ -152,6 +155,7 @@ test("builds a canonical reproducible thin server bundle without web/public", t 
         ],
     )
     assert.equal(first.files.some(file => file.path === "server-manifest.json"), false)
+    assert.equal(first.files.some(file => file.path.endsWith("/.gitignore")), false)
     for (const file of first.files) {
         const bytes = fs.readFileSync(path.join(firstOutput, ...file.path.split("/")))
         assert.equal(file.bytes, bytes.length)
@@ -323,12 +327,21 @@ test("verifier rejects self-consistent files outside the owned bundle roots", as
         ".cdn/archive.zip",
         "apk/client.apk",
         "assets/asset-patch/archive/patch.zip",
+        "assets/.gitignore",
+        "out/.gitignore",
+        "web/dist/.gitignore",
         "web/public/injected.txt",
         "web/pages/player.html",
         "out/.tsbuildinfo-cn",
     ]) {
         await t.test(relativePath, t => {
             const fixture = buildFixture(t)
+            if (fixture.manifest.files.some(file => file.path === relativePath)) {
+                fs.unlinkSync(path.join(fixture.outputRoot, ...relativePath.split("/")))
+                rewriteManifest(fixture.outputRoot, manifest => {
+                    manifest.files = manifest.files.filter(file => file.path !== relativePath)
+                })
+            }
             const contents = Buffer.from(`forbidden:${relativePath}`)
             write(fixture.outputRoot, relativePath, contents)
             rewriteManifest(fixture.outputRoot, manifest => {

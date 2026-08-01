@@ -49,9 +49,13 @@ function isWithin(relativePath, root) {
 }
 
 function requireOwnedBundlePath(relativePath, directory) {
+    if (path.posix.basename(relativePath) === ".gitignore") {
+        fail(`bundle path "${relativePath}" is not an allowed owned path`)
+    }
     if (!directory && (relativePath === "LICENSE" || relativePath === "NOTICE")) return
     if (isWithin(relativePath, "out") && !isWithin(relativePath, "out/.tsbuildinfo-cn")) return
-    if (isWithin(relativePath, "assets") && !isWithin(relativePath, "assets/asset-patch")) return
+    if (isWithin(relativePath, "assets")
+        && !isWithin(relativePath, "assets/asset-patch")) return
     if (isWithin(relativePath, "web/dist")) return
     if (directory && relativePath === "web") return
     fail(`bundle path "${relativePath}" is not an allowed owned path`)

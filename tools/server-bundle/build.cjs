@@ -67,6 +67,10 @@ function validateBundlePath(relativePath) {
     }
 }
 
+function isVersionControlMetadata(relativePath) {
+    return path.posix.basename(relativePath) === ".gitignore"
+}
+
 function copyTree({ sourceRoot, destinationRoot, destinationPrefix, exclude, files }) {
     requireDirectory(sourceRoot, `Input "${destinationPrefix}"`)
 
@@ -222,21 +226,25 @@ function buildServerBundle(options = {}) {
             sourceRoot: path.join(projectRoot, "out"),
             destinationRoot: temporaryRoot,
             destinationPrefix: "out",
-            exclude: relative => relative === ".tsbuildinfo-cn",
+            exclude: relative => relative === ".tsbuildinfo-cn" || isVersionControlMetadata(relative),
             files,
         })
         copyTree({
             sourceRoot: path.join(projectRoot, "assets"),
             destinationRoot: temporaryRoot,
             destinationPrefix: "assets",
-            exclude: relative => relative === "asset-patch" || relative.startsWith("asset-patch/"),
+            exclude: relative => (
+                relative === "asset-patch"
+                || relative.startsWith("asset-patch/")
+                || isVersionControlMetadata(relative)
+            ),
             files,
         })
         copyTree({
             sourceRoot: adminRoot,
             destinationRoot: temporaryRoot,
             destinationPrefix: "web/dist",
-            exclude: () => false,
+            exclude: isVersionControlMetadata,
             files,
         })
         copySingleFile({ sourcePath: path.join(projectRoot, "LICENSE"), destinationRoot: temporaryRoot, bundleRelative: "LICENSE", files })
