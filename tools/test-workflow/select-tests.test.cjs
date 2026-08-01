@@ -280,6 +280,7 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/runtime_admin.test.cjs",
             "tools/runtime_health.test.cjs",
             "tools/runtime_lifecycle.test.cjs",
+            "tools/runtime_native_binding.test.cjs",
         ],
     })
     assert.deepEqual(TEST_GROUPS["integration:runtime"], {

@@ -13,6 +13,12 @@ import {
 } from "../runtime/data-paths";
 import { createBetterSqlite3Database } from "../runtime/native-binding";
 
+// better-sqlite3 supports addon objects although the installed type declaration only lists paths.
+const sqlite3WithExternalAddon = sqlite3 as unknown as (
+    databasePath: string,
+    options?: { nativeBinding?: string | object },
+) => BetterSqlite3Database;
+
 export const enum Database {
     WDFP_DATA,
 }
@@ -133,7 +139,10 @@ export function initializeDatabase(
         const databaseExists = fs.existsSync(paths.databaseFile);
 
         const databaseFactory = options.databaseFactory
-            ?? ((databasePath: string) => createBetterSqlite3Database(sqlite3, databasePath));
+            ?? ((databasePath: string) => createBetterSqlite3Database(
+                sqlite3WithExternalAddon,
+                databasePath,
+            ));
         database = databaseFactory(paths.databaseFile);
 
         const userVersion = readUserVersion(database);

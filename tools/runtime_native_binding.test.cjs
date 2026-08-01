@@ -38,6 +38,18 @@ for (const environment of [
     })
 }
 
+test("rejects native binding files with unsupported extensions", t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "native-binding-extension-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const binding = path.join(root, "better_sqlite3.txt")
+    fs.writeFileSync(binding, "fixture")
+
+    assert.throws(
+        () => resolveNativeBinding({ BETTER_SQLITE3_NATIVE_BINDING: binding }),
+        error => error?.code === "INVALID_NATIVE_BINDING",
+    )
+})
+
 test("database factory passes the resolved native binding to better-sqlite3", t => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "native-binding-factory-"))
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))
@@ -59,4 +71,53 @@ test("database factory passes the resolved native binding to better-sqlite3", t 
         databasePath: path.join(root, "wdfp_data.db"),
         options: { nativeBinding: fs.realpathSync(binding) },
     }])
+})
+
+test("database factory loads APK-style shared libraries as addon objects", t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "native-binding-android-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const binding = path.join(root, "libsp_better_sqlite3.so")
+    fs.writeFileSync(binding, "fixture")
+    const addon = { Database: class {} }
+    const loaded = []
+    const calls = []
+
+    createBetterSqlite3Database(
+        (databasePath, options) => {
+            calls.push({ databasePath, options })
+            return { databasePath, options }
+        },
+        path.join(root, "wdfp_data.db"),
+        { BETTER_SQLITE3_NATIVE_BINDING: binding },
+        bindingPath => {
+            loaded.push(bindingPath)
+            return addon
+        },
+    )
+
+    assert.deepEqual(loaded, [fs.realpathSync(binding)])
+    assert.deepEqual(calls, [{
+        databasePath: path.join(root, "wdfp_data.db"),
+        options: { nativeBinding: addon },
+    }])
+})
+
+test("default APK-style addon loader reports a path-free configuration error", t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "native-binding-invalid-addon-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const binding = path.join(root, "libsp_better_sqlite3.so")
+    fs.writeFileSync(binding, "not a native addon")
+
+    assert.throws(
+        () => createBetterSqlite3Database(
+            () => ({ open: true }),
+            path.join(root, "wdfp_data.db"),
+            { BETTER_SQLITE3_NATIVE_BINDING: binding },
+        ),
+        error => (
+            error?.code === "INVALID_NATIVE_BINDING"
+            && !error.message.includes(root)
+            && error.cause === undefined
+        ),
+    )
 })

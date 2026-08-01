@@ -1,4 +1,5 @@
 import fs from "node:fs"
+import Module from "node:module"
 import path from "node:path"
 
 export class NativeBindingConfigError extends Error {
@@ -16,6 +17,10 @@ export function resolveNativeBinding(
     const configured = environment.BETTER_SQLITE3_NATIVE_BINDING
     if (configured === undefined) return undefined
     if (!path.isAbsolute(configured)) throw new NativeBindingConfigError()
+    const extension = path.extname(configured)
+    if (extension !== ".node" && extension !== ".so") {
+        throw new NativeBindingConfigError()
+    }
 
     let status: fs.Stats
     try {
@@ -33,12 +38,31 @@ export function resolveNativeBinding(
 }
 
 export function createBetterSqlite3Database<T>(
-    constructor: (databasePath: string, options?: { nativeBinding?: string }) => T,
+    constructor: (databasePath: string, options?: { nativeBinding?: string | object }) => T,
     databasePath: string,
     environment: Readonly<Record<string, string | undefined>> = process.env,
+    loadNativeBinding: (bindingPath: string) => object = loadNativeAddon,
 ): T {
     const nativeBinding = resolveNativeBinding(environment)
-    return nativeBinding === undefined
-        ? constructor(databasePath)
-        : constructor(databasePath, { nativeBinding })
+    if (nativeBinding === undefined) return constructor(databasePath)
+    return constructor(databasePath, {
+        nativeBinding: path.extname(nativeBinding) === ".node"
+            ? nativeBinding
+            : loadNativeBinding(nativeBinding),
+    })
+}
+
+function loadNativeAddon(bindingPath: string): object {
+    try {
+        const addonModule = new Module(bindingPath, module)
+        addonModule.filename = bindingPath
+        process.dlopen(addonModule, bindingPath)
+        const exports = addonModule.exports
+        if ((typeof exports !== "object" && typeof exports !== "function") || exports === null) {
+            throw new NativeBindingConfigError()
+        }
+        return exports
+    } catch {
+        throw new NativeBindingConfigError()
+    }
 }

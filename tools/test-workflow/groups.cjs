@@ -23,6 +23,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/runtime_admin.test.cjs",
             "tools/runtime_health.test.cjs",
             "tools/runtime_lifecycle.test.cjs",
+            "tools/runtime_native_binding.test.cjs",
         ],
     },
     "quick:modes": {
