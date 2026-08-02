@@ -141,17 +141,20 @@ Bundle 不包含：
 
 Content Release / fallback Catalog 是 CN 目标版本和归档清单的唯一权威。Asset Provider 不负责补丁版本分配、候选发布或自动回滚。
 
-## Server Manifest v2
+## Server Manifest v3
 
 manifest 核心字段如下：
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "name": "starpoint-cn",
   "serverVersion": "1.0.1",
   "bundleId": "sha256:<digest>",
   "entry": "out/cn-server.js",
+  "startup": {
+    "localPrepareEntry": "out/content/sync/entry.js"
+  },
   "requires": {
     "runtimeApi": 1,
     "node": ">=20.12.0",
@@ -179,9 +182,13 @@ manifest 核心字段如下：
 
 `requires.dependencyLock` 由 Builder 从仓库根 `package-lock.json` 原始字节计算。Supervisor 调用 verifier 时必须传入 Runtime Pack manifest 的同名值；不一致时不得启动候选 Bundle。
 
+`entry` 始终是长期运行的服务进程。`startup.localPrepareEntry` 是仅供 `ASSET_MODE=local` 使用的一次性内容准备进程；它与 `entry` 使用同一个受验证 Node、Bundle 工作目录和环境，成功标准是正常退出且退出码为 `0`。Supervisor 必须直接持有两个阶段各自的进程句柄，准备成功并确认进程退出后才能启动 `entry`。准备失败、收到信号、被取消或无法确认退出时不得启动服务进程。
+
+Manifest v2 继续作为兼容输入，只允许 `client-owned` 和 `remote`。要求 local 模式的 Supervisor 必须拒绝缺少 `startup.localPrepareEntry` 的 v2 Bundle；旧 Supervisor 则会因未知 schema 拒绝 v3，不能把 v3 当作 v2 降级执行。
+
 ## 启动配置
 
-Supervisor 以 Server Bundle 根为工作目录并执行 manifest `entry`。
+Supervisor 以 Server Bundle 根为工作目录。local 模式先执行 manifest `startup.localPrepareEntry`，成功后再执行 manifest `entry`；其他模式直接执行 `entry`。
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
@@ -200,14 +207,19 @@ Supervisor 以 Server Bundle 根为工作目录并执行 manifest `entry`。
 
 嵌入模式禁止设置旧 `WDFP_DATABASE_DIR`，也禁止设置 `CONTENT_DIR`、`CONTENT_STORE_DIR`、`CONTENT_STATE_DIR` 或 `CONTENT_RUNTIME_DIR`。Content Store、激活状态和 Asset Provider 可变数据因此都保留在唯一 `DATA_DIR`，bundled fallback 固定来自候选 Bundle 的 `assets/`；Supervisor 的一次停服备份可以覆盖全部可变状态。普通开发/服务器运行仍可使用这些兼容覆盖。
 
-默认监听回环地址。开放局域网或公网监听必须由部署者显式配置并承担访问控制。标准启动方式如下，`NODE_PATH` 是 Runtime Pack 与 CommonJS Bundle 之间唯一规范的模块解析桥梁：
+默认监听回环地址。开放局域网或公网监听必须由部署者显式配置并承担访问控制。`NODE_PATH` 是 Runtime Pack 与 CommonJS Bundle 之间唯一规范的模块解析桥梁。`client-owned` 和 `remote` 直接启动服务入口；local 的等价受支持顺序如下：
 
 ```bash
 cd <SERVER_BUNDLE>
-NODE_PATH=<RUNTIME_PACK>/node_modules \
-EMBEDDED_RUNTIME=1 \
-DATA_DIR=<ABSOLUTE_DATA_VOLUME> \
-BETTER_SQLITE3_NATIVE_BINDING=<ABSOLUTE_RUNTIME_ADDON> \
+export NODE_PATH=<RUNTIME_PACK>/node_modules
+export EMBEDDED_RUNTIME=1
+export DATA_DIR=<ABSOLUTE_DATA_VOLUME>
+export BETTER_SQLITE3_NATIVE_BINDING=<ABSOLUTE_RUNTIME_ADDON>
+export ASSET_MODE=local
+export CDN_DIR=<ABSOLUTE_CDN_PARENT>
+<RUNTIME_PACK>/node/bin/node out/content/sync/entry.js
+
+# 只有上一进程正常退出且退出码为 0 才执行
 <RUNTIME_PACK>/node/bin/node out/cn-server.js
 ```
 
@@ -215,14 +227,15 @@ Supervisor 在 Runtime Pack 的原生 addon 不位于 better-sqlite3 默认解�
 
 ## 生命周期
 
-启动顺序：
+Supervisor 和服务端的完整启动顺序：
 
-1. 解析并校验配置；
-2. 打开 Data Volume 和数据库，执行 migration；
-3. 加载 Content snapshot；
-4. 配置并监听 HTTP；
-5. 监听 TCP Session；
-6. 健康状态切换为 `ready`。
+1. Supervisor 校验 Runtime Pack、Server Bundle 和配置；
+2. local 模式启动内容准备入口并等待成功退出，其他模式跳过；
+3. Supervisor 清除准备阶段进程身份并启动服务入口；
+4. 服务解析配置，打开 Data Volume 和数据库并执行 migration；
+5. 服务加载 Content snapshot；
+6. 服务配置并监听 HTTP 与 TCP Session；
+7. 健康状态切换为 `ready`。
 
 任一步失败都会清理已打开资源并设置非零退出码。嵌入模式缺少或损坏 `server-manifest.json`、使用相对或与 Bundle/local CDN 重叠的 `DATA_DIR`，以及覆盖内容路径，均视为配置错误。退出码分类：
 

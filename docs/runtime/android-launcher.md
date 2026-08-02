@@ -17,8 +17,29 @@ ADB 代理、代理拦截、root 静默安装、设备兼容矩阵、厂商保�
 ## 资源模式
 
 - `client-owned` 是首版默认模式。客户端已经下载全量 CDN 时，服务端不读取本机 CDN，也不主动发布资源更新；没有 `CDN_DIR` 仍可进入 `ready`。
-- `local` 由用户选择外部 CDN 目录，Launcher 校验目录后传入 `CDN_DIR`；10GB 资源不进入 APK，也不随 Server Bundle 复制到应用私有目录。
+- `local` 使用固定外部目录 `/storage/emulated/0/Starpoint/cdn`，Launcher 校验特殊存储授权及 `cn/` 可读性后传入 `CDN_DIR`；10GB 资源不进入 APK，也不随 Server Bundle 复制到应用私有目录。
 - `remote` 只传入 `CDN_BASE_URL`，服务端声明外部地址，不由 Launcher 代理远端内容。
+
+普通设置页只显示 `client-owned` 和 `local`。`remote` 保留在配置模型和运行契约中，不提供首版可见入口。local 模式要求 Server Manifest v3；Launcher 先运行 `startup.localPrepareEntry`，确认退出码为 `0` 后再启动长期服务入口。准备进程失败、取消或未确认退出时不能继续启动服务。
+
+## CDN 补丁管理
+
+Launcher 可以通过系统文档选择器导入符合服务端 Patch Overlay schema 1 的外层 ZIP，但不生成、修复或解释补丁业务内容。导入目标固定为：
+
+```text
+/storage/emulated/0/Starpoint/cdn/
+|-- cn/
+`-- patches/
+    `-- <targetVersion>/
+        |-- patch-manifest.json
+        `-- archive-*-diff/
+```
+
+导入仅在服务停止时可用。Launcher 把选择的 ZIP 复制到 `/storage/emulated/0/Starpoint/.staging/cdn-patches/<operationId>`，拒绝加密条目、绝对路径、`..`、反斜线、重复规范化路径、符号链接和特殊文件，并按 manifest 校验目标版本、声明文件、字节数和 SHA-256。通过后把解包目录在同一存储卷内原子改名为 `patches/<targetVersion>`；目标已存在时拒绝覆盖。补丁依赖、三层版本边和完整升级图仍由 Server Bundle 的 Content Sync 权威校验，Launcher 不复制这部分服务端规则。
+
+删除同样只在服务停止时可用，只删除用户明确选择的 `patches/<targetVersion>`，不修改 `cn/`。删除后下次 local 启动重新同步内容并回到剩余补丁集合的有效最终版本。
+
+补丁真机验收分为两段：导入后启动 local 服务并打开客户端，登录后看到客户端自动弹出目标版本更新提示即停止，不点击下载、更新或安装；退出客户端并停服后删除补丁，再启动服务确认版本回到基线。客户端是否真正下载资源始终由用户控制。
 
 ## 客户端补丁
 

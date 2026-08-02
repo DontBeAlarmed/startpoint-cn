@@ -1,8 +1,8 @@
-# Server Bundle v2
+# Server Bundle v3
 
 Server Bundle 是不携带 Node、原生依赖和运行状态的可验证服务端代码包。默认构建到 `dist/server-bundle`：
 
-v2 将 `requires.dependencyLock` 设为必需字段，因此不会把缺少依赖兼容身份的早期 v1 manifest 当作合法候选。嵌入式运行契约仍是 v1；这里的版本只描述 Server Manifest/Bundle 格式。
+v3 在 v2 的必需依赖锁身份上增加 `startup.localPrepareEntry`，使宿主可以在 local CDN 模式下直接监管“内容同步进程 -> 服务进程”，不需要把会再派生 Node 子进程的 wrapper 当作唯一受监管进程。嵌入式运行契约仍是 v1；这里的版本只描述 Server Manifest/Bundle 格式。
 
 ```bash
 npm run build:bundle
@@ -18,6 +18,8 @@ npm run verify:bundle -- /path/to/server-bundle --dependency-lock sha256:<runtim
 `server-manifest.json` 使用递归键排序的 UTF-8 canonical JSON，并以换行结尾。`files` 按 POSIX 相对路径稳定排序，记录普通文件的字节数和小写 SHA256。manifest 自身不进入 `files`，避免摘要递归；`bundleId` 是移除 `bundleId` 后 canonical manifest 的 SHA256。`requires.dependencyLock` 是构建输入 `package-lock.json` 原始字节的 SHA256；Runtime Pack 必须用同一 lock 执行 `npm ci --omit=dev`，Supervisor 再通过 verifier 的 `--dependency-lock` 做依赖锁兼容校验。Node ABI、平台、CPU 架构和原生模块仍由 Supervisor 按 Runtime Pack manifest 独立校验。
 
 verifier 仅依赖 Node 内置模块和独立 canonical JSON 小模块。它会重新遍历 Bundle，并把 `out`、`assets`、`web/dist`、`LICENSE`、`NOTICE` 作为唯一允许的文件集合；即使伪造的 manifest 与额外文件彼此自洽，`web/public`、`web/pages`、`node_modules`、数据库、内容状态、CDN、APK、`asset-patch`、漫画和增量编译状态仍会被拒绝。它同时拒绝未知字段、不安全或重复路径、错序清单、符号链接、特殊文件、文件集合差异、摘要错误、`admin.required` 不为 `true`、缺少 admin 入口，以及不兼容的 runtime API、Node、Runtime Pack dependency lock 或可选数据 schema。
+
+v3 固定 `entry=out/cn-server.js`，并固定 `startup.localPrepareEntry=out/content/sync/entry.js`；两个入口都必须出现在 `files` 中。准备入口是编译后的生产 CLI，只执行一次 Content Sync 并以退出码报告结果，不启动 HTTP/TCP 服务。Supervisor 仅在 `ASSET_MODE=local` 时运行它，并在确认退出码为 `0` 后直接启动 `entry`。v2 Bundle 仍可用于 `client-owned` 和 `remote`，但不能声明 local 已具备受支持的嵌入启动流程。
 
 漫画是宿主或部署者另行准备的外置本地内容。普通开发默认读取项目根 `web/public/comic/`；嵌入模式必须通过绝对 `COMIC_DIR` 显式挂载，未配置时漫画接口返回空列表或 404。该目录不作为通用 `/public` 静态根，也不进入 Server Bundle。
 
