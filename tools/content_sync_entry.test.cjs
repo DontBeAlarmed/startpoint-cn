@@ -17,7 +17,7 @@ function loadEntry() {
 }
 
 for (const expectedCode of [0, 1]) {
-    test(`入口透传 argv 并返回 CLI 的 ${expectedCode} 结果`, async () => {
+    test(`CLI 持有 ${expectedCode} 退出码，入口只透传且不重复设置`, async () => {
         const { runContentSyncEntry } = loadEntry()
         const argv = ["--check"]
         const env = { CONTENT_SYNC_ENTRY_TEST: "1" }
@@ -50,7 +50,7 @@ for (const expectedCode of [0, 1]) {
     })
 }
 
-test("意外初始化异常只输出稳定类别且不泄露路径", async () => {
+test("CLI 拒绝时由入口设置一次兜底退出码且不泄露路径", async () => {
     const { runContentSyncEntry } = loadEntry()
     const secretPath = "/private/sensitive/content/catalog.json"
     let stderr = ""

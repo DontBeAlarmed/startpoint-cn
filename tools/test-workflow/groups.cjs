@@ -136,6 +136,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/content_repository.test.cjs",
             "tools/content_snapshot_configuration.test.cjs",
             "tools/content_startup.test.cjs",
+            "tools/content_sync_entry.test.cjs",
             "tools/content_sync.test.cjs",
             "tools/content_object_store.test.cjs",
             "tools/content_archive_index.test.cjs",

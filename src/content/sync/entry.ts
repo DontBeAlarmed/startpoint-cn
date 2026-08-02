@@ -22,6 +22,7 @@ export async function runContentSyncEntry(
         setExitCode,
     }
 
+    // The CLI owns resolved exit codes; this entry owns only rejected CLI startup.
     try {
         return await runCli(argv, cliDependencies)
     } catch {

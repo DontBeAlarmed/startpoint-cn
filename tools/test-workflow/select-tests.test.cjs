@@ -131,6 +131,7 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/content/startup/bootstrap.ts"]),
         ["integration:runtime", "quick:content"],
     )
+    assert.deepEqual(selectTestGroups(["src/content/sync/entry.ts"]), ["quick:content"])
     assert.deepEqual(
         selectTestGroups(["src/multi/tcp/server.ts"]),
         ["integration:runtime", "quick:protocol"],
@@ -347,6 +348,10 @@ test("registers the focused CDN path contract", () => {
     )
     assert.deepEqual(
         selectTestGroups(["tools/content_snapshot_configuration.test.cjs"]),
+        ["quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/content_sync_entry.test.cjs"]),
         ["quick:content"],
     )
 })

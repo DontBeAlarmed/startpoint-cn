@@ -83,6 +83,32 @@ test("accepts a complete default out directory", t => {
     assert.doesNotMatch(result.stdout, new RegExp(projectDirectory.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
 })
 
+test("force-kills an export probe that handles SIGTERM and treats it as invalid", t => {
+    const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "verify-cn-build-timeout-"))
+    t.after(() => fs.rmSync(outputDirectory, { recursive: true, force: true }))
+    createRuntimeFiles(
+        outputDirectory,
+        "module.exports = { runContentStartup() {} }\n",
+    )
+    createFile(
+        outputDirectory,
+        "content/sync/entry.js",
+        "process.on('SIGTERM', () => {})\n"
+            + "setTimeout(() => process.exit(0), 4000)\n"
+            + "module.exports = { runContentSyncEntry() {} }\n",
+    )
+
+    const result = spawnSync(process.execPath, [verifier, outputDirectory], {
+        encoding: "utf8",
+        timeout: 2_500,
+        killSignal: "SIGKILL",
+    })
+
+    assert.equal(result.error, undefined)
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /content\/sync\/entry\.js/)
+})
+
 for (const [name, bootstrapContents] of [
     ["空 bootstrap", ""],
     ["无 runContentStartup 导出的旧 bootstrap", "module.exports = {}\n"],

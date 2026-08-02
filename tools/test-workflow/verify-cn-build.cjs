@@ -4,6 +4,8 @@ const fs = require("node:fs")
 const { spawnSync } = require("node:child_process")
 const path = require("node:path")
 
+const EXPORT_PROBE_TIMEOUT_MS = 1_000
+
 const requiredFiles = [
     "cn-server.js",
     "server.js",
@@ -30,7 +32,11 @@ function verifyBuild(outputDirectory) {
             "const value = require(process.argv[1]); if (typeof value[process.argv[2]] !== 'function') process.exit(1)",
             modulePath,
             exportName,
-        ], { stdio: "ignore" })
+        ], {
+            stdio: "ignore",
+            timeout: EXPORT_PROBE_TIMEOUT_MS,
+            killSignal: "SIGKILL",
+        })
         if (probe.error || probe.signal !== null || probe.status !== 0) {
             invalidFiles.push(relativePath)
         }

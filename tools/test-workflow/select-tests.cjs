@@ -94,6 +94,7 @@ const SOURCE_RULES = [
         pattern: /^src\/content\/startup\/bootstrap\.ts$/,
         groups: ["quick:content", "integration:runtime"],
     },
+    { pattern: /^src\/content\/sync\/entry\.ts$/, groups: ["quick:content"] },
     {
         pattern: /^src\/content\/(?:converters\/(?:additional-reward|box-gacha|gameplay|item-equipment|mana-node|reward-campaign|skill-effects)|sync\/amf3)\.ts$/,
         groups: ["quick:content"],
