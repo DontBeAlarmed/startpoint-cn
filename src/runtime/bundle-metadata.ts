@@ -5,6 +5,9 @@ import path from "node:path"
 export const FALLBACK_BUNDLE_VERSION = "unknown"
 const SEMANTIC_VERSION = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/
 const BUNDLE_ID = /^sha256:[0-9a-f]{64}$/
+const objectWithHasOwn = Object as ObjectConstructor & {
+    hasOwn(value: object, property: PropertyKey): boolean
+}
 
 export interface BundleMetadata {
     readonly version: string
@@ -43,12 +46,25 @@ function normalizeMetadata(value: BundleMetadata | null): BundleMetadata | null 
     return Object.freeze({ version: value.version, bundleId: value.bundleId })
 }
 
+function hasSupportedManifestSchema(value: unknown): boolean {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return false
+    const manifest = value as Record<string, unknown>
+    if (manifest.schemaVersion === 2) return !objectWithHasOwn.hasOwn(manifest, "startup")
+    if (manifest.schemaVersion !== 3 || !objectWithHasOwn.hasOwn(manifest, "startup")) return false
+    const startup = manifest.startup
+    if (startup === null || typeof startup !== "object" || Array.isArray(startup)) return false
+    const startupKeys = Object.keys(startup)
+    return startupKeys.length === 1
+        && startupKeys[0] === "localPrepareEntry"
+        && (startup as Record<string, unknown>).localPrepareEntry === "out/content/sync/entry.js"
+}
+
 function readDefaultServerManifest(
     bundleRoot: string,
     readFileSync: (filePath: string, encoding: "utf8") => string,
 ): BundleMetadata | null {
     const value = JSON.parse(readFileSync(path.join(bundleRoot, "server-manifest.json"), "utf8"))
-    if (value?.schemaVersion !== 2
+    if (!hasSupportedManifestSchema(value)
         || value?.name !== "starpoint-cn"
         || typeof value.serverVersion !== "string"
         || !SEMANTIC_VERSION.test(value.serverVersion)
