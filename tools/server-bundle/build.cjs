@@ -253,12 +253,16 @@ function buildServerBundle(options = {}) {
         if (!files.some(file => file.path === "out/cn-server.js")) {
             throw new Error("Bundle entry out/cn-server.js is missing")
         }
+        if (!files.some(file => file.path === "out/content/sync/entry.js")) {
+            throw new Error("Local prepare entry out/content/sync/entry.js is missing")
+        }
 
         const digestInput = {
-            schemaVersion: 2,
+            schemaVersion: 3,
             name: "starpoint-cn",
             serverVersion: packageJson.version,
             entry: "out/cn-server.js",
+            startup: { localPrepareEntry: "out/content/sync/entry.js" },
             requires: {
                 runtimeApi: 1,
                 node: packageJson.engines.node,

@@ -43,6 +43,11 @@ function temporaryProject(t, { admin = true } = {}) {
         packages: {},
     }))
     write(root, "out/cn-server.js", "console.log('server')\n")
+    write(
+        root,
+        "out/content/sync/entry.js",
+        "async function runContentSyncEntry() {}\nmodule.exports = { runContentSyncEntry }\n",
+    )
     write(root, "out/lib/runtime.js", "module.exports = 1\n")
     write(root, "out/.tsbuildinfo-cn", "incremental state")
     write(root, "out/.gitignore", "runtime-only-ignore\n")
@@ -80,6 +85,80 @@ function canonicalBuffer(value) {
     return Buffer.from(`${encodeCanonical(value)}\n`, "utf8")
 }
 
+function snapshotFiles(root) {
+    const files = []
+
+    function visit(absoluteDirectory, relativeDirectory) {
+        const entries = fs.readdirSync(absoluteDirectory, { withFileTypes: true })
+            .sort((left, right) => Buffer.compare(
+                Buffer.from(left.name, "utf8"),
+                Buffer.from(right.name, "utf8"),
+            ))
+        for (const entry of entries) {
+            const relativePath = relativeDirectory
+                ? `${relativeDirectory}/${entry.name}`
+                : entry.name
+            const absolutePath = path.join(absoluteDirectory, entry.name)
+            if (entry.isDirectory()) {
+                visit(absolutePath, relativePath)
+            } else {
+                assert.equal(entry.isFile(), true)
+                files.push({ path: relativePath, bytes: fs.readFileSync(absolutePath) })
+            }
+        }
+    }
+
+    visit(root, "")
+    return files
+}
+
+function assertNoFailedBuildOutput(outputRoot) {
+    assert.equal(fs.existsSync(outputRoot), false)
+    const outputParent = path.dirname(outputRoot)
+    const stagingPrefix = `${path.basename(outputRoot)}.building-`
+    const staging = fs.existsSync(outputParent)
+        ? fs.readdirSync(outputParent).filter(name => name.startsWith(stagingPrefix))
+        : []
+    assert.deepEqual(staging, [])
+}
+
+function assertSelfConsistentV2Bundle(bundleRoot) {
+    const manifestPath = path.join(bundleRoot, "server-manifest.json")
+    const manifestBytes = fs.readFileSync(manifestPath)
+    const manifest = JSON.parse(manifestBytes.toString("utf8"))
+    assert.deepEqual(Object.keys(manifest).sort(), [
+        "admin",
+        "assets",
+        "bundleId",
+        "entry",
+        "files",
+        "name",
+        "ports",
+        "requires",
+        "schemaVersion",
+        "serverVersion",
+    ])
+    assert.equal(manifest.schemaVersion, 2)
+    assert.equal(Object.hasOwn(manifest, "startup"), false)
+    assert.deepEqual(manifestBytes, canonicalBuffer(manifest))
+
+    const { bundleId, ...digestInput } = manifest
+    assert.equal(
+        bundleId,
+        `sha256:${crypto.createHash("sha256").update(canonicalBuffer(digestInput)).digest("hex")}`,
+    )
+    const snapshot = snapshotFiles(bundleRoot)
+    assert.deepEqual(
+        snapshot.map(file => file.path).sort(),
+        ["server-manifest.json", ...manifest.files.map(file => file.path)].sort(),
+    )
+    for (const file of manifest.files) {
+        const bytes = fs.readFileSync(path.join(bundleRoot, ...file.path.split("/")))
+        assert.equal(file.bytes, bytes.length)
+        assert.equal(file.sha256, crypto.createHash("sha256").update(bytes).digest("hex"))
+    }
+}
+
 function rewriteManifest(bundleRoot, mutate) {
     const manifestPath = path.join(bundleRoot, "server-manifest.json")
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"))
@@ -99,10 +178,13 @@ function buildFixture(t, options) {
     return { manifest, outputRoot, root }
 }
 
-test("builds a canonical reproducible thin server bundle without web/public", t => {
+test("builds a canonical reproducible thin server bundle without web/public", async t => {
     const { buildServerBundle } = loadImplementations()
     const root = temporaryProject(t)
     assert.equal(fs.existsSync(path.join(root, "web/public")), false)
+    const compiledEntry = require(path.join(root, "out/content/sync/entry.js"))
+    assert.deepEqual(Object.keys(compiledEntry), ["runContentSyncEntry"])
+    assert.equal(await compiledEntry.runContentSyncEntry(), undefined)
     const firstOutput = path.join(root, "dist/server-bundle")
     const secondOutput = path.join(root, "dist/server-bundle-copy")
 
@@ -125,6 +207,7 @@ test("builds a canonical reproducible thin server bundle without web/public", t 
         },
         bundleId: first.bundleId,
         entry: "out/cn-server.js",
+        startup: { localPrepareEntry: "out/content/sync/entry.js" },
         files: first.files,
         name: "starpoint-cn",
         ports: { http: 8001, tcp: 8003 },
@@ -137,7 +220,7 @@ test("builds a canonical reproducible thin server bundle without web/public", t 
             runtimeApi: 1,
             targetDataSchema: 14,
         },
-        schemaVersion: 2,
+        schemaVersion: 3,
         serverVersion: "1.0.1",
     })
     assert.match(first.bundleId, /^sha256:[0-9a-f]{64}$/)
@@ -149,10 +232,17 @@ test("builds a canonical reproducible thin server bundle without web/public", t 
             "assets/base.json",
             "assets/nested/table.json",
             "out/cn-server.js",
+            "out/content/sync/entry.js",
             "out/lib/runtime.js",
             "web/dist/assets/admin.js",
             "web/dist/index.html",
         ],
+    )
+    const { bundleId: _bundleId, ...digestInput } = first
+    const { startup: _startup, ...digestWithoutStartup } = digestInput
+    assert.notEqual(
+        first.bundleId,
+        `sha256:${crypto.createHash("sha256").update(canonicalBuffer(digestWithoutStartup)).digest("hex")}`,
     )
     assert.equal(first.files.some(file => file.path === "server-manifest.json"), false)
     assert.equal(first.files.some(file => file.path.endsWith("/.gitignore")), false)
@@ -228,13 +318,36 @@ test("builder rejects unsafe input trees, input-contained output, and unowned ou
         )
     })
 
-    await t.test("missing entry", t => {
+    await t.test("missing server entry", t => {
         const root = temporaryProject(t)
+        const outputRoot = path.join(root, "dist/bundle")
         fs.unlinkSync(path.join(root, "out/cn-server.js"))
-        assert.throws(
-            () => buildServerBundle({ projectRoot: root, outputRoot: path.join(root, "dist/bundle") }),
-            /entry/i,
-        )
+        let thrown
+        try {
+            buildServerBundle({ projectRoot: root, outputRoot })
+        } catch (error) {
+            thrown = error
+        }
+        assert.ok(thrown)
+        assert.match(thrown.message, /bundle entry out\/cn-server\.js is missing/i)
+        assert.equal(thrown.message.includes(root), false)
+        assertNoFailedBuildOutput(outputRoot)
+    })
+
+    await t.test("missing local prepare entry", t => {
+        const root = temporaryProject(t)
+        const outputRoot = path.join(root, "dist/bundle")
+        fs.unlinkSync(path.join(root, "out/content/sync/entry.js"))
+        let thrown
+        try {
+            buildServerBundle({ projectRoot: root, outputRoot })
+        } catch (error) {
+            thrown = error
+        }
+        assert.ok(thrown)
+        assert.match(thrown.message, /local prepare entry out\/content\/sync\/entry\.js is missing/i)
+        assert.equal(thrown.message.includes(root), false)
+        assertNoFailedBuildOutput(outputRoot)
     })
 
     await t.test("missing dependency lock", t => {
@@ -269,19 +382,21 @@ test("builder rejects unsafe input trees, input-contained output, and unowned ou
         assert.equal(fs.readFileSync(path.join(outputRoot, "personal.txt"), "utf8"), "keep me")
     })
 
-    await t.test("forged ownership manifest", t => {
+    await t.test("self-consistent v2 existing output", t => {
         const root = temporaryProject(t)
         const outputRoot = path.join(root, "dist/bundle")
-        write(outputRoot, "personal.txt", "keep me")
-        write(outputRoot, "server-manifest.json", JSON.stringify({
-            schemaVersion: 1,
-            name: "starpoint-cn",
-        }))
+        buildServerBundle({ projectRoot: root, outputRoot })
+        rewriteManifest(outputRoot, manifest => {
+            manifest.schemaVersion = 2
+            delete manifest.startup
+        })
+        assertSelfConsistentV2Bundle(outputRoot)
+        const before = snapshotFiles(outputRoot)
         assert.throws(
             () => buildServerBundle({ projectRoot: root, outputRoot }),
             /not owned/i,
         )
-        assert.equal(fs.readFileSync(path.join(outputRoot, "personal.txt"), "utf8"), "keep me")
+        assert.deepEqual(snapshotFiles(outputRoot), before)
     })
 })
 
@@ -413,6 +528,65 @@ test("verifier rejects symlinks and non-canonical or shape-invalid manifests", a
         rewriteManifest(fixture.outputRoot, manifest => { manifest.unexpected = true })
         assert.throws(() => verifyServerBundle({ bundleRoot: fixture.outputRoot }), /exact|field|key/i)
     })
+
+    const startupShapes = [
+        ["missing startup", manifest => { delete manifest.startup }, /manifest.*exact keys|startup/i],
+        ["startup is null", manifest => { manifest.startup = null }, /startup.*object/i],
+        ["startup is an array", manifest => { manifest.startup = [] }, /startup.*object/i],
+        ["startup is a string", manifest => { manifest.startup = "out\/content\/sync\/entry.js" }, /startup.*object/i],
+        ["startup missing localPrepareEntry", manifest => { manifest.startup = {} }, /startup.*exact keys/i],
+        ["startup has an unknown key", manifest => {
+            manifest.startup = {
+                localPrepareEntry: "out/content/sync/entry.js",
+                unknown: true,
+            }
+        }, /startup.*exact keys/i],
+    ]
+    for (const [name, mutate, expected] of startupShapes) {
+        await t.test(name, t => {
+            const fixture = buildFixture(t)
+            rewriteManifest(fixture.outputRoot, mutate)
+            assert.throws(() => verifyServerBundle({ bundleRoot: fixture.outputRoot }), expected)
+        })
+    }
+
+    const localPrepareEntries = [
+        ["unsafe local prepare entry", "../content/sync/entry.js", /startup\.localPrepareEntry.*unsafe/i],
+        ["non-fixed local prepare entry", "out/content/sync/other.js", /startup\.localPrepareEntry must be out\/content\/sync\/entry\.js/i],
+    ]
+    for (const [name, localPrepareEntry, expected] of localPrepareEntries) {
+        await t.test(name, t => {
+            const fixture = buildFixture(t)
+            rewriteManifest(fixture.outputRoot, manifest => {
+                manifest.startup = { localPrepareEntry }
+            })
+            assert.throws(() => verifyServerBundle({ bundleRoot: fixture.outputRoot }), expected)
+        })
+    }
+
+    await t.test("local prepare entry is not listed in files", t => {
+        const fixture = buildFixture(t)
+        rewriteManifest(fixture.outputRoot, manifest => {
+            manifest.files = manifest.files.filter(file => (
+                file.path !== "out/content/sync/entry.js"
+            ))
+        })
+        assert.throws(
+            () => verifyServerBundle({ bundleRoot: fixture.outputRoot }),
+            /startup\.localPrepareEntry must be listed in files/i,
+        )
+    })
+
+    for (const schemaVersion of [2, 4]) {
+        await t.test(`schema version ${schemaVersion}`, t => {
+            const fixture = buildFixture(t)
+            rewriteManifest(fixture.outputRoot, manifest => { manifest.schemaVersion = schemaVersion })
+            assert.throws(
+                () => verifyServerBundle({ bundleRoot: fixture.outputRoot }),
+                /schemaVersion must be 3/,
+            )
+        })
+    }
 })
 
 test("verifier enforces runtime, Node, data schema, entry, and admin compatibility", async t => {

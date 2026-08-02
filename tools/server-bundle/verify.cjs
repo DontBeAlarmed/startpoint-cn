@@ -8,7 +8,7 @@ const path = require("node:path")
 const { canonicalJsonBuffer, sha256Hex } = require("./canonical-json.cjs")
 
 const MANIFEST_NAME = "server-manifest.json"
-const ROOT_KEYS = ["admin", "assets", "bundleId", "entry", "files", "name", "ports", "requires", "schemaVersion", "serverVersion"]
+const ROOT_KEYS = ["admin", "assets", "bundleId", "entry", "files", "name", "ports", "requires", "schemaVersion", "serverVersion", "startup"]
 
 function fail(message) {
     throw new Error(message)
@@ -101,7 +101,7 @@ function compareVersions(left, right) {
 function validateManifest(manifest, manifestBytes, dataSchema, dependencyLock) {
     exactKeys(manifest, ROOT_KEYS, "manifest")
     if (!manifestBytes.equals(canonicalJsonBuffer(manifest))) fail("server manifest must be canonical JSON")
-    if (manifest.schemaVersion !== 2) fail("schemaVersion must be 2")
+    if (manifest.schemaVersion !== 3) fail("schemaVersion must be 3")
     if (manifest.name !== "starpoint-cn") fail("name must be starpoint-cn")
     if (typeof manifest.serverVersion !== "string"
         || !/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(manifest.serverVersion)) {
@@ -112,6 +112,11 @@ function validateManifest(manifest, manifestBytes, dataSchema, dependencyLock) {
     }
     if (safeRelativePath(manifest.entry, "entry") !== "out/cn-server.js") {
         fail("entry must be out/cn-server.js")
+    }
+    exactKeys(manifest.startup, ["localPrepareEntry"], "startup")
+    if (safeRelativePath(manifest.startup.localPrepareEntry, "startup.localPrepareEntry")
+        !== "out/content/sync/entry.js") {
+        fail("startup.localPrepareEntry must be out/content/sync/entry.js")
     }
 
     exactKeys(
@@ -190,6 +195,9 @@ function validateManifest(manifest, manifestBytes, dataSchema, dependencyLock) {
         }
     }
     if (!seen.has(manifest.entry)) fail("entry must be listed in files")
+    if (!seen.has(manifest.startup.localPrepareEntry)) {
+        fail("startup.localPrepareEntry must be listed in files")
+    }
     for (const requiredFile of ["LICENSE", "NOTICE"]) {
         if (!seen.has(requiredFile)) fail(`${requiredFile} is required in files`)
     }
