@@ -83,6 +83,95 @@ test("accepts a complete default out directory", t => {
     assert.doesNotMatch(result.stdout, new RegExp(projectDirectory.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
 })
 
+test("rejects a runtime module that writes the marker to stdout and exits zero", t => {
+    const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "verify-cn-build-exit-zero-"))
+    t.after(() => fs.rmSync(outputDirectory, { recursive: true, force: true }))
+    createRuntimeFiles(
+        outputDirectory,
+        "module.exports = { runContentStartup() {} }\n",
+    )
+    createFile(
+        outputDirectory,
+        "content/sync/entry.js",
+        "process.stdout.write(Buffer.from([1])); process.exit(0)\n",
+    )
+
+    const result = spawnSync(process.execPath, [verifier, outputDirectory], {
+        encoding: "utf8",
+    })
+
+    assert.equal(result.status, 1)
+    assert.equal(result.stdout, "")
+    assert.match(result.stderr, /content\/sync\/entry\.js/)
+    assert.doesNotMatch(result.stderr, new RegExp(outputDirectory.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+})
+
+test("rejects a runtime module that throws while loading", t => {
+    const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "verify-cn-build-throw-"))
+    t.after(() => fs.rmSync(outputDirectory, { recursive: true, force: true }))
+    createRuntimeFiles(
+        outputDirectory,
+        "module.exports = { runContentStartup() {} }\n",
+    )
+    createFile(
+        outputDirectory,
+        "content/sync/entry.js",
+        "throw new Error('failed to load runtime module')\n",
+    )
+
+    const result = spawnSync(process.execPath, [verifier, outputDirectory], {
+        encoding: "utf8",
+    })
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /content\/sync\/entry\.js/)
+    assert.doesNotMatch(result.stderr, new RegExp(outputDirectory.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+})
+
+test("accepts a correct export without forwarding ordinary module output", t => {
+    const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "verify-cn-build-module-output-"))
+    t.after(() => fs.rmSync(outputDirectory, { recursive: true, force: true }))
+    createRuntimeFiles(
+        outputDirectory,
+        "module.exports = { runContentStartup() {} }\n",
+    )
+    createFile(
+        outputDirectory,
+        "content/sync/entry.js",
+        "process.stdout.write('ordinary module output\\n')\n"
+            + "module.exports = { runContentSyncEntry() {} }\n",
+    )
+
+    const result = spawnSync(process.execPath, [verifier, outputDirectory], {
+        encoding: "utf8",
+    })
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.stdout, "CN build verified\n")
+})
+
+test("rejects extra bytes on the completion channel", t => {
+    const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "verify-cn-build-extra-marker-"))
+    t.after(() => fs.rmSync(outputDirectory, { recursive: true, force: true }))
+    createRuntimeFiles(
+        outputDirectory,
+        "module.exports = { runContentStartup() {} }\n",
+    )
+    createFile(
+        outputDirectory,
+        "content/sync/entry.js",
+        "require('node:fs').writeSync(3, Buffer.from([1]))\n"
+            + "module.exports = { runContentSyncEntry() {} }\n",
+    )
+
+    const result = spawnSync(process.execPath, [verifier, outputDirectory], {
+        encoding: "utf8",
+    })
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /content\/sync\/entry\.js/)
+})
+
 test("force-kills an export probe that handles SIGTERM and treats it as invalid", t => {
     const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "verify-cn-build-timeout-"))
     t.after(() => fs.rmSync(outputDirectory, { recursive: true, force: true }))

@@ -5,6 +5,13 @@ const { spawnSync } = require("node:child_process")
 const path = require("node:path")
 
 const EXPORT_PROBE_TIMEOUT_MS = 1_000
+const EXPORT_PROBE_SUCCESS = Buffer.from([1])
+const EXPORT_PROBE_SCRIPT = [
+    "const writeCompletion = require('node:fs').writeSync",
+    "const value = require(process.argv[1])",
+    "if (typeof value[process.argv[2]] !== 'function') process.exit(1)",
+    "writeCompletion(3, Buffer.from([1]))",
+].join(";")
 
 const requiredFiles = [
     "cn-server.js",
@@ -29,15 +36,17 @@ function verifyBuild(outputDirectory) {
         const modulePath = path.join(outputDirectory, relativePath)
         const probe = spawnSync(process.execPath, [
             "-e",
-            "const value = require(process.argv[1]); if (typeof value[process.argv[2]] !== 'function') process.exit(1)",
+            EXPORT_PROBE_SCRIPT,
             modulePath,
             exportName,
         ], {
-            stdio: "ignore",
+            stdio: ["ignore", "ignore", "ignore", "pipe"],
             timeout: EXPORT_PROBE_TIMEOUT_MS,
             killSignal: "SIGKILL",
         })
-        if (probe.error || probe.signal !== null || probe.status !== 0) {
+        const completed = Buffer.isBuffer(probe.output?.[3])
+            && probe.output[3].equals(EXPORT_PROBE_SUCCESS)
+        if (probe.error || probe.signal !== null || probe.status !== 0 || !completed) {
             invalidFiles.push(relativePath)
         }
     }
