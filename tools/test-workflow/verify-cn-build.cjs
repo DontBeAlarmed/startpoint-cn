@@ -7,25 +7,32 @@ const path = require("node:path")
 const requiredFiles = [
     "cn-server.js",
     "server.js",
+    "content/sync/entry.js",
     "content/startup/bootstrap.js",
     "multi/tcp/lobby.js",
     "multi/npc/controller.js",
+]
+
+const requiredExports = [
+    ["content/sync/entry.js", "runContentSyncEntry"],
+    ["content/startup/bootstrap.js", "runContentStartup"],
 ]
 
 function verifyBuild(outputDirectory) {
     const invalidFiles = requiredFiles.filter(relativePath => (
         !fs.existsSync(path.join(outputDirectory, relativePath))
     ))
-    const bootstrapRelativePath = "content/startup/bootstrap.js"
-    if (!invalidFiles.includes(bootstrapRelativePath)) {
-        const bootstrapPath = path.join(outputDirectory, bootstrapRelativePath)
+    for (const [relativePath, exportName] of requiredExports) {
+        if (invalidFiles.includes(relativePath)) continue
+        const modulePath = path.join(outputDirectory, relativePath)
         const probe = spawnSync(process.execPath, [
             "-e",
-            "const value = require(process.argv[1]); if (typeof value.runContentStartup !== 'function') process.exit(1)",
-            bootstrapPath,
+            "const value = require(process.argv[1]); if (typeof value[process.argv[2]] !== 'function') process.exit(1)",
+            modulePath,
+            exportName,
         ], { stdio: "ignore" })
         if (probe.error || probe.signal !== null || probe.status !== 0) {
-            invalidFiles.push(bootstrapRelativePath)
+            invalidFiles.push(relativePath)
         }
     }
     return invalidFiles

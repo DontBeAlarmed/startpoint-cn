@@ -79,7 +79,7 @@ for (const releaseState of ["版本未变化", "版本已变化并激活 Release
 
         const running = runContentStartup(harness.dependencies)
         assert.equal(harness.calls.length, 1)
-        assert.equal(path.basename(harness.calls[0].args[0]), "content_sync.cjs")
+        assert.equal(harness.calls[0].args[0], path.join(projectRoot, "out/content/sync/entry.js"))
 
         await finishSync(harness)
         assert.equal(harness.calls.length, 2)
@@ -96,7 +96,7 @@ test("显式 local 与默认模式一样先 sync 再启动 server", async () => 
     harness.dependencies.env = { ASSET_MODE: "local" }
 
     const running = runContentStartup(harness.dependencies)
-    assert.equal(path.basename(harness.calls[0].args[0]), "content_sync.cjs")
+    assert.equal(harness.calls[0].args[0], path.join(projectRoot, "out/content/sync/entry.js"))
     await finishSync(harness)
     assert.equal(path.basename(harness.calls[1].args[0]), "cn-server.js")
     harness.children[1].emit("close", 0, null)
@@ -314,7 +314,7 @@ test("固定使用仓库入口、调用者 cwd 和参数不能注入 shell 命�
     assert.deepEqual(
         harness.calls.map(call => [call.executable, call.args, call.options]),
         [
-            ["/fixed/node", [path.join(projectRoot, "tools/content_sync.cjs")], {
+            ["/fixed/node", [path.join(projectRoot, "out/content/sync/entry.js")], {
                 cwd: projectRoot,
                 env: harness.dependencies.env,
                 shell: false,

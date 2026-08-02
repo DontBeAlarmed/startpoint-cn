@@ -9,6 +9,7 @@ const verifier = path.resolve(__dirname, "verify-cn-build.cjs")
 const requiredFiles = [
     "cn-server.js",
     "server.js",
+    "content/sync/entry.js",
     "content/startup/bootstrap.js",
     "multi/tcp/lobby.js",
     "multi/npc/controller.js",
@@ -22,11 +23,12 @@ function createFile(root, relativePath, contents = "") {
 
 function createRuntimeFiles(outputDirectory, bootstrapContents) {
     for (const relativePath of requiredFiles) {
-        createFile(
-            outputDirectory,
-            relativePath,
-            relativePath === "content/startup/bootstrap.js" ? bootstrapContents : "",
-        )
+        let contents = ""
+        if (relativePath === "content/startup/bootstrap.js") contents = bootstrapContents
+        if (relativePath === "content/sync/entry.js") {
+            contents = "module.exports = { runContentSyncEntry() {} }\n"
+        }
+        createFile(outputDirectory, relativePath, contents)
     }
 }
 

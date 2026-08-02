@@ -187,10 +187,10 @@ test("compiled bootstrap selects sync only for local mode", async t => {
     await t.test("default local", async () => {
         const harness = createStartupHarness({})
         const running = harness.run()
-        assert.deepEqual(harness.calls, ["content_sync.cjs"])
+        assert.deepEqual(harness.calls, ["entry.js"])
         harness.children[0].emit("close", 0, null)
         await waitForCallCount(harness, 2)
-        assert.deepEqual(harness.calls, ["content_sync.cjs", "cn-server.js"])
+        assert.deepEqual(harness.calls, ["entry.js", "cn-server.js"])
         harness.children[1].emit("close", 0, null)
         assert.deepEqual(await running, { code: 0, signal: null })
     })

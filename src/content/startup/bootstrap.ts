@@ -2,6 +2,8 @@ import { spawn as spawnChildProcess } from "node:child_process"
 import path from "node:path"
 
 import { parseAssetProviderConfig } from "../cdn/asset-mode"
+// Keep the standalone sync entry in the explicit CN TypeScript build graph.
+import type {} from "../sync/entry"
 
 export interface StartupOutcome {
     readonly code: number | null
@@ -123,7 +125,7 @@ export async function runContentStartup(
         if (assetProvider.mode === "local") {
             const syncOutcome = await runStage(
                 "sync",
-                path.join(projectRoot, "tools/content_sync.cjs"),
+                path.join(projectRoot, "out/content/sync/entry.js"),
             )
             if (
                 shutdownSignal !== null
