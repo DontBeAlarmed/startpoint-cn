@@ -19,7 +19,6 @@ const DOS_TIME = 0
 const DOS_DATE = 0x0021
 const REGULAR_0644 = (0o100644 << 16) >>> 0
 const READ_BUFFER_SIZE = 64 * 1024
-const PUBLICATION_CLEANUP_HANDLED = Symbol("publicationCleanupHandled")
 
 const CRC32_TABLE = new Uint32Array(256)
 for (let index = 0; index < CRC32_TABLE.length; index++) {
@@ -465,35 +464,6 @@ function destinationExists(io, outputPath) {
     }
 }
 
-function publicationCleanupError({ cleanupError, published, rollbackError }) {
-    const failure = new Error(
-        published
-            ? "Archive publication and temporary cleanup both remain pending"
-            : "Archive publication was rolled back but temporary cleanup remains pending",
-        { cause: cleanupError },
-    )
-    failure.name = published
-        ? "ArchivePublicationCleanupError"
-        : "ArchiveTemporaryCleanupError"
-    failure.code = published
-        ? "ARCHIVE_PUBLICATION_CLEANUP_PENDING"
-        : "ARCHIVE_TEMP_CLEANUP_PENDING"
-    failure.published = published
-    failure.cleanupPending = true
-    if (rollbackError !== undefined) failure.rollbackError = rollbackError
-    failure[PUBLICATION_CLEANUP_HANDLED] = true
-    return failure
-}
-
-function sameRegularFile(io, leftPath, rightPath) {
-    const left = io.lstatSync(leftPath)
-    const right = io.lstatSync(rightPath)
-    return left.isFile()
-        && right.isFile()
-        && left.dev === right.dev
-        && left.ino === right.ino
-}
-
 function publishWithoutReplacement(io, temporaryPath, outputPath) {
     try {
         io.linkSync(temporaryPath, outputPath)
@@ -506,32 +476,21 @@ function publishWithoutReplacement(io, temporaryPath, outputPath) {
         throw error
     }
 
-    let cleanupError
     for (let attempt = 0; attempt < 2; attempt++) {
         try {
             io.unlinkSync(temporaryPath)
-            return
+            return { published: true, cleanupPending: false }
         } catch (error) {
-            cleanupError = error
+            if (error && error.code === "ENOENT") {
+                return { published: true, cleanupPending: false }
+            }
         }
     }
-
-    let rollbackError
-    try {
-        if (!sameRegularFile(io, temporaryPath, outputPath)) {
-            const error = new Error("Published archive changed before rollback")
-            error.code = "ESTALE"
-            throw error
-        }
-        io.unlinkSync(outputPath)
-    } catch (error) {
-        rollbackError = error
+    return {
+        published: true,
+        cleanupPending: true,
+        temporaryFile: path.basename(temporaryPath),
     }
-    throw publicationCleanupError({
-        cleanupError,
-        published: rollbackError !== undefined,
-        rollbackError,
-    })
 }
 
 function writeStoredZip(options = {}) {
@@ -547,6 +506,7 @@ function writeStoredZip(options = {}) {
 
     let outputDescriptor
     let temporaryPath
+    let publicationResult
     try {
         const temporary = openUniqueTemporary(io, outputPath)
         outputDescriptor = temporary.descriptor
@@ -564,12 +524,7 @@ function writeStoredZip(options = {}) {
         io.fsyncSync(outputDescriptor)
         io.closeSync(outputDescriptor)
         outputDescriptor = undefined
-        try {
-            publishWithoutReplacement(io, temporaryPath, outputPath)
-        } catch (error) {
-            if (error && error[PUBLICATION_CLEANUP_HANDLED]) temporaryPath = undefined
-            throw error
-        }
+        publicationResult = publishWithoutReplacement(io, temporaryPath, outputPath)
         temporaryPath = undefined
     } catch (error) {
         if (outputDescriptor !== undefined) {
@@ -588,7 +543,7 @@ function writeStoredZip(options = {}) {
         }
         throw error
     }
-    return requestedOutputPath
+    return publicationResult
 }
 
 module.exports = { collectBundleEntries, crc32, writeStoredZip }

@@ -476,13 +476,14 @@ test("retries a one-time temporary unlink failure after publication", t => {
         return fs.unlinkSync(target)
     }
 
-    writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: fixture.outputPath, entries, fs: io })
+    const result = writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: fixture.outputPath, entries, fs: io })
+    assert.deepEqual(result, { published: true, cleanupPending: false })
     assert.equal(temporaryUnlinks, 2)
     assert.equal(fs.existsSync(fixture.outputPath), true)
     assert.equal(fs.existsSync(temporaryPath), false)
 })
 
-test("rolls back publication when temporary unlink keeps failing", t => {
+test("returns committed cleanup-pending status when temporary unlink keeps failing", t => {
     const fixture = createFixture(t, { "file.txt": "payload" })
     const entries = collectBundleEntries({ bundleRoot: fixture.bundleRoot })
     const io = Object.create(fs)
@@ -505,24 +506,31 @@ test("rolls back publication when temporary unlink keeps failing", t => {
         return fs.unlinkSync(target)
     }
 
-    assert.throws(
-        () => writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: fixture.outputPath, entries, fs: io }),
-        error => {
-            assert.equal(error.published, false)
-            assert.equal(error.cleanupPending, true)
-            return true
-        },
-    )
+    const result = writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: fixture.outputPath, entries, fs: io })
+    assert.deepEqual(result, {
+        published: true,
+        cleanupPending: true,
+        temporaryFile: path.basename(temporaryPath),
+    })
+    assert.equal(result.temporaryFile.includes("/"), false)
+    assert.equal(result.temporaryFile.includes("\\"), false)
     assert.equal(temporaryUnlinks, 2)
-    assert.equal(fs.existsSync(fixture.outputPath), false)
+    const archiveEntries = parseStoredZip(fs.readFileSync(fixture.outputPath))
+    assert.deepEqual(archiveEntries.map(entry => entry.name), ["server-bundle/file.txt"])
+    assert.deepEqual(archiveEntries[0].payload, Buffer.from("payload"))
     assert.equal(fs.existsSync(temporaryPath), true)
 })
 
-test("marks a publication whose target and temporary cleanup both remain pending", t => {
+test("never deletes a concurrently replaced target after publication", t => {
     const fixture = createFixture(t, { "file.txt": "payload" })
     const entries = collectBundleEntries({ bundleRoot: fixture.bundleRoot })
     const io = Object.create(fs)
     let temporaryPath
+    let publishedOutputPath
+    let temporaryUnlinks = 0
+    let outputUnlinks = 0
+    let replacementInstalled = false
+    const replacement = Buffer.from("concurrent replacement\n")
     io.openSync = (filePath, flags, mode) => {
         const descriptor = fs.openSync(filePath, flags, mode)
         if (path.basename(filePath).startsWith(`.${path.basename(fixture.outputPath)}.tmp-`)) {
@@ -530,23 +538,36 @@ test("marks a publication whose target and temporary cleanup both remain pending
         }
         return descriptor
     }
-    io.unlinkSync = target => {
-        const error = new Error(target === temporaryPath
-            ? "persistent temporary unlink failure"
-            : "publication rollback failure")
-        error.code = target === temporaryPath ? "EBUSY" : "EPERM"
-        throw error
+    io.linkSync = (source, destination) => {
+        publishedOutputPath = destination
+        return fs.linkSync(source, destination)
     }
+    io.unlinkSync = target => {
+        if (target === temporaryPath) {
+            temporaryUnlinks++
+            if (temporaryUnlinks === 2) {
+                fs.unlinkSync(fixture.outputPath)
+                fs.writeFileSync(fixture.outputPath, replacement)
+                replacementInstalled = true
+            }
+            const error = new Error("persistent temporary unlink failure")
+            error.code = "EBUSY"
+            throw error
+        }
+        if (target === publishedOutputPath) outputUnlinks++
+        return fs.unlinkSync(target)
+    }
+    io.lstatSync = target => replacementInstalled && target === publishedOutputPath
+        ? fs.lstatSync(temporaryPath)
+        : fs.lstatSync(target)
 
-    assert.throws(
-        () => writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: fixture.outputPath, entries, fs: io }),
-        error => {
-            assert.equal(error.name, "ArchivePublicationCleanupError")
-            assert.equal(error.published, true)
-            assert.equal(error.cleanupPending, true)
-            return true
-        },
-    )
-    assert.equal(fs.existsSync(fixture.outputPath), true)
+    const result = writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: fixture.outputPath, entries, fs: io })
+    assert.equal(outputUnlinks, 0)
+    assert.deepEqual(fs.readFileSync(fixture.outputPath), replacement)
+    assert.deepEqual(result, {
+        published: true,
+        cleanupPending: true,
+        temporaryFile: path.basename(temporaryPath),
+    })
     assert.equal(fs.existsSync(temporaryPath), true)
 })
