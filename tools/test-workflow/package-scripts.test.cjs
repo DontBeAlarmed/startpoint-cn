@@ -44,6 +44,10 @@ test("builds and verifies deterministic thin server bundles", () => {
         "node tools/server-bundle/verify.cjs",
     )
     assert.equal(
+        scripts["pack:bundle"],
+        "npm run build:bundle && npm run verify:bundle && node tools/server-bundle/pack.cjs",
+    )
+    assert.equal(
         scripts["verify:runtime-pack"],
         "node tools/runtime-pack/verify.cjs",
     )

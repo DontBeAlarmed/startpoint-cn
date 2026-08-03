@@ -32,6 +32,7 @@
     "gacha:seeds:verify": "node tools/gacha-faithful/verify_catalog.cjs",
     "gacha:seeds:audit": "node tools/gacha-faithful/audit_catalog.cjs",
     "verify:bundle": "node tools/server-bundle/verify.cjs",
+    "pack:bundle": "npm run build:bundle && npm run verify:bundle && node tools/server-bundle/pack.cjs",
     "verify:runtime-pack": "node tools/runtime-pack/verify.cjs",
     "build:admin": "npm run build --workspace=starpoint-admin",
     "dev:admin": "npm run dev --workspace=starpoint-admin",

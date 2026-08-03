@@ -7,9 +7,19 @@ v3 在 v2 的必需依赖锁身份上增加 `startup.localPrepareEntry`，使宿
 ```bash
 npm run build:bundle
 npm run verify:bundle
+npm run pack:bundle
 npm run verify:bundle -- /path/to/server-bundle --data-schema 14
 npm run verify:bundle -- /path/to/server-bundle --dependency-lock sha256:<runtime-pack-lock>
 ```
+
+`npm run pack:bundle` 依次构建、校验并打包，默认生成
+`dist/starpoint-cn-server-bundle-<serverVersion>.zip`。也可以在已有的已校验 Bundle 上直接运行：
+
+```bash
+node tools/server-bundle/pack.cjs --bundle /path/to/server-bundle --output /path/to/releases
+```
+
+重复打包相同 Bundle 会成功复用字节完全一致的同名归档；同名归档内容不同时会拒绝覆盖。打包过程先生成唯一候选文件，再进行无替换发布。若归档已经提交但临时文件清理未完成，命令仍返回成功并给出只包含临时文件名的警告，操作者可在确认没有并发打包后处理该文件。
 
 构建器收集 `out/`、业务基线 `assets/`、必需的 `web/dist/`，以及 `LICENSE`、`NOTICE`。它排除 TypeScript 增量状态、`assets/asset-patch/` 和 `.gitignore` 版本控制元数据，并且完全不读取 `web/public/`；fresh clone 中该目录不存在也不影响构建。`web/dist/index.html` 不存在或不是普通文件时构建失败，manifest 固定写入 `admin.required=true`；源码中存在遗留 `web/pages` 目录时也会明确拒绝构建。服务启动还会检查 `index.html` 实际引用的本地 `/admin/` 入口资源是否为普通文件，但不重复执行 Bundle 的全文件 SHA256 校验。
 
@@ -23,4 +33,6 @@ v3 固定 `entry=out/cn-server.js`，并固定 `startup.localPrepareEntry=out/co
 
 漫画是宿主或部署者另行准备的外置本地内容。普通开发默认读取项目根 `web/public/comic/`；嵌入模式必须通过绝对 `COMIC_DIR` 显式挂载，未配置时漫画接口返回空列表或 404。该目录不作为通用 `/public` 静态根，也不进入 Server Bundle。
 
-Server Bundle 的可验证形态始终是目录。跨设备本地导入使用只有一个顶层 `server-bundle/` 的 ZIP，解包安全规则、staging 和回滚顺序以[嵌入式运行契约](../embedded-runtime-contract.md)为准；ZIP 自身不替代 manifest 和解包后 verifier。
+Server Bundle 的可验证形态和格式权威始终是目录。ZIP 只是跨设备导入容器，不替代 `server-manifest.json` 或解包后的 verifier。Launcher 只接受专用的 `starpoint-cn-server-bundle-<serverVersion>.zip`；GitHub 自动生成的 `Source code.zip` 不是 Server Bundle，不能导入 Launcher。专用归档中必须恰好只有一个顶层 `server-bundle/`，其下内容与权威目录一致。解包安全规则、staging 和回滚顺序以[嵌入式运行契约](../embedded-runtime-contract.md)为准。
+
+归档器只使用 Node 内置模块，不增加 npm 依赖，也不改变 Runtime Pack 的 `requires.dependencyLock` 身份。输出采用确定性的 ZIP32 STORE：文件按 UTF-8 路径排序，时间戳和权限元数据固定，内容不压缩。因此相同 Bundle 产生相同字节，但归档体积接近未压缩目录总大小。ZIP32 要求每个文件、中央目录偏移和归档总偏移均不超过 4 GiB 边界，并最多包含 65,534 个条目；超限时打包会在发布前失败。

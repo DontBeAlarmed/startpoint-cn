@@ -8,6 +8,7 @@ const path = require("node:path")
 const { spawnSync } = require("node:child_process")
 const test = require("node:test")
 
+const packPath = path.join(__dirname, "server-bundle/pack.cjs")
 const zipPath = path.join(__dirname, "server-bundle/zip.cjs")
 const { collectBundleEntries, crc32, writeStoredZip } = require(zipPath)
 const { canonicalJsonBuffer } = require("./server-bundle/canonical-json.cjs")
@@ -53,6 +54,66 @@ function addManifest(fixture, listedPaths) {
     const manifest = { files }
     write(fixture.bundleRoot, "server-manifest.json", canonicalJsonBuffer(manifest))
     return manifest
+}
+
+function createPackFixture(t, serverVersion = "1.2.3") {
+    const fixture = createFixture(t, {
+        "LICENSE": "GPL-3.0-or-later\n",
+        "NOTICE": "notice\n",
+        "out/cn-server.js": "console.log('server')\n",
+        "out/content/sync/entry.js": "module.exports = {}\n",
+        "web/dist/index.html": "<main>admin</main>\n",
+    })
+    const outputDirectory = path.join(fixture.sandbox, "dist")
+    fs.mkdirSync(outputDirectory)
+    const listedPaths = [
+        "LICENSE",
+        "NOTICE",
+        "out/cn-server.js",
+        "out/content/sync/entry.js",
+        "web/dist/index.html",
+    ]
+    const files = listedPaths.map(relativePath => {
+        const bytes = fs.readFileSync(path.join(fixture.bundleRoot, ...relativePath.split("/")))
+        return { path: relativePath, bytes: bytes.length, sha256: digest(bytes) }
+    })
+    files.sort((left, right) => Buffer.compare(Buffer.from(left.path), Buffer.from(right.path)))
+    const manifestWithoutId = {
+        admin: { path: "web/dist", required: true },
+        assets: {
+            minClientAssetVersion: "1.4.54",
+            supportedModes: ["client-owned", "local", "remote"],
+        },
+        entry: "out/cn-server.js",
+        files,
+        name: "starpoint-cn",
+        ports: { http: 8001, tcp: 8003 },
+        requires: {
+            dependencyLock: `sha256:${"0".repeat(64)}`,
+            minDataSchema: 0,
+            node: ">=20.12.0",
+            runtimeApi: 1,
+            targetDataSchema: 14,
+        },
+        schemaVersion: 3,
+        serverVersion,
+        startup: { localPrepareEntry: "out/content/sync/entry.js" },
+    }
+    const manifest = {
+        ...manifestWithoutId,
+        bundleId: `sha256:${digest(canonicalJsonBuffer(manifestWithoutId))}`,
+    }
+    write(fixture.bundleRoot, "server-manifest.json", canonicalJsonBuffer(manifest))
+    return {
+        ...fixture,
+        archiveName: `starpoint-cn-server-bundle-${serverVersion}.zip`,
+        outputDirectory,
+    }
+}
+
+function packCandidates(outputDirectory, archiveName) {
+    return fs.readdirSync(outputDirectory)
+        .filter(name => name !== archiveName)
 }
 
 function parseStoredZip(bytes) {
@@ -146,6 +207,190 @@ test("exports the server bundle ZIP32 encoder surface", () => {
         Object.keys(require(zipPath)).sort(),
         ["collectBundleEntries", "crc32", "writeStoredZip"],
     )
+})
+
+test("exports the server bundle packer surface", () => {
+    assert.equal(fs.existsSync(packPath), true, "server bundle packer must exist")
+    assert.deepEqual(
+        Object.keys(require(packPath)).sort(),
+        ["packServerBundle", "parseArguments"],
+    )
+})
+
+test("parses strict pack CLI arguments with project dist defaults", () => {
+    const { parseArguments } = require(packPath)
+    assert.deepEqual(parseArguments([]), {
+        bundleRoot: path.resolve(__dirname, "../dist/server-bundle"),
+        outputDirectory: path.resolve(__dirname, "../dist"),
+    })
+    assert.deepEqual(parseArguments(["--bundle", "custom-bundle", "--output", "release"]), {
+        bundleRoot: "custom-bundle",
+        outputDirectory: "release",
+    })
+
+    for (const argv of [
+        ["--bundle"],
+        ["--bundle", "--output", "release"],
+        ["--bundle", "one", "--bundle", "two"],
+        ["--output"],
+        ["--output", "--bundle", "one"],
+        ["--output", "one", "--output", "two"],
+        ["bundle"],
+        ["--unknown", "value"],
+    ]) {
+        assert.throws(() => parseArguments(argv), /pack argument|--bundle|--output/i)
+    }
+})
+
+test("packs verified bundles by server version and repeats idempotently", t => {
+    const fixture = createPackFixture(t, "1.2.3-test.1")
+    const { packServerBundle } = require(packPath)
+
+    const first = packServerBundle({
+        bundleRoot: fixture.bundleRoot,
+        outputDirectory: fixture.outputDirectory,
+    })
+    const archivePath = path.join(fixture.outputDirectory, fixture.archiveName)
+    const firstBytes = fs.readFileSync(archivePath)
+    assert.deepEqual(first, {
+        archiveName: fixture.archiveName,
+        cleanupPending: false,
+        outputPath: archivePath,
+        status: "created",
+        warnings: [],
+    })
+    assert.deepEqual(
+        parseStoredZip(firstBytes).map(entry => entry.name),
+        [
+            "server-bundle/LICENSE",
+            "server-bundle/NOTICE",
+            "server-bundle/out/cn-server.js",
+            "server-bundle/out/content/sync/entry.js",
+            "server-bundle/server-manifest.json",
+            "server-bundle/web/dist/index.html",
+        ],
+    )
+
+    const second = packServerBundle({
+        bundleRoot: fixture.bundleRoot,
+        outputDirectory: fixture.outputDirectory,
+    })
+    assert.equal(second.status, "unchanged")
+    assert.equal(second.cleanupPending, false)
+    assert.deepEqual(second.warnings, [])
+    assert.deepEqual(fs.readFileSync(archivePath), firstBytes)
+    assert.deepEqual(packCandidates(fixture.outputDirectory, fixture.archiveName), [])
+})
+
+test("rejects a differing same-name archive without replacing it", t => {
+    const fixture = createPackFixture(t)
+    const { packServerBundle } = require(packPath)
+    packServerBundle({ bundleRoot: fixture.bundleRoot, outputDirectory: fixture.outputDirectory })
+    const archivePath = path.join(fixture.outputDirectory, fixture.archiveName)
+    const conflictingBytes = fs.readFileSync(archivePath)
+    conflictingBytes[0] ^= 0xff
+    fs.writeFileSync(archivePath, conflictingBytes)
+
+    assert.throws(
+        () => packServerBundle({ bundleRoot: fixture.bundleRoot, outputDirectory: fixture.outputDirectory }),
+        /archive.*(?:differs|conflict)/i,
+    )
+    assert.deepEqual(fs.readFileSync(archivePath), conflictingBytes)
+    assert.deepEqual(packCandidates(fixture.outputDirectory, fixture.archiveName), [])
+})
+
+test("verification failure creates no archive or temporary candidate", t => {
+    const fixture = createPackFixture(t)
+    fs.writeFileSync(path.join(fixture.bundleRoot, "out/cn-server.js"), "damaged\n")
+    const { packServerBundle } = require(packPath)
+
+    assert.throws(
+        () => packServerBundle({ bundleRoot: fixture.bundleRoot, outputDirectory: fixture.outputDirectory }),
+        /wrong (?:size|hash)/i,
+    )
+    assert.deepEqual(fs.readdirSync(fixture.outputDirectory), [])
+})
+
+test("passes the verified manifest to the ZIP writer before publication", t => {
+    const fixture = createPackFixture(t)
+    const { packServerBundle } = require(packPath)
+    const io = Object.create(fs)
+    let mutated = false
+    io.lstatSync = filePath => {
+        const status = fs.lstatSync(filePath)
+        if (!mutated && path.resolve(filePath) === path.resolve(fixture.bundleRoot)) {
+            mutated = true
+            fs.writeFileSync(path.join(fixture.bundleRoot, "out/cn-server.js"), "changed after verify\n")
+        }
+        return status
+    }
+
+    assert.throws(
+        () => packServerBundle({
+            bundleRoot: fixture.bundleRoot,
+            outputDirectory: fixture.outputDirectory,
+            fs: io,
+        }),
+        /verified manifest.*(?:size|hash)|match.*verified manifest/i,
+    )
+    assert.equal(mutated, true)
+    assert.deepEqual(fs.readdirSync(fixture.outputDirectory), [])
+})
+
+test("reports ZIP writer cleanupPending as committed success without private paths", t => {
+    const fixture = createPackFixture(t)
+    const { packServerBundle } = require(packPath)
+    const io = Object.create(fs)
+    let rejectedTemporary
+    io.unlinkSync = filePath => {
+        if (rejectedTemporary === undefined && path.basename(filePath).includes(".tmp-")) {
+            rejectedTemporary = filePath
+            const error = new Error("injected cleanup failure")
+            error.code = "EBUSY"
+            throw error
+        }
+        return fs.unlinkSync(filePath)
+    }
+
+    const result = packServerBundle({
+        bundleRoot: fixture.bundleRoot,
+        outputDirectory: fixture.outputDirectory,
+        fs: io,
+    })
+    assert.equal(result.status, "created")
+    assert.equal(result.cleanupPending, true)
+    assert.equal(fs.existsSync(path.join(fixture.outputDirectory, fixture.archiveName)), true)
+    assert.equal(result.warnings.length, 1)
+    assert.match(result.warnings[0], /committed.*cleanup.*temporary/i)
+    assert.equal(result.warnings[0].includes(fixture.sandbox), false)
+    assert.equal(result.warnings[0].includes(path.basename(rejectedTemporary)), true)
+})
+
+test("pack CLI supports explicit paths, idempotence, and private-path-safe errors", t => {
+    const fixture = createPackFixture(t)
+    const argumentsList = [
+        packPath,
+        "--bundle",
+        fixture.bundleRoot,
+        "--output",
+        fixture.outputDirectory,
+    ]
+    const first = spawnSync(process.execPath, argumentsList, { encoding: "utf8" })
+    assert.equal(first.status, 0, first.stderr)
+    assert.equal(first.stdout, `Packed ${fixture.archiveName} (created)\n`)
+    assert.equal(first.stderr, "")
+
+    const second = spawnSync(process.execPath, argumentsList, { encoding: "utf8" })
+    assert.equal(second.status, 0, second.stderr)
+    assert.equal(second.stdout, `Packed ${fixture.archiveName} (unchanged)\n`)
+    assert.equal(second.stderr, "")
+
+    fs.writeFileSync(path.join(fixture.bundleRoot, "out/cn-server.js"), "damaged\n")
+    const damaged = spawnSync(process.execPath, argumentsList, { encoding: "utf8" })
+    assert.equal(damaged.status, 1)
+    assert.match(damaged.stderr, /packaging failed.*wrong (?:size|hash)/i)
+    assert.match(damaged.stderr, /out\/cn-server\.js/)
+    assert.equal(damaged.stderr.includes(fixture.sandbox), false)
 })
 
 test("computes the standard CRC-32 check value", () => {
