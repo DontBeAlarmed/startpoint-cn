@@ -78,7 +78,7 @@ function uniqueCandidatePath(io, outputDirectory, archiveName) {
 function openRegularFile(io, filePath, label) {
     let status
     try {
-        status = io.lstatSync(filePath)
+        status = io.lstatSync(filePath, { bigint: true })
     } catch {
         fail(`${label} is missing or unreadable`)
     }
@@ -87,10 +87,9 @@ function openRegularFile(io, filePath, label) {
     let descriptor
     try {
         descriptor = io.openSync(filePath, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0))
-        const openedStatus = io.fstatSync(descriptor)
+        const openedStatus = io.fstatSync(descriptor, { bigint: true })
         if (!openedStatus.isFile()
-            || status.dev !== openedStatus.dev
-            || status.ino !== openedStatus.ino) {
+            || !sameFileState(status, openedStatus)) {
             fail(`${label} changed while it was opened`)
         }
         return { descriptor, status: openedStatus }
@@ -106,14 +105,20 @@ function openRegularFile(io, filePath, label) {
     }
 }
 
+function sameFileState(left, right) {
+    return left.dev === right.dev
+        && left.ino === right.ino
+        && left.size === right.size
+        && left.mtimeNs === right.mtimeNs
+        && left.ctimeNs === right.ctimeNs
+}
+
 function sameOpenedFile(io, filePath, status) {
     try {
-        const current = io.lstatSync(filePath)
+        const current = io.lstatSync(filePath, { bigint: true })
         return !current.isSymbolicLink()
             && current.isFile()
-            && current.dev === status.dev
-            && current.ino === status.ino
-            && current.size === status.size
+            && sameFileState(current, status)
     } catch {
         return false
     }
@@ -124,11 +129,10 @@ function filesEqual(io, candidatePath, outputPath) {
     let output
     try {
         output = openRegularFile(io, outputPath, "Existing archive")
-        if (candidate.status.size !== output.status.size) return false
-
+        let equal = candidate.status.size === output.status.size
         const candidateBuffer = Buffer.allocUnsafe(READ_BUFFER_SIZE)
         const outputBuffer = Buffer.allocUnsafe(READ_BUFFER_SIZE)
-        while (true) {
+        while (equal) {
             const candidateRead = io.readSync(
                 candidate.descriptor,
                 candidateBuffer,
@@ -143,16 +147,28 @@ function filesEqual(io, candidatePath, outputPath) {
                 outputBuffer.length,
                 null,
             )
-            if (candidateRead !== outputRead) return false
+            if (candidateRead !== outputRead) {
+                equal = false
+                break
+            }
             if (candidateRead === 0) break
             if (!candidateBuffer.subarray(0, candidateRead)
-                .equals(outputBuffer.subarray(0, outputRead))) return false
+                .equals(outputBuffer.subarray(0, outputRead))) equal = false
         }
-        if (!sameOpenedFile(io, candidatePath, candidate.status)
-            || !sameOpenedFile(io, outputPath, output.status)) {
-            fail("Archive changed during byte comparison")
+
+        let candidateAfter
+        let outputAfter
+        try {
+            candidateAfter = io.fstatSync(candidate.descriptor, { bigint: true })
+            outputAfter = io.fstatSync(output.descriptor, { bigint: true })
+        } catch {
+            return false
         }
-        return true
+        return equal
+            && sameFileState(candidate.status, candidateAfter)
+            && sameFileState(output.status, outputAfter)
+            && sameOpenedFile(io, candidatePath, candidateAfter)
+            && sameOpenedFile(io, outputPath, outputAfter)
     } finally {
         io.closeSync(candidate.descriptor)
         if (output !== undefined) io.closeSync(output.descriptor)

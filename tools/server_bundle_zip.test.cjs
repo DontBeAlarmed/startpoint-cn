@@ -299,6 +299,80 @@ test("rejects a differing same-name archive without replacing it", t => {
     assert.deepEqual(packCandidates(fixture.outputDirectory, fixture.archiveName), [])
 })
 
+test("rejects an existing archive modified in place during byte comparison", t => {
+    const fixture = createPackFixture(t)
+    const { packServerBundle } = require(packPath)
+    packServerBundle({ bundleRoot: fixture.bundleRoot, outputDirectory: fixture.outputDirectory })
+    const archivePath = path.join(fixture.outputDirectory, fixture.archiveName)
+    const originalBytes = fs.readFileSync(archivePath)
+    const conflictingBytes = Buffer.from(originalBytes)
+    conflictingBytes[conflictingBytes.length - 1] ^= 0xff
+    const originalStatus = fs.lstatSync(archivePath, { bigint: true })
+    const io = Object.create(fs)
+    let candidateDescriptor
+    let candidateFlags
+    let existingDescriptor
+    let existingFlags
+    let mutated = false
+    const bigintFstats = new Map()
+
+    io.openSync = (filePath, flags, mode) => {
+        const descriptor = fs.openSync(filePath, flags, mode)
+        const basename = path.basename(filePath)
+        if (path.resolve(filePath) === archivePath) {
+            existingDescriptor = descriptor
+            existingFlags = flags
+        } else if (basename.includes(".candidate-") && !basename.includes(".tmp-")) {
+            candidateDescriptor = descriptor
+            candidateFlags = flags
+        }
+        return descriptor
+    }
+    io.fstatSync = (descriptor, options) => {
+        if ((descriptor === candidateDescriptor || descriptor === existingDescriptor)
+            && options?.bigint === true) {
+            bigintFstats.set(descriptor, (bigintFstats.get(descriptor) ?? 0) + 1)
+        }
+        return fs.fstatSync(descriptor, options)
+    }
+    io.readSync = (descriptor, buffer, offset, length, position) => {
+        const bytesRead = fs.readSync(descriptor, buffer, offset, length, position)
+        if (descriptor === existingDescriptor && !mutated && bytesRead > 0) {
+            const writeDescriptor = fs.openSync(archivePath, fs.constants.O_WRONLY)
+            try {
+                fs.writeSync(writeDescriptor, conflictingBytes, 0, conflictingBytes.length, 0)
+                fs.fsyncSync(writeDescriptor)
+            } finally {
+                fs.closeSync(writeDescriptor)
+            }
+            const changedTime = new Date(Date.now() + 2_000)
+            fs.utimesSync(archivePath, changedTime, changedTime)
+            mutated = true
+        }
+        return bytesRead
+    }
+
+    assert.throws(
+        () => packServerBundle({
+            bundleRoot: fixture.bundleRoot,
+            outputDirectory: fixture.outputDirectory,
+            fs: io,
+        }),
+        /archive.*(?:differs|conflict)|changed during byte comparison/i,
+    )
+    assert.equal(mutated, true)
+    assert.equal(candidateFlags & fs.constants.O_NOFOLLOW, fs.constants.O_NOFOLLOW)
+    assert.equal(existingFlags & fs.constants.O_NOFOLLOW, fs.constants.O_NOFOLLOW)
+    assert.ok(bigintFstats.get(candidateDescriptor) >= 2)
+    assert.ok(bigintFstats.get(existingDescriptor) >= 2)
+    const finalStatus = fs.lstatSync(archivePath, { bigint: true })
+    assert.equal(finalStatus.dev, originalStatus.dev)
+    assert.equal(finalStatus.ino, originalStatus.ino)
+    assert.equal(finalStatus.size, originalStatus.size)
+    assert.deepEqual(fs.readFileSync(archivePath), conflictingBytes)
+    assert.deepEqual(packCandidates(fixture.outputDirectory, fixture.archiveName), [])
+})
+
 test("verification failure creates no archive or temporary candidate", t => {
     const fixture = createPackFixture(t)
     fs.writeFileSync(path.join(fixture.bundleRoot, "out/cn-server.js"), "damaged\n")
