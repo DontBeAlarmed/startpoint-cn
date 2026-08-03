@@ -441,6 +441,29 @@ function openUniqueTemporary(io, outputPath) {
     fail("Could not create a unique sibling temporary archive")
 }
 
+function destinationExists(io, outputPath) {
+    try {
+        return io.lstatSync(outputPath) !== null
+    } catch (error) {
+        if (error && error.code === "ENOENT") return false
+        return false
+    }
+}
+
+function publishWithoutReplacement(io, temporaryPath, outputPath) {
+    try {
+        io.linkSync(temporaryPath, outputPath)
+    } catch (error) {
+        if ((error && error.code === "EEXIST") || destinationExists(io, outputPath)) {
+            const conflict = new Error("Archive destination appeared during publication", { cause: error })
+            conflict.code = "EEXIST"
+            throw conflict
+        }
+        throw error
+    }
+    io.unlinkSync(temporaryPath)
+}
+
 function writeStoredZip(options = {}) {
     if (options === null || typeof options !== "object") fail("ZIP writer options must be an object")
     const io = options.fs ?? fs
@@ -471,10 +494,7 @@ function writeStoredZip(options = {}) {
         io.fsyncSync(outputDescriptor)
         io.closeSync(outputDescriptor)
         outputDescriptor = undefined
-        if (lstat(io, outputPath, "Archive destination", true) !== null) {
-            fail("Archive destination appeared during publication")
-        }
-        io.renameSync(temporaryPath, outputPath)
+        publishWithoutReplacement(io, temporaryPath, outputPath)
         temporaryPath = undefined
     } catch (error) {
         if (outputDescriptor !== undefined) {

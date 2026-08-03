@@ -131,6 +131,10 @@ function plannedEntry(sourcePath, name, size = fs.statSync(sourcePath).size) {
 
 function assertNoOutputOrTemps(outputPath) {
     assert.equal(fs.existsSync(outputPath), false)
+    assertNoTemps(outputPath)
+}
+
+function assertNoTemps(outputPath) {
     const parent = path.dirname(outputPath)
     const prefix = `.${path.basename(outputPath)}.tmp-`
     assert.deepEqual(fs.readdirSync(parent).filter(name => name.startsWith(prefix)), [])
@@ -315,7 +319,7 @@ test("preflights ZIP32 entry, name, size, and offset bounds from planned metadat
     assertNoOutputOrTemps(fixture.outputPath)
 })
 
-test("fsyncs and closes a sibling unique temporary file before atomic rename", t => {
+test("fsyncs and closes a sibling unique temporary file before atomic no-replace publication", t => {
     const fixture = createFixture(t, { "file.txt": "payload" })
     const entries = collectBundleEntries({ bundleRoot: fixture.bundleRoot })
     const io = Object.create(fs)
@@ -339,13 +343,17 @@ test("fsyncs and closes a sibling unique temporary file before atomic rename", t
         if (descriptor === outputDescriptor) events.push("close")
         return fs.closeSync(descriptor)
     }
-    io.renameSync = (source, destination) => {
-        events.push("rename")
-        return fs.renameSync(source, destination)
+    io.linkSync = (source, destination) => {
+        events.push("link")
+        return fs.linkSync(source, destination)
+    }
+    io.unlinkSync = target => {
+        if (target === temporaryPath) events.push("unlink")
+        return fs.unlinkSync(target)
     }
 
     writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: fixture.outputPath, entries, fs: io })
-    assert.deepEqual(events, ["open", "fsync", "close", "rename"])
+    assert.deepEqual(events, ["open", "fsync", "close", "link", "unlink"])
     assert.equal(path.dirname(temporaryPath), path.dirname(fixture.outputPath))
     assert.notEqual(temporaryPath, fixture.outputPath)
     assert.equal(fs.existsSync(temporaryPath), false)
@@ -356,15 +364,39 @@ test("cleans the temporary archive when publication fails", t => {
     const entries = collectBundleEntries({ bundleRoot: fixture.bundleRoot })
     const io = Object.create(fs)
     let attemptedTemporaryPath
-    io.renameSync = source => {
+    io.linkSync = source => {
         attemptedTemporaryPath = source
-        throw new Error("injected rename failure")
+        throw new Error("injected link failure")
     }
 
     assert.throws(
         () => writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: fixture.outputPath, entries, fs: io }),
-        /injected rename failure/,
+        /injected link failure/,
     )
     assert.equal(path.dirname(attemptedTemporaryPath), path.dirname(fixture.outputPath))
     assertNoOutputOrTemps(fixture.outputPath)
+})
+
+test("preserves a destination that appears at publication and cleans the temporary archive", t => {
+    const fixture = createFixture(t, { "file.txt": "payload" })
+    const entries = collectBundleEntries({ bundleRoot: fixture.bundleRoot })
+    const io = Object.create(fs)
+    const racedBytes = Buffer.from("raced destination\n")
+    io.linkSync = (source, destination) => {
+        fs.writeFileSync(destination, racedBytes)
+        const error = new Error("platform-specific link conflict")
+        error.code = "EPERM"
+        throw error
+    }
+
+    assert.throws(
+        () => writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: fixture.outputPath, entries, fs: io }),
+        error => {
+            assert.match(error.message, /destination.*(?:appeared|exist|conflict)/i)
+            assert.equal(error.code, "EEXIST")
+            return true
+        },
+    )
+    assert.deepEqual(fs.readFileSync(fixture.outputPath), racedBytes)
+    assertNoTemps(fixture.outputPath)
 })
