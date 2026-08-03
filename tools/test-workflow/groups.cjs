@@ -15,6 +15,7 @@ const TEST_GROUPS = Object.freeze({
         execution: "parallel",
         tests: [
             "tools/server_bundle.test.cjs",
+            "tools/server_bundle_zip.test.cjs",
             "tools/runtime_pack.test.cjs",
             "tools/runtime_bundle_metadata.test.cjs",
             "tools/runtime_config.test.cjs",

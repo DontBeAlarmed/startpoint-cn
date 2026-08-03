@@ -4,6 +4,8 @@ const crypto = require("node:crypto")
 const fs = require("node:fs")
 const path = require("node:path")
 
+const { canonicalJsonBuffer, sha256Hex } = require("./canonical-json.cjs")
+
 const ARCHIVE_PREFIX = "server-bundle/"
 const MANIFEST_NAME = "server-manifest.json"
 const MAX_ENTRIES = 65534
@@ -17,6 +19,7 @@ const DOS_TIME = 0
 const DOS_DATE = 0x0021
 const REGULAR_0644 = (0o100644 << 16) >>> 0
 const READ_BUFFER_SIZE = 64 * 1024
+const PUBLICATION_CLEANUP_HANDLED = Symbol("publicationCleanupHandled")
 
 const CRC32_TABLE = new Uint32Array(256)
 for (let index = 0; index < CRC32_TABLE.length; index++) {
@@ -137,7 +140,11 @@ function manifestFileMap(verifiedManifest) {
         fail("Verified manifest must contain a files array")
     }
 
-    const expected = new Map([[MANIFEST_NAME, null]])
+    const manifestBytes = canonicalJsonBuffer(verifiedManifest)
+    const expected = new Map([[
+        MANIFEST_NAME,
+        { size: manifestBytes.length, sha256: sha256Hex(manifestBytes) },
+    ]])
     for (const [index, file] of verifiedManifest.files.entries()) {
         if (file === null || typeof file !== "object") fail(`Verified manifest files[${index}] is invalid`)
         const relativePath = safeRelativePath(file.path, `Verified manifest files[${index}].path`)
@@ -230,21 +237,29 @@ function isContainedBy(candidate, root) {
         || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative))
 }
 
-function validateDestination(io, bundleRoot, outputPath) {
-    const parent = path.dirname(outputPath)
-    const parentStatus = lstat(io, parent, "Destination parent directory")
-    if (parentStatus.isSymbolicLink() || !parentStatus.isDirectory()) {
-        fail("Destination parent must be a real directory")
+function resolveDestination(io, bundleRoot, outputPath) {
+    const requestedParent = path.dirname(outputPath)
+    const parentStatus = lstat(io, requestedParent, "Destination parent directory")
+    if (!parentStatus.isDirectory() && !parentStatus.isSymbolicLink()) {
+        fail("Destination parent must resolve to a directory")
     }
+    let realParent
+    try {
+        realParent = io.realpathSync(requestedParent)
+    } catch {
+        fail("Destination parent must resolve to an existing directory")
+    }
+    const parent = lstat(io, realParent, "Resolved destination parent directory")
+    if (!parent.isDirectory()) fail("Destination parent must resolve to a directory")
     const realBundleRoot = io.realpathSync(bundleRoot)
-    const realParent = io.realpathSync(parent)
     const realOutput = path.join(realParent, path.basename(outputPath))
     if (isContainedBy(realOutput, realBundleRoot)) {
         fail("Archive destination must not be inside the bundle root")
     }
-    if (lstat(io, outputPath, "Archive destination", true) !== null) {
+    if (lstat(io, realOutput, "Archive destination", true) !== null) {
         fail("Archive destination already exists and conflicts with atomic publication")
     }
+    return realOutput
 }
 
 function validatePlannedEntries(entries, bundleRoot, verifiedManifest) {
@@ -450,6 +465,35 @@ function destinationExists(io, outputPath) {
     }
 }
 
+function publicationCleanupError({ cleanupError, published, rollbackError }) {
+    const failure = new Error(
+        published
+            ? "Archive publication and temporary cleanup both remain pending"
+            : "Archive publication was rolled back but temporary cleanup remains pending",
+        { cause: cleanupError },
+    )
+    failure.name = published
+        ? "ArchivePublicationCleanupError"
+        : "ArchiveTemporaryCleanupError"
+    failure.code = published
+        ? "ARCHIVE_PUBLICATION_CLEANUP_PENDING"
+        : "ARCHIVE_TEMP_CLEANUP_PENDING"
+    failure.published = published
+    failure.cleanupPending = true
+    if (rollbackError !== undefined) failure.rollbackError = rollbackError
+    failure[PUBLICATION_CLEANUP_HANDLED] = true
+    return failure
+}
+
+function sameRegularFile(io, leftPath, rightPath) {
+    const left = io.lstatSync(leftPath)
+    const right = io.lstatSync(rightPath)
+    return left.isFile()
+        && right.isFile()
+        && left.dev === right.dev
+        && left.ino === right.ino
+}
+
 function publishWithoutReplacement(io, temporaryPath, outputPath) {
     try {
         io.linkSync(temporaryPath, outputPath)
@@ -461,17 +505,43 @@ function publishWithoutReplacement(io, temporaryPath, outputPath) {
         }
         throw error
     }
-    io.unlinkSync(temporaryPath)
+
+    let cleanupError
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            io.unlinkSync(temporaryPath)
+            return
+        } catch (error) {
+            cleanupError = error
+        }
+    }
+
+    let rollbackError
+    try {
+        if (!sameRegularFile(io, temporaryPath, outputPath)) {
+            const error = new Error("Published archive changed before rollback")
+            error.code = "ESTALE"
+            throw error
+        }
+        io.unlinkSync(outputPath)
+    } catch (error) {
+        rollbackError = error
+    }
+    throw publicationCleanupError({
+        cleanupError,
+        published: rollbackError !== undefined,
+        rollbackError,
+    })
 }
 
 function writeStoredZip(options = {}) {
     if (options === null || typeof options !== "object") fail("ZIP writer options must be an object")
     const io = options.fs ?? fs
     const bundleRoot = path.resolve(options.bundleRoot ?? path.resolve(__dirname, "../../dist/server-bundle"))
-    const outputPath = path.resolve(options.outputPath ?? `${bundleRoot}.zip`)
+    const requestedOutputPath = path.resolve(options.outputPath ?? `${bundleRoot}.zip`)
     const verifiedManifest = options.verifiedManifest ?? options.manifest
     requireBundleRoot(io, bundleRoot)
-    validateDestination(io, bundleRoot, outputPath)
+    const outputPath = resolveDestination(io, bundleRoot, requestedOutputPath)
     const entries = options.entries ?? collectBundleEntries({ bundleRoot, verifiedManifest, fs: io })
     const plan = validatePlannedEntries(entries, bundleRoot, verifiedManifest)
 
@@ -494,7 +564,12 @@ function writeStoredZip(options = {}) {
         io.fsyncSync(outputDescriptor)
         io.closeSync(outputDescriptor)
         outputDescriptor = undefined
-        publishWithoutReplacement(io, temporaryPath, outputPath)
+        try {
+            publishWithoutReplacement(io, temporaryPath, outputPath)
+        } catch (error) {
+            if (error && error[PUBLICATION_CLEANUP_HANDLED]) temporaryPath = undefined
+            throw error
+        }
         temporaryPath = undefined
     } catch (error) {
         if (outputDescriptor !== undefined) {
@@ -513,7 +588,7 @@ function writeStoredZip(options = {}) {
         }
         throw error
     }
-    return outputPath
+    return requestedOutputPath
 }
 
 module.exports = { collectBundleEntries, crc32, writeStoredZip }

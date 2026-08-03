@@ -10,6 +10,7 @@ const test = require("node:test")
 
 const zipPath = path.join(__dirname, "server-bundle/zip.cjs")
 const { collectBundleEntries, crc32, writeStoredZip } = require(zipPath)
+const { canonicalJsonBuffer } = require("./server-bundle/canonical-json.cjs")
 
 const LOCAL_SIGNATURE = 0x04034b50
 const CENTRAL_SIGNATURE = 0x02014b50
@@ -50,7 +51,7 @@ function addManifest(fixture, listedPaths) {
     })
     files.sort((left, right) => Buffer.compare(Buffer.from(left.path), Buffer.from(right.path)))
     const manifest = { files }
-    write(fixture.bundleRoot, "server-manifest.json", `${JSON.stringify(manifest)}\n`)
+    write(fixture.bundleRoot, "server-manifest.json", canonicalJsonBuffer(manifest))
     return manifest
 }
 
@@ -218,6 +219,25 @@ test("verified manifest metadata is enforced and source mutation aborts publicat
     )
 })
 
+test("rejects a disk manifest replaced after verification", t => {
+    const fixture = createFixture(t, { "out/server.js": "payload\n" })
+    const verifiedManifest = addManifest(fixture, ["out/server.js"])
+    fs.writeFileSync(
+        path.join(fixture.bundleRoot, "server-manifest.json"),
+        canonicalJsonBuffer({ ...verifiedManifest, replaced: true }),
+    )
+
+    assert.throws(
+        () => writeStoredZip({
+            bundleRoot: fixture.bundleRoot,
+            outputPath: fixture.outputPath,
+            verifiedManifest,
+        }),
+        /manifest.*(?:size|hash|match)|size.*hash/i,
+    )
+    assertNoOutputOrTemps(fixture.outputPath)
+})
+
 test("rejects a source parent replaced by a symlink after collection", t => {
     const fixture = createFixture(t, { "out/server.js": "same bytes\n" })
     const entries = collectBundleEntries({ bundleRoot: fixture.bundleRoot })
@@ -277,6 +297,39 @@ test("refuses unsafe and conflicting destinations", t => {
         /destination.*exist|conflict/i,
     )
     assert.equal(fs.readFileSync(fixture.outputPath, "utf8"), "occupied")
+})
+
+test("publishes through a real parent resolved from a directory symlink", t => {
+    const fixture = createFixture(t, { "file.txt": "payload" })
+    const entries = collectBundleEntries({ bundleRoot: fixture.bundleRoot })
+    const realParent = path.join(fixture.sandbox, "real-output")
+    const linkedParent = path.join(fixture.sandbox, "linked-output")
+    fs.mkdirSync(realParent)
+    fs.symlinkSync(realParent, linkedParent, "dir")
+    const linkedOutput = path.join(linkedParent, "archive.zip")
+    const io = Object.create(fs)
+    let temporaryPath
+    io.openSync = (filePath, flags, mode) => {
+        const descriptor = fs.openSync(filePath, flags, mode)
+        if (path.basename(filePath).startsWith(".archive.zip.tmp-")) temporaryPath = filePath
+        return descriptor
+    }
+
+    writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: linkedOutput, entries, fs: io })
+    assert.equal(path.dirname(temporaryPath), fs.realpathSync(realParent))
+    assert.equal(fs.existsSync(linkedOutput), true)
+    assertNoTemps(linkedOutput)
+
+    const bundleParentLink = path.join(fixture.sandbox, "bundle-parent-link")
+    fs.symlinkSync(fixture.bundleRoot, bundleParentLink, "dir")
+    assert.throws(
+        () => writeStoredZip({
+            bundleRoot: fixture.bundleRoot,
+            outputPath: path.join(bundleParentLink, "escaped.zip"),
+            entries,
+        }),
+        /inside.*bundle root/i,
+    )
 })
 
 test("preflights ZIP32 entry, name, size, and offset bounds from planned metadata", t => {
@@ -354,7 +407,7 @@ test("fsyncs and closes a sibling unique temporary file before atomic no-replace
 
     writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: fixture.outputPath, entries, fs: io })
     assert.deepEqual(events, ["open", "fsync", "close", "link", "unlink"])
-    assert.equal(path.dirname(temporaryPath), path.dirname(fixture.outputPath))
+    assert.equal(path.dirname(temporaryPath), fs.realpathSync(path.dirname(fixture.outputPath)))
     assert.notEqual(temporaryPath, fixture.outputPath)
     assert.equal(fs.existsSync(temporaryPath), false)
 })
@@ -373,7 +426,7 @@ test("cleans the temporary archive when publication fails", t => {
         () => writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: fixture.outputPath, entries, fs: io }),
         /injected link failure/,
     )
-    assert.equal(path.dirname(attemptedTemporaryPath), path.dirname(fixture.outputPath))
+    assert.equal(path.dirname(attemptedTemporaryPath), fs.realpathSync(path.dirname(fixture.outputPath)))
     assertNoOutputOrTemps(fixture.outputPath)
 })
 
@@ -399,4 +452,101 @@ test("preserves a destination that appears at publication and cleans the tempora
     )
     assert.deepEqual(fs.readFileSync(fixture.outputPath), racedBytes)
     assertNoTemps(fixture.outputPath)
+})
+
+test("retries a one-time temporary unlink failure after publication", t => {
+    const fixture = createFixture(t, { "file.txt": "payload" })
+    const entries = collectBundleEntries({ bundleRoot: fixture.bundleRoot })
+    const io = Object.create(fs)
+    let temporaryPath
+    let temporaryUnlinks = 0
+    io.openSync = (filePath, flags, mode) => {
+        const descriptor = fs.openSync(filePath, flags, mode)
+        if (path.basename(filePath).startsWith(`.${path.basename(fixture.outputPath)}.tmp-`)) {
+            temporaryPath = filePath
+        }
+        return descriptor
+    }
+    io.unlinkSync = target => {
+        if (target === temporaryPath && ++temporaryUnlinks === 1) {
+            const error = new Error("one-time temporary unlink failure")
+            error.code = "EBUSY"
+            throw error
+        }
+        return fs.unlinkSync(target)
+    }
+
+    writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: fixture.outputPath, entries, fs: io })
+    assert.equal(temporaryUnlinks, 2)
+    assert.equal(fs.existsSync(fixture.outputPath), true)
+    assert.equal(fs.existsSync(temporaryPath), false)
+})
+
+test("rolls back publication when temporary unlink keeps failing", t => {
+    const fixture = createFixture(t, { "file.txt": "payload" })
+    const entries = collectBundleEntries({ bundleRoot: fixture.bundleRoot })
+    const io = Object.create(fs)
+    let temporaryPath
+    let temporaryUnlinks = 0
+    io.openSync = (filePath, flags, mode) => {
+        const descriptor = fs.openSync(filePath, flags, mode)
+        if (path.basename(filePath).startsWith(`.${path.basename(fixture.outputPath)}.tmp-`)) {
+            temporaryPath = filePath
+        }
+        return descriptor
+    }
+    io.unlinkSync = target => {
+        if (target === temporaryPath) {
+            temporaryUnlinks++
+            const error = new Error("persistent temporary unlink failure")
+            error.code = "EBUSY"
+            throw error
+        }
+        return fs.unlinkSync(target)
+    }
+
+    assert.throws(
+        () => writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: fixture.outputPath, entries, fs: io }),
+        error => {
+            assert.equal(error.published, false)
+            assert.equal(error.cleanupPending, true)
+            return true
+        },
+    )
+    assert.equal(temporaryUnlinks, 2)
+    assert.equal(fs.existsSync(fixture.outputPath), false)
+    assert.equal(fs.existsSync(temporaryPath), true)
+})
+
+test("marks a publication whose target and temporary cleanup both remain pending", t => {
+    const fixture = createFixture(t, { "file.txt": "payload" })
+    const entries = collectBundleEntries({ bundleRoot: fixture.bundleRoot })
+    const io = Object.create(fs)
+    let temporaryPath
+    io.openSync = (filePath, flags, mode) => {
+        const descriptor = fs.openSync(filePath, flags, mode)
+        if (path.basename(filePath).startsWith(`.${path.basename(fixture.outputPath)}.tmp-`)) {
+            temporaryPath = filePath
+        }
+        return descriptor
+    }
+    io.unlinkSync = target => {
+        const error = new Error(target === temporaryPath
+            ? "persistent temporary unlink failure"
+            : "publication rollback failure")
+        error.code = target === temporaryPath ? "EBUSY" : "EPERM"
+        throw error
+    }
+
+    assert.throws(
+        () => writeStoredZip({ bundleRoot: fixture.bundleRoot, outputPath: fixture.outputPath, entries, fs: io }),
+        error => {
+            assert.equal(error.name, "ArchivePublicationCleanupError")
+            assert.equal(error.published, true)
+            assert.equal(error.cleanupPending, true)
+            return true
+        },
+    )
+    assert.equal(fs.existsSync(fixture.outputPath), true)
+    assert.equal(fs.existsSync(temporaryPath), true)
 })
