@@ -373,6 +373,145 @@ test("rejects an existing archive modified in place during byte comparison", t =
     assert.deepEqual(packCandidates(fixture.outputDirectory, fixture.archiveName), [])
 })
 
+test("cleans the candidate when the existing archive becomes unavailable during comparison", async t => {
+    await t.test("existing archive disappears", t => {
+        const fixture = createPackFixture(t)
+        const { packServerBundle } = require(packPath)
+        packServerBundle({ bundleRoot: fixture.bundleRoot, outputDirectory: fixture.outputDirectory })
+        const archivePath = path.join(fixture.outputDirectory, fixture.archiveName)
+        const io = Object.create(fs)
+        let removed = false
+        io.lstatSync = (filePath, options) => {
+            if (!removed && path.resolve(filePath) === archivePath) {
+                fs.unlinkSync(archivePath)
+                removed = true
+                const error = new Error("injected existing disappearance")
+                error.code = "ENOENT"
+                throw error
+            }
+            return fs.lstatSync(filePath, options)
+        }
+
+        assert.throws(
+            () => packServerBundle({
+                bundleRoot: fixture.bundleRoot,
+                outputDirectory: fixture.outputDirectory,
+                fs: io,
+            }),
+            /existing archive.*missing|unreadable/i,
+        )
+        assert.equal(removed, true)
+        assert.equal(fs.existsSync(archivePath), false)
+        assert.deepEqual(packCandidates(fixture.outputDirectory, fixture.archiveName), [])
+    })
+
+    await t.test("existing archive cannot be opened", t => {
+        const fixture = createPackFixture(t)
+        const { packServerBundle } = require(packPath)
+        packServerBundle({ bundleRoot: fixture.bundleRoot, outputDirectory: fixture.outputDirectory })
+        const archivePath = path.join(fixture.outputDirectory, fixture.archiveName)
+        const archiveBytes = fs.readFileSync(archivePath)
+        const io = Object.create(fs)
+        let rejected = false
+        io.openSync = (filePath, flags, mode) => {
+            if (path.resolve(filePath) === archivePath) {
+                rejected = true
+                const error = new Error("injected existing unreadable")
+                error.code = "EACCES"
+                throw error
+            }
+            return fs.openSync(filePath, flags, mode)
+        }
+
+        assert.throws(
+            () => packServerBundle({
+                bundleRoot: fixture.bundleRoot,
+                outputDirectory: fixture.outputDirectory,
+                fs: io,
+            }),
+            /injected existing unreadable/i,
+        )
+        assert.equal(rejected, true)
+        assert.deepEqual(fs.readFileSync(archivePath), archiveBytes)
+        assert.deepEqual(packCandidates(fixture.outputDirectory, fixture.archiveName), [])
+    })
+})
+
+test("reports safe merged cleanup details when comparison and candidate cleanup fail", t => {
+    const fixture = createPackFixture(t)
+    const { packServerBundle } = require(packPath)
+    packServerBundle({ bundleRoot: fixture.bundleRoot, outputDirectory: fixture.outputDirectory })
+    const archivePath = path.join(fixture.outputDirectory, fixture.archiveName)
+    const archiveBytes = fs.readFileSync(archivePath)
+    const comparisonError = new Error(`injected comparison failure at ${archivePath}`)
+    comparisonError.code = "EACCES"
+    const io = Object.create(fs)
+    let candidatePath
+    let candidateFile
+    let candidateCleanupAttempts = 0
+    let zipTemporaryPath
+    let zipCleanupAttempts = 0
+
+    io.openSync = (filePath, flags, mode) => {
+        if (path.resolve(filePath) === archivePath) throw comparisonError
+        const descriptor = fs.openSync(filePath, flags, mode)
+        if (path.basename(filePath).includes(".tmp-")) zipTemporaryPath = filePath
+        return descriptor
+    }
+    io.linkSync = (source, destination) => {
+        const basename = path.basename(destination)
+        if (basename.includes(".candidate-") && !basename.includes(".tmp-")) {
+            candidatePath = destination
+            candidateFile = basename
+        }
+        return fs.linkSync(source, destination)
+    }
+    io.unlinkSync = filePath => {
+        if (filePath === zipTemporaryPath) {
+            zipCleanupAttempts++
+            const error = new Error("injected ZIP temporary cleanup failure")
+            error.code = "EBUSY"
+            throw error
+        }
+        if (path.basename(filePath) === candidateFile) {
+            candidateCleanupAttempts++
+            const error = new Error("injected candidate cleanup failure")
+            error.code = "EBUSY"
+            throw error
+        }
+        return fs.unlinkSync(filePath)
+    }
+
+    assert.throws(
+        () => packServerBundle({
+            bundleRoot: fixture.bundleRoot,
+            outputDirectory: fixture.outputDirectory,
+            fs: io,
+        }),
+        error => {
+            assert.equal(error.cause, comparisonError)
+            assert.match(error.message, /archive decision failed.*cleanup remains.*temporary file/i)
+            assert.equal(error.message.includes(path.basename(candidatePath)), true)
+            assert.equal(error.message.includes(fixture.sandbox), false)
+            assert.equal(Array.isArray(error.warnings), true)
+            assert.equal(error.warnings.length, 2)
+            assert.equal(error.warnings.some(warning => (
+                warning.includes(path.basename(zipTemporaryPath))
+            )), true)
+            assert.equal(error.warnings.some(warning => (
+                warning.includes(path.basename(candidatePath))
+            )), true)
+            assert.equal(error.warnings.every(warning => !warning.includes(fixture.sandbox)), true)
+            return true
+        },
+    )
+    assert.equal(zipCleanupAttempts, 1)
+    assert.equal(candidateCleanupAttempts, 1)
+    assert.equal(fs.existsSync(zipTemporaryPath), true)
+    assert.equal(fs.existsSync(candidatePath), true)
+    assert.deepEqual(fs.readFileSync(archivePath), archiveBytes)
+})
+
 test("verification failure creates no archive or temporary candidate", t => {
     const fixture = createPackFixture(t)
     fs.writeFileSync(path.join(fixture.bundleRoot, "out/cn-server.js"), "damaged\n")

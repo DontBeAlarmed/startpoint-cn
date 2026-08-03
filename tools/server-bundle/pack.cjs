@@ -175,37 +175,63 @@ function filesEqual(io, candidatePath, outputPath) {
     }
 }
 
-function cleanupCandidate(io, candidatePath, warnings) {
+function cleanupCandidate(io, candidatePath) {
     try {
         io.unlinkSync(candidatePath)
+        return true
     } catch (error) {
-        if (error && error.code === "ENOENT") return
+        return Boolean(error && error.code === "ENOENT")
+    }
+}
+
+function failureWithWarnings(message, cause, warnings) {
+    const error = new Error(message, { cause })
+    error.warnings = [...warnings]
+    return error
+}
+
+function publishCandidate(io, candidatePath, outputPath, warnings) {
+    let decisionError
+    let decisionFailed = false
+    let status
+    let cleanupSucceeded
+    try {
+        try {
+            io.linkSync(candidatePath, outputPath)
+            status = "created"
+        } catch (error) {
+            if ((!error || error.code !== "EEXIST") && !pathExists(io, outputPath)) throw error
+            if (!filesEqual(io, candidatePath, outputPath)) {
+                fail("Archive destination exists and differs from the verified bundle candidate")
+            }
+            status = "unchanged"
+        }
+    } catch (error) {
+        decisionFailed = true
+        decisionError = error
+    } finally {
+        cleanupSucceeded = cleanupCandidate(io, candidatePath)
+    }
+
+    if (decisionFailed) {
+        if (!cleanupSucceeded) {
+            const warning = `Archive decision failed; cleanup remains for temporary file "${path.basename(candidatePath)}"`
+            warnings.push(warning)
+            throw failureWithWarnings(warning, decisionError, warnings)
+        }
+        if (warnings.length > 0) {
+            const message = decisionError instanceof Error
+                ? decisionError.message
+                : "Archive decision failed"
+            throw failureWithWarnings(message, decisionError, warnings)
+        }
+        throw decisionError
+    }
+    if (!cleanupSucceeded) {
         warnings.push(
             `Archive committed; cleanup remains for temporary file "${path.basename(candidatePath)}"`,
         )
     }
-}
-
-function publishCandidate(io, candidatePath, outputPath, warnings) {
-    let status
-    try {
-        io.linkSync(candidatePath, outputPath)
-        status = "created"
-    } catch (error) {
-        if ((!error || error.code !== "EEXIST") && !pathExists(io, outputPath)) throw error
-        if (!filesEqual(io, candidatePath, outputPath)) {
-            try {
-                io.unlinkSync(candidatePath)
-            } catch {
-                fail(
-                    `Archive destination differs; cleanup remains for temporary file "${path.basename(candidatePath)}"`,
-                )
-            }
-            fail("Archive destination exists and differs from the verified bundle candidate")
-        }
-        status = "unchanged"
-    }
-    cleanupCandidate(io, candidatePath, warnings)
     return status
 }
 
@@ -256,6 +282,9 @@ if (require.main === module) {
         for (const warning of result.warnings) process.stderr.write(`Warning: ${warning}\n`)
     } catch (error) {
         process.stderr.write(`Server bundle packaging failed: ${publicErrorMessage(error)}\n`)
+        if (error !== null && typeof error === "object" && Array.isArray(error.warnings)) {
+            for (const warning of error.warnings) process.stderr.write(`Warning: ${warning}\n`)
+        }
         process.exitCode = 1
     }
 }
