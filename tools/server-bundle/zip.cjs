@@ -476,14 +476,12 @@ function publishWithoutReplacement(io, temporaryPath, outputPath) {
         throw error
     }
 
-    for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-            io.unlinkSync(temporaryPath)
+    try {
+        io.unlinkSync(temporaryPath)
+        return { published: true, cleanupPending: false }
+    } catch (error) {
+        if (error && error.code === "ENOENT") {
             return { published: true, cleanupPending: false }
-        } catch (error) {
-            if (error && error.code === "ENOENT") {
-                return { published: true, cleanupPending: false }
-            }
         }
     }
     return {
