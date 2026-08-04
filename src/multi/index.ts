@@ -2,6 +2,7 @@
 // Re-exports for backward compatibility with cn-server.ts
 
 export { multiBattleRoutes } from "./http/register"
+export { createEmbeddedMultiHttpContext } from "./http/context"
 export {
     getSessionServerStatus,
     isSessionServerListening,

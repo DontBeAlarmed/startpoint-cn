@@ -1,22 +1,20 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { PrepareBody, SummonBody, RestoreRoomBody, ShareRoomBody } from "../types";
 import { generateDataHeaders } from "../../utils";
-import { getRoom, getRoomByToken, updateHostEntryTime, disbandRoom, isRoomMember } from "../room/manager";
-import { serializeRoomConnection } from "../room/serializer";
-import { sessionManager } from "../state/SessionManager";
+import { serializeRoomStatusConnection } from "../room/serializer";
 import { buildNpcMates } from "../npc/builder";
-import { resolveMultiPlayerContext } from "../player-context";
+import { isValidMultiViewerId, type MultiHttpContext } from "./context";
 
-async function hasValidViewer(viewerId: number): Promise<boolean> {
-    return Number.isSafeInteger(viewerId) && viewerId > 0
-        && await resolveMultiPlayerContext(viewerId) !== null;
+async function hasValidViewer(context: MultiHttpContext, viewerId: number): Promise<boolean> {
+    return isValidMultiViewerId(viewerId)
+        && await context.resolvePlayerContext(viewerId) !== null;
 }
 
 function forbidden(reply: FastifyReply): FastifyReply {
     return reply.status(403).send({ "error": "Forbidden", "message": "Room permission denied." });
 }
 
-export function registerRoomRoutes(fastify: FastifyInstance): void {
+export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpContext): void {
 
     // ---- prepare ----
     fastify.post("/prepare", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -24,17 +22,26 @@ export function registerRoomRoutes(fastify: FastifyInstance): void {
         const viewerId = body.viewer_id;
         console.log(`[MULTI] prepare: viewer=${viewerId} room=${body.room_number}`);
 
-        if (!await hasValidViewer(viewerId)) {
+        if (!await hasValidViewer(context, viewerId)) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
         }
 
-        const room = body.room_number
-            ? getRoom(body.room_number)
-            : getRoomByToken(body.access_token || "");
+        const roomNumber = typeof body.room_number === "string" && body.room_number.trim().length > 0
+            ? body.room_number
+            : null;
+        const locator = roomNumber === null
+            ? { accessToken: body.access_token || "" }
+            : { roomNumber };
+        const coordinatorInput = {
+            participant: context.snapshotProvider.getParticipant(viewerId),
+            compatibility: await context.snapshotProvider.getCompatibility(viewerId),
+            ...locator,
+        };
+        const selectedRoom = await context.coordinator.selectRoom(coordinatorInput);
 
-        if (!room) {
+        if (!selectedRoom.ok) {
             reply.header("content-type", "application/x-msgpack");
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -54,17 +61,38 @@ export function registerRoomRoutes(fastify: FastifyInstance): void {
             });
         }
 
-        if (room.category !== body.category || room.quest_id !== body.quest_id) {
+        if (selectedRoom.value.category !== body.category
+            || selectedRoom.value.questId !== body.quest_id) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Room quest mismatch."
             });
         }
 
-        updateHostEntryTime(room.room_number);
-        const data = serializeRoomConnection(room);
-        if (viewerId === room.host_viewer_id) {
+        const room = await context.coordinator.prepareRoom(coordinatorInput);
+        if (!room.ok) {
+            reply.header("content-type", "application/x-msgpack");
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+                "data": {
+                    application_update_url: "",
+                    category_id: 0,
+                    host_entry_time: 0,
+                    ip_address: "",
+                    port: 0,
+                    quest_id: 0,
+                    raising_state: 9,
+                    room_number: body.room_number || "",
+                    room_sequence: 0,
+                    share_room_options: 0,
+                    is_pickup: null,
+                }
+            });
+        }
+
+        const data = serializeRoomStatusConnection(room.value);
+        if (viewerId === room.value.host.viewerId) {
             data.raising_state = 1
-        } else if (!sessionManager.isHostOnline(room.host_viewer_id, room.room_number)) {
+        } else if (!room.value.hostOnline) {
             data.raising_state = 2
             console.log(`[MULTI] prepare: host offline, guest polls raising_state → 2`)
         }
@@ -82,27 +110,30 @@ export function registerRoomRoutes(fastify: FastifyInstance): void {
         const viewerId = body.viewer_id;
         console.log(`[MULTI] summon: viewer=${viewerId} room=${body.room_number}`);
 
-        if (!await hasValidViewer(viewerId)) {
+        if (!await hasValidViewer(context, viewerId)) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
         }
 
-        const room = getRoom(body.room_number);
-        if (!room) {
+        const room = await context.coordinator.getRoomStatus({
+            participant: context.snapshotProvider.getParticipant(viewerId),
+            roomNumber: body.room_number,
+        });
+        if (!room.ok) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Room doesn't exist."
             });
         }
 
-        if (viewerId !== room.host_viewer_id) return forbidden(reply);
-        if (room.category !== body.category_id || room.quest_id !== body.quest_id) {
+        if (viewerId !== room.value.host.viewerId) return forbidden(reply);
+        if (room.value.category !== body.category_id || room.value.questId !== body.quest_id) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Room quest mismatch."
             });
         }
 
-        const mates = buildNpcMates(body.quest_id, room.category);
+        const mates = buildNpcMates(body.quest_id, room.value.category);
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
@@ -120,14 +151,17 @@ export function registerRoomRoutes(fastify: FastifyInstance): void {
         const viewerId = body.viewer_id;
         console.log(`[MULTI] restore_room: viewer=${viewerId} room=${body.room_number}`);
 
-        if (!await hasValidViewer(viewerId)) {
+        if (!await hasValidViewer(context, viewerId)) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
         }
 
-        const room = getRoom(body.room_number);
-        if (!room) {
+        const room = await context.coordinator.getRoomStatus({
+            participant: context.snapshotProvider.getParticipant(viewerId),
+            roomNumber: body.room_number,
+        });
+        if (!room.ok) {
             reply.header("content-type", "application/x-msgpack");
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -148,31 +182,31 @@ export function registerRoomRoutes(fastify: FastifyInstance): void {
             });
         }
 
-        if (!isRoomMember(room, viewerId)) {
+        if (!room.value.members.some(member => member.viewerId === viewerId)) {
             reply.header("content-type", "application/x-msgpack");
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
                 "data": {
                     application_update_url: "",
-                    category_id: room.category,
-                    host_entry_time: room.host_entry_time,
+                    category_id: room.value.category,
+                    host_entry_time: room.value.hostEntryTime,
                     ip_address: "",
                     port: 0,
-                    quest_id: room.quest_id,
+                    quest_id: room.value.questId,
                     raising_state: 13,
-                    room_number: room.room_number,
-                    room_sequence: room.room_sequence,
-                    share_room_options: room.share_room_options,
+                    room_number: room.value.roomNumber,
+                    room_sequence: room.value.roomSequence,
+                    share_room_options: room.value.shareRoomOptions,
                     is_pickup: null,
                     is_same_room: true,
                 }
             });
         }
 
-        const data = { ...serializeRoomConnection(room), is_same_room: true };
-        if (viewerId === room.host_viewer_id) {
+        const data = { ...serializeRoomStatusConnection(room.value), is_same_room: true };
+        if (viewerId === room.value.host.viewerId) {
             data.raising_state = 1
-        } else if (!sessionManager.isHostOnline(room.host_viewer_id, room.room_number)) {
+        } else if (!room.value.hostOnline) {
             data.raising_state = 2
             console.log(`[MULTI] restore_room: host offline, guest polls raising_state → 2`)
         }
@@ -190,14 +224,17 @@ export function registerRoomRoutes(fastify: FastifyInstance): void {
         const viewerId = body.viewer_id;
         console.log(`[MULTI] share_room: viewer=${viewerId} room=${body.room_number}`);
 
-        if (!await hasValidViewer(viewerId)) {
+        if (!await hasValidViewer(context, viewerId)) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
         }
 
-        const room = getRoom(body.room_number);
-        if (!room || viewerId !== room.host_viewer_id) return forbidden(reply);
+        const room = await context.coordinator.getRoomStatus({
+            participant: context.snapshotProvider.getParticipant(viewerId),
+            roomNumber: body.room_number,
+        });
+        if (!room.ok || viewerId !== room.value.host.viewerId) return forbidden(reply);
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
@@ -212,20 +249,18 @@ export function registerRoomRoutes(fastify: FastifyInstance): void {
         const viewerId = body.viewer_id;
         console.log(`[MULTI] disband_room: viewer=${viewerId} room=${body.room_number}`);
 
-        if (!await hasValidViewer(viewerId)) {
+        if (!await hasValidViewer(context, viewerId)) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
         }
 
-        const room = getRoom(body.room_number);
-        if (!room || viewerId !== room.host_viewer_id) return forbidden(reply);
-
-        if (body.room_number) {
-            sessionManager.broadcastToRoom(body.room_number, [1, [6, "multibattle_room_dismissed"]]);
-            disbandRoom(body.room_number);
-            console.log(`[MULTI] room ${body.room_number} disbanded by viewer ${viewerId}`);
-        }
+        const result = await context.coordinator.disbandRoom({
+            participant: context.snapshotProvider.getParticipant(viewerId),
+            roomNumber: body.room_number,
+        });
+        if (!result.ok) return forbidden(reply);
+        console.log(`[MULTI] room ${body.room_number} disbanded by viewer ${viewerId}`);
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({

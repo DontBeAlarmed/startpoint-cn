@@ -21,6 +21,7 @@ export type CoordinatorErrorCode =
     | "INCOMPATIBLE_ROOM"
     | "VIEWER_ID_CONFLICT"
     | "QUEST_NOT_AVAILABLE"
+    | "ROOM_PERMISSION_DENIED"
     | "ROOM_NOT_FOUND"
     | "HUB_UNAVAILABLE"
 

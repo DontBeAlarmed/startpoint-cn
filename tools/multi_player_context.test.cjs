@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict")
+const Fastify = require("fastify")
 const fs = require("node:fs")
 const path = require("node:path")
 require("ts-node/register/transpile-only")
@@ -76,13 +77,27 @@ async function testActivePlayerWinsOverFirstAccountPlayer() {
 
 function testMultiEntrypointsSharePlayerContextResolver() {
     const root = path.resolve(__dirname, "..")
-    const entrypoints = [
-        "src/multi/http/lobby.ts",
-        "src/multi/tcp/handshake.ts",
+    const injectedEntrypoints = [
         "src/multi/http/battle.ts",
+        "src/multi/http/lobby.ts",
+        "src/multi/http/room.ts",
+        "src/multi/http/social.ts",
+    ]
+    for (const relativePath of injectedEntrypoints) {
+        const source = fs.readFileSync(path.join(root, relativePath), "utf8")
+        assert.match(
+            source,
+            /context\.resolvePlayerContext\s*\(/,
+            `${relativePath} must use the injected resolver`,
+        )
+        assert.doesNotMatch(source, /\bresolveMultiPlayerContext\s*\(/)
+    }
+
+    const embeddedEntrypoints = [
+        "src/multi/tcp/handshake.ts",
     ]
 
-    for (const relativePath of entrypoints) {
+    for (const relativePath of embeddedEntrypoints) {
         const source = fs.readFileSync(path.join(root, relativePath), "utf8")
         assert.match(source, /resolveMultiPlayerContext\s*\(/, `${relativePath} must use the shared resolver`)
     }
@@ -108,8 +123,64 @@ function testMultiEntrypointsSharePlayerContextResolver() {
     }
 }
 
+async function testBattleRoutesRejectInvalidViewerIdsBeforeResolvingContext() {
+    const originalResolver = multiPlayerContext.resolveMultiPlayerContext
+    let globalResolverCalls = 0
+    let contextResolverCalls = 0
+    multiPlayerContext.resolveMultiPlayerContext = async () => {
+        globalResolverCalls++
+        return null
+    }
+
+    const battleModulePath = require.resolve("../src/multi/http/battle")
+    delete require.cache[battleModulePath]
+    const { registerBattleRoutes } = require(battleModulePath)
+    const fastify = Fastify()
+    registerBattleRoutes(fastify, {
+        resolvePlayerContext: async () => {
+            contextResolverCalls++
+            return null
+        },
+    })
+    await fastify.ready()
+
+    try {
+        const routes = [
+            { url: "/finish", payload: { statistics: {} } },
+            { url: "/abort", payload: {} },
+            { url: "/play_continue", payload: {} },
+        ]
+        const invalidViewerIds = ["101", Number.NaN, 101.5, 0, -1]
+        for (const route of routes) {
+            for (const viewerId of invalidViewerIds) {
+                const response = await fastify.inject({
+                    method: "POST",
+                    url: route.url,
+                    payload: {
+                        viewer_id: viewerId,
+                        quest_id: 1,
+                        category: 1,
+                        room_number: "000000",
+                        play_id: "invalid-viewer",
+                        api_count: 1,
+                        ...route.payload,
+                    },
+                })
+                assert.equal(response.statusCode, 400, `${route.url}: ${String(viewerId)}`)
+            }
+        }
+        assert.equal(globalResolverCalls, 0)
+        assert.equal(contextResolverCalls, 0)
+    } finally {
+        await fastify.close()
+        multiPlayerContext.resolveMultiPlayerContext = originalResolver
+        delete require.cache[battleModulePath]
+    }
+}
+
 async function main() {
     await testActivePlayerWinsOverFirstAccountPlayer()
+    await testBattleRoutesRejectInvalidViewerIdsBeforeResolvingContext()
     testMultiEntrypointsSharePlayerContextResolver()
     console.log("multi player context tests passed")
 }

@@ -44,6 +44,7 @@ const { activeQuests } = require("../src/lib/quest/active-quest-service")
 const { QuestCategory } = require("../src/lib/types")
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
 const { registerBattleRoutes } = require("../src/multi/http/battle")
+const { createEmbeddedMultiHttpContext } = require("../src/multi/http/context")
 
 initializeDatabase()
 db = getDb()
@@ -100,7 +101,11 @@ function stateSnapshot() {
 async function main() {
     const app = Fastify({ logger: false })
     await app.register(singleBattleRoutes, { prefix: "/single" })
-    await app.register(async instance => registerBattleRoutes(instance), { prefix: "/multi" })
+    const multiContext = createEmbeddedMultiHttpContext()
+    await app.register(
+        async instance => registerBattleRoutes(instance, multiContext),
+        { prefix: "/multi" },
+    )
     await app.ready()
 
     const before = stateSnapshot()

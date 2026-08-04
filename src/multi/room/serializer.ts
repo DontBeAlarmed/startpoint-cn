@@ -1,6 +1,6 @@
 import * as os from "os"
 import { MultiRoom } from "../types"
-import { sessionManager } from "../state/SessionManager"
+import type { RoomStatus } from "../coordinator/interface"
 
 export function getDisplayHost(): string {
     const publicHost = (process.env.SESSION_PUBLIC_HOST || process.env.CN_PUBLIC_HOST || "").trim()
@@ -88,19 +88,43 @@ export function serializeRoom(room: MultiRoom): SerializedRoom {
 }
 
 export function serializeRoomConnection(room: MultiRoom): SerializedRoomConnection {
+    return serializeRoomConnectionFields({
+        category: room.category,
+        hostEntryTime: room.host_entry_time,
+        questId: room.quest_id,
+        raisingState: room.raising_state,
+        roomNumber: room.room_number,
+        roomSequence: room.room_sequence,
+        shareRoomOptions: room.share_room_options,
+    })
+}
+
+export function serializeRoomStatusConnection(room: RoomStatus): SerializedRoomConnection {
+    return serializeRoomConnectionFields(room)
+}
+
+function serializeRoomConnectionFields(room: {
+    readonly category: number
+    readonly hostEntryTime: number
+    readonly questId: number
+    readonly raisingState: number
+    readonly roomNumber: string
+    readonly roomSequence: number
+    readonly shareRoomOptions: number
+}): SerializedRoomConnection {
     const displayHost = getDisplayHost();
     const sessionPort = parseInt(process.env.SESSION_PORT || "8003");
     return {
         application_update_url: "",
         category_id: room.category,
-        host_entry_time: room.host_entry_time,
+        host_entry_time: room.hostEntryTime,
         ip_address: displayHost,
         port: sessionPort,
-        quest_id: room.quest_id,
-        raising_state: room.raising_state,
-        room_number: room.room_number,
-        room_sequence: room.room_sequence,
-        share_room_options: room.share_room_options,
+        quest_id: room.questId,
+        raising_state: room.raisingState,
+        room_number: room.roomNumber,
+        room_sequence: room.roomSequence,
+        share_room_options: room.shareRoomOptions,
         is_pickup: null,
     };
 }

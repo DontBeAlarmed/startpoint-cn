@@ -39,7 +39,6 @@ import {
     settleMissionCategories,
 } from "../../lib/mission";
 import { resolveHostFinished, resolveIsRoomHost } from "../../lib/quest/host-finish";
-import { resolveMultiPlayerContext } from "../player-context";
 import { resolveQuestRewardEligibility } from "../../lib/quest/first-clear-reward";
 import { getCommonScoreRewardCount } from "../../lib/score-reward-lottery";
 import {
@@ -68,6 +67,7 @@ import {
     validateMultiFinishRequest,
     validateMultiStartRequest,
 } from "../../lib/quest/multi-battle-validation";
+import { isValidMultiViewerId, type MultiHttpContext } from "./context";
 
 export function canFinishMultiBattleQuest(
     quest: Pick<BattleQuest, "isBothBoss">,
@@ -88,7 +88,7 @@ export function cleanupAbortedMultiBattle(roomNumber: string, playerId: number):
     return false;
 }
 
-export function registerBattleRoutes(fastify: FastifyInstance): void {
+export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHttpContext): void {
 
     // ---- start ----
     fastify.post("/start", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -115,7 +115,7 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
             });
         }
 
-        const ctx = await resolveMultiPlayerContext(viewer_id);
+        const ctx = await context.resolvePlayerContext(viewer_id);
         if (!ctx) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id or no player bound."
@@ -240,13 +240,13 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         const viewerId = body.viewer_id;
         console.log(`[MULTI] finish: viewer=${viewerId} quest=${body.quest_id} category=${body.category} room=${body.room_number}`);
 
-        if (!viewerId || isNaN(viewerId)) {
+        if (!isValidMultiViewerId(viewerId)) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
         }
 
-        const ctx = await resolveMultiPlayerContext(viewerId);
+        const ctx = await context.resolvePlayerContext(viewerId);
         if (!ctx || !ctx.player) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id."
@@ -634,13 +634,13 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         const viewerId = body.viewer_id;
         console.log(`[MULTI] abort: viewer=${viewerId} quest=${body.quest_id} category=${body.category}`);
 
-        if (isNaN(viewerId)) {
+        if (!isValidMultiViewerId(viewerId)) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
         }
 
-        const ctx = await resolveMultiPlayerContext(viewerId);
+        const ctx = await context.resolvePlayerContext(viewerId);
         if (!ctx) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id or no player bound."
@@ -691,13 +691,13 @@ export function registerBattleRoutes(fastify: FastifyInstance): void {
         const viewerId = body.viewer_id;
         console.log(`[MULTI] play_continue: viewer=${viewerId} quest=${body.quest_id} category=${body.category}`);
 
-        if (isNaN(viewerId)) {
+        if (!isValidMultiViewerId(viewerId)) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
         }
 
-        const ctx = await resolveMultiPlayerContext(viewerId);
+        const ctx = await context.resolvePlayerContext(viewerId);
         if (!ctx || !ctx.player) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id or no player bound."

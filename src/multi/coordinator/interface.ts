@@ -41,6 +41,13 @@ export interface RoomStatus {
     readonly accessToken: string
     readonly category: number
     readonly questId: number
+    readonly hostEntryTime: number
+    readonly roomSequence: number
+    readonly raisingState: number
+    readonly shareRoomOptions: number
+    readonly hostMainCharacterId: number
+    readonly isNpcMode: boolean
+    readonly hostOnline: boolean
     readonly host: ParticipantIdentity
     readonly members: readonly ParticipantIdentity[]
     readonly compatibility: MultiCompatibilityProfile

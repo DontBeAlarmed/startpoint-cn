@@ -1,23 +1,24 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
 import { GetRoomsBody, CreateRoomBody, SearchRoomBody, SelectRoomBody } from "../types"
-import { getSession } from "../../data/domains/session"
 import { getQuestFromCategorySync } from "../../lib/assets"
 import { generateDataHeaders } from "../../utils"
-import { resolveMultiPlayerContext } from "../player-context"
-import { createRoom, getRoom, getRoomByToken } from "../room/manager"
-import { serializeRoomConnection } from "../room/serializer"
-import { sessionManager } from "../state/SessionManager"
+import { serializeRoomStatusConnection } from "../room/serializer"
+import { isValidMultiViewerId, type MultiHttpContext } from "./context"
 
-export function registerLobbyRoutes(fastify: FastifyInstance): void {
+function isPositiveSafeInteger(value: number): boolean {
+    return Number.isSafeInteger(value) && value > 0
+}
+
+export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttpContext): void {
 
     fastify.post("/get_rooms", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as GetRoomsBody
         const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+        if (!isValidMultiViewerId(viewerId)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         })
-        const sid = await getSession(viewerId.toString())
-        if (!sid) return reply.status(400).send({
+        const ctx = await context.resolvePlayerContext(viewerId)
+        if (!ctx) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid viewer id."
         })
 
@@ -31,10 +32,15 @@ export function registerLobbyRoutes(fastify: FastifyInstance): void {
     fastify.post("/create_room", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as CreateRoomBody
         const { viewer_id, category, quest_id, party_id } = body
-        if (!viewer_id || isNaN(viewer_id)) return reply.status(400).send({
+        if (!isValidMultiViewerId(viewer_id)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         })
-        const ctx = await resolveMultiPlayerContext(viewer_id)
+        if (![party_id, category, quest_id].every(isPositiveSafeInteger)) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Invalid request body."
+            })
+        }
+        const ctx = await context.resolvePlayerContext(viewer_id)
         if (!ctx) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid viewer id or no player bound."
         })
@@ -44,22 +50,26 @@ export function registerLobbyRoutes(fastify: FastifyInstance): void {
             "error": "Bad Request", "message": "Quest doesn't exist."
         })
 
-        const room = createRoom(
-            viewer_id,
-            ctx.playerId,
-            party_id,
+        const room = await context.coordinator.createRoom({
+            requestId: `create_room:${viewer_id}:${body.api_count}`,
+            participant: context.snapshotProvider.getParticipant(viewer_id),
+            localPlayerId: ctx.playerId,
+            partyId: party_id,
             category,
-            quest_id,
-            0,
-            ctx.player?.leaderCharacterId || 1
-        )
+            questId: quest_id,
+            leaderCharacterId: ctx.player?.leaderCharacterId || 1,
+            compatibility: await context.snapshotProvider.getCompatibility(viewer_id),
+        })
+        if (!room.ok) return reply.status(400).send({
+            "error": "Bad Request", "message": "Unable to create room."
+        })
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id }),
             "data": {
-                "access_token": room.access_token,
-                "room_number": room.room_number,
+                "access_token": room.value.accessToken,
+                "room_number": room.value.roomNumber,
                 "room_url": ""
             }
         })
@@ -68,24 +78,29 @@ export function registerLobbyRoutes(fastify: FastifyInstance): void {
     fastify.post("/search_room", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as SearchRoomBody
         const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+        if (!isValidMultiViewerId(viewerId)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         })
-        const sid = await getSession(viewerId.toString())
-        if (!sid) return reply.status(400).send({
+        const ctx = await context.resolvePlayerContext(viewerId)
+        if (!ctx) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid viewer id."
         })
 
-        const room = getRoom(body.room_number)
+        const room = await context.coordinator.searchRoom({
+            participant: context.snapshotProvider.getParticipant(viewerId),
+            roomNumber: body.room_number,
+            compatibility: await context.snapshotProvider.getCompatibility(viewerId),
+        })
+        const status = room.ok ? room.value : null
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
-                "room_exists": !!room,
-                "category_id": room?.category ?? 0,
-                "quest_id": room?.quest_id ?? 0,
-                "room_number": room?.room_number ?? body.room_number,
-                "establisher_viewer_id": room?.host_viewer_id ?? 0,
+                "room_exists": status !== null,
+                "category_id": status?.category ?? 0,
+                "quest_id": status?.questId ?? 0,
+                "room_number": status?.roomNumber ?? body.room_number,
+                "establisher_viewer_id": status?.host.viewerId ?? 0,
                 "establisher_follow": 0
             }
         })
@@ -94,16 +109,26 @@ export function registerLobbyRoutes(fastify: FastifyInstance): void {
     fastify.post("/select_room", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as SelectRoomBody
         const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+        if (!isValidMultiViewerId(viewerId)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         })
-        const ctx = await resolveMultiPlayerContext(viewerId)
+        const ctx = await context.resolvePlayerContext(viewerId)
         if (!ctx) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid viewer id or no player bound."
         })
 
-        const room = body.room_number ? getRoom(body.room_number) : getRoomByToken(body.access_token || "")
-        if (!room) {
+        const roomNumber = typeof body.room_number === "string" && body.room_number.trim().length > 0
+            ? body.room_number
+            : null
+        const locator = roomNumber === null
+            ? { accessToken: body.access_token || "" }
+            : { roomNumber }
+        const room = await context.coordinator.selectRoom({
+            participant: context.snapshotProvider.getParticipant(viewerId),
+            compatibility: await context.snapshotProvider.getCompatibility(viewerId),
+            ...locator,
+        })
+        if (!room.ok) {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -123,11 +148,11 @@ export function registerLobbyRoutes(fastify: FastifyInstance): void {
             })
         }
 
-        const selectData = serializeRoomConnection(room)
-        if (viewerId === room.host_viewer_id) {
+        const selectData = serializeRoomStatusConnection(room.value)
+        if (viewerId === room.value.host.viewerId) {
             selectData.raising_state = 1
             console.log(`[MULTI] select_room: host override raising_state → 1`)
-        } else if (!sessionManager.isHostOnline(room.host_viewer_id, room.room_number)) {
+        } else if (!room.value.hostOnline) {
             selectData.raising_state = 2
             console.log(`[MULTI] select_room: host offline, guest polls raising_state → 2`)
         }

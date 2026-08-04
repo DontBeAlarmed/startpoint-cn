@@ -100,13 +100,25 @@ import {
     type ParticipantIdentity,
 } from ${JSON.stringify(contractsModule)}
 import type {
+    BattleSessionInput,
     BattleStatus,
     CompatibleRoomInput,
     CreateRoomInput,
     MultiCoordinator,
-    RoomLocator,
+    RoomParticipantInput,
     RoomStatus,
 } from ${JSON.stringify(interfaceModule)}
+
+type Equal<Left, Right> =
+    (<Value>() => Value extends Left ? 1 : 2) extends
+    (<Value>() => Value extends Right ? 1 : 2)
+        ? (<Value>() => Value extends Right ? 1 : 2) extends
+            (<Value>() => Value extends Left ? 1 : 2)
+            ? true
+            : false
+        : false
+type IsAny<Value> = 0 extends (1 & Value) ? true : false
+type Assert<Condition extends true> = Condition
 
 const nodeSessionId = "node-a" as NodeSessionId
 const battleSessionId = "battle-a" as BattleSessionId
@@ -119,17 +131,15 @@ const compatibility: MultiCompatibilityProfile = {
     contentDigest: "content",
     modeDigest: "modes",
 }
-const byNumber: RoomLocator = { roomNumber: "123456" }
-const byToken: RoomLocator = { accessToken: "access-token" }
 const compatibleByNumber: CompatibleRoomInput = {
     participant,
     compatibility,
-    ...byNumber,
+    roomNumber: "123456",
 }
 const compatibleByToken: CompatibleRoomInput = {
     participant,
     compatibility,
-    ...byToken,
+    accessToken: "access-token",
 }
 const createInput: CreateRoomInput = {
     requestId: "request-1",
@@ -146,6 +156,13 @@ const roomStatus: RoomStatus = {
     accessToken: "access-token",
     category: 1,
     questId: 1001,
+    hostEntryTime: 1725000000,
+    roomSequence: 1,
+    raisingState: 2,
+    shareRoomOptions: 0,
+    hostMainCharacterId: 101,
+    isNpcMode: false,
+    hostOnline: false,
     host: participant,
     members: [participant],
     compatibility,
@@ -172,6 +189,89 @@ const coordinator: MultiCoordinator = {
     getRoomStatus: () => ok(roomStatus),
 }
 
+type CreateRoomParameters = Assert<Equal<
+    Parameters<MultiCoordinator["createRoom"]>,
+    [CreateRoomInput]
+>>
+type CreateRoomReturn = Assert<Equal<
+    ReturnType<MultiCoordinator["createRoom"]>,
+    Promise<CoordinatorResult<RoomStatus>>
+>>
+type SearchRoomParameters = Assert<Equal<
+    Parameters<MultiCoordinator["searchRoom"]>,
+    [CompatibleRoomInput]
+>>
+type SearchRoomReturn = Assert<Equal<
+    ReturnType<MultiCoordinator["searchRoom"]>,
+    Promise<CoordinatorResult<RoomStatus>>
+>>
+type PrepareRoomParameters = Assert<Equal<
+    Parameters<MultiCoordinator["prepareRoom"]>,
+    [CompatibleRoomInput]
+>>
+type PrepareRoomReturn = Assert<Equal<
+    ReturnType<MultiCoordinator["prepareRoom"]>,
+    Promise<CoordinatorResult<RoomStatus>>
+>>
+type SelectRoomParameters = Assert<Equal<
+    Parameters<MultiCoordinator["selectRoom"]>,
+    [CompatibleRoomInput]
+>>
+type SelectRoomReturn = Assert<Equal<
+    ReturnType<MultiCoordinator["selectRoom"]>,
+    Promise<CoordinatorResult<RoomStatus>>
+>>
+type DisbandRoomParameters = Assert<Equal<
+    Parameters<MultiCoordinator["disbandRoom"]>,
+    [RoomParticipantInput]
+>>
+type DisbandRoomReturn = Assert<Equal<
+    ReturnType<MultiCoordinator["disbandRoom"]>,
+    Promise<CoordinatorResult<void>>
+>>
+type StartBattleParameters = Assert<Equal<
+    Parameters<MultiCoordinator["startBattle"]>,
+    [RoomParticipantInput]
+>>
+type StartBattleReturn = Assert<Equal<
+    ReturnType<MultiCoordinator["startBattle"]>,
+    Promise<CoordinatorResult<BattleStatus>>
+>>
+type FinalizeBattleParameters = Assert<Equal<
+    Parameters<MultiCoordinator["finalizeBattle"]>,
+    [BattleSessionInput]
+>>
+type FinalizeBattleReturn = Assert<Equal<
+    ReturnType<MultiCoordinator["finalizeBattle"]>,
+    Promise<CoordinatorResult<BattleStatus>>
+>>
+type GetBattleStatusParameters = Assert<Equal<
+    Parameters<MultiCoordinator["getBattleStatus"]>,
+    [BattleSessionInput]
+>>
+type GetBattleStatusReturn = Assert<Equal<
+    ReturnType<MultiCoordinator["getBattleStatus"]>,
+    Promise<CoordinatorResult<BattleStatus>>
+>>
+type GetRoomStatusParameters = Assert<Equal<
+    Parameters<MultiCoordinator["getRoomStatus"]>,
+    [RoomParticipantInput]
+>>
+type GetRoomStatusReturn = Assert<Equal<
+    ReturnType<MultiCoordinator["getRoomStatus"]>,
+    Promise<CoordinatorResult<RoomStatus>>
+>>
+
+type CreateRoomReturnNotAny = Assert<Equal<IsAny<Awaited<ReturnType<MultiCoordinator["createRoom"]>>>, false>>
+type SearchRoomReturnNotAny = Assert<Equal<IsAny<Awaited<ReturnType<MultiCoordinator["searchRoom"]>>>, false>>
+type PrepareRoomReturnNotAny = Assert<Equal<IsAny<Awaited<ReturnType<MultiCoordinator["prepareRoom"]>>>, false>>
+type SelectRoomReturnNotAny = Assert<Equal<IsAny<Awaited<ReturnType<MultiCoordinator["selectRoom"]>>>, false>>
+type DisbandRoomReturnNotAny = Assert<Equal<IsAny<Awaited<ReturnType<MultiCoordinator["disbandRoom"]>>>, false>>
+type StartBattleReturnNotAny = Assert<Equal<IsAny<Awaited<ReturnType<MultiCoordinator["startBattle"]>>>, false>>
+type FinalizeBattleReturnNotAny = Assert<Equal<IsAny<Awaited<ReturnType<MultiCoordinator["finalizeBattle"]>>>, false>>
+type GetBattleStatusReturnNotAny = Assert<Equal<IsAny<Awaited<ReturnType<MultiCoordinator["getBattleStatus"]>>>, false>>
+type GetRoomStatusReturnNotAny = Assert<Equal<IsAny<Awaited<ReturnType<MultiCoordinator["getRoomStatus"]>>>, false>>
+
 participantKey(nodeSessionId, participant.viewerId)
 void coordinator.createRoom(createInput)
 void coordinator.searchRoom(compatibleByNumber)
@@ -181,10 +281,15 @@ void coordinator.prepareRoom(compatibleByToken)
 const plainIdentity: ParticipantIdentity = { nodeSessionId: "node-a", viewerId: 1 }
 // @ts-expect-error participantKey requires a branded node session id
 participantKey("node-a", 1)
-// @ts-expect-error a room locator requires exactly one locator field
-const missingLocator: RoomLocator = {}
-// @ts-expect-error a room locator cannot contain both locator fields
-const duplicateLocator: RoomLocator = { roomNumber: "123456", accessToken: "token" }
+// @ts-expect-error compatible room input requires exactly one locator field
+const missingLocator: CompatibleRoomInput = { participant, compatibility }
+// @ts-expect-error compatible room input cannot contain both locator fields
+const duplicateLocator: CompatibleRoomInput = {
+    participant,
+    compatibility,
+    roomNumber: "123456",
+    accessToken: "token",
+}
 // @ts-expect-error room status must carry access token and quest identity
 const incompleteRoomStatus: RoomStatus = {
     roomNumber: "123456",
@@ -256,6 +361,7 @@ test("coordinator type contract stays narrow and node-scoped", () => {
             "INCOMPATIBLE_ROOM",
             "QUEST_NOT_AVAILABLE",
             "ROOM_NOT_FOUND",
+            "ROOM_PERMISSION_DENIED",
             "VIEWER_ID_CONFLICT",
         ],
     )
@@ -283,9 +389,16 @@ test("coordinator type contract stays narrow and node-scoped", () => {
         "category",
         "compatibility",
         "host",
+        "hostEntryTime",
+        "hostMainCharacterId",
+        "hostOnline",
+        "isNpcMode",
         "members",
         "questId",
+        "raisingState",
         "roomNumber",
+        "roomSequence",
+        "shareRoomOptions",
     ])
 
     const multiCoordinator = findDeclaration(

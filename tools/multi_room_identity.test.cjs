@@ -1,5 +1,7 @@
 const assert = require("node:assert/strict")
 const Fastify = require("fastify")
+const fs = require("node:fs")
+const path = require("node:path")
 const { pack, unpack } = require("msgpackr")
 const test = require("node:test")
 
@@ -49,12 +51,17 @@ const {
 } = require("../src/multi/room/manager")
 const { getRoom } = require("../src/multi/room/manager")
 const { sessionManager } = require("../src/multi/state/SessionManager")
+const { createEmbeddedMultiHttpContext } = require("../src/multi/http/context")
 const { registerLobbyRoutes } = require("../src/multi/http/lobby")
 const { registerRoomRoutes } = require("../src/multi/http/room")
 const { registerSocialRoutes } = require("../src/multi/http/social")
 
-async function createRouteServer() {
+async function createRouteServer(options = {}) {
     const fastify = Fastify()
+    const context = options.context ?? createEmbeddedMultiHttpContext({
+        resolvePlayerContext: options.resolvePlayerContext
+            ?? (async viewerId => players.get(viewerId) ?? null),
+    })
     fastify.addHook("onSend", (_request, reply, payload, done) => {
         if (reply.getHeader("content-type") === "application/x-msgpack") {
             done(null, pack(payload).toString("base64"))
@@ -62,12 +69,434 @@ async function createRouteServer() {
         }
         done(null, payload)
     })
-    registerLobbyRoutes(fastify)
-    registerRoomRoutes(fastify)
-    registerSocialRoutes(fastify)
+    registerLobbyRoutes(fastify, context)
+    registerRoomRoutes(fastify, context)
+    registerSocialRoutes(fastify, context)
     await fastify.ready()
     return fastify
 }
+
+test("room HTTP routes depend on the injected context instead of global room access", () => {
+    const root = path.resolve(__dirname, "..")
+    for (const relativePath of [
+        "src/multi/http/lobby.ts",
+        "src/multi/http/room.ts",
+        "src/multi/http/social.ts",
+    ]) {
+        const source = fs.readFileSync(path.join(root, relativePath), "utf8")
+        assert.doesNotMatch(source, /from "\.\.\/room\/manager"/)
+        assert.doesNotMatch(source, /from "\.\.\/state\/SessionManager"/)
+        assert.doesNotMatch(source, /\bresolveMultiPlayerContext\b/)
+    }
+    assert.doesNotMatch(
+        fs.readFileSync(path.join(root, "src/multi/http/lobby.ts"), "utf8"),
+        /\bgetSession\b/,
+    )
+})
+
+test("room routes derive raising state from the injected coordinator status", async t => {
+    const participant = viewerId => ({ nodeSessionId: "test-node", viewerId })
+    const compatibility = {
+        protocolVersion: 1,
+        appVersion: "test",
+        resourceVersion: "test",
+        cdnTargetVersion: "test",
+        contentDigest: "test",
+        modeDigest: "test",
+    }
+    const status = {
+        roomNumber: "123456",
+        accessToken: "test-token",
+        category: 1,
+        questId: 701,
+        hostEntryTime: 1_725_000_000,
+        roomSequence: 1,
+        raisingState: 7,
+        shareRoomOptions: 0,
+        hostMainCharacterId: 401,
+        isNpcMode: false,
+        hostOnline: false,
+        host: participant(101),
+        members: [participant(101), participant(202)],
+        compatibility,
+    }
+    const ok = value => Promise.resolve({ ok: true, value })
+    const context = {
+        coordinator: {
+            selectRoom: () => ok(status),
+            prepareRoom: () => ok(status),
+            getRoomStatus: () => ok(status),
+        },
+        resolvePlayerContext: async viewerId => players.get(viewerId) ?? null,
+        snapshotProvider: {
+            getParticipant: participant,
+            getCompatibility: async () => compatibility,
+        },
+        settlementVerifier: {},
+    }
+    const originalIsHostOnline = sessionManager.isHostOnline
+    sessionManager.isHostOnline = () => true
+    t.after(() => { sessionManager.isHostOnline = originalIsHostOnline })
+
+    const fastify = await createRouteServer({ context })
+    t.after(async () => fastify.close())
+
+    const routes = [
+        {
+            name: "select",
+            url: "/select_room",
+            payload: { room_number: status.roomNumber, category: 1, quest_id: 701 },
+        },
+        {
+            name: "prepare",
+            url: "/prepare",
+            payload: { room_number: status.roomNumber, category: 1, quest_id: 701 },
+        },
+        {
+            name: "restore",
+            url: "/restore_room",
+            payload: { room_number: status.roomNumber, room_sequence: 1 },
+        },
+    ]
+    for (const route of routes) {
+        for (const [role, viewerId, expectedState] of [
+            ["guest", 202, 2],
+            ["host", 101, 1],
+        ]) {
+            await t.test(`${route.name}: ${role}`, async () => {
+                const response = await fastify.inject({
+                    method: "POST",
+                    url: route.url,
+                    payload: { ...route.payload, viewer_id: viewerId, api_count: 1 },
+                })
+                assert.equal(response.statusCode, 200)
+                assert.equal(decode(response).data.raising_state, expectedState)
+            })
+        }
+    }
+})
+
+test("lobby routes reject string viewer ids before resolving player context", async t => {
+    let resolverCalls = 0
+    const fastify = await createRouteServer({
+        resolvePlayerContext: async viewerId => {
+            resolverCalls++
+            return players.get(Number(viewerId)) ?? null
+        },
+    })
+    t.after(async () => fastify.close())
+
+    const cases = [
+        {
+            name: "get_rooms",
+            url: "/get_rooms",
+            payload: { viewer_id: "101", category_id: 1, party_id: 1, api_count: 1 },
+        },
+        {
+            name: "create_room",
+            url: "/create_room",
+            payload: {
+                viewer_id: "101",
+                party_id: 1,
+                category: 1,
+                quest_id: 701,
+                api_count: 2,
+            },
+        },
+        {
+            name: "search_room",
+            url: "/search_room",
+            payload: { viewer_id: "101", room_number: "000000", api_count: 3 },
+        },
+        {
+            name: "select_room",
+            url: "/select_room",
+            payload: {
+                viewer_id: "101",
+                room_number: "000000",
+                party_id: 1,
+                category: 1,
+                quest_id: 701,
+                accepted_type: 0,
+                api_count: 4,
+            },
+        },
+    ]
+
+    for (const entry of cases) {
+        await t.test(entry.name, async () => {
+            const response = await fastify.inject({
+                method: "POST",
+                url: entry.url,
+                payload: entry.payload,
+            })
+            assert.equal(response.statusCode, 400)
+        })
+    }
+    assert.equal(resolverCalls, 0)
+})
+
+test("lobby, room and social reject invalid viewer ids before resolving player context", async t => {
+    let resolverCalls = 0
+    const fastify = await createRouteServer({
+        resolvePlayerContext: async viewerId => {
+            resolverCalls++
+            return players.get(Number(viewerId)) ?? null
+        },
+    })
+    t.after(async () => fastify.close())
+
+    const routes = [
+        {
+            name: "lobby",
+            url: "/get_rooms",
+            payload: { category_id: 1, party_id: 1, api_count: 1 },
+        },
+        {
+            name: "room",
+            url: "/prepare",
+            payload: { room_number: "000000", category: 1, quest_id: 701, api_count: 2 },
+        },
+        {
+            name: "social",
+            url: "/verify_access_token",
+            payload: { access_token: "missing-token", api_count: 3 },
+        },
+    ]
+    const invalidViewerIds = [
+        ["string", "101"],
+        ["NaN", Number.NaN],
+        ["non-integer", 101.5],
+        ["zero", 0],
+        ["negative", -1],
+    ]
+
+    for (const route of routes) {
+        for (const [label, viewerId] of invalidViewerIds) {
+            await t.test(`${route.name}: ${label}`, async () => {
+                const response = await fastify.inject({
+                    method: "POST",
+                    url: route.url,
+                    payload: { ...route.payload, viewer_id: viewerId },
+                })
+                assert.equal(response.statusCode, 400)
+            })
+        }
+    }
+    assert.equal(resolverCalls, 0)
+})
+
+test("stateless social routes reject invalid viewer ids without resolving player context", async t => {
+    let resolverCalls = 0
+    const fastify = await createRouteServer({
+        resolvePlayerContext: async () => {
+            resolverCalls++
+            return null
+        },
+    })
+    t.after(async () => fastify.close())
+
+    for (const url of ["/micro_community", "/publish_room"]) {
+        for (const viewerId of ["101", Number.NaN, 101.5, 0, -1]) {
+            await t.test(`${url}: ${String(viewerId)}`, async () => {
+                const response = await fastify.inject({
+                    method: "POST",
+                    url,
+                    payload: { viewer_id: viewerId, api_count: 1 },
+                })
+                assert.equal(response.statusCode, 400)
+            })
+        }
+    }
+    assert.equal(resolverCalls, 0)
+})
+
+test("create, search, select and prepare preserve room response contracts through the coordinator", async t => {
+    const fastify = await createRouteServer()
+    t.after(async () => fastify.close())
+
+    const createResponse = await fastify.inject({
+        method: "POST",
+        url: "/create_room",
+        payload: { viewer_id: 101, party_id: 1, category: 1, quest_id: 701, api_count: 1 },
+    })
+    assert.equal(createResponse.statusCode, 200)
+    const created = decode(createResponse).data
+    assert.match(created.access_token, /^[A-Za-z0-9_-]{32,}$/)
+    assert.match(created.room_number, /^\d{6}$/)
+    assert.equal(created.room_url, "")
+    t.after(() => disbandRoom(created.room_number))
+
+    const searchResponse = await fastify.inject({
+        method: "POST",
+        url: "/search_room",
+        payload: { viewer_id: 202, room_number: created.room_number, api_count: 2 },
+    })
+    assert.deepEqual(decode(searchResponse).data, {
+        room_exists: true,
+        category_id: 1,
+        quest_id: 701,
+        room_number: created.room_number,
+        establisher_viewer_id: 101,
+        establisher_follow: 0,
+    })
+
+    for (const [url, locator, expectedState] of [
+        ["/select_room", { room_number: created.room_number }, 2],
+        ["/select_room", { access_token: created.access_token }, 2],
+        ["/prepare", { room_number: created.room_number }, 2],
+        ["/prepare", { access_token: created.access_token }, 2],
+    ]) {
+        const response = await fastify.inject({
+            method: "POST",
+            url,
+            payload: {
+                viewer_id: 202,
+                party_id: 1,
+                category: 1,
+                quest_id: 701,
+                api_count: 3,
+                ...locator,
+            },
+        })
+        assert.equal(response.statusCode, 200, `${url} ${JSON.stringify(locator)}`)
+        const data = decode(response).data
+        assert.equal(data.room_number, created.room_number)
+        assert.equal(data.category_id, 1)
+        assert.equal(data.quest_id, 701)
+        assert.equal(data.raising_state, expectedState)
+    }
+})
+
+test("empty room locators preserve legacy HTTP responses", async t => {
+    const fastify = await createRouteServer()
+    t.after(async () => fastify.close())
+
+    const cases = [
+        {
+            name: "search_room",
+            url: "/search_room",
+            payload: { viewer_id: 202, room_number: "", api_count: 1 },
+            statusCode: 200,
+            expectedExists: false,
+        },
+        {
+            name: "select_room",
+            url: "/select_room",
+            payload: {
+                viewer_id: 202,
+                room_number: "",
+                access_token: "",
+                party_id: 1,
+                category: 1,
+                quest_id: 701,
+                api_count: 2,
+            },
+            statusCode: 200,
+            expectedState: 9,
+        },
+        {
+            name: "prepare",
+            url: "/prepare",
+            payload: {
+                viewer_id: 202,
+                room_number: "",
+                access_token: "",
+                category: 1,
+                quest_id: 701,
+                api_count: 3,
+            },
+            statusCode: 200,
+            expectedState: 9,
+        },
+        {
+            name: "verify_access_token",
+            url: "/verify_access_token",
+            payload: { viewer_id: 202, access_token: "", api_count: 4 },
+            statusCode: 200,
+            expectedData: { room_exists: false },
+        },
+        {
+            name: "summon",
+            url: "/summon",
+            payload: {
+                viewer_id: 101,
+                room_number: "",
+                category_id: 1,
+                quest_id: 701,
+                api_count: 5,
+            },
+            statusCode: 400,
+        },
+        {
+            name: "restore_room",
+            url: "/restore_room",
+            payload: { viewer_id: 202, room_number: "", api_count: 6 },
+            statusCode: 200,
+            expectedState: 9,
+        },
+        {
+            name: "share_room",
+            url: "/share_room",
+            payload: { viewer_id: 101, room_number: "", api_count: 7 },
+            statusCode: 403,
+        },
+        {
+            name: "disband_room",
+            url: "/disband_room",
+            payload: { viewer_id: 101, room_number: "", api_count: 8 },
+            statusCode: 403,
+        },
+    ]
+
+    for (const entry of cases) {
+        await t.test(entry.name, async () => {
+            const response = await fastify.inject({
+                method: "POST",
+                url: entry.url,
+                payload: entry.payload,
+            })
+            assert.equal(response.statusCode, entry.statusCode)
+            if (entry.expectedData) {
+                assert.deepEqual(decode(response).data, entry.expectedData)
+            }
+            if (entry.expectedExists !== undefined) {
+                assert.equal(decode(response).data.room_exists, entry.expectedExists)
+            }
+            if (entry.expectedState !== undefined) {
+                assert.equal(decode(response).data.raising_state, entry.expectedState)
+            }
+        })
+    }
+})
+
+test("create_room maps invalid coordinator numeric fields to HTTP 400", async t => {
+    const fastify = await createRouteServer()
+    t.after(async () => fastify.close())
+
+    for (const [field, value] of [
+        ["party_id", 0],
+        ["category", 0],
+        ["quest_id", 0],
+    ]) {
+        await t.test(field, async () => {
+            const payload = {
+                viewer_id: 101,
+                party_id: 1,
+                category: 1,
+                quest_id: 701,
+                api_count: 1,
+                [field]: value,
+            }
+            const response = await fastify.inject({
+                method: "POST",
+                url: "/create_room",
+                payload,
+            })
+            assert.equal(response.statusCode, 400)
+        })
+    }
+})
 
 function decode(response) {
     return unpack(Buffer.from(response.body, "base64"))
@@ -176,12 +605,14 @@ test("room mutations require an authenticated host while restore accepts recorde
     })
     assert.equal(firstPrepare.statusCode, 200, "prepare is the authenticated pre-membership entry point")
 
+    room.host_entry_time = 1_700_000_000
     const mismatchedPrepare = await fastify.inject({
         method: "POST",
         url: "/prepare",
         payload: { viewer_id: 303, room_number: room.room_number, category: 1, quest_id: 999, api_count: 3 },
     })
     assert.equal(mismatchedPrepare.statusCode, 400)
+    assert.equal(room.host_entry_time, 1_700_000_000)
 
     const guestShare = await fastify.inject({
         method: "POST",
@@ -211,6 +642,10 @@ test("room mutations require an authenticated host while restore accepts recorde
         payload: { viewer_id: 202, room_number: room.room_number, api_count: 7 },
     })
     assert.equal(guestDisband.statusCode, 403)
+    assert.deepEqual(guestDisband.json(), {
+        error: "Forbidden",
+        message: "Room permission denied.",
+    })
     assert.equal(getRoom(room.room_number), room)
 
     const hostDisband = await fastify.inject({

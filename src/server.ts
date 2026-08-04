@@ -18,7 +18,7 @@ import expodApiPlugin from "./routes/api/expod"
 import storyQuestApiPlugin from "./routes/api/storyQuest"
 import optionApiPlugin from "./routes/api/option"
 import singleBattleQuestApiPlugin from "./routes/api/singleBattleQuest"
-import { multiBattleRoutes } from "./multi"
+import { createEmbeddedMultiHttpContext, multiBattleRoutes } from "./multi"
 import attentionApiPlugin from "./routes/api/attention"
 import characterApiPlugin from "./routes/api/character"
 import partyGroupApiPlugin from "./routes/api/partyGroup"
@@ -102,6 +102,7 @@ fastify.addContentTypeParser('application/json', { parseAs: 'string' }, jsonPars
 
 //api
 const apiPrefix = "/latest/api/index.php"
+const multiHttpContext = createEmbeddedMultiHttpContext()
 fastify.register(apiPlugin, { prefix: apiPrefix })
 fastify.register(assetApiPlugin, { prefix: `${apiPrefix}/asset` })
 fastify.register(toolApiPlugin, { prefix: `${apiPrefix}/tool` })
@@ -113,7 +114,10 @@ fastify.register(expodApiPlugin, { prefix: `${apiPrefix}/expod` })
 fastify.register(storyQuestApiPlugin, { prefix: `${apiPrefix}/story_quest` })
 fastify.register(optionApiPlugin, { prefix: `${apiPrefix}/option` })
 fastify.register(singleBattleQuestApiPlugin, { prefix: `${apiPrefix}/single_battle_quest` })
-fastify.register(multiBattleRoutes, { prefix: `${apiPrefix}/multi_battle_quest` })
+fastify.register(multiBattleRoutes, {
+    prefix: `${apiPrefix}/multi_battle_quest`,
+    context: multiHttpContext,
+})
 fastify.register(attentionApiPlugin, { prefix: `${apiPrefix}/attention` })
 fastify.register(characterApiPlugin, { prefix: `${apiPrefix}/character` })
 fastify.register(partyGroupApiPlugin, { prefix: `${apiPrefix}/party_group` })
