@@ -88,6 +88,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/lobby_lifecycle.test.cjs",
             "tools/msgpack_compat.test.cjs",
             "tools/multi_battle_multiscene.test.cjs",
+            "tools/multi_coordinator_contract.test.cjs",
             "tools/multi_finish_follow_info.test.cjs",
             "tools/multi_player_context.test.cjs",
             "tools/npc_contributor_names.test.cjs",

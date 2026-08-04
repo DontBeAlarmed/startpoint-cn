@@ -137,6 +137,14 @@ test("maps representative source files to focused groups", () => {
         ["integration:runtime", "quick:protocol"],
     )
     assert.deepEqual(
+        selectTestGroups(["src/multi/coordinator/contracts.ts"]),
+        ["quick:protocol"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/multi_coordinator_contract.test.cjs"]),
+        ["quick:protocol"],
+    )
+    assert.deepEqual(
         selectTestGroups(["assets/server/npc_contributor_names.json"]),
         ["quick:protocol"],
     )
@@ -639,6 +647,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/lobby_lifecycle.test.cjs",
         "tools/msgpack_compat.test.cjs",
         "tools/multi_battle_multiscene.test.cjs",
+        "tools/multi_coordinator_contract.test.cjs",
         "tools/multi_finish_follow_info.test.cjs",
         "tools/multi_player_context.test.cjs",
         "tools/npc_contributor_names.test.cjs",
