@@ -16,13 +16,7 @@ export interface AdmissionIssuer {
     issue(input: AdmissionIssueInput): AdmissionIssueResult
 }
 
-export interface EmbeddedAdmissionMetadata {
-    readonly localPlayerId: number
-}
-
-export interface AdmissionIssueInput extends RoomAdmission {
-    readonly embedded?: EmbeddedAdmissionMetadata
-}
+export type AdmissionIssueInput = RoomAdmission
 
 export type AdmissionIssueResult =
     | { readonly ok: true, readonly value: RoomAdmission }
@@ -30,11 +24,6 @@ export type AdmissionIssueResult =
 
 export interface AdmissionRegistryOptions {
     readonly now?: () => number
-}
-
-const embeddedMetadata = Symbol("embeddedAdmissionMetadata")
-type InternalAdmission = RoomAdmission & {
-    readonly [embeddedMetadata]?: EmbeddedAdmissionMetadata
 }
 
 function normalizeRoomNumber(value: unknown): string | null {
@@ -51,16 +40,8 @@ function key(roomNumber: string, viewerId: number): string {
     return `${roomNumber}\0${viewerId}`
 }
 
-export function getEmbeddedAdmissionMetadata(
-    admission: RoomAdmission | null,
-): EmbeddedAdmissionMetadata | null {
-    return admission
-        ? (admission as InternalAdmission)[embeddedMetadata] ?? null
-        : null
-}
-
 export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
-    private readonly admissions = new Map<string, InternalAdmission>()
+    private readonly admissions = new Map<string, RoomAdmission>()
     private readonly now: () => number
 
     constructor(options: AdmissionRegistryOptions = {}) {
@@ -84,11 +65,6 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
         if (!Number.isSafeInteger(input.expiresAt) || input.expiresAt <= now) {
             throw new TypeError("expiresAt must be a future safe integer")
         }
-        if (input.embedded !== undefined
-            && !isValidViewerId(input.embedded.localPlayerId)) {
-            throw new TypeError("embedded.localPlayerId must be a positive safe integer")
-        }
-
         this.cleanup()
         const admissionKey = key(roomNumber, input.participant.viewerId)
         const existing = this.admissions.get(admissionKey)
@@ -104,12 +80,6 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
             participant: Object.freeze({ ...input.participant }),
             snapshot: input.snapshot,
             expiresAt: input.expiresAt,
-        } as InternalAdmission
-        if (input.embedded !== undefined) {
-            Object.defineProperty(admission, embeddedMetadata, {
-                value: Object.freeze({ ...input.embedded }),
-                enumerable: false,
-            })
         }
         Object.freeze(admission)
         this.admissions.set(admissionKey, admission)

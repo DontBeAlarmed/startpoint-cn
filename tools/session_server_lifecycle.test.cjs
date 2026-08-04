@@ -206,7 +206,7 @@ test("stop waits for tracked handshakes, removes late sessions, and ignores new 
         async handleHandshake(socket) {
             handshakeCalls++
             await handshake.promise
-            lateClient = sessionManager.createClient(socket, 91, "pending-room", "pending-cid", null)
+            lateClient = sessionManager.createClient(socket, 91, "pending-room", "pending-cid")
             sessionManager.addClientToRoom(lateClient)
         },
     })
@@ -530,7 +530,7 @@ test("handshake shutdown timeout bounds stop and late resolution cannot add a se
         async handleHandshake(socket, _data, lifecycle) {
             await handshake.promise
             if (!lifecycle.isAccepting()) return
-            lateClient = sessionManager.createClient(socket, 92, "timeout-room", "timeout-cid", null)
+            lateClient = sessionManager.createClient(socket, 92, "timeout-room", "timeout-cid")
             sessionManager.addClientToRoom(lateClient)
         },
     })

@@ -12,7 +12,6 @@ import type { SessionClient } from "../state/SessionManager"
 import { ClientState } from "../types"
 import {
     embeddedAdmissionRegistry,
-    getEmbeddedAdmissionMetadata,
     type AdmissionProvider,
 } from "../admission/registry"
 import { buildYourselfFromSnapshot } from "../snapshot/player-snapshot"
@@ -90,7 +89,6 @@ export async function handleHandshake(
             participant.participant.viewerId,
             normalizedRoomNumber,
             normalizedConnectionId,
-            participant.localPlayerId,
         )
         battleClient.participant = participant.participant
         battleClient.isBattle = true
@@ -138,13 +136,11 @@ export async function handleHandshake(
 
         if (!lifecycle.isAccepting()) return
 
-        const localMetadata = getEmbeddedAdmissionMetadata(admission)
         const client = sessionManager.createClient(
             socket,
             normalizedViewerId,
             normalizedRoomNumber,
             normalizedConnectionId,
-            localMetadata?.localPlayerId ?? null,
         )
         client.clientState.tryTransition(ClientState.Handshaking)
         client.participant = admission.participant

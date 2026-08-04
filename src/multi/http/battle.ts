@@ -68,23 +68,27 @@ import {
     validateMultiStartRequest,
 } from "../../lib/quest/multi-battle-validation";
 import { isValidMultiViewerId, type MultiHttpContext } from "./context";
+import type { ParticipantIdentity } from "../coordinator/contracts";
 
 export function canFinishMultiBattleQuest(
     quest: Pick<BattleQuest, "isBothBoss">,
     roomNumber: string | null | undefined,
-    playerId: number,
+    participant: ParticipantIdentity,
 ): boolean {
     return quest.isBothBoss !== true
         || (roomNumber != null
-            && sessionManager.hasPlayerFinalizedBattle(roomNumber, playerId))
+            && sessionManager.hasParticipantFinalizedBattle(roomNumber, participant))
 }
 
-export function cleanupAbortedMultiBattle(roomNumber: string, playerId: number): boolean {
+export function cleanupAbortedMultiBattle(
+    roomNumber: string,
+    participant: ParticipantIdentity,
+): boolean {
     const room = getRoom(roomNumber);
-    if (room?.host_player_id === playerId) {
+    if (room?.host_viewer_id === participant.viewerId) {
         return disbandRoom(roomNumber);
     }
-    sessionManager.removeBattlePlayer(roomNumber, playerId);
+    sessionManager.removeBattleParticipant(roomNumber, participant);
     return false;
 }
 
@@ -254,6 +258,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         }
 
         const { playerId, player } = ctx;
+        const participant = context.snapshotProvider.getParticipant(viewerId);
 
         const activeQuestData = activeQuests[playerId];
         if (activeQuestData === undefined) {
@@ -293,7 +298,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         }
 
         const room = activeQuestData.roomNumber ? getRoom(activeQuestData.roomNumber) : null;
-        if (!canFinishMultiBattleQuest(questData, activeQuestData.roomNumber, playerId)) {
+        if (!canFinishMultiBattleQuest(questData, activeQuestData.roomNumber, participant)) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Battle is not finalized."
             });
@@ -519,7 +524,10 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             ? activeQuestData.roomNumber
             : undefined
         if (bothBossRoomNumber !== undefined
-            && !sessionManager.consumePlayerFinalizedBattle(bothBossRoomNumber, playerId)) {
+            && !sessionManager.consumeParticipantFinalizedBattle(
+                bothBossRoomNumber,
+                participant,
+            )) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Battle is not finalized."
             });
@@ -530,7 +538,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             finishWrites = getDb().transaction(executeFinishWrites)()
         } catch (error) {
             if (bothBossRoomNumber !== undefined) {
-                sessionManager.markPlayerFinalizedBattle(bothBossRoomNumber, playerId)
+                sessionManager.markParticipantFinalizedBattle(bothBossRoomNumber, participant)
             }
             throw error
         }
@@ -648,6 +656,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         }
 
         const { playerId, player } = ctx;
+        const participant = context.snapshotProvider.getParticipant(viewerId);
         const activeQuestData = activeQuests[playerId];
 
         const abortResult = runAbortActiveQuestTransaction(playerId, {
@@ -658,7 +667,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         if (abortResult.cancelled && activeQuestData) {
             if (activeQuestData.roomNumber) {
                 const room = getRoom(activeQuestData.roomNumber);
-                if (cleanupAbortedMultiBattle(activeQuestData.roomNumber, playerId)) {
+                if (cleanupAbortedMultiBattle(activeQuestData.roomNumber, participant)) {
                     console.log(`[MULTI] abort: room ${activeQuestData.roomNumber} disbanded (host abandoned)`);
                 } else if (room) {
                     console.log(`[MULTI] abort: player ${playerId} removed from room ${activeQuestData.roomNumber}`);

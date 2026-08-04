@@ -57,7 +57,7 @@ function startCapturedLobbyLifecycle() {
 
 function createLobbyClient(room, viewerId, connectionId) {
     const socket = new FakeSocket()
-    const client = sessionManager.createClient(socket, viewerId, room.room_number, connectionId, null)
+    const client = sessionManager.createClient(socket, viewerId, room.room_number, connectionId)
     client.yourself = {
         viewerId,
         connectionId,
@@ -154,7 +154,7 @@ test("all three lobby timeout paths are unrefed, cancelled, and inert after stop
     const room = createRoom(501, 601, 1, 1, 701, 1, 801)
     room.npc_count = 2
     const socket = new FakeSocket()
-    const client = sessionManager.createClient(socket, 501, room.room_number, "lobby-timer-cid", null)
+    const client = sessionManager.createClient(socket, 501, room.room_number, "lobby-timer-cid")
     client.yourself = {
         viewerId: 501,
         connectionId: "lobby-timer-cid",
@@ -208,7 +208,7 @@ test("an async lobby timer callback cannot mutate state after its generation sto
     const room = createRoom(502, 602, 1, 1, 702, 1, 802)
     room.npc_count = 2
     const socket = new FakeSocket()
-    const client = sessionManager.createClient(socket, 502, room.room_number, "async-lobby-cid", null)
+    const client = sessionManager.createClient(socket, 502, room.room_number, "async-lobby-cid")
     client.yourself = {
         viewerId: 502,
         connectionId: "async-lobby-cid",

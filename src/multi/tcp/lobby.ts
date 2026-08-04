@@ -442,7 +442,6 @@ function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: an
         return [{
             connectionId: String(mate.connectionId ?? ""),
             participant: member.participant,
-            localPlayerId: member.localPlayerId,
         }]
     }))
     updateRoomState(client.roomNumber, 4)

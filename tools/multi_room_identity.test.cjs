@@ -66,7 +66,6 @@ async function createRouteServer(options = {}) {
             const local = players.get(viewerId)
             return local ? {
                 snapshot: snapshotFixture(viewerId, local.player.name),
-                embedded: { localPlayerId: local.playerId },
             } : null
         },
     })
@@ -573,7 +572,7 @@ test("random matching stays empty and access-token verification follows the CN p
     const fastify = await createRouteServer()
     const room = createRoom(101, 201, 1, 1, 501, 0, 401)
     const socket = { writable: true, write: () => true }
-    const hostClient = sessionManager.createClient(socket, 101, room.room_number, "host-cid", 201)
+    const hostClient = sessionManager.createClient(socket, 101, room.room_number, "host-cid")
     sessionManager.addClientToRoom(hostClient)
     t.after(async () => {
         sessionManager.removeClient(hostClient)

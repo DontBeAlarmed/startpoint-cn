@@ -40,7 +40,7 @@ function createBattle(questId, count, category = QuestCategory.BOSS_BATTLE) {
     for (let index = 0; index < count; index++) {
         const socket = new FakeSocket()
         const connectionId = `multiscene-${room.room_number}-${index}`
-        const client = sessionManager.createClient(socket, 800000001 + index, room.room_number, connectionId, 100 + index)
+        const client = sessionManager.createClient(socket, 800000001 + index, room.room_number, connectionId)
         client.participant = participant(client.viewerId)
         client.isBattle = true
         sessionManager.addBattleClient(connectionId, client)
@@ -82,7 +82,7 @@ test("BothBoss performs a second SceneReady barrier and finalizes only after ind
 
     notify(first, [2])
     assert.equal(countMessage(first, [1, [2]]), 0, "second scene must finish before Finalized")
-    assert.equal(canFinishMultiBattleQuest({ isBothBoss: true }, battle.room.room_number, first.client.localPlayerId), false)
+    assert.equal(canFinishMultiBattleQuest({ isBothBoss: true }, battle.room.room_number, first.client.participant), false)
 
     notify(first, [1])
     notify(second, [0])
@@ -98,7 +98,7 @@ test("BothBoss performs a second SceneReady barrier and finalizes only after ind
 
     notify(first, [2])
     assert.equal(countMessage(first, [1, [2]]), 1)
-    assert.equal(canFinishMultiBattleQuest({ isBothBoss: true }, battle.room.room_number, first.client.localPlayerId), true)
+    assert.equal(canFinishMultiBattleQuest({ isBothBoss: true }, battle.room.room_number, first.client.participant), true)
 })
 
 test("ordinary boss battle ignores LevelNext", () => {
@@ -142,8 +142,8 @@ test("a participant reconnecting after barrier release receives only its missed 
     const [host, guest] = battle.clients
     battle.room.raising_state = 4
     sessionManager.setBattleParticipants(battle.room.room_number, [
-        { connectionId: host.client.connectionId, participant: host.client.participant, localPlayerId: host.client.localPlayerId },
-        { connectionId: guest.client.connectionId, participant: guest.client.participant, localPlayerId: guest.client.localPlayerId },
+        { connectionId: host.client.connectionId, participant: host.client.participant },
+        { connectionId: guest.client.connectionId, participant: guest.client.participant },
     ])
 
     notify(host, [0])
@@ -160,8 +160,8 @@ test("a participant reconnecting after barrier release receives only its missed 
         connection_id: guest.client.connectionId,
     })
     const client = sessionManager.getBattleClient(guest.client.connectionId)
-    assert.equal(client?.localPlayerId, guest.client.localPlayerId)
     assert.deepEqual(client?.participant, guest.client.participant)
+    assert.equal("localPlayerId" in client, false)
     const reconnected = { client, socket }
     notify(reconnected, [0])
 
@@ -179,8 +179,8 @@ test("an unwritable BattleStart target remains eligible for reconnect replay", a
     const [host, guest] = battle.clients
     battle.room.raising_state = 4
     sessionManager.setBattleParticipants(battle.room.room_number, [
-        { connectionId: host.client.connectionId, participant: host.client.participant, localPlayerId: host.client.localPlayerId },
-        { connectionId: guest.client.connectionId, participant: guest.client.participant, localPlayerId: guest.client.localPlayerId },
+        { connectionId: host.client.connectionId, participant: host.client.participant },
+        { connectionId: guest.client.connectionId, participant: guest.client.participant },
     ])
 
     guest.socket.writable = false
@@ -217,29 +217,29 @@ test("scene cleanup preserves each real player's Finalize until that player cons
     notify(first, [2])
     notify(second, [2])
 
-    assert.equal(sessionManager.consumePlayerFinalizedBattle(
+    assert.equal(sessionManager.consumeParticipantFinalizedBattle(
         battle.room.room_number,
-        first.client.localPlayerId,
+        first.client.participant,
     ), true)
     sessionManager.clearBattleSceneState(battle.room.room_number)
-    assert.equal(sessionManager.hasPlayerFinalizedBattle(
+    assert.equal(sessionManager.hasParticipantFinalizedBattle(
         battle.room.room_number,
-        first.client.localPlayerId,
+        first.client.participant,
     ), false)
-    assert.equal(sessionManager.hasPlayerFinalizedBattle(
+    assert.equal(sessionManager.hasParticipantFinalizedBattle(
         battle.room.room_number,
-        second.client.localPlayerId,
+        second.client.participant,
     ), true)
-    assert.equal(sessionManager.consumePlayerFinalizedBattle(
+    assert.equal(sessionManager.consumeParticipantFinalizedBattle(
         battle.room.room_number,
-        second.client.localPlayerId,
+        second.client.participant,
     ), true)
 })
 
 test("battle handshake requires an identity from the host StartBattle snapshot", async () => {
     const room = createRoom(800000101, 201, 1, QuestCategory.BOSS_BATTLE, 1001002, 0, 1, false)
     const lobbySocket = new FakeSocket()
-    const lobbyClient = sessionManager.createClient(lobbySocket, 800000101, room.room_number, "bound-cid", 201)
+    const lobbyClient = sessionManager.createClient(lobbySocket, 800000101, room.room_number, "bound-cid")
     lobbyClient.participant = participant(lobbyClient.viewerId)
     lobbyClient.yourself = {
         viewerId: lobbyClient.viewerId,
@@ -253,7 +253,7 @@ test("battle handshake requires an identity from the host StartBattle snapshot",
     assert.equal(room.raising_state, 4)
 
     const lateLobbySocket = new FakeSocket()
-    const lateLobbyClient = sessionManager.createClient(lateLobbySocket, 800000102, room.room_number, "late-cid", 202)
+    const lateLobbyClient = sessionManager.createClient(lateLobbySocket, 800000102, room.room_number, "late-cid")
     sessionManager.addClientToRoom(lateLobbyClient)
     const entry = { clients: [], lobbyClients: [lobbyClient, lateLobbyClient], room }
     cleanup.push(entry)
@@ -285,7 +285,7 @@ test("battle handshake requires an identity from the host StartBattle snapshot",
     })
     const battleClient = sessionManager.getBattleClient("bound-cid")
     assert.equal(battleClient?.viewerId, 800000101)
-    assert.equal(battleClient?.localPlayerId, 201)
+    assert.equal("localPlayerId" in battleClient, false)
     assert.deepEqual(battleClient?.participant, lobbyClient.participant)
     sessionManager.removeClient(battleClient)
 
@@ -298,7 +298,7 @@ test("battle handshake requires an identity from the host StartBattle snapshot",
     const reconnectedClient = sessionManager.getBattleClient("bound-cid")
     assert.equal(reconnectedSocket.ended, false, "battle disconnect must not revoke the start snapshot")
     assert.equal(reconnectedClient?.viewerId, 800000101)
-    assert.equal(reconnectedClient?.localPlayerId, 201)
+    assert.equal("localPlayerId" in reconnectedClient, false)
     sessionManager.removeClient(reconnectedClient)
     assert.equal(sessionManager.getClient(800000101, room.room_number), undefined)
 })
@@ -307,8 +307,8 @@ test("only the room host can freeze the StartBattle participant snapshot", () =>
     const room = createRoom(800000201, 301, 1, QuestCategory.BOSS_BATTLE, 1001002, 0, 1, false)
     const hostSocket = new FakeSocket()
     const guestSocket = new FakeSocket()
-    const host = sessionManager.createClient(hostSocket, 800000201, room.room_number, "host-start-cid", 301)
-    const guest = sessionManager.createClient(guestSocket, 800000202, room.room_number, "guest-start-cid", 302)
+    const host = sessionManager.createClient(hostSocket, 800000201, room.room_number, "host-start-cid")
+    const guest = sessionManager.createClient(guestSocket, 800000202, room.room_number, "guest-start-cid")
     host.participant = participant(host.viewerId)
     guest.participant = participant(guest.viewerId)
     host.yourself = { viewerId: host.viewerId, connectionId: host.connectionId, party: {}, state: [1] }
@@ -330,20 +330,19 @@ test("guest abort removes only that battle participant and preserves host settle
     assert.equal(typeof cleanupAbortedMultiBattle, "function")
     const battle = createBattle(1001002, 2)
     const [host, guest] = battle.clients
-    battle.room.host_player_id = host.client.localPlayerId
     sessionManager.setBattleParticipants(battle.room.room_number, [
-        { connectionId: host.client.connectionId, participant: host.client.participant, localPlayerId: host.client.localPlayerId },
-        { connectionId: guest.client.connectionId, participant: guest.client.participant, localPlayerId: guest.client.localPlayerId },
+        { connectionId: host.client.connectionId, participant: host.client.participant },
+        { connectionId: guest.client.connectionId, participant: guest.client.participant },
     ])
-    sessionManager.markPlayerFinalizedBattle(battle.room.room_number, host.client.localPlayerId)
-    sessionManager.markPlayerFinalizedBattle(battle.room.room_number, guest.client.localPlayerId)
+    sessionManager.markParticipantFinalizedBattle(battle.room.room_number, host.client.participant)
+    sessionManager.markParticipantFinalizedBattle(battle.room.room_number, guest.client.participant)
 
-    cleanupAbortedMultiBattle(battle.room.room_number, guest.client.localPlayerId)
+    cleanupAbortedMultiBattle(battle.room.room_number, guest.client.participant)
 
     assert.equal(sessionManager.getBattleClient(guest.client.connectionId), undefined)
     assert.equal(sessionManager.getBattleClient(host.client.connectionId), host.client)
-    assert.equal(sessionManager.hasPlayerFinalizedBattle(battle.room.room_number, guest.client.localPlayerId), false)
-    assert.equal(sessionManager.hasPlayerFinalizedBattle(battle.room.room_number, host.client.localPlayerId), true)
+    assert.equal(sessionManager.hasParticipantFinalizedBattle(battle.room.room_number, guest.client.participant), false)
+    assert.equal(sessionManager.hasParticipantFinalizedBattle(battle.room.room_number, host.client.participant), true)
 })
 
 test("CN measurement, line warning, and heartbeat indices do not alias finalize", () => {

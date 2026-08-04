@@ -3,10 +3,8 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
-const {
-    AdmissionRegistry,
-    getEmbeddedAdmissionMetadata,
-} = require("../src/multi/admission/registry")
+const admissionModule = require("../src/multi/admission/registry")
+const { AdmissionRegistry } = admissionModule
 
 function snapshotFixture(viewerId = 101, name = "Host") {
     return {
@@ -119,12 +117,17 @@ test("validates admission identity, room, expiry and snapshot viewer", () => {
     }
 })
 
-test("embedded local metadata is explicit and cannot enter serialized admission JSON", () => {
+test("admission contract has no hidden or exported local player metadata", () => {
     const registry = new AdmissionRegistry({ now: () => 1_000 })
-    issue(registry, { embedded: { localPlayerId: 77 } })
+    issue(registry)
 
     const admission = registry.consume("123456", 101)
-    assert.deepEqual(getEmbeddedAdmissionMetadata(admission), { localPlayerId: 77 })
+    assert.deepEqual(Object.keys(admission).sort(), [
+        "expiresAt",
+        "participant",
+        "roomNumber",
+        "snapshot",
+    ])
+    assert.equal("getEmbeddedAdmissionMetadata" in admissionModule, false)
     assert.equal(JSON.stringify(admission).includes("localPlayerId"), false)
-    assert.equal(JSON.stringify(admission.snapshot).includes("playerId"), false)
 })

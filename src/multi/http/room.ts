@@ -100,7 +100,6 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             participant: coordinatorInput.participant,
             snapshot: preparedAdmission.snapshot,
             expiresAt: context.now() + context.admissionTtlMs,
-            embedded: preparedAdmission.embedded,
         })
         if (!issued.ok) {
             return reply.status(409).send({

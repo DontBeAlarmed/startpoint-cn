@@ -20,7 +20,6 @@ import {
     type AdmissionIssuer,
     type AdmissionProvider,
     type AdmissionRegistry,
-    type EmbeddedAdmissionMetadata,
 } from "../admission/registry"
 import {
     buildPlayerSnapshot,
@@ -47,7 +46,6 @@ export interface MultiSnapshotProvider {
 
 export interface PreparedAdmissionSnapshot {
     readonly snapshot: PlayerSnapshot
-    readonly embedded?: EmbeddedAdmissionMetadata
 }
 
 export interface MultiSettlementVerifier {
@@ -103,10 +101,7 @@ export function createEmbeddedMultiHttpContext(
                     context.player.partySlot,
                     { resolvePlayerContext: async () => context },
                 )
-                return snapshot ? {
-                    snapshot,
-                    embedded: { localPlayerId: context.playerId },
-                } : null
+                return snapshot ? { snapshot } : null
             }),
         }),
         admissionProvider: admissionRegistry,

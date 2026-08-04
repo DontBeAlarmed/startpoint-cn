@@ -6,7 +6,7 @@ import * as net from "net"
 import { Result, ClientState, BattleState } from "../types"
 import { RoomStateMachine } from "./RoomStateMachine"
 import { ClientStateMachine } from "./ClientStateMachine"
-import type { ParticipantIdentity } from "../coordinator/contracts"
+import { participantKey, type ParticipantIdentity } from "../coordinator/contracts"
 import type { PlayerPartySnapshot, PlayerSnapshot } from "../snapshot/player-snapshot"
 
 export interface SessionMate {
@@ -31,8 +31,6 @@ export interface SessionClient {
     viewerId: number
     roomNumber: string
     connectionId: string
-    /** Embedded-node storage identity. Never serialize or use as a cross-node identity. */
-    localPlayerId: number | null
     participant?: ParticipantIdentity
     snapshot?: PlayerSnapshot
     npcPartySnapshots: readonly PlayerPartySnapshot[]
@@ -48,7 +46,6 @@ export interface SessionClient {
 
 export interface BattleParticipant {
     participant: ParticipantIdentity
-    localPlayerId: number
 }
 
 export class SessionManager {
@@ -62,20 +59,19 @@ export class SessionManager {
     private battleExpectedCount = new Map<string, number>()
     private battleParticipants = new Map<string, Map<string, BattleParticipant>>()
     private battleSceneGeneration = new Map<string, number>()
-    private finalizedBattlePlayerIds = new Map<string, Set<number>>()
+    private finalizedBattleParticipantKeys = new Map<string, Set<string>>()
     private roomStates = new Map<string, RoomStateMachine>()
 
     private addr(viewerId: number, roomNumber: string): string {
         return `${viewerId}@${roomNumber}`
     }
 
-    createClient(socket: net.Socket, viewerId: number, roomNumber: string, connectionId: string, localPlayerId: number | null): SessionClient {
+    createClient(socket: net.Socket, viewerId: number, roomNumber: string, connectionId: string): SessionClient {
         return {
             socket,
             viewerId,
             roomNumber,
             connectionId,
-            localPlayerId,
             npcPartySnapshots: [],
             isBattle: false,
             isReady: false,
@@ -230,18 +226,25 @@ export class SessionManager {
         return this.battleParticipants.get(roomNumber)?.get(connectionId)
     }
 
-    removeBattlePlayer(roomNumber: string, playerId: number): boolean {
+    removeBattleParticipant(roomNumber: string, identity: ParticipantIdentity): boolean {
+        const identityKey = participantKey(identity.nodeSessionId, identity.viewerId)
         const participants = this.battleParticipants.get(roomNumber)
         const connectionIds = participants
             ? [...participants.entries()]
-                .filter(([, participant]) => participant.localPlayerId === playerId)
+                .filter(([, participant]) => participantKey(
+                    participant.participant.nodeSessionId,
+                    participant.participant.viewerId,
+                ) === identityKey)
                 .map(([connectionId]) => connectionId)
             : []
 
         let removed = false
         for (const connectionId of connectionIds) {
             const battleClient = this.cidToBattleClient.get(connectionId)
-            if (battleClient?.localPlayerId === playerId) {
+            if (battleClient?.participant && participantKey(
+                battleClient.participant.nodeSessionId,
+                battleClient.participant.viewerId,
+            ) === identityKey) {
                 this.removeClient(battleClient)
             } else {
                 this.sceneReadyClients.get(roomNumber)?.delete(connectionId)
@@ -259,9 +262,9 @@ export class SessionManager {
         }
         if (participants?.size === 0) this.battleParticipants.delete(roomNumber)
 
-        const finalized = this.finalizedBattlePlayerIds.get(roomNumber)
-        if (finalized?.delete(playerId)) removed = true
-        if (finalized?.size === 0) this.finalizedBattlePlayerIds.delete(roomNumber)
+        const finalized = this.finalizedBattleParticipantKeys.get(roomNumber)
+        if (finalized?.delete(identityKey)) removed = true
+        if (finalized?.size === 0) this.finalizedBattleParticipantKeys.delete(roomNumber)
         return removed
     }
 
@@ -369,29 +372,34 @@ export class SessionManager {
     }
 
     markBattleFinalized(connectionId: string, roomNumber: string): boolean {
-        const playerId = this.cidToBattleClient.get(connectionId)?.localPlayerId
-        if (playerId === undefined || playerId === null) return false
-        this.markPlayerFinalizedBattle(roomNumber, playerId)
+        const participant = this.cidToBattleClient.get(connectionId)?.participant
+        if (!participant) return false
+        this.markParticipantFinalizedBattle(roomNumber, participant)
         return true
     }
 
-    markPlayerFinalizedBattle(roomNumber: string, playerId: number): void {
-        let finalized = this.finalizedBattlePlayerIds.get(roomNumber)
+    markParticipantFinalizedBattle(roomNumber: string, participant: ParticipantIdentity): void {
+        let finalized = this.finalizedBattleParticipantKeys.get(roomNumber)
         if (!finalized) {
             finalized = new Set()
-            this.finalizedBattlePlayerIds.set(roomNumber, finalized)
+            this.finalizedBattleParticipantKeys.set(roomNumber, finalized)
         }
-        finalized.add(playerId)
+        finalized.add(participantKey(participant.nodeSessionId, participant.viewerId))
     }
 
-    hasPlayerFinalizedBattle(roomNumber: string, playerId: number): boolean {
-        return this.finalizedBattlePlayerIds.get(roomNumber)?.has(playerId) === true
+    hasParticipantFinalizedBattle(roomNumber: string, participant: ParticipantIdentity): boolean {
+        return this.finalizedBattleParticipantKeys.get(roomNumber)?.has(
+            participantKey(participant.nodeSessionId, participant.viewerId),
+        ) === true
     }
 
-    consumePlayerFinalizedBattle(roomNumber: string, playerId: number): boolean {
-        const finalized = this.finalizedBattlePlayerIds.get(roomNumber)
-        if (!finalized?.delete(playerId)) return false
-        if (finalized.size === 0) this.finalizedBattlePlayerIds.delete(roomNumber)
+    consumeParticipantFinalizedBattle(roomNumber: string, participant: ParticipantIdentity): boolean {
+        const finalized = this.finalizedBattleParticipantKeys.get(roomNumber)
+        if (!finalized?.delete(participantKey(
+            participant.nodeSessionId,
+            participant.viewerId,
+        ))) return false
+        if (finalized.size === 0) this.finalizedBattleParticipantKeys.delete(roomNumber)
         return true
     }
 
@@ -413,15 +421,13 @@ export class SessionManager {
         participants: Array<{
             connectionId: string
             participant: ParticipantIdentity
-            localPlayerId: number | null
         }>,
     ): void {
         const participantMap = new Map<string, BattleParticipant>()
         for (const participant of participants) {
-            if (!participant.connectionId || participant.localPlayerId === null) continue
+            if (!participant.connectionId) continue
             participantMap.set(participant.connectionId, {
-                participant: participant.participant,
-                localPlayerId: participant.localPlayerId,
+                participant: Object.freeze({ ...participant.participant }),
             })
         }
         this.battleParticipants.set(roomNumber, participantMap)
@@ -432,7 +438,7 @@ export class SessionManager {
         this.sceneReadyClients.delete(roomNumber)
         this.sceneTransitionClients.delete(roomNumber)
         this.battleStartDeliveredClients.delete(roomNumber)
-        this.finalizedBattlePlayerIds.delete(roomNumber)
+        this.finalizedBattleParticipantKeys.delete(roomNumber)
         this.battleSceneGeneration.set(roomNumber, 0)
         this.battleExpectedCount.set(roomNumber, count)
     }
@@ -448,7 +454,7 @@ export class SessionManager {
     clearBattleExpectedCount(roomNumber: string): void {
         this.clearBattleSceneState(roomNumber)
         this.battleParticipants.delete(roomNumber)
-        this.finalizedBattlePlayerIds.delete(roomNumber)
+        this.finalizedBattleParticipantKeys.delete(roomNumber)
     }
 
     getRoomState(roomNumber: string): RoomStateMachine {
