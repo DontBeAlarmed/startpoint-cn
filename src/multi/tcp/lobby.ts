@@ -9,6 +9,7 @@ import {
     LobbyLifecycleGuard,
     scheduleLobbyTask,
 } from "./lobby-lifecycle"
+import { updatePlayerSnapshotParty } from "../snapshot/player-snapshot"
 
 const NPC_JOIN_DELAY_MS = parseInt(process.env.NPC_JOIN_DELAY_MS || "2000")
 const NPC_READY_DELAY_MS = parseInt(process.env.NPC_READY_DELAY_MS || "500")
@@ -389,16 +390,19 @@ function handleBye(_socket: net.Socket, client: SessionClient, _data: any[]): vo
 function handleChangeParty(_socket: net.Socket, client: SessionClient, data: any[]): void {
     const pd = data[1]
     if (pd?.party && client.yourself) {
-        client.yourself.party = pd.party
-        if (pd.currentPartyId !== undefined) {
-            client.yourself.currentPartyId = pd.currentPartyId
-        }
         if (client.snapshot) {
-            client.snapshot = Object.freeze({
-                ...client.snapshot,
-                party: pd.party,
-                currentPartyId: pd.currentPartyId ?? client.snapshot.currentPartyId,
-            })
+            client.snapshot = updatePlayerSnapshotParty(
+                client.snapshot,
+                pd.party,
+                pd.currentPartyId ?? client.snapshot.currentPartyId,
+            )
+            client.yourself.party = client.snapshot.party
+            client.yourself.currentPartyId = client.snapshot.currentPartyId
+        } else {
+            client.yourself.party = pd.party
+            if (pd.currentPartyId !== undefined) {
+                client.yourself.currentPartyId = pd.currentPartyId
+            }
         }
     }
     const mate = client.mates.find(m => m.viewerId === client.viewerId)
@@ -430,7 +434,7 @@ function handleHeartbeat(socket: net.Socket, client: SessionClient, _data: any[]
 
 function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: any[]): void {
     const room = getRoom(client.roomNumber)
-    if (!room || room.host_viewer_id !== client.viewerId) return
+    if (!room || room.host_viewer_id !== client.viewerId || !client.participant) return
     if ((sessionManager as any).battleExpectedCount?.has?.(client.roomNumber)) return
 
     const realMembers = client.mates.filter(mate => !mate.comId)
@@ -443,7 +447,7 @@ function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: an
             connectionId: String(mate.connectionId ?? ""),
             participant: member.participant,
         }]
-    }))
+    }), client.participant)
     updateRoomState(client.roomNumber, 4)
 
     autoStartingRooms.delete(client.roomNumber)

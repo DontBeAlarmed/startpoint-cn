@@ -6,8 +6,12 @@ require("ts-node/register/transpile-only")
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 const restoreContentSnapshot = installBundledGameplaySnapshot()
 const { QuestCategory } = require("../src/lib/types")
-const { canFinishMultiBattleQuest, cleanupAbortedMultiBattle } = require("../src/multi/http/battle")
-const { createRoom, disbandRoom } = require("../src/multi/room/manager")
+const {
+    canAbortMultiBattle,
+    canFinishMultiBattleQuest,
+    cleanupAbortedMultiBattle,
+} = require("../src/multi/http/battle")
+const { createRoom, disbandRoom, getRoom } = require("../src/multi/room/manager")
 const { sessionManager } = require("../src/multi/state/SessionManager")
 const { handleBattleMessage } = require("../src/multi/tcp/battle")
 const { handleHandshake } = require("../src/multi/tcp/handshake")
@@ -144,7 +148,7 @@ test("a participant reconnecting after barrier release receives only its missed 
     sessionManager.setBattleParticipants(battle.room.room_number, [
         { connectionId: host.client.connectionId, participant: host.client.participant },
         { connectionId: guest.client.connectionId, participant: guest.client.participant },
-    ])
+    ], host.client.participant)
 
     notify(host, [0])
     sessionManager.removeClient(guest.client)
@@ -181,7 +185,7 @@ test("an unwritable BattleStart target remains eligible for reconnect replay", a
     sessionManager.setBattleParticipants(battle.room.room_number, [
         { connectionId: host.client.connectionId, participant: host.client.participant },
         { connectionId: guest.client.connectionId, participant: guest.client.participant },
-    ])
+    ], host.client.participant)
 
     guest.socket.writable = false
     notify(host, [0])
@@ -333,7 +337,7 @@ test("guest abort removes only that battle participant and preserves host settle
     sessionManager.setBattleParticipants(battle.room.room_number, [
         { connectionId: host.client.connectionId, participant: host.client.participant },
         { connectionId: guest.client.connectionId, participant: guest.client.participant },
-    ])
+    ], host.client.participant)
     sessionManager.markParticipantFinalizedBattle(battle.room.room_number, host.client.participant)
     sessionManager.markParticipantFinalizedBattle(battle.room.room_number, guest.client.participant)
 
@@ -343,6 +347,26 @@ test("guest abort removes only that battle participant and preserves host settle
     assert.equal(sessionManager.getBattleClient(host.client.connectionId), host.client)
     assert.equal(sessionManager.hasParticipantFinalizedBattle(battle.room.room_number, guest.client.participant), false)
     assert.equal(sessionManager.hasParticipantFinalizedBattle(battle.room.room_number, host.client.participant), true)
+})
+
+test("the same viewer id from a different node cannot abort the host room", () => {
+    assert.equal(typeof canAbortMultiBattle, "function")
+    const room = createRoom(880001, 1, 1, QuestCategory.BOSS_BATTLE, 1001002, 0, 1, true)
+    const hostParticipant = { nodeSessionId: "node-a", viewerId: 880001 }
+    const differentNodeParticipant = { nodeSessionId: "different-node", viewerId: 880001 }
+    sessionManager.setBattleParticipants(room.room_number, [{
+        connectionId: "host-880001",
+        participant: hostParticipant,
+    }], hostParticipant)
+    cleanup.push({ clients: [], lobbyClients: [], room })
+
+    assert.equal(canAbortMultiBattle(room.room_number, differentNodeParticipant), false)
+    assert.equal(cleanupAbortedMultiBattle(room.room_number, differentNodeParticipant), false)
+    assert.equal(getRoom(room.room_number), room)
+
+    assert.equal(canAbortMultiBattle(room.room_number, hostParticipant), true)
+    assert.equal(cleanupAbortedMultiBattle(room.room_number, hostParticipant), true)
+    assert.equal(getRoom(room.room_number), undefined)
 })
 
 test("CN measurement, line warning, and heartbeat indices do not alias finalize", () => {

@@ -80,11 +80,21 @@ export function canFinishMultiBattleQuest(
             && sessionManager.hasParticipantFinalizedBattle(roomNumber, participant))
 }
 
+export function canAbortMultiBattle(
+    roomNumber: string,
+    participant: ParticipantIdentity,
+): boolean {
+    const room = getRoom(roomNumber);
+    return room?.host_viewer_id !== participant.viewerId
+        || sessionManager.isBattleHostParticipant(roomNumber, participant);
+}
+
 export function cleanupAbortedMultiBattle(
     roomNumber: string,
     participant: ParticipantIdentity,
 ): boolean {
     const room = getRoom(roomNumber);
+    if (!canAbortMultiBattle(roomNumber, participant)) return false;
     if (room?.host_viewer_id === participant.viewerId) {
         return disbandRoom(roomNumber);
     }
@@ -658,6 +668,13 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         const { playerId, player } = ctx;
         const participant = context.snapshotProvider.getParticipant(viewerId);
         const activeQuestData = activeQuests[playerId];
+
+        if (activeQuestData?.roomNumber
+            && !canAbortMultiBattle(activeQuestData.roomNumber, participant)) {
+            return reply.status(403).send({
+                "error": "Forbidden", "message": "Battle participant is not the room host."
+            });
+        }
 
         const abortResult = runAbortActiveQuestTransaction(playerId, {
             playId: body.play_id,

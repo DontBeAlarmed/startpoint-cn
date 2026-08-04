@@ -58,6 +58,7 @@ function startCapturedLobbyLifecycle() {
 function createLobbyClient(room, viewerId, connectionId) {
     const socket = new FakeSocket()
     const client = sessionManager.createClient(socket, viewerId, room.room_number, connectionId)
+    client.participant = { nodeSessionId: "embedded", viewerId }
     client.yourself = {
         viewerId,
         connectionId,
@@ -101,6 +102,59 @@ test("lobby does not read player storage or persist TCP party changes", () => {
     assert.doesNotMatch(source, /data\/domains\/(party|player)/)
     assert.doesNotMatch(source, /buildRealParty/)
     assert.doesNotMatch(source, /updatePlayerSync/)
+})
+
+test("change-party rebuilds a deeply frozen snapshot isolated from client input", t => {
+    const { host } = createLobbyRoom(t, 497)
+    const originalParty = {
+        characters: [[0, {
+            id: 101001,
+            evolution_level: 2,
+            exp: 30,
+            over_limit_step: 1,
+            mana_node_ids: { 101: 0 },
+            ex_boost: [1],
+            illustration_settings: [1],
+        }], [1], [1]],
+        unison_characters: [[1], [1], [1]],
+        equipments: [[0, {
+            equipmentId: 201001,
+            level: 4,
+            enhancementLevel: 2,
+        }], [1], [1]],
+        abilitySoulIds: [[0, 301001], [1], [1]],
+    }
+    host.client.snapshot = {
+        viewerId: host.client.viewerId,
+        name: "Host",
+        rank: 1,
+        degreeId: 1,
+        mainCharacterId: 101001,
+        playerRoleKind: 1,
+        isNewbie: false,
+        currentPartyId: 1,
+        party: {
+            characters: [[1], [1], [1]],
+            unison_characters: [[1], [1], [1]],
+            equipments: [[1], [1], [1]],
+            abilitySoulIds: [[1], [1], [1]],
+        },
+        npcParties: [],
+    }
+
+    handleMessage(host.socket, [0, [2, { party: originalParty, currentPartyId: 2 }]])
+
+    const snapshot = host.client.snapshot
+    assert.equal(Object.isFrozen(snapshot), true)
+    assert.equal(Object.isFrozen(snapshot.party), true)
+    assert.equal(Object.isFrozen(snapshot.party.characters[0][1]), true)
+    assert.equal(Object.isFrozen(snapshot.party.equipments[0][1]), true)
+    assert.equal(host.client.yourself.party, snapshot.party)
+
+    originalParty.characters[0][1].id = 999999
+    originalParty.equipments[0][1].level = 99
+    assert.equal(snapshot.party.characters[0][1].id, 101001)
+    assert.equal(snapshot.party.equipments[0][1].level, 4)
 })
 
 test("an explicit guest Bye releases the persistent room membership", t => {

@@ -58,6 +58,7 @@ export class SessionManager {
     private battleStartDeliveredClients = new Map<string, Map<number, Set<string>>>()
     private battleExpectedCount = new Map<string, number>()
     private battleParticipants = new Map<string, Map<string, BattleParticipant>>()
+    private battleHostParticipants = new Map<string, ParticipantIdentity>()
     private battleSceneGeneration = new Map<string, number>()
     private finalizedBattleParticipantKeys = new Map<string, Set<string>>()
     private roomStates = new Map<string, RoomStateMachine>()
@@ -224,6 +225,13 @@ export class SessionManager {
 
     getBattleParticipant(roomNumber: string, connectionId: string): BattleParticipant | undefined {
         return this.battleParticipants.get(roomNumber)?.get(connectionId)
+    }
+
+    isBattleHostParticipant(roomNumber: string, identity: ParticipantIdentity): boolean {
+        const host = this.battleHostParticipants.get(roomNumber)
+        return host !== undefined
+            && participantKey(host.nodeSessionId, host.viewerId)
+                === participantKey(identity.nodeSessionId, identity.viewerId)
     }
 
     removeBattleParticipant(roomNumber: string, identity: ParticipantIdentity): boolean {
@@ -413,6 +421,7 @@ export class SessionManager {
 
     setBattleExpectedCount(roomNumber: string, count: number): void {
         this.battleParticipants.delete(roomNumber)
+        this.battleHostParticipants.delete(roomNumber)
         this.resetBattleScene(roomNumber, count)
     }
 
@@ -422,6 +431,7 @@ export class SessionManager {
             connectionId: string
             participant: ParticipantIdentity
         }>,
+        hostParticipant: ParticipantIdentity,
     ): void {
         const participantMap = new Map<string, BattleParticipant>()
         for (const participant of participants) {
@@ -431,6 +441,7 @@ export class SessionManager {
             })
         }
         this.battleParticipants.set(roomNumber, participantMap)
+        this.battleHostParticipants.set(roomNumber, Object.freeze({ ...hostParticipant }))
         this.resetBattleScene(roomNumber, participantMap.size)
     }
 
@@ -454,6 +465,7 @@ export class SessionManager {
     clearBattleExpectedCount(roomNumber: string): void {
         this.clearBattleSceneState(roomNumber)
         this.battleParticipants.delete(roomNumber)
+        this.battleHostParticipants.delete(roomNumber)
         this.finalizedBattleParticipantKeys.delete(roomNumber)
     }
 

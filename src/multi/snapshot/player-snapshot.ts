@@ -83,6 +83,31 @@ function deepFreeze<T>(value: T): T {
     return Object.freeze(value)
 }
 
+function cloneSnapshotValue<T>(value: T): T {
+    if (Array.isArray(value)) return value.map(cloneSnapshotValue) as T
+    if (value !== null && typeof value === "object") {
+        return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+            .map(([key, child]) => [key, cloneSnapshotValue(child)])) as T
+    }
+    return value
+}
+
+export function normalizePlayerSnapshot(snapshot: PlayerSnapshot): PlayerSnapshot {
+    return deepFreeze(cloneSnapshotValue(snapshot))
+}
+
+export function updatePlayerSnapshotParty(
+    snapshot: PlayerSnapshot,
+    party: PlayerPartySnapshot,
+    currentPartyId: number,
+): PlayerSnapshot {
+    return normalizePlayerSnapshot({
+        ...snapshot,
+        party,
+        currentPartyId,
+    })
+}
+
 function none<T>(): MultiOption<T> {
     return [1]
 }
@@ -207,7 +232,7 @@ export async function buildPlayerSnapshot(
     const npcParties = findNpcParties([normalGroups, eventGroups])
         .map(party => buildPartySnapshot(context.playerId, party, dependencies))
 
-    return deepFreeze({
+    return normalizePlayerSnapshot({
         viewerId,
         name: context.player.name,
         rank: dependencies.getRankLevel(context.player.rankPoint || 0),
