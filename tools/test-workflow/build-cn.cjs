@@ -82,8 +82,11 @@ function runCnBuild(dependencies = {}) {
     ]
 
     const run = (stage, args, command = executable) => {
+        // Windows: `.cmd`/`.bat` entrypoints (e.g. npm.cmd) cannot be launched with
+        // shell:false — route them through the shell so `npm run build:admin` works on Windows.
+        const useShell = process.platform === "win32" && /\.(cmd|bat)$/i.test(command)
         try {
-            return processStatus(spawn(command, args, spawnOptions))
+            return processStatus(spawn(command, args, { ...spawnOptions, shell: useShell }))
         } catch {
             stderr.write(`CN build ${stage} process failed to start\n`)
             return 1
