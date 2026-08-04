@@ -89,6 +89,25 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             });
         }
 
+        const preparedAdmission = await context.snapshotProvider.prepareAdmission(viewerId)
+        if (!preparedAdmission) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Unable to snapshot player."
+            })
+        }
+        const issued = context.admissionIssuer.issue({
+            roomNumber: room.value.roomNumber,
+            participant: coordinatorInput.participant,
+            snapshot: preparedAdmission.snapshot,
+            expiresAt: context.now() + context.admissionTtlMs,
+            embedded: preparedAdmission.embedded,
+        })
+        if (!issued.ok) {
+            return reply.status(409).send({
+                "error": issued.error, "message": "Room admission conflict."
+            })
+        }
+
         const data = serializeRoomStatusConnection(room.value);
         if (viewerId === room.value.host.viewerId) {
             data.raising_state = 1

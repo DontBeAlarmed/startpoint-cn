@@ -93,14 +93,18 @@ function testMultiEntrypointsSharePlayerContextResolver() {
         assert.doesNotMatch(source, /\bresolveMultiPlayerContext\s*\(/)
     }
 
-    const embeddedEntrypoints = [
-        "src/multi/tcp/handshake.ts",
-    ]
+    const handshakeSource = fs.readFileSync(
+        path.join(root, "src/multi/tcp/handshake.ts"),
+        "utf8",
+    )
+    assert.doesNotMatch(handshakeSource, /resolveMultiPlayerContext\s*\(/)
+    assert.doesNotMatch(handshakeSource, /data\/domains\//)
 
-    for (const relativePath of embeddedEntrypoints) {
-        const source = fs.readFileSync(path.join(root, relativePath), "utf8")
-        assert.match(source, /resolveMultiPlayerContext\s*\(/, `${relativePath} must use the shared resolver`)
-    }
+    const snapshotSource = fs.readFileSync(
+        path.join(root, "src/multi/snapshot/player-snapshot.ts"),
+        "utf8",
+    )
+    assert.match(snapshotSource, /resolveMultiPlayerContext/)
 
     const multiRoot = path.join(root, "src/multi")
     const sourceFiles = []

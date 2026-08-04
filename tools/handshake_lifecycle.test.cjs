@@ -4,12 +4,6 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
-function deferred() {
-    let resolve
-    const promise = new Promise(resolvePromise => { resolve = resolvePromise })
-    return { promise, resolve }
-}
-
 function stubModule(relativePath, exports) {
     const modulePath = require.resolve(relativePath)
     require.cache[modulePath] = {
@@ -20,9 +14,9 @@ function stubModule(relativePath, exports) {
     }
 }
 
-const playerContext = deferred()
 stubModule("../src/multi/player-context", {
-    resolveMultiPlayerContext: () => playerContext.promise,
+    getPlayerRankLevel: () => 1,
+    resolveMultiPlayerContext: () => { throw new Error("handshake must not resolve player context") },
 })
 stubModule("../src/data/domains/party", {
     getPlayerPartyGroupListSync: () => ({}),
@@ -48,11 +42,28 @@ class FakeSocket extends EventEmitter {
     end() { this.writable = false }
 }
 
-test("room handshake checks the lifecycle guard after async player resolution", async t => {
+test("room handshake checks the lifecycle guard after admission consumption", async t => {
     const socket = new FakeSocket()
     const room = createRoom(93, 193, 1, 1, 293, 0, 393)
     t.after(() => disbandRoom(room.room_number))
     let accepting = true
+    const admission = {
+        roomNumber: room.room_number,
+        participant: { nodeSessionId: "embedded", viewerId: 93 },
+        snapshot: {
+            viewerId: 93,
+            name: "late-player",
+            rank: 1,
+            degreeId: 1,
+            mainCharacterId: 393,
+            playerRoleKind: 1,
+            isNewbie: false,
+            currentPartyId: 1,
+            party: {},
+            npcParties: [],
+        },
+        expiresAt: 6_000,
+    }
     const handshake = handleHandshake(
         socket,
         {
@@ -63,13 +74,11 @@ test("room handshake checks the lifecycle guard after async player resolution", 
             questId: room.quest_id,
         },
         { generation: 7, isAccepting: () => accepting },
+        { admissionProvider: { consume: () => {
+            accepting = false
+            return admission
+        } } },
     )
-
-    accepting = false
-    playerContext.resolve({
-        playerId: 193,
-        player: { id: 193, name: "late-player", rankPoint: 0 },
-    })
     await handshake
 
     assert.equal(sessionManager.getClient(93, room.room_number), undefined)

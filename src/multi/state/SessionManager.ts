@@ -6,26 +6,49 @@ import * as net from "net"
 import { Result, ClientState, BattleState } from "../types"
 import { RoomStateMachine } from "./RoomStateMachine"
 import { ClientStateMachine } from "./ClientStateMachine"
+import type { ParticipantIdentity } from "../coordinator/contracts"
+import type { PlayerPartySnapshot, PlayerSnapshot } from "../snapshot/player-snapshot"
+
+export interface SessionMate {
+    viewerId: number
+    connectionId: string
+    party: unknown
+    state?: unknown[]
+    comId?: number
+    name?: string
+    rank?: number
+    degreeId?: number
+    mainCharacterId?: number
+    playerRoleKind?: number
+    isNewbie?: boolean
+    isHost?: boolean
+    currentPartyId?: number
+    [key: string]: unknown
+}
 
 export interface SessionClient {
     socket: net.Socket
     viewerId: number
     roomNumber: string
     connectionId: string
-    playerId: number | null
+    /** Embedded-node storage identity. Never serialize or use as a cross-node identity. */
+    localPlayerId: number | null
+    participant?: ParticipantIdentity
+    snapshot?: PlayerSnapshot
+    npcPartySnapshots: readonly PlayerPartySnapshot[]
     isBattle: boolean
     isReady: boolean
     buffer: string
-    mates: any[]
-    enterData: any
-    yourself?: any
+    mates: SessionMate[]
+    enterData: unknown
+    yourself?: SessionMate
     clientState: ClientStateMachine
     battleState: BattleState
 }
 
 export interface BattleParticipant {
-    viewerId: number
-    playerId: number
+    participant: ParticipantIdentity
+    localPlayerId: number
 }
 
 export class SessionManager {
@@ -46,13 +69,14 @@ export class SessionManager {
         return `${viewerId}@${roomNumber}`
     }
 
-    createClient(socket: net.Socket, viewerId: number, roomNumber: string, connectionId: string, playerId: number | null): SessionClient {
+    createClient(socket: net.Socket, viewerId: number, roomNumber: string, connectionId: string, localPlayerId: number | null): SessionClient {
         return {
             socket,
             viewerId,
             roomNumber,
             connectionId,
-            playerId,
+            localPlayerId,
+            npcPartySnapshots: [],
             isBattle: false,
             isReady: false,
             buffer: "",
@@ -210,14 +234,14 @@ export class SessionManager {
         const participants = this.battleParticipants.get(roomNumber)
         const connectionIds = participants
             ? [...participants.entries()]
-                .filter(([, participant]) => participant.playerId === playerId)
+                .filter(([, participant]) => participant.localPlayerId === playerId)
                 .map(([connectionId]) => connectionId)
             : []
 
         let removed = false
         for (const connectionId of connectionIds) {
             const battleClient = this.cidToBattleClient.get(connectionId)
-            if (battleClient?.playerId === playerId) {
+            if (battleClient?.localPlayerId === playerId) {
                 this.removeClient(battleClient)
             } else {
                 this.sceneReadyClients.get(roomNumber)?.delete(connectionId)
@@ -345,7 +369,7 @@ export class SessionManager {
     }
 
     markBattleFinalized(connectionId: string, roomNumber: string): boolean {
-        const playerId = this.cidToBattleClient.get(connectionId)?.playerId
+        const playerId = this.cidToBattleClient.get(connectionId)?.localPlayerId
         if (playerId === undefined || playerId === null) return false
         this.markPlayerFinalizedBattle(roomNumber, playerId)
         return true
@@ -386,14 +410,18 @@ export class SessionManager {
 
     setBattleParticipants(
         roomNumber: string,
-        participants: Array<{ connectionId: string, viewerId: number, playerId: number | null }>,
+        participants: Array<{
+            connectionId: string
+            participant: ParticipantIdentity
+            localPlayerId: number | null
+        }>,
     ): void {
         const participantMap = new Map<string, BattleParticipant>()
         for (const participant of participants) {
-            if (!participant.connectionId || participant.playerId === null) continue
+            if (!participant.connectionId || participant.localPlayerId === null) continue
             participantMap.set(participant.connectionId, {
-                viewerId: participant.viewerId,
-                playerId: participant.playerId,
+                participant: participant.participant,
+                localPlayerId: participant.localPlayerId,
             })
         }
         this.battleParticipants.set(roomNumber, participantMap)

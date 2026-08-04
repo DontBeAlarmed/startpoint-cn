@@ -17,26 +17,18 @@ function stubModule(relativePath, exports) {
 stubModule("../src/utils", { getServerTime: () => 1_725_000_000 })
 stubModule("../src/multi/player-context", {
     getPlayerRankLevel: () => 1,
-    resolveMultiPlayerContext: async viewerId => ({
-        playerId: viewerId + 1_000,
-        player: {
-            id: viewerId + 1_000,
-            name: `Player${viewerId}`,
-            rankPoint: 0,
-            degreeId: 1,
-            leaderCharacterId: 101,
-            role: 1,
-            tutorialStep: 1,
-            partySlot: 1,
-        },
-    }),
+    resolveMultiPlayerContext: async () => { throw new Error("handshake must not resolve player context") },
 })
-stubModule("../src/data/domains/party", { getPlayerPartyGroupListSync: () => ({}) })
+stubModule("../src/data/domains/party", {
+    getPlayerPartyGroupListSync: () => { throw new Error("handshake must not read parties") },
+})
 stubModule("../src/data/domains/character", {
-    getPlayerCharacterManaNodesSync: () => [],
-    getPlayerCharacterSync: () => null,
+    getPlayerCharacterManaNodesSync: () => { throw new Error("handshake must not read mana nodes") },
+    getPlayerCharacterSync: () => { throw new Error("handshake must not read characters") },
 })
-stubModule("../src/data/domains/equipment", { getPlayerEquipmentSync: () => null })
+stubModule("../src/data/domains/equipment", {
+    getPlayerEquipmentSync: () => { throw new Error("handshake must not read equipment") },
+})
 
 const {
     addRoomMember,
@@ -47,6 +39,7 @@ const {
 } = require("../src/multi/room/manager")
 const { sessionManager } = require("../src/multi/state/SessionManager")
 const { handleHandshake } = require("../src/multi/tcp/handshake")
+const { AdmissionRegistry } = require("../src/multi/admission/registry")
 
 class FakeSocket extends EventEmitter {
     constructor() {
@@ -70,8 +63,38 @@ class FakeSocket extends EventEmitter {
     }
 }
 
-async function handshake(room, viewerId, extra = {}) {
+function snapshot(viewerId) {
+    return {
+        viewerId,
+        name: `Player${viewerId}`,
+        rank: 1,
+        degreeId: 1,
+        mainCharacterId: 101,
+        playerRoleKind: 1,
+        isNewbie: true,
+        currentPartyId: 1,
+        party: {
+            characters: [[1], [1], [1]],
+            unison_characters: [[1], [1], [1]],
+            equipments: [[1], [1], [1]],
+            abilitySoulIds: [[1], [1], [1]],
+        },
+        npcParties: [{ marker: "npc-one" }, { marker: "npc-two" }],
+    }
+}
+
+async function handshake(room, viewerId, extra = {}, options = {}) {
     const socket = new FakeSocket()
+    const registry = options.registry ?? new AdmissionRegistry({ now: () => 1_000 })
+    if (options.admit !== false && room) {
+        registry.issue({
+            roomNumber: room.room_number,
+            participant: { nodeSessionId: "embedded", viewerId },
+            snapshot: snapshot(viewerId),
+            expiresAt: 6_000,
+            embedded: { localPlayerId: viewerId + 1_000 },
+        })
+    }
     await handleHandshake(socket, {
         socklet: "cooperation_room",
         viewerId,
@@ -80,7 +103,8 @@ async function handshake(room, viewerId, extra = {}) {
         questId: room?.quest_id ?? 501,
         connectionId: `cid-${viewerId}`,
         ...extra,
-    })
+    }, undefined, { admissionProvider: registry })
+    socket.registry = registry
     return socket
 }
 
@@ -132,7 +156,53 @@ test("successful handshakes record membership and derive host role from the room
 
     assert.equal(host?.yourself?.isHost, true)
     assert.equal(guest?.yourself?.isHost, false)
+    assert.deepEqual(guest?.participant, { nodeSessionId: "embedded", viewerId: 222 })
+    assert.equal(guest?.snapshot?.name, "Player222")
+    assert.deepEqual(guest?.npcPartySnapshots, [{ marker: "npc-one" }, { marker: "npc-two" }])
+    assert.equal(guest?.localPlayerId, 1_222)
+    assert.equal("playerId" in guest.yourself, false)
     assert.equal(isRoomMember(room, 222), true)
+})
+
+test("room admission is required and consumed once", async t => {
+    const room = createRoom(113, 1_113, 1, 1, 513, 0, 101)
+    t.after(() => disbandRoom(room.room_number))
+    const registry = new AdmissionRegistry({ now: () => 1_000 })
+    registry.issue({
+        roomNumber: room.room_number,
+        participant: { nodeSessionId: "embedded", viewerId: 224 },
+        snapshot: snapshot(224),
+        expiresAt: 6_000,
+    })
+
+    const accepted = await handshake(room, 224, {}, { registry })
+    const replayed = await handshake(room, 224, {}, { registry, admit: false })
+    const missing = await handshake(room, 225, {}, { admit: false })
+    t.after(() => sessionManager.removeClientBySocket(accepted))
+
+    assert.equal(accepted.ended, false)
+    assert.deepEqual(replayed.messages.at(-1), [3, "HANDSHAKE_DENIED"])
+    assert.deepEqual(missing.messages.at(-1), [3, "HANDSHAKE_DENIED"])
+})
+
+test("invalid handshake identity is rejected before admission consumption", async t => {
+    const room = createRoom(114, 1_114, 1, 1, 514, 0, 101)
+    t.after(() => disbandRoom(room.room_number))
+    const registry = new AdmissionRegistry({ now: () => 1_000 })
+    registry.issue({
+        roomNumber: room.room_number,
+        participant: { nodeSessionId: "embedded", viewerId: 226 },
+        snapshot: snapshot(226),
+        expiresAt: 6_000,
+    })
+
+    const rejected = await handshake(room, 226, {
+        viewerId: "226",
+        connectionId: " ",
+    }, { registry, admit: false })
+
+    assert.deepEqual(rejected.messages.at(-1), [3, "HANDSHAKE_DENIED"])
+    assert.equal(registry.consume(room.room_number, 226)?.snapshot.viewerId, 226)
 })
 
 test("NPC slots remain replaceable by a real room member", async t => {

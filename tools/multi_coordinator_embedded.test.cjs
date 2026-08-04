@@ -432,6 +432,16 @@ test("embedded HTTP contexts copy compatibility and isolate coordinators", async
     )
 })
 
+test("embedded HTTP and default TCP admission wiring share one registry", () => {
+    const { embeddedAdmissionRegistry } = require("../src/multi/admission/registry")
+    const { DEFAULT_SESSION_ADMISSION_PROVIDER } = require("../src/multi/tcp/server")
+    const context = createEmbeddedMultiHttpContext()
+
+    assert.equal(context.admissionProvider, embeddedAdmissionRegistry)
+    assert.equal(context.admissionIssuer, embeddedAdmissionRegistry)
+    assert.equal(DEFAULT_SESSION_ADMISSION_PROVIDER, embeddedAdmissionRegistry)
+})
+
 test("embedded HTTP context carries all four injected collaborators", async t => {
     if (!createEmbeddedMultiHttpContext) return t.skip("HTTP context missing")
 

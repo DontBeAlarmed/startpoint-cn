@@ -15,6 +15,19 @@ import {
     EMBEDDED_NODE_SESSION_ID,
     EmbeddedMultiCoordinator,
 } from "../coordinator/embedded"
+import {
+    embeddedAdmissionRegistry,
+    type AdmissionIssuer,
+    type AdmissionProvider,
+    type AdmissionRegistry,
+    type EmbeddedAdmissionMetadata,
+} from "../admission/registry"
+import {
+    buildPlayerSnapshot,
+    type PlayerSnapshot,
+} from "../snapshot/player-snapshot"
+
+export const DEFAULT_ADMISSION_TTL_MS = 15_000
 
 export type ResolveMultiPlayerContext = (
     viewerId: number,
@@ -29,6 +42,12 @@ export function isValidMultiViewerId(viewerId: unknown): viewerId is number {
 export interface MultiSnapshotProvider {
     getParticipant(viewerId: number): ParticipantIdentity
     getCompatibility(viewerId: number): Promise<MultiCompatibilityProfile>
+    prepareAdmission(viewerId: number): Promise<PreparedAdmissionSnapshot | null>
+}
+
+export interface PreparedAdmissionSnapshot {
+    readonly snapshot: PlayerSnapshot
+    readonly embedded?: EmbeddedAdmissionMetadata
 }
 
 export interface MultiSettlementVerifier {
@@ -39,31 +58,61 @@ export interface MultiHttpContext {
     readonly coordinator: MultiCoordinator
     readonly resolvePlayerContext: ResolveMultiPlayerContext
     readonly snapshotProvider: MultiSnapshotProvider
+    readonly admissionProvider: AdmissionProvider
+    readonly admissionIssuer: AdmissionIssuer
+    readonly admissionTtlMs: number
+    readonly now: () => number
     readonly settlementVerifier: MultiSettlementVerifier
 }
 
 export interface EmbeddedMultiHttpContextOptions {
     readonly compatibility?: MultiCompatibilityProfile
     readonly resolvePlayerContext?: ResolveMultiPlayerContext
+    readonly admissionRegistry?: AdmissionRegistry
+    readonly admissionTtlMs?: number
+    readonly now?: () => number
+    readonly prepareAdmission?: (
+        viewerId: number,
+    ) => Promise<PreparedAdmissionSnapshot | null>
 }
 
 export function createEmbeddedMultiHttpContext(
     options: EmbeddedMultiHttpContextOptions = {},
 ): MultiHttpContext {
     const coordinator = new EmbeddedMultiCoordinator()
+    const resolvePlayerContext = options.resolvePlayerContext ?? resolveMultiPlayerContext
+    const admissionRegistry = options.admissionRegistry ?? embeddedAdmissionRegistry
+    const now = options.now ?? Date.now
     const compatibility = Object.freeze({
         ...(options.compatibility ?? EMBEDDED_COMPATIBILITY),
     })
     return Object.freeze({
         coordinator,
-        resolvePlayerContext: options.resolvePlayerContext ?? resolveMultiPlayerContext,
+        resolvePlayerContext,
         snapshotProvider: Object.freeze({
             getParticipant: (viewerId: number) => ({
                 nodeSessionId: EMBEDDED_NODE_SESSION_ID,
                 viewerId,
             }),
             getCompatibility: async (_viewerId: number) => compatibility,
+            prepareAdmission: options.prepareAdmission ?? (async (viewerId: number) => {
+                const context = await resolvePlayerContext(viewerId)
+                if (!context) return null
+                const snapshot = await buildPlayerSnapshot(
+                    viewerId,
+                    context.player.partySlot,
+                    { resolvePlayerContext: async () => context },
+                )
+                return snapshot ? {
+                    snapshot,
+                    embedded: { localPlayerId: context.playerId },
+                } : null
+            }),
         }),
+        admissionProvider: admissionRegistry,
+        admissionIssuer: admissionRegistry,
+        admissionTtlMs: options.admissionTtlMs ?? DEFAULT_ADMISSION_TTL_MS,
+        now,
         settlementVerifier: Object.freeze({
             getBattleStatus: (input: BattleSessionInput) => coordinator.getBattleStatus(input),
         }),

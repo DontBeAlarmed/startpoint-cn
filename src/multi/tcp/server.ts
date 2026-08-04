@@ -12,10 +12,15 @@ import { handleBattleMessage } from "./battle"
 import { sessionManager } from "../state/SessionManager"
 import { startRoomCleanup, stopRoomCleanup } from "../room/manager"
 import { startLobbyLifecycle, stopLobbyLifecycle } from "./lobby-lifecycle"
+import {
+    embeddedAdmissionRegistry,
+    type AdmissionProvider,
+} from "../admission/registry"
 
 export const SESSION_PORT = parseInt(process.env.SESSION_PORT || "8003")
 export const SESSION_HOST = process.env.SESSION_HOST || "127.0.0.1"
 export const DEFAULT_SESSION_SHUTDOWN_TIMEOUT_MS = 5000
+export const DEFAULT_SESSION_ADMISSION_PROVIDER: AdmissionProvider = embeddedAdmissionRegistry
 
 export type SessionServerPhase = "stopped" | "starting" | "listening" | "stopping" | "failed"
 export type SessionServerFailureStage = "startup" | "runtime" | "shutdown"
@@ -42,6 +47,7 @@ export interface SessionServerOptions {
         data: any,
         lifecycle: HandshakeLifecycleGuard,
     ) => Promise<void>
+    admissionProvider?: AdmissionProvider
     /** Maximum shutdown wait for this generation's handshakes before sockets are retired. */
     shutdownTimeoutMs?: number
     onFatalError?: (failure: SessionServerFailure) => void
@@ -384,7 +390,11 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
     lastFailure = null
     phase = "starting"
     const createServer = options.createServer ?? net.createServer
-    const handshakeHandler = options.handleHandshake ?? defaultHandleHandshake
+    const handshakeHandler = options.handleHandshake ?? ((socket, data, lifecycle) => (
+        defaultHandleHandshake(socket, data, lifecycle, {
+            admissionProvider: options.admissionProvider ?? DEFAULT_SESSION_ADMISSION_PROVIDER,
+        })
+    ))
     const generation = ++generationSequence
     let context!: ServerContext
     let createdServer: net.Server

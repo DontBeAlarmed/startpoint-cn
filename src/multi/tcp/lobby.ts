@@ -3,9 +3,6 @@ import { sessionManager, SessionClient } from "../state/SessionManager"
 import { disbandRoom, getRoom, removeRoomMember, updateRoomState } from "../room/manager"
 import { NpcMateProvider } from "../npc/controller"
 import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
-import { buildRealParty } from "./handshake"
-import { PartyCategory } from "../../data/types"
-import { getPlayerPartyGroupListSync } from "../../data/domains/party"
 import type { MultiRoom } from "../../lib/types"
 import {
     getLobbyLifecycleGuard,
@@ -207,23 +204,6 @@ async function handleEnterComs(
     const activeCount = Math.max(0, Math.min(room.npc_count, 3 - currentRealMates.length))
     const assignments = getActiveNpcRoster(room, activeCount)
 
-    // Fetch NPC party data from player's DB (uses real equipment/character IDs)
-    const npcParties: any[] = []
-    if (client.playerId) {
-        try {
-            for (const category of [PartyCategory.NORMAL, PartyCategory.EVENT]) {
-                const groups = getPlayerPartyGroupListSync(client.playerId, category)
-                for (const g of Object.values(groups)) {
-                    for (const party of Object.values(g.list)) {
-                        if (party.name && party.name.includes("NPC")) {
-                            npcParties.push(buildRealParty(client.playerId, party))
-                        }
-                    }
-                }
-            }
-        } catch (e) { }
-    }
-
     const npcMates: any[] = []
     const recruitedByComId = new Map(recruitResult.recruitedMates.map(mate => [mate.com_id, mate]))
     for (let i = 0; i < assignments.length; i++) {
@@ -231,7 +211,9 @@ async function handleEnterComs(
         const recruited = recruitedByComId.get(assignment.com_id)
         const comId = assignment.com_id
         const viewerId = recruited?.viewer_id ?? (900000000 + comId)
-        const party = npcParties[assignment.com_id - 1] ?? npcParties[0] ?? hostMate.party
+        const party = client.npcPartySnapshots[assignment.com_id - 1]
+            ?? client.npcPartySnapshots[0]
+            ?? hostMate.party
 
         npcMates.push({
             viewerId: viewerId,
@@ -411,10 +393,16 @@ function handleChangeParty(_socket: net.Socket, client: SessionClient, data: any
         if (pd.currentPartyId !== undefined) {
             client.yourself.currentPartyId = pd.currentPartyId
         }
+        if (client.snapshot) {
+            client.snapshot = Object.freeze({
+                ...client.snapshot,
+                party: pd.party,
+                currentPartyId: pd.currentPartyId ?? client.snapshot.currentPartyId,
+            })
+        }
     }
     const mate = client.mates.find(m => m.viewerId === client.viewerId)
     if (mate) {
-        if (client.playerId && pd.currentPartyId !== undefined) { try { const up = require("../../data/domains/player").updatePlayerSync; up({ id: client.playerId, partySlot: pd.currentPartyId }); } catch(e) {} }
         const room = getRoom(client.roomNumber); if (room) { room.host_party_id = pd.currentPartyId; }
         const hostClient = findHostClient(client.roomNumber)
         sessionManager.broadcastToRoom(client.roomNumber, [1, [1, hostClient?.mates ?? client.mates]])
@@ -446,11 +434,17 @@ function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: an
     if ((sessionManager as any).battleExpectedCount?.has?.(client.roomNumber)) return
 
     const realMembers = client.mates.filter(mate => !mate.comId)
-    sessionManager.setBattleParticipants(client.roomNumber, realMembers.map(mate => ({
-        connectionId: String(mate.connectionId ?? ""),
-        viewerId: Number(mate.viewerId),
-        playerId: Number.isSafeInteger(mate.playerId) ? mate.playerId : null,
-    })))
+    const clientsByViewerId = new Map(sessionManager.getClientsInRoom(client.roomNumber)
+        .map(member => [member.viewerId, member]))
+    sessionManager.setBattleParticipants(client.roomNumber, realMembers.flatMap(mate => {
+        const member = clientsByViewerId.get(Number(mate.viewerId))
+        if (!member?.participant) return []
+        return [{
+            connectionId: String(mate.connectionId ?? ""),
+            participant: member.participant,
+            localPlayerId: member.localPlayerId,
+        }]
+    }))
     updateRoomState(client.roomNumber, 4)
 
     autoStartingRooms.delete(client.roomNumber)

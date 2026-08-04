@@ -52,6 +52,7 @@ const {
 const { getRoom } = require("../src/multi/room/manager")
 const { sessionManager } = require("../src/multi/state/SessionManager")
 const { createEmbeddedMultiHttpContext } = require("../src/multi/http/context")
+const { AdmissionRegistry } = require("../src/multi/admission/registry")
 const { registerLobbyRoutes } = require("../src/multi/http/lobby")
 const { registerRoomRoutes } = require("../src/multi/http/room")
 const { registerSocialRoutes } = require("../src/multi/http/social")
@@ -61,6 +62,13 @@ async function createRouteServer(options = {}) {
     const context = options.context ?? createEmbeddedMultiHttpContext({
         resolvePlayerContext: options.resolvePlayerContext
             ?? (async viewerId => players.get(viewerId) ?? null),
+        prepareAdmission: async viewerId => {
+            const local = players.get(viewerId)
+            return local ? {
+                snapshot: snapshotFixture(viewerId, local.player.name),
+                embedded: { localPlayerId: local.playerId },
+            } : null
+        },
     })
     fastify.addHook("onSend", (_request, reply, payload, done) => {
         if (reply.getHeader("content-type") === "application/x-msgpack") {
@@ -74,6 +82,26 @@ async function createRouteServer(options = {}) {
     registerSocialRoutes(fastify, context)
     await fastify.ready()
     return fastify
+}
+
+function snapshotFixture(viewerId, name = `Player${viewerId}`) {
+    return {
+        viewerId,
+        name,
+        rank: 1,
+        degreeId: 1,
+        mainCharacterId: 401,
+        playerRoleKind: 1,
+        isNewbie: false,
+        currentPartyId: 1,
+        party: {
+            characters: [[1], [1], [1]],
+            unison_characters: [[1], [1], [1]],
+            equipments: [[1], [1], [1]],
+            abilitySoulIds: [[1], [1], [1]],
+        },
+        npcParties: [],
+    }
 }
 
 test("room HTTP routes depend on the injected context instead of global room access", () => {
@@ -121,6 +149,7 @@ test("room routes derive raising state from the injected coordinator status", as
         compatibility,
     }
     const ok = value => Promise.resolve({ ok: true, value })
+    const admissionRegistry = new AdmissionRegistry({ now: () => 1_000 })
     const context = {
         coordinator: {
             selectRoom: () => ok(status),
@@ -131,7 +160,12 @@ test("room routes derive raising state from the injected coordinator status", as
         snapshotProvider: {
             getParticipant: participant,
             getCompatibility: async () => compatibility,
+            prepareAdmission: async viewerId => ({ snapshot: snapshotFixture(viewerId) }),
         },
+        admissionProvider: admissionRegistry,
+        admissionIssuer: admissionRegistry,
+        admissionTtlMs: 5_000,
+        now: () => 1_000,
         settlementVerifier: {},
     }
     const originalIsHostOnline = sessionManager.isHostOnline
@@ -171,6 +205,12 @@ test("room routes derive raising state from the injected coordinator status", as
                 })
                 assert.equal(response.statusCode, 200)
                 assert.equal(decode(response).data.raising_state, expectedState)
+                if (route.name === "prepare") {
+                    assert.equal(
+                        admissionRegistry.consume(status.roomNumber, viewerId)?.snapshot.viewerId,
+                        viewerId,
+                    )
+                }
             })
         }
     }

@@ -1,0 +1,251 @@
+import {
+    getPlayerCharacterManaNodesSync,
+    getPlayerCharacterSync,
+} from "../../data/domains/character"
+import { getPlayerEquipmentSync } from "../../data/domains/equipment"
+import { getPlayerPartyGroupListSync } from "../../data/domains/party"
+import {
+    PartyCategory,
+    type PlayerCharacter,
+    type PlayerEquipment,
+    type PlayerParty,
+    type PlayerPartyGroup,
+} from "../../data/types"
+import { parseGlobalPartyId } from "../../lib/special-event-parties"
+import {
+    getPlayerRankLevel,
+    resolveMultiPlayerContext,
+    type MultiPlayerContext,
+} from "../player-context"
+
+export type MultiOption<T> = readonly [0, T] | readonly [1]
+
+export interface PlayerCharacterSnapshot {
+    readonly id: number
+    readonly evolution_level: number
+    readonly exp: number
+    readonly over_limit_step: number
+    readonly mana_node_ids: Readonly<Record<string, number>>
+    readonly ex_boost: MultiOption<{
+        readonly ability_id_list: readonly number[]
+        readonly status_id: number
+    }>
+    readonly illustration_settings: MultiOption<readonly number[]>
+}
+
+export interface PlayerEquipmentSnapshot {
+    readonly equipmentId: number
+    readonly level: number
+    readonly enhancementLevel: number
+}
+
+export interface PlayerPartySnapshot {
+    readonly characters: readonly MultiOption<PlayerCharacterSnapshot>[]
+    readonly unison_characters: readonly MultiOption<PlayerCharacterSnapshot>[]
+    readonly equipments: readonly MultiOption<PlayerEquipmentSnapshot>[]
+    readonly abilitySoulIds: readonly MultiOption<number>[]
+}
+
+export interface PlayerSnapshot {
+    readonly viewerId: number
+    readonly name: string
+    readonly rank: number
+    readonly degreeId: number
+    readonly mainCharacterId: number
+    readonly playerRoleKind: number
+    readonly isNewbie: boolean
+    readonly currentPartyId: number
+    readonly party: PlayerPartySnapshot
+    readonly npcParties: readonly PlayerPartySnapshot[]
+}
+
+export interface PlayerSnapshotDependencies {
+    resolvePlayerContext(viewerId: number): Promise<MultiPlayerContext | null>
+    getPartyGroups(playerId: number, category: PartyCategory): Record<string, PlayerPartyGroup>
+    getCharacter(playerId: number, characterId: number): PlayerCharacter | null
+    getManaNodes(playerId: number, characterId: number): number[]
+    getEquipment(playerId: number, equipmentId: number): PlayerEquipment | null
+    getRankLevel(rankPoint: number): number
+}
+
+const defaultDependencies: PlayerSnapshotDependencies = {
+    resolvePlayerContext: resolveMultiPlayerContext,
+    getPartyGroups: getPlayerPartyGroupListSync,
+    getCharacter: getPlayerCharacterSync,
+    getManaNodes: getPlayerCharacterManaNodesSync,
+    getEquipment: getPlayerEquipmentSync,
+    getRankLevel: getPlayerRankLevel,
+}
+
+function deepFreeze<T>(value: T): T {
+    if (value === null || typeof value !== "object" || Object.isFrozen(value)) return value
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child)
+    return Object.freeze(value)
+}
+
+function none<T>(): MultiOption<T> {
+    return [1]
+}
+
+function buildCharacter(
+    playerId: number,
+    characterId: number | null,
+    dependencies: PlayerSnapshotDependencies,
+): MultiOption<PlayerCharacterSnapshot> {
+    if (!characterId) return none()
+    const character = dependencies.getCharacter(playerId, characterId)
+    if (!character) return none()
+
+    const manaNodeIds: Record<string, number> = {}
+    for (const nodeId of dependencies.getManaNodes(playerId, characterId)) {
+        manaNodeIds[String(nodeId)] = 0
+    }
+    const exBoost = character.exBoost?.abilityIdList.length
+        ? [0, {
+            ability_id_list: [...character.exBoost.abilityIdList],
+            status_id: character.exBoost.statusId,
+        }] as const
+        : none<{ readonly ability_id_list: readonly number[], readonly status_id: number }>()
+
+    return [0, {
+        id: characterId,
+        evolution_level: character.evolutionLevel,
+        exp: character.exp,
+        over_limit_step: character.overLimitStep,
+        mana_node_ids: manaNodeIds,
+        ex_boost: exBoost,
+        illustration_settings: none(),
+    }]
+}
+
+export function buildPartySnapshot(
+    playerId: number,
+    party: PlayerParty | null | undefined,
+    dependencies: PlayerSnapshotDependencies = defaultDependencies,
+): PlayerPartySnapshot {
+    const characters: MultiOption<PlayerCharacterSnapshot>[] = []
+    const unisonCharacters: MultiOption<PlayerCharacterSnapshot>[] = []
+    const equipments: MultiOption<PlayerEquipmentSnapshot>[] = []
+    const abilitySoulIds: MultiOption<number>[] = []
+
+    for (let index = 0; index < 3; index++) {
+        characters.push(buildCharacter(
+            playerId,
+            party?.characterIds[index] ?? null,
+            dependencies,
+        ))
+        unisonCharacters.push(buildCharacter(
+            playerId,
+            party?.unisonCharacterIds[index] ?? null,
+            dependencies,
+        ))
+
+        const equipmentId = party?.equipmentIds[index] ?? null
+        const equipment = equipmentId
+            ? dependencies.getEquipment(playerId, equipmentId)
+            : null
+        equipments.push(equipmentId && equipment
+            ? [0, {
+                equipmentId,
+                level: equipment.level,
+                enhancementLevel: equipment.enhancementLevel,
+            }]
+            : none())
+
+        const soulId = party?.abilitySoulIds[index] ?? null
+        abilitySoulIds.push(soulId ? [0, soulId] : none())
+    }
+
+    return deepFreeze({
+        characters,
+        unison_characters: unisonCharacters,
+        equipments,
+        abilitySoulIds,
+    })
+}
+
+function findCurrentParty(
+    groups: Record<string, PlayerPartyGroup>,
+    currentPartyId: number,
+): PlayerParty | null {
+    const parsed = parseGlobalPartyId(currentPartyId)
+    if (!parsed) return null
+    return groups[String(parsed.groupId)]?.list[String(parsed.slot)] ?? null
+}
+
+function findNpcParties(
+    groupsByCategory: readonly Record<string, PlayerPartyGroup>[],
+): PlayerParty[] {
+    const parties: PlayerParty[] = []
+    for (const groups of groupsByCategory) {
+        for (const group of Object.values(groups)) {
+            for (const party of Object.values(group.list)) {
+                if (party.name.includes("NPC")) parties.push(party)
+                if (parties.length === 2) return parties
+            }
+        }
+    }
+    return parties
+}
+
+export async function buildPlayerSnapshot(
+    viewerId: number,
+    currentPartyId?: number,
+    dependencyOverrides: Partial<PlayerSnapshotDependencies> = {},
+): Promise<PlayerSnapshot | null> {
+    if (!Number.isSafeInteger(viewerId) || viewerId <= 0) {
+        throw new TypeError("viewerId must be a positive safe integer")
+    }
+    const dependencies = { ...defaultDependencies, ...dependencyOverrides }
+    const context = await dependencies.resolvePlayerContext(viewerId)
+    if (!context) return null
+
+    const selectedPartyId = currentPartyId ?? context.player.partySlot
+    const normalGroups = dependencies.getPartyGroups(context.playerId, PartyCategory.NORMAL)
+    const eventGroups = dependencies.getPartyGroups(context.playerId, PartyCategory.EVENT)
+    const currentParty = findCurrentParty(normalGroups, selectedPartyId)
+    const npcParties = findNpcParties([normalGroups, eventGroups])
+        .map(party => buildPartySnapshot(context.playerId, party, dependencies))
+
+    return deepFreeze({
+        viewerId,
+        name: context.player.name,
+        rank: dependencies.getRankLevel(context.player.rankPoint || 0),
+        degreeId: context.player.degreeId || 1,
+        mainCharacterId: context.player.leaderCharacterId,
+        playerRoleKind: context.player.role || 1,
+        isNewbie: !!context.player.tutorialStep,
+        currentPartyId: selectedPartyId,
+        party: buildPartySnapshot(context.playerId, currentParty, dependencies),
+        npcParties,
+    })
+}
+
+export function buildYourselfFromSnapshot(
+    snapshot: PlayerSnapshot,
+    connectionId: string,
+    isHost: boolean,
+): Record<string, unknown> {
+    return {
+        viewerId: snapshot.viewerId,
+        name: snapshot.name,
+        rank: snapshot.rank,
+        degreeId: snapshot.degreeId,
+        mainCharacterId: snapshot.mainCharacterId,
+        party: snapshot.party,
+        connectionId,
+        playerRoleKind: snapshot.playerRoleKind,
+        isNewbie: snapshot.isNewbie,
+        isHost,
+        entryTime: Date.now(),
+        currentPartyId: snapshot.currentPartyId,
+        autoplayMode: false,
+        autoskillMode: 1,
+        autoSpeedLevel: 1,
+        autoStart: false,
+        skillAbilityBehaviorMode: 1,
+        dashBehaviorMode: 1,
+        allowHealFromOtherPlayers: true,
+        state: [0],
+    }
+}

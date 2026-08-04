@@ -1,5 +1,7 @@
 const assert = require("node:assert/strict")
 const { EventEmitter } = require("node:events")
+const fs = require("node:fs")
+const path = require("node:path")
 const test = require("node:test")
 
 require("ts-node/register/transpile-only")
@@ -92,6 +94,13 @@ function stubRecruitment(t, recruitedMates) {
 
 test.afterEach(() => {
     if (typeof stopLobbyLifecycle === "function") stopLobbyLifecycle()
+})
+
+test("lobby does not read player storage or persist TCP party changes", () => {
+    const source = fs.readFileSync(path.resolve(__dirname, "../src/multi/tcp/lobby.ts"), "utf8")
+    assert.doesNotMatch(source, /data\/domains\/(party|player)/)
+    assert.doesNotMatch(source, /buildRealParty/)
+    assert.doesNotMatch(source, /updatePlayerSync/)
 })
 
 test("an explicit guest Bye releases the persistent room membership", t => {
@@ -758,26 +767,14 @@ test("active com_id 2 selects the second configured NPC party", async t => {
         { com_id: 1, name: "队伍甲" },
         { com_id: 2, name: "队伍乙" },
     ]
-    host.client.playerId = 1519
+    host.client.npcPartySnapshots = [
+        { marker: "npc-party-0" },
+        { marker: "npc-party-1" },
+    ]
     stubRecruitment(t, [
         { viewer_id: 984000001, com_id: 1 },
         { viewer_id: 984000002, com_id: 2 },
     ])
-
-    const partyDomain = require("../src/data/domains/party")
-    const handshake = require("../src/multi/tcp/handshake")
-    const originalGetPartyGroups = partyDomain.getPlayerPartyGroupListSync
-    const originalBuildRealParty = handshake.buildRealParty
-    let partyIndex = 0
-    partyDomain.getPlayerPartyGroupListSync = () => {
-        const marker = `npc-party-${partyIndex++}`
-        return { group: { list: { party: { name: `NPC ${marker}`, marker } } } }
-    }
-    handshake.buildRealParty = (_playerId, party) => ({ marker: party.marker })
-    t.after(() => {
-        partyDomain.getPlayerPartyGroupListSync = originalGetPartyGroups
-        handshake.buildRealParty = originalBuildRealParty
-    })
 
     handleMessage(host.socket, [0, [10, []]])
     await flushPromises()
