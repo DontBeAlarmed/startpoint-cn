@@ -33,9 +33,13 @@ class FakeSocket extends EventEmitter {
         super()
         this.destroyed = false
         this.writable = true
+        this.writes = []
     }
 
-    write() { return true }
+    write(value) {
+        this.writes.push(JSON.parse(String(value).replace(/\0$/, "")))
+        return true
+    }
     destroy() {
         this.destroyed = true
         this.writable = false
@@ -103,6 +107,26 @@ test("lobby does not read player storage or persist TCP party changes", () => {
     assert.doesNotMatch(source, /data\/domains\/(party|player)/)
     assert.doesNotMatch(source, /buildRealParty/)
     assert.doesNotMatch(source, /updatePlayerSync/)
+})
+
+test("a host entering after a guest receives Welcome before excluded mate updates", t => {
+    const { host, guests } = createLobbyRoom(t, 496, [596])
+    const guest = guests[0]
+    host.client.mates = []
+    guest.client.mates = []
+
+    handleMessage(guest.socket, [0, [0, { party: {} }]])
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+
+    const hostInitializationTags = host.socket.writes
+        .filter(message => message[0] === 1 && [0, 1].includes(message[1]?.[0]))
+        .map(message => message[1][0])
+    const guestInitializationTags = guest.socket.writes
+        .filter(message => message[0] === 1 && [0, 1].includes(message[1]?.[0]))
+        .map(message => message[1][0])
+
+    assert.deepEqual(hostInitializationTags, [0])
+    assert.deepEqual(guestInitializationTags, [0, 1])
 })
 
 test("change-party rebuilds a deeply frozen snapshot isolated from client input", t => {

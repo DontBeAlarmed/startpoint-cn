@@ -548,9 +548,13 @@ export class SessionManager {
         return true
     }
 
-    broadcastToRoom(roomNumber: string, data: any, excludeAddr?: string): void {
+    broadcastToRoom(roomNumber: string, data: any, excludeClient?: SessionClient): void {
         const set = this.roomClients.get(roomNumber)
         if (!set) return
+        const excludeAddr = excludeClient?.participant
+            && excludeClient.roomNumber === roomNumber
+            ? this.roomClientKey(roomNumber, excludeClient.participant)
+            : undefined
         for (const addr of set) {
             if (excludeAddr !== undefined && addr === excludeAddr) continue
             const c = this.clients.get(addr)

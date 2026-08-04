@@ -303,7 +303,7 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
         if (room) client.mates = selectRealMates(client.mates, room.host_viewer_id)
         if (room) room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
         if (client.mates.length > 1) {
-            sessionManager.broadcastToRoom(client.roomNumber, [1, [1, client.mates]], `${client.viewerId}@${client.roomNumber}`)
+            sessionManager.broadcastToRoom(client.roomNumber, [1, [1, client.mates]], client)
         }
         if (room && room.npc_count > 0 && countRealPlayers(client.mates) < 3) {
             scheduleLobbyTask(lifecycle => { handleEnterComs(client, lifecycle).catch(e => console.error("[LOBBY] EnterComs (timer) error", e)); }, 500)
@@ -328,7 +328,7 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
 
     if (!isHost) {
         const mates = hostClient?.mates ?? client.mates
-        sessionManager.broadcastToRoom(client.roomNumber, [1, [1, mates]], undefined)
+        sessionManager.broadcastToRoom(client.roomNumber, [1, [1, mates]])
     }
 
     console.log(`[LOBBY] ${isHost ? "host" : "guest"} ${client.viewerId} entered room ${client.roomNumber}`)
