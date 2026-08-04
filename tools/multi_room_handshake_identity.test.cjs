@@ -112,19 +112,19 @@ test("room handshake rejects unknown, non-joinable, mismatched and full rooms", 
     const missing = await handshake(null, 201)
     assert.equal(missing.ended, true)
     assert.deepEqual(missing.messages.at(-1), [3, "HANDSHAKE_DENIED"])
-    assert.equal(sessionManager.getClient(201, "missing-room"), undefined)
+    assert.equal(sessionManager.getUniqueRoomClientByViewerId(201, "missing-room"), undefined)
 
     const battleRoom = createRoom(101, 1_101, 1, 1, 501, 0, 101)
     updateRoomState(battleRoom.room_number, 4)
     const battle = await handshake(battleRoom, 202)
     assert.equal(battle.ended, true)
-    assert.equal(sessionManager.getClient(202, battleRoom.room_number), undefined)
+    assert.equal(sessionManager.getUniqueRoomClientByViewerId(202, battleRoom.room_number), undefined)
     disbandRoom(battleRoom.room_number)
 
     const mismatchRoom = createRoom(102, 1_102, 1, 1, 502, 0, 101)
     const mismatch = await handshake(mismatchRoom, 203, { questId: 999 })
     assert.equal(mismatch.ended, true)
-    assert.equal(sessionManager.getClient(203, mismatchRoom.room_number), undefined)
+    assert.equal(sessionManager.getUniqueRoomClientByViewerId(203, mismatchRoom.room_number), undefined)
     disbandRoom(mismatchRoom.room_number)
 
     const fullRoom = createRoom(103, 1_103, 1, 1, 503, 0, 101)
@@ -133,7 +133,7 @@ test("room handshake rejects unknown, non-joinable, mismatched and full rooms", 
     t.after(() => disbandRoom(fullRoom.room_number))
     const full = await handshake(fullRoom, 206)
     assert.equal(full.ended, true)
-    assert.equal(sessionManager.getClient(206, fullRoom.room_number), undefined)
+    assert.equal(sessionManager.getUniqueRoomClientByViewerId(206, fullRoom.room_number), undefined)
 
     const reconnect = await handshake(fullRoom, 204)
     assert.equal(reconnect.ended, false)
@@ -147,8 +147,8 @@ test("successful handshakes record membership and derive host role from the room
 
     const hostSocket = await handshake(room, 111)
     const guestSocket = await handshake(room, 222)
-    const host = sessionManager.getClient(111, room.room_number)
-    const guest = sessionManager.getClient(222, room.room_number)
+    const host = sessionManager.getUniqueRoomClientByViewerId(111, room.room_number)
+    const guest = sessionManager.getUniqueRoomClientByViewerId(222, room.room_number)
     t.after(() => {
         sessionManager.removeClientBySocket(guestSocket)
         sessionManager.removeClientBySocket(hostSocket)
@@ -185,6 +185,84 @@ test("room admission is required and consumed once", async t => {
     assert.deepEqual(missing.messages.at(-1), [3, "HANDSHAKE_DENIED"])
 })
 
+test("an active room participant rejects the same viewer id from a different node", async t => {
+    const room = createRoom(116, 1_116, 1, 1, 516, 0, 101)
+    const registry = new AdmissionRegistry({ now: () => 1_000 })
+    const nodeA = { nodeSessionId: "node-a", viewerId: 116 }
+    const nodeB = { nodeSessionId: "node-b", viewerId: 116 }
+    registry.issue({
+        roomNumber: room.room_number,
+        participant: nodeA,
+        snapshot: snapshot(116),
+        expiresAt: 6_000,
+    })
+    const socketA = await handshake(room, 116, { connectionId: "cid-node-a" }, {
+        registry,
+        admit: false,
+    })
+    registry.issue({
+        roomNumber: room.room_number,
+        participant: nodeB,
+        snapshot: snapshot(116),
+        expiresAt: 6_000,
+    })
+    const socketB = await handshake(room, 116, { connectionId: "cid-node-b" }, {
+        registry,
+        admit: false,
+    })
+    t.after(() => {
+        sessionManager.removeClientBySocket(socketB)
+        sessionManager.removeClientBySocket(socketA)
+        disbandRoom(room.room_number)
+    })
+
+    assert.equal(socketB.ended, true)
+    assert.deepEqual(socketB.messages.at(-1), [3, "HANDSHAKE_DENIED"])
+    assert.equal(sessionManager.getClientByParticipant(room.room_number, nodeA)?.socket, socketA)
+    assert.equal(sessionManager.getClientByParticipant(room.room_number, nodeB), undefined)
+
+    handleLobbyMessage(socketB, [0, [0, { party: snapshot(116).party }]])
+    handleLobbyMessage(socketB, [0, [6]])
+    assert.notEqual(room.raising_state, 4)
+
+    handleLobbyMessage(socketA, [0, [0, { party: snapshot(116).party }]])
+    handleLobbyMessage(socketA, [0, [6]])
+    assert.equal(room.raising_state, 4)
+    assert.equal(sessionManager.isBattleHostParticipant(room.room_number, nodeA), true)
+    assert.equal(sessionManager.isBattleHostParticipant(room.room_number, nodeB), false)
+})
+
+test("the same node participant can reconnect without an identity conflict", async t => {
+    const room = createRoom(117, 1_117, 1, 1, 517, 0, 101)
+    const registry = new AdmissionRegistry({ now: () => 1_000 })
+    const participant = { nodeSessionId: "node-a", viewerId: 117 }
+    const issueAdmission = () => registry.issue({
+        roomNumber: room.room_number,
+        participant,
+        snapshot: snapshot(117),
+        expiresAt: 6_000,
+    })
+    issueAdmission()
+    const first = await handshake(room, 117, { connectionId: "cid-first" }, {
+        registry,
+        admit: false,
+    })
+    issueAdmission()
+    const reconnected = await handshake(room, 117, { connectionId: "cid-reconnected" }, {
+        registry,
+        admit: false,
+    })
+    t.after(() => {
+        sessionManager.removeClientBySocket(reconnected)
+        sessionManager.removeClientBySocket(first)
+        disbandRoom(room.room_number)
+    })
+
+    assert.equal(first.ended, false)
+    assert.equal(reconnected.ended, false)
+    assert.equal(sessionManager.getClientByParticipant(room.room_number, participant)?.socket, reconnected)
+})
+
 test("remote participant completes room and battle handshakes without local player storage", async t => {
     const room = createRoom(115, 1_115, 1, 1, 515, 0, 101)
     const registry = new AdmissionRegistry({ now: () => 1_000 })
@@ -198,7 +276,10 @@ test("remote participant completes room and battle handshakes without local play
     t.after(() => disbandRoom(room.room_number))
 
     const roomSocket = await handshake(room, 115, {}, { registry, admit: false })
-    const roomClient = sessionManager.getClient(115, room.room_number)
+    const roomClient = sessionManager.getClientByParticipant(
+        room.room_number,
+        remoteParticipant,
+    )
     t.after(() => sessionManager.removeClientBySocket(roomSocket))
     assert.deepEqual(roomClient?.participant, remoteParticipant)
     assert.equal("localPlayerId" in roomClient, false)

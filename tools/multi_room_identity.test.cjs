@@ -573,6 +573,7 @@ test("random matching stays empty and access-token verification follows the CN p
     const room = createRoom(101, 201, 1, 1, 501, 0, 401)
     const socket = { writable: true, write: () => true }
     const hostClient = sessionManager.createClient(socket, 101, room.room_number, "host-cid")
+    hostClient.participant = { nodeSessionId: "embedded", viewerId: 101 }
     sessionManager.addClientToRoom(hostClient)
     t.after(async () => {
         sessionManager.removeClient(hostClient)

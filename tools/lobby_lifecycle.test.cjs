@@ -73,6 +73,7 @@ function createLobbyClient(room, viewerId, connectionId) {
 function createLobbyRoom(t, hostViewerId, guestViewerIds = []) {
     const room = createRoom(hostViewerId, hostViewerId + 1000, 1, 1, hostViewerId + 2000, 1, hostViewerId + 3000)
     const host = createLobbyClient(room, hostViewerId, `host-${hostViewerId}`)
+    sessionManager.claimRoomHostParticipant(room.room_number, host.client.participant)
     const guests = guestViewerIds.map(viewerId => createLobbyClient(room, viewerId, `guest-${viewerId}`))
     t.after(() => {
         for (const entry of [...guests].reverse()) sessionManager.removeClientBySocket(entry.socket)
@@ -209,6 +210,7 @@ test("all three lobby timeout paths are unrefed, cancelled, and inert after stop
     room.npc_count = 2
     const socket = new FakeSocket()
     const client = sessionManager.createClient(socket, 501, room.room_number, "lobby-timer-cid")
+    client.participant = { nodeSessionId: "embedded", viewerId: 501 }
     client.yourself = {
         viewerId: 501,
         connectionId: "lobby-timer-cid",
@@ -217,6 +219,7 @@ test("all three lobby timeout paths are unrefed, cancelled, and inert after stop
     }
     client.mates = [client.yourself]
     sessionManager.addClientToRoom(client)
+    sessionManager.claimRoomHostParticipant(room.room_number, client.participant)
     t.after(() => {
         sessionManager.removeClientBySocket(socket)
         disbandRoom(room.room_number)
@@ -263,6 +266,7 @@ test("an async lobby timer callback cannot mutate state after its generation sto
     room.npc_count = 2
     const socket = new FakeSocket()
     const client = sessionManager.createClient(socket, 502, room.room_number, "async-lobby-cid")
+    client.participant = { nodeSessionId: "embedded", viewerId: 502 }
     client.yourself = {
         viewerId: 502,
         connectionId: "async-lobby-cid",
@@ -271,6 +275,7 @@ test("an async lobby timer callback cannot mutate state after its generation sto
     }
     client.mates = [client.yourself]
     sessionManager.addClientToRoom(client)
+    sessionManager.claimRoomHostParticipant(room.room_number, client.participant)
     t.after(() => {
         sessionManager.removeClientBySocket(socket)
         disbandRoom(room.room_number)

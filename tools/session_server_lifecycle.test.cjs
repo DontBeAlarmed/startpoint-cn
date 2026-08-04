@@ -193,7 +193,7 @@ test("stop waits for tracked handshakes, removes late sessions, and ignores new 
     let handshakeCalls = 0
     let lateClient
     t.after(() => {
-        if (lateClient && sessionManager.getClient(91, "pending-room")) {
+        if (lateClient && sessionManager.getUniqueRoomClientByViewerId(91, "pending-room")) {
             sessionManager.removeClient(lateClient)
         }
     })
@@ -207,6 +207,7 @@ test("stop waits for tracked handshakes, removes late sessions, and ignores new 
             handshakeCalls++
             await handshake.promise
             lateClient = sessionManager.createClient(socket, 91, "pending-room", "pending-cid")
+            lateClient.participant = { nodeSessionId: "embedded", viewerId: 91 }
             sessionManager.addClientToRoom(lateClient)
         },
     })
@@ -244,7 +245,7 @@ test("stop waits for tracked handshakes, removes late sessions, and ignores new 
     await stopPromise
     assert.equal(stopped, true)
     assert.equal(servers[0].closeCalls, 1)
-    assert.equal(sessionManager.getClient(91, "pending-room"), undefined)
+    assert.equal(sessionManager.getUniqueRoomClientByViewerId(91, "pending-room"), undefined)
     assert.deepEqual(getRoomCleanupStatus(), { running: false })
     assert.deepEqual(getLobbyLifecycleStatus(), { running: false, activeTimers: 0 })
 })
@@ -517,7 +518,7 @@ test("handshake shutdown timeout bounds stop and late resolution cannot add a se
     let fakeServer
     let lateClient
     t.after(() => {
-        if (lateClient && sessionManager.getClient(92, "timeout-room")) {
+        if (lateClient && sessionManager.getUniqueRoomClientByViewerId(92, "timeout-room")) {
             sessionManager.removeClient(lateClient)
         }
     })
@@ -531,6 +532,7 @@ test("handshake shutdown timeout bounds stop and late resolution cannot add a se
             await handshake.promise
             if (!lifecycle.isAccepting()) return
             lateClient = sessionManager.createClient(socket, 92, "timeout-room", "timeout-cid")
+            lateClient.participant = { nodeSessionId: "embedded", viewerId: 92 }
             sessionManager.addClientToRoom(lateClient)
         },
     })
@@ -567,7 +569,7 @@ test("handshake shutdown timeout bounds stop and late resolution cannot add a se
         pendingHandshakes: 0,
         lastFailure: null,
     })
-    assert.equal(sessionManager.getClient(92, "timeout-room"), undefined)
+    assert.equal(sessionManager.getUniqueRoomClientByViewerId(92, "timeout-room"), undefined)
     assert.equal(replacementServer.listening, true)
     await stopSessionServer()
 })

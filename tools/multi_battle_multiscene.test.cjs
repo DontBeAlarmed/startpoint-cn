@@ -253,11 +253,13 @@ test("battle handshake requires an identity from the host StartBattle snapshot",
     }
     lobbyClient.mates = [lobbyClient.yourself]
     sessionManager.addClientToRoom(lobbyClient)
+    sessionManager.claimRoomHostParticipant(room.room_number, lobbyClient.participant)
     handleLobbyMessage(lobbySocket, [0, [6]])
     assert.equal(room.raising_state, 4)
 
     const lateLobbySocket = new FakeSocket()
     const lateLobbyClient = sessionManager.createClient(lateLobbySocket, 800000102, room.room_number, "late-cid")
+    lateLobbyClient.participant = participant(lateLobbyClient.viewerId)
     sessionManager.addClientToRoom(lateLobbyClient)
     const entry = { clients: [], lobbyClients: [lobbyClient, lateLobbyClient], room }
     cleanup.push(entry)
@@ -304,7 +306,7 @@ test("battle handshake requires an identity from the host StartBattle snapshot",
     assert.equal(reconnectedClient?.viewerId, 800000101)
     assert.equal("localPlayerId" in reconnectedClient, false)
     sessionManager.removeClient(reconnectedClient)
-    assert.equal(sessionManager.getClient(800000101, room.room_number), undefined)
+    assert.equal(sessionManager.getUniqueRoomClientByViewerId(800000101, room.room_number), undefined)
 })
 
 test("only the room host can freeze the StartBattle participant snapshot", () => {
@@ -321,6 +323,7 @@ test("only the room host can freeze the StartBattle participant snapshot", () =>
     guest.mates = [host.yourself, guest.yourself]
     sessionManager.addClientToRoom(host)
     sessionManager.addClientToRoom(guest)
+    sessionManager.claimRoomHostParticipant(room.room_number, host.participant)
     cleanup.push({ clients: [], lobbyClients: [host, guest], room })
 
     handleLobbyMessage(guestSocket, [0, [6]])

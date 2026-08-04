@@ -135,6 +135,14 @@ export async function handleHandshake(
         }
 
         if (!lifecycle.isAccepting()) return
+        const isRoomHost = normalizedViewerId === room.host_viewer_id
+        if (sessionManager.hasActiveRoomViewerConflict(
+            normalizedRoomNumber,
+            admission.participant,
+        )) {
+            deny(socket)
+            return
+        }
 
         const client = sessionManager.createClient(
             socket,
@@ -149,12 +157,23 @@ export async function handleHandshake(
         client.yourself = buildYourselfFromSnapshot(
             admission.snapshot,
             normalizedConnectionId,
-            normalizedViewerId === room.host_viewer_id,
+            isRoomHost,
         ) as SessionClient["yourself"]
 
         if (!lifecycle.isAccepting()) return
+        if (isRoomHost && !sessionManager.claimRoomHostParticipant(
+            normalizedRoomNumber,
+            admission.participant,
+        )) {
+            deny(socket)
+            return
+        }
+        const added = sessionManager.addClientToRoom(client)
+        if (!added.ok) {
+            deny(socket)
+            return
+        }
         addRoomMember(normalizedRoomNumber, normalizedViewerId)
-        sessionManager.addClientToRoom(client)
         sessionManager.sendJson(socket, [0, normalizedConnectionId, normalizedRoomNumber])
         return
     }

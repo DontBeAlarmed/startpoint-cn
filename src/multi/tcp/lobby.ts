@@ -50,25 +50,11 @@ function isCommittedRecruitment(roomNumber: string, room: MultiRoom, revision: n
 }
 
 function findClientBySocket(socket: net.Socket): SessionClient | undefined {
-    const clientsMap = (sessionManager as any).clients as Map<string, SessionClient> | undefined
-    if (!clientsMap) return undefined
-    for (const client of clientsMap.values()) {
-        if (client.socket === socket) return client
-    }
-    return undefined
+    return sessionManager.getClientBySocket(socket)
 }
 
 function findHostClient(roomNumber: string): SessionClient | undefined {
-    const room = getRoom(roomNumber)
-    if (!room) return undefined
-    const clientsMap = (sessionManager as any).clients as Map<string, SessionClient> | undefined
-    if (!clientsMap) return undefined
-    for (const client of clientsMap.values()) {
-        if (client.viewerId === room.host_viewer_id && client.roomNumber === roomNumber && !client.isBattle) {
-            return client
-        }
-    }
-    return undefined
+    return sessionManager.getRoomHostClient(roomNumber)
 }
 
 function countRealPlayers(mates: any[]): number {
@@ -290,7 +276,8 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     client.enterData = ed
 
     const room = getRoom(client.roomNumber)
-    const isHost = room && client.viewerId === room.host_viewer_id
+    const isHost = !!client.participant
+        && sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)
 
     if (isHost) {
         updateRoomState(client.roomNumber, 1)
@@ -308,16 +295,9 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
 
     if (isHost) {
         client.mates = [client.yourself!]
-        const set = (sessionManager as any).roomClients?.get?.(client.roomNumber) as Set<string> | undefined
-        if (set) {
-            const clientsMap = (sessionManager as any).clients as Map<string, SessionClient> | undefined
-            if (clientsMap) {
-                for (const addr of set) {
-                    const c = clientsMap.get(addr)
-                    if (c && c !== client && !c.isBattle && c.yourself) {
-                        client.mates.push(c.yourself)
-                    }
-                }
+        for (const connectedClient of sessionManager.getClientsInRoom(client.roomNumber)) {
+            if (connectedClient !== client && connectedClient.yourself) {
+                client.mates.push(connectedClient.yourself)
             }
         }
         if (room) client.mates = selectRealMates(client.mates, room.host_viewer_id)
@@ -355,21 +335,15 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
 }
 
 function handleBye(_socket: net.Socket, client: SessionClient, _data: any[]): void {
-    const room = getRoom(client.roomNumber)
-    const isHost = room?.host_viewer_id === client.viewerId
+    const isHost = !!client.participant
+        && sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)
     if (isHost) {
         sessionManager.broadcastToRoom(client.roomNumber, [1, [6, "multibattle_room_dismissed"]])
     }
-    const set = (sessionManager as any).roomClients?.get?.(client.roomNumber) as Set<string> | undefined
-    if (set) {
-        const clientsMap = (sessionManager as any).clients as Map<string, SessionClient> | undefined
-        if (clientsMap) {
-            for (const addr of set) {
-                const c = clientsMap.get(addr)
-                if (c && c !== client && !c.isBattle) {
-                    c.mates = c.mates.filter(m => m.viewerId !== client.viewerId)
-                }
-            }
+    for (const connectedClient of sessionManager.getClientsInRoom(client.roomNumber)) {
+        if (connectedClient !== client) {
+            connectedClient.mates = connectedClient.mates
+                .filter(mate => mate.viewerId !== client.viewerId)
         }
     }
     const hostClient = findHostClient(client.roomNumber)
@@ -434,14 +408,16 @@ function handleHeartbeat(socket: net.Socket, client: SessionClient, _data: any[]
 
 function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: any[]): void {
     const room = getRoom(client.roomNumber)
-    if (!room || room.host_viewer_id !== client.viewerId || !client.participant) return
+    if (!room || !client.participant
+        || !sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)) return
     if ((sessionManager as any).battleExpectedCount?.has?.(client.roomNumber)) return
 
     const realMembers = client.mates.filter(mate => !mate.comId)
-    const clientsByViewerId = new Map(sessionManager.getClientsInRoom(client.roomNumber)
-        .map(member => [member.viewerId, member]))
     sessionManager.setBattleParticipants(client.roomNumber, realMembers.flatMap(mate => {
-        const member = clientsByViewerId.get(Number(mate.viewerId))
+        const member = sessionManager.getUniqueRoomClientByViewerId(
+            Number(mate.viewerId),
+            client.roomNumber,
+        )
         if (!member?.participant) return []
         return [{
             connectionId: String(mate.connectionId ?? ""),
@@ -482,14 +458,8 @@ function handleBroadcast(_socket: net.Socket, client: SessionClient, data: any[]
 function handleSend(_socket: net.Socket, _client: SessionClient, data: any[]): void {
     const targetViewerId = data[1] as number
     const roomNumber = _client.roomNumber
-    const clientsMap = (sessionManager as any).clients as Map<string, SessionClient> | undefined
-    if (!clientsMap) return
-    for (const c of clientsMap.values()) {
-        if (c.viewerId === targetViewerId && c.roomNumber === roomNumber) {
-            sessionManager.sendJson(c.socket, data)
-            return
-        }
-    }
+    const target = sessionManager.getUniqueRoomClientByViewerId(targetViewerId, roomNumber)
+    if (target) sessionManager.sendJson(target.socket, data)
 }
 
 export function handleMessage(socket: net.Socket, data: unknown): void {

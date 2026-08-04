@@ -46,7 +46,7 @@ test("room handshake checks the lifecycle guard after admission consumption", as
     const socket = new FakeSocket()
     const room = createRoom(93, 193, 1, 1, 293, 0, 393)
     t.after(() => disbandRoom(room.room_number))
-    let accepting = true
+    let lifecycleChecks = 0
     const admission = {
         roomNumber: room.room_number,
         participant: { nodeSessionId: "embedded", viewerId: 93 },
@@ -73,15 +73,16 @@ test("room handshake checks the lifecycle guard after admission consumption", as
             questCategory: room.category,
             questId: room.quest_id,
         },
-        { generation: 7, isAccepting: () => accepting },
-        { admissionProvider: { consume: () => {
-            accepting = false
-            return admission
-        } } },
+        { generation: 7, isAccepting: () => ++lifecycleChecks === 1 },
+        { admissionProvider: { consume: () => admission } },
     )
     await handshake
 
-    assert.equal(sessionManager.getClient(93, room.room_number), undefined)
+    assert.equal(sessionManager.getUniqueRoomClientByViewerId(93, room.room_number), undefined)
+    assert.equal(sessionManager.isRoomHostParticipant(room.room_number, {
+        nodeSessionId: "embedded",
+        viewerId: 93,
+    }), false)
 })
 
 test("battle handshake refuses registration when its lifecycle generation is inactive", async () => {

@@ -209,7 +209,10 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             shareRoomOptions: room.share_room_options,
             hostMainCharacterId: room.host_main_character_id,
             isNpcMode: room.is_npc_mode,
-            hostOnline: sessionManager.isHostOnline(room.host_viewer_id, room.room_number),
+            hostOnline: sessionManager.isUniqueRoomViewerOnline(
+                room.host_viewer_id,
+                room.room_number,
+            ),
             host: Object.freeze(identity(room.host_viewer_id)),
             members: Object.freeze(room.member_viewer_ids.map(
                 viewerId => Object.freeze(identity(viewerId)),

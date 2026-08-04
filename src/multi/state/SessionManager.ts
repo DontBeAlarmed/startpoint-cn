@@ -61,10 +61,11 @@ export class SessionManager {
     private battleHostParticipants = new Map<string, ParticipantIdentity>()
     private battleSceneGeneration = new Map<string, number>()
     private finalizedBattleParticipantKeys = new Map<string, Set<string>>()
+    private roomHostParticipants = new Map<string, ParticipantIdentity>()
     private roomStates = new Map<string, RoomStateMachine>()
 
-    private addr(viewerId: number, roomNumber: string): string {
-        return `${viewerId}@${roomNumber}`
+    private roomClientKey(roomNumber: string, participant: ParticipantIdentity): string {
+        return JSON.stringify([roomNumber, participant.nodeSessionId, participant.viewerId])
     }
 
     createClient(socket: net.Socket, viewerId: number, roomNumber: string, connectionId: string): SessionClient {
@@ -84,12 +85,74 @@ export class SessionManager {
         }
     }
 
-    getClient(viewerId: number, roomNumber: string): SessionClient | undefined {
-        return this.clients.get(this.addr(viewerId, roomNumber))
+    getClientByParticipant(
+        roomNumber: string,
+        participant: ParticipantIdentity,
+    ): SessionClient | undefined {
+        return this.clients.get(this.roomClientKey(roomNumber, participant))
+    }
+
+    getUniqueRoomClientByViewerId(
+        viewerId: number,
+        roomNumber: string,
+    ): SessionClient | undefined {
+        const matches = this.getClientsInRoom(roomNumber)
+            .filter(client => client.viewerId === viewerId)
+        return matches.length === 1 ? matches[0] : undefined
+    }
+
+    getClientBySocket(socket: net.Socket): SessionClient | undefined {
+        for (const client of this.clients.values()) {
+            if (client.socket === socket) return client
+        }
+        return undefined
+    }
+
+    hasActiveRoomViewerConflict(
+        roomNumber: string,
+        participant: ParticipantIdentity,
+    ): boolean {
+        const identityKey = participantKey(participant.nodeSessionId, participant.viewerId)
+        return this.getClientsInRoom(roomNumber).some(client => (
+            client.viewerId === participant.viewerId
+            && (!client.participant || participantKey(
+                client.participant.nodeSessionId,
+                client.participant.viewerId,
+            ) !== identityKey)
+        ))
+    }
+
+    claimRoomHostParticipant(
+        roomNumber: string,
+        participant: ParticipantIdentity,
+    ): boolean {
+        const existing = this.roomHostParticipants.get(roomNumber)
+        if (existing) {
+            return participantKey(existing.nodeSessionId, existing.viewerId)
+                === participantKey(participant.nodeSessionId, participant.viewerId)
+        }
+        this.roomHostParticipants.set(roomNumber, Object.freeze({ ...participant }))
+        return true
+    }
+
+    isRoomHostParticipant(roomNumber: string, participant: ParticipantIdentity): boolean {
+        const host = this.roomHostParticipants.get(roomNumber)
+        return host !== undefined
+            && participantKey(host.nodeSessionId, host.viewerId)
+                === participantKey(participant.nodeSessionId, participant.viewerId)
+    }
+
+    getRoomHostClient(roomNumber: string): SessionClient | undefined {
+        const host = this.roomHostParticipants.get(roomNumber)
+        return host ? this.getClientByParticipant(roomNumber, host) : undefined
     }
 
     addClientToRoom(client: SessionClient): Result<void> {
-        const addr = this.addr(client.viewerId, client.roomNumber)
+        if (!client.participant) return { ok: false, error: "PARTICIPANT_REQUIRED" }
+        if (this.hasActiveRoomViewerConflict(client.roomNumber, client.participant)) {
+            return { ok: false, error: "VIEWER_ID_CONFLICT" }
+        }
+        const addr = this.roomClientKey(client.roomNumber, client.participant)
         this.clients.set(addr, client)
         let set = this.roomClients.get(client.roomNumber)
         if (!set) {
@@ -101,8 +164,6 @@ export class SessionManager {
     }
 
     removeClient(client: SessionClient): Result<void> {
-        const addr = this.addr(client.viewerId, client.roomNumber)
-
         if (client.isBattle) {
             const bSet = this.battleClients.get(client.roomNumber)
             if (bSet) {
@@ -129,6 +190,9 @@ export class SessionManager {
             return { ok: true, value: undefined }
         }
 
+        if (!client.participant) return { ok: true, value: undefined }
+        const addr = this.roomClientKey(client.roomNumber, client.participant)
+        if (this.clients.get(addr) !== client) return { ok: true, value: undefined }
         this.clients.delete(addr)
         const set = this.roomClients.get(client.roomNumber)
         if (set) {
@@ -180,14 +244,8 @@ export class SessionManager {
         return !!set && set.size > 0
     }
 
-    isHostOnline(hostViewerId: number, roomNumber: string): boolean {
-        const set = this.roomClients.get(roomNumber)
-        if (!set) return false
-        for (const addr of set) {
-            const c = this.clients.get(addr)
-            if (c && !c.isBattle && c.viewerId === hostViewerId) return true
-        }
-        return false
+    isUniqueRoomViewerOnline(viewerId: number, roomNumber: string): boolean {
+        return this.getUniqueRoomClientByViewerId(viewerId, roomNumber) !== undefined
     }
 
     addBattleClient(connectionId: string, client: SessionClient): void {
@@ -480,6 +538,7 @@ export class SessionManager {
 
     removeRoomState(roomNumber: string): void {
         this.roomStates.delete(roomNumber)
+        this.roomHostParticipants.delete(roomNumber)
         this.clearBattleExpectedCount(roomNumber)
     }
 

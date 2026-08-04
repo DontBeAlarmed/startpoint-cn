@@ -19,7 +19,7 @@ export function hasRoomClients(roomNumber: string): boolean {
 }
 
 export function isHostOnline(hostViewerId: number, roomNumber: string): boolean {
-    return sessionManager.isHostOnline(hostViewerId, roomNumber)
+    return sessionManager.isUniqueRoomViewerOnline(hostViewerId, roomNumber)
 }
 
 export function clearBattleExpectedCount(roomNumber: string): void {
