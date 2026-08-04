@@ -104,6 +104,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/cdn_patch_manifest.test.cjs",
             "tools/cdn_patch_overlay.test.cjs",
             "tools/cdn_patch_check.test.cjs",
+            "tools/admin_content_status.test.cjs",
             "tools/cdn_paths.test.cjs",
             "tools/cdn_planner.test.cjs",
             "tools/cdn_types.test.cjs",
@@ -333,6 +334,7 @@ const TEST_GROUPS = Object.freeze({
         execution: "parallel",
         tests: [
             "tests/admin-account-save-ui.test.js",
+            "tests/admin-cdn-status-source.test.js",
             "tests/admin-clairvoyance.test.js",
             "tests/admin-gameplay-settings-ui-source.test.js",
             "tests/admin-mail-rules.test.js",

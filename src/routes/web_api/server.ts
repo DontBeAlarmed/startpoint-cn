@@ -1,6 +1,4 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { existsSync, readdirSync, statSync } from "fs";
-import path from "path";
 import { getServerTime, getServerDate, setServerTime, getTimeOffset } from "../../utils";
 import { deleteAccountSync, getAccountPlayersSync, getAllAccountsSync } from "../../data/domains/account"
 import { deletePlayerSync, getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } from "../../data/domains/player"
@@ -8,8 +6,11 @@ import { getAllDeviceBindingsSync, updateDeviceBindingNameSync } from "../../dat
 import { getPlayerCharactersSync } from "../../data/domains/character"
 import { getActivePlayerId, setActivePlayerId, saveTimeOffset, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
 import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTemplate, getDefaultSaveMeta } from "../../data/defaultSave";
-import { detectCDNVersion, FULL_BASE, getEffectiveVersion } from "../../lib/version";
+import { getEffectiveVersion } from "../../lib/version";
 import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance";
+import { buildAdminContentStatus } from "../../lib/admin-content-status";
+import { parseAssetProviderConfig } from "../../content/cdn/asset-mode";
+import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import { wantsJson } from "./http";
 import {
     applyPlayerSaveTemplateSync,
@@ -22,51 +23,16 @@ interface TimeQuery {
     time: string | undefined
 }
 
-function countZipFiles(dir: string): { exists: boolean; count: number; latestMtime: string | null; totalBytes: number } {
-    if (!existsSync(dir)) return { exists: false, count: 0, latestMtime: null, totalBytes: 0 }
-    let count = 0
-    let totalBytes = 0
-    let latest = 0
-    const stack = [dir]
-    while (stack.length) {
-        const current = stack.pop()!
-        for (const name of readdirSync(current)) {
-            const fp = path.join(current, name)
-            const st = statSync(fp)
-            if (st.isDirectory()) {
-                stack.push(fp)
-                continue
-            }
-            if (!name.endsWith(".zip")) continue
-            count += 1
-            totalBytes += st.size
-            latest = Math.max(latest, st.mtimeMs)
-        }
-    }
-    return {
-        exists: true,
-        count,
-        latestMtime: latest ? new Date(latest).toISOString() : null,
-        totalBytes,
-    }
-}
-
-function getCdnBaseUrl(): string {
-    const cdnHost = process.env.CN_LISTEN_HOST || "localhost"
-    const cdnPort = process.env.CN_LISTEN_PORT || "8001"
-    const cdnDisplayHost = cdnHost === "0.0.0.0" ? "localhost" : cdnHost
-    return process.env.CDN_BASE_URL || `http://${cdnDisplayHost}:${cdnPort}/patch/cn`
-}
-
 const routes = async (fastify: FastifyInstance) => {
 
     fastify.get("/status", async (_request: FastifyRequest, reply: FastifyReply) => {
         const root = process.cwd()
         const cdnDir = process.env.CDN_DIR || ".cdn"
-        const cdnRoot = path.isAbsolute(cdnDir) ? path.join(cdnDir, "cn") : path.join(root, cdnDir, "cn")
-        const archiveSummary = countZipFiles(cdnRoot)
-        const detectedVersion = detectCDNVersion()
-        const effectiveVersion = getEffectiveVersion()
+        const cdnStatus = buildAdminContentStatus({
+            snapshot: getContentSnapshot(),
+            assetProvider: parseAssetProviderConfig({ projectRoot: root, env: process.env }),
+            configuredCdnDir: cdnDir,
+        })
 
         reply.status(200).send({
             server: {
@@ -78,49 +44,7 @@ const routes = async (fastify: FastifyInstance) => {
                 listenHost: process.env.CN_LISTEN_HOST || "localhost",
                 listenPort: process.env.CN_LISTEN_PORT || "8001",
             },
-            cdn: {
-                baseUrl: getCdnBaseUrl(),
-                baseline: {
-                    mode: "fixed-cn-final",
-                    source: "国服最终 CDN",
-                    fullVersion: FULL_BASE,
-                    cnFinalVersion: effectiveVersion,
-                    detectedArchiveVersion: detectedVersion,
-                    manifestVersion: effectiveVersion,
-                    pinned: true,
-                    dataScope: ["items", "characters", "events", "quests", "shops"],
-                },
-                extension: {
-                    mode: "reserved-patch-version-layer",
-                    status: "reserved",
-                    runtimeEnabled: false,
-                    effectiveVersionPreview: effectiveVersion,
-                    enabledPatchCount: 0,
-                    totalPatchCount: 0,
-                    activePatchArchiveCount: 0,
-                    note: "CN Catalog is authoritative; patch metadata is not loaded.",
-                },
-                storage: {
-                    configuredDir: cdnDir,
-                    directoryPresent: archiveSummary.exists,
-                    archiveCount: archiveSummary.count,
-                    archiveBytes: archiveSummary.totalBytes,
-                    latestArchiveMtime: archiveSummary.latestMtime,
-                },
-                // Backward-compatible flat fields for temporary admin scripts and older SPA builds.
-                configuredDir: cdnDir,
-                directoryPresent: archiveSummary.exists,
-                archiveCount: archiveSummary.count,
-                archiveBytes: archiveSummary.totalBytes,
-                latestArchiveMtime: archiveSummary.latestMtime,
-                fullVersion: FULL_BASE,
-                detectedVersion,
-                effectiveVersion,
-                manifestVersion: effectiveVersion,
-                enabledPatchCount: 0,
-                totalPatchCount: 0,
-                activePatchArchiveCount: 0,
-            },
+            cdn: cdnStatus,
         })
     })
 

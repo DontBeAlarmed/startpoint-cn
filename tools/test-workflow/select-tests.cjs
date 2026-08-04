@@ -31,6 +31,7 @@ const SOURCE_RULES = [
         pattern: /^src\/content\/cdn\/(?:catalog-builder|patch-graph|digest-cache|planner)\.ts$/,
         groups: ["quick:cdn"],
     },
+    { pattern: /^src\/lib\/admin-content-status\.ts$/, groups: ["quick:cdn", "admin"] },
     {
         pattern: /^src\/content\/(?:cdn\/entity-lists-directory|sync\/scanner)\.ts$/,
         groups: ["quick:cdn", "quick:content"],
