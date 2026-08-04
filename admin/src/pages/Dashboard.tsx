@@ -31,7 +31,7 @@ interface ServerStatus {
         listenPort: string
     }
     cdn: {
-        baseUrl: string
+        baseUrl: string | null
         baseline: {
             mode: string
             source: string
@@ -50,14 +50,22 @@ interface ServerStatus {
             enabledPatchCount: number
             totalPatchCount: number
             activePatchArchiveCount: number
+            versions: string[]
             note: string
         }
         storage: {
+            mode: "local" | "remote" | "client-owned"
             configuredDir: string
             directoryPresent: boolean
             archiveCount: number
             archiveBytes: number
             latestArchiveMtime: string | null
+        }
+        contentRelease: {
+            source: "bundled" | "release"
+            assetVersion: string
+            generatorVersion: number
+            releaseDigest: string | null
         }
         configuredDir: string
         directoryPresent: boolean
@@ -147,7 +155,7 @@ export default function Dashboard() {
         <AdminPage
             eyebrow="OPERATIONS"
             title="服务器总览"
-            description="查看服务端运行状态、CDN 固定基线和账号存档概况。时间控制已拆分到独立模块，为后续千里眼功能预留空间。"
+            description="查看服务端运行状态、当前内容快照和账号存档概况。"
             actions={
                 <Button
                     icon={<ReloadOutlined />}
@@ -193,24 +201,25 @@ export default function Dashboard() {
                         )}
                     </Card>
 
-                    <Card title="CDN 固定基线 / 扩展层">
+                    <Card title="CDN 基线 / 补丁 Overlay">
                         {statusError || !status ? (
                             <Alert type="error" showIcon message="CDN 信息加载失败" />
                         ) : (
                             <Space direction="vertical" className="admin-stack">
                                 <Alert
-                                    type="info"
+                                    type={status.cdn.extension.runtimeEnabled ? "success" : "info"}
                                     showIcon
-                                    message="当前版本策略：固定国服最终 CDN 基线"
-                                    description={`道具、角色、活动、任务和商店等基础数据现在都以国服最终 CDN ${status.cdn.baseline.cnFinalVersion} 为唯一基线；后台展示不会改变底层版本逻辑。`}
+                                    message={`当前 Content Snapshot：${status.cdn.extension.effectiveVersionPreview}`}
+                                    description={status.cdn.extension.note}
                                 />
                                 <div className="admin-metric-row">
                                     <Statistic title="国服最终基线" value={status.cdn.baseline.cnFinalVersion} />
-                                    <Statistic title="基础包版本" value={status.cdn.baseline.fullVersion} />
-                                    <Statistic title="版本策略" value={status.cdn.baseline.pinned ? "固定" : "可变"} />
+                                    <Statistic title="当前资源版本" value={status.cdn.extension.effectiveVersionPreview} />
+                                    <Statistic title="补丁版本" value={status.cdn.extension.enabledPatchCount} />
                                 </div>
                                 <Descriptions size="small" column={1}>
-                                    <Descriptions.Item label="CDN 地址">{status.cdn.baseUrl}</Descriptions.Item>
+                                    <Descriptions.Item label="资源模式">{status.cdn.storage.mode}</Descriptions.Item>
+                                    <Descriptions.Item label="CDN 地址">{status.cdn.baseUrl ?? "客户端自带"}</Descriptions.Item>
                                     <Descriptions.Item label="数据来源">{status.cdn.baseline.source}</Descriptions.Item>
                                     <Descriptions.Item label="覆盖范围">
                                         <Space wrap>
@@ -219,37 +228,36 @@ export default function Dashboard() {
                                             ))}
                                         </Space>
                                     </Descriptions.Item>
-                                    <Descriptions.Item label="归档检测版本">{status.cdn.baseline.detectedArchiveVersion}</Descriptions.Item>
-                                    <Descriptions.Item label="目录">
-                                        <Space wrap>
-                                            <code>{status.cdn.storage.configuredDir}/cn</code>
-                                            {status.cdn.storage.directoryPresent ? <Tag color="green">存在</Tag> : <Tag color="red">未找到</Tag>}
-                                        </Space>
-                                    </Descriptions.Item>
+                                    <Descriptions.Item label="完整包版本">{status.cdn.baseline.fullVersion}</Descriptions.Item>
                                     <Descriptions.Item label="归档">
                                         {status.cdn.storage.archiveCount} 个 ZIP / {formatBytes(status.cdn.storage.archiveBytes)}
                                     </Descriptions.Item>
-                                    <Descriptions.Item label="最新修改">
-                                        {status.cdn.storage.latestArchiveMtime ? new Date(status.cdn.storage.latestArchiveMtime).toLocaleString("zh-CN") : "无"}
+                                    <Descriptions.Item label="内容来源">
+                                        {status.cdn.contentRelease.source === "release" ? "Content Release" : "内置基线"}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Release">
+                                        <Typography.Text code>
+                                            {status.cdn.contentRelease.releaseDigest?.slice(0, 23) ?? "bundled"}
+                                        </Typography.Text>
                                     </Descriptions.Item>
                                 </Descriptions>
                                 <Divider style={{ margin: "4px 0" }} />
                                 <Space direction="vertical" size="small" className="admin-stack">
-                                    <Typography.Text strong>自制角色 / 活动补丁版本层</Typography.Text>
+                                    <Typography.Text strong>已加载补丁</Typography.Text>
                                     <Space wrap>
-                                        <Tag color={status.cdn.extension.runtimeEnabled ? "orange" : "default"}>
-                                            {status.cdn.extension.runtimeEnabled ? "Manifest 已启用" : "预留"}
+                                        <Tag color={status.cdn.extension.runtimeEnabled ? "green" : "default"}>
+                                            {status.cdn.extension.runtimeEnabled ? "Overlay 已启用" : "无补丁"}
                                         </Tag>
-                                        <Tag>补丁 {status.cdn.extension.enabledPatchCount}/{status.cdn.extension.totalPatchCount}</Tag>
-                                        <Tag>active {status.cdn.extension.activePatchArchiveCount}</Tag>
-                                        <Tag>预览版本 {status.cdn.extension.effectiveVersionPreview}</Tag>
+                                        <Tag>归档 {status.cdn.extension.activePatchArchiveCount}</Tag>
+                                        {status.cdn.extension.versions.map(version => (
+                                            <Tag key={version} color="blue">{version}</Tag>
+                                        ))}
                                     </Space>
-                                    <Alert
-                                        type="warning"
-                                        showIcon
-                                        message="后续接入点"
-                                        description={`该层为未来自制角色和活动补丁按新版本导入预留。功能补全前，它只作为状态模型和页面结构存在，不替代当前 ${status.cdn.baseline.cnFinalVersion} 固定基线。`}
-                                    />
+                                    {!status.cdn.extension.runtimeEnabled && (
+                                        <Typography.Text type="secondary">
+                                            当前固定 Content Snapshot 未包含补丁。
+                                        </Typography.Text>
+                                    )}
                                 </Space>
                             </Space>
                         )}

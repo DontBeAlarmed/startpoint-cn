@@ -140,6 +140,14 @@ normal 依次检查 current Release 是否存在、CDN `assetVersion`、全局 `
 npm run content:sync -- --check
 ```
 
+`content:sync -- --check` 面向运行状态判断，使用目标版本、补丁来源状态和 Registry 契约决定是否需要重建；它不会重新读取全部归档内容。需要在作者发布或服主安装后完整核对补丁 ZIP 摘要时，使用：
+
+```bash
+npm run cdn:patch:check
+```
+
+补丁检查会读取当前 `CDN_DIR/cn + CDN_DIR/patches`，完整校验 Overlay manifest 声明的 SHA-256，但不生成或激活 Release。正常受支持启动仍会在实际同步阶段执行同一套完整校验。
+
 强制重新读取和转换同版本内容：
 
 ```bash

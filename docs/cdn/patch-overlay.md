@@ -75,6 +75,30 @@ CDN_DIR/
 
 同一逻辑归档路径不得指向不同字节。Catalog、Content Release 和运行时快照只接受 manifest 声明的 inner ZIP；未知文件不进入 allowlist。
 
+### 作者工具与机器可读契约
+
+[`patch-manifest.schema.json`](./patch-manifest.schema.json) 是供 CDN 作者工具使用的 JSON Schema。作者工具负责编辑内容、生成 inner ZIP、分配版本并封装 manifest；服务端不接收作者工具私有 Catalog，不生成补丁版本，也不要求安装修改服务端源码的兼容补丁。
+
+作者工具的推荐输出流程为：
+
+```text
+生成三层 inner ZIP
+  -> 计算 bytes 与完整 SHA-256
+  -> 写入版本 staging 目录
+  -> 最后写 patch-manifest.json
+  -> 封装外层分发 ZIP
+```
+
+单次发布的一条版本边对应一个 `targetVersion` 目录。累计分享包包含多条版本边时，默认按每个 `toVersion` 拆成多个 Overlay 包；只有尚未下发给客户端的内容才适合先合并为一条版本边。已经下发的历史边不能静默重命名、覆盖或压缩，否则停留在中间版本的客户端会失去唯一升级路径。
+
+服务端仓库提供只读兼容性校验：
+
+```bash
+npm run cdn:patch:check
+```
+
+命令使用当前 `CDN_DIR` 的官方基线和 `patches/` 安装布局，执行目录、manifest、三层归档、版本图、大小和完整 SHA-256 校验，输出一行 JSON 摘要。它不会取得 Content Sync 锁、转换 orderedmap、写对象或激活 Content Release。作者工具可以在自己的临时 CDN 布局中调用同一命令作为发布门禁。
+
 ## 安装依赖与客户端升级图
 
 ### `baseVersion` 只表示内容依赖

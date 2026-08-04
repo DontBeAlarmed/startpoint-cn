@@ -17,3 +17,14 @@ test("server status uses the pinned content snapshot instead of placeholder patc
     assert.doesNotMatch(source, /enabledPatchCount:\s*0/)
     assert.doesNotMatch(source, /status:\s*["']reserved["']/)
 })
+
+test("dashboard renders active patch versions and content release facts", () => {
+    const source = fs.readFileSync(path.join(root, "admin/src/pages/Dashboard.tsx"), "utf8")
+
+    assert.match(source, /CDN 基线 \/ 补丁 Overlay/)
+    assert.match(source, /status\.cdn\.extension\.versions/)
+    assert.match(source, /status\.cdn\.contentRelease\.releaseDigest/)
+    assert.match(source, /当前固定 Content Snapshot 未包含补丁/)
+    assert.doesNotMatch(source, /后续接入点/)
+    assert.doesNotMatch(source, /未来自制角色和活动补丁/)
+})

@@ -65,6 +65,8 @@
 
 项目支持 `CDN_DIR/cn + CDN_DIR/patches/<version>` 多根 Overlay。运行时只接受版本目录内 `patch-manifest.json` 明确声明且通过完整校验的 inner ZIP；外层分发 ZIP、未知 ZIP和没有 manifest 的目录不会自动激活。manifest 一旦出现，目录版本、内容依赖、三层归档、字节数、SHA-256 或升级图不合法都会阻止受支持入口启动。完整的安装、版本、失败关闭和组件边界见 [`patch-overlay.md`](./patch-overlay.md)。
 
+CDN 作者工具可使用 [`patch-manifest.schema.json`](./patch-manifest.schema.json) 生成清单，并在完整本地 CDN 布局中运行 `npm run cdn:patch:check` 做只读发布前校验。该入口不生成补丁、不修改 CDN，也不激活 Content Release。
+
 框架支持合法的连续或跳号唯一链，但仓库不提供补丁包、配方或专用生成工具，也不为第三方补丁内容提供业务兼容保证。
 
 ## Range 客户端验收
