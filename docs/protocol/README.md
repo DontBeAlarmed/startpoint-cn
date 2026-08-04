@@ -13,6 +13,7 @@
 ## 多人联机
 
 - [多人联机协议](./multi-battle.md)
+- [可信局域网多人 Hub 架构](./trusted-multi-hub.md)
 - [超级猫头鹰多场景分析](./super-owl-multiscene.md)
 
 多人 TCP 使用 Typepacker 枚举数组和空字符分帧，与 HTTP MsgPack 管线不同。新增或修改协议字段前应同时检查反编译客户端、当前状态机和已有测试。
