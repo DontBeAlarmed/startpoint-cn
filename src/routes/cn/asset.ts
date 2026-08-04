@@ -1,3 +1,6 @@
+// iOS 资源/CDN 隔离补丁（DEVICE=1/ios 支持、ios_medium.csv、archive-ios-*、version_info 按实际路径计字节）
+// 由"灰"制作，基于 DontBeAlarmed/startpoint-cn@dev 提交 11d3bcf9 的 iOS 修复补丁包
+// （见补丁包内 iOS修复部署说明.txt）。
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import path from "node:path"
 import {
@@ -12,6 +15,13 @@ import {
     type AssetProviderConfig,
 } from "../../content/cdn/asset-mode"
 import { normalizeCdnBaseUrl, serializeCdnUpdatePlan } from "../../content/cdn/protocol"
+import {
+    buildIosCompatibleCatalog,
+    isIosAssetDevice,
+    isSupportedCnAssetDevice,
+    resolveIosEntityList,
+} from "../../content/cdn/ios-compat"
+import { resolveCnCdnRoot } from "../../content/paths"
 import type { ContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { generateDataHeaders } from "../../utils"
@@ -48,6 +58,7 @@ export interface CnAssetRouteOptions {
     readonly warn?: (details: AssetTargetMismatchWarning) => void
     readonly logError?: AssetRouteErrorLogger
     readonly resolveListenHost?: (listenHost: string) => string
+    readonly iosCdnRoot?: string
 }
 
 function headerValue(request: FastifyRequest, name: string): string | undefined {
@@ -170,8 +181,27 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
         env,
         resolveListenHost: options.resolveListenHost,
     })
+    let iosCatalogCache: {
+        readonly snapshot: ContentSnapshot
+        readonly cdnRoot: string
+        readonly catalog: ContentSnapshot["cdn"]
+    } | null = null
+    const getIosCatalog = (contentSnapshot: ContentSnapshot, provider: AssetProviderConfig) => {
+        const projectRoot = path.resolve(__dirname, "../../..")
+        const cdnRoot = options.iosCdnRoot
+            ?? (provider.mode === "local"
+                ? provider.cdnRoot
+                : resolveCnCdnRoot(env.CDN_DIR ?? ".cdn", projectRoot))
+        if (iosCatalogCache?.snapshot === contentSnapshot && iosCatalogCache.cdnRoot === cdnRoot) {
+            return iosCatalogCache
+        }
+        const catalog = buildIosCompatibleCatalog(contentSnapshot.cdn, cdnRoot)
+        iosCatalogCache = { snapshot: contentSnapshot, cdnRoot, catalog }
+        return iosCatalogCache
+    }
 
     fastify.post("/version_info", async (request, reply) => {
+        const device = headerValue(request, "device")?.toLowerCase()
         let provider: AssetProviderConfig
         try {
             provider = getProvider()
@@ -204,6 +234,32 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
         }
 
         try {
+            if (isIosAssetDevice(device)) {
+                const ios = getIosCatalog(contentSnapshot, provider)
+                const entityList = resolveIosEntityList(ios.catalog, ios.cdnRoot)
+                const normalizedBaseUrl = normalizeCdnBaseUrl(provider.baseUrl)
+                const entityDirectory = path.posix.dirname(entityList)
+                const entityBaseUrl = entityDirectory === "entities"
+                    ? `${normalizedBaseUrl}/${entityDirectory}/files/`
+                    : `${normalizedBaseUrl}/${entityDirectory}/`
+                const currentVersion = headerValue(request, "res_ver") ?? null
+                const plan = planCdnUpdate(ios.catalog, {
+                    currentVersion,
+                    targetVersion: ios.catalog.targetVersion,
+                    platform: "android",
+                    assetSizeKind: "fulfill",
+                    isInitial: currentVersion === null,
+                })
+                return reply.type("application/json").send({
+                    data_headers: generateDataHeaders(),
+                    data: {
+                        base_url: entityBaseUrl,
+                        files_list: `${normalizedBaseUrl}/${entityList}`,
+                        total_size: plan.downloadBytes,
+                        delayed_assets_size: 0,
+                    },
+                })
+            }
             return reply.type("application/json").send({
                 data_headers: generateDataHeaders(),
                 data: getCdnVersionInfo(provider.baseUrl, contentSnapshot),
@@ -215,7 +271,7 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
 
     fastify.post("/get_path", async (request, reply) => {
         const device = headerValue(request, "device")?.toLowerCase()
-        if (device !== undefined && device !== "2" && device !== "android") {
+        if (!isSupportedCnAssetDevice(device)) {
             return reply.status(400).type("application/json").send({
                 code: "UNSUPPORTED_PLATFORM",
                 message: `unsupported DEVICE header: ${device}`,
@@ -288,9 +344,12 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
                 else request.log.warn(warning, "ignoring client asset target that differs from pinned snapshot")
             }
 
-            const plan = planCdnUpdate(contentSnapshot.cdn, {
+            const catalog = isIosAssetDevice(device)
+                ? getIosCatalog(contentSnapshot, provider).catalog
+                : contentSnapshot.cdn
+            const plan = planCdnUpdate(catalog, {
                 currentVersion: plannerCurrentVersion,
-                targetVersion: contentSnapshot.cdn.targetVersion,
+                targetVersion: catalog.targetVersion,
                 platform: "android",
                 assetSizeKind: "fulfill",
                 isInitial: plannerCurrentVersion === null,
@@ -298,7 +357,7 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
             const data = serializeCdnUpdatePlan(plan, {
                 baseUrl: provider.baseUrl,
                 currentVersion: plannerCurrentVersion,
-                targetVersion: contentSnapshot.cdn.targetVersion,
+                targetVersion: catalog.targetVersion,
             })
             return reply.status(200).type("application/json").send({
                 data_headers: generateDataHeaders({ asset_update: true }),

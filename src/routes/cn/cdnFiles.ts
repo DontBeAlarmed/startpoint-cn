@@ -1,3 +1,6 @@
+// iOS archive-ios-full / archive-ios-diff ZIP 安全提供（保留路径与符号链接防护）
+// 由"灰"制作，基于 DontBeAlarmed/startpoint-cn@dev 提交 11d3bcf9 的 iOS 修复补丁包
+// （见补丁包内 iOS修复部署说明.txt）。
 import { constants, type Stats } from "node:fs"
 import { lstat, open, realpath, type FileHandle } from "node:fs/promises"
 import path from "node:path"
@@ -12,6 +15,7 @@ import {
 import type { ContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { parseHttpByteRange, type HttpByteRange } from "./httpRange"
+import { isIosArchiveRelativePath } from "../../content/cdn/ios-compat"
 
 export interface CdnFileSystem {
     realpath(filePath: string): Promise<string>
@@ -437,9 +441,8 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
             if (relativePath === null) return reply.status(404).send("Not Found")
             if (path.posix.extname(relativePath).toLowerCase() === ".zip") {
                 const location = zipAllowlist.get(relativePath)
-                return location === undefined
-                    ? reply.status(404).send("Not Found")
-                    : sendFile(
+                if (location !== undefined) {
+                    return sendFile(
                         request,
                         reply,
                         location.logicalRoot,
@@ -451,6 +454,22 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
                         location.expectedIdentity,
                         true,
                     )
+                }
+                if (isIosArchiveRelativePath(relativePath)) {
+                    return sendFile(
+                        request,
+                        reply,
+                        logicalRoot,
+                        physicalRoot,
+                        relativePath,
+                        fileSystem,
+                        observer,
+                        undefined,
+                        undefined,
+                        true,
+                    )
+                }
+                return reply.status(404).send("Not Found")
             }
             return sendFile(
                 request,

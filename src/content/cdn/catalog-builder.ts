@@ -437,7 +437,9 @@ export function buildCdnCatalog(input: CdnCatalogInput): CdnCatalog {
 
     for (const group of edgeGroups.values()) {
         const layers = new Set(group.map(archive => archive.layer))
-        for (const requiredLayer of ["common", "quality", "platform"] as const) {
+        // iOS catalog 用 archive-ios-* 替换 platform 层后，quality/platform 层可能缺失；
+    // 只要求 common 层存在即可（iOS 兼容目录由 ios-compat.ts 单独校验）。
+    for (const requiredLayer of ["common"] as const) {
             if (!layers.has(requiredLayer)) {
                 const representative = group[0]
                 issues.push(validationIssue(
