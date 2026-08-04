@@ -458,7 +458,7 @@ test("player serialization does not import the legacy asset route", () => {
     assert.equal(resolveSerializedAssetVersion(), "2.1.125")
 })
 
-test("CN admin status derives versions from the snapshot without patch metadata", () => {
+test("CN admin status derives runtime and patch facts from the frozen snapshot", () => {
     const statusSource = fs.readFileSync(
         path.join(projectRoot, "src/routes/web_api/server.ts"),
         "utf8",
@@ -470,8 +470,11 @@ test("CN admin status derives versions from the snapshot without patch metadata"
 
     assert.doesNotMatch(statusSource, /asset-patch|getPatchManifest/)
     assert.doesNotMatch(versionSource, /asset-patch|readFileSync/)
-    assert.match(statusSource, /enabledPatchCount:\s*0/)
-    assert.match(statusSource, /totalPatchCount:\s*0/)
+    assert.match(statusSource, /getContentSnapshot/)
+    assert.match(statusSource, /parseAssetProviderConfig/)
+    assert.match(statusSource, /buildAdminContentStatus/)
+    assert.doesNotMatch(statusSource, /enabledPatchCount:\s*0/)
+    assert.doesNotMatch(statusSource, /totalPatchCount:\s*0/)
 })
 
 test("legacy global asset metadata uses the external data volume", () => {
