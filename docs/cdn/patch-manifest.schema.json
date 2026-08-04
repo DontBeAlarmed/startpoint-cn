@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/DontBeAlarmed/startpoint-cn/blob/dev/docs/cdn/patch-manifest.schema.json",
+  "title": "startpoint-cn CDN Patch Overlay Manifest",
+  "type": "object",
+  "required": [
+    "schema",
+    "targetVersion",
+    "compatibleClient",
+    "archives"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "baseVersion": {
+      "$ref": "#/$defs/version"
+    },
+    "targetVersion": {
+      "$ref": "#/$defs/version"
+    },
+    "compatibleClient": {
+      "const": "CN 1.8.1"
+    },
+    "archives": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "relativePath",
+          "layer",
+          "order",
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "relativePath": {
+            "type": "string",
+            "pattern": "^archive-(common|medium|android)-diff/[^/]+\\.zip$"
+          },
+          "layer": {
+            "enum": [
+              "common",
+              "medium",
+              "android"
+            ]
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$"
+    }
+  }
+}

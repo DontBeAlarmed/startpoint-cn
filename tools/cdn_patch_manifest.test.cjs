@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const path = require("node:path")
 const test = require("node:test")
 
 require("ts-node/register/transpile-only")
@@ -101,4 +103,27 @@ test("rejects unsafe archive paths and invalid archive metadata with stable code
     assertCode("PATCH_ARCHIVE_SHA256_INVALID", () => parsePatchManifest(manifest({
         archives: [archive({ sha256: "A".repeat(64) })],
     })))
+})
+
+test("publishes a machine-readable schema matching the runtime manifest contract", () => {
+    const schemaPath = path.resolve(__dirname, "../docs/cdn/patch-manifest.schema.json")
+    const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"))
+
+    assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema")
+    assert.equal(schema.$id, "https://github.com/DontBeAlarmed/startpoint-cn/blob/dev/docs/cdn/patch-manifest.schema.json")
+    assert.deepEqual(schema.required, ["schema", "targetVersion", "compatibleClient", "archives"])
+    assert.equal(schema.properties.schema.const, 1)
+    assert.equal(schema.properties.compatibleClient.const, "CN 1.8.1")
+    assert.equal(schema.properties.baseVersion.$ref, "#/$defs/version")
+    assert.equal(schema.properties.targetVersion.$ref, "#/$defs/version")
+    assert.equal(schema.properties.archives.minItems, 1)
+    assert.equal(schema.properties.archives.items.additionalProperties, false)
+    assert.deepEqual(
+        schema.properties.archives.items.required,
+        ["relativePath", "layer", "order", "bytes", "sha256"],
+    )
+    assert.deepEqual(schema.properties.archives.items.properties.layer.enum, ["common", "medium", "android"])
+    assert.equal(schema.properties.archives.items.properties.order.minimum, 1)
+    assert.equal(schema.properties.archives.items.properties.bytes.minimum, 1)
+    assert.equal(schema.properties.archives.items.properties.sha256.pattern, "^[a-f0-9]{64}$")
 })

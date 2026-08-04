@@ -103,6 +103,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/cdn_archive_sources.test.cjs",
             "tools/cdn_patch_manifest.test.cjs",
             "tools/cdn_patch_overlay.test.cjs",
+            "tools/cdn_patch_check.test.cjs",
             "tools/cdn_paths.test.cjs",
             "tools/cdn_planner.test.cjs",
             "tools/cdn_types.test.cjs",
