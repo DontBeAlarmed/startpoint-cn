@@ -190,6 +190,7 @@ const TEST_GROUPS = Object.freeze({
         execution: "serial",
         timeoutMs: 180_000,
         tests: [
+            "tests/multi-hub-process-harness.test.js",
             "tests/multi-hub-process.test.js",
         ],
     },

@@ -135,11 +135,20 @@ class TcpPeer {
         this.waiters = []
         this.buffer = ""
         this.closed = false
+        this.terminalError = null
+        this.closedPromise = new Promise(resolve => {
+            this.resolveClosed = resolve
+        })
         socket.setEncoding("utf8")
         socket.on("data", chunk => this.onData(chunk))
+        socket.on("error", error => {
+            this.terminate(error)
+            if (!socket.destroyed) socket.destroy()
+        })
         socket.on("close", () => {
             this.closed = true
-            this.flushWaiters()
+            this.terminate(new Error(`${this.label} socket closed`))
+            this.resolveClosed()
         })
     }
 
@@ -165,20 +174,32 @@ class TcpPeer {
         }
     }
 
+    terminate(error) {
+        if (this.terminalError) return
+        this.terminalError = error
+        const waiters = this.waiters.splice(0)
+        for (const waiter of waiters) {
+            clearTimeout(waiter.timer)
+            waiter.reject(error)
+        }
+    }
+
     send(message) {
         this.socket.write(`${JSON.stringify(message)}\0`)
     }
 
     waitFor(predicate, timeoutMs = 5_000) {
+        if (this.terminalError) return Promise.reject(this.terminalError)
         const index = this.messages.findIndex(predicate)
         if (index >= 0) {
             this.messages.splice(index, 1)
             return Promise.resolve()
         }
         return new Promise((resolve, reject) => {
-            const waiter = { predicate, resolve, timer: null }
+            const waiter = { predicate, resolve, reject, timer: null }
             waiter.timer = setTimeout(() => {
-                this.waiters.splice(this.waiters.indexOf(waiter), 1)
+                const index = this.waiters.indexOf(waiter)
+                if (index >= 0) this.waiters.splice(index, 1)
                 reject(new Error(`timed out waiting for ${this.label}: ${JSON.stringify(this.messages)}`))
             }, timeoutMs)
             this.waiters.push(waiter)
@@ -186,7 +207,9 @@ class TcpPeer {
     }
 
     close() {
-        if (!this.closed) this.socket.destroy()
+        this.terminate(new Error(`${this.label} socket closed by cleanup`))
+        if (!this.closed && !this.socket.destroyed) this.socket.destroy()
+        return this.closedPromise
     }
 }
 
@@ -196,6 +219,7 @@ class MultiHubProcessHarness {
         this.runtimeRoot = path.join(this.root, "runtime")
         this.processes = []
         this.peers = []
+        this.cleanupPromise = null
     }
 
     dataDir(label) {
@@ -342,13 +366,25 @@ class MultiHubProcessHarness {
     }
 
     async cleanup() {
-        for (const peer of this.peers) peer.close()
-        const results = await Promise.allSettled(
+        if (!this.cleanupPromise) this.cleanupPromise = this.performCleanup()
+        return this.cleanupPromise
+    }
+
+    async performCleanup() {
+        const peerResults = await Promise.allSettled(this.peers.map(peer => peer.close()))
+        const processResults = await Promise.allSettled(
             [...this.processes].reverse().map(runtime => runtime.stop()),
         )
-        const failure = results.find(result => result.status === "rejected")
-        fs.rmSync(this.root, { recursive: true, force: true })
+        let removeFailure
+        try {
+            fs.rmSync(this.root, { recursive: true, force: true })
+        } catch (error) {
+            removeFailure = error
+        }
+        const failure = [...peerResults, ...processResults]
+            .find(result => result.status === "rejected")
         if (failure?.status === "rejected") throw failure.reason
+        if (removeFailure) throw removeFailure
     }
 }
 

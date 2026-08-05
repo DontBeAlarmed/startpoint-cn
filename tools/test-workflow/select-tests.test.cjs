@@ -344,8 +344,15 @@ test("registers the trusted multi-hub process suite as a bounded serial group", 
     assert.deepEqual(TEST_GROUPS["integration:multi-hub"], {
         execution: "serial",
         timeoutMs: 180_000,
-        tests: ["tests/multi-hub-process.test.js"],
+        tests: [
+            "tests/multi-hub-process-harness.test.js",
+            "tests/multi-hub-process.test.js",
+        ],
     })
+    assert.deepEqual(
+        selectTestGroups(["tests/multi-hub-process-harness.test.js"]),
+        ["integration:multi-hub"],
+    )
     assert.deepEqual(
         selectTestGroups(["tests/multi-hub-process.test.js"]),
         ["integration:multi-hub"],
