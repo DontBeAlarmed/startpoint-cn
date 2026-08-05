@@ -80,6 +80,11 @@ export class BattleFactStore {
             return this.toStatus(active, input.host)
         }
 
+        const capacityEvictions = this.getCapacityEvictions()
+        if (capacityEvictions === null) {
+            throw new Error("battle fact capacity is exhausted")
+        }
+
         const battleSessionId = this.createBattleSessionId() as BattleSessionId
         if (typeof battleSessionId !== "string"
             || battleSessionId.trim().length === 0
@@ -108,9 +113,11 @@ export class BattleFactStore {
             sequence: ++this.sequence,
             expiresAt: null,
         }
+        for (const retained of capacityEvictions) {
+            this.deleteRecord(retained.battleSessionId, retained)
+        }
         this.records.set(battleSessionId, record)
         this.activeBattleByRoom.set(input.roomNumber, battleSessionId)
-        this.prune()
         return this.toStatus(record, input.host)
     }
 
@@ -277,18 +284,27 @@ export class BattleFactStore {
     private prune(): void {
         const now = this.now()
         for (const [battleSessionId, record] of this.records) {
-            if (record.expiresAt !== null && record.expiresAt <= now) {
+            if (this.isRetained(record)
+                && record.expiresAt !== null
+                && record.expiresAt <= now) {
                 this.deleteRecord(battleSessionId, record)
             }
         }
-        while (this.records.size > this.maxRecords) {
-            let oldest: BattleFactRecord | null = null
-            for (const record of this.records.values()) {
-                if (oldest === null || record.sequence < oldest.sequence) oldest = record
-            }
-            if (oldest === null) break
-            this.deleteRecord(oldest.battleSessionId, oldest)
-        }
+    }
+
+    private getCapacityEvictions(): BattleFactRecord[] | null {
+        const required = this.records.size - this.maxRecords + 1
+        if (required <= 0) return []
+        const retained = [...this.records.values()]
+            .filter(record => this.isRetained(record))
+            .sort((left, right) => left.sequence - right.sequence)
+        return retained.length >= required ? retained.slice(0, required) : null
+    }
+
+    private isRetained(record: BattleFactRecord): boolean {
+        return record.finalizedViewerIds.size > 0
+            && record.expiresAt !== null
+            && this.activeBattleByRoom.get(record.roomNumber) !== record.battleSessionId
     }
 
     private deleteRecord(battleSessionId: BattleSessionId, record: BattleFactRecord): void {

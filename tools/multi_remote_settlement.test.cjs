@@ -195,6 +195,71 @@ test("Hub battle facts reject forged participants and bound retained records", (
     }), { ok: false, error: "ROOM_PERMISSION_DENIED" })
 })
 
+test("Hub battle facts preserve live records when capacity is exhausted", () => {
+    let now = 1_000
+    let sequence = 0
+    const store = new BattleFactStore({
+        now: () => now,
+        retentionMs: 10,
+        maxRecords: 2,
+        createBattleSessionId: () => `battle-${++sequence}`,
+    })
+    const active = store.startBattle({
+        roomNumber: "100001",
+        host,
+        participants: [host, guest],
+    })
+    const finalized = store.startBattle({
+        roomNumber: "100002",
+        host,
+        participants: [host, guest],
+    })
+    assert.equal(store.markFinalized({
+        participant: host,
+        roomNumber: "100002",
+        battleSessionId: finalized.battleSessionId,
+    }).ok, true)
+    now += 10
+
+    assert.equal(store.startBattle({
+        roomNumber: "100001",
+        host,
+        participants: [host, guest],
+    }).battleSessionId, active.battleSessionId, "repeated starts do not consume capacity")
+    assert.throws(() => store.startBattle({
+        roomNumber: "100003",
+        host,
+        participants: [host, guest],
+    }), /capacity/i)
+    assert.equal(sequence, 2, "capacity failure does not consume a battle session id")
+    assert.equal(store.getActiveBattleSessionId("100001"), active.battleSessionId)
+    assert.equal(store.getActiveBattleSessionId("100002"), finalized.battleSessionId)
+    assert.equal(store.getBattleStatus({
+        participant: host,
+        roomNumber: "100001",
+        battleSessionId: active.battleSessionId,
+    }).ok, true)
+    assert.equal(store.getBattleStatus({
+        participant: host,
+        roomNumber: "100002",
+        battleSessionId: finalized.battleSessionId,
+    }).ok, true)
+
+    store.releaseRoom("100002")
+    const replacement = store.startBattle({
+        roomNumber: "100003",
+        host,
+        participants: [host, guest],
+    })
+    assert.equal(replacement.battleSessionId, "battle-3")
+    assert.equal(store.getActiveBattleSessionId("100001"), active.battleSessionId)
+    assert.deepEqual(store.getBattleStatus({
+        participant: host,
+        roomNumber: "100002",
+        battleSessionId: finalized.battleSessionId,
+    }), { ok: false, error: "ROOM_NOT_FOUND" })
+})
+
 test("Hub coordinator exposes retained TCP completion facts without finalizing them", async t => {
     const { EmbeddedMultiCoordinator } = require("../src/multi/coordinator/embedded")
     const { addRoomMember, disbandRoom } = require("../src/multi/room/manager")
