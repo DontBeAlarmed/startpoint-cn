@@ -13,6 +13,7 @@ import type {
     PlayerSnapshot,
 } from "../snapshot/player-snapshot"
 import { isValidNetworkHost } from "../../runtime/network-host"
+import { isDiagnosticVersion } from "../../lib/diagnostic-version"
 import type { MultiHubControlStatus, MultiHubTcpEndpoint } from "./control-routes"
 
 type Validator = (value: unknown) => boolean
@@ -115,16 +116,8 @@ function isCompatibilityRejectionDifference(value: unknown): boolean {
         && keys.every(key => (
             key === "field" || key === "different" || key === "required" || key === "received"
         ))
-        && isSafeVersionValue(value.required)
-        && isSafeVersionValue(value.received)
-}
-
-function isSafeVersionValue(value: unknown): value is string {
-    return typeof value === "string"
-        && value.length <= 32
-        && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
-        && !/bearer|token|secret|session|credential/i.test(value)
-        && !/^[a-f0-9]{16,}$/i.test(value)
+        && isDiagnosticVersion(value.required)
+        && isDiagnosticVersion(value.received)
 }
 
 function isRoomStatus(value: unknown): value is RoomStatus {

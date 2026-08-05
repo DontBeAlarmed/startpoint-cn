@@ -22,6 +22,7 @@ import type {
     CompatibilityRejectionDifference,
     CompatibilityRejectionSummary,
 } from "../../lib/admin-multi-status"
+import { sanitizeDiagnosticVersion } from "../../lib/diagnostic-version"
 
 const COORDINATOR_ERRORS = new Set<CoordinatorErrorCode>([
     "INCOMPATIBLE_ROOM",
@@ -41,8 +42,6 @@ const COMPATIBILITY_FIELDS = new Set([
     "modeDigest",
 ])
 const VERSION_VALUE_FIELDS = new Set(["APP_VER", "RES_VER", "cdnTargetVersion"])
-const SENSITIVE_VERSION_PATTERN = /bearer|token|secret|session|credential/i
-const HASH_LIKE_VERSION_PATTERN = /^[a-f0-9]{16,}$/i
 
 export interface MultiHubTcpEndpoint {
     readonly host: string
@@ -157,8 +156,8 @@ function projectCompatibilityRejection(value: unknown): CompatibilityRejectionSu
             different: true,
         }
         if (VERSION_VALUE_FIELDS.has(candidate.field)) {
-            const required = safeVersionValue(candidate.required)
-            const received = safeVersionValue(candidate.received)
+            const required = sanitizeDiagnosticVersion(candidate.required)
+            const received = sanitizeDiagnosticVersion(candidate.received)
             if (required !== null && received !== null) {
                 difference.required = required
                 difference.received = received
@@ -186,16 +185,6 @@ function projectAuthorityDiagnostics(value: unknown): MultiHubAuthorityDiagnosti
             value.latestCompatibilityRejection,
         ),
     })
-}
-
-function safeVersionValue(value: unknown): string | null {
-    return typeof value === "string"
-        && value.length <= 32
-        && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
-        && !SENSITIVE_VERSION_PATTERN.test(value)
-        && !HASH_LIKE_VERSION_PATTERN.test(value)
-        ? value
-        : null
 }
 
 function isNonNegativeInteger(value: unknown): value is number {

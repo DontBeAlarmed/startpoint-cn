@@ -17,6 +17,7 @@ const { CredentialReloader } = require("../src/multi/hub/credential-reloader")
 const { HubClient } = require("../src/multi/hub/client")
 const { IdempotencyCache } = require("../src/multi/hub/idempotency")
 const { NodeSessionRegistry } = require("../src/multi/hub/node-sessions")
+const { isHubControlStatus } = require("../src/multi/hub/response-validator")
 const { buildMultiHubControlApp } = require("../src/multi/hub/server")
 const {
     addRoomMember,
@@ -773,8 +774,26 @@ test("control status selects diagnostic fields and drops provider extras", async
                     {
                         field: "APP_VER",
                         different: true,
-                        required: "a".repeat(32),
-                        received: "b".repeat(32),
+                        required: "sha1-deadbeefdeadbeef",
+                        received: "abcd-0123456789abcdef",
+                    },
+                    {
+                        field: "cdnTargetVersion",
+                        different: true,
+                        required: "deadbeefdeadbeefdeadbeefdeadbeef",
+                        received: path.join(privateHomePrefix, "version"),
+                    },
+                    {
+                        field: "APP_VER",
+                        different: true,
+                        required: "1.8.1 beta",
+                        received: "1.8.1\n",
+                    },
+                    {
+                        field: "RES_VER",
+                        different: true,
+                        required: `1.4.54-${"a".repeat(40)}`,
+                        received: "1.4.54\0",
                     },
                 ],
                 timestamp: "2026-08-06T00:00:00.000Z",
@@ -813,12 +832,56 @@ test("control status selects diagnostic fields and drops provider extras", async
                 },
                 { field: "contentDigest", different: true },
                 { field: "APP_VER", different: true },
+                { field: "cdnTargetVersion", different: true },
+                { field: "APP_VER", different: true },
+                { field: "RES_VER", different: true },
             ],
             timestamp: "2026-08-06T00:00:00.000Z",
         },
     })
     assert.equal(response.body.includes(privateHomePrefix), false)
-    assert.doesNotMatch(response.body, /token|sessionCredential|credentialId|credentialsPath|viewerId|rawBody|raw|stack|sha256|a{16}|b{16}/i)
+    assert.doesNotMatch(response.body, /token|sessionCredential|credentialId|credentialsPath|viewerId|rawBody|raw|stack|sha256|sha1|deadbeef|0123456789abcdef|a{16}|b{16}/i)
+})
+
+test("control status response validator allows only dotted numeric diagnostic versions", () => {
+    const status = difference => ({
+        activeNodeSessions: 1,
+        enabledCredentials: 1,
+        activeRooms: 1,
+        activeBattleFacts: 1,
+        finalizedBattleFacts: 1,
+        latestCompatibilityRejection: {
+            code: "INCOMPATIBLE_ROOM",
+            differences: [difference],
+            timestamp: "2026-08-06T00:00:00.000Z",
+        },
+    })
+    for (const value of ["1.8.1", "1.4.54", "2.1.125-rc.1", "2.1.125-rc-2"]) {
+        assert.equal(isHubControlStatus(status({
+            field: "APP_VER",
+            different: true,
+            required: value,
+            received: value,
+        })), true, value)
+    }
+    for (const value of [
+        "sha1-deadbeefdeadbeef",
+        "abcd-0123456789abcdef",
+        "deadbeefdeadbeefdeadbeefdeadbeef",
+        path.join(privateHomePrefix, "version"),
+        "1.8.1 beta",
+        "1.8.1\n",
+        "1.8.1\0",
+        `1.8.1-${"a".repeat(40)}`,
+        "",
+    ]) {
+        assert.equal(isHubControlStatus(status({
+            field: "APP_VER",
+            different: true,
+            required: value,
+            received: "1.8.1",
+        })), false, JSON.stringify(value))
+    }
 })
 
 test("status counting does not revalidate unrelated node credentials", () => {

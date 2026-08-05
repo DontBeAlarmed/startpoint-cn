@@ -1,12 +1,10 @@
 import type { CompatibilityDifference } from "../multi/compatibility"
 import type { MultiRuntimeStatus } from "../multi/runtime/status"
+import { sanitizeDiagnosticVersion } from "./diagnostic-version"
 
 const MAX_REJECTION_TTL_MS = 24 * 60 * 60 * 1000
 const DEFAULT_REJECTION_TTL_MS = 60 * 60 * 1000
 const MAX_DIFFERENCES = 6
-const MAX_DIAGNOSTIC_VALUE_LENGTH = 32
-const SENSITIVE_VALUE_PATTERN = /bearer|token|secret|session|credential/i
-const HASH_LIKE_VALUE_PATTERN = /^[a-f0-9]{16,}$/i
 const COMPATIBILITY_FIELDS = new Set<string>([
     "multiProtocolVersion",
     "APP_VER",
@@ -184,8 +182,8 @@ function sanitizeRejection(
             different: true,
         }
         if (VERSION_VALUE_FIELDS.has(field)) {
-            const safeRequired = diagnosticVersionValue(required)
-            const safeReceived = diagnosticVersionValue(received)
+            const safeRequired = sanitizeDiagnosticVersion(required)
+            const safeReceived = sanitizeDiagnosticVersion(received)
             if (safeRequired !== null && safeReceived !== null) {
                 difference.required = safeRequired
                 difference.received = safeReceived
@@ -198,16 +196,6 @@ function sanitizeRejection(
         differences: Object.freeze(differences),
         timestamp: parsedTimestamp.toISOString(),
     })
-}
-
-function diagnosticVersionValue(value: unknown): string | null {
-    return typeof value === "string"
-        && value.length <= MAX_DIAGNOSTIC_VALUE_LENGTH
-        && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
-        && !SENSITIVE_VALUE_PATTERN.test(value)
-        && !HASH_LIKE_VALUE_PATTERN.test(value)
-        ? value
-        : null
 }
 
 function sanitizeEndpoint(value: string | null): string | null {

@@ -201,18 +201,63 @@ test("compatibility difference values cannot smuggle paths or credential-shaped 
     assert.deepEqual(store.get().differences, [{ field: "RES_VER", different: true }])
 })
 
-test("version diagnostics never expose hash-like values", () => {
+test("admin diagnostics allow only dotted numeric version values", () => {
     const store = new CompatibilityRejectionStore()
     store.record({
         code: "INCOMPATIBLE_ROOM",
-        differences: [{
-            field: "APP_VER",
-            required: "a".repeat(32),
-            received: "b".repeat(32),
-        }],
+        differences: [
+            {
+                field: "APP_VER",
+                required: "sha1-deadbeefdeadbeef",
+                received: "abcd-0123456789abcdef",
+            },
+            {
+                field: "RES_VER",
+                required: "deadbeefdeadbeefdeadbeefdeadbeef",
+                received: privateHomePath,
+            },
+            {
+                field: "cdnTargetVersion",
+                required: "1.4.54 beta",
+                received: "1.4.54\n",
+            },
+            {
+                field: "APP_VER",
+                required: `1.8.1-${"a".repeat(40)}`,
+                received: "1.8.1\0",
+            },
+        ],
     })
 
-    assert.deepEqual(store.get().differences, [{ field: "APP_VER", different: true }])
+    assert.deepEqual(store.get().differences, [
+        { field: "APP_VER", different: true },
+        { field: "RES_VER", different: true },
+        { field: "cdnTargetVersion", different: true },
+        { field: "APP_VER", different: true },
+    ])
+
+    store.record({
+        code: "INCOMPATIBLE_ROOM",
+        differences: [
+            { field: "APP_VER", required: "1.8.1", received: "1.8.2" },
+            { field: "RES_VER", required: "1.4.54", received: "1.4.55" },
+            {
+                field: "cdnTargetVersion",
+                required: "2.1.125-rc.1",
+                received: "2.1.125-rc-2",
+            },
+        ],
+    })
+    assert.deepEqual(store.get().differences, [
+        { field: "APP_VER", different: true, required: "1.8.1", received: "1.8.2" },
+        { field: "RES_VER", different: true, required: "1.4.54", received: "1.4.55" },
+        {
+            field: "cdnTargetVersion",
+            different: true,
+            required: "2.1.125-rc.1",
+            received: "2.1.125-rc-2",
+        },
+    ])
 })
 
 test("embedded compatibility mismatch records only bounded differences", async t => {
