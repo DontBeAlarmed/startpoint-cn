@@ -4,9 +4,37 @@ import { getQuestFromCategorySync } from "../../lib/assets"
 import { generateDataHeaders } from "../../utils"
 import { serializeRoomStatusConnection } from "../room/serializer"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
+import type { CoordinatorResult } from "../coordinator/contracts"
+import type { RoomStatus } from "../coordinator/interface"
 
 function isPositiveSafeInteger(value: number): boolean {
     return Number.isSafeInteger(value) && value > 0
+}
+
+function checkLocalAvailability(
+    context: MultiHttpContext,
+    room: CoordinatorResult<RoomStatus>,
+): CoordinatorResult<RoomStatus> {
+    if (!room.ok) return room
+    return context.questAvailability.check(room.value.category, room.value.questId).available
+        ? room
+        : { ok: false, error: "QUEST_NOT_AVAILABLE" }
+}
+
+function unavailableConnection(roomNumber: string, raisingState: 7 | 9) {
+    return {
+        application_update_url: "",
+        category_id: 0,
+        host_entry_time: 0,
+        ip_address: "",
+        port: 0,
+        quest_id: 0,
+        raising_state: raisingState,
+        room_number: roomNumber,
+        room_sequence: 0,
+        share_room_options: 0,
+        is_pickup: null,
+    }
 }
 
 export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttpContext): void {
@@ -96,15 +124,20 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
         })
 
         const compatibility = context.snapshotProvider.getCompatibility(request.headers)
-        const room = compatibility.ok ? await context.coordinator.searchRoom({
+        const selected = compatibility.ok ? await context.coordinator.searchRoom({
             participant: context.snapshotProvider.getParticipant(viewerId),
             roomNumber: body.room_number,
             compatibility: compatibility.value,
         }) : compatibility
-        const status = room.ok
-            && context.questAvailability.check(room.value.category, room.value.questId).available
-            ? room.value
-            : null
+        const room = checkLocalAvailability(context, selected)
+        if (!room.ok && room.error !== "ROOM_NOT_FOUND") {
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({ viewer_id: viewerId, result_code: 4020 }),
+                "data": {},
+            })
+        }
+        const status = room.ok ? room.value : null
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -137,33 +170,24 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
             ? { accessToken: body.access_token || "" }
             : { roomNumber }
         const compatibility = context.snapshotProvider.getCompatibility(request.headers)
-        const room = compatibility.ok ? await context.coordinator.selectRoom({
+        const selected = compatibility.ok ? await context.coordinator.selectRoom({
             participant: context.snapshotProvider.getParticipant(viewerId),
             compatibility: compatibility.value,
             ...locator,
         }) : compatibility
-        if (!room.ok
-            || !context.questAvailability.check(room.value.category, room.value.questId).available) {
+        const room = checkLocalAvailability(context, selected)
+        if (!room.ok) {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-                "data": {
-                    application_update_url: "",
-                    category_id: 0,
-                    host_entry_time: 0,
-                    ip_address: "",
-                    port: 0,
-                    quest_id: 0,
-                    raising_state: 9,
-                    room_number: body.room_number || "",
-                    room_sequence: 0,
-                    share_room_options: 0,
-                    is_pickup: null
-                }
+                "data": unavailableConnection(
+                    body.room_number || "",
+                    room.error === "ROOM_NOT_FOUND" ? 9 : 7,
+                ),
             })
         }
 
-        const selectData = serializeRoomStatusConnection(room.value)
+        const selectData = serializeRoomStatusConnection(room.value, context.tcpEndpoint?.())
         if (viewerId === room.value.host.viewerId) {
             selectData.raising_state = 1
             console.log(`[MULTI] select_room: host override raising_state → 1`)

@@ -19,7 +19,10 @@ function stubModule(relativePath, exports) {
 
 stubModule("../src/utils", {
     getServerTime: () => 1_725_000_000,
-    generateDataHeaders: ({ viewer_id } = {}) => ({ viewer_id: viewer_id ?? 0 }),
+    generateDataHeaders: ({ viewer_id, result_code } = {}) => ({
+        viewer_id: viewer_id ?? 0,
+        result_code: result_code ?? 1,
+    }),
 })
 
 const players = new Map([
@@ -649,14 +652,14 @@ test("compatibility and local quest failures short-circuit room mutations", asyn
         url: "/search_room",
         payload: { viewer_id: 202, room_number: status.roomNumber, api_count: 3 },
     })
-    assert.equal(decode(search).data.room_exists, false)
+    assert.equal(decode(search).data_headers.result_code, 4020)
 
     const select = await fastify.inject({
         method: "POST",
         url: "/select_room",
         payload: { viewer_id: 202, room_number: status.roomNumber, api_count: 4 },
     })
-    assert.equal(decode(select).data.raising_state, 9)
+    assert.equal(decode(select).data.raising_state, 7)
 
     const prepare = await fastify.inject({
         method: "POST",
@@ -669,14 +672,15 @@ test("compatibility and local quest failures short-circuit room mutations", asyn
             api_count: 5,
         },
     })
-    assert.equal(decode(prepare).data.raising_state, 9)
+    assert.equal(decode(prepare).data_headers.result_code, 4507)
+    assert.equal("raising_state" in decode(prepare).data, false)
 
     const verify = await fastify.inject({
         method: "POST",
         url: "/verify_access_token",
         payload: { viewer_id: 202, access_token: status.accessToken, api_count: 6 },
     })
-    assert.deepEqual(decode(verify).data, { room_exists: false })
+    assert.equal(decode(verify).data_headers.result_code, 4020)
     assert.equal(prepareCalls, 0, "quest rejection must happen before prepareRoom")
     assert.equal(admissionCalls, 0, "quest rejection must not issue admission")
 })

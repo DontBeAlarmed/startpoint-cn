@@ -4,6 +4,8 @@ import { generateDataHeaders } from "../../utils";
 import { serializeRoomStatusConnection } from "../room/serializer";
 import { buildNpcMates } from "../npc/builder";
 import { isValidMultiViewerId, type MultiHttpContext } from "./context";
+import type { CoordinatorErrorCode, CoordinatorResult } from "../coordinator/contracts";
+import type { RoomStatus } from "../coordinator/interface";
 
 async function hasValidViewer(context: MultiHttpContext, viewerId: number): Promise<boolean> {
     return isValidMultiViewerId(viewerId)
@@ -12,6 +14,33 @@ async function hasValidViewer(context: MultiHttpContext, viewerId: number): Prom
 
 function forbidden(reply: FastifyReply): FastifyReply {
     return reply.status(403).send({ "error": "Forbidden", "message": "Room permission denied." });
+}
+
+function checkLocalAvailability(
+    context: MultiHttpContext,
+    room: CoordinatorResult<RoomStatus>,
+): CoordinatorResult<RoomStatus> {
+    if (!room.ok) return room;
+    return context.questAvailability.check(room.value.category, room.value.questId).available
+        ? room
+        : { ok: false, error: "QUEST_NOT_AVAILABLE" };
+}
+
+function prepareFailure(
+    reply: FastifyReply,
+    viewerId: number,
+    roomNumber: string,
+    error: CoordinatorErrorCode,
+): FastifyReply {
+    reply.header("content-type", "application/x-msgpack");
+    if (error === "ROOM_NOT_FOUND") return reply.status(200).send({
+        "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+        "data": unavailableRoomData(roomNumber, 9),
+    });
+    return reply.status(200).send({
+        "data_headers": generateDataHeaders({ viewer_id: viewerId, result_code: 4507 }),
+        "data": {},
+    });
 }
 
 export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpContext): void {
@@ -36,36 +65,18 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             : { roomNumber };
         const compatibility = context.snapshotProvider.getCompatibility(request.headers);
         if (!compatibility.ok) {
-            reply.header("content-type", "application/x-msgpack");
-            return reply.status(200).send({
-                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-                "data": unavailableRoomData(body.room_number || ""),
-            });
+            return prepareFailure(reply, viewerId, body.room_number || "", compatibility.error);
         }
         const coordinatorInput = {
             participant: context.snapshotProvider.getParticipant(viewerId),
             compatibility: compatibility.value,
             ...locator,
         };
-        const selectedRoom = await context.coordinator.selectRoom(coordinatorInput);
+        const selected = await context.coordinator.selectRoom(coordinatorInput);
+        const selectedRoom = checkLocalAvailability(context, selected);
 
         if (!selectedRoom.ok) {
-            reply.header("content-type", "application/x-msgpack");
-            return reply.status(200).send({
-                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-                "data": unavailableRoomData(body.room_number || ""),
-            });
-        }
-
-        if (!context.questAvailability.check(
-            selectedRoom.value.category,
-            selectedRoom.value.questId,
-        ).available) {
-            reply.header("content-type", "application/x-msgpack");
-            return reply.status(200).send({
-                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-                "data": unavailableRoomData(body.room_number || ""),
-            });
+            return prepareFailure(reply, viewerId, body.room_number || "", selectedRoom.error);
         }
 
         if (selectedRoom.value.category !== body.category
@@ -77,11 +88,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
 
         const room = await context.coordinator.prepareRoom(coordinatorInput);
         if (!room.ok) {
-            reply.header("content-type", "application/x-msgpack");
-            return reply.status(200).send({
-                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-                "data": unavailableRoomData(body.room_number || ""),
-            });
+            return prepareFailure(reply, viewerId, body.room_number || "", room.error);
         }
 
         const preparedAdmission = await context.snapshotProvider.prepareAdmission(viewerId)
@@ -90,19 +97,17 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                 "error": "Bad Request", "message": "Unable to snapshot player."
             })
         }
-        const issued = context.admissionIssuer.issue({
+        const issued = await context.admissionIssuer.issue({
             roomNumber: room.value.roomNumber,
             participant: coordinatorInput.participant,
             snapshot: preparedAdmission.snapshot,
             expiresAt: context.now() + context.admissionTtlMs,
         })
         if (!issued.ok) {
-            return reply.status(409).send({
-                "error": issued.error, "message": "Room admission conflict."
-            })
+            return prepareFailure(reply, viewerId, room.value.roomNumber, issued.error)
         }
 
-        const data = serializeRoomStatusConnection(room.value);
+        const data = serializeRoomStatusConnection(room.value, context.tcpEndpoint?.());
         if (viewerId === room.value.host.viewerId) {
             data.raising_state = 1
         } else if (!room.value.hostOnline) {
@@ -179,19 +184,12 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
                 "data": {
-                    application_update_url: "",
-                    category_id: 0,
-                    host_entry_time: 0,
-                    ip_address: "",
-                    port: 0,
-                    quest_id: 0,
-                    raising_state: 9,
-                    room_number: body.room_number,
-                    room_sequence: 0,
-                    share_room_options: 0,
-                    is_pickup: null,
+                    ...unavailableRoomData(
+                        body.room_number,
+                        room.error === "ROOM_NOT_FOUND" ? 9 : 13,
+                    ),
                     is_same_room: true,
-                }
+                },
             });
         }
 
@@ -216,7 +214,10 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             });
         }
 
-        const data = { ...serializeRoomStatusConnection(room.value), is_same_room: true };
+        const data = {
+            ...serializeRoomStatusConnection(room.value, context.tcpEndpoint?.()),
+            is_same_room: true,
+        };
         if (viewerId === room.value.host.viewerId) {
             data.raising_state = 1
         } else if (!room.value.hostOnline) {
@@ -283,7 +284,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
     });
 }
 
-function unavailableRoomData(roomNumber: string): Record<string, unknown> {
+function unavailableRoomData(roomNumber: string, raisingState: number): Record<string, unknown> {
     return {
         application_update_url: "",
         category_id: 0,
@@ -291,7 +292,7 @@ function unavailableRoomData(roomNumber: string): Record<string, unknown> {
         ip_address: "",
         port: 0,
         quest_id: 0,
-        raising_state: 9,
+        raising_state: raisingState,
         room_number: roomNumber,
         room_sequence: 0,
         share_room_options: 0,

@@ -13,6 +13,7 @@ require("ts-node/register/transpile-only")
 const projectRoot = path.resolve(__dirname, "..")
 const { parseCnRuntimeConfig } = require("../src/runtime/config")
 const { createMultiRuntimeService } = require("../src/multi/runtime/service")
+const { RemoteMultiCoordinator } = require("../src/multi/coordinator/remote")
 const { MultiHubCredentialStore } = require("../src/multi/hub/credential-store")
 
 test("multiplayer defaults to the current embedded listener", () => {
@@ -203,7 +204,7 @@ test("multiplayer rejects unknown modes", () => {
     }))
 })
 
-function createServiceHarness() {
+function createServiceHarness(options = {}) {
     const calls = []
     let tcpListening = false
     let hubListening = false
@@ -230,6 +231,7 @@ function createServiceHarness() {
             hubListening = false
         },
         isHubListening: () => hubListening,
+        createRemoteCoordinator: options.createRemoteCoordinator,
     })
     return {
         calls,
@@ -470,8 +472,15 @@ test("host TCP bind failure keeps the control listener available and degrades mu
     await harness.service.stop()
 })
 
-test("client runtime is an explicit remote placeholder and never starts local listeners", async () => {
-    const harness = createServiceHarness()
+test("client runtime installs the lazy remote coordinator and never starts local listeners", async () => {
+    const remote = new RemoteMultiCoordinator({
+        read: async () => ({ ok: false, error: "HUB_UNAVAILABLE" }),
+        write: async () => ({ ok: false, error: "HUB_UNAVAILABLE" }),
+        getTcpEndpoint: () => null,
+        getNodeSessionId: () => null,
+        isAvailable: () => false,
+    })
+    const harness = createServiceHarness({ createRemoteCoordinator: () => remote })
     await harness.service.start({
         mode: "client",
         hubUrl: new URL("http://192.0.2.20:8004"),
@@ -479,6 +488,7 @@ test("client runtime is an explicit remote placeholder and never starts local li
     })
 
     assert.deepEqual(harness.calls, [])
+    assert.equal(harness.service.getHttpContext().coordinator, remote)
     assert.deepEqual(harness.service.getStatus(), {
         mode: "client",
         state: "degraded",

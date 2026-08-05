@@ -3,6 +3,18 @@ import { VerifyAccessTokenBody, MicroCommunityBody } from "../types"
 import { generateDataHeaders } from "../../utils"
 import { getPlayerRankLevel } from "../player-context"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
+import type { CoordinatorResult } from "../coordinator/contracts"
+import type { RoomStatus } from "../coordinator/interface"
+
+function checkLocalAvailability(
+    context: MultiHttpContext,
+    room: CoordinatorResult<RoomStatus>,
+): CoordinatorResult<RoomStatus> {
+    if (!room.ok) return room
+    return context.questAvailability.check(room.value.category, room.value.questId).available
+        ? room
+        : { ok: false, error: "QUEST_NOT_AVAILABLE" }
+}
 
 export function registerSocialRoutes(fastify: FastifyInstance, context: MultiHttpContext): void {
 
@@ -17,13 +29,20 @@ export function registerSocialRoutes(fastify: FastifyInstance, context: MultiHtt
         })
 
         const compatibility = context.snapshotProvider.getCompatibility(request.headers)
-        const room = compatibility.ok ? await context.coordinator.selectRoom({
+        const selected = compatibility.ok ? await context.coordinator.selectRoom({
             participant: context.snapshotProvider.getParticipant(viewerId),
             accessToken: body.access_token || "",
             compatibility: compatibility.value,
         }) : compatibility
-        if (!room.ok
-            || !context.questAvailability.check(room.value.category, room.value.questId).available) {
+        const room = checkLocalAvailability(context, selected)
+        if (!room.ok && room.error !== "ROOM_NOT_FOUND") {
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({ viewer_id: viewerId, result_code: 4020 }),
+                "data": {},
+            })
+        }
+        if (!room.ok) {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),

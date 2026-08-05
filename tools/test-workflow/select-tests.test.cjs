@@ -702,6 +702,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/multi_player_context.test.cjs",
         "tools/multi_player_snapshot.test.cjs",
         "tools/multi_quest_availability.test.cjs",
+        "tools/multi_remote_coordinator.test.cjs",
         "tools/multi_room_handshake_identity.test.cjs",
         "tools/multi_room_identity.test.cjs",
         "tools/npc_contributor_names.test.cjs",

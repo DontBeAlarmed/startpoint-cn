@@ -36,6 +36,7 @@ import {
     buildPlayerSnapshot,
     type PlayerSnapshot,
 } from "../snapshot/player-snapshot"
+import type { RoomConnectionEndpoint } from "../room/serializer"
 
 export const DEFAULT_ADMISSION_TTL_MS = 15_000
 
@@ -77,6 +78,7 @@ export interface MultiHttpContext {
     readonly admissionTtlMs: number
     readonly now: () => number
     readonly settlementVerifier: MultiSettlementVerifier
+    readonly tcpEndpoint?: () => RoomConnectionEndpoint | null
 }
 
 export interface EmbeddedMultiHttpContextOptions {

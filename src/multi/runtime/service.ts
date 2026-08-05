@@ -1,11 +1,12 @@
 import type { MultiRuntimeConfig, RuntimeNetworkServiceConfig } from "../../runtime/config"
 import { AdmissionRegistry } from "../admission/registry"
-import type { CoordinatorResult } from "../coordinator/contracts"
-import type { MultiCoordinator } from "../coordinator/interface"
+import type { NodeSessionId } from "../coordinator/contracts"
 import {
     EMBEDDED_NODE_SESSION_ID,
     EmbeddedMultiCoordinator,
 } from "../coordinator/embedded"
+import { RemoteMultiCoordinator } from "../coordinator/remote"
+import { HubClient } from "../hub/client"
 import { CredentialReloader } from "../hub/credential-reloader"
 import { IdempotencyCache } from "../hub/idempotency"
 import { NodeSessionRegistry } from "../hub/node-sessions"
@@ -29,6 +30,7 @@ import {
 } from "./status"
 
 type FatalHandler = (error: unknown) => void
+const REMOTE_PENDING_NODE_SESSION_ID = "remote-pending" as NodeSessionId
 
 export interface MultiRuntimeFatal {
     readonly mode: MultiRuntimeConfig["mode"]
@@ -56,6 +58,9 @@ export interface MultiRuntimeServiceDependencies {
     ) => Promise<unknown>
     readonly stopHub: () => Promise<unknown> | unknown
     readonly isHubListening: () => boolean
+    readonly createRemoteCoordinator?: (
+        config: Extract<MultiRuntimeConfig, { readonly mode: "client" }>,
+    ) => RemoteMultiCoordinator
 }
 
 export interface MultiRuntimeService {
@@ -69,32 +74,23 @@ function endpoint(host: string, port: number): string {
     return `${host.includes(":") ? `[${host}]` : host}:${port}`
 }
 
-function unavailableCoordinator(): MultiCoordinator {
-    const unavailable = async <T>(): Promise<CoordinatorResult<T>> => ({
-        ok: false,
-        error: "HUB_UNAVAILABLE",
-    })
-    return Object.freeze({
-        createRoom: unavailable,
-        searchRoom: unavailable,
-        prepareRoom: unavailable,
-        selectRoom: unavailable,
-        disbandRoom: unavailable,
-        startBattle: unavailable,
-        finalizeBattle: unavailable,
-        getBattleStatus: unavailable,
-        getRoomStatus: unavailable,
-    })
-}
-
-function createUnavailableHttpContext(): MultiHttpContext {
+function createRemoteHttpContext(coordinator: RemoteMultiCoordinator): MultiHttpContext {
     const embedded = createEmbeddedMultiHttpContext()
-    const coordinator = unavailableCoordinator()
     return Object.freeze({
         ...embedded,
         coordinator,
+        snapshotProvider: Object.freeze({
+            ...embedded.snapshotProvider,
+            getParticipant: (viewerId: number) => ({
+                nodeSessionId: coordinator.getNodeSessionId()
+                    ?? REMOTE_PENDING_NODE_SESSION_ID,
+                viewerId,
+            }),
+        }),
+        admissionIssuer: coordinator,
+        tcpEndpoint: () => coordinator.getTcpEndpoint(),
         settlementVerifier: Object.freeze({
-            getBattleStatus: coordinator.getBattleStatus,
+            getBattleStatus: coordinator.getBattleStatus.bind(coordinator),
         }),
     })
 }
@@ -134,6 +130,7 @@ class Service implements MultiRuntimeService {
     private startPromise: Promise<void> | null = null
     private stopPromise: Promise<void> | null = null
     private hostServices: MultiRuntimeHostServices | null = null
+    private remoteCoordinator: RemoteMultiCoordinator | null = null
 
     constructor(private readonly dependencies: MultiRuntimeServiceDependencies) {}
 
@@ -177,6 +174,7 @@ class Service implements MultiRuntimeService {
         if (generation !== this.generation) return
         this.config = config
         if (config.mode === "host") {
+            this.remoteCoordinator = null
             const admissionRegistry = new AdmissionRegistry()
             const coordinator = new EmbeddedMultiCoordinator({ allowRemoteParticipants: true })
             const credentialReloader = new CredentialReloader({
@@ -211,9 +209,17 @@ class Service implements MultiRuntimeService {
             })
         } else {
             this.hostServices = null
-            this.context = config.mode === "client"
-                ? createUnavailableHttpContext()
-                : createEmbeddedMultiHttpContext()
+            if (config.mode === "client") {
+                this.remoteCoordinator = this.dependencies.createRemoteCoordinator?.(config)
+                    ?? new RemoteMultiCoordinator(new HubClient({
+                        hubUrl: config.hubUrl,
+                        token: config.token,
+                    }))
+                this.context = createRemoteHttpContext(this.remoteCoordinator)
+            } else {
+                this.remoteCoordinator = null
+                this.context = createEmbeddedMultiHttpContext()
+            }
         }
         this.tcpFailed = false
         this.hubFailed = false
@@ -258,12 +264,17 @@ class Service implements MultiRuntimeService {
         const config = this.config
         if (config === null) return unavailableMultiRuntimeStatus()
         if (config.mode === "client") {
+            const coordinatorAvailable = this.remoteCoordinator?.isAvailable() === true
+            const tcp = this.remoteCoordinator?.getTcpEndpoint() ?? null
             return freezeMultiRuntimeStatus({
                 mode: config.mode,
-                state: "degraded",
-                coordinator: { kind: "remote", available: false },
-                hub: { available: false, endpoint: config.hubUrl.href },
-                tcp: { available: false, endpoint: null },
+                state: coordinatorAvailable && tcp !== null ? "ready" : "degraded",
+                coordinator: { kind: "remote", available: coordinatorAvailable },
+                hub: { available: coordinatorAvailable, endpoint: config.hubUrl.href },
+                tcp: {
+                    available: tcp !== null,
+                    endpoint: tcp === null ? null : endpoint(tcp.host, tcp.port),
+                },
             })
         }
 
@@ -356,6 +367,7 @@ class Service implements MultiRuntimeService {
             this.hostServices?.nodeSessions.stop()
             this.hostServices?.nodeSessions.clear()
             this.hostServices = null
+            this.remoteCoordinator = null
             this.config = null
             this.context = null
             this.tcpFailed = false

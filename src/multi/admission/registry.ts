@@ -1,4 +1,4 @@
-import type { ParticipantIdentity } from "../coordinator/contracts"
+import type { CoordinatorErrorCode, ParticipantIdentity } from "../coordinator/contracts"
 import type { PlayerSnapshot } from "../snapshot/player-snapshot"
 
 export interface RoomAdmission {
@@ -13,14 +13,14 @@ export interface AdmissionProvider {
 }
 
 export interface AdmissionIssuer {
-    issue(input: AdmissionIssueInput): AdmissionIssueResult
+    issue(input: AdmissionIssueInput): AdmissionIssueResult | Promise<AdmissionIssueResult>
 }
 
 export type AdmissionIssueInput = RoomAdmission
 
 export type AdmissionIssueResult =
     | { readonly ok: true, readonly value: RoomAdmission }
-    | { readonly ok: false, readonly error: "VIEWER_ID_CONFLICT" }
+    | { readonly ok: false, readonly error: CoordinatorErrorCode }
 
 export interface AdmissionRegistryOptions {
     readonly now?: () => number

@@ -60,6 +60,11 @@ export interface SerializedRoomConnection {
     is_pickup: boolean | null;
 }
 
+export interface RoomConnectionEndpoint {
+    readonly host: string
+    readonly port: number
+}
+
 export function serializeRoom(room: MultiRoom): SerializedRoom {
     const charId = Number(room.host_main_character_id) || 1;
     return {
@@ -99,8 +104,11 @@ export function serializeRoomConnection(room: MultiRoom): SerializedRoomConnecti
     })
 }
 
-export function serializeRoomStatusConnection(room: RoomStatus): SerializedRoomConnection {
-    return serializeRoomConnectionFields(room)
+export function serializeRoomStatusConnection(
+    room: RoomStatus,
+    endpoint?: RoomConnectionEndpoint | null,
+): SerializedRoomConnection {
+    return serializeRoomConnectionFields(room, endpoint)
 }
 
 function serializeRoomConnectionFields(room: {
@@ -111,9 +119,9 @@ function serializeRoomConnectionFields(room: {
     readonly roomNumber: string
     readonly roomSequence: number
     readonly shareRoomOptions: number
-}): SerializedRoomConnection {
-    const displayHost = getDisplayHost();
-    const sessionPort = parseInt(process.env.SESSION_PORT || "8003");
+}, endpoint?: RoomConnectionEndpoint | null): SerializedRoomConnection {
+    const displayHost = endpoint?.host ?? getDisplayHost();
+    const sessionPort = endpoint?.port ?? parseInt(process.env.SESSION_PORT || "8003");
     return {
         application_update_url: "",
         category_id: room.category,
