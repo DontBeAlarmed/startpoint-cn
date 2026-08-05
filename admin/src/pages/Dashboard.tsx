@@ -92,8 +92,9 @@ interface ServerStatus {
             code: "INCOMPATIBLE_ROOM"
             differences: Array<{
                 field: string
-                required: string | number
-                received: string | number
+                different: true
+                required?: string
+                received?: string
             }>
             timestamp: string
         } | null
@@ -285,15 +286,40 @@ export default function Dashboard() {
                                             <Typography.Text type="secondary">
                                                 {new Date(status.multiplayer.latestCompatibilityRejection.timestamp).toLocaleString("zh-CN")}
                                             </Typography.Text>
-                                            <Space wrap>
+                                            <div className="multi-compatibility-differences">
                                                 {status.multiplayer.latestCompatibilityRejection.differences.length === 0 ? (
                                                     <Tag>请求版本信息不完整</Tag>
-                                                ) : status.multiplayer.latestCompatibilityRejection.differences.map(difference => (
-                                                    <Tag key={difference.field} color="orange">
-                                                        {difference.field}: {difference.received} / 要求 {difference.required}
-                                                    </Tag>
+                                                ) : status.multiplayer.latestCompatibilityRejection.differences.map((difference, index) => (
+                                                    <div
+                                                        key={`${difference.field}-${index}`}
+                                                        className="multi-compatibility-difference"
+                                                    >
+                                                        <Tag color="orange">{difference.field}</Tag>
+                                                        <div className="multi-compatibility-values">
+                                                            {difference.required !== undefined
+                                                                && difference.received !== undefined ? (
+                                                                <>
+                                                                    <div className="multi-compatibility-value">
+                                                                        <Typography.Text type="secondary">期望</Typography.Text>
+                                                                        <Typography.Text code>{difference.required}</Typography.Text>
+                                                                    </div>
+                                                                    <div className="multi-compatibility-value">
+                                                                        <Typography.Text type="secondary">实际</Typography.Text>
+                                                                        <Typography.Text code>{difference.received}</Typography.Text>
+                                                                    </div>
+                                                                </>
+                                                            ) : (
+                                                                <Typography.Text type="secondary">
+                                                                    {difference.field === "contentDigest"
+                                                                        || difference.field === "modeDigest"
+                                                                        ? "摘要值已隐藏"
+                                                                        : "差异值未提供"}
+                                                                </Typography.Text>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 ))}
-                                            </Space>
+                                            </div>
                                         </Space>
                                     ) : (
                                         <Typography.Text type="secondary">暂无兼容性拒绝记录。</Typography.Text>

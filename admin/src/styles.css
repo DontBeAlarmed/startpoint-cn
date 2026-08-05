@@ -276,6 +276,41 @@ html[data-admin-theme="dark"] body {
   gap: 14px;
 }
 
+.multi-compatibility-differences {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.multi-compatibility-difference {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.multi-compatibility-values {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.multi-compatibility-value {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .admin-clairvoyance-panel {
   display: flex;
   flex-direction: column;
@@ -553,6 +588,10 @@ html[data-admin-theme="dark"] body {
 
   .admin-page-title {
     font-size: 21px !important;
+  }
+
+  .multi-compatibility-difference {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .admin-toolbar {

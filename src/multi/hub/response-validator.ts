@@ -33,6 +33,24 @@ const VOID_ROUTES = new Set([
     "/v1/multi/rooms/disband",
     "/v1/multi/battles/abort",
 ])
+const CONTROL_STATUS_FIELDS = new Set([
+    "activeNodeSessions",
+    "enabledCredentials",
+    "activeRooms",
+    "activeBattleFacts",
+    "finalizedBattleFacts",
+    "latestCompatibilityRejection",
+])
+const REJECTION_FIELDS = new Set(["code", "differences", "timestamp"])
+const COMPATIBILITY_FIELDS = new Set([
+    "multiProtocolVersion",
+    "APP_VER",
+    "RES_VER",
+    "cdnTargetVersion",
+    "contentDigest",
+    "modeDigest",
+])
+const VERSION_VALUE_FIELDS = new Set(["APP_VER", "RES_VER", "cdnTargetVersion"])
 
 export interface HubNodeSessionPayload {
     readonly nodeSessionId: NodeSessionId
@@ -60,7 +78,8 @@ export function isHubSuccessValue<T>(route: string, value: unknown): value is T 
 
 export function isHubControlStatus(value: unknown): value is MultiHubControlStatus {
     if (!isRecord(value)) return false
-    return isNonNegativeInteger(value.activeNodeSessions)
+    return hasOnlyKeys(value, CONTROL_STATUS_FIELDS)
+        && isNonNegativeInteger(value.activeNodeSessions)
         && isNonNegativeInteger(value.enabledCredentials)
         && isNonNegativeInteger(value.activeRooms)
         && isNonNegativeInteger(value.activeBattleFacts)
@@ -71,17 +90,41 @@ export function isHubControlStatus(value: unknown): value is MultiHubControlStat
 function isCompatibilityRejection(value: unknown): boolean {
     if (value === null) return true
     if (!isRecord(value)
+        || !hasOnlyKeys(value, REJECTION_FIELDS)
         || value.code !== "INCOMPATIBLE_ROOM"
         || !Array.isArray(value.differences)
         || value.differences.length > 6
         || typeof value.timestamp !== "string"
         || !Number.isFinite(new Date(value.timestamp).getTime())) return false
-    return value.differences.every(difference => (
-        isRecord(difference)
-        && typeof difference.field === "string"
-        && (typeof difference.required === "string" || isNonNegativeInteger(difference.required))
-        && (typeof difference.received === "string" || isNonNegativeInteger(difference.received))
-    ))
+    return value.differences.every(isCompatibilityRejectionDifference)
+}
+
+function isCompatibilityRejectionDifference(value: unknown): boolean {
+    if (!isRecord(value)
+        || typeof value.field !== "string"
+        || !COMPATIBILITY_FIELDS.has(value.field)
+        || value.different !== true) return false
+    const keys = Object.keys(value)
+    if (!VERSION_VALUE_FIELDS.has(value.field)) {
+        return keys.length === 2 && keys.every(key => key === "field" || key === "different")
+    }
+    if (keys.length === 2) {
+        return keys.every(key => key === "field" || key === "different")
+    }
+    return keys.length === 4
+        && keys.every(key => (
+            key === "field" || key === "different" || key === "required" || key === "received"
+        ))
+        && isSafeVersionValue(value.required)
+        && isSafeVersionValue(value.received)
+}
+
+function isSafeVersionValue(value: unknown): value is string {
+    return typeof value === "string"
+        && value.length <= 32
+        && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+        && !/bearer|token|secret|session|credential/i.test(value)
+        && !/^[a-f0-9]{16,}$/i.test(value)
 }
 
 function isRoomStatus(value: unknown): value is RoomStatus {
@@ -225,6 +268,10 @@ function isNodeSessionId(value: unknown): value is NodeSessionId {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, allowed: ReadonlySet<string>): boolean {
+    return Object.keys(value).every(key => allowed.has(key))
 }
 
 function isArrayOf(value: unknown, validator: Validator): boolean {

@@ -23,7 +23,11 @@ import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { reconcileActiveMissionFacts } from "../../lib/mission/active-reconciliation";
 import { recordEventLoginMissionFactSync } from "../../lib/mission/event-entry-facts";
 import { setCnMsgpackPendingCommit } from "./msgpack";
-import type { ParticipantIdentity } from "../../multi/coordinator/contracts";
+import {
+    isValidBattleSessionId,
+    isValidMultiRoomNumber,
+    type ParticipantIdentity,
+} from "../../multi/coordinator/contracts";
 import type {
     MultiBattleRecoveryInspection,
     MultiSettlementIdentity,
@@ -142,12 +146,8 @@ function isValidStoredBattleIdentity(activeQuest: ActiveQuest): activeQuest is A
     roomNumber: string;
     battleSessionId: string;
 } {
-    return typeof activeQuest.roomNumber === "string"
-        && activeQuest.roomNumber.trim().length > 0
-        && activeQuest.roomNumber.length <= 64
-        && typeof activeQuest.battleSessionId === "string"
-        && activeQuest.battleSessionId.trim().length > 0
-        && activeQuest.battleSessionId.length <= 128;
+    return isValidMultiRoomNumber(activeQuest.roomNumber)
+        && isValidBattleSessionId(activeQuest.battleSessionId);
 }
 
 function fallbackParticipant(

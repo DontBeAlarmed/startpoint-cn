@@ -749,7 +749,38 @@ test("control status selects diagnostic fields and drops provider extras", async
             activeRooms: 1,
             activeBattleFacts: 2,
             finalizedBattleFacts: 3,
-            latestCompatibilityRejection: null,
+            latestCompatibilityRejection: {
+                code: "INCOMPATIBLE_ROOM",
+                differences: [
+                    {
+                        field: "RES_VER",
+                        different: true,
+                        required: "1.4.54",
+                        received: "1.4.55",
+                        token: "nested-token",
+                        sessionCredential: "nested-session",
+                        credentialId: "nested-credential",
+                        path: path.join(privateHomePrefix, "example", "nested.json"),
+                        raw: { body: "nested-body" },
+                        stack: "nested-stack",
+                    },
+                    {
+                        field: "contentDigest",
+                        different: true,
+                        required: `sha256:${"a".repeat(64)}`,
+                        received: `sha256:${"b".repeat(64)}`,
+                    },
+                    {
+                        field: "APP_VER",
+                        different: true,
+                        required: "a".repeat(32),
+                        received: "b".repeat(32),
+                    },
+                ],
+                timestamp: "2026-08-06T00:00:00.000Z",
+                token: "summary-token",
+                raw: { body: "summary-body" },
+            },
             token: "must-not-leak",
             credentialsPath: path.join(privateHomePrefix, "example", "private.json"),
             viewerId: 101,
@@ -771,10 +802,23 @@ test("control status selects diagnostic fields and drops provider extras", async
         activeRooms: 1,
         activeBattleFacts: 2,
         finalizedBattleFacts: 3,
-        latestCompatibilityRejection: null,
+        latestCompatibilityRejection: {
+            code: "INCOMPATIBLE_ROOM",
+            differences: [
+                {
+                    field: "RES_VER",
+                    different: true,
+                    required: "1.4.54",
+                    received: "1.4.55",
+                },
+                { field: "contentDigest", different: true },
+                { field: "APP_VER", different: true },
+            ],
+            timestamp: "2026-08-06T00:00:00.000Z",
+        },
     })
     assert.equal(response.body.includes(privateHomePrefix), false)
-    assert.doesNotMatch(response.body, /token|credentialsPath|viewerId|rawBody|stack/i)
+    assert.doesNotMatch(response.body, /token|sessionCredential|credentialId|credentialsPath|viewerId|rawBody|raw|stack|sha256|a{16}|b{16}/i)
 })
 
 test("status counting does not revalidate unrelated node credentials", () => {

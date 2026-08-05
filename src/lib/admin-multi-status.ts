@@ -6,13 +6,19 @@ const DEFAULT_REJECTION_TTL_MS = 60 * 60 * 1000
 const MAX_DIFFERENCES = 6
 const MAX_DIAGNOSTIC_VALUE_LENGTH = 32
 const SENSITIVE_VALUE_PATTERN = /bearer|token|secret|session|credential/i
-const COMPATIBILITY_FIELDS = new Set([
+const HASH_LIKE_VALUE_PATTERN = /^[a-f0-9]{16,}$/i
+const COMPATIBILITY_FIELDS = new Set<string>([
     "multiProtocolVersion",
     "APP_VER",
     "RES_VER",
     "cdnTargetVersion",
     "contentDigest",
     "modeDigest",
+])
+const VERSION_VALUE_FIELDS = new Set<string>([
+    "APP_VER",
+    "RES_VER",
+    "cdnTargetVersion",
 ])
 
 export interface AdminMultiAuthorityStatus {
@@ -23,8 +29,9 @@ export interface AdminMultiAuthorityStatus {
 
 export interface CompatibilityRejectionDifference {
     readonly field: string
-    readonly required: string | number
-    readonly received: string | number
+    readonly different: true
+    readonly required?: string
+    readonly received?: string
 }
 
 export interface CompatibilityRejectionSummary {
@@ -38,9 +45,14 @@ export interface CompatibilityRejectionInput {
     readonly differences?: readonly (
         CompatibilityDifference
         | CompatibilityRejectionDifference
-        | Record<string, unknown>
+        | {
+            readonly field?: unknown
+            readonly required?: unknown
+            readonly received?: unknown
+            readonly host?: unknown
+            readonly guest?: unknown
+        }
     )[]
-    readonly [key: string]: unknown
 }
 
 export interface AdminMultiStatus {
@@ -151,24 +163,35 @@ function sanitizeRejection(
     input: CompatibilityRejectionInput,
     timestamp: string,
 ): CompatibilityRejectionSummary | null {
-    if (input.code !== "INCOMPATIBLE_ROOM") return null
+    if (!isRecord(input) || input.code !== "INCOMPATIBLE_ROOM") return null
     const parsedTimestamp = new Date(timestamp)
     if (!Number.isFinite(parsedTimestamp.getTime())) return null
     const differences: CompatibilityRejectionDifference[] = []
     for (const candidate of input.differences ?? []) {
-        if (differences.length >= MAX_DIFFERENCES || !isRecord(candidate)) break
+        if (differences.length >= MAX_DIFFERENCES) break
+        if (!isRecord(candidate)) continue
         const field = candidate.field
         const required = candidate.required ?? candidate.host
         const received = candidate.received ?? candidate.guest
         if (typeof field !== "string" || !COMPATIBILITY_FIELDS.has(field)) continue
-        const safeRequired = diagnosticValue(field, required)
-        const safeReceived = diagnosticValue(field, received)
-        if (safeRequired === null || safeReceived === null) continue
-        differences.push(Object.freeze({
+        const difference: {
+            field: string
+            different: true
+            required?: string
+            received?: string
+        } = {
             field,
-            required: safeRequired,
-            received: safeReceived,
-        }))
+            different: true,
+        }
+        if (VERSION_VALUE_FIELDS.has(field)) {
+            const safeRequired = diagnosticVersionValue(required)
+            const safeReceived = diagnosticVersionValue(received)
+            if (safeRequired !== null && safeReceived !== null) {
+                difference.required = safeRequired
+                difference.received = safeReceived
+            }
+        }
+        differences.push(Object.freeze(difference))
     }
     return Object.freeze({
         code: "INCOMPATIBLE_ROOM",
@@ -177,22 +200,14 @@ function sanitizeRejection(
     })
 }
 
-function diagnosticValue(field: string, value: unknown): string | number {
-    if (field === "multiProtocolVersion") {
-        return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
-            ? value
-            : "[invalid]"
-    }
-    if (typeof value !== "string") return "[invalid]"
-    if (field === "contentDigest" || field === "modeDigest") {
-        return /^sha256:[a-f0-9]{64}$/.test(value)
-            ? `${value.slice(0, MAX_DIAGNOSTIC_VALUE_LENGTH - 3)}...`
-            : "[invalid]"
-    }
-    return /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value)
+function diagnosticVersionValue(value: unknown): string | null {
+    return typeof value === "string"
+        && value.length <= MAX_DIAGNOSTIC_VALUE_LENGTH
+        && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
         && !SENSITIVE_VALUE_PATTERN.test(value)
-        ? value.slice(0, MAX_DIAGNOSTIC_VALUE_LENGTH)
-        : "[invalid]"
+        && !HASH_LIKE_VALUE_PATTERN.test(value)
+        ? value
+        : null
 }
 
 function sanitizeEndpoint(value: string | null): string | null {

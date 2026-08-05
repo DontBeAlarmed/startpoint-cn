@@ -33,12 +33,17 @@ const {
     runAbortActiveQuestTransaction,
 } = require("../src/lib/quest/active-quest-service")
 const { MultiSettlementVerifier } = require("../src/multi/settlement/verifier")
+const {
+    isValidBattleSessionId,
+    isValidMultiRoomNumber,
+} = require("../src/multi/coordinator/contracts")
 const { RemoteMultiCoordinator } = require("../src/multi/coordinator/remote")
 const { HubClient } = require("../src/multi/hub/client")
 const cnLoadRoutes = require("../src/routes/cn/load").default
 
 const VIEWER_ID = 101
 const QUEST = Object.freeze({ category: 13, questId: 2001, ticketId: 500000 })
+const VALID_BATTLE_SESSION_ID = "123e4567-e89b-42d3-a456-426614174001"
 
 test.after(() => {
     closeDatabase()
@@ -59,7 +64,7 @@ function activeQuest(label, overrides = {}) {
         isAutoStartMode: false,
         isMulti: true,
         roomNumber: "123456",
-        battleSessionId: `battle-${label}`,
+        battleSessionId: VALID_BATTLE_SESSION_ID,
         entryItemId: QUEST.ticketId,
         entryItemCount: 2,
         eventId: null,
@@ -68,6 +73,26 @@ function activeQuest(label, overrides = {}) {
         ...overrides,
     }
 }
+
+test("stored identity validators match generated room numbers and UUID v4 battle sessions", () => {
+    assert.equal(typeof isValidMultiRoomNumber, "function")
+    assert.equal(typeof isValidBattleSessionId, "function")
+    for (const value of ["100000", "123456", "999998"]) {
+        assert.equal(isValidMultiRoomNumber(value), true, value)
+    }
+    for (const value of ["99999", "012345", "9999999", "abcdef", "12345\n"]) {
+        assert.equal(isValidMultiRoomNumber(value), false, value)
+    }
+    assert.equal(isValidBattleSessionId(VALID_BATTLE_SESSION_ID), true)
+    for (const value of [
+        "00000000-0000-1000-8000-000000000001",
+        VALID_BATTLE_SESSION_ID.toUpperCase(),
+        `${VALID_BATTLE_SESSION_ID}\n`,
+        "battle-session",
+    ]) {
+        assert.equal(isValidBattleSessionId(value), false, value)
+    }
+})
 
 async function openHome(label, quest) {
     closeDatabase()
@@ -238,28 +263,49 @@ test("concurrent missing load and abort refund a stored cost once", async t => {
     assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 5)
 })
 
-test("malformed stored remote identity fails closed with a bounded code", async t => {
-    const quest = activeQuest("malformed", { roomNumber: null, battleSessionId: "  " })
-    const home = await openHome("malformed", quest)
-    let verifierCalls = 0
-    const warnings = []
-    const originalWarn = console.warn
-    console.warn = (...args) => warnings.push(args.join(" "))
-    const app = await buildLoadApp({ inspect: async () => { verifierCalls++; return { state: "missing" } } })
-    t.after(async () => {
-        console.warn = originalWarn
-        delete activeQuests[home.playerId]
-        await app.close()
-    })
+test("malformed stored remote identities never reach Hub or mutate the save", async () => {
+    const absolutePath = path.join(path.sep, "private", "tmp", "multi-identity")
+    const cases = [
+        ["room-missing", { roomNumber: null }],
+        ["room-absolute", { roomNumber: absolutePath }],
+        ["room-control", { roomNumber: "12345\0" }],
+        ["room-overlong", { roomNumber: "1".repeat(65) }],
+        ["room-format", { roomNumber: "12345" }],
+        ["battle-absolute", { battleSessionId: absolutePath }],
+        ["battle-control", { battleSessionId: `${VALID_BATTLE_SESSION_ID}\0` }],
+        ["battle-overlong", { battleSessionId: "a".repeat(129) }],
+        ["battle-format", { battleSessionId: "battle-session" }],
+    ]
+    const fixedWarning = "[CN-LOAD] multi recovery skipped code=MULTI_RECOVERY_INVALID_IDENTITY"
 
-    const result = await load(app)
+    for (const [label, overrides] of cases) {
+        const quest = activeQuest(label, overrides)
+        const home = await openHome(`malformed-${label}`, quest)
+        let verifierCalls = 0
+        const warnings = []
+        const originalWarn = console.warn
+        console.warn = (...args) => warnings.push(args.join(" "))
+        const app = await buildLoadApp({
+            inspect: async () => {
+                verifierCalls++
+                return { state: "missing" }
+            },
+        })
+        try {
+            const result = await load(app)
 
-    assert.equal(result.response.statusCode, 200, result.response.body)
-    unfinished(result.payload, quest)
-    assert.equal(verifierCalls, 0)
-    assert.equal(getPlayerActiveQuestSync(home.playerId).playId, quest.playId)
-    assert.match(warnings.join("\n"), /MULTI_RECOVERY_INVALID_IDENTITY/)
-    assert.doesNotMatch(warnings.join("\n"), /\/Users\/|device|request|play-malformed|battle-malformed/i)
+            assert.equal(result.response.statusCode, 200, `${label}: ${result.response.body}`)
+            unfinished(result.payload, quest)
+            assert.equal(verifierCalls, 0, label)
+            assert.equal(getPlayerActiveQuestSync(home.playerId).playId, quest.playId, label)
+            assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 3, label)
+            assert.deepEqual(warnings, [fixedWarning], label)
+        } finally {
+            console.warn = originalWarn
+            delete activeQuests[home.playerId]
+            await app.close()
+        }
+    }
 })
 
 test("legacy multi quest without battle identity keeps local missing-room recovery", async t => {
@@ -324,7 +370,7 @@ test("401, network, timeout, and invalid JSON are unavailable, never missing", a
             nodeSessionId: "remote-pending",
             viewerId: VIEWER_ID,
             roomNumber: "123456",
-            battleSessionId: "battle-unavailable",
+            battleSessionId: VALID_BATTLE_SESSION_ID,
         }), { state: "unavailable", code: "HUB_UNAVAILABLE" }, name)
     }
 })

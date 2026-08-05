@@ -293,7 +293,7 @@ process.once("exit", () => {
 
 const productionQuest = Object.freeze({ category: 13, questId: 2001, ticketId: 500000 })
 const roomNumber = "123456"
-const battleSessionId = "shared-battle"
+const battleSessionId = "123e4567-e89b-42d3-a456-426614174002"
 
 function startPayload(viewerId, playId, overrides = {}) {
     return {

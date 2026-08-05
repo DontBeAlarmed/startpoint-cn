@@ -18,7 +18,10 @@ import {
     isValidIdempotencyKey,
 } from "./idempotency"
 import type { NodeSession, NodeSessionRegistry } from "./node-sessions"
-import type { CompatibilityRejectionSummary } from "../../lib/admin-multi-status"
+import type {
+    CompatibilityRejectionDifference,
+    CompatibilityRejectionSummary,
+} from "../../lib/admin-multi-status"
 
 const COORDINATOR_ERRORS = new Set<CoordinatorErrorCode>([
     "INCOMPATIBLE_ROOM",
@@ -28,6 +31,18 @@ const COORDINATOR_ERRORS = new Set<CoordinatorErrorCode>([
     "ROOM_NOT_FOUND",
     "HUB_UNAVAILABLE",
 ])
+const MAX_COMPATIBILITY_DIFFERENCES = 6
+const COMPATIBILITY_FIELDS = new Set([
+    "multiProtocolVersion",
+    "APP_VER",
+    "RES_VER",
+    "cdnTargetVersion",
+    "contentDigest",
+    "modeDigest",
+])
+const VERSION_VALUE_FIELDS = new Set(["APP_VER", "RES_VER", "cdnTargetVersion"])
+const SENSITIVE_VERSION_PATTERN = /bearer|token|secret|session|credential/i
+const HASH_LIKE_VERSION_PATTERN = /^[a-f0-9]{16,}$/i
 
 export interface MultiHubTcpEndpoint {
     readonly host: string
@@ -116,6 +131,79 @@ function normalizeResult(result: unknown): CachedJsonResponse {
         return response(200, { ok: false, code: value.error })
     }
     return response(503, { ok: false, code: "HUB_UNAVAILABLE" })
+}
+
+function projectCompatibilityRejection(value: unknown): CompatibilityRejectionSummary | null {
+    if (!isRecord(value)
+        || value.code !== "INCOMPATIBLE_ROOM"
+        || !Array.isArray(value.differences)
+        || typeof value.timestamp !== "string") return null
+    const timestamp = new Date(value.timestamp)
+    if (!Number.isFinite(timestamp.getTime())) return null
+
+    const differences: CompatibilityRejectionDifference[] = []
+    for (const candidate of value.differences) {
+        if (differences.length >= MAX_COMPATIBILITY_DIFFERENCES) break
+        if (!isRecord(candidate)
+            || typeof candidate.field !== "string"
+            || !COMPATIBILITY_FIELDS.has(candidate.field)) continue
+        const difference: {
+            field: string
+            different: true
+            required?: string
+            received?: string
+        } = {
+            field: candidate.field,
+            different: true,
+        }
+        if (VERSION_VALUE_FIELDS.has(candidate.field)) {
+            const required = safeVersionValue(candidate.required)
+            const received = safeVersionValue(candidate.received)
+            if (required !== null && received !== null) {
+                difference.required = required
+                difference.received = received
+            }
+        }
+        differences.push(Object.freeze(difference))
+    }
+    return Object.freeze({
+        code: "INCOMPATIBLE_ROOM",
+        differences: Object.freeze(differences),
+        timestamp: timestamp.toISOString(),
+    })
+}
+
+function projectAuthorityDiagnostics(value: unknown): MultiHubAuthorityDiagnostics | null {
+    if (!isRecord(value)
+        || !isNonNegativeInteger(value.activeRooms)
+        || !isNonNegativeInteger(value.activeBattleFacts)
+        || !isNonNegativeInteger(value.finalizedBattleFacts)) return null
+    return Object.freeze({
+        activeRooms: value.activeRooms,
+        activeBattleFacts: value.activeBattleFacts,
+        finalizedBattleFacts: value.finalizedBattleFacts,
+        latestCompatibilityRejection: projectCompatibilityRejection(
+            value.latestCompatibilityRejection,
+        ),
+    })
+}
+
+function safeVersionValue(value: unknown): string | null {
+    return typeof value === "string"
+        && value.length <= 32
+        && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+        && !SENSITIVE_VERSION_PATTERN.test(value)
+        && !HASH_LIKE_VERSION_PATTERN.test(value)
+        ? value
+        : null
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+    return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
 async function invoke(operation: ControlOperation, input: unknown, session: NodeSession) {
@@ -218,32 +306,21 @@ export function registerMultiHubControlRoutes(
         if (authenticate(request, options.nodeSessions) === null) {
             return send(reply, response(401, { ok: false, code: "UNAUTHORIZED" }))
         }
-        const diagnostics = options.getDiagnostics?.()
-        const safeDiagnostics = diagnostics === undefined ? {} : {
+        const diagnostics = projectAuthorityDiagnostics(options.getDiagnostics?.())
+        const value = diagnostics === null ? {
+            activeNodeSessions: options.nodeSessions.activeCount(),
+            enabledCredentials: options.credentialReloader.getStatus().enabled,
+        } : {
+            activeNodeSessions: options.nodeSessions.activeCount(),
+            enabledCredentials: options.credentialReloader.getStatus().enabled,
             activeRooms: diagnostics.activeRooms,
             activeBattleFacts: diagnostics.activeBattleFacts,
             finalizedBattleFacts: diagnostics.finalizedBattleFacts,
-            latestCompatibilityRejection: diagnostics.latestCompatibilityRejection === null
-                ? null
-                : {
-                    code: diagnostics.latestCompatibilityRejection.code,
-                    differences: diagnostics.latestCompatibilityRejection.differences.map(
-                        difference => ({
-                            field: difference.field,
-                            required: difference.required,
-                            received: difference.received,
-                        }),
-                    ),
-                    timestamp: diagnostics.latestCompatibilityRejection.timestamp,
-                },
+            latestCompatibilityRejection: diagnostics.latestCompatibilityRejection,
         }
         return send(reply, response(200, {
             ok: true,
-            value: {
-                activeNodeSessions: options.nodeSessions.activeCount(),
-                enabledCredentials: options.credentialReloader.getStatus().enabled,
-                ...safeDiagnostics,
-            },
+            value,
         }))
     })
 }

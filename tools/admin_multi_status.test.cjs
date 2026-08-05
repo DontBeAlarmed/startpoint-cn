@@ -124,7 +124,17 @@ test("diagnostics strip forbidden keys, absolute paths, credentials, and identit
         },
         latestCompatibilityRejection: {
             code: "INCOMPATIBLE_ROOM",
-            differences: [{ field: "RES_VER", required: "1.4.54", received: "1.4.55" }],
+            differences: [{
+                field: "RES_VER",
+                required: "1.4.54",
+                received: "1.4.55",
+                token: "nested-token",
+                sessionCredential: "nested-session",
+                credentialId: "nested-credential",
+                path: privateHomePath,
+                raw: { body: "nested-body" },
+                stack: "nested-stack",
+            }],
             timestamp: "2026-08-06T00:00:00.000Z",
             participant: { viewerId: 101 },
         },
@@ -136,7 +146,12 @@ test("diagnostics strip forbidden keys, absolute paths, credentials, and identit
     assert.doesNotMatch(serialized, /private\.json|top-secret|session-secret/)
     assert.deepEqual(result.latestCompatibilityRejection, {
         code: "INCOMPATIBLE_ROOM",
-        differences: [{ field: "RES_VER", required: "1.4.54", received: "1.4.55" }],
+        differences: [{
+            field: "RES_VER",
+            different: true,
+            required: "1.4.54",
+            received: "1.4.55",
+        }],
         timestamp: "2026-08-06T00:00:00.000Z",
     })
 })
@@ -158,9 +173,8 @@ test("compatibility rejection retention is capacity-one, clipped, and TTL bounde
     })
     const first = store.get()
     assert.equal(first.code, "INCOMPATIBLE_ROOM")
-    assert.equal(first.differences.length, 1)
-    assert.ok(first.differences[0].required.length <= 32)
-    assert.ok(first.differences[0].received.length <= 32)
+    assert.deepEqual(first.differences, [{ field: "contentDigest", different: true }])
+    assert.doesNotMatch(JSON.stringify(first), /sha256|a{16}|b{16}/i)
     assert.equal(JSON.stringify(first).includes(privateHomePrefix), false)
     assert.doesNotMatch(JSON.stringify(first), /must-not-survive|viewer/i)
 
@@ -184,6 +198,21 @@ test("compatibility difference values cannot smuggle paths or credential-shaped 
     const serialized = JSON.stringify(store.get())
     assert.equal(serialized.includes(privateHomePrefix), false)
     assert.doesNotMatch(serialized, /private\.json|Bearer|secret|session|token/i)
+    assert.deepEqual(store.get().differences, [{ field: "RES_VER", different: true }])
+})
+
+test("version diagnostics never expose hash-like values", () => {
+    const store = new CompatibilityRejectionStore()
+    store.record({
+        code: "INCOMPATIBLE_ROOM",
+        differences: [{
+            field: "APP_VER",
+            required: "a".repeat(32),
+            received: "b".repeat(32),
+        }],
+    })
+
+    assert.deepEqual(store.get().differences, [{ field: "APP_VER", different: true }])
 })
 
 test("embedded compatibility mismatch records only bounded differences", async t => {
@@ -222,6 +251,7 @@ test("embedded compatibility mismatch records only bounded differences", async t
     assert.deepEqual(searched, { ok: false, error: "INCOMPATIBLE_ROOM" })
     assert.deepEqual(store.get().differences, [{
         field: "RES_VER",
+        different: true,
         required: "1.4.54",
         received: "1.4.55",
     }])
@@ -336,9 +366,18 @@ test("existing admin server status endpoint exposes multiplayer diagnostics read
 
 test("Dashboard presents multiplayer diagnostics in Chinese without configuration controls", () => {
     const source = fs.readFileSync(path.join(repositoryRoot, "admin/src/pages/Dashboard.tsx"), "utf8")
+    const styles = fs.readFileSync(path.join(repositoryRoot, "admin/src/styles.css"), "utf8")
     assert.match(source, /多人联机状态/)
     assert.match(source, /控制面连通性/)
     assert.match(source, /活跃房间/)
     assert.match(source, /兼容性拒绝/)
+    assert.match(source, /期望/)
+    assert.match(source, /实际/)
+    assert.match(source, /摘要值已隐藏/)
+    assert.match(source, /multi-compatibility-difference/)
+    assert.doesNotMatch(source, /<Tag key=\{difference\.field\}/)
     assert.doesNotMatch(source, /MULTI_HUB_TOKEN|sessionCredential|编辑多人|保存多人|设置密钥/)
+    assert.match(styles, /\.multi-compatibility-difference[\s\S]*overflow-wrap:\s*anywhere/)
+    assert.match(styles, /\.multi-compatibility-difference[\s\S]*max-width:\s*100%/)
+    assert.match(styles, /\.multi-compatibility-difference[\s\S]*min-width:\s*0/)
 })
