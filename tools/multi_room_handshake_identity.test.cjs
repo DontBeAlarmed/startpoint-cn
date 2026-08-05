@@ -34,6 +34,7 @@ const {
     addRoomMember,
     createRoom,
     disbandRoom,
+    getRoom,
     isRoomMember,
     updateRoomState,
 } = require("../src/multi/room/manager")
@@ -47,6 +48,7 @@ class FakeSocket extends EventEmitter {
         super()
         this.writable = true
         this.ended = false
+        this.destroyed = false
         this.messages = []
         this.remoteAddress = "127.0.0.1"
         this.remotePort = 12345
@@ -61,6 +63,13 @@ class FakeSocket extends EventEmitter {
     end() {
         this.ended = true
         this.writable = false
+    }
+
+    destroy() {
+        this.destroyed = true
+        this.writable = false
+        this.emit("close")
+        return this
     }
 }
 
@@ -260,7 +269,11 @@ test("the same node participant can reconnect without an identity conflict", asy
 
     assert.equal(first.ended, false)
     assert.equal(reconnected.ended, false)
+    assert.equal(first.destroyed, true)
+    assert.equal(sessionManager.removeClientBySocket(first), false)
     assert.equal(sessionManager.getClientByParticipant(room.room_number, participant)?.socket, reconnected)
+    assert.equal(sessionManager.getUniqueRoomClientByViewerId(117, room.room_number)?.socket, reconnected)
+    assert.equal(getRoom(room.room_number)?.room_number, room.room_number)
 })
 
 test("remote participant completes room and battle handshakes without local player storage", async t => {

@@ -161,12 +161,42 @@ export class SessionManager {
         return host ? this.getClientByParticipant(roomNumber, host) : undefined
     }
 
+    private removeRoomClientIndexes(client: SessionClient): boolean {
+        if (!client.participant) return false
+        const addr = this.roomClientKey(client.roomNumber, client.participant)
+        if (this.clients.get(addr) !== client) return false
+        this.clients.delete(addr)
+        this.removeSocketIndex(client)
+        const set = this.roomClients.get(client.roomNumber)
+        if (set) {
+            set.delete(addr)
+            if (set.size === 0) this.roomClients.delete(client.roomNumber)
+        }
+        return true
+    }
+
+    private closeClientSocket(socket: net.Socket): void {
+        try {
+            if (typeof socket.destroy === "function") socket.destroy()
+            else socket.end()
+        } catch {
+            // Socket cleanup is best effort; its indexes are already removed.
+        }
+    }
+
+    private replaceRoomClient(previous: SessionClient): void {
+        this.removeRoomClientIndexes(previous)
+        this.closeClientSocket(previous.socket)
+    }
+
     addClientToRoom(client: SessionClient): Result<void> {
         if (!client.participant) return { ok: false, error: "PARTICIPANT_REQUIRED" }
         if (this.hasActiveRoomViewerConflict(client.roomNumber, client.participant)) {
             return { ok: false, error: "VIEWER_ID_CONFLICT" }
         }
         const addr = this.roomClientKey(client.roomNumber, client.participant)
+        const previous = this.clients.get(addr)
+        if (previous && previous !== client) this.replaceRoomClient(previous)
         this.clients.set(addr, client)
         let set = this.roomClients.get(client.roomNumber)
         if (!set) {
@@ -207,24 +237,13 @@ export class SessionManager {
         }
 
         if (!client.participant) return { ok: true, value: undefined }
-        const addr = this.roomClientKey(client.roomNumber, client.participant)
-        if (this.clients.get(addr) !== client) return { ok: true, value: undefined }
-        this.clients.delete(addr)
-        this.removeSocketIndex(client)
-        const set = this.roomClients.get(client.roomNumber)
-        if (set) {
-            set.delete(addr)
-            if (set.size === 0) {
-                this.roomClients.delete(client.roomNumber)
-            } else {
-                // OLD: if room still has clients, re-evaluate host auto-ready
-                if (!client.isBattle) {
-                    try {
-                        const lobby = require("../tcp/lobby")
-                        if (lobby.checkHostAutoReady) lobby.checkHostAutoReady(client.roomNumber)
-                    } catch (e) {}
-                }
-            }
+        if (!this.removeRoomClientIndexes(client)) return { ok: true, value: undefined }
+        if (this.hasRoomClients(client.roomNumber)) {
+            // OLD: if room still has clients, re-evaluate host auto-ready
+            try {
+                const lobby = require("../tcp/lobby")
+                if (lobby.checkHostAutoReady) lobby.checkHostAutoReady(client.roomNumber)
+            } catch (e) {}
         }
         return { ok: true, value: undefined }
     }
@@ -265,6 +284,23 @@ export class SessionManager {
         set.add(connectionId)
         this.cidToBattleClient.set(connectionId, client)
         this.socketToClient.set(client.socket, client)
+    }
+
+    closeRoomClients(roomNumber: string): number {
+        let removed = 0
+        for (const client of this.getClientsInRoom(roomNumber)) {
+            if (this.removeRoomClientIndexes(client)) {
+                removed++
+                this.closeClientSocket(client.socket)
+            }
+        }
+        for (const client of this.getBattleClientsInRoom(roomNumber)) {
+            if (this.cidToBattleClient.get(client.connectionId) !== client) continue
+            this.removeClient(client)
+            removed++
+            this.closeClientSocket(client.socket)
+        }
+        return removed
     }
 
     removeBattleClient(connectionId: string): void {

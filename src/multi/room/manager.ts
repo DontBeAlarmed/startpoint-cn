@@ -143,6 +143,10 @@ export function getRoom(roomNumber: string): MultiRoom | undefined {
     return room;
 }
 
+export function listActiveRooms(): readonly MultiRoom[] {
+    return Object.freeze([...rooms.values()]);
+}
+
 export function getRoomByToken(token: string): MultiRoom | undefined {
     for (const room of rooms.values()) {
         if (room.access_token === token) return room;
