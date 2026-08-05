@@ -1,4 +1,4 @@
-import { participantKey, type BattleSessionId, type NodeSessionId } from "../coordinator/contracts"
+import type { BattleSessionId, NodeSessionId } from "../coordinator/contracts"
 import type { MultiCoordinator } from "../coordinator/interface"
 
 export interface MultiSettlementIdentity {
@@ -35,19 +35,14 @@ export class MultiSettlementVerifier {
                 || result.value.battleSessionId !== input.battleSessionId) {
                 return { ok: false }
             }
-            const identityKey = participantKey(input.nodeSessionId, input.viewerId)
-            if (!result.value.participants.some(candidate => participantKey(
-                candidate.nodeSessionId,
-                candidate.viewerId,
-            ) === identityKey)) {
+            if (!result.value.participants.some(candidate => (
+                candidate.viewerId === input.viewerId
+            ))) {
                 return { ok: false }
             }
             return {
                 ok: true,
-                isHost: participantKey(
-                    result.value.host.nodeSessionId,
-                    result.value.host.viewerId,
-                ) === identityKey,
+                isHost: result.value.host.viewerId === input.viewerId,
             }
         } catch {
             return { ok: false }

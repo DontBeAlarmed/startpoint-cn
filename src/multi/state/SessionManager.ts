@@ -8,7 +8,11 @@ import { RoomStateMachine } from "./RoomStateMachine"
 import { ClientStateMachine } from "./ClientStateMachine"
 import { participantKey, type ParticipantIdentity } from "../coordinator/contracts"
 import type { CoordinatorResult } from "../coordinator/contracts"
-import type { BattleSessionInput, BattleStatus } from "../coordinator/interface"
+import type {
+    BattleSessionInput,
+    BattleStatus,
+    RoomParticipantInput,
+} from "../coordinator/interface"
 import { BattleFactStore } from "../settlement/facts"
 import type { PlayerPartySnapshot, PlayerSnapshot } from "../snapshot/player-snapshot"
 
@@ -579,6 +583,10 @@ export class SessionManager {
 
     authorizeBattleParticipant(input: BattleSessionInput): CoordinatorResult<BattleStatus> {
         return this.battleFacts.authorizeParticipant(input)
+    }
+
+    removeBattleFactParticipant(input: RoomParticipantInput): CoordinatorResult<void> {
+        return this.battleFacts.removeParticipant(input)
     }
 
     hasAnyFinalizedBattle(input: Pick<BattleSessionInput, "roomNumber" | "battleSessionId">): boolean {

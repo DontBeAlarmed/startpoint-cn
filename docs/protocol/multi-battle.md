@@ -12,7 +12,7 @@
 - battle TCP 的 SceneReady 屏障和普通 Broadcast/Send 中继；
 - 超级猫头鹰 BothBoss 的 LevelNext、第二代 SceneReady 和最终 Finalize；
 - 多人 active quest 写入 SQLite，并在 `/load` 中返回未完成关卡；
-- 房主结算后把现有房间恢复到可重赛状态；
+- 全部剩余真人 Finalize 后由 coordinator 权威释放当局，并把现有房间恢复到可重赛状态；
 - 房间级随机 access token、房主权限和断线成员恢复边界；
 - NPC 昵称从项目维护的昵称池分配，并在房间生命周期内保持稳定。
 
@@ -119,8 +119,8 @@ JSON.stringify(message) + "\0"
 | 路由 | 当前职责 |
 |---|---|
 | `start` | 校验玩家为房间成员且请求关卡与房间一致；每位真人分别写入 active quest，仅房主预扣体力和 Always 门票；事务提交后才把房间设置为状态 4 |
-| `finish` | 按 `play_id + category + quest_id` 校验多人 active quest，并拒绝负 Mana、非法分数/耗时、continue 次数或 Boost 余额不一致；结算玩家奖励和进度后清理 active quest，房主把房间恢复为状态 1 |
-| `abort` | 事务化取消 active quest；房主放弃时解散房间 |
+| `finish` | 由 Hub 授权 retained completion fact，再按 `play_id + category + quest_id` 校验多人 active quest，并拒绝负 Mana、非法分数/耗时、continue 次数或 Boost 余额不一致；各节点只结算自己的存档，全部剩余真人 Finalize 后由 coordinator 把房间恢复为状态 1 |
+| `abort` | 先在本地事务中退款并取消 active quest，提交后再 best-effort 通知 coordinator；房主放弃时解散房间，成员放弃时从权威当局参与者中移除 |
 | `play_continue` | 同时核对内存与 SQLite active quest；SQLite 提交成功后才更新内存 continue count。当前多人续关不扣星导石 |
 
 多人客户端会让每位真人分别请求 `start`，因此 active quest 是玩家级状态，不由房主记录替代成员记录。房主身份使用服务端房间中的 `host_player_id` 判断，不能由请求字段声明。成员 start 的入场成本固定为 0，但仍会保存自己的 `play_id`、房间号和关卡身份，以供 finish、abort、重连与多场景结束校验使用。
@@ -294,7 +294,7 @@ create_room
   -> state 1 (Ready)
   -> Ready / NPC 招募 / StartBattle
   -> state 4 (Battle)
-  -> host finish
+  -> 全部剩余真人 Finalize，coordinator release/reset
   -> state 1 (保留现有房间，允许重赛)
 ```
 
@@ -311,9 +311,10 @@ create_room
 
 ### 10.2 Abort 与主动解散
 
-- 房主 `abort` 通过 coordinator 解散房间，再取消自己的 active quest；
+- 房主 `abort` 先在自己的 SQLite 事务中退款并取消 active quest，提交后再通过 coordinator 解散房间；
 - `disband_room` 广播 Disbanded 并删除房间；
-- 非房主 abort 通过 coordinator 移除自身 battle 连接和屏障资格，再处理自己的 active quest，不删除房间或其他玩家的结算状态。
+- 非房主 abort 同样先提交自己的退款和 active quest 删除，再通过 coordinator 移除自身 battle 连接、屏障资格和 retained fact 授权，不删除房间或其他玩家的结算状态；
+- 本地事务失败时不调用 Hub，原请求可以重试；本地提交后 Hub cleanup 失败时仍返回本地成功并记录延迟清理告警，不回滚退款。重复 abort 因 active quest 已删除而失败，不会重复退款或再次调用 Hub。
 
 ### 10.3 连接断开
 

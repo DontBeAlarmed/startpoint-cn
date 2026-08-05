@@ -847,7 +847,7 @@ test("real RemoteCoordinator retains finalized facts across room reset and sessi
     }), { ok: false, error: "HUB_UNAVAILABLE" })
 })
 
-test("real RemoteCoordinator aborts through Hub room ownership", async t => {
+test("real RemoteCoordinator removes an aborted guest before host finalization", async t => {
     const target = fixture(t, { coordinatorFactory: createTrackedEmbeddedCoordinator })
     const hostClient = new HubClient({
         hubUrl: new URL("http://hub.example/"),
@@ -895,7 +895,21 @@ test("real RemoteCoordinator aborts through Hub room ownership", async t => {
         { connectionId: "remote-abort-host", participant: created.value.host },
         { connectionId: "remote-abort-guest", participant: guestParticipant },
     ], created.value.host)
+    const hostBattle = await hostRemote.startBattle({
+        participant: created.value.host,
+        roomNumber,
+    })
+    const guestBattle = await guestRemote.startBattle({
+        participant: guestParticipant,
+        roomNumber,
+    })
+    assert.equal(hostBattle.ok, true)
+    assert.equal(guestBattle.ok, true)
 
+    assert.deepEqual(await guestRemote.abortBattle({
+        participant: guestParticipant,
+        roomNumber,
+    }), { ok: true, value: undefined })
     assert.deepEqual(await guestRemote.abortBattle({
         participant: guestParticipant,
         roomNumber,
@@ -903,10 +917,50 @@ test("real RemoteCoordinator aborts through Hub room ownership", async t => {
     assert.notEqual(getRoom(roomNumber), undefined)
     assert.equal(sessionManager.getBattleParticipant(roomNumber, "remote-abort-guest"), undefined)
     assert.notEqual(sessionManager.getBattleParticipant(roomNumber, "remote-abort-host"), undefined)
+    assert.deepEqual(await guestRemote.getBattleStatus({
+        participant: guestParticipant,
+        roomNumber,
+        battleSessionId: guestBattle.value.battleSessionId,
+    }), { ok: false, error: "ROOM_PERMISSION_DENIED" })
 
-    assert.deepEqual(await hostRemote.abortBattle({
+    sessionManager.markParticipantFinalizedBattle(roomNumber, created.value.host)
+    const finalized = await hostRemote.finalizeBattle({
         participant: created.value.host,
         roomNumber,
-    }), { ok: true, value: undefined })
-    assert.equal(getRoom(roomNumber), undefined)
+        battleSessionId: hostBattle.value.battleSessionId,
+    })
+    assert.equal(finalized.ok, true)
+    assert.equal(finalized.value.finalized, true)
+    assert.equal(getRoom(roomNumber).raising_state, 1)
+    assert.equal(sessionManager.getActiveBattleSessionId(roomNumber), null)
+    assert.equal((await hostRemote.getBattleStatus({
+        participant: created.value.host,
+        roomNumber,
+        battleSessionId: hostBattle.value.battleSessionId,
+    })).ok, true)
+})
+
+test("real RemoteCoordinator treats repeated host abort as idempotent", async t => {
+    const target = fixture(t, { coordinatorFactory: createTrackedEmbeddedCoordinator })
+    const remote = new RemoteMultiCoordinator(new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        fetch: fetchThroughHub(target.app),
+        now: () => target.getNow(),
+    }))
+    const created = await remote.createRoom({
+        requestId: "remote-host-abort-idempotent",
+        participant: { nodeSessionId: "pending", viewerId: 505 },
+        partyId: 1,
+        category: 1,
+        questId: 501,
+        leaderCharacterId: 101,
+        compatibility,
+    })
+    assert.equal(created.ok, true)
+    const input = { participant: created.value.host, roomNumber: created.value.roomNumber }
+
+    assert.deepEqual(await remote.abortBattle(input), { ok: true, value: undefined })
+    assert.equal(getRoom(created.value.roomNumber), undefined)
+    assert.deepEqual(await remote.abortBattle(input), { ok: true, value: undefined })
 })

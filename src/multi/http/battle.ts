@@ -736,18 +736,6 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 "error": "Bad Request", "message": "Active quest does not match abort request."
             })
         }
-        const hubAbort = await context.coordinator.abortBattle({
-            participant,
-            roomNumber: storedQuest.roomNumber,
-        })
-        if (!hubAbort.ok) {
-            const forbidden = hubAbort.error === "ROOM_PERMISSION_DENIED"
-            return reply.status(forbidden ? 403 : 400).send({
-                "error": forbidden ? "Forbidden" : "Bad Request",
-                "message": "Battle abort is unavailable.",
-            })
-        }
-
         const abortResult = runAbortActiveQuestTransaction(playerId, {
             playId: body.play_id,
             questId: body.quest_id,
@@ -756,6 +744,24 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         if (!abortResult.cancelled) return reply.status(400).send({
             "error": "Bad Request", "message": "Active quest was already changed."
         })
+
+        try {
+            const hubAbort = await context.coordinator.abortBattle({
+                participant,
+                roomNumber: storedQuest.roomNumber,
+            })
+            if (!hubAbort.ok) {
+                console.warn(
+                    `[MULTI] abort: Hub cleanup deferred for room ${storedQuest.roomNumber}`
+                    + ` (${hubAbort.error})`,
+                )
+            }
+        } catch (error) {
+            console.warn(
+                `[MULTI] abort: Hub cleanup deferred for room ${storedQuest.roomNumber}`,
+                error,
+            )
+        }
 
         const headers = generateDataHeaders({ viewer_id: viewerId });
         reply.header("content-type", "application/x-msgpack");

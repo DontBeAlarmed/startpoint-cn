@@ -22,6 +22,18 @@ try {
 
 const { MultiSettlementVerifier } = settlement
 const { BattleFactStore } = facts
+const { AdmissionRegistry } = require("../src/multi/admission/registry")
+const { MULTI_PROTOCOL_VERSION } = require("../src/multi/coordinator/contracts")
+const { EmbeddedMultiCoordinator } = require("../src/multi/coordinator/embedded")
+const { RemoteMultiCoordinator } = require("../src/multi/coordinator/remote")
+const { MultiHubCredentialStore } = require("../src/multi/hub/credential-store")
+const { CredentialReloader } = require("../src/multi/hub/credential-reloader")
+const { HubClient } = require("../src/multi/hub/client")
+const { IdempotencyCache } = require("../src/multi/hub/idempotency")
+const { NodeSessionRegistry } = require("../src/multi/hub/node-sessions")
+const { buildMultiHubControlApp } = require("../src/multi/hub/server")
+const { disbandRoom, getRoom } = require("../src/multi/room/manager")
+const { sessionManager } = require("../src/multi/state/SessionManager")
 
 const host = Object.freeze({ nodeSessionId: "node-host", viewerId: 101 })
 const guest = Object.freeze({ nodeSessionId: "node-guest", viewerId: 202 })
@@ -58,6 +70,23 @@ test("settlement verifier queries all persistent identity fields and derives hos
         roomNumber: "123456",
         battleSessionId: "battle-1",
     }])
+})
+
+test("settlement verifier accepts a Hub-authorized rotated node session", async () => {
+    const rotatedHost = { nodeSessionId: "node-host-rotated", viewerId: host.viewerId }
+    const verifier = new MultiSettlementVerifier({
+        getBattleStatus: async () => ({
+            ok: true,
+            value: status({ host: rotatedHost, participants: [rotatedHost, guest] }),
+        }),
+    })
+
+    assert.deepEqual(await verifier.verify({
+        nodeSessionId: host.nodeSessionId,
+        viewerId: host.viewerId,
+        roomNumber: "123456",
+        battleSessionId: "battle-1",
+    }), { ok: true, isHost: true })
 })
 
 test("settlement verifier fails closed for unavailable or forged Hub facts", async () => {
@@ -283,7 +312,7 @@ function startPayload(viewerId, playId, overrides = {}) {
     }
 }
 
-function finishPayload(viewerId, playId) {
+function finishPayload(viewerId, playId, overrides = {}) {
     return {
         viewer_id: viewerId,
         api_count: 1,
@@ -308,6 +337,83 @@ function finishPayload(viewerId, playId) {
             },
         },
         mate_player_result: [],
+        ...overrides,
+    }
+}
+
+const compatibility = Object.freeze({
+    multiProtocolVersion: MULTI_PROTOCOL_VERSION,
+    APP_VER: "1.8.1",
+    RES_VER: "20240814",
+    cdnTargetVersion: "cn-20240814",
+    contentDigest: `sha256:${"a".repeat(64)}`,
+    modeDigest: `sha256:${"b".repeat(64)}`,
+})
+
+function fetchThroughHub(app) {
+    return async (url, init) => {
+        const response = await app.inject({
+            method: init.method,
+            url: new URL(url).pathname,
+            headers: init.headers,
+            payload: init.body,
+        })
+        return new Response(response.body, {
+            status: response.statusCode,
+            headers: response.headers,
+        })
+    }
+}
+
+function createRotatingHub(t) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-settlement-rotation-hub-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const credentialsPath = path.join(root, "credentials.json")
+    const credentialStore = new MultiHubCredentialStore({ credentialsPath })
+    const credential = credentialStore.create("rotation-node")
+    const reloader = new CredentialReloader({
+        credentialsPath,
+        intervalMs: 10,
+        warn: () => {},
+    })
+    assert.equal(reloader.reloadIfChanged(), true)
+    let now = 10_000
+    let generatedIndex = 0
+    const generated = [
+        "rotation-session-old", "a".repeat(43),
+        "rotation-session-new", "b".repeat(43),
+    ]
+    const coordinator = new EmbeddedMultiCoordinator({ allowRemoteParticipants: true })
+    const admissions = new AdmissionRegistry({ now: () => now })
+    const sessions = new NodeSessionRegistry({
+        now: () => now,
+        sessionTtlMs: 1_000,
+        generateId: () => generated[generatedIndex++],
+        isCredentialEnabled: credentialId => reloader.isCredentialEnabled(credentialId),
+        onInvalidated: nodeSessionId => {
+            admissions.removeByNodeSession(nodeSessionId)
+            coordinator.cleanupNodeSession(nodeSessionId)
+        },
+    })
+    const app = buildMultiHubControlApp({
+        coordinator,
+        credentialReloader: reloader,
+        nodeSessions: sessions,
+        admissionIssuer: admissions,
+        idempotency: new IdempotencyCache({ now: () => now }),
+        tcpEndpoint: { host: "hub.internal", port: 8003 },
+    })
+    t.after(() => app.close())
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: credential.token,
+        fetch: fetchThroughHub(app),
+        now: () => now,
+    })
+    return {
+        client,
+        coordinator: new RemoteMultiCoordinator(client),
+        setNow(value) { now = value },
     }
 }
 
@@ -355,6 +461,7 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
     givePlayerItemSync(playerId, productionQuest.ticketId, 1)
     const entryStamina = computeRealTimeStamina(getPlayerSync(playerId))
 
+    const effectiveRoomNumber = options.roomNumber ?? roomNumber
     const roomHost = isHost ? participant : host
     const roomMembers = [roomHost, participant].filter((member, index, all) => (
         all.findIndex(candidate => candidate.nodeSessionId === member.nodeSessionId
@@ -362,12 +469,42 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
     ))
     const battle = Object.freeze({
         battleSessionId,
-        roomNumber,
+        roomNumber: effectiveRoomNumber,
         host: roomHost,
         participants: roomMembers,
         finalized: false,
     })
     const coordinatorCalls = []
+    const coordinator = options.coordinator ?? {
+        getRoomStatus: async input => {
+            coordinatorCalls.push(structuredClone(input))
+            return {
+                ok: true,
+                value: {
+                    roomNumber: effectiveRoomNumber,
+                    host: roomHost,
+                    members: roomMembers,
+                    category: productionQuest.category,
+                    questId: productionQuest.questId,
+                },
+            }
+        },
+        startBattle: async input => {
+            coordinatorCalls.push(structuredClone(input))
+            if (options.startBattle) return options.startBattle(input, battle)
+            return { ok: true, value: battle }
+        },
+        finalizeBattle: async input => {
+            coordinatorCalls.push(structuredClone(input))
+            if (options.finalizeBattle) return options.finalizeBattle(input, battle)
+            return { ok: true, value: { ...battle, finalized: true } }
+        },
+        abortBattle: async input => {
+            coordinatorCalls.push(structuredClone(input))
+            if (options.abortBattle) return options.abortBattle(input)
+            return { ok: true, value: undefined }
+        },
+    }
     const context = {
         resolvePlayerContext: async viewerId => viewerId === participant.viewerId
             ? { playerId, player: getPlayerSync(playerId) }
@@ -376,35 +513,7 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
             getParticipant: viewerId => ({ ...participant, viewerId }),
         },
         questAvailability: { check: () => ({ available: true }) },
-        coordinator: {
-            getRoomStatus: async input => {
-                coordinatorCalls.push(structuredClone(input))
-                return {
-                    ok: true,
-                    value: {
-                        roomNumber,
-                        host: roomHost,
-                        members: roomMembers,
-                        category: productionQuest.category,
-                        questId: productionQuest.questId,
-                    },
-                }
-            },
-            startBattle: async input => {
-                coordinatorCalls.push(structuredClone(input))
-                if (options.startBattle) return options.startBattle(input, battle)
-                return { ok: true, value: battle }
-            },
-            finalizeBattle: async input => {
-                coordinatorCalls.push(structuredClone(input))
-                if (options.finalizeBattle) return options.finalizeBattle(input, battle)
-                return { ok: true, value: { ...battle, finalized: true } }
-            },
-            abortBattle: async input => {
-                coordinatorCalls.push(structuredClone(input))
-                return { ok: true, value: undefined }
-            },
-        },
+        coordinator,
         settlementVerifier,
     }
     const app = Fastify({ logger: false })
@@ -489,6 +598,65 @@ test("production /start charges only the host in isolated SQLite home saves", as
             ticketCount: 1,
             battleSessionId,
         })
+    } finally {
+        await closeProductionHome(home)
+    }
+})
+
+test("production /finish settles through a real HubClient session rotation", async t => {
+    const hub = createRotatingHub(t)
+    const created = await hub.coordinator.createRoom({
+        requestId: "production-finish-rotation",
+        participant: { nodeSessionId: "pending", viewerId: host.viewerId },
+        partyId: 1,
+        category: productionQuest.category,
+        questId: productionQuest.questId,
+        leaderCharacterId: 101,
+        compatibility,
+    })
+    assert.equal(created.ok, true)
+    const remoteRoomNumber = created.value.roomNumber
+    const originalParticipant = created.value.host
+    t.after(() => {
+        sessionManager.clearBattleExpectedCount(remoteRoomNumber)
+        disbandRoom(remoteRoomNumber)
+    })
+    sessionManager.setBattleParticipants(remoteRoomNumber, [{
+        connectionId: "production-finish-rotation-host",
+        participant: originalParticipant,
+    }], originalParticipant)
+
+    let home
+    try {
+        home = await openProductionHome(
+            "production-finish-rotation",
+            originalParticipant,
+            true,
+            new MultiSettlementVerifier(hub.coordinator),
+            { coordinator: hub.coordinator, roomNumber: remoteRoomNumber },
+        )
+        const playId = "production-finish-rotation"
+        const started = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, playId, { room_number: remoteRoomNumber }),
+        })
+        assert.equal(started.statusCode, 200, started.body)
+        const storedQuest = getPlayerActiveQuestSync(home.playerId)
+        sessionManager.markParticipantFinalizedBattle(remoteRoomNumber, originalParticipant)
+
+        hub.setNow(12_000)
+        const finished = await home.app.inject({
+            method: "POST",
+            url: "/finish",
+            payload: finishPayload(host.viewerId, playId, { room_number: remoteRoomNumber }),
+        })
+        assert.equal(finished.statusCode, 200, finished.body)
+        assert.notEqual(hub.client.getNodeSessionId(), originalParticipant.nodeSessionId)
+        assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+        assert.equal(getRoom(remoteRoomNumber).raising_state, 1)
+        assert.equal(sessionManager.getActiveBattleSessionId(remoteRoomNumber), null)
+        assert.equal(typeof storedQuest.battleSessionId, "string")
     } finally {
         await closeProductionHome(home)
     }
@@ -852,6 +1020,114 @@ test("production /abort uses coordinator authority when no local room exists", a
         await closeProductionHome(home)
     }
 })
+
+for (const [label, participant, isHost] of [
+    ["host", host, true],
+    ["guest", guest, false],
+]) {
+    test(`production /abort keeps Hub untouched when ${label} SQLite rollback fails`, async () => {
+        let home
+        try {
+            home = await openProductionHome(
+                `abort-rollback-${label}`,
+                participant,
+                isHost,
+                { verify: async () => ({ ok: true, isHost }) },
+            )
+            const playId = `abort-rollback-${label}`
+            const started = await home.app.inject({
+                method: "POST",
+                url: "/start",
+                payload: startPayload(participant.viewerId, playId),
+            })
+            assert.equal(started.statusCode, 200, started.body)
+            const callsBeforeAbort = home.coordinatorCalls.length
+            home.db.exec(`
+                CREATE TRIGGER reject_multi_abort_delete
+                BEFORE DELETE ON players_active_quests
+                WHEN OLD.player_id = ${home.playerId}
+                BEGIN SELECT RAISE(ABORT, 'forced multi abort rollback'); END;
+            `)
+
+            const failed = await home.app.inject({
+                method: "POST",
+                url: "/abort",
+                payload: {
+                    viewer_id: participant.viewerId,
+                    quest_id: productionQuest.questId,
+                    category: productionQuest.category,
+                    room_number: roomNumber,
+                    play_id: playId,
+                },
+            })
+            assert.equal(failed.statusCode, 500, failed.body)
+            assert.equal(home.coordinatorCalls.length, callsBeforeAbort)
+            assert.notEqual(getPlayerActiveQuestSync(home.playerId), null)
+            assert.equal(getPlayerItemSync(home.playerId, productionQuest.ticketId), isHost ? 0 : 1)
+
+            home.db.exec("DROP TRIGGER reject_multi_abort_delete")
+            const retried = await home.app.inject({
+                method: "POST",
+                url: "/abort",
+                payload: {
+                    viewer_id: participant.viewerId,
+                    quest_id: productionQuest.questId,
+                    category: productionQuest.category,
+                    room_number: roomNumber,
+                    play_id: playId,
+                },
+            })
+            assert.equal(retried.statusCode, 200, retried.body)
+            assert.equal(home.coordinatorCalls.length, callsBeforeAbort + 1)
+            assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+            assert.equal(getPlayerItemSync(home.playerId, productionQuest.ticketId), 1)
+        } finally {
+            home?.db.exec("DROP TRIGGER IF EXISTS reject_multi_abort_delete")
+            await closeProductionHome(home)
+        }
+    })
+
+    test(`production /abort commits ${label} cleanup once when Hub is unavailable`, async () => {
+        let home
+        try {
+            home = await openProductionHome(
+                `abort-hub-unavailable-${label}`,
+                participant,
+                isHost,
+                { verify: async () => ({ ok: true, isHost }) },
+                { abortBattle: async () => ({ ok: false, error: "HUB_UNAVAILABLE" }) },
+            )
+            const playId = `abort-hub-unavailable-${label}`
+            const started = await home.app.inject({
+                method: "POST",
+                url: "/start",
+                payload: startPayload(participant.viewerId, playId),
+            })
+            assert.equal(started.statusCode, 200, started.body)
+            const callsBeforeAbort = home.coordinatorCalls.length
+            const payload = {
+                viewer_id: participant.viewerId,
+                quest_id: productionQuest.questId,
+                category: productionQuest.category,
+                room_number: roomNumber,
+                play_id: playId,
+            }
+
+            const aborted = await home.app.inject({ method: "POST", url: "/abort", payload })
+            assert.equal(aborted.statusCode, 200, aborted.body)
+            assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+            assert.equal(getPlayerItemSync(home.playerId, productionQuest.ticketId), 1)
+            assert.equal(home.coordinatorCalls.length, callsBeforeAbort + 1)
+
+            const repeated = await home.app.inject({ method: "POST", url: "/abort", payload })
+            assert.equal(repeated.statusCode, 400, repeated.body)
+            assert.equal(getPlayerItemSync(home.playerId, productionQuest.ticketId), 1)
+            assert.equal(home.coordinatorCalls.length, callsBeforeAbort + 1)
+        } finally {
+            await closeProductionHome(home)
+        }
+    })
+}
 
 for (const corruption of ["missing", "battle-session-mismatch"]) {
     test(`production /finish fails closed when SQLite active quest is ${corruption}`, async () => {

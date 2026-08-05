@@ -184,7 +184,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
     async abortBattle(input: RoomParticipantInput): Promise<CoordinatorResult<void>> {
         assertParticipant(input.participant, this.allowRemoteParticipants)
         const room = getRoom(input.roomNumber)
-        if (!room) return roomNotFound()
+        if (!room) return ok(undefined)
         const status = this.toRoomStatus(room)
         const identityKey = participantKey(
             input.participant.nodeSessionId,
@@ -199,6 +199,8 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         if (participantKey(status.host.nodeSessionId, status.host.viewerId) === identityKey) {
             return this.removeOwnedRoom(room) ? ok(undefined) : roomNotFound()
         }
+        const factRemoval = sessionManager.removeBattleFactParticipant(input)
+        if (!factRemoval.ok) return factRemoval
         sessionManager.removeBattleParticipant(input.roomNumber, input.participant)
         return ok(undefined)
     }

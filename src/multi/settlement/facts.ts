@@ -6,7 +6,11 @@ import {
     type CoordinatorResult,
     type ParticipantIdentity,
 } from "../coordinator/contracts"
-import type { BattleSessionInput, BattleStatus } from "../coordinator/interface"
+import type {
+    BattleSessionInput,
+    BattleStatus,
+    RoomParticipantInput,
+} from "../coordinator/interface"
 
 export const MAX_BATTLE_FACT_RETENTION_MS = 30 * 60 * 1000
 const DEFAULT_MAX_RECORDS = 4096
@@ -15,8 +19,8 @@ interface BattleFactRecord {
     readonly battleSessionId: BattleSessionId
     readonly roomNumber: string
     readonly host: ParticipantIdentity
-    readonly participants: readonly ParticipantIdentity[]
-    readonly participantKeys: ReadonlySet<string>
+    readonly participants: ParticipantIdentity[]
+    readonly participantKeys: Set<string>
     readonly credentialIdByViewerId: Map<number, string>
     readonly finalizedViewerIds: Set<number>
     readonly sequence: number
@@ -76,9 +80,9 @@ export class BattleFactStore {
             || this.records.has(battleSessionId)) {
             throw new Error("battle session id is invalid or duplicated")
         }
-        const participants = Object.freeze(input.participants.map(participant => (
+        const participants = input.participants.map(participant => (
             Object.freeze({ ...participant })
-        )))
+        ))
         const host = Object.freeze({ ...input.host })
         const participantKeys = new Set(participants.map(participant => participantKey(
             participant.nodeSessionId,
@@ -146,6 +150,31 @@ export class BattleFactStore {
         record.finalizedViewerIds.add(input.participant.viewerId)
         record.expiresAt ??= this.now() + this.retentionMs
         return { ok: true, value: this.toStatus(record, input.participant) }
+    }
+
+    removeParticipant(input: RoomParticipantInput): CoordinatorResult<void> {
+        this.prune()
+        const battleSessionId = this.activeBattleByRoom.get(input.roomNumber)
+        const record = battleSessionId ? this.records.get(battleSessionId) : undefined
+        if (!record) return { ok: true, value: undefined }
+        const participantIndex = record.participants.findIndex(candidate => (
+            candidate.viewerId === input.participant.viewerId
+        ))
+        if (participantIndex < 0) return { ok: true, value: undefined }
+        if (!this.isAuthorized(record, {
+            ...input,
+            battleSessionId: record.battleSessionId,
+        })) {
+            return { ok: false, error: "ROOM_PERMISSION_DENIED" }
+        }
+        const [participant] = record.participants.splice(participantIndex, 1)
+        record.participantKeys.delete(participantKey(
+            participant.nodeSessionId,
+            participant.viewerId,
+        ))
+        record.credentialIdByViewerId.delete(participant.viewerId)
+        record.finalizedViewerIds.delete(participant.viewerId)
+        return { ok: true, value: undefined }
     }
 
     hasAnyFinalized(input: Pick<BattleSessionInput, "roomNumber" | "battleSessionId">): boolean {
