@@ -562,6 +562,181 @@ async function waitFor(predicate, message, timeoutMs) {
     assert.fail(message)
 }
 
+function connectSession(port) {
+    return new Promise((resolve, reject) => {
+        const socket = net.createConnection({ host: "127.0.0.1", port })
+        const connection = { socket, frames: [], closed: false }
+        let buffer = ""
+        let connected = false
+        socket.setEncoding("utf8")
+        socket.on("data", chunk => {
+            buffer += chunk
+            while (buffer.includes("\0")) {
+                const index = buffer.indexOf("\0")
+                const raw = buffer.slice(0, index)
+                buffer = buffer.slice(index + 1)
+                if (raw.length > 0) connection.frames.push(JSON.parse(raw))
+            }
+        })
+        socket.on("close", () => { connection.closed = true })
+        socket.on("error", error => {
+            if (!connected) reject(error)
+        })
+        socket.on("connect", () => {
+            connected = true
+            resolve(connection)
+        })
+    })
+}
+
+function sendSessionFrame(connection, frame) {
+    connection.socket.write(`${JSON.stringify(frame)}\0`)
+}
+
+function frameCount(connection, frame) {
+    const encoded = JSON.stringify(frame)
+    return connection.frames.filter(candidate => JSON.stringify(candidate) === encoded).length
+}
+
+function admissionSnapshot(viewerId) {
+    return Object.freeze({
+        viewerId,
+        name: `HostPlayer${viewerId}`,
+        rank: 1,
+        degreeId: 1,
+        mainCharacterId: 101,
+        playerRoleKind: 1,
+        isNewbie: false,
+        currentPartyId: 1,
+        party: {
+            characters: [[1], [1], [1]],
+            unison_characters: [[1], [1], [1]],
+            equipments: [[1], [1], [1]],
+            abilitySoulIds: [[1], [1], [1]],
+        },
+        npcParties: [],
+    })
+}
+
+test("host TCP accepts only its explicit internal identity across credential revocation", async t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-host-internal-identity-"))
+    const credentialsPath = path.join(root, "credentials.json")
+    const store = new MultiHubCredentialStore({ credentialsPath })
+    const issued = store.create("remote-node")
+    const tcpPort = await availablePort()
+    const hubPort = await availablePort()
+    const service = createMultiRuntimeService()
+    const connections = []
+    let roomNumber
+    t.after(async () => {
+        for (const connection of connections) connection.socket.destroy()
+        await service.stop()
+        if (roomNumber) require("../src/multi/room/manager").disbandRoom(roomNumber)
+        fs.rmSync(root, { recursive: true, force: true })
+    })
+
+    await service.start({
+        mode: "host",
+        tcp: { host: "127.0.0.1", port: tcpPort, publicHost: "127.0.0.1" },
+        hub: { host: "127.0.0.1", port: hubPort },
+        credentialsPath,
+    })
+    let registration
+    await waitFor(async () => {
+        registration = await postJson(hubPort, "/v1/multi/nodes/register", {
+            authorization: `Bearer ${issued.token}`,
+        }, { protocolVersion: 1 })
+        return registration.statusCode === 200
+    }, "host credential was not loaded", 2_000)
+
+    const context = service.getHttpContext()
+    const internalParticipant = context.snapshotProvider.getParticipant(901)
+    assert.deepEqual(internalParticipant, { nodeSessionId: "embedded", viewerId: 901 })
+    const compatibility = {
+        multiProtocolVersion: 1,
+        APP_VER: "1.8.1",
+        RES_VER: "20240814",
+        cdnTargetVersion: "cn-20240814",
+        contentDigest: `sha256:${"c".repeat(64)}`,
+        modeDigest: `sha256:${"d".repeat(64)}`,
+    }
+    const created = await context.coordinator.createRoom({
+        requestId: "host-internal-room",
+        participant: internalParticipant,
+        localPlayerId: 901,
+        partyId: 1,
+        category: 1,
+        questId: 501,
+        leaderCharacterId: 101,
+        compatibility,
+    })
+    assert.equal(created.ok, true)
+    roomNumber = created.value.roomNumber
+    const issueAdmission = participant => context.admissionIssuer.issue({
+        roomNumber,
+        participant,
+        snapshot: admissionSnapshot(participant.viewerId),
+        expiresAt: Date.now() + 5_000,
+    })
+    const openRoomSocket = async (participant, connectionId) => {
+        issueAdmission(participant)
+        const connection = await connectSession(tcpPort)
+        connections.push(connection)
+        sendSessionFrame(connection, {
+            socklet: "cooperation_room",
+            viewerId: participant.viewerId,
+            roomNumber,
+            questCategory: 1,
+            questId: 501,
+            connectionId,
+        })
+        return connection
+    }
+
+    const internal = await openRoomSocket(internalParticipant, "host-internal-cid")
+    await waitFor(
+        () => frameCount(internal, [0, "host-internal-cid", roomNumber]) === 1,
+        "Host internal handshake was not accepted",
+        2_000,
+    )
+    sendSessionFrame(internal, [0, [4]])
+    await waitFor(
+        () => frameCount(internal, [1, [11, "host-internal-cid"]]) === 1,
+        "Host internal inbound frame was rejected",
+        2_000,
+    )
+    assert.equal(internal.closed, false)
+
+    const forged = await openRoomSocket(
+        { nodeSessionId: "embedded-forged", viewerId: 902 },
+        "forged-internal-cid",
+    )
+    await waitFor(() => forged.closed, "forged embedded-like identity stayed connected", 2_000)
+
+    store.revoke(issued.credentialId)
+    await waitFor(async () => {
+        const rejected = await postJson(hubPort, "/v1/multi/nodes/register", {
+            authorization: `Bearer ${issued.token}`,
+        }, { protocolVersion: 1 })
+        return rejected.statusCode === 401
+    }, "credential revocation was not loaded", 2_000)
+
+    const beforeRevocationHeartbeat = frameCount(internal, [1, [11, "host-internal-cid"]])
+    sendSessionFrame(internal, [0, [4]])
+    await waitFor(
+        () => frameCount(internal, [1, [11, "host-internal-cid"]]) === beforeRevocationHeartbeat + 1,
+        "credential revocation invalidated the Host internal identity",
+        2_000,
+    )
+    assert.equal(internal.closed, false)
+
+    const revokedRemote = await openRoomSocket({
+        nodeSessionId: registration.body.nodeSessionId,
+        viewerId: 903,
+    }, "revoked-remote-cid")
+    await waitFor(() => revokedRemote.closed, "revoked remote identity stayed connected", 2_000)
+})
+
 test("real host hot-loads credentials and serves only the trusted control API", async t => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-host-empty-"))
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))

@@ -311,7 +311,12 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     } else {
         if (hostClient && client.yourself) {
             hostClient.mates = limitLobbyMates(
-                [...hostClient.mates, client.yourself],
+                [
+                    ...hostClient.mates.filter(
+                        mate => mate.comId || mate.viewerId !== client.viewerId,
+                    ),
+                    client.yourself,
+                ],
                 room?.host_viewer_id ?? hostClient.viewerId,
             )
             client.mates = [...hostClient.mates]

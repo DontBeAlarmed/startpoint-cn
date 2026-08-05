@@ -2,7 +2,10 @@ import type { MultiRuntimeConfig, RuntimeNetworkServiceConfig } from "../../runt
 import { AdmissionRegistry } from "../admission/registry"
 import type { CoordinatorResult } from "../coordinator/contracts"
 import type { MultiCoordinator } from "../coordinator/interface"
-import { EmbeddedMultiCoordinator } from "../coordinator/embedded"
+import {
+    EMBEDDED_NODE_SESSION_ID,
+    EmbeddedMultiCoordinator,
+} from "../coordinator/embedded"
 import { CredentialReloader } from "../hub/credential-reloader"
 import { IdempotencyCache } from "../hub/idempotency"
 import { NodeSessionRegistry } from "../hub/node-sessions"
@@ -103,7 +106,8 @@ function defaultDependencies(): MultiRuntimeServiceDependencies {
             ...config,
             admissionProvider: hostServices?.admissionRegistry,
             validateNodeSession: hostServices
-                ? nodeSessionId => hostServices.nodeSessions.isValid(nodeSessionId)
+                ? nodeSessionId => nodeSessionId === EMBEDDED_NODE_SESSION_ID
+                    || hostServices.nodeSessions.isValid(nodeSessionId)
                 : undefined,
             onFatalError: () => onFatalError(new Error("session server unavailable")),
         }),

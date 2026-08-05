@@ -276,6 +276,68 @@ test("the same node participant can reconnect without an identity conflict", asy
     assert.equal(getRoom(room.room_number)?.room_number, room.room_number)
 })
 
+test("guest reconnect Enter makes the new connection authoritative for battle", async t => {
+    const room = createRoom(118, 1_118, 1, 1, 518, 0, 101)
+    const hostSocket = await handshake(room, 118, { connectionId: "host-authority-cid" })
+    const firstGuest = await handshake(room, 228, { connectionId: "guest-old-cid" })
+    handleLobbyMessage(hostSocket, [0, [0, { party: snapshot(118).party }]])
+    handleLobbyMessage(firstGuest, [0, [0, { party: snapshot(228).party }]])
+    const hostClient = sessionManager.getUniqueRoomClientByViewerId(118, room.room_number)
+    assert.ok(hostClient)
+    hostClient.mates.push({
+        viewerId: 990000001,
+        connectionId: "npc-stable-cid",
+        comId: 1,
+        party: {},
+        state: [1],
+    })
+
+    const reconnectedGuest = await handshake(room, 228, { connectionId: "guest-new-cid" })
+    handleLobbyMessage(reconnectedGuest, [0, [0, { party: snapshot(228).party }]])
+    const newGuestClient = sessionManager.getUniqueRoomClientByViewerId(228, room.room_number)
+    t.after(() => {
+        sessionManager.removeClientBySocket(hostSocket)
+        sessionManager.removeClientBySocket(firstGuest)
+        sessionManager.removeClientBySocket(reconnectedGuest)
+        sessionManager.removeBattleClient("guest-new-cid")
+        disbandRoom(room.room_number)
+    })
+
+    assert.equal(firstGuest.destroyed, true)
+    assert.equal(sessionManager.getClientBySocket(firstGuest), undefined)
+    assert.equal(newGuestClient?.connectionId, "guest-new-cid")
+    assert.deepEqual(hostClient.mates.map(mate => mate.connectionId), [
+        "host-authority-cid",
+        "guest-new-cid",
+        "npc-stable-cid",
+    ])
+
+    handleLobbyMessage(hostSocket, [0, [6]])
+    assert.equal(room.raising_state, 4)
+    assert.equal(sessionManager.getBattleParticipant(room.room_number, "guest-old-cid"), undefined)
+    assert.deepEqual(
+        sessionManager.getBattleParticipant(room.room_number, "guest-new-cid")?.participant,
+        { nodeSessionId: "embedded", viewerId: 228 },
+    )
+
+    const oldBattleSocket = new FakeSocket()
+    await handleHandshake(oldBattleSocket, {
+        socklet: "cooperation_battle",
+        room_number: room.room_number,
+        connection_id: "guest-old-cid",
+    })
+    assert.equal(oldBattleSocket.ended, true)
+
+    const newBattleSocket = new FakeSocket()
+    await handleHandshake(newBattleSocket, {
+        socklet: "cooperation_battle",
+        room_number: room.room_number,
+        connection_id: "guest-new-cid",
+    })
+    assert.equal(newBattleSocket.ended, false)
+    assert.deepEqual(newBattleSocket.messages.at(-1), [0, room.room_number, ""])
+})
+
 test("remote participant completes room and battle handshakes without local player storage", async t => {
     const room = createRoom(115, 1_115, 1, 1, 515, 0, 101)
     const registry = new AdmissionRegistry({ now: () => 1_000 })
