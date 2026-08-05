@@ -9,6 +9,7 @@ require("ts-node/register/transpile-only")
 const originalRandomBytes = crypto.randomBytes
 const originalRandomInt = crypto.randomInt
 let accessTokenGenerationCalls = 0
+let roomNumberGenerationCalls = 0
 let roomNumberCandidates = []
 let roomNumberFallback = null
 
@@ -17,6 +18,7 @@ crypto.randomBytes = (...args) => {
     return originalRandomBytes(...args)
 }
 crypto.randomInt = (...args) => {
+    roomNumberGenerationCalls++
     if (roomNumberCandidates.length > 0) return roomNumberCandidates.shift()
     return roomNumberFallback ?? originalRandomInt(...args)
 }
@@ -40,6 +42,7 @@ function useRoomNumbers(...candidates) {
 
 test.afterEach(() => {
     stopRoomCleanup()
+    roomNumberGenerationCalls = 0
     roomNumberCandidates = []
     roomNumberFallback = null
 })
@@ -134,6 +137,25 @@ test("room creation retries a colliding number and preserves the active room", (
     assert.equal(disbandRoom(created.room_number), true)
 })
 
+test("room creation accepts the tenth candidate after nine collisions", t => {
+    useRoomNumbers(456789)
+    const existing = createRoom(107, 207, 1, 1, 307, 1, 407)
+    let created
+    t.after(() => {
+        disbandRoom(existing.room_number)
+        if (created) disbandRoom(created.room_number)
+    })
+
+    roomNumberGenerationCalls = 0
+    useRoomNumbers(...Array(9).fill(456789), 567890)
+    created = createRoom(108, 208, 1, 1, 308, 1, 408)
+
+    assert.equal(roomNumberGenerationCalls, 10)
+    assert.equal(created.room_number, "567890")
+    assert.equal(getRoom(existing.room_number), existing)
+    assert.equal(getRoom(created.room_number), created)
+})
+
 test("room number exhaustion fails without consuming or mutating room state", t => {
     useRoomNumbers(234567)
     const existing = createRoom(104, 204, 1, 1, 304, 1, 404)
@@ -167,6 +189,7 @@ test("room number exhaustion fails without consuming or mutating room state", t 
     const existingSnapshot = structuredClone(existing)
 
     accessTokenGenerationCalls = 0
+    roomNumberGenerationCalls = 0
     useRoomNumbers(...Array(10).fill(234567))
     assert.throws(
         () => createRoom(105, 205, 1, 1, 305, 1, 405),
@@ -174,6 +197,7 @@ test("room number exhaustion fails without consuming or mutating room state", t 
     )
 
     assert.equal(accessTokenGenerationCalls, 0)
+    assert.equal(roomNumberGenerationCalls, 10)
     assert.equal(getRoom(existing.room_number), existing)
     assert.deepEqual(existing, existingSnapshot)
     assert.equal(sessionManager.getRoomState(existing.room_number), roomState)
