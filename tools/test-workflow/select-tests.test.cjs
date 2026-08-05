@@ -343,7 +343,7 @@ test("registers focused runtime state and socket smoke groups", () => {
 test("registers the trusted multi-hub process suite as a bounded serial group", () => {
     assert.deepEqual(TEST_GROUPS["integration:multi-hub"], {
         execution: "serial",
-        timeoutMs: 180_000,
+        timeoutMs: 240_000,
         tests: [
             "tests/multi-hub-process-harness.test.js",
             "tests/multi-hub-process.test.js",

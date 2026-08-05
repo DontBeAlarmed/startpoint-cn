@@ -6,6 +6,7 @@ const test = require("node:test")
 const {
     MultiHubProcessHarness,
     defaultCompatibilityHeaders,
+    preparedTcpEndpoint,
     reserveLoopbackPorts,
 } = require("./helpers/multi-hub-process-harness")
 
@@ -170,9 +171,9 @@ async function disbandRoom(harness, host, roomNumber) {
     assert.equal(response.status, 200, JSON.stringify(response.body))
 }
 
-async function enterRoom(harness, node, roomNumber, quest, tcpPort, suffix) {
+async function enterRoom(harness, node, roomNumber, quest, endpoint, suffix) {
     const connectionId = `${node.dataKey}-${suffix}`
-    const peer = await harness.openTcp(`${connectionId}-lobby`, tcpPort, {
+    const peer = await harness.openTcp(`${connectionId}-lobby`, endpoint.host, endpoint.port, {
         socklet: "cooperation_room",
         room_number: roomNumber,
         viewerId: node.viewerId,
@@ -183,17 +184,16 @@ async function enterRoom(harness, node, roomNumber, quest, tcpPort, suffix) {
     await peer.waitFor(message => message[0] === 0 && message[1] === connectionId)
     peer.send([0, [0, { party: roomParty(), currentPartyId: 1 }]])
     await peer.waitFor(message => message[0] === 1 && message[1]?.[0] === 0)
-    return { peer, connectionId }
+    return { peer, connectionId, endpoint }
 }
 
-async function openRoomParty(harness, nodes, quest, tcpPort, suffix) {
+async function openRoomParty(harness, nodes, quest, suffix) {
     const roomNumber = await createRoom(harness, nodes[0], quest, suffix.length)
     const lobby = []
     for (const node of nodes) {
         const prepared = await prepareRoom(harness, node, roomNumber, quest)
-        assert.equal(prepared.status, 200, JSON.stringify(prepared.body))
-        assert.equal(prepared.body.data.room_number, roomNumber)
-        lobby.push(await enterRoom(harness, node, roomNumber, quest, tcpPort, suffix))
+        const endpoint = preparedTcpEndpoint(prepared, roomNumber)
+        lobby.push(await enterRoom(harness, node, roomNumber, quest, endpoint, suffix))
     }
     nodes.slice(1).forEach((_node, index) => lobby[index + 1].peer.send([0, [3, [1]]]))
     lobby[0].peer.send([0, [6]])
@@ -218,14 +218,19 @@ async function startPlayers(harness, nodes, roomNumber, quest, label) {
     return playIds
 }
 
-async function openBattlePeers(harness, lobby, roomNumber, tcpPort, suffix) {
+async function openBattlePeers(harness, lobby, roomNumber, suffix) {
     const battle = []
     for (const member of lobby) {
-        const peer = await harness.openTcp(`${member.connectionId}-${suffix}`, tcpPort, {
-            socklet: "cooperation_battle",
-            room_number: roomNumber,
-            connection_id: member.connectionId,
-        })
+        const peer = await harness.openTcp(
+            `${member.connectionId}-${suffix}`,
+            member.endpoint.host,
+            member.endpoint.port,
+            {
+                socklet: "cooperation_battle",
+                room_number: roomNumber,
+                connection_id: member.connectionId,
+            },
+        )
         await peer.waitFor(message => message[0] === 0 && message[1] === roomNumber)
         battle.push(peer)
     }
@@ -240,7 +245,7 @@ async function completeScene(peers) {
 }
 
 test("three compiled CN processes share trusted Hub state while keeping local settlement", {
-    timeout: 150_000,
+    timeout: 210_000,
     skip: process.platform === "win32" ? "process signal coverage is POSIX-only" : false,
 }, async t => {
     const harness = new MultiHubProcessHarness()
@@ -332,6 +337,9 @@ test("three compiled CN processes share trusted Hub state while keeping local se
     assert.equal(roomStillExists.body.data.room_exists, true)
     await setTime(harness, clientB, "2024-08-14T18:00:00.000Z")
 
+    const normalPrepared = await prepareRoom(harness, clientB, timedRoom, timedQuest)
+    const hostEndpoint = preparedTcpEndpoint(normalPrepared, timedRoom)
+
     const originalClientCViewer = clientC.viewerId
     harness.withDatabase(clientC.dataKey, database => {
         database.prepare("UPDATE sessions SET token = ? WHERE token = ?")
@@ -342,14 +350,19 @@ test("three compiled CN processes share trusted Hub state while keeping local se
     assert.equal(conflictSearch.body.data_headers.result_code, 4020)
     const conflictPrepare = await prepareRoom(harness, clientC, timedRoom, timedQuest)
     assert.equal(conflictPrepare.body.data_headers.result_code, 4507)
-    const denied = await harness.openTcp("viewer-conflict", tcpPort, {
-        socklet: "cooperation_room",
-        room_number: timedRoom,
-        viewerId: clientC.viewerId,
-        connection_id: "viewer-conflict",
-        questCategory: timedQuest.category,
-        questId: timedQuest.questId,
-    })
+    const denied = await harness.openTcp(
+        "viewer-conflict",
+        hostEndpoint.host,
+        hostEndpoint.port,
+        {
+            socklet: "cooperation_room",
+            room_number: timedRoom,
+            viewerId: clientC.viewerId,
+            connection_id: "viewer-conflict",
+            questCategory: timedQuest.category,
+            questId: timedQuest.questId,
+        },
+    )
     await denied.waitFor(message => message[0] === 3 && message[1] === "HANDSHAKE_DENIED")
     const unaffected = await searchRoom(harness, clientB, timedRoom)
     assert.equal(unaffected.body.data.room_exists, true)
@@ -364,7 +377,6 @@ test("three compiled CN processes share trusted Hub state while keeping local se
         harness,
         [host, clientB],
         ticketQuest,
-        tcpPort,
         "ticket",
     )
     const beforeTicket = new Map([host, clientB].map(node => [node.dataKey, playerState(harness, node)]))
@@ -407,7 +419,6 @@ test("three compiled CN processes share trusted Hub state while keeping local se
         harness,
         [host, clientB, clientC],
         bothBossQuest,
-        tcpPort,
         "both-boss",
     )
     const bossPlayIds = await startPlayers(
@@ -425,7 +436,6 @@ test("three compiled CN processes share trusted Hub state while keeping local se
         harness,
         bossParty.lobby,
         bossParty.roomNumber,
-        tcpPort,
         "battle",
     )
     await completeScene(battlePeers)
@@ -502,7 +512,6 @@ test("three compiled CN processes share trusted Hub state while keeping local se
         harness,
         [host, clientB],
         bothBossQuest,
-        tcpPort,
         "hub-stop",
     )
     const degradedPlayIds = await startPlayers(

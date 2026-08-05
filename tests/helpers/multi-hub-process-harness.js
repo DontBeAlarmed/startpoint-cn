@@ -8,6 +8,7 @@ const path = require("node:path")
 
 const Sqlite = require("better-sqlite3")
 const { pack, unpack } = require("msgpackr")
+const { runCnBuild } = require("../../tools/test-workflow/build-cn.cjs")
 
 const projectRoot = path.resolve(__dirname, "../..")
 const defaultCompatibilityHeaders = Object.freeze({
@@ -17,6 +18,27 @@ const defaultCompatibilityHeaders = Object.freeze({
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function preparedTcpEndpoint(response, expectedRoomNumber) {
+    if (response?.status !== 200) {
+        throw new Error(`prepare TCP endpoint requires HTTP 200, received ${response?.status}`)
+    }
+    const data = response.body?.data
+    if (data?.room_number !== expectedRoomNumber) {
+        throw new Error(`prepare room number mismatch: expected ${expectedRoomNumber}`)
+    }
+    const host = data?.ip_address
+    const port = data?.port
+    if (typeof host !== "string"
+        || host.trim() === ""
+        || host !== host.trim()) {
+        throw new Error("prepare TCP endpoint requires a non-empty host")
+    }
+    if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+        throw new Error("prepare TCP endpoint requires an integer port from 1 to 65535")
+    }
+    return { host, port }
 }
 
 function listen(server, options) {
@@ -214,23 +236,35 @@ class TcpPeer {
 }
 
 class MultiHubProcessHarness {
-    constructor() {
+    constructor(dependencies = {}) {
         this.root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-hub-process-"))
         this.runtimeRoot = path.join(this.root, "runtime")
         this.processes = []
         this.peers = []
         this.cleanupPromise = null
+        this.compiledRuntimeReady = false
+        this.buildCompiledRuntime = dependencies.buildCompiledRuntime ?? runCnBuild
+        this.loadCompiledTableRegistry = dependencies.loadCompiledTableRegistry ?? (() => (
+            require(path.join(projectRoot, "out/content/sync/table-registry.js"))
+        ))
     }
 
     dataDir(label) {
         return path.join(this.root, label)
     }
 
+    ensureCompiledRuntime() {
+        if (this.compiledRuntimeReady) return
+        const status = this.buildCompiledRuntime()
+        if (status !== 0) {
+            throw new Error(`compiled CN build failed with exit code ${status}`)
+        }
+        this.compiledRuntimeReady = true
+    }
+
     installRuntimeTables() {
-        const { TABLE_SOURCES } = require(path.join(
-            projectRoot,
-            "out/content/sync/table-registry.js",
-        ))
+        this.ensureCompiledRuntime()
+        const { TABLE_SOURCES } = this.loadCompiledTableRegistry()
         fs.mkdirSync(this.runtimeRoot, { recursive: true })
         for (const definition of TABLE_SOURCES) {
             const destination = path.join(this.runtimeRoot, definition.tableName)
@@ -273,6 +307,7 @@ class MultiHubProcessHarness {
     }
 
     spawnRuntime(label, env, ports) {
+        this.ensureCompiledRuntime()
         const runtimeEnv = {
             ...process.env,
             ASSET_MODE: "client-owned",
@@ -344,11 +379,20 @@ class MultiHubProcessHarness {
         return { status: response.status, body }
     }
 
-    async openTcp(label, port, handshake) {
-        const socket = net.createConnection({ host: "127.0.0.1", port })
+    async openTcp(label, host, port, handshake) {
+        const socket = net.createConnection({ host, port })
         await new Promise((resolve, reject) => {
-            socket.once("connect", resolve)
-            socket.once("error", reject)
+            const onConnect = () => {
+                socket.off("error", onError)
+                resolve()
+            }
+            const onError = error => {
+                socket.off("connect", onConnect)
+                socket.destroy()
+                reject(error)
+            }
+            socket.once("connect", onConnect)
+            socket.once("error", onError)
         })
         const peer = new TcpPeer(label, socket)
         this.peers.push(peer)
@@ -391,5 +435,6 @@ class MultiHubProcessHarness {
 module.exports = {
     MultiHubProcessHarness,
     defaultCompatibilityHeaders,
+    preparedTcpEndpoint,
     reserveLoopbackPorts,
 }
