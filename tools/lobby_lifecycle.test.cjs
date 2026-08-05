@@ -259,6 +259,30 @@ test("lobby lifecycle logs retain role and room without client identity", async 
     assert.match(output, new RegExp(`\\[LOBBY\\] client left: role=host room=${room.room_number}`))
 })
 
+test("lobby logs only bounded integer tags or a fixed invalid marker", async t => {
+    const { host } = createLobbyRoom(t, 918273644)
+    const orphanSocket = new FakeSocket()
+    const tagSentinel = "TAG_TOKEN_SENTINEL_LOBBY"
+    const largeTagSentinel = 918273645
+
+    const output = await captureConsole(async () => {
+        handleMessage(orphanSocket, [tagSentinel])
+        handleMessage(orphanSocket, [largeTagSentinel])
+        handleMessage(host.socket, [tagSentinel])
+        handleMessage(host.socket, [largeTagSentinel])
+        handleMessage(host.socket, [0, [tagSentinel]])
+        handleMessage(host.socket, [0, [largeTagSentinel]])
+        handleMessage(host.socket, [77])
+        handleMessage(host.socket, [0, [77]])
+    })
+
+    assert.doesNotMatch(output, new RegExp(tagSentinel))
+    assert.doesNotMatch(output, new RegExp(String(largeTagSentinel)))
+    assert.match(output, /tag=invalid/)
+    assert.match(output, /unhandled Client2Server: tag=77/)
+    assert.match(output, /unhandled Notify: tag=77/)
+})
+
 test("all three lobby timeout paths are unrefed, cancelled, and inert after stop", async t => {
     assert.equal(typeof startLobbyLifecycle, "function")
     assert.equal(typeof stopLobbyLifecycle, "function")

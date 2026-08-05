@@ -7,6 +7,24 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
+async function captureConsole(callback) {
+    const entries = []
+    const originals = {}
+    for (const method of ["log", "warn", "error"]) {
+        originals[method] = console[method]
+        console[method] = (...args) => entries.push(args.map(value => {
+            if (value instanceof Error) return `${value.name}: ${value.message}\n${value.stack || ""}`
+            return typeof value === "string" ? value : JSON.stringify(value)
+        }).join(" "))
+    }
+    try {
+        await callback()
+    } finally {
+        for (const method of ["log", "warn", "error"]) console[method] = originals[method]
+    }
+    return entries.join("\n")
+}
+
 function stubModule(relativePath, exports) {
     const modulePath = require.resolve(relativePath)
     require.cache[modulePath] = {
@@ -331,6 +349,35 @@ test("lobby, room and social reject invalid viewer ids before resolving player c
         }
     }
     assert.equal(resolverCalls, 0)
+})
+
+test("room route logs never echo unvalidated room payloads", async t => {
+    const fastify = await createRouteServer()
+    t.after(async () => fastify.close())
+    const roomSentinel = "ROOM_TOKEN_SENTINEL_HTTP_ROUTE"
+
+    const output = await captureConsole(async () => {
+        for (const url of ["/prepare", "/summon", "/restore_room", "/share_room", "/disband_room"]) {
+            const response = await fastify.inject({
+                method: "POST",
+                url,
+                payload: {
+                    viewer_id: "invalid-viewer",
+                    room_number: roomSentinel,
+                    category: 1,
+                    category_id: 1,
+                    quest_id: 701,
+                    api_count: 1,
+                },
+            })
+            assert.equal(response.statusCode, 400, url)
+        }
+    })
+
+    assert.doesNotMatch(output, new RegExp(roomSentinel))
+    for (const event of ["prepare", "summon", "restore_room", "share_room", "disband_room"]) {
+        assert.match(output, new RegExp(`\\[MULTI\\] ${event} received`))
+    }
 })
 
 test("stateless social routes reject invalid viewer ids without resolving player context", async t => {

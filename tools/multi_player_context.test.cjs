@@ -11,6 +11,24 @@ assert.equal(resolveIsRoomHost({
     playerId: 17,
 }), undefined, "缺失房间时房主身份必须保持未知")
 
+async function captureConsole(callback) {
+    const entries = []
+    const originals = {}
+    for (const method of ["log", "warn", "error"]) {
+        originals[method] = console[method]
+        console[method] = (...args) => entries.push(args.map(value => {
+            if (value instanceof Error) return `${value.name}: ${value.message}\n${value.stack || ""}`
+            return typeof value === "string" ? value : JSON.stringify(value)
+        }).join(" "))
+    }
+    try {
+        await callback()
+    } finally {
+        for (const method of ["log", "warn", "error"]) console[method] = originals[method]
+    }
+    return entries.join("\n")
+}
+
 function stubModule(relativePath, exports) {
     const modulePath = require.resolve(relativePath)
     require.cache[modulePath] = {
@@ -182,9 +200,55 @@ async function testBattleRoutesRejectInvalidViewerIdsBeforeResolvingContext() {
     }
 }
 
+async function testBattleRouteLogsDoNotEchoUnvalidatedPayloads() {
+    const battleModulePath = require.resolve("../src/multi/http/battle")
+    delete require.cache[battleModulePath]
+    const { registerBattleRoutes } = require(battleModulePath)
+    const fastify = Fastify()
+    registerBattleRoutes(fastify, {
+        resolvePlayerContext: async () => null,
+    })
+    await fastify.ready()
+    const sentinels = [
+        "ROOM_TOKEN_SENTINEL_BATTLE_ROUTE",
+        "QUEST_TOKEN_SENTINEL_BATTLE_ROUTE",
+        "CATEGORY_TOKEN_SENTINEL_BATTLE_ROUTE",
+    ]
+
+    try {
+        const output = await captureConsole(async () => {
+            for (const url of ["/start", "/finish", "/abort", "/play_continue"]) {
+                const response = await fastify.inject({
+                    method: "POST",
+                    url,
+                    payload: {
+                        viewer_id: "invalid-viewer",
+                        room_number: sentinels[0],
+                        quest_id: sentinels[1],
+                        category: sentinels[2],
+                        play_id: "invalid-play",
+                        statistics: {},
+                        api_count: 1,
+                    },
+                })
+                assert.equal(response.statusCode, 400, url)
+            }
+        })
+
+        for (const sentinel of sentinels) assert.doesNotMatch(output, new RegExp(sentinel))
+        for (const event of ["start", "finish", "abort", "play_continue"]) {
+            assert.match(output, new RegExp(`\\[MULTI\\] ${event} received`))
+        }
+    } finally {
+        await fastify.close()
+        delete require.cache[battleModulePath]
+    }
+}
+
 async function main() {
     await testActivePlayerWinsOverFirstAccountPlayer()
     await testBattleRoutesRejectInvalidViewerIdsBeforeResolvingContext()
+    await testBattleRouteLogsDoNotEchoUnvalidatedPayloads()
     testMultiEntrypointsSharePlayerContextResolver()
     console.log("multi player context tests passed")
 }

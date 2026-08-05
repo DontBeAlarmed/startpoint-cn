@@ -372,7 +372,7 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 
 多人不可用只产生 degraded 状态。后台显示模式、Hub 可达性、TCP 状态、活动房间数和最近的兼容性拒绝原因。
 
-兼容性日志只保留房间号和差异字段名，不记录双方原始值或摘要。普通多人运行日志还可以保留 quest/category/tag、有限错误码、host/guest 角色、状态和计数；不得记录原始请求、原始 `Error`/stack、完整 `viewerId`/`playerId`/`nodeSessionId`/`connectionId`、网络地址或端口、令牌、摘要和凭据。游戏客户端只接收对应端点现有的 NotPlayable 或通用失败结果；只有房间实际缺失时才显示房间不存在。
+后台 `latestCompatibilityRejection` 可保留差异字段名；只有 `APP_VER`、`RES_VER`、`cdnTargetVersion` 的 `required`/`received` 值通过格式与长度校验后才会保留，`contentDigest`/`modeDigest` 只保留 `different=true`，不保存摘要值。现有兼容性拒绝回调不携带房间号，因此后台诊断不承诺包含房间号。普通多人运行日志不输出双方原始值或摘要；只可保留固定事件、经过 `Number.isSafeInteger` 与有限范围校验的 tag、有限错误码、host/guest 角色、状态、计数，以及服务端生成或严格校验后的六位房间号。不得记录原始请求、原始 `Error`/stack、完整 `viewerId`/`playerId`/`nodeSessionId`/`connectionId`、网络地址或端口、令牌、摘要和凭据。游戏客户端只接收对应端点现有的 NotPlayable 或通用失败结果；只有房间实际缺失时才显示房间不存在。
 
 ## 12. 测试与验收
 

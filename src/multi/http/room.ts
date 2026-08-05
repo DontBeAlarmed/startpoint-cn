@@ -39,7 +39,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
     fastify.post("/prepare", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as PrepareBody;
         const viewerId = body.viewer_id;
-        console.log(`[MULTI] prepare: room=${body.room_number}`);
+        console.log("[MULTI] prepare received");
 
         if (!await hasValidViewer(context, viewerId)) {
             return reply.status(400).send({
@@ -117,7 +117,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
     fastify.post("/summon", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as SummonBody;
         const viewerId = body.viewer_id;
-        console.log(`[MULTI] summon: room=${body.room_number}`);
+        console.log("[MULTI] summon received");
 
         if (!await hasValidViewer(context, viewerId)) {
             return reply.status(400).send({
@@ -158,7 +158,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
     fastify.post("/restore_room", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as RestoreRoomBody;
         const viewerId = body.viewer_id;
-        console.log(`[MULTI] restore_room: room=${body.room_number}`);
+        console.log("[MULTI] restore_room received");
 
         if (!await hasValidViewer(context, viewerId)) {
             return reply.status(400).send({
@@ -227,7 +227,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
     fastify.post("/share_room", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as ShareRoomBody;
         const viewerId = body.viewer_id;
-        console.log(`[MULTI] share_room: room=${body.room_number}`);
+        console.log("[MULTI] share_room received");
 
         if (!await hasValidViewer(context, viewerId)) {
             return reply.status(400).send({
@@ -252,7 +252,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
     fastify.post("/disband_room", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as RestoreRoomBody;
         const viewerId = body.viewer_id;
-        console.log(`[MULTI] disband_room: room=${body.room_number}`);
+        console.log("[MULTI] disband_room received");
 
         if (!await hasValidViewer(context, viewerId)) {
             return reply.status(400).send({
@@ -265,7 +265,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             roomNumber: body.room_number,
         });
         if (!result.ok) return forbidden(reply);
-        console.log(`[MULTI] room disbanded: room=${body.room_number}`);
+        console.log("[MULTI] room disbanded");
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({

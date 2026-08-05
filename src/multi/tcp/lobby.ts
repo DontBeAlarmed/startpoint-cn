@@ -125,6 +125,16 @@ export function checkHostAutoReady(roomNumber: string): void {
 }
 
 const autoStartingRooms = new Set<string>()
+const MAX_LOG_TAG = 255
+
+function formatLogTag(value: unknown): string {
+    return typeof value === "number"
+        && Number.isSafeInteger(value)
+        && value >= 0
+        && value <= MAX_LOG_TAG
+        ? String(value)
+        : "invalid"
+}
 
 function checkAllReadyAndStart(roomNumber: string): void {
     if (autoStartingRooms.has(roomNumber)) return
@@ -452,7 +462,7 @@ function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: an
 function handleNotify(socket: net.Socket, client: SessionClient, data: any[]): void {
     const notifyData = data[1]
     if (!Array.isArray(notifyData)) return
-    const tag = notifyData[0] as number
+    const tag = notifyData[0]
 
     switch (tag) {
         case 0: handleEnter(socket, client, notifyData); break
@@ -464,7 +474,7 @@ function handleNotify(socket: net.Socket, client: SessionClient, data: any[]): v
         case 6: handleStartBattle(socket, client, notifyData); break
         case 10: handleEnterComs(client).catch(() => console.error("[LOBBY] EnterComs failed")); break
         default:
-            console.log(`[LOBBY] unhandled Notify: ${tag}`)
+            console.log(`[LOBBY] unhandled Notify: tag=${formatLogTag(tag)}`)
     }
 }
 
@@ -481,10 +491,10 @@ function handleSend(_socket: net.Socket, _client: SessionClient, data: any[]): v
 
 export function handleMessage(socket: net.Socket, data: unknown): void {
     if (!Array.isArray(data)) return
-    const tag = data[0] as number
+    const tag = data[0]
     const client = findClientBySocket(socket)
     if (!client) {
-        console.log(`[LOBBY] no client found for socket, dropping message tag=${tag}`)
+        console.log(`[LOBBY] no client found for socket, dropping message tag=${formatLogTag(tag)}`)
         return
     }
 
@@ -493,6 +503,6 @@ export function handleMessage(socket: net.Socket, data: unknown): void {
         case 1: handleBroadcast(socket, client, data); break
         case 2: handleSend(socket, client, data); break
         default:
-            console.log(`[LOBBY] unhandled Client2Server: ${tag}`)
+            console.log(`[LOBBY] unhandled Client2Server: tag=${formatLogTag(tag)}`)
     }
 }

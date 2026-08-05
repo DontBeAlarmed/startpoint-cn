@@ -159,6 +159,7 @@ test("multiplayer console calls reject sensitive identifiers and raw errors", ()
         "nodeSessionId", "node_session_id", "connectionId", "connection_id",
         "remoteAddress", "remotePort", "accessToken", "access_token",
         "token", "tokenDigest", "digest", "credential", "sessionCredential",
+        "room_number", "quest_id", "party_id", "tag",
         "payload", "raw", "e", "error", "closeError",
     ])
     const violations = []
@@ -169,7 +170,7 @@ test("multiplayer console calls reject sensitive identifiers and raw errors", ()
         const inspectLogArgument = (node, callLine) => {
             if (ts.isCallExpression(node)
                 && ts.isIdentifier(node.expression)
-                && node.expression.text === "failureCode") return
+                && ["failureCode", "formatLogTag"].includes(node.expression.text)) return
             if (ts.isCallExpression(node)
                 && ts.isPropertyAccessExpression(node.expression)
                 && node.expression.expression.getText(sourceFile) === "JSON"
@@ -178,12 +179,20 @@ test("multiplayer console calls reject sensitive identifiers and raw errors", ()
                 return
             }
             if (ts.isPropertyAccessExpression(node)) {
+                if (node.expression.getText(sourceFile) === "body") {
+                    violations.push(`${path.relative(multiRoot, filePath)}:${callLine}: unvalidated body field`)
+                    return
+                }
                 const boundedCoordinatorError = node.getText(sourceFile) === "hubAbort.error"
                 if (!boundedCoordinatorError && forbiddenIdentifiers.has(node.name.text)) {
                     violations.push(`${path.relative(multiRoot, filePath)}:${callLine}: ${node.name.text}`)
                     return
                 }
                 inspectLogArgument(node.expression, callLine)
+                return
+            }
+            if (ts.isElementAccessExpression(node)) {
+                violations.push(`${path.relative(multiRoot, filePath)}:${callLine}: indexed payload field`)
                 return
             }
             if (ts.isIdentifier(node) && forbiddenIdentifiers.has(node.text)) {
