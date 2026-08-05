@@ -202,6 +202,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         const factRemoval = sessionManager.removeBattleFactParticipant(input)
         if (!factRemoval.ok) return factRemoval
         sessionManager.removeBattleParticipant(input.roomNumber, input.participant)
+        if (factRemoval.value) this.releaseIfFullyFinalized(factRemoval.value)
         return ok(undefined)
     }
 
@@ -209,9 +210,42 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         let removed = 0
         for (const room of listActiveRooms()) {
             const host = hostIdentityByRoom.get(room)
-            if (host?.nodeSessionId === nodeSessionId && this.removeOwnedRoom(room)) {
-                removed++
+            if (host?.nodeSessionId === nodeSessionId) {
+                try {
+                    if (this.removeOwnedRoom(room)) removed++
+                } catch {
+                    this.warnNodeSessionCleanup(room.room_number)
+                }
+                continue
             }
+
+            let factStatus: BattleStatus | null = null
+            let roomRemoved = false
+            try {
+                factStatus = sessionManager.removeBattleFactParticipantsByNodeSession(
+                    room.room_number,
+                    nodeSessionId,
+                )
+                roomRemoved = factStatus !== null
+            } catch {
+                this.warnNodeSessionCleanup(room.room_number)
+            }
+            if (factStatus) {
+                try {
+                    this.releaseIfFullyFinalized(factStatus)
+                } catch {
+                    this.warnNodeSessionCleanup(room.room_number)
+                }
+            }
+            try {
+                if (sessionManager.removeNodeSessionBattleState(
+                    room.room_number,
+                    nodeSessionId,
+                )) roomRemoved = true
+            } catch {
+                this.warnNodeSessionCleanup(room.room_number)
+            }
+            if (roomRemoved) removed++
         }
         return removed
     }
@@ -245,10 +279,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         this.assertBattleInput(input)
         const result = sessionManager.getBattleStatus(input)
         if (!result.ok || !result.value.finalized) return result
-        if (sessionManager.isBattleFullyFinalized(input)) {
-            updateRoomState(input.roomNumber, 1)
-            sessionManager.clearBattleExpectedCount(input.roomNumber)
-        }
+        this.releaseIfFullyFinalized(result.value)
         return result
     }
 
@@ -297,6 +328,17 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         compatibilityByRoom.delete(room)
         hostIdentityByRoom.delete(room)
         return true
+    }
+
+    private releaseIfFullyFinalized(status: BattleStatus): boolean {
+        if (!sessionManager.isBattleFullyFinalized(status)) return false
+        updateRoomState(status.roomNumber, 1)
+        sessionManager.clearBattleExpectedCount(status.roomNumber)
+        return true
+    }
+
+    private warnNodeSessionCleanup(roomNumber: string): void {
+        console.warn(`[MULTI] node session cleanup deferred for room ${roomNumber}`)
     }
 
     private toRoomStatus(room: MultiRoom): RoomStatus {

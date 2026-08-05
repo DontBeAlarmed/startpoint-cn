@@ -6,7 +6,11 @@ import * as net from "net"
 import { Result, ClientState, BattleState } from "../types"
 import { RoomStateMachine } from "./RoomStateMachine"
 import { ClientStateMachine } from "./ClientStateMachine"
-import { participantKey, type ParticipantIdentity } from "../coordinator/contracts"
+import {
+    participantKey,
+    type NodeSessionId,
+    type ParticipantIdentity,
+} from "../coordinator/contracts"
 import type { CoordinatorResult } from "../coordinator/contracts"
 import type {
     BattleSessionInput,
@@ -391,6 +395,36 @@ export class SessionManager {
         return removed
     }
 
+    removeNodeSessionBattleState(roomNumber: string, nodeSessionId: NodeSessionId): boolean {
+        const clients = new Set([
+            ...this.getClientsInRoom(roomNumber),
+            ...this.getBattleClientsInRoom(roomNumber),
+        ].filter(client => client.participant?.nodeSessionId === nodeSessionId))
+        const identities = new Map<string, ParticipantIdentity>()
+        for (const battleParticipant of this.battleParticipants.get(roomNumber)?.values() ?? []) {
+            const identity = battleParticipant.participant
+            if (identity.nodeSessionId !== nodeSessionId) continue
+            identities.set(participantKey(identity.nodeSessionId, identity.viewerId), identity)
+        }
+
+        let removed = false
+        for (const identity of identities.values()) {
+            if (this.removeBattleParticipant(roomNumber, identity)) removed = true
+        }
+        for (const client of clients) {
+            if (client.isBattle) {
+                if (this.cidToBattleClient.get(client.connectionId) === client) {
+                    this.removeClient(client)
+                }
+            } else {
+                this.removeClient(client)
+            }
+            this.closeClientSocket(client.socket)
+            removed = true
+        }
+        return removed
+    }
+
     broadcastToBattleRoom(roomNumber: string, data: unknown): void {
         for (const client of this.getBattleClientsInRoom(roomNumber)) {
             this.sendJson(client.socket, data)
@@ -585,8 +619,15 @@ export class SessionManager {
         return this.battleFacts.authorizeParticipant(input)
     }
 
-    removeBattleFactParticipant(input: RoomParticipantInput): CoordinatorResult<void> {
+    removeBattleFactParticipant(input: RoomParticipantInput): CoordinatorResult<BattleStatus | null> {
         return this.battleFacts.removeParticipant(input)
+    }
+
+    removeBattleFactParticipantsByNodeSession(
+        roomNumber: string,
+        nodeSessionId: NodeSessionId,
+    ): BattleStatus | null {
+        return this.battleFacts.removeParticipantsByNodeSession(roomNumber, nodeSessionId)
     }
 
     hasAnyFinalizedBattle(input: Pick<BattleSessionInput, "roomNumber" | "battleSessionId">): boolean {

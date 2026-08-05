@@ -120,7 +120,7 @@ JSON.stringify(message) + "\0"
 |---|---|
 | `start` | 校验玩家为房间成员且请求关卡与房间一致；每位真人分别写入 active quest，仅房主预扣体力和 Always 门票；事务提交后才把房间设置为状态 4 |
 | `finish` | 由 Hub 授权 retained completion fact，再按 `play_id + category + quest_id` 校验多人 active quest，并拒绝负 Mana、非法分数/耗时、continue 次数或 Boost 余额不一致；各节点只结算自己的存档，全部剩余真人 Finalize 后由 coordinator 把房间恢复为状态 1 |
-| `abort` | 先在本地事务中退款并取消 active quest，提交后再 best-effort 通知 coordinator；房主放弃时解散房间，成员放弃时从权威当局参与者中移除 |
+| `abort` | 先在本地事务中退款并取消 active quest，提交后再 best-effort 通知 coordinator；房主放弃时解散房间，成员放弃时从权威当局参与者中移除并立即重判剩余成员是否全部 Finalize |
 | `play_continue` | 同时核对内存与 SQLite active quest；SQLite 提交成功后才更新内存 continue count。当前多人续关不扣星导石 |
 
 多人客户端会让每位真人分别请求 `start`，因此 active quest 是玩家级状态，不由房主记录替代成员记录。房主身份使用服务端房间中的 `host_player_id` 判断，不能由请求字段声明。成员 start 的入场成本固定为 0，但仍会保存自己的 `play_id`、房间号和关卡身份，以供 finish、abort、重连与多场景结束校验使用。
@@ -313,8 +313,9 @@ create_room
 
 - 房主 `abort` 先在自己的 SQLite 事务中退款并取消 active quest，提交后再通过 coordinator 解散房间；
 - `disband_room` 广播 Disbanded 并删除房间；
-- 非房主 abort 同样先提交自己的退款和 active quest 删除，再通过 coordinator 移除自身 battle 连接、屏障资格和 retained fact 授权，不删除房间或其他玩家的结算状态；
-- 本地事务失败时不调用 Hub，原请求可以重试；本地提交后 Hub cleanup 失败时仍返回本地成功并记录延迟清理告警，不回滚退款。重复 abort 因 active quest 已删除而失败，不会重复退款或再次调用 Hub。
+- 非房主 abort 同样先提交自己的退款和 active quest 删除，再通过 coordinator 移除自身 battle 连接、屏障资格和 retained fact 授权；移除后若剩余成员已经全部 Finalize，coordinator 立即 release 当局并保留已完成成员的 retained fact；
+- 本地事务失败时不调用 Hub，原请求可以重试；本地提交后 Hub cleanup 失败时仍返回本地成功，不回滚退款。node session 的 `expiresAt` 在注册时固定，认证 touch 只更新 `lastSeen`，不会延长 TTL；session 到期或 credential revoke 时，Hub 的失效回调按 active rooms 扫描并移除该 session 的 guest battle fact、参与者和连接，再次重判 release，因此遗漏的 Hub abort 会有界收敛；
+- 重复 abort 因 active quest 已删除而失败，不会重复退款或再次调用 Hub。失效扫描只在 node invalidation 事件执行，不给请求热路径增加索引或扫描。
 
 ### 10.3 连接断开
 

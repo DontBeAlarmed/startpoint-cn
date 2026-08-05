@@ -70,6 +70,152 @@ class FakeSocket {
     }
 }
 
+async function createGuestInvalidationFixture(t, mode) {
+    let now = 1_000
+    let credentialEnabled = true
+    const generated = ["invalidated-guest-node", "g".repeat(43)]
+    let generatedIndex = 0
+    const coordinator = new EmbeddedMultiCoordinator({ allowRemoteParticipants: true })
+    const cleanupResults = []
+    const sessions = new NodeSessionRegistry({
+        now: () => now,
+        sessionTtlMs: 100,
+        generateId: () => generated[generatedIndex++],
+        isCredentialEnabled: () => credentialEnabled,
+        onInvalidated(nodeSessionId) {
+            cleanupResults.push(coordinator.cleanupNodeSession(nodeSessionId))
+        },
+    })
+    const registered = sessions.register("invalidated-guest-credential", MULTI_PROTOCOL_VERSION)
+    const guest = { nodeSessionId: registered.nodeSessionId, viewerId: 902 }
+    const rooms = []
+
+    for (let index = 0; index < 2; index++) {
+        const host = { nodeSessionId: `invalidation-host-${mode}-${index}`, viewerId: 900 + index }
+        const created = await coordinator.createRoom({
+            requestId: `invalidation-${mode}-${index}`,
+            participant: host,
+            partyId: 1,
+            category: 1,
+            questId: 501,
+            leaderCharacterId: 101,
+            compatibility,
+        })
+        assert.equal(created.ok, true)
+        const roomNumber = created.value.roomNumber
+        getRoom(roomNumber).member_viewer_ids.push(guest.viewerId)
+        const hostConnectionId = `invalidation-host-${mode}-${index}`
+        const guestConnectionId = `invalidation-guest-${mode}-${index}`
+        const guestLobbySocket = new FakeSocket()
+        const guestLobby = sessionManager.createClient(
+            guestLobbySocket,
+            guest.viewerId,
+            roomNumber,
+            `invalidation-lobby-${mode}-${index}`,
+        )
+        guestLobby.participant = guest
+        assert.equal(sessionManager.addClientToRoom(guestLobby).ok, true)
+        const guestBattleSocket = new FakeSocket({ throwOnDestroy: index === 0 })
+        const guestBattle = sessionManager.createClient(
+            guestBattleSocket,
+            guest.viewerId,
+            roomNumber,
+            guestConnectionId,
+        )
+        guestBattle.participant = guest
+        guestBattle.isBattle = true
+        sessionManager.addBattleClient(guestConnectionId, guestBattle)
+        sessionManager.setBattleParticipants(roomNumber, [
+            { connectionId: hostConnectionId, participant: host },
+            { connectionId: guestConnectionId, participant: guest },
+        ], host)
+        updateRoomState(roomNumber, 4)
+        const battleSessionId = sessionManager.getActiveBattleSessionId(roomNumber)
+        assert.equal(typeof battleSessionId, "string")
+        sessionManager.markParticipantFinalizedBattle(roomNumber, host)
+        const finalized = await coordinator.finalizeBattle({ participant: host, roomNumber, battleSessionId })
+        assert.equal(finalized.ok, true)
+        assert.equal(finalized.value.finalized, true)
+        rooms.push({
+            battleSessionId,
+            guestBattleSocket,
+            guestLobbySocket,
+            host,
+            roomNumber,
+        })
+    }
+
+    t.after(() => {
+        for (const room of rooms) {
+            sessionManager.closeRoomClients(room.roomNumber)
+            disbandRoom(room.roomNumber)
+        }
+    })
+    return {
+        cleanupResults,
+        coordinator,
+        expire() {
+            if (mode === "expiry") now = registered.expiresAt
+            else credentialEnabled = false
+            return sessions.sweep()
+        },
+        guest,
+        rooms,
+        sessions,
+    }
+}
+
+for (const mode of ["expiry", "revoke"]) {
+    test(`invalidated guest cleanup converges finalized rooms after ${mode}`, async t => {
+        const fixture = await createGuestInvalidationFixture(t, mode)
+
+        // The home save already committed its abort, but the Hub abort request was lost.
+        assert.equal(fixture.sessions.isValid(fixture.guest.nodeSessionId), true)
+        assert.equal(fixture.expire(), 1)
+        assert.deepEqual(fixture.cleanupResults, [2])
+        for (const room of fixture.rooms) {
+            assert.equal(getRoom(room.roomNumber).raising_state, 1)
+            assert.equal(sessionManager.getActiveBattleSessionId(room.roomNumber), null)
+            assert.equal(room.guestLobbySocket.destroyed, true)
+            assert.equal(room.guestBattleSocket.destroyed, true)
+            assert.equal((await fixture.coordinator.getBattleStatus({
+                participant: room.host,
+                roomNumber: room.roomNumber,
+                battleSessionId: room.battleSessionId,
+            })).ok, true)
+            assert.deepEqual(await fixture.coordinator.getBattleStatus({
+                participant: fixture.guest,
+                roomNumber: room.roomNumber,
+                battleSessionId: room.battleSessionId,
+            }), { ok: false, error: "ROOM_PERMISSION_DENIED" })
+        }
+    })
+}
+
+test("invalidated guest cleanup continues after one room state cleanup throws", async t => {
+    const fixture = await createGuestInvalidationFixture(t, "expiry")
+    const originalCleanup = sessionManager.removeNodeSessionBattleState
+    let injected = false
+    sessionManager.removeNodeSessionBattleState = function (...args) {
+        const result = originalCleanup.apply(this, args)
+        if (!injected) {
+            injected = true
+            throw new Error("injected room state cleanup failure")
+        }
+        return result
+    }
+    t.after(() => {
+        sessionManager.removeNodeSessionBattleState = originalCleanup
+    })
+
+    assert.equal(fixture.expire(), 1)
+    assert.deepEqual(fixture.cleanupResults, [2])
+    for (const room of fixture.rooms) {
+        assert.equal(sessionManager.getActiveBattleSessionId(room.roomNumber), null)
+        assert.equal(getRoom(room.roomNumber).raising_state, 1)
+    }
+})
+
 test("invalid remote sessions remove their unconnected rooms and admissions only", async t => {
     let now = 1_000
     const enabled = new Map([

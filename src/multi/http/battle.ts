@@ -752,13 +752,15 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             })
             if (!hubAbort.ok) {
                 console.warn(
-                    `[MULTI] abort: Hub cleanup deferred for room ${storedQuest.roomNumber}`
+                    `[MULTI] abort: Hub cleanup deferred to node session invalidation`
+                    + `/revocation for room ${storedQuest.roomNumber}`
                     + ` (${hubAbort.error})`,
                 )
             }
         } catch (error) {
             console.warn(
-                `[MULTI] abort: Hub cleanup deferred for room ${storedQuest.roomNumber}`,
+                `[MULTI] abort: Hub cleanup deferred to node session invalidation`
+                + `/revocation for room ${storedQuest.roomNumber}`,
                 error,
             )
         }

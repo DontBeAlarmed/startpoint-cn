@@ -4,6 +4,7 @@ import {
     participantKey,
     type BattleSessionId,
     type CoordinatorResult,
+    type NodeSessionId,
     type ParticipantIdentity,
 } from "../coordinator/contracts"
 import type {
@@ -152,29 +153,40 @@ export class BattleFactStore {
         return { ok: true, value: this.toStatus(record, input.participant) }
     }
 
-    removeParticipant(input: RoomParticipantInput): CoordinatorResult<void> {
+    removeParticipant(input: RoomParticipantInput): CoordinatorResult<BattleStatus | null> {
         this.prune()
         const battleSessionId = this.activeBattleByRoom.get(input.roomNumber)
         const record = battleSessionId ? this.records.get(battleSessionId) : undefined
-        if (!record) return { ok: true, value: undefined }
+        if (!record) return { ok: true, value: null }
         const participantIndex = record.participants.findIndex(candidate => (
             candidate.viewerId === input.participant.viewerId
         ))
-        if (participantIndex < 0) return { ok: true, value: undefined }
+        if (participantIndex < 0) return { ok: true, value: null }
         if (!this.isAuthorized(record, {
             ...input,
             battleSessionId: record.battleSessionId,
         })) {
             return { ok: false, error: "ROOM_PERMISSION_DENIED" }
         }
-        const [participant] = record.participants.splice(participantIndex, 1)
-        record.participantKeys.delete(participantKey(
-            participant.nodeSessionId,
-            participant.viewerId,
-        ))
-        record.credentialIdByViewerId.delete(participant.viewerId)
-        record.finalizedViewerIds.delete(participant.viewerId)
-        return { ok: true, value: undefined }
+        this.removeRecordParticipant(record, participantIndex)
+        return { ok: true, value: this.toStatus(record, input.participant) }
+    }
+
+    removeParticipantsByNodeSession(
+        roomNumber: string,
+        nodeSessionId: NodeSessionId,
+    ): BattleStatus | null {
+        this.prune()
+        const battleSessionId = this.activeBattleByRoom.get(roomNumber)
+        const record = battleSessionId ? this.records.get(battleSessionId) : undefined
+        if (!record) return null
+        let removed = false
+        for (let index = record.participants.length - 1; index >= 0; index--) {
+            if (record.participants[index].nodeSessionId !== nodeSessionId) continue
+            this.removeRecordParticipant(record, index)
+            removed = true
+        }
+        return removed ? this.toStatus(record, record.host) : null
     }
 
     hasAnyFinalized(input: Pick<BattleSessionInput, "roomNumber" | "battleSessionId">): boolean {
@@ -234,6 +246,16 @@ export class BattleFactStore {
             input.participant.nodeSessionId,
             input.participant.viewerId,
         ))
+    }
+
+    private removeRecordParticipant(record: BattleFactRecord, index: number): void {
+        const [participant] = record.participants.splice(index, 1)
+        record.participantKeys.delete(participantKey(
+            participant.nodeSessionId,
+            participant.viewerId,
+        ))
+        record.credentialIdByViewerId.delete(participant.viewerId)
+        record.finalizedViewerIds.delete(participant.viewerId)
     }
 
     private prune(): void {
