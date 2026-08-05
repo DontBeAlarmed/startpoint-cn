@@ -271,13 +271,10 @@ async function main() {
             "a failed settlement must not consume the active quest",
         )
 
-        // --- control: the same finish without a module DOES settle -------
+        // --- control: retrying the same finish without a module settles --
         // Without this, "state unchanged" could pass vacuously if the chosen
         // state simply never moves during settlement.
         registry.resetModesForTest()
-        delete activeQuests[playerId]
-        const controlStart = await post(fastify, "start", startBody())
-        assert.equal(controlStart.statusCode, 200, controlStart.body)
         const beforeControl = settlementState()
         const controlFinish = await post(fastify, "finish", finishBody())
         assert.equal(controlFinish.statusCode, 200, controlFinish.body)

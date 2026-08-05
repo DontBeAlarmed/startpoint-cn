@@ -29,7 +29,7 @@ export function getPlayerActiveQuestSync(playerId: number): PlayerActiveQuest | 
 
 export function insertPlayerActiveQuestSync(playerId: number, quest: PlayerActiveQuest): void {
     getDb().prepare(`
-        INSERT OR REPLACE INTO players_active_quests
+        INSERT INTO players_active_quests
             (player_id, play_id, quest_id, category, use_boss_boost_point,
              use_boost_point, is_auto_start_mode, is_multi, room_number,
              battle_session_id, entry_item_id, entry_item_count, event_id, continue_count)

@@ -83,6 +83,7 @@ function bindParticipant(input: unknown, session: NodeSession): Record<string, u
     }
     return {
         ...record,
+        credentialId: session.credentialId,
         participant: Object.freeze({
             nodeSessionId: session.nodeSessionId,
             viewerId: participant?.viewerId,
@@ -190,6 +191,8 @@ export function registerMultiHubControlRoutes(
         input => options.coordinator.getRoomStatus(input))
     registerOperation(app, options, "/v1/multi/battles/start", "battles.start", true,
         input => options.coordinator.startBattle(input))
+    registerOperation(app, options, "/v1/multi/battles/abort", "battles.abort", true,
+        input => options.coordinator.abortBattle(input))
     registerOperation(app, options, "/v1/multi/battles/finalize", "battles.finalize", true,
         input => options.coordinator.finalizeBattle(input))
     registerOperation(app, options, "/v1/multi/battles/status", "battles.status", false,

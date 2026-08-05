@@ -11,12 +11,15 @@ require("ts-node/register/transpile-only")
 const { AdmissionRegistry } = require("../src/multi/admission/registry")
 const { MULTI_PROTOCOL_VERSION } = require("../src/multi/coordinator/contracts")
 const { EmbeddedMultiCoordinator } = require("../src/multi/coordinator/embedded")
+const { RemoteMultiCoordinator } = require("../src/multi/coordinator/remote")
 const { MultiHubCredentialStore } = require("../src/multi/hub/credential-store")
 const { CredentialReloader } = require("../src/multi/hub/credential-reloader")
 const { HubClient } = require("../src/multi/hub/client")
 const { IdempotencyCache } = require("../src/multi/hub/idempotency")
 const { NodeSessionRegistry } = require("../src/multi/hub/node-sessions")
 const { buildMultiHubControlApp } = require("../src/multi/hub/server")
+const { addRoomMember, disbandRoom, getRoom } = require("../src/multi/room/manager")
+const { sessionManager } = require("../src/multi/state/SessionManager")
 
 const compatibility = Object.freeze({
     multiProtocolVersion: MULTI_PROTOCOL_VERSION,
@@ -84,7 +87,9 @@ function createCoordinator() {
         const configured = results.get(name)
         if (configured instanceof Error) throw configured
         if (configured) return configured
-        if (name === "disbandRoom") return { ok: true, value: undefined }
+        if (name === "disbandRoom" || name === "abortBattle") {
+            return { ok: true, value: undefined }
+        }
         if (name.includes("Battle")) {
             return {
                 ok: true,
@@ -108,6 +113,7 @@ function createCoordinator() {
             prepareRoom: invoke("prepareRoom"),
             selectRoom: invoke("selectRoom"),
             disbandRoom: invoke("disbandRoom"),
+            abortBattle: invoke("abortBattle"),
             startBattle: invoke("startBattle"),
             finalizeBattle: invoke("finalizeBattle"),
             getBattleStatus: invoke("getBattleStatus"),
@@ -138,6 +144,7 @@ function createTrackedEmbeddedCoordinator() {
             prepareRoom: invoke("prepareRoom"),
             selectRoom: invoke("selectRoom"),
             disbandRoom: invoke("disbandRoom"),
+            abortBattle: invoke("abortBattle"),
             startBattle: invoke("startBattle"),
             finalizeBattle: invoke("finalizeBattle"),
             getBattleStatus: invoke("getBattleStatus"),
@@ -233,6 +240,21 @@ function participantInput(registration, viewerId = 101) {
             nodeSessionId: registration.json().nodeSessionId,
             viewerId,
         },
+    }
+}
+
+function fetchThroughHub(app) {
+    return async (url, init) => {
+        const response = await app.inject({
+            method: init.method,
+            url: new URL(url).pathname,
+            headers: init.headers,
+            payload: init.body,
+        })
+        return new Response(response.body, {
+            status: response.statusCode,
+            headers: response.headers,
+        })
     }
 }
 
@@ -405,6 +427,7 @@ test("delegates every room and battle operation with the authenticated node iden
         ["/v1/multi/rooms/disband", "disbandRoom", { participant, roomNumber: "123456" }, true],
         ["/v1/multi/rooms/status", "getRoomStatus", { participant, roomNumber: "123456" }, false],
         ["/v1/multi/battles/start", "startBattle", { participant, roomNumber: "123456" }, true],
+        ["/v1/multi/battles/abort", "abortBattle", { participant, roomNumber: "123456" }, true],
         ["/v1/multi/battles/finalize", "finalizeBattle", { participant, roomNumber: "123456", battleSessionId: "battle-session" }, true],
         ["/v1/multi/battles/status", "getBattleStatus", { participant, roomNumber: "123456", battleSessionId: "battle-session" }, false],
     ]
@@ -421,6 +444,7 @@ test("delegates every room and battle operation with the authenticated node iden
         assert.ok(call, method)
         assert.equal(call[1].participant.nodeSessionId, registration.json().nodeSessionId)
         assert.equal(call[1].participant.viewerId, 202)
+        assert.equal(call[1].credentialId, target.first.credentialId)
     }
 })
 
@@ -703,4 +727,186 @@ test("status counting does not revalidate unrelated node credentials", () => {
     assert.equal(credentialChecks, 1)
     assert.equal(sessions.activeCount(), 2)
     assert.equal(credentialChecks, 1)
+})
+
+test("real RemoteCoordinator retains finalized facts across room reset and session rotation", async t => {
+    const target = fixture(t, { coordinatorFactory: createTrackedEmbeddedCoordinator })
+    const hostClient = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        fetch: fetchThroughHub(target.app),
+        now: () => target.getNow(),
+    })
+    const guestClient = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.second.token,
+        fetch: fetchThroughHub(target.app),
+        now: () => target.getNow(),
+    })
+    const hostCoordinator = new RemoteMultiCoordinator(hostClient)
+    const guestCoordinator = new RemoteMultiCoordinator(guestClient)
+    const created = await hostCoordinator.createRoom({
+        requestId: "remote-finalized-lifecycle",
+        participant: { nodeSessionId: "pending", viewerId: 101 },
+        partyId: 1,
+        category: 1,
+        questId: 501,
+        leaderCharacterId: 101,
+        compatibility,
+    })
+    assert.equal(created.ok, true)
+    const roomNumber = created.value.roomNumber
+    t.after(() => disbandRoom(roomNumber))
+    assert.equal(addRoomMember(roomNumber, 202), true)
+    const guestRoom = await guestCoordinator.getRoomStatus({
+        participant: { nodeSessionId: "pending", viewerId: 202 },
+        roomNumber,
+    })
+    assert.equal(guestRoom.ok, true)
+    const hostParticipant = created.value.host
+    const guestParticipant = {
+        nodeSessionId: guestClient.getNodeSessionId(),
+        viewerId: 202,
+    }
+    const guestSessionClient = sessionManager.createClient({
+        writable: false,
+        end() {},
+    }, guestParticipant.viewerId, roomNumber, "remote-guest-lobby")
+    guestSessionClient.participant = guestParticipant
+    assert.equal(sessionManager.addClientToRoom(guestSessionClient).ok, true)
+    t.after(() => sessionManager.removeClient(guestSessionClient))
+    sessionManager.setBattleParticipants(roomNumber, [
+        { connectionId: "remote-host", participant: hostParticipant },
+        { connectionId: "remote-guest", participant: guestParticipant },
+    ], hostParticipant)
+
+    const hostBattle = await hostCoordinator.startBattle({ participant: hostParticipant, roomNumber })
+    const guestBattle = await guestCoordinator.startBattle({ participant: guestParticipant, roomNumber })
+    assert.equal(hostBattle.ok, true)
+    assert.equal(guestBattle.ok, true)
+    assert.equal(hostBattle.value.battleSessionId, guestBattle.value.battleSessionId)
+    const battleSessionId = hostBattle.value.battleSessionId
+    sessionManager.markParticipantFinalizedBattle(roomNumber, hostParticipant)
+    sessionManager.markParticipantFinalizedBattle(roomNumber, guestParticipant)
+
+    assert.deepEqual(await hostCoordinator.startBattle({ participant: hostParticipant, roomNumber }), {
+        ok: false,
+        error: "ROOM_NOT_FOUND",
+    })
+    assert.deepEqual(await guestCoordinator.startBattle({ participant: guestParticipant, roomNumber }), {
+        ok: false,
+        error: "ROOM_NOT_FOUND",
+    })
+    const finalized = await hostCoordinator.finalizeBattle({
+        participant: hostParticipant,
+        roomNumber,
+        battleSessionId,
+    })
+    assert.equal(finalized.ok, true)
+    assert.equal(finalized.value.finalized, true)
+    assert.equal(getRoom(roomNumber).raising_state, 1)
+    assert.equal(sessionManager.getActiveBattleSessionId(roomNumber), null)
+
+    const rotatedClient = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        fetch: fetchThroughHub(target.app),
+        now: () => target.getNow(),
+    })
+    const rotated = new RemoteMultiCoordinator(rotatedClient)
+    const delayed = await rotated.getBattleStatus({
+        participant: { nodeSessionId: "pending", viewerId: 101 },
+        roomNumber,
+        battleSessionId,
+    })
+    assert.equal(delayed.ok, true)
+    assert.equal(delayed.value.finalized, true)
+    assert.equal(delayed.value.host.nodeSessionId, rotatedClient.getNodeSessionId())
+    assert.equal("credentialId" in delayed.value, false)
+
+    assert.deepEqual(await guestCoordinator.getBattleStatus({
+        participant: guestParticipant,
+        roomNumber,
+        battleSessionId,
+    }), { ok: true, value: {
+        ...guestBattle.value,
+        finalized: true,
+    } })
+    assert.deepEqual(await guestCoordinator.getBattleStatus({
+        participant: { nodeSessionId: "pending", viewerId: 101 },
+        roomNumber,
+        battleSessionId,
+    }), { ok: false, error: "ROOM_PERMISSION_DENIED" })
+
+    target.store.revoke(target.first.credentialId)
+    target.reloader.reloadIfChanged()
+    assert.deepEqual(await rotated.getBattleStatus({
+        participant: { nodeSessionId: "pending", viewerId: 101 },
+        roomNumber,
+        battleSessionId,
+    }), { ok: false, error: "HUB_UNAVAILABLE" })
+})
+
+test("real RemoteCoordinator aborts through Hub room ownership", async t => {
+    const target = fixture(t, { coordinatorFactory: createTrackedEmbeddedCoordinator })
+    const hostClient = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        fetch: fetchThroughHub(target.app),
+        now: () => target.getNow(),
+    })
+    const guestClient = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.second.token,
+        fetch: fetchThroughHub(target.app),
+        now: () => target.getNow(),
+    })
+    const hostRemote = new RemoteMultiCoordinator(hostClient)
+    const guestRemote = new RemoteMultiCoordinator(guestClient)
+    const created = await hostRemote.createRoom({
+        requestId: "remote-abort",
+        participant: { nodeSessionId: "pending", viewerId: 303 },
+        partyId: 1,
+        category: 1,
+        questId: 501,
+        leaderCharacterId: 101,
+        compatibility,
+    })
+    assert.equal(created.ok, true)
+    const roomNumber = created.value.roomNumber
+    t.after(() => disbandRoom(roomNumber))
+    assert.equal(addRoomMember(roomNumber, 404), true)
+    assert.equal((await guestRemote.getRoomStatus({
+        participant: { nodeSessionId: "pending", viewerId: 404 },
+        roomNumber,
+    })).ok, true)
+    const guestParticipant = {
+        nodeSessionId: guestClient.getNodeSessionId(),
+        viewerId: 404,
+    }
+    const guestSessionClient = sessionManager.createClient({
+        writable: false,
+        end() {},
+    }, guestParticipant.viewerId, roomNumber, "remote-abort-guest-lobby")
+    guestSessionClient.participant = guestParticipant
+    assert.equal(sessionManager.addClientToRoom(guestSessionClient).ok, true)
+    t.after(() => sessionManager.removeClient(guestSessionClient))
+    sessionManager.setBattleParticipants(roomNumber, [
+        { connectionId: "remote-abort-host", participant: created.value.host },
+        { connectionId: "remote-abort-guest", participant: guestParticipant },
+    ], created.value.host)
+
+    assert.deepEqual(await guestRemote.abortBattle({
+        participant: guestParticipant,
+        roomNumber,
+    }), { ok: true, value: undefined })
+    assert.notEqual(getRoom(roomNumber), undefined)
+    assert.equal(sessionManager.getBattleParticipant(roomNumber, "remote-abort-guest"), undefined)
+    assert.notEqual(sessionManager.getBattleParticipant(roomNumber, "remote-abort-host"), undefined)
+
+    assert.deepEqual(await hostRemote.abortBattle({
+        participant: created.value.host,
+        roomNumber,
+    }), { ok: true, value: undefined })
+    assert.equal(getRoom(roomNumber), undefined)
 })

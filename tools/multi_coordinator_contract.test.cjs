@@ -179,6 +179,7 @@ const ok = <T>(value: T): Promise<CoordinatorResult<T>> => (
     Promise.resolve({ ok: true, value })
 )
 const coordinator: MultiCoordinator = {
+    abortBattle: () => ok(undefined),
     createRoom: () => ok(roomStatus),
     searchRoom: () => ok(roomStatus),
     prepareRoom: () => ok(roomStatus),
@@ -408,6 +409,7 @@ test("coordinator type contract stays narrow and node-scoped", () => {
         ts.isInterfaceDeclaration,
     )
     assert.deepEqual(sortedMemberNames(multiCoordinator), [
+        "abortBattle",
         "createRoom",
         "disbandRoom",
         "finalizeBattle",

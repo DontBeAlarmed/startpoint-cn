@@ -577,6 +577,18 @@ export class SessionManager {
         return this.battleFacts.getBattleStatus(input)
     }
 
+    authorizeBattleParticipant(input: BattleSessionInput): CoordinatorResult<BattleStatus> {
+        return this.battleFacts.authorizeParticipant(input)
+    }
+
+    hasAnyFinalizedBattle(input: Pick<BattleSessionInput, "roomNumber" | "battleSessionId">): boolean {
+        return this.battleFacts.hasAnyFinalized(input)
+    }
+
+    isBattleFullyFinalized(input: Pick<BattleSessionInput, "roomNumber" | "battleSessionId">): boolean {
+        return this.battleFacts.isFullyFinalized(input)
+    }
+
     private resetBattleScene(roomNumber: string, count: number): void {
         this.sceneReadyClients.delete(roomNumber)
         this.sceneTransitionClients.delete(roomNumber)

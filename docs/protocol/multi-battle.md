@@ -143,7 +143,7 @@ JSON.stringify(message) + "\0"
 
 | 值 | 当前语义 | 写入或返回时机 |
 |---:|---|---|
-| 1 | Ready | 房主进入 lobby；房主 finish 后恢复为可重赛状态 |
+| 1 | Ready | 房主进入 lobby；当局全部真人 Finalize 后由 coordinator 恢复为可重赛状态 |
 | 2 | Waiting | 新建房间初态；房主尚未进入时客人继续轮询 |
 | 4 | Battle | StartBattle 或 HTTP start 后进入战斗 |
 | 9 | Missing | `select_room`、`prepare` 或 `restore_room` 找不到房间时返回 |
@@ -300,20 +300,20 @@ create_room
 
 ### 10.1 Finish
 
-房主 `finish` 完成以下操作：
+每个玩家的 `finish` 完成以下操作：
 
-- 删除内存和 SQLite active quest；
-- 清理 battle expected count；
-- 结算玩家奖励、关卡进度和任务 tracker；
-- 如果进程内房间仍存在，把 `raising_state` 设为 1。
+- 在本地写事务前查询 Hub 保留的参与者、`battleSessionId` 和 Finalize 完成事实；
+- 通过 coordinator 处理权威房间生命周期；全部真人已 Finalize 时释放当局 battle 状态并把房间恢复为 Ready；
+- 在玩家自己的 SQLite 事务内重新比对并消费 active quest，同时结算奖励、关卡进度和任务 tracker；
+- 本地事务失败时整体回滚，active quest 与 Hub 限时保留的完成事实可供重试。
 
-`finish` 不直接解散房间，也没有专用的 60 秒回房定时器。只要 lobby 连接仍在，房间可以继续用于重赛；否则由连接断开规则和通用非战斗空闲清理决定房间寿命。
+`finish` 不直接解散房间，也没有专用的 60 秒回房定时器。client 模式不读取或重置节点本地 room manager；embedded、host 和 client 都经同一 coordinator 契约处理房间。只要 lobby 连接仍在，完成后的房间可以继续用于重赛；否则由连接断开规则和通用非战斗空闲清理决定房间寿命。
 
 ### 10.2 Abort 与主动解散
 
-- 房主 `abort` 成功取消 active quest 时解散房间；
+- 房主 `abort` 通过 coordinator 解散房间，再取消自己的 active quest；
 - `disband_room` 广播 Disbanded 并删除房间；
-- 非房主 abort 只处理其自身 active quest，并移除自身 battle 连接、屏障资格和未消费的 Finalize 凭证，不删除房间或其他玩家的结算状态。
+- 非房主 abort 通过 coordinator 移除自身 battle 连接和屏障资格，再处理自己的 active quest，不删除房间或其他玩家的结算状态。
 
 ### 10.3 连接断开
 

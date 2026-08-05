@@ -52,6 +52,10 @@ export class RemoteMultiCoordinator implements MultiCoordinator, AdmissionIssuer
         return this.client.write("/v1/multi/rooms/disband", input)
     }
 
+    abortBattle(input: RoomParticipantInput): Promise<CoordinatorResult<void>> {
+        return this.client.write("/v1/multi/battles/abort", input)
+    }
+
     startBattle(input: RoomParticipantInput): Promise<CoordinatorResult<BattleStatus>> {
         return this.client.write("/v1/multi/battles/start", input)
     }

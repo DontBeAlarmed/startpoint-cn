@@ -5,6 +5,7 @@ import {
     getRoom,
     getRoomByToken,
     listActiveRooms,
+    updateRoomState,
     updateHostEntryTime,
 } from "../room/manager"
 import { sessionManager } from "../state/SessionManager"
@@ -180,6 +181,28 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         return ok(undefined)
     }
 
+    async abortBattle(input: RoomParticipantInput): Promise<CoordinatorResult<void>> {
+        assertParticipant(input.participant, this.allowRemoteParticipants)
+        const room = getRoom(input.roomNumber)
+        if (!room) return roomNotFound()
+        const status = this.toRoomStatus(room)
+        const identityKey = participantKey(
+            input.participant.nodeSessionId,
+            input.participant.viewerId,
+        )
+        if (!status.members.some(member => participantKey(
+            member.nodeSessionId,
+            member.viewerId,
+        ) === identityKey)) {
+            return { ok: false, error: "ROOM_PERMISSION_DENIED" }
+        }
+        if (participantKey(status.host.nodeSessionId, status.host.viewerId) === identityKey) {
+            return this.removeOwnedRoom(room) ? ok(undefined) : roomNotFound()
+        }
+        sessionManager.removeBattleParticipant(input.roomNumber, input.participant)
+        return ok(undefined)
+    }
+
     cleanupNodeSession(nodeSessionId: NodeSessionId): number {
         let removed = 0
         for (const room of listActiveRooms()) {
@@ -211,16 +234,20 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         }
         const battleSessionId = sessionManager.getActiveBattleSessionId(input.roomNumber)
         if (battleSessionId === null) return { ok: false, error: "HUB_UNAVAILABLE" }
-        return sessionManager.getBattleStatus({
-            participant: input.participant,
-            roomNumber: input.roomNumber,
-            battleSessionId,
-        })
+        const battleInput = { ...input, battleSessionId }
+        if (sessionManager.hasAnyFinalizedBattle(battleInput)) return roomNotFound()
+        return sessionManager.authorizeBattleParticipant(battleInput)
     }
 
     async finalizeBattle(input: BattleSessionInput): Promise<CoordinatorResult<BattleStatus>> {
         this.assertBattleInput(input)
-        return sessionManager.getBattleStatus(input)
+        const result = sessionManager.getBattleStatus(input)
+        if (!result.ok || !result.value.finalized) return result
+        if (sessionManager.isBattleFullyFinalized(input)) {
+            updateRoomState(input.roomNumber, 1)
+            sessionManager.clearBattleExpectedCount(input.roomNumber)
+        }
+        return result
     }
 
     async getBattleStatus(input: BattleSessionInput): Promise<CoordinatorResult<BattleStatus>> {

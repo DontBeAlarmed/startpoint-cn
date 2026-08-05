@@ -48,7 +48,9 @@ CN 主数据中只有入口关卡 `1001002`、`1001003` 的第 122 列 `is_both_
 
 battle 握手要求房间已进入战斗状态，且 connection ID 属于房主 StartBattle 固化的真人身份快照；客人不能提前固化名单，仅在战斗开始后临时建立的 lobby 连接也不能加入场景屏障。快照独立于 lobby/battle socket 生命周期，因此合法成员可在 lobby 断开后建立 battle socket，也不会因 battle socket 短暂断开而失去当局重连资格。服务端按 generation 记录每个 connection ID 是否已收到 BattleStart，只有 socket 写入成功后才记录送达；重连者提交对应的 SceneReady 时只向其补发遗漏代次，不会让在线成员重复进入场景。校验通过后 battle socket 继承快照中的 viewer/player 身份，未知成员和重复连接会被拒绝。Notify 3、4、5 分别按 Measurement、LineSpeedWarning、Heartbeat 处理，Measurement 返回客户端参照实现使用的 2000ms 告警阈值，不再占用旧客户端枚举位置。普通关卡和隐藏战斗配置发送 LevelNext 会被忽略。
 
-HTTP active quest 仍贯穿一次 start 到最终 finish。第一 Boss 后不删除 active quest、不发奖励、不更新完成进度；BothBoss 的 HTTP finish 还要求当前玩家已完成合法 TCP Finalize。服务端在写事务前原子消费该玩家的 Finalize 凭证，事务失败时恢复；房主清理场景屏障不会删除其他真人尚未消费的凭证。非房主 abort 只移除自身的 battle 连接、屏障资格和 Finalize 凭证，房主 abort 才解散并清理全房间。第二 Boss 后客户端只提交一次 HTTP finish，因此奖励和任务事实仍只有一次事务结算。房主 finish 后才把房间恢复为可重赛状态，其他仍连接的 battle client 完成前不会提前清除场景状态。
+HTTP active quest 仍贯穿一次 start 到最终 finish。第一 Boss 后不删除 active quest、不发奖励、不更新完成进度；BothBoss 的 HTTP finish 还要求当前玩家已完成合法 TCP Finalize。Hub 把参与者、房间、`battleSessionId` 和 Finalize 结果保存为只读完成事实，房间释放后仍保留最多 30 分钟，HTTP finish 查询该事实但不消费它。
+
+完成后的房间生命周期由 coordinator/Hub 权威处理：全部真人已 Finalize 时，Hub 结束并释放当局房间状态，同时保留完成事实供各节点延迟结算。每个玩家节点随后只在自己的 SQLite 事务中重新比对并消费 active quest；奖励、库存、任务、履历、邮件和 active quest 删除处于同一事务。若本地事务失败，所有写入回滚，active quest 与 Hub 完成事实都仍可用于重试。非房主 abort 通过 coordinator 移除自身 battle 参与状态，房主 abort 通过 coordinator 解散房间；本地节点不把自己的 room manager 当作远端房间权威。第二 Boss 后客户端只提交一次 HTTP finish，重复请求会因本地 active quest 已被事务消费而失败，不会重复结算。
 
 ## 验收边界
 

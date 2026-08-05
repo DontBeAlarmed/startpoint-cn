@@ -71,7 +71,7 @@ export function validateMultiFinishRequest(
     activeQuest: Pick<ActiveQuest,
         "playId" | "questId" | "category" | "isMulti" | "continueCount"
         | "useBoostPoint" | "useBossBoostPoint">,
-    balances: MultiFinishBalances,
+    balances?: MultiFinishBalances,
 ): MultiFinishValidationResult {
     if (!activeQuest.isMulti
         || body.play_id !== activeQuest.playId
@@ -99,8 +99,8 @@ export function validateMultiFinishRequest(
         || Object.keys(statistics).length === 0) {
         return { ok: false, message: "Invalid finish result." }
     }
-    if ((activeQuest.useBoostPoint && balances.boostPoint < 1)
-        || (activeQuest.useBossBoostPoint && balances.bossBoostPoint < 1)) {
+    if (balances && ((activeQuest.useBoostPoint && balances.boostPoint < 1)
+        || (activeQuest.useBossBoostPoint && balances.bossBoostPoint < 1))) {
         return { ok: false, message: "Not enough boost points." }
     }
 

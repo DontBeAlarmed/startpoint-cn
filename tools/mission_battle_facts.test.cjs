@@ -173,14 +173,16 @@ const multiSettlementTime = multiBattleSource.indexOf(
 )
 const multiTransactionCall = multiBattleSource.indexOf("runMultiActiveQuestSettlementTransaction(")
 const multiActiveDelete = multiBattleSource.indexOf("delete activeQuests[playerId]", multiTransactionCall)
-const multiRoomReset = multiBattleSource.indexOf("updateRoomState(room.room_number, 1)", multiTransactionCall)
+const multiCoordinatorFinalize = multiBattleSource.indexOf("context.coordinator.finalizeBattle({")
 assert.equal(multiTransactionStart >= 0, true, "多人 finish 必须定义同步结算事务体")
 assert.equal(multiEvaluationTime > multiTransactionStart, true, "多人 finish 必须在事务体内固定任务时间")
 assert.equal(multiFactCall > multiTransactionStart, true)
 assert.equal(multiSettlementTime > multiFactCall, true, "多人任务结算必须复用事实记录的时间")
 assert.equal(multiTransactionCall > multiFactCall, true, "任务事实必须在事务体执行后统一提交")
 assert.equal(multiActiveDelete > multiTransactionCall, true, "事务成功前不得清除多人 active quest 内存")
-assert.equal(multiRoomReset > multiTransactionCall, true, "事务成功前不得重置多人房间状态")
+assert.equal(multiCoordinatorFinalize >= 0, true, "多人 finish 必须通过 coordinator 结束权威房间生命周期")
+assert.equal(multiCoordinatorFinalize < multiTransactionCall, true, "Hub 网络操作不得在本地 SQLite 事务内执行")
+assert.equal(multiBattleSource.includes("updateRoomState("), false, "HTTP 节点不得直接重置本地房间状态")
 assert.match(
     multiBattleSource,
     /const finishCtx: FinishContext = \{[\s\S]*?isMultiHost: isRoomHost,[\s\S]*?\}/,

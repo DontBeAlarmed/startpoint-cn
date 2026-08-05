@@ -17,7 +17,8 @@ interface BattleFactRecord {
     readonly host: ParticipantIdentity
     readonly participants: readonly ParticipantIdentity[]
     readonly participantKeys: ReadonlySet<string>
-    readonly finalizedParticipantKeys: Set<string>
+    readonly credentialIdByViewerId: Map<number, string>
+    readonly finalizedViewerIds: Set<number>
     readonly sequence: number
     expiresAt: number | null
 }
@@ -62,7 +63,12 @@ export class BattleFactStore {
         this.prune()
         const activeId = this.activeBattleByRoom.get(input.roomNumber)
         const active = activeId ? this.records.get(activeId) : undefined
-        if (active) return this.toStatus(active, input.host)
+        if (active) {
+            if (active.finalizedViewerIds.size > 0) {
+                throw new Error("battle session is finalized")
+            }
+            return this.toStatus(active, input.host)
+        }
 
         const battleSessionId = this.createBattleSessionId() as BattleSessionId
         if (typeof battleSessionId !== "string"
@@ -87,7 +93,8 @@ export class BattleFactStore {
             host,
             participants,
             participantKeys,
-            finalizedParticipantKeys: new Set(),
+            credentialIdByViewerId: new Map(),
+            finalizedViewerIds: new Set(),
             sequence: ++this.sequence,
             expiresAt: null,
         }
@@ -103,11 +110,30 @@ export class BattleFactStore {
         if (!record || record.roomNumber !== input.roomNumber) {
             return { ok: false, error: "ROOM_NOT_FOUND" }
         }
+        if (!this.isAuthorized(record, input)) {
+            return { ok: false, error: "ROOM_PERMISSION_DENIED" }
+        }
+        return { ok: true, value: this.toStatus(record, input.participant) }
+    }
+
+    authorizeParticipant(input: BattleSessionInput): CoordinatorResult<BattleStatus> {
+        this.prune()
+        const record = this.records.get(input.battleSessionId)
+        if (!record || record.roomNumber !== input.roomNumber) {
+            return { ok: false, error: "ROOM_NOT_FOUND" }
+        }
         if (!record.participantKeys.has(participantKey(
             input.participant.nodeSessionId,
             input.participant.viewerId,
         ))) {
             return { ok: false, error: "ROOM_PERMISSION_DENIED" }
+        }
+        if (input.credentialId !== undefined) {
+            const existing = record.credentialIdByViewerId.get(input.participant.viewerId)
+            if (existing !== undefined && existing !== input.credentialId) {
+                return { ok: false, error: "ROOM_PERMISSION_DENIED" }
+            }
+            record.credentialIdByViewerId.set(input.participant.viewerId, input.credentialId)
         }
         return { ok: true, value: this.toStatus(record, input.participant) }
     }
@@ -117,12 +143,22 @@ export class BattleFactStore {
         if (!result.ok) return result
         const record = this.records.get(input.battleSessionId)
         if (!record) return { ok: false, error: "ROOM_NOT_FOUND" }
-        record.finalizedParticipantKeys.add(participantKey(
-            input.participant.nodeSessionId,
-            input.participant.viewerId,
-        ))
+        record.finalizedViewerIds.add(input.participant.viewerId)
         record.expiresAt ??= this.now() + this.retentionMs
         return { ok: true, value: this.toStatus(record, input.participant) }
+    }
+
+    hasAnyFinalized(input: Pick<BattleSessionInput, "roomNumber" | "battleSessionId">): boolean {
+        this.prune()
+        const record = this.records.get(input.battleSessionId)
+        return record?.roomNumber === input.roomNumber && record.finalizedViewerIds.size > 0
+    }
+
+    isFullyFinalized(input: Pick<BattleSessionInput, "roomNumber" | "battleSessionId">): boolean {
+        this.prune()
+        const record = this.records.get(input.battleSessionId)
+        return record?.roomNumber === input.roomNumber
+            && record.finalizedViewerIds.size === record.participants.length
     }
 
     getActiveBattleSessionId(roomNumber: string): BattleSessionId | null {
@@ -135,7 +171,7 @@ export class BattleFactStore {
         this.activeBattleByRoom.delete(roomNumber)
         if (battleSessionId !== undefined) {
             const record = this.records.get(battleSessionId)
-            if (record?.finalizedParticipantKeys.size === 0) {
+            if (record?.finalizedViewerIds.size === 0) {
                 this.records.delete(battleSessionId)
             }
         }
@@ -143,16 +179,32 @@ export class BattleFactStore {
     }
 
     private toStatus(record: BattleFactRecord, participant: ParticipantIdentity): BattleStatus {
+        const participants = record.participants.map(candidate => (
+            candidate.viewerId === participant.viewerId
+                ? Object.freeze({ ...participant })
+                : candidate
+        ))
+        const host = record.host.viewerId === participant.viewerId
+            ? Object.freeze({ ...participant })
+            : record.host
         return Object.freeze({
             battleSessionId: record.battleSessionId,
             roomNumber: record.roomNumber,
-            host: record.host,
-            participants: record.participants,
-            finalized: record.finalizedParticipantKeys.has(participantKey(
-                participant.nodeSessionId,
-                participant.viewerId,
-            )),
+            host,
+            participants: Object.freeze(participants),
+            finalized: record.finalizedViewerIds.has(participant.viewerId),
         })
+    }
+
+    private isAuthorized(record: BattleFactRecord, input: BattleSessionInput): boolean {
+        const credentialId = record.credentialIdByViewerId.get(input.participant.viewerId)
+        if (credentialId !== undefined && input.credentialId !== undefined) {
+            return credentialId === input.credentialId
+        }
+        return record.participantKeys.has(participantKey(
+            input.participant.nodeSessionId,
+            input.participant.viewerId,
+        ))
     }
 
     private prune(): void {

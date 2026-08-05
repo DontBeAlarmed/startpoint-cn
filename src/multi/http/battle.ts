@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { MultiStartBody, MultiFinishBody, MultiAbortBody, PlayContinueBody } from "../types";
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
-import { getRoom, disbandRoom, updateRoomState } from "../room/manager";
+import { getRoom, disbandRoom } from "../room/manager";
 import { sessionManager } from "../state/SessionManager";
 import {
     ActiveQuestSettlementConflictError,
@@ -12,6 +12,7 @@ import {
     runContinueActiveQuestTransaction,
     runMultiActiveQuestSettlementTransaction,
 } from "../../lib/quest/active-quest-service";
+import { getPlayerActiveQuestSync } from "../../data/domains/quest_active";
 import { incrementPlayerCharacterClearSync } from "../../data/domains/character_clear";
 import {
     getPlayerSync,
@@ -57,6 +58,7 @@ import {
 import { buildFinishFollowInfo } from "../../lib/quest/finish/follow-info";
 import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
 import {
+    ActiveQuestAlreadyExistsError,
     buildStartEntryItemList,
     InsufficientEntryItemError,
     InsufficientStaminaError,
@@ -69,7 +71,11 @@ import {
     validateMultiStartRequest,
 } from "../../lib/quest/multi-battle-validation";
 import { isValidMultiViewerId, type MultiHttpContext } from "./context";
-import { participantKey, type ParticipantIdentity } from "../coordinator/contracts";
+import {
+    participantKey,
+    type BattleSessionId,
+    type ParticipantIdentity,
+} from "../coordinator/contracts";
 
 export function canAbortMultiBattle(
     roomNumber: string,
@@ -180,6 +186,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
 
         const battle = await context.coordinator.startBattle({ participant, roomNumber: room_number });
         if (!battle.ok
+            || battle.value.finalized
             || battle.value.roomNumber !== room_number
             || participantKey(
                 battle.value.host.nodeSessionId,
@@ -234,6 +241,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 now: new Date(),
             }, {
                 transaction: operation => getDb().transaction(operation)(),
+                getActiveQuest: getPlayerActiveQuestSync,
                 getPlayer: getPlayerSync,
                 computeStamina: computeRealTimeStamina,
                 getItemCount: getPlayerItemSync,
@@ -243,7 +251,8 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 publishActiveQuest,
             });
         } catch (error) {
-            if (error instanceof InsufficientEntryItemError
+            if (error instanceof ActiveQuestAlreadyExistsError
+                || error instanceof InsufficientEntryItemError
                 || error instanceof InsufficientStaminaError
                 || error instanceof PlayerNotFoundError) {
                 return reply.status(400).send({
@@ -286,7 +295,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             });
         }
 
-        const { playerId, player } = ctx;
+        const { playerId } = ctx;
         const participant = context.snapshotProvider.getParticipant(viewerId);
 
         const activeQuestData = activeQuests[playerId];
@@ -315,10 +324,6 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         const finishValidation = validateMultiFinishRequest(
             body as unknown as Record<string, unknown>,
             activeQuestData,
-            {
-                boostPoint: player.boostPoint,
-                bossBoostPoint: player.bossBoostPoint,
-            },
         );
         if (!finishValidation.ok) {
             return reply.status(400).send({
@@ -343,7 +348,16 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 "error": "Bad Request", "message": "Battle is not finalized."
             });
         }
-        const room = getRoom(activeQuestData.roomNumber);
+        const finalizedBattle = await context.coordinator.finalizeBattle({
+            participant,
+            roomNumber: activeQuestData.roomNumber,
+            battleSessionId: activeQuestData.battleSessionId as BattleSessionId,
+        });
+        if (!finalizedBattle.ok || !finalizedBattle.value.finalized) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Battle finalization is unavailable."
+            });
+        }
         const isRoomHost = settlement.isHost;
         console.log(`[MULTI] finish host context: playerId=${playerId} isRoomHost=${isRoomHost}`);
         // calculate clear rank
@@ -357,33 +371,9 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                             : 1
         ) : null;
 
-        const beforeRankPoint = player.rankPoint;
-        const newRankPoint = beforeRankPoint + questData.rankPointReward;
-
-        const newBoostPoint = player.boostPoint - (activeQuestData.useBoostPoint ? 1 : 0);
-        const newBossBoostPoint = player.bossBoostPoint - (activeQuestData.useBossBoostPoint ? 1 : 0);
         const useBoostPoint = activeQuestData.useBoostPoint || activeQuestData.useBossBoostPoint;
-
-        // quest progress
-        const questProgress = getPlayerSingleQuestProgressSync(playerId, questCategory, questId);
-        const questProgressExists = questProgress !== null;
-        const questPreviouslyCompleted = questProgress?.finished === true;
         const questAccomplished = body.is_accomplished;
-        const hostFinished = resolveHostFinished({
-            previouslyHostFinished: questProgress?.hostFinished ?? false,
-            questAccomplished,
-            isRoomHost,
-        });
         const leaderId = (finishValidation.statistics as any).party?.characters?.[0]?.id
-        const rewardEligibility = resolveQuestRewardEligibility({
-            questAccomplished,
-            clearRank,
-            questProgress,
-        })
-
-        const oldRkDegree = getRankDegree(beforeRankPoint);
-        const newDegreeId = getRankDegree(newRankPoint);
-        const didLevelUp = newDegreeId > oldRkDegree;
 
         const bodyPartyStatistics = (finishValidation.statistics as any).party || { characters: [], unison_characters: [] };
         const partyCharacterIdsArray: number[] = [];
@@ -391,22 +381,57 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             if (value !== null && (value as any).id !== null && (value as any).id !== undefined) partyCharacterIdsArray.push((value as any).id);
         }
 
-        const finishCtx: FinishContext = {
-            playerId, questCategory, questId,
-            questAccomplished,
-            clearTime, clearRank,
-            score: finishValidation.score,
-            party: bodyPartyStatistics as any,
-            statistics: finishValidation.statistics as any,
-            equipmentElements: (body as any).equipment_element,
-            player,
-            questPreviouslyCompleted,
-            questProgress,
-            isMulti: true,
-            isMultiHost: isRoomHost,
-        }
-
         const executeFinishWrites = () => {
+            const player = getPlayerSync(playerId)
+            if (!player) throw new PlayerNotFoundError(playerId)
+            const freshValidation = validateMultiFinishRequest(
+                body as unknown as Record<string, unknown>,
+                activeQuestData,
+                {
+                    boostPoint: player.boostPoint,
+                    bossBoostPoint: player.bossBoostPoint,
+                },
+            )
+            if (!freshValidation.ok) throw new ActiveQuestSettlementConflictError()
+            const beforeRankPoint = player.rankPoint
+            const newRankPoint = beforeRankPoint + questData.rankPointReward
+            const newBoostPoint = player.boostPoint - (activeQuestData.useBoostPoint ? 1 : 0)
+            const newBossBoostPoint = player.bossBoostPoint
+                - (activeQuestData.useBossBoostPoint ? 1 : 0)
+            const questProgress = getPlayerSingleQuestProgressSync(
+                playerId,
+                questCategory,
+                questId,
+            )
+            const questProgressExists = questProgress !== null
+            const questPreviouslyCompleted = questProgress?.finished === true
+            const hostFinished = resolveHostFinished({
+                previouslyHostFinished: questProgress?.hostFinished ?? false,
+                questAccomplished,
+                isRoomHost,
+            })
+            const rewardEligibility = resolveQuestRewardEligibility({
+                questAccomplished,
+                clearRank,
+                questProgress,
+            })
+            const oldRkDegree = getRankDegree(beforeRankPoint)
+            const newDegreeId = getRankDegree(newRankPoint)
+            const didLevelUp = newDegreeId > oldRkDegree
+            const finishCtx: FinishContext = {
+                playerId, questCategory, questId,
+                questAccomplished,
+                clearTime, clearRank,
+                score: freshValidation.score,
+                party: bodyPartyStatistics as any,
+                statistics: freshValidation.statistics as any,
+                equipmentElements: (body as any).equipment_element,
+                player,
+                questPreviouslyCompleted,
+                questProgress,
+                isMulti: true,
+                isMultiHost: isRoomHost,
+            }
             const settlementTime = new Date(getServerTime() * 1000)
             const rewardCampaignRates = getRewardCampaignRates(
                 questCategory,
@@ -427,7 +452,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 questData.characterExpReward || 0,
                 rewardCampaignRates,
             )
-            const fieldMana = finishValidation.addMana
+            const fieldMana = freshValidation.addMana
             const newMana = player.freeMana + fixedManaReward + fieldMana;
             const manaObtained = fixedManaReward + fieldMana;
             const clearReward = rewardEligibility.firstClear && (questData as any).clearReward !== undefined
@@ -444,7 +469,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                         questId: questId,
                         finished: true,
                         bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
-                        highScore: questProgress.highScore === undefined ? finishValidation.score : Math.max(finishValidation.score, questProgress.highScore),
+                        highScore: questProgress.highScore === undefined ? freshValidation.score : Math.max(freshValidation.score, questProgress.highScore),
                         leaderCharacterId: leaderId ?? null,
                         hostFinished,
                     };
@@ -457,7 +482,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                         questId: questId,
                         finished: true,
                         bestElapsedTimeMs: clearTime,
-                        highScore: finishValidation.score,
+                        highScore: freshValidation.score,
                         clearRank: clearRank ?? 5,
                         leaderCharacterId: leaderId ?? null,
                         hostFinished,
@@ -473,7 +498,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 boostPoint: newBoostPoint,
                 bossBoostPoint: newBossBoostPoint,
                 totalManaObtained: (player.totalManaObtained ?? 0) + manaObtained,
-                maxComboAchieved: Math.max(player.maxComboAchieved ?? 0, (finishValidation.statistics as any).max_combo_count ?? 0),
+                maxComboAchieved: Math.max(player.maxComboAchieved ?? 0, (freshValidation.statistics as any).max_combo_count ?? 0),
                 ...(didLevelUp ? { stamina: player.stamina + getMaxStamina(newDegreeId), staminaHealTime: new Date() } : {}),
             });
             const playerData = { ...player };
@@ -553,6 +578,12 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 fixedManaReward,
                 fixedPoolExpReward,
                 newMana,
+                beforeRankPoint,
+                newRankPoint,
+                newBoostPoint,
+                newBossBoostPoint,
+                hostFinished,
+                oldHighScore: questProgress?.highScore ?? 0,
             }
         }
         let finishWrites: ReturnType<typeof executeFinishWrites>
@@ -593,18 +624,15 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             fixedManaReward,
             fixedPoolExpReward,
             newMana,
+            beforeRankPoint,
+            newRankPoint,
+            newBoostPoint,
+            newBossBoostPoint,
+            hostFinished,
+            oldHighScore,
         } = finishWrites
 
         delete activeQuests[playerId];
-        if (activeQuestData.roomNumber) {
-            if (isRoomHost && room) {
-                updateRoomState(room.room_number, 1);
-                if (!sessionManager.hasBattleClients(activeQuestData.roomNumber)) {
-                    sessionManager.clearBattleSceneState(activeQuestData.roomNumber);
-                }
-                console.log(`[MULTI] finish: room ${activeQuestData.roomNumber} reset to raising_state=1`);
-            }
-        }
 
         const dataHeaders = generateDataHeaders({ viewer_id: viewerId });
         const matePlayerResult = ((body as any).mate_player_result || []) as Array<{ viewer_id?: number }>;
@@ -634,7 +662,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                     "reward_mana": fixedManaReward,
                     "field_mana": fieldMana
                 },
-                "old_high_score": questProgress === null ? 0 : questProgress.highScore || 0,
+                "old_high_score": oldHighScore,
                 "joined_character_id_list": [
                     ...(clearReward?.joined_character_id_list || []),
                     ...(sPlusClearReward?.joined_character_id_list || []),
@@ -693,15 +721,31 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             });
         }
 
-        const { playerId, player } = ctx;
+        const { playerId } = ctx;
         const participant = context.snapshotProvider.getParticipant(viewerId);
         const activeQuestData = activeQuests[playerId];
-
-        if (activeQuestData?.roomNumber
-            && !canAbortMultiBattle(activeQuestData.roomNumber, participant)) {
-            return reply.status(403).send({
-                "error": "Forbidden", "message": "Battle participant is not the room host."
-            });
+        const storedQuest = getPlayerActiveQuestSync(playerId)
+        if (!activeQuestData
+            || !storedQuest
+            || !storedQuest.isMulti
+            || typeof storedQuest.roomNumber !== "string"
+            || storedQuest.playId !== body.play_id
+            || storedQuest.questId !== body.quest_id
+            || storedQuest.category !== body.category) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Active quest does not match abort request."
+            })
+        }
+        const hubAbort = await context.coordinator.abortBattle({
+            participant,
+            roomNumber: storedQuest.roomNumber,
+        })
+        if (!hubAbort.ok) {
+            const forbidden = hubAbort.error === "ROOM_PERMISSION_DENIED"
+            return reply.status(forbidden ? 403 : 400).send({
+                "error": forbidden ? "Forbidden" : "Bad Request",
+                "message": "Battle abort is unavailable.",
+            })
         }
 
         const abortResult = runAbortActiveQuestTransaction(playerId, {
@@ -709,16 +753,9 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             questId: body.quest_id,
             category: body.category,
         });
-        if (abortResult.cancelled && activeQuestData) {
-            if (activeQuestData.roomNumber) {
-                const room = getRoom(activeQuestData.roomNumber);
-                if (cleanupAbortedMultiBattle(activeQuestData.roomNumber, participant)) {
-                    console.log(`[MULTI] abort: room ${activeQuestData.roomNumber} disbanded (host abandoned)`);
-                } else if (room) {
-                    console.log(`[MULTI] abort: player ${playerId} removed from room ${activeQuestData.roomNumber}`);
-                }
-            }
-        }
+        if (!abortResult.cancelled) return reply.status(400).send({
+            "error": "Bad Request", "message": "Active quest was already changed."
+        })
 
         const headers = generateDataHeaders({ viewer_id: viewerId });
         reply.header("content-type", "application/x-msgpack");

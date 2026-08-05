@@ -121,6 +121,7 @@ function wrapOptionFields(d: any, availableAssetVersion: string) {
 
 export interface CnLoadRouteOptions {
     readonly assetProvider?: AssetProviderConfig;
+    readonly multiMode?: "embedded" | "host" | "client";
 }
 
 const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => {
@@ -159,7 +160,12 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
 
         let activeQuest: ActiveQuest | null = getPlayerActiveQuestSync(playerId);
         if (activeQuest) {
-            const roomExists = activeQuest.roomNumber ? getRoom(activeQuest.roomNumber) : true;
+            const isRemoteBattleIdentity = options.multiMode === "client"
+                && activeQuest.isMulti
+                && typeof activeQuest.battleSessionId === "string"
+                && activeQuest.battleSessionId.length > 0;
+            const roomExists = isRemoteBattleIdentity
+                || (activeQuest.roomNumber ? getRoom(activeQuest.roomNumber) !== undefined : true);
             if (!roomExists) {
                 console.log(`[CN-LOAD] active quest room ${activeQuest.roomNumber} not found, cancelling`);
                 runAbortActiveQuestTransaction(playerId, {

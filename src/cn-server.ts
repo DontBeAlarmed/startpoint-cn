@@ -274,6 +274,7 @@ function configureRuntimeHttp(config: ReturnType<typeof parseCnRuntimeConfig>): 
     fastify.register(cnLoadPlugin, {
         prefix: apiPrefix,
         assetProvider: config.assetProvider,
+        multiMode: config.multi.mode,
     });
     fastify.register(comicApiPlugin, {
         prefix: `${apiPrefix}/comic`,

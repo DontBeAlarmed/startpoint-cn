@@ -29,7 +29,10 @@ const BATTLE_ROUTES = new Set([
     "/v1/multi/battles/finalize",
     "/v1/multi/battles/status",
 ])
-const VOID_ROUTES = new Set(["/v1/multi/rooms/disband"])
+const VOID_ROUTES = new Set([
+    "/v1/multi/rooms/disband",
+    "/v1/multi/battles/abort",
+])
 
 export interface HubNodeSessionPayload {
     readonly nodeSessionId: NodeSessionId

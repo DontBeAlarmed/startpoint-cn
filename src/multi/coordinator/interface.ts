@@ -29,11 +29,11 @@ export type CompatibleRoomInput = {
 export interface RoomParticipantInput {
     readonly participant: ParticipantIdentity
     readonly roomNumber: string
+    /** Hub-internal authorization identity; control routes overwrite client input. */
+    readonly credentialId?: string
 }
 
-export interface BattleSessionInput {
-    readonly participant: ParticipantIdentity
-    readonly roomNumber: string
+export interface BattleSessionInput extends RoomParticipantInput {
     readonly battleSessionId: BattleSessionId
 }
 
@@ -69,6 +69,7 @@ export interface MultiCoordinator {
     prepareRoom(input: CompatibleRoomInput): Promise<CoordinatorResult<RoomStatus>>
     selectRoom(input: CompatibleRoomInput): Promise<CoordinatorResult<RoomStatus>>
     disbandRoom(input: RoomParticipantInput): Promise<CoordinatorResult<void>>
+    abortBattle(input: RoomParticipantInput): Promise<CoordinatorResult<void>>
     startBattle(input: RoomParticipantInput): Promise<CoordinatorResult<BattleStatus>>
     finalizeBattle(input: BattleSessionInput): Promise<CoordinatorResult<BattleStatus>>
     getBattleStatus(input: BattleSessionInput): Promise<CoordinatorResult<BattleStatus>>

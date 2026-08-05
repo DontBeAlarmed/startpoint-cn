@@ -375,6 +375,7 @@ test("active quest domain roundtrips nullable battle session identity", t => {
         getDb().exec("ALTER TABLE players_active_quests ADD COLUMN battle_session_id TEXT")
     }
     const {
+        deletePlayerActiveQuestSync,
         getPlayerActiveQuestSync,
         insertPlayerActiveQuestSync,
     } = require("../../src/data/domains/quest_active")
@@ -408,6 +409,7 @@ test("active quest domain roundtrips nullable battle session identity", t => {
     insertPlayerActiveQuestSync(playerId, activeQuest)
     assert.equal(getPlayerActiveQuestSync(playerId).battleSessionId, "battle-session-1")
 
+    deletePlayerActiveQuestSync(playerId)
     insertPlayerActiveQuestSync(playerId, {
         ...activeQuest,
         battleSessionId: null,

@@ -7,6 +7,7 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 const Fastify = require("fastify")
+const { pack, unpack } = require("msgpackr")
 
 require("ts-node/register/transpile-only")
 
@@ -105,6 +106,11 @@ test("Hub battle facts survive room release but expire within thirty minutes", (
         roomNumber: "123456",
         battleSessionId: "battle-1",
     }).ok, true)
+    assert.throws(() => store.startBattle({
+        roomNumber: "123456",
+        host,
+        participants: [host, guest],
+    }), /finalized/i)
     store.releaseRoom("123456")
     assert.deepEqual(store.getBattleStatus({
         participant: guest,
@@ -232,7 +238,9 @@ process.env.DATA_DIR = databaseRoot
 delete process.env.WDFP_DATABASE_DIR
 
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
-const restoreContentSnapshot = installBundledGameplaySnapshot()
+const restoreContentSnapshot = installBundledGameplaySnapshot({
+    additionalTableNames: ["mission_active.json", "mission_active_event.json"],
+})
 const { closeDatabase, initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
@@ -242,6 +250,7 @@ const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
 const { activeQuests } = require("../src/lib/quest/active-quest-service")
 const { computeRealTimeStamina } = require("../src/lib/stamina")
 const { registerBattleRoutes } = require("../src/multi/http/battle")
+const cnLoadRoutes = require("../src/routes/cn/load").default
 
 process.once("exit", () => {
     closeDatabase()
@@ -257,7 +266,7 @@ const productionQuest = Object.freeze({ category: 13, questId: 2001, ticketId: 5
 const roomNumber = "123456"
 const battleSessionId = "shared-battle"
 
-function startPayload(viewerId, playId) {
+function startPayload(viewerId, playId, overrides = {}) {
     return {
         viewer_id: viewerId,
         api_count: 1,
@@ -270,6 +279,7 @@ function startPayload(viewerId, playId) {
         room_number: roomNumber,
         mate_player_ids: [],
         play_id: playId,
+        ...overrides,
     }
 }
 
@@ -301,7 +311,7 @@ function finishPayload(viewerId, playId) {
     }
 }
 
-function createSettlementBarrier() {
+function createSettlementBarrier(expectedCalls = 2) {
     const waiting = []
     let bothWaiting
     const reached = new Promise(resolve => { bothWaiting = resolve })
@@ -310,7 +320,7 @@ function createSettlementBarrier() {
         verifier: {
             verify: input => new Promise(resolve => {
                 waiting.push({ input: structuredClone(input), resolve })
-                if (waiting.length === 2) bothWaiting()
+                if (waiting.length === expectedCalls) bothWaiting()
             }),
         },
         release(index, result = { ok: true, isHost: true }) {
@@ -322,7 +332,7 @@ function createSettlementBarrier() {
     }
 }
 
-async function openProductionHome(label, participant, isHost, settlementVerifier) {
+async function openProductionHome(label, participant, isHost, settlementVerifier, options = {}) {
     closeDatabase()
     const homeDirectory = path.join(databaseRoot, label)
     process.env.DATA_DIR = homeDirectory
@@ -355,7 +365,7 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
         roomNumber,
         host: roomHost,
         participants: roomMembers,
-        finalized: true,
+        finalized: false,
     })
     const coordinatorCalls = []
     const context = {
@@ -382,7 +392,17 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
             },
             startBattle: async input => {
                 coordinatorCalls.push(structuredClone(input))
+                if (options.startBattle) return options.startBattle(input, battle)
                 return { ok: true, value: battle }
+            },
+            finalizeBattle: async input => {
+                coordinatorCalls.push(structuredClone(input))
+                if (options.finalizeBattle) return options.finalizeBattle(input, battle)
+                return { ok: true, value: { ...battle, finalized: true } }
+            },
+            abortBattle: async input => {
+                coordinatorCalls.push(structuredClone(input))
+                return { ok: true, value: undefined }
             },
         },
         settlementVerifier,
@@ -399,7 +419,7 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
     })
     registerBattleRoutes(app, context)
     await app.ready()
-    return { app, db, playerId, entryStamina, coordinatorCalls }
+    return { app, db, playerId, accountId: account.id, entryStamina, coordinatorCalls }
 }
 
 async function closeProductionHome(home) {
@@ -474,6 +494,101 @@ test("production /start charges only the host in isolated SQLite home saves", as
     }
 })
 
+for (const [label, participant, isHost] of [
+    ["host", host, true],
+    ["guest", guest, false],
+]) {
+    test(`production /start rejects a finalized restart for ${label} without duplicate rewards`, async () => {
+        let finalized = false
+        let home
+        try {
+            home = await openProductionHome(
+                `finalized-${label}`,
+                participant,
+                isHost,
+                { verify: async () => ({ ok: true, isHost }) },
+                {
+                    startBattle: (_input, battle) => ({
+                        ok: true,
+                        value: { ...battle, finalized },
+                    }),
+                },
+            )
+            const started = await home.app.inject({
+                method: "POST",
+                url: "/start",
+                payload: startPayload(participant.viewerId, `finalized-${label}-first`),
+            })
+            assert.equal(started.statusCode, 200, started.body)
+            const finished = await home.app.inject({
+                method: "POST",
+                url: "/finish",
+                payload: finishPayload(participant.viewerId, `finalized-${label}-first`),
+            })
+            assert.equal(finished.statusCode, 200, finished.body)
+            finalized = true
+            givePlayerItemSync(home.playerId, productionQuest.ticketId, 1)
+            const settledOnce = observableSettlementState(home.db, home.playerId)
+            assert.equal(settledOnce.questHistory.length, 1)
+            assert.ok(settledOnce.inventory.length > 0)
+
+            const restarted = await home.app.inject({
+                method: "POST",
+                url: "/start",
+                payload: startPayload(participant.viewerId, `finalized-${label}-second`),
+            })
+            assert.equal(restarted.statusCode, 400, restarted.body)
+            assert.deepEqual(observableSettlementState(home.db, home.playerId), settledOnce)
+        } finally {
+            await closeProductionHome(home)
+        }
+    })
+}
+
+test("production /start atomically occupies an empty SQLite active quest", async () => {
+    const waiting = []
+    let releaseStarts
+    const bothAtHub = new Promise(resolve => { releaseStarts = resolve })
+    let home
+    try {
+        home = await openProductionHome(
+            "concurrent-start",
+            host,
+            true,
+            { verify: async () => ({ ok: true, isHost: true }) },
+            {
+                startBattle: (input, battle) => new Promise(resolve => {
+                    waiting.push({ input: structuredClone(input), resolve, battle })
+                    if (waiting.length === 2) releaseStarts()
+                }),
+            },
+        )
+        givePlayerItemSync(home.playerId, productionQuest.ticketId, 1)
+        const firstPending = home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, "concurrent-start-a"),
+        })
+        const secondPending = home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, "concurrent-start-b"),
+        })
+        await bothAtHub
+        for (const pending of waiting) pending.resolve({ ok: true, value: pending.battle })
+        const responses = await Promise.all([firstPending, secondPending])
+        assert.deepEqual(responses.map(response => response.statusCode).sort(), [200, 400])
+        assert.equal(getPlayerSync(home.playerId).totalStaminaUsed, 10)
+        assert.equal(getPlayerItemSync(home.playerId, productionQuest.ticketId), 1)
+        assert.ok([
+            "concurrent-start-a",
+            "concurrent-start-b",
+        ].includes(getPlayerActiveQuestSync(home.playerId).playId))
+    } finally {
+        await closeProductionHome(home)
+    }
+})
+
 test("production /finish consumes one SQLite settlement after both requests pass the Hub barrier", async () => {
     const barrier = createSettlementBarrier()
     let home
@@ -511,6 +626,227 @@ test("production /finish consumes one SQLite settlement after both requests pass
             observableSettlementState(home.db, home.playerId),
             settledOnce,
             "重复 finish 不得产生库存、履历、任务、邮件或其他玩家写入",
+        )
+    } finally {
+        await closeProductionHome(home)
+    }
+})
+
+test("production /finish retries local rollback against the retained Hub fact", async () => {
+    const store = new BattleFactStore({ createBattleSessionId: () => battleSessionId })
+    store.startBattle({ roomNumber, host, participants: [host] })
+    const getBattleStatus = input => Promise.resolve(store.getBattleStatus(input))
+    const verifier = new MultiSettlementVerifier({ getBattleStatus })
+    let home
+    try {
+        home = await openProductionHome(
+            "retained-fact-retry",
+            host,
+            true,
+            verifier,
+            {
+                startBattle: input => getBattleStatus({ ...input, battleSessionId }),
+                finalizeBattle: getBattleStatus,
+            },
+        )
+        const playId = "retained-fact-retry"
+        const started = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, playId),
+        })
+        assert.equal(started.statusCode, 200, started.body)
+
+        assert.equal(store.markFinalized({
+            participant: host,
+            roomNumber,
+            battleSessionId,
+        }).ok, true)
+        store.releaseRoom(roomNumber)
+        const beforeFinish = observableSettlementState(home.db, home.playerId)
+        home.db.exec(`
+            CREATE TRIGGER reject_multi_active_quest_delete
+            BEFORE DELETE ON players_active_quests
+            WHEN OLD.player_id = ${home.playerId}
+            BEGIN SELECT RAISE(ABORT, 'forced multi settlement rollback'); END;
+        `)
+
+        const first = await home.app.inject({
+            method: "POST",
+            url: "/finish",
+            payload: finishPayload(host.viewerId, playId),
+        })
+        assert.equal(first.statusCode, 500, first.body)
+        assert.deepEqual(
+            observableSettlementState(home.db, home.playerId),
+            beforeFinish,
+            "本地删除失败必须回滚奖励、库存、履历、任务和邮件写入",
+        )
+        assert.equal((await getBattleStatus({
+            participant: host,
+            roomNumber,
+            battleSessionId,
+        })).ok, true, "Hub finalized fact must remain available after local rollback")
+
+        home.db.exec("DROP TRIGGER reject_multi_active_quest_delete")
+        const retried = await home.app.inject({
+            method: "POST",
+            url: "/finish",
+            payload: finishPayload(host.viewerId, playId),
+        })
+        assert.equal(retried.statusCode, 200, retried.body)
+        assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+        assert.equal((await getBattleStatus({
+            participant: host,
+            roomNumber,
+            battleSessionId,
+        })).ok, true, "successful local settlement must not consume the retained Hub fact")
+    } finally {
+        await closeProductionHome(home)
+    }
+})
+
+test("production /finish uses fresh player balances after the Hub await", async () => {
+    const barrier = createSettlementBarrier(1)
+    let home
+    try {
+        home = await openProductionHome("fresh-finish", host, true, barrier.verifier)
+        const playId = "fresh-finish"
+        const started = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, playId, { use_boost_point: true }),
+        })
+        assert.equal(started.statusCode, 200, started.body)
+        const pending = home.app.inject({
+            method: "POST",
+            url: "/finish",
+            payload: finishPayload(host.viewerId, playId),
+        })
+        await barrier.reached
+        const beforeMutation = getPlayerSync(home.playerId)
+        updatePlayerSync({
+            id: home.playerId,
+            freeMana: beforeMutation.freeMana + 500,
+            expPool: beforeMutation.expPool + 700,
+            boostPoint: beforeMutation.boostPoint + 2,
+        })
+        const freshBeforeFinish = getPlayerSync(home.playerId)
+        barrier.release(0)
+        const finished = await pending
+        assert.equal(finished.statusCode, 200, finished.body)
+        const after = getPlayerSync(home.playerId)
+        assert.equal(after.freeMana, freshBeforeFinish.freeMana + 40)
+        assert.equal(after.expPool, freshBeforeFinish.expPool + 180)
+        assert.equal(after.boostPoint, freshBeforeFinish.boostPoint - 1)
+    } finally {
+        await closeProductionHome(home)
+    }
+})
+
+test("production /load preserves a remote active quest when no local room exists", async () => {
+    let home
+    let loadApp
+    try {
+        home = await openProductionHome(
+            "remote-load",
+            host,
+            true,
+            { verify: async () => ({ ok: true, isHost: true }) },
+        )
+        const playId = "remote-load-active"
+        const started = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, playId),
+        })
+        assert.equal(started.statusCode, 200, started.body)
+        home.db.prepare(`
+            INSERT INTO sessions (token, account_id, expires, type)
+            VALUES (?, ?, ?, 2)
+        `).run(
+            String(host.viewerId),
+            home.accountId,
+            new Date("2099-12-31T23:59:59.000Z").toISOString(),
+        )
+
+        loadApp = Fastify({ logger: false })
+        loadApp.addContentTypeParser(
+            "application/x-www-form-urlencoded",
+            { parseAs: "string" },
+            (_request, body, done) => done(null, unpack(Buffer.from(body, "base64"))),
+        )
+        loadApp.addHook("onSend", (_request, reply, payload, done) => {
+            if (String(reply.getHeader("content-type")).includes("application/x-msgpack")) {
+                done(null, pack(payload).toString("base64"))
+                return
+            }
+            done(null, payload)
+        })
+        await loadApp.register(cnLoadRoutes, {
+            assetProvider: { mode: "client-owned" },
+            multiMode: "client",
+        })
+        await loadApp.ready()
+        const loaded = await loadApp.inject({
+            method: "POST",
+            url: "/load",
+            headers: {
+                "content-type": "application/x-www-form-urlencoded",
+                res_ver: "1.4.54",
+            },
+            payload: pack({
+                viewer_id: host.viewerId,
+                keychain: host.viewerId,
+                device_id: 1,
+                device_token: "remote-load-device",
+            }).toString("base64"),
+        })
+        assert.equal(loaded.statusCode, 200, loaded.body)
+        assert.equal(getPlayerActiveQuestSync(home.playerId).battleSessionId, battleSessionId)
+        assert.deepEqual(
+            unpack(Buffer.from(loaded.body, "base64")).data.unfinished_multi_quest_list,
+            [{ play_id: playId, continue_count: 0 }],
+        )
+    } finally {
+        if (loadApp) await loadApp.close()
+        await closeProductionHome(home)
+    }
+})
+
+test("production /abort uses coordinator authority when no local room exists", async () => {
+    let home
+    try {
+        home = await openProductionHome(
+            "remote-abort-route",
+            host,
+            true,
+            { verify: async () => ({ ok: true, isHost: true }) },
+        )
+        const playId = "remote-abort-route"
+        const started = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, playId),
+        })
+        assert.equal(started.statusCode, 200, started.body)
+        const aborted = await home.app.inject({
+            method: "POST",
+            url: "/abort",
+            payload: {
+                viewer_id: host.viewerId,
+                quest_id: productionQuest.questId,
+                category: productionQuest.category,
+                room_number: roomNumber,
+                play_id: playId,
+            },
+        })
+        assert.equal(aborted.statusCode, 200, aborted.body)
+        assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+        assert.equal(getPlayerItemSync(home.playerId, productionQuest.ticketId), 1)
+        assert.equal(
+            home.coordinatorCalls.some(call => call.roomNumber === roomNumber),
+            true,
         )
     } finally {
         await closeProductionHome(home)

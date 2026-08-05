@@ -82,6 +82,7 @@ import { givePlayerDegreeSync } from "../../data/domains/degree";
 import { givePlayerEquipmentSync } from "../../lib/equipment";
 import { getDb } from "../../data/db";
 import {
+    ActiveQuestAlreadyExistsError,
     buildStartEntryItemList,
     InsufficientEntryItemError,
     InsufficientStaminaError,
@@ -887,6 +888,7 @@ const routes = async (fastify: FastifyInstance) => {
                 now: startTime,
             }, {
                 transaction: operation => getDb().transaction(operation)(),
+                getActiveQuest: getPlayerActiveQuestSync,
                 getPlayer: getPlayerSync,
                 computeStamina: computeRealTimeStamina,
                 getItemCount: getPlayerItemSync,
@@ -904,7 +906,8 @@ const routes = async (fastify: FastifyInstance) => {
                 publishActiveQuest,
             })
         } catch (error) {
-            if (error instanceof InsufficientEntryItemError
+            if (error instanceof ActiveQuestAlreadyExistsError
+                || error instanceof InsufficientEntryItemError
                 || error instanceof InsufficientStaminaError
                 || error instanceof PlayerNotFoundError) {
                 console.warn(`[BATTLE-START] player ${playerId}: ${error.message}`)

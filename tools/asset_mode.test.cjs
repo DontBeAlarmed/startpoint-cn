@@ -439,6 +439,7 @@ test("CN runtime parses one provider and wires it through routes, load, and cont
     assert.equal((entry.match(/parseCnRuntimeConfig\(/g) ?? []).length, 1)
     assert.match(entry, /registerCnAssetProviderRoutes\(fastify,\s*\{\s*config: config\.assetProvider/)
     assert.match(entry, /fastify\.register\(cnLoadPlugin,\s*\{[^}]*assetProvider: config\.assetProvider/s)
+    assert.match(entry, /fastify\.register\(cnLoadPlugin,\s*\{[^}]*multiMode: config\.multi\.mode/s)
     assert.match(entry, /initializeContentSnapshot\(\{\s*assetMode: config\.assetProvider\.mode,\s*localCdn: config\.assetProvider\.mode === "local"/)
     assert.match(entry, /configureSerializedAssetVersionProvider\(/)
     assert.doesNotMatch(entry, /fastify\.register\(cnCdnFilesPlugin/)

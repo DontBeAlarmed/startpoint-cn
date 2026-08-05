@@ -25,6 +25,7 @@ export interface StartEntryInput<TActiveQuest> {
 
 export interface StartEntryDependencies<TActiveQuest> {
     transaction<T>(operation: () => T): T
+    getActiveQuest?(playerId: number): unknown | null
     getPlayer(playerId: number): StartEntryPlayer | null
     computeStamina(player: StartEntryPlayer): number
     getItemCount(playerId: number, itemId: number): number | null
@@ -45,6 +46,13 @@ export class PlayerNotFoundError extends Error {
     constructor(playerId: number) {
         super(`Player ${playerId} does not exist.`)
         this.name = "PlayerNotFoundError"
+    }
+}
+
+export class ActiveQuestAlreadyExistsError extends Error {
+    constructor(playerId: number) {
+        super(`Player ${playerId} already has an active quest.`)
+        this.name = "ActiveQuestAlreadyExistsError"
     }
 }
 
@@ -81,6 +89,9 @@ export function runStartEntryTransaction<TActiveQuest>(
     dependencies: StartEntryDependencies<TActiveQuest>,
 ): StartEntryResult {
     const result = dependencies.transaction(() => {
+        if (dependencies.getActiveQuest?.(input.playerId) != null) {
+            throw new ActiveQuestAlreadyExistsError(input.playerId)
+        }
         const player = dependencies.getPlayer(input.playerId)
         if (!player) throw new PlayerNotFoundError(input.playerId)
 
