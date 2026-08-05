@@ -11,10 +11,10 @@ function readSource(relativePath) {
     return fs.readFileSync(path.join(projectRoot, relativePath), "utf8")
 }
 
-function assertSettlementInsideFinishTransaction(source, label) {
+function assertSettlementInsideFinishTransaction(source, label, transactionCall) {
     const transactionBody = source.indexOf("const executeFinishWrites = () => {")
     const settlement = source.indexOf("settleAdditionalRewardsSync(", transactionBody)
-    const transactionCommit = source.indexOf("getDb().transaction(executeFinishWrites)()", settlement)
+    const transactionCommit = source.indexOf(transactionCall, settlement)
 
     assert.ok(transactionBody >= 0, `${label} must define a finish transaction`)
     assert.ok(settlement > transactionBody, `${label} must settle additional rewards in the transaction`)
@@ -23,7 +23,11 @@ function assertSettlementInsideFinishTransaction(source, label) {
 
 test("single finish grants and publishes additional rewards atomically", () => {
     const source = readSource("src/routes/api/singleBattleQuest.ts")
-    assertSettlementInsideFinishTransaction(source, "single finish")
+    assertSettlementInsideFinishTransaction(
+        source,
+        "single finish",
+        "getDb().transaction(executeFinishWrites)()",
+    )
     assert.match(source, /settleAdditionalRewardsSync\([\s\S]*?isMulti: false,/)
     assert.match(
         source,
@@ -37,7 +41,11 @@ test("single finish grants and publishes additional rewards atomically", () => {
 
 test("multi finish enables multi-only rules and publishes additional rewards atomically", () => {
     const source = readSource("src/multi/http/battle.ts")
-    assertSettlementInsideFinishTransaction(source, "multi finish")
+    assertSettlementInsideFinishTransaction(
+        source,
+        "multi finish",
+        "runMultiActiveQuestSettlementTransaction(",
+    )
     assert.match(source, /settleAdditionalRewardsSync\([\s\S]*?isMulti: true,/)
     assert.match(
         source,

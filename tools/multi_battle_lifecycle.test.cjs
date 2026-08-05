@@ -138,6 +138,10 @@ test("multi battle routes use the shared lifecycle boundaries", () => {
         path.resolve(__dirname, "../src/multi/http/battle.ts"),
         "utf8",
     )
+    const activeQuestService = fs.readFileSync(
+        path.resolve(__dirname, "../src/lib/quest/active-quest-service.ts"),
+        "utf8",
+    )
     assert.match(source, /validateMultiStartRequest\(/)
     assert.match(source, /runStartEntryTransaction\(/)
     assert.match(source, /validateMultiFinishRequest\(/)
@@ -149,9 +153,25 @@ test("multi battle routes use the shared lifecycle boundaries", () => {
     )
     assert.ok(
         source.indexOf("context.settlementVerifier.verify(")
-            < source.indexOf("getDb().transaction(executeFinishWrites)()"),
+            < source.indexOf("runMultiActiveQuestSettlementTransaction("),
         "Hub finalization must be verified before the local settlement transaction",
     )
+    const settlementTransaction = activeQuestService.indexOf(
+        "export function runMultiActiveQuestSettlementTransaction",
+    )
+    const activeQuestRead = activeQuestService.indexOf(
+        "getPlayerActiveQuestSync(playerId)",
+        settlementTransaction,
+    )
+    const settlementWrites = activeQuestService.indexOf("settle()", activeQuestRead)
+    const activeQuestDelete = activeQuestService.indexOf(
+        "deletePlayerActiveQuestSync(playerId)",
+        settlementWrites,
+    )
+    assert.ok(settlementTransaction >= 0)
+    assert.ok(activeQuestRead > settlementTransaction)
+    assert.ok(settlementWrites > activeQuestRead)
+    assert.ok(activeQuestDelete > settlementWrites)
     assert.match(source, /const entryCost = isRoomHost[\s\S]*?: undefined;/)
     assert.match(source, /const staminaCost = isRoomHost \? getStaminaCost\(questKey\)\.cost : 0;/)
     assert.doesNotMatch(source, /activeData\.continueCount\+\+/)

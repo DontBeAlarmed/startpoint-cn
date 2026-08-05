@@ -385,6 +385,7 @@ assert.ok(
     legacyDb.prepare("PRAGMA table_info(players_active_quests)").all()
         .some(column => column.name === "entry_item_count"),
 )
+activeQuestStorage.ensureActiveQuestBattleSessionIdStorageSync(legacyDb)
 
 const dbModulePath = require.resolve("../src/data/db")
 require.cache[dbModulePath] = {

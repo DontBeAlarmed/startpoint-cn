@@ -4,13 +4,14 @@ import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
 import { getRoom, disbandRoom, updateRoomState } from "../room/manager";
 import { sessionManager } from "../state/SessionManager";
 import {
+    ActiveQuestSettlementConflictError,
     activeQuests,
     persistActiveQuest,
     publishActiveQuest,
     runAbortActiveQuestTransaction,
     runContinueActiveQuestTransaction,
+    runMultiActiveQuestSettlementTransaction,
 } from "../../lib/quest/active-quest-service";
-import { deletePlayerActiveQuestSync } from "../../data/domains/quest_active";
 import { incrementPlayerCharacterClearSync } from "../../data/domains/character_clear";
 import {
     getPlayerSync,
@@ -539,8 +540,6 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 ...((sPlusClearReward?.character_list || []) as Record<string, unknown>[]),
                 ...(scoreRewardsResult.character_list as Record<string, unknown>[])
             ]);
-            deletePlayerActiveQuestSync(playerId);
-
             return {
                 characterList,
                 clearReward,
@@ -557,7 +556,30 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             }
         }
         let finishWrites: ReturnType<typeof executeFinishWrites>
-        finishWrites = getDb().transaction(executeFinishWrites)()
+        try {
+            finishWrites = runMultiActiveQuestSettlementTransaction(
+                playerId,
+                {
+                    playId: activeQuestData.playId,
+                    questId: activeQuestData.questId,
+                    category: activeQuestData.category,
+                    isMulti: true,
+                    roomNumber: activeQuestData.roomNumber,
+                    battleSessionId: activeQuestData.battleSessionId,
+                    useBossBoostPoint: activeQuestData.useBossBoostPoint,
+                    useBoostPoint: activeQuestData.useBoostPoint,
+                    continueCount: activeQuestData.continueCount,
+                },
+                executeFinishWrites,
+            )
+        } catch (error) {
+            if (error instanceof ActiveQuestSettlementConflictError) {
+                return reply.status(400).send({
+                    "error": "Bad Request", "message": error.message,
+                })
+            }
+            throw error
+        }
         const {
             characterList,
             clearReward,

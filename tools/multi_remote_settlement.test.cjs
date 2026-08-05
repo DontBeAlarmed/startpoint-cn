@@ -1,10 +1,12 @@
 "use strict"
 
 const assert = require("node:assert/strict")
+const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
-const Sqlite = require("better-sqlite3")
+const Fastify = require("fastify")
 
 require("ts-node/register/transpile-only")
 
@@ -223,129 +225,329 @@ test("Hub coordinator exposes retained TCP completion facts without finalizing t
     }), { ok: false, error: "ROOM_PERMISSION_DENIED" })
 })
 
-test("host and guest charge and settle only their own SQLite home save", async t => {
-    const { runStartEntryTransaction } = require("../src/lib/quest/start-entry")
-    const hub = new BattleFactStore({ createBattleSessionId: () => "shared-battle" })
-    const battle = hub.startBattle({ roomNumber: "123456", host, participants: [host, guest] })
-    const coordinatorCalls = []
-    const coordinator = {
-        getBattleStatus: async input => {
-            coordinatorCalls.push(structuredClone(input))
-            return hub.getBattleStatus(input)
+const databaseRoot = fs.mkdtempSync(path.join(os.tmpdir(), "multi-remote-settlement-db-"))
+const previousDataDirectory = process.env.DATA_DIR
+const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
+process.env.DATA_DIR = databaseRoot
+delete process.env.WDFP_DATABASE_DIR
+
+const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const restoreContentSnapshot = installBundledGameplaySnapshot()
+const { closeDatabase, initializeDatabase } = require("../src/data")
+const { getDb } = require("../src/data/db")
+const { insertAccountSync } = require("../src/data/domains/account")
+const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
+const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
+const { activeQuests } = require("../src/lib/quest/active-quest-service")
+const { computeRealTimeStamina } = require("../src/lib/stamina")
+const { registerBattleRoutes } = require("../src/multi/http/battle")
+
+process.once("exit", () => {
+    closeDatabase()
+    restoreContentSnapshot()
+    fs.rmSync(databaseRoot, { recursive: true, force: true })
+    if (previousDataDirectory === undefined) delete process.env.DATA_DIR
+    else process.env.DATA_DIR = previousDataDirectory
+    if (previousDatabaseDirectory === undefined) delete process.env.WDFP_DATABASE_DIR
+    else process.env.WDFP_DATABASE_DIR = previousDatabaseDirectory
+})
+
+const productionQuest = Object.freeze({ category: 13, questId: 2001, ticketId: 500000 })
+const roomNumber = "123456"
+const battleSessionId = "shared-battle"
+
+function startPayload(viewerId, playId) {
+    return {
+        viewer_id: viewerId,
+        api_count: 1,
+        quest_id: productionQuest.questId,
+        category: productionQuest.category,
+        party_id: 1,
+        use_boost_point: false,
+        use_boss_boost_point: false,
+        is_auto_start_mode: false,
+        room_number: roomNumber,
+        mate_player_ids: [],
+        play_id: playId,
+    }
+}
+
+function finishPayload(viewerId, playId) {
+    return {
+        viewer_id: viewerId,
+        api_count: 1,
+        quest_id: productionQuest.questId,
+        category: productionQuest.category,
+        room_number: roomNumber,
+        play_id: playId,
+        score: 0,
+        elapsed_time_ms: 1_000,
+        add_mana: 0,
+        is_accomplished: true,
+        continue_count: 0,
+        statistics: {
+            clear_phase: 1,
+            max_combo_count: 0,
+            zones: [{ use_power_flip_count: 1 }],
+            party: {
+                characters: [{ id: 1 }, null, null],
+                unison_characters: [null, null, null],
+                equipments: [null, null, null],
+                ability_soul_ids: [null, null, null],
+            },
+        },
+        mate_player_result: [],
+    }
+}
+
+function createSettlementBarrier() {
+    const waiting = []
+    let bothWaiting
+    const reached = new Promise(resolve => { bothWaiting = resolve })
+    return {
+        reached,
+        verifier: {
+            verify: input => new Promise(resolve => {
+                waiting.push({ input: structuredClone(input), resolve })
+                if (waiting.length === 2) bothWaiting()
+            }),
+        },
+        release(index, result = { ok: true, isHost: true }) {
+            waiting[index].resolve(result)
+        },
+        calls() {
+            return waiting.map(entry => entry.input)
         },
     }
+}
 
-    function home(participant) {
-        const db = new Sqlite(":memory:")
-        db.exec(`
-            CREATE TABLE player (
-                id INTEGER PRIMARY KEY,
-                stamina INTEGER NOT NULL,
-                ticket_count INTEGER NOT NULL,
-                reward_count INTEGER NOT NULL DEFAULT 0,
-                total_stamina_used INTEGER NOT NULL DEFAULT 0,
-                party_slot INTEGER NOT NULL DEFAULT 1
-            );
-            CREATE TABLE active_quest (
-                player_id INTEGER PRIMARY KEY,
-                battle_session_id TEXT NOT NULL
-            );
-            INSERT INTO player (id, stamina, ticket_count) VALUES (${participant.viewerId}, 100, 1);
-        `)
-        t.after(() => db.close())
-        return { db, participant }
-    }
+async function openProductionHome(label, participant, isHost, settlementVerifier) {
+    closeDatabase()
+    const homeDirectory = path.join(databaseRoot, label)
+    process.env.DATA_DIR = homeDirectory
+    initializeDatabase()
+    const db = getDb()
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: `${label}-${randomUUID()}`,
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    updatePlayerSync({
+        id: playerId,
+        stamina: 100,
+        staminaHealTime: new Date(Math.floor(Date.now() / 1_000) * 1_000),
+        totalStaminaUsed: 0,
+    })
+    givePlayerItemSync(playerId, productionQuest.ticketId, 1)
+    const entryStamina = computeRealTimeStamina(getPlayerSync(playerId))
 
-    function start(node, isHost) {
-        const activeQuest = { battleSessionId: battle.battleSessionId }
-        return runStartEntryTransaction({
-            playerId: node.participant.viewerId,
-            entryCost: isHost ? { itemId: 9001, itemCount: 1, stamina: 10 } : undefined,
-            staminaCost: isHost ? 10 : 0,
-            partyId: 1,
-            updatePartySlot: false,
-            activeQuest,
-            now: new Date(0),
-        }, {
-            transaction: operation => node.db.transaction(operation)(),
-            getPlayer: playerId => {
-                const row = node.db.prepare("SELECT * FROM player WHERE id = ?").get(playerId)
-                return row ? {
-                    id: row.id,
-                    stamina: row.stamina,
-                    staminaHealTime: new Date(0),
-                    rankPoint: 0,
-                    totalStaminaUsed: row.total_stamina_used,
-                    partySlot: row.party_slot,
-                } : null
+    const roomHost = isHost ? participant : host
+    const roomMembers = [roomHost, participant].filter((member, index, all) => (
+        all.findIndex(candidate => candidate.nodeSessionId === member.nodeSessionId
+            && candidate.viewerId === member.viewerId) === index
+    ))
+    const battle = Object.freeze({
+        battleSessionId,
+        roomNumber,
+        host: roomHost,
+        participants: roomMembers,
+        finalized: true,
+    })
+    const coordinatorCalls = []
+    const context = {
+        resolvePlayerContext: async viewerId => viewerId === participant.viewerId
+            ? { playerId, player: getPlayerSync(playerId) }
+            : null,
+        snapshotProvider: {
+            getParticipant: viewerId => ({ ...participant, viewerId }),
+        },
+        questAvailability: { check: () => ({ available: true }) },
+        coordinator: {
+            getRoomStatus: async input => {
+                coordinatorCalls.push(structuredClone(input))
+                return {
+                    ok: true,
+                    value: {
+                        roomNumber,
+                        host: roomHost,
+                        members: roomMembers,
+                        category: productionQuest.category,
+                        questId: productionQuest.questId,
+                    },
+                }
             },
-            computeStamina: player => player.stamina,
-            getItemCount: playerId => node.db.prepare(
-                "SELECT ticket_count FROM player WHERE id = ?",
-            ).get(playerId)?.ticket_count ?? null,
-            updateItemCount: (playerId, _itemId, amount) => node.db.prepare(
-                "UPDATE player SET ticket_count = ? WHERE id = ?",
-            ).run(amount, playerId),
-            updatePlayer: update => node.db.prepare(`
-                UPDATE player
-                SET stamina = COALESCE(?, stamina),
-                    total_stamina_used = COALESCE(?, total_stamina_used)
-                WHERE id = ?
-            `).run(update.stamina ?? null, update.totalStaminaUsed ?? null, update.id),
-            persistActiveQuest: (playerId, quest) => node.db.prepare(`
-                INSERT INTO active_quest (player_id, battle_session_id) VALUES (?, ?)
-            `).run(playerId, quest.battleSessionId),
-            publishActiveQuest() {},
-        })
+            startBattle: async input => {
+                coordinatorCalls.push(structuredClone(input))
+                return { ok: true, value: battle }
+            },
+        },
+        settlementVerifier,
     }
+    const app = Fastify({ logger: false })
+    app.addHook("onSend", (_request, reply, payload, done) => {
+        if (String(reply.getHeader("content-type")).includes("application/x-msgpack")
+            && payload !== null
+            && typeof payload === "object") {
+            done(null, JSON.stringify(payload))
+            return
+        }
+        done(null, payload)
+    })
+    registerBattleRoutes(app, context)
+    await app.ready()
+    return { app, db, playerId, entryStamina, coordinatorCalls }
+}
 
-    async function settle(node) {
-        const verifier = new MultiSettlementVerifier(coordinator)
-        const verified = await verifier.verify({
-            nodeSessionId: node.participant.nodeSessionId,
-            viewerId: node.participant.viewerId,
-            roomNumber: "123456",
-            battleSessionId: battle.battleSessionId,
-        })
-        if (!verified.ok) return false
-        return node.db.transaction(() => {
-            const active = node.db.prepare(
-                "SELECT battle_session_id FROM active_quest WHERE player_id = ?",
-            ).get(node.participant.viewerId)
-            if (active?.battle_session_id !== battle.battleSessionId) return false
-            node.db.prepare(
-                "UPDATE player SET reward_count = reward_count + 1 WHERE id = ?",
-            ).run(node.participant.viewerId)
-            node.db.prepare("DELETE FROM active_quest WHERE player_id = ?")
-                .run(node.participant.viewerId)
-            return true
-        })()
+async function closeProductionHome(home) {
+    if (home) {
+        delete activeQuests[home.playerId]
+        await home.app.close()
     }
+    closeDatabase()
+}
 
-    const hostHome = home(host)
-    const guestHome = home(guest)
-    start(hostHome, true)
-    start(guestHome, false)
-    assert.deepEqual(hostHome.db.prepare(
-        "SELECT stamina, ticket_count, total_stamina_used FROM player",
-    ).get(), { stamina: 90, ticket_count: 0, total_stamina_used: 10 })
-    assert.deepEqual(guestHome.db.prepare(
-        "SELECT stamina, ticket_count, total_stamina_used FROM player",
-    ).get(), { stamina: 100, ticket_count: 1, total_stamina_used: 0 })
-    assert.equal(hostHome.db.prepare("SELECT battle_session_id FROM active_quest").get().battle_session_id, "shared-battle")
-    assert.equal(guestHome.db.prepare("SELECT battle_session_id FROM active_quest").get().battle_session_id, "shared-battle")
+function observableSettlementState(db, playerId) {
+    const select = (sql, ...parameters) => db.prepare(sql).all(...parameters)
+    return {
+        player: select("SELECT * FROM players WHERE id = ?", playerId),
+        activeQuest: select("SELECT * FROM players_active_quests WHERE player_id = ?", playerId),
+        inventory: select("SELECT * FROM players_items WHERE player_id = ? ORDER BY id", playerId),
+        rewardHistory: select("SELECT * FROM players_receive_history WHERE player_id = ? ORDER BY id", playerId),
+        questHistory: select("SELECT * FROM players_quest_progress WHERE player_id = ? ORDER BY section, quest_id", playerId),
+        missionFacts: select("SELECT * FROM players_mission_battle_counters WHERE player_id = ?", playerId),
+        missions: select("SELECT * FROM players_category_missions WHERE player_id = ? ORDER BY category, id", playerId),
+        mails: select("SELECT * FROM players_mails WHERE player_id = ? ORDER BY id", playerId),
+    }
+}
 
-    hub.markFinalized({ participant: host, roomNumber: "123456", battleSessionId: battle.battleSessionId })
-    hub.markFinalized({ participant: guest, roomNumber: "123456", battleSessionId: battle.battleSessionId })
-    assert.equal(await settle(hostHome), true)
-    assert.equal(await settle(guestHome), true)
-    assert.equal(await settle(guestHome), false, "repeat finish must not duplicate local rewards")
-    assert.equal(hostHome.db.prepare("SELECT reward_count FROM player").get().reward_count, 1)
-    assert.equal(guestHome.db.prepare("SELECT reward_count FROM player").get().reward_count, 1)
-    assert.equal(coordinatorCalls.every(call => (
-        !Object.hasOwn(call, "database") && !Object.hasOwn(call, "grantRewards")
-    )), true)
+test("production /start charges only the host in isolated SQLite home saves", async () => {
+    let home
+    try {
+        home = await openProductionHome("host-home", host, true, { verify: async () => ({ ok: true, isHost: true }) })
+        const hostStart = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, "host-start"),
+        })
+        assert.equal(hostStart.statusCode, 200, hostStart.body)
+        assert.deepEqual({
+            stamina: getPlayerSync(home.playerId).stamina,
+            totalStaminaUsed: getPlayerSync(home.playerId).totalStaminaUsed,
+            ticketCount: getPlayerItemSync(home.playerId, productionQuest.ticketId),
+            battleSessionId: getPlayerActiveQuestSync(home.playerId).battleSessionId,
+        }, {
+            stamina: home.entryStamina - 10,
+            totalStaminaUsed: 10,
+            ticketCount: 0,
+            battleSessionId,
+        })
+        assert.equal(home.coordinatorCalls.every(call => (
+            !Object.hasOwn(call, "database") && !Object.hasOwn(call, "grantRewards")
+        )), true)
+        await closeProductionHome(home)
+        home = null
+
+        home = await openProductionHome("guest-home", guest, false, { verify: async () => ({ ok: true, isHost: false }) })
+        const guestStart = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(guest.viewerId, "guest-start"),
+        })
+        assert.equal(guestStart.statusCode, 200, guestStart.body)
+        assert.deepEqual({
+            stamina: getPlayerSync(home.playerId).stamina,
+            totalStaminaUsed: getPlayerSync(home.playerId).totalStaminaUsed,
+            ticketCount: getPlayerItemSync(home.playerId, productionQuest.ticketId),
+            battleSessionId: getPlayerActiveQuestSync(home.playerId).battleSessionId,
+        }, {
+            stamina: 100,
+            totalStaminaUsed: 0,
+            ticketCount: 1,
+            battleSessionId,
+        })
+    } finally {
+        await closeProductionHome(home)
+    }
 })
+
+test("production /finish consumes one SQLite settlement after both requests pass the Hub barrier", async () => {
+    const barrier = createSettlementBarrier()
+    let home
+    try {
+        home = await openProductionHome("concurrent-finish", host, true, barrier.verifier)
+        const playId = "concurrent-finish"
+        const started = await home.app.inject({ method: "POST", url: "/start", payload: startPayload(host.viewerId, playId) })
+        assert.equal(started.statusCode, 200, started.body)
+        const payload = finishPayload(host.viewerId, playId)
+        const firstPending = home.app.inject({ method: "POST", url: "/finish", payload })
+        const secondPending = home.app.inject({ method: "POST", url: "/finish", payload })
+
+        await barrier.reached
+        assert.deepEqual(barrier.calls(), [0, 1].map(() => ({
+            nodeSessionId: host.nodeSessionId,
+            viewerId: host.viewerId,
+            roomNumber,
+            battleSessionId,
+        })), "两个请求必须都在 SQLite 结算前读到同一 active quest")
+
+        barrier.release(0)
+        const first = await firstPending
+        assert.equal(first.statusCode, 200, first.body)
+        const settledOnce = observableSettlementState(home.db, home.playerId)
+        assert.equal(settledOnce.activeQuest.length, 0)
+        assert.equal(settledOnce.questHistory.length, 1)
+        assert.equal(settledOnce.missionFacts[0].multi_clear_count, 1)
+        assert.ok(settledOnce.inventory.length > 0, "真实奖励必须落入库存")
+
+        barrier.release(1)
+        const second = await secondPending
+        assert.equal(second.statusCode, 400, second.body)
+        assert.match(second.body, /active quest|settled|finish/i)
+        assert.deepEqual(
+            observableSettlementState(home.db, home.playerId),
+            settledOnce,
+            "重复 finish 不得产生库存、履历、任务、邮件或其他玩家写入",
+        )
+    } finally {
+        await closeProductionHome(home)
+    }
+})
+
+for (const corruption of ["missing", "battle-session-mismatch"]) {
+    test(`production /finish fails closed when SQLite active quest is ${corruption}`, async () => {
+        let home
+        try {
+            home = await openProductionHome(corruption, host, true, {
+                verify: async () => ({ ok: true, isHost: true }),
+            })
+            const playId = `finish-${corruption}`
+            const started = await home.app.inject({ method: "POST", url: "/start", payload: startPayload(host.viewerId, playId) })
+            assert.equal(started.statusCode, 200, started.body)
+            if (corruption === "missing") {
+                home.db.prepare("DELETE FROM players_active_quests WHERE player_id = ?").run(home.playerId)
+            } else {
+                home.db.prepare(`
+                    UPDATE players_active_quests SET battle_session_id = 'forged-battle'
+                    WHERE player_id = ?
+                `).run(home.playerId)
+            }
+            const before = observableSettlementState(home.db, home.playerId)
+            const finished = await home.app.inject({
+                method: "POST",
+                url: "/finish",
+                payload: finishPayload(host.viewerId, playId),
+            })
+            assert.equal(finished.statusCode, 400, finished.body)
+            assert.deepEqual(observableSettlementState(home.db, home.playerId), before)
+        } finally {
+            await closeProductionHome(home)
+        }
+    })
+}
 
 test("multi routes verify Hub state before opening local write transactions", () => {
     const source = fs.readFileSync(
@@ -357,7 +559,7 @@ test("multi routes verify Hub state before opening local write transactions", ()
     const battleStart = source.indexOf("context.coordinator.startBattle(", roomStatus)
     const entryTransaction = source.indexOf("runStartEntryTransaction({", battleStart)
     const settlementVerification = source.indexOf("context.settlementVerifier.verify(")
-    const settlementTransaction = source.indexOf("const executeFinishWrites = () => {")
+    const settlementTransaction = source.indexOf("runMultiActiveQuestSettlementTransaction(")
 
     assert.ok(availability >= 0)
     assert.ok(roomStatus > availability)

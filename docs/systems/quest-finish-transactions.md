@@ -33,8 +33,14 @@
 ## 协力结算
 
 协力 finish 的首通/S+ 奖励、关卡进度、玩家数值、普通与追加掉落、任务事实、角色经验、觉醒校准和数据库
-active quest 删除同样由一个外层事务覆盖。超级猫头鹰的场景完成标记会在进入事务前校验；事务失败时恢复该
-内存标记，避免玩家因一次数据库异常永久失去重试资格。
+active quest 删除同样由一个外层事务覆盖。服务端先在事务外向 Hub 只读验证参与者、房间、
+`battleSessionId` 和最终完成事实，网络等待不会占用本地 SQLite 事务。
+
+Hub 验证通过后，`runMultiActiveQuestSettlementTransaction()` 在同步 SQLite 事务内重新读取该玩家的
+active quest，并严格比较 `playId`、关卡分类与 ID、协力标记、房间、`battleSessionId`、Boost 使用状态和
+续关次数。只有全部匹配才执行奖励、库存、任务、履历和邮件相关写入，并在同一事务末尾删除 active quest。
+若另一请求已经完成删除，或存储身份已变化，本次请求在任何结算写入前失败。Hub 不接收玩家数据库句柄，也
+不执行玩家奖励回调；每个节点只结算自己的本地存档。
 
 事务提交后才处理房间内存状态和 `follow_info`。后者只是结算响应中的队友展示资料，不是奖励依据：查询某个
 真人队友失败时，服务端记录包含 viewer ID 的警告并跳过该项，继续返回成功结算；自己、NPC 和重复 viewer ID
@@ -45,6 +51,8 @@ active quest 删除同样由一个外层事务覆盖。超级猫头鹰的场景�
 - `tools/score_attack_route_transaction.test.cjs` 对 category 27 和普通 category 1 注入晚期删除失败，确认所有
   数值、奖励、进度、履历和任务写入回滚，数据库及内存 active quest 保留；
 - `tools/multi_finish_follow_info.test.cjs` 注入单个队友资料查询异常，确认其他队友仍返回且只记录一条警告；
+- `tools/multi_remote_settlement.test.cjs` 通过真实协力路由、项目 SQLite schema 和 Hub verifier 屏障并发提交
+  两个 finish，确认仅一个请求结算，另一个在事务内复核失败且玩家全部可观测表不再变化；
 - 活动专项测试继续验证各处理器自身的幂等键和业务字段，不能由总事务测试替代。
 
 本结论只覆盖服务端数据库一致性。各分类的客户端动画、响应字段和双客户端协力流程仍按对应系统文档验收。

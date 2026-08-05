@@ -35,6 +35,22 @@ export interface ActiveQuestIdentity {
     category: number
 }
 
+export interface MultiSettlementActiveQuestIdentity extends ActiveQuestIdentity {
+    isMulti: true
+    roomNumber: string
+    battleSessionId: string
+    useBossBoostPoint: boolean
+    useBoostPoint: boolean
+    continueCount: number
+}
+
+export class ActiveQuestSettlementConflictError extends Error {
+    constructor() {
+        super("Active quest was already settled or no longer matches this battle.")
+        this.name = "ActiveQuestSettlementConflictError"
+    }
+}
+
 export const activeQuests: Record<number, ActiveQuest> = {}
 
 export function persistActiveQuest(playerId: number, quest: ActiveQuest): void {
@@ -89,6 +105,34 @@ function matchesActiveQuestIdentity(
         && quest.playId === identity.playId
         && quest.questId === identity.questId
         && quest.category === identity.category
+}
+
+function matchesMultiSettlementIdentity(
+    quest: ActiveQuest,
+    identity: MultiSettlementActiveQuestIdentity,
+): boolean {
+    return matchesActiveQuestIdentity(quest, identity)
+        && quest.roomNumber === identity.roomNumber
+        && quest.battleSessionId === identity.battleSessionId
+        && quest.useBossBoostPoint === identity.useBossBoostPoint
+        && quest.useBoostPoint === identity.useBoostPoint
+        && quest.continueCount === identity.continueCount
+}
+
+export function runMultiActiveQuestSettlementTransaction<T>(
+    playerId: number,
+    identity: MultiSettlementActiveQuestIdentity,
+    settle: () => T,
+): T {
+    return getDb().transaction(() => {
+        const storedQuest = getPlayerActiveQuestSync(playerId)
+        if (!storedQuest || !matchesMultiSettlementIdentity(storedQuest, identity)) {
+            throw new ActiveQuestSettlementConflictError()
+        }
+        const result = settle()
+        deletePlayerActiveQuestSync(playerId)
+        return result
+    })()
 }
 
 export function runContinueActiveQuestTransaction(

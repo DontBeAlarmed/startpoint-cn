@@ -171,7 +171,7 @@ const multiSettlementTime = multiBattleSource.indexOf(
     "BATTLE_SETTLEMENT_CATEGORIES,\n                settlementTime,",
     multiFactCall,
 )
-const multiTransactionCall = multiBattleSource.indexOf("getDb().transaction(executeFinishWrites)()")
+const multiTransactionCall = multiBattleSource.indexOf("runMultiActiveQuestSettlementTransaction(")
 const multiActiveDelete = multiBattleSource.indexOf("delete activeQuests[playerId]", multiTransactionCall)
 const multiRoomReset = multiBattleSource.indexOf("updateRoomState(room.room_number, 1)", multiTransactionCall)
 assert.equal(multiTransactionStart >= 0, true, "多人 finish 必须定义同步结算事务体")
