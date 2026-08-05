@@ -1,5 +1,6 @@
 import type { AssetMode } from "../content/cdn/asset-mode"
 import type { CnRuntimeConfig } from "./config"
+import type { MultiRuntimeFatal, MultiRuntimeFatalHandler } from "../multi/runtime/service"
 import { unavailableMultiRuntimeStatus } from "../multi/runtime/status"
 import {
     createRuntimeHealthSnapshot,
@@ -34,7 +35,10 @@ export interface RuntimeCoordinatorDependencies {
     readonly listenHttp: (config: CnRuntimeConfig) => Promise<unknown>
     readonly closeHttp: () => Awaitable<unknown>
     readonly forceCloseHttp: () => Awaitable<unknown>
-    readonly startMulti: (config: CnRuntimeConfig) => Promise<unknown>
+    readonly startMulti: (
+        config: CnRuntimeConfig,
+        onFatalError: MultiRuntimeFatalHandler,
+    ) => Promise<unknown>
     readonly stopMulti: () => Awaitable<unknown>
     readonly checkpointDatabase: () => Awaitable<unknown>
     readonly closeDatabase: () => Awaitable<unknown>
@@ -103,6 +107,15 @@ class Coordinator implements RuntimeCoordinator {
 
     private readonly onSigint = (): void => { void this.requestShutdown() }
     private readonly onSigterm = (): void => { void this.requestShutdown() }
+    private readonly onMultiFatal = (failure: MultiRuntimeFatal): void => {
+        if (failure.mode !== this.config?.multi.mode) return
+        if (failure.mode !== "embedded" || failure.component !== "tcp") return
+        if (this.shutdownRequested || this.terminalExitCode !== null) return
+        if (this.phase === "stopping" || this.phase === "stopped" || this.phase === "failed") return
+        this.terminalExitCode = startupExitCode("tcp")
+        this.phase = "failed"
+        void this.requestShutdown()
+    }
     constructor(private readonly dependencies: RuntimeCoordinatorDependencies) {}
 
     start(): Promise<void> {
@@ -212,7 +225,7 @@ class Coordinator implements RuntimeCoordinator {
             this.stage = this.config.multi.mode === "embedded" ? "tcp" : "multi"
             this.multiAttempted = true
             try {
-                await this.dependencies.startMulti(this.config)
+                await this.dependencies.startMulti(this.config, this.onMultiFatal)
             } catch (error) {
                 if (this.config.multi.mode === "embedded") throw error
                 // Host and client multiplayer are optional; health exposes degradation.

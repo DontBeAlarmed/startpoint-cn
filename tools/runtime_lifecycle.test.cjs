@@ -198,6 +198,115 @@ function createHarness(overrides = {}) {
     }
 }
 
+function createRuntimeFatalHarness(mode) {
+    let tcpFatal = null
+    let hubFatal = null
+    let tcpListening = false
+    let hubListening = false
+    const service = createMultiRuntimeService({
+        async startTcp(_config, onFatalError) {
+            tcpFatal = onFatalError
+            tcpListening = true
+        },
+        async stopTcp() {
+            tcpListening = false
+        },
+        isTcpListening: () => tcpListening,
+        async startHub(_config, onFatalError) {
+            hubFatal = onFatalError
+            hubListening = true
+        },
+        async stopHub() {
+            hubListening = false
+        },
+        isHubListening: () => hubListening,
+    })
+    const multi = mode === "embedded"
+        ? {
+            mode,
+            tcp: { host: "127.0.0.1", port: 18003 },
+        }
+        : {
+            mode,
+            tcp: { host: "127.0.0.1", port: 18003, publicHost: "hub.internal" },
+            hub: { host: "127.0.0.1", port: 18004 },
+            credentialsPath: path.join(os.tmpdir(), "unused-host-credentials.json"),
+        }
+    const config = {
+        http: { host: "127.0.0.1", port: 18001 },
+        multi,
+        assetProvider: { mode: "client-owned" },
+    }
+    const harness = createHarness({
+        loadConfig() {
+            harness.calls.push("config")
+            return config
+        },
+        startMulti: (value, onFatalError) => service.start(value.multi, onFatalError),
+        stopMulti: () => service.stop(),
+        getMultiStatus: () => service.getStatus(),
+    })
+    return {
+        ...harness,
+        triggerTcpFatal() {
+            assert.equal(typeof tcpFatal, "function")
+            tcpFatal(new Error("runtime TCP failure"))
+        },
+        triggerHubFatal() {
+            assert.equal(typeof hubFatal, "function")
+            hubFatal(new Error("runtime control failure"))
+        },
+    }
+}
+
+test("embedded runtime TCP fatal fails health and requests TCP exit once", async () => {
+    const harness = createRuntimeFatalHarness("embedded")
+    await harness.coordinator.start()
+    assert.equal(harness.coordinator.getPhase(), "ready")
+
+    harness.triggerTcpFatal()
+    harness.triggerTcpFatal()
+
+    assert.equal(harness.coordinator.getPhase(), "failed")
+    const health = harness.coordinator.getHealthSnapshot()
+    assert.equal(health.statusCode, 503)
+    assert.equal(health.body.contractVersion, 1)
+    assert.equal(health.body.status, "failed")
+    assert.equal(health.body.services.tcp, false)
+    await harness.coordinator.stop()
+    assert.deepEqual(harness.exitCodes, [14])
+
+    harness.triggerTcpFatal()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.deepEqual(harness.exitCodes, [14])
+})
+
+test("host runtime TCP and control fatals only degrade multiplayer", async () => {
+    const harness = createRuntimeFatalHarness("host")
+    await harness.coordinator.start()
+    assert.equal(harness.coordinator.getPhase(), "ready")
+
+    harness.triggerTcpFatal()
+    harness.triggerHubFatal()
+
+    const health = harness.coordinator.getHealthSnapshot()
+    assert.equal(health.statusCode, 200)
+    assert.equal(health.body.contractVersion, 1)
+    assert.equal(health.body.status, "ready")
+    assert.equal(health.body.services.tcp, false)
+    assert.equal(health.body.multiplayer.state, "degraded")
+    assert.equal(health.body.multiplayer.hub.available, false)
+    assert.equal(harness.coordinator.getPhase(), "ready")
+    assert.deepEqual(harness.exitCodes, [])
+
+    await harness.coordinator.stop()
+    assert.deepEqual(harness.exitCodes, [0])
+    harness.triggerTcpFatal()
+    harness.triggerHubFatal()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.deepEqual(harness.exitCodes, [0])
+})
+
 test("successful startup follows the embedded contract order", async () => {
     const harness = createHarness()
 

@@ -20,6 +20,13 @@ import {
 
 type FatalHandler = (error: unknown) => void
 
+export interface MultiRuntimeFatal {
+    readonly mode: MultiRuntimeConfig["mode"]
+    readonly component: "tcp" | "hub"
+}
+
+export type MultiRuntimeFatalHandler = (failure: MultiRuntimeFatal) => void
+
 export interface MultiRuntimeServiceDependencies {
     readonly startTcp: (
         config: RuntimeNetworkServiceConfig,
@@ -36,7 +43,7 @@ export interface MultiRuntimeServiceDependencies {
 }
 
 export interface MultiRuntimeService {
-    start(config: MultiRuntimeConfig): Promise<void>
+    start(config: MultiRuntimeConfig, onFatalError?: MultiRuntimeFatalHandler): Promise<void>
     stop(): Promise<void>
     getStatus(): MultiRuntimeStatus
     getHttpContext(): MultiHttpContext
@@ -140,21 +147,31 @@ class Service implements MultiRuntimeService {
     private hubAttempted = false
     private tcpFailed = false
     private hubFailed = false
+    private generation = 0
+    private fatalReported = false
 
     constructor(private readonly dependencies: MultiRuntimeServiceDependencies) {}
 
-    async start(config: MultiRuntimeConfig): Promise<void> {
+    async start(
+        config: MultiRuntimeConfig,
+        onFatalError?: MultiRuntimeFatalHandler,
+    ): Promise<void> {
+        const generation = ++this.generation
         this.config = config
         this.context = config.mode === "client"
             ? createUnavailableHttpContext()
             : createEmbeddedMultiHttpContext()
         this.tcpFailed = false
         this.hubFailed = false
+        this.fatalReported = false
         if (config.mode === "client") return
 
         this.tcpAttempted = true
         try {
-            await this.dependencies.startTcp(config.tcp, () => { this.tcpFailed = true })
+            await this.dependencies.startTcp(
+                config.tcp,
+                () => this.handleFatal(generation, config, "tcp", onFatalError),
+            )
         } catch (error) {
             this.tcpFailed = true
             if (config.mode === "embedded") throw error
@@ -163,13 +180,17 @@ class Service implements MultiRuntimeService {
 
         this.hubAttempted = true
         try {
-            await this.dependencies.startHub(config.hub, () => { this.hubFailed = true })
+            await this.dependencies.startHub(
+                config.hub,
+                () => this.handleFatal(generation, config, "hub", onFatalError),
+            )
         } catch {
             this.hubFailed = true
         }
     }
 
     async stop(): Promise<void> {
+        this.generation += 1
         const operations: Promise<unknown>[] = []
         if (this.hubAttempted) operations.push(Promise.resolve().then(() => this.dependencies.stopHub()))
         if (this.tcpAttempted) operations.push(Promise.resolve().then(() => this.dependencies.stopTcp()))
@@ -234,6 +255,20 @@ class Service implements MultiRuntimeService {
         } catch {
             return false
         }
+    }
+
+    private handleFatal(
+        generation: number,
+        config: MultiRuntimeConfig,
+        component: MultiRuntimeFatal["component"],
+        onFatalError?: MultiRuntimeFatalHandler,
+    ): void {
+        if (generation !== this.generation || this.config !== config) return
+        if (component === "tcp") this.tcpFailed = true
+        else this.hubFailed = true
+        if (this.fatalReported) return
+        this.fatalReported = true
+        onFatalError?.(Object.freeze({ mode: config.mode, component }))
     }
 }
 
