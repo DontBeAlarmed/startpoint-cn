@@ -11,6 +11,7 @@ const INCOMPLETE_EXPIRY_MS = parseInt(process.env.MULTI_ROOM_INCOMPLETE_EXPIRY_M
 const FULL_ROOM_EXPIRY_MS = parseInt(process.env.MULTI_ROOM_FULL_EXPIRY_MS || "1800000"); // 30min, mates >= 3
 const CLEAN_INTERVAL_MS = parseInt(process.env.MULTI_ROOM_CLEAN_INTERVAL_MS || "60000");
 const REMAINING_NOTIFY_MS = 30000; // send RemainingTime float 30s before disband
+const ROOM_NUMBER_ALLOCATION_ATTEMPTS = 10;
 
 // Track which rooms have already been notified (to avoid repeat floats)
 const notifiedRooms = new Set<string>();
@@ -92,6 +93,16 @@ export function generateRoomNumber(): string {
     return String(randomInt(100000, 999999));
 }
 
+function allocateRoomNumber(): string {
+    for (let attempt = 0; attempt < ROOM_NUMBER_ALLOCATION_ATTEMPTS; attempt++) {
+        const roomNumber = generateRoomNumber();
+        if (!rooms.has(roomNumber)) return roomNumber;
+    }
+    throw new Error(
+        `failed to allocate an unused room number after ${ROOM_NUMBER_ALLOCATION_ATTEMPTS} attempts`,
+    );
+}
+
 export function generateRoomAccessToken(): string {
     let token: string;
     do {
@@ -110,7 +121,7 @@ export function createRoom(
     hostMainCharacterId: number,
     isNpcMode: boolean = false
 ): MultiRoom {
-    const roomNumber = generateRoomNumber();
+    const roomNumber = allocateRoomNumber();
     const room: MultiRoom = {
         room_number: roomNumber,
         access_token: generateRoomAccessToken(),

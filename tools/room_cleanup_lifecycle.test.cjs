@@ -1,9 +1,25 @@
 const assert = require("node:assert/strict")
+const crypto = require("node:crypto")
 const path = require("node:path")
 const { spawnSync } = require("node:child_process")
 const test = require("node:test")
 
 require("ts-node/register/transpile-only")
+
+const originalRandomBytes = crypto.randomBytes
+const originalRandomInt = crypto.randomInt
+let accessTokenGenerationCalls = 0
+let roomNumberCandidates = []
+let roomNumberFallback = null
+
+crypto.randomBytes = (...args) => {
+    accessTokenGenerationCalls++
+    return originalRandomBytes(...args)
+}
+crypto.randomInt = (...args) => {
+    if (roomNumberCandidates.length > 0) return roomNumberCandidates.shift()
+    return roomNumberFallback ?? originalRandomInt(...args)
+}
 
 const {
     createRoom,
@@ -13,8 +29,25 @@ const {
     startRoomCleanup,
     stopRoomCleanup,
 } = require("../src/multi/room/manager")
+const { RoomState } = require("../src/multi/types")
+const { sessionManager } = require("../src/multi/state/SessionManager")
+const { getServerTime } = require("../src/utils")
 
-test.afterEach(() => stopRoomCleanup())
+function useRoomNumbers(...candidates) {
+    roomNumberCandidates = [...candidates]
+    roomNumberFallback = candidates[candidates.length - 1] ?? null
+}
+
+test.afterEach(() => {
+    stopRoomCleanup()
+    roomNumberCandidates = []
+    roomNumberFallback = null
+})
+
+test.after(() => {
+    crypto.randomBytes = originalRandomBytes
+    crypto.randomInt = originalRandomInt
+})
 
 test("importing the room manager does not create a cleanup interval", () => {
     const projectRoot = path.resolve(__dirname, "..")
@@ -82,4 +115,80 @@ test("stopping room cleanup preserves in-memory rooms", () => {
 
     assert.equal(getRoom(room.room_number), room)
     assert.equal(disbandRoom(room.room_number), true)
+})
+
+test("room creation retries a colliding number and preserves the active room", () => {
+    useRoomNumbers(123456)
+    const existing = createRoom(102, 202, 1, 1, 302, 1, 402)
+    const existingSnapshot = structuredClone(existing)
+
+    useRoomNumbers(123456, 654321)
+    const created = createRoom(103, 203, 1, 1, 303, 1, 403)
+
+    assert.equal(created.room_number, "654321")
+    assert.equal(getRoom(existing.room_number), existing)
+    assert.deepEqual(existing, existingSnapshot)
+    assert.equal(getRoom(created.room_number), created)
+
+    assert.equal(disbandRoom(existing.room_number), true)
+    assert.equal(disbandRoom(created.room_number), true)
+})
+
+test("room number exhaustion fails without consuming or mutating room state", t => {
+    useRoomNumbers(234567)
+    const existing = createRoom(104, 204, 1, 1, 304, 1, 404)
+    const participant = { nodeSessionId: "collision-test", viewerId: existing.host_viewer_id }
+    const roomState = sessionManager.getRoomState(existing.room_number)
+    assert.equal(roomState.tryTransition(RoomState.Ready).allowed, true)
+    sessionManager.setBattleParticipants(existing.room_number, [{
+        connectionId: "collision-test-host",
+        participant,
+    }], participant)
+    const battleSessionId = sessionManager.getActiveBattleSessionId(existing.room_number)
+    assert.equal(typeof battleSessionId, "string")
+
+    let cleanup
+    startRoomCleanup({
+        createInterval(callback) {
+            cleanup = callback
+            return { unref() {} }
+        },
+        clearInterval() {},
+    })
+    const broadcasts = []
+    const originalBroadcastToRoom = sessionManager.broadcastToRoom
+    sessionManager.broadcastToRoom = (roomNumber, message) => {
+        broadcasts.push({ roomNumber, message })
+    }
+    t.after(() => { sessionManager.broadcastToRoom = originalBroadcastToRoom })
+    existing.host_entry_time = getServerTime() - 880
+    cleanup()
+    assert.equal(broadcasts.length, 1)
+    const existingSnapshot = structuredClone(existing)
+
+    accessTokenGenerationCalls = 0
+    useRoomNumbers(...Array(10).fill(234567))
+    assert.throws(
+        () => createRoom(105, 205, 1, 1, 305, 1, 405),
+        /failed to allocate an unused room number after 10 attempts/,
+    )
+
+    assert.equal(accessTokenGenerationCalls, 0)
+    assert.equal(getRoom(existing.room_number), existing)
+    assert.deepEqual(existing, existingSnapshot)
+    assert.equal(sessionManager.getRoomState(existing.room_number), roomState)
+    assert.equal(roomState.getState(), RoomState.Ready)
+    assert.equal(sessionManager.getActiveBattleSessionId(existing.room_number), battleSessionId)
+    cleanup()
+    assert.equal(broadcasts.length, 1)
+
+    useRoomNumbers(345678)
+    const next = createRoom(106, 206, 1, 1, 306, 1, 406)
+    assert.equal(next.room_sequence, existing.room_sequence + 1)
+    assert.equal(accessTokenGenerationCalls, 1)
+
+    existing.host_entry_time = getServerTime() - 1_000
+    cleanup()
+    assert.equal(getRoom(existing.room_number), undefined)
+    assert.equal(disbandRoom(next.room_number), true)
 })
