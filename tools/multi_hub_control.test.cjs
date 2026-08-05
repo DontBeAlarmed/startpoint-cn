@@ -215,6 +215,57 @@ test("registers two independent credentials and exposes only the control route f
     assert.equal((await target.app.inject({ method: "GET", url: "/patch/cn/file" })).statusCode, 404)
 })
 
+test("control server exposes only the exact route methods", async t => {
+    const target = fixture(t)
+    const registration = await register(target.app, target.first.token)
+    const methods = ["OPTIONS", "PUT", "PATCH", "DELETE"]
+
+    assert.equal((await target.app.inject({
+        method: "GET",
+        url: "/v1/multi/nodes/register",
+    })).statusCode, 404)
+    assert.equal((await target.app.inject({
+        method: "HEAD",
+        url: "/v1/multi/status",
+        headers: sessionHeaders(registration),
+    })).statusCode, 404)
+
+    for (const method of methods) {
+        const response = await target.app.inject({
+            method,
+            url: "/v1/multi/status",
+            headers: sessionHeaders(registration),
+        })
+        assert.equal(response.statusCode, 404, `${method} status`)
+    }
+
+    assert.equal((await target.app.inject({
+        method: "GET",
+        url: "/v1/multi/rooms/status",
+    })).statusCode, 404)
+    for (const method of methods) {
+        const response = await target.app.inject({
+            method,
+            url: "/v1/multi/nodes/register",
+        })
+        assert.equal(response.statusCode, 404, `${method} register`)
+    }
+
+    for (const url of ["/api/player", "/admin", "/patch/cn/file"]) {
+        for (const method of ["GET", "HEAD", ...methods]) {
+            const response = await target.app.inject({ method, url })
+            assert.equal(response.statusCode, 404, `${method} ${url}`)
+        }
+    }
+
+    const status = await target.app.inject({
+        method: "GET",
+        url: "/v1/multi/status",
+        headers: sessionHeaders(registration),
+    })
+    assert.equal(status.statusCode, 200)
+})
+
 test("rejects malformed, unknown, revoked and incompatible registration credentials", async t => {
     const target = fixture(t)
 

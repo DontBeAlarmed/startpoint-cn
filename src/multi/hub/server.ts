@@ -14,6 +14,7 @@ export function buildMultiHubControlApp(
     const app = Fastify({
         bodyLimit: MULTI_HUB_CONTROL_BODY_LIMIT,
         logger: false,
+        exposeHeadRoutes: false,
     })
     registerMultiHubControlRoutes(app, options)
     app.setNotFoundHandler((_request, reply) => reply.status(404).send({

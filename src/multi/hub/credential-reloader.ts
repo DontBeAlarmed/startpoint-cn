@@ -52,6 +52,7 @@ export class CredentialReloader {
     private readonly readFile: (filePath: string) => string
     private readonly warn: (message: string) => void
     private current: CredentialSnapshot = EMPTY_SNAPSHOT
+    private hasValidSnapshot = false
     private observedFingerprint: string | null = null
     private timer: NodeJS.Timeout | null = null
 
@@ -87,9 +88,10 @@ export class CredentialReloader {
         if (metadata.fingerprint === this.observedFingerprint) return false
         this.observedFingerprint = metadata.fingerprint
         if (!metadata.exists) {
-            const changed = this.current.records.length > 0
-            this.current = EMPTY_SNAPSHOT
-            return changed
+            if (this.hasValidSnapshot) {
+                this.warn("credential reload rejected: INVALID_MULTI_HUB_CREDENTIALS")
+            }
+            return false
         }
         if (!metadata.validFile) {
             this.warn("credential reload rejected: INVALID_MULTI_HUB_CREDENTIALS")
@@ -98,6 +100,7 @@ export class CredentialReloader {
         try {
             const table = parseMultiHubCredentialTable(this.readFile(this.credentialsPath))
             this.current = snapshot(table.credentials)
+            this.hasValidSnapshot = true
             return true
         } catch {
             this.warn("credential reload rejected: INVALID_MULTI_HUB_CREDENTIALS")

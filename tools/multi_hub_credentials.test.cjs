@@ -510,6 +510,62 @@ test("credential reloader retains the previous snapshot after malformed changes"
     assert.equal(warnings.length, 1)
 })
 
+test("credential reloader distinguishes initial missing state from a deleted valid snapshot", t => {
+    const { credentialsPath, store } = fixture(t)
+    const warnings = []
+    const reloader = new CredentialReloader({
+        credentialsPath,
+        intervalMs: 10,
+        warn: warning => warnings.push(warning),
+    })
+
+    assert.equal(reloader.reloadIfChanged(), false)
+    assert.deepEqual(reloader.getStatus(), { total: 0, enabled: 0 })
+    const first = store.create("node-a")
+    assert.equal(reloader.reloadIfChanged(), true)
+    assert.ok(reloader.authenticate(first.token))
+
+    fs.unlinkSync(credentialsPath)
+    assert.equal(reloader.reloadIfChanged(), false)
+    assert.ok(reloader.authenticate(first.token))
+    assert.deepEqual(reloader.getStatus(), { total: 1, enabled: 1 })
+    assert.equal(warnings.length, 1)
+    assert.equal(warnings[0].includes(credentialsPath), false)
+    assert.equal(warnings[0].includes(first.token), false)
+
+    const second = store.create("node-b")
+    assert.equal(reloader.reloadIfChanged(), true)
+    assert.equal(reloader.authenticate(first.token), null)
+    assert.ok(reloader.authenticate(second.token))
+
+    store.revoke(second.credentialId)
+    assert.equal(reloader.reloadIfChanged(), true)
+    assert.equal(reloader.isCredentialEnabled(second.credentialId), false)
+    assert.equal(reloader.authenticate(second.token), null)
+})
+
+test("credential reloader treats a previously loaded empty table as a valid snapshot", t => {
+    const { credentialsPath } = fixture(t)
+    const warnings = []
+    fs.mkdirSync(path.dirname(credentialsPath), { recursive: true })
+    fs.writeFileSync(credentialsPath, JSON.stringify({
+        schemaVersion: 1,
+        credentials: [],
+    }), { mode: 0o600 })
+    const reloader = new CredentialReloader({
+        credentialsPath,
+        intervalMs: 10,
+        warn: warning => warnings.push(warning),
+    })
+
+    assert.equal(reloader.reloadIfChanged(), true)
+    assert.deepEqual(reloader.getStatus(), { total: 0, enabled: 0 })
+    fs.unlinkSync(credentialsPath)
+    assert.equal(reloader.reloadIfChanged(), false)
+    assert.deepEqual(reloader.getStatus(), { total: 0, enabled: 0 })
+    assert.equal(warnings.length, 1)
+})
+
 test("credential reloader starts empty, hot-loads creation and preserves peers on revoke", t => {
     const { credentialsPath, store } = fixture(t)
     const reloader = new CredentialReloader({
