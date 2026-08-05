@@ -111,6 +111,16 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
         }
         return removed
     }
+
+    removeByNodeSession(nodeSessionId: string): number {
+        let removed = 0
+        for (const [admissionKey, admission] of this.admissions) {
+            if (admission.participant.nodeSessionId !== nodeSessionId) continue
+            this.admissions.delete(admissionKey)
+            removed++
+        }
+        return removed
+    }
 }
 
 export const embeddedAdmissionRegistry = new AdmissionRegistry()

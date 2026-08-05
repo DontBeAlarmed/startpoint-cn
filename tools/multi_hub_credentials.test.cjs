@@ -13,6 +13,7 @@ const projectRoot = path.resolve(__dirname, "..")
 const {
     MultiHubCredentialStore,
 } = require("../src/multi/hub/credential-store")
+const { CredentialReloader } = require("../src/multi/hub/credential-reloader")
 const {
     acquireMultiHubCredentialLock,
     withMultiHubCredentialLock,
@@ -457,4 +458,78 @@ test("management CLI uses only the injected private table and never reprints sec
     )
     assert.notEqual(clientCreate.status, 0)
     assert.equal(fs.existsSync(clientCredentialsPath), false)
+})
+
+test("credential reloader skips unchanged files and atomically adopts valid snapshots", t => {
+    const { credentialsPath, store } = fixture(t)
+    const first = store.create("node-a")
+    let reads = 0
+    const warnings = []
+    const reloader = new CredentialReloader({
+        credentialsPath,
+        intervalMs: 10,
+        readFile(filePath) {
+            reads++
+            return fs.readFileSync(filePath, "utf8")
+        },
+        warn: warning => warnings.push(warning),
+    })
+
+    assert.equal(reloader.reloadIfChanged(), true)
+    assert.equal(reads, 1)
+    assert.equal(reloader.authenticate(first.token)?.credentialId, first.credentialId)
+    assert.equal(reloader.reloadIfChanged(), false)
+    assert.equal(reads, 1)
+
+    const second = store.create("node-b")
+    assert.equal(reloader.reloadIfChanged(), true)
+    assert.equal(reads, 2)
+    assert.equal(reloader.authenticate(second.token)?.credentialId, second.credentialId)
+    assert.deepEqual(reloader.getStatus(), { total: 2, enabled: 2 })
+    assert.deepEqual(warnings, [])
+})
+
+test("credential reloader retains the previous snapshot after malformed changes", t => {
+    const { credentialsPath, store } = fixture(t)
+    const issued = store.create("node-a")
+    const warnings = []
+    const reloader = new CredentialReloader({
+        credentialsPath,
+        intervalMs: 10,
+        warn: warning => warnings.push(warning),
+    })
+    reloader.reloadIfChanged()
+
+    fs.writeFileSync(credentialsPath, `{ "secret": "${issued.token}" }\n`, { mode: 0o600 })
+    assert.equal(reloader.reloadIfChanged(), false)
+    assert.equal(reloader.authenticate(issued.token)?.credentialId, issued.credentialId)
+    assert.equal(warnings.length, 1)
+    assert.equal(warnings[0].includes(issued.token), false)
+    assert.equal(warnings[0].includes(credentialsPath), false)
+    assert.equal(reloader.reloadIfChanged(), false)
+    assert.equal(warnings.length, 1)
+})
+
+test("credential reloader starts empty, hot-loads creation and preserves peers on revoke", t => {
+    const { credentialsPath, store } = fixture(t)
+    const reloader = new CredentialReloader({
+        credentialsPath,
+        intervalMs: 10,
+        warn: () => {},
+    })
+
+    assert.equal(reloader.reloadIfChanged(), false)
+    assert.deepEqual(reloader.getStatus(), { total: 0, enabled: 0 })
+    const first = store.create("node-a")
+    const second = store.create("node-b")
+    assert.equal(reloader.reloadIfChanged(), true)
+    assert.ok(reloader.authenticate(first.token))
+    assert.ok(reloader.authenticate(second.token))
+
+    store.revoke(first.credentialId)
+    assert.equal(reloader.reloadIfChanged(), true)
+    assert.equal(reloader.isCredentialEnabled(first.credentialId), false)
+    assert.equal(reloader.isCredentialEnabled(second.credentialId), true)
+    assert.equal(reloader.authenticate(first.token), null)
+    assert.ok(reloader.authenticate(second.token))
 })

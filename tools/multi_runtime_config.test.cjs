@@ -13,6 +13,7 @@ require("ts-node/register/transpile-only")
 const projectRoot = path.resolve(__dirname, "..")
 const { parseCnRuntimeConfig } = require("../src/runtime/config")
 const { createMultiRuntimeService } = require("../src/multi/runtime/service")
+const { MultiHubCredentialStore } = require("../src/multi/hub/credential-store")
 
 test("multiplayer defaults to the current embedded listener", () => {
     const config = parseCnRuntimeConfig({
@@ -525,7 +526,43 @@ function getStatus(port, requestPath) {
     })
 }
 
-test("real host starts without credentials and leaves registration unimplemented", async t => {
+function postJson(port, requestPath, headers, payload) {
+    return new Promise((resolve, reject) => {
+        const body = JSON.stringify(payload)
+        const request = http.request({
+            host: "127.0.0.1",
+            port,
+            path: requestPath,
+            method: "POST",
+            headers: {
+                "content-type": "application/json",
+                "content-length": Buffer.byteLength(body),
+                ...headers,
+            },
+        }, response => {
+            let responseBody = ""
+            response.setEncoding("utf8")
+            response.on("data", chunk => { responseBody += chunk })
+            response.once("end", () => resolve({
+                statusCode: response.statusCode,
+                body: JSON.parse(responseBody),
+            }))
+        })
+        request.once("error", reject)
+        request.end(body)
+    })
+}
+
+async function waitFor(predicate, message, timeoutMs) {
+    const startedAt = Date.now()
+    while (Date.now() - startedAt < timeoutMs) {
+        if (await predicate()) return
+        await new Promise(resolve => setTimeout(resolve, 25))
+    }
+    assert.fail(message)
+}
+
+test("real host hot-loads credentials and serves only the trusted control API", async t => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-host-empty-"))
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))
     const credentialsPath = path.join(root, "credentials.json")
@@ -543,5 +580,21 @@ test("real host starts without credentials and leaves registration unimplemented
 
     assert.equal(fs.existsSync(credentialsPath), false)
     assert.equal(service.getStatus().state, "ready")
-    assert.equal(await getStatus(hubPort, "/register"), 404)
+    const missing = await postJson(hubPort, "/v1/multi/nodes/register", {
+        authorization: `Bearer ${"a".repeat(64)}`,
+    }, { protocolVersion: 1 })
+    assert.equal(missing.statusCode, 401)
+
+    const issued = new MultiHubCredentialStore({ credentialsPath }).create("runtime-node")
+    let registration
+    await waitFor(async () => {
+        registration = await postJson(hubPort, "/v1/multi/nodes/register", {
+            authorization: `Bearer ${issued.token}`,
+        }, { protocolVersion: 1 })
+        return registration.statusCode === 200
+    }, "credential table was not hot-loaded", 2_000)
+    assert.match(registration.body.nodeSessionId, /^[A-Za-z0-9_-]+$/)
+    assert.match(registration.body.sessionCredential, /^[A-Za-z0-9_-]{43}$/)
+    assert.equal(await getStatus(hubPort, "/api/player"), 404)
+    assert.equal(await getStatus(hubPort, "/"), 404)
 })

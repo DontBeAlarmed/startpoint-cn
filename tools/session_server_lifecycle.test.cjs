@@ -6,7 +6,14 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const { sessionManager } = require("../src/multi/state/SessionManager")
-const { getRoomCleanupStatus } = require("../src/multi/room/manager")
+const {
+    addRoomMember,
+    createRoom,
+    disbandRoom,
+    getRoom,
+    getRoomCleanupStatus,
+    isRoomMember,
+} = require("../src/multi/room/manager")
 const { getLobbyLifecycleStatus } = require("../src/multi/tcp/lobby-lifecycle")
 const {
     getSessionServerStatus,
@@ -277,6 +284,115 @@ test("socket error and close share exactly one session cleanup", async () => {
     } finally {
         sessionManager.removeClientBySocket = originalRemoveClientBySocket
     }
+})
+
+test("revoked node sessions close only their current TCP socket on the next frame", async () => {
+    let fakeServer
+    const validity = new Map([
+        ["node-host", true],
+        ["node-guest", true],
+    ])
+    const checks = []
+    const room = createRoom(91, 1_091, 1, 1, 501, 0, 101)
+    addRoomMember(room.room_number, 92)
+
+    try {
+        await startSessionServer({
+            createServer(connectionListener) {
+                fakeServer = new FakeServer(connectionListener)
+                return fakeServer
+            },
+            async handleHandshake(socket, data) {
+                const client = sessionManager.createClient(
+                    socket,
+                    data.viewerId,
+                    room.room_number,
+                    `cid-${data.viewerId}`,
+                )
+                client.participant = {
+                    nodeSessionId: data.nodeSessionId,
+                    viewerId: data.viewerId,
+                }
+                sessionManager.addClientToRoom(client)
+                if (data.viewerId === 91) {
+                    sessionManager.claimRoomHostParticipant(room.room_number, client.participant)
+                }
+            },
+            validateNodeSession(nodeSessionId) {
+                checks.push(nodeSessionId)
+                return validity.get(nodeSessionId) === true
+            },
+        })
+        const revokedSocket = new FakeSocket()
+        const validSocket = new FakeSocket()
+        fakeServer.accept(revokedSocket)
+        fakeServer.accept(validSocket)
+        revokedSocket.emit("data", `${JSON.stringify({
+            socklet: "cooperation_room",
+            nodeSessionId: "node-host",
+            viewerId: 91,
+        })}\0`)
+        validSocket.emit("data", `${JSON.stringify({
+            socklet: "cooperation_room",
+            nodeSessionId: "node-guest",
+            viewerId: 92,
+        })}\0`)
+        await waitFor(
+            () => getSessionServerStatus().pendingHandshakes === 0,
+            "handshakes did not settle",
+        )
+        checks.length = 0
+
+        validity.set("node-guest", false)
+        validSocket.emit("data", `${JSON.stringify([99])}\0`)
+
+        assert.equal(validSocket.destroyed, true)
+        assert.equal(revokedSocket.destroyed, false)
+        assert.deepEqual(checks, ["node-guest"])
+        assert.equal(
+            sessionManager.getUniqueRoomClientByViewerId(92, room.room_number),
+            undefined,
+        )
+        assert.equal(isRoomMember(room, 92), false)
+        assert.ok(getRoom(room.room_number))
+
+        validity.set("node-host", false)
+        revokedSocket.emit("data", `${JSON.stringify([99])}\0`)
+        assert.equal(revokedSocket.destroyed, true)
+        assert.equal(getRoom(room.room_number), undefined)
+    } finally {
+        disbandRoom(room.room_number)
+    }
+})
+
+test("a session revoked before handshake is closed by that handshake frame", async () => {
+    let fakeServer
+    await startSessionServer({
+        nodeSessionCheckIntervalMs: 10_000,
+        createServer(connectionListener) {
+            fakeServer = new FakeServer(connectionListener)
+            return fakeServer
+        },
+        async handleHandshake(socket) {
+            const client = sessionManager.createClient(socket, 93, "revoked-handshake", "cid-93")
+            client.participant = { nodeSessionId: "node-revoked", viewerId: 93 }
+            sessionManager.addClientToRoom(client)
+        },
+        validateNodeSession: () => false,
+    })
+    const socket = new FakeSocket()
+    fakeServer.accept(socket)
+    socket.emit("data", `${JSON.stringify({ socklet: "cooperation_room" })}\0`)
+    await waitFor(
+        () => getSessionServerStatus().pendingHandshakes === 0,
+        "revoked handshake did not settle",
+    )
+
+    assert.equal(socket.destroyed, true)
+    assert.equal(
+        sessionManager.getUniqueRoomClientByViewerId(93, "revoked-handshake"),
+        undefined,
+    )
 })
 
 test("synchronous server creation failures reject and repeated stop is idempotent", async () => {

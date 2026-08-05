@@ -444,6 +444,48 @@ test("embedded HTTP and default TCP admission wiring share one registry", () => 
     assert.equal(DEFAULT_SESSION_ADMISSION_PROVIDER, embeddedAdmissionRegistry)
 })
 
+test("host coordinator scopes viewer conflicts and room ownership by node session", async t => {
+    const { disbandRoom: disbandLocalRoom } = require("../src/multi/room/manager")
+    const coordinator = new EmbeddedMultiCoordinator({ allowRemoteParticipants: true })
+    const host = { nodeSessionId: "node-a", viewerId: 707 }
+    const created = await coordinator.createRoom({
+        requestId: "host-room",
+        participant: host,
+        partyId: 1,
+        category: 1,
+        questId: 501,
+        leaderCharacterId: 101,
+        compatibility,
+    })
+    assert.equal(created.ok, true)
+    t.after(() => disbandLocalRoom(created.value.roomNumber))
+
+    const conflicting = await coordinator.searchRoom({
+        participant: { nodeSessionId: "node-b", viewerId: host.viewerId },
+        roomNumber: created.value.roomNumber,
+        compatibility,
+    })
+    assert.deepEqual(conflicting, { ok: false, error: "VIEWER_ID_CONFLICT" })
+
+    const compatible = await coordinator.searchRoom({
+        participant: { nodeSessionId: "node-b", viewerId: 708 },
+        roomNumber: created.value.roomNumber,
+        compatibility,
+    })
+    assert.equal(compatible.ok, true)
+    assert.deepEqual(compatible.value.host, host)
+
+    const forgedDisband = await coordinator.disbandRoom({
+        participant: { nodeSessionId: "node-b", viewerId: host.viewerId },
+        roomNumber: created.value.roomNumber,
+    })
+    assert.deepEqual(forgedDisband, { ok: false, error: "ROOM_PERMISSION_DENIED" })
+    assert.deepEqual(await coordinator.disbandRoom({
+        participant: host,
+        roomNumber: created.value.roomNumber,
+    }), { ok: true, value: undefined })
+})
+
 test("embedded HTTP context carries all four injected collaborators", async t => {
     if (!createEmbeddedMultiHttpContext) return t.skip("HTTP context missing")
 

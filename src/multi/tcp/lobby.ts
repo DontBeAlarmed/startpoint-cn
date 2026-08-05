@@ -334,7 +334,7 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     console.log(`[LOBBY] ${isHost ? "host" : "guest"} ${client.viewerId} entered room ${client.roomNumber}`)
 }
 
-function handleBye(_socket: net.Socket, client: SessionClient, _data: any[]): void {
+function disconnectRoomClient(client: SessionClient): void {
     const isHost = !!client.participant
         && sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)
     if (isHost) {
@@ -359,6 +359,17 @@ function handleBye(_socket: net.Socket, client: SessionClient, _data: any[]): vo
     }
     try { client.socket.destroy(); } catch (e) {}
     console.log(`[LOBBY] client ${client.viewerId} left room ${client.roomNumber}`)
+}
+
+export function handleSocketDisconnect(socket: net.Socket): boolean {
+    const client = findClientBySocket(socket)
+    if (!client) return false
+    disconnectRoomClient(client)
+    return true
+}
+
+function handleBye(_socket: net.Socket, client: SessionClient, _data: any[]): void {
+    disconnectRoomClient(client)
 }
 
 function handleChangeParty(_socket: net.Socket, client: SessionClient, data: any[]): void {

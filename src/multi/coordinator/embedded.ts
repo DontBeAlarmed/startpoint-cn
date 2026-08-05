@@ -15,6 +15,8 @@ import {
     type MultiCompatibilityProfile,
     type NodeSessionId,
     type ParticipantIdentity,
+    hasViewerIdConflict,
+    participantKey,
 } from "./contracts"
 import type {
     BattleSessionInput,
@@ -38,6 +40,11 @@ export const EMBEDDED_COMPATIBILITY: MultiCompatibilityProfile = Object.freeze({
 })
 
 const compatibilityByRoom = new WeakMap<MultiRoom, MultiCompatibilityProfile>()
+const hostIdentityByRoom = new WeakMap<MultiRoom, ParticipantIdentity>()
+
+export interface EmbeddedMultiCoordinatorOptions {
+    readonly allowRemoteParticipants?: boolean
+}
 
 function ok<T>(value: T): CoordinatorResult<T> {
     return { ok: true, value }
@@ -53,9 +60,16 @@ function assertPositiveSafeInteger(value: number, field: string): void {
     }
 }
 
-function assertParticipant(participant: ParticipantIdentity): void {
-    if (participant?.nodeSessionId !== EMBEDDED_NODE_SESSION_ID) {
+function assertParticipant(
+    participant: ParticipantIdentity,
+    allowRemoteParticipants: boolean,
+): void {
+    if (!allowRemoteParticipants && participant?.nodeSessionId !== EMBEDDED_NODE_SESSION_ID) {
         throw new TypeError("participant must use the embedded node session")
+    }
+    if (typeof participant?.nodeSessionId !== "string"
+        || participant.nodeSessionId.trim().length === 0) {
+        throw new TypeError("participant.nodeSessionId must be a non-empty string")
     }
     assertPositiveSafeInteger(participant.viewerId, "participant.viewerId")
 }
@@ -84,7 +98,6 @@ function assertNonEmptyString(value: string, field: string): void {
 }
 
 function resolveCompatibleRoom(input: CompatibleRoomInput): MultiRoom | undefined {
-    assertParticipant(input.participant)
     assertCompatibility(input.compatibility)
 
     const roomNumber = typeof input.roomNumber === "string" && input.roomNumber.trim().length > 0
@@ -106,9 +119,15 @@ function unavailableBattle(): CoordinatorResult<BattleStatus> {
 }
 
 export class EmbeddedMultiCoordinator implements MultiCoordinator {
+    private readonly allowRemoteParticipants: boolean
+
+    constructor(options: EmbeddedMultiCoordinatorOptions = {}) {
+        this.allowRemoteParticipants = options.allowRemoteParticipants === true
+    }
+
     async createRoom(input: CreateRoomInput): Promise<CoordinatorResult<RoomStatus>> {
         assertNonEmptyString(input.requestId, "requestId")
-        assertParticipant(input.participant)
+        assertParticipant(input.participant, this.allowRemoteParticipants)
         assertPositiveSafeInteger(input.partyId, "partyId")
         assertPositiveSafeInteger(input.category, "category")
         assertPositiveSafeInteger(input.questId, "questId")
@@ -128,6 +147,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             input.leaderCharacterId,
         )
         compatibilityByRoom.set(room, Object.freeze({ ...input.compatibility }))
+        hostIdentityByRoom.set(room, Object.freeze({ ...input.participant }))
         return ok(this.toRoomStatus(room))
     }
 
@@ -144,24 +164,30 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
     }
 
     async disbandRoom(input: RoomParticipantInput): Promise<CoordinatorResult<void>> {
-        assertParticipant(input.participant)
+        assertParticipant(input.participant, this.allowRemoteParticipants)
         if (typeof input.roomNumber !== "string" || input.roomNumber.trim().length === 0) {
             return roomNotFound()
         }
         const room = getRoom(input.roomNumber)
         if (!room) return roomNotFound()
-        if (room.host_viewer_id !== input.participant.viewerId) {
+        const host = hostIdentityByRoom.get(room) ?? {
+            nodeSessionId: EMBEDDED_NODE_SESSION_ID,
+            viewerId: room.host_viewer_id,
+        }
+        if (participantKey(host.nodeSessionId, host.viewerId)
+            !== participantKey(input.participant.nodeSessionId, input.participant.viewerId)) {
             return { ok: false, error: "ROOM_PERMISSION_DENIED" }
         }
 
         sessionManager.broadcastToRoom(input.roomNumber, [1, [6, "multibattle_room_dismissed"]])
         if (!disbandLocalRoom(input.roomNumber)) return roomNotFound()
         compatibilityByRoom.delete(room)
+        hostIdentityByRoom.delete(room)
         return ok(undefined)
     }
 
     async startBattle(input: RoomParticipantInput): Promise<CoordinatorResult<BattleStatus>> {
-        assertParticipant(input.participant)
+        assertParticipant(input.participant, this.allowRemoteParticipants)
         if (typeof input.roomNumber !== "string" || input.roomNumber.trim().length === 0) {
             return roomNotFound()
         }
@@ -179,7 +205,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
     }
 
     async getRoomStatus(input: RoomParticipantInput): Promise<CoordinatorResult<RoomStatus>> {
-        assertParticipant(input.participant)
+        assertParticipant(input.participant, this.allowRemoteParticipants)
         if (typeof input.roomNumber !== "string" || input.roomNumber.trim().length === 0) {
             return roomNotFound()
         }
@@ -193,6 +219,10 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
     ): Promise<CoordinatorResult<RoomStatus>> {
         const room = resolveCompatibleRoom(input)
         if (!room) return roomNotFound()
+        assertParticipant(input.participant, this.allowRemoteParticipants)
+        if (hasViewerIdConflict(this.toRoomStatus(room).members, input.participant)) {
+            return { ok: false, error: "VIEWER_ID_CONFLICT" }
+        }
         const hostCompatibility = compatibilityByRoom.get(room) ?? EMBEDDED_COMPATIBILITY
         if (!compareCompatibility(hostCompatibility, input.compatibility).compatible) {
             return { ok: false, error: "INCOMPATIBLE_ROOM" }
@@ -202,15 +232,21 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
     }
 
     private assertBattleInput(input: BattleSessionInput): void {
-        assertParticipant(input.participant)
+        assertParticipant(input.participant, this.allowRemoteParticipants)
         assertNonEmptyString(input.battleSessionId as BattleSessionId, "battleSessionId")
     }
 
     private toRoomStatus(room: MultiRoom): RoomStatus {
-        const identity = (viewerId: number): ParticipantIdentity => ({
+        const host = hostIdentityByRoom.get(room) ?? Object.freeze({
             nodeSessionId: EMBEDDED_NODE_SESSION_ID,
-            viewerId,
+            viewerId: room.host_viewer_id,
         })
+        const connected = sessionManager.getClientsInRoom(room.room_number)
+        const identity = (viewerId: number): ParticipantIdentity => {
+            if (viewerId === host.viewerId) return host
+            return connected.find(client => client.viewerId === viewerId)?.participant
+                ?? { nodeSessionId: EMBEDDED_NODE_SESSION_ID, viewerId }
+        }
         return Object.freeze({
             roomNumber: room.room_number,
             accessToken: room.access_token,
@@ -226,7 +262,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
                 room.host_viewer_id,
                 room.room_number,
             ),
-            host: Object.freeze(identity(room.host_viewer_id)),
+            host,
             members: Object.freeze(room.member_viewer_ids.map(
                 viewerId => Object.freeze(identity(viewerId)),
             )),

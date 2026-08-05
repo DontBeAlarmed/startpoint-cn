@@ -48,6 +48,8 @@ export interface SessionServerOptions {
         lifecycle: HandshakeLifecycleGuard,
     ) => Promise<void>
     admissionProvider?: AdmissionProvider
+    validateNodeSession?: (nodeSessionId: string) => boolean
+    nodeSessionCheckIntervalMs?: number
     /** Maximum shutdown wait for this generation's handshakes before sockets are retired. */
     shutdownTimeoutMs?: number
     onFatalError?: (failure: SessionServerFailure) => void
@@ -59,6 +61,9 @@ interface ServerContext {
     readonly shutdownTimeoutMs: number
     readonly onError: (error: Error) => void
     readonly onFatalError?: (failure: SessionServerFailure) => void
+    readonly validateNodeSession?: (nodeSessionId: string) => boolean
+    readonly nodeSessionCheckIntervalMs: number
+    nodeSessionTimer: NodeJS.Timeout | null
     fatalStarted: boolean
     fatalSettled: boolean
     fatalTeardown: Promise<void> | null
@@ -96,6 +101,10 @@ function describeRemote(socket: net.Socket): string {
 
 function cleanupSession(socket: net.Socket): void {
     try {
+        const lobby = require("./lobby") as {
+            handleSocketDisconnect?: (candidate: net.Socket) => boolean
+        }
+        if (lobby.handleSocketDisconnect?.(socket)) return
         sessionManager.removeClientBySocket(socket)
     } catch (error) {
         console.error(`[TCP] session cleanup failed: code=${failureCode(error) ?? "UNKNOWN"}`)
@@ -105,6 +114,39 @@ function cleanupSession(socket: net.Socket): void {
 function cleanupAcceptedSocket(socket: net.Socket): void {
     if (!acceptedSockets.delete(socket)) return
     if (!socketHandshakes.has(socket)) cleanupSession(socket)
+}
+
+function hasValidNodeSession(context: ServerContext, socket: net.Socket): boolean {
+    const validator = context.validateNodeSession
+    if (!validator) return true
+    const participant = sessionManager.getClientBySocket(socket)?.participant
+    if (!participant) return true
+    try {
+        return validator(participant.nodeSessionId)
+    } catch {
+        return false
+    }
+}
+
+function rejectInvalidNodeSession(context: ServerContext, socket: net.Socket): boolean {
+    if (hasValidNodeSession(context, socket)) return false
+    socket.destroy()
+    return true
+}
+
+function startNodeSessionChecks(context: ServerContext): void {
+    if (!context.validateNodeSession || context.nodeSessionTimer !== null) return
+    context.nodeSessionTimer = setInterval(() => {
+        if (activeContext !== context || phase !== "listening") return
+        for (const socket of [...acceptedSockets]) rejectInvalidNodeSession(context, socket)
+    }, context.nodeSessionCheckIntervalMs)
+    context.nodeSessionTimer.unref()
+}
+
+function stopNodeSessionChecks(context: ServerContext): void {
+    if (context.nodeSessionTimer === null) return
+    clearInterval(context.nodeSessionTimer)
+    context.nodeSessionTimer = null
 }
 
 function isAccepting(context: ServerContext, socket: net.Socket): boolean {
@@ -133,6 +175,9 @@ function trackHandshake(
     let tracked: Promise<void>
     tracked = Promise.resolve()
         .then(() => handshakeHandler(socket, data, lifecycle))
+        .then(() => {
+            if (isAccepting(context, socket)) rejectInvalidNodeSession(context, socket)
+        })
         .catch(error => {
             console.error(`[TCP] handshake failed: code=${failureCode(error) ?? "UNKNOWN"}`)
             socket.destroy()
@@ -183,6 +228,7 @@ function handleConnection(
                     isBattleSocket = data.socklet === "cooperation_battle"
                     trackHandshake(context, socket, data, handshakeHandler)
                 } else if (handshakeDone) {
+                    if (rejectInvalidNodeSession(context, socket)) break
                     if (isBattleSocket) {
                         handleBattleMessage(socket, data)
                     } else {
@@ -225,6 +271,7 @@ function settleStart(context: ServerContext, error?: Error): void {
 }
 
 function finalizeContext(context: ServerContext): void {
+    stopNodeSessionChecks(context)
     context.server.off("error", context.onError)
     if (activeContext === context) activeContext = null
 }
@@ -413,6 +460,9 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
         shutdownTimeoutMs: options.shutdownTimeoutMs ?? DEFAULT_SESSION_SHUTDOWN_TIMEOUT_MS,
         onError,
         onFatalError: options.onFatalError,
+        validateNodeSession: options.validateNodeSession,
+        nodeSessionCheckIntervalMs: options.nodeSessionCheckIntervalMs ?? 1_000,
+        nodeSessionTimer: null,
         fatalStarted: false,
         fatalSettled: false,
         fatalTeardown: null,
@@ -440,6 +490,7 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
             try {
                 startRoomCleanup()
                 startLobbyLifecycle()
+                startNodeSessionChecks(context)
             } catch (error) {
                 recordFailure("startup", error)
                 stopRoomCleanup()

@@ -20,6 +20,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/runtime_bundle_metadata.test.cjs",
             "tools/runtime_config.test.cjs",
             "tools/multi_hub_credentials.test.cjs",
+            "tools/multi_hub_control.test.cjs",
             "tools/multi_hub_token.test.cjs",
             "tools/multi_runtime_config.test.cjs",
             "tools/comic_route.test.cjs",

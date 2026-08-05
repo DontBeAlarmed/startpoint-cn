@@ -327,6 +327,38 @@ npm run multi:token -- revoke <credentialId>
 
 密钥表属于 Host 运行配置，不属于玩家存档。服务端不建立账号系统、设备身份、密钥导入导出或分发协议，也不能阻止被撤销节点改用另一条有效密钥。壳或经过认证的管理工具以后可以复用同一生成与密钥表函数，提供遮挡显示、复制和扫码导入，但不得改变服务端契约。Client 只在自己的 `.env` 或壳运行配置中保存服主分发的一条 `MULTI_HUB_TOKEN`；服务端命令不替 Client 猜测、生成或自动写入另一条令牌。
 
+### 10.1 Hub 控制接口
+
+Host 在 `MULTI_HUB_HOST:MULTI_HUB_PORT` 启动独立 Fastify 实例，JSON 请求体上限为 256 KiB。该实例只注册下列端点：
+
+| 方法 | 路径 | 行为 | 写幂等键 |
+|------|------|------|----------|
+| `POST` | `/v1/multi/nodes/register` | 以集群令牌注册节点会话 | 否 |
+| `POST` | `/v1/multi/rooms/create` | `MultiCoordinator.createRoom` | 是 |
+| `POST` | `/v1/multi/rooms/search` | `MultiCoordinator.searchRoom` | 否 |
+| `POST` | `/v1/multi/rooms/prepare` | `MultiCoordinator.prepareRoom` | 是 |
+| `POST` | `/v1/multi/rooms/select` | `MultiCoordinator.selectRoom` | 否 |
+| `POST` | `/v1/multi/rooms/disband` | `MultiCoordinator.disbandRoom` | 是 |
+| `POST` | `/v1/multi/rooms/status` | `MultiCoordinator.getRoomStatus` | 否 |
+| `POST` | `/v1/multi/admissions/issue` | 建立一次性 TCP admission | 是 |
+| `POST` | `/v1/multi/battles/start` | `MultiCoordinator.startBattle` | 是 |
+| `POST` | `/v1/multi/battles/finalize` | `MultiCoordinator.finalizeBattle` | 是 |
+| `POST` | `/v1/multi/battles/status` | `MultiCoordinator.getBattleStatus` | 否 |
+| `GET` | `/v1/multi/status` | 只返回有效密钥与活动节点会话计数 | 否 |
+
+注册请求使用 `Authorization: Bearer <集群明文令牌>`，正文只包含 `protocolVersion`。成功响应包含随机 `nodeSessionId`、43 位 base64url `sessionCredential`、`expiresAt` 和 Hub TCP 的 `host/port`；不返回 `credentialId`、备注、令牌摘要或密钥表路径。后续调用不再发送集群明文令牌，而是同时发送：
+
+```text
+Authorization: Bearer <sessionCredential>
+x-node-session-id: <nodeSessionId>
+```
+
+Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的 `participant.nodeSessionId` 强制绑定为已认证会话，节点不能代替另一节点发起操作。写端点还必须携带 1 至 128 位可见 ASCII `x-idempotency-key`；缓存按 `nodeSessionId + operation + key` 隔离，在房间变更 TTL 内返回相同 HTTP 状态和 JSON 结果，不重复调用 Coordinator。业务失败使用 `{ ok: false, code }` 的有限错误集合；内部异常只返回 `HUB_UNAVAILABLE`，404 不回显请求路径，任何响应都不包含 stack、绝对路径或凭据。
+
+凭据热加载器默认每秒只检查文件身份、大小和修改时间。元数据未变化时不读取文件；合法变化整体替换不可变内存快照，非法变化只记录无路径、无令牌、无摘要的告警并保留上一份有效快照。文件首次不存在按空快照启动，运行中合法创建后可直接注册。每次控制调用和 TCP 入站帧只通过节点会话关联的 `credentialId` 对快照做 O(1) 启用状态查询，不读文件也不重新计算集群令牌摘要。
+
+密钥撤销后，该密钥关联的每个节点会话会在各自下一次控制调用时失效并清除 admission；TCP 连接在下一帧或最多一次节点会话检查周期内关闭，并复用 lobby 断线流程移除成员，房主断线时解散房间。实现不维护按密钥反查 Socket 的推送索引。另一条仍有效的密钥不受影响，可以继续注册新节点会话。Hub 控制面不读取服务器时间，`QUEST_NOT_AVAILABLE` 仍只由玩家所属服务端按自己的全局服务器时间生成。
+
 ## 11. 健康与诊断
 
 运行健康状态区分：

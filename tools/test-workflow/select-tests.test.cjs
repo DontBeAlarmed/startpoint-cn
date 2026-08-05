@@ -310,6 +310,7 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/runtime_bundle_metadata.test.cjs",
             "tools/runtime_config.test.cjs",
             "tools/multi_hub_credentials.test.cjs",
+            "tools/multi_hub_control.test.cjs",
             "tools/multi_hub_token.test.cjs",
             "tools/multi_runtime_config.test.cjs",
             "tools/comic_route.test.cjs",
@@ -331,6 +332,8 @@ test("routes multiplayer runtime and private credential changes to focused group
     for (const source of [
         "src/multi/hub/token.ts",
         "src/multi/hub/credential-store.ts",
+        "src/multi/hub/control-routes.ts",
+        "src/multi/hub/node-sessions.ts",
         "src/multi/runtime/service.ts",
         "src/multi/runtime/status.ts",
     ]) {

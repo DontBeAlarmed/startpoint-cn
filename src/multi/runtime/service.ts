@@ -1,8 +1,15 @@
-import * as http from "node:http"
-
 import type { MultiRuntimeConfig, RuntimeNetworkServiceConfig } from "../../runtime/config"
+import { AdmissionRegistry } from "../admission/registry"
 import type { CoordinatorResult } from "../coordinator/contracts"
 import type { MultiCoordinator } from "../coordinator/interface"
+import { EmbeddedMultiCoordinator } from "../coordinator/embedded"
+import { CredentialReloader } from "../hub/credential-reloader"
+import { IdempotencyCache } from "../hub/idempotency"
+import { NodeSessionRegistry } from "../hub/node-sessions"
+import {
+    MultiHubControlServer,
+} from "../hub/server"
+import type { MultiHubControlRoutesOptions } from "../hub/control-routes"
 import {
     createEmbeddedMultiHttpContext,
     type MultiHttpContext,
@@ -27,16 +34,22 @@ export interface MultiRuntimeFatal {
 
 export type MultiRuntimeFatalHandler = (failure: MultiRuntimeFatal) => void
 
+interface MultiRuntimeHostServices extends MultiHubControlRoutesOptions {
+    readonly admissionRegistry: AdmissionRegistry
+}
+
 export interface MultiRuntimeServiceDependencies {
     readonly startTcp: (
         config: RuntimeNetworkServiceConfig,
         onFatalError: FatalHandler,
+        hostServices?: MultiRuntimeHostServices,
     ) => Promise<unknown>
     readonly stopTcp: () => Promise<unknown> | unknown
     readonly isTcpListening: () => boolean
     readonly startHub: (
         config: RuntimeNetworkServiceConfig,
         onFatalError: FatalHandler,
+        hostServices?: MultiRuntimeHostServices,
     ) => Promise<unknown>
     readonly stopHub: () => Promise<unknown> | unknown
     readonly isHubListening: () => boolean
@@ -83,63 +96,24 @@ function createUnavailableHttpContext(): MultiHttpContext {
     })
 }
 
-class HubControlListener {
-    private server: http.Server | null = null
-
-    isListening = (): boolean => this.server?.listening === true
-
-    start = (
-        config: RuntimeNetworkServiceConfig,
-        onFatalError: FatalHandler,
-    ): Promise<void> => new Promise((resolve, reject) => {
-        if (this.server !== null) {
-            reject(new Error("Hub control listener already started"))
-            return
-        }
-        const server = http.createServer((_request, response) => {
-            response.writeHead(404).end()
-        })
-        this.server = server
-        let starting = true
-        server.on("error", error => {
-            if (starting) {
-                this.server = null
-                reject(error)
-                return
-            }
-            onFatalError(error)
-        })
-        server.listen(config.port, config.host, () => {
-            starting = false
-            resolve()
-        })
-    })
-
-    stop = async (): Promise<void> => {
-        const server = this.server
-        if (server === null) return
-        if (!server.listening) {
-            if (this.server === server) this.server = null
-            return
-        }
-        await new Promise<void>((resolve, reject) => {
-            server.close(error => error ? reject(error) : resolve())
-        })
-        if (this.server === server) this.server = null
-    }
-}
-
 function defaultDependencies(): MultiRuntimeServiceDependencies {
-    const hub = new HubControlListener()
+    const hub = new MultiHubControlServer()
     return {
-        startTcp: (config, onFatalError) => startSessionServer({
+        startTcp: (config, onFatalError, hostServices) => startSessionServer({
             ...config,
+            admissionProvider: hostServices?.admissionRegistry,
+            validateNodeSession: hostServices
+                ? nodeSessionId => hostServices.nodeSessions.isValid(nodeSessionId)
+                : undefined,
             onFatalError: () => onFatalError(new Error("session server unavailable")),
         }),
         stopTcp: stopSessionServer,
         isTcpListening: isSessionServerListening,
-        startHub: hub.start,
-        stopHub: hub.stop,
+        startHub: (config, onFatalError, hostServices) => {
+            if (!hostServices) return Promise.reject(new Error("Hub services unavailable"))
+            return hub.start(config, hostServices, onFatalError)
+        },
+        stopHub: () => hub.stop(),
         isHubListening: hub.isListening,
     }
 }
@@ -155,6 +129,7 @@ class Service implements MultiRuntimeService {
     private fatalReported = false
     private startPromise: Promise<void> | null = null
     private stopPromise: Promise<void> | null = null
+    private hostServices: MultiRuntimeHostServices | null = null
 
     constructor(private readonly dependencies: MultiRuntimeServiceDependencies) {}
 
@@ -197,9 +172,43 @@ class Service implements MultiRuntimeService {
         if (priorStop !== null) await priorStop
         if (generation !== this.generation) return
         this.config = config
-        this.context = config.mode === "client"
-            ? createUnavailableHttpContext()
-            : createEmbeddedMultiHttpContext()
+        if (config.mode === "host") {
+            const admissionRegistry = new AdmissionRegistry()
+            const coordinator = new EmbeddedMultiCoordinator({ allowRemoteParticipants: true })
+            const credentialReloader = new CredentialReloader({
+                credentialsPath: config.credentialsPath,
+            })
+            const nodeSessions = new NodeSessionRegistry({
+                isCredentialEnabled: credentialId => (
+                    credentialReloader.isCredentialEnabled(credentialId)
+                ),
+                onInvalidated: nodeSessionId => {
+                    admissionRegistry.removeByNodeSession(nodeSessionId)
+                },
+            })
+            this.hostServices = Object.freeze({
+                coordinator,
+                credentialReloader,
+                nodeSessions,
+                admissionIssuer: admissionRegistry,
+                admissionRegistry,
+                idempotency: new IdempotencyCache(),
+                tcpEndpoint: Object.freeze({
+                    host: config.tcp.publicHost ?? config.tcp.host,
+                    port: config.tcp.port,
+                }),
+            })
+            credentialReloader.start()
+            this.context = createEmbeddedMultiHttpContext({
+                coordinator,
+                admissionRegistry,
+            })
+        } else {
+            this.hostServices = null
+            this.context = config.mode === "client"
+                ? createUnavailableHttpContext()
+                : createEmbeddedMultiHttpContext()
+        }
         this.tcpFailed = false
         this.hubFailed = false
         this.fatalReported = false
@@ -210,6 +219,7 @@ class Service implements MultiRuntimeService {
             await this.dependencies.startTcp(
                 config.tcp,
                 () => this.handleFatal(generation, config, "tcp", onFatalError),
+                this.hostServices ?? undefined,
             )
         } catch (error) {
             this.tcpFailed = true
@@ -230,6 +240,7 @@ class Service implements MultiRuntimeService {
             await this.dependencies.startHub(
                 config.hub,
                 () => this.handleFatal(generation, config, "hub", onFatalError),
+                this.hostServices ?? undefined,
             )
         } catch {
             this.hubFailed = true
@@ -335,6 +346,9 @@ class Service implements MultiRuntimeService {
             }
         }
         if (!this.hubAttempted && !this.tcpAttempted) {
+            this.hostServices?.credentialReloader.stop()
+            this.hostServices?.nodeSessions.clear()
+            this.hostServices = null
             this.config = null
             this.context = null
             this.tcpFailed = false

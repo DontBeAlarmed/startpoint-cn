@@ -80,6 +80,7 @@ export interface MultiHttpContext {
 }
 
 export interface EmbeddedMultiHttpContextOptions {
+    readonly coordinator?: MultiCoordinator
     readonly compatibility?: MultiCompatibilityProfile
     readonly compatibilityProfileDependencies?: CompatibilityProfileDependencies
     readonly resolvePlayerContext?: ResolveMultiPlayerContext
@@ -95,7 +96,7 @@ export interface EmbeddedMultiHttpContextOptions {
 export function createEmbeddedMultiHttpContext(
     options: EmbeddedMultiHttpContextOptions = {},
 ): MultiHttpContext {
-    const coordinator = new EmbeddedMultiCoordinator()
+    const coordinator = options.coordinator ?? new EmbeddedMultiCoordinator()
     const resolvePlayerContext = options.resolvePlayerContext ?? resolveMultiPlayerContext
     const admissionRegistry = options.admissionRegistry ?? embeddedAdmissionRegistry
     const now = options.now ?? Date.now

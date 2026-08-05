@@ -21,7 +21,7 @@ const CREDENTIAL_KEYS = [
     "tokenDigest",
 ]
 
-interface StoredCredential {
+export interface MultiHubCredentialRecord {
     readonly credentialId: string
     readonly label: string
     readonly tokenDigest: string
@@ -29,9 +29,9 @@ interface StoredCredential {
     readonly revokedAt: string | null
 }
 
-interface CredentialTable {
+export interface MultiHubCredentialTable {
     readonly schemaVersion: typeof SCHEMA_VERSION
-    readonly credentials: readonly StoredCredential[]
+    readonly credentials: readonly MultiHubCredentialRecord[]
 }
 
 export interface MultiHubCredential {
@@ -85,7 +85,7 @@ function isValidLabel(value: unknown): value is string {
         && !/[\u0000-\u001f\u007f-\u009f]/.test(value)
 }
 
-function parseTable(value: unknown): CredentialTable {
+function parseTable(value: unknown): MultiHubCredentialTable {
     if (!isRecord(value)
         || !hasExactKeys(value, ROOT_KEYS)
         || value.schemaVersion !== SCHEMA_VERSION
@@ -95,7 +95,7 @@ function parseTable(value: unknown): CredentialTable {
 
     const credentialIds = new Set<string>()
     const tokenDigests = new Set<string>()
-    const credentials: StoredCredential[] = []
+    const credentials: MultiHubCredentialRecord[] = []
     for (const candidate of value.credentials) {
         if (!isRecord(candidate)
             || !hasExactKeys(candidate, CREDENTIAL_KEYS)
@@ -128,7 +128,7 @@ function parseTable(value: unknown): CredentialTable {
     })
 }
 
-function publicCredential(credential: StoredCredential): MultiHubCredential {
+function publicCredential(credential: MultiHubCredentialRecord): MultiHubCredential {
     return Object.freeze({
         credentialId: credential.credentialId,
         label: credential.label,
@@ -139,6 +139,15 @@ function publicCredential(credential: StoredCredential): MultiHubCredential {
 
 function tokenDigest(token: string): string {
     return createHash("sha256").update(token, "utf8").digest("hex")
+}
+
+export function parseMultiHubCredentialTable(text: string): MultiHubCredentialTable {
+    try {
+        return parseTable(JSON.parse(text))
+    } catch (error) {
+        if (error instanceof MultiHubCredentialStoreError) throw error
+        return failInvalidTable()
+    }
 }
 
 export class MultiHubCredentialStore {
@@ -186,7 +195,7 @@ export class MultiHubCredentialStore {
             throw new MultiHubCredentialStoreError("DUPLICATE_MULTI_HUB_TOKEN")
         }
         const createdAt = this.timestamp()
-        const credential: StoredCredential = Object.freeze({
+        const credential: MultiHubCredentialRecord = Object.freeze({
             credentialId,
             label,
             tokenDigest: digest,
@@ -235,7 +244,7 @@ export class MultiHubCredentialStore {
     authenticate(token: string): MultiHubCredential | null {
         if (!validateMultiHubToken(token)) return null
         const candidate = Buffer.from(tokenDigest(token), "hex")
-        let match: StoredCredential | null = null
+        let match: MultiHubCredentialRecord | null = null
         for (const credential of this.readTable().credentials) {
             const digest = Buffer.from(credential.tokenDigest, "hex")
             if (credential.revokedAt === null && timingSafeEqual(candidate, digest)) {
@@ -253,7 +262,7 @@ export class MultiHubCredentialStore {
         return date.toISOString()
     }
 
-    private readTable(): CredentialTable {
+    private readTable(): MultiHubCredentialTable {
         let stats: fs.Stats
         try {
             stats = fs.lstatSync(this.credentialsPath)
@@ -265,14 +274,14 @@ export class MultiHubCredentialStore {
         }
         if (stats.isSymbolicLink() || !stats.isFile()) return failInvalidTable()
         try {
-            return parseTable(JSON.parse(fs.readFileSync(this.credentialsPath, "utf8")))
+            return parseMultiHubCredentialTable(fs.readFileSync(this.credentialsPath, "utf8"))
         } catch (error) {
             if (error instanceof MultiHubCredentialStoreError) throw error
             return failInvalidTable()
         }
     }
 
-    private writeTable(table: CredentialTable): void {
+    private writeTable(table: MultiHubCredentialTable): void {
         const directory = path.dirname(this.credentialsPath)
         fs.mkdirSync(directory, { recursive: true, mode: 0o700 })
         const fileMode = this.currentFileMode()
