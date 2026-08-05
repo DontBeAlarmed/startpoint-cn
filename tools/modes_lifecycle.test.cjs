@@ -8,7 +8,7 @@
 // initializeContentAndModes() directly could not notice cn-server dropping
 // that call; this one loses its subject and fails.
 //
-// Snapshot, HTTP listen and TCP start are spies, so no port is bound.
+// Snapshot, HTTP listen and multiplayer start are spies, so no port is bound.
 
 require("ts-node/register/transpile-only")
 
@@ -51,7 +51,11 @@ export function register() {
 }
 
 function buildCoordinator(dir, trace) {
-    const config = { assetProvider: { mode: "local" }, http: {}, tcp: {} }
+    const config = {
+        assetProvider: { mode: "local" },
+        http: {},
+        multi: { mode: "embedded", tcp: {} },
+    }
     // Exactly what cn-server composes for the content step.
     const contentDependencies = createContentLifecycleDependencies({
         projectRoot: dir,
@@ -79,23 +83,28 @@ function buildCoordinator(dir, trace) {
         },
         closeHttp: async () => {},
         forceCloseHttp: () => {},
-        startTcp: async () => {
-            trace.push(`tcp-start:${registry.listModeCapabilities().join(",")}`)
-            return { close: () => {} }
+        startMulti: async () => {
+            trace.push(`multi-start:${registry.listModeCapabilities().join(",")}`)
         },
-        stopTcp: async () => {},
+        stopMulti: async () => {},
         checkpointDatabase: () => {},
         closeDatabase: () => {},
         getDatabaseHealth: () => ({ status: "ok" }),
         isHttpListening: () => true,
-        isTcpListening: () => true,
+        getMultiStatus: () => ({
+            mode: "embedded",
+            state: "ready",
+            coordinator: { kind: "local", available: true },
+            hub: null,
+            tcp: { available: true, endpoint: "127.0.0.1:8003" },
+        }),
         processTarget: new EventEmitter(),
         setExitCode: () => {},
         log: () => {},
     })
 }
 
-test("boot order is snapshot → modes → HTTP listen → TCP start", async () => {
+test("boot order is snapshot → modes → multiplayer start → HTTP listen", async () => {
     const dir = tempModesDir()
     installModule(dir, "lifecycle.mjs", "lifecycle-fixture")
     registry.resetModesForTest()
@@ -107,10 +116,9 @@ test("boot order is snapshot → modes → HTTP listen → TCP start", async () 
     assert.deepEqual(trace, [
         "content-snapshot",
         "modes-loaded:lifecycle-fixture@1",
-        // Both listeners must already see the registered capability: a
-        // request arriving at either one can dispatch into the seam.
+        // Multiplayer context must exist before HTTP route registration.
+        "multi-start:lifecycle-fixture@1",
         "http-listen:lifecycle-fixture@1",
-        "tcp-start:lifecycle-fixture@1",
     ])
 
     await coordinator.stop?.()
@@ -128,8 +136,8 @@ test("an empty modes dir still boots in the same order with nothing registered",
     assert.deepEqual(trace, [
         "content-snapshot",
         "modes-loaded:",
+        "multi-start:",
         "http-listen:",
-        "tcp-start:",
     ])
     assert.deepEqual(registry.listModeCapabilities(), [])
 

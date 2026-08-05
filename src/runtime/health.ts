@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify"
 
 import type { AssetMode } from "../content/cdn/asset-mode"
+import type { MultiRuntimeStatus } from "../multi/runtime/status"
 
 export type RuntimePhase = "starting" | "ready" | "stopping" | "failed" | "stopped"
 
@@ -15,7 +16,7 @@ export interface RuntimeHealthState {
     }
     readonly contentInitialized: boolean
     readonly httpListening: boolean
-    readonly tcpListening: boolean
+    readonly multi: MultiRuntimeStatus
     readonly adminAvailable: boolean
     readonly assetMode: AssetMode
 }
@@ -46,6 +47,7 @@ export interface RuntimeHealthBody {
         readonly minClientVersion: "1.4.54"
         readonly observedClientVersion: null
     }
+    readonly multiplayer?: MultiRuntimeStatus
 }
 
 export interface RuntimeHealthSnapshot {
@@ -59,7 +61,6 @@ export function createRuntimeHealthSnapshot(state: RuntimeHealthState): RuntimeH
         && state.database.schema !== null
         && state.contentInitialized
         && state.httpListening
-        && state.tcpListening
         && state.adminAvailable
     const status = state.phase === "ready" && !ready ? "failed" : state.phase
     const assetStatus = state.assetMode === "client-owned"
@@ -79,7 +80,7 @@ export function createRuntimeHealthSnapshot(state: RuntimeHealthState): RuntimeH
             database: Object.freeze({ ...state.database }),
             services: Object.freeze({
                 http: state.httpListening,
-                tcp: state.tcpListening,
+                tcp: state.multi.tcp.available,
             }),
             admin: Object.freeze({ required: true as const, available: state.adminAvailable }),
             assets: Object.freeze({
@@ -88,6 +89,7 @@ export function createRuntimeHealthSnapshot(state: RuntimeHealthState): RuntimeH
                 minClientVersion: "1.4.54",
                 observedClientVersion: null,
             }),
+            multiplayer: state.multi,
         }),
     })
 }

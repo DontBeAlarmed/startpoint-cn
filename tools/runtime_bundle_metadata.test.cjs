@@ -318,7 +318,13 @@ test("missing or invalid metadata uses a safe explicit fallback", async t => {
             database: { ready: true, schema: 4 },
             contentInitialized: true,
             httpListening: true,
-            tcpListening: true,
+            multi: {
+                mode: "embedded",
+                state: "ready",
+                coordinator: { kind: "local", available: true },
+                hub: null,
+                tcp: { available: true, endpoint: "127.0.0.1:8003" },
+            },
             adminAvailable: true,
             assetMode: "client-owned",
         })

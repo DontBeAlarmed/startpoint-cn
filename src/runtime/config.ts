@@ -6,10 +6,19 @@ import {
 import fs from "node:fs"
 import { isIP } from "node:net"
 import path from "node:path"
+import { validateMultiHubToken } from "../multi/hub/token"
+import { resolveRuntimeDataPaths } from "./data-paths"
 
 export interface RuntimeEnvironment extends AssetModeEnvironment {
     readonly SESSION_HOST?: string
     readonly SESSION_PORT?: string
+    readonly SESSION_PUBLIC_HOST?: string
+    readonly MULTI_MODE?: string
+    readonly MULTI_HUB_HOST?: string
+    readonly MULTI_HUB_PORT?: string
+    readonly MULTI_HUB_URL?: string
+    readonly MULTI_HUB_TOKEN?: string
+    readonly MULTI_HUB_CREDENTIALS_FILE?: string
     readonly EMBEDDED_RUNTIME?: string
     readonly DATA_DIR?: string
     readonly COMIC_DIR?: string
@@ -25,9 +34,23 @@ export interface RuntimeNetworkServiceConfig {
     readonly port: number
 }
 
+export interface RuntimeTcpServiceConfig extends RuntimeNetworkServiceConfig {
+    readonly publicHost?: string
+}
+
+export type MultiRuntimeConfig =
+    | { readonly mode: "embedded"; readonly tcp: RuntimeTcpServiceConfig }
+    | {
+        readonly mode: "host"
+        readonly tcp: RuntimeTcpServiceConfig
+        readonly hub: RuntimeNetworkServiceConfig
+        readonly credentialsPath: string
+    }
+    | { readonly mode: "client"; readonly hubUrl: URL; readonly token: string }
+
 export interface CnRuntimeConfig {
     readonly http: RuntimeNetworkServiceConfig
-    readonly tcp: RuntimeNetworkServiceConfig
+    readonly multi: MultiRuntimeConfig
     readonly assetProvider: AssetProviderConfig
     readonly comicDir: string | null
 }
@@ -92,14 +115,15 @@ function resolvePhysicalPath(filePath: string): string {
 }
 
 function pathsOverlap(left: string, right: string): boolean {
-    const isSameOrDescendant = (parent: string, candidate: string): boolean => {
-        const relative = path.relative(parent, candidate)
-        return relative === ""
-            || (!path.isAbsolute(relative)
-                && relative !== ".."
-                && !relative.startsWith(`..${path.sep}`))
-    }
     return isSameOrDescendant(left, right) || isSameOrDescendant(right, left)
+}
+
+function isSameOrDescendant(parent: string, candidate: string): boolean {
+    const relative = path.relative(parent, candidate)
+    return relative === ""
+        || (!path.isAbsolute(relative)
+            && relative !== ".."
+            && !relative.startsWith(`..${path.sep}`))
 }
 
 function validateEmbeddedRuntime(
@@ -150,6 +174,96 @@ function resolveComicDir(env: RuntimeEnvironment, projectRoot: string): string |
         : path.join(projectRoot, "web", "public", "comic")
 }
 
+export function resolveMultiHubCredentialsPath(
+    env: RuntimeEnvironment,
+    projectRoot: string,
+): string {
+    const dataDir = resolvePhysicalPath(resolveRuntimeDataPaths(env, projectRoot).dataDir)
+    const configured = env.MULTI_HUB_CREDENTIALS_FILE
+    if (configured !== undefined && !path.isAbsolute(configured)) throw new RuntimeConfigError()
+    const credentialsPath = configured === undefined
+        ? path.join(dataDir, "multi-hub-credentials.json")
+        : resolvePhysicalPath(configured)
+    const physicalProjectRoot = resolvePhysicalPath(projectRoot)
+    const privateProjectDataDir = resolvePhysicalPath(path.join(projectRoot, ".database"))
+    if (isSameOrDescendant(physicalProjectRoot, credentialsPath)
+        && !isSameOrDescendant(privateProjectDataDir, credentialsPath)) {
+        throw new RuntimeConfigError()
+    }
+    return credentialsPath
+}
+
+function parseHubUrl(value: string | undefined): URL {
+    if (value === undefined || value.length === 0 || value !== value.trim()) {
+        throw new RuntimeConfigError()
+    }
+    let hubUrl: URL
+    try {
+        hubUrl = new URL(value)
+    } catch {
+        throw new RuntimeConfigError()
+    }
+    if ((hubUrl.protocol !== "http:" && hubUrl.protocol !== "https:")
+        || hubUrl.username !== ""
+        || hubUrl.password !== ""
+        || hubUrl.search !== ""
+        || hubUrl.hash !== ""
+        || hubUrl.pathname !== "/") {
+        throw new RuntimeConfigError()
+    }
+    return hubUrl
+}
+
+function parseMultiRuntimeConfig(
+    env: RuntimeEnvironment,
+    projectRoot: string,
+): MultiRuntimeConfig {
+    const mode = env.MULTI_MODE ?? "embedded"
+    if (mode === "embedded") {
+        return Object.freeze({
+            mode,
+            tcp: Object.freeze({
+                host: parseHost(env.SESSION_HOST, "127.0.0.1"),
+                port: parsePort(env.SESSION_PORT, 8003),
+            }),
+        })
+    }
+    if (mode === "host") {
+        if (env.MULTI_HUB_HOST === undefined
+            || env.MULTI_HUB_PORT === undefined
+            || env.SESSION_PUBLIC_HOST === undefined) {
+            throw new RuntimeConfigError()
+        }
+        return Object.freeze({
+            mode,
+            tcp: Object.freeze({
+                host: parseHost(env.SESSION_HOST, "127.0.0.1"),
+                port: parsePort(env.SESSION_PORT, 8003),
+                publicHost: parseHost(env.SESSION_PUBLIC_HOST, ""),
+            }),
+            hub: Object.freeze({
+                host: parseHost(env.MULTI_HUB_HOST, ""),
+                port: parsePort(env.MULTI_HUB_PORT, 8004),
+            }),
+            credentialsPath: resolveMultiHubCredentialsPath(env, projectRoot),
+        })
+    }
+    if (mode === "client") {
+        if (env.SESSION_HOST !== undefined
+            || env.SESSION_PORT !== undefined
+            || env.SESSION_PUBLIC_HOST !== undefined) {
+            throw new RuntimeConfigError()
+        }
+        if (!validateMultiHubToken(env.MULTI_HUB_TOKEN)) throw new RuntimeConfigError()
+        return Object.freeze({
+            mode,
+            hubUrl: parseHubUrl(env.MULTI_HUB_URL),
+            token: env.MULTI_HUB_TOKEN,
+        })
+    }
+    throw new RuntimeConfigError()
+}
+
 export function parseCnRuntimeConfig({
     projectRoot,
     env = process.env,
@@ -158,12 +272,9 @@ export function parseCnRuntimeConfig({
         host: parseHost(env.CN_LISTEN_HOST, "127.0.0.1"),
         port: parsePort(env.CN_LISTEN_PORT, 8001),
     })
-    const tcp = Object.freeze({
-        host: parseHost(env.SESSION_HOST, "127.0.0.1"),
-        port: parsePort(env.SESSION_PORT, 8003),
-    })
+    const multi = parseMultiRuntimeConfig(env, projectRoot)
     const assetProvider = parseAssetProviderConfig({ projectRoot, env })
     const comicDir = resolveComicDir(env, projectRoot)
     validateEmbeddedRuntime(env, projectRoot, assetProvider, comicDir)
-    return Object.freeze({ http, tcp, assetProvider, comicDir })
+    return Object.freeze({ http, multi, assetProvider, comicDir })
 }

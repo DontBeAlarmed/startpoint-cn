@@ -1,6 +1,6 @@
 import type { AssetMode } from "../content/cdn/asset-mode"
 import type { CnRuntimeConfig } from "./config"
-import type { SessionServerFailure } from "../multi/tcp/server"
+import { unavailableMultiRuntimeStatus } from "../multi/runtime/status"
 import {
     createRuntimeHealthSnapshot,
     RuntimeHealthSnapshot,
@@ -13,6 +13,7 @@ export type RuntimeStartupStage =
     | "database"
     | "http"
     | "tcp"
+    | "multi"
     | "content"
     | "unknown"
 
@@ -33,16 +34,13 @@ export interface RuntimeCoordinatorDependencies {
     readonly listenHttp: (config: CnRuntimeConfig) => Promise<unknown>
     readonly closeHttp: () => Awaitable<unknown>
     readonly forceCloseHttp: () => Awaitable<unknown>
-    readonly startTcp: (
-        config: CnRuntimeConfig,
-        onFatalError: (failure: SessionServerFailure) => void,
-    ) => Promise<unknown>
-    readonly stopTcp: () => Awaitable<unknown>
+    readonly startMulti: (config: CnRuntimeConfig) => Promise<unknown>
+    readonly stopMulti: () => Awaitable<unknown>
     readonly checkpointDatabase: () => Awaitable<unknown>
     readonly closeDatabase: () => Awaitable<unknown>
     readonly getDatabaseHealth: () => { readonly ready: boolean; readonly schema: number | null }
     readonly isHttpListening: () => boolean
-    readonly isTcpListening: () => boolean
+    readonly getMultiStatus: () => ReturnType<typeof unavailableMultiRuntimeStatus>
     readonly processTarget: RuntimeSignalTarget
     readonly setExitCode: (code: number) => void
     readonly bundleVersion: string
@@ -58,7 +56,7 @@ export interface RuntimeCoordinatorDependencies {
 export type RuntimeShutdownStep =
     | "http-close"
     | "http-force-close"
-    | "tcp-stop"
+    | "multi-stop"
     | "database-checkpoint"
     | "database-close"
 
@@ -80,6 +78,7 @@ const EXIT_CODES: Readonly<Record<RuntimeStartupStage, number>> = Object.freeze(
     database: 12,
     http: 13,
     tcp: 14,
+    multi: 14,
     content: 15,
     unknown: 1,
 })
@@ -95,7 +94,7 @@ class Coordinator implements RuntimeCoordinator {
     private databaseInitialized = false
     private contentInitialized = false
     private httpAttempted = false
-    private tcpAttempted = false
+    private multiAttempted = false
     private shutdownRequested = false
     private signalsRegistered = false
     private startPromise: Promise<void> | null = null
@@ -104,16 +103,6 @@ class Coordinator implements RuntimeCoordinator {
 
     private readonly onSigint = (): void => { void this.requestShutdown() }
     private readonly onSigterm = (): void => { void this.requestShutdown() }
-    private readonly onTcpFatal = (_failure: SessionServerFailure): void => {
-        if (this.terminalExitCode !== 14) {
-            this.terminalExitCode = 14
-            this.shutdownRequested = true
-            this.phase = "failed"
-            this.dependencies.setExitCode(14)
-        }
-        void this.requestShutdown()
-    }
-
     constructor(private readonly dependencies: RuntimeCoordinatorDependencies) {}
 
     start(): Promise<void> {
@@ -156,13 +145,10 @@ class Coordinator implements RuntimeCoordinator {
     getHealthSnapshot(): RuntimeHealthSnapshot {
         let database = { ready: false, schema: null as number | null }
         let httpListening = false
-        let tcpListening = false
+        let multi = unavailableMultiRuntimeStatus(this.config?.multi.mode)
         try { database = this.dependencies.getDatabaseHealth() } catch { /* unavailable */ }
         try { httpListening = this.dependencies.isHttpListening() } catch { /* unavailable */ }
-        try { tcpListening = this.dependencies.isTcpListening() } catch { /* unavailable */ }
-        if (this.phase === "ready" && !tcpListening) {
-            this.onTcpFatal(Object.freeze({ stage: "runtime", code: null }))
-        }
+        try { multi = this.dependencies.getMultiStatus() } catch { /* unavailable */ }
         const assetMode: AssetMode = this.config?.assetProvider.mode ?? "client-owned"
         return createRuntimeHealthSnapshot({
             phase: this.phase,
@@ -172,7 +158,7 @@ class Coordinator implements RuntimeCoordinator {
             database,
             contentInitialized: this.contentInitialized,
             httpListening,
-            tcpListening,
+            multi,
             adminAvailable: this.dependencies.adminAvailable,
             assetMode,
         })
@@ -223,6 +209,15 @@ class Coordinator implements RuntimeCoordinator {
             this.contentInitialized = true
             if (this.interrupted()) return
 
+            this.stage = "multi"
+            this.multiAttempted = true
+            try {
+                await this.dependencies.startMulti(this.config)
+            } catch {
+                // Multiplayer is optional; getMultiStatus() exposes the degraded state.
+            }
+            if (this.interrupted()) return
+
             this.stage = "http"
             this.httpAttempted = true
             this.dependencies.configureHttp(this.config)
@@ -230,11 +225,6 @@ class Coordinator implements RuntimeCoordinator {
             await this.dependencies.readyHttp()
             if (this.interrupted()) return
             await this.dependencies.listenHttp(this.config)
-            if (this.interrupted()) return
-
-            this.stage = "tcp"
-            this.tcpAttempted = true
-            await this.dependencies.startTcp(this.config, this.onTcpFatal)
             if (this.interrupted()) return
 
             this.phase = "ready"
@@ -325,14 +315,14 @@ class Coordinator implements RuntimeCoordinator {
         if (forced) this.httpAttempted = false
     }
 
-    private async stopTcp(failures: RuntimeShutdownFailure[]): Promise<void> {
-        if (!this.tcpAttempted) return
+    private async stopMulti(failures: RuntimeShutdownFailure[]): Promise<void> {
+        if (!this.multiAttempted) return
         if (await this.runBoundedStep(
-            "tcp-stop",
-            () => this.dependencies.stopTcp(),
+            "multi-stop",
+            () => this.dependencies.stopMulti(),
             failures,
         )) {
-            this.tcpAttempted = false
+            this.multiAttempted = false
         }
     }
 
@@ -351,20 +341,20 @@ class Coordinator implements RuntimeCoordinator {
 
     private async cleanupStartupFailure(): Promise<RuntimeShutdownFailure[]> {
         const failures: RuntimeShutdownFailure[] = []
-        await this.stopTcp(failures)
         await this.closeHttpBounded(failures)
+        await this.stopMulti(failures)
         await this.closeDatabase(failures)
         return failures
     }
 
     private hasCleanupWork(): boolean {
-        return this.httpAttempted || this.tcpAttempted || this.databaseInitialized
+        return this.httpAttempted || this.multiAttempted || this.databaseInitialized
     }
 
     private async runShutdown(): Promise<void> {
         const failures: RuntimeShutdownFailure[] = []
         await this.closeHttpBounded(failures)
-        await this.stopTcp(failures)
+        await this.stopMulti(failures)
         if (this.startPromise !== null) await this.startPromise
         await this.closeDatabase(failures)
         this.contentInitialized = false

@@ -18,11 +18,15 @@ test("runtime network defaults are loopback-only and stable", () => {
     })
 
     assert.deepEqual(config.http, { host: "127.0.0.1", port: 8001 })
-    assert.deepEqual(config.tcp, { host: "127.0.0.1", port: 8003 })
+    assert.deepEqual(config.multi, {
+        mode: "embedded",
+        tcp: { host: "127.0.0.1", port: 8003 },
+    })
     assert.deepEqual(config.assetProvider, { mode: "client-owned" })
     assert.equal(Object.isFrozen(config), true)
     assert.equal(Object.isFrozen(config.http), true)
-    assert.equal(Object.isFrozen(config.tcp), true)
+    assert.equal(Object.isFrozen(config.multi), true)
+    assert.equal(Object.isFrozen(config.multi.tcp), true)
 })
 
 test("embedded runtime disables bundled comics unless an isolated COMIC_DIR is provided", () => {
@@ -93,7 +97,7 @@ test("runtime network accepts explicit wildcard hosts and boundary ports", () =>
     })
 
     assert.deepEqual(config.http, { host: "0.0.0.0", port: 1 })
-    assert.deepEqual(config.tcp, { host: "::", port: 65535 })
+    assert.deepEqual(config.multi.tcp, { host: "::", port: 65535 })
 })
 
 test("embedded runtime requires one absolute Data Volume and forbids content path escapes", () => {
@@ -191,7 +195,7 @@ for (const host of [
             },
         })
         assert.equal(config.http.host, host)
-        assert.equal(config.tcp.host, host)
+        assert.equal(config.multi.tcp.host, host)
     })
 }
 

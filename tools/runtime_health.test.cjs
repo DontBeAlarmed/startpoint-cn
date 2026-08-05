@@ -21,14 +21,20 @@ function state(overrides = {}) {
         database: { ready: true, schema: 4 },
         contentInitialized: true,
         httpListening: true,
-        tcpListening: true,
+        multi: {
+            mode: "embedded",
+            state: "ready",
+            coordinator: { kind: "local", available: true },
+            hub: null,
+            tcp: { available: true, endpoint: "127.0.0.1:8003" },
+        },
         adminAvailable: true,
         assetMode: "local",
         ...overrides,
     }
 }
 
-test("ready health exposes only the embedded contract fields", () => {
+test("ready health preserves v1 fields and adds embedded multiplayer details", () => {
     const result = createRuntimeHealthSnapshot(state())
 
     assert.equal(result.statusCode, 200)
@@ -46,8 +52,15 @@ test("ready health exposes only the embedded contract fields", () => {
             minClientVersion: "1.4.54",
             observedClientVersion: null,
         },
+        multiplayer: {
+            mode: "embedded",
+            state: "ready",
+            coordinator: { kind: "local", available: true },
+            hub: null,
+            tcp: { available: true, endpoint: "127.0.0.1:8003" },
+        },
     })
-    assert.doesNotMatch(JSON.stringify(result.body), /DATA_DIR|token|player|\/Users\//i)
+    assert.doesNotMatch(JSON.stringify(result.body), /DATA_DIR|"token"|"player"|\/Users\//i)
 })
 
 for (const phase of ["starting", "stopping", "failed", "stopped"]) {
@@ -62,7 +75,6 @@ for (const overrides of [
     { database: { ready: false, schema: null } },
     { contentInitialized: false },
     { httpListening: false },
-    { tcpListening: false },
     { adminAvailable: false },
 ]) {
     test(`ready phase still requires ${Object.keys(overrides)[0]}`, () => {
@@ -71,6 +83,22 @@ for (const overrides of [
         assert.equal(result.body.status, "failed")
     })
 }
+
+test("degraded multiplayer keeps core health ready and maps TCP compatibility", () => {
+    const multiplayer = {
+        mode: "client",
+        state: "degraded",
+        coordinator: { kind: "remote", available: false },
+        hub: { available: false, endpoint: "http://192.0.2.20:8004/" },
+        tcp: { available: false, endpoint: null },
+    }
+    const result = createRuntimeHealthSnapshot(state({ multi: multiplayer }))
+
+    assert.equal(result.statusCode, 200)
+    assert.equal(result.body.status, "ready")
+    assert.equal(result.body.services.tcp, false)
+    assert.deepEqual(result.body.multiplayer, multiplayer)
+})
 
 test("client-owned unknown assets do not block readiness", () => {
     const result = createRuntimeHealthSnapshot(state({

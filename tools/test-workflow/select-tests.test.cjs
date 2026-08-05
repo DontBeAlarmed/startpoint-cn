@@ -309,6 +309,9 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/runtime_pack.test.cjs",
             "tools/runtime_bundle_metadata.test.cjs",
             "tools/runtime_config.test.cjs",
+            "tools/multi_hub_credentials.test.cjs",
+            "tools/multi_hub_token.test.cjs",
+            "tools/multi_runtime_config.test.cjs",
             "tools/comic_route.test.cjs",
             "tools/cn_tool_capabilities.test.cjs",
             "tools/runtime_admin.test.cjs",
@@ -322,6 +325,21 @@ test("registers focused runtime state and socket smoke groups", () => {
         timeoutMs: 360_000,
         tests: ["tools/runtime_compiled_smoke.test.cjs"],
     })
+})
+
+test("routes multiplayer runtime and private credential changes to focused groups", () => {
+    for (const source of [
+        "src/multi/hub/token.ts",
+        "src/multi/hub/credential-store.ts",
+        "src/multi/runtime/service.ts",
+        "src/multi/runtime/status.ts",
+    ]) {
+        assert.deepEqual(
+            selectTestGroups([source]),
+            ["quick:protocol", "quick:runtime"],
+            source,
+        )
+    }
 })
 
 test("registers focused seed state and API regressions", () => {

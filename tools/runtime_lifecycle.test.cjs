@@ -21,16 +21,44 @@ function deferred() {
     return { promise, reject, resolve }
 }
 
+test("multiplayer startup failure is degraded and does not block core readiness", async () => {
+    const harness = createHarness({
+        async startMulti() {
+            harness.calls.push("multi-start-failure")
+            throw Object.assign(new Error("Hub unavailable"), { code: "EADDRINUSE" })
+        },
+    })
+
+    await harness.coordinator.start()
+
+    assert.equal(harness.coordinator.getPhase(), "ready")
+    const health = harness.coordinator.getHealthSnapshot()
+    assert.equal(health.statusCode, 200)
+    assert.equal(health.body.status, "ready")
+    assert.equal(health.body.services.tcp, false)
+    assert.equal(health.body.multiplayer.state, "unavailable")
+    assert.deepEqual(harness.exitCodes, [])
+    await harness.coordinator.stop()
+})
+
 function createHarness(overrides = {}) {
     const calls = []
     const exitCodes = []
     const processTarget = new EventEmitter()
     let httpListening = false
-    let tcpListening = false
-    let tcpFatalHandler = null
+    let multiStatus = {
+        mode: "embedded",
+        state: "unavailable",
+        coordinator: { kind: "local", available: false },
+        hub: null,
+        tcp: { available: false, endpoint: "127.0.0.1:18003" },
+    }
     const config = {
         http: { host: "127.0.0.1", port: 18001 },
-        tcp: { host: "127.0.0.1", port: 18003 },
+        multi: {
+            mode: "embedded",
+            tcp: { host: "127.0.0.1", port: 18003 },
+        },
         assetProvider: { mode: "client-owned" },
     }
     const dependencies = {
@@ -45,18 +73,31 @@ function createHarness(overrides = {}) {
             httpListening = true
         },
         async closeHttp() { calls.push("http-close"); httpListening = false },
-        async startTcp(value, onFatalError) {
-            calls.push(["tcp-start", value.tcp])
-            tcpFatalHandler = onFatalError
-            tcpListening = true
+        async startMulti(value) {
+            calls.push(["multi-start", value.multi])
+            multiStatus = {
+                mode: "embedded",
+                state: "ready",
+                coordinator: { kind: "local", available: true },
+                hub: null,
+                tcp: { available: true, endpoint: "127.0.0.1:18003" },
+            }
         },
-        async stopTcp() { calls.push("tcp-stop"); tcpListening = false },
+        async stopMulti() {
+            calls.push("multi-stop")
+            multiStatus = {
+                ...multiStatus,
+                state: "unavailable",
+                coordinator: { ...multiStatus.coordinator, available: false },
+                tcp: { ...multiStatus.tcp, available: false },
+            }
+        },
         async forceCloseHttp() { calls.push("http-force-close"); httpListening = false },
         checkpointDatabase() { calls.push("checkpoint") },
         closeDatabase() { calls.push("database-close") },
         getDatabaseHealth() { return { ready: true, schema: 4 } },
         isHttpListening() { return httpListening },
-        isTcpListening() { return tcpListening },
+        getMultiStatus() { return multiStatus },
         processTarget,
         setExitCode(code) { exitCodes.push(code) },
         bundleVersion: "1.0.1",
@@ -73,12 +114,7 @@ function createHarness(overrides = {}) {
         coordinator: createRuntimeCoordinator(dependencies),
         exitCodes,
         processTarget,
-        setTcpListening(value) { tcpListening = value },
-        triggerTcpFatal(failure = { stage: "runtime", code: "E_RUNTIME_TEST" }) {
-            assert.equal(typeof tcpFatalHandler, "function")
-            tcpListening = false
-            tcpFatalHandler(failure)
-        },
+        setMultiStatus(value) { multiStatus = value },
     }
 }
 
@@ -92,10 +128,10 @@ test("successful startup follows the embedded contract order", async () => {
         "database",
         "time",
         ["content", "client-owned"],
+        ["multi-start", harness.config.multi],
         ["configure-http", harness.config],
         "http-ready",
         ["http-listen", harness.config.http],
-        ["tcp-start", harness.config.tcp],
     ])
     assert.equal(harness.coordinator.getPhase(), "ready")
     assert.equal(harness.coordinator.getHealthSnapshot().statusCode, 200)
@@ -112,6 +148,7 @@ test("startup error classes retain stable exit codes including reserved runtime 
     assert.equal(startupExitCode("database"), 12)
     assert.equal(startupExitCode("http"), 13)
     assert.equal(startupExitCode("tcp"), 14)
+    assert.equal(startupExitCode("multi"), 14)
     assert.equal(startupExitCode("content"), 15)
     assert.equal(startupExitCode("unknown"), 1)
 })
@@ -121,10 +158,9 @@ for (const scenario of [
     { name: "database", method: "initializeDatabase", code: 12, cleanup: [], noHttpAttempt: true },
     { name: "database restore", method: "restoreTimeOffset", code: 12, cleanup: ["checkpoint", "database-close"], noHttpAttempt: true },
     { name: "content", method: "initializeContent", code: 15, cleanup: ["checkpoint", "database-close"], noHttpAttempt: true },
-    { name: "HTTP configure", method: "configureHttp", code: 13, cleanup: ["http-close", "checkpoint", "database-close"] },
-    { name: "HTTP ready", method: "readyHttp", code: 13, cleanup: ["http-close", "checkpoint", "database-close"] },
-    { name: "HTTP", method: "listenHttp", code: 13, cleanup: ["http-close", "checkpoint", "database-close"] },
-    { name: "TCP", method: "startTcp", code: 14, cleanup: ["tcp-stop", "http-close", "checkpoint", "database-close"] },
+    { name: "HTTP configure", method: "configureHttp", code: 13, cleanup: ["http-close", "multi-stop", "checkpoint", "database-close"] },
+    { name: "HTTP ready", method: "readyHttp", code: 13, cleanup: ["http-close", "multi-stop", "checkpoint", "database-close"] },
+    { name: "HTTP", method: "listenHttp", code: 13, cleanup: ["http-close", "multi-stop", "checkpoint", "database-close"] },
 ]) {
     test(`${scenario.name} startup failure maps its exit code and cleans up in reverse order`, async () => {
         const harness = createHarness({
@@ -139,7 +175,7 @@ for (const scenario of [
         assert.equal(harness.coordinator.getPhase(), "failed")
         assert.deepEqual(harness.exitCodes, [scenario.code])
         const cleanupCalls = harness.calls.filter(call => [
-            "tcp-stop",
+            "multi-stop",
             "http-close",
             "http-force-close",
             "checkpoint",
@@ -179,7 +215,7 @@ test("crossed and repeated signals reuse one stop promise and close once", async
     gate.resolve()
     await first
 
-    assert.deepEqual(harness.calls, ["http-close", "tcp-stop", "checkpoint", "database-close"])
+    assert.deepEqual(harness.calls, ["http-close", "multi-stop", "checkpoint", "database-close"])
     assert.deepEqual(harness.exitCodes, [0])
     assert.equal(harness.coordinator.getPhase(), "stopped")
     assert.equal(harness.processTarget.listenerCount("SIGTERM"), 0)
@@ -201,7 +237,7 @@ test("checkpoint failure still closes the database and remains a terminal failur
 
     assert.deepEqual(harness.calls, [
         "http-close",
-        "tcp-stop",
+        "multi-stop",
         "checkpoint",
         "database-close",
         ["shutdown-failures", [{ step: "database-checkpoint", code: null }]],
@@ -227,9 +263,9 @@ test("shutdown collects safe errors, continues every step, and permits retry", a
             harness.calls.push("http-force-close")
             if (fail) throw new Error("/private/force detail")
         },
-        stopTcp() {
-            harness.calls.push("tcp-stop")
-            if (fail) throw Object.assign(new Error("tcp detail"), { code: "E_TCP_STOP" })
+        stopMulti() {
+            harness.calls.push("multi-stop")
+            if (fail) throw Object.assign(new Error("multi detail"), { code: "E_MULTI_STOP" })
         },
         checkpointDatabase() {
             harness.calls.push("checkpoint")
@@ -249,13 +285,13 @@ test("shutdown collects safe errors, continues every step, and permits retry", a
     assert.deepEqual(harness.calls, [
         "http-close",
         "http-force-close",
-        "tcp-stop",
+        "multi-stop",
         "checkpoint",
         "database-close",
         ["shutdown-failures", [
             { step: "http-close", code: "E_HTTP_CLOSE" },
             { step: "http-force-close", code: null },
-            { step: "tcp-stop", code: "E_TCP_STOP" },
+            { step: "multi-stop", code: "E_MULTI_STOP" },
             { step: "database-checkpoint", code: null },
             { step: "database-close", code: "E_DB_CLOSE" },
         ]],
@@ -267,7 +303,7 @@ test("shutdown collects safe errors, continues every step, and permits retry", a
     fail = false
     harness.calls.length = 0
     await harness.coordinator.stop()
-    assert.deepEqual(harness.calls, ["http-close", "tcp-stop", "checkpoint", "database-close"])
+    assert.deepEqual(harness.calls, ["http-close", "multi-stop", "checkpoint", "database-close"])
     assert.deepEqual(harness.exitCodes, [1, 1])
     assert.equal(harness.coordinator.getPhase(), "failed")
 
@@ -295,29 +331,29 @@ test("a signal during startup switches phase immediately and prevents later stag
     assert.deepEqual(harness.exitCodes, [0])
 })
 
-test("a signal during TCP startup starts closing HTTP before TCP startup settles", async () => {
-    const tcp = deferred()
+test("a signal during multiplayer startup stops it before later startup stages", async () => {
+    const multi = deferred()
     const harness = createHarness({
-        startTcp() {
-            harness.calls.push("tcp-start")
-            return tcp.promise
+        startMulti() {
+            harness.calls.push("multi-start")
+            return multi.promise
         },
     })
     const starting = harness.coordinator.start()
-    for (let attempt = 0; attempt < 20 && !harness.calls.includes("tcp-start"); attempt++) {
+    for (let attempt = 0; attempt < 20 && !harness.calls.includes("multi-start"); attempt++) {
         await new Promise(resolve => setImmediate(resolve))
     }
-    assert.equal(harness.calls.includes("tcp-start"), true)
+    assert.equal(harness.calls.includes("multi-start"), true)
     harness.calls.length = 0
 
     harness.processTarget.emit("SIGTERM")
 
     assert.equal(harness.coordinator.getPhase(), "stopping")
     await new Promise(resolve => setImmediate(resolve))
-    assert.deepEqual(harness.calls, ["http-close", "tcp-stop"])
-    tcp.resolve()
+    assert.deepEqual(harness.calls, ["multi-stop"])
+    multi.resolve()
     await Promise.all([starting, harness.coordinator.stop()])
-    assert.deepEqual(harness.calls, ["http-close", "tcp-stop", "checkpoint", "database-close"])
+    assert.deepEqual(harness.calls, ["multi-stop", "checkpoint", "database-close"])
 })
 
 test("partial signal listener registration failure rolls back and maps unknown exit 1", async () => {
@@ -393,7 +429,7 @@ test("HTTP close timeout is unrefed, force-closes, and cannot block later cleanu
         assert.deepEqual(harness.calls, [
             "http-close",
             "http-force-close",
-            "tcp-stop",
+            "multi-stop",
             "checkpoint",
             "database-close",
             ["shutdown-failures", [
@@ -418,7 +454,7 @@ test("HTTP close timeout is unrefed, force-closes, and cannot block later cleanu
     }
 })
 
-test("TCP stop timeout is unrefed, continues database cleanup, and stays failed after late settlement", async () => {
+test("multiplayer stop timeout is unrefed, continues database cleanup, and stays failed after late settlement", async () => {
     let timeoutUnrefed = false
     const stopNever = deferred()
     const originalSetTimeout = global.setTimeout
@@ -434,8 +470,8 @@ test("TCP stop timeout is unrefed, continues database cleanup, and stays failed 
     }
     const harness = createHarness({
         shutdownStepTimeoutMs: 5,
-        stopTcp() {
-            harness.calls.push("tcp-stop")
+        stopMulti() {
+            harness.calls.push("multi-stop")
             return stopNever.promise
         },
     })
@@ -449,10 +485,10 @@ test("TCP stop timeout is unrefed, continues database cleanup, and stays failed 
         assert.equal(timeoutUnrefed, true)
         assert.deepEqual(harness.calls, [
             "http-close",
-            "tcp-stop",
+            "multi-stop",
             "checkpoint",
             "database-close",
-            ["shutdown-failures", [{ step: "tcp-stop", code: "TIMEOUT" }]],
+            ["shutdown-failures", [{ step: "multi-stop", code: "TIMEOUT" }]],
         ])
         assert.deepEqual(harness.exitCodes, [1])
         assert.equal(harness.coordinator.getPhase(), "failed")
@@ -464,12 +500,12 @@ test("TCP stop timeout is unrefed, continues database cleanup, and stays failed 
 
         harness.calls.length = 0
         await harness.coordinator.stop()
-        assert.deepEqual(harness.calls, ["tcp-stop"])
+        assert.deepEqual(harness.calls, ["multi-stop"])
         assert.deepEqual(harness.exitCodes, [1, 1])
         assert.equal(harness.coordinator.getPhase(), "failed")
 
         await harness.coordinator.stop()
-        assert.deepEqual(harness.calls, ["tcp-stop"])
+        assert.deepEqual(harness.calls, ["multi-stop"])
         assert.deepEqual(harness.exitCodes, [1, 1])
     } finally {
         global.setTimeout = originalSetTimeout
@@ -478,65 +514,25 @@ test("TCP stop timeout is unrefed, continues database cleanup, and stays failed 
     }
 })
 
-test("TCP runtime fatal immediately fails health, preserves exit 14, and reuses app shutdown", async () => {
+test("degraded multiplayer status never turns a ready core into a fatal runtime", async () => {
     const harness = createHarness()
     await harness.coordinator.start()
     harness.calls.length = 0
-
-    harness.triggerTcpFatal()
-    const firstStop = harness.coordinator.stop()
-    const secondStop = harness.coordinator.stop()
-
-    assert.equal(firstStop, secondStop)
-    assert.equal(harness.coordinator.getPhase(), "failed")
-    assert.equal(harness.coordinator.getHealthSnapshot().statusCode, 503)
-    assert.deepEqual(harness.exitCodes, [14])
-    await firstStop
-    assert.deepEqual(harness.calls, ["http-close", "tcp-stop", "checkpoint", "database-close"])
-    assert.equal(harness.coordinator.getPhase(), "failed")
-    assert.deepEqual(harness.exitCodes, [14, 14])
-})
-
-test("TCP fatal cleanup retry preserves exit 14 until resources converge", async () => {
-    let failTcpStop = true
-    const harness = createHarness({
-        stopTcp() {
-            harness.calls.push("tcp-stop")
-            if (failTcpStop) throw Object.assign(new Error("tcp detail"), { code: "E_TCP_STOP" })
-        },
+    harness.setMultiStatus({
+        mode: "host",
+        state: "degraded",
+        coordinator: { kind: "local", available: true },
+        hub: { available: false, endpoint: "http://0.0.0.0:8004" },
+        tcp: { available: false, endpoint: "192.0.2.20:8003" },
     })
-    await harness.coordinator.start()
-    harness.calls.length = 0
-
-    harness.triggerTcpFatal()
-    await harness.coordinator.stop()
-
-    assert.equal(harness.coordinator.getPhase(), "failed")
-    assert.deepEqual(harness.exitCodes, [14, 14])
-    assert.deepEqual(harness.calls.at(-1), [
-        "shutdown-failures",
-        [{ step: "tcp-stop", code: "E_TCP_STOP" }],
-    ])
-
-    failTcpStop = false
-    harness.calls.length = 0
-    await harness.coordinator.stop()
-    assert.deepEqual(harness.calls, ["tcp-stop"])
-    assert.equal(harness.coordinator.getPhase(), "failed")
-    assert.deepEqual(harness.exitCodes, [14, 14, 14])
-})
-
-test("health reconciles a ready coordinator with a non-listening TCP service", async () => {
-    const harness = createHarness()
-    await harness.coordinator.start()
-    harness.calls.length = 0
-    harness.setTcpListening(false)
 
     const health = harness.coordinator.getHealthSnapshot()
 
-    assert.equal(health.statusCode, 503)
-    assert.equal(health.body.status, "failed")
-    assert.equal(harness.coordinator.getPhase(), "failed")
-    assert.deepEqual(harness.exitCodes, [14])
+    assert.equal(health.statusCode, 200)
+    assert.equal(health.body.status, "ready")
+    assert.equal(health.body.multiplayer.state, "degraded")
+    assert.equal(health.body.services.tcp, false)
+    assert.equal(harness.coordinator.getPhase(), "ready")
+    assert.deepEqual(harness.exitCodes, [])
     await harness.coordinator.stop()
 })

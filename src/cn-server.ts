@@ -40,7 +40,8 @@ import expodApiPlugin from "./routes/api/expod";
 import storyQuestApiPlugin from "./routes/api/storyQuest";
 import optionApiPlugin from "./routes/api/option";
 import singleBattleQuestApiPlugin from "./routes/api/singleBattleQuest";
-import { createEmbeddedMultiHttpContext, multiBattleRoutes } from "./multi";
+import { multiBattleRoutes } from "./multi";
+import { createMultiRuntimeService } from "./multi/runtime/service";
 import attentionApiPlugin from "./routes/api/attention";
 import characterApiPlugin from "./routes/api/character";
 import characterManaPlugin from "./routes/api/character/mana";
@@ -70,12 +71,6 @@ import comicApiPlugin from "./routes/api/comic";
 import questUnlockApiPlugin from "./routes/api/questUnlock";
 import itemApiPlugin from "./routes/api/item";
 import characterElectionApiPlugin from "./routes/api/characterElection";
-import {
-    isSessionServerListening,
-    startSessionServer,
-    stopSessionServer,
-} from "./multi";
-
 const fastify = Fastify({
     logger: {
         level: "info"
@@ -84,6 +79,7 @@ const fastify = Fastify({
 });
 const projectRoot = path.resolve(__dirname, "..");
 let runtimeCoordinator: RuntimeCoordinator;
+const multiRuntimeService = createMultiRuntimeService();
 const gachaSeedQuarantine = getDefaultGachaSeedQuarantine();
 
 // Simple in-memory rate limiter for /crash endpoint only.
@@ -135,7 +131,6 @@ fastify.register(versionCheckPlugin);
 fastify.register(leitingAuthPlugin, { prefix: "/api/index.php" });
 
 const apiPrefix = "/api/index.php";
-const multiHttpContext = createEmbeddedMultiHttpContext();
 
 function stubMsgpackReply(reply: any, data: any) {
     const servertime = getServerTime()
@@ -234,10 +229,6 @@ fastify.register(expodApiPlugin, { prefix: `${apiPrefix}/expod` });
 fastify.register(storyQuestApiPlugin, { prefix: `${apiPrefix}/story_quest` });
 fastify.register(optionApiPlugin, { prefix: `${apiPrefix}/option` });
 fastify.register(singleBattleQuestApiPlugin, { prefix: `${apiPrefix}/single_battle_quest` });
-fastify.register(multiBattleRoutes, {
-    prefix: `${apiPrefix}/multi_battle_quest`,
-    context: multiHttpContext,
-});
 fastify.register(attentionApiPlugin, { prefix: `${apiPrefix}/attention` });
 fastify.register(characterApiPlugin, { prefix: `${apiPrefix}/character` });
 fastify.register(characterManaPlugin, { prefix: `${apiPrefix}/character` });
@@ -276,6 +267,10 @@ let runtimeHttpConfigured = false;
 function configureRuntimeHttp(config: ReturnType<typeof parseCnRuntimeConfig>): void {
     if (runtimeHttpConfigured) return;
     configureSerializedAssetVersionProvider(() => getContentSnapshot().cdn.targetVersion);
+    fastify.register(multiBattleRoutes, {
+        prefix: `${apiPrefix}/multi_battle_quest`,
+        context: multiRuntimeService.getHttpContext(),
+    });
     fastify.register(cnLoadPlugin, {
         prefix: apiPrefix,
         assetProvider: config.assetProvider,
@@ -338,16 +333,13 @@ runtimeCoordinator = createRuntimeCoordinator({
         fastify.server.closeIdleConnections?.();
         fastify.server.closeAllConnections?.();
     },
-    startTcp: (config, onFatalError) => startSessionServer({
-        ...config.tcp,
-        onFatalError,
-    }),
-    stopTcp: stopSessionServer,
+    startMulti: config => multiRuntimeService.start(config.multi),
+    stopMulti: () => multiRuntimeService.stop(),
     checkpointDatabase,
     closeDatabase,
     getDatabaseHealth: getRuntimeDatabaseHealth,
     isHttpListening: () => fastify.server.listening,
-    isTcpListening: isSessionServerListening,
+    getMultiStatus: () => multiRuntimeService.getStatus(),
     processTarget: process,
     setExitCode: code => { process.exitCode = code; },
     bundleVersion: bundleMetadata.version,
