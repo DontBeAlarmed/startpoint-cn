@@ -2,6 +2,8 @@
 
 const assert = require("node:assert/strict")
 const Fastify = require("fastify")
+const fs = require("node:fs")
+const path = require("node:path")
 const test = require("node:test")
 
 require("ts-node/register/transpile-only")
@@ -10,6 +12,7 @@ const {
     checkLocalQuestAvailability,
     checkQuestAvailability,
 } = require("../src/multi/quest-availability")
+const { QuestCategory } = require("../src/lib/types/quest")
 
 test("permanent quests are available without a bounded period", () => {
     const now = 1_725_000_000_000
@@ -67,16 +70,54 @@ test("availability accepts only a parsed period and local server time", () => {
 
 test("legacy bundled quests fail closed only for explicit activity categories", () => {
     const now = 1_725_000_000_000
-    assert.deepEqual(checkLocalQuestAvailability({}, 1, now), { available: true })
-    assert.deepEqual(checkLocalQuestAvailability({}, 15, now), { available: true })
-    assert.deepEqual(checkLocalQuestAvailability({}, 26, now), {
-        available: false,
-        code: "QUEST_NOT_AVAILABLE",
-    })
+    for (const category of [
+        QuestCategory.MAIN,
+        QuestCategory.BOSS_BATTLE,
+        QuestCategory.CHARACTER,
+        QuestCategory.EX,
+        QuestCategory.DAILY_WEEK_EVENT,
+        QuestCategory.DAILY_EXP_MANA_EVENT,
+        QuestCategory.PRACTICE,
+    ]) {
+        assert.deepEqual(checkLocalQuestAvailability({}, category, now), { available: true })
+    }
+    for (const category of [
+        QuestCategory.ADVENT_EVENT_SINGLE,
+        QuestCategory.ADVENT_EVENT_MULTI,
+        QuestCategory.STORY_EVENT_SINGLE,
+        QuestCategory.RANKING_EVENT_SINGLE,
+        QuestCategory.CHALLENGE_DUNGEON_EVENT,
+        QuestCategory.WORLD_STORY_EVENT,
+        QuestCategory.WORLD_STORY_EVENT_BOSS_BATTLE,
+        QuestCategory.TOWER_DUNGEON_EVENT,
+        QuestCategory.EXPERT_SINGLE_EVENT,
+        QuestCategory.CARNIVAL_EVENT,
+        QuestCategory.RAID_EVENT,
+        QuestCategory.RUSH_EVENT,
+        QuestCategory.SOLO_TIME_ATTACK_EVENT,
+        QuestCategory.HARD_MULTI_EVENT,
+        QuestCategory.SCORE_ATTACK_EVENT,
+    ]) {
+        assert.deepEqual(checkLocalQuestAvailability({}, category, now), {
+            available: false,
+            code: "QUEST_NOT_AVAILABLE",
+        })
+    }
     assert.deepEqual(checkLocalQuestAvailability({
         availableFromMs: now - 1,
         availableUntilMs: now + 1,
-    }, 26, now), { available: true })
+    }, QuestCategory.HARD_MULTI_EVENT, now), { available: true })
+})
+
+test("activity classification is declared with QuestCategory constants", () => {
+    const source = fs.readFileSync(path.join(
+        __dirname,
+        "../src/multi/quest-availability.ts",
+    ), "utf8")
+
+    assert.match(source, /QuestCategory\.ADVENT_EVENT_SINGLE/)
+    assert.match(source, /QuestCategory\.SCORE_ATTACK_EVENT/)
+    assert.doesNotMatch(source, /EXPLICIT_ACTIVITY_CATEGORIES\s*=\s*new Set\(\[\s*\d/)
 })
 
 test("multi start rechecks local quest availability before entry writes", async t => {

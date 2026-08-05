@@ -1,3 +1,5 @@
+import { QuestCategory } from "../lib/types/quest"
+
 export interface QuestAvailabilityPeriod {
     readonly availableFromMs: number | null
     readonly availableUntilMs: number | null
@@ -8,7 +10,21 @@ export type QuestAvailabilityResult =
     | { readonly available: false; readonly code: "QUEST_NOT_AVAILABLE" }
 
 const EXPLICIT_ACTIVITY_CATEGORIES = new Set([
-    7, 8, 10, 11, 13, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+    QuestCategory.ADVENT_EVENT_SINGLE,
+    QuestCategory.ADVENT_EVENT_MULTI,
+    QuestCategory.STORY_EVENT_SINGLE,
+    QuestCategory.RANKING_EVENT_SINGLE,
+    QuestCategory.CHALLENGE_DUNGEON_EVENT,
+    QuestCategory.WORLD_STORY_EVENT,
+    QuestCategory.WORLD_STORY_EVENT_BOSS_BATTLE,
+    QuestCategory.TOWER_DUNGEON_EVENT,
+    QuestCategory.EXPERT_SINGLE_EVENT,
+    QuestCategory.CARNIVAL_EVENT,
+    QuestCategory.RAID_EVENT,
+    QuestCategory.RUSH_EVENT,
+    QuestCategory.SOLO_TIME_ATTACK_EVENT,
+    QuestCategory.HARD_MULTI_EVENT,
+    QuestCategory.SCORE_ATTACK_EVENT,
 ])
 
 function isValidBoundary(value: number | null): boolean {

@@ -1,6 +1,10 @@
 import type { IncomingHttpHeaders } from "node:http"
 
-import { getContentSnapshot, type ContentSnapshot } from "../../content/runtime/content-snapshot"
+import {
+    ContentSnapshotError,
+    getContentSnapshot,
+    type ContentSnapshot,
+} from "../../content/runtime/content-snapshot"
 import { listLoadedModeIdentities } from "../../modes/registry"
 import {
     MULTI_PROTOCOL_VERSION,
@@ -87,8 +91,12 @@ export function createCompatibilityProfileFactory(
         if (cachedSource === null) {
             try {
                 cachedSource = resolveProfileSource(dependencies)
-            } catch {
-                return { ok: false, error: "INCOMPATIBLE_ROOM" }
+            } catch (error) {
+                if (error instanceof ContentSnapshotError
+                    && error.code === "CONTENT_SNAPSHOT_NOT_INITIALIZED") {
+                    return { ok: false, error: "INCOMPATIBLE_ROOM" }
+                }
+                throw error
             }
         }
         return {

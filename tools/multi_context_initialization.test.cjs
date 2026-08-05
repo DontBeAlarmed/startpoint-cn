@@ -6,6 +6,7 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const { createEmbeddedMultiHttpContext } = require("../src/multi/http/context")
+const { ContentSnapshotError } = require("../src/content/runtime/content-snapshot")
 
 const RELEASE_DIGEST = `sha256:${"7".repeat(64)}`
 const compatibility = Object.freeze({
@@ -41,7 +42,12 @@ test("embedded context construction defers compatibility source and recovers aft
         compatibilityProfileDependencies: {
             getContentSnapshot: () => {
                 snapshotCalls++
-                if (!initialized) throw new Error("CONTENT_SNAPSHOT_NOT_INITIALIZED")
+                if (!initialized) {
+                    throw new ContentSnapshotError(
+                        "CONTENT_SNAPSHOT_NOT_INITIALIZED",
+                        "embedded context test",
+                    )
+                }
                 return snapshot()
             },
             getLoadedModeIdentities: () => {

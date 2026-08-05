@@ -10,6 +10,7 @@ const {
     compareCompatibility,
     createCompatibilityProfileFactory,
 } = require("../src/multi/compatibility")
+const { ContentSnapshotError } = require("../src/content/runtime/content-snapshot")
 
 const RELEASE_DIGEST = `sha256:${"1".repeat(64)}`
 const BUNDLED_DIGEST = `sha256:${"4".repeat(64)}`
@@ -95,7 +96,12 @@ test("profile source failure is controlled, not cached, and recovers after initi
     const factory = createCompatibilityProfileFactory({
         getContentSnapshot: () => {
             snapshotCalls++
-            if (!initialized) throw new Error("CONTENT_SNAPSHOT_NOT_INITIALIZED: controlled test")
+            if (!initialized) {
+                throw new ContentSnapshotError(
+                    "CONTENT_SNAPSHOT_NOT_INITIALIZED",
+                    "controlled test",
+                )
+            }
             return snapshot()
         },
         getLoadedModeIdentities: () => {
@@ -122,29 +128,125 @@ test("profile source failure is controlled, not cached, and recovers after initi
     assert.equal(modeCalls, 1)
 })
 
-test("mode identity failure is controlled and does not cache a partial source", () => {
-    let snapshotCalls = 0
-    let modeCalls = 0
+test("only the exact uninitialized ContentSnapshotError is mapped to incompatibility", () => {
+    const wrongCode = new ContentSnapshotError(
+        "CONTENT_SNAPSHOT_NOT_INITIALIZED",
+        "wrong code test",
+    )
+    wrongCode.code = "CONTENT_SNAPSHOT_CORRUPT"
     const factory = createCompatibilityProfileFactory({
-        getContentSnapshot: () => {
-            snapshotCalls++
-            return snapshot()
-        },
-        getLoadedModeIdentities: () => {
-            modeCalls++
-            if (modeCalls === 1) throw new Error("controlled mode registry failure")
-            return []
-        },
+        getContentSnapshot: () => { throw wrongCode },
+        getLoadedModeIdentities: () => [],
     })
 
-    assert.deepEqual(factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" }), {
-        ok: false,
-        error: "INCOMPATIBLE_ROOM",
-    })
-    assert.equal(factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" }).ok, true)
-    assert.equal(factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" }).ok, true)
-    assert.equal(snapshotCalls, 2)
-    assert.equal(modeCalls, 2)
+    assert.throws(
+        () => factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" }),
+        error => error === wrongCode,
+    )
+})
+
+test("unexpected source failures are rethrown unchanged and remain recoverable", async t => {
+    const scenarios = [
+        {
+            name: "snapshot dependency",
+            createFailure: () => {
+                const error = new Error("generic snapshot failure")
+                return {
+                    error,
+                    dependencies: {
+                        getContentSnapshot: () => { throw error },
+                        getLoadedModeIdentities: () => [],
+                    },
+                }
+            },
+        },
+        {
+            name: "snapshot structure",
+            createFailure: () => ({
+                dependencies: {
+                    getContentSnapshot: () => ({}),
+                    getLoadedModeIdentities: () => [],
+                },
+                errorType: TypeError,
+            }),
+        },
+        {
+            name: "repository info",
+            createFailure: () => {
+                const error = new Error("repository info failure")
+                return {
+                    error,
+                    dependencies: {
+                        getContentSnapshot: () => ({
+                            ...snapshot(),
+                            repository: {
+                                info: () => { throw error },
+                                table: () => undefined,
+                            },
+                        }),
+                        getLoadedModeIdentities: () => [],
+                    },
+                }
+            },
+        },
+        {
+            name: "mode registry",
+            createFailure: () => {
+                const error = new Error("mode registry failure")
+                return {
+                    error,
+                    dependencies: {
+                        getContentSnapshot: () => snapshot(),
+                        getLoadedModeIdentities: () => { throw error },
+                    },
+                }
+            },
+        },
+        {
+            name: "mode digest",
+            createFailure: () => ({
+                dependencies: {
+                    getContentSnapshot: () => snapshot(),
+                    getLoadedModeIdentities: () => [{
+                        fileName: undefined,
+                        name: "invalid",
+                        capability: "invalid@1",
+                        sha256: "a".repeat(64),
+                    }],
+                },
+                errorType: TypeError,
+            }),
+        },
+    ]
+
+    for (const scenario of scenarios) {
+        await t.test(scenario.name, () => {
+            let failing = true
+            const failure = scenario.createFailure()
+            const factory = createCompatibilityProfileFactory({
+                getContentSnapshot: () => failing
+                    ? failure.dependencies.getContentSnapshot()
+                    : snapshot(),
+                getLoadedModeIdentities: () => failing
+                    ? failure.dependencies.getLoadedModeIdentities()
+                    : [],
+            })
+
+            if (failure.error) {
+                assert.throws(
+                    () => factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" }),
+                    error => error === failure.error,
+                )
+            } else {
+                assert.throws(
+                    () => factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" }),
+                    failure.errorType,
+                )
+            }
+            failing = false
+            assert.equal(factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" }).ok, true)
+        })
+    }
 })
 
 test("fixed profile source never reads snapshot or mode dependencies", () => {
