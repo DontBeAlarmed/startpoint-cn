@@ -78,14 +78,14 @@ test("independent credentials revoke separately and repeated revoke is idempoten
     assert.equal(store.list().find(item => item.credentialId === second.credentialId).revokedAt, null)
 })
 
-test("new and replaced credential tables remain owner-readable only", t => {
+test("new tables use 0600 and updates preserve existing permissions", t => {
     const { credentialsPath, store } = fixture(t)
     store.create("node-a")
     assert.equal(fs.statSync(credentialsPath).mode & 0o777, 0o600)
 
-    fs.chmodSync(credentialsPath, 0o644)
+    fs.chmodSync(credentialsPath, 0o400)
     store.create("node-b")
-    assert.equal(fs.statSync(credentialsPath).mode & 0o777, 0o600)
+    assert.equal(fs.statSync(credentialsPath).mode & 0o777, 0o400)
 })
 
 test("atomic replacement failure preserves the previous credential table", t => {
@@ -121,6 +121,8 @@ test("strict loading rejects malformed, ambiguous, and unsupported tables", t =>
         { schemaVersion: 2, credentials: [] },
         { schemaVersion: 1, credentials: [], extra: true },
         { schemaVersion: 1, credentials: [{ ...baseEntry, label: "" }] },
+        { schemaVersion: 1, credentials: [{ ...baseEntry, label: "node\u0000a" }] },
+        { schemaVersion: 1, credentials: [{ ...baseEntry, label: "node\u0085a" }] },
         { schemaVersion: 1, credentials: [{ ...baseEntry, tokenDigest: "xyz" }] },
         { schemaVersion: 1, credentials: [{ ...baseEntry, createdAt: "yesterday" }] },
         { schemaVersion: 1, credentials: [baseEntry, { ...baseEntry }] },
@@ -151,7 +153,22 @@ test("strict loading rejects malformed, ambiguous, and unsupported tables", t =>
 
 test("credential labels and revocation require exact non-empty values", t => {
     const { store } = fixture(t)
-    for (const label of ["", " ", "\n"]) assert.throws(() => store.create(label))
+    for (const label of [
+        "",
+        " ",
+        "\n",
+        "node\u0000a",
+        "node\u001fa",
+        "node\u007fa",
+        "node\u0085a",
+        "node\u009fa",
+        "node\na",
+    ]) {
+        assert.throws(
+            () => store.create(label),
+            { code: "INVALID_MULTI_HUB_CREDENTIAL_LABEL" },
+        )
+    }
     const issued = store.create("node-a")
     for (const credentialId of ["", issued.credentialId.slice(0, -1), `${issued.credentialId}0`]) {
         assert.throws(() => store.revoke(credentialId))
@@ -203,8 +220,7 @@ test("management CLI uses only the injected private table and never reprints sec
     assert.equal(listed.stdout.includes(issuedToken), false)
     assert.doesNotMatch(listed.stdout, /tokenDigest|"token"/)
     const listedCredentialId = JSON.parse(listed.stdout)[0].credentialId
-    assert.match(listedCredentialId, /^[0-9a-f]{8}\.\.\.$/)
-    assert.notEqual(listedCredentialId, credentialId)
+    assert.equal(listedCredentialId, credentialId)
 
     const revoked = run("revoke", credentialId)
     assert.equal(revoked.status, 0, revoked.stderr)

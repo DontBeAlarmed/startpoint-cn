@@ -2,6 +2,9 @@
 
 const assert = require("node:assert/strict")
 const { EventEmitter } = require("node:events")
+const net = require("node:net")
+const os = require("node:os")
+const path = require("node:path")
 const test = require("node:test")
 
 require("ts-node/register/transpile-only")
@@ -10,6 +13,7 @@ const {
     createRuntimeCoordinator,
     startupExitCode,
 } = require("../src/runtime/lifecycle")
+const { createMultiRuntimeService } = require("../src/multi/runtime/service")
 
 function deferred() {
     let resolve
@@ -21,10 +25,31 @@ function deferred() {
     return { promise, reject, resolve }
 }
 
-test("multiplayer startup failure is degraded and does not block core readiness", async () => {
+test("host multiplayer startup failure is degraded and does not block core readiness", async () => {
+    const hostConfig = {
+        http: { host: "127.0.0.1", port: 18001 },
+        multi: {
+            mode: "host",
+            tcp: { host: "127.0.0.1", port: 18003, publicHost: "hub.internal" },
+            hub: { host: "127.0.0.1", port: 18004 },
+            credentialsPath: path.join(os.tmpdir(), "unused-host-credentials.json"),
+        },
+        assetProvider: { mode: "client-owned" },
+    }
     const harness = createHarness({
+        loadConfig() {
+            harness.calls.push("config")
+            return hostConfig
+        },
         async startMulti() {
             harness.calls.push("multi-start-failure")
+            harness.setMultiStatus({
+                mode: "host",
+                state: "degraded",
+                coordinator: { kind: "local", available: true },
+                hub: { available: false, endpoint: "http://127.0.0.1:18004" },
+                tcp: { available: false, endpoint: "hub.internal:18003" },
+            })
             throw Object.assign(new Error("Hub unavailable"), { code: "EADDRINUSE" })
         },
     })
@@ -36,9 +61,64 @@ test("multiplayer startup failure is degraded and does not block core readiness"
     assert.equal(health.statusCode, 200)
     assert.equal(health.body.status, "ready")
     assert.equal(health.body.services.tcp, false)
-    assert.equal(health.body.multiplayer.state, "unavailable")
+    assert.equal(health.body.multiplayer.state, "degraded")
     assert.deepEqual(harness.exitCodes, [])
     await harness.coordinator.stop()
+})
+
+function listen(server) {
+    return new Promise((resolve, reject) => {
+        server.once("error", reject)
+        server.listen(0, "127.0.0.1", () => {
+            server.off("error", reject)
+            resolve()
+        })
+    })
+}
+
+function closeServer(server) {
+    if (!server.listening) return Promise.resolve()
+    return new Promise((resolve, reject) => {
+        server.close(error => error ? reject(error) : resolve())
+    })
+}
+
+test("occupied embedded SESSION_PORT remains fatal with TCP exit 14", async t => {
+    const blocker = net.createServer()
+    await listen(blocker)
+    t.after(() => closeServer(blocker))
+    const address = blocker.address()
+    assert.ok(address && typeof address === "object")
+
+    const multiService = createMultiRuntimeService()
+    const embeddedConfig = {
+        http: { host: "127.0.0.1", port: 18001 },
+        multi: {
+            mode: "embedded",
+            tcp: { host: "127.0.0.1", port: address.port },
+        },
+        assetProvider: { mode: "client-owned" },
+    }
+    const harness = createHarness({
+        loadConfig() {
+            harness.calls.push("config")
+            return embeddedConfig
+        },
+        startMulti: config => multiService.start(config.multi),
+        stopMulti: () => multiService.stop(),
+        getMultiStatus: () => multiService.getStatus(),
+    })
+    t.after(() => harness.coordinator.stop())
+
+    await harness.coordinator.start()
+
+    assert.equal(harness.coordinator.getPhase(), "failed")
+    assert.deepEqual(harness.exitCodes, [14])
+    const health = harness.coordinator.getHealthSnapshot()
+    assert.equal(health.statusCode, 503)
+    assert.equal(health.body.status, "failed")
+    assert.equal(health.body.services.tcp, false)
+    assert.equal(harness.calls.some(call => Array.isArray(call) && call[0] === "http-listen"), false)
 })
 
 function createHarness(overrides = {}) {

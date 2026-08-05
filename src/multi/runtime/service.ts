@@ -155,8 +155,9 @@ class Service implements MultiRuntimeService {
         this.tcpAttempted = true
         try {
             await this.dependencies.startTcp(config.tcp, () => { this.tcpFailed = true })
-        } catch {
+        } catch (error) {
             this.tcpFailed = true
+            if (config.mode === "embedded") throw error
         }
         if (config.mode !== "host") return
 

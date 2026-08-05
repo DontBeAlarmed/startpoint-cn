@@ -78,7 +78,10 @@ function isCanonicalTimestamp(value: unknown): value is string {
 }
 
 function isValidLabel(value: unknown): value is string {
-    return typeof value === "string" && value.length > 0 && value === value.trim()
+    return typeof value === "string"
+        && value.length > 0
+        && value === value.trim()
+        && !/[\u0000-\u001f\u007f-\u009f]/.test(value)
 }
 
 function parseTable(value: unknown): CredentialTable {
@@ -257,14 +260,16 @@ export class MultiHubCredentialStore {
     private writeTable(table: CredentialTable): void {
         const directory = path.dirname(this.credentialsPath)
         fs.mkdirSync(directory, { recursive: true, mode: 0o700 })
+        const fileMode = this.currentFileMode()
         const temporaryPath = path.join(
             directory,
             `.${path.basename(this.credentialsPath)}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`,
         )
         let descriptor: number | null = null
         try {
-            descriptor = fs.openSync(temporaryPath, "wx", 0o600)
+            descriptor = fs.openSync(temporaryPath, "wx", fileMode)
             fs.writeFileSync(descriptor, `${JSON.stringify(table, null, 2)}\n`, "utf8")
+            fs.fchmodSync(descriptor, fileMode)
             fs.fsyncSync(descriptor)
             fs.closeSync(descriptor)
             descriptor = null
@@ -276,6 +281,17 @@ export class MultiHubCredentialStore {
             } catch (error) {
                 if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
             }
+        }
+    }
+
+    private currentFileMode(): number {
+        try {
+            const stats = fs.lstatSync(this.credentialsPath)
+            if (stats.isSymbolicLink() || !stats.isFile()) return failInvalidTable()
+            return stats.mode & 0o777
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0o600
+            throw error
         }
     }
 }

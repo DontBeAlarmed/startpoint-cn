@@ -209,12 +209,13 @@ class Coordinator implements RuntimeCoordinator {
             this.contentInitialized = true
             if (this.interrupted()) return
 
-            this.stage = "multi"
+            this.stage = this.config.multi.mode === "embedded" ? "tcp" : "multi"
             this.multiAttempted = true
             try {
                 await this.dependencies.startMulti(this.config)
-            } catch {
-                // Multiplayer is optional; getMultiStatus() exposes the degraded state.
+            } catch (error) {
+                if (this.config.multi.mode === "embedded") throw error
+                // Host and client multiplayer are optional; health exposes degradation.
             }
             if (this.interrupted()) return
 

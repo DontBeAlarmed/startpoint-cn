@@ -185,7 +185,7 @@ export function resolveMultiHubCredentialsPath(
         ? path.join(dataDir, "multi-hub-credentials.json")
         : resolvePhysicalPath(configured)
     const physicalProjectRoot = resolvePhysicalPath(projectRoot)
-    const privateProjectDataDir = resolvePhysicalPath(path.join(projectRoot, ".database"))
+    const privateProjectDataDir = path.join(physicalProjectRoot, ".database")
     if (isSameOrDescendant(physicalProjectRoot, credentialsPath)
         && !isSameOrDescendant(privateProjectDataDir, credentialsPath)) {
         throw new RuntimeConfigError()

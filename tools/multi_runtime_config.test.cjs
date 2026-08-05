@@ -2,6 +2,8 @@
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
+const http = require("node:http")
+const net = require("node:net")
 const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
@@ -139,6 +141,26 @@ test("host defaults to the private runtime data area and rejects tracked DATA_DI
     }))
 })
 
+test("host rejects a private data symlink that resolves into tracked project content", t => {
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "multi-host-symlink-"))
+    t.after(() => fs.rmSync(sandbox, { recursive: true, force: true }))
+    const temporaryProjectRoot = path.join(sandbox, "repo")
+    const trackedDir = path.join(temporaryProjectRoot, "tracked")
+    fs.mkdirSync(trackedDir, { recursive: true })
+    fs.symlinkSync(trackedDir, path.join(temporaryProjectRoot, ".database"), "dir")
+
+    assert.throws(() => parseCnRuntimeConfig({
+        projectRoot: temporaryProjectRoot,
+        env: {
+            ASSET_MODE: "client-owned",
+            MULTI_MODE: "host",
+            MULTI_HUB_HOST: "127.0.0.1",
+            MULTI_HUB_PORT: "8004",
+            SESSION_PUBLIC_HOST: "hub.internal",
+        },
+    }), error => error?.code === "INVALID_RUNTIME_CONFIG")
+})
+
 test("client mode accepts only an issued remote Hub credential and has no local TCP listener", () => {
     const config = parseCnRuntimeConfig({
         projectRoot,
@@ -184,10 +206,12 @@ function createServiceHarness() {
     const calls = []
     let tcpListening = false
     let hubListening = false
+    let failTcp = false
     let failHub = false
     const service = createMultiRuntimeService({
         async startTcp(config) {
             calls.push(["tcp-start", config])
+            if (failTcp) throw Object.assign(new Error("bind failed"), { code: "EADDRINUSE" })
             tcpListening = true
         },
         async stopTcp() {
@@ -209,6 +233,7 @@ function createServiceHarness() {
     return {
         calls,
         service,
+        failTcp() { failTcp = true },
         failHub() { failHub = true },
     }
 }
@@ -257,6 +282,26 @@ test("host Hub bind failure degrades multiplayer without discarding local TCP", 
     assert.equal(harness.calls.includes("tcp-stop"), true)
 })
 
+test("host TCP bind failure keeps the control listener available and degrades multiplayer", async () => {
+    const harness = createServiceHarness()
+    harness.failTcp()
+    await harness.service.start({
+        mode: "host",
+        tcp: { host: "0.0.0.0", port: 8003, publicHost: "192.0.2.20" },
+        hub: { host: "127.0.0.1", port: 8004 },
+        credentialsPath: path.join(os.tmpdir(), "unused-multi-credentials.json"),
+    })
+
+    assert.deepEqual(harness.service.getStatus(), {
+        mode: "host",
+        state: "degraded",
+        coordinator: { kind: "local", available: true },
+        hub: { available: true, endpoint: "http://127.0.0.1:8004" },
+        tcp: { available: false, endpoint: "192.0.2.20:8003" },
+    })
+    await harness.service.stop()
+})
+
 test("client runtime is an explicit remote placeholder and never starts local listeners", async () => {
     const harness = createServiceHarness()
     await harness.service.start({
@@ -280,4 +325,56 @@ test("client runtime is an explicit remote placeholder and never starts local li
     assert.deepEqual(result, { ok: false, error: "HUB_UNAVAILABLE" })
     await harness.service.stop()
     assert.deepEqual(harness.calls, [])
+})
+
+function listen(server) {
+    return new Promise((resolve, reject) => {
+        server.once("error", reject)
+        server.listen(0, "127.0.0.1", () => {
+            server.off("error", reject)
+            resolve()
+        })
+    })
+}
+
+async function availablePort() {
+    const server = net.createServer()
+    await listen(server)
+    const address = server.address()
+    assert.ok(address && typeof address === "object")
+    await new Promise((resolve, reject) => {
+        server.close(error => error ? reject(error) : resolve())
+    })
+    return address.port
+}
+
+function getStatus(port, requestPath) {
+    return new Promise((resolve, reject) => {
+        const request = http.get({ host: "127.0.0.1", port, path: requestPath }, response => {
+            response.resume()
+            response.once("end", () => resolve(response.statusCode))
+        })
+        request.once("error", reject)
+    })
+}
+
+test("real host starts without credentials and leaves registration unimplemented", async t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-host-empty-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const credentialsPath = path.join(root, "credentials.json")
+    const tcpPort = await availablePort()
+    const hubPort = await availablePort()
+    const service = createMultiRuntimeService()
+    t.after(() => service.stop())
+
+    await service.start({
+        mode: "host",
+        tcp: { host: "127.0.0.1", port: tcpPort, publicHost: "127.0.0.1" },
+        hub: { host: "127.0.0.1", port: hubPort },
+        credentialsPath,
+    })
+
+    assert.equal(fs.existsSync(credentialsPath), false)
+    assert.equal(service.getStatus().state, "ready")
+    assert.equal(await getStatus(hubPort, "/register"), 404)
 })

@@ -38,10 +38,7 @@ function main() {
         return
     }
     if (command === "list" && args.length === 0) {
-        print(store.list().map(credential => ({
-            ...credential,
-            credentialId: `${credential.credentialId.slice(0, 8)}...`,
-        })))
+        print(store.list())
         return
     }
     if (command === "revoke" && args.length === 1) {
