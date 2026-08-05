@@ -287,6 +287,7 @@ export class SessionManager {
     }
 
     closeRoomClients(roomNumber: string): number {
+        this.clearBattleExpectedCount(roomNumber)
         let removed = 0
         for (const client of this.getClientsInRoom(roomNumber)) {
             if (this.removeRoomClientIndexes(client)) {
@@ -300,6 +301,8 @@ export class SessionManager {
             removed++
             this.closeClientSocket(client.socket)
         }
+        this.roomClients.delete(roomNumber)
+        this.battleClients.delete(roomNumber)
         return removed
     }
 

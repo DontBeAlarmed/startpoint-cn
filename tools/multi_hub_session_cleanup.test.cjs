@@ -48,9 +48,10 @@ function snapshot(viewerId) {
 }
 
 class FakeSocket {
-    constructor() {
+    constructor(options = {}) {
         this.destroyed = false
         this.destroyCalls = 0
+        this.throwOnDestroy = options.throwOnDestroy === true
         this.writable = true
         this.writes = []
     }
@@ -64,6 +65,7 @@ class FakeSocket {
         this.destroyCalls++
         this.destroyed = true
         this.writable = false
+        if (this.throwOnDestroy) throw new Error("injected destroy failure")
         return this
     }
 }
@@ -253,6 +255,75 @@ test("invalidating a host closes every lobby and battle client in its room", asy
     assert.equal(getRoom(otherRoomNumber)?.room_number, otherRoomNumber)
     assert.equal(otherSocket.destroyed, false)
     assert.equal(sessionManager.getClientBySocket(otherSocket), otherClient)
+})
+
+test("revoked room teardown never releases a partially ready battle barrier", async t => {
+    const coordinator = new EmbeddedMultiCoordinator({ allowRemoteParticipants: true })
+    for (const [index, order] of [
+        [0, ["host", "guest"]],
+        [1, ["guest", "host"]],
+    ]) {
+        const host = { nodeSessionId: `barrier-host-${index}`, viewerId: 800 + index * 10 }
+        const guest = { nodeSessionId: `barrier-guest-${index}`, viewerId: host.viewerId + 1 }
+        const created = await coordinator.createRoom({
+            requestId: `barrier-room-${index}`,
+            participant: host,
+            partyId: 1,
+            category: 1,
+            questId: 501,
+            leaderCharacterId: 101,
+            compatibility,
+        })
+        assert.equal(created.ok, true)
+        const roomNumber = created.value.roomNumber
+        const sockets = {
+            host: new FakeSocket({ throwOnDestroy: index === 0 }),
+            guest: new FakeSocket(),
+        }
+        const clients = {
+            host: sessionManager.createClient(sockets.host, host.viewerId, roomNumber, `barrier-host-${index}`),
+            guest: sessionManager.createClient(sockets.guest, guest.viewerId, roomNumber, `barrier-guest-${index}`),
+        }
+        clients.host.participant = host
+        clients.guest.participant = guest
+        clients.host.isBattle = true
+        clients.guest.isBattle = true
+        sessionManager.setBattleParticipants(roomNumber, [
+            { connectionId: clients.host.connectionId, participant: host },
+            { connectionId: clients.guest.connectionId, participant: guest },
+        ], host)
+        updateRoomState(roomNumber, 4)
+        for (const role of order) {
+            sessionManager.addBattleClient(clients[role].connectionId, clients[role])
+        }
+        t.after(() => {
+            sessionManager.closeRoomClients(roomNumber)
+            disbandRoom(roomNumber)
+        })
+
+        assert.equal(sessionManager.markSceneReady(clients.guest.connectionId, roomNumber), false)
+        assert.equal(coordinator.cleanupNodeSession(host.nodeSessionId), 1)
+
+        for (const socket of Object.values(sockets)) {
+            assert.equal(socket.destroyed, true)
+            assert.equal(socket.destroyCalls, 1)
+            assert.equal(sessionManager.getClientBySocket(socket), undefined)
+            assert.equal(socket.writes.some(message => (
+                JSON.stringify(message) === JSON.stringify([1, [1]])
+            )), false)
+        }
+        assert.deepEqual(sessionManager.getBattleClientsInRoom(roomNumber), [])
+        assert.equal(sessionManager.getBattleClient(clients.host.connectionId), undefined)
+        assert.equal(sessionManager.getBattleClient(clients.guest.connectionId), undefined)
+        assert.equal(sessionManager.getBattleParticipant(roomNumber, clients.host.connectionId), undefined)
+        assert.equal(sessionManager.getBattleParticipant(roomNumber, clients.guest.connectionId), undefined)
+        assert.equal(sessionManager.markSceneReady(clients.guest.connectionId, roomNumber), false)
+        assert.equal(sessionManager.beginNextBattleScene(clients.guest.connectionId, roomNumber), false)
+        assert.equal(sessionManager.canFinalizeBattle(roomNumber, false), false)
+        assert.equal(sessionManager.replayBattleStartIfNeeded(clients.guest.connectionId, roomNumber), false)
+        assert.equal(coordinator.cleanupNodeSession(host.nodeSessionId), 0)
+        assert.equal(sessionManager.closeRoomClients(roomNumber), 0)
+    }
 })
 
 test("expired rooms do not leave a host-session cleanup index", async t => {
