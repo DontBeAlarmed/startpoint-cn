@@ -144,7 +144,7 @@ export function createRoom(
         npc_roster: [],
     };
     rooms.set(roomNumber, room);
-    console.log(`[MULTI] room created: ${roomNumber} host=${hostViewerId} category=${category} quest=${questId}`);
+    console.log(`[MULTI] room created: room=${roomNumber} category=${category} quest=${questId}`);
     return room;
 }
 

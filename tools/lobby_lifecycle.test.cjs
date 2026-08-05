@@ -28,6 +28,24 @@ function flushPromises() {
     return new Promise(resolve => setImmediate(resolve))
 }
 
+async function captureConsole(callback) {
+    const entries = []
+    const originals = {}
+    for (const method of ["log", "warn", "error"]) {
+        originals[method] = console[method]
+        console[method] = (...args) => entries.push(args.map(value => {
+            if (value instanceof Error) return `${value.name}: ${value.message}\n${value.stack || ""}`
+            return typeof value === "string" ? value : JSON.stringify(value)
+        }).join(" "))
+    }
+    try {
+        await callback()
+    } finally {
+        for (const method of ["log", "warn", "error"]) console[method] = originals[method]
+    }
+    return entries.join("\n")
+}
+
 class FakeSocket extends EventEmitter {
     constructor() {
         super()
@@ -59,10 +77,10 @@ function startCapturedLobbyLifecycle() {
     return timers
 }
 
-function createLobbyClient(room, viewerId, connectionId) {
+function createLobbyClient(room, viewerId, connectionId, nodeSessionId = "embedded") {
     const socket = new FakeSocket()
     const client = sessionManager.createClient(socket, viewerId, room.room_number, connectionId)
-    client.participant = { nodeSessionId: "embedded", viewerId }
+    client.participant = { nodeSessionId, viewerId }
     client.yourself = {
         viewerId,
         connectionId,
@@ -74,9 +92,15 @@ function createLobbyClient(room, viewerId, connectionId) {
     return { client, socket }
 }
 
-function createLobbyRoom(t, hostViewerId, guestViewerIds = []) {
+function createLobbyRoom(
+    t,
+    hostViewerId,
+    guestViewerIds = [],
+    hostNodeSessionId = "embedded",
+    hostConnectionId = `host-${hostViewerId}`,
+) {
     const room = createRoom(hostViewerId, hostViewerId + 1000, 1, 1, hostViewerId + 2000, 1, hostViewerId + 3000)
-    const host = createLobbyClient(room, hostViewerId, `host-${hostViewerId}`)
+    const host = createLobbyClient(room, hostViewerId, hostConnectionId, hostNodeSessionId)
     sessionManager.claimRoomHostParticipant(room.room_number, host.client.participant)
     const guests = guestViewerIds.map(viewerId => createLobbyClient(room, viewerId, `guest-${viewerId}`))
     t.after(() => {
@@ -207,6 +231,32 @@ test("an explicit host Bye disbands the room even while guests remain", t => {
     handleMessage(host.socket, [0, [1]])
 
     assert.equal(getRoom(room.room_number), undefined)
+})
+
+test("lobby lifecycle logs retain role and room without client identity", async t => {
+    const viewerId = 918273643
+    const { room, host } = createLobbyRoom(
+        t,
+        viewerId,
+        [],
+        "NODE_SESSION_SENTINEL_LOBBY",
+        "CONNECTION_SENTINEL_LOBBY",
+    )
+
+    const output = await captureConsole(async () => {
+        handleMessage(host.socket, [0, [0, { party: {} }]])
+        handleMessage(host.socket, [0, [2, { party: {}, currentPartyId: 2 }]])
+        handleMessage(host.socket, [0, [3, [1]]])
+        handleMessage(host.socket, [0, [1]])
+    })
+
+    for (const sentinel of [
+        String(viewerId),
+        "NODE_SESSION_SENTINEL_LOBBY",
+        "CONNECTION_SENTINEL_LOBBY",
+    ]) assert.doesNotMatch(output, new RegExp(sentinel))
+    assert.match(output, new RegExp(`\\[LOBBY\\] host entered: room=${room.room_number}`))
+    assert.match(output, new RegExp(`\\[LOBBY\\] client left: role=host room=${room.room_number}`))
 })
 
 test("all three lobby timeout paths are unrefed, cancelled, and inert after stop", async t => {

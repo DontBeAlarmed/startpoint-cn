@@ -95,10 +95,6 @@ const acceptedSockets = new Set<net.Socket>()
 const pendingHandshakes = new Set<HandshakeRecord>()
 const socketHandshakes = new Map<net.Socket, HandshakeRecord>()
 
-function describeRemote(socket: net.Socket): string {
-    return `${socket.remoteAddress}:${socket.remotePort}`
-}
-
 function cleanupSession(socket: net.Socket): void {
     try {
         const lobby = require("./lobby") as {
@@ -203,8 +199,7 @@ function handleConnection(
     }
 
     acceptedSockets.add(socket)
-    const remoteAddress = describeRemote(socket)
-    console.log(`[TCP] new connection from ${remoteAddress}`)
+    console.log("[TCP] connection accepted")
 
     socket.setEncoding("utf8")
     let buffer = ""
@@ -237,18 +232,18 @@ function handleConnection(
                     }
                 }
             } catch (error) {
-                console.error(`[TCP] parse error from ${remoteAddress}: code=${failureCode(error) ?? "UNKNOWN"}`)
+                console.error(`[TCP] parse failed: code=${failureCode(error) ?? "UNKNOWN"}`)
             }
         }
     })
 
     socket.on("close", () => {
-        console.log(`[TCP] connection closed: ${remoteAddress}`)
+        console.log("[TCP] connection closed")
         cleanupAcceptedSocket(socket)
     })
 
     socket.on("error", error => {
-        console.error(`[TCP] socket error from ${remoteAddress}: code=${failureCode(error) ?? "UNKNOWN"}`)
+        console.error(`[TCP] socket error: code=${failureCode(error) ?? "UNKNOWN"}`)
         cleanupAcceptedSocket(socket)
         socket.destroy()
     })
@@ -508,7 +503,7 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
             }
             phase = "listening"
             settleStart(context)
-            console.log(`[TCP] session server listening on ${options.host ?? SESSION_HOST}:${options.port ?? SESSION_PORT}`)
+            console.log("[TCP] session server listening")
         })
     } catch (error) {
         recordFailure("startup", error)

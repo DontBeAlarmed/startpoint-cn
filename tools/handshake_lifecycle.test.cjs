@@ -1,6 +1,9 @@
 const assert = require("node:assert/strict")
 const { EventEmitter } = require("node:events")
+const fs = require("node:fs")
+const path = require("node:path")
 const test = require("node:test")
+const ts = require("typescript")
 
 require("ts-node/register/transpile-only")
 
@@ -40,6 +43,32 @@ class FakeSocket extends EventEmitter {
     }
     write() { return true }
     end() { this.writable = false }
+}
+
+async function captureConsole(callback) {
+    const entries = []
+    const originals = {}
+    for (const method of ["log", "warn", "error"]) {
+        originals[method] = console[method]
+        console[method] = (...args) => entries.push(args.map(value => {
+            if (value instanceof Error) return `${value.name}: ${value.message}\n${value.stack || ""}`
+            return typeof value === "string" ? value : JSON.stringify(value)
+        }).join(" "))
+    }
+    try {
+        await callback()
+    } finally {
+        for (const method of ["log", "warn", "error"]) console[method] = originals[method]
+    }
+    return entries.join("\n")
+}
+
+function multiTypeScriptFiles(directory) {
+    return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+        const entryPath = path.join(directory, entry.name)
+        if (entry.isDirectory()) return multiTypeScriptFiles(entryPath)
+        return entry.isFile() && entry.name.endsWith(".ts") ? [entryPath] : []
+    })
 }
 
 test("room handshake checks the lifecycle guard after admission consumption", async t => {
@@ -94,4 +123,87 @@ test("battle handshake refuses registration when its lifecycle generation is ina
     )
 
     assert.equal(sessionManager.getBattleClient("guard-cid"), undefined)
+})
+
+test("handshake logs never serialize client identity or payload fields", async () => {
+    const socket = new FakeSocket()
+    socket.remoteAddress = "203.0.113.201"
+    socket.remotePort = 61981
+    const sentinels = [
+        "918273641",
+        "NODE_SESSION_SENTINEL_HANDSHAKE",
+        "CONNECTION_SENTINEL_HANDSHAKE",
+        "203.0.113.201",
+        "61981",
+        "ROOM_PAYLOAD_SENTINEL_HANDSHAKE",
+        "TOKEN_SENTINEL_HANDSHAKE",
+    ]
+
+    const output = await captureConsole(() => handleHandshake(socket, {
+        socklet: "unsupported_handshake",
+        viewerId: 918273641,
+        nodeSessionId: "NODE_SESSION_SENTINEL_HANDSHAKE",
+        connection_id: "CONNECTION_SENTINEL_HANDSHAKE",
+        room_number: "ROOM_PAYLOAD_SENTINEL_HANDSHAKE",
+        access_token: "TOKEN_SENTINEL_HANDSHAKE",
+    }))
+
+    for (const sentinel of sentinels) assert.doesNotMatch(output, new RegExp(sentinel))
+    assert.match(output, /\[TCP\] handshake received/)
+})
+
+test("multiplayer console calls reject sensitive identifiers and raw errors", () => {
+    const multiRoot = path.resolve(__dirname, "../src/multi")
+    const forbiddenIdentifiers = new Set([
+        "viewerId", "viewer_id", "hostViewerId", "playerId", "player_id",
+        "nodeSessionId", "node_session_id", "connectionId", "connection_id",
+        "remoteAddress", "remotePort", "accessToken", "access_token",
+        "token", "tokenDigest", "digest", "credential", "sessionCredential",
+        "payload", "raw", "e", "error", "closeError",
+    ])
+    const violations = []
+
+    for (const filePath of multiTypeScriptFiles(multiRoot)) {
+        const sourceText = fs.readFileSync(filePath, "utf8")
+        const sourceFile = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true)
+        const inspectLogArgument = (node, callLine) => {
+            if (ts.isCallExpression(node)
+                && ts.isIdentifier(node.expression)
+                && node.expression.text === "failureCode") return
+            if (ts.isCallExpression(node)
+                && ts.isPropertyAccessExpression(node.expression)
+                && node.expression.expression.getText(sourceFile) === "JSON"
+                && node.expression.name.text === "stringify") {
+                violations.push(`${path.relative(multiRoot, filePath)}:${callLine}: serialized payload`)
+                return
+            }
+            if (ts.isPropertyAccessExpression(node)) {
+                const boundedCoordinatorError = node.getText(sourceFile) === "hubAbort.error"
+                if (!boundedCoordinatorError && forbiddenIdentifiers.has(node.name.text)) {
+                    violations.push(`${path.relative(multiRoot, filePath)}:${callLine}: ${node.name.text}`)
+                    return
+                }
+                inspectLogArgument(node.expression, callLine)
+                return
+            }
+            if (ts.isIdentifier(node) && forbiddenIdentifiers.has(node.text)) {
+                violations.push(`${path.relative(multiRoot, filePath)}:${callLine}: ${node.text}`)
+                return
+            }
+            node.forEachChild(child => inspectLogArgument(child, callLine))
+        }
+        const visit = node => {
+            if (ts.isCallExpression(node)
+                && ts.isPropertyAccessExpression(node.expression)
+                && node.expression.expression.getText(sourceFile) === "console"
+                && ["log", "warn", "error"].includes(node.expression.name.text)) {
+                const callLine = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1
+                for (const argument of node.arguments) inspectLogArgument(argument, callLine)
+            }
+            node.forEachChild(visit)
+        }
+        visit(sourceFile)
+    }
+
+    assert.deepEqual(violations, [])
 })

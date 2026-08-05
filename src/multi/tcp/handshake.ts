@@ -59,7 +59,7 @@ export async function handleHandshake(
     lifecycle: HandshakeLifecycleGuard = unmanagedLifecycle,
     dependencies: HandshakeDependencies = defaultDependencies,
 ): Promise<void> {
-    console.log(`[TCP] handshake:`, JSON.stringify(data).substring(0, 200))
+    console.log("[TCP] handshake received")
 
     const socklet = data.socklet
     const roomNumber = data.room_number || data.roomNumber

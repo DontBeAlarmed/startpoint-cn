@@ -130,6 +130,24 @@ class FakeServer extends EventEmitter {
     }
 }
 
+async function captureConsole(callback) {
+    const entries = []
+    const originals = {}
+    for (const method of ["log", "warn", "error"]) {
+        originals[method] = console[method]
+        console[method] = (...args) => entries.push(args.map(value => {
+            if (value instanceof Error) return `${value.name}: ${value.message}\n${value.stack || ""}`
+            return typeof value === "string" ? value : JSON.stringify(value)
+        }).join(" "))
+    }
+    try {
+        await callback()
+    } finally {
+        for (const method of ["log", "warn", "error"]) console[method] = originals[method]
+    }
+    return entries.join("\n")
+}
+
 test.afterEach(async () => {
     await stopSessionServer()
     const status = getSessionServerStatus()
@@ -284,6 +302,44 @@ test("socket error and close share exactly one session cleanup", async () => {
     } finally {
         sessionManager.removeClientBySocket = originalRemoveClientBySocket
     }
+})
+
+test("TCP parse, socket error, and close logs omit addresses and raw errors", async () => {
+    let fakeServer
+    const socket = new FakeSocket()
+    socket.remoteAddress = "203.0.113.202"
+    socket.remotePort = 61982
+    const socketError = Object.assign(new Error("ERROR_SENTINEL_TCP_SOCKET"), {
+        code: "ECONNRESET",
+    })
+
+    const output = await captureConsole(async () => {
+        await startSessionServer({
+            host: "198.51.100.202",
+            port: 61983,
+            createServer(connectionListener) {
+                fakeServer = new FakeServer(connectionListener)
+                return fakeServer
+            },
+        })
+        fakeServer.accept(socket)
+        socket.emit("data", "{\"token\":\"TOKEN_SENTINEL_TCP_PARSE\"\0")
+        socket.emit("error", socketError)
+        await stopSessionServer()
+    })
+
+    for (const sentinel of [
+        "203.0.113.202",
+        "61982",
+        "198.51.100.202",
+        "61983",
+        "ERROR_SENTINEL_TCP_SOCKET",
+        "TOKEN_SENTINEL_TCP_PARSE",
+    ]) assert.doesNotMatch(output, new RegExp(sentinel))
+    assert.match(output, /\[TCP\] connection accepted/)
+    assert.match(output, /\[TCP\] parse failed: code=UNKNOWN/)
+    assert.match(output, /\[TCP\] socket error: code=ECONNRESET/)
+    assert.match(output, /\[TCP\] connection closed/)
 })
 
 test("revoked node sessions close only their current TCP socket on the next frame", async () => {

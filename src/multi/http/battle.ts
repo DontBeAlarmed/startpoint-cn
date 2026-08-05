@@ -105,7 +105,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
     fastify.post("/start", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as MultiStartBody;
         const { viewer_id, quest_id, category, party_id, use_boost_point, use_boss_boost_point, is_auto_start_mode, room_number, mate_player_ids, play_id } = body;
-        console.log(`[MULTI] start: viewer=${viewer_id} quest=${quest_id} category=${category} party=${party_id} room=${room_number}`);
+        console.log(`[MULTI] start: quest=${quest_id} category=${category} room=${room_number}`);
 
         const requestValidation = validateMultiStartRequest({
             viewerId: viewer_id,
@@ -280,7 +280,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
     fastify.post("/finish", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as MultiFinishBody;
         const viewerId = body.viewer_id;
-        console.log(`[MULTI] finish: viewer=${viewerId} quest=${body.quest_id} category=${body.category} room=${body.room_number}`);
+        console.log(`[MULTI] finish: quest=${body.quest_id} category=${body.category} room=${body.room_number}`);
 
         if (!isValidMultiViewerId(viewerId)) {
             return reply.status(400).send({
@@ -359,7 +359,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             });
         }
         const isRoomHost = settlement.isHost;
-        console.log(`[MULTI] finish host context: playerId=${playerId} isRoomHost=${isRoomHost}`);
+        console.log(`[MULTI] finish context: role=${isRoomHost ? "host" : "guest"}`);
         // calculate clear rank
         const clearTime = finishValidation.elapsedTimeMs;
         const hasRankThresholds = questData.bRankTime > 0;
@@ -706,7 +706,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
     fastify.post("/abort", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as MultiAbortBody;
         const viewerId = body.viewer_id;
-        console.log(`[MULTI] abort: viewer=${viewerId} quest=${body.quest_id} category=${body.category}`);
+        console.log(`[MULTI] abort: quest=${body.quest_id} category=${body.category}`);
 
         if (!isValidMultiViewerId(viewerId)) {
             return reply.status(400).send({
@@ -757,11 +757,10 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                     + ` (${hubAbort.error})`,
                 )
             }
-        } catch (error) {
+        } catch {
             console.warn(
                 `[MULTI] abort: Hub cleanup deferred to node session invalidation`
                 + `/revocation for room ${storedQuest.roomNumber}`,
-                error,
             )
         }
 
@@ -788,7 +787,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
     fastify.post("/play_continue", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as PlayContinueBody;
         const viewerId = body.viewer_id;
-        console.log(`[MULTI] play_continue: viewer=${viewerId} quest=${body.quest_id} category=${body.category}`);
+        console.log(`[MULTI] play_continue: quest=${body.quest_id} category=${body.category}`);
 
         if (!isValidMultiViewerId(viewerId)) {
             return reply.status(400).send({
