@@ -117,11 +117,15 @@ class HubControlListener {
 
     stop = async (): Promise<void> => {
         const server = this.server
-        this.server = null
-        if (server === null || !server.listening) return
+        if (server === null) return
+        if (!server.listening) {
+            if (this.server === server) this.server = null
+            return
+        }
         await new Promise<void>((resolve, reject) => {
             server.close(error => error ? reject(error) : resolve())
         })
+        if (this.server === server) this.server = null
     }
 }
 
@@ -149,14 +153,49 @@ class Service implements MultiRuntimeService {
     private hubFailed = false
     private generation = 0
     private fatalReported = false
+    private startPromise: Promise<void> | null = null
+    private stopPromise: Promise<void> | null = null
 
     constructor(private readonly dependencies: MultiRuntimeServiceDependencies) {}
 
-    async start(
+    start(
         config: MultiRuntimeConfig,
         onFatalError?: MultiRuntimeFatalHandler,
     ): Promise<void> {
+        if (this.startPromise !== null && this.stopPromise === null) return this.startPromise
+        if (this.config !== null && this.stopPromise === null) {
+            return Promise.reject(new Error("multiplayer runtime already started"))
+        }
         const generation = ++this.generation
+        const priorStop = this.stopPromise
+        let tracked!: Promise<void>
+        tracked = this.runStart(generation, config, onFatalError, priorStop).finally(() => {
+            if (this.startPromise === tracked) this.startPromise = null
+        })
+        this.startPromise = tracked
+        return tracked
+    }
+
+    stop(): Promise<void> {
+        this.generation += 1
+        if (this.stopPromise !== null) return this.stopPromise
+        const pendingStart = this.startPromise
+        let tracked!: Promise<void>
+        tracked = this.runStop(pendingStart).finally(() => {
+            if (this.stopPromise === tracked) this.stopPromise = null
+        })
+        this.stopPromise = tracked
+        return tracked
+    }
+
+    private async runStart(
+        generation: number,
+        config: MultiRuntimeConfig,
+        onFatalError: MultiRuntimeFatalHandler | undefined,
+        priorStop: Promise<void> | null,
+    ): Promise<void> {
+        if (priorStop !== null) await priorStop
+        if (generation !== this.generation) return
         this.config = config
         this.context = config.mode === "client"
             ? createUnavailableHttpContext()
@@ -174,7 +213,15 @@ class Service implements MultiRuntimeService {
             )
         } catch (error) {
             this.tcpFailed = true
+            if (generation !== this.generation) {
+                await this.stopStartedComponents()
+                return
+            }
             if (config.mode === "embedded") throw error
+        }
+        if (generation !== this.generation) {
+            await this.stopStartedComponents()
+            return
         }
         if (config.mode !== "host") return
 
@@ -187,20 +234,7 @@ class Service implements MultiRuntimeService {
         } catch {
             this.hubFailed = true
         }
-    }
-
-    async stop(): Promise<void> {
-        this.generation += 1
-        const operations: Promise<unknown>[] = []
-        if (this.hubAttempted) operations.push(Promise.resolve().then(() => this.dependencies.stopHub()))
-        if (this.tcpAttempted) operations.push(Promise.resolve().then(() => this.dependencies.stopTcp()))
-        const results = await Promise.allSettled(operations)
-        this.hubAttempted = false
-        this.tcpAttempted = false
-        this.config = null
-        this.context = null
-        const failure = results.find(result => result.status === "rejected")
-        if (failure?.status === "rejected") throw failure.reason
+        if (generation !== this.generation) await this.stopStartedComponents()
     }
 
     getStatus(): MultiRuntimeStatus {
@@ -269,6 +303,45 @@ class Service implements MultiRuntimeService {
         if (this.fatalReported) return
         this.fatalReported = true
         onFatalError?.(Object.freeze({ mode: config.mode, component }))
+    }
+
+    private async runStop(pendingStart: Promise<void> | null): Promise<void> {
+        if (pendingStart !== null) {
+            try {
+                await pendingStart
+            } catch {
+                // Startup errors are reported to the startup caller; stop still retries cleanup.
+            }
+        }
+        await this.stopStartedComponents()
+    }
+
+    private async stopStartedComponents(): Promise<void> {
+        const failures: unknown[] = []
+        if (this.hubAttempted) {
+            try {
+                await this.dependencies.stopHub()
+                this.hubAttempted = false
+            } catch (error) {
+                failures.push(error)
+            }
+        }
+        if (this.tcpAttempted) {
+            try {
+                await this.dependencies.stopTcp()
+                this.tcpAttempted = false
+            } catch (error) {
+                failures.push(error)
+            }
+        }
+        if (!this.hubAttempted && !this.tcpAttempted) {
+            this.config = null
+            this.context = null
+            this.tcpFailed = false
+            this.hubFailed = false
+            this.fatalReported = false
+        }
+        if (failures.length > 0) throw failures[0]
     }
 }
 

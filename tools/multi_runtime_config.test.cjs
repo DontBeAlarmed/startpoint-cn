@@ -238,6 +238,173 @@ function createServiceHarness() {
     }
 }
 
+function deferred() {
+    let resolve
+    let reject
+    const promise = new Promise((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise
+        reject = rejectPromise
+    })
+    return { promise, reject, resolve }
+}
+
+function hostRuntimeConfig(label = "hub.internal") {
+    return {
+        mode: "host",
+        tcp: { host: "127.0.0.1", port: 8003, publicHost: label },
+        hub: { host: "127.0.0.1", port: 8004 },
+        credentialsPath: path.join(os.tmpdir(), `unused-${label}-credentials.json`),
+    }
+}
+
+test("stop during TCP start prevents a late Host control listener", async () => {
+    const tcpStarted = deferred()
+    const calls = []
+    let tcpListening = false
+    let hubListening = false
+    const service = createMultiRuntimeService({
+        async startTcp() {
+            calls.push("tcp-start")
+            await tcpStarted.promise
+            tcpListening = true
+        },
+        async stopTcp() { calls.push("tcp-stop"); tcpListening = false },
+        isTcpListening: () => tcpListening,
+        async startHub() { calls.push("hub-start"); hubListening = true },
+        async stopHub() { calls.push("hub-stop"); hubListening = false },
+        isHubListening: () => hubListening,
+    })
+
+    const starting = service.start(hostRuntimeConfig())
+    await new Promise(resolve => setImmediate(resolve))
+    const stopping = service.stop()
+    tcpStarted.resolve()
+    await Promise.all([starting, stopping])
+
+    assert.deepEqual(calls, ["tcp-start", "tcp-stop"])
+    assert.equal(tcpListening, false)
+    assert.equal(hubListening, false)
+    assert.equal(service.getStatus().state, "unavailable")
+})
+
+test("stop during Hub start closes the late control listener", async () => {
+    const hubStarted = deferred()
+    const calls = []
+    let tcpListening = false
+    let hubListening = false
+    const service = createMultiRuntimeService({
+        async startTcp() { calls.push("tcp-start"); tcpListening = true },
+        async stopTcp() { calls.push("tcp-stop"); tcpListening = false },
+        isTcpListening: () => tcpListening,
+        async startHub() {
+            calls.push("hub-start")
+            await hubStarted.promise
+            hubListening = true
+        },
+        async stopHub() { calls.push("hub-stop"); hubListening = false },
+        isHubListening: () => hubListening,
+    })
+
+    const starting = service.start(hostRuntimeConfig())
+    while (!calls.includes("hub-start")) await new Promise(resolve => setImmediate(resolve))
+    const stopping = service.stop()
+    hubStarted.resolve()
+    await Promise.all([starting, stopping])
+
+    assert.deepEqual(calls, ["tcp-start", "hub-start", "hub-stop", "tcp-stop"])
+    assert.equal(tcpListening, false)
+    assert.equal(hubListening, false)
+    assert.equal(service.getStatus().state, "unavailable")
+})
+
+test("an old generation completes before a queued Host start becomes current", async () => {
+    const firstTcpStarted = deferred()
+    const calls = []
+    let tcpStarts = 0
+    let tcpListening = false
+    let hubListening = false
+    const service = createMultiRuntimeService({
+        async startTcp(config) {
+            calls.push(["tcp-start", config.publicHost])
+            tcpStarts += 1
+            if (tcpStarts === 1) await firstTcpStarted.promise
+            tcpListening = true
+        },
+        async stopTcp() { calls.push("tcp-stop"); tcpListening = false },
+        isTcpListening: () => tcpListening,
+        async startHub() { calls.push("hub-start"); hubListening = true },
+        async stopHub() { calls.push("hub-stop"); hubListening = false },
+        isHubListening: () => hubListening,
+    })
+
+    const oldStart = service.start(hostRuntimeConfig("old.internal"))
+    await new Promise(resolve => setImmediate(resolve))
+    const stopping = service.stop()
+    const newStart = service.start(hostRuntimeConfig("new.internal"))
+    firstTcpStarted.resolve()
+    await Promise.all([oldStart, stopping, newStart])
+
+    assert.deepEqual(calls, [
+        ["tcp-start", "old.internal"],
+        "tcp-stop",
+        ["tcp-start", "new.internal"],
+        "hub-start",
+    ])
+    assert.equal(service.getStatus().tcp.endpoint, "new.internal:8003")
+    assert.equal(service.getStatus().state, "ready")
+    await service.stop()
+})
+
+for (const component of ["hub", "tcp"]) {
+    test(`${component} stop failure remains retryable and concurrent stop is shared`, async () => {
+        const calls = []
+        let tcpListening = false
+        let hubListening = false
+        let tcpStops = 0
+        let hubStops = 0
+        const service = createMultiRuntimeService({
+            async startTcp() { tcpListening = true },
+            async stopTcp() {
+                calls.push("tcp-stop")
+                tcpStops += 1
+                if (component === "tcp" && tcpStops === 1) {
+                    throw Object.assign(new Error("TCP close failed"), { code: "EIO" })
+                }
+                tcpListening = false
+            },
+            isTcpListening: () => tcpListening,
+            async startHub() { hubListening = true },
+            async stopHub() {
+                calls.push("hub-stop")
+                hubStops += 1
+                if (component === "hub" && hubStops === 1) {
+                    throw Object.assign(new Error("Hub close failed"), { code: "EIO" })
+                }
+                hubListening = false
+            },
+            isHubListening: () => hubListening,
+        })
+        await service.start(hostRuntimeConfig())
+
+        const firstStop = service.stop()
+        const concurrentStop = service.stop()
+        const sharedStop = concurrentStop === firstStop
+        const stopResults = await Promise.allSettled([firstStop, concurrentStop])
+        assert.equal(sharedStop, true)
+        assert.equal(stopResults[0].status, "rejected")
+        assert.equal(stopResults[0].reason.code, "EIO")
+        assert.equal(stopResults[1].status, "rejected")
+        assert.equal(component === "hub" ? hubListening : tcpListening, true)
+
+        await service.stop()
+        assert.equal(tcpListening, false)
+        assert.equal(hubListening, false)
+        assert.equal(component === "hub" ? hubStops : tcpStops, 2)
+        assert.equal(service.getStatus().state, "unavailable")
+        assert.throws(() => service.getHttpContext())
+    })
+}
+
 test("embedded runtime service preserves the local coordinator and TCP experience", async () => {
     const harness = createServiceHarness()
     await harness.service.start({

@@ -4,7 +4,7 @@ const assert = require("node:assert/strict")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
-const { spawnSync } = require("node:child_process")
+const { spawn, spawnSync } = require("node:child_process")
 const test = require("node:test")
 
 require("ts-node/register/transpile-only")
@@ -13,6 +13,10 @@ const projectRoot = path.resolve(__dirname, "..")
 const {
     MultiHubCredentialStore,
 } = require("../src/multi/hub/credential-store")
+const {
+    acquireMultiHubCredentialLock,
+    withMultiHubCredentialLock,
+} = require("../src/multi/hub/credential-lock")
 
 function fixture(t, options = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-hub-credentials-"))
@@ -22,6 +26,93 @@ function fixture(t, options = {}) {
         credentialsPath,
         root,
         store: new MultiHubCredentialStore({ credentialsPath, ...options }),
+    }
+}
+
+const concurrentWorker = String.raw`
+const fs = require("node:fs")
+const { randomBytes } = require("node:crypto")
+require("ts-node/register/transpile-only")
+const { MultiHubCredentialStore } = require("./src/multi/hub/credential-store")
+const [credentialsPath, action, value, readyPath, goPath] = process.argv.slice(1)
+const sleep = milliseconds => Atomics.wait(
+    new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds,
+)
+fs.writeFileSync(readyPath, "ready", { mode: 0o600 })
+while (!fs.existsSync(goPath)) sleep(5)
+const options = { credentialsPath }
+if (action === "create") {
+    options.generateToken = () => {
+        sleep(200)
+        return randomBytes(32).toString("hex")
+    }
+} else {
+    options.now = () => {
+        sleep(200)
+        return new Date()
+    }
+}
+const store = new MultiHubCredentialStore(options)
+const result = action === "create" ? store.create(value) : store.revoke(value)
+process.stdout.write(JSON.stringify({ credentialId: result.credentialId }))
+`
+
+function runCredentialWorker(credentialsPath, action, value, readyPath, goPath) {
+    const child = spawn(process.execPath, [
+        "-e",
+        concurrentWorker,
+        credentialsPath,
+        action,
+        value,
+        readyPath,
+        goPath,
+    ], {
+        cwd: projectRoot,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+    })
+    let stdout = ""
+    let stderr = ""
+    child.stdout.setEncoding("utf8").on("data", chunk => { stdout += chunk })
+    child.stderr.setEncoding("utf8").on("data", chunk => { stderr += chunk })
+    return {
+        child,
+        completed: new Promise(resolve => {
+            child.once("close", status => resolve({ status, stderr, stdout }))
+        }),
+    }
+}
+
+async function waitForFiles(paths, workers) {
+    for (let attempt = 0; attempt < 1_000; attempt++) {
+        if (paths.every(filePath => fs.existsSync(filePath))) return
+        const exited = workers.find(worker => worker.child.exitCode !== null)
+        if (exited) assert.fail(`worker exited before start barrier: ${(await exited.completed).stderr}`)
+        await new Promise(resolve => setTimeout(resolve, 5))
+    }
+    assert.fail(`workers did not reach start barrier: ${paths.join(", ")}`)
+}
+
+async function runConcurrentCredentialOperations(root, credentialsPath, operations) {
+    const goPath = path.join(root, "go")
+    const workers = operations.map(([action, value], index) => runCredentialWorker(
+        credentialsPath,
+        action,
+        value,
+        path.join(root, `ready-${index}`),
+        goPath,
+    ))
+    const readyPaths = workers.map((_worker, index) => path.join(root, `ready-${index}`))
+    try {
+        await waitForFiles(readyPaths, workers)
+        fs.writeFileSync(goPath, "go", { mode: 0o600 })
+        const results = await Promise.all(workers.map(worker => worker.completed))
+        for (const result of results) assert.equal(result.status, 0, result.stderr)
+        return results
+    } finally {
+        for (const worker of workers) {
+            if (worker.child.exitCode === null) worker.child.kill()
+        }
     }
 }
 
@@ -54,6 +145,91 @@ test("create returns plaintext once while the private table stores only its dige
         createdAt: issued.createdAt,
         revokedAt: null,
     }])
+})
+
+test("credential lock is a private sibling and times out while its owner is active", t => {
+    const { credentialsPath, root } = fixture(t)
+    const lock = acquireMultiHubCredentialLock(credentialsPath, {
+        timeoutMs: 20,
+        pollIntervalMs: 2,
+    })
+    const lockPath = `${credentialsPath}.lock`
+
+    assert.equal(lock.lockPath, lockPath)
+    assert.equal(fs.statSync(lockPath).mode & 0o777, 0o600)
+    assert.throws(
+        () => acquireMultiHubCredentialLock(credentialsPath, {
+            timeoutMs: 20,
+            pollIntervalMs: 2,
+        }),
+        { code: "MULTI_HUB_CREDENTIAL_LOCK_TIMEOUT" },
+    )
+    lock.release()
+    assert.equal(fs.existsSync(lockPath), false)
+    assert.equal(fs.readdirSync(root).some(name => name.endsWith(".lock")), false)
+})
+
+test("credential lock waits for an owner record being published", t => {
+    const { credentialsPath } = fixture(t)
+    const lockPath = `${credentialsPath}.lock`
+    fs.mkdirSync(path.dirname(lockPath), { recursive: true })
+    fs.writeFileSync(lockPath, "", { mode: 0o600 })
+    let clock = 0
+    let published = false
+
+    assert.throws(() => acquireMultiHubCredentialLock(credentialsPath, {
+        isProcessAlive: () => true,
+        now: () => clock,
+        pollIntervalMs: 1,
+        sleep(milliseconds) {
+            clock += milliseconds
+            if (published) return
+            published = true
+            fs.writeFileSync(lockPath, JSON.stringify({
+                schemaVersion: 1,
+                ownerToken: "c".repeat(32),
+                pid: process.pid,
+                createdAt: 0,
+            }))
+        },
+        timeoutMs: 5,
+    }), { code: "MULTI_HUB_CREDENTIAL_LOCK_TIMEOUT" })
+})
+
+test("credential lock recovers a stale dead owner without deleting its successor", t => {
+    const { credentialsPath } = fixture(t)
+    const stale = acquireMultiHubCredentialLock(credentialsPath, {
+        now: () => 1_000,
+        ownerToken: "a".repeat(32),
+        pid: 999_999,
+    })
+    const recovered = acquireMultiHubCredentialLock(credentialsPath, {
+        isProcessAlive: () => false,
+        now: () => 10_000,
+        ownerToken: "b".repeat(32),
+        pid: process.pid,
+        staleMs: 1_000,
+        timeoutMs: 20,
+    })
+
+    assert.throws(
+        () => stale.release(),
+        { code: "MULTI_HUB_CREDENTIAL_LOCK_REPLACED" },
+    )
+    assert.equal(fs.existsSync(recovered.lockPath), true)
+    recovered.release()
+    assert.equal(fs.existsSync(recovered.lockPath), false)
+})
+
+test("credential lock releases its own file when the operation throws", t => {
+    const { credentialsPath } = fixture(t)
+    const failure = new Error("operation failed")
+
+    assert.throws(
+        () => withMultiHubCredentialLock(credentialsPath, () => { throw failure }),
+        error => error === failure,
+    )
+    assert.equal(fs.existsSync(`${credentialsPath}.lock`), false)
 })
 
 test("independent credentials revoke separately and repeated revoke is idempotent", t => {
@@ -92,9 +268,13 @@ test("atomic replacement failure preserves the previous credential table", t => 
     const target = fixture(t)
     target.store.create("node-a")
     const original = fs.readFileSync(target.credentialsPath)
+    const token = "d".repeat(64)
     const failingStore = new MultiHubCredentialStore({
         credentialsPath: target.credentialsPath,
-        replaceFile() {
+        generateToken: () => token,
+        replaceFile(temporaryPath, credentialsPath) {
+            assert.equal(fs.readFileSync(temporaryPath, "utf8").includes(token), false)
+            assert.equal(fs.readFileSync(`${credentialsPath}.lock`, "utf8").includes(token), false)
             throw Object.assign(new Error("replace failed"), { code: "EIO" })
         },
     })
@@ -190,6 +370,36 @@ test("a generated token collision is rejected without changing the table", t => 
         { code: "DUPLICATE_MULTI_HUB_TOKEN" },
     )
     assert.deepEqual(fs.readFileSync(credentialsPath), original)
+})
+
+test("concurrent create processes preserve both credentials", async t => {
+    const { credentialsPath, root } = fixture(t)
+
+    await runConcurrentCredentialOperations(root, credentialsPath, [
+        ["create", "node-a"],
+        ["create", "node-b"],
+    ])
+
+    const listed = new MultiHubCredentialStore({ credentialsPath }).list()
+    assert.deepEqual(listed.map(item => item.label).sort(), ["node-a", "node-b"])
+    assert.equal(fs.existsSync(`${credentialsPath}.lock`), false)
+    assert.equal(fs.readdirSync(path.dirname(credentialsPath)).some(name => name.endsWith(".tmp")), false)
+})
+
+test("concurrent revoke processes preserve both revocations", async t => {
+    const { credentialsPath, root, store } = fixture(t)
+    const first = store.create("node-a")
+    const second = store.create("node-b")
+
+    await runConcurrentCredentialOperations(root, credentialsPath, [
+        ["revoke", first.credentialId],
+        ["revoke", second.credentialId],
+    ])
+
+    const listed = new MultiHubCredentialStore({ credentialsPath }).list()
+    assert.equal(listed.every(item => item.revokedAt !== null), true)
+    assert.equal(fs.existsSync(`${credentialsPath}.lock`), false)
+    assert.equal(fs.readdirSync(path.dirname(credentialsPath)).some(name => name.endsWith(".tmp")), false)
 })
 
 test("management CLI uses only the injected private table and never reprints secrets", t => {

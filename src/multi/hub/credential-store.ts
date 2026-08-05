@@ -6,6 +6,7 @@ import {
 import * as fs from "node:fs"
 import * as path from "node:path"
 
+import { withMultiHubCredentialLock } from "./credential-lock"
 import { generateMultiHubToken, validateMultiHubToken } from "./token"
 
 const SCHEMA_VERSION = 1 as const
@@ -163,6 +164,13 @@ export class MultiHubCredentialStore {
         if (!isValidLabel(label)) {
             throw new MultiHubCredentialStoreError("INVALID_MULTI_HUB_CREDENTIAL_LABEL")
         }
+        return withMultiHubCredentialLock(
+            this.credentialsPath,
+            () => this.createLocked(label),
+        )
+    }
+
+    private createLocked(label: string): IssuedMultiHubCredential {
         const table = this.readTable()
         const token = this.generateToken()
         const credentialId = this.generateCredentialId()
@@ -200,6 +208,13 @@ export class MultiHubCredentialStore {
         if (!CREDENTIAL_ID_PATTERN.test(credentialId)) {
             throw new MultiHubCredentialStoreError("INVALID_MULTI_HUB_CREDENTIAL_ID")
         }
+        return withMultiHubCredentialLock(
+            this.credentialsPath,
+            () => this.revokeLocked(credentialId),
+        )
+    }
+
+    private revokeLocked(credentialId: string): MultiHubCredential {
         const table = this.readTable()
         const index = table.credentials.findIndex(item => item.credentialId === credentialId)
         if (index < 0) throw new MultiHubCredentialStoreError("MULTI_HUB_CREDENTIAL_NOT_FOUND")
