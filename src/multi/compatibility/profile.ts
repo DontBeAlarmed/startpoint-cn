@@ -75,12 +75,21 @@ function resolveProfileSource(
 export function createCompatibilityProfileFactory(
     dependencies: CompatibilityProfileDependencies = {},
 ): (headers: CompatibilityHeaders) => CoordinatorResult<MultiCompatibilityProfile> {
-    const source = resolveProfileSource(dependencies)
+    let cachedSource = dependencies.source
+        ? resolveProfileSource(dependencies)
+        : null
     return headers => {
         const APP_VER = readVersionHeader(headers, "APP_VER")
         const RES_VER = readVersionHeader(headers, "RES_VER")
         if (APP_VER === null || RES_VER === null) {
             return { ok: false, error: "INCOMPATIBLE_ROOM" }
+        }
+        if (cachedSource === null) {
+            try {
+                cachedSource = resolveProfileSource(dependencies)
+            } catch {
+                return { ok: false, error: "INCOMPATIBLE_ROOM" }
+            }
         }
         return {
             ok: true,
@@ -88,7 +97,7 @@ export function createCompatibilityProfileFactory(
                 multiProtocolVersion: MULTI_PROTOCOL_VERSION,
                 APP_VER,
                 RES_VER,
-                ...source,
+                ...cachedSource,
             }),
         }
     }

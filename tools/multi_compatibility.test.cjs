@@ -54,6 +54,130 @@ function profile(overrides = {}) {
     return result.value
 }
 
+test("profile source is resolved on first valid request and caches only the successful source", () => {
+    let snapshotCalls = 0
+    let modeCalls = 0
+    const factory = createCompatibilityProfileFactory({
+        getContentSnapshot: () => {
+            snapshotCalls++
+            return snapshot()
+        },
+        getLoadedModeIdentities: () => {
+            modeCalls++
+            return []
+        },
+    })
+
+    assert.equal(snapshotCalls, 0)
+    assert.equal(modeCalls, 0)
+    assert.deepEqual(factory({ RES_VER: "1.4.54" }), {
+        ok: false,
+        error: "INCOMPATIBLE_ROOM",
+    })
+    assert.equal(snapshotCalls, 0)
+    assert.equal(modeCalls, 0)
+
+    const first = factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" })
+    const second = factory({ APP_VER: "custom", RES_VER: "custom-resource" })
+
+    assert.equal(first.ok, true)
+    assert.equal(second.ok, true)
+    assert.equal(first.value.contentDigest, RELEASE_DIGEST)
+    assert.equal(second.value.contentDigest, RELEASE_DIGEST)
+    assert.equal(snapshotCalls, 1)
+    assert.equal(modeCalls, 1)
+})
+
+test("profile source failure is controlled, not cached, and recovers after initialization", () => {
+    let initialized = false
+    let snapshotCalls = 0
+    let modeCalls = 0
+    const factory = createCompatibilityProfileFactory({
+        getContentSnapshot: () => {
+            snapshotCalls++
+            if (!initialized) throw new Error("CONTENT_SNAPSHOT_NOT_INITIALIZED: controlled test")
+            return snapshot()
+        },
+        getLoadedModeIdentities: () => {
+            modeCalls++
+            return []
+        },
+    })
+
+    assert.equal(snapshotCalls, 0)
+    assert.deepEqual(factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" }), {
+        ok: false,
+        error: "INCOMPATIBLE_ROOM",
+    })
+    assert.equal(snapshotCalls, 1)
+    assert.equal(modeCalls, 0)
+
+    initialized = true
+    const recovered = factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" })
+    const cached = factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" })
+
+    assert.equal(recovered.ok, true)
+    assert.equal(cached.ok, true)
+    assert.equal(snapshotCalls, 2)
+    assert.equal(modeCalls, 1)
+})
+
+test("mode identity failure is controlled and does not cache a partial source", () => {
+    let snapshotCalls = 0
+    let modeCalls = 0
+    const factory = createCompatibilityProfileFactory({
+        getContentSnapshot: () => {
+            snapshotCalls++
+            return snapshot()
+        },
+        getLoadedModeIdentities: () => {
+            modeCalls++
+            if (modeCalls === 1) throw new Error("controlled mode registry failure")
+            return []
+        },
+    })
+
+    assert.deepEqual(factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" }), {
+        ok: false,
+        error: "INCOMPATIBLE_ROOM",
+    })
+    assert.equal(factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" }).ok, true)
+    assert.equal(factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" }).ok, true)
+    assert.equal(snapshotCalls, 2)
+    assert.equal(modeCalls, 2)
+})
+
+test("fixed profile source never reads snapshot or mode dependencies", () => {
+    let dependencyCalls = 0
+    const source = {
+        cdnTargetVersion: "fixed-cdn",
+        contentDigest: `sha256:${"5".repeat(64)}`,
+        modeDigest: `sha256:${"6".repeat(64)}`,
+    }
+    const factory = createCompatibilityProfileFactory({
+        source,
+        getContentSnapshot: () => {
+            dependencyCalls++
+            throw new Error("fixed source must not read snapshot")
+        },
+        getLoadedModeIdentities: () => {
+            dependencyCalls++
+            throw new Error("fixed source must not read modes")
+        },
+    })
+
+    const result = factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" })
+
+    assert.equal(result.ok, true)
+    assert.deepEqual(result.value, {
+        multiProtocolVersion: 1,
+        APP_VER: "1.8.1",
+        RES_VER: "1.4.54",
+        ...source,
+    })
+    assert.equal(dependencyCalls, 0)
+})
+
 test("profile contains only the six room compatibility fields", () => {
     const host = profile()
     assert.deepEqual(host, {
