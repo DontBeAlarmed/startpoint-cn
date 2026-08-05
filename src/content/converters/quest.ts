@@ -352,6 +352,9 @@ function parseCnQuestTime(
     if (match === null) invalidQuest(tableName, `TimeRange ${field} must be a CN timestamp`)
     const parts = match.slice(1).map(Number)
     const [year, month, day, hour, minute, second] = parts
+    if (year < 1970 || year > 2200) {
+        invalidQuest(tableName, `TimeRange ${field} year must be between 1970 and 2200`)
+    }
     const utcWithoutOffset = Date.UTC(year, month - 1, day, hour, minute, second)
     const normalized = new Date(utcWithoutOffset)
     if (normalized.getUTCFullYear() !== year

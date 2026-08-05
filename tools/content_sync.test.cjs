@@ -853,6 +853,39 @@ test("normal sync rebuilds when the registered table contract changes", async t 
     }
 })
 
+test("normal sync rebuilds all quest tables when converter contract advances from v3 to v4", async t => {
+    const questDefinitions = TABLE_SOURCES.filter(definition => (
+        definition.converterId === "quest"
+        && definition.tableName in QUEST_TABLE_SOURCES
+    ))
+    assert.equal(questDefinitions.length, 20)
+    assert.ok(questDefinitions.every(definition => (
+        definition.converterVersion === 4 && definition.outputShapeVersion === 4
+    )))
+    const legacyDefinitions = questDefinitions.map(definition => ({
+        ...definition,
+        converterVersion: 3,
+        outputShapeVersion: 3,
+    }))
+    const fixture = engineFixture(t, {
+        tableSources: legacyDefinitions,
+        builderValues: tableValues("legacy-v3", legacyDefinitions),
+    })
+    await sync(fixture)
+    fixture.dependencies.tableSources = questDefinitions
+    fixture.setBuilderValues(tableValues("current-v4", questDefinitions))
+
+    const result = await sync(fixture)
+    const manifest = await readCurrentRelease(fixture.store)
+
+    assert.equal(result.status, "synchronized")
+    assert.equal(result.reason, "table-registry")
+    assert.equal(fixture.calls.builder, 2)
+    for (const definition of questDefinitions) {
+        assert.equal(manifest.tables[definition.tableName].converterVersion, 4)
+    }
+})
+
 test("complete legacy ContentPaths keep content and sync lock in one readable root", async t => {
     const { paths: modernPaths, sandbox } = createSandbox(t, "content-sync-legacy-paths-")
     const contentRootDir = path.join(sandbox, "legacy")

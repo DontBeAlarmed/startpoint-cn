@@ -1,14 +1,13 @@
 import type { IncomingHttpHeaders } from "node:http"
 
 import { getContentSnapshot, type ContentSnapshot } from "../../content/runtime/content-snapshot"
-import { TABLE_SOURCES } from "../../content/sync/table-registry"
 import { listLoadedModeIdentities } from "../../modes/registry"
 import {
     MULTI_PROTOCOL_VERSION,
     type CoordinatorResult,
     type MultiCompatibilityProfile,
 } from "../coordinator/contracts"
-import { resolveContentDigest, type Sha256Digest } from "./content-digest"
+import type { Sha256Digest } from "./content-digest"
 import { buildModeDigest, type LoadedModeIdentity } from "./mode-digest"
 
 const PROFILE_FIELDS = Object.freeze([
@@ -30,7 +29,6 @@ export interface CompatibilityProfileSource {
 export interface CompatibilityProfileDependencies {
     readonly getContentSnapshot?: () => ContentSnapshot
     readonly getLoadedModeIdentities?: () => readonly LoadedModeIdentity[]
-    readonly tableNames?: readonly string[]
     readonly source?: CompatibilityProfileSource
 }
 
@@ -65,11 +63,9 @@ function resolveProfileSource(
 ): CompatibilityProfileSource {
     if (dependencies.source) return Object.freeze({ ...dependencies.source })
     const snapshot = (dependencies.getContentSnapshot ?? getContentSnapshot)()
-    const tableNames = dependencies.tableNames
-        ?? TABLE_SOURCES.map(definition => definition.tableName)
     return Object.freeze({
         cdnTargetVersion: snapshot.cdn.targetVersion,
-        contentDigest: resolveContentDigest(snapshot.repository, tableNames),
+        contentDigest: snapshot.repository.info().contentDigest,
         modeDigest: buildModeDigest(
             (dependencies.getLoadedModeIdentities ?? listLoadedModeIdentities)(),
         ),

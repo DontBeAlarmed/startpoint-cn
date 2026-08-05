@@ -1,6 +1,4 @@
 export {
-    buildBundledContentDigest,
-    resolveContentDigest,
     type Sha256Digest,
 } from "./content-digest"
 export {

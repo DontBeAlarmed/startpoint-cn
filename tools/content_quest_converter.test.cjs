@@ -16,6 +16,7 @@ const {
     QUEST_TABLE_SOURCES,
     QUEST_TIME_RANGE_COLUMNS,
 } = require("../src/content/converters/quest")
+const { TABLE_SOURCES } = require("../src/content/sync/table-registry")
 
 const PERMANENT_PERIOD = {
     availableFromMs: null,
@@ -64,6 +65,19 @@ test("quest converter closes the 20 authoritative quest tables", () => {
     })
 })
 
+test("all authoritative quest tables publish converter contract v4", () => {
+    const questDefinitions = TABLE_SOURCES.filter(definition => (
+        definition.converterId === "quest"
+        && definition.tableName in QUEST_TABLE_SOURCES
+    ))
+
+    assert.equal(questDefinitions.length, 20)
+    for (const definition of questDefinitions) {
+        assert.equal(definition.converterVersion, 4, definition.tableName)
+        assert.equal(definition.outputShapeVersion, 4, definition.tableName)
+    }
+})
+
 test("quest TimeRange is preserved as inclusive UTC+8 epoch milliseconds", () => {
     const battle = row(119, {
         0: 1001002,
@@ -79,6 +93,54 @@ test("quest TimeRange is preserved as inclusive UTC+8 epoch milliseconds", () =>
 
     assert.equal(converted.availableFromMs, Date.parse("2024-08-16T04:00:00.000Z"))
     assert.equal(converted.availableUntilMs, Date.parse("2024-08-29T15:59:59.000Z"))
+})
+
+test("quest TimeRange accepts only years 1970 through 2200 and preserves UTC+8 boundaries", () => {
+    const earliest = row(119, {
+        0: 1001002,
+        1: "最早边界",
+        3: 2,
+        4: "1970-01-01 08:00:00",
+        5: "1970-01-01 08:00:01",
+        84: 1,
+    })
+    const latest = row(119, {
+        0: 1001003,
+        1: "最晚边界",
+        3: 2,
+        4: "2200-12-31 23:59:58",
+        5: "2200-12-31 23:59:59",
+        84: 1,
+    })
+    const converted = convertQuestTree("main_quest.json", {
+        1: { 1: { 2: [earliest, latest] } },
+    })
+
+    assert.equal(converted[1001002].availableFromMs, 0)
+    assert.equal(converted[1001002].availableUntilMs, 1000)
+    assert.equal(
+        converted[1001003].availableFromMs,
+        Date.parse("2200-12-31T15:59:58.000Z"),
+    )
+    assert.equal(
+        converted[1001003].availableUntilMs,
+        Date.parse("2200-12-31T15:59:59.000Z"),
+    )
+
+    for (const timestamp of ["1969-12-31 23:59:59", "2201-01-01 00:00:00"]) {
+        const battle = row(119, {
+            0: 1001004,
+            1: "越界年份",
+            3: 2,
+            4: timestamp,
+            5: timestamp,
+            84: 1,
+        })
+        assert.throws(
+            () => convertQuestTree("main_quest.json", { 1: { 1: { 2: [battle] } } }),
+            /invalid quest content.*TimeRange/i,
+        )
+    }
 })
 
 test("quest conversion rejects malformed and inverted non-empty TimeRange values", () => {

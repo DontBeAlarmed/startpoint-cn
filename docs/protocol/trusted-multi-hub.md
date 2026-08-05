@@ -161,10 +161,11 @@ modeDigest
 - `multiProtocolVersion` 是 Hub 内部接口和多人状态契约版本；破坏兼容时递增。
 - `APP_VER`、`RES_VER` 来自该玩家当前多人 HTTP 请求的客户端头。
 - `cdnTargetVersion` 来自本地固定 `ContentSnapshot.cdn.targetVersion`。
-- `contentDigest` 表示服务端实际加载的业务表快照。当前激活的 Content Release 直接使用
-  `ContentRepository.info().releaseDigest`；bundled fallback 对当前 Registry 的全部已加载业务表分别生成
-  canonical SHA-256，再按表名的 code-point 顺序组合。两条路径都不读取候选或失败 Release，不扫描 CDN
-  大文件，也不触发 `content:sync`。
+- `contentDigest` 表示服务端实际加载的业务表快照。当前激活的 Content Release 令
+  `ContentRepository.info().contentDigest` 等于 `releaseDigest`；bundled fallback 在
+  `ContentRepository` 完成全部注册表加载时，对实际 entries 分别生成 canonical SHA-256，再按表名的
+  code-point 顺序组合并一次性保存到 `info()`。兼容资料只读取 `info()`，不再次访问任一 `table()`。
+  两条路径都不读取候选或失败 Release，不扫描 CDN 大文件，也不触发 `content:sync`。
 - `modeDigest` 只包含依次通过 allowlist SHA、静态 manifest、`register()` 和 Registry 注册的 Mod 身份，
   以文件名、manifest 名称与 capability、已验证文件 SHA 按稳定顺序组合。禁用、摘要不符、manifest
   不兼容、加载失败或注册失败的模块不计入。
@@ -183,7 +184,9 @@ modeDigest
 
 关卡资格的权威周期来自 20 张已注册 CN Quest OrderedMap 行内的 `TimeRange`。Content Sync 按国服
 `AppTimeConfig` 的 UTC+8 日历语义把 `start_time`、`end_time` 转为 `availableFromMs`、
-`availableUntilMs`；无界端保持 `null`，非空非法日期或倒置周期拒绝生成 Release。旧 bundled 关卡 JSON
+`availableUntilMs`；年份只接受 `1970..2200`（含边界），无界端保持 `null`，越界年份、非空非法日期或
+倒置周期拒绝生成 Release。Quest converter v4 会使 normal sync 在同 CDN 版本下自动重建旧 v3 Release，
+无需 `--force`。旧 bundled 关卡 JSON
 尚无这两个字段时，普通与练习关卡保持原有可用行为；只有明确活动关卡分类因缺少权威周期而 fail closed。
 一旦任一周期字段出现，缺少另一字段或值非法同样 fail closed，不推测永久开放。
 

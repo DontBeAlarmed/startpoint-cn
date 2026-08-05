@@ -16,8 +16,19 @@ const {
     CONTENT_SCHEMA_VERSION,
 } = require("../src/content/sync/schema")
 const { TABLE_SOURCES } = require("../src/content/sync/table-registry")
+const { canonicalJsonBuffer, sha256Object } = require("../src/content/sync/canonical-json")
 
 const projectRoot = path.resolve(__dirname, "..")
+
+function expectedBundledDigest(tables) {
+    const identities = Object.entries(tables)
+        .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+        .map(([tableName, value]) => ({
+            tableName,
+            digest: sha256Object(canonicalJsonBuffer(value)),
+        }))
+    return sha256Object(canonicalJsonBuffer(identities))
+}
 
 function assertDeepFrozen(value, seen = new Set()) {
     if (!value || typeof value !== "object" || seen.has(value)) return
@@ -84,11 +95,16 @@ test("missing current loads and freezes every registered bundled fallback table"
     const fixture = createLegacyLayout(t)
     const repository = await ContentRepository.load(fixture.options)
 
+    const bundledTables = Object.fromEntries(TABLE_SOURCES.map(definition => [
+        definition.tableName,
+        JSON.parse(fs.readFileSync(path.join(projectRoot, definition.bundledPath), "utf8")),
+    ]))
     assert.deepEqual(repository.info(), {
         source: "bundled",
         assetVersion: "1.4.54",
         generatorVersion: CONTENT_GENERATOR_VERSION,
         releaseDigest: null,
+        contentDigest: expectedBundledDigest(bundledTables),
     })
     assertDeepFrozen(repository.info())
 
@@ -156,6 +172,34 @@ test("bundled fallback imports all tables with bounded concurrency and stable or
         expectedNames.map(tableName => repository.table(tableName).tableName),
         expectedNames,
     )
+    assert.equal(
+        repository.info().contentDigest,
+        expectedBundledDigest(Object.fromEntries(expectedNames.map(tableName => [
+            tableName,
+            { tableName },
+        ]))),
+    )
+})
+
+test("bundled content digest changes with loaded content and not import completion order", async t => {
+    const fixture = createLegacyLayout(t)
+    async function load(marker, reverseDelay) {
+        return ContentRepository.load(fixture.options, {
+            importBundledTable: async (_runtimeRoot, tableName) => {
+                const index = TABLE_SOURCES.findIndex(definition => definition.tableName === tableName)
+                const delay = reverseDelay ? TABLE_SOURCES.length - index : index
+                await new Promise(resolve => setTimeout(resolve, delay % 3))
+                return { tableName, marker: tableName === "character.json" ? marker : "stable" }
+            },
+        })
+    }
+
+    const first = await load("first", false)
+    const sameContent = await load("first", true)
+    const changed = await load("changed", false)
+
+    assert.equal(first.info().contentDigest, sameContent.info().contentDigest)
+    assert.notEqual(first.info().contentDigest, changed.info().contentDigest)
 })
 
 test("bundled import failure drains workers before immediate retry", async t => {
@@ -220,6 +264,7 @@ test("release tables and info are deeply frozen and keep one cached reference", 
         assetVersion: "1.4.55",
         generatorVersion: 7,
         releaseDigest: manifest.releaseDigest,
+        contentDigest: manifest.releaseDigest,
     })
     assertDeepFrozen(repository.info())
     assert.strictEqual(repository.info(), repository.info())

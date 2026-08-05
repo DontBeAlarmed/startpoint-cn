@@ -261,8 +261,8 @@ function questDefinition(tableName: QuestTableName): TableSourceInput {
         scope: "cdn",
         sourceOrderedMaps: [QUEST_TABLE_SOURCES[tableName].logicalPath],
         converterId: "quest",
-        converterVersion: 3,
-        outputShapeVersion: 3,
+        converterVersion: 4,
+        outputShapeVersion: 4,
     }
 }
 

@@ -6,15 +6,19 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const {
-    buildBundledContentDigest,
     buildModeDigest,
     compareCompatibility,
     createCompatibilityProfileFactory,
 } = require("../src/multi/compatibility")
 
 const RELEASE_DIGEST = `sha256:${"1".repeat(64)}`
+const BUNDLED_DIGEST = `sha256:${"4".repeat(64)}`
 
-function snapshot({ releaseDigest = RELEASE_DIGEST, tables = {} } = {}) {
+function snapshot({
+    releaseDigest = RELEASE_DIGEST,
+    contentDigest = releaseDigest ?? BUNDLED_DIGEST,
+    table = () => undefined,
+} = {}) {
     return {
         cdn: { targetVersion: "1.4.54" },
         repository: {
@@ -23,8 +27,9 @@ function snapshot({ releaseDigest = RELEASE_DIGEST, tables = {} } = {}) {
                 assetVersion: "1.4.54",
                 generatorVersion: 1,
                 releaseDigest,
+                contentDigest,
             }),
-            table: tableName => tables[tableName],
+            table,
         },
     }
 }
@@ -39,7 +44,6 @@ function profile(overrides = {}) {
     const factory = createCompatibilityProfileFactory({
         getContentSnapshot: () => snapshot(),
         getLoadedModeIdentities: () => [],
-        tableNames: [],
         source,
     })
     const result = factory({
@@ -99,7 +103,6 @@ test("missing, repeated, non-ASCII and oversized client version headers fail clo
     const factory = createCompatibilityProfileFactory({
         getContentSnapshot: () => snapshot(),
         getLoadedModeIdentities: () => [],
-        tableNames: [],
     })
     for (const headers of [
         { RES_VER: "1.4.54" },
@@ -126,7 +129,6 @@ test("profile construction uses the active release digest and never invokes asse
     const factory = createCompatibilityProfileFactory({
         getContentSnapshot: () => activeSnapshot,
         getLoadedModeIdentities: () => [],
-        tableNames: ["ignored-for-release.json"],
     })
 
     const result = factory({ app_ver: "1.8.1", res_ver: "1.4.54" })
@@ -136,17 +138,26 @@ test("profile construction uses the active release digest and never invokes asse
     assert.equal(assetUpdateCalls, 0)
 })
 
-test("bundled content digest is canonical and independent of table registration order", () => {
-    const tables = {
-        "z.json": { z: 1, nested: { b: 2, a: 1 } },
-        "a.json": [{ value: "A" }],
-    }
-    const repository = snapshot({ releaseDigest: null, tables }).repository
-    const forward = buildBundledContentDigest(repository, ["z.json", "a.json"])
-    const reverse = buildBundledContentDigest(repository, ["a.json", "z.json"])
+test("profile reads the loaded bundled digest from repository info without table access", () => {
+    let tableCalls = 0
+    const activeSnapshot = snapshot({
+        releaseDigest: null,
+        contentDigest: BUNDLED_DIGEST,
+        table: () => {
+            tableCalls++
+            throw new Error("compatibility profile must not access content tables")
+        },
+    })
+    const factory = createCompatibilityProfileFactory({
+        getContentSnapshot: () => activeSnapshot,
+        getLoadedModeIdentities: () => [],
+    })
 
-    assert.equal(forward, "sha256:0b029e70676ace05e333f05f4c258a03ca7d6d6ae70c905c6c0bd184507c43a6")
-    assert.equal(reverse, forward)
+    const result = factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" })
+
+    assert.equal(result.ok, true)
+    assert.equal(result.value.contentDigest, BUNDLED_DIGEST)
+    assert.equal(tableCalls, 0)
 })
 
 test("mode digest includes only validated loaded identities in stable order", () => {

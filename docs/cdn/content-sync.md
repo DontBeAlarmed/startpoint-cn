@@ -49,6 +49,9 @@ QuestRange、敌人等级累计阈值，以及 Boss Pickup 的联机 schedule。
 Challenge、Tower、Hard Multi 等历史列偏移；其中 Hard Multi 体力列为 `70`，不是旧脚本猜测的
 `69`。官方 1.4.54 基线为 5159 条动态关卡、3045 条入场成本、9 条 Once 解锁成本、5257 条
 后台关卡名称（含 98 个 bundled 兼容练习关卡）、282 条每日挑战点和 3 条活动挑战点映射。
+20 张运行关卡表的转换契约为 Quest converter v4 / output shape v4。旧 v3 Release 即使 CDN
+`assetVersion` 不变，normal sync 也会因 Registry 的 `converterVersion` 不一致返回 `table-registry`
+并自动重建，无需使用 `--force`。
 
 任务技能效果索引只记录 CDN 能直接证明的角色技能效果。服务端在同步阶段解压并解析
 `*.action.dsl.amf3.deflate`，识别 `CreateNormalHeal`、`CreateRatioHeal`、`ACRegeneration`，以及
@@ -130,7 +133,7 @@ normal 模式：
 npm run content:sync
 ```
 
-normal 依次检查 current Release 是否存在、CDN `assetVersion`、全局 `generatorVersion`、已安装补丁来源状态，以及 Release 表集合与当前 Registry 是否兼容。补丁 manifest 或 inner ZIP 文件身份在同一目标版本下变化时返回 `source-state`，随后完整校验摘要并重建或失败关闭；注册表新增、移除，或任一表的 `scope`、`converterId`、`converterVersion`、`sources` 变化时返回 `table-registry` 并自动重建。所有状态完全一致时才快速跳过。
+normal 依次检查 current Release 是否存在、CDN `assetVersion`、全局 `generatorVersion`、已安装补丁来源状态，以及 Release 表集合与当前 Registry 是否兼容。补丁 manifest 或 inner ZIP 文件身份在同一目标版本下变化时返回 `source-state`，随后完整校验摘要并重建或失败关闭；注册表新增、移除，或任一表的 `scope`、`converterId`、`converterVersion`、`sources` 变化时返回 `table-registry` 并自动重建。Quest converter v3 升级到 v4 就属于该路径，同 CDN 版本也不会复用旧 Release，不需要 `--force`。所有状态完全一致时才快速跳过。
 
 这项契约判断本身只使用 manifest 元数据；当前 `ContentObjectStore` 读取 current Release 时仍会先校验并读取该 Release 的对象闭包，因此 `--check` 也会检查对象可读性，但不会执行 orderedmap 转换或重建。转换器内部算法改变但注册元数据不变时，开发者仍必须递增对应 `converterVersion`；影响全部内容生成的规则变化使用 `generatorVersion`。运行时继续执行同一套严格 Registry 校验，作为最后的加载防线。
 
@@ -200,7 +203,7 @@ smoke 始终执行 force sync，并验证：
 - 35 张通用递归 OrderedMap 表逐张与 bundled 官方 1.4.54 基线深度相等；
 - 8 张物品装备派生表闭合到同一 Release；其中 6 张逐字段等于 bundled，`item_data.json` 只允许登记的 9 个官方限时体力道具补全，`equipment_lookup.json` 必须匹配 436 条固定 canonical 摘要；
 - 6 张奖励派生表逐张闭合；按 `differences-1.4.54.json` 的具体键、位置与 ID 元组，只接受 5 条 Clear 字段修正、82 个空 id 清理和 47 个同名活动代币别名；
-- 20 张关卡表和 5 张关卡派生表匹配固定 canonical 摘要；名称非空、推荐属性为 `0..5`，Clear/SS 与普通掉落组全部闭合到同一 Release 的奖励表，入场和解锁索引只能引用当前关卡；每张 CN Quest OrderedMap 的权威 `TimeRange` 按国服 UTC+8 语义转换为 `availableFromMs`、`availableUntilMs`，空边界保留 `null`，非法日期和倒置周期拒绝同步；98 个 bundled 兼容练习关卡必须全部进入名称索引，活动挑战点必须引用同一 Release 的每日挑战点；
+- 20 张关卡表和 5 张关卡派生表匹配固定 canonical 摘要；名称非空、推荐属性为 `0..5`，Clear/SS 与普通掉落组全部闭合到同一 Release 的奖励表，入场和解锁索引只能引用当前关卡；每张 CN Quest OrderedMap 的权威 `TimeRange` 按国服 UTC+8 语义转换为 `availableFromMs`、`availableUntilMs`，年份只接受 `1970..2200`（含边界），空边界保留 `null`，越界年份、非法日期和倒置周期拒绝同步；98 个 bundled 兼容练习关卡必须全部进入名称索引，活动挑战点必须引用同一 Release 的每日挑战点；
 - 两张角色 cdndata 各 505 行，运行时 505 个角色；名称、稀有度、属性与 bundled 一致；
 - 只允许已记录的 45 个 `skill_count` 从 3 变为 6，12 个 `skill_count=2` 保持不变；
 - 卡池 raw row 为 584、campaign 为 145，全部非空 odds 已成功读取；

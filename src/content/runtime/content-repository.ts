@@ -15,12 +15,16 @@ import {
 import type { ContentCurrentReleaseSnapshot } from "../sync/object-store"
 import { findTableSource, TABLE_SOURCES } from "../sync/table-registry"
 import { assertReleaseTableRegistry } from "../sync/table-contract"
+import { canonicalJsonBuffer, sha256Object } from "../sync/canonical-json"
+
+type ContentDigest = `sha256:${string}`
 
 export interface ContentRepositoryInfo {
     readonly source: "bundled" | "release"
     readonly assetVersion: string
     readonly generatorVersion: number
     readonly releaseDigest: `sha256:${string}` | null
+    readonly contentDigest: ContentDigest
 }
 
 export interface ContentRepositoryOptions {
@@ -33,6 +37,20 @@ export interface ContentRepositoryDependencies {
 }
 
 const BUNDLED_IMPORT_CONCURRENCY = 8
+
+function compareCodePoint(left: string, right: string): number {
+    return left < right ? -1 : left > right ? 1 : 0
+}
+
+function digestBundledEntries(entries: readonly (readonly [string, unknown])[]): ContentDigest {
+    const identities = entries
+        .map(([tableName, value]) => ({
+            tableName,
+            digest: sha256Object(canonicalJsonBuffer(value)),
+        }))
+        .sort((left, right) => compareCodePoint(left.tableName, right.tableName))
+    return sha256Object(canonicalJsonBuffer(identities))
+}
 
 export class ContentRepository {
     readonly #repositoryInfo: ContentRepositoryInfo
@@ -91,12 +109,14 @@ export class ContentRepository {
                     ] as const
                 ),
             )
+            const contentDigest = digestBundledEntries(entries)
             return deepFreeze(new ContentRepository(
                 deepFreeze({
                     source: "bundled",
                     assetVersion: BUNDLED_CDN_CATALOG_VERSION,
                     generatorVersion: CONTENT_GENERATOR_VERSION,
                     releaseDigest: null,
+                    contentDigest,
                 }),
                 deepFreeze(Object.fromEntries(entries)),
             ))
@@ -115,6 +135,7 @@ export class ContentRepository {
                 assetVersion: release.manifest.assetVersion,
                 generatorVersion: release.manifest.generatorVersion,
                 releaseDigest: release.manifest.releaseDigest,
+                contentDigest: release.manifest.releaseDigest,
             }),
             deepFreeze(Object.fromEntries(entries)),
         ))
