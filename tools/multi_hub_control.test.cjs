@@ -10,6 +10,7 @@ require("ts-node/register/transpile-only")
 
 const { AdmissionRegistry } = require("../src/multi/admission/registry")
 const { MULTI_PROTOCOL_VERSION } = require("../src/multi/coordinator/contracts")
+const { EmbeddedMultiCoordinator } = require("../src/multi/coordinator/embedded")
 const { MultiHubCredentialStore } = require("../src/multi/hub/credential-store")
 const { CredentialReloader } = require("../src/multi/hub/credential-reloader")
 const { HubClient } = require("../src/multi/hub/client")
@@ -110,6 +111,37 @@ function createCoordinator() {
             finalizeBattle: invoke("finalizeBattle"),
             getBattleStatus: invoke("getBattleStatus"),
             getRoomStatus: invoke("getRoomStatus"),
+            cleanupNodeSession: () => 0,
+        }),
+    }
+}
+
+function createTrackedEmbeddedCoordinator() {
+    const calls = []
+    const createResults = []
+    const delegate = new EmbeddedMultiCoordinator({ allowRemoteParticipants: true })
+    const invoke = name => async input => {
+        calls.push([name, input])
+        const result = await delegate[name](input)
+        if (name === "createRoom") createResults.push(result)
+        return result
+    }
+    return {
+        calls,
+        createResults,
+        delegate,
+        results: new Map(),
+        coordinator: Object.freeze({
+            createRoom: invoke("createRoom"),
+            searchRoom: invoke("searchRoom"),
+            prepareRoom: invoke("prepareRoom"),
+            selectRoom: invoke("selectRoom"),
+            disbandRoom: invoke("disbandRoom"),
+            startBattle: invoke("startBattle"),
+            finalizeBattle: invoke("finalizeBattle"),
+            getBattleStatus: invoke("getBattleStatus"),
+            getRoomStatus: invoke("getRoomStatus"),
+            cleanupNodeSession: nodeSessionId => delegate.cleanupNodeSession(nodeSessionId),
         }),
     }
 }
@@ -135,14 +167,17 @@ function fixture(t, options = {}) {
         "node-session-c", "session-credential-c".padEnd(43, "c"),
     ]
     const admissions = new AdmissionRegistry({ now: () => now })
+    const coordinator = (options.coordinatorFactory ?? createCoordinator)()
     const sessions = new NodeSessionRegistry({
         now: () => now,
         sessionTtlMs: options.sessionTtlMs ?? 5_000,
         generateId: () => randomValues[randomIndex++],
         isCredentialEnabled: credentialId => reloader.isCredentialEnabled(credentialId),
-        onInvalidated: nodeSessionId => admissions.removeByNodeSession(nodeSessionId),
+        onInvalidated: nodeSessionId => {
+            admissions.removeByNodeSession(nodeSessionId)
+            coordinator.coordinator.cleanupNodeSession(nodeSessionId)
+        },
     })
-    const coordinator = createCoordinator()
     const idempotency = new IdempotencyCache({
         now: () => now,
         ttlMs: options.idempotencyTtlMs ?? 1_000,
@@ -410,7 +445,7 @@ test("issues node-scoped admissions and removes them when the node session expir
     assert.equal(target.admissions.consume("123456", 303), null)
 })
 
-test("requires bounded ASCII idempotency keys and isolates cached writes by credential and TTL", async t => {
+test("requires bounded ASCII idempotency keys and isolates cached writes by node session and TTL", async t => {
     const target = fixture(t, { idempotencyTtlMs: 100 })
     const firstNode = await register(target.app, target.first.token)
     const payload = {
@@ -449,21 +484,32 @@ test("requires bounded ASCII idempotency keys and isolates cached writes by cred
     assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 1)
 
     const refreshedNode = await register(target.app, target.first.token)
-    assert.equal((await invoke(refreshedNode)).body, firstResult.body)
-    assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 1)
+    const refreshedResult = await invoke(refreshedNode)
+    assert.notEqual(refreshedResult.body, firstResult.body)
+    assert.equal(refreshedResult.json().value.host.nodeSessionId, "node-session-b")
+    assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 2)
 
     const otherCredential = await register(target.app, target.second.token)
     await invoke(otherCredential)
-    assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 2)
+    assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 3)
 
     target.setNow(10_101)
     await invoke(firstNode)
-    assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 3)
+    assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 4)
 })
 
-test("lost mutation response replays through a refreshed session without executing twice", async t => {
-    const target = fixture(t, { sessionTtlMs: 100, idempotencyTtlMs: 10_000 })
+test("lost create response rebuilds live state after expired-session teardown", async t => {
+    const target = fixture(t, {
+        coordinatorFactory: createTrackedEmbeddedCoordinator,
+        sessionTtlMs: 100,
+        idempotencyTtlMs: 10_000,
+    })
+    t.after(() => {
+        target.coordinator.coordinator.cleanupNodeSession("node-session-a")
+        target.coordinator.coordinator.cleanupNodeSession("node-session-b")
+    })
     let loseMutationResponse = true
+    let cleanupObserved = false
     const fetchFromHub = async (url, init) => {
         const route = new URL(url).pathname
         const response = await target.app.inject({
@@ -474,8 +520,26 @@ test("lost mutation response replays through a refreshed session without executi
         })
         if (route === "/v1/multi/rooms/create" && loseMutationResponse) {
             loseMutationResponse = false
+            const first = target.coordinator.createResults[0]
+            assert.equal(first.ok, true)
+            target.admissions.issue({
+                roomNumber: first.value.roomNumber,
+                participant: first.value.host,
+                snapshot: snapshot(first.value.host.viewerId),
+                expiresAt: 20_000,
+            })
             target.setNow(10_100)
             throw new TypeError("response lost after mutation")
+        }
+        if (route === "/v1/multi/rooms/create" && response.statusCode === 401) {
+            const first = target.coordinator.createResults[0]
+            assert.equal(first.ok, true)
+            assert.deepEqual(await target.coordinator.delegate.getRoomStatus({
+                participant: { nodeSessionId: "observer", viewerId: 999 },
+                roomNumber: first.value.roomNumber,
+            }), { ok: false, error: "ROOM_NOT_FOUND" })
+            assert.equal(target.admissions.consume(first.value.roomNumber, 101), null)
+            cleanupObserved = true
         }
         return new Response(response.body, {
             status: response.statusCode,
@@ -500,18 +564,24 @@ test("lost mutation response replays through a refreshed session without executi
     })
     const replayed = await firstClient.write("/v1/multi/rooms/create", input)
     assert.equal(replayed.ok, true)
+    assert.equal(cleanupObserved, true)
     assert.equal(firstClient.getNodeSessionId(), "node-session-b")
-    assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 1)
+    assert.equal(target.coordinator.createResults.length, 2)
+    const [removed, live] = target.coordinator.createResults
+    assert.equal(removed.ok, true)
+    assert.equal(live.ok, true)
+    assert.equal(live.value.host.nodeSessionId, "node-session-b")
+    assert.equal(replayed.value.roomNumber, live.value.roomNumber)
+    assert.equal(replayed.value.host.nodeSessionId, "node-session-b")
 
-    const otherClient = new HubClient({
-        hubUrl: new URL("http://hub.example/"),
-        token: target.second.token,
-        fetch: fetchFromHub,
-        now: () => target.getNow(),
-        createIdempotencyKey: () => "lost-response-key",
+    const status = await firstClient.read("/v1/multi/rooms/status", {
+        participant: input.participant,
+        roomNumber: live.value.roomNumber,
     })
-    assert.equal((await otherClient.write("/v1/multi/rooms/create", input)).ok, true)
-    assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 2)
+    assert.equal(status.ok, true)
+    assert.equal(status.value.roomNumber, live.value.roomNumber)
+    assert.equal(status.value.host.nodeSessionId, "node-session-b")
+    t.after(() => target.coordinator.coordinator.cleanupNodeSession("node-session-b"))
 })
 
 test("pending write capacity returns bounded unavailable without evicting the replay", async t => {
