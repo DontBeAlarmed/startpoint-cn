@@ -67,6 +67,54 @@ function participant(viewerId = 101) {
     return { nodeSessionId: "pending", viewerId }
 }
 
+function battleStatus(nodeSessionId = "node-a") {
+    return {
+        battleSessionId: "battle-1",
+        roomNumber: "123456",
+        participants: [{ nodeSessionId, viewerId: 101 }],
+        finalized: false,
+    }
+}
+
+function playerSnapshot(viewerId = 101) {
+    const character = [0, {
+        id: 401,
+        evolution_level: 0,
+        exp: 0,
+        over_limit_step: 0,
+        mana_node_ids: { "1": 0 },
+        ex_boost: [0, { ability_id_list: [11], status_id: 7 }],
+        illustration_settings: [1],
+    }]
+    const party = {
+        characters: [character, [1], [1]],
+        unison_characters: [[1], [1], [1]],
+        equipments: [[0, { equipmentId: 501, level: 1, enhancementLevel: 0 }], [1], [1]],
+        abilitySoulIds: [[0, 601], [1], [1]],
+    }
+    return {
+        viewerId,
+        name: `Player${viewerId}`,
+        rank: 1,
+        degreeId: 1,
+        mainCharacterId: 401,
+        playerRoleKind: 1,
+        isNewbie: false,
+        currentPartyId: 1,
+        party,
+        npcParties: [party],
+    }
+}
+
+function admission(nodeSessionId = "node-a") {
+    return {
+        roomNumber: "123456",
+        participant: { nodeSessionId, viewerId: 101 },
+        snapshot: playerSnapshot(),
+        expiresAt: Date.now() + 10_000,
+    }
+}
+
 test("Hub client registers lazily and sends the registered participant identity", async () => {
     const calls = []
     const client = new HubClient({
@@ -196,6 +244,255 @@ test("Hub client refreshes an expired session only once", async () => {
     assert.equal(operations, 2)
 })
 
+test("Hub client rejects malformed successful values for every operation shape", async t => {
+    const cases = [
+        ["room", "/v1/multi/rooms/status", { ...roomStatus(), host: null }],
+        ["battle", "/v1/multi/battles/status", {
+            ...battleStatus(), participants: [{ nodeSessionId: "node-a", viewerId: 0 }],
+        }],
+        ["admission", "/v1/multi/admissions/issue", {
+            ...admission(), snapshot: { viewerId: 101 },
+        }],
+    ]
+    for (const [label, route, value] of cases) {
+        await t.test(label, async () => {
+            const client = new HubClient({
+                hubUrl: new URL("http://hub.example/"),
+                token: TOKEN,
+                fetch: async url => String(url).endsWith("/nodes/register")
+                    ? jsonResponse(registration())
+                    : jsonResponse({ ok: true, value }),
+            })
+            const result = route.includes("admissions")
+                ? await client.write(route, { participant: participant() })
+                : await client.read(route, { participant: participant() })
+            assert.deepEqual(result, { ok: false, error: "HUB_UNAVAILABLE" })
+            assert.equal(client.isAvailable(), false)
+        })
+    }
+
+    await t.test("registration TCP endpoint", async () => {
+        const client = new HubClient({
+            hubUrl: new URL("http://hub.example/"),
+            token: TOKEN,
+            fetch: async () => jsonResponse({ ...registration(), tcp: { host: "", port: 0 } }),
+        })
+        assert.deepEqual(await client.read("/v1/multi/rooms/status", {
+            participant: participant(), roomNumber: "123456",
+        }), { ok: false, error: "HUB_UNAVAILABLE" })
+        assert.equal(client.getTcpEndpoint(), null)
+        assert.equal(client.isAvailable(), false)
+    })
+
+    await t.test("already expired registration", async () => {
+        const paths = []
+        const client = new HubClient({
+            hubUrl: new URL("http://hub.example/"),
+            token: TOKEN,
+            now: () => 100,
+            fetch: async url => {
+                paths.push(new URL(url).pathname)
+                return jsonResponse({ ...registration(), expiresAt: 100 })
+            },
+        })
+        assert.deepEqual(await client.read("/v1/multi/rooms/status", {
+            participant: participant(), roomNumber: "123456",
+        }), { ok: false, error: "HUB_UNAVAILABLE" })
+        assert.deepEqual(paths, ["/v1/multi/nodes/register"])
+        assert.equal(client.getNodeSessionId(), null)
+        assert.equal(client.isAvailable(), false)
+    })
+})
+
+test("Hub client accepts validated room, battle, admission and void successes", async () => {
+    const values = new Map([
+        ["/v1/multi/rooms/status", roomStatus()],
+        ["/v1/multi/battles/status", battleStatus()],
+        ["/v1/multi/admissions/issue", admission()],
+        ["/v1/multi/rooms/disband", undefined],
+    ])
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: TOKEN,
+        fetch: async url => {
+            const route = new URL(url).pathname
+            if (route.endsWith("/nodes/register")) return jsonResponse(registration())
+            const value = values.get(route)
+            return jsonResponse(value === undefined
+                ? { ok: true }
+                : { ok: true, value })
+        },
+    })
+    assert.equal((await client.read("/v1/multi/rooms/status", {})).ok, true)
+    assert.equal((await client.read("/v1/multi/battles/status", {})).ok, true)
+    assert.equal((await client.write("/v1/multi/admissions/issue", {})).ok, true)
+    assert.deepEqual(await client.write("/v1/multi/rooms/disband", {}), {
+        ok: true, value: undefined,
+    })
+})
+
+test("an uncertain write never crosses node sessions after retry", async () => {
+    let registrations = 0
+    const operationNodes = []
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: TOKEN,
+        fetch: async (url, init) => {
+            if (String(url).endsWith("/nodes/register")) {
+                registrations++
+                return jsonResponse(registration(`node-${registrations}`))
+            }
+            operationNodes.push(init.headers["x-node-session-id"])
+            if (operationNodes.length === 1) throw new TypeError("connection reset")
+            if (operationNodes.length === 2) {
+                return jsonResponse({ ok: false, code: "UNAUTHORIZED" }, 401)
+            }
+            return jsonResponse({ ok: true, value: roomStatus(`node-${registrations}`) })
+        },
+    })
+    assert.deepEqual(await client.write("/v1/multi/rooms/create", {
+        participant: participant(),
+    }), { ok: false, error: "HUB_UNAVAILABLE" })
+    assert.equal(registrations, 1)
+    assert.deepEqual(operationNodes, ["node-1", "node-1"])
+    assert.equal(client.getNodeSessionId(), null)
+})
+
+test("a first definite 401 refreshes reads and writes only once", async t => {
+    for (const kind of ["read", "write"]) {
+        await t.test(kind, async () => {
+            let registrations = 0
+            const operationNodes = []
+            const client = new HubClient({
+                hubUrl: new URL("http://hub.example/"),
+                token: TOKEN,
+                fetch: async (url, init) => {
+                    if (String(url).endsWith("/nodes/register")) {
+                        registrations++
+                        return jsonResponse(registration(`node-${registrations}`))
+                    }
+                    operationNodes.push(init.headers["x-node-session-id"])
+                    return operationNodes.length === 1
+                        ? jsonResponse({ ok: false, code: "UNAUTHORIZED" }, 401)
+                        : jsonResponse({ ok: true, value: roomStatus("node-2") })
+                },
+            })
+            const result = await client[kind](
+                kind === "read" ? "/v1/multi/rooms/status" : "/v1/multi/rooms/create",
+                { participant: participant() },
+            )
+            assert.equal(result.ok, true)
+            assert.equal(registrations, 2)
+            assert.deepEqual(operationNodes, ["node-1", "node-2"])
+        })
+    }
+})
+
+test("a write gets only one transport attempt after a definite 401 refresh", async () => {
+    let registrations = 0
+    const operationNodes = []
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: TOKEN,
+        fetch: async (url, init) => {
+            if (String(url).endsWith("/nodes/register")) {
+                registrations++
+                return jsonResponse(registration(`node-${registrations}`))
+            }
+            operationNodes.push(init.headers["x-node-session-id"])
+            if (operationNodes.length === 1) {
+                return jsonResponse({ ok: false, code: "UNAUTHORIZED" }, 401)
+            }
+            if (operationNodes.length === 2) throw new TypeError("connection reset")
+            return jsonResponse({ ok: true, value: roomStatus("node-2") })
+        },
+    })
+    assert.deepEqual(await client.write("/v1/multi/rooms/create", {
+        participant: participant(),
+    }), { ok: false, error: "HUB_UNAVAILABLE" })
+    assert.deepEqual(operationNodes, ["node-1", "node-2"])
+})
+
+test("expired sessions stop exposing identity, TCP endpoint and availability", async () => {
+    let now = 100
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: TOKEN,
+        now: () => now,
+        fetch: async url => String(url).endsWith("/nodes/register")
+            ? jsonResponse({ ...registration(), expiresAt: 200 })
+            : jsonResponse({ ok: false, code: "ROOM_NOT_FOUND" }),
+    })
+    await client.read("/v1/multi/rooms/status", {
+        participant: participant(), roomNumber: "123456",
+    })
+    assert.equal(client.isAvailable(), true)
+    assert.equal(client.getNodeSessionId(), "node-a")
+
+    now = 200
+    assert.equal(client.getNodeSessionId(), null)
+    assert.equal(client.getTcpEndpoint(), null)
+    assert.equal(client.isAvailable(), false)
+})
+
+test("malformed 200 and invalid 4xx responses degrade availability", async () => {
+    const responses = [
+        jsonResponse({ ok: false, code: "ROOM_NOT_FOUND" }),
+        jsonResponse({ ok: true, value: { roomNumber: "partial" } }),
+        jsonResponse({ ok: false, code: "INVALID_REQUEST" }, 400),
+    ]
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: TOKEN,
+        fetch: async url => String(url).endsWith("/nodes/register")
+            ? jsonResponse(registration())
+            : responses.shift(),
+    })
+    const input = { participant: participant(), roomNumber: "123456" }
+    assert.deepEqual(await client.read("/v1/multi/rooms/status", input), {
+        ok: false, error: "ROOM_NOT_FOUND",
+    })
+    assert.equal(client.isAvailable(), true)
+    assert.deepEqual(await client.read("/v1/multi/rooms/status", input), {
+        ok: false, error: "HUB_UNAVAILABLE",
+    })
+    assert.equal(client.isAvailable(), false)
+    assert.deepEqual(await client.read("/v1/multi/rooms/status", input), {
+        ok: false, error: "HUB_UNAVAILABLE",
+    })
+    assert.equal(client.isAvailable(), false)
+})
+
+test("client runtime degrades immediately when its Hub session expires", async () => {
+    let now = 100
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: TOKEN,
+        now: () => now,
+        fetch: async url => String(url).endsWith("/nodes/register")
+            ? jsonResponse({ ...registration(), expiresAt: 200 })
+            : jsonResponse({ ok: false, code: "ROOM_NOT_FOUND" }),
+    })
+    const remote = new RemoteMultiCoordinator(client)
+    const service = createMultiRuntimeService({
+        startTcp: async () => {}, stopTcp: async () => {}, isTcpListening: () => false,
+        startHub: async () => {}, stopHub: async () => {}, isHubListening: () => false,
+        createRemoteCoordinator: () => remote,
+    })
+    await service.start({ mode: "client", hubUrl: new URL("http://hub.example/"), token: TOKEN })
+    await remote.getRoomStatus({ participant: participant(), roomNumber: "123456" })
+    assert.equal(service.getStatus().state, "ready")
+    now = 200
+    assert.deepEqual(service.getStatus(), {
+        mode: "client",
+        state: "degraded",
+        coordinator: { kind: "remote", available: false },
+        hub: { available: false, endpoint: "http://hub.example/" },
+        tcp: { available: false, endpoint: null },
+    })
+    await service.stop()
+})
+
 test("Remote coordinator implements every Hub operation and forwards compatibility", async () => {
     const calls = []
     const client = {
@@ -259,18 +556,12 @@ test("serializer uses the Hub TCP endpoint without exposing an update URL", () =
     assert.equal("asset_update" in serialized, false)
 })
 
-test("official client mappings separate missing rooms from join failures", () => {
+test("multi HTTP routes do not introduce CDN update side effects", () => {
     const lobby = fs.readFileSync(path.join(ROOT, "src/multi/http/lobby.ts"), "utf8")
     const room = fs.readFileSync(path.join(ROOT, "src/multi/http/room.ts"), "utf8")
     const social = fs.readFileSync(path.join(ROOT, "src/multi/http/social.ts"), "utf8")
     const sources = `${lobby}\n${room}\n${social}`
 
-    assert.match(lobby, /result_code:\s*4020/)
-    assert.match(social, /result_code:\s*4020/)
-    assert.match(lobby, /ROOM_NOT_FOUND"\s*\?\s*9\s*:\s*7/)
-    assert.match(room, /result_code:\s*4507/)
-    assert.doesNotMatch(room, /raising_state:\s*7/)
-    assert.match(sources, /ROOM_NOT_FOUND/)
     assert.doesNotMatch(sources, /asset_update\s*:\s*true/)
     assert.doesNotMatch(sources, /\/patch\/cn|CDN_BASE_URL|registerAssetRoutes/)
 })

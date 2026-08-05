@@ -1,0 +1,214 @@
+import type { RoomAdmission } from "../admission/registry"
+import {
+    MULTI_PROTOCOL_VERSION,
+    type NodeSessionId,
+    type ParticipantIdentity,
+} from "../coordinator/contracts"
+import type { BattleStatus, RoomStatus } from "../coordinator/interface"
+import type {
+    MultiOption,
+    PlayerCharacterSnapshot,
+    PlayerEquipmentSnapshot,
+    PlayerPartySnapshot,
+    PlayerSnapshot,
+} from "../snapshot/player-snapshot"
+import type { MultiHubTcpEndpoint } from "./control-routes"
+
+type Validator = (value: unknown) => boolean
+
+const ROOM_ROUTES = new Set([
+    "/v1/multi/rooms/create",
+    "/v1/multi/rooms/search",
+    "/v1/multi/rooms/prepare",
+    "/v1/multi/rooms/select",
+    "/v1/multi/rooms/status",
+])
+const BATTLE_ROUTES = new Set([
+    "/v1/multi/battles/start",
+    "/v1/multi/battles/finalize",
+    "/v1/multi/battles/status",
+])
+const VOID_ROUTES = new Set(["/v1/multi/rooms/disband"])
+
+export interface HubNodeSessionPayload {
+    readonly nodeSessionId: NodeSessionId
+    readonly sessionCredential: string
+    readonly expiresAt: number
+    readonly tcp: MultiHubTcpEndpoint
+}
+
+export function isHubNodeSessionPayload(value: unknown): value is HubNodeSessionPayload {
+    if (!isRecord(value) || !isRecord(value.tcp)) return false
+    return isNodeSessionId(value.nodeSessionId)
+        && typeof value.sessionCredential === "string"
+        && /^[A-Za-z0-9_-]{43}$/.test(value.sessionCredential)
+        && isPositiveInteger(value.expiresAt)
+        && isTcpEndpoint(value.tcp)
+}
+
+export function isHubSuccessValue<T>(route: string, value: unknown): value is T {
+    if (ROOM_ROUTES.has(route)) return isRoomStatus(value)
+    if (BATTLE_ROUTES.has(route)) return isBattleStatus(value)
+    if (route === "/v1/multi/admissions/issue") return isRoomAdmission(value)
+    if (VOID_ROUTES.has(route)) return value === undefined
+    return false
+}
+
+function isRoomStatus(value: unknown): value is RoomStatus {
+    if (!isRecord(value)) return false
+    return isNonEmptyString(value.roomNumber)
+        && isNonEmptyString(value.accessToken)
+        && isPositiveInteger(value.category)
+        && isPositiveInteger(value.questId)
+        && isNonNegativeInteger(value.hostEntryTime)
+        && isNonNegativeInteger(value.roomSequence)
+        && isNonNegativeInteger(value.raisingState)
+        && isNonNegativeInteger(value.shareRoomOptions)
+        && isPositiveInteger(value.hostMainCharacterId)
+        && typeof value.isNpcMode === "boolean"
+        && typeof value.hostOnline === "boolean"
+        && isParticipant(value.host)
+        && isArrayOf(value.members, isParticipant)
+        && isCompatibility(value.compatibility)
+        && (value.battleSessionId === undefined || isNonEmptyString(value.battleSessionId))
+}
+
+function isBattleStatus(value: unknown): value is BattleStatus {
+    if (!isRecord(value)) return false
+    return isNonEmptyString(value.battleSessionId)
+        && isNonEmptyString(value.roomNumber)
+        && isArrayOf(value.participants, isParticipant)
+        && typeof value.finalized === "boolean"
+}
+
+function isRoomAdmission(value: unknown): value is RoomAdmission {
+    if (!isRecord(value)) return false
+    const participant = value.participant
+    const snapshot = value.snapshot
+    return isNonEmptyString(value.roomNumber)
+        && isParticipant(participant)
+        && isPlayerSnapshot(snapshot)
+        && snapshot.viewerId === participant.viewerId
+        && isPositiveInteger(value.expiresAt)
+}
+
+function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
+    if (!isRecord(value)) return false
+    return isPositiveInteger(value.viewerId)
+        && typeof value.name === "string"
+        && isPositiveInteger(value.rank)
+        && isPositiveInteger(value.degreeId)
+        && isPositiveInteger(value.mainCharacterId)
+        && isPositiveInteger(value.playerRoleKind)
+        && typeof value.isNewbie === "boolean"
+        && isPositiveInteger(value.currentPartyId)
+        && isPartySnapshot(value.party)
+        && isArrayOf(value.npcParties, isPartySnapshot)
+}
+
+function isPartySnapshot(value: unknown): value is PlayerPartySnapshot {
+    if (!isRecord(value)) return false
+    return isPartyOptionArray(value.characters, isCharacterSnapshot)
+        && isPartyOptionArray(value.unison_characters, isCharacterSnapshot)
+        && isPartyOptionArray(value.equipments, isEquipmentSnapshot)
+        && isPartyOptionArray(value.abilitySoulIds, isPositiveInteger)
+}
+
+function isPartyOptionArray<T>(
+    value: unknown,
+    validator: (candidate: unknown) => candidate is T,
+): value is readonly MultiOption<T>[] {
+    return Array.isArray(value)
+        && value.length === 3
+        && value.every(candidate => isOption(candidate, validator))
+}
+
+function isCharacterSnapshot(value: unknown): value is PlayerCharacterSnapshot {
+    if (!isRecord(value) || !isRecord(value.mana_node_ids)) return false
+    return isPositiveInteger(value.id)
+        && isNonNegativeInteger(value.evolution_level)
+        && isNonNegativeInteger(value.exp)
+        && isNonNegativeInteger(value.over_limit_step)
+        && Object.values(value.mana_node_ids).every(isNonNegativeInteger)
+        && isOption(value.ex_boost, isExBoost)
+        && isOption(value.illustration_settings, isNumberArray)
+}
+
+function isExBoost(value: unknown): value is {
+    readonly ability_id_list: readonly number[]
+    readonly status_id: number
+} {
+    if (!isRecord(value)) return false
+    return isArrayOf(value.ability_id_list, isPositiveInteger)
+        && isPositiveInteger(value.status_id)
+}
+
+function isEquipmentSnapshot(value: unknown): value is PlayerEquipmentSnapshot {
+    if (!isRecord(value)) return false
+    return isPositiveInteger(value.equipmentId)
+        && isNonNegativeInteger(value.level)
+        && isNonNegativeInteger(value.enhancementLevel)
+}
+
+function isOption<T>(
+    value: unknown,
+    validator: (candidate: unknown) => candidate is T,
+): value is MultiOption<T> {
+    return Array.isArray(value)
+        && ((value.length === 1 && value[0] === 1)
+            || (value.length === 2 && value[0] === 0 && validator(value[1])))
+}
+
+function isCompatibility(value: unknown): boolean {
+    if (!isRecord(value)) return false
+    return value.multiProtocolVersion === MULTI_PROTOCOL_VERSION
+        && isNonEmptyString(value.APP_VER)
+        && isNonEmptyString(value.RES_VER)
+        && isNonEmptyString(value.cdnTargetVersion)
+        && isSha256(value.contentDigest)
+        && isSha256(value.modeDigest)
+}
+
+function isParticipant(value: unknown): value is ParticipantIdentity {
+    return isRecord(value)
+        && isNodeSessionId(value.nodeSessionId)
+        && isPositiveInteger(value.viewerId)
+}
+
+function isTcpEndpoint(value: Record<string, unknown>): boolean {
+    return isNonEmptyString(value.host)
+        && isPositiveInteger(value.port)
+        && value.port <= 65535
+}
+
+function isNodeSessionId(value: unknown): value is NodeSessionId {
+    return typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+function isArrayOf(value: unknown, validator: Validator): boolean {
+    return Array.isArray(value) && value.every(validator)
+}
+
+function isNumberArray(value: unknown): value is readonly number[] {
+    return isArrayOf(value, isNonNegativeInteger)
+}
+
+function isPositiveInteger(value: unknown): value is number {
+    return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+    return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+}
+
+function isNonEmptyString(value: unknown): value is string {
+    return typeof value === "string" && value.trim().length > 0
+}
+
+function isSha256(value: unknown): boolean {
+    return typeof value === "string" && /^sha256:[a-f0-9]{64}$/.test(value)
+}

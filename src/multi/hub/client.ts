@@ -7,6 +7,11 @@ import {
     type NodeSessionId,
 } from "../coordinator/contracts"
 import type { MultiHubTcpEndpoint } from "./control-routes"
+import {
+    isHubNodeSessionPayload,
+    isHubSuccessValue,
+    type HubNodeSessionPayload,
+} from "./response-validator"
 
 const DEFAULT_TIMEOUT_MS = 3_000
 const DEFAULT_MAX_RESPONSE_BYTES = 256 * 1024
@@ -21,16 +26,17 @@ const COORDINATOR_ERRORS = new Set<CoordinatorErrorCode>([
     "HUB_UNAVAILABLE",
 ])
 
-interface HubNodeSession {
-    readonly nodeSessionId: NodeSessionId
-    readonly sessionCredential: string
-    readonly expiresAt: number
-    readonly tcp: MultiHubTcpEndpoint
-}
+type HubNodeSession = HubNodeSessionPayload
 
 interface HubResponse {
     readonly status: number
     readonly body: unknown
+}
+
+interface HubRequestOutcome {
+    readonly response: HubResponse | null
+    readonly attempts: number
+    readonly uncertain: boolean
 }
 
 export interface HubClientOptions {
@@ -82,15 +88,15 @@ export class HubClient {
     }
 
     getTcpEndpoint(): MultiHubTcpEndpoint | null {
-        return this.session?.tcp ?? null
+        return this.getLiveSession()?.tcp ?? null
     }
 
     getNodeSessionId(): NodeSessionId | null {
-        return this.session?.nodeSessionId ?? null
+        return this.getLiveSession()?.nodeSessionId ?? null
     }
 
     isAvailable(): boolean {
-        return this.available
+        return this.getLiveSession() !== null && this.available
     }
 
     private async call<T>(
@@ -108,34 +114,41 @@ export class HubClient {
                 return { ok: false, error: "HUB_UNAVAILABLE" }
             }
 
-            const response = await this.requestWithRetry(
+            const outcome = await this.requestWithRetry(
                 route,
                 this.bindParticipant(input, session.nodeSessionId),
                 session,
                 idempotencyKey,
+                idempotencyKey !== null && refreshed ? 1 : RETRY_ATTEMPTS,
             )
+            const response = outcome.response
             if (response?.status === 401) {
+                if (this.session === session) this.session = null
+                if (idempotencyKey !== null
+                    && (outcome.uncertain || outcome.attempts > 1)) {
+                    this.available = false
+                    return { ok: false, error: "HUB_UNAVAILABLE" }
+                }
                 if (refreshed) {
                     this.available = false
                     return { ok: false, error: "HUB_UNAVAILABLE" }
                 }
                 refreshed = true
-                if (this.session === session) this.session = null
                 continue
             }
             if (response === null) {
                 this.available = false
                 return { ok: false, error: "HUB_UNAVAILABLE" }
             }
-            const result = this.normalizeResult<T>(response)
-            this.available = response.status < 500
-            return result
+            const normalized = this.normalizeResult<T>(route, response)
+            this.available = normalized.trusted
+            return normalized.result
         }
     }
 
     private async ensureSession(): Promise<HubNodeSession> {
-        if (this.session !== null && this.session.expiresAt > this.now()) return this.session
-        this.session = null
+        const current = this.getLiveSession()
+        if (current !== null) return current
         if (this.registration !== null) return this.registration
         let tracked!: Promise<HubNodeSession>
         tracked = this.register().finally(() => {
@@ -154,7 +167,9 @@ export class HubClient {
             },
             body: JSON.stringify({ protocolVersion: MULTI_PROTOCOL_VERSION }),
         })
-        if (response.status !== 200 || !isNodeSession(response.body)) {
+        if (response.status !== 200
+            || !isHubNodeSessionPayload(response.body)
+            || response.body.expiresAt <= this.now()) {
             throw new Error("Hub registration failed")
         }
         this.session = Object.freeze({
@@ -163,6 +178,7 @@ export class HubClient {
             expiresAt: response.body.expiresAt,
             tcp: Object.freeze({ ...response.body.tcp }),
         })
+        this.available = true
         return this.session
     }
 
@@ -171,8 +187,10 @@ export class HubClient {
         input: unknown,
         session: HubNodeSession,
         idempotencyKey: string | null,
-    ): Promise<HubResponse | null> {
-        for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
+        maxAttempts: number,
+    ): Promise<HubRequestOutcome> {
+        let uncertain = false
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
             try {
                 const headers: Record<string, string> = {
                     authorization: `Bearer ${session.sessionCredential}`,
@@ -185,12 +203,17 @@ export class HubClient {
                     headers,
                     body: JSON.stringify(input),
                 })
-                if (response.status < 500 || attempt === RETRY_ATTEMPTS - 1) return response
+                if (response.status < 500 || attempt === maxAttempts - 1) {
+                    return { response, attempts: attempt + 1, uncertain }
+                }
             } catch {
-                if (attempt === RETRY_ATTEMPTS - 1) return null
+                uncertain = true
+                if (attempt === maxAttempts - 1) {
+                    return { response: null, attempts: attempt + 1, uncertain }
+                }
             }
         }
-        return null
+        return { response: null, attempts: maxAttempts, uncertain }
     }
 
     private async requestJson(route: string, init: RequestInit): Promise<HubResponse> {
@@ -254,38 +277,33 @@ export class HubClient {
         }
     }
 
-    private normalizeResult<T>(response: HubResponse): CoordinatorResult<T> {
-        if (response.status >= 500 || response.body === null || typeof response.body !== "object") {
-            return { ok: false, error: "HUB_UNAVAILABLE" }
+    private normalizeResult<T>(route: string, response: HubResponse): {
+        readonly result: CoordinatorResult<T>
+        readonly trusted: boolean
+    } {
+        if (response.status !== 200
+            || response.body === null
+            || typeof response.body !== "object") {
+            return { result: { ok: false, error: "HUB_UNAVAILABLE" }, trusted: false }
         }
         const body = response.body as { ok?: unknown; value?: unknown; code?: unknown }
-        if (body.ok === true) return { ok: true, value: body.value as T }
-        if (body.ok === false && COORDINATOR_ERRORS.has(body.code as CoordinatorErrorCode)) {
-            return { ok: false, error: body.code as CoordinatorErrorCode }
+        if (body.ok === true && isHubSuccessValue<T>(route, body.value)) {
+            return { result: { ok: true, value: body.value }, trusted: true }
         }
-        return { ok: false, error: "HUB_UNAVAILABLE" }
+        if (body.ok === false && COORDINATOR_ERRORS.has(body.code as CoordinatorErrorCode)) {
+            return {
+                result: { ok: false, error: body.code as CoordinatorErrorCode },
+                trusted: true,
+            }
+        }
+        return { result: { ok: false, error: "HUB_UNAVAILABLE" }, trusted: false }
     }
-}
 
-function isNodeSession(value: unknown): value is {
-    readonly nodeSessionId: string
-    readonly sessionCredential: string
-    readonly expiresAt: number
-    readonly tcp: MultiHubTcpEndpoint
-} {
-    if (value === null || typeof value !== "object") return false
-    const session = value as Record<string, unknown>
-    const tcp = session.tcp as Record<string, unknown> | undefined
-    return typeof session.nodeSessionId === "string"
-        && /^[A-Za-z0-9_-]{1,128}$/.test(session.nodeSessionId)
-        && typeof session.sessionCredential === "string"
-        && /^[A-Za-z0-9_-]{43}$/.test(session.sessionCredential)
-        && Number.isSafeInteger(session.expiresAt)
-        && (session.expiresAt as number) > 0
-        && tcp !== undefined
-        && typeof tcp.host === "string"
-        && tcp.host.length > 0
-        && Number.isSafeInteger(tcp.port)
-        && (tcp.port as number) > 0
-        && (tcp.port as number) <= 65535
+    private getLiveSession(): HubNodeSession | null {
+        if (this.session !== null && this.session.expiresAt <= this.now()) {
+            this.session = null
+            this.available = false
+        }
+        return this.session
+    }
 }

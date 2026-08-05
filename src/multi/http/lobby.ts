@@ -4,21 +4,10 @@ import { getQuestFromCategorySync } from "../../lib/assets"
 import { generateDataHeaders } from "../../utils"
 import { serializeRoomStatusConnection } from "../room/serializer"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
-import type { CoordinatorResult } from "../coordinator/contracts"
-import type { RoomStatus } from "../coordinator/interface"
+import { classifyRoomJoin } from "./join-result"
 
 function isPositiveSafeInteger(value: number): boolean {
     return Number.isSafeInteger(value) && value > 0
-}
-
-function checkLocalAvailability(
-    context: MultiHttpContext,
-    room: CoordinatorResult<RoomStatus>,
-): CoordinatorResult<RoomStatus> {
-    if (!room.ok) return room
-    return context.questAvailability.check(room.value.category, room.value.questId).available
-        ? room
-        : { ok: false, error: "QUEST_NOT_AVAILABLE" }
 }
 
 function unavailableConnection(roomNumber: string, raisingState: 7 | 9) {
@@ -129,15 +118,15 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
             roomNumber: body.room_number,
             compatibility: compatibility.value,
         }) : compatibility
-        const room = checkLocalAvailability(context, selected)
-        if (!room.ok && room.error !== "ROOM_NOT_FOUND") {
+        const room = classifyRoomJoin(context.questAvailability, selected)
+        if (room.kind === "unavailable") {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId, result_code: 4020 }),
                 "data": {},
             })
         }
-        const status = room.ok ? room.value : null
+        const status = room.kind === "available" ? room.value : null
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -175,14 +164,14 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
             compatibility: compatibility.value,
             ...locator,
         }) : compatibility
-        const room = checkLocalAvailability(context, selected)
-        if (!room.ok) {
+        const room = classifyRoomJoin(context.questAvailability, selected)
+        if (room.kind !== "available") {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
                 "data": unavailableConnection(
                     body.room_number || "",
-                    room.error === "ROOM_NOT_FOUND" ? 9 : 7,
+                    room.kind === "missing" ? 9 : 7,
                 ),
             })
         }

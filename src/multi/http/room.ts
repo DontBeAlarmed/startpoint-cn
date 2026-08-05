@@ -4,8 +4,8 @@ import { generateDataHeaders } from "../../utils";
 import { serializeRoomStatusConnection } from "../room/serializer";
 import { buildNpcMates } from "../npc/builder";
 import { isValidMultiViewerId, type MultiHttpContext } from "./context";
-import type { CoordinatorErrorCode, CoordinatorResult } from "../coordinator/contracts";
-import type { RoomStatus } from "../coordinator/interface";
+import type { CoordinatorErrorCode } from "../coordinator/contracts";
+import { classifyRoomJoin } from "./join-result";
 
 async function hasValidViewer(context: MultiHttpContext, viewerId: number): Promise<boolean> {
     return isValidMultiViewerId(viewerId)
@@ -14,16 +14,6 @@ async function hasValidViewer(context: MultiHttpContext, viewerId: number): Prom
 
 function forbidden(reply: FastifyReply): FastifyReply {
     return reply.status(403).send({ "error": "Forbidden", "message": "Room permission denied." });
-}
-
-function checkLocalAvailability(
-    context: MultiHttpContext,
-    room: CoordinatorResult<RoomStatus>,
-): CoordinatorResult<RoomStatus> {
-    if (!room.ok) return room;
-    return context.questAvailability.check(room.value.category, room.value.questId).available
-        ? room
-        : { ok: false, error: "QUEST_NOT_AVAILABLE" };
 }
 
 function prepareFailure(
@@ -73,9 +63,9 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             ...locator,
         };
         const selected = await context.coordinator.selectRoom(coordinatorInput);
-        const selectedRoom = checkLocalAvailability(context, selected);
+        const selectedRoom = classifyRoomJoin(context.questAvailability, selected);
 
-        if (!selectedRoom.ok) {
+        if (selectedRoom.kind !== "available") {
             return prepareFailure(reply, viewerId, body.room_number || "", selectedRoom.error);
         }
 
@@ -86,8 +76,9 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             });
         }
 
-        const room = await context.coordinator.prepareRoom(coordinatorInput);
-        if (!room.ok) {
+        const prepared = await context.coordinator.prepareRoom(coordinatorInput);
+        const room = classifyRoomJoin(context.questAvailability, prepared);
+        if (room.kind !== "available") {
             return prepareFailure(reply, viewerId, body.room_number || "", room.error);
         }
 
