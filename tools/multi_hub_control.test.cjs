@@ -17,7 +17,10 @@ const { CredentialReloader } = require("../src/multi/hub/credential-reloader")
 const { HubClient } = require("../src/multi/hub/client")
 const { IdempotencyCache } = require("../src/multi/hub/idempotency")
 const { NodeSessionRegistry } = require("../src/multi/hub/node-sessions")
-const { isHubControlStatus } = require("../src/multi/hub/response-validator")
+const {
+    isHubControlStatus,
+    parseHubControlStatus,
+} = require("../src/multi/hub/response-validator")
 const { buildMultiHubControlApp } = require("../src/multi/hub/server")
 const {
     addRoomMember,
@@ -744,6 +747,73 @@ test("HubClient reads bounded authoritative diagnostics through the existing con
     })
 })
 
+test("HubClient diagnostics use only an existing session and never change availability", async t => {
+    const target = fixture(t)
+    let failStatus = false
+    let statusRequests = 0
+    const delegate = fetchThroughHub(target.app)
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        now: () => target.getNow(),
+        fetch: async (url, init) => {
+            if (new URL(url).pathname === "/v1/multi/status") {
+                statusRequests++
+                if (failStatus) throw new Error("diagnostic failure")
+            }
+            return delegate(url, init)
+        },
+    })
+
+    assert.equal(await client.getExistingSessionControlStatus(), null)
+    assert.equal(statusRequests, 0)
+    assert.equal(target.sessions.activeCount(), 0)
+    assert.equal(client.isAvailable(), false)
+
+    const coreResult = await client.read("/v1/multi/rooms/status", {
+        participant: { nodeSessionId: "pending", viewerId: 101 },
+        roomNumber: "999999",
+    })
+    assert.equal(coreResult.ok, true)
+    assert.equal(target.sessions.activeCount(), 1)
+    assert.equal(client.isAvailable(), true)
+
+    const diagnostics = await client.getExistingSessionControlStatus()
+    assert.equal(diagnostics.activeRooms, 2)
+    assert.equal(statusRequests, 1)
+    assert.equal(target.sessions.activeCount(), 1)
+    assert.equal(client.isAvailable(), true)
+
+    failStatus = true
+    assert.equal(await client.getExistingSessionControlStatus(), null)
+    assert.equal(statusRequests, 2)
+    assert.equal(target.sessions.activeCount(), 1)
+    assert.equal(client.isAvailable(), true)
+})
+
+test("control status parser accepts legacy core fields and discards malformed diagnostics", () => {
+    const legacy = {
+        activeNodeSessions: 2,
+        enabledCredentials: 3,
+    }
+    assert.deepEqual(parseHubControlStatus(legacy), legacy)
+    assert.equal(isHubControlStatus(legacy), true)
+
+    const malformedExtension = {
+        ...legacy,
+        activeRooms: 9,
+        activeBattleFacts: "invalid",
+        finalizedBattleFacts: 4,
+        latestCompatibilityRejection: {
+            code: "INCOMPATIBLE_ROOM",
+            differences: [{ field: "RES_VER", different: true, raw: "secret" }],
+            timestamp: "2026-08-06T00:00:00.000Z",
+        },
+    }
+    assert.deepEqual(parseHubControlStatus(malformedExtension), legacy)
+    assert.equal(isHubControlStatus(malformedExtension), true)
+})
+
 test("control status selects diagnostic fields and drops provider extras", async t => {
     const target = fixture(t, {
         getDiagnostics: () => ({
@@ -844,9 +914,12 @@ test("control status selects diagnostic fields and drops provider extras", async
 })
 
 test("control status response validator allows only dotted numeric diagnostic versions", () => {
-    const status = difference => ({
+    const core = {
         activeNodeSessions: 1,
         enabledCredentials: 1,
+    }
+    const status = difference => ({
+        ...core,
         activeRooms: 1,
         activeBattleFacts: 1,
         finalizedBattleFacts: 1,
@@ -857,12 +930,14 @@ test("control status response validator allows only dotted numeric diagnostic ve
         },
     })
     for (const value of ["1.8.1", "1.4.54", "2.1.125-rc.1", "2.1.125-rc-2"]) {
-        assert.equal(isHubControlStatus(status({
+        const input = status({
             field: "APP_VER",
             different: true,
             required: value,
             received: value,
-        })), true, value)
+        })
+        assert.equal(isHubControlStatus(input), true, value)
+        assert.deepEqual(parseHubControlStatus(input), input, value)
     }
     for (const value of [
         "sha1-deadbeefdeadbeef",
@@ -875,12 +950,14 @@ test("control status response validator allows only dotted numeric diagnostic ve
         `1.8.1-${"a".repeat(40)}`,
         "",
     ]) {
-        assert.equal(isHubControlStatus(status({
+        const input = status({
             field: "APP_VER",
             different: true,
             required: value,
             received: "1.8.1",
-        })), false, JSON.stringify(value))
+        })
+        assert.equal(isHubControlStatus(input), true, JSON.stringify(value))
+        assert.deepEqual(parseHubControlStatus(input), core, JSON.stringify(value))
     }
 })
 

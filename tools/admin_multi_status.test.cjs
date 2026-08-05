@@ -59,6 +59,61 @@ function runtime(mode, overrides = {}) {
     }
 }
 
+function deferred() {
+    let resolve
+    const promise = new Promise(done => { resolve = done })
+    return { promise, resolve }
+}
+
+function clientConfig() {
+    return {
+        mode: "client",
+        hubUrl: new URL("https://hub.example/"),
+        token: "a".repeat(32),
+    }
+}
+
+function embeddedConfig() {
+    return {
+        mode: "embedded",
+        tcp: { host: "127.0.0.1", port: 18003 },
+    }
+}
+
+function hostConfig() {
+    return {
+        mode: "host",
+        tcp: { host: "127.0.0.1", port: 18003, publicHost: "hub.example" },
+        hub: { host: "127.0.0.1", port: 18004 },
+        credentialsPath: path.join(os.tmpdir(), "admin-status-unused-credentials.json"),
+    }
+}
+
+function createAdminRuntimeService(remotes) {
+    let remoteIndex = 0
+    let tcpListening = false
+    let hubListening = false
+    return createMultiRuntimeService({
+        async startTcp() { tcpListening = true },
+        async stopTcp() { tcpListening = false },
+        isTcpListening: () => tcpListening,
+        async startHub() { hubListening = true },
+        async stopHub() { hubListening = false },
+        isHubListening: () => hubListening,
+        createRemoteCoordinator: () => remotes[remoteIndex++],
+    })
+}
+
+function remoteCoordinator(overrides = {}) {
+    return {
+        isAvailable: () => true,
+        getTcpEndpoint: () => ({ host: "hub.example", port: 8003 }),
+        getNodeSessionId: () => "node-session",
+        getExistingSessionControlStatus: async () => null,
+        ...overrides,
+    }
+}
+
 test("admin status has one stable read-only shape for every runtime mode", () => {
     assert.equal(typeof buildAdminMultiStatus, "function")
     for (const mode of ["embedded", "host", "client"]) {
@@ -322,24 +377,24 @@ test("invalid compatibility headers record a code without request identity", () 
     assert.doesNotMatch(JSON.stringify(rejections), /header|request|viewer|player|device|body/i)
 })
 
-test("client runtime diagnostics refresh authority and degrade without guessed counts", async t => {
+test("client runtime diagnostics never change core availability", async t => {
     let available = true
-    let controlResult = {
-        ok: true,
-        value: {
-            activeRooms: 7,
-            activeBattleFacts: 5,
-            finalizedBattleFacts: 2,
-            latestCompatibilityRejection: null,
-        },
+    let diagnosticError = false
+    let controlStatus = {
+        activeNodeSessions: 1,
+        enabledCredentials: 1,
+        activeRooms: 7,
+        activeBattleFacts: 5,
+        finalizedBattleFacts: 2,
+        latestCompatibilityRejection: null,
     }
     const remote = {
         isAvailable: () => available,
         getTcpEndpoint: () => available ? { host: "hub.example", port: 8003 } : null,
         getNodeSessionId: () => available ? "node-session" : null,
-        async getControlStatus() {
-            if (!controlResult.ok) available = false
-            return controlResult
+        async getExistingSessionControlStatus() {
+            if (diagnosticError) throw new Error("diagnostic failure")
+            return controlStatus
         },
     }
     const service = createMultiRuntimeService({
@@ -351,11 +406,7 @@ test("client runtime diagnostics refresh authority and degrade without guessed c
         isHubListening: () => false,
         createRemoteCoordinator: () => remote,
     })
-    await service.start({
-        mode: "client",
-        hubUrl: new URL("https://hub.example/"),
-        token: "a".repeat(32),
-    })
+    await service.start(clientConfig())
     t.after(() => service.stop())
 
     const ready = await service.getAdminStatus()
@@ -364,12 +415,125 @@ test("client runtime diagnostics refresh authority and degrade without guessed c
     assert.equal(ready.activeRooms, 7)
     assert.deepEqual(ready.battleFacts, { active: 5, finalized: 2 })
 
-    controlResult = { ok: false, error: "HUB_UNAVAILABLE" }
-    const degraded = await service.getAdminStatus()
-    assert.equal(degraded.state, "degraded")
-    assert.equal(degraded.hub.available, false)
-    assert.equal(degraded.activeRooms, null)
-    assert.equal(degraded.battleFacts, null)
+    controlStatus = { activeNodeSessions: 1, enabledCredentials: 1 }
+    const legacy = await service.getAdminStatus()
+    assert.equal(legacy.state, "ready")
+    assert.equal(legacy.hub.available, true)
+    assert.equal(legacy.coordinator.available, true)
+    assert.equal(legacy.activeRooms, null)
+    assert.equal(legacy.battleFacts, null)
+
+    diagnosticError = true
+    const failedSample = await service.getAdminStatus()
+    assert.equal(failedSample.state, "ready")
+    assert.equal(failedSample.hub.available, true)
+    assert.equal(failedSample.coordinator.available, true)
+    assert.equal(failedSample.activeRooms, null)
+    assert.equal(failedSample.battleFacts, null)
+    assert.equal(available, true)
+})
+
+test("client admin polling without a live session does not change runtime availability", async t => {
+    let available = false
+    let diagnosticCalls = 0
+    const service = createAdminRuntimeService([remoteCoordinator({
+        isAvailable: () => available,
+        getTcpEndpoint: () => null,
+        getNodeSessionId: () => null,
+        async getExistingSessionControlStatus() {
+            diagnosticCalls++
+            return null
+        },
+    })])
+    await service.start(clientConfig())
+    t.after(() => service.stop())
+
+    const before = service.getStatus()
+    const first = await service.getAdminStatus()
+    const second = await service.getAdminStatus()
+    assert.deepEqual(service.getStatus(), before)
+    assert.equal(first.activeRooms, null)
+    assert.equal(second.activeRooms, null)
+    assert.equal(available, false)
+    assert.equal(diagnosticCalls, 2)
+})
+
+test("stale client authority is discarded when runtime stops", async () => {
+    const gate = deferred()
+    const service = createAdminRuntimeService([remoteCoordinator({
+        getExistingSessionControlStatus: () => gate.promise,
+    })])
+    await service.start(clientConfig())
+    const pending = service.getAdminStatus()
+    await service.stop()
+    gate.resolve({
+        activeNodeSessions: 1,
+        enabledCredentials: 1,
+        activeRooms: 91,
+        activeBattleFacts: 92,
+        finalizedBattleFacts: 93,
+        latestCompatibilityRejection: null,
+    })
+
+    const result = await pending
+    assert.equal(result.state, "unavailable")
+    assert.equal(result.activeRooms, null)
+    assert.equal(result.battleFacts, null)
+})
+
+test("stale client authority is discarded after client to embedded transition", async t => {
+    const gate = deferred()
+    const service = createAdminRuntimeService([remoteCoordinator({
+        getExistingSessionControlStatus: () => gate.promise,
+    })])
+    await service.start(clientConfig())
+    const pending = service.getAdminStatus()
+    await service.stop()
+    await service.start(embeddedConfig())
+    t.after(() => service.stop())
+    gate.resolve({
+        activeNodeSessions: 1,
+        enabledCredentials: 1,
+        activeRooms: 81,
+        activeBattleFacts: 82,
+        finalizedBattleFacts: 83,
+        latestCompatibilityRejection: null,
+    })
+
+    const result = await pending
+    assert.equal(result.mode, "embedded")
+    assert.equal(result.state, "ready")
+    assert.notEqual(result.activeRooms, 81)
+})
+
+test("stale authority spanning client host client transition never reaches the new client", async t => {
+    const gate = deferred()
+    const firstRemote = remoteCoordinator({
+        getExistingSessionControlStatus: () => gate.promise,
+    })
+    const secondRemote = remoteCoordinator()
+    const service = createAdminRuntimeService([firstRemote, secondRemote])
+    await service.start(clientConfig())
+    const pending = service.getAdminStatus()
+    await service.stop()
+    await service.start(hostConfig())
+    await service.stop()
+    await service.start(clientConfig())
+    t.after(() => service.stop())
+    gate.resolve({
+        activeNodeSessions: 1,
+        enabledCredentials: 1,
+        activeRooms: 71,
+        activeBattleFacts: 72,
+        finalizedBattleFacts: 73,
+        latestCompatibilityRejection: null,
+    })
+
+    const result = await pending
+    assert.equal(result.mode, "client")
+    assert.equal(result.state, "ready")
+    assert.equal(result.activeRooms, null)
+    assert.equal(result.battleFacts, null)
 })
 
 test("runtime-not-started admin diagnostics use the same unavailable shape", async () => {
@@ -409,10 +573,44 @@ test("existing admin server status endpoint exposes multiplayer diagnostics read
     assert.doesNotMatch(response.body, new RegExp(os.homedir().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
 })
 
+test("admin server status locally degrades multiplayer diagnostics errors", async t => {
+    const app = Fastify({ logger: false })
+    await app.register(serverRoutes, {
+        getMultiStatus: async () => {
+            throw new Error(`sensitive ${privateHomePath}\nprivate stack`)
+        },
+    })
+    await app.ready()
+    t.after(() => app.close())
+
+    const response = await app.inject({ method: "GET", url: "/status" })
+    assert.equal(response.statusCode, 200, response.body)
+    assert.ok(response.json().server)
+    assert.ok(response.json().cdn)
+    assert.deepEqual(response.json().multiplayer, buildAdminMultiStatus({
+        runtime: {
+            mode: "embedded",
+            state: "unavailable",
+            coordinator: { kind: "local", available: false },
+            hub: null,
+            tcp: { available: false, endpoint: null },
+        },
+        authority: null,
+        latestCompatibilityRejection: null,
+    }))
+    assert.equal(response.body.includes(privateHomePath), false)
+    assert.doesNotMatch(response.body, /sensitive|private stack|Error:/i)
+})
+
 test("Dashboard presents multiplayer diagnostics in Chinese without configuration controls", () => {
     const source = fs.readFileSync(path.join(repositoryRoot, "admin/src/pages/Dashboard.tsx"), "utf8")
     const styles = fs.readFileSync(path.join(repositoryRoot, "admin/src/styles.css"), "utf8")
     assert.match(source, /多人联机状态/)
+    assert.match(source, /正在加载服务端状态/)
+    assert.match(source, /正在加载多人联机状态/)
+    assert.match(source, /多人联机状态加载失败/)
+    assert.match(source, /权威统计暂不可用/)
+    assert.match(source, /statusLoading\s*&&\s*!status/)
     assert.match(source, /控制面连通性/)
     assert.match(source, /活跃房间/)
     assert.match(source, /兼容性拒绝/)

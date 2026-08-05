@@ -9,9 +9,9 @@ import {
 import type { MultiHubTcpEndpoint } from "./control-routes"
 import type { MultiHubControlStatus } from "./control-routes"
 import {
-    isHubControlStatus,
     isHubNodeSessionPayload,
     isHubSuccessValue,
+    parseHubControlStatus,
     type HubNodeSessionPayload,
 } from "./response-validator"
 
@@ -84,15 +84,32 @@ export class HubClient {
     }
 
     getTcpEndpoint(): MultiHubTcpEndpoint | null {
-        return this.getLiveSession()?.tcp ?? null
+        return this.peekLiveSession()?.tcp ?? null
     }
 
     getNodeSessionId(): NodeSessionId | null {
-        return this.getLiveSession()?.nodeSessionId ?? null
+        return this.peekLiveSession()?.nodeSessionId ?? null
     }
 
     isAvailable(): boolean {
-        return this.getLiveSession() !== null && this.available
+        return this.peekLiveSession() !== null && this.available
+    }
+
+    async getExistingSessionControlStatus(): Promise<MultiHubControlStatus | null> {
+        const session = this.peekLiveSession()
+        if (session === null) return null
+        try {
+            const response = await this.requestJson("/v1/multi/status", {
+                method: "GET",
+                headers: this.sessionHeaders(session),
+            })
+            const body = response.body as { ok?: unknown; value?: unknown } | null
+            return response.status === 200 && body?.ok === true
+                ? parseHubControlStatus(body.value)
+                : null
+        } catch {
+            return null
+        }
     }
 
     async getControlStatus(): Promise<CoordinatorResult<MultiHubControlStatus>> {
@@ -125,14 +142,15 @@ export class HubClient {
                 continue
             }
             const body = response.body as { ok?: unknown; value?: unknown } | null
-            if (response.status !== 200
-                || body?.ok !== true
-                || !isHubControlStatus(body.value)) {
+            const status = body?.ok === true
+                ? parseHubControlStatus(body.value)
+                : null
+            if (response.status !== 200 || status === null) {
                 this.available = false
                 return { ok: false, error: "HUB_UNAVAILABLE" }
             }
             this.available = true
-            return { ok: true, value: body.value }
+            return { ok: true, value: status }
         }
     }
 
@@ -333,10 +351,17 @@ export class HubClient {
     }
 
     private getLiveSession(): HubNodeSession | null {
-        if (this.session !== null && this.session.expiresAt <= this.now()) {
+        const current = this.peekLiveSession()
+        if (current === null && this.session !== null) {
             this.session = null
             this.available = false
         }
-        return this.session
+        return current
+    }
+
+    private peekLiveSession(): HubNodeSession | null {
+        return this.session !== null && this.session.expiresAt > this.now()
+            ? this.session
+            : null
     }
 }

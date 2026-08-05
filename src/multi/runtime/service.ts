@@ -21,6 +21,7 @@ import {
     MultiHubControlServer,
 } from "../hub/server"
 import type { MultiHubControlRoutesOptions } from "../hub/control-routes"
+import type { MultiHubControlStatus } from "../hub/control-routes"
 import {
     createEmbeddedMultiHttpContext,
     type MultiHttpContext,
@@ -327,26 +328,47 @@ class Service implements MultiRuntimeService {
     }
 
     async getAdminStatus(): Promise<AdminMultiStatus> {
-        let authority: AdminMultiAuthorityStatus | null = null
-        let latestCompatibilityRejection = multiCompatibilityRejections.get()
-        if (this.config?.mode === "client" && this.remoteCoordinator !== null) {
-            const result = await this.remoteCoordinator.getControlStatus()
-            if (result.ok) {
-                authority = {
-                    activeRooms: result.value.activeRooms,
-                    activeBattleFacts: result.value.activeBattleFacts,
-                    finalizedBattleFacts: result.value.finalizedBattleFacts,
-                }
-                latestCompatibilityRejection = result.value.latestCompatibilityRejection
-                    ?? latestCompatibilityRejection
-            }
-        } else if (this.config !== null && this.getStatus().coordinator.available) {
-            authority = localAuthorityStatus()
+        const generation = this.generation
+        const config = this.config
+        const context = this.context
+        const remoteCoordinator = this.remoteCoordinator
+        if (config?.mode !== "client" || remoteCoordinator === null) {
+            return this.buildCurrentAdminStatus()
         }
+
+        let controlStatus: MultiHubControlStatus | null = null
+        try {
+            controlStatus = await remoteCoordinator.getExistingSessionControlStatus()
+        } catch {
+            // Diagnostics are observational; a failed sample must not affect runtime state.
+        }
+        if (generation !== this.generation
+            || config !== this.config
+            || context !== this.context
+            || remoteCoordinator !== this.remoteCoordinator) {
+            return this.buildCurrentAdminStatus()
+        }
+        const authority = authorityFromControlStatus(controlStatus)
+        const latestCompatibilityRejection = controlStatus?.latestCompatibilityRejection
+            ?? multiCompatibilityRejections.get()
         return buildAdminMultiStatus({
             runtime: this.getStatus(),
             authority,
             latestCompatibilityRejection,
+        })
+    }
+
+    private buildCurrentAdminStatus(): AdminMultiStatus {
+        const runtime = this.getStatus()
+        const authority = this.config !== null
+            && this.config.mode !== "client"
+            && runtime.coordinator.available
+            ? localAuthorityStatus()
+            : null
+        return buildAdminMultiStatus({
+            runtime,
+            authority,
+            latestCompatibilityRejection: multiCompatibilityRejections.get(),
         })
     }
 
@@ -428,6 +450,21 @@ function localAuthorityStatus(): AdminMultiAuthorityStatus {
         activeRooms: listActiveRooms().length,
         activeBattleFacts: facts.active,
         finalizedBattleFacts: facts.finalized,
+    })
+}
+
+function authorityFromControlStatus(
+    status: MultiHubControlStatus | null,
+): AdminMultiAuthorityStatus | null {
+    if (status === null
+        || status.activeRooms === undefined
+        || status.activeBattleFacts === undefined
+        || status.finalizedBattleFacts === undefined
+        || !Object.prototype.hasOwnProperty.call(status, "latestCompatibilityRejection")) return null
+    return Object.freeze({
+        activeRooms: status.activeRooms,
+        activeBattleFacts: status.activeBattleFacts,
+        finalizedBattleFacts: status.finalizedBattleFacts,
     })
 }
 

@@ -42,13 +42,22 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
             assetProvider: parseAssetProviderConfig({ projectRoot: root, env: process.env }),
             configuredCdnDir: cdnDir,
         })
-        const multiplayer = options.getMultiStatus
-            ? await options.getMultiStatus()
-            : buildAdminMultiStatus({
+        let multiplayer: AdminMultiStatus
+        try {
+            multiplayer = options.getMultiStatus
+                ? await options.getMultiStatus()
+                : buildAdminMultiStatus({
+                    runtime: unavailableMultiRuntimeStatus(),
+                    authority: null,
+                    latestCompatibilityRejection: null,
+                })
+        } catch {
+            multiplayer = buildAdminMultiStatus({
                 runtime: unavailableMultiRuntimeStatus(),
                 authority: null,
                 latestCompatibilityRejection: null,
             })
+        }
 
         reply.status(200).send({
             server: {

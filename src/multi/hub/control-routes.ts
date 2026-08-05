@@ -55,9 +55,13 @@ export interface MultiHubAuthorityDiagnostics {
     readonly latestCompatibilityRejection: CompatibilityRejectionSummary | null
 }
 
-export interface MultiHubControlStatus extends MultiHubAuthorityDiagnostics {
+export interface MultiHubControlStatus {
     readonly activeNodeSessions: number
     readonly enabledCredentials: number
+    readonly activeRooms?: number
+    readonly activeBattleFacts?: number
+    readonly finalizedBattleFacts?: number
+    readonly latestCompatibilityRejection?: CompatibilityRejectionSummary | null
 }
 
 export interface MultiHubControlRoutesOptions {

@@ -28,6 +28,7 @@ export interface RemoteHubClient {
     getNodeSessionId(): NodeSessionId | null
     isAvailable(): boolean
     getControlStatus(): Promise<CoordinatorResult<MultiHubControlStatus>>
+    getExistingSessionControlStatus(): Promise<MultiHubControlStatus | null>
 }
 
 export class RemoteMultiCoordinator implements MultiCoordinator, AdmissionIssuer {
@@ -92,5 +93,9 @@ export class RemoteMultiCoordinator implements MultiCoordinator, AdmissionIssuer
 
     getControlStatus(): Promise<CoordinatorResult<MultiHubControlStatus>> {
         return this.client.getControlStatus()
+    }
+
+    getExistingSessionControlStatus(): Promise<MultiHubControlStatus | null> {
+        return this.client.getExistingSessionControlStatus()
     }
 }

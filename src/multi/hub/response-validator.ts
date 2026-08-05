@@ -14,6 +14,7 @@ import type {
 } from "../snapshot/player-snapshot"
 import { isValidNetworkHost } from "../../runtime/network-host"
 import { isDiagnosticVersion } from "../../lib/diagnostic-version"
+import type { CompatibilityRejectionSummary } from "../../lib/admin-multi-status"
 import type { MultiHubControlStatus, MultiHubTcpEndpoint } from "./control-routes"
 
 type Validator = (value: unknown) => boolean
@@ -34,14 +35,12 @@ const VOID_ROUTES = new Set([
     "/v1/multi/rooms/disband",
     "/v1/multi/battles/abort",
 ])
-const CONTROL_STATUS_FIELDS = new Set([
-    "activeNodeSessions",
-    "enabledCredentials",
+const CONTROL_DIAGNOSTIC_FIELDS = Object.freeze([
     "activeRooms",
     "activeBattleFacts",
     "finalizedBattleFacts",
     "latestCompatibilityRejection",
-])
+] as const)
 const REJECTION_FIELDS = new Set(["code", "differences", "timestamp"])
 const COMPATIBILITY_FIELDS = new Set([
     "multiProtocolVersion",
@@ -78,17 +77,39 @@ export function isHubSuccessValue<T>(route: string, value: unknown): value is T 
 }
 
 export function isHubControlStatus(value: unknown): value is MultiHubControlStatus {
-    if (!isRecord(value)) return false
-    return hasOnlyKeys(value, CONTROL_STATUS_FIELDS)
-        && isNonNegativeInteger(value.activeNodeSessions)
-        && isNonNegativeInteger(value.enabledCredentials)
-        && isNonNegativeInteger(value.activeRooms)
-        && isNonNegativeInteger(value.activeBattleFacts)
-        && isNonNegativeInteger(value.finalizedBattleFacts)
-        && isCompatibilityRejection(value.latestCompatibilityRejection)
+    return parseHubControlStatus(value) !== null
 }
 
-function isCompatibilityRejection(value: unknown): boolean {
+export function parseHubControlStatus(value: unknown): MultiHubControlStatus | null {
+    if (!isRecord(value)
+        || !isNonNegativeInteger(value.activeNodeSessions)
+        || !isNonNegativeInteger(value.enabledCredentials)) return null
+    const core = {
+        activeNodeSessions: value.activeNodeSessions,
+        enabledCredentials: value.enabledCredentials,
+    }
+    const hasCompleteDiagnostics = CONTROL_DIAGNOSTIC_FIELDS.every(field => (
+        Object.prototype.hasOwnProperty.call(value, field)
+    ))
+    if (!hasCompleteDiagnostics
+        || !isNonNegativeInteger(value.activeRooms)
+        || !isNonNegativeInteger(value.activeBattleFacts)
+        || !isNonNegativeInteger(value.finalizedBattleFacts)
+        || !isCompatibilityRejection(value.latestCompatibilityRejection)) {
+        return Object.freeze(core)
+    }
+    return Object.freeze({
+        ...core,
+        activeRooms: value.activeRooms,
+        activeBattleFacts: value.activeBattleFacts,
+        finalizedBattleFacts: value.finalizedBattleFacts,
+        latestCompatibilityRejection: value.latestCompatibilityRejection,
+    })
+}
+
+function isCompatibilityRejection(
+    value: unknown,
+): value is CompatibilityRejectionSummary | null {
     if (value === null) return true
     if (!isRecord(value)
         || !hasOnlyKeys(value, REJECTION_FIELDS)

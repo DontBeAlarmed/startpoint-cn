@@ -157,7 +157,7 @@ export default function Dashboard() {
         queryFn: () => apiGet<AccountRow[]>("/api/server/accounts"),
     })
 
-    const { data: status, isError: statusError, isFetching: statusFetching } = useQuery({
+    const { data: status, isLoading: statusLoading, isError: statusError, isFetching: statusFetching } = useQuery({
         queryKey: ["serverStatus"],
         queryFn: () => apiGet<ServerStatus>("/api/server/status"),
         refetchInterval: 30_000,
@@ -213,7 +213,9 @@ export default function Dashboard() {
 
                     <div className="admin-card-grid">
                     <Card title="服务端状态">
-                        {statusError || !status ? (
+                        {statusLoading && !status ? (
+                            <Alert type="info" showIcon message="正在加载服务端状态" />
+                        ) : statusError || !status ? (
                             <Alert type="error" showIcon message="服务端状态加载失败" description="接口 /api/server/status 不可用。" />
                         ) : (
                             <>
@@ -239,7 +241,9 @@ export default function Dashboard() {
                         </Card>
 
                         <Card title="多人联机状态">
-                            {statusError || !status ? (
+                            {statusLoading && !status ? (
+                                <Alert type="info" showIcon message="正在加载多人联机状态" />
+                            ) : statusError || !status ? (
                                 <Alert type="error" showIcon message="多人联机状态加载失败" />
                             ) : (
                                 <Space direction="vertical" className="admin-stack">
@@ -263,6 +267,12 @@ export default function Dashboard() {
                                             <Statistic title="已结束事实" value={status.multiplayer.battleFacts?.finalized ?? "未知"} />
                                         </Col>
                                     </Row>
+                                    {(status.multiplayer.activeRooms === null
+                                        || status.multiplayer.battleFacts === null) && (
+                                        <Typography.Text type="secondary">
+                                            权威统计暂不可用。
+                                        </Typography.Text>
+                                    )}
                                     <Descriptions size="small" column={1}>
                                         <Descriptions.Item label="控制面连通性">
                                             {status.multiplayer.hub === null
@@ -329,7 +339,9 @@ export default function Dashboard() {
                         </Card>
 
                         <Card title="CDN 基线 / 补丁 Overlay">
-                        {statusError || !status ? (
+                        {statusLoading && !status ? (
+                            <Alert type="info" showIcon message="正在加载 CDN 状态" />
+                        ) : statusError || !status ? (
                             <Alert type="error" showIcon message="CDN 信息加载失败" />
                         ) : (
                             <Space direction="vertical" className="admin-stack">
