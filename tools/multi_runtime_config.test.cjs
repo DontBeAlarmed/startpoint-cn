@@ -585,16 +585,88 @@ test("real host hot-loads credentials and serves only the trusted control API", 
     }, { protocolVersion: 1 })
     assert.equal(missing.statusCode, 401)
 
-    const issued = new MultiHubCredentialStore({ credentialsPath }).create("runtime-node")
+    const store = new MultiHubCredentialStore({ credentialsPath })
+    const issued = store.create("runtime-node-a")
+    const peer = store.create("runtime-node-b")
     let registration
+    let peerRegistration
     await waitFor(async () => {
         registration = await postJson(hubPort, "/v1/multi/nodes/register", {
             authorization: `Bearer ${issued.token}`,
         }, { protocolVersion: 1 })
-        return registration.statusCode === 200
+        peerRegistration = await postJson(hubPort, "/v1/multi/nodes/register", {
+            authorization: `Bearer ${peer.token}`,
+        }, { protocolVersion: 1 })
+        return registration.statusCode === 200 && peerRegistration.statusCode === 200
     }, "credential table was not hot-loaded", 2_000)
     assert.match(registration.body.nodeSessionId, /^[A-Za-z0-9_-]+$/)
     assert.match(registration.body.sessionCredential, /^[A-Za-z0-9_-]{43}$/)
+
+    const compatibility = {
+        multiProtocolVersion: 1,
+        APP_VER: "1.8.1",
+        RES_VER: "20240814",
+        cdnTargetVersion: "cn-20240814",
+        contentDigest: `sha256:${"a".repeat(64)}`,
+        modeDigest: `sha256:${"b".repeat(64)}`,
+    }
+    const sessionHeaders = node => ({
+        authorization: `Bearer ${node.body.sessionCredential}`,
+        "x-node-session-id": node.body.nodeSessionId,
+    })
+    const createRoom = (node, viewerId, key) => postJson(
+        hubPort,
+        "/v1/multi/rooms/create",
+        { ...sessionHeaders(node), "x-idempotency-key": key },
+        {
+            requestId: key,
+            participant: { nodeSessionId: node.body.nodeSessionId, viewerId },
+            partyId: 1,
+            category: 1,
+            questId: 501,
+            leaderCharacterId: 101,
+            compatibility,
+        },
+    )
+    const firstRoom = await createRoom(registration, 601, "runtime-room-a")
+    const secondRoom = await createRoom(peerRegistration, 602, "runtime-room-b")
+    assert.equal(firstRoom.statusCode, 200)
+    assert.equal(secondRoom.statusCode, 200)
+
+    store.revoke(issued.credentialId)
+    await waitFor(async () => {
+        const invalid = await postJson(
+            hubPort,
+            "/v1/multi/rooms/status",
+            sessionHeaders(registration),
+            {
+                participant: { nodeSessionId: registration.body.nodeSessionId, viewerId: 601 },
+                roomNumber: firstRoom.body.value.roomNumber,
+            },
+        )
+        return invalid.statusCode === 401
+    }, "revoked runtime node session stayed valid", 2_000)
+
+    const removed = await postJson(
+        hubPort,
+        "/v1/multi/rooms/status",
+        sessionHeaders(peerRegistration),
+        {
+            participant: { nodeSessionId: peerRegistration.body.nodeSessionId, viewerId: 602 },
+            roomNumber: firstRoom.body.value.roomNumber,
+        },
+    )
+    const retained = await postJson(
+        hubPort,
+        "/v1/multi/rooms/status",
+        sessionHeaders(peerRegistration),
+        {
+            participant: { nodeSessionId: peerRegistration.body.nodeSessionId, viewerId: 602 },
+            roomNumber: secondRoom.body.value.roomNumber,
+        },
+    )
+    assert.deepEqual(removed.body, { ok: false, code: "ROOM_NOT_FOUND" })
+    assert.equal(retained.body.ok, true)
     assert.equal(await getStatus(hubPort, "/api/player"), 404)
     assert.equal(await getStatus(hubPort, "/"), 404)
 })

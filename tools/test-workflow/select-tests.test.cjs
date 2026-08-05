@@ -311,6 +311,8 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/runtime_config.test.cjs",
             "tools/multi_hub_credentials.test.cjs",
             "tools/multi_hub_control.test.cjs",
+            "tools/multi_hub_idempotency.test.cjs",
+            "tools/multi_hub_session_cleanup.test.cjs",
             "tools/multi_hub_token.test.cjs",
             "tools/multi_runtime_config.test.cjs",
             "tools/comic_route.test.cjs",

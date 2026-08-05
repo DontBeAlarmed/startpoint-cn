@@ -10,8 +10,18 @@ export interface IdempotencyCacheOptions {
 }
 
 interface CacheEntry {
-    readonly expiresAt: number
+    state: "pending" | "settled"
+    expiresAt: number
     readonly result: Promise<CachedJsonResponse>
+}
+
+export class IdempotencyCapacityError extends Error {
+    readonly code = "IDEMPOTENCY_CAPACITY_EXCEEDED"
+
+    constructor() {
+        super("idempotency cache capacity exceeded")
+        this.name = "IdempotencyCapacityError"
+    }
 }
 
 export function isValidIdempotencyKey(value: unknown): value is string {
@@ -44,24 +54,45 @@ export class IdempotencyCache {
         const cacheKey = `${nodeSessionId}\0${operation}\0${key}`
         const existing = this.entries.get(cacheKey)
         if (existing) return existing.result
-
-        const result = Promise.resolve().then(handler).catch(error => {
-            this.entries.delete(cacheKey)
-            throw error
-        })
-        this.entries.set(cacheKey, { expiresAt: this.now() + this.ttlMs, result })
-        while (this.entries.size > this.maxEntries) {
-            const oldest = this.entries.keys().next().value as string | undefined
-            if (oldest === undefined) break
-            this.entries.delete(oldest)
+        if (this.entries.size >= this.maxEntries && !this.evictOldestSettled()) {
+            return Promise.reject(new IdempotencyCapacityError())
         }
+
+        let entry!: CacheEntry
+        const settle = (): void => {
+            entry.state = "settled"
+            entry.expiresAt = this.now() + this.ttlMs
+        }
+        const result = Promise.resolve().then(handler).then(
+            value => {
+                settle()
+                return value
+            },
+            error => {
+                settle()
+                throw error
+            },
+        )
+        entry = { state: "pending", expiresAt: Number.POSITIVE_INFINITY, result }
+        this.entries.set(cacheKey, entry)
         return result
     }
 
     private cleanup(): void {
         const now = this.now()
         for (const [key, entry] of this.entries) {
-            if (entry.expiresAt <= now) this.entries.delete(key)
+            if (entry.state === "settled" && entry.expiresAt <= now) {
+                this.entries.delete(key)
+            }
         }
+    }
+
+    private evictOldestSettled(): boolean {
+        for (const [key, entry] of this.entries) {
+            if (entry.state !== "settled") continue
+            this.entries.delete(key)
+            return true
+        }
+        return false
     }
 }

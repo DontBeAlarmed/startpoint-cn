@@ -22,6 +22,7 @@ export interface RegisteredNodeSession {
 export interface NodeSessionRegistryOptions {
     readonly now?: () => number
     readonly sessionTtlMs?: number
+    readonly sweepIntervalMs?: number
     readonly generateId?: () => string
     readonly isCredentialEnabled: (credentialId: string) => boolean
     readonly onInvalidated?: (nodeSessionId: NodeSessionId) => void
@@ -35,18 +36,22 @@ export class NodeSessionRegistry {
     private readonly sessions = new Map<NodeSessionId, StoredNodeSession>()
     private readonly now: () => number
     private readonly sessionTtlMs: number
+    private readonly sweepIntervalMs: number
     private readonly generateId: () => string
     private readonly isCredentialEnabled: (credentialId: string) => boolean
     private readonly onInvalidated: (nodeSessionId: NodeSessionId) => void
+    private sweepTimer: NodeJS.Timeout | null = null
 
     constructor(options: NodeSessionRegistryOptions) {
         this.now = options.now ?? Date.now
         this.sessionTtlMs = options.sessionTtlMs ?? 5 * 60_000
+        this.sweepIntervalMs = options.sweepIntervalMs ?? 1_000
         this.generateId = options.generateId ?? (() => randomBytes(32).toString("base64url"))
         this.isCredentialEnabled = options.isCredentialEnabled
         this.onInvalidated = options.onInvalidated ?? (() => {})
-        if (!Number.isSafeInteger(this.sessionTtlMs) || this.sessionTtlMs <= 0) {
-            throw new TypeError("sessionTtlMs must be a positive safe integer")
+        if (!Number.isSafeInteger(this.sessionTtlMs) || this.sessionTtlMs <= 0
+            || !Number.isSafeInteger(this.sweepIntervalMs) || this.sweepIntervalMs <= 0) {
+            throw new TypeError("node session intervals must be positive safe integers")
         }
     }
 
@@ -102,6 +107,26 @@ export class NodeSessionRegistry {
 
     activeCount(): number {
         return this.sessions.size
+    }
+
+    start(): void {
+        if (this.sweepTimer !== null) return
+        this.sweepTimer = setInterval(() => this.sweep(), this.sweepIntervalMs)
+        this.sweepTimer.unref()
+    }
+
+    stop(): void {
+        if (this.sweepTimer === null) return
+        clearInterval(this.sweepTimer)
+        this.sweepTimer = null
+    }
+
+    sweep(): number {
+        let removed = 0
+        for (const stored of [...this.sessions.values()]) {
+            if (!this.validate(stored)) removed++
+        }
+        return removed
     }
 
     clear(): void {

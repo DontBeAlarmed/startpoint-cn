@@ -184,6 +184,7 @@ class Service implements MultiRuntimeService {
                 ),
                 onInvalidated: nodeSessionId => {
                     admissionRegistry.removeByNodeSession(nodeSessionId)
+                    coordinator.cleanupNodeSession(nodeSessionId)
                 },
             })
             this.hostServices = Object.freeze({
@@ -199,6 +200,7 @@ class Service implements MultiRuntimeService {
                 }),
             })
             credentialReloader.start()
+            nodeSessions.start()
             this.context = createEmbeddedMultiHttpContext({
                 coordinator,
                 admissionRegistry,
@@ -347,6 +349,7 @@ class Service implements MultiRuntimeService {
         }
         if (!this.hubAttempted && !this.tcpAttempted) {
             this.hostServices?.credentialReloader.stop()
+            this.hostServices?.nodeSessions.stop()
             this.hostServices?.nodeSessions.clear()
             this.hostServices = null
             this.config = null

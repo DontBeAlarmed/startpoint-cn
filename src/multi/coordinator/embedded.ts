@@ -120,6 +120,7 @@ function unavailableBattle(): CoordinatorResult<BattleStatus> {
 
 export class EmbeddedMultiCoordinator implements MultiCoordinator {
     private readonly allowRemoteParticipants: boolean
+    private readonly hostRoomsByNodeSession = new Map<NodeSessionId, Set<string>>()
 
     constructor(options: EmbeddedMultiCoordinatorOptions = {}) {
         this.allowRemoteParticipants = options.allowRemoteParticipants === true
@@ -148,6 +149,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         )
         compatibilityByRoom.set(room, Object.freeze({ ...input.compatibility }))
         hostIdentityByRoom.set(room, Object.freeze({ ...input.participant }))
+        this.trackHostRoom(input.participant.nodeSessionId, room.room_number)
         return ok(this.toRoomStatus(room))
     }
 
@@ -179,11 +181,25 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             return { ok: false, error: "ROOM_PERMISSION_DENIED" }
         }
 
-        sessionManager.broadcastToRoom(input.roomNumber, [1, [6, "multibattle_room_dismissed"]])
-        if (!disbandLocalRoom(input.roomNumber)) return roomNotFound()
-        compatibilityByRoom.delete(room)
-        hostIdentityByRoom.delete(room)
+        if (!this.removeOwnedRoom(room)) return roomNotFound()
         return ok(undefined)
+    }
+
+    cleanupNodeSession(nodeSessionId: NodeSessionId): number {
+        const roomNumbers = this.hostRoomsByNodeSession.get(nodeSessionId)
+        if (!roomNumbers) return 0
+        let removed = 0
+        for (const roomNumber of [...roomNumbers]) {
+            const room = getRoom(roomNumber)
+            const host = room ? hostIdentityByRoom.get(room) : undefined
+            if (room && host?.nodeSessionId === nodeSessionId && this.removeOwnedRoom(room)) {
+                removed++
+            } else {
+                roomNumbers.delete(roomNumber)
+            }
+        }
+        if (roomNumbers.size === 0) this.hostRoomsByNodeSession.delete(nodeSessionId)
+        return removed
     }
 
     async startBattle(input: RoomParticipantInput): Promise<CoordinatorResult<BattleStatus>> {
@@ -234,6 +250,29 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
     private assertBattleInput(input: BattleSessionInput): void {
         assertParticipant(input.participant, this.allowRemoteParticipants)
         assertNonEmptyString(input.battleSessionId as BattleSessionId, "battleSessionId")
+    }
+
+    private trackHostRoom(nodeSessionId: NodeSessionId, roomNumber: string): void {
+        let roomNumbers = this.hostRoomsByNodeSession.get(nodeSessionId)
+        if (!roomNumbers) {
+            roomNumbers = new Set()
+            this.hostRoomsByNodeSession.set(nodeSessionId, roomNumbers)
+        }
+        roomNumbers.add(roomNumber)
+    }
+
+    private removeOwnedRoom(room: MultiRoom): boolean {
+        const host = hostIdentityByRoom.get(room)
+        sessionManager.broadcastToRoom(room.room_number, [1, [6, "multibattle_room_dismissed"]])
+        if (!disbandLocalRoom(room.room_number)) return false
+        compatibilityByRoom.delete(room)
+        hostIdentityByRoom.delete(room)
+        if (host) {
+            const roomNumbers = this.hostRoomsByNodeSession.get(host.nodeSessionId)
+            roomNumbers?.delete(room.room_number)
+            if (roomNumbers?.size === 0) this.hostRoomsByNodeSession.delete(host.nodeSessionId)
+        }
+        return true
     }
 
     private toRoomStatus(room: MultiRoom): RoomStatus {

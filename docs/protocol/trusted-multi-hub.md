@@ -353,11 +353,11 @@ Authorization: Bearer <sessionCredential>
 x-node-session-id: <nodeSessionId>
 ```
 
-Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的 `participant.nodeSessionId` 强制绑定为已认证会话，节点不能代替另一节点发起操作。写端点还必须携带 1 至 128 位可见 ASCII `x-idempotency-key`；缓存按 `nodeSessionId + operation + key` 隔离，在房间变更 TTL 内返回相同 HTTP 状态和 JSON 结果，不重复调用 Coordinator。业务失败使用 `{ ok: false, code }` 的有限错误集合；内部异常只返回 `HUB_UNAVAILABLE`，404 不回显请求路径，任何响应都不包含 stack、绝对路径或凭据。
+Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的 `participant.nodeSessionId` 强制绑定为已认证会话，节点不能代替另一节点发起操作。写端点还必须携带 1 至 128 位可见 ASCII `x-idempotency-key`；缓存按 `nodeSessionId + operation + key` 隔离，在房间变更 TTL 内返回相同 HTTP 状态和 JSON 结果，不重复调用 Coordinator。执行中的 pending 记录不参与 TTL 或容量淘汰；容量已全部被 pending 占用时，新 key 不执行操作并只返回 `503 HUB_UNAVAILABLE`。成功、有限业务失败和内部失败结果都在完成后进入相同 TTL 与最旧记录回收流程。业务失败使用 `{ ok: false, code }` 的有限错误集合；内部异常只返回 `HUB_UNAVAILABLE`，404 不回显请求路径，任何响应都不包含 stack、绝对路径或凭据。
 
 凭据热加载器默认每秒只检查文件身份、大小和修改时间。元数据未变化时不读取文件；合法变化整体替换不可变内存快照，非法变化只记录无路径、无令牌、无摘要的告警并保留上一份有效快照。文件首次不存在按空快照启动，运行中合法创建后可直接注册。每次控制调用和 TCP 入站帧只通过节点会话关联的 `credentialId` 对快照做 O(1) 启用状态查询，不读文件也不重新计算集群令牌摘要。
 
-密钥撤销后，该密钥关联的每个节点会话会在各自下一次控制调用时失效并清除 admission；TCP 连接在下一帧或最多一次节点会话检查周期内关闭，并复用 lobby 断线流程移除成员，房主断线时解散房间。实现不维护按密钥反查 Socket 的推送索引。另一条仍有效的密钥不受影响，可以继续注册新节点会话。Hub 控制面不读取服务器时间，`QUEST_NOT_AVAILABLE` 仍只由玩家所属服务端按自己的全局服务器时间生成。
+密钥撤销或会话到期后，该节点会话会由下一次显式检查或后台 sweep 统一失效：先清除 admission，再通过 Embedded 的 Hub 内部清理 capability 解散该节点作为房主创建的未连接房间；其他节点房间不受影响。已经连接的 TCP 仍由中央 checker 在握手、下一帧或最多一次节点会话检查周期内关闭，并复用 lobby 断线流程移除成员和解散房主房间，不按凭据主动遍历 Socket。失效回调幂等，同一会话不会重复清理。另一条仍有效的密钥不受影响，可以继续注册新节点会话。Hub 控制面不读取服务器时间，`QUEST_NOT_AVAILABLE` 仍只由玩家所属服务端按自己的全局服务器时间生成。
 
 ## 11. 健康与诊断
 

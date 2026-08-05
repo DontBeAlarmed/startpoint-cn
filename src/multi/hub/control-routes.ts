@@ -134,13 +134,17 @@ function registerOperation(
             ok: false,
             code: "INVALID_IDEMPOTENCY_KEY",
         }))
-        const result = await options.idempotency.execute(
-            session.nodeSessionId,
-            name,
-            idempotencyKey,
-            () => invoke(operation, request.body, session),
-        )
-        return send(reply, result)
+        try {
+            const result = await options.idempotency.execute(
+                session.nodeSessionId,
+                name,
+                idempotencyKey,
+                () => invoke(operation, request.body, session),
+            )
+            return send(reply, result)
+        } catch {
+            return send(reply, response(503, { ok: false, code: "HUB_UNAVAILABLE" }))
+        }
     })
 }
 

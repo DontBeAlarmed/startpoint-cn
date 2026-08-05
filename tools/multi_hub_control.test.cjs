@@ -45,6 +45,16 @@ function snapshot(viewerId) {
     })
 }
 
+function deferred() {
+    let resolve
+    let reject
+    const promise = new Promise((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise
+        reject = rejectPromise
+    })
+    return { promise, reject, resolve }
+}
+
 function roomStatus(participant, roomNumber = "123456") {
     return Object.freeze({
         roomNumber,
@@ -135,7 +145,7 @@ function fixture(t, options = {}) {
     const idempotency = new IdempotencyCache({
         now: () => now,
         ttlMs: options.idempotencyTtlMs ?? 1_000,
-        maxEntries: 32,
+        maxEntries: options.idempotencyMaxEntries ?? 32,
     })
     const app = buildMultiHubControlApp({
         coordinator: coordinator.coordinator,
@@ -392,6 +402,59 @@ test("requires bounded ASCII idempotency keys and isolates cached writes by node
     target.setNow(10_101)
     await invoke(first)
     assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 3)
+})
+
+test("pending write capacity returns bounded unavailable without evicting the replay", async t => {
+    const target = fixture(t, { idempotencyMaxEntries: 1 })
+    const registration = await register(target.app, target.first.token)
+    const coordinatorResult = deferred()
+    target.coordinator.results.set("createRoom", coordinatorResult.promise)
+    const payload = {
+        ...participantInput(registration),
+        requestId: "pending-room",
+        partyId: 1,
+        category: 1,
+        questId: 501,
+        leaderCharacterId: 101,
+        compatibility,
+    }
+    const invoke = key => target.app.inject({
+        method: "POST",
+        url: "/v1/multi/rooms/create",
+        headers: sessionHeaders(registration, key),
+        payload,
+    })
+    const first = invoke("pending-a")
+    while (target.coordinator.calls.length === 0) {
+        await new Promise(resolve => setImmediate(resolve))
+    }
+    const atCapacity = invoke("pending-b")
+    let capacitySettled = false
+    void atCapacity.then(() => { capacitySettled = true })
+    for (let attempt = 0; attempt < 100
+        && !capacitySettled
+        && target.coordinator.calls.length === 1; attempt++) {
+        await new Promise(resolve => setImmediate(resolve))
+    }
+    const replay = invoke("pending-a")
+    await new Promise(resolve => setImmediate(resolve))
+    const callsBeforeSettlement = target.coordinator.calls.length
+
+    coordinatorResult.resolve({ ok: true, value: roomStatus(
+        participantInput(registration).participant,
+        "pending-room",
+    ) })
+    const [firstResponse, capacityResponse, replayResponse] = await Promise.all([
+        first,
+        atCapacity,
+        replay,
+    ])
+
+    assert.equal(callsBeforeSettlement, 1)
+    assert.equal(capacityResponse.statusCode, 503)
+    assert.deepEqual(capacityResponse.json(), { ok: false, code: "HUB_UNAVAILABLE" })
+    assert.equal(firstResponse.body, replayResponse.body)
+    assert.equal(target.coordinator.calls.length, 1)
 })
 
 test("returns bounded coordinator errors without paths, credentials or stack traces", async t => {
