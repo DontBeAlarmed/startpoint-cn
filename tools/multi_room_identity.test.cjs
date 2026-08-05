@@ -380,6 +380,43 @@ test("room route logs never echo unvalidated room payloads", async t => {
     }
 })
 
+test("valid viewers cannot leak missing room lookups through the coordinator", async t => {
+    const fastify = await createRouteServer()
+    t.after(async () => fastify.close())
+    const roomSentinel = "ROOM_TOKEN_SENTINEL_MANAGER_MISS"
+    const cases = [
+        ["/search_room", 200, { category: 1, quest_id: 701 }],
+        ["/select_room", 200, { party_id: 1, category: 1, quest_id: 701 }],
+        ["/prepare", 200, { category: 1, quest_id: 701 }],
+        ["/summon", 400, { category_id: 1, quest_id: 701 }],
+        ["/restore_room", 200, { room_sequence: 1 }],
+        ["/share_room", 403, {}],
+        ["/disband_room", 403, {}],
+    ]
+
+    const output = await captureConsole(async () => {
+        for (const [url, statusCode, extraPayload] of cases) {
+            const response = await fastify.inject({
+                method: "POST",
+                url,
+                payload: {
+                    viewer_id: 202,
+                    room_number: roomSentinel,
+                    api_count: 1,
+                    ...extraPayload,
+                },
+            })
+            assert.equal(response.statusCode, statusCode, url)
+        }
+    })
+
+    assert.doesNotMatch(output, new RegExp(roomSentinel))
+    assert.equal(
+        output.match(/\[MULTI\] room lookup missed/g)?.length,
+        cases.length,
+    )
+})
+
 test("stateless social routes reject invalid viewer ids without resolving player context", async t => {
     let resolverCalls = 0
     const fastify = await createRouteServer({

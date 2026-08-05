@@ -163,8 +163,15 @@ test("multiplayer console calls reject sensitive identifiers and raw errors", ()
         "payload", "raw", "e", "error", "closeError",
     ])
     const violations = []
+    const enclosingFunctionName = node => {
+        for (let current = node.parent; current; current = current.parent) {
+            if (ts.isFunctionDeclaration(current)) return current.name?.text ?? null
+        }
+        return null
+    }
 
     for (const filePath of multiTypeScriptFiles(multiRoot)) {
+        const relativePath = path.relative(multiRoot, filePath)
         const sourceText = fs.readFileSync(filePath, "utf8")
         const sourceFile = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true)
         const inspectLogArgument = (node, callLine) => {
@@ -207,6 +214,11 @@ test("multiplayer console calls reject sensitive identifiers and raw errors", ()
                 && node.expression.expression.getText(sourceFile) === "console"
                 && ["log", "warn", "error"].includes(node.expression.name.text)) {
                 const callLine = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1
+                if (relativePath === path.join("room", "manager.ts")
+                    && enclosingFunctionName(node) === "getRoom"
+                    && node.arguments.some(argument => !ts.isStringLiteral(argument))) {
+                    violations.push(`${relativePath}:${callLine}: variable missing-room diagnostic`)
+                }
                 for (const argument of node.arguments) inspectLogArgument(argument, callLine)
             }
             node.forEachChild(visit)

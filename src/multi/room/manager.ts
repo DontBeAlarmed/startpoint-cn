@@ -150,7 +150,7 @@ export function createRoom(
 
 export function getRoom(roomNumber: string): MultiRoom | undefined {
     const room = rooms.get(roomNumber);
-    if (!room) console.log(`[MULTI] room not found: ${roomNumber}`);
+    if (!room) console.log("[MULTI] room lookup missed");
     return room;
 }
 
