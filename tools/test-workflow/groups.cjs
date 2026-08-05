@@ -186,6 +186,13 @@ const TEST_GROUPS = Object.freeze({
             "tools/runtime_compiled_smoke.test.cjs",
         ],
     },
+    "integration:multi-hub": {
+        execution: "serial",
+        timeoutMs: 180_000,
+        tests: [
+            "tests/multi-hub-process.test.js",
+        ],
+    },
     "integration:content": {
         execution: "serial",
         tests: [

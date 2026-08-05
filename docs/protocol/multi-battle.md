@@ -11,6 +11,7 @@
 - lobby 内的 Welcome、Mates、Ready、Start 和心跳；
 - battle TCP 的 SceneReady 屏障和普通 Broadcast/Send 中继；
 - 超级猫头鹰 BothBoss 的 LevelNext、第二代 SceneReady 和最终 Finalize；
+- `embedded`、可信 LAN/VPN `host`、`client` 三种运行模式，以及三独立进程的服务端集成验证；
 - 多人 active quest 写入 SQLite，并在 `/load` 中返回未完成关卡；
 - 全部剩余真人 Finalize 后由 coordinator 权威释放当局，并把现有房间恢复到可重赛状态；
 - 房间级随机 access token、房主权限和断线成员恢复边界；
@@ -18,7 +19,7 @@
 
 当前不完整或缺失的能力：
 
-- 真人随机匹配和完整的双客户端流程；
+- 真人随机匹配和完整的双客户端真机流程；
 - 多场景进程重启恢复和客户端完整异常链；
 - 进程重启后的房间和 TCP 会话恢复；
 - 真人成员、重赛、昵称显示和 TCP 中断的完整客户端回归矩阵。
@@ -26,6 +27,10 @@
 基础 NPC 房主流程已有实际使用。自动测试覆盖服务端状态机，但不能替代 CN 客户端验收。
 
 ## 2. 组件与数据边界
+
+默认 `embedded` 把游戏 HTTP、Coordinator 和 TCP 放在同一服务进程中，普通用户无需额外配置。可选 `host` 在自身 `8001` 游戏 HTTP 外提供 `8003` Hub TCP 和 `8004` Hub control；`client` 只保留自己的 `8001`，通过 `8004` 控制房间，游戏客户端按房间响应直连 Host `8003`。三种模式都保持玩家 SQLite 与结算在所属服务端本地。
+
+Hub 不代理游戏主 API、CDN 或后台，也不自动对齐资源与服务器时间。版本或内容不兼容时，`search_room`/`verify_access_token` 映射为 `4020` NotPlayable，`select_room` 返回 `raising_state=7`，`prepare` 返回 `4507`；只有真实缺房才使用 `room_exists=false` 或 `raising_state=9`。
 
 多人联机由六类组件组成：
 
@@ -374,6 +379,8 @@ CN Notify 索引已经按 `SceneReady=0`、`LevelNext=1`、`Finalize=2`、`Measu
 | 真人随机匹配 | 缺失 |
 | 超级猫头鹰多场景 | 服务端状态机已实现，CN 客户端待验收 |
 
+其中“真人双客户端”已有三个编译服务进程的自动集成覆盖，包括各自 SQLite、两至三人 TCP、Host-only 扣费和本地奖励；表中缺口专指 CN 客户端真机交互、显示与异常体验验收。
+
 全项目人工状态以[测试进度](../status/test-progress.md)和[支持矩阵](../status/support-matrix.md)为准。自动测试通过不得写成客户端已经通过。
 
 ## 13. 源码与测试入口
@@ -390,6 +397,7 @@ CN Notify 索引已经按 `SceneReady=0`、`LevelNext=1`、`Finalize=2`、`Measu
 | `tools/lobby_lifecycle.test.cjs` | NPC 招募、成员、准备和重赛状态 |
 | `tools/room_cleanup_lifecycle.test.cjs` | 15/30 分钟清理与 state 4 跳过 |
 | `tools/session_server_lifecycle.test.cjs` | TCP 启停和会话生命周期 |
+| `tests/multi-hub-process.test.js` | 三编译进程、独立 SQLite、兼容/时间/身份准入、BothBoss、会话轮换与 Hub degraded |
 | `tools/multi_player_context.test.cjs` | viewer、账号与存档映射 |
 | `tools/npc_contributor_names.test.cjs` | NPC 昵称数据契约 |
 | `tools/npc_nickname_pool.test.cjs` | 昵称抽样和房间稳定性 |

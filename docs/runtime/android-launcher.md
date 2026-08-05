@@ -14,6 +14,19 @@ TCP Session: 127.0.0.1:8003
 
 ADB 代理、代理拦截、root 静默安装、设备兼容矩阵、厂商保活和完整局域网体验不属于 v1。监听地址和客户端 API 地址仍必须在 profile 中分开保存，为后续局域网或自定义服务地址保留配置边界。
 
+## 可选多人模式
+
+Launcher 不提供多人业务逻辑。未配置时始终使用服务端默认 `MULTI_MODE=embedded`，普通用户不需要看到 Hub、令牌或额外端口设置。
+
+后续可信局域网或 VPN profile 可以把同一 Server Bundle 作为 `host` 或 `client` 启动：
+
+- `host` 保留本机 `8001`，并提供可达的 `8003` Hub TCP 与 `8004` Hub 控制接口；
+- `client` 只保留本机 `8001`，设置 `MULTI_HUB_URL` 和一条服主分发的 `MULTI_HUB_TOKEN`，游戏 TCP 按房间响应直连 Host `8003`；
+- 每台设备的 `DATA_DIR`、SQLite、体力、门票、奖励和任务结算保持本地独立；
+- Launcher 不自动复制、下载或对齐另一节点的 CDN、Content Release、Mod 或服务器时间。
+
+当前令牌流程以 Host 上的 `npm run multi:token -- create/list/revoke` 为权威 CLI，Client 令牌只进入壳私有配置或环境变量，不进入 profile 导出、日志、二维码历史或仓库。`8004` 只承载运行中的房间控制，不暴露令牌管理。完整契约见[可信多人 Hub](../protocol/trusted-multi-hub.md)。
+
 ## 资源模式
 
 - `client-owned` 是首版默认模式。客户端已经下载全量 CDN 时，服务端不读取本机 CDN，也不主动发布资源更新；没有 `CDN_DIR` 仍可进入 `ready`。
@@ -87,3 +100,5 @@ Launcher 提供服务端、TCP、CDN 校验、补丁器和壳自身的来源筛�
 壳以前台服务运行服务端并显示常驻通知。只保证应用未被系统杀死或强制停止时服务正常运行；不实现开机启动、厂商保活、双进程守护或无限自动重启。
 
 后台由服务端 Bundle 的 React 产物提供，Launcher 只打开 `http://<host>:<port>/admin/`，不复制或内嵌后台业务逻辑。
+
+多人管理以后统一通过服务端 `MultiManagementService` 边界实现；CLI、React 后台和 Launcher 只能作为适配器，不得各自直接改密钥表或多人内部状态。在后台账号与权限系统完成前，React 后台只能显示多人只读诊断，不能提供令牌创建、撤销或配置写入。服务器时间分享是独立管理能力，不属于 Hub，也不得由加入房间自动触发。

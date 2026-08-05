@@ -55,7 +55,13 @@ const SOURCE_RULES = [
     { pattern: /^src\/routes\/cn\/load\.ts$/, groups: ["full", "integration:mission", "quick:protocol"] },
     {
         pattern: /^src\/cn-server\.ts$/,
-        groups: ["integration:cdn", "integration:database", "integration:runtime", "full"],
+        groups: [
+            "integration:cdn",
+            "integration:database",
+            "integration:multi-hub",
+            "integration:runtime",
+            "full",
+        ],
     },
     {
         pattern: /^src\/server\.ts$/,
@@ -88,11 +94,11 @@ const SOURCE_RULES = [
     { pattern: /^assets\/gacha-seed-catalog\//, groups: ["quick:seed"] },
     {
         pattern: /^src\/runtime\/(?:bundle-metadata|config|health|lifecycle)\.ts$/,
-        groups: ["quick:runtime", "integration:runtime"],
+        groups: ["quick:runtime", "integration:runtime", "integration:multi-hub"],
     },
     {
         pattern: /^src\/multi\/(?:hub|runtime)\//,
-        groups: ["quick:runtime", "quick:protocol"],
+        groups: ["quick:runtime", "quick:protocol", "integration:multi-hub"],
     },
     { pattern: /^tools\/server-bundle\//, groups: ["quick:runtime"] },
     { pattern: /^docs\/runtime\/server-bundle\.md$/, groups: ["quick:runtime"] },
@@ -190,7 +196,7 @@ const SOURCE_RULES = [
         pattern: /^(?:assets\/server\/npc_contributor_names\.json|tools\/npc_contributor_names(?:\.test)?\.cjs)$/,
         groups: ["quick:protocol"],
     },
-    { pattern: /^src\/multi\//, groups: ["quick:protocol"] },
+    { pattern: /^src\/multi\//, groups: ["quick:protocol", "integration:multi-hub"] },
     { pattern: /^src\/multi\/tcp\/server\.ts$/, groups: ["integration:runtime"] },
     {
         pattern: /^src\/data\/(?!player-save\/|defaultSave\.ts$)/,
@@ -222,6 +228,14 @@ function groupsForFile(filePath) {
         return ["integration:cdn", "integration:content"]
     }
     if (filePath === "docs/protocol/seed-verification.md") return ["quick:seed"]
+    if (filePath === "tests/helpers/multi-hub-process-harness.js"
+        || filePath.startsWith("tools/fixtures/multi-hub/")
+        || [
+            "docs/protocol/multi-battle.md",
+            "docs/protocol/trusted-multi-hub.md",
+            "docs/runtime/android-launcher.md",
+            "docs/getting-started/network-boundary.md",
+        ].includes(filePath)) return ["integration:multi-hub"]
 
     const matchedGroups = SOURCE_RULES
         .filter(rule => rule.pattern.test(filePath))

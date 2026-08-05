@@ -94,7 +94,13 @@ test("maps representative source files to focused groups", () => {
     )
     assert.deepEqual(
         selectTestGroups(["src/cn-server.ts"]),
-        ["full", "integration:cdn", "integration:database", "integration:runtime"],
+        [
+            "full",
+            "integration:cdn",
+            "integration:database",
+            "integration:multi-hub",
+            "integration:runtime",
+        ],
     )
     assert.deepEqual(
         selectTestGroups(["src/server.ts"]),
@@ -125,7 +131,7 @@ test("maps representative source files to focused groups", () => {
     )
     assert.deepEqual(
         selectTestGroups(["src/runtime/lifecycle.ts"]),
-        ["integration:runtime", "quick:runtime"],
+        ["integration:multi-hub", "integration:runtime", "quick:runtime"],
     )
     assert.deepEqual(selectTestGroups(["tools/server-bundle/build.cjs"]), ["quick:runtime"])
     assert.deepEqual(selectTestGroups(["tools/server-bundle/verify.cjs"]), ["quick:runtime"])
@@ -137,27 +143,27 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/content/sync/entry.ts"]), ["quick:content"])
     assert.deepEqual(
         selectTestGroups(["src/multi/tcp/server.ts"]),
-        ["integration:runtime", "quick:protocol"],
+        ["integration:multi-hub", "integration:runtime", "quick:protocol"],
     )
     assert.deepEqual(
         selectTestGroups(["src/multi/coordinator/contracts.ts"]),
-        ["quick:protocol"],
+        ["integration:multi-hub", "quick:protocol"],
     )
     assert.deepEqual(
         selectTestGroups(["src/multi/coordinator/embedded.ts"]),
-        ["quick:protocol"],
+        ["integration:multi-hub", "quick:protocol"],
     )
     assert.deepEqual(
         selectTestGroups(["src/multi/http/context.ts"]),
-        ["quick:protocol"],
+        ["integration:multi-hub", "quick:protocol"],
     )
     assert.deepEqual(
         selectTestGroups(["src/multi/admission/registry.ts"]),
-        ["quick:protocol"],
+        ["integration:multi-hub", "quick:protocol"],
     )
     assert.deepEqual(
         selectTestGroups(["src/multi/snapshot/player-snapshot.ts"]),
-        ["quick:protocol"],
+        ["integration:multi-hub", "quick:protocol"],
     )
     assert.deepEqual(
         selectTestGroups(["tools/multi_coordinator_contract.test.cjs"]),
@@ -334,6 +340,26 @@ test("registers focused runtime state and socket smoke groups", () => {
     })
 })
 
+test("registers the trusted multi-hub process suite as a bounded serial group", () => {
+    assert.deepEqual(TEST_GROUPS["integration:multi-hub"], {
+        execution: "serial",
+        timeoutMs: 180_000,
+        tests: ["tests/multi-hub-process.test.js"],
+    })
+    assert.deepEqual(
+        selectTestGroups(["tests/multi-hub-process.test.js"]),
+        ["integration:multi-hub"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tests/helpers/multi-hub-process-harness.js"]),
+        ["integration:multi-hub"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/fixtures/multi-hub/README.md"]),
+        ["integration:multi-hub"],
+    )
+})
+
 test("routes multiplayer runtime and private credential changes to focused groups", () => {
     for (const source of [
         "src/multi/hub/token.ts",
@@ -345,7 +371,7 @@ test("routes multiplayer runtime and private credential changes to focused group
     ]) {
         assert.deepEqual(
             selectTestGroups([source]),
-            ["quick:protocol", "quick:runtime"],
+            ["integration:multi-hub", "quick:protocol", "quick:runtime"],
             source,
         )
     }

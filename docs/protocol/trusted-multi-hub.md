@@ -1,6 +1,6 @@
 # 可信局域网多人 Hub 架构设计
 
-状态：已确认设计
+状态：首期服务端已实现，CN 客户端真机待验收
 
 日期：2026-08-05
 
@@ -378,7 +378,7 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 
 ### 12.1 自动测试
 
-必须覆盖：
+单元、路由与状态机测试覆盖：
 
 - `embedded` 模式现有 NPC、真人和超级猫头鹰流程不回归；
 - 两个独立临时数据库通过不同节点会话加入同一房间；
@@ -403,13 +403,27 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 
 ### 12.2 本机集成测试
 
-一台开发机启动三个隔离进程：
+`tests/multi-hub-process.test.js` 直接启动三个编译后的 `out/cn-server.js` 进程：
 
 ```text
-Hub/主机服务 + 客机服务 A + 客机服务 B
+Host: HTTP A + Hub control + Hub TCP + SQLite A
+Client B: HTTP B + SQLite B
+Client C: HTTP C + SQLite C
 ```
 
-每个服务使用独立端口和临时数据库，验证房间、TCP、扣费、结算和故障隔离，不依赖多台手机。
+测试使用动态回环端口、隔离临时 `DATA_DIR` 和同一份只读运行表，不依赖固定端口、本机绝对路径或源码内 mock。它通过真实 MsgPack HTTP 与空字符分帧 TCP 驱动节点懒注册、建房、查房、准备、两至三人握手、开战、Finalize 和各节点 finish，并直接核对三个 SQLite。
+
+当前进程矩阵已验证：
+
+- 兼容性差异映射为不可加入且不设置 CDN 更新；
+- 跨节点相同裸 `viewerId` 在 admission 前拒绝，原房间仍可加入；
+- 各节点时间不同但都在开放期时可加入，开放期外成员收到 NotPlayable 且房间不删除；
+- 只有游戏房主扣体力和门票，每名参与者的奖励分别写入自己的 SQLite；
+- 超级猫头鹰 BothBoss 完成两代 SceneReady，提前 HTTP finish 被拒绝，延迟 finish 可继续使用 retained fact；
+- Client 进程重启产生新的 node session 后，`/load` 仍保留 active quest，并可完成轮换后的 finish；
+- Host/Hub 停止后 Client 核心 HTTP 与 SQLite 继续工作，多人进入 degraded，active quest 不被误删，Guest abort 可本地收敛。
+
+进程、socket、端口和临时目录由测试统一清理；TTL、撤销和 session sweep 的时间推进继续由现有确定性状态机测试覆盖，不在进程测试中重复长时间等待。
 
 ### 12.3 壳与真机验收
 
@@ -423,17 +437,17 @@ Hub/主机服务 + 客机服务 A + 客机服务 B
 - 不兼容资源组合使用客户端已有的“无法加入”或通用失败提示，后台可见差异；
 - Hub 停止后两边单人流程仍可使用。
 
-## 13. 实施规模与顺序
+## 13. 管理能力边界
 
-预计生产代码约 2500 至 4500 行，测试代码规模与生产代码接近，整体约 2 至 4 周。实施顺序为：
+首期已经完成 Coordinator、玩家快照、host/client、TCP admission、本地 start/finish/abort/load、兼容性摘要与只读后台诊断。后续管理能力必须收敛到统一的 `MultiManagementService`：
 
-1. 抽出 Coordinator、玩家快照和结算验证接口，`embedded` 行为保持不变；
-2. 增加 Hub 控制接口、节点会话和 host 模式；
-3. 增加远端适配器、client 模式和直接 TCP admission；
-4. 接入 start、finish、abort、load 与多场景事实；
-5. 增加兼容性摘要、只读查房校验、后台诊断和完整测试。
+- `MultiManagementService` 是创建、列出、撤销节点凭据和读取管理状态的唯一业务边界；
+- CLI、React 后台与 Android Launcher 只做输入输出适配，不得各自直接写密钥表、节点会话或房间状态；
+- `8004` 只保留运行时 Hub 控制协议，不增加凭据管理、配置写入或后台管理端点；
+- React 后台在账号、认证和权限系统完成前只允许只读诊断，不提供令牌创建、撤销或多人配置写入；
+- 服务器时间分享、导入与回滚属于独立管理服务，不进入 Hub，不随建房、查房或准备自动触发。
 
-每阶段独立验证和提交，不在首期引入公网联邦、持久房间或自动资源对齐。
+本节只记录架构边界，当前不实现 `MultiManagementService` 或新的管理 UI。
 
 ## 14. 后续可选的时间对齐与恢复
 

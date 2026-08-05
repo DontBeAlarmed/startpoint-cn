@@ -17,6 +17,8 @@ StarPoint CN 是《世界弹射物语》国服（雷霆）客户端的非官方�
 
 网络运行范围为本机和受信任的局域网。服务端不提供公网管理后台鉴权、TCP TLS 或云安全承诺；变量语义和范围见[网络支持边界](./docs/getting-started/network-boundary.md)。
 
+多人联机默认使用 `embedded`，无需修改配置，HTTP 与 TCP 分别使用本机 `8001`、`8003`。`host`/`client` 是可选的可信局域网或 VPN 功能：各节点继续使用自己的 HTTP、SQLite 和本地结算，只把房间控制交给 Host 的 `8004`，游戏 TCP 直连 Host 的 `8003`。节点不会自动对齐 CDN、内容、Mod 或服务器时间；不兼容时只拒绝加入。完整边界见[可信多人 Hub](./docs/protocol/trusted-multi-hub.md)。
+
 ## 当前状态
 
 服务端已经覆盖账号与存档、主要养成、单人关卡、部分特殊活动、抽卡、商店、邮件、NPC 协力及内容运行时，但仍有部分端点、任务分类和客户端流程尚未完成验收。
@@ -38,6 +40,8 @@ bash scripts/start-cn.sh
 ```
 
 启动脚本会先编译 CN 服务端，再按资源模式启动：`local` 先执行 `content:sync`，成功后启动；`remote` 和 `client-owned` 不执行本地内容同步，直接按该模式初始化并启动。详细准备、目录和故障排查见[运行服务](./docs/getting-started/README.md)。
+
+默认多人模式就是 `embedded`，普通用户不需要配置 Hub、令牌或额外端口。只有明确要让多台各自持有存档的服务端联机时，才配置 `host`/`client`。
 
 ## 安装 CDN 增量补丁
 
