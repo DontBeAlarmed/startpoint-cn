@@ -594,9 +594,6 @@ export class SessionManager {
                 participant: Object.freeze({ ...participant.participant }),
             })
         }
-        this.battleParticipants.set(roomNumber, participantMap)
-        this.battleHostParticipants.set(roomNumber, Object.freeze({ ...hostParticipant }))
-        this.resetBattleScene(roomNumber, participantMap.size)
         this.battleFacts.releaseRoom(roomNumber)
         if (participantMap.size > 0) {
             this.battleFacts.startBattle({
@@ -605,6 +602,9 @@ export class SessionManager {
                 participants: [...participantMap.values()].map(value => value.participant),
             })
         }
+        this.battleParticipants.set(roomNumber, participantMap)
+        this.battleHostParticipants.set(roomNumber, Object.freeze({ ...hostParticipant }))
+        this.resetBattleScene(roomNumber, participantMap.size)
     }
 
     getActiveBattleSessionId(roomNumber: string) {

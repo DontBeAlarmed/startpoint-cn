@@ -11,7 +11,8 @@ const {
     cleanupAbortedMultiBattle,
 } = require("../src/multi/http/battle")
 const { createRoom, disbandRoom, getRoom } = require("../src/multi/room/manager")
-const { sessionManager } = require("../src/multi/state/SessionManager")
+const { BattleFactStore } = require("../src/multi/settlement/facts")
+const { SessionManager, sessionManager } = require("../src/multi/state/SessionManager")
 const { handleBattleMessage } = require("../src/multi/tcp/battle")
 const { handleHandshake } = require("../src/multi/tcp/handshake")
 const { handleMessage: handleLobbyMessage } = require("../src/multi/tcp/lobby")
@@ -76,6 +77,52 @@ test.afterEach(() => {
 })
 
 test.after(() => restoreContentSnapshot())
+
+test("rejected battle setup publishes no room state and permits retry", () => {
+    let sequence = 0
+    const manager = new SessionManager()
+    manager.battleFacts = new BattleFactStore({
+        maxRecords: 1,
+        createBattleSessionId: () => `battle-${++sequence}`,
+    })
+    const occupiedHost = { nodeSessionId: "occupied-node", viewerId: 700001 }
+    manager.battleFacts.startBattle({
+        roomNumber: "occupied-room",
+        host: occupiedHost,
+        participants: [occupiedHost],
+    })
+    const roomNumber = "retry-room"
+    const retryHost = { nodeSessionId: "retry-node", viewerId: 700002 }
+    const participants = [{ connectionId: "retry-cid", participant: retryHost }]
+
+    assert.throws(() => manager.setBattleParticipants(
+        roomNumber,
+        participants,
+        retryHost,
+    ), /capacity/i)
+    assert.equal(manager.getActiveBattleSessionId(roomNumber), null)
+    for (const field of [
+        "battleParticipants",
+        "battleHostParticipants",
+        "battleExpectedCount",
+        "battleSceneGeneration",
+        "sceneReadyClients",
+        "sceneTransitionClients",
+        "battleStartDeliveredClients",
+        "finalizedBattleParticipantKeys",
+    ]) {
+        assert.equal(manager[field].has(roomNumber), false, `${field} must remain unpublished`)
+    }
+
+    manager.clearBattleSceneState("occupied-room")
+    manager.setBattleParticipants(roomNumber, participants, retryHost)
+
+    assert.equal(manager.getActiveBattleSessionId(roomNumber), "battle-2")
+    assert.equal(manager.battleParticipants.get(roomNumber).size, 1)
+    assert.deepEqual(manager.battleHostParticipants.get(roomNumber), retryHost)
+    assert.equal(manager.battleExpectedCount.get(roomNumber), 1)
+    assert.equal(manager.battleSceneGeneration.get(roomNumber), 0)
+})
 
 test("BothBoss performs a second SceneReady barrier and finalizes only after index 2", () => {
     const battle = createBattle(1001002, 2)

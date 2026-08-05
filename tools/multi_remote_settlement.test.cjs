@@ -155,6 +155,50 @@ test("Hub battle facts survive room release but expire within thirty minutes", (
     }), { ok: false, error: "ROOM_NOT_FOUND" })
 })
 
+test("Hub battle fact retention keeps the first finalize deadline after participant removal", () => {
+    let now = 1_000
+    const store = new BattleFactStore({
+        now: () => now,
+        retentionMs: 100,
+        createBattleSessionId: () => "fixed-deadline-battle",
+    })
+    const started = store.startBattle({
+        roomNumber: "123456",
+        host,
+        participants: [host, guest],
+    })
+    assert.equal(store.markFinalized({
+        participant: host,
+        roomNumber: "123456",
+        battleSessionId: started.battleSessionId,
+    }).ok, true)
+
+    now += 50
+    assert.equal(store.removeParticipant({
+        participant: host,
+        roomNumber: "123456",
+    }).ok, true)
+    assert.equal(store.markFinalized({
+        participant: guest,
+        roomNumber: "123456",
+        battleSessionId: started.battleSessionId,
+    }).ok, true)
+    store.releaseRoom("123456")
+
+    now = 1_099
+    assert.equal(store.getBattleStatus({
+        participant: guest,
+        roomNumber: "123456",
+        battleSessionId: started.battleSessionId,
+    }).ok, true)
+    now = 1_100
+    assert.deepEqual(store.getBattleStatus({
+        participant: guest,
+        roomNumber: "123456",
+        battleSessionId: started.battleSessionId,
+    }), { ok: false, error: "ROOM_NOT_FOUND" })
+})
+
 test("Hub battle facts discard unfinished records when their room is released", () => {
     const store = new BattleFactStore({ createBattleSessionId: () => "abandoned-battle" })
     store.startBattle({ roomNumber: "123456", host, participants: [host, guest] })
