@@ -307,10 +307,14 @@ test("socket error and close share exactly one session cleanup", async () => {
 test("TCP parse, socket error, and close logs omit addresses and raw errors", async () => {
     let fakeServer
     const socket = new FakeSocket()
+    const maliciousSocket = new FakeSocket()
     socket.remoteAddress = "203.0.113.202"
     socket.remotePort = 61982
     const socketError = Object.assign(new Error("ERROR_SENTINEL_TCP_SOCKET"), {
         code: "ECONNRESET",
+    })
+    const maliciousSocketError = Object.assign(new Error("ERROR_SENTINEL_TCP_MALICIOUS"), {
+        code: "TOKEN_SENTINEL_TCP_CODE",
     })
 
     const output = await captureConsole(async () => {
@@ -325,6 +329,8 @@ test("TCP parse, socket error, and close logs omit addresses and raw errors", as
         fakeServer.accept(socket)
         socket.emit("data", "{\"token\":\"TOKEN_SENTINEL_TCP_PARSE\"\0")
         socket.emit("error", socketError)
+        fakeServer.accept(maliciousSocket)
+        maliciousSocket.emit("error", maliciousSocketError)
         await stopSessionServer()
     })
 
@@ -334,11 +340,14 @@ test("TCP parse, socket error, and close logs omit addresses and raw errors", as
         "198.51.100.202",
         "61983",
         "ERROR_SENTINEL_TCP_SOCKET",
+        "ERROR_SENTINEL_TCP_MALICIOUS",
         "TOKEN_SENTINEL_TCP_PARSE",
+        "TOKEN_SENTINEL_TCP_CODE",
     ]) assert.doesNotMatch(output, new RegExp(sentinel))
     assert.match(output, /\[TCP\] connection accepted/)
     assert.match(output, /\[TCP\] parse failed: code=UNKNOWN/)
     assert.match(output, /\[TCP\] socket error: code=ECONNRESET/)
+    assert.match(output, /\[TCP\] socket error: code=UNKNOWN/)
     assert.match(output, /\[TCP\] connection closed/)
 })
 
@@ -924,10 +933,10 @@ test("runtime server errors perform fatal teardown, retain safe diagnostics, and
     assert.deepEqual(getLobbyLifecycleStatus(), { running: true, activeTimers: 0 })
 
     const runtimeError = Object.assign(new Error("must-not-appear-sensitive-detail"), {
-        code: "E_RUNTIME_TEST",
+        code: "TOKEN_SENTINEL_RUNTIME_CODE",
     })
     const closePhaseError = Object.assign(new Error("close-phase-detail"), {
-        code: "E_RUNTIME_CLOSE_TEST",
+        code: "TOKEN_SENTINEL_CLOSE_CODE",
     })
     const originalRuntimeClose = runtimeServer.close.bind(runtimeServer)
     let runtimeCloseCalls = 0
@@ -935,21 +944,25 @@ test("runtime server errors perform fatal teardown, retain safe diagnostics, and
         runtimeCloseCalls++
         return originalRuntimeClose(callback)
     }
-    runtimeServer.emit("error", runtimeError)
-    runtimeServer.emit("error", closePhaseError)
-    const immediateStatus = getSessionServerStatus()
-    const fatalCompleted = await waitFor(
-        () => {
-            const status = getSessionServerStatus()
-            return status.phase === "failed"
-                && status.activeSockets === 0
-                && status.pendingHandshakes === 0
-                && runtimeServer.listenerCount("error") === 0
-                && !runtimeServer.listening
-        },
-        "runtime fatal teardown did not complete",
-        120,
-    ).then(() => true, () => false)
+    let immediateStatus
+    let fatalCompleted
+    const runtimeOutput = await captureConsole(async () => {
+        runtimeServer.emit("error", runtimeError)
+        runtimeServer.emit("error", closePhaseError)
+        immediateStatus = getSessionServerStatus()
+        fatalCompleted = await waitFor(
+            () => {
+                const status = getSessionServerStatus()
+                return status.phase === "failed"
+                    && status.activeSockets === 0
+                    && status.pendingHandshakes === 0
+                    && runtimeServer.listenerCount("error") === 0
+                    && !runtimeServer.listening
+            },
+            "runtime fatal teardown did not complete",
+            120,
+        ).then(() => true, () => false)
+    })
     const failedStatus = getSessionServerStatus()
     const roomStatus = getRoomCleanupStatus()
     const lobbyStatus = getLobbyLifecycleStatus()
@@ -975,13 +988,17 @@ test("runtime server errors perform fatal teardown, retain safe diagnostics, and
 
     assert.equal(immediateStatus.phase, "failed")
     assert.equal(immediateStatus.listening, false)
-    assert.deepEqual(immediateStatus.lastFailure, { stage: "runtime", code: "E_RUNTIME_TEST" })
+    assert.deepEqual(immediateStatus.lastFailure, { stage: "runtime", code: null })
     assert.equal(JSON.stringify(immediateStatus).includes(runtimeError.message), false)
-    assert.deepEqual(fatalFailures, [{ stage: "runtime", code: "E_RUNTIME_TEST" }])
+    assert.deepEqual(fatalFailures, [{ stage: "runtime", code: null }])
+    assert.doesNotMatch(runtimeOutput, /TOKEN_SENTINEL_(?:RUNTIME|CLOSE)_CODE/)
+    assert.match(runtimeOutput, /\[TCP\] fatal session server error: code=UNKNOWN/)
+    assert.match(runtimeOutput, /\[TCP\] server error during fatal teardown: code=UNKNOWN/)
+    assert.match(runtimeOutput, /\[TCP\] fatal teardown close failed: code=UNKNOWN/)
     assert.ok(applicationStopPromise)
     await assert.rejects(
         applicationStopPromise,
-        error => error.code === "E_RUNTIME_CLOSE_TEST",
+        error => error.code === "TOKEN_SENTINEL_CLOSE_CODE",
     )
     assert.equal(fatalCompleted, true)
     assert.deepEqual(failedStatus, {
@@ -989,7 +1006,7 @@ test("runtime server errors perform fatal teardown, retain safe diagnostics, and
         listening: false,
         activeSockets: 0,
         pendingHandshakes: 0,
-        lastFailure: { stage: "runtime", code: "E_RUNTIME_TEST" },
+        lastFailure: { stage: "runtime", code: null },
     })
     assert.deepEqual(roomStatus, { running: false })
     assert.deepEqual(lobbyStatus, { running: false, activeTimers: 0 })

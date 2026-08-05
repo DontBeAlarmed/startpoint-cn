@@ -94,6 +94,17 @@ const stoppedPromise = Promise.resolve()
 const acceptedSockets = new Set<net.Socket>()
 const pendingHandshakes = new Set<HandshakeRecord>()
 const socketHandshakes = new Map<net.Socket, HandshakeRecord>()
+const LOGGABLE_FAILURE_CODES: ReadonlySet<string> = new Set([
+    "EACCES",
+    "EADDRINUSE",
+    "ECONNABORTED",
+    "ECONNRESET",
+    "EHOSTUNREACH",
+    "ENETUNREACH",
+    "EPIPE",
+    "ERR_SERVER_NOT_RUNNING",
+    "ETIMEDOUT",
+])
 
 function cleanupSession(socket: net.Socket): void {
     try {
@@ -273,7 +284,7 @@ function finalizeContext(context: ServerContext): void {
 
 function failureCode(error: unknown): string | null {
     const code = (error as NodeJS.ErrnoException | null)?.code
-    return typeof code === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(code) ? code : null
+    return typeof code === "string" && LOGGABLE_FAILURE_CODES.has(code) ? code : null
 }
 
 function recordFailure(stage: SessionServerFailureStage, error: unknown): void {

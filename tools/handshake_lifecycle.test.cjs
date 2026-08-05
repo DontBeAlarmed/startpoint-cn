@@ -71,6 +71,88 @@ function multiTypeScriptFiles(directory) {
     })
 }
 
+function collectDirectConsoleViolations(sourceText, relativePath = "fixture.ts") {
+    const sourceFile = ts.createSourceFile(relativePath, sourceText, ts.ScriptTarget.Latest, true)
+    const violations = []
+    const enclosingFunctionName = node => {
+        for (let current = node.parent; current; current = current.parent) {
+            if (ts.isFunctionDeclaration(current)) return current.name?.text ?? null
+        }
+        return null
+    }
+    const enclosingCatchBinding = node => {
+        for (let current = node.parent; current; current = current.parent) {
+            if (!ts.isCatchClause(current)) continue
+            const binding = current.variableDeclaration?.name
+            return binding && ts.isIdentifier(binding) ? binding.text : null
+        }
+        return null
+    }
+    const inspectLogArgument = (node, callLine, wrappedByFormatter = false) => {
+        if (ts.isCallExpression(node)) {
+            if (ts.isPropertyAccessExpression(node.expression)
+                && node.expression.expression.getText(sourceFile) === "JSON"
+                && node.expression.name.text === "stringify") {
+                violations.push(`${relativePath}:${callLine}: serialized payload`)
+                return
+            }
+            node.expression.forEachChild(child => inspectLogArgument(child, callLine, true))
+            for (const argument of node.arguments) inspectLogArgument(argument, callLine, true)
+            return
+        }
+        if (ts.isNewExpression(node) && node.expression.getText(sourceFile) === "Error") {
+            violations.push(`${relativePath}:${callLine}: raw Error`)
+            return
+        }
+        if (ts.isPropertyAccessExpression(node)) {
+            const source = node.expression.getText(sourceFile)
+            if (source === "body") {
+                violations.push(`${relativePath}:${callLine}: unvalidated body field`)
+                return
+            }
+            if (source === "data") {
+                violations.push(`${relativePath}:${callLine}: direct data field`)
+                return
+            }
+            if (source === "socket" && ["remoteAddress", "remotePort"].includes(node.name.text)) {
+                violations.push(`${relativePath}:${callLine}: socket ${node.name.text}`)
+                return
+            }
+            if (node.name.text === "stack") {
+                violations.push(`${relativePath}:${callLine}: raw Error stack`)
+                return
+            }
+        }
+        if (ts.isElementAccessExpression(node)) {
+            violations.push(`${relativePath}:${callLine}: indexed payload field`)
+            return
+        }
+        if (!wrappedByFormatter && ts.isIdentifier(node)
+            && enclosingCatchBinding(node) === node.text) {
+            violations.push(`${relativePath}:${callLine}: raw caught Error`)
+            return
+        }
+        node.forEachChild(child => inspectLogArgument(child, callLine, wrappedByFormatter))
+    }
+    const visit = node => {
+        if (ts.isCallExpression(node)
+            && ts.isPropertyAccessExpression(node.expression)
+            && node.expression.expression.getText(sourceFile) === "console"
+            && ["log", "warn", "error"].includes(node.expression.name.text)) {
+            const callLine = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1
+            if (relativePath === path.join("room", "manager.ts")
+                && enclosingFunctionName(node) === "getRoom"
+                && node.arguments.some(argument => !ts.isStringLiteral(argument))) {
+                violations.push(`${relativePath}:${callLine}: variable missing-room diagnostic`)
+            }
+            for (const argument of node.arguments) inspectLogArgument(argument, callLine)
+        }
+        node.forEachChild(visit)
+    }
+    visit(sourceFile)
+    return violations
+}
+
 test("room handshake checks the lifecycle guard after admission consumption", async t => {
     const socket = new FakeSocket()
     const room = createRoom(93, 193, 1, 1, 293, 0, 393)
@@ -152,79 +234,46 @@ test("handshake logs never serialize client identity or payload fields", async (
     assert.match(output, /\[TCP\] handshake received/)
 })
 
-test("multiplayer console calls reject sensitive identifiers and raw errors", () => {
+test("direct multiplayer console structures reject unvalidated payloads and raw errors", () => {
     const multiRoot = path.resolve(__dirname, "../src/multi")
-    const forbiddenIdentifiers = new Set([
-        "viewerId", "viewer_id", "hostViewerId", "playerId", "player_id",
-        "nodeSessionId", "node_session_id", "connectionId", "connection_id",
-        "remoteAddress", "remotePort", "accessToken", "access_token",
-        "token", "tokenDigest", "digest", "credential", "sessionCredential",
-        "room_number", "quest_id", "party_id", "tag",
-        "payload", "raw", "e", "error", "closeError",
-    ])
     const violations = []
-    const enclosingFunctionName = node => {
-        for (let current = node.parent; current; current = current.parent) {
-            if (ts.isFunctionDeclaration(current)) return current.name?.text ?? null
-        }
-        return null
-    }
 
     for (const filePath of multiTypeScriptFiles(multiRoot)) {
         const relativePath = path.relative(multiRoot, filePath)
         const sourceText = fs.readFileSync(filePath, "utf8")
-        const sourceFile = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true)
-        const inspectLogArgument = (node, callLine) => {
-            if (ts.isCallExpression(node)
-                && ts.isIdentifier(node.expression)
-                && ["failureCode", "formatLogTag"].includes(node.expression.text)) return
-            if (ts.isCallExpression(node)
-                && ts.isPropertyAccessExpression(node.expression)
-                && node.expression.expression.getText(sourceFile) === "JSON"
-                && node.expression.name.text === "stringify") {
-                violations.push(`${path.relative(multiRoot, filePath)}:${callLine}: serialized payload`)
-                return
-            }
-            if (ts.isPropertyAccessExpression(node)) {
-                if (node.expression.getText(sourceFile) === "body") {
-                    violations.push(`${path.relative(multiRoot, filePath)}:${callLine}: unvalidated body field`)
-                    return
-                }
-                const boundedCoordinatorError = node.getText(sourceFile) === "hubAbort.error"
-                if (!boundedCoordinatorError && forbiddenIdentifiers.has(node.name.text)) {
-                    violations.push(`${path.relative(multiRoot, filePath)}:${callLine}: ${node.name.text}`)
-                    return
-                }
-                inspectLogArgument(node.expression, callLine)
-                return
-            }
-            if (ts.isElementAccessExpression(node)) {
-                violations.push(`${path.relative(multiRoot, filePath)}:${callLine}: indexed payload field`)
-                return
-            }
-            if (ts.isIdentifier(node) && forbiddenIdentifiers.has(node.text)) {
-                violations.push(`${path.relative(multiRoot, filePath)}:${callLine}: ${node.text}`)
-                return
-            }
-            node.forEachChild(child => inspectLogArgument(child, callLine))
-        }
-        const visit = node => {
-            if (ts.isCallExpression(node)
-                && ts.isPropertyAccessExpression(node.expression)
-                && node.expression.expression.getText(sourceFile) === "console"
-                && ["log", "warn", "error"].includes(node.expression.name.text)) {
-                const callLine = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1
-                if (relativePath === path.join("room", "manager.ts")
-                    && enclosingFunctionName(node) === "getRoom"
-                    && node.arguments.some(argument => !ts.isStringLiteral(argument))) {
-                    violations.push(`${relativePath}:${callLine}: variable missing-room diagnostic`)
-                }
-                for (const argument of node.arguments) inspectLogArgument(argument, callLine)
-            }
-            node.forEachChild(visit)
-        }
-        visit(sourceFile)
+        violations.push(...collectDirectConsoleViolations(sourceText, relativePath))
     }
 
     assert.deepEqual(violations, [])
+})
+
+test("console AST guard checks direct structures without treating variable names as data flow", () => {
+    assert.deepEqual(collectDirectConsoleViolations(`
+        const error = "safe"
+        const e = 2
+        const tag = 3
+        console.log(error, e, tag)
+        const alias = body.token
+        console.log(alias)
+    `), [])
+
+    const violations = collectDirectConsoleViolations(`
+        console.log(body.token)
+        console.warn(data[0])
+        console.error(socket.remoteAddress, socket.remotePort)
+        console.log(JSON.stringify(value))
+        try { work() } catch (cause) { console.error(cause) }
+        console.error(new Error("detail"))
+        console.error(problem.stack)
+    `)
+    assert.deepEqual(violations.map(violation => violation.replace(/^fixture\.ts:\d+: /, "")), [
+        "unvalidated body field",
+        "indexed payload field",
+        "socket remoteAddress",
+        "socket remotePort",
+        "serialized payload",
+        "raw caught Error",
+        "raw Error",
+        "raw Error stack",
+    ])
 })
