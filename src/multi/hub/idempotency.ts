@@ -45,13 +45,13 @@ export class IdempotencyCache {
     }
 
     execute(
-        nodeSessionId: string,
+        credentialId: string,
         operation: string,
         key: string,
         handler: () => Promise<CachedJsonResponse>,
     ): Promise<CachedJsonResponse> {
         this.cleanup()
-        const cacheKey = `${nodeSessionId}\0${operation}\0${key}`
+        const cacheKey = `${credentialId}\0${operation}\0${key}`
         const existing = this.entries.get(cacheKey)
         if (existing) return existing.result
         if (this.entries.size >= this.maxEntries && !this.evictOldestSettled()) {

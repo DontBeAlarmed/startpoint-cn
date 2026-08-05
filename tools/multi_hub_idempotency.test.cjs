@@ -27,14 +27,14 @@ test("pending entries are shared and reject new keys when capacity is exhausted"
     const cache = new IdempotencyCache({ maxEntries: 1, ttlMs: 1_000 })
     let firstCalls = 0
     let secondCalls = 0
-    const executeFirst = () => cache.execute("node-a", "rooms.create", "key-a", async () => {
+    const executeFirst = () => cache.execute("credential-a", "rooms.create", "key-a", async () => {
         firstCalls++
         return firstResult.promise
     })
     const pending = executeFirst()
     await new Promise(resolve => setImmediate(resolve))
 
-    const atCapacity = cache.execute("node-a", "rooms.create", "key-b", async () => {
+    const atCapacity = cache.execute("credential-a", "rooms.create", "key-b", async () => {
         secondCalls++
         return okResponse("second")
     })
@@ -69,11 +69,11 @@ test("settled entries are evicted by capacity and bounded failure responses stay
         statusCode: 503,
         body: JSON.stringify({ ok: false, code: "HUB_UNAVAILABLE" }),
     }
-    const first = await cache.execute("node-a", "rooms.create", "key-a", async () => {
+    const first = await cache.execute("credential-a", "rooms.create", "key-a", async () => {
         firstCalls++
         return unavailable
     })
-    const replay = await cache.execute("node-a", "rooms.create", "key-a", async () => {
+    const replay = await cache.execute("credential-a", "rooms.create", "key-a", async () => {
         firstCalls++
         return okResponse("unexpected")
     })
@@ -81,14 +81,14 @@ test("settled entries are evicted by capacity and bounded failure responses stay
     assert.deepEqual(replay, unavailable)
     assert.equal(firstCalls, 1)
 
-    assert.deepEqual(await cache.execute("node-a", "rooms.create", "key-b", async () => {
+    assert.deepEqual(await cache.execute("credential-a", "rooms.create", "key-b", async () => {
         secondCalls++
         return okResponse("second")
     }), okResponse("second"))
     assert.equal(secondCalls, 1)
 
     now = 1_101
-    assert.deepEqual(await cache.execute("node-b", "rooms.create", "key-b", async () => {
+    assert.deepEqual(await cache.execute("credential-b", "rooms.create", "key-b", async () => {
         secondCalls++
         return okResponse("isolated")
     }), okResponse("isolated"))
@@ -99,7 +99,7 @@ test("rejected handlers remain replayable until normal cache eviction", async ()
     const cache = new IdempotencyCache({ maxEntries: 2, ttlMs: 1_000 })
     const failure = Object.assign(new Error("operation failed"), { code: "E_OPERATION" })
     let calls = 0
-    const execute = () => cache.execute("node-a", "rooms.create", "key-a", async () => {
+    const execute = () => cache.execute("credential-a", "rooms.create", "key-a", async () => {
         calls++
         throw failure
     })
@@ -112,23 +112,23 @@ test("rejected handlers remain replayable until normal cache eviction", async ()
     assert.equal(calls, 1)
 })
 
-test("cache identity remains isolated by node operation and key", async () => {
+test("cache identity remains isolated by credential operation and key", async () => {
     const cache = new IdempotencyCache({ maxEntries: 4, ttlMs: 1_000 })
     let calls = 0
-    const execute = (node, operation, key) => cache.execute(node, operation, key, async () => {
+    const execute = (credential, operation, key) => cache.execute(credential, operation, key, async () => {
         calls++
-        return okResponse(`${node}:${operation}:${key}`)
+        return okResponse(`${credential}:${operation}:${key}`)
     })
 
-    await execute("node-a", "rooms.create", "key-a")
-    await execute("node-b", "rooms.create", "key-a")
-    await execute("node-a", "battles.start", "key-a")
-    await execute("node-a", "rooms.create", "key-b")
+    await execute("credential-a", "rooms.create", "key-a")
+    await execute("credential-b", "rooms.create", "key-a")
+    await execute("credential-a", "battles.start", "key-a")
+    await execute("credential-a", "rooms.create", "key-b")
     assert.equal(calls, 4)
 
     assert.deepEqual(
-        await execute("node-a", "rooms.create", "key-a"),
-        okResponse("node-a:rooms.create:key-a"),
+        await execute("credential-a", "rooms.create", "key-a"),
+        okResponse("credential-a:rooms.create:key-a"),
     )
     assert.equal(calls, 4)
 })

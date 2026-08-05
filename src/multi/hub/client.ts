@@ -33,12 +33,6 @@ interface HubResponse {
     readonly body: unknown
 }
 
-interface HubRequestOutcome {
-    readonly response: HubResponse | null
-    readonly attempts: number
-    readonly uncertain: boolean
-}
-
 export interface HubClientOptions {
     readonly hubUrl: URL
     readonly token: string
@@ -114,21 +108,15 @@ export class HubClient {
                 return { ok: false, error: "HUB_UNAVAILABLE" }
             }
 
-            const outcome = await this.requestWithRetry(
+            const response = await this.requestWithRetry(
                 route,
                 this.bindParticipant(input, session.nodeSessionId),
                 session,
                 idempotencyKey,
                 idempotencyKey !== null && refreshed ? 1 : RETRY_ATTEMPTS,
             )
-            const response = outcome.response
             if (response?.status === 401) {
                 if (this.session === session) this.session = null
-                if (idempotencyKey !== null
-                    && (outcome.uncertain || outcome.attempts > 1)) {
-                    this.available = false
-                    return { ok: false, error: "HUB_UNAVAILABLE" }
-                }
                 if (refreshed) {
                     this.available = false
                     return { ok: false, error: "HUB_UNAVAILABLE" }
@@ -188,8 +176,7 @@ export class HubClient {
         session: HubNodeSession,
         idempotencyKey: string | null,
         maxAttempts: number,
-    ): Promise<HubRequestOutcome> {
-        let uncertain = false
+    ): Promise<HubResponse | null> {
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             try {
                 const headers: Record<string, string> = {
@@ -204,16 +191,13 @@ export class HubClient {
                     body: JSON.stringify(input),
                 })
                 if (response.status < 500 || attempt === maxAttempts - 1) {
-                    return { response, attempts: attempt + 1, uncertain }
+                    return response
                 }
             } catch {
-                uncertain = true
-                if (attempt === maxAttempts - 1) {
-                    return { response: null, attempts: attempt + 1, uncertain }
-                }
+                if (attempt === maxAttempts - 1) return null
             }
         }
-        return { response: null, attempts: maxAttempts, uncertain }
+        return null
     }
 
     private async requestJson(route: string, init: RequestInit): Promise<HubResponse> {

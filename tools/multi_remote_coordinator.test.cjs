@@ -271,18 +271,23 @@ test("Hub client rejects malformed successful values for every operation shape",
         })
     }
 
-    await t.test("registration TCP endpoint", async () => {
-        const client = new HubClient({
-            hubUrl: new URL("http://hub.example/"),
-            token: TOKEN,
-            fetch: async () => jsonResponse({ ...registration(), tcp: { host: "", port: 0 } }),
+    for (const host of ["", "bad host", "bad\x00host", `${"a".repeat(254)}.example`]) {
+        await t.test(`registration TCP endpoint rejects ${JSON.stringify(host)}`, async () => {
+            const client = new HubClient({
+                hubUrl: new URL("http://hub.example/"),
+                token: TOKEN,
+                fetch: async () => jsonResponse({
+                    ...registration(),
+                    tcp: { host, port: host === "" ? 0 : 8003 },
+                }),
+            })
+            assert.deepEqual(await client.read("/v1/multi/rooms/status", {
+                participant: participant(), roomNumber: "123456",
+            }), { ok: false, error: "HUB_UNAVAILABLE" })
+            assert.equal(client.getTcpEndpoint(), null)
+            assert.equal(client.isAvailable(), false)
         })
-        assert.deepEqual(await client.read("/v1/multi/rooms/status", {
-            participant: participant(), roomNumber: "123456",
-        }), { ok: false, error: "HUB_UNAVAILABLE" })
-        assert.equal(client.getTcpEndpoint(), null)
-        assert.equal(client.isAvailable(), false)
-    })
+    }
 
     await t.test("already expired registration", async () => {
         const paths = []
@@ -331,18 +336,21 @@ test("Hub client accepts validated room, battle, admission and void successes", 
     })
 })
 
-test("an uncertain write never crosses node sessions after retry", async () => {
+test("an uncertain write refreshes once with the same idempotency key", async () => {
     let registrations = 0
     const operationNodes = []
+    const operationKeys = []
     const client = new HubClient({
         hubUrl: new URL("http://hub.example/"),
         token: TOKEN,
+        createIdempotencyKey: () => "stable-key",
         fetch: async (url, init) => {
             if (String(url).endsWith("/nodes/register")) {
                 registrations++
                 return jsonResponse(registration(`node-${registrations}`))
             }
             operationNodes.push(init.headers["x-node-session-id"])
+            operationKeys.push(init.headers["x-idempotency-key"])
             if (operationNodes.length === 1) throw new TypeError("connection reset")
             if (operationNodes.length === 2) {
                 return jsonResponse({ ok: false, code: "UNAUTHORIZED" }, 401)
@@ -350,12 +358,14 @@ test("an uncertain write never crosses node sessions after retry", async () => {
             return jsonResponse({ ok: true, value: roomStatus(`node-${registrations}`) })
         },
     })
-    assert.deepEqual(await client.write("/v1/multi/rooms/create", {
+    const result = await client.write("/v1/multi/rooms/create", {
         participant: participant(),
-    }), { ok: false, error: "HUB_UNAVAILABLE" })
-    assert.equal(registrations, 1)
-    assert.deepEqual(operationNodes, ["node-1", "node-1"])
-    assert.equal(client.getNodeSessionId(), null)
+    })
+    assert.equal(result.ok, true)
+    assert.equal(registrations, 2)
+    assert.deepEqual(operationNodes, ["node-1", "node-1", "node-2"])
+    assert.deepEqual(operationKeys, ["stable-key", "stable-key", "stable-key"])
+    assert.equal(client.getNodeSessionId(), "node-2")
 })
 
 test("a first definite 401 refreshes reads and writes only once", async t => {

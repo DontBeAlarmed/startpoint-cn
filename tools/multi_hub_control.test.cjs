@@ -12,6 +12,7 @@ const { AdmissionRegistry } = require("../src/multi/admission/registry")
 const { MULTI_PROTOCOL_VERSION } = require("../src/multi/coordinator/contracts")
 const { MultiHubCredentialStore } = require("../src/multi/hub/credential-store")
 const { CredentialReloader } = require("../src/multi/hub/credential-reloader")
+const { HubClient } = require("../src/multi/hub/client")
 const { IdempotencyCache } = require("../src/multi/hub/idempotency")
 const { NodeSessionRegistry } = require("../src/multi/hub/node-sessions")
 const { buildMultiHubControlApp } = require("../src/multi/hub/server")
@@ -165,6 +166,7 @@ function fixture(t, options = {}) {
         reloader,
         second,
         sessions,
+        getNow() { return now },
         setNow(value) { now = value },
         store,
     }
@@ -408,12 +410,11 @@ test("issues node-scoped admissions and removes them when the node session expir
     assert.equal(target.admissions.consume("123456", 303), null)
 })
 
-test("requires bounded ASCII idempotency keys and isolates cached writes by node and TTL", async t => {
+test("requires bounded ASCII idempotency keys and isolates cached writes by credential and TTL", async t => {
     const target = fixture(t, { idempotencyTtlMs: 100 })
-    const first = await register(target.app, target.first.token)
-    const second = await register(target.app, target.second.token)
+    const firstNode = await register(target.app, target.first.token)
     const payload = {
-        ...participantInput(first),
+        ...participantInput(firstNode),
         requestId: "request-1",
         partyId: 1,
         category: 1,
@@ -426,7 +427,7 @@ test("requires bounded ASCII idempotency keys and isolates cached writes by node
         const response = await target.app.inject({
             method: "POST",
             url: "/v1/multi/rooms/create",
-            headers: sessionHeaders(first, key),
+            headers: sessionHeaders(firstNode, key),
             payload,
         })
         assert.equal(response.statusCode, 400)
@@ -442,17 +443,75 @@ test("requires bounded ASCII idempotency keys and isolates cached writes by node
             participant: participantInput(registration).participant,
         },
     })
-    const firstResult = await invoke(first)
-    const replay = await invoke(first)
+    const firstResult = await invoke(firstNode)
+    const replay = await invoke(firstNode)
     assert.equal(firstResult.body, replay.body)
     assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 1)
 
-    await invoke(second)
+    const refreshedNode = await register(target.app, target.first.token)
+    assert.equal((await invoke(refreshedNode)).body, firstResult.body)
+    assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 1)
+
+    const otherCredential = await register(target.app, target.second.token)
+    await invoke(otherCredential)
     assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 2)
 
     target.setNow(10_101)
-    await invoke(first)
+    await invoke(firstNode)
     assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 3)
+})
+
+test("lost mutation response replays through a refreshed session without executing twice", async t => {
+    const target = fixture(t, { sessionTtlMs: 100, idempotencyTtlMs: 10_000 })
+    let loseMutationResponse = true
+    const fetchFromHub = async (url, init) => {
+        const route = new URL(url).pathname
+        const response = await target.app.inject({
+            method: init.method,
+            url: route,
+            headers: init.headers,
+            payload: init.body,
+        })
+        if (route === "/v1/multi/rooms/create" && loseMutationResponse) {
+            loseMutationResponse = false
+            target.setNow(10_100)
+            throw new TypeError("response lost after mutation")
+        }
+        return new Response(response.body, {
+            status: response.statusCode,
+            headers: response.headers,
+        })
+    }
+    const input = {
+        requestId: "lost-response",
+        participant: { nodeSessionId: "pending", viewerId: 101 },
+        partyId: 1,
+        category: 1,
+        questId: 501,
+        leaderCharacterId: 101,
+        compatibility,
+    }
+    const firstClient = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        fetch: fetchFromHub,
+        now: () => target.getNow(),
+        createIdempotencyKey: () => "lost-response-key",
+    })
+    const replayed = await firstClient.write("/v1/multi/rooms/create", input)
+    assert.equal(replayed.ok, true)
+    assert.equal(firstClient.getNodeSessionId(), "node-session-b")
+    assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 1)
+
+    const otherClient = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.second.token,
+        fetch: fetchFromHub,
+        now: () => target.getNow(),
+        createIdempotencyKey: () => "lost-response-key",
+    })
+    assert.equal((await otherClient.write("/v1/multi/rooms/create", input)).ok, true)
+    assert.equal(target.coordinator.calls.filter(([name]) => name === "createRoom").length, 2)
 })
 
 test("pending write capacity returns bounded unavailable without evicting the replay", async t => {

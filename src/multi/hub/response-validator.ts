@@ -12,6 +12,7 @@ import type {
     PlayerPartySnapshot,
     PlayerSnapshot,
 } from "../snapshot/player-snapshot"
+import { isValidNetworkHost } from "../../runtime/network-host"
 import type { MultiHubTcpEndpoint } from "./control-routes"
 
 type Validator = (value: unknown) => boolean
@@ -176,7 +177,7 @@ function isParticipant(value: unknown): value is ParticipantIdentity {
 }
 
 function isTcpEndpoint(value: Record<string, unknown>): boolean {
-    return isNonEmptyString(value.host)
+    return isValidNetworkHost(value.host)
         && isPositiveInteger(value.port)
         && value.port <= 65535
 }

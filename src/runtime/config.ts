@@ -4,10 +4,10 @@ import {
     parseAssetProviderConfig,
 } from "../content/cdn/asset-mode"
 import fs from "node:fs"
-import { isIP } from "node:net"
 import path from "node:path"
 import { validateMultiHubToken } from "../multi/hub/token"
 import { resolveRuntimeDataPaths } from "./data-paths"
+import { isValidNetworkHost } from "./network-host"
 
 export interface RuntimeEnvironment extends AssetModeEnvironment {
     readonly SESSION_HOST?: string
@@ -71,20 +71,7 @@ export class RuntimeConfigError extends Error {
 
 function parseHost(value: string | undefined, fallback: string): string {
     const host = value ?? fallback
-    if (host.length === 0 || host !== host.trim() || /\s|[\x00-\x1f\x7f]/.test(host)) {
-        throw new RuntimeConfigError()
-    }
-    if (isIP(host) !== 0) return host
-    if (host.length > 253 || /^[0-9.]+$/.test(host) || !/^[A-Za-z0-9.-]+$/.test(host)) {
-        throw new RuntimeConfigError()
-    }
-    const labels = host.split(".")
-    if (labels.some(label => (
-        label.length === 0
-        || label.length > 63
-        || label.startsWith("-")
-        || label.endsWith("-")
-    ))) throw new RuntimeConfigError()
+    if (!isValidNetworkHost(host)) throw new RuntimeConfigError()
     return host
 }
 

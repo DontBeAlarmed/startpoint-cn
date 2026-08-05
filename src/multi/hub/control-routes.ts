@@ -136,7 +136,7 @@ function registerOperation(
         }))
         try {
             const result = await options.idempotency.execute(
-                session.nodeSessionId,
+                session.credentialId,
                 name,
                 idempotencyKey,
                 () => invoke(operation, request.body, session),
