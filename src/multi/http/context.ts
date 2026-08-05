@@ -4,11 +4,7 @@ import { getQuestFromCategorySync } from "../../lib/assets"
 import { getServerTime } from "../../utils"
 import type { MultiPlayerContext } from "../player-context"
 import { resolveMultiPlayerContext } from "../player-context"
-import type {
-    BattleSessionInput,
-    BattleStatus,
-    MultiCoordinator,
-} from "../coordinator/interface"
+import type { MultiCoordinator } from "../coordinator/interface"
 import type {
     CoordinatorResult,
     MultiCompatibilityProfile,
@@ -37,6 +33,7 @@ import {
     type PlayerSnapshot,
 } from "../snapshot/player-snapshot"
 import type { RoomConnectionEndpoint } from "../room/serializer"
+import { MultiSettlementVerifier } from "../settlement/verifier"
 
 export const DEFAULT_ADMISSION_TTL_MS = 15_000
 
@@ -62,10 +59,6 @@ export interface MultiQuestAvailabilityProvider {
 
 export interface PreparedAdmissionSnapshot {
     readonly snapshot: PlayerSnapshot
-}
-
-export interface MultiSettlementVerifier {
-    getBattleStatus(input: BattleSessionInput): Promise<CoordinatorResult<BattleStatus>>
 }
 
 export interface MultiHttpContext {
@@ -144,8 +137,6 @@ export function createEmbeddedMultiHttpContext(
         admissionIssuer: admissionRegistry,
         admissionTtlMs: options.admissionTtlMs ?? DEFAULT_ADMISSION_TTL_MS,
         now,
-        settlementVerifier: Object.freeze({
-            getBattleStatus: (input: BattleSessionInput) => coordinator.getBattleStatus(input),
-        }),
+        settlementVerifier: new MultiSettlementVerifier(coordinator),
     })
 }

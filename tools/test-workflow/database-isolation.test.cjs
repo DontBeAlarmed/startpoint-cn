@@ -53,9 +53,9 @@ try {
     data.initializeDatabase()
     const db = getDb()
     assert.equal(db.prepare("SELECT 1 AS value").get().value, 1)
-    assert.deepEqual(data.getDatabaseStatus(), { open: true, ready: true, schema: 14 })
+    assert.deepEqual(data.getDatabaseStatus(), { open: true, ready: true, schema: 15 })
     assert.equal(fs.existsSync(path.join(dataDirectory, "wdfp_data.db")), true)
-    assert.equal(fs.readFileSync(path.join(dataDirectory, "wdfp_data.db.version"), "utf8"), "14")
+    assert.equal(fs.readFileSync(path.join(dataDirectory, "wdfp_data.db.version"), "utf8"), "15")
 
     assert.equal(data.closeDatabase(), true)
     assert.equal(data.closeDatabase(), false)

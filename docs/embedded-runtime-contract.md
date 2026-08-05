@@ -127,7 +127,7 @@ Bundle 不包含：
 
 默认开发路径是项目根的 `.database`。嵌入模式必须显式传入由 Supervisor 管理的绝对 `DATA_DIR`。服务端在打开数据库前解析现有祖先的物理路径，拒绝 Data Volume 与 Server Bundle 或 local CDN 相等、互为祖先/后代；通过祖先符号链接指回这些只读输入也会被拒绝。替换 Server Bundle 不得覆盖 Data Volume。
 
-数据库 schema 由服务端代码拥有。当前 Bundle 接受 schema `0..14`，启动时由服务端事务化迁移到 `14`，并拒绝高于 `14` 的数据库。Supervisor 只在停服后复制备份，不直接执行 SQL。
+数据库 schema 由服务端代码拥有。当前 Bundle 接受 schema `0..15`，启动时由服务端事务化迁移到 `15`，并拒绝高于 `15` 的数据库。Supervisor 只在停服后复制备份，不直接执行 SQL。
 
 ### Asset Provider
 
@@ -160,7 +160,7 @@ manifest 核心字段如下：
     "node": ">=20.12.0",
     "dependencyLock": "sha256:<package-lock digest>",
     "minDataSchema": 0,
-    "targetDataSchema": 14
+    "targetDataSchema": 15
   },
   "admin": {
     "path": "web/dist",

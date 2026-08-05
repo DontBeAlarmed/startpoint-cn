@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { MultiStartBody, MultiFinishBody, MultiAbortBody, PlayContinueBody } from "../types";
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
-import { getRoom, setRoomBattle, disbandRoom, updateRoomState, isRoomMember } from "../room/manager";
+import { getRoom, disbandRoom, updateRoomState } from "../room/manager";
 import { sessionManager } from "../state/SessionManager";
 import {
     activeQuests,
@@ -38,7 +38,7 @@ import {
     reconcileAwakeUnlockCharacterList,
     settleMissionCategories,
 } from "../../lib/mission";
-import { resolveHostFinished, resolveIsRoomHost } from "../../lib/quest/host-finish";
+import { resolveHostFinished } from "../../lib/quest/host-finish";
 import { resolveQuestRewardEligibility } from "../../lib/quest/first-clear-reward";
 import { getCommonScoreRewardCount } from "../../lib/score-reward-lottery";
 import {
@@ -68,17 +68,7 @@ import {
     validateMultiStartRequest,
 } from "../../lib/quest/multi-battle-validation";
 import { isValidMultiViewerId, type MultiHttpContext } from "./context";
-import type { ParticipantIdentity } from "../coordinator/contracts";
-
-export function canFinishMultiBattleQuest(
-    quest: Pick<BattleQuest, "isBothBoss">,
-    roomNumber: string | null | undefined,
-    participant: ParticipantIdentity,
-): boolean {
-    return quest.isBothBoss !== true
-        || (roomNumber != null
-            && sessionManager.hasParticipantFinalizedBattle(roomNumber, participant))
-}
+import { participantKey, type ParticipantIdentity } from "../coordinator/contracts";
 
 export function canAbortMultiBattle(
     roomNumber: string,
@@ -150,13 +140,23 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             });
         }
 
-        const room = getRoom(room_number);
-        if (!room) {
+        const availability = context.questAvailability.check(category, quest_id);
+        if (!availability.available) {
             return reply.status(400).send({
-                "error": "Bad Request", "message": "Room doesn't exist."
+                "error": availability.code, "message": "Quest is not available."
             });
         }
 
+        const participant = context.snapshotProvider.getParticipant(viewer_id);
+        const room = await context.coordinator.getRoomStatus({
+            participant,
+            roomNumber: room_number,
+        });
+        const identityKey = participantKey(participant.nodeSessionId, participant.viewerId);
+        const isRoomMember = room.ok && room.value.members.some(member => participantKey(
+            member.nodeSessionId,
+            member.viewerId,
+        ) === identityKey);
         const roomValidation = validateMultiStartRequest({
             viewerId: viewer_id,
             partyId: party_id,
@@ -166,25 +166,37 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             useBoostPoint: use_boost_point,
             useBossBoostPoint: use_boss_boost_point,
             isAutoStartMode: is_auto_start_mode,
-            isRoomMember: isRoomMember(room, viewer_id),
-            roomCategory: room.category,
-            roomQuestId: room.quest_id,
+            isRoomMember,
+            roomCategory: room.ok ? room.value.category : -1,
+            roomQuestId: room.ok ? room.value.questId : -1,
         });
-        if (!roomValidation.ok) {
+        if (!room.ok || !roomValidation.ok) {
             return reply.status(400).send({
-                "error": "Bad Request", "message": roomValidation.message,
+                "error": "Bad Request",
+                "message": roomValidation.ok ? "Room is unavailable." : roomValidation.message,
             });
         }
 
-        const availability = context.questAvailability.check(category, quest_id);
-        if (!availability.available) {
+        const battle = await context.coordinator.startBattle({ participant, roomNumber: room_number });
+        if (!battle.ok
+            || battle.value.roomNumber !== room_number
+            || participantKey(
+                battle.value.host.nodeSessionId,
+                battle.value.host.viewerId,
+            ) !== participantKey(room.value.host.nodeSessionId, room.value.host.viewerId)
+            || !battle.value.participants.some(member => participantKey(
+                member.nodeSessionId,
+                member.viewerId,
+            ) === identityKey)) {
             return reply.status(400).send({
-                "error": availability.code, "message": "Quest is not available."
+                "error": "Bad Request", "message": "Battle session is unavailable.",
             });
         }
 
-        const mateComIds = room.mates.map(m => m.com_id);
-        const isRoomHost = room.host_player_id === ctx.playerId;
+        const isRoomHost = participantKey(
+            room.value.host.nodeSessionId,
+            room.value.host.viewerId,
+        ) === identityKey;
         const questKey = `${category}_${quest_id}`;
         const entryCost = isRoomHost
             ? getRuntimeContentTableSync(
@@ -201,8 +213,9 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             isAutoStartMode: is_auto_start_mode,
             isMulti: true,
             roomNumber: room_number,
+            battleSessionId: battle.value.battleSessionId,
             matePlayerIds: Array.isArray(mate_player_ids) ? mate_player_ids : [],
-            mateComIds,
+            mateComIds: [],
             entryItemId: entryCost && entryCost.itemId > 0 ? entryCost.itemId : undefined,
             entryItemCount: entryCost && entryCost.itemCount > 0 ? entryCost.itemCount : undefined,
             playId: play_id,
@@ -238,8 +251,6 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             }
             throw error;
         }
-        setRoomBattle(room_number);
-
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id }),
@@ -314,17 +325,26 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             });
         }
 
-        const room = activeQuestData.roomNumber ? getRoom(activeQuestData.roomNumber) : null;
-        if (!canFinishMultiBattleQuest(questData, activeQuestData.roomNumber, participant)) {
+        if (typeof activeQuestData.roomNumber !== "string"
+            || typeof activeQuestData.battleSessionId !== "string") {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Battle session identity is missing."
+            });
+        }
+        const settlement = await context.settlementVerifier.verify({
+            nodeSessionId: participant.nodeSessionId,
+            viewerId,
+            roomNumber: activeQuestData.roomNumber,
+            battleSessionId: activeQuestData.battleSessionId,
+        });
+        if (!settlement.ok) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Battle is not finalized."
             });
         }
-        const isRoomHost = resolveIsRoomHost({
-            roomHostPlayerId: room?.host_player_id ?? null,
-            playerId,
-        });
-        console.log(`[MULTI] finish host context: roomHostPlayerId=${room?.host_player_id ?? "none"} playerId=${playerId} isRoomHost=${isRoomHost}`);
+        const room = getRoom(activeQuestData.roomNumber);
+        const isRoomHost = settlement.isHost;
+        console.log(`[MULTI] finish host context: playerId=${playerId} isRoomHost=${isRoomHost}`);
         // calculate clear rank
         const clearTime = finishValidation.elapsedTimeMs;
         const hasRankThresholds = questData.bRankTime > 0;
@@ -536,29 +556,8 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 newMana,
             }
         }
-        const bothBossRoomNumber = questData.isBothBoss === true
-            && typeof activeQuestData.roomNumber === "string"
-            ? activeQuestData.roomNumber
-            : undefined
-        if (bothBossRoomNumber !== undefined
-            && !sessionManager.consumeParticipantFinalizedBattle(
-                bothBossRoomNumber,
-                participant,
-            )) {
-            return reply.status(400).send({
-                "error": "Bad Request", "message": "Battle is not finalized."
-            });
-        }
-
         let finishWrites: ReturnType<typeof executeFinishWrites>
-        try {
-            finishWrites = getDb().transaction(executeFinishWrites)()
-        } catch (error) {
-            if (bothBossRoomNumber !== undefined) {
-                sessionManager.markParticipantFinalizedBattle(bothBossRoomNumber, participant)
-            }
-            throw error
-        }
+        finishWrites = getDb().transaction(executeFinishWrites)()
         const {
             characterList,
             clearReward,

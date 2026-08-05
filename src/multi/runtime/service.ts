@@ -18,6 +18,7 @@ import {
     createEmbeddedMultiHttpContext,
     type MultiHttpContext,
 } from "../http/context"
+import { MultiSettlementVerifier } from "../settlement/verifier"
 import {
     isSessionServerListening,
     startSessionServer,
@@ -89,9 +90,7 @@ function createRemoteHttpContext(coordinator: RemoteMultiCoordinator): MultiHttp
         }),
         admissionIssuer: coordinator,
         tcpEndpoint: () => coordinator.getTcpEndpoint(),
-        settlementVerifier: Object.freeze({
-            getBattleStatus: coordinator.getBattleStatus.bind(coordinator),
-        }),
+        settlementVerifier: new MultiSettlementVerifier(coordinator),
     })
 }
 

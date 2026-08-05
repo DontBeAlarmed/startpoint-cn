@@ -502,5 +502,5 @@ test("embedded HTTP context carries all four injected collaborators", async t =>
         ok: true,
         value: compatibility,
     })
-    assert.equal(typeof context.settlementVerifier.getBattleStatus, "function")
+    assert.equal(typeof context.settlementVerifier.verify, "function")
 })

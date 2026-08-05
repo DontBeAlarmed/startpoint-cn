@@ -8,3 +8,12 @@ export function ensureActiveQuestEntryItemCountStorageSync(database: Database): 
         ADD COLUMN entry_item_count INTEGER
     `).run()
 }
+
+export function ensureActiveQuestBattleSessionIdStorageSync(database: Database): void {
+    const columns = database.prepare(`PRAGMA table_info(players_active_quests)`).all() as { name: string }[]
+    if (columns.some(column => column.name === "battle_session_id")) return
+    database.prepare(`
+        ALTER TABLE players_active_quests
+        ADD COLUMN battle_session_id TEXT
+    `).run()
+}

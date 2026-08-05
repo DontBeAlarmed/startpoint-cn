@@ -236,7 +236,7 @@ test("[socket] official CN wrapper reports ready and releases resources on SIGTE
     assert.equal(health.status, "ready")
     assert.deepEqual(health.serverBundle, { version: "1.0.1", bundleId: null })
     assert.deepEqual(health.services, { http: true, tcp: true })
-    assert.deepEqual(health.database, { ready: true, schema: 14 })
+    assert.deepEqual(health.database, { ready: true, schema: 15 })
     assert.deepEqual(health.assets, {
         mode: "client-owned",
         status: "unknown",
@@ -258,7 +258,7 @@ test("[socket] official CN wrapper reports ready and releases resources on SIGTE
     const database = new Sqlite(path.join(dataDir, "wdfp_data.db"))
     try {
         assert.deepEqual(database.prepare("SELECT 1 AS value").get(), { value: 1 })
-        assert.equal(database.pragma("user_version", { simple: true }), 14)
+        assert.equal(database.pragma("user_version", { simple: true }), 15)
     } finally {
         database.close()
     }
@@ -326,7 +326,13 @@ test("compiled lifecycle order and metadata fallback survive an isolated bundle"
         database: { ready: true, schema: 4 },
         contentInitialized: true,
         httpListening: true,
-        tcpListening: true,
+        multi: {
+            mode: "embedded",
+            state: "ready",
+            coordinator: { kind: "local", available: true },
+            hub: null,
+            tcp: { available: true, endpoint: "127.0.0.1:8003" },
+        },
         adminAvailable: true,
         assetMode: "client-owned",
     })

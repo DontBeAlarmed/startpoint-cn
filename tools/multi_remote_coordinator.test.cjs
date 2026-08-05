@@ -71,6 +71,7 @@ function battleStatus(nodeSessionId = "node-a") {
     return {
         battleSessionId: "battle-1",
         roomNumber: "123456",
+        host: { nodeSessionId, viewerId: 101 },
         participants: [{ nodeSessionId, viewerId: 101 }],
         finalized: false,
     }
@@ -249,6 +250,9 @@ test("Hub client rejects malformed successful values for every operation shape",
         ["room", "/v1/multi/rooms/status", { ...roomStatus(), host: null }],
         ["battle", "/v1/multi/battles/status", {
             ...battleStatus(), participants: [{ nodeSessionId: "node-a", viewerId: 0 }],
+        }],
+        ["battle host outside participants", "/v1/multi/battles/status", {
+            ...battleStatus(), host: { nodeSessionId: "node-a", viewerId: 202 },
         }],
         ["admission", "/v1/multi/admissions/issue", {
             ...admission(), snapshot: { viewerId: 101 },
@@ -529,8 +533,12 @@ test("Remote coordinator implements every Hub operation and forwards compatibili
     await remote.selectRoom(compatible)
     await remote.disbandRoom({ participant: participant(), roomNumber: "123456" })
     await remote.startBattle({ participant: participant(), roomNumber: "123456" })
-    await remote.finalizeBattle({ participant: participant(), battleSessionId: "battle-1" })
-    await remote.getBattleStatus({ participant: participant(), battleSessionId: "battle-1" })
+    await remote.finalizeBattle({
+        participant: participant(), roomNumber: "123456", battleSessionId: "battle-1",
+    })
+    await remote.getBattleStatus({
+        participant: participant(), roomNumber: "123456", battleSessionId: "battle-1",
+    })
     await remote.getRoomStatus({ participant: participant(), roomNumber: "123456" })
     await remote.issue({
         roomNumber: "123456",

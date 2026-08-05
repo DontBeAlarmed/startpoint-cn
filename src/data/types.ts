@@ -801,6 +801,7 @@ export interface RawPlayerActiveQuest {
     is_auto_start_mode: number
     is_multi: number
     room_number: string | null
+    battle_session_id: string | null
     entry_item_id: number | null
     entry_item_count: number | null
     event_id: number | null
@@ -817,6 +818,7 @@ export interface PlayerActiveQuest {
     isAutoStartMode: boolean
     isMulti: boolean
     roomNumber: string | null
+    battleSessionId: string | null
     entryItemId: number | null
     entryItemCount: number | null
     eventId: number | null

@@ -171,6 +171,7 @@ const roomStatus: RoomStatus = {
 const battleStatus: BattleStatus = {
     battleSessionId,
     roomNumber: roomStatus.roomNumber,
+    host: participant,
     participants: [participant],
     finalized: false,
 }

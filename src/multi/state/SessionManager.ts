@@ -7,6 +7,9 @@ import { Result, ClientState, BattleState } from "../types"
 import { RoomStateMachine } from "./RoomStateMachine"
 import { ClientStateMachine } from "./ClientStateMachine"
 import { participantKey, type ParticipantIdentity } from "../coordinator/contracts"
+import type { CoordinatorResult } from "../coordinator/contracts"
+import type { BattleSessionInput, BattleStatus } from "../coordinator/interface"
+import { BattleFactStore } from "../settlement/facts"
 import type { PlayerPartySnapshot, PlayerSnapshot } from "../snapshot/player-snapshot"
 
 export interface SessionMate {
@@ -64,6 +67,7 @@ export class SessionManager {
     private finalizedBattleParticipantKeys = new Map<string, Set<string>>()
     private roomHostParticipants = new Map<string, ParticipantIdentity>()
     private roomStates = new Map<string, RoomStateMachine>()
+    private battleFacts = new BattleFactStore()
 
     private roomClientKey(roomNumber: string, participant: ParticipantIdentity): string {
         return JSON.stringify([roomNumber, participant.nodeSessionId, participant.viewerId])
@@ -500,6 +504,10 @@ export class SessionManager {
             this.finalizedBattleParticipantKeys.set(roomNumber, finalized)
         }
         finalized.add(participantKey(participant.nodeSessionId, participant.viewerId))
+        const battleSessionId = this.battleFacts.getActiveBattleSessionId(roomNumber)
+        if (battleSessionId !== null) {
+            this.battleFacts.markFinalized({ participant, roomNumber, battleSessionId })
+        }
     }
 
     hasParticipantFinalizedBattle(roomNumber: string, participant: ParticipantIdentity): boolean {
@@ -527,6 +535,7 @@ export class SessionManager {
     }
 
     setBattleExpectedCount(roomNumber: string, count: number): void {
+        this.battleFacts.releaseRoom(roomNumber)
         this.battleParticipants.delete(roomNumber)
         this.battleHostParticipants.delete(roomNumber)
         this.resetBattleScene(roomNumber, count)
@@ -550,6 +559,22 @@ export class SessionManager {
         this.battleParticipants.set(roomNumber, participantMap)
         this.battleHostParticipants.set(roomNumber, Object.freeze({ ...hostParticipant }))
         this.resetBattleScene(roomNumber, participantMap.size)
+        this.battleFacts.releaseRoom(roomNumber)
+        if (participantMap.size > 0) {
+            this.battleFacts.startBattle({
+                roomNumber,
+                host: hostParticipant,
+                participants: [...participantMap.values()].map(value => value.participant),
+            })
+        }
+    }
+
+    getActiveBattleSessionId(roomNumber: string) {
+        return this.battleFacts.getActiveBattleSessionId(roomNumber)
+    }
+
+    getBattleStatus(input: BattleSessionInput): CoordinatorResult<BattleStatus> {
+        return this.battleFacts.getBattleStatus(input)
     }
 
     private resetBattleScene(roomNumber: string, count: number): void {
@@ -562,6 +587,7 @@ export class SessionManager {
     }
 
     clearBattleSceneState(roomNumber: string): void {
+        this.battleFacts.releaseRoom(roomNumber)
         this.battleExpectedCount.delete(roomNumber)
         this.sceneReadyClients.delete(roomNumber)
         this.sceneTransitionClients.delete(roomNumber)

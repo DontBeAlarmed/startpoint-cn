@@ -76,10 +76,18 @@ function isRoomStatus(value: unknown): value is RoomStatus {
 
 function isBattleStatus(value: unknown): value is BattleStatus {
     if (!isRecord(value)) return false
-    return isNonEmptyString(value.battleSessionId)
-        && isNonEmptyString(value.roomNumber)
-        && isArrayOf(value.participants, isParticipant)
-        && typeof value.finalized === "boolean"
+    const host = value.host
+    const participants = value.participants
+    if (!isNonEmptyString(value.battleSessionId)
+        || !isNonEmptyString(value.roomNumber)
+        || !isParticipant(host)
+        || !Array.isArray(participants)
+        || !participants.every(isParticipant)
+        || typeof value.finalized !== "boolean") return false
+    return participants.some(participant => (
+        participant.nodeSessionId === host.nodeSessionId
+        && participant.viewerId === host.viewerId
+    ))
 }
 
 function isRoomAdmission(value: unknown): value is RoomAdmission {

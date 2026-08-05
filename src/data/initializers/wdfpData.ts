@@ -1,6 +1,9 @@
 import { Database } from "better-sqlite3";
 import { ensureQuestHostFinishedStorageSync } from "../../lib/quest/host-finish-persistence";
-import { ensureActiveQuestEntryItemCountStorageSync } from "../../lib/quest/active-quest-persistence";
+import {
+    ensureActiveQuestBattleSessionIdStorageSync,
+    ensureActiveQuestEntryItemCountStorageSync,
+} from "../../lib/quest/active-quest-persistence";
 import { ensureSchemaColumn } from "../schema";
 
 function getInitialDropMultiplier(): number {
@@ -936,6 +939,7 @@ export default function init(
         is_auto_start_mode INTEGER NOT NULL DEFAULT 0,
         is_multi INTEGER NOT NULL DEFAULT 0,
         room_number TEXT,
+        battle_session_id TEXT,
         entry_item_id INTEGER,
         entry_item_count INTEGER,
         event_id INTEGER,
@@ -943,4 +947,5 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
     ensureActiveQuestEntryItemCountStorageSync(database)
+    ensureActiveQuestBattleSessionIdStorageSync(database)
 }

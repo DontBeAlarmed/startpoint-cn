@@ -12,6 +12,7 @@ function buildActiveQuest(raw: RawPlayerActiveQuest): PlayerActiveQuest {
         isAutoStartMode: raw.is_auto_start_mode === 1,
         isMulti: raw.is_multi === 1,
         roomNumber: raw.room_number,
+        battleSessionId: raw.battle_session_id,
         entryItemId: raw.entry_item_id,
         entryItemCount: raw.entry_item_count,
         eventId: raw.event_id,
@@ -31,13 +32,13 @@ export function insertPlayerActiveQuestSync(playerId: number, quest: PlayerActiv
         INSERT OR REPLACE INTO players_active_quests
             (player_id, play_id, quest_id, category, use_boss_boost_point,
              use_boost_point, is_auto_start_mode, is_multi, room_number,
-             entry_item_id, entry_item_count, event_id, continue_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             battle_session_id, entry_item_id, entry_item_count, event_id, continue_count)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         playerId, quest.playId, quest.questId, quest.category,
         quest.useBossBoostPoint ? 1 : 0, quest.useBoostPoint ? 1 : 0,
         quest.isAutoStartMode ? 1 : 0, quest.isMulti ? 1 : 0,
-        quest.roomNumber ?? null, quest.entryItemId ?? null,
+        quest.roomNumber ?? null, quest.battleSessionId ?? null, quest.entryItemId ?? null,
         quest.entryItemCount ?? null, quest.eventId ?? null, quest.continueCount
     )
 }

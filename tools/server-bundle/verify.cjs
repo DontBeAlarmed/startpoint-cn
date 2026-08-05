@@ -144,8 +144,8 @@ function validateManifest(manifest, manifestBytes, dataSchema, dependencyLock) {
     const currentNode = currentMatch.slice(1).map(Number)
     if (compareVersions(currentNode, requiredNode) < 0) fail("current Node version is incompatible")
     const { minDataSchema, targetDataSchema } = manifest.requires
-    if (minDataSchema !== 0 || targetDataSchema !== 14) {
-        fail("data schema range must be exactly 0 through 14")
+    if (minDataSchema !== 0 || targetDataSchema !== 15) {
+        fail("data schema range must be exactly 0 through 15")
     }
     if (dataSchema !== undefined) {
         if (!Number.isSafeInteger(dataSchema)

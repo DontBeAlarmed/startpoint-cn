@@ -91,6 +91,7 @@ function createCoordinator() {
                 value: {
                     battleSessionId: input.battleSessionId ?? "battle-session",
                     roomNumber: input.roomNumber ?? "123456",
+                    host: input.participant,
                     participants: [input.participant],
                     finalized: name === "finalizeBattle",
                 },
@@ -404,8 +405,8 @@ test("delegates every room and battle operation with the authenticated node iden
         ["/v1/multi/rooms/disband", "disbandRoom", { participant, roomNumber: "123456" }, true],
         ["/v1/multi/rooms/status", "getRoomStatus", { participant, roomNumber: "123456" }, false],
         ["/v1/multi/battles/start", "startBattle", { participant, roomNumber: "123456" }, true],
-        ["/v1/multi/battles/finalize", "finalizeBattle", { participant, battleSessionId: "battle-session" }, true],
-        ["/v1/multi/battles/status", "getBattleStatus", { participant, battleSessionId: "battle-session" }, false],
+        ["/v1/multi/battles/finalize", "finalizeBattle", { participant, roomNumber: "123456", battleSessionId: "battle-session" }, true],
+        ["/v1/multi/battles/status", "getBattleStatus", { participant, roomNumber: "123456", battleSessionId: "battle-session" }, false],
     ]
 
     for (const [url, method, payload, write] of operations) {

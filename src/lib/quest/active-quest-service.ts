@@ -19,6 +19,7 @@ export interface ActiveQuest {
     isAutoStartMode: boolean
     isMulti: boolean
     roomNumber?: string | null
+    battleSessionId?: string | null
     matePlayerIds?: number[]
     mateComIds?: number[]
     entryItemId?: number | null
@@ -47,6 +48,7 @@ export function persistActiveQuest(playerId: number, quest: ActiveQuest): void {
         isAutoStartMode: quest.isAutoStartMode,
         isMulti: quest.isMulti,
         roomNumber: quest.roomNumber ?? null,
+        battleSessionId: quest.battleSessionId ?? null,
         entryItemId: quest.entryItemId ?? null,
         entryItemCount: quest.entryItemCount ?? null,
         eventId: quest.eventId ?? null,

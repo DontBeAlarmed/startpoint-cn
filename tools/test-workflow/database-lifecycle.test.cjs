@@ -281,7 +281,7 @@ test("default schema migration preserves v6 players and creates cascading Pass t
 
     data.initializeDatabase({ paths })
     const migrated = getDb()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 14)
+    assert.equal(migrated.pragma("user_version", { simple: true }), 15)
     assert.deepEqual(
         migrated.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_character_election_votes'").get(),
         { name: "players_character_election_votes" },
@@ -319,6 +319,100 @@ test("default schema migration preserves v6 players and creates cascading Pass t
     migrated.prepare("DELETE FROM players WHERE id = ?").run(playerId)
     assert.equal(migrated.prepare("SELECT COUNT(*) AS count FROM players_pass_cards").get().count, 0)
     assert.equal(migrated.prepare("SELECT COUNT(*) AS count FROM players_pass_card_rewards").get().count, 0)
+})
+
+test("default schema migrates schema 14 active quests to battle session identity", t => {
+    const paths = temporaryPaths(t)
+    fs.mkdirSync(paths.dataDir, { recursive: true })
+    const schema14 = new Sqlite(paths.databaseFile)
+    schema14.exec(`
+        CREATE TABLE players_active_quests (
+            player_id INTEGER PRIMARY KEY,
+            play_id TEXT NOT NULL,
+            quest_id INTEGER NOT NULL,
+            category INTEGER NOT NULL,
+            use_boss_boost_point INTEGER NOT NULL DEFAULT 0,
+            use_boost_point INTEGER NOT NULL DEFAULT 0,
+            is_auto_start_mode INTEGER NOT NULL DEFAULT 0,
+            is_multi INTEGER NOT NULL DEFAULT 0,
+            room_number TEXT,
+            entry_item_id INTEGER,
+            entry_item_count INTEGER,
+            event_id INTEGER,
+            continue_count INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT INTO players_active_quests (
+            player_id, play_id, quest_id, category, is_multi, room_number
+        ) VALUES (77, 'legacy-play', 501, 2, 1, '123456');
+    `)
+    schema14.pragma("user_version = 14")
+    schema14.close()
+    fs.writeFileSync(paths.databaseVersionFile, "14")
+
+    data.initializeDatabase({ paths })
+
+    assert.equal(getDb().pragma("user_version", { simple: true }), 15)
+    assert.equal(
+        getDb().pragma("table_info(players_active_quests)")
+            .some(column => column.name === "battle_session_id" && column.notnull === 0),
+        true,
+    )
+    assert.deepEqual(
+        getDb().prepare(`
+            SELECT play_id, battle_session_id
+            FROM players_active_quests
+            WHERE player_id = 77
+        `).get(),
+        { play_id: "legacy-play", battle_session_id: null },
+    )
+})
+
+test("active quest domain roundtrips nullable battle session identity", t => {
+    const paths = temporaryPaths(t)
+    data.initializeDatabase({ paths })
+    const columns = getDb().pragma("table_info(players_active_quests)")
+    if (!columns.some(column => column.name === "battle_session_id")) {
+        getDb().exec("ALTER TABLE players_active_quests ADD COLUMN battle_session_id TEXT")
+    }
+    const {
+        getPlayerActiveQuestSync,
+        insertPlayerActiveQuestSync,
+    } = require("../../src/data/domains/quest_active")
+    const { insertAccountSync } = require("../../src/data/domains/account")
+    const { insertDefaultPlayerSync } = require("../../src/data/domains/player")
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: "active-quest-battle-session-roundtrip",
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    const activeQuest = {
+        playerId,
+        playId: "remote-play",
+        questId: 501,
+        category: 2,
+        useBossBoostPoint: false,
+        useBoostPoint: false,
+        isAutoStartMode: false,
+        isMulti: true,
+        roomNumber: "654321",
+        battleSessionId: "battle-session-1",
+        entryItemId: null,
+        entryItemCount: null,
+        eventId: null,
+        continueCount: 0,
+    }
+
+    insertPlayerActiveQuestSync(playerId, activeQuest)
+    assert.equal(getPlayerActiveQuestSync(playerId).battleSessionId, "battle-session-1")
+
+    insertPlayerActiveQuestSync(playerId, {
+        ...activeQuest,
+        battleSessionId: null,
+    })
+    assert.equal(getPlayerActiveQuestSync(playerId).battleSessionId, null)
 })
 
 test("non-duplicate ALTER failure rolls back and leaves user_version unchanged", t => {

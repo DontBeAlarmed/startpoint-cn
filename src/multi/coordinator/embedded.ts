@@ -115,10 +115,6 @@ function resolveCompatibleRoom(input: CompatibleRoomInput): MultiRoom | undefine
     return undefined
 }
 
-function unavailableBattle(): CoordinatorResult<BattleStatus> {
-    return { ok: false, error: "HUB_UNAVAILABLE" }
-}
-
 export class EmbeddedMultiCoordinator implements MultiCoordinator {
     private readonly allowRemoteParticipants: boolean
 
@@ -200,17 +196,36 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         if (typeof input.roomNumber !== "string" || input.roomNumber.trim().length === 0) {
             return roomNotFound()
         }
-        return unavailableBattle()
+        const room = getRoom(input.roomNumber)
+        if (!room) return roomNotFound()
+        const roomStatus = this.toRoomStatus(room)
+        const identityKey = participantKey(
+            input.participant.nodeSessionId,
+            input.participant.viewerId,
+        )
+        if (!roomStatus.members.some(member => participantKey(
+            member.nodeSessionId,
+            member.viewerId,
+        ) === identityKey)) {
+            return { ok: false, error: "ROOM_PERMISSION_DENIED" }
+        }
+        const battleSessionId = sessionManager.getActiveBattleSessionId(input.roomNumber)
+        if (battleSessionId === null) return { ok: false, error: "HUB_UNAVAILABLE" }
+        return sessionManager.getBattleStatus({
+            participant: input.participant,
+            roomNumber: input.roomNumber,
+            battleSessionId,
+        })
     }
 
     async finalizeBattle(input: BattleSessionInput): Promise<CoordinatorResult<BattleStatus>> {
         this.assertBattleInput(input)
-        return unavailableBattle()
+        return sessionManager.getBattleStatus(input)
     }
 
     async getBattleStatus(input: BattleSessionInput): Promise<CoordinatorResult<BattleStatus>> {
         this.assertBattleInput(input)
-        return unavailableBattle()
+        return sessionManager.getBattleStatus(input)
     }
 
     async getRoomStatus(input: RoomParticipantInput): Promise<CoordinatorResult<RoomStatus>> {
@@ -242,6 +257,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
 
     private assertBattleInput(input: BattleSessionInput): void {
         assertParticipant(input.participant, this.allowRemoteParticipants)
+        assertNonEmptyString(input.roomNumber, "roomNumber")
         assertNonEmptyString(input.battleSessionId as BattleSessionId, "battleSessionId")
     }
 
@@ -259,6 +275,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             nodeSessionId: EMBEDDED_NODE_SESSION_ID,
             viewerId: room.host_viewer_id,
         })
+        const battleSessionId = sessionManager.getActiveBattleSessionId(room.room_number)
         const connected = sessionManager.getClientsInRoom(room.room_number)
         const identity = (viewerId: number): ParticipantIdentity => {
             if (viewerId === host.viewerId) return host
@@ -285,6 +302,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
                 viewerId => Object.freeze(identity(viewerId)),
             )),
             compatibility: compatibilityByRoom.get(room) ?? EMBEDDED_COMPATIBILITY,
+            ...(battleSessionId === null ? {} : { battleSessionId }),
         })
     }
 }

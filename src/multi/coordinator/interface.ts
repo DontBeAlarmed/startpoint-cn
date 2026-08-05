@@ -33,6 +33,7 @@ export interface RoomParticipantInput {
 
 export interface BattleSessionInput {
     readonly participant: ParticipantIdentity
+    readonly roomNumber: string
     readonly battleSessionId: BattleSessionId
 }
 
@@ -57,6 +58,7 @@ export interface RoomStatus {
 export interface BattleStatus {
     readonly battleSessionId: BattleSessionId
     readonly roomNumber: string
+    readonly host: ParticipantIdentity
     readonly participants: readonly ParticipantIdentity[]
     readonly finalized: boolean
 }

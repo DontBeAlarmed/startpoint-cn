@@ -143,8 +143,16 @@ test("multi battle routes use the shared lifecycle boundaries", () => {
     assert.match(source, /validateMultiFinishRequest\(/)
     assert.match(source, /runContinueActiveQuestTransaction\(/)
     assert.ok(
-        source.indexOf("runStartEntryTransaction(") < source.indexOf("setRoomBattle(room_number)"),
-        "room state must change only after the entry transaction commits",
+        source.indexOf("context.coordinator.startBattle(")
+            < source.indexOf("runStartEntryTransaction("),
+        "Hub battle identity must be fixed before the local entry transaction",
     )
+    assert.ok(
+        source.indexOf("context.settlementVerifier.verify(")
+            < source.indexOf("getDb().transaction(executeFinishWrites)()"),
+        "Hub finalization must be verified before the local settlement transaction",
+    )
+    assert.match(source, /const entryCost = isRoomHost[\s\S]*?: undefined;/)
+    assert.match(source, /const staminaCost = isRoomHost \? getStaminaCost\(questKey\)\.cost : 0;/)
     assert.doesNotMatch(source, /activeData\.continueCount\+\+/)
 })

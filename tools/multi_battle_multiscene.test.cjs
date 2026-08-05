@@ -8,7 +8,6 @@ const restoreContentSnapshot = installBundledGameplaySnapshot()
 const { QuestCategory } = require("../src/lib/types")
 const {
     canAbortMultiBattle,
-    canFinishMultiBattleQuest,
     cleanupAbortedMultiBattle,
 } = require("../src/multi/http/battle")
 const { createRoom, disbandRoom, getRoom } = require("../src/multi/room/manager")
@@ -50,7 +49,10 @@ function createBattle(questId, count, category = QuestCategory.BOSS_BATTLE) {
         sessionManager.addBattleClient(connectionId, client)
         clients.push({ client, socket })
     }
-    sessionManager.setBattleExpectedCount(room.room_number, count)
+    sessionManager.setBattleParticipants(room.room_number, clients.map(({ client }) => ({
+        connectionId: client.connectionId,
+        participant: client.participant,
+    })), clients[0].client.participant)
     cleanup.push({ clients, lobbyClients: [], room })
     return { clients, room }
 }
@@ -78,6 +80,8 @@ test.after(() => restoreContentSnapshot())
 test("BothBoss performs a second SceneReady barrier and finalizes only after index 2", () => {
     const battle = createBattle(1001002, 2)
     const [first, second] = battle.clients
+    const battleSessionId = sessionManager.getActiveBattleSessionId(battle.room.room_number)
+    assert.equal(typeof battleSessionId, "string")
 
     notify(first, [0])
     notify(second, [0])
@@ -86,7 +90,11 @@ test("BothBoss performs a second SceneReady barrier and finalizes only after ind
 
     notify(first, [2])
     assert.equal(countMessage(first, [1, [2]]), 0, "second scene must finish before Finalized")
-    assert.equal(canFinishMultiBattleQuest({ isBothBoss: true }, battle.room.room_number, first.client.participant), false)
+    assert.equal(sessionManager.getBattleStatus({
+        participant: first.client.participant,
+        roomNumber: battle.room.room_number,
+        battleSessionId,
+    }).value?.finalized, false)
 
     notify(first, [1])
     notify(second, [0])
@@ -102,7 +110,17 @@ test("BothBoss performs a second SceneReady barrier and finalizes only after ind
 
     notify(first, [2])
     assert.equal(countMessage(first, [1, [2]]), 1)
-    assert.equal(canFinishMultiBattleQuest({ isBothBoss: true }, battle.room.room_number, first.client.participant), true)
+    assert.equal(sessionManager.getBattleStatus({
+        participant: first.client.participant,
+        roomNumber: battle.room.room_number,
+        battleSessionId,
+    }).value?.finalized, true)
+    sessionManager.clearBattleSceneState(battle.room.room_number)
+    assert.equal(sessionManager.getBattleStatus({
+        participant: first.client.participant,
+        roomNumber: battle.room.room_number,
+        battleSessionId,
+    }).value?.finalized, true, "Hub completion fact must survive scene cleanup")
 })
 
 test("ordinary boss battle ignores LevelNext", () => {
