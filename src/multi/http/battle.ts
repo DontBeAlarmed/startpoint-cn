@@ -176,6 +176,13 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             });
         }
 
+        const availability = context.questAvailability.check(category, quest_id);
+        if (!availability.available) {
+            return reply.status(400).send({
+                "error": availability.code, "message": "Quest is not available."
+            });
+        }
+
         const mateComIds = room.mates.map(m => m.com_id);
         const isRoomHost = room.host_player_id === ctx.playerId;
         const questKey = `${category}_${quest_id}`;

@@ -40,12 +40,12 @@ const {
 const { createEmbeddedMultiHttpContext } = contextModule
 
 const compatibility = Object.freeze({
-    protocolVersion: 1,
-    appVersion: "1.8.1",
-    resourceVersion: "1",
+    multiProtocolVersion: 1,
+    APP_VER: "1.8.1",
+    RES_VER: "1",
     cdnTargetVersion: "embedded-cn",
-    contentDigest: "embedded-content",
-    modeDigest: "embedded-modes",
+    contentDigest: `sha256:${"1".repeat(64)}`,
+    modeDigest: `sha256:${"2".repeat(64)}`,
 })
 
 function participant(viewerId) {
@@ -111,7 +111,7 @@ test("createRoom projects the local room into a node-scoped read-only status", a
     assert.equal(status.hostOnline, false)
 })
 
-test("searchRoom finds a room number without comparing compatibility digests", async t => {
+test("searchRoom rejects a room with different participant compatibility", async t => {
     if (!EmbeddedMultiCoordinator) return t.skip("embedded coordinator missing")
 
     const { coordinator, status } = await createFixture(t)
@@ -120,14 +120,13 @@ test("searchRoom finds a room number without comparing compatibility digests", a
         roomNumber: status.roomNumber,
         compatibility: {
             ...compatibility,
-            appVersion: "different",
-            contentDigest: "different",
-            modeDigest: "different",
+            APP_VER: "different",
+            contentDigest: `sha256:${"3".repeat(64)}`,
+            modeDigest: `sha256:${"4".repeat(64)}`,
         },
     })
 
-    assert.equal(found.ok, true)
-    assert.equal(found.value.roomNumber, status.roomNumber)
+    assert.deepEqual(found, { ok: false, error: "INCOMPATIBLE_ROOM" })
 })
 
 test("selectRoom and prepareRoom accept either non-empty locator value", async t => {
@@ -157,11 +156,11 @@ test("room compatibility metadata is shared across embedded coordinator instance
     const creator = new EmbeddedMultiCoordinator()
     const reader = new EmbeddedMultiCoordinator()
     const customCompatibility = compatibilityProfile({
-        appVersion: "creator-app",
-        resourceVersion: "creator-resource",
+        APP_VER: "creator-app",
+        RES_VER: "creator-resource",
         cdnTargetVersion: "creator-cdn",
-        contentDigest: "creator-content",
-        modeDigest: "creator-mode",
+        contentDigest: `sha256:${"5".repeat(64)}`,
+        modeDigest: `sha256:${"6".repeat(64)}`,
     })
     const created = await creator.createRoom(createInput({ compatibility: customCompatibility }))
     assert.equal(created.ok, true)
@@ -178,7 +177,7 @@ test("room compatibility metadata is shared across embedded coordinator instance
     ]) {
         const found = await reader[operation]({
             participant: participant(202),
-            compatibility,
+            compatibility: customCompatibility,
             ...locator,
         })
         assert.equal(found.ok, true, operation)
@@ -254,8 +253,8 @@ test("createRoom validates request identity, local ids and protocol version", as
         createInput({ questId: 1.5 }),
         createInput({ leaderCharacterId: Number.MAX_SAFE_INTEGER + 1 }),
         createInput({ localPlayerId: 0 }),
-        createInput({ compatibility: { ...compatibility, protocolVersion: 0 } }),
-        createInput({ compatibility: { ...compatibility, protocolVersion: 1.5 } }),
+        createInput({ compatibility: { ...compatibility, multiProtocolVersion: 0 } }),
+        createInput({ compatibility: { ...compatibility, multiProtocolVersion: 1.5 } }),
     ]
 
     for (const input of invalidInputs) {
@@ -279,8 +278,8 @@ test("createRoom rejects invalid runtime compatibility before creating a room", 
 
     const coordinator = new EmbeddedMultiCoordinator()
     const fields = [
-        "appVersion",
-        "resourceVersion",
+        "APP_VER",
+        "RES_VER",
         "cdnTargetVersion",
         "contentDigest",
         "modeDigest",
@@ -363,7 +362,7 @@ test("room compatibility metadata follows the room object across external replac
     t.after(() => { crypto.randomInt = originalRandomInt })
 
     const coordinator = new EmbeddedMultiCoordinator()
-    const oldProfile = compatibilityProfile({ contentDigest: "old-content" })
+    const oldProfile = compatibilityProfile({ contentDigest: `sha256:${"a".repeat(64)}` })
     const created = await coordinator.createRoom(createInput({ compatibility: oldProfile }))
     assert.equal(created.ok, true)
     assert.equal(created.value.roomNumber, "654321")
@@ -392,7 +391,8 @@ test("room compatibility metadata follows the room object across external replac
 test("room statuses are immutable snapshots isolated from later queries", async t => {
     if (!EmbeddedMultiCoordinator) return t.skip("embedded coordinator missing")
 
-    const mutableProfile = compatibilityProfile({ contentDigest: "original-content" })
+    const originalDigest = `sha256:${"7".repeat(64)}`
+    const mutableProfile = compatibilityProfile({ contentDigest: originalDigest })
     const { coordinator, status } = await createFixture(t, { compatibility: mutableProfile })
 
     assert.equal(Object.isFrozen(status), true)
@@ -410,32 +410,34 @@ test("room statuses are immutable snapshots isolated from later queries", async 
     })
     assert.equal(queried.ok, true)
     assert.equal(queried.value.members[0].viewerId, 101)
-    assert.equal(queried.value.compatibility.contentDigest, "original-content")
+    assert.equal(queried.value.compatibility.contentDigest, originalDigest)
 })
 
 test("embedded HTTP contexts copy compatibility and isolate coordinators", async () => {
     if (!createEmbeddedMultiHttpContext) return test.skip("HTTP context missing")
 
-    const firstInput = compatibilityProfile({ contentDigest: "first" })
-    const secondInput = compatibilityProfile({ contentDigest: "second" })
+    const firstDigest = `sha256:${"8".repeat(64)}`
+    const secondDigest = `sha256:${"9".repeat(64)}`
+    const firstInput = compatibilityProfile({ contentDigest: firstDigest })
+    const secondInput = compatibilityProfile({ contentDigest: secondDigest })
     const first = createEmbeddedMultiHttpContext({ compatibility: firstInput })
     const second = createEmbeddedMultiHttpContext({ compatibility: secondInput })
 
     firstInput.contentDigest = "mutated-first"
     secondInput.contentDigest = "mutated-second"
     assert.notEqual(first.coordinator, second.coordinator)
-    assert.equal((await first.snapshotProvider.getCompatibility(101)).contentDigest, "first")
-    assert.equal((await second.snapshotProvider.getCompatibility(101)).contentDigest, "second")
+    assert.equal(first.snapshotProvider.getCompatibility({}).value.contentDigest, firstDigest)
+    assert.equal(second.snapshotProvider.getCompatibility({}).value.contentDigest, secondDigest)
     assert.notEqual(
-        await first.snapshotProvider.getCompatibility(101),
-        await second.snapshotProvider.getCompatibility(101),
+        first.snapshotProvider.getCompatibility({}).value,
+        second.snapshotProvider.getCompatibility({}).value,
     )
 })
 
 test("embedded HTTP and default TCP admission wiring share one registry", () => {
     const { embeddedAdmissionRegistry } = require("../src/multi/admission/registry")
     const { DEFAULT_SESSION_ADMISSION_PROVIDER } = require("../src/multi/tcp/server")
-    const context = createEmbeddedMultiHttpContext()
+    const context = createEmbeddedMultiHttpContext({ compatibility })
 
     assert.equal(context.admissionProvider, embeddedAdmissionRegistry)
     assert.equal(context.admissionIssuer, embeddedAdmissionRegistry)
@@ -454,6 +456,9 @@ test("embedded HTTP context carries all four injected collaborators", async t =>
     assert.equal(context.coordinator instanceof EmbeddedMultiCoordinator, true)
     assert.equal(await context.resolvePlayerContext(101), resolved)
     assert.deepEqual(context.snapshotProvider.getParticipant(101), participant(101))
-    assert.deepEqual(await context.snapshotProvider.getCompatibility(101), compatibility)
+    assert.deepEqual(context.snapshotProvider.getCompatibility({}), {
+        ok: true,
+        value: compatibility,
+    })
     assert.equal(typeof context.settlementVerifier.getBattleStatus, "function")
 })

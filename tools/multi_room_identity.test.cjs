@@ -27,6 +27,14 @@ const players = new Map([
     [202, { playerId: 302, player: { id: 302, name: "Guest", rankPoint: 0, leaderCharacterId: 402 } }],
     [303, { playerId: 403, player: { id: 403, name: "Stranger", rankPoint: 0, leaderCharacterId: 403 } }],
 ])
+const TEST_COMPATIBILITY = Object.freeze({
+    multiProtocolVersion: 1,
+    APP_VER: "embedded",
+    RES_VER: "embedded",
+    cdnTargetVersion: "embedded",
+    contentDigest: `sha256:${"0".repeat(64)}`,
+    modeDigest: `sha256:${"0".repeat(64)}`,
+})
 stubModule("../src/multi/player-context", {
     resolveMultiPlayerContext: async viewerId => players.get(viewerId) ?? null,
     getPlayerRankLevel: () => 1,
@@ -60,6 +68,7 @@ const { registerSocialRoutes } = require("../src/multi/http/social")
 async function createRouteServer(options = {}) {
     const fastify = Fastify()
     const context = options.context ?? createEmbeddedMultiHttpContext({
+        compatibility: TEST_COMPATIBILITY,
         resolvePlayerContext: options.resolvePlayerContext
             ?? (async viewerId => players.get(viewerId) ?? null),
         prepareAdmission: async viewerId => {
@@ -123,14 +132,7 @@ test("room HTTP routes depend on the injected context instead of global room acc
 
 test("room routes derive raising state from the injected coordinator status", async t => {
     const participant = viewerId => ({ nodeSessionId: "test-node", viewerId })
-    const compatibility = {
-        protocolVersion: 1,
-        appVersion: "test",
-        resourceVersion: "test",
-        cdnTargetVersion: "test",
-        contentDigest: "test",
-        modeDigest: "test",
-    }
+    const compatibility = TEST_COMPATIBILITY
     const status = {
         roomNumber: "123456",
         accessToken: "test-token",
@@ -158,8 +160,11 @@ test("room routes derive raising state from the injected coordinator status", as
         resolvePlayerContext: async viewerId => players.get(viewerId) ?? null,
         snapshotProvider: {
             getParticipant: participant,
-            getCompatibility: async () => compatibility,
+            getCompatibility: () => ({ ok: true, value: compatibility }),
             prepareAdmission: async viewerId => ({ snapshot: snapshotFixture(viewerId) }),
+        },
+        questAvailability: {
+            check: () => ({ available: true }),
         },
         admissionProvider: admissionRegistry,
         admissionIssuer: admissionRegistry,
@@ -540,6 +545,141 @@ test("create_room maps invalid coordinator numeric fields to HTTP 400", async t 
 function decode(response) {
     return unpack(Buffer.from(response.body, "base64"))
 }
+
+test("compatibility and local quest failures short-circuit room mutations", async t => {
+    const participant = viewerId => ({ nodeSessionId: "test-node", viewerId })
+    const compatibility = {
+        multiProtocolVersion: 1,
+        APP_VER: "1.8.1",
+        RES_VER: "1.4.54",
+        cdnTargetVersion: "1.4.54",
+        contentDigest: `sha256:${"1".repeat(64)}`,
+        modeDigest: `sha256:${"2".repeat(64)}`,
+    }
+    const status = {
+        roomNumber: "123456",
+        accessToken: "test-token",
+        category: 1,
+        questId: 701,
+        hostEntryTime: 1_725_000_000,
+        roomSequence: 1,
+        raisingState: 2,
+        shareRoomOptions: 0,
+        hostMainCharacterId: 401,
+        isNpcMode: false,
+        hostOnline: true,
+        host: participant(101),
+        members: [participant(101)],
+        compatibility,
+    }
+    let coordinatorCalls = 0
+    let prepareCalls = 0
+    let admissionCalls = 0
+    let compatibilityResult = { ok: false, error: "INCOMPATIBLE_ROOM" }
+    let questResult = { available: true }
+    const found = async () => {
+        coordinatorCalls++
+        return { ok: true, value: status }
+    }
+    const context = {
+        coordinator: {
+            createRoom: async () => {
+                coordinatorCalls++
+                return { ok: true, value: status }
+            },
+            searchRoom: found,
+            selectRoom: found,
+            prepareRoom: async () => {
+                prepareCalls++
+                return { ok: true, value: status }
+            },
+        },
+        resolvePlayerContext: async viewerId => players.get(viewerId) ?? null,
+        snapshotProvider: {
+            getParticipant: participant,
+            getCompatibility: () => compatibilityResult,
+            prepareAdmission: async viewerId => ({ snapshot: snapshotFixture(viewerId) }),
+        },
+        questAvailability: {
+            check: () => questResult,
+        },
+        admissionProvider: {},
+        admissionIssuer: {
+            issue: () => {
+                admissionCalls++
+                return { ok: true, value: undefined }
+            },
+        },
+        admissionTtlMs: 5_000,
+        now: () => 1_000,
+        settlementVerifier: {},
+    }
+    const fastify = await createRouteServer({ context })
+    t.after(async () => fastify.close())
+
+    for (const [url, payload] of [
+        ["/create_room", { party_id: 1, category: 1, quest_id: 701 }],
+        ["/search_room", { room_number: status.roomNumber }],
+        ["/select_room", { room_number: status.roomNumber }],
+        ["/prepare", { room_number: status.roomNumber, category: 1, quest_id: 701 }],
+        ["/verify_access_token", { access_token: status.accessToken }],
+    ]) {
+        await fastify.inject({
+            method: "POST",
+            url,
+            payload: { viewer_id: 202, api_count: 1, ...payload },
+        })
+    }
+    assert.equal(coordinatorCalls, 0, "invalid compatibility must not reach the coordinator")
+    assert.equal(prepareCalls, 0)
+    assert.equal(admissionCalls, 0)
+
+    compatibilityResult = { ok: true, value: compatibility }
+    questResult = { available: false, code: "QUEST_NOT_AVAILABLE" }
+    const create = await fastify.inject({
+        method: "POST",
+        url: "/create_room",
+        payload: { viewer_id: 202, party_id: 1, category: 1, quest_id: 701, api_count: 2 },
+    })
+    assert.equal(create.statusCode, 400)
+    assert.equal(coordinatorCalls, 0, "unavailable host quest must not create a room")
+
+    const search = await fastify.inject({
+        method: "POST",
+        url: "/search_room",
+        payload: { viewer_id: 202, room_number: status.roomNumber, api_count: 3 },
+    })
+    assert.equal(decode(search).data.room_exists, false)
+
+    const select = await fastify.inject({
+        method: "POST",
+        url: "/select_room",
+        payload: { viewer_id: 202, room_number: status.roomNumber, api_count: 4 },
+    })
+    assert.equal(decode(select).data.raising_state, 9)
+
+    const prepare = await fastify.inject({
+        method: "POST",
+        url: "/prepare",
+        payload: {
+            viewer_id: 202,
+            room_number: status.roomNumber,
+            category: 1,
+            quest_id: 701,
+            api_count: 5,
+        },
+    })
+    assert.equal(decode(prepare).data.raising_state, 9)
+
+    const verify = await fastify.inject({
+        method: "POST",
+        url: "/verify_access_token",
+        payload: { viewer_id: 202, access_token: status.accessToken, api_count: 6 },
+    })
+    assert.deepEqual(decode(verify).data, { room_exists: false })
+    assert.equal(prepareCalls, 0, "quest rejection must happen before prepareRoom")
+    assert.equal(admissionCalls, 0, "quest rejection must not issue admission")
+})
 
 test("each room receives an unguessable token that resolves only to that room", t => {
     const first = createRoom(101, 201, 1, 1, 301, 0, 401)

@@ -14,7 +14,13 @@ const {
     convertQuestTree,
     QUEST_AUXILIARY_SOURCES,
     QUEST_TABLE_SOURCES,
+    QUEST_TIME_RANGE_COLUMNS,
 } = require("../src/content/converters/quest")
+
+const PERMANENT_PERIOD = {
+    availableFromMs: null,
+    availableUntilMs: null,
+}
 
 function row(length, values) {
     const output = Array.from({ length }, () => "")
@@ -33,6 +39,60 @@ test("quest converter closes the 20 authoritative quest tables", () => {
         nestingDepth: 1,
     })
     assert.equal("practice_quest.json" in QUEST_TABLE_SOURCES, false)
+    assert.deepEqual(Object.keys(QUEST_TIME_RANGE_COLUMNS).sort(), Object.keys(QUEST_TABLE_SOURCES).sort())
+    assert.deepEqual(QUEST_TIME_RANGE_COLUMNS, {
+        "main_quest.json": [4, 5],
+        "ex_quest.json": [4, 5],
+        "boss_battle_quest.json": [5, 6],
+        "character_quest.json": [6, 7],
+        "world_story_event_quest.json": [5, 6],
+        "world_story_event_boss_battle_quest.json": [5, 6],
+        "advent_event_quest.json": [5, 6],
+        "daily_exp_mana_event_quest.json": [5, 6],
+        "daily_week_event_quest.json": [4, 5],
+        "challenge_dungeon_event_quest.json": [5, 6],
+        "story_event_single_quest.json": [5, 6],
+        "ranking_event_single_quest.json": [5, 6],
+        "solo_time_attack_event_quest.json": [6, 7],
+        "tower_dungeon_event_quest.json": [5, 6],
+        "expert_single_event_quest.json": [7, 8],
+        "carnival_event_quest.json": [7, 8],
+        "rush_event_quest.json": [7, 8],
+        "raid_event_quest.json": [7, 8],
+        "score_attack_event_quest.json": [7, 8],
+        "hard_multi_event_quest.json": [5, 6],
+    })
+})
+
+test("quest TimeRange is preserved as inclusive UTC+8 epoch milliseconds", () => {
+    const battle = row(119, {
+        0: 1001002,
+        1: "活动战斗",
+        3: 2,
+        4: "2024-08-16 12:00:00",
+        5: "2024-08-29 23:59:59",
+        84: 1,
+    })
+    const converted = convertQuestTree("main_quest.json", {
+        1: { 1: { 2: [battle] } },
+    })[1001002]
+
+    assert.equal(converted.availableFromMs, Date.parse("2024-08-16T04:00:00.000Z"))
+    assert.equal(converted.availableUntilMs, Date.parse("2024-08-29T15:59:59.000Z"))
+})
+
+test("quest conversion rejects malformed and inverted non-empty TimeRange values", () => {
+    for (const [start, end] of [
+        ["2024-02-30 12:00:00", "2024-08-29 23:59:59"],
+        ["2024-08-30 00:00:00", "2024-08-29 23:59:59"],
+        ["not-a-time", "(None)"],
+    ]) {
+        const battle = row(119, { 0: 1001002, 1: "非法周期", 3: 2, 4: start, 5: end, 84: 1 })
+        assert.throws(
+            () => convertQuestTree("main_quest.json", { 1: { 1: { 2: [battle] } } }),
+            /invalid quest content.*TimeRange/i,
+        )
+    }
 })
 
 test("standard quest conversion separates story rows from battle rows", () => {
@@ -64,8 +124,9 @@ test("standard quest conversion separates story rows from battle rows", () => {
     })
 
     assert.deepEqual(output, {
-        1001001: { name: "剧情", clearRewardId: 1 },
+        1001001: { ...PERMANENT_PERIOD, name: "剧情", clearRewardId: 1 },
         1001002: {
+            ...PERMANENT_PERIOD,
             name: "战斗",
             clearRewardId: 2,
             scoreRewardGroupId: 300,
@@ -111,6 +172,7 @@ test("authoritative reward and common-drop count columns are preserved", () => {
     assert.deepEqual(convertQuestTree("advent_event_quest.json", {
         1: { 1: [advent] },
     })[200013009], {
+        ...PERMANENT_PERIOD,
         name: "降临",
         clearRewardId: 10,
         scoreRewardGroupId: 20,
@@ -152,6 +214,7 @@ test("authoritative reward and common-drop count columns are preserved", () => {
     assert.deepEqual(convertQuestTree("challenge_dungeon_event_quest.json", {
         1: { 1: [challenge] },
     })[1038], {
+        ...PERMANENT_PERIOD,
         name: "宝物域",
         clearRewardId: 12,
         scoreRewardGroupId: 30,
@@ -189,6 +252,7 @@ test("hard multi conversion preserves first-clear and S+ reward ids", () => {
         100002: { 1: [quest] },
     }), {
         100002001: {
+            ...PERMANENT_PERIOD,
             name: "决战级",
             clearRewardId: 200077004,
             sPlusRewardId: 200077005,
@@ -255,6 +319,7 @@ test("score attack and carnival conversions preserve event-local metadata", () =
         7: { 3: [scoreAttack] },
     }), {
         1101: {
+            ...PERMANENT_PERIOD,
             name: "评分战",
             eventId: 7,
             scoreAttackQuestId: 3,
@@ -291,6 +356,7 @@ test("score attack and carnival conversions preserve event-local metadata", () =
         22: { 1: [carnival] },
     }), {
         2201: {
+            ...PERMANENT_PERIOD,
             name: "",
             clearRewardId: 12,
             bRankTime: 0,
@@ -315,7 +381,7 @@ test("character quest uses the OrderedMap key and rejects malformed rows", () =>
     assert.deepEqual(convertQuestTree("character_quest.json", {
         101: [character],
     }), {
-        101: { name: "角色剧情", clearRewardId: 17 },
+        101: { ...PERMANENT_PERIOD, name: "角色剧情", clearRewardId: 17 },
     })
     assert.throws(
         () => convertQuestTree("character_quest.json", { 101: [["broken"]] }),
@@ -372,6 +438,7 @@ test("quest derived tables use authoritative categories, costs and names", () =>
         [tableName, convertQuestTree(tableName, tree)]
     )))
     assert.deepEqual(converted["ranking_event_single_quest.json"][2001], {
+        ...PERMANENT_PERIOD,
         name: "竞速",
         clearRewardId: 2,
         bRankTime: 0,

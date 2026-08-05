@@ -9,12 +9,12 @@ export interface ParticipantIdentity {
 }
 
 export interface MultiCompatibilityProfile {
-    readonly protocolVersion: number
-    readonly appVersion: string
-    readonly resourceVersion: string
+    readonly multiProtocolVersion: typeof MULTI_PROTOCOL_VERSION
+    readonly APP_VER: string
+    readonly RES_VER: string
     readonly cdnTargetVersion: string
-    readonly contentDigest: string
-    readonly modeDigest: string
+    readonly contentDigest: `sha256:${string}`
+    readonly modeDigest: `sha256:${string}`
 }
 
 export type CoordinatorErrorCode =

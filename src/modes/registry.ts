@@ -139,7 +139,15 @@ export interface ModeHooks {
 
 export interface ModeDefinition extends ModeManifest, ModeHooks {}
 
+export interface LoadedModeIdentity {
+    readonly fileName: string
+    readonly name: string
+    readonly capability: string
+    readonly sha256: string
+}
+
 const modes: ModeDefinition[] = []
+const loadedModeIdentities: LoadedModeIdentity[] = []
 
 export function isModeManifest(value: unknown): value is ModeManifest {
     if (typeof value !== "object" || value === null) return false
@@ -149,7 +157,10 @@ export function isModeManifest(value: unknown): value is ModeManifest {
         && typeof candidate.apiVersion === "number"
 }
 
-export function registerMode(mode: ModeDefinition): void {
+export function registerMode(
+    mode: ModeDefinition,
+    loadedIdentity?: LoadedModeIdentity,
+): void {
     if (!isModeManifest(mode)) {
         throw new Error("mode definition requires apiVersion, name and capability")
     }
@@ -162,15 +173,30 @@ export function registerMode(mode: ModeDefinition): void {
     if (modes.some(existing => existing.name === mode.name)) {
         throw new Error(`mode is already registered: ${mode.name}`)
     }
+    if (loadedIdentity !== undefined
+        && (loadedIdentity.name !== mode.name
+            || loadedIdentity.capability !== mode.capability
+            || !/^[^/\\]+\.mjs$/.test(loadedIdentity.fileName)
+            || !/^[a-f0-9]{64}$/.test(loadedIdentity.sha256))) {
+        throw new Error(`mode ${mode.name} has an invalid loaded identity`)
+    }
     modes.push(mode)
+    if (loadedIdentity !== undefined) {
+        loadedModeIdentities.push(Object.freeze({ ...loadedIdentity }))
+    }
 }
 
 export function resetModesForTest(): void {
     modes.length = 0
+    loadedModeIdentities.length = 0
 }
 
 export function listModeCapabilities(): readonly string[] {
     return modes.map(mode => mode.capability)
+}
+
+export function listLoadedModeIdentities(): readonly LoadedModeIdentity[] {
+    return Object.freeze([...loadedModeIdentities])
 }
 
 /**

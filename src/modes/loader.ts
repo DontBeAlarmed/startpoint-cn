@@ -164,7 +164,15 @@ export async function loadModes(options: LoadModesOptions): Promise<readonly str
                 continue
             }
             const hooks = (await register(createModeHost(log)) ?? {}) as ModeHooks
-            registerMode({ ...(manifest as ModeManifest), ...hooks })
+            registerMode(
+                { ...(manifest as ModeManifest), ...hooks },
+                {
+                    fileName,
+                    name: manifest.name,
+                    capability: manifest.capability,
+                    sha256: digest,
+                },
+            )
             log(`[modes] loaded ${manifest.name} (${manifest.capability}) sha256=${digest.slice(0, 12)}…`)
             loaded.push(manifest.name)
         } catch (error) {

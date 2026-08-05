@@ -124,12 +124,12 @@ const nodeSessionId = "node-a" as NodeSessionId
 const battleSessionId = "battle-a" as BattleSessionId
 const participant: ParticipantIdentity = { nodeSessionId, viewerId: 800000001 }
 const compatibility: MultiCompatibilityProfile = {
-    protocolVersion: 1,
-    appVersion: "1.8.1",
-    resourceVersion: "1",
+    multiProtocolVersion: 1,
+    APP_VER: "1.8.1",
+    RES_VER: "1",
     cdnTargetVersion: "cn-1",
-    contentDigest: "content",
-    modeDigest: "modes",
+    contentDigest: "sha256:${"1".repeat(64)}",
+    modeDigest: "sha256:${"2".repeat(64)}",
 }
 const compatibleByNumber: CompatibleRoomInput = {
     participant,
@@ -306,11 +306,11 @@ const timedCompatibility: MultiCompatibilityProfile = {
 }
 // @ts-expect-error every compatibility field is required
 const missingCompatibility: MultiCompatibilityProfile = {
-    protocolVersion: 1,
-    appVersion: "1.8.1",
-    resourceVersion: "1",
+    multiProtocolVersion: 1,
+    APP_VER: "1.8.1",
+    RES_VER: "1",
     cdnTargetVersion: "cn-1",
-    contentDigest: "content",
+    contentDigest: "sha256:${"1".repeat(64)}",
 }
 
 void plainIdentity
@@ -345,12 +345,12 @@ test("coordinator type contract stays narrow and node-scoped", () => {
 
     const profile = findDeclaration(contracts.file, "MultiCompatibilityProfile", ts.isInterfaceDeclaration)
     assert.deepEqual(sortedMemberNames(profile), [
-        "appVersion",
+        "APP_VER",
         "cdnTargetVersion",
         "contentDigest",
         "modeDigest",
-        "protocolVersion",
-        "resourceVersion",
+        "multiProtocolVersion",
+        "RES_VER",
     ])
 
     const errorCode = findDeclaration(contracts.file, "CoordinatorErrorCode", ts.isTypeAliasDeclaration)

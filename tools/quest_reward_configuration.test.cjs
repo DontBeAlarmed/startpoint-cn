@@ -43,6 +43,14 @@ withHardMultiOverride({}, () => {
     assert.equal(validQuest.sPlusReward?.type, 3)
     assert.equal(validQuest.sPlusReward?.id, undefined)
     assert.equal(validQuest.sPlusReward?.count, 30)
+    assert.equal(Object.hasOwn(validQuest, "availableFromMs"), false)
+    assert.equal(Object.hasOwn(validQuest, "availableUntilMs"), false)
+})
+
+withHardMultiOverride({ availableFromMs: 10, availableUntilMs: 20 }, () => {
+    const quest = getQuestFromCategorySync(QuestCategory.HARD_MULTI_EVENT, 100002001)
+    assert.equal(quest.availableFromMs, 10)
+    assert.equal(quest.availableUntilMs, 20)
 })
 
 withHardMultiOverride({ clearRewardId: 999999999 }, () => {

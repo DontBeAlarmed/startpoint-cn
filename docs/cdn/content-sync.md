@@ -200,7 +200,7 @@ smoke 始终执行 force sync，并验证：
 - 35 张通用递归 OrderedMap 表逐张与 bundled 官方 1.4.54 基线深度相等；
 - 8 张物品装备派生表闭合到同一 Release；其中 6 张逐字段等于 bundled，`item_data.json` 只允许登记的 9 个官方限时体力道具补全，`equipment_lookup.json` 必须匹配 436 条固定 canonical 摘要；
 - 6 张奖励派生表逐张闭合；按 `differences-1.4.54.json` 的具体键、位置与 ID 元组，只接受 5 条 Clear 字段修正、82 个空 id 清理和 47 个同名活动代币别名；
-- 20 张关卡表和 5 张关卡派生表匹配固定 canonical 摘要；名称非空、推荐属性为 `0..5`，Clear/SS 与普通掉落组全部闭合到同一 Release 的奖励表，入场和解锁索引只能引用当前关卡；98 个 bundled 兼容练习关卡必须全部进入名称索引，活动挑战点必须引用同一 Release 的每日挑战点；
+- 20 张关卡表和 5 张关卡派生表匹配固定 canonical 摘要；名称非空、推荐属性为 `0..5`，Clear/SS 与普通掉落组全部闭合到同一 Release 的奖励表，入场和解锁索引只能引用当前关卡；每张 CN Quest OrderedMap 的权威 `TimeRange` 按国服 UTC+8 语义转换为 `availableFromMs`、`availableUntilMs`，空边界保留 `null`，非法日期和倒置周期拒绝同步；98 个 bundled 兼容练习关卡必须全部进入名称索引，活动挑战点必须引用同一 Release 的每日挑战点；
 - 两张角色 cdndata 各 505 行，运行时 505 个角色；名称、稀有度、属性与 bundled 一致；
 - 只允许已记录的 45 个 `skill_count` 从 3 变为 6，12 个 `skill_count=2` 保持不变；
 - 卡池 raw row 为 584、campaign 为 145，全部非空 odds 已成功读取；

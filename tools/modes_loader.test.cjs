@@ -14,6 +14,7 @@ const {
     dispatchModeQuestStart,
     dispatchModeRushFinish,
     listModeCapabilities,
+    listLoadedModeIdentities,
     registerMode,
     resetModesForTest,
     MODE_API_VERSION,
@@ -58,6 +59,12 @@ test("loader loads allowlisted modules and registers handlers", async t => {
     })
     assert.deepEqual(loaded, ["fixture-mode"])
     assert.deepEqual(listModeCapabilities(), ["fixture@1"])
+    assert.deepEqual(listLoadedModeIdentities(), [{
+        fileName: "fixture.mjs",
+        name: "fixture-mode",
+        capability: "fixture@1",
+        sha256: crypto.createHash("sha256").update(MODULE_SOURCE).digest("hex"),
+    }])
     const extension = dispatchModeRushFinish({}, { table: () => ({}), log: () => {} })
     assert.deepEqual(extension, {
         rush_battle_reward_list: [{ kind: 1, kind_id: 5, number: 2 }],
@@ -86,6 +93,7 @@ test("loader skips unregistered and hash-mismatched modules", async t => {
         log: message => logs.push(message),
     })
     assert.deepEqual(loaded, [])
+    assert.deepEqual(listLoadedModeIdentities(), [])
     assert.ok(logs.some(line => line.includes("SKIP unlisted.mjs")))
     assert.ok(logs.some(line => line.includes("SKIP tampered.mjs")))
     assert.equal(dispatchModeRushFinish({}, { table: () => ({}), log: () => {} }), null)
@@ -112,6 +120,7 @@ test("registry rejects duplicate and malformed registrations", t => {
     t.after(resetModesForTest)
     const base = { apiVersion: MODE_API_VERSION }
     registerMode({ ...base, name: "a", capability: "a@1" })
+    assert.deepEqual(listLoadedModeIdentities(), [], "direct registrations are not loader-validated")
     assert.throws(() => registerMode({ ...base, name: "a", capability: "a@2" }), /already registered/)
     assert.throws(() => registerMode({ ...base, name: "", capability: "x" }), /requires apiVersion, name and capability/)
 })

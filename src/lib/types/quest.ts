@@ -46,6 +46,8 @@ export enum Element {
 
 export interface RawQuest {
     name: string,
+    availableFromMs?: number | null,
+    availableUntilMs?: number | null,
     enemyLevel?: number,
     clearRewardId?: number,
     sPlusRewardId?: number,
@@ -87,6 +89,8 @@ export interface StoryQuest {
 
 export interface BattleQuest {
     name: string,
+    availableFromMs?: number | null,
+    availableUntilMs?: number | null,
     enemyLevel: number,
     clearReward?: Reward,
     sPlusReward?: Reward,

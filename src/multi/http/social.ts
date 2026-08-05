@@ -16,12 +16,14 @@ export function registerSocialRoutes(fastify: FastifyInstance, context: MultiHtt
             "error": "Bad Request", "message": "Invalid viewer id."
         })
 
-        const room = await context.coordinator.selectRoom({
+        const compatibility = context.snapshotProvider.getCompatibility(request.headers)
+        const room = compatibility.ok ? await context.coordinator.selectRoom({
             participant: context.snapshotProvider.getParticipant(viewerId),
             accessToken: body.access_token || "",
-            compatibility: await context.snapshotProvider.getCompatibility(viewerId),
-        })
-        if (!room.ok) {
+            compatibility: compatibility.value,
+        }) : compatibility
+        if (!room.ok
+            || !context.questAvailability.check(room.value.category, room.value.questId).available) {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),

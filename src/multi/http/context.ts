@@ -1,3 +1,7 @@
+import type { IncomingHttpHeaders } from "node:http"
+
+import { getQuestFromCategorySync } from "../../lib/assets"
+import { getServerTime } from "../../utils"
 import type { MultiPlayerContext } from "../player-context"
 import { resolveMultiPlayerContext } from "../player-context"
 import type {
@@ -11,10 +15,17 @@ import type {
     ParticipantIdentity,
 } from "../coordinator/contracts"
 import {
-    EMBEDDED_COMPATIBILITY,
     EMBEDDED_NODE_SESSION_ID,
     EmbeddedMultiCoordinator,
 } from "../coordinator/embedded"
+import {
+    createCompatibilityProfileFactory,
+    type CompatibilityProfileDependencies,
+} from "../compatibility"
+import {
+    checkLocalQuestAvailability,
+    type QuestAvailabilityResult,
+} from "../quest-availability"
 import {
     embeddedAdmissionRegistry,
     type AdmissionIssuer,
@@ -40,8 +51,12 @@ export function isValidMultiViewerId(viewerId: unknown): viewerId is number {
 
 export interface MultiSnapshotProvider {
     getParticipant(viewerId: number): ParticipantIdentity
-    getCompatibility(viewerId: number): Promise<MultiCompatibilityProfile>
+    getCompatibility(headers: IncomingHttpHeaders): CoordinatorResult<MultiCompatibilityProfile>
     prepareAdmission(viewerId: number): Promise<PreparedAdmissionSnapshot | null>
+}
+
+export interface MultiQuestAvailabilityProvider {
+    check(category: number, questId: number): QuestAvailabilityResult
 }
 
 export interface PreparedAdmissionSnapshot {
@@ -56,6 +71,7 @@ export interface MultiHttpContext {
     readonly coordinator: MultiCoordinator
     readonly resolvePlayerContext: ResolveMultiPlayerContext
     readonly snapshotProvider: MultiSnapshotProvider
+    readonly questAvailability: MultiQuestAvailabilityProvider
     readonly admissionProvider: AdmissionProvider
     readonly admissionIssuer: AdmissionIssuer
     readonly admissionTtlMs: number
@@ -65,10 +81,12 @@ export interface MultiHttpContext {
 
 export interface EmbeddedMultiHttpContextOptions {
     readonly compatibility?: MultiCompatibilityProfile
+    readonly compatibilityProfileDependencies?: CompatibilityProfileDependencies
     readonly resolvePlayerContext?: ResolveMultiPlayerContext
     readonly admissionRegistry?: AdmissionRegistry
     readonly admissionTtlMs?: number
     readonly now?: () => number
+    readonly serverTimeMs?: () => number
     readonly prepareAdmission?: (
         viewerId: number,
     ) => Promise<PreparedAdmissionSnapshot | null>
@@ -81,9 +99,16 @@ export function createEmbeddedMultiHttpContext(
     const resolvePlayerContext = options.resolvePlayerContext ?? resolveMultiPlayerContext
     const admissionRegistry = options.admissionRegistry ?? embeddedAdmissionRegistry
     const now = options.now ?? Date.now
-    const compatibility = Object.freeze({
-        ...(options.compatibility ?? EMBEDDED_COMPATIBILITY),
-    })
+    const fixedCompatibility = options.compatibility
+        ? Object.freeze({ ...options.compatibility }) as MultiCompatibilityProfile
+        : null
+    const getCompatibility = fixedCompatibility
+        ? () => ({
+            ok: true as const,
+            value: fixedCompatibility,
+        })
+        : createCompatibilityProfileFactory(options.compatibilityProfileDependencies)
+    const serverTimeMs = options.serverTimeMs ?? (() => getServerTime() * 1000)
     return Object.freeze({
         coordinator,
         resolvePlayerContext,
@@ -92,7 +117,7 @@ export function createEmbeddedMultiHttpContext(
                 nodeSessionId: EMBEDDED_NODE_SESSION_ID,
                 viewerId,
             }),
-            getCompatibility: async (_viewerId: number) => compatibility,
+            getCompatibility,
             prepareAdmission: options.prepareAdmission ?? (async (viewerId: number) => {
                 const context = await resolvePlayerContext(viewerId)
                 if (!context) return null
@@ -103,6 +128,14 @@ export function createEmbeddedMultiHttpContext(
                 )
                 return snapshot ? { snapshot } : null
             }),
+        }),
+        questAvailability: Object.freeze({
+            check: (category: number, questId: number) => {
+                const quest = getQuestFromCategorySync(category, questId)
+                return quest === null
+                    ? { available: false as const, code: "QUEST_NOT_AVAILABLE" as const }
+                    : checkLocalQuestAvailability(quest, category, serverTimeMs())
+            },
         }),
         admissionProvider: admissionRegistry,
         admissionIssuer: admissionRegistry,

@@ -34,9 +34,17 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
         const locator = roomNumber === null
             ? { accessToken: body.access_token || "" }
             : { roomNumber };
+        const compatibility = context.snapshotProvider.getCompatibility(request.headers);
+        if (!compatibility.ok) {
+            reply.header("content-type", "application/x-msgpack");
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+                "data": unavailableRoomData(body.room_number || ""),
+            });
+        }
         const coordinatorInput = {
             participant: context.snapshotProvider.getParticipant(viewerId),
-            compatibility: await context.snapshotProvider.getCompatibility(viewerId),
+            compatibility: compatibility.value,
             ...locator,
         };
         const selectedRoom = await context.coordinator.selectRoom(coordinatorInput);
@@ -45,19 +53,18 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             reply.header("content-type", "application/x-msgpack");
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-                "data": {
-                    application_update_url: "",
-                    category_id: 0,
-                    host_entry_time: 0,
-                    ip_address: "",
-                    port: 0,
-                    quest_id: 0,
-                    raising_state: 9,
-                    room_number: body.room_number || "",
-                    room_sequence: 0,
-                    share_room_options: 0,
-                    is_pickup: null,
-                }
+                "data": unavailableRoomData(body.room_number || ""),
+            });
+        }
+
+        if (!context.questAvailability.check(
+            selectedRoom.value.category,
+            selectedRoom.value.questId,
+        ).available) {
+            reply.header("content-type", "application/x-msgpack");
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+                "data": unavailableRoomData(body.room_number || ""),
             });
         }
 
@@ -73,19 +80,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             reply.header("content-type", "application/x-msgpack");
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-                "data": {
-                    application_update_url: "",
-                    category_id: 0,
-                    host_entry_time: 0,
-                    ip_address: "",
-                    port: 0,
-                    quest_id: 0,
-                    raising_state: 9,
-                    room_number: body.room_number || "",
-                    room_sequence: 0,
-                    share_room_options: 0,
-                    is_pickup: null,
-                }
+                "data": unavailableRoomData(body.room_number || ""),
             });
         }
 
@@ -286,4 +281,20 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             "data": {}
         });
     });
+}
+
+function unavailableRoomData(roomNumber: string): Record<string, unknown> {
+    return {
+        application_update_url: "",
+        category_id: 0,
+        host_entry_time: 0,
+        ip_address: "",
+        port: 0,
+        quest_id: 0,
+        raising_state: 9,
+        room_number: roomNumber,
+        room_sequence: 0,
+        share_room_options: 0,
+        is_pickup: null,
+    };
 }

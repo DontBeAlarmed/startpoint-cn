@@ -7,6 +7,7 @@ import {
     updateHostEntryTime,
 } from "../room/manager"
 import { sessionManager } from "../state/SessionManager"
+import { compareCompatibility } from "../compatibility"
 import {
     MULTI_PROTOCOL_VERSION,
     type BattleSessionId,
@@ -28,12 +29,12 @@ import type {
 export const EMBEDDED_NODE_SESSION_ID = "embedded" as NodeSessionId
 
 export const EMBEDDED_COMPATIBILITY: MultiCompatibilityProfile = Object.freeze({
-    protocolVersion: MULTI_PROTOCOL_VERSION,
-    appVersion: "embedded",
-    resourceVersion: "embedded",
+    multiProtocolVersion: MULTI_PROTOCOL_VERSION,
+    APP_VER: "embedded",
+    RES_VER: "embedded",
     cdnTargetVersion: "embedded",
-    contentDigest: "embedded",
-    modeDigest: "embedded",
+    contentDigest: `sha256:${"0".repeat(64)}`,
+    modeDigest: `sha256:${"0".repeat(64)}`,
 })
 
 const compatibilityByRoom = new WeakMap<MultiRoom, MultiCompatibilityProfile>()
@@ -60,12 +61,20 @@ function assertParticipant(participant: ParticipantIdentity): void {
 }
 
 function assertCompatibility(compatibility: MultiCompatibilityProfile): void {
-    assertPositiveSafeInteger(compatibility?.protocolVersion, "compatibility.protocolVersion")
-    assertNonEmptyString(compatibility?.appVersion, "compatibility.appVersion")
-    assertNonEmptyString(compatibility?.resourceVersion, "compatibility.resourceVersion")
+    if (compatibility?.multiProtocolVersion !== MULTI_PROTOCOL_VERSION) {
+        throw new TypeError("compatibility.multiProtocolVersion is unsupported")
+    }
+    assertNonEmptyString(compatibility?.APP_VER, "compatibility.APP_VER")
+    assertNonEmptyString(compatibility?.RES_VER, "compatibility.RES_VER")
     assertNonEmptyString(compatibility?.cdnTargetVersion, "compatibility.cdnTargetVersion")
-    assertNonEmptyString(compatibility?.contentDigest, "compatibility.contentDigest")
-    assertNonEmptyString(compatibility?.modeDigest, "compatibility.modeDigest")
+    assertSha256(compatibility?.contentDigest, "compatibility.contentDigest")
+    assertSha256(compatibility?.modeDigest, "compatibility.modeDigest")
+}
+
+function assertSha256(value: string, field: string): void {
+    if (typeof value !== "string" || !/^sha256:[a-f0-9]{64}$/.test(value)) {
+        throw new TypeError(`${field} must be a sha256 digest`)
+    }
 }
 
 function assertNonEmptyString(value: string, field: string): void {
@@ -184,6 +193,10 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
     ): Promise<CoordinatorResult<RoomStatus>> {
         const room = resolveCompatibleRoom(input)
         if (!room) return roomNotFound()
+        const hostCompatibility = compatibilityByRoom.get(room) ?? EMBEDDED_COMPATIBILITY
+        if (!compareCompatibility(hostCompatibility, input.compatibility).compatible) {
+            return { ok: false, error: "INCOMPATIBLE_ROOM" }
+        }
         if (refreshHostEntryTime) updateHostEntryTime(room.room_number)
         return ok(this.toRoomStatus(room))
     }

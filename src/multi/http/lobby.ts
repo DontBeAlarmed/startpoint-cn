@@ -45,9 +45,18 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
             "error": "Bad Request", "message": "Invalid viewer id or no player bound."
         })
 
+        const compatibility = context.snapshotProvider.getCompatibility(request.headers)
+        if (!compatibility.ok) return reply.status(400).send({
+            "error": compatibility.error, "message": "Unable to create room."
+        })
+
         const quest = getQuestFromCategorySync(category, quest_id)
         if (!quest) return reply.status(400).send({
             "error": "Bad Request", "message": "Quest doesn't exist."
+        })
+        const availability = context.questAvailability.check(category, quest_id)
+        if (!availability.available) return reply.status(400).send({
+            "error": availability.code, "message": "Unable to create room."
         })
 
         const room = await context.coordinator.createRoom({
@@ -58,7 +67,7 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
             category,
             questId: quest_id,
             leaderCharacterId: ctx.player?.leaderCharacterId || 1,
-            compatibility: await context.snapshotProvider.getCompatibility(viewer_id),
+            compatibility: compatibility.value,
         })
         if (!room.ok) return reply.status(400).send({
             "error": "Bad Request", "message": "Unable to create room."
@@ -86,12 +95,16 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
             "error": "Bad Request", "message": "Invalid viewer id."
         })
 
-        const room = await context.coordinator.searchRoom({
+        const compatibility = context.snapshotProvider.getCompatibility(request.headers)
+        const room = compatibility.ok ? await context.coordinator.searchRoom({
             participant: context.snapshotProvider.getParticipant(viewerId),
             roomNumber: body.room_number,
-            compatibility: await context.snapshotProvider.getCompatibility(viewerId),
-        })
-        const status = room.ok ? room.value : null
+            compatibility: compatibility.value,
+        }) : compatibility
+        const status = room.ok
+            && context.questAvailability.check(room.value.category, room.value.questId).available
+            ? room.value
+            : null
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -123,12 +136,14 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
         const locator = roomNumber === null
             ? { accessToken: body.access_token || "" }
             : { roomNumber }
-        const room = await context.coordinator.selectRoom({
+        const compatibility = context.snapshotProvider.getCompatibility(request.headers)
+        const room = compatibility.ok ? await context.coordinator.selectRoom({
             participant: context.snapshotProvider.getParticipant(viewerId),
-            compatibility: await context.snapshotProvider.getCompatibility(viewerId),
+            compatibility: compatibility.value,
             ...locator,
-        })
-        if (!room.ok) {
+        }) : compatibility
+        if (!room.ok
+            || !context.questAvailability.check(room.value.category, room.value.questId).available) {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),

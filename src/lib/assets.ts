@@ -143,6 +143,12 @@ function getQuestSync(
     // always return BattleQuest; missing fields default to 0
     return {
         name: quest.name,
+        ...(Object.prototype.hasOwnProperty.call(quest, "availableFromMs")
+            ? { availableFromMs: quest.availableFromMs ?? null }
+            : {}),
+        ...(Object.prototype.hasOwnProperty.call(quest, "availableUntilMs")
+            ? { availableUntilMs: quest.availableUntilMs ?? null }
+            : {}),
         enemyLevel: quest.enemyLevel ?? 0,
         clearReward,
         sPlusReward,

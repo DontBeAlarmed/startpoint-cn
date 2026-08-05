@@ -161,8 +161,13 @@ modeDigest
 - `multiProtocolVersion` 是 Hub 内部接口和多人状态契约版本；破坏兼容时递增。
 - `APP_VER`、`RES_VER` 来自该玩家当前多人 HTTP 请求的客户端头。
 - `cdnTargetVersion` 来自本地固定 `ContentSnapshot.cdn.targetVersion`。
-- `contentDigest` 表示服务端实际加载的业务表快照。Content Release 使用 `releaseDigest`；bundled fallback 生成覆盖已加载表身份的确定性摘要。
-- `modeDigest` 对实际加载成功的 Mod 文件摘要按稳定顺序组合生成。
+- `contentDigest` 表示服务端实际加载的业务表快照。当前激活的 Content Release 直接使用
+  `ContentRepository.info().releaseDigest`；bundled fallback 对当前 Registry 的全部已加载业务表分别生成
+  canonical SHA-256，再按表名的 code-point 顺序组合。两条路径都不读取候选或失败 Release，不扫描 CDN
+  大文件，也不触发 `content:sync`。
+- `modeDigest` 只包含依次通过 allowlist SHA、静态 manifest、`register()` 和 Registry 注册的 Mod 身份，
+  以文件名、manifest 名称与 capability、已验证文件 SHA 按稳定顺序组合。禁用、摘要不符、manifest
+  不兼容、加载失败或注册失败的模块不计入。
 
 服务端版本和 Bundle ID 只用于后台与日志诊断，不作为唯一兼容条件。两个节点只有上述字段完全一致时才允许同房。
 
@@ -175,6 +180,12 @@ modeDigest
 - 不推测不同版本是否可以正常战斗。
 
 服务器当前时间不属于兼容性身份，也不要求各节点时钟、全局 `timeOffset` 或所处日期一致。时间只用于每名玩家所属服务端判断当前关卡是否可参与：双方不必处于活动的同一天，只要同一关卡在各自服务器时间下都处于可挑战区间即可。
+
+关卡资格的权威周期来自 20 张已注册 CN Quest OrderedMap 行内的 `TimeRange`。Content Sync 按国服
+`AppTimeConfig` 的 UTC+8 日历语义把 `start_time`、`end_time` 转为 `availableFromMs`、
+`availableUntilMs`；无界端保持 `null`，非空非法日期或倒置周期拒绝生成 Release。旧 bundled 关卡 JSON
+尚无这两个字段时，普通与练习关卡保持原有可用行为；只有明确活动关卡分类因缺少权威周期而 fail closed。
+一旦任一周期字段出现，缺少另一字段或值非法同样 fail closed，不推测永久开放。
 
 角色、装备、能力魂、Mana Node、觉醒能力和 EX Boost 不按发布时间再次校验。玩家所属服务端负责确认配队来自其真实存档，并生成只读玩家快照；双方内容定义是否存在则由 `contentDigest` 和 `modeDigest` 保证。已经获得的活动或后期内容不会因为另一节点时间较早而失效。
 

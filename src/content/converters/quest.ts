@@ -83,6 +83,32 @@ interface QuestDerivationLayout {
     readonly entryItem: readonly [mode: number, itemId: number, itemCount: number]
 }
 
+export const QUEST_TIME_RANGE_COLUMNS: Readonly<Record<
+    QuestTableName,
+    readonly [availableFrom: number, availableUntil: number]
+>> = Object.freeze({
+    "main_quest.json": [4, 5],
+    "ex_quest.json": [4, 5],
+    "boss_battle_quest.json": [5, 6],
+    "character_quest.json": [6, 7],
+    "world_story_event_quest.json": [5, 6],
+    "world_story_event_boss_battle_quest.json": [5, 6],
+    "advent_event_quest.json": [5, 6],
+    "daily_exp_mana_event_quest.json": [5, 6],
+    "daily_week_event_quest.json": [4, 5],
+    "challenge_dungeon_event_quest.json": [5, 6],
+    "story_event_single_quest.json": [5, 6],
+    "ranking_event_single_quest.json": [5, 6],
+    "solo_time_attack_event_quest.json": [6, 7],
+    "tower_dungeon_event_quest.json": [5, 6],
+    "expert_single_event_quest.json": [7, 8],
+    "carnival_event_quest.json": [7, 8],
+    "rush_event_quest.json": [7, 8],
+    "raid_event_quest.json": [7, 8],
+    "score_attack_event_quest.json": [7, 8],
+    "hard_multi_event_quest.json": [5, 6],
+})
+
 const QUEST_DERIVATION_LAYOUTS: Readonly<Record<QuestTableName, QuestDerivationLayout>> = {
     "main_quest.json": { category: 1, name: 1, stamina: 69, entryItem: [55, 56, 57] },
     "boss_battle_quest.json": { category: 2, name: 2, stamina: 69, entryItem: [55, 56, 57] },
@@ -314,6 +340,54 @@ function parseMilliseconds(tableName: string, value: string | undefined, field: 
     const milliseconds = Math.floor(parsed * 1000)
     if (!Number.isSafeInteger(milliseconds)) invalidQuest(tableName, `${field} is out of range`)
     return milliseconds
+}
+
+function parseCnQuestTime(
+    tableName: QuestTableName,
+    value: string | undefined,
+    field: "availableFromMs" | "availableUntilMs",
+): number | null {
+    if (isMissing(value)) return null
+    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value as string)
+    if (match === null) invalidQuest(tableName, `TimeRange ${field} must be a CN timestamp`)
+    const parts = match.slice(1).map(Number)
+    const [year, month, day, hour, minute, second] = parts
+    const utcWithoutOffset = Date.UTC(year, month - 1, day, hour, minute, second)
+    const normalized = new Date(utcWithoutOffset)
+    if (normalized.getUTCFullYear() !== year
+        || normalized.getUTCMonth() + 1 !== month
+        || normalized.getUTCDate() !== day
+        || normalized.getUTCHours() !== hour
+        || normalized.getUTCMinutes() !== minute
+        || normalized.getUTCSeconds() !== second) {
+        invalidQuest(tableName, `TimeRange ${field} is not a real timestamp`)
+    }
+    const parsed = utcWithoutOffset - 8 * 60 * 60 * 1000
+    if (!Number.isSafeInteger(parsed)) invalidQuest(tableName, `TimeRange ${field} is out of range`)
+    return parsed
+}
+
+function parseQuestTimeRange(
+    tableName: QuestTableName,
+    fields: readonly string[],
+): { readonly availableFromMs: number | null; readonly availableUntilMs: number | null } {
+    const [fromColumn, untilColumn] = QUEST_TIME_RANGE_COLUMNS[tableName]
+    const availableFromMs = parseCnQuestTime(
+        tableName,
+        fields[fromColumn],
+        "availableFromMs",
+    )
+    const availableUntilMs = parseCnQuestTime(
+        tableName,
+        fields[untilColumn],
+        "availableUntilMs",
+    )
+    if (availableFromMs !== null
+        && availableUntilMs !== null
+        && availableFromMs > availableUntilMs) {
+        invalidQuest(tableName, "TimeRange start must not be after end")
+    }
+    return { availableFromMs, availableUntilMs }
 }
 
 function parseBoolean(tableName: string, value: string | undefined, field: string): boolean {
@@ -660,9 +734,12 @@ export function convertQuestTree(
             : row.fields[0]
         if (!/^[1-9]\d*$/.test(questId)) invalidQuest(tableName, `invalid quest id: ${questId}`)
         if (output[questId] !== undefined) invalidQuest(tableName, `duplicate quest id: ${questId}`)
-        output[questId] = layout
-            ? standardQuest(tableName, row, layout)
-            : specialQuest(tableName, row)
+        output[questId] = {
+            ...parseQuestTimeRange(tableName, row.fields),
+            ...(layout
+                ? standardQuest(tableName, row, layout)
+                : specialQuest(tableName, row)),
+        }
     }
     return deepFreeze(output)
 }
