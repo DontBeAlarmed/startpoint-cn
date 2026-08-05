@@ -310,13 +310,14 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
         }
     } else {
         if (hostClient && client.yourself) {
+            const existingMateIndex = hostClient.mates.findIndex(
+                mate => !mate.comId && mate.viewerId === client.viewerId,
+            )
+            const mergedMates = [...hostClient.mates]
+            if (existingMateIndex >= 0) mergedMates[existingMateIndex] = client.yourself
+            else mergedMates.push(client.yourself)
             hostClient.mates = limitLobbyMates(
-                [
-                    ...hostClient.mates.filter(
-                        mate => mate.comId || mate.viewerId !== client.viewerId,
-                    ),
-                    client.yourself,
-                ],
+                mergedMates,
                 room?.host_viewer_id ?? hostClient.viewerId,
             )
             client.mates = [...hostClient.mates]
