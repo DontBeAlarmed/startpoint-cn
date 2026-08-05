@@ -1,4 +1,11 @@
 import type { MultiRuntimeConfig, RuntimeNetworkServiceConfig } from "../../runtime/config"
+import {
+    buildAdminMultiStatus,
+    multiCompatibilityRejections,
+    recordMultiCompatibilityRejection,
+    type AdminMultiAuthorityStatus,
+    type AdminMultiStatus,
+} from "../../lib/admin-multi-status"
 import { AdmissionRegistry } from "../admission/registry"
 import type { NodeSessionId } from "../coordinator/contracts"
 import {
@@ -19,6 +26,8 @@ import {
     type MultiHttpContext,
 } from "../http/context"
 import { MultiSettlementVerifier } from "../settlement/verifier"
+import { listActiveRooms } from "../room/manager"
+import { sessionManager } from "../state/SessionManager"
 import {
     isSessionServerListening,
     startSessionServer,
@@ -68,6 +77,7 @@ export interface MultiRuntimeService {
     start(config: MultiRuntimeConfig, onFatalError?: MultiRuntimeFatalHandler): Promise<void>
     stop(): Promise<void>
     getStatus(): MultiRuntimeStatus
+    getAdminStatus(): Promise<AdminMultiStatus>
     getHttpContext(): MultiHttpContext
 }
 
@@ -175,7 +185,10 @@ class Service implements MultiRuntimeService {
         if (config.mode === "host") {
             this.remoteCoordinator = null
             const admissionRegistry = new AdmissionRegistry()
-            const coordinator = new EmbeddedMultiCoordinator({ allowRemoteParticipants: true })
+            const coordinator = new EmbeddedMultiCoordinator({
+                allowRemoteParticipants: true,
+                onCompatibilityRejection: recordMultiCompatibilityRejection,
+            })
             const credentialReloader = new CredentialReloader({
                 credentialsPath: config.credentialsPath,
             })
@@ -199,6 +212,10 @@ class Service implements MultiRuntimeService {
                     host: config.tcp.publicHost ?? config.tcp.host,
                     port: config.tcp.port,
                 }),
+                getDiagnostics: () => ({
+                    ...localAuthorityStatus(),
+                    latestCompatibilityRejection: multiCompatibilityRejections.get(),
+                }),
             })
             credentialReloader.start()
             nodeSessions.start()
@@ -217,7 +234,11 @@ class Service implements MultiRuntimeService {
                 this.context = createRemoteHttpContext(this.remoteCoordinator)
             } else {
                 this.remoteCoordinator = null
-                this.context = createEmbeddedMultiHttpContext()
+                this.context = createEmbeddedMultiHttpContext({
+                    coordinator: new EmbeddedMultiCoordinator({
+                        onCompatibilityRejection: recordMultiCompatibilityRejection,
+                    }),
+                })
             }
         }
         this.tcpFailed = false
@@ -305,6 +326,30 @@ class Service implements MultiRuntimeService {
         })
     }
 
+    async getAdminStatus(): Promise<AdminMultiStatus> {
+        let authority: AdminMultiAuthorityStatus | null = null
+        let latestCompatibilityRejection = multiCompatibilityRejections.get()
+        if (this.config?.mode === "client" && this.remoteCoordinator !== null) {
+            const result = await this.remoteCoordinator.getControlStatus()
+            if (result.ok) {
+                authority = {
+                    activeRooms: result.value.activeRooms,
+                    activeBattleFacts: result.value.activeBattleFacts,
+                    finalizedBattleFacts: result.value.finalizedBattleFacts,
+                }
+                latestCompatibilityRejection = result.value.latestCompatibilityRejection
+                    ?? latestCompatibilityRejection
+            }
+        } else if (this.config !== null && this.getStatus().coordinator.available) {
+            authority = localAuthorityStatus()
+        }
+        return buildAdminMultiStatus({
+            runtime: this.getStatus(),
+            authority,
+            latestCompatibilityRejection,
+        })
+    }
+
     getHttpContext(): MultiHttpContext {
         if (this.context === null) throw new Error("multiplayer runtime is not initialized")
         return this.context
@@ -375,6 +420,15 @@ class Service implements MultiRuntimeService {
         }
         if (failures.length > 0) throw failures[0]
     }
+}
+
+function localAuthorityStatus(): AdminMultiAuthorityStatus {
+    const facts = sessionManager.getBattleFactCounts()
+    return Object.freeze({
+        activeRooms: listActiveRooms().length,
+        activeBattleFacts: facts.active,
+        finalizedBattleFacts: facts.finalized,
+    })
 }
 
 export function createMultiRuntimeService(

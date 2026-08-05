@@ -32,6 +32,7 @@ const SOURCE_RULES = [
         groups: ["quick:cdn"],
     },
     { pattern: /^src\/lib\/admin-content-status\.ts$/, groups: ["quick:cdn", "admin"] },
+    { pattern: /^src\/lib\/admin-multi-status\.ts$/, groups: ["quick:runtime", "admin"] },
     {
         pattern: /^src\/content\/(?:cdn\/entity-lists-directory|sync\/scanner)\.ts$/,
         groups: ["quick:cdn", "quick:content"],
@@ -51,7 +52,7 @@ const SOURCE_RULES = [
     },
     { pattern: /^src\/content\/deep-freeze\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/lib\/version\.ts$/, groups: ["full"] },
-    { pattern: /^src\/routes\/cn\/load\.ts$/, groups: ["full", "integration:mission"] },
+    { pattern: /^src\/routes\/cn\/load\.ts$/, groups: ["full", "integration:mission", "quick:protocol"] },
     {
         pattern: /^src\/cn-server\.ts$/,
         groups: ["integration:cdn", "integration:database", "integration:runtime", "full"],

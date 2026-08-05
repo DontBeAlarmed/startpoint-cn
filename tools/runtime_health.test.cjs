@@ -11,6 +11,7 @@ const {
     createRuntimeHealthSnapshot,
     registerRuntimeHealthRoute,
 } = require("../src/runtime/health")
+const { unavailableMultiRuntimeStatus } = require("../src/multi/runtime/status")
 
 function state(overrides = {}) {
     return {
@@ -127,4 +128,14 @@ test("health route remains ordinary JSON with the CN MsgPack hook installed", as
     assert.equal(response.statusCode, 200)
     assert.match(response.headers["content-type"], /^application\/json/)
     assert.equal(response.json().contractVersion, 1)
+})
+
+test("runtime-not-started multiplayer status keeps the diagnostic endpoint shape stable", () => {
+    assert.deepEqual(unavailableMultiRuntimeStatus("client"), {
+        mode: "client",
+        state: "unavailable",
+        coordinator: { kind: "remote", available: false },
+        hub: { available: false, endpoint: null },
+        tcp: { available: false, endpoint: null },
+    })
 })

@@ -46,6 +46,14 @@ const hostIdentityByRoom = new WeakMap<MultiRoom, ParticipantIdentity>()
 
 export interface EmbeddedMultiCoordinatorOptions {
     readonly allowRemoteParticipants?: boolean
+    readonly onCompatibilityRejection?: (input: {
+        readonly code: "INCOMPATIBLE_ROOM"
+        readonly differences: readonly {
+            readonly field: string
+            readonly required: string | number
+            readonly received: string | number
+        }[]
+    }) => void
 }
 
 function ok<T>(value: T): CoordinatorResult<T> {
@@ -118,9 +126,11 @@ function resolveCompatibleRoom(input: CompatibleRoomInput): MultiRoom | undefine
 
 export class EmbeddedMultiCoordinator implements MultiCoordinator {
     private readonly allowRemoteParticipants: boolean
+    private readonly onCompatibilityRejection: EmbeddedMultiCoordinatorOptions["onCompatibilityRejection"]
 
     constructor(options: EmbeddedMultiCoordinatorOptions = {}) {
         this.allowRemoteParticipants = options.allowRemoteParticipants === true
+        this.onCompatibilityRejection = options.onCompatibilityRejection
     }
 
     async createRoom(input: CreateRoomInput): Promise<CoordinatorResult<RoomStatus>> {
@@ -308,7 +318,16 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             return { ok: false, error: "VIEWER_ID_CONFLICT" }
         }
         const hostCompatibility = compatibilityByRoom.get(room) ?? EMBEDDED_COMPATIBILITY
-        if (!compareCompatibility(hostCompatibility, input.compatibility).compatible) {
+        const comparison = compareCompatibility(hostCompatibility, input.compatibility)
+        if (!comparison.compatible) {
+            this.onCompatibilityRejection?.({
+                code: "INCOMPATIBLE_ROOM",
+                differences: comparison.differences.map(difference => ({
+                    field: difference.field,
+                    required: difference.host,
+                    received: difference.guest,
+                })),
+            })
             return { ok: false, error: "INCOMPATIBLE_ROOM" }
         }
         if (refreshHostEntryTime) updateHostEntryTime(room.room_number)

@@ -18,6 +18,7 @@ import {
     isValidIdempotencyKey,
 } from "./idempotency"
 import type { NodeSession, NodeSessionRegistry } from "./node-sessions"
+import type { CompatibilityRejectionSummary } from "../../lib/admin-multi-status"
 
 const COORDINATOR_ERRORS = new Set<CoordinatorErrorCode>([
     "INCOMPATIBLE_ROOM",
@@ -33,6 +34,18 @@ export interface MultiHubTcpEndpoint {
     readonly port: number
 }
 
+export interface MultiHubAuthorityDiagnostics {
+    readonly activeRooms: number
+    readonly activeBattleFacts: number
+    readonly finalizedBattleFacts: number
+    readonly latestCompatibilityRejection: CompatibilityRejectionSummary | null
+}
+
+export interface MultiHubControlStatus extends MultiHubAuthorityDiagnostics {
+    readonly activeNodeSessions: number
+    readonly enabledCredentials: number
+}
+
 export interface MultiHubControlRoutesOptions {
     readonly coordinator: MultiCoordinator
     readonly credentialReloader: CredentialReloader
@@ -40,6 +53,7 @@ export interface MultiHubControlRoutesOptions {
     readonly admissionIssuer: AdmissionIssuer
     readonly idempotency: IdempotencyCache
     readonly tcpEndpoint: MultiHubTcpEndpoint
+    readonly getDiagnostics?: () => MultiHubAuthorityDiagnostics
 }
 
 type ControlOperation = (input: any) => Promise<unknown> | unknown
@@ -204,11 +218,31 @@ export function registerMultiHubControlRoutes(
         if (authenticate(request, options.nodeSessions) === null) {
             return send(reply, response(401, { ok: false, code: "UNAUTHORIZED" }))
         }
+        const diagnostics = options.getDiagnostics?.()
+        const safeDiagnostics = diagnostics === undefined ? {} : {
+            activeRooms: diagnostics.activeRooms,
+            activeBattleFacts: diagnostics.activeBattleFacts,
+            finalizedBattleFacts: diagnostics.finalizedBattleFacts,
+            latestCompatibilityRejection: diagnostics.latestCompatibilityRejection === null
+                ? null
+                : {
+                    code: diagnostics.latestCompatibilityRejection.code,
+                    differences: diagnostics.latestCompatibilityRejection.differences.map(
+                        difference => ({
+                            field: difference.field,
+                            required: difference.required,
+                            received: difference.received,
+                        }),
+                    ),
+                    timestamp: diagnostics.latestCompatibilityRejection.timestamp,
+                },
+        }
         return send(reply, response(200, {
             ok: true,
             value: {
                 activeNodeSessions: options.nodeSessions.activeCount(),
                 enabledCredentials: options.credentialReloader.getStatus().enabled,
+                ...safeDiagnostics,
             },
         }))
     })

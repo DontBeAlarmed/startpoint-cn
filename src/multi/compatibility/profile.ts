@@ -34,6 +34,10 @@ export interface CompatibilityProfileDependencies {
     readonly getContentSnapshot?: () => ContentSnapshot
     readonly getLoadedModeIdentities?: () => readonly LoadedModeIdentity[]
     readonly source?: CompatibilityProfileSource
+    readonly onCompatibilityRejection?: (input: {
+        readonly code: "INCOMPATIBLE_ROOM"
+        readonly differences: readonly []
+    }) => void
 }
 
 export interface CompatibilityDifference {
@@ -86,6 +90,10 @@ export function createCompatibilityProfileFactory(
         const APP_VER = readVersionHeader(headers, "APP_VER")
         const RES_VER = readVersionHeader(headers, "RES_VER")
         if (APP_VER === null || RES_VER === null) {
+            dependencies.onCompatibilityRejection?.({
+                code: "INCOMPATIBLE_ROOM",
+                differences: [],
+            })
             return { ok: false, error: "INCOMPATIBLE_ROOM" }
         }
         if (cachedSource === null) {
@@ -94,6 +102,10 @@ export function createCompatibilityProfileFactory(
             } catch (error) {
                 if (error instanceof ContentSnapshotError
                     && error.code === "CONTENT_SNAPSHOT_NOT_INITIALIZED") {
+                    dependencies.onCompatibilityRejection?.({
+                        code: "INCOMPATIBLE_ROOM",
+                        differences: [],
+                    })
                     return { ok: false, error: "INCOMPATIBLE_ROOM" }
                 }
                 throw error

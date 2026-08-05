@@ -7,7 +7,9 @@ import {
     type NodeSessionId,
 } from "../coordinator/contracts"
 import type { MultiHubTcpEndpoint } from "./control-routes"
+import type { MultiHubControlStatus } from "./control-routes"
 import {
+    isHubControlStatus,
     isHubNodeSessionPayload,
     isHubSuccessValue,
     type HubNodeSessionPayload,
@@ -91,6 +93,47 @@ export class HubClient {
 
     isAvailable(): boolean {
         return this.getLiveSession() !== null && this.available
+    }
+
+    async getControlStatus(): Promise<CoordinatorResult<MultiHubControlStatus>> {
+        let refreshed = false
+        while (true) {
+            let session: HubNodeSession
+            try {
+                session = await this.ensureSession()
+            } catch {
+                this.available = false
+                return { ok: false, error: "HUB_UNAVAILABLE" }
+            }
+            let response: HubResponse
+            try {
+                response = await this.requestJson("/v1/multi/status", {
+                    method: "GET",
+                    headers: this.sessionHeaders(session),
+                })
+            } catch {
+                this.available = false
+                return { ok: false, error: "HUB_UNAVAILABLE" }
+            }
+            if (response.status === 401) {
+                if (this.session === session) this.session = null
+                if (refreshed) {
+                    this.available = false
+                    return { ok: false, error: "HUB_UNAVAILABLE" }
+                }
+                refreshed = true
+                continue
+            }
+            const body = response.body as { ok?: unknown; value?: unknown } | null
+            if (response.status !== 200
+                || body?.ok !== true
+                || !isHubControlStatus(body.value)) {
+                this.available = false
+                return { ok: false, error: "HUB_UNAVAILABLE" }
+            }
+            this.available = true
+            return { ok: true, value: body.value }
+        }
     }
 
     private async call<T>(
@@ -180,9 +223,8 @@ export class HubClient {
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             try {
                 const headers: Record<string, string> = {
-                    authorization: `Bearer ${session.sessionCredential}`,
+                    ...this.sessionHeaders(session),
                     "content-type": "application/json",
-                    "x-node-session-id": session.nodeSessionId,
                 }
                 if (idempotencyKey !== null) headers["x-idempotency-key"] = idempotencyKey
                 const response = await this.requestJson(route, {
@@ -258,6 +300,13 @@ export class HubClient {
                 ...(participant as Record<string, unknown>),
                 nodeSessionId,
             },
+        }
+    }
+
+    private sessionHeaders(session: HubNodeSession): Record<string, string> {
+        return {
+            authorization: `Bearer ${session.sessionCredential}`,
+            "x-node-session-id": session.nodeSessionId,
         }
     }
 

@@ -13,7 +13,7 @@ import type {
     PlayerSnapshot,
 } from "../snapshot/player-snapshot"
 import { isValidNetworkHost } from "../../runtime/network-host"
-import type { MultiHubTcpEndpoint } from "./control-routes"
+import type { MultiHubControlStatus, MultiHubTcpEndpoint } from "./control-routes"
 
 type Validator = (value: unknown) => boolean
 
@@ -56,6 +56,32 @@ export function isHubSuccessValue<T>(route: string, value: unknown): value is T 
     if (route === "/v1/multi/admissions/issue") return isRoomAdmission(value)
     if (VOID_ROUTES.has(route)) return value === undefined
     return false
+}
+
+export function isHubControlStatus(value: unknown): value is MultiHubControlStatus {
+    if (!isRecord(value)) return false
+    return isNonNegativeInteger(value.activeNodeSessions)
+        && isNonNegativeInteger(value.enabledCredentials)
+        && isNonNegativeInteger(value.activeRooms)
+        && isNonNegativeInteger(value.activeBattleFacts)
+        && isNonNegativeInteger(value.finalizedBattleFacts)
+        && isCompatibilityRejection(value.latestCompatibilityRejection)
+}
+
+function isCompatibilityRejection(value: unknown): boolean {
+    if (value === null) return true
+    if (!isRecord(value)
+        || value.code !== "INCOMPATIBLE_ROOM"
+        || !Array.isArray(value.differences)
+        || value.differences.length > 6
+        || typeof value.timestamp !== "string"
+        || !Number.isFinite(new Date(value.timestamp).getTime())) return false
+    return value.differences.every(difference => (
+        isRecord(difference)
+        && typeof difference.field === "string"
+        && (typeof difference.required === "string" || isNonNegativeInteger(difference.required))
+        && (typeof difference.received === "string" || isNonNegativeInteger(difference.received))
+    ))
 }
 
 function isRoomStatus(value: unknown): value is RoomStatus {

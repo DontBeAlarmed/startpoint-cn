@@ -23,6 +23,11 @@ import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { reconcileActiveMissionFacts } from "../../lib/mission/active-reconciliation";
 import { recordEventLoginMissionFactSync } from "../../lib/mission/event-entry-facts";
 import { setCnMsgpackPendingCommit } from "./msgpack";
+import type { ParticipantIdentity } from "../../multi/coordinator/contracts";
+import type {
+    MultiBattleRecoveryInspection,
+    MultiSettlementIdentity,
+} from "../../multi/settlement/verifier";
 
 interface CnLoadBody {
     device_id: number;
@@ -122,6 +127,37 @@ function wrapOptionFields(d: any, availableAssetVersion: string) {
 export interface CnLoadRouteOptions {
     readonly assetProvider?: AssetProviderConfig;
     readonly multiMode?: "embedded" | "host" | "client";
+    readonly multiRecoveryVerifier?: {
+        inspect(input: MultiSettlementIdentity): Promise<MultiBattleRecoveryInspection>;
+    };
+    readonly getMultiParticipant?: (viewerId: number) => ParticipantIdentity;
+}
+
+function hasStoredBattleIdentity(activeQuest: ActiveQuest): boolean {
+    return activeQuest.isMulti && activeQuest.battleSessionId !== null
+        && activeQuest.battleSessionId !== undefined;
+}
+
+function isValidStoredBattleIdentity(activeQuest: ActiveQuest): activeQuest is ActiveQuest & {
+    roomNumber: string;
+    battleSessionId: string;
+} {
+    return typeof activeQuest.roomNumber === "string"
+        && activeQuest.roomNumber.trim().length > 0
+        && activeQuest.roomNumber.length <= 64
+        && typeof activeQuest.battleSessionId === "string"
+        && activeQuest.battleSessionId.trim().length > 0
+        && activeQuest.battleSessionId.length <= 128;
+}
+
+function fallbackParticipant(
+    mode: CnLoadRouteOptions["multiMode"],
+    viewerId: number,
+): ParticipantIdentity {
+    return {
+        nodeSessionId: mode === "client" ? "remote-pending" as any : "embedded" as any,
+        viewerId,
+    };
 }
 
 const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => {
@@ -160,21 +196,34 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
 
         let activeQuest: ActiveQuest | null = getPlayerActiveQuestSync(playerId);
         if (activeQuest) {
-            const isRemoteBattleIdentity = options.multiMode === "client"
-                && activeQuest.isMulti
-                && typeof activeQuest.battleSessionId === "string"
-                && activeQuest.battleSessionId.length > 0;
-            const roomExists = isRemoteBattleIdentity
-                || (activeQuest.roomNumber ? getRoom(activeQuest.roomNumber) !== undefined : true);
-            if (!roomExists) {
+            let authoritativeMissing = false;
+            if (hasStoredBattleIdentity(activeQuest)) {
+                if (!isValidStoredBattleIdentity(activeQuest)) {
+                    console.warn("[CN-LOAD] multi recovery skipped code=MULTI_RECOVERY_INVALID_IDENTITY");
+                } else if (options.multiRecoveryVerifier) {
+                    const participant = options.getMultiParticipant?.(viewerId)
+                        ?? fallbackParticipant(options.multiMode, viewerId);
+                    const recovery = await options.multiRecoveryVerifier.inspect({
+                        ...participant,
+                        roomNumber: activeQuest.roomNumber,
+                        battleSessionId: activeQuest.battleSessionId,
+                    });
+                    authoritativeMissing = recovery.state === "missing";
+                }
+            }
+            const legacyRoomMissing = !hasStoredBattleIdentity(activeQuest)
+                && !!activeQuest.roomNumber
+                && getRoom(activeQuest.roomNumber) === undefined;
+            if (authoritativeMissing || legacyRoomMissing) {
                 console.log(`[CN-LOAD] active quest room ${activeQuest.roomNumber} not found, cancelling`);
-                runAbortActiveQuestTransaction(playerId, {
+                const aborted = runAbortActiveQuestTransaction(playerId, {
                     playId: activeQuest.playId,
                     questId: activeQuest.questId,
                     category: activeQuest.category,
                 });
-                activeQuest = null;
-            } else {
+                activeQuest = aborted.cancelled ? null : getPlayerActiveQuestSync(playerId);
+            }
+            if (activeQuest) {
                 activeQuest = restoreActiveQuestFromStorage(playerId, activeQuest, {
                     getEntryCost: (category, questId) => (
                         getRuntimeContentTableSync(

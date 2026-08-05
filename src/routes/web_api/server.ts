@@ -13,6 +13,11 @@ import { parseAssetProviderConfig } from "../../content/cdn/asset-mode";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import { wantsJson } from "./http";
 import {
+    buildAdminMultiStatus,
+    type AdminMultiStatus,
+} from "../../lib/admin-multi-status";
+import { unavailableMultiRuntimeStatus } from "../../multi/runtime/status";
+import {
     applyPlayerSaveTemplateSync,
     clonePlayerSaveV2Sync,
     exportPlayerSaveV2Sync,
@@ -23,7 +28,11 @@ interface TimeQuery {
     time: string | undefined
 }
 
-const routes = async (fastify: FastifyInstance) => {
+export interface ServerRoutesOptions {
+    readonly getMultiStatus?: () => Promise<AdminMultiStatus> | AdminMultiStatus
+}
+
+const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) => {
 
     fastify.get("/status", async (_request: FastifyRequest, reply: FastifyReply) => {
         const root = process.cwd()
@@ -33,6 +42,13 @@ const routes = async (fastify: FastifyInstance) => {
             assetProvider: parseAssetProviderConfig({ projectRoot: root, env: process.env }),
             configuredCdnDir: cdnDir,
         })
+        const multiplayer = options.getMultiStatus
+            ? await options.getMultiStatus()
+            : buildAdminMultiStatus({
+                runtime: unavailableMultiRuntimeStatus(),
+                authority: null,
+                latestCompatibilityRejection: null,
+            })
 
         reply.status(200).send({
             server: {
@@ -45,6 +61,7 @@ const routes = async (fastify: FastifyInstance) => {
                 listenPort: process.env.CN_LISTEN_PORT || "8001",
             },
             cdn: cdnStatus,
+            multiplayer,
         })
     })
 

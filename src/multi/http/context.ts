@@ -34,6 +34,7 @@ import {
 } from "../snapshot/player-snapshot"
 import type { RoomConnectionEndpoint } from "../room/serializer"
 import { MultiSettlementVerifier } from "../settlement/verifier"
+import { recordMultiCompatibilityRejection } from "../../lib/admin-multi-status"
 
 export const DEFAULT_ADMISSION_TTL_MS = 15_000
 
@@ -103,7 +104,11 @@ export function createEmbeddedMultiHttpContext(
             ok: true as const,
             value: fixedCompatibility,
         })
-        : createCompatibilityProfileFactory(options.compatibilityProfileDependencies)
+        : createCompatibilityProfileFactory({
+            ...options.compatibilityProfileDependencies,
+            onCompatibilityRejection: options.compatibilityProfileDependencies
+                ?.onCompatibilityRejection ?? recordMultiCompatibilityRejection,
+        })
     const serverTimeMs = options.serverTimeMs ?? (() => getServerTime() * 1000)
     return Object.freeze({
         coordinator,

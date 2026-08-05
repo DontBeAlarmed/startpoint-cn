@@ -5,10 +5,13 @@ import mailApiPlugin from "./mail"
 import lookupApiPlugin from "./lookup"
 import settingsApiPlugin from "./settings"
 import { ADMIN_UPLOAD_FILE_SIZE_LIMIT } from "./upload-limits"
+import type { ServerRoutesOptions } from "./server"
 
 export { ADMIN_UPLOAD_FILE_SIZE_LIMIT } from "./upload-limits"
 
-const routes = async (fastify: FastifyInstance) => {
+export interface WebApiRoutesOptions extends ServerRoutesOptions {}
+
+const routes = async (fastify: FastifyInstance, options: WebApiRoutesOptions) => {
     fastify.register(require('@fastify/multipart'), {
         limits: {
             fieldNameSize: 100, // Max field name size in bytes
@@ -22,7 +25,10 @@ const routes = async (fastify: FastifyInstance) => {
     })
 
     fastify.register(playerApiPlugin, { prefix: "/player" })
-    fastify.register(serverApiPlugin, { prefix: "/server" })
+    fastify.register(serverApiPlugin, {
+        prefix: "/server",
+        getMultiStatus: options.getMultiStatus,
+    })
     fastify.register(mailApiPlugin, { prefix: "/mail" })
     fastify.register(lookupApiPlugin, { prefix: "/lookup" })
     fastify.register(settingsApiPlugin, { prefix: "/server/settings" })

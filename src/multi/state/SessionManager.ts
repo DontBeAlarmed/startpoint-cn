@@ -611,6 +611,10 @@ export class SessionManager {
         return this.battleFacts.getActiveBattleSessionId(roomNumber)
     }
 
+    getBattleFactCounts() {
+        return this.battleFacts.getCounts()
+    }
+
     getBattleStatus(input: BattleSessionInput): CoordinatorResult<BattleStatus> {
         return this.battleFacts.getBattleStatus(input)
     }

@@ -41,6 +41,11 @@ export interface BattleFactStoreOptions {
     readonly maxRecords?: number
 }
 
+export interface BattleFactCounts {
+    readonly active: number
+    readonly finalized: number
+}
+
 export class BattleFactStore {
     private readonly now: () => number
     private readonly createBattleSessionId: () => string
@@ -205,6 +210,17 @@ export class BattleFactStore {
     getActiveBattleSessionId(roomNumber: string): BattleSessionId | null {
         this.prune()
         return this.activeBattleByRoom.get(roomNumber) ?? null
+    }
+
+    getCounts(): BattleFactCounts {
+        this.prune()
+        let active = 0
+        let finalized = 0
+        for (const record of this.records.values()) {
+            if (record.finalizedViewerIds.size > 0) finalized++
+            else active++
+        }
+        return Object.freeze({ active, finalized })
     }
 
     releaseRoom(roomNumber: string): void {

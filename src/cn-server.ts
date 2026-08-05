@@ -258,7 +258,10 @@ fastify.register(questUnlockApiPlugin, { prefix: `${apiPrefix}/quest` });
 fastify.register(itemApiPlugin, { prefix: `${apiPrefix}/item` });
 fastify.register(characterElectionApiPlugin, { prefix: `${apiPrefix}/character_election` });
 
-fastify.register(indexWebApiPlugin, { prefix: "/api" });
+fastify.register(indexWebApiPlugin, {
+    prefix: "/api",
+    getMultiStatus: () => multiRuntimeService.getAdminStatus(),
+});
 fastify.register(seedsWebApiPlugin, { prefix: "/api/seeds" });
 
 registerAdminUi(fastify, { projectRoot });
@@ -267,14 +270,17 @@ let runtimeHttpConfigured = false;
 function configureRuntimeHttp(config: ReturnType<typeof parseCnRuntimeConfig>): void {
     if (runtimeHttpConfigured) return;
     configureSerializedAssetVersionProvider(() => getContentSnapshot().cdn.targetVersion);
+    const multiContext = multiRuntimeService.getHttpContext();
     fastify.register(multiBattleRoutes, {
         prefix: `${apiPrefix}/multi_battle_quest`,
-        context: multiRuntimeService.getHttpContext(),
+        context: multiContext,
     });
     fastify.register(cnLoadPlugin, {
         prefix: apiPrefix,
         assetProvider: config.assetProvider,
         multiMode: config.multi.mode,
+        multiRecoveryVerifier: multiContext.settlementVerifier,
+        getMultiParticipant: multiContext.snapshotProvider.getParticipant,
     });
     fastify.register(comicApiPlugin, {
         prefix: `${apiPrefix}/comic`,

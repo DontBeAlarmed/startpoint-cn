@@ -80,6 +80,24 @@ interface ServerStatus {
         totalPatchCount: number
         activePatchArchiveCount: number
     }
+    multiplayer: {
+        mode: "embedded" | "host" | "client"
+        state: "ready" | "degraded" | "unavailable"
+        coordinator: { kind: "local" | "remote"; available: boolean }
+        hub: { available: boolean; endpoint: string | null } | null
+        tcp: { available: boolean; endpoint: string | null }
+        activeRooms: number | null
+        battleFacts: { active: number; finalized: number } | null
+        latestCompatibilityRejection: {
+            code: "INCOMPATIBLE_ROOM"
+            differences: Array<{
+                field: string
+                required: string | number
+                received: string | number
+            }>
+            timestamp: string
+        } | null
+    }
 }
 
 function formatDuration(seconds: number): string {
@@ -110,6 +128,24 @@ const cdnScopeLabels: Record<string, string> = {
     quests: "任务",
     shops: "商店",
 }
+
+const multiModeLabels = {
+    embedded: "内置模式",
+    host: "Hub 主机",
+    client: "Hub 客户端",
+} as const
+
+const multiStateLabels = {
+    ready: "正常",
+    degraded: "降级",
+    unavailable: "未启动",
+} as const
+
+const multiStateColors = {
+    ready: "green",
+    degraded: "orange",
+    unavailable: "default",
+} as const
 
 export default function Dashboard() {
     const qc = useQueryClient()
@@ -174,7 +210,7 @@ export default function Dashboard() {
                     description="此管理后台随服务端一同构建，用于统一查看运行状态并执行日常管理操作。"
                 />
 
-                <div className="admin-card-grid">
+                    <div className="admin-card-grid">
                     <Card title="服务端状态">
                         {statusError || !status ? (
                             <Alert type="error" showIcon message="服务端状态加载失败" description="接口 /api/server/status 不可用。" />
@@ -199,9 +235,74 @@ export default function Dashboard() {
                                 </Descriptions>
                             </>
                         )}
-                    </Card>
+                        </Card>
 
-                    <Card title="CDN 基线 / 补丁 Overlay">
+                        <Card title="多人联机状态">
+                            {statusError || !status ? (
+                                <Alert type="error" showIcon message="多人联机状态加载失败" />
+                            ) : (
+                                <Space direction="vertical" className="admin-stack">
+                                    <Space wrap>
+                                        <Tag>{multiModeLabels[status.multiplayer.mode]}</Tag>
+                                        <Tag color={multiStateColors[status.multiplayer.state]}>
+                                            {multiStateLabels[status.multiplayer.state]}
+                                        </Tag>
+                                        <Tag color={status.multiplayer.coordinator.available ? "green" : "default"}>
+                                            {status.multiplayer.coordinator.kind === "local" ? "本地协调器" : "远程协调器"}
+                                        </Tag>
+                                    </Space>
+                                    <Row gutter={[16, 16]}>
+                                        <Col xs={12} sm={8}>
+                                            <Statistic title="活跃房间" value={status.multiplayer.activeRooms ?? "未知"} />
+                                        </Col>
+                                        <Col xs={12} sm={8}>
+                                            <Statistic title="进行中事实" value={status.multiplayer.battleFacts?.active ?? "未知"} />
+                                        </Col>
+                                        <Col xs={12} sm={8}>
+                                            <Statistic title="已结束事实" value={status.multiplayer.battleFacts?.finalized ?? "未知"} />
+                                        </Col>
+                                    </Row>
+                                    <Descriptions size="small" column={1}>
+                                        <Descriptions.Item label="控制面连通性">
+                                            {status.multiplayer.hub === null
+                                                ? "不适用"
+                                                : status.multiplayer.hub.available ? "可用" : "不可用"}
+                                        </Descriptions.Item>
+                                        <Descriptions.Item label="控制面地址">
+                                            {status.multiplayer.hub?.endpoint ?? "-"}
+                                        </Descriptions.Item>
+                                        <Descriptions.Item label="TCP 服务">
+                                            {status.multiplayer.tcp.available ? "可用" : "不可用"}
+                                        </Descriptions.Item>
+                                        <Descriptions.Item label="TCP 地址">
+                                            {status.multiplayer.tcp.endpoint ?? "-"}
+                                        </Descriptions.Item>
+                                    </Descriptions>
+                                    <Divider style={{ margin: "4px 0" }} />
+                                    {status.multiplayer.latestCompatibilityRejection ? (
+                                        <Space direction="vertical" size="small" className="admin-stack">
+                                            <Typography.Text strong>最近兼容性拒绝</Typography.Text>
+                                            <Typography.Text type="secondary">
+                                                {new Date(status.multiplayer.latestCompatibilityRejection.timestamp).toLocaleString("zh-CN")}
+                                            </Typography.Text>
+                                            <Space wrap>
+                                                {status.multiplayer.latestCompatibilityRejection.differences.length === 0 ? (
+                                                    <Tag>请求版本信息不完整</Tag>
+                                                ) : status.multiplayer.latestCompatibilityRejection.differences.map(difference => (
+                                                    <Tag key={difference.field} color="orange">
+                                                        {difference.field}: {difference.received} / 要求 {difference.required}
+                                                    </Tag>
+                                                ))}
+                                            </Space>
+                                        </Space>
+                                    ) : (
+                                        <Typography.Text type="secondary">暂无兼容性拒绝记录。</Typography.Text>
+                                    )}
+                                </Space>
+                            )}
+                        </Card>
+
+                        <Card title="CDN 基线 / 补丁 Overlay">
                         {statusError || !status ? (
                             <Alert type="error" showIcon message="CDN 信息加载失败" />
                         ) : (

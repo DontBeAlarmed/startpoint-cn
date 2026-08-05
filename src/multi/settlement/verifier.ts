@@ -12,10 +12,45 @@ export type MultiSettlementVerification =
     | { readonly ok: true; readonly isHost: boolean }
     | { readonly ok: false }
 
+export type MultiBattleRecoveryInspection =
+    | { readonly state: "active" }
+    | { readonly state: "finalized" }
+    | { readonly state: "missing" }
+    | { readonly state: "unavailable"; readonly code: "HUB_UNAVAILABLE" }
+
 export class MultiSettlementVerifier {
     constructor(
         private readonly coordinator: Pick<MultiCoordinator, "getBattleStatus">,
     ) {}
+
+    async inspect(input: MultiSettlementIdentity): Promise<MultiBattleRecoveryInspection> {
+        if (!isValidIdentity(input)) return unavailable()
+        try {
+            const result = await this.coordinator.getBattleStatus({
+                participant: {
+                    nodeSessionId: input.nodeSessionId,
+                    viewerId: input.viewerId,
+                },
+                roomNumber: input.roomNumber,
+                battleSessionId: input.battleSessionId as BattleSessionId,
+            })
+            if (!result.ok) {
+                return result.error === "ROOM_NOT_FOUND"
+                    ? { state: "missing" }
+                    : unavailable()
+            }
+            if (result.value.roomNumber !== input.roomNumber
+                || result.value.battleSessionId !== input.battleSessionId
+                || !result.value.participants.some(candidate => (
+                    candidate.viewerId === input.viewerId
+                ))) {
+                return unavailable()
+            }
+            return { state: result.value.finalized ? "finalized" : "active" }
+        } catch {
+            return unavailable()
+        }
+    }
 
     async verify(input: MultiSettlementIdentity): Promise<MultiSettlementVerification> {
         if (input.battleSessionId.trim().length === 0) return { ok: false }
@@ -48,4 +83,19 @@ export class MultiSettlementVerifier {
             return { ok: false }
         }
     }
+}
+
+function isValidIdentity(input: MultiSettlementIdentity): boolean {
+    return typeof input.nodeSessionId === "string"
+        && input.nodeSessionId.trim().length > 0
+        && Number.isSafeInteger(input.viewerId)
+        && input.viewerId > 0
+        && typeof input.roomNumber === "string"
+        && input.roomNumber.trim().length > 0
+        && typeof input.battleSessionId === "string"
+        && input.battleSessionId.trim().length > 0
+}
+
+function unavailable(): MultiBattleRecoveryInspection {
+    return { state: "unavailable", code: "HUB_UNAVAILABLE" }
 }

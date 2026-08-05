@@ -34,6 +34,7 @@ const compatibility = Object.freeze({
     contentDigest: `sha256:${"a".repeat(64)}`,
     modeDigest: `sha256:${"b".repeat(64)}`,
 })
+const privateHomePrefix = path.join(path.sep, "Users") + path.sep
 
 function snapshot(viewerId) {
     return Object.freeze({
@@ -203,6 +204,12 @@ function fixture(t, options = {}) {
         admissionIssuer: admissions,
         idempotency,
         tcpEndpoint: { host: "hub.internal", port: 8003 },
+        getDiagnostics: options.getDiagnostics ?? (() => ({
+            activeRooms: 2,
+            activeBattleFacts: 3,
+            finalizedBattleFacts: 4,
+            latestCompatibilityRejection: null,
+        })),
     })
     t.after(() => app.close())
     return {
@@ -704,10 +711,70 @@ test("returns bounded coordinator errors without paths, credentials or stack tra
     })
     assert.equal(status.statusCode, 200)
     assert.deepEqual(Object.keys(status.json().value).sort(), [
+        "activeBattleFacts",
         "activeNodeSessions",
+        "activeRooms",
         "enabledCredentials",
+        "finalizedBattleFacts",
+        "latestCompatibilityRejection",
     ])
     assert.equal(status.body.includes(target.first.label), false)
+})
+
+test("HubClient reads bounded authoritative diagnostics through the existing control plane", async t => {
+    const target = fixture(t)
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        fetch: fetchThroughHub(target.app),
+        now: () => target.getNow(),
+    })
+
+    assert.deepEqual(await client.getControlStatus(), {
+        ok: true,
+        value: {
+            activeNodeSessions: 1,
+            enabledCredentials: 2,
+            activeRooms: 2,
+            activeBattleFacts: 3,
+            finalizedBattleFacts: 4,
+            latestCompatibilityRejection: null,
+        },
+    })
+})
+
+test("control status selects diagnostic fields and drops provider extras", async t => {
+    const target = fixture(t, {
+        getDiagnostics: () => ({
+            activeRooms: 1,
+            activeBattleFacts: 2,
+            finalizedBattleFacts: 3,
+            latestCompatibilityRejection: null,
+            token: "must-not-leak",
+            credentialsPath: path.join(privateHomePrefix, "example", "private.json"),
+            viewerId: 101,
+            rawBody: { private: true },
+            stack: "private stack",
+        }),
+    })
+    const registration = await register(target.app, target.first.token)
+    const response = await target.app.inject({
+        method: "GET",
+        url: "/v1/multi/status",
+        headers: sessionHeaders(registration),
+    })
+
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json().value, {
+        activeNodeSessions: 1,
+        enabledCredentials: 2,
+        activeRooms: 1,
+        activeBattleFacts: 2,
+        finalizedBattleFacts: 3,
+        latestCompatibilityRejection: null,
+    })
+    assert.equal(response.body.includes(privateHomePrefix), false)
+    assert.doesNotMatch(response.body, /token|credentialsPath|viewerId|rawBody|stack/i)
 })
 
 test("status counting does not revalidate unrelated node credentials", () => {

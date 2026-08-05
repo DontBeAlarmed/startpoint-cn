@@ -76,7 +76,10 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/routes/cn/httpRange.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/msgpack.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/lib/version.ts"]), ["full"])
-    assert.deepEqual(selectTestGroups(["src/routes/cn/load.ts"]), ["full", "integration:mission"])
+    assert.deepEqual(
+        selectTestGroups(["src/routes/cn/load.ts"]),
+        ["full", "integration:mission", "quick:protocol"],
+    )
     assert.deepEqual(
         selectTestGroups(["src/routes/api/raidEvent.ts"]),
         ["full", "integration:event", "integration:mission"],
@@ -318,6 +321,7 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/comic_route.test.cjs",
             "tools/cn_tool_capabilities.test.cjs",
             "tools/runtime_admin.test.cjs",
+            "tools/admin_multi_status.test.cjs",
             "tools/runtime_health.test.cjs",
             "tools/runtime_lifecycle.test.cjs",
             "tools/runtime_native_binding.test.cjs",
@@ -704,6 +708,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/multi_quest_availability.test.cjs",
         "tools/multi_remote_coordinator.test.cjs",
         "tools/multi_remote_settlement.test.cjs",
+        "tools/multi_load_recovery.test.cjs",
         "tools/multi_room_handshake_identity.test.cjs",
         "tools/multi_room_identity.test.cjs",
         "tools/npc_contributor_names.test.cjs",

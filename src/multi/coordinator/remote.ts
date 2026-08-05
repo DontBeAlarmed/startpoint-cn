@@ -5,6 +5,7 @@ import type {
 } from "../admission/registry"
 import type { HubClient } from "../hub/client"
 import type { MultiHubTcpEndpoint } from "../hub/control-routes"
+import type { MultiHubControlStatus } from "../hub/control-routes"
 import type {
     BattleSessionInput,
     BattleStatus,
@@ -26,6 +27,7 @@ export interface RemoteHubClient {
     getTcpEndpoint(): MultiHubTcpEndpoint | null
     getNodeSessionId(): NodeSessionId | null
     isAvailable(): boolean
+    getControlStatus(): Promise<CoordinatorResult<MultiHubControlStatus>>
 }
 
 export class RemoteMultiCoordinator implements MultiCoordinator, AdmissionIssuer {
@@ -86,5 +88,9 @@ export class RemoteMultiCoordinator implements MultiCoordinator, AdmissionIssuer
 
     isAvailable(): boolean {
         return this.client.isAvailable()
+    }
+
+    getControlStatus(): Promise<CoordinatorResult<MultiHubControlStatus>> {
+        return this.client.getControlStatus()
     }
 }

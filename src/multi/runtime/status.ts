@@ -36,7 +36,7 @@ export function unavailableMultiRuntimeStatus(
         mode,
         state: "unavailable",
         coordinator: { kind: remote ? "remote" : "local", available: false },
-        hub: null,
+        hub: remote ? { available: false, endpoint: null } : null,
         tcp: { available: false, endpoint: null },
     })
 }
