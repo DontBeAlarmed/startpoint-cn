@@ -53,6 +53,7 @@ export class SessionManager {
     private roomClients = new Map<string, Set<string>>()
     private battleClients = new Map<string, Set<string>>()
     private cidToBattleClient = new Map<string, SessionClient>()
+    private socketToClient = new Map<net.Socket, SessionClient>()
     private sceneReadyClients = new Map<string, Set<string>>()
     private sceneTransitionClients = new Map<string, Set<string>>()
     private battleStartDeliveredClients = new Map<string, Map<number, Set<string>>>()
@@ -102,10 +103,23 @@ export class SessionManager {
     }
 
     getClientBySocket(socket: net.Socket): SessionClient | undefined {
-        for (const client of this.clients.values()) {
-            if (client.socket === socket) return client
+        return this.socketToClient.get(socket)
+    }
+
+    getLobbyClientBySocket(socket: net.Socket): SessionClient | undefined {
+        const client = this.socketToClient.get(socket)
+        return client?.isBattle ? undefined : client
+    }
+
+    getBattleClientBySocket(socket: net.Socket): SessionClient | undefined {
+        const client = this.socketToClient.get(socket)
+        return client?.isBattle ? client : undefined
+    }
+
+    private removeSocketIndex(client: SessionClient): void {
+        if (this.socketToClient.get(client.socket) === client) {
+            this.socketToClient.delete(client.socket)
         }
-        return undefined
     }
 
     hasActiveRoomViewerConflict(
@@ -160,6 +174,7 @@ export class SessionManager {
             this.roomClients.set(client.roomNumber, set)
         }
         set.add(addr)
+        this.socketToClient.set(client.socket, client)
         return { ok: true, value: undefined }
     }
 
@@ -176,6 +191,7 @@ export class SessionManager {
             }
             this.battleClients.get(client.roomNumber)?.delete(client.connectionId)
             this.cidToBattleClient.delete(client.connectionId)
+            this.removeSocketIndex(client)
             this.sceneReadyClients.get(client.roomNumber)?.delete(client.connectionId)
             const exp = this.battleExpectedCount.get(client.roomNumber)
             if (exp && exp > 1) this.battleExpectedCount.set(client.roomNumber, exp - 1)
@@ -194,6 +210,7 @@ export class SessionManager {
         const addr = this.roomClientKey(client.roomNumber, client.participant)
         if (this.clients.get(addr) !== client) return { ok: true, value: undefined }
         this.clients.delete(addr)
+        this.removeSocketIndex(client)
         const set = this.roomClients.get(client.roomNumber)
         if (set) {
             set.delete(addr)
@@ -213,19 +230,10 @@ export class SessionManager {
     }
 
     removeClientBySocket(socket: net.Socket): boolean {
-        for (const client of this.clients.values()) {
-            if (client.socket === socket) {
-                this.removeClient(client)
-                return true
-            }
-        }
-        for (const client of this.cidToBattleClient.values()) {
-            if (client.socket === socket) {
-                this.removeClient(client)
-                return true
-            }
-        }
-        return false
+        const client = this.socketToClient.get(socket)
+        if (!client) return false
+        this.removeClient(client)
+        return true
     }
 
     getClientsInRoom(roomNumber: string): SessionClient[] {
@@ -256,12 +264,14 @@ export class SessionManager {
         }
         set.add(connectionId)
         this.cidToBattleClient.set(connectionId, client)
+        this.socketToClient.set(client.socket, client)
     }
 
     removeBattleClient(connectionId: string): void {
         const client = this.cidToBattleClient.get(connectionId)
         if (client) {
             this.battleClients.get(client.roomNumber)?.delete(connectionId)
+            this.removeSocketIndex(client)
             this.sceneReadyClients.get(client.roomNumber)?.delete(connectionId)
             this.sceneTransitionClients.get(client.roomNumber)?.delete(connectionId)
         }

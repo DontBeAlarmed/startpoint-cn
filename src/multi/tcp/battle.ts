@@ -8,12 +8,7 @@ import { relayToBattleRoom } from "./relay"
 const BATTLE_MEASUREMENT_WARNING_THRESHOLD_MS = 2000
 
 function findBattleClientBySocket(socket: net.Socket): SessionClient | undefined {
-    const map = (sessionManager as any).cidToBattleClient as Map<string, SessionClient> | undefined
-    if (!map) return undefined
-    for (const client of map.values()) {
-        if (client.socket === socket) return client
-    }
-    return undefined
+    return sessionManager.getBattleClientBySocket(socket)
 }
 
 function getRoomQuest(client: SessionClient) {

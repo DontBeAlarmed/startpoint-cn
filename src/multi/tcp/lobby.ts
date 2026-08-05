@@ -50,7 +50,7 @@ function isCommittedRecruitment(roomNumber: string, room: MultiRoom, revision: n
 }
 
 function findClientBySocket(socket: net.Socket): SessionClient | undefined {
-    return sessionManager.getClientBySocket(socket)
+    return sessionManager.getLobbyClientBySocket(socket)
 }
 
 function findHostClient(roomNumber: string): SessionClient | undefined {

@@ -365,6 +365,92 @@ test("revoked node sessions close only their current TCP socket on the next fram
     }
 })
 
+test("battle handshake validates the node session before the next battle frame", async () => {
+    let fakeServer
+    const validity = new Map([["battle-node", true]])
+    const room = createRoom(94, 1_094, 1, 1, 501, 0, 101)
+    const participant = { nodeSessionId: "battle-node", viewerId: 94 }
+    sessionManager.setBattleParticipants(room.room_number, [
+        { connectionId: "battle-cid", participant },
+    ], participant)
+    const { updateRoomState } = require("../src/multi/room/manager")
+    updateRoomState(room.room_number, 4)
+
+    try {
+        await startSessionServer({
+            nodeSessionCheckIntervalMs: 10_000,
+            createServer(connectionListener) {
+                fakeServer = new FakeServer(connectionListener)
+                return fakeServer
+            },
+            validateNodeSession(nodeSessionId) {
+                return validity.get(nodeSessionId) === true
+            },
+        })
+
+        const socket = new FakeSocket()
+        fakeServer.accept(socket)
+        socket.emit("data", `${JSON.stringify({
+            socklet: "cooperation_battle",
+            room_number: room.room_number,
+            connection_id: "battle-cid",
+        })}\0`)
+        await waitFor(
+            () => getSessionServerStatus().pendingHandshakes === 0,
+            "battle handshake did not settle",
+        )
+
+        assert.equal(sessionManager.getBattleClientBySocket(socket)?.connectionId, "battle-cid")
+        validity.set("battle-node", false)
+        socket.emit("data", `${JSON.stringify([0, [5]])}\0`)
+
+        assert.equal(socket.destroyed, true)
+        assert.equal(sessionManager.getBattleClientBySocket(socket), undefined)
+        assert.equal(sessionManager.getBattleClient("battle-cid"), undefined)
+    } finally {
+        disbandRoom(room.room_number)
+        sessionManager.removeBattleClient("battle-cid")
+    }
+})
+
+test("lobby and battle socket lookups use their O(1) session indexes", () => {
+    const roomNumber = `socket-index-${Date.now()}-${Math.random()}`
+    const lobbySocket = new FakeSocket()
+    const lobbyClient = sessionManager.createClient(lobbySocket, 951, roomNumber, "lobby-index-cid")
+    lobbyClient.participant = { nodeSessionId: "index-node", viewerId: 951 }
+    sessionManager.addClientToRoom(lobbyClient)
+
+    const battleSocket = new FakeSocket()
+    const battleClient = sessionManager.createClient(battleSocket, 952, roomNumber, "battle-index-cid")
+    battleClient.participant = { nodeSessionId: "index-node", viewerId: 952 }
+    battleClient.isBattle = true
+    sessionManager.addBattleClient(battleClient.connectionId, battleClient)
+
+    let socketReads = 0
+    for (const [client, socket] of [
+        [lobbyClient, lobbySocket],
+        [battleClient, battleSocket],
+    ]) {
+        Object.defineProperty(client, "socket", {
+            configurable: true,
+            get() {
+                socketReads++
+                return socket
+            },
+        })
+    }
+    socketReads = 0
+
+    try {
+        assert.equal(sessionManager.getClientBySocket(lobbySocket), lobbyClient)
+        assert.equal(sessionManager.getBattleClientBySocket(battleSocket), battleClient)
+        assert.equal(socketReads, 0)
+    } finally {
+        sessionManager.removeClient(lobbyClient)
+        sessionManager.removeBattleClient(battleClient.connectionId)
+    }
+})
+
 test("a session revoked before handshake is closed by that handshake frame", async () => {
     let fakeServer
     await startSessionServer({
