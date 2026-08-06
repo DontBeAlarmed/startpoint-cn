@@ -19,6 +19,7 @@ export function requireLoopback(request: FastifyRequest, reply: FastifyReply): b
     if (isLoopbackAddress(request.raw.socket.remoteAddress)) return true
     reply.status(403).send({
         error: "Forbidden",
+        code: "LOCAL_MANAGEMENT_ONLY",
         message: "This management operation requires a loopback request",
     })
     return false

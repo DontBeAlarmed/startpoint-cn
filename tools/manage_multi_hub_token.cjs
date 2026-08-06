@@ -2,13 +2,12 @@
 
 require("ts-node/register/transpile-only")
 
+const readline = require("node:readline/promises")
 const path = require("node:path")
 const {
-    MultiHubCredentialStore,
-} = require("../src/multi/hub/credential-store")
-const {
-    resolveMultiHubCredentialsPath,
-} = require("../src/runtime/config")
+    createOfflineMultiManagementService,
+} = require("../src/multi/management/offline")
+const { maybeWriteMultiHubTokenEnv } = require("./lib/multi-hub-env.cjs")
 
 function usage() {
     process.stderr.write(
@@ -21,37 +20,51 @@ function print(value) {
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`)
 }
 
-function main() {
+async function confirm(question) {
+    const input = readline.createInterface({
+        input: process.stdin,
+        output: process.stderr,
+    })
+    try {
+        const suffix = question.defaultValue ? "[Y/n]" : "[y/N]"
+        const answer = (await input.question(`${question.message} ${suffix} `)).trim().toLowerCase()
+        if (answer === "") return question.defaultValue
+        return answer === "y" || answer === "yes"
+    } finally {
+        input.close()
+    }
+}
+
+async function main() {
     const [command, ...args] = process.argv.slice(2)
     if (!command) return usage()
-    if (command === "create" && process.env.MULTI_MODE === "client") {
-        const error = new Error("Client mode cannot issue Host credentials")
-        error.code = "CLIENT_CANNOT_ISSUE_MULTI_HUB_CREDENTIAL"
-        throw error
-    }
     const projectRoot = path.resolve(__dirname, "..")
-    const credentialsPath = resolveMultiHubCredentialsPath(process.env, projectRoot)
-    const store = new MultiHubCredentialStore({ credentialsPath })
+    const service = createOfflineMultiManagementService({ projectRoot, env: process.env })
 
     if (command === "create" && args.length === 1) {
-        print(store.create(args[0]))
+        const issued = service.createCredential(args[0])
+        print(issued)
+        await maybeWriteMultiHubTokenEnv({
+            envPath: path.join(projectRoot, ".env"),
+            token: issued.token,
+            interactive: process.stdin.isTTY === true && process.stdout.isTTY === true,
+            confirm,
+        })
         return
     }
     if (command === "list" && args.length === 0) {
-        print(store.list())
+        print(service.listCredentials())
         return
     }
     if (command === "revoke" && args.length === 1) {
-        print(store.revoke(args[0]))
+        print(service.revokeCredential(args[0]))
         return
     }
     usage()
 }
 
-try {
-    main()
-} catch (error) {
+main().catch(error => {
     const code = typeof error?.code === "string" ? error.code : "UNKNOWN"
     process.stderr.write(`Multi Hub credential command failed: ${code}\n`)
     process.exitCode = 1
-}
+})

@@ -18,6 +18,9 @@ const {
     acquireMultiHubCredentialLock,
     withMultiHubCredentialLock,
 } = require("../src/multi/hub/credential-lock")
+const {
+    maybeWriteMultiHubTokenEnv,
+} = require("./lib/multi-hub-env.cjs")
 
 function fixture(t, options = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-hub-credentials-"))
@@ -417,6 +420,10 @@ test("management CLI uses only the injected private table and never reprints sec
         { cwd: projectRoot, encoding: "utf8", env },
     )
 
+    const projectEnvPath = path.join(projectRoot, ".env")
+    const projectEnvBefore = fs.existsSync(projectEnvPath)
+        ? fs.readFileSync(projectEnvPath)
+        : null
     const created = run("create", "node-b")
     assert.equal(created.status, 0, created.stderr)
     assert.match(created.stdout, /credentialId/)
@@ -438,26 +445,194 @@ test("management CLI uses only the injected private table and never reprints sec
     assert.equal(revoked.stdout.includes(issuedToken), false)
     assert.doesNotMatch(revoked.stdout, /tokenDigest|"token"/)
     assert.equal(fs.readdirSync(root).some(name => /sqlite|\.env/i.test(name)), false)
+    assert.deepEqual(
+        fs.existsSync(projectEnvPath) ? fs.readFileSync(projectEnvPath) : null,
+        projectEnvBefore,
+    )
 
     const invalid = run("create", "")
     assert.notEqual(invalid.status, 0)
 
     const clientCredentialsPath = path.join(root, "client-credentials.json")
-    const clientCreate = spawnSync(
-        process.execPath,
-        ["tools/manage_multi_hub_token.cjs", "create", "must-not-exist"],
-        {
-            cwd: projectRoot,
-            encoding: "utf8",
-            env: {
-                ...env,
-                MULTI_MODE: "client",
-                MULTI_HUB_CREDENTIALS_FILE: clientCredentialsPath,
+    for (const args of [
+        ["create", "must-not-exist"],
+        ["list"],
+        ["revoke", "a".repeat(32)],
+    ]) {
+        const clientResult = spawnSync(
+            process.execPath,
+            ["tools/manage_multi_hub_token.cjs", ...args],
+            {
+                cwd: projectRoot,
+                encoding: "utf8",
+                env: {
+                    ...env,
+                    MULTI_MODE: "client",
+                    MULTI_HUB_CREDENTIALS_FILE: clientCredentialsPath,
+                },
             },
-        },
-    )
-    assert.notEqual(clientCreate.status, 0)
+        )
+        assert.notEqual(clientResult.status, 0, args[0])
+        assert.match(clientResult.stderr, /CLIENT_MULTI_MANAGEMENT_UNAVAILABLE/)
+    }
     assert.equal(fs.existsSync(clientCredentialsPath), false)
+})
+
+test("management CLI composes through the offline management adapter", () => {
+    const source = fs.readFileSync(
+        path.join(projectRoot, "tools", "manage_multi_hub_token.cjs"),
+        "utf8",
+    )
+
+    assert.match(source, /multi\/management\/offline/)
+    assert.doesNotMatch(source, /multi\/hub\/credential-store/)
+    assert.doesNotMatch(source, /\bstore\.(?:create|list|revoke)\s*\(/)
+})
+
+test("interactive create writes a missing MULTI_HUB_TOKEN entry by default", async t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-hub-env-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const envPath = path.join(root, ".env")
+    fs.writeFileSync(envPath, "KEEP=value\n", { mode: 0o640 })
+    const prompts = []
+
+    const result = await maybeWriteMultiHubTokenEnv({
+        envPath,
+        token: "a".repeat(64),
+        interactive: true,
+        confirm: async question => {
+            prompts.push(question)
+            return question.defaultValue
+        },
+    })
+
+    assert.deepEqual(result, { written: true, reason: "created" })
+    assert.equal(prompts.length, 1)
+    assert.equal(prompts[0].defaultValue, true)
+    assert.match(fs.readFileSync(envPath, "utf8"), /^KEEP=value\nMULTI_HUB_TOKEN=a{64}\n$/)
+    assert.equal(fs.statSync(envPath).mode & 0o777, 0o640)
+})
+
+test("interactive create does not overwrite one existing token by default", async t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-hub-env-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const envPath = path.join(root, ".env")
+    const original = `MULTI_HUB_TOKEN=${"b".repeat(64)}\nKEEP=value\n`
+    fs.writeFileSync(envPath, original, { mode: 0o600 })
+    const prompts = []
+
+    const result = await maybeWriteMultiHubTokenEnv({
+        envPath,
+        token: "a".repeat(64),
+        interactive: true,
+        confirm: async question => {
+            prompts.push(question)
+            return question.defaultValue
+        },
+    })
+
+    assert.deepEqual(result, { written: false, reason: "declined" })
+    assert.equal(prompts[0].defaultValue, false)
+    assert.match(prompts[0].message, /not overwrite|不会覆盖/i)
+    assert.equal(fs.readFileSync(envPath, "utf8"), original)
+})
+
+test("interactive create explicitly replaces one existing token without exposing other values", async t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-hub-env-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const envPath = path.join(root, ".env")
+    const secretValue = "other-secret-value"
+    fs.writeFileSync(
+        envPath,
+        `KEEP=${secretValue}\nexport MULTI_HUB_TOKEN=${"b".repeat(64)}\n`,
+        { mode: 0o600 },
+    )
+    const prompts = []
+
+    const result = await maybeWriteMultiHubTokenEnv({
+        envPath,
+        token: "a".repeat(64),
+        interactive: true,
+        confirm: async question => {
+            prompts.push(question)
+            return true
+        },
+    })
+
+    assert.deepEqual(result, { written: true, reason: "replaced" })
+    const updated = fs.readFileSync(envPath, "utf8")
+    assert.equal(updated, `KEEP=${secretValue}\nexport MULTI_HUB_TOKEN=${"a".repeat(64)}\n`)
+    assert.equal(JSON.stringify(prompts).includes(secretValue), false)
+    assert.equal(JSON.stringify(prompts).includes("b".repeat(64)), false)
+})
+
+test("duplicate MULTI_HUB_TOKEN entries are rejected without prompting or writing", async t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-hub-env-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const envPath = path.join(root, ".env")
+    const original = `MULTI_HUB_TOKEN=${"b".repeat(64)}\nMULTI_HUB_TOKEN=${"c".repeat(64)}\n`
+    fs.writeFileSync(envPath, original, { mode: 0o600 })
+    let prompted = false
+
+    await assert.rejects(
+        maybeWriteMultiHubTokenEnv({
+            envPath,
+            token: "a".repeat(64),
+            interactive: true,
+            confirm: async () => {
+                prompted = true
+                return true
+            },
+        }),
+        { code: "DUPLICATE_MULTI_HUB_TOKEN_ENV" },
+    )
+    assert.equal(prompted, false)
+    assert.equal(fs.readFileSync(envPath, "utf8"), original)
+})
+
+test("non-interactive create never prompts or writes .env", async t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-hub-env-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const envPath = path.join(root, ".env")
+    let prompted = false
+
+    const result = await maybeWriteMultiHubTokenEnv({
+        envPath,
+        token: "a".repeat(64),
+        interactive: false,
+        confirm: async () => {
+            prompted = true
+            return true
+        },
+    })
+
+    assert.deepEqual(result, { written: false, reason: "non_interactive" })
+    assert.equal(prompted, false)
+    assert.equal(fs.existsSync(envPath), false)
+})
+
+test("atomic .env replacement failure preserves the original file", async t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-hub-env-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const envPath = path.join(root, ".env")
+    const original = "KEEP=value\n"
+    fs.writeFileSync(envPath, original, { mode: 0o600 })
+
+    await assert.rejects(
+        maybeWriteMultiHubTokenEnv({
+            envPath,
+            token: "a".repeat(64),
+            interactive: true,
+            confirm: async () => true,
+            replaceFile(temporaryPath) {
+                assert.match(fs.readFileSync(temporaryPath, "utf8"), /MULTI_HUB_TOKEN=a{64}/)
+                throw Object.assign(new Error("replace failed"), { code: "EIO" })
+            },
+        }),
+        { code: "EIO" },
+    )
+    assert.equal(fs.readFileSync(envPath, "utf8"), original)
+    assert.deepEqual(fs.readdirSync(root), [".env"])
 })
 
 test("credential reloader skips unchanged files and atomically adopts valid snapshots", t => {

@@ -4,12 +4,16 @@ import serverApiPlugin from "./server"
 import mailApiPlugin from "./mail"
 import lookupApiPlugin from "./lookup"
 import settingsApiPlugin from "./settings"
+import multiManagementApiPlugin from "./multi-management"
 import { ADMIN_UPLOAD_FILE_SIZE_LIMIT } from "./upload-limits"
 import type { ServerRoutesOptions } from "./server"
+import type { MultiManagementRoutesOptions } from "./multi-management"
 
 export { ADMIN_UPLOAD_FILE_SIZE_LIMIT } from "./upload-limits"
 
-export interface WebApiRoutesOptions extends ServerRoutesOptions {}
+export interface WebApiRoutesOptions extends ServerRoutesOptions {
+    readonly getMultiManagementService?: MultiManagementRoutesOptions["getMultiManagementService"]
+}
 
 const routes = async (fastify: FastifyInstance, options: WebApiRoutesOptions) => {
     fastify.register(require('@fastify/multipart'), {
@@ -33,6 +37,10 @@ const routes = async (fastify: FastifyInstance, options: WebApiRoutesOptions) =>
     fastify.register(mailApiPlugin, { prefix: "/mail" })
     fastify.register(lookupApiPlugin, { prefix: "/lookup" })
     fastify.register(settingsApiPlugin, { prefix: "/server/settings" })
+    fastify.register(multiManagementApiPlugin, {
+        prefix: "/server/multiplayer",
+        getMultiManagementService: options.getMultiManagementService ?? (() => null),
+    })
 }
 
 export default routes;

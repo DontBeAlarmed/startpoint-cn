@@ -160,6 +160,7 @@ test("time-package writes require a loopback request", async t => {
     })
 
     assert.equal(response.statusCode, 403)
+    assert.equal(response.json().code, "LOCAL_MANAGEMENT_ONLY")
     assert.match(response.json().message, /loopback/i)
 })
 
@@ -200,5 +201,6 @@ test("time-package writes accept loopback variants and ignore forwarded client a
         payload: packagePayload,
     })
     assert.equal(forwardedRemote.statusCode, 403)
+    assert.equal(forwardedRemote.json().code, "LOCAL_MANAGEMENT_ONLY")
     assert.match(forwardedRemote.json().message, /loopback/i)
 })

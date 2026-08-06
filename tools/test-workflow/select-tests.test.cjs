@@ -320,6 +320,7 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/runtime_config.test.cjs",
             "tools/multi_hub_credentials.test.cjs",
             "tools/multi_management_service.test.cjs",
+            "tools/multi_management_routes.test.cjs",
             "tools/multi_hub_control.test.cjs",
             "tools/multi_hub_idempotency.test.cjs",
             "tools/multi_hub_session_cleanup.test.cjs",
@@ -344,11 +345,34 @@ test("registers focused runtime state and socket smoke groups", () => {
         selectTestGroups(["tools/multi_management_service.test.cjs"]),
         ["quick:runtime"],
     )
+    assert.deepEqual(
+        selectTestGroups(["tools/multi_management_routes.test.cjs"]),
+        ["quick:runtime"],
+    )
     assert.deepEqual(TEST_GROUPS["integration:runtime"], {
         execution: "serial",
         timeoutMs: 360_000,
         tests: ["tools/runtime_compiled_smoke.test.cjs"],
     })
+})
+
+test("routes multiplayer management adapters to the runtime regressions", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/multi/management/offline.ts"]),
+        ["integration:multi-hub", "quick:protocol", "quick:runtime"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/routes/web_api/multi-management.ts"]),
+        ["admin", "integration:database", "quick:runtime"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/manage_multi_hub_token.cjs"]),
+        ["quick:runtime"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/lib/multi-hub-env.cjs"]),
+        ["quick:runtime"],
+    )
 })
 
 test("registers the trusted multi-hub process suite as a bounded serial group", () => {

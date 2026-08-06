@@ -33,6 +33,15 @@ const SOURCE_RULES = [
     },
     { pattern: /^src\/lib\/admin-content-status\.ts$/, groups: ["quick:cdn", "admin"] },
     { pattern: /^src\/lib\/admin-multi-status\.ts$/, groups: ["quick:runtime", "admin"] },
+    { pattern: /^src\/multi\/management\//, groups: ["quick:runtime"] },
+    {
+        pattern: /^src\/routes\/web_api\/(?:index|multi-management)\.ts$/,
+        groups: ["quick:runtime"],
+    },
+    {
+        pattern: /^tools\/(?:manage_multi_hub_token\.cjs|lib\/multi-hub-env\.cjs)$/,
+        groups: ["quick:runtime"],
+    },
     {
         pattern: /^src\/content\/(?:cdn\/entity-lists-directory|sync\/scanner)\.ts$/,
         groups: ["quick:cdn", "quick:content"],

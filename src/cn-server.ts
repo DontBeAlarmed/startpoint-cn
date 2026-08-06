@@ -14,7 +14,10 @@ import { ServerTimeService } from "./runtime/server-time/service";
 import { getContentSnapshot, initializeContentSnapshot } from "./content/runtime/content-snapshot";
 import { createContentLifecycleDependencies } from "./modes/cn-lifecycle";
 import { configureSerializedAssetVersionProvider } from "./data/utils/serialized-asset-version";
-import { parseCnRuntimeConfig } from "./runtime/config";
+import {
+    parseCnRuntimeConfig,
+    resolveMultiHubCredentialsPath,
+} from "./runtime/config";
 import {
     createRuntimeCoordinator,
     RuntimeCoordinator,
@@ -42,6 +45,8 @@ import optionApiPlugin from "./routes/api/option";
 import singleBattleQuestApiPlugin from "./routes/api/singleBattleQuest";
 import { multiBattleRoutes } from "./multi";
 import { createMultiRuntimeService } from "./multi/runtime/service";
+import { MultiHubCredentialStore } from "./multi/hub/credential-store";
+import { MultiManagementService } from "./multi/management/service";
 import attentionApiPlugin from "./routes/api/attention";
 import characterApiPlugin from "./routes/api/character";
 import characterManaPlugin from "./routes/api/character/mana";
@@ -80,6 +85,7 @@ const fastify = Fastify({
 const projectRoot = path.resolve(__dirname, "..");
 let runtimeCoordinator: RuntimeCoordinator;
 const multiRuntimeService = createMultiRuntimeService();
+let multiManagementService: MultiManagementService | null = null;
 const serverTimeService = new ServerTimeService();
 const gachaSeedQuarantine = getDefaultGachaSeedQuarantine();
 
@@ -262,6 +268,7 @@ fastify.register(characterElectionApiPlugin, { prefix: `${apiPrefix}/character_e
 fastify.register(indexWebApiPlugin, {
     prefix: "/api",
     getMultiStatus: () => multiRuntimeService.getAdminStatus(),
+    getMultiManagementService: () => multiManagementService,
     serverTimeService,
 });
 fastify.register(seedsWebApiPlugin, { prefix: "/api/seeds" });
@@ -320,7 +327,18 @@ try {
 runtimeCoordinator = createRuntimeCoordinator({
     loadConfig: () => {
         if (bundleMetadataError) throw new Error("invalid embedded bundle metadata");
-        return parseCnRuntimeConfig({ projectRoot });
+        const config = parseCnRuntimeConfig({ projectRoot });
+        if (multiManagementService === null) {
+            multiManagementService = new MultiManagementService({
+                mode: config.multi.mode,
+                credentials: new MultiHubCredentialStore({
+                    credentialsPath: resolveMultiHubCredentialsPath(process.env, projectRoot),
+                }),
+                getStatus: () => multiRuntimeService.getAdminStatus(),
+                probe: () => multiRuntimeService.probeControlStatus(),
+            });
+        }
+        return config;
     },
     configureHttp: configureRuntimeHttp,
     initializeDatabase,

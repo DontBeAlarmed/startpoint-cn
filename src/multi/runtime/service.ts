@@ -7,7 +7,7 @@ import {
     type AdminMultiStatus,
 } from "../../lib/admin-multi-status"
 import { AdmissionRegistry } from "../admission/registry"
-import type { NodeSessionId } from "../coordinator/contracts"
+import type { CoordinatorResult, NodeSessionId } from "../coordinator/contracts"
 import {
     EMBEDDED_NODE_SESSION_ID,
     EmbeddedMultiCoordinator,
@@ -79,6 +79,7 @@ export interface MultiRuntimeService {
     stop(): Promise<void>
     getStatus(): MultiRuntimeStatus
     getAdminStatus(): Promise<AdminMultiStatus>
+    probeControlStatus(): Promise<CoordinatorResult<MultiHubControlStatus>>
     getHttpContext(): MultiHttpContext
 }
 
@@ -374,6 +375,27 @@ class Service implements MultiRuntimeService {
             authority,
             latestCompatibilityRejection: multiCompatibilityRejections.get(),
         })
+    }
+
+    async probeControlStatus(): Promise<CoordinatorResult<MultiHubControlStatus>> {
+        const generation = this.generation
+        const config = this.config
+        const remoteCoordinator = this.remoteCoordinator
+        if (config?.mode !== "client" || remoteCoordinator === null) {
+            return Object.freeze({ ok: false, error: "HUB_UNAVAILABLE" })
+        }
+
+        try {
+            const result = await remoteCoordinator.getControlStatus()
+            if (generation !== this.generation
+                || config !== this.config
+                || remoteCoordinator !== this.remoteCoordinator) {
+                return Object.freeze({ ok: false, error: "HUB_UNAVAILABLE" })
+            }
+            return result
+        } catch {
+            return Object.freeze({ ok: false, error: "HUB_UNAVAILABLE" })
+        }
     }
 
     getHttpContext(): MultiHttpContext {
