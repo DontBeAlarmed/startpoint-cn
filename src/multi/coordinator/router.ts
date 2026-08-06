@@ -181,14 +181,33 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
         input: TInput,
         operation: TOperation,
     ): Promise<Awaited<ReturnType<MultiCoordinator[TOperation]>>> {
-        const teardownEntry = this.roomOrigins.get(input.roomNumber)
-        const origin = await this.resolveOrigin(input)
+        const isTeardown = operation === "disbandRoom"
+            || operation === "abortBattle"
+            || operation === "finalizeBattle"
+        const teardownEntry = isTeardown ? this.roomOrigins.get(input.roomNumber) : undefined
+        const participantEntry = isTeardown
+            ? this.participantOrigins.get(this.participantKey(input.participant))
+            : undefined
+        const origin = teardownEntry?.origin
+            ?? (isTeardown
+                ? await this.resolveTeardownOrigin(input, participantEntry)
+                : await this.resolveOrigin(input))
         const coordinator = this.coordinatorFor(origin)
         const result = await coordinator[operation](input as never) as Awaited<ReturnType<MultiCoordinator[TOperation]>>
-        if (result.ok && ["disbandRoom", "abortBattle", "finalizeBattle"].includes(operation)) {
+        if (result.ok && isTeardown) {
             this.clearTeardownEntry(teardownEntry)
         }
         return result
+    }
+
+    private async resolveTeardownOrigin(
+        input: RoomParticipantInput,
+        participantEntry: RoomOriginEntry | undefined,
+    ): Promise<MultiCoordinatorOrigin> {
+        const activeOrigin = await this.options.resolveActiveQuestOrigin?.(input.participant)
+        if (activeOrigin === "remote" || activeOrigin === "local") return activeOrigin
+        if (participantEntry) return participantEntry.origin
+        return this.newRoomOrigin()
     }
 
     private cachedOrigin(input: CoordinatorOriginLookup): MultiCoordinatorOrigin | null {

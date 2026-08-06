@@ -513,3 +513,95 @@ test("completed teardown cannot clear a reused room's newer local cache entry", 
         assert.deepEqual(remote.calls.map(call => call.name), ["selectRoom", operation], operation)
     }
 })
+
+test("teardown pins remote origin while active origin resolution is deferred during room reuse", async () => {
+    const roomNumber = "123456"
+
+    for (const operation of ["abortBattle", "finalizeBattle", "disbandRoom"]) {
+        let releaseActiveOrigin
+        let releaseRemoteTeardown
+        let markRemoteTeardownStarted
+        let deferActiveOrigin = false
+        let newRoomOrigin = "remote"
+        const activeOriginPending = new Promise(resolve => { releaseActiveOrigin = resolve })
+        const remoteTeardownPending = new Promise(resolve => { releaseRemoteTeardown = resolve })
+        const remoteTeardownStarted = new Promise(resolve => { markRemoteTeardownStarted = resolve })
+        const remote = coordinator("remote", {
+            [operation]: async () => {
+                markRemoteTeardownStarted()
+                await remoteTeardownPending
+                return {
+                    ok: true,
+                    value: operation === "finalizeBattle"
+                        ? { ...battle(roomNumber), finalized: true }
+                        : undefined,
+                }
+            },
+        })
+        const local = coordinator("local", {
+            createRoom: () => ({
+                ok: true,
+                value: { ...room(roomNumber), accessToken: `local-token-${operation}` },
+            }),
+        })
+        const router = new RoutedMultiCoordinator({
+            remote,
+            local,
+            remoteAdmissionIssuer: remote,
+            localAdmissionIssuer: local,
+            newRoomOrigin: () => newRoomOrigin,
+            resolveActiveQuestOrigin: () => {
+                if (deferActiveOrigin) return activeOriginPending
+                return null
+            },
+        })
+
+        assert.equal((await router.selectRoom(compatibleInput(roomNumber))).ok, true, operation)
+        deferActiveOrigin = true
+        const teardownInput = operation === "finalizeBattle"
+            ? { participant, roomNumber, battleSessionId }
+            : { participant, roomNumber }
+        const teardown = router[operation](teardownInput)
+        deferActiveOrigin = false
+
+        const started = await Promise.race([
+            remoteTeardownStarted.then(() => true),
+            new Promise(resolve => setImmediate(() => resolve(false))),
+        ])
+        try {
+            assert.equal(started, true, operation)
+
+            newRoomOrigin = "local"
+            const created = await router.createRoom(createInput())
+            assert.equal(created.ok, true, operation)
+            assert.equal(created.value.roomNumber, roomNumber, operation)
+
+            releaseRemoteTeardown({
+                ok: true,
+                value: operation === "finalizeBattle"
+                    ? { ...battle(roomNumber), finalized: true }
+                    : undefined,
+            })
+            assert.equal((await teardown).ok, true, operation)
+
+            assert.deepEqual(remote.calls.map(call => call.name), ["selectRoom", operation], operation)
+            assert.equal((await router.selectRoom(compatibleInput(roomNumber))).ok, true, operation)
+            assert.deepEqual(local.calls.map(call => call.name), ["createRoom", "selectRoom"], operation)
+            assert.equal(await router.resolveOrigin({ participant, roomNumber }), "local", operation)
+            assert.equal(await router.resolveOrigin({
+                participant,
+                accessToken: created.value.accessToken,
+            }), "local", operation)
+            assert.equal(await router.resolveOrigin({ participant }), "local", operation)
+        } finally {
+            releaseActiveOrigin(null)
+            releaseRemoteTeardown({
+                ok: true,
+                value: operation === "finalizeBattle"
+                    ? { ...battle(roomNumber), finalized: true }
+                    : undefined,
+            })
+            await teardown
+        }
+    }
+})
