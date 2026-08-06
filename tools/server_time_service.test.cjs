@@ -223,6 +223,50 @@ test("a failed write leaves the in-memory server time unchanged", () => {
   assert.equal(getTimeOffset(), previousOffset)
 })
 
+test("propagates parent directory fsync errors without masking them during cleanup", () => {
+  const paths = makePaths()
+  const fsyncError = Object.assign(new Error("directory fsync failed"), { code: "EIO" })
+  const store = makeStore(paths, {
+    syncParentDirectory: () => {
+      throw fsyncError
+    },
+  })
+
+  assert.throws(() => store.write({
+    mode: "system",
+    offsetMs: 0,
+    generatedAt: "2026-08-06T03:00:00.000Z",
+  }), error => {
+    assert.strictEqual(error, fsyncError)
+    return true
+  })
+  assert.deepEqual(
+    fs.readdirSync(paths.dataDir).filter(name => name.endsWith(".tmp")),
+    [],
+  )
+})
+
+test("ignores only unsupported parent directory fsync errors", () => {
+  for (const code of ["EINVAL", "ENOTSUP", "EOPNOTSUPP"]) {
+    const paths = makePaths()
+    let calls = 0
+    const store = makeStore(paths, {
+      syncParentDirectory: () => {
+        calls += 1
+        throw Object.assign(new Error(`directory fsync ${code}`), { code })
+      },
+    })
+
+    store.write({
+      mode: "system",
+      offsetMs: 0,
+      generatedAt: "2026-08-06T03:00:00.000Z",
+    })
+    assert.equal(calls, 1)
+    assert.equal(store.read().mode, "system")
+  }
+})
+
 test("migrates a finite legacy active account offset only when the new file is absent", () => {
   const { paths, store, service } = freshService()
   fs.writeFileSync(paths.legacyFilePath, JSON.stringify({ timeOffset: 12345 }))

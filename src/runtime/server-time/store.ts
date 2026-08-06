@@ -9,12 +9,18 @@ import {
 import { prepareDataVolume } from "../data-paths"
 
 const SERVER_TIME_KEYS = ["generatedAt", "mode", "offsetMs"] as const
+const UNSUPPORTED_DIRECTORY_SYNC_CODES = new Set([
+    "EINVAL",
+    "ENOTSUP",
+    "EOPNOTSUPP",
+])
 
 export interface ServerTimeStoreOptions {
     readonly filePath?: string
     readonly legacyFilePath?: string
     readonly now?: () => number
     readonly replaceFile?: (temporaryPath: string, filePath: string) => void
+    readonly syncParentDirectory?: (directory: string) => void
 }
 
 export class ServerTimeStoreError extends Error {
@@ -49,6 +55,33 @@ function isValidOffset(value: unknown): value is number {
     return typeof value === "number"
         && Number.isFinite(value)
         && (!Number.isInteger(value) || Number.isSafeInteger(value))
+}
+
+function isUnsupportedDirectorySyncError(error: unknown): boolean {
+    return UNSUPPORTED_DIRECTORY_SYNC_CODES.has(
+        (error as NodeJS.ErrnoException).code ?? "",
+    )
+}
+
+function syncParentDirectoryDefault(directory: string): void {
+    let descriptor: number | null = null
+    let primaryError: unknown = null
+    let closeError: unknown = null
+    try {
+        descriptor = fs.openSync(directory, "r")
+        fs.fsyncSync(descriptor)
+    } catch (error) {
+        primaryError = error
+    }
+    if (descriptor !== null) {
+        try {
+            fs.closeSync(descriptor)
+        } catch (error) {
+            closeError = error
+        }
+    }
+    if (closeError !== null) throw closeError
+    if (primaryError !== null) throw primaryError
 }
 
 function parseValue(value: unknown): ServerTimeState {
@@ -87,6 +120,7 @@ export class ServerTimeStore {
     private readonly legacyFilePath: string | null
     private readonly now: () => number
     private readonly replaceFile: (temporaryPath: string, filePath: string) => void
+    private readonly syncParentDirectory: (directory: string) => void
 
     constructor(options: ServerTimeStoreOptions = {}) {
         const paths = options.filePath === undefined ? prepareDataVolume() : null
@@ -97,6 +131,7 @@ export class ServerTimeStore {
             : options.legacyFilePath
         this.now = options.now ?? Date.now
         this.replaceFile = options.replaceFile ?? fs.renameSync
+        this.syncParentDirectory = options.syncParentDirectory ?? syncParentDirectoryDefault
     }
 
     read(): ServerTimeState | null {
@@ -174,7 +209,11 @@ export class ServerTimeStore {
             fs.closeSync(descriptor)
             descriptor = null
             this.replaceFile(temporaryPath, this.filePath)
-            this.syncParentDirectory(directory)
+            try {
+                this.syncParentDirectory(directory)
+            } catch (error) {
+                if (!isUnsupportedDirectorySyncError(error)) throw error
+            }
         } catch (error) {
             primaryError = error
         }
@@ -197,16 +236,4 @@ export class ServerTimeStore {
         if (primaryError !== null) throw primaryError
     }
 
-    private syncParentDirectory(directory: string): void {
-        try {
-            const descriptor = fs.openSync(directory, "r")
-            try {
-                fs.fsyncSync(descriptor)
-            } finally {
-                fs.closeSync(descriptor)
-            }
-        } catch {
-            // Directory fsync is best effort on platforms that do not support opening directories.
-        }
-    }
 }
