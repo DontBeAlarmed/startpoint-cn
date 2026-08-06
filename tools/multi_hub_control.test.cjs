@@ -860,6 +860,48 @@ test("an older TCP status response cannot override a newer degradation", async t
     assert.equal(client.getTcpEndpoint(), null)
 })
 
+test("an older room response cannot override a newer TCP degradation", async t => {
+    let tcpAvailable = true
+    let delayNextRoomStatus = false
+    const roomResponseCaptured = deferred()
+    const releaseRoomResponse = deferred()
+    const target = fixture(t, {
+        getTcpEndpoint: () => tcpAvailable ? { host: "hub.internal", port: 8003 } : null,
+    })
+    const delegate = fetchThroughHub(target.app)
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        now: () => target.getNow(),
+        fetch: async (url, init) => {
+            const response = await delegate(url, init)
+            if (delayNextRoomStatus
+                && new URL(url).pathname === "/v1/multi/rooms/status") {
+                delayNextRoomStatus = false
+                roomResponseCaptured.resolve()
+                await releaseRoomResponse.promise
+            }
+            return response
+        },
+    })
+    assert.equal((await client.getControlStatus()).ok, true)
+
+    delayNextRoomStatus = true
+    const older = client.read("/v1/multi/rooms/status", {
+        participant: { nodeSessionId: "pending", viewerId: 101 },
+        roomNumber: "123456",
+    })
+    await roomResponseCaptured.promise
+    tcpAvailable = false
+    assert.equal((await client.getExistingSessionControlStatus()).tcpAvailable, false)
+    assert.equal(client.isAvailable(), false)
+
+    releaseRoomResponse.resolve()
+    assert.equal((await older).ok, true)
+    assert.equal(client.isAvailable(), false)
+    assert.equal(client.getTcpEndpoint(), null)
+})
+
 test("HubClient diagnostics use only an existing session and never change availability", async t => {
     const target = fixture(t)
     let failStatus = false

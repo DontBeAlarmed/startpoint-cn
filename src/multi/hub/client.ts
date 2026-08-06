@@ -56,7 +56,7 @@ export class HubClient {
     private session: HubNodeSession | null = null
     private registration: Promise<HubNodeSession> | null = null
     private available = false
-    private controlStatusRequestId = 0
+    private availabilityRequestId = 0
 
     constructor(options: HubClientOptions) {
         this.hubUrl = new URL(options.hubUrl.href)
@@ -99,7 +99,7 @@ export class HubClient {
     async getExistingSessionControlStatus(): Promise<MultiHubControlStatus | null> {
         const session = this.peekLiveSession()
         if (session === null) return null
-        const requestId = ++this.controlStatusRequestId
+        const requestId = ++this.availabilityRequestId
         try {
             const response = await this.requestJson("/v1/multi/status", {
                 method: "GET",
@@ -110,7 +110,7 @@ export class HubClient {
                 ? parseHubControlStatus(body.value)
                 : null
             if (status?.tcpAvailable !== undefined) {
-                this.applyControlAvailability(session, requestId, status.tcpAvailable)
+                this.applyAvailability(session, requestId, status.tcpAvailable)
             }
             return status
         } catch {
@@ -121,12 +121,12 @@ export class HubClient {
     async getControlStatus(): Promise<CoordinatorResult<MultiHubControlStatus>> {
         let refreshed = false
         while (true) {
-            const requestId = ++this.controlStatusRequestId
+            const requestId = ++this.availabilityRequestId
             let session: HubNodeSession
             try {
                 session = await this.ensureSession()
             } catch {
-                this.applyControlAvailability(null, requestId, false)
+                this.applyAvailability(null, requestId, false)
                 return { ok: false, error: "HUB_UNAVAILABLE" }
             }
             let response: HubResponse
@@ -136,13 +136,13 @@ export class HubClient {
                     headers: this.sessionHeaders(session),
                 })
             } catch {
-                this.applyControlAvailability(session, requestId, false)
+                this.applyAvailability(session, requestId, false)
                 return { ok: false, error: "HUB_UNAVAILABLE" }
             }
             if (response.status === 401) {
                 if (this.session === session) this.session = null
                 if (refreshed) {
-                    this.applyControlAvailability(null, requestId, false)
+                    this.applyAvailability(null, requestId, false)
                     return { ok: false, error: "HUB_UNAVAILABLE" }
                 }
                 refreshed = true
@@ -153,10 +153,10 @@ export class HubClient {
                 ? parseHubControlStatus(body.value)
                 : null
             if (response.status !== 200 || status === null) {
-                this.applyControlAvailability(session, requestId, false)
+                this.applyAvailability(session, requestId, false)
                 return { ok: false, error: "HUB_UNAVAILABLE" }
             }
-            this.applyControlAvailability(session, requestId, status.tcpAvailable !== false)
+            this.applyAvailability(session, requestId, status.tcpAvailable !== false)
             return { ok: true, value: status }
         }
     }
@@ -166,14 +166,14 @@ export class HubClient {
         input: unknown,
         idempotencyKey: string | null,
     ): Promise<CoordinatorResult<T>> {
-        this.controlStatusRequestId++
         let refreshed = false
         while (true) {
+            const requestId = ++this.availabilityRequestId
             let session: HubNodeSession
             try {
                 session = await this.ensureSession()
             } catch {
-                this.available = false
+                this.applyAvailability(null, requestId, false)
                 return { ok: false, error: "HUB_UNAVAILABLE" }
             }
 
@@ -187,18 +187,18 @@ export class HubClient {
             if (response?.status === 401) {
                 if (this.session === session) this.session = null
                 if (refreshed) {
-                    this.available = false
+                    this.applyAvailability(null, requestId, false)
                     return { ok: false, error: "HUB_UNAVAILABLE" }
                 }
                 refreshed = true
                 continue
             }
             if (response === null) {
-                this.available = false
+                this.applyAvailability(session, requestId, false)
                 return { ok: false, error: "HUB_UNAVAILABLE" }
             }
             const normalized = this.normalizeResult<T>(route, response)
-            this.available = normalized.trusted
+            this.applyAvailability(session, requestId, normalized.trusted)
             return normalized.result
         }
     }
@@ -336,12 +336,12 @@ export class HubClient {
         }
     }
 
-    private applyControlAvailability(
+    private applyAvailability(
         session: HubNodeSession | null,
         requestId: number,
         available: boolean,
     ): void {
-        if (requestId !== this.controlStatusRequestId) return
+        if (requestId !== this.availabilityRequestId) return
         if (session !== null && this.session !== session) return
         this.available = available
     }
