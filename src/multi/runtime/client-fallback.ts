@@ -1,5 +1,6 @@
 import type { CoordinatorResult, MultiCoordinatorOrigin } from "../coordinator/contracts"
 import type { MultiHubControlStatus, MultiHubTcpEndpoint } from "../hub/control-routes"
+import type { RuntimeTcpServiceConfig } from "../../runtime/config"
 
 export type MultiClientFallbackState = "remote" | "probing" | "local" | "degraded"
 
@@ -13,9 +14,10 @@ const DEFAULT_PROBE_COOLDOWN_MS = 1_000
 export interface ClientFallbackDependencies {
     readonly now?: () => number
     readonly isRemoteAvailable?: () => boolean
+    readonly tcpConfig?: RuntimeTcpServiceConfig
     readonly probeControlStatus: () => Promise<CoordinatorResult<MultiHubControlStatus>>
     readonly startTcp: (
-        config: typeof CLIENT_FALLBACK_TCP_CONFIG,
+        config: RuntimeTcpServiceConfig,
         onFatalError: () => void,
     ) => Promise<unknown>
     readonly stopTcp: () => Promise<unknown> | unknown
@@ -26,6 +28,7 @@ export interface ClientFallbackDependencies {
 export class ClientFallbackController {
     private readonly now: () => number
     private readonly probeCooldownMs: number
+    private readonly tcpConfig: RuntimeTcpServiceConfig
     private state: MultiClientFallbackState = "remote"
     private lastProbeAt: number | null = null
     private probePromise: Promise<MultiCoordinatorOrigin> | null = null
@@ -35,6 +38,9 @@ export class ClientFallbackController {
     constructor(private readonly dependencies: ClientFallbackDependencies) {
         this.now = dependencies.now ?? Date.now
         this.probeCooldownMs = dependencies.probeCooldownMs ?? DEFAULT_PROBE_COOLDOWN_MS
+        this.tcpConfig = Object.freeze({
+            ...(dependencies.tcpConfig ?? CLIENT_FALLBACK_TCP_CONFIG),
+        })
         if (!Number.isSafeInteger(this.probeCooldownMs) || this.probeCooldownMs < 0) {
             throw new TypeError("Client fallback probe cooldown must be a non-negative safe integer")
         }
@@ -59,7 +65,10 @@ export class ClientFallbackController {
 
     getTcpEndpoint(remoteEndpoint: MultiHubTcpEndpoint | null): MultiHubTcpEndpoint | null {
         if (this.state === "local" || this.state === "degraded") {
-            return this.safeListening() ? CLIENT_FALLBACK_TCP_CONFIG : null
+            return this.safeListening() ? Object.freeze({
+                host: this.tcpConfig.publicHost ?? this.tcpConfig.host,
+                port: this.tcpConfig.port,
+            }) : null
         }
         return remoteEndpoint
     }
@@ -109,7 +118,7 @@ export class ClientFallbackController {
         this.tcpAttempted = true
         try {
             await this.dependencies.startTcp(
-                CLIENT_FALLBACK_TCP_CONFIG,
+                this.tcpConfig,
                 () => {
                     this.tcpFailed = true
                     this.state = "degraded"

@@ -145,11 +145,13 @@ function createClientFixture(options = {}) {
             if (!value) remoteAvailable = false
         },
         async start() {
-            await service.start({
+            const config = {
                 mode: "client",
                 hubUrl: new URL("http://hub.example/"),
                 token: "token",
-            })
+            }
+            if (options.tcpConfig) config.tcp = options.tcpConfig
+            await service.start(config)
         },
         async stop() {
             await service.stop()
@@ -219,6 +221,31 @@ test("local fallback TCP failure is degraded without tearing down HTTP or SQLite
     assert.equal(fixture.service.getStatus().clientFallbackState, "degraded")
     assert.equal(fixture.service.getHttpContext(), context)
     assert.equal(context.coordinator !== undefined, true)
+})
+
+test("shared Client fallback listens locally and advertises its public TCP endpoint", async t => {
+    const fixture = createClientFixture({
+        controlAvailable: false,
+        tcpConfig: {
+            host: "0.0.0.0",
+            port: 8013,
+            publicHost: "client-b.internal",
+        },
+    })
+    t.after(() => fixture.stop())
+    await fixture.start()
+
+    const context = fixture.service.getHttpContext()
+    assert.equal(await context.resolveCoordinatorOrigin({ participant: participant(351) }), "local")
+    assert.deepEqual(fixture.tcpConfigs[0], {
+        host: "0.0.0.0",
+        port: 8013,
+        publicHost: "client-b.internal",
+    })
+    assert.deepEqual(fixture.service.getStatus().tcp, {
+        available: true,
+        endpoint: "client-b.internal:8013",
+    })
 })
 
 test("Hub recovery routes only new rooms remote and does not migrate existing rooms", async t => {

@@ -46,7 +46,12 @@ export type MultiRuntimeConfig =
         readonly hub: RuntimeNetworkServiceConfig
         readonly credentialsPath: string
     }
-    | { readonly mode: "client"; readonly hubUrl: URL; readonly token: string }
+    | {
+        readonly mode: "client"
+        readonly hubUrl: URL
+        readonly token: string
+        readonly tcp: RuntimeTcpServiceConfig
+    }
 
 export interface CnRuntimeConfig {
     readonly http: RuntimeNetworkServiceConfig
@@ -236,16 +241,23 @@ function parseMultiRuntimeConfig(
         })
     }
     if (mode === "client") {
-        if (env.SESSION_HOST !== undefined
-            || env.SESSION_PORT !== undefined
-            || env.SESSION_PUBLIC_HOST !== undefined) {
+        if (!validateMultiHubToken(env.MULTI_HUB_TOKEN)) throw new RuntimeConfigError()
+        const host = parseHost(env.SESSION_HOST, "127.0.0.1")
+        const publicHost = env.SESSION_PUBLIC_HOST === undefined
+            ? undefined
+            : parseHost(env.SESSION_PUBLIC_HOST, "")
+        if ((host === "0.0.0.0" || host === "::") && publicHost === undefined) {
             throw new RuntimeConfigError()
         }
-        if (!validateMultiHubToken(env.MULTI_HUB_TOKEN)) throw new RuntimeConfigError()
         return Object.freeze({
             mode,
             hubUrl: parseHubUrl(env.MULTI_HUB_URL),
             token: env.MULTI_HUB_TOKEN,
+            tcp: Object.freeze({
+                host,
+                port: parsePort(env.SESSION_PORT, 8003),
+                ...(publicHost === undefined ? {} : { publicHost }),
+            }),
         })
     }
     throw new RuntimeConfigError()

@@ -163,7 +163,7 @@ test("host rejects a private data symlink that resolves into tracked project con
     }), error => error?.code === "INVALID_RUNTIME_CONFIG")
 })
 
-test("client mode accepts only an issued remote Hub credential and has no local TCP listener", () => {
+test("client mode accepts a remote Hub credential and a lazy local TCP fallback", () => {
     const config = parseCnRuntimeConfig({
         projectRoot,
         env: {
@@ -177,7 +177,25 @@ test("client mode accepts only an issued remote Hub credential and has no local 
     assert.equal(config.multi.mode, "client")
     assert.equal(config.multi.hubUrl.href, "http://192.0.2.20:8004/")
     assert.equal(config.multi.token, "a".repeat(32))
-    assert.equal("tcp" in config.multi, false)
+    assert.deepEqual(config.multi.tcp, { host: "127.0.0.1", port: 8003 })
+
+    const sharedServer = parseCnRuntimeConfig({
+        projectRoot,
+        env: {
+            ASSET_MODE: "client-owned",
+            MULTI_MODE: "client",
+            MULTI_HUB_URL: "http://192.0.2.20:8004",
+            MULTI_HUB_TOKEN: "a".repeat(32),
+            SESSION_HOST: "0.0.0.0",
+            SESSION_PORT: "8013",
+            SESSION_PUBLIC_HOST: "client-b.internal",
+        },
+    })
+    assert.deepEqual(sharedServer.multi.tcp, {
+        host: "0.0.0.0",
+        port: 8013,
+        publicHost: "client-b.internal",
+    })
 
     for (const env of [
         { MULTI_MODE: "client", MULTI_HUB_TOKEN: "a".repeat(32) },
@@ -187,7 +205,7 @@ test("client mode accepts only an issued remote Hub credential and has no local 
             MULTI_MODE: "client",
             MULTI_HUB_URL: "http://192.0.2.20:8004",
             MULTI_HUB_TOKEN: "a".repeat(32),
-            SESSION_HOST: "127.0.0.1",
+            SESSION_HOST: "0.0.0.0",
         },
     ]) {
         assert.throws(() => parseCnRuntimeConfig({

@@ -48,7 +48,6 @@ import {
     unavailableMultiRuntimeStatus,
 } from "./status"
 import {
-    CLIENT_FALLBACK_TCP_CONFIG,
     ClientFallbackController,
 } from "./client-fallback"
 import { getPlayerActiveQuestSync } from "../../data/domains/quest_active"
@@ -290,6 +289,7 @@ class Service implements MultiRuntimeService {
                     })
                 const fallback = new ClientFallbackController({
                     now: this.dependencies.now,
+                    tcpConfig: config.tcp,
                     isRemoteAvailable: () => remoteCoordinator.isAvailable()
                         && remoteCoordinator.getTcpEndpoint() !== null,
                     probeControlStatus: () => remoteCoordinator.getControlStatus(),
