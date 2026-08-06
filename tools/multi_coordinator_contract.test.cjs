@@ -107,6 +107,7 @@ import type {
     MultiCoordinator,
     RoomParticipantInput,
     RoomStatus,
+    StartBattleInput,
 } from ${JSON.stringify(interfaceModule)}
 
 type Equal<Left, Right> =
@@ -149,6 +150,11 @@ const createInput: CreateRoomInput = {
     category: 1,
     questId: 1001,
     leaderCharacterId: 101,
+    compatibility,
+}
+const startInput: StartBattleInput = {
+    participant,
+    roomNumber: "123456",
     compatibility,
 }
 const roomStatus: RoomStatus = {
@@ -233,7 +239,7 @@ type DisbandRoomReturn = Assert<Equal<
 >>
 type StartBattleParameters = Assert<Equal<
     Parameters<MultiCoordinator["startBattle"]>,
-    [RoomParticipantInput]
+    [StartBattleInput]
 >>
 type StartBattleReturn = Assert<Equal<
     ReturnType<MultiCoordinator["startBattle"]>,
@@ -278,6 +284,7 @@ participantKey(nodeSessionId, participant.viewerId)
 void coordinator.createRoom(createInput)
 void coordinator.searchRoom(compatibleByNumber)
 void coordinator.prepareRoom(compatibleByToken)
+void coordinator.startBattle(startInput)
 
 // @ts-expect-error participant identities require a branded node session id
 const plainIdentity: ParticipantIdentity = { nodeSessionId: "node-a", viewerId: 1 }
@@ -402,6 +409,13 @@ test("coordinator type contract stays narrow and node-scoped", () => {
         "roomSequence",
         "shareRoomOptions",
     ])
+
+    const startBattleInput = findDeclaration(
+        coordinator.file,
+        "StartBattleInput",
+        ts.isInterfaceDeclaration,
+    )
+    assert.deepEqual(sortedMemberNames(startBattleInput), ["compatibility"])
 
     const multiCoordinator = findDeclaration(
         coordinator.file,
