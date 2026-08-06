@@ -349,6 +349,7 @@ const routes = async (fastify: FastifyInstance) => {
             useBossBoostPoint: false,
             isAutoStartMode: isAutoStartMode,
             isMulti: false,
+            coordinatorOrigin: null,
             playId: body.play_id,
             continueCount: 0
         })

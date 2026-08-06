@@ -2,6 +2,7 @@ import { Database } from "better-sqlite3";
 import { ensureQuestHostFinishedStorageSync } from "../../lib/quest/host-finish-persistence";
 import {
     ensureActiveQuestBattleSessionIdStorageSync,
+    ensureActiveQuestCoordinatorOriginStorageSync,
     ensureActiveQuestEntryItemCountStorageSync,
 } from "../../lib/quest/active-quest-persistence";
 import { ensureSchemaColumn } from "../schema";
@@ -938,6 +939,9 @@ export default function init(
         use_boost_point INTEGER NOT NULL DEFAULT 0,
         is_auto_start_mode INTEGER NOT NULL DEFAULT 0,
         is_multi INTEGER NOT NULL DEFAULT 0,
+        coordinator_origin TEXT CHECK (
+            coordinator_origin IS NULL OR coordinator_origin IN ('remote', 'local')
+        ),
         room_number TEXT,
         battle_session_id TEXT,
         entry_item_id INTEGER,
@@ -948,4 +952,5 @@ export default function init(
     )`).run()
     ensureActiveQuestEntryItemCountStorageSync(database)
     ensureActiveQuestBattleSessionIdStorageSync(database)
+    ensureActiveQuestCoordinatorOriginStorageSync(database)
 }

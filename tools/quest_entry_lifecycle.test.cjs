@@ -386,6 +386,7 @@ assert.ok(
         .some(column => column.name === "entry_item_count"),
 )
 activeQuestStorage.ensureActiveQuestBattleSessionIdStorageSync(legacyDb)
+activeQuestStorage.ensureActiveQuestCoordinatorOriginStorageSync(legacyDb)
 
 const dbModulePath = require.resolve("../src/data/db")
 require.cache[dbModulePath] = {

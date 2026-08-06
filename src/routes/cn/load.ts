@@ -2,7 +2,11 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import path from "node:path";
 import { generateDataHeaders, getServerTime, getServerDate } from "../../utils";
 import { collectPlayerDataPooledExpSync, dailyResetPlayerDataSync, getPlayerSync, updatePlayerSync } from "../../data/domains/player"
-import { getPlayerActiveQuestSync, updatePlayerActiveQuestEntryItemCountSync } from "../../data/domains/quest_active"
+import {
+    getPlayerActiveQuestSync,
+    updatePlayerActiveQuestCoordinatorOriginSync,
+    updatePlayerActiveQuestEntryItemCountSync,
+} from "../../data/domains/quest_active"
 import { getSession } from "../../data/domains/session"
 import { getClientSerializedData } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -26,6 +30,7 @@ import { setCnMsgpackPendingCommit } from "./msgpack";
 import {
     isValidBattleSessionId,
     isValidMultiRoomNumber,
+    type MultiCoordinatorOrigin,
     type ParticipantIdentity,
 } from "../../multi/coordinator/contracts";
 import type {
@@ -160,6 +165,12 @@ function fallbackParticipant(
     };
 }
 
+function inferLegacyCoordinatorOrigin(
+    mode: CnLoadRouteOptions["multiMode"],
+): MultiCoordinatorOrigin {
+    return mode === "client" ? "remote" : "local";
+}
+
 const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => {
     const assetProvider = options.assetProvider ?? parseAssetProviderConfig({
         projectRoot: path.resolve(__dirname, "../../.."),
@@ -196,6 +207,11 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
 
         let activeQuest: ActiveQuest | null = getPlayerActiveQuestSync(playerId);
         if (activeQuest) {
+            if (activeQuest.isMulti && activeQuest.coordinatorOrigin === null) {
+                const coordinatorOrigin = inferLegacyCoordinatorOrigin(options.multiMode);
+                updatePlayerActiveQuestCoordinatorOriginSync(playerId, coordinatorOrigin);
+                activeQuest = { ...activeQuest, coordinatorOrigin };
+            }
             let authoritativeMissing = false;
             if (hasStoredBattleIdentity(activeQuest)) {
                 if (!isValidStoredBattleIdentity(activeQuest)) {
@@ -207,11 +223,13 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                         ...participant,
                         roomNumber: activeQuest.roomNumber,
                         battleSessionId: activeQuest.battleSessionId,
+                        coordinatorOrigin: activeQuest.coordinatorOrigin as MultiCoordinatorOrigin,
                     });
                     authoritativeMissing = recovery.state === "missing";
                 }
             }
-            const legacyRoomMissing = !hasStoredBattleIdentity(activeQuest)
+            const legacyRoomMissing = activeQuest.coordinatorOrigin === "local"
+                && !hasStoredBattleIdentity(activeQuest)
                 && !!activeQuest.roomNumber
                 && getRoom(activeQuest.roomNumber) === undefined;
             if (authoritativeMissing || legacyRoomMissing) {

@@ -800,6 +800,7 @@ export interface RawPlayerActiveQuest {
     use_boost_point: number
     is_auto_start_mode: number
     is_multi: number
+    coordinator_origin: "remote" | "local" | null
     room_number: string | null
     battle_session_id: string | null
     entry_item_id: number | null
@@ -817,6 +818,7 @@ export interface PlayerActiveQuest {
     useBoostPoint: boolean
     isAutoStartMode: boolean
     isMulti: boolean
+    coordinatorOrigin: "remote" | "local" | null
     roomNumber: string | null
     battleSessionId: string | null
     entryItemId: number | null

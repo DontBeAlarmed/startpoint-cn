@@ -11,6 +11,7 @@ function buildActiveQuest(raw: RawPlayerActiveQuest): PlayerActiveQuest {
         useBoostPoint: raw.use_boost_point === 1,
         isAutoStartMode: raw.is_auto_start_mode === 1,
         isMulti: raw.is_multi === 1,
+        coordinatorOrigin: raw.coordinator_origin,
         roomNumber: raw.room_number,
         battleSessionId: raw.battle_session_id,
         entryItemId: raw.entry_item_id,
@@ -28,19 +29,36 @@ export function getPlayerActiveQuestSync(playerId: number): PlayerActiveQuest | 
 }
 
 export function insertPlayerActiveQuestSync(playerId: number, quest: PlayerActiveQuest): void {
+    if (quest.isMulti && quest.coordinatorOrigin !== "remote" && quest.coordinatorOrigin !== "local") {
+        throw new TypeError("Multi active quest coordinator origin must be remote or local")
+    }
+    const coordinatorOrigin = quest.isMulti ? quest.coordinatorOrigin : null
     getDb().prepare(`
         INSERT INTO players_active_quests
             (player_id, play_id, quest_id, category, use_boss_boost_point,
              use_boost_point, is_auto_start_mode, is_multi, room_number,
-             battle_session_id, entry_item_id, entry_item_count, event_id, continue_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             battle_session_id, coordinator_origin, entry_item_id, entry_item_count,
+             event_id, continue_count)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         playerId, quest.playId, quest.questId, quest.category,
         quest.useBossBoostPoint ? 1 : 0, quest.useBoostPoint ? 1 : 0,
         quest.isAutoStartMode ? 1 : 0, quest.isMulti ? 1 : 0,
-        quest.roomNumber ?? null, quest.battleSessionId ?? null, quest.entryItemId ?? null,
+        quest.roomNumber ?? null, quest.battleSessionId ?? null, coordinatorOrigin,
+        quest.entryItemId ?? null,
         quest.entryItemCount ?? null, quest.eventId ?? null, quest.continueCount
     )
+}
+
+export function updatePlayerActiveQuestCoordinatorOriginSync(
+    playerId: number,
+    coordinatorOrigin: "remote" | "local",
+): void {
+    getDb().prepare(`
+        UPDATE players_active_quests
+        SET coordinator_origin = ?
+        WHERE player_id = ? AND is_multi = 1 AND coordinator_origin IS NULL
+    `).run(coordinatorOrigin, playerId)
 }
 
 export function deletePlayerActiveQuestSync(playerId: number): void {

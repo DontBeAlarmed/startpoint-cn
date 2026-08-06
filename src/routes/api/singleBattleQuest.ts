@@ -869,6 +869,7 @@ const routes = async (fastify: FastifyInstance) => {
             useBossBoostPoint: useBossBoostPoint,
             isAutoStartMode: isAutoStartMode,
             isMulti: false,
+            coordinatorOrigin: null,
             entryItemId: entryCost && entryCost.itemId > 0 ? entryCost.itemId : undefined,
             entryItemCount: entryCost && entryCost.itemCount > 0 ? entryCost.itemCount : undefined,
             playId: body.play_id,

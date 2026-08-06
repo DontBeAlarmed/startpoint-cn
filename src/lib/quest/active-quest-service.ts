@@ -10,6 +10,7 @@ import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 import { runAbortEntryTransaction } from "./entry-lifecycle"
 import type { StartEntryCost } from "./start-entry"
+import type { MultiCoordinatorOrigin } from "../../multi/coordinator/contracts"
 
 export interface ActiveQuest {
     questId: number
@@ -18,6 +19,7 @@ export interface ActiveQuest {
     useBoostPoint: boolean
     isAutoStartMode: boolean
     isMulti: boolean
+    coordinatorOrigin: MultiCoordinatorOrigin | null
     roomNumber?: string | null
     battleSessionId?: string | null
     matePlayerIds?: number[]
@@ -37,6 +39,7 @@ export interface ActiveQuestIdentity {
 
 export interface MultiSettlementActiveQuestIdentity extends ActiveQuestIdentity {
     isMulti: true
+    coordinatorOrigin: MultiCoordinatorOrigin
     roomNumber: string
     battleSessionId: string
     useBossBoostPoint: boolean
@@ -63,6 +66,7 @@ export function persistActiveQuest(playerId: number, quest: ActiveQuest): void {
         useBoostPoint: quest.useBoostPoint,
         isAutoStartMode: quest.isAutoStartMode,
         isMulti: quest.isMulti,
+        coordinatorOrigin: quest.isMulti ? quest.coordinatorOrigin : null,
         roomNumber: quest.roomNumber ?? null,
         battleSessionId: quest.battleSessionId ?? null,
         entryItemId: quest.entryItemId ?? null,
@@ -112,6 +116,7 @@ function matchesMultiSettlementIdentity(
     identity: MultiSettlementActiveQuestIdentity,
 ): boolean {
     return matchesActiveQuestIdentity(quest, identity)
+        && quest.coordinatorOrigin === identity.coordinatorOrigin
         && quest.roomNumber === identity.roomNumber
         && quest.battleSessionId === identity.battleSessionId
         && quest.useBossBoostPoint === identity.useBossBoostPoint

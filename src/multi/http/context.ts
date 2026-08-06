@@ -8,8 +8,13 @@ import type { MultiCoordinator } from "../coordinator/interface"
 import type {
     CoordinatorResult,
     MultiCompatibilityProfile,
+    MultiCoordinatorOrigin,
     ParticipantIdentity,
 } from "../coordinator/contracts"
+import {
+    isOriginAwareMultiCoordinator,
+    type CoordinatorOriginLookup,
+} from "../coordinator/router"
 import {
     EMBEDDED_NODE_SESSION_ID,
     EmbeddedMultiCoordinator,
@@ -64,6 +69,9 @@ export interface PreparedAdmissionSnapshot {
 
 export interface MultiHttpContext {
     readonly coordinator: MultiCoordinator
+    readonly resolveCoordinatorOrigin: (
+        input: CoordinatorOriginLookup,
+    ) => Promise<MultiCoordinatorOrigin>
     readonly resolvePlayerContext: ResolveMultiPlayerContext
     readonly snapshotProvider: MultiSnapshotProvider
     readonly questAvailability: MultiQuestAvailabilityProvider
@@ -77,6 +85,7 @@ export interface MultiHttpContext {
 
 export interface EmbeddedMultiHttpContextOptions {
     readonly coordinator?: MultiCoordinator
+    readonly coordinatorOrigin?: MultiCoordinatorOrigin
     readonly compatibility?: MultiCompatibilityProfile
     readonly compatibilityProfileDependencies?: CompatibilityProfileDependencies
     readonly resolvePlayerContext?: ResolveMultiPlayerContext
@@ -93,6 +102,7 @@ export function createEmbeddedMultiHttpContext(
     options: EmbeddedMultiHttpContextOptions = {},
 ): MultiHttpContext {
     const coordinator = options.coordinator ?? new EmbeddedMultiCoordinator()
+    const coordinatorOrigin = options.coordinatorOrigin ?? "local"
     const resolvePlayerContext = options.resolvePlayerContext ?? resolveMultiPlayerContext
     const admissionRegistry = options.admissionRegistry ?? embeddedAdmissionRegistry
     const now = options.now ?? Date.now
@@ -112,6 +122,11 @@ export function createEmbeddedMultiHttpContext(
     const serverTimeMs = options.serverTimeMs ?? (() => getServerTime() * 1000)
     return Object.freeze({
         coordinator,
+        resolveCoordinatorOrigin: (
+            input: CoordinatorOriginLookup,
+        ): Promise<MultiCoordinatorOrigin> => isOriginAwareMultiCoordinator(coordinator)
+            ? coordinator.resolveOrigin(input)
+            : Promise.resolve(coordinatorOrigin),
         resolvePlayerContext,
         snapshotProvider: Object.freeze({
             getParticipant: (viewerId: number) => ({

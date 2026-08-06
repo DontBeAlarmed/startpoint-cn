@@ -655,6 +655,7 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
         },
         questAvailability: { check: () => ({ available: true }) },
         coordinator,
+        resolveCoordinatorOrigin: async () => options.coordinatorOrigin ?? "remote",
         settlementVerifier,
     }
     const app = Fastify({ logger: false })
@@ -738,11 +739,13 @@ test("production /start charges only the host in isolated SQLite home saves", as
             totalStaminaUsed: getPlayerSync(home.playerId).totalStaminaUsed,
             ticketCount: getPlayerItemSync(home.playerId, productionQuest.ticketId),
             battleSessionId: getPlayerActiveQuestSync(home.playerId).battleSessionId,
+            coordinatorOrigin: getPlayerActiveQuestSync(home.playerId).coordinatorOrigin,
         }, {
             stamina: home.entryStamina - 10,
             totalStaminaUsed: 10,
             ticketCount: 0,
             battleSessionId,
+            coordinatorOrigin: "remote",
         })
         assert.equal(home.coordinatorCalls.every(call => (
             !Object.hasOwn(call, "database") && !Object.hasOwn(call, "grantRewards")
@@ -762,11 +765,13 @@ test("production /start charges only the host in isolated SQLite home saves", as
             totalStaminaUsed: getPlayerSync(home.playerId).totalStaminaUsed,
             ticketCount: getPlayerItemSync(home.playerId, productionQuest.ticketId),
             battleSessionId: getPlayerActiveQuestSync(home.playerId).battleSessionId,
+            coordinatorOrigin: getPlayerActiveQuestSync(home.playerId).coordinatorOrigin,
         }, {
             stamina: 100,
             totalStaminaUsed: 0,
             ticketCount: 1,
             battleSessionId,
+            coordinatorOrigin: "remote",
         })
     } finally {
         await closeProductionHome(home)
@@ -945,6 +950,7 @@ test("production /finish consumes one SQLite settlement after both requests pass
             viewerId: host.viewerId,
             roomNumber,
             battleSessionId,
+            coordinatorOrigin: "remote",
         })), "两个请求必须都在 SQLite 结算前读到同一 active quest")
 
         barrier.release(0)
@@ -1299,7 +1305,7 @@ for (const [label, participant, isHost] of [
     })
 }
 
-for (const corruption of ["missing", "battle-session-mismatch"]) {
+for (const corruption of ["missing", "battle-session-mismatch", "coordinator-origin-mismatch"]) {
     test(`production /finish fails closed when SQLite active quest is ${corruption}`, async () => {
         let home
         try {
@@ -1311,9 +1317,14 @@ for (const corruption of ["missing", "battle-session-mismatch"]) {
             assert.equal(started.statusCode, 200, started.body)
             if (corruption === "missing") {
                 home.db.prepare("DELETE FROM players_active_quests WHERE player_id = ?").run(home.playerId)
-            } else {
+            } else if (corruption === "battle-session-mismatch") {
                 home.db.prepare(`
                     UPDATE players_active_quests SET battle_session_id = 'forged-battle'
+                    WHERE player_id = ?
+                `).run(home.playerId)
+            } else {
+                home.db.prepare(`
+                    UPDATE players_active_quests SET coordinator_origin = 'local'
                     WHERE player_id = ?
                 `).run(home.playerId)
             }

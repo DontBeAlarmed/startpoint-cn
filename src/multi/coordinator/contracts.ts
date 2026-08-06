@@ -5,6 +5,7 @@ const BATTLE_SESSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][
 
 export type NodeSessionId = string & { readonly __nodeSessionId: unique symbol }
 export type BattleSessionId = string & { readonly __battleSessionId: unique symbol }
+export type MultiCoordinatorOrigin = "remote" | "local"
 
 export interface ParticipantIdentity {
     readonly nodeSessionId: NodeSessionId

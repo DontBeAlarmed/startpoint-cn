@@ -1,4 +1,8 @@
-import type { BattleSessionId, NodeSessionId } from "../coordinator/contracts"
+import type {
+    BattleSessionId,
+    MultiCoordinatorOrigin,
+    NodeSessionId,
+} from "../coordinator/contracts"
 import type { MultiCoordinator } from "../coordinator/interface"
 
 export interface MultiSettlementIdentity {
@@ -6,6 +10,7 @@ export interface MultiSettlementIdentity {
     readonly viewerId: number
     readonly roomNumber: string
     readonly battleSessionId: string
+    readonly coordinatorOrigin: MultiCoordinatorOrigin
 }
 
 export type MultiSettlementVerification =
@@ -26,7 +31,7 @@ export class MultiSettlementVerifier {
     async inspect(input: MultiSettlementIdentity): Promise<MultiBattleRecoveryInspection> {
         if (!isValidIdentity(input)) return unavailable()
         try {
-            const result = await this.coordinator.getBattleStatus({
+            const result = await this.coordinatorFor(input.coordinatorOrigin).getBattleStatus({
                 participant: {
                     nodeSessionId: input.nodeSessionId,
                     viewerId: input.viewerId,
@@ -59,7 +64,7 @@ export class MultiSettlementVerifier {
             viewerId: input.viewerId,
         }
         try {
-            const result = await this.coordinator.getBattleStatus({
+            const result = await this.coordinatorFor(input.coordinatorOrigin).getBattleStatus({
                 participant,
                 roomNumber: input.roomNumber,
                 battleSessionId: input.battleSessionId as BattleSessionId,
@@ -82,6 +87,20 @@ export class MultiSettlementVerifier {
         } catch {
             return { ok: false }
         }
+    }
+
+    private coordinatorFor(
+        origin: MultiCoordinatorOrigin,
+    ): Pick<MultiCoordinator, "getBattleStatus"> {
+        const candidate = this.coordinator as Pick<MultiCoordinator, "getBattleStatus"> & {
+            coordinatorFor?: (
+                coordinatorOrigin: MultiCoordinatorOrigin,
+            ) => Pick<MultiCoordinator, "getBattleStatus">
+        }
+        return (origin === "remote" || origin === "local")
+            && typeof candidate.coordinatorFor === "function"
+            ? candidate.coordinatorFor(origin)
+            : this.coordinator
     }
 }
 

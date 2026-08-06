@@ -63,6 +63,7 @@ function activeQuest(label, overrides = {}) {
         useBoostPoint: false,
         isAutoStartMode: false,
         isMulti: true,
+        coordinatorOrigin: "remote",
         roomNumber: "123456",
         battleSessionId: VALID_BATTLE_SESSION_ID,
         entryItemId: QUEST.ticketId,
@@ -200,6 +201,7 @@ for (const state of ["active", "finalized", "unavailable"]) {
             viewerId: VIEWER_ID,
             roomNumber: quest.roomNumber,
             battleSessionId: quest.battleSessionId,
+            coordinatorOrigin: "remote",
         }])
         assert.equal(getPlayerActiveQuestSync(home.playerId).playId, quest.playId)
         assert.equal(activeQuests[home.playerId].playId, quest.playId)
@@ -309,8 +311,16 @@ test("malformed stored remote identities never reach Hub or mutate the save", as
 })
 
 test("legacy multi quest without battle identity keeps local missing-room recovery", async t => {
-    const quest = activeQuest("legacy", { battleSessionId: null, roomNumber: "999999" })
-    const home = await openHome("legacy", quest)
+    const quest = activeQuest("legacy", {
+        battleSessionId: null,
+        coordinatorOrigin: null,
+        roomNumber: "999999",
+    })
+    const home = await openHome("legacy", { ...quest, coordinatorOrigin: "local" })
+    getDb().prepare(
+        "UPDATE players_active_quests SET coordinator_origin = NULL WHERE player_id = ?",
+    ).run(home.playerId)
+    delete activeQuests[home.playerId]
     let verifierCalls = 0
     const app = await buildLoadApp({ inspect: async () => { verifierCalls++; return { state: "active" } } }, "embedded")
     t.after(async () => {
@@ -325,6 +335,96 @@ test("legacy multi quest without battle identity keeps local missing-room recove
     assert.equal(getPlayerActiveQuestSync(home.playerId), null)
     assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 5)
 })
+
+test("client legacy quest without battle identity is not cleared by the local room table", async t => {
+    const quest = activeQuest("legacy-remote-no-identity", {
+        battleSessionId: null,
+        coordinatorOrigin: null,
+        roomNumber: "999999",
+    })
+    const home = await openHome("legacy-remote-no-identity", {
+        ...quest,
+        coordinatorOrigin: "remote",
+    })
+    getDb().prepare(
+        "UPDATE players_active_quests SET coordinator_origin = NULL WHERE player_id = ?",
+    ).run(home.playerId)
+    delete activeQuests[home.playerId]
+    let verifierCalls = 0
+    const app = await buildLoadApp({
+        inspect: async () => { verifierCalls++; return { state: "missing" } },
+    }, "client")
+    t.after(async () => {
+        delete activeQuests[home.playerId]
+        await app.close()
+    })
+
+    const result = await load(app)
+
+    assert.equal(result.response.statusCode, 200, result.response.body)
+    unfinished(result.payload, quest)
+    assert.equal(verifierCalls, 0)
+    assert.equal(getPlayerActiveQuestSync(home.playerId).coordinatorOrigin, "remote")
+    assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 3)
+})
+
+test("load verifies an explicit local active quest through its stored origin", async t => {
+    const quest = activeQuest("explicit-local", { coordinatorOrigin: "local" })
+    const home = await openHome("explicit-local", quest)
+    const calls = []
+    const app = await buildLoadApp({
+        inspect: async input => {
+            calls.push(structuredClone(input))
+            return { state: "active" }
+        },
+    }, "client")
+    t.after(async () => {
+        delete activeQuests[home.playerId]
+        await app.close()
+    })
+
+    const result = await load(app)
+
+    assert.equal(result.response.statusCode, 200, result.response.body)
+    assert.equal(calls[0].coordinatorOrigin, "local")
+    assert.equal(getPlayerActiveQuestSync(home.playerId).coordinatorOrigin, "local")
+})
+
+for (const [mode, expectedOrigin] of [
+    ["client", "remote"],
+    ["embedded", "local"],
+    ["host", "local"],
+]) {
+    test(`legacy null origin converges to ${expectedOrigin} in ${mode} mode`, async t => {
+        const quest = activeQuest(`legacy-origin-${mode}`, { coordinatorOrigin: null })
+        const home = await openHome(`legacy-origin-${mode}`, {
+            ...quest,
+            coordinatorOrigin: expectedOrigin,
+        })
+        getDb().prepare(
+            "UPDATE players_active_quests SET coordinator_origin = NULL WHERE player_id = ?",
+        ).run(home.playerId)
+        delete activeQuests[home.playerId]
+        const calls = []
+        const app = await buildLoadApp({
+            inspect: async input => {
+                calls.push(structuredClone(input))
+                return { state: "unavailable", code: "HUB_UNAVAILABLE" }
+            },
+        }, mode)
+        t.after(async () => {
+            delete activeQuests[home.playerId]
+            await app.close()
+        })
+
+        const result = await load(app)
+
+        assert.equal(result.response.statusCode, 200, result.response.body)
+        assert.equal(calls[0].coordinatorOrigin, expectedOrigin)
+        assert.equal(getPlayerActiveQuestSync(home.playerId).coordinatorOrigin, expectedOrigin)
+        assert.equal(activeQuests[home.playerId].coordinatorOrigin, expectedOrigin)
+    })
+}
 
 test("load without a recoverable battle identity never awaits the verifier", async t => {
     await openHome("no-active-quest", null)

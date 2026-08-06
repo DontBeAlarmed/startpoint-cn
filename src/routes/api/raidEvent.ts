@@ -321,6 +321,7 @@ const routes = async (fastify: FastifyInstance) => {
             useBoostPoint: false,
             isAutoStartMode: body.is_auto_start_mode,
             isMulti: false,
+            coordinatorOrigin: null,
             eventId: raidEventId,
             playId: body.play_id,
             continueCount: 0

@@ -224,6 +224,10 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             )[questKey]
             : undefined;
         const staminaCost = isRoomHost ? getStaminaCost(questKey).cost : 0;
+        const coordinatorOrigin = await context.resolveCoordinatorOrigin({
+            participant,
+            roomNumber: battle.value.roomNumber,
+        });
         const activeQuest = {
             questId: quest_id,
             category,
@@ -231,6 +235,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             useBossBoostPoint: use_boss_boost_point,
             isAutoStartMode: is_auto_start_mode,
             isMulti: true,
+            coordinatorOrigin,
             roomNumber: room_number,
             battleSessionId: battle.value.battleSessionId,
             matePlayerIds: Array.isArray(mate_player_ids) ? mate_player_ids : [],
@@ -343,9 +348,11 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         }
 
         if (typeof activeQuestData.roomNumber !== "string"
-            || typeof activeQuestData.battleSessionId !== "string") {
+            || typeof activeQuestData.battleSessionId !== "string"
+            || (activeQuestData.coordinatorOrigin !== "remote"
+                && activeQuestData.coordinatorOrigin !== "local")) {
             return reply.status(400).send({
-                "error": "Bad Request", "message": "Battle session identity is missing."
+                "error": "Bad Request", "message": "Battle session identity or coordinator origin is missing."
             });
         }
         const settlement = await context.settlementVerifier.verify({
@@ -353,6 +360,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             viewerId,
             roomNumber: activeQuestData.roomNumber,
             battleSessionId: activeQuestData.battleSessionId,
+            coordinatorOrigin: activeQuestData.coordinatorOrigin,
         });
         if (!settlement.ok) {
             return reply.status(400).send({
@@ -606,6 +614,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                     questId: activeQuestData.questId,
                     category: activeQuestData.category,
                     isMulti: true,
+                    coordinatorOrigin: activeQuestData.coordinatorOrigin,
                     roomNumber: activeQuestData.roomNumber,
                     battleSessionId: activeQuestData.battleSessionId,
                     useBossBoostPoint: activeQuestData.useBossBoostPoint,

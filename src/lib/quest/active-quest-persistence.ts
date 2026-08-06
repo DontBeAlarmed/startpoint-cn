@@ -17,3 +17,13 @@ export function ensureActiveQuestBattleSessionIdStorageSync(database: Database):
         ADD COLUMN battle_session_id TEXT
     `).run()
 }
+
+export function ensureActiveQuestCoordinatorOriginStorageSync(database: Database): void {
+    const columns = database.prepare(`PRAGMA table_info(players_active_quests)`).all() as { name: string }[]
+    if (columns.some(column => column.name === "coordinator_origin")) return
+    database.prepare(`
+        ALTER TABLE players_active_quests
+        ADD COLUMN coordinator_origin TEXT
+        CHECK (coordinator_origin IS NULL OR coordinator_origin IN ('remote', 'local'))
+    `).run()
+}

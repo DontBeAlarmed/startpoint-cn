@@ -26,7 +26,6 @@ import {
     createEmbeddedMultiHttpContext,
     type MultiHttpContext,
 } from "../http/context"
-import { MultiSettlementVerifier } from "../settlement/verifier"
 import { listActiveRooms } from "../room/manager"
 import { sessionManager } from "../state/SessionManager"
 import {
@@ -88,10 +87,12 @@ function endpoint(host: string, port: number): string {
 }
 
 function createRemoteHttpContext(coordinator: RemoteMultiCoordinator): MultiHttpContext {
-    const embedded = createEmbeddedMultiHttpContext()
+    const embedded = createEmbeddedMultiHttpContext({
+        coordinator,
+        coordinatorOrigin: "remote",
+    })
     return Object.freeze({
         ...embedded,
-        coordinator,
         snapshotProvider: Object.freeze({
             ...embedded.snapshotProvider,
             getParticipant: (viewerId: number) => ({
@@ -102,7 +103,6 @@ function createRemoteHttpContext(coordinator: RemoteMultiCoordinator): MultiHttp
         }),
         admissionIssuer: coordinator,
         tcpEndpoint: () => coordinator.getTcpEndpoint(),
-        settlementVerifier: new MultiSettlementVerifier(coordinator),
     })
 }
 

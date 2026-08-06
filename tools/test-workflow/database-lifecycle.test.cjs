@@ -321,7 +321,7 @@ test("default schema migration preserves v6 players and creates cascading Pass t
     assert.equal(migrated.prepare("SELECT COUNT(*) AS count FROM players_pass_card_rewards").get().count, 0)
 })
 
-test("default schema migrates schema 14 active quests to battle session identity", t => {
+test("default schema migrates schema 14 active quests to battle session and coordinator identity", t => {
     const paths = temporaryPaths(t)
     fs.mkdirSync(paths.dataDir, { recursive: true })
     const schema14 = new Sqlite(paths.databaseFile)
@@ -357,13 +357,18 @@ test("default schema migrates schema 14 active quests to battle session identity
             .some(column => column.name === "battle_session_id" && column.notnull === 0),
         true,
     )
+    assert.equal(
+        getDb().pragma("table_info(players_active_quests)")
+            .some(column => column.name === "coordinator_origin" && column.notnull === 0),
+        true,
+    )
     assert.deepEqual(
         getDb().prepare(`
-            SELECT play_id, battle_session_id
+            SELECT play_id, battle_session_id, coordinator_origin
             FROM players_active_quests
             WHERE player_id = 77
         `).get(),
-        { play_id: "legacy-play", battle_session_id: null },
+        { play_id: "legacy-play", battle_session_id: null, coordinator_origin: null },
     )
 })
 
@@ -398,6 +403,7 @@ test("active quest domain roundtrips nullable battle session identity", t => {
         useBoostPoint: false,
         isAutoStartMode: false,
         isMulti: true,
+        coordinatorOrigin: "remote",
         roomNumber: "654321",
         battleSessionId: "battle-session-1",
         entryItemId: null,
@@ -408,6 +414,7 @@ test("active quest domain roundtrips nullable battle session identity", t => {
 
     insertPlayerActiveQuestSync(playerId, activeQuest)
     assert.equal(getPlayerActiveQuestSync(playerId).battleSessionId, "battle-session-1")
+    assert.equal(getPlayerActiveQuestSync(playerId).coordinatorOrigin, "remote")
 
     deletePlayerActiveQuestSync(playerId)
     insertPlayerActiveQuestSync(playerId, {
