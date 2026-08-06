@@ -174,7 +174,11 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
     ): Promise<Awaited<ReturnType<MultiCoordinator[TOperation]>>> {
         const origin = await this.resolveOrigin(input)
         const coordinator = this.coordinatorFor(origin)
-        return coordinator[operation](input as never) as Awaited<ReturnType<MultiCoordinator[TOperation]>>
+        const result = await coordinator[operation](input as never) as Awaited<ReturnType<MultiCoordinator[TOperation]>>
+        if (result.ok && ["disbandRoom", "abortBattle", "finalizeBattle"].includes(operation)) {
+            this.roomOrigins.delete(input.roomNumber)
+        }
+        return result
     }
 
     private cachedOrigin(input: CoordinatorOriginLookup): MultiCoordinatorOrigin | null {

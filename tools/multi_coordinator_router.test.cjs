@@ -390,3 +390,66 @@ test("remote write failures are never replayed against local", async () => {
         assert.equal(local.calls.length, 0, method)
     }
 })
+
+test("successful disband clears the room origin before a reused room is selected", async () => {
+    const remote = coordinator("remote")
+    const local = coordinator("local")
+    const fixture = routed({ remote, local, newRoomOrigin: "remote" })
+    const roomNumber = "123456"
+
+    assert.equal((await fixture.router.selectRoom(compatibleInput(roomNumber))).ok, true)
+    assert.deepEqual(await fixture.router.disbandRoom({ participant, roomNumber }), {
+        ok: true,
+        value: undefined,
+    })
+
+    fixture.setNewRoomOrigin("local")
+    const selected = await fixture.router.selectRoom(compatibleInput(roomNumber))
+
+    assert.equal(selected.ok, true)
+    assert.deepEqual(remote.calls.map(call => call.name), ["selectRoom", "disbandRoom"])
+    assert.deepEqual(local.calls.map(call => call.name), ["selectRoom"])
+})
+
+test("successful abort, finalize and disband clear their room origins", async () => {
+    const operations = ["abortBattle", "finalizeBattle", "disbandRoom"]
+
+    for (const operation of operations) {
+        const remote = coordinator("remote")
+        const local = coordinator("local")
+        const fixture = routed({ remote, local, newRoomOrigin: "remote" })
+        const roomNumber = "123456"
+
+        assert.equal((await fixture.router.selectRoom(compatibleInput(roomNumber))).ok, true, operation)
+        const input = operation === "finalizeBattle"
+            ? { participant, roomNumber, battleSessionId }
+            : { participant, roomNumber }
+        assert.equal((await fixture.router[operation](input)).ok, true, operation)
+
+        fixture.setNewRoomOrigin("local")
+        assert.equal((await fixture.router.selectRoom(compatibleInput(roomNumber))).ok, true, operation)
+        assert.deepEqual(local.calls.map(call => call.name), ["selectRoom"], operation)
+    }
+})
+
+test("failed abort, finalize and disband keep their room origins", async () => {
+    for (const error of ["ROOM_NOT_FOUND", "HUB_UNAVAILABLE"]) {
+        for (const operation of ["abortBattle", "finalizeBattle", "disbandRoom"]) {
+            const remote = coordinator("remote", { [operation]: { ok: false, error } })
+            const local = coordinator("local")
+            const fixture = routed({ remote, local, newRoomOrigin: "remote" })
+            const roomNumber = "123456"
+
+            assert.equal((await fixture.router.selectRoom(compatibleInput(roomNumber))).ok, true, `${error}:${operation}`)
+            const input = operation === "finalizeBattle"
+                ? { participant, roomNumber, battleSessionId }
+                : { participant, roomNumber }
+            assert.deepEqual(await fixture.router[operation](input), { ok: false, error }, `${error}:${operation}`)
+
+            fixture.setNewRoomOrigin("local")
+            assert.equal((await fixture.router.selectRoom(compatibleInput(roomNumber))).ok, true, `${error}:${operation}`)
+            assert.deepEqual(remote.calls.map(call => call.name), ["selectRoom", operation, "selectRoom"], `${error}:${operation}`)
+            assert.deepEqual(local.calls.map(call => call.name), [], `${error}:${operation}`)
+        }
+    }
+})
