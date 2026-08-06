@@ -332,8 +332,13 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/runtime_lifecycle.test.cjs",
             "tools/runtime_native_binding.test.cjs",
             "tools/server_time_service.test.cjs",
+            "tools/server_time_routes.test.cjs",
         ],
     })
+    assert.deepEqual(
+        selectTestGroups(["tools/server_time_routes.test.cjs"]),
+        ["quick:runtime"],
+    )
     assert.deepEqual(TEST_GROUPS["integration:runtime"], {
         execution: "serial",
         timeoutMs: 360_000,
