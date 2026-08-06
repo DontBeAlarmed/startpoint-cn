@@ -821,6 +821,45 @@ test("existing-session status polling applies authoritative TCP unavailability",
     assert.equal(client.getTcpEndpoint(), null)
 })
 
+test("an older TCP status response cannot override a newer degradation", async t => {
+    let tcpAvailable = true
+    let delayNextStatus = false
+    const firstStatusCaptured = deferred()
+    const releaseFirstStatus = deferred()
+    const target = fixture(t, {
+        getTcpEndpoint: () => tcpAvailable ? { host: "hub.internal", port: 8003 } : null,
+    })
+    const delegate = fetchThroughHub(target.app)
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        now: () => target.getNow(),
+        fetch: async (url, init) => {
+            const response = await delegate(url, init)
+            if (delayNextStatus && new URL(url).pathname === "/v1/multi/status") {
+                delayNextStatus = false
+                firstStatusCaptured.resolve()
+                await releaseFirstStatus.promise
+            }
+            return response
+        },
+    })
+    assert.equal((await client.getControlStatus()).ok, true)
+
+    delayNextStatus = true
+    const older = client.getExistingSessionControlStatus()
+    await firstStatusCaptured.promise
+    tcpAvailable = false
+    const newer = await client.getExistingSessionControlStatus()
+    assert.equal(newer.tcpAvailable, false)
+    assert.equal(client.isAvailable(), false)
+
+    releaseFirstStatus.resolve()
+    assert.equal((await older).tcpAvailable, true)
+    assert.equal(client.isAvailable(), false)
+    assert.equal(client.getTcpEndpoint(), null)
+})
+
 test("HubClient diagnostics use only an existing session and never change availability", async t => {
     const target = fixture(t)
     let failStatus = false
