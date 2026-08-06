@@ -800,6 +800,27 @@ test("explicit control status degrades a client when Host TCP stops", async t =>
     assert.equal(client.getTcpEndpoint(), null)
 })
 
+test("existing-session status polling applies authoritative TCP unavailability", async t => {
+    let tcpAvailable = true
+    const target = fixture(t, {
+        getTcpEndpoint: () => tcpAvailable ? { host: "hub.internal", port: 8003 } : null,
+    })
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        fetch: fetchThroughHub(target.app),
+        now: () => target.getNow(),
+    })
+    assert.equal((await client.getControlStatus()).ok, true)
+    assert.equal(client.isAvailable(), true)
+
+    tcpAvailable = false
+    const status = await client.getExistingSessionControlStatus()
+    assert.equal(status.tcpAvailable, false)
+    assert.equal(client.isAvailable(), false)
+    assert.equal(client.getTcpEndpoint(), null)
+})
+
 test("HubClient diagnostics use only an existing session and never change availability", async t => {
     const target = fixture(t)
     let failStatus = false

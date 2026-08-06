@@ -433,6 +433,32 @@ test("client runtime diagnostics never change core availability", async t => {
     assert.equal(available, true)
 })
 
+test("client admin polling exposes authoritative Host TCP degradation", async t => {
+    let available = true
+    const remote = remoteCoordinator({
+        isAvailable: () => available,
+        getTcpEndpoint: () => available ? { host: "hub.example", port: 8003 } : null,
+        async getExistingSessionControlStatus() {
+            available = false
+            return {
+                activeNodeSessions: 1,
+                enabledCredentials: 1,
+                tcpAvailable: false,
+            }
+        },
+    })
+    const service = createAdminRuntimeService([remote])
+    await service.start(clientConfig())
+    t.after(() => service.stop())
+
+    assert.equal(service.getStatus().state, "ready")
+    const status = await service.getAdminStatus()
+    assert.equal(status.state, "degraded")
+    assert.equal(status.hub.available, false)
+    assert.deepEqual(status.tcp, { available: false, endpoint: null })
+    assert.equal(service.getStatus().state, "degraded")
+})
+
 test("client admin polling without a live session does not change runtime availability", async t => {
     let available = false
     let diagnosticCalls = 0

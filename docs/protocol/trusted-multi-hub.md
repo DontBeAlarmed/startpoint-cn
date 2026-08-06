@@ -125,7 +125,7 @@ MULTI_MODE=embedded | host | client
 
 Host 在运行数据目录维护私有密钥表。每项只保存随机 `credentialId`、服主填写的备注、令牌 SHA-256 摘要、创建时间和撤销时间，不保存可再次导出的明文令牌。密钥数量不设业务上限；同一密钥被分发给多个节点时，这些节点只能作为一个撤销单元处理。密钥可以撤销但不恢复，误撤销时生成新密钥。
 
-Hub 在内存中为每次节点注册生成随机 `nodeSessionId`，并关联认证所用的 `credentialId`。后续控制调用使用节点会话凭据，Hub 重启后全部失效。普通日志可以显示密钥备注和缩短后的 `credentialId`，不得显示明文令牌或完整摘要。
+Hub 在内存中为每次节点注册生成随机 `nodeSessionId`，并关联认证所用的 `credentialId`。后续控制调用使用节点会话凭据，Hub 重启后全部失效。密钥管理命令的本机交互输出可以显示备注和缩短后的 `credentialId`；普通运行日志不得记录备注、`credentialId`、明文令牌或摘要。
 
 密钥表由管理命令原子更新，Hub 以短周期检查文件身份与修改时间；文件没有变化时不得重新读取。有效更新整体替换内存快照，非法文件保留上一份有效快照并产生明确告警。撤销不建立主动推送式 Socket 索引；每次 Hub 控制调用和 TCP 入站消息只以 `credentialId` 对内存快照执行 O(1) 状态查询。发现撤销后立即使节点会话失效、关闭对应连接，并复用现有断线流程清理 admission、成员和房间。空闲连接最迟在下一次心跳或会话过期时清理，因此该语义是近实时撤销，不承诺操作命令返回时所有连接已经同步关闭。
 
@@ -344,9 +344,10 @@ Host 在 `MULTI_HUB_HOST:MULTI_HUB_PORT` 启动独立 Fastify 实例，JSON 请�
 | `POST` | `/v1/multi/rooms/status` | `MultiCoordinator.getRoomStatus` | 否 |
 | `POST` | `/v1/multi/admissions/issue` | 建立一次性 TCP admission | 是 |
 | `POST` | `/v1/multi/battles/start` | `MultiCoordinator.startBattle` | 是 |
+| `POST` | `/v1/multi/battles/abort` | `MultiCoordinator.abortBattle` | 是 |
 | `POST` | `/v1/multi/battles/finalize` | `MultiCoordinator.finalizeBattle` | 是 |
 | `POST` | `/v1/multi/battles/status` | `MultiCoordinator.getBattleStatus` | 否 |
-| `GET` | `/v1/multi/status` | 只返回有效密钥与活动节点会话计数 | 否 |
+| `GET` | `/v1/multi/status` | 返回活动节点、有效密钥、实时 TCP 可用性及有界权威诊断 | 否 |
 
 注册请求使用 `Authorization: Bearer <集群明文令牌>`，正文只包含 `protocolVersion`。Hub 只在 Host TCP 真实监听时接受注册；TCP 不可用时返回 `HUB_UNAVAILABLE`，不创建 node session。成功响应包含随机 `nodeSessionId`、43 位 base64url `sessionCredential`、`expiresAt` 和当时可用的 Hub TCP `host/port`；不返回 `credentialId`、备注、令牌摘要或密钥表路径。后续调用不再发送集群明文令牌，而是同时发送：
 

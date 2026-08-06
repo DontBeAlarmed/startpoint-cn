@@ -104,9 +104,13 @@ export class HubClient {
                 headers: this.sessionHeaders(session),
             })
             const body = response.body as { ok?: unknown; value?: unknown } | null
-            return response.status === 200 && body?.ok === true
+            const status = response.status === 200 && body?.ok === true
                 ? parseHubControlStatus(body.value)
                 : null
+            if (status?.tcpAvailable !== undefined) {
+                this.available = status.tcpAvailable
+            }
+            return status
         } catch {
             return null
         }
