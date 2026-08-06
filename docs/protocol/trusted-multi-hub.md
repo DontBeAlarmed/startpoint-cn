@@ -348,7 +348,7 @@ Host 在 `MULTI_HUB_HOST:MULTI_HUB_PORT` 启动独立 Fastify 实例，JSON 请�
 | `POST` | `/v1/multi/battles/status` | `MultiCoordinator.getBattleStatus` | 否 |
 | `GET` | `/v1/multi/status` | 只返回有效密钥与活动节点会话计数 | 否 |
 
-注册请求使用 `Authorization: Bearer <集群明文令牌>`，正文只包含 `protocolVersion`。成功响应包含随机 `nodeSessionId`、43 位 base64url `sessionCredential`、`expiresAt` 和 Hub TCP 的 `host/port`；不返回 `credentialId`、备注、令牌摘要或密钥表路径。后续调用不再发送集群明文令牌，而是同时发送：
+注册请求使用 `Authorization: Bearer <集群明文令牌>`，正文只包含 `protocolVersion`。Hub 只在 Host TCP 真实监听时接受注册；TCP 不可用时返回 `HUB_UNAVAILABLE`，不创建 node session。成功响应包含随机 `nodeSessionId`、43 位 base64url `sessionCredential`、`expiresAt` 和当时可用的 Hub TCP `host/port`；不返回 `credentialId`、备注、令牌摘要或密钥表路径。后续调用不再发送集群明文令牌，而是同时发送：
 
 ```text
 Authorization: Bearer <sessionCredential>
@@ -370,7 +370,7 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 - Hub 控制接口；
 - Hub TCP。
 
-多人不可用只产生 degraded 状态。后台显示模式、Hub 可达性、TCP 状态、活动房间数和最近的兼容性拒绝原因。
+多人不可用只产生 degraded 状态。Hub status 返回实时 `tcpAvailable`；TCP 在已有 session 期间失效后，房间、战斗和 admission 控制操作统一返回 `HUB_UNAVAILABLE`，Client 在下一次显式控制探测或多人请求后进入 degraded，不继续使用注册时缓存的 TCP 地址。后台显示模式、Hub 可达性、TCP 状态、活动房间数和最近的兼容性拒绝原因。
 
 后台 `latestCompatibilityRejection` 可保留差异字段名；只有 `APP_VER`、`RES_VER`、`cdnTargetVersion` 的 `required`/`received` 值通过格式与长度校验后才会保留，`contentDigest`/`modeDigest` 只保留 `different=true`，不保存摘要值。现有兼容性拒绝回调不携带房间号，因此后台诊断不承诺包含房间号。普通多人运行日志不输出双方原始值或摘要；只可保留固定事件、经过 `Number.isSafeInteger` 与有限范围校验的 tag、经过业务校验的 quest/category、有限错误码、host/guest 角色、状态、计数，以及服务端生成或严格校验后的六位房间号。不得记录原始请求、原始 `Error`/stack、完整 `viewerId`/`playerId`/`nodeSessionId`/`connectionId`、网络地址或端口、令牌、摘要和凭据。游戏客户端只接收对应端点现有的 NotPlayable 或通用失败结果；只有房间实际缺失时才显示房间不存在。
 

@@ -87,6 +87,9 @@ export function parseHubControlStatus(value: unknown): MultiHubControlStatus | n
     const core = {
         activeNodeSessions: value.activeNodeSessions,
         enabledCredentials: value.enabledCredentials,
+        ...(typeof value.tcpAvailable === "boolean"
+            ? { tcpAvailable: value.tcpAvailable }
+            : {}),
     }
     const hasCompleteDiagnostics = CONTROL_DIAGNOSTIC_FIELDS.every(field => (
         Object.prototype.hasOwnProperty.call(value, field)

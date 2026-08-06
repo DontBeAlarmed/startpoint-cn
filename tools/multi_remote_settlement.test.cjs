@@ -541,7 +541,7 @@ function createRotatingHub(t) {
         nodeSessions: sessions,
         admissionIssuer: admissions,
         idempotency: new IdempotencyCache({ now: () => now }),
-        tcpEndpoint: { host: "hub.internal", port: 8003 },
+        getTcpEndpoint: () => ({ host: "hub.internal", port: 8003 }),
     })
     t.after(() => app.close())
     const client = new HubClient({

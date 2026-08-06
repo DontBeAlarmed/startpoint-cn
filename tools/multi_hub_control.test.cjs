@@ -207,7 +207,7 @@ function fixture(t, options = {}) {
         nodeSessions: sessions,
         admissionIssuer: admissions,
         idempotency,
-        tcpEndpoint: { host: "hub.internal", port: 8003 },
+        getTcpEndpoint: options.getTcpEndpoint ?? (() => ({ host: "hub.internal", port: 8003 })),
         getDiagnostics: options.getDiagnostics ?? (() => ({
             activeRooms: 2,
             activeBattleFacts: 3,
@@ -289,6 +289,35 @@ test("registers two independent credentials and exposes only the control route f
     assert.equal((await target.app.inject({ method: "GET", url: "/api/player" })).statusCode, 404)
     assert.equal((await target.app.inject({ method: "GET", url: "/admin" })).statusCode, 404)
     assert.equal((await target.app.inject({ method: "GET", url: "/patch/cn/file" })).statusCode, 404)
+})
+
+test("TCP unavailability blocks registration and existing control operations", async t => {
+    let tcpAvailable = true
+    const target = fixture(t, {
+        getTcpEndpoint: () => tcpAvailable ? { host: "hub.internal", port: 8003 } : null,
+    })
+    const registration = await register(target.app, target.first.token)
+    assert.equal(registration.statusCode, 200)
+
+    tcpAvailable = false
+    const status = await target.app.inject({
+        method: "GET",
+        url: "/v1/multi/status",
+        headers: sessionHeaders(registration),
+    })
+    assert.equal(status.statusCode, 200)
+    assert.equal(status.json().value.tcpAvailable, false)
+    const unavailable = await target.app.inject({
+        method: "POST",
+        url: "/v1/multi/rooms/status",
+        headers: sessionHeaders(registration),
+        payload: { participant: { viewerId: 101 }, roomNumber: "123456" },
+    })
+    assert.equal(unavailable.statusCode, 503)
+
+    const rejected = await register(target.app, target.second.token)
+    assert.equal(rejected.statusCode, 503)
+    assert.equal(target.sessions.activeCount(), 1)
 })
 
 test("control server exposes only the exact route methods", async t => {
@@ -721,6 +750,7 @@ test("returns bounded coordinator errors without paths, credentials or stack tra
         "enabledCredentials",
         "finalizedBattleFacts",
         "latestCompatibilityRejection",
+        "tcpAvailable",
     ])
     assert.equal(status.body.includes(target.first.label), false)
 })
@@ -739,12 +769,35 @@ test("HubClient reads bounded authoritative diagnostics through the existing con
         value: {
             activeNodeSessions: 1,
             enabledCredentials: 2,
+            tcpAvailable: true,
             activeRooms: 2,
             activeBattleFacts: 3,
             finalizedBattleFacts: 4,
             latestCompatibilityRejection: null,
         },
     })
+})
+
+test("explicit control status degrades a client when Host TCP stops", async t => {
+    let tcpAvailable = true
+    const target = fixture(t, {
+        getTcpEndpoint: () => tcpAvailable ? { host: "hub.internal", port: 8003 } : null,
+    })
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        fetch: fetchThroughHub(target.app),
+        now: () => target.getNow(),
+    })
+    assert.equal((await client.getControlStatus()).ok, true)
+    assert.deepEqual(client.getTcpEndpoint(), { host: "hub.internal", port: 8003 })
+
+    tcpAvailable = false
+    const status = await client.getControlStatus()
+    assert.equal(status.ok, true)
+    assert.equal(status.value.tcpAvailable, false)
+    assert.equal(client.isAvailable(), false)
+    assert.equal(client.getTcpEndpoint(), null)
 })
 
 test("HubClient diagnostics use only an existing session and never change availability", async t => {
@@ -888,6 +941,7 @@ test("control status selects diagnostic fields and drops provider extras", async
     assert.deepEqual(response.json().value, {
         activeNodeSessions: 1,
         enabledCredentials: 2,
+        tcpAvailable: true,
         activeRooms: 1,
         activeBattleFacts: 2,
         finalizedBattleFacts: 3,

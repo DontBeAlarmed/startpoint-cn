@@ -58,6 +58,7 @@ export interface MultiHubAuthorityDiagnostics {
 export interface MultiHubControlStatus {
     readonly activeNodeSessions: number
     readonly enabledCredentials: number
+    readonly tcpAvailable?: boolean
     readonly activeRooms?: number
     readonly activeBattleFacts?: number
     readonly finalizedBattleFacts?: number
@@ -70,7 +71,7 @@ export interface MultiHubControlRoutesOptions {
     readonly nodeSessions: NodeSessionRegistry
     readonly admissionIssuer: AdmissionIssuer
     readonly idempotency: IdempotencyCache
-    readonly tcpEndpoint: MultiHubTcpEndpoint
+    readonly getTcpEndpoint: () => MultiHubTcpEndpoint | null
     readonly getDiagnostics?: () => MultiHubAuthorityDiagnostics
 }
 
@@ -223,6 +224,10 @@ function registerOperation(
             ok: false,
             code: "UNAUTHORIZED",
         }))
+        if (options.getTcpEndpoint() === null) return send(reply, response(503, {
+            ok: false,
+            code: "HUB_UNAVAILABLE",
+        }))
         if (!write) return send(reply, await invoke(operation, request.body, session))
 
         const idempotencyKey = request.headers["x-idempotency-key"]
@@ -258,6 +263,10 @@ export function registerMultiHubControlRoutes(
         if (credential === null) {
             return send(reply, response(401, { ok: false, code: "UNAUTHORIZED" }))
         }
+        const tcpEndpoint = options.getTcpEndpoint()
+        if (tcpEndpoint === null) {
+            return send(reply, response(503, { ok: false, code: "HUB_UNAVAILABLE" }))
+        }
         try {
             const registration = options.nodeSessions.register(
                 credential.credentialId,
@@ -265,7 +274,7 @@ export function registerMultiHubControlRoutes(
             )
             return reply.status(200).send({
                 ...registration,
-                tcp: options.tcpEndpoint,
+                tcp: tcpEndpoint,
             })
         } catch {
             return send(reply, response(401, { ok: false, code: "UNAUTHORIZED" }))
@@ -303,9 +312,11 @@ export function registerMultiHubControlRoutes(
         const value = diagnostics === null ? {
             activeNodeSessions: options.nodeSessions.activeCount(),
             enabledCredentials: options.credentialReloader.getStatus().enabled,
+            tcpAvailable: options.getTcpEndpoint() !== null,
         } : {
             activeNodeSessions: options.nodeSessions.activeCount(),
             enabledCredentials: options.credentialReloader.getStatus().enabled,
+            tcpAvailable: options.getTcpEndpoint() !== null,
             activeRooms: diagnostics.activeRooms,
             activeBattleFacts: diagnostics.activeBattleFacts,
             finalizedBattleFacts: diagnostics.finalizedBattleFacts,

@@ -209,10 +209,14 @@ class Service implements MultiRuntimeService {
                 admissionIssuer: admissionRegistry,
                 admissionRegistry,
                 idempotency: new IdempotencyCache(),
-                tcpEndpoint: Object.freeze({
-                    host: config.tcp.publicHost ?? config.tcp.host,
-                    port: config.tcp.port,
-                }),
+                getTcpEndpoint: () => (
+                    !this.tcpFailed && this.safeListening(this.dependencies.isTcpListening)
+                        ? Object.freeze({
+                            host: config.tcp.publicHost ?? config.tcp.host,
+                            port: config.tcp.port,
+                        })
+                        : null
+                ),
                 getDiagnostics: () => ({
                     ...localAuthorityStatus(),
                     latestCompatibilityRejection: multiCompatibilityRejections.get(),

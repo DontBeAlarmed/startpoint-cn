@@ -84,7 +84,7 @@ export class HubClient {
     }
 
     getTcpEndpoint(): MultiHubTcpEndpoint | null {
-        return this.peekLiveSession()?.tcp ?? null
+        return this.available ? this.peekLiveSession()?.tcp ?? null : null
     }
 
     getNodeSessionId(): NodeSessionId | null {
@@ -149,7 +149,7 @@ export class HubClient {
                 this.available = false
                 return { ok: false, error: "HUB_UNAVAILABLE" }
             }
-            this.available = true
+            this.available = status.tcpAvailable !== false
             return { ok: true, value: status }
         }
     }

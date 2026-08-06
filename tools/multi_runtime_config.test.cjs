@@ -210,6 +210,7 @@ function createServiceHarness(options = {}) {
     let hubListening = false
     let failTcp = false
     let failHub = false
+    let hostServices = null
     const service = createMultiRuntimeService({
         async startTcp(config) {
             calls.push(["tcp-start", config])
@@ -221,9 +222,10 @@ function createServiceHarness(options = {}) {
             tcpListening = false
         },
         isTcpListening: () => tcpListening,
-        async startHub(config) {
+        async startHub(config, _onFatalError, services) {
             calls.push(["hub-start", config])
             if (failHub) throw Object.assign(new Error("bind failed"), { code: "EADDRINUSE" })
+            hostServices = services
             hubListening = true
         },
         async stopHub() {
@@ -238,6 +240,7 @@ function createServiceHarness(options = {}) {
         service,
         failTcp() { failTcp = true },
         failHub() { failHub = true },
+        hostServices() { return hostServices },
     }
 }
 
@@ -469,6 +472,7 @@ test("host TCP bind failure keeps the control listener available and degrades mu
         hub: { available: true, endpoint: "http://127.0.0.1:8004" },
         tcp: { available: false, endpoint: "192.0.2.20:8003" },
     })
+    assert.equal(harness.hostServices().getTcpEndpoint(), null)
     await harness.service.stop()
 })
 
