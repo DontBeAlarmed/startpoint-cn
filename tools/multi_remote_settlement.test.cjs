@@ -304,6 +304,37 @@ test("Hub battle facts preserve live records when capacity is exhausted", () => 
     }), { ok: false, error: "ROOM_NOT_FOUND" })
 })
 
+test("rotated guest session takes ownership before the old session is swept", () => {
+    const oldGuest = { nodeSessionId: "guest-session-old", viewerId: guest.viewerId }
+    const rotatedGuest = { nodeSessionId: "guest-session-new", viewerId: guest.viewerId }
+    const store = new BattleFactStore({ createBattleSessionId: () => "rotation-battle" })
+    const started = store.startBattle({
+        roomNumber: "rotation-room",
+        host,
+        participants: [host, oldGuest],
+    })
+    const oldInput = {
+        participant: oldGuest,
+        credentialId: "guest-credential",
+        roomNumber: "rotation-room",
+        battleSessionId: started.battleSessionId,
+    }
+    assert.equal(store.authorizeParticipant(oldInput).ok, true)
+    assert.equal(store.markFinalized(oldInput).ok, true)
+
+    const rotatedInput = { ...oldInput, participant: rotatedGuest }
+    assert.equal(store.getBattleStatus(rotatedInput).ok, true)
+    assert.equal(
+        store.removeParticipantsByNodeSession("rotation-room", oldGuest.nodeSessionId),
+        null,
+        "the expired session no longer owns the finalized guest",
+    )
+    const retained = store.getBattleStatus(rotatedInput)
+    assert.equal(retained.ok, true)
+    assert.deepEqual(retained.value.participants, [host, rotatedGuest])
+    assert.equal(retained.value.finalized, true)
+})
+
 test("Hub coordinator exposes retained TCP completion facts without finalizing them", async t => {
     const { EmbeddedMultiCoordinator } = require("../src/multi/coordinator/embedded")
     const { addRoomMember, disbandRoom } = require("../src/multi/room/manager")

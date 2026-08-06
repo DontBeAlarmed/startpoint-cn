@@ -19,7 +19,7 @@ const DEFAULT_MAX_RECORDS = 4096
 interface BattleFactRecord {
     readonly battleSessionId: BattleSessionId
     readonly roomNumber: string
-    readonly host: ParticipantIdentity
+    host: ParticipantIdentity
     readonly participants: ParticipantIdentity[]
     readonly participantKeys: Set<string>
     readonly credentialIdByViewerId: Map<number, string>
@@ -139,17 +139,10 @@ export class BattleFactStore {
         if (!record || record.roomNumber !== input.roomNumber) {
             return { ok: false, error: "ROOM_NOT_FOUND" }
         }
-        if (!record.participantKeys.has(participantKey(
-            input.participant.nodeSessionId,
-            input.participant.viewerId,
-        ))) {
+        if (!this.isAuthorized(record, input)) {
             return { ok: false, error: "ROOM_PERMISSION_DENIED" }
         }
         if (input.credentialId !== undefined) {
-            const existing = record.credentialIdByViewerId.get(input.participant.viewerId)
-            if (existing !== undefined && existing !== input.credentialId) {
-                return { ok: false, error: "ROOM_PERMISSION_DENIED" }
-            }
             record.credentialIdByViewerId.set(input.participant.viewerId, input.credentialId)
         }
         return { ok: true, value: this.toStatus(record, input.participant) }
@@ -263,12 +256,34 @@ export class BattleFactStore {
     private isAuthorized(record: BattleFactRecord, input: BattleSessionInput): boolean {
         const credentialId = record.credentialIdByViewerId.get(input.participant.viewerId)
         if (credentialId !== undefined && input.credentialId !== undefined) {
-            return credentialId === input.credentialId
+            if (credentialId !== input.credentialId) return false
+            this.rebindParticipant(record, input.participant)
+            return true
         }
         return record.participantKeys.has(participantKey(
             input.participant.nodeSessionId,
             input.participant.viewerId,
         ))
+    }
+
+    private rebindParticipant(
+        record: BattleFactRecord,
+        participant: ParticipantIdentity,
+    ): void {
+        const index = record.participants.findIndex(candidate => (
+            candidate.viewerId === participant.viewerId
+        ))
+        if (index < 0) return
+        const previous = record.participants[index]
+        const previousKey = participantKey(previous.nodeSessionId, previous.viewerId)
+        const nextKey = participantKey(participant.nodeSessionId, participant.viewerId)
+        if (previousKey === nextKey) return
+
+        const rebound = Object.freeze({ ...participant })
+        record.participants[index] = rebound
+        record.participantKeys.delete(previousKey)
+        record.participantKeys.add(nextKey)
+        if (record.host.viewerId === participant.viewerId) record.host = rebound
     }
 
     private removeRecordParticipant(record: BattleFactRecord, index: number): void {
