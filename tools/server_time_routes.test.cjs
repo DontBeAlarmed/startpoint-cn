@@ -42,8 +42,8 @@ function createFixture() {
     }
 }
 
-async function createApp(fixture, t) {
-    const app = Fastify({ logger: false })
+async function createApp(fixture, t, options = {}) {
+    const app = Fastify({ logger: false, ...options })
     app.register(serverRoutes, {
         prefix: "/api/server",
         serverTimeService: fixture.service,
@@ -161,4 +161,44 @@ test("time-package writes require a loopback request", async t => {
 
     assert.equal(response.statusCode, 403)
     assert.match(response.json().message, /loopback/i)
+})
+
+test("time-package writes accept loopback variants and ignore forwarded client addresses", async t => {
+    const fixture = createFixture()
+    const app = await createApp(fixture, t, { trustProxy: true })
+    const packagePayload = {
+        mode: "system",
+        offsetMs: 0,
+        generatedAt: "2026-08-06T03:00:00.000Z",
+    }
+
+    for (const remoteAddress of [
+        "127.0.0.1",
+        "127.0.0.2",
+        "::ffff:127.0.0.2",
+        "::1",
+        "0:0:0:0:0:0:0:1",
+    ]) {
+        const response = await app.inject({
+            method: "PUT",
+            url: "/api/server/time-package",
+            remoteAddress,
+            headers: { "content-type": "application/json" },
+            payload: packagePayload,
+        })
+        assert.equal(response.statusCode, 200, remoteAddress)
+    }
+
+    const forwardedRemote = await app.inject({
+        method: "PUT",
+        url: "/api/server/time-package",
+        remoteAddress: "192.0.2.10",
+        headers: {
+            "content-type": "application/json",
+            "x-forwarded-for": "127.0.0.1",
+        },
+        payload: packagePayload,
+    })
+    assert.equal(forwardedRemote.statusCode, 403)
+    assert.match(forwardedRemote.json().message, /loopback/i)
 })

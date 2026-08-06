@@ -20,6 +20,7 @@ import {
     type AdminMultiStatus,
 } from "../../lib/admin-multi-status";
 import { unavailableMultiRuntimeStatus } from "../../multi/runtime/status";
+import { requireLoopback } from "../../multi/management/loopback";
 import {
     applyPlayerSaveTemplateSync,
     clonePlayerSaveV2Sync,
@@ -53,22 +54,6 @@ function legacyTimeResponse(
         date: new Date(snapshot.serverTimeMs).toISOString(),
         isCustom,
     }
-}
-
-function isLoopbackRequest(request: FastifyRequest): boolean {
-    const address = request.ip.replace(/^::ffff:/, "")
-    return address === "127.0.0.1"
-        || address === "::1"
-        || address === "0:0:0:0:0:0:0:1"
-}
-
-function requireLoopback(request: FastifyRequest, reply: FastifyReply): boolean {
-    if (isLoopbackRequest(request)) return true
-    reply.status(403).send({
-        error: "Forbidden",
-        message: "This management operation requires a loopback request",
-    })
-    return false
 }
 
 const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) => {
