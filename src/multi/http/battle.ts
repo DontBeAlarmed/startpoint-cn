@@ -154,6 +154,13 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             });
         }
 
+        const compatibility = context.snapshotProvider.getCompatibility(request.headers);
+        if (!compatibility.ok) {
+            return reply.status(400).send({
+                "error": compatibility.error, "message": "Battle session is unavailable.",
+            });
+        }
+
         const participant = context.snapshotProvider.getParticipant(viewer_id);
         const room = await context.coordinator.getRoomStatus({
             participant,
@@ -184,7 +191,11 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             });
         }
 
-        const battle = await context.coordinator.startBattle({ participant, roomNumber: room_number });
+        const battle = await context.coordinator.startBattle({
+            participant,
+            roomNumber: room_number,
+            compatibility: compatibility.value,
+        });
         if (!battle.ok
             || battle.value.finalized
             || battle.value.roomNumber !== room_number

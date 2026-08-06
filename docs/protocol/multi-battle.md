@@ -123,12 +123,12 @@ JSON.stringify(message) + "\0"
 
 | 路由 | 当前职责 |
 |---|---|
-| `start` | 校验玩家为房间成员且请求关卡与房间一致；每位真人分别写入 active quest，仅房主预扣体力和 Always 门票；事务提交后才把房间设置为状态 4 |
+| `start` | 重新校验请求节点与房间固定兼容性、玩家成员身份及关卡一致性；兼容性校验在任何本地扣费或 active quest 写入前完成。每位真人分别写入 active quest，仅房主预扣体力和 Always 门票；房间状态 4 已由 TCP StartBattle 建立 |
 | `finish` | 由 Hub 授权 retained completion fact，再按 `play_id + category + quest_id` 校验多人 active quest，并拒绝负 Mana、非法分数/耗时、continue 次数或 Boost 余额不一致；各节点只结算自己的存档，全部剩余真人 Finalize 后由 coordinator 把房间恢复为状态 1 |
 | `abort` | 先在本地事务中退款并取消 active quest，提交后再 best-effort 通知 coordinator；房主放弃时解散房间，成员放弃时从权威当局参与者中移除并立即重判剩余成员是否全部 Finalize |
 | `play_continue` | 同时核对内存与 SQLite active quest；SQLite 提交成功后才更新内存 continue count。当前多人续关不扣星导石 |
 
-多人客户端会让每位真人分别请求 `start`，因此 active quest 是玩家级状态，不由房主记录替代成员记录。房主身份使用服务端房间中的 `host_player_id` 判断，不能由请求字段声明。成员 start 的入场成本固定为 0，但仍会保存自己的 `play_id`、房间号和关卡身份，以供 finish、abort、重连与多场景结束校验使用。
+多人客户端会让每位真人分别请求 `start`，因此 active quest 是玩家级状态，不由房主记录替代成员记录。房主身份使用 Hub 内部的 `nodeSessionId + viewerId` 复合身份判断，不能由请求字段或节点本地 player ID 声明。成员 start 的入场成本固定为 0，但仍会保存自己的 `play_id`、房间号和关卡身份，以供 finish、abort、重连与多场景结束校验使用。
 
 `finish` 请求不要求携带 `room_number`；服务端从 active quest 恢复房间身份。`statistics` 必须是非空对象，`elapsed_time_ms` 必须为正安全整数，`add_mana`、`score` 和 `continue_count` 不得为负。Boost 点在 finish 时确认扣除，余额不足时整个结算拒绝，不会写成负数。
 
@@ -150,7 +150,7 @@ JSON.stringify(message) + "\0"
 |---:|---|---|
 | 1 | Ready | 房主进入 lobby；当局全部真人 Finalize 后由 coordinator 恢复为可重赛状态 |
 | 2 | Waiting | 新建房间初态；房主尚未进入时客人继续轮询 |
-| 4 | Battle | StartBattle 或 HTTP start 后进入战斗 |
+| 4 | Battle | TCP lobby 收到房主 StartBattle 并固化当局成员后进入战斗 |
 | 9 | Missing | `select_room`、`prepare` 或 `restore_room` 找不到房间时返回 |
 | 13 | NotMate | `restore_room` 的 viewer 不是该房间已记录成员时返回 |
 

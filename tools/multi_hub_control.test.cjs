@@ -1036,8 +1036,8 @@ test("real RemoteCoordinator retains finalized facts across room reset and sessi
         { connectionId: "remote-guest", participant: guestParticipant },
     ], hostParticipant)
 
-    const hostBattle = await hostCoordinator.startBattle({ participant: hostParticipant, roomNumber })
-    const guestBattle = await guestCoordinator.startBattle({ participant: guestParticipant, roomNumber })
+    const hostBattle = await hostCoordinator.startBattle({ participant: hostParticipant, roomNumber, compatibility })
+    const guestBattle = await guestCoordinator.startBattle({ participant: guestParticipant, roomNumber, compatibility })
     assert.equal(hostBattle.ok, true)
     assert.equal(guestBattle.ok, true)
     assert.equal(hostBattle.value.battleSessionId, guestBattle.value.battleSessionId)
@@ -1045,11 +1045,11 @@ test("real RemoteCoordinator retains finalized facts across room reset and sessi
     sessionManager.markParticipantFinalizedBattle(roomNumber, hostParticipant)
     sessionManager.markParticipantFinalizedBattle(roomNumber, guestParticipant)
 
-    assert.deepEqual(await hostCoordinator.startBattle({ participant: hostParticipant, roomNumber }), {
+    assert.deepEqual(await hostCoordinator.startBattle({ participant: hostParticipant, roomNumber, compatibility }), {
         ok: false,
         error: "ROOM_NOT_FOUND",
     })
-    assert.deepEqual(await guestCoordinator.startBattle({ participant: guestParticipant, roomNumber }), {
+    assert.deepEqual(await guestCoordinator.startBattle({ participant: guestParticipant, roomNumber, compatibility }), {
         ok: false,
         error: "ROOM_NOT_FOUND",
     })
@@ -1086,6 +1086,8 @@ test("real RemoteCoordinator retains finalized facts across room reset and sessi
         battleSessionId,
     }), { ok: true, value: {
         ...guestBattle.value,
+        host: delayed.value.host,
+        participants: delayed.value.participants,
         finalized: true,
     } })
     assert.deepEqual(await guestCoordinator.getBattleStatus({
@@ -1154,10 +1156,12 @@ test("real RemoteCoordinator removes an aborted guest before host finalization",
     const hostBattle = await hostRemote.startBattle({
         participant: created.value.host,
         roomNumber,
+        compatibility,
     })
     const guestBattle = await guestRemote.startBattle({
         participant: guestParticipant,
         roomNumber,
+        compatibility,
     })
     assert.equal(hostBattle.ok, true)
     assert.equal(guestBattle.ok, true)
@@ -1248,10 +1252,12 @@ test("real RemoteCoordinator releases after a finalized host loses its guest", a
     const hostBattle = await hostRemote.startBattle({
         participant: created.value.host,
         roomNumber,
+        compatibility,
     })
     const guestBattle = await guestRemote.startBattle({
         participant: guestParticipant,
         roomNumber,
+        compatibility,
     })
     assert.equal(hostBattle.ok, true)
     assert.equal(guestBattle.ok, true)
@@ -1345,10 +1351,12 @@ test("lost remote guest abort converges when its fixed session expires", async t
     const hostBattle = await hostRemote.startBattle({
         participant: created.value.host,
         roomNumber,
+        compatibility,
     })
     const guestBattle = await guestRemote.startBattle({
         participant: guestParticipant,
         roomNumber,
+        compatibility,
     })
     assert.equal(hostBattle.ok, true)
     assert.equal(guestBattle.ok, true)

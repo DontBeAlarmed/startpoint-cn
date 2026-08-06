@@ -375,7 +375,7 @@ test("Hub coordinator exposes retained TCP completion facts without finalizing t
         { connectionId: "guest-cid", participant: guest },
     ], host)
 
-    const started = await coordinator.startBattle({ participant: guest, roomNumber })
+    const started = await coordinator.startBattle({ participant: guest, roomNumber, compatibility })
     assert.equal(started.ok, true)
     assert.equal(started.value.finalized, false)
     assert.deepEqual(await coordinator.finalizeBattle({
@@ -651,6 +651,7 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
             : null,
         snapshotProvider: {
             getParticipant: viewerId => ({ ...participant, viewerId }),
+            getCompatibility: () => ({ ok: true, value: compatibility }),
         },
         questAvailability: { check: () => ({ available: true }) },
         coordinator,
@@ -692,6 +693,35 @@ function observableSettlementState(db, playerId) {
         mails: select("SELECT * FROM players_mails WHERE player_id = ? ORDER BY id", playerId),
     }
 }
+
+test("production /start rejects a changed compatibility profile before local entry writes", async () => {
+    let home
+    try {
+        home = await openProductionHome(
+            "incompatible-start",
+            host,
+            true,
+            { verify: async () => ({ ok: false }) },
+            {
+                startBattle(input) {
+                    assert.deepEqual(input.compatibility, compatibility)
+                    return { ok: false, error: "INCOMPATIBLE_ROOM" }
+                },
+            },
+        )
+        const response = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, "incompatible-start"),
+        })
+        assert.equal(response.statusCode, 400)
+        assert.equal(getPlayerSync(home.playerId).stamina, home.entryStamina)
+        assert.equal(getPlayerItemSync(home.playerId, productionQuest.ticketId), 1)
+        assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+    } finally {
+        await closeProductionHome(home)
+    }
+})
 
 test("production /start charges only the host in isolated SQLite home saves", async () => {
     let home

@@ -129,6 +129,24 @@ test("searchRoom rejects a room with different participant compatibility", async
     assert.deepEqual(found, { ok: false, error: "INCOMPATIBLE_ROOM" })
 })
 
+test("startBattle rechecks the room compatibility profile", async t => {
+    const { sessionManager } = require("../src/multi/state/SessionManager")
+    const { coordinator, status } = await createFixture(t)
+    const host = participant(101)
+    sessionManager.setBattleParticipants(status.roomNumber, [{
+        connectionId: "compatibility-host",
+        participant: host,
+    }], host)
+
+    const result = await coordinator.startBattle({
+        participant: host,
+        roomNumber: status.roomNumber,
+        compatibility: compatibilityProfile({ APP_VER: "changed-before-start" }),
+    })
+
+    assert.deepEqual(result, { ok: false, error: "INCOMPATIBLE_ROOM" })
+})
+
 test("selectRoom and prepareRoom accept either non-empty locator value", async t => {
     if (!EmbeddedMultiCoordinator) return t.skip("embedded coordinator missing")
 

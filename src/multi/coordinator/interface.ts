@@ -37,6 +37,10 @@ export interface BattleSessionInput extends RoomParticipantInput {
     readonly battleSessionId: BattleSessionId
 }
 
+export interface StartBattleInput extends RoomParticipantInput {
+    readonly compatibility: MultiCompatibilityProfile
+}
+
 export interface RoomStatus {
     readonly roomNumber: string
     readonly accessToken: string
@@ -70,7 +74,7 @@ export interface MultiCoordinator {
     selectRoom(input: CompatibleRoomInput): Promise<CoordinatorResult<RoomStatus>>
     disbandRoom(input: RoomParticipantInput): Promise<CoordinatorResult<void>>
     abortBattle(input: RoomParticipantInput): Promise<CoordinatorResult<void>>
-    startBattle(input: RoomParticipantInput): Promise<CoordinatorResult<BattleStatus>>
+    startBattle(input: StartBattleInput): Promise<CoordinatorResult<BattleStatus>>
     finalizeBattle(input: BattleSessionInput): Promise<CoordinatorResult<BattleStatus>>
     getBattleStatus(input: BattleSessionInput): Promise<CoordinatorResult<BattleStatus>>
     getRoomStatus(input: RoomParticipantInput): Promise<CoordinatorResult<RoomStatus>>

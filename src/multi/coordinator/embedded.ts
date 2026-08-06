@@ -29,6 +29,7 @@ import type {
     MultiCoordinator,
     RoomParticipantInput,
     RoomStatus,
+    StartBattleInput,
 } from "./interface"
 
 export const EMBEDDED_NODE_SESSION_ID = "embedded" as NodeSessionId
@@ -276,13 +277,15 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         return removed
     }
 
-    async startBattle(input: RoomParticipantInput): Promise<CoordinatorResult<BattleStatus>> {
+    async startBattle(input: StartBattleInput): Promise<CoordinatorResult<BattleStatus>> {
         assertParticipant(input.participant, this.allowRemoteParticipants)
         if (typeof input.roomNumber !== "string" || input.roomNumber.trim().length === 0) {
             return roomNotFound()
         }
         const room = getRoom(input.roomNumber)
         if (!room) return roomNotFound()
+        const compatibility = this.checkRoomCompatibility(room, input.compatibility)
+        if (!compatibility.ok) return compatibility
         const roomStatus = this.toRoomStatus(room)
         const identityKey = participantKey(
             input.participant.nodeSessionId,
@@ -333,8 +336,19 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         if (hasViewerIdConflict(this.toRoomStatus(room).members, input.participant)) {
             return { ok: false, error: "VIEWER_ID_CONFLICT" }
         }
+        const compatibility = this.checkRoomCompatibility(room, input.compatibility)
+        if (!compatibility.ok) return compatibility
+        if (refreshHostEntryTime) updateHostEntryTime(room.room_number)
+        return ok(this.toRoomStatus(room))
+    }
+
+    private checkRoomCompatibility(
+        room: MultiRoom,
+        received: MultiCompatibilityProfile,
+    ): CoordinatorResult<void> {
+        assertCompatibility(received)
         const hostCompatibility = compatibilityByRoom.get(room) ?? EMBEDDED_COMPATIBILITY
-        const comparison = compareCompatibility(hostCompatibility, input.compatibility)
+        const comparison = compareCompatibility(hostCompatibility, received)
         if (!comparison.compatible) {
             this.onCompatibilityRejection?.({
                 code: "INCOMPATIBLE_ROOM",
@@ -346,8 +360,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             })
             return { ok: false, error: "INCOMPATIBLE_ROOM" }
         }
-        if (refreshHostEntryTime) updateHostEntryTime(room.room_number)
-        return ok(this.toRoomStatus(room))
+        return ok(undefined)
     }
 
     private assertBattleInput(input: BattleSessionInput): void {

@@ -14,6 +14,7 @@ import type {
     MultiCoordinator,
     RoomParticipantInput,
     RoomStatus,
+    StartBattleInput,
 } from "./interface"
 import type { CoordinatorResult, NodeSessionId } from "./contracts"
 
@@ -59,7 +60,7 @@ export class RemoteMultiCoordinator implements MultiCoordinator, AdmissionIssuer
         return this.client.write("/v1/multi/battles/abort", input)
     }
 
-    startBattle(input: RoomParticipantInput): Promise<CoordinatorResult<BattleStatus>> {
+    startBattle(input: StartBattleInput): Promise<CoordinatorResult<BattleStatus>> {
         return this.client.write("/v1/multi/battles/start", input)
     }
 

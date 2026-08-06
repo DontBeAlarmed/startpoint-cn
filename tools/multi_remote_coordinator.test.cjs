@@ -532,7 +532,7 @@ test("Remote coordinator implements every Hub operation and forwards compatibili
     await remote.prepareRoom(compatible)
     await remote.selectRoom(compatible)
     await remote.disbandRoom({ participant: participant(), roomNumber: "123456" })
-    await remote.startBattle({ participant: participant(), roomNumber: "123456" })
+    await remote.startBattle({ participant: participant(), roomNumber: "123456", compatibility })
     await remote.finalizeBattle({
         participant: participant(), roomNumber: "123456", battleSessionId: "battle-1",
     })
