@@ -1,3 +1,4 @@
+import type { AdminMultiStatus } from "../../lib/admin-multi-status"
 import type {
     IssuedMultiHubCredential,
     MultiHubCredential,
@@ -8,6 +9,19 @@ import {
     type MultiManagementServiceContract,
     type MultiProbeResult,
 } from "./types"
+
+function cloneAndFreeze<T>(value: T): T {
+    if (value === null || typeof value !== "object") return value
+    if (Array.isArray(value)) {
+        return Object.freeze(value.map(item => cloneAndFreeze(item))) as T
+    }
+
+    const clone: Record<string, unknown> = {}
+    for (const [key, child] of Object.entries(value)) {
+        clone[key] = cloneAndFreeze(child)
+    }
+    return Object.freeze(clone) as T
+}
 
 export class MultiManagementError extends Error {
     readonly code: typeof CLIENT_MULTI_MANAGEMENT_UNAVAILABLE
@@ -30,28 +44,29 @@ export class MultiManagementService implements MultiManagementServiceContract {
 
     createCredential(label: string): IssuedMultiHubCredential {
         this.assertHostManagementAvailable()
-        return this.dependencies.credentials.create(label)
+        return cloneAndFreeze(this.dependencies.credentials.create(label))
     }
 
     listCredentials(): readonly MultiHubCredential[] {
         this.assertHostManagementAvailable()
-        return this.dependencies.credentials.list()
+        return cloneAndFreeze(this.dependencies.credentials.list())
     }
 
     revokeCredential(credentialId: string): MultiHubCredential {
         this.assertHostManagementAvailable()
-        return this.dependencies.credentials.revoke(credentialId)
+        return cloneAndFreeze(this.dependencies.credentials.revoke(credentialId))
     }
 
-    async getStatus() {
-        return this.dependencies.getStatus()
+    async getStatus(): Promise<AdminMultiStatus> {
+        return cloneAndFreeze(await this.dependencies.getStatus())
     }
 
     async probeHub(): Promise<MultiProbeResult> {
-        const checkedAt = new Date(this.now()).toISOString()
+        const checkedAt = this.readCheckedAt()
         if (this.dependencies.mode !== "client") {
             return Object.freeze({ state: "not_applicable", checkedAt })
         }
+        if (checkedAt === null) return Object.freeze({ state: "unavailable", checkedAt })
 
         try {
             const result = await this.dependencies.probe()
@@ -68,6 +83,17 @@ export class MultiManagementService implements MultiManagementServiceContract {
     private assertHostManagementAvailable(): void {
         if (this.dependencies.mode === "client") {
             throw new MultiManagementError(CLIENT_MULTI_MANAGEMENT_UNAVAILABLE)
+        }
+    }
+
+    private readCheckedAt(): string | null {
+        try {
+            const milliseconds = this.now()
+            if (typeof milliseconds !== "number" || !Number.isFinite(milliseconds)) return null
+            const date = new Date(milliseconds)
+            return Number.isFinite(date.getTime()) ? date.toISOString() : null
+        } catch {
+            return null
         }
     }
 }

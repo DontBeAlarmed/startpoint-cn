@@ -22,9 +22,7 @@ export type MultiManagementErrorCode = typeof CLIENT_MULTI_MANAGEMENT_UNAVAILABL
 
 export interface MultiProbeResult {
     readonly state: MultiProbeState
-    readonly checkedAt: string
-    readonly endpoint?: string
-    readonly status?: AdminMultiStatus
+    readonly checkedAt: string | null
 }
 
 export interface MultiManagementDependencies {
@@ -32,6 +30,7 @@ export interface MultiManagementDependencies {
     readonly credentials: Pick<MultiHubCredentialStore, "create" | "list" | "revoke">
     readonly getStatus: () => Promise<AdminMultiStatus> | AdminMultiStatus
     readonly probe: () => Promise<CoordinatorResult<MultiHubControlStatus>>
+        | CoordinatorResult<MultiHubControlStatus>
     readonly now?: () => number
 }
 

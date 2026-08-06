@@ -90,6 +90,76 @@ test("credential management delegates create, list, and revoke to the injected s
     ])
 })
 
+test("credential and status results are copied and deeply frozen without freezing providers", async () => {
+    const createdSource = {
+        credentialId: "created",
+        label: "node",
+        createdAt: CHECKED_AT,
+        revokedAt: null,
+        token: "token",
+    }
+    const listedSource = [{
+        credentialId: "listed",
+        label: "node",
+        createdAt: CHECKED_AT,
+        revokedAt: null,
+    }]
+    const revokedSource = {
+        credentialId: "revoked",
+        label: "node",
+        createdAt: CHECKED_AT,
+        revokedAt: CHECKED_AT,
+    }
+    const statusSource = {
+        ...status(),
+        latestCompatibilityRejection: {
+            code: "INCOMPATIBLE_ROOM",
+            differences: [{ field: "APP_VER", different: true }],
+            timestamp: CHECKED_AT,
+        },
+    }
+    const fixture = createService("host", {
+        credentials: {
+            create: () => createdSource,
+            list: () => listedSource,
+            revoke: () => revokedSource,
+        },
+        getStatus: () => statusSource,
+    })
+
+    const created = fixture.service.createCredential("node")
+    const listed = fixture.service.listCredentials()
+    const revoked = fixture.service.revokeCredential("revoked")
+    const actualStatus = await fixture.service.getStatus()
+
+    assert.notEqual(created, createdSource)
+    assert.equal(Object.isFrozen(created), true)
+    assert.notEqual(listed, listedSource)
+    assert.equal(Object.isFrozen(listed), true)
+    assert.equal(Object.isFrozen(listed[0]), true)
+    assert.notEqual(revoked, revokedSource)
+    assert.equal(Object.isFrozen(revoked), true)
+    assert.notEqual(actualStatus, statusSource)
+    assert.equal(Object.isFrozen(actualStatus), true)
+    assert.equal(Object.isFrozen(actualStatus.coordinator), true)
+    assert.equal(Object.isFrozen(actualStatus.hub), true)
+    assert.equal(Object.isFrozen(actualStatus.tcp), true)
+    assert.equal(Object.isFrozen(actualStatus.latestCompatibilityRejection), true)
+    assert.equal(Object.isFrozen(actualStatus.latestCompatibilityRejection.differences), true)
+    assert.equal(Object.isFrozen(actualStatus.latestCompatibilityRejection.differences[0]), true)
+    assert.equal(Object.isFrozen(createdSource), false)
+    assert.equal(Object.isFrozen(listedSource), false)
+    assert.equal(Object.isFrozen(listedSource[0]), false)
+    assert.equal(Object.isFrozen(statusSource), false)
+    assert.equal(Object.isFrozen(statusSource.coordinator), false)
+    assert.equal(Object.isFrozen(statusSource.latestCompatibilityRejection), false)
+
+    statusSource.tcp.available = false
+    statusSource.latestCompatibilityRejection.differences[0].field = "RES_VER"
+    assert.equal(actualStatus.tcp.available, true)
+    assert.equal(actualStatus.latestCompatibilityRejection.differences[0].field, "APP_VER")
+})
+
 test("client mode rejects all host credential management with a stable error", () => {
     const fixture = createService("client")
 
@@ -117,7 +187,9 @@ test("getStatus returns the injected status provider result", async () => {
         },
     })
 
-    assert.equal(await fixture.service.getStatus(), expected)
+    const actual = await fixture.service.getStatus()
+    assert.deepEqual(actual, expected)
+    assert.notEqual(actual, expected)
     assert.deepEqual(calls, ["status"])
 })
 
@@ -136,6 +208,32 @@ test("embedded and host probes are not applicable without calling the network pr
             checkedAt: CHECKED_AT,
         })
         assert.deepEqual(calls, [])
+    }
+})
+
+test("probeHub safely handles now provider errors and NaN", async () => {
+    for (const mode of ["client", "embedded", "host"]) {
+        for (const now of [
+            () => {
+                throw new Error("clock unavailable")
+            },
+            () => Number.NaN,
+        ]) {
+            const calls = []
+            const fixture = createService(mode, {
+                now,
+                probe: async () => {
+                    calls.push("probe")
+                    return { ok: true, value: { tcpAvailable: true } }
+                },
+            })
+
+            assert.deepEqual(await fixture.service.probeHub(), {
+                state: mode === "client" ? "unavailable" : "not_applicable",
+                checkedAt: null,
+            })
+            assert.deepEqual(calls, [])
+        }
     }
 })
 
@@ -158,6 +256,17 @@ test("client probe maps a successful control status to ready without exposing th
     const result = await fixture.service.probeHub()
     assert.deepEqual(result, { state: "ready", checkedAt: CHECKED_AT })
     assert.doesNotMatch(JSON.stringify(result), /secret-(token|digest|node-session|session-credential)/)
+})
+
+test("client probe accepts a synchronous control status provider", async () => {
+    const fixture = createService("client", {
+        probe: () => ({ ok: true, value: { tcpAvailable: true } }),
+    })
+
+    assert.deepEqual(await fixture.service.probeHub(), {
+        state: "ready",
+        checkedAt: CHECKED_AT,
+    })
 })
 
 test("client probe maps tcp unavailability to degraded", async () => {

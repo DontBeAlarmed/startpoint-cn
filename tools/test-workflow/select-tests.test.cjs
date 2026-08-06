@@ -319,6 +319,7 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/runtime_bundle_metadata.test.cjs",
             "tools/runtime_config.test.cjs",
             "tools/multi_hub_credentials.test.cjs",
+            "tools/multi_management_service.test.cjs",
             "tools/multi_hub_control.test.cjs",
             "tools/multi_hub_idempotency.test.cjs",
             "tools/multi_hub_session_cleanup.test.cjs",
@@ -337,6 +338,10 @@ test("registers focused runtime state and socket smoke groups", () => {
     })
     assert.deepEqual(
         selectTestGroups(["tools/server_time_routes.test.cjs"]),
+        ["quick:runtime"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/multi_management_service.test.cjs"]),
         ["quick:runtime"],
     )
     assert.deepEqual(TEST_GROUPS["integration:runtime"], {
