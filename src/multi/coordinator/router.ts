@@ -24,6 +24,14 @@ type OriginResolver = (
     participant: ParticipantIdentity,
 ) => MultiCoordinatorOrigin | null | Promise<MultiCoordinatorOrigin | null>
 
+interface RoomOriginEntry {
+    readonly generation: number
+    readonly origin: MultiCoordinatorOrigin
+    readonly roomNumber: string
+    readonly accessToken?: string
+    readonly participantKey?: string
+}
+
 export interface RoutedMultiCoordinatorOptions {
     readonly remote: MultiCoordinator
     readonly local: MultiCoordinator
@@ -53,9 +61,10 @@ export function isOriginAwareMultiCoordinator(
 }
 
 export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer, OriginAwareMultiCoordinator {
-    private readonly roomOrigins = new Map<string, MultiCoordinatorOrigin>()
-    private readonly accessTokenOrigins = new Map<string, MultiCoordinatorOrigin>()
-    private readonly participantOrigins = new Map<string, MultiCoordinatorOrigin>()
+    private readonly roomOrigins = new Map<string, RoomOriginEntry>()
+    private readonly accessTokenOrigins = new Map<string, RoomOriginEntry>()
+    private readonly participantOrigins = new Map<string, RoomOriginEntry>()
+    private nextGeneration = 0
 
     constructor(private readonly options: RoutedMultiCoordinatorOptions) {}
 
@@ -68,14 +77,14 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
         if (activeOrigin === "remote" || activeOrigin === "local") return activeOrigin
         if (input.roomNumber) {
             const roomOrigin = this.roomOrigins.get(input.roomNumber)
-            if (roomOrigin) return roomOrigin
+            if (roomOrigin) return roomOrigin.origin
         }
         if (input.accessToken) {
             const tokenOrigin = this.accessTokenOrigins.get(input.accessToken)
-            if (tokenOrigin) return tokenOrigin
+            if (tokenOrigin) return tokenOrigin.origin
         }
         const participantOrigin = this.participantOrigins.get(this.participantKey(input.participant))
-        if (participantOrigin) return participantOrigin
+        if (participantOrigin) return participantOrigin.origin
         return this.newRoomOrigin()
     }
 
@@ -172,11 +181,12 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
         input: TInput,
         operation: TOperation,
     ): Promise<Awaited<ReturnType<MultiCoordinator[TOperation]>>> {
+        const teardownEntry = this.roomOrigins.get(input.roomNumber)
         const origin = await this.resolveOrigin(input)
         const coordinator = this.coordinatorFor(origin)
         const result = await coordinator[operation](input as never) as Awaited<ReturnType<MultiCoordinator[TOperation]>>
         if (result.ok && ["disbandRoom", "abortBattle", "finalizeBattle"].includes(operation)) {
-            this.roomOrigins.delete(input.roomNumber)
+            this.clearTeardownEntry(teardownEntry)
         }
         return result
     }
@@ -184,11 +194,11 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
     private cachedOrigin(input: CoordinatorOriginLookup): MultiCoordinatorOrigin | null {
         if (input.roomNumber) {
             const roomOrigin = this.roomOrigins.get(input.roomNumber)
-            if (roomOrigin) return roomOrigin
+            if (roomOrigin) return roomOrigin.origin
         }
         if (input.accessToken) {
             const tokenOrigin = this.accessTokenOrigins.get(input.accessToken)
-            if (tokenOrigin) return tokenOrigin
+            if (tokenOrigin) return tokenOrigin.origin
         }
         return null
     }
@@ -199,11 +209,17 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
         room: RoomStatus,
         rememberParticipant: boolean,
     ): void {
-        this.roomOrigins.set(room.roomNumber, origin)
-        this.accessTokenOrigins.set(room.accessToken, origin)
-        if (rememberParticipant) {
-            this.participantOrigins.set(this.participantKey(participant), origin)
-        }
+        const previous = this.roomOrigins.get(room.roomNumber)
+        const associatedParticipantKey = rememberParticipant
+            ? this.participantKey(participant)
+            : previous?.participantKey
+        this.installEntry({
+            generation: this.nextEntryGeneration(),
+            origin,
+            roomNumber: room.roomNumber,
+            accessToken: room.accessToken,
+            participantKey: associatedParticipantKey,
+        })
     }
 
     private rememberBattle(
@@ -211,8 +227,46 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
         participant: ParticipantIdentity,
         roomNumber: string,
     ): void {
-        this.roomOrigins.set(roomNumber, origin)
-        this.participantOrigins.set(this.participantKey(participant), origin)
+        const previous = this.roomOrigins.get(roomNumber)
+        this.installEntry({
+            generation: this.nextEntryGeneration(),
+            origin,
+            roomNumber,
+            accessToken: previous?.accessToken,
+            participantKey: this.participantKey(participant),
+        })
+    }
+
+    private installEntry(entry: RoomOriginEntry): void {
+        const previous = this.roomOrigins.get(entry.roomNumber)
+        if (previous) this.detachEntryAssociations(previous)
+        this.roomOrigins.set(entry.roomNumber, entry)
+        if (entry.accessToken) this.accessTokenOrigins.set(entry.accessToken, entry)
+        if (entry.participantKey) this.participantOrigins.set(entry.participantKey, entry)
+    }
+
+    private detachEntryAssociations(entry: RoomOriginEntry): void {
+        if (entry.accessToken && this.isCurrentEntry(this.accessTokenOrigins.get(entry.accessToken), entry)) {
+            this.accessTokenOrigins.delete(entry.accessToken)
+        }
+        if (entry.participantKey && this.isCurrentEntry(this.participantOrigins.get(entry.participantKey), entry)) {
+            this.participantOrigins.delete(entry.participantKey)
+        }
+    }
+
+    private clearTeardownEntry(entry: RoomOriginEntry | undefined): void {
+        if (!entry || !this.isCurrentEntry(this.roomOrigins.get(entry.roomNumber), entry)) return
+        this.roomOrigins.delete(entry.roomNumber)
+        this.detachEntryAssociations(entry)
+    }
+
+    private isCurrentEntry(current: RoomOriginEntry | undefined, expected: RoomOriginEntry): boolean {
+        return current?.generation === expected.generation
+    }
+
+    private nextEntryGeneration(): number {
+        this.nextGeneration += 1
+        return this.nextGeneration
     }
 
     private participantKey(participant: ParticipantIdentity): string {

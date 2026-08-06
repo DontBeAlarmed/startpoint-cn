@@ -453,3 +453,63 @@ test("failed abort, finalize and disband keep their room origins", async () => {
         }
     }
 })
+
+test("completed teardown cannot clear a reused room's newer local cache entry", async () => {
+    const roomNumber = "123456"
+
+    for (const operation of ["abortBattle", "finalizeBattle", "disbandRoom"]) {
+        let release
+        let markOperationStarted
+        const pending = new Promise(resolve => { release = resolve })
+        const operationStarted = new Promise(resolve => { markOperationStarted = resolve })
+        const remote = coordinator("remote", {
+            [operation]: async () => {
+                markOperationStarted()
+                await pending
+                return {
+                    ok: true,
+                    value: operation === "finalizeBattle"
+                        ? { ...battle(roomNumber), finalized: true }
+                        : undefined,
+                }
+            },
+        })
+        const local = coordinator("local", {
+            createRoom: () => ({
+                ok: true,
+                value: { ...room(roomNumber), accessToken: `local-token-${operation}` },
+            }),
+        })
+        const fixture = routed({ remote, local, newRoomOrigin: "remote" })
+
+        assert.equal((await fixture.router.selectRoom(compatibleInput(roomNumber))).ok, true, operation)
+        const teardownInput = operation === "finalizeBattle"
+            ? { participant, roomNumber, battleSessionId }
+            : { participant, roomNumber }
+        const teardown = fixture.router[operation](teardownInput)
+        await operationStarted
+
+        fixture.setNewRoomOrigin("local")
+        const created = await fixture.router.createRoom(createInput())
+        assert.equal(created.ok, true, operation)
+        assert.equal(created.value.roomNumber, roomNumber, operation)
+
+        fixture.setNewRoomOrigin("remote")
+        release({
+            ok: true,
+            value: operation === "finalizeBattle"
+                ? { ...battle(roomNumber), finalized: true }
+                : undefined,
+        })
+        assert.equal((await teardown).ok, true, operation)
+
+        assert.equal(await fixture.router.resolveOrigin({ participant, roomNumber }), "local", operation)
+        assert.equal(await fixture.router.resolveOrigin({
+            participant,
+            accessToken: `token-${roomNumber}`,
+        }), "local", operation)
+        assert.equal((await fixture.router.selectRoom(compatibleInput(roomNumber))).ok, true, operation)
+        assert.deepEqual(local.calls.map(call => call.name), ["createRoom", "selectRoom"], operation)
+        assert.deepEqual(remote.calls.map(call => call.name), ["selectRoom", operation], operation)
+    }
+})
