@@ -103,7 +103,7 @@ function scanTokenAssignments(text) {
 
         index++
         while (isHorizontalWhitespace(text[index])) index++
-        const scanned = text[index] === "'" || text[index] === '"'
+        const scanned = text[index] === "'" || text[index] === '"' || text[index] === "`"
             ? scanQuotedValue(text, index, text[index])
             : scanUnquotedValue(text, index)
         if (key === TOKEN_KEY) assignments.push({
@@ -204,7 +204,8 @@ async function maybeWriteMultiHubTokenEnv({
     syncParentDirectory = syncParentDirectoryDefault,
 }) {
     if (!interactive) return { written: false, reason: "non_interactive" }
-    const text = readEnvFile(envPath)
+    const originalText = readEnvFile(envPath)
+    const text = originalText.charCodeAt(0) === 0xFEFF ? originalText.slice(1) : originalText
     const assignments = scanTokenAssignments(text)
     if (assignments.length > 1) {
         throw new MultiHubEnvError("DUPLICATE_MULTI_HUB_TOKEN_ENV")

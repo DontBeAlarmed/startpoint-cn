@@ -27,6 +27,16 @@ function envFixture(t, text = "", mode = 0o600) {
     return { envPath, root }
 }
 
+function readTokenViaNodeEnvFile(envPath) {
+    const env = { ...process.env }
+    delete env.MULTI_HUB_TOKEN
+    return spawnSync(process.execPath, [
+        `--env-file=${envPath}`,
+        "-e",
+        "process.stdout.write(process.env.MULTI_HUB_TOKEN ?? 'missing')",
+    ], { encoding: "utf8", env })
+}
+
 test("client management ignores an invalid residual Host credentials path", () => {
     const service = createOfflineMultiManagementService({
         projectRoot,
@@ -131,7 +141,7 @@ test("interactive create does not overwrite one existing token by default", asyn
     assert.equal(fs.readFileSync(envPath, "utf8"), original)
 })
 
-test("scanner preserves BOM, comments, quotes, and CRLF around a replaced top-level token", async t => {
+test("scanner removes BOM while preserving comments, quotes, and CRLF", async t => {
     const oldToken = "b".repeat(64)
     const newToken = "a".repeat(64)
     const original = [
@@ -151,7 +161,28 @@ test("scanner preserves BOM, comments, quotes, and CRLF around a replaced top-le
         confirm: async () => true,
     })
 
-    assert.equal(fs.readFileSync(envPath, "utf8"), original.replace(oldToken, newToken))
+    assert.equal(fs.readFileSync(envPath, "utf8"), original.slice(1).replace(oldToken, newToken))
+})
+
+test("writing removes a BOM directly before the token so Node env-file reads the real key", async t => {
+    const oldToken = "b".repeat(64)
+    const newToken = "a".repeat(64)
+    const { envPath } = envFixture(t, `\uFEFFMULTI_HUB_TOKEN=${oldToken}\nKEEP=value\n`)
+
+    await maybeWriteMultiHubTokenEnv({
+        envPath,
+        token: newToken,
+        interactive: true,
+        confirm: async () => true,
+    })
+
+    assert.equal(
+        fs.readFileSync(envPath, "utf8"),
+        `MULTI_HUB_TOKEN=${newToken}\nKEEP=value\n`,
+    )
+    const loaded = readTokenViaNodeEnvFile(envPath)
+    assert.equal(loaded.status, 0, loaded.stderr)
+    assert.equal(loaded.stdout, newToken)
 })
 
 test("scanner ignores token-looking text inside a multiline quoted value", async t => {
@@ -162,6 +193,29 @@ test("scanner ignores token-looking text inside a multiline quoted value", async
         "MULTI_HUB_TOKEN=fake-inside-value",
         "last line\"",
         `MULTI_HUB_TOKEN='${oldToken}'`,
+        "TAIL=value",
+        "",
+    ].join("\n")
+    const { envPath } = envFixture(t, original)
+
+    await maybeWriteMultiHubTokenEnv({
+        envPath,
+        token: newToken,
+        interactive: true,
+        confirm: async () => true,
+    })
+
+    assert.equal(fs.readFileSync(envPath, "utf8"), original.replace(oldToken, newToken))
+})
+
+test("scanner ignores token-looking text inside a multiline backtick value", async t => {
+    const oldToken = "b".repeat(64)
+    const newToken = "a".repeat(64)
+    const original = [
+        "PAYLOAD=`first line",
+        "MULTI_HUB_TOKEN=fake-inside-backticks",
+        "last line`",
+        `MULTI_HUB_TOKEN=${oldToken}`,
         "TAIL=value",
         "",
     ].join("\n")
