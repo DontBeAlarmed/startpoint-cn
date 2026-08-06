@@ -66,6 +66,45 @@ test("host multiplayer startup failure is degraded and does not block core readi
     await harness.coordinator.stop()
 })
 
+test("restores server time before HTTP ready and listen", async () => {
+    const harness = createHarness({
+        restoreServerTime() {
+            harness.calls.push("time")
+        },
+    })
+
+    await harness.coordinator.start()
+
+    const timeIndex = harness.calls.indexOf("time")
+    const readyIndex = harness.calls.indexOf("http-ready")
+    const listenIndex = harness.calls.findIndex(call => (
+        Array.isArray(call) && call[0] === "http-listen"
+    ))
+    assert.ok(timeIndex >= 0)
+    assert.ok(timeIndex < readyIndex)
+    assert.ok(timeIndex < listenIndex)
+    await harness.coordinator.stop()
+})
+
+test("server time restore failure reports the database startup stage", async () => {
+    const harness = createHarness({
+        restoreServerTime() {
+            harness.calls.push("time-failure")
+            throw new Error("server time state is unreadable")
+        },
+    })
+
+    await harness.coordinator.start()
+
+    assert.equal(harness.coordinator.getPhase(), "failed")
+    assert.deepEqual(harness.startupStages, ["database"])
+    assert.equal(harness.exitCodes[0], 12)
+    assert.equal(harness.calls.includes("http-ready"), false)
+    assert.equal(harness.calls.some(call => (
+        Array.isArray(call) && call[0] === "http-listen"
+    )), false)
+})
+
 function listen(server) {
     return new Promise((resolve, reject) => {
         server.once("error", reject)
@@ -145,7 +184,7 @@ function createHarness(overrides = {}) {
         loadConfig() { calls.push("config"); return config },
         configureHttp(value) { calls.push(["configure-http", value]) },
         initializeDatabase() { calls.push("database") },
-        restoreTimeOffset() { calls.push("time") },
+        restoreServerTime() { calls.push("time") },
         async initializeContent(value) { calls.push(["content", value.assetProvider.mode]) },
         async readyHttp() { calls.push("http-ready") },
         async listenHttp(value) {
@@ -185,15 +224,18 @@ function createHarness(overrides = {}) {
         nodeVersion: "v20.12.0",
         adminAvailable: true,
         shutdownStepTimeoutMs: 25,
+        reportStartupFailure(stage) { startupStages.push(stage) },
         reportShutdownFailures(failures) { calls.push(["shutdown-failures", failures]) },
         ...overrides,
     }
+    const startupStages = []
     return {
         calls,
         config,
         coordinator: createRuntimeCoordinator(dependencies),
         exitCodes,
         processTarget,
+        startupStages,
         setMultiStatus(value) { multiStatus = value },
     }
 }
@@ -345,7 +387,7 @@ test("startup error classes retain stable exit codes including reserved runtime 
 for (const scenario of [
     { name: "config", method: "loadConfig", code: 10, cleanup: [] },
     { name: "database", method: "initializeDatabase", code: 12, cleanup: [], noHttpAttempt: true },
-    { name: "database restore", method: "restoreTimeOffset", code: 12, cleanup: ["checkpoint", "database-close"], noHttpAttempt: true },
+    { name: "database restore", method: "restoreServerTime", code: 12, cleanup: ["checkpoint", "database-close"], noHttpAttempt: true },
     { name: "content", method: "initializeContent", code: 15, cleanup: ["checkpoint", "database-close"], noHttpAttempt: true },
     { name: "HTTP configure", method: "configureHttp", code: 13, cleanup: ["http-close", "multi-stop", "checkpoint", "database-close"] },
     { name: "HTTP ready", method: "readyHttp", code: 13, cleanup: ["http-close", "multi-stop", "checkpoint", "database-close"] },

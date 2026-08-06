@@ -28,6 +28,7 @@ const routes = async (fastify: FastifyInstance, options: WebApiRoutesOptions) =>
     fastify.register(serverApiPlugin, {
         prefix: "/server",
         getMultiStatus: options.getMultiStatus,
+        serverTimeService: options.serverTimeService,
     })
     fastify.register(mailApiPlugin, { prefix: "/mail" })
     fastify.register(lookupApiPlugin, { prefix: "/lookup" })

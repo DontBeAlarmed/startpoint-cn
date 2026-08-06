@@ -29,7 +29,7 @@ export interface RuntimeCoordinatorDependencies {
     readonly loadConfig: () => CnRuntimeConfig
     readonly configureHttp: (config: CnRuntimeConfig) => void
     readonly initializeDatabase: () => void
-    readonly restoreTimeOffset: () => void
+    readonly restoreServerTime: () => void
     readonly initializeContent: (config: CnRuntimeConfig) => Promise<unknown>
     readonly readyHttp: () => Promise<unknown>
     readonly listenHttp: (config: CnRuntimeConfig) => Promise<unknown>
@@ -214,7 +214,7 @@ class Coordinator implements RuntimeCoordinator {
             this.stage = "database"
             this.dependencies.initializeDatabase()
             this.databaseInitialized = true
-            this.dependencies.restoreTimeOffset()
+            this.dependencies.restoreServerTime()
             if (this.interrupted()) return
 
             this.stage = "content"

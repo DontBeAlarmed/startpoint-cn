@@ -70,7 +70,7 @@ function buildCoordinator(dir, trace) {
         loadConfig: () => config,
         configureHttp: () => {},
         initializeDatabase: () => {},
-        restoreTimeOffset: () => {},
+        restoreServerTime: () => {},
         ...contentDependencies,
         initializeContent: async currentConfig => {
             const loaded = await contentDependencies.initializeContent(currentConfig)

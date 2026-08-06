@@ -10,7 +10,7 @@ import getDatabase, {
     getDatabaseStatus,
     initializeDatabase,
 } from "./data";
-import { restoreTimeOffset } from "./data/activeAccount";
+import { ServerTimeService } from "./runtime/server-time/service";
 import { getContentSnapshot, initializeContentSnapshot } from "./content/runtime/content-snapshot";
 import { createContentLifecycleDependencies } from "./modes/cn-lifecycle";
 import { configureSerializedAssetVersionProvider } from "./data/utils/serialized-asset-version";
@@ -80,6 +80,7 @@ const fastify = Fastify({
 const projectRoot = path.resolve(__dirname, "..");
 let runtimeCoordinator: RuntimeCoordinator;
 const multiRuntimeService = createMultiRuntimeService();
+const serverTimeService = new ServerTimeService();
 const gachaSeedQuarantine = getDefaultGachaSeedQuarantine();
 
 // Simple in-memory rate limiter for /crash endpoint only.
@@ -261,6 +262,7 @@ fastify.register(characterElectionApiPlugin, { prefix: `${apiPrefix}/character_e
 fastify.register(indexWebApiPlugin, {
     prefix: "/api",
     getMultiStatus: () => multiRuntimeService.getAdminStatus(),
+    serverTimeService,
 });
 fastify.register(seedsWebApiPlugin, { prefix: "/api/seeds" });
 
@@ -322,7 +324,7 @@ runtimeCoordinator = createRuntimeCoordinator({
     },
     configureHttp: configureRuntimeHttp,
     initializeDatabase,
-    restoreTimeOffset,
+    restoreServerTime: () => { serverTimeService.restore(); },
     // Content snapshot, then operator-installed gameplay modules (modes.d/).
     // Composed by the seam so the lifecycle test drives this exact entry
     // point instead of re-creating the ordering.

@@ -1,10 +1,13 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getServerTime, getServerDate, setServerTime, getTimeOffset } from "../../utils";
+import { getServerDate } from "../../utils";
+import { ServerTimeService, ServerTimeServiceError } from "../../runtime/server-time/service";
+import { validateServerTimePackage } from "../../runtime/server-time/store";
+import type { ServerTimePackage, ServerTimeSnapshot } from "../../runtime/server-time/types";
 import { deleteAccountSync, getAccountPlayersSync, getAllAccountsSync } from "../../data/domains/account"
 import { deletePlayerSync, getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getAllDeviceBindingsSync, updateDeviceBindingNameSync } from "../../data/domains/session"
 import { getPlayerCharactersSync } from "../../data/domains/character"
-import { getActivePlayerId, setActivePlayerId, saveTimeOffset, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
+import { getActivePlayerId, setActivePlayerId, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
 import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTemplate, getDefaultSaveMeta } from "../../data/defaultSave";
 import { getEffectiveVersion } from "../../lib/version";
 import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance";
@@ -30,9 +33,46 @@ interface TimeQuery {
 
 export interface ServerRoutesOptions {
     readonly getMultiStatus?: () => Promise<AdminMultiStatus> | AdminMultiStatus
+    readonly serverTimeService?: ServerTimeService
+}
+
+function httpTimePackage(snapshot: ServerTimeSnapshot): ServerTimePackage {
+    return {
+        mode: snapshot.mode,
+        offsetMs: snapshot.offsetMs,
+        generatedAt: snapshot.generatedAt,
+    }
+}
+
+function legacyTimeResponse(
+    snapshot: ServerTimeSnapshot,
+    isCustom: boolean = snapshot.mode === "offset",
+) {
+    return {
+        servertime: Math.floor(snapshot.serverTimeMs / 1000),
+        date: new Date(snapshot.serverTimeMs).toISOString(),
+        isCustom,
+    }
+}
+
+function isLoopbackRequest(request: FastifyRequest): boolean {
+    const address = request.ip.replace(/^::ffff:/, "")
+    return address === "127.0.0.1"
+        || address === "::1"
+        || address === "0:0:0:0:0:0:0:1"
+}
+
+function requireLoopback(request: FastifyRequest, reply: FastifyReply): boolean {
+    if (isLoopbackRequest(request)) return true
+    reply.status(403).send({
+        error: "Forbidden",
+        message: "This management operation requires a loopback request",
+    })
+    return false
 }
 
 const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) => {
+    const serverTimeService = options.serverTimeService ?? new ServerTimeService()
 
     fastify.get("/status", async (_request: FastifyRequest, reply: FastifyReply) => {
         const root = process.cwd()
@@ -75,25 +115,47 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
     })
 
     fastify.get("/currentTime", async (_request: FastifyRequest, reply: FastifyReply) => {
-        const date = getServerDate()
-        reply.status(200).send({
-            servertime: getServerTime(),
-            date: date.toISOString(),
-            isCustom: date.getTime() !== Date.now()
-        })
+        reply.status(200).send(legacyTimeResponse(serverTimeService.getState()))
     })
 
-    fastify.get("/resetTime", async (_request: FastifyRequest, reply: FastifyReply) => {
-        setServerTime(null)
-        saveTimeOffset(null)
-        reply.status(200).send({
-            servertime: getServerTime(),
-            date: getServerDate().toISOString(),
-            isCustom: false
-        })
+    fastify.get("/time-package", async (_request: FastifyRequest, reply: FastifyReply) => {
+        return reply.status(200).send(httpTimePackage(serverTimeService.exportPackage()))
+    })
+
+    fastify.put("/time-package", async (request: FastifyRequest, reply: FastifyReply) => {
+        if (!requireLoopback(request, reply)) return
+        try {
+            validateServerTimePackage(request.body)
+        } catch (error) {
+            return reply.status(400).send({
+                error: "Bad Request",
+                message: error instanceof Error ? error.message : "INVALID_SERVER_TIME_STATE",
+            })
+        }
+
+        try {
+            return reply.status(200).send(serverTimeService.importPackage(request.body))
+        } catch (error) {
+            if (error instanceof ServerTimeServiceError) {
+                return reply.status(400).send({ error: "Bad Request", message: error.message })
+            }
+            return reply.status(500).send({
+                error: "Internal Server Error",
+                message: error instanceof Error ? error.message : "Unknown error",
+            })
+        }
+    })
+
+    fastify.get("/resetTime", async (request: FastifyRequest, reply: FastifyReply) => {
+        if (!requireLoopback(request, reply)) return
+        reply.status(200).send(legacyTimeResponse(
+            serverTimeService.setSystemTime(),
+            false,
+        ))
     })
 
     fastify.get("/time", async (request: FastifyRequest, reply: FastifyReply) => {
+        if (!requireLoopback(request, reply)) return
         const newTime = (request.query as TimeQuery).time
         if (!newTime) return reply.status(400).send({
             "error": "Bad Request",
@@ -115,13 +177,10 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
                     "message": `Invalid time format: "${newTime}". Use ISO format.`
                 })
             }
-            setServerTime(time)
-            saveTimeOffset(getTimeOffset())
-            reply.status(200).send({
-                servertime: getServerTime(),
-                date: getServerDate().toISOString(),
-                isCustom: true
-            })
+            reply.status(200).send(legacyTimeResponse(
+                serverTimeService.setAbsoluteTime(time.getTime()),
+                true,
+            ))
         } catch (error: any) {
             return reply.status(500).send({
                 "error": "Internal Server Error",
