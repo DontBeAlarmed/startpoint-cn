@@ -32,6 +32,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/runtime_health.test.cjs",
             "tools/runtime_lifecycle.test.cjs",
             "tools/runtime_native_binding.test.cjs",
+            "tools/server_time_service.test.cjs",
         ],
     },
     "quick:modes": {

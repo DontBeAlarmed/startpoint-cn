@@ -18,6 +18,7 @@ const {
 const NOW_MS = Date.parse("2026-08-06T03:00:00.000Z")
 const TARGET_MS = Date.parse("2024-08-14T12:00:00.000Z")
 const DEFAULT_DATE = "2024-08-14T12:00:00.000Z"
+const ORIGINAL_TIME_OFFSET = getTimeOffset()
 
 function makePaths() {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "server-time-test-"))
@@ -247,6 +248,48 @@ test("migrates a finite fractional legacy active account offset", () => {
   assert.equal(store.read().offsetMs, 1.5)
 })
 
+test("rejects corrupt legacy active account JSON instead of using the default date", () => {
+  const { paths, service } = freshService()
+  fs.writeFileSync(paths.legacyFilePath, "not-json")
+
+  assert.throws(() => service.restore({ nowMs: NOW_MS }), error => {
+    assertCode(error, "INVALID_SERVER_TIME_STATE")
+    return true
+  })
+})
+
+test("rejects structurally invalid legacy active account state", () => {
+  const { paths, service } = freshService()
+  fs.writeFileSync(paths.legacyFilePath, JSON.stringify({ timeOffset: "1.5" }))
+
+  assert.throws(() => service.restore({ nowMs: NOW_MS }), error => {
+    assertCode(error, "INVALID_SERVER_TIME_STATE")
+    return true
+  })
+})
+
+test("rejects a symbolic-link legacy active account file", () => {
+  const { paths, service } = freshService()
+  const target = path.join(paths.dataDir, "legacy-active-account.json")
+  fs.writeFileSync(target, JSON.stringify({ timeOffset: 1.5 }))
+  fs.symlinkSync(target, paths.legacyFilePath)
+
+  assert.throws(() => service.restore({ nowMs: NOW_MS }), error => {
+    assertCode(error, "INVALID_SERVER_TIME_STATE")
+    return true
+  })
+})
+
+test("rejects a non-regular legacy active account path", () => {
+  const { paths, service } = freshService()
+  fs.mkdirSync(paths.legacyFilePath)
+
+  assert.throws(() => service.restore({ nowMs: NOW_MS }), error => {
+    assertCode(error, "INVALID_SERVER_TIME_STATE")
+    return true
+  })
+})
+
 test("uses the project default date when no valid state exists", () => {
   const { paths, service } = freshService()
   const restored = service.restore({ nowMs: NOW_MS })
@@ -286,6 +329,8 @@ async function main() {
       console.error(`not ok - ${current.name}`)
       console.error(error)
       throw error
+    } finally {
+      setServerTimeOffset(ORIGINAL_TIME_OFFSET)
     }
   }
   console.log(`${passed}/${tests.length} tests passed`)

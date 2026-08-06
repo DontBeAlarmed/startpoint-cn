@@ -123,16 +123,26 @@ export class ServerTimeStore {
             stats = fs.lstatSync(this.legacyFilePath)
         } catch (error) {
             if ((error as NodeJS.ErrnoException).code === "ENOENT") return null
-            return null
+            return invalidState("unable to inspect legacy active account state")
         }
-        if (stats.isSymbolicLink() || !stats.isFile()) return null
+        if (stats.isSymbolicLink() || !stats.isFile()) {
+            return invalidState("legacy active account state must be a regular file")
+        }
+
+        let value: unknown
         try {
-            const value = JSON.parse(fs.readFileSync(this.legacyFilePath, "utf8"))
-            const offset = isRecord(value) ? value.timeOffset : null
-            return typeof offset === "number" && Number.isFinite(offset) ? offset : null
+            value = JSON.parse(fs.readFileSync(this.legacyFilePath, "utf8"))
         } catch {
-            return null
+            return invalidState("invalid legacy active account JSON")
         }
+
+        if (!isRecord(value)) return invalidState("invalid legacy active account structure")
+        const offset = value.timeOffset
+        if (offset === undefined || offset === null) return null
+        if (typeof offset !== "number" || !Number.isFinite(offset)) {
+            return invalidState("invalid legacy active account time offset")
+        }
+        return offset
     }
 
     write(value: ServerTimePackage): void {
@@ -155,6 +165,7 @@ export class ServerTimeStore {
             `.${path.basename(this.filePath)}.${process.pid}.${this.now()}.${randomBytes(8).toString("hex")}.tmp`,
         )
         let descriptor: number | null = null
+        let primaryError: unknown = null
         try {
             descriptor = fs.openSync(temporaryPath, "wx", 0o600)
             fs.writeFileSync(descriptor, `${JSON.stringify(state)}\n`, "utf8")
@@ -163,13 +174,39 @@ export class ServerTimeStore {
             fs.closeSync(descriptor)
             descriptor = null
             this.replaceFile(temporaryPath, this.filePath)
-        } finally {
-            if (descriptor !== null) fs.closeSync(descriptor)
+            this.syncParentDirectory(directory)
+        } catch (error) {
+            primaryError = error
+        }
+
+        if (descriptor !== null) {
             try {
-                fs.unlinkSync(temporaryPath)
+                fs.closeSync(descriptor)
             } catch (error) {
-                if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+                if (primaryError === null) primaryError = error
             }
+        }
+        try {
+            fs.unlinkSync(temporaryPath)
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ENOENT"
+                && primaryError === null) {
+                primaryError = error
+            }
+        }
+        if (primaryError !== null) throw primaryError
+    }
+
+    private syncParentDirectory(directory: string): void {
+        try {
+            const descriptor = fs.openSync(directory, "r")
+            try {
+                fs.fsyncSync(descriptor)
+            } finally {
+                fs.closeSync(descriptor)
+            }
+        } catch {
+            // Directory fsync is best effort on platforms that do not support opening directories.
         }
     }
 }
