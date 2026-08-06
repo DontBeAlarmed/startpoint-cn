@@ -5,6 +5,7 @@ import {
     getRoom,
     getRoomByToken,
     listActiveRooms,
+    removeRoomMember,
     updateRoomState,
     updateHostEntryTime,
 } from "../room/manager"
@@ -229,6 +230,10 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
                 continue
             }
 
+            const invalidatedParticipants = sessionManager.getNodeSessionParticipants(
+                room.room_number,
+                nodeSessionId,
+            )
             let factStatus: BattleStatus | null = null
             let roomRemoved = false
             try {
@@ -252,6 +257,17 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
                     room.room_number,
                     nodeSessionId,
                 )) roomRemoved = true
+            } catch {
+                this.warnNodeSessionCleanup(room.room_number)
+            }
+            try {
+                if (this.removeInvalidatedRoomMembers(
+                    room,
+                    nodeSessionId,
+                    invalidatedParticipants,
+                )) {
+                    roomRemoved = true
+                }
             } catch {
                 this.warnNodeSessionCleanup(room.room_number)
             }
@@ -353,6 +369,36 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         if (!sessionManager.isBattleFullyFinalized(status)) return false
         updateRoomState(status.roomNumber, 1)
         sessionManager.clearBattleExpectedCount(status.roomNumber)
+        return true
+    }
+
+    private removeInvalidatedRoomMembers(
+        room: MultiRoom,
+        nodeSessionId: NodeSessionId,
+        invalidatedParticipants: readonly ParticipantIdentity[],
+    ): boolean {
+        const survivingViewerIds = new Set(sessionManager.getClientsInRoom(room.room_number)
+            .filter(client => client.participant?.nodeSessionId !== nodeSessionId)
+            .map(client => client.viewerId))
+        const removedViewerIds = new Set<number>()
+        for (const participant of invalidatedParticipants) {
+            if (survivingViewerIds.has(participant.viewerId)) continue
+            if (removeRoomMember(room.room_number, participant.viewerId)) {
+                removedViewerIds.add(participant.viewerId)
+            }
+        }
+        if (removedViewerIds.size === 0) return false
+
+        room.mates = room.mates.filter(mate => (
+            mate.viewer_id === null || !removedViewerIds.has(mate.viewer_id)
+        ))
+        for (const client of sessionManager.getClientsInRoom(room.room_number)) {
+            client.mates = client.mates.filter(mate => !removedViewerIds.has(mate.viewerId))
+        }
+        const hostClient = sessionManager.getRoomHostClient(room.room_number)
+        if (hostClient) {
+            sessionManager.broadcastToRoom(room.room_number, [1, [1, hostClient.mates]])
+        }
         return true
     }
 

@@ -103,9 +103,19 @@ async function createGuestInvalidationFixture(t, mode) {
         })
         assert.equal(created.ok, true)
         const roomNumber = created.value.roomNumber
-        getRoom(roomNumber).member_viewer_ids.push(guest.viewerId)
+        const room = getRoom(roomNumber)
+        room.member_viewer_ids.push(guest.viewerId)
         const hostConnectionId = `invalidation-host-${mode}-${index}`
         const guestConnectionId = `invalidation-guest-${mode}-${index}`
+        const hostLobbySocket = new FakeSocket()
+        const hostLobby = sessionManager.createClient(
+            hostLobbySocket,
+            host.viewerId,
+            roomNumber,
+            `invalidation-lobby-host-${mode}-${index}`,
+        )
+        hostLobby.participant = host
+        assert.equal(sessionManager.addClientToRoom(hostLobby).ok, true)
         const guestLobbySocket = new FakeSocket()
         const guestLobby = sessionManager.createClient(
             guestLobbySocket,
@@ -115,6 +125,13 @@ async function createGuestInvalidationFixture(t, mode) {
         )
         guestLobby.participant = guest
         assert.equal(sessionManager.addClientToRoom(guestLobby).ok, true)
+        const lobbyMates = [
+            { viewerId: host.viewerId, connectionId: hostLobby.connectionId, party: {} },
+            { viewerId: guest.viewerId, connectionId: guestLobby.connectionId, party: {} },
+        ]
+        hostLobby.mates = [...lobbyMates]
+        guestLobby.mates = [...lobbyMates]
+        room.mates = lobbyMates.map(mate => ({ viewer_id: mate.viewerId, com_id: 0 }))
         const guestBattleSocket = new FakeSocket({ throwOnDestroy: index === 0 })
         const guestBattle = sessionManager.createClient(
             guestBattleSocket,
@@ -140,6 +157,7 @@ async function createGuestInvalidationFixture(t, mode) {
             battleSessionId,
             guestBattleSocket,
             guestLobbySocket,
+            hostLobby,
             host,
             roomNumber,
         })
@@ -178,6 +196,12 @@ for (const mode of ["expiry", "revoke"]) {
             assert.equal(sessionManager.getActiveBattleSessionId(room.roomNumber), null)
             assert.equal(room.guestLobbySocket.destroyed, true)
             assert.equal(room.guestBattleSocket.destroyed, true)
+            assert.deepEqual(getRoom(room.roomNumber).member_viewer_ids, [room.host.viewerId])
+            assert.deepEqual(getRoom(room.roomNumber).mates, [{
+                viewer_id: room.host.viewerId,
+                com_id: 0,
+            }])
+            assert.deepEqual(room.hostLobby.mates.map(mate => mate.viewerId), [room.host.viewerId])
             assert.equal((await fixture.coordinator.getBattleStatus({
                 participant: room.host,
                 roomNumber: room.roomNumber,

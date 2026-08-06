@@ -395,6 +395,26 @@ export class SessionManager {
         return removed
     }
 
+    getNodeSessionParticipants(
+        roomNumber: string,
+        nodeSessionId: NodeSessionId,
+    ): readonly ParticipantIdentity[] {
+        const identities = new Map<string, ParticipantIdentity>()
+        const add = (identity: ParticipantIdentity | undefined): void => {
+            if (!identity || identity.nodeSessionId !== nodeSessionId) return
+            identities.set(
+                participantKey(identity.nodeSessionId, identity.viewerId),
+                Object.freeze({ ...identity }),
+            )
+        }
+        for (const client of this.getClientsInRoom(roomNumber)) add(client.participant)
+        for (const client of this.getBattleClientsInRoom(roomNumber)) add(client.participant)
+        for (const battleParticipant of this.battleParticipants.get(roomNumber)?.values() ?? []) {
+            add(battleParticipant.participant)
+        }
+        return Object.freeze([...identities.values()])
+    }
+
     removeNodeSessionBattleState(roomNumber: string, nodeSessionId: NodeSessionId): boolean {
         const clients = new Set([
             ...this.getClientsInRoom(roomNumber),
