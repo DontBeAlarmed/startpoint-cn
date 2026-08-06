@@ -10,6 +10,9 @@ const { MultiManagementService } = require("../src/multi/management/service")
 const {
     MultiHubCredentialStoreError,
 } = require("../src/multi/hub/credential-store")
+const {
+    MultiHubCredentialLockError,
+} = require("../src/multi/hub/credential-lock")
 const { createMultiRuntimeService } = require("../src/multi/runtime/service")
 const multiManagementRoutes = require("../src/routes/web_api/multi-management").default
 
@@ -260,6 +263,23 @@ test("management routes map store and unknown failures without exposing internal
         message: "Multiplayer management request failed",
     })
     assert.doesNotMatch(unknown.body, /raw hub|secret-token/)
+})
+
+test("management routes map credential lock failures to storage unavailable", async t => {
+    const app = await createApp(t, () => ({
+        listCredentials: () => {
+            throw new MultiHubCredentialLockError("MULTI_HUB_CREDENTIAL_LOCK_TIMEOUT")
+        },
+    }))
+
+    const response = await request(app, "GET", "/credentials")
+    assert.equal(response.statusCode, 500)
+    assert.deepEqual(response.json(), {
+        error: "Internal Server Error",
+        code: "MULTI_HUB_CREDENTIALS_UNAVAILABLE",
+        message: "Credential storage is unavailable",
+    })
+    assert.doesNotMatch(response.body, /LOCK_TIMEOUT/)
 })
 
 test("runtime control probe calls only the client remote coordinator status method", async t => {

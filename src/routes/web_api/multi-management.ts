@@ -5,6 +5,7 @@ import {
     type IssuedMultiHubCredential,
     type MultiHubCredential,
 } from "../../multi/hub/credential-store"
+import { MultiHubCredentialLockError } from "../../multi/hub/credential-lock"
 import { requireLoopback } from "../../multi/management/loopback"
 import {
     MultiManagementError,
@@ -88,6 +89,9 @@ function sendManagementError(reply: FastifyReply, error: unknown): FastifyReply 
                 message: "Credential was not found",
             })
         }
+    }
+    if (error instanceof MultiHubCredentialStoreError
+        || error instanceof MultiHubCredentialLockError) {
         return reply.status(500).send({
             error: "Internal Server Error",
             code: "MULTI_HUB_CREDENTIALS_UNAVAILABLE",

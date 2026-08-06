@@ -7,7 +7,10 @@ const path = require("node:path")
 const {
     createOfflineMultiManagementService,
 } = require("../src/multi/management/offline")
-const { maybeWriteMultiHubTokenEnv } = require("./lib/multi-hub-env.cjs")
+const {
+    isInteractiveTerminal,
+    maybeWriteMultiHubTokenEnv,
+} = require("./lib/multi-hub-env.cjs")
 
 function usage() {
     process.stderr.write(
@@ -47,7 +50,7 @@ async function main() {
         await maybeWriteMultiHubTokenEnv({
             envPath: path.join(projectRoot, ".env"),
             token: issued.token,
-            interactive: process.stdin.isTTY === true && process.stdout.isTTY === true,
+            interactive: isInteractiveTerminal(process.stdin, process.stderr),
             confirm,
         })
         return

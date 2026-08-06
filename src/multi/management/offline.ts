@@ -2,12 +2,11 @@ import {
     buildAdminMultiStatus,
 } from "../../lib/admin-multi-status"
 import {
-    resolveMultiHubCredentialsPath,
     RuntimeConfigError,
     type RuntimeEnvironment,
 } from "../../runtime/config"
-import { MultiHubCredentialStore } from "../hub/credential-store"
 import { unavailableMultiRuntimeStatus } from "../runtime/status"
+import { createMultiManagementCredentialProvider } from "./credentials"
 import { MultiManagementService } from "./service"
 import type { MultiManagementMode } from "./types"
 
@@ -26,11 +25,10 @@ export function createOfflineMultiManagementService({
     projectRoot,
     env = process.env,
 }: OfflineMultiManagementOptions): MultiManagementService {
+    const mode = managementMode(env.MULTI_MODE)
     return new MultiManagementService({
-        mode: managementMode(env.MULTI_MODE),
-        credentials: new MultiHubCredentialStore({
-            credentialsPath: resolveMultiHubCredentialsPath(env, projectRoot),
-        }),
+        mode,
+        credentials: createMultiManagementCredentialProvider({ mode, env, projectRoot }),
         getStatus: () => buildAdminMultiStatus({
             runtime: unavailableMultiRuntimeStatus(),
             authority: null,

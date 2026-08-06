@@ -14,10 +14,7 @@ import { ServerTimeService } from "./runtime/server-time/service";
 import { getContentSnapshot, initializeContentSnapshot } from "./content/runtime/content-snapshot";
 import { createContentLifecycleDependencies } from "./modes/cn-lifecycle";
 import { configureSerializedAssetVersionProvider } from "./data/utils/serialized-asset-version";
-import {
-    parseCnRuntimeConfig,
-    resolveMultiHubCredentialsPath,
-} from "./runtime/config";
+import { parseCnRuntimeConfig } from "./runtime/config";
 import {
     createRuntimeCoordinator,
     RuntimeCoordinator,
@@ -45,8 +42,8 @@ import optionApiPlugin from "./routes/api/option";
 import singleBattleQuestApiPlugin from "./routes/api/singleBattleQuest";
 import { multiBattleRoutes } from "./multi";
 import { createMultiRuntimeService } from "./multi/runtime/service";
-import { MultiHubCredentialStore } from "./multi/hub/credential-store";
 import { MultiManagementService } from "./multi/management/service";
+import { createMultiManagementCredentialProvider } from "./multi/management/credentials";
 import attentionApiPlugin from "./routes/api/attention";
 import characterApiPlugin from "./routes/api/character";
 import characterManaPlugin from "./routes/api/character/mana";
@@ -331,8 +328,10 @@ runtimeCoordinator = createRuntimeCoordinator({
         if (multiManagementService === null) {
             multiManagementService = new MultiManagementService({
                 mode: config.multi.mode,
-                credentials: new MultiHubCredentialStore({
-                    credentialsPath: resolveMultiHubCredentialsPath(process.env, projectRoot),
+                credentials: createMultiManagementCredentialProvider({
+                    mode: config.multi.mode,
+                    env: process.env,
+                    projectRoot,
                 }),
                 getStatus: () => multiRuntimeService.getAdminStatus(),
                 probe: () => multiRuntimeService.probeControlStatus(),
