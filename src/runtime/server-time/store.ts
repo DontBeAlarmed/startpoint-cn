@@ -45,14 +45,19 @@ function isCanonicalTimestamp(value: unknown): value is string {
     return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value
 }
 
+function isValidOffset(value: unknown): value is number {
+    return typeof value === "number"
+        && Number.isFinite(value)
+        && (!Number.isInteger(value) || Number.isSafeInteger(value))
+}
+
 function parseValue(value: unknown): ServerTimeState {
     if (!isRecord(value) || !hasExactKeys(value)) return invalidState()
     const mode = value.mode
     const offsetMs = value.offsetMs
     const generatedAt = value.generatedAt
     if ((mode !== "system" && mode !== "offset")
-        || typeof offsetMs !== "number"
-        || !Number.isSafeInteger(offsetMs)
+        || !isValidOffset(offsetMs)
         || !isCanonicalTimestamp(generatedAt)
         || (mode === "system" && offsetMs !== 0)) {
         return invalidState()
@@ -124,7 +129,7 @@ export class ServerTimeStore {
         try {
             const value = JSON.parse(fs.readFileSync(this.legacyFilePath, "utf8"))
             const offset = isRecord(value) ? value.timeOffset : null
-            return typeof offset === "number" && Number.isSafeInteger(offset) ? offset : null
+            return typeof offset === "number" && Number.isFinite(offset) ? offset : null
         } catch {
             return null
         }

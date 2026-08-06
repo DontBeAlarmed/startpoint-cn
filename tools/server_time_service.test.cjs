@@ -238,6 +238,15 @@ test("migrates a finite legacy active account offset only when the new file is a
   })
 })
 
+test("migrates a finite fractional legacy active account offset", () => {
+  const { paths, store, service } = freshService()
+  fs.writeFileSync(paths.legacyFilePath, JSON.stringify({ timeOffset: 1.5 }))
+
+  const restored = service.restore({ nowMs: NOW_MS })
+  assert.equal(restored.offsetMs, 1.5)
+  assert.equal(store.read().offsetMs, 1.5)
+})
+
 test("uses the project default date when no valid state exists", () => {
   const { paths, service } = freshService()
   const restored = service.restore({ nowMs: NOW_MS })
