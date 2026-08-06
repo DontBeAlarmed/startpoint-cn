@@ -37,7 +37,7 @@ export interface RoutedMultiCoordinatorOptions {
     readonly local: MultiCoordinator
     readonly remoteAdmissionIssuer: AdmissionIssuer
     readonly localAdmissionIssuer: AdmissionIssuer
-    readonly newRoomOrigin: () => MultiCoordinatorOrigin
+    readonly newRoomOrigin: () => MultiCoordinatorOrigin | Promise<MultiCoordinatorOrigin>
     readonly resolveActiveQuestOrigin?: OriginResolver
 }
 
@@ -90,7 +90,7 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
 
     async createRoom(input: CreateRoomInput): Promise<CoordinatorResult<RoomStatus>> {
         const activeOrigin = await this.options.resolveActiveQuestOrigin?.(input.participant)
-        const origin = activeOrigin ?? this.newRoomOrigin()
+        const origin = activeOrigin ?? await this.newRoomOrigin()
         const result = await this.coordinatorFor(origin).createRoom(input)
         if (result.ok) this.remember(origin, input.participant, result.value, true)
         return result
@@ -150,7 +150,7 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
     ): Promise<CoordinatorResult<RoomStatus>> {
         const activeOrigin = await this.options.resolveActiveQuestOrigin?.(input.participant)
         const cachedOrigin = this.cachedOrigin(input)
-        const preferred = activeOrigin ?? cachedOrigin ?? this.newRoomOrigin()
+        const preferred = activeOrigin ?? cachedOrigin ?? await this.newRoomOrigin()
         const first = await this.coordinatorFor(preferred)[operation](input)
         if (first.ok) {
             this.remember(preferred, input.participant, first.value, rememberParticipant)
@@ -292,8 +292,8 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
         return participantKey(participant.nodeSessionId, participant.viewerId)
     }
 
-    private newRoomOrigin(): MultiCoordinatorOrigin {
-        const origin = this.options.newRoomOrigin()
+    private async newRoomOrigin(): Promise<MultiCoordinatorOrigin> {
+        const origin = await this.options.newRoomOrigin()
         if (origin !== "remote" && origin !== "local") {
             throw new TypeError("newRoomOrigin must return remote or local")
         }

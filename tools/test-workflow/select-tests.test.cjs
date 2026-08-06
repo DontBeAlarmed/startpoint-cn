@@ -327,6 +327,7 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/multi_hub_session_cleanup.test.cjs",
             "tools/multi_hub_token.test.cjs",
             "tools/multi_runtime_config.test.cjs",
+            "tools/multi_client_fallback.test.cjs",
             "tools/comic_route.test.cjs",
             "tools/cn_tool_capabilities.test.cjs",
             "tools/runtime_admin.test.cjs",
@@ -352,6 +353,10 @@ test("registers focused runtime state and socket smoke groups", () => {
     )
     assert.deepEqual(
         selectTestGroups(["tools/multi_management_routes.test.cjs"]),
+        ["quick:runtime"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/multi_client_fallback.test.cjs"]),
         ["quick:runtime"],
     )
     assert.deepEqual(TEST_GROUPS["integration:runtime"], {
@@ -774,6 +779,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/multi_compatibility.test.cjs",
         "tools/multi_coordinator_contract.test.cjs",
         "tools/multi_coordinator_embedded.test.cjs",
+        "tools/multi_coordinator_router.test.cjs",
         "tools/multi_context_initialization.test.cjs",
         "tools/multi_finish_follow_info.test.cjs",
         "tools/multi_player_context.test.cjs",

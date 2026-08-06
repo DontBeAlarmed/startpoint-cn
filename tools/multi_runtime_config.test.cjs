@@ -476,7 +476,7 @@ test("host TCP bind failure keeps the control listener available and degrades mu
     await harness.service.stop()
 })
 
-test("client runtime installs the lazy remote coordinator and never starts local listeners", async () => {
+test("client runtime installs routed remote authority and starts local fallback only on demand", async () => {
     const remote = new RemoteMultiCoordinator({
         read: async () => ({ ok: false, error: "HUB_UNAVAILABLE" }),
         write: async () => ({ ok: false, error: "HUB_UNAVAILABLE" }),
@@ -492,10 +492,12 @@ test("client runtime installs the lazy remote coordinator and never starts local
     })
 
     assert.deepEqual(harness.calls, [])
-    assert.equal(harness.service.getHttpContext().coordinator, remote)
+    assert.notEqual(harness.service.getHttpContext().coordinator, remote)
+    assert.equal(typeof harness.service.getHttpContext().resolveCoordinatorOrigin, "function")
     assert.deepEqual(harness.service.getStatus(), {
         mode: "client",
         state: "degraded",
+        clientFallbackState: "remote",
         coordinator: { kind: "remote", available: false },
         hub: { available: false, endpoint: "http://192.0.2.20:8004/" },
         tcp: { available: false, endpoint: null },
@@ -504,9 +506,13 @@ test("client runtime installs the lazy remote coordinator and never starts local
         participant: { nodeSessionId: "pending", viewerId: 1 },
         roomNumber: "123456",
     })
-    assert.deepEqual(result, { ok: false, error: "HUB_UNAVAILABLE" })
+    assert.deepEqual(result, { ok: false, error: "ROOM_NOT_FOUND" })
+    assert.deepEqual(harness.calls, [["tcp-start", { host: "127.0.0.1", port: 8003 }]])
     await harness.service.stop()
-    assert.deepEqual(harness.calls, [])
+    assert.deepEqual(harness.calls, [
+        ["tcp-start", { host: "127.0.0.1", port: 8003 }],
+        "tcp-stop",
+    ])
 })
 
 function listen(server) {

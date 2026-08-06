@@ -7,12 +7,20 @@ import {
     type AdminMultiStatus,
 } from "../../lib/admin-multi-status"
 import { AdmissionRegistry } from "../admission/registry"
-import type { CoordinatorResult, NodeSessionId } from "../coordinator/contracts"
+import { embeddedAdmissionRegistry } from "../admission/registry"
+import type {
+    CoordinatorResult,
+    MultiCoordinatorOrigin,
+    NodeSessionId,
+    ParticipantIdentity,
+} from "../coordinator/contracts"
+import type { MultiCoordinator } from "../coordinator/interface"
 import {
     EMBEDDED_NODE_SESSION_ID,
     EmbeddedMultiCoordinator,
 } from "../coordinator/embedded"
 import { RemoteMultiCoordinator } from "../coordinator/remote"
+import { RoutedMultiCoordinator } from "../coordinator/router"
 import { HubClient } from "../hub/client"
 import { CredentialReloader } from "../hub/credential-reloader"
 import { IdempotencyCache } from "../hub/idempotency"
@@ -35,9 +43,17 @@ import {
 } from "../tcp/server"
 import {
     freezeMultiRuntimeStatus,
+    type MultiClientFallbackState,
     type MultiRuntimeStatus,
     unavailableMultiRuntimeStatus,
 } from "./status"
+import {
+    CLIENT_FALLBACK_TCP_CONFIG,
+    ClientFallbackController,
+} from "./client-fallback"
+import { getPlayerActiveQuestSync } from "../../data/domains/quest_active"
+import { resolvePlayerIdSync } from "../../data/activeAccount"
+import { getSessionSync } from "../../data/domains/session"
 
 type FatalHandler = (error: unknown) => void
 const REMOTE_PENDING_NODE_SESSION_ID = "remote-pending" as NodeSessionId
@@ -71,6 +87,14 @@ export interface MultiRuntimeServiceDependencies {
     readonly createRemoteCoordinator?: (
         config: Extract<MultiRuntimeConfig, { readonly mode: "client" }>,
     ) => RemoteMultiCoordinator
+    readonly createLocalCoordinator?: () => MultiCoordinator
+    readonly resolveActiveQuestOrigin?: (
+        participant: ParticipantIdentity,
+    ) => MultiCoordinatorOrigin | null | Promise<MultiCoordinatorOrigin | null>
+    readonly resolveActiveQuestOriginSync?: (
+        viewerId: number,
+    ) => MultiCoordinatorOrigin | null
+    readonly now?: () => number
 }
 
 export interface MultiRuntimeService {
@@ -86,23 +110,43 @@ function endpoint(host: string, port: number): string {
     return `${host.includes(":") ? `[${host}]` : host}:${port}`
 }
 
-function createRemoteHttpContext(coordinator: RemoteMultiCoordinator): MultiHttpContext {
+function createClientHttpContext(
+    remoteCoordinator: RemoteMultiCoordinator,
+    coordinator: RoutedMultiCoordinator,
+    fallback: ClientFallbackController,
+    resolveActiveQuestOriginSync: (viewerId: number) => MultiCoordinatorOrigin | null,
+): MultiHttpContext {
     const embedded = createEmbeddedMultiHttpContext({
         coordinator,
-        coordinatorOrigin: "remote",
     })
     return Object.freeze({
         ...embedded,
         snapshotProvider: Object.freeze({
             ...embedded.snapshotProvider,
-            getParticipant: (viewerId: number) => ({
-                nodeSessionId: coordinator.getNodeSessionId()
-                    ?? REMOTE_PENDING_NODE_SESSION_ID,
-                viewerId,
-            }),
+            getParticipant: (viewerId: number) => {
+                let activeOrigin: MultiCoordinatorOrigin | null = null
+                try {
+                    activeOrigin = resolveActiveQuestOriginSync(viewerId)
+                } catch {
+                    // A participant identity must still be produced if the local DB is unavailable.
+                }
+                const state = fallback.getState()
+                const useLocal = activeOrigin === "local"
+                    || (activeOrigin === null
+                        && (state === "local"
+                            || state === "degraded"
+                            || !remoteCoordinator.isAvailable()))
+                return {
+                    nodeSessionId: useLocal
+                        ? EMBEDDED_NODE_SESSION_ID
+                        : remoteCoordinator.getNodeSessionId()
+                            ?? REMOTE_PENDING_NODE_SESSION_ID,
+                    viewerId,
+                }
+            },
         }),
         admissionIssuer: coordinator,
-        tcpEndpoint: () => coordinator.getTcpEndpoint(),
+        tcpEndpoint: () => fallback.getTcpEndpoint(remoteCoordinator.getTcpEndpoint()),
     })
 }
 
@@ -142,6 +186,8 @@ class Service implements MultiRuntimeService {
     private stopPromise: Promise<void> | null = null
     private hostServices: MultiRuntimeHostServices | null = null
     private remoteCoordinator: RemoteMultiCoordinator | null = null
+    private clientFallback: ClientFallbackController | null = null
+    private clientCoordinator: RoutedMultiCoordinator | null = null
 
     constructor(private readonly dependencies: MultiRuntimeServiceDependencies) {}
 
@@ -232,14 +278,51 @@ class Service implements MultiRuntimeService {
         } else {
             this.hostServices = null
             if (config.mode === "client") {
-                this.remoteCoordinator = this.dependencies.createRemoteCoordinator?.(config)
+                const remoteCoordinator = this.dependencies.createRemoteCoordinator?.(config)
                     ?? new RemoteMultiCoordinator(new HubClient({
                         hubUrl: config.hubUrl,
                         token: config.token,
                     }))
-                this.context = createRemoteHttpContext(this.remoteCoordinator)
+                const localCoordinator = this.dependencies.createLocalCoordinator?.()
+                    ?? new EmbeddedMultiCoordinator({
+                        allowRemoteParticipants: true,
+                        onCompatibilityRejection: recordMultiCompatibilityRejection,
+                    })
+                const fallback = new ClientFallbackController({
+                    now: this.dependencies.now,
+                    isRemoteAvailable: () => remoteCoordinator.isAvailable()
+                        && remoteCoordinator.getTcpEndpoint() !== null,
+                    probeControlStatus: () => remoteCoordinator.getControlStatus(),
+                    startTcp: (tcpConfig, onFatalError) => this.dependencies.startTcp(
+                        tcpConfig,
+                        onFatalError,
+                    ),
+                    stopTcp: this.dependencies.stopTcp,
+                    isTcpListening: this.dependencies.isTcpListening,
+                })
+                const routed = new RoutedMultiCoordinator({
+                    remote: remoteCoordinator,
+                    local: localCoordinator,
+                    remoteAdmissionIssuer: remoteCoordinator,
+                    localAdmissionIssuer: embeddedAdmissionRegistry,
+                    newRoomOrigin: () => fallback.resolveNewRoomOrigin(),
+                    resolveActiveQuestOrigin: this.dependencies.resolveActiveQuestOrigin
+                        ?? resolveClientActiveQuestOrigin,
+                })
+                this.remoteCoordinator = remoteCoordinator
+                this.clientFallback = fallback
+                this.clientCoordinator = routed
+                this.context = createClientHttpContext(
+                    remoteCoordinator,
+                    routed,
+                    fallback,
+                    this.dependencies.resolveActiveQuestOriginSync
+                        ?? resolveClientActiveQuestOriginSync,
+                )
             } else {
                 this.remoteCoordinator = null
+                this.clientFallback = null
+                this.clientCoordinator = null
                 this.context = createEmbeddedMultiHttpContext({
                     coordinator: new EmbeddedMultiCoordinator({
                         onCompatibilityRejection: recordMultiCompatibilityRejection,
@@ -290,13 +373,24 @@ class Service implements MultiRuntimeService {
         const config = this.config
         if (config === null) return unavailableMultiRuntimeStatus()
         if (config.mode === "client") {
-            const coordinatorAvailable = this.remoteCoordinator?.isAvailable() === true
-            const tcp = this.remoteCoordinator?.getTcpEndpoint() ?? null
+            const fallbackState: MultiClientFallbackState = this.clientFallback?.getState() ?? "remote"
+            const localSelected = fallbackState === "local" || fallbackState === "degraded"
+            const remoteAvailable = this.remoteCoordinator?.isAvailable() === true
+            const remoteTcp = this.remoteCoordinator?.getTcpEndpoint() ?? null
+            const tcp = this.clientFallback?.getTcpEndpoint(remoteTcp) ?? remoteTcp
+            const coordinatorAvailable = localSelected || remoteAvailable
             return freezeMultiRuntimeStatus({
                 mode: config.mode,
                 state: coordinatorAvailable && tcp !== null ? "ready" : "degraded",
-                coordinator: { kind: "remote", available: coordinatorAvailable },
-                hub: { available: coordinatorAvailable, endpoint: config.hubUrl.href },
+                clientFallbackState: fallbackState,
+                coordinator: {
+                    kind: localSelected ? "local" : "remote",
+                    available: coordinatorAvailable,
+                },
+                hub: {
+                    available: !localSelected && remoteAvailable,
+                    endpoint: config.hubUrl.href,
+                },
                 tcp: {
                     available: tcp !== null,
                     endpoint: tcp === null ? null : endpoint(tcp.host, tcp.port),
@@ -438,6 +532,15 @@ class Service implements MultiRuntimeService {
 
     private async stopStartedComponents(): Promise<void> {
         const failures: unknown[] = []
+        if (this.clientFallback !== null) {
+            try {
+                await this.clientFallback.stop()
+                this.clientFallback = null
+                this.clientCoordinator = null
+            } catch (error) {
+                failures.push(error)
+            }
+        }
         if (this.hubAttempted) {
             try {
                 await this.dependencies.stopHub()
@@ -454,12 +557,13 @@ class Service implements MultiRuntimeService {
                 failures.push(error)
             }
         }
-        if (!this.hubAttempted && !this.tcpAttempted) {
+        if (!this.hubAttempted && !this.tcpAttempted && this.clientFallback === null) {
             this.hostServices?.credentialReloader.stop()
             this.hostServices?.nodeSessions.stop()
             this.hostServices?.nodeSessions.clear()
             this.hostServices = null
             this.remoteCoordinator = null
+            this.clientCoordinator = null
             this.config = null
             this.context = null
             this.tcpFailed = false
@@ -468,6 +572,31 @@ class Service implements MultiRuntimeService {
         }
         if (failures.length > 0) throw failures[0]
     }
+}
+
+async function resolveClientActiveQuestOrigin(
+    participant: ParticipantIdentity,
+): Promise<MultiCoordinatorOrigin | null> {
+    try {
+        return resolveClientActiveQuestOriginSync(participant.viewerId)
+    } catch {
+        return null
+    }
+}
+
+function resolveClientActiveQuestOriginSync(
+    viewerId: number,
+): MultiCoordinatorOrigin | null {
+    const session = getSessionSync(viewerId.toString())
+    if (!session) return null
+    const playerId = resolvePlayerIdSync(session.accountId)
+    if (!playerId) return null
+    const activeQuest = getPlayerActiveQuestSync(playerId)
+    if (!activeQuest?.isMulti) return null
+    return activeQuest.coordinatorOrigin === "remote"
+        || activeQuest.coordinatorOrigin === "local"
+        ? activeQuest.coordinatorOrigin
+        : null
 }
 
 function localAuthorityStatus(): AdminMultiAuthorityStatus {

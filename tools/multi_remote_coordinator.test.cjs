@@ -500,6 +500,7 @@ test("client runtime degrades immediately when its Hub session expires", async (
     assert.deepEqual(service.getStatus(), {
         mode: "client",
         state: "degraded",
+        clientFallbackState: "remote",
         coordinator: { kind: "remote", available: false },
         hub: { available: false, endpoint: "http://hub.example/" },
         tcp: { available: false, endpoint: null },
@@ -766,11 +767,13 @@ test("client runtime installs the remote coordinator lazily while local modes st
         hubUrl: new URL("http://hub.example/"),
         token: TOKEN,
     })
-    assert.equal(service.getHttpContext().coordinator, remote)
+    assert.notEqual(service.getHttpContext().coordinator, remote)
+    assert.equal(typeof service.getHttpContext().resolveCoordinatorOrigin, "function")
     assert.deepEqual(calls, [])
     assert.deepEqual(service.getStatus(), {
         mode: "client",
         state: "ready",
+        clientFallbackState: "remote",
         coordinator: { kind: "remote", available: true },
         hub: { available: true, endpoint: "http://hub.example/" },
         tcp: { available: true, endpoint: "hub.example:8003" },

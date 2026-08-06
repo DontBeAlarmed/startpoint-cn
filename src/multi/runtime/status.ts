@@ -1,5 +1,6 @@
 export type MultiRuntimeMode = "embedded" | "host" | "client"
 export type MultiRuntimeState = "ready" | "degraded" | "unavailable"
+export type MultiClientFallbackState = "remote" | "probing" | "local" | "degraded"
 
 export interface MultiCoordinatorStatus {
     readonly kind: "local" | "remote"
@@ -14,6 +15,7 @@ export interface MultiEndpointStatus {
 export interface MultiRuntimeStatus {
     readonly mode: MultiRuntimeMode
     readonly state: MultiRuntimeState
+    readonly clientFallbackState?: MultiClientFallbackState
     readonly coordinator: MultiCoordinatorStatus
     readonly hub: MultiEndpointStatus | null
     readonly tcp: MultiEndpointStatus

@@ -26,7 +26,7 @@ function buildSession(
  * @param token The token of the session to retrieve.
  * @returns The session that was found or null
  */
-function getSessionSync(
+export function getSessionSync(
     token: string
 ): Session | null {
 
