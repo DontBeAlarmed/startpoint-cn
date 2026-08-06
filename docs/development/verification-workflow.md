@@ -85,3 +85,22 @@ git status --short
 其中部分测试需要临时监听 `127.0.0.1`。受限沙箱出现 `listen EPERM` 时，应在允许本机回环端口的环境重新运行同一命令，不能把权限失败记作代码通过或跳过测试。
 
 运行时 seed、扫描结果、临时 benchmark JSON、真实数据库、CDN 归档和抓包都不得进入普通提交。计划书与一次性执行步骤保存在仓库外；长期有效的架构、协议和系统边界才进入 tracked 文档。
+
+## 多人 Hub 专项
+
+修改 `src/multi/runtime/`、Hub 管理、active quest 来源或远程结算时，至少运行：
+
+```bash
+node tools/test-workflow/run.cjs --files \
+  tools/multi_client_fallback.test.cjs \
+  tools/multi_coordinator_router.test.cjs \
+  tools/multi_load_recovery.test.cjs \
+  tools/multi_remote_settlement.test.cjs \
+  tools/multi_runtime_config.test.cjs
+
+node --test \
+  tests/multi-hub-process-harness.test.js \
+  tests/multi-hub-process.test.js
+```
+
+专项回归必须证明：Host 本地玩家不经过自己的 Hub；Client 只为后续新房间自动降级或升级；已有 active quest 固定原协调来源；网络不可用不等同于房间不存在；远程写响应不确定时不在本地重放；本地 fallback 使用当前 Client 自己的 TCP 绑定和公开地址。专项通过后仍需执行模块提交前总门禁。

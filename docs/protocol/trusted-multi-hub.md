@@ -15,7 +15,7 @@
 - 游戏客户端从房间响应取得 Hub 的 TCP 地址并直接连接；
 - 体力、门票、奖励、任务和进度始终由玩家自己的本地服务端处理；
 - 未配置 Hub 时保持现有单服务端行为；
-- Hub 故障只关闭多人能力，不影响单人游戏、存档和管理后台；
+- Hub 故障不得影响单人游戏、存档和管理后台；Host 继续使用本地多人路径，Client 已有远程上下文不迁移，后续新房间在 fallback 可用时自动降级到本地，否则仅多人能力不可用；
 - 不同客户端、CDN、业务表或 Mod 只进行兼容性比较，不自动更新或转换。
 
 ## 2. 首期不实现
@@ -76,14 +76,18 @@ MULTI_MODE=embedded | host | client
 
 ### 4.3 client
 
-主服务不监听本地多人 TCP。多人 HTTP 仍由本地服务接收，但房间控制操作通过远端适配器调用 Hub。游戏客户端最终直接连接 Hub TCP。
+主服务优先通过远端适配器调用 Hub。正常状态下游戏客户端直接连接 Host TCP；Hub 不可用时，只有后续新房间改用本地 Coordinator，并按需启动 Client 自己的 TCP。已有远程房间和 active quest 不迁移。
 
 ```text
 游戏 HTTP -> 本机服务 -> Remote Coordinator Adapter -> Hub 控制接口
 游戏 TCP  --------------------------------------------> Hub TCP
+
+Hub 不可用后的新房间：
+游戏 HTTP -> 本机服务 -> Local Coordinator
+游戏 TCP  -------------------------------> 本机按需 TCP
 ```
 
-`client` 节点也可以在同一 Hub 创建自己的房间；`host` 只表示基础设施角色，不等于游戏房间房主。
+`client` 节点也可以在同一 Hub 创建自己的房间；`host` 只表示基础设施角色，不等于游戏房间房主。Host 本地玩家始终直接使用 Host 的本地 Coordinator 和 TCP，不经过自己的 `8004`，因此 Host 不参与远程优先状态的自动升降级。
 
 ## 5. 组件边界
 
@@ -284,7 +288,9 @@ Hub 可以在战斗结束后把房间恢复为可重赛状态，但旧 `battleSe
 - `/finish` 时 Hub 暂时不可达，不发奖、不删除 active quest，允许在完成记录 TTL 内重试。
 - Hub 已重启或明确报告房间、战斗记录不存在时，按联机中断处理，不推测战斗成功。
 - Host 的 Hub 控制端口或 TCP 故障只把多人状态标记为不可用，不关闭主 HTTP 或数据库。
-- Hub 不在瞬时失败后自动创建 embedded 替代房间，也不自动切换 `MULTI_MODE`。
+- Client 对没有 active quest 的新多人操作执行有冷却的控制探测；Hub 不可用时按需启动本地 TCP，并把后续新房间固定为 `local`。
+- Hub 恢复后只让后续新房间重新使用 `remote`；已存在的 `local`、`remote` 房间和 active quest 都不迁移。
+- 自动降级不会改写 `MULTI_MODE`、`.env`、数据库模式或客户端资源，也不会把响应不确定的远程写请求重试到本地。
 
 Hub 或主机服务重启后所有房间、节点会话、admission、socket 和战斗记录失效。首期不恢复原房间。
 
@@ -313,7 +319,13 @@ Client：
 ```text
 MULTI_HUB_URL=http://<host-address>:8004
 MULTI_HUB_TOKEN=<token-issued-for-this-node>
+# 可选：Hub 不可用时按需启动的本地 fallback TCP
+SESSION_HOST=127.0.0.1
+SESSION_PORT=8003
+SESSION_PUBLIC_HOST=<client-node-reachable-address>
 ```
+
+Client 未配置 `SESSION_*` 时，fallback 默认为同机 `127.0.0.1:8003`。如果 Client 本身服务其他设备，必须显式设置可绑定的 `SESSION_HOST` 和玩家可达的 `SESSION_PUBLIC_HOST`；通配绑定地址不能作为客户端连接地址下发。
 
 `8004` 只注册最小 Hub 控制接口，不暴露主游戏 API、CDN、存档或管理后台。服务端提供显式的密钥管理命令：
 
@@ -371,7 +383,7 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 - Hub 控制接口；
 - Hub TCP。
 
-多人不可用只产生 degraded 状态。Hub status 返回实时 `tcpAvailable`；TCP 在已有 session 期间失效后，房间、战斗和 admission 控制操作统一返回 `HUB_UNAVAILABLE`，Client 在下一次显式控制探测或多人请求后进入 degraded，不继续使用注册时缓存的 TCP 地址。后台显示模式、Hub 可达性、TCP 状态、活动房间数和最近的兼容性拒绝原因。
+多人不可用只产生 degraded 状态。Hub status 返回实时 `tcpAvailable`；TCP 在已有 session 期间失效后，房间、战斗和 admission 控制操作统一返回 `HUB_UNAVAILABLE`，Client 不继续使用注册时缓存的 TCP 地址。Client 状态额外区分 `remote`、`probing`、`local` 和 `degraded`；本地 fallback 启动成功后，新房间可继续使用本机多人能力，启动失败也不影响 HTTP、SQLite 和单人功能。后台显示模式、Hub 可达性、TCP 状态、活动房间数和最近的兼容性拒绝原因。
 
 后台 `latestCompatibilityRejection` 可保留差异字段名；只有 `APP_VER`、`RES_VER`、`cdnTargetVersion` 的 `required`/`received` 值通过格式与长度校验后才会保留，`contentDigest`/`modeDigest` 只保留 `different=true`，不保存摘要值。现有兼容性拒绝回调不携带房间号，因此后台诊断不承诺包含房间号。普通多人运行日志不输出双方原始值或摘要；只可保留固定事件、经过 `Number.isSafeInteger` 与有限范围校验的 tag、经过业务校验的 quest/category、有限错误码、host/guest 角色、状态、计数，以及服务端生成或严格校验后的六位房间号。不得记录原始请求、原始 `Error`/stack、完整 `viewerId`/`playerId`/`nodeSessionId`/`connectionId`、网络地址或端口、令牌、摘要和凭据。游戏客户端只接收对应端点现有的 NotPlayable 或通用失败结果；只有房间实际缺失时才显示房间不存在。
 
@@ -423,6 +435,7 @@ Client C: HTTP C + SQLite C
 - 超级猫头鹰 BothBoss 完成两代 SceneReady，提前 HTTP finish 被拒绝，延迟 finish 可继续使用 retained fact；
 - Client 进程重启产生新的 node session 后，`/load` 仍保留 active quest，并可完成轮换后的 finish；
 - Host/Hub 停止后 Client 核心 HTTP 与 SQLite 继续工作，多人进入 degraded，active quest 不被误删，Guest abort 可本地收敛。
+- Client 对新房间在 Hub 失败后按需启动自己的 TCP，并在 Hub 恢复后只把后续新房间切回远程；已有房间来源保持不变。
 
 进程、socket、端口和临时目录由测试统一清理；TTL、撤销和 session sweep 的时间推进继续由现有确定性状态机测试覆盖，不在进程测试中重复长时间等待。
 
@@ -440,15 +453,15 @@ Client C: HTTP C + SQLite C
 
 ## 13. 管理能力边界
 
-首期已经完成 Coordinator、玩家快照、host/client、TCP admission、本地 start/finish/abort/load、兼容性摘要与只读后台诊断。后续管理能力必须收敛到统一的 `MultiManagementService`：
+首期已经完成 Coordinator、玩家快照、host/client、TCP admission、本地 start/finish/abort/load、兼容性摘要、自动降级、只读后台诊断和统一的 `MultiManagementService`：
 
 - `MultiManagementService` 是创建、列出、撤销节点凭据和读取管理状态的唯一业务边界；
 - CLI、React 后台与 Android Launcher 只做输入输出适配，不得各自直接写密钥表、节点会话或房间状态；
 - `8004` 只保留运行时 Hub 控制协议，不增加凭据管理、配置写入或后台管理端点；
-- React 后台在账号、认证和权限系统完成前只允许只读诊断，不提供令牌创建、撤销或多人配置写入；
+- 当前 CLI 与 loopback 管理 API 已复用该服务；React 后台在账号、认证和权限系统完成前只允许只读诊断，不提供远程令牌创建、撤销或多人配置写入；
 - 服务器时间分享与导入属于独立管理服务，不进入 Hub，不随建房、查房或准备自动触发。
 
-本节只记录架构边界，当前不实现 `MultiManagementService` 或新的管理 UI。
+运行中的凭据、Hub probe 和时间导入动作只接受真实 loopback 来源；`8004` 不增加管理端点。新的管理 UI 仍留待后台账号与权限系统完成后接入。
 
 ## 14. 后续可选的时间对齐
 

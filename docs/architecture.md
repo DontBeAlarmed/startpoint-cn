@@ -51,6 +51,8 @@ CN 客户端不能正确处理部分 `uint32` 标记，响应层会把安全范�
 
 房间、NPC 队友、状态机和 TCP 会话分别位于 `src/multi/room/`、`src/multi/npc/`、`src/multi/state/` 和 `src/multi/tcp/`。房间表、TCP 连接和联机状态机都保存在进程内存中，不写入 SQLite；服务重启后现有房间与会话不会恢复。协议细节见[多人联机文档](./protocol/multi-battle.md)。
 
+默认 `embedded` 使用本地 Coordinator 和 TCP。可选 `host` 在保留本地路径的同时提供可信 Hub 控制面；`client` 为新房间优先使用远程 Hub，远程不可用时按需启动自己的本地 TCP。每个多人 active quest 在 SQLite 中只持久化 `remote` 或 `local` 协调来源，已有房间不随探测结果迁移。管理、配置与玩家操作见[多人 Hub 设置教程](./protocol/multi-hub-setup.md)，协议和故障边界见[可信多人 Hub 架构](./protocol/trusted-multi-hub.md)。
+
 ## 4. Content Runtime
 
 `src/content/` 将 CDN 读取与业务代码隔开：

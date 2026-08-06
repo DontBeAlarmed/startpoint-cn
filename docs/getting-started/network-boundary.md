@@ -22,7 +22,7 @@
 
 ## 多人 Hub 拓扑
 
-默认 `embedded` 在同一服务进程内提供 `8001` 游戏 HTTP 与 `8003` 多人 TCP，不监听 `8004`。可选 `host` 在自己的 `8001` 之外同时提供 `8003` Hub TCP 与 `8004` Hub 控制接口；`client` 只提供自己的 `8001`，不监听本地多人 TCP：
+默认 `embedded` 在同一服务进程内提供 `8001` 游戏 HTTP 与 `8003` 多人 TCP，不监听 `8004`。可选 `host` 在自己的 `8001` 之外同时提供 `8003` Hub TCP 与 `8004` Hub 控制接口；`client` 正常状态只提供自己的 `8001`，远程 Hub 不可用时才为后续新房间按需启动本地 `8003`：
 
 ```text
 Host:     本地客户端 -> Host 8001 -> 本地 SQLite
@@ -30,13 +30,14 @@ Host:     本地客户端 -> Host 8001 -> 本地 SQLite
           Client 服务 ----------> Host 8004
 
 Client:   本地客户端 -> Client 8001 -> Client 自己的 SQLite
+          降级后的新房间 -----> Client 8003
 ```
 
 Host 与每个 Client 都保留自己的账号、存档、active quest、体力、门票和奖励结算。只有游戏房主所属数据库扣入场成本，每名参与者的 finish 只写自己的 SQLite。Host 不复制或合并其他节点存档。
 
 节点会严格比较客户端版本、资源版本、Content Release 摘要和 Mod 摘要。差异映射为客户端现有的 NotPlayable 或通用 Failure，不触发 `asset_update`，不下载、切换或修复另一节点的 CDN。各节点服务器时间可以不同，只要目标关卡在该节点自己的时间下处于开放期；开放期外只拒绝该成员，不删除房间。
 
-Host 使用 `npm run multi:token -- create <label>` 生成 Client 令牌，明文只在创建时输出一次。Client 通过 `MULTI_HUB_TOKEN` 读取该令牌；`8004` 不提供密钥管理、后台、主游戏 API 或 CDN。详细配置、撤销与错误映射见[可信多人 Hub](../protocol/trusted-multi-hub.md)。
+Host 使用 `npm run multi:token -- create <label>` 生成 Client 令牌，明文只在创建时输出一次。Client 通过 `MULTI_HUB_TOKEN` 读取该令牌；`8004` 不提供密钥管理、后台、主游戏 API 或 CDN。可操作步骤见[多人 Hub 设置教程](../protocol/multi-hub-setup.md)，详细身份、撤销与错误映射见[可信多人 Hub 架构](../protocol/trusted-multi-hub.md)。
 
 ## 不提供的公网能力
 

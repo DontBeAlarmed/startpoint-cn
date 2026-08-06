@@ -6,40 +6,10 @@
  */
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getSession } from "../../data/domains/session"
+import { claimForcedNewsDeliverySync } from "../../data/domains/news"
+import { resolvePlayerIdSync } from "../../data/activeAccount"
+import { findPendingForcedNews, loadVisibleNews, toClientNews } from "../../lib/news-catalog"
 import { generateDataHeaders } from "../../utils";
-import { readFileSync } from "fs";
-import path from "path";
-
-interface NewsItem {
-    id: number
-    title: string
-    date: string
-    label: number
-    thumbnail: number
-    thumbnail_path: string | null
-    added_time: string | null
-    html: string
-}
-
-function loadNews(): NewsItem[] {
-    try {
-        const raw = readFileSync(path.join(__dirname, "..", "..", "..", "assets", "news.json"), "utf-8")
-        const items = JSON.parse(raw) as any[]
-        // Ensure all required fields exist
-        return items.map((n: any) => ({
-            id: n.id,
-            title: n.title || "",
-            date: n.date || new Date().toISOString().replace("T", " ").substring(0, 19),
-            label: n.label || 1,
-            thumbnail: n.thumbnail || 1,
-            thumbnail_path: n.thumbnail_path || null,
-            added_time: n.added_time || null,
-            html: n.html || "",
-        }))
-    } catch {
-        return []
-    }
-}
 
 const routes = async (fastify: FastifyInstance) => {
     // News list (paginated by page_index, category)
@@ -57,7 +27,7 @@ const routes = async (fastify: FastifyInstance) => {
             message: "Invalid viewer id."
         })
 
-        const allNews = loadNews()
+        const allNews = loadVisibleNews()
         const page = body.page_index || body.current_page || 1
         const perPage = 20
         const start = (page - 1) * perPage
@@ -68,16 +38,7 @@ const routes = async (fastify: FastifyInstance) => {
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
                 current_page: page,
-                news: items.map(n => ({
-                    id: n.id,
-                    title: n.title,
-                    date: n.date,
-                    html: n.html,
-                    label: n.label,
-                    thumbnail: n.thumbnail,
-                    thumbnail_path: n.thumbnail_path,
-                    added_time: n.added_time,
-                })),
+                news: items.map(toClientNews),
                 news_count: allNews.length,
             }
         })
@@ -98,7 +59,7 @@ const routes = async (fastify: FastifyInstance) => {
             message: "Invalid viewer id."
         })
 
-        const allNews = loadNews()
+        const allNews = loadVisibleNews()
         const news = allNews.find(n => n.id === body.news_id)
         if (!news) return reply.status(400).send({
             error: "Bad Request",
@@ -109,14 +70,7 @@ const routes = async (fastify: FastifyInstance) => {
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
-                id: news.id,
-                title: news.title,
-                date: news.date,
-                html: news.html,
-                label: news.label,
-                thumbnail: news.thumbnail,
-                thumbnail_path: news.thumbnail_path,
-                added_time: news.added_time,
+                ...toClientNews(news),
             }
         })
     })
@@ -151,13 +105,29 @@ const routes = async (fastify: FastifyInstance) => {
         })
     })
 
-    // Latest forced news popup — return empty (no forced popup)
+    // Latest forced news popup — claim once per player and announcement.
     fastify.post("/latest_forced", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as any
         const viewerId = body.viewer_id
         if (!viewerId || isNaN(viewerId)) return reply.status(400).send({ error: "Bad Request", message: "Invalid request body." })
         const session = await getSession(viewerId.toString())
         if (!session) return reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." })
+
+        const playerId = resolvePlayerIdSync(session.accountId)
+        const news = playerId === null ? null : findPendingForcedNews(playerId)
+        if (playerId !== null && news !== null) {
+            const claimed = claimForcedNewsDeliverySync(
+                playerId,
+                news.id,
+            )
+            if (claimed) {
+                reply.header("content-type", "application/x-msgpack")
+                return reply.status(200).send({
+                    data_headers: generateDataHeaders({ viewer_id: viewerId }),
+                    data: toClientNews(news),
+                })
+            }
+        }
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

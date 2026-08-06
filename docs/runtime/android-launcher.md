@@ -21,11 +21,13 @@ Launcher 不提供多人业务逻辑。未配置时始终使用服务端默认 `
 后续可信局域网或 VPN profile 可以把同一 Server Bundle 作为 `host` 或 `client` 启动：
 
 - `host` 保留本机 `8001`，并提供可达的 `8003` Hub TCP 与 `8004` Hub 控制接口；
-- `client` 只保留本机 `8001`，设置 `MULTI_HUB_URL` 和一条服主分发的 `MULTI_HUB_TOKEN`，游戏 TCP 按房间响应直连 Host `8003`；
+- `client` 正常状态只使用本机 `8001`，设置 `MULTI_HUB_URL` 和一条服主分发的 `MULTI_HUB_TOKEN`，游戏 TCP 按房间响应直连 Host `8003`；Hub 不可用时，后续新房间可以按需启动本机 fallback `8003`；
 - 每台设备的 `DATA_DIR`、SQLite、体力、门票、奖励和任务结算保持本地独立；
 - Launcher 不自动复制、下载或对齐另一节点的 CDN、Content Release、Mod 或服务器时间。
 
-当前令牌流程以 Host 上的 `npm run multi:token -- create/list/revoke` 为权威 CLI，Client 令牌只进入壳私有配置或环境变量，不进入 profile 导出、日志、二维码历史或仓库。`8004` 只承载运行中的房间控制，不暴露令牌管理。完整契约见[可信多人 Hub](../protocol/trusted-multi-hub.md)。
+当前令牌流程以 Host 上的 `npm run multi:token -- create/list/revoke` 为权威 CLI，Client 令牌只进入壳私有配置或环境变量，不进入 profile 导出、日志、二维码历史或仓库。`8004` 只承载运行中的房间控制，不暴露令牌管理。配置步骤见[多人 Hub 设置教程](../protocol/multi-hub-setup.md)，完整契约见[可信多人 Hub 架构](../protocol/trusted-multi-hub.md)。
+
+Launcher 为 Client 生成运行配置时必须同时保留本地 fallback TCP 字段。单机壳可使用 `127.0.0.1:8003`；供其他设备连接的服务器 profile 必须分别保存绑定地址和对客户端公开的 `SESSION_PUBLIC_HOST`。本地 TCP 仍由服务端在首次需要降级时按需启动，Launcher 不自行切换房间来源。
 
 ## 资源模式
 
@@ -101,4 +103,4 @@ Launcher 提供服务端、TCP、CDN 校验、补丁器和壳自身的来源筛�
 
 后台由服务端 Bundle 的 React 产物提供，Launcher 只打开 `http://<host>:<port>/admin/`，不复制或内嵌后台业务逻辑。
 
-多人管理以后统一通过服务端 `MultiManagementService` 边界实现；CLI、React 后台和 Launcher 只能作为适配器，不得各自直接改密钥表或多人内部状态。在后台账号与权限系统完成前，React 后台只能显示多人只读诊断，不能提供令牌创建、撤销或配置写入。服务器时间分享是独立管理能力，不属于 Hub，也不得由加入房间自动触发。
+多人管理统一通过服务端 `MultiManagementService` 边界实现；CLI、React 后台和 Launcher 只能作为适配器，不得各自直接改密钥表或多人内部状态。Launcher 只从 loopback 调用 `/api/server/multiplayer/credentials`、`/api/server/multiplayer/probe` 和 `/api/server/time-package`；不得直接打开密钥表或 `server-time.json`。在后台账号与权限系统完成前，React 后台只能显示多人只读诊断，不能提供远程令牌创建、撤销或配置写入。服务器时间分享是独立管理能力，不属于 Hub，也不得由加入房间自动触发。

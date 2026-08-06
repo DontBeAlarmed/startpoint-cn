@@ -13,6 +13,7 @@
 ## 多人联机
 
 - [多人联机协议](./multi-battle.md)
+- [可信多人 Hub 设置教程](./multi-hub-setup.md)
 - [可信局域网多人 Hub 架构](./trusted-multi-hub.md)
 - [超级猫头鹰多场景分析](./super-owl-multiscene.md)
 

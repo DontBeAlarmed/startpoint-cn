@@ -98,6 +98,7 @@ export function generateViewerId(): number {
 
 export interface DataHeaders {
     force_update?: boolean
+    force_news?: number
     asset_update?: boolean
     short_udid?: number
     viewer_id?: number

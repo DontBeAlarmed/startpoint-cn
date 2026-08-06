@@ -22,6 +22,10 @@ const DEFAULT_PROFILE_SETTINGS: PlayerProfileSettings = {
     showOwnedDegreeCount: true,
 }
 
+function isClientOptionKey(key: string): boolean {
+    return !key.startsWith("server.")
+}
+
 /**
  * Inserts a value for a player option.
  * 
@@ -54,6 +58,7 @@ export function insertPlayerOptionsSync(
     const db = getDb();
     db.transaction(() => {
         for (const [key, value] of Object.entries(options)) {
+            if (!isClientOptionKey(key)) continue
             insertPlayerOptionSync(playerId, key, value)
         }
     })()
@@ -72,7 +77,9 @@ export function getPlayerOptionsSync(
     const rawOptions = db.prepare(`
     SELECT key, value
     FROM players_options
-    WHERE player_id = ? AND key NOT LIKE 'profile.%'
+    WHERE player_id = ?
+      AND key NOT LIKE 'profile.%'
+      AND key NOT LIKE 'server.%'
     `).all(playerId) as RawPlayerOption[]
 
     const result: Record<string, boolean> = {}
@@ -119,6 +126,7 @@ export function updatePlayerOptionsSync(
     const db = getDb();
     db.transaction(() => {
         for (const [key, newValue] of Object.entries(options)) {
+            if (!isClientOptionKey(key)) continue
             const existingValue = allOptions[key]
             if (existingValue === undefined) {
                 insertPlayerOptionSync(playerId, key, newValue)

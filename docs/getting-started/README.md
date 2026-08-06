@@ -46,6 +46,7 @@ npm run build
 - [当前运行时架构](../architecture.md)
 - [CDN 与内容](../cdn/README.md)
 - [网络支持边界](./network-boundary.md)
+- [可信多人 Hub 设置教程](../protocol/multi-hub-setup.md)
 - [客户端测试进度](../status/test-progress.md)
 - [嵌入式运行契约](../embedded-runtime-contract.md)
 
