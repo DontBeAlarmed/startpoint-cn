@@ -44,6 +44,7 @@
     "test:full": "node tools/test-workflow/run.cjs --group full",
     "benchmark:workflow": "node tools/test-workflow/benchmark.cjs",
     "benchmark:http": "node tools/perf/http_baseline.cjs",
+    "benchmark:tcp": "node tools/perf/tcp_baseline.cjs",
     "docs:check": "node tools/docs_check.cjs",
     "hygiene": "bash scripts/check-hygiene.sh --all",
     "verify:full": "npm run typecheck && npm run docs:check && npm run test:full && npm run hygiene && npm run build:server"
