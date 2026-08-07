@@ -19,7 +19,11 @@ export function buildComicBaseUrl(
     httpDisplayHost = "127.0.0.1",
     httpPort = 8001,
 ): string {
-    return `http://${requestHost || `${httpDisplayHost}:${httpPort}`}`
+    if (requestHost) return `http://${requestHost}`
+    const host = httpDisplayHost.includes(":") && !httpDisplayHost.startsWith("[")
+        ? `[${httpDisplayHost}]`
+        : httpDisplayHost
+    return `http://${host}:${httpPort}`
 }
 
 // Kind 1: 史黛拉的弹射世界讲座 (Stella's Classroom)
