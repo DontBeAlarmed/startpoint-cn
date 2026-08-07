@@ -2,6 +2,17 @@ const path = require("node:path")
 
 const { TEST_GROUPS } = require("./groups.cjs")
 
+const HUB_AUTHENTICATION_FILES = new Set([
+    "src/multi/hub/authentication-rejections.ts",
+    "src/multi/hub/credential-reloader.ts",
+    "tools/multi_hub_authentication.test.cjs",
+])
+const HUB_AUTHENTICATION_GROUPS = [
+    "integration:multi-hub",
+    "quick:protocol",
+    "quick:runtime",
+]
+
 const SOURCE_RULES = [
     { pattern: /^admin\//, groups: ["admin"] },
     { pattern: /^tests\/admin-/, groups: ["admin"] },
@@ -225,6 +236,7 @@ function groupsForTestFile(filePath) {
 }
 
 function groupsForFile(filePath) {
+    if (HUB_AUTHENTICATION_FILES.has(filePath)) return HUB_AUTHENTICATION_GROUPS
     const testGroups = groupsForTestFile(filePath)
     if (testGroups.length > 0) return testGroups
     if (filePath === "tools/test-workflow/groups.cjs") return ["full"]

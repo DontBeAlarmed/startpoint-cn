@@ -319,6 +319,7 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/runtime_bundle_metadata.test.cjs",
             "tools/runtime_config.test.cjs",
             "tools/multi_hub_credentials.test.cjs",
+            "tools/multi_hub_authentication.test.cjs",
             "tools/multi_hub_cli_env.test.cjs",
             "tools/multi_management_service.test.cjs",
             "tools/multi_management_routes.test.cjs",
@@ -414,6 +415,8 @@ test("registers the trusted multi-hub process suite as a bounded serial group", 
 
 test("routes multiplayer runtime and private credential changes to focused groups", () => {
     for (const source of [
+        "src/multi/hub/authentication-rejections.ts",
+        "src/multi/hub/credential-reloader.ts",
         "src/multi/hub/token.ts",
         "src/multi/hub/credential-store.ts",
         "src/multi/hub/control-routes.ts",
@@ -427,6 +430,10 @@ test("routes multiplayer runtime and private credential changes to focused group
             source,
         )
     }
+    assert.deepEqual(
+        selectTestGroups(["tools/multi_hub_authentication.test.cjs"]),
+        ["integration:multi-hub", "quick:protocol", "quick:runtime"],
+    )
 })
 
 test("registers focused seed state and API regressions", () => {
@@ -519,7 +526,9 @@ test("registers every test in exactly one leaf group and full covers runtime reg
 
     assert.ok(allTests.length >= 42)
     for (const file of allTests) {
-        assert.deepEqual(leafMembership.get(file), [selectTestGroups([file])[0]], file)
+        const registeredGroups = leafMembership.get(file)
+        assert.equal(registeredGroups?.length, 1, file)
+        assert.equal(selectTestGroups([file]).includes(registeredGroups[0]), true, file)
     }
 
     const externalGeneratorTests = new Set(TEST_GROUPS.generator.tests)

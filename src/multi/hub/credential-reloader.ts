@@ -16,6 +16,11 @@ export interface CredentialReloaderOptions {
     readonly warn?: (message: string) => void
 }
 
+export type CredentialAuthenticationResult =
+    | { readonly ok: true; readonly credential: MultiHubCredential }
+    | { readonly ok: false; readonly reason: "malformed" | "unknown" }
+    | { readonly ok: false; readonly reason: "revoked"; readonly credentialId: string }
+
 interface CredentialSnapshot {
     readonly records: readonly MultiHubCredentialRecord[]
     readonly byId: ReadonlyMap<string, MultiHubCredentialRecord>
@@ -108,15 +113,34 @@ export class CredentialReloader {
         }
     }
 
-    authenticate(token: string): MultiHubCredential | null {
-        if (!validateMultiHubToken(token)) return null
+    authenticateDetailed(token: string | null): CredentialAuthenticationResult {
+        if (!validateMultiHubToken(token)) return { ok: false, reason: "malformed" }
         const candidate = createHash("sha256").update(token, "utf8").digest()
-        let match: MultiHubCredentialRecord | null = null
+        let activeMatch: MultiHubCredentialRecord | null = null
+        let revokedMatch: MultiHubCredentialRecord | null = null
         for (const record of this.current.records) {
             const digest = Buffer.from(record.tokenDigest, "hex")
-            if (record.revokedAt === null && timingSafeEqual(candidate, digest)) match = record
+            if (timingSafeEqual(candidate, digest)) {
+                if (record.revokedAt === null) activeMatch = record
+                else revokedMatch = record
+            }
         }
-        return match === null ? null : publicCredential(match)
+        if (activeMatch !== null) {
+            return { ok: true, credential: publicCredential(activeMatch) }
+        }
+        if (revokedMatch !== null) {
+            return {
+                ok: false,
+                reason: "revoked",
+                credentialId: revokedMatch.credentialId,
+            }
+        }
+        return { ok: false, reason: "unknown" }
+    }
+
+    authenticate(token: string): MultiHubCredential | null {
+        const result = this.authenticateDetailed(token)
+        return result.ok ? result.credential : null
     }
 
     isCredentialEnabled(credentialId: string): boolean {
