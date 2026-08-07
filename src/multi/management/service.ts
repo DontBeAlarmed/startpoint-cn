@@ -15,6 +15,7 @@ import {
 } from "./types"
 
 const CREDENTIAL_ID_PATTERN = /^[0-9a-f]{32}$/
+const ISO_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?Z$/
 
 function cloneAndFreeze<T>(value: T): T {
     if (value === null || typeof value !== "object") return value
@@ -226,13 +227,12 @@ function projectAuthenticationRejection(
 ): MultiAuthenticationDiagnostics["rejections"][number] | null {
     try {
         if (event === null || typeof event !== "object" || Array.isArray(event)) return null
-        const timestamp = (event as { timestamp?: unknown }).timestamp
+        const timestamp = normalizeDiagnosticTimestamp(
+            (event as { timestamp?: unknown }).timestamp,
+        )
         const reason = (event as { reason?: unknown }).reason
-        if (typeof timestamp !== "string") return null
+        if (timestamp === null) return null
         if (reason !== "malformed" && reason !== "unknown" && reason !== "revoked") return null
-
-        const date = new Date(timestamp)
-        if (!Number.isFinite(date.getTime())) return null
 
         let credential: MultiAuthenticationCredentialHint | null = null
         if (reason === "revoked") {
@@ -242,13 +242,32 @@ function projectAuthenticationRejection(
             }
         }
         return {
-            timestamp: date.toISOString(),
+            timestamp,
             reason,
             credential,
         }
     } catch {
         return null
     }
+}
+
+function normalizeDiagnosticTimestamp(value: unknown): string | null {
+    if (typeof value !== "string") return null
+    const match = ISO_TIMESTAMP_PATTERN.exec(value)
+    if (match === null) return null
+
+    const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number)
+    const date = new Date(value)
+    if (!Number.isFinite(date.getTime())
+        || date.getUTCFullYear() !== year
+        || date.getUTCMonth() + 1 !== month
+        || date.getUTCDate() !== day
+        || date.getUTCHours() !== hour
+        || date.getUTCMinutes() !== minute
+        || date.getUTCSeconds() !== second) {
+        return null
+    }
+    return date.toISOString()
 }
 
 export { CLIENT_MULTI_MANAGEMENT_UNAVAILABLE }

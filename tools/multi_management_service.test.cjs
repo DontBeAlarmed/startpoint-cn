@@ -497,6 +497,8 @@ test("host authentication diagnostics filter malformed provider values and inval
                 null,
                 "invalid",
                 throwingEvent,
+                { timestamp: "08/06/2026", reason: "malformed" },
+                { timestamp: "2026-08-06", reason: "unknown" },
                 { timestamp: "invalid-date", reason: "malformed" },
                 { timestamp: CHECKED_AT, reason: "secret-reason", token: "secret-token" },
                 {
