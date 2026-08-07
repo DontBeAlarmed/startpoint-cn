@@ -3,7 +3,7 @@ import { getEventSafeMissionIds } from "./computer-event-safe"
 import { getExactEventBattleMissionIds } from "./event-battle-facts"
 import { getProducerBackedEventEntryMissionIds } from "./event-entry-facts"
 import { getMissionMasterDefinitions } from "./master-data"
-import { AWAKE_MISSION_RULE_FAMILIES } from "./awake-rule-catalog"
+import { getAwakeMissionRuleFamilies } from "./awake-rule-catalog"
 import type { AwakeMissionRuleFamilyName } from "./awake-rule-catalog"
 
 export interface MissionCoverageEntry {
@@ -169,7 +169,7 @@ function passPartition(): MissionCoveragePartition {
 
 function awakeCoverage(): MissionCoverageAudit["awake"] {
     const definitions = getMissionMasterDefinitions(9)
-    const families = AWAKE_MISSION_RULE_FAMILIES.map(family => Object.freeze({
+    const families = getAwakeMissionRuleFamilies().map(family => Object.freeze({
         family: family.family,
         status: family.status,
         missionIds: Object.freeze([...family.missionIds]),

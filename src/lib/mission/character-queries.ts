@@ -1,6 +1,8 @@
 // Character → quest mapping helpers
 
-import charQuests from "../../../assets/character_quest_lookup.json"
+import bundledCharacterQuests from "../../../assets/character_quest_lookup.json"
+import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 
 type RawCharacterQuestTable = Record<string, unknown>
 
@@ -33,15 +35,42 @@ export function buildCharacterStoryQuestIndex(
     return index
 }
 
-const bundledCharacterStoryQuestIndex = buildCharacterStoryQuestIndex(
-    charQuests as RawCharacterQuestTable,
-)
+const characterStoryQuestIndexByTable = new WeakMap<
+    RawCharacterQuestTable,
+    ReadonlyMap<string, readonly number[]> | null
+>()
+
+function getCharacterQuestTable(
+    repository?: ReadonlyContentRepository,
+): RawCharacterQuestTable {
+    return repository
+        ? repository.table<RawCharacterQuestTable>("character_quest_lookup.json")
+        : getRuntimeContentTableSync(
+            "character_quest_lookup.json",
+            bundledCharacterQuests as RawCharacterQuestTable,
+        )
+}
+
+function getCharacterStoryQuestIndex(
+    repository?: ReadonlyContentRepository,
+): ReadonlyMap<string, readonly number[]> | null {
+    const table = getCharacterQuestTable(repository)
+    if (characterStoryQuestIndexByTable.has(table)) {
+        return characterStoryQuestIndexByTable.get(table) ?? null
+    }
+    const index = buildCharacterStoryQuestIndex(table)
+    characterStoryQuestIndexByTable.set(table, index)
+    return index
+}
 
 export function getCharacterIdFromMission(missionId: number): string {
     const s = String(missionId)
     return s.length > 1 ? s.substring(0, s.length - 1) : s
 }
 
-export function getCharacterStoryQuestIds(characterId: number | string): number[] {
-    return [...(bundledCharacterStoryQuestIndex?.get(String(characterId)) ?? [])]
+export function getCharacterStoryQuestIds(
+    characterId: number | string,
+    repository?: ReadonlyContentRepository,
+): number[] {
+    return [...(getCharacterStoryQuestIndex(repository)?.get(String(characterId)) ?? [])]
 }

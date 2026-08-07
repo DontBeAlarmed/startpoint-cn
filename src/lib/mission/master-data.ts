@@ -1,13 +1,15 @@
-import regularDefinitions from "../../../assets/mission_regular.json"
-import dailyDefinitions from "../../../assets/mission_daily.json"
-import eventDefinitions from "../../../assets/mission_event.json"
-import collectItemDefinitions from "../../../assets/mission_collect_item.json"
-import degreeDefinitions from "../../../assets/mission_degree.json"
-import characterAwakeDefinitions from "../../../assets/mission_char_awake.json"
-import weeklyDefinitions from "../../../assets/mission_weekly_def.json"
-import passDailyDefinitions from "../../../assets/mission_pass_daily.json"
-import passWeekDefinitions from "../../../assets/mission_pass_week.json"
-import passEventDefinitions from "../../../assets/mission_pass_event.json"
+import bundledRegularDefinitions from "../../../assets/mission_regular.json"
+import bundledDailyDefinitions from "../../../assets/mission_daily.json"
+import bundledEventDefinitions from "../../../assets/mission_event.json"
+import bundledCollectItemDefinitions from "../../../assets/mission_collect_item.json"
+import bundledDegreeDefinitions from "../../../assets/mission_degree.json"
+import bundledCharacterAwakeDefinitions from "../../../assets/mission_char_awake.json"
+import bundledWeeklyDefinitions from "../../../assets/mission_weekly_def.json"
+import bundledPassDailyDefinitions from "../../../assets/mission_pass_daily.json"
+import bundledPassWeekDefinitions from "../../../assets/mission_pass_week.json"
+import bundledPassEventDefinitions from "../../../assets/mission_pass_event.json"
+import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 
 interface CategoryLayout {
     pattern: number
@@ -33,17 +35,22 @@ const CATEGORY_LAYOUT: Readonly<Record<number, CategoryLayout>> = {
 
 type RawMissionTable = Record<string, unknown>
 
-const TABLE_BY_CATEGORY: Readonly<Record<number, RawMissionTable>> = {
-    1: regularDefinitions,
-    2: dailyDefinitions,
-    3: eventDefinitions,
-    4: collectItemDefinitions,
-    5: degreeDefinitions,
-    6: passDailyDefinitions,
-    7: passWeekDefinitions,
-    8: passEventDefinitions,
-    9: characterAwakeDefinitions,
-    10: weeklyDefinitions,
+interface MissionTableSource {
+    readonly tableName: string
+    readonly bundledBeforeInitialization: RawMissionTable
+}
+
+const TABLE_BY_CATEGORY: Readonly<Record<number, MissionTableSource>> = {
+    1: { tableName: "mission_regular.json", bundledBeforeInitialization: bundledRegularDefinitions },
+    2: { tableName: "mission_daily.json", bundledBeforeInitialization: bundledDailyDefinitions },
+    3: { tableName: "mission_event.json", bundledBeforeInitialization: bundledEventDefinitions },
+    4: { tableName: "mission_collect_item.json", bundledBeforeInitialization: bundledCollectItemDefinitions },
+    5: { tableName: "mission_degree.json", bundledBeforeInitialization: bundledDegreeDefinitions },
+    6: { tableName: "mission_pass_daily.json", bundledBeforeInitialization: bundledPassDailyDefinitions },
+    7: { tableName: "mission_pass_week.json", bundledBeforeInitialization: bundledPassWeekDefinitions },
+    8: { tableName: "mission_pass_event.json", bundledBeforeInitialization: bundledPassEventDefinitions },
+    9: { tableName: "mission_char_awake.json", bundledBeforeInitialization: bundledCharacterAwakeDefinitions },
+    10: { tableName: "mission_weekly_def.json", bundledBeforeInitialization: bundledWeeklyDefinitions },
 }
 
 export interface MissionMasterDefinition {
@@ -58,7 +65,10 @@ export interface MissionMasterDefinition {
     row: readonly unknown[]
 }
 
-const definitionCache = new Map<number, readonly MissionMasterDefinition[]>()
+const definitionCache = new WeakMap<
+    RawMissionTable,
+    Map<number, readonly MissionMasterDefinition[]>
+>()
 
 function optionalMasterString(value: unknown): string | undefined {
     if (value === undefined || value === null || value === "" || value === "(None)") return undefined
@@ -75,11 +85,28 @@ function parseMasterCnTime(value: string | undefined): number | undefined {
     return Date.parse(`${value.replace(" ", "T")}+08:00`)
 }
 
-export function getMissionMasterDefinitions(category: number): readonly MissionMasterDefinition[] {
-    const table = TABLE_BY_CATEGORY[category]
+function getMissionTable(
+    source: MissionTableSource,
+    repository?: ReadonlyContentRepository,
+): RawMissionTable {
+    return repository
+        ? repository.table<RawMissionTable>(source.tableName)
+        : getRuntimeContentTableSync(
+            source.tableName,
+            source.bundledBeforeInitialization,
+        )
+}
+
+export function getMissionMasterDefinitions(
+    category: number,
+    repository?: ReadonlyContentRepository,
+): readonly MissionMasterDefinition[] {
+    const source = TABLE_BY_CATEGORY[category]
     const layout = CATEGORY_LAYOUT[category]
-    if (!table || !layout) throw new Error(`unsupported mission category: ${category}`)
-    const cached = definitionCache.get(category)
+    if (!source || !layout) throw new Error(`unsupported mission category: ${category}`)
+    const table = getMissionTable(source, repository)
+    let definitionsByCategory = definitionCache.get(table)
+    const cached = definitionsByCategory?.get(category)
     if (cached) return cached
 
     const definitions: MissionMasterDefinition[] = []
@@ -106,15 +133,21 @@ export function getMissionMasterDefinitions(category: number): readonly MissionM
         }))
     }
     const frozen = Object.freeze(definitions)
-    definitionCache.set(category, frozen)
+    if (!definitionsByCategory) {
+        definitionsByCategory = new Map()
+        definitionCache.set(table, definitionsByCategory)
+    }
+    definitionsByCategory.set(category, frozen)
     return frozen
 }
 
 export function getMissionMasterDefinition(
     category: number,
     missionId: number,
+    repository?: ReadonlyContentRepository,
 ): MissionMasterDefinition | undefined {
-    return getMissionMasterDefinitions(category).find(definition => definition.missionId === missionId)
+    return getMissionMasterDefinitions(category, repository)
+        .find(definition => definition.missionId === missionId)
 }
 
 export function isMissionDefinitionEnabledAt(

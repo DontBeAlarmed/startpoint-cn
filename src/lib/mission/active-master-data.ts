@@ -1,6 +1,7 @@
-import activeMissions from "../../../assets/mission_active.json"
-import activeMissionEvents from "../../../assets/mission_active_event.json"
+import bundledActiveMissions from "../../../assets/mission_active.json"
+import bundledActiveMissionEvents from "../../../assets/mission_active_event.json"
 import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 
 export interface ActiveMissionMasterDefinition {
     readonly missionId: number
@@ -27,68 +28,85 @@ function buildDefinitions<T extends { readonly row: readonly unknown[] }>(
     })
 }
 
-function getMissionTable(repository?: ReadonlyContentRepository): Record<string, unknown> {
+type ActiveMasterTable = Record<string, unknown>
+
+const missionDefinitionsByTable = new WeakMap<
+    ActiveMasterTable,
+    readonly ActiveMissionMasterDefinition[]
+>()
+const eventDefinitionsByTable = new WeakMap<
+    ActiveMasterTable,
+    readonly ActiveMissionEventMasterDefinition[]
+>()
+
+function getMissionTable(repository?: ReadonlyContentRepository): ActiveMasterTable {
     return repository
-        ? repository.table<Record<string, unknown>>("mission_active.json")
-        : activeMissions as Record<string, unknown>
+        ? repository.table<ActiveMasterTable>("mission_active.json")
+        : getRuntimeContentTableSync(
+            "mission_active.json",
+            bundledActiveMissions as ActiveMasterTable,
+        )
 }
 
-function getEventTable(repository?: ReadonlyContentRepository): Record<string, unknown> {
+function getEventTable(repository?: ReadonlyContentRepository): ActiveMasterTable {
     return repository
-        ? repository.table<Record<string, unknown>>("mission_active_event.json")
-        : activeMissionEvents as Record<string, unknown>
+        ? repository.table<ActiveMasterTable>("mission_active_event.json")
+        : getRuntimeContentTableSync(
+            "mission_active_event.json",
+            bundledActiveMissionEvents as ActiveMasterTable,
+        )
 }
 
-function buildMissionDefinitions(
-    repository?: ReadonlyContentRepository,
+function getMissionDefinitions(
+    table: ActiveMasterTable,
 ): readonly ActiveMissionMasterDefinition[] {
-    return buildDefinitions(
-        getMissionTable(repository),
+    const cached = missionDefinitionsByTable.get(table)
+    if (cached) return cached
+    const definitions = buildDefinitions(
+        table,
         (missionId, row): ActiveMissionMasterDefinition => ({ missionId, row }),
     )
+    missionDefinitionsByTable.set(table, definitions)
+    return definitions
 }
 
-function buildEventDefinitions(
-    repository?: ReadonlyContentRepository,
+function getEventDefinitions(
+    table: ActiveMasterTable,
 ): readonly ActiveMissionEventMasterDefinition[] {
-    return buildDefinitions(
-        getEventTable(repository),
+    const cached = eventDefinitionsByTable.get(table)
+    if (cached) return cached
+    const definitions = buildDefinitions(
+        table,
         (eventId, row): ActiveMissionEventMasterDefinition => ({ eventId, row }),
     )
+    eventDefinitionsByTable.set(table, definitions)
+    return definitions
 }
-
-const missionDefinitions = buildMissionDefinitions()
-const eventDefinitions = buildEventDefinitions()
-
-const missionById = new Map(missionDefinitions.map(definition => [definition.missionId, definition]))
-const eventById = new Map(eventDefinitions.map(definition => [definition.eventId, definition]))
 
 export function getActiveMissionMasterDefinitions(
     repository?: ReadonlyContentRepository,
 ): readonly ActiveMissionMasterDefinition[] {
-    return repository ? buildMissionDefinitions(repository) : missionDefinitions
+    return getMissionDefinitions(getMissionTable(repository))
 }
 
 export function getActiveMissionMasterDefinition(
     missionId: number,
     repository?: ReadonlyContentRepository,
 ): ActiveMissionMasterDefinition | undefined {
-    return repository
-        ? buildMissionDefinitions(repository).find(definition => definition.missionId === missionId)
-        : missionById.get(missionId)
+    return getActiveMissionMasterDefinitions(repository)
+        .find(definition => definition.missionId === missionId)
 }
 
 export function getActiveMissionEventMasterDefinitions(
     repository?: ReadonlyContentRepository,
 ): readonly ActiveMissionEventMasterDefinition[] {
-    return repository ? buildEventDefinitions(repository) : eventDefinitions
+    return getEventDefinitions(getEventTable(repository))
 }
 
 export function getActiveMissionEventMasterDefinition(
     eventId: number,
     repository?: ReadonlyContentRepository,
 ): ActiveMissionEventMasterDefinition | undefined {
-    return repository
-        ? buildEventDefinitions(repository).find(definition => definition.eventId === eventId)
-        : eventById.get(eventId)
+    return getActiveMissionEventMasterDefinitions(repository)
+        .find(definition => definition.eventId === eventId)
 }

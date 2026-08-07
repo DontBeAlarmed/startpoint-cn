@@ -3,9 +3,9 @@ import {
 } from "./awake-rule-catalog"
 
 export {
-    AWAKE_GENERIC_CHARACTER_CLEAR_MISSION_IDS,
-    AWAKE_GENERIC_CHARACTER_CLEAR_RULES,
-    AWAKE_MISSION_RULE_FAMILIES,
+    getAwakeGenericCharacterClearRules,
+    getAwakeMissionRuleFamilies,
+    isAwakeGenericCharacterClearMission,
 } from "./awake-rule-catalog"
 
 export interface PartyCoClearRow {

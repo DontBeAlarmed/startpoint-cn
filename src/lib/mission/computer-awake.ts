@@ -12,15 +12,14 @@ import type { MissionComputer, CategoryContext } from "./types"
 import type { PlayerCharacter } from "../../data/types"
 import {
     AWAKE_DIRECT_BATTLE_MISSION_IDS,
-    AWAKE_GENERIC_CHARACTER_CLEAR_MISSION_IDS,
     getCharacterPairKey,
     isBondTokenMissionComplete,
     mergePartyCoClearRows,
 } from "./awake-battle-rules"
-import { getAwakeMissionIdsByFamily } from "./awake-rule-catalog"
-
-// Slot 1 missions that count story reading (not party clears)
-const STORY_MISSION_IDS = new Set(getAwakeMissionIdsByFamily("story-read"))
+import {
+    getAwakeMissionIdsByFamily,
+    isAwakeGenericCharacterClearMission,
+} from "./awake-rule-catalog"
 
 // ─── Awake-specific context (extends base) ───
 
@@ -194,7 +193,7 @@ function computeAwakeDerivedProgress(missionId: number, actx: AwakeContext): num
         case AwakeType.PARTY_OR_SPECIAL:
             if (charId === '1') return actx.totalStories
             if (charId === '263002') return actx.player.totalManaObtained ?? 0
-            if (!AWAKE_GENERIC_CHARACTER_CLEAR_MISSION_IDS.has(missionId)
+            if (!isAwakeGenericCharacterClearMission(missionId)
                 && !isLeaderRequired) return 0
             return isLeaderRequired
                 ? actx.leaderClears.get(charId) ?? 0
@@ -208,7 +207,7 @@ function computeAwakeDerivedProgress(missionId: number, actx: AwakeContext): num
             if (COOP_MISSION_IDS.has(missionId)) {
                 return actx.leaderMultiClears.get(charId) ?? 0
             }
-            if (!AWAKE_GENERIC_CHARACTER_CLEAR_MISSION_IDS.has(missionId)
+            if (!isAwakeGenericCharacterClearMission(missionId)
                 && !isLeaderRequired) return 0
             return isLeaderRequired
                 ? actx.leaderClears.get(charId) ?? 0
@@ -236,7 +235,7 @@ enum AwakeType {
 }
 
 function computeStoryOrParty(missionId: number, actx: AwakeContext, charId: string): number {
-    if (STORY_MISSION_IDS.has(missionId)) {
+    if (getAwakeMissionIdsByFamily("story-read").includes(missionId)) {
         const storyIds = getCharacterStoryQuestIds(charId)
         let count = 0
         for (const qid of storyIds) {
@@ -244,7 +243,7 @@ function computeStoryOrParty(missionId: number, actx: AwakeContext, charId: stri
         }
         return count
     }
-    if (!AWAKE_GENERIC_CHARACTER_CLEAR_MISSION_IDS.has(missionId)) {
+    if (!isAwakeGenericCharacterClearMission(missionId)) {
         return actx.categoryMissionProgress?.get(missionId) ?? 0
     }
     return actx.charClears.get(charId) ?? 0

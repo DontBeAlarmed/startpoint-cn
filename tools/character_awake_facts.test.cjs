@@ -3,9 +3,9 @@ require("ts-node/register/transpile-only")
 const assert = require("node:assert/strict")
 
 const {
-    AWAKE_GENERIC_CHARACTER_CLEAR_RULES,
-    AWAKE_MISSION_RULE_FAMILIES,
     AWAKE_DIRECT_BATTLE_MISSION_IDS,
+    getAwakeGenericCharacterClearRules,
+    getAwakeMissionRuleFamilies,
     getAwakeBattleProgressFacts,
     getMatchedAwakeDirectBattleMissionIds,
     getMatchedAwakeRaceMissionIds,
@@ -16,6 +16,8 @@ const {
 } = require("../src/lib/mission/awake-battle-rules")
 const { getComputer } = require("../src/lib/mission")
 const { getCharacterStoryQuestIds } = require("../src/lib/mission/character-queries")
+const AWAKE_GENERIC_CHARACTER_CLEAR_RULES = getAwakeGenericCharacterClearRules()
+const AWAKE_MISSION_RULE_FAMILIES = getAwakeMissionRuleFamilies()
 
 assert.deepEqual(normalizeCharacterPair(231001, 211001), [211001, 231001])
 assert.deepEqual(
