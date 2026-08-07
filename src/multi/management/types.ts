@@ -6,6 +6,7 @@ import type {
     MultiHubCredential,
     MultiHubCredentialStore,
 } from "../hub/credential-store"
+import type { MultiRuntimeAuthenticationDiagnostics } from "../runtime/service"
 
 export type MultiManagementMode = "embedded" | "host" | "client"
 
@@ -25,12 +26,30 @@ export interface MultiProbeResult {
     readonly checkedAt: string | null
 }
 
+export interface MultiAuthenticationCredentialHint {
+    readonly label: string
+    readonly shortId: string
+}
+
+export interface MultiAuthenticationRejectionSummary {
+    readonly timestamp: string
+    readonly reason: "malformed" | "unknown" | "revoked"
+    readonly credential: MultiAuthenticationCredentialHint | null
+}
+
+export interface MultiAuthenticationDiagnostics {
+    readonly mode: MultiManagementMode
+    readonly clientState: "authentication_rejected" | null
+    readonly rejections: readonly MultiAuthenticationRejectionSummary[]
+}
+
 export interface MultiManagementDependencies {
     readonly mode: MultiManagementMode
     readonly credentials: Pick<MultiHubCredentialStore, "create" | "list" | "revoke">
     readonly getStatus: () => Promise<AdminMultiStatus> | AdminMultiStatus
     readonly probe: () => Promise<CoordinatorResult<MultiHubControlStatus>>
         | CoordinatorResult<MultiHubControlStatus>
+    readonly getAuthenticationDiagnostics: () => MultiRuntimeAuthenticationDiagnostics
     readonly now?: () => number
 }
 
@@ -40,4 +59,5 @@ export interface MultiManagementServiceContract {
     revokeCredential(credentialId: string): MultiHubCredential
     getStatus(): Promise<AdminMultiStatus>
     probeHub(): Promise<MultiProbeResult>
+    getAuthenticationDiagnostics(): MultiAuthenticationDiagnostics
 }

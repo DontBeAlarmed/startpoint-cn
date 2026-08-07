@@ -11,6 +11,7 @@ const {
 
 const CHECKED_AT_MS = Date.parse("2026-08-06T03:00:00.000Z")
 const CHECKED_AT = "2026-08-06T03:00:00.000Z"
+const REVOKED_CREDENTIAL_ID = "a".repeat(32)
 
 function status() {
     return {
@@ -54,6 +55,10 @@ function createService(mode, overrides = {}) {
         probe: async () => {
             calls.push(["probe"])
             return { ok: true, value: { tcpAvailable: true } }
+        },
+        getAuthenticationDiagnostics: () => {
+            calls.push(["getAuthenticationDiagnostics"])
+            return { clientState: null, hostRejections: [] }
         },
         now: () => CHECKED_AT_MS,
         ...overrides,
@@ -325,4 +330,235 @@ test("probe only invokes the injected provider", async () => {
 
     await fixture.service.probeHub()
     assert.deepEqual(calls, ["getControlStatus"])
+})
+
+test("host authentication diagnostics safely project rejection events and revoked credential hints", () => {
+    const fixture = createService("host", {
+        credentials: {
+            create: () => { throw new Error("not used") },
+            list: () => [{
+                credentialId: REVOKED_CREDENTIAL_ID,
+                label: "node-a",
+                createdAt: CHECKED_AT,
+                revokedAt: CHECKED_AT,
+                token: "secret-token",
+                digest: "secret-digest",
+            }],
+            revoke: () => { throw new Error("not used") },
+        },
+        getAuthenticationDiagnostics: () => ({
+            clientState: "authentication_rejected",
+            hostRejections: [
+                {
+                    timestamp: "2026-08-06T03:00:00Z",
+                    reason: "malformed",
+                    credentialId: "secret-malformed-id",
+                    request: { token: "secret-malformed-token" },
+                },
+                {
+                    timestamp: "2026-08-06T03:00:01.000Z",
+                    reason: "unknown",
+                    credentialId: "secret-unknown-id",
+                    body: "secret-unknown-body",
+                },
+                {
+                    timestamp: "2026-08-06T03:00:02.000Z",
+                    reason: "revoked",
+                    credentialId: REVOKED_CREDENTIAL_ID,
+                    token: "secret-revoked-token",
+                    stack: "/private/operator/path",
+                },
+                {
+                    timestamp: "2026-08-06T03:00:03.000Z",
+                    reason: "revoked",
+                    credentialId: "b".repeat(32),
+                    remoteAddress: "192.0.2.10",
+                },
+            ],
+        }),
+    })
+
+    const result = fixture.service.getAuthenticationDiagnostics()
+    assert.deepEqual(result, {
+        mode: "host",
+        clientState: null,
+        rejections: [
+            {
+                timestamp: "2026-08-06T03:00:00.000Z",
+                reason: "malformed",
+                credential: null,
+            },
+            {
+                timestamp: "2026-08-06T03:00:01.000Z",
+                reason: "unknown",
+                credential: null,
+            },
+            {
+                timestamp: "2026-08-06T03:00:02.000Z",
+                reason: "revoked",
+                credential: { label: "node-a", shortId: "aaaaaaaa" },
+            },
+            {
+                timestamp: "2026-08-06T03:00:03.000Z",
+                reason: "revoked",
+                credential: null,
+            },
+        ],
+    })
+    assert.doesNotMatch(
+        JSON.stringify(result),
+        /secret-|digest|token|request|body|remoteAddress|private|operator|path|aaaaaaaaaaaaaaaa/,
+    )
+})
+
+test("client authentication diagnostics expose only the strict client state", () => {
+    const calls = []
+    const fixture = createService("client", {
+        credentials: {
+            create: () => { throw new Error("not used") },
+            list: () => {
+                calls.push("list")
+                throw new Error("credentials must not be read")
+            },
+            revoke: () => { throw new Error("not used") },
+        },
+        getAuthenticationDiagnostics: () => {
+            calls.push("diagnostics")
+            return {
+                clientState: "authentication_rejected",
+                hostRejections: [{
+                    timestamp: CHECKED_AT,
+                    reason: "revoked",
+                    credentialId: REVOKED_CREDENTIAL_ID,
+                    token: "secret-token",
+                }],
+            }
+        },
+    })
+
+    assert.deepEqual(fixture.service.getAuthenticationDiagnostics(), {
+        mode: "client",
+        clientState: "authentication_rejected",
+        rejections: [],
+    })
+    assert.deepEqual(calls, ["diagnostics"])
+})
+
+test("embedded authentication diagnostics are empty without reading credentials", () => {
+    const calls = []
+    const fixture = createService("embedded", {
+        credentials: {
+            create: () => { throw new Error("not used") },
+            list: () => {
+                calls.push("list")
+                throw new Error("credentials must not be read")
+            },
+            revoke: () => { throw new Error("not used") },
+        },
+        getAuthenticationDiagnostics: () => {
+            calls.push("diagnostics")
+            return {
+                clientState: "authentication_rejected",
+                hostRejections: [{
+                    timestamp: CHECKED_AT,
+                    reason: "revoked",
+                    credentialId: REVOKED_CREDENTIAL_ID,
+                }],
+            }
+        },
+    })
+
+    assert.deepEqual(fixture.service.getAuthenticationDiagnostics(), {
+        mode: "embedded",
+        clientState: null,
+        rejections: [],
+    })
+    assert.deepEqual(calls, [])
+})
+
+test("host authentication diagnostics filter malformed provider values and invalid events", () => {
+    const throwingEvent = {}
+    Object.defineProperty(throwingEvent, "timestamp", {
+        enumerable: true,
+        get() { throw new Error("secret getter failure") },
+    })
+    const fixture = createService("host", {
+        credentials: {
+            create: () => { throw new Error("not used") },
+            list: () => [null, "invalid", {
+                credentialId: REVOKED_CREDENTIAL_ID,
+                label: "node-a",
+            }],
+            revoke: () => { throw new Error("not used") },
+        },
+        getAuthenticationDiagnostics: () => ({
+            clientState: "secret-invalid-state",
+            hostRejections: [
+                null,
+                "invalid",
+                throwingEvent,
+                { timestamp: "invalid-date", reason: "malformed" },
+                { timestamp: CHECKED_AT, reason: "secret-reason", token: "secret-token" },
+                {
+                    timestamp: CHECKED_AT,
+                    reason: "revoked",
+                    credentialId: "not-a-complete-id",
+                    credential: { token: "secret-token" },
+                },
+                { timestamp: CHECKED_AT, reason: "unknown", credentialId: Symbol("secret") },
+            ],
+        }),
+    })
+
+    const result = fixture.service.getAuthenticationDiagnostics()
+    assert.deepEqual(result, {
+        mode: "host",
+        clientState: null,
+        rejections: [
+            { timestamp: CHECKED_AT, reason: "revoked", credential: null },
+            { timestamp: CHECKED_AT, reason: "unknown", credential: null },
+        ],
+    })
+    assert.doesNotMatch(JSON.stringify(result), /secret-|complete-id|token|credentialId/)
+})
+
+test("authentication diagnostics return fresh deeply frozen projections", () => {
+    const source = {
+        clientState: null,
+        hostRejections: [{
+            timestamp: CHECKED_AT,
+            reason: "revoked",
+            credentialId: REVOKED_CREDENTIAL_ID,
+        }],
+    }
+    const fixture = createService("host", {
+        credentials: {
+            create: () => { throw new Error("not used") },
+            list: () => [{
+                credentialId: REVOKED_CREDENTIAL_ID,
+                label: "node-a",
+                createdAt: CHECKED_AT,
+                revokedAt: CHECKED_AT,
+            }],
+            revoke: () => { throw new Error("not used") },
+        },
+        getAuthenticationDiagnostics: () => source,
+    })
+
+    const first = fixture.service.getAuthenticationDiagnostics()
+    const second = fixture.service.getAuthenticationDiagnostics()
+    assert.notEqual(first, second)
+    assert.notEqual(first.rejections, second.rejections)
+    assert.notEqual(first.rejections[0], second.rejections[0])
+    assert.notEqual(first.rejections[0].credential, second.rejections[0].credential)
+    assert.equal(Object.isFrozen(first), true)
+    assert.equal(Object.isFrozen(first.rejections), true)
+    assert.equal(Object.isFrozen(first.rejections[0]), true)
+    assert.equal(Object.isFrozen(first.rejections[0].credential), true)
+    assert.equal(Object.isFrozen(source), false)
+    assert.equal(Object.isFrozen(source.hostRejections), false)
+    assert.equal(Object.isFrozen(source.hostRejections[0]), false)
+
+    source.hostRejections[0].timestamp = "2026-08-07T00:00:00.000Z"
+    assert.equal(first.rejections[0].timestamp, CHECKED_AT)
 })

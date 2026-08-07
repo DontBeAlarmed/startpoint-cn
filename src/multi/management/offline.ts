@@ -35,5 +35,9 @@ export function createOfflineMultiManagementService({
             latestCompatibilityRejection: null,
         }),
         probe: async () => ({ ok: false, error: "HUB_UNAVAILABLE" }),
+        getAuthenticationDiagnostics: () => ({
+            clientState: null,
+            hostRejections: [],
+        }),
     })
 }

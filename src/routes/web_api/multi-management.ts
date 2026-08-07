@@ -11,6 +11,7 @@ import {
     MultiManagementError,
 } from "../../multi/management/service"
 import type {
+    MultiAuthenticationDiagnostics,
     MultiManagementServiceContract,
     MultiProbeResult,
 } from "../../multi/management/types"
@@ -42,6 +43,25 @@ function publicIssuedCredential(credential: IssuedMultiHubCredential): IssuedMul
 
 function publicProbe(result: MultiProbeResult): MultiProbeResult {
     return { state: result.state, checkedAt: result.checkedAt }
+}
+
+function publicAuthenticationDiagnostics(
+    result: MultiAuthenticationDiagnostics,
+): MultiAuthenticationDiagnostics {
+    return {
+        mode: result.mode,
+        clientState: result.clientState,
+        rejections: result.rejections.map(rejection => ({
+            timestamp: rejection.timestamp,
+            reason: rejection.reason,
+            credential: rejection.credential === null
+                ? null
+                : {
+                    label: rejection.credential.label,
+                    shortId: rejection.credential.shortId,
+                },
+        })),
+    }
 }
 
 function getService(
@@ -106,6 +126,18 @@ function sendManagementError(reply: FastifyReply, error: unknown): FastifyReply 
 }
 
 const routes = async (fastify: FastifyInstance, options: MultiManagementRoutesOptions) => {
+    fastify.get("/authentication-rejections", async (request, reply) => {
+        const service = getService(request, reply, options)
+        if (service === null) return
+        try {
+            return reply.status(200).send(
+                publicAuthenticationDiagnostics(service.getAuthenticationDiagnostics()),
+            )
+        } catch (error) {
+            return sendManagementError(reply, error)
+        }
+    })
+
     fastify.get("/credentials", async (request, reply) => {
         const service = getService(request, reply, options)
         if (service === null) return

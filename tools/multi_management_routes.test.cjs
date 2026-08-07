@@ -50,12 +50,77 @@ test("management routes return a stable 503 until the lazy service is configured
         message: "Multiplayer management is not ready",
     })
 
+    const diagnosticsUnavailable = await request(app, "GET", "/authentication-rejections")
+    assert.equal(diagnosticsUnavailable.statusCode, 503)
+    assert.deepEqual(diagnosticsUnavailable.json(), unavailable.json())
+
     service = {
         listCredentials: () => [],
+        getAuthenticationDiagnostics: () => ({
+            mode: "embedded",
+            clientState: null,
+            rejections: [],
+        }),
     }
     const ready = await request(app, "GET", "/credentials")
     assert.equal(ready.statusCode, 200)
     assert.deepEqual(ready.json(), [])
+})
+
+test("loopback authentication rejection diagnostics return exact public fields", async t => {
+    const calls = []
+    const service = {
+        getAuthenticationDiagnostics() {
+            calls.push("diagnostics")
+            return {
+                mode: "host",
+                clientState: null,
+                token: "secret-root-token",
+                host: "192.0.2.10:8002",
+                rejections: [{
+                    timestamp: CREATED_AT,
+                    reason: "revoked",
+                    credential: {
+                        label: "node-a",
+                        shortId: "aaaaaaaa",
+                        credentialId: "a".repeat(32),
+                        token: "secret-credential-token",
+                    },
+                    request: { body: "secret-request-body" },
+                    digest: "secret-digest",
+                    session: "secret-session",
+                    stack: "/private/operator/path",
+                }, {
+                    timestamp: "2026-08-06T03:00:01.000Z",
+                    reason: "unknown",
+                    credential: null,
+                    remoteAddress: "192.0.2.10",
+                }],
+            }
+        },
+    }
+    const app = await createApp(t, () => service)
+
+    const response = await request(app, "GET", "/authentication-rejections")
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json(), {
+        mode: "host",
+        clientState: null,
+        rejections: [{
+            timestamp: CREATED_AT,
+            reason: "revoked",
+            credential: { label: "node-a", shortId: "aaaaaaaa" },
+        }, {
+            timestamp: "2026-08-06T03:00:01.000Z",
+            reason: "unknown",
+            credential: null,
+        }],
+    })
+    assert.doesNotMatch(
+        response.body,
+        /secret-|credentialId|request|body|digest|session|remoteAddress|192\.0\.2\.10|private|operator|path/,
+    )
+    assert.deepEqual(calls, ["diagnostics"])
 })
 
 test("loopback management routes delegate CRUD and probe with public response fields only", async t => {
@@ -167,6 +232,7 @@ test("all management actions reject non-loopback requests before touching the se
         listCredentials: () => calls.push("list"),
         revokeCredential: () => calls.push("revoke"),
         probeHub: () => calls.push("probe"),
+        getAuthenticationDiagnostics: () => calls.push("diagnostics"),
     }
     const app = await createApp(t, () => service)
     const requests = [
@@ -177,6 +243,7 @@ test("all management actions reject non-loopback requests before touching the se
         }],
         ["DELETE", `/credentials/${"a".repeat(32)}`, {}],
         ["POST", "/probe", {}],
+        ["GET", "/authentication-rejections", {}],
     ]
 
     for (const [method, url, options] of requests) {
@@ -280,6 +347,23 @@ test("management routes map credential lock failures to storage unavailable", as
         message: "Credential storage is unavailable",
     })
     assert.doesNotMatch(response.body, /LOCK_TIMEOUT/)
+})
+
+test("authentication diagnostic failures use the safe management error response", async t => {
+    const app = await createApp(t, () => ({
+        getAuthenticationDiagnostics: () => {
+            throw new Error("secret-token at /private/operator/path")
+        },
+    }))
+
+    const response = await request(app, "GET", "/authentication-rejections")
+    assert.equal(response.statusCode, 500)
+    assert.deepEqual(response.json(), {
+        error: "Internal Server Error",
+        code: "MULTI_MANAGEMENT_FAILED",
+        message: "Multiplayer management request failed",
+    })
+    assert.doesNotMatch(response.body, /secret-token|private|operator|path/)
 })
 
 test("runtime control probe calls only the client remote coordinator status method", async t => {

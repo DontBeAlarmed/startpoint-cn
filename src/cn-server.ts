@@ -335,6 +335,7 @@ runtimeCoordinator = createRuntimeCoordinator({
                 }),
                 getStatus: () => multiRuntimeService.getAdminStatus(),
                 probe: () => multiRuntimeService.probeControlStatus(),
+                getAuthenticationDiagnostics: () => multiRuntimeService.getAuthenticationDiagnostics(),
             });
         }
         return config;
