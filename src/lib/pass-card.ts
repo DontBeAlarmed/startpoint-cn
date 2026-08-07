@@ -1,5 +1,6 @@
-import passCardEvents from "../../assets/pass_card_event.json"
-import passCardRewards from "../../assets/pass_card_reward.json"
+import bundledPassCardEvents from "../../assets/pass_card_event.json"
+import bundledPassCardRewards from "../../assets/pass_card_reward.json"
+import { getRuntimeContentTableSync } from "../content/runtime/table-access"
 import type { ActiveMissionReward } from "./mission/rewards"
 
 export interface PassCardEventDefinition {
@@ -59,7 +60,11 @@ function parseReward(row: readonly unknown[], kindIndex: number): ActiveMissionR
 }
 
 export function getPassCardEventDefinition(eventId: number): PassCardEventDefinition | undefined {
-    const row = firstRow((passCardEvents as Record<string, unknown>)[String(eventId)])
+    const passCardEvents = getRuntimeContentTableSync(
+        "pass_card_event.json",
+        bundledPassCardEvents as Record<string, unknown>,
+    )
+    const row = firstRow(passCardEvents[String(eventId)])
     const thresholdPoint = row ? integer(row[4]) : undefined
     const levelThreshold = row ? integer(row[5]) : undefined
     const startTime = row ? cnTimestamp(row[8]) : undefined
@@ -77,7 +82,11 @@ export function isPassCardEventActiveAt(event: PassCardEventDefinition, at: Date
 }
 
 export function getPassCardRewardDefinition(rewardId: number): PassCardRewardDefinition | undefined {
-    const row = firstRow((passCardRewards as Record<string, unknown>)[String(rewardId)])
+    const passCardRewards = getRuntimeContentTableSync(
+        "pass_card_reward.json",
+        bundledPassCardRewards as Record<string, unknown>,
+    )
+    const row = firstRow(passCardRewards[String(rewardId)])
     if (!row) return undefined
     const eventId = integer(row[0])
     const level = integer(row[1])

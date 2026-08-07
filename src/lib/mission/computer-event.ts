@@ -6,9 +6,10 @@ import { getPlayerSync } from "../../data/domains/player"
 import { getMissionPattern } from "./patterns"
 import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "./master-data"
 import questMap from "../../../assets/mission_event_quest_map.json"
-import eventRewards from "../../../assets/mission_event_reward.json"
+import bundledEventRewards from "../../../assets/mission_event_reward.json"
 import type { MissionComputer, CategoryContext } from "./types"
 import { getExactEventBattleRuleCoverage } from "./event-battle-facts"
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 
 type EventCountMode = "single" | "multi" | "finish"
 
@@ -30,7 +31,11 @@ export interface EventMissionCoverageReport {
 }
 
 function getTargetClearTimeMs(missionId: number): number | undefined {
-    const stages = (eventRewards as Record<string, Record<string, unknown[]>>)[String(missionId)]
+    const eventRewards = getRuntimeContentTableSync(
+        "mission_event_reward.json",
+        bundledEventRewards as Record<string, Record<string, unknown[]>>,
+    )
+    const stages = eventRewards[String(missionId)]
     const firstStage = stages && Object.values(stages)[0]
     const row = Array.isArray(firstStage) && Array.isArray(firstStage[0]) ? firstStage[0] : undefined
     const seconds = Number(row?.[2])

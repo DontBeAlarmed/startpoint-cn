@@ -13,9 +13,10 @@ import { givePlayerCharacterSync } from "../../lib/character";
 import { givePlayerEquipmentSync } from "../../lib/equipment";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { getMailArrivedSync } from "../../lib/mail-notification";
-import starCrumbExchange from "../../../assets/star_crumb_exchange.json";
-import starCrumbExchangeCost from "../../../assets/star_crumb_exchange_cost.json";
+import bundledStarCrumbExchange from "../../../assets/star_crumb_exchange.json";
+import bundledStarCrumbExchangeCost from "../../../assets/star_crumb_exchange_cost.json";
 import { getDb } from "../../data/db";
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 
 interface ExchangeBody {
     viewer_id: number;
@@ -65,7 +66,11 @@ const routes = async (fastify: FastifyInstance) => {
         });
 
         // star_crumb_exchange.json: { exchange_id: [["kind","id","desc","start","end","limited","comeback","stars","rarity"]] }
-        const exchangeList = (starCrumbExchange as Record<string, string[][]>)[String(exchangeId)];
+        const starCrumbExchange = getRuntimeContentTableSync(
+            "star_crumb_exchange.json",
+            bundledStarCrumbExchange as Record<string, string[][]>,
+        );
+        const exchangeList = starCrumbExchange[String(exchangeId)];
         if (!exchangeList || !exchangeList[0]) return reply.status(400).send({
             error: "Bad Request",
             message: `Exchange item with id ${exchangeId} does not exist.`,
@@ -77,7 +82,10 @@ const routes = async (fastify: FastifyInstance) => {
         const rarity = Number(entry[8]); // 4 or 5
 
         // cost table: { "0": [["300","600"]], "1": [["300","600"]], "2": [["200","400"]] }
-        const costTable = starCrumbExchangeCost as Record<string, string[][]>;
+        const costTable = getRuntimeContentTableSync(
+            "star_crumb_exchange_cost.json",
+            bundledStarCrumbExchangeCost as Record<string, string[][]>,
+        );
         const costEntry = costTable[String(kind)];
         if (!costEntry || !costEntry[0]) return reply.status(500).send({
             error: "Internal Server Error",

@@ -69,6 +69,8 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "mana_board2_open_condition.json",
     "mana_node.json",
     "mana_node_awake.json",
+    "pass_card_event.json",
+    "pass_card_reward.json",
     "raid_event.json",
     "reward_campaign.json",
     "story_join_character.json",

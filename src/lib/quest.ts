@@ -6,7 +6,7 @@ import { givePlayerCharacterSync } from "./character";
 import { givePlayerEquipmentSync } from "./equipment";
 import { CharacterReward, CommonScoreReward, CurrencyReward, CurrencyScoreReward, DropScoreRewardId, EquipmentItemReward, GivePlayerScoreRewardsResult, ItemScoreReward, PlayerRewardResult, Reward, RewardType, ScoreReward, ScoreRewardType } from "./types";
 import { Player } from "../data/types";
-import rewardElementMap from "../../assets/reward_element_map.json";
+import bundledRewardElementMap from "../../assets/reward_element_map.json";
 import { resolveEventCurrencyId } from "./event-currency";
 import { getDateFromServerTime, getServerTime } from "../utils";
 import { getServerGameplaySettingsSync } from "../data/domains/server-settings";
@@ -15,6 +15,7 @@ import {
     calculateScoreRewardAmount,
     type RewardCampaignRates,
 } from "./reward-campaign";
+import { getRuntimeContentTableSync } from "../content/runtime/table-access";
 
 const ELEMENT_TO_ENEMY_MAP: Record<number, number> = {
     0: 3, 1: 0, 2: 1, 3: 2, 4: 5, 5: 4,
@@ -22,13 +23,19 @@ const ELEMENT_TO_ENEMY_MAP: Record<number, number> = {
 
 function resolveElementItemId(rarity: number, questElement?: number): number {
     const enemyElement = ELEMENT_TO_ENEMY_MAP[questElement ?? 0] ?? 3;
-    const map = rewardElementMap as Record<string, Record<string, Record<string, string[][]>>>;
+    const map = getRuntimeContentTableSync(
+        "reward_element_map.json",
+        bundledRewardElementMap as Record<string, Record<string, Record<string, string[][]>>>,
+    );
     return Number(map["1"][String(rarity)][String(enemyElement)][0][0]);
 }
 
 function resolveAetherItemId(rarity: number, questElement?: number): number {
     const enemyElement = ELEMENT_TO_ENEMY_MAP[questElement ?? 0] ?? 3;
-    const map = rewardElementMap as Record<string, Record<string, Record<string, string[][]>>>;
+    const map = getRuntimeContentTableSync(
+        "reward_element_map.json",
+        bundledRewardElementMap as Record<string, Record<string, Record<string, string[][]>>>,
+    );
     return Number(map["2"][String(rarity)][String(enemyElement)][0][0]);
 }
 

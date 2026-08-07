@@ -1,4 +1,4 @@
-import eventRewards from "../../../assets/mission_event_reward.json"
+import bundledEventRewards from "../../../assets/mission_event_reward.json"
 import { getDb } from "../../data/db"
 import {
     completePlayerEventMissionFactSync,
@@ -10,6 +10,7 @@ import {
     isMissionDefinitionEnabledAt,
     type MissionMasterDefinition,
 } from "./master-data"
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 
 export type EventEntryRuleProducer =
     | "login"
@@ -397,7 +398,11 @@ export function recordRaidSetEditMissionFactsSync(
 
 function getValidatedRule(spec: EventEntryRuleSpec): MissionMasterDefinition | undefined {
     const definition = getMissionMasterDefinition(3, spec.missionId)
-    const rewards = (eventRewards as Record<string, unknown>)[String(spec.missionId)]
+    const eventRewards = getRuntimeContentTableSync(
+        "mission_event_reward.json",
+        bundledEventRewards as Record<string, unknown>,
+    )
+    const rewards = eventRewards[String(spec.missionId)]
     return validateEventEntryRule(definition, rewards, spec) ? definition : undefined
 }
 

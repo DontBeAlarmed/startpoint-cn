@@ -2,8 +2,8 @@ import { resolvePlayerIdSync } from "../data/activeAccount"
 import { getPlayerSync } from "../data/domains/player"
 import { getSession } from "../data/domains/session"
 import type { Player } from "../data/types"
-
-const playerRankTable = require("../../assets/cdndata/player_rank.json")
+import bundledPlayerRankTable from "../../assets/cdndata/player_rank.json"
+import { getRuntimeContentTableSync } from "../content/runtime/table-access"
 
 export interface MultiPlayerContext {
     playerId: number
@@ -17,8 +17,12 @@ export interface MultiPlayerContextDependencies {
 }
 
 export function getPlayerRankLevel(rankPoint: number): number {
+    const playerRankTable = getRuntimeContentTableSync(
+        "cdndata/player_rank.json",
+        bundledPlayerRankTable as Record<string, unknown[][]>,
+    )
     let level = 1
-    for (const [rank, data] of Object.entries(playerRankTable as Record<string, any>)) {
+    for (const [rank, data] of Object.entries(playerRankTable)) {
         const threshold = Number(data?.[0]?.[1])
         if (Number.isFinite(threshold) && rankPoint >= threshold) level = Number(rank)
     }
