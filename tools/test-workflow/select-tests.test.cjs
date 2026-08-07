@@ -189,6 +189,9 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["tools/npc_contributor_names.test.cjs"]),
         ["quick:protocol"],
     )
+    assert.deepEqual(selectTestGroups(["tools/perf/hub_baseline.cjs"]), ["integration:multi-hub"])
+    assert.deepEqual(selectTestGroups(["tools/perf/hub_baseline_helpers.cjs"]), ["integration:multi-hub"])
+    assert.deepEqual(selectTestGroups(["tools/perf/hub_baseline.test.cjs"]), ["integration:multi-hub"])
     assert.deepEqual(selectTestGroups(["admin/src/App.tsx"]), ["admin"])
 })
 
@@ -394,6 +397,7 @@ test("registers the trusted multi-hub process suite as a bounded serial group", 
         tests: [
             "tests/multi-hub-process-harness.test.js",
             "tests/multi-hub-process.test.js",
+            "tools/perf/hub_baseline.test.cjs",
         ],
     })
     assert.deepEqual(

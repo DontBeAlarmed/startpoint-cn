@@ -379,20 +379,35 @@ class MultiHubProcessHarness {
         return { status: response.status, body }
     }
 
-    async openTcp(label, host, port, handshake) {
+    async openTcp(label, host, port, handshake, timeoutMs = 0) {
         const socket = net.createConnection({ host, port })
         await new Promise((resolve, reject) => {
-            const onConnect = () => {
+            let timer = null
+            let settled = false
+            const finish = callback => {
+                if (settled) return
+                settled = true
+                if (timer) clearTimeout(timer)
+                socket.off("connect", onConnect)
                 socket.off("error", onError)
-                resolve()
+                callback()
+            }
+            const onConnect = () => {
+                finish(resolve)
             }
             const onError = error => {
                 socket.off("connect", onConnect)
                 socket.destroy()
-                reject(error)
+                finish(() => reject(error))
             }
             socket.once("connect", onConnect)
             socket.once("error", onError)
+            if (timeoutMs > 0) {
+                timer = setTimeout(() => {
+                    socket.destroy()
+                    finish(() => reject(new Error(`${label} TCP connect timed out after ${timeoutMs}ms`)))
+                }, timeoutMs)
+            }
         })
         const peer = new TcpPeer(label, socket)
         this.peers.push(peer)

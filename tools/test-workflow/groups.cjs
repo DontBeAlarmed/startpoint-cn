@@ -212,6 +212,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tests/multi-hub-process-harness.test.js",
             "tests/multi-hub-process.test.js",
+            "tools/perf/hub_baseline.test.cjs",
         ],
     },
     "integration:content": {

@@ -117,6 +117,10 @@ test("exposes the workflow benchmark command", () => {
         scripts["benchmark:tcp"],
         "node tools/perf/tcp_baseline.cjs",
     )
+    assert.equal(
+        scripts["benchmark:hub"],
+        "node tools/perf/hub_baseline.cjs",
+    )
 })
 
 test("exposes the offline faithful gacha seed catalog workflow", () => {

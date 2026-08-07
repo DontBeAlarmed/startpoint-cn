@@ -216,6 +216,7 @@ const SOURCE_RULES = [
         pattern: /^(?:assets\/server\/npc_contributor_names\.json|tools\/npc_contributor_names(?:\.test)?\.cjs)$/,
         groups: ["quick:protocol"],
     },
+    { pattern: /^tools\/perf\/hub_baseline(?:_helpers)?\.cjs$/, groups: ["integration:multi-hub"] },
     { pattern: /^src\/multi\//, groups: ["quick:protocol", "integration:multi-hub"] },
     { pattern: /^src\/multi\/tcp\/server\.ts$/, groups: ["integration:runtime"] },
     {
