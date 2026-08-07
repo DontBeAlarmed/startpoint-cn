@@ -869,6 +869,46 @@ test("HubClient leaves authentication state unchanged on registration network fa
     assert.equal(client.getAuthenticationState(), null)
 })
 
+test("HubClient preserves authentication rejection across registration network outages", async t => {
+    const target = fixture(t)
+    const delegate = fetchThroughHub(target.app)
+    let registrationAttempts = 0
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        now: () => target.getNow(),
+        fetch: async (url, init) => {
+            if (new URL(url).pathname === "/v1/multi/nodes/register") {
+                registrationAttempts++
+                if (registrationAttempts === 1) {
+                    return delegate(url, {
+                        ...init,
+                        headers: {
+                            ...init.headers,
+                            authorization: `Bearer ${"z".repeat(32)}`,
+                        },
+                    })
+                }
+                throw new Error("network unavailable")
+            }
+            return delegate(url, init)
+        },
+    })
+
+    assert.deepEqual(await client.getControlStatus(), {
+        ok: false,
+        error: "HUB_UNAVAILABLE",
+    })
+    assert.equal(client.getAuthenticationState(), "authentication_rejected")
+
+    assert.deepEqual(await client.getControlStatus(), {
+        ok: false,
+        error: "HUB_UNAVAILABLE",
+    })
+    assert.equal(registrationAttempts, 2)
+    assert.equal(client.getAuthenticationState(), "authentication_rejected")
+})
+
 test("HubClient clears authentication rejection after a valid registration", async t => {
     const target = fixture(t)
     const delegate = fetchThroughHub(target.app)
