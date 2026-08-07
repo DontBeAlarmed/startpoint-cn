@@ -12,8 +12,9 @@ import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTempl
 import { getEffectiveVersion } from "../../lib/version";
 import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance";
 import { buildAdminContentStatus } from "../../lib/admin-content-status";
-import { parseAssetProviderConfig } from "../../content/cdn/asset-mode";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
+import type { CnRuntimeConfig } from "../../runtime/config";
+import path from "node:path";
 import { wantsJson } from "./http";
 import {
     buildAdminMultiStatus,
@@ -35,6 +36,8 @@ interface TimeQuery {
 export interface ServerRoutesOptions {
     readonly getMultiStatus?: () => Promise<AdminMultiStatus> | AdminMultiStatus
     readonly serverTimeService?: ServerTimeService
+    readonly runtimeConfig?: Pick<CnRuntimeConfig, "http" | "httpDisplayHost" | "assetProvider">
+    readonly getRuntimeConfig?: () => Pick<CnRuntimeConfig, "http" | "httpDisplayHost" | "assetProvider"> | null
 }
 
 function httpTimePackage(snapshot: ServerTimeSnapshot): ServerTimePackage {
@@ -58,14 +61,23 @@ function legacyTimeResponse(
 
 const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) => {
     const serverTimeService = options.serverTimeService ?? new ServerTimeService()
+    const fallbackRuntimeConfig: Pick<CnRuntimeConfig, "http" | "httpDisplayHost" | "assetProvider"> = {
+        http: { host: "127.0.0.1", port: 8001 },
+        httpDisplayHost: "127.0.0.1",
+        assetProvider: { mode: "client-owned" },
+    }
 
     fastify.get("/status", async (_request: FastifyRequest, reply: FastifyReply) => {
-        const root = process.cwd()
-        const cdnDir = process.env.CDN_DIR || ".cdn"
+        const runtimeConfig = options.runtimeConfig
+            ?? options.getRuntimeConfig?.()
+            ?? fallbackRuntimeConfig
+        const configuredCdnDir = runtimeConfig.assetProvider.mode === "local"
+            ? path.dirname(runtimeConfig.assetProvider.cdnRoot)
+            : ".cdn"
         const cdnStatus = buildAdminContentStatus({
             snapshot: getContentSnapshot(),
-            assetProvider: parseAssetProviderConfig({ projectRoot: root, env: process.env }),
-            configuredCdnDir: cdnDir,
+            assetProvider: runtimeConfig.assetProvider,
+            configuredCdnDir,
         })
         let multiplayer: AdminMultiStatus
         try {
@@ -91,8 +103,8 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
                 platform: `${process.platform}/${process.arch}`,
                 pid: process.pid,
                 memory: process.memoryUsage(),
-                listenHost: process.env.CN_LISTEN_HOST || "localhost",
-                listenPort: process.env.CN_LISTEN_PORT || "8001",
+                listenHost: runtimeConfig.http.host,
+                listenPort: String(runtimeConfig.http.port),
             },
             cdn: cdnStatus,
             multiplayer,

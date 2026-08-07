@@ -82,6 +82,7 @@ const fastify = Fastify({
 const projectRoot = path.resolve(__dirname, "..");
 let runtimeCoordinator: RuntimeCoordinator;
 const multiRuntimeService = createMultiRuntimeService();
+let startupRuntimeConfig: ReturnType<typeof parseCnRuntimeConfig> | null = null;
 let multiManagementService: MultiManagementService | null = null;
 const serverTimeService = new ServerTimeService();
 const gachaSeedQuarantine = getDefaultGachaSeedQuarantine();
@@ -266,6 +267,7 @@ fastify.register(indexWebApiPlugin, {
     prefix: "/api",
     getMultiStatus: () => multiRuntimeService.getAdminStatus(),
     getMultiManagementService: () => multiManagementService,
+    getRuntimeConfig: () => startupRuntimeConfig,
     serverTimeService,
 });
 fastify.register(seedsWebApiPlugin, { prefix: "/api/seeds" });
@@ -286,6 +288,8 @@ function configureRuntimeHttp(config: ReturnType<typeof parseCnRuntimeConfig>): 
         assetProvider: config.assetProvider,
         httpDisplayHost: config.httpDisplayHost,
         httpPort: config.http.port,
+        summonComSeconds: config.summonComSeconds,
+        dailyResetHour: config.dailyResetHour,
         multiMode: config.multi.mode,
         multiRecoveryVerifier: multiContext.settlementVerifier,
         getMultiParticipant: multiContext.snapshotProvider.getParticipant,
@@ -327,6 +331,7 @@ runtimeCoordinator = createRuntimeCoordinator({
     loadConfig: () => {
         if (bundleMetadataError) throw new Error("invalid embedded bundle metadata");
         const config = parseCnRuntimeConfig({ projectRoot });
+        startupRuntimeConfig = config;
         if (multiManagementService === null) {
             multiManagementService = new MultiManagementService({
                 mode: config.multi.mode,

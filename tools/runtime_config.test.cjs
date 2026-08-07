@@ -28,6 +28,40 @@ test("runtime network defaults are loopback-only and stable", () => {
     assert.equal(Object.isFrozen(config.http), true)
     assert.equal(Object.isFrozen(config.multi), true)
     assert.equal(Object.isFrozen(config.multi.tcp), true)
+    assert.equal(config.summonComSeconds, 5)
+    assert.equal(config.dailyResetHour, 5)
+})
+
+test("runtime client response settings are parsed once at startup", () => {
+    const config = parseCnRuntimeConfig({
+        projectRoot,
+        env: {
+            ASSET_MODE: "client-owned",
+            SUMMON_COM_SECONDS: "9",
+            DAILY_RESET_HOUR: "6",
+        },
+    })
+
+    assert.equal(config.summonComSeconds, 9)
+    assert.equal(config.dailyResetHour, 6)
+    assert.equal(Object.isFrozen(config), true)
+})
+
+test("runtime rejects invalid client response settings", () => {
+    for (const [key, value] of [
+        ["SUMMON_COM_SECONDS", "-1"],
+        ["SUMMON_COM_SECONDS", "not-a-number"],
+        ["DAILY_RESET_HOUR", "24"],
+        ["DAILY_RESET_HOUR", "-1"],
+    ]) {
+        assert.throws(
+            () => parseCnRuntimeConfig({
+                projectRoot,
+                env: { ASSET_MODE: "client-owned", [key]: value },
+            }),
+            error => error?.code === "INVALID_RUNTIME_CONFIG",
+        )
+    }
 })
 
 test("embedded runtime disables bundled comics unless an isolated COMIC_DIR is provided", () => {

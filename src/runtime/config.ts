@@ -28,6 +28,8 @@ export interface RuntimeEnvironment extends AssetModeEnvironment {
     readonly MULTI_HUB_URL?: string
     readonly MULTI_HUB_TOKEN?: string
     readonly MULTI_HUB_CREDENTIALS_FILE?: string
+    readonly SUMMON_COM_SECONDS?: string
+    readonly DAILY_RESET_HOUR?: string
     readonly EMBEDDED_RUNTIME?: string
     readonly DATA_DIR?: string
     readonly COMIC_DIR?: string
@@ -81,6 +83,8 @@ export interface CnRuntimeConfig {
     readonly multiTuning: MultiRuntimeTuningConfig
     readonly assetProvider: AssetProviderConfig
     readonly comicDir: string | null
+    readonly summonComSeconds: number
+    readonly dailyResetHour: number
 }
 
 export interface ParseCnRuntimeConfigOptions {
@@ -126,6 +130,20 @@ function parseMilliseconds(value: string | undefined, fallback: number): number 
     const milliseconds = Number(value)
     if (!Number.isSafeInteger(milliseconds)) throw new RuntimeConfigError()
     return milliseconds
+}
+
+function parseNonNegativeInteger(value: string | undefined, fallback: number): number {
+    if (value === undefined) return fallback
+    if (!/^\d+$/.test(value)) throw new RuntimeConfigError()
+    const parsed = Number(value)
+    if (!Number.isSafeInteger(parsed)) throw new RuntimeConfigError()
+    return parsed
+}
+
+function parseDailyResetHour(value: string | undefined): number {
+    const hour = parseNonNegativeInteger(value, 5)
+    if (hour > 23) throw new RuntimeConfigError()
+    return hour
 }
 
 function resolvePhysicalPath(filePath: string): string {
@@ -339,6 +357,17 @@ export function parseCnRuntimeConfig({
     const multiTuning = parseMultiRuntimeTuning(env)
     const assetProvider = parseAssetProviderConfig({ projectRoot, env })
     const comicDir = resolveComicDir(env, projectRoot)
+    const summonComSeconds = parseNonNegativeInteger(env.SUMMON_COM_SECONDS, 5)
+    const dailyResetHour = parseDailyResetHour(env.DAILY_RESET_HOUR)
     validateEmbeddedRuntime(env, projectRoot, assetProvider, comicDir)
-    return Object.freeze({ http, httpDisplayHost, multi, multiTuning, assetProvider, comicDir })
+    return Object.freeze({
+        http,
+        httpDisplayHost,
+        multi,
+        multiTuning,
+        assetProvider,
+        comicDir,
+        summonComSeconds,
+        dailyResetHour,
+    })
 }
