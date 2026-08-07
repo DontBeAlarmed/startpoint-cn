@@ -12,7 +12,8 @@ import { randomInt } from "crypto"
 import { clientSerializeDate } from "../../data/utils"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { characterMaxOverLimits } from "./character"
-import orderedExAbility from "../../../assets/ex_ability.json"
+import bundledExAbility from "../../../assets/ex_ability.json"
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
 import {
@@ -67,10 +68,23 @@ function classifyAbilities(data: Record<string, string[][]>): AbilityInfo[] {
     return list
 }
 
-const ALL_ABILITIES = classifyAbilities(orderedExAbility as Record<string, string[][]>)
+type ExAbilityTable = Record<string, string[][]>
+const abilitiesByTable = new WeakMap<ExAbilityTable, readonly AbilityInfo[]>()
+
+function getAllAbilities(): readonly AbilityInfo[] {
+    const table = getRuntimeContentTableSync(
+        "ex_ability.json",
+        bundledExAbility as ExAbilityTable,
+    )
+    const cached = abilitiesByTable.get(table)
+    if (cached) return cached
+    const abilities = Object.freeze(classifyAbilities(table))
+    abilitiesByTable.set(table, abilities)
+    return abilities
+}
 
 // 6 pools: A/B × gold(3)/silver(2)/brown(1)
-function poolCopy(abilities: AbilityInfo[], group: 'A' | 'B', rarity: number): number[] {
+function poolCopy(abilities: readonly AbilityInfo[], group: 'A' | 'B', rarity: number): number[] {
     return abilities.filter(a => a.group === group && a.rarity === rarity).map(a => a.id)
 }
 
@@ -108,10 +122,15 @@ const MATERIAL_PROBS: Record<number, MaterialProbs> = {}
 // ---- Draw pools (regenerated per draw to allow mutation) ----
 
 function freshPools(): { A: Record<number, number[]>, B: Record<number, number[]> } {
+    const allAbilities = getAllAbilities()
     return {
-        A: { 1: poolCopy(ALL_ABILITIES, 'A', 1), 2: poolCopy(ALL_ABILITIES, 'A', 2), 3: poolCopy(ALL_ABILITIES, 'A', 3) },
-        B: { 1: poolCopy(ALL_ABILITIES, 'B', 1), 2: poolCopy(ALL_ABILITIES, 'B', 2), 3: poolCopy(ALL_ABILITIES, 'B', 3) },
+        A: { 1: poolCopy(allAbilities, 'A', 1), 2: poolCopy(allAbilities, 'A', 2), 3: poolCopy(allAbilities, 'A', 3) },
+        B: { 1: poolCopy(allAbilities, 'B', 1), 2: poolCopy(allAbilities, 'B', 2), 3: poolCopy(allAbilities, 'B', 3) },
     }
+}
+
+export function getRuntimeExAbilityPools(): { A: Record<number, number[]>, B: Record<number, number[]> } {
+    return freshPools()
 }
 
 // ---- Draw logic ----

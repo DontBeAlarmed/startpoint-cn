@@ -3,16 +3,14 @@ import { getAllAccountsSync, getAccountPlayersSync, getAccountSync } from "../..
 import { insertMailSync } from "../../data/domains/mail"
 import { getPlayerSync } from "../../data/domains/player"
 import { wantsJson } from "./http"
-import characterData from "../../../assets/character.json"
 import { getEquipmentIdsSync, getItemIdsSync } from "../../lib/assets"
+import { isValidCharacterId } from "./validation"
 import {
     ADMIN_MAIL_MAX_INT,
     parseAdminMailInteger,
     validateMailAttachment,
 } from "../../lib/admin-mail-rules"
 
-// Pre-built CDN validation sets
-const CDN_CHAR_IDS: Set<number> = new Set(Object.keys(characterData).map(Number))
 const VALID_MAIL_TYPES: Set<number> = new Set([1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15])
 
 interface SendMailBody {
@@ -69,7 +67,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         // Validate type_id against CDN data
         if (typeId !== null) {
-            if (mailType === 5 && !CDN_CHAR_IDS.has(typeId)) {
+            if (mailType === 5 && !isValidCharacterId(typeId)) {
                 return fail(`角色 ID ${typeId} 不存在于 CDN 数据中`)
             }
             if (mailType === 1 && !getItemIdsSync().includes(typeId)) {

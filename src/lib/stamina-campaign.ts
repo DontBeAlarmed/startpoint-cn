@@ -1,4 +1,5 @@
-import campaignData from "../../assets/stamina_campaign.json";
+import bundledCampaignData from "../../assets/stamina_campaign.json";
+import { getRuntimeContentTableSync } from "../content/runtime/table-access";
 import { QuestCategory } from "./types";
 
 interface StaminaCampaign {
@@ -11,20 +12,38 @@ interface StaminaCampaign {
     endTime: Date;
 }
 
-const campaigns: StaminaCampaign[] = [];
+type CampaignTable = Record<string, string[][]>
 
-for (const [id, rows] of Object.entries(campaignData)) {
-    const row = (rows as string[][])[0];
-    if (!row || !row[5]) continue;
-    campaigns.push({
-        id,
-        rate: parseFloat(row[5]),
-        questType: parseInt(row[6]),
-        questIds: row[9] || "",
-        eventIds: row[7] || "",
-        startTime: new Date(row[1]),
-        endTime: new Date(row[2]),
-    });
+function buildCampaigns(campaignData: CampaignTable): readonly StaminaCampaign[] {
+    const campaigns: StaminaCampaign[] = []
+    for (const [id, rows] of Object.entries(campaignData)) {
+        const row = rows[0]
+        if (!row || !row[5]) continue
+        campaigns.push({
+            id,
+            rate: parseFloat(row[5]),
+            questType: parseInt(row[6]),
+            questIds: row[9] || "",
+            eventIds: row[7] || "",
+            startTime: new Date(row[1]),
+            endTime: new Date(row[2]),
+        })
+    }
+    return Object.freeze(campaigns)
+}
+
+const campaignsByTable = new WeakMap<CampaignTable, readonly StaminaCampaign[]>()
+
+function getCampaigns(): readonly StaminaCampaign[] {
+    const table = getRuntimeContentTableSync(
+        "stamina_campaign.json",
+        bundledCampaignData as CampaignTable,
+    )
+    const cached = campaignsByTable.get(table)
+    if (cached) return cached
+    const campaigns = buildCampaigns(table)
+    campaignsByTable.set(table, campaigns)
+    return campaigns
 }
 
 const CATEGORY_TO_CDN_TYPE: Record<number, number> = {
@@ -70,7 +89,7 @@ export function getActiveCampaignRate(
     if (cdnType === undefined) return 1;
 
     let rate = 1;
-    for (const c of campaigns) {
+    for (const c of getCampaigns()) {
         if (c.questType !== cdnType) continue;
         if (serverDate < c.startTime || serverDate > c.endTime) continue;
         if (!matchesQuestId(c, questId) && !matchesEvent(c, questId)) continue;

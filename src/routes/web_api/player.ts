@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { validatePlayerField, VALID_CHARACTER_IDS, isValidItemId, MAX_INT } from "./validation";
+import { validatePlayerField, isValidCharacterId, isValidItemId, MAX_INT } from "./validation";
 import { wantsJson } from "./http";
 import { getAllPlayersSync, getDefaultPlayerPartyGroupsSync, getPlayerDailyChallengePointListSync, getPlayerSync, insertPlayerDailyChallengePointListSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
 import { deleteAllPlayerMailSync } from "../../data/domains/mail"
@@ -275,7 +275,7 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as Record<string, any> || {}
         const code = Number(body.code || body.character_id)
         if (isNaN(code)) return reply.status(400).send({ error: "Missing code (business code)" })
-        if (!VALID_CHARACTER_IDS.has(code)) return reply.status(400).send({ error: `角色 ID ${code} 不存在于资源表中` })
+        if (!isValidCharacterId(code)) return reply.status(400).send({ error: `角色 ID ${code} 不存在于资源表中` })
 
         try {
             insertDefaultPlayerCharacterSync(playerId, code)
