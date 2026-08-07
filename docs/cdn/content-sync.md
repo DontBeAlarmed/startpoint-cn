@@ -13,7 +13,7 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 
 同步器负责严格解析、引用闭包、稳定输出和文件系统安全，不负责判断 CDN 作者给出的 ID、赔率、奖励、价格或资源内容是否合理。服务端不会替 CDN 作者猜测缺失内容、复制其他活动数据、修复非法主数据或自动生成客户端补丁。
 
-阶段 B 当前把 Registry 的 115 张表分为 `106 CDN + 5 bundled + 4 server`。原阶段 A 的五个动态领域为：
+阶段 B 已完成“有权威 CDN 来源的表动态迁移”这一目标。当前 Registry 的 115 张表明确分为 `106 CDN + 5 bundled + 4 server`。原阶段 A 的五个动态领域为：
 
 | 领域 | 动态输出 |
 |---|---|
@@ -62,7 +62,18 @@ Challenge、Tower、Hard Multi 等历史列偏移；其中 Hard Multi 体力列�
 Content Sync 时，20015/20016 会保持 fail closed。使用官方 CDN 执行同步后，当前 Release 才会包含实际
 角色效果索引。
 
-Registry 仍要求每个 Release 闭合当前全部注册表。剩余 5 张 bundled 表为 `cdndata/player_rank_full.json`、`encyclopedia.json`、两张任务审计派生表和 `practice_quest.json`。其中玩家 `0..100` 等级数据来自历史实测，练习关卡还保留 7 个官方 1.4.54 OrderedMap 不包含的兼容 ID，因此不能伪装成完整 CDN 转换结果。图鉴官方源与 bundled 的显示集合不一致，在客户端显示和解锁语义审计完成前继续保留 bundled。两张任务派生表由服务端任务规则审计生成，不是可直接复制的 CDN 表。上述表不会因为 CDN OrderedMap 改动而自动变化；不能迁移的表明确搁置，不用猜测规则填满数字。4 张 `server` 表为服务端配置或后台内容，不属于 CDN 转换范围。
+Registry 仍要求每个 Release 闭合当前全部注册表，但“闭合”不等于所有表都必须从 CDN 生成。当前 5 张 bundled 表为 `cdndata/player_rank_full.json`、`encyclopedia.json`、两张任务审计派生表和 `practice_quest.json`：
+
+- `cdndata/player_rank_full.json` 的玩家 `0..100` 等级数据来自历史实测，没有已确认的 CDN 权威来源；
+- `encyclopedia.json` 的官方源与 bundled 显示集合不一致，客户端显示和解锁语义尚未证明可以直接替换；
+- 两张任务审计派生表由服务端任务规则审计生成，不是可直接复制的 CDN 表；
+- `practice_quest.json` 还保留 7 个官方 1.4.54 OrderedMap 不包含的兼容 ID。
+
+这些表不会因为 CDN OrderedMap 改动而自动变化，也不作为当前 CDN 迁移缺口。除非后续获得权威来源并完成独立转换器、引用闭包和 smoke，否则不猜测规则、不伪造 CDN 输出。4 张 `server` 表为服务端配置或后台内容，不属于 CDN 转换范围。
+
+### 阶段 B 的完成判定
+
+阶段 B 的“完成”指：所有有权威 CDN 来源、且属于服务端运行时内容的表，都已经登记为 `scope=cdn` 并由当前 Content Release 生成；没有权威来源的 bundled 表和服务端配置表保留其原职责。注册表测试固定三类范围为 `cdn=106`、`bundled=5`、`server=4`，以后新增表必须先明确来源和职责，再更新对应转换器与测试。此处不要求把所有活动逻辑改造成可插拔插件，特殊关卡继续使用独立 handler 加共享结算基础设施。
 
 ## 受支持输入
 
@@ -195,7 +206,7 @@ npm run content:smoke -- \
 
 `content:smoke` 是同 UID 开发者手动离线工具，不是面向不受信任本地用户的安全边界。运行期间调用者必须保证没有同 UID 进程故意替换 content root、派生目录或祖先路径。现有 identity、symlink 和空目录检查用于防止误传，并发现检查时存在或留下可观察变化的并发修改；它们不构成同 UID 对抗性 TOCTOU 防护。本工具不使用轮询、文件系统 watch、额外锁文件或平台专用 API 尝试对抗同 UID 进程。
 
-smoke 创建或接受 root 后记录其 `dev`、`ino`、权限和 realpath，并预先建立权限为 `0700` 的 `release/`。Release 是 smoke 唯一可写派生目录，必须是 root 的直接子目录且 identity 不变；阶段 B 尚未迁移的 bundled 表从项目只读 `assets/` 加载，并由下述 Git/seed 来源快照覆盖。在调用同步前和同步结束后都会复核 root、`release/` 及 root 顶层项目集合。root 替换、Release 符号链接或工具外顶层项目在检查时存在，或在后续复核时留下可观察变化时会失败；检查间隙由同 UID 对手完成并恢复的替换不在保护范围内。
+smoke 创建或接受 root 后记录其 `dev`、`ino`、权限和 realpath，并预先建立权限为 `0700` 的 `release/`。Release 是 smoke 唯一可写派生目录，必须是 root 的直接子目录且 identity 不变；保留 bundled 的表从项目只读 `assets/` 加载，并由下述 Git/seed 来源快照覆盖。在调用同步前和同步结束后都会复核 root、`release/` 及 root 顶层项目集合。root 替换、Release 符号链接或工具外顶层项目在检查时存在，或在后续复核时留下可观察变化时会失败；检查间隙由同 UID 对手完成并恢复的替换不在保护范围内。
 
 smoke 始终执行 force sync，并验证：
 

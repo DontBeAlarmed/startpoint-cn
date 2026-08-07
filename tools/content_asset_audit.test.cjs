@@ -16,6 +16,7 @@ const {
     auditRuntimeRegistryTables,
     runContentAssetAudit,
 } = require("../src/content/audit/runner")
+const { TABLE_SOURCES } = require("../src/content/sync/table-registry")
 const {
     formatContentAssetAuditReport,
     main: runContentAssetAuditCli,
@@ -230,6 +231,33 @@ test("mission asset contracts reject broken awake groups and pass event referenc
 test("asset audit verifies all Content Registry runtime tables", () => {
     const result = auditRuntimeRegistryTables(path.join(__dirname, "../assets"))
     assert.deepEqual(result, { registryTableCount: 115, readableRuntimeTableCount: 115 })
+})
+
+test("Content Registry keeps CDN, bundled, and server table boundaries explicit", () => {
+    const tablesByScope = new Map()
+    for (const definition of TABLE_SOURCES) {
+        const tables = tablesByScope.get(definition.scope) ?? []
+        tables.push(definition.tableName)
+        tablesByScope.set(definition.scope, tables)
+    }
+
+    assert.deepEqual(
+        Object.fromEntries([...tablesByScope].map(([scope, tables]) => [scope, tables.length])),
+        { bundled: 5, cdn: 106, server: 4 },
+    )
+    assert.deepEqual(tablesByScope.get("bundled"), [
+        "cdndata/player_rank_full.json",
+        "encyclopedia.json",
+        "mission_event_battle_rules.json",
+        "mission_event_quest_map.json",
+        "practice_quest.json",
+    ])
+    assert.deepEqual(tablesByScope.get("server"), [
+        "cdn_general_shop_whitelist.json",
+        "config.json",
+        "news.json",
+        "payment_products.json",
+    ])
 })
 
 test("asset audit runner produces a stable report without writing sources", t => {
