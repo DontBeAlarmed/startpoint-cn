@@ -837,6 +837,44 @@ test("HubClient reads bounded authoritative diagnostics through the existing con
     })
 })
 
+test("concurrent HubClient control calls share one registration", async t => {
+    const target = fixture(t)
+    const delegate = fetchThroughHub(target.app)
+    const registrationCaptured = deferred()
+    const releaseRegistration = deferred()
+    let registrationRequests = 0
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        now: () => target.getNow(),
+        fetch: async (url, init) => {
+            if (new URL(url).pathname === "/v1/multi/nodes/register") {
+                registrationRequests++
+                registrationCaptured.resolve()
+                await releaseRegistration.promise
+            }
+            return delegate(url, init)
+        },
+    })
+
+    const first = client.getControlStatus()
+    await registrationCaptured.promise
+    const second = client.getControlStatus()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(registrationRequests, 1)
+
+    releaseRegistration.resolve()
+    const [firstStatus, secondStatus] = await Promise.all([first, second])
+    assert.equal(firstStatus.ok, true)
+    assert.equal(secondStatus.ok, true)
+    assert.equal(registrationRequests, 1)
+    assert.equal(target.sessions.activeCount(), 1)
+    assert.equal(client.isAvailable(), true)
+    assert.deepEqual(client.getTcpEndpoint(), { host: "hub.internal", port: 8003 })
+    assert.match(client.getNodeSessionId(), /^node-session-/)
+    assert.equal(client.getAuthenticationState(), null)
+})
+
 test("HubClient records authentication rejection only for registration 401", async t => {
     const target = fixture(t)
     const client = new HubClient({
@@ -986,6 +1024,51 @@ test("existing-session status polling applies authoritative TCP unavailability",
     assert.equal(status.tcpAvailable, false)
     assert.equal(client.isAvailable(), false)
     assert.equal(client.getTcpEndpoint(), null)
+})
+
+test("a delayed old-session 401 cannot clear a refreshed HubClient session", async t => {
+    const target = fixture(t)
+    const delegate = fetchThroughHub(target.app)
+    const oldUnauthorizedCaptured = deferred()
+    const releaseOldUnauthorized = deferred()
+    let delayNextUnauthorizedStatus = false
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        now: () => target.getNow(),
+        fetch: async (url, init) => {
+            const response = await delegate(url, init)
+            if (delayNextUnauthorizedStatus
+                && new URL(url).pathname === "/v1/multi/status"
+                && response.status === 401) {
+                delayNextUnauthorizedStatus = false
+                oldUnauthorizedCaptured.resolve()
+                await releaseOldUnauthorized.promise
+            }
+            return response
+        },
+    })
+    assert.equal((await client.getControlStatus()).ok, true)
+    const oldNodeSessionId = client.getNodeSessionId()
+    target.sessions.clear()
+
+    delayNextUnauthorizedStatus = true
+    const older = client.getControlStatus()
+    await oldUnauthorizedCaptured.promise
+    const newer = await client.getControlStatus()
+    assert.equal(newer.ok, true)
+    const refreshedNodeSessionId = client.getNodeSessionId()
+    assert.notEqual(refreshedNodeSessionId, oldNodeSessionId)
+    assert.equal(client.getAuthenticationState(), null)
+    assert.equal(client.isAvailable(), true)
+
+    releaseOldUnauthorized.resolve()
+    assert.equal((await older).ok, true)
+    assert.equal(client.getNodeSessionId(), refreshedNodeSessionId)
+    assert.equal(target.sessions.activeCount(), 1)
+    assert.equal(client.getAuthenticationState(), null)
+    assert.equal(client.isAvailable(), true)
+    assert.deepEqual(client.getTcpEndpoint(), { host: "hub.internal", port: 8003 })
 })
 
 test("an older TCP status response cannot override a newer degradation", async t => {

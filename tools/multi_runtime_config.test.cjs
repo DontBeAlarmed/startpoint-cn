@@ -544,6 +544,8 @@ test("client runtime exposes authentication state and contains diagnostic getter
     assert.equal(Object.isFrozen(rejected), true)
     assert.equal(Object.isFrozen(rejected.hostRejections), true)
 
+    state = "unexpected-state"
+    assert.equal(harness.service.getAuthenticationDiagnostics().clientState, null)
     state = null
     assert.equal(harness.service.getAuthenticationDiagnostics().clientState, null)
     failDiagnostics = true

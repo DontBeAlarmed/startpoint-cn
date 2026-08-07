@@ -450,6 +450,9 @@ class Service implements MultiRuntimeService {
             let clientState: ClientAuthenticationState = null
             try {
                 clientState = this.remoteCoordinator.getAuthenticationState()
+                    === "authentication_rejected"
+                    ? "authentication_rejected"
+                    : null
             } catch {
                 // Diagnostics are observational; a failed sample must not affect runtime state.
             }
