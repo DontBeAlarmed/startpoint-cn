@@ -185,7 +185,6 @@ class Service implements MultiRuntimeService {
     private startPromise: Promise<void> | null = null
     private stopPromise: Promise<void> | null = null
     private hostServices: MultiRuntimeHostServices | null = null
-    private authenticationRejections: AuthenticationRejectionBuffer | null = null
     private remoteCoordinator: RemoteMultiCoordinator | null = null
     private clientFallback: ClientFallbackController | null = null
     private clientCoordinator: RoutedMultiCoordinator | null = null
@@ -234,7 +233,6 @@ class Service implements MultiRuntimeService {
         if (config.mode === "host") {
             this.remoteCoordinator = null
             const authenticationRejections = new AuthenticationRejectionBuffer()
-            this.authenticationRejections = authenticationRejections
             const admissionRegistry = new AdmissionRegistry()
             const coordinator = new EmbeddedMultiCoordinator({
                 allowRemoteParticipants: true,
@@ -281,7 +279,6 @@ class Service implements MultiRuntimeService {
             })
         } else {
             this.hostServices = null
-            this.authenticationRejections = null
             if (config.mode === "client") {
                 const remoteCoordinator = this.dependencies.createRemoteCoordinator?.(config)
                     ?? new RemoteMultiCoordinator(new HubClient({
@@ -568,7 +565,6 @@ class Service implements MultiRuntimeService {
             this.hostServices?.nodeSessions.stop()
             this.hostServices?.nodeSessions.clear()
             this.hostServices = null
-            this.authenticationRejections = null
             this.remoteCoordinator = null
             this.clientCoordinator = null
             this.config = null

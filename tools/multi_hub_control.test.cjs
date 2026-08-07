@@ -391,17 +391,36 @@ test("records only token authentication rejections behind a uniform registration
         payload: { protocolVersion: MULTI_PROTOCOL_VERSION },
     })
     const unknownToken = "z".repeat(64)
-    const unknown = await register(target.app, unknownToken)
+    const unknownWithIncompatibleProtocol = await register(
+        target.app,
+        unknownToken,
+        MULTI_PROTOCOL_VERSION + 1,
+    )
+    assert.deepEqual(
+        target.authenticationRejections.list().map(event => event.reason),
+        ["malformed", "malformed", "unknown"],
+    )
     target.store.revoke(target.first.credentialId)
     target.reloader.reloadIfChanged()
     const revoked = await register(target.app, target.first.token)
+    const rejectionCountBeforeIncompatibleProtocol = target.authenticationRejections.list().length
     const incompatible = await register(
         target.app,
         target.second.token,
         MULTI_PROTOCOL_VERSION + 1,
     )
+    assert.equal(
+        target.authenticationRejections.list().length,
+        rejectionCountBeforeIncompatibleProtocol,
+    )
 
-    const responses = [missing, malformed, unknown, revoked, incompatible]
+    const responses = [
+        missing,
+        malformed,
+        unknownWithIncompatibleProtocol,
+        revoked,
+        incompatible,
+    ]
     for (const response of responses) {
         assert.equal(response.statusCode, 401)
         assert.equal(response.body, '{"ok":false,"code":"UNAUTHORIZED"}')
