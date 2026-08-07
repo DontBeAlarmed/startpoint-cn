@@ -43,7 +43,7 @@ SIGINT 或 SIGTERM 会进入统一关闭流程：停止接收 HTTP、停止 TCP�
 
 CN 客户端不能正确处理部分 `uint32` 标记，响应层会把安全范围内的 MsgPack `0xCE` 标记改写为等长的 `int32` 标记 `0xD2`。端点不得绕过统一响应管线自行拼接近似格式。
 
-版本检查、CDN 资源、漫画图片、健康检查和后台页面不使用游戏主 API 的 MsgPack 包装；具体格式由各自路由定义。普通开发的漫画图片默认来自 `web/public/comic/`，嵌入模式由绝对 `COMIC_DIR` 显式挂载，并统一通过 `/api/index.php/comic/image` 业务接口读取；不存在通用 `/public` 静态挂载。
+版本检查、CDN 资源、漫画图片、健康检查和后台页面不使用游戏主 API 的 MsgPack 包装；具体格式由各自路由定义。普通开发的漫画图片默认来自 `web/public/comic/`，嵌入模式由绝对 `COMIC_DIR` 显式挂载，并统一通过 `/api/index.php/comic/image` 业务接口读取；不存在通用 `/public` 静态挂载。HTTP 崩溃回报地址和多人房间返回的 TCP endpoint 在启动时从 `RuntimeConfig` 固定，单次请求不重新读取环境变量。
 
 ### 3.2 TCP 联机
 

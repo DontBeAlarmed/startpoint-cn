@@ -12,6 +12,7 @@ require("ts-node/register/transpile-only")
 
 const projectRoot = path.resolve(__dirname, "..")
 const { parseCnRuntimeConfig } = require("../src/runtime/config")
+const { resolveDisplayHost } = require("../src/runtime/network-host")
 const { createMultiRuntimeService } = require("../src/multi/runtime/service")
 const { RemoteMultiCoordinator } = require("../src/multi/coordinator/remote")
 const {
@@ -31,6 +32,54 @@ test("multiplayer defaults to the current embedded listener", () => {
     })
     assert.equal(Object.isFrozen(config.multi), true)
     assert.equal(Object.isFrozen(config.multi.tcp), true)
+})
+
+test("runtime config freezes the HTTP display host used by load responses", () => {
+    const defaultConfig = parseCnRuntimeConfig({
+        projectRoot,
+        env: { ASSET_MODE: "client-owned" },
+    })
+    assert.equal(defaultConfig.httpDisplayHost, "127.0.0.1")
+
+    const publicConfig = parseCnRuntimeConfig({
+        projectRoot,
+        env: {
+            ASSET_MODE: "client-owned",
+            CN_LISTEN_HOST: "0.0.0.0",
+            CN_PUBLIC_HOST: "gateway.example",
+        },
+    })
+    assert.equal(publicConfig.httpDisplayHost, "gateway.example")
+})
+
+test("embedded wildcard TCP bind resolves a client-reachable display host", () => {
+    const config = parseCnRuntimeConfig({
+        projectRoot,
+        env: {
+            ASSET_MODE: "client-owned",
+            SESSION_HOST: "0.0.0.0",
+        },
+    })
+
+    assert.equal(
+        config.multi.tcp.publicHost,
+        resolveDisplayHost({ listenHost: "0.0.0.0" }),
+    )
+    assert.notEqual(config.multi.tcp.publicHost, "0.0.0.0")
+})
+
+test("runtime config rejects equivalent unspecified public IPv6 hosts", () => {
+    for (const variable of ["CN_PUBLIC_HOST", "SESSION_PUBLIC_HOST"]) {
+        for (const value of ["0:0:0:0:0:0:0:0", "::0.0.0.0"]) {
+            assert.throws(() => parseCnRuntimeConfig({
+                projectRoot,
+                env: {
+                    ASSET_MODE: "client-owned",
+                    [variable]: value,
+                },
+            }), error => error?.code === "INVALID_RUNTIME_CONFIG")
+        }
+    }
 })
 
 test("multiplayer lifecycle tuning is parsed into the startup snapshot", () => {
@@ -260,6 +309,12 @@ test("client mode accepts a remote Hub credential and a lazy local TCP fallback"
             MULTI_HUB_TOKEN: "a".repeat(32),
             SESSION_HOST: "0.0.0.0",
         },
+        {
+            MULTI_MODE: "client",
+            MULTI_HUB_URL: "http://192.0.2.20:8004",
+            MULTI_HUB_TOKEN: "a".repeat(32),
+            SESSION_HOST: "::0.0.0.0",
+        },
     ]) {
         assert.throws(() => parseCnRuntimeConfig({
             projectRoot,
@@ -362,6 +417,32 @@ test("runtime service forwards multiplayer tuning to the TCP lifecycle", async (
     await service.stop()
 
     assert.deepEqual(received, [tuning])
+})
+
+test("embedded runtime context exposes its configured TCP endpoint", async () => {
+    let tcpListening = false
+    const service = createMultiRuntimeService({
+        async startTcp() { tcpListening = true },
+        async stopTcp() { tcpListening = false },
+        isTcpListening: () => tcpListening,
+        async startHub() {},
+        async stopHub() {},
+        isHubListening: () => false,
+    })
+
+    await service.start({
+        mode: "embedded",
+        tcp: { host: "0.0.0.0", port: 8123, publicHost: "multi.example" },
+    })
+    assert.deepEqual(service.getHttpContext().tcpEndpoint?.(), {
+        host: "multi.example",
+        port: 8123,
+    })
+    assert.deepEqual(service.getStatus().tcp, {
+        available: true,
+        endpoint: "multi.example:8123",
+    })
+    await service.stop()
 })
 
 test("multiplayer lifecycle modules do not read process.env directly", () => {
@@ -683,7 +764,7 @@ test("host TCP bind failure keeps the control listener available and degrades mu
         state: "degraded",
         coordinator: { kind: "local", available: true },
         hub: { available: true, endpoint: "http://127.0.0.1:8004" },
-        tcp: { available: false, endpoint: "192.0.2.20:8003" },
+        tcp: { available: false, endpoint: null },
     })
     assert.equal(harness.hostServices().getTcpEndpoint(), null)
     await harness.service.stop()

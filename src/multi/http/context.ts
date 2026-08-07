@@ -96,6 +96,7 @@ export interface EmbeddedMultiHttpContextOptions {
     readonly prepareAdmission?: (
         viewerId: number,
     ) => Promise<PreparedAdmissionSnapshot | null>
+    readonly tcpEndpoint?: () => RoomConnectionEndpoint | null
 }
 
 export function createEmbeddedMultiHttpContext(
@@ -158,5 +159,6 @@ export function createEmbeddedMultiHttpContext(
         admissionTtlMs: options.admissionTtlMs ?? DEFAULT_ADMISSION_TTL_MS,
         now,
         settlementVerifier: new MultiSettlementVerifier(coordinator),
+        tcpEndpoint: options.tcpEndpoint,
     })
 }

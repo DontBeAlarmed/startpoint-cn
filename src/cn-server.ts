@@ -284,6 +284,8 @@ function configureRuntimeHttp(config: ReturnType<typeof parseCnRuntimeConfig>): 
     fastify.register(cnLoadPlugin, {
         prefix: apiPrefix,
         assetProvider: config.assetProvider,
+        httpDisplayHost: config.httpDisplayHost,
+        httpPort: config.http.port,
         multiMode: config.multi.mode,
         multiRecoveryVerifier: multiContext.settlementVerifier,
         getMultiParticipant: multiContext.snapshotProvider.getParticipant,

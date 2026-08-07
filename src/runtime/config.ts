@@ -7,7 +7,11 @@ import fs from "node:fs"
 import path from "node:path"
 import { validateMultiHubToken } from "../multi/hub/token"
 import { resolveRuntimeDataPaths } from "./data-paths"
-import { isValidNetworkHost } from "./network-host"
+import {
+    isUnspecifiedNetworkHost,
+    isValidNetworkHost,
+    resolveDisplayHost,
+} from "./network-host"
 
 export interface RuntimeEnvironment extends AssetModeEnvironment {
     readonly SESSION_HOST?: string
@@ -72,6 +76,7 @@ export type MultiRuntimeConfig =
 
 export interface CnRuntimeConfig {
     readonly http: RuntimeNetworkServiceConfig
+    readonly httpDisplayHost: string
     readonly multi: MultiRuntimeConfig
     readonly multiTuning: MultiRuntimeTuningConfig
     readonly assetProvider: AssetProviderConfig
@@ -95,6 +100,13 @@ export class RuntimeConfigError extends Error {
 function parseHost(value: string | undefined, fallback: string): string {
     const host = value ?? fallback
     if (!isValidNetworkHost(host)) throw new RuntimeConfigError()
+    return host
+}
+
+function parseOptionalPublicHost(value: string | undefined): string | undefined {
+    if (value === undefined) return undefined
+    const host = parseHost(value, "")
+    if (isUnspecifiedNetworkHost(host)) throw new RuntimeConfigError()
     return host
 }
 
@@ -238,11 +250,19 @@ function parseMultiRuntimeConfig(
 ): MultiRuntimeConfig {
     const mode = env.MULTI_MODE ?? "embedded"
     if (mode === "embedded") {
+        const host = parseHost(env.SESSION_HOST, "127.0.0.1")
+        const configuredPublicHost = parseOptionalPublicHost(
+            env.SESSION_PUBLIC_HOST ?? env.CN_PUBLIC_HOST,
+        )
+        const publicHost = configuredPublicHost ?? (isUnspecifiedNetworkHost(host)
+            ? resolveDisplayHost({ listenHost: host })
+            : undefined)
         return Object.freeze({
             mode,
             tcp: Object.freeze({
-                host: parseHost(env.SESSION_HOST, "127.0.0.1"),
+                host,
                 port: parsePort(env.SESSION_PORT, 8003),
+                ...(publicHost === undefined ? {} : { publicHost }),
             }),
         })
     }
@@ -252,12 +272,14 @@ function parseMultiRuntimeConfig(
             || env.SESSION_PUBLIC_HOST === undefined) {
             throw new RuntimeConfigError()
         }
+        const publicHost = parseOptionalPublicHost(env.SESSION_PUBLIC_HOST)
+        if (publicHost === undefined) throw new RuntimeConfigError()
         return Object.freeze({
             mode,
             tcp: Object.freeze({
                 host: parseHost(env.SESSION_HOST, "127.0.0.1"),
                 port: parsePort(env.SESSION_PORT, 8003),
-                publicHost: parseHost(env.SESSION_PUBLIC_HOST, ""),
+                publicHost,
             }),
             hub: Object.freeze({
                 host: parseHost(env.MULTI_HUB_HOST, ""),
@@ -269,10 +291,8 @@ function parseMultiRuntimeConfig(
     if (mode === "client") {
         if (!validateMultiHubToken(env.MULTI_HUB_TOKEN)) throw new RuntimeConfigError()
         const host = parseHost(env.SESSION_HOST, "127.0.0.1")
-        const publicHost = env.SESSION_PUBLIC_HOST === undefined
-            ? undefined
-            : parseHost(env.SESSION_PUBLIC_HOST, "")
-        if ((host === "0.0.0.0" || host === "::") && publicHost === undefined) {
+        const publicHost = parseOptionalPublicHost(env.SESSION_PUBLIC_HOST)
+        if (isUnspecifiedNetworkHost(host) && publicHost === undefined) {
             throw new RuntimeConfigError()
         }
         return Object.freeze({
@@ -311,10 +331,14 @@ export function parseCnRuntimeConfig({
         host: parseHost(env.CN_LISTEN_HOST, "127.0.0.1"),
         port: parsePort(env.CN_LISTEN_PORT, 8001),
     })
+    const httpDisplayHost = resolveDisplayHost({
+        listenHost: http.host,
+        publicHost: parseOptionalPublicHost(env.SESSION_PUBLIC_HOST ?? env.CN_PUBLIC_HOST),
+    })
     const multi = parseMultiRuntimeConfig(env, projectRoot)
     const multiTuning = parseMultiRuntimeTuning(env)
     const assetProvider = parseAssetProviderConfig({ projectRoot, env })
     const comicDir = resolveComicDir(env, projectRoot)
     validateEmbeddedRuntime(env, projectRoot, assetProvider, comicDir)
-    return Object.freeze({ http, multi, multiTuning, assetProvider, comicDir })
+    return Object.freeze({ http, httpDisplayHost, multi, multiTuning, assetProvider, comicDir })
 }

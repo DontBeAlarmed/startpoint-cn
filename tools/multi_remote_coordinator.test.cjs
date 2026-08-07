@@ -577,6 +577,31 @@ test("serializer uses the Hub TCP endpoint without exposing an update URL", () =
     assert.equal("asset_update" in serialized, false)
 })
 
+test("room serializer keeps a stable safe fallback without reading process.env", () => {
+    const source = fs.readFileSync(path.join(ROOT, "src/multi/room/serializer.ts"), "utf8")
+    assert.doesNotMatch(source, /process\.env/)
+    const previousPort = process.env.SESSION_PORT
+    process.env.SESSION_PORT = "9911"
+    try {
+        const serialized = serializeRoomStatusConnection(roomStatus())
+        assert.equal(serialized.port, 8003)
+    } finally {
+        if (previousPort === undefined) delete process.env.SESSION_PORT
+        else process.env.SESSION_PORT = previousPort
+    }
+})
+
+test("room serializer preserves an explicitly unavailable TCP endpoint", () => {
+    const serialized = serializeRoomStatusConnection(roomStatus(), null)
+    assert.equal(serialized.ip_address, "")
+    assert.equal(serialized.port, 0)
+})
+
+test("CN load route does not read process.env during a request", () => {
+    const source = fs.readFileSync(path.join(ROOT, "src/routes/cn/load.ts"), "utf8")
+    assert.doesNotMatch(source, /process\.env/)
+})
+
 test("multi HTTP routes do not introduce CDN update side effects", () => {
     const lobby = fs.readFileSync(path.join(ROOT, "src/multi/http/lobby.ts"), "utf8")
     const room = fs.readFileSync(path.join(ROOT, "src/multi/http/room.ts"), "utf8")

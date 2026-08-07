@@ -18,6 +18,7 @@ import type {
     NodeSessionId,
     ParticipantIdentity,
 } from "../coordinator/contracts"
+import type { RoomConnectionEndpoint } from "../room/serializer"
 import type { MultiCoordinator } from "../coordinator/interface"
 import {
     EMBEDDED_NODE_SESSION_ID,
@@ -281,14 +282,7 @@ class Service implements MultiRuntimeService {
                 admissionIssuer: admissionRegistry,
                 admissionRegistry,
                 idempotency: new IdempotencyCache(),
-                getTcpEndpoint: () => (
-                    !this.tcpFailed && this.safeListening(this.dependencies.isTcpListening)
-                        ? Object.freeze({
-                            host: config.tcp.publicHost ?? config.tcp.host,
-                            port: config.tcp.port,
-                        })
-                        : null
-                ),
+                getTcpEndpoint: () => this.getLocalTcpEndpoint(config),
                 getDiagnostics: () => ({
                     ...localAuthorityStatus(),
                     latestCompatibilityRejection: multiCompatibilityRejections.get(),
@@ -299,6 +293,7 @@ class Service implements MultiRuntimeService {
             this.context = createEmbeddedMultiHttpContext({
                 coordinator,
                 admissionRegistry,
+                tcpEndpoint: () => this.getLocalTcpEndpoint(config),
             })
         } else {
             this.hostServices = null
@@ -355,6 +350,7 @@ class Service implements MultiRuntimeService {
                     coordinator: new EmbeddedMultiCoordinator({
                         onCompatibilityRejection: recordMultiCompatibilityRejection,
                     }),
+                    tcpEndpoint: () => this.getLocalTcpEndpoint(config),
                 })
             }
         }
@@ -427,11 +423,11 @@ class Service implements MultiRuntimeService {
             })
         }
 
-        const tcpAvailable = !this.tcpFailed && this.safeListening(this.dependencies.isTcpListening)
-        const tcpEndpoint = endpoint(
-            config.mode === "host" ? config.tcp.publicHost ?? config.tcp.host : config.tcp.host,
-            config.tcp.port,
-        )
+        const localTcpEndpoint = this.getLocalTcpEndpoint(config)
+        const tcpAvailable = localTcpEndpoint !== null
+        const tcpEndpoint = localTcpEndpoint === null
+            ? null
+            : endpoint(localTcpEndpoint.host, localTcpEndpoint.port)
         if (config.mode === "embedded") {
             return freezeMultiRuntimeStatus({
                 mode: config.mode,
@@ -554,6 +550,16 @@ class Service implements MultiRuntimeService {
         } catch {
             return false
         }
+    }
+
+    private getLocalTcpEndpoint(
+        config: Extract<MultiRuntimeConfig, { readonly mode: "embedded" | "host" }>,
+    ): RoomConnectionEndpoint | null {
+        if (this.tcpFailed || !this.safeListening(this.dependencies.isTcpListening)) return null
+        return Object.freeze({
+            host: config.tcp.publicHost ?? config.tcp.host,
+            port: config.tcp.port,
+        })
     }
 
     private handleFatal(

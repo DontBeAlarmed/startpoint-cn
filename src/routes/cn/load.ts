@@ -11,7 +11,6 @@ import { getSession } from "../../data/domains/session"
 import { findPendingForcedNews } from "../../lib/news-catalog"
 import { getClientSerializedData } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getDisplayHost } from "../../multi/room/serializer";
 import { getRoom } from "../../multi/room/manager";
 import { runPermanentValidators } from "../../lib/validate";
 import { restoreActiveQuestFromStorage } from "../../lib/quest/entry-lifecycle";
@@ -53,7 +52,11 @@ interface CnLoadBody {
     viewer_id?: number;
 }
 
-function wrapOptionFields(d: any, availableAssetVersion: string) {
+function wrapOptionFields(
+    d: any,
+    availableAssetVersion: string,
+    crashEndpoint: { readonly host: string; readonly port: number },
+) {
     d.available_asset_version = availableAssetVersion;
 
     if (d.user_info) {
@@ -81,7 +84,7 @@ function wrapOptionFields(d: any, availableAssetVersion: string) {
         d.user_option.stamina ??= false;
     }
 
-    d.cn_crash_url = `http://${getDisplayHost()}:${process.env.CN_LISTEN_PORT || "8001"}/crash`;
+    d.cn_crash_url = `http://${crashEndpoint.host}:${crashEndpoint.port}/crash`;
     d.survey_url = "";
     d.qq_group_url = "";
     d.bug_report_url = "";
@@ -141,6 +144,8 @@ export interface CnLoadRouteOptions {
         inspect(input: MultiSettlementIdentity): Promise<MultiBattleRecoveryInspection>;
     };
     readonly getMultiParticipant?: (viewerId: number) => ParticipantIdentity;
+    readonly httpDisplayHost?: string;
+    readonly httpPort?: number;
 }
 
 function hasStoredBattleIdentity(activeQuest: ActiveQuest): boolean {
@@ -273,7 +278,10 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 ? ""
                 : contentSnapshot.cdn.targetVersion;
             const assetState = resolveAssetLoadState(assetProvider, resVer, snapshotTargetVersion);
-            wrapOptionFields(clientData, assetState.availableAssetVersion);
+            wrapOptionFields(clientData, assetState.availableAssetVersion, {
+                host: options.httpDisplayHost ?? "127.0.0.1",
+                port: options.httpPort ?? 8001,
+            });
 
             // Inject unfinished quest lists for battle recovery
             if (activeQuest) {

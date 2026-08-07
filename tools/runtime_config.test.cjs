@@ -10,6 +10,7 @@ require("ts-node/register/transpile-only")
 
 const projectRoot = path.resolve(__dirname, "..")
 const { parseCnRuntimeConfig } = require("../src/runtime/config")
+const { resolveDisplayHost } = require("../src/runtime/network-host")
 
 test("runtime network defaults are loopback-only and stable", () => {
     const config = parseCnRuntimeConfig({
@@ -97,7 +98,11 @@ test("runtime network accepts explicit wildcard hosts and boundary ports", () =>
     })
 
     assert.deepEqual(config.http, { host: "0.0.0.0", port: 1 })
-    assert.deepEqual(config.multi.tcp, { host: "::", port: 65535 })
+    assert.deepEqual(config.multi.tcp, {
+        host: "::",
+        port: 65535,
+        publicHost: resolveDisplayHost({ listenHost: "::" }),
+    })
 })
 
 test("embedded runtime requires one absolute Data Volume and forbids content path escapes", () => {

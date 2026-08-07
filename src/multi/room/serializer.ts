@@ -1,25 +1,8 @@
-import * as os from "os"
 import { MultiRoom } from "../types"
 import type { RoomStatus } from "../coordinator/interface"
+import { resolveDisplayHost } from "../../runtime/network-host"
 
-export function getDisplayHost(): string {
-    const publicHost = (process.env.SESSION_PUBLIC_HOST || process.env.CN_PUBLIC_HOST || "").trim()
-    if (publicHost.length > 0) return publicHost
-
-    const raw = (process.env.CN_LISTEN_HOST || "127.0.0.1").trim()
-    if (raw !== "0.0.0.0" && raw !== "::") return raw
-    const nets = os.networkInterfaces()
-    for (const name of Object.keys(nets)) {
-        const addrs = nets[name]
-        if (!addrs) continue
-        for (const addr of addrs) {
-            if (addr.family === "IPv4" && !addr.internal) {
-                return addr.address
-            }
-        }
-    }
-    return "127.0.0.1"
-}
+export const getDisplayHost = resolveDisplayHost
 
 export interface SerializedRoom {
     access_token: string;
@@ -120,8 +103,9 @@ function serializeRoomConnectionFields(room: {
     readonly roomSequence: number
     readonly shareRoomOptions: number
 }, endpoint?: RoomConnectionEndpoint | null): SerializedRoomConnection {
-    const displayHost = endpoint?.host ?? getDisplayHost();
-    const sessionPort = endpoint?.port ?? parseInt(process.env.SESSION_PORT || "8003");
+    const endpointUnavailable = endpoint === null;
+    const displayHost = endpointUnavailable ? "" : endpoint?.host ?? getDisplayHost();
+    const sessionPort = endpointUnavailable ? 0 : endpoint?.port ?? 8003;
     return {
         application_update_url: "",
         category_id: room.category,
