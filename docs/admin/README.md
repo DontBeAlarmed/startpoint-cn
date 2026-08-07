@@ -54,6 +54,8 @@ Server Bundle 始终打包完整 `web/dist/`，manifest 固定为 `admin.require
 
 `ASSET_MODE`、CDN/数据目录、HTTP/TCP 监听地址和端口等启动边界仍由环境变量或 Supervisor 控制。后台最多只读展示这类状态，不提供在线修改，避免运行中的进程写回部署配置。
 
+总览中的服务状态直接反映服务启动时冻结的 `RuntimeConfig` 和当前 `ContentSnapshot`。请求期间修改环境变量不会改变已运行进程显示的监听地址、CDN 模式或内容版本；需要变更时应重启服务并重新完成内容初始化。
+
 因此：
 
 - 自动测试通过不等于后台已经完成人工验收；

@@ -15,6 +15,8 @@
 | `MULTI_HUB_HOST` / `MULTI_HUB_PORT` | `host` 模式的可信 Hub 控制接口绑定地址与端口；默认端口语义为 `8004` |
 | `MULTI_HUB_URL` | `client` 模式访问 Host 控制接口的完整 HTTP(S) 根 URL，只用于多人控制面 |
 | `MULTI_HUB_TOKEN` | `client` 模式使用的节点明文令牌，只放在本机 `.env` 或壳私有运行配置中 |
+| `SUMMON_COM_SECONDS` | 客户端抽卡演出配置，默认 `5` 秒；只在启动时读取 |
+| `DAILY_RESET_HOUR` | 中国时区每日/每周周期边界小时，默认 `5`；取值 `0～23`，只在启动时读取 |
 
 绑定 `0.0.0.0` 表示监听所有本机网络接口，不等于服务端自动获得公网安全能力。`CDN_BASE_URL` 和 `SESSION_PUBLIC_HOST` 必须是客户端实际能够访问的地址，但项目不负责配置路由器、域名或外部网络。
 
@@ -29,6 +31,8 @@
 | `NPC_READY_DELAY_MS` | `500` | NPC 加入后进入准备状态的额外延迟 |
 
 这些值以毫秒为单位，仅在进程启动时解析并进入只读运行配置；修改后必须重启服务。管理后台不提供在线修改入口，运行过程中不会热更新；重启后的生命周期会使用新的配置。
+
+`SUMMON_COM_SECONDS` 和 `DAILY_RESET_HOUR` 也属于同一份启动配置。后台 `/api/server/status` 使用启动时的 `RuntimeConfig` 与当前 `ContentSnapshot`，不会在每次请求时重新读取环境变量；客户端 `/load` 的抽卡演出和周期边界因此在同一进程内保持稳定。
 
 联机地址只按 `SESSION_PUBLIC_HOST`、`CN_PUBLIC_HOST`、`CN_LISTEN_HOST` 的顺序选择，完全不读取 HTTP 请求。前两项都未设置且 `CN_LISTEN_HOST` 是 `0.0.0.0` 或 `::` 时，服务端使用操作系统网络接口枚举中的首个非回环 IPv4，找不到时回退到 `127.0.0.1`。多网卡、VPN 或虚拟网卡环境中自动结果可能不是客户端可达地址，应显式设置 `SESSION_PUBLIC_HOST`。
 

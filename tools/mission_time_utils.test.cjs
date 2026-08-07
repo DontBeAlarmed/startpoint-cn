@@ -25,4 +25,15 @@ assert.equal(
     "国服日常必须在北京时间 05:00 重置",
 )
 
+const previousDayAtSix = new Date("2024-08-13T05:00:00.000Z") // 北京 13:00
+assert.equal(
+    isNewDay(new Date("2024-08-13T21:59:59.999Z"), previousDayAtSix, 6),
+    false,
+)
+assert.equal(
+    isNewDay(new Date("2024-08-13T22:00:00.000Z"), previousDayAtSix, 6),
+    true,
+    "自定义重置时间必须在传入的小时生效",
+)
+
 console.log("mission time utility tests passed")

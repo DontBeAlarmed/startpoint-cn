@@ -1250,12 +1250,13 @@ export function collectPlayerPooledExpSync(
  */
 export function dailyResetPlayerDataSync(
     player: Player,
-    loginDate: Date = new Date()
+    loginDate: Date = new Date(),
+    resetHour = 5,
 ): boolean {
     const lastLoginTime = player.lastLoginTime
     const playerId = player.id
-    const crossedDay = isNewDay(loginDate, lastLoginTime)
-    const crossedWeek = isNewWeek(loginDate, lastLoginTime)
+    const crossedDay = isNewDay(loginDate, lastLoginTime, resetHour)
+    const crossedWeek = isNewWeek(loginDate, lastLoginTime, resetHour)
 
     if (crossedDay) {
         return getDb().transaction(() => {
@@ -1365,10 +1366,11 @@ export function dailyResetPlayerDataSync(
  * @returns A boolean; whether the daily reset was performed
  */
 export function dailyResetPlayerSync(
-    playerId: number
+    playerId: number,
+    resetHour = 5,
 ): boolean {
     const playerData = getPlayerSync(playerId)
     if (!playerData) return false;
 
-    return dailyResetPlayerDataSync(playerData)
+    return dailyResetPlayerDataSync(playerData, new Date(), resetHour)
 }
