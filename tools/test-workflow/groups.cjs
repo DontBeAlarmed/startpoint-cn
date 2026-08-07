@@ -165,6 +165,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/content_runtime_table.test.cjs",
             "tools/content_runtime_authority.test.cjs",
             "tools/content_runtime_endpoint_tables.test.cjs",
+            "tools/content_runtime_direct_tables.test.cjs",
+            "tools/content_runtime_mission_tables.test.cjs",
             "tools/content_shop_converter.test.cjs",
             "tools/gacha_repository.test.cjs",
             "tools/shop_repository.test.cjs",

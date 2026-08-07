@@ -217,6 +217,7 @@ export function getMatchedAwakeDirectBattleMissionIds(
     ctx: QuestPartyFactContext,
     raceKey: string,
 ): number[] {
+    validateAwakeBattleRuleSchemas()
     const matched = [
         ...getMatchedAwakeRaceMissionIds(ctx, raceKey),
         ...getMatchedAwakeQuestPartyMissionIds(ctx),
@@ -262,6 +263,7 @@ export function getAwakeBattleProgressFacts(
     ctx: AwakeBattleFactContext,
     raceKey = "",
 ): AwakeBattleProgressFacts {
+    validateAwakeBattleRuleSchemas()
     if (ctx.questAccomplished !== true) return { increments: [], maxima: [] }
 
     const increments = getMatchedAwakeDirectBattleMissionIds(ctx, raceKey)
@@ -334,6 +336,7 @@ export function isBondTokenMissionComplete(
         && bondTokens.every(bondToken => bondToken.status >= 2)
 }
 
+function validateAwakeBattleRuleSchemas(): void {
 for (const rule of EXACT_QUEST_RULES) {
     const expectedPattern = rule.timeLimitMs === undefined
         ? rule.missionId === 1110013 ? "93" : "23"
@@ -354,3 +357,4 @@ assertAwakeMissionFields(13, { 4: "28", 5: "1", 7: "3", 23: "1" })
 assertAwakeMissionFields(1210012, { 4: "28", 5: "1", 7: "3", 23: "121001" })
 assertAwakeMissionFields(1210013, { 4: "30", 7: "3", 23: "121001" })
 assertAwakeMissionFields(2410633, { 4: "93", 7: "3", 24: "241063,243007,361009" })
+}

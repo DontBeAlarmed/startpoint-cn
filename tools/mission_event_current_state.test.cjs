@@ -300,6 +300,7 @@ function withContentTables(overrides, callback) {
         "item_sale.json": itemSale,
         "main_quest.json": mainQuests,
         "mana_board.json": manaBoard,
+        "mission_event.json": require("../assets/mission_event.json"),
         "challenge_dungeon_event_quest.json": require("../assets/challenge_dungeon_event_quest.json"),
         ...overrides,
     }
@@ -362,8 +363,11 @@ test("Event buildContext skips current-state queries and indexes outside all 15 
         repository: {
             info: () => ({ source: "test" }),
             table() {
+                if (arguments[0] === "mission_event.json") {
+                    return require("../assets/mission_event.json")
+                }
                 tableReads++
-                throw new Error("current-state table must not be read")
+                throw new Error("unexpected current-state table read")
             },
         },
     }

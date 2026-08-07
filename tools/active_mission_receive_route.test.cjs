@@ -55,6 +55,16 @@ rewardRow[8] = "5"
 
 const tables = {
     "daily_challenge_point_lookup.json": require("../assets/daily_challenge_point_lookup.json"),
+    "mission_regular.json": require("../assets/mission_regular.json"),
+    "mission_daily.json": require("../assets/mission_daily.json"),
+    "mission_event.json": require("../assets/mission_event.json"),
+    "mission_collect_item.json": require("../assets/mission_collect_item.json"),
+    "mission_degree.json": require("../assets/mission_degree.json"),
+    "mission_char_awake.json": require("../assets/mission_char_awake.json"),
+    "mission_weekly_def.json": require("../assets/mission_weekly_def.json"),
+    "mission_pass_daily.json": require("../assets/mission_pass_daily.json"),
+    "mission_pass_week.json": require("../assets/mission_pass_week.json"),
+    "mission_pass_event.json": require("../assets/mission_pass_event.json"),
     "mission_active.json": { 99001: [missionRow] },
     "mission_active_event.json": { 99: [eventRow] },
     "mission_active_reward.json": { 99001: { 1: [rewardRow] } },

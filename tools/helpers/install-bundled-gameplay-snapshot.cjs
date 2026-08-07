@@ -54,6 +54,7 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "box_gacha_box_settings.json",
     "box_reward.json",
     "carnival_event_total_score_reward.json",
+    "character_quest_lookup.json",
     "equipment_gacha_movie_probability.json",
     "ex_ability.json",
     "ex_boost.json",
@@ -97,6 +98,9 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "pass_card_reward.json",
     "raid_event.json",
     "reward_campaign.json",
+    "stamina_campaign.json",
+    "star_crumb_exchange.json",
+    "star_crumb_exchange_cost.json",
     "story_join_character.json",
 ]
 

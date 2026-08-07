@@ -36,8 +36,10 @@ productionContentSnapshotProvider.snapshot = {
     cdn: { targetVersion: "mission-event-login-test" },
     repository: {
         info: () => ({ source: "release", assetVersion: "test", generatorVersion: 1, releaseDigest: "sha256:test" }),
-        table: () => {
+        table: tableName => {
             if (failReconciliation) throw new Error("forced load reconciliation failure")
+            if (tableName === "mission_event.json") return require("../assets/mission_event.json")
+            if (tableName === "mission_event_reward.json") return require("../assets/mission_event_reward.json")
             return {}
         },
     },

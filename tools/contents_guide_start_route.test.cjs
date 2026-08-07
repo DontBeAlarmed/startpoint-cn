@@ -64,6 +64,9 @@ function rewardRow() {
 
 const tables = {
     "daily_challenge_point_lookup.json": require("../assets/daily_challenge_point_lookup.json"),
+    "mission_pass_week.json": require("../assets/mission_pass_week.json"),
+    "mission_pass_daily.json": require("../assets/mission_pass_daily.json"),
+    "mission_pass_event.json": require("../assets/mission_pass_event.json"),
     "mission_active.json": {
         77123: [missionRow(77)],
         88123: [missionRow(88)],
