@@ -4,11 +4,19 @@ export type AuthenticationRejection =
     | { readonly reason: "malformed" | "unknown" }
     | { readonly reason: "revoked"; readonly credentialId: string }
 
-export interface AuthenticationRejectionEvent {
+interface AuthenticationRejectionEventBase {
     readonly timestamp: string
-    readonly reason: AuthenticationRejectionReason
-    readonly credentialId?: string
 }
+
+export type AuthenticationRejectionEvent =
+    | (AuthenticationRejectionEventBase & {
+        readonly reason: "malformed" | "unknown"
+        readonly credentialId?: never
+    })
+    | (AuthenticationRejectionEventBase & {
+        readonly reason: "revoked"
+        readonly credentialId: string
+    })
 
 export type ClientAuthenticationState = "authentication_rejected" | null
 

@@ -1,6 +1,7 @@
 "use strict"
 
 const assert = require("node:assert/strict")
+const { spawnSync } = require("node:child_process")
 const crypto = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
@@ -9,6 +10,7 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
+const projectRoot = path.resolve(__dirname, "..")
 const {
     AuthenticationRejectionBuffer,
 } = require("../src/multi/hub/authentication-rejections")
@@ -78,28 +80,79 @@ test("legacy authenticate keeps returning only active credentials", t => {
     assert.equal(reloader.authenticate(active.token)?.credentialId, active.credentialId)
 })
 
-test("revoked authentication scans every credential digest", t => {
+test("authentication rejection event type requires credential IDs only for revoked", t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-hub-authentication-types-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const sourcePath = path.join(root, "contract.ts")
+    const targetPath = path.join(projectRoot, "src/multi/hub/authentication-rejections")
+    const relativeTarget = path.relative(root, targetPath).replaceAll(path.sep, "/")
+    const importTarget = relativeTarget.startsWith(".") ? relativeTarget : `./${relativeTarget}`
+    fs.writeFileSync(sourcePath, `
+import type { AuthenticationRejectionEvent } from ${JSON.stringify(importTarget)}
+
+// @ts-expect-error revoked events require a credential ID
+const missingRevokedId: AuthenticationRejectionEvent = {
+    timestamp: "2026-08-07T12:00:00.000Z",
+    reason: "revoked",
+}
+
+// @ts-expect-error unknown events cannot carry a credential ID
+const unknownWithId: AuthenticationRejectionEvent = {
+    timestamp: "2026-08-07T12:00:00.000Z",
+    reason: "unknown",
+    credentialId: "forbidden",
+}
+
+void missingRevokedId
+void unknownWithId
+`, "utf8")
+
+    const result = spawnSync(process.execPath, [
+        path.join(projectRoot, "node_modules/typescript/bin/tsc"),
+        "--noEmit",
+        "--strict",
+        "--skipLibCheck",
+        "--module",
+        "commonjs",
+        "--moduleResolution",
+        "node",
+        "--target",
+        "es2016",
+        sourcePath,
+    ], { cwd: projectRoot, encoding: "utf8" })
+    assert.equal(result.status, 0, `${result.stdout}${result.stderr}`)
+})
+
+test("unknown and revoked authentication scan every credential digest", t => {
     const { credentialsPath, reloader, revoked } = authenticationFixture(t)
     const persisted = JSON.parse(fs.readFileSync(credentialsPath, "utf8"))
     assert.equal(persisted.credentials[0].credentialId, revoked.credentialId)
 
     const originalTimingSafeEqual = crypto.timingSafeEqual
     let comparisons = 0
+    const snapshotSize = reloader.getStatus().total
     crypto.timingSafeEqual = (...args) => {
         comparisons++
         return originalTimingSafeEqual(...args)
     }
     try {
+        assert.deepEqual(reloader.authenticateDetailed("c".repeat(64)), {
+            ok: false,
+            reason: "unknown",
+        })
+        assert.equal(comparisons, snapshotSize)
+
+        comparisons = 0
         assert.deepEqual(reloader.authenticateDetailed(revoked.token), {
             ok: false,
             reason: "revoked",
             credentialId: revoked.credentialId,
         })
+        assert.equal(comparisons, snapshotSize)
     } finally {
         crypto.timingSafeEqual = originalTimingSafeEqual
     }
 
-    assert.equal(comparisons, reloader.getStatus().total)
     assert.equal(crypto.timingSafeEqual, originalTimingSafeEqual)
 })
 
