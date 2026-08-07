@@ -155,8 +155,11 @@ const serializedPlayer = serializePlayerData({
     startDashExchangeCampaignList: [],
     multiSpecialExchangeCampaignList: [],
     userOption: {},
+}, {
+    summonComSeconds: 9,
 })
 assert.equal(serializedPlayer.user_info.degree_id, 61000)
+assert.equal(serializedPlayer.config.summon_com_seconds, 9)
 assert.throws(
     () => carnivalParser.parseCarnivalRewardRow(9999, [
         "250604", "test", "100", "20001",

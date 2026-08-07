@@ -10,6 +10,16 @@ import path from "path";
 
 interface ComicRouteOptions {
     readonly comicDir?: string | null
+    readonly httpDisplayHost?: string
+    readonly httpPort?: number
+}
+
+export function buildComicBaseUrl(
+    requestHost: string | undefined,
+    httpDisplayHost = "127.0.0.1",
+    httpPort = 8001,
+): string {
+    return `http://${requestHost || `${httpDisplayHost}:${httpPort}`}`
 }
 
 // Kind 1: 史黛拉的弹射世界讲座 (Stella's Classroom)
@@ -119,7 +129,11 @@ const routes = async (fastify: FastifyInstance, options: ComicRouteOptions) => {
         const start = pageIndex * perPage
         const items = comics.slice(start, start + perPage)
 
-        const base = `http://${request.headers.host || `127.0.0.1:${process.env.CN_LISTEN_PORT || "8001"}`}`
+        const base = buildComicBaseUrl(
+            request.headers.host,
+            options.httpDisplayHost,
+            options.httpPort,
+        )
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

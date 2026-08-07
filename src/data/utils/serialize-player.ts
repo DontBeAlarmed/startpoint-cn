@@ -27,6 +27,7 @@ export interface SerializePlayerDataOptions {
     serializeRushEventData?: boolean // should rush event data be serialized?
     activeMissionList?: { mission_id: number; progress_value: number; stages: { stage: number; received: boolean }[] }[]
     availableAssetVersion?: string
+    summonComSeconds?: number
 }
 
 export function serializePlayerQuestProgress(progress: PlayerQuestProgress): UserQuestProgress {
@@ -282,7 +283,7 @@ export function serializePlayerData(
         }),
         "associate_token": "associate_token",
         "config": {
-            "summon_com_seconds": parseInt(process.env.SUMMON_COM_SECONDS || "5"),
+            "summon_com_seconds": options?.summonComSeconds ?? 5,
             "attention_recruitment_interval_seconds": 15,
             "attention_recruitment_redeliver_limit": 20,
             "attention_polling_interval_seconds_normal": 10,

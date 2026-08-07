@@ -146,6 +146,8 @@ export interface CnLoadRouteOptions {
     readonly getMultiParticipant?: (viewerId: number) => ParticipantIdentity;
     readonly httpDisplayHost?: string;
     readonly httpPort?: number;
+    readonly summonComSeconds?: number;
+    readonly dailyResetHour?: number;
 }
 
 function hasStoredBattleIdentity(activeQuest: ActiveQuest): boolean {
@@ -200,7 +202,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         }
 
         const now = getServerDate();
-        dailyResetPlayerDataSync(player, now);
+        dailyResetPlayerDataSync(player, now, options.dailyResetHour);
         collectPlayerDataPooledExpSync(player, now);
 
         // Run save validators (permanent fixes: max_level, etc.)
@@ -269,7 +271,10 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         });
 
         const responsePayload = (() => {
-            const clientData = getClientSerializedData(playerId, { viewerId: accountId }) as any;
+            const clientData = getClientSerializedData(playerId, {
+                viewerId: accountId,
+                summonComSeconds: options.summonComSeconds,
+            }) as any;
             if (clientData === null) throw new Error("No player data.");
 
             const resVer = request.headers['res_ver'] as string | undefined;

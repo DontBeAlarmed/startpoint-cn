@@ -9,7 +9,15 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const Fastify = require("fastify")
-const comicRoutes = require("../src/routes/api/comic").default
+const comicModule = require("../src/routes/api/comic")
+const comicRoutes = comicModule.default
+
+test("comic URLs use the startup display endpoint when the request has no host", () => {
+    assert.equal(
+        comicModule.buildComicBaseUrl(undefined, "configured.example", 9100),
+        "http://configured.example:9100",
+    )
+})
 
 test("comic image route reads only the configured external directory", async t => {
     const comicDir = fs.mkdtempSync(path.join(os.tmpdir(), "comic-route-"))
