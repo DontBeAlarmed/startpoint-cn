@@ -384,7 +384,12 @@ test("records only token authentication rejections behind a uniform registration
         url: "/v1/multi/nodes/register",
         payload: { protocolVersion: MULTI_PROTOCOL_VERSION },
     })
-    const malformed = await register(target.app, "short")
+    const malformed = await target.app.inject({
+        method: "POST",
+        url: "/v1/multi/nodes/register",
+        headers: { authorization: "Bearer bad token" },
+        payload: { protocolVersion: MULTI_PROTOCOL_VERSION },
+    })
     const unknownToken = "z".repeat(64)
     const unknown = await register(target.app, unknownToken)
     target.store.revoke(target.first.credentialId)
