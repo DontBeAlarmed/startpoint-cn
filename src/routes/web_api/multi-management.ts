@@ -25,6 +25,8 @@ interface CredentialParams {
     readonly credentialId: string
 }
 
+const SHORT_CREDENTIAL_ID_PATTERN = /^[0-9a-f]{8}$/
+
 export interface MultiManagementRoutesOptions {
     readonly getMultiManagementService: () => MultiManagementServiceContract | null | undefined
 }
@@ -47,12 +49,33 @@ function publicProbe(result: MultiProbeResult): MultiProbeResult {
 }
 
 function publicAuthenticationDiagnostics(
-    result: MultiAuthenticationDiagnostics,
+    result: unknown,
 ): MultiAuthenticationDiagnostics {
+    if (result === null || typeof result !== "object" || Array.isArray(result)) {
+        throw new TypeError("Invalid authentication diagnostics root")
+    }
+
+    const root = result as {
+        readonly mode?: unknown
+        readonly clientState?: unknown
+        readonly rejections?: unknown
+    }
+    const mode = root.mode
+    const clientState = root.clientState
+    if (mode !== "embedded" && mode !== "host" && mode !== "client") {
+        throw new TypeError("Invalid authentication diagnostics mode")
+    }
+    if (clientState !== null && clientState !== "authentication_rejected") {
+        throw new TypeError("Invalid authentication diagnostics client state")
+    }
+    if ((mode === "embedded" || mode === "host") && clientState !== null) {
+        throw new TypeError("Invalid authentication diagnostics mode state")
+    }
+
     return {
-        mode: result.mode,
-        clientState: result.clientState,
-        rejections: publicAuthenticationRejections(result.rejections),
+        mode,
+        clientState,
+        rejections: mode === "host" ? publicAuthenticationRejections(root.rejections) : [],
     }
 }
 
@@ -78,20 +101,24 @@ function publicAuthenticationRejections(values: unknown): MultiAuthenticationDia
             }
             const timestamp = (candidate as { timestamp?: unknown }).timestamp
             const reason = (candidate as { reason?: unknown }).reason
-            if (typeof timestamp !== "string"
-                || (reason !== "malformed" && reason !== "unknown" && reason !== "revoked")) {
+            if (!isCanonicalAuthenticationTimestamp(timestamp)
+                || !isAuthenticationRejectionReason(reason)) {
                 continue
             }
-            const credentialValue = (candidate as { credential?: unknown }).credential
             let credential = null
-            if (credentialValue !== null) {
-                if (typeof credentialValue !== "object" || Array.isArray(credentialValue)) continue
-                const label = (credentialValue as { label?: unknown }).label
-                const shortId = (credentialValue as { shortId?: unknown }).shortId
-                if (typeof label !== "string" || typeof shortId !== "string") continue
-                credential = {
-                    label,
-                    shortId,
+            if (reason === "revoked") {
+                const credentialValue = (candidate as { credential?: unknown }).credential
+                if (credentialValue !== null) {
+                    if (typeof credentialValue !== "object" || Array.isArray(credentialValue)) continue
+                    const label = (credentialValue as { label?: unknown }).label
+                    const shortId = (credentialValue as { shortId?: unknown }).shortId
+                    if (typeof label !== "string"
+                        || typeof shortId !== "string"
+                        || !SHORT_CREDENTIAL_ID_PATTERN.test(shortId)) continue
+                    credential = {
+                        label,
+                        shortId,
+                    }
                 }
             }
             rejections.push({
@@ -104,6 +131,23 @@ function publicAuthenticationRejections(values: unknown): MultiAuthenticationDia
         }
     }
     return rejections
+}
+
+function isCanonicalAuthenticationTimestamp(value: unknown): value is string {
+    if (typeof value !== "string") return false
+    const milliseconds = Date.parse(value)
+    if (!Number.isFinite(milliseconds)) return false
+    try {
+        return new Date(milliseconds).toISOString() === value
+    } catch {
+        return false
+    }
+}
+
+function isAuthenticationRejectionReason(
+    value: unknown,
+): value is MultiAuthenticationDiagnostics["rejections"][number]["reason"] {
+    return value === "malformed" || value === "unknown" || value === "revoked"
 }
 
 function getService(

@@ -123,6 +123,197 @@ test("loopback authentication rejection diagnostics return exact public fields",
     assert.deepEqual(calls, ["diagnostics"])
 })
 
+test("authentication diagnostic root semantics reject unsafe replacement services", async t => {
+    let diagnostics = null
+    const app = await createApp(t, () => ({
+        getAuthenticationDiagnostics: () => diagnostics,
+    }))
+    for (const invalid of [
+        null,
+        [],
+        { mode: "secret-mode", clientState: null, rejections: [] },
+        { mode: "host", clientState: "authentication_rejected", rejections: [] },
+        { mode: "embedded", clientState: "authentication_rejected", rejections: [] },
+        { mode: "client", clientState: "secret-state", rejections: [] },
+    ]) {
+        diagnostics = invalid
+        const response = await request(app, "GET", "/authentication-rejections")
+        assert.equal(response.statusCode, 500)
+        assert.deepEqual(response.json(), {
+            error: "Internal Server Error",
+            code: "MULTI_MANAGEMENT_FAILED",
+            message: "Multiplayer management request failed",
+        })
+        assert.doesNotMatch(response.body, /secret-mode|secret-state/)
+    }
+})
+
+test("authentication diagnostic root getters fail safely", async t => {
+    let diagnostics
+    const app = await createApp(t, () => ({
+        getAuthenticationDiagnostics: () => diagnostics,
+    }))
+    for (const property of ["mode", "clientState", "rejections"]) {
+        diagnostics = {
+            get mode() {
+                if (property === "mode") throw new Error("secret-mode-getter")
+                return "host"
+            },
+            get clientState() {
+                if (property === "clientState") throw new Error("secret-state-getter")
+                return null
+            },
+            get rejections() {
+                if (property === "rejections") throw new Error("secret-rejections-getter")
+                return []
+            },
+        }
+        const response = await request(app, "GET", "/authentication-rejections")
+        assert.equal(response.statusCode, 500)
+        assert.equal(response.json().code, "MULTI_MANAGEMENT_FAILED")
+        assert.doesNotMatch(response.body, /secret-(mode|state|rejections)-getter/)
+    }
+})
+
+test("client and embedded diagnostics never read provider rejection collections", async t => {
+    let diagnostics
+    let collectionReads = 0
+    const hostileRejections = new Proxy([], {
+        get(target, property, receiver) {
+            collectionReads++
+            if (property === "length") return Number.MAX_SAFE_INTEGER
+            throw new Error("secret-rejection-collection-getter")
+        },
+    })
+    const app = await createApp(t, () => ({
+        getAuthenticationDiagnostics: () => diagnostics,
+    }))
+
+    for (const mode of ["client", "embedded"]) {
+        diagnostics = { mode, clientState: null, rejections: hostileRejections }
+        const response = await request(app, "GET", "/authentication-rejections")
+        assert.equal(response.statusCode, 200)
+        assert.deepEqual(response.json(), { mode, clientState: null, rejections: [] })
+    }
+    assert.equal(collectionReads, 0)
+})
+
+test("host diagnostics enforce canonical events and revoked credential hints", async t => {
+    let unknownCredentialReads = 0
+    const unknownEvent = {
+        timestamp: CREATED_AT,
+        reason: "unknown",
+        get credential() {
+            unknownCredentialReads++
+            throw new Error("secret-unknown-credential")
+        },
+    }
+    const app = await createApp(t, () => ({
+        getAuthenticationDiagnostics: () => ({
+            mode: "host",
+            clientState: null,
+            rejections: [
+                { timestamp: "2026-08-06T03:00:00Z", reason: "unknown", credential: null },
+                { timestamp: CREATED_AT, reason: "revoked", credential: {
+                    label: "bad-length", shortId: "abc1234",
+                } },
+                { timestamp: CREATED_AT, reason: "revoked", credential: {
+                    label: "bad-case", shortId: "ABCDEF12",
+                } },
+                { timestamp: CREATED_AT, reason: "revoked", credential: {
+                    label: "bad-hex", shortId: "gggggggg",
+                } },
+                unknownEvent,
+                { timestamp: CREATED_AT, reason: "revoked", credential: {
+                    label: "node-a", shortId: "abcdef12",
+                } },
+            ],
+        }),
+    }))
+
+    const response = await request(app, "GET", "/authentication-rejections")
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json(), {
+        mode: "host",
+        clientState: null,
+        rejections: [{
+            timestamp: CREATED_AT,
+            reason: "unknown",
+            credential: null,
+        }, {
+            timestamp: CREATED_AT,
+            reason: "revoked",
+            credential: { label: "node-a", shortId: "abcdef12" },
+        }],
+    })
+    assert.equal(unknownCredentialReads, 0)
+    assert.doesNotMatch(response.body, /secret-|bad-length|bad-case|bad-hex/)
+})
+
+test("host diagnostic collection getters are bounded and sparse values are safe", async t => {
+    let diagnostics
+    const app = await createApp(t, () => ({
+        getAuthenticationDiagnostics: () => diagnostics,
+    }))
+
+    diagnostics = {
+        mode: "host",
+        clientState: null,
+        rejections: new Proxy([], {
+            get(target, property, receiver) {
+                if (property === "length") throw new Error("secret-length-getter")
+                return Reflect.get(target, property, receiver)
+            },
+        }),
+    }
+    let response = await request(app, "GET", "/authentication-rejections")
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json().rejections, [])
+
+    diagnostics = {
+        mode: "host",
+        clientState: null,
+        rejections: new Proxy([{
+            timestamp: CREATED_AT,
+            reason: "unknown",
+            credential: null,
+        }, {
+            timestamp: CREATED_AT,
+            reason: "revoked",
+            credential: null,
+        }], {
+            get(target, property, receiver) {
+                if (property === "1") throw new Error("secret-index-getter")
+                return Reflect.get(target, property, receiver)
+            },
+        }),
+    }
+    response = await request(app, "GET", "/authentication-rejections")
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json().rejections, [{
+        timestamp: CREATED_AT,
+        reason: "unknown",
+        credential: null,
+    }])
+
+    diagnostics = {
+        mode: "host",
+        clientState: null,
+        rejections: [{
+            timestamp: CREATED_AT,
+            reason: "unknown",
+            credential: null,
+        }, ,],
+    }
+    response = await request(app, "GET", "/authentication-rejections")
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json().rejections, [{
+        timestamp: CREATED_AT,
+        reason: "unknown",
+        credential: null,
+    }])
+})
+
 test("authentication rejection route copies only the last 32 public events", async t => {
     const rejections = Array.from({ length: 33 }, (_, index) => ({
         timestamp: new Date(Date.parse(CREATED_AT) + index).toISOString(),
@@ -154,13 +345,6 @@ test("authentication rejection route bounds sparse proxy reads and preserves its
     const firstVisibleIndex = reportedLength - 32
     let indexAccesses = 0
     const rejections = new Proxy([], {
-        has(target, property) {
-            if (typeof property === "string" && /^\d+$/.test(property)) {
-                indexAccesses++
-                return Number(property) >= firstVisibleIndex
-            }
-            return Reflect.has(target, property)
-        },
         get(target, property, receiver) {
             if (property === "length") return reportedLength
             if (typeof property === "string" && /^\d+$/.test(property)) {
@@ -174,7 +358,7 @@ test("authentication rejection route bounds sparse proxy reads and preserves its
                         reason: "revoked",
                         credential: {
                             label: `node-${index}`,
-                            shortId: index.toString(16).padStart(8, "0"),
+                            shortId: "abcdef12",
                             token: "secret-credential-token",
                         },
                         request: { token: "secret-request-token" },
