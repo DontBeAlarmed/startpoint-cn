@@ -81,11 +81,12 @@ B 正常启动时不会立即监听本地 fallback TCP。只有新多人操作�
 GET    /api/server/multiplayer/credentials
 POST   /api/server/multiplayer/credentials
 DELETE /api/server/multiplayer/credentials/:credentialId
+GET    /api/server/multiplayer/authentication-rejections
 POST   /api/server/multiplayer/probe
 PUT    /api/server/time-package
 ```
 
-`GET /api/server/time-package` 可导出三字段时间包；导入只修改全局服务器时间，不修改任务周期、商店购买、奖励或玩家存档。Launcher 和后台应调用这些服务接口，不得直接编辑密钥表、`server-time.json`、房间状态或 SQLite。
+`GET /api/server/time-package` 可导出三字段时间包；导入只修改全局服务器时间，不修改任务周期、商店购买、奖励或玩家存档。服务端已提供只读 `GET /api/server/multiplayer/authentication-rejections` 投影，但当前 Launcher 尚未消费；未来 Launcher 适配器也只能通过真实 loopback 公开投影读取，不得直接读取凭据表、Host 内存或其他内部状态。Launcher 和后台应调用这些服务接口，不得直接编辑密钥表、`server-time.json`、房间状态或 SQLite。
 
 ## 排查顺序
 

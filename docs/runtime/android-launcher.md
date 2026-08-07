@@ -103,4 +103,4 @@ Launcher 提供服务端、TCP、CDN 校验、补丁器和壳自身的来源筛�
 
 后台由服务端 Bundle 的 React 产物提供，Launcher 只打开 `http://<host>:<port>/admin/`，不复制或内嵌后台业务逻辑。
 
-多人管理统一通过服务端 `MultiManagementService` 边界实现；CLI、React 后台和 Launcher 只能作为适配器，不得各自直接改密钥表或多人内部状态。Launcher 只从 loopback 调用 `/api/server/multiplayer/credentials`、`/api/server/multiplayer/probe` 和 `/api/server/time-package`；不得直接打开密钥表或 `server-time.json`。在后台账号与权限系统完成前，React 后台只能显示多人只读诊断，不能提供远程令牌创建、撤销或配置写入。服务器时间分享是独立管理能力，不属于 Hub，也不得由加入房间自动触发。
+多人管理统一通过服务端 `MultiManagementService` 边界实现；CLI、React 后台和 Launcher 只能作为适配器，不得各自直接改密钥表或多人内部状态。Launcher 只从 loopback 调用 `/api/server/multiplayer/credentials`、`/api/server/multiplayer/probe` 和 `/api/server/time-package`；服务端另已提供只读 `GET /api/server/multiplayer/authentication-rejections`，但当前 Launcher 尚未消费该投影。未来若接入，Launcher 也只能读取 `MultiManagementService` 的 loopback 公开投影，不能读取凭据表或 Host 内存；现有流程同样不得直接打开密钥表或 `server-time.json`。在后台账号与权限系统完成前，React 后台只能显示多人只读诊断，不能提供远程令牌创建、撤销或配置写入。服务器时间分享是独立管理能力，不属于 Hub，也不得由加入房间自动触发。
