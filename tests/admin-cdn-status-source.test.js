@@ -11,7 +11,8 @@ test("server status uses the pinned content snapshot instead of placeholder patc
     const source = fs.readFileSync(path.join(root, "src/routes/web_api/server.ts"), "utf8")
 
     assert.match(source, /getContentSnapshot/)
-    assert.match(source, /parseAssetProviderConfig/)
+    assert.match(source, /runtimeConfig|getRuntimeConfig/)
+    assert.doesNotMatch(source, /parseAssetProviderConfig/)
     assert.match(source, /buildAdminContentStatus/)
     assert.doesNotMatch(source, /runtimeEnabled:\s*false/)
     assert.doesNotMatch(source, /enabledPatchCount:\s*0/)

@@ -32,6 +32,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/multi_runtime_config.test.cjs",
             "tools/multi_client_fallback.test.cjs",
             "tools/comic_route.test.cjs",
+            "tools/admin_server_status_runtime_config.test.cjs",
             "tools/cn_tool_capabilities.test.cjs",
             "tools/runtime_admin.test.cjs",
             "tools/admin_multi_status.test.cjs",
