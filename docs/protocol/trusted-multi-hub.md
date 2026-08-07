@@ -393,7 +393,7 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 
 认证拒绝诊断已由 Host、Client 和 `MultiManagementService` 共同实现，但不改变上述网络响应：
 
-- Client 在发起连接前继续拒绝缺失或格式错误的启动配置；只有注册端点收到合法的 Hub `401` 后才记录有限状态 `authentication_rejected`，提示服主检查令牌或联系 Host，不推断具体原因；网络失败仍是普通 `HUB_UNAVAILABLE`；
+- Client 在发起连接前继续拒绝缺失或格式错误的启动配置；只有注册端点收到合法的 Hub `401` 后才将有限状态 `authentication_rejected` 记录到 Client 管理诊断，不推断具体原因；成功注册后清空状态；网络失败仍是普通 `HUB_UNAVAILABLE`；
 - `authentication_rejected` 只进入 Client 的管理诊断；游戏多人操作仍按 `HUB_UNAVAILABLE` 进入现有自动降级，不向游戏客户端增加新协议错误码；
 - Host 内部认证结果区分 `malformed`、`unknown` 和 `revoked`，但比较未知与已撤销令牌时必须完整扫描当前凭据快照，不因命中记录提前返回；
 - Host 只在内存保存最近 32 条认证拒绝，进程重启即清空；容量满时淘汰最旧记录，不写 SQLite、凭据文件或普通日志；
