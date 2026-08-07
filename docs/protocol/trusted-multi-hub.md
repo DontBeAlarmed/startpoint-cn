@@ -391,17 +391,38 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 
 节点注册的网络响应继续采用统一安全边界：缺少令牌、格式错误、未知令牌和已撤销令牌都只返回 HTTP `401` 与 `{ ok: false, code: "UNAUTHORIZED" }`。Hub 不向客机公开令牌是否曾经存在或是否已撤销，避免把注册端点变成凭据状态查询接口。
 
-下一阶段由 Host 对认证拒绝承担本机诊断责任，但不改变上述网络响应：
+认证拒绝诊断已由 Host、Client 和 `MultiManagementService` 共同实现，但不改变上述网络响应：
 
-- Client 在发起连接前继续拒绝缺失或格式错误的启动配置；收到 Hub `401` 后只记录有限状态 `authentication_rejected`，提示服主检查令牌或联系 Host，不推断具体原因；
+- Client 在发起连接前继续拒绝缺失或格式错误的启动配置；只有注册端点收到合法的 Hub `401` 后才记录有限状态 `authentication_rejected`，提示服主检查令牌或联系 Host，不推断具体原因；网络失败仍是普通 `HUB_UNAVAILABLE`；
 - `authentication_rejected` 只进入 Client 的管理诊断；游戏多人操作仍按 `HUB_UNAVAILABLE` 进入现有自动降级，不向游戏客户端增加新协议错误码；
 - Host 内部认证结果区分 `malformed`、`unknown` 和 `revoked`，但比较未知与已撤销令牌时必须完整扫描当前凭据快照，不因命中记录提前返回；
 - Host 只在内存保存最近 32 条认证拒绝，进程重启即清空；容量满时淘汰最旧记录，不写 SQLite、凭据文件或普通日志；
-- 诊断事件只保存服务端时间和有限原因。只有 `revoked` 可以在内部关联已有 `credentialId`；对 loopback 管理调用的公开投影只返回凭据备注和缩短后的 ID；
-- 不保存或返回明文令牌、令牌摘要、完整 `credentialId`、请求头、请求正文、网络地址、端口、设备 ID、节点会话或 stack；
+- 诊断事件只保存服务端生成的时间戳和有限原因。只有 `revoked` 可以在内部关联已有的完整 `credentialId`；对 loopback 管理调用的公开投影只返回凭据备注和 8 位 `shortId`；
+- 不保存或返回明文令牌、令牌摘要、请求、网络地址、端口、设备 ID、节点会话或 stack；
 - 普通运行日志最多记录固定事件与有限原因，不包含能够把请求关联到具体凭据的值。
 
-`MultiManagementService` 是该诊断的唯一公开业务边界。计划新增的 `GET /api/server/multiplayer/authentication-rejections` 只接受真实 loopback 请求；远程后台、`8004` Hub 控制面和游戏客户端都不能读取。React 后台与 Launcher 只消费该投影，不直接读取凭据表或 Hub 内存。
+`MultiManagementService` 是该诊断的唯一公开业务边界。`GET /api/server/multiplayer/authentication-rejections` 只接受真实 loopback 请求；远程请求、`8004` Hub 控制面和游戏客户端都不能读取。React 后台与 Launcher 若消费该能力，只消费公开投影，不直接读取凭据表或 Host 内存。
+
+公开 JSON 形态固定为：
+
+```json
+{
+  "mode": "host",
+  "clientState": null,
+  "rejections": [
+    {
+      "timestamp": "2026-08-07T00:00:00.000Z",
+      "reason": "revoked",
+      "credential": {
+        "label": "trusted-node",
+        "shortId": "12ab34cd"
+      }
+    }
+  ]
+}
+```
+
+`malformed` 和 `unknown` 的 `credential` 必须为 `null`；`revoked` 找不到对应凭据时也为 `null`。`timestamp` 必须是服务端生成的 canonical ISO UTC 字符串；管理投影会过滤时间戳或原因非法的事件，这是管理边界行为，不是游戏协议错误。`shortId` 始终只有 8 位。Client 的 `rejections` 始终为空数组，但 `clientState` 可以是 `authentication_rejected`；embedded 模式的 `clientState` 为 `null` 且 `rejections` 为空数组。
 
 ## 12. 测试与验收
 
@@ -417,6 +438,8 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 - 缺失、格式错误、未知和已撤销令牌在网络上返回完全相同的 `401 UNAUTHORIZED`；
 - Host 本机诊断能够区分 `malformed`、`unknown`、`revoked`，有界淘汰且不泄露令牌、摘要、完整凭据 ID 或网络身份；
 - Client 管理诊断可以区分认证拒绝与网络失败，但游戏多人流程仍使用既有 `HUB_UNAVAILABLE` 与本地降级；
+- 认证拒绝公开投影只保留规定的 JSON 字段，canonical ISO UTC 时间戳和非法事件过滤生效，`shortId` 恰为 8 位；Host、Client、embedded 三种模式的空值和数组形态符合契约；
+- `GET /api/server/multiplayer/authentication-rejections` 只允许真实 loopback，远程请求、`8004` Hub 控制面和游戏客户端均不能读取；
 - 非法密钥表不会替换上一份有效内存快照；
 - 两个节点本地 `playerId` 相同时仍分别结算；
 - 不同节点的相同裸 `viewerId` 在搜索或准备阶段被拒绝，同节点重复请求保持幂等；
@@ -482,7 +505,7 @@ Client C: HTTP C + SQLite C
 
 运行中的凭据、Hub probe 和时间导入动作只接受真实 loopback 来源；`8004` 不增加管理端点。新的管理 UI 仍留待后台账号与权限系统完成后接入。
 
-下一阶段的认证拒绝诊断同样复用 `MultiManagementService` 和 loopback 边界；不新增远程管理入口，不允许 Launcher、React 后台或 CLI 各自实现第二套认证判断。
+认证拒绝诊断已复用 `MultiManagementService` 和 loopback 边界；不新增远程管理入口，不允许 Launcher、React 后台或 CLI 各自实现第二套认证判断。
 
 ## 14. 后续可选的时间对齐
 
