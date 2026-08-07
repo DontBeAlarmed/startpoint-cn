@@ -372,7 +372,7 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 
 凭据热加载器默认每秒只检查文件身份、大小和修改时间。元数据未变化时不读取文件；合法变化整体替换不可变内存快照，非法变化只记录无路径、无令牌、无摘要的告警并保留上一份有效快照。文件首次不存在按空快照启动，运行中合法创建后可直接注册。每次控制调用和 TCP 入站帧只通过节点会话关联的 `credentialId` 对快照做 O(1) 启用状态查询，不读文件也不重新计算集群令牌摘要。
 
-密钥撤销或会话到期后，该节点会话会由下一次显式检查或后台 sweep 统一失效：先清除 admission，再由 Embedded 的 Hub 内部清理 capability 扫描活动房间快照。若失效节点是房主，Hub 先发送既有房间解散消息，再通过 SessionManager 集中移除并关闭该房间全部 lobby 与 battle 连接，最后解散房间；其他节点房间不受影响，也不会留下仍可 relay 的 battle socket。未被房主关房流程覆盖的失效节点连接，仍由中央 checker 在握手、下一帧或最多一次节点会话检查周期内关闭并复用既有断线流程；系统不建立按凭据主动遍历 Socket 的反向索引。失效回调幂等，同一会话不会重复清理。另一条仍有效的密钥不受影响，可以继续注册新节点会话。Hub 控制面不读取服务器时间，`QUEST_NOT_AVAILABLE` 仍只由玩家所属服务端按自己的全局服务器时间生成。
+密钥撤销或会话到期后，该节点会话会由下一次显式检查或后台 sweep 统一失效：先清除 admission，再由 Hub 内部的 capability 扫描器检查活动房间快照。若失效节点是房主，Hub 先发送既有房间解散消息，再通过 SessionManager 集中移除并关闭该房间全部 lobby 与 battle 连接，最后解散房间；其他节点房间不受影响，也不会留下仍可 relay 的 battle socket。未被房主关房流程覆盖的失效节点连接，仍由中央 checker 在握手、下一帧或最多一次节点会话检查周期内关闭并复用既有断线流程；系统不建立按凭据主动遍历 Socket 的反向索引。失效回调幂等，同一会话不会重复清理。另一条仍有效的密钥不受影响，可以继续注册新节点会话。Hub 控制面不读取服务器时间，`QUEST_NOT_AVAILABLE` 仍只由玩家所属服务端按自己的全局服务器时间生成。
 
 ## 11. 健康与诊断
 
@@ -422,7 +422,7 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 }
 ```
 
-`malformed` 和 `unknown` 的 `credential` 必须为 `null`；`revoked` 找不到对应凭据时也为 `null`。`timestamp` 必须是服务端生成的 canonical ISO UTC 字符串；管理投影会过滤时间戳或原因非法的事件，这是管理边界行为，不是游戏协议错误。`shortId` 始终只有 8 位。Client 的 `rejections` 始终为空数组，但 `clientState` 可以是 `authentication_rejected`；embedded 模式的 `clientState` 为 `null` 且 `rejections` 为空数组。
+`malformed` 和 `unknown` 的 `credential` 必须为 `null`；`revoked` 找不到对应凭据时也为 `null`。`timestamp` 必须是服务端生成的 canonical ISO UTC 字符串；管理投影会过滤时间戳或原因非法的事件，这是管理边界行为，不是游戏协议错误。`shortId` 始终只有 8 位。Host 模式的 `clientState` 始终为 `null`，`rejections` 为经过公开投影的 Host 拒绝列表；Client 的 `rejections` 始终为空数组，但 `clientState` 可以是 `authentication_rejected`；embedded 模式的 `clientState` 为 `null` 且 `rejections` 为空数组。
 
 ## 12. 测试与验收
 
@@ -498,14 +498,14 @@ Client C: HTTP C + SQLite C
 首期已经完成 Coordinator、玩家快照、host/client、TCP admission、本地 start/finish/abort/load、兼容性摘要、自动降级、只读后台诊断和统一的 `MultiManagementService`：
 
 - `MultiManagementService` 是创建、列出、撤销节点凭据和读取管理状态的唯一业务边界；
-- CLI、React 后台与 Android Launcher 只做输入输出适配，不得各自直接写密钥表、节点会话或房间状态；
+- 当前没有 React 后台、Android Launcher 或 CLI 消费认证拒绝投影；这些适配器不得各自直接写密钥表、节点会话或房间状态；
 - `8004` 只保留运行时 Hub 控制协议，不增加凭据管理、配置写入或后台管理端点；
-- 当前 CLI 与 loopback 管理 API 已复用该服务；React 后台在账号、认证和权限系统完成前只允许只读诊断，不提供远程令牌创建、撤销或多人配置写入；
+- 当前 CLI 与 loopback 管理 API 已复用该服务的其他管理能力，包括凭据 CRUD；认证拒绝诊断目前只由 loopback API 提供。React 后台在账号、认证和权限系统完成前只允许只读诊断，不提供远程令牌创建、撤销或多人配置写入；
 - 服务器时间分享与导入属于独立管理服务，不进入 Hub，不随建房、查房或准备自动触发。
 
 运行中的凭据、Hub probe 和时间导入动作只接受真实 loopback 来源；`8004` 不增加管理端点。新的管理 UI 仍留待后台账号与权限系统完成后接入。
 
-认证拒绝诊断已复用 `MultiManagementService` 和 loopback 边界；不新增远程管理入口，不允许 Launcher、React 后台或 CLI 各自实现第二套认证判断。
+认证拒绝诊断目前只由 loopback API 提供；未来适配器只能通过公开 loopback 投影读取，不得直接读取凭据表或 Host 内存，也不允许 Launcher、React 后台或 CLI 各自实现第二套认证判断。
 
 ## 14. 后续可选的时间对齐
 
