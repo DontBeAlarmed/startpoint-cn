@@ -12,6 +12,9 @@ const { AdmissionRegistry } = require("../src/multi/admission/registry")
 const { MULTI_PROTOCOL_VERSION } = require("../src/multi/coordinator/contracts")
 const { EmbeddedMultiCoordinator } = require("../src/multi/coordinator/embedded")
 const { RemoteMultiCoordinator } = require("../src/multi/coordinator/remote")
+const {
+    AuthenticationRejectionBuffer,
+} = require("../src/multi/hub/authentication-rejections")
 const { MultiHubCredentialStore } = require("../src/multi/hub/credential-store")
 const { CredentialReloader } = require("../src/multi/hub/credential-reloader")
 const { HubClient } = require("../src/multi/hub/client")
@@ -178,6 +181,7 @@ function fixture(t, options = {}) {
     })
     assert.equal(reloader.reloadIfChanged(), true)
     let now = 10_000
+    const authenticationRejections = new AuthenticationRejectionBuffer(() => now)
     let randomIndex = 0
     const randomValues = [
         "node-session-a", "session-credential-a".padEnd(43, "a"),
@@ -204,6 +208,7 @@ function fixture(t, options = {}) {
     const app = buildMultiHubControlApp({
         coordinator: coordinator.coordinator,
         credentialReloader: reloader,
+        authenticationRejections,
         nodeSessions: sessions,
         admissionIssuer: admissions,
         idempotency,
@@ -219,6 +224,7 @@ function fixture(t, options = {}) {
     return {
         admissions,
         app,
+        authenticationRejections,
         coordinator,
         credentialsPath,
         first,
@@ -371,25 +377,54 @@ test("control server exposes only the exact route methods", async t => {
     assert.equal(status.statusCode, 200)
 })
 
-test("rejects malformed, unknown, revoked and incompatible registration credentials", async t => {
+test("records only token authentication rejections behind a uniform registration response", async t => {
     const target = fixture(t)
-
-    for (const [token, protocolVersion] of [
-        ["short", MULTI_PROTOCOL_VERSION],
-        ["z".repeat(64), MULTI_PROTOCOL_VERSION],
-        [target.first.token, MULTI_PROTOCOL_VERSION + 1],
-    ]) {
-        const response = await register(target.app, token, protocolVersion)
-        assert.equal(response.statusCode, 401)
-        assert.deepEqual(response.json(), { ok: false, code: "UNAUTHORIZED" })
-        assert.equal(response.body.includes(token), false)
-    }
-
+    const missing = await target.app.inject({
+        method: "POST",
+        url: "/v1/multi/nodes/register",
+        payload: { protocolVersion: MULTI_PROTOCOL_VERSION },
+    })
+    const malformed = await register(target.app, "short")
+    const unknownToken = "z".repeat(64)
+    const unknown = await register(target.app, unknownToken)
     target.store.revoke(target.first.credentialId)
     target.reloader.reloadIfChanged()
     const revoked = await register(target.app, target.first.token)
-    assert.equal(revoked.statusCode, 401)
-    assert.deepEqual(revoked.json(), { ok: false, code: "UNAUTHORIZED" })
+    const incompatible = await register(
+        target.app,
+        target.second.token,
+        MULTI_PROTOCOL_VERSION + 1,
+    )
+
+    const responses = [missing, malformed, unknown, revoked, incompatible]
+    for (const response of responses) {
+        assert.equal(response.statusCode, 401)
+        assert.equal(response.body, '{"ok":false,"code":"UNAUTHORIZED"}')
+        assert.deepEqual(response.json(), { ok: false, code: "UNAUTHORIZED" })
+    }
+
+    const events = target.authenticationRejections.list()
+    assert.deepEqual(events.map(event => event.reason), [
+        "malformed",
+        "malformed",
+        "unknown",
+        "revoked",
+    ])
+    assert.equal(events.at(-1).credentialId, target.first.credentialId)
+    assert.equal(events.length, 4)
+
+    const serialized = JSON.stringify(events).toLowerCase()
+    for (const forbidden of ["token", "digest", "request", "address", "session"]) {
+        assert.equal(serialized.includes(forbidden), false, forbidden)
+    }
+    assert.equal(serialized.includes(unknownToken.toLowerCase()), false)
+    assert.equal(serialized.includes(target.first.token.toLowerCase()), false)
+
+    target.sessions.register = () => { throw new Error("registration failed") }
+    const registrationFailure = await register(target.app, target.second.token)
+    assert.equal(registrationFailure.statusCode, 401)
+    assert.equal(registrationFailure.body, responses[0].body)
+    assert.equal(target.authenticationRejections.list().length, 4)
 })
 
 test("expires sessions fail closed and revocation invalidates only matching credentials", async t => {

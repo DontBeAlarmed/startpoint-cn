@@ -11,6 +11,7 @@ import {
     type ParticipantIdentity,
 } from "../coordinator/contracts"
 import type { MultiCoordinator } from "../coordinator/interface"
+import type { AuthenticationRejectionBuffer } from "./authentication-rejections"
 import type { CredentialReloader } from "./credential-reloader"
 import {
     type CachedJsonResponse,
@@ -68,6 +69,7 @@ export interface MultiHubControlStatus {
 export interface MultiHubControlRoutesOptions {
     readonly coordinator: MultiCoordinator
     readonly credentialReloader: CredentialReloader
+    readonly authenticationRejections: AuthenticationRejectionBuffer
     readonly nodeSessions: NodeSessionRegistry
     readonly admissionIssuer: AdmissionIssuer
     readonly idempotency: IdempotencyCache
@@ -86,6 +88,10 @@ function send(reply: FastifyReply, result: CachedJsonResponse): FastifyReply {
         .status(result.statusCode)
         .header("content-type", "application/json; charset=utf-8")
         .send(result.body)
+}
+
+function unauthorized(reply: FastifyReply): FastifyReply {
+    return send(reply, response(401, { ok: false, code: "UNAUTHORIZED" }))
 }
 
 function bearer(request: FastifyRequest): string | null {
@@ -220,10 +226,7 @@ function registerOperation(
 ): void {
     app.post(route, async (request, reply) => {
         const session = authenticate(request, options.nodeSessions)
-        if (session === null) return send(reply, response(401, {
-            ok: false,
-            code: "UNAUTHORIZED",
-        }))
+        if (session === null) return unauthorized(reply)
         if (options.getTcpEndpoint() === null) return send(reply, response(503, {
             ok: false,
             code: "HUB_UNAVAILABLE",
@@ -255,21 +258,20 @@ export function registerMultiHubControlRoutes(
 ): void {
     app.post("/v1/multi/nodes/register", async (request, reply) => {
         const token = bearer(request)
+        const authentication = options.credentialReloader.authenticateDetailed(token)
+        if (!authentication.ok) {
+            options.authenticationRejections.record(authentication)
+            return unauthorized(reply)
+        }
         const payload = request.body as { protocolVersion?: unknown } | null
-        if (token === null || payload?.protocolVersion !== MULTI_PROTOCOL_VERSION) {
-            return send(reply, response(401, { ok: false, code: "UNAUTHORIZED" }))
-        }
-        const credential = options.credentialReloader.authenticate(token)
-        if (credential === null) {
-            return send(reply, response(401, { ok: false, code: "UNAUTHORIZED" }))
-        }
+        if (payload?.protocolVersion !== MULTI_PROTOCOL_VERSION) return unauthorized(reply)
         const tcpEndpoint = options.getTcpEndpoint()
         if (tcpEndpoint === null) {
             return send(reply, response(503, { ok: false, code: "HUB_UNAVAILABLE" }))
         }
         try {
             const registration = options.nodeSessions.register(
-                credential.credentialId,
+                authentication.credential.credentialId,
                 MULTI_PROTOCOL_VERSION,
             )
             return reply.status(200).send({
@@ -277,7 +279,7 @@ export function registerMultiHubControlRoutes(
                 tcp: tcpEndpoint,
             })
         } catch {
-            return send(reply, response(401, { ok: false, code: "UNAUTHORIZED" }))
+            return unauthorized(reply)
         }
     })
 

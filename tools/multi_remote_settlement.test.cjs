@@ -25,6 +25,9 @@ const { BattleFactStore } = facts
 const { AdmissionRegistry } = require("../src/multi/admission/registry")
 const { MULTI_PROTOCOL_VERSION } = require("../src/multi/coordinator/contracts")
 const { EmbeddedMultiCoordinator } = require("../src/multi/coordinator/embedded")
+const {
+    AuthenticationRejectionBuffer,
+} = require("../src/multi/hub/authentication-rejections")
 const { RemoteMultiCoordinator } = require("../src/multi/coordinator/remote")
 const { MultiHubCredentialStore } = require("../src/multi/hub/credential-store")
 const { CredentialReloader } = require("../src/multi/hub/credential-reloader")
@@ -538,6 +541,7 @@ function createRotatingHub(t) {
     const app = buildMultiHubControlApp({
         coordinator,
         credentialReloader: reloader,
+        authenticationRejections: new AuthenticationRejectionBuffer(() => now),
         nodeSessions: sessions,
         admissionIssuer: admissions,
         idempotency: new IdempotencyCache({ now: () => now }),

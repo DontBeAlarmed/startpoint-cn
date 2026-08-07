@@ -14,6 +14,9 @@ const projectRoot = path.resolve(__dirname, "..")
 const { parseCnRuntimeConfig } = require("../src/runtime/config")
 const { createMultiRuntimeService } = require("../src/multi/runtime/service")
 const { RemoteMultiCoordinator } = require("../src/multi/coordinator/remote")
+const {
+    AuthenticationRejectionBuffer,
+} = require("../src/multi/hub/authentication-rejections")
 const { MultiHubCredentialStore } = require("../src/multi/hub/credential-store")
 
 test("multiplayer defaults to the current embedded listener", () => {
@@ -450,6 +453,24 @@ test("embedded runtime service preserves the local coordinator and TCP experienc
 
     await harness.service.stop()
     assert.deepEqual(harness.calls.at(-1), "tcp-stop")
+})
+
+test("host runtime creates a fresh authentication rejection buffer after a full stop", async () => {
+    const harness = createServiceHarness()
+    await harness.service.start(hostRuntimeConfig("first.internal"))
+    const first = harness.hostServices().authenticationRejections
+
+    assert.equal(first instanceof AuthenticationRejectionBuffer, true)
+    first.record({ reason: "unknown" })
+    assert.equal(first.list().length, 1)
+    await harness.service.stop()
+
+    await harness.service.start(hostRuntimeConfig("second.internal"))
+    const second = harness.hostServices().authenticationRejections
+    assert.equal(second instanceof AuthenticationRejectionBuffer, true)
+    assert.notEqual(second, first)
+    assert.deepEqual(second.list(), [])
+    await harness.service.stop()
 })
 
 test("host Hub bind failure degrades multiplayer without discarding local TCP", async () => {
