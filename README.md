@@ -100,7 +100,7 @@ bash client-patch/apply.sh <AS3_EXPORT_DIR> <SERVER_HOST>:8001
 
 - `src/routes/`：CN 与通用 HTTP API、管理后台 API
 - `src/multi/`：多人房间、NPC 队友和 TCP 会话
-- `src/data/`：SQLite 数据层及 22 个领域模块
+- `src/data/`：SQLite 数据层及按业务拆分的领域模块
 - `src/content/`：CDN 解析、Content Release 与运行时快照
 - `admin/`：React 管理后台
 - `assets/`：服务端业务表和内置静态数据

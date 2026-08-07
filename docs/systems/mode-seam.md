@@ -127,8 +127,8 @@ Mod 扩展它,`host.table` 也读不到未注册的表。模块的开关与配�
   无模块时全部 no-op;
 - `tools/modes_lifecycle.test.cjs` —— **生产启动顺序**:经
   `createContentLifecycleDependencies()`(cn-server 展开进协调器依赖的同一个组合)
-  驱动真实 coordinator,snapshot/HTTP listen/TCP start 用 spy 不占端口,断言顺序为
-  **内容快照 → 模块注册完成 → HTTP listen → TCP start**,空目录同序且零注册;
+  驱动真实 coordinator,snapshot/多人运行时/HTTP listen 用 spy 不占端口,断言顺序为
+  **内容快照 → 模块注册完成 → 多人运行时启动 → HTTP listen**,空目录同序且零注册;
 - `tools/modes_wiring.test.cjs` —— **接线契约**:cn-server 导入即自动 `start()`,测试
   无法安全导入它,因此改为对其**真实 AST** 断言:必须 import 该工厂、必须把工厂调用
   **展开进** `createRuntimeCoordinator({...})` 依赖、且展开之后不得再出现会覆盖它的

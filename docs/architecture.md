@@ -30,8 +30,8 @@ CN 客户端 -> TCP 会话 -> 进程内房间与联机状态机
 4. `remote` 和 `client-owned` 模式跳过本地 `content:sync`，直接启动 `out/cn-server.js`。
 5. 运行时解析配置并初始化 SQLite。
 6. 按资源模式加载本次进程固定使用的 Content snapshot。
-7. Fastify 完成路由注册并监听 HTTP。
-8. 联机 TCP 会话服务启动，运行时进入 `ready`。
+7. 启动多人运行时并取得多人 HTTP 上下文；默认 `embedded` 模式在此监听 TCP，`host`/`client` 模式故障时进入降级状态。
+8. Fastify 注册依赖运行时上下文的路由并监听 HTTP，随后进入 `ready`。
 
 SIGINT 或 SIGTERM 会进入统一关闭流程：停止接收 HTTP、停止 TCP、checkpoint SQLite 并关闭数据库。`node out/cn-server.js` 是不执行内容同步的低级入口，只用于明确知道当前 Release 已准备好的调试场景。
 
@@ -67,9 +67,9 @@ CN 客户端不能正确处理部分 `uint32` 标记，响应层会把安全范�
 
 ## 5. SQLite 状态
 
-`src/data/db.ts` 管理共享 SQLite 实例，schema 初始化和迁移位于 `initializers/`、`updaters/`。`src/data/domains/` 的 22 个领域模块负责账号、玩家、角色、装备、道具、任务、关卡、商店、邮件、活动和认证会话等持久状态。这里的认证会话不包括多人房间、TCP 连接或联机状态机。
+`src/data/db.ts` 管理共享 SQLite 实例，schema 初始化和迁移位于 `initializers/`、`updaters/`。`src/data/domains/` 的领域模块负责账号、玩家、角色、装备、道具、任务、关卡、商店、邮件、活动和认证会话等持久状态。这里的认证会话不包括多人房间、TCP 连接或联机状态机。
 
-路由应通过领域 API 完成读取和事务写入。`wdfpData.ts` 仅保留为兼容导出层，不是新增业务的归属位置。序列化工具把数据库实体转换为客户端需要的完整玩家快照。
+新增持久化能力应优先进入对应领域 API；需要跨领域原子写入时，由路由或业务服务明确编排同一个事务。序列化工具把数据库实体转换为客户端需要的完整玩家快照。
 
 设备绑定以 `device_id` 关联账号；运行时没有全局活动账号。时间统一使用服务器 `timeOffset`，存档中的 `time_offset` 只为数据库兼容保留。
 
@@ -108,4 +108,5 @@ Android 启动器、桌面壳、容器和 Supervisor 通过稳定的外部契约
 - 协议字段以 CN 1.8.1 客户端反编译和实际请求为依据，不猜测字段。
 - 当前行为写入 architecture、systems、protocol、cdn 或 runtime；原始样本写入 reference；完成度写入 status。
 - 业务状态写入 SQLite，内容定义来自固定 snapshot，二者不得在请求中隐式互换。
+- 生产模块不得相互运行时导入；`tools/architecture_dependencies.test.cjs` 检查直接双向依赖。
 - 每个功能模块完成后运行对应测试和类型检查，并同步更新其权威文档。

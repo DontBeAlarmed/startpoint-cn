@@ -1,8 +1,7 @@
 import { getDb } from "../db";
-import { PlayerRushEvent, RawPlayerRushEvent, PlayerRushEventClearedFolders, RawPlayerRushEventClearedFolder, PlayerRushEventPlayedParty, RawPlayerRushEventPlayedParty, RawPlayerRushEventRanking, RushEventBattleType, GetRushEventEndlessRankingListResult, UserRushEventEndlessBattleRanking, UserRushEventPlayedParty } from "../types";
+import { PlayerRushEvent, RawPlayerRushEvent, PlayerRushEventClearedFolders, RawPlayerRushEventClearedFolder, PlayerRushEventPlayedParty, RawPlayerRushEventPlayedParty, RushEventBattleType, UserRushEventPlayedParty } from "../types";
 import { serializeBoolean, deserializeBoolean, deserializeNumberList } from "../utils";
 import { getServerTime } from "../../utils";
-import { getPlayerRushEventEndlessBattleRankingSync } from "../../lib/rush";
 
 /**
  * Deserializes a RawPlayerRushEvent into a PlayerRushEvent
@@ -93,57 +92,6 @@ export function getPlayerRushEventListSync(
     `).all(playerId) as RawPlayerRushEvent[]
 
     return rawData.map(raw => deserializeRushEvent(raw, 1))
-}
-
-/**
- * Gets rush event endless battle rankings for a specific rush event.
- * 
- * @param eventId The rush event's ID.
- * @param page The current page.
- * @param pageSize The size of each page.
- * @returns The ranking list result.
- */
-export function getRushEventEndlessRankingListSync(
-    eventId: number,
-    page: number,
-    pageSize: number = 100
-): GetRushEventEndlessRankingListResult {
-    const offset = page * pageSize
-
-    const results = getDb().prepare(`
-    SELECT *,
-        COUNT(*) OVER() as total_count
-    FROM players_rush_events
-    WHERE event_id = ?
-    ORDER BY endless_battle_max_round DESC,
-        endless_battle_max_round_time ASC
-    LIMIT ?
-    OFFSET ?
-    `).all(
-        eventId,
-        pageSize,
-        offset
-    ) as RawPlayerRushEventRanking[]
-
-    const totalCount = results[0]?.total_count ?? 0;
-
-    const mappedResults: UserRushEventEndlessBattleRanking[] = []
-    let rankNumber = 1;
-
-    for (const raw of results) {
-        const ranking = getPlayerRushEventEndlessBattleRankingSync(raw.player_id, eventId, {
-            rankNumber: rankNumber + offset
-        })
-        if (ranking !== null) {
-            mappedResults.push(ranking)
-            rankNumber += 1;
-        }
-    }
-    
-    return {
-        pageMax: Math.ceil(totalCount / pageSize),
-        list: mappedResults
-    }
 }
 
 /**

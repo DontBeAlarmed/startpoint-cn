@@ -10,7 +10,7 @@ import { initializeContentAndModes } from "./boot"
  * and fail instead of quietly passing.
  *
  * Ordering guarantee under test: content snapshot → modes registered →
- * HTTP listen → TCP start. Modules must see a ready snapshot, and
+ * multiplayer start → HTTP listen. Modules must see a ready snapshot, and
  * registration must complete before any listener can accept a request that
  * would dispatch into a half-registered set.
  */
