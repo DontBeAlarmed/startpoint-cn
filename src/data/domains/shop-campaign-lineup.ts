@@ -1,4 +1,4 @@
-import { clientSerializeDate } from "../utils"
+import { clientSerializeDate } from "../utils/date"
 import { getDb } from "../db"
 
 interface RawShopCampaignLineup {

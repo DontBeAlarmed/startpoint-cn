@@ -1,6 +1,6 @@
 import { getDb } from "../db";
 import { RawPlayerOption } from "../types";
-import { serializeBoolean, deserializeBoolean } from "../utils";
+import { serializeBoolean, deserializeBoolean } from "../utils/primitives";
 
 export interface PlayerProfileSettings {
     showOpenedManaBoardSecondCount: boolean

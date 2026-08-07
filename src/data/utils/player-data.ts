@@ -1,6 +1,6 @@
 import { serializePlayerData, SerializePlayerDataOptions } from "./serialize-player"
-import { getDateFromServerTime, getServerTime, getServerDate, realToVirtual } from "../../utils"
-import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, Player, PlayerBoxGacha, PlayerCharacter, PlayerCharacterBondToken, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserCharacterBondTokenStatus, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "../types"
+import { getDateFromServerTime, getServerTime, realToVirtual } from "../../utils"
+import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, PlayerBoxGacha, PlayerCharacter, PlayerCharacterBondToken, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserCharacterBondTokenStatus, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "../types"
 import { deserializePlayerRushEventPlayedParty, deserializeRushEvent, getPlayerRushEventListClearedFoldersSync, getPlayerRushEventListPlayedPartiesSync, getPlayerRushEventListSync, serializePlayerRushEventPlayedParty } from "../domains/rushEvent"
 import { getPlayerActiveMissionsSync, getPlayerCategoryMissionListSync, getPlayerClearedRegularMissionListSync } from "../domains/mission"
 import { getPlayerBoxGachasSync } from "../domains/boxGacha"
@@ -22,53 +22,7 @@ import { getCarnivalSaveStateSync } from "../../lib/carnival-save-state"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getPlayerCharacterAwakeUnlockRecordSync } from "../domains/character_awake"
 import { reconcileInterruptedStartTutorialSync } from "../../lib/start-tutorial-state"
-
-/**
- * Generates default player data.
- * 
- * @returns The generated default player data.
- */
-export function getDefaultPlayerData(): Omit<Player, 'id'> {
-    const now = getServerDate();
-    // Default values aligned with CN client PlayerSaveDataTools.createDummy()
-    return {
-        stamina: 10,
-        staminaHealTime: new Date(),
-        boostPoint: 10,
-        bossBoostPoint: 3,
-        transitionState: 0,
-        role: 1,
-        name: "冒险者",
-        lastLoginTime: now,
-        comment: "よろしくお願いします",
-        vmoney: 100,
-        freeVmoney: 100,
-        rankPoint: 0,
-        starCrumb: 2,
-        bondToken: 10,
-        expPool: 0,
-        expPooledTime: now,
-        leaderCharacterId: 1,
-        partySlot: 1,
-        degreeId: 1,
-        birth: 19900101,
-        freeMana: 2000,
-        paidMana: 2000,
-        enableAuto3x: false,
-        totalStaminaUsed: 0,
-        totalPowerflips: 0,
-        totalDashes: 0,
-        totalManaObtained: 0,
-        maxComboAchieved: 0,
-        totalLoginDays: 1,
-        tutorialStep: 0,
-        tutorialSkipFlag: null,
-        tutorialGachaCharacterId: null,
-        timeOffset: null
-    }
-}
-
-
+export { getDefaultPlayerData } from "./default-player"
 
 /**
  * Takes a playerID and returns all of the necessary data for the game client.

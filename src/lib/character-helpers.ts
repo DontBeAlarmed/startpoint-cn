@@ -9,7 +9,7 @@ import { resolvePlayerIdSync } from "../data/activeAccount"
 import { getPlayerItemSync } from "../data/domains/item"
 import { updatePlayerCharacterBondTokenSync, updatePlayerCharacterSync } from "../data/domains/character"
 import { generateDataHeaders } from "../utils"
-import { clientSerializeDate } from "../data/utils"
+import { clientSerializeDate } from "../data/utils/date"
 
 // ─── Response types ───
 

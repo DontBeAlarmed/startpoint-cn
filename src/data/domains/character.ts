@@ -1,6 +1,6 @@
 import { getDb } from "../db";
 import { PlayerCharacter, PlayerCharacterBondToken, PlayerCharacterExBoost, RawPlayerCharacter, RawPlayerCharacterBondToken, RawPlayerCharacterManaNode } from "../types";
-import { deserializeBoolean, deserializeNumberList, serializeBoolean, serializeNumberList } from "../utils";
+import { deserializeBoolean, deserializeNumberList, serializeBoolean, serializeNumberList } from "../utils/primitives";
 import { getCharacterDataSync } from "../../lib/assets";
 
 /**

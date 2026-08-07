@@ -108,5 +108,5 @@ Android 启动器、桌面壳、容器和 Supervisor 通过稳定的外部契约
 - 协议字段以 CN 1.8.1 客户端反编译和实际请求为依据，不猜测字段。
 - 当前行为写入 architecture、systems、protocol、cdn 或 runtime；原始样本写入 reference；完成度写入 status。
 - 业务状态写入 SQLite，内容定义来自固定 snapshot，二者不得在请求中隐式互换。
-- 生产模块不得相互运行时导入；`tools/architecture_dependencies.test.cjs` 检查直接双向依赖。
+- 生产模块不得形成任何长度的运行时循环导入；`tools/architecture_dependencies.test.cjs` 检查完整依赖图中的循环。
 - 每个功能模块完成后运行对应测试和类型检查，并同步更新其权威文档。

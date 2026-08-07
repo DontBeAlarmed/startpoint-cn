@@ -1,6 +1,6 @@
 import { getDb } from "../db";
 import { PartyCategory, PlayerParty, PlayerPartyGroup, RawPlayerParty, RawPlayerPartyGroup } from "../types";
-import { deserializeBoolean, serializeBoolean } from "../utils";
+import { deserializeBoolean, serializeBoolean } from "../utils/primitives";
 import { insertMissingPartyGroupListSync } from "../../lib/party-group-persistence";
 
 export function getPlayerPartyGroupListSync(

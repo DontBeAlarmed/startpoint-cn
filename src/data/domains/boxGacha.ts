@@ -1,6 +1,6 @@
 import { getDb } from "../db";
 import { PlayerBoxGacha, PlayerBoxGachaDrawnReward, RawPlayerBoxGacha } from "../types";
-import { deserializeBoolean, serializeBoolean, deserializeNumberList } from "../utils";
+import { deserializeBoolean, serializeBoolean, deserializeNumberList } from "../utils/primitives";
 
 /**
  * Converts a RawPlayerBoxGacha object into a PlayerBoxGacha object.

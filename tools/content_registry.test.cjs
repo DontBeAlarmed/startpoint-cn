@@ -27,6 +27,18 @@ const {
 } = require("../src/content/sync/schema")
 const { importBundledTable } = require("../src/content/sync/bundled-importer")
 
+test("CDN overview reports the registry scope counts from code", () => {
+    const counts = TABLE_SOURCES.reduce((result, definition) => {
+        result[definition.scope] = (result[definition.scope] ?? 0) + 1
+        return result
+    }, {})
+    const source = fs.readFileSync(path.join(projectRoot, "docs/cdn/README.md"), "utf8")
+    assert.match(
+        source,
+        new RegExp(`${counts.cdn} CDN \\+ ${counts.bundled} bundled \\+ ${counts.server} server`),
+    )
+})
+
 const TEST_DIGEST = `sha256:${"a".repeat(64)}`
 const EXPECTED_GACHA_ODDS_DYNAMIC_SOURCE = Object.freeze({
     kind: "gacha-odds-references",

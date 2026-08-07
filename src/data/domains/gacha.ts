@@ -1,6 +1,6 @@
 import { getDb } from "../db";
 import { PlayerGachaInfo, PlayerGachaCampaign, RawPlayerGachaInfo, RawPlayerGachaCampaign } from "../types";
-import { deserializeBoolean, serializeBoolean, deserializeNumberList } from "../utils";
+import { deserializeBoolean, serializeBoolean, deserializeNumberList } from "../utils/primitives";
 
 /**
  * Converts a RawPlayerGachaInfo object into a PlayerGachaInfo object.

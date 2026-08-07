@@ -1,6 +1,6 @@
 import { getDb } from "../db";
 import { PlayerRushEvent, RawPlayerRushEvent, PlayerRushEventClearedFolders, RawPlayerRushEventClearedFolder, PlayerRushEventPlayedParty, RawPlayerRushEventPlayedParty, RushEventBattleType, UserRushEventPlayedParty } from "../types";
-import { serializeBoolean, deserializeBoolean, deserializeNumberList } from "../utils";
+import { serializeBoolean, deserializeBoolean, deserializeNumberList } from "../utils/primitives";
 import { getServerTime } from "../../utils";
 
 /**

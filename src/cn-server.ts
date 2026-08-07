@@ -297,6 +297,8 @@ function configureRuntimeHttp(config: ReturnType<typeof parseCnRuntimeConfig>): 
     fastify.register(comicApiPlugin, {
         prefix: `${apiPrefix}/comic`,
         comicDir: config.comicDir,
+        httpDisplayHost: config.httpDisplayHost,
+        httpPort: config.http.port,
     });
     registerCnAssetProviderRoutes(fastify, { config: config.assetProvider });
     runtimeHttpConfigured = true;

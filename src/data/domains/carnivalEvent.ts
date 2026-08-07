@@ -1,6 +1,6 @@
 import { getDb } from "../db";
 import { PlayerCarnivalEventRecord, RawPlayerCarnivalEventRecord } from "../types";
-import { deserializeNumberList, serializeNumberList } from "../utils";
+import { deserializeNumberList, serializeNumberList } from "../utils/primitives";
 import {
     getClaimedCarnivalRewardIdsSync,
     insertClaimedCarnivalRewardIdsSync,

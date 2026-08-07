@@ -1,6 +1,6 @@
 import { getDb } from "../db";
 import { PlayerActiveMission, RawPlayerClearedRegularMission, RawPlayerActiveMission, RawPlayerActiveMissionStage } from "../types";
-import { deserializeBoolean, serializeBoolean } from "../utils";
+import { deserializeBoolean, serializeBoolean } from "../utils/primitives";
 
 /**
  * Retrieve a list of a player's cleared regular missions.

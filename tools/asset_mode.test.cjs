@@ -15,6 +15,7 @@ const {
 } = require("../src/content/cdn/asset-mode")
 const Fastify = require("fastify")
 const { unpack } = require("msgpackr")
+const { buildComicBaseUrl } = require("../src/routes/api/comic")
 
 const SHA = "a".repeat(64)
 
@@ -440,9 +441,17 @@ test("CN runtime parses one provider and wires it through routes, load, and cont
     assert.match(entry, /registerCnAssetProviderRoutes\(fastify,\s*\{\s*config: config\.assetProvider/)
     assert.match(entry, /fastify\.register\(cnLoadPlugin,\s*\{[^}]*assetProvider: config\.assetProvider/s)
     assert.match(entry, /fastify\.register\(cnLoadPlugin,\s*\{[^}]*multiMode: config\.multi\.mode/s)
+    assert.match(entry, /comicApiPlugin[\s\S]{0,400}httpDisplayHost: config\.httpDisplayHost/)
+    assert.match(entry, /comicApiPlugin[\s\S]{0,400}httpPort: config\.http\.port/)
     assert.match(entry, /initializeContentSnapshot\(\{\s*assetMode: config\.assetProvider\.mode,\s*localCdn: config\.assetProvider\.mode === "local"/)
     assert.match(entry, /configureSerializedAssetVersionProvider\(/)
     assert.doesNotMatch(entry, /fastify\.register\(cnCdnFilesPlugin/)
+})
+
+test("comic URL fallback formats IPv6 display hosts", () => {
+    assert.equal(buildComicBaseUrl(undefined, "::1", 8001), "http://[::1]:8001")
+    assert.equal(buildComicBaseUrl(undefined, "[::1]", 8001), "http://[::1]:8001")
+    assert.equal(buildComicBaseUrl("[::1]:8001"), "http://[::1]:8001")
 })
 
 test("player serialization does not import the legacy asset route", () => {

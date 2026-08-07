@@ -71,19 +71,39 @@ function buildRuntimeDependencyGraph() {
     return graph
 }
 
-function findDirectRuntimeCycle(graph) {
-    for (const [filePath, dependencies] of graph) {
-        for (const dependency of dependencies) {
-            if (graph.get(dependency)?.includes(filePath)) {
-                return [filePath, dependency, filePath]
-            }
+function findRuntimeCycle(graph) {
+    const visited = new Set()
+    const active = new Map()
+    const pathStack = []
+
+    function visit(filePath) {
+        const activeIndex = active.get(filePath)
+        if (activeIndex !== undefined) {
+            return [...pathStack.slice(activeIndex), filePath]
         }
+        if (visited.has(filePath)) return null
+
+        active.set(filePath, pathStack.length)
+        pathStack.push(filePath)
+        for (const dependency of graph.get(filePath) ?? []) {
+            const cycle = visit(dependency)
+            if (cycle !== null) return cycle
+        }
+        pathStack.pop()
+        active.delete(filePath)
+        visited.add(filePath)
+        return null
+    }
+
+    for (const filePath of graph.keys()) {
+        const cycle = visit(filePath)
+        if (cycle !== null) return cycle
     }
     return null
 }
 
-test("production TypeScript modules do not import each other at runtime", () => {
-    const cycle = findDirectRuntimeCycle(buildRuntimeDependencyGraph())
+test("production TypeScript modules have no runtime import cycles", () => {
+    const cycle = findRuntimeCycle(buildRuntimeDependencyGraph())
     assert.equal(
         cycle,
         null,
@@ -91,4 +111,13 @@ test("production TypeScript modules do not import each other at runtime", () => 
             .map(filePath => path.relative(projectRoot, filePath))
             .join(" -> ")}`,
     )
+})
+
+test("runtime dependency guard detects cycles longer than two modules", () => {
+    const graph = new Map([
+        ["a.ts", ["b.ts"]],
+        ["b.ts", ["c.ts"]],
+        ["c.ts", ["a.ts"]],
+    ])
+    assert.deepEqual(findRuntimeCycle(graph), ["a.ts", "b.ts", "c.ts", "a.ts"])
 })

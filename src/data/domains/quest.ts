@@ -1,6 +1,6 @@
 import { getDb } from "../db";
 import { PlayerQuestProgress, PlayerDrawnQuest, RawPlayerQuestProgress, RawPlayerDrawnQuest } from "../types";
-import { deserializeBoolean, serializeBoolean } from "../utils";
+import { deserializeBoolean, serializeBoolean } from "../utils/primitives";
 
 /**
  * Converts a RawPlayerQuestProgress object into a PlayerQuestProgress object.

@@ -1,5 +1,5 @@
 import { getDb } from "../db"
-import { deserializeNumberList, serializeNumberList } from "../utils"
+import { deserializeNumberList, serializeNumberList } from "../utils/primitives"
 
 export interface PendingExBoostDraw {
     characterId: number
