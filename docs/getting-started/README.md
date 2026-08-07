@@ -30,6 +30,8 @@ bash scripts/start-cn.sh
 
 React 管理后台是服务端唯一管理界面，也是受支持构建和启动的必需产物。根目录 `npm ci` 会按同一份 `package-lock.json` 安装服务端与 `admin` workspace 依赖。标准 `build`、`bash scripts/start-cn.sh` 和 `npm run dev:cn` 都会通过 `build:server` 先生成后台；`npm run start:cn` 明确复用已有构建，适用于已经完成构建的部署目录。运行时会校验 `web/dist/index.html` 及其引用的本地入口资源。
 
+Windows 原生环境可以直接执行 `npm run build:server`；构建编排器会通过 Windows shell 启动 `npm.cmd`，而 TypeScript 和产物校验仍使用直接 Node 进程。`npm run hygiene`、`bash scripts/start-cn.sh` 等命令仍要求 Bash/POSIX 环境，不属于 Windows 原生入口。
+
 ```bash
 npm ci
 npm run build

@@ -12,11 +12,15 @@ function loadOrchestrator() {
     return require(orchestratorPath)
 }
 
-function result(status) {
-    return { error: undefined, signal: null, status }
+function result(status, error = undefined) {
+    return { error, signal: null, status }
 }
 
-function createHarness(statuses, { adminReady = true } = {}) {
+function createHarness(statuses, {
+    adminReady = true,
+    npmExecutable = "/runtime/npm",
+    platform = "darwin",
+} = {}) {
     const calls = []
     const cleaned = []
     const removed = []
@@ -27,13 +31,15 @@ function createHarness(statuses, { adminReady = true } = {}) {
         dependencies: {
             cleanOrphanCompiledFiles: () => cleaned.push("cleaned"),
             executable: "/runtime/node",
-            npmExecutable: "/runtime/npm",
+            npmExecutable,
+            platform,
             projectRoot: "/project",
             verifyAdminBuild: () => adminReady,
             removeBuildInfo: filePath => removed.push(filePath),
             spawnSync: (executable, args, options) => {
                 calls.push({ args, executable, options })
-                return result(statuses.shift())
+                const next = statuses.shift()
+                return next && typeof next === "object" ? next : result(next)
             },
             stderr: { write: chunk => stderr.push(String(chunk)) },
         },
@@ -72,6 +78,18 @@ const adminCall = {
     },
 }
 
+function expectedAdminCall({ executable = "/runtime/npm", shell = false } = {}) {
+    return {
+        args: ["run", "build:admin"],
+        executable,
+        options: {
+            cwd: "/project",
+            shell,
+            stdio: "inherit",
+        },
+    }
+}
+
 test("正常构建先完成 admin，再运行一次 tsc 和 verifier", () => {
     const { runCnBuild } = loadOrchestrator()
     const harness = createHarness([0, 0, 0])
@@ -100,6 +118,29 @@ test("admin 构建失败时不运行 tsc、verifier 或恢复轮次", () => {
     assert.equal(runCnBuild(harness.dependencies), 2)
     assert.deepEqual(harness.calls, [adminCall])
     assert.deepEqual(harness.removed, [])
+})
+
+test("Windows 通过 shell 启动 npm.cmd，但 TypeScript 和 verifier 仍保持 shell:false", () => {
+    const { runCnBuild } = loadOrchestrator()
+    const harness = createHarness([0, 0, 0], {
+        npmExecutable: "npm.cmd",
+        platform: "win32",
+    })
+
+    assert.equal(runCnBuild(harness.dependencies), 0)
+    assert.deepEqual(harness.calls[0], expectedAdminCall({ executable: "npm.cmd", shell: true }))
+    assert.equal(harness.calls[1].options.shell, false)
+    assert.equal(harness.calls[2].options.shell, false)
+})
+
+test("spawnSync 启动错误会输出具体原因而不是静默返回 1", () => {
+    const { runCnBuild } = loadOrchestrator()
+    const harness = createHarness([
+        result(null, Object.assign(new Error("spawnSync npm.cmd EINVAL"), { code: "EINVAL" })),
+    ], { npmExecutable: "npm.cmd", platform: "win32" })
+
+    assert.equal(runCnBuild(harness.dependencies), 1)
+    assert.match(harness.stderr.join(""), /CN build admin process failed: spawnSync npm\.cmd EINVAL/)
 })
 
 test("admin 构建未生成 index.html 时整体失败", () => {
