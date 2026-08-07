@@ -8,8 +8,19 @@ const path = require("node:path")
 const COMPILED_SUFFIXES = [".d.ts.map", ".js.map", ".d.ts", ".js"]
 const SOURCE_SUFFIXES = [".ts", ".tsx", ".cts", ".mts"]
 
-function processStatus(result) {
-    if (result?.error || result?.signal !== null || !Number.isInteger(result?.status)) return 1
+function processStatus(result, stage, stderr) {
+    if (result?.error) {
+        stderr.write(`CN build ${stage} process failed: ${result.error.message}\n`)
+        return 1
+    }
+    if (result?.signal !== null) {
+        stderr.write(`CN build ${stage} process terminated by ${result.signal}\n`)
+        return 1
+    }
+    if (!Number.isInteger(result?.status)) {
+        stderr.write(`CN build ${stage} process returned no exit status\n`)
+        return 1
+    }
     return result.status
 }
 
@@ -52,8 +63,9 @@ function removeOrphanCompiledFiles(sourceDirectory, outputDirectory) {
 
 function runCnBuild(dependencies = {}) {
     const projectRoot = path.resolve(dependencies.projectRoot ?? path.resolve(__dirname, "../.."))
+    const platform = dependencies.platform ?? process.platform
     const executable = dependencies.executable ?? process.execPath
-    const npmExecutable = dependencies.npmExecutable ?? (process.platform === "win32" ? "npm.cmd" : "npm")
+    const npmExecutable = dependencies.npmExecutable ?? (platform === "win32" ? "npm.cmd" : "npm")
     const spawn = dependencies.spawnSync ?? spawnSync
     const stderr = dependencies.stderr ?? process.stderr
     const removeBuildInfo = dependencies.removeBuildInfo
@@ -82,8 +94,13 @@ function runCnBuild(dependencies = {}) {
     ]
 
     const run = (stage, args, command = executable) => {
+        const useShell = platform === "win32" && /\.(cmd|bat)$/i.test(command)
         try {
-            return processStatus(spawn(command, args, spawnOptions))
+            return processStatus(
+                spawn(command, args, { ...spawnOptions, shell: useShell }),
+                stage,
+                stderr,
+            )
         } catch {
             stderr.write(`CN build ${stage} process failed to start\n`)
             return 1
