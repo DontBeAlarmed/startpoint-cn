@@ -15,7 +15,11 @@ try {
     // RED: lifecycle module does not exist yet.
 }
 const { getLobbyLifecycleStatus, startLobbyLifecycle, stopLobbyLifecycle } = lobbyLifecycle
-const { handleMessage } = require("../src/multi/tcp/lobby")
+const {
+    configureNpcRecruitmentTiming,
+    handleMessage,
+    resetNpcRecruitmentTiming,
+} = require("../src/multi/tcp/lobby")
 const { NpcMateProvider } = require("../src/multi/npc/controller")
 
 function deferred() {
@@ -124,6 +128,7 @@ function stubRecruitment(t, recruitedMates) {
 
 test.afterEach(() => {
     if (typeof stopLobbyLifecycle === "function") stopLobbyLifecycle()
+    if (typeof resetNpcRecruitmentTiming === "function") resetNpcRecruitmentTiming()
 })
 
 test("lobby does not read player storage or persist TCP party changes", () => {
@@ -432,6 +437,33 @@ test("EnterComs ignores client aliases and joins roster names to provider identi
             { comId: 2, viewerId: 920000002, name: "贡献者乙" },
         ],
     )
+})
+
+test("NPC recruitment uses configured delays and explicit reset restores defaults", async t => {
+    assert.equal(typeof configureNpcRecruitmentTiming, "function")
+    assert.equal(typeof resetNpcRecruitmentTiming, "function")
+    configureNpcRecruitmentTiming({ joinDelayMs: 125, readyDelayMs: 40 })
+    const configuredTimers = startCapturedLobbyLifecycle()
+    const configured = createLobbyRoom(t, 521)
+    configured.room.npc_count = 2
+    stubRecruitment(t, [
+        { viewer_id: 992000001, com_id: 1 },
+        { viewer_id: 992000002, com_id: 2 },
+    ])
+
+    handleMessage(configured.host.socket, [0, [10, []]])
+    await flushPromises()
+    assert.deepEqual(configuredTimers.map(timer => timer.delayMs), [125, 165])
+
+    stopLobbyLifecycle()
+    resetNpcRecruitmentTiming()
+    const defaultTimers = startCapturedLobbyLifecycle()
+    const defaults = createLobbyRoom(t, 522)
+    defaults.room.npc_count = 2
+    handleMessage(defaults.host.socket, [0, [10, []]])
+    await flushPromises()
+
+    assert.deepEqual(defaultTimers.map(timer => timer.delayMs), [2_000, 2_500])
 })
 
 test("repeated EnterComs preserves the room com_id to contributor-name binding", async t => {

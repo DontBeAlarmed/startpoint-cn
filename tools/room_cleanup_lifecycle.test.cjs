@@ -120,6 +120,35 @@ test("stopping room cleanup preserves in-memory rooms", () => {
     assert.equal(disbandRoom(room.room_number), true)
 })
 
+test("room cleanup uses the configured incomplete and full expiry thresholds", t => {
+    let cleanup
+    startRoomCleanup({
+        incompleteExpiryMs: 1_000,
+        fullExpiryMs: 3_000,
+        intervalMs: 250,
+        createInterval(callback, intervalMs) {
+            cleanup = callback
+            assert.equal(intervalMs, 250)
+            return { unref() {} }
+        },
+        clearInterval() {},
+    })
+    const incomplete = createRoom(109, 209, 1, 1, 309, 1, 409)
+    const full = createRoom(110, 210, 1, 1, 310, 1, 410)
+    full.mates = [{}, {}, {}]
+    incomplete.host_entry_time = getServerTime() - 2
+    full.host_entry_time = getServerTime() - 2
+    t.after(() => {
+        disbandRoom(incomplete.room_number)
+        disbandRoom(full.room_number)
+    })
+
+    cleanup()
+
+    assert.equal(getRoom(incomplete.room_number), undefined)
+    assert.equal(getRoom(full.room_number), full)
+})
+
 test("room creation retries a colliding number and preserves the active room", () => {
     useRoomNumbers(123456)
     const existing = createRoom(102, 202, 1, 1, 302, 1, 402)

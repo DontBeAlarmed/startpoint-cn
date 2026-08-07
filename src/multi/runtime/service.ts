@@ -1,4 +1,8 @@
-import type { MultiRuntimeConfig, RuntimeNetworkServiceConfig } from "../../runtime/config"
+import type {
+    MultiRuntimeConfig,
+    MultiRuntimeTuningConfig,
+    RuntimeNetworkServiceConfig,
+} from "../../runtime/config"
 import {
     buildAdminMultiStatus,
     multiCompatibilityRejections,
@@ -83,6 +87,7 @@ export interface MultiRuntimeServiceDependencies {
         config: RuntimeNetworkServiceConfig,
         onFatalError: FatalHandler,
         hostServices?: MultiRuntimeHostServices,
+        tuning?: MultiRuntimeTuningConfig,
     ) => Promise<unknown>
     readonly stopTcp: () => Promise<unknown> | unknown
     readonly isTcpListening: () => boolean
@@ -107,7 +112,11 @@ export interface MultiRuntimeServiceDependencies {
 }
 
 export interface MultiRuntimeService {
-    start(config: MultiRuntimeConfig, onFatalError?: MultiRuntimeFatalHandler): Promise<void>
+    start(
+        config: MultiRuntimeConfig,
+        onFatalError?: MultiRuntimeFatalHandler,
+        tuning?: MultiRuntimeTuningConfig,
+    ): Promise<void>
     stop(): Promise<void>
     getStatus(): MultiRuntimeStatus
     getAuthenticationDiagnostics(): MultiRuntimeAuthenticationDiagnostics
@@ -163,8 +172,10 @@ function createClientHttpContext(
 function defaultDependencies(): MultiRuntimeServiceDependencies {
     const hub = new MultiHubControlServer()
     return {
-        startTcp: (config, onFatalError, hostServices) => startSessionServer({
+        startTcp: (config, onFatalError, hostServices, tuning) => startSessionServer({
             ...config,
+            roomCleanup: tuning?.roomCleanup,
+            npcRecruitment: tuning?.npcRecruitment,
             admissionProvider: hostServices?.admissionRegistry,
             validateNodeSession: hostServices
                 ? nodeSessionId => nodeSessionId === EMBEDDED_NODE_SESSION_ID
@@ -204,6 +215,7 @@ class Service implements MultiRuntimeService {
     start(
         config: MultiRuntimeConfig,
         onFatalError?: MultiRuntimeFatalHandler,
+        tuning?: MultiRuntimeTuningConfig,
     ): Promise<void> {
         if (this.startPromise !== null && this.stopPromise === null) return this.startPromise
         if (this.config !== null && this.stopPromise === null) {
@@ -212,7 +224,7 @@ class Service implements MultiRuntimeService {
         const generation = ++this.generation
         const priorStop = this.stopPromise
         let tracked!: Promise<void>
-        tracked = this.runStart(generation, config, onFatalError, priorStop).finally(() => {
+        tracked = this.runStart(generation, config, onFatalError, priorStop, tuning).finally(() => {
             if (this.startPromise === tracked) this.startPromise = null
         })
         this.startPromise = tracked
@@ -236,6 +248,7 @@ class Service implements MultiRuntimeService {
         config: MultiRuntimeConfig,
         onFatalError: MultiRuntimeFatalHandler | undefined,
         priorStop: Promise<void> | null,
+        tuning: MultiRuntimeTuningConfig | undefined,
     ): Promise<void> {
         if (priorStop !== null) await priorStop
         if (generation !== this.generation) return
@@ -309,6 +322,8 @@ class Service implements MultiRuntimeService {
                     startTcp: (tcpConfig, onFatalError) => this.dependencies.startTcp(
                         tcpConfig,
                         onFatalError,
+                        undefined,
+                        tuning,
                     ),
                     stopTcp: this.dependencies.stopTcp,
                     isTcpListening: this.dependencies.isTcpListening,
@@ -354,6 +369,7 @@ class Service implements MultiRuntimeService {
                 config.tcp,
                 () => this.handleFatal(generation, config, "tcp", onFatalError),
                 this.hostServices ?? undefined,
+                tuning,
             )
         } catch (error) {
             this.tcpFailed = true

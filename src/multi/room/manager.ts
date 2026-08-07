@@ -7,9 +7,9 @@ const rooms = new Map<string, MultiRoom>();
 
 let roomSequence = 1;
 
-const INCOMPLETE_EXPIRY_MS = parseInt(process.env.MULTI_ROOM_INCOMPLETE_EXPIRY_MS || "900000"); // 15min, mates < 3
-const FULL_ROOM_EXPIRY_MS = parseInt(process.env.MULTI_ROOM_FULL_EXPIRY_MS || "1800000"); // 30min, mates >= 3
-const CLEAN_INTERVAL_MS = parseInt(process.env.MULTI_ROOM_CLEAN_INTERVAL_MS || "60000");
+const DEFAULT_INCOMPLETE_EXPIRY_MS = 900_000; // 15min, mates < 3
+const DEFAULT_FULL_ROOM_EXPIRY_MS = 1_800_000; // 30min, mates >= 3
+const DEFAULT_CLEAN_INTERVAL_MS = 60_000;
 const REMAINING_NOTIFY_MS = 30000; // send RemainingTime float 30s before disband
 const ROOM_NUMBER_ALLOCATION_ATTEMPTS = 10;
 
@@ -19,6 +19,8 @@ const notifiedRooms = new Set<string>();
 type RoomCleanupTimer = ReturnType<typeof setInterval>;
 
 export interface RoomCleanupOptions {
+    incompleteExpiryMs?: number;
+    fullExpiryMs?: number;
     intervalMs?: number;
     createInterval?: (callback: () => void, intervalMs: number) => RoomCleanupTimer;
     clearInterval?: (timer: RoomCleanupTimer) => void;
@@ -31,7 +33,12 @@ export interface RoomCleanupStatus {
 let cleanupTimer: RoomCleanupTimer | null = null;
 let clearCleanupInterval: ((timer: RoomCleanupTimer) => void) | null = null;
 
-function cleanExpiredRooms() {
+interface RoomCleanupTiming {
+    readonly incompleteExpiryMs: number;
+    readonly fullExpiryMs: number;
+}
+
+function cleanExpiredRooms(timing: RoomCleanupTiming) {
     const now = Date.now();
     const timeOffset = now - getServerTime() * 1000;
     let cleaned = 0;
@@ -40,7 +47,9 @@ function cleanExpiredRooms() {
         if (room.raising_state === 4) continue;
 
         const idleAge = now - (room.host_entry_time * 1000 + timeOffset);
-        const timeout = room.mates.length < 3 ? INCOMPLETE_EXPIRY_MS : FULL_ROOM_EXPIRY_MS;
+        const timeout = room.mates.length < 3
+            ? timing.incompleteExpiryMs
+            : timing.fullExpiryMs;
         const remaining = timeout - idleAge;
 
         // Send RemainingTime float 30s before expiry
@@ -65,7 +74,14 @@ export function startRoomCleanup(options: RoomCleanupOptions = {}): void {
 
     const createInterval = options.createInterval ?? setInterval;
     const clearIntervalHandle = options.clearInterval ?? clearInterval;
-    const timer = createInterval(cleanExpiredRooms, options.intervalMs ?? CLEAN_INTERVAL_MS);
+    const timing: RoomCleanupTiming = Object.freeze({
+        incompleteExpiryMs: options.incompleteExpiryMs ?? DEFAULT_INCOMPLETE_EXPIRY_MS,
+        fullExpiryMs: options.fullExpiryMs ?? DEFAULT_FULL_ROOM_EXPIRY_MS,
+    });
+    const timer = createInterval(
+        () => cleanExpiredRooms(timing),
+        options.intervalMs ?? DEFAULT_CLEAN_INTERVAL_MS,
+    );
     try {
         timer.unref();
     } catch (error) {

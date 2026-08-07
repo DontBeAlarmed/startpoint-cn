@@ -11,8 +11,31 @@ import {
 } from "./lobby-lifecycle"
 import { updatePlayerSnapshotParty } from "../snapshot/player-snapshot"
 
-const NPC_JOIN_DELAY_MS = parseInt(process.env.NPC_JOIN_DELAY_MS || "2000")
-const NPC_READY_DELAY_MS = parseInt(process.env.NPC_READY_DELAY_MS || "500")
+const DEFAULT_NPC_JOIN_DELAY_MS = 2_000
+const DEFAULT_NPC_READY_DELAY_MS = 500
+
+export interface NpcRecruitmentTiming {
+    readonly joinDelayMs: number
+    readonly readyDelayMs: number
+}
+
+let npcRecruitmentTiming: NpcRecruitmentTiming = Object.freeze({
+    joinDelayMs: DEFAULT_NPC_JOIN_DELAY_MS,
+    readyDelayMs: DEFAULT_NPC_READY_DELAY_MS,
+})
+
+export function configureNpcRecruitmentTiming(
+    options: Partial<NpcRecruitmentTiming> = {},
+): void {
+    npcRecruitmentTiming = Object.freeze({
+        joinDelayMs: options.joinDelayMs ?? DEFAULT_NPC_JOIN_DELAY_MS,
+        readyDelayMs: options.readyDelayMs ?? DEFAULT_NPC_READY_DELAY_MS,
+    })
+}
+
+export function resetNpcRecruitmentTiming(): void {
+    configureNpcRecruitmentTiming()
+}
 
 interface RoomRecruitmentState {
     nextRequestId: number
@@ -249,7 +272,7 @@ async function handleEnterComs(
             // Send Mates only to triggering client — others get theirs via handleEnter
             sessionManager.sendJson(client.socket, [1, [1, client.mates]])
         } catch { console.error("[LOBBY] EnterComs send-mates failed") }
-    }, NPC_JOIN_DELAY_MS)
+    }, npcRecruitmentTiming.joinDelayMs)
 
     scheduleLobbyTask(() => {
         try {
@@ -268,7 +291,7 @@ async function handleEnterComs(
             }
             if (countRealPlayers(currentHostClient.mates) === 1) checkHostAutoReady(client.roomNumber)
         } catch { console.error("[LOBBY] EnterComs npc-ready failed") }
-    }, NPC_JOIN_DELAY_MS + NPC_READY_DELAY_MS)
+    }, npcRecruitmentTiming.joinDelayMs + npcRecruitmentTiming.readyDelayMs)
 }
 
 function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): void {

@@ -10,15 +10,24 @@ import {
 } from "./handshake"
 import { handleBattleMessage } from "./battle"
 import { sessionManager } from "../state/SessionManager"
-import { startRoomCleanup, stopRoomCleanup } from "../room/manager"
+import {
+    startRoomCleanup,
+    stopRoomCleanup,
+    type RoomCleanupOptions,
+} from "../room/manager"
 import { startLobbyLifecycle, stopLobbyLifecycle } from "./lobby-lifecycle"
+import {
+    configureNpcRecruitmentTiming,
+    resetNpcRecruitmentTiming,
+    type NpcRecruitmentTiming,
+} from "./lobby"
 import {
     embeddedAdmissionRegistry,
     type AdmissionProvider,
 } from "../admission/registry"
 
-export const SESSION_PORT = parseInt(process.env.SESSION_PORT || "8003")
-export const SESSION_HOST = process.env.SESSION_HOST || "127.0.0.1"
+export const SESSION_PORT = 8003
+export const SESSION_HOST = "127.0.0.1"
 export const DEFAULT_SESSION_SHUTDOWN_TIMEOUT_MS = 5000
 export const DEFAULT_SESSION_ADMISSION_PROVIDER: AdmissionProvider = embeddedAdmissionRegistry
 
@@ -50,6 +59,8 @@ export interface SessionServerOptions {
     admissionProvider?: AdmissionProvider
     validateNodeSession?: (nodeSessionId: string) => boolean
     nodeSessionCheckIntervalMs?: number
+    roomCleanup?: RoomCleanupOptions
+    npcRecruitment?: NpcRecruitmentTiming
     /** Maximum shutdown wait for this generation's handshakes before sockets are retired. */
     shutdownTimeoutMs?: number
     onFatalError?: (failure: SessionServerFailure) => void
@@ -267,6 +278,12 @@ function destroyAcceptedSockets(): void {
     }
 }
 
+function stopSessionLifecycles(): void {
+    stopRoomCleanup()
+    stopLobbyLifecycle()
+    resetNpcRecruitmentTiming()
+}
+
 function settleStart(context: ServerContext, error?: Error): void {
     const attempt = startAttempt
     if (!attempt || attempt.context !== context || attempt.settled) return
@@ -300,8 +317,7 @@ function handlePersistentServerError(context: ServerContext, error: Error): void
     if (phase === "starting") {
         recordFailure("startup", error)
         settleStart(context, error)
-        stopRoomCleanup()
-        stopLobbyLifecycle()
+        stopSessionLifecycles()
         destroyAcceptedSockets()
         phase = "failed"
         if (!context.server.listening) {
@@ -389,8 +405,7 @@ function beginFatalTeardown(context: ServerContext, error: Error): Promise<void>
     recordFailure("runtime", error)
     phase = "failed"
     console.error(`[TCP] fatal session server error: code=${failureCode(error) ?? "UNKNOWN"}`)
-    stopRoomCleanup()
-    stopLobbyLifecycle()
+    stopSessionLifecycles()
     destroyAcceptedSockets()
 
     const closePromise = closeServer(context)
@@ -494,13 +509,13 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
         createdServer.listen(options.port ?? SESSION_PORT, options.host ?? SESSION_HOST, () => {
             if (activeContext !== context || phase !== "starting") return
             try {
-                startRoomCleanup()
+                startRoomCleanup(options.roomCleanup)
+                configureNpcRecruitmentTiming(options.npcRecruitment)
                 startLobbyLifecycle()
                 startNodeSessionChecks(context)
             } catch (error) {
                 recordFailure("startup", error)
-                stopRoomCleanup()
-                stopLobbyLifecycle()
+                stopSessionLifecycles()
                 settleStart(context, error as Error)
                 phase = "failed"
                 void closeServer(context).then(
@@ -529,8 +544,7 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
 export function stopSessionServer(): Promise<void> {
     if (phase === "stopping" && stopPromise) return stopPromise
     const context = activeContext
-    stopRoomCleanup()
-    stopLobbyLifecycle()
+    stopSessionLifecycles()
     if (!context) {
         phase = "stopped"
         return stoppedPromise

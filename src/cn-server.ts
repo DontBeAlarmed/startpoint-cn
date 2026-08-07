@@ -360,7 +360,11 @@ runtimeCoordinator = createRuntimeCoordinator({
         fastify.server.closeIdleConnections?.();
         fastify.server.closeAllConnections?.();
     },
-    startMulti: (config, onFatalError) => multiRuntimeService.start(config.multi, onFatalError),
+    startMulti: (config, onFatalError) => multiRuntimeService.start(
+        config.multi,
+        onFatalError,
+        config.multiTuning,
+    ),
     stopMulti: () => multiRuntimeService.stop(),
     checkpointDatabase,
     closeDatabase,

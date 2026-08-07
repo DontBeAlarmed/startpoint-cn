@@ -13,6 +13,11 @@ export interface RuntimeEnvironment extends AssetModeEnvironment {
     readonly SESSION_HOST?: string
     readonly SESSION_PORT?: string
     readonly SESSION_PUBLIC_HOST?: string
+    readonly MULTI_ROOM_INCOMPLETE_EXPIRY_MS?: string
+    readonly MULTI_ROOM_FULL_EXPIRY_MS?: string
+    readonly MULTI_ROOM_CLEAN_INTERVAL_MS?: string
+    readonly NPC_JOIN_DELAY_MS?: string
+    readonly NPC_READY_DELAY_MS?: string
     readonly MULTI_MODE?: string
     readonly MULTI_HUB_HOST?: string
     readonly MULTI_HUB_PORT?: string
@@ -38,6 +43,18 @@ export interface RuntimeTcpServiceConfig extends RuntimeNetworkServiceConfig {
     readonly publicHost?: string
 }
 
+export interface MultiRuntimeTuningConfig {
+    readonly roomCleanup: {
+        readonly incompleteExpiryMs: number
+        readonly fullExpiryMs: number
+        readonly intervalMs: number
+    }
+    readonly npcRecruitment: {
+        readonly joinDelayMs: number
+        readonly readyDelayMs: number
+    }
+}
+
 export type MultiRuntimeConfig =
     | { readonly mode: "embedded"; readonly tcp: RuntimeTcpServiceConfig }
     | {
@@ -56,6 +73,7 @@ export type MultiRuntimeConfig =
 export interface CnRuntimeConfig {
     readonly http: RuntimeNetworkServiceConfig
     readonly multi: MultiRuntimeConfig
+    readonly multiTuning: MultiRuntimeTuningConfig
     readonly assetProvider: AssetProviderConfig
     readonly comicDir: string | null
 }
@@ -88,6 +106,14 @@ function parsePort(value: string | undefined, fallback: number): number {
         throw new RuntimeConfigError()
     }
     return port
+}
+
+function parseMilliseconds(value: string | undefined, fallback: number): number {
+    if (value === undefined) return fallback
+    if (!/^\d+$/.test(value)) throw new RuntimeConfigError()
+    const milliseconds = Number(value)
+    if (!Number.isSafeInteger(milliseconds)) throw new RuntimeConfigError()
+    return milliseconds
 }
 
 function resolvePhysicalPath(filePath: string): string {
@@ -263,6 +289,20 @@ function parseMultiRuntimeConfig(
     throw new RuntimeConfigError()
 }
 
+function parseMultiRuntimeTuning(env: RuntimeEnvironment): MultiRuntimeTuningConfig {
+    return Object.freeze({
+        roomCleanup: Object.freeze({
+            incompleteExpiryMs: parseMilliseconds(env.MULTI_ROOM_INCOMPLETE_EXPIRY_MS, 900_000),
+            fullExpiryMs: parseMilliseconds(env.MULTI_ROOM_FULL_EXPIRY_MS, 1_800_000),
+            intervalMs: parseMilliseconds(env.MULTI_ROOM_CLEAN_INTERVAL_MS, 60_000),
+        }),
+        npcRecruitment: Object.freeze({
+            joinDelayMs: parseMilliseconds(env.NPC_JOIN_DELAY_MS, 2_000),
+            readyDelayMs: parseMilliseconds(env.NPC_READY_DELAY_MS, 500),
+        }),
+    })
+}
+
 export function parseCnRuntimeConfig({
     projectRoot,
     env = process.env,
@@ -272,8 +312,9 @@ export function parseCnRuntimeConfig({
         port: parsePort(env.CN_LISTEN_PORT, 8001),
     })
     const multi = parseMultiRuntimeConfig(env, projectRoot)
+    const multiTuning = parseMultiRuntimeTuning(env)
     const assetProvider = parseAssetProviderConfig({ projectRoot, env })
     const comicDir = resolveComicDir(env, projectRoot)
     validateEmbeddedRuntime(env, projectRoot, assetProvider, comicDir)
-    return Object.freeze({ http, multi, assetProvider, comicDir })
+    return Object.freeze({ http, multi, multiTuning, assetProvider, comicDir })
 }

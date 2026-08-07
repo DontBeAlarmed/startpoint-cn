@@ -33,6 +33,56 @@ test("multiplayer defaults to the current embedded listener", () => {
     assert.equal(Object.isFrozen(config.multi.tcp), true)
 })
 
+test("multiplayer lifecycle tuning is parsed into the startup snapshot", () => {
+    const config = parseCnRuntimeConfig({
+        projectRoot,
+        env: {
+            ASSET_MODE: "client-owned",
+            MULTI_ROOM_INCOMPLETE_EXPIRY_MS: "120000",
+            MULTI_ROOM_FULL_EXPIRY_MS: "240000",
+            MULTI_ROOM_CLEAN_INTERVAL_MS: "15000",
+            NPC_JOIN_DELAY_MS: "250",
+            NPC_READY_DELAY_MS: "75",
+        },
+    })
+
+    assert.deepEqual(config.multiTuning, {
+        roomCleanup: {
+            incompleteExpiryMs: 120000,
+            fullExpiryMs: 240000,
+            intervalMs: 15000,
+        },
+        npcRecruitment: {
+            joinDelayMs: 250,
+            readyDelayMs: 75,
+        },
+    })
+    assert.equal(Object.isFrozen(config.multiTuning), true)
+    assert.equal(Object.isFrozen(config.multiTuning.roomCleanup), true)
+    assert.equal(Object.isFrozen(config.multiTuning.npcRecruitment), true)
+})
+
+test("multiplayer lifecycle tuning rejects malformed millisecond values", () => {
+    for (const value of ["", "-1", "1.5", "9007199254740992"]) {
+        assert.throws(() => parseCnRuntimeConfig({
+            projectRoot,
+            env: {
+                ASSET_MODE: "client-owned",
+                NPC_JOIN_DELAY_MS: value,
+            },
+        }), error => error?.code === "INVALID_RUNTIME_CONFIG")
+    }
+
+    const config = parseCnRuntimeConfig({
+        projectRoot,
+        env: {
+            ASSET_MODE: "client-owned",
+            NPC_JOIN_DELAY_MS: "0",
+        },
+    })
+    assert.equal(config.multiTuning.npcRecruitment.joinDelayMs, 0)
+})
+
 test("host mode requires public TCP reachability and keeps credentials private", t => {
     const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "multi-host-config-"))
     t.after(() => fs.rmSync(sandbox, { recursive: true, force: true }))
@@ -283,6 +333,47 @@ function hostRuntimeConfig(label = "hub.internal") {
         credentialsPath: path.join(os.tmpdir(), `unused-${label}-credentials.json`),
     }
 }
+
+test("runtime service forwards multiplayer tuning to the TCP lifecycle", async () => {
+    const received = []
+    const tuning = {
+        roomCleanup: {
+            incompleteExpiryMs: 120000,
+            fullExpiryMs: 240000,
+            intervalMs: 15000,
+        },
+        npcRecruitment: {
+            joinDelayMs: 250,
+            readyDelayMs: 75,
+        },
+    }
+    const service = createMultiRuntimeService({
+        async startTcp(_config, _onFatalError, _hostServices, receivedTuning) {
+            received.push(receivedTuning)
+        },
+        async stopTcp() {},
+        isTcpListening: () => true,
+        async startHub() {},
+        async stopHub() {},
+        isHubListening: () => true,
+    })
+
+    await service.start(hostRuntimeConfig(), undefined, tuning)
+    await service.stop()
+
+    assert.deepEqual(received, [tuning])
+})
+
+test("multiplayer lifecycle modules do not read process.env directly", () => {
+    for (const relativePath of [
+        "src/multi/room/manager.ts",
+        "src/multi/tcp/lobby.ts",
+        "src/multi/tcp/server.ts",
+    ]) {
+        const source = fs.readFileSync(path.join(projectRoot, relativePath), "utf8")
+        assert.doesNotMatch(source, /process\.env/)
+    }
+})
 
 test("stop during TCP start prevents a late Host control listener", async () => {
     const tcpStarted = deferred()
