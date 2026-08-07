@@ -20,7 +20,7 @@ export type AuthenticationRejectionEvent =
 
 export type ClientAuthenticationState = "authentication_rejected" | null
 
-const MAX_AUTHENTICATION_REJECTIONS = 32
+export const MAX_AUTHENTICATION_REJECTIONS = 32
 
 export class AuthenticationRejectionBuffer {
     private readonly events: AuthenticationRejectionEvent[] = []

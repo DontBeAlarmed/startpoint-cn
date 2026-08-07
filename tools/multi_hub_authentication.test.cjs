@@ -13,6 +13,7 @@ require("ts-node/register/transpile-only")
 const projectRoot = path.resolve(__dirname, "..")
 const {
     AuthenticationRejectionBuffer,
+    MAX_AUTHENTICATION_REJECTIONS,
 } = require("../src/multi/hub/authentication-rejections")
 const {
     MultiHubCredentialStore,
@@ -157,6 +158,7 @@ test("unknown and revoked authentication scan every credential digest", t => {
 })
 
 test("authentication rejection buffer keeps a frozen sanitized 32-event FIFO", () => {
+    assert.equal(MAX_AUTHENTICATION_REJECTIONS, 32)
     let timestamp = Date.parse("2026-08-07T12:00:00.000Z")
     const buffer = new AuthenticationRejectionBuffer(() => timestamp++)
 

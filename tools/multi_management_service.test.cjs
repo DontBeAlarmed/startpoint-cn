@@ -411,6 +411,172 @@ test("host authentication diagnostics safely project rejection events and revoke
     )
 })
 
+test("host authentication diagnostics project only the last 32 rejection candidates", () => {
+    const calls = []
+    const events = Array.from({ length: 33 }, (_, index) => ({
+        timestamp: new Date(CHECKED_AT_MS + index).toISOString(),
+        reason: "unknown",
+    }))
+    const fixture = createService("host", {
+        credentials: {
+            create: () => { throw new Error("not used") },
+            list: () => {
+                calls.push("list")
+                throw new Error("credentials must not be read")
+            },
+            revoke: () => { throw new Error("not used") },
+        },
+        getAuthenticationDiagnostics: () => {
+            calls.push("diagnostics")
+            return { clientState: null, hostRejections: events }
+        },
+    })
+
+    const result = fixture.service.getAuthenticationDiagnostics()
+    assert.equal(result.rejections.length, 32)
+    assert.deepEqual(
+        result.rejections.map(event => event.timestamp),
+        events.slice(-32).map(event => event.timestamp),
+    )
+    assert.deepEqual(calls, ["diagnostics"])
+})
+
+test("host authentication diagnostics bound sparse proxy rejection reads to the last 32 indices", () => {
+    const reportedLength = Number.MAX_SAFE_INTEGER
+    const firstVisibleIndex = reportedLength - 32
+    let indexReads = 0
+    const events = new Proxy([], {
+        get(target, property, receiver) {
+            if (property === "length") return reportedLength
+            if (typeof property === "string" && /^\d+$/.test(property)) {
+                indexReads++
+                const index = Number(property)
+                if (index >= firstVisibleIndex) {
+                    return {
+                        timestamp: new Date(CHECKED_AT_MS + index - firstVisibleIndex).toISOString(),
+                        reason: "unknown",
+                    }
+                }
+            }
+            return Reflect.get(target, property, receiver)
+        },
+    })
+    const fixture = createService("host", {
+        credentials: {
+            create: () => { throw new Error("not used") },
+            list: () => { throw new Error("credentials must not be read") },
+            revoke: () => { throw new Error("not used") },
+        },
+        getAuthenticationDiagnostics: () => ({
+            clientState: null,
+            hostRejections: events,
+        }),
+    })
+
+    const result = fixture.service.getAuthenticationDiagnostics()
+    assert.equal(result.rejections.length, 32)
+    assert.equal(indexReads, 32)
+})
+
+test("host authentication diagnostics reject invalid rejection array lengths", () => {
+    const event = { timestamp: CHECKED_AT, reason: "unknown" }
+    for (const invalidLength of ["1", 1.5, -1]) {
+        const events = new Proxy([], {
+            get(target, property, receiver) {
+                if (property === "length") return invalidLength
+                if (property === "0") return event
+                return Reflect.get(target, property, receiver)
+            },
+        })
+        const fixture = createService("host", {
+            credentials: {
+                create: () => { throw new Error("not used") },
+                list: () => [],
+                revoke: () => { throw new Error("not used") },
+            },
+            getAuthenticationDiagnostics: () => ({
+                clientState: null,
+                hostRejections: events,
+            }),
+        })
+
+        assert.deepEqual(fixture.service.getAuthenticationDiagnostics().rejections, [])
+    }
+})
+
+test("host authentication diagnostics do not scan oversized credential lists", () => {
+    for (const reportedLength of [4_097, Number.MAX_SAFE_INTEGER]) {
+        let indexReads = 0
+        const credentials = new Proxy([], {
+            get(target, property, receiver) {
+                if (property === "length") return reportedLength
+                if (typeof property === "string" && /^\d+$/.test(property)) indexReads++
+                return Reflect.get(target, property, receiver)
+            },
+        })
+        const fixture = createService("host", {
+            credentials: {
+                create: () => { throw new Error("not used") },
+                list: () => credentials,
+                revoke: () => { throw new Error("not used") },
+            },
+            getAuthenticationDiagnostics: () => ({
+                clientState: null,
+                hostRejections: [{
+                    timestamp: CHECKED_AT,
+                    reason: "revoked",
+                    credentialId: REVOKED_CREDENTIAL_ID,
+                }],
+            }),
+        })
+
+        assert.deepEqual(fixture.service.getAuthenticationDiagnostics().rejections, [{
+            timestamp: CHECKED_AT,
+            reason: "revoked",
+            credential: null,
+        }])
+        assert.equal(indexReads, 0)
+    }
+})
+
+test("host authentication diagnostics stop credential scanning after wanted IDs are found", () => {
+    let indexReads = 0
+    const credentials = new Proxy([{
+        credentialId: REVOKED_CREDENTIAL_ID,
+        label: "node-a",
+    }, {
+        credentialId: "b".repeat(32),
+        label: "unwanted-node",
+    }], {
+        get(target, property, receiver) {
+            if (typeof property === "string" && /^\d+$/.test(property)) indexReads++
+            return Reflect.get(target, property, receiver)
+        },
+    })
+    const fixture = createService("host", {
+        credentials: {
+            create: () => { throw new Error("not used") },
+            list: () => credentials,
+            revoke: () => { throw new Error("not used") },
+        },
+        getAuthenticationDiagnostics: () => ({
+            clientState: null,
+            hostRejections: [{
+                timestamp: CHECKED_AT,
+                reason: "revoked",
+                credentialId: REVOKED_CREDENTIAL_ID,
+            }],
+        }),
+    })
+
+    assert.deepEqual(fixture.service.getAuthenticationDiagnostics().rejections, [{
+        timestamp: CHECKED_AT,
+        reason: "revoked",
+        credential: { label: "node-a", shortId: "aaaaaaaa" },
+    }])
+    assert.equal(indexReads, 1)
+})
+
 test("client authentication diagnostics expose only the strict client state", () => {
     const calls = []
     const fixture = createService("client", {

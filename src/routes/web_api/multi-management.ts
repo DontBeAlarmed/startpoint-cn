@@ -5,6 +5,7 @@ import {
     type IssuedMultiHubCredential,
     type MultiHubCredential,
 } from "../../multi/hub/credential-store"
+import { MAX_AUTHENTICATION_REJECTIONS } from "../../multi/hub/authentication-rejections"
 import { MultiHubCredentialLockError } from "../../multi/hub/credential-lock"
 import { requireLoopback } from "../../multi/management/loopback"
 import {
@@ -51,17 +52,58 @@ function publicAuthenticationDiagnostics(
     return {
         mode: result.mode,
         clientState: result.clientState,
-        rejections: result.rejections.map(rejection => ({
-            timestamp: rejection.timestamp,
-            reason: rejection.reason,
-            credential: rejection.credential === null
-                ? null
-                : {
-                    label: rejection.credential.label,
-                    shortId: rejection.credential.shortId,
-                },
-        })),
+        rejections: publicAuthenticationRejections(result.rejections),
     }
+}
+
+function publicAuthenticationRejections(values: unknown): MultiAuthenticationDiagnostics["rejections"] {
+    let candidates: readonly unknown[]
+    let length: number
+    try {
+        if (!Array.isArray(values)) return []
+        candidates = values
+        length = candidates.length
+    } catch {
+        return []
+    }
+    if (!Number.isSafeInteger(length) || length < 0) return []
+
+    const rejections: MultiAuthenticationDiagnostics["rejections"][number][] = []
+    const start = Math.max(0, length - MAX_AUTHENTICATION_REJECTIONS)
+    for (let index = start; index < length; index += 1) {
+        try {
+            const candidate = candidates[index]
+            if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate)) {
+                continue
+            }
+            const timestamp = (candidate as { timestamp?: unknown }).timestamp
+            const reason = (candidate as { reason?: unknown }).reason
+            if (typeof timestamp !== "string"
+                || (reason !== "malformed" && reason !== "unknown" && reason !== "revoked")) {
+                continue
+            }
+            const credentialValue = (candidate as { credential?: unknown }).credential
+            let credential = null
+            if (credentialValue !== null) {
+                if (typeof credentialValue !== "object" || Array.isArray(credentialValue)) continue
+                const label = (credentialValue as { label?: unknown }).label
+                const shortId = (credentialValue as { shortId?: unknown }).shortId
+                if (typeof label !== "string" || typeof shortId !== "string") continue
+                credential = {
+                    label,
+                    shortId,
+                }
+            }
+            rejections.push({
+                timestamp,
+                reason,
+                credential,
+            })
+        } catch {
+            // A malformed service result is not allowed across the public boundary.
+        }
+    }
+    return rejections
 }
 
 function getService(

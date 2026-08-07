@@ -3,6 +3,7 @@ import type {
     IssuedMultiHubCredential,
     MultiHubCredential,
 } from "../hub/credential-store"
+import { MAX_AUTHENTICATION_REJECTIONS } from "../hub/authentication-rejections"
 import type { MultiRuntimeAuthenticationDiagnostics } from "../runtime/service"
 import {
     CLIENT_MULTI_MANAGEMENT_UNAVAILABLE,
@@ -16,6 +17,7 @@ import {
 
 const CREDENTIAL_ID_PATTERN = /^[0-9a-f]{32}$/
 const ISO_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?Z$/
+const MAX_CREDENTIAL_HINT_SCAN = 4_096
 
 function cloneAndFreeze<T>(value: T): T {
     if (value === null || typeof value !== "object") return value
@@ -105,12 +107,19 @@ export class MultiManagementService implements MultiManagementServiceContract {
             })
         }
 
-        const credentialHints = createCredentialHintMap(this.dependencies.credentials.list())
+        const hostRejections = readHostRejections(diagnostics)
+        const wantedCredentialIds = collectRevokedCredentialIds(hostRejections)
+        const credentialHints = wantedCredentialIds.size === 0
+            ? new Map<string, MultiAuthenticationCredentialHint>()
+            : createCredentialHintMap(
+                this.dependencies.credentials.list(),
+                wantedCredentialIds,
+            )
         return cloneAndFreeze({
             mode: "host",
             clientState: null,
             rejections: projectAuthenticationRejections(
-                readHostRejections(diagnostics),
+                hostRejections,
                 credentialHints,
             ),
         })
@@ -152,32 +161,77 @@ function readHostRejections(
     diagnostics: MultiRuntimeAuthenticationDiagnostics,
 ): readonly unknown[] {
     try {
-        return diagnostics !== null
+        const values = diagnostics !== null
             && typeof diagnostics === "object"
-            && Array.isArray(diagnostics.hostRejections)
             ? diagnostics.hostRejections
             : []
+        return readBoundedArrayTail(values, MAX_AUTHENTICATION_REJECTIONS)
     } catch {
         return []
     }
 }
 
-function createCredentialHintMap(values: unknown): Map<string, MultiAuthenticationCredentialHint> {
+function readBoundedArrayTail(values: unknown, limit: number): readonly unknown[] {
+    let candidates: readonly unknown[]
+    let length: number
+    try {
+        if (!Array.isArray(values)) return []
+        candidates = values
+        length = candidates.length
+    } catch {
+        return []
+    }
+    if (!Number.isSafeInteger(length) || length < 0) return []
+
+    const tail: unknown[] = []
+    const start = Math.max(0, length - limit)
+    for (let index = start; index < length; index += 1) {
+        try {
+            tail.push(candidates[index])
+        } catch {
+            // A malformed provider value is not allowed across the public boundary.
+        }
+    }
+    return tail
+}
+
+function collectRevokedCredentialIds(events: readonly unknown[]): Set<string> {
+    const credentialIds = new Set<string>()
+    for (const event of events) {
+        try {
+            if (event === null || typeof event !== "object" || Array.isArray(event)) continue
+            const reason = (event as { reason?: unknown }).reason
+            const credentialId = (event as { credentialId?: unknown }).credentialId
+            if (reason === "revoked"
+                && typeof credentialId === "string"
+                && CREDENTIAL_ID_PATTERN.test(credentialId)) {
+                credentialIds.add(credentialId)
+            }
+        } catch {
+            // A malformed event is not allowed to trigger credential scanning.
+        }
+    }
+    return credentialIds
+}
+
+function createCredentialHintMap(
+    values: unknown,
+    wantedCredentialIds: ReadonlySet<string>,
+): Map<string, MultiAuthenticationCredentialHint> {
     const hints = new Map<string, MultiAuthenticationCredentialHint>()
     let candidates: readonly unknown[]
+    let length: number
     try {
         if (!Array.isArray(values)) return hints
         candidates = values
-    } catch {
-        return hints
-    }
-
-    let length: number
-    try {
         length = candidates.length
     } catch {
         return hints
     }
+    if (!Number.isSafeInteger(length) || length < 0 || length > MAX_CREDENTIAL_HINT_SCAN) {
+        return hints
+    }
+
     for (let index = 0; index < length; index += 1) {
         try {
             const candidate = candidates[index]
@@ -185,13 +239,15 @@ function createCredentialHintMap(values: unknown): Map<string, MultiAuthenticati
                 continue
             }
             const credentialId = (candidate as { credentialId?: unknown }).credentialId
-            const label = (candidate as { label?: unknown }).label
             if (typeof credentialId !== "string"
                 || !CREDENTIAL_ID_PATTERN.test(credentialId)
-                || typeof label !== "string") {
+                || !wantedCredentialIds.has(credentialId)) {
                 continue
             }
+            const label = (candidate as { label?: unknown }).label
+            if (typeof label !== "string") continue
             hints.set(credentialId, { label, shortId: credentialId.slice(0, 8) })
+            if (hints.size === wantedCredentialIds.size) break
         } catch {
             // A malformed provider value is not allowed across the public boundary.
         }

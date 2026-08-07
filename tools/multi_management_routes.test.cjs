@@ -123,6 +123,143 @@ test("loopback authentication rejection diagnostics return exact public fields",
     assert.deepEqual(calls, ["diagnostics"])
 })
 
+test("authentication rejection route copies only the last 32 public events", async t => {
+    const rejections = Array.from({ length: 33 }, (_, index) => ({
+        timestamp: new Date(Date.parse(CREATED_AT) + index).toISOString(),
+        reason: "unknown",
+        credential: null,
+        token: `secret-${index}`,
+    }))
+    const app = await createApp(t, () => ({
+        getAuthenticationDiagnostics: () => ({
+            mode: "host",
+            clientState: null,
+            rejections,
+        }),
+    }))
+
+    const response = await request(app, "GET", "/authentication-rejections")
+    assert.equal(response.statusCode, 200)
+    const body = response.json()
+    assert.equal(body.rejections.length, 32)
+    assert.deepEqual(
+        body.rejections.map(event => event.timestamp),
+        rejections.slice(-32).map(event => event.timestamp),
+    )
+    assert.doesNotMatch(response.body, /secret-/)
+})
+
+test("authentication rejection route bounds sparse proxy reads and preserves its whitelist", async t => {
+    const reportedLength = Number.MAX_SAFE_INTEGER
+    const firstVisibleIndex = reportedLength - 32
+    let indexAccesses = 0
+    const rejections = new Proxy([], {
+        has(target, property) {
+            if (typeof property === "string" && /^\d+$/.test(property)) {
+                indexAccesses++
+                return Number(property) >= firstVisibleIndex
+            }
+            return Reflect.has(target, property)
+        },
+        get(target, property, receiver) {
+            if (property === "length") return reportedLength
+            if (typeof property === "string" && /^\d+$/.test(property)) {
+                indexAccesses++
+                const index = Number(property)
+                if (index >= firstVisibleIndex) {
+                    return {
+                        timestamp: new Date(
+                            Date.parse(CREATED_AT) + index - firstVisibleIndex,
+                        ).toISOString(),
+                        reason: "revoked",
+                        credential: {
+                            label: `node-${index}`,
+                            shortId: index.toString(16).padStart(8, "0"),
+                            token: "secret-credential-token",
+                        },
+                        request: { token: "secret-request-token" },
+                    }
+                }
+            }
+            return Reflect.get(target, property, receiver)
+        },
+    })
+    const app = await createApp(t, () => ({
+        getAuthenticationDiagnostics: () => ({
+            mode: "host",
+            clientState: null,
+            rejections,
+        }),
+    }))
+
+    const response = await request(app, "GET", "/authentication-rejections")
+    assert.equal(response.statusCode, 200)
+    assert.equal(response.json().rejections.length, 32)
+    assert.equal(indexAccesses, 32)
+    assert.doesNotMatch(response.body, /secret-|request|token/)
+})
+
+test("authentication rejection route returns no events for an invalid array length", async t => {
+    const rejections = new Proxy([], {
+        get(target, property, receiver) {
+            if (property === "length") return "1"
+            if (property === "0") {
+                return { timestamp: CREATED_AT, reason: "unknown", credential: null }
+            }
+            return Reflect.get(target, property, receiver)
+        },
+    })
+    const app = await createApp(t, () => ({
+        getAuthenticationDiagnostics: () => ({
+            mode: "host",
+            clientState: null,
+            rejections,
+        }),
+    }))
+
+    const response = await request(app, "GET", "/authentication-rejections")
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json().rejections, [])
+})
+
+test("authentication rejection route skips malformed field values without leaking nested data", async t => {
+    const app = await createApp(t, () => ({
+        getAuthenticationDiagnostics: () => ({
+            mode: "host",
+            clientState: null,
+            rejections: [{
+                timestamp: { value: CREATED_AT, token: "secret-timestamp-token" },
+                reason: "unknown",
+                credential: null,
+            }, {
+                timestamp: CREATED_AT,
+                reason: { value: "unknown", token: "secret-reason-token" },
+                credential: null,
+            }, {
+                timestamp: CREATED_AT,
+                reason: "revoked",
+                credential: {
+                    label: { value: "node-a", token: "secret-label-token" },
+                    shortId: "aaaaaaaa",
+                },
+            }, {
+                timestamp: CREATED_AT,
+                reason: "malformed",
+                credential: null,
+            }],
+        }),
+    }))
+
+    const response = await request(app, "GET", "/authentication-rejections")
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json().rejections, [{
+        timestamp: CREATED_AT,
+        reason: "malformed",
+        credential: null,
+    }])
+    assert.doesNotMatch(response.body, /secret-|value|token/)
+})
+
 test("loopback management routes delegate CRUD and probe with public response fields only", async t => {
     const calls = []
     const secretFields = {
