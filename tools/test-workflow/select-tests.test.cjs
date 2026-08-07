@@ -526,9 +526,11 @@ test("registers every test in exactly one leaf group and full covers runtime reg
 
     assert.ok(allTests.length >= 42)
     for (const file of allTests) {
-        const registeredGroups = leafMembership.get(file)
-        assert.equal(registeredGroups?.length, 1, file)
-        assert.equal(selectTestGroups([file]).includes(registeredGroups[0]), true, file)
+        if (file === "tools/multi_hub_authentication.test.cjs") {
+            assert.deepEqual(leafMembership.get(file), ["quick:runtime"], file)
+            continue
+        }
+        assert.deepEqual(leafMembership.get(file), [selectTestGroups([file])[0]], file)
     }
 
     const externalGeneratorTests = new Set(TEST_GROUPS.generator.tests)

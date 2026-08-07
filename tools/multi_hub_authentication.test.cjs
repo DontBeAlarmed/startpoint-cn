@@ -1,6 +1,7 @@
 "use strict"
 
 const assert = require("node:assert/strict")
+const crypto = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
@@ -34,7 +35,7 @@ function authenticationFixture(t) {
     store.revoke(revoked.credentialId)
     const reloader = new CredentialReloader({ credentialsPath, warn: () => {} })
     assert.equal(reloader.reloadIfChanged(), true)
-    return { active, reloader, revoked }
+    return { active, credentialsPath, reloader, revoked }
 }
 
 test("credential reloader classifies malformed, unknown, revoked, and active tokens", t => {
@@ -77,8 +78,33 @@ test("legacy authenticate keeps returning only active credentials", t => {
     assert.equal(reloader.authenticate(active.token)?.credentialId, active.credentialId)
 })
 
+test("revoked authentication scans every credential digest", t => {
+    const { credentialsPath, reloader, revoked } = authenticationFixture(t)
+    const persisted = JSON.parse(fs.readFileSync(credentialsPath, "utf8"))
+    assert.equal(persisted.credentials[0].credentialId, revoked.credentialId)
+
+    const originalTimingSafeEqual = crypto.timingSafeEqual
+    let comparisons = 0
+    crypto.timingSafeEqual = (...args) => {
+        comparisons++
+        return originalTimingSafeEqual(...args)
+    }
+    try {
+        assert.deepEqual(reloader.authenticateDetailed(revoked.token), {
+            ok: false,
+            reason: "revoked",
+            credentialId: revoked.credentialId,
+        })
+    } finally {
+        crypto.timingSafeEqual = originalTimingSafeEqual
+    }
+
+    assert.equal(comparisons, reloader.getStatus().total)
+    assert.equal(crypto.timingSafeEqual, originalTimingSafeEqual)
+})
+
 test("authentication rejection buffer keeps a frozen sanitized 32-event FIFO", () => {
-    let timestamp = 1_000
+    let timestamp = Date.parse("2026-08-07T12:00:00.000Z")
     const buffer = new AuthenticationRejectionBuffer(() => timestamp++)
 
     for (let index = 0; index < 34; index++) {
@@ -101,12 +127,15 @@ test("authentication rejection buffer keeps a frozen sanitized 32-event FIFO", (
     const firstList = buffer.list()
     const secondList = buffer.list()
     assert.equal(firstList.length, 32)
-    assert.equal(firstList[0].timestamp, 1_002)
-    assert.equal(firstList.at(-1).timestamp, 1_033)
+    assert.equal(firstList[0].timestamp, "2026-08-07T12:00:00.002Z")
+    assert.equal(firstList.at(-1).timestamp, "2026-08-07T12:00:00.033Z")
     assert.notEqual(firstList, secondList)
     assert.equal(Object.isFrozen(firstList), true)
     assert.equal(firstList.every(Object.isFrozen), true)
-    assert.throws(() => firstList.push({ timestamp: 0, reason: "unknown" }), TypeError)
+    assert.throws(() => firstList.push({
+        timestamp: "1970-01-01T00:00:00.000Z",
+        reason: "unknown",
+    }), TypeError)
     assert.throws(() => { firstList[0].reason = "unknown" }, TypeError)
 
     for (const event of firstList) {

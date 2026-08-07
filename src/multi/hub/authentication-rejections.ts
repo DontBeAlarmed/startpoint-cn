@@ -5,7 +5,7 @@ export type AuthenticationRejection =
     | { readonly reason: "revoked"; readonly credentialId: string }
 
 export interface AuthenticationRejectionEvent {
-    readonly timestamp: number
+    readonly timestamp: string
     readonly reason: AuthenticationRejectionReason
     readonly credentialId?: string
 }
@@ -20,7 +20,7 @@ export class AuthenticationRejectionBuffer {
     constructor(private readonly now: () => number = Date.now) {}
 
     record(rejection: AuthenticationRejection): void {
-        const timestamp = this.now()
+        const timestamp = new Date(this.now()).toISOString()
         const event: AuthenticationRejectionEvent = rejection.reason === "revoked"
             ? Object.freeze({
                 timestamp,
