@@ -837,6 +837,74 @@ test("HubClient reads bounded authoritative diagnostics through the existing con
     })
 })
 
+test("HubClient records authentication rejection only for registration 401", async t => {
+    const target = fixture(t)
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: "z".repeat(32),
+        fetch: fetchThroughHub(target.app),
+        now: () => target.getNow(),
+    })
+
+    assert.deepEqual(await client.getControlStatus(), {
+        ok: false,
+        error: "HUB_UNAVAILABLE",
+    })
+    assert.equal(client.getAuthenticationState(), "authentication_rejected")
+})
+
+test("HubClient leaves authentication state unchanged on registration network failure", async () => {
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: "a".repeat(32),
+        fetch: async () => {
+            throw new Error("network unavailable")
+        },
+    })
+
+    assert.deepEqual(await client.getControlStatus(), {
+        ok: false,
+        error: "HUB_UNAVAILABLE",
+    })
+    assert.equal(client.getAuthenticationState(), null)
+})
+
+test("HubClient clears authentication rejection after a valid registration", async t => {
+    const target = fixture(t)
+    const delegate = fetchThroughHub(target.app)
+    let rejectNextRegistration = true
+    const client = new HubClient({
+        hubUrl: new URL("http://hub.example/"),
+        token: target.first.token,
+        now: () => target.getNow(),
+        fetch: (url, init) => {
+            if (rejectNextRegistration
+                && new URL(url).pathname === "/v1/multi/nodes/register") {
+                rejectNextRegistration = false
+                return delegate(url, {
+                    ...init,
+                    headers: {
+                        ...init.headers,
+                        authorization: `Bearer ${"z".repeat(32)}`,
+                    },
+                })
+            }
+            return delegate(url, init)
+        },
+    })
+
+    assert.deepEqual(await client.getControlStatus(), {
+        ok: false,
+        error: "HUB_UNAVAILABLE",
+    })
+    assert.equal(client.getAuthenticationState(), "authentication_rejected")
+
+    const status = await client.getControlStatus()
+    assert.equal(status.ok, true)
+    assert.equal(status.value.tcpAvailable, true)
+    assert.equal(client.getAuthenticationState(), null)
+})
+
 test("explicit control status degrades a client when Host TCP stops", async t => {
     let tcpAvailable = true
     const target = fixture(t, {

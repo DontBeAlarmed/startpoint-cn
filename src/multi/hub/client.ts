@@ -6,6 +6,7 @@ import {
     type CoordinatorResult,
     type NodeSessionId,
 } from "../coordinator/contracts"
+import type { ClientAuthenticationState } from "./authentication-rejections"
 import type { MultiHubTcpEndpoint } from "./control-routes"
 import type { MultiHubControlStatus } from "./control-routes"
 import {
@@ -55,6 +56,7 @@ export class HubClient {
     private readonly createIdempotencyKey: () => string
     private session: HubNodeSession | null = null
     private registration: Promise<HubNodeSession> | null = null
+    private authenticationState: ClientAuthenticationState = null
     private available = false
     private availabilityRequestId = 0
 
@@ -94,6 +96,10 @@ export class HubClient {
 
     isAvailable(): boolean {
         return this.peekLiveSession() !== null && this.available
+    }
+
+    getAuthenticationState(): ClientAuthenticationState {
+        return this.authenticationState
     }
 
     async getExistingSessionControlStatus(): Promise<MultiHubControlStatus | null> {
@@ -224,11 +230,15 @@ export class HubClient {
             },
             body: JSON.stringify({ protocolVersion: MULTI_PROTOCOL_VERSION }),
         })
+        if (response.status === 401) {
+            this.authenticationState = "authentication_rejected"
+        }
         if (response.status !== 200
             || !isHubNodeSessionPayload(response.body)
             || response.body.expiresAt <= this.now()) {
             throw new Error("Hub registration failed")
         }
+        this.authenticationState = null
         this.session = Object.freeze({
             nodeSessionId: response.body.nodeSessionId as NodeSessionId,
             sessionCredential: response.body.sessionCredential,

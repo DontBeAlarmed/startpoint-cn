@@ -21,7 +21,11 @@ import {
 } from "../coordinator/embedded"
 import { RemoteMultiCoordinator } from "../coordinator/remote"
 import { RoutedMultiCoordinator } from "../coordinator/router"
-import { AuthenticationRejectionBuffer } from "../hub/authentication-rejections"
+import {
+    AuthenticationRejectionBuffer,
+    type AuthenticationRejectionEvent,
+    type ClientAuthenticationState,
+} from "../hub/authentication-rejections"
 import { HubClient } from "../hub/client"
 import { CredentialReloader } from "../hub/credential-reloader"
 import { IdempotencyCache } from "../hub/idempotency"
@@ -65,6 +69,11 @@ export interface MultiRuntimeFatal {
 
 export type MultiRuntimeFatalHandler = (failure: MultiRuntimeFatal) => void
 
+export interface MultiRuntimeAuthenticationDiagnostics {
+    readonly clientState: ClientAuthenticationState
+    readonly hostRejections: readonly AuthenticationRejectionEvent[]
+}
+
 interface MultiRuntimeHostServices extends MultiHubControlRoutesOptions {
     readonly admissionRegistry: AdmissionRegistry
 }
@@ -101,6 +110,7 @@ export interface MultiRuntimeService {
     start(config: MultiRuntimeConfig, onFatalError?: MultiRuntimeFatalHandler): Promise<void>
     stop(): Promise<void>
     getStatus(): MultiRuntimeStatus
+    getAuthenticationDiagnostics(): MultiRuntimeAuthenticationDiagnostics
     getAdminStatus(): Promise<AdminMultiStatus>
     probeControlStatus(): Promise<CoordinatorResult<MultiHubControlStatus>>
     getHttpContext(): MultiHttpContext
@@ -429,6 +439,25 @@ class Service implements MultiRuntimeService {
         })
     }
 
+    getAuthenticationDiagnostics(): MultiRuntimeAuthenticationDiagnostics {
+        if (this.config?.mode === "host" && this.hostServices !== null) {
+            return freezeAuthenticationDiagnostics(
+                null,
+                this.hostServices.authenticationRejections.list(),
+            )
+        }
+        if (this.config?.mode === "client" && this.remoteCoordinator !== null) {
+            let clientState: ClientAuthenticationState = null
+            try {
+                clientState = this.remoteCoordinator.getAuthenticationState()
+            } catch {
+                // Diagnostics are observational; a failed sample must not affect runtime state.
+            }
+            return freezeAuthenticationDiagnostics(clientState, [])
+        }
+        return freezeAuthenticationDiagnostics(null, [])
+    }
+
     async getAdminStatus(): Promise<AdminMultiStatus> {
         const generation = this.generation
         const config = this.config
@@ -575,6 +604,16 @@ class Service implements MultiRuntimeService {
         }
         if (failures.length > 0) throw failures[0]
     }
+}
+
+function freezeAuthenticationDiagnostics(
+    clientState: ClientAuthenticationState,
+    hostRejections: readonly AuthenticationRejectionEvent[],
+): MultiRuntimeAuthenticationDiagnostics {
+    return Object.freeze({
+        clientState,
+        hostRejections: Object.freeze([...hostRejections]),
+    })
 }
 
 async function resolveClientActiveQuestOrigin(

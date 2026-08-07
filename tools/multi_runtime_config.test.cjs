@@ -473,6 +473,87 @@ test("host runtime creates a fresh authentication rejection buffer after a full 
     await harness.service.stop()
 })
 
+test("unstarted and embedded runtimes return fresh frozen empty authentication diagnostics", async () => {
+    const harness = createServiceHarness()
+    const unstarted = harness.service.getAuthenticationDiagnostics()
+    const nextUnstarted = harness.service.getAuthenticationDiagnostics()
+
+    assert.deepEqual(unstarted, { clientState: null, hostRejections: [] })
+    assert.equal(Object.isFrozen(unstarted), true)
+    assert.equal(Object.isFrozen(unstarted.hostRejections), true)
+    assert.notEqual(nextUnstarted, unstarted)
+    assert.notEqual(nextUnstarted.hostRejections, unstarted.hostRejections)
+
+    await harness.service.start({
+        mode: "embedded",
+        tcp: { host: "127.0.0.1", port: 8003 },
+    })
+    const embedded = harness.service.getAuthenticationDiagnostics()
+    assert.deepEqual(embedded, { clientState: null, hostRejections: [] })
+    assert.equal(Object.isFrozen(embedded), true)
+    assert.equal(Object.isFrozen(embedded.hostRejections), true)
+    assert.notEqual(embedded.hostRejections, unstarted.hostRejections)
+    await harness.service.stop()
+})
+
+test("host runtime exposes only its bounded authentication rejection events", async () => {
+    const harness = createServiceHarness()
+    await harness.service.start(hostRuntimeConfig())
+    const buffer = harness.hostServices().authenticationRejections
+    buffer.record({ reason: "revoked", credentialId: "credential-a" })
+    const event = buffer.list()[0]
+
+    const first = harness.service.getAuthenticationDiagnostics()
+    const second = harness.service.getAuthenticationDiagnostics()
+    assert.equal(first.clientState, null)
+    assert.deepEqual(first.hostRejections, [event])
+    assert.equal(first.hostRejections[0], event)
+    assert.equal(Object.isFrozen(first), true)
+    assert.equal(Object.isFrozen(first.hostRejections), true)
+    assert.notEqual(second, first)
+    assert.notEqual(second.hostRejections, first.hostRejections)
+    await harness.service.stop()
+})
+
+test("client runtime exposes authentication state and contains diagnostic getter failures", async () => {
+    let state = "authentication_rejected"
+    let failDiagnostics = false
+    const remote = new RemoteMultiCoordinator({
+        read: async () => ({ ok: false, error: "HUB_UNAVAILABLE" }),
+        write: async () => ({ ok: false, error: "HUB_UNAVAILABLE" }),
+        getTcpEndpoint: () => null,
+        getNodeSessionId: () => null,
+        isAvailable: () => false,
+        getAuthenticationState: () => {
+            if (failDiagnostics) throw new Error("diagnostic failure")
+            return state
+        },
+    })
+    const harness = createServiceHarness({ createRemoteCoordinator: () => remote })
+    await harness.service.start({
+        mode: "client",
+        hubUrl: new URL("http://192.0.2.20:8004"),
+        token: "a".repeat(32),
+    })
+
+    const rejected = harness.service.getAuthenticationDiagnostics()
+    assert.deepEqual(rejected, {
+        clientState: "authentication_rejected",
+        hostRejections: [],
+    })
+    assert.equal(Object.isFrozen(rejected), true)
+    assert.equal(Object.isFrozen(rejected.hostRejections), true)
+
+    state = null
+    assert.equal(harness.service.getAuthenticationDiagnostics().clientState, null)
+    failDiagnostics = true
+    assert.deepEqual(harness.service.getAuthenticationDiagnostics(), {
+        clientState: null,
+        hostRejections: [],
+    })
+    await harness.service.stop()
+})
+
 test("host Hub bind failure degrades multiplayer without discarding local TCP", async () => {
     const harness = createServiceHarness()
     harness.failHub()

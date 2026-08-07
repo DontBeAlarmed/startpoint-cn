@@ -522,6 +522,7 @@ test("Remote coordinator implements every Hub operation and forwards compatibili
         getTcpEndpoint: () => ({ host: "hub.example", port: 8003 }),
         getNodeSessionId: () => "node-a",
         isAvailable: () => true,
+        getAuthenticationState: () => "authentication_rejected",
     }
     const remote = new RemoteMultiCoordinator(client)
     const compatible = { participant: participant(), roomNumber: "123456", compatibility }
@@ -562,6 +563,7 @@ test("Remote coordinator implements every Hub operation and forwards compatibili
     ])
     assert.deepEqual(calls[1][2].compatibility, compatibility)
     assert.deepEqual(remote.getTcpEndpoint(), { host: "hub.example", port: 8003 })
+    assert.equal(remote.getAuthenticationState(), "authentication_rejected")
 })
 
 test("serializer uses the Hub TCP endpoint without exposing an update URL", () => {

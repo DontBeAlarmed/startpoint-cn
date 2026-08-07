@@ -3,6 +3,7 @@ import type {
     AdmissionIssueResult,
     AdmissionIssuer,
 } from "../admission/registry"
+import type { ClientAuthenticationState } from "../hub/authentication-rejections"
 import type { HubClient } from "../hub/client"
 import type { MultiHubTcpEndpoint } from "../hub/control-routes"
 import type { MultiHubControlStatus } from "../hub/control-routes"
@@ -28,6 +29,7 @@ export interface RemoteHubClient {
     getTcpEndpoint(): MultiHubTcpEndpoint | null
     getNodeSessionId(): NodeSessionId | null
     isAvailable(): boolean
+    getAuthenticationState(): ClientAuthenticationState
     getControlStatus(): Promise<CoordinatorResult<MultiHubControlStatus>>
     getExistingSessionControlStatus(): Promise<MultiHubControlStatus | null>
 }
@@ -90,6 +92,10 @@ export class RemoteMultiCoordinator implements MultiCoordinator, AdmissionIssuer
 
     isAvailable(): boolean {
         return this.client.isAvailable()
+    }
+
+    getAuthenticationState(): ClientAuthenticationState {
+        return this.client.getAuthenticationState()
     }
 
     getControlStatus(): Promise<CoordinatorResult<MultiHubControlStatus>> {
