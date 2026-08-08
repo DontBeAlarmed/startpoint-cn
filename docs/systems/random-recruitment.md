@@ -11,14 +11,14 @@ NPC 模式和 NPC 等待时长是两个独立配置：
 | 配置 | 作用 | 默认行为 |
 |---|---|---|
 | `npc_mode_enabled` | 是否启用当前 NPC 优先流程 | `true`，保持旧部署体验 |
-| `summon_com_seconds` | 客户端开始随机招募后，等待多久再请求 NPC | 保留当前运行配置，默认 5 秒 |
+| `summon_com_seconds` | 官方真人招募开始后，客户端等待多久再请求 NPC | 默认 120 秒（2 分钟） |
 
 `npc_mode_enabled` 不使用 `0` 表示关闭。它是布尔开关：
 
 - `true`：服务端不建立真人招募队列，`summon` 按当前实现返回 NPC；`attention/check` 不返回本服真人招募请求。
-- `false`：服务端启用官方真人随机招募；真人不足时，客户端按照 `summon_com_seconds` 请求 `summon`，服务端只补足剩余空位的 NPC。
+- `false`：服务端启用官方真人随机招募；真人不足时，客户端等待默认 120 秒后按照 `summon_com_seconds` 请求 `summon`，服务端只补足剩余空位的 NPC。
 
-`summon_com_seconds` 只影响客户端何时请求 `multi_battle_quest/summon`，不负责切换 NPC 模式。TCP 中的 NPC 加入消息延迟和 ready 消息延迟仍是内部协议时序，不与该设置混用。
+`summon_com_seconds` 只影响客户端何时请求 `multi_battle_quest/summon`，不负责切换 NPC 模式。首期后台默认值为 `120` 秒，适用于关闭 NPC 优先模式后的真人招募等待；NPC 模式开启时仍保持当前 NPC 优先体验。TCP 中的 NPC 加入消息延迟和 ready 消息延迟仍是内部协议时序，不与该设置混用。
 
 首期只实现同一服务端内的真人随机招募。跨 Hub、跨服的随机招募另行设计，不把跨节点房间发现混入本功能。
 
@@ -62,7 +62,7 @@ CN 1.8.1 反编译源码已经包含完整的客户端招募链路：
 
 5. 其他玩家接受通知后，客户端根据 `room_number` 进入对应房间。成功进入后，房主继续接收成员变化，真人成员占用房间空位。
 
-6. 房主开始随机招募后，客户端在 `summon_com_seconds` 到期且房间仍未满时请求 `multi_battle_quest/summon`。若返回有效 NPC，客户端再通过 TCP `EnterComs` 将 NPC 加入房间；若没有有效 NPC，则停止本轮 NPC 尝试并继续随机招募。
+6. 房主开始随机招募后，客户端在 `summon_com_seconds` 到期且房间仍未满时请求 `multi_battle_quest/summon`。本项目首期将该值设置为 120 秒。若返回有效 NPC，客户端再通过 TCP `EnterComs` 将 NPC 加入房间；若没有有效 NPC，则停止本轮 NPC 尝试并继续随机招募。
 
 因此，官方客户端的“随机招募”和“NPC 回退”已经是两段流程。服务端不能只延长当前 TCP NPC 消息的延迟来实现真人招募。
 
