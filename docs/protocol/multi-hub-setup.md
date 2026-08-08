@@ -73,9 +73,9 @@ B 正常启动时不会立即监听本地 fallback TCP。只有新多人操作�
 - `load` 遇到网络不可用会保留 active quest；只有 Hub 明确报告房间不存在时才清理。
 - Hub 不会同步或修改另一节点的 CDN、Content Release、Mod 或服务器时间。
 
-## 本机诊断
+## 管理接口
 
-运行中的服务提供只允许本机 loopback 调用的管理动作：
+运行中的服务提供以下管理动作。当前不内置后台账号、权限或公网鉴权；这些接口可以通过远程后台调用，服主负责限制 `8001` 的可达范围并自行提供访问控制：
 
 ```text
 GET    /api/server/multiplayer/credentials
@@ -86,7 +86,7 @@ POST   /api/server/multiplayer/probe
 PUT    /api/server/time-package
 ```
 
-`GET /api/server/time-package` 可导出三字段时间包；导入只修改全局服务器时间，不修改任务周期、商店购买、奖励或玩家存档。服务端已提供只读 `GET /api/server/multiplayer/authentication-rejections` 投影，但当前 Launcher 尚未消费；未来 Launcher 适配器也只能通过真实 loopback 公开投影读取，不得直接读取凭据表、Host 内存或其他内部状态。Launcher 和后台应调用这些服务接口，不得直接编辑密钥表、`server-time.json`、房间状态或 SQLite。
+`GET /api/server/time-package` 可导出三字段时间包；导入只修改全局服务器时间，不修改任务周期、商店购买、奖励或玩家存档。Launcher 和后台应调用这些服务接口，不得直接编辑凭据表、`server-time.json`、房间状态或 SQLite。`8004` 仍然只承载 Hub 控制协议，不承载这些管理接口。
 
 ## 排查顺序
 

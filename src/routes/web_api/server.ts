@@ -21,7 +21,6 @@ import {
     type AdminMultiStatus,
 } from "../../lib/admin-multi-status";
 import { unavailableMultiRuntimeStatus } from "../../multi/runtime/status";
-import { requireLoopback } from "../../multi/management/loopback";
 import {
     applyPlayerSaveTemplateSync,
     clonePlayerSaveV2Sync,
@@ -120,7 +119,6 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
     })
 
     fastify.put("/time-package", async (request: FastifyRequest, reply: FastifyReply) => {
-        if (!requireLoopback(request, reply)) return
         try {
             validateServerTimePackage(request.body)
         } catch (error) {
@@ -144,7 +142,6 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
     })
 
     fastify.get("/resetTime", async (request: FastifyRequest, reply: FastifyReply) => {
-        if (!requireLoopback(request, reply)) return
         reply.status(200).send(legacyTimeResponse(
             serverTimeService.setSystemTime(),
             false,
@@ -152,7 +149,6 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
     })
 
     fastify.get("/time", async (request: FastifyRequest, reply: FastifyReply) => {
-        if (!requireLoopback(request, reply)) return
         const newTime = (request.query as TimeQuery).time
         if (!newTime) return reply.status(400).send({
             "error": "Bad Request",

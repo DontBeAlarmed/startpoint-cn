@@ -7,7 +7,6 @@ import {
 } from "../../multi/hub/credential-store"
 import { MAX_AUTHENTICATION_REJECTIONS } from "../../multi/hub/authentication-rejections"
 import { MultiHubCredentialLockError } from "../../multi/hub/credential-lock"
-import { requireLoopback } from "../../multi/management/loopback"
 import {
     MultiManagementError,
 } from "../../multi/management/service"
@@ -151,11 +150,9 @@ function isAuthenticationRejectionReason(
 }
 
 function getService(
-    request: FastifyRequest,
     reply: FastifyReply,
     options: MultiManagementRoutesOptions,
 ): MultiManagementServiceContract | null {
-    if (!requireLoopback(request, reply)) return null
     let service: MultiManagementServiceContract | null | undefined
     try {
         service = options.getMultiManagementService()
@@ -213,7 +210,7 @@ function sendManagementError(reply: FastifyReply, error: unknown): FastifyReply 
 
 const routes = async (fastify: FastifyInstance, options: MultiManagementRoutesOptions) => {
     fastify.get("/authentication-rejections", async (request, reply) => {
-        const service = getService(request, reply, options)
+        const service = getService(reply, options)
         if (service === null) return
         try {
             return reply.status(200).send(
@@ -225,7 +222,7 @@ const routes = async (fastify: FastifyInstance, options: MultiManagementRoutesOp
     })
 
     fastify.get("/credentials", async (request, reply) => {
-        const service = getService(request, reply, options)
+        const service = getService(reply, options)
         if (service === null) return
         try {
             return reply.status(200).send(service.listCredentials().map(publicCredential))
@@ -235,7 +232,7 @@ const routes = async (fastify: FastifyInstance, options: MultiManagementRoutesOp
     })
 
     fastify.post("/credentials", async (request, reply) => {
-        const service = getService(request, reply, options)
+        const service = getService(reply, options)
         if (service === null) return
         try {
             const label = (request.body as CreateCredentialBody | null)?.label
@@ -250,7 +247,7 @@ const routes = async (fastify: FastifyInstance, options: MultiManagementRoutesOp
     fastify.delete<{ Params: CredentialParams }>(
         "/credentials/:credentialId",
         async (request, reply) => {
-            const service = getService(request, reply, options)
+            const service = getService(reply, options)
             if (service === null) return
             try {
                 return reply.status(200).send(publicCredential(
@@ -263,7 +260,7 @@ const routes = async (fastify: FastifyInstance, options: MultiManagementRoutesOp
     )
 
     fastify.post("/probe", async (request, reply) => {
-        const service = getService(request, reply, options)
+        const service = getService(reply, options)
         if (service === null) return
         try {
             return reply.status(200).send(publicProbe(await service.probeHub()))

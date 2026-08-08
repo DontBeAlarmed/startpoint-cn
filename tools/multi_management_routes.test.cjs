@@ -67,7 +67,7 @@ test("management routes return a stable 503 until the lazy service is configured
     assert.deepEqual(ready.json(), [])
 })
 
-test("loopback authentication rejection diagnostics return exact public fields", async t => {
+test("authentication rejection diagnostics return exact public fields", async t => {
     const calls = []
     const service = {
         getAuthenticationDiagnostics() {
@@ -444,7 +444,7 @@ test("authentication rejection route skips malformed field values without leakin
     assert.doesNotMatch(response.body, /secret-|value|token/)
 })
 
-test("loopback management routes delegate CRUD and probe with public response fields only", async t => {
+test("management routes delegate CRUD and probe with public response fields only", async t => {
     const calls = []
     const secretFields = {
         digest: "secret-digest",
@@ -546,14 +546,40 @@ test("loopback management routes delegate CRUD and probe with public response fi
     ])
 })
 
-test("all management actions reject non-loopback requests before touching the service", async t => {
+test("all management actions accept remote requests", async t => {
     const calls = []
     const service = {
-        createCredential: () => calls.push("create"),
-        listCredentials: () => calls.push("list"),
-        revokeCredential: () => calls.push("revoke"),
-        probeHub: () => calls.push("probe"),
-        getAuthenticationDiagnostics: () => calls.push("diagnostics"),
+        createCredential: () => {
+            calls.push("create")
+            return {
+                credentialId: "a".repeat(32),
+                label: "node-a",
+                createdAt: CREATED_AT,
+                revokedAt: null,
+                token: "b".repeat(64),
+            }
+        },
+        listCredentials: () => {
+            calls.push("list")
+            return []
+        },
+        revokeCredential: () => {
+            calls.push("revoke")
+            return {
+                credentialId: "a".repeat(32),
+                label: "node-a",
+                createdAt: CREATED_AT,
+                revokedAt: CREATED_AT,
+            }
+        },
+        probeHub: () => {
+            calls.push("probe")
+            return { state: "ready", checkedAt: CREATED_AT }
+        },
+        getAuthenticationDiagnostics: () => {
+            calls.push("diagnostics")
+            return { mode: "host", clientState: null, rejections: [] }
+        },
     }
     const app = await createApp(t, () => service)
     const requests = [
@@ -572,14 +598,9 @@ test("all management actions reject non-loopback requests before touching the se
             ...options,
             remoteAddress: "192.0.2.10",
         })
-        assert.equal(response.statusCode, 403)
-        assert.deepEqual(response.json(), {
-            error: "Forbidden",
-            code: "LOCAL_MANAGEMENT_ONLY",
-            message: "This management operation requires a loopback request",
-        })
+        assert.ok([200, 201].includes(response.statusCode), response.body)
     }
-    assert.deepEqual(calls, [])
+    assert.deepEqual(calls, ["list", "create", "revoke", "probe", "diagnostics"])
 })
 
 test("client mode rejects create, list, and revoke with one stable safe code", async t => {

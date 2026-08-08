@@ -397,11 +397,11 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 - `authentication_rejected` 只进入 Client 的管理诊断；游戏多人操作仍按 `HUB_UNAVAILABLE` 进入现有自动降级，不向游戏客户端增加新协议错误码；
 - Host 内部认证结果区分 `malformed`、`unknown` 和 `revoked`，但比较未知与已撤销令牌时必须完整扫描当前凭据快照，不因命中记录提前返回；
 - Host 只在内存保存最近 32 条认证拒绝，进程重启即清空；容量满时淘汰最旧记录，不写 SQLite、凭据文件或普通日志；
-- 诊断事件只保存服务端生成的时间戳和有限原因。只有 `revoked` 可以在内部关联已有的完整 `credentialId`；对 loopback 管理调用的公开投影只返回凭据备注和 8 位 `shortId`；
+- 诊断事件只保存服务端生成的时间戳和有限原因。只有 `revoked` 可以在内部关联已有的完整 `credentialId`；管理 API 的公开投影只返回凭据备注和 8 位 `shortId`；
 - 不保存或返回明文令牌、令牌摘要、请求、网络地址、端口、设备 ID、节点会话或 stack；
 - 普通运行日志最多记录固定事件与有限原因，不包含能够把请求关联到具体凭据的值。
 
-`MultiManagementService` 是该诊断的唯一公开业务边界。`GET /api/server/multiplayer/authentication-rejections` 只接受真实 loopback 请求；远程请求、`8004` Hub 控制面和游戏客户端都不能读取。React 后台与 Launcher 若消费该能力，只消费公开投影，不直接读取凭据表或 Host 内存。
+`MultiManagementService` 是该诊断的唯一公开业务边界。`GET /api/server/multiplayer/authentication-rejections` 可以由远程管理工具调用；`8004` Hub 控制面和游戏客户端都不能读取。React 后台与 Launcher 若消费该能力，只消费公开投影，不直接读取凭据表或 Host 内存。服务端不内置后台账号、权限或公网鉴权，服主必须自行限制管理接口的网络暴露。
 
 公开 JSON 形态固定为：
 
@@ -439,7 +439,7 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 - Host 本机诊断能够区分 `malformed`、`unknown`、`revoked`，有界淘汰且不泄露令牌、摘要、完整凭据 ID 或网络身份；
 - Client 管理诊断可以区分认证拒绝与网络失败，但游戏多人流程仍使用既有 `HUB_UNAVAILABLE` 与本地降级；
 - 认证拒绝公开投影只保留规定的 JSON 字段，canonical ISO UTC 时间戳和非法事件过滤生效，`shortId` 恰为 8 位；Host、Client、embedded 三种模式的空值和数组形态符合契约；
-- `GET /api/server/multiplayer/authentication-rejections` 只允许真实 loopback，远程请求、`8004` Hub 控制面和游戏客户端均不能读取；
+- `GET /api/server/multiplayer/authentication-rejections` 只允许管理 API 访问，`8004` Hub 控制面和游戏客户端均不能读取；
 - 非法密钥表不会替换上一份有效内存快照；
 - 两个节点本地 `playerId` 相同时仍分别结算；
 - 不同节点的相同裸 `viewerId` 在搜索或准备阶段被拒绝，同节点重复请求保持幂等；
@@ -500,12 +500,12 @@ Client C: HTTP C + SQLite C
 - `MultiManagementService` 是创建、列出、撤销节点凭据和读取管理状态的唯一业务边界；
 - 当前没有 React 后台、Android Launcher 或 CLI 消费认证拒绝投影；这些适配器不得各自直接写密钥表、节点会话或房间状态；
 - `8004` 只保留运行时 Hub 控制协议，不增加凭据管理、配置写入或后台管理端点；
-- 当前 CLI 与 loopback 管理 API 已复用该服务的其他管理能力，包括凭据 CRUD；认证拒绝诊断目前只由 loopback API 提供。React 后台在账号、认证和权限系统完成前只允许只读诊断，不提供远程令牌创建、撤销或多人配置写入；
+- 当前 CLI 与管理 API 已复用该服务的其他管理能力，包括凭据 CRUD 和认证拒绝诊断。React 后台可以提供这些管理操作；服务端不限制网络来源，账号鉴权、反向代理和访问控制由服主负责；
 - 服务器时间分享与导入属于独立管理服务，不进入 Hub，不随建房、查房或准备自动触发。
 
-运行中的凭据、Hub probe 和时间导入动作只接受真实 loopback 来源；`8004` 不增加管理端点。新的管理 UI 仍留待后台账号与权限系统完成后接入。
+运行中的凭据、Hub probe 和时间导入动作通过 `8001` 管理 API 提供；`8004` 不增加管理端点。服务端不对 `8001` 管理 API 做来源地址限制，新的管理 UI 可以直接接入，但服主必须自行负责鉴权和网络隔离。
 
-认证拒绝诊断目前只由 loopback API 提供；未来适配器只能通过公开 loopback 投影读取，不得直接读取凭据表或 Host 内存，也不允许 Launcher、React 后台或 CLI 各自实现第二套认证判断。
+认证拒绝诊断通过管理 API 提供；未来适配器只能通过公开投影读取，不得直接读取凭据表或 Host 内存，也不允许 Launcher、React 后台或 CLI 各自实现第二套认证判断。
 
 ## 14. 后续可选的时间对齐
 
