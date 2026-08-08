@@ -22,11 +22,13 @@ NPC 模式和 NPC 等待时长是两个独立配置：
 
 首期只实现同一服务端内的真人随机招募。跨 Hub、跨服的随机招募另行设计，不把跨节点房间发现混入本功能。
 
+关闭 NPC 模式不会改变客户端的入口行为：仅创建房间、进入房间或原地等待，都不会自动开启随机招募。房主仍需在房间内选择随机招募；服务端不能替客户端凭空触发 `share_room` 请求。若要实现“创建房间后自动发布招募”，那是额外的服务端自定义行为，不属于官方客户端流程。
+
 ## 2. 国服客户端证据
 
 CN 1.8.1 反编译源码已经包含完整的客户端招募链路：
 
-1. 房主选择随机招募后，`MultiBattleRoomScene.shareRequestAPI()` 调用 `multi_battle_quest/share_room`，请求字段包含：
+1. 房主在房间内选择随机招募后，`MultiBattleRoomScene.shareRequestAPI()` 才会把 `roomSharings[3]` 标记为已选择、启动 Attention 招募，并调用 `multi_battle_quest/share_room`。仅创建房间不会执行这一步，请求字段包含：
 
    ```json
    {
@@ -37,7 +39,7 @@ CN 1.8.1 反编译源码已经包含完整的客户端招募链路：
    }
    ```
 
-2. `AttentionRecruitmentRedeliverTimer` 首次立即发送招募，之后按照 `attention_recruitment_interval_seconds` 重复发送；当前客户端配置为 15 秒，最多 20 次。房间满员或进入 NPC 回退后停止重发。
+2. `AttentionRecruitmentRedeliverTimer` 首次立即发送招募，之后按照 `attention_recruitment_interval_seconds` 重复发送；当前客户端配置为 15 秒，最多 20 次。房间满员或进入 NPC 回退后停止重发。客户端还会在已选择随机招募并恢复房间状态后设置一个 1800 帧的延迟重发计数，但这不是创建房间后的自动开启。
 
 3. 其他玩家在普通场景或战斗场景按客户端配置轮询 `/attention/check`。当前配置为普通场景 10 秒、战斗场景 15 秒，请求携带 `holding_number` 和 `request_number=3`。
 
@@ -92,6 +94,7 @@ CN 1.8.1 反编译源码已经包含完整的客户端招募链路：
 
 ```text
 Idle
+  -> 房主手动选择随机招募
   -> share_room
 Recruiting
   -> 真人接受并进入房间
