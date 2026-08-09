@@ -230,7 +230,7 @@ test("room routes derive raising state from the injected coordinator status", as
                 })
                 assert.equal(response.statusCode, 200)
                 assert.equal(decode(response).data.raising_state, expectedState)
-                if (route.name === "prepare") {
+                if (route.name === "select" || route.name === "prepare") {
                     assert.equal(
                         admissionRegistry.consume(status.roomNumber, viewerId)?.snapshot.viewerId,
                         viewerId,

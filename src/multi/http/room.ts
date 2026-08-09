@@ -6,6 +6,7 @@ import { buildNpcMates } from "../npc/builder";
 import { isValidMultiViewerId, type MultiHttpContext } from "./context";
 import type { CoordinatorErrorCode } from "../coordinator/contracts";
 import { classifyRoomJoin } from "./join-result";
+import { issueRoomAdmission } from "./room-admission";
 
 async function hasValidViewer(context: MultiHttpContext, viewerId: number): Promise<boolean> {
     return isValidMultiViewerId(viewerId)
@@ -82,18 +83,17 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             return prepareFailure(reply, viewerId, body.room_number || "", room.error);
         }
 
-        const preparedAdmission = await context.snapshotProvider.prepareAdmission(viewerId)
-        if (!preparedAdmission) {
+        const issued = await issueRoomAdmission(
+            context,
+            room.value.roomNumber,
+            viewerId,
+            coordinatorInput.participant,
+        )
+        if (!issued) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Unable to snapshot player."
             })
         }
-        const issued = await context.admissionIssuer.issue({
-            roomNumber: room.value.roomNumber,
-            participant: coordinatorInput.participant,
-            snapshot: preparedAdmission.snapshot,
-            expiresAt: context.now() + context.admissionTtlMs,
-        })
         if (!issued.ok) {
             return prepareFailure(reply, viewerId, room.value.roomNumber, issued.error)
         }

@@ -5,6 +5,7 @@ import { generateDataHeaders } from "../../utils"
 import { serializeRoomStatusConnection } from "../room/serializer"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
 import { classifyRoomJoin } from "./join-result"
+import { issueRoomAdmission } from "./room-admission"
 
 function isPositiveSafeInteger(value: number): boolean {
     return Number.isSafeInteger(value) && value > 0
@@ -173,6 +174,24 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
                     body.room_number || "",
                     room.kind === "missing" ? 9 : 7,
                 ),
+            })
+        }
+
+        const participant = context.snapshotProvider.getParticipant(viewerId)
+        const issued = await issueRoomAdmission(
+            context,
+            room.value.roomNumber,
+            viewerId,
+            participant,
+        )
+        if (!issued) return reply.status(400).send({
+            "error": "Bad Request", "message": "Unable to snapshot player."
+        })
+        if (!issued.ok) {
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+                "data": unavailableConnection(room.value.roomNumber, 7),
             })
         }
 

@@ -162,6 +162,18 @@ async function prepareRoom(harness, node, roomNumber, quest) {
     })
 }
 
+async function selectRoom(harness, node, roomNumber, quest) {
+    return harness.gamePost(node.url, `${apiPrefix}/select_room`, {
+        viewer_id: node.viewerId,
+        api_count: 1,
+        room_number: roomNumber,
+        category: quest.category,
+        quest_id: quest.questId,
+        party_id: 1,
+        accepted_type: 0,
+    })
+}
+
 async function disbandRoom(harness, host, roomNumber) {
     const response = await harness.gamePost(host.url, `${apiPrefix}/disband_room`, {
         viewer_id: host.viewerId,
@@ -187,12 +199,18 @@ async function enterRoom(harness, node, roomNumber, quest, endpoint, suffix) {
     return { peer, connectionId, endpoint }
 }
 
-async function openRoomParty(harness, nodes, quest, suffix) {
+async function openRoomParty(harness, nodes, quest, suffix, admissionRoute = "select") {
     const roomNumber = await createRoom(harness, nodes[0], quest, suffix.length)
     const lobby = []
-    for (const node of nodes) {
-        const prepared = await prepareRoom(harness, node, roomNumber, quest)
-        const endpoint = preparedTcpEndpoint(prepared, roomNumber)
+    for (const [index, node] of nodes.entries()) {
+        if (index > 0 && admissionRoute === "select") {
+            const searched = await searchRoom(harness, node, roomNumber)
+            assert.equal(searched.body.data.room_exists, true)
+        }
+        const admitted = admissionRoute === "prepare"
+            ? await prepareRoom(harness, node, roomNumber, quest)
+            : await selectRoom(harness, node, roomNumber, quest)
+        const endpoint = preparedTcpEndpoint(admitted, roomNumber)
         lobby.push(await enterRoom(harness, node, roomNumber, quest, endpoint, suffix))
     }
     nodes.slice(1).forEach((_node, index) => lobby[index + 1].peer.send([0, [3, [1]]]))
@@ -383,6 +401,7 @@ test("three compiled CN processes share trusted Hub state while keeping local se
         [host, clientB],
         ticketQuest,
         "ticket",
+        "prepare",
     )
     const beforeTicket = new Map([host, clientB].map(node => [node.dataKey, playerState(harness, node)]))
     const ticketPlayIds = await startPlayers(
