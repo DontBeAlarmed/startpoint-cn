@@ -244,6 +244,11 @@ async function completeScene(peers) {
     )))
 }
 
+async function leaveLobbyForBattle(lobby) {
+    lobby.forEach(({ peer }) => peer.send([0, [1]]))
+    await Promise.all(lobby.map(({ peer }) => peer.closedPromise))
+}
+
 test("three compiled CN processes share trusted Hub state while keeping local settlement", {
     timeout: 210_000,
     skip: process.platform === "win32" ? "process signal coverage is POSIX-only" : false,
@@ -438,6 +443,7 @@ test("three compiled CN processes share trusted Hub state while keeping local se
         bossParty.roomNumber,
         "battle",
     )
+    await leaveLobbyForBattle(bossParty.lobby)
     await completeScene(battlePeers)
     const earlyFinish = await harness.gamePost(
         host.url,

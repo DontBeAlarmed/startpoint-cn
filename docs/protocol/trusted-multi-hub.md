@@ -484,6 +484,7 @@ Client C: HTTP C + SQLite C
 - 各节点时间不同但都在开放期时可加入，开放期外成员收到 NotPlayable 且房间不删除；
 - 只有游戏房主扣体力和门票，每名参与者的奖励分别写入自己的 SQLite；
 - 超级猫头鹰 BothBoss 完成两代 SceneReady，提前 HTTP finish 被拒绝，延迟 finish 可继续使用 retained fact；
+- 三个节点建立 battle socket 后按客户端真实切场顺序发送 lobby `Bye`，房间、远程成员快照和 SceneReady 屏障继续有效；
 - Client 进程重启产生新的 node session 后，`/load` 仍保留 active quest，并可完成轮换后的 finish；
 - Host/Hub 停止后 Client 核心 HTTP 与 SQLite 继续工作，多人进入 degraded，active quest 不被误删，Guest abort 可本地收敛。
 - Client 对新房间在 Hub 失败后按需启动自己的 TCP，并在 Hub 恢复后只把后续新房间切回远程；已有房间来源保持不变。
