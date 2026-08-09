@@ -172,6 +172,7 @@ function isAccepting(context: ServerContext, socket: net.Socket): boolean {
         && phase === "listening"
         && acceptedSockets.has(socket)
         && !socket.destroyed
+        && !socket.writableEnded
 }
 
 function trackHandshake(
@@ -179,7 +180,7 @@ function trackHandshake(
     socket: net.Socket,
     data: any,
     handshakeHandler: NonNullable<SessionServerOptions["handleHandshake"]>,
-): void {
+): Promise<void> {
     const lifecycle: HandshakeLifecycleGuard = Object.freeze({
         generation: context.generation,
         isAccepting: () => isAccepting(context, socket),
@@ -208,6 +209,7 @@ function trackHandshake(
     record.promise = tracked
     pendingHandshakes.add(record)
     socketHandshakes.set(socket, record)
+    return tracked
 }
 
 function handleConnection(
@@ -226,12 +228,11 @@ function handleConnection(
     socket.setEncoding("utf8")
     let buffer = ""
     let handshakeDone = false
+    let handshakePending: Promise<void> | null = null
     let isBattleSocket = false
 
-    socket.on("data", (chunk: string) => {
-        if (!isAccepting(context, socket)) return
-
-        buffer += chunk
+    const processBuffer = (): void => {
+        if (handshakePending !== null || !isAccepting(context, socket)) return
         while (isAccepting(context, socket) && buffer.includes("\0")) {
             const index = buffer.indexOf("\0")
             const raw = buffer.substring(0, index)
@@ -243,7 +244,20 @@ function handleConnection(
                 if (!handshakeDone && data.socklet) {
                     handshakeDone = true
                     isBattleSocket = data.socklet === "cooperation_battle"
-                    trackHandshake(context, socket, data, handshakeHandler)
+                    socket.pause()
+                    const pending = trackHandshake(context, socket, data, handshakeHandler)
+                    handshakePending = pending
+                    void pending.then(() => {
+                        if (handshakePending !== pending) return
+                        handshakePending = null
+                        if (!isAccepting(context, socket)) {
+                            buffer = ""
+                            return
+                        }
+                        socket.resume()
+                        processBuffer()
+                    })
+                    return
                 } else if (handshakeDone) {
                     if (rejectInvalidNodeSession(context, socket)) break
                     if (isBattleSocket) {
@@ -257,9 +271,17 @@ function handleConnection(
                 console.error(`[TCP] parse failed: code=${failureCode(error) ?? "UNKNOWN"}`)
             }
         }
+    }
+
+    socket.on("data", (chunk: string) => {
+        if (!isAccepting(context, socket)) return
+        buffer += chunk
+        processBuffer()
     })
 
     socket.on("close", () => {
+        buffer = ""
+        handshakePending = null
         console.log("[TCP] connection closed")
         cleanupAcceptedSocket(socket)
     })

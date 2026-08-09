@@ -177,6 +177,10 @@ JSON.stringify(message) + "\0"
 
 握手阶段只完成连接注册。Welcome 和 Mates 在客户端随后发送 Enter notify 后进入 lobby 流程。
 
+首个 `socklet` 握手是每条 TCP 连接的顺序屏障。握手与 Enter、SceneReady 等后续帧即使出现在
+同一个 TCP 数据块中，服务端也必须保留后续帧，等待连接注册和节点会话复核完成后再按原顺序处理；
+握手失败、节点失效或连接关闭时不再处理排队帧。客户端和 Launcher 不需要为此人为增加发送延迟。
+
 成员资格与 socket 在线状态分开保存：普通网络断开只移除连接，房间保留到恢复、主动解散或过期清理，因此成员仍有 `restore_room` 资格；非房主主动发送 Bye 时释放自身成员资格，房主主动发送 Bye 时立即广播解散并销毁整个房间。
 
 ### 6.2 Battle socket 握手
@@ -396,6 +400,7 @@ CN Notify 索引已经按 `SceneReady=0`、`LevelNext=1`、`Finalize=2`、`Measu
 | `tools/multi_room_identity.test.cjs` | 随机 token、HTTP 权限、成员恢复和外部社区关闭响应 |
 | `tools/lobby_lifecycle.test.cjs` | NPC 招募、成员、准备和重赛状态 |
 | `tools/room_cleanup_lifecycle.test.cjs` | 15/30 分钟清理与 state 4 跳过 |
+| `tools/session_frame_order.test.cjs` | Room/Battle 握手后同包首帧顺序与拒绝清理 |
 | `tools/session_server_lifecycle.test.cjs` | TCP 启停和会话生命周期 |
 | `tests/multi-hub-process.test.js` | 三编译进程、独立 SQLite、兼容/时间/身份准入、BothBoss、会话轮换与 Hub degraded |
 | `tools/multi_player_context.test.cjs` | viewer、账号与存档映射 |

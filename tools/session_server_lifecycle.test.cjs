@@ -84,12 +84,21 @@ class FakeSocket extends EventEmitter {
         this.destroyCalls = 0
         this.destroyed = false
         this.writable = true
+        this.writableEnded = false
     }
 
     setEncoding() {}
 
     write() {
         return true
+    }
+
+    pause() {
+        return this
+    }
+
+    resume() {
+        return this
     }
 
     destroy() {

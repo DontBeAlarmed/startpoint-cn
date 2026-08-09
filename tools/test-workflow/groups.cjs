@@ -126,6 +126,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/npc_contributor_names.test.cjs",
             "tools/npc_nickname_pool.test.cjs",
             "tools/room_cleanup_lifecycle.test.cjs",
+            "tools/session_frame_order.test.cjs",
             "tools/session_server_lifecycle.test.cjs",
         ],
     },
