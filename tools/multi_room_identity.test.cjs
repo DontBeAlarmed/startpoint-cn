@@ -391,7 +391,7 @@ test("valid viewers cannot leak missing room lookups through the coordinator", a
         ["/summon", 400, { category_id: 1, quest_id: 701 }],
         ["/restore_room", 200, { room_sequence: 1 }],
         ["/share_room", 403, {}],
-        ["/disband_room", 403, {}],
+        ["/disband_room", 200, {}],
     ]
 
     const output = await captureConsole(async () => {
@@ -499,7 +499,7 @@ test("create, search, select and prepare preserve room response contracts throug
     }
 })
 
-test("empty room locators preserve legacy HTTP responses", async t => {
+test("empty room locators use non-fatal HTTP responses", async t => {
     const fastify = await createRouteServer()
     t.after(async () => fastify.close())
 
@@ -576,7 +576,7 @@ test("empty room locators preserve legacy HTTP responses", async t => {
             name: "disband_room",
             url: "/disband_room",
             payload: { viewer_id: 101, room_number: "", api_count: 8 },
-            statusCode: 403,
+            statusCode: 200,
         },
     ]
 

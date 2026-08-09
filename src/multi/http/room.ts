@@ -264,8 +264,8 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             participant: context.snapshotProvider.getParticipant(viewerId),
             roomNumber: body.room_number,
         });
-        if (!result.ok) return forbidden(reply);
-        console.log("[MULTI] room disbanded");
+        if (!result.ok && result.error !== "ROOM_NOT_FOUND") return forbidden(reply);
+        console.log(result.ok ? "[MULTI] room disbanded" : "[MULTI] room already absent");
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({

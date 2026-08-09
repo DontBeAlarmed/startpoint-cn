@@ -117,7 +117,7 @@ JSON.stringify(message) + "\0"
 | `summon` | 仅房主可请求静态 NPC mate 模板 |
 | `restore_room` | 已记录成员可恢复仍在进程内的房间；陌生玩家返回状态 13，缺失房间返回状态 9 |
 | `share_room` | 仅房主可提交，成功响应不含业务字段，也不提供真实分享或匹配队列 |
-| `disband_room` | 仅房主可广播 Disbanded 并删除进程内房间 |
+| `disband_room` | 房间存在时仅房主可广播 Disbanded 并删除房间；房间已不存在时幂等成功 |
 
 ### 4.3 战斗生命周期
 
@@ -317,7 +317,7 @@ create_room
 ### 10.2 Abort 与主动解散
 
 - 房主 `abort` 先在自己的 SQLite 事务中退款并取消 active quest，提交后再通过 coordinator 解散房间；
-- `disband_room` 广播 Disbanded 并删除房间；
+- `disband_room` 对现存房间仅允许房主广播 Disbanded 并删除房间；客户端重复清理已经不存在的房间时返回成功，不触发 H403；
 - 非房主 abort 同样先提交自己的退款和 active quest 删除，再通过 coordinator 移除自身 battle 连接、屏障资格和 retained fact 授权；移除后若剩余成员已经全部 Finalize，coordinator 立即 release 当局并保留已完成成员的 retained fact；
 - 本地事务失败时不调用 Hub，原请求可以重试；本地提交后 Hub cleanup 失败时仍返回本地成功，不回滚退款。node session 的 `expiresAt` 在注册时固定，认证 touch 只更新 `lastSeen`，不会延长 TTL；session 到期或 credential revoke 时，Hub 的失效回调按 active rooms 扫描并移除该 session 的 guest battle fact、参与者和连接，再次重判 release，因此遗漏的 Hub abort 会有界收敛；
 - 重复 abort 因 active quest 已删除而失败，不会重复退款或再次调用 Hub。失效扫描只在 node invalidation 事件执行，不给请求热路径增加索引或扫描。
