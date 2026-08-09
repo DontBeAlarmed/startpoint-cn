@@ -627,11 +627,12 @@ const routes = async (fastify: FastifyInstance) => {
         // Calculate recovery amount (capped at overflow)
         const afterStamina = Math.min(currentStamina + recoveryValue, maxOverflow)
         const actualRecovery = afterStamina - currentStamina
+        const recoveryTime = new Date()
 
         updatePlayerSync({
             id: playerId,
             stamina: afterStamina,
-            staminaHealTime: new Date(),
+            staminaHealTime: recoveryTime,
             freeVmoney: freeVmoney - recoveryCost
         })
 
@@ -643,7 +644,7 @@ const routes = async (fastify: FastifyInstance) => {
             "data": {
                 "user_info": {
                     "stamina": afterStamina,
-                    "stamina_heal_time": realToVirtual(new Date()),
+                    "stamina_heal_time": realToVirtual(recoveryTime),
                     "free_vmoney": freeVmoney - recoveryCost
                 },
                 "mail_arrived": getMailArrivedSync(playerId)

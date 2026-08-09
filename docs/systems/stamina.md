@@ -61,9 +61,9 @@ cost = max(1, floor(baseCost * activeRate))
 
 ## 多人关卡
 
-多人开战当前没有实现体力扣除，这是与单人流程的明确差异。
+多人开战由房主按同一套入场事务校验并扣除体力与入场道具；成员不承担房主的关卡入场体力成本。开战响应使用与数据库写入相同的恢复时间锚点，避免客户端对同一段自然恢复再次累计。
 
-多人结算已经实现 rank point 与 degree 更新。跨级时同样在当前体力上增加 `getMaxStamina(newDegreeId)` 并重置恢复时间，然后通过 `user_info` 返回新体力。不得再把“多人升级未实现”作为当前状态。
+多人结算已经实现 rank point 与 degree 更新。跨级时同样在当前体力上增加 `getMaxStamina(newDegreeId)` 并重置恢复时间，然后通过 `user_info` 返回新体力。
 
 ## 活动折扣
 
@@ -87,7 +87,7 @@ cost = max(1, floor(baseCost * activeRate))
 
 ## 已知边界
 
-- 多人开战不扣体力；
+- 多人入场成本由房主承担，成员不扣房主的体力或入场道具；
 - 自动连战在体力不足时仍按普通入场返回 H400，客户端缺少官方的非致命停止语义；
 - 体力、门票与 active quest 已在单人 start 事务化；单人和协力 finish 的数据库写入也已有总事务，详见[战斗关卡结算事务](./quest-finish-transactions.md)；
 - 客户端显示和长时间离线恢复仍需结合服务器 `timeOffset` 做人工验收。
@@ -99,6 +99,7 @@ cost = max(1, floor(baseCost * activeRate))
 主要相关测试：
 
 - `tools/quest_entry_lifecycle.test.cjs`；
+- `tools/stamina_serialization.test.cjs`；
 - `tools/treasure_key_entry.test.cjs`；
 - `tools/quest_host_finish.test.cjs`；
 - `tools/event_currency.test.cjs`。

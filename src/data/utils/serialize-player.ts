@@ -154,8 +154,10 @@ export function serializePlayerData(
 
     const realTimeStamina = computeRealTimeStamina(playerData)
     if (realTimeStamina !== playerData.stamina) {
-        updatePlayerSync({ id: playerData.id, stamina: realTimeStamina, staminaHealTime: new Date() })
+        const staminaHealTime = new Date()
+        updatePlayerSync({ id: playerData.id, stamina: realTimeStamina, staminaHealTime })
         playerData.stamina = realTimeStamina
+        playerData.staminaHealTime = staminaHealTime
     }
 
     const clientData: ClientPlayerData = {

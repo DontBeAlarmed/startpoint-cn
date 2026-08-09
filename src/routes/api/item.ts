@@ -121,6 +121,7 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         const afterStamina = Math.min(currentStamina + totalStaminaRecovery, maxOverflow)
+        const recoveryTime = new Date()
 
         getDb().transaction(() => {
             for (const upd of itemUpdates) {
@@ -129,7 +130,7 @@ const routes = async (fastify: FastifyInstance) => {
             updatePlayerSync({
                 id: playerId,
                 stamina: afterStamina,
-                staminaHealTime: new Date()
+                staminaHealTime: recoveryTime
             })
         })()
 
@@ -147,7 +148,7 @@ const routes = async (fastify: FastifyInstance) => {
             "data": {
                 "user_info": {
                     "stamina": afterStamina,
-                    "stamina_heal_time": realToVirtual(new Date())
+                    "stamina_heal_time": realToVirtual(recoveryTime)
                 },
                 "item_list": itemListMap,
                 "mail_arrived": getMailArrivedSync(playerId)

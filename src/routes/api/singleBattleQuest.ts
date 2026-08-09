@@ -941,7 +941,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "user_info": {
                     "last_main_quest_id": body.quest_id,
                     "stamina": startResult.afterStamina,
-                    "stamina_heal_time": realToVirtual(new Date())
+                    "stamina_heal_time": realToVirtual(startTime)
                 },
                 "item_list": buildStartEntryItemList(startResult),
                 "category_id": body.category,

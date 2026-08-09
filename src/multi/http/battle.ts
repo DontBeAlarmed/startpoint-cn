@@ -245,6 +245,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             playId: play_id,
             continueCount: 0,
         };
+        const startTime = new Date();
         let startResult;
         try {
             startResult = runStartEntryTransaction({
@@ -254,7 +255,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 partyId: party_id,
                 updatePartySlot: questData.fixedParty === undefined,
                 activeQuest,
-                now: new Date(),
+                now: startTime,
             }, {
                 transaction: operation => getDb().transaction(operation)(),
                 getActiveQuest: getPlayerActiveQuestSync,
@@ -285,7 +286,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 "play_id": play_id,
                 "user_info": {
                     "stamina": startResult.afterStamina,
-                    "stamina_heal_time": realToVirtual(new Date()),
+                    "stamina_heal_time": realToVirtual(startTime),
                 },
                 "item_list": buildStartEntryItemList(startResult),
             }

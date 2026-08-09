@@ -265,6 +265,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/test-workflow/database-isolation.test.cjs",
             "tools/test-workflow/database-lifecycle.test.cjs",
             "tools/test-workflow/runtime-data-paths.test.cjs",
+            "tools/stamina_serialization.test.cjs",
         ],
     },
     "integration:event": {
