@@ -23,6 +23,10 @@ const {
 } = adminStatus
 
 const repositoryRoot = path.resolve(__dirname, "..")
+const dashboardSource = fs.readFileSync(
+    path.join(repositoryRoot, "admin/src/pages/Dashboard.tsx"),
+    "utf8",
+)
 const privateHomePrefix = path.join(path.sep, "Users") + path.sep
 const privateHomePath = path.join(privateHomePrefix, "example", "private.json")
 const { createMultiRuntimeService } = require("../src/multi/runtime/service")
@@ -44,6 +48,10 @@ productionContentSnapshotProvider.snapshot = {
 }
 
 test.after(() => restoreContentSnapshot())
+
+test("dashboard identifies contentDigest as multiplayer battle content", () => {
+    assert.match(dashboardSource, /多人战斗内容（contentDigest）/)
+})
 
 function runtime(mode, overrides = {}) {
     const remote = mode === "client"

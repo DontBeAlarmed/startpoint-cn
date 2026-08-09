@@ -14,10 +14,12 @@ const { ContentSnapshotError } = require("../src/content/runtime/content-snapsho
 
 const RELEASE_DIGEST = `sha256:${"1".repeat(64)}`
 const BUNDLED_DIGEST = `sha256:${"4".repeat(64)}`
+const MULTI_BATTLE_DIGEST = `sha256:${"7".repeat(64)}`
 
 function snapshot({
     releaseDigest = RELEASE_DIGEST,
     contentDigest = releaseDigest ?? BUNDLED_DIGEST,
+    multiBattleContentDigest = MULTI_BATTLE_DIGEST,
     table = () => undefined,
 } = {}) {
     return {
@@ -29,6 +31,7 @@ function snapshot({
                 generatorVersion: 1,
                 releaseDigest,
                 contentDigest,
+                multiBattleContentDigest,
             }),
             table,
         },
@@ -83,8 +86,8 @@ test("profile source is resolved on first valid request and caches only the succ
 
     assert.equal(first.ok, true)
     assert.equal(second.ok, true)
-    assert.equal(first.value.contentDigest, RELEASE_DIGEST)
-    assert.equal(second.value.contentDigest, RELEASE_DIGEST)
+    assert.equal(first.value.contentDigest, MULTI_BATTLE_DIGEST)
+    assert.equal(second.value.contentDigest, MULTI_BATTLE_DIGEST)
     assert.equal(snapshotCalls, 1)
     assert.equal(modeCalls, 1)
 })
@@ -342,7 +345,7 @@ test("missing, repeated, non-ASCII and oversized client version headers fail clo
     }
 })
 
-test("profile construction uses the active release digest and never invokes asset update", () => {
+test("profile construction uses the multiplayer battle digest and never invokes asset update", () => {
     let assetUpdateCalls = 0
     const activeSnapshot = snapshot()
     Object.defineProperty(activeSnapshot, "assetUpdate", {
@@ -360,15 +363,16 @@ test("profile construction uses the active release digest and never invokes asse
     const result = factory({ app_ver: "1.8.1", res_ver: "1.4.54" })
 
     assert.equal(result.ok, true)
-    assert.equal(result.value.contentDigest, RELEASE_DIGEST)
+    assert.equal(result.value.contentDigest, MULTI_BATTLE_DIGEST)
     assert.equal(assetUpdateCalls, 0)
 })
 
-test("profile reads the loaded bundled digest from repository info without table access", () => {
+test("profile reads the loaded multiplayer battle digest without table access", () => {
     let tableCalls = 0
     const activeSnapshot = snapshot({
         releaseDigest: null,
         contentDigest: BUNDLED_DIGEST,
+        multiBattleContentDigest: MULTI_BATTLE_DIGEST,
         table: () => {
             tableCalls++
             throw new Error("compatibility profile must not access content tables")
@@ -382,7 +386,7 @@ test("profile reads the loaded bundled digest from repository info without table
     const result = factory({ APP_VER: "1.8.1", RES_VER: "1.4.54" })
 
     assert.equal(result.ok, true)
-    assert.equal(result.value.contentDigest, BUNDLED_DIGEST)
+    assert.equal(result.value.contentDigest, MULTI_BATTLE_DIGEST)
     assert.equal(tableCalls, 0)
 })
 

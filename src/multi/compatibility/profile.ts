@@ -73,7 +73,7 @@ function resolveProfileSource(
     const snapshot = (dependencies.getContentSnapshot ?? getContentSnapshot)()
     return Object.freeze({
         cdnTargetVersion: snapshot.cdn.targetVersion,
-        contentDigest: snapshot.repository.info().contentDigest,
+        contentDigest: snapshot.repository.info().multiBattleContentDigest,
         modeDigest: buildModeDigest(
             (dependencies.getLoadedModeIdentities ?? listLoadedModeIdentities)(),
         ),

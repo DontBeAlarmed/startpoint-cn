@@ -304,7 +304,11 @@ export default function Dashboard() {
                                                         key={`${difference.field}-${index}`}
                                                         className="multi-compatibility-difference"
                                                     >
-                                                        <Tag color="orange">{difference.field}</Tag>
+                                                        <Tag color="orange">
+                                                            {difference.field === "contentDigest"
+                                                                ? "多人战斗内容（contentDigest）"
+                                                                : difference.field}
+                                                        </Tag>
                                                         <div className="multi-compatibility-values">
                                                             {difference.required !== undefined
                                                                 && difference.received !== undefined ? (

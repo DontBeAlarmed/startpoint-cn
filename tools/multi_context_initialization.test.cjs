@@ -28,6 +28,7 @@ function snapshot() {
                 generatorVersion: 3,
                 releaseDigest: RELEASE_DIGEST,
                 contentDigest: RELEASE_DIGEST,
+                multiBattleContentDigest: RELEASE_DIGEST,
             }),
             table: () => undefined,
         },

@@ -16,6 +16,10 @@ import type { ContentCurrentReleaseSnapshot } from "../sync/object-store"
 import { findTableSource, TABLE_SOURCES } from "../sync/table-registry"
 import { assertReleaseTableRegistry } from "../sync/table-contract"
 import { canonicalJsonBuffer, sha256Object } from "../sync/canonical-json"
+import {
+    buildMultiBattleContentDigest,
+    buildMultiBattleContentDigestFromObjects,
+} from "./multi-battle-digest"
 
 type ContentDigest = `sha256:${string}`
 
@@ -25,6 +29,7 @@ export interface ContentRepositoryInfo {
     readonly generatorVersion: number
     readonly releaseDigest: `sha256:${string}` | null
     readonly contentDigest: ContentDigest
+    readonly multiBattleContentDigest: ContentDigest
 }
 
 export interface ContentRepositoryOptions {
@@ -109,6 +114,7 @@ export class ContentRepository {
                     ] as const
                 ),
             )
+            const tables = deepFreeze(Object.fromEntries(entries))
             const contentDigest = digestBundledEntries(entries)
             return deepFreeze(new ContentRepository(
                 deepFreeze({
@@ -117,8 +123,9 @@ export class ContentRepository {
                     generatorVersion: CONTENT_GENERATOR_VERSION,
                     releaseDigest: null,
                     contentDigest,
+                    multiBattleContentDigest: buildMultiBattleContentDigest(tables),
                 }),
-                deepFreeze(Object.fromEntries(entries)),
+                tables,
             ))
         }
 
@@ -129,6 +136,7 @@ export class ContentRepository {
                 release.objects[release.manifest.tables[definition.tableName].object],
             ] as const
         ))
+        const tables = deepFreeze(Object.fromEntries(entries))
         return deepFreeze(new ContentRepository(
             deepFreeze({
                 source: "release",
@@ -136,8 +144,13 @@ export class ContentRepository {
                 generatorVersion: release.manifest.generatorVersion,
                 releaseDigest: release.manifest.releaseDigest,
                 contentDigest: release.manifest.releaseDigest,
+                multiBattleContentDigest: buildMultiBattleContentDigestFromObjects(
+                    Object.fromEntries(Object.entries(release.manifest.tables).map(
+                        ([tableName, table]) => [tableName, table.object],
+                    )),
+                ),
             }),
-            deepFreeze(Object.fromEntries(entries)),
+            tables,
         ))
     }
 

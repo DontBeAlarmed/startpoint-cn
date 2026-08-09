@@ -165,11 +165,13 @@ modeDigest
 - `multiProtocolVersion` 是 Hub 内部接口和多人状态契约版本；破坏兼容时递增。
 - `APP_VER`、`RES_VER` 来自该玩家当前多人 HTTP 请求的客户端头。
 - `cdnTargetVersion` 来自本地固定 `ContentSnapshot.cdn.targetVersion`。
-- `contentDigest` 表示服务端实际加载的业务表快照。当前激活的 Content Release 令
-  `ContentRepository.info().contentDigest` 等于 `releaseDigest`；bundled fallback 在
-  `ContentRepository` 完成全部注册表加载时，对实际 entries 分别生成 canonical SHA-256，再按表名的
-  code-point 顺序组合并一次性保存到 `info()`。兼容资料只读取 `info()`，不再次访问任一 `table()`。
-  两条路径都不读取候选或失败 Release，不扫描 CDN 大文件，也不触发 `content:sync`。
+- `contentDigest` 在线上协议中表示多人战斗内容摘要，而不是完整业务表摘要。`ContentRepository`
+  仍以 `info().contentDigest` 保存完整 Release 摘要，并另以 `info().multiBattleContentDigest`
+  保存多人摘要；兼容资料把后者写入既有 `contentDigest` 字段，以保持 Hub 报文结构不变。
+  多人摘要只包含建房、入场或结算链实际读取的关卡、入场消耗、角色、掉落与特殊关卡结算表。
+  卡池、卡池种子、商店、公告、支付、任务定义及其他养成表不会影响同房判断。两种摘要都在
+  `ContentRepository` 完成全部注册表加载时按表名和 canonical SHA-256 一次性生成；兼容资料只读取
+  `info()`，不再次访问任一 `table()`，也不扫描 CDN 大文件或触发 `content:sync`。
 - `modeDigest` 只包含依次通过 allowlist SHA、静态 manifest、`register()` 和 Registry 注册的 Mod 身份，
   以文件名、manifest 名称与 capability、已验证文件 SHA 按稳定顺序组合。禁用、摘要不符、manifest
   不兼容、加载失败或注册失败的模块不计入。
@@ -194,7 +196,7 @@ modeDigest
 尚无这两个字段时，普通与练习关卡保持原有可用行为；只有明确活动关卡分类因缺少权威周期而 fail closed。
 一旦任一周期字段出现，缺少另一字段或值非法同样 fail closed，不推测永久开放。
 
-角色、装备、能力魂、Mana Node、觉醒能力和 EX Boost 不按发布时间再次校验。玩家所属服务端负责确认配队来自其真实存档，并生成只读玩家快照；双方内容定义是否存在则由 `contentDigest` 和 `modeDigest` 保证。已经获得的活动或后期内容不会因为另一节点时间较早而失效。
+角色、装备、能力魂、Mana Node、觉醒能力和 EX Boost 不按发布时间再次校验。玩家所属服务端负责确认配队来自其真实存档，并生成只读玩家快照；客户端战斗资源仍由 `APP_VER`、`RES_VER` 和 `cdnTargetVersion` 表明版本，多人路由读取的服务端战斗数据由 `contentDigest` 保证，自定义玩法逻辑由 `modeDigest` 保证。已经获得的活动或后期内容不会因为另一节点时间较早而失效。
 
 `QUEST_NOT_AVAILABLE` 始终由当前玩家所属节点按自己的本地服务器时间判断，Hub 不使用自身时钟生成或覆盖该结果，也不把业务时间加入兼容性 profile。Hub 侧 Embedded 房间仍保留既有的房间生命周期时钟语义：`getServerTime` 只服务于房间的 `host_entry_time`、空闲 TTL 和客户端状态相关逻辑；这些生命周期判断不等同于活动资格判断。
 

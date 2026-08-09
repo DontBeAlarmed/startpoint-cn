@@ -105,6 +105,7 @@ test("missing current loads and freezes every registered bundled fallback table"
         generatorVersion: CONTENT_GENERATOR_VERSION,
         releaseDigest: null,
         contentDigest: expectedBundledDigest(bundledTables),
+        multiBattleContentDigest: repository.info().multiBattleContentDigest,
     })
     assertDeepFrozen(repository.info())
 
@@ -202,6 +203,30 @@ test("bundled content digest changes with loaded content and not import completi
     assert.notEqual(first.info().contentDigest, changed.info().contentDigest)
 })
 
+test("multiplayer battle digest ignores gacha content but changes with quest content", async t => {
+    const fixture = createLegacyLayout(t)
+    const load = overrides => ContentRepository.load(fixture.options, {
+        importBundledTable: async (_runtimeRoot, tableName) => ({
+            tableName,
+            marker: overrides[tableName] ?? "stable",
+        }),
+    })
+
+    const baseline = await load({})
+    const changedGacha = await load({ "gacha.json": "changed" })
+    const changedQuest = await load({ "boss_battle_quest.json": "changed" })
+
+    assert.notEqual(baseline.info().contentDigest, changedGacha.info().contentDigest)
+    assert.equal(
+        baseline.info().multiBattleContentDigest,
+        changedGacha.info().multiBattleContentDigest,
+    )
+    assert.notEqual(
+        baseline.info().multiBattleContentDigest,
+        changedQuest.info().multiBattleContentDigest,
+    )
+})
+
 test("bundled import failure drains workers before immediate retry", async t => {
     const fixture = createLegacyLayout(t)
     const failure = new Error("controlled bundled import failure")
@@ -265,6 +290,7 @@ test("release tables and info are deeply frozen and keep one cached reference", 
         generatorVersion: 7,
         releaseDigest: manifest.releaseDigest,
         contentDigest: manifest.releaseDigest,
+        multiBattleContentDigest: repository.info().multiBattleContentDigest,
     })
     assertDeepFrozen(repository.info())
     assert.strictEqual(repository.info(), repository.info())
