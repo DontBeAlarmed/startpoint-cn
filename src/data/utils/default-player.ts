@@ -1,11 +1,12 @@
 import { getServerDate } from "../../utils"
+import { getMaxStamina } from "../../lib/stamina"
 import type { Player } from "../types"
 
 /** Build the persisted defaults for a newly-created player. */
 export function getDefaultPlayerData(): Omit<Player, "id"> {
     const now = getServerDate()
     return {
-        stamina: 10,
+        stamina: getMaxStamina(1),
         staminaHealTime: new Date(),
         boostPoint: 10,
         bossBoostPoint: 3,

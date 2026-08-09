@@ -14,6 +14,12 @@
 
 `getRankDegree(rankPoint)` 从等级阈值计算当前 degree；`getMaxStamina(degree)` 返回该等级的自然体力上限。
 
+## 新账号初始化
+
+新建账号的初始 `rankPoint=0`、`degreeId=1`，体力通过 `getMaxStamina(1)` 从等级表读取，因此创建时为当前 rank 1 自然上限；国服 1.4.54 表中该值为 19。教程或后续关卡仍按正常入场规则消耗体力。
+
+该规则只用于创建新玩家，不会在升级服务端时自动补满或改写已有存档。若等级表以后调整，新账号默认值会随服务端当前等级表变化，避免再次维护独立硬编码。
+
 ## 自然恢复
 
 `computeRealTimeStamina()` 读取玩家体力、恢复时间、等级和 `heal_rate`：

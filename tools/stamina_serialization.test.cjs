@@ -39,6 +39,7 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getMergedPlayerDataSync } = require("../src/data/utils/player-data")
 const { serializePlayerData } = require("../src/data/utils/serialize-player")
+const { getMaxStamina, getRankDegree } = require("../src/lib/stamina")
 const { realToVirtual } = require("../src/utils")
 const singleBattleSource = fs.readFileSync(
     path.join(__dirname, "../src/routes/api/singleBattleQuest.ts"),
@@ -65,6 +66,13 @@ const account = insertAccountSync({
     status: "normal",
 })
 const playerId = insertDefaultPlayerSync(account.id).id
+const initialPlayer = getPlayerSync(playerId)
+assert.notEqual(initialPlayer, null)
+assert.equal(
+    initialPlayer.stamina,
+    getMaxStamina(getRankDegree(initialPlayer.rankPoint)),
+    "new players must start at their current rank's stamina cap",
+)
 const staleHealTime = new Date(Date.now() - 3_600_000)
 updatePlayerSync({ id: playerId, stamina: 5, staminaHealTime: staleHealTime })
 
