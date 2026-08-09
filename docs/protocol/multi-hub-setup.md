@@ -30,7 +30,7 @@ MULTI_HUB_PORT="8004"
 `SESSION_PUBLIC_HOST` 是游戏客户端实际连接的地址，不能填写 `0.0.0.0`。启动 A 后生成一条只发给 B 的令牌：
 
 ```bash
-npm run multi:token -- create "B 服务器"
+npm run multi:token -- create "B 服务器备注名"
 ```
 
 命令会把凭据写入 A 的私有运行数据，并只显示一次明文令牌。若命令询问是否把令牌写入当前 `.env`，纯 Host 可以选择不写；把明文令牌通过可信渠道交给 B 即可。
