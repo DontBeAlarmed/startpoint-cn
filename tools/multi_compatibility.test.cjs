@@ -328,20 +328,66 @@ test("comparison is exact and reports differences in schema order", () => {
     })
 })
 
-test("missing, repeated, non-ASCII and oversized client version headers fail closed", () => {
+test("each admission field independently blocks room compatibility", () => {
+    const host = profile()
+    for (const [field, guest] of [
+        ["multiProtocolVersion", { ...host, multiProtocolVersion: 2 }],
+        ["APP_VER", { ...host, APP_VER: "custom" }],
+        ["contentDigest", { ...host, contentDigest: `sha256:${"3".repeat(64)}` }],
+        ["modeDigest", { ...host, modeDigest: `sha256:${"4".repeat(64)}` }],
+    ]) {
+        const comparison = compareCompatibility(host, guest)
+        assert.equal(comparison.compatible, false, field)
+        assert.deepEqual(comparison.differences.map(difference => difference.field), [field])
+    }
+})
+
+test("resource and CDN version differences remain diagnostic without blocking rooms", () => {
+    const host = profile()
+    const guest = profile({
+        RES_VER: "1.4.55",
+        source: { cdnTargetVersion: "1.4.55" },
+    })
+
+    assert.deepEqual(compareCompatibility(host, guest), {
+        compatible: true,
+        differences: [
+            { field: "RES_VER", host: "1.4.54", guest: "1.4.55" },
+            { field: "cdnTargetVersion", host: "1.4.54", guest: "1.4.55" },
+        ],
+    })
+})
+
+test("missing, repeated, non-ASCII and oversized application versions fail closed", () => {
     const factory = createCompatibilityProfileFactory({
         getContentSnapshot: () => snapshot(),
         getLoadedModeIdentities: () => [],
     })
     for (const headers of [
         { RES_VER: "1.4.54" },
-        { APP_VER: "1.8.1" },
         { APP_VER: ["1.8.1", "custom"], RES_VER: "1.4.54" },
         { APP_VER: "国服", RES_VER: "1.4.54" },
         { APP_VER: "x".repeat(65), RES_VER: "1.4.54" },
-        { APP_VER: "1.8.1", RES_VER: "bad\nvalue" },
     ]) {
         assert.deepEqual(factory(headers), { ok: false, error: "INCOMPATIBLE_ROOM" })
+    }
+})
+
+test("missing or invalid resource versions use a diagnostic placeholder", () => {
+    const factory = createCompatibilityProfileFactory({
+        getContentSnapshot: () => snapshot(),
+        getLoadedModeIdentities: () => [],
+    })
+    for (const headers of [
+        { APP_VER: "1.8.1" },
+        { APP_VER: "1.8.1", RES_VER: ["1.4.54", "1.4.55"] },
+        { APP_VER: "1.8.1", RES_VER: "国服" },
+        { APP_VER: "1.8.1", RES_VER: "x".repeat(65) },
+        { APP_VER: "1.8.1", RES_VER: "bad\nvalue" },
+    ]) {
+        const result = factory(headers)
+        assert.equal(result.ok, true)
+        assert.equal(result.value.RES_VER, "unknown")
     }
 })
 

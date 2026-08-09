@@ -22,7 +22,14 @@ const PROFILE_FIELDS = Object.freeze([
     "contentDigest",
     "modeDigest",
 ] as const)
+const BLOCKING_PROFILE_FIELDS = new Set<typeof PROFILE_FIELDS[number]>([
+    "multiProtocolVersion",
+    "APP_VER",
+    "contentDigest",
+    "modeDigest",
+])
 const VERSION_HEADER_PATTERN = /^[\x21-\x7e]{1,64}$/
+const UNKNOWN_RESOURCE_VERSION = "unknown"
 
 export interface CompatibilityProfileSource {
     readonly cdnTargetVersion: string
@@ -88,8 +95,8 @@ export function createCompatibilityProfileFactory(
         : null
     return headers => {
         const APP_VER = readVersionHeader(headers, "APP_VER")
-        const RES_VER = readVersionHeader(headers, "RES_VER")
-        if (APP_VER === null || RES_VER === null) {
+        const RES_VER = readVersionHeader(headers, "RES_VER") ?? UNKNOWN_RESOURCE_VERSION
+        if (APP_VER === null) {
             dependencies.onCompatibilityRejection?.({
                 code: "INCOMPATIBLE_ROOM",
                 differences: [],
@@ -133,7 +140,7 @@ export function compareCompatibility(
         differences.push({ field, host: host[field], guest: guest[field] })
     }
     return Object.freeze({
-        compatible: differences.length === 0,
+        compatible: differences.every(difference => !BLOCKING_PROFILE_FIELDS.has(difference.field)),
         differences: Object.freeze(differences),
     })
 }

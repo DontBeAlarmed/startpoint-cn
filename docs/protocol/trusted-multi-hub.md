@@ -163,7 +163,8 @@ modeDigest
 ```
 
 - `multiProtocolVersion` 是 Hub 内部接口和多人状态契约版本；破坏兼容时递增。
-- `APP_VER`、`RES_VER` 来自该玩家当前多人 HTTP 请求的客户端头。
+- `APP_VER`、`RES_VER` 来自该玩家当前多人 HTTP 请求的客户端头。`APP_VER` 缺失或非法时
+  fail closed；`RES_VER` 缺失或非法时记为 `unknown`，只参与诊断。
 - `cdnTargetVersion` 来自本地固定 `ContentSnapshot.cdn.targetVersion`。
 - `contentDigest` 在线上协议中表示多人战斗内容摘要，而不是完整业务表摘要。`ContentRepository`
   仍以 `info().contentDigest` 保存完整 Release 摘要，并另以 `info().multiBattleContentDigest`
@@ -176,7 +177,12 @@ modeDigest
   以文件名、manifest 名称与 capability、已验证文件 SHA 按稳定顺序组合。禁用、摘要不符、manifest
   不兼容、加载失败或注册失败的模块不计入。
 
-服务端版本和 Bundle ID 只用于后台与日志诊断，不作为唯一兼容条件。两个节点只有上述字段完全一致时才允许同房。
+服务端版本和 Bundle ID 只用于后台与日志诊断，不作为兼容条件。上述六个字段分为两组：
+
+- `multiProtocolVersion`、`APP_VER`、`contentDigest`、`modeDigest` 是同房准入字段，任一不同即拒绝；
+- `RES_VER`、`cdnTargetVersion` 是资源版本标签，参与当次比较，但不记录为兼容性拒绝，也不单独阻断同房。
+
+因此，资源版本号不同但多人战斗内容摘要相同的补丁可以联机；内容摘要不同则仍然 fail closed。
 
 兼容校验严格只读：
 
@@ -196,7 +202,7 @@ modeDigest
 尚无这两个字段时，普通与练习关卡保持原有可用行为；只有明确活动关卡分类因缺少权威周期而 fail closed。
 一旦任一周期字段出现，缺少另一字段或值非法同样 fail closed，不推测永久开放。
 
-角色、装备、能力魂、Mana Node、觉醒能力和 EX Boost 不按发布时间再次校验。玩家所属服务端负责确认配队来自其真实存档，并生成只读玩家快照；客户端战斗资源仍由 `APP_VER`、`RES_VER` 和 `cdnTargetVersion` 表明版本，多人路由读取的服务端战斗数据由 `contentDigest` 保证，自定义玩法逻辑由 `modeDigest` 保证。已经获得的活动或后期内容不会因为另一节点时间较早而失效。
+角色、装备、能力魂、Mana Node、觉醒能力和 EX Boost 不按发布时间再次校验。玩家所属服务端负责确认配队来自其真实存档，并生成只读玩家快照；客户端代际由 `APP_VER` 约束，`RES_VER` 和 `cdnTargetVersion` 仅说明资源版本标签，多人路由读取的服务端战斗数据由 `contentDigest` 保证，自定义玩法逻辑由 `modeDigest` 保证。已经获得的活动或后期内容不会因为另一节点时间较早而失效。
 
 `QUEST_NOT_AVAILABLE` 始终由当前玩家所属节点按自己的本地服务器时间判断，Hub 不使用自身时钟生成或覆盖该结果，也不把业务时间加入兼容性 profile。Hub 侧 Embedded 房间仍保留既有的房间生命周期时钟语义：`getServerTime` 只服务于房间的 `host_entry_time`、空闲 TTL 和客户端状态相关逻辑；这些生命周期判断不等同于活动资格判断。
 
@@ -216,12 +222,12 @@ modeDigest
 2. 本地服务从请求头取得该客户端的 `APP_VER`、`RES_VER`，并加入本地内容与 Mod 摘要。
 3. Hub 比较客机资料与房间资料。
 4. 本地服务取得房间关卡后，按自己的服务器时间确认该关卡当前可挑战；不满足时生成内部 `QUEST_NOT_AVAILABLE`。
-5. 兼容信息一致且关卡可挑战时返回现有查房成功结果。
-6. 兼容信息不一致或字段缺失时，Hub 向本地服务返回结构化 `INCOMPATIBLE_ROOM` 与字段差异。
+5. 四个准入字段一致且关卡可挑战时返回现有查房成功结果；两个资源版本标签的差异不改变结果。
+6. 任一准入字段不一致、`APP_VER` 缺失或内容快照不可用时，Hub 向本地服务返回结构化 `INCOMPATIBLE_ROOM` 与字段差异。
 7. 同房裸 `viewerId` 冲突时返回结构化 `VIEWER_ID_CONFLICT`。
 8. 本地服务把内部原因映射到对应端点已有的“无法加入”分支。
 
-差异只写入 Hub 与客机服务端日志，并在后台显示；房间本身不删除，其他兼容玩家仍可加入。
+比较结果仍按固定顺序保留六个字段的差异；只有准入字段差异形成兼容性拒绝并进入拒绝诊断。房间本身不删除，其他兼容玩家仍可加入。
 
 客户端失败映射遵循现有端点能力：
 
@@ -387,7 +393,7 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 
 多人不可用只产生 degraded 状态。Hub status 返回实时 `tcpAvailable`；TCP 在已有 session 期间失效后，房间、战斗和 admission 控制操作统一返回 `HUB_UNAVAILABLE`，Client 不继续使用注册时缓存的 TCP 地址。Client 状态额外区分 `remote`、`probing`、`local` 和 `degraded`；本地 fallback 启动成功后，新房间可继续使用本机多人能力，启动失败也不影响 HTTP、SQLite 和单人功能。后台显示模式、Hub 可达性、TCP 状态、活动房间数和最近的兼容性拒绝原因。
 
-后台 `latestCompatibilityRejection` 可保留差异字段名；只有 `APP_VER`、`RES_VER`、`cdnTargetVersion` 的 `required`/`received` 值通过格式与长度校验后才会保留，`contentDigest`/`modeDigest` 只保留 `different=true`，不保存摘要值。现有兼容性拒绝回调不携带房间号，因此后台诊断不承诺包含房间号。普通多人运行日志不输出双方原始值或摘要；只可保留固定事件、经过 `Number.isSafeInteger` 与有限范围校验的 tag、经过业务校验的 quest/category、有限错误码、host/guest 角色、状态、计数，以及服务端生成或严格校验后的六位房间号。不得记录原始请求、原始 `Error`/stack、完整 `viewerId`/`playerId`/`nodeSessionId`/`connectionId`、网络地址或端口、令牌、摘要和凭据。游戏客户端只接收对应端点现有的 NotPlayable 或通用失败结果；只有房间实际缺失时才显示房间不存在。
+后台 `latestCompatibilityRejection` 只记录准入失败，可保留该次比较的差异字段名；只有 `APP_VER`、`RES_VER`、`cdnTargetVersion` 的 `required`/`received` 值通过格式与长度校验后才会保留，`contentDigest`/`modeDigest` 只保留 `different=true`，不保存摘要值。仅有 `RES_VER` 或 `cdnTargetVersion` 差异时不产生拒绝记录。现有兼容性拒绝回调不携带房间号，因此后台诊断不承诺包含房间号。普通多人运行日志不输出双方原始值或摘要；只可保留固定事件、经过 `Number.isSafeInteger` 与有限范围校验的 tag、经过业务校验的 quest/category、有限错误码、host/guest 角色、状态、计数，以及服务端生成或严格校验后的六位房间号。不得记录原始请求、原始 `Error`/stack、完整 `viewerId`/`playerId`/`nodeSessionId`/`connectionId`、网络地址或端口、令牌、摘要和凭据。游戏客户端只接收对应端点现有的 NotPlayable 或通用失败结果；只有房间实际缺失时才显示房间不存在。
 
 ### 11.1 节点认证失败诊断
 
@@ -449,7 +455,8 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 - 每名玩家的奖励、任务与进度只写入自己的数据库；
 - Hub 不可用时单人接口正常；
 - Hub 重启后旧房间明确失效；
-- 客户端、CDN、内容或 Mod 任一兼容字段不同都映射到端点已有的 NotPlayable 或 Failure 分支；
+- 多人协议版本、客户端版本、多人战斗内容或 Mod 任一准入字段不同都映射到端点已有的 NotPlayable 或 Failure 分支；
+- 只有 `RES_VER` 或 `cdnTargetVersion` 不同但两个摘要相同时允许同房，且不产生兼容性拒绝记录；
 - 真正缺失的房间仍使用 RoomNotFound，兼容性失败不得伪装成房间缺失；
 - 兼容性失败不会调用或修改 CDN 更新状态；
 - 两个节点时间不同但都处于同一关卡开放期时可以加入；任一节点处于开放期外时只拒绝该节点，不删除房间；
@@ -472,7 +479,7 @@ Client C: HTTP C + SQLite C
 
 当前进程矩阵已验证：
 
-- 兼容性差异映射为不可加入且不设置 CDN 更新；
+- 准入字段差异映射为不可加入且不设置 CDN 更新；资源版本标签差异不阻断同房；
 - 跨节点相同裸 `viewerId` 在 admission 前拒绝，原房间仍可加入；
 - 各节点时间不同但都在开放期时可加入，开放期外成员收到 NotPlayable 且房间不删除；
 - 只有游戏房主扣体力和门票，每名参与者的奖励分别写入自己的 SQLite；

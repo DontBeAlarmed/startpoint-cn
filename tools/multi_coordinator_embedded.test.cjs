@@ -129,6 +129,33 @@ test("searchRoom rejects a room with different participant compatibility", async
     assert.deepEqual(found, { ok: false, error: "INCOMPATIBLE_ROOM" })
 })
 
+test("searchRoom accepts resource version labels that differ from compatible battle content", async t => {
+    const rejections = []
+    const coordinator = new EmbeddedMultiCoordinator({
+        onCompatibilityRejection: rejection => rejections.push(rejection),
+    })
+    const created = await coordinator.createRoom(createInput())
+    assert.equal(created.ok, true)
+    t.after(async () => {
+        await coordinator.disbandRoom({
+            participant: participant(101),
+            roomNumber: created.value.roomNumber,
+        })
+    })
+
+    const found = await coordinator.searchRoom({
+        participant: participant(202),
+        roomNumber: created.value.roomNumber,
+        compatibility: compatibilityProfile({
+            RES_VER: "1.4.55",
+            cdnTargetVersion: "1.4.55",
+        }),
+    })
+
+    assert.equal(found.ok, true)
+    assert.deepEqual(rejections, [])
+})
+
 test("startBattle rechecks the room compatibility profile", async t => {
     const { sessionManager } = require("../src/multi/state/SessionManager")
     const { coordinator, status } = await createFixture(t)

@@ -93,7 +93,7 @@ PUT    /api/server/time-package
 1. 确认 A 的 `8003` 和 `8004` 对 B 所在的受信网络可达。
 2. 确认 B 的 `MULTI_HUB_URL` 是完整根 URL，令牌来自 A 且未撤销。
 3. 在 B 本机调用 Hub probe，区分远程可用、降级和不可用状态。
-4. 跨服务端加入失败时，检查双方 `APP_VER`、`RES_VER`、Content 与 Mod 摘要差异；服务端只输出差异，不自动更新资源。
+4. 跨服务端加入失败时，优先检查双方多人协议版本、`APP_VER`、多人战斗 Content 摘要与 Mod 摘要。`RES_VER` 和 CDN 目标版本不同不会形成拒绝记录，也不会在两个摘要相同时单独阻断联机；服务端不会自动更新资源。
 5. 若 B 已降级且外部玩家无法连接，检查 B 的 `SESSION_PUBLIC_HOST` 是否是玩家可达地址。
 
 安全、身份、兼容性和失败恢复的完整依据见[可信局域网多人 Hub 架构](./trusted-multi-hub.md)。

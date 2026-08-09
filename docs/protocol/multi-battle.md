@@ -30,7 +30,7 @@
 
 默认 `embedded` 把游戏 HTTP、Coordinator 和 TCP 放在同一服务进程中，普通用户无需额外配置。可选 `host` 在自身 `8001` 游戏 HTTP 外提供 `8003` Hub TCP 和 `8004` Hub control；`client` 只保留自己的 `8001`，通过 `8004` 控制房间，游戏客户端按房间响应直连 Host `8003`。三种模式都保持玩家 SQLite 与结算在所属服务端本地。
 
-Hub 不代理游戏主 API、CDN 或后台，也不自动对齐资源与服务器时间。版本或内容不兼容时，`search_room`/`verify_access_token` 映射为 `4020` NotPlayable，`select_room` 返回 `raising_state=7`，`prepare` 返回 `4507`；只有真实缺房才使用 `room_exists=false` 或 `raising_state=9`。
+Hub 不代理游戏主 API、CDN 或后台，也不自动对齐资源与服务器时间。多人协议版本、`APP_VER`、多人战斗内容摘要或 Mod 摘要不兼容时，`search_room`/`verify_access_token` 映射为 `4020` NotPlayable，`select_room` 返回 `raising_state=7`，`prepare` 返回 `4507`；`RES_VER` 与 CDN 目标版本参与比较，但不记录为拒绝，也不单独阻断同房。只有真实缺房才使用 `room_exists=false` 或 `raising_state=9`。
 
 多人联机由六类组件组成：
 
