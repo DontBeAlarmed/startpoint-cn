@@ -67,6 +67,7 @@ export async function handleHandshake(
     if (socklet === "cooperation_battle") {
         const connectionId = data.connection_id || data.connectionId || `${socket.remoteAddress}:${socket.remotePort}`
         if (!roomNumber) {
+            console.log("[TCP] battle handshake denied: reason=invalid_room")
             sessionManager.sendJson(socket, [3, "HANDSHAKE_DENIED"])
             socket.end()
             return
@@ -80,6 +81,14 @@ export async function handleHandshake(
             ? sessionManager.getBattleParticipant(normalizedRoomNumber, normalizedConnectionId)
             : undefined
         if (!participant || sessionManager.getBattleClient(normalizedConnectionId)) {
+            const reason = !room
+                ? "missing_room"
+                : room.raising_state !== 4
+                    ? "room_not_active"
+                    : !participant
+                        ? "unknown_participant"
+                        : "duplicate_connection"
+            console.log(`[TCP] battle handshake denied: reason=${reason}`)
             sessionManager.sendJson(socket, [3, "HANDSHAKE_DENIED"])
             socket.end()
             return
@@ -94,6 +103,7 @@ export async function handleHandshake(
         battleClient.isBattle = true
         sessionManager.addBattleClient(normalizedConnectionId, battleClient)
         sessionManager.sendJson(socket, [0, roomNumber, ""])
+        console.log(`[TCP] battle handshake accepted: room=${normalizedRoomNumber}`)
         return
     }
 

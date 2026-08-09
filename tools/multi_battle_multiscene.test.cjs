@@ -66,6 +66,18 @@ function countMessage(entry, expected) {
     return entry.socket.writes.filter(value => JSON.stringify(value) === JSON.stringify(expected)).length
 }
 
+async function captureConsole(callback) {
+    const entries = []
+    const original = console.log
+    console.log = (...args) => entries.push(args.join(" "))
+    try {
+        await callback()
+    } finally {
+        console.log = original
+    }
+    return entries.join("\n")
+}
+
 test.afterEach(() => {
     while (cleanup.length > 0) {
         const { clients, lobbyClients, room } = cleanup.pop()
@@ -191,6 +203,21 @@ test("non-boss multiplayer quest still finalizes after its first barrier", () =>
     notify(client, [0])
     notify(client, [2])
     assert.equal(countMessage(client, [1, [2]]), 1)
+})
+
+test("SceneReady diagnostics expose only bounded room barrier counts", async () => {
+    const battle = createBattle(1001001, 1)
+    const [client] = battle.clients
+    const output = await captureConsole(async () => notify(client, [0]))
+
+    assert.match(output, new RegExp(
+        `\\[BATTLE\\] SceneReady: room=${battle.room.room_number} generation=0 expected=1 ready=1 connected=1 complete=true`,
+    ))
+    assert.match(output, new RegExp(
+        `\\[BATTLE\\] BattleStart: room=${battle.room.room_number} generation=0 targets=1 delivered=1`,
+    ))
+    assert.doesNotMatch(output, new RegExp(client.client.connectionId))
+    assert.doesNotMatch(output, new RegExp(String(client.client.viewerId)))
 })
 
 test("disconnect releases the remaining client from the next-scene barrier", () => {

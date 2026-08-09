@@ -464,11 +464,15 @@ export class SessionManager {
             delivered = new Set()
             deliveredByGeneration.set(generation, delivered)
         }
-        for (const client of this.getBattleClientsInRoom(roomNumber)) {
+        const targets = this.getBattleClientsInRoom(roomNumber)
+        let deliveredCount = 0
+        for (const client of targets) {
             if (this.sendJson(client.socket, [1, [1]])) {
                 delivered.add(client.connectionId)
+                deliveredCount++
             }
         }
+        console.log(`[BATTLE] BattleStart: room=${roomNumber} generation=${generation} targets=${targets.length} delivered=${deliveredCount}`)
     }
 
     replayBattleStartIfNeeded(connectionId: string, roomNumber: string): boolean {
@@ -522,7 +526,12 @@ export class SessionManager {
             this.sceneReadyClients.set(roomNumber, readySet)
         }
         readySet.add(connectionId)
-        return this.isSceneBarrierComplete(roomNumber)
+        const ready = readySet.size
+        const connected = this.battleClients.get(roomNumber)?.size ?? 0
+        const generation = this.battleSceneGeneration.get(roomNumber) ?? -1
+        const complete = this.isSceneBarrierComplete(roomNumber)
+        console.log(`[BATTLE] SceneReady: room=${roomNumber} generation=${generation} expected=${expected} ready=${ready} connected=${connected} complete=${complete}`)
+        return complete
     }
 
     beginNextBattleScene(connectionId: string, roomNumber: string): boolean {

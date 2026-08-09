@@ -123,7 +123,7 @@ JSON.stringify(message) + "\0"
 
 | 路由 | 当前职责 |
 |---|---|
-| `start` | 重新校验请求节点与房间固定兼容性、玩家成员身份及关卡一致性；兼容性校验在任何本地扣费或 active quest 写入前完成。每位真人分别写入 active quest，仅房主预扣体力和 Always 门票；房间状态 4 已由 TCP StartBattle 建立 |
+| `start` | 重新校验请求节点与房间固定兼容性、玩家成员身份及关卡一致性；兼容性校验在任何本地扣费或 active quest 写入前完成。每位真人分别写入 active quest，仅房主预扣体力和 Always 门票；`raising_state=4` 已由 TCP StartBattle 建立 |
 | `finish` | 由 Hub 授权 retained completion fact，再按 `play_id + category + quest_id` 校验多人 active quest，并拒绝负 Mana、非法分数/耗时、continue 次数或 Boost 余额不一致；各节点只结算自己的存档，全部剩余真人 Finalize 后由 coordinator 把房间恢复为状态 1 |
 | `abort` | 先在本地事务中退款并取消 active quest，提交后再 best-effort 通知 coordinator；房主放弃时解散房间，成员放弃时从权威当局参与者中移除并立即重判剩余成员是否全部 Finalize |
 | `play_continue` | 同时核对内存与 SQLite active quest；SQLite 提交成功后才更新内存 continue count。当前多人续关不扣星导石 |
@@ -144,6 +144,8 @@ JSON.stringify(message) + "\0"
 
 ## 5. RoomState 语义
 
+`raising_state` 是国服客户端 HTTP 响应解析器要求的字段。下表中的 Ready、Waiting、Battle 等名称来自客户端各数值分支对应的输入类型；“当前语义”描述的是服务端在这些客户端分支约束下采用的状态机行为。
+
 当前服务端只写入 1、2、4 三个房间状态；9 和 13 只用于 HTTP 返回。
 
 | 值 | 当前语义 | 写入或返回时机 |
@@ -156,7 +158,7 @@ JSON.stringify(message) + "\0"
 
 状态 9 不会存入房间。客户端收到它时应把目标房间视为不存在或已经过期。
 
-当前服务端不写入历史枚举中的 state 3。NPC 招募不会把房间改为 3，而是保持 1，直到开始战斗时直接进入 4。
+当前服务端不写入历史值 `raising_state=3`。NPC 招募不会把房间改为 3，而是保持 1，直到开始战斗时直接进入 4。
 
 ## 6. TCP 握手与 lobby 流程
 
@@ -181,7 +183,9 @@ JSON.stringify(message) + "\0"
 同一个 TCP 数据块中，服务端也必须保留后续帧，等待连接注册和节点会话复核完成后再按原顺序处理；
 握手失败、节点失效或连接关闭时不再处理排队帧。客户端和 Launcher 不需要为此人为增加发送延迟。
 
-成员资格与 socket 在线状态分开保存：普通网络断开只移除连接，房间保留到恢复、主动解散或过期清理，因此成员仍有 `restore_room` 资格；非房主主动发送 Bye 时释放自身成员资格，房主主动发送 Bye 时立即广播解散并销毁整个房间。
+客户端协议中的 `MeetingNotifyMessage.Bye`（Notify index 1）是客户端定义的无参数枚举消息，不是 HTTP 字段，也不等同于“玩家主动退出房间”。客户端停止使用当前 `cooperation_room` 连接时会发送它，主动离开和进入战斗时的连接切换都可能走同一消息；因此服务端必须结合 `raising_state` 解释，不能仅凭名称判断为解散。
+
+成员资格与 socket 在线状态分开保存：普通网络断开只移除连接，房间保留到恢复、主动解散或过期清理，因此成员仍有 `restore_room` 资格。战斗开始前，非房主发送 `Bye` 时释放自身成员资格，房主发送 `Bye` 时广播解散并销毁整个房间；进入 `raising_state=4` 后，切换 battle socket 产生的 `Bye` 只关闭 lobby 连接，必须保留房间、当局成员快照和 SceneReady 屏障，直到战斗结算或中止流程清理。
 
 ### 6.2 Battle socket 握手
 
@@ -199,7 +203,7 @@ SceneReady 只统计已登记的 battle client。
 
 | Index | 名称 | 当前处理 |
 |---:|---|---|
-| 0 | Notify | 进入、离开、换队、准备、心跳、开始和 NPC 招募 |
+| 0 | Notify | 进入、关闭房间连接、换队、准备、心跳、开始和 NPC 招募 |
 | 1 | Broadcast | 广播给同房 lobby client |
 | 2 | Send | 按 viewer 定向发送 |
 
@@ -208,11 +212,11 @@ SceneReady 只统计已登记的 battle client。
 | Index | 名称 | 当前行为 |
 |---:|---|---|
 | 0 | Enter | 更新本人 party，发送 Welcome，并同步 Mates |
-| 1 | Bye | 移除 lobby client 和非房主成员资格，必要时解散空房间 |
+| 1 | Bye | 客户端定义的通用 lobby 连接结束通知；服务端结合 `raising_state` 决定释放成员、解散房间或仅关闭连接 |
 | 2 | ChangeParty | 更新当前 party 并广播 Mates |
 | 3 | Ready | 更新准备状态并广播 StateChanged |
 | 4 | Heartbeat | 回 AckHeartbeat |
-| 6 | StartBattle | 设置预期 battle client 数量、状态 4，并广播 Start |
+| 6 | StartBattle | 设置预期 battle client 数量、`raising_state=4`，并广播 Start |
 | 10 | EnterComs | 调用 NPC 招募流程 |
 
 服务端关键消息：
@@ -298,13 +302,13 @@ NPC 昵称与贡献规则见[NPC 昵称贡献](../systems/npc-contributor-names.
 
 ```text
 create_room
-  -> state 2 (Waiting)
+  -> raising_state=2 (Waiting)
   -> 房主 TCP handshake + Enter
-  -> state 1 (Ready)
+  -> raising_state=1 (Ready)
   -> Ready / NPC 招募 / StartBattle
-  -> state 4 (Battle)
+  -> raising_state=4 (Battle)
   -> 全部剩余真人 Finalize，coordinator release/reset
-  -> state 1 (保留现有房间，允许重赛)
+  -> raising_state=1 (保留现有房间，允许重赛)
 ```
 
 ### 10.1 Finish
@@ -399,7 +403,7 @@ CN Notify 索引已经按 `SceneReady=0`、`LevelNext=1`、`Finalize=2`、`Measu
 | `tools/multi_room_handshake_identity.test.cjs` | room socket 的存在性、状态、满员、关卡和房主身份边界 |
 | `tools/multi_room_identity.test.cjs` | 随机 token、HTTP 权限、成员恢复和外部社区关闭响应 |
 | `tools/lobby_lifecycle.test.cjs` | NPC 招募、成员、准备和重赛状态 |
-| `tools/room_cleanup_lifecycle.test.cjs` | 15/30 分钟清理与 state 4 跳过 |
+| `tools/room_cleanup_lifecycle.test.cjs` | 15/30 分钟清理与 `raising_state=4` 跳过 |
 | `tools/session_frame_order.test.cjs` | Room/Battle 握手后同包首帧顺序与拒绝清理 |
 | `tools/session_server_lifecycle.test.cjs` | TCP 启停和会话生命周期 |
 | `tests/multi-hub-process.test.js` | 三编译进程、独立 SQLite、兼容/时间/身份准入、BothBoss、会话轮换与 Hub degraded |

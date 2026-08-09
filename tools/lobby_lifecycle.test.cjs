@@ -238,6 +238,19 @@ test("an explicit host Bye disbands the room even while guests remain", t => {
     assert.equal(getRoom(room.room_number), undefined)
 })
 
+test("a host Bye after StartBattle preserves the active battle room", t => {
+    const { room, host } = createLobbyRoom(t, 502)
+
+    handleMessage(host.socket, [0, [6]])
+    assert.equal(room.raising_state, 4)
+    assert.notEqual(sessionManager.getBattleParticipant(room.room_number, host.client.connectionId), undefined)
+
+    handleMessage(host.socket, [0, [1]])
+
+    assert.equal(getRoom(room.room_number), room)
+    assert.notEqual(sessionManager.getBattleParticipant(room.room_number, host.client.connectionId), undefined)
+})
+
 test("lobby lifecycle logs retain role and room without client identity", async t => {
     const viewerId = 918273643
     const { room, host } = createLobbyRoom(

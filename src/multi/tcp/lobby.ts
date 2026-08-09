@@ -376,7 +376,9 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
 function disconnectRoomClient(client: SessionClient): void {
     const isHost = !!client.participant
         && sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)
-    if (isHost) {
+    const room = getRoom(client.roomNumber)
+    const preserveActiveBattle = room?.raising_state === 4
+    if (isHost && !preserveActiveBattle) {
         sessionManager.broadcastToRoom(client.roomNumber, [1, [6, "multibattle_room_dismissed"]])
     }
     for (const connectedClient of sessionManager.getClientsInRoom(client.roomNumber)) {
@@ -388,7 +390,7 @@ function disconnectRoomClient(client: SessionClient): void {
     const hostClient = findHostClient(client.roomNumber)
     removeRoomMember(client.roomNumber, client.viewerId)
     sessionManager.removeClient(client)
-    if (isHost) disbandRoom(client.roomNumber)
+    if (isHost && !preserveActiveBattle) disbandRoom(client.roomNumber)
     // Only refresh the mate list if the room still exists AND a *different* client is the host (i.e. a
     // guest left but the room lives on). If the room was disbanded (host left / went empty), the
     // [6, dismissed] broadcast already tore it down — pushing a stale/empty mate list here makes the

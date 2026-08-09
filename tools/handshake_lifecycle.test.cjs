@@ -207,6 +207,31 @@ test("battle handshake refuses registration when its lifecycle generation is ina
     assert.equal(sessionManager.getBattleClient("guard-cid"), undefined)
 })
 
+test("battle handshake diagnostics expose the room but not participant identity", async t => {
+    const socket = new FakeSocket()
+    const room = createRoom(918273642, 193, 1, 2, 1001001, 0, 393)
+    const participant = { nodeSessionId: "NODE_SESSION_SENTINEL_BATTLE", viewerId: 918273642 }
+    const connectionId = "CONNECTION_SENTINEL_BATTLE"
+    room.raising_state = 4
+    sessionManager.setBattleParticipants(room.room_number, [{ connectionId, participant }], participant)
+    t.after(() => {
+        sessionManager.removeClientBySocket(socket)
+        sessionManager.clearBattleExpectedCount(room.room_number)
+        disbandRoom(room.room_number)
+    })
+
+    const output = await captureConsole(() => handleHandshake(socket, {
+        socklet: "cooperation_battle",
+        room_number: room.room_number,
+        connection_id: connectionId,
+    }))
+
+    assert.match(output, new RegExp(`\\[TCP\\] battle handshake accepted: room=${room.room_number}`))
+    assert.doesNotMatch(output, new RegExp(connectionId))
+    assert.doesNotMatch(output, new RegExp(String(participant.viewerId)))
+    assert.doesNotMatch(output, new RegExp(participant.nodeSessionId))
+})
+
 test("handshake logs never serialize client identity or payload fields", async () => {
     const socket = new FakeSocket()
     socket.remoteAddress = "203.0.113.201"
