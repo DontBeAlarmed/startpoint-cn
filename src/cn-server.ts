@@ -24,6 +24,7 @@ import { loadBundleMetadata } from "./runtime/bundle-metadata";
 import { registerAdminUi } from "./runtime/admin";
 
 import versionCheckPlugin from "./routes/cn/versionCheck";
+import iosLeitingPlugin from "./routes/cn/ios-leiting";
 import leitingAuthPlugin from "./routes/cn/leitingAuth";
 import cnToolPlugin from "./routes/cn/tool";
 import cnLoadPlugin from "./routes/cn/load";
@@ -133,7 +134,6 @@ fastify.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "st
 );
 fastify.addContentTypeParser("application/json", { parseAs: "string" }, jsonParser);
 
-fastify.register(versionCheckPlugin);
 fastify.register(leitingAuthPlugin, { prefix: "/api/index.php" });
 
 const apiPrefix = "/api/index.php";
@@ -303,6 +303,13 @@ function configureRuntimeHttp(config: ReturnType<typeof parseCnRuntimeConfig>): 
         httpPort: config.http.port,
     });
     registerCnAssetProviderRoutes(fastify, { config: config.assetProvider });
+    // iOS实验性兼容（IOS_COMPAT_ENABLED=1）：SDK裸路由与 iOS专用行为仅在启用时注册。
+    // versionCheck需要运行时配置，故在 config就绪的 http阶段注册（不能早于此时）。
+    fastify.register(versionCheckPlugin, { ios: config.iosCompat });
+    if (config.iosCompat.enabled) {
+        // iOS SDK请求的是裸路径（/sdk/v3-3/...、/mobile!...），必须无前缀注册。
+        fastify.register(iosLeitingPlugin, { ios: config.iosCompat });
+    }
     runtimeHttpConfigured = true;
 }
 

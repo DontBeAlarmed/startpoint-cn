@@ -71,11 +71,13 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/content/cdn/protocol.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/asset-mode.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/asset-provider.ts"]), ["full", "integration:cdn"])
+    assert.deepEqual(selectTestGroups(["src/routes/cn/ios-leiting.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/asset.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/assetInTitle.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/cdnFiles.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/httpRange.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/routes/cn/msgpack.ts"]), ["full", "integration:cdn"])
+    assert.deepEqual(selectTestGroups(["src/routes/cn/versionCheck.ts"]), ["full", "integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/lib/version.ts"]), ["full"])
     assert.deepEqual(
         selectTestGroups(["src/routes/cn/load.ts"]),
@@ -282,6 +284,9 @@ test("generator aggregate includes both leaves while full only adds the self-con
         "tools/cdn_audit.test.cjs",
         "tools/cdn_files.test.cjs",
         "tools/ios_asset_route.test.cjs",
+        "tools/combined_startup.test.cjs",
+        "tools/ios_leiting_route.test.cjs",
+        "tools/version_dis_android.test.cjs",
         "tools/legacy_asset_state.test.cjs",
     ])
 })
@@ -313,6 +318,7 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/runtime_pack.test.cjs",
             "tools/runtime_bundle_metadata.test.cjs",
             "tools/runtime_config.test.cjs",
+            "tools/ios_runtime_config.test.cjs",
             "tools/multi_hub_credentials.test.cjs",
             "tools/multi_hub_authentication.test.cjs",
             "tools/multi_hub_cli_env.test.cjs",
