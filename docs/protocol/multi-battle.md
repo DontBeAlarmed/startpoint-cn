@@ -53,10 +53,11 @@ Hub 不代理游戏主 API、CDN 或后台，也不自动对齐资源与服务�
 
 - `/start` 写入 `players_active_quests`；
 - `/finish` 或 `/abort` 清理 active quest；
-- `/load` 可以返回 `unfinished_multi_quest_list`；
-- 进程重启后即使 active quest 仍在，原 room number 和 TCP socket 也无法恢复。
+- 进程重启或客户端重新登录后，即使 active quest 仍在，原战斗场景和 TCP socket 也无法恢复；
+- 国服客户端把战斗中的 `raising_state=4` 映射为“房间已开始”，没有消费服务端战斗快照的续接路径。因此 `/load` 对具有完整多人战斗身份的残留记录执行既有中止退款事务，不再发布会循环失败的 `unfinished_multi_quest_list`；
+- 身份字段非法或旧 client 记录缺少战斗身份时继续 fail closed，不把未经验证的数据猜测为可退款战斗。
 
-因此，“未完成多人关卡可见”和“原多人房间可恢复”是两个不同能力。当前只保证前者的数据层基础。
+同一客户端进程内的 HTTP finish 重试仍可使用 active quest 和 Hub retained fact；跨客户端重启不承诺恢复已经开始的多人战斗。
 
 ## 3. HTTP 与 TCP 编码
 
@@ -327,7 +328,7 @@ create_room
 - 房主 `abort` 先在自己的 SQLite 事务中退款并取消 active quest，提交后再通过 coordinator 解散房间；
 - `disband_room` 对现存房间仅允许房主广播 Disbanded 并删除房间；客户端重复清理已经不存在的房间时返回成功，不触发 H403；
 - 非房主 abort 同样先提交自己的退款和 active quest 删除，再通过 coordinator 移除自身 battle 连接、屏障资格和 retained fact 授权；移除后若剩余成员已经全部 Finalize，coordinator 立即 release 当局并保留已完成成员的 retained fact；
-- 本地事务失败时不调用 Hub，原请求可以重试；本地提交后 Hub cleanup 失败时仍返回本地成功，不回滚退款。node session 的 `expiresAt` 在注册时固定，认证 touch 只更新 `lastSeen`，不会延长 TTL；session 到期或 credential revoke 时，Hub 的失效回调按 active rooms 扫描并移除该 session 的 guest battle fact、参与者和连接，再次重判 release，因此遗漏的 Hub abort 会有界收敛；
+- 本地事务失败时不调用 Hub，原请求可以重试；本地提交后 Hub cleanup 失败时仍返回本地成功，不回滚退款。node session 使用五分钟滑动空闲 TTL，控制认证和 Host TCP 的每秒有效性检查会同时刷新 `lastSeen` 与 `expiresAt`，持续活动的房间不会在注册满五分钟时被强制断开；连接停止活动满 TTL 或 credential revoke 后，Hub 的失效回调按 active rooms 扫描并移除该 session 的 guest battle fact、参与者和连接，再次重判 release，因此遗漏的 Hub abort 仍会有界收敛；
 - 重复 abort 因 active quest 已删除而失败，不会重复退款或再次调用 Hub。失效扫描只在 node invalidation 事件执行，不给请求热路径增加索引或扫描。
 
 ### 10.3 连接断开

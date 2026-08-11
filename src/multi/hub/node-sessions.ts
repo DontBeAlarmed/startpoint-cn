@@ -143,7 +143,12 @@ export class NodeSessionRegistry {
     }
 
     private touch(stored: StoredNodeSession): NodeSession {
-        const touched: StoredNodeSession = Object.freeze({ ...stored, lastSeen: this.now() })
+        const now = this.now()
+        const touched: StoredNodeSession = Object.freeze({
+            ...stored,
+            expiresAt: now + this.sessionTtlMs,
+            lastSeen: now,
+        })
         this.sessions.set(stored.nodeSessionId, touched)
         const { sessionCredential: _secret, ...session } = touched
         return Object.freeze(session)

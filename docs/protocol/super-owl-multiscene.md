@@ -50,7 +50,7 @@ battle 握手要求房间已进入战斗状态，且 connection ID 属于房主 
 
 HTTP active quest 仍贯穿一次 start 到最终 finish。第一 Boss 后不删除 active quest、不发奖励、不更新完成进度；BothBoss 的 HTTP finish 还要求当前玩家已完成合法 TCP Finalize。Hub 把参与者、房间、`battleSessionId` 和 Finalize 结果保存为只读完成事实，房间释放后仍保留最多 30 分钟，HTTP finish 查询该事实但不消费它。
 
-完成后的房间生命周期由 coordinator/Hub 权威处理：全部剩余真人已 Finalize 时，Hub 结束并释放当局房间状态，同时保留完成事实供各节点延迟结算。每个玩家节点随后只在自己的 SQLite 事务中重新比对并消费 active quest；奖励、库存、任务、履历、邮件和 active quest 删除处于同一事务。若本地事务失败，所有写入回滚，active quest 与 Hub 完成事实都仍可用于重试。abort 先提交玩家自己的退款和 active quest 删除，再 best-effort 通知 coordinator；非房主会从当局参与者和 retained fact 授权集合移除，不能再 finish，并在移除后立即重判剩余成员是否已全部 Finalize，房主则解散房间。若该 Hub 请求丢失，固定 TTL 的 node session 到期或 credential revoke 会触发 Hub 扫描 active rooms，清理该 session 的 guest 当局状态并完成同一 release 重判；本地节点不把自己的 room manager 当作远端房间权威。第二 Boss 后客户端只提交一次 HTTP finish，重复请求会因本地 active quest 已被事务消费而失败，不会重复结算。
+完成后的房间生命周期由 coordinator/Hub 权威处理：全部剩余真人已 Finalize 时，Hub 结束并释放当局房间状态，同时保留完成事实供各节点延迟结算。每个玩家节点随后只在自己的 SQLite 事务中重新比对并消费 active quest；奖励、库存、任务、履历、邮件和 active quest 删除处于同一事务。若本地事务失败，所有写入回滚，active quest 与 Hub 完成事实都仍可用于同一客户端进程内重试。abort 先提交玩家自己的退款和 active quest 删除，再 best-effort 通知 coordinator；非房主会从当局参与者和 retained fact 授权集合移除，不能再 finish，并在移除后立即重判剩余成员是否已全部 Finalize，房主则解散房间。若该 Hub 请求丢失，node session 停止活动满五分钟或 credential revoke 会触发 Hub 扫描 active rooms，清理该 session 的 guest 当局状态并完成同一 release 重判；持续活动的 TCP 会滑动续期，不会在注册满五分钟时被误断。本地节点不把自己的 room manager 当作远端房间权威。客户端重启后不尝试恢复第二 Boss 场景，`/load` 按中止事务清理残留 active quest。第二 Boss 后客户端只提交一次 HTTP finish，重复请求会因本地 active quest 已被事务消费而失败，不会重复结算。
 
 ## 验收边界
 

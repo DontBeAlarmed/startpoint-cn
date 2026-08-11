@@ -174,7 +174,7 @@ function unfinished(payload, quest) {
 }
 
 for (const state of ["active", "finalized", "unavailable"]) {
-    test(`load preserves and publishes a remote ${state} active quest`, async t => {
+    test(`load aborts an unrestorable remote ${state} active quest`, async t => {
         const quest = activeQuest(state)
         const home = await openHome(`preserve-${state}`, quest)
         const calls = []
@@ -195,7 +195,7 @@ for (const state of ["active", "finalized", "unavailable"]) {
         const result = await load(app)
 
         assert.equal(result.response.statusCode, 200, result.response.body)
-        unfinished(result.payload, quest)
+        assert.deepEqual(result.payload.data.unfinished_multi_quest_list, [])
         assert.deepEqual(calls, [{
             nodeSessionId: "remote-pending",
             viewerId: VIEWER_ID,
@@ -203,9 +203,9 @@ for (const state of ["active", "finalized", "unavailable"]) {
             battleSessionId: quest.battleSessionId,
             coordinatorOrigin: "remote",
         }])
-        assert.equal(getPlayerActiveQuestSync(home.playerId).playId, quest.playId)
-        assert.equal(activeQuests[home.playerId].playId, quest.playId)
-        assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 3)
+        assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+        assert.equal(activeQuests[home.playerId], undefined)
+        assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 5)
         assert.equal(getDb().prepare(
             "SELECT COUNT(*) AS count FROM players_receive_history WHERE player_id = ?",
         ).get(home.playerId).count, 0)
@@ -368,7 +368,7 @@ test("client legacy quest without battle identity is not cleared by the local ro
     assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 3)
 })
 
-test("load verifies an explicit local active quest through its stored origin", async t => {
+test("load verifies and aborts an explicit local active quest through its stored origin", async t => {
     const quest = activeQuest("explicit-local", { coordinatorOrigin: "local" })
     const home = await openHome("explicit-local", quest)
     const calls = []
@@ -387,7 +387,8 @@ test("load verifies an explicit local active quest through its stored origin", a
 
     assert.equal(result.response.statusCode, 200, result.response.body)
     assert.equal(calls[0].coordinatorOrigin, "local")
-    assert.equal(getPlayerActiveQuestSync(home.playerId).coordinatorOrigin, "local")
+    assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+    assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 5)
 })
 
 for (const [mode, expectedOrigin] of [
@@ -395,7 +396,7 @@ for (const [mode, expectedOrigin] of [
     ["embedded", "local"],
     ["host", "local"],
 ]) {
-    test(`legacy null origin converges to ${expectedOrigin} in ${mode} mode`, async t => {
+    test(`legacy null origin resolves to ${expectedOrigin} before abort in ${mode} mode`, async t => {
         const quest = activeQuest(`legacy-origin-${mode}`, { coordinatorOrigin: null })
         const home = await openHome(`legacy-origin-${mode}`, {
             ...quest,
@@ -421,8 +422,9 @@ for (const [mode, expectedOrigin] of [
 
         assert.equal(result.response.statusCode, 200, result.response.body)
         assert.equal(calls[0].coordinatorOrigin, expectedOrigin)
-        assert.equal(getPlayerActiveQuestSync(home.playerId).coordinatorOrigin, expectedOrigin)
-        assert.equal(activeQuests[home.playerId].coordinatorOrigin, expectedOrigin)
+        assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+        assert.equal(activeQuests[home.playerId], undefined)
+        assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 5)
     })
 }
 

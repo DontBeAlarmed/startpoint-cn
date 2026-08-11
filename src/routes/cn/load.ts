@@ -220,7 +220,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 updatePlayerActiveQuestCoordinatorOriginSync(playerId, coordinatorOrigin);
                 activeQuest = { ...activeQuest, coordinatorOrigin };
             }
-            let authoritativeMissing = false;
+            let multiRecoveryState: MultiBattleRecoveryInspection["state"] | null = null;
             if (hasStoredBattleIdentity(activeQuest)) {
                 if (!isValidStoredBattleIdentity(activeQuest)) {
                     console.warn("[CN-LOAD] multi recovery skipped code=MULTI_RECOVERY_INVALID_IDENTITY");
@@ -233,15 +233,19 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                         battleSessionId: activeQuest.battleSessionId,
                         coordinatorOrigin: activeQuest.coordinatorOrigin as MultiCoordinatorOrigin,
                     });
-                    authoritativeMissing = recovery.state === "missing";
+                    multiRecoveryState = recovery.state;
                 }
             }
             const legacyRoomMissing = activeQuest.coordinatorOrigin === "local"
                 && !hasStoredBattleIdentity(activeQuest)
                 && !!activeQuest.roomNumber
                 && getRoom(activeQuest.roomNumber) === undefined;
-            if (authoritativeMissing || legacyRoomMissing) {
-                console.log(`[CN-LOAD] active quest room ${activeQuest.roomNumber} not found, cancelling`);
+            if (multiRecoveryState !== null || legacyRoomMissing) {
+                console.log(
+                    `[CN-LOAD] cancelling unrestorable multi active quest`
+                    + ` room=${activeQuest.roomNumber}`
+                    + ` state=${multiRecoveryState ?? "legacy-missing"}`,
+                );
                 const aborted = runAbortActiveQuestTransaction(playerId, {
                     playId: activeQuest.playId,
                     questId: activeQuest.questId,

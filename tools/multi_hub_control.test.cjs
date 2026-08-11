@@ -187,6 +187,7 @@ function fixture(t, options = {}) {
         "node-session-a", "session-credential-a".padEnd(43, "a"),
         "node-session-b", "session-credential-b".padEnd(43, "b"),
         "node-session-c", "session-credential-c".padEnd(43, "c"),
+        "node-session-d", "session-credential-d".padEnd(43, "d"),
     ]
     const admissions = new AdmissionRegistry({ now: () => now })
     const coordinator = (options.coordinatorFactory ?? createCoordinator)()
@@ -485,6 +486,21 @@ test("expires sessions fail closed and revocation invalidates only matching cred
     })
     assert.equal(expired.statusCode, 401)
     assert.equal(target.sessions.has(second.json().nodeSessionId), false)
+})
+
+test("active node sessions remain valid past their original expiry and expire after idle TTL", async t => {
+    const target = fixture(t)
+    const registration = await register(target.app, target.first.token)
+    const nodeSessionId = registration.json().nodeSessionId
+
+    target.setNow(14_000)
+    assert.equal(target.sessions.isValid(nodeSessionId), true)
+
+    target.setNow(16_000)
+    assert.equal(target.sessions.isValid(nodeSessionId), true)
+
+    target.setNow(21_001)
+    assert.equal(target.sessions.isValid(nodeSessionId), false)
 })
 
 test("revoking a shared credential invalidates all of its sessions but not a peer credential", async t => {
@@ -1696,7 +1712,7 @@ test("real RemoteCoordinator releases after a finalized host loses its guest", a
     }), { ok: false, error: "ROOM_PERMISSION_DENIED" })
 })
 
-test("lost remote guest abort converges when its fixed session expires", async t => {
+test("lost remote guest abort converges after its active session becomes idle", async t => {
     const target = fixture(t, {
         coordinatorFactory: createTrackedEmbeddedCoordinator,
         sessionTtlMs: 100,
@@ -1766,6 +1782,7 @@ test("lost remote guest abort converges when its fixed session expires", async t
     })
     assert.equal(hostBattle.ok, true)
     assert.equal(guestBattle.ok, true)
+    target.setNow(10_075)
     sessionManager.markParticipantFinalizedBattle(roomNumber, created.value.host)
     assert.equal((await hostRemote.finalizeBattle({
         participant: created.value.host,
@@ -1779,7 +1796,7 @@ test("lost remote guest abort converges when its fixed session expires", async t
     }), { ok: false, error: "HUB_UNAVAILABLE" })
     assert.equal(sessionManager.getActiveBattleSessionId(roomNumber), hostBattle.value.battleSessionId)
 
-    target.setNow(10_100)
+    target.setNow(10_151)
     assert.equal(target.sessions.sweep(), 1)
     assert.equal(getRoom(roomNumber).raising_state, 1)
     assert.equal(sessionManager.getActiveBattleSessionId(roomNumber), null)

@@ -517,19 +517,20 @@ test("three compiled CN processes share trusted Hub state while keeping local se
         storage_directory_path: "/fixture",
     }, { RES_VER: defaultCompatibilityHeaders.RES_VER })
     assert.equal(loaded.status, 200, JSON.stringify(loaded.body))
-    assert.deepEqual(loaded.body.data.unfinished_multi_quest_list, [{
-        play_id: bossPlayIds.get(clientC.dataKey),
-        continue_count: 0,
-    }])
-    await finishNode(clientC)
+    assert.deepEqual(loaded.body.data.unfinished_multi_quest_list, [])
+    assert.equal(playerState(harness, clientC).activeQuests, 0)
 
-    for (const node of [host, clientB, clientC]) {
+    for (const node of [host, clientB]) {
         const after = playerState(harness, node)
         const before = beforeBoss.get(node.dataKey)
         assert.equal(after.activeQuests, 0)
         assert.equal(after.rankPoint, before.rankPoint + 399)
         assert.ok(after.freeMana >= before.freeMana + 1290)
     }
+    const clientCAfterRestart = playerState(harness, clientC)
+    const clientCBeforeBoss = beforeBoss.get(clientC.dataKey)
+    assert.equal(clientCAfterRestart.rankPoint, clientCBeforeBoss.rankPoint)
+    assert.equal(clientCAfterRestart.freeMana, clientCBeforeBoss.freeMana)
 
     bossParty.lobby.forEach(({ peer }) => peer.close())
     battlePeers.forEach(peer => peer.close())
@@ -567,10 +568,8 @@ test("three compiled CN processes share trusted Hub state while keeping local se
         storage_directory_path: "/fixture",
     }, { RES_VER: defaultCompatibilityHeaders.RES_VER })
     assert.equal(retained.status, 200, JSON.stringify(retained.body))
-    assert.equal(retained.body.data.unfinished_multi_quest_list[0].play_id, (
-        degradedPlayIds.get(clientB.dataKey)
-    ))
-    assert.equal(playerState(harness, clientB).activeQuests, 1)
+    assert.deepEqual(retained.body.data.unfinished_multi_quest_list, [])
+    assert.equal(playerState(harness, clientB).activeQuests, 0)
 
     const guestAbort = await harness.gamePost(clientB.url, `${apiPrefix}/abort`, {
         viewer_id: clientB.viewerId,
@@ -580,6 +579,6 @@ test("three compiled CN processes share trusted Hub state while keeping local se
         room_number: degradedParty.roomNumber,
         play_id: degradedPlayIds.get(clientB.dataKey),
     })
-    assert.equal(guestAbort.status, 200, JSON.stringify(guestAbort.body))
+    assert.equal(guestAbort.status, 400, JSON.stringify(guestAbort.body))
     assert.equal(playerState(harness, clientB).activeQuests, 0)
 })

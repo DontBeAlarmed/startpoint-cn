@@ -292,12 +292,12 @@ Hub 可以在战斗结束后把房间恢复为可重赛状态，但旧 `battleSe
 - `prepare` 复核失败映射为现有通用 Failure 分支。
 - 只有房间实际不存在时才使用房间不存在响应。
 - TCP 直连但没有有效 admission 时拒绝握手。
-- `/start` 成功后断线保留本地 active quest，沿用现有中断语义，不自动退款。
+- `/start` 成功后在同一客户端进程内断线时保留本地 active quest，允许客户端隔离战斗或重试 finish；重新登录触发 `/load` 时，因国服客户端不能续接已经开始的多人场景，按中止事务清理并退款。
 - `/finish` 时 Hub 暂时不可达，不发奖、不删除 active quest，允许在完成记录 TTL 内重试。
-- Hub 已重启或明确报告房间、战斗记录不存在时，按联机中断处理，不推测战斗成功。
+- Hub 已重启、暂时不可达或明确报告房间、战斗记录不存在时，重新登录均按联机中断处理，不推测战斗成功。
 - Host 的 Hub 控制端口或 TCP 故障只把多人状态标记为不可用，不关闭主 HTTP 或数据库。
 - Client 对没有 active quest 的新多人操作执行有冷却的控制探测；Hub 不可用时按需启动本地 TCP，并把后续新房间固定为 `local`。
-- Hub 恢复后只让后续新房间重新使用 `remote`；已存在的 `local`、`remote` 房间和 active quest 都不迁移。
+- Hub 恢复后只让后续新房间重新使用 `remote`；已存在的 `local`、`remote` 房间不迁移，重新登录时残留多人 active quest 按中止事务收敛。
 - 自动降级不会改写 `MULTI_MODE`、`.env`、数据库模式或客户端资源，也不会把响应不确定的远程写请求重试到本地。
 
 Hub 或主机服务重启后所有房间、节点会话、admission、socket 和战斗记录失效。首期不恢复原房间。
@@ -485,8 +485,8 @@ Client C: HTTP C + SQLite C
 - 只有游戏房主扣体力和门票，每名参与者的奖励分别写入自己的 SQLite；
 - 超级猫头鹰 BothBoss 完成两代 SceneReady，提前 HTTP finish 被拒绝，延迟 finish 可继续使用 retained fact；
 - 三个节点建立 battle socket 后按客户端真实切场顺序发送 lobby `Bye`，房间、远程成员快照和 SceneReady 屏障继续有效；
-- Client 进程重启产生新的 node session 后，`/load` 仍保留 active quest，并可完成轮换后的 finish；
-- Host/Hub 停止后 Client 核心 HTTP 与 SQLite 继续工作，多人进入 degraded，active quest 不被误删，Guest abort 可本地收敛。
+- Client 进程重启产生新的 node session 后，`/load` 中止并退款无法由国服客户端续接的多人 active quest，不再发布无效的返回房间入口；
+- Host/Hub 停止后 Client 核心 HTTP 与 SQLite 继续工作，多人进入 degraded；重新登录时残留多人 active quest 本地中止并退款，不依赖 Hub 恢复。
 - Client 对新房间在 Hub 失败后按需启动自己的 TCP，并在 Hub 恢复后只把后续新房间切回远程；已有房间来源保持不变。
 
 进程、socket、端口和临时目录由测试统一清理；TTL、撤销和 session sweep 的时间推进继续由现有确定性状态机测试覆盖，不在进程测试中重复长时间等待。
