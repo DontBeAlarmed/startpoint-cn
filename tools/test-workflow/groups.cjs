@@ -379,6 +379,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/cdn_runtime_manifest.test.cjs",
             "tools/cdn_audit.test.cjs",
             "tools/cdn_files.test.cjs",
+            "tools/ios_asset_route.test.cjs",
             "tools/legacy_asset_state.test.cjs",
         ],
     },

@@ -12,6 +12,7 @@ import {
 import type { ContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { parseHttpByteRange, type HttpByteRange } from "./httpRange"
+import { getIosZipAllowlist } from "../../content/cdn/ios-compat"
 
 export interface CdnFileSystem {
     realpath(filePath: string): Promise<string>
@@ -28,6 +29,9 @@ export interface CnCdnFilesRouteOptions {
     readonly getSnapshot?: () => ContentSnapshot
     readonly paths?: Pick<ContentPaths, "cdnRoot" | "patchesRoot">
     readonly patchUploadRoot?: string
+    readonly iosCompat?: {
+        readonly enabled: boolean
+    }
     readonly fileSystem?: CdnFileSystem
     readonly handleObserver?: CdnFileHandleObserver
 }
@@ -436,6 +440,25 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
             const relativePath = requestRelativePath(request)
             if (relativePath === null) return reply.status(404).send("Not Found")
             if (path.posix.extname(relativePath).toLowerCase() === ".zip") {
+                if (options.iosCompat?.enabled === true) {
+                    // archive-ios-* 独立 allowlist：仅放行冻结 iOS 目录视图中解析出的归档
+                    // （relativePath → 期望压缩字节数），不按目录名前缀放行未解析来源。
+                    const expectedSize = getIosZipAllowlist(snapshot, paths.cdnRoot).get(relativePath)
+                    if (expectedSize !== undefined) {
+                        return sendFile(
+                            request,
+                            reply,
+                            logicalRoot,
+                            physicalRoot,
+                            relativePath,
+                            fileSystem,
+                            observer,
+                            expectedSize,
+                            undefined,
+                            true,
+                        )
+                    }
+                }
                 const location = zipAllowlist.get(relativePath)
                 return location === undefined
                     ? reply.status(404).send("Not Found")

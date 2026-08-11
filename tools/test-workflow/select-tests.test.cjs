@@ -39,6 +39,7 @@ test("maps representative source files to focused groups", () => {
         ["quick:cdn", "quick:content"],
     )
     assert.deepEqual(selectTestGroups(["src/content/cdn/types.ts"]), ["quick:cdn"])
+    assert.deepEqual(selectTestGroups(["src/content/cdn/ios-compat.ts"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["src/content/cdn/catalog-builder.ts"]), ["quick:cdn"])
     assert.deepEqual(
         selectTestGroups(["src/content/cdn/entity-lists-directory.ts"]),
@@ -280,6 +281,7 @@ test("generator aggregate includes both leaves while full only adds the self-con
         "tools/cdn_runtime_manifest.test.cjs",
         "tools/cdn_audit.test.cjs",
         "tools/cdn_files.test.cjs",
+        "tools/ios_asset_route.test.cjs",
         "tools/legacy_asset_state.test.cjs",
     ])
 })
@@ -471,6 +473,7 @@ test("registers the focused CDN path contract", () => {
     assert.deepEqual(selectTestGroups(["tools/cdn_audit.test.cjs"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_runtime_manifest.test.cjs"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["tools/cdn_files.test.cjs"]), ["integration:cdn"])
+    assert.deepEqual(selectTestGroups(["tools/ios_asset_route.test.cjs"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["tools/audit_cdn_catalog.cjs"]), ["integration:cdn"])
     assert.deepEqual(selectTestGroups(["docs/cdn/catalog-planner.md"]), ["integration:cdn"])
     assert.deepEqual(
@@ -496,6 +499,10 @@ test("registers the focused CDN path contract", () => {
         selectTestGroups(["tools/content_sync_entry.test.cjs"]),
         ["quick:content"],
     )
+})
+
+test("registers the iOS asset route regression in the CDN group", () => {
+    assert.ok(TEST_GROUPS["integration:cdn"].tests.includes("tools/ios_asset_route.test.cjs"))
 })
 
 test("registers every test in exactly one leaf group and full covers runtime regressions", () => {

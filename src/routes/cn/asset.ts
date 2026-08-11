@@ -15,6 +15,13 @@ import { normalizeCdnBaseUrl, serializeCdnUpdatePlan } from "../../content/cdn/p
 import type { ContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { generateDataHeaders } from "../../utils"
+import { resolveCnCdnRoot } from "../../content/paths"
+import {
+    isIosAssetDevice,
+    isSupportedCnAssetDevice,
+    prepareIosCompat,
+    type IosCompatState,
+} from "../../content/cdn/ios-compat"
 
 type AssetRouteEnvironment = AssetModeEnvironment
 
@@ -48,6 +55,11 @@ export interface CnAssetRouteOptions {
     readonly warn?: (details: AssetTargetMismatchWarning) => void
     readonly logError?: AssetRouteErrorLogger
     readonly resolveListenHost?: (listenHost: string) => string
+    readonly iosCompat?: {
+        readonly enabled: boolean
+        readonly apiHost: string
+        readonly apiScheme: "http" | "https"
+    }
 }
 
 function headerValue(request: FastifyRequest, name: string): string | undefined {
@@ -170,6 +182,13 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
         env,
         resolveListenHost: options.resolveListenHost,
     })
+    const prepareIos = (contentSnapshot: ContentSnapshot, provider: AssetProviderConfig): IosCompatState => {
+        const projectRoot = path.resolve(__dirname, "../../..")
+        const cdnRoot = provider.mode === "local"
+            ? provider.cdnRoot
+            : resolveCnCdnRoot(env.CDN_DIR ?? ".cdn", projectRoot)
+        return prepareIosCompat(contentSnapshot, cdnRoot)
+    }
 
     fastify.post("/version_info", async (request, reply) => {
         let provider: AssetProviderConfig
@@ -203,7 +222,32 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
             )
         }
 
+        const device = headerValue(request, "device")?.toLowerCase()
+        const iosEnabled = options.iosCompat?.enabled === true
+
         try {
+            if (iosEnabled && isIosAssetDevice(device)) {
+                const state = prepareIos(contentSnapshot, provider)
+                if (state.kind !== "ready") {
+                    // iOS 目录/实体表缺失：明确不可用（不静默回落 Android 数据，也不影响 Android 服务）。
+                    return reply.status(503).type("application/json").send({
+                        code: "IOS_ASSETS_UNAVAILABLE",
+                        message: "ios assets are unavailable",
+                    })
+                }
+                // 与 Android version_info 语义一致：files_list 指向空恢复清单（不宣称逐文件可恢复），
+                // total_size 使用未压缩 installedBytes，而非 ZIP 压缩下载量。
+                const normalizedBaseUrl = normalizeCdnBaseUrl(provider.baseUrl)
+                return reply.type("application/json").send({
+                    data_headers: generateDataHeaders(),
+                    data: {
+                        base_url: `${normalizedBaseUrl}/`,
+                        files_list: `${normalizedBaseUrl}/recovery/empty.csv`,
+                        total_size: state.installedBytes,
+                        delayed_assets_size: 0,
+                    },
+                })
+            }
             return reply.type("application/json").send({
                 data_headers: generateDataHeaders(),
                 data: getCdnVersionInfo(provider.baseUrl, contentSnapshot),
@@ -215,7 +259,11 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
 
     fastify.post("/get_path", async (request, reply) => {
         const device = headerValue(request, "device")?.toLowerCase()
-        if (device !== undefined && device !== "2" && device !== "android") {
+        const iosEnabled = options.iosCompat?.enabled === true
+        const supportedDevice = iosEnabled
+            ? isSupportedCnAssetDevice(device)
+            : device === undefined || device === "2" || device === "android"
+        if (!supportedDevice) {
             return reply.status(400).type("application/json").send({
                 code: "UNSUPPORTED_PLATFORM",
                 message: `unsupported DEVICE header: ${device}`,
@@ -288,9 +336,21 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
                 else request.log.warn(warning, "ignoring client asset target that differs from pinned snapshot")
             }
 
-            const plan = planCdnUpdate(contentSnapshot.cdn, {
+            let catalog = contentSnapshot.cdn
+            if (iosEnabled && isIosAssetDevice(device)) {
+                const state = prepareIos(contentSnapshot, provider)
+                if (state.kind !== "ready") {
+                    // iOS 目录/实体表缺失：明确不可用，不给 iOS 客户端下发 Android 归档计划。
+                    return reply.status(503).type("application/json").send({
+                        code: "IOS_ASSETS_UNAVAILABLE",
+                        message: "ios assets are unavailable",
+                    })
+                }
+                catalog = state.catalog
+            }
+            const plan = planCdnUpdate(catalog, {
                 currentVersion: plannerCurrentVersion,
-                targetVersion: contentSnapshot.cdn.targetVersion,
+                targetVersion: catalog.targetVersion,
                 platform: "android",
                 assetSizeKind: "fulfill",
                 isInitial: plannerCurrentVersion === null,
@@ -298,7 +358,7 @@ const routes = async (fastify: FastifyInstance, options: CnAssetRouteOptions) =>
             const data = serializeCdnUpdatePlan(plan, {
                 baseUrl: provider.baseUrl,
                 currentVersion: plannerCurrentVersion,
-                targetVersion: contentSnapshot.cdn.targetVersion,
+                targetVersion: catalog.targetVersion,
             })
             return reply.status(200).type("application/json").send({
                 data_headers: generateDataHeaders({ asset_update: true }),

@@ -42,6 +42,7 @@ const SOURCE_RULES = [
         pattern: /^src\/content\/cdn\/(?:catalog-builder|patch-graph|digest-cache|planner)\.ts$/,
         groups: ["quick:cdn"],
     },
+    { pattern: /^src\/content\/cdn\/ios-compat\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/lib\/admin-content-status\.ts$/, groups: ["quick:cdn", "admin"] },
     { pattern: /^src\/lib\/admin-multi-status\.ts$/, groups: ["quick:runtime", "admin"] },
     { pattern: /^src\/multi\/management\//, groups: ["quick:runtime"] },
