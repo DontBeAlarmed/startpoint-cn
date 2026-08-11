@@ -38,7 +38,7 @@ const {
 } = require("../src/lib/shop-select-campaign")
 
 db = initializeDatabase()
-assert.equal(db.pragma("user_version", { simple: true }), 15)
+assert.equal(db.pragma("user_version", { simple: true }), 16)
 
 const account = insertAccountSync({
     appId: "wf_cn",

@@ -281,7 +281,7 @@ test("default schema migration preserves v6 players and creates cascading Pass t
 
     data.initializeDatabase({ paths })
     const migrated = getDb()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 15)
+    assert.equal(migrated.pragma("user_version", { simple: true }), 16)
     assert.deepEqual(
         migrated.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_character_election_votes'").get(),
         { name: "players_character_election_votes" },
@@ -302,6 +302,11 @@ test("default schema migration preserves v6 players and creates cascading Pass t
             .filter(foreignKey => foreignKey.table === "players_pass_cards" && foreignKey.on_delete === "CASCADE")
             .length,
         2,
+    )
+    assert.equal(
+        migrated.pragma("foreign_key_list(players_player_history_settings)")
+            .some(foreignKey => foreignKey.table === "players" && foreignKey.on_delete === "CASCADE"),
+        true,
     )
 
     const insertPassRows = () => {
@@ -351,7 +356,7 @@ test("default schema migrates schema 14 active quests to battle session and coor
 
     data.initializeDatabase({ paths })
 
-    assert.equal(getDb().pragma("user_version", { simple: true }), 15)
+    assert.equal(getDb().pragma("user_version", { simple: true }), 16)
     assert.equal(
         getDb().pragma("table_info(players_active_quests)")
             .some(column => column.name === "battle_session_id" && column.notnull === 0),
@@ -370,6 +375,37 @@ test("default schema migrates schema 14 active quests to battle session and coor
         `).get(),
         { play_id: "legacy-play", battle_session_id: null, coordinator_origin: null },
     )
+})
+
+test("default schema migrates schema 15 databases to player history storage", t => {
+    const paths = temporaryPaths(t)
+    data.initializeDatabase({ paths })
+    const { insertAccountSync } = require("../../src/data/domains/account")
+    const { insertDefaultPlayerSync } = require("../../src/data/domains/player")
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: "schema-v15-player-history-migration",
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    getDb().prepare("UPDATE players SET name = ? WHERE id = ?").run("schema-v15-player", playerId)
+    data.closeDatabase()
+
+    const schema15 = new Sqlite(paths.databaseFile)
+    schema15.exec("DROP TABLE players_player_history_settings")
+    schema15.pragma("user_version = 15")
+    schema15.close()
+    fs.writeFileSync(paths.databaseVersionFile, "15")
+
+    data.initializeDatabase({ paths })
+    assert.equal(getDb().pragma("user_version", { simple: true }), 16)
+    assert.deepEqual(
+        getDb().prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_player_history_settings'").get(),
+        { name: "players_player_history_settings" },
+    )
+    assert.equal(getDb().prepare("SELECT name FROM players WHERE id = ?").get(playerId).name, "schema-v15-player")
 })
 
 test("active quest domain roundtrips nullable battle session identity", t => {

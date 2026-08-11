@@ -643,6 +643,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/admin_player_actions.test.cjs",
         "tools/history_receive_route.test.cjs",
         "tools/mail_receive_transaction.test.cjs",
+        "tools/player_history_profile_route.test.cjs",
         "tools/player_save_v2.test.cjs",
         "tools/server_gameplay_settings.test.cjs",
         "tools/shop_purchase_period_storage.test.cjs",

@@ -47,6 +47,6 @@ schema 13 新增 `players_practice_battle_history`：
 - 插入幂等、查询顺序和玩家隔离；
 - Fastify 查询响应与非法 viewer；
 - finish 总事务成功与回滚；
-- schema 13 引入、schema 15 当前兼容、存档 V2 和 Server Bundle 数据版本契约。
+- schema 13 引入、schema 16 当前兼容、存档 V2 和 Server Bundle 数据版本契约。
 
 CN 客户端仍需验证练习战履历列表、详情弹窗、失败记录显示以及重新登录后的持久化。

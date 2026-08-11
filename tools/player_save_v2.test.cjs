@@ -244,6 +244,12 @@ test("v2 export includes all registered domains and excludes transient battle st
         INSERT INTO players_active_quests (player_id, play_id, quest_id, category)
         VALUES (?, 'transient-play', 1001, 1)
     `).run(playerId)
+    db.prepare(`
+        INSERT INTO players_player_history_settings (
+            player_id, player_history_id, background_card_id, degree_id,
+            character_ids, unison_character_ids, topic_visibility
+        ) VALUES (?, 1, 2, 1, '[1,null,null]', '[null,null,null]', '{"100":true}')
+    `).run(playerId)
 
     const snapshot = exportPlayerSaveV2Sync(playerId)
     const tables = allSnapshotTables(snapshot)
@@ -252,13 +258,14 @@ test("v2 export includes all registered domains and excludes transient battle st
     assert.equal(snapshot.formatVersion, 2)
     assert.equal(snapshot.version, 2)
     assert.equal(snapshot.mode, "backup")
-    assert.equal(snapshot.producer.dbSchemaVersion, 15)
+    assert.equal(snapshot.producer.dbSchemaVersion, 16)
     assert.equal(snapshot.playerId, playerId)
     assert.equal(tables.players_mails[0].subject, "backup-mail")
     assert.equal(tables.players_box_gacha_drawn_rewards[0].number, 3)
     assert.equal(tables.players_pass_card_rewards[0].reward_id, 121)
     assert.equal(tables.players_shop_campaign_lineups[0].lineup_id, 1010)
     assert.equal(tables.players_score_attack_battle_history[0].play_id, "save-v2-play")
+    assert.equal(tables.players_player_history_settings[0].background_card_id, 2)
     assert.equal(Object.hasOwn(tables, "players_active_quests"), false)
     assert.deepEqual(snapshot.excludedDomains, ["account", "session", "serverConfig", "activeQuest"])
 })
@@ -288,6 +295,12 @@ test("restore preserves target identity, replaces all domains, and clears active
             elapsed_time_ms, finish_kind, quest_id, total_damage
         ) VALUES (?, 7001, 'restore-history', 7, ?, 1234, 1, 7001001, 999)
     `).run(sourceId, new Date().toISOString())
+    db.prepare(`
+        INSERT INTO players_player_history_settings (
+            player_id, player_history_id, background_card_id, degree_id,
+            character_ids, unison_character_ids, topic_visibility
+        ) VALUES (?, 1, 3, 1, '[1,null,null]', '[null,null,null]', '{"101":false}')
+    `).run(sourceId)
 
     db.prepare("UPDATE players SET name = 'target-before' WHERE id = ?").run(targetId)
     db.prepare("INSERT INTO players_items (id, amount, player_id) VALUES (99999, 2, ?)").run(targetId)
@@ -326,6 +339,10 @@ test("restore preserves target identity, replaces all domains, and clears active
     assert.equal(activeQuests[targetId], undefined)
     assert.equal(db.prepare("SELECT lineup_id FROM players_shop_campaign_lineups WHERE player_id = ?").get(targetId).lineup_id, 1020)
     assert.equal(db.prepare("SELECT play_id FROM players_score_attack_battle_history WHERE player_id = ?").get(targetId).play_id, "restore-history")
+    assert.equal(
+        db.prepare("SELECT background_card_id FROM players_player_history_settings WHERE player_id = ?").get(targetId).background_card_id,
+        3,
+    )
     assert.notEqual(db.prepare("SELECT id FROM players_mails WHERE player_id = ?").get(targetId).id, sourceMailId)
 })
 
@@ -335,7 +352,7 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     const snapshot = exportPlayerSaveV2Sync(playerId)
 
     const future = cloneJson(snapshot)
-    future.producer.dbSchemaVersion = 16
+    future.producer.dbSchemaVersion = 17
     assert.throws(() => restorePlayerSaveV2Sync(future, playerId), /newer.*schema|future.*schema/i)
 
     const missingCurrent = cloneJson(snapshot)
@@ -371,6 +388,11 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     schema13.producer.dbSchemaVersion = 13
     delete schema13.domains.core.tables.players_ex_boost_pending_draws
     assert.doesNotThrow(() => restorePlayerSaveV2Sync(schema13, playerId))
+
+    const schema15 = cloneJson(snapshot)
+    schema15.producer.dbSchemaVersion = 15
+    delete schema15.domains.core.tables.players_player_history_settings
+    assert.doesNotThrow(() => restorePlayerSaveV2Sync(schema15, playerId))
 
     const conflictingVersion = cloneJson(snapshot)
     conflictingVersion.version = 1

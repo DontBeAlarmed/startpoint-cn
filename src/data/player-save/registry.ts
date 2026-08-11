@@ -29,6 +29,7 @@ export const PLAYER_SAVE_TABLES: readonly PlayerSaveTableDefinition[] = [
     table("players_party_groups", "core"),
     table("players_parties", "core"),
     table("players_options", "core"),
+    table("players_player_history_settings", "core", 16),
     table("players_items", "core"),
     table("players_collected_items", "core", 6),
     table("players_equipment", "core"),
