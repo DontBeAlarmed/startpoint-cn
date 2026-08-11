@@ -71,6 +71,7 @@ async function createAssetApp(options = {}) {
         warn: options.warn,
         logError: options.logError,
         resolveListenHost: options.resolveListenHost,
+        iosCompat: options.iosCompat,
     })
     await app.ready()
     return app
@@ -457,6 +458,20 @@ test("accepts missing or Android DEVICE and rejects explicit other platforms", a
     assert.equal(rejected.statusCode, 400)
     assert.equal(rejected.json().code, "UNSUPPORTED_PLATFORM")
     assert.equal("data" in rejected.json(), false)
+})
+
+test("accepts iOS DEVICE when iosCompat is enabled; unavailable when ios assets are missing", async t => {
+    const app = await createAssetApp({
+        iosCompat: { enabled: true, apiHost: "10.0.0.5:8001", apiScheme: "http" },
+    })
+    t.after(() => app.close())
+
+    for (const device of ["1", "ios"]) {
+        // 无 iOS 目录/实体表 → 明确不可用（不回落 Android，也不 400）
+        const response = await postGetPath(app, { res_ver: "1.4.54", device })
+        assert.equal(response.statusCode, 503, `device=${device}`)
+        assert.equal(response.json().code, "IOS_ASSETS_UNAVAILABLE", `device=${device}`)
+    }
 })
 
 test("rejects unsupported asset sizes and planner failures without partial data", async t => {
