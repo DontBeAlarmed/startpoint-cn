@@ -160,9 +160,9 @@ const tables = {
         90003: { 1: [rewardRow()] },
         90004: { 1: [rewardRow(3)] },
         90005: { 1: [rewardRow(20)] },
-        90006: { 1: [rewardRow()] },
-        90007: { 1: [rewardRow()] },
-        90008: { 1: [rewardRow()] },
+        90006: { 1: [rewardRow(3)] },
+        90007: { 1: [rewardRow(6)] },
+        90008: { 1: [rewardRow(2)] },
         90009: { 1: [rewardRow()] },
         90010: { 1: [rewardRow()] },
         90011: { 1: [rewardRow()] },
@@ -273,11 +273,14 @@ async function main() {
     for (const missionId of [90001, 90002, 90003, 90004, 90005, 90006, 90007, 90013]) {
         const expectedProgress = missionId === 90004 || missionId === 90013
             ? 3
-            : missionId === 90005 ? 20 : 1
+            : missionId === 90005 ? 20
+                : missionId === 90006 ? 3
+                    : missionId === 90007 ? 6 : 1
         assert.equal(firstById[missionId]?.progress_value, expectedProgress)
         assert.deepEqual(firstById[missionId]?.stages, [{ stage: 1, received: false }])
     }
-    assert.equal(firstById[90008], undefined, "target_mission_clear 缺一个目标时不得完成")
+    assert.equal(firstById[90008]?.progress_value, 1, "target_mission_clear 应保留已完成目标数量")
+    assert.deepEqual(firstById[90008]?.stages, [], "目标未全部完成时不得开放奖励阶段")
     assert.equal(firstById[90009], undefined, "unfinished quest 不得完成")
     assert.equal(firstById[90010], undefined, "未开放任务必须 fail closed")
     assert.equal(firstById[90011], undefined, "已过期任务必须 fail closed")
@@ -289,7 +292,7 @@ async function main() {
     assert.equal(firstById[90013]?.progress_value, 3, "普通 kind 1 Normal 事件不得被误判为 Comeback")
     assert.equal(
         getPlayerActiveMissionsSync(playerId)[90007].progress,
-        1,
+        6,
         "同一次 reconcile 必须通过固定点完成前置任务并开放 phase 2",
     )
     assert.equal(

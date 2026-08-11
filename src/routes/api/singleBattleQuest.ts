@@ -64,6 +64,7 @@ import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
 import bundledEventChallengePointMap from "../../../assets/event_challenge_point_map.json";
 import bundledAdditionalRewardRules from "../../../assets/additional_reward_rules.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
+import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import {
     settleAdditionalRewardsSync,
     type AdditionalRewardTable,
@@ -72,6 +73,7 @@ import {
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import {
     mergeMissionSettlementResponse,
+    reconcileActiveMissionFacts,
     reconcileAwakeUnlockCharacterList,
     settleMissionCategories,
 } from "../../lib/mission";
@@ -627,6 +629,11 @@ const routes = async (fastify: FastifyInstance) => {
                 BATTLE_SETTLEMENT_CATEGORIES,
                 settlementTime,
             )
+            const activeMissionList = reconcileActiveMissionFacts({
+                playerId,
+                repository: getContentSnapshot().repository,
+                now: settlementTime,
+            })
             const itemList = {
                 ...(activeQuestData.entryItemId ? { [activeQuestData.entryItemId]: getPlayerItemSync(playerId, activeQuestData.entryItemId) ?? 0 } : {}),
                 ...scoreRewardsResult.items,
@@ -664,6 +671,7 @@ const routes = async (fastify: FastifyInstance) => {
                 clearReward,
                 sPlusClearReward,
                 missionSettlement,
+                activeMissionList,
                 fixedManaReward,
                 fixedPoolExpReward,
                 newMana,
@@ -690,6 +698,7 @@ const routes = async (fastify: FastifyInstance) => {
             clearReward,
             sPlusClearReward,
             missionSettlement,
+            activeMissionList,
             fixedManaReward,
             fixedPoolExpReward,
             newMana,
@@ -755,6 +764,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "user_daily_challenge_point_list": dailyChallengePointList ?? [],
                 "presigned_quest_category": []
         }
+        responseData.active_mission_list = activeMissionList
         mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)
         responseData.mail_arrived = getPlayerMailCountSync(playerId, true) > 0
         return reply.status(200).send({

@@ -34,6 +34,7 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerCharacterSync } = require("../src/data/domains/character")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getPlayerSingleQuestProgressSync } = require("../src/data/domains/quest")
+const { getPlayerActiveMissionsSync } = require("../src/data/domains/mission")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 const storyRoutes = require("../src/routes/api/storyQuest").default
@@ -62,12 +63,12 @@ function decode(response) {
     return unpack(Buffer.from(response.body, "base64"))
 }
 
-async function finish(app, viewerId, questId, pathName = "/story/finish") {
+async function finish(app, viewerId, questId, pathName = "/story/finish", category = 1) {
     return app.inject({
         method: "POST",
         url: pathName,
         payload: {
-            category: 1,
+            category,
             quest_id: questId,
             party_id: 1,
             viewer_id: viewerId,
@@ -108,6 +109,48 @@ async function main() {
     assert.deepEqual(repeatedData.story_join_character_id_list, [])
     assert.deepEqual(repeatedData.character_list, [])
     assert.equal(getPlayerCharacterSync(direct.playerId, 10).stack, 0)
+
+    const characterEpisode = await createPlayer(5)
+    const characterEpisodeFinish = await finish(
+        app,
+        characterEpisode.viewerId,
+        101,
+        "/story/finish",
+        3,
+    )
+    assert.equal(characterEpisodeFinish.statusCode, 200, characterEpisodeFinish.body)
+    const characterEpisodeData = decode(characterEpisodeFinish).data
+    assert.deepEqual(
+        characterEpisodeData.active_mission_list.find(entry => entry.mission_id === 11010),
+        {
+            mission_id: 11010,
+            progress_value: 1,
+            stages: [{ stage: 1, received: false }],
+        },
+        "角色故事首次完成后必须在同一响应刷新成长任务",
+    )
+    assert.equal(getPlayerActiveMissionsSync(characterEpisode.playerId)[11010].progress, 1)
+
+    const activeMissionRollback = await createPlayer(6)
+    db.exec(`
+        CREATE TRIGGER reject_story_active_mission
+        BEFORE INSERT ON players_active_missions
+        WHEN NEW.player_id = ${activeMissionRollback.playerId} AND NEW.id = 11010
+        BEGIN
+            SELECT RAISE(ABORT, 'forced story active mission failure');
+        END;
+    `)
+    const failedActiveMission = await finish(
+        app,
+        activeMissionRollback.viewerId,
+        101,
+        "/story/finish",
+        3,
+    )
+    assert.equal(failedActiveMission.statusCode, 500)
+    assert.equal(getPlayerSingleQuestProgressSync(activeMissionRollback.playerId, 3, 101), null)
+    assert.equal(getPlayerActiveMissionsSync(activeMissionRollback.playerId)[11010], undefined)
+    db.exec("DROP TRIGGER reject_story_active_mission")
 
     const skipped = await createPlayer(2)
     const skipResponse = await finish(

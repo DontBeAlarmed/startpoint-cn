@@ -222,27 +222,17 @@ test("accumulates every directly related source group", () => {
     )
     assert.deepEqual(
         selectTestGroups(["src/routes/api/singleBattleQuest.ts"]),
-        ["integration:compiled", "integration:quest", "quick:quest"],
+        ["integration:compiled", "integration:mission", "integration:quest", "quick:quest"],
     )
 })
 
-test("selects only the direct single battle route regressions", () => {
+test("selects quest and mission regressions for the single battle route", () => {
     const groups = selectTestGroups(["src/routes/api/singleBattleQuest.ts"])
-    assert.deepEqual(groups, ["integration:compiled", "integration:quest", "quick:quest"])
-    assert.deepEqual(groups.flatMap(group => TEST_GROUPS[group].tests), [
-        "tools/quest_abort_route.test.cjs",
-        "tools/score_attack_event.test.cjs",
-        "tools/treasure_key_entry.test.cjs",
-        "tools/auto_start_stamina_stop.test.cjs",
-        "tools/quest_entry_lifecycle.test.cjs",
-        "tools/quest_host_finish.test.cjs",
-        "tools/story_quest_finish.test.cjs",
-        "tools/tutorial_update_step.test.cjs",
-        "tools/active_quest_service_import.test.cjs",
-        "tools/additional_reward_routes.test.cjs",
-        "tools/reward_campaign_routes.test.cjs",
-        "tools/special_quest_flow.test.cjs",
-    ])
+    assert.deepEqual(groups, ["integration:compiled", "integration:mission", "integration:quest", "quick:quest"])
+    assert.ok(
+        groups.flatMap(group => TEST_GROUPS[group].tests)
+            .includes("tools/mission_auto_settlement_route.test.cjs"),
+    )
 })
 
 test("upgrades package and unknown source changes to full", () => {

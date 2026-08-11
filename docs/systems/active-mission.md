@@ -74,17 +74,20 @@ Content Release；这一步只补齐服务端解释 Active Mission 所需的定�
 - 回归活动通过 event `string_id` 中的 `come_back_mission` 识别；当前没有回归资格生产者时 fail closed，不会把 250xx
   任务发给普通玩家。普通 `kind=1` 事件不因此被误判为回归活动。
 
-### 已确认的角色故事刷新时机缺口
+### 角色故事与单人战斗的即时刷新
 
 成长任务 `11010`“阅读角色故事”使用 pattern 21（`episode_clear_count`），其权威事实是玩家已经成功完成的普通角色故事关卡，
-不是卡池角色剧情试读。`/api/index.php/story_quest/finish` 当前会正确持久化角色故事关卡进度，但不会在同一次结算中运行
-Active Mission 重算，也不会在响应中返回 `active_mission_list` 增量。因此客户端返回成长任务页面时可能仍显示未完成；重新登录
-触发 `/load` 后，服务端会依据已持久化的关卡记录重算并完成该任务。该现象已经过客户端验证，不会丢失故事进度或任务资格，
-但属于即时反馈缺口。
-
-后续调整应评估在角色故事结算事务内同步计算 Active Mission，并通过该响应返回标准进度增量，使客户端无需重新登录即可刷新。
-在完成接口响应兼容与事务回归验证前，保留当前由 `/load` 校准的行为。`/episode_trial_reading/finish` 仍是独立的角色剧情试读入口，
+不是卡池角色剧情试读。`/api/index.php/story_quest/finish` 会在原故事结算事务内同步重算 Active Mission，并在响应中返回
+`active_mission_list` 增量，使客户端返回成长任务页面时立即刷新。`/episode_trial_reading/finish` 仍是独立的角色剧情试读入口，
 不得用于完成 `11010`。
+
+`/api/index.php/single_battle_quest/finish` 同样会在原战斗结算事务内完成重算并返回增量。因此成长任务 `11060`
+“通关任意属性「每日关卡 摇曳的迷宫」”和 `11080`“通关「每日关卡 摇曳的迷宫 经验值&玛纳」”无需重新登录即可刷新；
+两条任务分别使用 category 6 和 category 14 的关卡事实，不得合并为同一关卡类别。`/load` 仍保留全量事实校准，负责修复旧存档
+或异常中断后尚未即时同步的进度。
+
+pattern 13（`target_mission_clear`）的进度是已完成目标任务的数量，不是“是否全部完成”的布尔值。四个成长任务阶段的
+“完成所有本篇任务”均要求进度达到 10；服务端会保留部分完成数量，并在全部目标达成时写入进度 10 和待领取阶段。
 
 这组状态事实只写入 `all_active_mission_list`，不会写入角色觉醒使用的 category 9 `active_mission_list`。
 

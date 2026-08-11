@@ -157,6 +157,9 @@ stubModule("../src/data/db", { getDb: () => db })
 stubModule("../src/data/domains/server-settings", {
     getServerGameplaySettingsSync: () => ({ dropMultiplier: 3 }),
 })
+stubModule("../src/content/runtime/content-snapshot", {
+    getContentSnapshot: () => ({ repository: {} }),
+})
 stubModule("../src/content/runtime/table-access", {
     getRuntimeContentTableSync(tableName, fallback) {
         if (tableName !== "additional_reward_rules.json") return fallback
@@ -332,6 +335,7 @@ stubModule("../src/lib/reward-campaign", {
 stubModule("../src/routes/api/rushEvent", { rushEventFolderMaxRounds: {} })
 stubModule("../src/lib/rush", { getSerializedPlayerRushEventPlayedPartiesSync: () => ({ folderParties: null, endlessParties: null }) })
 stubModule("../src/lib/mission", {
+    reconcileActiveMissionFacts: () => [],
     reconcileAwakeUnlockCharacterList: (_playerId, list) => list,
     settleMissionCategories: () => ({
         missionInfo: [],

@@ -9,9 +9,10 @@ import { getQuestFromCategorySync } from "../../lib/assets";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { givePlayerRewardSync } from "../../lib/quest";
-import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import { reconcileActiveMissionFacts, reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { getQuestJoinCharacterIds } from "../../lib/story-join-character";
-import { generateDataHeaders } from "../../utils";
+import { generateDataHeaders, getServerTime } from "../../utils";
+import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 
 interface FinishBody {
     party_id: number,
@@ -84,6 +85,11 @@ function processStoryQuestFinish(playerId: number, questSection: number, questId
             ...((rewardResult?.character_list ?? []) as Record<string, unknown>[]),
             ...storyCharacterList,
         ])
+        const activeMissionList = reconcileActiveMissionFacts({
+            playerId,
+            repository: getContentSnapshot().repository,
+            now: getServerTime() * 1000,
+        })
         return {
             user_info: {
                 free_vmoney: playerAfter.freeVmoney,
@@ -97,6 +103,7 @@ function processStoryQuestFinish(playerId: number, questSection: number, questId
             story_join_character_id_list: storyJoinCharacterIds,
             user_notice_list: [],
             presigned_quest_category: [],
+            active_mission_list: activeMissionList,
             mail_arrived: getMailArrivedSync(playerId),
         }
     })()

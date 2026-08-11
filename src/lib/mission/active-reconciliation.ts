@@ -683,11 +683,13 @@ function computeAuthoritativeProgress(
     if (pattern === PATTERN_TARGET_MISSION_CLEAR) {
         const missionIds = parseIntegerList(row[55], "target mission ids")
         if (missionIds.length === 0) return 0
-        return missionIds.every(missionId => isMissionComplete(
-            missionId,
-            activeMissions,
-            repository,
-        )) ? 1 : 0
+        return missionIds.reduce((completedCount, targetMissionId) => (
+            completedCount + (isMissionComplete(
+                targetMissionId,
+                activeMissions,
+                repository,
+            ) ? 1 : 0)
+        ), 0)
     }
     return null
 }

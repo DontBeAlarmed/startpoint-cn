@@ -31,7 +31,9 @@ function cleanup() {
 process.once("exit", cleanup)
 
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
-restoreContentSnapshot = installBundledGameplaySnapshot()
+restoreContentSnapshot = installBundledGameplaySnapshot({
+    additionalTableNames: ["event_item_shop.json"],
+})
 
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
@@ -40,7 +42,7 @@ const { recordMissionBattleResultSync } = require("../src/data/domains/mission_b
 const { givePlayerItemSync } = require("../src/data/domains/item")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
-const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
+const { getPlayerActiveMissionsSync, getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
 const missionRoutes = require("../src/routes/api/mission").default
 const { getTimeOffset, setServerTimeOffset } = require("../src/utils")
@@ -165,6 +167,7 @@ async function main() {
                 SELECT RAISE(ABORT, 'injected awake fact rollback');
             END;
         `)
+        const activeMissionsBeforeRollback = structuredClone(getPlayerActiveMissionsSync(playerId))
         const rolledBackFinish = await fastify.inject({
             method: "POST",
             url: "/api/index.php/single_battle_quest/finish",
@@ -173,6 +176,11 @@ async function main() {
         })
         assert.equal(rolledBackFinish.statusCode, 500)
         assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[13], undefined)
+        assert.deepEqual(
+            getPlayerActiveMissionsSync(playerId),
+            activeMissionsBeforeRollback,
+            "结算后段失败时 Active Mission 写入必须随战斗事务回滚",
+        )
         assert.notEqual(getPlayerActiveQuestSync(playerId), null)
         db.exec("DROP TRIGGER fail_awake_fact_finish")
 
@@ -201,6 +209,84 @@ async function main() {
         })
         assert.equal(duplicateFinish.statusCode, 400)
         assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[13].progress, 5)
+
+        const dailyMazeStart = await fastify.inject({
+            method: "POST",
+            url: "/api/index.php/single_battle_quest/start",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            payload: encodeRequest({
+                viewer_id: viewerId,
+                api_count: 2,
+                quest_id: 19001,
+                category: 6,
+                party_id: 1,
+                use_boost_point: false,
+                use_boss_boost_point: false,
+                is_auto_start_mode: false,
+                play_id: "active-mission-daily-maze",
+            }),
+        })
+        assert.equal(dailyMazeStart.statusCode, 200, dailyMazeStart.body)
+        const dailyMazeFinish = await fastify.inject({
+            method: "POST",
+            url: "/api/index.php/single_battle_quest/finish",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            payload: encodeRequest({
+                ...finishPayload,
+                api_count: 2,
+                quest_id: 19001,
+                category: 6,
+            }),
+        })
+        assert.equal(dailyMazeFinish.statusCode, 200, dailyMazeFinish.body)
+        const dailyMazeData = decodeResponse(dailyMazeFinish).data
+        const dailyMazeActiveMissions = Object.fromEntries(
+            dailyMazeData.active_mission_list.map(entry => [entry.mission_id, entry]),
+        )
+        assert.deepEqual(dailyMazeActiveMissions[11060], {
+            mission_id: 11060,
+            progress_value: 1,
+            stages: [{ stage: 1, received: false }],
+        })
+
+        const dailyExpManaStart = await fastify.inject({
+            method: "POST",
+            url: "/api/index.php/single_battle_quest/start",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            payload: encodeRequest({
+                viewer_id: viewerId,
+                api_count: 3,
+                quest_id: 1001,
+                category: 14,
+                party_id: 1,
+                use_boost_point: false,
+                use_boss_boost_point: false,
+                is_auto_start_mode: false,
+                play_id: "active-mission-daily-exp-mana",
+            }),
+        })
+        assert.equal(dailyExpManaStart.statusCode, 200, dailyExpManaStart.body)
+        const dailyExpManaFinish = await fastify.inject({
+            method: "POST",
+            url: "/api/index.php/single_battle_quest/finish",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            payload: encodeRequest({
+                ...finishPayload,
+                api_count: 3,
+                quest_id: 1001,
+                category: 14,
+            }),
+        })
+        assert.equal(dailyExpManaFinish.statusCode, 200, dailyExpManaFinish.body)
+        const dailyExpManaData = decodeResponse(dailyExpManaFinish).data
+        assert.deepEqual(
+            dailyExpManaData.active_mission_list.find(entry => entry.mission_id === 11080),
+            {
+                mission_id: 11080,
+                progress_value: 1,
+                stages: [{ stage: 1, received: false }],
+            },
+        )
 
         updatePlayerSync({
             id: playerId,
