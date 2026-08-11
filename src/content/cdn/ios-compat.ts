@@ -4,6 +4,7 @@
 //  - 缺失 iOS edge、实体表或目录整体缺失 → iOS 视图标记为明确"不可用"（503），
 //    不回退 Android platform 归档，错误严格限制在 iOS 请求范围（不影响 Android）。
 //  - iOS 目录在启动/首次使用扫描一次并冻结（模块级缓存），不在每次请求中重扫磁盘。
+import { createHash } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
@@ -27,11 +28,11 @@ export type IosCompatState =
         readonly reason: string
     }
 
-function archive(relativePath: string, compressedBytes: number, order: number): CatalogArchive {
+function archive(relativePath: string, bytes: Buffer, order: number): CatalogArchive {
     return Object.freeze({
         relativePath,
-        compressedBytes,
-        sha256: "",
+        compressedBytes: bytes.length,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
         layer: "platform" as const,
         order,
     })
@@ -54,7 +55,7 @@ function readZipArchives(cdnRoot: string, directory: string): ReadonlyArray<Cata
         .sort((left, right) => left.name.localeCompare(right.name))
         .map((entry, index) => archive(
             `${directory}/${entry.name}`,
-            fs.statSync(path.join(absoluteDirectory, entry.name)).size,
+            fs.readFileSync(path.join(absoluteDirectory, entry.name)),
             index + 1,
         ))
 }
@@ -107,8 +108,19 @@ export function prepareIosCompat(snapshot: ContentSnapshot, cdnRoot: string): Io
         return state
     }
 
-    const iosFull = readZipArchives(cdnRoot, IOS_FULL_DIRECTORY)
-    const iosDiff = readZipArchives(cdnRoot, IOS_DIFF_DIRECTORY)
+    let iosFull: ReadonlyArray<CatalogArchive>
+    let iosDiff: ReadonlyArray<CatalogArchive>
+    try {
+        iosFull = readZipArchives(cdnRoot, IOS_FULL_DIRECTORY)
+        iosDiff = readZipArchives(cdnRoot, IOS_DIFF_DIRECTORY)
+    } catch {
+        const state: IosCompatState = Object.freeze({
+            kind: "unavailable",
+            reason: "ios archive directory is unreadable",
+        })
+        iosCompatCache.set(cdnRoot, state)
+        return state
+    }
     if (iosFull.length === 0 && iosDiff.length === 0) {
         const state: IosCompatState = Object.freeze({
             kind: "unavailable",
@@ -132,6 +144,14 @@ export function prepareIosCompat(snapshot: ContentSnapshot, cdnRoot: string): Io
         edges: Object.freeze(replaced as ReadonlyArray<CatalogEdge>),
     })
     const installedBytes = readEntityListInstalledBytes(cdnRoot, entityList)
+    if (installedBytes === null) {
+        const state: IosCompatState = Object.freeze({
+            kind: "unavailable",
+            reason: "invalid ios entity list",
+        })
+        iosCompatCache.set(cdnRoot, state)
+        return state
+    }
     const state: IosCompatState = Object.freeze({ kind: "ready", catalog, installedBytes })
     iosCompatCache.set(cdnRoot, state)
     return state
@@ -139,16 +159,14 @@ export function prepareIosCompat(snapshot: ContentSnapshot, cdnRoot: string): Io
 
 export function resolveIosEntityList(catalog: CdnCatalog, cdnRoot: string): string | null {
     const androidPath = catalog.entityListsRelativePath
-    const expected = androidPath.replace(/android_medium\.csv$/i, "ios_medium.csv")
-    if (expected !== androidPath && fs.existsSync(path.join(cdnRoot, ...expected.split("/")))) {
-        return expected
-    }
     const directory = path.posix.dirname(androidPath)
     const absoluteDirectory = path.join(cdnRoot, ...directory.split("/"))
     let candidates: string[] = []
     try {
         candidates = fs.readdirSync(absoluteDirectory, { withFileTypes: true })
-            .filter(entry => entry.isFile() && /-ios_medium\.csv$/i.test(entry.name))
+            .filter(entry => entry.isFile()
+                && (entry.name.toLowerCase() === "ios_medium.csv"
+                    || /-ios_medium\.csv$/i.test(entry.name)))
             .map(entry => entry.name)
             .sort((left, right) => left.localeCompare(right))
     } catch {
@@ -158,25 +176,27 @@ export function resolveIosEntityList(catalog: CdnCatalog, cdnRoot: string): stri
     return `${directory}/${candidates[0]}`
 }
 
-function readEntityListInstalledBytes(cdnRoot: string, entityList: string): number {
+function readEntityListInstalledBytes(cdnRoot: string, entityList: string): number | null {
     // 与 Android installedBytes 语义一致：实体表 size 列之和（未压缩字节），
     // 不使用 ZIP 压缩下载量。
     const absolutePath = path.join(cdnRoot, ...entityList.split("/"))
     let total = 0
     try {
         const lines = fs.readFileSync(absolutePath, "utf8").split(/\r?\n/)
+        if (lines.shift() !== ENTITY_LIST_HEADER) return null
         for (const line of lines) {
             const trimmed = line.trim()
-            if (trimmed.length === 0 || trimmed.startsWith("#") || trimmed === ENTITY_LIST_HEADER) continue
+            if (trimmed.length === 0 || trimmed.startsWith("#")) continue
             const columns = trimmed.split(",")
-            if (columns.length < 3) continue
+            if (columns.length < 3) return null
             const size = Number(columns[2])
-            if (Number.isSafeInteger(size) && size >= 0) total += size
+            if (!Number.isSafeInteger(size) || size < 0) return null
+            total += size
         }
+        return total
     } catch {
-        // 读取失败按 0 处理（不可用状态由调用方基于实体表缺失判定）
+        return null
     }
-    return total
 }
 
 const iosAllowlistCache = new Map<string, ReadonlyMap<string, number>>()

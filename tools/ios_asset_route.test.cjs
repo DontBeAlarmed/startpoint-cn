@@ -2,6 +2,7 @@
 
 const assert = require("node:assert/strict")
 const test = require("node:test")
+const crypto = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
@@ -184,7 +185,12 @@ test("get_path plans ios-full archives for an iOS device and android archives ot
     assert.equal(iosResponse.statusCode, 200)
     const iosData = iosResponse.json().data
     assert.equal(iosData.full.version, "1.4.0")
-    assert.ok(iosData.full.archive.some(item => item.location.includes("archive-ios-full/pinball-1.4.0-1-abc123.zip")))
+    const fullArchive = iosData.full.archive.find(item => item.location.includes("archive-ios-full/pinball-1.4.0-1-abc123.zip"))
+    assert.ok(fullArchive)
+    assert.equal(
+        fullArchive.sha256,
+        crypto.createHash("sha256").update(Buffer.from("full-archive")).digest("hex"),
+    )
     assert.ok(iosData.full.archive[0].location.startsWith("http://10.0.0.5:8001/patch/cn/"))
 
     // Android 设备不受影响（仍然用 android 归档）
@@ -212,6 +218,50 @@ test("get_path returns explicit unavailable when ios assets are missing", async 
     const response = await app.inject({
         method: "POST",
         url: "/asset/get_path",
+        headers: { device: "1" },
+        payload: {},
+    })
+    assert.equal(response.statusCode, 503)
+    assert.equal(response.json().code, "IOS_ASSETS_UNAVAILABLE")
+})
+
+test("version_info returns unavailable when the iOS entity list is duplicated", async t => {
+    const fixture = buildIosFixture()
+    fs.writeFileSync(path.join(fixture.cn, "EntityLists", "extra-ios_medium.csv"), IOS_ENTITY_LIST)
+    t.after(() => fs.rmSync(fixture.tempRoot, { recursive: true, force: true }))
+
+    const app = await createAssetApp({
+        env: { CDN_DIR: fixture.tempRoot, CN_LISTEN_PORT: "8001" },
+        resolveListenHost: () => "10.0.0.5",
+        iosCompat: IOS_COMPAT,
+    })
+    t.after(() => app.close())
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/asset/version_info",
+        headers: { device: "1" },
+        payload: {},
+    })
+    assert.equal(response.statusCode, 503)
+    assert.equal(response.json().code, "IOS_ASSETS_UNAVAILABLE")
+})
+
+test("version_info returns unavailable when the iOS entity list is malformed", async t => {
+    const fixture = buildIosFixture()
+    fs.writeFileSync(path.join(fixture.cn, "EntityLists", "ios_medium.csv"), "not,a,valid,entity,list")
+    t.after(() => fs.rmSync(fixture.tempRoot, { recursive: true, force: true }))
+
+    const app = await createAssetApp({
+        env: { CDN_DIR: fixture.tempRoot, CN_LISTEN_PORT: "8001" },
+        resolveListenHost: () => "10.0.0.5",
+        iosCompat: IOS_COMPAT,
+    })
+    t.after(() => app.close())
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/asset/version_info",
         headers: { device: "1" },
         payload: {},
     })
