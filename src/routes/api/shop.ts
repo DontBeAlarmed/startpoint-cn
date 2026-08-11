@@ -27,16 +27,13 @@ import { clientSerializeEquipment } from "../../lib/equipment";
 import { planEquipmentEnhancementPurchase } from "../../lib/equipment-enhancement";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import {
-    calculateShopStockQuantity,
     executeGenericShopBatchPurchaseSync,
     executeGenericShopPurchaseSync,
     getShopPurchasePeriodKeys,
-    isShopItemAvailable,
     ShopPeriodError,
     ShopPurchaseError,
     validateShopPurchaseAmount,
 } from "../../lib/event-shop-purchase";
-import CDN_GENERAL_SHOP_WHITELIST from "../../../assets/cdn_general_shop_whitelist.json";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { recordDegreeOperationFactsSync } from "../../lib/mission/degree-operation-facts";
 import {
@@ -45,94 +42,7 @@ import {
     ShopCampaignPeriodError,
     ShopCampaignValidationError,
 } from "../../lib/shop-select-campaign";
-
-const GENERAL_SHOP_CDN_KEYS: Set<number> = new Set(CDN_GENERAL_SHOP_WHITELIST);
-
-interface EnhancementGroup {
-    groupId: number
-    items: { id: string, item: ShopItem, stage: number }[]
-    equipmentId: number
-}
-
-function buildEnhancementSalesList(playerId: number, items: ShopItems): Object[] {
-    if (Object.keys(items).length === 0) return []
-
-    // Group items by groupId
-    const groups = new Map<number, EnhancementGroup>()
-    for (const [itemId, item] of Object.entries(items)) {
-        const gid = item.groupId ?? 0
-        if (!groups.has(gid)) {
-            groups.set(gid, {
-                groupId: gid,
-                items: [],
-                equipmentId: item.equipmentId ?? 0
-            })
-        }
-        groups.get(gid)!.items.push({ id: itemId, item, stage: item.stage ?? 0 })
-    }
-
-    const result: Object[] = []
-
-    for (const [, group] of groups) {
-        // Sort by stage ascending
-        group.items.sort((a, b) => a.stage - b.stage)
-
-        const equipmentId = group.equipmentId
-        const enhancementLevel = playerOwnsEquipmentSync(playerId, equipmentId)
-            ? (getPlayerEquipmentSync(playerId, equipmentId)?.enhancementLevel ?? 0)
-            : -1
-
-        // Find target product: first item with enhancementMaxLevel > current enhancementLevel
-        let targetItem: { id: string, item: ShopItem } | null = null
-        let stockQuantity = 0
-        let totalPurchaseNum = 0
-
-        if (enhancementLevel < 0) {
-            // Player doesn't have the equipment
-            targetItem = group.items[0]
-            stockQuantity = targetItem.item.enhancementMaxLevel ?? 0
-            totalPurchaseNum = 0
-        } else {
-            for (const entry of group.items) {
-                const maxLv = entry.item.enhancementMaxLevel ?? 0
-                if (maxLv > enhancementLevel) {
-                    targetItem = entry
-                    stockQuantity = maxLv - enhancementLevel
-                    break
-                }
-            }
-            // If no target found (fully maxed), use last item with stock_quantity=0
-            if (!targetItem) {
-                targetItem = group.items[group.items.length - 1]
-                stockQuantity = 0
-            }
-            totalPurchaseNum = enhancementLevel
-        }
-
-        // Group info: max level from last item in group
-        const maxLevel = group.items[group.items.length - 1].item.enhancementMaxLevel ?? 0
-        const multiStage = group.items.length > 1
-
-        result.push({
-            "shop_item_id": Number(targetItem.id),
-            "stock_quantity": stockQuantity,
-            "today_purchase_num": 0,
-            "this_month_purchase_num": null,  // null → MsgPack nil / Option.None
-            "total_purchase_num": totalPurchaseNum,
-            "discount_id": null,
-            "discount_rate": null,
-            "discounted_price": null,
-            "group_info": {
-                "group_total_stock_quantity": maxLevel - totalPurchaseNum,
-                "group_total_purchase_num": totalPurchaseNum,
-                "multi_stage": multiStage
-            },
-            "shop_type": ShopType.TREASURE_EQUIPMENT
-        })
-    }
-
-    return result
-}
+import { buildShopSalesListSync } from "../../lib/shop-sales-list";
 
 interface GetSalesListBody {
     equipment_enhancement_shop_category_ids: number[],
@@ -486,71 +396,26 @@ const routes = async (fastify: FastifyInstance) => {
             toParseShopItems[ShopType.BOSS_COIN] = items === null ? existing : { ...existing, ...items }
         }
 
-        // parse shop items
-        const salesList: Object[] = []
-
-        let filteredCdnCount = 0
         const nowMs = getServerTime() * 1000
         const campaignLineups = getPlayerShopCampaignLineupsSync(playerId)
+        const { salesList, filteredGeneralCount } = buildShopSalesListSync({
+            playerId,
+            itemsByType: toParseShopItems,
+            nowMs,
+            equipmentEnhancementCategoryIds,
+            isItemVisible: (item, shopType) => (
+                isShopItemVisibleForCampaign(item, shopType, campaignLineups)
+            ),
+        }, {
+            getEquipmentEnhancementLevel: (ownerId, equipmentId) => (
+                playerOwnsEquipmentSync(ownerId, equipmentId)
+                    ? (getPlayerEquipmentSync(ownerId, equipmentId)?.enhancementLevel ?? 0)
+                    : -1
+            ),
+        })
 
-        // Collect enhancement shop items for group-level processing
-        const enhancementItems: ShopItems = {}
-
-        for (const [shopType, items] of Object.entries(toParseShopItems)) {
-            const shopTypeNum = Number(shopType)
-            for (const [itemId, item] of Object.entries(items)) {
-
-                if (shopTypeNum === ShopType.GENERAL && !GENERAL_SHOP_CDN_KEYS.has(Number(itemId))) {
-                    filteredCdnCount++
-                    continue
-                }
-
-                // Filter equipment enhancement shop by category IDs
-                if (shopTypeNum === ShopType.TREASURE_EQUIPMENT && equipmentEnhancementCategoryIds?.length) {
-                    if (item.shopCategoryId === undefined || !equipmentEnhancementCategoryIds.includes(item.shopCategoryId)) {
-                        continue
-                    }
-                }
-
-                if (!isShopItemAvailable(item, nowMs)) continue
-                if (!isShopItemVisibleForCampaign(item, shopTypeNum, campaignLineups)) continue
-
-                if (shopTypeNum === ShopType.TREASURE_EQUIPMENT) {
-                    // Collect for group-level processing later
-                    enhancementItems[itemId] = item
-                    continue
-                }
-
-                const periodKeys = getShopPurchasePeriodKeys(nowMs, item.specifiedMonths)
-                const counts = getPlayerShopPurchaseCountsByTypeSync(
-                    playerId,
-                    shopTypeNum,
-                    Number(itemId),
-                    periodKeys,
-                )
-                const stockQuantity = calculateShopStockQuantity(item, counts)
-                salesList.push({
-                    "shop_item_id": Number(itemId),
-                    "stock_quantity": stockQuantity,
-                    "today_purchase_num": item.dailyStock === undefined ? 0 : counts.daily,
-                    "this_month_purchase_num": item.monthlyStock === undefined ? null : counts.monthly,
-                    "total_purchase_num": counts.total,
-                    "group_info": {
-                        "group_total_stock_quantity": stockQuantity,
-                        "group_total_purchase_num": counts.total,
-                        "multi_stage": false
-                    },
-                    "shop_type": Number(shopType)
-                })
-            }
-        }
-
-        // Process equipment enhancement items by group
-        const enhancementSales = buildEnhancementSalesList(playerId, enhancementItems)
-        salesList.push(...enhancementSales)
-
-        if (filteredCdnCount > 0) {
-            console.log(`[shop] Filtered ${filteredCdnCount} general shop items not in CDN master data`)
+        if (filteredGeneralCount > 0) {
+            console.log(`[shop] Filtered ${filteredGeneralCount} general shop items not in CDN master data`)
         }
 
         const salesByType: Record<number, number> = {}

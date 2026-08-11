@@ -205,6 +205,10 @@ const SOURCE_RULES = [
         groups: ["integration:event"],
     },
     {
+        pattern: /^src\/(?:lib\/(?:how-to-get|shop-sales-list)|routes\/api\/howToGet)\.ts$/,
+        groups: ["integration:event"],
+    },
+    {
         pattern: /^src\/routes\/api\/party\.ts$/,
         groups: ["integration:mission", "integration:party"],
     },
