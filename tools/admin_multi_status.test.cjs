@@ -353,15 +353,15 @@ test("embedded compatibility mismatch records only bounded differences", async t
     const searched = await coordinator.searchRoom({
         participant: { nodeSessionId: "guest-node", viewerId: 202 },
         roomNumber: created.value.roomNumber,
-        compatibility: { ...base, RES_VER: "1.4.55" },
+        compatibility: { ...base, APP_VER: "1.8.2" },
     })
 
     assert.deepEqual(searched, { ok: false, error: "INCOMPATIBLE_ROOM" })
     assert.deepEqual(store.get().differences, [{
-        field: "RES_VER",
+        field: "APP_VER",
         different: true,
-        required: "1.4.54",
-        received: "1.4.55",
+        required: "1.8.1",
+        received: "1.8.2",
     }])
     assert.doesNotMatch(JSON.stringify(store.get()), /host-node|guest-node|viewerId|participant/)
 })
@@ -377,7 +377,7 @@ test("invalid compatibility headers record a code without request identity", () 
         onCompatibilityRejection: rejection => rejections.push(rejection),
     })
 
-    assert.deepEqual(factory({ APP_VER: "1.8.1" }), {
+    assert.deepEqual(factory({ RES_VER: "1.4.54" }), {
         ok: false,
         error: "INCOMPATIBLE_ROOM",
     })

@@ -646,6 +646,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/test-workflow/database-isolation.test.cjs",
         "tools/test-workflow/database-lifecycle.test.cjs",
         "tools/test-workflow/runtime-data-paths.test.cjs",
+        "tools/stamina_serialization.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS["integration:event"].tests, [
         "tools/box_gacha_exec_transaction.test.cjs",
