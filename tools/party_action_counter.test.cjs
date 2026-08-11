@@ -66,6 +66,12 @@ stubModule("../src/data/domains/equipment", {
 })
 stubModule("../src/data/domains/item", { getPlayerItemsSync: () => ({}) })
 stubModule("../src/data/domains/party", {
+    getPlayerPartyLoadoutSync() {
+        return {
+            equipmentIds: [500001, null, null],
+            abilitySoulIds: [300002, null, null],
+        }
+    },
     updatePlayerPartySync(playerId, slot, party, groupId) {
         db.prepare(`
             INSERT INTO party_state VALUES (?, ?, ?, ?, ?, ?)
@@ -98,7 +104,7 @@ const {
 } = require("../src/data/domains/active_mission_counters")
 const partyRoutes = require("../src/routes/api/party.ts").default
 
-function partyInfo({ equipment = [], unison = [], characters = [] } = {}) {
+function partyInfo({ equipment = [], unison = [], characters = [], abilitySouls = [null, null, null] } = {}) {
     return {
         party_edited: true,
         party_category: 0,
@@ -107,7 +113,7 @@ function partyInfo({ equipment = [], unison = [], characters = [] } = {}) {
         unison_character_ids: unison,
         equipment_ids: equipment,
         character_ids: characters,
-        ability_soul_ids: [null, null, null],
+        ability_soul_ids: abilitySouls,
         options: { allow_other_players_to_heal_me: true },
     }
 }
@@ -157,6 +163,21 @@ async function main() {
         assert.equal(emptyEdit.statusCode, 200)
         assert.deepEqual(getActiveMissionCountersSync(7), beforeEmptyEdit)
 
+        const preservedLegacySoul = await fastify.inject({
+            method: "POST",
+            url: "/edit",
+            payload: {
+                viewer_id: 123,
+                main_party_id: 1001,
+                party_info_list: [partyInfo({
+                    equipment: [500001, null, null],
+                    abilitySouls: [300002, null, null],
+                })],
+            },
+        })
+        assert.equal(preservedLegacySoul.statusCode, 200, preservedLegacySoul.body)
+
+        const beforeInvalidLoadoutCounters = getActiveMissionCountersSync(7)
         const beforeInvalidLoadout = db.prepare("SELECT * FROM party_state WHERE player_id = 7").all()
         const invalidLoadout = await fastify.inject({
             method: "POST",
@@ -169,9 +190,12 @@ async function main() {
         })
         assert.equal(invalidLoadout.statusCode, 400)
         assert.deepEqual(db.prepare("SELECT * FROM party_state WHERE player_id = 7").all(), beforeInvalidLoadout)
-        assert.deepEqual(getActiveMissionCountersSync(7), beforeEmptyEdit)
+        assert.deepEqual(getActiveMissionCountersSync(7), beforeInvalidLoadoutCounters)
 
         const beforeFailure = getActiveMissionCountersSync(7)
+        const beforeFailureEquipmentCount = db.prepare(
+            "SELECT equipment_count FROM party_state WHERE player_id = 7",
+        ).get().equipment_count
         failPartyWrite = true
         const failed = await fastify.inject({
             method: "POST",
@@ -185,7 +209,10 @@ async function main() {
         failPartyWrite = false
         assert.equal(failed.statusCode, 500)
         assert.deepEqual(getActiveMissionCountersSync(7), beforeFailure)
-        assert.equal(db.prepare("SELECT equipment_count FROM party_state WHERE player_id = 7").get().equipment_count, 0)
+        assert.equal(
+            db.prepare("SELECT equipment_count FROM party_state WHERE player_id = 7").get().equipment_count,
+            beforeFailureEquipmentCount,
+        )
     } finally {
         await fastify.close()
         db.close()

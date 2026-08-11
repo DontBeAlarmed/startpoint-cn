@@ -25,8 +25,10 @@ function isInventoryId(value: number | null): value is number {
 export function validatePartyLoadouts(
     parties: readonly PartyLoadoutInput[],
     inventory: PartyLoadoutInventory,
+    existingParties: readonly PartyLoadoutInput[] = [],
 ): PartyLoadoutValidationResult {
-    for (const party of parties) {
+    for (let partyIndex = 0; partyIndex < parties.length; partyIndex++) {
+        const party = parties[partyIndex]
         const usedEquipment = new Set<number>()
         for (const equipmentId of party.equipment_ids) {
             if (equipmentId === null) continue
@@ -41,15 +43,29 @@ export function validatePartyLoadouts(
         }
 
         const usedSouls = new Map<number, number>()
+        const existingSouls = countIds(existingParties[partyIndex]?.ability_soul_ids ?? [])
         for (const abilitySoulId of party.ability_soul_ids) {
             if (abilitySoulId === null) continue
             if (!isInventoryId(abilitySoulId)) return { ok: false, reason: "invalid_id", id: Number(abilitySoulId) }
             const useCount = (usedSouls.get(abilitySoulId) ?? 0) + 1
-            if (useCount > (inventory.items[String(abilitySoulId)] ?? 0)) {
+            const allowedCount = Math.max(
+                inventory.items[String(abilitySoulId)] ?? 0,
+                existingSouls.get(abilitySoulId) ?? 0,
+            )
+            if (useCount > allowedCount) {
                 return { ok: false, reason: "ability_soul_shortage", id: abilitySoulId }
             }
             usedSouls.set(abilitySoulId, useCount)
         }
     }
     return { ok: true }
+}
+
+function countIds(ids: readonly (number | null)[]): Map<number, number> {
+    const counts = new Map<number, number>()
+    for (const id of ids) {
+        if (!isInventoryId(id)) continue
+        counts.set(id, (counts.get(id) ?? 0) + 1)
+    }
+    return counts
 }

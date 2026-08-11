@@ -61,6 +61,29 @@ export function getPlayerPartyGroupListSync(
     return final
 }
 
+export function getPlayerPartyLoadoutSync(
+    playerId: number,
+    groupId: number,
+    slot: number,
+    category: PartyCategory,
+): Pick<PlayerParty, "equipmentIds" | "abilitySoulIds"> | null {
+    const raw = getDb().prepare(`
+    SELECT equipment_1, equipment_2, equipment_3,
+        ability_soul_1, ability_soul_2, ability_soul_3
+    FROM players_parties
+    WHERE player_id = ? AND group_id = ? AND slot = ? AND category = ?
+    `).get(playerId, groupId, slot, category) as Pick<
+        RawPlayerParty,
+        "equipment_1" | "equipment_2" | "equipment_3"
+            | "ability_soul_1" | "ability_soul_2" | "ability_soul_3"
+    > | undefined
+    if (!raw) return null
+    return {
+        equipmentIds: [raw.equipment_1, raw.equipment_2, raw.equipment_3],
+        abilitySoulIds: [raw.ability_soul_1, raw.ability_soul_2, raw.ability_soul_3],
+    }
+}
+
 function insertPlayerPartySync(playerId: number, slot: number | string, groupId: number | string, party: PlayerParty) {
     const db = getDb();
     db.prepare(`

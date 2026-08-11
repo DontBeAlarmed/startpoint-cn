@@ -4,7 +4,7 @@ import { getSession } from "../../data/domains/session"
 import { playerOwnsCharacterSync } from "../../data/domains/character"
 import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
 import { getPlayerItemsSync } from "../../data/domains/item"
-import { updatePlayerPartySync } from "../../data/domains/party"
+import { getPlayerPartyLoadoutSync, updatePlayerPartySync } from "../../data/domains/party"
 import { getDb } from "../../data/db"
 import { incrementActiveMissionPartyActionCountsSync } from "../../data/domains/active_mission_counters"
 import { generateDataHeaders, getServerTime } from "../../utils";
@@ -467,14 +467,33 @@ const routes = async (fastify: FastifyInstance) => {
             return isOwned ? characterId : null
         }
 
+        const existingLoadouts = body.party_info_list.map(updateInfo => {
+            const parsed = parseGlobalPartyId(updateInfo.party_id)!
+            const existing = getPlayerPartyLoadoutSync(
+                playerId,
+                parsed.groupId,
+                parsed.slot,
+                updateInfo.party_category as PartyCategory,
+            )
+            return {
+                equipment_ids: existing?.equipmentIds ?? [],
+                ability_soul_ids: existing?.abilitySoulIds ?? [],
+            }
+        })
         const loadoutValidation = validatePartyLoadouts(body.party_info_list, {
             equipments: getPlayerEquipmentListSync(playerId),
             items: getPlayerItemsSync(playerId),
-        })
-        if (!loadoutValidation.ok) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid party equipment or ability soul inventory.",
-        })
+        }, existingLoadouts)
+        if (!loadoutValidation.ok) {
+            console.warn(
+                `[PARTY] edit rejected: viewer=${viewerId}`
+                + ` reason=${loadoutValidation.reason} id=${loadoutValidation.id}`,
+            )
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Invalid party equipment or ability soul inventory.",
+            })
+        }
 
         const mappedParties = body.party_info_list.map(updateInfo => {
             const parsed = parseGlobalPartyId(updateInfo.party_id)!

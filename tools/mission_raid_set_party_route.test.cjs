@@ -71,6 +71,7 @@ stubModule("../src/data/domains/equipment", {
 })
 stubModule("../src/data/domains/item", { getPlayerItemsSync: () => ({}) })
 stubModule("../src/data/domains/party", {
+    getPlayerPartyLoadoutSync: () => null,
     updatePlayerPartySync(playerId, slot, party, groupId) {
         db.prepare(`
             INSERT INTO party_state VALUES (?, ?, ?, ?, ?)

@@ -61,4 +61,20 @@ assert.deepEqual(validatePartyLoadouts([
     id: 5010999,
 })
 
+assert.deepEqual(validatePartyLoadouts([
+    party([5010001, null, null], [5010999, null, null]),
+], inventory, [
+    party([5010001, null, null], [5010999, null, null]),
+]), { ok: true })
+
+assert.deepEqual(validatePartyLoadouts([
+    party([5010001, null, null], [5010999, 5010999, null]),
+], inventory, [
+    party([5010001, null, null], [5010999, null, null]),
+]), {
+    ok: false,
+    reason: "ability_soul_shortage",
+    id: 5010999,
+})
+
 console.log("party loadout validation tests passed")
