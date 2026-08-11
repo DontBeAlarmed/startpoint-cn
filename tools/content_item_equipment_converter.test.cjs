@@ -17,6 +17,7 @@ const SOURCES = Object.freeze({
     craft: "master/item/equipment_craft_point_exchange.orderedmap",
     dissolveRate: "master/item/equipment_dissolve_rate.orderedmap",
     item: "master/item/item.orderedmap",
+    itemBonusSelect: "master/item/item_bonus_select.orderedmap",
 })
 
 function row(key, fields) {
@@ -37,6 +38,21 @@ function itemFields(overrides = {}) {
         "fixture_item", "1", "测试道具", "thumb", "(None)", "description",
         "2", "25", "true", "", "", "", "", "", "9", "(None)",
         "100", "3", "9999", "2015-12-31 23:59:59", "(None)", "true", "",
+    ]
+    for (const [index, value] of Object.entries(overrides)) fields[Number(index)] = value
+    return fields
+}
+
+function itemBonusSelectFields(overrides = {}) {
+    const fields = [
+        "测试资源箱",
+        "1", "300", "2",
+        "1", "300", "6",
+        "1", "300", "10",
+        "1", "300", "14",
+        "1", "300", "43",
+        "1", "300", "47",
+        "999999",
     ]
     for (const [index, value] of Object.entries(overrides)) fields[Number(index)] = value
     return fields
@@ -72,6 +88,16 @@ function fixture(overrides = {}) {
             row("100", itemFields()),
             row("101", itemFields({ 2: "普通素材", 6: "0", 7: "", 16: "5" })),
             row("102", itemFields({ 2: "比例体力药", 6: "3", 7: "50" })),
+            row("103", itemFields({
+                2: "测试资源箱",
+                6: "22",
+                7: "",
+                21: "false",
+                22: "900",
+            })),
+        ]],
+        [SOURCES.itemBonusSelect, [
+            row("900", itemBonusSelectFields()),
         ]],
     ])
     for (const [logicalPath, rows] of Object.entries(overrides)) tables.set(logicalPath, rows)
@@ -136,17 +162,31 @@ test("item and equipment converter derives the eight authoritative runtime table
         "item_data.json": {
             "100": { effectKind: 2, effectValue: 25 },
             "102": { effectKind: 3, effectValue: 50 },
+            "103": {
+                effectKind: 22,
+                effectValue: 0,
+                selectRewards: [
+                    { itemId: 2, amount: 300 },
+                    { itemId: 6, amount: 300 },
+                    { itemId: 10, amount: 300 },
+                    { itemId: 14, amount: 300 },
+                    { itemId: 43, amount: 300 },
+                    { itemId: 47, amount: 300 },
+                ],
+            },
         },
-        "item_ids.json": [100, 101, 102],
+        "item_ids.json": [100, 101, 102, 103],
         "item_lookup.json": {
             "100": "测试道具",
             "101": "普通素材",
             "102": "比例体力药",
+            "103": "测试资源箱",
         },
         "item_sale.json": {
             "100": { category: 9, sale_price: 100, sellable: true },
             "101": { category: 9, sale_price: 5, sellable: true },
             "102": { category: 9, sale_price: 100, sellable: true },
+            "103": { category: 9, sale_price: 100, sellable: false },
         },
     })
     assertDeepFrozen(output)
@@ -176,5 +216,98 @@ test("item and equipment converter requires matching craft and dissolve rarity k
     await assert.rejects(
         convertItemEquipmentTables(source.reader),
         /equipment craft rarity keys do not match dissolve rates/i,
+    )
+})
+
+test("cultivate pack conversion requires the referenced bonus row", async () => {
+    const source = fixture({
+        [SOURCES.itemBonusSelect]: [],
+    })
+    await assert.rejects(
+        convertItemEquipmentTables(source.reader),
+        /item\[103\]\.selectBonusId references missing item_bonus_select: 900/i,
+    )
+})
+
+test("cultivate pack conversion rejects a missing Item candidate", async () => {
+    const source = fixture({
+        [SOURCES.itemBonusSelect]: [row("900", itemBonusSelectFields({ 6: "" }))],
+    })
+    await assert.rejects(
+        convertItemEquipmentTables(source.reader),
+        /item_bonus_select\[900\] candidate 2 itemId must be present/i,
+    )
+})
+
+test("cultivate pack conversion rejects duplicate Item candidates", async () => {
+    const source = fixture({
+        [SOURCES.itemBonusSelect]: [row("900", itemBonusSelectFields({ 6: "2" }))],
+    })
+    await assert.rejects(
+        convertItemEquipmentTables(source.reader),
+        /item_bonus_select\[900\] has duplicate Item candidate: 2/i,
+    )
+})
+
+test("cultivate pack conversion rejects non-Item candidates", async () => {
+    const source = fixture({
+        [SOURCES.itemBonusSelect]: [row("900", itemBonusSelectFields({ 4: "2" }))],
+    })
+    await assert.rejects(
+        convertItemEquipmentTables(source.reader),
+        /item_bonus_select\[900\] candidate 2 kind must be Item \(1\): 2/i,
+    )
+})
+
+for (const { name, overrides, expected } of [
+    {
+        name: "zero candidate amount",
+        overrides: { 2: "0" },
+        expected: /item_bonus_select\[900\] candidate 1 amount must be a positive integer: 0/i,
+    },
+    {
+        name: "non-numeric candidate itemId",
+        overrides: { 3: "invalid" },
+        expected: /item_bonus_select\[900\] candidate 1 itemId must be a positive integer: invalid/i,
+    },
+    {
+        name: "zero candidate itemId",
+        overrides: { 3: "0" },
+        expected: /item_bonus_select\[900\] candidate 1 itemId must be a positive integer: 0/i,
+    },
+    {
+        name: "unsafe candidate itemId",
+        overrides: { 3: "9007199254740992" },
+        expected: /item_bonus_select\[900\] candidate 1 itemId must be a safe integer: 9007199254740992/i,
+    },
+]) {
+    test(`cultivate pack conversion rejects ${name}`, async () => {
+        const source = fixture({
+            [SOURCES.itemBonusSelect]: [row("900", itemBonusSelectFields(overrides))],
+        })
+        await assert.rejects(convertItemEquipmentTables(source.reader), expected)
+    })
+}
+
+test("cultivate pack conversion rejects bonus rows with the wrong column count", async () => {
+    const source = fixture({
+        [SOURCES.itemBonusSelect]: [row("900", itemBonusSelectFields().slice(0, -1))],
+    })
+    await assert.rejects(
+        convertItemEquipmentTables(source.reader),
+        /item_bonus_select\[900\] must have 20 columns, got 19/i,
+    )
+})
+
+test("cultivate pack conversion validates unreferenced bonus rows", async () => {
+    const source = fixture({
+        [SOURCES.itemBonusSelect]: [
+            row("900", itemBonusSelectFields()),
+            row("901", itemBonusSelectFields({ 2: "0" })),
+        ],
+    })
+    await assert.rejects(
+        convertItemEquipmentTables(source.reader),
+        /item_bonus_select\[901\] candidate 1 amount must be a positive integer: 0/i,
     )
 })

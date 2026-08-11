@@ -33,6 +33,24 @@ type TableSourceInput = Omit<
     readonly dynamicSources?: readonly GachaOddsDynamicSourceReference[]
 }
 
+type TableSourceVersionDefinition = Pick<
+    TableSourceDefinition,
+    "tableName" | "converterVersion" | "outputShapeVersion"
+>
+
+// Release manifests persist converterVersion, so shape changes must advance it too.
+export function validateTableSourceVersions(
+    definitions: readonly TableSourceVersionDefinition[],
+): void {
+    for (const definition of definitions) {
+        if (definition.outputShapeVersion !== definition.converterVersion) {
+            throw new Error(
+                `content table ${definition.tableName} outputShapeVersion ${definition.outputShapeVersion} must equal converterVersion ${definition.converterVersion}`,
+            )
+        }
+    }
+}
+
 const GACHA_ODDS_DYNAMIC_SOURCE: GachaOddsDynamicSourceReference = {
     kind: "gacha-odds-references",
     sourceOrderedMap: "master/gacha/gacha.orderedmap",
@@ -145,7 +163,13 @@ const ITEM_EQUIPMENT_TABLES = [
         ["master/item/equipment.orderedmap"],
         ["assets/equipment_lookup.json"],
     ],
-    ["item_data.json", ["master/item/item.orderedmap"]],
+    [
+        "item_data.json",
+        [
+            "master/item/item.orderedmap",
+            "master/item/item_bonus_select.orderedmap",
+        ],
+    ],
     ["item_ids.json", ["master/item/item.orderedmap"]],
     ["item_lookup.json", ["master/item/item.orderedmap"]],
     ["item_sale.json", ["master/item/item.orderedmap"]],
@@ -250,8 +274,8 @@ function itemEquipmentDefinition(
         sourceOrderedMaps,
         bundledSources,
         converterId: "item-equipment",
-        converterVersion: 1,
-        outputShapeVersion: 1,
+        converterVersion: tableName === "item_data.json" ? 2 : 1,
+        outputShapeVersion: tableName === "item_data.json" ? 2 : 1,
     }
 }
 
@@ -538,6 +562,8 @@ const definitionInputs: TableSourceInput[] = [
     ...BUNDLED_TABLE_NAMES.map(bundledDefinition),
     ...SERVER_TABLE_NAMES.map(serverDefinition),
 ]
+
+validateTableSourceVersions(definitionInputs)
 
 const definitions: TableSourceDefinition[] = definitionInputs.map(definition => {
     const bundledSources = definition.bundledSources ?? []

@@ -18,6 +18,7 @@ const seedCatalogManifestDigest = crypto.createHash("sha256")
 const {
     TABLE_SOURCES,
     findTableSource,
+    validateTableSourceVersions,
 } = require("../src/content/sync/table-registry")
 const {
     CONTENT_RUNTIME_SCHEMA_VERSION,
@@ -201,7 +202,10 @@ const EXPECTED_ITEM_EQUIPMENT_CDN_TABLES = Object.freeze({
     "equipment_dissolve.json": ["master/item/equipment.orderedmap"],
     "equipment_ids.json": ["master/item/equipment.orderedmap"],
     "equipment_lookup.json": ["master/item/equipment.orderedmap"],
-    "item_data.json": ["master/item/item.orderedmap"],
+    "item_data.json": [
+        "master/item/item.orderedmap",
+        "master/item/item_bonus_select.orderedmap",
+    ],
     "item_ids.json": ["master/item/item.orderedmap"],
     "item_lookup.json": ["master/item/item.orderedmap"],
     "item_sale.json": ["master/item/item.orderedmap"],
@@ -404,9 +408,22 @@ test("registry is sorted, unique, deeply frozen, and versioned", () => {
     for (const entry of TABLE_SOURCES) {
         assert.ok(Number.isSafeInteger(entry.converterVersion) && entry.converterVersion > 0)
         assert.ok(Number.isSafeInteger(entry.outputShapeVersion) && entry.outputShapeVersion > 0)
+        assert.equal(entry.outputShapeVersion, entry.converterVersion, entry.tableName)
         assert.ok(entry.sourceOrderedMaps.length > 0)
         assert.equal(entry.bundledPath, `assets/${entry.tableName}`)
     }
+})
+
+test("registry rejects output shape versions that do not match converter versions", () => {
+    assert.equal(typeof validateTableSourceVersions, "function")
+    assert.throws(
+        () => validateTableSourceVersions([{
+            tableName: "fixture.json",
+            converterVersion: 2,
+            outputShapeVersion: 1,
+        }]),
+        /fixture\.json outputShapeVersion 1 must equal converterVersion 2/i,
+    )
 })
 
 test("registry covers the first CDN converter tables with verified logical paths", () => {
@@ -475,6 +492,8 @@ test("registry derives item and equipment runtime tables from official OrderedMa
         findTableSource("equipment_lookup.json").bundledSources,
         ["assets/equipment_lookup.json"],
     )
+    assert.equal(findTableSource("item_data.json").converterVersion, 2)
+    assert.equal(findTableSource("item_data.json").outputShapeVersion, 2)
 })
 
 test("registry derives authoritative quest tables from official OrderedMap sources", () => {

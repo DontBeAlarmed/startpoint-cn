@@ -1041,10 +1041,21 @@ export function getEquipmentLookupSync(): Readonly<Record<string, EquipmentLooku
     )
 }
 
-export interface ItemEffectEntry {
-    readonly effectKind: number
+export interface StaminaItemEffectEntry {
+    readonly effectKind: 2 | 3
     readonly effectValue: number
 }
+
+export interface CultivatePackEffectEntry {
+    readonly effectKind: 22
+    readonly effectValue: 0
+    readonly selectRewards: readonly {
+        readonly itemId: number
+        readonly amount: number
+    }[]
+}
+
+export type ItemEffectEntry = StaminaItemEffectEntry | CultivatePackEffectEntry
 
 export function getItemEffectSync(id: number | string): ItemEffectEntry | null {
     const table = getRuntimeContentTableSync(

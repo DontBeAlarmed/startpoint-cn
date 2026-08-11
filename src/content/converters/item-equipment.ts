@@ -6,6 +6,7 @@ const EQUIPMENT_PATH = "master/item/equipment.orderedmap"
 const EQUIPMENT_CRAFT_PATH = "master/item/equipment_craft_point_exchange.orderedmap"
 const EQUIPMENT_DISSOLVE_RATE_PATH = "master/item/equipment_dissolve_rate.orderedmap"
 const ITEM_PATH = "master/item/item.orderedmap"
+const ITEM_BONUS_SELECT_PATH = "master/item/item_bonus_select.orderedmap"
 
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/
 const NON_NEGATIVE_INTEGER_PATTERN = /^(?:0|[1-9]\d*)$/
@@ -187,7 +188,58 @@ function convertEquipmentCraft(
     return output
 }
 
-function convertItems(rows: readonly OrderedMapTextRow[]): {
+interface SelectReward {
+    readonly itemId: number
+    readonly amount: number
+}
+
+function convertItemBonusSelect(
+    rows: readonly OrderedMapTextRow[],
+): ReadonlyMap<string, readonly SelectReward[]> {
+    const output = new Map<string, readonly SelectReward[]>()
+    for (const [id, fields] of parseRows(rows, "item_bonus_select", 20)) {
+        const rewards: SelectReward[] = []
+        const seenItemIds = new Set<number>()
+        for (let index = 0; index < 6; index += 1) {
+            const candidateNumber = index + 1
+            const offset = 1 + index * 3
+            const kind = fields[offset]
+            if (kind !== "1") {
+                invalidItemEquipment(
+                    `item_bonus_select[${id}] candidate ${candidateNumber} kind must be Item (1): ${kind}`,
+                )
+            }
+            const amount = parsePositiveInteger(
+                requireText(
+                    fields[offset + 1],
+                    `item_bonus_select[${id}] candidate ${candidateNumber} amount`,
+                ),
+                `item_bonus_select[${id}] candidate ${candidateNumber} amount`,
+            )
+            const itemId = parsePositiveInteger(
+                requireText(
+                    fields[offset + 2],
+                    `item_bonus_select[${id}] candidate ${candidateNumber} itemId`,
+                ),
+                `item_bonus_select[${id}] candidate ${candidateNumber} itemId`,
+            )
+            if (seenItemIds.has(itemId)) {
+                invalidItemEquipment(
+                    `item_bonus_select[${id}] has duplicate Item candidate: ${itemId}`,
+                )
+            }
+            seenItemIds.add(itemId)
+            rewards.push({ itemId, amount })
+        }
+        output.set(id, rewards)
+    }
+    return output
+}
+
+function convertItems(
+    rows: readonly OrderedMapTextRow[],
+    bonusSelect: ReadonlyMap<string, readonly SelectReward[]>,
+): {
     readonly data: Record<string, unknown>
     readonly ids: number[]
     readonly lookup: Record<string, string>
@@ -206,6 +258,22 @@ function convertItems(rows: readonly OrderedMapTextRow[]): {
                 effectKind,
                 effectValue: parsePositiveInteger(fields[7], `item[${id}].effectValue`),
             }
+        } else if (effectKind === 22) {
+            const selectBonusId = String(parsePositiveInteger(
+                requireText(fields[22], `item[${id}].selectBonusId`),
+                `item[${id}].selectBonusId`,
+            ))
+            const selectRewards = bonusSelect.get(selectBonusId)
+            if (!selectRewards) {
+                invalidItemEquipment(
+                    `item[${id}].selectBonusId references missing item_bonus_select: ${selectBonusId}`,
+                )
+            }
+            data[id] = {
+                effectKind: 22,
+                effectValue: 0,
+                selectRewards,
+            }
         }
         sale[id] = {
             category: parseNonNegativeInteger(fields[14], `item[${id}].category`),
@@ -220,14 +288,15 @@ export async function convertItemEquipmentTables(
     reader: ItemEquipmentSourceReader,
     compatibility: ItemEquipmentConversionCompatibility = { equipmentLookup: {} },
 ): Promise<ItemEquipmentConversionOutput> {
-    const [equipmentRows, craftRows, dissolveRateRows, itemRows] = await Promise.all([
+    const [equipmentRows, craftRows, dissolveRateRows, itemRows, itemBonusSelectRows] = await Promise.all([
         reader.read(EQUIPMENT_PATH),
         reader.read(EQUIPMENT_CRAFT_PATH),
         reader.read(EQUIPMENT_DISSOLVE_RATE_PATH),
         reader.read(ITEM_PATH),
+        reader.read(ITEM_BONUS_SELECT_PATH),
     ])
     const equipment = convertEquipment(equipmentRows, compatibility)
-    const items = convertItems(itemRows)
+    const items = convertItems(itemRows, convertItemBonusSelect(itemBonusSelectRows))
     return deepFreeze({
         "equipment_craft.json": convertEquipmentCraft(craftRows, dissolveRateRows),
         "equipment_dissolve.json": equipment.dissolve,
