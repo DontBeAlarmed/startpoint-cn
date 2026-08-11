@@ -17,6 +17,9 @@ export interface RuntimeEnvironment extends AssetModeEnvironment {
     readonly SESSION_HOST?: string
     readonly SESSION_PORT?: string
     readonly SESSION_PUBLIC_HOST?: string
+    readonly IOS_COMPAT_ENABLED?: string
+    readonly IOS_API_HOST?: string
+    readonly IOS_API_SCHEME?: string
     readonly MULTI_ROOM_INCOMPLETE_EXPIRY_MS?: string
     readonly MULTI_ROOM_FULL_EXPIRY_MS?: string
     readonly MULTI_ROOM_CLEAN_INTERVAL_MS?: string
@@ -76,9 +79,16 @@ export type MultiRuntimeConfig =
         readonly tcp: RuntimeTcpServiceConfig
     }
 
+export interface CnIosCompatConfig {
+    readonly enabled: boolean
+    readonly apiHost: string
+    readonly apiScheme: "http" | "https"
+}
+
 export interface CnRuntimeConfig {
     readonly http: RuntimeNetworkServiceConfig
     readonly httpDisplayHost: string
+    readonly iosCompat: CnIosCompatConfig
     readonly multi: MultiRuntimeConfig
     readonly multiTuning: MultiRuntimeTuningConfig
     readonly assetProvider: AssetProviderConfig
@@ -341,6 +351,43 @@ function parseMultiRuntimeTuning(env: RuntimeEnvironment): MultiRuntimeTuningCon
     })
 }
 
+/**
+ * iOS 兼容适配开关。
+ * - IOS_COMPAT_ENABLED=1 且 IOS_API_HOST 为合法、可达（非 0.0.0.0/::）地址时启用；
+ * - IOS_API_HOST 接受 "host" 或 "host:port"（host 为 IP 或域名，port 1-65535）；
+ * - 缺失或非法配置只让 iOS 适配明确不可用（降级关闭），绝不影响 Android 服务启动，
+ *   也绝不从 CN_LISTEN_HOST 拼出 0.0.0.0:port 之类的不可达默认值。
+ */
+function normalizeIosApiHost(value: string): string | null {
+    const colon = value.lastIndexOf(":")
+    let host = colon === -1 ? value : value.slice(0, colon)
+    if (host.startsWith("[") && host.endsWith("]")) {
+        // IPv6 字面量带括号（如 [2001:db8::5]:8001）
+        host = host.slice(1, -1)
+    }
+    if (!isValidNetworkHost(host) || isUnspecifiedNetworkHost(host)) return null
+    if (colon !== -1) {
+        const portText = value.slice(colon + 1)
+        if (!/^\d+$/.test(portText)) return null
+        const port = Number(portText)
+        if (!Number.isSafeInteger(port) || port < 1 || port > 65535) return null
+    }
+    return value
+}
+
+function parseIosCompatConfig(env: RuntimeEnvironment): CnIosCompatConfig {
+    if (env.IOS_COMPAT_ENABLED !== "1") {
+        return Object.freeze({ enabled: false, apiHost: "", apiScheme: "http" })
+    }
+    const apiHost = normalizeIosApiHost((env.IOS_API_HOST ?? "").trim())
+    if (apiHost === null) {
+        console.warn("[runtime] IOS_COMPAT_ENABLED=1 requires a reachable IOS_API_HOST (host[:port]); iOS compatibility disabled")
+        return Object.freeze({ enabled: false, apiHost: "", apiScheme: "http" })
+    }
+    const apiScheme = env.IOS_API_SCHEME === "https" ? "https" : "http"
+    return Object.freeze({ enabled: true, apiHost, apiScheme })
+}
+
 export function parseCnRuntimeConfig({
     projectRoot,
     env = process.env,
@@ -363,6 +410,7 @@ export function parseCnRuntimeConfig({
     return Object.freeze({
         http,
         httpDisplayHost,
+        iosCompat: parseIosCompatConfig(env),
         multi,
         multiTuning,
         assetProvider,
