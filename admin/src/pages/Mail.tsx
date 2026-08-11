@@ -14,6 +14,7 @@ const MAIL_TYPES = [
     { value: 4, label: "免费星导石" },
     { value: 5, label: "角色", needsId: true, singleOnly: true },
     { value: 6, label: "装备", needsId: true, singleOnly: true },
+    { value: 7, label: "星之碎片" },
     { value: 10, label: "羁绊之证" },
     { value: 11, label: "Boss Boost 点" },
     { value: 12, label: "Boost 点" },
@@ -21,6 +22,10 @@ const MAIL_TYPES = [
 ]
 
 const TYPE_LABEL: Record<number, string> = Object.fromEntries(MAIL_TYPES.map(t => [t.value, t.label]))
+
+function requiresTypeId(type: number | undefined): boolean {
+    return !!MAIL_TYPES.find(t => t.value === type)?.needsId
+}
 
 type TargetMode = "all" | "account" | "player"
 
@@ -134,8 +139,7 @@ export default function Mail() {
     const type = Form.useWatch("type", form)
     const typeId = Form.useWatch("type_id", form)
     const targetMode: TargetMode = Form.useWatch("targetMode", form) ?? "all"
-    const meta = MAIL_TYPES.find(t => t.value === type)
-    const needsId = !!meta?.needsId
+    const needsId = requiresTypeId(type)
     const attachmentEndpoint = lookupEndpoint(type)
     const quantityRule = getMailAttachmentRule(type, typeId)
 
@@ -161,7 +165,7 @@ export default function Mail() {
     const send = useMutation({
         mutationFn: (v: any) => apiPost<SendResult>("/api/mail/send", {
             type: String(v.type),
-            type_id: v.type_id != null ? String(v.type_id) : "",
+            type_id: requiresTypeId(v.type) && v.type_id != null ? String(v.type_id) : undefined,
             number: String(v.number ?? 1),
             subject: v.subject ?? "",
             description: v.description ?? "",

@@ -7,7 +7,6 @@ const mailSource = fs.readFileSync(path.join(__dirname, "../admin/src/pages/Mail
 const removedTypeLabels = [
     "付费星导石",
     "Paid Vmoney",
-    "星之碎片",
     "Star Crumb",
     "法力",
     "Mana",
@@ -18,6 +17,15 @@ const removedTypeLabels = [
 for (const label of removedTypeLabels) {
     assert(!mailSource.includes(label), `邮件附件类型不应再展示：${label}`)
 }
+
+const starCrumbTypeMatch = mailSource.match(/\{\s*value:\s*7,\s*label:\s*"星之碎片"([^}]*)\}/)
+assert(starCrumbTypeMatch, "邮件附件类型应展示 value 7：星之碎片")
+assert(!starCrumbTypeMatch[1].includes("needsId"), "星之碎片不应要求 type_id")
+assert.match(
+    mailSource,
+    /type_id:\s*requiresTypeId\(v\.type\)\s*&&\s*v\.type_id\s*!=\s*null\s*\?\s*String\(v\.type_id\)\s*:\s*undefined/,
+    "不需要附件 ID 的邮件类型不应提交 type_id",
+)
 
 const attachmentRequiredMessages = mailSource.match(/"请选择附件"/g) ?? []
 assert.strictEqual(attachmentRequiredMessages.length, 1, "附件字段清空时只能产生一条“请选择附件”校验提示")
