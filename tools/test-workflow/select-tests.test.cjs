@@ -766,6 +766,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/economy_write_transaction.test.cjs",
         "tools/event_currency.test.cjs",
         "tools/gacha_write_transaction.test.cjs",
+        "tools/item_use_cultivate_pack.test.cjs",
         "tools/inventory_write_transaction.test.cjs",
         "tools/inventory_rules.test.cjs",
         "tools/party_loadout_validation.test.cjs",
@@ -777,6 +778,14 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/mail_notification.test.cjs",
         "tools/mail_notification_write_routes.test.cjs",
     ])
+    assert.deepEqual(
+        selectTestGroups(["src/lib/item-use-settlement.ts"]),
+        ["integration:rules"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/item_use_cultivate_pack.test.cjs"]),
+        ["integration:rules"],
+    )
     assert.deepEqual(TEST_GROUPS.generator.tests, [
         "tools/boss_battle_multiscene_content.test.cjs",
         "tools/box_gacha_reset.test.cjs",

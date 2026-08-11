@@ -59,9 +59,23 @@ stubModule("../src/lib/equipment", {
     clientSerializeEquipment: value => value,
 })
 stubModule("../src/lib/equipment-upgrade", { canUseEquipmentAwakeningCrystal: () => false })
-stubModule("../src/data/db", {
-    getDb: () => ({ transaction: operation => operation }),
-})
+let inTransaction = false
+const database = {
+    get inTransaction() {
+        return inTransaction
+    },
+    transaction(operation) {
+        return () => {
+            inTransaction = true
+            try {
+                return operation()
+            } finally {
+                inTransaction = false
+            }
+        }
+    },
+}
+stubModule("../src/data/db", { getDb: () => database })
 stubModule("../src/lib/mail-notification", {
     getMailArrivedSync(playerId) {
         mailLookups.push(playerId)

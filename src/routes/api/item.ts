@@ -1,29 +1,26 @@
 // Handles item usage (stamina recovery items, etc.)
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
-import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getConfigSync } from "../../lib/assets";
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
 import { sellItemSync } from "../../lib/item-sell";
 import { AccountId, PlayerId } from "../../lib/types";
-import { computeRealTimeStamina } from "../../lib/stamina";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { getMailArrivedSync } from "../../lib/mail-notification";
-import { getItemEffectSync } from "../../lib/assets";
 import { getDb } from "../../data/db";
+import {
+    ItemUsePlayerNotFoundError,
+    ItemUseValidationError,
+    settleItemUseInCallerTransactionSync,
+} from "../../lib/item-use-settlement";
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/use_item", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as {
-            viewer_id: number
-            api_count: number
-            items: { id: number; number: number; selectIndex: number }[]
-        }
+        const body = request.body as Record<string, unknown> | null
 
-        const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId) || !Array.isArray(body.items) || body.items.length === 0) {
+        const viewerId = body?.viewer_id
+        if (typeof viewerId !== "number" || !Number.isSafeInteger(viewerId) || viewerId <= 0) {
             console.warn('[ITEM-USE] invalid request body')
             return reply.status(400).send({ "error": "Bad Request", "message": "Invalid request body." })
         }
@@ -34,125 +31,47 @@ const routes = async (fastify: FastifyInstance) => {
         const playerId = resolvePlayerIdSync(session.accountId)!
         if (!playerId) return reply.status(500).send({ "error": "Internal Server Error", "message": "No player bound to account." })
 
-        const player = getPlayerSync(playerId)
-        if (!player) return reply.status(500).send({ "error": "Internal Server Error", "message": "Player not found." })
-
-        const config = getConfigSync()
-        const maxOverflow = config.max_stamina_overflow
-
-        let totalStaminaRecovery = 0
-        const itemUpdates: { id: number; newCount: number }[] = []
-        let hasStaminaItem = false
-
-        const requestedCounts = new Map<number, number>()
-        for (const itemReq of body.items) {
-            const itemId = itemReq.id
-            const requestCount = itemReq.number
-
-            if (!Number.isInteger(itemId) || itemId <= 0) {
-                console.warn(`[ITEM-USE] invalid item id: ${itemId}`)
-                continue
+        let settlement
+        try {
+            settlement = getDb().transaction(() => (
+                settleItemUseInCallerTransactionSync(
+                    playerId,
+                    body,
+                    getConfigSync().max_stamina_overflow,
+                )
+            ))()
+        } catch (error) {
+            if (error instanceof ItemUseValidationError) {
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    ...(error.resultCode === undefined ? {} : { code: error.resultCode }),
+                    "message": error.message,
+                })
             }
-            if (!Number.isInteger(requestCount) || requestCount <= 0) {
-                console.warn(`[ITEM-USE] invalid count: ${requestCount} for item ${itemId}`)
-                continue
+            if (error instanceof ItemUsePlayerNotFoundError) {
+                return reply.status(500).send({ "error": "Internal Server Error", "message": error.message })
             }
-            requestedCounts.set(itemId, (requestedCounts.get(itemId) ?? 0) + requestCount)
+            console.error(`[ITEM-USE] settlement failed for player ${playerId}`, error)
+            throw error
         }
 
-        for (const [itemId, requestCount] of requestedCounts) {
-
-            const effectInfo = getItemEffectSync(itemId)
-            if (!effectInfo) {
-                console.warn(`[ITEM-USE] item ${itemId} not in effect table, skipping`)
-                continue
-            }
-
-            const { effectKind, effectValue } = effectInfo
-
-            // Only handle stamina recovery items
-            if (effectKind !== 2 && effectKind !== 3) {
-                console.warn(`[ITEM-USE] item ${itemId} effectKind=${effectKind}, not a stamina item, skipping`)
-                continue
-            }
-
-            // Verify ownership
-            const currentCount = getPlayerItemSync(playerId, itemId) ?? 0
-            if (currentCount < requestCount) {
-                console.warn(`[ITEM-USE] player ${playerId} has ${currentCount} of item ${itemId}, requested ${requestCount}`)
-                return reply.status(400).send({ "error": "Bad Request", "message": "Insufficient items." })
-            }
-
-            let recoveryAmount: number
-            if (effectKind === 2) {
-                // StaminaFixed: fixed recovery amount
-                recoveryAmount = effectValue
-            } else {
-                // StaminaRate: percentage of max overflow
-                const rate = Math.max(0, effectValue) / 100 // e.g. 50 = 50%
-                recoveryAmount = Math.floor(Math.max(0, maxOverflow) * rate)
-            }
-
-            if (!isFinite(recoveryAmount) || recoveryAmount < 0) {
-                console.warn(`[ITEM-USE] invalid recovery amount for item ${itemId}: ${recoveryAmount}`)
-                recoveryAmount = 0
-            }
-
-            totalStaminaRecovery += recoveryAmount * requestCount
-            itemUpdates.push({ id: itemId, newCount: currentCount - requestCount })
-            hasStaminaItem = true
-        }
-
-        if (!hasStaminaItem) {
-            console.warn(`[ITEM-USE] no valid stamina recovery items in request`)
-            return reply.status(400).send({ "error": "Bad Request", "message": "No valid stamina items." })
-        }
-
-        if (totalStaminaRecovery <= 0) {
-            console.warn(`[ITEM-USE] zero total recovery`)
-            return reply.status(400).send({ "error": "Bad Request", "message": "Zero recovery." })
-        }
-
-        const currentStamina = computeRealTimeStamina(player)
-
-        if (currentStamina >= maxOverflow) {
-            console.log(`[ITEM-USE] player ${playerId} already at max stamina (${currentStamina} >= ${maxOverflow})`)
-            return reply.status(400).send({ "error": "Bad Request", "code": 2102, "message": "Already at max stamina." })
-        }
-
-        const afterStamina = Math.min(currentStamina + totalStaminaRecovery, maxOverflow)
-        const recoveryTime = new Date()
-
-        getDb().transaction(() => {
-            for (const upd of itemUpdates) {
-                updatePlayerItemSync(playerId, upd.id, upd.newCount)
-            }
-            updatePlayerSync({
-                id: playerId,
-                stamina: afterStamina,
-                staminaHealTime: recoveryTime
-            })
-        })()
-
-        console.log(`[ITEM-USE] player ${playerId}: stamina ${currentStamina}->${afterStamina} (+${totalStaminaRecovery}), items: ${JSON.stringify(itemUpdates)}`)
-
-        // Build item_list as IntMap<int> (client expects { itemId: count })
-        const itemListMap: Record<number, number> = {}
-        for (const upd of itemUpdates) {
-            itemListMap[upd.id] = upd.newCount
-        }
+        const { plan, itemList: itemListMap } = settlement
+        const recoveryTime = plan.stamina?.recoveryTime ?? new Date()
 
         reply.header("content-type", "application/x-msgpack")
+        const responseData: Record<string, unknown> = {
+            "item_list": itemListMap,
+            "mail_arrived": getMailArrivedSync(playerId),
+        }
+        if (plan.stamina !== null) {
+            responseData.user_info = {
+                "stamina": plan.stamina.after,
+                "stamina_heal_time": realToVirtual(recoveryTime)
+            }
+        }
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "user_info": {
-                    "stamina": afterStamina,
-                    "stamina_heal_time": realToVirtual(recoveryTime)
-                },
-                "item_list": itemListMap,
-                "mail_arrived": getMailArrivedSync(playerId)
-            }
+            "data": responseData,
         })
     })
 

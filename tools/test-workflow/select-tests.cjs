@@ -185,6 +185,10 @@ const SOURCE_RULES = [
         groups: ["integration:rules"],
     },
     {
+        pattern: /^src\/lib\/item-use-settlement\.ts$/,
+        groups: ["integration:rules"],
+    },
+    {
         pattern: /^src\/routes\/api\/(?:exchange|expod)\.ts$/,
         groups: ["integration:rules"],
     },

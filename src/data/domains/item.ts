@@ -177,12 +177,27 @@ export function givePlayerItemSync(
     itemId: string | number,
     giveAmount: number
 ): number {
-    return getDb().transaction(() => {
-        const ownedAmount = getPlayerItemSync(playerId, itemId)
-        const newAmount = (ownedAmount ?? 0) + giveAmount
-        if (ownedAmount === null) insertPlayerItemSync(playerId, itemId, newAmount)
-        else updatePlayerItemSync(playerId, itemId, newAmount)
-        recordPlayerCollectedItemSync(playerId, itemId, giveAmount)
-        return newAmount
-    })()
+    return getDb().transaction(() => (
+        givePlayerItemWithinTransactionSync(playerId, itemId, giveAmount)
+    ))()
+}
+
+/**
+ * Gives an item while the caller owns the surrounding database transaction.
+ * Keep the transaction boundary in givePlayerItemSync for ordinary callers.
+ */
+export function givePlayerItemWithinTransactionSync(
+    playerId: number,
+    itemId: string | number,
+    giveAmount: number,
+): number {
+    if (!getDb().inTransaction) {
+        throw new Error("givePlayerItemWithinTransactionSync requires an active caller transaction")
+    }
+    const ownedAmount = getPlayerItemSync(playerId, itemId)
+    const newAmount = (ownedAmount ?? 0) + giveAmount
+    if (ownedAmount === null) insertPlayerItemSync(playerId, itemId, newAmount)
+    else updatePlayerItemSync(playerId, itemId, newAmount)
+    recordPlayerCollectedItemSync(playerId, itemId, giveAmount)
+    return newAmount
 }
