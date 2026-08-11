@@ -74,6 +74,18 @@ Content Release；这一步只补齐服务端解释 Active Mission 所需的定�
 - 回归活动通过 event `string_id` 中的 `come_back_mission` 识别；当前没有回归资格生产者时 fail closed，不会把 250xx
   任务发给普通玩家。普通 `kind=1` 事件不因此被误判为回归活动。
 
+### 已确认的角色故事刷新时机缺口
+
+成长任务 `11010`“阅读角色故事”使用 pattern 21（`episode_clear_count`），其权威事实是玩家已经成功完成的普通角色故事关卡，
+不是卡池角色剧情试读。`/api/index.php/story_quest/finish` 当前会正确持久化角色故事关卡进度，但不会在同一次结算中运行
+Active Mission 重算，也不会在响应中返回 `active_mission_list` 增量。因此客户端返回成长任务页面时可能仍显示未完成；重新登录
+触发 `/load` 后，服务端会依据已持久化的关卡记录重算并完成该任务。该现象已经过客户端验证，不会丢失故事进度或任务资格，
+但属于即时反馈缺口。
+
+后续调整应评估在角色故事结算事务内同步计算 Active Mission，并通过该响应返回标准进度增量，使客户端无需重新登录即可刷新。
+在完成接口响应兼容与事务回归验证前，保留当前由 `/load` 校准的行为。`/episode_trial_reading/finish` 仍是独立的角色剧情试读入口，
+不得用于完成 `11010`。
+
 这组状态事实只写入 `all_active_mission_list`，不会写入角色觉醒使用的 category 9 `active_mission_list`。
 
 上述能力构成内容解释、首任务生产、状态事实校准、可用性判定、安全领奖和存储链。当前已接入 40 个实际使用的 pattern，
