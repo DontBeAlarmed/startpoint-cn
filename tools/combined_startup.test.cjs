@@ -114,10 +114,9 @@ test("combined PR2+PR3 startup serves the full iOS client chain", async t => {
     assert.equal(login.statusCode, 200)
     assert.equal(login.json().status, "0")
 
-    // 4. 协议版本文件（快照版本）
+    // 4. 协议版本文件没有权威 payload，保持未实现
     const version = await app.inject({ method: "GET", url: "/protocols/leiting/sensitive/part/wf_version.txt" })
-    assert.equal(version.statusCode, 200)
-    assert.equal(version.body, "1.4.54")
+    assert.equal(version.statusCode, 404)
 
     // 5. version_info（iOS 设备 → 空恢复清单 + installedBytes 语义）
     const info = await app.inject({

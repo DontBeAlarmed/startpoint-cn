@@ -89,10 +89,10 @@ const SOURCE_RULES = [
         groups: ["integration:cdn", "integration:database", "full"],
     },
     {
-        pattern: /^src\/routes\/cn\/(?:asset|assetInTitle|asset-provider|cdnFiles|httpRange|msgpack)\.ts$/,
+        pattern: /^src\/routes\/cn\/(?:asset|assetInTitle|asset-provider|cdnFiles|httpRange|ios-leiting|msgpack)\.ts$/,
         groups: ["integration:cdn", "full"],
     },
-    { pattern: /^src\/routes\/cn\/versionCheck\.ts$/, groups: ["full"] },
+    { pattern: /^src\/routes\/cn\/versionCheck\.ts$/, groups: ["integration:cdn", "full"] },
     { pattern: /^src\/routes\/web_api\//, groups: ["admin", "integration:database"] },
     {
         pattern: /^src\/data\/(?:player-save\/|defaultSave\.ts$)/,

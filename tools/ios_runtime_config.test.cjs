@@ -1,6 +1,7 @@
 "use strict"
 
 const assert = require("node:assert/strict")
+const fs = require("node:fs")
 const test = require("node:test")
 const path = require("node:path")
 
@@ -69,4 +70,9 @@ test("Android runtime config is unaffected by iOS configuration", () => {
     assert.equal(withIos.httpDisplayHost, baseline.httpDisplayHost)
     assert.equal(withIos.multi.mode, baseline.multi.mode)
     assert.equal(withIos.assetProvider.mode, baseline.assetProvider.mode)
+})
+
+test("cn-server forwards the enabled iOS runtime config to the SDK routes", () => {
+    const source = fs.readFileSync(path.join(projectRoot, "src", "cn-server.ts"), "utf8")
+    assert.match(source, /register\(iosLeitingPlugin,\s*\{\s*ios:\s*config\.iosCompat\s*\}\)/)
 })

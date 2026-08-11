@@ -308,7 +308,7 @@ function configureRuntimeHttp(config: ReturnType<typeof parseCnRuntimeConfig>): 
     fastify.register(versionCheckPlugin, { ios: config.iosCompat });
     if (config.iosCompat.enabled) {
         // iOS SDK请求的是裸路径（/sdk/v3-3/...、/mobile!...），必须无前缀注册。
-        fastify.register(iosLeitingPlugin);
+        fastify.register(iosLeitingPlugin, { ios: config.iosCompat });
     }
     runtimeHttpConfigured = true;
 }

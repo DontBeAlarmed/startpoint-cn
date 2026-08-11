@@ -1,5 +1,4 @@
 import { FastifyInstance } from "fastify"
-import { getEffectiveVersion } from "../../lib/version"
 
 // --- iOS Leiting SDK 登录 mock ---
 // 移植自 dennis96292/startpoint-cn-launcher：
@@ -29,26 +28,17 @@ const MG_LOG_PATHS = [
     "/api/mg_log!addMgRegisterLog.action",
 ] as const;
 
-const protocolEndpoints = [
-    "/protocols/leiting/sensitive/part/common_version.txt",
-    "/protocols/leiting/sensitive/part/wf_version.txt",
-    "/protocols/leiting/sensitive/part/wf-text_version.txt",
-    "/protocols/leiting/sensitive/part/common-text_version.txt",
-] as const;
-
 export interface IosLeitingPluginOptions {
     readonly ios?: {
         readonly apiHost: string
         readonly apiScheme: "http" | "https"
     }
-    readonly resolveVersion?: () => string
 }
 
 export default async function iosLeitingRoutes(
     fastify: FastifyInstance,
     options: IosLeitingPluginOptions = {},
 ): Promise<void> {
-    const resolveVersion = options.resolveVersion ?? getEffectiveVersion
     const ios = options.ios
     // 区服/CDN 配置
     fastify.get("/area/config.json", async (_request, reply) => {
@@ -57,24 +47,6 @@ export default async function iosLeitingRoutes(
             cdn_list: [{ url: "" }],
         })
     })
-
-    // 协议版本文件（版本号来自 Content Snapshot，与 CDN 资源版本一致；惰性读取）
-    for (const path of protocolEndpoints) {
-        fastify.get(path, async (_request, reply) => {
-            let version: string
-            try {
-                version = resolveVersion()
-            } catch {
-                // 资源版本缺失属于配置/初始化错误：明确失败而非 200 空版本，
-                // 避免把配置错误延迟成客户端故障。
-                return reply.status(503).type("text/plain").send("content snapshot unavailable")
-            }
-            if (version === "") {
-                return reply.status(503).type("text/plain").send("content snapshot unavailable")
-            }
-            return reply.type("text/plain").send(version)
-        })
-    }
 
     // 功能开关
     fastify.get("/protocols/leiting/switch/switch.txt", async (_request, reply) => {

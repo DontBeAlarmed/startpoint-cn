@@ -133,8 +133,8 @@ test("myip returns the request ip", async t => {
     assert.equal(response.body, "127.0.0.1")
 })
 
-test("protocol version files use the injected resolver and degrade when the version is missing", async t => {
-    const app = await createApp({ resolveVersion: () => "1.4.54" })
+test("protocol version files remain unavailable without authoritative payloads", async t => {
+    const app = await createApp()
     t.after(() => app.close())
 
     for (const url of [
@@ -142,16 +142,8 @@ test("protocol version files use the injected resolver and degrade when the vers
         "/protocols/leiting/sensitive/part/wf_version.txt",
     ]) {
         const response = await app.inject({ method: "GET", url })
-        assert.equal(response.statusCode, 200, url)
-        assert.equal(response.body, "1.4.54")
+        assert.equal(response.statusCode, 404, url)
     }
-
-    // 资源版本缺失（快照未初始化/解析抛错）：明确 503 失败，不返回 200 空版本
-    const missingApp = await createApp({ resolveVersion: () => { throw new Error("snapshot not initialized") } })
-    t.after(() => missingApp.close())
-    const missing = await missingApp.inject({ method: "GET", url: "/protocols/leiting/sensitive/part/wf_version.txt" })
-    assert.equal(missing.statusCode, 503)
-    assert.match(missing.body, /unavailable/)
 })
 
 test("wf config reflects the configured iOS api host", async t => {
