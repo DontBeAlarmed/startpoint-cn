@@ -39,6 +39,16 @@ export class QuestConfigurationError extends Error {
     }
 }
 
+export class RushEventQuestConfigurationError extends Error {
+    constructor(
+        public readonly eventId: number | undefined,
+        public readonly folderId: number | undefined,
+    ) {
+        super(`Invalid rush event quest configuration: eventId=${eventId} folderId=${folderId}`)
+        this.name = "RushEventQuestConfigurationError"
+    }
+}
+
 function getConfiguredQuestRewardSync(
     category: QuestCategory,
     questId: string | number,
@@ -73,6 +83,42 @@ export function getQuestConfigurationErrorResponse(error: unknown): Record<strin
         reward_id: Number(error.rewardId),
         field: error.field,
     }
+}
+
+export function getRushEventQuestConfigurationErrorResponse(error: unknown): Record<string, unknown> | null {
+    if (!(error instanceof RushEventQuestConfigurationError)) return null
+    return {
+        error: "Internal Server Error",
+        message: "Rush event quest configuration is invalid.",
+        event_id: error.eventId ?? null,
+        folder_id: error.folderId ?? null,
+    }
+}
+
+export function getRushEventFolderMaxRoundSync(
+    eventId: number | undefined,
+    folderId: number | undefined,
+): number {
+    if (!Number.isSafeInteger(eventId) || eventId! <= 0
+        || !Number.isSafeInteger(folderId) || folderId! <= 0) {
+        throw new RushEventQuestConfigurationError(eventId, folderId)
+    }
+
+    const matchingQuests = Object.values(getQuestContentTableSync("rush_event_quest.json"))
+        .filter(quest => quest.rushEventId === eventId && quest.rushEventFolderId === folderId)
+    if (matchingQuests.length === 0) {
+        throw new RushEventQuestConfigurationError(eventId, folderId)
+    }
+
+    let maxRound = 0
+    for (const quest of matchingQuests) {
+        const round = quest.rushEventRound
+        if (!Number.isSafeInteger(round) || round! <= 0) {
+            throw new RushEventQuestConfigurationError(eventId, folderId)
+        }
+        maxRound = Math.max(maxRound, round!)
+    }
+    return maxRound
 }
 
 /**

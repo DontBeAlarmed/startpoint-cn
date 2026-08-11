@@ -23,7 +23,7 @@ import {
     runCarnivalEventTransactionSync,
     upsertPlayerCarnivalEventRecordSync,
 } from "../../data/domains/carnivalEvent"
-import { getQuestConfigurationErrorResponse, getQuestFromCategorySync, getRushEventFolderClearRewards, getScoreAttackBorderRewards } from "../../lib/assets";
+import { getQuestConfigurationErrorResponse, getQuestFromCategorySync, getRushEventFolderClearRewards, getRushEventFolderMaxRoundSync, getRushEventQuestConfigurationErrorResponse, getScoreAttackBorderRewards } from "../../lib/assets";
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
 import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
 import { getCommonScoreRewardCount } from "../../lib/score-reward-lottery";
@@ -35,7 +35,6 @@ import {
 } from "../../lib/reward-campaign";
 import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
-import { rushEventFolderMaxRounds } from "./rushEvent";
 import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/stamina";
@@ -257,6 +256,20 @@ const routes = async (fastify: FastifyInstance) => {
                 "error": "Bad Request",
                 "message": "Quest doesn't exist."
             })
+        }
+
+        let rushEventFolderMaxRound: number | undefined
+        if (questCategory === QuestCategory.RUSH_EVENT && questData.rushEventRound !== 0) {
+            try {
+                rushEventFolderMaxRound = getRushEventFolderMaxRoundSync(
+                    questData.rushEventId,
+                    questData.rushEventFolderId,
+                )
+            } catch (error) {
+                const configurationError = getRushEventQuestConfigurationErrorResponse(error)
+                if (configurationError !== null) return reply.status(500).send(configurationError)
+                throw error
+            }
         }
 
         // calculate clear rank
@@ -488,7 +501,7 @@ const routes = async (fastify: FastifyInstance) => {
                 playerId,
                 questId,
                 getEvoLevels: (pid: number, chars: (number | null)[]) => getCharactersEvolutionImgLevels(pid, chars),
-                folderMaxRounds: rushEventFolderMaxRounds,
+                folderMaxRound: rushEventFolderMaxRound,
                 getRushEvent: (pid: number, eid: number) => getPlayerRushEventSync(pid, eid),
                 updateRushEvent: (pid: number, data: any) => updatePlayerRushEventSync(pid, data),
                 insertParty: (pid: number, eid: number, p: any) => insertPlayerRushEventPlayedPartySync(pid, eid, p),

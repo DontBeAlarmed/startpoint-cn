@@ -542,6 +542,24 @@ export function deletePlayerRushEventPlayedPartyListSync(
     )
 }
 
+export function selectPlayerRushEventFolderSync(
+    playerId: number,
+    eventId: number,
+    folderId: number,
+): void {
+    getDb().transaction(() => {
+        deletePlayerRushEventPlayedPartyListSync(
+            playerId,
+            eventId,
+            RushEventBattleType.FOLDER,
+        )
+        updatePlayerRushEventSync(playerId, {
+            eventId,
+            activeRushBattleFolderId: folderId,
+        })
+    })()
+}
+
 /**
  * Deletes a single rush event played party for a specific player & rush event.
  * 

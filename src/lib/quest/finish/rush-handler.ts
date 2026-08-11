@@ -34,7 +34,7 @@ interface RushHandlerParams {
     playerId: number
     questId: number
     getEvoLevels: (playerId: number, charIds: (number | null)[]) => (number | null)[]
-    folderMaxRounds: Record<number, number | undefined>
+    folderMaxRound?: number
     getRushEvent: (playerId: number, eventId: number) => any | null
     updateRushEvent: (playerId: number, data: any) => void
     insertParty: (playerId: number, eventId: number, data: any) => void
@@ -51,7 +51,7 @@ export function handleRushEventFinish(params: RushHandlerParams): {
     rushEventRewardsResult: PlayerRewardResult | null
 } {
     const { questCategory, questAccomplished, questData, clearTime, party, playerId, questId,
-        getEvoLevels, folderMaxRounds, getRushEvent, updateRushEvent,
+        getEvoLevels, folderMaxRound, getRushEvent, updateRushEvent,
         insertParty, insertClearedFolder, deletePartyList,
         getSerializedParties, getFolderRewards, giveRewards, transaction } = params
 
@@ -120,7 +120,10 @@ export function handleRushEventFinish(params: RushHandlerParams): {
             battleType: rushEventBattleType, round
         })
     } else if (rushEventBattleType === RushEventBattleType.FOLDER) {
-        const isFolderFinal = rushEventRound >= (folderMaxRounds[rushEventFolderId] ?? 0)
+        if (!Number.isSafeInteger(folderMaxRound) || folderMaxRound! <= 0) {
+            throw new Error("Rush event folder max round is not configured.")
+        }
+        const isFolderFinal = rushEventRound >= folderMaxRound!
         if (isFolderFinal) {
             transaction(() => {
                 const isFirstClear = insertClearedFolder(playerId, rushEventId, rushEventFolderId)

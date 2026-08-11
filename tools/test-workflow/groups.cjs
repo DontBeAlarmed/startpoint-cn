@@ -284,6 +284,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/raid_event_summary.test.cjs",
             "tools/raid_event_summary_route.test.cjs",
             "tools/ranking_event_route.test.cjs",
+            "tools/rush_event_battle_flow.test.cjs",
             "tools/rush_event_shop.test.cjs",
             "tools/rush_event_shop_route.test.cjs",
             "tools/rush_event_reset_route.test.cjs",

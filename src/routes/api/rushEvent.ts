@@ -1,8 +1,23 @@
-// Handles mail.
+// Handles Rush event routes.
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { PartyCategory, RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
-import { deletePlayerRushEventPlayedPartiesUntilSync, deletePlayerRushEventPlayedPartyListSync, deletePlayerRushEventPlayedPartySync, getDefaultPlayerRushEventSync, getPlayerRushEventClearedFoldersSync, getPlayerRushEventNextEndlessBattleRoundSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, insertPlayerRushEventSync, serializePlayerRushEventPlayedParty, updatePlayerRushEventSync } from "../../data/domains/rushEvent"
+import {
+    deletePlayerRushEventPlayedPartiesUntilSync,
+    deletePlayerRushEventPlayedPartyListSync,
+    deletePlayerRushEventPlayedPartySync,
+    getDefaultPlayerRushEventSync,
+    getPlayerRushEventClearedFoldersSync,
+    getPlayerRushEventNextEndlessBattleRoundSync,
+    getPlayerRushEventPlayedPartiesSync,
+    getPlayerRushEventSync,
+    insertPlayerRushEventClearedFolderSync,
+    insertPlayerRushEventPlayedPartySync,
+    insertPlayerRushEventSync,
+    selectPlayerRushEventFolderSync,
+    serializePlayerRushEventPlayedParty,
+    updatePlayerRushEventSync,
+} from "../../data/domains/rushEvent"
 import { getAccountPlayers } from "../../data/domains/account"
 import { getDefaultPlayerPartyGroupsSync } from "../../data/domains/player"
 import { getPlayerCharacterSync } from "../../data/domains/character"
@@ -10,10 +25,12 @@ import { ensurePlayerPartyGroupListSync, getPlayerPartyGroupListSync } from "../
 import { getSession } from "../../data/domains/session"
 import {
     getQuestFromCategorySync,
+    getRushEventFolderMaxRoundSync,
+    getRushEventQuestConfigurationErrorResponse,
     getRushEventRankingRewards,
     type RushEventRankingRewardEntry,
 } from "../../lib/assets";
-import { BattleQuest, QuestCategory, RushEventFolder } from "../../lib/types";
+import { BattleQuest, QuestCategory } from "../../lib/types";
 import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
 import type { FinishBody } from "./singleBattleQuest";
 import { insertActiveQuest } from "../../lib/quest/active-quest-service";
@@ -22,6 +39,7 @@ import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { ensureSpecialEventPartyGroupsSync, getGlobalPartyId } from "../../lib/special-event-parties";
 import { getDb } from "../../data/db";
+import { canStartRushEventFolderBattle } from "../../lib/rush-folder-progression";
 
 interface SummaryBody {
     event_id: number,
@@ -77,12 +95,6 @@ interface RushPartyGroup {
     party_group_color_id: number,
     party_group_id: number,
     party_list: RushParty[]
-}
-
-export const rushEventFolderMaxRounds: { [key in RushEventFolder]?: number } = {
-    [RushEventFolder.INTERMEDIATE]: 2,
-    [RushEventFolder.ADVANCED]: 2,
-    [RushEventFolder.GODLY]: 2
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -183,11 +195,7 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "Already selected a folder for this rush event."
         });
 
-        // update folder
-        updatePlayerRushEventSync(playerId, {
-            eventId: eventId,
-            activeRushBattleFolderId: folderId
-        })
+        selectPlayerRushEventFolderSync(playerId, eventId, folderId)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -335,11 +343,38 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get quest
-        const questData = getQuestFromCategorySync(QuestCategory.RUSH_EVENT, questId) as BattleQuest | null
+        let questData: BattleQuest | null
+        try {
+            questData = getQuestFromCategorySync(QuestCategory.RUSH_EVENT, questId)
+            if (questData !== null && questData.rushEventRound !== 0) {
+                getRushEventFolderMaxRoundSync(
+                    questData.rushEventId,
+                    questData.rushEventFolderId,
+                )
+            }
+        } catch (error) {
+            const configurationError = getRushEventQuestConfigurationErrorResponse(error)
+            if (configurationError !== null) return reply.status(500).send(configurationError)
+            throw error
+        }
         if (questData === null || !('rankPointReward' in questData) || questData.rushEventId === undefined) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Quest doesn't exist."
         })
+
+        if (questData.rushEventRound !== 0) {
+            const rushEventData = getPlayerRushEventSync(playerId, questData.rushEventId)
+            const playedParties = getPlayerRushEventPlayedPartiesSync(playerId, questData.rushEventId)
+            if (!canStartRushEventFolderBattle({
+                quest: questData,
+                rushEvent: rushEventData,
+                playedParties,
+                getQuest: id => getQuestFromCategorySync(QuestCategory.RUSH_EVENT, id),
+            })) return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Rush event folder progression is invalid."
+            })
+        }
 
         // insert active quest for '/single_battle_quest/finish' endpoint
         insertActiveQuest(playerId, {
