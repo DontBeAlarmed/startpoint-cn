@@ -34,6 +34,7 @@ export interface CategoryContext {
         multiClearCount: number
         multiHostClearCount: number
         episodeClearCount: number
+        characterLevels: ReadonlyMap<number, number>
         bondedCharacterIds: ReadonlySet<number>
         secondManaBoardNodeCount: number
         secondManaBoardCompletedCharacterIds: ReadonlySet<number>

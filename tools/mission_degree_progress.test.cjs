@@ -29,7 +29,9 @@ const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const {
     insertPlayerCharacterManaNodesSync,
+    insertPlayerCharacterBondTokenSync,
     insertPlayerCharacterSync,
+    updatePlayerCharacterBondTokenSync,
     updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
@@ -611,15 +613,26 @@ insertPlayerCharacterSync(levelPlayerId, 111001, {
     manaBoardIndex: 1,
     bondTokenList: [{ manaBoardIndex: 1, status: 0 }],
 })
+insertPlayerCharacterBondTokenSync(levelPlayerId, 111001, {
+    manaBoardIndex: 2,
+    status: 1,
+})
 const level80Context = DegreeComputer.buildContext(levelPlayerId, 5)
 assert.equal(DegreeComputer.compute(3000, level80Context, 7), 7, "Lv60 缺少完整曲线时必须继续保留 fallback")
 assert.equal(DegreeComputer.compute(3010, level80Context, 0), 80, "五星角色达到官方 Lv80 EXP 阈值时应完成称号")
 assert.equal(DegreeComputer.compute(3020, level80Context, 7), 80, "Lv100 称号应显示当前已证明的最高等级")
+assert.equal(DegreeComputer.compute(111001, level80Context, 0), 0, "第二板信赖记录不得代替第一板信赖之证")
+
+updatePlayerCharacterBondTokenSync(levelPlayerId, 111001, { manaBoardIndex: 1, status: 1 })
+const bondedLevel80Context = DegreeComputer.buildContext(levelPlayerId, 5)
+assert.equal(DegreeComputer.compute(111001, bondedLevel80Context, 0), 1, "仅取得一版信赖之证时一版称号应为 1/2")
 
 updatePlayerCharacterSync(levelPlayerId, 111001, { exp: 379988, overLimitStep: 4 })
 const level100Context = DegreeComputer.buildContext(levelPlayerId, 5)
 assert.equal(DegreeComputer.compute(3010, level100Context, 90), 100, "角色等级称号进度不得低于已证明等级")
 assert.equal(DegreeComputer.compute(3020, level100Context, 0), 100, "五星角色达到官方 Lv100 EXP 阈值时应完成称号")
+assert.equal(DegreeComputer.compute(111001, level100Context, 0), 2, "Lv100 且取得一版信赖之证时一版称号应为 2/2")
+assert.equal(DegreeComputer.compute(111001, level100Context, 3), 3, "历史一版称号进度不得回退")
 
 const coverage = getDegreeMissionCoverageReport()
 assert.equal(getExactDegreeQuestClearRuleCount(), 84)

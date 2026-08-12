@@ -408,11 +408,14 @@ function buildStats(playerId: number, category: number): CategoryContext {
         bundledCharacters as RawCharacterTable,
     )
     let maxCharacterLevel = 0
+    const characterLevels = new Map<number, number>()
     for (const [characterId, character] of Object.entries(characters)) {
         const rarity = characterDefinitions[characterId]?.rarity
         if (!Number.isSafeInteger(rarity) || (rarity as number) <= 0) continue
         const level = getProvenCharacterLevel(rarity as number, character.exp)
-        if (level !== null) maxCharacterLevel = Math.max(maxCharacterLevel, level)
+        if (level === null) continue
+        maxCharacterLevel = Math.max(maxCharacterLevel, level)
+        characterLevels.set(Number(characterId), level)
     }
     return {
         category,
@@ -437,8 +440,11 @@ function buildStats(playerId: number, category: number): CategoryContext {
             multiClearCount: battleCounters.multiClearCount,
             multiHostClearCount: battleCounters.multiHostClearCount,
             episodeClearCount: countFinishedPlayerQuestsByCategorySync(playerId, 3),
+            characterLevels,
             bondedCharacterIds: new Set(Object.entries(characters)
-                .filter(([, character]) => character.bondTokenList.some(token => token.status >= 1))
+                .filter(([, character]) => character.bondTokenList.some(token => (
+                    token.manaBoardIndex === 1 && token.status >= 1
+                )))
                 .map(([characterId]) => Number(characterId))),
             ...(() => {
                 const secondManaBoard = getSecondManaBoardStats(characters, manaNodes)
@@ -770,7 +776,9 @@ export const DegreeComputer: MissionComputer = {
         }
         const bondCharacterId = getSpecificCharacterBondId(missionId)
         if (bondCharacterId !== undefined) {
-            return Math.max(dbProgress, stats.bondedCharacterIds.has(bondCharacterId) ? 1 : 0)
+            const levelProgress = (stats.characterLevels.get(bondCharacterId) ?? 0) >= 100 ? 1 : 0
+            const bondProgress = stats.bondedCharacterIds.has(bondCharacterId) ? 1 : 0
+            return Math.max(dbProgress, levelProgress + bondProgress)
         }
         const secondManaBoardCharacterId = getSecondManaBoardCharacterId(missionId)
         if (secondManaBoardCharacterId !== undefined) {
