@@ -67,14 +67,22 @@
 - `contractVersion`：当前固定为 `1`。字段缺失、未知字段或非 `1` 值均应失败关闭。
 - `serverCapabilities`：服务端实际支持能力的去重并集，按 Unicode 码点序排列。它只能来自顶层，消费者不得从 `features` 或 `modes` 推导或补齐。
 - `serverBundle`：当前代码包版本和可选的 canonical Bundle 身份。非嵌入式源码运行可没有 `bundleId`。
-- `runtime`：Mode API、Node 版本、Node ABI、平台和架构事实。
+- `runtime`：独立的 Runtime API、Node 版本、Node ABI、平台和架构事实。`runtime.api`
+  与 `modes.api` 当前数值都为 `1` 只是巧合，两者属于独立契约，不能互相推导。
 - `content`：当前固定 Content Snapshot、CDN 链尾及已加载补丁边。
 - `modes`：基础 Mode seam 能力、已验证并加载的模块身份，以及包含模块文件名、名称、能力和字节摘要的 canonical 集合摘要。
 - `features`：当前固定的行为开关；不是 capability 的替代来源。
 
-`content.contentDigest` 对当前全部内容表的有效状态作身份见证：bundled 模式从每张表的 canonical 内容摘要组合得到，Release 模式等于已验证 Release manifest 的摘要。它不包含本地绝对路径。
+`content.contentDigest` 对当前实际加载的全部内容表状态作身份见证：bundled 与 Release
+模式都从每张表的 canonical 内容摘要组合得到。`content.releaseDigest` 单独保存 Release
+manifest 身份；它还覆盖 catalog、summary 与 manifest 元数据，因此不能冒充业务表状态摘要。
+两个摘要都不包含本地绝对路径。
 
-`modes.loaded` 只公开模块名、声明能力和模块字节 SHA-256，不公开模块目录或完整文件名。`modes.modeDigest` 仍把经 loader 验证的文件名纳入 canonical 身份，因此文件排序或替换会改变整体摘要。
+`modes.loaded` 只公开模块名、声明能力和模块字节 SHA-256，不公开模块目录或完整文件名。
+Mode API v1 对第三方模块的 `capability` 只要求非空；`modes.loaded[].capabilities` 必须如实保留
+这些既有值，不能用本端点的 `name@version` 规则反向收紧 Mode 装载兼容性。顶层
+`serverCapabilities` 仍只包含本服务端明确声明的版本化能力。`modes.modeDigest` 仍把经 loader
+验证的文件名纳入 canonical 身份，因此文件排序或替换会改变整体摘要。
 
 ## 当前能力边界
 
