@@ -31,6 +31,17 @@ const converted = convertPeriodicRewardTrees({
     periodicRewards,
     periodicRewardPoints,
 })
+
+const unsupportedRewardKind = structuredClone(periodicRewards)
+unsupportedRewardKind["10000002"]["1"][0][1] = "1"
+assert.throws(
+    () => convertPeriodicRewardTrees({
+        hardMultiEvents,
+        periodicRewards: unsupportedRewardKind,
+        periodicRewardPoints,
+    }),
+    /invalid periodic reward content.*kind.*must be 0/i,
+)
 const convertedHardMultiQuests = convertQuestTree(
     "hard_multi_event_quest.json",
     hardMultiQuests,

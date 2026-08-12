@@ -160,11 +160,17 @@ function convertPeriodicRewardTable(tree: CsvOrderedMapTree): Record<string, unk
                 group[index],
                 5,
             )
+            const kind = parseNonNegativeInteger(
+                fields[1],
+                `periodic_reward[${groupId}][${index}].kind`,
+            )
+            if (kind !== 0) {
+                invalidPeriodicReward(
+                    `periodic_reward[${groupId}][${index}].kind must be 0`,
+                )
+            }
             rewards[index] = {
-                kind: parseNonNegativeInteger(
-                    fields[1],
-                    `periodic_reward[${groupId}][${index}].kind`,
-                ),
+                kind,
                 itemId: parsePositiveInteger(
                     fields[2],
                     `periodic_reward[${groupId}][${index}].itemId`,

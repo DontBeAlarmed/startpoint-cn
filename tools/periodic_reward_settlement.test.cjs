@@ -15,12 +15,37 @@ delete process.env.WDFP_DATABASE_DIR
 const { installBundledGameplaySnapshot } = require(
     "./helpers/install-bundled-gameplay-snapshot.cjs"
 )
+const hardMultiEvents = structuredClone(require("../assets/hard_multi_event.json"))
+const hardMultiQuests = structuredClone(require("../assets/hard_multi_event_quest.json"))
+const periodicRewards = structuredClone(require("../assets/periodic_reward.json"))
+const periodicRewardPoints = structuredClone(require("../assets/periodic_reward_point.json"))
+hardMultiQuests["1006001"].periodicRewardGroupId = 90000000
+periodicRewards["90000000"] = {
+    1: { kind: 0, itemId: 40405, count: 9, probability: 1 },
+}
+periodicRewardPoints["90000000"] = {
+    maxPoint: 99,
+    recoveryPoint: 2,
+    recoveryCycle: 0,
+}
+hardMultiEvents["9000"] = { periodicPointId: 90000001 }
+periodicRewardPoints["90000001"] = {
+    maxPoint: 99,
+    recoveryPoint: 2,
+    recoveryCycle: 1,
+}
 const restoreSnapshot = installBundledGameplaySnapshot({
     additionalTableNames: [
         "hard_multi_event.json",
         "periodic_reward.json",
         "periodic_reward_point.json",
     ],
+    tableOverrides: {
+        "hard_multi_event.json": hardMultiEvents,
+        "hard_multi_event_quest.json": hardMultiQuests,
+        "periodic_reward.json": periodicRewards,
+        "periodic_reward_point.json": periodicRewardPoints,
+    },
 })
 
 let db
@@ -80,6 +105,8 @@ assert.deepEqual(points(playerId), {
     10000000: 2,
     10000001: 2,
     10000002: 2,
+    90000000: 2,
+    90000001: 2,
 })
 
 db.prepare(`UPDATE players_periodic_reward_points SET point = 7 WHERE player_id = ? AND id = 1`)
@@ -94,6 +121,8 @@ db.prepare(`UPDATE players_periodic_reward_points SET point = 98 WHERE player_id
     .run(playerId)
 db.prepare(`UPDATE players_periodic_reward_points SET point = 1 WHERE player_id = ? AND id = 2`)
     .run(playerId)
+db.prepare(`UPDATE players_periodic_reward_points SET point = 1 WHERE player_id = ? AND id = 90000001`)
+    .run(playerId)
 db.prepare(`DELETE FROM players_periodic_reward_points WHERE player_id = ? AND id = 3`)
     .run(playerId)
 const previousLogin = new Date("2025-06-19T00:00:00.000Z")
@@ -105,6 +134,7 @@ assert.equal(dailyResetPlayerDataSync(getPlayerSync(playerId), resetTime), true)
 assert.equal(points(playerId)[1], 99, "恢复后不得超过 CDN 上限")
 assert.equal(points(playerId)[2], 3, "每日恢复应增加 CDN recoveryPoint")
 assert.equal(points(playerId)[3], 2, "跨日首次补齐不得额外叠加恢复")
+assert.equal(points(playerId)[90000001], 1, "非每日周期不得在每日重置时恢复")
 assert.equal(
     dailyResetPlayerDataSync(getPlayerSync(playerId), new Date("2025-06-20T01:00:00.000Z")),
     false,
@@ -150,8 +180,8 @@ const finalPlayerId = createPlayer("periodic-final")
 const finalBefore = getPlayerItemSync(finalPlayerId, 40405) ?? 0
 const final = settlePeriodic(finalPlayerId, { questId: 1006001 })
 assert.deepEqual(final, {
-    dropPeriodicRewardIds: [{ group_id: 10000002, index: 1, number: 9 }],
-    periodicRewardPointList: [{ id: 10000002, point: 1 }],
+    dropPeriodicRewardIds: [{ group_id: 90000000, index: 1, number: 9 }],
+    periodicRewardPointList: [{ id: 90000000, point: 1 }],
     items: { 40405: finalBefore + 9 },
 })
 

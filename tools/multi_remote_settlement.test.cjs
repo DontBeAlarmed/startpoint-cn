@@ -411,12 +411,17 @@ delete process.env.WDFP_DATABASE_DIR
 
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 const restoreContentSnapshot = installBundledGameplaySnapshot({
-    additionalTableNames: ["mission_active.json", "mission_active_event.json"],
+    additionalTableNames: [
+        "event_item_shop.json",
+        "mission_active.json",
+        "mission_active_event.json",
+    ],
 })
 const { closeDatabase, initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerPeriodicRewardPointsSync } = require("../src/data/domains/campaign")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
 const { activeQuests } = require("../src/lib/quest/active-quest-service")
@@ -435,6 +440,7 @@ process.once("exit", () => {
 })
 
 const productionQuest = Object.freeze({ category: 13, questId: 2001, ticketId: 500000 })
+const activityHardMultiQuest = Object.freeze({ category: 26, questId: 100002001 })
 const roomNumber = "123456"
 const battleSessionId = "123e4567-e89b-42d3-a456-426614174002"
 
@@ -602,7 +608,8 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
         staminaHealTime: new Date(Math.floor(Date.now() / 1_000) * 1_000),
         totalStaminaUsed: 0,
     })
-    givePlayerItemSync(playerId, productionQuest.ticketId, 1)
+    const quest = options.quest ?? productionQuest
+    if (quest.ticketId !== undefined) givePlayerItemSync(playerId, quest.ticketId, 1)
     const entryStamina = computeRealTimeStamina(getPlayerSync(playerId))
 
     const effectiveRoomNumber = options.roomNumber ?? roomNumber
@@ -628,8 +635,8 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
                     roomNumber: effectiveRoomNumber,
                     host: roomHost,
                     members: roomMembers,
-                    category: productionQuest.category,
-                    questId: productionQuest.questId,
+                    category: quest.category,
+                    questId: quest.questId,
                 },
             }
         },
@@ -676,6 +683,58 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
     await app.ready()
     return { app, db, playerId, accountId: account.id, entryStamina, coordinatorCalls }
 }
+
+test("production /finish settles activity hard multi periodic rewards for host and guest", async () => {
+    for (const [label, participant, isHost] of [
+        ["host", host, true],
+        ["guest", guest, false],
+    ]) {
+        let home
+        try {
+            home = await openProductionHome(
+                `periodic-route-${label}`,
+                participant,
+                isHost,
+                { verify: async () => ({ ok: true, isHost }) },
+                { quest: activityHardMultiQuest },
+            )
+            const playId = `periodic-route-${label}`
+            const questFields = {
+                category: activityHardMultiQuest.category,
+                quest_id: activityHardMultiQuest.questId,
+            }
+            const started = await home.app.inject({
+                method: "POST",
+                url: "/start",
+                payload: startPayload(participant.viewerId, playId, questFields),
+            })
+            assert.equal(started.statusCode, 200, started.body)
+
+            const finished = await home.app.inject({
+                method: "POST",
+                url: "/finish",
+                payload: finishPayload(participant.viewerId, playId, questFields),
+            })
+            assert.equal(finished.statusCode, 200, finished.body)
+            const response = JSON.parse(finished.body).data
+            assert.deepEqual(response.drop_periodic_reward_ids, [
+                { group_id: 10000002, index: 1, number: 9 },
+            ])
+            assert.deepEqual(response.user_periodic_reward_point_list, [
+                { id: 10000002, point: 1 },
+            ])
+            assert.equal(response.item_list[40405], 9)
+            assert.equal(getPlayerItemSync(home.playerId, 40405), 9)
+            assert.equal(
+                getPlayerPeriodicRewardPointsSync(home.playerId)
+                    .find(entry => entry.id === 10000002)?.point,
+                1,
+            )
+        } finally {
+            await closeProductionHome(home)
+        }
+    }
+})
 
 async function closeProductionHome(home) {
     if (home) {
