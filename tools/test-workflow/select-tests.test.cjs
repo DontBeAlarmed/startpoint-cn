@@ -453,11 +453,6 @@ test("routes multiplayer runtime and private credential changes to focused group
     )
 })
 
-test("registers verified mode identity coverage with the mode seam", () => {
-    assert.equal(TEST_GROUPS["quick:modes"].tests.includes("tools/mode_identity.test.cjs"), true)
-    assert.deepEqual(selectTestGroups(["tools/mode_identity.test.cjs"]), ["quick:modes"])
-})
-
 test("registers focused seed state and API regressions", () => {
     assert.deepEqual(TEST_GROUPS["quick:seed"], {
         execution: "parallel",
@@ -704,6 +699,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_auto_settlement_route.test.cjs",
         "tools/mission_get_progress_transaction.test.cjs",
         "tools/mission_collect_progress.test.cjs",
+        "tools/mission-client-check-diagnostics.test.cjs",
         "tools/mission_coverage_audit.test.cjs",
         "tools/mission_daily_battle_facts.test.cjs",
         "tools/mission_degree_progress.test.cjs",

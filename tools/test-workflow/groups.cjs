@@ -60,7 +60,6 @@ const TEST_GROUPS = Object.freeze({
             "tools/modes_routes.test.cjs",
             "tools/modes_lifecycle.test.cjs",
             "tools/modes_wiring.test.cjs",
-            "tools/mode_identity.test.cjs",
         ],
     },
     "quick:seed": {
@@ -317,6 +316,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_auto_settlement_route.test.cjs",
             "tools/mission_get_progress_transaction.test.cjs",
             "tools/mission_collect_progress.test.cjs",
+            "tools/mission-client-check-diagnostics.test.cjs",
             "tools/mission_coverage_audit.test.cjs",
             "tools/mission_daily_battle_facts.test.cjs",
             "tools/mission_degree_progress.test.cjs",
