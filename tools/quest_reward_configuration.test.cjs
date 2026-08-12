@@ -43,8 +43,8 @@ withHardMultiOverride({}, () => {
     assert.equal(validQuest.sPlusReward?.type, 3)
     assert.equal(validQuest.sPlusReward?.id, undefined)
     assert.equal(validQuest.sPlusReward?.count, 30)
-    assert.equal(Object.hasOwn(validQuest, "availableFromMs"), false)
-    assert.equal(Object.hasOwn(validQuest, "availableUntilMs"), false)
+    assert.equal(validQuest.availableFromMs, 1750305600000)
+    assert.equal(validQuest.availableUntilMs, 1752163199000)
 })
 
 withHardMultiOverride({ availableFromMs: 10, availableUntilMs: 20 }, () => {

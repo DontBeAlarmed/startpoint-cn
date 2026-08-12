@@ -1,8 +1,8 @@
 {
   "1001": {
+    "availableFromMs": 1723780800000,
+    "availableUntilMs": 1724947199000,
     "name": "红机兵海茵莱特 ::quest_rank::",
-    "clearRewardId": 34,
-    "sPlusRewardId": 34,
     "bRankTime": 738000,
     "aRankTime": 603000,
     "sRankTime": 468000,
@@ -10,12 +10,26 @@
     "rankPointReward": 1590,
     "characterExpReward": 2900,
     "manaReward": 2790,
-    "poolExpReward": 2900
+    "poolExpReward": 2900,
+    "element": 1,
+    "enemyLevel": 100,
+    "clearRewardId": 34,
+    "sPlusRewardId": 34,
+    "periodicRewardGroupId": 1,
+    "periodicRewardSlots": 1,
+    "scoreRewardGroupId": 800001,
+    "commonRewardCounts": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
   },
   "2001": {
+    "availableFromMs": 1728619200000,
+    "availableUntilMs": 1729785599000,
     "name": "碧机兵克拉格 ::quest_rank::",
-    "clearRewardId": 34,
-    "sPlusRewardId": 34,
     "bRankTime": 738000,
     "aRankTime": 603000,
     "sRankTime": 468000,
@@ -23,12 +37,26 @@
     "rankPointReward": 1590,
     "characterExpReward": 2900,
     "manaReward": 2790,
-    "poolExpReward": 2900
+    "poolExpReward": 2900,
+    "element": 0,
+    "enemyLevel": 100,
+    "clearRewardId": 34,
+    "sPlusRewardId": 34,
+    "periodicRewardGroupId": 2,
+    "periodicRewardSlots": 1,
+    "scoreRewardGroupId": 800002,
+    "commonRewardCounts": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
   },
   "3001": {
+    "availableFromMs": 1730952000000,
+    "availableUntilMs": 1732204799000,
     "name": "苍机兵维尔努斯 ::quest_rank::",
-    "clearRewardId": 34,
-    "sPlusRewardId": 34,
     "bRankTime": 792000,
     "aRankTime": 702000,
     "sRankTime": 612000,
@@ -36,12 +64,26 @@
     "rankPointReward": 1590,
     "characterExpReward": 2900,
     "manaReward": 2790,
-    "poolExpReward": 2900
+    "poolExpReward": 2900,
+    "element": 2,
+    "enemyLevel": 100,
+    "clearRewardId": 34,
+    "sPlusRewardId": 34,
+    "periodicRewardGroupId": 3,
+    "periodicRewardSlots": 1,
+    "scoreRewardGroupId": 800003,
+    "commonRewardCounts": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
   },
   "1001001": {
+    "availableFromMs": 1752120000000,
+    "availableUntilMs": null,
     "name": "红机兵海茵莱特 ::quest_rank::",
-    "clearRewardId": 34,
-    "sPlusRewardId": 34,
     "bRankTime": 738000,
     "aRankTime": 603000,
     "sRankTime": 468000,
@@ -49,12 +91,26 @@
     "rankPointReward": 1590,
     "characterExpReward": 2900,
     "manaReward": 2790,
-    "poolExpReward": 2900
+    "poolExpReward": 2900,
+    "element": 1,
+    "enemyLevel": 100,
+    "clearRewardId": 34,
+    "sPlusRewardId": 34,
+    "periodicRewardGroupId": 1,
+    "periodicRewardSlots": 1,
+    "scoreRewardGroupId": 11000930,
+    "commonRewardCounts": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
   },
   "1002001": {
+    "availableFromMs": 1752120000000,
+    "availableUntilMs": null,
     "name": "苍机兵维尔努斯 ::quest_rank::",
-    "clearRewardId": 34,
-    "sPlusRewardId": 34,
     "bRankTime": 738000,
     "aRankTime": 603000,
     "sRankTime": 468000,
@@ -62,12 +118,26 @@
     "rankPointReward": 1590,
     "characterExpReward": 2900,
     "manaReward": 2790,
-    "poolExpReward": 2900
+    "poolExpReward": 2900,
+    "element": 2,
+    "enemyLevel": 100,
+    "clearRewardId": 34,
+    "sPlusRewardId": 34,
+    "periodicRewardGroupId": 3,
+    "periodicRewardSlots": 1,
+    "scoreRewardGroupId": 11000931,
+    "commonRewardCounts": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
   },
   "1003001": {
+    "availableFromMs": 1752120000000,
+    "availableUntilMs": null,
     "name": "橙机兵吉布西兹 ::quest_rank::",
-    "clearRewardId": 34,
-    "sPlusRewardId": 34,
     "bRankTime": 738000,
     "aRankTime": 603000,
     "sRankTime": 468000,
@@ -75,12 +145,26 @@
     "rankPointReward": 1590,
     "characterExpReward": 2900,
     "manaReward": 2790,
-    "poolExpReward": 2900
+    "poolExpReward": 2900,
+    "element": 3,
+    "enemyLevel": 100,
+    "clearRewardId": 34,
+    "sPlusRewardId": 34,
+    "periodicRewardGroupId": 10000001,
+    "periodicRewardSlots": 1,
+    "scoreRewardGroupId": 11000932,
+    "commonRewardCounts": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
   },
   "1004001": {
+    "availableFromMs": 1752120000000,
+    "availableUntilMs": null,
     "name": "碧机兵克拉格 ::quest_rank::",
-    "clearRewardId": 34,
-    "sPlusRewardId": 34,
     "bRankTime": 738000,
     "aRankTime": 603000,
     "sRankTime": 468000,
@@ -88,12 +172,26 @@
     "rankPointReward": 1590,
     "characterExpReward": 2900,
     "manaReward": 2790,
-    "poolExpReward": 2900
+    "poolExpReward": 2900,
+    "element": 0,
+    "enemyLevel": 100,
+    "clearRewardId": 34,
+    "sPlusRewardId": 34,
+    "periodicRewardGroupId": 2,
+    "periodicRewardSlots": 1,
+    "scoreRewardGroupId": 11000933,
+    "commonRewardCounts": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
   },
   "1005001": {
+    "availableFromMs": 1752120000000,
+    "availableUntilMs": null,
     "name": "闪机兵艾赞 ::quest_rank::",
-    "clearRewardId": 34,
-    "sPlusRewardId": 34,
     "bRankTime": 738000,
     "aRankTime": 603000,
     "sRankTime": 468000,
@@ -101,12 +199,26 @@
     "rankPointReward": 1590,
     "characterExpReward": 2900,
     "manaReward": 2790,
-    "poolExpReward": 2900
+    "poolExpReward": 2900,
+    "element": 5,
+    "enemyLevel": 100,
+    "clearRewardId": 34,
+    "sPlusRewardId": 34,
+    "periodicRewardGroupId": 10000000,
+    "periodicRewardSlots": 1,
+    "scoreRewardGroupId": 11000934,
+    "commonRewardCounts": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
   },
   "1006001": {
+    "availableFromMs": 1752120000000,
+    "availableUntilMs": null,
     "name": "暗机兵德古兰 ::quest_rank::",
-    "clearRewardId": 34,
-    "sPlusRewardId": 34,
     "bRankTime": 738000,
     "aRankTime": 603000,
     "sRankTime": 468000,
@@ -114,12 +226,26 @@
     "rankPointReward": 1590,
     "characterExpReward": 2900,
     "manaReward": 2790,
-    "poolExpReward": 2900
+    "poolExpReward": 2900,
+    "element": 4,
+    "enemyLevel": 100,
+    "clearRewardId": 34,
+    "sPlusRewardId": 34,
+    "periodicRewardGroupId": 10000002,
+    "periodicRewardSlots": 1,
+    "scoreRewardGroupId": 11000935,
+    "commonRewardCounts": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
   },
   "100000001": {
+    "availableFromMs": 1735790400000,
+    "availableUntilMs": 1737647999000,
     "name": "闪机兵艾赞 ::quest_rank::",
-    "clearRewardId": 34,
-    "sPlusRewardId": 34,
     "bRankTime": 792000,
     "aRankTime": 702000,
     "sRankTime": 612000,
@@ -127,12 +253,26 @@
     "rankPointReward": 1590,
     "characterExpReward": 2900,
     "manaReward": 2790,
-    "poolExpReward": 2900
+    "poolExpReward": 2900,
+    "element": 5,
+    "enemyLevel": 100,
+    "clearRewardId": 34,
+    "sPlusRewardId": 34,
+    "periodicRewardGroupId": 10000000,
+    "periodicRewardSlots": 1,
+    "scoreRewardGroupId": 11000342,
+    "commonRewardCounts": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
   },
   "100001001": {
+    "availableFromMs": 1743048000000,
+    "availableUntilMs": 1744300799000,
     "name": "橙机兵吉布西兹 ::quest_rank::",
-    "clearRewardId": 34,
-    "sPlusRewardId": 34,
     "bRankTime": 792000,
     "aRankTime": 702000,
     "sRankTime": 612000,
@@ -140,12 +280,26 @@
     "rankPointReward": 1590,
     "characterExpReward": 2900,
     "manaReward": 2790,
-    "poolExpReward": 2900
+    "poolExpReward": 2900,
+    "element": 3,
+    "enemyLevel": 100,
+    "clearRewardId": 34,
+    "sPlusRewardId": 34,
+    "periodicRewardGroupId": 10000001,
+    "periodicRewardSlots": 1,
+    "scoreRewardGroupId": 11000420,
+    "commonRewardCounts": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
   },
   "100002001": {
+    "availableFromMs": 1750305600000,
+    "availableUntilMs": 1752163199000,
     "name": "暗机兵德古兰 ::quest_rank::",
-    "clearRewardId": 34,
-    "sPlusRewardId": 34,
     "bRankTime": 792000,
     "aRankTime": 702000,
     "sRankTime": 612000,
@@ -153,6 +307,20 @@
     "rankPointReward": 1590,
     "characterExpReward": 2900,
     "manaReward": 2790,
-    "poolExpReward": 2900
+    "poolExpReward": 2900,
+    "element": 4,
+    "enemyLevel": 100,
+    "clearRewardId": 34,
+    "sPlusRewardId": 34,
+    "periodicRewardGroupId": 10000002,
+    "periodicRewardSlots": 1,
+    "scoreRewardGroupId": 11000487,
+    "commonRewardCounts": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
   }
 }

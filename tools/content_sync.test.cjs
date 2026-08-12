@@ -19,6 +19,9 @@ const {
     QUEST_TABLE_SOURCES,
 } = require("../src/content/converters/quest")
 const {
+    PERIODIC_REWARD_TABLE_SOURCES,
+} = require("../src/content/converters/periodic-reward")
+const {
     hashResourcePath,
     serializeNestedOrderedMap,
     serializeOrderedMap,
@@ -289,6 +292,15 @@ function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}
             )
         }
     }
+    for (const source of Object.values(PERIODIC_REWARD_TABLE_SOURCES)) {
+        if (logicalEntries.has(source.logicalPath)) continue
+        logicalEntries.set(
+            source.logicalPath,
+            source.nestingDepth === 1
+                ? serializeOrderedMap([])
+                : serializeNestedOrderedMap([]),
+        )
+    }
     const entries = new Map()
     const logicalByPhysical = new Map()
     for (const [logicalPath, bytes] of logicalEntries) {
@@ -402,6 +414,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         skillEffects: 0,
         reward: 0,
         quest: 0,
+        periodicReward: 0,
         rewardCampaign: 0,
     }
     let bundledImports = 0
@@ -455,6 +468,10 @@ test("default release builder closes all registry tables and runs each CDN conve
             converterCalls.quest++
             return converterOutput("quest")
         },
+        convertPeriodicRewards: async () => {
+            converterCalls.periodicReward++
+            return converterOutput("periodic-reward")
+        },
         convertRewardCampaigns: async () => {
             converterCalls.rewardCampaign++
             return converterOutput("reward-campaign")
@@ -485,6 +502,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         skillEffects: 1,
         reward: 1,
         quest: 1,
+        periodicReward: 1,
         rewardCampaign: 1,
     })
     assert.equal(
@@ -853,27 +871,27 @@ test("normal sync rebuilds when the registered table contract changes", async t 
     }
 })
 
-test("normal sync rebuilds all quest tables when converter contract advances from v3 to v4", async t => {
+test("normal sync rebuilds all quest tables when converter contract advances from v4 to v5", async t => {
     const questDefinitions = TABLE_SOURCES.filter(definition => (
         definition.converterId === "quest"
         && definition.tableName in QUEST_TABLE_SOURCES
     ))
     assert.equal(questDefinitions.length, 20)
     assert.ok(questDefinitions.every(definition => (
-        definition.converterVersion === 4 && definition.outputShapeVersion === 4
+        definition.converterVersion === 5 && definition.outputShapeVersion === 5
     )))
     const legacyDefinitions = questDefinitions.map(definition => ({
         ...definition,
-        converterVersion: 3,
-        outputShapeVersion: 3,
+        converterVersion: 4,
+        outputShapeVersion: 4,
     }))
     const fixture = engineFixture(t, {
         tableSources: legacyDefinitions,
-        builderValues: tableValues("legacy-v3", legacyDefinitions),
+        builderValues: tableValues("legacy-v4", legacyDefinitions),
     })
     await sync(fixture)
     fixture.dependencies.tableSources = questDefinitions
-    fixture.setBuilderValues(tableValues("current-v4", questDefinitions))
+    fixture.setBuilderValues(tableValues("current-v5", questDefinitions))
 
     const result = await sync(fixture)
     const manifest = await readCurrentRelease(fixture.store)
@@ -882,7 +900,7 @@ test("normal sync rebuilds all quest tables when converter contract advances fro
     assert.equal(result.reason, "table-registry")
     assert.equal(fixture.calls.builder, 2)
     for (const definition of questDefinitions) {
-        assert.equal(manifest.tables[definition.tableName].converterVersion, 4)
+        assert.equal(manifest.tables[definition.tableName].converterVersion, 5)
     }
 })
 

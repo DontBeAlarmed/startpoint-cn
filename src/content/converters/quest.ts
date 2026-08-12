@@ -596,7 +596,7 @@ function specialQuest(tableName: QuestTableName, row: QuestRow): Record<string, 
         return output
     }
     if (tableName === "hard_multi_event_quest.json") {
-        requireColumns(tableName, fields, 98)
+        requireColumns(tableName, fields, 125)
         const output: Record<string, unknown> = {
             name: fields[2],
             bRankTime: parseMilliseconds(tableName, fields[85], "bRankTime"),
@@ -612,6 +612,16 @@ function specialQuest(tableName: QuestTableName, row: QuestRow): Record<string, 
         addOptional(output, "enemyLevel", optionalInteger(tableName, fields[107], "enemyLevel"))
         addOptional(output, "clearRewardId", optionalInteger(tableName, fields[4], "clearRewardId"))
         addOptional(output, "sPlusRewardId", optionalInteger(tableName, fields[72], "sPlusRewardId"))
+        addOptional(
+            output,
+            "periodicRewardGroupId",
+            optionalInteger(tableName, fields[123], "periodicRewardGroupId"),
+        )
+        output.periodicRewardSlots = parseNonNegativeInteger(
+            tableName,
+            fields[124],
+            "periodicRewardSlots",
+        )
         addOptional(
             output,
             "scoreRewardGroupId",

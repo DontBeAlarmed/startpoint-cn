@@ -1,0 +1,32 @@
+{
+  "1": {
+    "maxPoint": 99,
+    "recoveryPoint": 2,
+    "recoveryCycle": 0
+  },
+  "2": {
+    "maxPoint": 99,
+    "recoveryPoint": 2,
+    "recoveryCycle": 0
+  },
+  "3": {
+    "maxPoint": 99,
+    "recoveryPoint": 2,
+    "recoveryCycle": 0
+  },
+  "10000000": {
+    "maxPoint": 99,
+    "recoveryPoint": 2,
+    "recoveryCycle": 0
+  },
+  "10000001": {
+    "maxPoint": 99,
+    "recoveryPoint": 2,
+    "recoveryCycle": 0
+  },
+  "10000002": {
+    "maxPoint": 99,
+    "recoveryPoint": 2,
+    "recoveryCycle": 0
+  }
+}

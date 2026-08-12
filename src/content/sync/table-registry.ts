@@ -1,5 +1,6 @@
 import { deepFreeze } from "../deep-freeze"
 import { ADDITIONAL_REWARD_PATHS } from "../converters/additional-reward"
+import { PERIODIC_REWARD_TABLE_SOURCES } from "../converters/periodic-reward"
 import {
     QUEST_AUXILIARY_SOURCES,
     QUEST_TABLE_SOURCES,
@@ -289,8 +290,21 @@ function questDefinition(tableName: QuestTableName): TableSourceInput {
         scope: "cdn",
         sourceOrderedMaps: [QUEST_TABLE_SOURCES[tableName].logicalPath],
         converterId: "quest",
-        converterVersion: 4,
-        outputShapeVersion: 4,
+        converterVersion: 5,
+        outputShapeVersion: 5,
+    }
+}
+
+function periodicRewardDefinition(
+    tableName: keyof typeof PERIODIC_REWARD_TABLE_SOURCES,
+): TableSourceInput {
+    return {
+        tableName,
+        scope: "cdn",
+        sourceOrderedMaps: [PERIODIC_REWARD_TABLE_SOURCES[tableName].logicalPath],
+        converterId: "periodic-reward",
+        converterVersion: 1,
+        outputShapeVersion: 1,
     }
 }
 
@@ -535,6 +549,9 @@ const definitionInputs: TableSourceInput[] = [
     ...ITEM_EQUIPMENT_TABLES.map(([tableName, sourceOrderedMaps, bundledSources]) => (
         itemEquipmentDefinition(tableName, sourceOrderedMaps, bundledSources)
     )),
+    ...(Object.keys(PERIODIC_REWARD_TABLE_SOURCES) as Array<
+        keyof typeof PERIODIC_REWARD_TABLE_SOURCES
+    >).map(periodicRewardDefinition),
     ...(Object.keys(QUEST_TABLE_SOURCES) as QuestTableName[]).map(questDefinition),
     questDerivedDefinition(
         "daily_challenge_point_lookup.json",

@@ -254,6 +254,12 @@ const EXPECTED_QUEST_DERIVED_CDN_TABLES = Object.freeze({
     "quest_unlock_costs.json": Object.values(EXPECTED_QUEST_CDN_TABLES),
 })
 
+const EXPECTED_PERIODIC_REWARD_CDN_TABLES = Object.freeze({
+    "hard_multi_event.json": "master/quest/event/hard_multi_event.orderedmap",
+    "periodic_reward.json": "master/reward/periodic_reward.orderedmap",
+    "periodic_reward_point.json": "master/reward/periodic_reward_point.orderedmap",
+})
+
 const EXPECTED_BUNDLED_TABLES = Object.freeze([
     "advent_event_quest.json",
     "boss_battle_quest.json",
@@ -520,6 +526,15 @@ test("registry derives authoritative quest tables from official OrderedMap sourc
     assert.equal(findTableSource("practice_quest.json").scope, "bundled")
 })
 
+test("registry derives activity hard multi periodic rewards from official OrderedMaps", () => {
+    for (const [tableName, source] of Object.entries(EXPECTED_PERIODIC_REWARD_CDN_TABLES)) {
+        const entry = findTableSource(tableName)
+        assert.equal(entry.scope, "cdn", tableName)
+        assert.equal(entry.converterId, "periodic-reward", tableName)
+        assert.deepEqual(entry.sourceOrderedMaps, [source], tableName)
+    }
+})
+
 test("registry and release manifest explicitly describe referenced gacha odds sources", () => {
     const gacha = findTableSource("gacha.json")
 
@@ -617,7 +632,7 @@ test("registry independently covers static CN runtime JSON references", () => {
 })
 
 test("every registry table has an explicit existing bundled fallback", () => {
-    assert.equal(TABLE_SOURCES.length, 119)
+    assert.equal(TABLE_SOURCES.length, 122)
     for (const entry of TABLE_SOURCES) {
         const sourcePath = path.resolve(projectRoot, entry.bundledPath)
         assert.ok(fs.existsSync(sourcePath), `${entry.tableName} source must exist`)

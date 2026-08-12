@@ -1,10 +1,13 @@
 const assert = require("node:assert/strict")
-const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
 const path = require("node:path")
 
+require("ts-node/register/transpile-only")
+
+const { convertQuestTree } = require("../src/content/converters/quest")
+
 const projectRoot = path.resolve(__dirname, "..")
-const workspaceRoot = path.resolve(projectRoot, "../..")
+const workspaceRoot = path.resolve(projectRoot, "..")
 const rawRoot = path.join(workspaceRoot, "wf-assets-cn", "orderedmap")
 const rawQuests = JSON.parse(fs.readFileSync(
     path.join(rawRoot, "quest/event/hard_multi_event_quest.json"),
@@ -22,19 +25,7 @@ function flattenRows(source) {
 const rawRows = flattenRows(rawQuests)
 assert.equal(rawRows.length, 12)
 
-const converterOutput = JSON.parse(execFileSync("python3", [
-    "-c",
-    [
-        "import json, sys",
-        "sys.path.insert(0, 'scripts')",
-        "from converters import convert_hard_multi_event_quest",
-        "print(json.dumps(convert_hard_multi_event_quest(json.load(sys.stdin))))",
-    ].join(";"),
-], {
-    cwd: projectRoot,
-    input: JSON.stringify(rawQuests),
-    encoding: "utf8",
-}))
+const converterOutput = convertQuestTree("hard_multi_event_quest.json", rawQuests)
 
 for (const row of rawRows) {
     const questId = String(row[0])
@@ -44,6 +35,11 @@ for (const row of rawRows) {
     assert.equal(converterOutput[questId].characterExpReward, Number(row[95]))
     assert.equal(converterOutput[questId].manaReward, Number(row[96]))
     assert.equal(converterOutput[questId].poolExpReward, Number(row[97]))
+}
+
+for (const questId of ["100002001", "1006001"]) {
+    assert.equal(converterOutput[questId].periodicRewardGroupId, 10000002)
+    assert.equal(converterOutput[questId].periodicRewardSlots, 1)
 }
 
 assert.deepEqual(bundledQuests, converterOutput)

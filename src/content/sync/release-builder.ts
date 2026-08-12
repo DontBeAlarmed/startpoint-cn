@@ -52,6 +52,11 @@ import {
 import { parseCsvLine } from "../converters/csv"
 import { convertOrderedMapJson } from "../converters/ordered-map-json"
 import {
+    convertPeriodicRewards,
+    type PeriodicRewardConversionOutput,
+    type PeriodicRewardSourceReader,
+} from "../converters/periodic-reward"
+import {
     convertRewards,
     type RewardConversionOutput,
     type RewardSourceReader,
@@ -98,6 +103,7 @@ const SUPPORTED_CONVERTER_IDS = new Set([
     "ordered-map-json-1",
     "ordered-map-json-2",
     "ordered-map-json-3",
+    "periodic-reward",
     "reward",
     "reward-campaign",
     "quest",
@@ -147,6 +153,9 @@ export interface DefaultContentTableBuilderDependencies {
         reader: QuestSourceReader,
         compatibility: QuestConversionCompatibility,
     ) => QuestConversionOutput | Promise<QuestConversionOutput>
+    readonly convertPeriodicRewards?: (
+        reader: PeriodicRewardSourceReader,
+    ) => PeriodicRewardConversionOutput | Promise<PeriodicRewardConversionOutput>
     readonly importBundledTable?: typeof importBundledTable
 }
 
@@ -173,7 +182,7 @@ function requireLogicalPath(logicalPath: string): string {
 class StrictOrderedMapReader implements BoxGachaSourceReader, GachaSourceReader, GameplaySourceReader,
     AdditionalRewardSourceReader, ItemEquipmentSourceReader, ManaNodeSourceReader,
     ShopSourceReader, RewardSourceReader,
-    QuestSourceReader {
+    QuestSourceReader, PeriodicRewardSourceReader {
     private readonly context: ContentTableBuildContext
     private readonly allowed = new Set<string>()
     private readonly rawCache = new Map<string, Buffer>()
@@ -417,6 +426,7 @@ export function createDefaultContentTableBuilder(
     const rewardConverter = dependencies.convertRewards ?? convertRewards
     const rewardCampaignConverter = dependencies.convertRewardCampaigns ?? convertRewardCampaigns
     const questConverter = dependencies.convertQuests ?? convertQuests
+    const periodicRewardConverter = dependencies.convertPeriodicRewards ?? convertPeriodicRewards
     const bundledImporter = dependencies.importBundledTable ?? importBundledTable
 
     return Object.freeze({
@@ -442,6 +452,7 @@ export function createDefaultContentTableBuilder(
                     || definition.converterId === "reward"
                     || definition.converterId === "reward-campaign"
                     || definition.converterId === "quest"
+                    || definition.converterId === "periodic-reward"
                     || directOrderedMapDepth(definition.converterId) !== null
                     ? definition.sourceOrderedMaps
                     : []
@@ -529,6 +540,13 @@ export function createDefaultContentTableBuilder(
                         Record<string, { readonly name?: unknown }>
                     >,
                 }))
+            }
+            if (converterIds.has("periodic-reward")) {
+                addConverterOutput(
+                    values,
+                    "periodic-reward",
+                    await periodicRewardConverter(reader),
+                )
             }
 
             const directDefinitions = context.definitions.filter(definition => (

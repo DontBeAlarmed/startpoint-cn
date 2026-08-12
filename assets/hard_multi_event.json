@@ -1,0 +1,26 @@
+{
+  "1": {
+    "periodicPointId": 1
+  },
+  "2": {
+    "periodicPointId": 2
+  },
+  "3": {
+    "periodicPointId": 3
+  },
+  "1001": {},
+  "1002": {},
+  "1003": {},
+  "1004": {},
+  "1005": {},
+  "1006": {},
+  "100000": {
+    "periodicPointId": 10000000
+  },
+  "100001": {
+    "periodicPointId": 10000001
+  },
+  "100002": {
+    "periodicPointId": 10000002
+  }
+}

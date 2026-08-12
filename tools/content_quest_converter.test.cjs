@@ -65,7 +65,7 @@ test("quest converter closes the 20 authoritative quest tables", () => {
     })
 })
 
-test("all authoritative quest tables publish converter contract v4", () => {
+test("all authoritative quest tables publish converter contract v5", () => {
     const questDefinitions = TABLE_SOURCES.filter(definition => (
         definition.converterId === "quest"
         && definition.tableName in QUEST_TABLE_SOURCES
@@ -73,8 +73,8 @@ test("all authoritative quest tables publish converter contract v4", () => {
 
     assert.equal(questDefinitions.length, 20)
     for (const definition of questDefinitions) {
-        assert.equal(definition.converterVersion, 4, definition.tableName)
-        assert.equal(definition.outputShapeVersion, 4, definition.tableName)
+        assert.equal(definition.converterVersion, 5, definition.tableName)
+        assert.equal(definition.outputShapeVersion, 5, definition.tableName)
     }
 })
 
@@ -295,7 +295,7 @@ test("authoritative reward and common-drop count columns are preserved", () => {
 })
 
 test("hard multi conversion preserves first-clear and S+ reward ids", () => {
-    const quest = row(98, {
+    const quest = row(125, {
         0: 100002001,
         2: "决战级",
         4: 200077004,
@@ -309,6 +309,8 @@ test("hard multi conversion preserves first-clear and S+ reward ids", () => {
         95: 200,
         96: 300,
         97: 400,
+        123: 10000002,
+        124: 1,
     })
     assert.deepEqual(convertQuestTree("hard_multi_event_quest.json", {
         100002: { 1: [quest] },
@@ -327,6 +329,8 @@ test("hard multi conversion preserves first-clear and S+ reward ids", () => {
             manaReward: 300,
             poolExpReward: 400,
             element: 2,
+            periodicRewardGroupId: 10000002,
+            periodicRewardSlots: 1,
         },
     })
 })
@@ -454,7 +458,16 @@ test("character quest uses the OrderedMap key and rejects malformed rows", () =>
 test("quest derived tables use authoritative categories, costs and names", () => {
     const main = row(119, { 0: 1001, 1: "主线", 3: 1, 55: "(None)", 69: 6, 84: 30 })
     const ranking = row(80, { 0: 2001, 2: "竞速", 4: 2, 52: "(None)", 66: 9, 68: 0 })
-    const hard = row(98, { 0: 3001, 2: "歼灭者", 4: 3, 56: "(None)", 69: 999, 70: 5, 73: 1 })
+    const hard = row(125, {
+        0: 3001,
+        2: "歼灭者",
+        4: 3,
+        56: "(None)",
+        69: 999,
+        70: 5,
+        73: 1,
+        124: 0,
+    })
     const adventTicket = row(103, {
         0: 4001,
         2: "门票降临",
