@@ -106,6 +106,18 @@ test("maps representative source files to focused groups", () => {
         ],
     )
     assert.deepEqual(
+        selectTestGroups(["src/runtime/capabilities.ts"]),
+        ["integration:runtime", "quick:runtime"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/modes/registry.ts"]),
+        ["quick:modes"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/content/runtime/content-repository.ts"]),
+        ["quick:content"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/server.ts"]),
         ["full", "integration:cdn", "integration:database"],
     )
@@ -340,6 +352,8 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/runtime_native_binding.test.cjs",
             "tools/server_time_service.test.cjs",
             "tools/server_time_routes.test.cjs",
+            "tools/runtime_capabilities.test.cjs",
+            "tools/runtime_capabilities_wiring.test.cjs",
         ],
     })
     assert.deepEqual(
@@ -685,6 +699,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_auto_settlement_route.test.cjs",
         "tools/mission_get_progress_transaction.test.cjs",
         "tools/mission_collect_progress.test.cjs",
+        "tools/mission-client-check-diagnostics.test.cjs",
         "tools/mission_coverage_audit.test.cjs",
         "tools/mission_daily_battle_facts.test.cjs",
         "tools/mission_degree_progress.test.cjs",

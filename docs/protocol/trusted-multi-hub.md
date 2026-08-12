@@ -167,7 +167,7 @@ modeDigest
   fail closed；`RES_VER` 缺失或非法时记为 `unknown`，只参与诊断。
 - `cdnTargetVersion` 来自本地固定 `ContentSnapshot.cdn.targetVersion`。
 - `contentDigest` 在线上协议中表示多人战斗内容摘要，而不是完整业务表摘要。`ContentRepository`
-  仍以 `info().contentDigest` 保存完整 Release 摘要，并另以 `info().multiBattleContentDigest`
+  仍以 `info().contentDigest` 保存实际加载的完整业务表状态摘要，并另以 `info().multiBattleContentDigest`
   保存多人摘要；兼容资料把后者写入既有 `contentDigest` 字段，以保持 Hub 报文结构不变。
   多人摘要只包含建房、入场或结算链实际读取的关卡、入场消耗、角色、掉落与特殊关卡结算表。
   卡池、卡池种子、商店、公告、支付、任务定义及其他养成表不会影响同房判断。两种摘要都在

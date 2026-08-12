@@ -46,6 +46,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/runtime_native_binding.test.cjs",
             "tools/server_time_service.test.cjs",
             "tools/server_time_routes.test.cjs",
+            "tools/runtime_capabilities.test.cjs",
+            "tools/runtime_capabilities_wiring.test.cjs",
         ],
     },
     "quick:modes": {
@@ -314,6 +316,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_auto_settlement_route.test.cjs",
             "tools/mission_get_progress_transaction.test.cjs",
             "tools/mission_collect_progress.test.cjs",
+            "tools/mission-client-check-diagnostics.test.cjs",
             "tools/mission_coverage_audit.test.cjs",
             "tools/mission_daily_battle_facts.test.cjs",
             "tools/mission_degree_progress.test.cjs",

@@ -284,12 +284,18 @@ test("release tables and info are deeply frozen and keep one cached reference", 
     assert.strictEqual(second, first)
     assert.deepEqual(first, { marker: "release-a", nested: { value: "release-a" } })
     assertDeepFrozen(first)
+    const expectedReleaseTables = Object.fromEntries(TABLE_SOURCES.map(definition => [
+        definition.tableName,
+        { marker: "release-a", nested: { value: "release-a" } },
+    ]))
+    const expectedContentDigest = expectedBundledDigest(expectedReleaseTables)
+    assert.notEqual(expectedContentDigest, manifest.releaseDigest)
     assert.deepEqual(repository.info(), {
         source: "release",
         assetVersion: "1.4.55",
         generatorVersion: 7,
         releaseDigest: manifest.releaseDigest,
-        contentDigest: manifest.releaseDigest,
+        contentDigest: expectedContentDigest,
         multiBattleContentDigest: repository.info().multiBattleContentDigest,
     })
     assertDeepFrozen(repository.info())

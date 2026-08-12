@@ -68,6 +68,10 @@ const SOURCE_RULES = [
         groups: ["integration:cdn", "quick:content"],
     },
     {
+        pattern: /^src\/content\/runtime\/content-repository\.ts$/,
+        groups: ["quick:content"],
+    },
+    {
         pattern: /^src\/lib\/character-content\.ts$/,
         groups: ["quick:content", "admin", "integration:quest"],
     },
@@ -120,6 +124,14 @@ const SOURCE_RULES = [
     {
         pattern: /^src\/multi\/(?:hub|runtime)\//,
         groups: ["quick:runtime", "quick:protocol", "integration:multi-hub"],
+    },
+    {
+        pattern: /^src\/runtime\/capabilities\.ts$/,
+        groups: ["quick:runtime", "integration:runtime"],
+    },
+    {
+        pattern: /^src\/modes\/(?:loader|registry)\.ts$/,
+        groups: ["quick:modes"],
     },
     { pattern: /^tools\/server-bundle\//, groups: ["quick:runtime"] },
     { pattern: /^docs\/runtime\/server-bundle\.md$/, groups: ["quick:runtime"] },
