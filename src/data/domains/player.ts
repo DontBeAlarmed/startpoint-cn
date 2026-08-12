@@ -81,7 +81,7 @@ import { insertPlayerGachaInfoListSync, insertPlayerGachaCampaignListSync , getP
 import { insertPlayerBoxGachasSync } from "./boxGacha";
 import { insertPlayerRushEventListSync, insertPlayerRushEventClearedFolderListSync, insertPlayerRushEventPlayedPartyListSync } from "./rushEvent";
 import { deletePlayerCategoryMissionsSync, insertPlayerCategoryMissionListSync, insertPlayerClearedRegularMissionListSync, insertPlayerActiveMissionsSync } from "./mission";
-import { insertPlayerPeriodicRewardPointsListSync, insertPlayerStartDashExchangeCampaignsSync, insertPlayerMultiSpecialExchangeCampaignsSync } from "./campaign";
+import { ensureActivityPeriodicRewardPointsSync, insertPlayerPeriodicRewardPointsListSync, insertPlayerStartDashExchangeCampaignsSync, insertPlayerMultiSpecialExchangeCampaignsSync, recoverActivityPeriodicRewardPointsSync } from "./campaign";
 import { insertCarnivalSaveStateSync } from "../../lib/carnival-save-state";
 
 const expPoolMax = 100000;
@@ -1018,25 +1018,8 @@ export function insertDefaultPlayerSync(
         },
     ])
 
-    // insert periodicReward
-    insertPlayerPeriodicRewardPointsListSync(playerId, [
-        {
-            id: 1,
-            point: 22,
-        },
-        {
-            id: 2,
-            point: 2,
-        },
-        {
-            id: 3,
-            point: 2,
-        },
-        {
-            id: 10000000,
-            point: 2,
-        },
-    ])
+    // Initialize activity periodic rewards from the active Content Snapshot.
+    ensureActivityPeriodicRewardPointsSync(playerId)
 
     // insert active missions
     insertPlayerActiveMissionsSync(playerId, {})
@@ -1311,6 +1294,8 @@ export function dailyResetPlayerDataSync(
             for (const campaign of gachaCampaigns) {
                 updatePlayerGachaCampaignSync(playerId, campaign.gachaId, campaign.campaignId, 1)
             }
+
+            recoverActivityPeriodicRewardPointsSync(playerId)
 
             // Daily mission reset: take snapshot + wipe cache
             const questProgress = getPlayerQuestProgressSync(playerId)

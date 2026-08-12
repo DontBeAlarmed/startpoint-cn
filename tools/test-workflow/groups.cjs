@@ -86,6 +86,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/additional_reward_routes.test.cjs",
             "tools/reward_campaign_routes.test.cjs",
             "tools/special_quest_flow.test.cjs",
+            "tools/periodic_reward_settlement.test.cjs",
         ],
     },
     "quick:character": {
