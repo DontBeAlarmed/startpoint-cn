@@ -13,7 +13,7 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 
 同步器负责严格解析、引用闭包、稳定输出和文件系统安全，不负责判断 CDN 作者给出的 ID、赔率、奖励、价格或资源内容是否合理。服务端不会替 CDN 作者猜测缺失内容、复制其他活动数据、修复非法主数据或自动生成客户端补丁。
 
-阶段 B 已完成“有权威 CDN 来源的表动态迁移”这一目标。当前 Registry 的 119 张表明确分为 `110 CDN + 5 bundled + 4 server`。原阶段 A 的五个动态领域为：
+阶段 B 已完成“有权威 CDN 来源的表动态迁移”这一目标。当前 Registry 的 122 张表明确分为 `113 CDN + 5 bundled + 4 server`。原阶段 A 的五个动态领域为：
 
 | 领域 | 动态输出 |
 |---|---|
@@ -23,9 +23,11 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 | 商店 | General、Event、Boss、Star Grain、Treasure、Equipment 及选择式 campaign 共 10 张运行时表 |
 | 任务技能效果 | `cdndata/active_mission_skill_effects.json`；读取角色、技能 orderedmap 和 Action DSL |
 
-在此基础上，35 张与官方提取 JSON 可机器证明完全相等的表已改用通用递归 OrderedMap 转换器。转换器按 Registry 声明的一至三层嵌套深度还原 CSV 树，不改字段、不补 ID，也不叠加 bundled 数据。范围包括 Active Mission、角色觉醒、收集、普通/每日/每周/称号/活动任务、Pass 任务及奖励表，以及玩家等级、角色剧情 lookup、EX Ability、Mana Board、Raid 总体奖励、奖励属性映射、体力活动和星屑兑换等直接表。
+在此基础上，41 张与官方提取 JSON 可机器证明完全相等的表已改用通用递归 OrderedMap 转换器。转换器按 Registry 声明的一至三层嵌套深度还原 CSV 树，不改字段、不补 ID，也不叠加 bundled 数据。范围包括 Active Mission、角色觉醒、收集、普通/每日/每周/称号/活动任务、Pass 任务及奖励表，以及玩家等级、角色剧情 lookup、EX Ability、Mana Board、Raid 总体奖励、奖励属性映射、体力活动和星屑兑换等直接表。
 
 奖励领域另有 6 张派生表从官方 OrderedMap 动态生成：Clear、Score、Rare Score、Score Attack Border、Rush Folder 和 Rush Ranking。转换器保留原始位置、概率、数量和多奖励槽；关卡转换器同时导出普通掉落的固定或五档抽取次数。Reward 与 Quest 的输出结构版本变化会触发同版本快照自动重建。历史 bundled 的 5 条 Clear Reward 字段误复制及 82 个无意义 `id:null` 已修正。早期活动代币中另有 47 行官方 ID 与 bundled 世代 ID 不同；smoke 只在 `item_lookup` 名称一致时视为同一代币族，实际发奖仍由业务层按服务器时间选择开放期 ID。
+
+活动机兵的 `hard_multi_event.json`、`periodic_reward.json` 和 `periodic_reward_point.json` 也从官方 OrderedMap 动态生成；关卡转换器保留关卡周期奖励组和槽位。末期活动 `1001` 至 `1006` 的活动级点数 ID 为空时，转换器仍忠实输出空值，受限回退只发生在业务结算层。该边界与 Rush `eventId - 10` 回退统一登记在[国服运营末期推测性兼容](../systems/cn-final-operation-compatibility.md)。
 
 Additional Reward 由 6 张官方活动与奖励 OrderedMap 联合生成 1 张
 `additional_reward_rules.json`。表中保留奖励组、Collect Item Event 的活动期、前置关卡、
@@ -49,7 +51,7 @@ QuestRange、敌人等级累计阈值，以及 Boss Pickup 的联机 schedule。
 Challenge、Tower、Hard Multi 等历史列偏移；其中 Hard Multi 体力列为 `70`，不是旧脚本猜测的
 `69`。官方 1.4.54 基线为 5159 条动态关卡、3045 条入场成本、9 条 Once 解锁成本、5257 条
 后台关卡名称（含 98 个 bundled 兼容练习关卡）、282 条每日挑战点和 3 条活动挑战点映射。
-20 张运行关卡表的转换契约为 Quest converter v4 / output shape v4。旧 v3 Release 即使 CDN
+20 张运行关卡表的转换契约为 Quest converter v5 / output shape v5。旧 v4 Release 即使 CDN
 `assetVersion` 不变，normal sync 也会因 Registry 的 `converterVersion` 不一致返回 `table-registry`
 并自动重建，无需使用 `--force`。
 
@@ -73,7 +75,7 @@ Registry 仍要求每个 Release 闭合当前全部注册表，但“闭合”�
 
 ### 阶段 B 的完成判定
 
-阶段 B 的“完成”指：所有有权威 CDN 来源、且属于服务端运行时内容的表，都已经登记为 `scope=cdn` 并由当前 Content Release 生成；没有权威来源的 bundled 表和服务端配置表保留其原职责。注册表测试固定三类范围为 `cdn=106`、`bundled=5`、`server=4`，以后新增表必须先明确来源和职责，再更新对应转换器与测试。此处不要求把所有活动逻辑改造成可插拔插件，特殊关卡继续使用独立 handler 加共享结算基础设施。
+阶段 B 的“完成”指：所有有权威 CDN 来源、且属于服务端运行时内容的表，都已经登记为 `scope=cdn` 并由当前 Content Release 生成；没有权威来源的 bundled 表和服务端配置表保留其原职责。注册表测试固定三类范围为 `cdn=113`、`bundled=5`、`server=4`，以后新增表必须先明确来源和职责，再更新对应转换器与测试。此处不要求把所有活动逻辑改造成可插拔插件，特殊关卡继续使用独立 handler 加共享结算基础设施。
 
 ## 受支持输入
 
@@ -144,7 +146,7 @@ normal 模式：
 npm run content:sync
 ```
 
-normal 依次检查 current Release 是否存在、CDN `assetVersion`、全局 `generatorVersion`、已安装补丁来源状态，以及 Release 表集合与当前 Registry 是否兼容。补丁 manifest 或 inner ZIP 文件身份在同一目标版本下变化时返回 `source-state`，随后完整校验摘要并重建或失败关闭；注册表新增、移除，或任一表的 `scope`、`converterId`、`converterVersion`、`sources` 变化时返回 `table-registry` 并自动重建。Quest converter v3 升级到 v4 就属于该路径，同 CDN 版本也不会复用旧 Release，不需要 `--force`。所有状态完全一致时才快速跳过。
+normal 依次检查 current Release 是否存在、CDN `assetVersion`、全局 `generatorVersion`、已安装补丁来源状态，以及 Release 表集合与当前 Registry 是否兼容。补丁 manifest 或 inner ZIP 文件身份在同一目标版本下变化时返回 `source-state`，随后完整校验摘要并重建或失败关闭；注册表新增、移除，或任一表的 `scope`、`converterId`、`converterVersion`、`sources` 变化时返回 `table-registry` 并自动重建。Quest converter v4 升级到 v5 就属于该路径，同 CDN 版本也不会复用旧 Release，不需要 `--force`。所有状态完全一致时才快速跳过。
 
 这项契约判断本身只使用 manifest 元数据；当前 `ContentObjectStore` 读取 current Release 时仍会先校验并读取该 Release 的对象闭包，因此 `--check` 也会检查对象可读性，但不会执行 orderedmap 转换或重建。转换器内部算法改变但注册元数据不变时，开发者仍必须递增对应 `converterVersion`；影响全部内容生成的规则变化使用 `generatorVersion`。运行时继续执行同一套严格 Registry 校验，作为最后的加载防线。
 
@@ -183,12 +185,12 @@ npm run content:audit -- --source-root <WF_ASSETS_CN_ROOT> --format json
 
 当前审计分两层：
 
-1. Content Registry 的 119 张运行表必须存在、是普通文件且可解析为 JSON；
+1. Content Registry 的 122 张运行表必须存在、是普通文件且可解析为 JSON；
 2. 普通、每日、每周、称号、活动、角色觉醒、收集、Active Mission 和 Pass 共 25 张关键表与官方提取源按解析后的完整 JSON 深度比较，并校验 11 组任务/奖励 ID、144 条觉醒任务四元组和 Pass 活动奖励引用闭包。
 
-官方 1.4.54 基线为 119 张 Registry 表、25 张任务深度对比表、13327 个任务深度对比顶层键、36 个觉醒角色组、19 个 Pass 活动及 1140 条 Pass 等级奖励；玩家履历的四张官方表另由直接 OrderedMap smoke 与 bundled 基线逐值比较。`story_join_character.json` 与 `mana_board2_open_condition.json` 也继续由直接 OrderedMap smoke 与 bundled 基线逐值比较。格式和对象键顺序不构成差异，数组顺序、ID 集合和嵌套值差异会失败。
+官方 1.4.54 基线为 122 张 Registry 表、25 张任务深度对比表、13327 个任务深度对比顶层键、36 个觉醒角色组、19 个 Pass 活动及 1140 条 Pass 等级奖励；玩家履历的四张官方表另由直接 OrderedMap smoke 与 bundled 基线逐值比较。`story_join_character.json` 与 `mana_board2_open_condition.json` 也继续由直接 OrderedMap smoke 与 bundled 基线逐值比较。格式和对象键顺序不构成差异，数组顺序、ID 集合和嵌套值差异会失败。
 
-该命令不写 CDN、`assets/`、`.content/` 或玩家数据库，不生成修复数据，也不由 `start:cn`、`dev:cn` 或 `content:sync` 自动调用。单个 JSON 通过文件描述符读取并在前后核对身份；119 张运行表各读取一次后作为本次内存快照复用于后续检查。该工具不提供跨 119 个文件的原子文件系统快照，发布者必须在停止内容写入后运行；同 UID 对抗性进程在检查间隙替换并恢复路径不属于保护边界。完整 CDN 归档合法性仍由 `content:smoke` 负责，两项工具不能互相替代。
+该命令不写 CDN、`assets/`、`.content/` 或玩家数据库，不生成修复数据，也不由 `start:cn`、`dev:cn` 或 `content:sync` 自动调用。单个 JSON 通过文件描述符读取并在前后核对身份；122 张运行表各读取一次后作为本次内存快照复用于后续检查。该工具不提供跨 122 个文件的原子文件系统快照，发布者必须在停止内容写入后运行；同 UID 对抗性进程在检查间隙替换并恢复路径不属于保护边界。完整 CDN 归档合法性仍由 `content:smoke` 负责，两项工具不能互相替代。
 
 ## 真实 CDN smoke
 
@@ -211,7 +213,7 @@ smoke 创建或接受 root 后记录其 `dev`、`ino`、权限和 realpath，并
 smoke 始终执行 force sync，并验证：
 
 - Release、Repository、Catalog 都是 1.4.54；当前 Registry 全部表及所有对象引用闭合；
-- 35 张通用递归 OrderedMap 表逐张与 bundled 官方 1.4.54 基线深度相等；
+- 41 张通用递归 OrderedMap 表逐张与 bundled 官方 1.4.54 基线深度相等；
 - 8 张物品装备派生表闭合到同一 Release；其中 6 张逐字段等于 bundled，`item_data.json` 只允许登记的 9 个官方限时体力道具补全，`equipment_lookup.json` 必须匹配 436 条固定 canonical 摘要；
 - 6 张奖励派生表逐张闭合；按 `differences-1.4.54.json` 的具体键、位置与 ID 元组，只接受 5 条 Clear 字段修正、82 个空 id 清理和 47 个同名活动代币别名；
 - 20 张关卡表和 5 张关卡派生表匹配固定 canonical 摘要；名称非空、推荐属性为 `0..5`，Clear/SS 与普通掉落组全部闭合到同一 Release 的奖励表，入场和解锁索引只能引用当前关卡；每张 CN Quest OrderedMap 的权威 `TimeRange` 按国服 UTC+8 语义转换为 `availableFromMs`、`availableUntilMs`，年份只接受 `1970..2200`（含边界），空边界保留 `null`，越界年份、非法日期和倒置周期拒绝同步；98 个 bundled 兼容练习关卡必须全部进入名称索引，活动挑战点必须引用同一 Release 的每日挑战点；

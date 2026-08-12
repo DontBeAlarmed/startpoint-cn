@@ -4,6 +4,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/architecture_dependencies.test.cjs",
             "tools/docs_check.test.cjs",
+            "tools/final_operation_compatibility_docs.test.cjs",
             "tools/test-workflow/benchmark.test.cjs",
             "tools/test-workflow/build-cn.test.cjs",
             "tools/test-workflow/package-scripts.test.cjs",

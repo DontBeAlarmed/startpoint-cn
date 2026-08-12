@@ -22,6 +22,7 @@
 - [随机招募与 NPC 回退](./random-recruitment.md)
 - [战阵事件级奖励](./raid-event-overall-rewards.md)
 - [狂热激战](./rush-event.md)
+- [国服运营末期推测性兼容](./cn-final-operation-compatibility.md)
 - [排名活动](./ranking-event.md)
 - [土俑累计分奖励](./carnival-score-rewards.md)
 - [无限演武](./score-attack-event.md)

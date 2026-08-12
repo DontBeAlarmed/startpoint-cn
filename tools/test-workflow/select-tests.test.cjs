@@ -741,6 +741,7 @@ test("quick workflow includes documentation and package script contracts", () =>
     assert.deepEqual(TEST_GROUPS["quick:workflow"].tests, [
         "tools/architecture_dependencies.test.cjs",
         "tools/docs_check.test.cjs",
+        "tools/final_operation_compatibility_docs.test.cjs",
         "tools/test-workflow/benchmark.test.cjs",
         "tools/test-workflow/build-cn.test.cjs",
         "tools/test-workflow/package-scripts.test.cjs",
