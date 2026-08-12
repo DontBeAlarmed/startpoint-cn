@@ -43,6 +43,7 @@ export interface FinishContext {
     clearTime: number
     clearRank: number | null
     score?: number
+    manaObtained?: number
     party: QuestStatistics['party']
     statistics: QuestStatistics
     equipmentElements?: readonly number[]

@@ -1,4 +1,5 @@
 import { getDegreeComputedMissionIds } from "./computer-degree"
+import { getRegularComputedMissionIds } from "./computer-regular"
 import { getEventSafeMissionIds } from "./computer-event-safe"
 import { getExactEventBattleMissionIds } from "./event-battle-facts"
 import { getProducerBackedEventEntryMissionIds } from "./event-entry-facts"
@@ -27,6 +28,7 @@ export interface MissionCoveragePartition {
 
 export interface MissionCoverageAudit {
     readonly schemaVersion: 1
+    readonly regular: MissionCoveragePartition
     readonly event: MissionCoveragePartition
     readonly degree: MissionCoveragePartition
     readonly awake: {
@@ -76,6 +78,29 @@ const DEFERRED_DEGREE_REASON_BY_MISSION_ID: ReadonlyMap<number, string> = new Ma
 function degreeFallbackReason(missionId: number): string {
     return DEFERRED_DEGREE_REASON_BY_MISSION_ID.get(missionId)
         ?? "authoritative-degree-fact-unavailable"
+}
+
+const REGULAR_FALLBACK_REASON_BY_MISSION_ID: ReadonlyMap<number, string> = new Map([
+    [29, "mvp-result-unavailable"],
+    [62, "rescue-source-unavailable"],
+    [63, "rescue-source-unavailable"],
+    [64, "rescue-source-unavailable"],
+    [65, "ability-soul-operation-semantics-unverified"],
+    [87, "rescue-source-unavailable"],
+    [88, "rescue-source-unavailable"],
+    [89, "rescue-source-unavailable"],
+    [100, "rescue-source-unavailable"],
+    [107, "external-social-check-not-supported"],
+    [108, "anniversary-window-semantics-unverified"],
+])
+
+function regularPartition(): MissionCoveragePartition {
+    return createPartition(
+        [{ category: 1, definitions: getMissionMasterDefinitions(1) }],
+        missionKeys(1, getRegularComputedMissionIds()),
+        (_category, definition) => REGULAR_FALLBACK_REASON_BY_MISSION_ID.get(definition.missionId)
+            ?? "authoritative-regular-fact-unavailable",
+    )
 }
 
 function createPartition(
@@ -195,6 +220,7 @@ function awakeCoverage(): MissionCoverageAudit["awake"] {
 export function getMissionCoverageAudit(): MissionCoverageAudit {
     return Object.freeze({
         schemaVersion: 1,
+        regular: regularPartition(),
         event: eventPartition(),
         degree: degreePartition(),
         awake: awakeCoverage(),

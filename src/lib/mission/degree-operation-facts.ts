@@ -13,6 +13,14 @@ const EXPECTED_TYPE: Readonly<Record<DegreeOperationKind, number>> = {
     equipment_upgrade: 34,
 }
 
+const REGULAR_RULES: Readonly<Record<DegreeOperationKind, {
+    readonly missionId: number
+    readonly pattern: string
+}>> = {
+    treasure_mana: { missionId: 41, pattern: "treasure_shop_used_mana_count" },
+    equipment_upgrade: { missionId: 67, pattern: "total_equipment_awaking_count" },
+}
+
 function validMissionIds(kind: DegreeOperationKind): readonly number[] {
     return RULES[kind].filter(missionId => (
         Number(getMissionMasterDefinition(5, missionId)?.row[3]) === EXPECTED_TYPE[kind]
@@ -30,7 +38,7 @@ export function getDegreeOperationMissionIds(): readonly number[] {
     ].sort((left, right) => left - right))
 }
 
-export function recordDegreeOperationFactsSync(
+export function recordMissionOperationFactsSync(
     playerId: number,
     kind: DegreeOperationKind,
     amount: number,
@@ -39,4 +47,10 @@ export function recordDegreeOperationFactsSync(
     for (const missionId of validMissionIds(kind)) {
         incrementPlayerCategoryMissionSync(playerId, 5, missionId, amount)
     }
+    const regularRule = REGULAR_RULES[kind]
+    if (getMissionMasterDefinition(1, regularRule.missionId)?.pattern === regularRule.pattern) {
+        incrementPlayerCategoryMissionSync(playerId, 1, regularRule.missionId, amount)
+    }
 }
+
+export const recordDegreeOperationFactsSync = recordMissionOperationFactsSync

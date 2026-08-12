@@ -32,7 +32,7 @@ restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cj
 const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerCharacterSync } = require("../src/data/domains/character")
-const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 const characterRoutes = require("../src/routes/api/character").default
@@ -142,13 +142,17 @@ async function main() {
     assert.equal(updateProfile.statusCode, 200, updateProfile.body)
     assert.deepEqual(decode(updateProfile).data.profile_settings, settings)
 
+    updatePlayerSync({ id: playerId, degreeId: 2 })
+
     const readProfile = await app.inject({
         method: "POST",
         url: "/profile/get_my_profile",
         payload: { viewer_id: viewerId },
     })
     assert.equal(readProfile.statusCode, 200, readProfile.body)
-    assert.deepEqual(decode(readProfile).data.profile_settings, settings)
+    const readProfileData = decode(readProfile).data
+    assert.deepEqual(readProfileData.profile_settings, settings)
+    assert.equal(readProfileData.user_info.degree_id, 2, "个人资料重载必须恢复当前称号")
 
     const invalidProfile = await app.inject({
         method: "POST",

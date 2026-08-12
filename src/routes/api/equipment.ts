@@ -18,7 +18,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
 import { canUseEquipmentAwakeningCrystal } from "../../lib/equipment-upgrade";
 import { getMailArrivedSync } from "../../lib/mail-notification";
-import { recordDegreeOperationFactsSync } from "../../lib/mission/degree-operation-facts";
+import { recordMissionOperationFactsSync } from "../../lib/mission/degree-operation-facts";
 
 interface SetProtectionBody {
     protection: boolean
@@ -106,7 +106,7 @@ const routes = async (fastify: FastifyInstance) => {
             returnItemList[wrightpieceItemId()] = newWrightPieces
             updatePlayerItemSync(playerId, wrightpieceItemId(), newWrightPieces)
             updatePlayerEquipmentSync(playerId, equipmentId, { stack: newStack, level: newLevel })
-            recordDegreeOperationFactsSync(playerId, "equipment_upgrade", upgradeCount)
+            recordMissionOperationFactsSync(playerId, "equipment_upgrade", upgradeCount)
 
             if (dissolveInfo && dissolveInfo.generate_ability_soul) {
                 returnItemList[dissolveInfo.ability_soul_id] = givePlayerItemSync(playerId, dissolveInfo.ability_soul_id, upgradeCount)
@@ -198,7 +198,7 @@ const routes = async (fastify: FastifyInstance) => {
                 }
             }
             updatePlayerItemSync(playerId, wrightpieceItemId(), newCraftPoints)
-            recordDegreeOperationFactsSync(
+            recordMissionOperationFactsSync(
                 playerId,
                 "equipment_upgrade",
                 upgrades.reduce((total, entry) => total + entry.upgradeCount, 0),

@@ -379,6 +379,7 @@ const routes = async (fastify: FastifyInstance) => {
             )
             const newMana = playerData.freeMana + fixedManaReward + body.add_mana
             const manaObtained = fixedManaReward + body.add_mana
+            finishCtx.manaObtained = manaObtained
             const clearReward = !isScoreAttackEvent && rewardEligibility.firstClear && questData.clearReward !== undefined
                 ? givePlayerRewardSync(playerId, questData.clearReward)
                 : null

@@ -120,6 +120,9 @@ const routes = async (fastify: FastifyInstance) => {
                     owned_character_count: charCount,
                     owned_degree_count: degreeCount,
                 },
+                user_info: {
+                    degree_id: player.degreeId,
+                },
                 profile_settings: serializeProfileSettings(profileSettings),
                 user_party_group_list: partyGroupList,
             }

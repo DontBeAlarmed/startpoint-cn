@@ -31,6 +31,8 @@ const {
     getMissionBattleCountersSync,
     recordMissionBattleResultSync,
 } = require("../src/data/domains/mission_battle_facts")
+const { recordDegreeBattleStatsSync } = require("../src/data/domains/degree_battle_stats")
+const { deletePlayerEquipmentSync, insertPlayerEquipmentSync } = require("../src/data/domains/equipment")
 const { insertPlayerQuestProgressSync } = require("../src/data/domains/quest")
 const {
     dailyResetPlayerDataSync,
@@ -42,8 +44,13 @@ const { getComputer } = require("../src/lib/mission/registry")
 const { settleMissionCategories } = require("../src/lib/mission/settlement")
 const { getSnapshot, takeSnapshot } = require("../src/lib/mission/snapshot")
 const { getRankDegree } = require("../src/lib/stamina")
+const { recordMissionOperationFactsSync } = require("../src/lib/mission/degree-operation-facts")
+const { recordRegularMissionBattleFactsSync } = require("../src/lib/mission/regular-battle-facts")
+const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { getMergedPlayerDataSync } = require("../src/data/utils/player-data")
 const { replacePlayerDataSync } = require("../src/data/domains/player")
+const mainQuests = require("../assets/main_quest.json")
+const exQuests = require("../assets/ex_quest.json")
 
 initializeDatabase()
 db = getDb()
@@ -163,6 +170,7 @@ updatePlayerSync({
     totalStaminaUsed: 50,
     totalPowerflips: 7,
     totalDashes: 10,
+    totalManaObtained: 1234,
     totalLoginDays: 3,
 })
 takeSnapshot(playerId, "daily", {
@@ -421,6 +429,130 @@ assert.equal(
     100,
     "技能使用累计只应统计成功结算中的合法次数",
 )
+recordDegreeBattleStatsSync(playerId, {
+    feverCount: 7,
+    feverMs: 0,
+    debuffEnemyCount: 0,
+    clearEnemyBuffCount: 0,
+    clearSelfDebuffCount: 0,
+    buffPartyCount: 0,
+    healPartyCount: 0,
+    emotionCount: 0,
+    enemyKillCount: 19,
+    weakPointAttackCount: 11,
+    powerFlipLv3Count: 0,
+    coffinReducedCount: 0,
+    damageDealMax: 0,
+    revivalCoffinMax: 0,
+    partyPowerMax: 500,
+    skillChainMax: 4,
+})
+insertPlayerEquipmentSync(playerId, 100001, {
+    level: 1,
+    enhancementLevel: 0,
+    protection: false,
+    stack: 0,
+})
+insertPlayerEquipmentSync(playerId, 200001, {
+    level: 5,
+    enhancementLevel: 0,
+    protection: false,
+    stack: 0,
+})
+
+insertPlayerQuestProgressSync(playerId, 3, {
+    questId: 101001,
+    finished: true,
+})
+for (const questId of Object.keys(mainQuests).map(Number)
+    .filter(questId => Math.floor(questId / 1_000_000) === 1)) {
+    insertPlayerQuestProgressSync(playerId, 1, {
+        questId,
+        finished: true,
+    })
+}
+for (const questId of Object.keys(exQuests).map(Number)
+    .filter(questId => Math.floor(questId / 1_000_000) === 1)) {
+    insertPlayerQuestProgressSync(playerId, 4, {
+        questId,
+        finished: true,
+    })
+}
+insertPlayerQuestProgressSync(playerId, 15, {
+    questId: 1,
+    finished: true,
+})
+
+const expandedRegularContext = regular.buildContext(playerId, 1)
+assert.equal(regular.compute(8, expandedRegularContext, 0), 100, "技能成就应读取成功结算累计")
+assert.equal(
+    regular.compute(9, expandedRegularContext, 0),
+    getRankDegree(10_000),
+    "character_level 是玩家等级成就，不读取角色经验",
+)
+assert.equal(regular.compute(10, expandedRegularContext, 0), 1, "第 1 章全部普通关卡完成后应达成")
+assert.equal(regular.compute(16, expandedRegularContext, 0), 1, "第 1 章全部高难关卡完成后应达成")
+assert.equal(regular.compute(69, expandedRegularContext, 0), 1, "新版第 1 章高难定义应使用相同官方范围")
+assert.equal(regular.compute(23, expandedRegularContext, 0), 1, "角色故事应按完成记录累计")
+assert.equal(regular.compute(42, expandedRegularContext, 0), 1, "指定主线关卡应按 QuestRange 精确完成")
+assert.equal(regular.compute(56, expandedRegularContext, 0), 1, "任意属性假人只需完成候选关卡之一")
+assert.equal(regular.compute(5, expandedRegularContext, 0), 11, "弱点攻击读取累计战斗事实")
+assert.equal(regular.compute(28, expandedRegularContext, 0), 4, "最大技能连锁读取历史最大值")
+assert.equal(regular.compute(30, expandedRegularContext, 0), 500, "通关战力读取历史最大值")
+assert.equal(regular.compute(31, expandedRegularContext, 0), 7, "狂热发动次数读取累计事实")
+assert.equal(regular.compute(34, expandedRegularContext, 0), 50_000_000, "分数成就读取单人最高分")
+assert.equal(regular.compute(35, expandedRegularContext, 0), 19, "敌人讨伐读取累计事实")
+assert.equal(regular.compute(33, expandedRegularContext, 0), 2, "装备种类按当前不同 ID 复算")
+assert.equal(
+    regular.compute(40, expandedRegularContext, 0),
+    getPlayerSync(playerId).totalManaObtained,
+    "累计玛纳读取玩家历史累计",
+)
+assert.equal(regular.compute(68, expandedRegularContext, 0), 1, "只有实际达到 5 级的装备才计数")
+recordMissionOperationFactsSync(playerId, "treasure_mana", 250)
+recordMissionOperationFactsSync(playerId, "equipment_upgrade", 3)
+const operationRegularContext = regular.buildContext(playerId, 1)
+const operationProgress = getPlayerCategoryMissionsSync(playerId, 1)
+assert.equal(
+    regular.compute(41, operationRegularContext, operationProgress[41].progress),
+    250,
+    "珍品商店玛纳消耗必须保留累计历史",
+)
+assert.equal(
+    regular.compute(67, operationRegularContext, operationProgress[67].progress),
+    4,
+    "装备觉醒以当前状态与累计历史的较大值为准",
+)
+deletePlayerEquipmentSync(playerId, 200001)
+assert.equal(
+    regular.compute(67, regular.buildContext(playerId, 1), operationProgress[67].progress),
+    3,
+    "装备被移除后仍必须保留累计觉醒历史",
+)
+recordRegularMissionBattleFactsSync({
+    playerId,
+    questCategory: 1,
+    isMulti: false,
+    questAccomplished: true,
+    manaObtained: 80,
+})
+recordRegularMissionBattleFactsSync({
+    playerId,
+    questCategory: 21,
+    isMulti: false,
+    questAccomplished: true,
+    manaObtained: 20,
+})
+recordRegularMissionBattleFactsSync({
+    playerId,
+    questCategory: 21,
+    isMulti: true,
+    questAccomplished: true,
+    manaObtained: 0,
+})
+const battleOperationProgress = getPlayerCategoryMissionsSync(playerId, 1)
+assert.equal(battleOperationProgress[4].progress, 100, "战斗获得玛纳按真实到账值累计")
+assert.equal(battleOperationProgress[94].progress, 1, "单人挑战只统计成功的单人 ExpertSingleEvent")
 assert.throws(() => {
     db.transaction(() => {
         recordMissionBattleResultSync(playerId, {

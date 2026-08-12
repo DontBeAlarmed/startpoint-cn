@@ -4,6 +4,7 @@ import type { Player, PlayerCharacter, RawPlayerQuestProgress } from "../../data
 import type { SnapshotData } from "./snapshot"
 import type { MissionBattleCounters } from "../../data/domains/mission_battle_facts"
 import type { DegreeBattleStats } from "../../data/domains/degree_battle_stats"
+import type { RegularStateFacts } from "./regular-state-facts"
 
 export interface PlayerQuestProgressEntry {
     questId: number
@@ -24,6 +25,11 @@ export interface CategoryContext {
     totalStories: number
     rankCounts: Record<string, number>
     collectedItemTotals?: Record<string, number>
+    regularStats?: {
+        exRankSsCount: number
+        degreeBattleStats: DegreeBattleStats
+        state: RegularStateFacts
+    }
     degreeStats?: {
         maxCharacterLevel: number
         companionCount: number

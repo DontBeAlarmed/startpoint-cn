@@ -25,6 +25,28 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     const report = getMissionCoverageAudit()
     assert.equal(report.schemaVersion, 1)
 
+    assertPartition(report.regular)
+    assert.deepEqual(
+        { total: report.regular.total, automated: report.regular.automated, fallback: report.regular.fallback },
+        { total: 120, automated: 109, fallback: 11 },
+    )
+    assert.deepEqual(
+        report.regular.fallbackMissions.map(entry => [entry.missionId, entry.reason]),
+        [
+            [29, "mvp-result-unavailable"],
+            [62, "rescue-source-unavailable"],
+            [63, "rescue-source-unavailable"],
+            [64, "rescue-source-unavailable"],
+            [65, "ability-soul-operation-semantics-unverified"],
+            [87, "rescue-source-unavailable"],
+            [88, "rescue-source-unavailable"],
+            [89, "rescue-source-unavailable"],
+            [100, "rescue-source-unavailable"],
+            [107, "external-social-check-not-supported"],
+            [108, "anniversary-window-semantics-unverified"],
+        ],
+    )
+
     assertPartition(report.event)
     assert.deepEqual(
         { total: report.event.total, automated: report.event.automated, fallback: report.event.fallback },
@@ -179,7 +201,7 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
 
 test("mission coverage audit leaves no ID in both sides of a partition", () => {
     const report = getMissionCoverageAudit()
-    for (const section of [report.event, report.degree, report.pass]) {
+    for (const section of [report.regular, report.event, report.degree, report.pass]) {
         const automated = new Set(section.automatedMissions.map(entry => (
             `${entry.category}:${entry.missionId}`
         )))

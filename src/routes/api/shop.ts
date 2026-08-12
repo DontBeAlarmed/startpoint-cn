@@ -35,7 +35,7 @@ import {
     validateShopPurchaseAmount,
 } from "../../lib/event-shop-purchase";
 import { getMailArrivedSync } from "../../lib/mail-notification";
-import { recordDegreeOperationFactsSync } from "../../lib/mission/degree-operation-facts";
+import { recordMissionOperationFactsSync } from "../../lib/mission/degree-operation-facts";
 import {
     isShopItemVisibleForCampaign,
     requireAvailableShopCampaign,
@@ -287,7 +287,7 @@ const routes = async (fastify: FastifyInstance) => {
                 recordManaSpent: (id, amount) => {
                     incrementActiveMissionUsedManaCountSync(id, amount)
                     if (shopType === ShopType.TREASURE) {
-                        recordDegreeOperationFactsSync(id, "treasure_mana", amount)
+                        recordMissionOperationFactsSync(id, "treasure_mana", amount)
                     }
                 },
                 grantRewards: givePlayerRewardsSync,

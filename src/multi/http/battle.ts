@@ -487,6 +487,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             const fieldMana = freshValidation.addMana
             const newMana = player.freeMana + fixedManaReward + fieldMana;
             const manaObtained = fixedManaReward + fieldMana;
+            finishCtx.manaObtained = manaObtained;
             const clearReward = rewardEligibility.firstClear && (questData as any).clearReward !== undefined
                 ? givePlayerRewardSync(playerId, (questData as any).clearReward)
                 : null;
