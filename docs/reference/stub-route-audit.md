@@ -48,9 +48,9 @@
 
 ## 明确的兼容取舍
 
-### 玩家履历主数据缺口
+### 玩家履历统计兼容
 
-`/player_history/index` 与 `/player_history/edit` 已保存收藏队伍、称号、背景和客户端实际提交的主题可见性，设置表随存档 V2 导出、恢复和克隆。当前 Content Snapshot 尚无官方 `PlayerHistoryTable`、`PlayerHistoryTopicTable` 与 `PlayerHistoryCardBackgroundTable` 转换结果，因此默认履历期和背景使用客户端 `PlayerHistoryIndexDummyRemote` 的首项语义，主题列表不伪造历史值。后续取得权威表后应替换默认索引并接入可复算主题，不应人工猜测 27 类主题映射。
+`/player_history/index` 与 `/player_history/edit` 已保存收藏队伍、称号、背景和客户端实际提交的主题可见性，设置表随存档 V2 导出、恢复和克隆。Content Snapshot 已接入官方 `player_history`、`player_history_topic`、`player_history_card_background` 和 `player_history_challenge_single_boss` 四张表；当前履历索引与主题结构按服务器时间和官方主数据生成。历史统计尚未建立完整的逐项事实来源，因此主题值使用客户端 Dummy 约定的正确字段、数组长度和 `null` 占位，不伪造玩家成绩。
 
 ### 百科全部解锁
 

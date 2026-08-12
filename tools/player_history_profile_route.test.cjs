@@ -19,8 +19,10 @@ const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
+const { setServerTime } = require("../src/utils")
 
 initializeDatabase()
+setServerTime(new Date("2025-07-25T00:00:00.000Z"))
 const db = getDb()
 const account = insertAccountSync({
     appId: "wf_cn",
@@ -83,6 +85,7 @@ async function createApp() {
 }
 
 test.after(() => {
+    setServerTime(null)
     if (db.open) db.close()
     fs.rmSync(dataDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR
@@ -100,15 +103,65 @@ test("player history index exposes the required client shape", async () => {
             payload: { viewer_id: viewerId, api_count: 0 },
         })
         assert.equal(response.statusCode, 200, response.body)
-        assert.deepEqual(decode(response).data, {
-            player_history_id: 1,
-            background_card_id: 1,
-            degree_id: 1,
-            favorite_character: {
-                character_ids: [1, null, null],
-                unison_character_ids: [null, null, null],
+        const data = decode(response).data
+        assert.equal(data.player_history_id, 1)
+        assert.equal(data.background_card_id, 1001)
+        assert.equal(data.degree_id, 1)
+        assert.deepEqual(data.favorite_character, {
+            character_ids: [1, null, null],
+            unison_character_ids: [null, null, null],
+        })
+        assert.deepEqual(Object.keys(data.player_history_topic_list), Array.from(
+            { length: 27 },
+            (_, index) => String(index + 1),
+        ))
+        assert.deepEqual(data.player_history_topic_list[1], {
+            is_visible: true,
+            value_list: {
+                int_values: null,
+                string_values: null,
+                date_values: [null],
+                character_id_values: null,
+                equipment_id_values: null,
+                quest_values: null,
+                boss_id_values: null,
             },
-            player_history_topic_list: {},
+        })
+        assert.deepEqual(data.player_history_topic_list[5].value_list, {
+            int_values: null,
+            string_values: null,
+            date_values: [null],
+            character_id_values: [null],
+            equipment_id_values: null,
+            quest_values: null,
+            boss_id_values: null,
+        })
+        assert.deepEqual(data.player_history_topic_list[18].value_list, {
+            int_values: null,
+            string_values: null,
+            date_values: [null],
+            character_id_values: null,
+            equipment_id_values: null,
+            quest_values: null,
+            boss_id_values: [null],
+        })
+        assert.deepEqual(data.player_history_topic_list[19].value_list, {
+            int_values: [null, null],
+            string_values: null,
+            date_values: null,
+            character_id_values: [null, null, null, null, null, null, null],
+            equipment_id_values: null,
+            quest_values: null,
+            boss_id_values: null,
+        })
+        assert.deepEqual(data.player_history_topic_list[27].value_list, {
+            int_values: [null],
+            string_values: null,
+            date_values: null,
+            character_id_values: null,
+            equipment_id_values: null,
+            quest_values: null,
+            boss_id_values: null,
         })
     } finally {
         await app.close()
@@ -137,20 +190,20 @@ test("player history edit persists each supported presentation setting", async (
             {
                 party_info: null,
                 degree_id: null,
-                background_card_id: 2,
+                background_card_id: 1002,
                 player_history_topic_visible: null,
             },
             {
                 party_info: null,
                 degree_id: null,
                 background_card_id: null,
-                player_history_topic_visible: { "100": false },
+                player_history_topic_visible: { "1": false },
             },
             {
                 party_info: null,
                 degree_id: null,
                 background_card_id: null,
-                player_history_topic_visible: { "101": true },
+                player_history_topic_visible: { "2": true },
             },
         ]
 
@@ -169,16 +222,15 @@ test("player history edit persists each supported presentation setting", async (
             url: "/api/index.php/player_history/index",
             payload: { viewer_id: viewerId, api_count: 2 },
         })).data
-        assert.equal(reloaded.background_card_id, 2)
+        assert.equal(reloaded.background_card_id, 1002)
         assert.equal(reloaded.degree_id, 1)
         assert.deepEqual(reloaded.favorite_character, {
             character_ids: [1, null, null],
             unison_character_ids: [null, 1, null],
         })
-        assert.deepEqual(reloaded.player_history_topic_list, {
-            "100": { is_visible: false, value_list: {} },
-            "101": { is_visible: true, value_list: {} },
-        })
+        assert.equal(reloaded.player_history_topic_list[1].is_visible, false)
+        assert.equal(reloaded.player_history_topic_list[2].is_visible, true)
+        assert.equal(Object.keys(reloaded.player_history_topic_list).length, 27)
     } finally {
         await app.close()
     }
@@ -192,6 +244,7 @@ test("player history edit rejects unknown owned-state references without changin
         ).get(player.id)
         const invalidBodies = [
             { degree_id: 999999 },
+            { background_card_id: 999999 },
             {
                 party_info: {
                     character_ids: [999999, null, null],
@@ -199,6 +252,7 @@ test("player history edit rejects unknown owned-state references without changin
                 },
             },
             { player_history_topic_visible: { invalid: true } },
+            { player_history_topic_visible: { "999": true } },
         ]
         for (const body of invalidBodies) {
             const response = await app.inject({
@@ -223,7 +277,7 @@ test("player history settings remain isolated by authenticated player", async ()
         const edited = await app.inject({
             method: "POST",
             url: "/api/index.php/player_history/edit",
-            payload: { viewer_id: viewerId, background_card_id: 7 },
+            payload: { viewer_id: viewerId, background_card_id: 1003 },
         })
         assert.equal(edited.statusCode, 200, edited.body)
 
@@ -232,7 +286,7 @@ test("player history settings remain isolated by authenticated player", async ()
             url: "/api/index.php/player_history/index",
             payload: { viewer_id: otherViewerId },
         })).data
-        assert.equal(other.background_card_id, 1)
+        assert.equal(other.background_card_id, 1001)
         assert.equal(
             db.prepare("SELECT COUNT(*) AS count FROM players_player_history_settings WHERE player_id = ?")
                 .get(otherPlayer.id).count,

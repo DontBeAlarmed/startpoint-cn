@@ -155,6 +155,10 @@ const EXPECTED_DIRECT_CDN_TABLES = Object.freeze({
     "mission_weekly_reward.json": [2, "master/mission/weekly_mission_reward.orderedmap"],
     "pass_card_event.json": [1, "master/pass_card/pass_card_event.orderedmap"],
     "pass_card_reward.json": [1, "master/pass_card/pass_card_reward.orderedmap"],
+    "player_history.json": [1, "master/player_history/player_history.orderedmap"],
+    "player_history_card_background.json": [1, "master/player_history/player_history_card_background.orderedmap"],
+    "player_history_challenge_single_boss.json": [1, "master/player_history/player_history_challenge_single_boss.orderedmap"],
+    "player_history_topic.json": [2, "master/player_history/player_history_topic.orderedmap"],
     "raid_event_overall_reward.json": [1, "master/quest/event/raid_event_overall_reward.orderedmap"],
     "reward_element_map.json": [3, "master/reward/reward_element_map.orderedmap"],
     "stamina_campaign.json": [1, "master/campaign/stamina_campaign.orderedmap"],
@@ -315,6 +319,10 @@ const EXPECTED_BUNDLED_TABLES = Object.freeze([
     "mission_weekly_reward.json",
     "pass_card_event.json",
     "pass_card_reward.json",
+    "player_history.json",
+    "player_history_card_background.json",
+    "player_history_challenge_single_boss.json",
+    "player_history_topic.json",
     "practice_quest.json",
     "quest_entry_costs.json",
     "quest_lookup.json",
@@ -436,7 +444,7 @@ test("registry covers the first CDN converter tables with verified logical paths
 })
 
 test("registry dynamically restores tables that exactly match official OrderedMap trees", () => {
-    assert.equal(Object.keys(EXPECTED_DIRECT_CDN_TABLES).length, 35)
+    assert.equal(Object.keys(EXPECTED_DIRECT_CDN_TABLES).length, 39)
     for (const [tableName, [depth, source]] of Object.entries(EXPECTED_DIRECT_CDN_TABLES)) {
         const entry = findTableSource(tableName)
         assert.equal(entry.scope, "cdn", tableName)
@@ -609,7 +617,7 @@ test("registry independently covers static CN runtime JSON references", () => {
 })
 
 test("every registry table has an explicit existing bundled fallback", () => {
-    assert.equal(TABLE_SOURCES.length, 115)
+    assert.equal(TABLE_SOURCES.length, 119)
     for (const entry of TABLE_SOURCES) {
         const sourcePath = path.resolve(projectRoot, entry.bundledPath)
         assert.ok(fs.existsSync(sourcePath), `${entry.tableName} source must exist`)
