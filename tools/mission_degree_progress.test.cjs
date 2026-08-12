@@ -636,11 +636,11 @@ assert.equal(DegreeComputer.compute(111001, level100Context, 3), 3, "历史一�
 
 const coverage = getDegreeMissionCoverageReport()
 assert.equal(getExactDegreeQuestClearRuleCount(), 84)
-assert.equal(getDegreeOperationRuleCount(), 6)
+assert.equal(getDegreeOperationRuleCount(), 9)
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1275,
-    unsupported: 13,
+    serverComputed: 1281,
+    unsupported: 7,
     supportedFamilies: {
         playerRank: 8,
         characterLevel: 2,
@@ -667,6 +667,7 @@ assert.deepEqual(coverage, {
         carnivalQuestClear: 27,
         hardMultiQuestClear: 6,
         specifiedQuestClearCount: 84,
+        mvpFacts: 3,
         feverCount: 3,
         feverTime: 3,
         debuffEnemy: 3,
@@ -683,7 +684,7 @@ assert.deepEqual(coverage, {
         revivalCoffinMax: 1,
         partyPowerMax: 3,
         skillChainMax: 3,
-        operationFacts: 6,
+        operationFacts: 9,
         challengeDungeonClear: 3,
         scoreClearSingle: 3,
         timeClearSingle: 3,

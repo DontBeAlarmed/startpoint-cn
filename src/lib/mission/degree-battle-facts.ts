@@ -10,6 +10,8 @@ interface DegreeBattleFactContext {
     readonly questCategory: number
     readonly questId: number
     readonly questAccomplished: boolean
+    readonly isMulti?: boolean
+    readonly isMvp?: boolean
 }
 
 interface ExactDegreeQuestClearRule {
@@ -17,6 +19,20 @@ interface ExactDegreeQuestClearRule {
     readonly category: number
     readonly questIds: ReadonlySet<number>
     readonly definition: ReturnType<typeof getMissionMasterDefinitions>[number]
+}
+
+const DEGREE_MVP_MISSION_IDS = [26000, 26010, 26020] as const
+
+function isDegreeMvpDefinitionSupported(missionId: number): boolean {
+    return getMissionMasterDefinitions(5).some(definition => (
+        definition.missionId === missionId
+        && definition.pattern === `degree_mvp_get_${missionId === 26000 ? 1 : missionId === 26010 ? 2 : 3}`
+        && Number(definition.row[3]) === 19
+    ))
+}
+
+export function getDegreeMvpMissionIds(): readonly number[] {
+    return Object.freeze(DEGREE_MVP_MISSION_IDS.filter(isDegreeMvpDefinitionSupported))
 }
 
 function buildExactDegreeQuestClearRules(): readonly ExactDegreeQuestClearRule[] {
@@ -78,6 +94,18 @@ export function recordDegreeMissionBattleFacts(
 ): number[] {
     if (!context.questAccomplished) return []
     const matchedMissionIds: number[] = []
+    if (context.isMulti === true
+        && context.isMvp === true) {
+        for (const missionId of getDegreeMvpMissionIds()) {
+            const definition = getMissionMasterDefinitions(5)
+                .find(entry => entry.missionId === missionId)
+            if (definition?.pattern === `degree_mvp_get_${missionId === 26000 ? 1 : missionId === 26010 ? 2 : 3}`
+                && isMissionDefinitionEnabledAt(definition, evaluationTime)) {
+                incrementPlayerCategoryMissionSync(context.playerId, 5, missionId, 1)
+                matchedMissionIds.push(missionId)
+            }
+        }
+    }
     for (const rule of buildExactDegreeQuestClearRules()) {
         if (rule.category !== context.questCategory || !rule.questIds.has(context.questId)) continue
         if (!isMissionDefinitionEnabledAt(rule.definition, evaluationTime)) continue

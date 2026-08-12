@@ -3,6 +3,7 @@ import type { FinishContext } from "../quest/finish/types"
 import { getMissionMasterDefinition } from "./master-data"
 
 const BATTLE_MANA_MISSION_ID = 4
+const MVP_MISSION_ID = 29
 const EXPERT_SINGLE_MISSION_ID = 94
 
 function hasExpectedPattern(missionId: number, pattern: string): boolean {
@@ -11,7 +12,7 @@ function hasExpectedPattern(missionId: number, pattern: string): boolean {
 
 export function recordRegularMissionBattleFactsSync(
     context: Pick<FinishContext,
-        "playerId" | "questCategory" | "questAccomplished" | "isMulti" | "manaObtained">,
+        "playerId" | "questCategory" | "questAccomplished" | "isMulti" | "manaObtained" | "statistics">,
 ): void {
     const manaObtained = context.manaObtained ?? 0
     if (Number.isSafeInteger(manaObtained)
@@ -30,5 +31,12 @@ export function recordRegularMissionBattleFactsSync(
         && context.questCategory === 21
         && hasExpectedPattern(EXPERT_SINGLE_MISSION_ID, "challenge_single_battle_play")) {
         incrementPlayerCategoryMissionSync(context.playerId, 1, EXPERT_SINGLE_MISSION_ID, 1)
+    }
+
+    if (context.questAccomplished
+        && context.isMulti === true
+        && context.statistics.is_mvp === true
+        && hasExpectedPattern(MVP_MISSION_ID, "get_mvp")) {
+        incrementPlayerCategoryMissionSync(context.playerId, 1, MVP_MISSION_ID, 1)
     }
 }

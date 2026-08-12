@@ -91,6 +91,7 @@ const LIFETIME_PATTERNS = new Set([
     "total_equipment_awaking_count", "total_equipment_5_level_count",
     "manaboard_2nd_open_count", "manaboard_2nd_complete_count",
     "total_attained_drop_mana_count", "challenge_single_battle_play",
+    "total_ability_soul_use_count", "get_mvp",
 ])
 
 export function getRegularComputedMissionIds(): readonly number[] {

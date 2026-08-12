@@ -14,6 +14,7 @@ import { hasValidPartyCategory, parseGlobalPartyId } from "../../lib/special-eve
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { recordRaidSetEditMissionFactsSync } from "../../lib/mission/event-entry-facts";
 import { validatePartyLoadouts } from "../../lib/party-loadout-validation";
+import { recordAbilitySoulEquipFactsSync } from "../../lib/mission/degree-operation-facts";
 
 interface PartyInfoListItem {
     party_edited: boolean
@@ -526,6 +527,13 @@ const routes = async (fastify: FastifyInstance) => {
             for (const { parsed, party } of mappedParties) {
                 updatePlayerPartySync(playerId, parsed.slot, party, parsed.groupId)
             }
+            recordAbilitySoulEquipFactsSync(
+                playerId,
+                existingLoadouts.map(loadout => ({
+                    abilitySoulIds: loadout.ability_soul_ids,
+                })),
+                mappedParties.map(({ party }) => ({ abilitySoulIds: party.abilitySoulIds })),
+            )
             incrementActiveMissionPartyActionCountsSync(playerId, {
                 equipmentEquipCount: mappedParties.some(({ party }) => party.equipmentIds.some(id => id !== null)) ? 1 : 0,
                 unisonSetCount: mappedParties.some(({ party }) => party.unisonCharacterIds.some(id => id !== null)) ? 1 : 0,

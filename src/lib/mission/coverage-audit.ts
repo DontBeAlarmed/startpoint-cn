@@ -61,15 +61,9 @@ function eventFallbackReason(row: readonly unknown[]): string {
 
 const DEFERRED_DEGREE_REASON_BY_MISSION_ID: ReadonlyMap<number, string> = new Map([
     [3000, "character-level-curve-incomplete"],
-    [8000, "ability-soul-operation-semantics-unverified"],
-    [8010, "ability-soul-operation-semantics-unverified"],
-    [8020, "ability-soul-operation-semantics-unverified"],
     [25000, "attention-source-unavailable"],
     [25010, "attention-source-unavailable"],
     [25020, "attention-source-unavailable"],
-    [26000, "mvp-result-unavailable"],
-    [26010, "mvp-result-unavailable"],
-    [26020, "mvp-result-unavailable"],
     [70004, "newbie-classification-unavailable"],
     [70005, "newbie-classification-unavailable"],
     [70006, "newbie-classification-unavailable"],
@@ -81,11 +75,9 @@ function degreeFallbackReason(missionId: number): string {
 }
 
 const REGULAR_FALLBACK_REASON_BY_MISSION_ID: ReadonlyMap<number, string> = new Map([
-    [29, "mvp-result-unavailable"],
     [62, "rescue-source-unavailable"],
     [63, "rescue-source-unavailable"],
     [64, "rescue-source-unavailable"],
-    [65, "ability-soul-operation-semantics-unverified"],
     [87, "rescue-source-unavailable"],
     [88, "rescue-source-unavailable"],
     [89, "rescue-source-unavailable"],

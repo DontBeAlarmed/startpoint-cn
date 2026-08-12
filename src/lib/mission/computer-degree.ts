@@ -41,6 +41,7 @@ import { ShopType } from "../types"
 import {
     getExactDegreeQuestClearMissionIds,
     getExactDegreeQuestClearRuleCount,
+    getDegreeMvpMissionIds,
 } from "./degree-battle-facts"
 import {
     getDegreeOperationMissionIds,
@@ -616,6 +617,7 @@ export function getDegreeMissionCoverageReport() {
             getHardMultiQuestId(definition.missionId) !== undefined
         )).length,
         specifiedQuestClearCount: getExactDegreeQuestClearRuleCount(),
+        mvpFacts: getDegreeMvpMissionIds().length,
         operationFacts: getDegreeOperationRuleCount(),
         eventCollectItem: definitions.filter(definition => (
             getDegreeCollectedItemId(definition.missionId) !== undefined
@@ -744,6 +746,7 @@ function isDegreeDefinitionComputed(
 export function getDegreeComputedMissionIds(): readonly number[] {
     const factMissionIds = new Set([
         ...getExactDegreeQuestClearMissionIds(),
+        ...getDegreeMvpMissionIds(),
         ...getDegreeOperationMissionIds(),
     ])
     return Object.freeze(getMissionMasterDefinitions(5)

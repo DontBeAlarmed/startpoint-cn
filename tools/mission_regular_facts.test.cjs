@@ -44,8 +44,13 @@ const { getComputer } = require("../src/lib/mission/registry")
 const { settleMissionCategories } = require("../src/lib/mission/settlement")
 const { getSnapshot, takeSnapshot } = require("../src/lib/mission/snapshot")
 const { getRankDegree } = require("../src/lib/stamina")
-const { recordMissionOperationFactsSync } = require("../src/lib/mission/degree-operation-facts")
+const {
+    countAbilitySoulEquipments,
+    recordAbilitySoulEquipFactsSync,
+    recordMissionOperationFactsSync,
+} = require("../src/lib/mission/degree-operation-facts")
 const { recordRegularMissionBattleFactsSync } = require("../src/lib/mission/regular-battle-facts")
+const { recordDegreeMissionBattleFacts } = require("../src/lib/mission/degree-battle-facts")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { getMergedPlayerDataSync } = require("../src/data/utils/player-data")
 const { replacePlayerDataSync } = require("../src/data/domains/player")
@@ -535,6 +540,7 @@ recordRegularMissionBattleFactsSync({
     isMulti: false,
     questAccomplished: true,
     manaObtained: 80,
+    statistics: { clear_phase: 1, party: { characters: [], unison_characters: [] } },
 })
 recordRegularMissionBattleFactsSync({
     playerId,
@@ -542,6 +548,7 @@ recordRegularMissionBattleFactsSync({
     isMulti: false,
     questAccomplished: true,
     manaObtained: 20,
+    statistics: { clear_phase: 1, party: { characters: [], unison_characters: [] } },
 })
 recordRegularMissionBattleFactsSync({
     playerId,
@@ -549,10 +556,59 @@ recordRegularMissionBattleFactsSync({
     isMulti: true,
     questAccomplished: true,
     manaObtained: 0,
+    statistics: { clear_phase: 1, party: { characters: [], unison_characters: [] } },
 })
+recordRegularMissionBattleFactsSync({
+    playerId,
+    questCategory: 2,
+    isMulti: true,
+    questAccomplished: true,
+    manaObtained: 0,
+    statistics: {
+        clear_phase: 1,
+        is_mvp: true,
+        party: { characters: [], unison_characters: [] },
+    },
+})
+recordRegularMissionBattleFactsSync({
+    playerId,
+    questCategory: 2,
+    isMulti: false,
+    questAccomplished: true,
+    manaObtained: 0,
+    statistics: {
+        clear_phase: 1,
+        is_mvp: true,
+        party: { characters: [], unison_characters: [] },
+    },
+})
+assert.deepEqual(recordDegreeMissionBattleFacts({
+    playerId,
+    questCategory: 2,
+    questId: 1001001,
+    questAccomplished: true,
+    isMulti: true,
+    isMvp: true,
+}, evaluationTime).filter(missionId => [26000, 26010, 26020].includes(missionId)), [
+    26000, 26010, 26020,
+], "官方 is_mvp=true 应同时生产三档 MVP 称号事实")
+assert.equal(countAbilitySoulEquipments(
+    [{ abilitySoulIds: [null, 1001, 1002] }],
+    [{ abilitySoulIds: [1001, 1001, null] }],
+), 1, "新增装配计一次，未变化与卸下不计数")
+assert.equal(recordAbilitySoulEquipFactsSync(
+    playerId,
+    [{ abilitySoulIds: [null, 1001, 1002] }],
+    [{ abilitySoulIds: [1001, 2001, null] }],
+), 2, "新增和替换魂珠各计一次")
 const battleOperationProgress = getPlayerCategoryMissionsSync(playerId, 1)
 assert.equal(battleOperationProgress[4].progress, 100, "战斗获得玛纳按真实到账值累计")
+assert.equal(battleOperationProgress[29].progress, 1, "成功多人结算只接受官方 is_mvp=true")
+assert.equal(battleOperationProgress[65].progress, 2, "魂珠任务按成功配队编辑中的装配变化累计")
 assert.equal(battleOperationProgress[94].progress, 1, "单人挑战只统计成功的单人 ExpertSingleEvent")
+const degreeOperationProgress = getPlayerCategoryMissionsSync(playerId, 5)
+assert.equal(degreeOperationProgress[8000].progress, 2, "魂珠称号与普通任务共享装配事实")
+assert.equal(degreeOperationProgress[26000].progress, 1, "MVP 称号读取官方结算字段")
 assert.throws(() => {
     db.transaction(() => {
         recordMissionBattleResultSync(playerId, {

@@ -32,6 +32,7 @@ export interface QuestStatistics {
     }[]
     client_checks?: string[]
     max_combo_count?: number
+    is_mvp?: boolean | null
     [key: string]: any
 }
 

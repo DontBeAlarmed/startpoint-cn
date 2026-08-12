@@ -50,7 +50,14 @@ export function recordMissionBattleFacts(
     recordDegreeBattleStatisticsSync(ctx)
     recordDailyMissionBattleFacts(ctx, evaluationTime)
     recordEventMissionBattleFacts(ctx, evaluationTime)
-    recordDegreeMissionBattleFacts(ctx, evaluationTime)
+    recordDegreeMissionBattleFacts({
+        playerId: ctx.playerId,
+        questCategory: ctx.questCategory,
+        questId: ctx.questId,
+        questAccomplished: ctx.questAccomplished,
+        isMulti: ctx.isMulti,
+        isMvp: ctx.statistics.is_mvp === true,
+    }, evaluationTime)
     recordActiveMissionSpecificBattleFactsSync(ctx)
     recordActiveMissionConditionalBattleFactsSync(ctx)
     if (ctx.isMulti) {
