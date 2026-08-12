@@ -47,7 +47,7 @@ function compareCodePoint(left: string, right: string): number {
     return left < right ? -1 : left > right ? 1 : 0
 }
 
-function digestBundledEntries(entries: readonly (readonly [string, unknown])[]): ContentDigest {
+function digestTableEntries(entries: readonly (readonly [string, unknown])[]): ContentDigest {
     const identities = entries
         .map(([tableName, value]) => ({
             tableName,
@@ -115,7 +115,7 @@ export class ContentRepository {
                 ),
             )
             const tables = deepFreeze(Object.fromEntries(entries))
-            const contentDigest = digestBundledEntries(entries)
+            const contentDigest = digestTableEntries(entries)
             return deepFreeze(new ContentRepository(
                 deepFreeze({
                     source: "bundled",
@@ -137,13 +137,14 @@ export class ContentRepository {
             ] as const
         ))
         const tables = deepFreeze(Object.fromEntries(entries))
+        const contentDigest = digestTableEntries(entries)
         return deepFreeze(new ContentRepository(
             deepFreeze({
                 source: "release",
                 assetVersion: release.manifest.assetVersion,
                 generatorVersion: release.manifest.generatorVersion,
                 releaseDigest: release.manifest.releaseDigest,
-                contentDigest: release.manifest.releaseDigest,
+                contentDigest,
                 multiBattleContentDigest: buildMultiBattleContentDigestFromObjects(
                     Object.fromEntries(Object.entries(release.manifest.tables).map(
                         ([tableName, table]) => [tableName, table.object],
