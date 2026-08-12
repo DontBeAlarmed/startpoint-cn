@@ -13,7 +13,12 @@ import getDatabase, {
 import { ServerTimeService } from "./runtime/server-time/service";
 import { getContentSnapshot, initializeContentSnapshot } from "./content/runtime/content-snapshot";
 import { createContentLifecycleDependencies } from "./modes/cn-lifecycle";
+import { listLoadedModeIdentities } from "./modes/registry";
 import { configureSerializedAssetVersionProvider } from "./data/utils/serialized-asset-version";
+import {
+    createRuntimeCapabilitiesSnapshot,
+    registerRuntimeCapabilitiesRoute,
+} from "./runtime/capabilities";
 import { parseCnRuntimeConfig } from "./runtime/config";
 import {
     createRuntimeCoordinator,
@@ -343,6 +348,15 @@ try {
 } catch {
     bundleMetadataError = true;
 }
+registerRuntimeCapabilitiesRoute(fastify, () => createRuntimeCapabilitiesSnapshot({
+    bundle: bundleMetadata,
+    content: getContentSnapshot(),
+    loadedModes: listLoadedModeIdentities(),
+    node: process.versions.node,
+    nodeAbi: process.versions.modules,
+    platform: process.platform,
+    arch: process.arch,
+}));
 runtimeCoordinator = createRuntimeCoordinator({
     loadConfig: () => {
         if (bundleMetadataError) throw new Error("invalid embedded bundle metadata");
