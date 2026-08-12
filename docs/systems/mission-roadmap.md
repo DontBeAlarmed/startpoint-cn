@@ -45,7 +45,7 @@
 
 ### 3. 分批补全活动任务与 Pass
 
-category 3 的 QuestRange、评级、房主/成员、阶段和 client check 已按类型化事实拆分，禁止重新启用旧宽松 map。剩余 Attention 救援来源不明确时不冒充普通 Guest。Pass 优先处理有明确单人事实的 pattern，购买流程不与免费轨混合。
+category 3 的 QuestRange、评级、房主/成员、阶段和 HardMulti 战斗条件已按类型化事实拆分，禁止重新启用旧宽松 map。剩余 Attention 救援来源不明确时不冒充普通 Guest。Pass 优先处理有明确单人事实的 pattern，购买流程不与免费轨混合。
 
 战阵 type 80/81/82 的 12 条任务仅以 SET 编辑器成功保存 RAID 第 1 组主队伍、副 1、副 2 槽位作为权威事实。服务端请求无法证明用户是否点击过客户端“复制”按钮，因此不得把这批实现描述为复制按钮追踪。
 

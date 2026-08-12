@@ -126,7 +126,7 @@
   官方表派生索引按启动后冻结的 Content repository 对象缓存，不支持也不引入热更新。`buildContext` 只有在 evaluationTime 下至少一条上述任务开放时才读取新增角色、玛纳板、装备、物品和 party 玩家状态；15 条均关闭时不构建索引、不执行新增查询。
   后续只剩缺少权威救援来源的 Attention 谓词。
 - 948 条 type 16 空 selector 已作为独立兼容层闭合：579 条全 BossBattle、9 条指定 Boss group、342 条指定 WorldStory event、18 条指定 Advent event。该结论由 CN/GL 主数据重复形状、任务文案和外层范围共同支持，但没有官方后端源码，因此必须标记为兼容推断并等待历史活动客户端验收。
-- 10 条 type 87 逐 ID 校验 HardMulti category 26、成功多人 SS、精确 event/quest、唯一奖励 target 1 及 `statistics.client_checks` 中的 `row[6]`。检查数组必须非空、无重复且没有空白项；600002/900812 另要求 `clearTime <= 180000`。服务端不重演减攻、麻痹、耐性下降或棺柩过程，真实 CN 客户端是否提交非空检查数组仍待验收。剩余 27 条全部为 type 20 Attention。
+- 10 条 type 87 逐 ID 校验 HardMulti category 26、成功多人 SS、精确 event/quest 和唯一奖励 target 1；再按客户端枚举索引分别读取队长攻击力下降、队长光耐下降、全队麻痹或各 zone 棺柩统计。600002/900812 另要求 `clearTime <= 180000`。真实活动暗机兵结算已证明 `client_checks=[]`，该字段不再作为条件来源；统计缺失或非法时 fail closed。剩余 27 条全部为 type 20 Attention。
 
 ## Pass 分类与等级奖励
 

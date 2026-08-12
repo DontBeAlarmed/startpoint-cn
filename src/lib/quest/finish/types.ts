@@ -23,6 +23,10 @@ export interface QuestStatistics {
         members?: ({
             debuff_r?: number
             origin_damage?: number
+            conditions?: ({
+                max_acc_good?: number
+                max_acc_bad?: number
+            } | null)[]
             [key: string]: any
         } | null)[]
     }[]

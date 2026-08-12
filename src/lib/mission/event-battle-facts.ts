@@ -66,12 +66,15 @@ interface ExactResistanceDebuffRule {
     readonly definition: ReturnType<typeof getMissionMasterDefinitions>[number]
 }
 
-interface ExactClientCheckRule {
+type ExactHardMultiCondition = "leader-attack-down" | "leader-light-resistance-down"
+    | "party-paralysis" | "coffin-count"
+
+interface ExactHardMultiConditionRule {
     readonly missionId: number
     readonly battleKind: 2
     readonly category: 26
     readonly questId: number
-    readonly clientCheck: string
+    readonly condition: ExactHardMultiCondition
     readonly maxClearTimeMs: number | null
     readonly definition: ReturnType<typeof getMissionMasterDefinitions>[number]
 }
@@ -529,45 +532,30 @@ function buildExactResistanceDebuffRules(): readonly ExactResistanceDebuffRule[]
     return Object.freeze(rules)
 }
 
-const EXACT_CLIENT_CHECK_RULES: Readonly<Record<number, {
+const EXACT_HARD_MULTI_CONDITION_RULES: Readonly<Record<number, {
     readonly eventId: number
+    readonly clientCheckKey: string
+    readonly condition: ExactHardMultiCondition
     readonly maxClearTimeMs: number | null
 }>> = Object.freeze({
-    600002: { eventId: 2, maxClearTimeMs: 180_000 },
-    600003: { eventId: 3, maxClearTimeMs: null },
-    900653: { eventId: 100_000, maxClearTimeMs: null },
-    900728: { eventId: 100_001, maxClearTimeMs: null },
-    900793: { eventId: 100_002, maxClearTimeMs: null },
-    900810: { eventId: 1002, maxClearTimeMs: null },
-    900811: { eventId: 1003, maxClearTimeMs: null },
-    900812: { eventId: 1004, maxClearTimeMs: 180_000 },
-    900813: { eventId: 1005, maxClearTimeMs: null },
-    900814: { eventId: 1006, maxClearTimeMs: null },
+    600002: { eventId: 2, clientCheckKey: "hard_multi_steam_robot_wind_coffin_count", condition: "coffin-count", maxClearTimeMs: 180_000 },
+    600003: { eventId: 3, clientCheckKey: "hard_multi_steam_robot_water", condition: "leader-attack-down", maxClearTimeMs: null },
+    900653: { eventId: 100_000, clientCheckKey: "hard_multi_steam_robot_light", condition: "leader-light-resistance-down", maxClearTimeMs: null },
+    900728: { eventId: 100_001, clientCheckKey: "hard_multi_steam_robot_thunder", condition: "party-paralysis", maxClearTimeMs: null },
+    900793: { eventId: 100_002, clientCheckKey: "hard_multi_steam_robot_dark", condition: "leader-attack-down", maxClearTimeMs: null },
+    900810: { eventId: 1002, clientCheckKey: "hard_multi_steam_robot_water", condition: "leader-attack-down", maxClearTimeMs: null },
+    900811: { eventId: 1003, clientCheckKey: "hard_multi_steam_robot_thunder", condition: "party-paralysis", maxClearTimeMs: null },
+    900812: { eventId: 1004, clientCheckKey: "hard_multi_steam_robot_wind_coffin_count", condition: "coffin-count", maxClearTimeMs: 180_000 },
+    900813: { eventId: 1005, clientCheckKey: "hard_multi_steam_robot_light", condition: "leader-light-resistance-down", maxClearTimeMs: null },
+    900814: { eventId: 1006, clientCheckKey: "hard_multi_steam_robot_dark", condition: "leader-attack-down", maxClearTimeMs: null },
 })
 
-function isValidClientCheck(value: unknown): value is string {
-    return typeof value === "string"
-        && value.length > 0
-        && value.trim() === value
-}
-
-function hasExpectedClientCheck(
-    value: unknown,
-    expected: string,
-): boolean {
-    if (!Array.isArray(value) || value.length === 0) return false
-    const checks = value as unknown[]
-    if (!checks.every(isValidClientCheck)) return false
-    if (new Set(checks).size !== checks.length) return false
-    return checks.includes(expected)
-}
-
-function buildExactClientCheckRules(): readonly ExactClientCheckRule[] {
+function buildExactHardMultiConditionRules(): readonly ExactHardMultiConditionRule[] {
     const hardMultiEventQuests = getQuestContentTableSync("hard_multi_event_quest.json")
     const sourceQuestIds = trackedQuestIds(hardMultiEventQuests)
     if (sourceQuestIds === null) return Object.freeze([])
-    const rules: ExactClientCheckRule[] = []
-    for (const [missionIdToken, expected] of Object.entries(EXACT_CLIENT_CHECK_RULES)) {
+    const rules: ExactHardMultiConditionRule[] = []
+    for (const [missionIdToken, expected] of Object.entries(EXACT_HARD_MULTI_CONDITION_RULES)) {
         const missionId = Number(missionIdToken)
         const definition = getMissionMasterDefinition(3, missionId)
         const questId = expected.eventId * 1_000 + 1
@@ -578,7 +566,7 @@ function buildExactClientCheckRules(): readonly ExactClientCheckRule[] {
             || Number(definition.row[8]) !== expected.eventId
             || definition.row[10] !== ""
             || definition.row[11] !== "(None)"
-            || !isValidClientCheck(definition.row[6])
+            || definition.row[6] !== expected.clientCheckKey
             || !hasSingleEventMissionTarget(
                 (eventMissionRewards as Record<string, unknown>)[missionIdToken],
             )
@@ -589,7 +577,7 @@ function buildExactClientCheckRules(): readonly ExactClientCheckRule[] {
             battleKind: 2,
             category: 26,
             questId,
-            clientCheck: definition.row[6] as string,
+            condition: expected.condition,
             maxClearTimeMs: expected.maxClearTimeMs,
             definition,
         })
@@ -597,7 +585,7 @@ function buildExactClientCheckRules(): readonly ExactClientCheckRule[] {
     return Object.freeze(rules)
 }
 
-const exactClientCheckRules = buildExactClientCheckRules()
+const exactHardMultiConditionRules = buildExactHardMultiConditionRules()
 
 function matchesRole(role: MultiRole, isMultiHost: boolean | undefined): boolean {
     if (role === "any") return true
@@ -630,8 +618,8 @@ export function getExactEventBattleRuleCoverage() {
         exactStatisticsRuleMissionIds: exactStatisticsRules.map(rule => rule.missionId),
         exactResistanceDebuffRules: exactResistanceDebuffRules.length,
         exactResistanceDebuffRuleMissionIds: exactResistanceDebuffRules.map(rule => rule.missionId),
-        exactClientCheckRules: exactClientCheckRules.length,
-        exactClientCheckRuleMissionIds: exactClientCheckRules.map(rule => rule.missionId),
+        exactHardMultiConditionRules: exactHardMultiConditionRules.length,
+        exactHardMultiConditionRuleMissionIds: exactHardMultiConditionRules.map(rule => rule.missionId),
     }
 }
 
@@ -646,7 +634,7 @@ export function getExactEventBattleMissionIds(): readonly number[] {
         ...exactPhaseRules.map(rule => rule.missionId),
         ...exactStatisticsRules.map(rule => rule.missionId),
         ...exactResistanceDebuffRules.map(rule => rule.missionId),
-        ...exactClientCheckRules.map(rule => rule.missionId),
+        ...exactHardMultiConditionRules.map(rule => rule.missionId),
         ...exactEventSingleClearRules.map(rule => rule.missionId),
     ])].sort((left, right) => left - right))
 }
@@ -690,7 +678,34 @@ function recordExactResistanceDebuffRules(
     return matchedMissionIds
 }
 
-function recordExactClientCheckRules(
+function hasNoBadCondition(member: unknown, conditionIndex: number): boolean {
+    if (!isPlainRecord(member) || !Array.isArray(member.conditions)) return false
+    const condition = member.conditions[conditionIndex]
+    return isPlainRecord(condition)
+        && isSafeNonNegativeInteger(condition.max_acc_bad)
+        && condition.max_acc_bad === 0
+}
+
+function matchesHardMultiCondition(ctx: FinishContext, condition: ExactHardMultiCondition): boolean {
+    const zones = ctx.statistics?.zones
+    if (!Array.isArray(zones) || zones.length === 0) return false
+    if (condition === "coffin-count") {
+        return zones.every(zone => isPlainRecord(zone)
+            && isSafeNonNegativeInteger(zone.encoffinment_count)
+            && zone.encoffinment_count === 0)
+    }
+    const conditionIndex = condition === "leader-attack-down" ? 0
+        : condition === "leader-light-resistance-down" ? 7
+            : 14
+    return zones.every(zone => {
+        if (!isPlainRecord(zone) || !Array.isArray(zone.members) || zone.members.length === 0) return false
+        if (condition !== "party-paralysis") return hasNoBadCondition(zone.members[0], conditionIndex)
+        const members = zone.members.filter(member => member !== null)
+        return members.length > 0 && members.every(member => hasNoBadCondition(member, conditionIndex))
+    })
+}
+
+function recordExactHardMultiConditionRules(
     ctx: FinishContext,
     evaluationTime: Date,
 ): number[] {
@@ -701,11 +716,11 @@ function recordExactClientCheckRules(
         || !isSafeNonNegativeInteger(ctx.clearTime)
         || ctx.clearTime <= 0) return []
     const matchedMissionIds: number[] = []
-    for (const rule of exactClientCheckRules) {
+    for (const rule of exactHardMultiConditionRules) {
         if (rule.questId !== ctx.questId
             || !isMissionDefinitionEnabledAt(rule.definition, evaluationTime)
             || (rule.maxClearTimeMs !== null && ctx.clearTime > rule.maxClearTimeMs)
-            || !hasExpectedClientCheck(ctx.statistics?.client_checks, rule.clientCheck)) continue
+            || !matchesHardMultiCondition(ctx, rule.condition)) continue
         if (completePlayerEventMissionFactSync(ctx.playerId, rule.missionId)) {
             matchedMissionIds.push(rule.missionId)
         }
@@ -836,6 +851,6 @@ export function recordEventMissionBattleFacts(
     }
     matchedMissionIds.push(...recordExactStatisticsRules(ctx, evaluationTime))
     matchedMissionIds.push(...recordExactResistanceDebuffRules(ctx, evaluationTime))
-    matchedMissionIds.push(...recordExactClientCheckRules(ctx, evaluationTime))
+    matchedMissionIds.push(...recordExactHardMultiConditionRules(ctx, evaluationTime))
     return matchedMissionIds
 }

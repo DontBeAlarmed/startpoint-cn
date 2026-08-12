@@ -76,7 +76,7 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
             ].includes(entry.missionId))
             .map(entry => entry.missionId),
         [600002, 600003, 900653, 900728, 900793, 900810, 900811, 900812, 900813, 900814],
-        "10 条 type87 client check 必须进入自动事实覆盖",
+        "10 条 type87 HardMulti 战斗条件必须进入自动事实覆盖",
     )
     assert.deepEqual(
         report.event.fallbackMissions.reduce((counts, entry) => {

@@ -42,16 +42,17 @@
   `ranking_event_single_quest.json` 和唯一旧映射全部指向同一关卡时启用。目标时间取官方 `mission_event_reward.json`
   的奖励阶段秒数，玩家必须已有成功通关且历史最佳毫秒值不超过该阈值。
 
-## category 3：Type 87 客户端检查
+## category 3：Type 87 HardMulti 战斗条件
 
-- mission `600002/600003/900653/900728/900793/900810～900814` 的 pattern 87 由多人 finish 的
-  `statistics.client_checks` 提供条件事实。服务端只接受非空、无重复、无首尾空白的字符串数组，并要求包含对应
-  `mission_event row[6]`；额外合法检查项不会导致拒绝。缺字段、错误类型、空项、重复项和错误 ID 全部 fail closed。
+- mission `600002/600003/900653/900728/900793/900810～900814` 的 pattern 87 由多人 finish 的真实战斗统计提供条件事实。
+  CN 1.8.1 客户端 `ConditionChangeContent.__constructs__` 与 `BattleZoneMemberStats` 证明 `conditions` 数组按枚举索引输出，
+  每项的 `max_acc_bad` 表示该类负面状态在战斗中的最大累计层数。攻击力下降读取队长 `conditions[0]`，光属性耐性下降读取
+  队长 `conditions[7]`，麻痹读取所有非空队员 `conditions[14]`；棺柩读取每个 zone 的 `encoffinment_count`。
 - 规则还逐 ID 校验 `battle_kind=2`、QuestRange kind 19、event ID、空 suffix、QuestRank `(None)`、
   `hard_multi_event_quest` 中的 `eventId * 1000 + 1` 以及唯一奖励 target 1。只有携带正安全整数耗时的 category 26 成功多人 SS 会幂等完成；
   600002 与 900812 根据任务明确的“180 秒内”条件额外要求 `clearTime <= 180000`。
-- 服务端不根据 zone/member 统计重演攻击力下降、麻痹、属性耐性下降或棺柩判断。该边界采用官方协议已有的
-  `client_checks` 事实，但当前普通抓包样本中该数组为空；需要真实 HardMulti 结算确认 CN 客户端会在条件成立时上报对应 ID。
+- 真实 CN 活动暗机兵成功多人 SS 结算已确认 `statistics.client_checks=[]`，因此它不能作为 Type 87 条件事实。服务端只读取客户端已经
+  汇总的战斗统计，不重演战斗。缺 zone、缺目标成员、条件数组过短、缺字段、非安全非负整数或任一目标统计大于 0 均 fail closed。
 - category 24 的 42 条狂热激战限时任务不再使用旧映射。旧映射会把“第 N 战”扩展为同一期全部 8 个关卡，例如
   mission `700012` 的映射包含 `700002001` 至 `700002008`；当前改为按 QuestRange kind 17、`event_id * 1000 + suffix` 和
   `rush_event_quest.rushEventId` 精确闭合，只读取 category 24 对应单关的历史最佳时间。

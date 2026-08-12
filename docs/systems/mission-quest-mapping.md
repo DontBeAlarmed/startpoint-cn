@@ -41,16 +41,16 @@ CN 1.8.1 的权威语义如下：
 的 12 条和 type 18 Guest 的 1 条，共 1753 条。其中 805 条保持 `compatibility=null`，948 条必须携带上述唯一兼容标记。
 运行时会重新对照原始 mission 行、selector 形状和当前关卡表；未知标记、字段漂移、虚构或缺失 quest ID 均 fail closed。
 
-## Type 87 客户端战斗检查
+## Type 87 HardMulti 战斗条件
 
 10 条 type 87 只接受 category 26 对应 HardMulti 关卡的成功多人 SS 结算。规则逐 ID 校验 pattern type 87、
 `battle_kind=2`、QuestRange kind 19、event ID、空 suffix、`row[11]=(None)`、唯一奖励 target 1 和关卡表中的
-`eventId * 1000 + 1`。`statistics.client_checks` 必须是非空、无重复、无空白项的字符串数组，并包含该任务 `row[6]`；
-允许同时携带其他合法检查 ID。所有规则要求正安全整数耗时；600002 与 900812 另要求 `clearTime <= 180000`。
+`eventId * 1000 + 1`。水、暗机兵要求每个 zone 的队长 `members[0].conditions[0].max_acc_bad=0`；闪机兵要求队长
+`conditions[7].max_acc_bad=0`；雷机兵要求每个非空队员 `conditions[14].max_acc_bad=0`；风机兵要求每个 zone 的
+`encoffinment_count=0`。所有规则要求正安全整数耗时；600002 与 900812 另要求 `clearTime <= 180000`。
 
-服务端不重演攻击力下降、麻痹、属性耐性下降或棺柩过程；这些条件由官方 finish 协议的 client check ID 表达。
-当前自动测试证明字段校验、任务写入、幂等、开放期和错误上下文边界，但仍需真实 CN HardMulti 结算确认客户端会提交
-非空 `client_checks`。
+枚举索引来自 CN 1.8.1 客户端的 `ConditionChangeContent` 和 `BattleZoneMemberStats`；真实活动暗机兵结算确认
+`client_checks=[]`，不再依赖该字段。服务端不重演战斗，只接受完整、类型正确的客户端汇总统计；字段缺失或非法均 fail closed。
 
 category 3 的 type 37 不依赖 QuestRange 资产。运行时从 `row[12]` 读取物品 ID，以
 `players_collected_items` 的累计获得量结算 40 条交易商人任务；该白名单由 `computer-event-safe.ts` 承载。

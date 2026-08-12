@@ -69,14 +69,14 @@ assert.deepEqual(
     [600001, 900809],
     "两条 type86 歼灭者 SS 条件必须进入机器覆盖",
 )
-const clientCheckMissionIds = [
+const hardMultiConditionMissionIds = [
     600002, 600003, 900653, 900728, 900793,
     900810, 900811, 900812, 900813, 900814,
 ]
 assert.deepEqual(
-    getExactEventBattleMissionIds().filter(missionId => clientCheckMissionIds.includes(missionId)),
-    clientCheckMissionIds,
-    "10 条 type87 client check 条件必须进入机器覆盖",
+    getExactEventBattleMissionIds().filter(missionId => hardMultiConditionMissionIds.includes(missionId)),
+    hardMultiConditionMissionIds,
+    "10 条 type87 HardMulti 战斗条件必须进入机器覆盖",
 )
 for (const missionId of [600001, 900809]) {
     assert.equal(hasSingleEventMissionTarget(eventMissionRewards[String(missionId)]), true)
@@ -287,8 +287,8 @@ assert.deepEqual(getExactEventBattleRuleCoverage(), {
     exactStatisticsRuleMissionIds: [1200, 1208, 1209, 1210, 1211, 1216, 1223],
     exactResistanceDebuffRules: 2,
     exactResistanceDebuffRuleMissionIds: [600001, 900809],
-    exactClientCheckRules: 10,
-    exactClientCheckRuleMissionIds: clientCheckMissionIds,
+    exactHardMultiConditionRules: 10,
+    exactHardMultiConditionRuleMissionIds: hardMultiConditionMissionIds,
 })
 assert.deepEqual(BATTLE_SETTLEMENT_CATEGORIES, [1, 2, 3, 6, 7, 8, 10])
 
@@ -358,67 +358,180 @@ for (const outsideTime of [
     assert.equal(missionProgress(1208), singleSsBefore + 1, "开放期外不得改变 type26 持久化进度")
 }
 
-function clientCheckFixture(missionId, overrides = {}) {
+const type87AttackDownMissionIds = [600003, 900793, 900810, 900814]
+const type87LightResistanceDownMissionIds = [900653, 900813]
+const type87ParalysisMissionIds = [900728, 900811]
+const type87CoffinMissionIds = [600002, 900812]
+
+function conditionStats(overrides = {}) {
+    return Array.from({ length: 42 }, (_, index) => ({
+        max_acc_good: 0,
+        max_acc_bad: overrides[index] ?? 0,
+    }))
+}
+
+function type87Statistics(missionId, overrides = {}) {
+    const members = overrides.members ?? [
+        { conditions: conditionStats() },
+        { conditions: conditionStats() },
+        { conditions: conditionStats() },
+    ]
+    return {
+        clear_phase: 0,
+        client_checks: [],
+        zones: overrides.zones ?? [{
+            encoffinment_count: 0,
+            members,
+        }],
+        party: { characters: [], unison_characters: [] },
+    }
+}
+
+function type87Fixture(missionId, overrides = {}) {
     const mission = require("../assets/mission_event.json")[String(missionId)][0]
     const eventId = Number(mission[8])
     const questId = eventId * 1000 + 1
-    const clientCheckTime = new Date(
+    const evaluationTime = new Date(
         Date.parse(`${mission[25].replace(" ", "T")}+08:00`) + 1_000,
     )
     return {
         mission,
         questId,
-        clientCheckTime,
+        evaluationTime,
         context: finishContext({
             questCategory: 26,
             questId,
             clearTime: 120_000,
-            statistics: {
-                clear_phase: 0,
-                client_checks: [mission[6]],
-                party: { characters: [], unison_characters: [] },
-            },
+            statistics: type87Statistics(missionId),
             ...overrides,
         }),
     }
 }
 
-for (const missionId of clientCheckMissionIds) {
-    const { context, clientCheckTime } = clientCheckFixture(missionId)
+for (const missionId of hardMultiConditionMissionIds) {
+    const { context, evaluationTime } = type87Fixture(missionId)
     assert.equal(
-        recordEventMissionBattleFacts(context, clientCheckTime).includes(missionId),
+        recordEventMissionBattleFacts(context, evaluationTime).includes(missionId),
         true,
-        `type87 ${missionId} 必须接受包含 row[6] 的 client_checks`,
+        `type87 ${missionId} 必须接受对应的无异常战斗统计`,
     )
     assert.equal(missionProgress(missionId), 1, `type87 ${missionId} 应完成到 1`)
 }
 
-const idempotentClientCheck = clientCheckFixture(900810)
-recordEventMissionBattleFacts(idempotentClientCheck.context, idempotentClientCheck.clientCheckTime)
+const idempotentType87 = type87Fixture(900810)
+recordEventMissionBattleFacts(idempotentType87.context, idempotentType87.evaluationTime)
 assert.equal(missionProgress(900810), 1, "type87 重复结算必须幂等")
 
 const representativeMissionId = 900810
-const representative = clientCheckFixture(representativeMissionId)
+const representative = type87Fixture(representativeMissionId)
 db.prepare(`
     DELETE FROM players_category_missions
     WHERE player_id = ? AND category = 3 AND id = ?
 `).run(playerId, representativeMissionId)
-for (const invalidChecks of [
-    undefined,
-    null,
-    [],
-    [representative.mission[6], representative.mission[6]],
-    [""],
-    ["wrong-client-check"],
-    "not-an-array",
+for (const invalidStatistics of [
+    { clear_phase: 0, party: { characters: [], unison_characters: [] } },
+    type87Statistics(representativeMissionId, { zones: [] }),
+    type87Statistics(representativeMissionId, { zones: [{}] }),
+    type87Statistics(representativeMissionId, { members: [] }),
+    type87Statistics(representativeMissionId, { members: [null] }),
+    type87Statistics(representativeMissionId, { members: [{ conditions: [] }] }),
+    type87Statistics(representativeMissionId, {
+        members: [{ conditions: conditionStats({ 0: 1 }) }],
+    }),
+    type87Statistics(representativeMissionId, {
+        members: [{ conditions: conditionStats({ 0: -1 }) }],
+    }),
 ]) {
     const matches = recordEventMissionBattleFacts({
         ...representative.context,
-        statistics: { ...representative.context.statistics, client_checks: invalidChecks },
-    }, representative.clientCheckTime)
-    assert.equal(matches.includes(representativeMissionId), false, "type87 非法 client_checks 不得匹配")
-    assert.equal(missionProgress(representativeMissionId), 0, "type87 非法 client_checks 不得写入")
+        statistics: invalidStatistics,
+    }, representative.evaluationTime)
+    assert.equal(matches.includes(representativeMissionId), false, "type87 非法队长减攻统计不得匹配")
+    assert.equal(missionProgress(representativeMissionId), 0, "type87 非法队长减攻统计不得写入")
 }
+
+for (const missionId of type87AttackDownMissionIds) {
+    const fixture = type87Fixture(missionId, {
+        statistics: type87Statistics(missionId, {
+            members: [
+                { conditions: conditionStats() },
+                { conditions: conditionStats({ 0: 1 }) },
+            ],
+        }),
+    })
+    db.prepare(`DELETE FROM players_category_missions WHERE player_id = ? AND category = 3 AND id = ?`)
+        .run(playerId, missionId)
+    assert.equal(recordEventMissionBattleFacts(fixture.context, fixture.evaluationTime).includes(missionId), true,
+        `type87 ${missionId} 只检查队长攻击力下降`)
+}
+
+for (const missionId of type87LightResistanceDownMissionIds) {
+    for (const members of [
+        [{ conditions: conditionStats({ 7: 1 }) }],
+        [{ conditions: conditionStats().slice(0, 7) }],
+    ]) {
+        const fixture = type87Fixture(missionId, {
+            statistics: type87Statistics(missionId, { members }),
+        })
+        db.prepare(`DELETE FROM players_category_missions WHERE player_id = ? AND category = 3 AND id = ?`)
+            .run(playerId, missionId)
+        assert.equal(recordEventMissionBattleFacts(fixture.context, fixture.evaluationTime).includes(missionId), false,
+            `type87 ${missionId} 队长光耐下降或字段缺失时不得匹配`)
+    }
+}
+
+for (const missionId of type87ParalysisMissionIds) {
+    for (const members of [
+        [{ conditions: conditionStats() }, { conditions: conditionStats({ 14: 1 }) }],
+        [{ conditions: conditionStats() }, { conditions: conditionStats().slice(0, 14) }],
+    ]) {
+        const fixture = type87Fixture(missionId, {
+            statistics: type87Statistics(missionId, { members }),
+        })
+        db.prepare(`DELETE FROM players_category_missions WHERE player_id = ? AND category = 3 AND id = ?`)
+            .run(playerId, missionId)
+        assert.equal(recordEventMissionBattleFacts(fixture.context, fixture.evaluationTime).includes(missionId), false,
+            `type87 ${missionId} 任一队员麻痹或字段缺失时不得匹配`)
+    }
+}
+
+for (const missionId of type87CoffinMissionIds) {
+    for (const zone of [
+        { encoffinment_count: 1, members: [{ conditions: conditionStats() }] },
+        { members: [{ conditions: conditionStats() }] },
+        { encoffinment_count: -1, members: [{ conditions: conditionStats() }] },
+    ]) {
+        const fixture = type87Fixture(missionId, {
+            statistics: type87Statistics(missionId, { zones: [zone] }),
+        })
+        db.prepare(`DELETE FROM players_category_missions WHERE player_id = ? AND category = 3 AND id = ?`)
+            .run(playerId, missionId)
+        assert.equal(recordEventMissionBattleFacts(fixture.context, fixture.evaluationTime).includes(missionId), false,
+            `type87 ${missionId} 任一 zone 有棺柩或字段非法时不得匹配`)
+    }
+}
+
+for (const [missionId, secondZone] of [
+    [900814, { encoffinment_count: 0, members: [{ conditions: conditionStats({ 0: 1 }) }] }],
+    [900813, { encoffinment_count: 0, members: [{ conditions: conditionStats({ 7: 1 }) }] }],
+    [900811, { encoffinment_count: 0, members: [{ conditions: conditionStats({ 14: 1 }) }] }],
+    [900812, { encoffinment_count: 1, members: [{ conditions: conditionStats() }] }],
+]) {
+    const firstZone = {
+        encoffinment_count: 0,
+        members: [{ conditions: conditionStats() }],
+    }
+    const fixture = type87Fixture(missionId, {
+        statistics: type87Statistics(missionId, { zones: [firstZone, secondZone] }),
+    })
+    db.prepare(`DELETE FROM players_category_missions WHERE player_id = ? AND category = 3 AND id = ?`)
+        .run(playerId, missionId)
+    assert.equal(recordEventMissionBattleFacts(fixture.context, fixture.evaluationTime).includes(missionId), false,
+        `type87 ${missionId} 后续 zone 出现目标异常时不得匹配`)
+}
+
+db.prepare(`DELETE FROM players_category_missions WHERE player_id = ? AND category = 3 AND id = ?`)
+    .run(playerId, representativeMissionId)
 for (const invalidContext of [
     { questAccomplished: false },
     { isMulti: false, isMultiHost: undefined },
@@ -432,18 +545,18 @@ for (const invalidContext of [
     const matches = recordEventMissionBattleFacts({
         ...representative.context,
         ...invalidContext,
-    }, representative.clientCheckTime)
+    }, representative.evaluationTime)
     assert.equal(matches.includes(representativeMissionId), false, "type87 非法结算上下文不得匹配")
     assert.equal(missionProgress(representativeMissionId), 0, "type87 非法结算上下文不得写入")
 }
 
 for (const missionId of [600002, 900812]) {
-    const fixture = clientCheckFixture(missionId, { clearTime: 180_001 })
+    const fixture = type87Fixture(missionId, { clearTime: 180_001 })
     db.prepare(`
         DELETE FROM players_category_missions
         WHERE player_id = ? AND category = 3 AND id = ?
     `).run(playerId, missionId)
-    const matches = recordEventMissionBattleFacts(fixture.context, fixture.clientCheckTime)
+    const matches = recordEventMissionBattleFacts(fixture.context, fixture.evaluationTime)
     assert.equal(matches.includes(missionId), false, `type87 ${missionId} 超过 180 秒不得匹配`)
     assert.equal(missionProgress(missionId), 0, `type87 ${missionId} 超过 180 秒不得写入`)
 }
