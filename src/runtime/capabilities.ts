@@ -2,19 +2,27 @@ import type { FastifyInstance } from "fastify"
 
 import { deepFreeze } from "../content/deep-freeze"
 import type { ContentSnapshot } from "../content/runtime/content-snapshot"
-import { canonicalJsonBuffer, sha256Object } from "../content/sync/canonical-json"
 import {
     MODE_API_VERSION,
-    MODE_SERVER_CAPABILITIES,
     type LoadedModeIdentity,
 } from "../modes/registry"
+import { buildModeDigest } from "../multi/compatibility/mode-digest"
 import type { BundleMetadata } from "./bundle-metadata"
 
 const SHA256_IDENTITY = /^sha256:[0-9a-f]{64}$/
 const SHA256_HEX = /^[0-9a-f]{64}$/
 const DECIMAL = /^(0|[1-9][0-9]*)$/
 const VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/
-const CAPABILITY = /^[a-z0-9][a-z0-9._-]*@[1-9][0-9]*$/
+
+export const RUNTIME_API_VERSION = 1 as const
+
+const MODE_SERVER_CAPABILITIES = Object.freeze([
+    "mode.hook.quest-start@1",
+    "mode.hook.rush-finish@1",
+    "mode.hook.rush-parties-serialized@1",
+    "mode.host.base-table@1",
+    "mode.host.transaction-server@1",
+] as const)
 
 export interface RuntimeCapabilitiesInput {
     readonly bundle: BundleMetadata
@@ -34,7 +42,7 @@ export interface RuntimeCapabilitiesBody {
         readonly bundleId: string | null
     }
     readonly runtime: {
-        readonly api: 1
+        readonly api: typeof RUNTIME_API_VERSION
         readonly node: string
         readonly nodeAbi: string
         readonly platform: NodeJS.Platform
@@ -98,23 +106,9 @@ function validateLoadedMode(identity: LoadedModeIdentity): void {
         || !identity.fileName.endsWith(".mjs")
         || /[\0/\\]/.test(identity.fileName)
         || !SHA256_HEX.test(identity.sha256)
-        || identity.capabilities.length === 0
-        || identity.capabilities.some(capability => !CAPABILITY.test(capability))
-        || new Set(identity.capabilities).size !== identity.capabilities.length) {
+        || !identity.capability) {
         throw new TypeError("loaded mode identity is invalid")
     }
-}
-
-function buildModeDigest(identities: readonly LoadedModeIdentity[]): `sha256:${string}` {
-    const canonicalIdentities = [...identities]
-        .sort(compareLoadedModes)
-        .map(identity => ({
-            fileName: identity.fileName,
-            name: identity.name,
-            capabilities: [...identity.capabilities],
-            sha256: identity.sha256,
-        }))
-    return sha256Object(canonicalJsonBuffer(canonicalIdentities))
 }
 
 export function createRuntimeCapabilitiesSnapshot(
@@ -154,7 +148,7 @@ export function createRuntimeCapabilitiesSnapshot(
             bundleId: input.bundle.bundleId,
         },
         runtime: {
-            api: MODE_API_VERSION,
+            api: RUNTIME_API_VERSION,
             node: input.node,
             nodeAbi: input.nodeAbi,
             platform: input.platform,
@@ -174,7 +168,7 @@ export function createRuntimeCapabilitiesSnapshot(
             serverCapabilities: [...MODE_SERVER_CAPABILITIES],
             loaded: loadedModes.map(identity => ({
                 name: identity.name,
-                capabilities: [...identity.capabilities],
+                capabilities: [identity.capability],
                 sha256: identity.sha256,
             })),
             modeDigest: buildModeDigest(input.loadedModes),

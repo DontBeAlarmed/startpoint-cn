@@ -10,6 +10,7 @@ const { canonicalJsonBuffer, sha256Object } = require("../src/content/sync/canon
 const {
     createRuntimeCapabilitiesSnapshot,
     registerRuntimeCapabilitiesRoute,
+    RUNTIME_API_VERSION,
 } = require("../src/runtime/capabilities")
 
 const RELEASE_DIGEST = `sha256:${"a".repeat(64)}`
@@ -38,7 +39,7 @@ function modeDigest(identities) {
         .map(identity => ({
             fileName: identity.fileName,
             name: identity.name,
-            capabilities: [...identity.capabilities],
+            capability: identity.capability,
             sha256: identity.sha256,
         }))
     return sha256Object(canonicalJsonBuffer(canonical))
@@ -73,7 +74,7 @@ function validInput(overrides = {}) {
         loadedModes: [{
             fileName: "20-fixture.mjs",
             name: "fixture",
-            capabilities: ["fixture@1"],
+            capability: "fixture@1",
             sha256: "c".repeat(64),
         }],
         node: "20.20.2",
@@ -132,6 +133,7 @@ test("builds the exact frozen v1 capabilities body from local public facts", () 
         },
     })
     assertDeepFrozen(body)
+    assert.equal(RUNTIME_API_VERSION, 1)
     assert.equal(body.serverCapabilities.includes("mode.release-contract@1"), false)
     assert.equal(body.modes.loaded.some(identity => "fileName" in identity), false)
     assert.doesNotMatch(
@@ -143,18 +145,17 @@ test("builds the exact frozen v1 capabilities body from local public facts", () 
 test("sorts copied mode and patch facts without trusting caller mutation", () => {
     const bmpPrivate = "\uE000"
     const astral = "\u{10000}"
-    const capabilities = ["astral@1"]
     const loadedModes = [
         {
             fileName: `${astral}.mjs`,
             name: "astral",
-            capabilities,
+            capability: "astral@1",
             sha256: "d".repeat(64),
         },
         {
             fileName: `${bmpPrivate}.mjs`,
             name: "bmp-private",
-            capabilities: ["bmp-private@1"],
+            capability: "bmp-private@1",
             sha256: "e".repeat(64),
         },
     ]
@@ -165,7 +166,6 @@ test("sorts copied mode and patch facts without trusting caller mutation", () =>
     ]
     const body = createRuntimeCapabilitiesSnapshot(validInput({ content, loadedModes }))
 
-    capabilities.push("mutated@1")
     loadedModes.length = 0
     content.archiveSources.archives.push({
         source: { kind: "patch", targetVersion: "9.9.9" },
@@ -183,19 +183,40 @@ test("rejects invalid public runtime identities", () => {
         validInput({ loadedModes: [{
             fileName: "fixture.mjs",
             name: "fixture",
-            capabilities: ["fixture@1"],
+            capability: "fixture@1",
             sha256: "invalid",
         }] }),
         validInput({ loadedModes: [{
             fileName: "fixture.mjs",
             name: "fixture",
-            capabilities: ["fixture@1", "fixture@1"],
-            sha256: "c".repeat(64),
+            capability: "",
+            sha256: "d".repeat(64),
         }] }),
     ]
     for (const input of cases) {
         assert.throws(() => createRuntimeCapabilitiesSnapshot(input), TypeError)
     }
+})
+
+test("preserves Mode API v1 nonempty third-party capability strings", () => {
+    const input = validInput({
+        loadedModes: [{
+            fileName: "legacy-third-party.mjs",
+            name: "legacy-third-party",
+            capability: "Legacy Third Party Capability",
+            sha256: "f".repeat(64),
+        }],
+    })
+
+    const body = createRuntimeCapabilitiesSnapshot(input)
+
+    assert.deepEqual(body.modes.loaded, [{
+        name: "legacy-third-party",
+        capabilities: ["Legacy Third Party Capability"],
+        sha256: "f".repeat(64),
+    }])
+    assert.equal(body.modes.modeDigest, modeDigest(input.loadedModes))
+    assert.equal(body.serverCapabilities.includes("Legacy Third Party Capability"), false)
 })
 
 test("local capabilities route returns exact JSON", async t => {
