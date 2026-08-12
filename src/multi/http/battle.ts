@@ -56,6 +56,7 @@ import {
     type AdditionalRewardTable,
 } from "../../lib/additional-reward";
 import { buildFinishFollowInfo } from "../../lib/quest/finish/follow-info";
+import { settleActivityPeriodicRewardsSync } from "../../lib/quest/finish/periodic-reward-handler";
 import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
 import {
     ActiveQuestAlreadyExistsError,
@@ -569,6 +570,13 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                     { grantRewards: rewards => givePlayerRewardsSync(playerId, rewards) },
                 )
                 : { dropAdditionalRewardIds: [], rewardResult: null };
+            const periodicRewardSettlement = settleActivityPeriodicRewardsSync({
+                playerId,
+                questCategory,
+                questId,
+                questAccomplished,
+                isMulti: true,
+            })
             recordMissionBattleFacts(finishCtx, settlementTime)
             const rewardCharacterExpResult = givePlayerCharactersExpSync(
                 playerId, partyCharacterIdsArray, characterBattleExp,
@@ -592,6 +600,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 rewardCharacterExpResult,
                 scoreRewardsResult,
                 additionalRewardSettlement,
+                periodicRewardSettlement,
                 sPlusClearReward,
                 missionSettlement,
                 fieldMana,
@@ -639,6 +648,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             rewardCharacterExpResult,
             scoreRewardsResult,
             additionalRewardSettlement,
+            periodicRewardSettlement,
             sPlusClearReward,
             missionSettlement,
             fieldMana,
@@ -694,7 +704,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 "drop_score_reward_ids": scoreRewardsResult.drop_score_reward_ids,
                 "drop_rare_reward_ids": scoreRewardsResult.drop_rare_reward_ids,
                 "drop_additional_reward_ids": additionalRewardSettlement.dropAdditionalRewardIds,
-                "drop_periodic_reward_ids": [],
+                "drop_periodic_reward_ids": periodicRewardSettlement.dropPeriodicRewardIds,
                 "equipment_list": [
                     ...scoreRewardsResult.equipment_list,
                     ...(clearReward?.equipment_list || []),
@@ -707,7 +717,9 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 "item_list": {
                     ...scoreRewardsResult.items,
                     ...(additionalRewardSettlement.rewardResult?.items ?? {}),
+                    ...periodicRewardSettlement.items,
                 },
+                "user_periodic_reward_point_list": periodicRewardSettlement.periodicRewardPointList,
                 "presigned_quest_category": [],
                 "mate_player_result": matePlayerResult,
                 "follow_info": followInfo,

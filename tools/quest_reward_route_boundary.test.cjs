@@ -7,6 +7,19 @@ const os = require("node:os")
 const path = require("node:path")
 const Fastify = require("fastify")
 
+const multiBattleSource = fs.readFileSync(
+    path.join(__dirname, "../src/multi/http/battle.ts"),
+    "utf8",
+)
+const singleBattleSource = fs.readFileSync(
+    path.join(__dirname, "../src/routes/api/singleBattleQuest.ts"),
+    "utf8",
+)
+assert.match(multiBattleSource, /settleActivityPeriodicRewardsSync/)
+assert.match(multiBattleSource, /user_periodic_reward_point_list/)
+assert.doesNotMatch(singleBattleSource, /settleActivityPeriodicRewardsSync/)
+assert.match(singleBattleSource, /"drop_periodic_reward_ids": \[\]/)
+
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "quest-reward-boundary-db-"))
 const previousDataDirectory = process.env.DATA_DIR
 const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR

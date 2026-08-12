@@ -48,6 +48,10 @@ const {
     getPlayerSync,
     insertDefaultPlayerSync,
 } = require("../src/data/domains/player")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const {
+    settleActivityPeriodicRewardsSync,
+} = require("../src/lib/quest/finish/periodic-reward-handler")
 
 initializeDatabase()
 db = getDb()
@@ -119,5 +123,77 @@ assert.throws(() => db.transaction(() => {
     throw new Error("rollback periodic reward point")
 })(), /rollback periodic reward point/)
 assert.equal(points(playerId)[10000002], 1)
+
+function settlePeriodic(player, overrides = {}) {
+    return db.transaction(() => settleActivityPeriodicRewardsSync({
+        playerId: player,
+        questCategory: 26,
+        questId: 100002001,
+        questAccomplished: true,
+        isMulti: true,
+        random: () => 0.5,
+        ...overrides,
+    }))()
+}
+
+const normalPlayerId = createPlayer("periodic-normal")
+const normalBefore = getPlayerItemSync(normalPlayerId, 40405) ?? 0
+const normal = settlePeriodic(normalPlayerId)
+assert.deepEqual(normal, {
+    dropPeriodicRewardIds: [{ group_id: 10000002, index: 1, number: 9 }],
+    periodicRewardPointList: [{ id: 10000002, point: 1 }],
+    items: { 40405: normalBefore + 9 },
+})
+assert.equal(getPlayerItemSync(normalPlayerId, 40405), normalBefore + 9)
+
+const finalPlayerId = createPlayer("periodic-final")
+const finalBefore = getPlayerItemSync(finalPlayerId, 40405) ?? 0
+const final = settlePeriodic(finalPlayerId, { questId: 1006001 })
+assert.deepEqual(final, {
+    dropPeriodicRewardIds: [{ group_id: 10000002, index: 1, number: 9 }],
+    periodicRewardPointList: [{ id: 10000002, point: 1 }],
+    items: { 40405: finalBefore + 9 },
+})
+
+const exhaustedPlayerId = createPlayer("periodic-exhausted")
+db.prepare(`UPDATE players_periodic_reward_points SET point = 0 WHERE player_id = ? AND id = 10000002`)
+    .run(exhaustedPlayerId)
+let exhaustedRandomCalls = 0
+assert.deepEqual(settlePeriodic(exhaustedPlayerId, { random: () => {
+    exhaustedRandomCalls++
+    return 0.5
+} }), {
+    dropPeriodicRewardIds: [], periodicRewardPointList: [], items: {},
+})
+assert.equal(exhaustedRandomCalls, 0, "次数耗尽时不得进入周期奖励抽选")
+assert.equal(getPlayerItemSync(exhaustedPlayerId, 40405), null)
+
+for (const [label, overrides] of [
+    ["failed", { questAccomplished: false }],
+    ["single", { isMulti: false }],
+    ["boss", { questCategory: 2, questId: 1066001 }],
+]) {
+    const boundaryPlayerId = createPlayer(`periodic-${label}`)
+    assert.deepEqual(settlePeriodic(boundaryPlayerId, overrides), {
+        dropPeriodicRewardIds: [], periodicRewardPointList: [], items: {},
+    })
+    assert.equal(points(boundaryPlayerId)[10000002], 2)
+    assert.equal(getPlayerItemSync(boundaryPlayerId, 40405), null)
+}
+
+const settlementRollbackPlayerId = createPlayer("periodic-settlement-rollback")
+assert.throws(() => db.transaction(() => {
+    settleActivityPeriodicRewardsSync({
+        playerId: settlementRollbackPlayerId,
+        questCategory: 26,
+        questId: 100002001,
+        questAccomplished: true,
+        isMulti: true,
+        random: () => 0.5,
+    })
+    throw new Error("rollback periodic settlement")
+})(), /rollback periodic settlement/)
+assert.equal(points(settlementRollbackPlayerId)[10000002], 2)
+assert.equal(getPlayerItemSync(settlementRollbackPlayerId, 40405), null)
 
 console.log("periodic reward settlement tests passed")
