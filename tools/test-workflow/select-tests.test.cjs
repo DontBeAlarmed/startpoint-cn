@@ -106,6 +106,18 @@ test("maps representative source files to focused groups", () => {
         ],
     )
     assert.deepEqual(
+        selectTestGroups(["src/runtime/capabilities.ts"]),
+        ["integration:runtime", "quick:runtime"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/modes/registry.ts"]),
+        ["quick:modes"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/content/runtime/content-repository.ts"]),
+        ["quick:content"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/server.ts"]),
         ["full", "integration:cdn", "integration:database"],
     )
@@ -340,6 +352,8 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/runtime_native_binding.test.cjs",
             "tools/server_time_service.test.cjs",
             "tools/server_time_routes.test.cjs",
+            "tools/runtime_capabilities.test.cjs",
+            "tools/runtime_capabilities_wiring.test.cjs",
         ],
     })
     assert.deepEqual(
@@ -437,6 +451,11 @@ test("routes multiplayer runtime and private credential changes to focused group
         selectTestGroups(["tools/multi_hub_authentication.test.cjs"]),
         ["integration:multi-hub", "quick:protocol", "quick:runtime"],
     )
+})
+
+test("registers verified mode identity coverage with the mode seam", () => {
+    assert.equal(TEST_GROUPS["quick:modes"].tests.includes("tools/mode_identity.test.cjs"), true)
+    assert.deepEqual(selectTestGroups(["tools/mode_identity.test.cjs"]), ["quick:modes"])
 })
 
 test("registers focused seed state and API regressions", () => {

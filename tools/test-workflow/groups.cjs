@@ -46,6 +46,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/runtime_native_binding.test.cjs",
             "tools/server_time_service.test.cjs",
             "tools/server_time_routes.test.cjs",
+            "tools/runtime_capabilities.test.cjs",
+            "tools/runtime_capabilities_wiring.test.cjs",
         ],
     },
     "quick:modes": {
@@ -58,6 +60,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/modes_routes.test.cjs",
             "tools/modes_lifecycle.test.cjs",
             "tools/modes_wiring.test.cjs",
+            "tools/mode_identity.test.cjs",
         ],
     },
     "quick:seed": {
