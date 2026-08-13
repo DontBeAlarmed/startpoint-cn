@@ -17,6 +17,7 @@ export const ITEM_SHOP_PERIOD_ERROR_CODE = 2053
 
 export interface GenericShopPlayerState {
     id: number
+    vmoney: number
     freeMana: number
     freeVmoney: number
     bondToken: number
@@ -54,6 +55,7 @@ export interface GenericShopPurchaseDependencies {
     ): ShopPurchaseCounts
     recordManaSpent(playerId: number, amount: number): void
     grantRewards(playerId: number, rewards: Reward[]): PlayerRewardResult | null
+    grantPassCardPoints?(playerId: number, amount: number): void
 }
 
 export interface GenericShopPurchaseResult {
@@ -317,6 +319,10 @@ export function executeGenericShopPurchaseSync(
                     nextPlayer.bondToken -= cost
                     if (nextPlayer.bondToken < 0) throw new ShopBalanceError("Not enough amity scrolls.")
                     break
+                case ShopItemUserCostType.PAID_BEADS:
+                    nextPlayer.vmoney -= cost
+                    if (nextPlayer.vmoney < 0) throw new ShopBalanceError("Not enough paid beads.")
+                    break
             }
         }
 
@@ -344,6 +350,15 @@ export function executeGenericShopPurchaseSync(
             buildRewards(input.shopItem, purchaseAmount),
         )
         if (rewardResult === null) throw new ShopPurchaseError("Failed to grant shop rewards.")
+        if (input.shopItem.passCardPoints !== undefined) {
+            if (!dependencies.grantPassCardPoints) {
+                throw new ShopPurchaseError("Pass card point rewards are unavailable.")
+            }
+            dependencies.grantPassCardPoints(
+                input.playerId,
+                input.shopItem.passCardPoints * purchaseAmount,
+            )
+        }
 
         const purchaseCount = dependencies.addPurchaseCounts(
             input.playerId,

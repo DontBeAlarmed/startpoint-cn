@@ -116,7 +116,6 @@ export interface CurrencyShopItemReward extends ShopItemReward {
     count: number
 }
 
-
 export interface PlayerRewardResult {
     user_info: {
         free_mana: number

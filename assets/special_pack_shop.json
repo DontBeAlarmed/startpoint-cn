@@ -1,0 +1,14 @@
+{
+  "220040": {
+    "costs": [],
+    "rewards": [],
+    "availableFrom": "2024-06-01 05:00:00",
+    "availableUntil": null,
+    "stock": 99,
+    "userCost": {
+      "type": 3,
+      "amount": 50
+    },
+    "passCardPoints": 100
+  }
+}

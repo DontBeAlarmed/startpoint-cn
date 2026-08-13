@@ -531,6 +531,14 @@ const definitionInputs: TableSourceInput[] = [
         converterVersion: 2,
         outputShapeVersion: 2,
     },
+    {
+        tableName: "special_pack_shop.json",
+        scope: "cdn",
+        sourceOrderedMaps: ["master/shop/special_pack_shop.orderedmap"],
+        converterId: "shop",
+        converterVersion: 4,
+        outputShapeVersion: 4,
+    },
     ...DIRECT_ORDERED_MAP_TABLES.map(([tableName, nestingDepth, sourceOrderedMap]) => (
         directOrderedMapDefinition(tableName, nestingDepth, sourceOrderedMap)
     )),

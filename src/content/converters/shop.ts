@@ -8,6 +8,7 @@ import type {
     ShopItems,
     ShopSelectItemCampaigns,
 } from "../../lib/types/shop"
+import { ShopItemUserCostType } from "../../lib/types/shop"
 import { parseCsvLine } from "./csv"
 
 const GENERAL_SHOP_PATH = "master/shop/general_shop.orderedmap"
@@ -28,6 +29,7 @@ const EQUIPMENT_ENHANCEMENT_SHOP_PATH =
     "master/equipment_enhancement/equipment_enhancement_shop.orderedmap"
 const EQUIPMENT_ENHANCEMENT_SHOP_CATEGORY_PATH =
     "master/equipment_enhancement/equipment_enhancement_shop_category.orderedmap"
+const SPECIAL_PACK_SHOP_PATH = "master/shop/special_pack_shop.orderedmap"
 
 const INTEGER_PATTERN = /^(?:0|-?[1-9]\d*)$/
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/
@@ -57,6 +59,7 @@ export interface ShopConversionOutput {
     readonly "star_grain_shop.json": DeepReadonly<ShopItems>
     readonly "treasure_shop.json": DeepReadonly<ShopItems>
     readonly "equipment_enhancement_shop.json": DeepReadonly<ShopItems>
+    readonly "special_pack_shop.json": DeepReadonly<ShopItems>
 }
 
 interface ShopLayout {
@@ -160,6 +163,37 @@ const EQUIPMENT_LAYOUT: ShopLayout = {
     dailyStock: 27,
     monthlyStock: 28,
     rewardStarts: [32, 35, 38, 41, 44, 47],
+}
+
+function convertSpecialPackShop(rows: readonly OrderedMapTextRow[]): ShopItems {
+    const parsed = requireRows(rows, "special_pack_shop", 46)
+    const result: ShopItems = {}
+    for (const [id, fields] of parsed) {
+        const kind = parseOptionalInteger(fields[27], `special_pack_shop[${id}].kind1`)
+        const points = parseOptionalInteger(fields[29], `special_pack_shop[${id}].kind1.count`)
+        const priceKind = parseOptionalInteger(fields[9], `special_pack_shop[${id}].priceKind`)
+        const price = parseOptionalInteger(fields[10], `special_pack_shop[${id}].price`)
+        if (kind !== 6 || points === undefined || priceKind !== 0 || price === undefined) continue
+        const item: ShopItem = {
+            costs: [],
+            rewards: [],
+            availableFrom: parseDate(fields[20], `special_pack_shop[${id}].availableFrom`),
+            availableUntil: parseOptionalDate(fields[21], `special_pack_shop[${id}].availableUntil`),
+            stock: parseInteger(fields[23], `special_pack_shop[${id}].buyMaxCount`),
+            userCost: { type: ShopItemUserCostType.PAID_BEADS, amount: price },
+            passCardPoints: points,
+        }
+        for (const [fieldName, column] of [
+            ["maxFrequency", 24],
+            ["dailyStock", 25],
+            ["monthlyStock", 26],
+        ] as const) {
+            const value = parseOptionalInteger(fields[column], `special_pack_shop[${id}].${fieldName}`)
+            if (value !== undefined) item[fieldName] = value
+        }
+        result[id] = item
+    }
+    return result
 }
 
 function invalidShop(reason: string): never {
@@ -465,6 +499,7 @@ export async function convertShops(reader: ShopSourceReader): Promise<ShopConver
         "equipment_enhancement_shop_category",
         10,
     )
+    const specialPackRows = await reader.read(SPECIAL_PACK_SHOP_PATH)
 
     const shopSelectItemCampaigns: ShopSelectItemCampaigns = {
         "4": convertSelectCampaigns(
@@ -569,5 +604,6 @@ export async function convertShops(reader: ShopSourceReader): Promise<ShopConver
         "star_grain_shop.json": convertFlatShop(starGrainRows, STAR_GRAIN_LAYOUT),
         "treasure_shop.json": convertFlatShop(treasureRows, TREASURE_LAYOUT),
         "equipment_enhancement_shop.json": equipmentEnhancementShop,
+        "special_pack_shop.json": convertSpecialPackShop(specialPackRows),
     })
 }

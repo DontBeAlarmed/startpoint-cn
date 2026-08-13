@@ -4,6 +4,7 @@ export enum ShopItemUserCostType {
     BEADS,
     MANA,
     AMITY_SCROLL,
+    PAID_BEADS,
 }
 
 
@@ -58,6 +59,7 @@ export interface ShopItem {
     compatibilityPeriods?: ShopItemAvailabilityPeriod[]
     campaignId?: number
     lineupId?: number
+    passCardPoints?: number
 }
 
 export interface ShopSelectItemCampaign {

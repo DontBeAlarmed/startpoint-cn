@@ -122,6 +122,9 @@ const EXPECTED_CDN_TABLES = Object.freeze({
         "master/equipment_enhancement/equipment_enhancement_shop.orderedmap",
         "master/equipment_enhancement/equipment_enhancement_shop_category.orderedmap",
     ]],
+    "special_pack_shop.json": ["shop", [
+        "master/shop/special_pack_shop.orderedmap",
+    ]],
 })
 
 const EXPECTED_DIRECT_CDN_TABLES = Object.freeze({
@@ -632,7 +635,7 @@ test("registry independently covers static CN runtime JSON references", () => {
 })
 
 test("every registry table has an explicit existing bundled fallback", () => {
-    assert.equal(TABLE_SOURCES.length, 122)
+    assert.equal(TABLE_SOURCES.length, 123)
     for (const entry of TABLE_SOURCES) {
         const sourcePath = path.resolve(projectRoot, entry.bundledPath)
         assert.ok(fs.existsSync(sourcePath), `${entry.tableName} source must exist`)

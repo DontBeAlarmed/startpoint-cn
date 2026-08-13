@@ -803,6 +803,8 @@ export function getGenericShopItemsSync(
             return getShopContentTable<ShopItems>("general_shop.json")
         case ShopType.STAR_GRAIN:
             return getShopContentTable<ShopItems>("star_grain_shop.json")
+        case ShopType.SPECIAL_PACK:
+            return getShopContentTable<ShopItems>("special_pack_shop.json")
     }
     return null
 }
@@ -877,6 +879,8 @@ export function getShopItemSync(
             return getShopContentTable<ShopItems>("general_shop.json")[String(itemId)] ?? null
         case ShopType.STAR_GRAIN:
             return getShopContentTable<ShopItems>("star_grain_shop.json")[String(itemId)] ?? null
+        case ShopType.SPECIAL_PACK:
+            return getShopContentTable<ShopItems>("special_pack_shop.json")[String(itemId)] ?? null
         case ShopType.BOSS_COIN:
             const category = getShopContentTable<Record<string, number>>(
                 "boss_coin_shop_item_category_map.json",

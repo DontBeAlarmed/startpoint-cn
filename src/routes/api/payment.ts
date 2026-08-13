@@ -25,6 +25,7 @@ const PRODUCTS: Record<string, PaymentProduct> = paymentProducts as Record<strin
 
 // In-memory purchase tracking (resets on server restart)
 const purchaseHistory: Record<string, number> = {}
+const pendingProducts: Record<string, string> = {}
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/item_list", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -39,12 +40,20 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Bad Request", "message": "Invalid viewer id."
         })
 
-        // Payment disabled on private server — return empty list
+        const now = new Date(getServerTime() * 1000)
+        const activePass = getActivePassCardEventDefinitionAt(now)
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
-                "payment_item_list": [],
+                "payment_item_list": activePass ? [{
+                    "store_product_id": "com.leiting.wf.pass_card",
+                    "age_limit": false,
+                    "monthly_alert": false,
+                    "purchased_times": null,
+                    "start_time": activePass.startTime / 1000,
+                    "end_time": activePass.endTime / 1000,
+                }] : [],
                 "refund_penalty_status": null
             }
         })
@@ -89,6 +98,10 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         console.log(`[PAYMENT-START] viewer ${viewerId}, product: ${productId} (paid=${product.charge_vmoney_num} free=${product.free_vmoney_num})`)
+        const playerId = resolvePlayerIdSync(session.accountId)
+        if (playerId !== null && playerId !== undefined) {
+            pendingProducts[String(playerId)] = productId
+        }
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -143,7 +156,12 @@ const routes = async (fastify: FastifyInstance) => {
         if (!player) return reply.status(500).send({ "error": "Internal Server Error", "message": "Player not found." })
 
         // Determine product_id from pending payment
-        const productId = body.product_id || body.payment?.product_id || ""
+        const pendingProductKey = String(playerId)
+        const productId = body.product_id
+            || body.payment?.product_id
+            || pendingProducts[pendingProductKey]
+            || ""
+        delete pendingProducts[pendingProductKey]
         const product = PRODUCTS[productId]
         if (!product) {
             console.warn(`[PAYMENT-FINISH] unknown product: ${productId}, receipt: ${receipt}`)

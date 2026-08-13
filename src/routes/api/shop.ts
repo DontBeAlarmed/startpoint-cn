@@ -43,6 +43,10 @@ import {
     ShopCampaignValidationError,
 } from "../../lib/shop-select-campaign";
 import { buildShopSalesListSync } from "../../lib/shop-sales-list";
+import {
+    addPlayerPassCardPointSync,
+} from "../../data/domains/pass-card"
+import { getActivePassCardEventDefinitionAt } from "../../lib/pass-card"
 
 interface GetSalesListBody {
     equipment_enhancement_shop_category_ids: number[],
@@ -291,6 +295,11 @@ const routes = async (fastify: FastifyInstance) => {
                     }
                 },
                 grantRewards: givePlayerRewardsSync,
+                grantPassCardPoints: (id, amount) => {
+                    const activeEvent = getActivePassCardEventDefinitionAt(new Date(getServerTime() * 1000))
+                    if (!activeEvent) throw new ShopPurchaseError("No active pass card.")
+                    addPlayerPassCardPointSync(id, activeEvent.eventId, amount, activeEvent.thresholdPoint)
+                },
             })
         } catch (error) {
             if (error instanceof ShopPeriodError) {
@@ -328,6 +337,7 @@ const routes = async (fastify: FastifyInstance) => {
             }),
             "data": {
                 "user_info": {
+                    "vmoney": afterPlayer.vmoney,
                     "free_vmoney": afterPlayer.freeVmoney,
                     "free_mana": afterPlayer.freeMana,
                     "bond_token": afterPlayer.bondToken,

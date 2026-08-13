@@ -26,6 +26,7 @@ const PATHS = Object.freeze({
     equipment: "master/equipment_enhancement/equipment_enhancement_shop.orderedmap",
     equipmentCategory:
         "master/equipment_enhancement/equipment_enhancement_shop_category.orderedmap",
+    specialPack: "master/shop/special_pack_shop.orderedmap",
 })
 
 function encodeCsv(fields) {
@@ -190,6 +191,18 @@ function createFixture() {
             8: "2024-06-01 12:00:00",
             9: "(None)",
         }))]],
+        [PATHS.specialPack, [row("220040", fields(46, {
+            9: 0,
+            10: 50,
+            20: "2024-06-01 05:00:00",
+            21: "(None)",
+            23: 99,
+            24: "(None)",
+            25: "(None)",
+            26: "(None)",
+            27: 6,
+            29: 100,
+        }))]],
     ])
     return {
         requested,
@@ -320,6 +333,17 @@ test("shop converter reads all verified sources and emits runtime-compatible tab
             requireAwakeningLevel: 5,
         },
     })
+    assert.deepEqual(output["special_pack_shop.json"], {
+        "220040": {
+            costs: [],
+            rewards: [],
+            availableFrom: "2024-06-01 05:00:00",
+            availableUntil: null,
+            stock: 99,
+            userCost: { type: 3, amount: 50 },
+            passCardPoints: 100,
+        },
+    })
     assert.equal(output["event_item_shop.json"]["11"]["700011"], undefined)
     assertDeepFrozen(output)
 })
@@ -341,6 +365,7 @@ test("shop converter preserves empty official shops without synthesizing rows", 
         "star_grain_shop.json": {},
         "treasure_shop.json": {},
         "equipment_enhancement_shop.json": {},
+        "special_pack_shop.json": {},
     })
 })
 
