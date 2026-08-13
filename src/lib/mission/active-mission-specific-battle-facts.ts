@@ -123,6 +123,8 @@ export function collectActiveMissionSpecificBattleFacts(
     if (!context.questAccomplished) return []
     const partyCharacterIds = new Set(context.partyCharacterIds)
     const unisonCharacterIds = new Set(context.unisonCharacterIds ?? [])
+    // Loadout missions without a leader/slot selector apply to every character in the party.
+    const allCharacterIds = new Set([...partyCharacterIds, ...unisonCharacterIds])
     const matched: ActiveMissionBattleFact[] = []
     for (const definition of definitions) {
         try {
@@ -134,7 +136,7 @@ export function collectActiveMissionSpecificBattleFacts(
             if (pattern === LOADOUT_PATTERN
                 && matchesCharacterElement(
                     parseTargetElement(definition.row[69]),
-                    partyCharacterIds,
+                    allCharacterIds,
                     characters,
                 )
                 && matchesEquipmentElement(definition.row[70], context.equipmentElements)) {

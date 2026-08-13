@@ -111,6 +111,23 @@ assert.deepEqual(collectActiveMissionSpecificBattleFacts(definitions, {
     { missionId: 20013 },
 ])
 
+// Element missions without a slot selector also accept a matching Sub/Unison character.
+assert.deepEqual(collectActiveMissionSpecificBattleFacts(definitions, {
+    questAccomplished: true,
+    isMulti: false,
+    questCategory: 1,
+    questId: 1001001,
+    partyCharacterIds: [4],
+    unisonCharacterIds: [2],
+    equipmentElements: [2],
+}, {
+    "2": { element: 2 },
+    "4": { element: 4 },
+}), [
+    { missionId: 20013 },
+    { missionId: 20014 },
+])
+
 assert.deepEqual(collectActiveMissionSpecificBattleFacts(definitions, {
     questAccomplished: false,
     isMulti: false,
