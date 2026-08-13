@@ -22,12 +22,14 @@ const { getActiveMissionCountersSync } = require("../src/data/domains/active_mis
 const { getPlayerCharacterSync, getPlayerCharactersSync } = require("../src/data/domains/character")
 const { getPlayerEquipmentSync, getPlayerEquipmentListSync } = require("../src/data/domains/equipment")
 const { getPlayerGachaInfoSync, insertPlayerGachaInfoSync } = require("../src/data/domains/gacha")
-const { getPlayerItemsSync } = require("../src/data/domains/item")
+const { getPlayerItemSync, getPlayerItemsSync, givePlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 const gachaRoutes = require("../src/routes/api/gacha").default
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
+const { rewardPlayerGachaDrawResultSync } = require("../src/lib/gacha")
+const { GachaType } = require("../src/lib/types")
 
 let database
 let app
@@ -212,4 +214,29 @@ test("gacha exec commits charge reward history points and mission fact together"
     assert.equal(after.gachaInfo.gachaExchangePoint, 1)
     assert.equal(after.historyCount, 1)
     assert.equal(after.activeMissionCounters.totalGachaCharacterCount, 1)
+})
+
+test("character duplicate gacha item_list reports the post-reward inventory", async () => {
+    const { playerId } = await createPlayer("gacha-duplicate-item-list")
+    const characterId = 1
+    const exBoostItemId = 14002
+    givePlayerItemSync(playerId, exBoostItemId, 20)
+
+    const result = rewardPlayerGachaDrawResultSync(
+        playerId,
+        { type: GachaType.CHARACTER },
+        [characterId],
+        undefined,
+        [{
+            characterId,
+            rarity: 4,
+            movieId: "normal",
+            seed: 1,
+            requiresVerification: true,
+        }],
+    )
+
+    assert.equal(getPlayerItemSync(playerId, exBoostItemId), 21)
+    assert.equal(result.draw[0].ex_boost_item.count, 1)
+    assert.equal(result.items[exBoostItemId], 21)
 })

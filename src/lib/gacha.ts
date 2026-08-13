@@ -9,6 +9,7 @@ import { PlayerBoxGachaDrawnReward } from "../data/types";
 import { givePlayerCharacterSync } from "./character";
 import { givePlayerEquipmentSync } from "./equipment";
 import { givePlayerRewardsSync } from "./quest";
+import { getPlayerItemSync } from "../data/domains/item";
 import { getCharacterDataSync } from "./assets";
 import { BoxGachaBox, BoxGachaDrawResult, BoxGachaIdReward, BoxGachaRewardTier, BoxGachaRewardType, CharacterGacha, CharacterReward, CurrencyReward, EquipmentItemReward, Gacha, GachaCharacterDraw, GachaDrawResult, GachaDraws, GachaMovieType, GachaType, PlayerRewardResult, Reward, RewardPlayerGachaDrawResult, RewardType } from "./types";
 import { computeEquipmentGachaMovieEffectsForGacha, EquipmentMovieDrawInput } from "./gacha-equipment-movie";
@@ -163,7 +164,9 @@ export function rewardPlayerGachaDrawResultSync(
                     const giveItem = giveResult.item
                     if (giveItem !== undefined) {
                         draw['ex_boost_item'] = giveItem // add ex_boost_item to draw
-                        items.set(giveItem.id, (items.get(giveItem.id) ?? 0) + giveItem.count)
+                        // item_list carries post-reward inventory totals; the draw field above
+                        // carries the amount granted by this duplicate character.
+                        items.set(giveItem.id, getPlayerItemSync(playerId, giveItem.id) ?? 0)
                     }
 
                     const existingCharacter = characters.get(characterId)
