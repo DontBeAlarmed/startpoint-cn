@@ -43,7 +43,6 @@ const paymentRoutes = require("../src/routes/api/payment").default
 const shopRoutes = require("../src/routes/api/shop").default
 const { getTimeOffset, setServerTimeOffset } = require("../src/utils")
 const { pack } = require("msgpackr")
-const { getPassCardEventDefinition } = require("../src/lib/pass-card")
 
 const previousTimeOffset = getTimeOffset()
 restoreTimeOffset = () => setServerTimeOffset(previousTimeOffset)
@@ -85,16 +84,7 @@ async function main() {
         assert.equal(itemListResponse.statusCode, 200, itemListResponse.body)
 
         const itemListData = require("msgpackr").unpack(itemListResponse.rawPayload).data
-        const activeEvent = getPassCardEventDefinition(3)
-        assert.ok(activeEvent)
-        assert.deepEqual(itemListData.payment_item_list, [{
-            store_product_id: "com.leiting.wf.pass_card",
-            age_limit: false,
-            monthly_alert: false,
-            purchased_times: 0,
-            start_time: activeEvent.startTime / 1000,
-            end_time: activeEvent.endTime / 1000,
-        }])
+        assert.deepEqual(itemListData.payment_item_list, [])
 
         const before = getPlayerSync(playerId)
         const initialVmoney = before.vmoney
@@ -140,7 +130,7 @@ async function main() {
         const purchasedItemListData = require("msgpackr").unpack(
             purchasedItemListResponse.rawPayload,
         ).data
-        assert.equal(purchasedItemListData.payment_item_list[0].purchased_times, 1)
+        assert.deepEqual(purchasedItemListData.payment_item_list, [])
 
         const pointBeforeGift = getPlayerPassCardStateSync(playerId, 3).point
         const vmoneyBeforeGift = getPlayerSync(playerId).vmoney

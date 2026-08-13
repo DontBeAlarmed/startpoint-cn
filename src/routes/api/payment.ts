@@ -40,28 +40,13 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Bad Request", "message": "Invalid viewer id."
         })
 
-        const playerId = resolvePlayerIdSync(session.accountId)
-        const purchaseKey = playerId === null || playerId === undefined
-            ? null
-            : `${playerId}_com.leiting.wf.pass_card`
-        const purchasedTimes = purchaseKey === null
-            ? 0
-            : (purchaseHistory[purchaseKey] ?? 0)
-
-        const now = new Date(getServerTime() * 1000)
-        const activePass = getActivePassCardEventDefinitionAt(now)
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
-                "payment_item_list": activePass ? [{
-                    "store_product_id": "com.leiting.wf.pass_card",
-                    "age_limit": false,
-                    "monthly_alert": false,
-                    "purchased_times": purchasedTimes,
-                    "start_time": activePass.startTime / 1000,
-                    "end_time": activePass.endTime / 1000,
-                }] : [],
+                // Payment SDK is intentionally unavailable in the private server.
+                // Keep the route compatible, but do not advertise Pass purchases.
+                "payment_item_list": [],
                 "refund_penalty_status": null
             }
         })
