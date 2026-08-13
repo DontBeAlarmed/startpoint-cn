@@ -1,16 +1,16 @@
 // Character bond token and mana board opening endpoints
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getPlayerCharacterSync, insertPlayerCharacterBondTokenSync, updatePlayerCharacterBondTokenSync, updatePlayerCharacterSync } from "../../../data/domains/character"
+import { getPlayerCharacterManaNodesSync, getPlayerCharacterSync, insertPlayerCharacterBondTokenSync, updatePlayerCharacterBondTokenSync, updatePlayerCharacterSync } from "../../../data/domains/character"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
 import { getSession } from "../../../data/domains/session"
-import { generateDataHeaders } from "../../../utils";
-import { getCharacterDataSync, getCharacterManaBoardCountSync } from "../../../lib/assets";
+import { getServerDate } from "../../../utils";
+import { getCharacterDataSync, getCharacterManaBoardCountSync, getCharacterManaNodesSync } from "../../../lib/assets";
 import { clientSerializeDate } from "../../../data/utils";
 import { resolvePlayerIdSync } from "../../../data/activeAccount";
 import { validateSessionAndPlayer, validateCharacterOwnership, buildCharacterListEntry, sendCharacterResponse } from "../../../lib/character-helpers";
 import { characterExpCaps } from "../../../lib/character";
-import { reconcileAwakeUnlockCharacterList } from "../../../lib/mission";
+import { mergeMissionSettlementResponse, reconcileAwakeUnlockCharacterList, settleMissionCategories } from "../../../lib/mission";
 import { getMailArrivedSync } from "../../../lib/mail-notification";
 import { isCharacterSecondManaBoardAvailable } from "../../../lib/mana-board-availability";
 import { getDb } from "../../../data/db";
@@ -159,7 +159,18 @@ const routes = async (fastify: FastifyInstance) => {
                 "error": "Bad Request", "message": `Character is not uncapped enough to unlock mana board.`
             })
         }
-        if (1 > characterData.bondTokenList[manaBoardIndex - 2]?.status) {
+        if (manaBoardIndex === 2) {
+            const firstBoardNodes = getCharacterManaNodesSync(characterId, 1)
+            const learnedNodeIds = new Set(getPlayerCharacterManaNodesSync(playerId, characterId))
+            const firstBoardComplete = firstBoardNodes !== null
+                && Object.keys(firstBoardNodes).every(nodeId => learnedNodeIds.has(Number(nodeId)))
+            if (!firstBoardComplete) {
+                console.log(`[MANA] open_mana_board FAIL: first board is incomplete, char=${characterId}`)
+                return reply.status(400).send({
+                    "error": "Bad Request", "message": `Must unlock all previous mana board nodes.`
+                })
+            }
+        } else if (1 > characterData.bondTokenList[manaBoardIndex - 2]?.status) {
             console.log(`[MANA] open_mana_board FAIL: prev board bond not claimed, prevIdx=${manaBoardIndex - 2} prevStatus=${characterData.bondTokenList[manaBoardIndex - 2]?.status}`)
             return reply.status(400).send({
                 "error": "Bad Request", "message": `Must unlock all previous mana board nodes.`
@@ -187,21 +198,28 @@ const routes = async (fastify: FastifyInstance) => {
             updatePlayerCharacterSync(playerId, characterId, { manaBoardIndex })
         })()
 
-        reply.header("content-type", "application/x-msgpack")
-        return reply.status(200).send({
-            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "character_list": [{
-                    "viewer_id": viewerId,
-                    "character_id": characterId,
-                    "mana_board_index": manaBoardIndex,
-                    "create_time": clientSerializeDate(characterData.joinTime),
-                    "update_time": clientSerializeDate(characterData.updateTime),
-                    "join_time": clientSerializeDate(characterData.joinTime)
-                }],
-                "mail_arrived": getMailArrivedSync(playerId)
-            }
-        })
+        const missionSettlement = settleMissionCategories(playerId, [1], getServerDate())
+        const responseData = {
+            "user_info": {},
+            "character_list": [{
+                "viewer_id": viewerId,
+                "character_id": characterId,
+                "mana_board_index": manaBoardIndex,
+                "create_time": clientSerializeDate(characterData.joinTime),
+                "update_time": clientSerializeDate(characterData.updateTime),
+                "join_time": clientSerializeDate(characterData.joinTime)
+            }],
+            "user_character_mana_node_list": {},
+            "item_list": {},
+            "evolution": [],
+            "mail_arrived": getMailArrivedSync(playerId),
+            "mission_info": [],
+            "equipment_list": [],
+            "degree_list": [],
+        }
+        mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)
+        responseData.mail_arrived = getMailArrivedSync(playerId)
+        return sendCharacterResponse(reply, viewerId, responseData)
     })
 }
 

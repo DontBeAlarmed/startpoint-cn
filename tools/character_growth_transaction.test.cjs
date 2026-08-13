@@ -8,7 +8,7 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const Fastify = require("fastify")
-const { pack } = require("msgpackr")
+const { pack, unpack } = require("msgpackr")
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "character-growth-tx-db-"))
 const previousDataDirectory = process.env.DATA_DIR
@@ -42,6 +42,7 @@ const { insertDefaultPlayerSync, getPlayerSync, updatePlayerSync } = require("..
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 const { characterExpCaps } = require("../src/lib/character")
+const { getCharacterManaNodesSync } = require("../src/lib/assets")
 const manaRoutes = require("../src/routes/api/character/mana").default
 const bondRoutes = require("../src/routes/api/character/bond").default
 const characterRoutes = require("../src/routes/api/character").default
@@ -153,6 +154,12 @@ async function main() {
         exp: characterExpCaps[4][0],
         overLimitStep: 4,
     })
+    const firstBoardNodeIds = Object.keys(getCharacterManaNodesSync(1, 1)).map(Number)
+    const insertOpenNode = db.prepare(`
+        INSERT INTO players_characters_mana_nodes (value, awake_level, player_id, character_id)
+        VALUES (?, 0, ?, 1)
+    `)
+    for (const nodeId of firstBoardNodeIds) insertOpenNode.run(nodeId, open.playerId)
     updatePlayerCharacterBondTokenSync(open.playerId, 1, { manaBoardIndex: 1, status: 2 })
     db.prepare(`
         DELETE FROM players_characters_bond_tokens
@@ -177,6 +184,31 @@ async function main() {
     })
     assert.equal(openResponse.statusCode, 500)
     assert.deepEqual(characterState(open.playerId), beforeOpen)
+
+    db.exec(`DROP TRIGGER reject_board_open`)
+    const openSuccess = await createPlayer(8)
+    updatePlayerCharacterSync(openSuccess.playerId, 1, {
+        exp: characterExpCaps[4][0],
+        overLimitStep: 4,
+    })
+    for (const nodeId of firstBoardNodeIds) insertOpenNode.run(nodeId, openSuccess.playerId)
+    updatePlayerCharacterBondTokenSync(openSuccess.playerId, 1, { manaBoardIndex: 1, status: 2 })
+    const openSuccessResponse = await app.inject({
+        method: "POST",
+        url: "/bond/open_mana_board",
+        payload: {
+            viewer_id: openSuccess.viewerId,
+            character_id: 1,
+            mana_board_index: 2,
+            api_count: 1,
+        },
+    })
+    assert.equal(openSuccessResponse.statusCode, 200)
+    const openSuccessPayload = unpack(Buffer.from(openSuccessResponse.body, "base64"))
+    assert.ok(
+        openSuccessPayload.data.mission_info.some(entry => entry.mission_category_id === 1 && entry.mission_id === 95),
+        "opening the second mana board should settle regular mission 95 in the same response",
+    )
 
     const overLimit = await createPlayer(4)
     givePlayerItemSync(overLimit.playerId, 10002, 1)

@@ -20,6 +20,9 @@ export interface CharacterResponseData {
     item_list: Record<string, number>
     evolution: Object
     mail_arrived: boolean
+    mission_info?: Record<string, unknown>[]
+    equipment_list?: Record<string, unknown>[]
+    degree_list?: Record<string, unknown>[]
 }
 
 // ─── Shared validation ───
