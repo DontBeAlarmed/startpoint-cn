@@ -5,6 +5,7 @@ import { getPlayerMailCountSync } from "../../data/domains/mail"
 import {
     getPlayerPassCardRewardRecordsSync,
     getPlayerPassCardStateSync,
+    setPlayerPassCardPurchasedSync,
     setPlayerPassCardRewardReceivedSync,
 } from "../../data/domains/pass-card"
 import { getPlayerSync } from "../../data/domains/player"
@@ -86,6 +87,7 @@ export default async function passCardRoutes(fastify: FastifyInstance): Promise<
         if (!event || !isPassCardEventActiveAt(event, new Date(getServerTime() * 1000))) {
             return reply.status(400).send({ error: "Bad Request", message: "Unknown pass card." })
         }
+        setPlayerPassCardPurchasedSync(playerId, body.pass_card_id)
         const state = getPlayerPassCardStateSync(playerId, body.pass_card_id)
         reply.header("content-type", "application/x-msgpack")
         return reply.send({

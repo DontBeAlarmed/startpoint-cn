@@ -58,8 +58,9 @@ export function ensurePlayerPassCardLoginProgressSync(
     const initialBaseline = Math.max(0, totalLoginDays - 1)
     const row = getDb().prepare(`
         INSERT INTO players_pass_cards (player_id, event_id, point, is_buy, login_baseline)
-        VALUES (?, ?, 0, 0, ?)
+        VALUES (?, ?, 0, 1, ?)
         ON CONFLICT(player_id, event_id) DO UPDATE SET
+            is_buy = 1,
             login_baseline = COALESCE(login_baseline, excluded.login_baseline)
         RETURNING login_baseline
     `).get(playerId, eventId, initialBaseline) as { login_baseline: number }

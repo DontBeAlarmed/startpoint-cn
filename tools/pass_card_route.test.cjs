@@ -64,6 +64,14 @@ const viewerId = 800000219
 db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
     .run(String(viewerId), account.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 2)
 addPlayerPassCardPointSync(playerId, 3, 100)
+assert.equal(
+    db.prepare("SELECT is_buy FROM players_pass_cards WHERE player_id = ? AND event_id = 3")
+        .get(playerId).is_buy,
+    1,
+    "新存档应默认拥有当前 Pass 高阶资格",
+)
+db.prepare("UPDATE players_pass_cards SET is_buy = 0 WHERE player_id = ? AND event_id = 3")
+    .run(playerId)
 
 async function main() {
     const fastify = Fastify()
@@ -105,7 +113,7 @@ async function main() {
         assert.equal(getResponse.statusCode, 200, getResponse.body)
         assert.deepEqual(unpack(Buffer.from(getResponse.body, "base64")).data, {
             point: 100,
-            is_buy: false,
+            is_buy: true,
             all_received_record: [],
         })
 
