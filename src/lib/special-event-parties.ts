@@ -22,6 +22,25 @@ export function hasValidPartyCategory(
     return typeof category === "number" && isPartyCategory(category)
 }
 
+export function getPartyGroupLimit(category: PartyCategory): number {
+    return category === PartyCategory.CARNIVAL || category === PartyCategory.RUSH ? 6 : 12
+}
+
+export function isPartyGroupAllowedForCategory(
+    category: PartyCategory,
+    groupId: number,
+): boolean {
+    return Number.isInteger(groupId) && groupId >= 1 && groupId <= getPartyGroupLimit(category)
+}
+
+export function isGlobalPartyIdAllowedForCategory(
+    category: PartyCategory,
+    partyId: number,
+): boolean {
+    const parsed = parseGlobalPartyId(partyId)
+    return parsed !== null && isPartyGroupAllowedForCategory(category, parsed.groupId)
+}
+
 export function resolvePartyGroupColorId(
     group: Pick<PlayerPartyGroup, "colorId"> | undefined,
 ): number {
@@ -67,6 +86,7 @@ export function mergePartyGroupsForCategory(
 
     for (const source of sources) {
         for (const [groupId, group] of Object.entries(source)) {
+            if (!isPartyGroupAllowedForCategory(category, Number(groupId))) continue
             const target = result[groupId] ?? {
                 list: {},
                 colorId: group.colorId,

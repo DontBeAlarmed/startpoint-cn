@@ -93,6 +93,7 @@ stubModule("../src/data/domains/party", {
 stubModule("../src/lib/special-event-parties", {
     hasValidPartyCategory: () => true,
     parseGlobalPartyId: partyId => ({ groupId: Math.floor(partyId / 1000), slot: partyId % 1000 }),
+    isGlobalPartyIdAllowedForCategory: () => true,
 })
 stubModule("../src/utils", {
     generateDataHeaders: values => ({ viewer_id: values.viewer_id, result_code: values.result_code ?? 1 }),

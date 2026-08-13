@@ -5,9 +5,11 @@ require("ts-node/register/transpile-only")
 const { PartyCategory } = require("../src/data/types")
 let specialEventParties = {}
 let partyGroupPersistence = {}
+let playerDomain = {}
 try {
     specialEventParties = require("../src/lib/special-event-parties")
     partyGroupPersistence = require("../src/lib/party-group-persistence")
+    playerDomain = require("../src/data/domains/player")
 } catch {
     // The first TDD run intentionally reaches this branch before the helper exists.
 }
@@ -24,7 +26,27 @@ assert.equal(typeof specialEventParties.isPartyCategory, "function")
 assert.equal(typeof specialEventParties.hasValidPartyCategory, "function")
 assert.equal(typeof specialEventParties.getGlobalPartyId, "function")
 assert.equal(typeof specialEventParties.parseGlobalPartyId, "function")
+assert.equal(typeof specialEventParties.getPartyGroupLimit, "function")
+assert.equal(typeof specialEventParties.isPartyGroupAllowedForCategory, "function")
+assert.equal(typeof specialEventParties.isGlobalPartyIdAllowedForCategory, "function")
 assert.equal(typeof partyGroupPersistence.insertMissingPartyGroupListSync, "function")
+assert.equal(typeof partyGroupPersistence.pruneSpecialEventPartyGroupsSync, "function")
+
+for (const category of [PartyCategory.NORMAL, PartyCategory.CARNIVAL, PartyCategory.RAID, PartyCategory.RUSH]) {
+    const groups = playerDomain.getDefaultPlayerPartyGroupsSync(category)
+    const expectedGroupCount = category === PartyCategory.CARNIVAL || category === PartyCategory.RUSH ? 6 : 12
+    assert.equal(specialEventParties.getPartyGroupLimit(category), expectedGroupCount)
+    assert.equal(Object.keys(groups).length, expectedGroupCount)
+    assert.equal(Object.values(groups).reduce((count, group) => count + Object.keys(group.list).length, 0), expectedGroupCount * 10)
+}
+assert.equal(specialEventParties.isPartyGroupAllowedForCategory(PartyCategory.RUSH, 6), true)
+assert.equal(specialEventParties.isPartyGroupAllowedForCategory(PartyCategory.RUSH, 7), false)
+assert.equal(specialEventParties.isPartyGroupAllowedForCategory(PartyCategory.CARNIVAL, 7), false)
+assert.equal(specialEventParties.isPartyGroupAllowedForCategory(PartyCategory.NORMAL, 12), true)
+assert.equal(specialEventParties.isPartyGroupAllowedForCategory(PartyCategory.RAID, 12), true)
+assert.equal(specialEventParties.isGlobalPartyIdAllowedForCategory(PartyCategory.RUSH, 60), true)
+assert.equal(specialEventParties.isGlobalPartyIdAllowedForCategory(PartyCategory.RUSH, 61), false)
+assert.equal(specialEventParties.isGlobalPartyIdAllowedForCategory(PartyCategory.NORMAL, 120), true)
 
 assert.equal(specialEventParties.resolvePartyGroupColorId(undefined), 15)
 assert.equal(specialEventParties.resolvePartyGroupColorId({ colorId: 7 }), 7)
@@ -196,26 +218,64 @@ db.exec(`
     );
 `)
 db.prepare("INSERT INTO players_party_groups VALUES (1, 99, 17, 2)").run()
+db.prepare("INSERT INTO players_party_groups VALUES (7, 99, 17, 1)").run()
+db.prepare("INSERT INTO players_party_groups VALUES (7, 99, 17, 2)").run()
+db.prepare("INSERT INTO players_party_groups VALUES (7, 99, 17, 3)").run()
+db.prepare("INSERT INTO players_party_groups VALUES (7, 99, 17, 4)").run()
 db.prepare(`
     INSERT INTO players_parties (
         slot, name, edited, player_id, group_id, category
     ) VALUES (1, 'database winner', 1, 17, 1, 2)
 `).run()
 
+for (const category of [1, 2, 3, 4]) {
+    db.prepare(`
+        INSERT INTO players_parties (slot, name, edited, player_id, group_id, category)
+        VALUES (1, ?, 1, 17, 7, ?)
+    `).run(`group-7-${category}`, category)
+}
+
+partyGroupPersistence.pruneSpecialEventPartyGroupsSync(db)
+
+assert.deepEqual(
+    db.prepare("SELECT id, category FROM players_party_groups ORDER BY category, id").all(),
+    [
+        { id: 7, category: 1 },
+        { id: 1, category: 2 },
+        { id: 7, category: 3 },
+    ],
+)
+assert.deepEqual(
+    db.prepare("SELECT group_id, category, name FROM players_parties ORDER BY category, group_id").all(),
+    [
+        { group_id: 7, category: 1, name: "group-7-1" },
+        { group_id: 1, category: 2, name: "database winner" },
+        { group_id: 7, category: 3, name: "group-7-3" },
+    ],
+)
+
 partyGroupPersistence.insertMissingPartyGroupListSync(db, 17, merged)
 
 assert.deepEqual(
-    db.prepare("SELECT id, color_id FROM players_party_groups ORDER BY id").all(),
-    [{ id: 1, color_id: 99 }, { id: 2, color_id: 5 }, { id: 3, color_id: 15 }],
+    db.prepare("SELECT id, category, color_id FROM players_party_groups ORDER BY category, id").all(),
+    [
+        { id: 7, category: 1, color_id: 99 },
+        { id: 1, category: 2, color_id: 99 },
+        { id: 2, category: 2, color_id: 5 },
+        { id: 3, category: 2, color_id: 15 },
+        { id: 7, category: 3, color_id: 99 },
+    ],
 )
 assert.deepEqual(
-    db.prepare("SELECT group_id, slot, name FROM players_parties ORDER BY group_id, slot").all(),
+    db.prepare("SELECT group_id, category, slot, name FROM players_parties ORDER BY category, group_id, slot").all(),
     [
-        { group_id: 1, slot: 1, name: "database winner" },
-        { group_id: 1, slot: 2, name: "legacy slot 2" },
-        { group_id: 1, slot: 3, name: "default slot 3" },
-        { group_id: 2, slot: 1, name: "legacy group 2" },
-        { group_id: 3, slot: 1, name: "default group 3" },
+        { group_id: 7, category: 1, slot: 1, name: "group-7-1" },
+        { group_id: 1, category: 2, slot: 1, name: "database winner" },
+        { group_id: 1, category: 2, slot: 2, name: "legacy slot 2" },
+        { group_id: 1, category: 2, slot: 3, name: "default slot 3" },
+        { group_id: 2, category: 2, slot: 1, name: "legacy group 2" },
+        { group_id: 3, category: 2, slot: 1, name: "default group 3" },
+        { group_id: 7, category: 3, slot: 1, name: "group-7-3" },
     ],
 )
 db.close()

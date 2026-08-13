@@ -10,7 +10,7 @@ import { incrementActiveMissionPartyActionCountsSync } from "../../data/domains/
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { PartyCategory } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { hasValidPartyCategory, parseGlobalPartyId } from "../../lib/special-event-parties";
+import { hasValidPartyCategory, isGlobalPartyIdAllowedForCategory, parseGlobalPartyId } from "../../lib/special-event-parties";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { recordRaidSetEditMissionFactsSync } from "../../lib/mission/event-entry-facts";
 import { validatePartyLoadouts } from "../../lib/party-loadout-validation";
@@ -428,7 +428,11 @@ const routes = async (fastify: FastifyInstance) => {
         })
         if (!Array.isArray(body.party_info_list)
             || body.party_info_list.some(info => !hasValidPartyCategory(info)
-                || parseGlobalPartyId((info as PartyInfoListItem).party_id) === null)) {
+                || parseGlobalPartyId((info as PartyInfoListItem).party_id) === null
+                || !isGlobalPartyIdAllowedForCategory(
+                    (info as PartyInfoListItem).party_category as PartyCategory,
+                    (info as PartyInfoListItem).party_id,
+                ))) {
             return reply.status(400).send({
                 "error": "Bad Request",
                 "message": "Invalid party category or party ID."

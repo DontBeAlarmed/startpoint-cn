@@ -6,6 +6,7 @@ import {
     ensureActiveQuestEntryItemCountStorageSync,
 } from "../../lib/quest/active-quest-persistence";
 import { ensureSchemaColumn } from "../schema";
+import { pruneSpecialEventPartyGroupsSync } from "../../lib/party-group-persistence";
 
 function getInitialDropMultiplier(): number {
     const configured = process.env.DROP_MULTIPLIER
@@ -471,6 +472,7 @@ export default function init(
     // migration: add current_battle_power and before_battle_power to existing tables
     ensureSchemaColumn(database, "players_parties.current_battle_power")
     ensureSchemaColumn(database, "players_parties.before_battle_power")
+    pruneSpecialEventPartyGroupsSync(database)
 
     // database.prepare(`CREATE TABLE IF NOT EXISTS players_party_options (
     //     allow_other_players_to_heal_me INTEGER NOT NULL,

@@ -22,7 +22,7 @@
 |---|---|---|
 | `/event/rush/summary` | 活动状态、出战队伍、排名 | 返回 `endless_battle_max_round` 等 Rush 字段 |
 | `/event/rush/select_folder` | 选择难度 | 已锁定难度时拒绝重复选择 |
-| `/event/rush/party` | 读取活动配队 | 使用 `party_category=4` 和全局唯一 `party_id` |
+| `/event/rush/party` | 读取活动配队 | 使用 `party_category=4`、6 组 × 10 队和全局唯一 `party_id=1..60` |
 | `/event/rush/battle/start` | 开始关卡 | 写入 active quest |
 | `/single_battle_quest/finish` | 关卡结算 | 返回 `rush_event` 专用字段 |
 | `/event/rush/endless_battle` | 无限轮次状态 | 从玩家 Rush 状态读取 |

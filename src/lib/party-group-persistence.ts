@@ -1,5 +1,20 @@
 import { Database as BetterSqlite3Database } from "better-sqlite3"
-import { PlayerParty, PlayerPartyGroup } from "../data/types"
+import { PartyCategory, PlayerParty, PlayerPartyGroup } from "../data/types"
+
+const PRUNED_SPECIAL_EVENT_CATEGORIES = [PartyCategory.CARNIVAL, PartyCategory.RUSH]
+const MAX_SPECIAL_EVENT_PARTY_GROUP_ID = 6
+
+export function pruneSpecialEventPartyGroupsSync(db: BetterSqlite3Database): void {
+    const placeholders = PRUNED_SPECIAL_EVENT_CATEGORIES.map(() => "?").join(",")
+    db.prepare(`
+        DELETE FROM players_parties
+        WHERE category IN (${placeholders}) AND group_id > ?
+    `).run(...PRUNED_SPECIAL_EVENT_CATEGORIES, MAX_SPECIAL_EVENT_PARTY_GROUP_ID)
+    db.prepare(`
+        DELETE FROM players_party_groups
+        WHERE category IN (${placeholders}) AND id > ?
+    `).run(...PRUNED_SPECIAL_EVENT_CATEGORIES, MAX_SPECIAL_EVENT_PARTY_GROUP_ID)
+}
 
 function insertMissingPartySync(
     db: BetterSqlite3Database,

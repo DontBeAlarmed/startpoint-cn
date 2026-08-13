@@ -74,6 +74,7 @@ import { insertPlayerOptionsSync } from "./option";
 import { insertPlayerItemsSync } from "./item";
 import { insertPlayerEquipmentListSync } from "./equipment";
 import { insertPlayerPartyGroupListSync } from "./party";
+import { getPartyGroupLimit } from "../../lib/special-event-parties";
 import { insertPlayerCharactersSync, insertPlayerCharactersManaNodesSync, updatePlayerCharactersManaNodeAwakeLevelsSync } from "./character";
 import { insertPlayerCharacterAwakeUnlocksSync } from "./character_awake";
 import { insertPlayerDrawnQuestsSync, insertPlayerQuestProgressListSync } from "./quest";
@@ -573,7 +574,7 @@ export function getDefaultPlayerPartyGroupsSync(
     const partyGroups: Record<string, PlayerPartyGroup> = {}
 
     const partyNames = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
-    const groupCount = 12  // CN version: 12 groups × 10 slots = 120 parties
+    const groupCount = getPartyGroupLimit(partyType)
 
     const character1 = characterIds[0]
     const character2 = characterIds[1]

@@ -8,7 +8,7 @@ import { updatePlayerPartyGroupSync } from "../../data/domains/party"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders } from "../../utils";
 import { PartyCategory } from "../../data/types";
-import { hasValidPartyCategory } from "../../lib/special-event-parties";
+import { hasValidPartyCategory, isPartyGroupAllowedForCategory } from "../../lib/special-event-parties";
 import { getDb } from "../../data/db";
 
 interface EditBody {
@@ -28,8 +28,10 @@ function isValidEditParams(value: unknown): value is EditBody["party_group_edit_
     if (!hasValidPartyCategory(value)) return false
     const params = value as Record<string, unknown>
     return Number.isSafeInteger(params.party_group_id)
-        && (params.party_group_id as number) >= 1
-        && (params.party_group_id as number) <= 12
+        && isPartyGroupAllowedForCategory(
+            params.party_category as PartyCategory,
+            params.party_group_id as number,
+        )
         && Number.isSafeInteger(params.party_group_color_id)
         && (params.party_group_color_id as number) > 0
 }
