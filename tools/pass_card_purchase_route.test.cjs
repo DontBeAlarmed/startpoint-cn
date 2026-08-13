@@ -91,7 +91,7 @@ async function main() {
             store_product_id: "com.leiting.wf.pass_card",
             age_limit: false,
             monthly_alert: false,
-            purchased_times: null,
+            purchased_times: 0,
             start_time: activeEvent.startTime / 1000,
             end_time: activeEvent.endTime / 1000,
         }])
@@ -130,6 +130,17 @@ async function main() {
         assert.equal(getPlayerPassCardStateSync(playerId, 3).isBuy, true)
         assert.equal(getPlayerSync(playerId).vmoney, initialVmoney)
         assert.equal(getPlayerSync(playerId).freeVmoney, initialFreeVmoney)
+
+        const purchasedItemListResponse = await fastify.inject({
+            method: "POST",
+            url: "/payment/item_list",
+            payload: { viewer_id: viewerId },
+        })
+        assert.equal(purchasedItemListResponse.statusCode, 200, purchasedItemListResponse.body)
+        const purchasedItemListData = require("msgpackr").unpack(
+            purchasedItemListResponse.rawPayload,
+        ).data
+        assert.equal(purchasedItemListData.payment_item_list[0].purchased_times, 1)
 
         const pointBeforeGift = getPlayerPassCardStateSync(playerId, 3).point
         const vmoneyBeforeGift = getPlayerSync(playerId).vmoney
