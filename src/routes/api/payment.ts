@@ -7,6 +7,8 @@ import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { getConfigSync } from "../../lib/assets";
+import { setPlayerPassCardPurchasedSync } from "../../data/domains/pass-card";
+import { getActivePassCardEventDefinitionAt } from "../../lib/pass-card";
 import paymentProducts from "../../../assets/payment_products.json";
 
 interface PaymentProduct {
@@ -103,6 +105,7 @@ const routes = async (fastify: FastifyInstance) => {
             receipt?: string
             signature?: string
             payment?: {
+                product_id?: string
                 original_receipt?: string
                 signature?: string
                 currency_code?: string
@@ -140,7 +143,7 @@ const routes = async (fastify: FastifyInstance) => {
         if (!player) return reply.status(500).send({ "error": "Internal Server Error", "message": "Player not found." })
 
         // Determine product_id from pending payment
-        const productId = body.product_id || ""
+        const productId = body.product_id || body.payment?.product_id || ""
         const product = PRODUCTS[productId]
         if (!product) {
             console.warn(`[PAYMENT-FINISH] unknown product: ${productId}, receipt: ${receipt}`)
@@ -168,6 +171,11 @@ const routes = async (fastify: FastifyInstance) => {
             vmoney: afterPaid,
             freeVmoney: afterFree
         })
+
+        if (productId === "com.leiting.wf.pass_card") {
+            const activeEvent = getActivePassCardEventDefinitionAt(new Date(getServerTime() * 1000))
+            if (activeEvent) setPlayerPassCardPurchasedSync(playerId, activeEvent.eventId)
+        }
 
         // Track purchase count per player+product
         const purchaseKey = `${playerId}_${productId}`

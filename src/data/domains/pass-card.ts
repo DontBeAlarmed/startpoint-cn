@@ -38,6 +38,18 @@ export function getPlayerPassCardStateSync(
     }
 }
 
+export function setPlayerPassCardPurchasedSync(
+    playerId: number,
+    eventId: number,
+): void {
+    getDb().prepare(`
+        INSERT INTO players_pass_cards (player_id, event_id, point, is_buy, login_baseline)
+        VALUES (?, ?, 0, 1, NULL)
+        ON CONFLICT(player_id, event_id) DO UPDATE SET
+            is_buy = 1
+    `).run(playerId, eventId)
+}
+
 export function ensurePlayerPassCardLoginProgressSync(
     playerId: number,
     eventId: number,

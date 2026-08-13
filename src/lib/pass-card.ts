@@ -76,6 +76,21 @@ export function getPassCardEventDefinition(eventId: number): PassCardEventDefini
     return { eventId, thresholdPoint, levelThreshold, startTime, endTime, forceTime }
 }
 
+export function getActivePassCardEventDefinitionAt(at: Date): PassCardEventDefinition | undefined {
+    const passCardEvents = getRuntimeContentTableSync(
+        "pass_card_event.json",
+        bundledPassCardEvents as Record<string, unknown>,
+    )
+    return Object.keys(passCardEvents)
+        .map(eventId => integer(eventId))
+        .filter((eventId): eventId is number => eventId !== undefined)
+        .sort((left, right) => left - right)
+        .map(eventId => getPassCardEventDefinition(eventId))
+        .find((event): event is PassCardEventDefinition =>
+            event !== undefined && isPassCardEventActiveAt(event, at),
+        )
+}
+
 export function isPassCardEventActiveAt(event: PassCardEventDefinition, at: Date): boolean {
     const time = at.getTime()
     return Number.isFinite(time) && event.startTime <= time && time <= event.endTime
