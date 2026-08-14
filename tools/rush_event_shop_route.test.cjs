@@ -239,7 +239,7 @@ stubModule("../src/data/domains/active_mission_counters", {
     },
 })
 stubModule("../src/lib/mission/degree-operation-facts", {
-    recordDegreeOperationFactsSync: (...args) => degreeOperationCalls.push(args),
+    recordMissionOperationFactsSync: (...args) => degreeOperationCalls.push(args),
 })
 stubModule("../src/utils", {
     generateDataHeaders(values = {}) {

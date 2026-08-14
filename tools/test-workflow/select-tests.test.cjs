@@ -737,6 +737,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_settlement.test.cjs",
         "tools/mission_storage.test.cjs",
         "tools/mission_time_utils.test.cjs",
+        "tools/pass_card_purchase_route.test.cjs",
         "tools/pass_card_route.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS["integration:quest"].tests, [

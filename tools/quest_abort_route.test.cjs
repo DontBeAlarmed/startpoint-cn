@@ -55,6 +55,12 @@ const unusedRouteDependencies = [
     "../assets/score_attack_border_reward.json",
 ]
 for (const dependency of unusedRouteDependencies) stubModule(dependency, {})
+stubModule("../src/data/types", {
+    PartyCategory: {
+        CARNIVAL: 2,
+        RUSH: 4,
+    },
+})
 stubModule("../src/data/domains/quest_active", {
     deletePlayerActiveQuestSync() {},
     getPlayerActiveQuestSync: () => null,

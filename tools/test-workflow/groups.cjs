@@ -354,6 +354,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_settlement.test.cjs",
             "tools/mission_storage.test.cjs",
             "tools/mission_time_utils.test.cjs",
+            "tools/pass_card_purchase_route.test.cjs",
             "tools/pass_card_route.test.cjs",
         ],
     },
