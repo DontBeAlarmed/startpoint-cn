@@ -44,6 +44,7 @@ const {
     updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
 const { getPlayerCharacterAwakeUnlocksSync } = require("../src/data/domains/character_awake")
+const { getPlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const characterAssets = require("../src/lib/assets")
@@ -98,6 +99,27 @@ insertActiveQuest(playerId, {
     playId: "awake-immediate-unlock",
     continueCount: 0,
 })
+
+const expectedAwakeMissionProgress = {
+    3410051: { progress: 5, stages: { 1: true } },
+    3410052: { progress: 5, stages: { 1: true } },
+    3410053: { progress: 5, stages: { 1: true } },
+    3410054: { progress: 3, stages: { 1: true } },
+}
+const awakeRewardAmounts = { 13: 10, 14: 5, 15: 3, 16: 1 }
+
+function getAwakeItemAmounts() {
+    return Object.fromEntries(
+        Object.keys(awakeRewardAmounts)
+            .map(itemId => [itemId, getPlayerItemSync(playerId, Number(itemId)) ?? 0]),
+    )
+}
+
+const awakeItemAmountsBefore = getAwakeItemAmounts()
+const expectedAwakeItemAmounts = Object.fromEntries(
+    Object.entries(awakeRewardAmounts)
+        .map(([itemId, amount]) => [itemId, awakeItemAmountsBefore[itemId] + amount]),
+)
 
 function encodeRequest(body) {
     return pack(body).toString("base64")
@@ -176,12 +198,32 @@ async function main() {
         const finish = await finishAwakeBattle(fastify)
         assert.equal(finish.statusCode, 200, finish.body)
         const finishData = decodeResponse(finish).data
+        const finishCharacterList = finishData.character_list
+            .filter(entry => entry.character_id === 341005)
+        assert.equal(finishCharacterList.length, 1)
         assert.deepEqual(
-            finishData.character_list.find(entry => entry.character_id === 341005)?.mana_board_awake,
+            finishCharacterList[0].mana_board_awake,
             { 1: 1 },
         )
+        assert.deepEqual(
+            finishData.mission_info.filter(entry => entry.mission_category_id === 9),
+            [
+                { mission_category_id: 9, mission_id: 3410051, mission_reward_id: 34100511 },
+                { mission_category_id: 9, mission_id: 3410052, mission_reward_id: 34100521 },
+                { mission_category_id: 9, mission_id: 3410053, mission_reward_id: 34100531 },
+                { mission_category_id: 9, mission_id: 3410054, mission_reward_id: 34100541 },
+            ],
+        )
+        assert.deepEqual(
+            Object.fromEntries(Object.keys(awakeRewardAmounts).map(itemId => [
+                itemId,
+                finishData.item_list[itemId],
+            ])),
+            expectedAwakeItemAmounts,
+        )
+        assert.deepEqual(getAwakeItemAmounts(), expectedAwakeItemAmounts)
         assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 1 })
-        assert.deepEqual(getPlayerCategoryMissionsSync(playerId, 9), {})
+        assert.deepEqual(getPlayerCategoryMissionsSync(playerId, 9), expectedAwakeMissionProgress)
 
         const originalPrepare = db.prepare.bind(db)
         const originalGetCharacterDataSync = characterAssets.getCharacterDataSync
@@ -233,19 +275,20 @@ async function main() {
         })
         const firstData = decodeResponse(first).data
         assert.deepEqual(
-            firstData.mission_progress_list.map(entry => entry.mission_id),
-            [3410051, 3410052, 3410053, 3410054],
+            firstData.mission_progress_list,
+            [
+                { mission_category: 9, mission_id: 3410051, progress_value: 5, stage: 1 },
+                { mission_category: 9, mission_id: 3410052, progress_value: 5, stage: 1 },
+                { mission_category: 9, mission_id: 3410053, progress_value: 5, stage: 1 },
+                { mission_category: 9, mission_id: 3410054, progress_value: 3, stage: 1 },
+            ],
         )
-        assert.deepEqual(
-            firstData.mission_info.map(entry => entry.mission_id),
-            [3410051, 3410052, 3410053, 3410054],
-        )
+        assert.deepEqual(firstData.mission_info, [])
+        assert.deepEqual(firstData.item_list, {})
         assert.deepEqual(firstData.character_list, [])
         assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 1 })
-
-        const persisted = getPlayerCategoryMissionsSync(playerId, 9)
-        assert.equal([3410051, 3410052, 3410053, 3410054]
-            .every(missionId => persisted[missionId].stages[1] === true), true)
+        assert.deepEqual(getPlayerCategoryMissionsSync(playerId, 9), expectedAwakeMissionProgress)
+        assert.deepEqual(getAwakeItemAmounts(), expectedAwakeItemAmounts)
 
         const repeated = await requestAwakePage(fastify)
         assert.equal(repeated.statusCode, 200)
@@ -253,6 +296,7 @@ async function main() {
         assert.deepEqual(repeatedData.mission_info, [])
         assert.deepEqual(repeatedData.item_list, {})
         assert.deepEqual(repeatedData.character_list, [])
+        assert.deepEqual(getAwakeItemAmounts(), expectedAwakeItemAmounts)
     } finally {
         await fastify.close()
         cleanup()

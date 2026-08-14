@@ -917,18 +917,35 @@ try {
     assert.equal(typeof appendedCharacterList[0].update_time, "string")
     assert.deepEqual(appendedCharacterList[0].mana_board_awake, { 1: 1 })
 
-    const unchangedCharacterList = [
-        { character_id: 341005, exp: 1 },
-        { character_id: 341005, exp: 2 },
-    ]
-    assert.strictEqual(
-        reconcileAwakeUnlockCharacterList(playerId, unchangedCharacterList),
-        unchangedCharacterList
+    const unchangedBondTokenList = [{ mana_board_index: 2, status: 1 }]
+    const unchangedCharacterList = [{
+        character_id: 341005,
+        exp: 1,
+        bond_token_list: unchangedBondTokenList,
+        mana_board_awake: { 1: 1, 2: 1 },
+    }, {
+        character_id: 341005,
+        exp: 2,
+        stack: 3,
+        update_time: "latest-response-value",
+        mana_board_awake: { 2: 2, 3: 1 },
+    }]
+    const unchangedCharacterListSnapshot = structuredClone(unchangedCharacterList)
+    const deduplicatedCharacterList = reconcileAwakeUnlockCharacterList(
+        playerId,
+        unchangedCharacterList,
     )
-    assert.deepEqual(unchangedCharacterList, [
-        { character_id: 341005, exp: 1 },
-        { character_id: 341005, exp: 2 },
-    ])
+    assert.notStrictEqual(deduplicatedCharacterList, unchangedCharacterList)
+    assert.deepEqual(deduplicatedCharacterList, [{
+        character_id: 341005,
+        exp: 2,
+        bond_token_list: unchangedBondTokenList,
+        mana_board_awake: { 1: 1, 2: 2, 3: 1 },
+        stack: 3,
+        update_time: "latest-response-value",
+    }])
+    assert.strictEqual(deduplicatedCharacterList[0].bond_token_list, unchangedBondTokenList)
+    assert.deepEqual(unchangedCharacterList, unchangedCharacterListSnapshot)
 
     const fallbackExistingCharacterList = [{ character_id: 341005, stack: 2 }]
     const fallbackError = new Error("synthetic awake unlock reconciliation failure")
