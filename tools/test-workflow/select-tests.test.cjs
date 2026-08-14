@@ -766,6 +766,7 @@ test("quick workflow includes documentation and package script contracts", () =>
         "tools/test-workflow/verify-cn-build.test.cjs",
         "tools/perf/http_metrics.test.cjs",
         "tools/perf/http_baseline.test.cjs",
+        "tools/perf/mission_settlement_baseline.test.cjs",
         "tools/perf/tcp_baseline.test.cjs",
     ])
 })

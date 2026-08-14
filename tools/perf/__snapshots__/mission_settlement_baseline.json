@@ -1,0 +1,62 @@
+{
+  "categories": [
+    1,
+    2,
+    3,
+    6,
+    7,
+    8,
+    10
+  ],
+  "fixedTime": "2024-08-14T12:00:00.000Z",
+  "measurements": 1,
+  "scenarios": [
+    {
+      "missions": {
+        "candidates": 3557,
+        "computed": 131,
+        "progressChanged": 6
+      },
+      "name": "new-account",
+      "rewards": 1,
+      "sql": {
+        "other": 2,
+        "select": 50,
+        "total": 62,
+        "writes": 10
+      }
+    },
+    {
+      "missions": {
+        "candidates": 3557,
+        "computed": 131,
+        "progressChanged": 20
+      },
+      "name": "normal-progress",
+      "rewards": 38,
+      "sql": {
+        "other": 12,
+        "select": 55,
+        "total": 141,
+        "writes": 74
+      }
+    },
+    {
+      "missions": {
+        "candidates": 3557,
+        "computed": 131,
+        "progressChanged": 21
+      },
+      "name": "high-completion-volume",
+      "rewards": 95,
+      "sql": {
+        "other": 46,
+        "select": 72,
+        "total": 284,
+        "writes": 166
+      }
+    }
+  ],
+  "sha256": "909dffb201c0537477c917d7345d33f21d83ddc0a10c26c2d2bb02c20b9f01e3",
+  "warmups": 0
+}

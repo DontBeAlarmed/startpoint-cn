@@ -29,6 +29,12 @@ export interface MissionSettlementScope {
     eventId?: number
 }
 
+export interface MissionSettlementObserver {
+    onCategoryCandidates?(category: number, count: number): void
+    onMissionComputed?(category: number, missionId: number): void
+    onMissionProgressChanged?(category: number, missionId: number): void
+}
+
 interface EvaluatedMission {
     category: number
     missionId: number
@@ -64,6 +70,7 @@ export function settleMissionCategories(
     playerId: number,
     categories: readonly (number | MissionSettlementScope)[],
     evaluationTime: Date,
+    observer?: MissionSettlementObserver,
 ): MissionSettlementResult {
     return getDb().transaction(() => {
         const player = getPlayerSync(playerId)
@@ -80,7 +87,9 @@ export function settleMissionCategories(
             const computer = getComputer(category)
             const context = computer.buildContext(playerId, category, evaluationTime)
             const persisted = getPlayerCategoryMissionsSync(playerId, category)
-            for (const missionId of getMissionIdsByCategory(category)) {
+            const missionIds = getMissionIdsByCategory(category)
+            observer?.onCategoryCandidates?.(category, missionIds.length)
+            for (const missionId of missionIds) {
                 if (!isMissionEnabledAt(category, missionId, evaluationTime, eventId)) continue
                 const missionKey = `${category}:${missionId}`
                 if (evaluatedMissionKeys.has(missionKey)) continue
@@ -88,6 +97,7 @@ export function settleMissionCategories(
                 const current = persisted[String(missionId)]
                 const dbProgress = current?.progress ?? 0
                 const computed = computer.compute(missionId, context, dbProgress)
+                observer?.onMissionComputed?.(category, missionId)
                 evaluatedMissions.push({
                     category,
                     missionId,
@@ -103,6 +113,7 @@ export function settleMissionCategories(
         const missionInfo: MissionSettlementInfo[] = []
         for (const mission of evaluatedMissions) {
             if (mission.progress === mission.dbProgress) continue
+            observer?.onMissionProgressChanged?.(mission.category, mission.missionId)
             updatePlayerCategoryMissionSync(
                 playerId,
                 mission.category,
