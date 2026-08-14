@@ -734,6 +734,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_progress_route.test.cjs",
         "tools/mission_regular_facts.test.cjs",
         "tools/mission_response_merge.test.cjs",
+        "tools/perf/mission_settlement_baseline.test.cjs",
         "tools/mission_settlement.test.cjs",
         "tools/mission_storage.test.cjs",
         "tools/mission_time_utils.test.cjs",
@@ -766,7 +767,6 @@ test("quick workflow includes documentation and package script contracts", () =>
         "tools/test-workflow/verify-cn-build.test.cjs",
         "tools/perf/http_metrics.test.cjs",
         "tools/perf/http_baseline.test.cjs",
-        "tools/perf/mission_settlement_baseline.test.cjs",
         "tools/perf/tcp_baseline.test.cjs",
     ])
 })

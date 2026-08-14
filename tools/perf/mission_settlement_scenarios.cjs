@@ -1,7 +1,5 @@
 "use strict"
 
-const { randomUUID } = require("node:crypto")
-
 const { getDb } = require("../../src/data/db")
 const { insertAccountSync } = require("../../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../../src/data/domains/player")
@@ -30,7 +28,7 @@ function createPlayer(name) {
         appId: "wf_cn",
         idpAlias: "",
         idpCode: "mission-perf",
-        idpId: `${name}-${randomUUID()}`,
+        idpId: name,
         status: "normal",
     })
     return insertDefaultPlayerSync(account.id).id

@@ -65,76 +65,75 @@
       "sql": {
         "byTable": {
           "players": {
-            "select": 8,
-            "total": 8,
+            "reads": 8,
+            "statements": 8,
             "writes": 0
           },
           "players_category_mission_stages": {
-            "select": 8,
-            "total": 9,
+            "reads": 8,
+            "statements": 9,
             "writes": 1
           },
           "players_category_missions": {
-            "select": 8,
-            "total": 14,
+            "reads": 8,
+            "statements": 14,
             "writes": 6
           },
           "players_characters": {
-            "select": 1,
-            "total": 1,
+            "reads": 1,
+            "statements": 1,
             "writes": 0
           },
           "players_characters_bond_tokens": {
-            "select": 1,
-            "total": 1,
+            "reads": 1,
+            "statements": 1,
             "writes": 0
           },
           "players_characters_mana_nodes": {
-            "select": 1,
-            "total": 1,
+            "reads": 1,
+            "statements": 1,
             "writes": 0
           },
           "players_collected_items": {
-            "select": 2,
-            "total": 2,
+            "reads": 2,
+            "statements": 2,
             "writes": 0
           },
           "players_degree_battle_stats": {
-            "select": 1,
-            "total": 1,
+            "reads": 1,
+            "statements": 1,
             "writes": 0
           },
           "players_equipment": {
-            "select": 1,
-            "total": 1,
+            "reads": 1,
+            "statements": 1,
             "writes": 0
           },
           "players_mission_battle_counters": {
-            "select": 6,
-            "total": 6,
+            "reads": 6,
+            "statements": 6,
             "writes": 0
           },
           "players_pass_cards": {
-            "select": 0,
-            "total": 2,
+            "reads": 0,
+            "statements": 2,
             "writes": 2
           },
           "players_periodic_snapshots": {
-            "select": 5,
-            "total": 5,
+            "reads": 5,
+            "statements": 5,
             "writes": 0
           },
           "players_quest_progress": {
-            "select": 7,
-            "total": 7,
+            "reads": 7,
+            "statements": 7,
             "writes": 0
           }
         },
-        "other": 0,
-        "select": 49,
-        "total": 60,
-        "transactions": 2,
-        "writes": 9
+        "selectStatements": 49,
+        "statements": 60,
+        "transactionStatements": 2,
+        "writeStatements": 9
       }
     },
     {
@@ -192,81 +191,80 @@
       "sql": {
         "byTable": {
           "players": {
-            "select": 8,
-            "total": 9,
+            "reads": 8,
+            "statements": 9,
             "writes": 1
           },
           "players_category_mission_stages": {
-            "select": 8,
-            "total": 47,
+            "reads": 8,
+            "statements": 47,
             "writes": 39
           },
           "players_category_missions": {
-            "select": 8,
-            "total": 35,
+            "reads": 8,
+            "statements": 35,
             "writes": 27
           },
           "players_characters": {
-            "select": 1,
-            "total": 1,
+            "reads": 1,
+            "statements": 1,
             "writes": 0
           },
           "players_characters_bond_tokens": {
-            "select": 1,
-            "total": 1,
+            "reads": 1,
+            "statements": 1,
             "writes": 0
           },
           "players_characters_mana_nodes": {
-            "select": 1,
-            "total": 1,
+            "reads": 1,
+            "statements": 1,
             "writes": 0
           },
           "players_collected_items": {
-            "select": 2,
-            "total": 9,
+            "reads": 2,
+            "statements": 9,
             "writes": 7
           },
           "players_degree_battle_stats": {
-            "select": 1,
-            "total": 1,
+            "reads": 1,
+            "statements": 1,
             "writes": 0
           },
           "players_equipment": {
-            "select": 2,
-            "total": 3,
+            "reads": 2,
+            "statements": 3,
             "writes": 1
           },
           "players_items": {
-            "select": 7,
-            "total": 14,
+            "reads": 7,
+            "statements": 14,
             "writes": 7
           },
           "players_mission_battle_counters": {
-            "select": 6,
-            "total": 6,
+            "reads": 6,
+            "statements": 6,
             "writes": 0
           },
           "players_pass_cards": {
-            "select": 0,
-            "total": 4,
+            "reads": 0,
+            "statements": 4,
             "writes": 4
           },
           "players_periodic_snapshots": {
-            "select": 5,
-            "total": 5,
+            "reads": 5,
+            "statements": 5,
             "writes": 0
           },
           "players_quest_progress": {
-            "select": 7,
-            "total": 7,
+            "reads": 7,
+            "statements": 7,
             "writes": 0
           }
         },
-        "other": 0,
-        "select": 57,
-        "total": 159,
-        "transactions": 16,
-        "writes": 86
+        "selectStatements": 57,
+        "statements": 159,
+        "transactionStatements": 16,
+        "writeStatements": 86
       }
     },
     {
@@ -324,84 +322,83 @@
       "sql": {
         "byTable": {
           "players": {
-            "select": 8,
-            "total": 9,
+            "reads": 8,
+            "statements": 9,
             "writes": 1
           },
           "players_category_mission_stages": {
-            "select": 8,
-            "total": 141,
+            "reads": 8,
+            "statements": 141,
             "writes": 133
           },
           "players_category_missions": {
-            "select": 8,
-            "total": 62,
+            "reads": 8,
+            "statements": 62,
             "writes": 54
           },
           "players_characters": {
-            "select": 1,
-            "total": 1,
+            "reads": 1,
+            "statements": 1,
             "writes": 0
           },
           "players_characters_bond_tokens": {
-            "select": 1,
-            "total": 1,
+            "reads": 1,
+            "statements": 1,
             "writes": 0
           },
           "players_characters_mana_nodes": {
-            "select": 1,
-            "total": 1,
+            "reads": 1,
+            "statements": 1,
             "writes": 0
           },
           "players_collected_items": {
-            "select": 2,
-            "total": 31,
+            "reads": 2,
+            "statements": 31,
             "writes": 29
           },
           "players_degree_battle_stats": {
-            "select": 1,
-            "total": 1,
+            "reads": 1,
+            "statements": 1,
             "writes": 0
           },
           "players_equipment": {
-            "select": 7,
-            "total": 13,
+            "reads": 7,
+            "statements": 13,
             "writes": 6
           },
           "players_items": {
-            "select": 29,
-            "total": 58,
+            "reads": 29,
+            "statements": 58,
             "writes": 29
           },
           "players_mission_battle_counters": {
-            "select": 6,
-            "total": 6,
+            "reads": 6,
+            "statements": 6,
             "writes": 0
           },
           "players_pass_cards": {
-            "select": 0,
-            "total": 5,
+            "reads": 0,
+            "statements": 5,
             "writes": 5
           },
           "players_periodic_snapshots": {
-            "select": 5,
-            "total": 5,
+            "reads": 5,
+            "statements": 5,
             "writes": 0
           },
           "players_quest_progress": {
-            "select": 7,
-            "total": 7,
+            "reads": 7,
+            "statements": 7,
             "writes": 0
           }
         },
-        "other": 0,
-        "select": 84,
-        "total": 401,
-        "transactions": 60,
-        "writes": 257
+        "selectStatements": 84,
+        "statements": 401,
+        "transactionStatements": 60,
+        "writeStatements": 257
       }
     }
   ],
   "version": 2,
-  "sha256": "519c52885a8cfe88bb8914a7652bc4cc91b33d97b12e30a8f58884f80ebfdbae"
+  "sha256": "4023c7274f598dea6b8a1af90a386077c8aa4be03405eb4dc225f8011363da0c"
 }

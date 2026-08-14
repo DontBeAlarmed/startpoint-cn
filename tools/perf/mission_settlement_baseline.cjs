@@ -111,18 +111,49 @@ function createMissionDiagnostics() {
     }
 }
 
+function completeCleanup(primaryError, actions) {
+    const cleanupErrors = []
+    for (const action of actions) {
+        try {
+            action()
+        } catch (error) {
+            cleanupErrors.push(error)
+        }
+    }
+
+    if (primaryError !== null) {
+        if (cleanupErrors.length > 0 && primaryError instanceof Error) {
+            const cleanupCause = cleanupErrors.length === 1
+                ? cleanupErrors[0]
+                : new AggregateError(cleanupErrors, "Mission baseline cleanup failed")
+            if (primaryError.cause === undefined) primaryError.cause = cleanupCause
+            else primaryError.cleanupCause = cleanupCause
+        }
+        throw primaryError
+    }
+    if (cleanupErrors.length === 1) throw cleanupErrors[0]
+    if (cleanupErrors.length > 1) {
+        throw new AggregateError(cleanupErrors, "Mission baseline cleanup failed")
+    }
+}
+
 function runOnce(scenario, suiteDirectory, fixedTime, runtime) {
     const runDirectory = fs.mkdtempSync(path.join(suiteDirectory, `${scenario.name}-`))
     const counter = createSqlCounter()
+    let database = null
+    let measureSql = false
+    let primaryError = null
+    let sample
     try {
         const paths = runtime.resolveRuntimeDataPaths({ DATA_DIR: runDirectory })
-        runtime.initializeDatabase({
+        database = runtime.initializeDatabase({
             paths,
             databaseFactory: databasePath => new BetterSqlite3(databasePath, {
-                verbose: sql => counter.observe(sql),
+                verbose: sql => { if (measureSql) counter.observe(sql) },
             }),
         })
         const playerId = scenario.create()
+        measureSql = true
         counter.reset()
 
         const diagnostics = createMissionDiagnostics()
@@ -135,16 +166,21 @@ function runOnce(scenario, suiteDirectory, fixedTime, runtime) {
         )
         const durationMs = performance.now() - startedAt
         const missions = diagnostics.finish(result.missionInfo)
-        return {
+        sample = {
             durationMs,
             sql: counter.snapshot(),
             missions,
             rewardStagesGranted: result.missionInfo.length,
         }
-    } finally {
-        runtime.closeDatabase()
-        fs.rmSync(runDirectory, { recursive: true, force: true })
+    } catch (error) {
+        primaryError = error
     }
+    completeCleanup(primaryError, [
+        () => runtime.closeDatabase(),
+        () => { if (database?.open) database.close() },
+        () => fs.rmSync(runDirectory, { recursive: true, force: true }),
+    ])
+    return sample
 }
 
 function structuralResult(sample) {
@@ -203,9 +239,14 @@ function runMissionSettlementBaseline({
     let originalTimeOffset
     let timeOffsetCaptured = false
     const originalLog = console.log
+    let primaryError = null
+    let report
 
     try {
         console.log = () => {}
+        suiteDirectory = fs.mkdtempSync(
+            path.join(temporaryParent, "mission-settlement-baseline-"),
+        )
         runtime = runtimeLoader()
         originalTimeOffset = runtime.getTimeOffset()
         timeOffsetCaptured = true
@@ -216,9 +257,6 @@ function runMissionSettlementBaseline({
                 "Mission settlement baseline refuses to run while the shared database is open.",
             )
         }
-        suiteDirectory = fs.mkdtempSync(
-            path.join(temporaryParent, "mission-settlement-baseline-"),
-        )
         const scenarios = runtime.SCENARIOS.map(scenario => {
             for (let index = 0; index < normalizedWarmups; index++) {
                 runOnce(scenario, suiteDirectory, fixedTime, runtime)
@@ -242,7 +280,7 @@ function runMissionSettlementBaseline({
                 ...stable,
             }
         })
-        const report = {
+        report = {
             version: 2,
             fixedTime: FIXED_TIME,
             categories: [...CATEGORIES],
@@ -250,20 +288,20 @@ function runMissionSettlementBaseline({
             measurements: normalizedMeasurements,
             scenarios,
         }
-        return { ...report, stableSummary: createStableSummary(report) }
-    } finally {
-        try {
-            if (timeOffsetCaptured) runtime.setServerTimeOffset(originalTimeOffset)
-        } finally {
-            try {
-                if (suiteDirectory !== null) {
-                    fs.rmSync(suiteDirectory, { recursive: true, force: true })
-                }
-            } finally {
-                console.log = originalLog
-            }
-        }
+        report = { ...report, stableSummary: createStableSummary(report) }
+    } catch (error) {
+        primaryError = error
     }
+    completeCleanup(primaryError, [
+        () => { if (timeOffsetCaptured) runtime.setServerTimeOffset(originalTimeOffset) },
+        () => {
+            if (suiteDirectory !== null) {
+                fs.rmSync(suiteDirectory, { recursive: true, force: true })
+            }
+        },
+        () => { console.log = originalLog },
+    ])
+    return report
 }
 
 function writeReport(report, { output = null, stdout = value => process.stdout.write(value) } = {}) {

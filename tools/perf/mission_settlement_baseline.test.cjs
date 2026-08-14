@@ -57,15 +57,35 @@ test("classifies SQL totals, reads, writes, transactions, and touched tables", (
     counter.observe("UPDATE players SET free_vmoney = 10 WHERE id = 1")
 
     assert.deepEqual(counter.snapshot(), {
-        total: 3,
-        select: 1,
-        writes: 2,
-        transactions: 0,
-        other: 0,
+        statements: 3,
+        selectStatements: 1,
+        writeStatements: 2,
+        transactionStatements: 0,
         byTable: {
-            players: { total: 2, select: 1, writes: 1 },
-            players_category_missions: { total: 1, select: 0, writes: 1 },
-            players_items: { total: 1, select: 1, writes: 0 },
+            players: { statements: 2, reads: 1, writes: 1 },
+            players_category_missions: { statements: 1, reads: 0, writes: 1 },
+            players_items: { statements: 1, reads: 1, writes: 0 },
+        },
+    })
+})
+
+test("classifies conflict updates and delete self-reads without inventing tables", () => {
+    const counter = createSqlCounter()
+    counter.observe("UPDATE OR IGNORE players SET free_vmoney = 10 WHERE id = 1")
+    counter.observe(`
+        DELETE FROM players_items
+        WHERE player_id IN (SELECT player_id FROM players_items JOIN players ON players.id = player_id)
+    `)
+    counter.observe("SELECT 'FROM fake_table' AS source FROM players")
+
+    assert.deepEqual(counter.snapshot(), {
+        statements: 3,
+        selectStatements: 1,
+        writeStatements: 2,
+        transactionStatements: 0,
+        byTable: {
+            players: { statements: 3, reads: 2, writes: 1 },
+            players_items: { statements: 1, reads: 1, writes: 1 },
         },
     })
 })
@@ -75,6 +95,7 @@ test("classifies SQLite transaction control separately", () => {
     for (const sql of [
         "BEGIN IMMEDIATE",
         "SAVEPOINT mission_settlement",
+        "SAVEPOINT ` _bs3. `",
         "ROLLBACK TO mission_settlement",
         "RELEASE mission_settlement",
         "COMMIT",
@@ -82,63 +103,26 @@ test("classifies SQLite transaction control separately", () => {
     ]) counter.observe(sql)
 
     assert.deepEqual(counter.snapshot(), {
-        total: 6,
-        select: 0,
-        writes: 0,
-        transactions: 6,
-        other: 0,
+        statements: 7,
+        selectStatements: 0,
+        writeStatements: 0,
+        transactionStatements: 7,
         byTable: {},
     })
 })
 
-test("classifies supported CTE SELECT and nested entity reads without CTE aliases", () => {
+test("rejects CTEs, leading comments, and unknown SQL instead of silently counting them", () => {
     const counter = createSqlCounter()
-    counter.observe(`
-        WITH RECURSIVE recent(player_id) AS (
-            SELECT player_id FROM players_items WHERE amount > 0
-        )
-        SELECT p.id FROM players p
-        WHERE EXISTS (
-            SELECT 1 FROM players_mails m WHERE m.player_id = p.id
-        )
-        AND p.id IN (SELECT player_id FROM recent)
-    `)
-
+    assert.throws(() => counter.observe("WITH recent AS (SELECT id FROM players) SELECT * FROM recent"), /unsupported SQL/i)
+    assert.throws(() => counter.observe("-- baseline\nSELECT id FROM players"), /unsupported SQL/i)
+    assert.throws(() => counter.observe("PRAGMA user_version"), /unsupported SQL/i)
+    assert.throws(() => counter.observe("UPDATE OR IGNORE SET value = 1"), /unsupported SQL/i)
     assert.deepEqual(counter.snapshot(), {
-        total: 1,
-        select: 1,
-        writes: 0,
-        transactions: 0,
-        other: 0,
-        byTable: {
-            players: { total: 1, select: 1, writes: 0 },
-            players_items: { total: 1, select: 1, writes: 0 },
-            players_mails: { total: 1, select: 1, writes: 0 },
-        },
-    })
-})
-
-test("classifies supported CTE UPDATE target and source tables", () => {
-    const counter = createSqlCounter()
-    counter.observe(`
-        WITH totals AS (
-            SELECT player_id FROM players_items GROUP BY player_id
-        )
-        UPDATE players
-        SET free_mana = (SELECT COUNT(*) FROM totals)
-        WHERE id IN (SELECT player_id FROM totals)
-    `)
-
-    assert.deepEqual(counter.snapshot(), {
-        total: 1,
-        select: 0,
-        writes: 1,
-        transactions: 0,
-        other: 0,
-        byTable: {
-            players: { total: 1, select: 0, writes: 1 },
-            players_items: { total: 1, select: 1, writes: 0 },
-        },
+        statements: 0,
+        selectStatements: 0,
+        writeStatements: 0,
+        transactionStatements: 0,
+        byTable: {},
     })
 })
 
@@ -152,12 +136,11 @@ test("stable summaries publish their complete payload and ignore run configurati
             name: "new-account",
             latencyMs: { p50: 1.25, p95: 3.5 },
             sql: {
-                total: 1,
-                select: 1,
-                writes: 0,
-                transactions: 0,
-                other: 0,
-                byTable: { players: { total: 1, select: 1, writes: 0 } },
+                statements: 1,
+                selectStatements: 1,
+                writeStatements: 0,
+                transactionStatements: 0,
+                byTable: { players: { statements: 1, reads: 1, writes: 0 } },
             },
             missions: {
                 candidates: 10,
@@ -233,13 +216,16 @@ test("refuses to run while the shared database is open and leaves it untouched",
     }
 })
 
-test("cleans its suite directory when dependency loading fails", () => {
+test("cleans an already-created suite directory when dependency loading fails", () => {
     const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "mission-baseline-load-fail-"))
     try {
         assert.throws(
             () => runMissionSettlementBaseline({
                 measurements: 1,
-                runtimeLoader() { throw new Error("injected dependency failure") },
+                runtimeLoader() {
+                    assert.equal(fs.readdirSync(temporaryParent).length, 1)
+                    throw new Error("injected dependency failure")
+                },
                 temporaryParent,
                 warmups: 0,
             }),
@@ -249,6 +235,107 @@ test("cleans its suite directory when dependency loading fails", () => {
     } finally {
         fs.rmSync(temporaryParent, { recursive: true, force: true })
     }
+})
+
+test("cleans the database, suite directory, and time offset when scenario creation fails", () => {
+    const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "mission-baseline-create-fail-"))
+    const originalOffset = 12345
+    let currentOffset = originalOffset
+    let databaseHandle
+    let sharedCloseCalls = 0
+    const runtime = {
+        closeDatabase() {
+            sharedCloseCalls++
+            databaseHandle.close()
+        },
+        getDatabaseStatus() { return { open: false, ready: false, schema: null } },
+        getTimeOffset() { return currentOffset },
+        initializeDatabase() {
+            databaseHandle = {
+                open: true,
+                close() { this.open = false },
+            }
+            return databaseHandle
+        },
+        resolveRuntimeDataPaths() { return {} },
+        setServerTimeOffset(value) { currentOffset = value },
+        settleMissionCategories() { throw new Error("settlement should not run") },
+        SCENARIOS: [{
+            name: "create-failure",
+            create() { throw new Error("injected scenario creation failure") },
+        }],
+    }
+
+    try {
+        assert.throws(
+            () => runMissionSettlementBaseline({
+                measurements: 1,
+                runtimeLoader: () => runtime,
+                temporaryParent,
+                warmups: 0,
+            }),
+            /injected scenario creation failure/,
+        )
+        assert.equal(sharedCloseCalls, 1)
+        assert.equal(databaseHandle.open, false)
+        assert.equal(currentOffset, originalOffset)
+        assert.deepEqual(fs.readdirSync(temporaryParent), [])
+    } finally {
+        fs.rmSync(temporaryParent, { recursive: true, force: true })
+    }
+})
+
+test("preserves settlement failure while fallback-closing the database after close failure", () => {
+    const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "mission-baseline-close-fail-"))
+    const originalOffset = 67890
+    let currentOffset = originalOffset
+    let databaseHandle
+    const runtime = {
+        closeDatabase() { throw new Error("injected shared close failure") },
+        getDatabaseStatus() { return { open: false, ready: false, schema: null } },
+        getTimeOffset() { return currentOffset },
+        initializeDatabase() {
+            databaseHandle = {
+                open: true,
+                close() { this.open = false },
+            }
+            return databaseHandle
+        },
+        resolveRuntimeDataPaths() { return {} },
+        setServerTimeOffset(value) { currentOffset = value },
+        settleMissionCategories() { throw new Error("injected settlement failure") },
+        SCENARIOS: [{ name: "settlement-failure", create() { return 1 } }],
+    }
+
+    try {
+        assert.throws(
+            () => runMissionSettlementBaseline({
+                measurements: 1,
+                runtimeLoader: () => runtime,
+                temporaryParent,
+                warmups: 0,
+            }),
+            error => {
+                assert.match(error.message, /injected settlement failure/)
+                assert.match(error.cause.message, /injected shared close failure/)
+                return true
+            },
+        )
+        assert.equal(databaseHandle.open, false)
+        assert.equal(currentOffset, originalOffset)
+        assert.deepEqual(fs.readdirSync(temporaryParent), [])
+    } finally {
+        fs.rmSync(temporaryParent, { recursive: true, force: true })
+    }
+})
+
+test("uses fixed scenario-unique identity provider ids", () => {
+    const source = fs.readFileSync(
+        path.join(__dirname, "mission_settlement_scenarios.cjs"),
+        "utf8",
+    )
+    assert.doesNotMatch(source, /randomUUID/)
+    assert.match(source, /idpId:\s*name/)
 })
 
 test("does not leak domain diagnostics to stdout while running the baseline", () => {
@@ -332,13 +419,12 @@ test("runs all synthetic scenarios against disposable databases", { timeout: 120
             assert.equal(Number.isFinite(scenario.latencyMs.p50), true)
             assert.equal(Number.isFinite(scenario.latencyMs.p95), true)
             assert.equal(
-                scenario.sql.total,
-                scenario.sql.select
-                    + scenario.sql.writes
-                    + scenario.sql.transactions
-                    + scenario.sql.other,
+                scenario.sql.statements,
+                scenario.sql.selectStatements
+                    + scenario.sql.writeStatements
+                    + scenario.sql.transactionStatements,
             )
-            assert.equal(scenario.sql.select > 0, true)
+            assert.equal(scenario.sql.selectStatements > 0, true)
             assert.equal(Object.keys(scenario.sql.byTable).length > 0, true)
             assert.equal(scenario.missions.candidates >= scenario.missions.computed, true)
             assert.equal(scenario.missions.progressChanged >= 0, true)
