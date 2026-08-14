@@ -226,10 +226,20 @@ stubModule("../src/data/domains/character_clear", { incrementPlayerCharacterClea
 stubModule("../src/data/domains/mission_battle_facts", { recordMissionBattleResultSync() {} })
 stubModule("../src/lib/mission/degree-battle-stat-facts", { recordDegreeBattleStatisticsSync() {} })
 stubModule("../src/lib/mission/battle-facts", {
-    BATTLE_SETTLEMENT_CATEGORIES: [],
+    buildBattleMissionSettlementScopes: () => [
+        1,
+        2,
+        3,
+        { category: 5, missionIds: [] },
+        6,
+        7,
+        8,
+        10,
+    ],
     recordMissionBattleFacts() {
         writeAttempts++
         db.prepare("UPDATE mission_state SET clear_count = clear_count + 1 WHERE player_id = 17").run()
+        return { awakeMissionIds: [] }
     },
 })
 stubModule("../src/data/domains/equipment", {
@@ -335,8 +345,17 @@ stubModule("../src/lib/reward-campaign", {
 stubModule("../src/routes/api/rushEvent", { rushEventFolderMaxRounds: {} })
 stubModule("../src/lib/rush", { getSerializedPlayerRushEventPlayedPartiesSync: () => ({ folderParties: null, endlessParties: null }) })
 stubModule("../src/lib/mission", {
+    getAwakeBattleMissionIds: () => [],
     reconcileActiveMissionFacts: () => [],
     reconcileAwakeUnlockCharacterList: (_playerId, list) => list,
+    settleAwakeMissionCandidates: () => ({
+        missionInfo: [],
+        itemList: {},
+        characterList: [],
+        equipmentList: [],
+        degreeIds: [],
+        passCardPoints: {},
+    }),
     settleMissionCategories: () => ({
         missionInfo: [],
         itemList: {},
