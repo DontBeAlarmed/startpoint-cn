@@ -72,9 +72,11 @@ import {
 
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import {
+    getAwakeBattleMissionIds,
     mergeMissionSettlementResponse,
     reconcileActiveMissionFacts,
     reconcileAwakeUnlockCharacterList,
+    settleAwakeMissionCandidates,
     settleMissionCategories,
 } from "../../lib/mission";
 import type { MissionSettlementResult } from "../../lib/mission";
@@ -489,7 +491,7 @@ const routes = async (fastify: FastifyInstance) => {
                 )
                 : { dropAdditionalRewardIds: [], rewardResult: null }
 
-            recordMissionBattleFacts(finishCtx, settlementTime)
+            const missionBattleFacts = recordMissionBattleFacts(finishCtx, settlementTime)
 
             const rewardCharacterExpResult = givePlayerCharactersExpSync(
                 playerId,
@@ -633,6 +635,17 @@ const routes = async (fastify: FastifyInstance) => {
                 buildBattleMissionSettlementScopes(partyCharacterIdsArray),
                 settlementTime,
             )
+            const awakeMissionIds = questAccomplished
+                ? getAwakeBattleMissionIds(
+                    partyCharacterIdsArray,
+                    missionBattleFacts.awakeMissionIds,
+                )
+                : []
+            const awakeMissionSettlement = settleAwakeMissionCandidates(
+                playerId,
+                awakeMissionIds,
+                settlementTime,
+            )
             const activeMissionList = reconcileActiveMissionFacts({
                 playerId,
                 repository: getContentSnapshot().repository,
@@ -652,6 +665,8 @@ const routes = async (fastify: FastifyInstance) => {
                 ...((sPlusClearReward?.character_list || []) as Record<string, unknown>[]),
                 ...(scoreRewardsResult.character_list as Record<string, unknown>[]),
                 ...((scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[]),
+                ...(missionSettlement.characterList as Record<string, unknown>[]),
+                ...awakeMissionSettlement.characterList,
             ])
 
             if (!isScoreAttackEvent) deletePlayerActiveQuestSync(playerId)
@@ -675,6 +690,7 @@ const routes = async (fastify: FastifyInstance) => {
                 clearReward,
                 sPlusClearReward,
                 missionSettlement,
+                awakeMissionSettlement,
                 activeMissionList,
                 fixedManaReward,
                 fixedPoolExpReward,
@@ -702,6 +718,7 @@ const routes = async (fastify: FastifyInstance) => {
             clearReward,
             sPlusClearReward,
             missionSettlement,
+            awakeMissionSettlement,
             activeMissionList,
             fixedManaReward,
             fixedPoolExpReward,
@@ -770,6 +787,7 @@ const routes = async (fastify: FastifyInstance) => {
         }
         responseData.active_mission_list = activeMissionList
         mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)
+        mergeMissionSettlementResponse(responseData, awakeMissionSettlement, viewerId)
         responseData.mail_arrived = getPlayerMailCountSync(playerId, true) > 0
         return reply.status(200).send({
             "data_headers": dataHeaders,

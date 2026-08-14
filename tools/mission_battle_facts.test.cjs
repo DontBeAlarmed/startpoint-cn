@@ -22,7 +22,10 @@ stubModule("../src/lib/quest/finish/leader-powerflip-tracker", {
     trackLeaderPowerflip: ctx => calls.push(["leader-powerflip", ctx.questId]),
 })
 stubModule("../src/lib/quest/finish/party-co-clear-tracker", {
-    trackPartyCoClears: ctx => calls.push(["party", ctx.questId]),
+    trackPartyCoClears: ctx => {
+        calls.push(["party", ctx.questId])
+        return [3310032, 3310033]
+    },
 })
 stubModule("../src/lib/quest/finish/powerflip-tracker", {
     trackPowerflip: ctx => calls.push(["powerflip", ctx.questId]),
@@ -113,7 +116,8 @@ const baseContext = {
     questProgress: null,
 }
 
-recordMissionBattleFacts({ ...baseContext, questAccomplished: false })
+const failedResult = recordMissionBattleFacts({ ...baseContext, questAccomplished: false })
+assert.deepEqual(failedResult, { awakeMissionIds: [] })
 assert.deepEqual(calls, [["result", 1, {
     isMulti: false,
     questCategory: 1,
@@ -126,7 +130,13 @@ assert.deepEqual(calls, [["result", 1, {
 }], ["pass", 1001]])
 assert.equal(calls.some(([kind]) => kind === "party"), false, "failed settlement must not call direct awake tracker")
 
-recordMissionBattleFacts({ ...baseContext, questAccomplished: true, isMulti: true, isMultiHost: true })
+const completedResult = recordMissionBattleFacts({
+    ...baseContext,
+    questAccomplished: true,
+    isMulti: true,
+    isMultiHost: true,
+})
+assert.deepEqual(completedResult, { awakeMissionIds: [3310032, 3310033] })
 assert.deepEqual(calls, [
     ["result", 1, {
         isMulti: false,
@@ -184,10 +194,33 @@ const singleSettlementTime = singleBattleSource.indexOf(
     "buildBattleMissionSettlementScopes(partyCharacterIdsArray),\n                settlementTime,",
     singleFactCall,
 )
+const singleAwakeCandidates = singleBattleSource.indexOf(
+    "getAwakeBattleMissionIds(",
+    singleFactCall,
+)
+const singleAwakeSettlement = singleBattleSource.indexOf(
+    "settleAwakeMissionCandidates(",
+    singleSettlementTime,
+)
+const singleGeneralMerge = singleBattleSource.indexOf(
+    "mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)",
+)
+const singleAwakeMerge = singleBattleSource.indexOf(
+    "mergeMissionSettlementResponse(responseData, awakeMissionSettlement, viewerId)",
+    singleGeneralMerge,
+)
 assert.equal(singleEvaluationTime > singleTransactionStart, true, "单人 finish 必须在事务体内固定任务时间")
 assert.equal(singleFactCall > singleEvaluationTime, true, "单人任务事实必须使用事务时间")
 assert.equal(singleCharacterExp > singleFactCall, true, "单人角色经验必须在任务事实后写入")
 assert.equal(singleSettlementTime > singleCharacterExp, true, "单人称号结算必须看到本场角色经验")
+assert.equal(singleAwakeCandidates > singleFactCall, true, "单人 finish 必须用本场 facts 构建觉醒候选")
+assert.equal(singleAwakeSettlement > singleSettlementTime, true, "单人觉醒结算必须位于通用结算之后")
+assert.equal(singleGeneralMerge >= 0 && singleAwakeMerge > singleGeneralMerge, true, "单人响应必须先合并通用结算再合并觉醒结算")
+assert.match(
+    singleBattleSource,
+    /reconcileAwakeUnlockCharacterList\(playerId, \[[\s\S]*?\.\.\.awakeMissionSettlement\.characterList/,
+    "单人 character_list 必须在 reconcile 前包含觉醒奖励与解锁更新",
+)
 assert.match(
     singleBattleSource,
     /const characterId = value\?\.id[\s\S]*?Number\.isSafeInteger\(characterId\)[\s\S]*?characterId > 0[\s\S]*?partyCharacterIdsArray\.push\(characterId\)/,
@@ -220,6 +253,21 @@ const multiSettlementTime = multiBattleSource.indexOf(
     "buildBattleMissionSettlementScopes(partyCharacterIdsArray),\n                settlementTime,",
     multiFactCall,
 )
+const multiAwakeCandidates = multiBattleSource.indexOf(
+    "getAwakeBattleMissionIds(",
+    multiFactCall,
+)
+const multiAwakeSettlement = multiBattleSource.indexOf(
+    "settleAwakeMissionCandidates(",
+    multiSettlementTime,
+)
+const multiGeneralMerge = multiBattleSource.indexOf(
+    "mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)",
+)
+const multiAwakeMerge = multiBattleSource.indexOf(
+    "mergeMissionSettlementResponse(responseData, awakeMissionSettlement, viewerId)",
+    multiGeneralMerge,
+)
 const multiTransactionCall = multiBattleSource.indexOf("runMultiActiveQuestSettlementTransaction(")
 const multiActiveDelete = multiBattleSource.indexOf("delete activeQuests[playerId]", multiTransactionCall)
 const multiCoordinatorFinalize = multiBattleSource.indexOf("context.coordinator.finalizeBattle({")
@@ -228,6 +276,14 @@ assert.equal(multiEvaluationTime > multiTransactionStart, true, "多人 finish �
 assert.equal(multiFactCall > multiTransactionStart, true)
 assert.equal(multiCharacterExp > multiFactCall, true, "多人角色经验必须在任务事实后写入")
 assert.equal(multiSettlementTime > multiCharacterExp, true, "多人称号结算必须看到本场角色经验")
+assert.equal(multiAwakeCandidates > multiFactCall, true, "多人 finish 必须用本场 facts 构建觉醒候选")
+assert.equal(multiAwakeSettlement > multiSettlementTime, true, "多人觉醒结算必须位于通用结算之后")
+assert.equal(multiGeneralMerge >= 0 && multiAwakeMerge > multiGeneralMerge, true, "多人响应必须先合并通用结算再合并觉醒结算")
+assert.match(
+    multiBattleSource,
+    /reconcileAwakeUnlockCharacterList\(playerId, \[[\s\S]*?\.\.\.awakeMissionSettlement\.characterList/,
+    "多人 character_list 必须在 reconcile 前包含觉醒奖励与解锁更新",
+)
 assert.equal(multiTransactionCall > multiFactCall, true, "任务事实必须在事务体执行后统一提交")
 assert.equal(multiActiveDelete > multiTransactionCall, true, "事务成功前不得清除多人 active quest 内存")
 assert.equal(multiCoordinatorFinalize >= 0, true, "多人 finish 必须通过 coordinator 结束权威房间生命周期")

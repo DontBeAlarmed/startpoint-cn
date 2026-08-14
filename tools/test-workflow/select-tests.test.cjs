@@ -261,9 +261,31 @@ test("selects quest and mission regressions for the single battle route", () => 
 test("upgrades package and unknown source changes to full", () => {
     assert.deepEqual(selectTestGroups(["package.json"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/unmapped/new-feature.ts"]), ["full"])
-    assert.deepEqual(selectTestGroups(["src/lib/mission/awake-settlement.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/lib/character.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["tools/test-workflow/groups.cjs"]), ["full"])
+})
+
+test("selects mission regressions for awake finish settlement wiring", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/awake-settlement.ts"]),
+        ["integration:mission"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/awake-unlock-response.ts"]),
+        ["integration:mission"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/index.ts"]),
+        ["integration:mission"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/finish/party-co-clear-tracker.ts"]),
+        ["integration:mission"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/multi/http/battle.ts"]),
+        ["integration:mission", "integration:multi-hub", "quick:protocol"],
+    )
 })
 
 test("deduplicates and stably sorts selected groups", () => {

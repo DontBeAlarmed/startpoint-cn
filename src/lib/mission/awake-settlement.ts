@@ -9,10 +9,12 @@ import { getDb } from "../../data/db"
 import { buildManaBoardAwakeCharacterList } from "../character-helpers"
 import { MissionRewardGranter } from "./grants"
 import { getAwakeMissionRewardStageDefinition } from "./rewards"
-import { getCompletedStageNumbers } from "./stages"
+import { getCompletedStageNumbers, getMissionIdsByCategory } from "./stages"
 import { getCharacterIdFromMission } from "./character-queries"
 import { createCharacterAwakeEligibilityResolver } from "./awake-eligibility"
 import type { CharacterAwakeEligibilityResolver } from "./awake-eligibility"
+import { getComputer } from "./registry"
+import { isMissionEnabledAt } from "./patterns"
 
 export interface AwakeMissionComputedProgress {
     missionId: number
@@ -31,7 +33,67 @@ export interface AwakeMissionSettlementResult {
     characterList: Record<string, unknown>[]
     equipmentList: Object[]
     degreeIds: number[]
+    passCardPoints: Record<string, number>
     userInfo?: Record<string, number>
+}
+
+function emptyAwakeMissionSettlement(): AwakeMissionSettlementResult {
+    return {
+        missionInfo: [],
+        itemList: {},
+        characterList: [],
+        equipmentList: [],
+        degreeIds: [],
+        passCardPoints: {},
+    }
+}
+
+export function getAwakeBattleMissionIds(
+    characterIds: readonly number[],
+    directlyChangedMissionIds: readonly number[] = [],
+): number[] {
+    const categoryMissionIds = getMissionIdsByCategory(9)
+    const categoryMissionIdSet = new Set(categoryMissionIds)
+    const characterIdSet = new Set(characterIds.filter(characterId =>
+        Number.isSafeInteger(characterId) && characterId > 0,
+    ))
+    const candidates = categoryMissionIds.filter(missionId =>
+        characterIdSet.has(Number(getCharacterIdFromMission(missionId))),
+    )
+    for (const missionId of directlyChangedMissionIds) {
+        if (Number.isSafeInteger(missionId) && missionId > 0 && categoryMissionIdSet.has(missionId)) {
+            candidates.push(missionId)
+        }
+    }
+    return [...new Set(candidates)].sort((left, right) => left - right)
+}
+
+export function settleAwakeMissionCandidates(
+    playerId: number,
+    missionIds: readonly number[],
+    evaluationTime: Date,
+): AwakeMissionSettlementResult {
+    if (missionIds.length === 0) return emptyAwakeMissionSettlement()
+    const candidates = getAwakeBattleMissionIds([], missionIds)
+        .filter(missionId => isMissionEnabledAt(9, missionId, evaluationTime))
+    if (candidates.length === 0) return emptyAwakeMissionSettlement()
+
+    const computer = getComputer(9)
+    const context = computer.buildContext(playerId, 9, evaluationTime, candidates)
+    const persisted = getPlayerCategoryMissionsSync(playerId, 9)
+    const progressList = candidates.map(missionId => {
+        const dbProgress = persisted[String(missionId)]?.progress ?? 0
+        const computed = computer.compute(missionId, context, dbProgress)
+        return {
+            missionId,
+            progress: Math.max(0, dbProgress, Number.isFinite(computed) ? computed : 0),
+        }
+    })
+    return settleAwakeMissionRewards(
+        playerId,
+        progressList,
+        createCharacterAwakeEligibilityResolver(playerId, evaluationTime),
+    )
 }
 
 export function settleAwakeMissionRewards(
@@ -116,6 +178,7 @@ export function settleAwakeMissionRewards(
         characterList,
         equipmentList: granter.equipmentList,
         degreeIds: granter.degreeList,
+        passCardPoints: {},
         ...(granter.hasPlayerChanges() ? { userInfo: granter.getUserInfo() } : {}),
     }
 }

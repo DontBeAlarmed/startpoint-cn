@@ -38,12 +38,28 @@ restoreContentSnapshot = installBundledGameplaySnapshot({
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { insertPlayerCharacterSync } = require("../src/data/domains/character")
+const {
+    insertPlayerCharacterManaNodesSync,
+    insertPlayerCharacterSync,
+    updatePlayerCharacterSync,
+} = require("../src/data/domains/character")
+const { getPlayerCharacterAwakeUnlocksSync } = require("../src/data/domains/character_awake")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
-const { givePlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
-const { getPlayerActiveMissionsSync, getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
+const {
+    getPlayerActiveMissionsSync,
+    getPlayerCategoryMissionsSync,
+    updatePlayerCategoryMissionStageSync,
+    updatePlayerCategoryMissionSync,
+} = require("../src/data/domains/mission")
+const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
+const { characterExpCaps } = require("../src/lib/character")
+const {
+    createCharacterAwakeEligibilityResolver,
+    getAwakeBattleMissionIds,
+} = require("../src/lib/mission")
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
 const missionRoutes = require("../src/routes/api/mission").default
 const { getTimeOffset, setServerTimeOffset } = require("../src/utils")
@@ -79,6 +95,39 @@ for (const characterId of degreeCharacterIds) {
         bondTokenList: [{ manaBoardIndex: 1, status: 1 }],
     })
 }
+const alkCharacterId = 1
+const alkRarity = getCharacterDataSync(alkCharacterId).rarity
+updatePlayerCharacterSync(playerId, alkCharacterId, { exp: characterExpCaps[alkRarity][0] })
+db.prepare("DELETE FROM players_characters_mana_nodes WHERE player_id = ? AND character_id = ?")
+    .run(playerId, alkCharacterId)
+insertPlayerCharacterManaNodesSync(
+    playerId,
+    alkCharacterId,
+    Object.keys(getCharacterManaNodesSync(alkCharacterId, 1)).map(Number),
+)
+insertPlayerCharacterManaNodesSync(
+    playerId,
+    111001,
+    Object.keys(getCharacterManaNodesSync(111001, 1)).map(Number),
+)
+db.prepare(`
+    INSERT INTO players_character_quest_clears (
+        player_id, character_id, clear_count, multi_count,
+        leader_clear_count, leader_multi_count, leader_power_flip_count
+    ) VALUES (?, 111001, 5, 0, 0, 0, 0)
+`).run(playerId)
+for (const [missionId, progress] of [[11, 3], [12, 100]]) {
+    updatePlayerCategoryMissionSync(playerId, 9, missionId, progress)
+    updatePlayerCategoryMissionStageSync(playerId, 9, 1, missionId, true)
+}
+assert.deepEqual(getAwakeBattleMissionIds([1], [13]), [11, 12, 13, 14])
+assert.equal(
+    createCharacterAwakeEligibilityResolver(
+        playerId,
+        new Date("2024-08-14T12:00:00.000Z"),
+    ).getBaseReadiness(1),
+    "ready",
+)
 db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
     .run(String(viewerId), account.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 2)
 db.prepare(`
@@ -169,7 +218,7 @@ async function main() {
                 clear_phase: 1,
                 max_combo_count: 0,
                 max_power: 3000,
-                zones: [{ use_power_flip_count: 5 }],
+                zones: [{ use_power_flip_count: 100 }],
                 party: {
                     characters: [{ id: 1 }, null, null],
                     unison_characters: [null, null, null],
@@ -185,6 +234,10 @@ async function main() {
                 SELECT RAISE(ABORT, 'injected awake fact rollback');
             END;
         `)
+        const awakeItemsBeforeRollback = {
+            3: getPlayerItemSync(playerId, 3) ?? 0,
+            4: getPlayerItemSync(playerId, 4) ?? 0,
+        }
         const activeMissionsBeforeRollback = structuredClone(getPlayerActiveMissionsSync(playerId))
         const rolledBackFinish = await fastify.inject({
             method: "POST",
@@ -194,6 +247,10 @@ async function main() {
         })
         assert.equal(rolledBackFinish.statusCode, 500)
         assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[13], undefined)
+        assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[14], undefined)
+        assert.equal(getPlayerItemSync(playerId, 3) ?? 0, awakeItemsBeforeRollback[3])
+        assert.equal(getPlayerItemSync(playerId, 4) ?? 0, awakeItemsBeforeRollback[4])
+        assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("1"), false)
         assert.deepEqual(
             getPlayerActiveMissionsSync(playerId),
             activeMissionsBeforeRollback,
@@ -210,6 +267,37 @@ async function main() {
         })
         assert.equal(finish.statusCode, 200, finish.body)
         const finishData = decodeResponse(finish).data
+        const awakeProgressAfterFinish = getPlayerCategoryMissionsSync(playerId, 9)
+        assert.equal(awakeProgressAfterFinish[13]?.progress, 100, "本场 powerflip fact 必须先写入")
+        assert.equal(awakeProgressAfterFinish[14]?.progress, 3, "awake candidate settlement 必须计算 ALL_COMPLETE")
+        assert.deepEqual(
+            finishData.mission_info
+                .filter(entry => entry.mission_category_id === 9)
+                .map(entry => entry.mission_id),
+            [13, 14],
+            "本场觉醒任务与 ALL_COMPLETE 必须随同一次 finish 返回",
+        )
+        assert.deepEqual(
+            finishData.character_list.find(character => character.character_id === 1)
+                ?.mana_board_awake,
+            { 1: 1 },
+            "觉醒 board unlock 必须在同次 character_list 即时可见",
+        )
+        assert.equal(
+            finishData.character_list.filter(character => character.character_id === 1).length,
+            1,
+            "同一角色的经验与觉醒更新不得产生重复 character_list 条目",
+        )
+        assert.equal(finishData.item_list[3], awakeItemsBeforeRollback[3] + 3)
+        assert.equal(finishData.item_list[4], awakeItemsBeforeRollback[4] + 1)
+        assert.equal(
+            finishData.mission_info.some(entry => (
+                entry.mission_category_id === 9
+                && Math.floor(entry.mission_id / 10) === 111001
+            )),
+            false,
+            "未出战角色不得在本场 finish 结算",
+        )
         assert.deepEqual(
             finishData.mission_info
                 .filter(entry => entry.mission_category_id === 2)
@@ -249,7 +337,7 @@ async function main() {
             "condition 27 称号奖励必须沿既有 response 路径返回",
         )
         assert.equal(finishData.mail_arrived, true)
-        assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[13].progress, 5)
+        assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[13].progress, 100)
 
         const duplicateFinish = await fastify.inject({
             method: "POST",
@@ -258,7 +346,7 @@ async function main() {
             payload: encodeRequest(finishPayload),
         })
         assert.equal(duplicateFinish.statusCode, 400)
-        assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[13].progress, 5)
+        assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[13].progress, 100)
 
         const dailyMazeStart = await fastify.inject({
             method: "POST",

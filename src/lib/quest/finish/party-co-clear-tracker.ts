@@ -12,7 +12,7 @@ import {
 import { getCharacterRaces, getRaceKeyString } from "./race-utils"
 import type { FinishContext } from "./types"
 
-export function trackPartyCoClears(ctx: FinishContext): void {
+export function trackPartyCoClears(ctx: FinishContext): number[] {
     const ids: number[] = []
     const allRaces: string[] = []
     for (const c of ctx.party.characters) {
@@ -67,4 +67,10 @@ export function trackPartyCoClears(ctx: FinishContext): void {
     for (const fact of facts.maxima) {
         ensurePlayerCategoryMissionProgressSync(ctx.playerId, 9, fact.missionId, fact.progress)
     }
+
+    return [...new Set([
+        ...facts.increments.map(fact => fact.missionId),
+        ...facts.maxima.map(fact => fact.missionId),
+    ].filter(missionId => Number.isSafeInteger(missionId) && missionId > 0))]
+        .sort((left, right) => left - right)
 }

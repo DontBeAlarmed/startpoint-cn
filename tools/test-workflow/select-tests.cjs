@@ -210,6 +210,18 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
+        pattern: /^src\/lib\/mission\/(?:awake-settlement|awake-unlock-response|index)\.ts$/,
+        groups: ["integration:mission"],
+    },
+    {
+        pattern: /^src\/lib\/quest\/finish\/party-co-clear-tracker\.ts$/,
+        groups: ["integration:mission"],
+    },
+    {
+        pattern: /^src\/multi\/http\/battle\.ts$/,
+        groups: ["integration:mission"],
+    },
+    {
         pattern: /^src\/lib\/mission\/(?:computer-regular|regular-battle-facts|regular-quest-facts|regular-state-facts|types)\.ts$/,
         groups: ["integration:mission"],
     },

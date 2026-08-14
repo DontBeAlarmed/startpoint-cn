@@ -28,7 +28,6 @@ export function reconcileAwakeUnlockCharacterList(
     try {
         const resolver = createCharacterAwakeEligibilityResolver(playerId)
         const { changed, removed } = reconcileAwakeUnlocks(playerId, undefined, resolver)
-        if (changed.size === 0 && removed.size === 0) return existing
 
         const updates = buildManaBoardAwakeCharacterList(
             resolver.characters,

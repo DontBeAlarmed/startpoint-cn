@@ -24,6 +24,10 @@ export const BATTLE_DEGREE_CONDITION_TYPES = Object.freeze([
     22, 23, 25, 26, 27, 28, 29, 30, 31, 37, 39, 44, 92,
 ])
 
+export interface MissionBattleFactsResult {
+    awakeMissionIds: number[]
+}
+
 export function buildBattleMissionSettlementScopes(
     affectedCharacterIds: readonly number[],
 ): readonly (number | MissionSettlementScope)[] {
@@ -61,7 +65,7 @@ function getSkillUseCount(ctx: FinishContext): number {
 export function recordMissionBattleFacts(
     ctx: FinishContext,
     evaluationTime: Date = new Date(getServerTime() * 1000),
-): void {
+): MissionBattleFactsResult {
     recordMissionBattleResultSync(ctx.playerId, {
         isMulti: ctx.isMulti === true,
         questCategory: ctx.questCategory,
@@ -74,7 +78,7 @@ export function recordMissionBattleFacts(
     })
     recordPassMissionBattleFacts(ctx, evaluationTime)
     recordRegularMissionBattleFactsSync(ctx)
-    if (!ctx.questAccomplished) return
+    if (!ctx.questAccomplished) return { awakeMissionIds: [] }
     recordDegreeBattleStatisticsSync(ctx)
     recordDailyMissionBattleFacts(ctx, evaluationTime)
     recordEventMissionBattleFacts(ctx, evaluationTime)
@@ -93,6 +97,7 @@ export function recordMissionBattleFacts(
     }
     trackCharacterClears(ctx)
     trackLeaderPowerflip(ctx)
-    trackPartyCoClears(ctx)
+    const awakeMissionIds = trackPartyCoClears(ctx)
     trackPowerflip(ctx)
+    return { awakeMissionIds }
 }

@@ -114,7 +114,13 @@ function cleanupDatabase() {
 process.once("exit", cleanupDatabase)
 
 const { getDb } = require("../src/data/db")
-const { computeAwakeSummary, reconcileAwakeUnlocks, settleAwakeMissionRewards } = require("../src/lib/mission")
+const {
+    computeAwakeSummary,
+    getAwakeBattleMissionIds,
+    reconcileAwakeUnlocks,
+    settleAwakeMissionCandidates,
+    settleAwakeMissionRewards,
+} = require("../src/lib/mission")
 const { insertAccountSync } = require("../src/data/domains/account")
 const {
     insertDefaultPlayerCharacterSync,
@@ -125,11 +131,13 @@ const characterAwakeDomain = require("../src/data/domains/character_awake")
 const { getPlayerCharacterAwakeUnlocksSync } = characterAwakeDomain
 const { getPlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
+const missionDomain = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
 const { characterExpCaps } = require("../src/lib/character")
 const { getAwakeMissionRewardStageDefinition } = require("../src/lib/mission/rewards")
 const awakeRewardMaster = require("../assets/mission_char_awake_reward.json")
+const { AwakeComputer } = require("../src/lib/mission/computer-awake")
 
 require("../src/data").initializeDatabase()
 db = getDb()
@@ -251,6 +259,43 @@ function testSpecialUnlockFailureRollsBackSettlement(playerId) {
 
 db.exec("BEGIN")
 try {
+    assert.deepEqual(
+        getAwakeBattleMissionIds(
+            [341005, 1, 341005],
+            [1110013, 1110013, 15000, 999999999, -1, 1.5],
+        ),
+        [11, 12, 13, 14, 1110013, 3410051, 3410052, 3410053, 3410054],
+        "main/Sub、直接变化任务及同角色 ALL_COMPLETE 必须稳定去重，未知或跨分类 ID 必须 fail closed",
+    )
+
+    const originalBuildContext = AwakeComputer.buildContext
+    const originalGetPlayerCategoryMissionsSync = missionDomain.getPlayerCategoryMissionsSync
+    let buildContextCalls = 0
+    AwakeComputer.buildContext = () => {
+        buildContextCalls++
+        throw new Error("empty candidates must not build awake context")
+    }
+    missionDomain.getPlayerCategoryMissionsSync = () => {
+        throw new Error("empty candidates must not read mission progress")
+    }
+    try {
+        assert.deepEqual(
+            settleAwakeMissionCandidates(123456, [], new Date("2024-08-14T12:00:00.000Z")),
+            {
+                missionInfo: [],
+                itemList: {},
+                characterList: [],
+                equipmentList: [],
+                degreeIds: [],
+                passCardPoints: {},
+            },
+        )
+        assert.equal(buildContextCalls, 0)
+    } finally {
+        AwakeComputer.buildContext = originalBuildContext
+        missionDomain.getPlayerCategoryMissionsSync = originalGetPlayerCategoryMissionsSync
+    }
+
     assertNoCharacterRewardConflictsWithSpecialUnlock()
 
     const account = insertAccountSync({

@@ -36,8 +36,10 @@ import { getServerGameplaySettingsSync } from "../../data/domains/server-setting
 import { buildBattleMissionSettlementScopes, recordMissionBattleFacts } from "../../lib/mission/battle-facts";
 import type { FinishContext } from "../../lib/quest/finish/types";
 import {
+    getAwakeBattleMissionIds,
     mergeMissionSettlementResponse,
     reconcileAwakeUnlockCharacterList,
+    settleAwakeMissionCandidates,
     settleMissionCategories,
 } from "../../lib/mission";
 import { resolveHostFinished } from "../../lib/quest/host-finish";
@@ -592,7 +594,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 questAccomplished,
                 isMulti: true,
             })
-            recordMissionBattleFacts(finishCtx, settlementTime)
+            const missionBattleFacts = recordMissionBattleFacts(finishCtx, settlementTime)
             const rewardCharacterExpResult = givePlayerCharactersExpSync(
                 playerId, partyCharacterIdsArray, characterBattleExp,
                 questData.fixedParty !== undefined
@@ -602,11 +604,24 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 buildBattleMissionSettlementScopes(partyCharacterIdsArray),
                 settlementTime,
             );
+            const awakeMissionIds = questAccomplished
+                ? getAwakeBattleMissionIds(
+                    partyCharacterIdsArray,
+                    missionBattleFacts.awakeMissionIds,
+                )
+                : []
+            const awakeMissionSettlement = settleAwakeMissionCandidates(
+                playerId,
+                awakeMissionIds,
+                settlementTime,
+            )
             const characterList = reconcileAwakeUnlockCharacterList(playerId, [
                 ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
                 ...((clearReward?.character_list || []) as Record<string, unknown>[]),
                 ...((sPlusClearReward?.character_list || []) as Record<string, unknown>[]),
-                ...(scoreRewardsResult.character_list as Record<string, unknown>[])
+                ...(scoreRewardsResult.character_list as Record<string, unknown>[]),
+                ...(missionSettlement.characterList as Record<string, unknown>[]),
+                ...awakeMissionSettlement.characterList,
             ]);
             return {
                 characterList,
@@ -618,6 +633,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 periodicRewardSettlement,
                 sPlusClearReward,
                 missionSettlement,
+                awakeMissionSettlement,
                 fieldMana,
                 fixedManaReward,
                 fixedPoolExpReward,
@@ -666,6 +682,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             periodicRewardSettlement,
             sPlusClearReward,
             missionSettlement,
+            awakeMissionSettlement,
             fieldMana,
             fixedManaReward,
             fixedPoolExpReward,
@@ -743,6 +760,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 "aborted_play_id": null,
         };
         mergeMissionSettlementResponse(responseData, missionSettlement, viewerId);
+        mergeMissionSettlementResponse(responseData, awakeMissionSettlement, viewerId);
         responseData.mail_arrived = getPlayerMailCountSync(playerId, true) > 0;
         return reply.status(200).send({
             "data_headers": dataHeaders,
