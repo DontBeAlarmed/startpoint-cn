@@ -42,7 +42,7 @@ export function getSessionSync(
 
     // viewer tokens don't expire.
     if (session.type !== SessionType.VIEWER && new Date() >= session.expires) {
-        console.log(`session of type (${session.type}) expired:`, session)
+        console.log(`[SESSION] expired type=${session.type} accountId=${session.accountId} expires=${session.expires.toISOString()}`)
         deleteSessionSync(session.token)
         return null
     }

@@ -160,7 +160,7 @@ async function validateAssetsMultithread(
     const isCDNInvalid = invalidCount > 0
     console.log(isCDNInvalid ? `Your copy of the CDN contains ${invalidCount} invalid and/or missing files.` : "Your copy of the CDN is valid.");
     if (isCDNInvalid) {
-        console.log("Invalid and/or missing files: [", invalidLocations.join(", "), ']')
+        console.log(`Invalid and/or missing files: [${invalidLocations.join(", ")}]`)
     }
 }
 

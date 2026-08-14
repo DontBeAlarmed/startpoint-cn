@@ -16,6 +16,7 @@ import {
     type RewardCampaignRates,
 } from "./reward-campaign";
 import { getRuntimeContentTableSync } from "../content/runtime/table-access";
+import { sampledLog } from "./sampled-log";
 
 const ELEMENT_TO_ENEMY_MAP: Record<number, number> = {
     0: 3, 1: 0, 2: 1, 3: 2, 4: 5, 5: 4,
@@ -76,7 +77,6 @@ export function givePlayerScoreRewardsSync(
         const dropMultiplier = getServerGameplaySettingsSync().dropMultiplier
         const campaignRates = lottery?.rewardCampaignRates ?? { item: 1, exp: 1, mana: 1 }
         const rewardDate = lottery?.rewardDate ?? getDateFromServerTime(getServerTime())
-        console.log(`[QUEST] givePlayerScoreRewards group=${groupId} items=${scoreRewards.length} pid=${playerId}`)
         const commonRewards = lottery?.commonRewardCount === undefined
             ? scoreRewards.filter((reward): reward is CommonScoreReward => reward.type === ScoreRewardType.ITEM)
             : selectCommonScoreRewards(scoreRewards, lottery.commonRewardCount, lottery.random)
@@ -93,7 +93,6 @@ export function givePlayerScoreRewardsSync(
                         boostPointUsed, dropMultiplier,
                     )
                     items[String(itemId)] = givePlayerItemSync(playerId, itemId, rewardAmount)
-                    console.log(`[QUEST-ITEM] id=${itemId} cdnCount=${itemReward.count} ×drop=${dropMultiplier} ×boost=${boostPointUsed ? 2 : 1} → ${rewardAmount}`)
                     break
                 }
                 case RewardType.MANA: {
@@ -133,7 +132,6 @@ export function givePlayerScoreRewardsSync(
                         boostPointUsed, dropMultiplier,
                     )
                     items[String(itemId)] = givePlayerItemSync(playerId, itemId, rewardAmount)
-                    console.log(`[QUEST-ELEMENT] rarity=${itemReward.id} →id=${itemId} cdnCount=${itemReward.count} ×drop=${dropMultiplier} ×boost=${boostPointUsed ? 2 : 1} → ${rewardAmount}`)
                     break
                 }
                 case RewardType.AETHER: {
@@ -144,7 +142,6 @@ export function givePlayerScoreRewardsSync(
                         boostPointUsed, dropMultiplier,
                     )
                     items[String(itemId)] = givePlayerItemSync(playerId, itemId, rewardAmount)
-                    console.log(`[QUEST-AETHER] rarity=${itemReward.id} →id=${itemId} cdnCount=${itemReward.count} ×drop=${dropMultiplier} ×boost=${boostPointUsed ? 2 : 1} → ${rewardAmount}`)
                     break
                 }
             }
@@ -200,10 +197,15 @@ export function givePlayerScoreRewardsSync(
                 number: rewardAmount,
             })
         }
-    }
 
-    if (Object.keys(items).length > 0) {
-        console.log(`[QUEST-BAG] total items bagged: ${JSON.stringify(items)}`)
+        sampledLog("quest-score-rewards", () => {
+            const drops = dropScoreRewardIds.map(({ index, number }) => ({ index, number }))
+            const rareDrops = dropRareRewardIds.map(({ index, number }) => ({ index, number }))
+            return `[QUEST] score_rewards playerId=${playerId} groupId=${groupId}`
+                + ` common=${dropScoreRewardIds.length} rare=${dropRareRewardIds.length}`
+                + ` drops=${JSON.stringify(drops)} rareDrops=${JSON.stringify(rareDrops)}`
+                + ` items=${JSON.stringify(items)}`
+        })
     }
 
     return {

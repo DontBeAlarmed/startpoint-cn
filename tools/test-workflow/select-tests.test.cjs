@@ -42,6 +42,16 @@ test("maps representative source files to focused groups", () => {
     )
     assert.deepEqual(selectTestGroups(["docs/protocol/seed-verification.md"]), ["quick:seed"])
     assert.deepEqual(selectTestGroups(["src/lib/gacha-draw.ts"]), ["quick:gacha"])
+    assert.deepEqual(selectTestGroups(["src/lib/sampled-log.ts"]), ["quick:workflow"])
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest.ts"]),
+        ["integration:rules", "quick:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/data/domains/session.ts"]),
+        ["full", "integration:database", "quick:workflow"],
+    )
+    assert.deepEqual(selectTestGroups(["src/validate_cdn.ts"]), ["quick:workflow"])
     assert.deepEqual(
         selectTestGroups(["src/content/paths.ts"]),
         ["quick:cdn", "quick:content"],
@@ -791,6 +801,8 @@ test("quick workflow includes documentation and package script contracts", () =>
         "tools/architecture_dependencies.test.cjs",
         "tools/docs_check.test.cjs",
         "tools/final_operation_compatibility_docs.test.cjs",
+        "tools/log_readability.test.cjs",
+        "tools/sampled_log.test.cjs",
         "tools/test-workflow/benchmark.test.cjs",
         "tools/test-workflow/build-cn.test.cjs",
         "tools/test-workflow/package-scripts.test.cjs",

@@ -1,6 +1,8 @@
 require("ts-node/register/transpile-only")
 
 const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const path = require("node:path")
 const { formatHardMultiMissionDiagnostic } = require("../src/lib/mission/client-check-diagnostics")
 
 assert.equal(
@@ -51,6 +53,13 @@ assert.equal(
         statistics: { client_checks: ["ignored"] },
     }),
     null,
+)
+
+const battleSource = fs.readFileSync(path.join(__dirname, "../src/multi/http/battle.ts"), "utf8")
+assert.match(
+    battleSource,
+    /if \(questCategory === 26\) \{\s*sampledLog\("hard-multi-mission-diagnostic", \(\) =>\s*formatHardMultiMissionDiagnostic\(/,
+    "category 26 should be checked before sampling and diagnostic formatting should stay inside the factory",
 )
 
 console.log("mission client-check diagnostics tests passed")

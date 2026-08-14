@@ -75,6 +75,7 @@ import {
 } from "../../lib/quest/multi-battle-validation";
 import { isValidMultiViewerId, type MultiHttpContext } from "./context";
 import { formatHardMultiMissionDiagnostic } from "../../lib/mission/client-check-diagnostics";
+import { sampledLog } from "../../lib/sampled-log";
 import {
     participantKey,
     type BattleSessionId,
@@ -395,15 +396,18 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                             : 1
         ) : null;
 
-        const missionDiagnostic = formatHardMultiMissionDiagnostic({
-            category: questCategory,
-            questId,
-            accomplished: body.is_accomplished,
-            clearRank,
-            clearTimeMs: clearTime,
-            statistics: finishValidation.statistics,
-        });
-        if (missionDiagnostic !== null) console.log(missionDiagnostic);
+        if (questCategory === 26) {
+            sampledLog("hard-multi-mission-diagnostic", () =>
+                formatHardMultiMissionDiagnostic({
+                    category: questCategory,
+                    questId,
+                    accomplished: body.is_accomplished,
+                    clearRank,
+                    clearTimeMs: clearTime,
+                    statistics: finishValidation.statistics,
+                })!
+            );
+        }
 
         const useBoostPoint = activeQuestData.useBoostPoint || activeQuestData.useBossBoostPoint;
         const questAccomplished = body.is_accomplished;

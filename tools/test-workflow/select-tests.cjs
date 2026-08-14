@@ -17,6 +17,10 @@ const SOURCE_RULES = [
     { pattern: /^admin\//, groups: ["admin"] },
     { pattern: /^tests\/admin-/, groups: ["admin"] },
     {
+        pattern: /^src\/(?:data\/domains\/session|validate_cdn)\.ts$/,
+        groups: ["quick:workflow"],
+    },
+    {
         pattern: /^assets\/(?:mission_event|mission_event_battle_rules|boss_battle_quest|advent_event_quest|world_story_event_boss_battle_quest)\.json$/,
         groups: ["generator:mission-event", "integration:mission", "quick:content"],
     },
@@ -115,6 +119,7 @@ const SOURCE_RULES = [
         groups: ["integration:database", "quick:cdn", "quick:content"],
     },
     { pattern: /^src\/lib\/gacha-seed-quarantine\.ts$/, groups: ["quick:seed", "quick:gacha"] },
+    { pattern: /^src\/lib\/sampled-log\.ts$/, groups: ["quick:workflow"] },
     { pattern: /^tools\/gacha-faithful\//, groups: ["quick:seed"] },
     { pattern: /^assets\/gacha-seed-catalog\//, groups: ["quick:seed"] },
     {
@@ -159,6 +164,10 @@ const SOURCE_RULES = [
     {
         pattern: /^src\/lib\/(?:gacha|gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-seed-catalog|gacha-ticket)\.ts$/,
         groups: ["quick:gacha"],
+    },
+    {
+        pattern: /^src\/lib\/quest\.ts$/,
+        groups: ["integration:rules", "quick:quest"],
     },
     {
         pattern: /^src\/routes\/api\/gacha\.ts$/,
