@@ -27,6 +27,11 @@ export interface MissionSettlementResult {
 export interface MissionSettlementScope {
     category: number
     eventId?: number
+    /**
+     * Restrict evaluation to these missions. Invalid or out-of-category IDs are
+     * ignored (fail closed); undefined keeps the existing full-category behavior.
+     */
+    missionIds?: readonly number[]
 }
 
 export interface MissionSettlementObserver {
@@ -41,6 +46,49 @@ interface EvaluatedMission {
     progress: number
     receivedStages: Record<string, boolean> | unknown[]
     dbProgress: number
+}
+
+function isSafeMissionId(missionId: number): boolean {
+    return Number.isSafeInteger(missionId) && missionId > 0
+}
+
+function mergeSettlementScopes(
+    categories: readonly (number | MissionSettlementScope)[],
+): MissionSettlementScope[] {
+    const scopes = new Map<string, MissionSettlementScope>()
+    for (const entry of categories) {
+        const scope = typeof entry === "number" ? { category: entry } : entry
+        const key = `${scope.category}:${scope.eventId ?? ""}`
+        const missionIds = scope.missionIds === undefined
+            ? undefined
+            : [...new Set(scope.missionIds.filter(isSafeMissionId))]
+        const existing = scopes.get(key)
+        if (!existing) {
+            scopes.set(key, { category: scope.category, eventId: scope.eventId, missionIds })
+            continue
+        }
+        if (existing.missionIds === undefined || missionIds === undefined) {
+            scopes.set(key, { category: scope.category, eventId: scope.eventId })
+            continue
+        }
+        scopes.set(key, {
+            category: scope.category,
+            eventId: scope.eventId,
+            missionIds: [...new Set([...existing.missionIds, ...missionIds])],
+        })
+    }
+    return [...scopes.values()]
+}
+
+function getRequestedMissionIds(scope: MissionSettlementScope): number[] {
+    const categoryMissionIds = getMissionIdsByCategory(scope.category)
+    if (scope.category === 2 || scope.missionIds === undefined) {
+        return [...new Set(categoryMissionIds.filter(isSafeMissionId))]
+    }
+    const categoryMissionIdSet = new Set(categoryMissionIds)
+    return [...new Set(scope.missionIds.filter(missionId =>
+        isSafeMissionId(missionId) && categoryMissionIdSet.has(missionId),
+    ))]
 }
 
 function isDailyCoreMission(pattern: string): boolean {
@@ -78,19 +126,24 @@ export function settleMissionCategories(
 
         const evaluatedMissions: EvaluatedMission[] = []
         const evaluatedMissionKeys = new Set<string>()
-        const scopes = new Map<string, MissionSettlementScope>()
-        for (const entry of categories) {
-            const scope = typeof entry === "number" ? { category: entry } : entry
-            scopes.set(`${scope.category}:${scope.eventId ?? ""}`, scope)
-        }
-        for (const { category, eventId } of scopes.values()) {
+        for (const scope of mergeSettlementScopes(categories)) {
+            const { category, eventId } = scope
+            const requestedMissionIds = getRequestedMissionIds(scope)
+            const enabledMissionIds = requestedMissionIds.filter(missionId =>
+                isMissionEnabledAt(category, missionId, evaluationTime, eventId),
+            )
+            observer?.onCategoryCandidates?.(category, requestedMissionIds.length)
+            if (enabledMissionIds.length === 0) continue
+
             const computer = getComputer(category)
-            const context = computer.buildContext(playerId, category, evaluationTime)
+            const context = computer.buildContext(
+                playerId,
+                category,
+                evaluationTime,
+                enabledMissionIds,
+            )
             const persisted = getPlayerCategoryMissionsSync(playerId, category)
-            const missionIds = getMissionIdsByCategory(category)
-            observer?.onCategoryCandidates?.(category, missionIds.length)
-            for (const missionId of missionIds) {
-                if (!isMissionEnabledAt(category, missionId, evaluationTime, eventId)) continue
+            for (const missionId of enabledMissionIds) {
                 const missionKey = `${category}:${missionId}`
                 if (evaluatedMissionKeys.has(missionKey)) continue
                 evaluatedMissionKeys.add(missionKey)

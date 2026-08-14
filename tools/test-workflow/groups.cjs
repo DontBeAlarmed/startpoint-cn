@@ -352,6 +352,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_regular_facts.test.cjs",
             "tools/mission_response_merge.test.cjs",
             "tools/perf/mission_settlement_baseline.test.cjs",
+            "tools/mission_settlement_scope.test.cjs",
             "tools/mission_settlement.test.cjs",
             "tools/mission_storage.test.cjs",
             "tools/mission_time_utils.test.cjs",

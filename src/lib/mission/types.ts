@@ -89,7 +89,12 @@ export interface MissionComputer {
      * Build pre-cached context for this category.
      * All DB I/O happens here — compute() must be pure.
      */
-    buildContext(playerId: number, category: number, evaluationTime: Date): CategoryContext
+    buildContext(
+        playerId: number,
+        category: number,
+        evaluationTime: Date,
+        missionIds?: readonly number[],
+    ): CategoryContext
 
     /**
      * Compute progress for a single mission.
