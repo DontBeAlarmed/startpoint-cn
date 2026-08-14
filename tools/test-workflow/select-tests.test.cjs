@@ -44,6 +44,10 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/lib/gacha-draw.ts"]), ["quick:gacha"])
     assert.deepEqual(selectTestGroups(["src/lib/sampled-log.ts"]), ["quick:workflow"])
     assert.deepEqual(
+        selectTestGroups(["src/lib/hot-path-log-formatters.ts"]),
+        ["quick:gacha", "quick:quest"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/lib/quest.ts"]),
         ["integration:rules", "quick:quest"],
     )

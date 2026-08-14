@@ -16,6 +16,7 @@ import { computeEquipmentGachaMovieEffectsForGacha, EquipmentMovieDrawInput } fr
 import { drawGachaWithMetadataSync } from "./gacha-draw";
 import type { GachaDrawMetadata } from "./gacha-draw";
 import { sampledLog } from "./sampled-log";
+import { formatGachaCharacterDrawsSummary } from "./hot-path-log-formatters";
 
 export { drawGachaSync, drawGachaWithMetadataSync, selectWeightedIndexByRoll } from "./gacha-draw";
 export type { GachaDrawMetadata } from "./gacha-draw";
@@ -177,25 +178,11 @@ export function rewardPlayerGachaDrawResultSync(
             }
         }
 
-        sampledLog("gacha-character-draws", () => {
-            const drawSummary = draws.map(draw => {
-                const characterDraw = draw as GachaCharacterDraw
-                const plan = characterMoviePlan.find(candidate =>
-                    candidate.characterId === characterDraw.character_id
-                    && candidate.movieId === characterDraw.movie_id
-                    && candidate.seed === characterDraw.seed
-                )
-                return {
-                    character_id: characterDraw.character_id,
-                    movie_id: characterDraw.movie_id,
-                    seed: characterDraw.seed,
-                    rarity: plan?.rarity,
-                    verification: plan?.requiresVerification === false ? "SKIP" : "VERIFY",
-                }
-            })
-            return `[GACHA] reward_summary playerId=${playerId} draws=${draws.length}`
-                + ` characters=${JSON.stringify(drawSummary)}`
-        })
+        sampledLog("gacha-character-draws", () => formatGachaCharacterDrawsSummary({
+            playerId,
+            draws: draws as GachaCharacterDraw[],
+            moviePlans: characterMoviePlan,
+        }))
     } else {
         const equipmentMovieInputs: EquipmentMovieDrawInput[] = gachaDrawResult.map((equipmentId, index) => {
             const metadata = gachaDrawMetadata?.[index]

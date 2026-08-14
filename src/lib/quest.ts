@@ -17,6 +17,7 @@ import {
 } from "./reward-campaign";
 import { getRuntimeContentTableSync } from "../content/runtime/table-access";
 import { sampledLog } from "./sampled-log";
+import { formatQuestScoreRewardsSummary } from "./hot-path-log-formatters";
 
 const ELEMENT_TO_ENEMY_MAP: Record<number, number> = {
     0: 3, 1: 0, 2: 1, 3: 2, 4: 5, 5: 4,
@@ -198,14 +199,13 @@ export function givePlayerScoreRewardsSync(
             })
         }
 
-        sampledLog("quest-score-rewards", () => {
-            const drops = dropScoreRewardIds.map(({ index, number }) => ({ index, number }))
-            const rareDrops = dropRareRewardIds.map(({ index, number }) => ({ index, number }))
-            return `[QUEST] score_rewards playerId=${playerId} groupId=${groupId}`
-                + ` common=${dropScoreRewardIds.length} rare=${dropRareRewardIds.length}`
-                + ` drops=${JSON.stringify(drops)} rareDrops=${JSON.stringify(rareDrops)}`
-                + ` items=${JSON.stringify(items)}`
-        })
+        sampledLog("quest-score-rewards", () => formatQuestScoreRewardsSummary({
+            playerId,
+            groupId,
+            commonDrops: dropScoreRewardIds,
+            rareDrops: dropRareRewardIds,
+            inventoryTotals: items,
+        }))
     }
 
     return {

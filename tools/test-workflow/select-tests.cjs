@@ -120,6 +120,10 @@ const SOURCE_RULES = [
     },
     { pattern: /^src\/lib\/gacha-seed-quarantine\.ts$/, groups: ["quick:seed", "quick:gacha"] },
     { pattern: /^src\/lib\/sampled-log\.ts$/, groups: ["quick:workflow"] },
+    {
+        pattern: /^src\/lib\/hot-path-log-formatters\.ts$/,
+        groups: ["quick:gacha", "quick:quest"],
+    },
     { pattern: /^tools\/gacha-faithful\//, groups: ["quick:seed"] },
     { pattern: /^assets\/gacha-seed-catalog\//, groups: ["quick:seed"] },
     {

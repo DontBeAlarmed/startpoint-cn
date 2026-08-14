@@ -13,14 +13,18 @@ export function createSampledLogger(
         throw new RangeError("sampled log interval must be a positive safe integer")
     }
 
-    const sink = options.sink ?? console.log
+    const sink = options.sink ?? ((message: string) => console.log(message))
     const counts = new Map<string, number>()
 
     return (key, messageFactory) => {
         const count = (counts.get(key) ?? 0) + 1
         counts.set(key, count)
         if (count !== 1 && count % interval !== 0) return
-        sink(messageFactory())
+        try {
+            sink(messageFactory())
+        } catch {
+            // Logging is best-effort and must not affect business behavior.
+        }
     }
 }
 
