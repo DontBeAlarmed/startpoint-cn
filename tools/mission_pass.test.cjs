@@ -23,7 +23,7 @@ const missionTypesSource = fs.readFileSync(path.resolve(__dirname, "../src/lib/m
 const passComputerSource = fs.readFileSync(path.resolve(__dirname, "../src/lib/mission/pass.ts"), "utf8")
 assert.match(
     missionTypesSource,
-    /buildContext\(playerId: number, category: number, evaluationTime: Date\): CategoryContext/,
+    /buildContext\s*\(\s*playerId\s*:\s*number\s*,\s*category\s*:\s*number\s*,\s*evaluationTime\s*:\s*Date(?:\s*,\s*missionIds\s*\?\s*:\s*readonly\s+number\[\])?\s*,?\s*\)\s*:\s*CategoryContext/,
     "MissionComputer 必须要求调用方提供统一的评估时间",
 )
 assert.doesNotMatch(
