@@ -38,6 +38,7 @@ restoreContentSnapshot = installBundledGameplaySnapshot({
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
+const { insertPlayerCharacterSync } = require("../src/data/domains/character")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
 const { givePlayerItemSync } = require("../src/data/domains/item")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
@@ -62,6 +63,22 @@ const account = insertAccountSync({
 })
 const playerId = insertDefaultPlayerSync(account.id).id
 const viewerId = 800000198
+const degreeCharacterIds = [111001, 111002, 111003]
+const degreeCharacterTime = new Date("2024-01-01T00:00:00.000Z")
+for (const characterId of degreeCharacterIds) {
+    insertPlayerCharacterSync(playerId, characterId, {
+        entryCount: 1,
+        evolutionLevel: 0,
+        overLimitStep: 4,
+        protection: false,
+        joinTime: degreeCharacterTime,
+        updateTime: degreeCharacterTime,
+        exp: 379988,
+        stack: 0,
+        manaBoardIndex: 1,
+        bondTokenList: [{ manaBoardIndex: 1, status: 1 }],
+    })
+}
 db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
     .run(String(viewerId), account.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 2)
 db.prepare(`
@@ -151,6 +168,7 @@ async function main() {
             statistics: {
                 clear_phase: 1,
                 max_combo_count: 0,
+                max_power: 3000,
                 zones: [{ use_power_flip_count: 5 }],
                 party: {
                     characters: [{ id: 1 }, null, null],
@@ -198,6 +216,38 @@ async function main() {
                 .map(entry => entry.mission_id),
             [11, 17],
         )
+        assert.deepEqual(
+            finishData.mission_info.find(entry => (
+                entry.mission_category_id === 5 && entry.mission_id === 15000
+            )),
+            {
+                mission_category_id: 5,
+                mission_id: 15000,
+                mission_reward_id: 15000001,
+            },
+            "本场满足的称号任务必须随同一次 finish 返回",
+        )
+        assert.equal(
+            finishData.degree_list.some(entry => entry.degree_id === 15000),
+            true,
+            "称号奖励必须沿 mission settlement response 路径返回",
+        )
+        assert.deepEqual(
+            finishData.mission_info.find(entry => (
+                entry.mission_category_id === 5 && entry.mission_id === 32000
+            )),
+            {
+                mission_category_id: 5,
+                mission_id: 32000,
+                mission_reward_id: 32000001,
+            },
+            "本场 max_power 权威事实必须在同一次 finish 结算称号",
+        )
+        assert.equal(
+            finishData.degree_list.some(entry => entry.degree_id === 32000),
+            true,
+            "condition 27 称号奖励必须沿既有 response 路径返回",
+        )
         assert.equal(finishData.mail_arrived, true)
         assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[13].progress, 5)
 
@@ -236,6 +286,15 @@ async function main() {
                 api_count: 2,
                 quest_id: 19001,
                 category: 6,
+                statistics: {
+                    ...finishPayload.statistics,
+                    party: {
+                        characters: [{ id: 111001 }, null, null],
+                        unison_characters: [{ id: 111002 }, null, null],
+                        equipments: [null, null, null],
+                        ability_soul_ids: [null, null, null],
+                    },
+                },
             }),
         })
         assert.equal(dailyMazeFinish.statusCode, 200, dailyMazeFinish.body)
@@ -248,6 +307,16 @@ async function main() {
             progress_value: 1,
             stages: [{ stage: 1, received: false }],
         })
+        const degreeMissionIds = dailyMazeData.mission_info
+            .filter(entry => entry.mission_category_id === 5)
+            .map(entry => entry.mission_id)
+        assert.equal(degreeMissionIds.includes(111001), true, "main 角色称号必须同场结算")
+        assert.equal(degreeMissionIds.includes(111002), true, "Sub 角色称号必须同场结算")
+        assert.equal(degreeMissionIds.includes(111003), false, "未出战角色称号不得进入本场结算")
+        const degreeIds = dailyMazeData.degree_list.map(entry => entry.degree_id)
+        assert.equal(degreeIds.includes(111001), true, "main 角色称号奖励必须同次返回")
+        assert.equal(degreeIds.includes(111002), true, "Sub 角色称号奖励必须同次返回")
+        assert.equal(degreeIds.includes(111003), false, "未出战角色称号奖励不得返回")
 
         const dailyExpManaStart = await fastify.inject({
             method: "POST",

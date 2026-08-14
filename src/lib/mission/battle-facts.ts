@@ -13,9 +13,37 @@ import { recordActiveMissionSpecificBattleFactsSync } from "./active-mission-spe
 import { recordDailyMissionBattleFacts } from "./daily-battle-facts"
 import { recordDegreeMissionBattleFacts } from "./degree-battle-facts"
 import { recordDegreeBattleStatisticsSync } from "./degree-battle-stat-facts"
+import { getDegreeMissionIdsForConditionTypes } from "./degree-candidates"
 import { recordRegularMissionBattleFactsSync } from "./regular-battle-facts"
+import type { MissionSettlementScope } from "./settlement"
 
 export const BATTLE_SETTLEMENT_CATEGORIES = Object.freeze([1, 2, 3, 6, 7, 8, 10])
+
+export const BATTLE_DEGREE_CONDITION_TYPES = Object.freeze([
+    1, 4, 5, 8, 14, 15, 16, 17, 19, 20, 21,
+    22, 23, 25, 26, 27, 28, 29, 30, 31, 37, 39, 44, 92,
+])
+
+export function buildBattleMissionSettlementScopes(
+    affectedCharacterIds: readonly number[],
+): readonly (number | MissionSettlementScope)[] {
+    return [
+        1,
+        2,
+        3,
+        {
+            category: 5,
+            missionIds: getDegreeMissionIdsForConditionTypes(
+                BATTLE_DEGREE_CONDITION_TYPES,
+                affectedCharacterIds,
+            ),
+        },
+        6,
+        7,
+        8,
+        10,
+    ]
+}
 
 function getSkillUseCount(ctx: FinishContext): number {
     if (!ctx.questAccomplished) return 0

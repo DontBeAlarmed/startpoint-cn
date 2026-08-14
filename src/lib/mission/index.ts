@@ -59,6 +59,7 @@ export { reconcileAwakeUnlockCharacterList } from "./awake-unlock-response"
 
 // Degree helpers
 export { getTargetDegree } from "./computer-degree"
+export { getDegreeMissionIdsForConditionTypes } from "./degree-candidates"
 
 // Filter (active mission ID filtering, C8601 prevention)
 export { isActiveMissionId, filterToActiveMissions } from "./filter"

@@ -33,7 +33,7 @@ import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } f
 import { getDb } from "../../data/db";
 import { getPlayerMailCountSync } from "../../data/domains/mail";
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings";
-import { BATTLE_SETTLEMENT_CATEGORIES, recordMissionBattleFacts } from "../../lib/mission/battle-facts";
+import { buildBattleMissionSettlementScopes, recordMissionBattleFacts } from "../../lib/mission/battle-facts";
 import type { FinishContext } from "../../lib/quest/finish/types";
 import {
     mergeMissionSettlementResponse,
@@ -410,7 +410,10 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         const bodyPartyStatistics = (finishValidation.statistics as any).party || { characters: [], unison_characters: [] };
         const partyCharacterIdsArray: number[] = [];
         for (const value of [...(bodyPartyStatistics.characters || []), ...(bodyPartyStatistics.unison_characters || [])]) {
-            if (value !== null && (value as any).id !== null && (value as any).id !== undefined) partyCharacterIdsArray.push((value as any).id);
+            const characterId = value?.id
+            if (typeof characterId === "number"
+                && Number.isSafeInteger(characterId)
+                && characterId > 0) partyCharacterIdsArray.push(characterId)
         }
 
         const executeFinishWrites = () => {
@@ -596,7 +599,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             );
             const missionSettlement = settleMissionCategories(
                 playerId,
-                BATTLE_SETTLEMENT_CATEGORIES,
+                buildBattleMissionSettlementScopes(partyCharacterIdsArray),
                 settlementTime,
             );
             const characterList = reconcileAwakeUnlockCharacterList(playerId, [

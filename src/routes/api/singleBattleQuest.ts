@@ -58,7 +58,7 @@ import {
 } from "../../lib/quest/finish/score-attack-handler";
 import { validateSessionAndPlayer } from "../../lib/quest/finish/session-validator";
 import { handleDailyChallengePoint } from "../../lib/quest/finish/challenge-point";
-import { BATTLE_SETTLEMENT_CATEGORIES, recordMissionBattleFacts } from "../../lib/mission/battle-facts";
+import { buildBattleMissionSettlementScopes, recordMissionBattleFacts } from "../../lib/mission/battle-facts";
 import type { FinishContext } from "../../lib/quest/finish/types";
 import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
 import bundledEventChallengePointMap from "../../../assets/event_challenge_point_map.json";
@@ -354,7 +354,10 @@ const routes = async (fastify: FastifyInstance) => {
         }
         const partyCharacterIdsArray: number[] = []
         for (const value of partyCharacterIds.values()) {
-            if (value !== null && value.id !== null) partyCharacterIdsArray.push(value.id);
+            const characterId = value?.id
+            if (typeof characterId === "number"
+                && Number.isSafeInteger(characterId)
+                && characterId > 0) partyCharacterIdsArray.push(characterId)
         }
         const executeFinishWrites = () => {
             const settlementTime = new Date(getServerTime() * 1000)
@@ -627,7 +630,7 @@ const routes = async (fastify: FastifyInstance) => {
             const scoreAttackRewardResult = scoreAttackFinishResult?.rewardResult
             const missionSettlement = settleMissionCategories(
                 playerId,
-                BATTLE_SETTLEMENT_CATEGORIES,
+                buildBattleMissionSettlementScopes(partyCharacterIdsArray),
                 settlementTime,
             )
             const activeMissionList = reconcileActiveMissionFacts({

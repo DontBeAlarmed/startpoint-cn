@@ -319,6 +319,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission-client-check-diagnostics.test.cjs",
             "tools/mission_coverage_audit.test.cjs",
             "tools/mission_daily_battle_facts.test.cjs",
+            "tools/mission_degree_candidates.test.cjs",
             "tools/mission_degree_progress.test.cjs",
             "tools/mission_event_battle_facts.test.cjs",
             "tools/mission_event_current_state.test.cjs",

@@ -59,7 +59,42 @@ stubModule("../src/lib/mission/active-conditional-battle-facts", {
     recordActiveMissionConditionalBattleFactsSync: ctx => calls.push(["active-conditional", ctx.questId]),
 })
 
-const { recordMissionBattleFacts } = require("../src/lib/mission/battle-facts")
+const {
+    BATTLE_SETTLEMENT_CATEGORIES,
+    buildBattleMissionSettlementScopes,
+    recordMissionBattleFacts,
+} = require("../src/lib/mission/battle-facts")
+const { getMissionMasterDefinitions } = require("../src/lib/mission/master-data")
+
+assert.equal(
+    typeof buildBattleMissionSettlementScopes,
+    "function",
+    "battle-facts 必须导出定向 settlement scope builder",
+)
+const battleScopes = buildBattleMissionSettlementScopes([111002, 111001, 111002, 0, -1])
+assert.deepEqual(
+    battleScopes.filter(scope => typeof scope === "number"),
+    BATTLE_SETTLEMENT_CATEGORIES,
+    "现有 battle settlement 分类及数字 scope 语义必须保持不变",
+)
+assert.equal(
+    battleScopes.includes(2),
+    true,
+    "category 2 必须继续使用全量数字 scope",
+)
+const degreeScope = battleScopes.find(scope => typeof scope !== "number" && scope.category === 5)
+assert.ok(degreeScope, "battle settlement 必须包含 category 5 定向 scope")
+assert.equal(degreeScope.missionIds.includes(111001), true, "main 角色称号必须进入候选")
+assert.equal(degreeScope.missionIds.includes(111002), true, "Sub 角色称号必须进入候选")
+assert.equal(degreeScope.missionIds.includes(111003), false, "非本场角色的 type 44 不得进入候选")
+assert.equal(degreeScope.missionIds.includes(32000), true, "本场战力称号必须进入候选")
+assert.equal(degreeScope.missionIds.includes(35000), true, "本场最大伤害称号必须进入候选")
+assert.equal(degreeScope.missionIds.includes(39000), true, "本场复活棺柩称号必须进入候选")
+assert.equal(
+    degreeScope.missionIds.length < getMissionMasterDefinitions(5).length,
+    true,
+    "battle category 5 候选必须小于全量 1288",
+)
 
 const baseContext = {
     playerId: 1,
@@ -141,13 +176,23 @@ const singleFactCall = singleBattleSource.indexOf(
     "recordMissionBattleFacts(finishCtx, settlementTime)",
     singleEvaluationTime,
 )
+const singleCharacterExp = singleBattleSource.indexOf(
+    "givePlayerCharactersExpSync(",
+    singleFactCall,
+)
 const singleSettlementTime = singleBattleSource.indexOf(
-    "BATTLE_SETTLEMENT_CATEGORIES,\n                settlementTime,",
+    "buildBattleMissionSettlementScopes(partyCharacterIdsArray),\n                settlementTime,",
     singleFactCall,
 )
 assert.equal(singleEvaluationTime > singleTransactionStart, true, "单人 finish 必须在事务体内固定任务时间")
 assert.equal(singleFactCall > singleEvaluationTime, true, "单人任务事实必须使用事务时间")
-assert.equal(singleSettlementTime > singleFactCall, true, "单人任务结算必须复用事实记录的时间")
+assert.equal(singleCharacterExp > singleFactCall, true, "单人角色经验必须在任务事实后写入")
+assert.equal(singleSettlementTime > singleCharacterExp, true, "单人称号结算必须看到本场角色经验")
+assert.match(
+    singleBattleSource,
+    /const characterId = value\?\.id[\s\S]*?Number\.isSafeInteger\(characterId\)[\s\S]*?characterId > 0[\s\S]*?partyCharacterIdsArray\.push\(characterId\)/,
+    "单人 finish 必须只收集 main/Sub 的有效正整数角色 ID",
+)
 assert.equal(
     singleBattleSource.includes("const finishWrites = getDb().transaction(executeFinishWrites)()"),
     true,
@@ -167,8 +212,12 @@ const multiFactCall = multiBattleSource.indexOf(
     "recordMissionBattleFacts(finishCtx, settlementTime)",
     multiEvaluationTime,
 )
+const multiCharacterExp = multiBattleSource.indexOf(
+    "givePlayerCharactersExpSync(",
+    multiFactCall,
+)
 const multiSettlementTime = multiBattleSource.indexOf(
-    "BATTLE_SETTLEMENT_CATEGORIES,\n                settlementTime,",
+    "buildBattleMissionSettlementScopes(partyCharacterIdsArray),\n                settlementTime,",
     multiFactCall,
 )
 const multiTransactionCall = multiBattleSource.indexOf("runMultiActiveQuestSettlementTransaction(")
@@ -177,7 +226,8 @@ const multiCoordinatorFinalize = multiBattleSource.indexOf("context.coordinator.
 assert.equal(multiTransactionStart >= 0, true, "多人 finish 必须定义同步结算事务体")
 assert.equal(multiEvaluationTime > multiTransactionStart, true, "多人 finish 必须在事务体内固定任务时间")
 assert.equal(multiFactCall > multiTransactionStart, true)
-assert.equal(multiSettlementTime > multiFactCall, true, "多人任务结算必须复用事实记录的时间")
+assert.equal(multiCharacterExp > multiFactCall, true, "多人角色经验必须在任务事实后写入")
+assert.equal(multiSettlementTime > multiCharacterExp, true, "多人称号结算必须看到本场角色经验")
 assert.equal(multiTransactionCall > multiFactCall, true, "任务事实必须在事务体执行后统一提交")
 assert.equal(multiActiveDelete > multiTransactionCall, true, "事务成功前不得清除多人 active quest 内存")
 assert.equal(multiCoordinatorFinalize >= 0, true, "多人 finish 必须通过 coordinator 结束权威房间生命周期")
@@ -187,6 +237,11 @@ assert.match(
     multiBattleSource,
     /const finishCtx: FinishContext = \{[\s\S]*?isMultiHost: isRoomHost,[\s\S]*?\}/,
     "多人路由必须把 resolveIsRoomHost 的 true/false/undefined 原样写入 FinishContext",
+)
+assert.match(
+    multiBattleSource,
+    /const characterId = value\?\.id[\s\S]*?Number\.isSafeInteger\(characterId\)[\s\S]*?characterId > 0[\s\S]*?partyCharacterIdsArray\.push\(characterId\)/,
+    "多人 finish 必须只收集 main/Sub 的有效正整数角色 ID",
 )
 
 recordMissionBattleFacts({

@@ -27,6 +27,14 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/lib/mission/event-entry-facts.ts"]),
         ["integration:mission"],
     )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/battle-facts.ts"]),
+        ["integration:mission"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/degree-candidates.ts"]),
+        ["integration:mission"],
+    )
     assert.deepEqual(selectTestGroups(["src/lib/gacha.ts"]), ["quick:gacha"])
     assert.deepEqual(
         selectTestGroups(["src/lib/gacha-seed-quarantine.ts"]),
@@ -702,6 +710,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission-client-check-diagnostics.test.cjs",
         "tools/mission_coverage_audit.test.cjs",
         "tools/mission_daily_battle_facts.test.cjs",
+        "tools/mission_degree_candidates.test.cjs",
         "tools/mission_degree_progress.test.cjs",
         "tools/mission_event_battle_facts.test.cjs",
         "tools/mission_event_current_state.test.cjs",
