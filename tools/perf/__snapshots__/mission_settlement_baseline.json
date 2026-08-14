@@ -8,135 +8,400 @@
     8,
     10
   ],
-  "fixedTime": "2019-12-03T04:00:00.000Z",
+  "fixedTime": "2024-07-18T12:00:00.000Z",
   "scenarios": [
     {
       "missions": {
         "byCategory": {
-          "1": { "candidates": 120, "computed": 88, "progressChanged": 4, "rewardStagesGranted": 0 },
-          "2": { "candidates": 656, "computed": 5, "progressChanged": 0, "rewardStagesGranted": 0 },
-          "3": { "candidates": 2512, "computed": 33, "progressChanged": 0, "rewardStagesGranted": 0 },
-          "6": { "candidates": 76, "computed": 0, "progressChanged": 0, "rewardStagesGranted": 0 },
-          "7": { "candidates": 76, "computed": 0, "progressChanged": 0, "rewardStagesGranted": 0 },
-          "8": { "candidates": 115, "computed": 0, "progressChanged": 0, "rewardStagesGranted": 0 },
-          "10": { "candidates": 2, "computed": 0, "progressChanged": 0, "rewardStagesGranted": 0 }
+          "1": {
+            "candidates": 120,
+            "computed": 107,
+            "progressChanged": 4,
+            "rewardStagesGranted": 0
+          },
+          "2": {
+            "candidates": 656,
+            "computed": 16,
+            "progressChanged": 0,
+            "rewardStagesGranted": 0
+          },
+          "3": {
+            "candidates": 2512,
+            "computed": 40,
+            "progressChanged": 0,
+            "rewardStagesGranted": 0
+          },
+          "6": {
+            "candidates": 76,
+            "computed": 4,
+            "progressChanged": 0,
+            "rewardStagesGranted": 0
+          },
+          "7": {
+            "candidates": 76,
+            "computed": 4,
+            "progressChanged": 0,
+            "rewardStagesGranted": 0
+          },
+          "8": {
+            "candidates": 115,
+            "computed": 4,
+            "progressChanged": 1,
+            "rewardStagesGranted": 1
+          },
+          "10": {
+            "candidates": 2,
+            "computed": 2,
+            "progressChanged": 1,
+            "rewardStagesGranted": 0
+          }
         },
         "candidates": 3557,
-        "computed": 126,
-        "progressChanged": 4
+        "computed": 177,
+        "progressChanged": 6
       },
       "name": "new-account",
-      "rewardStagesGranted": 0,
+      "rewardStagesGranted": 1,
       "sql": {
         "byTable": {
-          "players": { "select": 8, "total": 8, "writes": 0 },
-          "players_category_mission_stages": { "select": 8, "total": 8, "writes": 0 },
-          "players_category_missions": { "select": 8, "total": 12, "writes": 4 },
-          "players_characters": { "select": 2, "total": 2, "writes": 0 },
-          "players_characters_bond_tokens": { "select": 2, "total": 2, "writes": 0 },
-          "players_characters_mana_nodes": { "select": 2, "total": 2, "writes": 0 },
-          "players_collected_items": { "select": 2, "total": 2, "writes": 0 },
-          "players_degree_battle_stats": { "select": 1, "total": 1, "writes": 0 },
-          "players_equipment": { "select": 2, "total": 2, "writes": 0 },
-          "players_items": { "select": 1, "total": 1, "writes": 0 },
-          "players_mission_battle_counters": { "select": 6, "total": 6, "writes": 0 },
-          "players_parties": { "select": 1, "total": 1, "writes": 0 },
-          "players_party_groups": { "select": 1, "total": 1, "writes": 0 },
-          "players_periodic_snapshots": { "select": 4, "total": 4, "writes": 0 },
-          "players_quest_progress": { "select": 7, "total": 7, "writes": 0 }
+          "players": {
+            "select": 8,
+            "total": 8,
+            "writes": 0
+          },
+          "players_category_mission_stages": {
+            "select": 8,
+            "total": 9,
+            "writes": 1
+          },
+          "players_category_missions": {
+            "select": 8,
+            "total": 14,
+            "writes": 6
+          },
+          "players_characters": {
+            "select": 1,
+            "total": 1,
+            "writes": 0
+          },
+          "players_characters_bond_tokens": {
+            "select": 1,
+            "total": 1,
+            "writes": 0
+          },
+          "players_characters_mana_nodes": {
+            "select": 1,
+            "total": 1,
+            "writes": 0
+          },
+          "players_collected_items": {
+            "select": 2,
+            "total": 2,
+            "writes": 0
+          },
+          "players_degree_battle_stats": {
+            "select": 1,
+            "total": 1,
+            "writes": 0
+          },
+          "players_equipment": {
+            "select": 1,
+            "total": 1,
+            "writes": 0
+          },
+          "players_mission_battle_counters": {
+            "select": 6,
+            "total": 6,
+            "writes": 0
+          },
+          "players_pass_cards": {
+            "select": 0,
+            "total": 2,
+            "writes": 2
+          },
+          "players_periodic_snapshots": {
+            "select": 5,
+            "total": 5,
+            "writes": 0
+          },
+          "players_quest_progress": {
+            "select": 7,
+            "total": 7,
+            "writes": 0
+          }
         },
         "other": 0,
-        "select": 55,
-        "total": 61,
+        "select": 49,
+        "total": 60,
         "transactions": 2,
-        "writes": 4
+        "writes": 9
       }
     },
     {
       "missions": {
         "byCategory": {
-          "1": { "candidates": 120, "computed": 88, "progressChanged": 16, "rewardStagesGranted": 30 },
-          "2": { "candidates": 656, "computed": 5, "progressChanged": 2, "rewardStagesGranted": 1 },
-          "3": { "candidates": 2512, "computed": 33, "progressChanged": 4, "rewardStagesGranted": 7 },
-          "6": { "candidates": 76, "computed": 0, "progressChanged": 0, "rewardStagesGranted": 0 },
-          "7": { "candidates": 76, "computed": 0, "progressChanged": 0, "rewardStagesGranted": 0 },
-          "8": { "candidates": 115, "computed": 0, "progressChanged": 0, "rewardStagesGranted": 0 },
-          "10": { "candidates": 2, "computed": 0, "progressChanged": 0, "rewardStagesGranted": 0 }
+          "1": {
+            "candidates": 120,
+            "computed": 107,
+            "progressChanged": 17,
+            "rewardStagesGranted": 31
+          },
+          "2": {
+            "candidates": 656,
+            "computed": 16,
+            "progressChanged": 3,
+            "rewardStagesGranted": 2
+          },
+          "3": {
+            "candidates": 2512,
+            "computed": 40,
+            "progressChanged": 2,
+            "rewardStagesGranted": 2
+          },
+          "6": {
+            "candidates": 76,
+            "computed": 4,
+            "progressChanged": 2,
+            "rewardStagesGranted": 2
+          },
+          "7": {
+            "candidates": 76,
+            "computed": 4,
+            "progressChanged": 1,
+            "rewardStagesGranted": 0
+          },
+          "8": {
+            "candidates": 115,
+            "computed": 4,
+            "progressChanged": 1,
+            "rewardStagesGranted": 1
+          },
+          "10": {
+            "candidates": 2,
+            "computed": 2,
+            "progressChanged": 1,
+            "rewardStagesGranted": 1
+          }
         },
         "candidates": 3557,
-        "computed": 126,
-        "progressChanged": 22
+        "computed": 177,
+        "progressChanged": 27
       },
       "name": "normal-progress",
-      "rewardStagesGranted": 38,
+      "rewardStagesGranted": 39,
       "sql": {
         "byTable": {
-          "players": { "select": 8, "total": 9, "writes": 1 },
-          "players_category_mission_stages": { "select": 8, "total": 46, "writes": 38 },
-          "players_category_missions": { "select": 8, "total": 30, "writes": 22 },
-          "players_characters": { "select": 2, "total": 2, "writes": 0 },
-          "players_characters_bond_tokens": { "select": 2, "total": 2, "writes": 0 },
-          "players_characters_mana_nodes": { "select": 2, "total": 2, "writes": 0 },
-          "players_collected_items": { "select": 2, "total": 12, "writes": 10 },
-          "players_degree_battle_stats": { "select": 1, "total": 1, "writes": 0 },
-          "players_equipment": { "select": 2, "total": 2, "writes": 0 },
-          "players_items": { "select": 11, "total": 21, "writes": 10 },
-          "players_mission_battle_counters": { "select": 6, "total": 6, "writes": 0 },
-          "players_parties": { "select": 1, "total": 1, "writes": 0 },
-          "players_party_groups": { "select": 1, "total": 1, "writes": 0 },
-          "players_periodic_snapshots": { "select": 4, "total": 4, "writes": 0 },
-          "players_quest_progress": { "select": 7, "total": 7, "writes": 0 }
+          "players": {
+            "select": 8,
+            "total": 9,
+            "writes": 1
+          },
+          "players_category_mission_stages": {
+            "select": 8,
+            "total": 47,
+            "writes": 39
+          },
+          "players_category_missions": {
+            "select": 8,
+            "total": 35,
+            "writes": 27
+          },
+          "players_characters": {
+            "select": 1,
+            "total": 1,
+            "writes": 0
+          },
+          "players_characters_bond_tokens": {
+            "select": 1,
+            "total": 1,
+            "writes": 0
+          },
+          "players_characters_mana_nodes": {
+            "select": 1,
+            "total": 1,
+            "writes": 0
+          },
+          "players_collected_items": {
+            "select": 2,
+            "total": 9,
+            "writes": 7
+          },
+          "players_degree_battle_stats": {
+            "select": 1,
+            "total": 1,
+            "writes": 0
+          },
+          "players_equipment": {
+            "select": 2,
+            "total": 3,
+            "writes": 1
+          },
+          "players_items": {
+            "select": 7,
+            "total": 14,
+            "writes": 7
+          },
+          "players_mission_battle_counters": {
+            "select": 6,
+            "total": 6,
+            "writes": 0
+          },
+          "players_pass_cards": {
+            "select": 0,
+            "total": 4,
+            "writes": 4
+          },
+          "players_periodic_snapshots": {
+            "select": 5,
+            "total": 5,
+            "writes": 0
+          },
+          "players_quest_progress": {
+            "select": 7,
+            "total": 7,
+            "writes": 0
+          }
         },
         "other": 0,
-        "select": 65,
-        "total": 168,
-        "transactions": 22,
-        "writes": 81
+        "select": 57,
+        "total": 159,
+        "transactions": 16,
+        "writes": 86
       }
     },
     {
       "missions": {
         "byCategory": {
-          "1": { "candidates": 120, "computed": 88, "progressChanged": 33, "rewardStagesGranted": 113 },
-          "2": { "candidates": 656, "computed": 5, "progressChanged": 2, "rewardStagesGranted": 1 },
-          "3": { "candidates": 2512, "computed": 33, "progressChanged": 7, "rewardStagesGranted": 12 },
-          "6": { "candidates": 76, "computed": 0, "progressChanged": 0, "rewardStagesGranted": 0 },
-          "7": { "candidates": 76, "computed": 0, "progressChanged": 0, "rewardStagesGranted": 0 },
-          "8": { "candidates": 115, "computed": 0, "progressChanged": 0, "rewardStagesGranted": 0 },
-          "10": { "candidates": 2, "computed": 0, "progressChanged": 0, "rewardStagesGranted": 0 }
+          "1": {
+            "candidates": 120,
+            "computed": 107,
+            "progressChanged": 39,
+            "rewardStagesGranted": 119
+          },
+          "2": {
+            "candidates": 656,
+            "computed": 16,
+            "progressChanged": 3,
+            "rewardStagesGranted": 2
+          },
+          "3": {
+            "candidates": 2512,
+            "computed": 40,
+            "progressChanged": 7,
+            "rewardStagesGranted": 7
+          },
+          "6": {
+            "candidates": 76,
+            "computed": 4,
+            "progressChanged": 2,
+            "rewardStagesGranted": 2
+          },
+          "7": {
+            "candidates": 76,
+            "computed": 4,
+            "progressChanged": 1,
+            "rewardStagesGranted": 1
+          },
+          "8": {
+            "candidates": 115,
+            "computed": 4,
+            "progressChanged": 1,
+            "rewardStagesGranted": 1
+          },
+          "10": {
+            "candidates": 2,
+            "computed": 2,
+            "progressChanged": 1,
+            "rewardStagesGranted": 1
+          }
         },
         "candidates": 3557,
-        "computed": 126,
-        "progressChanged": 42
+        "computed": 177,
+        "progressChanged": 54
       },
       "name": "high-completion-volume",
-      "rewardStagesGranted": 126,
+      "rewardStagesGranted": 133,
       "sql": {
         "byTable": {
-          "players": { "select": 8, "total": 9, "writes": 1 },
-          "players_category_mission_stages": { "select": 8, "total": 134, "writes": 126 },
-          "players_category_missions": { "select": 8, "total": 50, "writes": 42 },
-          "players_characters": { "select": 2, "total": 2, "writes": 0 },
-          "players_characters_bond_tokens": { "select": 2, "total": 2, "writes": 0 },
-          "players_characters_mana_nodes": { "select": 2, "total": 2, "writes": 0 },
-          "players_collected_items": { "select": 2, "total": 34, "writes": 32 },
-          "players_degree_battle_stats": { "select": 1, "total": 1, "writes": 0 },
-          "players_equipment": { "select": 2, "total": 2, "writes": 0 },
-          "players_items": { "select": 33, "total": 65, "writes": 32 },
-          "players_mission_battle_counters": { "select": 6, "total": 6, "writes": 0 },
-          "players_parties": { "select": 1, "total": 1, "writes": 0 },
-          "players_party_groups": { "select": 1, "total": 1, "writes": 0 },
-          "players_periodic_snapshots": { "select": 4, "total": 4, "writes": 0 },
-          "players_quest_progress": { "select": 7, "total": 7, "writes": 0 }
+          "players": {
+            "select": 8,
+            "total": 9,
+            "writes": 1
+          },
+          "players_category_mission_stages": {
+            "select": 8,
+            "total": 141,
+            "writes": 133
+          },
+          "players_category_missions": {
+            "select": 8,
+            "total": 62,
+            "writes": 54
+          },
+          "players_characters": {
+            "select": 1,
+            "total": 1,
+            "writes": 0
+          },
+          "players_characters_bond_tokens": {
+            "select": 1,
+            "total": 1,
+            "writes": 0
+          },
+          "players_characters_mana_nodes": {
+            "select": 1,
+            "total": 1,
+            "writes": 0
+          },
+          "players_collected_items": {
+            "select": 2,
+            "total": 31,
+            "writes": 29
+          },
+          "players_degree_battle_stats": {
+            "select": 1,
+            "total": 1,
+            "writes": 0
+          },
+          "players_equipment": {
+            "select": 7,
+            "total": 13,
+            "writes": 6
+          },
+          "players_items": {
+            "select": 29,
+            "total": 58,
+            "writes": 29
+          },
+          "players_mission_battle_counters": {
+            "select": 6,
+            "total": 6,
+            "writes": 0
+          },
+          "players_pass_cards": {
+            "select": 0,
+            "total": 5,
+            "writes": 5
+          },
+          "players_periodic_snapshots": {
+            "select": 5,
+            "total": 5,
+            "writes": 0
+          },
+          "players_quest_progress": {
+            "select": 7,
+            "total": 7,
+            "writes": 0
+          }
         },
         "other": 0,
-        "select": 87,
-        "total": 386,
-        "transactions": 66,
-        "writes": 233
+        "select": 84,
+        "total": 401,
+        "transactions": 60,
+        "writes": 257
       }
     }
   ],
   "version": 2,
-  "sha256": "cff4b6d3d24e18d489589fa9eb96692769de370f7a1ce97916cb1f39912aee46"
+  "sha256": "519c52885a8cfe88bb8914a7652bc4cc91b33d97b12e30a8f58884f80ebfdbae"
 }

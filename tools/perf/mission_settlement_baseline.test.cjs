@@ -21,6 +21,7 @@ const {
 const data = require("../../src/data")
 const { getDb } = require("../../src/data/db")
 const { resolveRuntimeDataPaths } = require("../../src/runtime/data-paths")
+const { getTimeOffset, setServerTimeOffset } = require("../../src/utils")
 
 const snapshotPath = path.join(
     __dirname,
@@ -268,6 +269,42 @@ test("does not leak domain diagnostics to stdout while running the baseline", ()
     }
 })
 
+test("stable summary is independent of the global server time", { timeout: 120_000 }, () => {
+    const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "mission-baseline-time-"))
+    const originalTimeOffset = getTimeOffset()
+    const originalLog = console.log
+
+    try {
+        console.log = () => {}
+        const earlyOffset = Date.parse("2024-07-18T12:00:00.000Z") - Date.now()
+        setServerTimeOffset(earlyOffset)
+        const earlySummary = runMissionSettlementBaseline({
+            measurements: 1,
+            temporaryParent,
+            warmups: 0,
+        }).stableSummary
+        assert.equal(getTimeOffset(), earlyOffset)
+
+        const lateOffset = Date.parse("2026-11-12T13:14:15.000Z") - Date.now()
+        setServerTimeOffset(lateOffset)
+        const lateSummary = runMissionSettlementBaseline({
+            measurements: 1,
+            temporaryParent,
+            warmups: 0,
+        }).stableSummary
+        assert.equal(getTimeOffset(), lateOffset)
+
+        assert.deepEqual(lateSummary, earlySummary)
+    } finally {
+        try {
+            setServerTimeOffset(originalTimeOffset)
+        } finally {
+            console.log = originalLog
+            fs.rmSync(temporaryParent, { recursive: true, force: true })
+        }
+    }
+})
+
 test("runs all synthetic scenarios against disposable databases", { timeout: 120_000 }, () => {
     const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "mission-baseline-test-"))
     const realDataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "mission-baseline-real-data-"))
@@ -317,6 +354,15 @@ test("runs all synthetic scenarios against disposable databases", { timeout: 120
         for (const scenario of report.scenarios.filter(({ name }) => name !== "new-account")) {
             assert.equal(scenario.missions.byCategory["3"].computed > 0, true)
             assert.equal(scenario.missions.byCategory["3"].progressChanged > 0, true)
+        }
+        for (const category of [1, 2, 3, 6, 7, 8, 10]) {
+            assert.equal(
+                report.scenarios.some(scenario => (
+                    scenario.missions.byCategory[String(category)].computed > 0
+                )),
+                true,
+                `category ${category} must compute missions in at least one scenario`,
+            )
         }
         assert.deepEqual(report.stableSummary, JSON.parse(fs.readFileSync(snapshotPath, "utf8")))
         assert.equal(fs.readFileSync(markerPath, "utf8"), "unchanged")

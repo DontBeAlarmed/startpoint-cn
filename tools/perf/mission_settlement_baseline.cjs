@@ -12,7 +12,7 @@ const BetterSqlite3 = require("better-sqlite3")
 const { percentile } = require("./http_metrics.cjs")
 const { createSqlCounter } = require("./mission_settlement_sql.cjs")
 
-const FIXED_TIME = "2019-12-03T04:00:00.000Z"
+const FIXED_TIME = "2024-07-18T12:00:00.000Z"
 const CATEGORIES = Object.freeze([1, 2, 3, 6, 7, 8, 10])
 const DEFAULT_WARMUPS = 2
 const DEFAULT_MEASUREMENTS = 5
@@ -30,12 +30,15 @@ function getRuntimeDependencies() {
         } = require("../../src/data")
         const { resolveRuntimeDataPaths } = require("../../src/runtime/data-paths")
         const { settleMissionCategories } = require("../../src/lib/mission/settlement")
+        const { getTimeOffset, setServerTimeOffset } = require("../../src/utils")
         const { SCENARIOS } = require("./mission_settlement_scenarios.cjs")
         runtimeDependencies = {
             closeDatabase,
             getDatabaseStatus,
+            getTimeOffset,
             initializeDatabase,
             resolveRuntimeDataPaths,
+            setServerTimeOffset,
             settleMissionCategories,
             SCENARIOS,
         }
@@ -196,11 +199,17 @@ function runMissionSettlementBaseline({
     const normalizedMeasurements = parseInteger(measurements, "measurements", false)
     const fixedTime = new Date(FIXED_TIME)
     let suiteDirectory = null
+    let runtime = null
+    let originalTimeOffset
+    let timeOffsetCaptured = false
     const originalLog = console.log
 
     try {
         console.log = () => {}
-        const runtime = runtimeLoader()
+        runtime = runtimeLoader()
+        originalTimeOffset = runtime.getTimeOffset()
+        timeOffsetCaptured = true
+        runtime.setServerTimeOffset(fixedTime.getTime() - Date.now())
         const databaseStatus = runtime.getDatabaseStatus()
         if (databaseStatus.open || databaseStatus.ready) {
             throw new Error(
@@ -244,11 +253,15 @@ function runMissionSettlementBaseline({
         return { ...report, stableSummary: createStableSummary(report) }
     } finally {
         try {
-            if (suiteDirectory !== null) {
-                fs.rmSync(suiteDirectory, { recursive: true, force: true })
-            }
+            if (timeOffsetCaptured) runtime.setServerTimeOffset(originalTimeOffset)
         } finally {
-            console.log = originalLog
+            try {
+                if (suiteDirectory !== null) {
+                    fs.rmSync(suiteDirectory, { recursive: true, force: true })
+                }
+            } finally {
+                console.log = originalLog
+            }
         }
     }
 }

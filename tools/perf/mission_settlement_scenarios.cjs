@@ -10,8 +10,9 @@ const characterTable = require("../../assets/character.json")
 const equipmentTable = require("../../assets/equipment_dissolve.json")
 const itemTable = require("../../assets/item_sale.json")
 const mainQuestTable = require("../../assets/main_quest.json")
+const rushEventQuestTable = require("../../assets/rush_event_quest.json")
 
-const FIXTURE_TIME = "2019-12-03T04:00:00.000Z"
+const FIXTURE_TIME = "2024-07-18T12:00:00.000Z"
 const CHARACTER_IDS = Object.keys(characterTable).map(Number).filter(id => id !== 1)
 const EQUIPMENT_IDS = [
     1010001,
@@ -19,6 +20,10 @@ const EQUIPMENT_IDS = [
 ]
 const ITEM_IDS = Object.keys(itemTable).map(Number)
 const MAIN_QUEST_IDS = Object.keys(mainQuestTable).map(Number)
+const EVENT_QUEST_IDS = Object.entries(rushEventQuestTable)
+    .filter(([, quest]) => quest.rushEventId === 700004)
+    .map(([questId]) => Number(questId))
+    .sort((left, right) => left - right)
 
 function createPlayer(name) {
     const account = insertAccountSync({
@@ -92,6 +97,16 @@ function seedInventory(playerId, itemCount, equipmentCount, characterCount) {
     }
 }
 
+function seedEventProgress(playerId, count) {
+    const insert = getDb().prepare(`
+        INSERT INTO players_quest_progress (
+            section, quest_id, finished, unlocked, high_score, clear_rank,
+            best_elapsed_time_ms, leader_character_id, host_finished, player_id
+        ) VALUES (24, ?, 1, 1, NULL, 5, 90000, 1, 0, ?)
+    `)
+    for (const questId of EVENT_QUEST_IDS.slice(0, count)) insert.run(questId, playerId)
+}
+
 function seedProgress(playerId, scale) {
     const db = getDb()
     db.prepare(`
@@ -117,6 +132,7 @@ function seedProgress(playerId, scale) {
     )
     seedQuestProgress(playerId, scale * 12, scale >= 10 ? 0.95 : 0.6)
     seedInventory(playerId, scale * 8, scale * 5, scale * 4)
+    seedEventProgress(playerId, scale >= 10 ? 7 : 2)
 }
 
 const SCENARIOS = Object.freeze([
