@@ -6,7 +6,19 @@ const { getDb } = require("../../src/data/db")
 const { insertAccountSync } = require("../../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../../src/data/domains/player")
 
-const FIXTURE_TIME = "2024-08-14T12:00:00.000Z"
+const characterTable = require("../../assets/character.json")
+const equipmentTable = require("../../assets/equipment_dissolve.json")
+const itemTable = require("../../assets/item_sale.json")
+const mainQuestTable = require("../../assets/main_quest.json")
+
+const FIXTURE_TIME = "2019-12-03T04:00:00.000Z"
+const CHARACTER_IDS = Object.keys(characterTable).map(Number).filter(id => id !== 1)
+const EQUIPMENT_IDS = [
+    1010001,
+    ...Object.keys(equipmentTable).map(Number).filter(id => id !== 1010001),
+]
+const ITEM_IDS = Object.keys(itemTable).map(Number)
+const MAIN_QUEST_IDS = Object.keys(mainQuestTable).map(Number)
 
 function createPlayer(name) {
     const account = insertAccountSync({
@@ -27,11 +39,11 @@ function seedQuestProgress(playerId, count, completionRatio) {
         ) VALUES (?, ?, ?, 1, ?, ?, ?, 1, 0, ?)
     `)
     for (let index = 0; index < count; index++) {
-        const section = index % 8 + 1
+        const section = 1
         const finished = index / count < completionRatio ? 1 : 0
         insert.run(
             section,
-            100_000 + index,
+            MAIN_QUEST_IDS[index],
             finished,
             finished ? index * 100 : null,
             finished ? index % 5 + 1 : null,
@@ -45,7 +57,7 @@ function seedInventory(playerId, itemCount, equipmentCount, characterCount) {
     const db = getDb()
     const insertItem = db.prepare("INSERT INTO players_items (id, amount, player_id) VALUES (?, ?, ?)")
     for (let index = 0; index < itemCount; index++) {
-        insertItem.run(900_000 + index, index + 1, playerId)
+        insertItem.run(ITEM_IDS[index], index + 1, playerId)
     }
 
     const insertEquipment = db.prepare(`
@@ -54,7 +66,10 @@ function seedInventory(playerId, itemCount, equipmentCount, characterCount) {
         ) VALUES (?, ?, ?, 0, ?, ?)
     `)
     for (let index = 0; index < equipmentCount; index++) {
-        insertEquipment.run(800_000 + index, index % 5 + 1, index % 6, index % 3, playerId)
+        const equipmentId = EQUIPMENT_IDS[index]
+        const maxLevel = equipmentTable[String(equipmentId)].max_level
+        const level = index === 0 ? maxLevel : Math.min(index % 5 + 1, maxLevel)
+        insertEquipment.run(equipmentId, level, index % 6, index % 3, playerId)
     }
 
     const insertCharacter = db.prepare(`
@@ -66,7 +81,7 @@ function seedInventory(playerId, itemCount, equipmentCount, characterCount) {
     `)
     for (let index = 0; index < characterCount; index++) {
         insertCharacter.run(
-            700_000 + index,
+            CHARACTER_IDS[index],
             index % 2,
             index % 6,
             FIXTURE_TIME,
@@ -79,6 +94,11 @@ function seedInventory(playerId, itemCount, equipmentCount, characterCount) {
 
 function seedProgress(playerId, scale) {
     const db = getDb()
+    db.prepare(`
+        UPDATE players_characters
+        SET over_limit_step = 1, update_time = ?
+        WHERE player_id = ? AND id = 1
+    `).run(FIXTURE_TIME, playerId)
     db.prepare(`
         UPDATE players
         SET rank_point = ?, total_stamina_used = ?, total_powerflips = ?,

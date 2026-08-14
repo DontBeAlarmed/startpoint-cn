@@ -12,7 +12,7 @@ const BetterSqlite3 = require("better-sqlite3")
 const { percentile } = require("./http_metrics.cjs")
 const { createSqlCounter } = require("./mission_settlement_sql.cjs")
 
-const FIXED_TIME = "2024-08-14T12:00:00.000Z"
+const FIXED_TIME = "2019-12-03T04:00:00.000Z"
 const CATEGORIES = Object.freeze([1, 2, 3, 6, 7, 8, 10])
 const DEFAULT_WARMUPS = 2
 const DEFAULT_MEASUREMENTS = 5
@@ -23,12 +23,17 @@ function getRuntimeDependencies() {
     const originalLog = console.log
     try {
         console.log = () => {}
-        const { closeDatabase, initializeDatabase } = require("../../src/data")
+        const {
+            closeDatabase,
+            getDatabaseStatus,
+            initializeDatabase,
+        } = require("../../src/data")
         const { resolveRuntimeDataPaths } = require("../../src/runtime/data-paths")
         const { settleMissionCategories } = require("../../src/lib/mission/settlement")
         const { SCENARIOS } = require("./mission_settlement_scenarios.cjs")
         runtimeDependencies = {
             closeDatabase,
+            getDatabaseStatus,
             initializeDatabase,
             resolveRuntimeDataPaths,
             settleMissionCategories,
@@ -72,7 +77,7 @@ function createMissionDiagnostics() {
         candidates: 0,
         computed: 0,
         progressChanged: 0,
-        rewards: 0,
+        rewardStagesGranted: 0,
     }]))
     return {
         observer: {
@@ -88,7 +93,7 @@ function createMissionDiagnostics() {
         },
         finish(missionInfo) {
             for (const reward of missionInfo) {
-                byCategory[String(reward.mission_category_id)].rewards++
+                byCategory[String(reward.mission_category_id)].rewardStagesGranted++
             }
             return {
                 candidates: Object.values(byCategory)
@@ -131,7 +136,7 @@ function runOnce(scenario, suiteDirectory, fixedTime, runtime) {
             durationMs,
             sql: counter.snapshot(),
             missions,
-            rewards: result.missionInfo.length,
+            rewardStagesGranted: result.missionInfo.length,
         }
     } finally {
         runtime.closeDatabase()
@@ -143,7 +148,7 @@ function structuralResult(sample) {
     return {
         sql: sample.sql,
         missions: sample.missions,
-        rewards: sample.rewards,
+        rewardStagesGranted: sample.rewardStagesGranted,
     }
 }
 
@@ -164,55 +169,47 @@ function sortedObject(value) {
 }
 
 function createStableSummary(report) {
-    const data = sortedObject({
+    const payload = sortedObject({
         version: report.version,
         fixedTime: report.fixedTime,
         categories: report.categories ?? CATEGORIES,
-        warmups: report.warmups,
-        measurements: report.measurements,
         scenarios: report.scenarios.map(scenario => ({
             name: scenario.name,
             sql: scenario.sql,
             missions: scenario.missions,
-            rewards: scenario.rewards,
+            rewardStagesGranted: scenario.rewardStagesGranted,
         })),
     })
-    return sortedObject({
-        sha256: crypto.createHash("sha256").update(JSON.stringify(data)).digest("hex"),
-        fixedTime: data.fixedTime,
-        categories: data.categories,
-        warmups: data.warmups,
-        measurements: data.measurements,
-        scenarios: data.scenarios.map(scenario => ({
-            name: scenario.name,
-            sql: {
-                total: scenario.sql.total,
-                select: scenario.sql.select,
-                writes: scenario.sql.writes,
-                other: scenario.sql.other,
-            },
-            missions: {
-                candidates: scenario.missions.candidates,
-                computed: scenario.missions.computed,
-                progressChanged: scenario.missions.progressChanged,
-            },
-            rewards: scenario.rewards,
-        })),
-    })
+    const sha256 = crypto.createHash("sha256")
+        .update(JSON.stringify(payload))
+        .digest("hex")
+    return { ...payload, sha256 }
 }
 
 function runMissionSettlementBaseline({
     measurements = DEFAULT_MEASUREMENTS,
+    runtimeLoader = getRuntimeDependencies,
     temporaryParent = os.tmpdir(),
     warmups = DEFAULT_WARMUPS,
 } = {}) {
     const normalizedWarmups = parseInteger(warmups, "warmups", true)
     const normalizedMeasurements = parseInteger(measurements, "measurements", false)
     const fixedTime = new Date(FIXED_TIME)
-    const suiteDirectory = fs.mkdtempSync(path.join(temporaryParent, "mission-settlement-baseline-"))
-    const runtime = getRuntimeDependencies()
+    let suiteDirectory = null
+    const originalLog = console.log
 
     try {
+        console.log = () => {}
+        const runtime = runtimeLoader()
+        const databaseStatus = runtime.getDatabaseStatus()
+        if (databaseStatus.open || databaseStatus.ready) {
+            throw new Error(
+                "Mission settlement baseline refuses to run while the shared database is open.",
+            )
+        }
+        suiteDirectory = fs.mkdtempSync(
+            path.join(temporaryParent, "mission-settlement-baseline-"),
+        )
         const scenarios = runtime.SCENARIOS.map(scenario => {
             for (let index = 0; index < normalizedWarmups; index++) {
                 runOnce(scenario, suiteDirectory, fixedTime, runtime)
@@ -237,7 +234,7 @@ function runMissionSettlementBaseline({
             }
         })
         const report = {
-            version: 1,
+            version: 2,
             fixedTime: FIXED_TIME,
             categories: [...CATEGORIES],
             warmups: normalizedWarmups,
@@ -246,7 +243,13 @@ function runMissionSettlementBaseline({
         }
         return { ...report, stableSummary: createStableSummary(report) }
     } finally {
-        fs.rmSync(suiteDirectory, { recursive: true, force: true })
+        try {
+            if (suiteDirectory !== null) {
+                fs.rmSync(suiteDirectory, { recursive: true, force: true })
+            }
+        } finally {
+            console.log = originalLog
+        }
     }
 }
 
