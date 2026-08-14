@@ -1,10 +1,14 @@
 import { getDb } from "../db";
 import { PlayerCarnivalEventRecord, RawPlayerCarnivalEventRecord } from "../types";
-import { deserializeNumberList, serializeNumberList } from "../utils/primitives";
+import { serializeNumberList } from "../utils/primitives";
 import {
     getClaimedCarnivalRewardIdsSync,
     insertClaimedCarnivalRewardIdsSync,
 } from "../../lib/carnival-reward-persistence";
+
+function deserializeNullableNumberList(value: string): (number | null)[] {
+    return value.split(",").map(part => part === "" ? null : Number(part))
+}
 
 function buildRecord(raw: RawPlayerCarnivalEventRecord): PlayerCarnivalEventRecord {
     return {
@@ -12,8 +16,8 @@ function buildRecord(raw: RawPlayerCarnivalEventRecord): PlayerCarnivalEventReco
         folderId: raw.folder_id,
         bestScore: raw.best_score,
         previousScore: raw.previous_score,
-        previousCharacterIds: raw.previous_character_ids !== null ? deserializeNumberList(raw.previous_character_ids) : null,
-        previousUnisonCharacterIds: raw.previous_unison_character_ids !== null ? deserializeNumberList(raw.previous_unison_character_ids) : null,
+        previousCharacterIds: raw.previous_character_ids !== null ? deserializeNullableNumberList(raw.previous_character_ids) : null,
+        previousUnisonCharacterIds: raw.previous_unison_character_ids !== null ? deserializeNullableNumberList(raw.previous_unison_character_ids) : null,
     }
 }
 

@@ -33,7 +33,21 @@ after(() => {
     process.removeListener("exit", cleanupDatabase)
     cleanupDatabase()
 })
-initializeDatabase()
+const runtimeDatabase = initializeDatabase()
+
+const carnivalDomain = require("../src/data/domains/carnivalEvent")
+runtimeDatabase.pragma("foreign_keys = OFF")
+runtimeDatabase.prepare(`
+    INSERT INTO players_carnival_event_records
+        (player_id, event_id, folder_id, best_score, previous_score,
+            previous_character_ids, previous_unison_character_ids)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+`).run(999, 250601, 1, 1000, 1000, "111015,111002,", "111117,111021,")
+const incompletePartyRecord = carnivalDomain.getPlayerCarnivalEventRecordSync(999, 250601, 1)
+assert.deepEqual(incompletePartyRecord.previousCharacterIds, [111015, 111002, null])
+assert.deepEqual(incompletePartyRecord.previousUnisonCharacterIds, [111117, 111021, null])
+runtimeDatabase.prepare("DELETE FROM players_carnival_event_records WHERE player_id = ?").run(999)
+runtimeDatabase.pragma("foreign_keys = ON")
 
 let carnivalRewards = {}
 let carnivalPersistence = {}
