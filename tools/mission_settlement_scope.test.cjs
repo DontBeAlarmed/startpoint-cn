@@ -25,14 +25,21 @@ function cleanup() {
 process.once("exit", cleanup)
 
 const missionDomain = require("../src/data/domains/mission")
+const playerDomain = require("../src/data/domains/player")
+const dbDomain = require("../src/data/db")
 const registry = require("../src/lib/mission/registry")
 const calls = {
     buildContext: [],
     compute: [],
+    getDb: [],
     getComputer: [],
+    getPlayerSync: [],
     persisted: [],
+    transaction: [],
 }
 const realGetPlayerCategoryMissionsSync = missionDomain.getPlayerCategoryMissionsSync
+const realGetPlayerSync = playerDomain.getPlayerSync
+const realGetDb = dbDomain.getDb
 const realGetComputer = registry.getComputer
 
 missionDomain.getPlayerCategoryMissionsSync = function instrumentedPersistedRead(playerId, category) {
@@ -64,16 +71,42 @@ registry.getComputer = function instrumentedGetComputer(category) {
 }
 
 const { initializeDatabase } = require("../src/data")
-const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
-const { settleMissionCategories } = require("../src/lib/mission/settlement")
 const { isMissionEnabledAt } = require("../src/lib/mission/patterns")
 const { getMissionIdsByCategory } = require("../src/lib/mission/stages")
 
 initializeDatabase()
-db = getDb()
+db = realGetDb()
+
+let settlementInProgress = false
+const instrumentedDb = new Proxy(db, {
+    get(target, property) {
+        if (property === "transaction") {
+            return function instrumentedTransactionFactory(...args) {
+                const transaction = target.transaction(...args)
+                return function instrumentedTransaction(...transactionArgs) {
+                    if (settlementInProgress) calls.transaction.push(true)
+                    return transaction(...transactionArgs)
+                }
+            }
+        }
+        const value = Reflect.get(target, property, target)
+        return typeof value === "function" ? value.bind(target) : value
+    },
+})
+dbDomain.getDb = function instrumentedGetDb() {
+    if (!settlementInProgress) return realGetDb()
+    calls.getDb.push(true)
+    return instrumentedDb
+}
+playerDomain.getPlayerSync = function instrumentedGetPlayerSync(playerId) {
+    if (settlementInProgress) calls.getPlayerSync.push(playerId)
+    return realGetPlayerSync(playerId)
+}
+
+const { settleMissionCategories } = require("../src/lib/mission/settlement")
 
 function createPlayer(label) {
     const account = insertAccountSync({
@@ -92,12 +125,17 @@ function resetCalls() {
 
 function settleWithCandidates(playerId, scopes, evaluationTime) {
     const candidates = []
-    const result = settleMissionCategories(playerId, scopes, evaluationTime, {
-        onCategoryCandidates(category, count) {
-            candidates.push({ category, count })
-        },
-    })
-    return { candidates, result }
+    settlementInProgress = true
+    try {
+        const result = settleMissionCategories(playerId, scopes, evaluationTime, {
+            onCategoryCandidates(category, count) {
+                candidates.push({ category, count })
+            },
+        })
+        return { candidates, result }
+    } finally {
+        settlementInProgress = false
+    }
 }
 
 const evaluationTime = new Date("2025-01-01T12:00:00.000Z")
@@ -118,6 +156,12 @@ const targeted = settleWithCandidates(
     evaluationTime,
 )
 assert.deepEqual(targeted.candidates, [{ category: 1, count: 3 }])
+assert.ok(calls.getDb.length > 0, "targeted scope must exercise the real database monitor")
+assert.deepEqual(calls.transaction, [true])
+assert.ok(
+    calls.getPlayerSync.includes(targetedPlayerId),
+    "targeted scope must exercise the real player-read monitor",
+)
 assert.deepEqual(calls.getComputer, [1])
 assert.deepEqual(calls.buildContext, [{
     playerId: targetedPlayerId,
@@ -141,6 +185,23 @@ for (const [label, missionIds, expectedCandidateCount] of [
         evaluationTime,
     )
     assert.deepEqual(settlement.candidates, [{ category: 1, count: expectedCandidateCount }])
+    assert.deepEqual(settlement.result, {
+        missionInfo: [],
+        itemList: {},
+        characterList: [],
+        equipmentList: [],
+        degreeIds: [],
+        passCardPoints: {},
+    })
+    assert.deepEqual({
+        getDb: calls.getDb,
+        getPlayerSync: calls.getPlayerSync,
+        transaction: calls.transaction,
+    }, {
+        getDb: [],
+        getPlayerSync: [],
+        transaction: [],
+    }, `${label} scope must not touch the database`)
     assert.deepEqual(calls.getComputer, [], `${label} scope must not resolve a computer`)
     assert.deepEqual(calls.buildContext, [], `${label} scope must not build context`)
     assert.deepEqual(calls.persisted, [], `${label} scope must not read persisted missions`)

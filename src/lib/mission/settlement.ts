@@ -120,19 +120,38 @@ export function settleMissionCategories(
     evaluationTime: Date,
     observer?: MissionSettlementObserver,
 ): MissionSettlementResult {
+    const preparedScopes = mergeSettlementScopes(categories).map(scope => {
+        const requestedMissionIds = getRequestedMissionIds(scope)
+        return {
+            category: scope.category,
+            candidateCount: requestedMissionIds.length,
+            enabledMissionIds: requestedMissionIds.filter(missionId =>
+                isMissionEnabledAt(scope.category, missionId, evaluationTime, scope.eventId),
+            ),
+        }
+    })
+    if (!preparedScopes.some(scope => scope.enabledMissionIds.length > 0)) {
+        for (const scope of preparedScopes) {
+            observer?.onCategoryCandidates?.(scope.category, scope.candidateCount)
+        }
+        return {
+            missionInfo: [],
+            itemList: {},
+            characterList: [],
+            equipmentList: [],
+            degreeIds: [],
+            passCardPoints: {},
+        }
+    }
+
     return getDb().transaction(() => {
         const player = getPlayerSync(playerId)
         if (!player) throw new Error(`Player ${playerId} not found during mission settlement.`)
 
         const evaluatedMissions: EvaluatedMission[] = []
         const evaluatedMissionKeys = new Set<string>()
-        for (const scope of mergeSettlementScopes(categories)) {
-            const { category, eventId } = scope
-            const requestedMissionIds = getRequestedMissionIds(scope)
-            const enabledMissionIds = requestedMissionIds.filter(missionId =>
-                isMissionEnabledAt(category, missionId, evaluationTime, eventId),
-            )
-            observer?.onCategoryCandidates?.(category, requestedMissionIds.length)
+        for (const { category, candidateCount, enabledMissionIds } of preparedScopes) {
+            observer?.onCategoryCandidates?.(category, candidateCount)
             if (enabledMissionIds.length === 0) continue
 
             const computer = getComputer(category)
