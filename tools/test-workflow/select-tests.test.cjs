@@ -289,6 +289,10 @@ test("selects mission regressions for awake finish settlement wiring", () => {
         ["integration:mission"],
     )
     assert.deepEqual(
+        selectTestGroups(["src/lib/mission/degree-context-requirements.ts"]),
+        ["integration:mission"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/lib/mission/index.ts"]),
         ["integration:mission"],
     )
@@ -747,6 +751,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_coverage_audit.test.cjs",
         "tools/mission_daily_battle_facts.test.cjs",
         "tools/mission_degree_candidates.test.cjs",
+        "tools/mission_degree_context_scope.test.cjs",
         "tools/mission_degree_progress.test.cjs",
         "tools/mission_event_battle_facts.test.cjs",
         "tools/mission_event_current_state.test.cjs",

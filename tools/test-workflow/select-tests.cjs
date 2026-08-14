@@ -219,7 +219,7 @@ const SOURCE_RULES = [
         groups: ["integration:rules"],
     },
     {
-        pattern: /^src\/lib\/mission\/(?:battle-facts|event-battle-facts|event-entry-facts|computer-event|coverage-audit|computer-degree|degree-battle-facts|degree-candidates|degree-operation-facts)\.ts$/,
+        pattern: /^src\/lib\/mission\/(?:battle-facts|event-battle-facts|event-entry-facts|computer-event|coverage-audit|computer-degree|degree-battle-facts|degree-candidates|degree-context-requirements|degree-operation-facts)\.ts$/,
         groups: ["integration:mission"],
     },
     {
