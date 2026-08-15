@@ -13,6 +13,28 @@ const {
 
 const CHARACTER_TABLE_NAME = "character.json"
 const CHARACTER_CONTENT_TABLE_NAME = "cdndata/character.json"
+const STANDARD_MISSION_TABLE_NAMES = [
+    "mission_regular.json",
+    "mission_daily.json",
+    "mission_event.json",
+    "mission_collect_item.json",
+    "mission_degree.json",
+    "mission_char_awake.json",
+    "mission_weekly_def.json",
+    "mission_pass_daily.json",
+    "mission_pass_week.json",
+    "mission_pass_event.json",
+    "mission_regular_reward.json",
+    "mission_daily_reward.json",
+    "mission_event_reward.json",
+    "mission_degree_reward.json",
+    "mission_collect_item_reward.json",
+    "mission_weekly_reward.json",
+    "mission_char_awake_reward.json",
+    "mission_pass_daily_reward.json",
+    "mission_pass_week_reward.json",
+    "mission_pass_event_reward.json",
+]
 const REWARD_TABLE_NAMES = [
     "clear_reward.json",
     "score_reward.json",
@@ -75,26 +97,7 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "mission_active.json",
     "mission_active_event.json",
     "mission_active_reward.json",
-    "mission_regular.json",
-    "mission_daily.json",
-    "mission_event.json",
-    "mission_collect_item.json",
-    "mission_degree.json",
-    "mission_char_awake.json",
-    "mission_weekly_def.json",
-    "mission_pass_daily.json",
-    "mission_pass_week.json",
-    "mission_pass_event.json",
-    "mission_regular_reward.json",
-    "mission_daily_reward.json",
-    "mission_event_reward.json",
-    "mission_degree_reward.json",
-    "mission_collect_item_reward.json",
-    "mission_weekly_reward.json",
-    "mission_char_awake_reward.json",
-    "mission_pass_daily_reward.json",
-    "mission_pass_week_reward.json",
-    "mission_pass_event_reward.json",
+    ...STANDARD_MISSION_TABLE_NAMES,
     "pass_card_event.json",
     "pass_card_reward.json",
     "periodic_reward.json",
@@ -162,4 +165,16 @@ function installBundledGameplaySnapshot({
     }
 }
 
-module.exports = { installBundledGameplaySnapshot }
+function getBundledStandardMissionTables(overrides = {}) {
+    return Object.fromEntries(STANDARD_MISSION_TABLE_NAMES.map(tableName => [
+        tableName,
+        Object.prototype.hasOwnProperty.call(overrides, tableName)
+            ? overrides[tableName]
+            : require(path.join(projectRoot, "assets", tableName)),
+    ]))
+}
+
+module.exports = {
+    getBundledStandardMissionTables,
+    installBundledGameplaySnapshot,
+}

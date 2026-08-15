@@ -41,6 +41,12 @@ const {
 } = require("../src/lib/mission/event-entry-facts")
 const masterData = require("../src/lib/mission/master-data")
 const { getMissionMasterDefinition } = masterData
+const {
+    productionContentSnapshotProvider,
+} = require("../src/content/runtime/content-snapshot")
+const {
+    getBundledStandardMissionTables,
+} = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 const { PartyCategory } = require("../src/data/types")
 const eventRewards = require("../assets/mission_event_reward.json")
 
@@ -400,9 +406,19 @@ test("Raid SET edit facts fail closed for ordinary edits, illegal input, closed 
         masterData.isMissionDefinitionEnabledAt = originalEnabledAt
     }
 
-    const driftDefinition = getMissionMasterDefinition(3, 400054)
-    const originalType = driftDefinition.row[2]
-    driftDefinition.row[2] = "81"
+    const previousSnapshot = productionContentSnapshotProvider.snapshot
+    const driftEventDefinitions = structuredClone(require("../assets/mission_event.json"))
+    driftEventDefinitions["400054"][0][2] = "81"
+    const driftTables = getBundledStandardMissionTables({
+        "mission_event.json": driftEventDefinitions,
+    })
+    productionContentSnapshotProvider.snapshot = {
+        cdn: { targetVersion: "event-entry-master-drift" },
+        repository: {
+            info: () => ({ source: "test" }),
+            table: tableName => driftTables[tableName],
+        },
+    }
     try {
         assert.equal(recordRaidSetEditMissionFactsSync(
             noFactPlayerId,
@@ -411,7 +427,7 @@ test("Raid SET edit facts fail closed for ordinary edits, illegal input, closed 
             new Date("2024-05-23T04:00:00.000Z"),
         ), false, "任一族内主数据不符时不得写入部分事实")
     } finally {
-        driftDefinition.row[2] = originalType
+        productionContentSnapshotProvider.snapshot = previousSnapshot
     }
     assert.deepEqual(getPlayerCategoryMissionsSync(noFactPlayerId, 3), {})
 })

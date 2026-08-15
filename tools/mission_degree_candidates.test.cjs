@@ -18,9 +18,21 @@ function degreeDefinition(pattern, conditionType, characterId = "(None)") {
     return [row]
 }
 
+function degreeRewards(table) {
+    return Object.fromEntries(Object.keys(table).map(missionId => {
+        const row = []
+        row[0] = missionId
+        row[1] = "1"
+        return [missionId, { 1: [row] }]
+    }))
+}
+
 function installDegreeSnapshot(table) {
     return installBundledGameplaySnapshot({
-        tableOverrides: { "mission_degree.json": table },
+        tableOverrides: {
+            "mission_degree.json": table,
+            "mission_degree_reward.json": degreeRewards(table),
+        },
     })
 }
 

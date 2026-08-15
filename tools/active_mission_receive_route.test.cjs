@@ -54,6 +54,8 @@ rewardRow[7] = "0"
 rewardRow[8] = "5"
 
 const tables = {
+    ...require("./helpers/install-bundled-gameplay-snapshot.cjs")
+        .getBundledStandardMissionTables(),
     "daily_challenge_point_lookup.json": require("../assets/daily_challenge_point_lookup.json"),
     "hard_multi_event.json": {},
     "hard_multi_event_quest.json": {},

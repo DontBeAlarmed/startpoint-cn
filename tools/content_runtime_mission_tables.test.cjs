@@ -16,6 +16,7 @@ const activeMasterData = require("../src/lib/mission/active-master-data")
 const awakeRuleCatalog = require("../src/lib/mission/awake-rule-catalog")
 const characterQueries = require("../src/lib/mission/character-queries")
 const masterData = require("../src/lib/mission/master-data")
+const patterns = require("../src/lib/mission/patterns")
 const rewards = require("../src/lib/mission/rewards")
 const stages = require("../src/lib/mission/stages")
 
@@ -74,6 +75,33 @@ function awakeDefinitions(characterId, allCompletePattern) {
     return table
 }
 
+const standardMissionTableNames = [
+    "mission_regular.json",
+    "mission_daily.json",
+    "mission_event.json",
+    "mission_collect_item.json",
+    "mission_degree.json",
+    "mission_pass_daily.json",
+    "mission_pass_week.json",
+    "mission_pass_event.json",
+    "mission_char_awake.json",
+    "mission_weekly_def.json",
+    "mission_regular_reward.json",
+    "mission_daily_reward.json",
+    "mission_event_reward.json",
+    "mission_collect_item_reward.json",
+    "mission_degree_reward.json",
+    "mission_pass_daily_reward.json",
+    "mission_pass_week_reward.json",
+    "mission_pass_event_reward.json",
+    "mission_char_awake_reward.json",
+    "mission_weekly_reward.json",
+]
+
+function emptyStandardMissionTables() {
+    return Object.fromEntries(standardMissionTableNames.map(tableName => [tableName, {}]))
+}
+
 function releaseTables(marker) {
     const missionId = marker * 1000 + 1
     const eventId = marker * 1000 + 2
@@ -81,9 +109,15 @@ function releaseTables(marker) {
     const questId = marker * 1000 + 4
     const rewardId = marker * 1000 + 5
     const itemId = marker * 1000 + 6
+    const awakeMissionId = 1110012
+    const awakeDefinitionTable = awakeDefinitions(
+        characterId,
+        marker === 2 ? "96" : "13",
+    )
     return {
-        ids: { missionId, eventId, characterId, questId, rewardId, itemId },
+        ids: { missionId, eventId, characterId, questId, rewardId, itemId, awakeMissionId },
         tables: {
+            ...emptyStandardMissionTables(),
             "mission_active.json": { [missionId]: [[`active-${marker}`]] },
             "mission_active_event.json": { [eventId]: [[`event-${marker}`]] },
             "character_quest_lookup.json": {
@@ -98,12 +132,9 @@ function releaseTables(marker) {
             "mission_active_reward.json": {
                 [missionId]: { 1: [activeRewardRow(marker, itemId)] },
             },
-            "mission_char_awake.json": awakeDefinitions(
-                characterId,
-                marker === 2 ? "96" : "13",
-            ),
+            "mission_char_awake.json": awakeDefinitionTable,
             "mission_char_awake_reward.json": {
-                [missionId]: { 1: [awakeRewardRow(rewardId, marker, itemId)] },
+                [awakeMissionId]: { 1: [awakeRewardRow(rewardId, marker, itemId)] },
             },
         },
     }
@@ -159,6 +190,15 @@ test("mission tables imported before snapshot follow the current complete runtim
         masterData.getMissionMasterDefinition(1, first.ids.missionId).pattern,
         "runtime-1",
     )
+    assert.equal(patterns.getMissionPattern(1, first.ids.missionId), "runtime-1")
+    assert.deepEqual(patterns.getMissionsByPattern("runtime-1"), [{
+        missionId: first.ids.missionId,
+        category: 1,
+    }])
+    assert.equal(
+        patterns.getMissionDefinition(1, first.ids.missionId)[24],
+        "marker-1",
+    )
     assert.equal(
         rewards.getCategoryMissionRewardStageDefinition(1, first.ids.missionId, 1).targetProgress,
         1,
@@ -168,7 +208,7 @@ test("mission tables imported before snapshot follow the current complete runtim
         1,
     )
     assert.equal(
-        rewards.getAwakeMissionRewardStageDefinition(first.ids.missionId, 1).targetProgress,
+        rewards.getAwakeMissionRewardStageDefinition(first.ids.awakeMissionId, 1).targetProgress,
         1,
     )
     assert.deepEqual(stages.getMissionIdsByCategory(1), [first.ids.missionId])
@@ -199,8 +239,20 @@ test("mission tables imported before snapshot follow the current complete runtim
         [second.ids.questId],
     )
     assert.equal(masterData.getMissionMasterDefinition(1, first.ids.missionId), undefined)
+    assert.equal(patterns.getMissionPattern(1, first.ids.missionId), "")
+    assert.deepEqual(patterns.getMissionsByPattern("runtime-1"), [])
+    assert.equal(patterns.getMissionDefinition(1, first.ids.missionId), undefined)
     assert.equal(
         masterData.getMissionMasterDefinition(1, second.ids.missionId).row[24],
+        "marker-2",
+    )
+    assert.equal(patterns.getMissionPattern(1, second.ids.missionId), "runtime-2")
+    assert.deepEqual(patterns.getMissionsByPattern("runtime-2"), [{
+        missionId: second.ids.missionId,
+        category: 1,
+    }])
+    assert.equal(
+        patterns.getMissionDefinition(1, second.ids.missionId)[24],
         "marker-2",
     )
     assert.equal(
@@ -212,7 +264,7 @@ test("mission tables imported before snapshot follow the current complete runtim
         second.ids.itemId,
     )
     assert.equal(
-        rewards.getAwakeMissionRewards(second.ids.missionId, 1)[0].itemId,
+        rewards.getAwakeMissionRewards(second.ids.awakeMissionId, 1)[0].itemId,
         second.ids.itemId,
     )
     assert.deepEqual(stages.getMissionStageIds(1, second.ids.missionId), [1])
@@ -251,6 +303,10 @@ test("explicit repositories take priority over the installed runtime release", (
     )
     assert.equal(
         masterData.getMissionMasterDefinition(1, explicit.ids.missionId, explicitRepository).pattern,
+        "runtime-4",
+    )
+    assert.equal(
+        patterns.getMissionPattern(1, explicit.ids.missionId, explicitRepository),
         "runtime-4",
     )
     assert.equal(

@@ -45,6 +45,9 @@ const {
 const { characterExpCaps } = require("../src/lib/character")
 const { getCharacterStoryQuestIds } = require("../src/lib/mission/character-queries")
 const { EventSafeComputer } = require("../src/lib/mission/computer-event-safe")
+const {
+    getBundledStandardMissionTables,
+} = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 
 const characters = require("../assets/character.json")
 const characterQuests = require("../assets/character_quest_lookup.json")
@@ -294,6 +297,7 @@ test("Event chapter facts require every official quest in the selected chapter",
 function withContentTables(overrides, callback) {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     const tables = {
+        ...getBundledStandardMissionTables(),
         "character.json": characters,
         "character_quest_lookup.json": characterQuests,
         "equipment_dissolve.json": equipmentDissolve,
@@ -358,13 +362,14 @@ test("Event buildContext skips current-state queries and indexes outside all 15 
     }
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     let tableReads = 0
+    const standardMissionTables = getBundledStandardMissionTables()
     productionContentSnapshotProvider.snapshot = {
         cdn: { targetVersion: "test" },
         repository: {
             info: () => ({ source: "test" }),
-            table() {
-                if (arguments[0] === "mission_event.json") {
-                    return require("../assets/mission_event.json")
+            table(tableName) {
+                if (Object.prototype.hasOwnProperty.call(standardMissionTables, tableName)) {
+                    return standardMissionTables[tableName]
                 }
                 tableReads++
                 throw new Error("unexpected current-state table read")

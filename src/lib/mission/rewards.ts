@@ -1,18 +1,13 @@
-// Mission reward parsers — from CDN reward tables
+// Active Mission rewards keep their independent table path; standard rewards use MissionCatalog.
 
 import bundledActiveRewards from "../../../assets/mission_active_reward.json"
-import bundledRegularRewards from "../../../assets/mission_regular_reward.json"
-import bundledDailyRewards from "../../../assets/mission_daily_reward.json"
-import bundledEventRewards from "../../../assets/mission_event_reward.json"
-import bundledDegreeRewards from "../../../assets/mission_degree_reward.json"
-import bundledCollectRewards from "../../../assets/mission_collect_item_reward.json"
-import bundledWeeklyRewards from "../../../assets/mission_weekly_reward.json"
-import bundledCharAwakeRewards from "../../../assets/mission_char_awake_reward.json"
-import bundledPassDailyRewards from "../../../assets/mission_pass_daily_reward.json"
-import bundledPassWeekRewards from "../../../assets/mission_pass_week_reward.json"
-import bundledPassEventRewards from "../../../assets/mission_pass_event_reward.json"
 import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import {
+    getMissionCatalog,
+    type MissionCatalogReward,
+    type MissionCatalogStage,
+} from "./mission-catalog"
 
 export interface ActiveMissionReward {
     kind: number
@@ -44,10 +39,12 @@ export interface AwakeMissionRewardStageDefinition extends MissionRewardStageDef
     specialReward?: AwakeMissionSpecialReward
 }
 
+type RewardTable = Record<string, Record<string, any[]>>
+
 function getRewardRow(
-    table: Record<string, Record<string, any[]>>,
+    table: RewardTable,
     missionId: number,
-    stage: number
+    stage: number,
 ): any[] | undefined {
     return table[String(missionId)]?.[String(stage)]?.[0]
 }
@@ -58,7 +55,11 @@ function parseOptionalInteger(value: unknown): number | undefined {
     return Number.isNaN(parsed) ? undefined : parsed
 }
 
-function parseMissionRewardSlots(row: any[], firstKindIndex: number, slotCount = 4): ActiveMissionReward[] {
+function parseMissionRewardSlots(
+    row: any[],
+    firstKindIndex: number,
+    slotCount = 4,
+): ActiveMissionReward[] {
     const result: ActiveMissionReward[] = []
     for (let slot = 0; slot < slotCount; slot++) {
         const base = firstKindIndex + slot * 6
@@ -88,8 +89,6 @@ function parseMissionRewardSlots(row: any[], firstKindIndex: number, slotCount =
     }
     return result
 }
-
-type RewardTable = Record<string, Record<string, any[]>>
 
 interface RewardTableSource {
     readonly tableName: string
@@ -135,102 +134,59 @@ export function getMissionRewardStageDefinition(
     }
 }
 
-function getCategoryRewards(
-    table: Record<string, Record<string, any[]>>,
-    missionId: number,
-    stage: number,
-    firstKindIndex: number
-): ActiveMissionReward[] {
-    const row = getRewardRow(table, missionId, stage)
-    return row ? parseMissionRewardSlots(row, firstKindIndex) : []
+function cloneReward(reward: MissionCatalogReward): ActiveMissionReward {
+    return {
+        kind: reward.kind,
+        amount: reward.amount,
+        ...(reward.itemId === undefined ? {} : { itemId: reward.itemId }),
+        ...(reward.characterId === undefined ? {} : { characterId: reward.characterId }),
+        ...(reward.equipmentId === undefined ? {} : { equipmentId: reward.equipmentId }),
+        ...(reward.degreeId === undefined ? {} : { degreeId: reward.degreeId }),
+    }
 }
 
-const REGULAR_REWARD_SOURCE: RewardTableSource = {
-    tableName: "mission_regular_reward.json",
-    bundledBeforeInitialization: bundledRegularRewards as RewardTable,
+function cloneRewards(stage: MissionCatalogStage | undefined): ActiveMissionReward[] {
+    return stage?.rewards.map(cloneReward) ?? []
 }
-const DAILY_REWARD_SOURCE: RewardTableSource = {
-    tableName: "mission_daily_reward.json",
-    bundledBeforeInitialization: bundledDailyRewards as RewardTable,
-}
-const EVENT_REWARD_SOURCE: RewardTableSource = {
-    tableName: "mission_event_reward.json",
-    bundledBeforeInitialization: bundledEventRewards as RewardTable,
-}
-const COLLECT_REWARD_SOURCE: RewardTableSource = {
-    tableName: "mission_collect_item_reward.json",
-    bundledBeforeInitialization: bundledCollectRewards as RewardTable,
-}
-const DEGREE_REWARD_SOURCE: RewardTableSource = {
-    tableName: "mission_degree_reward.json",
-    bundledBeforeInitialization: bundledDegreeRewards as RewardTable,
-}
-const WEEKLY_REWARD_SOURCE: RewardTableSource = {
-    tableName: "mission_weekly_reward.json",
-    bundledBeforeInitialization: bundledWeeklyRewards as RewardTable,
-}
-const AWAKE_REWARD_SOURCE: RewardTableSource = {
-    tableName: "mission_char_awake_reward.json",
-    bundledBeforeInitialization: bundledCharAwakeRewards as RewardTable,
-}
-const PASS_DAILY_REWARD_SOURCE: RewardTableSource = {
-    tableName: "mission_pass_daily_reward.json",
-    bundledBeforeInitialization: bundledPassDailyRewards as RewardTable,
-}
-const PASS_WEEK_REWARD_SOURCE: RewardTableSource = {
-    tableName: "mission_pass_week_reward.json",
-    bundledBeforeInitialization: bundledPassWeekRewards as RewardTable,
-}
-const PASS_EVENT_REWARD_SOURCE: RewardTableSource = {
-    tableName: "mission_pass_event_reward.json",
-    bundledBeforeInitialization: bundledPassEventRewards as RewardTable,
+
+function getStandardMissionRewards(
+    category: number,
+    missionId: number,
+    stage: number,
+    repository?: ReadonlyContentRepository,
+): ActiveMissionReward[] {
+    return cloneRewards(getMissionCatalog(repository).getRewardStage(category, missionId, stage))
 }
 
 export const getRegularMissionRewards = (
     missionId: number,
     stage: number,
     repository?: ReadonlyContentRepository,
-) => getCategoryRewards(getRewardTable(REGULAR_REWARD_SOURCE, repository), missionId, stage, 5)
+): ActiveMissionReward[] => getStandardMissionRewards(1, missionId, stage, repository)
 
 export const getDailyMissionRewards = (
     missionId: number,
     stage: number,
     repository?: ReadonlyContentRepository,
-) => getCategoryRewards(getRewardTable(DAILY_REWARD_SOURCE, repository), missionId, stage, 5)
+): ActiveMissionReward[] => getStandardMissionRewards(2, missionId, stage, repository)
 
 export function getAwakeMissionRewardStageDefinition(
     missionId: number,
     stage: number,
     repository?: ReadonlyContentRepository,
 ): AwakeMissionRewardStageDefinition | null {
-    const row = getRewardRow(
-        getRewardTable(AWAKE_REWARD_SOURCE, repository),
-        missionId,
-        stage
-    )
-    if (!row) return null
-
-    const missionRewardId = parseOptionalInteger(row[0])
-    const targetProgress = Number.parseFloat(String(row[5]))
-    if (missionRewardId === undefined || !Number.isFinite(targetProgress)) return null
-
-    const specialKind = parseOptionalInteger(row[1])
-    let specialReward: AwakeMissionSpecialReward | undefined
-    if (specialKind === 0) {
-        const characterId = parseOptionalInteger(row[2])
-        const boardIndex = parseOptionalInteger(row[3])
-        const awakeLevel = parseOptionalInteger(row[4])
-        if (characterId === undefined || boardIndex === undefined || awakeLevel === undefined) return null
-        specialReward = { characterId, boardIndex, awakeLevel }
-    }
-
-    const targetClearSeconds = parseOptionalInteger(row[6])
+    const definition = getMissionCatalog(repository).getRewardStage(9, missionId, stage)
+    if (!definition) return null
     return {
-        missionRewardId,
-        targetProgress,
-        ...(targetClearSeconds !== undefined ? { targetClearSeconds } : {}),
-        ...(specialReward ? { specialReward } : {}),
-        rewards: parseMissionRewardSlots(row, 9),
+        missionRewardId: definition.missionRewardId,
+        targetProgress: definition.targetProgress,
+        ...(definition.targetClearSeconds === undefined
+            ? {}
+            : { targetClearSeconds: definition.targetClearSeconds }),
+        ...(definition.specialReward === undefined ? {} : {
+            specialReward: { ...definition.specialReward },
+        }),
+        rewards: definition.rewards.map(cloneReward),
     }
 }
 
@@ -247,42 +203,28 @@ export function getEventMissionRewards(
     stage: number,
     repository?: ReadonlyContentRepository,
 ): ActiveMissionReward[] {
-    return getCategoryRewards(getRewardTable(EVENT_REWARD_SOURCE, repository), missionId, stage, 5)
+    return getStandardMissionRewards(3, missionId, stage, repository)
 }
 
 export const getCollectMissionRewards = (
     missionId: number,
     stage: number,
     repository?: ReadonlyContentRepository,
-) => getCategoryRewards(getRewardTable(COLLECT_REWARD_SOURCE, repository), missionId, stage, 6)
+): ActiveMissionReward[] => getStandardMissionRewards(4, missionId, stage, repository)
 
 export const getDegreeMissionRewards = (
     missionId: number,
     stage: number,
     repository?: ReadonlyContentRepository,
-) => getCategoryRewards(getRewardTable(DEGREE_REWARD_SOURCE, repository), missionId, stage, 5)
+): ActiveMissionReward[] => getStandardMissionRewards(5, missionId, stage, repository)
 
 export const getWeeklyMissionRewards = (
     missionId: number,
     stage: number,
     repository?: ReadonlyContentRepository,
-) => getCategoryRewards(getRewardTable(WEEKLY_REWARD_SOURCE, repository), missionId, stage, 5)
+): ActiveMissionReward[] => getStandardMissionRewards(10, missionId, stage, repository)
 
-const categoryRewardTables: Readonly<Record<number, {
-    source: RewardTableSource
-    targetProgressIndex: number
-    firstKindIndex: number
-}>> = {
-    1: { source: REGULAR_REWARD_SOURCE, targetProgressIndex: 1, firstKindIndex: 5 },
-    2: { source: DAILY_REWARD_SOURCE, targetProgressIndex: 1, firstKindIndex: 5 },
-    3: { source: EVENT_REWARD_SOURCE, targetProgressIndex: 1, firstKindIndex: 5 },
-    4: { source: COLLECT_REWARD_SOURCE, targetProgressIndex: 2, firstKindIndex: 6 },
-    5: { source: DEGREE_REWARD_SOURCE, targetProgressIndex: 1, firstKindIndex: 5 },
-    6: { source: PASS_DAILY_REWARD_SOURCE, targetProgressIndex: 1, firstKindIndex: 5 },
-    7: { source: PASS_WEEK_REWARD_SOURCE, targetProgressIndex: 1, firstKindIndex: 5 },
-    8: { source: PASS_EVENT_REWARD_SOURCE, targetProgressIndex: 1, firstKindIndex: 5 },
-    10: { source: WEEKLY_REWARD_SOURCE, targetProgressIndex: 1, firstKindIndex: 5 },
-}
+const CATEGORY_REWARD_IDS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 10])
 
 export function getCategoryMissionRewardStageDefinition(
     category: number,
@@ -290,17 +232,12 @@ export function getCategoryMissionRewardStageDefinition(
     stage: number,
     repository?: ReadonlyContentRepository,
 ): CategoryMissionRewardStageDefinition | null {
-    const layout = categoryRewardTables[category]
-    if (!layout) return null
-    const row = getRewardRow(getRewardTable(layout.source, repository), missionId, stage)
-    if (!row) return null
-
-    const missionRewardId = parseOptionalInteger(row[0])
-    const targetProgress = Number.parseFloat(String(row[layout.targetProgressIndex]))
-    if (missionRewardId === undefined || !Number.isFinite(targetProgress)) return null
+    if (!CATEGORY_REWARD_IDS.has(category)) return null
+    const definition = getMissionCatalog(repository).getRewardStage(category, missionId, stage)
+    if (!definition) return null
     return {
-        missionRewardId,
-        targetProgress,
-        rewards: parseMissionRewardSlots(row, layout.firstKindIndex),
+        missionRewardId: definition.missionRewardId,
+        targetProgress: definition.targetProgress,
+        rewards: definition.rewards.map(cloneReward),
     }
 }

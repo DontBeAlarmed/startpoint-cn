@@ -61,6 +61,10 @@ const EMPTY_DEFINITIONS: readonly MissionMasterDefinition[] = Object.freeze([])
 const EMPTY_STAGES: readonly MissionCatalogStage[] = Object.freeze([])
 const EMPTY_IDS: readonly number[] = Object.freeze([])
 
+export function isMissionCatalogCategory(category: number): boolean {
+    return Number.isInteger(category) && category >= 1 && category <= 10
+}
+
 function missionKey(category: number, missionId: number): string {
     return `${category}:${missionId}`
 }
@@ -89,6 +93,28 @@ function parseMasterCnTime(value: string | undefined): number | undefined {
 function positiveSafeInteger(value: unknown): number | undefined {
     const parsed = Number(value)
     return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
+}
+
+export function isMissionMasterDefinitionEnabledAt(
+    definition: MissionMasterDefinition,
+    at: Date,
+    eventId?: number,
+): boolean {
+    if (definition.requiresEventScope) {
+        const definitionEventId = positiveSafeInteger(definition.eventId)
+        const requestedEventId = positiveSafeInteger(eventId)
+        if (definitionEventId === undefined
+            || requestedEventId === undefined
+            || definitionEventId !== requestedEventId) return false
+    }
+
+    const now = at.getTime()
+    const start = parseMasterCnTime(definition.enableStart)
+    const end = parseMasterCnTime(definition.enableEnd)
+    if (!Number.isFinite(now)) return false
+    if (start !== undefined && (!Number.isFinite(start) || start > now)) return false
+    if (end !== undefined && (!Number.isFinite(end) || now > end)) return false
+    return true
 }
 
 function compareDefinitions(left: MissionMasterDefinition, right: MissionMasterDefinition): number {
@@ -180,21 +206,7 @@ class SnapshotMissionCatalog implements MissionCatalog {
     isEnabledAt(category: number, missionId: number, at: Date, eventId?: number): boolean {
         const definition = this.getDefinition(category, missionId)
         if (!definition) return false
-        if (definition.requiresEventScope) {
-            const definitionEventId = positiveSafeInteger(definition.eventId)
-            const requestedEventId = positiveSafeInteger(eventId)
-            if (definitionEventId === undefined
-                || requestedEventId === undefined
-                || definitionEventId !== requestedEventId) return false
-        }
-
-        const now = at.getTime()
-        const start = parseMasterCnTime(definition.enableStart)
-        const end = parseMasterCnTime(definition.enableEnd)
-        if (!Number.isFinite(now)) return false
-        if (start !== undefined && (!Number.isFinite(start) || start > now)) return false
-        if (end !== undefined && (!Number.isFinite(end) || now > end)) return false
-        return true
+        return isMissionMasterDefinitionEnabledAt(definition, at, eventId)
     }
 
     getAwakeMissionIdsByCharacter(characterId: number | string): readonly number[] {

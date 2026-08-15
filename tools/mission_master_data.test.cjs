@@ -4,7 +4,9 @@ const assert = require("node:assert/strict")
 
 const {
     getMissionMasterDefinition,
+    getMissionMasterDefinitions,
     isMissionDefinitionEnabledAt,
+    MISSION_CATEGORIES,
 } = require("../src/lib/mission/master-data")
 const {
     resolveClientProgressTargetsFromDefinitions,
@@ -31,6 +33,13 @@ assert.equal(regular.pattern, "twitter_check_mission_001")
 assert.equal(isMissionDefinitionEnabledAt(regular, new Date("2099-12-30T04:00:00.000Z")), true)
 assert.equal(isMissionDefinitionEnabledAt(regular, new Date("2099-12-31T03:59:59.000Z")), true)
 assert.equal(isMissionDefinitionEnabledAt(regular, new Date("2099-12-31T03:59:59.001Z")), false)
+assert.equal(isMissionDefinitionEnabledAt(
+    { ...regular, enableStart: "2026-02-30 00:00:00", enableEnd: "2026-12-31 23:59:59" },
+    new Date("2026-03-03T00:00:00.000Z"),
+), false)
+assert.deepEqual(MISSION_CATEGORIES, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+assert.equal(Object.isFrozen(MISSION_CATEGORIES), true)
+assert.throws(() => getMissionMasterDefinitions(99), /unsupported mission category: 99/)
 
 const daily = getMissionMasterDefinition(2, 1)
 assert.equal(daily.pattern, "single_battle_play")
