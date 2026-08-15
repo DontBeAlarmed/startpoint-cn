@@ -361,6 +361,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_pass_content.test.cjs",
             "tools/mission_pass_route.test.cjs",
             "tools/mission_pass_settlement.test.cjs",
+            "tools/mission_periodic_session_migration.test.cjs",
             "tools/mission_progress_route.test.cjs",
             "tools/mission_regular_facts.test.cjs",
             "tools/mission_response_merge.test.cjs",

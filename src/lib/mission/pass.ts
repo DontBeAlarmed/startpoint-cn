@@ -7,6 +7,7 @@ import { RegularComputer } from "./computer-regular"
 import type { CategoryContext, MissionComputer } from "./types"
 import { ensurePlayerPassCardLoginProgressSync } from "../../data/domains/pass-card"
 import { buildPeriodicSnapshotData, getPassWeekSnapshotType, getSnapshot, takeSnapshot } from "./snapshot"
+import { buildPeriodicCategoryContextFromSession } from "./periodic-session-context"
 
 function periodValue(current: number, baseline: number | undefined): number {
     return Math.max(0, current - (baseline ?? 0))
@@ -17,15 +18,25 @@ function computePeriodicPassProgress(
     context: CategoryContext,
     dbProgress: number,
 ): number {
-    const counters = context.battleCounters
     const snapshot = context.snapshot
-    if (!counters) return dbProgress
 
     switch (patternType) {
-        case 14:
-            return Math.max(dbProgress, periodValue(counters.singleClearCount, snapshot?.singleClearCount))
-        case 16:
-            return Math.max(dbProgress, periodValue(counters.multiClearCount, snapshot?.multiClearCount))
+        case 14: {
+            const counters = context.battleCounters
+            if (!counters) return dbProgress
+            return Math.max(
+                dbProgress,
+                periodValue(counters.singleClearCount, snapshot?.singleClearCount),
+            )
+        }
+        case 16: {
+            const counters = context.battleCounters
+            if (!counters) return dbProgress
+            return Math.max(
+                dbProgress,
+                periodValue(counters.multiClearCount, snapshot?.multiClearCount),
+            )
+        }
         case 28:
             return Math.max(dbProgress, periodValue(context.player.totalDashes ?? 0, snapshot?.dashCount))
         case 39:
@@ -74,6 +85,13 @@ export const PassComputer: MissionComputer = {
         }
         context.passEventLoginProgress = loginProgress
         return context
+    },
+
+    buildContextFromSession(session, category, missionIds): CategoryContext {
+        if (category !== 6) {
+            throw new Error("Pass Session context only supports category 6")
+        }
+        return buildPeriodicCategoryContextFromSession(session, category, missionIds, "daily")
     },
 
     compute(missionId: number, context: CategoryContext, dbProgress: number): number {

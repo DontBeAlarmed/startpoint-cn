@@ -5,6 +5,7 @@ import type { SnapshotData } from "./snapshot"
 import type { MissionBattleCounters } from "../../data/domains/mission_battle_facts"
 import type { DegreeBattleStats } from "../../data/domains/degree_battle_stats"
 import type { RegularStateFacts } from "./regular-state-facts"
+import type { MissionEvaluationSession } from "./evaluation-session"
 
 export interface PlayerQuestProgressEntry {
     questId: number
@@ -94,6 +95,12 @@ export interface MissionComputer {
         category: number,
         evaluationTime: Date,
         missionIds?: readonly number[],
+    ): CategoryContext
+
+    buildContextFromSession?(
+        session: MissionEvaluationSession,
+        category: number,
+        missionIds: readonly number[],
     ): CategoryContext
 
     /**

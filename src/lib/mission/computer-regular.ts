@@ -11,6 +11,7 @@ import {
 } from "./regular-quest-facts"
 import { getRegularStateFactsSync } from "./regular-state-facts"
 import { getSnapshot } from "./snapshot"
+import { buildPeriodicCategoryContextFromSession } from "./periodic-session-context"
 import type { MissionComputer, CategoryContext } from "./types"
 
 function buildStats(playerId: number, category: number): CategoryContext {
@@ -187,6 +188,18 @@ export const RegularComputer: MissionComputer = {
 
     buildContext(playerId: number, category: number): CategoryContext {
         return buildStats(playerId, category)
+    },
+
+    buildContextFromSession(session, category, missionIds): CategoryContext {
+        if (category !== 2 && category !== 10) {
+            throw new Error("Regular Session context only supports categories 2 and 10")
+        }
+        return buildPeriodicCategoryContextFromSession(
+            session,
+            category,
+            missionIds,
+            category === 2 ? "daily" : "weekly",
+        )
     },
 
     compute(missionId: number, ctx: CategoryContext, dbProgress: number): number {

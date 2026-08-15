@@ -43,6 +43,13 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/lib/mission/requirements/registry.ts"]),
         ["integration:mission"],
     )
+    for (const file of [
+        "src/lib/mission/pass.ts",
+        "src/lib/mission/periodic-session-context.ts",
+        "src/lib/mission/settlement.ts",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:mission"])
+    }
     assert.deepEqual(selectTestGroups(["src/lib/gacha.ts"]), ["quick:gacha"])
     assert.deepEqual(
         selectTestGroups(["src/lib/gacha-seed-quarantine.ts"]),
@@ -657,6 +664,7 @@ test("registers mission catalog and fact store regressions in the mission leaf g
         "tools/mission_evaluation_production_loaders.test.cjs",
         "tools/mission_evaluation_quest_scoped.test.cjs",
         "tools/mission_evaluation_session.test.cjs",
+        "tools/mission_periodic_session_migration.test.cjs",
     ]) {
         assert.deepEqual(selectTestGroups([file]), ["integration:mission"])
         assert.ok(TEST_GROUPS["integration:mission"].tests.includes(file))
@@ -837,6 +845,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_pass_content.test.cjs",
         "tools/mission_pass_route.test.cjs",
         "tools/mission_pass_settlement.test.cjs",
+        "tools/mission_periodic_session_migration.test.cjs",
         "tools/mission_progress_route.test.cjs",
         "tools/mission_regular_facts.test.cjs",
         "tools/mission_response_merge.test.cjs",

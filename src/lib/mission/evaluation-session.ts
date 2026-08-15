@@ -29,6 +29,7 @@ export interface MissionEvaluationSessionOptions {
     readonly catalog: MissionCatalog
     readonly requirementRegistry: MissionFactRequirementRegistry
     readonly candidates: readonly MissionRef[]
+    readonly orchestratorFacts?: readonly FactKey[]
     readonly loaders: MissionFactLoaderRegistry
     readonly observer?: MissionEvaluationObserver
 }
@@ -86,7 +87,7 @@ export class MissionEvaluationSession {
         this.requirementRegistry = options.requirementRegistry
         this.observer = options.observer
 
-        const facts: FactKey[] = []
+        const facts: FactKey[] = [...(options.orchestratorFacts ?? [])]
         const candidates = options.candidates.map(candidate => {
             const requirement = options.requirementRegistry.getRequirement(
                 candidate.category,

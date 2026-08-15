@@ -247,7 +247,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^src\/lib\/mission\/(?:computer-regular|regular-battle-facts|regular-quest-facts|regular-state-facts|types)\.ts$/,
+        pattern: /^src\/lib\/mission\/(?:computer-regular|pass|periodic-session-context|regular-battle-facts|regular-quest-facts|regular-state-facts|settlement|types)\.ts$/,
         groups: ["integration:mission"],
     },
     { pattern: /^src\/routes\/api\/profile\.ts$/, groups: ["quick:character"] },

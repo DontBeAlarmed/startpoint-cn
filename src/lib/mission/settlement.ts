@@ -1,6 +1,10 @@
 import { getPlayerCategoryMissionsSync, updatePlayerCategoryMissionStageSync, updatePlayerCategoryMissionSync } from "../../data/domains/mission"
-import { getPlayerSync } from "../../data/domains/player"
 import { getDb } from "../../data/db"
+import type { FactKey } from "./facts/fact-key"
+import { MissionEvaluationSession } from "./evaluation-session"
+import { getMissionCatalog } from "./mission-catalog"
+import { createProductionMissionFactLoaderRegistry } from "./production-fact-loaders"
+import { getMissionFactRequirementRegistry } from "./requirements/registry"
 import { getComputer } from "./registry"
 import { getCategoryMissionRewardStageDefinition } from "./rewards"
 import { getCompletedStageNumbers, getMissionIdsByCategory, isMissionProgressComplete } from "./stages"
@@ -38,6 +42,7 @@ export interface MissionSettlementObserver {
     onCategoryCandidates?(category: number, count: number): void
     onMissionComputed?(category: number, missionId: number): void
     onMissionProgressChanged?(category: number, missionId: number): void
+    onMissionFactLoaderCall?(key: FactKey): void
 }
 
 interface EvaluatedMission {
@@ -145,8 +150,38 @@ export function settleMissionCategories(
     }
 
     return getDb().transaction(() => {
-        const player = getPlayerSync(playerId)
-        if (!player) throw new Error(`Player ${playerId} not found during mission settlement.`)
+        const candidateByKey = new Map<string, { category: number, missionId: number }>()
+        for (const scope of preparedScopes) {
+            for (const missionId of scope.enabledMissionIds) {
+                candidateByKey.set(`${scope.category}:${missionId}`, {
+                    category: scope.category,
+                    missionId,
+                })
+            }
+        }
+        const catalog = getMissionCatalog()
+        const session = new MissionEvaluationSession({
+            playerId,
+            evaluationTime,
+            catalog,
+            requirementRegistry: getMissionFactRequirementRegistry(catalog),
+            candidates: [...candidateByKey.values()],
+            orchestratorFacts: [{ kind: "player" }],
+            loaders: createProductionMissionFactLoaderRegistry(),
+            observer: observer?.onMissionFactLoaderCall === undefined
+                ? undefined
+                : { onLoaderCall: key => observer.onMissionFactLoaderCall?.(key) },
+        })
+        let player
+        try {
+            player = session.getFact({ kind: "player" })
+        } catch (error) {
+            if (error instanceof Error
+                && error.message === `Mission evaluation player ${playerId} not found`) {
+                throw new Error(`Player ${playerId} not found during mission settlement.`)
+            }
+            throw error
+        }
 
         const evaluatedMissions: EvaluatedMission[] = []
         const evaluatedMissionKeys = new Set<string>()
@@ -155,12 +190,10 @@ export function settleMissionCategories(
             if (enabledMissionIds.length === 0) continue
 
             const computer = getComputer(category)
-            const context = computer.buildContext(
-                playerId,
-                category,
-                evaluationTime,
-                enabledMissionIds,
-            )
+            const context = (category === 2 || category === 6 || category === 10)
+                && computer.buildContextFromSession !== undefined
+                ? computer.buildContextFromSession(session, category, enabledMissionIds)
+                : computer.buildContext(playerId, category, evaluationTime, enabledMissionIds)
             const persisted = getPlayerCategoryMissionsSync(playerId, category)
             for (const missionId of enabledMissionIds) {
                 const missionKey = `${category}:${missionId}`
