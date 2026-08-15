@@ -484,22 +484,58 @@ test("fails aggregate missions closed when any declared dependency is absent", (
     )
 })
 
-test("keeps Category 4 compatible only with the current Computer definition", () => {
+test("derives Category 4 selected item facts from the supplied Catalog", () => {
     const catalog = getMissionCatalog()
     const sameContent = forwardingCatalog(catalog)
     const source = catalog.getDefinition(4, 1500)
-    const changedItem = withDefinitionField(source, 14, "999999")
-    const changedCatalog = forwardingCatalog(
-        catalog,
-        new Map([["4:1500", changedItem]]),
-    )
 
     assert.equal(getMissionFactRequirementRegistry(sameContent)
         .getRequirement(4, 1500).mode, "computed")
-    assertUnsupported(
-        getMissionFactRequirementRegistry(changedCatalog).getRequirement(4, 1500),
-        /catalog|computer|definition/i,
-    )
+    for (const [rawItemId, itemId] of [[999999, 999999], ["999999", 999999], ["+42", 42]]) {
+        const definition = withDefinitionField(source, 14, rawItemId)
+        const changedCatalog = forwardingCatalog(
+            catalog,
+            new Map([["4:1500", definition]]),
+        )
+        const requirement = getMissionFactRequirementRegistry(changedCatalog)
+            .getRequirement(4, 1500)
+        assert.equal(requirement.mode, "computed", String(rawItemId))
+        assert.deepEqual(
+            requirement.facts,
+            [{ kind: "collectedItems", itemIds: [itemId] }],
+            String(rawItemId),
+        )
+    }
+})
+
+test("rejects coercive or non-positive Category 4 item selectors", () => {
+    const catalog = getMissionCatalog()
+    const source = catalog.getDefinition(4, 1500)
+    const malformed = [
+        true,
+        "1e3",
+        " 42 ",
+        1.5,
+        "1.5",
+        0,
+        "0",
+        -1,
+        "-1",
+        Number.MAX_SAFE_INTEGER + 1,
+        String(Number.MAX_SAFE_INTEGER + 1),
+    ]
+
+    for (const rawItemId of malformed) {
+        const definition = withDefinitionField(source, 14, rawItemId)
+        const changedCatalog = forwardingCatalog(
+            catalog,
+            new Map([["4:1500", definition]]),
+        )
+        assertUnsupported(
+            getMissionFactRequirementRegistry(changedCatalog).getRequirement(4, 1500),
+            /selector/i,
+        )
+    }
 })
 
 test("exports the Registry API and builds without DB, loader, or Session work", () => {

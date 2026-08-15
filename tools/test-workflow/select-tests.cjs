@@ -247,7 +247,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^src\/lib\/mission\/(?:computer-regular|pass|periodic-session-context|regular-battle-facts|regular-quest-facts|regular-session-context|regular-state-facts|settlement|types)\.ts$/,
+        pattern: /^src\/lib\/mission\/(?:category-session-plan|collect-progress|collect-session-context|computer-regular|master-value|pass|periodic-session-context|regular-battle-facts|regular-quest-facts|regular-session-context|regular-state-facts|settlement|types)\.ts$/,
         groups: ["integration:mission"],
     },
     { pattern: /^src\/data\/domains\/item\.ts$/, groups: ["integration:mission"] },

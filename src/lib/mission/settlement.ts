@@ -190,7 +190,8 @@ export function settleMissionCategories(
             if (enabledMissionIds.length === 0) continue
 
             const computer = getComputer(category)
-            const context = (category === 1 || category === 2 || category === 6 || category === 10)
+            const context = (category === 1 || category === 2 || category === 4
+                || category === 6 || category === 10)
                 && computer.buildContextFromSession !== undefined
                 ? computer.buildContextFromSession(session, category, enabledMissionIds)
                 : computer.buildContext(playerId, category, evaluationTime, enabledMissionIds)

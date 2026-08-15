@@ -26,6 +26,7 @@ export interface CategoryContext {
     totalStories: number
     rankCounts: Record<string, number>
     collectedItemTotals?: Record<string, number>
+    collectMissionItemIds?: ReadonlyMap<number, number>
     regularStats?: {
         exRankSsCount: number
         degreeBattleStats: DegreeBattleStats

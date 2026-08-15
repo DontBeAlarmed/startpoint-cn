@@ -5,6 +5,7 @@ import {
     type MissionMasterDefinition,
 } from "../mission-catalog"
 import { getRegularQuestFactSection } from "../regular-quest-facts"
+import { parsePositiveSafeIntegerMasterValue } from "../master-value"
 import { getAwakeRequirement } from "./provider-awake"
 import { getDegreeRequirement } from "./provider-degree"
 import { getEventRequirement } from "./provider-event"
@@ -140,14 +141,8 @@ function getWeeklyRequirement(definition: MissionMasterDefinition): MissionFactR
 }
 
 function getCollectRequirement(definition: MissionMasterDefinition): MissionFactRequirementDraft {
-    if (!matchesCurrentMissionComputerDefinition(definition)) {
-        return {
-            mode: "unsupported",
-            reason: "Collect mission definition is incompatible with the current Computer Catalog.",
-        }
-    }
-    const itemId = Number(definition.row[14])
-    return Number.isSafeInteger(itemId) && itemId > 0
+    const itemId = parsePositiveSafeIntegerMasterValue(definition.row[14])
+    return itemId !== undefined
         ? { mode: "computed", facts: [{ kind: "collectedItems", itemIds: [itemId] }] }
         : { mode: "unsupported", reason: "Collect mission item selector is invalid." }
 }

@@ -1,8 +1,6 @@
 import type { DegreeBattleStats } from "../../data/domains/degree_battle_stats"
 import type { PlayerQuestProgress } from "../../data/types"
-import type { FactKey } from "./facts/fact-key"
-import { buildFactLoadPlan } from "./facts/load-plan"
-import type { MissionFactLoadPlan } from "./facts/types"
+import { buildCategoryFactPlan, getFactLoadPlanKey } from "./category-session-plan"
 import {
     DEFAULT_CRAFT_POINT_ITEM_ID,
     getMissionCatalogContentTable,
@@ -37,37 +35,6 @@ interface QuestSummary {
     readonly totalStories: number
     readonly exRankSsCount: number
     readonly rankCounts: Record<string, number>
-}
-
-function buildCategoryPlan(
-    session: MissionEvaluationSession,
-    category: number,
-    missionIds: readonly number[],
-): MissionFactLoadPlan {
-    const requestedIds = new Set(missionIds)
-    const foundIds = new Set<number>()
-    const facts: FactKey[] = []
-    for (const candidate of session.candidateRequirements) {
-        if (candidate.category !== category || !requestedIds.has(candidate.missionId)) continue
-        foundIds.add(candidate.missionId)
-        facts.push(...candidate.requirement.facts)
-    }
-    const missingMissionId = missionIds.find(missionId => !foundIds.has(missionId))
-    if (missingMissionId !== undefined) {
-        throw new Error(
-            `Mission ${category}:${missingMissionId} is outside the evaluation Session candidates`,
-        )
-    }
-    return buildFactLoadPlan(facts)
-}
-
-function getPlanKey<Kind extends FactKey["kind"]>(
-    plan: MissionFactLoadPlan,
-    kind: Kind,
-): Extract<FactKey, { kind: Kind }> | undefined {
-    return plan.keys.find(key => key.kind === kind) as
-        | Extract<FactKey, { kind: Kind }>
-        | undefined
 }
 
 function summarizeQuestProgress(
@@ -106,14 +73,14 @@ export function buildRegularCategoryContextFromSession(
     session: MissionEvaluationSession,
     missionIds: readonly number[],
 ): CategoryContext {
-    const plan = buildCategoryPlan(session, 1, missionIds)
-    const questKey = getPlanKey(plan, "questProgress")
-    const charactersKey = getPlanKey(plan, "characters")
-    const manaNodesKey = getPlanKey(plan, "characterManaNodes")
-    const equipmentKey = getPlanKey(plan, "equipment")
-    const collectedKey = getPlanKey(plan, "collectedItems")
-    const degreeKey = getPlanKey(plan, "degreeBattleStats")
-    const battleKey = getPlanKey(plan, "missionBattleCounters")
+    const plan = buildCategoryFactPlan(session, 1, missionIds)
+    const questKey = getFactLoadPlanKey(plan, "questProgress")
+    const charactersKey = getFactLoadPlanKey(plan, "characters")
+    const manaNodesKey = getFactLoadPlanKey(plan, "characterManaNodes")
+    const equipmentKey = getFactLoadPlanKey(plan, "equipment")
+    const collectedKey = getFactLoadPlanKey(plan, "collectedItems")
+    const degreeKey = getFactLoadPlanKey(plan, "degreeBattleStats")
+    const battleKey = getFactLoadPlanKey(plan, "missionBattleCounters")
     const characters = charactersKey
         ? session.getFactFromPlan(charactersKey, plan)
         : undefined
