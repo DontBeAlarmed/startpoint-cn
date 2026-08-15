@@ -243,13 +243,14 @@ test("persisted and unsupported candidates load only the orchestrator player fac
     assert.deepEqual(calls, { player: 1, battle: 0, snapshot: 0, quest: 0 })
 })
 
-test("Session context builders reject categories outside the stage 3B boundary", () => {
+test("Session context builders reject categories outside their migrated boundaries", () => {
     const playerId = createPlayer("mission-periodic-boundary")
     const session = createProductionSession(playerId, [{ category: 1, missionId: 1 }])
 
+    assert.doesNotThrow(() => RegularComputer.buildContextFromSession(session, 1, [1]))
     assert.throws(
-        () => RegularComputer.buildContextFromSession(session, 1, [1]),
-        /only supports categories 2 and 10/i,
+        () => RegularComputer.buildContextFromSession(session, 3, [1]),
+        /only supports categories 1, 2 and 10/i,
     )
     assert.throws(
         () => PassComputer.buildContextFromSession(session, 7, [1]),

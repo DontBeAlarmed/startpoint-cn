@@ -69,6 +69,22 @@ export function getPlayerCollectedItemTotalsSync(
     return Object.fromEntries(rows.map(row => [String(row.item_id), row.total_obtained]))
 }
 
+export function getPlayerCollectedItemTotalsByIdsSync(
+    playerId: number,
+    itemIds: readonly number[],
+): Record<string, number> {
+    const normalizedIds = [...new Set(itemIds)]
+        .filter(itemId => Number.isSafeInteger(itemId) && itemId > 0)
+    if (normalizedIds.length === 0) return {}
+    const placeholders = normalizedIds.map(() => "?").join(", ")
+    const rows = getDb().prepare(`
+    SELECT item_id, total_obtained
+    FROM players_collected_items
+    WHERE player_id = ? AND item_id IN (${placeholders})
+    `).all(playerId, ...normalizedIds) as { item_id: number; total_obtained: number }[]
+    return Object.fromEntries(rows.map(row => [String(row.item_id), row.total_obtained]))
+}
+
 function recordPlayerCollectedItemSync(
     playerId: number,
     itemId: number | string,

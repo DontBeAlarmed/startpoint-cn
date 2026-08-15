@@ -77,6 +77,7 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "box_reward.json",
     "carnival_event_total_score_reward.json",
     "character_quest_lookup.json",
+    "config.json",
     "equipment_gacha_movie_probability.json",
     "hard_multi_event.json",
     "ex_ability.json",

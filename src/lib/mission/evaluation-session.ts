@@ -125,6 +125,23 @@ export class MissionEvaluationSession {
     getFact<Key extends FactKey>(key: Key): MissionFactValue<Key> {
         const requestedKey = normalizeFactKey(key)
         const plannedKey = this.resolvePlannedKey(requestedKey)
+        return this.loadFact(requestedKey, plannedKey)
+    }
+
+    getFactFromPlan<Key extends FactKey>(
+        key: Key,
+        plan: MissionFactLoadPlan,
+    ): MissionFactValue<Key> {
+        const requestedKey = normalizeFactKey(key)
+        const plannedKey = this.resolvePlannedKey(requestedKey, plan)
+        this.resolvePlannedKey(plannedKey)
+        return this.loadFact(requestedKey, plannedKey)
+    }
+
+    private loadFact<Key extends FactKey>(
+        requestedKey: FactKey,
+        plannedKey: FactKey,
+    ): MissionFactValue<Key> {
         const plannedId = getFactKeyId(plannedKey)
         const cached = this.#cachedById.get(plannedId)
         if (cached !== undefined) {
@@ -163,15 +180,20 @@ export class MissionEvaluationSession {
         }
     }
 
-    private resolvePlannedKey(requestedKey: FactKey): FactKey {
+    private resolvePlannedKey(
+        requestedKey: FactKey,
+        plan: MissionFactLoadPlan = this.factLoadPlan,
+    ): FactKey {
         if (requestedKey.kind === "questProgress") {
-            return this.resolveSelectionKey(requestedKey, "sections")
+            return this.resolveSelectionKey(requestedKey, "sections", plan)
         }
         if (requestedKey.kind === "collectedItems") {
-            return this.resolveSelectionKey(requestedKey, "itemIds")
+            return this.resolveSelectionKey(requestedKey, "itemIds", plan)
         }
 
-        const planned = this.#plannedById.get(getFactKeyId(requestedKey))
+        const planned = plan === this.factLoadPlan
+            ? this.#plannedById.get(getFactKeyId(requestedKey))
+            : plan.keys.find(key => getFactKeyId(key) === getFactKeyId(requestedKey))
         if (planned === undefined) {
             throw new Error(`Mission fact ${getFactKeyId(requestedKey)} was not declared`)
         }
@@ -181,8 +203,8 @@ export class MissionEvaluationSession {
     private resolveSelectionKey<
         Key extends Extract<FactKey, { kind: "questProgress" | "collectedItems" }>,
         Field extends Key["kind"] extends "questProgress" ? "sections" : "itemIds",
-    >(requestedKey: Key, field: Field): FactKey {
-        const planned = this.factLoadPlan.keys.find(key => key.kind === requestedKey.kind)
+    >(requestedKey: Key, field: Field, plan: MissionFactLoadPlan): FactKey {
+        const planned = plan.keys.find(key => key.kind === requestedKey.kind)
         if (planned === undefined) {
             throw new Error(`Mission fact ${getFactKeyId(requestedKey)} was not declared`)
         }

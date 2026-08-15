@@ -144,3 +144,78 @@ test("production player loader fails explicitly when the player is missing", () 
 
     assert.throws(() => session.getFact({ kind: "player" }), /player 404.*not found/i)
 })
+
+test("production Regular loaders dispatch singleton and collected selection domains once", () => {
+    const calls = []
+    const values = {
+        characters: { 100001: { exp: 10 } },
+        manaNodes: { 100001: [1, 2] },
+        equipment: { 200001: { level: 5 } },
+        selected: { 11: 3, 33: 9 },
+        all: { 11: 3, 22: 7, 33: 9 },
+        degree: { feverCount: 4 },
+    }
+    const domains = {
+        getPlayerCharactersSync(playerId) {
+            calls.push(["characters", playerId])
+            return values.characters
+        },
+        getPlayerCharactersManaNodesSync(playerId) {
+            calls.push(["manaNodes", playerId])
+            return values.manaNodes
+        },
+        getPlayerEquipmentListSync(playerId) {
+            calls.push(["equipment", playerId])
+            return values.equipment
+        },
+        getPlayerCollectedItemTotalsByIdsSync(playerId, itemIds) {
+            calls.push(["collectedSelected", playerId, itemIds])
+            return values.selected
+        },
+        getPlayerCollectedItemTotalsSync(playerId) {
+            calls.push(["collectedAll", playerId])
+            return values.all
+        },
+        getDegreeBattleStatsSync(playerId) {
+            calls.push(["degree", playerId])
+            return values.degree
+        },
+    }
+    const loaders = createProductionMissionFactLoaderRegistry(domains)
+    const selectedSession = createSession([
+        { kind: "characters" },
+        { kind: "characterManaNodes" },
+        { kind: "equipment" },
+        { kind: "collectedItems", itemIds: [33, 11] },
+        { kind: "degreeBattleStats" },
+    ], loaders)
+
+    assert.strictEqual(selectedSession.getFact({ kind: "characters" }), values.characters)
+    assert.strictEqual(
+        selectedSession.getFact({ kind: "characterManaNodes" }),
+        values.manaNodes,
+    )
+    assert.strictEqual(selectedSession.getFact({ kind: "equipment" }), values.equipment)
+    assert.strictEqual(
+        selectedSession.getFact({ kind: "collectedItems", itemIds: [11] }),
+        values.selected,
+    )
+    assert.strictEqual(selectedSession.getFact({ kind: "degreeBattleStats" }), values.degree)
+
+    const allSession = createSession(
+        [{ kind: "collectedItems", itemIds: "all" }],
+        loaders,
+    )
+    assert.strictEqual(
+        allSession.getFact({ kind: "collectedItems", itemIds: [22] }),
+        values.all,
+    )
+    assert.deepEqual(calls, [
+        ["characters", 77],
+        ["manaNodes", 77],
+        ["equipment", 77],
+        ["collectedSelected", 77, [11, 33]],
+        ["degree", 77],
+        ["collectedAll", 77],
+    ])
+})

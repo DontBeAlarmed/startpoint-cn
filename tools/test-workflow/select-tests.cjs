@@ -223,7 +223,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^src\/lib\/mission\/(?:awake-settlement|awake-unlock-response|evaluation-session|fact-loaders|index|production-fact-loaders)\.ts$/,
+        pattern: /^src\/lib\/mission\/(?:awake-settlement|awake-unlock-response|evaluation-session|fact-loaders|index|mission-catalog|mission-catalog-source|production-fact-loaders)\.ts$/,
         groups: ["integration:mission"],
     },
     {
@@ -247,9 +247,10 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^src\/lib\/mission\/(?:computer-regular|pass|periodic-session-context|regular-battle-facts|regular-quest-facts|regular-state-facts|settlement|types)\.ts$/,
+        pattern: /^src\/lib\/mission\/(?:computer-regular|pass|periodic-session-context|regular-battle-facts|regular-quest-facts|regular-session-context|regular-state-facts|settlement|types)\.ts$/,
         groups: ["integration:mission"],
     },
+    { pattern: /^src\/data\/domains\/item\.ts$/, groups: ["integration:mission"] },
     { pattern: /^src\/routes\/api\/profile\.ts$/, groups: ["quick:character"] },
     {
         pattern: /^src\/routes\/api\/raidEvent\.ts$/,

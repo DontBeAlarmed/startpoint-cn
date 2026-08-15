@@ -217,6 +217,7 @@ class SnapshotMissionCatalog implements MissionCatalog {
 }
 
 const catalogByRepository = new WeakMap<ReadonlyContentRepository, MissionCatalog>()
+const repositoryByCatalog = new WeakMap<MissionCatalog, ReadonlyContentRepository>()
 
 function currentRepository(): ReadonlyContentRepository {
     try {
@@ -236,5 +237,30 @@ export function getMissionCatalog(repository?: ReadonlyContentRepository): Missi
     if (cached) return cached
     const catalog = Object.freeze(new SnapshotMissionCatalog(selectedRepository))
     catalogByRepository.set(selectedRepository, catalog)
+    repositoryByCatalog.set(catalog, selectedRepository)
     return catalog
+}
+
+export function getMissionCatalogContentTable<T>(
+    catalog: MissionCatalog,
+    tableName: string,
+): T {
+    const repository = repositoryByCatalog.get(catalog)
+    if (repository === undefined) throw new Error("Mission Catalog Content source not found")
+    return repository.table<T>(tableName)
+}
+
+export const DEFAULT_CRAFT_POINT_ITEM_ID = 100000
+
+export function getMissionCatalogCraftPointItemId(catalog: MissionCatalog): number {
+    let config: Record<string, unknown>
+    try {
+        config = getMissionCatalogContentTable(catalog, "config.json")
+    } catch {
+        return DEFAULT_CRAFT_POINT_ITEM_ID
+    }
+    const itemId = Number(config.craft_point_item_id)
+    return Number.isSafeInteger(itemId) && itemId > 0
+        ? itemId
+        : DEFAULT_CRAFT_POINT_ITEM_ID
 }

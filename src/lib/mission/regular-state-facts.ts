@@ -7,6 +7,7 @@ import {
 } from "../../data/domains/character"
 import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
 import { getPlayerCollectedItemTotalSync } from "../../data/domains/item"
+import type { PlayerCharacter, PlayerEquipment } from "../../data/types"
 import { getConfigSync } from "../assets"
 import { characterExpCaps } from "../character"
 
@@ -25,6 +26,16 @@ export interface RegularStateFacts {
     secondManaBoardOpenCount: number
     secondManaBoardCompleteCount: number
     craftPointObtainedCount: number
+}
+
+export interface RegularStateFactSources {
+    readonly characters?: Readonly<Record<string, PlayerCharacter>>
+    readonly characterManaNodes?: Readonly<Record<string, readonly number[]>>
+    readonly equipment?: Readonly<Record<string, PlayerEquipment>>
+    readonly collectedItemTotals?: Readonly<Record<string, number>>
+    readonly characterTable?: RawCharacterTable
+    readonly manaBoardTable?: RawManaBoard
+    readonly craftPointItemId: number
 }
 
 function reachesCharacterLevel80(rarity: number, experience: number): boolean {
@@ -53,18 +64,12 @@ function getSecondBoardNodeIds(
     return nodeIds.size > 0 ? nodeIds : null
 }
 
-export function getRegularStateFactsSync(playerId: number): RegularStateFacts {
-    const characters = getPlayerCharactersSync(playerId)
-    const manaNodes = getPlayerCharactersManaNodesSync(playerId)
-    const equipment = getPlayerEquipmentListSync(playerId)
-    const characterTable = getRuntimeContentTableSync<RawCharacterTable>(
-        "character.json",
-        bundledCharacters as RawCharacterTable,
-    )
-    const manaBoardTable = getRuntimeContentTableSync<RawManaBoard>(
-        "mana_board.json",
-        bundledManaBoard as RawManaBoard,
-    )
+export function deriveRegularStateFacts(sources: RegularStateFactSources): RegularStateFacts {
+    const characters = sources.characters ?? {}
+    const manaNodes = sources.characterManaNodes ?? {}
+    const equipment = sources.equipment ?? {}
+    const characterTable = sources.characterTable ?? {}
+    const manaBoardTable = sources.manaBoardTable ?? {}
 
     let level80CharacterCount = 0
     let secondManaBoardOpenCount = 0
@@ -90,7 +95,6 @@ export function getRegularStateFactsSync(playerId: number): RegularStateFacts {
         if (item.level >= 5) maxLevelEquipmentCount++
     }
 
-    const craftPointItemId = getConfigSync().craft_point_item_id || 100000
     return {
         characterCount: Object.keys(characters).length,
         level80CharacterCount,
@@ -106,6 +110,30 @@ export function getRegularStateFactsSync(playerId: number): RegularStateFacts {
         maxLevelEquipmentCount,
         secondManaBoardOpenCount,
         secondManaBoardCompleteCount,
-        craftPointObtainedCount: getPlayerCollectedItemTotalSync(playerId, craftPointItemId),
+        craftPointObtainedCount: sources.collectedItemTotals?.[String(sources.craftPointItemId)] ?? 0,
     }
+}
+
+export function getRegularStateFactsSync(playerId: number): RegularStateFacts {
+    const craftPointItemId = getConfigSync().craft_point_item_id || 100000
+    return deriveRegularStateFacts({
+        characters: getPlayerCharactersSync(playerId),
+        characterManaNodes: getPlayerCharactersManaNodesSync(playerId),
+        equipment: getPlayerEquipmentListSync(playerId),
+        collectedItemTotals: {
+            [String(craftPointItemId)]: getPlayerCollectedItemTotalSync(
+                playerId,
+                craftPointItemId,
+            ),
+        },
+        characterTable: getRuntimeContentTableSync<RawCharacterTable>(
+            "character.json",
+            bundledCharacters as RawCharacterTable,
+        ),
+        manaBoardTable: getRuntimeContentTableSync<RawManaBoard>(
+            "mana_board.json",
+            bundledManaBoard as RawManaBoard,
+        ),
+        craftPointItemId,
+    })
 }

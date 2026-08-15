@@ -20,7 +20,7 @@ const EXPECTED_SCENARIO_KEYS = [
     "multi-battle-finish",
 ]
 const HISTORICAL_SETTLEMENT_SHA256 =
-    "f6413769c90d43f7d242cb00edb9d88f645c92c29f05e01cd3e98f7bcbe5a72e"
+    "f379b4efee7f16d70ecf9ef554ba37937d9f2cda70156ace8e7c40feaf4fcc0f"
 const snapshotPath = path.join(
     __dirname,
     "__snapshots__",

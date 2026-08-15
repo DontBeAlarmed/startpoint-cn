@@ -12,6 +12,7 @@ import {
 import { getRegularStateFactsSync } from "./regular-state-facts"
 import { getSnapshot } from "./snapshot"
 import { buildPeriodicCategoryContextFromSession } from "./periodic-session-context"
+import { buildRegularCategoryContextFromSession } from "./regular-session-context"
 import type { MissionComputer, CategoryContext } from "./types"
 
 function buildStats(playerId: number, category: number): CategoryContext {
@@ -191,8 +192,11 @@ export const RegularComputer: MissionComputer = {
     },
 
     buildContextFromSession(session, category, missionIds): CategoryContext {
+        if (category === 1) {
+            return buildRegularCategoryContextFromSession(session, missionIds)
+        }
         if (category !== 2 && category !== 10) {
-            throw new Error("Regular Session context only supports categories 2 and 10")
+            throw new Error("Regular Session context only supports categories 1, 2 and 10")
         }
         return buildPeriodicCategoryContextFromSession(
             session,

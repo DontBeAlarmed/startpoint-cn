@@ -1,5 +1,6 @@
 import type { MissionBattleCounters } from "../../data/domains/mission_battle_facts"
-import type { Player, PlayerQuestProgress } from "../../data/types"
+import type { DegreeBattleStats } from "../../data/domains/degree_battle_stats"
+import type { Player, PlayerCharacter, PlayerEquipment, PlayerQuestProgress } from "../../data/types"
 import type { FactKey } from "./facts/fact-key"
 import type { MissionCatalog } from "./mission-catalog"
 import type { MissionFactRequirementRegistry } from "./requirements/types"
@@ -7,8 +8,13 @@ import type { SnapshotData } from "./snapshot"
 
 export interface MissionFactValueByKind {
     readonly player: Player
+    readonly characters: Record<string, PlayerCharacter>
+    readonly characterManaNodes: Record<string, number[]>
+    readonly equipment: Record<string, PlayerEquipment>
+    readonly collectedItems: Record<string, number>
     readonly questProgress: Record<string, PlayerQuestProgress[]>
     readonly missionBattleCounters: MissionBattleCounters
+    readonly degreeBattleStats: DegreeBattleStats
     readonly periodicSnapshot: SnapshotData | null
 }
 

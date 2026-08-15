@@ -18,6 +18,9 @@ import bundledPassWeekRewards from "../../../assets/mission_pass_week_reward.jso
 import bundledPassEventRewards from "../../../assets/mission_pass_event_reward.json"
 import bundledAwakeRewards from "../../../assets/mission_char_awake_reward.json"
 import bundledWeeklyRewards from "../../../assets/mission_weekly_reward.json"
+import bundledCharacters from "../../../assets/character.json"
+import bundledManaBoard from "../../../assets/mana_board.json"
+import bundledConfig from "../../../assets/config.json"
 import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import type {
     MissionCatalogReward,
@@ -82,6 +85,9 @@ const BUNDLED_TABLES: Readonly<Record<string, unknown>> = Object.freeze({
     "mission_pass_event_reward.json": bundledPassEventRewards,
     "mission_char_awake_reward.json": bundledAwakeRewards,
     "mission_weekly_reward.json": bundledWeeklyRewards,
+    "character.json": bundledCharacters,
+    "mana_board.json": bundledManaBoard,
+    "config.json": bundledConfig,
 })
 
 const bundledInfo = Object.freeze({

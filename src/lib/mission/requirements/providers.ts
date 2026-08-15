@@ -1,5 +1,9 @@
 import type { FactKey } from "../facts/fact-key"
-import type { MissionCatalog, MissionMasterDefinition } from "../mission-catalog"
+import {
+    getMissionCatalogCraftPointItemId,
+    type MissionCatalog,
+    type MissionMasterDefinition,
+} from "../mission-catalog"
 import { getRegularQuestFactSection } from "../regular-quest-facts"
 import { getAwakeRequirement } from "./provider-awake"
 import { getDegreeRequirement } from "./provider-degree"
@@ -48,7 +52,6 @@ const REGULAR_FACTS: Readonly<Record<string, readonly FactKey[]>> = Object.freez
     total_obtained_bond_token_count: [{ kind: "characters" }],
     total_mana_addition_count: [{ kind: "player" }],
     ex_rank_ss: [{ kind: "questProgress", sections: [4] }],
-    total_craft_point_addition_count: [{ kind: "collectedItems", itemIds: "all" }],
     total_equipment_awaking_count: [{ kind: "equipment" }],
     total_equipment_5_level_count: [{ kind: "equipment" }],
     manaboard_2nd_open_count: [{ kind: "characters" }],
@@ -66,7 +69,19 @@ function parsePositiveIntegerList(value: unknown): readonly number[] | null {
         : null
 }
 
-function getRegularRequirement(definition: MissionMasterDefinition): MissionFactRequirementDraft {
+function getRegularRequirement(
+    definition: MissionMasterDefinition,
+    catalog: MissionCatalog,
+): MissionFactRequirementDraft {
+    if (definition.pattern === "total_craft_point_addition_count") {
+        return {
+            mode: "computed",
+            facts: [{
+                kind: "collectedItems",
+                itemIds: [getMissionCatalogCraftPointItemId(catalog)],
+            }],
+        }
+    }
     const facts = REGULAR_FACTS[definition.pattern]
     if (facts) return { mode: "computed", facts }
     if (REGULAR_PERSISTED_PATTERNS.has(definition.pattern)) return { mode: "persisted" }
@@ -185,7 +200,7 @@ export function getMissionRequirementDraft(
 ): MissionFactRequirementDraft {
     switch (definition.category) {
         case 1:
-            return getRegularRequirement(definition)
+            return getRegularRequirement(definition, catalog)
         case 2:
             return getDailyRequirement(definition)
         case 3:

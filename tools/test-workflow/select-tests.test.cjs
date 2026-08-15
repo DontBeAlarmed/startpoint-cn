@@ -661,13 +661,26 @@ test("registers mission catalog and fact store regressions in the mission leaf g
     assert.deepEqual(selectTestGroups(["tools/mission_fact_key.test.cjs"]), ["integration:mission"])
     assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_fact_key.test.cjs"))
     for (const file of [
+        "tools/mission_collected_items_batch.test.cjs",
         "tools/mission_evaluation_production_loaders.test.cjs",
         "tools/mission_evaluation_quest_scoped.test.cjs",
         "tools/mission_evaluation_session.test.cjs",
         "tools/mission_periodic_session_migration.test.cjs",
+        "tools/mission_regular_session_equivalence.test.cjs",
+        "tools/mission_regular_session_scope.test.cjs",
+        "tools/mission_regular_session_settlement.test.cjs",
+        "tools/mission_regular_state_derivation.test.cjs",
     ]) {
         assert.deepEqual(selectTestGroups([file]), ["integration:mission"])
         assert.ok(TEST_GROUPS["integration:mission"].tests.includes(file))
+    }
+    for (const file of [
+        "src/data/domains/item.ts",
+        "src/lib/mission/mission-catalog-source.ts",
+        "src/lib/mission/mission-catalog.ts",
+        "src/lib/mission/regular-session-context.ts",
+    ]) {
+        assert.ok(selectTestGroups([file]).includes("integration:mission"), file)
     }
     for (const file of [
         "tools/helpers/mission-evaluation-rejected-observer-worker.cjs",
@@ -816,6 +829,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_raid_set_party_route.test.cjs",
         "tools/mission_event_login_route.test.cjs",
         "tools/mission_event_progress.test.cjs",
+        "tools/mission_collected_items_batch.test.cjs",
         "tools/mission_evaluation_production_loaders.test.cjs",
         "tools/mission_evaluation_quest_scoped.test.cjs",
         "tools/mission_evaluation_session.test.cjs",
@@ -848,6 +862,10 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_periodic_session_migration.test.cjs",
         "tools/mission_progress_route.test.cjs",
         "tools/mission_regular_facts.test.cjs",
+        "tools/mission_regular_session_equivalence.test.cjs",
+        "tools/mission_regular_session_scope.test.cjs",
+        "tools/mission_regular_session_settlement.test.cjs",
+        "tools/mission_regular_state_derivation.test.cjs",
         "tools/mission_response_merge.test.cjs",
         "tools/perf/mission_engine_focused_baseline.test.cjs",
         "tools/perf/mission_engine_focused_runner.test.cjs",
