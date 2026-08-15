@@ -2,6 +2,10 @@
 
 // Types
 export type { MissionComputer, CategoryContext, ComputerRegistry, PlayerQuestProgressEntry } from "./types"
+export type { FactIdSelection, FactKey, PeriodicSnapshotKind } from "./facts/fact-key"
+export type { MissionFactLoadPlan } from "./facts/types"
+export { getFactKeyId, normalizeFactKey } from "./facts/fact-key"
+export { buildFactLoadPlan } from "./facts/load-plan"
 
 // Registry
 export { getComputer } from "./registry"

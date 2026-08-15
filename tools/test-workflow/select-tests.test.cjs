@@ -35,6 +35,10 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/lib/mission/degree-candidates.ts"]),
         ["integration:mission"],
     )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/facts/fact-key.ts"]),
+        ["integration:mission"],
+    )
     assert.deepEqual(selectTestGroups(["src/lib/gacha.ts"]), ["quick:gacha"])
     assert.deepEqual(
         selectTestGroups(["src/lib/gacha-seed-quarantine.ts"]),
@@ -630,6 +634,8 @@ test("registers the mission catalog regression in the mission leaf group", () =>
     assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_catalog.test.cjs"))
     assert.deepEqual(selectTestGroups(["tools/mission_catalog_wrappers.test.cjs"]), ["integration:mission"])
     assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_catalog_wrappers.test.cjs"))
+    assert.deepEqual(selectTestGroups(["tools/mission_fact_key.test.cjs"]), ["integration:mission"])
+    assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_fact_key.test.cjs"))
 })
 
 test("keeps external data concerns out of self-contained runtime tests", () => {
@@ -766,6 +772,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_raid_set_party_route.test.cjs",
         "tools/mission_event_login_route.test.cjs",
         "tools/mission_event_progress.test.cjs",
+        "tools/mission_fact_key.test.cjs",
         "tools/mission_raid_summary_route.test.cjs",
         "tools/mission_active_content.test.cjs",
         "tools/mission_active_core.test.cjs",
