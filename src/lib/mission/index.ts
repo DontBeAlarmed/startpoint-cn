@@ -6,6 +6,10 @@ export type { MissionComputer, CategoryContext, ComputerRegistry, PlayerQuestPro
 // Registry
 export { getComputer } from "./registry"
 
+// Snapshot-scoped standard mission catalog
+export type { MissionCatalog, MissionCatalogReward, MissionCatalogStage, MissionMasterDefinition } from "./mission-catalog"
+export { getMissionCatalog } from "./mission-catalog"
+
 // Stages
 export { getMissionIdsByCategory, getCurrentStage, getCompletedStageNumbers, getMissionStageIds, isMissionProgressComplete } from "./stages"
 

@@ -625,6 +625,11 @@ test("registers every test in exactly one leaf group and full covers runtime reg
     }
 })
 
+test("registers the mission catalog regression in the mission leaf group", () => {
+    assert.deepEqual(selectTestGroups(["tools/mission_catalog.test.cjs"]), ["integration:mission"])
+    assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_catalog.test.cjs"))
+})
+
 test("keeps external data concerns out of self-contained runtime tests", () => {
     const runtimeTests = [
         "tools/score_attack_event.test.cjs",
@@ -775,6 +780,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/active_mission_specific_battle_facts.test.cjs",
         "tools/active_mission_receive_route.test.cjs",
         "tools/contents_guide_start_route.test.cjs",
+        "tools/mission_catalog.test.cjs",
         "tools/mission_master_data.test.cjs",
         "tools/mission_pass.test.cjs",
         "tools/mission_pass_battle_facts.test.cjs",
