@@ -14,6 +14,14 @@ const HUB_AUTHENTICATION_GROUPS = [
 ]
 
 const SOURCE_RULES = [
+    {
+        pattern: /^tools\/helpers\/mission-degree-session-fixture\.cjs$/,
+        groups: ["integration:mission"],
+    },
+    {
+        pattern: /^src\/lib\/mission\/(?:computer-degree|degree-(?:content-tables|coverage|immutable|rule-catalog|state-derivation|session-context))\.ts$/,
+        groups: ["integration:mission"],
+    },
     { pattern: /^admin\//, groups: ["admin"] },
     { pattern: /^tests\/admin-/, groups: ["admin"] },
     {

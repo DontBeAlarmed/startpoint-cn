@@ -6,6 +6,7 @@ import type { MissionBattleCounters } from "../../data/domains/mission_battle_fa
 import type { DegreeBattleStats } from "../../data/domains/degree_battle_stats"
 import type { RegularStateFacts } from "./regular-state-facts"
 import type { MissionEvaluationSession } from "./evaluation-session"
+import type { DegreeRule } from "./degree-rule-catalog"
 
 export interface PlayerQuestProgressEntry {
     questId: number
@@ -56,6 +57,7 @@ export interface CategoryContext {
         adventFinishedQuestIds: ReadonlySet<number>
         carnivalFinishedQuestIds: ReadonlySet<number>
         hardMultiFinishedQuestIds: ReadonlySet<number>
+        finishedQuestIdsBySection: Readonly<Record<number, ReadonlySet<number>>>
         challengeDungeonClearCount: number
         singleScoreMax: number
         singleClearTimeMin: number
@@ -66,6 +68,7 @@ export interface CategoryContext {
         skillUseCount: number
         degreeBattleStats: DegreeBattleStats
     }
+    degreeRules?: ReadonlyMap<number, DegreeRule>
     battleCounters?: MissionBattleCounters
     snapshot?: SnapshotData | null
     passEventLoginProgress?: Record<number, number>

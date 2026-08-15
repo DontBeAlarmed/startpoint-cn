@@ -119,11 +119,8 @@ instrument(characterDomain, "getPlayerCharactersManaNodesSync", "mana")
 instrument(missionBattleDomain, "getMissionBattleCountersSync", "battleCounters")
 instrument(degreeBattleDomain, "getDegreeBattleStatsSync", "degreeBattleStats")
 instrument(shopDomain, "getPlayerShopPurchasesMapSync", "shop")
-instrument(itemDomain, "getPlayerCollectedItemTotalSync", "item")
-instrument(itemDomain, "getPlayerCollectedItemTotalsSync", "allItems")
-instrument(questDomain, "countFinishedPlayerQuestsByCategorySync", "questCount")
-instrument(questDomain, "getFinishedPlayerQuestIdsBySectionsSync", "questSections")
-instrument(questDomain, "getPlayerQuestClearRanksBySectionsSync", "questRanks")
+instrument(itemDomain, "getPlayerCollectedItemTotalsByIdsSync", "selectedItems")
+instrument(questDomain, "getPlayerQuestProgressSync", "questProgress")
 instrument(equipmentDomain, "getPlayerEquipmentListSync", "equipment")
 
 // Domain instrumentation must be installed before this import.
@@ -150,7 +147,7 @@ const fullContext = DegreeComputer.buildContext(playerId, 5, evaluationTime)
 const fullFamilies = touchedFamilies()
 for (const family of [
     "player", "character", "mana", "battleCounters", "degreeBattleStats",
-    "shop", "item", "allItems", "questCount", "questSections", "questRanks", "equipment",
+    "shop", "selectedItems", "questProgress", "equipment",
 ]) {
     assert.equal(fullFamilies.has(family), true, `全量上下文探针未触发 ${family}`)
 }
@@ -160,8 +157,8 @@ const rankContext = DegreeComputer.buildContext(playerId, 5, evaluationTime, [10
 assert.equal(DegreeComputer.compute(1000, rankContext, 0), DegreeComputer.compute(1000, fullContext, 0))
 assert.equal(countFamily("player") > 0, true, "rank-only 必须正向触发玩家事实探针")
 assertUntouched([
-    "character", "mana", "battleCounters", "degreeBattleStats", "shop", "item", "allItems",
-    "questCount", "questSections", "questRanks", "equipment",
+    "character", "mana", "battleCounters", "degreeBattleStats", "shop", "selectedItems",
+    "questProgress", "equipment",
 ])
 
 resetCalls()
@@ -169,8 +166,8 @@ const battleStatContext = DegreeComputer.buildContext(playerId, 5, evaluationTim
 assert.equal(DegreeComputer.compute(16000, battleStatContext, 0), DegreeComputer.compute(16000, fullContext, 0))
 assert.equal(countFamily("degreeBattleStats") > 0, true, "FEVER 候选必须读取称号战斗统计")
 assertUntouched([
-    "character", "mana", "battleCounters", "shop", "item", "allItems",
-    "questCount", "questSections", "questRanks", "equipment",
+    "character", "mana", "battleCounters", "shop", "selectedItems",
+    "questProgress", "equipment",
 ])
 
 const representativeMissionIds = [1000, 111001, 33000, 16000, 57010, 70000]
@@ -188,10 +185,10 @@ for (const missionId of representativeMissionIds) {
         `${missionId} scoped/full 计算结果必须一致`,
     )
 }
-for (const family of ["player", "character", "battleCounters", "degreeBattleStats", "questSections", "item"]) {
+for (const family of ["player", "character", "battleCounters", "degreeBattleStats", "questProgress", "selectedItems"]) {
     assert.equal(countFamily(family) > 0, true, `代表性候选必须正向触发 ${family}`)
 }
-assertUntouched(["mana", "shop", "allItems", "questCount", "questRanks", "equipment"])
+assertUntouched(["mana", "shop", "equipment"])
 
 const battleDegreeScope = buildBattleMissionSettlementScopes([])
     .find(scope => typeof scope === "object" && scope.category === 5)
@@ -199,10 +196,10 @@ assert.ok(battleDegreeScope, "真实战斗 scope 必须包含 Category 5")
 resetCalls()
 DegreeComputer.buildContext(playerId, 5, evaluationTime, battleDegreeScope.missionIds)
 const battleFamilies = touchedFamilies()
-for (const family of ["player", "character", "battleCounters", "degreeBattleStats", "questSections", "item"]) {
+for (const family of ["player", "character", "battleCounters", "degreeBattleStats", "questProgress", "selectedItems"]) {
     assert.equal(battleFamilies.has(family), true, `真实 battle scope 探针未触发 ${family}`)
 }
-assertUntouched(["mana", "shop", "allItems", "equipment"])
+assertUntouched(["mana", "shop", "equipment"])
 assert.equal(
     battleFamilies.size < fullFamilies.size,
     true,
@@ -220,8 +217,8 @@ for (const missionId of [3000, 25000, 70004, 999999]) {
     assert.equal(DegreeComputer.compute(missionId, fallbackContext, 7), 7)
 }
 assertUntouched([
-    "character", "mana", "battleCounters", "degreeBattleStats", "shop", "item", "allItems",
-    "questCount", "questSections", "questRanks", "equipment",
+    "character", "mana", "battleCounters", "degreeBattleStats", "shop", "selectedItems",
+    "questProgress", "equipment",
 ])
 
 const {

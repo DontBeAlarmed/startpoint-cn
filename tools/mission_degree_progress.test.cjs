@@ -63,6 +63,14 @@ const {
     getDegreeOperationRuleCount,
     recordDegreeOperationFactsSync,
 } = require("../src/lib/mission/degree-operation-facts")
+const { MissionEvaluationSession } = require("../src/lib/mission/evaluation-session")
+const { getMissionCatalog } = require("../src/lib/mission/mission-catalog")
+const {
+    createProductionMissionFactLoaderRegistry,
+} = require("../src/lib/mission/production-fact-loaders")
+const {
+    getMissionFactRequirementRegistry,
+} = require("../src/lib/mission/requirements/registry")
 
 const questProgressCountIndex = "idx_players_quest_progress_player_section_finished"
 const initializerSource = fs.readFileSync(
@@ -253,8 +261,8 @@ const degreeComputerSource = fs.readFileSync(
     path.join(__dirname, "../src/lib/mission/computer-degree.ts"),
     "utf8",
 )
-assert.match(degreeComputerSource, /countFinishedPlayerQuestsByCategorySync\(playerId, 3\)/)
-assert.doesNotMatch(degreeComputerSource, /getPlayerQuestProgressSync/)
+assert.doesNotMatch(degreeComputerSource, /data\/domains|content-snapshot|getMissionPattern/)
+assert.match(degreeComputerSource, /ctx\.degreeRules\?\.get\(missionId\)/)
 
 assert.equal(countFinishedPlayerQuestsByCategorySync(playerId, 3), 2)
 assert.equal(countFinishedPlayerQuestsByCategorySync(playerId, 1), 1)
@@ -438,6 +446,30 @@ assert.equal(
 )
 
 const context = DegreeComputer.buildContext(playerId, 5)
+const catalog = getMissionCatalog()
+const degreeMissionIds = catalog.getMissionIds(5)
+const degreeSession = new MissionEvaluationSession({
+    playerId,
+    evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
+    catalog,
+    requirementRegistry: getMissionFactRequirementRegistry(catalog),
+    candidates: degreeMissionIds.map(missionId => ({ category: 5, missionId })),
+    orchestratorFacts: [{ kind: "player" }],
+    loaders: createProductionMissionFactLoaderRegistry(),
+})
+const sessionContext = DegreeComputer.buildContextFromSession(degreeSession, 5, degreeMissionIds)
+assert.deepEqual(sessionContext.degreeStats, context.degreeStats)
+assert.deepEqual(sessionContext.degreeRules, context.degreeRules)
+for (const missionId of [1000, 3010, 111001, 1111001, 9000, 12000, 46000, 11010,
+    57010, 58000, 68000, 61040, 62330, 41000, 70000, 43000, 16000]) {
+    for (const dbProgress of [0, 1, 17]) {
+        assert.equal(
+            DegreeComputer.compute(missionId, sessionContext, dbProgress),
+            DegreeComputer.compute(missionId, context, dbProgress),
+            `legacy/session ${missionId} db=${dbProgress}`,
+        )
+    }
+}
 assert.equal(DegreeComputer.compute(1000, context, 0), 250)
 assert.equal(DegreeComputer.compute(2000, context, 0), 6)
 assert.equal(DegreeComputer.compute(4000, context, 0), 5)

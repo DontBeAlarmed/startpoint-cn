@@ -261,6 +261,22 @@ test("selects the registered group before applying workflow path rules", () => {
 
 test("accumulates every directly related source group", () => {
     assert.deepEqual(
+        selectTestGroups(["src/lib/mission/degree-session-context.ts"]),
+        ["integration:mission"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/degree-content-tables.ts"]),
+        ["integration:mission"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/degree-immutable.ts"]),
+        ["integration:mission"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/helpers/mission-degree-session-fixture.cjs"]),
+        ["integration:mission"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/lib/quest/host-finish-persistence.ts"]),
         ["integration:quest", "quick:quest"],
     )
@@ -833,8 +849,15 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_coverage_audit.test.cjs",
         "tools/mission_daily_battle_facts.test.cjs",
         "tools/mission_degree_candidates.test.cjs",
+        "tools/mission_degree_characterization.test.cjs",
+        "tools/mission_degree_content_cache.test.cjs",
+        "tools/mission_degree_content_tables.test.cjs",
         "tools/mission_degree_context_scope.test.cjs",
+        "tools/mission_degree_custom_catalog.test.cjs",
+        "tools/mission_degree_immutable.test.cjs",
         "tools/mission_degree_progress.test.cjs",
+        "tools/mission_degree_session_context.test.cjs",
+        "tools/mission_degree_second_board_scope.test.cjs",
         "tools/mission_event_battle_facts.test.cjs",
         "tools/mission_event_current_state.test.cjs",
         "tools/mission_event_entry_facts.test.cjs",

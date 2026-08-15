@@ -21,6 +21,16 @@ import bundledWeeklyRewards from "../../../assets/mission_weekly_reward.json"
 import bundledCharacters from "../../../assets/character.json"
 import bundledManaBoard from "../../../assets/mana_board.json"
 import bundledConfig from "../../../assets/config.json"
+import bundledMainQuests from "../../../assets/main_quest.json"
+import bundledExQuests from "../../../assets/ex_quest.json"
+import bundledTreasureShop from "../../../assets/treasure_shop.json"
+import bundledBossBattleQuests from "../../../assets/boss_battle_quest.json"
+import bundledExpertSingleEventQuests from "../../../assets/expert_single_event_quest.json"
+import bundledWorldStoryEventQuests from "../../../assets/world_story_event_quest.json"
+import bundledAdventEventQuests from "../../../assets/advent_event_quest.json"
+import bundledCarnivalEventQuests from "../../../assets/carnival_event_quest.json"
+import bundledHardMultiEventQuests from "../../../assets/hard_multi_event_quest.json"
+import bundledEquipmentDissolve from "../../../assets/equipment_dissolve.json"
 import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import type {
     MissionCatalogReward,
@@ -88,6 +98,16 @@ const BUNDLED_TABLES: Readonly<Record<string, unknown>> = Object.freeze({
     "character.json": bundledCharacters,
     "mana_board.json": bundledManaBoard,
     "config.json": bundledConfig,
+    "main_quest.json": bundledMainQuests,
+    "ex_quest.json": bundledExQuests,
+    "treasure_shop.json": bundledTreasureShop,
+    "boss_battle_quest.json": bundledBossBattleQuests,
+    "expert_single_event_quest.json": bundledExpertSingleEventQuests,
+    "world_story_event_quest.json": bundledWorldStoryEventQuests,
+    "advent_event_quest.json": bundledAdventEventQuests,
+    "carnival_event_quest.json": bundledCarnivalEventQuests,
+    "hard_multi_event_quest.json": bundledHardMultiEventQuests,
+    "equipment_dissolve.json": bundledEquipmentDissolve,
 })
 
 const bundledInfo = Object.freeze({

@@ -1,946 +1,127 @@
 // Degree mission computer (category 5)
 
-import { getPlayerSync } from "../../data/domains/player"
-import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../../data/domains/character"
-import {
-    getMissionBattleCountersSync,
-    type MissionBattleCounters,
-} from "../../data/domains/mission_battle_facts"
-import {
-    getDegreeBattleStatsSync,
-    type DegreeBattleStats,
-} from "../../data/domains/degree_battle_stats"
-import { getPlayerShopPurchasesMapSync } from "../../data/domains/shopPurchase"
-import {
-    getPlayerCollectedItemTotalSync,
-    getPlayerCollectedItemTotalsSync,
-} from "../../data/domains/item"
-import {
-    countFinishedPlayerQuestsByCategorySync,
-    getFinishedPlayerQuestIdsBySectionsSync,
-    getPlayerQuestClearRanksBySectionsSync,
-} from "../../data/domains/quest"
 import { getRankDegree } from "../stamina"
-import { getConfigSync } from "../assets"
-import { characterExpCaps } from "../character"
-import bundledCharacters from "../../../assets/character.json"
-import bundledManaBoard from "../../../assets/mana_board.json"
-import bundledMainQuests from "../../../assets/main_quest.json"
-import bundledExQuests from "../../../assets/ex_quest.json"
-import bundledTreasureShop from "../../../assets/treasure_shop.json"
-import bundledBossBattleQuests from "../../../assets/boss_battle_quest.json"
-import bundledExpertSingleEventQuests from "../../../assets/expert_single_event_quest.json"
-import bundledWorldStoryEventQuests from "../../../assets/world_story_event_quest.json"
-import bundledAdventEventQuests from "../../../assets/advent_event_quest.json"
-import bundledCarnivalEventQuests from "../../../assets/carnival_event_quest.json"
-import bundledHardMultiEventQuests from "../../../assets/hard_multi_event_quest.json"
-import bundledEquipmentDissolve from "../../../assets/equipment_dissolve.json"
-import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
-import {
-    ContentSnapshotError,
-    getContentSnapshot,
-} from "../../content/runtime/content-snapshot"
-import { getMissionMasterDefinition, getMissionMasterDefinitions } from "./master-data"
-import { getMissionPattern } from "./patterns"
-import type { MissionComputer, CategoryContext } from "./types"
-import { ShopType } from "../types"
-import {
-    getExactDegreeQuestClearMissionIds,
-    getExactDegreeQuestClearRuleCount,
-    getDegreeMvpMissionIds,
-} from "./degree-battle-facts"
-import {
-    getDegreeOperationMissionIds,
-    getDegreeOperationRuleCount,
-} from "./degree-operation-facts"
-import { getDegreeClientProgressPattern } from "./client-progress"
-import {
-    DEGREE_SUPPORTED_FAMILIES as SUPPORTED_FAMILIES,
-    getDegreeContextRequirements,
-    getEpisodeChapter,
-    getSecondManaBoardCharacterId,
-    getSpecificCharacterBondId,
-    isAuthoritativeCharacterLevelMission,
-    isSecondManaBoardAggregateMission,
-    type DegreeContextRequirements,
-} from "./degree-context-requirements"
+import { buildDegreeCategoryContextFromSession } from "./degree-session-context"
+import type { DegreeMetric, DegreeRule } from "./degree-rule-catalog"
+import { MissionEvaluationSession } from "./evaluation-session"
+import { getMissionCatalog } from "./mission-catalog"
+import { createProductionMissionFactLoaderRegistry } from "./production-fact-loaders"
+import { getMissionFactRequirementRegistry } from "./requirements/registry"
+import type { CategoryContext, MissionComputer } from "./types"
 
+export {
+    getBossBattleSuperQuestId,
+    getDegreeComputedMissionIds,
+    getDegreeMissionCoverageReport,
+    getTargetDegree,
+} from "./degree-coverage"
 export { getSpecificCharacterBondId } from "./degree-context-requirements"
 
-// Degree mission target lookup
-const degreeTargetMap: Record<number, number> = {}
-const degreeScoreTargetMap: Record<number, number> = {}
-const degreeTimeTargetMap: Record<number, number> = {}
-const degreeDashTargetMap: Record<number, number> = {}
-const degreeComboTargetMap: Record<number, number> = {}
-const degreeCraftPointTargetMap: Record<number, number> = {}
-{
-    // Note: this import is resolved at module load time via the patterns file's data
-    // but we use the same degreeDefs. For simplicity, inline the regex.
-    const degreeDefs = require("../../../assets/mission_degree.json")
-    const descRegex = /玩家(?:达到|级别达到)\s*(\d+)/
-    for (const [mid, rows] of Object.entries(degreeDefs as Record<string, any>)) {
-        const row = (rows as any[])[0]
-        if (!row || !row[2]) continue
-        const match = descRegex.exec(String(row[2]))
-        if (match) degreeTargetMap[parseInt(mid)] = parseInt(match[1])
-        const scoreMatch = /单人战斗获得\s*(\d+)\s*以上的分数/.exec(String(row[2]))
-        if (scoreMatch) degreeScoreTargetMap[parseInt(mid)] = parseInt(scoreMatch[1])
-        const timeMatch = /单人战斗\s*(\d+)\s*秒以内通关/.exec(String(row[2]))
-        if (timeMatch) degreeTimeTargetMap[parseInt(mid)] = parseInt(timeMatch[1]) * 1000
-        const dashMatch = /使用\s*(\d+)\s*次冲刺/.exec(String(row[2]))
-        if (dashMatch) degreeDashTargetMap[parseInt(mid)] = parseInt(dashMatch[1])
-        const comboMatch = /单次战斗中达成\s*(\d+)\s*连击/.exec(String(row[2]))
-        if (comboMatch) degreeComboTargetMap[parseInt(mid)] = parseInt(comboMatch[1])
-        const craftPointMatch = /累计获得\s*(\d+)\s*个锻造石/.exec(String(row[2]))
-        if (craftPointMatch) degreeCraftPointTargetMap[parseInt(mid)] = parseInt(craftPointMatch[1])
+function metricValue(metric: DegreeMetric, ctx: CategoryContext): number {
+    const stats = ctx.degreeStats
+    if (!stats) return 0
+    switch (metric) {
+        case "staminaUseCount": return ctx.player.totalStaminaUsed ?? 0
+        case "loginCount": return ctx.player.totalLoginDays ?? 0
+        case "dashUseCount": return ctx.player.totalDashes ?? 0
+        case "comboMax": return ctx.player.maxComboAchieved ?? 0
+        case "feverCount": return stats.degreeBattleStats.feverCount
+        case "feverMs": return stats.degreeBattleStats.feverMs
+        case "debuffEnemyCount": return stats.degreeBattleStats.debuffEnemyCount
+        case "clearEnemyBuffCount": return stats.degreeBattleStats.clearEnemyBuffCount
+        case "clearSelfDebuffCount": return stats.degreeBattleStats.clearSelfDebuffCount
+        case "buffPartyCount": return stats.degreeBattleStats.buffPartyCount
+        case "healPartyCount": return stats.degreeBattleStats.healPartyCount
+        case "emotionCount": return stats.degreeBattleStats.emotionCount
+        case "enemyKillCount": return stats.degreeBattleStats.enemyKillCount
+        case "weakPointAttackCount": return stats.degreeBattleStats.weakPointAttackCount
+        case "powerFlipLv3Count": return stats.degreeBattleStats.powerFlipLv3Count
+        case "coffinReducedCount": return stats.degreeBattleStats.coffinReducedCount
+        case "damageDealMax": return stats.degreeBattleStats.damageDealMax
+        case "revivalCoffinMax": return stats.degreeBattleStats.revivalCoffinMax
+        case "partyPowerMax": return stats.degreeBattleStats.partyPowerMax
+        case "skillChainMax": return stats.degreeBattleStats.skillChainMax
+        default: return stats[metric]
     }
 }
 
-export function getTargetDegree(missionId: number): number | undefined {
-    return degreeTargetMap[missionId]
+function finishedQuestIds(ctx: CategoryContext, section: number): ReadonlySet<number> {
+    return ctx.degreeStats?.finishedQuestIdsBySection[section] ?? new Set()
 }
 
-function getTargetScore(missionId: number): number | undefined {
-    return degreeScoreTargetMap[missionId]
-}
-
-function getTargetTime(missionId: number): number | undefined {
-    return degreeTimeTargetMap[missionId]
-}
-
-function getTargetDash(missionId: number): number | undefined {
-    return degreeDashTargetMap[missionId]
-}
-
-function getTargetCombo(missionId: number): number | undefined {
-    return degreeComboTargetMap[missionId]
-}
-
-function getTargetCraftPoint(missionId: number): number | undefined {
-    return degreeCraftPointTargetMap[missionId]
-}
-
-type RawManaBoard = Record<string, Record<string, Record<string, readonly unknown[][]>>>
-
-type RawQuestDefinition = { readonly enemyLevel?: unknown }
-type RawQuestTable = Record<string, RawQuestDefinition | unknown>
-type RawCharacterTable = Record<string, { readonly rarity?: unknown }>
-
-const QUEST_RANK_LEVEL_RANGE_BY_DIFFICULTY: ReadonlyMap<number, readonly [number, number]> = new Map([
-    [1, [1, 19]],
-    [2, [20, 39]],
-    [3, [40, 69]],
-    [4, [80, 89]],
-    [5, [70, 79]],
-    [6, [90, 99]],
-    [7, [100, 100]],
-])
-
-// The historical bundled table predates enemyLevel; keep only the two verified nonstandard IDs.
-const BUNDLED_SUPER_QUEST_ID_BY_GROUP: ReadonlyMap<string, number> = new Map([
-    ["1:6", 1006003],
-    ["1:20", 1020003],
-])
-
-function getProvenCharacterLevel(rarity: number, experience: number): number | null {
-    const thresholds = characterExpCaps[rarity]
-    if (!Array.isArray(thresholds)
-        || !Number.isSafeInteger(experience)
-        || experience < 0) return null
-    const baseLevel = 40 + (rarity - 1) * 10
-    let provenLevel = 0
-    for (let index = 0; index < thresholds.length; index++) {
-        if (experience >= thresholds[index]) provenLevel = baseLevel + index * 5
-    }
-    return provenLevel
-}
-
-function getRuntimeTable<T>(tableName: string, bundled: T): T {
-    try {
-        return getContentSnapshot().repository.table<T>(tableName)
-    } catch (error) {
-        if (error instanceof ContentSnapshotError
-            && error.code === "CONTENT_SNAPSHOT_NOT_INITIALIZED") {
-            return bundled
+export function computeDegreeProgress(
+    rule: DegreeRule | undefined,
+    ctx: CategoryContext,
+    dbProgress: number,
+): number {
+    if (!rule || rule.kind === "persisted" || rule.kind === "unsupported") return dbProgress
+    if (rule.kind === "playerRank") return getRankDegree(ctx.player.rankPoint)
+    const stats = ctx.degreeStats
+    if (!stats) return dbProgress
+    switch (rule.kind) {
+        case "maxCharacterLevel":
+            return Math.max(dbProgress, stats.maxCharacterLevel)
+        case "specificCharacterBond": {
+            const level = (stats.characterLevels.get(rule.characterId) ?? 0) >= 100 ? 1 : 0
+            const bond = stats.bondedCharacterIds.has(rule.characterId) ? 1 : 0
+            return Math.max(dbProgress, level + bond)
         }
-        throw error
-    }
-}
-
-function getManaBoardTable(): RawManaBoard {
-    return getRuntimeTable("mana_board.json", bundledManaBoard as RawManaBoard)
-}
-
-function getSecondManaBoardNodeIds(characterId: string): ReadonlySet<number> | null {
-    const board = getManaBoardTable()[characterId]?.["2"]
-    if (!board || Object.keys(board).length === 0) return null
-
-    const nodeIds = new Set<number>()
-    for (const rows of Object.values(board)) {
-        const row = rows[0]
-        const nodeId = Number(row?.[0])
-        if (!Number.isSafeInteger(nodeId) || nodeId <= 0) return null
-        nodeIds.add(nodeId)
-    }
-    return nodeIds.size > 0 ? nodeIds : null
-}
-
-function getSecondManaBoardStats(
-    characters: Record<string, unknown>,
-    manaNodes: Record<string, number[]>,
-): {
-    nodeCount: number
-    completedCharacterIds: ReadonlySet<number>
-} {
-    let nodeCount = 0
-    const completedCharacterIds = new Set<number>()
-
-    for (const characterId of Object.keys(characters)) {
-        const nodeIds = getSecondManaBoardNodeIds(characterId)
-        if (nodeIds === null) continue
-
-        const learned = new Set(manaNodes[characterId] ?? [])
-        let learnedSecondBoardNodes = 0
-        for (const nodeId of nodeIds) {
-            if (learned.has(nodeId)) learnedSecondBoardNodes++
+        case "secondManaBoardCharacter":
+            return Math.max(dbProgress, stats.secondManaBoardCompletedCharacterIds.has(rule.characterId) ? 1 : 0)
+        case "secondManaBoardAggregate":
+            return Math.max(dbProgress, stats.secondManaBoardNodeCount)
+        case "episodeChapter":
+            return Math.max(dbProgress, stats.episodeCompletedChapters.has(rule.chapter) ? 1 : 0)
+        case "practiceSs":
+            return Math.max(dbProgress, rule.questIds.every(id => stats.practiceSsQuestIds.has(id)) ? 1 : 0)
+        case "treasureShopPurchases":
+            return Math.max(dbProgress, stats.treasureShopPurchaseCount)
+        case "finishedQuest":
+            return Math.max(dbProgress, finishedQuestIds(ctx, rule.section).has(rule.questId) ? 1 : 0)
+        case "collectedItem":
+            return Math.max(dbProgress, stats.collectedItemTotals[String(rule.itemId)] ?? 0)
+        case "maxLevelEquipment":
+            return Math.max(dbProgress, stats.maxLevelEquipmentCount)
+        case "singleClearTime":
+            return stats.singleClearTimeMin <= 0
+                ? dbProgress
+                : Math.max(dbProgress, stats.singleClearTimeMin <= rule.targetMs ? 1 : 0)
+        case "metric": {
+            const value = metricValue(rule.metric, ctx)
+            return rule.replace ? value : Math.max(dbProgress, value)
         }
-        nodeCount += learnedSecondBoardNodes
-        if (learnedSecondBoardNodes === nodeIds.size) {
-            const numericCharacterId = Number(characterId)
-            if (Number.isSafeInteger(numericCharacterId)) {
-                completedCharacterIds.add(numericCharacterId)
-            }
-        }
+        default:
+            return dbProgress
     }
-
-    return { nodeCount, completedCharacterIds }
 }
 
-function getCompletedEpisodeChapters(playerId: number): ReadonlySet<number> {
-    const mainQuests = getRuntimeTable<RawQuestTable>("main_quest.json", bundledMainQuests)
-    const exQuests = getRuntimeTable<RawQuestTable>("ex_quest.json", bundledExQuests)
-    const finished = getFinishedPlayerQuestIdsBySectionsSync(playerId, [1, 4])
-    const mainFinished = finished[1] ?? new Set<number>()
-    const exFinished = finished[4] ?? new Set<number>()
-    const chapters = new Set<number>()
-
-    for (const questId of [...Object.keys(mainQuests), ...Object.keys(exQuests)]) {
-        const numericQuestId = Number(questId)
-        const chapter = Math.floor(numericQuestId / 1_000_000)
-        if (Number.isSafeInteger(chapter) && chapter >= 1 && chapter <= 12) chapters.add(chapter)
-    }
-
-    const completed = new Set<number>()
-    for (const chapter of chapters) {
-        const mainIds = Object.keys(mainQuests)
-            .map(Number)
-            .filter(questId => Math.floor(questId / 1_000_000) === chapter)
-        const exIds = Object.keys(exQuests)
-            .map(Number)
-            .filter(questId => Math.floor(questId / 1_000_000) === chapter)
-        if (mainIds.length === 0 || exIds.length === 0) continue
-        if (mainIds.every(questId => mainFinished.has(questId))
-            && exIds.every(questId => exFinished.has(questId))) {
-            completed.add(chapter)
-        }
-    }
-    return completed
-}
-
-function getPracticeQuestIds(missionId: number): readonly number[] | null {
-    const definition = getMissionMasterDefinition(5, missionId)
-    if (!definition
-        || Number(definition.row[3]) !== 26
-        || !definition.pattern.startsWith("degree_practice_rank_ss_clear_")) return null
-    const value = definition.row[11]
-    if (value === undefined || value === null || value === "" || value === "(None)") return null
-    const questIds = String(value).split(",").map(Number)
-    return questIds.every(questId => Number.isSafeInteger(questId) && questId > 0)
-        ? questIds
-        : null
-}
-
-function getTreasureShopPurchaseCount(playerId: number): number {
-    const treasureShop = getRuntimeTable<RawQuestTable>("treasure_shop.json", bundledTreasureShop)
-    const purchases = getPlayerShopPurchasesMapSync(playerId, ShopType.TREASURE)
-    return Object.entries(purchases).reduce((total, [itemId, count]) => (
-        treasureShop[itemId] === undefined ? total : total + Math.max(0, count)
-    ), 0)
-}
-
-export function getBossBattleSuperQuestId(
-    missionId: number,
-    bossBattleQuests: RawQuestTable = getRuntimeTable("boss_battle_quest.json", bundledBossBattleQuests),
-): number | undefined {
-    const definition = getMissionMasterDefinition(5, missionId)
-    if (!definition
-        || Number(definition.row[3]) !== 14
-        || !definition.pattern.startsWith("degree_boss_battle_ex_clear_single_")) return undefined
-    const stageGroup = Number(definition.row[10])
-    const difficulty = Number(definition.row[12])
-    const family = Number(definition.row[9])
-    const levelRange = QUEST_RANK_LEVEL_RANGE_BY_DIFFICULTY.get(difficulty)
-    if (!Number.isSafeInteger(stageGroup)
-        || !Number.isSafeInteger(family)
-        || !levelRange) return undefined
-
-    const candidates = Object.entries(bossBattleQuests).flatMap(([rawQuestId, rawQuest]) => {
-        const questId = Number(rawQuestId)
-        if (!Number.isSafeInteger(questId)
-            || Math.floor(questId / 1_000_000) !== family
-            || Math.floor(questId / 1_000) % 1_000 !== stageGroup) return []
-        const enemyLevel = Number((rawQuest as RawQuestDefinition)?.enemyLevel)
-        return [{ questId, enemyLevel }]
-    })
-    const candidatesWithLevel = candidates.filter(candidate => Number.isSafeInteger(candidate.enemyLevel))
-    if (candidatesWithLevel.length > 0) {
-        const [minimumLevel, maximumLevel] = levelRange
-        const matches = candidatesWithLevel.filter(candidate => (
-            candidate.enemyLevel >= minimumLevel && candidate.enemyLevel <= maximumLevel
-        ))
-        return matches.length === 1 ? matches[0].questId : undefined
-    }
-
-    const questId = BUNDLED_SUPER_QUEST_ID_BY_GROUP.get(`${family}:${stageGroup}`)
-        ?? family * 1_000_000 + stageGroup * 1_000 + difficulty
-    return bossBattleQuests[String(questId)] === undefined ? undefined : questId
-}
-
-function getExactDegreeQuestId(
-    missionId: number,
-    missionType: number,
-    rangeKind: number,
-    tableName: string,
-    bundledTable: RawQuestTable,
-): number | undefined {
-    const definition = getMissionMasterDefinition(5, missionId)
-    if (!definition
-        || Number(definition.row[3]) !== missionType
-        || Number(definition.row[8]) !== rangeKind) return undefined
-    const eventId = Number(definition.row[9])
-    const suffix = Number(definition.row[11])
-    if (!Number.isSafeInteger(eventId) || eventId <= 0
-        || !Number.isSafeInteger(suffix) || suffix <= 0) return undefined
-    const questId = eventId * 1000 + suffix
-    const quests = getRuntimeTable<RawQuestTable>(tableName, bundledTable)
-    return quests[String(questId)] === undefined ? undefined : questId
-}
-
-function getExpertSingleQuestId(missionId: number): number | undefined {
-    return getExactDegreeQuestId(
-        missionId,
-        14,
-        14,
-        "expert_single_event_quest.json",
-        bundledExpertSingleEventQuests,
-    )
-}
-
-function getWorldStoryQuestId(missionId: number): number | undefined {
-    return getExactDegreeQuestId(
-        missionId,
-        14,
-        9,
-        "world_story_event_quest.json",
-        bundledWorldStoryEventQuests,
-    )
-}
-
-function getAdventQuestId(missionId: number): number | undefined {
-    return getExactDegreeQuestId(
-        missionId,
-        14,
-        5,
-        "advent_event_quest.json",
-        bundledAdventEventQuests,
-    )
-}
-
-function getDegreeCollectedItemId(missionId: number): number | undefined {
-    const definition = getMissionMasterDefinition(5, missionId)
-    if (!definition
-        || Number(definition.row[3]) !== 37
-        || !definition.pattern.startsWith("degree_collect_item_event_")) return undefined
-    const itemId = Number(definition.row[13])
-    return Number.isSafeInteger(itemId) && itemId > 0 ? itemId : undefined
-}
-
-function getMaxLevelEquipmentCount(playerId: number): number {
-    const equipment = getPlayerEquipmentListSync(playerId)
-    const definitions = getRuntimeTable<Record<string, { readonly max_level?: number }>>(
-        "equipment_dissolve.json",
-        bundledEquipmentDissolve,
-    )
-    return Object.entries(equipment).reduce((count, [equipmentId, item]) => {
-        const maxLevel = definitions[equipmentId]?.max_level
-        return Number.isSafeInteger(maxLevel) && (maxLevel ?? 0) > 0 && item.level >= maxLevel!
-            ? count + 1
-            : count
-    }, 0)
-}
-
-function getCarnivalQuestId(missionId: number): number | undefined {
-    return getExactDegreeQuestId(
-        missionId,
-        23,
-        15,
-        "carnival_event_quest.json",
-        bundledCarnivalEventQuests,
-    )
-}
-
-function getHardMultiQuestId(missionId: number): number | undefined {
-    return getExactDegreeQuestId(
-        missionId,
-        23,
-        19,
-        "hard_multi_event_quest.json",
-        bundledHardMultiEventQuests,
-    )
-}
-
-const EMPTY_BATTLE_COUNTERS: Readonly<MissionBattleCounters> = Object.freeze({
-    singlePlayCount: 0,
-    singleClearCount: 0,
-    multiPlayCount: 0,
-    multiClearCount: 0,
-    multiHostClearCount: 0,
-    multiGuestClearCount: 0,
-    singleRankSsCount: 0,
-    rankSsCount: 0,
-    rankSCount: 0,
-    rankACount: 0,
-    rankBCount: 0,
-    challengeDungeonClearCount: 0,
-    singleScoreMax: 0,
-    singleClearTimeMin: 0,
-    bossBattleClearCount: 0,
-    skillUseCount: 0,
-})
-
-const EMPTY_DEGREE_BATTLE_STATS: Readonly<DegreeBattleStats> = Object.freeze({
-    feverCount: 0,
-    feverMs: 0,
-    debuffEnemyCount: 0,
-    clearEnemyBuffCount: 0,
-    clearSelfDebuffCount: 0,
-    buffPartyCount: 0,
-    healPartyCount: 0,
-    emotionCount: 0,
-    enemyKillCount: 0,
-    weakPointAttackCount: 0,
-    powerFlipLv3Count: 0,
-    coffinReducedCount: 0,
-    damageDealMax: 0,
-    revivalCoffinMax: 0,
-    partyPowerMax: 0,
-    skillChainMax: 0,
-})
-
-function buildStats(
+function buildLegacyContext(
     playerId: number,
     category: number,
-    requirements?: DegreeContextRequirements,
+    evaluationTime: Date,
+    missionIds?: readonly number[],
 ): CategoryContext {
-    const needs = (family: Parameters<DegreeContextRequirements["factFamilies"]["has"]>[0]) => (
-        requirements === undefined || requirements.factFamilies.has(family)
-    )
-    const player = getPlayerSync(playerId)!
-    const characters: ReturnType<typeof getPlayerCharactersSync> = needs("characters")
-        ? getPlayerCharactersSync(playerId)
-        : {}
-    const manaNodes: ReturnType<typeof getPlayerCharactersManaNodesSync> = needs("manaNodes")
-        ? getPlayerCharactersManaNodesSync(playerId)
-        : {}
-    const battleCounters = needs("missionBattleCounters")
-        ? getMissionBattleCountersSync(playerId)
-        : EMPTY_BATTLE_COUNTERS
-    const episodeCompletedChapters = needs("episodeChapters")
-        ? getCompletedEpisodeChapters(playerId)
-        : new Set<number>()
-    const practiceClearRanks = needs("practiceRanks")
-        ? getPlayerQuestClearRanksBySectionsSync(playerId, [15])[15] ?? new Map()
-        : new Map<number, number>()
-    const treasureShopPurchaseCount = needs("treasureShop")
-        ? getTreasureShopPurchaseCount(playerId)
-        : 0
-    const craftPointObtainedCount = needs("craftPoint")
-        ? getPlayerCollectedItemTotalSync(
-            playerId,
-            getConfigSync().craft_point_item_id || 100000,
-        )
-        : 0
-    const bossBattleSuperQuestByMission = new Map<number, number>()
-    const bossBattleMissionIds = requirements === undefined
-        ? getMissionMasterDefinitions(5).map(definition => definition.missionId)
-        : [...requirements.bossBattleSuperMissionIds]
-    if (bossBattleMissionIds.length > 0) {
-        const bossBattleQuests = getRuntimeTable<RawQuestTable>(
-            "boss_battle_quest.json",
-            bundledBossBattleQuests,
-        )
-        for (const missionId of bossBattleMissionIds) {
-            const questId = getBossBattleSuperQuestId(missionId, bossBattleQuests)
-            if (questId !== undefined) bossBattleSuperQuestByMission.set(missionId, questId)
-        }
-    }
-    const finishedQuestSections = requirements === undefined
-        ? [2, 7, 18, 21, 22, 26]
-        : [...requirements.finishedQuestSections]
-    const finishedQuestIdsBySection = finishedQuestSections.length > 0
-        ? getFinishedPlayerQuestIdsBySectionsSync(playerId, finishedQuestSections)
-        : {}
-    const finishedQuestIds = finishedQuestIdsBySection[2] ?? new Set()
-    let maxCharacterLevel = 0
-    const characterLevels = new Map<number, number>()
-    if (needs("characters")) {
-        const characterDefinitions = getRuntimeTable<RawCharacterTable>(
-            "character.json",
-            bundledCharacters as RawCharacterTable,
-        )
-        for (const [characterId, character] of Object.entries(characters)) {
-            const rarity = characterDefinitions[characterId]?.rarity
-            if (!Number.isSafeInteger(rarity) || (rarity as number) <= 0) continue
-            const level = getProvenCharacterLevel(rarity as number, character.exp)
-            if (level === null) continue
-            maxCharacterLevel = Math.max(maxCharacterLevel, level)
-            characterLevels.set(Number(characterId), level)
-        }
-    }
-    const secondManaBoard = needs("characters") && needs("manaNodes")
-        ? getSecondManaBoardStats(characters, manaNodes)
-        : { nodeCount: 0, completedCharacterIds: new Set<number>() }
-    const collectedItemTotals = requirements === undefined
-        ? getPlayerCollectedItemTotalsSync(playerId)
-        : Object.fromEntries([...requirements.collectedItemIds].map(itemId => [
-            String(itemId),
-            getPlayerCollectedItemTotalSync(playerId, itemId),
-        ]))
-    return {
-        category,
+    if (category !== 5) throw new Error("Degree context only supports category 5")
+    const catalog = getMissionCatalog()
+    const requestedIds = missionIds ?? catalog.getMissionIds(5)
+    const candidateIds = [...new Set(requestedIds)].filter(id => catalog.getDefinition(5, id))
+    const session = new MissionEvaluationSession({
         playerId,
-        player,
-        questProgress: {},
-        totalQuestClears: 0,
-        totalStories: 0,
-        rankCounts: {},
-        battleCounters,
-        degreeStats: {
-            maxCharacterLevel,
-            companionCount: Object.keys(characters).length,
-            overLimitCount: Object.values(characters)
-                .reduce((total, character) => total + character.overLimitStep, 0),
-            manaBoardCount: Object.values(manaNodes)
-                .reduce((total, nodes) => total + nodes.length, 0),
-            bondTokenCount: Object.values(characters)
-                .reduce((total, character) => total
-                    + character.bondTokenList.filter(token => token.status >= 1).length, 0),
-            singleSsCount: battleCounters.singleRankSsCount,
-            multiClearCount: battleCounters.multiClearCount,
-            multiHostClearCount: battleCounters.multiHostClearCount,
-            episodeClearCount: needs("episodeClearCount")
-                ? countFinishedPlayerQuestsByCategorySync(playerId, 3)
-                : 0,
-            characterLevels,
-            bondedCharacterIds: new Set(Object.entries(characters)
-                .filter(([, character]) => character.bondTokenList.some(token => (
-                    token.manaBoardIndex === 1 && token.status >= 1
-                )))
-                .map(([characterId]) => Number(characterId))),
-            secondManaBoardNodeCount: secondManaBoard.nodeCount,
-            secondManaBoardCompletedCharacterIds: secondManaBoard.completedCharacterIds,
-            episodeCompletedChapters,
-            practiceSsQuestIds: new Set(
-                [...practiceClearRanks.entries()]
-                    .filter(([, clearRank]) => clearRank === 5)
-                    .map(([questId]) => questId),
-            ),
-            treasureShopPurchaseCount,
-            bossBattleSuperQuestByMission,
-            bossBattleClearQuestIds: finishedQuestIds,
-            expertSingleFinishedQuestIds: finishedQuestIdsBySection[21] ?? new Set(),
-            worldStoryFinishedQuestIds: finishedQuestIdsBySection[18] ?? new Set(),
-            adventFinishedQuestIds: finishedQuestIdsBySection[7] ?? new Set(),
-            carnivalFinishedQuestIds: finishedQuestIdsBySection[22] ?? new Set(),
-            hardMultiFinishedQuestIds: finishedQuestIdsBySection[26] ?? new Set(),
-            challengeDungeonClearCount: battleCounters.challengeDungeonClearCount,
-            singleScoreMax: battleCounters.singleScoreMax,
-            singleClearTimeMin: battleCounters.singleClearTimeMin,
-            bossBattleClearCount: battleCounters.bossBattleClearCount,
-            craftPointObtainedCount,
-            collectedItemTotals,
-            maxLevelEquipmentCount: needs("equipment") ? getMaxLevelEquipmentCount(playerId) : 0,
-            skillUseCount: battleCounters.skillUseCount,
-            degreeBattleStats: needs("degreeBattleStats")
-                ? getDegreeBattleStatsSync(playerId)
-                : EMPTY_DEGREE_BATTLE_STATS,
-        },
-    }
-}
-
-export function getDegreeMissionCoverageReport() {
-    const definitions = getMissionMasterDefinitions(5)
-    const prefixFamilies = Object.fromEntries(
-        Object.entries(SUPPORTED_FAMILIES).map(([name, prefix]) => [
-            name,
-            definitions.filter(definition => definition.pattern.startsWith(prefix)).length,
-        ]),
-    ) as Record<keyof typeof SUPPORTED_FAMILIES, number>
-    const supportedFamilies = {
-        ...prefixFamilies,
-        characterLevel: definitions.filter(definition => (
-            isAuthoritativeCharacterLevelMission(definition.missionId)
-        )).length,
-        specificCharacterBond: definitions.filter(definition => (
-            Number(definition.row[3]) === 44
-            && getSpecificCharacterBondId(definition.missionId) !== undefined
-        )).length,
-        secondManaBoardNodeCount: definitions.filter(definition => (
-            isSecondManaBoardAggregateMission(definition.missionId)
-        )).length,
-        secondManaBoardCompletion: definitions.filter(definition => (
-            getSecondManaBoardCharacterId(definition.missionId) !== undefined
-        )).length,
-        episodeChapterCompletion: definitions.filter(definition => (
-            getEpisodeChapter(definition.missionId) !== undefined
-        )).length,
-        practiceRankSs: definitions.filter(definition => (
-            getPracticeQuestIds(definition.missionId) !== null
-        )).length,
-        treasureShopPurchaseCount: definitions.filter(definition => (
-            Number(definition.row[3]) === 45
-            && definition.pattern.startsWith("degree_treasure_shop_buy_count_")
-        )).length,
-        bossBattleExClearSingle: definitions.filter(definition => (
-            getBossBattleSuperQuestId(definition.missionId) !== undefined
-        )).length,
-        expertSingleQuestClear: definitions.filter(definition => (
-            getExpertSingleQuestId(definition.missionId) !== undefined
-        )).length,
-        worldStoryQuestClear: definitions.filter(definition => (
-            getWorldStoryQuestId(definition.missionId) !== undefined
-        )).length,
-        adventQuestClear: definitions.filter(definition => (
-            getAdventQuestId(definition.missionId) !== undefined
-        )).length,
-        carnivalQuestClear: definitions.filter(definition => (
-            getCarnivalQuestId(definition.missionId) !== undefined
-        )).length,
-        hardMultiQuestClear: definitions.filter(definition => (
-            getHardMultiQuestId(definition.missionId) !== undefined
-        )).length,
-        specifiedQuestClearCount: getExactDegreeQuestClearRuleCount(),
-        mvpFacts: getDegreeMvpMissionIds().length,
-        operationFacts: getDegreeOperationRuleCount(),
-        eventCollectItem: definitions.filter(definition => (
-            getDegreeCollectedItemId(definition.missionId) !== undefined
-        )).length,
-        maxLevelEquipment: definitions.filter(definition => (
-            Number(definition.row[3]) === 36
-            && definition.pattern.startsWith("degree_equipment_lv5_get_")
-        )).length,
-        challengeDungeonClear: definitions.filter(definition => (
-            definition.pattern.startsWith(SUPPORTED_FAMILIES.challengeDungeonClear)
-        )).length,
-        scoreClearSingle: definitions.filter(definition => (
-            definition.pattern.startsWith(SUPPORTED_FAMILIES.scoreClearSingle)
-            && getTargetScore(definition.missionId) !== undefined
-        )).length,
-        timeClearSingle: definitions.filter(definition => (
-            definition.pattern.startsWith(SUPPORTED_FAMILIES.timeClearSingle)
-            && getTargetTime(definition.missionId) !== undefined
-        )).length,
-        bossBattleClear: definitions.filter(definition => (
-            definition.pattern.startsWith(SUPPORTED_FAMILIES.bossBattleClear)
-        )).length,
-        dashUse: definitions.filter(definition => (
-            definition.pattern.startsWith(SUPPORTED_FAMILIES.dashUse)
-            && getTargetDash(definition.missionId) !== undefined
-        )).length,
-        comboOneTime: definitions.filter(definition => (
-            definition.pattern.startsWith(SUPPORTED_FAMILIES.comboOneTime)
-            && getTargetCombo(definition.missionId) !== undefined
-        )).length,
-        craftPointGet: definitions.filter(definition => (
-            definition.pattern.startsWith(SUPPORTED_FAMILIES.craftPointGet)
-            && getTargetCraftPoint(definition.missionId) !== undefined
-        )).length,
-        skillUse: definitions.filter(definition => (
-            definition.pattern.startsWith(SUPPORTED_FAMILIES.skillUse)
-        )).length,
-        clientProgress: definitions.filter(definition => (
-            getDegreeClientProgressPattern(definition) !== undefined
-        )).length,
-    }
-    const serverComputed = getDegreeComputedMissionIds().length
-    return {
-        total: definitions.length,
-        serverComputed,
-        unsupported: definitions.length - serverComputed,
-        supportedFamilies,
-    }
-}
-
-const SIMPLE_SUPPORTED_PREFIXES = [
-    SUPPORTED_FAMILIES.playerRank,
-    SUPPORTED_FAMILIES.companionCount,
-    SUPPORTED_FAMILIES.overLimitCount,
-    SUPPORTED_FAMILIES.manaBoardCount,
-    SUPPORTED_FAMILIES.bondTokenCount,
-    SUPPORTED_FAMILIES.singleSsCount,
-    SUPPORTED_FAMILIES.multiClearCount,
-    SUPPORTED_FAMILIES.multiHostClearCount,
-    SUPPORTED_FAMILIES.episodeClearCount,
-    SUPPORTED_FAMILIES.staminaUseCount,
-    SUPPORTED_FAMILIES.loginCount,
-    SUPPORTED_FAMILIES.challengeDungeonClear,
-    SUPPORTED_FAMILIES.bossBattleClear,
-    SUPPORTED_FAMILIES.skillUse,
-    SUPPORTED_FAMILIES.feverCount,
-    SUPPORTED_FAMILIES.feverTime,
-    SUPPORTED_FAMILIES.debuffEnemy,
-    SUPPORTED_FAMILIES.clearEnemyBuff,
-    SUPPORTED_FAMILIES.clearSelfDebuff,
-    SUPPORTED_FAMILIES.buffParty,
-    SUPPORTED_FAMILIES.healParty,
-    SUPPORTED_FAMILIES.emotionUse,
-    SUPPORTED_FAMILIES.enemyKill,
-    SUPPORTED_FAMILIES.weakPointAttack,
-    SUPPORTED_FAMILIES.powerFlipLv3,
-    SUPPORTED_FAMILIES.coffinReduced,
-    SUPPORTED_FAMILIES.damageMax,
-    SUPPORTED_FAMILIES.revivalCoffinMax,
-    SUPPORTED_FAMILIES.partyPowerMax,
-    SUPPORTED_FAMILIES.skillChainMax,
-] as const
-
-function isDegreeDefinitionComputed(
-    definition: ReturnType<typeof getMissionMasterDefinitions>[number],
-    factMissionIds: ReadonlySet<number>,
-): boolean {
-    const { missionId, pattern } = definition
-    if (factMissionIds.has(missionId)
-        || SIMPLE_SUPPORTED_PREFIXES.some(prefix => pattern.startsWith(prefix))) return true
-    if (isAuthoritativeCharacterLevelMission(missionId)) return true
-    if (getDegreeClientProgressPattern(definition) !== undefined) return true
-    if (pattern.startsWith(SUPPORTED_FAMILIES.scoreClearSingle)) {
-        return getTargetScore(missionId) !== undefined
-    }
-    if (pattern.startsWith(SUPPORTED_FAMILIES.timeClearSingle)) {
-        return getTargetTime(missionId) !== undefined
-    }
-    if (pattern.startsWith(SUPPORTED_FAMILIES.dashUse)) {
-        return getTargetDash(missionId) !== undefined
-    }
-    if (pattern.startsWith(SUPPORTED_FAMILIES.comboOneTime)) {
-        return getTargetCombo(missionId) !== undefined
-    }
-    if (pattern.startsWith(SUPPORTED_FAMILIES.craftPointGet)) {
-        return getTargetCraftPoint(missionId) !== undefined
-    }
-    return getSpecificCharacterBondId(missionId) !== undefined
-        || isSecondManaBoardAggregateMission(missionId)
-        || getSecondManaBoardCharacterId(missionId) !== undefined
-        || getEpisodeChapter(missionId) !== undefined
-        || getPracticeQuestIds(missionId) !== null
-        || (Number(definition.row[3]) === 45
-            && pattern.startsWith("degree_treasure_shop_buy_count_"))
-        || getBossBattleSuperQuestId(missionId) !== undefined
-        || getExpertSingleQuestId(missionId) !== undefined
-        || getWorldStoryQuestId(missionId) !== undefined
-        || getAdventQuestId(missionId) !== undefined
-        || getCarnivalQuestId(missionId) !== undefined
-        || getHardMultiQuestId(missionId) !== undefined
-        || getDegreeCollectedItemId(missionId) !== undefined
-        || (Number(definition.row[3]) === 36
-            && pattern.startsWith("degree_equipment_lv5_get_"))
-}
-
-export function getDegreeComputedMissionIds(): readonly number[] {
-    const factMissionIds = new Set([
-        ...getExactDegreeQuestClearMissionIds(),
-        ...getDegreeMvpMissionIds(),
-        ...getDegreeOperationMissionIds(),
-    ])
-    return Object.freeze(getMissionMasterDefinitions(5)
-        .filter(definition => isDegreeDefinitionComputed(definition, factMissionIds))
-        .map(definition => definition.missionId)
-        .sort((left, right) => left - right))
+        evaluationTime: evaluationTime instanceof Date ? evaluationTime : new Date(0),
+        catalog,
+        requirementRegistry: getMissionFactRequirementRegistry(catalog),
+        candidates: candidateIds.map(missionId => ({ category: 5, missionId })),
+        orchestratorFacts: [{ kind: "player" }],
+        loaders: createProductionMissionFactLoaderRegistry(),
+    })
+    return buildDegreeCategoryContextFromSession(session, 5, candidateIds)
 }
 
 export const DegreeComputer: MissionComputer = {
     name: "Degree",
-
-    buildContext(
-        playerId: number,
-        category: number,
-        _evaluationTime: Date,
-        missionIds?: readonly number[],
-    ): CategoryContext {
-        return buildStats(
-            playerId,
-            category,
-            missionIds === undefined ? undefined : getDegreeContextRequirements(missionIds),
-        )
-    },
-
-    compute(missionId: number, ctx: CategoryContext, dbProgress: number): number {
-        const pattern = getMissionPattern(5, missionId)
-        const stats = ctx.degreeStats
-        if (pattern.startsWith(SUPPORTED_FAMILIES.playerRank)) return getRankDegree(ctx.player.rankPoint)
-        if (!stats) return dbProgress
-        if (isAuthoritativeCharacterLevelMission(missionId)) {
-            return Math.max(dbProgress, stats.maxCharacterLevel)
-        }
-        const bondCharacterId = getSpecificCharacterBondId(missionId)
-        if (bondCharacterId !== undefined) {
-            const levelProgress = (stats.characterLevels.get(bondCharacterId) ?? 0) >= 100 ? 1 : 0
-            const bondProgress = stats.bondedCharacterIds.has(bondCharacterId) ? 1 : 0
-            return Math.max(dbProgress, levelProgress + bondProgress)
-        }
-        const secondManaBoardCharacterId = getSecondManaBoardCharacterId(missionId)
-        if (secondManaBoardCharacterId !== undefined) {
-            return Math.max(
-                dbProgress,
-                stats.secondManaBoardCompletedCharacterIds.has(secondManaBoardCharacterId) ? 1 : 0,
-            )
-        }
-        if (isSecondManaBoardAggregateMission(missionId)) {
-            return Math.max(dbProgress, stats.secondManaBoardNodeCount)
-        }
-        const episodeChapter = getEpisodeChapter(missionId)
-        if (episodeChapter !== undefined) {
-            return Math.max(dbProgress, stats.episodeCompletedChapters.has(episodeChapter) ? 1 : 0)
-        }
-        const practiceQuestIds = getPracticeQuestIds(missionId)
-        if (practiceQuestIds !== null) {
-            return Math.max(
-                dbProgress,
-                practiceQuestIds.every(questId => stats.practiceSsQuestIds.has(questId)) ? 1 : 0,
-            )
-        }
-        if (Number(getMissionMasterDefinition(5, missionId)?.row[3]) === 45
-            && pattern.startsWith("degree_treasure_shop_buy_count_")) {
-            return Math.max(dbProgress, stats.treasureShopPurchaseCount)
-        }
-        const bossBattleSuperQuestId = stats.bossBattleSuperQuestByMission.get(missionId)
-        if (bossBattleSuperQuestId !== undefined) {
-            return Math.max(dbProgress, stats.bossBattleClearQuestIds.has(bossBattleSuperQuestId) ? 1 : 0)
-        }
-        const expertSingleQuestId = getExpertSingleQuestId(missionId)
-        if (expertSingleQuestId !== undefined) {
-            return Math.max(
-                dbProgress,
-                stats.expertSingleFinishedQuestIds.has(expertSingleQuestId) ? 1 : 0,
-            )
-        }
-        const worldStoryQuestId = getWorldStoryQuestId(missionId)
-        if (worldStoryQuestId !== undefined) {
-            return Math.max(
-                dbProgress,
-                stats.worldStoryFinishedQuestIds.has(worldStoryQuestId) ? 1 : 0,
-            )
-        }
-        const adventQuestId = getAdventQuestId(missionId)
-        if (adventQuestId !== undefined) {
-            return Math.max(
-                dbProgress,
-                stats.adventFinishedQuestIds.has(adventQuestId) ? 1 : 0,
-            )
-        }
-        const carnivalQuestId = getCarnivalQuestId(missionId)
-        if (carnivalQuestId !== undefined) {
-            return Math.max(
-                dbProgress,
-                stats.carnivalFinishedQuestIds.has(carnivalQuestId) ? 1 : 0,
-            )
-        }
-        const hardMultiQuestId = getHardMultiQuestId(missionId)
-        if (hardMultiQuestId !== undefined) {
-            return Math.max(
-                dbProgress,
-                stats.hardMultiFinishedQuestIds.has(hardMultiQuestId) ? 1 : 0,
-            )
-        }
-        const collectedItemId = getDegreeCollectedItemId(missionId)
-        if (collectedItemId !== undefined) {
-            return Math.max(
-                dbProgress,
-                stats.collectedItemTotals[String(collectedItemId)] ?? 0,
-            )
-        }
-        if (Number(getMissionMasterDefinition(5, missionId)?.row[3]) === 36
-            && pattern.startsWith("degree_equipment_lv5_get_")) {
-            return Math.max(dbProgress, stats.maxLevelEquipmentCount)
-        }
-        if (pattern.startsWith(SUPPORTED_FAMILIES.companionCount)) return stats.companionCount
-        if (pattern.startsWith(SUPPORTED_FAMILIES.overLimitCount)) return stats.overLimitCount
-        if (pattern.startsWith(SUPPORTED_FAMILIES.manaBoardCount)) return stats.manaBoardCount
-        if (pattern.startsWith(SUPPORTED_FAMILIES.bondTokenCount)) return stats.bondTokenCount
-        if (pattern.startsWith(SUPPORTED_FAMILIES.singleSsCount)) return stats.singleSsCount
-        if (pattern.startsWith(SUPPORTED_FAMILIES.multiClearCount)) {
-            return Math.max(dbProgress, stats.multiClearCount)
-        }
-        if (pattern.startsWith(SUPPORTED_FAMILIES.multiHostClearCount)) {
-            return Math.max(dbProgress, stats.multiHostClearCount)
-        }
-        if (pattern.startsWith(SUPPORTED_FAMILIES.episodeClearCount)) {
-            return Math.max(dbProgress, stats.episodeClearCount)
-        }
-        if (pattern.startsWith(SUPPORTED_FAMILIES.staminaUseCount)) {
-            return Math.max(dbProgress, ctx.player.totalStaminaUsed ?? 0)
-        }
-        if (pattern.startsWith(SUPPORTED_FAMILIES.loginCount)) {
-            return Math.max(dbProgress, ctx.player.totalLoginDays ?? 0)
-        }
-        if (pattern.startsWith(SUPPORTED_FAMILIES.challengeDungeonClear)) {
-            return Math.max(dbProgress, stats.challengeDungeonClearCount)
-        }
-        if (pattern.startsWith(SUPPORTED_FAMILIES.scoreClearSingle)) {
-            const target = getTargetScore(missionId)
-            return target === undefined
-                ? dbProgress
-                : Math.max(dbProgress, stats.singleScoreMax)
-        }
-        if (pattern.startsWith(SUPPORTED_FAMILIES.timeClearSingle)) {
-            const target = getTargetTime(missionId)
-            return target === undefined || stats.singleClearTimeMin <= 0
-                ? dbProgress
-                : Math.max(dbProgress, stats.singleClearTimeMin <= target ? 1 : 0)
-        }
-        if (pattern.startsWith(SUPPORTED_FAMILIES.bossBattleClear)) {
-            return Math.max(dbProgress, stats.bossBattleClearCount)
-        }
-        if (pattern.startsWith(SUPPORTED_FAMILIES.dashUse)) {
-            return Math.max(dbProgress, ctx.player.totalDashes ?? 0)
-        }
-        if (pattern.startsWith(SUPPORTED_FAMILIES.comboOneTime)) {
-            return Math.max(dbProgress, ctx.player.maxComboAchieved ?? 0)
-        }
-        if (pattern.startsWith(SUPPORTED_FAMILIES.craftPointGet)) {
-            return Math.max(dbProgress, stats.craftPointObtainedCount)
-        }
-        if (pattern.startsWith(SUPPORTED_FAMILIES.skillUse)) {
-            return Math.max(dbProgress, stats.skillUseCount)
-        }
-        const battleStats = stats.degreeBattleStats
-        if (pattern.startsWith(SUPPORTED_FAMILIES.feverCount)) return Math.max(dbProgress, battleStats.feverCount)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.feverTime)) return Math.max(dbProgress, battleStats.feverMs)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.debuffEnemy)) return Math.max(dbProgress, battleStats.debuffEnemyCount)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.clearEnemyBuff)) return Math.max(dbProgress, battleStats.clearEnemyBuffCount)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.clearSelfDebuff)) return Math.max(dbProgress, battleStats.clearSelfDebuffCount)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.buffParty)) return Math.max(dbProgress, battleStats.buffPartyCount)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.healParty)) return Math.max(dbProgress, battleStats.healPartyCount)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.emotionUse)) return Math.max(dbProgress, battleStats.emotionCount)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.enemyKill)) return Math.max(dbProgress, battleStats.enemyKillCount)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.weakPointAttack)) return Math.max(dbProgress, battleStats.weakPointAttackCount)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.powerFlipLv3)) return Math.max(dbProgress, battleStats.powerFlipLv3Count)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.coffinReduced)) return Math.max(dbProgress, battleStats.coffinReducedCount)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.damageMax)) return Math.max(dbProgress, battleStats.damageDealMax)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.revivalCoffinMax)) return Math.max(dbProgress, battleStats.revivalCoffinMax)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.partyPowerMax)) return Math.max(dbProgress, battleStats.partyPowerMax)
-        if (pattern.startsWith(SUPPORTED_FAMILIES.skillChainMax)) return Math.max(dbProgress, battleStats.skillChainMax)
-        return dbProgress
+    buildContext: buildLegacyContext,
+    buildContextFromSession: buildDegreeCategoryContextFromSession,
+    compute(missionId, ctx, dbProgress) {
+        return computeDegreeProgress(ctx.degreeRules?.get(missionId), ctx, dbProgress)
     },
 }
