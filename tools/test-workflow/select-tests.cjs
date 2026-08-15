@@ -250,7 +250,7 @@ const SOURCE_RULES = [
         pattern: /^src\/lib\/mission\/(?:category-session-plan|collect-progress|collect-session-context|computer-regular|master-value|pass|periodic-session-context|regular-battle-facts|regular-quest-facts|regular-session-context|regular-state-facts|settlement|types)\.ts$/,
         groups: ["integration:mission"],
     },
-    { pattern: /^src\/data\/domains\/item\.ts$/, groups: ["integration:mission"] },
+    { pattern: /^src\/data\/domains\/(?:item|shopPurchase)\.ts$/, groups: ["integration:mission"] },
     { pattern: /^src\/routes\/api\/profile\.ts$/, groups: ["quick:character"] },
     {
         pattern: /^src\/routes\/api\/raidEvent\.ts$/,

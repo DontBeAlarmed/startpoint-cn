@@ -17,6 +17,10 @@ import {
     getDegreeBattleStatsSync,
     type DegreeBattleStats,
 } from "../../data/domains/degree_battle_stats"
+import {
+    getPlayerShopPurchasesMapSync,
+    type ShopPurchaseMap,
+} from "../../data/domains/shopPurchase"
 import type {
     Player,
     PlayerCharacter,
@@ -46,6 +50,10 @@ export interface ProductionMissionFactDomains {
         sections?: readonly number[],
     ) => Record<string, PlayerQuestProgress[]>
     readonly getMissionBattleCountersSync: (playerId: number) => MissionBattleCounters
+    readonly getPlayerShopPurchasesMapSync: (
+        playerId: number,
+        shopType: number,
+    ) => ShopPurchaseMap
     readonly getSnapshot: (playerId: number, periodType: string) => SnapshotData | null
     readonly getPassWeekSnapshotType: (eventId: number) => string
 }
@@ -60,6 +68,7 @@ const productionDomains: ProductionMissionFactDomains = {
     getDegreeBattleStatsSync,
     getPlayerQuestProgressSync,
     getMissionBattleCountersSync,
+    getPlayerShopPurchasesMapSync,
     getSnapshot,
     getPassWeekSnapshotType,
 }
@@ -91,6 +100,9 @@ export function createProductionMissionFactLoaderRegistry(
         ))
         .register("missionBattleCounters", ({ playerId }) => (
             domains.getMissionBattleCountersSync(playerId)
+        ))
+        .register("shopPurchases", ({ playerId, key }) => (
+            domains.getPlayerShopPurchasesMapSync(playerId, key.shopType)
         ))
         .register("degreeBattleStats", ({ playerId }) => (
             domains.getDegreeBattleStatsSync(playerId)

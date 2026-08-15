@@ -159,9 +159,14 @@ const BATTLE_COUNTER_PREFIXES = [
     DEGREE_SUPPORTED_FAMILIES.challengeDungeonClear,
     DEGREE_SUPPORTED_FAMILIES.scoreClearSingle,
     DEGREE_SUPPORTED_FAMILIES.timeClearSingle,
-    DEGREE_SUPPORTED_FAMILIES.bossBattleClear,
     DEGREE_SUPPORTED_FAMILIES.skillUse,
 ] as const
+
+const AGGREGATE_BOSS_BATTLE_CLEAR_PATTERNS: ReadonlyMap<number, string> = new Map([
+    [30000, "degree_boss_battle_clear_1"],
+    [30010, "degree_boss_battle_clear_2"],
+    [30020, "degree_boss_battle_clear_3"],
+])
 
 const DEGREE_BATTLE_STAT_PREFIXES = [
     DEGREE_SUPPORTED_FAMILIES.feverCount,
@@ -186,6 +191,20 @@ function startsWithAny(pattern: string, prefixes: readonly string[]): boolean {
     return prefixes.some(prefix => pattern.startsWith(prefix))
 }
 
+function isAggregateBossBattleClearDefinition(definition: MissionMasterDefinition): boolean {
+    const expectedPattern = AGGREGATE_BOSS_BATTLE_CLEAR_PATTERNS.get(definition.missionId)
+    return expectedPattern !== undefined
+        && definition.pattern === expectedPattern
+        && definition.row[1] === expectedPattern
+        && definition.row[3] === "23"
+        && definition.row[6] === "3"
+        && definition.row[8] === "2"
+        && definition.row[9] === ""
+        && definition.row[10] === ""
+        && definition.row[11] === ""
+        && definition.row[12] === "(None)"
+}
+
 function isPersistedProgressDefinition(definition: MissionMasterDefinition): boolean {
     const conditionType = Number(definition.row[3])
     if (getDegreeClientProgressPattern(definition) !== undefined) return true
@@ -205,9 +224,14 @@ export function getDegreeMissionFactRequirements(
     catalog?: MissionCatalog,
 ): DegreeMissionFactRequirements | undefined {
     if (definition.category !== 5) return undefined
+    const { missionId, pattern } = definition
+    if (AGGREGATE_BOSS_BATTLE_CLEAR_PATTERNS.has(missionId)) {
+        return isAggregateBossBattleClearDefinition(definition)
+            ? { factFamilies: ["missionBattleCounters"] }
+            : undefined
+    }
     if (isPersistedProgressDefinition(definition)) return { factFamilies: [] }
 
-    const { missionId, pattern } = definition
     const conditionType = Number(definition.row[3])
     if (startsWithAny(pattern, PLAYER_PREFIXES)) return { factFamilies: ["player"] }
     if (startsWithAny(pattern, CHARACTER_PREFIXES)) return { factFamilies: ["characters"] }

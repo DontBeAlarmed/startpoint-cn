@@ -1,5 +1,9 @@
 import type { FactKey } from "../facts/fact-key"
-import type { MissionCatalog, MissionMasterDefinition } from "../mission-catalog"
+import {
+    getMissionCatalogCraftPointItemId,
+    type MissionCatalog,
+    type MissionMasterDefinition,
+} from "../mission-catalog"
 import {
     getDegreeMissionFactRequirements,
     type DegreeContextFactFamily,
@@ -11,7 +15,10 @@ const AUTHORITATIVE_CHARACTER_LEVEL_TARGETS: Readonly<Record<number, number>> = 
     3020: 100,
 })
 
-function familyFacts(family: DegreeContextFactFamily): readonly FactKey[] {
+function familyFacts(
+    family: DegreeContextFactFamily,
+    catalog: MissionCatalog,
+): readonly FactKey[] {
     switch (family) {
         case "player":
             return [{ kind: "player" }]
@@ -35,7 +42,10 @@ function familyFacts(family: DegreeContextFactFamily): readonly FactKey[] {
         case "treasureShop":
             return [{ kind: "shopPurchases", shopType: 2 }]
         case "craftPoint":
-            return [{ kind: "collectedItems", itemIds: "all" }]
+            return [{
+                kind: "collectedItems",
+                itemIds: [getMissionCatalogCraftPointItemId(catalog)],
+            }]
         case "collectedItems":
         case "equipment":
             return family === "equipment" ? [{ kind: "equipment" }] : []
@@ -64,7 +74,7 @@ export function getDegreeRequirement(
         }
     }
 
-    const facts = requirements.factFamilies.flatMap(familyFacts)
+    const facts = requirements.factFamilies.flatMap(family => familyFacts(family, catalog))
     if (requirements.collectedItemId !== undefined) {
         facts.push({ kind: "collectedItems", itemIds: [requirements.collectedItemId] })
     }

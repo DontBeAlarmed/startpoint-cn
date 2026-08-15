@@ -668,6 +668,7 @@ test("registers mission catalog and fact store regressions in the mission leaf g
         "tools/mission_collect_session_scope.test.cjs",
         "tools/mission_collect_session_settlement.test.cjs",
         "tools/mission_evaluation_production_loaders.test.cjs",
+        "tools/mission_shop_purchases_fact_loader.test.cjs",
         "tools/mission_evaluation_quest_scoped.test.cjs",
         "tools/mission_evaluation_session.test.cjs",
         "tools/mission_master_value.test.cjs",
@@ -682,6 +683,7 @@ test("registers mission catalog and fact store regressions in the mission leaf g
     }
     for (const file of [
         "src/data/domains/item.ts",
+        "src/data/domains/shopPurchase.ts",
         "src/lib/mission/category-session-plan.ts",
         "src/lib/mission/collect-progress.ts",
         "src/lib/mission/collect-session-context.ts",
@@ -846,6 +848,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_collect_session_scope.test.cjs",
         "tools/mission_collect_session_settlement.test.cjs",
         "tools/mission_evaluation_production_loaders.test.cjs",
+        "tools/mission_shop_purchases_fact_loader.test.cjs",
         "tools/mission_evaluation_quest_scoped.test.cjs",
         "tools/mission_evaluation_session.test.cjs",
         "tools/mission_fact_key.test.cjs",

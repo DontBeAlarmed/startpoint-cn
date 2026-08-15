@@ -62,6 +62,7 @@ test("production loaders dispatch exact domain calls and preserve values", () =>
         player: { id: 77 },
         quests: { 1: [{ questId: 10 }], 4: [{ questId: 40 }] },
         counters: { singlePlayCount: 3 },
+        shop: { 1001: 4, 1002: 7 },
         daily: { questClears: 1 },
         weekly: { questClears: 2 },
         pass: { questClears: 3 },
@@ -79,6 +80,10 @@ test("production loaders dispatch exact domain calls and preserve values", () =>
             calls.push(["counters", playerId])
             return values.counters
         },
+        getPlayerShopPurchasesMapSync(playerId, shopType) {
+            calls.push(["shop", playerId, shopType])
+            return values.shop
+        },
         getSnapshot(playerId, periodType) {
             calls.push(["snapshot", playerId, periodType])
             if (periodType === "daily") return values.daily
@@ -94,6 +99,7 @@ test("production loaders dispatch exact domain calls and preserve values", () =>
         { kind: "player" },
         { kind: "questProgress", sections: [4, 1] },
         { kind: "missionBattleCounters" },
+        { kind: "shopPurchases", shopType: 2 },
         { kind: "periodicSnapshot", snapshotKind: "daily" },
         { kind: "periodicSnapshot", snapshotKind: "weekly" },
         { kind: "periodicSnapshot", snapshotKind: "passWeek", eventId: 9 },
@@ -105,6 +111,10 @@ test("production loaders dispatch exact domain calls and preserve values", () =>
         values.quests,
     )
     assert.strictEqual(session.getFact({ kind: "missionBattleCounters" }), values.counters)
+    assert.strictEqual(
+        session.getFact({ kind: "shopPurchases", shopType: 2 }),
+        values.shop,
+    )
     assert.strictEqual(
         session.getFact({ kind: "periodicSnapshot", snapshotKind: "daily" }),
         values.daily,
@@ -121,11 +131,31 @@ test("production loaders dispatch exact domain calls and preserve values", () =>
         ["player", 77],
         ["quests", 77, [1, 4]],
         ["counters", 77],
+        ["shop", 77, 2],
         ["snapshot", 77, "daily"],
         ["snapshot", 77, "weekly"],
         ["passType", 9],
         ["snapshot", 77, "pass-week:9"],
     ])
+})
+
+test("production shop purchase loader stays lazy and calls its domain once per planned key", () => {
+    const calls = []
+    const value = Object.freeze({ 501: 3 })
+    const loaders = createProductionMissionFactLoaderRegistry({
+        getPlayerShopPurchasesMapSync(playerId, shopType) {
+            calls.push([playerId, shopType])
+            return value
+        },
+    })
+    const session = createSession([
+        { kind: "shopPurchases", shopType: 5 },
+    ], loaders)
+
+    assert.equal(calls.length, 0)
+    assert.strictEqual(session.getFact({ kind: "shopPurchases", shopType: 5 }), value)
+    assert.strictEqual(session.getFact({ kind: "shopPurchases", shopType: 5 }), value)
+    assert.deepEqual(calls, [[77, 5]])
 })
 
 test("production player loader fails explicitly when the player is missing", () => {

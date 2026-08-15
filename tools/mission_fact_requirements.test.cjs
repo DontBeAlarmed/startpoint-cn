@@ -50,6 +50,15 @@ function bundledRuntimeTable(tableName) {
     return bundledMissionContentRepository.table(tableName)
 }
 
+function catalogWithConfig(config) {
+    return getMissionCatalog(Object.freeze({
+        info: bundledMissionContentRepository.info,
+        table(tableName) {
+            return tableName === "config.json" ? config : bundledRuntimeTable(tableName)
+        },
+    }))
+}
+
 function forwardingCatalog(source, overrides = new Map(), options = {}) {
     const removedDefinitions = options.removedDefinitions ?? new Set()
     const removedRewardStages = options.removedRewardStages ?? new Set()
@@ -180,7 +189,7 @@ test("maps every Degree fact family to the authoritative FactKey domain", () => 
         [11010, ["questProgress:2"]],
         [12000, ["questProgress:15"]],
         [16000, ["degreeBattleStats"]],
-        [41000, ["collectedItems:all"]],
+        [41000, ["collectedItems:100000"]],
         [43000, ["equipment"]],
         [46000, ["shopPurchases:2"]],
         [57010, ["questProgress:21"]],
@@ -195,6 +204,100 @@ test("maps every Degree fact family to the authoritative FactKey domain", () => 
         const requirement = registry.getRequirement(5, missionId)
         assert.equal(requirement.mode, "computed", `Degree ${missionId}`)
         assert.deepEqual(factIds(requirement), expectedFacts, `Degree ${missionId}`)
+    }
+})
+
+test("computes only the three aggregate Degree boss clear missions from battle counters", () => {
+    const catalog = getMissionCatalog()
+    const registry = getMissionFactRequirementRegistry(catalog)
+    const aggregateMissionIds = [30000, 30010, 30020]
+
+    for (const missionId of aggregateMissionIds) {
+        const requirement = registry.getRequirement(5, missionId)
+        assert.equal(requirement.mode, "computed", `Degree ${missionId}`)
+        assert.deepEqual(factIds(requirement), ["missionBattleCounters"], `Degree ${missionId}`)
+    }
+
+    const atomicBossMissionIds = catalog.getDefinitions(5)
+        .filter(definition => (
+            definition.pattern.startsWith("degree_advent_event_")
+            || definition.pattern.startsWith("degree_eye_dragon_multibattle_")
+        ))
+        .map(definition => definition.missionId)
+    assert.equal(atomicBossMissionIds.length, 84)
+    for (const missionId of atomicBossMissionIds) {
+        assert.equal(registry.getRequirement(5, missionId).mode, "persisted", `Degree ${missionId}`)
+    }
+    assert.deepEqual(
+        [31000, 59210, 62170, 62560, 70003]
+            .map(missionId => registry.getRequirement(5, missionId).mode),
+        ["persisted", "persisted", "persisted", "persisted", "persisted"],
+    )
+})
+
+test("fails aggregate Degree boss clear requirements closed on authoritative field drift", () => {
+    const catalog = getMissionCatalog()
+    const drifts = [
+        ["pattern", source => {
+            const pattern = `${source.pattern}_drift`
+            return withDefinitionField(source, 1, pattern, pattern)
+        }],
+        ["condition type", source => withDefinitionField(source, 3, "14")],
+        ["battle kind selector", source => withDefinitionField(source, 6, "1")],
+        ["range kind", source => withDefinitionField(source, 8, "1")],
+        ["boss group selector", source => withDefinitionField(source, 9, "1")],
+        ["boss kind selector", source => withDefinitionField(source, 10, "25")],
+        ["boss difficulty selector", source => withDefinitionField(source, 11, "1")],
+        ["quest rank selector", source => withDefinitionField(source, 12, "1")],
+    ]
+
+    for (const missionId of [30000, 30010, 30020]) {
+        const source = catalog.getDefinition(5, missionId)
+        for (const [label, drift] of drifts) {
+            const customCatalog = forwardingCatalog(
+                catalog,
+                new Map([[`5:${missionId}`, drift(source)]]),
+            )
+            assertUnsupported(
+                getMissionFactRequirementRegistry(customCatalog).getRequirement(5, missionId),
+                /authoritative|mapping/i,
+            )
+        }
+    }
+})
+
+test("keeps exact bundled Category 5 classification counts and unsupported IDs", () => {
+    const entries = getMissionFactRequirementRegistry().entries
+        .filter(entry => entry.category === 5)
+    const count = mode => entries.filter(entry => entry.requirement.mode === mode).length
+
+    assert.equal(count("computed"), 1181)
+    assert.equal(count("persisted"), 100)
+    assert.equal(count("unsupported"), 7)
+    assert.deepEqual(
+        entries
+            .filter(entry => entry.requirement.mode === "unsupported")
+            .map(entry => entry.missionId),
+        [3000, 25000, 25010, 25020, 70004, 70005, 70006],
+    )
+})
+
+test("selects Degree craft points from the supplied Catalog config without all-item fallback", () => {
+    const bundledRegistry = getMissionFactRequirementRegistry(getMissionCatalog())
+    const customRegistry = getMissionFactRequirementRegistry(catalogWithConfig({
+        craft_point_item_id: 777777,
+    }))
+
+    for (const missionId of [41000, 41010, 41020]) {
+        assert.deepEqual(factIds(bundledRegistry.getRequirement(5, missionId)), [
+            "collectedItems:100000",
+        ])
+        assert.deepEqual(factIds(customRegistry.getRequirement(5, missionId)), [
+            "collectedItems:777777",
+        ])
+        assert.equal(factIds(customRegistry.getRequirement(5, missionId)).includes(
+            "collectedItems:all",
+        ), false)
     }
 })
 

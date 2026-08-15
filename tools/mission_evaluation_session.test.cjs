@@ -288,6 +288,15 @@ test("fails closed for undeclared facts, missing loaders, and duplicate kinds", 
         () => missingLoaderSession.getFact({ kind: "missionBattleCounters" }),
         /no.*loader|loader.*not registered/i,
     )
+
+    const missingShopLoaderSession = createSession(
+        [{ kind: "shopPurchases", shopType: 2 }],
+        new MissionFactLoaderRegistry(),
+    )
+    assert.throws(
+        () => missingShopLoaderSession.getFact({ kind: "shopPurchases", shopType: 2 }),
+        /no.*loader|loader.*not registered/i,
+    )
 })
 
 test("separate sessions do not share values and failed loads are not retried", () => {

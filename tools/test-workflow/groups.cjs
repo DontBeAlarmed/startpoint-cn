@@ -339,6 +339,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_collect_session_scope.test.cjs",
             "tools/mission_collect_session_settlement.test.cjs",
             "tools/mission_evaluation_production_loaders.test.cjs",
+            "tools/mission_shop_purchases_fact_loader.test.cjs",
             "tools/mission_evaluation_quest_scoped.test.cjs",
             "tools/mission_evaluation_session.test.cjs",
             "tools/mission_fact_key.test.cjs",

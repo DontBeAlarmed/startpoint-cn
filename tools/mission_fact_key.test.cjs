@@ -1,7 +1,9 @@
 "use strict"
 
 const assert = require("node:assert/strict")
+const { spawnSync } = require("node:child_process")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 
@@ -421,6 +423,54 @@ test("facts modules have no data-layer imports", () => {
     for (const source of sources) {
         assert.doesNotMatch(source, /(?:from\s+|require\s*\()["'][^"']*\/data(?:\/|["'])/)
     }
+})
+
+test("shop purchase FactKey value rejects index assignment at TypeScript compile time", t => {
+    const projectRoot = path.resolve(__dirname, "..")
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "mission-fact-types-"))
+    const fixturePath = path.join(fixtureDirectory, "shop-purchases.ts")
+    const factLoadersModule = path.join(
+        projectRoot,
+        "src/lib/mission/fact-loaders",
+    ).replaceAll("\\", "/")
+    const tscPath = path.join(projectRoot, "node_modules/typescript/bin/tsc")
+    t.after(() => fs.rmSync(fixtureDirectory, { force: true, recursive: true }))
+
+    const compile = source => {
+        fs.writeFileSync(fixturePath, source, "utf8")
+        return spawnSync(process.execPath, [
+            tscPath,
+            "--strict",
+            "--noEmit",
+            "--skipLibCheck",
+            "--module", "commonjs",
+            "--moduleResolution", "node",
+            "--target", "es2016",
+            "--esModuleInterop",
+            "--resolveJsonModule",
+            fixturePath,
+        ], { cwd: projectRoot, encoding: "utf8" })
+    }
+
+    const readonlyResult = compile(`
+import type { MissionFactValueByKind } from ${JSON.stringify(factLoadersModule)}
+
+declare const purchases: MissionFactValueByKind["shopPurchases"]
+const count: number = purchases[501]
+// @ts-expect-error shop purchase fact maps are immutable
+purchases[501] = 4
+void count
+`)
+    assert.equal(readonlyResult.status, 0, `${readonlyResult.stdout}${readonlyResult.stderr}`)
+
+    const mutableControl = compile(`
+type MutablePurchaseMap = Record<number, number>
+declare const purchases: MutablePurchaseMap
+// @ts-expect-error mutable maps must make this directive fail as unused
+purchases[501] = 4
+`)
+    assert.notEqual(mutableControl.status, 0)
+    assert.match(`${mutableControl.stdout}${mutableControl.stderr}`, /TS2578|Unused '@ts-expect-error'/)
 })
 
 test("fact key types have a one-way dependency into load plan types", () => {

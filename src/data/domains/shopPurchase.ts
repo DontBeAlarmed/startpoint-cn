@@ -5,6 +5,8 @@ export interface ShopPurchaseCount {
     count: number
 }
 
+export type ShopPurchaseMap = Readonly<Record<number, number>>
+
 export interface ShopPurchasePeriodKeys {
     readonly daily: string
     readonly monthly: string
@@ -106,7 +108,7 @@ export function getPlayerShopPurchasesSync(playerId: number): ShopPurchaseCount[
 export function getPlayerShopPurchasesMapSync(
     playerId: number,
     shopType?: number,
-): Record<number, number> {
+): ShopPurchaseMap {
     const map: Record<number, number> = {}
     const rows = (shopType === undefined
         ? getDb().prepare(`
