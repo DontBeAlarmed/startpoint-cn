@@ -1,0 +1,344 @@
+{
+  "version": 1,
+  "fixedTime": "2025-01-01T12:00:00.000Z",
+  "scenarios": {
+    "degree-focused": {
+      "sqlReads": 9,
+      "sqlWrites": 1,
+      "missionComputes": 5,
+      "behavior": {
+        "adapter": "scoped-settlement",
+        "degreeIds": [],
+        "missionIds": [
+          1000,
+          111001,
+          33000,
+          16000,
+          57010,
+          70000
+        ],
+        "missionRewards": []
+      },
+      "behaviorSha256": "6bc342219ca5b6729374c6d11d993d28512c91dcefd89e7d10da2fed2fddd4ce"
+    },
+    "awake-character-page": {
+      "sqlReads": 18,
+      "sqlWrites": 4,
+      "missionComputes": 7,
+      "behavior": {
+        "characterIds": [],
+        "degreeIds": [],
+        "equipmentIds": [],
+        "itemIds": [],
+        "missionProgressCount": 4,
+        "missionProgressSha256": "42ffa89290def47c7d7ff6f10a620fb7ed7658cf175302dae604f103bae18470",
+        "missionRewardIds": [],
+        "statusCode": 200
+      },
+      "behaviorSha256": "8bade6bcad9665cf0d4128ec01ba4ca16026351ad240055daa9a18af432a343d"
+    },
+    "get-progress-no-invalidation": {
+      "sqlReads": 26,
+      "sqlWrites": 4,
+      "missionComputes": 220,
+      "behavior": {
+        "characterIds": [],
+        "degreeIds": [],
+        "equipmentIds": [],
+        "itemIds": [],
+        "missionProgressCount": 110,
+        "missionProgressSha256": "f983ebec42603991cb5519594469c9e4f3087ba1f7264aa2d491df67d4442e44",
+        "missionRewardIds": [],
+        "statusCode": 200
+      },
+      "behaviorSha256": "63b798e8b698886123d421b48dfea8c50f5ef23b6a767fa24802dce118602e38"
+    },
+    "get-progress-item-invalidation": {
+      "sqlReads": 60,
+      "sqlWrites": 20,
+      "missionComputes": 2530,
+      "behavior": {
+        "characterIds": [],
+        "degreeIds": [],
+        "equipmentIds": [],
+        "invalidationRule": "regular-33-item-100000-to-degree-41000",
+        "itemIds": [
+          100000
+        ],
+        "missionProgressCount": 1265,
+        "missionProgressSha256": "3888dc66b2248760c36e81c344e306588c1616810543b3e302afda429dbed0be",
+        "missionRewardIds": [
+          33001
+        ],
+        "statusCode": 200,
+        "targetMission": {
+          "mission_category": 5,
+          "mission_id": 41000,
+          "progress_value": 300,
+          "stage": 1
+        }
+      },
+      "behaviorSha256": "70743d804ff5f75364f094d775e65ea9bb41b632a0dd8851624616fe11a9bdf1"
+    },
+    "get-progress-character-invalidation": {
+      "sqlReads": 52,
+      "sqlWrites": 13,
+      "missionComputes": 1482,
+      "behavior": {
+        "characterIds": [
+          231003
+        ],
+        "degreeIds": [],
+        "equipmentIds": [],
+        "invalidationRule": "event-2571-character-231003-to-degree-2000",
+        "invalidationRuleTime": "2022-12-01T12:00:00.000Z",
+        "itemIds": [],
+        "missionProgressCount": 741,
+        "missionProgressSha256": "b98a9c83d0a94bf3f52bcbcb14ab9972efab9ed59dc9ad92dc93dc60afd5ec84",
+        "missionRewardIds": [
+          2571001
+        ],
+        "statusCode": 200,
+        "targetMission": {
+          "mission_category": 5,
+          "mission_id": 2000,
+          "progress_value": 2,
+          "stage": 1
+        }
+      },
+      "behaviorSha256": "a3b22b37aa5187f24c4b9917d36dd7fec72405b7b1cd44911bb6652b49e34c1b"
+    },
+    "get-progress-equipment-invalidation": {
+      "sqlReads": 60,
+      "sqlWrites": 19,
+      "missionComputes": 2530,
+      "behavior": {
+        "characterIds": [],
+        "degreeIds": [],
+        "equipmentIds": [
+          200001
+        ],
+        "invalidationRule": "regular-56-equipment-200001-to-degree-43000",
+        "itemIds": [],
+        "missionProgressCount": 1265,
+        "missionProgressSha256": "e14c9fb29d143d91820de4bbdf692fc693f5cd751bafb43efc8da6ada0fd6df2",
+        "missionRewardIds": [
+          56001
+        ],
+        "statusCode": 200,
+        "targetMission": {
+          "mission_category": 5,
+          "mission_id": 43000,
+          "progress_value": 1,
+          "stage": 1
+        }
+      },
+      "behaviorSha256": "fcfaa0ae0d6a931536f2c9e413da6b7a44ed7e5fd6e57f513aa49a341328ef34"
+    },
+    "single-battle-finish": {
+      "sqlReads": 83,
+      "sqlWrites": 80,
+      "missionComputes": 425,
+      "behavior": {
+        "adapter": "mission-finish-boundary",
+        "awake": {
+          "candidateIds": [
+            3410051,
+            3410052,
+            3410053,
+            3410054
+          ],
+          "characterIds": [
+            341005
+          ],
+          "degreeIds": [],
+          "equipmentIds": [],
+          "itemIds": [
+            13,
+            14,
+            15,
+            16
+          ],
+          "missionInfo": [
+            [
+              9,
+              3410051,
+              34100511
+            ],
+            [
+              9,
+              3410052,
+              34100521
+            ],
+            [
+              9,
+              3410053,
+              34100531
+            ],
+            [
+              9,
+              3410054,
+              34100541
+            ]
+          ],
+          "missionProgressCount": 4,
+          "missionProgressSha256": "b4a5a63dab23d07f2e4cd958b4d790e8393e46fcc8305f5ec8f2a662b7567e91"
+        },
+        "mode": "single",
+        "standard": {
+          "characterIds": [],
+          "degreeIds": [
+            15000
+          ],
+          "equipmentIds": [],
+          "itemIds": [],
+          "missionInfo": [
+            [
+              1,
+              37,
+              37001
+            ],
+            [
+              1,
+              37,
+              37002
+            ],
+            [
+              1,
+              37,
+              37003
+            ],
+            [
+              5,
+              15000,
+              15000001
+            ],
+            [
+              6,
+              29,
+              29001
+            ],
+            [
+              8,
+              43,
+              43001
+            ]
+          ],
+          "missionProgressCount": 418,
+          "missionProgressSha256": "c7a5d64a582b41d9944f0a8eeb010834655416a73eeb0ca515ccfba92d576b08"
+        }
+      },
+      "behaviorSha256": "4659b8cdcf1384c70f787fba12d4d42b74c3680d7b446330c9e7f06abb6a6ce4"
+    },
+    "multi-battle-finish": {
+      "sqlReads": 84,
+      "sqlWrites": 91,
+      "missionComputes": 425,
+      "behavior": {
+        "adapter": "mission-finish-boundary",
+        "awake": {
+          "candidateIds": [
+            3410051,
+            3410052,
+            3410053,
+            3410054
+          ],
+          "characterIds": [
+            341005
+          ],
+          "degreeIds": [],
+          "equipmentIds": [],
+          "itemIds": [
+            13,
+            14,
+            15,
+            16
+          ],
+          "missionInfo": [
+            [
+              9,
+              3410051,
+              34100511
+            ],
+            [
+              9,
+              3410052,
+              34100521
+            ],
+            [
+              9,
+              3410053,
+              34100531
+            ],
+            [
+              9,
+              3410054,
+              34100541
+            ]
+          ],
+          "missionProgressCount": 4,
+          "missionProgressSha256": "b4a5a63dab23d07f2e4cd958b4d790e8393e46fcc8305f5ec8f2a662b7567e91"
+        },
+        "mode": "multi",
+        "standard": {
+          "characterIds": [],
+          "degreeIds": [],
+          "equipmentIds": [],
+          "itemIds": [
+            100000
+          ],
+          "missionInfo": [
+            [
+              1,
+              25,
+              25001
+            ],
+            [
+              1,
+              26,
+              26001
+            ],
+            [
+              1,
+              29,
+              29001
+            ],
+            [
+              1,
+              37,
+              37001
+            ],
+            [
+              1,
+              37,
+              37002
+            ],
+            [
+              1,
+              37,
+              37003
+            ],
+            [
+              2,
+              13,
+              13001
+            ],
+            [
+              6,
+              31,
+              31001
+            ],
+            [
+              8,
+              43,
+              43001
+            ]
+          ],
+          "missionProgressCount": 418,
+          "missionProgressSha256": "850bd7f0b2f43fc6db5c28afb1126079ce140c12e7e2c3c7edb70f6964492987"
+        }
+      },
+      "behaviorSha256": "ad5705fbacde23e851d93e9559ba095e94615811760b64e883e3c748a7c03514"
+    }
+  }
+}

@@ -784,6 +784,8 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_progress_route.test.cjs",
         "tools/mission_regular_facts.test.cjs",
         "tools/mission_response_merge.test.cjs",
+        "tools/perf/mission_engine_focused_baseline.test.cjs",
+        "tools/perf/mission_engine_focused_runner.test.cjs",
         "tools/perf/mission_settlement_baseline.test.cjs",
         "tools/mission_settlement_scope.test.cjs",
         "tools/mission_settlement.test.cjs",
