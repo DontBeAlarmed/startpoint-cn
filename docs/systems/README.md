@@ -36,6 +36,7 @@
 
 ## 任务与角色
 
+- [任务引擎演进架构](./mission-engine-architecture.md)
 - [任务完成度审计](./mission-completion-audit.md)
 - [任务模块优先补全设计](./mission-priority-completion.md)
 - [任务系统后续路线图](./mission-roadmap.md)

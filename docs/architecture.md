@@ -81,7 +81,7 @@ HTTP 路由分为三组：
 - `src/routes/api/`：角色、装备、抽卡、关卡、任务、商店、邮件等业务端点；
 - `src/routes/web_api/`：管理后台使用的结构化管理接口。
 
-复杂规则下沉到 `src/lib/`。任务位于 `src/lib/mission/`，关卡结算位于 `src/lib/quest/finish/`，抽卡、体力、装备和校验各有独立模块。路由负责协议边界和事务编排，不应重复实现业务计算。
+复杂规则下沉到 `src/lib/`。任务位于 `src/lib/mission/`，关卡结算位于 `src/lib/quest/finish/`，抽卡、体力、装备和校验各有独立模块。路由负责协议边界和事务编排，不应重复实现业务计算。任务模块下一阶段的 Catalog、阶段内事实共享和求值结果复用边界见[任务引擎演进架构](./systems/mission-engine-architecture.md)。
 
 ## 7. 管理后台
 
