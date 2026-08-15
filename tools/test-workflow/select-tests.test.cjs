@@ -646,13 +646,32 @@ test("registers every test in exactly one leaf group and full covers runtime reg
     }
 })
 
-test("registers the mission catalog regression in the mission leaf group", () => {
+test("registers mission catalog and fact store regressions in the mission leaf group", () => {
     assert.deepEqual(selectTestGroups(["tools/mission_catalog.test.cjs"]), ["integration:mission"])
     assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_catalog.test.cjs"))
     assert.deepEqual(selectTestGroups(["tools/mission_catalog_wrappers.test.cjs"]), ["integration:mission"])
     assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_catalog_wrappers.test.cjs"))
     assert.deepEqual(selectTestGroups(["tools/mission_fact_key.test.cjs"]), ["integration:mission"])
     assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_fact_key.test.cjs"))
+    for (const file of [
+        "tools/mission_evaluation_production_loaders.test.cjs",
+        "tools/mission_evaluation_quest_scoped.test.cjs",
+        "tools/mission_evaluation_session.test.cjs",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:mission"])
+        assert.ok(TEST_GROUPS["integration:mission"].tests.includes(file))
+    }
+    for (const file of [
+        "tools/helpers/mission-evaluation-rejected-observer-worker.cjs",
+        "tools/helpers/mission-evaluation-rejected-promise-worker.cjs",
+        "tools/helpers/mission-evaluation-session-fixture.cjs",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:mission"])
+    }
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/evaluation-session.ts"]),
+        ["integration:mission"],
+    )
 })
 
 test("keeps external data concerns out of self-contained runtime tests", () => {
@@ -789,6 +808,9 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_raid_set_party_route.test.cjs",
         "tools/mission_event_login_route.test.cjs",
         "tools/mission_event_progress.test.cjs",
+        "tools/mission_evaluation_production_loaders.test.cjs",
+        "tools/mission_evaluation_quest_scoped.test.cjs",
+        "tools/mission_evaluation_session.test.cjs",
         "tools/mission_fact_key.test.cjs",
         "tools/mission_fact_requirements.test.cjs",
         "tools/mission_raid_summary_route.test.cjs",

@@ -33,14 +33,25 @@ function buildPlayerQuestProgress(
  * @returns A record where the index is the section and the value is a list of PlayerQuestProgress.
  */
 export function getPlayerQuestProgressSync(
-    playerId: number
+    playerId: number,
+    sections?: readonly number[],
 ): Record<string, PlayerQuestProgress[]> {
+
+    const normalizedSections = sections === undefined
+        ? undefined
+        : [...new Set(sections.map(Number))]
+            .filter(section => Number.isSafeInteger(section))
+            .sort((left, right) => left - right)
+    if (normalizedSections?.length === 0) return {}
+    const sectionFilter = normalizedSections === undefined
+        ? ""
+        : ` AND section IN (${normalizedSections.map(() => "?").join(", ")})`
 
     const rawProgress = getDb().prepare(`
     SELECT section, quest_id, finished, unlocked, high_score, clear_rank, best_elapsed_time_ms, leader_character_id, multi_clear_count, host_finished
     FROM players_quest_progress
-    WHERE player_id = ?
-    `).all(playerId) as RawPlayerQuestProgress[]
+    WHERE player_id = ?${sectionFilter}
+    `).all(playerId, ...(normalizedSections ?? [])) as RawPlayerQuestProgress[]
 
     const mapped: Record<string, PlayerQuestProgress[]> = {}
 

@@ -223,7 +223,11 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^src\/lib\/mission\/(?:awake-settlement|awake-unlock-response|index)\.ts$/,
+        pattern: /^src\/lib\/mission\/(?:awake-settlement|awake-unlock-response|evaluation-session|fact-loaders|index|production-fact-loaders)\.ts$/,
+        groups: ["integration:mission"],
+    },
+    {
+        pattern: /^tools\/helpers\/mission-evaluation-(?:rejected-(?:observer|promise)-worker|session-fixture)\.cjs$/,
         groups: ["integration:mission"],
     },
     {

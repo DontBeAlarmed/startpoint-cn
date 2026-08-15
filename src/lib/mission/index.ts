@@ -7,12 +7,27 @@ export type { MissionFactLoadPlan } from "./facts/types"
 export { getFactKeyId, normalizeFactKey } from "./facts/fact-key"
 export { buildFactLoadPlan } from "./facts/load-plan"
 export type {
+    MissionFactLoader,
+    MissionFactLoaderContext,
+    MissionFactValue,
+    MissionFactValueByKind,
+} from "./fact-loaders"
+export { MissionFactLoaderRegistry } from "./fact-loaders"
+export type { ProductionMissionFactDomains } from "./production-fact-loaders"
+export { createProductionMissionFactLoaderRegistry } from "./production-fact-loaders"
+export type {
     MissionFactRequirement,
     MissionFactRequirementEntry,
     MissionFactRequirementRegistry,
     MissionRef,
 } from "./requirements/types"
 export { getMissionFactRequirementRegistry } from "./requirements/registry"
+export type {
+    MissionEvaluationCandidateRequirement,
+    MissionEvaluationObserver,
+    MissionEvaluationSessionOptions,
+} from "./evaluation-session"
+export { MissionEvaluationSession } from "./evaluation-session"
 
 // Registry
 export { getComputer } from "./registry"
