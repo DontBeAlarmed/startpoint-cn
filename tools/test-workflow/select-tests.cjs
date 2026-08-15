@@ -231,6 +231,10 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
+        pattern: /^src\/lib\/mission\/requirements\/.*\.ts$/,
+        groups: ["integration:mission"],
+    },
+    {
         pattern: /^src\/lib\/quest\/finish\/party-co-clear-tracker\.ts$/,
         groups: ["integration:mission"],
     },

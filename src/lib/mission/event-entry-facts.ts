@@ -10,6 +10,7 @@ import {
     isMissionDefinitionEnabledAt,
     type MissionMasterDefinition,
 } from "./master-data"
+import type { MissionCatalogStage } from "./mission-catalog"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 
 export type EventEntryRuleProducer =
@@ -307,6 +308,46 @@ export function validateEventEntryRule(
     if (start === undefined || end === undefined
         || !Number.isFinite(start) || !Number.isFinite(end) || start > end) return false
 
+    if (spec.selectorKind === undefined) {
+        return definition.row[7] === "(None)"
+            && definition.row[8] === ""
+            && definition.row[9] === ""
+            && definition.row[10] === ""
+    }
+    return parseIntegerToken(definition.row[7]) === spec.selectorKind
+        && parseIntegerToken(definition.row[8]) === spec.eventId
+        && definition.row[9] === ""
+        && definition.row[10] === "(None)"
+}
+
+function hasExactCatalogTargets(
+    stages: readonly MissionCatalogStage[],
+    targets: readonly number[],
+): boolean {
+    return stages.length === targets.length
+        && stages.every((stage, index) => (
+            stage.stage === index + 1 && stage.targetProgress === targets[index]
+        ))
+}
+
+export function validateEventEntryCatalogRule(
+    definition: MissionMasterDefinition,
+    stages: readonly MissionCatalogStage[],
+): boolean {
+    const spec = EVENT_ENTRY_RULES.find(rule => rule.missionId === definition.missionId)
+    if (!spec || !hasExactCatalogTargets(stages, spec.targets)) return false
+    const start = parseCnMasterTime(definition.enableStart)
+    const end = parseCnMasterTime(definition.enableEnd)
+    if (definition.category !== 3
+        || definition.pattern !== spec.pattern
+        || parseIntegerToken(definition.row[2]) !== spec.patternType
+        || definition.row.slice(3, 7).some(value => value !== "")
+        || definition.row[11] !== "(None)"
+        || definition.enableStart !== spec.enableStart
+        || definition.enableEnd !== spec.enableEnd
+        || definition.row[27] !== spec.enableStart
+        || definition.row[28] !== spec.enableEnd
+        || start === undefined || end === undefined || start > end) return false
     if (spec.selectorKind === undefined) {
         return definition.row[7] === "(None)"
             && definition.row[8] === ""

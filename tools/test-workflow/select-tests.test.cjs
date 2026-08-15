@@ -39,6 +39,10 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/lib/mission/facts/fact-key.ts"]),
         ["integration:mission"],
     )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/requirements/registry.ts"]),
+        ["integration:mission"],
+    )
     assert.deepEqual(selectTestGroups(["src/lib/gacha.ts"]), ["quick:gacha"])
     assert.deepEqual(
         selectTestGroups(["src/lib/gacha-seed-quarantine.ts"]),
@@ -370,6 +374,19 @@ test("registers strict event battle generation separately from runtime facts", (
     assert.equal(
         TEST_GROUPS["integration:mission"].tests.includes("tools/mission_coverage_audit.test.cjs"),
         true,
+    )
+})
+
+test("registers mission fact requirements in the mission integration suite", () => {
+    assert.equal(
+        TEST_GROUPS["integration:mission"].tests.includes(
+            "tools/mission_fact_requirements.test.cjs",
+        ),
+        true,
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/mission_fact_requirements.test.cjs"]),
+        ["integration:mission"],
     )
 })
 
@@ -773,6 +790,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_event_login_route.test.cjs",
         "tools/mission_event_progress.test.cjs",
         "tools/mission_fact_key.test.cjs",
+        "tools/mission_fact_requirements.test.cjs",
         "tools/mission_raid_summary_route.test.cjs",
         "tools/mission_active_content.test.cjs",
         "tools/mission_active_core.test.cjs",

@@ -26,6 +26,12 @@ import bundledItemSale from "../../../assets/item_sale.json"
 import bundledMainQuests from "../../../assets/main_quest.json"
 import bundledManaBoard from "../../../assets/mana_board.json"
 import { getQuestContentTableSync } from "../assets"
+import { getMissionCatalog } from "./mission-catalog"
+import {
+    getEventCurrentStateRule as getCatalogEventCurrentStateRule,
+    getEventCurrentStateRuleMissionIds,
+    type EventCurrentStateRule,
+} from "./event-current-state-rules"
 import type { CategoryContext, MissionComputer } from "./types"
 
 const GET_ITEM_COUNT_PATTERN_TYPE = 37
@@ -33,40 +39,6 @@ const TARGET_MISSION_CLEAR_PATTERN_TYPE = 13
 const SINGLE_BATTLE_CLEAR_PATTERN_TYPE = 14
 const CARNIVAL_BATTLE_PATTERN_TYPE = 23
 const TIME_CLEAR_PATTERN_TYPE = 15
-
-type EventCurrentStateFact =
-    | "maxCharacterLevel"
-    | "manaBoardNodeCount"
-    | "overLimitCount"
-    | "characterEpisodeClearCount"
-    | "mainChapterClear"
-    | "equipmentAwakeningCount"
-    | "hasEquippedAbilitySoul"
-
-interface EventCurrentStateRule {
-    readonly patternType: number
-    readonly targets: readonly number[]
-    readonly fact: EventCurrentStateFact
-    readonly mainChapter?: number
-}
-
-const EVENT_CURRENT_STATE_RULES: Readonly<Record<number, EventCurrentStateRule>> = Object.freeze({
-    1201: { patternType: 22, targets: [1], fact: "mainChapterClear", mainChapter: 1 },
-    1202: { patternType: 22, targets: [1], fact: "mainChapterClear", mainChapter: 2 },
-    1203: { patternType: 22, targets: [1], fact: "mainChapterClear", mainChapter: 3 },
-    1204: { patternType: 21, targets: [1], fact: "characterEpisodeClearCount" },
-    1205: { patternType: 7, targets: [3], fact: "manaBoardNodeCount" },
-    1206: { patternType: 7, targets: [3], fact: "manaBoardNodeCount" },
-    1207: { patternType: 7, targets: [3], fact: "manaBoardNodeCount" },
-    1212: { patternType: 34, targets: [1], fact: "equipmentAwakeningCount" },
-    1217: { patternType: 7, targets: [15], fact: "manaBoardNodeCount" },
-    1218: { patternType: 7, targets: [15], fact: "manaBoardNodeCount" },
-    1219: { patternType: 7, targets: [15], fact: "manaBoardNodeCount" },
-    1220: { patternType: 35, targets: [1], fact: "hasEquippedAbilitySoul" },
-    1305: { patternType: 5, targets: [50, 60, 70], fact: "maxCharacterLevel" },
-    1306: { patternType: 9, targets: [1], fact: "overLimitCount" },
-    1307: { patternType: 34, targets: [1, 2, 3, 4], fact: "equipmentAwakeningCount" },
-})
 
 interface SafeQuestMapping {
     readonly questIds: readonly number[]
@@ -104,42 +76,20 @@ interface EventCurrentStateStaticIndex {
 const staticIndexByRepository = new WeakMap<object, EventCurrentStateStaticIndex>()
 let bundledStaticIndex: EventCurrentStateStaticIndex | undefined
 
-function hasExpectedEventTargets(missionId: number, expected: readonly number[]): boolean {
-    const stages = (eventRewards as Record<string, Record<string, unknown[]>>)[String(missionId)]
-    if (!stages) return false
-    const stageIds = Object.keys(stages).map(Number).sort((left, right) => left - right)
-    if (stageIds.length !== expected.length
-        || stageIds.some((stageId, index) => stageId !== index + 1)) return false
-    return stageIds.every((stageId, index) => {
-        const rows = stages[String(stageId)]
-        if (!Array.isArray(rows) || rows.length !== 1 || !Array.isArray(rows[0])) return false
-        const target = Number(rows[0][1])
-        return Number.isSafeInteger(target) && target > 0 && target === expected[index]
-    })
-}
-
 function getEventCurrentStateRule(missionId: number): EventCurrentStateRule | undefined {
-    const rule = EVENT_CURRENT_STATE_RULES[missionId]
-    const definition = getMissionMasterDefinition(3, missionId)
-    if (!rule || !definition || Number(definition.row[2]) !== rule.patternType) return undefined
-    if (!hasExpectedEventTargets(missionId, rule.targets)) return undefined
-    if (definition.row[11] !== "(None)") return undefined
-    if (rule.fact !== "mainChapterClear") {
-        return definition.row[7] === "(None)" ? rule : undefined
-    }
-    return Number(definition.row[7]) === 0
-        && Number(definition.row[8]) === rule.mainChapter
-        && definition.row[9] === "(None)"
-        && definition.row[10] === "(None)"
-        ? rule
+    const catalog = getMissionCatalog()
+    const definition = catalog.getDefinition(3, missionId)
+    return definition
+        ? getCatalogEventCurrentStateRule(
+            definition,
+            catalog.getRewardStages(3, missionId),
+        )
         : undefined
 }
 
 export function getEventCurrentStateMissionIds(): readonly number[] {
-    return Object.keys(EVENT_CURRENT_STATE_RULES)
-        .map(Number)
+    return getEventCurrentStateRuleMissionIds()
         .filter(missionId => getEventCurrentStateRule(missionId) !== undefined)
-        .sort((left, right) => left - right)
 }
 
 function hasEnabledEventCurrentStateMission(evaluationTime: Date): boolean {
@@ -400,7 +350,9 @@ function buildEventCurrentState(
         ? null
         : new Set<number>()
     if (clearedMainChapters !== null) {
-        for (const rule of Object.values(EVENT_CURRENT_STATE_RULES)) {
+        for (const missionId of getEventCurrentStateRuleMissionIds()) {
+            const rule = getEventCurrentStateRule(missionId)
+            if (!rule) continue
             if (rule.mainChapter === undefined) continue
             const questIds = staticIndex.mainQuestIdsByChapter!.get(rule.mainChapter) ?? []
             if (questIds.length > 0 && questIds.every(questId => finishedMainQuestIds.has(questId))) {

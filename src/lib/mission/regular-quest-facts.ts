@@ -1,7 +1,10 @@
 import bundledExQuests from "../../../assets/ex_quest.json"
 import bundledMainQuests from "../../../assets/main_quest.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
-import { getMissionMasterDefinition } from "./master-data"
+import {
+    getMissionMasterDefinition,
+    type MissionMasterDefinition,
+} from "./master-data"
 import type { CategoryContext } from "./types"
 
 type RawQuestTable = Record<string, unknown>
@@ -38,12 +41,10 @@ function matchesSelector(
         && (quests === null || quests.includes(quest))
 }
 
-function getStoryQuestRule(missionId: number): {
+function getStoryQuestRule(definition: MissionMasterDefinition): {
     readonly section: number
     readonly candidates: readonly number[]
 } | null {
-    const definition = getMissionMasterDefinition(1, missionId)
-    if (!definition) return null
     const rangeKind = Number(definition.row[7])
     if (rangeKind !== 0 && rangeKind !== 1) return null
     const worlds = parseIntegerList(definition.row[8])
@@ -63,9 +64,10 @@ function getStoryQuestRule(missionId: number): {
         : null
 }
 
-function getPracticeQuestCandidates(missionId: number): readonly number[] | null {
-    const definition = getMissionMasterDefinition(1, missionId)
-    if (!definition || Number(definition.row[7]) !== 11) return null
+function getPracticeQuestCandidates(
+    definition: MissionMasterDefinition,
+): readonly number[] | null {
+    if (Number(definition.row[7]) !== 11) return null
     const candidates = parseIntegerList(definition.row[10])
     return candidates && candidates.length > 0 ? candidates : null
 }
@@ -74,7 +76,8 @@ function computeStoryQuestRange(
     missionId: number,
     ctx: CategoryContext,
 ): number | undefined {
-    const rule = getStoryQuestRule(missionId)
+    const definition = getMissionMasterDefinition(1, missionId)
+    const rule = definition ? getStoryQuestRule(definition) : null
     if (!rule) return undefined
     const finished = getFinishedQuestIds(ctx, rule.section)
     return rule.candidates.every(questId => finished.has(questId)) ? 1 : 0
@@ -84,15 +87,24 @@ function computePracticeQuestRange(
     missionId: number,
     ctx: CategoryContext,
 ): number | undefined {
-    const candidates = getPracticeQuestCandidates(missionId)
+    const definition = getMissionMasterDefinition(1, missionId)
+    const candidates = definition ? getPracticeQuestCandidates(definition) : null
     if (!candidates) return undefined
     const finished = getFinishedQuestIds(ctx, 15)
     return candidates.some(questId => finished.has(questId)) ? 1 : 0
 }
 
 export function isRegularQuestMissionSupported(missionId: number): boolean {
-    return getStoryQuestRule(missionId) !== null
-        || getPracticeQuestCandidates(missionId) !== null
+    const definition = getMissionMasterDefinition(1, missionId)
+    return definition !== undefined && getRegularQuestFactSection(definition) !== undefined
+}
+
+export function getRegularQuestFactSection(
+    definition: MissionMasterDefinition,
+): number | undefined {
+    const storyRule = getStoryQuestRule(definition)
+    if (storyRule) return storyRule.section
+    return getPracticeQuestCandidates(definition) ? 15 : undefined
 }
 
 export function computeRegularQuestProgress(

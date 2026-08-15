@@ -3,6 +3,7 @@ import {
     getMissionMasterDefinition,
     type MissionMasterDefinition,
 } from "./master-data"
+import type { MissionCatalog } from "./mission-catalog"
 import { getCategoryMissionRewardStageDefinition } from "./rewards"
 
 export const DEGREE_SUPPORTED_FAMILIES = {
@@ -79,35 +80,46 @@ const AUTHORITATIVE_CHARACTER_LEVEL_MISSIONS: ReadonlyMap<number, {
     [3020, { pattern: "degree_character_lv_growth_3", target: 100 }],
 ] as const)
 
-export function isAuthoritativeCharacterLevelMission(missionId: number): boolean {
+export function isAuthoritativeCharacterLevelMission(
+    missionId: number,
+    definition: MissionMasterDefinition | undefined = getMissionMasterDefinition(5, missionId),
+    catalog?: MissionCatalog,
+): boolean {
     const expected = AUTHORITATIVE_CHARACTER_LEVEL_MISSIONS.get(missionId)
     if (!expected) return false
-    const definition = getMissionMasterDefinition(5, missionId)
-    const reward = getCategoryMissionRewardStageDefinition(5, missionId, 1)
+    const targetProgress = catalog
+        ? catalog.getRewardStage(5, missionId, 1)?.targetProgress
+        : getCategoryMissionRewardStageDefinition(5, missionId, 1)?.targetProgress
     return Boolean(
         definition
         && Number(definition.row[3]) === 5
         && definition.pattern === expected.pattern
-        && reward?.targetProgress === expected.target
+        && targetProgress === expected.target
     )
 }
 
-export function getSpecificCharacterBondId(missionId: number): number | undefined {
-    const definition = getMissionMasterDefinition(5, missionId)
+export function getSpecificCharacterBondId(
+    missionId: number,
+    definition: MissionMasterDefinition | undefined = getMissionMasterDefinition(5, missionId),
+): number | undefined {
     if (!definition || Number(definition.row[3]) !== 44) return undefined
     const characterId = Number(definition.row[15])
     return Number.isSafeInteger(characterId) && characterId > 0 ? characterId : undefined
 }
 
-export function getSecondManaBoardCharacterId(missionId: number): number | undefined {
-    const definition = getMissionMasterDefinition(5, missionId)
+export function getSecondManaBoardCharacterId(
+    missionId: number,
+    definition: MissionMasterDefinition | undefined = getMissionMasterDefinition(5, missionId),
+): number | undefined {
     if (!definition || Number(definition.row[3]) !== 48) return undefined
     const characterId = Number(definition.row[15])
     return Number.isSafeInteger(characterId) && characterId > 0 ? characterId : undefined
 }
 
-export function isSecondManaBoardAggregateMission(missionId: number): boolean {
-    const definition = getMissionMasterDefinition(5, missionId)
+export function isSecondManaBoardAggregateMission(
+    missionId: number,
+    definition: MissionMasterDefinition | undefined = getMissionMasterDefinition(5, missionId),
+): boolean {
     return Boolean(
         definition
         && Number(definition.row[3]) === 48
@@ -115,8 +127,10 @@ export function isSecondManaBoardAggregateMission(missionId: number): boolean {
     )
 }
 
-export function getEpisodeChapter(missionId: number): number | undefined {
-    const definition = getMissionMasterDefinition(5, missionId)
+export function getEpisodeChapter(
+    missionId: number,
+    definition: MissionMasterDefinition | undefined = getMissionMasterDefinition(5, missionId),
+): number | undefined {
     if (!definition
         || Number(definition.row[3]) !== 22
         || !definition.pattern.startsWith("degree_all_episode_quest_clear_")) return undefined
@@ -188,6 +202,7 @@ function isPersistedProgressDefinition(definition: MissionMasterDefinition): boo
 
 export function getDegreeMissionFactRequirements(
     definition: MissionMasterDefinition,
+    catalog?: MissionCatalog,
 ): DegreeMissionFactRequirements | undefined {
     if (definition.category !== 5) return undefined
     if (isPersistedProgressDefinition(definition)) return { factFamilies: [] }
@@ -205,13 +220,19 @@ export function getDegreeMissionFactRequirements(
     if (startsWithAny(pattern, DEGREE_BATTLE_STAT_PREFIXES)) {
         return { factFamilies: ["degreeBattleStats"] }
     }
-    if (isAuthoritativeCharacterLevelMission(missionId)) return { factFamilies: ["characters"] }
-    if (getSpecificCharacterBondId(missionId) !== undefined) return { factFamilies: ["characters"] }
-    if (isSecondManaBoardAggregateMission(missionId)
-        || getSecondManaBoardCharacterId(missionId) !== undefined) {
+    if (isAuthoritativeCharacterLevelMission(missionId, definition, catalog)) {
+        return { factFamilies: ["characters"] }
+    }
+    if (getSpecificCharacterBondId(missionId, definition) !== undefined) {
+        return { factFamilies: ["characters"] }
+    }
+    if (isSecondManaBoardAggregateMission(missionId, definition)
+        || getSecondManaBoardCharacterId(missionId, definition) !== undefined) {
         return { factFamilies: ["characters", "manaNodes"] }
     }
-    if (getEpisodeChapter(missionId) !== undefined) return { factFamilies: ["episodeChapters"] }
+    if (getEpisodeChapter(missionId, definition) !== undefined) {
+        return { factFamilies: ["episodeChapters"] }
+    }
     if (conditionType === 21 && pattern.startsWith(DEGREE_SUPPORTED_FAMILIES.episodeClearCount)) {
         return { factFamilies: ["episodeClearCount"] }
     }

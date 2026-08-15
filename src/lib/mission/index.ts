@@ -6,6 +6,13 @@ export type { FactIdSelection, FactKey, PeriodicSnapshotKind } from "./facts/fac
 export type { MissionFactLoadPlan } from "./facts/types"
 export { getFactKeyId, normalizeFactKey } from "./facts/fact-key"
 export { buildFactLoadPlan } from "./facts/load-plan"
+export type {
+    MissionFactRequirement,
+    MissionFactRequirementEntry,
+    MissionFactRequirementRegistry,
+    MissionRef,
+} from "./requirements/types"
+export { getMissionFactRequirementRegistry } from "./requirements/registry"
 
 // Registry
 export { getComputer } from "./registry"
