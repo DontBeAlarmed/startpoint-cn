@@ -329,6 +329,17 @@ test("maps single finish settlement implementation and regression precisely", ()
     )
 })
 
+test("maps single continue lifecycle implementation and regression precisely", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/single-continue-lifecycle.ts"]),
+        ["integration:quest", "integration:rules", "quick:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/single_continue_lifecycle.test.cjs"]),
+        ["quick:quest"],
+    )
+})
+
 test("maps the single battle settlement baseline family to integration quest", () => {
     for (const file of [
         "tools/perf/single_battle_settlement_admission.cjs",

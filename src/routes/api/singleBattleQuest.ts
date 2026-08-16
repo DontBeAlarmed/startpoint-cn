@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { deletePlayerActiveQuestSync, getPlayerActiveQuestSync, updatePlayerActiveQuestContinueCountSync } from "../../data/domains/quest_active"
+import { deletePlayerActiveQuestSync, getPlayerActiveQuestSync } from "../../data/domains/quest_active"
 import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerRushEventSync } from "../../data/domains/rushEvent"
 import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
 import { getPlayerItemSync, givePlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
@@ -114,6 +114,7 @@ import {
     SingleFinishSettlementContext,
     SingleFinishSettlementValidationError,
 } from "../../lib/quest/single-finish-settlement";
+import { runSingleContinueLifecycleTransaction } from "../../lib/quest/single-continue-lifecycle";
 
 interface StartBody {
     quest_id: number
@@ -175,15 +176,6 @@ interface PlayContinueBody {
     category: number,
     statistics?: QuestStatistics
 }
-
-type ContinueTransactionResult =
-    | {
-        ok: true
-        freeVmoney: number
-        vmoney: number
-        continueCount: number
-    }
-    | { ok: false, message: string }
 
 interface AbortBody {
     api_count: number,
@@ -1060,58 +1052,18 @@ const routes = async (fastify: FastifyInstance) => {
         })
         const { playerId } = sessionResult
 
-        // get active quest data
-        const activeQuestData = activeQuests[playerId]
-        if (activeQuestData === undefined) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "No active quest to continue."
+        const continueResult = runSingleContinueLifecycleTransaction({
+            playerId,
+            memoryQuest: activeQuests[playerId],
+            playId: body.play_id,
+            questId: body.quest_id,
+            category: body.category,
+            cost: continueVmoneyCost,
         })
-        if (
-            activeQuestData.playId !== body.play_id
-            || activeQuestData.questId !== body.quest_id
-            || activeQuestData.category !== body.category
-        ) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Active quest does not match continue request."
-        })
-
-        const continueResult = getDb().transaction((): ContinueTransactionResult => {
-            const currentPlayer = getPlayerSync(playerId)
-            const persistedQuest = getPlayerActiveQuestSync(playerId)
-            if (!currentPlayer || !persistedQuest) {
-                return { ok: false, message: "No persisted active quest to continue." }
-            }
-            if (
-                persistedQuest.isMulti
-                || persistedQuest.playId !== body.play_id
-                || persistedQuest.questId !== body.quest_id
-                || persistedQuest.category !== body.category
-            ) {
-                return { ok: false, message: "Persisted active quest does not match continue request." }
-            }
-
-            const freeSpent = Math.min(currentPlayer.freeVmoney, continueVmoneyCost)
-            const paidCost = continueVmoneyCost - freeSpent
-            if (currentPlayer.vmoney < paidCost) {
-                return { ok: false, message: "Not enough vmoney to continue" }
-            }
-
-            const freeVmoney = currentPlayer.freeVmoney - freeSpent
-            const vmoney = currentPlayer.vmoney - paidCost
-            const continueCount = persistedQuest.continueCount + 1
-            updatePlayerSync({
-                id: playerId,
-                freeVmoney,
-                vmoney,
-            })
-            updatePlayerActiveQuestContinueCountSync(playerId, continueCount)
-            return { ok: true, freeVmoney, vmoney, continueCount }
-        })()
         if (!continueResult.ok) return reply.status(400).send({
             "error": "Bad Request",
             "message": continueResult.message,
         })
-        activeQuestData.continueCount = continueResult.continueCount
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

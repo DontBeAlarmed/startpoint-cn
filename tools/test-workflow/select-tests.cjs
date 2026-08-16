@@ -119,6 +119,10 @@ const SOURCE_RULES = [
         groups: ["integration:quest", "quick:quest"],
     },
     {
+        pattern: /^src\/lib\/quest\/single-continue-lifecycle\.ts$/,
+        groups: ["integration:quest", "integration:rules", "quick:quest"],
+    },
+    {
         pattern: /^src\/lib\/quest\/single-finish-settlement\.ts$/,
         groups: ["integration:quest"],
     },

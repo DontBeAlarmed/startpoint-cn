@@ -11,8 +11,13 @@ function readSource(relativePath) {
     return fs.readFileSync(path.join(projectRoot, relativePath), "utf8")
 }
 
-function assertSettlementInsideFinishTransaction(source, label, transactionCall) {
-    const transactionBody = source.indexOf("const executeFinishWrites = () => {")
+function assertSettlementInsideFinishTransaction(
+    source,
+    label,
+    transactionCall,
+    transactionBodyCall = "const executeFinishWrites = () => {",
+) {
+    const transactionBody = source.indexOf(transactionBodyCall)
     const settlement = source.indexOf("settleAdditionalRewardsSync(", transactionBody)
     const transactionCommit = source.indexOf(transactionCall, settlement)
 
@@ -26,7 +31,8 @@ test("single finish grants and publishes additional rewards atomically", () => {
     assertSettlementInsideFinishTransaction(
         source,
         "single finish",
-        "getDb().transaction(executeFinishWrites)()",
+        "runSingleFinishSettlementTransaction(",
+        "const executeFinishWrites = ({",
     )
     assert.match(source, /settleAdditionalRewardsSync\([\s\S]*?isMulti: false,/)
     assert.match(
