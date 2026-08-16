@@ -7,7 +7,7 @@ import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { createCharacterAwakeEligibilityResolver, evaluateMissionProgressStageB, getCharacterIdFromMission, getCurrentStage, getMissionCatalog, getMissionIdsByCategory, mergeMissionSettlementResponse, reconcileAwakeUnlockCharacterList, settleAwakeMissionCandidatesWithEvaluation, settleMissionCategoriesWithEvaluation } from "../../lib/mission/index";
+import { createCharacterAwakeEligibilityResolver, evaluateMissionProgressStageB, getCharacterIdFromMission, getCurrentStage, getMissionCatalog, mergeMissionSettlementResponse, reconcileAwakeUnlockCharacterList, settleAwakeMissionCandidatesWithEvaluation, settleMissionCategoriesWithEvaluation } from "../../lib/mission/index";
 import { resolveClientProgressTargets } from "../../lib/mission/client-progress";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { addMissionProgressDelta } from "../../lib/mission/progress";
@@ -112,13 +112,19 @@ const routes = async (fastify: FastifyInstance) => {
             const awakeProgressByMission = new Map(
                 (awakeSettlement?.evaluation.missions ?? []).map(mission => [mission.missionId, mission]),
             )
+            const automaticMissionIdsByRequest = requestList.map(requestEntry => (
+                automaticSettlement?.prepared.scopes.find(scope => (
+                    scope.category === requestEntry.category
+                    && scope.eventId === requestEntry.event_id
+                ))?.enabledMissionIds ?? []
+            ))
 
             for (let requestIndex = 0; requestIndex < requestList.length; requestIndex++) {
                 const requestEntry = requestList[requestIndex]
                 const category = requestEntry.category
                 const allIds = category === 9
                     ? awakeCandidatesByRequest[requestIndex]
-                    : getMissionIdsByCategory(category)
+                    : automaticMissionIdsByRequest[requestIndex]
 
                 for (const missionId of allIds) {
                     if (category !== 9) {

@@ -59,6 +59,7 @@ const { characterExpCaps } = require("../src/lib/character")
 const {
     createCharacterAwakeEligibilityResolver,
     getAwakeBattleMissionIds,
+    getMissionCatalog,
 } = require("../src/lib/mission")
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
 const missionRoutes = require("../src/routes/api/mission").default
@@ -560,6 +561,40 @@ async function main() {
             collectPageData.mission_progress_list.find(entry => entry.mission_id === 1500).progress_value,
             50,
         )
+
+        setServerTimeOffset(Date.parse("2020-07-21T04:00:00.000Z") - Date.now())
+        const catalog = getMissionCatalog()
+        const category4Definitions = catalog.getDefinitions(4)
+        const event3MissionIds = category4Definitions
+            .filter(definition => catalog.isEnabledAt(4, definition.missionId, new Date("2020-07-21T04:00:00.000Z"), 3))
+            .map(definition => definition.missionId)
+        const event10002MissionIds = category4Definitions
+            .filter(definition => catalog.isEnabledAt(4, definition.missionId, new Date("2020-07-21T04:00:00.000Z"), 10002))
+            .map(definition => definition.missionId)
+        assert.equal(event3MissionIds.length, 60)
+        assert.equal(event10002MissionIds.length, 8)
+
+        const dualEventPage = await fastify.inject({
+            method: "POST",
+            url: "/api/index.php/mission/get_mission_progress",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            payload: encodeRequest({
+                viewer_id: viewerId,
+                api_count: 1,
+                category_list: [
+                    { category: 4, event_id: 3 },
+                    { category: 4, event_id: 10002 },
+                ],
+            }),
+        })
+        assert.equal(dualEventPage.statusCode, 200, dualEventPage.body)
+        const dualEventMissionIds = decodeResponse(dualEventPage).data.mission_progress_list
+            .map(entry => entry.mission_id)
+        assert.equal(dualEventMissionIds.length, 68)
+        assert.deepEqual(dualEventMissionIds, [
+            ...event3MissionIds,
+            ...event10002MissionIds,
+        ])
 
         setServerTimeOffset(Date.parse("2023-12-01T04:00:00.000Z") - Date.now())
         givePlayerItemSync(playerId, 80111, 10)

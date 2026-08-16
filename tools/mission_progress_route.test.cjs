@@ -65,7 +65,15 @@ stubModule("../src/lib/mission/index", {
             receivedStages: [],
         }))
         return {
-            prepared: { scopes: [], candidates: [], passPreparation: {} },
+            prepared: {
+                scopes: [{
+                    category: 5,
+                    candidateCount: missions.length,
+                    enabledMissionIds: missions.map(mission => mission.missionId),
+                }],
+                candidates: [],
+                passPreparation: {},
+            },
             evaluation: { playerId, missions },
             settlement: { missionInfo: [], itemList: {}, characterList: [], equipmentList: [], degreeIds: [] },
             invalidatedFactKeys: [],
