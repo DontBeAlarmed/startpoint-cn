@@ -320,7 +320,9 @@ test("uses actual child missions for Daily and Awake aggregate dependencies", ()
         { category: 9, missionId: 13 },
     ])
     assert.equal(factIds(registry.getRequirement(2, 5)).includes("categoryMissionProgress:2"), false)
-    assert.equal(factIds(registry.getRequirement(9, 14)).includes("categoryMissionProgress:9"), false)
+    assert.deepEqual(factIds(registry.getRequirement(9, 14)), [
+        "categoryMissionProgress:9:11,12,13",
+    ])
 })
 
 test("separates Event producers from fail-closed selectors", () => {
@@ -420,7 +422,11 @@ test("separates recomputable, atomic, and fail-closed Awake families", () => {
     assert.deepEqual(factIds(registry.getRequirement(9, 1410033)), ["characters"])
     assert.equal(registry.getRequirement(9, 1410033).mode, "computed")
     assert.equal(registry.getRequirement(9, 1110013).mode, "persisted")
-    assert.deepEqual(registry.getRequirement(9, 1110013).facts, [])
+    assert.deepEqual(registry.getRequirement(9, 1110013).facts, [{
+        kind: "categoryMissionProgress",
+        category: 9,
+        missionIds: [1110013],
+    }])
 
     const catalog = getMissionCatalog()
     const source = catalog.getDefinition(9, 1110013)

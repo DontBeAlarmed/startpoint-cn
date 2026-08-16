@@ -295,6 +295,39 @@ export function getPlayerCategoryMissionProgressByIdsSync(
     return new Map(rows.map(row => [row.id, row.progress]))
 }
 
+export function getPlayerCategoryMissionsByIdsSync(
+    playerId: number,
+    category: number,
+    missionIds: readonly number[],
+): Record<string, PlayerActiveMission> {
+    const normalizedIds = [...new Set(missionIds)]
+        .filter(missionId => Number.isSafeInteger(missionId) && missionId > 0)
+        .sort((left, right) => left - right)
+    if (normalizedIds.length === 0) return {}
+    const placeholders = normalizedIds.map(() => "?").join(", ")
+    const missions = getDb().prepare(`
+        SELECT id, progress
+        FROM players_category_missions
+        WHERE player_id = ? AND category = ? AND id IN (${placeholders})
+    `).all(playerId, category, ...normalizedIds) as RawPlayerActiveMission[]
+    const stages = getDb().prepare(`
+        SELECT id, status, mission_id
+        FROM players_category_mission_stages
+        WHERE player_id = ? AND category = ? AND mission_id IN (${placeholders})
+    `).all(playerId, category, ...normalizedIds) as RawPlayerActiveMissionStage[]
+    const stageBuckets: Record<string, Record<string, boolean>> = {}
+    for (const stage of stages) {
+        const missionId = String(stage.mission_id)
+        const bucket = stageBuckets[missionId] ?? {}
+        bucket[String(stage.id)] = deserializeBoolean(stage.status)
+        stageBuckets[missionId] = bucket
+    }
+    return Object.fromEntries(missions.map(mission => [String(mission.id), {
+        progress: mission.progress,
+        stages: stageBuckets[String(mission.id)] ?? [],
+    }]))
+}
+
 export function getPlayerCategoryMissionListSync(
     playerId: number
 ): Record<string, Record<string, PlayerActiveMission>> {

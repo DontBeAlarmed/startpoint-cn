@@ -36,10 +36,9 @@ import { getServerGameplaySettingsSync } from "../../data/domains/server-setting
 import { buildBattleMissionSettlementScopes, recordMissionBattleFacts } from "../../lib/mission/battle-facts";
 import type { FinishContext } from "../../lib/quest/finish/types";
 import {
-    getAwakeBattleMissionIds,
     mergeMissionSettlementResponse,
     reconcileAwakeUnlockCharacterList,
-    settleAwakeMissionCandidates,
+    settleAwakeBattleMissions,
     settleMissionCategories,
 } from "../../lib/mission";
 import { resolveHostFinished } from "../../lib/quest/host-finish";
@@ -608,17 +607,13 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 buildBattleMissionSettlementScopes(partyCharacterIdsArray),
                 settlementTime,
             );
-            const awakeMissionIds = questAccomplished
-                ? getAwakeBattleMissionIds(
-                    partyCharacterIdsArray,
-                    missionBattleFacts.awakeMissionIds,
-                )
-                : []
-            const awakeMissionSettlement = settleAwakeMissionCandidates(
+            const awakeMissionSettlement = settleAwakeBattleMissions({
                 playerId,
-                awakeMissionIds,
-                settlementTime,
-            )
+                questAccomplished,
+                characterIds: partyCharacterIdsArray,
+                directlyChangedMissionIds: missionBattleFacts.awakeMissionIds,
+                evaluationTime: settlementTime,
+            })
             const characterList = reconcileAwakeUnlockCharacterList(playerId, [
                 ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
                 ...((clearReward?.character_list || []) as Record<string, unknown>[]),

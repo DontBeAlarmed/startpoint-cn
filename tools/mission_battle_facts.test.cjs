@@ -194,12 +194,8 @@ const singleSettlementTime = singleBattleSource.indexOf(
     "buildBattleMissionSettlementScopes(partyCharacterIdsArray),\n                settlementTime,",
     singleFactCall,
 )
-const singleAwakeCandidates = singleBattleSource.indexOf(
-    "getAwakeBattleMissionIds(",
-    singleFactCall,
-)
 const singleAwakeSettlement = singleBattleSource.indexOf(
-    "settleAwakeMissionCandidates(",
+    "settleAwakeBattleMissions({",
     singleSettlementTime,
 )
 const singleGeneralMerge = singleBattleSource.indexOf(
@@ -213,8 +209,8 @@ assert.equal(singleEvaluationTime > singleTransactionStart, true, "单人 finish
 assert.equal(singleFactCall > singleEvaluationTime, true, "单人任务事实必须使用事务时间")
 assert.equal(singleCharacterExp > singleFactCall, true, "单人角色经验必须在任务事实后写入")
 assert.equal(singleSettlementTime > singleCharacterExp, true, "单人称号结算必须看到本场角色经验")
-assert.equal(singleAwakeCandidates > singleFactCall, true, "单人 finish 必须用本场 facts 构建觉醒候选")
-assert.equal(singleAwakeSettlement > singleSettlementTime, true, "单人觉醒结算必须位于通用结算之后")
+assert.equal(singleAwakeSettlement > singleFactCall, true, "单人 finish 必须把本场 facts 传入觉醒 seam")
+assert.equal(singleAwakeSettlement > singleSettlementTime, true, "单人觉醒 seam 必须位于通用结算之后")
 assert.equal(singleGeneralMerge >= 0 && singleAwakeMerge > singleGeneralMerge, true, "单人响应必须先合并通用结算再合并觉醒结算")
 assert.match(
     singleBattleSource,
@@ -253,12 +249,8 @@ const multiSettlementTime = multiBattleSource.indexOf(
     "buildBattleMissionSettlementScopes(partyCharacterIdsArray),\n                settlementTime,",
     multiFactCall,
 )
-const multiAwakeCandidates = multiBattleSource.indexOf(
-    "getAwakeBattleMissionIds(",
-    multiFactCall,
-)
 const multiAwakeSettlement = multiBattleSource.indexOf(
-    "settleAwakeMissionCandidates(",
+    "settleAwakeBattleMissions({",
     multiSettlementTime,
 )
 const multiGeneralMerge = multiBattleSource.indexOf(
@@ -276,8 +268,8 @@ assert.equal(multiEvaluationTime > multiTransactionStart, true, "多人 finish �
 assert.equal(multiFactCall > multiTransactionStart, true)
 assert.equal(multiCharacterExp > multiFactCall, true, "多人角色经验必须在任务事实后写入")
 assert.equal(multiSettlementTime > multiCharacterExp, true, "多人称号结算必须看到本场角色经验")
-assert.equal(multiAwakeCandidates > multiFactCall, true, "多人 finish 必须用本场 facts 构建觉醒候选")
-assert.equal(multiAwakeSettlement > multiSettlementTime, true, "多人觉醒结算必须位于通用结算之后")
+assert.equal(multiAwakeSettlement > multiFactCall, true, "多人 finish 必须把本场 facts 传入觉醒 seam")
+assert.equal(multiAwakeSettlement > multiSettlementTime, true, "多人觉醒 seam 必须位于通用结算之后")
 assert.equal(multiGeneralMerge >= 0 && multiAwakeMerge > multiGeneralMerge, true, "多人响应必须先合并通用结算再合并觉醒结算")
 assert.match(
     multiBattleSource,

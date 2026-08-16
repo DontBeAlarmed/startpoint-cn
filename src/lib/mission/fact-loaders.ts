@@ -13,6 +13,8 @@ import type { MissionCatalog } from "./mission-catalog"
 import type { MissionFactRequirementRegistry } from "./requirements/types"
 import type { SnapshotData } from "./snapshot"
 import type { PlayerPassCardState } from "../../data/domains/pass-card"
+import type { PlayerCharacterClear } from "../../data/domains/character_clear"
+import type { PlayerPartyCoClearCounter } from "../../data/domains/party_co_clear"
 
 export interface MissionFactValueByKind {
     readonly player: Player
@@ -29,6 +31,8 @@ export interface MissionFactValueByKind {
     readonly shopPurchases: ShopPurchaseMap
     readonly periodicSnapshot: SnapshotData | null
     readonly passState: PlayerPassCardState
+    readonly characterClearCounters: Record<string, PlayerCharacterClear>
+    readonly partyCoClearCounters: readonly PlayerPartyCoClearCounter[]
 }
 
 export type MissionFactValue<Key extends FactKey> = Key["kind"] extends keyof MissionFactValueByKind

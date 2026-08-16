@@ -1,4 +1,7 @@
-import { getPlayerCategoryMissionsSync } from "../../data/domains/mission"
+import {
+    getPlayerCategoryMissionsByIdsSync,
+    getPlayerCategoryMissionsSync,
+} from "../../data/domains/mission"
 import { getPlayerSync } from "../../data/domains/player"
 import type { Player, PlayerActiveMission } from "../../data/types"
 import { MissionEvaluationSession } from "./evaluation-session"
@@ -19,11 +22,7 @@ import type {
     PreparedMissionSettlement,
 } from "./settlement"
 
-const SESSION_CATEGORIES: ReadonlySet<number> = new Set([1, 2, 3, 4, 5, 6, 7, 8, 10])
-
-interface LegacyMissionStateContext extends CategoryContext {
-    readonly categoryMissionStates?: ReadonlyMap<number, PlayerActiveMission>
-}
+const SESSION_CATEGORIES: ReadonlySet<number> = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 
 interface MutableEvaluatedMission {
     category: number
@@ -103,12 +102,31 @@ export function evaluateMissionCandidates(
         throw new Error("Mission evaluation requires at least one prepared candidate")
     }
     const catalog = getMissionCatalog()
+    const requirementRegistry = getMissionFactRequirementRegistry(catalog)
     const loaderCalls: FactKey[] = []
     const player = getPlayerSync(prepared.playerId)
     if (!player) throw new Error(`Player ${prepared.playerId} not found during mission settlement.`)
     const persistedByCategory = new Map<number, ReturnType<typeof getPlayerCategoryMissionsSync>>()
     for (const category of new Set(prepared.candidates.map(candidate => candidate.category))) {
-        if (category === 9) continue
+        if (category === 9) {
+            const missionIds = new Set<number>()
+            const visit = (missionId: number): void => {
+                if (missionIds.has(missionId)) return
+                missionIds.add(missionId)
+                const requirement = requirementRegistry.getRequirement(9, missionId)
+                for (const dependency of requirement?.missionDependencies ?? []) {
+                    if (dependency.category === 9) visit(dependency.missionId)
+                }
+            }
+            for (const candidate of prepared.candidates) {
+                if (candidate.category === 9) visit(candidate.missionId)
+            }
+            persistedByCategory.set(
+                category,
+                getPlayerCategoryMissionsByIdsSync(prepared.playerId, category, [...missionIds]),
+            )
+            continue
+        }
         persistedByCategory.set(
             category,
             getPlayerCategoryMissionsSync(prepared.playerId, category),
@@ -118,7 +136,7 @@ export function evaluateMissionCandidates(
         playerId: prepared.playerId,
         evaluationTime: new Date(prepared.evaluationTime),
         catalog,
-        requirementRegistry: getMissionFactRequirementRegistry(catalog),
+        requirementRegistry,
         candidates: prepared.candidates,
         orchestratorFacts: [{ kind: "player" }],
         loaders: createProductionMissionFactLoaderRegistry(undefined, {
@@ -147,7 +165,7 @@ export function evaluateMissionCandidates(
         if (missionIds.length === 0) continue
         const computer = getComputer(scope.category)
         const persisted = persistedByCategory.get(scope.category)
-        if (scope.category !== 9 && !persisted) {
+        if (!persisted) {
             throw new Error(`Mission category ${scope.category} was not prefetched`)
         }
         for (const groupedMissionIds of groupPassMissionIds(scope.category, missionIds)) {
@@ -164,10 +182,7 @@ export function evaluateMissionCandidates(
                 const key = `${scope.category}:${missionId}`
                 if (evaluatedKeys.has(key)) continue
                 evaluatedKeys.add(key)
-                const current = persisted?.[String(missionId)]
-                    ?? (scope.category === 9
-                        ? (context as LegacyMissionStateContext).categoryMissionStates?.get(missionId)
-                        : undefined)
+                const current = persisted[String(missionId)]
                 const dbProgress = current?.progress ?? 0
                 const computed = computer.compute(missionId, context, dbProgress)
                 const computedProgress = Number.isFinite(computed) ? computed : 0

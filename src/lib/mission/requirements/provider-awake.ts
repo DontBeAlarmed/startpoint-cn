@@ -39,13 +39,19 @@ export function getAwakeRequirement(
 
     switch (family.family) {
         case "all-complete":
+            const childMissionIds = [
+                definition.missionId - 3,
+                definition.missionId - 2,
+                definition.missionId - 1,
+            ]
             return {
                 mode: "computed",
-                missionDependencies: [
-                    definition.missionId - 3,
-                    definition.missionId - 2,
-                    definition.missionId - 1,
-                ].map(missionId => ({ category: 9, missionId })),
+                facts: [{
+                    kind: "categoryMissionProgress",
+                    category: 9,
+                    missionIds: childMissionIds,
+                }],
+                missionDependencies: childMissionIds.map(missionId => ({ category: 9, missionId })),
             }
         case "bond-token":
             return { mode: "computed", facts: [{ kind: "characters" }] }
@@ -70,6 +76,13 @@ export function getAwakeRequirement(
         case "race-selector":
         case "same-party-quest":
         case "same-party-three":
-            return { mode: "persisted" }
+            return {
+                mode: "persisted",
+                facts: [{
+                    kind: "categoryMissionProgress",
+                    category: 9,
+                    missionIds: [definition.missionId],
+                }],
+            }
     }
 }

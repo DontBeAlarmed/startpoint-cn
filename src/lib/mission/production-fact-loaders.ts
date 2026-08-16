@@ -42,6 +42,14 @@ import {
     getPlayerPassCardStateSync,
     type PlayerPassCardState,
 } from "../../data/domains/pass-card"
+import {
+    getPlayerCharacterClearsSync,
+    type PlayerCharacterClear,
+} from "../../data/domains/character_clear"
+import {
+    getPlayerPartyCoClearCountersSync,
+    type PlayerPartyCoClearCounter,
+} from "../../data/domains/party_co_clear"
 
 export interface ProductionMissionFactDomains {
     readonly getPlayerSync: (playerId: number) => Player | null
@@ -76,6 +84,8 @@ export interface ProductionMissionFactDomains {
     readonly getSnapshot: (playerId: number, periodType: string) => SnapshotData | null
     readonly getPassWeekSnapshotType: (eventId: number) => string
     readonly getPlayerPassCardStateSync: (playerId: number, eventId: number) => PlayerPassCardState
+    readonly getPlayerCharacterClearsSync: (playerId: number) => Record<string, PlayerCharacterClear>
+    readonly getPlayerPartyCoClearCountersSync: (playerId: number) => PlayerPartyCoClearCounter[]
 }
 
 export interface ProductionMissionFactSeeds {
@@ -103,6 +113,8 @@ const productionDomains: ProductionMissionFactDomains = {
     getSnapshot,
     getPassWeekSnapshotType,
     getPlayerPassCardStateSync,
+    getPlayerCharacterClearsSync,
+    getPlayerPartyCoClearCountersSync,
 }
 
 export function createProductionMissionFactLoaderRegistry(
@@ -166,5 +178,11 @@ export function createProductionMissionFactLoaderRegistry(
         })
         .register("passState", ({ playerId, key }) => (
             domains.getPlayerPassCardStateSync(playerId, key.eventId)
+        ))
+        .register("characterClearCounters", ({ playerId }) => (
+            domains.getPlayerCharacterClearsSync(playerId)
+        ))
+        .register("partyCoClearCounters", ({ playerId }) => (
+            domains.getPlayerPartyCoClearCountersSync(playerId)
         ))
 }

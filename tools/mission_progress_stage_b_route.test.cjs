@@ -40,11 +40,19 @@ process.once("exit", cleanup)
 
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
+const {
+    getPlayerItemSync,
+    givePlayerItemWithinTransactionSync,
+} = require("../src/data/domains/item")
+const {
+    mergeMissionSettlementResponse,
+} = require("../src/lib/mission/response")
 initializeDatabase()
 db = getDb()
 
 let stageBEvaluationCalls = 0
 let standardComputerCalls = 0
+const rewardItemId = 9001
 const stageAEvaluation = {
     prepared: {
         playerId: 1,
@@ -70,7 +78,7 @@ const stageAEvaluation = {
     },
     settlement: {
         missionInfo: [],
-        itemList: { "9001": 1 },
+        itemList: {},
         characterList: [],
         equipmentList: [],
         degreeIds: [],
@@ -94,18 +102,69 @@ stubModule("../src/lib/mission/index", {
         standardComputerCalls++
         throw new Error("standard mission Computer must not be called by the response path")
     },
+    getMissionCatalog: () => ({
+        getMissionIds: category => category === 9 ? [901] : [],
+        getAwakeMissionIdsByCharacter: characterId => characterId === 341005 ? [901] : [],
+        isEnabledAt: () => true,
+    }),
     getMissionIdsByCategory: category => category === 1 ? [101, 102, 103] : [],
     getCurrentStage: (_category, _missionId, progress) => progress >= 7 ? 2 : 1,
-    getCharacterIdFromMission: () => "0",
+    getCharacterIdFromMission: missionId => missionId === 901 ? "341005" : "0",
     isMissionEnabledAt: () => true,
-    mergeMissionSettlementResponse: (data, settlement) => {
-        data.item_list = { ...(data.item_list ?? {}), ...settlement.itemList }
-    },
+    mergeMissionSettlementResponse,
     reconcileAwakeUnlockCharacterList: (_playerId, list) => list,
-    settleAwakeMissionRewards: () => ({
-        missionInfo: [], itemList: {}, characterList: [], equipmentList: [], degreeIds: [], passCardPoints: {},
-    }),
-    settleMissionCategoriesWithEvaluation: () => stageAEvaluation,
+    settleAwakeMissionCandidatesWithEvaluation: (actualPlayerId, missionIds) => {
+        assert.equal(actualPlayerId, playerId)
+        assert.deepEqual(missionIds, [901])
+        const amount = givePlayerItemWithinTransactionSync(actualPlayerId, rewardItemId, 10)
+        return {
+            evaluation: {
+                playerId: actualPlayerId,
+                evaluationTime: "2024-08-14T12:00:00.000Z",
+                player: {},
+                missions: [{
+                    category: 9,
+                    missionId: 901,
+                    declaredFactDependencies: [{ kind: "characters" }],
+                    dbProgress: 0,
+                    computedProgress: 1,
+                    finalProgress: 1,
+                    receivedStages: [],
+                }],
+                observer: { candidateCount: 1, computeCount: 1, loaderCalls: [] },
+            },
+            settlement: {
+                missionInfo: [{ mission_category_id: 9, mission_id: 901, mission_reward_id: 9011 }],
+                itemList: { [rewardItemId]: amount },
+                characterList: [{
+                    character_id: 341005,
+                    exp: 110,
+                    mana_board_awake: { 2: 1 },
+                }],
+                equipmentList: [{ equipment_id: 8101, enhancement_level: 2 }],
+                degreeIds: [7001],
+                passCardPoints: {},
+            },
+            invalidatedFactKeys: [{ kind: "items" }],
+        }
+    },
+    settleMissionCategoriesWithEvaluation: actualPlayerId => {
+        assert.equal(actualPlayerId, playerId)
+        const amount = givePlayerItemWithinTransactionSync(actualPlayerId, rewardItemId, 100)
+        stageAEvaluation.settlement = {
+            missionInfo: [{ mission_category_id: 1, mission_id: 101, mission_reward_id: 1011 }],
+            itemList: { [rewardItemId]: amount },
+            characterList: [{
+                character_id: 341005,
+                exp: 100,
+                mana_board_awake: { 1: 1 },
+            }],
+            equipmentList: [{ equipment_id: 8101, enhancement_level: 1 }],
+            degreeIds: [7001],
+            passCardPoints: {},
+        }
+        return stageAEvaluation
+    },
 })
 
 const { insertAccountSync } = require("../src/data/domains/account")
@@ -144,16 +203,41 @@ async function main() {
             payload: {
                 viewer_id: viewerId,
                 api_count: 1,
-                category_list: [{ category: 1 }],
+                category_list: [
+                    { category: 1 },
+                    { category: 9, character_id: 341005 },
+                ],
             },
         })
         assert.equal(response.statusCode, 200, response.body)
         const data = unpack(response.rawPayload).data
         assert.deepEqual(
             data.mission_progress_list.map(entry => [entry.mission_id, entry.progress_value]),
-            [[101, 2], [102, 7], [103, 3]],
+            [[101, 2], [102, 7], [103, 3], [901, 1]],
         )
-        assert.deepEqual(data.item_list, { "9001": 1 })
+        assert.deepEqual(data.mission_info, [
+            { mission_category_id: 9, mission_id: 901, mission_reward_id: 9011 },
+            { mission_category_id: 1, mission_id: 101, mission_reward_id: 1011 },
+        ])
+        assert.equal(getPlayerItemSync(playerId, rewardItemId), 110)
+        assert.deepEqual(data.item_list, { [rewardItemId]: 110 })
+        assert.deepEqual(data.character_list, [{
+            character_id: 341005,
+            exp: 110,
+            mana_board_awake: { 1: 1, 2: 1 },
+        }])
+        assert.deepEqual(data.equipment_list, [{
+            equipment_id: 8101,
+            enhancement_level: 2,
+        }])
+        assert.deepEqual(data.degree_list, [
+            { viewer_id: viewerId, degree_id: 7001 },
+        ])
+        assert.equal(data.mail_arrived, false)
+        assert.deepEqual(
+            data.mission_progress_list.map(entry => entry.mission_category),
+            [1, 1, 1, 9],
+        )
         assert.equal(stageBEvaluationCalls, 1)
         assert.equal(standardComputerCalls, 0)
     } finally {

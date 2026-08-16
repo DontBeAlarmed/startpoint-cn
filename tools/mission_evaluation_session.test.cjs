@@ -48,6 +48,9 @@ test("construction fixes session inputs and performs no fact loads", () => {
             missionDependencies: dependencies,
         }),
     }, {
+        ...dependencies[0],
+        requirement: requirement([], { mode: "persisted" }),
+    }, {
         ...unsupportedRef,
         requirement: requirement([], { mode: "unsupported" }),
     }])

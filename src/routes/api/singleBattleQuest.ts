@@ -72,11 +72,10 @@ import {
 
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import {
-    getAwakeBattleMissionIds,
     mergeMissionSettlementResponse,
     reconcileActiveMissionFacts,
     reconcileAwakeUnlockCharacterList,
-    settleAwakeMissionCandidates,
+    settleAwakeBattleMissions,
     settleMissionCategories,
 } from "../../lib/mission";
 import type { MissionSettlementResult } from "../../lib/mission";
@@ -635,17 +634,13 @@ const routes = async (fastify: FastifyInstance) => {
                 buildBattleMissionSettlementScopes(partyCharacterIdsArray),
                 settlementTime,
             )
-            const awakeMissionIds = questAccomplished
-                ? getAwakeBattleMissionIds(
-                    partyCharacterIdsArray,
-                    missionBattleFacts.awakeMissionIds,
-                )
-                : []
-            const awakeMissionSettlement = settleAwakeMissionCandidates(
+            const awakeMissionSettlement = settleAwakeBattleMissions({
                 playerId,
-                awakeMissionIds,
-                settlementTime,
-            )
+                questAccomplished,
+                characterIds: partyCharacterIdsArray,
+                directlyChangedMissionIds: missionBattleFacts.awakeMissionIds,
+                evaluationTime: settlementTime,
+            })
             const activeMissionList = reconcileActiveMissionFacts({
                 playerId,
                 repository: getContentSnapshot().repository,

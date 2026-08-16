@@ -9,12 +9,24 @@ import { getDb } from "../../data/db"
 import { buildManaBoardAwakeCharacterList } from "../character-helpers"
 import { MissionRewardGranter } from "./grants"
 import { getAwakeMissionRewardStageDefinition } from "./rewards"
-import { getCompletedStageNumbers, getMissionIdsByCategory } from "./stages"
+import { getCompletedStageNumbers } from "./stages"
 import { getCharacterIdFromMission } from "./character-queries"
 import { createCharacterAwakeEligibilityResolver } from "./awake-eligibility"
 import type { CharacterAwakeEligibilityResolver } from "./awake-eligibility"
-import { getComputer } from "./registry"
-import { isMissionEnabledAt } from "./patterns"
+import { getMissionCatalog, type MissionCatalog } from "./mission-catalog"
+import {
+    prepareMissionSettlement,
+    selectMissionSettlementCandidates,
+} from "./settlement-prepare"
+import { evaluateMissionCandidates } from "./settlement-evaluate"
+import {
+    settleAwakeMissionEvaluationWithInvalidations,
+} from "./awake-evaluation-settlement"
+import type {
+    MissionEvaluationResult,
+    PreparedMissionSettlement,
+} from "./settlement"
+import type { FactKey } from "./facts/fact-key"
 
 export interface AwakeMissionComputedProgress {
     missionId: number
@@ -37,6 +49,21 @@ export interface AwakeMissionSettlementResult {
     userInfo?: Record<string, number>
 }
 
+export interface AwakeMissionSettlementEvaluation {
+    readonly prepared: PreparedMissionSettlement
+    readonly evaluation: MissionEvaluationResult
+    readonly settlement: AwakeMissionSettlementResult
+    readonly invalidatedFactKeys: readonly FactKey[]
+}
+
+export interface AwakeBattleMissionSettlementParams {
+    readonly playerId: number
+    readonly questAccomplished: boolean
+    readonly characterIds: readonly number[]
+    readonly directlyChangedMissionIds: readonly number[]
+    readonly evaluationTime: Date
+}
+
 function emptyAwakeMissionSettlement(): AwakeMissionSettlementResult {
     return {
         missionInfo: [],
@@ -51,17 +78,17 @@ function emptyAwakeMissionSettlement(): AwakeMissionSettlementResult {
 export function getAwakeBattleMissionIds(
     characterIds: readonly number[],
     directlyChangedMissionIds: readonly number[] = [],
+    catalog: MissionCatalog = getMissionCatalog(),
 ): number[] {
-    const categoryMissionIds = getMissionIdsByCategory(9)
-    const categoryMissionIdSet = new Set(categoryMissionIds)
     const characterIdSet = new Set(characterIds.filter(characterId =>
         Number.isSafeInteger(characterId) && characterId > 0,
     ))
-    const candidates = categoryMissionIds.filter(missionId =>
-        characterIdSet.has(Number(getCharacterIdFromMission(missionId))),
-    )
+    const candidates = [...characterIdSet]
+        .flatMap(characterId => catalog.getAwakeMissionIdsByCharacter(characterId))
     for (const missionId of directlyChangedMissionIds) {
-        if (Number.isSafeInteger(missionId) && missionId > 0 && categoryMissionIdSet.has(missionId)) {
+        if (Number.isSafeInteger(missionId)
+            && missionId > 0
+            && catalog.getDefinition(9, missionId) !== undefined) {
             candidates.push(missionId)
         }
     }
@@ -73,26 +100,57 @@ export function settleAwakeMissionCandidates(
     missionIds: readonly number[],
     evaluationTime: Date,
 ): AwakeMissionSettlementResult {
-    if (missionIds.length === 0) return emptyAwakeMissionSettlement()
-    const candidates = getAwakeBattleMissionIds([], missionIds)
-        .filter(missionId => isMissionEnabledAt(9, missionId, evaluationTime))
-    if (candidates.length === 0) return emptyAwakeMissionSettlement()
+    return settleAwakeMissionCandidatesWithEvaluation(playerId, missionIds, evaluationTime)
+        ?.settlement ?? emptyAwakeMissionSettlement()
+}
 
-    const computer = getComputer(9)
-    const context = computer.buildContext(playerId, 9, evaluationTime, candidates)
-    const persisted = getPlayerCategoryMissionsSync(playerId, 9)
-    const progressList = candidates.map(missionId => {
-        const dbProgress = persisted[String(missionId)]?.progress ?? 0
-        const computed = computer.compute(missionId, context, dbProgress)
+export function settleAwakeMissionCandidatesWithEvaluation(
+    playerId: number,
+    missionIds: readonly number[],
+    evaluationTime: Date,
+    resolver?: CharacterAwakeEligibilityResolver,
+): AwakeMissionSettlementEvaluation | null {
+    if (missionIds.length === 0) return null
+    const candidates = getAwakeBattleMissionIds([], missionIds)
+    if (candidates.length === 0) return null
+    const categories = [{ category: 9, missionIds: candidates }]
+    const selection = selectMissionSettlementCandidates(categories, evaluationTime)
+    if (selection.candidates.length === 0) return null
+    return getDb().transaction(() => {
+        const prepared = prepareMissionSettlement(
+            playerId,
+            categories,
+            evaluationTime,
+            undefined,
+            selection,
+        )
+        const evaluation = evaluateMissionCandidates(prepared)
+        const settled = settleAwakeMissionEvaluationWithInvalidations(
+            evaluation,
+            resolver ?? createCharacterAwakeEligibilityResolver(playerId, evaluationTime),
+        )
         return {
-            missionId,
-            progress: Math.max(0, dbProgress, Number.isFinite(computed) ? computed : 0),
+            prepared,
+            evaluation,
+            settlement: settled.settlement,
+            invalidatedFactKeys: settled.invalidatedFactKeys,
         }
-    })
-    return settleAwakeMissionRewards(
-        playerId,
-        progressList,
-        createCharacterAwakeEligibilityResolver(playerId, evaluationTime),
+    })()
+}
+
+export function settleAwakeBattleMissions(
+    params: AwakeBattleMissionSettlementParams,
+): AwakeMissionSettlementResult {
+    if (!params.questAccomplished) return emptyAwakeMissionSettlement()
+    const missionIds = getAwakeBattleMissionIds(
+        params.characterIds,
+        params.directlyChangedMissionIds,
+    )
+    if (missionIds.length === 0) return emptyAwakeMissionSettlement()
+    return settleAwakeMissionCandidates(
+        params.playerId,
+        missionIds,
+        params.evaluationTime,
     )
 }
 

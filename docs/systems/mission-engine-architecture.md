@@ -1,6 +1,6 @@
 # 任务引擎演进架构
 
-> 状态：阶段 1～5 已实施；Category 1～8、10 已接入 Session，Awake category 9 保持 legacy。阶段 6 待后续评估。
+> 状态：阶段 1～5 已实施，阶段 6 的第 13 项已实施；Category 1～10（包含 Awake 9）已接入 Session。性能收尾待第 14 项，任务引擎整体尚未完成。
 
 ## 目标
 
@@ -34,13 +34,14 @@
 当前标准结算链路为：
 
 ```text
-scope -> category mission IDs -> 开放时间过滤 -> Computer.buildContext
-      -> Computer.compute -> 进度写入 -> stage 领取 -> 奖励发放 -> 响应合并
+scope -> Catalog 候选与开放时间过滤 -> PreparedMissionSettlement
+      -> MissionEvaluationSession -> Computer.buildContextFromSession
+      -> EvaluationResult -> 专用写入器 -> 响应合并
 ```
 
-重构前的基线场景一次会扫描 3557 个候选，实际计算 177 条任务。不同 Computer 各自构造完整上下文，无法共享相同事实。阶段 1～3 已让 Category 1～6、10 在同一求值阶段共享 Session facts，但标准结算仍把候选准备、纯计算、进度写入和奖励发放集中在一个函数中。
+重构前的基线场景一次会扫描 3557 个候选，实际计算 177 条任务。不同 Computer 各自构造完整上下文，无法共享相同事实。阶段 1～5 已让 Category 1～8、10 在同一求值阶段共享 Session facts，阶段 6 的第 13 项又接入 Awake 9；候选准备、纯计算、进度写入和奖励发放现已拆分，性能收尾仍待第 14 项。
 
-Pass Category 7/8 不能直接迁入现有 Fact loader：Category 7 在缺少 `passWeek` 时会创建周期快照；Category 8 会通过 `ensurePlayerPassCardLoginProgressSync` 初始化登录基线。这些都是真实写入，必须在只读 Session 建立前完成。
+Pass Category 7/8 的迁移保留了必要的前置写入：Category 7 在缺少 `passWeek` 时创建周期快照，Category 8 通过 `ensurePlayerPassCardLoginProgressSync` 初始化登录基线；这些写入均在只读 Session 建立前完成。
 
 `/mission/get_mission_progress` 还存在两个求值阶段：
 
@@ -261,7 +262,7 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 
 ### 阶段 3：阶段内 FactStore
 
-状态：Category 1～8、10 已完成；Awake 9 保持 legacy，随阶段 6 再评估。
+状态：Category 1～8、10 已于本阶段完成；Awake 9 已于阶段 6 的第 13 项接入。
 
 - 引入 `MissionEvaluationSession`；
 - 先迁移重复读取最多的 player、quest progress、battle counters 和 periodic snapshot；
@@ -277,7 +278,7 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 - 保持现有 `MissionSettlementResult` 响应兼容层；
 - 验证重复调用不会重复发奖；
 - Category 7/8 在 prepare 中完成幂等 Pass 前置写入，在 evaluate 中通过只读 Session facts 求值；
-- Category 9 Awake 保持 legacy，未提前实现阶段 B 或奖励失效重算。
+- Category 9 Awake 已在阶段 6 接入相同的 Catalog、Session 与 EvaluationResult；未扩展阶段 B 语义。
 
 ### 阶段 5：任务页响应
 
@@ -288,17 +289,20 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 - 只对奖励失效键反向索引命中的、且已经属于本次请求阶段 A 候选的任务执行阶段 B；
 - 阶段 B 创建新只读 Session，只求值并覆盖任务页进度/阶段，不写进度、不领取 stage、不发奖励、不初始化 Pass 前置；
 - 无失效奖励或无受影响任务时不创建阶段 B；
-- 合并阶段 A/阶段 B 后保持请求顺序、任务响应字段、mail 和 Awake legacy 字段兼容；
+- 合并阶段 A/阶段 B 后保持请求顺序、任务响应字段、mail 和 Awake 响应字段兼容；
 - 阶段 A 写入、奖励、阶段 B 求值和响应生成继续位于同一外层事务，任一步失败整体回滚。
 
 ### 阶段 6：Awake 与性能收尾
 
-状态：待实施。
+状态：第 13 项已实施，性能收尾待第 14 项。
 
-- Awake 接入 Catalog 和 Session；
-- 增加单人、多人非空候选的即时响应与回滚测试；
-- 扩展结构性能基线到 Degree、Awake、`get_progress` 和战斗 finish；
-- 全部阶段完成后更新本文最终状态。
+- Awake 候选已接入 snapshot-scoped Catalog；指定角色页和战斗 main/Sub 只建立请求范围内候选，并合并本场 direct mission IDs；
+- Category 9 已通过只读 Session 声明并加载角色、玩家、任务履历、角色 clear、同队 clear 和 scoped persisted mission facts；all-complete 显式声明三个子任务及其 facts；
+- AwakeComputer 已使用 Session context，Category 9 persisted progress/stages 按候选及依赖 ID 单次批量读取，EvaluationResult 不再依赖 legacy `categoryMissionStates`；
+- Awake 专用写入器只消费 EvaluationResult，写入 progress/stage、普通奖励和 mana board awake unlock，保留 eligibility、幂等与原响应结构；
+- 单人、多人 finish 在本场事实和角色经验写入后调用共享 Awake settlement seam，同次响应可见奖励和 unlock，注入失败时由原外层事务完整回滚；
+- `/mission/get_mission_progress` 的 Category 9 指定角色页已复用 Catalog、Session 和 EvaluationResult，保持请求顺序、mail 与响应字段；不扩展阶段 B；
+- 第 14 项仍需扩展 Degree、Awake、`get_progress` 和战斗 finish 的结构性能基线，并完成性能收尾；任务引擎整体状态暂不宣告完成。
 
 每个阶段独立提交，不自动 push。若阶段需要改变数据库结构、客户端协议、Active Mission 所有权或事务外部边界，必须停止并重新确认。
 
@@ -352,6 +356,6 @@ Settlement BASE fixture 与负载 reference 分别由固定无参数 generator
 ## 已知后续项
 
 - 为 Degree 的 mana、章节、练习、商店和装备事实补齐逐族 scoped 正向矩阵；
-- 增加多人非空 Awake 候选端到端即时响应测试；
+- 第 14 项补齐 Degree、Awake、`get_progress` 和战斗 finish 的结构性能基线并完成性能收尾；
 - Active Mission 的共享事实、固定点和统一事务协调留到独立 Gate；
 - 跨请求缓存、数据库物化事实和 Content 热切换不在当前路线中。

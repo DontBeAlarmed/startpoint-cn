@@ -178,7 +178,7 @@ test("Event aggregate reuses the category progress settlement read", () => {
     })
 })
 
-test("generic Category 9 settlement uses the legacy mission state read once", () => {
+test("generic Category 9 settlement uses one scoped persisted state batch", () => {
     const playerId = createPlayer()
     updatePlayerCategoryMissionSync(playerId, 9, 11, 1)
     updatePlayerCategoryMissionStageSync(playerId, 9, 1, 11, true)
@@ -205,7 +205,7 @@ test("generic Category 9 settlement uses the legacy mission state read once", ()
     })
 })
 
-test("Pass 7/8 use the Session settlement guard while Awake 9 remains legacy", () => {
+test("Pass 7/8 and Awake 9 use the Session settlement guard", () => {
     const passComputer = getComputer(7)
     assert.strictEqual(passComputer, getComputer(8))
     const originalPassLegacy = passComputer.buildContext
@@ -223,10 +223,16 @@ test("Pass 7/8 use the Session settlement guard while Awake 9 remains legacy", (
 
     const awakeComputer = getComputer(9)
     const originalAwakeLegacy = awakeComputer.buildContext
+    const originalAwakeSession = awakeComputer.buildContextFromSession
     let awakeLegacyContexts = 0
+    let awakeSessionContexts = 0
     awakeComputer.buildContext = (...args) => {
         awakeLegacyContexts++
         return originalAwakeLegacy.call(awakeComputer, ...args)
+    }
+    awakeComputer.buildContextFromSession = (...args) => {
+        awakeSessionContexts++
+        return originalAwakeSession.call(awakeComputer, ...args)
     }
     try {
         settleMissionCategories(
@@ -243,10 +249,11 @@ test("Pass 7/8 use the Session settlement guard while Awake 9 remains legacy", (
         passComputer.buildContext = originalPassLegacy
         passComputer.buildContextFromSession = originalPassSession
         awakeComputer.buildContext = originalAwakeLegacy
+        awakeComputer.buildContextFromSession = originalAwakeSession
     }
 
     assert.equal(passLegacyContexts, 0)
     assert.equal(passSessionContexts, 2)
-    assert.equal(awakeLegacyContexts, 1)
-    assert.equal(awakeComputer.buildContextFromSession, undefined)
+    assert.equal(awakeLegacyContexts, 0)
+    assert.equal(awakeSessionContexts, 1)
 })

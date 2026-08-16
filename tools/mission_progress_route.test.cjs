@@ -246,7 +246,7 @@ async function main() {
                 category_list: [{ category: 5 }],
             },
         })
-        assert.equal(loadResponse.statusCode, 200)
+        assert.equal(loadResponse.statusCode, 200, loadResponse.body)
         assert.deepEqual(
             Object.fromEntries(unpack(loadResponse.rawPayload).data.mission_progress_list
                 .map(mission => [mission.mission_id, mission.progress_value])),

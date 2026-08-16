@@ -10,6 +10,7 @@ import {
     takeSnapshot,
 } from "./snapshot"
 import { getMissionIdsByCategory } from "./stages"
+import { getMissionCatalog } from "./mission-catalog"
 import type {
     MissionSettlementObserver,
     MissionSettlementScope,
@@ -52,7 +53,9 @@ function mergeSettlementScopes(
 }
 
 function getRequestedMissionIds(scope: MissionSettlementScope): number[] {
-    const categoryMissionIds = getMissionIdsByCategory(scope.category)
+    const categoryMissionIds = scope.category === 9
+        ? getMissionCatalog().getMissionIds(9)
+        : getMissionIdsByCategory(scope.category)
     if (scope.category === 2 || scope.missionIds === undefined) {
         return [...new Set(categoryMissionIds.filter(isSafeMissionId))]
     }

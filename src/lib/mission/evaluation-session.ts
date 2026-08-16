@@ -88,7 +88,9 @@ export class MissionEvaluationSession {
         this.observer = options.observer
 
         const facts: FactKey[] = [...(options.orchestratorFacts ?? [])]
-        const candidates = options.candidates.map(candidate => {
+        const visitedRequirements = new Set<string>()
+        const collectRequirementFacts = (candidate: MissionRef): MissionFactRequirement => {
+            const key = `${candidate.category}:${candidate.missionId}`
             const requirement = options.requirementRegistry.getRequirement(
                 candidate.category,
                 candidate.missionId,
@@ -98,7 +100,16 @@ export class MissionEvaluationSession {
                     `Mission requirement not found for ${candidate.category}:${candidate.missionId}`,
                 )
             }
+            if (visitedRequirements.has(key)) return requirement
+            visitedRequirements.add(key)
             facts.push(...requirement.facts)
+            for (const dependency of requirement.missionDependencies) {
+                collectRequirementFacts(dependency)
+            }
+            return requirement
+        }
+        const candidates = options.candidates.map(candidate => {
+            const requirement = collectRequirementFacts(candidate)
             return Object.freeze({
                 category: candidate.category,
                 missionId: candidate.missionId,

@@ -423,8 +423,16 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerPeriodicRewardPointsSync } = require("../src/data/domains/campaign")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
+const {
+    insertPlayerCharacterManaNodesSync,
+    updatePlayerCharacterSync,
+} = require("../src/data/domains/character")
+const { getPlayerCharacterAwakeUnlocksSync } = require("../src/data/domains/character_awake")
+const { updatePlayerCategoryMissionSync } = require("../src/data/domains/mission")
 const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
 const { activeQuests } = require("../src/lib/quest/active-quest-service")
+const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
+const { characterExpCaps } = require("../src/lib/character")
 const { computeRealTimeStamina } = require("../src/lib/stamina")
 const { registerBattleRoutes } = require("../src/multi/http/battle")
 const cnLoadRoutes = require("../src/routes/cn/load").default
@@ -733,6 +741,68 @@ test("production /finish settles activity hard multi periodic rewards for host a
         } finally {
             await closeProductionHome(home)
         }
+    }
+})
+
+test("production multi /finish returns non-empty Awake progress rewards and unlock immediately", async () => {
+    let home
+    try {
+        home = await openProductionHome(
+            "awake-route-multi",
+            host,
+            true,
+            { verify: async () => ({ ok: true, isHost: true }) },
+        )
+        const rarity = getCharacterDataSync(1).rarity
+        updatePlayerCharacterSync(home.playerId, 1, { exp: characterExpCaps[rarity][0] })
+        insertPlayerCharacterManaNodesSync(
+            home.playerId,
+            1,
+            Object.keys(getCharacterManaNodesSync(1, 1)).map(Number),
+        )
+        updatePlayerCategoryMissionSync(home.playerId, 9, 11, 3)
+        updatePlayerCategoryMissionSync(home.playerId, 9, 12, 100)
+        updatePlayerCategoryMissionSync(home.playerId, 9, 13, 96)
+        const itemBefore = Object.fromEntries([1, 2, 3, 4].map(itemId => [
+            itemId,
+            getPlayerItemSync(home.playerId, itemId) ?? 0,
+        ]))
+        const playId = "awake-route-multi"
+        const started = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, playId),
+        })
+        assert.equal(started.statusCode, 200, started.body)
+        const finished = await home.app.inject({
+            method: "POST",
+            url: "/finish",
+            payload: finishPayload(host.viewerId, playId),
+        })
+        assert.equal(finished.statusCode, 200, finished.body)
+        const response = JSON.parse(finished.body).data
+        assert.deepEqual(response.mission_info.filter(entry => entry.mission_category_id === 9), [
+            { mission_category_id: 9, mission_id: 11, mission_reward_id: 111 },
+            { mission_category_id: 9, mission_id: 12, mission_reward_id: 121 },
+            { mission_category_id: 9, mission_id: 13, mission_reward_id: 131 },
+            { mission_category_id: 9, mission_id: 14, mission_reward_id: 141 },
+        ])
+        assert.deepEqual(Object.fromEntries([1, 2, 3, 4].map(itemId => [
+            itemId,
+            response.item_list[itemId],
+        ])), {
+            1: itemBefore[1] + 10,
+            2: itemBefore[2] + 5,
+            3: itemBefore[3] + 3,
+            4: itemBefore[4] + 1,
+        })
+        assert.deepEqual(
+            response.character_list.find(entry => entry.character_id === 1)?.mana_board_awake,
+            { 1: 1 },
+        )
+        assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(home.playerId).get("1"), { 1: 1 })
+    } finally {
+        await closeProductionHome(home)
     }
 })
 

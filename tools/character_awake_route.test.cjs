@@ -50,6 +50,8 @@ const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const characterAssets = require("../src/lib/assets")
 const { getCharacterDataSync, getCharacterManaNodesSync } = characterAssets
 const { characterExpCaps } = require("../src/lib/character")
+const computerAwakeModule = require("../src/lib/mission/computer-awake")
+const { AwakeComputer } = computerAwakeModule
 const { insertActiveQuest } = require("../src/lib/quest/active-quest-service")
 const missionRoutes = require("../src/routes/api/mission").default
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
@@ -61,31 +63,47 @@ setServerTimeOffset(Date.parse("2025-01-01T12:00:00.000Z") - Date.now())
 
 initializeDatabase()
 db = getDb()
-const account = insertAccountSync({
-    appId: "wf_cn",
-    idpAlias: "",
-    idpCode: "test",
-    idpId: `character-awake-route-test-${randomUUID()}`,
-    status: "normal",
-})
-const playerId = insertDefaultPlayerSync(account.id).id
-insertDefaultPlayerCharacterSync(playerId, 341005)
-const rarity = getCharacterDataSync(341005).rarity
-updatePlayerCharacterSync(playerId, 341005, { exp: characterExpCaps[rarity][0] })
-insertPlayerCharacterManaNodesSync(
-    playerId,
-    341005,
-    Object.keys(getCharacterManaNodesSync(341005, 1)).map(Number),
+function createEligiblePlayer(label, viewerId) {
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: `${label}-${randomUUID()}`,
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    insertDefaultPlayerCharacterSync(playerId, 341005)
+    const rarity = getCharacterDataSync(341005).rarity
+    updatePlayerCharacterSync(playerId, 341005, { exp: characterExpCaps[rarity][0] })
+    insertPlayerCharacterManaNodesSync(
+        playerId,
+        341005,
+        Object.keys(getCharacterManaNodesSync(341005, 1)).map(Number),
+    )
+    db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
+        .run(String(viewerId), account.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 2)
+    db.prepare(`
+        INSERT INTO players_character_quest_clears (
+            player_id, character_id, clear_count, multi_count,
+            leader_clear_count, leader_multi_count, leader_power_flip_count
+        ) VALUES (?, 341005, 4, 0, 0, 0, 0)
+    `).run(playerId)
+    return { playerId, viewerId }
+}
+
+const { playerId, viewerId } = createEligiblePlayer(
+    "character-awake-route-test",
+    800000099,
 )
-const viewerId = 800000099
-db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
-    .run(String(viewerId), account.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 2)
+const invalidCandidatePlayer = createEligiblePlayer(
+    "character-awake-route-invalid-candidate",
+    800000100,
+)
 db.prepare(`
-    INSERT INTO players_character_quest_clears (
-        player_id, character_id, clear_count, multi_count,
-        leader_clear_count, leader_multi_count, leader_power_flip_count
-    ) VALUES (?, 341005, 4, 0, 0, 0, 0)
-`).run(playerId)
+    UPDATE players_character_quest_clears
+    SET clear_count = 5
+    WHERE player_id = ? AND character_id = 341005
+`).run(invalidCandidatePlayer.playerId)
 
 assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
 assert.deepEqual(getPlayerCategoryMissionsSync(playerId, 9), {})
@@ -129,15 +147,19 @@ function decodeResponse(response) {
     return unpack(Buffer.from(response.body, "base64"))
 }
 
-async function requestAwakePage(fastify) {
+async function requestAwakePage(
+    fastify,
+    targetViewerId = viewerId,
+    categoryList = [{ category: 9, character_id: 341005 }],
+) {
     return fastify.inject({
         method: "POST",
         url: "/api/index.php/mission/get_mission_progress",
         headers: { "content-type": "application/x-www-form-urlencoded" },
         payload: encodeRequest({
-            viewer_id: viewerId,
+            viewer_id: targetViewerId,
             api_count: 1,
-            category_list: [{ category: 9, character_id: 341005 }],
+            category_list: categoryList,
         }),
     })
 }
@@ -195,6 +217,78 @@ async function main() {
     await fastify.ready()
 
     try {
+        const invalidBefore = Object.fromEntries(
+            Object.keys(awakeRewardAmounts).map(itemId => [
+                itemId,
+                getPlayerItemSync(invalidCandidatePlayer.playerId, Number(itemId)) ?? 0,
+            ]),
+        )
+        for (const invalidCharacterId of [
+            undefined,
+            0,
+            -1,
+            Number.MAX_SAFE_INTEGER + 1,
+            Number.NaN,
+        ]) {
+            const entry = { category: 9 }
+            if (invalidCharacterId !== undefined) entry.character_id = invalidCharacterId
+            const invalid = await requestAwakePage(
+                fastify,
+                invalidCandidatePlayer.viewerId,
+                [entry],
+            )
+            assert.equal(invalid.statusCode, 200, invalid.body)
+            const invalidData = decodeResponse(invalid).data
+            assert.deepEqual(invalidData.mission_progress_list, [])
+            assert.deepEqual(invalidData.mission_info, [])
+            assert.deepEqual(invalidData.item_list, {})
+            assert.deepEqual(getPlayerCategoryMissionsSync(invalidCandidatePlayer.playerId, 9), {})
+            assert.equal(
+                getPlayerCharacterAwakeUnlocksSync(invalidCandidatePlayer.playerId).has("341005"),
+                false,
+            )
+            assert.deepEqual(Object.fromEntries(
+                Object.keys(awakeRewardAmounts).map(itemId => [
+                    itemId,
+                    getPlayerItemSync(invalidCandidatePlayer.playerId, Number(itemId)) ?? 0,
+                ]),
+            ), invalidBefore)
+        }
+
+        const originalDuplicateContext = AwakeComputer.buildContextFromSession
+        const duplicateCandidateBatches = []
+        AwakeComputer.buildContextFromSession = function trackedDuplicateContext(...args) {
+            duplicateCandidateBatches.push([...args[2]])
+            return originalDuplicateContext.apply(this, args)
+        }
+        let duplicate
+        try {
+            duplicate = await requestAwakePage(
+                fastify,
+                invalidCandidatePlayer.viewerId,
+                [
+                    { category: 9, character_id: 341005 },
+                    { category: 9, character_id: 341005 },
+                ],
+            )
+        } finally {
+            AwakeComputer.buildContextFromSession = originalDuplicateContext
+        }
+        assert.equal(duplicate.statusCode, 200, duplicate.body)
+        const duplicateData = decodeResponse(duplicate).data
+        assert.deepEqual(duplicateCandidateBatches, [[3410051, 3410052, 3410053, 3410054]])
+        assert.deepEqual(
+            duplicateData.mission_progress_list.map(entry => entry.mission_id),
+            [...Object.keys(expectedAwakeMissionProgress).map(Number),
+                ...Object.keys(expectedAwakeMissionProgress).map(Number)],
+        )
+        assert.deepEqual(Object.fromEntries(
+            Object.keys(awakeRewardAmounts).map(itemId => [
+                itemId,
+                getPlayerItemSync(invalidCandidatePlayer.playerId, Number(itemId)) ?? 0,
+            ]),
+        ), expectedAwakeItemAmounts)
+
         const finish = await finishAwakeBattle(fastify)
         assert.equal(finish.statusCode, 200, finish.body)
         const finishData = decodeResponse(finish).data
@@ -227,13 +321,20 @@ async function main() {
 
         const originalPrepare = db.prepare.bind(db)
         const originalGetCharacterDataSync = characterAssets.getCharacterDataSync
+        const originalLegacyAwakeContext = computerAwakeModule.buildAwakeContext
+        const originalSessionAwakeContext = AwakeComputer.buildContextFromSession
         const evaluatedCharacterIds = new Set()
+        const sessionCandidateBatches = []
         const queryCounts = {
             characterBatch: 0,
             manaNodeBatch: 0,
             characterSingle: 0,
             manaNodeSingle: 0,
             characterClearSingle: 0,
+            categoryProgressScoped: 0,
+            categoryStageScoped: 0,
+            categoryProgressFull: 0,
+            categoryStageFull: 0,
         }
         db.prepare = sql => {
             const normalized = String(sql).replace(/\s+/g, " ").trim()
@@ -250,11 +351,28 @@ async function main() {
             if (normalized.includes("FROM players_character_quest_clears WHERE player_id = ? AND character_id = ?")) {
                 queryCounts.characterClearSingle++
             }
+            if (normalized.includes("FROM players_category_missions")
+                && normalized.includes("category = ?")) {
+                if (normalized.includes("id IN")) queryCounts.categoryProgressScoped++
+                else queryCounts.categoryProgressFull++
+            }
+            if (normalized.includes("FROM players_category_mission_stages")
+                && normalized.includes("category = ?")) {
+                if (normalized.includes("mission_id IN")) queryCounts.categoryStageScoped++
+                else queryCounts.categoryStageFull++
+            }
             return originalPrepare(sql)
         }
         characterAssets.getCharacterDataSync = candidateCharacterId => {
             evaluatedCharacterIds.add(Number(candidateCharacterId))
             return originalGetCharacterDataSync(candidateCharacterId)
+        }
+        computerAwakeModule.buildAwakeContext = () => {
+            throw new Error("Category 9 get_progress must not use legacy context")
+        }
+        AwakeComputer.buildContextFromSession = function trackedSessionContext(...args) {
+            sessionCandidateBatches.push([...args[2]])
+            return originalSessionAwakeContext.apply(this, args)
         }
 
         let first
@@ -263,6 +381,8 @@ async function main() {
         } finally {
             db.prepare = originalPrepare
             characterAssets.getCharacterDataSync = originalGetCharacterDataSync
+            computerAwakeModule.buildAwakeContext = originalLegacyAwakeContext
+            AwakeComputer.buildContextFromSession = originalSessionAwakeContext
         }
         assert.equal(first.statusCode, 200)
         assert.deepEqual([...evaluatedCharacterIds], [341005])
@@ -272,7 +392,12 @@ async function main() {
             characterSingle: 0,
             manaNodeSingle: 0,
             characterClearSingle: 0,
+            categoryProgressScoped: 1,
+            categoryStageScoped: 1,
+            categoryProgressFull: 0,
+            categoryStageFull: 0,
         })
+        assert.deepEqual(sessionCandidateBatches, [[3410051, 3410052, 3410053, 3410054]])
         const firstData = decodeResponse(first).data
         assert.deepEqual(
             firstData.mission_progress_list,

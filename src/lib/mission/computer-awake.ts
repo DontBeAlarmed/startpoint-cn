@@ -9,7 +9,7 @@ import { getDb } from "../../data/db"
 import { getCharacterStoryQuestIds, getCharacterIdFromMission } from "./character-queries"
 import { isMissionProgressComplete } from "./stages"
 import type { MissionComputer, CategoryContext } from "./types"
-import type { PlayerActiveMission, PlayerCharacter } from "../../data/types"
+import type { PlayerCharacter } from "../../data/types"
 import {
     AWAKE_DIRECT_BATTLE_MISSION_IDS,
     getCharacterPairKey,
@@ -20,10 +20,11 @@ import {
     getAwakeMissionIdsByFamily,
     isAwakeGenericCharacterClearMission,
 } from "./awake-rule-catalog"
+import { buildAwakeContextFromSession } from "./awake-session-context"
 
 // ─── Awake-specific context (extends base) ───
 
-interface AwakeContext extends CategoryContext {
+export interface AwakeContext extends CategoryContext {
     charClears: Map<string, number>
     leaderClears: Map<string, number>
     multiClears: Map<string, number>
@@ -31,7 +32,6 @@ interface AwakeContext extends CategoryContext {
     coClears: Map<string, number>
     charData: Map<string, PlayerCharacter>
     categoryMissionProgress: Map<number, number>
-    categoryMissionStates: ReadonlyMap<number, PlayerActiveMission>
 }
 
 // ─── Special mission tables ───
@@ -124,10 +124,8 @@ export function buildAwakeContext(
     const coClears = mergePartyCoClearRows(rows)
 
     const categoryMissionProgress = new Map<number, number>()
-    const categoryMissionStates = new Map<number, PlayerActiveMission>()
     for (const [missionId, progress] of Object.entries(getPlayerCategoryMissionsSync(playerId, 9))) {
         categoryMissionProgress.set(Number(missionId), progress.progress)
-        categoryMissionStates.set(Number(missionId), progress)
     }
 
     return {
@@ -137,7 +135,6 @@ export function buildAwakeContext(
         rankCounts: { rank_ss: ssClears, rank_s: sClears, rank_a: aClears, rank_b: bClears },
         charClears, leaderClears, multiClears, leaderMultiClears,
         coClears, charData, categoryMissionProgress,
-        categoryMissionStates,
     }
 }
 
@@ -148,13 +145,19 @@ export const AwakeComputer: MissionComputer = {
         return buildAwakeContext(playerId)
     },
 
+    buildContextFromSession: buildAwakeContextFromSession,
+
     compute(missionId: number, ctx: CategoryContext, dbProgress: number): number {
-        const computed = computeAwakeDerivedProgress(missionId, ctx as AwakeContext)
+        const computed = computeAwakeDerivedProgress(missionId, ctx as AwakeContext, dbProgress)
         return Math.max(dbProgress, Number.isFinite(computed) ? computed : 0)
     },
 }
 
-function computeAwakeDerivedProgress(missionId: number, actx: AwakeContext): number {
+function computeAwakeDerivedProgress(
+    missionId: number,
+    actx: AwakeContext,
+    dbProgress: number,
+): number {
     const charId = getCharacterIdFromMission(missionId)
 
     const qc = QUEST_CLEAR_MAP.get(missionId)
@@ -173,7 +176,7 @@ function computeAwakeDerivedProgress(missionId: number, actx: AwakeContext): num
 
     // Per-finish atomic facts and unresolved families both read persisted progress.
     if (AWAKE_DIRECT_BATTLE_MISSION_IDS.has(missionId)) {
-        return actx.categoryMissionProgress?.get(missionId) ?? 0
+        return actx.categoryMissionProgress?.get(missionId) ?? dbProgress
     }
 
     // Two-character co-clear missions can use their pairwise same-battle counter.
@@ -192,7 +195,7 @@ function computeAwakeDerivedProgress(missionId: number, actx: AwakeContext): num
     const isLeaderRequired = LEADER_REQUIRED_IDS.has(missionId)
     switch (missionId % 10) {
         case AwakeType.STORY_READ:
-            return computeStoryOrParty(missionId, actx, charId)
+            return computeStoryOrParty(missionId, actx, charId, dbProgress)
 
         case AwakeType.PARTY_OR_SPECIAL:
             if (charId === '1') return actx.totalStories
@@ -238,7 +241,12 @@ enum AwakeType {
     ALL_COMPLETE = 4,
 }
 
-function computeStoryOrParty(missionId: number, actx: AwakeContext, charId: string): number {
+function computeStoryOrParty(
+    missionId: number,
+    actx: AwakeContext,
+    charId: string,
+    dbProgress: number,
+): number {
     if (getAwakeMissionIdsByFamily("story-read").includes(missionId)) {
         const storyIds = getCharacterStoryQuestIds(charId)
         let count = 0
@@ -248,7 +256,7 @@ function computeStoryOrParty(missionId: number, actx: AwakeContext, charId: stri
         return count
     }
     if (!isAwakeGenericCharacterClearMission(missionId)) {
-        return actx.categoryMissionProgress?.get(missionId) ?? 0
+        return actx.categoryMissionProgress?.get(missionId) ?? dbProgress
     }
     return actx.charClears.get(charId) ?? 0
 }
