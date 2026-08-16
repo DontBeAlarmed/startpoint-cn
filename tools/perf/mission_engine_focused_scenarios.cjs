@@ -134,6 +134,23 @@ function summarizeSettlement(result) {
     }
 }
 
+function completeSettlementResponse(result) {
+    return {
+        missionInfo: result.missionInfo,
+        itemList: result.itemList,
+        characterList: result.characterList,
+        equipmentList: result.equipmentList,
+        degreeIds: result.degreeIds,
+        passCardPoints: result.passCardPoints,
+        userInfo: result.userInfo ?? null,
+    }
+}
+
+function getPersistedDegree(runtime, playerId, missionId) {
+    const mission = runtime.getPlayerCategoryMissionsSync(playerId, 5)[missionId]
+    return { missionId, progress: mission.progress, stages: mission.stages }
+}
+
 function summarizeStoredMissionProgress(runtime, playerId, missionRefs) {
     const rows = []
     const missionIdsByCategory = new Map()
@@ -155,6 +172,43 @@ function summarizeStoredMissionProgress(runtime, playerId, missionRefs) {
         }
     }
     return createMissionProgressSummary(rows)
+}
+
+function executeDegreeFocused(runtime, playerId, fixedTime, useRoutingFallback) {
+    const computer = runtime.getComputer(5)
+    const sessionBuilder = computer.buildContextFromSession
+    if (useRoutingFallback) computer.buildContextFromSession = undefined
+    try {
+        const result = runtime.settleMissionCategories(playerId, [{
+            category: 5,
+            missionIds: DEGREE_FOCUSED_MISSION_IDS,
+        }], fixedTime)
+        return {
+            adapter: "scoped-settlement-routing",
+            missionIds: [...DEGREE_FOCUSED_MISSION_IDS],
+            missionRewards: result.missionInfo.map(info => info.mission_reward_id),
+            degreeIds: [...result.degreeIds].sort((left, right) => left - right),
+        }
+    } finally {
+        computer.buildContextFromSession = sessionBuilder
+    }
+}
+
+function executeDegreeBehaviorCharacterization(runtime, playerId, fixedTime) {
+    const scope = [{ category: 5, missionIds: [1000] }]
+    const firstResult = runtime.settleMissionCategories(playerId, scope, fixedTime)
+    const first = {
+        response: completeSettlementResponse(firstResult),
+        persisted: getPersistedDegree(runtime, playerId, 1000),
+    }
+    const repeatedResult = runtime.settleMissionCategories(playerId, scope, fixedTime)
+    return {
+        first,
+        repeated: {
+            response: completeSettlementResponse(repeatedResult),
+            persisted: getPersistedDegree(runtime, playerId, 1000),
+        },
+    }
 }
 
 function executeBattleFinish(runtime, playerId, fixedTime, isMulti) {
@@ -218,20 +272,37 @@ function summarizeBattleFinish(runtime, outcome, playerId) {
 function createFocusedScenarios(runtime) {
     return [
         {
+            name: "degree-routing-fallback",
+            prepare: () => createPlayer(runtime),
+            execute: (playerId, fixedTime) => executeDegreeFocused(
+                runtime,
+                playerId,
+                fixedTime,
+                true,
+            ),
+        },
+        {
             name: "degree-focused",
             prepare: () => createPlayer(runtime),
-            execute(playerId, fixedTime) {
-                const result = runtime.settleMissionCategories(playerId, [{
-                    category: 5,
-                    missionIds: DEGREE_FOCUSED_MISSION_IDS,
-                }], fixedTime)
-                return {
-                    adapter: "scoped-settlement",
-                    missionIds: [...DEGREE_FOCUSED_MISSION_IDS],
-                    missionRewards: result.missionInfo.map(info => info.mission_reward_id),
-                    degreeIds: [...result.degreeIds].sort((left, right) => left - right),
-                }
+            execute: (playerId, fixedTime) => executeDegreeFocused(
+                runtime,
+                playerId,
+                fixedTime,
+                false,
+            ),
+        },
+        {
+            name: "degree-behavior-characterization",
+            prepare() {
+                const playerId = createPlayer(runtime)
+                runtime.updatePlayerSync({ id: playerId, rankPoint: Number.MAX_SAFE_INTEGER })
+                return playerId
             },
+            execute: (playerId, fixedTime) => executeDegreeBehaviorCharacterization(
+                runtime,
+                playerId,
+                fixedTime,
+            ),
         },
         {
             name: "awake-character-page",

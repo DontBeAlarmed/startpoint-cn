@@ -1,7 +1,7 @@
 require("ts-node/register/transpile-only")
 
 const assert = require("node:assert/strict")
-const { randomUUID } = require("node:crypto")
+const { createHash, randomUUID } = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
@@ -71,6 +71,7 @@ const {
 const {
     getMissionFactRequirementRegistry,
 } = require("../src/lib/mission/requirements/registry")
+const legacyDegreeFixture = require("./fixtures/mission-degree/legacy-f8be414.json")
 
 const questProgressCountIndex = "idx_players_quest_progress_player_section_finished"
 const initializerSource = fs.readFileSync(
@@ -458,15 +459,32 @@ const degreeSession = new MissionEvaluationSession({
     loaders: createProductionMissionFactLoaderRegistry(),
 })
 const sessionContext = DegreeComputer.buildContextFromSession(degreeSession, 5, degreeMissionIds)
-assert.deepEqual(sessionContext.degreeStats, context.degreeStats)
-assert.deepEqual(sessionContext.degreeRules, context.degreeRules)
+const equivalenceStats = {
+    missions: degreeMissionIds.length,
+    dbProgresses: legacyDegreeFixture.compute.dbProgresses,
+    comparisons: 0,
+}
+assert.equal(degreeMissionIds.length, legacyDegreeFixture.compute.missionCount)
+for (const dbProgress of equivalenceStats.dbProgresses) {
+    const values = degreeMissionIds.map(missionId => [
+        missionId,
+        DegreeComputer.compute(missionId, sessionContext, dbProgress),
+    ])
+    const hash = createHash("sha256").update(JSON.stringify(values)).digest("hex")
+    assert.equal(hash, legacyDegreeFixture.compute.hashes[String(dbProgress)])
+    equivalenceStats.comparisons += degreeMissionIds.length
+}
+console.log(`degree legacy characterization: ${JSON.stringify({
+    ...equivalenceStats,
+    oracleCommit: legacyDegreeFixture.source.commit,
+})}`)
 for (const missionId of [1000, 3010, 111001, 1111001, 9000, 12000, 46000, 11010,
     57010, 58000, 68000, 61040, 62330, 41000, 70000, 43000, 16000]) {
     for (const dbProgress of [0, 1, 17]) {
         assert.equal(
             DegreeComputer.compute(missionId, sessionContext, dbProgress),
             DegreeComputer.compute(missionId, context, dbProgress),
-            `legacy/session ${missionId} db=${dbProgress}`,
+            `direct/session builder ${missionId} db=${dbProgress}`,
         )
     }
 }

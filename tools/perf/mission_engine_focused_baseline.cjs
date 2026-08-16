@@ -18,7 +18,9 @@ const SNAPSHOT_PATH = path.join(
     "mission_engine_focused_baseline.json",
 )
 const SCENARIO_KEYS = Object.freeze([
+    "degree-routing-fallback",
     "degree-focused",
+    "degree-behavior-characterization",
     "awake-character-page",
     "get-progress-no-invalidation",
     "get-progress-item-invalidation",

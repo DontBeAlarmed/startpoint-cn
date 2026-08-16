@@ -10,7 +10,9 @@ const path = require("node:path")
 const test = require("node:test")
 
 const EXPECTED_SCENARIO_KEYS = [
+    "degree-routing-fallback",
     "degree-focused",
+    "degree-behavior-characterization",
     "awake-character-page",
     "get-progress-no-invalidation",
     "get-progress-item-invalidation",
@@ -26,12 +28,13 @@ const snapshotPath = path.join(
     "__snapshots__",
     "mission_engine_focused_baseline.json",
 )
+const legacyDegreeFixture = require("../fixtures/mission-degree/legacy-f8be414.json")
 
 function readSnapshot() {
     assert.equal(
         fs.existsSync(snapshotPath),
         true,
-        "focused mission engine snapshot must exist and cover all eight scenarios",
+        "focused mission engine snapshot must exist and cover all ten scenarios",
     )
     return JSON.parse(fs.readFileSync(snapshotPath, "utf8"))
 }
@@ -296,6 +299,25 @@ test("current focused mission engine behavior matches the checked-in behavior", 
         createBehaviorBaselineView(current),
         createBehaviorBaselineView(readSnapshot()),
     )
+    const routingFallback = current.scenarios["degree-routing-fallback"]
+    const session = current.scenarios["degree-focused"]
+    const behavior = current.scenarios["degree-behavior-characterization"]
+    assert.deepEqual({
+        routingFallback: {
+            sqlReads: routingFallback.sqlReads,
+            sqlWrites: routingFallback.sqlWrites,
+            missionComputes: routingFallback.missionComputes,
+        },
+        session: {
+            sqlReads: session.sqlReads,
+            sqlWrites: session.sqlWrites,
+            missionComputes: session.missionComputes,
+        },
+    }, {
+        routingFallback: { sqlReads: 9, sqlWrites: 1, missionComputes: 5 },
+        session: { sqlReads: 8, sqlWrites: 1, missionComputes: 5 },
+    })
+    assert.deepEqual(behavior.behavior, legacyDegreeFixture.settlement)
 })
 
 test("cleanup attempts every scenario and suite restoration after failures", async () => {

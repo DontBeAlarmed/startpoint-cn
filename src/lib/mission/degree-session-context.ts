@@ -74,13 +74,11 @@ function assertRuleRequirementInvariant(
     if (ruleMode(rule) !== requirement.mode) {
         throw new Error(`${prefix}requirement mode must match the Catalog rule`)
     }
-    if (requirement.mode === "computed") {
-        const expected = factIds(rule)
-        const actual = factIds(requirement)
-        if (expected.length !== actual.length
-            || expected.some((id, index) => id !== actual[index])) {
-            throw new Error(`${prefix}computed requirement selector must match the Catalog rule`)
-        }
+    const expected = factIds(rule)
+    const actual = factIds(requirement)
+    if (expected.length !== actual.length
+        || expected.some((id, index) => id !== actual[index])) {
+        throw new Error(`${prefix}${requirement.mode} requirement facts/selector must match the Catalog rule`)
     }
 }
 

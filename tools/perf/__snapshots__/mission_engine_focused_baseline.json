@@ -2,12 +2,12 @@
   "version": 1,
   "fixedTime": "2025-01-01T12:00:00.000Z",
   "scenarios": {
-    "degree-focused": {
+    "degree-routing-fallback": {
       "sqlReads": 9,
       "sqlWrites": 1,
       "missionComputes": 5,
       "behavior": {
-        "adapter": "scoped-settlement",
+        "adapter": "scoped-settlement-routing",
         "degreeIds": [],
         "missionIds": [
           1000,
@@ -19,7 +19,83 @@
         ],
         "missionRewards": []
       },
-      "behaviorSha256": "6bc342219ca5b6729374c6d11d993d28512c91dcefd89e7d10da2fed2fddd4ce"
+      "behaviorSha256": "c9d89764f66f25f39a442a8ae236d614e76ee5133b7f3b60ea2a9f73f7930db7"
+    },
+    "degree-focused": {
+      "sqlReads": 8,
+      "sqlWrites": 1,
+      "missionComputes": 5,
+      "behavior": {
+        "adapter": "scoped-settlement-routing",
+        "degreeIds": [],
+        "missionIds": [
+          1000,
+          111001,
+          33000,
+          16000,
+          57010,
+          70000
+        ],
+        "missionRewards": []
+      },
+      "behaviorSha256": "c9d89764f66f25f39a442a8ae236d614e76ee5133b7f3b60ea2a9f73f7930db7"
+    },
+    "degree-behavior-characterization": {
+      "sqlReads": 10,
+      "sqlWrites": 4,
+      "missionComputes": 2,
+      "behavior": {
+        "first": {
+          "persisted": {
+            "missionId": 1000,
+            "progress": 250,
+            "stages": {
+              "1": true
+            }
+          },
+          "response": {
+            "characterList": [],
+            "degreeIds": [
+              1000
+            ],
+            "equipmentList": [],
+            "itemList": {},
+            "missionInfo": [
+              {
+                "mission_category_id": 5,
+                "mission_id": 1000,
+                "mission_reward_id": 1000001
+              }
+            ],
+            "passCardPoints": {},
+            "userInfo": {
+              "degree_id": 1000,
+              "exp_pool": 0,
+              "free_mana": 2000,
+              "free_vmoney": 100
+            }
+          }
+        },
+        "repeated": {
+          "persisted": {
+            "missionId": 1000,
+            "progress": 250,
+            "stages": {
+              "1": true
+            }
+          },
+          "response": {
+            "characterList": [],
+            "degreeIds": [],
+            "equipmentList": [],
+            "itemList": {},
+            "missionInfo": [],
+            "passCardPoints": {},
+            "userInfo": null
+          }
+        }
+      },
+      "behaviorSha256": "053ad90e26988cbdb0c3ac6544b810a0cd1c219a66905a6cce9d1fa44d28498a"
     },
     "awake-character-page": {
       "sqlReads": 18,

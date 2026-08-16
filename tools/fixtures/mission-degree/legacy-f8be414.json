@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "commit": "f8be41456f719a4bf39fab9072e00bebd09b8247",
+    "version": "pre-5B",
+    "entrypoint": "src/lib/mission/computer-degree.ts",
+    "generator": "tools/generate_mission_degree_legacy_fixture.cjs"
+  },
+  "compute": {
+    "missionCount": 1288,
+    "dbProgresses": [
+      0,
+      2,
+      31,
+      1000000000
+    ],
+    "hashes": {
+      "0": "1b6fe4ad53ccf4557334a1c3c20a1a13de2071951346cc6396a452f9d3955f71",
+      "2": "d640e99f1e4efc4d9f4c0b997f78776dff324990869cc600b7d38edf69b428bd",
+      "31": "91c0c1a56aa388e8569cd9bb0dbebef88bd15092cb3e5c08499185ee1d3ef07a",
+      "1000000000": "bb4602843737029c536c4011d352ecf38967bd66593161fc363b578a41447b0b"
+    }
+  },
+  "settlement": {
+    "first": {
+      "response": {
+        "missionInfo": [
+          {
+            "mission_category_id": 5,
+            "mission_id": 1000,
+            "mission_reward_id": 1000001
+          }
+        ],
+        "itemList": {},
+        "characterList": [],
+        "equipmentList": [],
+        "degreeIds": [
+          1000
+        ],
+        "passCardPoints": {},
+        "userInfo": {
+          "free_vmoney": 100,
+          "free_mana": 2000,
+          "exp_pool": 0,
+          "degree_id": 1000
+        }
+      },
+      "persisted": {
+        "missionId": 1000,
+        "progress": 250,
+        "stages": {
+          "1": true
+        }
+      }
+    },
+    "repeated": {
+      "response": {
+        "missionInfo": [],
+        "itemList": {},
+        "characterList": [],
+        "equipmentList": [],
+        "degreeIds": [],
+        "passCardPoints": {},
+        "userInfo": null
+      },
+      "persisted": {
+        "missionId": 1000,
+        "progress": 250,
+        "stages": {
+          "1": true
+        }
+      }
+    }
+  },
+  "integritySha256": "e2866694483a1015400e92fdd22d111ae65619bfe7927ab48c7c7cd60e737b30"
+}
