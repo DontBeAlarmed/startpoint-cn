@@ -109,6 +109,11 @@ import { getRaidEventRequiredKillCount } from "../../lib/raid-event-master";
 import { resolveQuestRewardEligibility } from "../../lib/quest/first-clear-reward";
 import { buildScoreAttackBattleHistoryRecord } from "../../lib/quest/score-attack-history";
 import { buildPracticeBattleHistoryRecord } from "../../lib/quest/practice-battle-history";
+import {
+    runSingleFinishSettlementTransaction,
+    SingleFinishSettlementContext,
+    SingleFinishSettlementValidationError,
+} from "../../lib/quest/single-finish-settlement";
 
 interface StartBody {
     quest_id: number
@@ -146,6 +151,7 @@ interface QuestStatistics {
 }
 
 export interface FinishBody {
+    play_id: string
     is_restored: boolean
     continue_count: number
     elapsed_time_ms: number
@@ -298,15 +304,6 @@ const routes = async (fastify: FastifyInstance) => {
             })
             : calculateClearRank(clearTime, questData)
 
-        // calculate player rewards
-        const beforeRankPoint = playerData.rankPoint
-        const newRankPoint = beforeRankPoint + questData.rankPointReward
-
-        // calculate boost point
-        let newBoostPoint = playerData.boostPoint - (activeQuestData.useBoostPoint ? 1 : 0)
-        let newBossBoostPoint = playerData.bossBoostPoint - (activeQuestData.useBossBoostPoint ? 1 : 0)
-        let useBoostPoint = (activeQuestData.useBoostPoint && (newBoostPoint >= 0)) || (activeQuestData.useBossBoostPoint && (newBossBoostPoint >= 0))
-
         // check current quest progress
         const questProgress = getPlayerSingleQuestProgressSync(playerId, questCategory, questId);
         const questProgressExists = questProgress !== null
@@ -360,7 +357,18 @@ const routes = async (fastify: FastifyInstance) => {
                 && Number.isSafeInteger(characterId)
                 && characterId > 0) partyCharacterIdsArray.push(characterId)
         }
-        const executeFinishWrites = () => {
+        const executeFinishWrites = ({
+            activeQuest: settlementActiveQuest,
+            player: settlementPlayer,
+        }: SingleFinishSettlementContext) => {
+            const beforeRankPoint = settlementPlayer.rankPoint
+            const newRankPoint = beforeRankPoint + questData.rankPointReward
+            const newBoostPoint = settlementPlayer.boostPoint
+                - (settlementActiveQuest.useBoostPoint ? 1 : 0)
+            const newBossBoostPoint = settlementPlayer.bossBoostPoint
+                - (settlementActiveQuest.useBossBoostPoint ? 1 : 0)
+            const useBoostPoint = settlementActiveQuest.useBoostPoint
+                || settlementActiveQuest.useBossBoostPoint
             const settlementTime = new Date(getServerTime() * 1000)
             const rewardCampaignRates = getRewardCampaignRates(
                 questCategory,
@@ -381,7 +389,7 @@ const routes = async (fastify: FastifyInstance) => {
                 questData.characterExpReward,
                 rewardCampaignRates,
             )
-            const newMana = playerData.freeMana + fixedManaReward + body.add_mana
+            const newMana = settlementPlayer.freeMana + fixedManaReward + body.add_mana
             const manaObtained = fixedManaReward + body.add_mana
             finishCtx.manaObtained = manaObtained
             const clearReward = !isScoreAttackEvent && rewardEligibility.firstClear && questData.clearReward !== undefined
@@ -420,18 +428,20 @@ const routes = async (fastify: FastifyInstance) => {
             const newDegreeId = getRankDegree(newRankPoint)
             const didLevelUp = newDegreeId > oldRkDegree
             const afterStamina = didLevelUp
-                ? playerData.stamina + getMaxStamina(newDegreeId)
-                : playerData.stamina
-            const afterStaminaHealTime = didLevelUp ? new Date() : playerData.staminaHealTime
+                ? settlementPlayer.stamina + getMaxStamina(newDegreeId)
+                : settlementPlayer.stamina
+            const afterStaminaHealTime = didLevelUp
+                ? new Date()
+                : settlementPlayer.staminaHealTime
             updatePlayerSync({
                 id: playerId,
                 freeMana: newMana,
-                expPool: playerData.expPool + fixedPoolExpReward,
+                expPool: settlementPlayer.expPool + fixedPoolExpReward,
                 rankPoint: newRankPoint,
                 boostPoint: newBoostPoint,
                 bossBoostPoint: newBossBoostPoint,
-                totalManaObtained: (playerData.totalManaObtained ?? 0) + manaObtained,
-                maxComboAchieved: Math.max(playerData.maxComboAchieved ?? 0, (body as any).statistics?.max_combo_count ?? 0),
+                totalManaObtained: (settlementPlayer.totalManaObtained ?? 0) + manaObtained,
+                maxComboAchieved: Math.max(settlementPlayer.maxComboAchieved ?? 0, (body as any).statistics?.max_combo_count ?? 0),
                 ...(didLevelUp ? { stamina: afterStamina, staminaHealTime: afterStaminaHealTime } : {}),
             })
             if (didLevelUp) {
@@ -530,7 +540,7 @@ const routes = async (fastify: FastifyInstance) => {
             const raidEventData = handleRaidEventFinish({
                 questCategory,
                 questAccomplished,
-                activeEventId: activeQuestData.eventId ?? undefined,
+                activeEventId: settlementActiveQuest.eventId ?? undefined,
                 killCountWeight: questData.killCountWeight,
                 party: bodyPartyStatistics,
                 playerId,
@@ -574,7 +584,7 @@ const routes = async (fastify: FastifyInstance) => {
                 insertPlayerScoreAttackBattleHistorySync(buildScoreAttackBattleHistoryRecord({
                     playerId,
                     eventId: questData.eventId!,
-                    playId: activeQuestData.playId,
+                    playId: settlementActiveQuest.playId,
                     categoryId: questCategory,
                     questId,
                     finishKind: 0,
@@ -590,7 +600,7 @@ const routes = async (fastify: FastifyInstance) => {
             if (questCategory === QuestCategory.PRACTICE) {
                 insertPlayerPracticeBattleHistorySync(buildPracticeBattleHistoryRecord({
                     playerId,
-                    playId: activeQuestData.playId,
+                    playId: settlementActiveQuest.playId,
                     categoryId: questCategory,
                     questId,
                     finishKind: questAccomplished ? 0 : 1,
@@ -647,7 +657,7 @@ const routes = async (fastify: FastifyInstance) => {
                 now: settlementTime,
             })
             const itemList = {
-                ...(activeQuestData.entryItemId ? { [activeQuestData.entryItemId]: getPlayerItemSync(playerId, activeQuestData.entryItemId) ?? 0 } : {}),
+                ...(settlementActiveQuest.entryItemId ? { [settlementActiveQuest.entryItemId]: getPlayerItemSync(playerId, settlementActiveQuest.entryItemId) ?? 0 } : {}),
                 ...scoreRewardsResult.items,
                 ...(additionalRewardSettlement.rewardResult?.items ?? {}),
                 ...(scoreAttackRewardResult?.items ?? {}),
@@ -690,10 +700,36 @@ const routes = async (fastify: FastifyInstance) => {
                 fixedManaReward,
                 fixedPoolExpReward,
                 newMana,
+                beforeRankPoint,
+                newRankPoint,
+                newBoostPoint,
+                newBossBoostPoint,
             }
         }
 
-        const finishWrites = getDb().transaction(executeFinishWrites)()
+        let finishWrites
+        try {
+            finishWrites = runSingleFinishSettlementTransaction({
+                playerId,
+                memoryQuest: activeQuestData,
+                request: {
+                    playId: body.play_id,
+                    questId: body.quest_id,
+                    category: body.category,
+                    continueCount: body.continue_count,
+                },
+                player: playerData,
+                settle: executeFinishWrites,
+            })
+        } catch (error) {
+            if (error instanceof SingleFinishSettlementValidationError) {
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    "message": error.message,
+                })
+            }
+            throw error
+        }
         const {
             afterStamina,
             afterStaminaHealTime,
@@ -718,6 +754,10 @@ const routes = async (fastify: FastifyInstance) => {
             fixedManaReward,
             fixedPoolExpReward,
             newMana,
+            beforeRankPoint,
+            newRankPoint,
+            newBoostPoint,
+            newBossBoostPoint,
         } = finishWrites
         delete activeQuests[playerId]
         const scoreAttackEventData = scoreAttackFinishResult?.scoreAttackEvent ?? null

@@ -51,8 +51,17 @@ CREATE TABLE quest_progress (
 );
 CREATE TABLE players_active_quests (
     player_id INTEGER PRIMARY KEY,
+    play_id TEXT NOT NULL,
     quest_id INTEGER NOT NULL,
-    category INTEGER NOT NULL
+    category INTEGER NOT NULL,
+    use_boss_boost_point INTEGER NOT NULL DEFAULT 0,
+    use_boost_point INTEGER NOT NULL DEFAULT 0,
+    is_auto_start_mode INTEGER NOT NULL DEFAULT 0,
+    is_multi INTEGER NOT NULL DEFAULT 0,
+    entry_item_id INTEGER,
+    entry_item_count INTEGER,
+    event_id INTEGER,
+    continue_count INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE score_history (
     player_id INTEGER NOT NULL,
@@ -72,7 +81,8 @@ INSERT INTO player_state VALUES (17, 1000, 2000, 3000, 0, 0);
 INSERT INTO character_state VALUES (17, 101, 100);
 INSERT INTO mission_state VALUES (17, 0);
 INSERT INTO item_state VALUES (17, 40501, 7);
-INSERT INTO players_active_quests VALUES (17, 1101, 27);
+INSERT INTO players_active_quests (player_id, play_id, quest_id, category)
+VALUES (17, 'score-play', 1101, 27);
 CREATE TRIGGER fail_score_attack_active_delete
 AFTER DELETE ON players_active_quests
 BEGIN
@@ -181,6 +191,24 @@ stubModule("../src/content/runtime/table-access", {
     },
 })
 stubModule("../src/data/domains/quest_active", {
+    getPlayerActiveQuestSync(playerId) {
+        const row = db.prepare("SELECT * FROM players_active_quests WHERE player_id = ?").get(playerId)
+        return row ? {
+            playerId: row.player_id,
+            playId: row.play_id,
+            questId: row.quest_id,
+            category: row.category,
+            useBossBoostPoint: row.use_boss_boost_point === 1,
+            useBoostPoint: row.use_boost_point === 1,
+            isAutoStartMode: row.is_auto_start_mode === 1,
+            isMulti: row.is_multi === 1,
+            coordinatorOrigin: null,
+            entryItemId: row.entry_item_id,
+            entryItemCount: row.entry_item_count,
+            eventId: row.event_id,
+            continueCount: row.continue_count,
+        } : null
+    },
     deletePlayerActiveQuestSync(playerId) {
         writeAttempts++
         db.prepare("DELETE FROM players_active_quests WHERE player_id = ?").run(playerId)
@@ -404,13 +432,15 @@ const initialState = {
 }
 
 async function finish(fastify) {
+    const activeQuest = activeQuests[17]
     return fastify.inject({
         method: "POST",
         url: "/finish",
         payload: {
             viewer_id: 800000017,
-            quest_id: 1101,
-            category: 27,
+            play_id: activeQuest.playId,
+            quest_id: activeQuest.questId,
+            category: activeQuest.category,
             score: 1_500_000,
             elapsed_time_ms: 90000,
             add_mana: 5,
@@ -528,7 +558,10 @@ async function main() {
         playId: "normal-play",
         continueCount: 0,
     }
-    db.prepare("INSERT INTO players_active_quests VALUES (?, ?, ?)").run(17, 1101, 1)
+    db.prepare(`
+        INSERT INTO players_active_quests (player_id, play_id, quest_id, category)
+        VALUES (?, ?, ?, ?)
+    `).run(17, "normal-play", 1101, 1)
     const beforeNormalFailure = {
         player: db.prepare("SELECT * FROM player_state").get(),
         character: db.prepare("SELECT * FROM character_state").get(),
@@ -562,7 +595,9 @@ async function main() {
         playId: "practice-play",
         continueCount: 0,
     }
-    db.prepare("UPDATE players_active_quests SET category = 15 WHERE player_id = 17").run()
+    db.prepare(`
+        UPDATE players_active_quests SET play_id = ?, category = 15 WHERE player_id = 17
+    `).run("practice-play")
     const practiceFinished = await finish(fastify)
     assert.equal(practiceFinished.statusCode, 200, practiceFinished.body)
     assert.deepEqual(db.prepare("SELECT * FROM practice_history").all(), [{

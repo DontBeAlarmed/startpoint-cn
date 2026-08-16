@@ -427,12 +427,14 @@ const TEST_GROUPS = Object.freeze({
     },
     "integration:quest": {
         execution: "parallel",
+        timeoutMs: 60_000,
         tests: [
             "tools/auto_start_stamina_stop.test.cjs",
             "tools/perf/single_battle_settlement_admission.test.cjs",
             "tools/perf/single_battle_settlement_baseline.test.cjs",
             "tools/quest_entry_lifecycle.test.cjs",
             "tools/quest_host_finish.test.cjs",
+            "tools/single_battle_finish_validation.test.cjs",
             "tools/story_quest_finish.test.cjs",
             "tools/tutorial_update_step.test.cjs",
         ],

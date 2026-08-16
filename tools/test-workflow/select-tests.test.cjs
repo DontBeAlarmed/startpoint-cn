@@ -314,6 +314,21 @@ test("selects quest and mission regressions for the single battle route", () => 
     )
 })
 
+test("maps single finish settlement implementation and regression precisely", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/routes/api/singleBattleQuest.ts"]),
+        ["integration:compiled", "integration:mission", "integration:quest", "quick:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/single-finish-settlement.ts"]),
+        ["integration:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/single_battle_finish_validation.test.cjs"]),
+        ["integration:quest"],
+    )
+})
+
 test("maps the single battle settlement baseline family to integration quest", () => {
     for (const file of [
         "tools/perf/single_battle_settlement_admission.cjs",
@@ -839,6 +854,7 @@ test("keeps isolated test groups parallel while infrastructure groups stay seria
     assert.equal(TEST_GROUPS["integration:mission"].timeoutMs, 60_000)
     assert.equal(TEST_GROUPS["integration:party"].execution, "parallel")
     assert.equal(TEST_GROUPS["integration:quest"].execution, "parallel")
+    assert.equal(TEST_GROUPS["integration:quest"].timeoutMs, 60_000)
     assert.equal(TEST_GROUPS["integration:cdn"].execution, "serial")
 })
 
@@ -999,6 +1015,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/perf/single_battle_settlement_baseline.test.cjs",
         "tools/quest_entry_lifecycle.test.cjs",
         "tools/quest_host_finish.test.cjs",
+        "tools/single_battle_finish_validation.test.cjs",
         "tools/story_quest_finish.test.cjs",
         "tools/tutorial_update_step.test.cjs",
     ])
