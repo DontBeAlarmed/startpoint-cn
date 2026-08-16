@@ -1,6 +1,6 @@
 # 任务引擎演进架构
 
-> 状态：设计已确认，尚未实施。本文描述任务引擎下一阶段的目标边界，不代表当前 `dev` 已具备全部组件。
+> 状态：阶段 1～3 的 Catalog、事实需求和阶段内 Session 已实施；Category 1～6、10 已接入 Session。本文同时记录已确认但尚未实施的阶段 4～6 边界。
 
 ## 目标
 
@@ -15,6 +15,20 @@
 
 本阶段覆盖普通任务 Category 1 至 10（包含称号和 Pass）以及角色觉醒 Category 9。Active Mission 继续使用现有独立事实与结算体系，不并入本次重构。
 
+## 生产负载背景
+
+本次重构源于真实部署中的容量问题：当时服务器约有 1000 份玩家存档，在线玩家约 600 人，部署后出现严重卡顿。任务结算嵌在任务进度、单人战斗、多人战斗和角色羁绊等高频路径中；单次请求的重复查库和全量扫描会被在线规模放大。
+
+因此，本重构不仅要求代码职责清晰，还必须提供以下可复核证据：
+
+- 单次结算的 SQL、loader、候选和 compute 次数；
+- 首次与重复调用的写入、奖励和完整响应等价；
+- 任务入口在分层并发下的吞吐、P50/P95、事件循环延迟和错误率；
+- 整体优化结束后的登录、load、战斗、商店、抽卡、邮件和日志混合负载；
+- 联机与 Hub 在双服测试环境建立后的独立及混合负载。
+
+600 人在线不等于 600 个任务结算请求在同一时刻执行。直接制造 600 个同步结算只能作为极端压力上限，不能冒充真实流量模型。
+
 ## 当前问题
 
 当前标准结算链路为：
@@ -24,7 +38,9 @@ scope -> category mission IDs -> 开放时间过滤 -> Computer.buildContext
       -> Computer.compute -> 进度写入 -> stage 领取 -> 奖励发放 -> 响应合并
 ```
 
-基线场景一次会扫描 3557 个候选，实际计算 177 条任务。当前稳定基线中，单次标准结算会读取玩家 8 次、关卡进度 7 次、战斗累计 6 次、周期快照 5 次。不同 Computer 各自构造完整上下文，无法共享相同事实。
+重构前的基线场景一次会扫描 3557 个候选，实际计算 177 条任务。不同 Computer 各自构造完整上下文，无法共享相同事实。阶段 1～3 已让 Category 1～6、10 在同一求值阶段共享 Session facts，但标准结算仍把候选准备、纯计算、进度写入和奖励发放集中在一个函数中。
+
+Pass Category 7/8 不能直接迁入现有 Fact loader：Category 7 在缺少 `passWeek` 时会创建周期快照；Category 8 会通过 `ensurePlayerPassCardLoginProgressSync` 初始化登录基线。这些都是真实写入，必须在只读 Session 建立前完成。
 
 `/mission/get_mission_progress` 还存在两个求值阶段：
 
@@ -129,6 +145,50 @@ Computer 不再自行决定如何重复查库，而是从 Session 获取已声�
 
 结算层消费该结果写入进度、领取 stage 并发放奖励；响应层消费同一结果生成 `mission_progress_list`。同一阶段内不得再次调用 Computer 计算相同任务。
 
+## 阶段 4 已确认设计
+
+采用三阶段流水线，外部继续只暴露 `settleMissionCategories`：
+
+```text
+settleMissionCategories（单个数据库事务）
+  -> prepareMissionSettlement
+  -> evaluateMissionCandidates
+  -> settleMissionEvaluation
+  -> 兼容的 MissionSettlementResult
+```
+
+### prepare
+
+`prepareMissionSettlement` 负责所有允许写入的前置动作：
+
+1. 合并 scope，过滤非法和未开放任务；
+2. 为 Category 7 按 event 去重，缺失时创建一次 `passWeek` 快照；
+3. 为 Category 8 按 event 去重，初始化一次登录基线；
+4. 返回只读 `PreparedMissionSettlement`，包含固定 evaluation time、enabled scopes、候选引用和 Pass 前置结果。
+
+前置动作必须幂等。重复调用不得重置已有快照或登录基线。
+
+### evaluate
+
+`evaluateMissionCandidates` 在 prepare 后创建一个 `MissionEvaluationSession`。Fact loader 全部只读；Computer 只读取已声明事实；同一规范化 FactKey 最多加载一次。函数不写数据库、不发奖励，返回不可变 `MissionEvaluationResult`。
+
+结果至少包含只读玩家快照、每条候选的持久化进度、计算进度、最终进度和已领取 stage，以及 loader、候选和 compute 的结构观察数据。
+
+### settle
+
+`settleMissionEvaluation` 只消费 `MissionEvaluationResult`：
+
+1. 写入真正变化的任务进度；
+2. 写入首次完成的 stage；
+3. 发放奖励并合并客户端响应；
+4. 保持重复调用不重复写入和发奖。
+
+prepare、evaluate、settle 继续位于同一个数据库事务。任何阶段失败，Pass 前置初始化、任务进度、stage 和奖励必须一起回滚。
+
+### 方案升级边界
+
+首选三阶段流水线，不提前引入“每个 Category 一个 handler”的框架。只有在完成相对基线和混合负载 profile 后，剩余瓶颈仍明确位于任务类别调度或类别上下文，且无法在三阶段边界内解决时，才重新评估按类别处理器拆分。全服务仍卡顿本身不能证明该升级有价值。
+
 ## 奖励失效与局部二次求值
 
 奖励层在发放时返回实际改变的事实键，而不是只返回客户端响应字段。首版使用保守映射：
@@ -183,12 +243,16 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 
 ### 阶段 1：MissionCatalog
 
+状态：已完成。
+
 - 建立 snapshot-scoped definition、category、pattern、stage 和 Awake 角色索引；
 - 将 `master-data.ts`、`stages.ts` 和 `patterns.ts` 切换到 Catalog；
 - 保持现有导出函数作为兼容外壳；
 - 验证 bundled 到 Runtime Content 初始化切换不会复用旧索引。
 
 ### 阶段 2：事实需求契约
+
+状态：已完成。
 
 - 定义 `FactKey`、规范化规则和 loader 注册表；
 - 把现有 Degree 分类作为首个接入模块；
@@ -197,12 +261,16 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 
 ### 阶段 3：阶段内 FactStore
 
+状态：Category 1～6、10 已完成；Category 7/8 随阶段 4 迁移，Awake 9 随阶段 6 迁移。
+
 - 引入 `MissionEvaluationSession`；
 - 先迁移重复读取最多的 player、quest progress、battle counters 和 periodic snapshot；
 - Computer 接口改为接收 Session，不改变 `compute()`；
 - 每迁移一个 Computer，保留 full/scoped 结果等价测试。
 
 ### 阶段 4：求值结果与标准结算
+
+状态：设计已确认，待实施。
 
 - 拆分 prepare、evaluate、settle；
 - 让 settlement 返回可复用的 EvaluationResult 和奖励失效键；
@@ -211,12 +279,16 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 
 ### 阶段 5：任务页响应
 
+状态：待阶段 4 完成后实施。
+
 - `/mission/get_mission_progress` 复用阶段 A 结果；
 - 只对奖励失效键命中的请求内任务执行阶段 B 求值；
 - 阶段 B 禁止写进度或发奖；
 - 保留整请求事务与 mail、Awake 响应字段。
 
 ### 阶段 6：Awake 与性能收尾
+
+状态：待实施。
 
 - Awake 接入 Catalog 和 Session；
 - 增加单人、多人非空候选的即时响应与回滚测试；
@@ -247,6 +319,19 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 - 现有稳定基线的候选、计算、进度、奖励和 SQL 结构不得无解释变化。
 
 延迟 p50/p95 继续作为同机观察值，不写入跨机器硬门槛。验收以 SQL、loader、候选、compute 和结果等价等结构指标为主。
+
+### 分层负载
+
+阶段 4 使用 600 份独立玩家状态，对真实任务入口按 1、10、25、50、100 并发阶梯执行：
+
+- `/mission/get_mission_progress`；
+- 单人战斗结算；
+- 多人战斗结算；
+- 角色羁绊结算。
+
+每档记录吞吐、P50/P95、事件循环延迟、SQL、错误率和事务回滚结果。阶段 4 不把 600 个同时结算请求描述为真实在线流量。
+
+整个优化路线完成后再执行全服务混合负载，覆盖登录、load、战斗、商店、抽卡、邮件和生产等价日志级别。联机与 Hub 留到可重复双服环境建立后加入。若混合负载失败，必须先 profile 到具体模块；日志、数据库写锁、商店、CDN 或 Hub 的瓶颈不得通过改造任务类别框架掩盖。
 
 ## 已知后续项
 
