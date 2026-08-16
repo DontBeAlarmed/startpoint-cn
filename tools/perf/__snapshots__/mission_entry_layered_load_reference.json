@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "runtimeCommit": "f85a01c1eb730afa3ff9e6de00fd7b7a9d992c32",
+  "fixedTime": "2024-08-14T12:00:00.000Z",
+  "entries": {
+    "get-progress": {
+      "behaviorSignature": "9c137e047e815be0f19649170fbd26db20acb9c7048cfff1ade8f2629cc4cdb5",
+      "sqlReads": 25,
+      "sqlWrites": 4,
+      "missionComputes": 214
+    },
+    "single-finish": {
+      "behaviorSignature": "0cc085fb412c763070580a94e082c4f0f8e9c04576cdf26c592cd8db90da1661",
+      "sqlReads": 50,
+      "sqlWrites": 63,
+      "missionComputes": 391
+    },
+    "multi-finish": {
+      "behaviorSignature": "44caeb3b6e395cc72a07f21668e0c61fd5747cc1cabddb0992d3d3bef8bf5b06",
+      "sqlReads": 52,
+      "sqlWrites": 80,
+      "missionComputes": 391
+    },
+    "character-bond": {
+      "behaviorSignature": "c9e655d9551509a7d14bd5e449c20aff81e08b3596a30aafc734a992c273cb30",
+      "sqlReads": 18,
+      "sqlWrites": 16,
+      "missionComputes": 107
+    }
+  }
+}

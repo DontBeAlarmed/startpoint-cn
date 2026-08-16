@@ -12,6 +12,7 @@ import type { FactKey } from "./facts/fact-key"
 import type { MissionCatalog } from "./mission-catalog"
 import type { MissionFactRequirementRegistry } from "./requirements/types"
 import type { SnapshotData } from "./snapshot"
+import type { PlayerPassCardState } from "../../data/domains/pass-card"
 
 export interface MissionFactValueByKind {
     readonly player: Player
@@ -27,6 +28,7 @@ export interface MissionFactValueByKind {
     readonly degreeBattleStats: DegreeBattleStats
     readonly shopPurchases: ShopPurchaseMap
     readonly periodicSnapshot: SnapshotData | null
+    readonly passState: PlayerPassCardState
 }
 
 export type MissionFactValue<Key extends FactKey> = Key["kind"] extends keyof MissionFactValueByKind

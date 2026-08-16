@@ -296,3 +296,32 @@ test("production Event loaders keep inventory, party, and dependency progress ty
         ["categoryMissionProgress", 77, 3, [1448, 1454]],
     ])
 })
+
+test("settlement category progress seed stays typed and filters to the Session selection", () => {
+    const seeded = new Map([[3, Object.freeze({
+        1448: { progress: 1, stages: [] },
+        1454: { progress: 6, stages: { 1: true } },
+        9999: { progress: 99, stages: [] },
+    })]])
+    const loaders = createProductionMissionFactLoaderRegistry({
+        getPlayerCategoryMissionProgressByIdsSync() {
+            throw new Error("seeded category progress must not query the database")
+        },
+    }, { categoryMissions: seeded })
+    const session = createSession([{
+        kind: "categoryMissionProgress",
+        category: 3,
+        missionIds: [1454, 1448],
+    }], loaders)
+
+    assert.deepEqual([...session.getFact({
+        kind: "categoryMissionProgress",
+        category: 3,
+        missionIds: [1448],
+    })], [[1448, 1], [1454, 6]])
+    assert.throws(() => session.getFact({
+        kind: "categoryMissionProgress",
+        category: 3,
+        missionIds: [9999],
+    }), /outside declared missionIds selection/)
+})

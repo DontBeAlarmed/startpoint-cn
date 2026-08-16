@@ -129,6 +129,10 @@ test("exposes the workflow benchmark command", () => {
         scripts["benchmark:mission-engine-focused"],
         "node tools/perf/mission_engine_focused_baseline.cjs",
     )
+    assert.equal(
+        scripts["benchmark:mission-entry-load"],
+        "node tools/perf/mission_entry_layered_load.cjs",
+    )
 })
 
 test("exposes the offline faithful gacha seed catalog workflow", () => {

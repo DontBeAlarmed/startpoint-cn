@@ -9,7 +9,7 @@ import { getDb } from "../../data/db"
 import { getCharacterStoryQuestIds, getCharacterIdFromMission } from "./character-queries"
 import { isMissionProgressComplete } from "./stages"
 import type { MissionComputer, CategoryContext } from "./types"
-import type { PlayerCharacter } from "../../data/types"
+import type { PlayerActiveMission, PlayerCharacter } from "../../data/types"
 import {
     AWAKE_DIRECT_BATTLE_MISSION_IDS,
     getCharacterPairKey,
@@ -31,6 +31,7 @@ interface AwakeContext extends CategoryContext {
     coClears: Map<string, number>
     charData: Map<string, PlayerCharacter>
     categoryMissionProgress: Map<number, number>
+    categoryMissionStates: ReadonlyMap<number, PlayerActiveMission>
 }
 
 // ─── Special mission tables ───
@@ -123,8 +124,10 @@ export function buildAwakeContext(
     const coClears = mergePartyCoClearRows(rows)
 
     const categoryMissionProgress = new Map<number, number>()
+    const categoryMissionStates = new Map<number, PlayerActiveMission>()
     for (const [missionId, progress] of Object.entries(getPlayerCategoryMissionsSync(playerId, 9))) {
         categoryMissionProgress.set(Number(missionId), progress.progress)
+        categoryMissionStates.set(Number(missionId), progress)
     }
 
     return {
@@ -134,6 +137,7 @@ export function buildAwakeContext(
         rankCounts: { rank_ss: ssClears, rank_s: sClears, rank_a: aClears, rank_b: bClears },
         charClears, leaderClears, multiClears, leaderMultiClears,
         coClears, charData, categoryMissionProgress,
+        categoryMissionStates,
     }
 }
 

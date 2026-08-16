@@ -493,4 +493,11 @@ function createFocusedScenarios(runtime) {
     ]
 }
 
-module.exports = { createFocusedScenarios }
+module.exports = {
+    AWAKE_CHARACTER_ID,
+    createFinishContext,
+    createFocusedScenarios,
+    executeBattleFinish,
+    prepareAwakeCharacter,
+    summarizeBattleFinish,
+}

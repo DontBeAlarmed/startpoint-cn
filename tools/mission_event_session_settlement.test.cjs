@@ -18,7 +18,13 @@ delete process.env.WDFP_DATABASE_DIR
 const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getDb } = require("../src/data/db")
+const {
+    getPlayerCategoryMissionsSync,
+    updatePlayerCategoryMissionStageSync,
+    updatePlayerCategoryMissionSync,
+} = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { insertPlayerQuestProgressSync } = require("../src/data/domains/quest")
 
 initializeDatabase()
 const db = getDb()
@@ -134,7 +140,72 @@ test("Category 3 settlement routes through Session and loads only mission 1201 f
     })
 })
 
-test("Pass 7/8 and Awake 9 remain outside the Session settlement guard", () => {
+test("Event aggregate reuses the category progress settlement read", () => {
+    const playerId = createPlayer()
+    const deepDomainQuestIds = [1002, 1005, 1008, 1011, 1014, 1017]
+    for (const [index, questId] of deepDomainQuestIds.entries()) {
+        insertPlayerQuestProgressSync(playerId, 13, {
+            questId,
+            finished: true,
+        })
+        // Keep persisted dependencies present so the Session seed path is exercised too.
+        updatePlayerCategoryMissionSync(playerId, 3, 1448 + index, 1)
+    }
+
+    sqlReads = emptySqlReads()
+    tracking = true
+    let result
+    try {
+        result = settleMissionCategories(
+            playerId,
+            [{ category: 3, missionIds: [1454] }],
+            new Date("2020-05-01T04:00:00.000Z"),
+        )
+    } finally {
+        tracking = false
+    }
+
+    assert.equal(sqlReads.categoryMissions, 1)
+    assert.equal(sqlReads.categoryStages, 1)
+    assert.deepEqual(result.missionInfo, [{
+        mission_category_id: 3,
+        mission_id: 1454,
+        mission_reward_id: 1454001,
+    }])
+    assert.deepEqual(getPlayerCategoryMissionsSync(playerId, 3)[1454], {
+        progress: 6,
+        stages: { 1: true },
+    })
+})
+
+test("generic Category 9 settlement uses the legacy mission state read once", () => {
+    const playerId = createPlayer()
+    updatePlayerCategoryMissionSync(playerId, 9, 11, 1)
+    updatePlayerCategoryMissionStageSync(playerId, 9, 1, 11, true)
+
+    sqlReads = emptySqlReads()
+    tracking = true
+    let result
+    try {
+        result = settleMissionCategories(
+            playerId,
+            [{ category: 9, missionIds: [11] }],
+            new Date("2024-08-14T12:00:00.000Z"),
+        )
+    } finally {
+        tracking = false
+    }
+
+    assert.equal(sqlReads.categoryMissions, 1)
+    assert.equal(sqlReads.categoryStages, 1)
+    assert.deepEqual(result.missionInfo, [])
+    assert.deepEqual(getPlayerCategoryMissionsSync(playerId, 9)[11], {
+        progress: 1,
+        stages: { 1: true },
+    })
+})
+
+test("Pass 7/8 use the Session settlement guard while Awake 9 remains legacy", () => {
     const passComputer = getComputer(7)
     assert.strictEqual(passComputer, getComputer(8))
     const originalPassLegacy = passComputer.buildContext
@@ -174,8 +245,8 @@ test("Pass 7/8 and Awake 9 remain outside the Session settlement guard", () => {
         awakeComputer.buildContext = originalAwakeLegacy
     }
 
-    assert.equal(passLegacyContexts, 2)
-    assert.equal(passSessionContexts, 0)
+    assert.equal(passLegacyContexts, 0)
+    assert.equal(passSessionContexts, 2)
     assert.equal(awakeLegacyContexts, 1)
     assert.equal(awakeComputer.buildContextFromSession, undefined)
 })

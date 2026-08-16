@@ -8,6 +8,11 @@ import { givePlayerDegreeSync } from "../../data/domains/degree"
 import { addPlayerPassCardPointSync } from "../../data/domains/pass-card"
 import { getPassCardEventDefinition } from "../pass-card"
 
+type MissionRewardPlayer = Pick<
+    Player,
+    "freeVmoney" | "freeMana" | "expPool" | "totalManaObtained"
+>
+
 interface MissionRewardGrantContext {
     passCardEventId?: number
 }
@@ -24,7 +29,7 @@ export class MissionRewardGranter {
     private totalManaGained = 0
     private latestDegreeId: number | undefined
 
-    constructor(private readonly playerId: number, private readonly player: Player) {
+    constructor(private readonly playerId: number, private readonly player: MissionRewardPlayer) {
         this.freeVmoney = player.freeVmoney
         this.freeMana = player.freeMana
         this.expPool = player.expPool

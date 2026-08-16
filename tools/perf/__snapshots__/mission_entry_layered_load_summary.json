@@ -1,0 +1,953 @@
+{
+  "version": 1,
+  "fixedTime": "2024-08-14T12:00:00.000Z",
+  "playerPool": {
+    "preparedIndependentStates": 600,
+    "requestsPerStep": 600,
+    "concurrencySteps": [
+      1,
+      10,
+      25,
+      50,
+      100
+    ],
+    "note": "Prepared player states are an online-pool model; concurrency is only the in-flight request limit."
+  },
+  "boundaries": {
+    "get-progress": "Fastify route /get_mission_progress",
+    "single-finish": "mission-finish-boundary adapter, not full battle HTTP protocol",
+    "multi-finish": "mission-finish-boundary adapter, not full battle HTTP protocol",
+    "character-bond": "Fastify route /open_mana_board through its mission settlement boundary"
+  },
+  "steps": [
+    {
+      "concurrency": 1,
+      "requests": 600,
+      "elapsedMs": 13903.773,
+      "throughputPerSecond": 43.154,
+      "latencyMs": {
+        "p50": 30.656,
+        "p95": 37.98
+      },
+      "eventLoopDelayMs": {
+        "p50": 88.474,
+        "p95": 95.486,
+        "max": 400.294
+      },
+      "sql": {
+        "statements": 47400,
+        "selectStatements": 20550,
+        "writeStatements": 24450,
+        "transactionStatements": 2400
+      },
+      "errors": 0,
+      "rollback": {
+        "verified": true,
+        "injectedError": "injected layered load rollback"
+      },
+      "entries": {
+        "get-progress": {
+          "boundary": "fastify-route:/get_mission_progress",
+          "requests": 150,
+          "throughputPerSecond": 10.788,
+          "latencyMs": {
+            "p50": 11.424,
+            "p95": 13.28
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "9c137e047e815be0f19649170fbd26db20acb9c7048cfff1ade8f2629cc4cdb5"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 25,
+            "sqlWritesMax": 4,
+            "missionComputesMax": 214
+          }
+        },
+        "single-finish": {
+          "boundary": "mission-finish-boundary",
+          "requests": 150,
+          "throughputPerSecond": 10.788,
+          "latencyMs": {
+            "p50": 33.26,
+            "p95": 37.319
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "0cc085fb412c763070580a94e082c4f0f8e9c04576cdf26c592cd8db90da1661"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 46,
+            "sqlWritesMax": 63,
+            "missionComputesMax": 391
+          }
+        },
+        "multi-finish": {
+          "boundary": "mission-finish-boundary",
+          "requests": 150,
+          "throughputPerSecond": 10.788,
+          "latencyMs": {
+            "p50": 36.276,
+            "p95": 41.849
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "44caeb3b6e395cc72a07f21668e0c61fd5747cc1cabddb0992d3d3bef8bf5b06"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 48,
+            "sqlWritesMax": 80,
+            "missionComputesMax": 391
+          }
+        },
+        "character-bond": {
+          "boundary": "fastify-route:/open_mana_board",
+          "requests": 150,
+          "throughputPerSecond": 10.788,
+          "latencyMs": {
+            "p50": 8.365,
+            "p95": 9.966
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "c9e655d9551509a7d14bd5e449c20aff81e08b3596a30aafc734a992c273cb30"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 18,
+            "sqlWritesMax": 16,
+            "missionComputesMax": 107
+          }
+        }
+      }
+    },
+    {
+      "concurrency": 10,
+      "requests": 600,
+      "elapsedMs": 13434.741,
+      "throughputPerSecond": 44.66,
+      "latencyMs": {
+        "p50": 137.334,
+        "p95": 463.036
+      },
+      "eventLoopDelayMs": {
+        "p50": 448.528,
+        "p95": 477.364,
+        "max": 491.52
+      },
+      "sql": {
+        "statements": 47400,
+        "selectStatements": 20550,
+        "writeStatements": 24450,
+        "transactionStatements": 2400
+      },
+      "errors": 0,
+      "rollback": {
+        "verified": true,
+        "injectedError": "injected layered load rollback"
+      },
+      "entries": {
+        "get-progress": {
+          "boundary": "fastify-route:/get_mission_progress",
+          "requests": 150,
+          "throughputPerSecond": 11.165,
+          "latencyMs": {
+            "p50": 448.309,
+            "p95": 474.243
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "9c137e047e815be0f19649170fbd26db20acb9c7048cfff1ade8f2629cc4cdb5"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 25,
+            "sqlWritesMax": 4,
+            "missionComputesMax": 214
+          }
+        },
+        "single-finish": {
+          "boundary": "mission-finish-boundary",
+          "requests": 150,
+          "throughputPerSecond": 11.165,
+          "latencyMs": {
+            "p50": 33.471,
+            "p95": 38.806
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "0cc085fb412c763070580a94e082c4f0f8e9c04576cdf26c592cd8db90da1661"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 46,
+            "sqlWritesMax": 63,
+            "missionComputesMax": 391
+          }
+        },
+        "multi-finish": {
+          "boundary": "mission-finish-boundary",
+          "requests": 150,
+          "throughputPerSecond": 11.165,
+          "latencyMs": {
+            "p50": 36.531,
+            "p95": 41.335
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "44caeb3b6e395cc72a07f21668e0c61fd5747cc1cabddb0992d3d3bef8bf5b06"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 48,
+            "sqlWritesMax": 80,
+            "missionComputesMax": 391
+          }
+        },
+        "character-bond": {
+          "boundary": "fastify-route:/open_mana_board",
+          "requests": 150,
+          "throughputPerSecond": 11.165,
+          "latencyMs": {
+            "p50": 377.88,
+            "p95": 400.297
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "c9e655d9551509a7d14bd5e449c20aff81e08b3596a30aafc734a992c273cb30"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 18,
+            "sqlWritesMax": 16,
+            "missionComputesMax": 107
+          }
+        }
+      }
+    },
+    {
+      "concurrency": 25,
+      "requests": 600,
+      "elapsedMs": 13554.2,
+      "throughputPerSecond": 44.267,
+      "latencyMs": {
+        "p50": 309.476,
+        "p95": 1133.188
+      },
+      "eventLoopDelayMs": {
+        "p50": 1112.539,
+        "p95": 1183.842,
+        "max": 1368.392
+      },
+      "sql": {
+        "statements": 47400,
+        "selectStatements": 20550,
+        "writeStatements": 24450,
+        "transactionStatements": 2400
+      },
+      "errors": 0,
+      "rollback": {
+        "verified": true,
+        "injectedError": "injected layered load rollback"
+      },
+      "entries": {
+        "get-progress": {
+          "boundary": "fastify-route:/get_mission_progress",
+          "requests": 150,
+          "throughputPerSecond": 11.067,
+          "latencyMs": {
+            "p50": 1090.789,
+            "p95": 1264.054
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "9c137e047e815be0f19649170fbd26db20acb9c7048cfff1ade8f2629cc4cdb5"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 25,
+            "sqlWritesMax": 4,
+            "missionComputesMax": 214
+          }
+        },
+        "single-finish": {
+          "boundary": "mission-finish-boundary",
+          "requests": 150,
+          "throughputPerSecond": 11.067,
+          "latencyMs": {
+            "p50": 33.62,
+            "p95": 130.399
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "0cc085fb412c763070580a94e082c4f0f8e9c04576cdf26c592cd8db90da1661"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 46,
+            "sqlWritesMax": 63,
+            "missionComputesMax": 391
+          }
+        },
+        "multi-finish": {
+          "boundary": "mission-finish-boundary",
+          "requests": 150,
+          "throughputPerSecond": 11.067,
+          "latencyMs": {
+            "p50": 36.296,
+            "p95": 100.81
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "44caeb3b6e395cc72a07f21668e0c61fd5747cc1cabddb0992d3d3bef8bf5b06"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 48,
+            "sqlWritesMax": 80,
+            "missionComputesMax": 391
+          }
+        },
+        "character-bond": {
+          "boundary": "fastify-route:/open_mana_board",
+          "requests": 150,
+          "throughputPerSecond": 11.067,
+          "latencyMs": {
+            "p50": 1088.282,
+            "p95": 1261.514
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "c9e655d9551509a7d14bd5e449c20aff81e08b3596a30aafc734a992c273cb30"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 18,
+            "sqlWritesMax": 16,
+            "missionComputesMax": 107
+          }
+        }
+      }
+    },
+    {
+      "concurrency": 50,
+      "requests": 600,
+      "elapsedMs": 13518.836,
+      "throughputPerSecond": 44.383,
+      "latencyMs": {
+        "p50": 676.043,
+        "p95": 2432.22
+      },
+      "eventLoopDelayMs": {
+        "p50": 2172.649,
+        "p95": 2512.388,
+        "max": 2512.388
+      },
+      "sql": {
+        "statements": 47400,
+        "selectStatements": 20550,
+        "writeStatements": 24450,
+        "transactionStatements": 2400
+      },
+      "errors": 0,
+      "rollback": {
+        "verified": true,
+        "injectedError": "injected layered load rollback"
+      },
+      "entries": {
+        "get-progress": {
+          "boundary": "fastify-route:/get_mission_progress",
+          "requests": 150,
+          "throughputPerSecond": 11.096,
+          "latencyMs": {
+            "p50": 2179.666,
+            "p95": 2502.8
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "9c137e047e815be0f19649170fbd26db20acb9c7048cfff1ade8f2629cc4cdb5"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 25,
+            "sqlWritesMax": 4,
+            "missionComputesMax": 214
+          }
+        },
+        "single-finish": {
+          "boundary": "mission-finish-boundary",
+          "requests": 150,
+          "throughputPerSecond": 11.096,
+          "latencyMs": {
+            "p50": 33.703,
+            "p95": 412.299
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "0cc085fb412c763070580a94e082c4f0f8e9c04576cdf26c592cd8db90da1661"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 46,
+            "sqlWritesMax": 63,
+            "missionComputesMax": 391
+          }
+        },
+        "multi-finish": {
+          "boundary": "mission-finish-boundary",
+          "requests": 150,
+          "throughputPerSecond": 11.096,
+          "latencyMs": {
+            "p50": 36.676,
+            "p95": 423.498
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "44caeb3b6e395cc72a07f21668e0c61fd5747cc1cabddb0992d3d3bef8bf5b06"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 48,
+            "sqlWritesMax": 80,
+            "missionComputesMax": 391
+          }
+        },
+        "character-bond": {
+          "boundary": "fastify-route:/open_mana_board",
+          "requests": 150,
+          "throughputPerSecond": 11.096,
+          "latencyMs": {
+            "p50": 2110.683,
+            "p95": 2430.955
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "c9e655d9551509a7d14bd5e449c20aff81e08b3596a30aafc734a992c273cb30"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 18,
+            "sqlWritesMax": 16,
+            "missionComputesMax": 107
+          }
+        }
+      }
+    },
+    {
+      "concurrency": 100,
+      "requests": 600,
+      "elapsedMs": 13344.542,
+      "throughputPerSecond": 44.962,
+      "latencyMs": {
+        "p50": 1318.81,
+        "p95": 4524.612
+      },
+      "eventLoopDelayMs": {
+        "p50": 4412.408,
+        "p95": 4651.483,
+        "max": 4651.483
+      },
+      "sql": {
+        "statements": 47400,
+        "selectStatements": 20550,
+        "writeStatements": 24450,
+        "transactionStatements": 2400
+      },
+      "errors": 0,
+      "rollback": {
+        "verified": true,
+        "injectedError": "injected layered load rollback"
+      },
+      "entries": {
+        "get-progress": {
+          "boundary": "fastify-route:/get_mission_progress",
+          "requests": 150,
+          "throughputPerSecond": 11.241,
+          "latencyMs": {
+            "p50": 4054.74,
+            "p95": 4638.209
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "9c137e047e815be0f19649170fbd26db20acb9c7048cfff1ade8f2629cc4cdb5"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 25,
+            "sqlWritesMax": 4,
+            "missionComputesMax": 214
+          }
+        },
+        "single-finish": {
+          "boundary": "mission-finish-boundary",
+          "requests": 150,
+          "throughputPerSecond": 11.241,
+          "latencyMs": {
+            "p50": 34.751,
+            "p95": 1186.021
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "0cc085fb412c763070580a94e082c4f0f8e9c04576cdf26c592cd8db90da1661"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 46,
+            "sqlWritesMax": 63,
+            "missionComputesMax": 391
+          }
+        },
+        "multi-finish": {
+          "boundary": "mission-finish-boundary",
+          "requests": 150,
+          "throughputPerSecond": 11.241,
+          "latencyMs": {
+            "p50": 38.118,
+            "p95": 1155.674
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "44caeb3b6e395cc72a07f21668e0c61fd5747cc1cabddb0992d3d3bef8bf5b06"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 48,
+            "sqlWritesMax": 80,
+            "missionComputesMax": 391
+          }
+        },
+        "character-bond": {
+          "boundary": "fastify-route:/open_mana_board",
+          "requests": 150,
+          "throughputPerSecond": 11.241,
+          "latencyMs": {
+            "p50": 3997.556,
+            "p95": 4566.99
+          },
+          "errors": 0,
+          "errorRate": 0,
+          "errorMessages": [],
+          "behaviorSignatures": [
+            "c9e655d9551509a7d14bd5e449c20aff81e08b3596a30aafc734a992c273cb30"
+          ],
+          "structural": {
+            "requests": 150,
+            "sqlReadsMax": 18,
+            "sqlWritesMax": 16,
+            "missionComputesMax": 107
+          }
+        }
+      }
+    }
+  ],
+  "gate": {
+    "zeroErrors": true,
+    "behaviorEquivalent": true,
+    "rollbackVerified": true,
+    "sqlComputeNonIncreasing": true,
+    "admitted": true
+  },
+  "structuralComparisons": [
+    {
+      "concurrency": 1,
+      "entry": "get-progress",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 25,
+        "sqlWritesMax": 4,
+        "missionComputesMax": 214
+      },
+      "expected": {
+        "behaviorSignature": "9c137e047e815be0f19649170fbd26db20acb9c7048cfff1ade8f2629cc4cdb5",
+        "sqlReads": 25,
+        "sqlWrites": 4,
+        "missionComputes": 214
+      }
+    },
+    {
+      "concurrency": 1,
+      "entry": "single-finish",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 46,
+        "sqlWritesMax": 63,
+        "missionComputesMax": 391
+      },
+      "expected": {
+        "behaviorSignature": "0cc085fb412c763070580a94e082c4f0f8e9c04576cdf26c592cd8db90da1661",
+        "sqlReads": 50,
+        "sqlWrites": 63,
+        "missionComputes": 391
+      }
+    },
+    {
+      "concurrency": 1,
+      "entry": "multi-finish",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 48,
+        "sqlWritesMax": 80,
+        "missionComputesMax": 391
+      },
+      "expected": {
+        "behaviorSignature": "44caeb3b6e395cc72a07f21668e0c61fd5747cc1cabddb0992d3d3bef8bf5b06",
+        "sqlReads": 52,
+        "sqlWrites": 80,
+        "missionComputes": 391
+      }
+    },
+    {
+      "concurrency": 1,
+      "entry": "character-bond",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 18,
+        "sqlWritesMax": 16,
+        "missionComputesMax": 107
+      },
+      "expected": {
+        "behaviorSignature": "c9e655d9551509a7d14bd5e449c20aff81e08b3596a30aafc734a992c273cb30",
+        "sqlReads": 18,
+        "sqlWrites": 16,
+        "missionComputes": 107
+      }
+    },
+    {
+      "concurrency": 10,
+      "entry": "get-progress",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 25,
+        "sqlWritesMax": 4,
+        "missionComputesMax": 214
+      },
+      "expected": {
+        "behaviorSignature": "9c137e047e815be0f19649170fbd26db20acb9c7048cfff1ade8f2629cc4cdb5",
+        "sqlReads": 25,
+        "sqlWrites": 4,
+        "missionComputes": 214
+      }
+    },
+    {
+      "concurrency": 10,
+      "entry": "single-finish",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 46,
+        "sqlWritesMax": 63,
+        "missionComputesMax": 391
+      },
+      "expected": {
+        "behaviorSignature": "0cc085fb412c763070580a94e082c4f0f8e9c04576cdf26c592cd8db90da1661",
+        "sqlReads": 50,
+        "sqlWrites": 63,
+        "missionComputes": 391
+      }
+    },
+    {
+      "concurrency": 10,
+      "entry": "multi-finish",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 48,
+        "sqlWritesMax": 80,
+        "missionComputesMax": 391
+      },
+      "expected": {
+        "behaviorSignature": "44caeb3b6e395cc72a07f21668e0c61fd5747cc1cabddb0992d3d3bef8bf5b06",
+        "sqlReads": 52,
+        "sqlWrites": 80,
+        "missionComputes": 391
+      }
+    },
+    {
+      "concurrency": 10,
+      "entry": "character-bond",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 18,
+        "sqlWritesMax": 16,
+        "missionComputesMax": 107
+      },
+      "expected": {
+        "behaviorSignature": "c9e655d9551509a7d14bd5e449c20aff81e08b3596a30aafc734a992c273cb30",
+        "sqlReads": 18,
+        "sqlWrites": 16,
+        "missionComputes": 107
+      }
+    },
+    {
+      "concurrency": 25,
+      "entry": "get-progress",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 25,
+        "sqlWritesMax": 4,
+        "missionComputesMax": 214
+      },
+      "expected": {
+        "behaviorSignature": "9c137e047e815be0f19649170fbd26db20acb9c7048cfff1ade8f2629cc4cdb5",
+        "sqlReads": 25,
+        "sqlWrites": 4,
+        "missionComputes": 214
+      }
+    },
+    {
+      "concurrency": 25,
+      "entry": "single-finish",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 46,
+        "sqlWritesMax": 63,
+        "missionComputesMax": 391
+      },
+      "expected": {
+        "behaviorSignature": "0cc085fb412c763070580a94e082c4f0f8e9c04576cdf26c592cd8db90da1661",
+        "sqlReads": 50,
+        "sqlWrites": 63,
+        "missionComputes": 391
+      }
+    },
+    {
+      "concurrency": 25,
+      "entry": "multi-finish",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 48,
+        "sqlWritesMax": 80,
+        "missionComputesMax": 391
+      },
+      "expected": {
+        "behaviorSignature": "44caeb3b6e395cc72a07f21668e0c61fd5747cc1cabddb0992d3d3bef8bf5b06",
+        "sqlReads": 52,
+        "sqlWrites": 80,
+        "missionComputes": 391
+      }
+    },
+    {
+      "concurrency": 25,
+      "entry": "character-bond",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 18,
+        "sqlWritesMax": 16,
+        "missionComputesMax": 107
+      },
+      "expected": {
+        "behaviorSignature": "c9e655d9551509a7d14bd5e449c20aff81e08b3596a30aafc734a992c273cb30",
+        "sqlReads": 18,
+        "sqlWrites": 16,
+        "missionComputes": 107
+      }
+    },
+    {
+      "concurrency": 50,
+      "entry": "get-progress",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 25,
+        "sqlWritesMax": 4,
+        "missionComputesMax": 214
+      },
+      "expected": {
+        "behaviorSignature": "9c137e047e815be0f19649170fbd26db20acb9c7048cfff1ade8f2629cc4cdb5",
+        "sqlReads": 25,
+        "sqlWrites": 4,
+        "missionComputes": 214
+      }
+    },
+    {
+      "concurrency": 50,
+      "entry": "single-finish",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 46,
+        "sqlWritesMax": 63,
+        "missionComputesMax": 391
+      },
+      "expected": {
+        "behaviorSignature": "0cc085fb412c763070580a94e082c4f0f8e9c04576cdf26c592cd8db90da1661",
+        "sqlReads": 50,
+        "sqlWrites": 63,
+        "missionComputes": 391
+      }
+    },
+    {
+      "concurrency": 50,
+      "entry": "multi-finish",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 48,
+        "sqlWritesMax": 80,
+        "missionComputesMax": 391
+      },
+      "expected": {
+        "behaviorSignature": "44caeb3b6e395cc72a07f21668e0c61fd5747cc1cabddb0992d3d3bef8bf5b06",
+        "sqlReads": 52,
+        "sqlWrites": 80,
+        "missionComputes": 391
+      }
+    },
+    {
+      "concurrency": 50,
+      "entry": "character-bond",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 18,
+        "sqlWritesMax": 16,
+        "missionComputesMax": 107
+      },
+      "expected": {
+        "behaviorSignature": "c9e655d9551509a7d14bd5e449c20aff81e08b3596a30aafc734a992c273cb30",
+        "sqlReads": 18,
+        "sqlWrites": 16,
+        "missionComputes": 107
+      }
+    },
+    {
+      "concurrency": 100,
+      "entry": "get-progress",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 25,
+        "sqlWritesMax": 4,
+        "missionComputesMax": 214
+      },
+      "expected": {
+        "behaviorSignature": "9c137e047e815be0f19649170fbd26db20acb9c7048cfff1ade8f2629cc4cdb5",
+        "sqlReads": 25,
+        "sqlWrites": 4,
+        "missionComputes": 214
+      }
+    },
+    {
+      "concurrency": 100,
+      "entry": "single-finish",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 46,
+        "sqlWritesMax": 63,
+        "missionComputesMax": 391
+      },
+      "expected": {
+        "behaviorSignature": "0cc085fb412c763070580a94e082c4f0f8e9c04576cdf26c592cd8db90da1661",
+        "sqlReads": 50,
+        "sqlWrites": 63,
+        "missionComputes": 391
+      }
+    },
+    {
+      "concurrency": 100,
+      "entry": "multi-finish",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 48,
+        "sqlWritesMax": 80,
+        "missionComputesMax": 391
+      },
+      "expected": {
+        "behaviorSignature": "44caeb3b6e395cc72a07f21668e0c61fd5747cc1cabddb0992d3d3bef8bf5b06",
+        "sqlReads": 52,
+        "sqlWrites": 80,
+        "missionComputes": 391
+      }
+    },
+    {
+      "concurrency": 100,
+      "entry": "character-bond",
+      "sqlNonIncreasing": true,
+      "computeNonIncreasing": true,
+      "actual": {
+        "requests": 150,
+        "sqlReadsMax": 18,
+        "sqlWritesMax": 16,
+        "missionComputesMax": 107
+      },
+      "expected": {
+        "behaviorSignature": "c9e655d9551509a7d14bd5e449c20aff81e08b3596a30aafc734a992c273cb30",
+        "sqlReads": 18,
+        "sqlWrites": 16,
+        "missionComputes": 107
+      }
+    }
+  ]
+}

@@ -277,7 +277,7 @@ settleWithCandidates(
     ],
     evaluationTime,
 )
-assert.deepEqual(calls.buildContext.map(call => call.missionIds), [[1], [1]])
+assert.deepEqual(calls.buildContext.map(call => call.missionIds), [[1]])
 assert.deepEqual(calls.compute.map(call => call.missionId), [1])
 
 console.log("scoped mission settlement tests passed")

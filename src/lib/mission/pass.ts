@@ -8,6 +8,8 @@ import type { CategoryContext, MissionComputer } from "./types"
 import { ensurePlayerPassCardLoginProgressSync } from "../../data/domains/pass-card"
 import { buildPeriodicSnapshotData, getPassWeekSnapshotType, getSnapshot, takeSnapshot } from "./snapshot"
 import { buildPeriodicCategoryContextFromSession } from "./periodic-session-context"
+import { buildCategoryFactPlan, getFactLoadPlanKey } from "./category-session-plan"
+import type { MissionEvaluationSession } from "./evaluation-session"
 
 function periodValue(current: number, baseline: number | undefined): number {
     return Math.max(0, current - (baseline ?? 0))
@@ -44,6 +46,50 @@ function computePeriodicPassProgress(
         default:
             return dbProgress
     }
+}
+
+function emptyPassContext(session: MissionEvaluationSession, category: number): CategoryContext {
+    return {
+        category,
+        playerId: session.playerId,
+        player: session.getFact({ kind: "player" }),
+        questProgress: {},
+        totalQuestClears: 0,
+        totalStories: 0,
+        rankCounts: { rank_ss: 0, rank_s: 0, rank_a: 0, rank_b: 0 },
+    }
+}
+
+function buildWeeklyPassContext(
+    session: MissionEvaluationSession,
+    missionIds: readonly number[],
+): CategoryContext {
+    const plan = buildCategoryFactPlan(session, 7, missionIds)
+    const context = emptyPassContext(session, 7)
+    const battleKey = getFactLoadPlanKey(plan, "missionBattleCounters")
+    const snapshotKey = getFactLoadPlanKey(plan, "periodicSnapshot")
+    return {
+        ...context,
+        ...(battleKey ? { battleCounters: session.getFactFromPlan(battleKey, plan) } : {}),
+        ...(snapshotKey ? { snapshot: session.getFactFromPlan(snapshotKey, plan) } : {}),
+    }
+}
+
+function buildEventPassContext(
+    session: MissionEvaluationSession,
+    missionIds: readonly number[],
+): CategoryContext {
+    const context = emptyPassContext(session, 8)
+    const loginProgress: Record<number, number> = {}
+    for (const missionId of missionIds) {
+        const definition = getMissionMasterDefinition(8, missionId)
+        if (definition?.patternType !== 0 || definition.eventId === undefined) continue
+        const state = session.getFact({ kind: "passState", eventId: definition.eventId })
+        loginProgress[missionId] = state.loginBaseline === undefined
+            ? 0
+            : Math.max(0, context.player.totalLoginDays - state.loginBaseline)
+    }
+    return { ...context, passEventLoginProgress: loginProgress }
 }
 
 export const PassComputer: MissionComputer = {
@@ -88,10 +134,12 @@ export const PassComputer: MissionComputer = {
     },
 
     buildContextFromSession(session, category, missionIds): CategoryContext {
-        if (category !== 6) {
-            throw new Error("Pass Session context only supports category 6")
+        if (category === 6) {
+            return buildPeriodicCategoryContextFromSession(session, category, missionIds, "daily")
         }
-        return buildPeriodicCategoryContextFromSession(session, category, missionIds, "daily")
+        if (category === 7) return buildWeeklyPassContext(session, missionIds)
+        if (category === 8) return buildEventPassContext(session, missionIds)
+        throw new Error("Pass Session context only supports categories 6, 7 and 8")
     },
 
     compute(missionId: number, context: CategoryContext, dbProgress: number): number {

@@ -26,6 +26,7 @@ import {
 } from "../../data/domains/shopPurchase"
 import type {
     Player,
+    PlayerActiveMission,
     PlayerCharacter,
     PlayerEquipment,
     PlayerPartyGroup,
@@ -37,6 +38,10 @@ import {
     getSnapshot,
     type SnapshotData,
 } from "./snapshot"
+import {
+    getPlayerPassCardStateSync,
+    type PlayerPassCardState,
+} from "../../data/domains/pass-card"
 
 export interface ProductionMissionFactDomains {
     readonly getPlayerSync: (playerId: number) => Player | null
@@ -70,6 +75,15 @@ export interface ProductionMissionFactDomains {
     ) => ShopPurchaseMap
     readonly getSnapshot: (playerId: number, periodType: string) => SnapshotData | null
     readonly getPassWeekSnapshotType: (eventId: number) => string
+    readonly getPlayerPassCardStateSync: (playerId: number, eventId: number) => PlayerPassCardState
+}
+
+export interface ProductionMissionFactSeeds {
+    readonly player?: Player
+    readonly categoryMissions?: ReadonlyMap<
+        number,
+        Readonly<Record<string, PlayerActiveMission>>
+    >
 }
 
 const productionDomains: ProductionMissionFactDomains = {
@@ -88,14 +102,16 @@ const productionDomains: ProductionMissionFactDomains = {
     getPlayerShopPurchasesMapSync,
     getSnapshot,
     getPassWeekSnapshotType,
+    getPlayerPassCardStateSync,
 }
 
 export function createProductionMissionFactLoaderRegistry(
     domains: ProductionMissionFactDomains = productionDomains,
+    seeds: ProductionMissionFactSeeds = {},
 ): MissionFactLoaderRegistry {
     return new MissionFactLoaderRegistry()
         .register("player", ({ playerId }) => {
-            const player = domains.getPlayerSync(playerId)
+            const player = seeds.player ?? domains.getPlayerSync(playerId)
             if (player === null) throw new Error(`Mission evaluation player ${playerId} not found`)
             return player
         })
@@ -108,13 +124,20 @@ export function createProductionMissionFactLoaderRegistry(
         .register("partyGroups", ({ playerId, key }) => (
             domains.getPlayerPartyGroupListSync(playerId, key.category)
         ))
-        .register("categoryMissionProgress", ({ playerId, key }) => (
-            domains.getPlayerCategoryMissionProgressByIdsSync(
-                playerId,
-                key.category,
-                key.missionIds,
-            )
-        ))
+        .register("categoryMissionProgress", ({ playerId, key }) => {
+            const seeded = seeds.categoryMissions?.get(key.category)
+            if (seeded === undefined) {
+                return domains.getPlayerCategoryMissionProgressByIdsSync(
+                    playerId,
+                    key.category,
+                    key.missionIds,
+                )
+            }
+            return new Map(key.missionIds.flatMap(missionId => {
+                const mission = seeded[String(missionId)]
+                return mission === undefined ? [] : [[missionId, mission.progress] as const]
+            }))
+        })
         .register("collectedItems", ({ playerId, key }) => (
             key.itemIds === "all"
                 ? domains.getPlayerCollectedItemTotalsSync(playerId)
@@ -141,4 +164,7 @@ export function createProductionMissionFactLoaderRegistry(
                 : key.snapshotKind
             return domains.getSnapshot(playerId, periodType)
         })
+        .register("passState", ({ playerId, key }) => (
+            domains.getPlayerPassCardStateSync(playerId, key.eventId)
+        ))
 }

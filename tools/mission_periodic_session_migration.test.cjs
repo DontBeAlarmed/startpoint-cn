@@ -243,19 +243,22 @@ test("persisted and unsupported candidates load only the orchestrator player fac
     assert.deepEqual(calls, { player: 1, battle: 0, snapshot: 0, quest: 0 })
 })
 
-test("Session context builders reject categories outside their migrated boundaries", () => {
+test("Session context builders include Pass 7/8 while Awake 9 remains outside the guard", () => {
     const playerId = createPlayer("mission-periodic-boundary")
     const session = createProductionSession(playerId, [{ category: 1, missionId: 1 }])
+    const passSession = createProductionSession(playerId, [
+        { category: 7, missionId: 9 },
+        { category: 8, missionId: 13 },
+    ])
 
     assert.doesNotThrow(() => RegularComputer.buildContextFromSession(session, 1, [1]))
     assert.throws(
         () => RegularComputer.buildContextFromSession(session, 3, [1]),
         /only supports categories 1, 2 and 10/i,
     )
-    assert.throws(
-        () => PassComputer.buildContextFromSession(session, 7, [1]),
-        /only supports category 6/i,
-    )
+    assert.doesNotThrow(() => PassComputer.buildContextFromSession(passSession, 7, [9]))
+    assert.doesNotThrow(() => PassComputer.buildContextFromSession(passSession, 8, [13]))
+    assert.throws(() => PassComputer.buildContextFromSession(passSession, 9, [1]), /6, 7 and 8/i)
 })
 
 test("settlement shares production facts and keeps daily all-clear semantics", () => {

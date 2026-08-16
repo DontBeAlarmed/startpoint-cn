@@ -255,10 +255,23 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^src\/lib\/mission\/(?:category-session-plan|collect-progress|collect-session-context|computer-regular|master-value|pass|periodic-session-context|regular-battle-facts|regular-quest-facts|regular-session-context|regular-state-facts|settlement|types)\.ts$/,
+        pattern: /^src\/lib\/mission\/(?:category-session-plan|collect-progress|collect-session-context|computer-regular|grants|master-value|pass|periodic-session-context|regular-battle-facts|regular-quest-facts|regular-session-context|regular-state-facts|settlement|types)\.ts$/,
+        groups: ["integration:mission"],
+    },
+    {
+        pattern: /^(?:tools\/perf\/mission_entry_(?:base_oracle|layered_load|load_metrics|load_scenarios)(?:\.test)?\.cjs|tools\/perf\/__snapshots__\/mission_entry_layered_load_reference\.json)$/,
+        groups: ["integration:mission"],
+    },
+    {
+        pattern: /^(?:src\/lib\/mission\/settlement-(?:prepare|evaluate|write)\.ts|tools\/fixtures\/mission-settlement-pipeline-base\.json|tools\/mission_settlement_base_oracle\.test\.cjs)$/,
+        groups: ["integration:mission"],
+    },
+    {
+        pattern: /^tools\/oracle\/(?:git-object-runtime(?:\.test)?|generate_mission_(?:entry_load|settlement)_base|mission_(?:entry_load|settlement)_base_collector)\.cjs$/,
         groups: ["integration:mission"],
     },
     { pattern: /^src\/data\/domains\/(?:item|shopPurchase)\.ts$/, groups: ["integration:mission"] },
+    { pattern: /^src\/data\/domains\/pass-card\.ts$/, groups: ["integration:mission"] },
     { pattern: /^src\/routes\/api\/profile\.ts$/, groups: ["quick:character"] },
     {
         pattern: /^src\/routes\/api\/raidEvent\.ts$/,

@@ -1,0 +1,98 @@
+{
+  "dailyAllClear": {
+    "persisted": { "progress": 4, "stages": { "1": true } },
+    "response": {
+      "characterList": [],
+      "degreeIds": [],
+      "equipmentList": [],
+      "itemList": { "100000": 10 },
+      "missionInfo": [
+        { "mission_category_id": 2, "mission_id": 11, "mission_reward_id": 11001 },
+        { "mission_category_id": 2, "mission_id": 13, "mission_reward_id": 13001 },
+        { "mission_category_id": 2, "mission_id": 14, "mission_reward_id": 14001 },
+        { "mission_category_id": 2, "mission_id": 16, "mission_reward_id": 16001 },
+        { "mission_category_id": 2, "mission_id": 17, "mission_reward_id": 17001 }
+      ],
+      "passCardPoints": {},
+      "userInfo": { "exp_pool": 500, "free_mana": 3500, "free_vmoney": 150 }
+    }
+  },
+  "eventScope": {
+    "persisted": {},
+    "response": {
+      "characterList": [],
+      "degreeIds": [],
+      "equipmentList": [],
+      "itemList": {},
+      "missionInfo": [],
+      "passCardPoints": {}
+    }
+  },
+  "fixedTime": "2024-08-14T12:00:00.000Z",
+  "outerTransactionRollback": {
+    "after": { "freeVmoney": 100, "mission": { "progress": 10, "stages": [] } },
+    "before": { "freeVmoney": 100, "mission": { "progress": 10, "stages": [] } },
+    "injectedError": "injected BASE stage failure",
+    "rolledBack": true
+  },
+  "passLegacyBoundary": {
+    "legacyCategories": [7, 8],
+    "sessionCategories": [],
+    "weeklySnapshotCreated": true
+  },
+  "passReward": {
+    "firstResponse": {
+      "characterList": [],
+      "degreeIds": [],
+      "equipmentList": [],
+      "itemList": {},
+      "missionInfo": [
+        { "mission_category_id": 8, "mission_id": 13, "mission_reward_id": 13001 }
+      ],
+      "passCardPoints": { "3": 100 }
+    },
+    "passState": { "eventId": 3, "isBuy": true, "loginBaseline": 4, "point": 100 },
+    "persisted": { "progress": 1, "stages": { "1": true } },
+    "repeatedResponse": {
+      "characterList": [],
+      "degreeIds": [],
+      "equipmentList": [],
+      "itemList": {},
+      "missionInfo": [],
+      "passCardPoints": {}
+    }
+  },
+  "runtimeCommit": "f85a01c1eb730afa3ff9e6de00fd7b7a9d992c32",
+  "settlement": {
+    "emptyResponse": {
+      "characterList": [],
+      "degreeIds": [],
+      "equipmentList": [],
+      "itemList": {},
+      "missionInfo": [],
+      "passCardPoints": {}
+    },
+    "firstPersisted": { "progress": 30, "stages": { "1": true, "2": true, "3": true } },
+    "firstResponse": {
+      "characterList": [],
+      "degreeIds": [],
+      "equipmentList": [],
+      "itemList": {},
+      "missionInfo": [
+        { "mission_category_id": 1, "mission_id": 1, "mission_reward_id": 1001 },
+        { "mission_category_id": 1, "mission_id": 1, "mission_reward_id": 1002 },
+        { "mission_category_id": 1, "mission_id": 1, "mission_reward_id": 1003 }
+      ],
+      "passCardPoints": {},
+      "userInfo": { "exp_pool": 0, "free_mana": 2000, "free_vmoney": 115 }
+    },
+    "repeatedResponse": {
+      "characterList": [],
+      "degreeIds": [],
+      "equipmentList": [],
+      "itemList": {},
+      "missionInfo": [],
+      "passCardPoints": {}
+    }
+  }
+}

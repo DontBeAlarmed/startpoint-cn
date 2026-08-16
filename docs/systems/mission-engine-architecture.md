@@ -1,6 +1,6 @@
 # 任务引擎演进架构
 
-> 状态：阶段 1～3 的 Catalog、事实需求和阶段内 Session 已实施；Category 1～6、10 已接入 Session。本文同时记录已确认但尚未实施的阶段 4～6 边界。
+> 状态：阶段 1～4 已实施；Category 1～8、10 已接入 Session。本文同时记录阶段 5～6 的边界。
 
 ## 目标
 
@@ -261,7 +261,7 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 
 ### 阶段 3：阶段内 FactStore
 
-状态：Category 1～6、10 已完成；Category 7/8 随阶段 4 迁移，Awake 9 随阶段 6 迁移。
+状态：Category 1～8、10 已完成；Awake 9 保持 legacy，随阶段 6 再评估。
 
 - 引入 `MissionEvaluationSession`；
 - 先迁移重复读取最多的 player、quest progress、battle counters 和 periodic snapshot；
@@ -270,16 +270,18 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 
 ### 阶段 4：求值结果与标准结算
 
-状态：设计已确认，待实施。
+状态：已实施（方案 B）。
 
 - 拆分 prepare、evaluate、settle；
-- 让 settlement 返回可复用的 EvaluationResult 和奖励失效键；
+- 让 settlement 内部复用不可变 EvaluationResult；奖励失效键和阶段 B 重算仍留在阶段 5；
 - 保持现有 `MissionSettlementResult` 响应兼容层；
-- 验证重复调用不会重复发奖。
+- 验证重复调用不会重复发奖；
+- Category 7/8 在 prepare 中完成幂等 Pass 前置写入，在 evaluate 中通过只读 Session facts 求值；
+- Category 9 Awake 保持 legacy，未提前实现阶段 B 或奖励失效重算。
 
 ### 阶段 5：任务页响应
 
-状态：待阶段 4 完成后实施。
+状态：待实施。
 
 - `/mission/get_mission_progress` 复用阶段 A 结果；
 - 只对奖励失效键命中的请求内任务执行阶段 B 求值；
@@ -293,7 +295,7 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 - Awake 接入 Catalog 和 Session；
 - 增加单人、多人非空候选的即时响应与回滚测试；
 - 扩展结构性能基线到 Degree、Awake、`get_progress` 和战斗 finish；
-- 更新当前架构文档，将本文状态从“设计”改为“已实现”。
+- 全部阶段完成后更新本文最终状态。
 
 每个阶段独立提交，不自动 push。若阶段需要改变数据库结构、客户端协议、Active Mission 所有权或事务外部边界，必须停止并重新确认。
 
@@ -330,6 +332,17 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 - 角色羁绊结算。
 
 每档记录吞吐、P50/P95、事件循环延迟、SQL、错误率和事务回滚结果。阶段 4 不把 600 个同时结算请求描述为真实在线流量。
+
+可复核工具为 `tools/perf/mission_entry_layered_load.cjs`，摘要为
+`tools/perf/__snapshots__/mission_entry_layered_load_summary.json`，BASE 结构与行为
+reference 为 `tools/perf/__snapshots__/mission_entry_layered_load_reference.json`。
+其中 `get_progress` 和角色羁绊使用 Fastify 路由；单人和多人使用现有
+`mission-finish-boundary` adapter，明确不代表完整战斗 HTTP 混合压测。自动准入只检查
+零错误、行为等价、回滚验证和 SQL/compute 不增加，延迟仅作为同机观察值。
+Settlement BASE fixture 与负载 reference 分别由固定无参数 generator
+`tools/oracle/generate_mission_settlement_base.cjs` 和
+`tools/oracle/generate_mission_entry_load_base.cjs` 从 `f85a01c` Git 对象的隔离归档生成；
+普通 benchmark 不提供 reference 写入入口。
 
 整个优化路线完成后再执行全服务混合负载，覆盖登录、load、战斗、商店、抽卡、邮件和生产等价日志级别。联机与 Hub 留到可重复双服环境建立后加入。若混合负载失败，必须先 profile 到具体模块；日志、数据库写锁、商店、CDN 或 Hub 的瓶颈不得通过改造任务类别框架掩盖。
 
