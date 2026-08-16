@@ -25,7 +25,10 @@ const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/
 const { getDb } = require("../src/data/db")
 const { evaluateMissionCandidates } = require("../src/lib/mission/settlement-evaluate")
 const { prepareMissionSettlement } = require("../src/lib/mission/settlement-prepare")
-const { settleMissionEvaluation } = require("../src/lib/mission/settlement-write")
+const {
+    settleMissionEvaluation,
+    settleMissionEvaluationWithInvalidations,
+} = require("../src/lib/mission/settlement-write")
 
 initializeDatabase()
 const db = getDb()
@@ -101,6 +104,18 @@ test("settle skips unchanged progress writes", () => {
         END;
     `)
     assert.doesNotThrow(() => db.transaction(() => settleMissionEvaluation(evaluation))())
+})
+
+test("repeated settlement has no reward invalidation after the first grant", () => {
+    const playerId = createPlayer("write-invalidation-repeat")
+    updatePlayerCategoryMissionSync(playerId, 1, 1, 10)
+
+    const first = db.transaction(() => settleMissionEvaluationWithInvalidations(evaluate(playerId, [1])))()
+    assert.equal(first.invalidatedFactKeys.some(key => key.kind === "player"), true)
+
+    const repeated = db.transaction(() => settleMissionEvaluationWithInvalidations(evaluate(playerId, [1])))()
+    assert.deepEqual(repeated.invalidatedFactKeys, [])
+    assert.deepEqual(repeated.settlement.missionInfo, [])
 })
 
 test("reward persistence failure rolls progress stages and reward back together", () => {

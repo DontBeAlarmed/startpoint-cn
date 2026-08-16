@@ -27,7 +27,7 @@ test("mission settlement keeps the three-stage API internal", () => {
     assert.equal(typeof write.settleMissionEvaluation, "function")
 })
 
-test("architecture status keeps stages 5 and 6 explicitly pending", () => {
+test("architecture status records Stage 5 and keeps Stage 6 pending", () => {
     const architecture = fs.readFileSync(path.join(
         __dirname,
         "..",
@@ -38,7 +38,7 @@ test("architecture status keeps stages 5 and 6 explicitly pending", () => {
     const stage5 = architecture.match(/### 阶段 5：[\s\S]*?(?=### 阶段 6：)/)?.[0]
     const stage6 = architecture.match(/### 阶段 6：[\s\S]*?(?=## 验收指标)/)?.[0]
 
-    assert.match(stage5, /状态：待实施。/)
+    assert.match(stage5, /状态：已实施。/)
     assert.doesNotMatch(stage5, /待阶段 4 完成后实施/)
     assert.match(stage6, /全部阶段完成后更新本文最终状态/)
     assert.doesNotMatch(stage6, /将本文状态从“设计”改为“已实现”/)

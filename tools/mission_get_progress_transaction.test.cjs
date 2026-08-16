@@ -58,15 +58,27 @@ stubModule("../src/lib/mission/index", {
     isMissionEnabledAt: () => true,
     mergeMissionSettlementResponse: () => {},
     reconcileAwakeUnlockCharacterList: (_playerId, list) => list,
-    settleMissionCategories: playerId => getDb().transaction(() => {
+    settleMissionCategoriesWithEvaluation: playerId => getDb().transaction(() => {
         getDb().prepare(`
             INSERT INTO players_items (id, amount, player_id)
             VALUES (900001, 1, ?)
         `).run(playerId)
         return {
-            missionInfo: [], itemList: {}, characterList: [], equipmentList: [],
-            degreeIds: [], passCardPoints: {},
+            prepared: { scopes: [], candidates: [], passPreparation: {} },
+            evaluation: { playerId, missions: [] },
+            settlement: {
+                missionInfo: [], itemList: {}, characterList: [], equipmentList: [],
+                degreeIds: [], passCardPoints: {},
+            },
+            invalidatedFactKeys: [],
         }
+    })(),
+    evaluateMissionProgressStageB: stageA => getDb().transaction(() => {
+        getDb().prepare(`
+            INSERT INTO players_items (id, amount, player_id)
+            VALUES (900002, 1, ?)
+        `).run(stageA.evaluation.playerId)
+        throw new Error("injected Stage B evaluation failure")
     })(),
     settleAwakeMissionRewards: playerId => getDb().transaction(() => {
         getDb().prepare(`

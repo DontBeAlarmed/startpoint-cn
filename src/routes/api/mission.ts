@@ -10,7 +10,7 @@ import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { createCharacterAwakeEligibilityResolver, getComputer, getMissionIdsByCategory, getCurrentStage, getCharacterIdFromMission, isMissionEnabledAt, mergeMissionSettlementResponse, reconcileAwakeUnlockCharacterList, settleAwakeMissionRewards, settleMissionCategories } from "../../lib/mission/index";
+import { createCharacterAwakeEligibilityResolver, evaluateMissionProgressStageB, getComputer, getMissionIdsByCategory, getCurrentStage, getCharacterIdFromMission, isMissionEnabledAt, mergeMissionSettlementResponse, reconcileAwakeUnlockCharacterList, settleAwakeMissionRewards, settleMissionCategoriesWithEvaluation } from "../../lib/mission/index";
 import { resolveClientProgressTargets } from "../../lib/mission/client-progress";
 import type { AwakeMissionComputedProgress, AwakeMissionInfo } from "../../lib/mission/index";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -86,21 +86,30 @@ const routes = async (fastify: FastifyInstance) => {
                 .filter(entry => [1, 2, 3, 4, 5, 6, 7, 8, 10].includes(entry.category))
                 .map(entry => ({ category: entry.category, eventId: entry.event_id }))
             const automaticSettlement = automaticScopes.length > 0
-                ? settleMissionCategories(playerId, automaticScopes, evaluationTime)
+                ? settleMissionCategoriesWithEvaluation(playerId, automaticScopes, evaluationTime)
                 : null
+            const stageB = automaticSettlement
+                ? evaluateMissionProgressStageB(automaticSettlement)
+                : null
+            const standardProgressByMission = new Map<string, { progress: number, stage: number }>()
+            for (const mission of automaticSettlement?.evaluation.missions ?? []) {
+                standardProgressByMission.set(`${mission.category}:${mission.missionId}`, {
+                    progress: mission.finalProgress,
+                    stage: getCurrentStage(mission.category, mission.missionId, mission.finalProgress),
+                })
+            }
+            for (const mission of stageB?.missions ?? []) {
+                standardProgressByMission.set(`${mission.category}:${mission.missionId}`, {
+                    progress: mission.finalProgress,
+                    stage: getCurrentStage(mission.category, mission.missionId, mission.finalProgress),
+                })
+            }
             const missionProgressList: any[] = []
             const categoryMissionCache = new Map<number, ReturnType<typeof getPlayerCategoryMissionsSync>>()
             const awakeProgressByCharacter = new Map<string, AwakeMissionComputedProgress[]>()
 
             for (const requestEntry of requestList) {
                 const category = requestEntry.category
-                const computer = getComputer(category)
-                const ctx = getCtx(category)
-                let categoryMissions = categoryMissionCache.get(category)
-                if (!categoryMissions) {
-                    categoryMissions = getPlayerCategoryMissionsSync(playerId, category)
-                    categoryMissionCache.set(category, categoryMissions)
-                }
                 const charId = requestEntry.character_id === undefined ? undefined : String(requestEntry.character_id)
                 const candidateIds = category === 9 && charId !== undefined
                     ? getMissionIdsByCategory(category).filter(missionId =>
@@ -116,6 +125,25 @@ const routes = async (fastify: FastifyInstance) => {
                 )
 
                 for (const missionId of allIds) {
+                    if (category !== 9) {
+                        const progress = standardProgressByMission.get(`${category}:${missionId}`)
+                        if (!progress) continue
+                        missionProgressList.push({
+                            mission_category: category,
+                            mission_id: missionId,
+                            progress_value: Number(progress.progress),
+                            stage: progress.stage,
+                        })
+                        continue
+                    }
+
+                    const computer = getComputer(category)
+                    const ctx = getCtx(category)
+                    let categoryMissions = categoryMissionCache.get(category)
+                    if (!categoryMissions) {
+                        categoryMissions = getPlayerCategoryMissionsSync(playerId, category)
+                        categoryMissionCache.set(category, categoryMissions)
+                    }
                     const dbProgress = categoryMissions[String(missionId)]?.progress ?? 0
                     const progress = computer.compute(missionId, ctx, dbProgress)
                     const stage = getCurrentStage(category, missionId, progress)
@@ -166,7 +194,7 @@ const routes = async (fastify: FastifyInstance) => {
             if (automaticSettlement) {
                 mergeMissionSettlementResponse(
                     responseData,
-                    automaticSettlement,
+                    automaticSettlement.settlement,
                     viewerId,
                 )
             }

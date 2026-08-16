@@ -43,7 +43,9 @@ export { getMissionIdsByCategory, getCurrentStage, getCompletedStageNumbers, get
 export type { ActiveMissionReward, AwakeMissionRewardStageDefinition, AwakeMissionSpecialReward, MissionRewardStageDefinition } from "./rewards"
 export { getActiveMissionRewards, getAwakeMissionRewards, getAwakeMissionRewardStageDefinition, getCollectMissionRewards, getDailyMissionRewards, getDegreeMissionRewards, getEventMissionRewards, getMissionRewardStageDefinition, getRegularMissionRewards, getWeeklyMissionRewards } from "./rewards"
 export type { MissionSettlementInfo, MissionSettlementResult, MissionSettlementScope } from "./settlement"
-export { settleMissionCategories } from "./settlement"
+export { settleMissionCategories, settleMissionCategoriesWithEvaluation } from "./settlement"
+export type { MissionSettlementEvaluation } from "./settlement"
+export { evaluateMissionProgressStageB, getMissionProgressStageBRefs } from "./progress-stage-b"
 export { mergeMissionSettlementResponse } from "./response"
 
 // Patterns (for update_mission_progress)

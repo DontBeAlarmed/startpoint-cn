@@ -53,7 +53,26 @@ stubModule("../src/lib/mission/index", {
     settleAwakeMissionRewards: () => ({
         missionInfo: [], itemList: {}, characterList: [], equipmentList: [], degreeIds: [],
     }),
-    settleMissionCategories: () => null,
+    settleMissionCategoriesWithEvaluation: playerId => {
+        const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
+        const missions = Object.entries(getPlayerCategoryMissionsSync(playerId, 5)).map(([missionId, mission]) => ({
+            category: 5,
+            missionId: Number(missionId),
+            declaredFactDependencies: [],
+            dbProgress: mission.progress,
+            computedProgress: mission.progress,
+            finalProgress: mission.progress,
+            receivedStages: [],
+        }))
+        return {
+            prepared: { scopes: [], candidates: [], passPreparation: {} },
+            evaluation: { playerId, missions },
+            settlement: { missionInfo: [], itemList: {}, characterList: [], equipmentList: [], degreeIds: [] },
+            invalidatedFactKeys: [],
+        }
+    },
+    evaluateMissionProgressStageB: () => null,
+    mergeMissionSettlementResponse: () => {},
 })
 
 const missionRoutes = require("../src/routes/api/mission").default

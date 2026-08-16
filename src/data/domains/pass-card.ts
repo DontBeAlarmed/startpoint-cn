@@ -90,6 +90,48 @@ export function addPlayerPassCardPointSync(
     return row.point
 }
 
+export function addPlayerPassCardPointWithChangeSync(
+    playerId: number,
+    eventId: number,
+    amount: number,
+    maxPoint: number = Number.MAX_SAFE_INTEGER,
+): { point: number, changed: boolean } {
+    if (!Number.isSafeInteger(amount) || amount < 0) {
+        throw new TypeError("Pass point amount must be a non-negative safe integer.")
+    }
+    if (!Number.isSafeInteger(maxPoint) || maxPoint < 0) {
+        throw new TypeError("Pass point limit must be a non-negative safe integer.")
+    }
+    if (amount === 0 || maxPoint === 0) {
+        return {
+            point: getPlayerPassCardStateSync(playerId, eventId).point,
+            changed: false,
+        }
+    }
+
+    const cappedAmount = Math.min(amount, maxPoint)
+    const updated = getDb().prepare(`
+        UPDATE players_pass_cards
+        SET point = MIN(point + ?, ?)
+        WHERE player_id = ? AND event_id = ? AND point < ?
+        RETURNING point
+    `).get(cappedAmount, maxPoint, playerId, eventId, maxPoint) as { point: number } | undefined
+    if (updated) return { point: updated.point, changed: true }
+
+    const inserted = getDb().prepare(`
+        INSERT INTO players_pass_cards (player_id, event_id, point, is_buy, login_baseline)
+        VALUES (?, ?, ?, 0, NULL)
+        ON CONFLICT(player_id, event_id) DO NOTHING
+        RETURNING point
+    `).get(playerId, eventId, cappedAmount) as { point: number } | undefined
+    return inserted
+        ? { point: inserted.point, changed: true }
+        : {
+            point: getPlayerPassCardStateSync(playerId, eventId).point,
+            changed: false,
+        }
+}
+
 export function getPlayerPassCardRewardRecordsSync(
     playerId: number,
     eventId: number,

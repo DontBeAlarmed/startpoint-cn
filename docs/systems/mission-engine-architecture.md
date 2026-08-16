@@ -1,6 +1,6 @@
 # 任务引擎演进架构
 
-> 状态：阶段 1～4 已实施；Category 1～8、10 已接入 Session。本文同时记录阶段 5～6 的边界。
+> 状态：阶段 1～5 已实施；Category 1～8、10 已接入 Session，Awake category 9 保持 legacy。阶段 6 待后续评估。
 
 ## 目标
 
@@ -273,7 +273,7 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 状态：已实施（方案 B）。
 
 - 拆分 prepare、evaluate、settle；
-- 让 settlement 内部复用不可变 EvaluationResult；奖励失效键和阶段 B 重算仍留在阶段 5；
+- 让 settlement 内部复用不可变 EvaluationResult；奖励失效键和阶段 B 重算由阶段 5 接入任务页；
 - 保持现有 `MissionSettlementResult` 响应兼容层；
 - 验证重复调用不会重复发奖；
 - Category 7/8 在 prepare 中完成幂等 Pass 前置写入，在 evaluate 中通过只读 Session facts 求值；
@@ -281,12 +281,15 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 
 ### 阶段 5：任务页响应
 
-状态：待实施。
+状态：已实施。
 
-- `/mission/get_mission_progress` 复用阶段 A 结果；
-- 只对奖励失效键命中的请求内任务执行阶段 B 求值；
-- 阶段 B 禁止写进度或发奖；
-- 保留整请求事务与 mail、Awake 响应字段。
+- `/mission/get_mission_progress` 复用阶段 A 的 `PreparedMissionSettlement` 和 `MissionEvaluationResult`；
+- 奖励层在实际写入成功后返回规范化、不可变、批内去重的 `FactKey`；玩家事实在 `persistPlayer()` 成功后才标记；
+- 只对奖励失效键反向索引命中的、且已经属于本次请求阶段 A 候选的任务执行阶段 B；
+- 阶段 B 创建新只读 Session，只求值并覆盖任务页进度/阶段，不写进度、不领取 stage、不发奖励、不初始化 Pass 前置；
+- 无失效奖励或无受影响任务时不创建阶段 B；
+- 合并阶段 A/阶段 B 后保持请求顺序、任务响应字段、mail 和 Awake legacy 字段兼容；
+- 阶段 A 写入、奖励、阶段 B 求值和响应生成继续位于同一外层事务，任一步失败整体回滚。
 
 ### 阶段 6：Awake 与性能收尾
 

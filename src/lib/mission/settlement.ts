@@ -6,7 +6,7 @@ import {
     prepareMissionSettlement,
     selectMissionSettlementCandidates,
 } from "./settlement-prepare"
-import { settleMissionEvaluation } from "./settlement-write"
+import { settleMissionEvaluationWithInvalidations } from "./settlement-write"
 
 export interface MissionSettlementInfo {
     mission_category_id: number
@@ -94,22 +94,39 @@ export interface MissionEvaluationResult {
     readonly observer: MissionEvaluationObserverSummary
 }
 
+export interface MissionSettlementEvaluation {
+    readonly prepared: PreparedMissionSettlement
+    readonly evaluation: MissionEvaluationResult
+    readonly settlement: MissionSettlementResult
+    readonly invalidatedFactKeys: readonly FactKey[]
+}
+
 export function settleMissionCategories(
     playerId: number,
     categories: readonly (number | MissionSettlementScope)[],
     evaluationTime: Date,
     observer?: MissionSettlementObserver,
 ): MissionSettlementResult {
+    const result = settleMissionCategoriesWithEvaluation(playerId, categories, evaluationTime, observer)
+    return result?.settlement ?? {
+        missionInfo: [],
+        itemList: {},
+        characterList: [],
+        equipmentList: [],
+        degreeIds: [],
+        passCardPoints: {},
+    }
+}
+
+export function settleMissionCategoriesWithEvaluation(
+    playerId: number,
+    categories: readonly (number | MissionSettlementScope)[],
+    evaluationTime: Date,
+    observer?: MissionSettlementObserver,
+): MissionSettlementEvaluation | null {
     const selection = selectMissionSettlementCandidates(categories, evaluationTime, observer)
     if (selection.candidates.length === 0) {
-        return {
-            missionInfo: [],
-            itemList: {},
-            characterList: [],
-            equipmentList: [],
-            degreeIds: [],
-            passCardPoints: {},
-        }
+        return null
     }
 
     return getDb().transaction(() => {
@@ -121,6 +138,12 @@ export function settleMissionCategories(
             selection,
         )
         const evaluation = evaluateMissionCandidates(prepared, observer)
-        return settleMissionEvaluation(evaluation, observer)
+        const settled = settleMissionEvaluationWithInvalidations(evaluation, observer)
+        return {
+            prepared,
+            evaluation,
+            settlement: settled.settlement,
+            invalidatedFactKeys: settled.invalidatedFactKeys,
+        }
     })()
 }

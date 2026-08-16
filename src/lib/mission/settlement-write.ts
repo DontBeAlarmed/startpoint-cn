@@ -6,6 +6,7 @@ import { MissionRewardGranter } from "./grants"
 import { getMissionMasterDefinition } from "./master-data"
 import { getCategoryMissionRewardStageDefinition } from "./rewards"
 import { getCompletedStageNumbers } from "./stages"
+import type { FactKey } from "./facts/fact-key"
 import type {
     MissionEvaluationResult,
     MissionSettlementInfo,
@@ -17,6 +18,18 @@ export function settleMissionEvaluation(
     evaluation: MissionEvaluationResult,
     observer?: MissionSettlementObserver,
 ): MissionSettlementResult {
+    return settleMissionEvaluationWithInvalidations(evaluation, observer).settlement
+}
+
+export interface MissionEvaluationSettlement {
+    readonly settlement: MissionSettlementResult
+    readonly invalidatedFactKeys: readonly FactKey[]
+}
+
+export function settleMissionEvaluationWithInvalidations(
+    evaluation: MissionEvaluationResult,
+    observer?: MissionSettlementObserver,
+): MissionEvaluationSettlement {
     const granter = new MissionRewardGranter(evaluation.playerId, evaluation.player)
     const missionInfo: MissionSettlementInfo[] = []
 
@@ -65,12 +78,15 @@ export function settleMissionEvaluation(
 
     granter.persistPlayer()
     return {
-        missionInfo,
-        itemList: granter.itemList,
-        characterList: granter.characterList,
-        equipmentList: granter.equipmentList,
-        degreeIds: granter.degreeList,
-        passCardPoints: granter.passCardPoints,
-        ...(granter.hasPlayerChanges() ? { userInfo: granter.getUserInfo() } : {}),
+        settlement: {
+            missionInfo,
+            itemList: granter.itemList,
+            characterList: granter.characterList,
+            equipmentList: granter.equipmentList,
+            degreeIds: granter.degreeList,
+            passCardPoints: granter.passCardPoints,
+            ...(granter.hasPlayerChanges() ? { userInfo: granter.getUserInfo() } : {}),
+        },
+        invalidatedFactKeys: granter.invalidatedFactKeys,
     }
 }
