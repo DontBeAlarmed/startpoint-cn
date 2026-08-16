@@ -45,7 +45,7 @@ const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
-const { activeQuests } = require("../src/lib/quest/active-quest-service")
+const { activeQuests, insertActiveQuest } = require("../src/lib/quest/active-quest-service")
 const raidEventRoutes = require("../src/routes/api/raidEvent").default
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
 const { getTimeOffset, setServerTimeOffset } = require("../src/utils")
@@ -83,7 +83,7 @@ async function summary(fastify, viewerId, eventId, apiCount) {
 }
 
 async function finishRaidBattle(fastify, viewerId) {
-    activeQuests[playerId] = {
+    insertActiveQuest(playerId, {
         questId: 4001,
         category: 23,
         eventId: 4,
@@ -93,12 +93,13 @@ async function finishRaidBattle(fastify, viewerId) {
         isMulti: false,
         playId: "raid-finish-without-summary",
         continueCount: 0,
-    }
+    })
     return fastify.inject({
         method: "POST",
         url: "/battle/finish",
         payload: {
             viewer_id: viewerId,
+            play_id: "raid-finish-without-summary",
             quest_id: 4001,
             category: 23,
             score: 0,
@@ -113,7 +114,7 @@ async function finishRaidBattle(fastify, viewerId) {
                 max_combo_count: 0,
                 zones: [],
                 party: {
-                    characters: [null, null, null],
+                    characters: [{ id: 1 }, null, null],
                     unison_characters: [null, null, null],
                     equipments: [null, null, null],
                     ability_soul_ids: [null, null, null],

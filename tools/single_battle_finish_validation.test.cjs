@@ -1,6 +1,8 @@
 "use strict"
 
 const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const path = require("node:path")
 const test = require("node:test")
 
 const {
@@ -12,6 +14,14 @@ const {
     runSingleFinishSettlementTransaction,
     SingleFinishSettlementValidationError,
 } = require("../src/lib/quest/single-finish-settlement")
+const {
+    saturatingAddNonNegativeSafeIntegers,
+} = require("../src/lib/quest/finish/powerflip-tracker")
+const {
+    trackLeaderPowerflip,
+} = require("../src/lib/quest/finish/leader-powerflip-tracker")
+
+const INT32_MAX = 2_147_483_647
 
 function createHelperActiveQuest(overrides = {}) {
     return {
@@ -173,6 +183,18 @@ test("single finish helper rejects mutually enabled Boost flags", () => {
     })
 })
 
+test("powerflip tracker saturates safe totals and normalizes invalid existing values", () => {
+    assert.equal(typeof saturatingAddNonNegativeSafeIntegers, "function")
+    assert.equal(saturatingAddNonNegativeSafeIntegers(10, 5), 15)
+    assert.equal(
+        saturatingAddNonNegativeSafeIntegers(Number.MAX_SAFE_INTEGER - 1, 2),
+        Number.MAX_SAFE_INTEGER,
+    )
+    for (const existing of [-1, 0.5, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+        assert.equal(saturatingAddNonNegativeSafeIntegers(existing, 3), 3)
+    }
+})
+
 test("single finish validates settlement authority before writing", async t => {
     await withSingleBattleHarness("finish-validation", async harness => {
         const rejectionCases = [
@@ -203,6 +225,7 @@ test("single finish validates settlement authority before writing", async t => {
                 title: `rejects an invalid ${field} type or range`,
                 name: `${field}-invalid`,
                 payloadOverrides: { [field]: value },
+                messagePattern: /^Invalid request body\.$/,
             })),
             {
                 title: "rejects a persisted identity mismatch",
@@ -344,4 +367,207 @@ test("single finish validates settlement authority before writing", async t => {
             assert.equal(measured.sql.byTable.players_active_quests.reads, 1)
         })
     })
+})
+
+test("single finish rejects malformed request results before writing", async t => {
+    await withSingleBattleHarness("finish-request-validation", async harness => {
+        const validStatistics = harness.finishPayload().statistics
+        const withoutStatistic = field => {
+            const statistics = { ...validStatistics }
+            delete statistics[field]
+            return statistics
+        }
+        const malformedCases = [
+            ["statistics null", { statistics: null }],
+            ["party missing", { statistics: { clear_phase: 1 } }],
+            ["clear phase missing", { statistics: withoutStatistic("clear_phase") }],
+            ["zones missing", { statistics: withoutStatistic("zones") }],
+            ["zones null member", {
+                statistics: { ...validStatistics, zones: [null] },
+            }],
+            ["characters non-array", {
+                statistics: {
+                    ...validStatistics,
+                    party: { ...validStatistics.party, characters: {} },
+                },
+            }],
+            ["character id invalid", {
+                statistics: {
+                    ...validStatistics,
+                    party: { ...validStatistics.party, characters: [{ id: 0 }, null, null] },
+                },
+            }],
+            ["characters without a positive id", {
+                statistics: {
+                    ...validStatistics,
+                    party: { ...validStatistics.party, characters: [null] },
+                },
+            }],
+            ["power flip count invalid", {
+                statistics: {
+                    ...validStatistics,
+                    zones: [{ ...validStatistics.zones[0], use_power_flip_count: Infinity }],
+                },
+            }],
+            ["max combo count invalid", {
+                statistics: { ...validStatistics, max_combo_count: Infinity },
+            }],
+            ["power flip aggregate exceeds int32", {
+                statistics: {
+                    ...validStatistics,
+                    zones: [
+                        { ...validStatistics.zones[0], use_power_flip_count: INT32_MAX },
+                        { use_power_flip_count: 1 },
+                    ],
+                },
+            }],
+            ["elapsed time invalid", { elapsed_time_ms: 0 }],
+            ["add mana invalid", { add_mana: -1 }],
+            ["score invalid", { score: -1 }],
+            ["equipment element invalid", { equipment_element: [-1] }],
+        ]
+
+        for (const [name, payloadOverrides] of malformedCases) {
+            await t.test(name, () => assertRejectedWithoutWrites(harness, {
+                name: `request-${name.replaceAll(" ", "-")}`,
+                payloadOverrides,
+                messagePattern: /^Invalid request body\.$/,
+            }))
+        }
+    })
+})
+
+test("single finish powerflip tracker saturates database totals", async () => {
+    await withSingleBattleHarness("finish-powerflip-saturation", async harness => {
+        const playId = "gate-task-21a-powerflip-saturation"
+        harness.db.prepare(`
+            UPDATE players SET total_powerflips = ?, total_dashes = ? WHERE id = ?
+        `).run(Number.MAX_SAFE_INTEGER - 1, 1.5, harness.playerId)
+        harness.insertActiveQuest(harness.createActiveQuest({ playId }))
+        const payload = harness.finishPayload({ playId })
+        payload.statistics.zones = [{
+            ...payload.statistics.zones[0],
+            use_power_flip_count: 2,
+            use_dash_count: 3,
+        }]
+
+        const measured = await measureFinish(harness, payload)
+        const totals = harness.db.prepare(`
+            SELECT total_powerflips AS powerflips, total_dashes AS dashes
+            FROM players WHERE id = ?
+        `).get(harness.playerId)
+
+        assert.equal(measured.value.statusCode, 200)
+        assert.deepEqual(totals, {
+            powerflips: Number.MAX_SAFE_INTEGER,
+            dashes: 3,
+        })
+    })
+})
+
+test("single finish leader powerflip counter saturates through the real route", async () => {
+    await withSingleBattleHarness("finish-leader-powerflip-saturation", async harness => {
+        const playId = "gate-task-21a-leader-powerflip-saturation"
+        const payload = harness.finishPayload({ playId })
+        const leaderId = payload.statistics.party.characters[0].id
+        harness.db.prepare(`
+            INSERT INTO players_character_quest_clears (
+                player_id, character_id, clear_count, multi_count,
+                leader_clear_count, leader_multi_count, leader_power_flip_count
+            ) VALUES (?, ?, 0, 0, 0, 0, ?)
+        `).run(harness.playerId, leaderId, Number.MAX_SAFE_INTEGER - 1)
+        harness.insertActiveQuest(harness.createActiveQuest({ playId }))
+        payload.statistics.zones = [{
+            ...payload.statistics.zones[0],
+            use_power_flip_count: 2,
+        }]
+
+        const measured = await measureFinish(harness, payload)
+        const counter = harness.db.prepare(`
+            SELECT leader_power_flip_count AS value
+            FROM players_character_quest_clears
+            WHERE player_id = ? AND character_id = ?
+        `).get(harness.playerId, leaderId).value
+
+        assert.equal(measured.value.statusCode, 200)
+        assert.equal(counter, Number.MAX_SAFE_INTEGER)
+        assert.equal(Number.isSafeInteger(counter), true)
+    })
+})
+
+test("leader powerflip tracker preserves insert and safe update semantics", async t => {
+    await withSingleBattleHarness("leader-powerflip-upsert", async harness => {
+        const payload = harness.finishPayload()
+        const leaderId = payload.statistics.party.characters[0].id
+        const context = {
+            playerId: harness.playerId,
+            party: payload.statistics.party,
+            statistics: payload.statistics,
+        }
+        for (const [name, existing, expected] of [
+            ["insert", null, 2],
+            ["normal update", 7, 9],
+            ["negative recovery", -5, 2],
+        ]) {
+            await t.test(name, () => {
+                harness.db.prepare(`
+                    DELETE FROM players_character_quest_clears
+                    WHERE player_id = ? AND character_id = ?
+                `).run(harness.playerId, leaderId)
+                if (existing !== null) {
+                    harness.db.prepare(`
+                        INSERT INTO players_character_quest_clears (
+                            player_id, character_id, clear_count, multi_count,
+                            leader_clear_count, leader_multi_count, leader_power_flip_count
+                        ) VALUES (?, ?, 0, 0, 0, 0, ?)
+                    `).run(harness.playerId, leaderId, existing)
+                }
+                trackLeaderPowerflip({
+                    ...context,
+                    statistics: { ...context.statistics, zones: [{ use_power_flip_count: 2 }] },
+                })
+                const counter = harness.db.prepare(`
+                    SELECT leader_power_flip_count AS value
+                    FROM players_character_quest_clears
+                    WHERE player_id = ? AND character_id = ?
+                `).get(harness.playerId, leaderId).value
+                assert.equal(counter, expected)
+            })
+        }
+    })
+})
+
+test("single finish accepts unknown result extensions", async () => {
+    await withSingleBattleHarness("finish-request-extensions", async harness => {
+        const playId = "gate-task-21a-extensions"
+        harness.insertActiveQuest(harness.createActiveQuest({ playId }))
+        const payload = harness.finishPayload({ playId })
+        payload.statistics.future_statistics_field = { accepted: true }
+        payload.statistics.zones.push({ future_zone_field: ["accepted"] })
+        payload.sub_statistics = { future_payload: true }
+        payload.equipment_element = [0, 1]
+
+        const measured = await measureFinish(harness, payload)
+
+        assert.equal(measured.value.statusCode, 200)
+    })
+})
+
+test("single finish route validates before identity and party access", () => {
+    const routePath = path.join(__dirname, "../src/routes/api/singleBattleQuest.ts")
+    const source = fs.readFileSync(routePath, "utf8")
+    const finishStart = source.indexOf('fastify.post("/finish"')
+    const finishEnd = source.indexOf('fastify.post("/start"', finishStart)
+    const finishSource = source.slice(finishStart, finishEnd)
+    const validationCall = finishSource.indexOf("validateSingleFinishRequest(request.body)")
+    const validatedBody = finishSource.indexOf("const body = validationResult.body")
+    const identityGate = finishSource.indexOf("validateSessionAndPlayer")
+    const firstPartyAccess = finishSource.indexOf("body.statistics.party")
+
+    assert.ok(validationCall >= 0, "finish must call the pure request validator")
+    assert.ok(validatedBody > validationCall, "finish must use the validated body")
+    assert.ok(identityGate > validatedBody, "request validation must precede the identity gate")
+    assert.ok(firstPartyAccess > identityGate, "party access must follow validation and identity")
+    assert.doesNotMatch(finishSource, /party:\s*body\.statistics\.party\s+as\s+any/)
+    assert.doesNotMatch(finishSource, /statistics:\s*\(body\s+as\s+any\)\.statistics/)
 })

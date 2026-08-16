@@ -232,10 +232,25 @@ test("single and multi production finish routes call the shared Awake battle sea
         "src/multi/http/battle.ts",
     ]) {
         const source = fs.readFileSync(path.join(__dirname, "..", routePath), "utf8")
-        const transactionBody = source.indexOf("const executeFinishWrites = () => {")
-        const seamCall = source.indexOf("settleAwakeBattleMissions({", transactionBody)
+        const single = routePath === "src/routes/api/singleBattleQuest.ts"
+        const finishStart = source.indexOf('fastify.post("/finish"')
+        const finishEnd = source.indexOf('fastify.post("/abort"', finishStart)
+        const finishSource = source.slice(finishStart, finishEnd)
+        const transactionBody = finishSource.indexOf(single
+            ? "const executeFinishWrites = ({"
+            : "const executeFinishWrites = () => {")
+        const seamCall = finishSource.indexOf("settleAwakeBattleMissions({", transactionBody)
+        const transactionCall = finishSource.indexOf(single
+            ? "finishWrites = runSingleFinishSettlementTransaction({"
+            : "finishWrites = runMultiActiveQuestSettlementTransaction(", seamCall)
+        const settleBinding = finishSource.indexOf(single
+            ? "settle: executeFinishWrites"
+            : "executeFinishWrites,", transactionCall)
+        assert.equal(finishStart >= 0 && finishEnd > finishStart, true, `${routePath} finish block`)
         assert.equal(transactionBody >= 0, true, `${routePath} transaction body`)
         assert.equal(seamCall > transactionBody, true, `${routePath} shared Awake seam call`)
+        assert.equal(transactionCall > seamCall, true, `${routePath} transaction call`)
+        assert.equal(settleBinding >= transactionCall, true, `${routePath} transaction callback`)
     }
 })
 

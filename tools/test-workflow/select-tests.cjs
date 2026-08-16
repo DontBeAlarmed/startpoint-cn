@@ -127,6 +127,10 @@ const SOURCE_RULES = [
         groups: ["integration:quest"],
     },
     {
+        pattern: /^src\/lib\/quest\/single-finish-validation\.ts$/,
+        groups: ["integration:quest"],
+    },
+    {
         pattern: /^docs\/systems\/save-validation\.md$/,
         groups: ["integration:database"],
     },
@@ -275,7 +279,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^(?:tools\/single_battle_finish_validation\.test\.cjs|tools\/perf\/single_battle_settlement_(?:(?:admission|baseline)(?:\.test)?|fixture|harness|request_runner|scenario_helpers|time|(?:lifecycle|finish)_scenarios|scenarios)\.cjs|tools\/perf\/__snapshots__\/single_battle_settlement_baseline\.json)$/,
+        pattern: /^(?:tools\/(?:single_battle_finish_validation|single_finish_request_validation)\.test\.cjs|tools\/perf\/single_battle_settlement_(?:(?:admission|baseline)(?:\.test)?|fixture|harness|request_runner|scenario_helpers|time|(?:lifecycle|finish)_scenarios|scenarios)\.cjs|tools\/perf\/__snapshots__\/single_battle_settlement_baseline\.json)$/,
         groups: ["integration:quest"],
     },
     {

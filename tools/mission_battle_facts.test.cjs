@@ -173,11 +173,18 @@ assert.deepEqual(calls, [
     ["powerflip", 1001],
 ])
 
-const singleBattleSource = fs.readFileSync(
+function finishRouteSource(source) {
+    const start = source.indexOf('fastify.post("/finish"')
+    const end = source.indexOf('fastify.post("/abort"', start)
+    assert.equal(start >= 0 && end > start, true, "finish route source block")
+    return source.slice(start, end)
+}
+
+const singleBattleSource = finishRouteSource(fs.readFileSync(
     path.join(__dirname, "../src/routes/api/singleBattleQuest.ts"),
     "utf8",
-)
-const singleTransactionStart = singleBattleSource.indexOf("const executeFinishWrites = () => {")
+))
+const singleTransactionStart = singleBattleSource.indexOf("const executeFinishWrites = ({")
 const singleEvaluationTime = singleBattleSource.indexOf(
     "const settlementTime = new Date(getServerTime() * 1000)",
     singleTransactionStart,
@@ -205,6 +212,14 @@ const singleAwakeMerge = singleBattleSource.indexOf(
     "mergeMissionSettlementResponse(responseData, awakeMissionSettlement, viewerId)",
     singleGeneralMerge,
 )
+const singleTransactionCall = singleBattleSource.indexOf(
+    "finishWrites = runSingleFinishSettlementTransaction({",
+    singleAwakeSettlement,
+)
+const singleTransactionBinding = singleBattleSource.indexOf(
+    "settle: executeFinishWrites",
+    singleTransactionCall,
+)
 assert.equal(singleEvaluationTime > singleTransactionStart, true, "单人 finish 必须在事务体内固定任务时间")
 assert.equal(singleFactCall > singleEvaluationTime, true, "单人任务事实必须使用事务时间")
 assert.equal(singleCharacterExp > singleFactCall, true, "单人角色经验必须在任务事实后写入")
@@ -222,16 +237,13 @@ assert.match(
     /const characterId = value\?\.id[\s\S]*?Number\.isSafeInteger\(characterId\)[\s\S]*?characterId > 0[\s\S]*?partyCharacterIdsArray\.push\(characterId\)/,
     "单人 finish 必须只收集 main/Sub 的有效正整数角色 ID",
 )
-assert.equal(
-    singleBattleSource.includes("const finishWrites = getDb().transaction(executeFinishWrites)()"),
-    true,
-    "所有单人同步结算写入必须共享事务",
-)
+assert.equal(singleTransactionCall > singleAwakeSettlement, true, "单人写入闭包必须交给 finish 事务")
+assert.equal(singleTransactionBinding > singleTransactionCall, true, "所有单人同步结算写入必须共享事务")
 
-const multiBattleSource = fs.readFileSync(
+const multiBattleSource = finishRouteSource(fs.readFileSync(
     path.join(__dirname, "../src/multi/http/battle.ts"),
     "utf8",
-)
+))
 const multiTransactionStart = multiBattleSource.indexOf("const executeFinishWrites = () => {")
 const multiEvaluationTime = multiBattleSource.indexOf(
     "const settlementTime = new Date(getServerTime() * 1000)",

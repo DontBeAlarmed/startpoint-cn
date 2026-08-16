@@ -431,7 +431,26 @@ const initialState = {
     item: db.prepare("SELECT * FROM item_state").get(),
 }
 
-async function finish(fastify) {
+function finishStatistics() {
+    return {
+        clear_phase: 1,
+        max_combo_count: 0,
+        party: {
+            characters: [{ id: 101 }, null, null],
+            unison_characters: [null, null, null],
+            equipments: [null, null, null],
+            ability_soul_ids: [null, null, null],
+        },
+        zones: [{
+            use_power_flip_count: 1,
+            use_dash_count: 0,
+            damage_deal_total: 1234.5,
+            members: [{ origin_damage: 1234.5 }, null, null],
+        }],
+    }
+}
+
+async function finish(fastify, payloadOverrides = {}) {
     const activeQuest = activeQuests[17]
     return fastify.inject({
         method: "POST",
@@ -448,24 +467,23 @@ async function finish(fastify) {
             is_restored: false,
             continue_count: 0,
             api_count: 1,
-            statistics: {
-                clear_phase: 1,
-                max_combo_count: 0,
-                party: {
-                    characters: [{ id: 101 }, null, null],
-                    unison_characters: [null, null, null],
-                    equipments: [null, null, null],
-                    ability_soul_ids: [null, null, null],
-                },
-                zones: [{
-                    use_power_flip_count: 1,
-                    use_dash_count: 0,
-                    damage_deal_total: 1234.5,
-                    members: [{ origin_damage: 1234.5 }, null, null],
-                }],
-            },
+            statistics: finishStatistics(),
+            ...payloadOverrides,
         },
     })
+}
+
+function transactionalState() {
+    return {
+        player: db.prepare("SELECT * FROM player_state").get(),
+        character: db.prepare("SELECT * FROM character_state").get(),
+        mission: db.prepare("SELECT * FROM mission_state").get(),
+        item: db.prepare("SELECT * FROM item_state").get(),
+        questProgress: db.prepare("SELECT * FROM quest_progress ORDER BY category, quest_id").all(),
+        scoreHistory: db.prepare("SELECT * FROM score_history ORDER BY play_id").all(),
+        practiceHistory: db.prepare("SELECT * FROM practice_history ORDER BY play_id").all(),
+        activeQuest: db.prepare("SELECT * FROM players_active_quests").get(),
+    }
 }
 
 async function main() {
@@ -598,6 +616,26 @@ async function main() {
     db.prepare(`
         UPDATE players_active_quests SET play_id = ?, category = 15 WHERE player_id = 17
     `).run("practice-play")
+    for (const [name, zones] of [
+        ["empty zones", []],
+        ["missing total damage", [{}]],
+        ["member damage overflow", [
+            { damage_deal_total: 1, members: [{ origin_damage: 1e308 }] },
+            { damage_deal_total: 1, members: [{ origin_damage: 1e308 }] },
+        ]],
+    ]) {
+        writeAttempts = 0
+        const before = transactionalState()
+        const rejected = await finish(fastify, {
+            statistics: { ...finishStatistics(), zones },
+        })
+        const response = JSON.parse(rejected.body)
+        assert.equal(rejected.statusCode, 400, name)
+        assert.equal(response.message, "Invalid request body.", name)
+        assert.equal(writeAttempts, 0, name)
+        assert.deepEqual(transactionalState(), before, name)
+        assert.ok(activeQuests[17], name)
+    }
     const practiceFinished = await finish(fastify)
     assert.equal(practiceFinished.statusCode, 200, practiceFinished.body)
     assert.deepEqual(db.prepare("SELECT * FROM practice_history").all(), [{

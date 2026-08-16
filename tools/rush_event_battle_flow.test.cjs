@@ -113,9 +113,11 @@ async function startBattle(questId, partyId) {
 }
 
 async function finishBattle(questId) {
+    const activeQuest = getPlayerActiveQuestSync(playerId)
     return post("/api/index.php/single_battle_quest/finish", {
         viewer_id: viewerId,
         api_count: 1,
+        play_id: activeQuest.playId,
         quest_id: questId,
         category: QuestCategory.RUSH_EVENT,
         score: 0,

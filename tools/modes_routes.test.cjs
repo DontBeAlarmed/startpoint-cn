@@ -147,6 +147,7 @@ const ROLLBACK_MARKER = "settlement-fixture-fault-4f2a"
 
 function finishBody() {
     return {
+        play_id: activeQuests[playerId].playId,
         is_restored: false,
         continue_count: 0,
         elapsed_time_ms: 1000,
@@ -158,8 +159,9 @@ function finishBody() {
         is_accomplished: true,
         statistics: {
             clear_phase: 1,
+            zones: [],
             party: {
-                characters: [], unison_characters: [], equipments: [],
+                characters: [{ id: 1 }], unison_characters: [], equipments: [],
                 ability_soul_ids: [],
             },
         },

@@ -89,6 +89,31 @@ function activeQuest(isMulti) {
     }
 }
 
+function singleFinishBody() {
+    return {
+        viewer_id: viewerId,
+        play_id: "single-config-error",
+        quest_id: questId,
+        category,
+        score: 0,
+        elapsed_time_ms: 1000,
+        add_mana: 0,
+        is_accomplished: true,
+        is_restored: false,
+        continue_count: 0,
+        statistics: {
+            clear_phase: 0,
+            zones: [],
+            party: {
+                characters: [{ id: 1 }],
+                unison_characters: [null],
+                equipments: [],
+                ability_soul_ids: [],
+            },
+        },
+    }
+}
+
 function assertConfigurationError(response, field, rewardId) {
     assert.equal(response.statusCode, 500, response.body)
     assert.deepEqual(JSON.parse(response.body), {
@@ -164,7 +189,7 @@ async function main() {
         const singleFinish = await app.inject({
             method: "POST",
             url: "/single/finish",
-            payload: { viewer_id: viewerId },
+            payload: singleFinishBody(),
         })
         assertConfigurationError(singleFinish, "clearRewardId", 999999999)
         assert.deepEqual(stateSnapshot(), before, "单人 finish 配置错误不得写入")

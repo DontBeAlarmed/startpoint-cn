@@ -327,6 +327,14 @@ test("maps single finish settlement implementation and regression precisely", ()
         selectTestGroups(["tools/single_battle_finish_validation.test.cjs"]),
         ["integration:quest"],
     )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/single-finish-validation.ts"]),
+        ["integration:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/single_finish_request_validation.test.cjs"]),
+        ["integration:quest"],
+    )
 })
 
 test("maps single continue lifecycle implementation and regression precisely", () => {
@@ -1027,6 +1035,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/quest_entry_lifecycle.test.cjs",
         "tools/quest_host_finish.test.cjs",
         "tools/single_battle_finish_validation.test.cjs",
+        "tools/single_finish_request_validation.test.cjs",
         "tools/story_quest_finish.test.cjs",
         "tools/tutorial_update_step.test.cjs",
     ])

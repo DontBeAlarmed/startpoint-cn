@@ -172,12 +172,15 @@ async function finishAwakeBattle(fastify) {
         payload: encodeRequest({
             viewer_id: viewerId,
             api_count: 1,
+            play_id: "awake-immediate-unlock",
             quest_id: 5,
             category: 15,
             score: 0,
             elapsed_time_ms: 1000,
             add_mana: 0,
             is_accomplished: true,
+            is_restored: false,
+            continue_count: 0,
             statistics: {
                 clear_phase: 1,
                 max_combo_count: 0,

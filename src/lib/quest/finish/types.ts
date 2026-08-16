@@ -4,13 +4,14 @@ import type { Player } from "../../../data/types"
 
 export interface PartyCharacter {
     id?: number | null
+    [key: string]: unknown
 }
 
 export interface QuestStatistics {
     clear_phase: number
     party: {
         unison_characters: (PartyCharacter | null)[]
-        characters: PartyCharacter[]
+        characters: (PartyCharacter | null)[]
     }
     zones?: {
         use_power_flip_count?: number
@@ -27,13 +28,13 @@ export interface QuestStatistics {
                 max_acc_good?: number
                 max_acc_bad?: number
             } | null)[]
-            [key: string]: any
+            [key: string]: unknown
         } | null)[]
     }[]
     client_checks?: string[]
     max_combo_count?: number
     is_mvp?: boolean | null
-    [key: string]: any
+    [key: string]: unknown
 }
 
 export interface FinishContext {

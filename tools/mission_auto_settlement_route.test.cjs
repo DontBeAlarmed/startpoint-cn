@@ -209,12 +209,15 @@ async function main() {
         const finishPayload = {
             viewer_id: viewerId,
             api_count: 1,
+            play_id: "mission-auto-settlement",
             quest_id: 2001,
             category: 22,
             score: 0,
             elapsed_time_ms: 1000,
             add_mana: 0,
             is_accomplished: true,
+            is_restored: false,
+            continue_count: 0,
             statistics: {
                 clear_phase: 1,
                 max_combo_count: 0,
@@ -373,6 +376,7 @@ async function main() {
             payload: encodeRequest({
                 ...finishPayload,
                 api_count: 2,
+                play_id: "active-mission-daily-maze",
                 quest_id: 19001,
                 category: 6,
                 statistics: {
@@ -431,6 +435,7 @@ async function main() {
             payload: encodeRequest({
                 ...finishPayload,
                 api_count: 3,
+                play_id: "active-mission-daily-exp-mana",
                 quest_id: 1001,
                 category: 14,
             }),

@@ -115,6 +115,10 @@ import {
     SingleFinishSettlementValidationError,
 } from "../../lib/quest/single-finish-settlement";
 import { runSingleContinueLifecycleTransaction } from "../../lib/quest/single-continue-lifecycle";
+import {
+    validateSingleFinishRequest,
+    type ValidatedSingleFinishBody,
+} from "../../lib/quest/single-finish-validation";
 
 interface StartBody {
     quest_id: number
@@ -151,21 +155,7 @@ interface QuestStatistics {
     }[]
 }
 
-export interface FinishBody {
-    play_id: string
-    is_restored: boolean
-    continue_count: number
-    elapsed_time_ms: number
-    quest_id: number
-    category: number
-    score: number
-    viewer_id: number
-    add_mana: number
-    is_accomplished: boolean
-    statistics: QuestStatistics
-    equipment_element?: number[]
-    api_count: number
-}
+export type FinishBody = ValidatedSingleFinishBody
 
 interface PlayContinueBody {
     api_count: number,
@@ -219,13 +209,13 @@ const continueVmoneyCost = 50;
 const routes = async (fastify: FastifyInstance) => {
 
     fastify.post("/finish", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as FinishBody
+        const validationResult = validateSingleFinishRequest(request.body)
+        if (!validationResult.ok) return reply.status(400).send({
+            "error": "Bad Request", "message": validationResult.message,
+        })
+        const body = validationResult.body
 
         const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
-            "error": "Bad Request", "message": "Invalid request body."
-        })
-
         const sessionResult = await validateSessionAndPlayer(viewerId)
         if (!sessionResult) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid viewer id."
@@ -335,8 +325,8 @@ const routes = async (fastify: FastifyInstance) => {
             clearTime: body.elapsed_time_ms,
             clearRank,
             score: body.score,
-            party: body.statistics.party as any,
-            statistics: (body as any).statistics,
+            party: body.statistics.party,
+            statistics: body.statistics,
             equipmentElements: body.equipment_element,
             player: playerData,
             questPreviouslyCompleted,
@@ -433,7 +423,10 @@ const routes = async (fastify: FastifyInstance) => {
                 boostPoint: newBoostPoint,
                 bossBoostPoint: newBossBoostPoint,
                 totalManaObtained: (settlementPlayer.totalManaObtained ?? 0) + manaObtained,
-                maxComboAchieved: Math.max(settlementPlayer.maxComboAchieved ?? 0, (body as any).statistics?.max_combo_count ?? 0),
+                maxComboAchieved: Math.max(
+                    settlementPlayer.maxComboAchieved ?? 0,
+                    body.statistics.max_combo_count ?? 0,
+                ),
                 ...(didLevelUp ? { stamina: afterStamina, staminaHealTime: afterStaminaHealTime } : {}),
             })
             if (didLevelUp) {
