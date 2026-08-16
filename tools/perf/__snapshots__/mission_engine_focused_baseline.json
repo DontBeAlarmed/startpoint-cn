@@ -218,8 +218,8 @@
       "behaviorSha256": "e7c1d0f314fd74d38455dc3f2b4ac7eaf0bf749c2620a083d0a24393b4becadc"
     },
     "awake-character-page": {
-      "sqlReads": 18,
-      "sqlWrites": 4,
+      "sqlReads": 11,
+      "sqlWrites": 0,
       "missionComputes": 7,
       "behavior": {
         "characterIds": [],
@@ -234,9 +234,9 @@
       "behaviorSha256": "8bade6bcad9665cf0d4128ec01ba4ca16026351ad240055daa9a18af432a343d"
     },
     "get-progress-no-invalidation": {
-      "sqlReads": 25,
+      "sqlReads": 14,
       "sqlWrites": 4,
-      "missionComputes": 220,
+      "missionComputes": 110,
       "behavior": {
         "characterIds": [],
         "degreeIds": [],
@@ -250,9 +250,9 @@
       "behaviorSha256": "63b798e8b698886123d421b48dfea8c50f5ef23b6a767fa24802dce118602e38"
     },
     "get-progress-item-invalidation": {
-      "sqlReads": 44,
+      "sqlReads": 26,
       "sqlWrites": 20,
-      "missionComputes": 2530,
+      "missionComputes": 1269,
       "behavior": {
         "characterIds": [],
         "degreeIds": [],
@@ -277,9 +277,9 @@
       "behaviorSha256": "70743d804ff5f75364f094d775e65ea9bb41b632a0dd8851624616fe11a9bdf1"
     },
     "get-progress-character-invalidation": {
-      "sqlReads": 39,
+      "sqlReads": 25,
       "sqlWrites": 13,
-      "missionComputes": 1482,
+      "missionComputes": 1208,
       "behavior": {
         "characterIds": [
           231003
@@ -305,9 +305,9 @@
       "behaviorSha256": "a3b22b37aa5187f24c4b9917d36dd7fec72405b7b1cd44911bb6652b49e34c1b"
     },
     "get-progress-equipment-invalidation": {
-      "sqlReads": 44,
+      "sqlReads": 26,
       "sqlWrites": 19,
-      "missionComputes": 2530,
+      "missionComputes": 1271,
       "behavior": {
         "characterIds": [],
         "degreeIds": [],
@@ -332,7 +332,7 @@
       "behaviorSha256": "fcfaa0ae0d6a931536f2c9e413da6b7a44ed7e5fd6e57f513aa49a341328ef34"
     },
     "single-battle-finish": {
-      "sqlReads": 58,
+      "sqlReads": 45,
       "sqlWrites": 80,
       "missionComputes": 425,
       "behavior": {
@@ -427,7 +427,7 @@
       "behaviorSha256": "4659b8cdcf1384c70f787fba12d4d42b74c3680d7b446330c9e7f06abb6a6ce4"
     },
     "multi-battle-finish": {
-      "sqlReads": 59,
+      "sqlReads": 46,
       "sqlWrites": 91,
       "missionComputes": 425,
       "behavior": {

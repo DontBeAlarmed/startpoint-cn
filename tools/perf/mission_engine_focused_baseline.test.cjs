@@ -37,7 +37,7 @@ function readSnapshot() {
     assert.equal(
         fs.existsSync(snapshotPath),
         true,
-        "focused mission engine snapshot must exist and cover all ten scenarios",
+        "focused mission engine snapshot must exist and cover all 13 scenarios",
     )
     return JSON.parse(fs.readFileSync(snapshotPath, "utf8"))
 }
@@ -69,6 +69,37 @@ test("snapshot covers the focused mission engine scenario set and metric shape",
     for (const [name, scenario] of Object.entries(snapshot.scenarios)) {
         assertScenarioShape(name, scenario)
     }
+})
+
+test("snapshot pins the completed mission engine structural performance values", () => {
+    const scenarios = readSnapshot().scenarios
+    assert.deepEqual({
+        awakeCharacterPage: {
+            sqlReads: scenarios["awake-character-page"].sqlReads,
+            sqlWrites: scenarios["awake-character-page"].sqlWrites,
+            missionComputes: scenarios["awake-character-page"].missionComputes,
+        },
+        getProgressNoInvalidation: {
+            sqlReads: scenarios["get-progress-no-invalidation"].sqlReads,
+            sqlWrites: scenarios["get-progress-no-invalidation"].sqlWrites,
+            missionComputes: scenarios["get-progress-no-invalidation"].missionComputes,
+        },
+        singleBattleFinish: {
+            sqlReads: scenarios["single-battle-finish"].sqlReads,
+            sqlWrites: scenarios["single-battle-finish"].sqlWrites,
+            missionComputes: scenarios["single-battle-finish"].missionComputes,
+        },
+        multiBattleFinish: {
+            sqlReads: scenarios["multi-battle-finish"].sqlReads,
+            sqlWrites: scenarios["multi-battle-finish"].sqlWrites,
+            missionComputes: scenarios["multi-battle-finish"].missionComputes,
+        },
+    }, {
+        awakeCharacterPage: { sqlReads: 11, sqlWrites: 0, missionComputes: 7 },
+        getProgressNoInvalidation: { sqlReads: 14, sqlWrites: 4, missionComputes: 110 },
+        singleBattleFinish: { sqlReads: 45, sqlWrites: 80, missionComputes: 425 },
+        multiBattleFinish: { sqlReads: 46, sqlWrites: 91, missionComputes: 425 },
+    })
 })
 
 test("mission progress summaries cover every tuple and detect progress or stage changes", () => {
@@ -302,6 +333,7 @@ test("mission page closes Fastify without replacing register, ready, or inject f
 test("current focused mission engine behavior matches the checked-in behavior", async () => {
     const {
         SCENARIO_KEYS,
+        admitFocusedMissionReport,
         createBehaviorBaselineView,
         runMissionEngineFocusedBaseline,
     } = require("./mission_engine_focused_baseline.cjs")
@@ -310,10 +342,31 @@ test("current focused mission engine behavior matches the checked-in behavior", 
     for (const [name, scenario] of Object.entries(current.scenarios)) {
         assertScenarioShape(name, scenario)
     }
+    const snapshot = readSnapshot()
+    const admission = admitFocusedMissionReport(current, {
+        snapshotPath,
+        write: false,
+    })
+    assert.equal(admission.admitted, true)
     assert.deepEqual(
         createBehaviorBaselineView(current),
-        createBehaviorBaselineView(readSnapshot()),
+        createBehaviorBaselineView(snapshot),
     )
+    for (const name of ["single-battle-finish", "get-progress-no-invalidation"]) {
+        const regressed = structuredClone(current)
+        regressed.scenarios[name].sqlReads++
+        const regressionAdmission = admitFocusedMissionReport(regressed, {
+            snapshotPath,
+            write: false,
+        })
+        assert.equal(regressionAdmission.admitted, false, name)
+        assert.ok(
+            regressionAdmission.failures.some(failure => (
+                failure.scenario === name && failure.metric === "sqlReads"
+            )),
+            name,
+        )
+    }
     const routingFallback = current.scenarios["degree-routing-fallback"]
     const session = current.scenarios["degree-focused"]
     const behavior = current.scenarios["degree-behavior-characterization"]

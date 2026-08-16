@@ -1,6 +1,6 @@
 # 任务引擎演进架构
 
-> 状态：阶段 1～5 已实施，阶段 6 的第 13 项已实施；Category 1～10（包含 Awake 9）已接入 Session。性能收尾待第 14 项，任务引擎整体尚未完成。
+> 状态：阶段 1～5 已实施，阶段 6 的第 13、14 项已实施；Category 1～10（包含 Awake 9）已接入 Session，结构性能基线与自动准入已固化。第 15 项最终全量回归与最终双审仍待执行，任务引擎整体尚未完成。
 
 ## 目标
 
@@ -39,7 +39,7 @@ scope -> Catalog 候选与开放时间过滤 -> PreparedMissionSettlement
       -> EvaluationResult -> 专用写入器 -> 响应合并
 ```
 
-重构前的基线场景一次会扫描 3557 个候选，实际计算 177 条任务。不同 Computer 各自构造完整上下文，无法共享相同事实。阶段 1～5 已让 Category 1～8、10 在同一求值阶段共享 Session facts，阶段 6 的第 13 项又接入 Awake 9；候选准备、纯计算、进度写入和奖励发放现已拆分，性能收尾仍待第 14 项。
+重构前的基线场景一次会扫描 3557 个候选，实际计算 177 条任务。不同 Computer 各自构造完整上下文，无法共享相同事实。阶段 1～5 已让 Category 1～8、10 在同一求值阶段共享 Session facts，阶段 6 的第 13 项又接入 Awake 9；候选准备、纯计算、进度写入和奖励发放现已拆分，第 14 项已固化结构性能基线与自动准入。
 
 Pass Category 7/8 的迁移保留了必要的前置写入：Category 7 在缺少 `passWeek` 时创建周期快照，Category 8 通过 `ensurePlayerPassCardLoginProgressSync` 初始化登录基线；这些写入均在只读 Session 建立前完成。
 
@@ -294,15 +294,21 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 
 ### 阶段 6：Awake 与性能收尾
 
-状态：第 13 项已实施，性能收尾待第 14 项。
+状态：第 13、14 项已实施；第 15 项最终全量回归与最终双审待执行。
 
 - Awake 候选已接入 snapshot-scoped Catalog；指定角色页和战斗 main/Sub 只建立请求范围内候选，并合并本场 direct mission IDs；
 - Category 9 已通过只读 Session 声明并加载角色、玩家、任务履历、角色 clear、同队 clear 和 scoped persisted mission facts；all-complete 显式声明三个子任务及其 facts；
 - AwakeComputer 已使用 Session context，Category 9 persisted progress/stages 按候选及依赖 ID 单次批量读取，EvaluationResult 不再依赖 legacy `categoryMissionStates`；
 - Awake 专用写入器只消费 EvaluationResult，写入 progress/stage、普通奖励和 mana board awake unlock，保留 eligibility、幂等与原响应结构；
-- 单人、多人 finish 在本场事实和角色经验写入后调用共享 Awake settlement seam，同次响应可见奖励和 unlock，注入失败时由原外层事务完整回滚；
+- 单人、多人 finish 在本场事实和角色经验写入后调用共享 Awake settlement 边界，同次响应可见奖励和 unlock，注入失败时由原外层事务完整回滚；
 - `/mission/get_mission_progress` 的 Category 9 指定角色页已复用 Catalog、Session 和 EvaluationResult，保持请求顺序、mail 与响应字段；不扩展阶段 B；
-- 第 14 项仍需扩展 Degree、Awake、`get_progress` 和战斗 finish 的结构性能基线，并完成性能收尾；任务引擎整体状态暂不宣告完成。
+- 第 14 项已用确定性 focused snapshot 固化全部场景的行为 payload/hash 与结构上限：Awake 指定角色页为 `11/0/7`，single finish 为 `45/80/425`，multi finish 为 `46/91/425`（依次为 SQL reads/writes/mission computes）；
+- 固定时间 `2024-08-14T12:00:00.000Z` 的单请求 no-invalidation `get_progress` 为 `14/4/107`；
+- 固定时间 `2025-01-01T12:00:00.000Z` 的 focused snapshot no-invalidation `get_progress` 为 `14/4/110`；
+- 分层 600 状态负载按已检入 summary/reference 的 `get_progress` entry structural max 为 `25/4/214`（每个 entry 的最大 SQL reads/writes/mission computes）；single/multi 仍使用 `mission-finish-boundary` adapter，不代表完整 battle HTTP；
+- focused 自动准入要求场景集合完全一致、行为 payload/hash 完全一致、三项结构指标均为非负安全整数且不高于已检入 snapshot；允许后续优化下降，延迟不作为跨机器硬门槛；
+- 普通 `benchmark:mission-engine-focused` 只读 snapshot，只有显式确定性 `--write` 才能在行为准入通过后更新结构值；Degree 与 Event 的专项等价/不增断言继续保留；
+- 第 15 项最终全量回归与最终双审仍未执行，任务引擎整体状态暂不宣告完成。
 
 每个阶段独立提交，不自动 push。若阶段需要改变数据库结构、客户端协议、Active Mission 所有权或事务外部边界，必须停止并重新确认。
 
@@ -356,6 +362,6 @@ Settlement BASE fixture 与负载 reference 分别由固定无参数 generator
 ## 已知后续项
 
 - 为 Degree 的 mana、章节、练习、商店和装备事实补齐逐族 scoped 正向矩阵；
-- 第 14 项补齐 Degree、Awake、`get_progress` 和战斗 finish 的结构性能基线并完成性能收尾；
+- 第 15 项执行最终全量回归与最终双审；完成前不得宣告任务引擎整体完成；
 - Active Mission 的共享事实、固定点和统一事务协调留到独立 Gate；
 - 跨请求缓存、数据库物化事实和 Content 热切换不在当前路线中。

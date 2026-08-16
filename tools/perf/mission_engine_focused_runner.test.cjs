@@ -10,9 +10,14 @@ const test = require("node:test")
 
 const {
     SCENARIO_KEYS,
+    admitFocusedMissionReport,
     createBehaviorSummary,
     runMissionEngineFocusedBaseline,
+    writeFocusedMissionSnapshotAtomic,
 } = require("./mission_engine_focused_baseline.cjs")
+const {
+    evaluateFocusedMissionAdmission,
+} = require("./mission_engine_focused_admission.cjs")
 const { createFocusedScenarios } = require("./mission_engine_focused_scenarios.cjs")
 
 const snapshotPath = path.join(
@@ -30,6 +35,168 @@ function emptySettlement() {
         degreeIds: [],
     }
 }
+
+function createAdmissionReport() {
+    const behavior = createBehaviorSummary({ result: "stable" })
+    return {
+        version: 1,
+        fixedTime: "2025-01-01T12:00:00.000Z",
+        scenarios: {
+            focused: {
+                sqlReads: 10,
+                sqlWrites: 5,
+                missionComputes: 20,
+                ...behavior,
+            },
+        },
+    }
+}
+
+test("focused snapshot writer replaces atomically and cleans failed temporary files", () => {
+    const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "mission-focused-write-"))
+    const temporarySnapshot = path.join(temporaryParent, "snapshot.json")
+    const temporaryFile = path.join(temporaryParent, ".snapshot.test.tmp")
+    const checked = createAdmissionReport()
+    const improved = createAdmissionReport()
+    improved.scenarios.focused.sqlReads = 9
+    const canonicalImproved = evaluateFocusedMissionAdmission(improved, checked).canonicalReport
+    const checkedJson = `${JSON.stringify(checked, null, 2)}\n`
+    fs.writeFileSync(temporarySnapshot, checkedJson)
+
+    try {
+        writeFocusedMissionSnapshotAtomic(canonicalImproved, temporarySnapshot, {
+            temporaryPathFactory: () => temporaryFile,
+        })
+        assert.deepEqual(JSON.parse(fs.readFileSync(temporarySnapshot, "utf8")), improved)
+        assert.equal(fs.existsSync(temporaryFile), false)
+
+        for (const failingOperation of ["write", "rename"]) {
+            fs.writeFileSync(temporarySnapshot, checkedJson)
+            const fileSystem = {
+                writeFileSync(...args) {
+                    if (failingOperation === "write") {
+                        fs.writeFileSync(args[0], "partial", "utf8")
+                        throw new Error("injected write failure")
+                    }
+                    return fs.writeFileSync(...args)
+                },
+                renameSync(...args) {
+                    if (failingOperation === "rename") {
+                        throw new Error("injected rename failure")
+                    }
+                    return fs.renameSync(...args)
+                },
+                rmSync: (...args) => fs.rmSync(...args),
+            }
+
+            assert.throws(
+                () => writeFocusedMissionSnapshotAtomic(canonicalImproved, temporarySnapshot, {
+                    fileSystem,
+                    temporaryPathFactory: () => temporaryFile,
+                }),
+                new RegExp(`injected ${failingOperation} failure`),
+            )
+            assert.equal(fs.readFileSync(temporarySnapshot, "utf8"), checkedJson)
+            assert.equal(fs.existsSync(temporaryFile), false)
+        }
+    } finally {
+        fs.rmSync(temporaryParent, { recursive: true, force: true })
+    }
+})
+
+test("focused admission keeps ordinary runs read-only and blocks behavior-changing writes", () => {
+    const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "mission-focused-admission-"))
+    const temporarySnapshot = path.join(temporaryParent, "snapshot.json")
+    const checked = createAdmissionReport()
+    const improved = createAdmissionReport()
+    improved.scenarios.focused.sqlReads = 9
+    const checkedJson = `${JSON.stringify(checked, null, 2)}\n`
+    fs.writeFileSync(temporarySnapshot, checkedJson)
+
+    try {
+        const readOnly = admitFocusedMissionReport(improved, {
+            snapshotPath: temporarySnapshot,
+            write: false,
+        })
+        assert.equal(readOnly.admitted, true)
+        assert.equal(fs.readFileSync(temporarySnapshot, "utf8"), checkedJson)
+
+        const written = admitFocusedMissionReport(improved, {
+            snapshotPath: temporarySnapshot,
+            write: true,
+        })
+        assert.equal(written.admitted, true)
+        assert.deepEqual(JSON.parse(fs.readFileSync(temporarySnapshot, "utf8")), improved)
+
+        fs.writeFileSync(temporarySnapshot, checkedJson)
+        const changed = createAdmissionReport()
+        changed.scenarios.focused.behavior.result = "changed"
+        const rejected = admitFocusedMissionReport(changed, {
+            snapshotPath: temporarySnapshot,
+            write: true,
+        })
+        assert.equal(rejected.admitted, false)
+        assert.equal(fs.readFileSync(temporarySnapshot, "utf8"), checkedJson)
+    } finally {
+        fs.rmSync(temporaryParent, { recursive: true, force: true })
+    }
+})
+
+test("focused admission writes its validated canonical behavior", () => {
+    const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "mission-focused-canonical-"))
+    const temporarySnapshot = path.join(temporaryParent, "snapshot.json")
+    const checked = createAdmissionReport()
+    Object.assign(checked.scenarios.focused, createBehaviorSummary({ a: 1, z: 2 }))
+    const current = structuredClone(checked)
+    current.scenarios.focused.behavior = { z: 2, a: 1 }
+    fs.writeFileSync(temporarySnapshot, `${JSON.stringify(checked, null, 2)}\n`)
+
+    try {
+        const admission = admitFocusedMissionReport(current, {
+            snapshotPath: temporarySnapshot,
+            write: true,
+        })
+        const written = JSON.parse(fs.readFileSync(temporarySnapshot, "utf8"))
+
+        assert.equal(admission.admitted, true)
+        assert.deepEqual(Object.keys(written.scenarios.focused.behavior), ["a", "z"])
+        assert.deepEqual(written.scenarios.focused.behavior, checked.scenarios.focused.behavior)
+    } finally {
+        fs.rmSync(temporaryParent, { recursive: true, force: true })
+    }
+})
+
+test("focused admission never overwrites a snapshot with invalid behavior", () => {
+    const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "mission-focused-invalid-"))
+    const temporarySnapshot = path.join(temporaryParent, "snapshot.json")
+    const checked = createAdmissionReport()
+    const checkedJson = `${JSON.stringify(checked, null, 2)}\n`
+    fs.writeFileSync(temporarySnapshot, checkedJson)
+    const current = createAdmissionReport()
+    current.scenarios.focused.behavior.self = current.scenarios.focused.behavior
+
+    try {
+        let admission
+        assert.doesNotThrow(() => {
+            admission = admitFocusedMissionReport(current, {
+                snapshotPath: temporarySnapshot,
+                write: true,
+            })
+        })
+        assert.equal(admission.admitted, false)
+        assert.equal(fs.readFileSync(temporarySnapshot, "utf8"), checkedJson)
+
+        const dateReport = createAdmissionReport()
+        dateReport.scenarios.focused.behavior = new Date("2025-01-01T12:00:00.000Z")
+        assert.throws(
+            () => writeFocusedMissionSnapshotAtomic(dateReport, temporarySnapshot),
+            /validated canonical focused report/,
+        )
+        assert.equal(fs.readFileSync(temporarySnapshot, "utf8"), checkedJson)
+    } finally {
+        fs.rmSync(temporaryParent, { recursive: true, force: true })
+    }
+})
 
 test("scenario summaries run after SQL and compute metrics are frozen", async () => {
     const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "mission-focused-summary-"))
@@ -87,8 +254,8 @@ test("scenario summaries run after SQL and compute metrics are frozen", async ()
 
 test("finish SQL metrics exclude post-settlement behavior reads", () => {
     const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"))
-    assert.equal(snapshot.scenarios["single-battle-finish"].sqlReads, 58)
-    assert.equal(snapshot.scenarios["multi-battle-finish"].sqlReads, 59)
+    assert.equal(snapshot.scenarios["single-battle-finish"].sqlReads, 45)
+    assert.equal(snapshot.scenarios["multi-battle-finish"].sqlReads, 46)
 })
 
 test("finish summaries cover only computed standard refs and enabled Awake refs", () => {

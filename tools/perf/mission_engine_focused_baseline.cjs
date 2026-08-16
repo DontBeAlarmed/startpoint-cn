@@ -3,15 +3,25 @@
 
 require("ts-node/register/transpile-only")
 
-const crypto = require("node:crypto")
+const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const BetterSqlite3 = require("better-sqlite3")
 
+const {
+    evaluateFocusedMissionAdmission,
+    formatFocusedMissionAdmissionFailures,
+} = require("./mission_engine_focused_admission.cjs")
+const {
+    FOCUSED_FIXED_TIME,
+    FOCUSED_REPORT_VERSION,
+    assertCanonicalFocusedReport,
+    createBehaviorSummary,
+} = require("./mission_engine_focused_report.cjs")
 const { createSqlCounter } = require("./mission_settlement_sql.cjs")
 
-const FIXED_TIME = "2025-01-01T12:00:00.000Z"
+const FIXED_TIME = FOCUSED_FIXED_TIME
 const SNAPSHOT_PATH = path.join(
     __dirname,
     "__snapshots__",
@@ -83,23 +93,6 @@ function getRuntimeDependencies() {
         settleMissionCategories,
     }
     return runtimeDependencies
-}
-
-function sortedObject(value) {
-    if (Array.isArray(value)) return value.map(sortedObject)
-    if (value === null || typeof value !== "object") return value
-    return Object.fromEntries(Object.keys(value).sort()
-        .map(key => [key, sortedObject(value[key])]))
-}
-
-function createBehaviorSummary(behavior) {
-    const stableBehavior = sortedObject(behavior)
-    return {
-        behavior: stableBehavior,
-        behaviorSha256: crypto.createHash("sha256")
-            .update(JSON.stringify(stableBehavior))
-            .digest("hex"),
-    }
 }
 
 function createBehaviorBaselineView(report) {
@@ -264,7 +257,11 @@ async function runMissionEngineFocusedBaseline({
                 runtime,
             )
         }
-        report = { version: 1, fixedTime: FIXED_TIME, scenarios: results }
+        report = {
+            version: FOCUSED_REPORT_VERSION,
+            fixedTime: FIXED_TIME,
+            scenarios: results,
+        }
     } catch (error) {
         primaryError = error
     }
@@ -287,12 +284,74 @@ function parseArgs(argv) {
     throw new Error(`unknown argument: ${argv[0]}`)
 }
 
+function serializeFocusedMissionReport(report) {
+    const scenarios = Object.fromEntries(Object.keys(report.scenarios).map(name => {
+        const scenario = report.scenarios[name]
+        return [name, {
+            sqlReads: scenario.sqlReads,
+            sqlWrites: scenario.sqlWrites,
+            missionComputes: scenario.missionComputes,
+            behavior: scenario.behavior,
+            behaviorSha256: scenario.behaviorSha256,
+        }]
+    }))
+    return `${JSON.stringify({
+        version: report.version,
+        fixedTime: report.fixedTime,
+        scenarios,
+    }, null, 2)}\n`
+}
+
+function writeFocusedMissionSnapshotAtomic(report, snapshotPath, {
+    fileSystem = fs,
+    temporaryPathFactory = targetPath => path.join(
+        path.dirname(targetPath),
+        `.${path.basename(targetPath)}.${process.pid}.${randomUUID()}.tmp`,
+    ),
+} = {}) {
+    assertCanonicalFocusedReport(report)
+    const temporaryPath = temporaryPathFactory(snapshotPath)
+    try {
+        fileSystem.writeFileSync(
+            temporaryPath,
+            serializeFocusedMissionReport(report),
+            { encoding: "utf8", flag: "wx" },
+        )
+        fileSystem.renameSync(temporaryPath, snapshotPath)
+    } catch (error) {
+        try {
+            fileSystem.rmSync(temporaryPath, { force: true })
+        } catch (cleanupError) {
+            if (error instanceof Error && error.cause === undefined) error.cause = cleanupError
+        }
+        throw error
+    }
+}
+
+function admitFocusedMissionReport(report, {
+    snapshotPath = SNAPSHOT_PATH,
+    write = false,
+} = {}) {
+    const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"))
+    const admission = evaluateFocusedMissionAdmission(report, snapshot)
+    if (write && admission.admitted) {
+        writeFocusedMissionSnapshotAtomic(admission.canonicalReport, snapshotPath)
+    }
+    return admission
+}
+
 async function main() {
     const { write } = parseArgs(process.argv.slice(2))
     const report = await runMissionEngineFocusedBaseline()
     const serialized = `${JSON.stringify(report, null, 2)}\n`
-    if (write) fs.writeFileSync(SNAPSHOT_PATH, serialized, "utf8")
+    const admission = admitFocusedMissionReport(report, { write })
     process.stdout.write(serialized)
+    if (!admission.admitted) {
+        for (const failure of formatFocusedMissionAdmissionFailures(admission)) {
+            process.stderr.write(`Focused mission admission failed: ${failure}\n`)
+        }
+        process.exitCode = 1
+    }
 }
 
 if (require.main === module) {
@@ -305,9 +364,11 @@ if (require.main === module) {
 module.exports = {
     FIXED_TIME,
     SCENARIO_KEYS,
+    admitFocusedMissionReport,
     createBehaviorBaselineView,
     createBehaviorSummary,
     installComputeCounter,
     parseArgs,
     runMissionEngineFocusedBaseline,
+    writeFocusedMissionSnapshotAtomic,
 }

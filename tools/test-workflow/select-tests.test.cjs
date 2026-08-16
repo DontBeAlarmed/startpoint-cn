@@ -726,6 +726,19 @@ test("registers mission catalog and fact store regressions in the mission leaf g
     )
 })
 
+test("routes focused mission performance admission files to the mission group", () => {
+    for (const file of [
+        "tools/perf/mission_engine_focused_admission.cjs",
+        "tools/perf/mission_engine_focused_admission.test.cjs",
+        "tools/perf/mission_engine_focused_baseline.cjs",
+        "tools/perf/mission_engine_focused_report.cjs",
+        "tools/perf/mission_engine_focused_runner.test.cjs",
+        "tools/perf/__snapshots__/mission_engine_focused_baseline.json",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:mission"], file)
+    }
+})
+
 test("keeps external data concerns out of self-contained runtime tests", () => {
     const runtimeTests = [
         "tools/score_attack_event.test.cjs",
@@ -930,6 +943,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_regular_session_settlement.test.cjs",
         "tools/mission_regular_state_derivation.test.cjs",
         "tools/mission_response_merge.test.cjs",
+        "tools/perf/mission_engine_focused_admission.test.cjs",
         "tools/perf/mission_engine_focused_baseline.test.cjs",
         "tools/perf/mission_engine_focused_runner.test.cjs",
         "tools/perf/mission_entry_base_oracle.test.cjs",

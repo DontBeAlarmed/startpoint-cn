@@ -402,6 +402,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_regular_session_settlement.test.cjs",
             "tools/mission_regular_state_derivation.test.cjs",
             "tools/mission_response_merge.test.cjs",
+            "tools/perf/mission_engine_focused_admission.test.cjs",
             "tools/perf/mission_engine_focused_baseline.test.cjs",
             "tools/perf/mission_engine_focused_runner.test.cjs",
             "tools/perf/mission_entry_base_oracle.test.cjs",
