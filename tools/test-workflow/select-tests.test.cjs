@@ -304,6 +304,34 @@ test("selects quest and mission regressions for the single battle route", () => 
         groups.flatMap(group => TEST_GROUPS[group].tests)
             .includes("tools/mission_auto_settlement_route.test.cjs"),
     )
+    assert.ok(
+        TEST_GROUPS["integration:quest"].tests
+            .includes("tools/perf/single_battle_settlement_baseline.test.cjs"),
+    )
+    assert.ok(
+        TEST_GROUPS["integration:quest"].tests
+            .includes("tools/perf/single_battle_settlement_admission.test.cjs"),
+    )
+})
+
+test("maps the single battle settlement baseline family to integration quest", () => {
+    for (const file of [
+        "tools/perf/single_battle_settlement_admission.cjs",
+        "tools/perf/single_battle_settlement_admission.test.cjs",
+        "tools/perf/single_battle_settlement_baseline.cjs",
+        "tools/perf/single_battle_settlement_baseline.test.cjs",
+        "tools/perf/single_battle_settlement_fixture.cjs",
+        "tools/perf/single_battle_settlement_harness.cjs",
+        "tools/perf/single_battle_settlement_request_runner.cjs",
+        "tools/perf/single_battle_settlement_time.cjs",
+        "tools/perf/single_battle_settlement_scenario_helpers.cjs",
+        "tools/perf/single_battle_settlement_lifecycle_scenarios.cjs",
+        "tools/perf/single_battle_settlement_finish_scenarios.cjs",
+        "tools/perf/single_battle_settlement_scenarios.cjs",
+        "tools/perf/__snapshots__/single_battle_settlement_baseline.json",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:quest"], file)
+    }
 })
 
 test("upgrades package and unknown source changes to full", () => {
@@ -967,6 +995,8 @@ test("splits isolated integration tests into focused domains", () => {
     ])
     assert.deepEqual(TEST_GROUPS["integration:quest"].tests, [
         "tools/auto_start_stamina_stop.test.cjs",
+        "tools/perf/single_battle_settlement_admission.test.cjs",
+        "tools/perf/single_battle_settlement_baseline.test.cjs",
         "tools/quest_entry_lifecycle.test.cjs",
         "tools/quest_host_finish.test.cjs",
         "tools/story_quest_finish.test.cjs",

@@ -133,6 +133,10 @@ test("exposes the workflow benchmark command", () => {
         scripts["benchmark:mission-entry-load"],
         "node tools/perf/mission_entry_layered_load.cjs",
     )
+    assert.equal(
+        scripts["benchmark:single-battle-settlement"],
+        "node tools/perf/single_battle_settlement_baseline.cjs",
+    )
 })
 
 test("exposes the offline faithful gacha seed catalog workflow", () => {

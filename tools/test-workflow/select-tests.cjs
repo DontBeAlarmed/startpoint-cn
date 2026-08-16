@@ -267,6 +267,10 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
+        pattern: /^(?:tools\/perf\/single_battle_settlement_(?:(?:admission|baseline)(?:\.test)?|fixture|harness|request_runner|scenario_helpers|time|(?:lifecycle|finish)_scenarios|scenarios)\.cjs|tools\/perf\/__snapshots__\/single_battle_settlement_baseline\.json)$/,
+        groups: ["integration:quest"],
+    },
+    {
         pattern: /^(?:src\/lib\/mission\/settlement-(?:prepare|evaluate|write)\.ts|tools\/fixtures\/mission-settlement-pipeline-base\.json|tools\/mission_settlement_base_oracle\.test\.cjs)$/,
         groups: ["integration:mission"],
     },

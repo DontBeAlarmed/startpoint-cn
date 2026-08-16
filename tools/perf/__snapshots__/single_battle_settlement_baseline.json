@@ -1,0 +1,4425 @@
+{
+  "version": 1,
+  "fixedTime": "2025-01-01T12:00:00.000Z",
+  "scenarios": {
+    "abort_entry_item_refund_once": {
+      "behavior": {
+        "abortResponse": {
+          "data": {
+            "category_id": 7,
+            "is_multi": "single",
+            "item_list": {
+              "10000072": 2
+            },
+            "quest_name": "",
+            "start_time": "fixed-server-time",
+            "user_info": {}
+          },
+          "data_headers": {
+            "asset_update": false,
+            "force_update": false,
+            "result_code": 1,
+            "servertime": "fixed-server-time",
+            "short_udid": 0,
+            "viewer_id": 800000018
+          },
+          "statusCode": 200
+        },
+        "afterAbort": {
+          "databaseActive": null,
+          "itemAmount": 2,
+          "memoryActive": null
+        },
+        "afterRepeat": {
+          "databaseActive": null,
+          "itemAmount": 2,
+          "memoryActive": null
+        },
+        "afterStart": {
+          "databaseActive": {
+            "battleSessionId": null,
+            "category": 7,
+            "continueCount": 0,
+            "coordinatorOrigin": null,
+            "entryItemCount": 1,
+            "entryItemId": 10000072,
+            "eventId": null,
+            "isAutoStartMode": false,
+            "isMulti": false,
+            "playId": "gate-task-18-entry",
+            "questId": 200076009,
+            "roomNumber": null,
+            "useBoostPoint": false,
+            "useBossBoostPoint": false
+          },
+          "itemAmount": 1,
+          "memoryActive": {
+            "battleSessionId": null,
+            "category": 7,
+            "continueCount": 0,
+            "coordinatorOrigin": null,
+            "entryItemCount": 1,
+            "entryItemId": 10000072,
+            "eventId": null,
+            "isAutoStartMode": false,
+            "isMulti": false,
+            "playId": "gate-task-18-entry",
+            "questId": 200076009,
+            "roomNumber": null,
+            "useBoostPoint": false,
+            "useBossBoostPoint": false
+          }
+        },
+        "before": {
+          "itemAmount": 2
+        },
+        "quest": {
+          "category": 7,
+          "entryItemCount": 1,
+          "entryItemId": 10000072,
+          "questId": 200076009,
+          "staminaBaseCost": 30,
+          "staminaCost": 30,
+          "staminaRate": 1
+        },
+        "repeatResponse": {
+          "data": {
+            "category_id": 7,
+            "is_multi": "single",
+            "item_list": {},
+            "quest_name": "",
+            "start_time": "fixed-server-time",
+            "user_info": {}
+          },
+          "data_headers": {
+            "asset_update": false,
+            "force_update": false,
+            "result_code": 1,
+            "servertime": "fixed-server-time",
+            "short_udid": 0,
+            "viewer_id": 800000018
+          },
+          "statusCode": 200
+        },
+        "startResponse": {
+          "data": {
+            "category_id": 7,
+            "character_list": [],
+            "degree_list": [],
+            "equipment_list": [],
+            "is_multi": "single",
+            "item_list": {
+              "10000072": 1
+            },
+            "mail_arrived": false,
+            "mission_info": [],
+            "quest_name": "",
+            "start_time": "fixed-server-time",
+            "user_info": {
+              "last_main_quest_id": 200076009,
+              "stamina": 70,
+              "stamina_heal_time": "matches-database-virtual-time"
+            }
+          },
+          "data_headers": {
+            "asset_update": false,
+            "force_update": false,
+            "result_code": 1,
+            "servertime": "fixed-server-time",
+            "short_udid": 0,
+            "viewer_id": 800000018
+          },
+          "statusCode": 200
+        }
+      },
+      "behaviorSha256": "261e0b5baca8233743ced169fb138290e66542e525e524ace70f7c3f1150257a",
+      "sql": {
+        "statements": 55,
+        "selectStatements": 36,
+        "writeStatements": 11,
+        "transactionStatements": 8,
+        "byTable": {
+          "players": {
+            "statements": 9,
+            "reads": 8,
+            "writes": 1
+          },
+          "players_active_quests": {
+            "statements": 7,
+            "reads": 5,
+            "writes": 2
+          },
+          "players_category_mission_stages": {
+            "statements": 3,
+            "reads": 3,
+            "writes": 0
+          },
+          "players_category_missions": {
+            "statements": 9,
+            "reads": 3,
+            "writes": 6
+          },
+          "players_characters": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_characters_bond_tokens": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_characters_mana_nodes": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_collected_items": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_degree_battle_stats": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_equipment": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_items": {
+            "statements": 5,
+            "reads": 3,
+            "writes": 2
+          },
+          "players_mails": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_mission_battle_counters": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_periodic_snapshots": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "players_quest_progress": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "sessions": {
+            "statements": 3,
+            "reads": 3,
+            "writes": 0
+          }
+        }
+      }
+    },
+    "finish_first_clear_s_plus": {
+      "behavior": {
+        "before": {
+          "awakeUnlocks": [],
+          "characterClear": [
+            {
+              "character_id": 341005,
+              "clear_count": 4,
+              "leader_clear_count": 0,
+              "leader_multi_count": 0,
+              "leader_power_flip_count": 0,
+              "multi_count": 0
+            }
+          ],
+          "databaseActive": {
+            "battleSessionId": null,
+            "category": 1,
+            "continueCount": 0,
+            "coordinatorOrigin": null,
+            "entryItemCount": null,
+            "entryItemId": null,
+            "eventId": null,
+            "isAutoStartMode": false,
+            "isMulti": false,
+            "playId": "gate-task-18-first",
+            "questId": 1001002,
+            "roomNumber": null,
+            "useBoostPoint": false,
+            "useBossBoostPoint": false
+          },
+          "items": {},
+          "memoryActive": {
+            "battleSessionId": null,
+            "category": 1,
+            "continueCount": 0,
+            "coordinatorOrigin": null,
+            "entryItemCount": null,
+            "entryItemId": null,
+            "eventId": null,
+            "isAutoStartMode": false,
+            "isMulti": false,
+            "playId": "gate-task-18-first",
+            "questId": 1001002,
+            "roomNumber": null,
+            "useBoostPoint": false,
+            "useBossBoostPoint": false
+          },
+          "missionProgress": [],
+          "missionStages": [],
+          "player": {
+            "degreeId": 1,
+            "expPool": 0,
+            "freeMana": 2000,
+            "freeVmoney": 100,
+            "maxComboAchieved": 0,
+            "partySlot": 1,
+            "rankPoint": 0,
+            "stamina": 100,
+            "staminaHealTime": "fixed-fixture-time",
+            "totalManaObtained": 0,
+            "totalStaminaUsed": 0,
+            "vmoney": 100
+          },
+          "questProgress": null,
+          "rankDegree": 1
+        },
+        "database": {
+          "activeQuest": null,
+          "awakeUnlocks": [
+            {
+              "awake_level": 1,
+              "board_index": 1,
+              "character_id": 341005
+            }
+          ],
+          "characterClear": [
+            {
+              "character_id": 341005,
+              "clear_count": 5,
+              "leader_clear_count": 1,
+              "leader_multi_count": 0,
+              "leader_power_flip_count": 5,
+              "multi_count": 0
+            }
+          ],
+          "items": {
+            "13": 10,
+            "14": 5,
+            "15": 3,
+            "16": 1,
+            "910001": 2,
+            "910002": 3
+          },
+          "missionProgress": [
+            {
+              "category": 1,
+              "id": 1,
+              "progress": 30
+            },
+            {
+              "category": 1,
+              "id": 2,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 3,
+              "progress": 5
+            },
+            {
+              "category": 1,
+              "id": 4,
+              "progress": 31
+            },
+            {
+              "category": 1,
+              "id": 6,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 7,
+              "progress": 5
+            },
+            {
+              "category": 1,
+              "id": 8,
+              "progress": 5
+            },
+            {
+              "category": 1,
+              "id": 9,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 22,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 24,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 32,
+              "progress": 2
+            },
+            {
+              "category": 1,
+              "id": 34,
+              "progress": 123456
+            },
+            {
+              "category": 1,
+              "id": 37,
+              "progress": 23
+            },
+            {
+              "category": 1,
+              "id": 40,
+              "progress": 31
+            },
+            {
+              "category": 2,
+              "id": 11,
+              "progress": 1
+            },
+            {
+              "category": 2,
+              "id": 14,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 1000,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 1010,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 1020,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 1030,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 1040,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 1050,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 1060,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 1070,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 2000,
+              "progress": 2
+            },
+            {
+              "category": 5,
+              "id": 2010,
+              "progress": 2
+            },
+            {
+              "category": 5,
+              "id": 3010,
+              "progress": 60
+            },
+            {
+              "category": 5,
+              "id": 3020,
+              "progress": 60
+            },
+            {
+              "category": 5,
+              "id": 13000,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 13010,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 13020,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 14000,
+              "progress": 123456
+            },
+            {
+              "category": 5,
+              "id": 14010,
+              "progress": 123456
+            },
+            {
+              "category": 5,
+              "id": 14020,
+              "progress": 123456
+            },
+            {
+              "category": 5,
+              "id": 15000,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 15010,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 15020,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 33000,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 33010,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 33020,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 34000,
+              "progress": 30
+            },
+            {
+              "category": 5,
+              "id": 34010,
+              "progress": 30
+            },
+            {
+              "category": 5,
+              "id": 34020,
+              "progress": 30
+            },
+            {
+              "category": 5,
+              "id": 37000,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 37010,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 37020,
+              "progress": 5
+            },
+            {
+              "category": 6,
+              "id": 29,
+              "progress": 1
+            },
+            {
+              "category": 6,
+              "id": 30,
+              "progress": 5
+            },
+            {
+              "category": 8,
+              "id": 43,
+              "progress": 1
+            },
+            {
+              "category": 9,
+              "id": 3410051,
+              "progress": 5
+            },
+            {
+              "category": 9,
+              "id": 3410052,
+              "progress": 5
+            },
+            {
+              "category": 9,
+              "id": 3410053,
+              "progress": 5
+            },
+            {
+              "category": 9,
+              "id": 3410054,
+              "progress": 3
+            },
+            {
+              "category": 10,
+              "id": 1,
+              "progress": 1
+            }
+          ],
+          "missionStages": [
+            {
+              "category": 1,
+              "mission_id": 1,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 1,
+              "stage": 2,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 1,
+              "stage": 3,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 34,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 37,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 37,
+              "stage": 2,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 37,
+              "stage": 3,
+              "status": 1
+            },
+            {
+              "category": 5,
+              "mission_id": 15000,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 5,
+              "mission_id": 15010,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 5,
+              "mission_id": 15020,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 6,
+              "mission_id": 29,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 8,
+              "mission_id": 43,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 9,
+              "mission_id": 3410051,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 9,
+              "mission_id": 3410052,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 9,
+              "mission_id": 3410053,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 9,
+              "mission_id": 3410054,
+              "stage": 1,
+              "status": 1
+            }
+          ],
+          "player": {
+            "degreeId": 15020,
+            "expPool": 26,
+            "freeMana": 2031,
+            "freeVmoney": 250,
+            "maxComboAchieved": 30,
+            "partySlot": 1,
+            "rankPoint": 3,
+            "stamina": 100,
+            "staminaHealTime": "fixed-fixture-time",
+            "totalManaObtained": 31,
+            "totalStaminaUsed": 0,
+            "vmoney": 100
+          },
+          "questProgress": {
+            "bestElapsedTimeMs": 1000,
+            "clearRank": 5,
+            "finished": true,
+            "highScore": 123456,
+            "hostFinished": null,
+            "leaderCharacterId": 341005,
+            "questId": 1001002,
+            "unlocked": false
+          }
+        },
+        "memory": {
+          "activeQuest": null
+        },
+        "observedRewards": {
+          "additional": [
+            {
+              "group_id": 910018,
+              "index": 1,
+              "number": 3
+            }
+          ],
+          "awake": [
+            {
+              "mission_category_id": 9,
+              "mission_id": 3410051,
+              "mission_reward_id": 34100511
+            },
+            {
+              "mission_category_id": 9,
+              "mission_id": 3410052,
+              "mission_reward_id": 34100521
+            },
+            {
+              "mission_category_id": 9,
+              "mission_id": 3410053,
+              "mission_reward_id": 34100531
+            },
+            {
+              "mission_category_id": 9,
+              "mission_id": 3410054,
+              "mission_reward_id": 34100541
+            }
+          ],
+          "firstClear": [
+            {
+              "count": 15,
+              "name": "",
+              "type": 3
+            }
+          ],
+          "mission": [
+            {
+              "mission_category_id": 1,
+              "mission_id": 1,
+              "mission_reward_id": 1001
+            },
+            {
+              "mission_category_id": 1,
+              "mission_id": 1,
+              "mission_reward_id": 1002
+            },
+            {
+              "mission_category_id": 1,
+              "mission_id": 1,
+              "mission_reward_id": 1003
+            },
+            {
+              "mission_category_id": 1,
+              "mission_id": 34,
+              "mission_reward_id": 34001
+            },
+            {
+              "mission_category_id": 1,
+              "mission_id": 37,
+              "mission_reward_id": 37001
+            },
+            {
+              "mission_category_id": 1,
+              "mission_id": 37,
+              "mission_reward_id": 37002
+            },
+            {
+              "mission_category_id": 1,
+              "mission_id": 37,
+              "mission_reward_id": 37003
+            },
+            {
+              "mission_category_id": 5,
+              "mission_id": 15000,
+              "mission_reward_id": 15000001
+            },
+            {
+              "mission_category_id": 5,
+              "mission_id": 15010,
+              "mission_reward_id": 15010001
+            },
+            {
+              "mission_category_id": 5,
+              "mission_id": 15020,
+              "mission_reward_id": 15020001
+            },
+            {
+              "mission_category_id": 6,
+              "mission_id": 29,
+              "mission_reward_id": 29001
+            },
+            {
+              "mission_category_id": 8,
+              "mission_id": 43,
+              "mission_reward_id": 43001
+            }
+          ],
+          "normal": {
+            "addExpList": [
+              {
+                "add_exp": 0,
+                "add_exp_pool": 13,
+                "after_exp": 37241,
+                "character_id": 341005
+              }
+            ],
+            "currency": {
+              "expPool": 26,
+              "freeMana": 2031,
+              "freeVmoney": 250
+            },
+            "rewards": {
+              "converted_pool_exp": 0,
+              "field_mana": 11,
+              "overflow_pool_exp": 0,
+              "reward_mana": 20,
+              "reward_pool_exp": 13
+            }
+          },
+          "rareScore": [],
+          "sPlus": [
+            {
+              "count": 15,
+              "name": "",
+              "type": 3
+            }
+          ],
+          "score": [
+            {
+              "group_id": 40000,
+              "index": 1,
+              "number": 2
+            }
+          ]
+        },
+        "quest": {
+          "category": 1,
+          "clearRewardId": 1,
+          "questId": 1001002,
+          "sPlusRewardId": 1,
+          "scoreRewardGroupId": 40000
+        },
+        "response": {
+          "data": {
+            "active_mission_list": [
+              {
+                "mission_id": 11070,
+                "progress_value": 18,
+                "stages": [
+                  {
+                    "received": false,
+                    "stage": 1
+                  }
+                ]
+              },
+              {
+                "mission_id": 11110,
+                "progress_value": 1,
+                "stages": []
+              }
+            ],
+            "add_exp_list": [
+              {
+                "add_exp": 0,
+                "add_exp_pool": 13,
+                "after_exp": 37241,
+                "character_id": 341005
+              }
+            ],
+            "before_rank_point": 0,
+            "bond_token_status_list": {
+              "341005": {
+                "after": [
+                  {
+                    "mana_board_index": 1,
+                    "status": 0
+                  },
+                  {
+                    "mana_board_index": 2,
+                    "status": 0
+                  }
+                ],
+                "before": [
+                  {
+                    "mana_board_index": 1,
+                    "status": 0
+                  },
+                  {
+                    "mana_board_index": 2,
+                    "status": 0
+                  }
+                ]
+              }
+            },
+            "carnival_event": null,
+            "category_id": 1,
+            "character_list": [
+              {
+                "character_id": 341005,
+                "create_time": "fixture-character-time",
+                "exp": 37241,
+                "exp_total": 37241,
+                "join_time": "fixture-character-time",
+                "mana_board_awake": {
+                  "1": 1
+                },
+                "update_time": "fixture-character-time"
+              }
+            ],
+            "clear_rank": 5,
+            "degree_list": [
+              {
+                "degree_id": 15000,
+                "viewer_id": 800000018
+              },
+              {
+                "degree_id": 15010,
+                "viewer_id": 800000018
+              },
+              {
+                "degree_id": 15020,
+                "viewer_id": 800000018
+              }
+            ],
+            "drop_additional_reward_ids": [
+              {
+                "group_id": 910018,
+                "index": 1,
+                "number": 3
+              }
+            ],
+            "drop_periodic_reward_ids": [],
+            "drop_rare_reward_ids": [],
+            "drop_score_reward_ids": [
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
+              }
+            ],
+            "equipment_list": [],
+            "is_multi": "single",
+            "item_list": {
+              "13": 10,
+              "14": 5,
+              "15": 3,
+              "16": 1,
+              "910001": 2,
+              "910002": 3
+            },
+            "joined_character_id_list": [],
+            "mail_arrived": false,
+            "mission_info": [
+              {
+                "mission_category_id": 1,
+                "mission_id": 1,
+                "mission_reward_id": 1001
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 1,
+                "mission_reward_id": 1002
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 1,
+                "mission_reward_id": 1003
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 34,
+                "mission_reward_id": 34001
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 37,
+                "mission_reward_id": 37001
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 37,
+                "mission_reward_id": 37002
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 37,
+                "mission_reward_id": 37003
+              },
+              {
+                "mission_category_id": 5,
+                "mission_id": 15000,
+                "mission_reward_id": 15000001
+              },
+              {
+                "mission_category_id": 5,
+                "mission_id": 15010,
+                "mission_reward_id": 15010001
+              },
+              {
+                "mission_category_id": 5,
+                "mission_id": 15020,
+                "mission_reward_id": 15020001
+              },
+              {
+                "mission_category_id": 6,
+                "mission_id": 29,
+                "mission_reward_id": 29001
+              },
+              {
+                "mission_category_id": 8,
+                "mission_id": 43,
+                "mission_reward_id": 43001
+              },
+              {
+                "mission_category_id": 9,
+                "mission_id": 3410051,
+                "mission_reward_id": 34100511
+              },
+              {
+                "mission_category_id": 9,
+                "mission_id": 3410052,
+                "mission_reward_id": 34100521
+              },
+              {
+                "mission_category_id": 9,
+                "mission_id": 3410053,
+                "mission_reward_id": 34100531
+              },
+              {
+                "mission_category_id": 9,
+                "mission_id": 3410054,
+                "mission_reward_id": 34100541
+              }
+            ],
+            "old_high_score": 0,
+            "presigned_quest_category": [],
+            "quest_name": "",
+            "raid_event": null,
+            "rewards": {
+              "converted_pool_exp": 0,
+              "field_mana": 11,
+              "overflow_pool_exp": 0,
+              "reward_mana": 20,
+              "reward_pool_exp": 13
+            },
+            "rush_event": null,
+            "score_attack_event": null,
+            "start_time": "fixed-server-time",
+            "user_daily_challenge_point_list": [],
+            "user_info": {
+              "boost_point": 10,
+              "boss_boost_point": 3,
+              "degree_id": 15020,
+              "exp_pool": 26,
+              "exp_pooled_time": "fixture-pool-time",
+              "free_mana": 2031,
+              "free_vmoney": 250,
+              "rank_point": 3,
+              "stamina": 100,
+              "stamina_heal_time": "matches-database-virtual-time"
+            }
+          },
+          "data_headers": {
+            "asset_update": false,
+            "force_update": false,
+            "result_code": 1,
+            "servertime": "fixed-server-time",
+            "short_udid": 0,
+            "viewer_id": 800000018
+          },
+          "statusCode": 200
+        }
+      },
+      "behaviorSha256": "72e2c2ade754a2fb54b94f2fe04dce20bc2799198461f0d1f2a49ff1baf3287f",
+      "sql": {
+        "statements": 222,
+        "selectStatements": 93,
+        "writeStatements": 107,
+        "transactionStatements": 22,
+        "byTable": {
+          "players": {
+            "statements": 16,
+            "reads": 10,
+            "writes": 6
+          },
+          "players_active_mission_battle_condition_facts": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_active_mission_battle_facts": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_active_mission_counters": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "players_active_missions": {
+            "statements": 3,
+            "reads": 1,
+            "writes": 2
+          },
+          "players_active_missions_stages": {
+            "statements": 2,
+            "reads": 1,
+            "writes": 1
+          },
+          "players_active_quests": {
+            "statements": 1,
+            "reads": 0,
+            "writes": 1
+          },
+          "players_category_mission_stages": {
+            "statements": 27,
+            "reads": 11,
+            "writes": 16
+          },
+          "players_category_missions": {
+            "statements": 65,
+            "reads": 11,
+            "writes": 54
+          },
+          "players_character_awake_unlocks": {
+            "statements": 4,
+            "reads": 2,
+            "writes": 2
+          },
+          "players_character_quest_clears": {
+            "statements": 6,
+            "reads": 4,
+            "writes": 2
+          },
+          "players_characters": {
+            "statements": 6,
+            "reads": 5,
+            "writes": 1
+          },
+          "players_characters_bond_tokens": {
+            "statements": 5,
+            "reads": 5,
+            "writes": 0
+          },
+          "players_characters_mana_nodes": {
+            "statements": 6,
+            "reads": 6,
+            "writes": 0
+          },
+          "players_collected_items": {
+            "statements": 7,
+            "reads": 1,
+            "writes": 6
+          },
+          "players_degree_battle_stats": {
+            "statements": 2,
+            "reads": 1,
+            "writes": 1
+          },
+          "players_degrees": {
+            "statements": 3,
+            "reads": 0,
+            "writes": 3
+          },
+          "players_equipment": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "players_items": {
+            "statements": 12,
+            "reads": 6,
+            "writes": 6
+          },
+          "players_mails": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_mission_battle_counters": {
+            "statements": 3,
+            "reads": 2,
+            "writes": 1
+          },
+          "players_parties": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_party_groups": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_party_member_co_clears": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_party_race_clears": {
+            "statements": 1,
+            "reads": 0,
+            "writes": 1
+          },
+          "players_pass_cards": {
+            "statements": 4,
+            "reads": 1,
+            "writes": 3
+          },
+          "players_periodic_snapshots": {
+            "statements": 4,
+            "reads": 4,
+            "writes": 0
+          },
+          "players_quest_progress": {
+            "statements": 6,
+            "reads": 5,
+            "writes": 1
+          },
+          "players_shop_purchase_counters": {
+            "statements": 4,
+            "reads": 4,
+            "writes": 0
+          },
+          "server_gameplay_settings": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "sessions": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          }
+        }
+      }
+    },
+    "finish_late_transaction_rollback": {
+      "behavior": {
+        "after": {
+          "awakeUnlocks": [],
+          "characterClear": [
+            {
+              "character_id": 341005,
+              "clear_count": 4,
+              "leader_clear_count": 0,
+              "leader_multi_count": 0,
+              "leader_power_flip_count": 0,
+              "multi_count": 0
+            }
+          ],
+          "databaseActive": {
+            "battleSessionId": null,
+            "category": 1,
+            "continueCount": 0,
+            "coordinatorOrigin": null,
+            "entryItemCount": null,
+            "entryItemId": null,
+            "eventId": null,
+            "isAutoStartMode": false,
+            "isMulti": false,
+            "playId": "gate-task-18-rollback",
+            "questId": 1001002,
+            "roomNumber": null,
+            "useBoostPoint": false,
+            "useBossBoostPoint": false
+          },
+          "items": {},
+          "memoryActive": {
+            "battleSessionId": null,
+            "category": 1,
+            "continueCount": 0,
+            "coordinatorOrigin": null,
+            "entryItemCount": null,
+            "entryItemId": null,
+            "eventId": null,
+            "isAutoStartMode": false,
+            "isMulti": false,
+            "playId": "gate-task-18-rollback",
+            "questId": 1001002,
+            "roomNumber": null,
+            "useBoostPoint": false,
+            "useBossBoostPoint": false
+          },
+          "missionProgress": [],
+          "missionStages": [],
+          "player": {
+            "degreeId": 1,
+            "expPool": 0,
+            "freeMana": 2000,
+            "freeVmoney": 100,
+            "maxComboAchieved": 0,
+            "partySlot": 1,
+            "rankPoint": 0,
+            "stamina": 100,
+            "staminaHealTime": "fixed-fixture-time",
+            "totalManaObtained": 0,
+            "totalStaminaUsed": 0,
+            "vmoney": 100
+          },
+          "questProgress": null,
+          "rankDegree": 1
+        },
+        "before": {
+          "awakeUnlocks": [],
+          "characterClear": [
+            {
+              "character_id": 341005,
+              "clear_count": 4,
+              "leader_clear_count": 0,
+              "leader_multi_count": 0,
+              "leader_power_flip_count": 0,
+              "multi_count": 0
+            }
+          ],
+          "databaseActive": {
+            "battleSessionId": null,
+            "category": 1,
+            "continueCount": 0,
+            "coordinatorOrigin": null,
+            "entryItemCount": null,
+            "entryItemId": null,
+            "eventId": null,
+            "isAutoStartMode": false,
+            "isMulti": false,
+            "playId": "gate-task-18-rollback",
+            "questId": 1001002,
+            "roomNumber": null,
+            "useBoostPoint": false,
+            "useBossBoostPoint": false
+          },
+          "items": {},
+          "memoryActive": {
+            "battleSessionId": null,
+            "category": 1,
+            "continueCount": 0,
+            "coordinatorOrigin": null,
+            "entryItemCount": null,
+            "entryItemId": null,
+            "eventId": null,
+            "isAutoStartMode": false,
+            "isMulti": false,
+            "playId": "gate-task-18-rollback",
+            "questId": 1001002,
+            "roomNumber": null,
+            "useBoostPoint": false,
+            "useBossBoostPoint": false
+          },
+          "missionProgress": [],
+          "missionStages": [],
+          "player": {
+            "degreeId": 1,
+            "expPool": 0,
+            "freeMana": 2000,
+            "freeVmoney": 100,
+            "maxComboAchieved": 0,
+            "partySlot": 1,
+            "rankPoint": 0,
+            "stamina": 100,
+            "staminaHealTime": "fixed-fixture-time",
+            "totalManaObtained": 0,
+            "totalStaminaUsed": 0,
+            "vmoney": 100
+          },
+          "questProgress": null,
+          "rankDegree": 1
+        },
+        "failure": {
+          "message": "forced late settlement rollback",
+          "statusCode": 500
+        },
+        "response": {
+          "code": "SQLITE_CONSTRAINT_TRIGGER",
+          "error": "Internal Server Error",
+          "message": "forced late settlement rollback",
+          "statusCode": 500
+        }
+      },
+      "behaviorSha256": "ece93a5759d57939832dd018021034f586638e6c14584eb71c241c6f4ff00a9e",
+      "sql": {
+        "statements": 221,
+        "selectStatements": 92,
+        "writeStatements": 107,
+        "transactionStatements": 22,
+        "byTable": {
+          "players": {
+            "statements": 16,
+            "reads": 10,
+            "writes": 6
+          },
+          "players_active_mission_battle_condition_facts": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_active_mission_battle_facts": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_active_mission_counters": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "players_active_missions": {
+            "statements": 3,
+            "reads": 1,
+            "writes": 2
+          },
+          "players_active_missions_stages": {
+            "statements": 2,
+            "reads": 1,
+            "writes": 1
+          },
+          "players_active_quests": {
+            "statements": 1,
+            "reads": 0,
+            "writes": 1
+          },
+          "players_category_mission_stages": {
+            "statements": 27,
+            "reads": 11,
+            "writes": 16
+          },
+          "players_category_missions": {
+            "statements": 65,
+            "reads": 11,
+            "writes": 54
+          },
+          "players_character_awake_unlocks": {
+            "statements": 4,
+            "reads": 2,
+            "writes": 2
+          },
+          "players_character_quest_clears": {
+            "statements": 6,
+            "reads": 4,
+            "writes": 2
+          },
+          "players_characters": {
+            "statements": 6,
+            "reads": 5,
+            "writes": 1
+          },
+          "players_characters_bond_tokens": {
+            "statements": 5,
+            "reads": 5,
+            "writes": 0
+          },
+          "players_characters_mana_nodes": {
+            "statements": 6,
+            "reads": 6,
+            "writes": 0
+          },
+          "players_collected_items": {
+            "statements": 7,
+            "reads": 1,
+            "writes": 6
+          },
+          "players_degree_battle_stats": {
+            "statements": 2,
+            "reads": 1,
+            "writes": 1
+          },
+          "players_degrees": {
+            "statements": 3,
+            "reads": 0,
+            "writes": 3
+          },
+          "players_equipment": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "players_items": {
+            "statements": 12,
+            "reads": 6,
+            "writes": 6
+          },
+          "players_mission_battle_counters": {
+            "statements": 3,
+            "reads": 2,
+            "writes": 1
+          },
+          "players_parties": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_party_groups": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_party_member_co_clears": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_party_race_clears": {
+            "statements": 1,
+            "reads": 0,
+            "writes": 1
+          },
+          "players_pass_cards": {
+            "statements": 4,
+            "reads": 1,
+            "writes": 3
+          },
+          "players_periodic_snapshots": {
+            "statements": 4,
+            "reads": 4,
+            "writes": 0
+          },
+          "players_quest_progress": {
+            "statements": 6,
+            "reads": 5,
+            "writes": 1
+          },
+          "players_shop_purchase_counters": {
+            "statements": 4,
+            "reads": 4,
+            "writes": 0
+          },
+          "server_gameplay_settings": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "sessions": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          }
+        }
+      }
+    },
+    "finish_rank_up": {
+      "behavior": {
+        "after": {
+          "awakeUnlocks": [],
+          "characterClear": [
+            {
+              "character_id": 1,
+              "clear_count": 1,
+              "leader_clear_count": 1,
+              "leader_multi_count": 0,
+              "leader_power_flip_count": 5,
+              "multi_count": 0
+            }
+          ],
+          "databaseActive": null,
+          "items": {
+            "910001": 2,
+            "910002": 3
+          },
+          "memoryActive": null,
+          "missionProgress": [
+            {
+              "category": 1,
+              "id": 1,
+              "progress": 30
+            },
+            {
+              "category": 1,
+              "id": 2,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 3,
+              "progress": 5
+            },
+            {
+              "category": 1,
+              "id": 4,
+              "progress": 31
+            },
+            {
+              "category": 1,
+              "id": 6,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 7,
+              "progress": 5
+            },
+            {
+              "category": 1,
+              "id": 8,
+              "progress": 5
+            },
+            {
+              "category": 1,
+              "id": 9,
+              "progress": 2
+            },
+            {
+              "category": 1,
+              "id": 22,
+              "progress": 2
+            },
+            {
+              "category": 1,
+              "id": 24,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 32,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 34,
+              "progress": 123456
+            },
+            {
+              "category": 1,
+              "id": 40,
+              "progress": 31
+            },
+            {
+              "category": 2,
+              "id": 11,
+              "progress": 1
+            },
+            {
+              "category": 2,
+              "id": 14,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 1000,
+              "progress": 2
+            },
+            {
+              "category": 5,
+              "id": 1010,
+              "progress": 2
+            },
+            {
+              "category": 5,
+              "id": 1020,
+              "progress": 2
+            },
+            {
+              "category": 5,
+              "id": 1030,
+              "progress": 2
+            },
+            {
+              "category": 5,
+              "id": 1040,
+              "progress": 2
+            },
+            {
+              "category": 5,
+              "id": 1050,
+              "progress": 2
+            },
+            {
+              "category": 5,
+              "id": 1060,
+              "progress": 2
+            },
+            {
+              "category": 5,
+              "id": 1070,
+              "progress": 2
+            },
+            {
+              "category": 5,
+              "id": 2000,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 2010,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 13000,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 13010,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 13020,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 14000,
+              "progress": 123456
+            },
+            {
+              "category": 5,
+              "id": 14010,
+              "progress": 123456
+            },
+            {
+              "category": 5,
+              "id": 14020,
+              "progress": 123456
+            },
+            {
+              "category": 5,
+              "id": 15000,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 15010,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 15020,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 33000,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 33010,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 33020,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 34000,
+              "progress": 30
+            },
+            {
+              "category": 5,
+              "id": 34010,
+              "progress": 30
+            },
+            {
+              "category": 5,
+              "id": 34020,
+              "progress": 30
+            },
+            {
+              "category": 5,
+              "id": 37000,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 37010,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 37020,
+              "progress": 5
+            },
+            {
+              "category": 6,
+              "id": 29,
+              "progress": 1
+            },
+            {
+              "category": 6,
+              "id": 30,
+              "progress": 5
+            },
+            {
+              "category": 8,
+              "id": 43,
+              "progress": 1
+            },
+            {
+              "category": 9,
+              "id": 13,
+              "progress": 5
+            },
+            {
+              "category": 10,
+              "id": 1,
+              "progress": 1
+            }
+          ],
+          "missionStages": [
+            {
+              "category": 1,
+              "mission_id": 1,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 1,
+              "stage": 2,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 1,
+              "stage": 3,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 34,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 5,
+              "mission_id": 15000,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 5,
+              "mission_id": 15010,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 5,
+              "mission_id": 15020,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 6,
+              "mission_id": 29,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 8,
+              "mission_id": 43,
+              "stage": 1,
+              "status": 1
+            }
+          ],
+          "player": {
+            "degreeId": 15020,
+            "expPool": 13,
+            "freeMana": 2031,
+            "freeVmoney": 160,
+            "maxComboAchieved": 30,
+            "partySlot": 1,
+            "rankPoint": 12,
+            "stamina": 27,
+            "staminaHealTime": "within-request-window",
+            "totalManaObtained": 31,
+            "totalStaminaUsed": 0,
+            "vmoney": 100
+          },
+          "questProgress": {
+            "bestElapsedTimeMs": 1000,
+            "clearRank": 5,
+            "finished": true,
+            "highScore": 123456,
+            "hostFinished": null,
+            "leaderCharacterId": 1,
+            "questId": 1001002,
+            "unlocked": false
+          },
+          "rankDegree": 2
+        },
+        "before": {
+          "awakeUnlocks": [],
+          "characterClear": [],
+          "databaseActive": {
+            "battleSessionId": null,
+            "category": 1,
+            "continueCount": 0,
+            "coordinatorOrigin": null,
+            "entryItemCount": null,
+            "entryItemId": null,
+            "eventId": null,
+            "isAutoStartMode": false,
+            "isMulti": false,
+            "playId": "gate-task-18-rank",
+            "questId": 1001002,
+            "roomNumber": null,
+            "useBoostPoint": false,
+            "useBossBoostPoint": false
+          },
+          "items": {},
+          "memoryActive": {
+            "battleSessionId": null,
+            "category": 1,
+            "continueCount": 0,
+            "coordinatorOrigin": null,
+            "entryItemCount": null,
+            "entryItemId": null,
+            "eventId": null,
+            "isAutoStartMode": false,
+            "isMulti": false,
+            "playId": "gate-task-18-rank",
+            "questId": 1001002,
+            "roomNumber": null,
+            "useBoostPoint": false,
+            "useBossBoostPoint": false
+          },
+          "missionProgress": [],
+          "missionStages": [],
+          "player": {
+            "degreeId": 1,
+            "expPool": 0,
+            "freeMana": 2000,
+            "freeVmoney": 100,
+            "maxComboAchieved": 0,
+            "partySlot": 1,
+            "rankPoint": 9,
+            "stamina": 5,
+            "staminaHealTime": "fixed-fixture-time",
+            "totalManaObtained": 0,
+            "totalStaminaUsed": 0,
+            "vmoney": 100
+          },
+          "questProgress": null,
+          "rankDegree": 1
+        },
+        "quest": {
+          "category": 1,
+          "questId": 1001002,
+          "rankPointReward": 3
+        },
+        "response": {
+          "data": {
+            "active_mission_list": [],
+            "add_exp_list": [
+              {
+                "add_exp": 13,
+                "add_exp_pool": 0,
+                "after_exp": 23,
+                "character_id": 1
+              }
+            ],
+            "before_rank_point": 9,
+            "bond_token_status_list": {
+              "1": {
+                "after": [
+                  {
+                    "mana_board_index": 1,
+                    "status": 0
+                  },
+                  {
+                    "mana_board_index": 2,
+                    "status": 0
+                  }
+                ],
+                "before": [
+                  {
+                    "mana_board_index": 1,
+                    "status": 0
+                  },
+                  {
+                    "mana_board_index": 2,
+                    "status": 0
+                  }
+                ]
+              }
+            },
+            "carnival_event": null,
+            "category_id": 1,
+            "character_list": [
+              {
+                "character_id": 1,
+                "create_time": "fixture-character-time",
+                "exp": 23,
+                "exp_total": 23,
+                "join_time": "fixture-character-time",
+                "update_time": "fixture-character-time"
+              }
+            ],
+            "clear_rank": 5,
+            "degree_list": [
+              {
+                "degree_id": 15000,
+                "viewer_id": 800000018
+              },
+              {
+                "degree_id": 15010,
+                "viewer_id": 800000018
+              },
+              {
+                "degree_id": 15020,
+                "viewer_id": 800000018
+              }
+            ],
+            "drop_additional_reward_ids": [
+              {
+                "group_id": 910018,
+                "index": 1,
+                "number": 3
+              }
+            ],
+            "drop_periodic_reward_ids": [],
+            "drop_rare_reward_ids": [],
+            "drop_score_reward_ids": [
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
+              }
+            ],
+            "equipment_list": [],
+            "is_multi": "single",
+            "item_list": {
+              "910001": 2,
+              "910002": 3
+            },
+            "joined_character_id_list": [],
+            "mail_arrived": false,
+            "mission_info": [
+              {
+                "mission_category_id": 1,
+                "mission_id": 1,
+                "mission_reward_id": 1001
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 1,
+                "mission_reward_id": 1002
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 1,
+                "mission_reward_id": 1003
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 34,
+                "mission_reward_id": 34001
+              },
+              {
+                "mission_category_id": 5,
+                "mission_id": 15000,
+                "mission_reward_id": 15000001
+              },
+              {
+                "mission_category_id": 5,
+                "mission_id": 15010,
+                "mission_reward_id": 15010001
+              },
+              {
+                "mission_category_id": 5,
+                "mission_id": 15020,
+                "mission_reward_id": 15020001
+              },
+              {
+                "mission_category_id": 6,
+                "mission_id": 29,
+                "mission_reward_id": 29001
+              },
+              {
+                "mission_category_id": 8,
+                "mission_id": 43,
+                "mission_reward_id": 43001
+              }
+            ],
+            "old_high_score": 0,
+            "presigned_quest_category": [],
+            "quest_name": "",
+            "raid_event": null,
+            "rewards": {
+              "converted_pool_exp": 0,
+              "field_mana": 11,
+              "overflow_pool_exp": 0,
+              "reward_mana": 20,
+              "reward_pool_exp": 13
+            },
+            "rush_event": null,
+            "score_attack_event": null,
+            "start_time": "fixed-server-time",
+            "user_daily_challenge_point_list": [],
+            "user_info": {
+              "boost_point": 10,
+              "boss_boost_point": 3,
+              "degree_id": 15020,
+              "exp_pool": 13,
+              "exp_pooled_time": "fixture-pool-time",
+              "free_mana": 2031,
+              "free_vmoney": 160,
+              "rank_point": 12,
+              "stamina": 27,
+              "stamina_heal_time": "matches-database-virtual-time"
+            }
+          },
+          "data_headers": {
+            "asset_update": false,
+            "force_update": false,
+            "result_code": 1,
+            "servertime": "fixed-server-time",
+            "short_udid": 0,
+            "viewer_id": 800000018
+          },
+          "statusCode": 200
+        }
+      },
+      "behaviorSha256": "462252424112a5e57dcd4d1e50d3d7f905dac2209b8a00fdecfe357369a894f2",
+      "sql": {
+        "statements": 186,
+        "selectStatements": 89,
+        "writeStatements": 81,
+        "transactionStatements": 16,
+        "byTable": {
+          "players": {
+            "statements": 15,
+            "reads": 10,
+            "writes": 5
+          },
+          "players_active_mission_battle_condition_facts": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_active_mission_battle_facts": {
+            "statements": 2,
+            "reads": 1,
+            "writes": 1
+          },
+          "players_active_mission_counters": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "players_active_missions": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_active_missions_stages": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_active_quests": {
+            "statements": 1,
+            "reads": 0,
+            "writes": 1
+          },
+          "players_category_mission_stages": {
+            "statements": 20,
+            "reads": 11,
+            "writes": 9
+          },
+          "players_category_missions": {
+            "statements": 60,
+            "reads": 12,
+            "writes": 48
+          },
+          "players_character_awake_unlocks": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "players_character_quest_clears": {
+            "statements": 4,
+            "reads": 2,
+            "writes": 2
+          },
+          "players_characters": {
+            "statements": 6,
+            "reads": 5,
+            "writes": 1
+          },
+          "players_characters_bond_tokens": {
+            "statements": 5,
+            "reads": 5,
+            "writes": 0
+          },
+          "players_characters_mana_nodes": {
+            "statements": 6,
+            "reads": 6,
+            "writes": 0
+          },
+          "players_collected_items": {
+            "statements": 3,
+            "reads": 1,
+            "writes": 2
+          },
+          "players_degree_battle_stats": {
+            "statements": 2,
+            "reads": 1,
+            "writes": 1
+          },
+          "players_degrees": {
+            "statements": 3,
+            "reads": 0,
+            "writes": 3
+          },
+          "players_equipment": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "players_items": {
+            "statements": 4,
+            "reads": 2,
+            "writes": 2
+          },
+          "players_mails": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_mission_battle_counters": {
+            "statements": 3,
+            "reads": 2,
+            "writes": 1
+          },
+          "players_parties": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_party_groups": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_party_member_co_clears": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_party_race_clears": {
+            "statements": 1,
+            "reads": 0,
+            "writes": 1
+          },
+          "players_pass_cards": {
+            "statements": 4,
+            "reads": 1,
+            "writes": 3
+          },
+          "players_periodic_snapshots": {
+            "statements": 4,
+            "reads": 4,
+            "writes": 0
+          },
+          "players_quest_progress": {
+            "statements": 7,
+            "reads": 6,
+            "writes": 1
+          },
+          "players_shop_purchase_counters": {
+            "statements": 4,
+            "reads": 4,
+            "writes": 0
+          },
+          "server_gameplay_settings": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "sessions": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          }
+        }
+      }
+    },
+    "finish_repeat_clear": {
+      "behavior": {
+        "beforeSecond": {
+          "awakeUnlocks": [
+            {
+              "awake_level": 1,
+              "board_index": 1,
+              "character_id": 341005
+            }
+          ],
+          "characterClear": [
+            {
+              "character_id": 341005,
+              "clear_count": 5,
+              "leader_clear_count": 1,
+              "leader_multi_count": 0,
+              "leader_power_flip_count": 5,
+              "multi_count": 0
+            }
+          ],
+          "databaseActive": {
+            "battleSessionId": null,
+            "category": 1,
+            "continueCount": 0,
+            "coordinatorOrigin": null,
+            "entryItemCount": null,
+            "entryItemId": null,
+            "eventId": null,
+            "isAutoStartMode": false,
+            "isMulti": false,
+            "playId": "gate-task-18-repeat-second",
+            "questId": 1001002,
+            "roomNumber": null,
+            "useBoostPoint": false,
+            "useBossBoostPoint": false
+          },
+          "items": {
+            "13": 10,
+            "14": 5,
+            "15": 3,
+            "16": 1,
+            "910001": 2,
+            "910002": 3
+          },
+          "memoryActive": {
+            "battleSessionId": null,
+            "category": 1,
+            "continueCount": 0,
+            "coordinatorOrigin": null,
+            "entryItemCount": null,
+            "entryItemId": null,
+            "eventId": null,
+            "isAutoStartMode": false,
+            "isMulti": false,
+            "playId": "gate-task-18-repeat-second",
+            "questId": 1001002,
+            "roomNumber": null,
+            "useBoostPoint": false,
+            "useBossBoostPoint": false
+          },
+          "missionProgress": [
+            {
+              "category": 1,
+              "id": 1,
+              "progress": 30
+            },
+            {
+              "category": 1,
+              "id": 2,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 3,
+              "progress": 5
+            },
+            {
+              "category": 1,
+              "id": 4,
+              "progress": 31
+            },
+            {
+              "category": 1,
+              "id": 6,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 7,
+              "progress": 5
+            },
+            {
+              "category": 1,
+              "id": 8,
+              "progress": 5
+            },
+            {
+              "category": 1,
+              "id": 9,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 22,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 24,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 32,
+              "progress": 2
+            },
+            {
+              "category": 1,
+              "id": 34,
+              "progress": 123456
+            },
+            {
+              "category": 1,
+              "id": 37,
+              "progress": 23
+            },
+            {
+              "category": 1,
+              "id": 40,
+              "progress": 31
+            },
+            {
+              "category": 2,
+              "id": 11,
+              "progress": 1
+            },
+            {
+              "category": 2,
+              "id": 14,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 1000,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 1010,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 1020,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 1030,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 1040,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 1050,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 1060,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 1070,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 2000,
+              "progress": 2
+            },
+            {
+              "category": 5,
+              "id": 2010,
+              "progress": 2
+            },
+            {
+              "category": 5,
+              "id": 3010,
+              "progress": 60
+            },
+            {
+              "category": 5,
+              "id": 3020,
+              "progress": 60
+            },
+            {
+              "category": 5,
+              "id": 13000,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 13010,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 13020,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 14000,
+              "progress": 123456
+            },
+            {
+              "category": 5,
+              "id": 14010,
+              "progress": 123456
+            },
+            {
+              "category": 5,
+              "id": 14020,
+              "progress": 123456
+            },
+            {
+              "category": 5,
+              "id": 15000,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 15010,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 15020,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 33000,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 33010,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 33020,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 34000,
+              "progress": 30
+            },
+            {
+              "category": 5,
+              "id": 34010,
+              "progress": 30
+            },
+            {
+              "category": 5,
+              "id": 34020,
+              "progress": 30
+            },
+            {
+              "category": 5,
+              "id": 37000,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 37010,
+              "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 37020,
+              "progress": 5
+            },
+            {
+              "category": 6,
+              "id": 29,
+              "progress": 1
+            },
+            {
+              "category": 6,
+              "id": 30,
+              "progress": 5
+            },
+            {
+              "category": 8,
+              "id": 43,
+              "progress": 1
+            },
+            {
+              "category": 9,
+              "id": 3410051,
+              "progress": 5
+            },
+            {
+              "category": 9,
+              "id": 3410052,
+              "progress": 5
+            },
+            {
+              "category": 9,
+              "id": 3410053,
+              "progress": 5
+            },
+            {
+              "category": 9,
+              "id": 3410054,
+              "progress": 3
+            },
+            {
+              "category": 10,
+              "id": 1,
+              "progress": 1
+            }
+          ],
+          "missionStages": [
+            {
+              "category": 1,
+              "mission_id": 1,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 1,
+              "stage": 2,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 1,
+              "stage": 3,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 34,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 37,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 37,
+              "stage": 2,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 37,
+              "stage": 3,
+              "status": 1
+            },
+            {
+              "category": 5,
+              "mission_id": 15000,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 5,
+              "mission_id": 15010,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 5,
+              "mission_id": 15020,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 6,
+              "mission_id": 29,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 8,
+              "mission_id": 43,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 9,
+              "mission_id": 3410051,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 9,
+              "mission_id": 3410052,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 9,
+              "mission_id": 3410053,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 9,
+              "mission_id": 3410054,
+              "stage": 1,
+              "status": 1
+            }
+          ],
+          "player": {
+            "degreeId": 15020,
+            "expPool": 26,
+            "freeMana": 2031,
+            "freeVmoney": 250,
+            "maxComboAchieved": 30,
+            "partySlot": 1,
+            "rankPoint": 3,
+            "stamina": 100,
+            "staminaHealTime": "fixed-fixture-time",
+            "totalManaObtained": 31,
+            "totalStaminaUsed": 0,
+            "vmoney": 100
+          },
+          "questProgress": {
+            "bestElapsedTimeMs": 1000,
+            "clearRank": 5,
+            "finished": true,
+            "highScore": 123456,
+            "hostFinished": null,
+            "leaderCharacterId": 341005,
+            "questId": 1001002,
+            "unlocked": false
+          },
+          "rankDegree": 1
+        },
+        "first": {
+          "database": {
+            "activeQuest": null,
+            "awakeUnlocks": [
+              {
+                "awake_level": 1,
+                "board_index": 1,
+                "character_id": 341005
+              }
+            ],
+            "characterClear": [
+              {
+                "character_id": 341005,
+                "clear_count": 5,
+                "leader_clear_count": 1,
+                "leader_multi_count": 0,
+                "leader_power_flip_count": 5,
+                "multi_count": 0
+              }
+            ],
+            "items": {
+              "13": 10,
+              "14": 5,
+              "15": 3,
+              "16": 1,
+              "910001": 2,
+              "910002": 3
+            },
+            "missionProgress": [
+              {
+                "category": 1,
+                "id": 1,
+                "progress": 30
+              },
+              {
+                "category": 1,
+                "id": 2,
+                "progress": 1
+              },
+              {
+                "category": 1,
+                "id": 3,
+                "progress": 5
+              },
+              {
+                "category": 1,
+                "id": 4,
+                "progress": 31
+              },
+              {
+                "category": 1,
+                "id": 6,
+                "progress": 1
+              },
+              {
+                "category": 1,
+                "id": 7,
+                "progress": 5
+              },
+              {
+                "category": 1,
+                "id": 8,
+                "progress": 5
+              },
+              {
+                "category": 1,
+                "id": 9,
+                "progress": 1
+              },
+              {
+                "category": 1,
+                "id": 22,
+                "progress": 1
+              },
+              {
+                "category": 1,
+                "id": 24,
+                "progress": 1
+              },
+              {
+                "category": 1,
+                "id": 32,
+                "progress": 2
+              },
+              {
+                "category": 1,
+                "id": 34,
+                "progress": 123456
+              },
+              {
+                "category": 1,
+                "id": 37,
+                "progress": 23
+              },
+              {
+                "category": 1,
+                "id": 40,
+                "progress": 31
+              },
+              {
+                "category": 2,
+                "id": 11,
+                "progress": 1
+              },
+              {
+                "category": 2,
+                "id": 14,
+                "progress": 5
+              },
+              {
+                "category": 5,
+                "id": 1000,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1010,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1020,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1030,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1040,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1050,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1060,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1070,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 2000,
+                "progress": 2
+              },
+              {
+                "category": 5,
+                "id": 2010,
+                "progress": 2
+              },
+              {
+                "category": 5,
+                "id": 3010,
+                "progress": 60
+              },
+              {
+                "category": 5,
+                "id": 3020,
+                "progress": 60
+              },
+              {
+                "category": 5,
+                "id": 13000,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 13010,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 13020,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 14000,
+                "progress": 123456
+              },
+              {
+                "category": 5,
+                "id": 14010,
+                "progress": 123456
+              },
+              {
+                "category": 5,
+                "id": 14020,
+                "progress": 123456
+              },
+              {
+                "category": 5,
+                "id": 15000,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 15010,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 15020,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 33000,
+                "progress": 5
+              },
+              {
+                "category": 5,
+                "id": 33010,
+                "progress": 5
+              },
+              {
+                "category": 5,
+                "id": 33020,
+                "progress": 5
+              },
+              {
+                "category": 5,
+                "id": 34000,
+                "progress": 30
+              },
+              {
+                "category": 5,
+                "id": 34010,
+                "progress": 30
+              },
+              {
+                "category": 5,
+                "id": 34020,
+                "progress": 30
+              },
+              {
+                "category": 5,
+                "id": 37000,
+                "progress": 5
+              },
+              {
+                "category": 5,
+                "id": 37010,
+                "progress": 5
+              },
+              {
+                "category": 5,
+                "id": 37020,
+                "progress": 5
+              },
+              {
+                "category": 6,
+                "id": 29,
+                "progress": 1
+              },
+              {
+                "category": 6,
+                "id": 30,
+                "progress": 5
+              },
+              {
+                "category": 8,
+                "id": 43,
+                "progress": 1
+              },
+              {
+                "category": 9,
+                "id": 3410051,
+                "progress": 5
+              },
+              {
+                "category": 9,
+                "id": 3410052,
+                "progress": 5
+              },
+              {
+                "category": 9,
+                "id": 3410053,
+                "progress": 5
+              },
+              {
+                "category": 9,
+                "id": 3410054,
+                "progress": 3
+              },
+              {
+                "category": 10,
+                "id": 1,
+                "progress": 1
+              }
+            ],
+            "missionStages": [
+              {
+                "category": 1,
+                "mission_id": 1,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 1,
+                "stage": 2,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 1,
+                "stage": 3,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 34,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 37,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 37,
+                "stage": 2,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 37,
+                "stage": 3,
+                "status": 1
+              },
+              {
+                "category": 5,
+                "mission_id": 15000,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 5,
+                "mission_id": 15010,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 5,
+                "mission_id": 15020,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 6,
+                "mission_id": 29,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 8,
+                "mission_id": 43,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 9,
+                "mission_id": 3410051,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 9,
+                "mission_id": 3410052,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 9,
+                "mission_id": 3410053,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 9,
+                "mission_id": 3410054,
+                "stage": 1,
+                "status": 1
+              }
+            ],
+            "player": {
+              "degreeId": 15020,
+              "expPool": 26,
+              "freeMana": 2031,
+              "freeVmoney": 250,
+              "maxComboAchieved": 30,
+              "partySlot": 1,
+              "rankPoint": 3,
+              "stamina": 100,
+              "staminaHealTime": "fixed-fixture-time",
+              "totalManaObtained": 31,
+              "totalStaminaUsed": 0,
+              "vmoney": 100
+            },
+            "questProgress": {
+              "bestElapsedTimeMs": 1000,
+              "clearRank": 5,
+              "finished": true,
+              "highScore": 123456,
+              "hostFinished": null,
+              "leaderCharacterId": 341005,
+              "questId": 1001002,
+              "unlocked": false
+            }
+          },
+          "observedRewards": {
+            "additional": [
+              {
+                "group_id": 910018,
+                "index": 1,
+                "number": 3
+              }
+            ],
+            "awake": [
+              {
+                "mission_category_id": 9,
+                "mission_id": 3410051,
+                "mission_reward_id": 34100511
+              },
+              {
+                "mission_category_id": 9,
+                "mission_id": 3410052,
+                "mission_reward_id": 34100521
+              },
+              {
+                "mission_category_id": 9,
+                "mission_id": 3410053,
+                "mission_reward_id": 34100531
+              },
+              {
+                "mission_category_id": 9,
+                "mission_id": 3410054,
+                "mission_reward_id": 34100541
+              }
+            ],
+            "firstClear": [
+              {
+                "count": 15,
+                "name": "",
+                "type": 3
+              }
+            ],
+            "mission": [
+              {
+                "mission_category_id": 1,
+                "mission_id": 1,
+                "mission_reward_id": 1001
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 1,
+                "mission_reward_id": 1002
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 1,
+                "mission_reward_id": 1003
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 34,
+                "mission_reward_id": 34001
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 37,
+                "mission_reward_id": 37001
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 37,
+                "mission_reward_id": 37002
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 37,
+                "mission_reward_id": 37003
+              },
+              {
+                "mission_category_id": 5,
+                "mission_id": 15000,
+                "mission_reward_id": 15000001
+              },
+              {
+                "mission_category_id": 5,
+                "mission_id": 15010,
+                "mission_reward_id": 15010001
+              },
+              {
+                "mission_category_id": 5,
+                "mission_id": 15020,
+                "mission_reward_id": 15020001
+              },
+              {
+                "mission_category_id": 6,
+                "mission_id": 29,
+                "mission_reward_id": 29001
+              },
+              {
+                "mission_category_id": 8,
+                "mission_id": 43,
+                "mission_reward_id": 43001
+              }
+            ],
+            "normal": {
+              "addExpList": [
+                {
+                  "add_exp": 0,
+                  "add_exp_pool": 13,
+                  "after_exp": 37241,
+                  "character_id": 341005
+                }
+              ],
+              "currency": {
+                "expPool": 26,
+                "freeMana": 2031,
+                "freeVmoney": 250
+              },
+              "rewards": {
+                "converted_pool_exp": 0,
+                "field_mana": 11,
+                "overflow_pool_exp": 0,
+                "reward_mana": 20,
+                "reward_pool_exp": 13
+              }
+            },
+            "rareScore": [],
+            "sPlus": [
+              {
+                "count": 15,
+                "name": "",
+                "type": 3
+              }
+            ],
+            "score": [
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
+              }
+            ]
+          }
+        },
+        "second": {
+          "database": {
+            "activeQuest": null,
+            "awakeUnlocks": [
+              {
+                "awake_level": 1,
+                "board_index": 1,
+                "character_id": 341005
+              }
+            ],
+            "characterClear": [
+              {
+                "character_id": 341005,
+                "clear_count": 6,
+                "leader_clear_count": 2,
+                "leader_multi_count": 0,
+                "leader_power_flip_count": 10,
+                "multi_count": 0
+              }
+            ],
+            "items": {
+              "13": 10,
+              "14": 5,
+              "15": 3,
+              "16": 1,
+              "910001": 4,
+              "910002": 6
+            },
+            "missionProgress": [
+              {
+                "category": 1,
+                "id": 1,
+                "progress": 30
+              },
+              {
+                "category": 1,
+                "id": 2,
+                "progress": 2
+              },
+              {
+                "category": 1,
+                "id": 3,
+                "progress": 10
+              },
+              {
+                "category": 1,
+                "id": 4,
+                "progress": 62
+              },
+              {
+                "category": 1,
+                "id": 6,
+                "progress": 2
+              },
+              {
+                "category": 1,
+                "id": 7,
+                "progress": 10
+              },
+              {
+                "category": 1,
+                "id": 8,
+                "progress": 10
+              },
+              {
+                "category": 1,
+                "id": 9,
+                "progress": 1
+              },
+              {
+                "category": 1,
+                "id": 22,
+                "progress": 1
+              },
+              {
+                "category": 1,
+                "id": 24,
+                "progress": 1
+              },
+              {
+                "category": 1,
+                "id": 32,
+                "progress": 2
+              },
+              {
+                "category": 1,
+                "id": 34,
+                "progress": 123456
+              },
+              {
+                "category": 1,
+                "id": 37,
+                "progress": 23
+              },
+              {
+                "category": 1,
+                "id": 40,
+                "progress": 62
+              },
+              {
+                "category": 2,
+                "id": 11,
+                "progress": 2
+              },
+              {
+                "category": 2,
+                "id": 14,
+                "progress": 10
+              },
+              {
+                "category": 2,
+                "id": 17,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1000,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1010,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1020,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1030,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1040,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1050,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1060,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 1070,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 2000,
+                "progress": 2
+              },
+              {
+                "category": 5,
+                "id": 2010,
+                "progress": 2
+              },
+              {
+                "category": 5,
+                "id": 3010,
+                "progress": 60
+              },
+              {
+                "category": 5,
+                "id": 3020,
+                "progress": 60
+              },
+              {
+                "category": 5,
+                "id": 13000,
+                "progress": 2
+              },
+              {
+                "category": 5,
+                "id": 13010,
+                "progress": 2
+              },
+              {
+                "category": 5,
+                "id": 13020,
+                "progress": 2
+              },
+              {
+                "category": 5,
+                "id": 14000,
+                "progress": 123456
+              },
+              {
+                "category": 5,
+                "id": 14010,
+                "progress": 123456
+              },
+              {
+                "category": 5,
+                "id": 14020,
+                "progress": 123456
+              },
+              {
+                "category": 5,
+                "id": 15000,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 15010,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 15020,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 33000,
+                "progress": 10
+              },
+              {
+                "category": 5,
+                "id": 33010,
+                "progress": 10
+              },
+              {
+                "category": 5,
+                "id": 33020,
+                "progress": 10
+              },
+              {
+                "category": 5,
+                "id": 34000,
+                "progress": 30
+              },
+              {
+                "category": 5,
+                "id": 34010,
+                "progress": 30
+              },
+              {
+                "category": 5,
+                "id": 34020,
+                "progress": 30
+              },
+              {
+                "category": 5,
+                "id": 37000,
+                "progress": 10
+              },
+              {
+                "category": 5,
+                "id": 37010,
+                "progress": 10
+              },
+              {
+                "category": 5,
+                "id": 37020,
+                "progress": 10
+              },
+              {
+                "category": 6,
+                "id": 29,
+                "progress": 2
+              },
+              {
+                "category": 6,
+                "id": 30,
+                "progress": 10
+              },
+              {
+                "category": 8,
+                "id": 43,
+                "progress": 1
+              },
+              {
+                "category": 9,
+                "id": 3410051,
+                "progress": 6
+              },
+              {
+                "category": 9,
+                "id": 3410052,
+                "progress": 6
+              },
+              {
+                "category": 9,
+                "id": 3410053,
+                "progress": 6
+              },
+              {
+                "category": 9,
+                "id": 3410054,
+                "progress": 3
+              },
+              {
+                "category": 10,
+                "id": 1,
+                "progress": 1
+              }
+            ],
+            "missionStages": [
+              {
+                "category": 1,
+                "mission_id": 1,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 1,
+                "stage": 2,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 1,
+                "stage": 3,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 4,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 8,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 34,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 37,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 37,
+                "stage": 2,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 37,
+                "stage": 3,
+                "status": 1
+              },
+              {
+                "category": 2,
+                "mission_id": 14,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 5,
+                "mission_id": 15000,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 5,
+                "mission_id": 15010,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 5,
+                "mission_id": 15020,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 6,
+                "mission_id": 29,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 6,
+                "mission_id": 30,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 8,
+                "mission_id": 43,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 9,
+                "mission_id": 3410051,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 9,
+                "mission_id": 3410052,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 9,
+                "mission_id": 3410053,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 9,
+                "mission_id": 3410054,
+                "stage": 1,
+                "status": 1
+              }
+            ],
+            "player": {
+              "degreeId": 15020,
+              "expPool": 52,
+              "freeMana": 3562,
+              "freeVmoney": 260,
+              "maxComboAchieved": 30,
+              "partySlot": 1,
+              "rankPoint": 6,
+              "stamina": 100,
+              "staminaHealTime": "fixed-fixture-time",
+              "totalManaObtained": 1562,
+              "totalStaminaUsed": 0,
+              "vmoney": 100
+            },
+            "questProgress": {
+              "bestElapsedTimeMs": 1000,
+              "clearRank": 5,
+              "finished": true,
+              "highScore": 123456,
+              "hostFinished": null,
+              "leaderCharacterId": 341005,
+              "questId": 1001002,
+              "unlocked": false
+            }
+          },
+          "memory": {
+            "activeQuest": null
+          },
+          "observedRewards": {
+            "additional": [
+              {
+                "group_id": 910018,
+                "index": 1,
+                "number": 3
+              }
+            ],
+            "awake": [],
+            "firstClear": [],
+            "mission": [
+              {
+                "mission_category_id": 1,
+                "mission_id": 4,
+                "mission_reward_id": 4001
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 8,
+                "mission_reward_id": 8001
+              },
+              {
+                "mission_category_id": 2,
+                "mission_id": 14,
+                "mission_reward_id": 14001
+              },
+              {
+                "mission_category_id": 6,
+                "mission_id": 30,
+                "mission_reward_id": 30001
+              }
+            ],
+            "normal": {
+              "addExpList": [
+                {
+                  "add_exp": 0,
+                  "add_exp_pool": 13,
+                  "after_exp": 37241,
+                  "character_id": 341005
+                }
+              ],
+              "currency": {
+                "expPool": 52,
+                "freeMana": 3562,
+                "freeVmoney": 260
+              },
+              "rewards": {
+                "converted_pool_exp": 0,
+                "field_mana": 11,
+                "overflow_pool_exp": 0,
+                "reward_mana": 20,
+                "reward_pool_exp": 13
+              }
+            },
+            "rareScore": [],
+            "sPlus": [],
+            "score": [
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
+              }
+            ]
+          },
+          "response": {
+            "data": {
+              "active_mission_list": [],
+              "add_exp_list": [
+                {
+                  "add_exp": 0,
+                  "add_exp_pool": 13,
+                  "after_exp": 37241,
+                  "character_id": 341005
+                }
+              ],
+              "before_rank_point": 3,
+              "bond_token_status_list": {
+                "341005": {
+                  "after": [
+                    {
+                      "mana_board_index": 1,
+                      "status": 0
+                    },
+                    {
+                      "mana_board_index": 2,
+                      "status": 0
+                    }
+                  ],
+                  "before": [
+                    {
+                      "mana_board_index": 1,
+                      "status": 0
+                    },
+                    {
+                      "mana_board_index": 2,
+                      "status": 0
+                    }
+                  ]
+                }
+              },
+              "carnival_event": null,
+              "category_id": 1,
+              "character_list": [
+                {
+                  "character_id": 341005,
+                  "create_time": "fixture-character-time",
+                  "exp": 37241,
+                  "exp_total": 37241,
+                  "join_time": "fixture-character-time",
+                  "update_time": "fixture-character-time"
+                }
+              ],
+              "clear_rank": 5,
+              "degree_list": [],
+              "drop_additional_reward_ids": [
+                {
+                  "group_id": 910018,
+                  "index": 1,
+                  "number": 3
+                }
+              ],
+              "drop_periodic_reward_ids": [],
+              "drop_rare_reward_ids": [],
+              "drop_score_reward_ids": [
+                {
+                  "group_id": 40000,
+                  "index": 1,
+                  "number": 2
+                }
+              ],
+              "equipment_list": [],
+              "is_multi": "single",
+              "item_list": {
+                "910001": 4,
+                "910002": 6
+              },
+              "joined_character_id_list": [],
+              "mail_arrived": false,
+              "mission_info": [
+                {
+                  "mission_category_id": 1,
+                  "mission_id": 4,
+                  "mission_reward_id": 4001
+                },
+                {
+                  "mission_category_id": 1,
+                  "mission_id": 8,
+                  "mission_reward_id": 8001
+                },
+                {
+                  "mission_category_id": 2,
+                  "mission_id": 14,
+                  "mission_reward_id": 14001
+                },
+                {
+                  "mission_category_id": 6,
+                  "mission_id": 30,
+                  "mission_reward_id": 30001
+                }
+              ],
+              "old_high_score": 123456,
+              "presigned_quest_category": [],
+              "quest_name": "",
+              "raid_event": null,
+              "rewards": {
+                "converted_pool_exp": 0,
+                "field_mana": 11,
+                "overflow_pool_exp": 0,
+                "reward_mana": 20,
+                "reward_pool_exp": 13
+              },
+              "rush_event": null,
+              "score_attack_event": null,
+              "start_time": "fixed-server-time",
+              "user_daily_challenge_point_list": [],
+              "user_info": {
+                "boost_point": 10,
+                "boss_boost_point": 3,
+                "degree_id": 15020,
+                "exp_pool": 52,
+                "exp_pooled_time": "fixture-pool-time",
+                "free_mana": 3562,
+                "free_vmoney": 260,
+                "rank_point": 6,
+                "stamina": 100,
+                "stamina_heal_time": "matches-database-virtual-time"
+              }
+            },
+            "data_headers": {
+              "asset_update": false,
+              "force_update": false,
+              "result_code": 1,
+              "servertime": "fixed-server-time",
+              "short_udid": 0,
+              "viewer_id": 800000018
+            },
+            "statusCode": 200
+          }
+        }
+      },
+      "behaviorSha256": "c21386221dbfc1363e143d394a84c6557e24625b2722e16b3c4ac283eae469e2",
+      "sql": {
+        "statements": 148,
+        "selectStatements": 87,
+        "writeStatements": 47,
+        "transactionStatements": 14,
+        "byTable": {
+          "players": {
+            "statements": 12,
+            "reads": 8,
+            "writes": 4
+          },
+          "players_active_mission_battle_condition_facts": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_active_mission_battle_facts": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_active_mission_counters": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "players_active_missions": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_active_missions_stages": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_active_quests": {
+            "statements": 1,
+            "reads": 0,
+            "writes": 1
+          },
+          "players_category_mission_stages": {
+            "statements": 15,
+            "reads": 11,
+            "writes": 4
+          },
+          "players_category_missions": {
+            "statements": 35,
+            "reads": 11,
+            "writes": 24
+          },
+          "players_character_awake_unlocks": {
+            "statements": 3,
+            "reads": 2,
+            "writes": 1
+          },
+          "players_character_quest_clears": {
+            "statements": 6,
+            "reads": 4,
+            "writes": 2
+          },
+          "players_characters": {
+            "statements": 6,
+            "reads": 5,
+            "writes": 1
+          },
+          "players_characters_bond_tokens": {
+            "statements": 5,
+            "reads": 5,
+            "writes": 0
+          },
+          "players_characters_mana_nodes": {
+            "statements": 6,
+            "reads": 6,
+            "writes": 0
+          },
+          "players_collected_items": {
+            "statements": 3,
+            "reads": 1,
+            "writes": 2
+          },
+          "players_degree_battle_stats": {
+            "statements": 2,
+            "reads": 1,
+            "writes": 1
+          },
+          "players_equipment": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "players_items": {
+            "statements": 4,
+            "reads": 2,
+            "writes": 2
+          },
+          "players_mails": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_mission_battle_counters": {
+            "statements": 3,
+            "reads": 2,
+            "writes": 1
+          },
+          "players_parties": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_party_groups": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_party_member_co_clears": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_party_race_clears": {
+            "statements": 1,
+            "reads": 0,
+            "writes": 1
+          },
+          "players_pass_cards": {
+            "statements": 3,
+            "reads": 1,
+            "writes": 2
+          },
+          "players_periodic_snapshots": {
+            "statements": 4,
+            "reads": 4,
+            "writes": 0
+          },
+          "players_quest_progress": {
+            "statements": 6,
+            "reads": 5,
+            "writes": 1
+          },
+          "players_shop_purchase_counters": {
+            "statements": 4,
+            "reads": 4,
+            "writes": 0
+          },
+          "server_gameplay_settings": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "sessions": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          }
+        }
+      }
+    },
+    "play_continue_free_then_paid": {
+      "behavior": {
+        "after": {
+          "currency": {
+            "freeVmoney": 0,
+            "vmoney": 20
+          },
+          "databaseContinueCount": 1,
+          "memoryContinueCount": 1
+        },
+        "before": {
+          "currency": {
+            "freeVmoney": 30,
+            "vmoney": 40
+          },
+          "databaseContinueCount": 0,
+          "memoryContinueCount": 0
+        },
+        "response": {
+          "data": {
+            "mail_arrived": false,
+            "user_info": {
+              "free_vmoney": 0,
+              "vmoney": 20
+            }
+          },
+          "data_headers": {
+            "asset_update": false,
+            "force_update": false,
+            "result_code": 1,
+            "servertime": "fixed-server-time",
+            "short_udid": 0,
+            "viewer_id": 800000018
+          },
+          "statusCode": 200
+        }
+      },
+      "behaviorSha256": "5b5670ec3feaba0fb3919e0db1cad9efa33ee8cf6efa2def989400bba923868d",
+      "sql": {
+        "statements": 10,
+        "selectStatements": 6,
+        "writeStatements": 2,
+        "transactionStatements": 2,
+        "byTable": {
+          "players": {
+            "statements": 4,
+            "reads": 3,
+            "writes": 1
+          },
+          "players_active_quests": {
+            "statements": 2,
+            "reads": 1,
+            "writes": 1
+          },
+          "players_mails": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "sessions": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          }
+        }
+      }
+    },
+    "start_normal": {
+      "behavior": {
+        "before": {
+          "player": {
+            "degreeId": 1,
+            "expPool": 0,
+            "freeMana": 2000,
+            "freeVmoney": 100,
+            "maxComboAchieved": 0,
+            "partySlot": 1,
+            "rankPoint": 0,
+            "stamina": 100,
+            "staminaHealTime": "fixed-fixture-time",
+            "totalManaObtained": 0,
+            "totalStaminaUsed": 0,
+            "vmoney": 100
+          }
+        },
+        "database": {
+          "activeQuest": {
+            "battleSessionId": null,
+            "category": 1,
+            "continueCount": 0,
+            "coordinatorOrigin": null,
+            "entryItemCount": null,
+            "entryItemId": null,
+            "eventId": null,
+            "isAutoStartMode": false,
+            "isMulti": false,
+            "playId": "gate-task-18-start",
+            "questId": 1001002,
+            "roomNumber": null,
+            "useBoostPoint": false,
+            "useBossBoostPoint": false
+          },
+          "awakeUnlocks": [],
+          "characterClear": [],
+          "items": {},
+          "missionProgress": [
+            {
+              "category": 1,
+              "id": 9,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 22,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 24,
+              "progress": 1
+            },
+            {
+              "category": 1,
+              "id": 32,
+              "progress": 1
+            },
+            {
+              "category": 2,
+              "id": 16,
+              "progress": 1
+            },
+            {
+              "category": 10,
+              "id": 1,
+              "progress": 1
+            }
+          ],
+          "missionStages": [],
+          "player": {
+            "degreeId": 1,
+            "expPool": 0,
+            "freeMana": 2000,
+            "freeVmoney": 100,
+            "maxComboAchieved": 0,
+            "partySlot": 2,
+            "rankPoint": 0,
+            "stamina": 99,
+            "staminaHealTime": "within-request-window",
+            "totalManaObtained": 0,
+            "totalStaminaUsed": 1,
+            "vmoney": 100
+          },
+          "questProgress": null
+        },
+        "memory": {
+          "activeQuest": {
+            "battleSessionId": null,
+            "category": 1,
+            "continueCount": 0,
+            "coordinatorOrigin": null,
+            "entryItemCount": null,
+            "entryItemId": null,
+            "eventId": null,
+            "isAutoStartMode": false,
+            "isMulti": false,
+            "playId": "gate-task-18-start",
+            "questId": 1001002,
+            "roomNumber": null,
+            "useBoostPoint": false,
+            "useBossBoostPoint": false
+          }
+        },
+        "quest": {
+          "category": 1,
+          "questId": 1001002,
+          "staminaBaseCost": 6,
+          "staminaCost": 1,
+          "staminaRate": 0.25
+        },
+        "response": {
+          "data": {
+            "category_id": 1,
+            "character_list": [],
+            "degree_list": [],
+            "equipment_list": [],
+            "is_multi": "single",
+            "item_list": {},
+            "mail_arrived": false,
+            "mission_info": [],
+            "quest_name": "",
+            "start_time": "fixed-server-time",
+            "user_info": {
+              "last_main_quest_id": 1001002,
+              "stamina": 99,
+              "stamina_heal_time": "matches-database-virtual-time"
+            }
+          },
+          "data_headers": {
+            "asset_update": false,
+            "force_update": false,
+            "result_code": 1,
+            "servertime": "fixed-server-time",
+            "short_udid": 0,
+            "viewer_id": 800000018
+          },
+          "statusCode": 200
+        }
+      },
+      "behaviorSha256": "0f8d44986b78239b50775bb7882487748b349b563c3b035549879e74565c7b5a",
+      "sql": {
+        "statements": 35,
+        "selectStatements": 23,
+        "writeStatements": 8,
+        "transactionStatements": 4,
+        "byTable": {
+          "players": {
+            "statements": 5,
+            "reads": 4,
+            "writes": 1
+          },
+          "players_active_quests": {
+            "statements": 2,
+            "reads": 1,
+            "writes": 1
+          },
+          "players_category_mission_stages": {
+            "statements": 3,
+            "reads": 3,
+            "writes": 0
+          },
+          "players_category_missions": {
+            "statements": 9,
+            "reads": 3,
+            "writes": 6
+          },
+          "players_characters": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_characters_bond_tokens": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_characters_mana_nodes": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_collected_items": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_degree_battle_stats": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_equipment": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_mails": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_mission_battle_counters": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "players_periodic_snapshots": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
+          },
+          "players_quest_progress": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          },
+          "sessions": {
+            "statements": 1,
+            "reads": 1,
+            "writes": 0
+          }
+        }
+      }
+    }
+  }
+}
