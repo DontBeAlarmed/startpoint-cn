@@ -47,27 +47,57 @@ test("bounded runner never exceeds the requested in-flight work", async () => {
     assert.equal(maximum, 4)
 })
 
-test("latency summary and admission gate use structural hard checks only", () => {
+test("latency summary and admission gate require every hard check", () => {
     assert.deepEqual(summarizeLatencies([9, 1, 5, 3, 7]), { p50: 5, p95: 9 })
     assert.deepEqual(createAdmissionGate({
+        reportStructureValid: true,
         errors: 0,
         behaviorEquivalent: true,
         rollbackVerified: true,
+        loadProfileValid: true,
         structuralComparisons: [
             { entry: "get-progress", sqlNonIncreasing: true, computeNonIncreasing: true },
             { entry: "single-finish", sqlNonIncreasing: true, computeNonIncreasing: true },
         ],
     }), {
+        reportStructureValid: true,
         zeroErrors: true,
         behaviorEquivalent: true,
         rollbackVerified: true,
         sqlComputeNonIncreasing: true,
+        loadProfileValid: true,
         admitted: true,
     })
     assert.equal(createAdmissionGate({
+        reportStructureValid: true,
         errors: 1,
         behaviorEquivalent: true,
         rollbackVerified: true,
+        loadProfileValid: true,
         structuralComparisons: [],
     }).admitted, false)
+    assert.equal(createAdmissionGate({
+        reportStructureValid: true,
+        errors: 0,
+        behaviorEquivalent: true,
+        rollbackVerified: true,
+        loadProfileValid: false,
+        structuralComparisons: [],
+    }).admitted, false)
+    assert.deepEqual(createAdmissionGate({
+        reportStructureValid: false,
+        errors: 0,
+        behaviorEquivalent: true,
+        rollbackVerified: true,
+        loadProfileValid: true,
+        structuralComparisons: [],
+    }), {
+        reportStructureValid: false,
+        zeroErrors: false,
+        behaviorEquivalent: false,
+        rollbackVerified: false,
+        sqlComputeNonIncreasing: false,
+        loadProfileValid: false,
+        admitted: false,
+    })
 })

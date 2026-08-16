@@ -67,18 +67,22 @@ function summarizeLatencies(values) {
 }
 
 function createAdmissionGate({
+    reportStructureValid,
     errors,
     behaviorEquivalent,
     rollbackVerified,
+    loadProfileValid,
     structuralComparisons,
 }) {
     const gate = {
-        zeroErrors: errors === 0,
-        behaviorEquivalent,
-        rollbackVerified,
-        sqlComputeNonIncreasing: structuralComparisons.every(comparison => (
+        reportStructureValid,
+        zeroErrors: reportStructureValid && errors === 0,
+        behaviorEquivalent: reportStructureValid && behaviorEquivalent,
+        rollbackVerified: reportStructureValid && rollbackVerified,
+        sqlComputeNonIncreasing: reportStructureValid && structuralComparisons.every(comparison => (
             comparison.sqlNonIncreasing && comparison.computeNonIncreasing
         )),
+        loadProfileValid: reportStructureValid && loadProfileValid,
     }
     return { ...gate, admitted: Object.values(gate).every(Boolean) }
 }

@@ -28,6 +28,9 @@ const { createSqlCounter } = require("./mission_settlement_sql.cjs")
 
 const FIXED_TIME = "2024-08-14T12:00:00.000Z"
 const FIXED_BASE_COMMIT = "f85a01c1eb730afa3ff9e6de00fd7b7a9d992c32"
+const FORMAL_CONCURRENCY_STEPS = Object.freeze([1, 10, 25, 50, 100])
+const FORMAL_PREPARED_STATES = 600
+const FORMAL_REQUESTS_PER_ENTRY = 150
 const REFERENCE_PATH = path.join(
     __dirname,
     "__snapshots__",
@@ -265,8 +268,131 @@ function assertFixedBaseRuntime(runtimeCommit) {
     }
 }
 
+function isRecord(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+function isNonNegativeSafeInteger(value) {
+    return Number.isSafeInteger(value) && value >= 0
+}
+
+function isDensePositiveIntegerArray(values) {
+    if (!Array.isArray(values) || values.length === 0) return false
+    for (let index = 0; index < values.length; index++) {
+        if (!Object.hasOwn(values, index)
+            || !Number.isSafeInteger(values[index])
+            || values[index] <= 0) {
+            return false
+        }
+    }
+    return true
+}
+
+function inspectReportStructure(report) {
+    const playerPool = report?.playerPool
+    if (!isRecord(report)
+        || !isRecord(playerPool)
+        || !isNonNegativeSafeInteger(playerPool.preparedIndependentStates)
+        || !isNonNegativeSafeInteger(playerPool.requestsPerStep)
+        || !isDensePositiveIntegerArray(playerPool.concurrencySteps)
+        || !Array.isArray(report.steps)
+        || report.steps.length === 0) {
+        return null
+    }
+    let errors = 0
+    for (const step of report.steps) {
+        if (!isRecord(step)
+            || !isNonNegativeSafeInteger(step.concurrency)
+            || !isNonNegativeSafeInteger(step.requests)
+            || !isNonNegativeSafeInteger(step.errors)
+            || !isRecord(step.rollback)
+            || typeof step.rollback.verified !== "boolean"
+            || !isRecord(step.entries)) {
+            return null
+        }
+        let stepEntryErrors = 0
+        for (const entry of ENTRY_NAMES) {
+            const actual = step.entries[entry]
+            const structural = actual?.structural
+            if (!isRecord(actual)
+                || !isNonNegativeSafeInteger(actual.requests)
+                || !isNonNegativeSafeInteger(actual.errors)
+                || !Array.isArray(actual.behaviorSignatures)
+                || !actual.behaviorSignatures.every(signature => typeof signature === "string")
+                || !isRecord(structural)
+                || !isNonNegativeSafeInteger(structural.requests)
+                || structural.requests !== actual.requests
+                || !isNonNegativeSafeInteger(structural.sqlReadsMax)
+                || !isNonNegativeSafeInteger(structural.sqlWritesMax)
+                || !isNonNegativeSafeInteger(structural.missionComputesMax)
+                || !Number.isSafeInteger(stepEntryErrors + actual.errors)) {
+                return null
+            }
+            stepEntryErrors += actual.errors
+        }
+        if (step.errors !== stepEntryErrors || !Number.isSafeInteger(errors + stepEntryErrors)) {
+            return null
+        }
+        errors += stepEntryErrors
+    }
+    return { errors }
+}
+
+function isFormalLoadProfile(report, reportStructureValid) {
+    if (!reportStructureValid) return false
+    const playerPool = report?.playerPool
+    if (playerPool?.preparedIndependentStates !== FORMAL_PREPARED_STATES
+        || playerPool.requestsPerStep !== FORMAL_PREPARED_STATES
+        || !Array.isArray(playerPool.concurrencySteps)
+        || playerPool.concurrencySteps.length !== FORMAL_CONCURRENCY_STEPS.length
+        || !Array.isArray(report?.steps)
+        || report.steps.length !== FORMAL_CONCURRENCY_STEPS.length) {
+        return false
+    }
+    for (let index = 0; index < FORMAL_CONCURRENCY_STEPS.length; index++) {
+        if (playerPool.concurrencySteps[index] !== FORMAL_CONCURRENCY_STEPS[index]) {
+            return false
+        }
+    }
+
+    return report.steps.every((step, index) => {
+        const entries = step?.entries
+        if (step?.concurrency !== FORMAL_CONCURRENCY_STEPS[index]
+            || step.requests !== FORMAL_PREPARED_STATES
+            || entries === null
+            || typeof entries !== "object"
+            || Object.keys(entries).length !== ENTRY_NAMES.length) {
+            return false
+        }
+        const entryRequests = ENTRY_NAMES.map(entry => entries[entry].requests)
+        const structuralRequests = ENTRY_NAMES.map(entry => (
+            entries[entry].structural.requests
+        ))
+        return entryRequests.every(requests => requests === FORMAL_REQUESTS_PER_ENTRY)
+            && structuralRequests.every(requests => requests === FORMAL_REQUESTS_PER_ENTRY)
+            && entryRequests.reduce((sum, requests) => sum + requests, 0)
+                === FORMAL_PREPARED_STATES
+            && structuralRequests.reduce((sum, requests) => sum + requests, 0)
+                === FORMAL_PREPARED_STATES
+    })
+}
+
 function evaluateReport(report, reference) {
     assertFixedBaseRuntime(reference?.runtimeCommit)
+    const inspection = inspectReportStructure(report)
+    if (inspection === null) {
+        return {
+            gate: createAdmissionGate({
+                reportStructureValid: false,
+                errors: null,
+                behaviorEquivalent: false,
+                rollbackVerified: false,
+                loadProfileValid: false,
+                structuralComparisons: [],
+            }),
+            structuralComparisons: [],
+        }
+    }
     const structuralComparisons = []
     let behaviorEquivalent = true
     for (const step of report.steps) {
@@ -274,17 +400,18 @@ function evaluateReport(report, reference) {
             const actual = step.entries[entry]
             const expected = reference?.entries?.[entry]
             const signatures = actual.behaviorSignatures
-            const behaviorMatches = expected !== undefined
+            const behaviorMatches = typeof expected?.behaviorSignature === "string"
                 && signatures.length === 1
                 && signatures[0] === expected.behaviorSignature
             behaviorEquivalent &&= behaviorMatches
             structuralComparisons.push({
                 concurrency: step.concurrency,
                 entry,
-                sqlNonIncreasing: expected !== undefined
+                sqlNonIncreasing: isNonNegativeSafeInteger(expected?.sqlReads)
+                    && isNonNegativeSafeInteger(expected?.sqlWrites)
                     && actual.structural.sqlReadsMax <= expected.sqlReads
                     && actual.structural.sqlWritesMax <= expected.sqlWrites,
-                computeNonIncreasing: expected !== undefined
+                computeNonIncreasing: isNonNegativeSafeInteger(expected?.missionComputes)
                     && actual.structural.missionComputesMax <= expected.missionComputes,
                 actual: actual.structural,
                 expected: expected ?? null,
@@ -292,9 +419,11 @@ function evaluateReport(report, reference) {
         }
     }
     const gate = createAdmissionGate({
-        errors: report.steps.reduce((sum, step) => sum + step.errors, 0),
+        reportStructureValid: true,
+        errors: inspection.errors,
         behaviorEquivalent,
         rollbackVerified: report.steps.every(step => step.rollback.verified),
+        loadProfileValid: isFormalLoadProfile(report, true),
         structuralComparisons,
     })
     return { gate, structuralComparisons }

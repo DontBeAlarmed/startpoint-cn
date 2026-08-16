@@ -350,8 +350,18 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 `tools/perf/__snapshots__/mission_entry_layered_load_summary.json`，BASE 结构与行为
 reference 为 `tools/perf/__snapshots__/mission_entry_layered_load_reference.json`。
 其中 `get_progress` 和角色羁绊使用 Fastify 路由；单人和多人使用现有
-`mission-finish-boundary` adapter，明确不代表完整战斗 HTTP 混合压测。自动准入只检查
-零错误、行为等价、回滚验证和 SQL/compute 不增加，延迟仅作为同机观察值。
+`mission-finish-boundary` adapter，明确不代表完整战斗 HTTP 混合压测。自动准入检查
+`reportStructureValid`、零错误、行为等价、回滚验证、SQL/compute 不增加和
+`loadProfileValid`。`reportStructureValid` 要求 playerPool 是结构化记录，其状态数、
+每档请求数和非空稠密正整数并发档可安全计算；同时要求 step/entry 计数与结构指标可安全
+计算，entry 与 structural 请求数一致，且 step errors 等于四入口 errors 之和；零错误以通过
+一致性校验后的 entry errors 为准。缺少 steps/entry、错误类型、NaN 或重复统计矛盾
+均安全返回全维度 `false`，不抛出原生类型错误，也不利用空集合伪装通过。其中
+`loadProfileValid` 仅在 600 份独立状态、`[1,10,25,50,100]` 五档顺序完整且不重复、
+step 与并发档一一对应、每 step 600 请求、四入口的 entry/structural requests 均各
+150 时为 `true`；任一条件不满足都会令 `admitted=false`。缩小参数仍可用于 smoke，
+并继续执行结构、零错误、行为、回滚和 SQL/compute 检查，但 `loadProfileValid=false`，
+不能作为正式准入结果。延迟仅作为同机观察值。
 Settlement BASE fixture 与负载 reference 分别由固定无参数 generator
 `tools/oracle/generate_mission_settlement_base.cjs` 和
 `tools/oracle/generate_mission_entry_load_base.cjs` 从 `f85a01c` Git 对象的隔离归档生成；
