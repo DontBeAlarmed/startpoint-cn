@@ -345,10 +345,9 @@ stubModule("../src/lib/reward-campaign", {
 stubModule("../src/routes/api/rushEvent", { rushEventFolderMaxRounds: {} })
 stubModule("../src/lib/rush", { getSerializedPlayerRushEventPlayedPartiesSync: () => ({ folderParties: null, endlessParties: null }) })
 stubModule("../src/lib/mission", {
-    getAwakeBattleMissionIds: () => [],
     reconcileActiveMissionFacts: () => [],
     reconcileAwakeUnlockCharacterList: (_playerId, list) => list,
-    settleAwakeMissionCandidates: () => ({
+    settleAwakeBattleMissions: () => ({
         missionInfo: [],
         itemList: {},
         characterList: [],
