@@ -21,6 +21,9 @@ const SCENARIO_KEYS = Object.freeze([
     "degree-routing-fallback",
     "degree-focused",
     "degree-behavior-characterization",
+    "event-routing-fallback",
+    "event-focused",
+    "event-behavior-characterization",
     "awake-character-page",
     "get-progress-no-invalidation",
     "get-progress-item-invalidation",
@@ -36,6 +39,7 @@ function getRuntimeDependencies() {
     const data = require("../../src/data")
     const { getDb } = require("../../src/data/db")
     const character = require("../../src/data/domains/character")
+    const item = require("../../src/data/domains/item")
     const mission = require("../../src/data/domains/mission")
     const player = require("../../src/data/domains/player")
     const assets = require("../../src/lib/assets")
@@ -58,6 +62,7 @@ function getRuntimeDependencies() {
     runtimeDependencies = {
         ...data,
         ...character,
+        ...item,
         ...mission,
         ...player,
         ...assets,

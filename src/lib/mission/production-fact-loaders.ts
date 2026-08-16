@@ -12,7 +12,10 @@ import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
 import {
     getPlayerCollectedItemTotalsByIdsSync,
     getPlayerCollectedItemTotalsSync,
+    getPlayerItemsSync,
 } from "../../data/domains/item"
+import { getPlayerCategoryMissionProgressByIdsSync } from "../../data/domains/mission"
+import { getPlayerPartyGroupListSync } from "../../data/domains/party"
 import {
     getDegreeBattleStatsSync,
     type DegreeBattleStats,
@@ -25,6 +28,7 @@ import type {
     Player,
     PlayerCharacter,
     PlayerEquipment,
+    PlayerPartyGroup,
     PlayerQuestProgress,
 } from "../../data/types"
 import { MissionFactLoaderRegistry } from "./fact-loaders"
@@ -39,6 +43,16 @@ export interface ProductionMissionFactDomains {
     readonly getPlayerCharactersSync: (playerId: number) => Record<string, PlayerCharacter>
     readonly getPlayerCharactersManaNodesSync: (playerId: number) => Record<string, number[]>
     readonly getPlayerEquipmentListSync: (playerId: number) => Record<string, PlayerEquipment>
+    readonly getPlayerItemsSync: (playerId: number) => Record<string, number>
+    readonly getPlayerPartyGroupListSync: (
+        playerId: number,
+        category: number,
+    ) => Record<string, PlayerPartyGroup>
+    readonly getPlayerCategoryMissionProgressByIdsSync: (
+        playerId: number,
+        category: number,
+        missionIds: readonly number[],
+    ) => ReadonlyMap<number, number>
     readonly getPlayerCollectedItemTotalsByIdsSync: (
         playerId: number,
         itemIds: readonly number[],
@@ -63,6 +77,9 @@ const productionDomains: ProductionMissionFactDomains = {
     getPlayerCharactersSync,
     getPlayerCharactersManaNodesSync,
     getPlayerEquipmentListSync,
+    getPlayerItemsSync,
+    getPlayerPartyGroupListSync,
+    getPlayerCategoryMissionProgressByIdsSync,
     getPlayerCollectedItemTotalsByIdsSync,
     getPlayerCollectedItemTotalsSync,
     getDegreeBattleStatsSync,
@@ -87,6 +104,17 @@ export function createProductionMissionFactLoaderRegistry(
             domains.getPlayerCharactersManaNodesSync(playerId)
         ))
         .register("equipment", ({ playerId }) => domains.getPlayerEquipmentListSync(playerId))
+        .register("items", ({ playerId }) => domains.getPlayerItemsSync(playerId))
+        .register("partyGroups", ({ playerId, key }) => (
+            domains.getPlayerPartyGroupListSync(playerId, key.category)
+        ))
+        .register("categoryMissionProgress", ({ playerId, key }) => (
+            domains.getPlayerCategoryMissionProgressByIdsSync(
+                playerId,
+                key.category,
+                key.missionIds,
+            )
+        ))
         .register("collectedItems", ({ playerId, key }) => (
             key.itemIds === "all"
                 ? domains.getPlayerCollectedItemTotalsSync(playerId)

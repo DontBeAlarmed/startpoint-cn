@@ -13,7 +13,11 @@ const {
     getEventSafeMissionIds,
     getEventItemMissionItemId,
 } = require("../src/lib/mission/computer-event-safe")
+const { getEventRuleCatalog } = require("../src/lib/mission/event-rule-catalog")
+const { getMissionCatalog } = require("../src/lib/mission/mission-catalog")
 const { getComputer } = require("../src/lib/mission/registry")
+
+const eventRules = getEventRuleCatalog(getMissionCatalog())
 
 function context(questProgress) {
     return {
@@ -24,6 +28,7 @@ function context(questProgress) {
         totalQuestClears: 0,
         totalStories: 0,
         rankCounts: {},
+        eventRules,
         eventMissionProgress: new Map(),
     }
 }

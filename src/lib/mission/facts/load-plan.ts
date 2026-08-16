@@ -39,6 +39,7 @@ export function buildFactLoadPlan(keys: readonly FactKey[]): MissionFactLoadPlan
     const normalizedById = new Map<string, FactKey>()
     const collectedItems = createSelectionAccumulator()
     const questProgress = createSelectionAccumulator()
+    const categoryMissionProgress = new Map<number, SelectionAccumulator>()
 
     for (const key of keys) {
         const normalized = normalizeFactKey(key)
@@ -49,6 +50,13 @@ export function buildFactLoadPlan(keys: readonly FactKey[]): MissionFactLoadPlan
             case "questProgress":
                 addSelection(questProgress, normalized.sections)
                 continue
+            case "categoryMissionProgress": {
+                const accumulator = categoryMissionProgress.get(normalized.category)
+                    ?? createSelectionAccumulator()
+                addSelection(accumulator, normalized.missionIds)
+                categoryMissionProgress.set(normalized.category, accumulator)
+                continue
+            }
             default:
                 normalizedById.set(getFactKeyId(normalized), normalized)
         }
@@ -66,6 +74,12 @@ export function buildFactLoadPlan(keys: readonly FactKey[]): MissionFactLoadPlan
             kind: "questProgress",
             sections: accumulatedSelection(questProgress),
         })
+        normalizedById.set(getFactKeyId(key), key)
+    }
+    for (const [category, accumulator] of categoryMissionProgress) {
+        const missionIds = accumulatedSelection(accumulator)
+        if (missionIds === "all") throw new TypeError("categoryMissionProgress cannot load all missions")
+        const key = normalizeFactKey({ kind: "categoryMissionProgress", category, missionIds })
         normalizedById.set(getFactKeyId(key), key)
     }
 

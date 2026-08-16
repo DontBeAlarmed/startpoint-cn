@@ -59,6 +59,12 @@ function questFacts(definition: MissionMasterDefinition): readonly FactKey[] {
 
     const patternType = Number(definition.row[2])
     const rangeKind = Number(definition.row[7])
+    if (patternType === 14 && rangeKind === 1) {
+        return [{ kind: "questProgress", sections: [4] }]
+    }
+    if (patternType === 14 && rangeKind === 12) {
+        return [{ kind: "questProgress", sections: [6, 13, 14, 20] }]
+    }
     if (patternType === 14 && rangeKind === 13) {
         return [{ kind: "questProgress", sections: [13] }]
     }
@@ -71,6 +77,53 @@ function questFacts(definition: MissionMasterDefinition): readonly FactKey[] {
     return [{ kind: "questProgress", sections: "all" }]
 }
 
+interface EventDependencyFacts {
+    readonly facts: readonly FactKey[]
+    readonly missionIds: readonly number[]
+}
+
+function directComputedFacts(definition: MissionMasterDefinition): readonly FactKey[] {
+    const { missionId } = definition
+    if (isEventCurrentStateMission(missionId)) return currentStateFacts(missionId)
+    if (Number(definition.row[2]) === 37) {
+        const itemId = Number(definition.row[12])
+        return Number.isSafeInteger(itemId) && itemId > 0
+            ? [{ kind: "collectedItems", itemIds: [itemId] }]
+            : []
+    }
+    return questFacts(definition)
+}
+
+function collectDependencyFacts(
+    definition: MissionMasterDefinition,
+    catalog: MissionCatalog,
+    view: EventRequirementView,
+    visiting: Set<number>,
+): EventDependencyFacts | undefined {
+    const dependencies = parseMissionDependencies(definition)
+    const facts: FactKey[] = []
+    const missionIds = new Set<number>()
+    for (const dependency of dependencies) {
+        if (visiting.has(dependency.missionId)
+            || !view.safeMissionIds.has(dependency.missionId)) return undefined
+        const child = catalog.getDefinition(dependency.category, dependency.missionId)
+        if (!child) return undefined
+        missionIds.add(dependency.missionId)
+        const childDependencies = parseMissionDependencies(child)
+        if (childDependencies.length === 0) {
+            facts.push(...directComputedFacts(child))
+            continue
+        }
+        visiting.add(dependency.missionId)
+        const nested = collectDependencyFacts(child, catalog, view, visiting)
+        visiting.delete(dependency.missionId)
+        if (!nested) return undefined
+        facts.push(...nested.facts)
+        for (const missionId of nested.missionIds) missionIds.add(missionId)
+    }
+    return { facts, missionIds: [...missionIds] }
+}
+
 export function getEventRequirement(
     definition: MissionMasterDefinition,
     catalog: MissionCatalog,
@@ -78,22 +131,40 @@ export function getEventRequirement(
     const view = getView(catalog)
     const { missionId } = definition
     if (view.safeMissionIds.has(missionId)) {
-        if (isEventCurrentStateMission(missionId)) {
-            return { mode: "computed", facts: currentStateFacts(missionId) }
-        }
-        if (Number(definition.row[2]) === 37) {
-            const itemId = Number(definition.row[12])
-            return Number.isSafeInteger(itemId) && itemId > 0
-                ? { mode: "computed", facts: [{ kind: "collectedItems", itemIds: [itemId] }] }
+        const missionDependencies = parseMissionDependencies(definition)
+        if (missionDependencies.length === 0) {
+            const facts = directComputedFacts(definition)
+            return facts.length > 0
+                ? { mode: "computed", facts }
                 : {
                     mode: "unsupported",
-                    reason: "Event item selector is not authoritative.",
+                    reason: "Event computed selector produced no authoritative facts.",
                 }
         }
-        const missionDependencies = parseMissionDependencies(definition)
-        return missionDependencies.length > 0
-            ? { mode: "computed", missionDependencies }
-            : { mode: "computed", facts: questFacts(definition) }
+        const dependencyFacts = collectDependencyFacts(
+            definition,
+            catalog,
+            view,
+            new Set([missionId]),
+        )
+        if (!dependencyFacts || dependencyFacts.missionIds.length === 0) {
+            return {
+                mode: "unsupported",
+                reason: "Event aggregate dependency graph is malformed.",
+            }
+        }
+        return {
+            mode: "computed",
+            missionDependencies,
+            facts: [
+                ...dependencyFacts.facts,
+                {
+                    kind: "categoryMissionProgress",
+                    category: 3,
+                    missionIds: dependencyFacts.missionIds,
+                },
+            ],
+        }
     }
     if (view.producerMissionIds.has(missionId)) return { mode: "persisted" }
     return {

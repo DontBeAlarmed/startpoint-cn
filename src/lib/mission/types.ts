@@ -7,6 +7,7 @@ import type { DegreeBattleStats } from "../../data/domains/degree_battle_stats"
 import type { RegularStateFacts } from "./regular-state-facts"
 import type { MissionEvaluationSession } from "./evaluation-session"
 import type { DegreeRule } from "./degree-rule-catalog"
+import type { EventRule } from "./event-rule-catalog"
 
 export interface PlayerQuestProgressEntry {
     questId: number
@@ -69,6 +70,7 @@ export interface CategoryContext {
         degreeBattleStats: DegreeBattleStats
     }
     degreeRules?: ReadonlyMap<number, DegreeRule>
+    eventRules?: ReadonlyMap<number, EventRule>
     battleCounters?: MissionBattleCounters
     snapshot?: SnapshotData | null
     passEventLoginProgress?: Record<number, number>

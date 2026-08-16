@@ -190,6 +190,21 @@ export class MissionEvaluationSession {
         if (requestedKey.kind === "collectedItems") {
             return this.resolveSelectionKey(requestedKey, "itemIds", plan)
         }
+        if (requestedKey.kind === "categoryMissionProgress") {
+            const planned = plan.keys.find((key): key is Extract<FactKey, {
+                kind: "categoryMissionProgress"
+            }> => (
+                key.kind === "categoryMissionProgress"
+                && key.category === requestedKey.category
+            ))
+            if (planned === undefined
+                || !selectionCovers(planned.missionIds, requestedKey.missionIds)) {
+                throw new Error(
+                    `Mission fact ${getFactKeyId(requestedKey)} is outside declared missionIds selection`,
+                )
+            }
+            return planned
+        }
 
         const planned = plan === this.factLoadPlan
             ? this.#plannedById.get(getFactKeyId(requestedKey))

@@ -278,6 +278,23 @@ export function getPlayerCategoryMissionsSync(
     return result
 }
 
+export function getPlayerCategoryMissionProgressByIdsSync(
+    playerId: number,
+    category: number,
+    missionIds: readonly number[],
+): ReadonlyMap<number, number> {
+    const normalizedIds = [...new Set(missionIds)]
+        .filter(missionId => Number.isSafeInteger(missionId) && missionId > 0)
+    if (normalizedIds.length === 0) return new Map()
+    const placeholders = normalizedIds.map(() => "?").join(", ")
+    const rows = getDb().prepare(`
+        SELECT id, progress
+        FROM players_category_missions
+        WHERE player_id = ? AND category = ? AND id IN (${placeholders})
+    `).all(playerId, category, ...normalizedIds) as { id: number; progress: number }[]
+    return new Map(rows.map(row => [row.id, row.progress]))
+}
+
 export function getPlayerCategoryMissionListSync(
     playerId: number
 ): Record<string, Record<string, PlayerActiveMission>> {

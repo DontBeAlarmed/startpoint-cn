@@ -13,6 +13,9 @@ const EXPECTED_SCENARIO_KEYS = [
     "degree-routing-fallback",
     "degree-focused",
     "degree-behavior-characterization",
+    "event-routing-fallback",
+    "event-focused",
+    "event-behavior-characterization",
     "awake-character-page",
     "get-progress-no-invalidation",
     "get-progress-item-invalidation",
@@ -22,7 +25,7 @@ const EXPECTED_SCENARIO_KEYS = [
     "multi-battle-finish",
 ]
 const HISTORICAL_SETTLEMENT_SHA256 =
-    "f379b4efee7f16d70ecf9ef554ba37937d9f2cda70156ace8e7c40feaf4fcc0f"
+    "8841a269fac0a9f9afdd8bb51498c5e2aab9abf5331e57226c4dadfe1c36b7e5"
 const snapshotPath = path.join(
     __dirname,
     "__snapshots__",
@@ -206,6 +209,18 @@ test("behavior baseline comparison ignores performance metric improvements", () 
         createBehaviorBaselineView(improved),
         createBehaviorBaselineView(snapshot),
     )
+})
+
+test("Event Session focused settlement preserves behavior without increasing SQL or compute", () => {
+    const scenarios = readSnapshot().scenarios
+    const legacy = scenarios["event-routing-fallback"]
+    const session = scenarios["event-focused"]
+
+    assert.deepEqual(session.behavior, legacy.behavior)
+    assert.equal(session.behaviorSha256, legacy.behaviorSha256)
+    assert.equal(session.sqlReads <= legacy.sqlReads, true)
+    assert.equal(session.sqlWrites, legacy.sqlWrites)
+    assert.equal(session.missionComputes, legacy.missionComputes)
 })
 
 test("compute counter installation rolls back earlier wrappers when a later patch fails", () => {

@@ -1,7 +1,13 @@
 import type { MissionBattleCounters } from "../../data/domains/mission_battle_facts"
 import type { DegreeBattleStats } from "../../data/domains/degree_battle_stats"
 import type { ShopPurchaseMap } from "../../data/domains/shopPurchase"
-import type { Player, PlayerCharacter, PlayerEquipment, PlayerQuestProgress } from "../../data/types"
+import type {
+    Player,
+    PlayerCharacter,
+    PlayerEquipment,
+    PlayerPartyGroup,
+    PlayerQuestProgress,
+} from "../../data/types"
 import type { FactKey } from "./facts/fact-key"
 import type { MissionCatalog } from "./mission-catalog"
 import type { MissionFactRequirementRegistry } from "./requirements/types"
@@ -12,8 +18,11 @@ export interface MissionFactValueByKind {
     readonly characters: Record<string, PlayerCharacter>
     readonly characterManaNodes: Record<string, number[]>
     readonly equipment: Record<string, PlayerEquipment>
+    readonly items: Record<string, number>
     readonly collectedItems: Record<string, number>
     readonly questProgress: Record<string, PlayerQuestProgress[]>
+    readonly categoryMissionProgress: ReadonlyMap<number, number>
+    readonly partyGroups: Record<string, PlayerPartyGroup>
     readonly missionBattleCounters: MissionBattleCounters
     readonly degreeBattleStats: DegreeBattleStats
     readonly shopPurchases: ShopPurchaseMap

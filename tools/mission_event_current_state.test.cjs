@@ -46,6 +46,12 @@ const { characterExpCaps } = require("../src/lib/character")
 const { getCharacterStoryQuestIds } = require("../src/lib/mission/character-queries")
 const { EventSafeComputer } = require("../src/lib/mission/computer-event-safe")
 const {
+    MissionEvaluationSession,
+    createProductionMissionFactLoaderRegistry,
+    getMissionCatalog,
+    getMissionFactRequirementRegistry,
+} = require("../src/lib/mission")
+const {
     getBundledStandardMissionTables,
 } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 
@@ -216,6 +222,35 @@ test("Event current-state buildContext proves all 15 missions from real DB and a
     }
 })
 
+test("Event Session context preserves all 15 real current-state results", () => {
+    resetValidState()
+    const missionIds = [
+        1201, 1202, 1203, 1204, 1205, 1206, 1207, 1212,
+        1217, 1218, 1219, 1220, 1305, 1306, 1307,
+    ]
+    const expectedProgress = new Map([
+        [1201, 1], [1202, 0], [1203, 0], [1204, 1],
+        [1205, 3], [1206, 3], [1207, 3], [1212, 4],
+        [1217, 3], [1218, 3], [1219, 3], [1220, 1],
+        [1305, 70], [1306, 3], [1307, 4],
+    ])
+    const catalog = getMissionCatalog()
+    const session = new MissionEvaluationSession({
+        playerId,
+        evaluationTime: new Date("2019-12-03T12:00:00.000Z"),
+        catalog,
+        requirementRegistry: getMissionFactRequirementRegistry(catalog),
+        candidates: missionIds.map(missionId => ({ category: 3, missionId })),
+        orchestratorFacts: [{ kind: "player" }],
+        loaders: createProductionMissionFactLoaderRegistry(),
+    })
+    const context = EventSafeComputer.buildContextFromSession(session, 3, missionIds)
+
+    for (const [missionId, expected] of expectedProgress) {
+        assert.equal(EventSafeComputer.compute(missionId, context, 0), expected, String(missionId))
+    }
+})
+
 test("Event mana-node facts reject a node outside the character official board", () => {
     resetValidState()
     insertPlayerCharacterManaNodesSync(playerId, characterId, [999999])
@@ -363,6 +398,12 @@ test("Event buildContext skips current-state queries and indexes outside all 15 
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     let tableReads = 0
     const standardMissionTables = getBundledStandardMissionTables()
+    const eventRuleTables = Object.fromEntries([
+        "challenge_dungeon_event_quest.json",
+        "ranking_event_single_quest.json",
+        "rush_event_quest.json",
+        "carnival_event_quest.json",
+    ].map(tableName => [tableName, require(`../assets/${tableName}`)]))
     productionContentSnapshotProvider.snapshot = {
         cdn: { targetVersion: "test" },
         repository: {
@@ -370,6 +411,9 @@ test("Event buildContext skips current-state queries and indexes outside all 15 
             table(tableName) {
                 if (Object.prototype.hasOwnProperty.call(standardMissionTables, tableName)) {
                     return standardMissionTables[tableName]
+                }
+                if (Object.prototype.hasOwnProperty.call(eventRuleTables, tableName)) {
+                    return eventRuleTables[tableName]
                 }
                 tableReads++
                 throw new Error("unexpected current-state table read")

@@ -65,18 +65,18 @@
       "sql": {
         "byTable": {
           "players": {
-            "reads": 4,
-            "statements": 4,
+            "reads": 3,
+            "statements": 3,
             "writes": 0
           },
           "players_category_mission_stages": {
-            "reads": 8,
-            "statements": 9,
+            "reads": 7,
+            "statements": 8,
             "writes": 1
           },
           "players_category_missions": {
-            "reads": 8,
-            "statements": 14,
+            "reads": 7,
+            "statements": 13,
             "writes": 6
           },
           "players_characters": {
@@ -95,8 +95,8 @@
             "writes": 0
           },
           "players_collected_items": {
-            "reads": 2,
-            "statements": 2,
+            "reads": 1,
+            "statements": 1,
             "writes": 0
           },
           "players_degree_battle_stats": {
@@ -130,8 +130,8 @@
             "writes": 0
           }
         },
-        "selectStatements": 38,
-        "statements": 49,
+        "selectStatements": 34,
+        "statements": 45,
         "transactionStatements": 2,
         "writeStatements": 9
       }
@@ -191,18 +191,18 @@
       "sql": {
         "byTable": {
           "players": {
-            "reads": 4,
-            "statements": 5,
+            "reads": 3,
+            "statements": 4,
             "writes": 1
           },
           "players_category_mission_stages": {
-            "reads": 8,
-            "statements": 47,
+            "reads": 7,
+            "statements": 46,
             "writes": 39
           },
           "players_category_missions": {
-            "reads": 8,
-            "statements": 35,
+            "reads": 7,
+            "statements": 34,
             "writes": 27
           },
           "players_characters": {
@@ -221,8 +221,8 @@
             "writes": 0
           },
           "players_collected_items": {
-            "reads": 2,
-            "statements": 9,
+            "reads": 1,
+            "statements": 8,
             "writes": 7
           },
           "players_degree_battle_stats": {
@@ -261,8 +261,8 @@
             "writes": 0
           }
         },
-        "selectStatements": 46,
-        "statements": 148,
+        "selectStatements": 42,
+        "statements": 144,
         "transactionStatements": 16,
         "writeStatements": 86
       }
@@ -322,18 +322,18 @@
       "sql": {
         "byTable": {
           "players": {
-            "reads": 4,
-            "statements": 5,
+            "reads": 3,
+            "statements": 4,
             "writes": 1
           },
           "players_category_mission_stages": {
-            "reads": 8,
-            "statements": 141,
+            "reads": 7,
+            "statements": 140,
             "writes": 133
           },
           "players_category_missions": {
-            "reads": 8,
-            "statements": 62,
+            "reads": 7,
+            "statements": 61,
             "writes": 54
           },
           "players_characters": {
@@ -352,8 +352,8 @@
             "writes": 0
           },
           "players_collected_items": {
-            "reads": 2,
-            "statements": 31,
+            "reads": 1,
+            "statements": 30,
             "writes": 29
           },
           "players_degree_battle_stats": {
@@ -392,13 +392,13 @@
             "writes": 0
           }
         },
-        "selectStatements": 73,
-        "statements": 390,
+        "selectStatements": 69,
+        "statements": 386,
         "transactionStatements": 60,
         "writeStatements": 257
       }
     }
   ],
   "version": 2,
-  "sha256": "f379b4efee7f16d70ecf9ef554ba37937d9f2cda70156ace8e7c40feaf4fcc0f"
+  "sha256": "8841a269fac0a9f9afdd8bb51498c5e2aab9abf5331e57226c4dadfe1c36b7e5"
 }

@@ -16,6 +16,8 @@ const DEGREE_FOCUSED_MISSION_IDS = Object.freeze([
 ])
 const AWAKE_CHARACTER_ID = 341005
 const CHARACTER_REWARD_TIME = "2022-12-01T12:00:00.000Z"
+const EVENT_REWARD_TIME = "2023-11-30T04:00:00.000Z"
+const EVENT_FOCUSED_MISSION_ID = 2316
 
 function createPlayer(runtime) {
     const playerId = runtime.createBasePlayer()
@@ -151,6 +153,18 @@ function getPersistedDegree(runtime, playerId, missionId) {
     return { missionId, progress: mission.progress, stages: mission.stages }
 }
 
+function getPersistedEvent(runtime, playerId) {
+    const mission = runtime.getPlayerCategoryMissionsSync(
+        playerId,
+        3,
+    )[EVENT_FOCUSED_MISSION_ID]
+    return {
+        missionId: EVENT_FOCUSED_MISSION_ID,
+        progress: mission.progress,
+        stages: mission.stages,
+    }
+}
+
 function summarizeStoredMissionProgress(runtime, playerId, missionRefs) {
     const rows = []
     const missionIdsByCategory = new Map()
@@ -209,6 +223,49 @@ function executeDegreeBehaviorCharacterization(runtime, playerId, fixedTime) {
             persisted: getPersistedDegree(runtime, playerId, 1000),
         },
     }
+}
+
+function executeEventFocused(runtime, playerId, fixedTime, useRoutingFallback) {
+    const computer = runtime.getComputer(3)
+    const sessionBuilder = computer.buildContextFromSession
+    if (useRoutingFallback) computer.buildContextFromSession = undefined
+    try {
+        const result = runtime.settleMissionCategories(playerId, [{
+            category: 3,
+            missionIds: [EVENT_FOCUSED_MISSION_ID],
+        }], fixedTime)
+        return {
+            adapter: "event-scoped-settlement-routing",
+            missionId: EVENT_FOCUSED_MISSION_ID,
+            response: completeSettlementResponse(result),
+            persisted: getPersistedEvent(runtime, playerId),
+        }
+    } finally {
+        computer.buildContextFromSession = sessionBuilder
+    }
+}
+
+function executeEventBehaviorCharacterization(runtime, playerId, fixedTime) {
+    const scope = [{ category: 3, missionIds: [EVENT_FOCUSED_MISSION_ID] }]
+    const firstResult = runtime.settleMissionCategories(playerId, scope, fixedTime)
+    const first = {
+        response: completeSettlementResponse(firstResult),
+        persisted: getPersistedEvent(runtime, playerId),
+    }
+    const repeatedResult = runtime.settleMissionCategories(playerId, scope, fixedTime)
+    return {
+        first,
+        repeated: {
+            response: completeSettlementResponse(repeatedResult),
+            persisted: getPersistedEvent(runtime, playerId),
+        },
+    }
+}
+
+function prepareEventPlayer(runtime) {
+    const playerId = createPlayer(runtime)
+    runtime.givePlayerItemSync(playerId, 80111, 10)
+    return playerId
 }
 
 function executeBattleFinish(runtime, playerId, fixedTime, isMulti) {
@@ -299,6 +356,38 @@ function createFocusedScenarios(runtime) {
                 return playerId
             },
             execute: (playerId, fixedTime) => executeDegreeBehaviorCharacterization(
+                runtime,
+                playerId,
+                fixedTime,
+            ),
+        },
+        {
+            name: "event-routing-fallback",
+            serverTime: EVENT_REWARD_TIME,
+            prepare: () => prepareEventPlayer(runtime),
+            execute: (playerId, fixedTime) => executeEventFocused(
+                runtime,
+                playerId,
+                fixedTime,
+                true,
+            ),
+        },
+        {
+            name: "event-focused",
+            serverTime: EVENT_REWARD_TIME,
+            prepare: () => prepareEventPlayer(runtime),
+            execute: (playerId, fixedTime) => executeEventFocused(
+                runtime,
+                playerId,
+                fixedTime,
+                false,
+            ),
+        },
+        {
+            name: "event-behavior-characterization",
+            serverTime: EVENT_REWARD_TIME,
+            prepare: () => prepareEventPlayer(runtime),
+            execute: (playerId, fixedTime) => executeEventBehaviorCharacterization(
                 runtime,
                 playerId,
                 fixedTime,

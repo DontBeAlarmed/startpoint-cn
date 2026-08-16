@@ -374,6 +374,46 @@ test("matches Event safe coverage and validates current-state reward stages", ()
     )
 })
 
+test("declares exact Event quest and aggregate dependency facts without all-table selectors", () => {
+    const registry = getMissionFactRequirementRegistry()
+
+    assert.deepEqual(factIds(registry.getRequirement(3, 1213)), [
+        "questProgress:6,13,14,20",
+    ])
+    assert.deepEqual(factIds(registry.getRequirement(3, 1221)), ["questProgress:4"])
+    assert.deepEqual(factIds(registry.getRequirement(3, 1454)), [
+        "categoryMissionProgress:3:1448,1449,1450,1451,1452,1453",
+        "questProgress:13",
+    ])
+    assert.deepEqual(factIds(registry.getRequirement(3, 500004)), [
+        "categoryMissionProgress:3:500001,500002,500003",
+        "questProgress:22",
+    ])
+    assert.deepEqual(factIds(registry.getRequirement(3, 1490)), [
+        `categoryMissionProgress:3:${Array.from(
+            { length: 43 },
+            (_, index) => index + 1447,
+        ).join(",")}`,
+        "questProgress:13",
+    ])
+
+    const eventEntries = registry.entries.filter(entry => entry.category === 3)
+    assert.equal(eventEntries.length, 2512)
+    assert.deepEqual(
+        Object.fromEntries(["computed", "persisted", "unsupported"].map(mode => [
+            mode,
+            eventEntries.filter(entry => entry.requirement.mode === mode).length,
+        ])),
+        { computed: 407, persisted: 2078, unsupported: 27 },
+    )
+    assert.equal(eventEntries.some(entry => entry.requirement.facts.some(fact => (
+        fact.kind === "questProgress" && fact.sections === "all"
+    ))), false)
+    for (const entry of eventEntries.filter(entry => entry.requirement.mode !== "computed")) {
+        assert.deepEqual(entry.requirement.facts, [], `${entry.requirement.mode} ${entry.missionId}`)
+    }
+})
+
 test("separates recomputable, atomic, and fail-closed Awake families", () => {
     const registry = getMissionFactRequirementRegistry()
 
@@ -576,6 +616,9 @@ test("fails aggregate missions closed when any declared dependency is absent", (
     const missingAwake = forwardingCatalog(catalog, new Map(), {
         removedDefinitions: new Set(["9:13"]),
     })
+    const missingEvent = forwardingCatalog(catalog, new Map(), {
+        removedDefinitions: new Set(["3:1448"]),
+    })
 
     assertUnsupported(
         getMissionFactRequirementRegistry(missingDaily).getRequirement(2, 5),
@@ -584,6 +627,10 @@ test("fails aggregate missions closed when any declared dependency is absent", (
     assertUnsupported(
         getMissionFactRequirementRegistry(missingAwake).getRequirement(9, 14),
         /dependency/i,
+    )
+    assertUnsupported(
+        getMissionFactRequirementRegistry(missingEvent).getRequirement(3, 1454),
+        /dependency|mapping|selector/i,
     )
 })
 

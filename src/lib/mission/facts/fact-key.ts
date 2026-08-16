@@ -36,7 +36,11 @@ export type FactKey =
     | SingletonFactKey
     | Readonly<{ kind: "collectedItems"; itemIds: FactIdSelection }>
     | Readonly<{ kind: "questProgress"; sections: FactIdSelection }>
-    | Readonly<{ kind: "categoryMissionProgress"; category: number }>
+    | Readonly<{
+        kind: "categoryMissionProgress"
+        category: number
+        missionIds: readonly number[]
+    }>
     | Readonly<{ kind: "partyGroups"; category: number }>
     | Readonly<{ kind: "shopPurchases"; shopType: number }>
     | PeriodicSnapshotFactKey
@@ -73,8 +77,8 @@ function positiveSafeInteger(value: unknown, kind: string, field: string): numbe
 
 function normalizeSelection(
     value: unknown,
-    kind: "collectedItems" | "questProgress",
-    field: "itemIds" | "sections",
+    kind: "collectedItems" | "questProgress" | "categoryMissionProgress",
+    field: "itemIds" | "sections" | "missionIds",
 ): FactIdSelection {
     if (value === "all") return "all"
     if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
@@ -175,7 +179,15 @@ export function normalizeFactKey(key: FactKey): FactKey {
                 ),
             })
         case "categoryMissionProgress":
-            assertExactOwnKeys(candidate, kind, ["kind", "category"])
+            assertExactOwnKeys(candidate, kind, ["kind", "category", "missionIds"])
+            const missionIds = normalizeSelection(
+                getOwnEnumerableDataValue(candidate, kind, "missionIds"),
+                kind,
+                "missionIds",
+            )
+            if (missionIds === "all") {
+                throw new TypeError(`${kind}.missionIds must be a plain array`)
+            }
             return Object.freeze({
                 kind,
                 category: positiveSafeInteger(
@@ -183,6 +195,7 @@ export function normalizeFactKey(key: FactKey): FactKey {
                     kind,
                     "category",
                 ),
+                missionIds,
             })
         case "partyGroups":
             assertExactOwnKeys(candidate, kind, ["kind", "category"])
@@ -247,6 +260,7 @@ export function getFactKeyId(key: FactKey): string {
         case "questProgress":
             return `${normalized.kind}:${normalized.sections === "all" ? "all" : normalized.sections.join(",")}`
         case "categoryMissionProgress":
+            return `${normalized.kind}:${normalized.category}:${normalized.missionIds.join(",")}`
         case "partyGroups":
             return `${normalized.kind}:${normalized.category}`
         case "shopPurchases":

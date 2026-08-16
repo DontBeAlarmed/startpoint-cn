@@ -87,8 +87,8 @@ test("scenario summaries run after SQL and compute metrics are frozen", async ()
 
 test("finish SQL metrics exclude post-settlement behavior reads", () => {
     const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"))
-    assert.equal(snapshot.scenarios["single-battle-finish"].sqlReads, 83)
-    assert.equal(snapshot.scenarios["multi-battle-finish"].sqlReads, 84)
+    assert.equal(snapshot.scenarios["single-battle-finish"].sqlReads, 58)
+    assert.equal(snapshot.scenarios["multi-battle-finish"].sqlReads, 59)
 })
 
 test("finish summaries cover only computed standard refs and enabled Awake refs", () => {

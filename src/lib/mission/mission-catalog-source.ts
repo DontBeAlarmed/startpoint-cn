@@ -19,6 +19,7 @@ import bundledPassEventRewards from "../../../assets/mission_pass_event_reward.j
 import bundledAwakeRewards from "../../../assets/mission_char_awake_reward.json"
 import bundledWeeklyRewards from "../../../assets/mission_weekly_reward.json"
 import bundledCharacters from "../../../assets/character.json"
+import bundledCharacterQuests from "../../../assets/character_quest_lookup.json"
 import bundledManaBoard from "../../../assets/mana_board.json"
 import bundledConfig from "../../../assets/config.json"
 import bundledMainQuests from "../../../assets/main_quest.json"
@@ -30,7 +31,11 @@ import bundledWorldStoryEventQuests from "../../../assets/world_story_event_ques
 import bundledAdventEventQuests from "../../../assets/advent_event_quest.json"
 import bundledCarnivalEventQuests from "../../../assets/carnival_event_quest.json"
 import bundledHardMultiEventQuests from "../../../assets/hard_multi_event_quest.json"
+import bundledChallengeDungeonEventQuests from "../../../assets/challenge_dungeon_event_quest.json"
+import bundledRankingEventSingleQuests from "../../../assets/ranking_event_single_quest.json"
+import bundledRushEventQuests from "../../../assets/rush_event_quest.json"
 import bundledEquipmentDissolve from "../../../assets/equipment_dissolve.json"
+import bundledItemSale from "../../../assets/item_sale.json"
 import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import type {
     MissionCatalogReward,
@@ -96,6 +101,7 @@ const BUNDLED_TABLES: Readonly<Record<string, unknown>> = Object.freeze({
     "mission_char_awake_reward.json": bundledAwakeRewards,
     "mission_weekly_reward.json": bundledWeeklyRewards,
     "character.json": bundledCharacters,
+    "character_quest_lookup.json": bundledCharacterQuests,
     "mana_board.json": bundledManaBoard,
     "config.json": bundledConfig,
     "main_quest.json": bundledMainQuests,
@@ -107,7 +113,11 @@ const BUNDLED_TABLES: Readonly<Record<string, unknown>> = Object.freeze({
     "advent_event_quest.json": bundledAdventEventQuests,
     "carnival_event_quest.json": bundledCarnivalEventQuests,
     "hard_multi_event_quest.json": bundledHardMultiEventQuests,
+    "challenge_dungeon_event_quest.json": bundledChallengeDungeonEventQuests,
+    "ranking_event_single_quest.json": bundledRankingEventSingleQuests,
+    "rush_event_quest.json": bundledRushEventQuests,
     "equipment_dissolve.json": bundledEquipmentDissolve,
+    "item_sale.json": bundledItemSale,
 })
 
 const bundledInfo = Object.freeze({

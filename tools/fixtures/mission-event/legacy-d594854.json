@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "commit": "d594854070718d12c3dab4a31901d5647c4bf1e9",
+    "version": "pre-event-session",
+    "entrypoint": "src/lib/mission/computer-event-safe.ts",
+    "generator": "tools/generate_mission_event_legacy_fixture.cjs"
+  },
+  "compute": {
+    "currentState": {
+      "available": {
+        "1201": 1,
+        "1202": 0,
+        "1203": 1,
+        "1204": 4,
+        "1205": 15,
+        "1206": 15,
+        "1207": 15,
+        "1212": 3,
+        "1217": 15,
+        "1218": 15,
+        "1219": 15,
+        "1220": 1,
+        "1305": 65,
+        "1306": 2,
+        "1307": 3
+      },
+      "unavailable": {
+        "1201": 7,
+        "1202": 7,
+        "1203": 7,
+        "1204": 7,
+        "1205": 7,
+        "1206": 7,
+        "1207": 7,
+        "1212": 7,
+        "1217": 7,
+        "1218": 7,
+        "1219": 7,
+        "1220": 7,
+        "1305": 7,
+        "1306": 7,
+        "1307": 7
+      }
+    },
+    "item": 12,
+    "quest": 1,
+    "aggregate": 1,
+    "persisted": 7,
+    "unsupported": 9
+  },
+  "settlement": {
+    "first": {
+      "response": {
+        "missionInfo": [
+          {
+            "mission_category_id": 3,
+            "mission_id": 2316,
+            "mission_reward_id": 2316001
+          }
+        ],
+        "itemList": {
+          "224": 5
+        },
+        "characterList": [],
+        "equipmentList": [],
+        "degreeIds": [],
+        "passCardPoints": {},
+        "userInfo": null
+      },
+      "persisted": {
+        "missionId": 2316,
+        "progress": 10,
+        "stages": {
+          "1": true
+        }
+      }
+    },
+    "repeated": {
+      "response": {
+        "missionInfo": [],
+        "itemList": {},
+        "characterList": [],
+        "equipmentList": [],
+        "degreeIds": [],
+        "passCardPoints": {},
+        "userInfo": null
+      },
+      "persisted": {
+        "missionId": 2316,
+        "progress": 10,
+        "stages": {
+          "1": true
+        }
+      }
+    }
+  },
+  "integritySha256": "801d5204edf56a65625e50c098fd462d5c926f68590fe8aebdc9277ef0cc7a2d"
+}

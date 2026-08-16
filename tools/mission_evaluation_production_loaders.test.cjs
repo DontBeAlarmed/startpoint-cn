@@ -249,3 +249,50 @@ test("production Regular loaders dispatch singleton and collected selection doma
         ["collectedAll", 77],
     ])
 })
+
+test("production Event loaders keep inventory, party, and dependency progress typed and scoped", () => {
+    const calls = []
+    const values = {
+        items: Object.freeze({ 50001: 2 }),
+        partyGroups: Object.freeze({ 1: { list: {} } }),
+        missionProgress: new Map([[1448, 1], [1454, 6]]),
+    }
+    const loaders = createProductionMissionFactLoaderRegistry({
+        getPlayerItemsSync(playerId) {
+            calls.push(["items", playerId])
+            return values.items
+        },
+        getPlayerPartyGroupListSync(playerId, category) {
+            calls.push(["partyGroups", playerId, category])
+            return values.partyGroups
+        },
+        getPlayerCategoryMissionProgressByIdsSync(playerId, category, missionIds) {
+            calls.push(["categoryMissionProgress", playerId, category, missionIds])
+            return values.missionProgress
+        },
+    })
+    const session = createSession([
+        { kind: "items" },
+        { kind: "partyGroups", category: 1 },
+        { kind: "categoryMissionProgress", category: 3, missionIds: [1454, 1448] },
+    ], loaders)
+
+    assert.strictEqual(session.getFact({ kind: "items" }), values.items)
+    assert.strictEqual(
+        session.getFact({ kind: "partyGroups", category: 1 }),
+        values.partyGroups,
+    )
+    assert.strictEqual(
+        session.getFact({
+            kind: "categoryMissionProgress",
+            category: 3,
+            missionIds: [1448],
+        }),
+        values.missionProgress,
+    )
+    assert.deepEqual(calls, [
+        ["items", 77],
+        ["partyGroups", 77, 1],
+        ["categoryMissionProgress", 77, 3, [1448, 1454]],
+    ])
+})

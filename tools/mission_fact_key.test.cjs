@@ -85,7 +85,10 @@ test("creates the specified ID for every FactKey kind", () => {
         [{ kind: "collectedItems", itemIds: [2, 1, 2] }, "collectedItems:1,2"],
         [{ kind: "questProgress", sections: "all" }, "questProgress:all"],
         [{ kind: "questProgress", sections: [21, 7, 7] }, "questProgress:7,21"],
-        [{ kind: "categoryMissionProgress", category: 5 }, "categoryMissionProgress:5"],
+        [
+            { kind: "categoryMissionProgress", category: 3, missionIds: [1454, 1448, 1454] },
+            "categoryMissionProgress:3:1448,1454",
+        ],
         [{ kind: "missionBattleCounters" }, "missionBattleCounters"],
         [{ kind: "degreeBattleStats" }, "degreeBattleStats"],
         [{ kind: "characterClearCounters" }, "characterClearCounters"],
@@ -294,10 +297,23 @@ test("deduplicates singleton keys, merges local arrays, and lets all cover local
     ])
 })
 
+test("merges category mission progress selections only within the same category", () => {
+    const plan = buildFactLoadPlan([
+        { kind: "categoryMissionProgress", category: 3, missionIds: [1454, 1448] },
+        { kind: "categoryMissionProgress", category: 3, missionIds: [1450, 1448] },
+        { kind: "categoryMissionProgress", category: 9, missionIds: [14] },
+    ])
+
+    assert.deepEqual(plan.keys, [
+        { kind: "categoryMissionProgress", category: 3, missionIds: [1448, 1450, 1454] },
+        { kind: "categoryMissionProgress", category: 9, missionIds: [14] },
+    ])
+})
+
 test("keeps parameterized keys isolated by their complete identity", () => {
     const plan = buildFactLoadPlan([
-        { kind: "categoryMissionProgress", category: 2 },
-        { kind: "categoryMissionProgress", category: 1 },
+        { kind: "categoryMissionProgress", category: 2, missionIds: [5] },
+        { kind: "categoryMissionProgress", category: 1, missionIds: [4] },
         { kind: "partyGroups", category: 3 },
         { kind: "partyGroups", category: 4 },
         { kind: "shopPurchases", shopType: 2 },
@@ -311,8 +327,8 @@ test("keeps parameterized keys isolated by their complete identity", () => {
     ])
 
     assert.deepEqual(plan.keyIds, [
-        "categoryMissionProgress:1",
-        "categoryMissionProgress:2",
+        "categoryMissionProgress:1:4",
+        "categoryMissionProgress:2:5",
         "partyGroups:3",
         "partyGroups:4",
         "passState:1",
@@ -388,13 +404,27 @@ test("rejects invalid numeric parameters and empty arrays with kind and field co
     for (const value of invalidNumbers) {
         assertInvalid({ kind: "collectedItems", itemIds: [value] }, "collectedItems", "itemIds")
         assertInvalid({ kind: "questProgress", sections: [value] }, "questProgress", "sections")
-        assertInvalid({ kind: "categoryMissionProgress", category: value }, "categoryMissionProgress", "category")
+        assertInvalid({
+            kind: "categoryMissionProgress",
+            category: value,
+            missionIds: [1],
+        }, "categoryMissionProgress", "category")
+        assertInvalid({
+            kind: "categoryMissionProgress",
+            category: 3,
+            missionIds: [value],
+        }, "categoryMissionProgress", "missionIds")
         assertInvalid({ kind: "partyGroups", category: value }, "partyGroups", "category")
         assertInvalid({ kind: "shopPurchases", shopType: value }, "shopPurchases", "shopType")
         assertInvalid({ kind: "passState", eventId: value }, "passState", "eventId")
     }
     assertInvalid({ kind: "collectedItems", itemIds: [] }, "collectedItems", "itemIds")
     assertInvalid({ kind: "questProgress", sections: [] }, "questProgress", "sections")
+    assertInvalid({
+        kind: "categoryMissionProgress",
+        category: 3,
+        missionIds: [],
+    }, "categoryMissionProgress", "missionIds")
 })
 
 test("rejects invalid periodic snapshot combinations", () => {
