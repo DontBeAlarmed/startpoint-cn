@@ -52,7 +52,11 @@ test("maps representative source files to focused groups", () => {
     ]) {
         assert.deepEqual(selectTestGroups([file]), ["integration:mission"])
     }
-    assert.deepEqual(selectTestGroups(["src/lib/gacha.ts"]), ["quick:gacha"])
+    assert.deepEqual(selectTestGroups(["src/lib/gacha.ts"]), ["integration:reward-grant", "quick:gacha"])
+    assert.deepEqual(selectTestGroups(["src/lib/gacha-reward-grant.ts"]), ["integration:reward-grant", "quick:gacha"])
+    assert.deepEqual(selectTestGroups(["src/routes/api/gacha.ts"]), ["full", "integration:reward-grant", "integration:rules", "quick:gacha"])
+    assert.deepEqual(selectTestGroups(["src/routes/api/tutorial.ts"]), ["full", "integration:quest", "integration:reward-grant", "quick:gacha"])
+    assert.deepEqual(selectTestGroups(["src/routes/api/boxGacha.ts"]), ["full", "integration:event"])
     assert.deepEqual(
         selectTestGroups(["src/lib/gacha-seed-quarantine.ts"]),
         ["quick:gacha", "quick:seed"],
@@ -535,7 +539,7 @@ test("deduplicates and stably sorts selected groups", () => {
             "src/lib/quest/host-finish-persistence.ts",
             "src/lib/gacha.ts",
         ]),
-        ["admin", "integration:quest", "quick:gacha", "quick:quest"],
+        ["admin", "integration:quest", "integration:reward-grant", "quick:gacha", "quick:quest"],
     )
 })
 

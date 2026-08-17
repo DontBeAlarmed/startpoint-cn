@@ -12,6 +12,7 @@ import { getPlayerCharacterSync } from "../../data/domains/character"
 import { clientSerializeDate, serializeBondTokenStatuses } from "../../data/utils"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
+import { executeRewardGrantPlanInTransactionOwnerInternalSync } from "../../lib/reward-grant/owner-executor"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { getGachaSync } from "../../lib/assets";
@@ -227,6 +228,7 @@ const routes = async (fastify: FastifyInstance) => {
             : null
         const gachaData = gachaId === null ? null : getGachaSync(gachaId)
 
+        let deferredCharacterSampledLog: (() => void) | undefined
         const result = getDb().transaction(() => {
             const currentPlayer = getPlayerSync(playerId)
             if (currentPlayer === null) throw new Error("Tutorial player disappeared during update")
@@ -319,6 +321,20 @@ const routes = async (fastify: FastifyInstance) => {
                     playerId,
                     gachaData!,
                     [randomCharacterId],
+                    undefined,
+                    undefined,
+                    {
+                        ownerGrant: plan => executeRewardGrantPlanInTransactionOwnerInternalSync(
+                            playerId,
+                            plan,
+                            {
+                                freeMana: currentPlayer.freeMana,
+                                freeVmoney: currentPlayer.freeVmoney,
+                                expPool: currentPlayer.expPool,
+                            },
+                        ),
+                        deferCharacterSampledLog: log => { deferredCharacterSampledLog = log },
+                    },
                 )
                 insertReceiveHistorySync(playerId, {
                     type: MailType.CHARACTER,
@@ -477,6 +493,8 @@ const routes = async (fastify: FastifyInstance) => {
             })
             return { ok: true, data } as const
         })()
+
+        deferredCharacterSampledLog?.()
 
         if (!result.ok) {
             return reply.status(400).send({

@@ -1,0 +1,24 @@
+{
+  "draw": [
+    {
+      "character_id": 1,
+      "movie_id": "normal",
+      "seed": 1,
+      "entry_count": 1,
+      "ex_boost_item": {
+        "id": 14002,
+        "count": 1
+      }
+    }
+  ],
+  "characters": [
+    {
+      "character_id": 1,
+      "stack": 1
+    }
+  ],
+  "equipment": [],
+  "items": {
+    "14002": 21
+  }
+}

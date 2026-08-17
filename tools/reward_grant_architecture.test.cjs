@@ -157,6 +157,9 @@ test("only approved standard reward domains and single settlement paths consume 
 
     assert.deepEqual(consumers, [
         "src/lib/carnival-rewards.ts",
+        "src/lib/gacha-reward-grant.ts",
+        "src/lib/gacha-reward-legacy.ts",
+        "src/lib/gacha.ts",
         "src/lib/mission/grants.ts",
         "src/lib/quest/finish/single-settlement-reward-grant.ts",
         "src/lib/quest/finish/single-settlement-writes.ts",
@@ -166,5 +169,7 @@ test("only approved standard reward domains and single settlement paths consume 
         "src/lib/quest/score-reward-selection-core.ts",
         "src/lib/quest/score-reward-selection.ts",
         "src/lib/quest/score-reward-settlement.ts",
+        "src/routes/api/gacha.ts",
+        "src/routes/api/tutorial.ts",
     ])
 })

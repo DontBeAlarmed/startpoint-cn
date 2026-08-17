@@ -1,7 +1,8 @@
 import { clientSerializeDate } from "../data/utils/date";
+import { getDb } from "../data/db";
 import { getPlayerCharacterSync, insertPlayerCharacterSync, updatePlayerCharacterSync } from "../data/domains/character"
 import { getPlayerSync, updatePlayerSync } from "../data/domains/player"
-import { givePlayerItemSync } from "../data/domains/item"
+import { givePlayerItemSync, givePlayerItemWithinTransactionSync } from "../data/domains/item"
 import { getCharacterDataSync } from "./assets";
 import { AddExpList, AddExpListItem, ClientReturnBondTokenStatus, ClientReturnBondTokenStatusList, ClientReturnCharacter, Element, GivePlayerCharacterResult, RewardPlayerCharacterExpResult } from "./types";
 
@@ -97,9 +98,10 @@ const dupeItemRewards: Record<number, Record<Element, number>> = {
  * @param characterId The ID of the character to give.
  * @returns An items list, indicating what, if any, items were given to the player.
  */
-export function givePlayerCharacterSync(
+function givePlayerCharacterWithItemWriterSync(
     playerId: number,
-    characterId: number
+    characterId: number,
+    giveItem: typeof givePlayerItemSync,
 ): GivePlayerCharacterResult | null {
 
     // get the character's asset data
@@ -168,7 +170,7 @@ export function givePlayerCharacterSync(
         let returnItem = undefined
         if (dupeRewards) {
             const itemId = dupeRewards[assetData.element]
-            givePlayerItemSync(playerId, itemId, 1)
+            giveItem(playerId, itemId, 1)
             returnItem = {
                 id: itemId,
                 count: 1
@@ -193,6 +195,27 @@ export function givePlayerCharacterSync(
             item: returnItem
         }
     }
+}
+
+export function givePlayerCharacterSync(
+    playerId: number,
+    characterId: number,
+): GivePlayerCharacterResult | null {
+    return givePlayerCharacterWithItemWriterSync(playerId, characterId, givePlayerItemSync)
+}
+
+export function givePlayerCharacterWithinTransactionSync(
+    playerId: number,
+    characterId: number,
+): GivePlayerCharacterResult | null {
+    if (!getDb().inTransaction) {
+        throw new Error("givePlayerCharacterWithinTransactionSync requires an active caller transaction")
+    }
+    return givePlayerCharacterWithItemWriterSync(
+        playerId,
+        characterId,
+        givePlayerItemWithinTransactionSync,
+    )
 }
 
 /**

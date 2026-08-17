@@ -1,7 +1,11 @@
 import { getDb } from "../../data/db"
-import { getPlayerItemSync, givePlayerItemSync } from "../../data/domains/item"
+import {
+    getPlayerItemSync,
+    givePlayerItemSync,
+    givePlayerItemWithinTransactionSync,
+} from "../../data/domains/item"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
-import { givePlayerCharacterSync } from "../character"
+import { givePlayerCharacterSync, givePlayerCharacterWithinTransactionSync } from "../character"
 import { givePlayerEquipmentSync } from "../equipment"
 import { PlayerRewardResult, RewardType } from "../types/rewards"
 import { createRewardGrantPlan } from "./plan"
@@ -115,13 +119,15 @@ function grantEntrySync(
     reward: RewardGrantReward,
     entryIndex: number,
     grantCurrency: typeof grantCurrencySync = grantCurrencySync,
+    grantItem: typeof givePlayerItemSync = givePlayerItemSync,
+    grantCharacter: typeof givePlayerCharacterSync = givePlayerCharacterSync,
 ): RewardGrantEntryExecution {
     const result = emptyPlayerRewardResult()
     switch (reward.type) {
         case RewardType.ITEM:
         case RewardType.ELEMENT:
         case RewardType.AETHER:
-            result.items[reward.id] = givePlayerItemSync(playerId, reward.id, reward.count)
+            result.items[reward.id] = grantItem(playerId, reward.id, reward.count)
             return { result }
         case RewardType.EQUIPMENT:
             result.equipment_list.push(
@@ -129,7 +135,7 @@ function grantEntrySync(
             )
             return { result }
         case RewardType.CHARACTER: {
-            const granted = givePlayerCharacterSync(playerId, reward.id)
+            const granted = grantCharacter(playerId, reward.id)
             if (granted === null) {
                 throw new RewardGrantExecutionError(
                     entryIndex,
@@ -233,8 +239,14 @@ export function executeNormalizedRewardGrantPlanAsTransactionOwnerInternalSync<T
     const currencyDeltas = { freeMana: 0, freeVmoney: 0, expPool: 0 }
     const entries = plan.entries.map((entry, entryIndex) => createRewardGrantEntryResult(
         entry,
-        grantEntrySync(playerId, entry.reward, entryIndex, (pid, reward) =>
-            grantOwnerCurrency(reward, playerAfter, currencyDeltas)),
+        grantEntrySync(
+            playerId,
+            entry.reward,
+            entryIndex,
+            (pid, reward) => grantOwnerCurrency(reward, playerAfter, currencyDeltas),
+            givePlayerItemWithinTransactionSync,
+            givePlayerCharacterWithinTransactionSync,
+        ),
     ))
     persistOwnerCurrency(playerId, playerAfter, currencyDeltas, playerUpdate)
     return { aggregate: aggregateEntryResults(entries), entries, playerAfter }

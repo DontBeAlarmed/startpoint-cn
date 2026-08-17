@@ -187,10 +187,16 @@ assert.equal(
     "only the rarity_5_guarantee planner may derive a placeholder seed from character id",
 )
 assert.equal(
-    gachaSource.indexOf("const characterMoviePlan = planCharacterGachaMovies")
-        < gachaSource.indexOf("const giveResult = givePlayerCharacterSync"),
+    gachaSource.indexOf("const characterMoviePlan = gacha.type")
+        < gachaSource.indexOf("return rewardGachaDrawResultThroughGrantOwnerSync"),
     true,
-    "all seeds must be planned before the first character write",
+    "all seeds must be planned before owner reward execution",
+)
+assert.equal(
+    gachaSource.indexOf("const characterMoviePlan = gacha.type")
+        < gachaSource.indexOf("return rewardPlayerGachaDrawResultLegacySync"),
+    true,
+    "all seeds must be planned before legacy reward execution",
 )
 
 const gachaRouteSource = fs.readFileSync(

@@ -22,6 +22,7 @@ import { getExchangeableGachaItem } from "../../lib/gacha-rules";
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
+import { executeRewardGrantPlanInTransactionOwnerInternalSync } from "../../lib/reward-grant/owner-executor";
 
 interface ExecBody {
     api_count: number,
@@ -287,11 +288,8 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "Invalid viewer id."
         })
 
-        // get player
         const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
         if (playerId === null) return reply.status(500).send({ "error": "Internal Server Error", "message": "No players bound to account." })
-        const player = getPlayerSync(playerId)
-        if (player === null) return
 
         // get the gacha
         const gachaData = getGachaSync(gachaId)
@@ -304,73 +302,74 @@ const routes = async (fastify: FastifyInstance) => {
         }
         const isCharacterGacha = gachaData.type == GachaType.CHARACTER
 
-        // get player gacha data
-        let playerGachaData = getPlayerGachaInfoSync(playerId, gachaId)
-        const insertPlayerGachaData = playerGachaData === null
-        playerGachaData = playerGachaData ?? {
-            gachaId: gachaId,
-            isAccountFirst: true,
-            isDailyFirst: true,
-            gachaExchangePoint: 0
-        }
-
         let gachaCampaigns: UserGachaCampaign[] = []
         let items: Record<number, number> = {}
-        let plannedCampaign: PlayerGachaCampaign | null = null
-
-        const planResult = buildGachaExecPlan({
-            gacha: gachaData,
-            paymentType,
-            execType: type,
-            numberOfExec,
-            playerFunds: {
-                freeVmoney: player.freeVmoney,
-                paidVmoney: player.vmoney,
-            },
-            playerGachaData,
-            getTicketCount: (itemId) => getPlayerItemSync(playerId, itemId),
-            getCampaignState: () => {
-                const campaignId = getGachaCampaignIdSync(gachaId)
-                if (campaignId === null) return null
-
-                const existingCampaign = getPlayerGachaCampaignSync(playerId, gachaId, campaignId)
-                const campaignForPlan: PlayerGachaCampaign = existingCampaign ?? {
-                    gachaId,
-                    campaignId,
-                    count: 1,
-                }
-                plannedCampaign = campaignForPlan
-
-                return {
-                    campaignId,
-                    count: campaignForPlan.count,
-                    insert: existingCampaign === null,
-                }
-            },
-        })
-
-        if (!planResult.ok) {
-            console.log(`[GACHA] Exec plan rejected: gachaId=${gachaId} paymentType=${paymentType} type=${type} message=${planResult.message}`);
-            return reply.status(planResult.status).send({
-                "error": "Bad Request",
-                "message": planResult.message
-            })
-        }
-
-        const execPlan = planResult.plan
-        const pullCount = execPlan.pullCount
-        const playerPaidVmoney = execPlan.paidVmoney
-        const playerFreeVmoney = execPlan.freeVmoney
-
-        const drawMetadata = drawGachaWithMetadataSync(gachaData, pullCount)
-        const drawResult = drawMetadata.map((draw) => draw.id)
-        const characterMoviePlan = isCharacterGacha
-            ? planCharacterGachaMovies(gachaData as CharacterGacha, drawResult)
-            : undefined
-
-        const newGachaExchangePoint = (playerGachaData.gachaExchangePoint ?? 0) + pullCount
+        let playerPaidVmoney = 0
+        let playerFreeVmoney = 0
+        let newGachaExchangePoint = 0
         let rewardResult!: ReturnType<typeof rewardPlayerGachaDrawResultSync>
-        getDb().transaction(() => {
+        let deferredCharacterSampledLog: (() => void) | undefined
+        const transactionResult = getDb().transaction(() => {
+            const player = getPlayerSync(playerId)
+            if (player === null) throw new Error("Gacha player disappeared during execution")
+            const knownPlayerBefore = {
+                freeMana: player.freeMana,
+                freeVmoney: player.freeVmoney,
+                expPool: player.expPool,
+            }
+
+            let playerGachaData = getPlayerGachaInfoSync(playerId, gachaId)
+            const insertPlayerGachaData = playerGachaData === null
+            playerGachaData = playerGachaData ?? {
+                gachaId: gachaId,
+                isAccountFirst: true,
+                isDailyFirst: true,
+                gachaExchangePoint: 0,
+            }
+            let plannedCampaign: PlayerGachaCampaign | null = null
+            const planResult = buildGachaExecPlan({
+                gacha: gachaData,
+                paymentType,
+                execType: type,
+                numberOfExec,
+                playerFunds: {
+                    freeVmoney: player.freeVmoney,
+                    paidVmoney: player.vmoney,
+                },
+                playerGachaData,
+                getTicketCount: (itemId) => getPlayerItemSync(playerId, itemId),
+                getCampaignState: () => {
+                    const campaignId = getGachaCampaignIdSync(gachaId)
+                    if (campaignId === null) return null
+
+                    const existingCampaign = getPlayerGachaCampaignSync(playerId, gachaId, campaignId)
+                    const campaignForPlan: PlayerGachaCampaign = existingCampaign ?? {
+                        gachaId,
+                        campaignId,
+                        count: 1,
+                    }
+                    plannedCampaign = campaignForPlan
+
+                    return {
+                        campaignId,
+                        count: campaignForPlan.count,
+                        insert: existingCampaign === null,
+                    }
+                },
+            })
+            if (!planResult.ok) return planResult
+
+            const execPlan = planResult.plan
+            const pullCount = execPlan.pullCount
+            playerPaidVmoney = execPlan.paidVmoney
+            playerFreeVmoney = execPlan.freeVmoney
+            const drawMetadata = drawGachaWithMetadataSync(gachaData, pullCount)
+            const drawResult = drawMetadata.map((draw) => draw.id)
+            const characterMoviePlan = isCharacterGacha
+                ? planCharacterGachaMovies(gachaData as CharacterGacha, drawResult)
+                : undefined
+            newGachaExchangePoint = (playerGachaData.gachaExchangePoint ?? 0) + pullCount
+
             if (execPlan.ticket) {
                 items[execPlan.ticket.itemId] = execPlan.ticket.afterCount
                 updatePlayerItemSync(playerId, execPlan.ticket.itemId, execPlan.ticket.afterCount)
@@ -399,6 +398,14 @@ const routes = async (fastify: FastifyInstance) => {
                 drawResult,
                 drawMetadata,
                 characterMoviePlan,
+                {
+                    ownerGrant: plan => executeRewardGrantPlanInTransactionOwnerInternalSync(
+                        playerId,
+                        plan,
+                        knownPlayerBefore,
+                    ),
+                    deferCharacterSampledLog: log => { deferredCharacterSampledLog = log },
+                },
             )
 
             const historyType = isCharacterGacha ? MailType.CHARACTER : MailType.EQUIPMENT
@@ -431,7 +438,16 @@ const routes = async (fastify: FastifyInstance) => {
             if (execPlan.campaign) {
                 incrementActiveMissionGachaCampaignCountSync(playerId)
             }
+            return { ok: true as const }
         })()
+        if (!transactionResult.ok) {
+            console.log(`[GACHA] Exec plan rejected: gachaId=${gachaId} paymentType=${paymentType} type=${type} message=${transactionResult.message}`)
+            return reply.status(transactionResult.status).send({
+                "error": "Bad Request",
+                "message": transactionResult.message,
+            })
+        }
+        deferredCharacterSampledLog?.()
 
         reply.header("content-type", "application/x-msgpack")
         if (isCharacterGacha) {

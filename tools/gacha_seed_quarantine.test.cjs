@@ -92,8 +92,13 @@ const cnServerSource = fs.readFileSync(path.join(__dirname, "..", "src", "cn-ser
 assert.match(cnServerSource, /quarantineIfRecentlySent/)
 assert.doesNotMatch(cnServerSource, /parsePlayBeacon|moveToVerified|addPending|recordPlay/)
 
-const gachaSource = fs.readFileSync(path.join(__dirname, "..", "src", "lib", "gacha.ts"), "utf8")
-assert.match(gachaSource, /gachaSeedQuarantine\.markSent/)
-assert.doesNotMatch(gachaSource, /seedValidator/)
+for (const file of ["gacha-reward-grant.ts", "gacha-reward-legacy.ts"]) {
+    const gachaRewardSource = fs.readFileSync(
+        path.join(__dirname, "..", "src", "lib", file),
+        "utf8",
+    )
+    assert.match(gachaRewardSource, /gachaSeedQuarantine\.markSent/, file)
+    assert.doesNotMatch(gachaRewardSource, /seedValidator/, file)
+}
 
 console.log("gacha seed quarantine tests passed")

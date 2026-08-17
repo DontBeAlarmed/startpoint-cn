@@ -4,25 +4,23 @@
 
 import { randomInt } from "crypto";
 import { getDefaultGachaSeedCatalog, reserveUniquePlaceholderSeed } from "./gacha-seed-catalog";
-import { getDefaultGachaSeedQuarantine } from "./gacha-seed-quarantine";
 import { PlayerBoxGachaDrawnReward } from "../data/types";
-import { givePlayerCharacterSync } from "./character";
-import { givePlayerEquipmentSync } from "./equipment";
 import { givePlayerRewardsSync } from "./quest";
-import { getPlayerItemSync } from "../data/domains/item";
 import { getCharacterDataSync } from "./assets";
-import { BoxGachaBox, BoxGachaDrawResult, BoxGachaIdReward, BoxGachaRewardTier, BoxGachaRewardType, CharacterGacha, CharacterReward, CurrencyReward, EquipmentItemReward, Gacha, GachaCharacterDraw, GachaDrawResult, GachaDraws, GachaMovieType, GachaType, PlayerRewardResult, Reward, RewardPlayerGachaDrawResult, RewardType } from "./types";
-import { computeEquipmentGachaMovieEffectsForGacha, EquipmentMovieDrawInput } from "./gacha-equipment-movie";
+import { BoxGachaBox, BoxGachaDrawResult, BoxGachaIdReward, BoxGachaRewardTier, BoxGachaRewardType, CharacterGacha, CharacterReward, CurrencyReward, EquipmentItemReward, Gacha, GachaDrawResult, GachaMovieType, GachaType, PlayerRewardResult, Reward, RewardPlayerGachaDrawResult, RewardType } from "./types";
 import { drawGachaWithMetadataSync } from "./gacha-draw";
 import type { GachaDrawMetadata } from "./gacha-draw";
-import { sampledLog } from "./sampled-log";
-import { formatGachaCharacterDrawsSummary } from "./hot-path-log-formatters";
+import {
+    rewardGachaDrawResultThroughGrantOwnerSync,
+    type GachaRewardGrantOptions,
+    type PlannedCharacterGachaMovie,
+} from "./gacha-reward-grant";
+import { rewardPlayerGachaDrawResultLegacySync } from "./gacha-reward-legacy";
 
 export { drawGachaSync, drawGachaWithMetadataSync, selectWeightedIndexByRoll } from "./gacha-draw";
 export type { GachaDrawMetadata } from "./gacha-draw";
 
 const gachaSeedCatalog = getDefaultGachaSeedCatalog();
-const gachaSeedQuarantine = getDefaultGachaSeedQuarantine();
 
 const rankMovieRates = [
     [ // 5*
@@ -51,13 +49,7 @@ export interface SummonResult {
     pulls: GachaResult[],
 }
 
-export interface PlannedCharacterGachaMovie {
-    characterId: number
-    rarity: number
-    movieId: string
-    seed: number
-    requiresVerification: boolean
-}
+export type { PlannedCharacterGachaMovie } from "./gacha-reward-grant"
 
 export function planCharacterGachaMovies(
     gacha: CharacterGacha,
@@ -111,130 +103,29 @@ export function rewardPlayerGachaDrawResultSync(
     gachaDrawResult: number[],
     gachaDrawMetadata?: GachaDrawMetadata[],
     plannedCharacterMovies?: PlannedCharacterGachaMovie[],
+    options: GachaRewardGrantOptions = {},
 ): RewardPlayerGachaDrawResult {
-    const draws: GachaDraws = []
-    const characters: Map<number, Object> = new Map()
-    const equipment: Map<number, Object> = new Map()
-    const items: Map<number, number> = new Map()
-
-    if (gacha.type == GachaType.CHARACTER) {
-        const characterGacha = gacha as CharacterGacha
-        const characterMoviePlan = plannedCharacterMovies
-            ?? planCharacterGachaMovies(characterGacha, gachaDrawResult)
-        if (characterMoviePlan.length !== gachaDrawResult.length
-            || characterMoviePlan.some((plan, index) => plan.characterId !== gachaDrawResult[index])) {
-            throw new Error("Character gacha movie plan does not match draw result")
-        }
-        // reward characters (flat array, no grouping)
-        for (let index = 0; index < gachaDrawResult.length; index += 1) {
-            const characterId = gachaDrawResult[index]
-            const plannedMovie = characterMoviePlan[index]
-            const giveResult = givePlayerCharacterSync(playerId, characterId)
-            
-            if (giveResult !== null) {
-                // Build draw with CN-validated seeds from pre-computed pool
-                // Generated offline by tools/gacha-faithful.
-                const { rarity, movieId, seed } = plannedMovie
-
-                // rarity_5_guarantee: isRarity5=true → ball.rarity forced to 2, moviePlayable=false
-                // Client skips ALL physics. Seed is irrelevant — use characterId*1000.
-                if (!plannedMovie.requiresVerification) {
-                    const draw: GachaCharacterDraw = {
-                        "character_id": characterId,
-                        "movie_id": movieId,
-                        "seed": seed,
-                        "entry_count": 1
-                    }
-                    draws.push(draw)
-                    characters.set(characterId, giveResult.character)
-                    continue
-                }
-
-                gachaSeedQuarantine.markSent(movieId, seed, rarity)
-
-                const draw: GachaCharacterDraw = {
-                    "character_id": characterId,
-                    "movie_id": movieId,
-                    "seed": seed,
-                    "entry_count": 1
-                }
-                    
-                    // set values in items map, characters map, and draws array.
-                    const giveItem = giveResult.item
-                    if (giveItem !== undefined) {
-                        draw['ex_boost_item'] = giveItem // add ex_boost_item to draw
-                        // item_list carries post-reward inventory totals; the draw field above
-                        // carries the amount granted by this duplicate character.
-                        items.set(giveItem.id, getPlayerItemSync(playerId, giveItem.id) ?? 0)
-                    }
-
-                    const existingCharacter = characters.get(characterId)
-                    if (existingCharacter) {
-                        characters.set(characterId, {...existingCharacter, ...giveResult.character})
-                    } else {    
-                        characters.set(characterId, giveResult.character)
-                    }
-                    draws.push(draw)
-            }
-        }
-
-        sampledLog("gacha-character-draws", () => formatGachaCharacterDrawsSummary({
+    const characterMoviePlan = gacha.type === GachaType.CHARACTER
+        ? plannedCharacterMovies
+            ?? planCharacterGachaMovies(gacha as CharacterGacha, gachaDrawResult)
+        : undefined
+    if (options.ownerGrant !== undefined) {
+        return rewardGachaDrawResultThroughGrantOwnerSync(
             playerId,
-            draws: draws as GachaCharacterDraw[],
-            moviePlans: characterMoviePlan,
-        }))
-    } else {
-        const equipmentMovieInputs: EquipmentMovieDrawInput[] = gachaDrawResult.map((equipmentId, index) => {
-            const metadata = gachaDrawMetadata?.[index]
-            return {
-                id: equipmentId,
-                rank: metadata?.rank ?? 0,
-                isGuarantee: metadata?.isGuarantee ?? false,
-            }
-        })
-        const equipmentMovieEffects = computeEquipmentGachaMovieEffectsForGacha(gacha, equipmentMovieInputs)
-
-        for (let index = 0; index < gachaDrawResult.length; index += 1) {
-            const equipmentId = gachaDrawResult[index]
-            const giveResult = givePlayerEquipmentSync(playerId, equipmentId, 1);
-
-            equipment.set(equipmentId, giveResult)
-            draws.push({
-                "equipment_id": equipmentId,
-                "treasure_up_type": equipmentMovieEffects.draws[index]?.treasureUpType ?? 0
-            })
-        }
-
-        return {
-            draw: draws,
-            characters: [],
-            equipment: Array.from(equipment.values()),
-            items: Object.fromEntries(items),
-            isErupt: equipmentMovieEffects.isErupt,
-        }
+            gacha,
+            gachaDrawResult,
+            gachaDrawMetadata,
+            characterMoviePlan,
+            { ...options, ownerGrant: options.ownerGrant },
+        )
     }
-    
-    const returnCharacters: Object[] = [];
-    for (const value of characters.values()) {
-        returnCharacters.push(value)
-    }
-
-    const returnEquipment: Object[] = []
-    for (const value of equipment.values()) {
-        returnEquipment.push(value)
-    }
-    
-    const returnItems: Record<number, number> = {}
-    for (const [itemId, amount] of items) {
-        returnItems[itemId] = amount
-    }
-
-    return {
-        draw: draws,
-        characters: returnCharacters,
-        equipment: returnEquipment,
-        items: returnItems
-    }
+    return rewardPlayerGachaDrawResultLegacySync(
+        playerId,
+        gacha,
+        gachaDrawResult,
+        gachaDrawMetadata,
+        characterMoviePlan,
+    )
 }
 
 /**

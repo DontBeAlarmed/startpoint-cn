@@ -1,6 +1,6 @@
 # 奖励发放事务
 
-`src/lib/reward-grant/` 提供可组合的奖励计划和同步执行器。该模块只负责公共发放核心；单人战斗 finish 的直接标准奖励、普通/Rare Score、Carnival 标准奖励和 Mission 标准奖励已迁移，扭蛋、商店、邮件仍保持原有 writer。Carnival degree、Mission degree/pass 点数/事实写入继续由领域模块负责。协力 Score 只复用规范化 Plan 的选择结果，继续通过 `givePlayerScoreRewardsSync()` 兼容 writer 发放，不使用事务拥有者入口。
+`src/lib/reward-grant/` 提供可组合的奖励计划和同步执行器。单人战斗 finish 的直接标准奖励、普通/Rare Score、Carnival 标准奖励、Mission 标准奖励，以及普通角色/装备抽卡生产路径已迁移到 owner 计划执行；box gacha、商店和邮件仍保持原有 writer。Carnival degree、Mission degree/pass 点数/事实写入继续由领域模块负责。协力 Score 只复用规范化 Plan 的选择结果，继续通过 `givePlayerScoreRewardsSync()` 兼容 writer 发放，不使用事务拥有者入口。
 
 ## 安全公共 API
 
@@ -8,7 +8,7 @@
 - `executeRewardGrantPlanWithinTransactionSync(playerId, plan)`：在调用方已经开启的 SQLite 事务中执行计划。
 - `executeRewardGrantPlanSync(playerId, plan)`：为独立调用建立一次 SQLite 事务并执行计划。
 
-`executeRewardGrantPlanInTransactionOwnerSync(playerId, plan, knownPlayerBefore)` 是 executor 模块的内部事务拥有者契约，不从 `reward-grant/index.ts` 公共 barrel 导出。它仅供拥有最外层事务、负责绑定 `playerId` 与已知状态且保证错误向外传播的协调器使用；该入口复用调用方已知的玩家货币前态，不建立计划 savepoint。Score 单人适配器才允许 direct import 名为 `Internal` 的详细入口；详细结果类型与 `itemDeltas` 仅限该适配器内部使用，不得进入公共 barrel、HTTP/TCP 响应或其他结算模块。
+`executeRewardGrantPlanInTransactionOwnerSync(playerId, plan, knownPlayerBefore)` 与其 `Internal` detailed 版本是 executor 模块的内部事务拥有者契约，不从 `reward-grant/index.ts` 公共 barrel 导出。它仅供拥有最外层事务、负责绑定 `playerId` 与已知状态且保证错误向外传播的协调器使用；该入口复用调用方已知的玩家货币前态，不建立计划 savepoint。gacha route、Tutorial route 和 Score 适配器均 direct import 需要的 owner 入口；详细结果类型与 `itemDeltas` 仅限各自 projection 内部使用，不得进入公共 barrel、HTTP/TCP 响应或其他结算模块。
 
 计划条目通过泛型 `source` 保留调用方关联信息，例如抽取序号或邮件 ID。计划保持条目顺序和 `source` 引用，不复制或冻结 `source`；建计划时只读取一次条目及奖励必需字段，并把奖励复制成仅含 `name`、`type`、`id`、`count` 中适用字段的普通冻结对象。奖励对象、条目、条目数组和计划本身会被冻结，因此调用方之后修改原奖励对象不会改变计划，额外奖励字段也不会进入计划。
 
@@ -22,7 +22,7 @@
 
 独立执行器在规范化 Plan 后，仅包装一次 `getDb().transaction` 并直接调用同一个私有执行体，不调用事务内执行器，因此公共模块不会形成“外层事务加计划 savepoint”的两层包装。两个入口都不提交或吞掉执行错误；调用方仍可通过抛错或显式回滚撤销包含奖励在内的整个外层事务。
 
-事务拥有者入口同样要求活动事务，并在首笔写入前重新规范化完整 Plan，但不查询玩家前后态，也不建立 savepoint。它先各读取一次 `knownPlayerBefore.freeMana`、`freeVmoney` 和 `expPool`，复制为不含额外字段的普通对象；三字段必须是非负安全整数，否则抛出带 `field` 的 `RewardGrantKnownPlayerValidationError` 且零写入。执行过程先在内存中逐条投影货币结果，再用一条 `players` UPDATE 写入本 Plan 的最终三项余额与 mana 累计，并返回完整 `entries`、`aggregate` 和 `playerAfter`，不增加玩家 `SELECT` 或事务语句。CHARACTER 发放直接复用 `givePlayerCharacterSync()` 内部查询返回的首次获得事实，不再为了 `joined_character_id_list` 预查一次角色所有权。
+事务拥有者入口同样要求活动事务，并在首笔写入前重新规范化完整 Plan，但不查询玩家前后态，也不建立 savepoint。它先各读取一次 `knownPlayerBefore.freeMana`、`freeVmoney` 和 `expPool`，复制为不含额外字段的普通对象；三字段必须是非负安全整数，否则抛出带 `field` 的 `RewardGrantKnownPlayerValidationError` 且零写入。执行过程先在内存中逐条投影货币结果，再用一条 `players` UPDATE 写入本 Plan 的最终三项余额与 mana 累计，并返回完整 `entries`、`aggregate` 和 `playerAfter`，不增加玩家 `SELECT` 或事务语句。owner CHARACTER 发放使用事务内 item/character writer，避免重复角色补偿为每抽建立 savepoint；它仍复用角色写入返回的首次获得事实，不为了 `joined_character_id_list` 预查一次角色所有权。
 
 单人 Mission 适配器可向未公开的 owner direct 调用附带当前 `degreeId`，使 Mission 标准货币和领域称号选择继续合并为旧 writer 的一条玩家 UPDATE。该 patch 不属于 `RewardGrantPlan`、`RewardGrantResult` 或公共 barrel；degree 授予、响应和 invalidation 仍由 Mission granter 决定。
 
@@ -39,6 +39,12 @@
 - 重复角色补偿会在同一事务中回读物品最终库存后态。
 
 `playerAfter` 同时返回执行后的 `freeMana`、`freeVmoney` 和 `expPool`，后续调用方不需要为这些字段再次查询玩家。
+
+## 抽卡逐抽 projection
+
+普通抽卡的 plan source 只携带 `{ drawIndex, kind, rewardId }`，不携带 gacha 或 movie 大对象。gacha projection 在 owner detailed entries 上重建客户端结果：角色 entry 的内部补偿 delta 只成为当前 draw 的 `ex_boost_item` 增量，entry result 的 item 后态成为对应 ID 的最终 `item_list`；角色对象按同 ID 的出现顺序合并，特殊 `rarity_5_guarantee` 路径保持独立。装备 entry 按抽次生成 `draw_equipment`，movie effect 的 rank/guarantee metadata 同样按抽次匹配，响应中的 equipment list 对重复 ID 保留最后状态。
+
+`rewardPlayerGachaDrawResultSync` 保留直接调用兼容性：有 owner callback 时执行 gacha plan，未提供时进入 `gacha-reward-legacy.ts`。legacy 路径仍在函数成功后记录旧 sampled log；生产 `/gacha/exec` 与 Tutorial 路径则只捕获 log closure，并在最外层事务提交成功后调用。Tutorial receipt replay 不经过 reward plan，因此不会重复奖励或 sampled success log。
 
 ## 后续迁移
 

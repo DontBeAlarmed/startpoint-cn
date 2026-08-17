@@ -228,7 +228,11 @@ const SOURCE_RULES = [
         groups: ["quick:content"],
     },
     {
-        pattern: /^src\/lib\/(?:gacha|gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-seed-catalog|gacha-ticket)\.ts$/,
+        pattern: /^src\/lib\/(?:gacha|gacha-reward-(?:grant|legacy))\.ts$/,
+        groups: ["integration:reward-grant", "quick:gacha"],
+    },
+    {
+        pattern: /^src\/lib\/(?:gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-seed-catalog|gacha-ticket)\.ts$/,
         groups: ["quick:gacha"],
     },
     {
@@ -237,7 +241,11 @@ const SOURCE_RULES = [
     },
     {
         pattern: /^src\/routes\/api\/gacha\.ts$/,
-        groups: ["integration:rules", "quick:gacha"],
+        groups: ["integration:reward-grant", "integration:rules", "quick:gacha"],
+    },
+    {
+        pattern: /^src\/routes\/api\/tutorial\.ts$/,
+        groups: ["integration:quest", "integration:reward-grant", "quick:gacha"],
     },
     { pattern: /^src\/routes\/web_api\/seeds\.ts$/, groups: ["quick:seed"] },
     {

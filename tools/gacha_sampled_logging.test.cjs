@@ -5,9 +5,9 @@ const fs = require("node:fs")
 const path = require("node:path")
 const test = require("node:test")
 
-const source = fs.readFileSync(path.join(__dirname, "../src/lib/gacha.ts"), "utf8")
-const functionStart = source.indexOf("export function rewardPlayerGachaDrawResultSync(")
-const functionEnd = source.indexOf("/**\n * Performs box gacha draws", functionStart)
+const source = fs.readFileSync(path.join(__dirname, "../src/lib/gacha-reward-grant.ts"), "utf8")
+const functionStart = source.indexOf("function scheduleCharacterLog(")
+const functionEnd = source.indexOf("function projectCharacters(", functionStart)
 const functionSource = source.slice(functionStart, functionEnd)
 
 test("formats duplicate character draws with their exact movie plans as one line", () => {
@@ -38,7 +38,7 @@ test("formats duplicate character draws with their exact movie plans as one line
     assert.equal(message.includes("\n"), false)
 })
 
-test("character gacha settlement emits one sampled lazy draw summary", () => {
+test("character gacha settlement captures one sampled lazy draw summary", () => {
     assert.doesNotMatch(functionSource, /console\.log\(`\[GACHA\] rarity=/)
     assert.equal(functionSource.match(/sampledLog\("gacha-character-draws"/g)?.length, 1)
 
@@ -49,8 +49,13 @@ test("character gacha settlement emits one sampled lazy draw summary", () => {
     assert(factory > sampledCall)
     assert(formatter > factory)
     assert.equal(functionSource.match(/formatGachaCharacterDrawsSummary\(/g)?.length, 1)
-    assert.doesNotMatch(functionSource, /draws\.map|JSON\.stringify/)
+    assert.doesNotMatch(functionSource, /JSON\.stringify/)
     assert(!functionSource.slice(sampledCall).includes("\\n"), "summary should stay on one line")
 
-    assert.equal(functionSource.match(/gachaSeedQuarantine\.markSent\(/g)?.length, 1)
+})
+
+test("character projection keeps quarantine marking outside log scheduling", () => {
+    const projection = source.slice(source.indexOf("function projectCharacters("))
+    assert.equal(projection.match(/gachaSeedQuarantine\.markSent\(/g)?.length, 1)
+    assert.ok(projection.indexOf("gachaSeedQuarantine.markSent") < projection.indexOf("scheduleCharacterLog"))
 })

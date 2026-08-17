@@ -106,6 +106,13 @@ async function finishTrigger(fastify, viewerId, tutorialIds) {
 }
 
 async function main() {
+    const originalLog = console.log
+    const gachaLogs = []
+    console.log = (...args) => {
+        const message = args.map(String).join(" ")
+        if (message.startsWith("[GACHA] reward_summary")) gachaLogs.push(message)
+        originalLog(...args)
+    }
     const fastify = Fastify()
     fastify.addContentTypeParser(
         "application/x-www-form-urlencoded",
@@ -157,6 +164,7 @@ async function main() {
         `)
         const failedDraw = await updateStep(fastify, viewerId, { step: 14, gacha_id: 1 })
         assert.equal(failedDraw.statusCode, 500)
+        assert.equal(gachaLogs.length, 0)
         assert.equal(getPlayerSync(playerId).tutorialStep, 14)
         assert.equal(getPlayerSync(playerId).freeVmoney, 1000)
         const awardedAfterFailure = db.prepare(`
@@ -169,6 +177,7 @@ async function main() {
 
         const firstDraw = await updateStep(fastify, viewerId, { step: 14, gacha_id: 1 })
         assert.equal(firstDraw.statusCode, 200, firstDraw.body)
+        assert.equal(gachaLogs.length, 1)
         const firstDrawData = decodeResponse(firstDraw).data
         const tutorialCharacterId = firstDrawData.gacha.draw[0].character_id
         const afterFirstDraw = getPlayerSync(playerId)
@@ -178,6 +187,7 @@ async function main() {
 
         const repeatedDraw = await updateStep(fastify, viewerId, { step: 14, gacha_id: 1 })
         assert.equal(repeatedDraw.statusCode, 200, repeatedDraw.body)
+        assert.equal(gachaLogs.length, 1)
         const repeatedDrawData = decodeResponse(repeatedDraw).data
         assert.deepEqual(repeatedDrawData, firstDrawData)
         assert.equal(typeof repeatedDrawData.character_list[0].join_time, "string")
@@ -365,6 +375,7 @@ async function main() {
         assert.deepEqual(decodeResponse(repeatedDuplicateDraw).data, duplicateDrawData)
     } finally {
         await fastify.close()
+        console.log = originalLog
     }
 }
 
