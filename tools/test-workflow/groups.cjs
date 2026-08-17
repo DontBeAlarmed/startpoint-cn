@@ -264,6 +264,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/shop_reward_purchase_contract.test.cjs",
             "tools/mail_notification.test.cjs",
             "tools/mail_notification_write_routes.test.cjs",
+            "tools/mail_reward_fixture.test.cjs",
+            "tools/mail_reward_rollback.test.cjs",
         ],
     },
     "integration:reward-grant": {
@@ -278,6 +280,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/single_settlement_reward_grant.test.cjs",
             "tools/task23c_reward_grants.test.cjs",
             "tools/shop_reward_grant.test.cjs",
+            "tools/mail_reward_grant.test.cjs",
+            "tools/mail_reward_owner.test.cjs",
         ],
     },
     "integration:database": {

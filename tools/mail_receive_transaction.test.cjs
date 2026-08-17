@@ -14,6 +14,7 @@ const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
 
 const Fastify = require("fastify")
+const BetterSqlite3 = require("better-sqlite3")
 const { unpack } = require("msgpackr")
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
@@ -31,6 +32,25 @@ let database
 let app
 let nextViewerId = 910000000
 let restoreContentSnapshot
+let sqlTrace = null
+
+async function captureSql(operation) {
+    const statements = []
+    sqlTrace = statements
+    try {
+        return { result: await operation(), statements }
+    } finally {
+        sqlTrace = null
+    }
+}
+
+function playerSnapshots(statements) {
+    return statements.filter(statement => /^\s*SELECT\s+id,\s*stamina,[\s\S]*\bFROM\s+players\b/i.test(statement))
+}
+
+function nestedTransactionStatements(statements) {
+    return statements.filter(statement => /^\s*(?:SAVEPOINT|RELEASE)\b/i.test(statement))
+}
 
 async function createPlayer(label) {
     const account = insertAccountSync({
@@ -81,7 +101,13 @@ function receiveHistoryCount(playerId) {
 
 test.before(async () => {
     restoreContentSnapshot = installBundledGameplaySnapshot()
-    database = data.initializeDatabase()
+    database = data.initializeDatabase({
+        databaseFactory: databasePath => new BetterSqlite3(databasePath, {
+            verbose: statement => {
+                if (sqlTrace !== null) sqlTrace.push(statement)
+            },
+        }),
+    })
     app = Fastify({ logger: false })
     registerCnMsgpackOnSend(app)
     app.register(mailRoutes)
@@ -132,6 +158,38 @@ test("receive_all grants each requested mail id at most once", async () => {
     assert.equal(getPlayerItemSync(playerId, itemId), before + 3)
     assert.deepEqual(decode(response).data.mail_ids, [mailId])
     assert.equal(receiveHistoryCount(playerId), 1)
+})
+
+test("single receive owns one player snapshot without nested reward transaction SQL", async () => {
+    const { playerId, viewerId } = await createPlayer("single-owner-sql")
+    const mailId = addMail(playerId, MailType.ITEM, 30005, 2)
+
+    const measured = await captureSql(() => app.inject({
+        method: "POST",
+        url: "/receive",
+        payload: { viewer_id: viewerId, mail_id: mailId },
+    }))
+
+    assert.equal(measured.result.statusCode, 200, measured.result.body)
+    assert.equal(playerSnapshots(measured.statements).length, 2, measured.statements.join("\n---\n"))
+    assert.equal(nestedTransactionStatements(measured.statements).length, 2, measured.statements.join("\n---\n"))
+})
+
+test("receive_all reads one authoritative player snapshot for the whole standard batch", async () => {
+    const { playerId, viewerId } = await createPlayer("batch-owner-sql")
+    const firstMailId = addMail(playerId, MailType.FREE_MANA, null, 2)
+    const secondMailId = addMail(playerId, MailType.EXP_POOL, null, 3)
+    const thirdMailId = addMail(playerId, MailType.FREE_VMONEY, null, 4)
+
+    const measured = await captureSql(() => app.inject({
+        method: "POST",
+        url: "/receive_all",
+        payload: { viewer_id: viewerId, mail_ids: [firstMailId, secondMailId, thirdMailId] },
+    }))
+
+    assert.equal(measured.result.statusCode, 200, measured.result.body)
+    assert.equal(playerSnapshots(measured.statements).length, 2, measured.statements.join("\n---\n"))
+    assert.equal(nestedTransactionStatements(measured.statements).length, 2, measured.statements.join("\n---\n"))
 })
 
 test("single receive rolls reward and history back when marking the mail fails", async t => {
@@ -199,5 +257,52 @@ test("unsupported attachments remain unreceived instead of being silently consum
     })
     assert.equal(response.statusCode, 400)
     assert.equal(mailState(mailId), "0000-00-00 00:00:00")
+    assert.equal(receiveHistoryCount(playerId), 0)
+})
+
+test("receive_all keeps duplicate, missing, and already-received ID compatibility", async () => {
+    const { playerId, viewerId } = await createPlayer("id-compatibility")
+    const itemId = 30005
+    const before = getPlayerItemSync(playerId, itemId) ?? 0
+    const validMailId = addMail(playerId, MailType.ITEM, itemId, 3)
+    const alreadyMailId = addMail(playerId, MailType.FREE_MANA, null, 4)
+    database.prepare("UPDATE players_mails SET receive_time = ? WHERE id = ?")
+        .run("2026-08-18 00:00:01", alreadyMailId)
+    const missingMailId = alreadyMailId + 999999
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/receive_all",
+        payload: {
+            viewer_id: viewerId,
+            mail_ids: [missingMailId, validMailId, validMailId, alreadyMailId],
+        },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    const result = decode(response).data
+    assert.deepEqual(result.mail_ids, [validMailId])
+    assert.equal(result.already_mail_count, 2)
+    assert.equal(getPlayerItemSync(playerId, itemId), before + 3)
+    assert.equal(receiveHistoryCount(playerId), 1)
+})
+
+test("unsupported attachment in a mixed batch rolls every valid mail back", async () => {
+    const { playerId, viewerId } = await createPlayer("unsupported-mixed")
+    const itemId = 30005
+    const before = getPlayerItemSync(playerId, itemId) ?? 0
+    const itemMailId = addMail(playerId, MailType.ITEM, itemId, 3)
+    const unsupportedMailId = addMail(playerId, MailType.DEGREE, 1001, 1)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/receive_all",
+        payload: { viewer_id: viewerId, mail_ids: [itemMailId, unsupportedMailId] },
+    })
+
+    assert.equal(response.statusCode, 400, response.body)
+    assert.equal(getPlayerItemSync(playerId, itemId) ?? 0, before)
+    assert.equal(mailState(itemMailId), "0000-00-00 00:00:00")
+    assert.equal(mailState(unsupportedMailId), "0000-00-00 00:00:00")
     assert.equal(receiveHistoryCount(playerId), 0)
 })

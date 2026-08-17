@@ -160,6 +160,7 @@ test("only approved standard reward domains and single settlement paths consume 
         "src/lib/gacha-reward-grant.ts",
         "src/lib/gacha-reward-legacy.ts",
         "src/lib/gacha.ts",
+        "src/lib/mail-reward-grant.ts",
         "src/lib/mission/grants.ts",
         "src/lib/quest/finish/single-settlement-reward-grant.ts",
         "src/lib/quest/finish/single-settlement-writes.ts",
@@ -171,6 +172,7 @@ test("only approved standard reward domains and single settlement paths consume 
         "src/lib/quest/score-reward-settlement.ts",
         "src/lib/shop-reward-grant.ts",
         "src/routes/api/gacha.ts",
+        "src/routes/api/mail.ts",
         "src/routes/api/shop.ts",
         "src/routes/api/tutorial.ts",
     ])

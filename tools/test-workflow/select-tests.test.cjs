@@ -93,7 +93,32 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/routes/api/shop.ts"]),
         ["full", "integration:reward-grant", "integration:rules"],
     )
-    assert.deepEqual(selectTestGroups(["src/routes/api/mail.ts"]), ["full"])
+    assert.deepEqual(
+        selectTestGroups(["src/routes/api/mail.ts"]),
+        ["full", "integration:reward-grant", "integration:rules"],
+    )
+    for (const file of [
+        "src/lib/mail-reward-grant.ts",
+        "docs/systems/mail.md",
+    ]) {
+        assert.deepEqual(
+            selectTestGroups([file]),
+            ["integration:reward-grant", "integration:rules"],
+            file,
+        )
+    }
+    for (const file of [
+        "tools/mail_reward_grant.test.cjs",
+        "tools/mail_reward_owner.test.cjs",
+    ]) assert.deepEqual(selectTestGroups([file]), ["integration:reward-grant"], file)
+    for (const file of [
+        "tools/mail_reward_fixture.test.cjs",
+        "tools/mail_reward_rollback.test.cjs",
+    ]) assert.deepEqual(selectTestGroups([file]), ["integration:rules"], file)
+    assert.deepEqual(
+        selectTestGroups(["tools/mail_receive_transaction.test.cjs"]),
+        ["integration:database"],
+    )
     assert.deepEqual(
         selectTestGroups(["src/data/domains/session.ts"]),
         ["full", "integration:database", "quick:workflow"],
@@ -430,6 +455,8 @@ test("maps the public reward grant layer and its regressions to one focused leaf
         "tools/single_settlement_reward_grant.test.cjs",
         "tools/task23c_reward_grants.test.cjs",
         "tools/shop_reward_grant.test.cjs",
+        "tools/mail_reward_grant.test.cjs",
+        "tools/mail_reward_owner.test.cjs",
     ]
 
     assert.deepEqual(TEST_GROUPS[group], {
@@ -1255,6 +1282,8 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/shop_reward_purchase_contract.test.cjs",
         "tools/mail_notification.test.cjs",
         "tools/mail_notification_write_routes.test.cjs",
+        "tools/mail_reward_fixture.test.cjs",
+        "tools/mail_reward_rollback.test.cjs",
     ])
     assert.deepEqual(
         selectTestGroups(["src/lib/item-use-settlement.ts"]),

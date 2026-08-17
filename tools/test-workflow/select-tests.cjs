@@ -244,6 +244,10 @@ const SOURCE_RULES = [
         groups: ["integration:reward-grant", "integration:rules"],
     },
     {
+        pattern: /^(?:src\/lib\/mail-reward-grant\.ts|src\/routes\/api\/mail\.ts|docs\/systems\/mail\.md)$/,
+        groups: ["integration:reward-grant", "integration:rules"],
+    },
+    {
         pattern: /^src\/routes\/api\/gacha\.ts$/,
         groups: ["integration:reward-grant", "integration:rules", "quick:gacha"],
     },

@@ -1,6 +1,6 @@
 # 奖励发放事务
 
-`src/lib/reward-grant/` 提供可组合的奖励计划和同步执行器。单人战斗 finish 的直接标准奖励、普通/Rare Score、Carnival 标准奖励、Mission 标准奖励、普通角色/装备抽卡生产路径，以及普通/bulk shop 标准奖励已迁移到 owner 计划执行。box gacha、邮件和 `TREASURE_EQUIPMENT` 强化商店仍保持各自领域 writer。Carnival degree、Mission degree/pass 点数/事实写入继续由领域模块负责。协力 Score 只复用规范化 Plan 的选择结果，继续通过 `givePlayerScoreRewardsSync()` 兼容 writer 发放，不使用事务拥有者入口。
+`src/lib/reward-grant/` 提供可组合的奖励计划和同步执行器。单人战斗 finish 的直接标准奖励、普通/Rare Score、Carnival 标准奖励、Mission 标准奖励、普通角色/装备抽卡生产路径、普通/bulk shop 标准奖励，以及邮件的六种标准附件已迁移到 owner 计划执行。box gacha 和 `TREASURE_EQUIPMENT` 强化商店仍保持各自领域 writer；邮件的六种专用余额也继续由邮件领域负责。Carnival degree、Mission degree/pass 点数/事实写入继续由领域模块负责。协力 Score 只复用规范化 Plan 的选择结果，继续通过 `givePlayerScoreRewardsSync()` 兼容 writer 发放，不使用事务拥有者入口。
 
 ## 安全公共 API
 
@@ -8,7 +8,7 @@
 - `executeRewardGrantPlanWithinTransactionSync(playerId, plan)`：在调用方已经开启的 SQLite 事务中执行计划。
 - `executeRewardGrantPlanSync(playerId, plan)`：为独立调用建立一次 SQLite 事务并执行计划。
 
-`executeRewardGrantPlanInTransactionOwnerSync(playerId, plan, knownPlayerBefore)` 与其 `Internal` detailed 版本是 executor 模块的内部事务拥有者契约，不从 `reward-grant/index.ts` 公共 barrel 导出。它仅供拥有最外层事务、负责绑定 `playerId` 与已知状态且保证错误向外传播的协调器使用；该入口复用调用方已知的玩家货币前态，不建立计划 savepoint。gacha route、Tutorial route、Score 适配器和 shop reward 适配器均 direct import 需要的 owner 入口；详细结果类型与 `itemDeltas` 仅限各自 projection 内部使用，不得进入公共 barrel、HTTP/TCP 响应或其他结算模块。
+`executeRewardGrantPlanInTransactionOwnerSync(playerId, plan, knownPlayerBefore)` 与其 `Internal` detailed 版本是 executor 模块的内部事务拥有者契约，不从 `reward-grant/index.ts` 公共 barrel 导出。它仅供拥有最外层事务、负责绑定 `playerId` 与已知状态且保证错误向外传播的协调器使用；该入口复用调用方已知的玩家货币前态，不建立计划 savepoint。gacha route、Tutorial route、Score 适配器、shop reward 适配器和 mail reward 适配器均 direct import 需要的 owner 入口；详细结果类型与 `itemDeltas` 仅限各自 projection 内部使用，不得进入公共 barrel、HTTP/TCP 响应或其他结算模块。
 
 计划条目通过泛型 `source` 保留调用方关联信息，例如抽取序号或邮件 ID。计划保持条目顺序和 `source` 引用，不复制或冻结 `source`；建计划时只读取一次条目及奖励必需字段，并把奖励复制成仅含 `name`、`type`、`id`、`count` 中适用字段的普通冻结对象。奖励对象、条目、条目数组和计划本身会被冻结，因此调用方之后修改原奖励对象不会改变计划，额外奖励字段也不会进入计划。
 
@@ -52,6 +52,14 @@
 
 owner 返回的 item、角色、装备最终状态与货币后态直接用于商店响应，不再为最终 `user_info` 查询玩家；同一 item 多次奖励及重复角色补偿均返回数据库最终库存。purchase count、mana mission fact、pass-card point 或奖励执行失败必须离开事务回调，使成本、奖励和后续写入由同一个外层事务回滚。`TREASURE_EQUIPMENT` 强化商店继续执行专用装备成长事务，不经过 shop reward adapter。
 
+## 邮件标准奖励
+
+`mail-reward-grant.ts` 将 `ITEM`、`FREE_VMONEY`、`CHARACTER`、`EQUIPMENT`、`FREE_MANA`、`EXP_POOL` 分别映射为 RewardGrant 的 `ITEM`、`BEADS`、`CHARACTER`、`EQUIPMENT`、`MANA`、`EXP`。角色邮件按 `number` 展开；source 为 `{ mailId, attachmentIndex }`，保持请求中有效邮件和附件的顺序。`PAID_VMONEY`、`STAR_CRUMB`、`BOND_TOKEN`、`BOSS_BOOST_POINT`、`BOOST_POINT`、`RANK_POINT` 不进入 plan，也不增加 RewardGrant 公共类型。
+
+`/mail/receive` 与 `/mail/receive_all` 各自拥有唯一最外层事务，并在其中读取一次奖励所需 Player 前态。adapter 的 owner 调用不查询 Player、不建立 savepoint；专用余额复用同一前态，只更新本批实际涉及字段。adapter 只返回邮件协议需要的角色、装备、最终 item 库存和最终绝对余额，plan source、`joined_character_id_list`、`isNew`、`itemDeltas` 均不向 route 暴露为响应字段。
+
+全部有效邮件先完成校验，再执行标准 plan、专用写入和每封一次的领取历史；route 随后逐封标记领取，并在原有时点 reconcile Awake unlock。owner、专用写入、history、标记、未知角色或安全整数溢出必须抛出到最外层事务，使批量全部回滚。不支持附件仍由邮件领域返回 400，不会消费同批合法邮件。
+
 ## 后续迁移
 
-单人 finish 通过事务拥有者入口迁移 clear、S+、普通/Rare Score、additional、rush、score-attack、Carnival kind 0/1/2/3/4 和 Mission kind 0/1/2/3/4/5 标准奖励，并维护三个货币后态字段。Carnival kind 7、Mission kind 6/7 以及 mission facts/stages、Carnival claimed/record 仍由领域 writer 负责。Mission granter 跨 stage 收集标准 entries，在 `persistPlayer()` 一次执行 owner callback；character amount 会在领域适配层展开为多个 CHARACTER entry，RewardGrant 的公共 character 类型不增加 count。普通/bulk shop 已在各自最外层购买事务中启用 owner callback；无 callback 的 Carnival standalone、active mission、pass-card、box gacha 和邮件继续使用原 writer，`TREASURE_EQUIPMENT` 继续使用装备强化专用路径。所有回滚仍由最外层事务拥有者负责，本模块不提供 Unit of Work、事件总线或插件扩展。
+单人 finish 通过事务拥有者入口迁移 clear、S+、普通/Rare Score、additional、rush、score-attack、Carnival kind 0/1/2/3/4 和 Mission kind 0/1/2/3/4/5 标准奖励，并维护三个货币后态字段。Carnival kind 7、Mission kind 6/7 以及 mission facts/stages、Carnival claimed/record 仍由领域 writer 负责。Mission granter 跨 stage 收集标准 entries，在 `persistPlayer()` 一次执行 owner callback；character amount 会在领域适配层展开为多个 CHARACTER entry，RewardGrant 的公共 character 类型不增加 count。普通/bulk shop 和邮件标准附件已在各自最外层事务中启用 owner callback；无 callback 的 Carnival standalone、active mission、pass-card 和 box gacha 继续使用原 writer，`TREASURE_EQUIPMENT` 继续使用装备强化专用路径。所有回滚仍由最外层事务拥有者负责，本模块不提供 Unit of Work、事件总线或插件扩展。
