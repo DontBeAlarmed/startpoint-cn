@@ -6,6 +6,11 @@ import { givePlayerEquipmentSync } from "../equipment"
 import { PlayerRewardResult, RewardType } from "../types/rewards"
 import { createRewardGrantPlan } from "./plan"
 import {
+    grantOwnerCurrency,
+    persistOwnerCurrency,
+    type RewardGrantOwnerPlayerUpdate,
+} from "./owner-currency"
+import {
     createRewardGrantEntryResult,
     projectPublicRewardGrantResult,
     type InternalRewardGrantEntryResult,
@@ -160,36 +165,6 @@ function grantEntrySync(
     }
 }
 
-function grantCurrencyFromKnownPlayerSync(
-    playerId: number,
-    reward: Extract<RewardGrantReward, { type: RewardType.BEADS | RewardType.MANA | RewardType.EXP }>,
-    playerAfter: { freeMana: number; freeVmoney: number; expPool: number },
-): PlayerRewardResult {
-    const result = emptyPlayerRewardResult()
-    switch (reward.type) {
-        case RewardType.BEADS:
-            playerAfter.freeVmoney += reward.count
-            result.user_info.free_vmoney = reward.count
-            updatePlayerSync({ id: playerId, freeVmoney: playerAfter.freeVmoney })
-            break
-        case RewardType.MANA:
-            playerAfter.freeMana += reward.count
-            result.user_info.free_mana = reward.count
-            getDb().prepare(`
-                UPDATE players
-                SET free_mana = ?, total_mana_obtained = total_mana_obtained + ?
-                WHERE id = ?
-            `).run(playerAfter.freeMana, reward.count, playerId)
-            break
-        case RewardType.EXP:
-            playerAfter.expPool += reward.count
-            result.user_info.exp_pool = reward.count
-            updatePlayerSync({ id: playerId, expPool: playerAfter.expPool })
-            break
-    }
-    return result
-}
-
 function aggregateEntryResults<TSource>(
     entries: readonly InternalRewardGrantEntryResult<TSource>[],
 ): PlayerRewardResult {
@@ -252,13 +227,16 @@ export function executeNormalizedRewardGrantPlanAsTransactionOwnerInternalSync<T
     playerId: number,
     plan: RewardGrantPlan<TSource>,
     knownPlayerBefore: RewardGrantPlayerAfter,
+    playerUpdate: RewardGrantOwnerPlayerUpdate = {},
 ): InternalRewardGrantResult<TSource> {
     const playerAfter = { ...knownPlayerBefore }
+    const currencyDeltas = { freeMana: 0, freeVmoney: 0, expPool: 0 }
     const entries = plan.entries.map((entry, entryIndex) => createRewardGrantEntryResult(
         entry,
         grantEntrySync(playerId, entry.reward, entryIndex, (pid, reward) =>
-            grantCurrencyFromKnownPlayerSync(pid, reward, playerAfter)),
+            grantOwnerCurrency(reward, playerAfter, currencyDeltas)),
     ))
+    persistOwnerCurrency(playerId, playerAfter, currencyDeltas, playerUpdate)
     return { aggregate: aggregateEntryResults(entries), entries, playerAfter }
 }
 

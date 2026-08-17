@@ -137,6 +137,7 @@ const SOURCE_RULES = [
             "integration:event",
             "integration:mission",
             "integration:quest",
+            "integration:reward-grant",
             "quick:modes",
             "quick:quest",
         ],
@@ -160,8 +161,12 @@ const SOURCE_RULES = [
         groups: ["integration:reward-grant"],
     },
     {
-        pattern: /^(?:src\/lib\/quest\/finish\/single-settlement-reward-grant\.ts|tools\/single_settlement_reward_grant\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/quest\/finish\/(?:single-settlement-reward-grant|single-standard-reward-callbacks)\.ts|tools\/(?:single_settlement_reward_grant|task23c_reward_grants)\.test\.cjs)$/,
         groups: ["integration:reward-grant"],
+    },
+    {
+        pattern: /^src\/lib\/quest\/finish\/single-mission-settlement\.ts$/,
+        groups: ["integration:mission", "integration:quest", "integration:reward-grant", "quick:quest"],
     },
     {
         pattern: /^(?:src\/lib\/quest\/score-reward-(?:selection(?:-core)?|normalization|projection|settlement)\.ts|docs\/systems\/quest-score-rewards\.md)$/,
@@ -304,8 +309,20 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^src\/lib\/mission\/(?:category-session-plan|collect-progress|collect-session-context|computer-regular|grants|master-value|pass|periodic-session-context|regular-battle-facts|regular-quest-facts|regular-session-context|regular-state-facts|settlement|types)\.ts$/,
+        pattern: /^src\/lib\/mission\/(?:category-session-plan|collect-progress|collect-session-context|computer-regular|master-value|pass|periodic-session-context|regular-battle-facts|regular-quest-facts|regular-session-context|regular-state-facts|types)\.ts$/,
         groups: ["integration:mission"],
+    },
+    {
+        pattern: /^src\/lib\/mission\/settlement\.ts$/,
+        groups: ["integration:mission", "integration:reward-grant"],
+    },
+    {
+        pattern: /^src\/lib\/mission\/grants\.ts$/,
+        groups: ["integration:mission", "integration:reward-grant"],
+    },
+    {
+        pattern: /^src\/lib\/carnival-rewards\.ts$/,
+        groups: ["integration:reward-grant", "integration:event"],
     },
     {
         pattern: /^(?:tools\/perf\/mission_engine_focused_(?:admission|baseline|helpers|report|runner|scenarios)(?:\.test)?\.cjs|tools\/perf\/__snapshots__\/mission_engine_focused_baseline\.json)$/,
@@ -320,8 +337,12 @@ const SOURCE_RULES = [
         groups: ["integration:quest"],
     },
     {
-        pattern: /^(?:src\/lib\/mission\/settlement-(?:prepare|evaluate|write)\.ts|tools\/fixtures\/mission-settlement-pipeline-base\.json|tools\/mission_settlement_base_oracle\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/mission\/settlement-(?:prepare|evaluate)\.ts|tools\/fixtures\/mission-settlement-pipeline-base\.json|tools\/mission_settlement_base_oracle\.test\.cjs)$/,
         groups: ["integration:mission"],
+    },
+    {
+        pattern: /^src\/lib\/mission\/settlement-write\.ts$/,
+        groups: ["integration:mission", "integration:reward-grant"],
     },
     {
         pattern: /^tools\/oracle\/(?:git-object-runtime(?:\.test)?|generate_mission_(?:entry_load|settlement)_base|mission_(?:entry_load|settlement)_base_collector)\.cjs$/,

@@ -206,7 +206,7 @@ const singleCharacterExp = singleBattleSource.indexOf(
     singleFactCall,
 )
 const singleSettlementTime = singleBattleSource.indexOf(
-    "buildBattleMissionSettlementScopes(partyCharacterIds), settlementTime,",
+    "settleSingleBattleMissionCategories(playerId, partyCharacterIds, settlementTime,",
     singleFactCall,
 )
 const singleAwakeSettlement = singleBattleSource.indexOf(
@@ -214,10 +214,10 @@ const singleAwakeSettlement = singleBattleSource.indexOf(
     singleSettlementTime,
 )
 const singleGeneralMerge = singleProjectorSource.indexOf(
-    "mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)",
+    "mergeMissionSettlementResponse(missionResponseTarget, missionSettlement, viewerId)",
 )
 const singleAwakeMerge = singleProjectorSource.indexOf(
-    "mergeMissionSettlementResponse(responseData, awakeMissionSettlement, viewerId)",
+    "mergeMissionSettlementResponse(missionResponseTarget, awakeMissionSettlement, viewerId)",
     singleGeneralMerge,
 )
 const singleTransactionCall = singleOrchestratorSource.indexOf(

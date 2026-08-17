@@ -1,4 +1,5 @@
 import type {
+    RewardGrantPlan,
     RewardGrantPlayerAfter,
     RewardGrantResult,
     RewardGrantReward,
@@ -76,5 +77,19 @@ export function grantSingleSettlementRewardsWithinTransactionSync(
         source: { kind, index },
         reward: reward as RewardGrantReward,
     })))
-    return executeRewardGrantPlanInTransactionOwnerSync(playerId, plan, knownPlayerBefore)
+    return grantSingleSettlementPlanWithinTransactionSync(playerId, plan, knownPlayerBefore)
+}
+
+export function grantSingleSettlementPlanWithinTransactionSync<TSource>(
+    playerId: number,
+    plan: RewardGrantPlan<TSource>,
+    knownPlayerBefore: RewardGrantPlayerAfter,
+    playerUpdate: { readonly degreeId?: number } = {},
+): RewardGrantResult<TSource> {
+    return executeRewardGrantPlanInTransactionOwnerSync(
+        playerId,
+        plan,
+        knownPlayerBefore,
+        playerUpdate,
+    )
 }

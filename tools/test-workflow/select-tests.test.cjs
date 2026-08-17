@@ -46,7 +46,6 @@ test("maps representative source files to focused groups", () => {
     for (const file of [
         "src/lib/mission/pass.ts",
         "src/lib/mission/periodic-session-context.ts",
-        "src/lib/mission/settlement.ts",
         "tools/oracle/git-object-runtime.test.cjs",
         "tools/oracle/generate_mission_settlement_base.cjs",
         "tools/oracle/generate_mission_entry_load_base.cjs",
@@ -334,6 +333,7 @@ test("maps single finish settlement implementation and regression precisely", ()
             "integration:event",
             "integration:mission",
             "integration:quest",
+            "integration:reward-grant",
             "quick:modes",
             "quick:quest",
         ],
@@ -351,6 +351,18 @@ test("maps single finish settlement implementation and regression precisely", ()
     assert.deepEqual(
         selectTestGroups(["tools/single_battle_finish_validation.test.cjs"]),
         ["integration:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/finish/single-mission-settlement.ts"]),
+        ["integration:mission", "integration:quest", "integration:reward-grant", "quick:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/settlement.ts"]),
+        ["integration:mission", "integration:reward-grant"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/settlement-write.ts"]),
+        ["integration:mission", "integration:reward-grant"],
     )
     assert.deepEqual(
         selectTestGroups(["tools/single_finish_orchestrator_architecture.test.cjs"]),
@@ -390,6 +402,7 @@ test("maps the public reward grant layer and its regressions to one focused leaf
         "tools/score_reward_selection_core.test.cjs",
         "tools/score_reward_selection.test.cjs",
         "tools/single_settlement_reward_grant.test.cjs",
+        "tools/task23c_reward_grants.test.cjs",
     ]
 
     assert.deepEqual(TEST_GROUPS[group], {
@@ -417,6 +430,24 @@ test("maps single settlement reward grants to the focused reward grant leaf", ()
     assert.deepEqual(selectTestGroups([adapter]), expectedGroups)
     assert.deepEqual(selectTestGroups([regression]), expectedGroups)
     assert.ok(TEST_GROUPS[expectedGroups[0]].tests.includes(regression))
+})
+
+test("maps Task23c reward domains and its real regression to precise groups", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/grants.ts"]),
+        ["integration:mission", "integration:reward-grant"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/carnival-rewards.ts"]),
+        ["integration:event", "integration:reward-grant"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/task23c_reward_grants.test.cjs"]),
+        ["integration:reward-grant"],
+    )
+    assert.ok(TEST_GROUPS["integration:reward-grant"].tests.includes(
+        "tools/task23c_reward_grants.test.cjs",
+    ))
 })
 
 test("maps score reward selection and projection to every affected leaf", () => {

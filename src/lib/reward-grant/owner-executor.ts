@@ -9,6 +9,7 @@ import {
     RewardGrantTransactionRequiredError,
 } from "./executor"
 import { snapshotKnownRewardGrantPlayer } from "./known-player"
+import type { RewardGrantOwnerPlayerUpdate } from "./owner-currency"
 import type {
     RewardGrantPlan,
     RewardGrantPlayerAfter,
@@ -22,6 +23,7 @@ export function executeRewardGrantPlanInTransactionOwnerInternalSync<TSource>(
     playerId: number,
     plan: RewardGrantPlan<TSource>,
     knownPlayerBefore: RewardGrantPlayerAfter,
+    playerUpdate: RewardGrantOwnerPlayerUpdate = {},
 ): InternalRewardGrantResult<TSource> {
     const db = getDb()
     if (!db.inTransaction) throw new RewardGrantTransactionRequiredError()
@@ -29,6 +31,7 @@ export function executeRewardGrantPlanInTransactionOwnerInternalSync<TSource>(
         playerId,
         normalizeRewardGrantPlanInternal(plan),
         snapshotKnownRewardGrantPlayer(knownPlayerBefore),
+        playerUpdate,
     )
 }
 
@@ -36,12 +39,14 @@ export function executeRewardGrantPlanInTransactionOwnerSync<TSource>(
     playerId: number,
     plan: RewardGrantPlan<TSource>,
     knownPlayerBefore: RewardGrantPlayerAfter,
+    playerUpdate: RewardGrantOwnerPlayerUpdate = {},
 ): RewardGrantResult<TSource> {
     return projectPublicRewardGrantResult(
         executeRewardGrantPlanInTransactionOwnerInternalSync(
             playerId,
             plan,
             knownPlayerBefore,
+            playerUpdate,
         ),
     )
 }

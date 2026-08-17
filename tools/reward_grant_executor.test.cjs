@@ -298,6 +298,33 @@ test("transaction-owner execution rejects invalid known player fields before wri
     }
 })
 
+test("transaction-owner execution rejects final expPool overflow before player write", () => {
+    const playerId = createPlayer("owner-exp-overflow")
+    const before = playerState(playerId)
+    const statements = []
+    sqlTrace.active = true
+    try {
+        assert.throws(
+            () => database.transaction(() => executeRewardGrantPlanInTransactionOwnerSync(
+                playerId,
+                createRewardGrantPlan([{
+                    source: { kind: "exp-overflow", index: 0 },
+                    reward: { type: RewardType.EXP, count: 1 },
+                }]),
+                { freeMana: before.freeMana, freeVmoney: before.freeVmoney, expPool: Number.MAX_SAFE_INTEGER },
+            ))(),
+            error => error instanceof RewardGrantKnownPlayerValidationError
+                && error.field === "expPool",
+        )
+    } finally {
+        statements.push(...sqlTrace.statements)
+        sqlTrace.active = false
+    }
+
+    assert.equal(statements.filter(sql => /^\s*UPDATE\s+players\b/i.test(sql)).length, 0)
+    assert.deepEqual(playerState(playerId), before)
+})
+
 test("transaction-owner execution is absent from the public reward grant barrel", () => {
     assert.equal(
         require("../src/lib/reward-grant").executeRewardGrantPlanInTransactionOwnerSync,

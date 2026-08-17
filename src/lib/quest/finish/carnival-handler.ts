@@ -40,6 +40,7 @@ export function handleCarnivalEventFinish(params: {
     getClaimedRewardIdsFn?: (playerId: number, eventId: number) => Set<number>
     grantRewardsFn?: (playerId: number, definitions: CarnivalRewardDefinition[]) => CarnivalRewardGrantResult
     claimRewardIdsFn?: (playerId: number, eventId: number, rewardIds: number[]) => void
+    assertTargetPlayerFn?: (targetPlayerId: number) => void
     transactionFn?: <T>(operation: () => T) => T
 }): CarnivalEventFinishResult | null {
     const { questCategory, questAccomplished, questData, clearTime, party, playerId, getRecordsFn, upsertFn } = params
@@ -51,6 +52,7 @@ export function handleCarnivalEventFinish(params: {
 
     const transactionFn = params.transactionFn ?? (operation => operation())
     return transactionFn(() => {
+        params.assertTargetPlayerFn?.(playerId)
         const characterIds = party.characters.map(v => v?.id ?? null)
         const unisonCharacterIds = party.unison_characters.map(v => v?.id ?? null)
         const leaderCharId = party.leader?.id ?? party.characters[0]?.id ?? 0

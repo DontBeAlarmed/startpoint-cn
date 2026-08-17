@@ -1,6 +1,6 @@
 # 奖励发放事务
 
-`src/lib/reward-grant/` 提供可组合的奖励计划和同步执行器。该模块只负责公共发放核心；单人战斗 finish 的直接标准奖励以及普通/Rare Score 已迁移，扭蛋、商店、邮件、Carnival 和 Mission 仍保持原有 writer。协力 Score 只复用规范化 Plan 的选择结果，继续通过 `givePlayerScoreRewardsSync()` 兼容 writer 发放，不使用事务拥有者入口。
+`src/lib/reward-grant/` 提供可组合的奖励计划和同步执行器。该模块只负责公共发放核心；单人战斗 finish 的直接标准奖励、普通/Rare Score、Carnival 标准奖励和 Mission 标准奖励已迁移，扭蛋、商店、邮件仍保持原有 writer。Carnival degree、Mission degree/pass 点数/事实写入继续由领域模块负责。协力 Score 只复用规范化 Plan 的选择结果，继续通过 `givePlayerScoreRewardsSync()` 兼容 writer 发放，不使用事务拥有者入口。
 
 ## 安全公共 API
 
@@ -22,7 +22,9 @@
 
 独立执行器在规范化 Plan 后，仅包装一次 `getDb().transaction` 并直接调用同一个私有执行体，不调用事务内执行器，因此公共模块不会形成“外层事务加计划 savepoint”的两层包装。两个入口都不提交或吞掉执行错误；调用方仍可通过抛错或显式回滚撤销包含奖励在内的整个外层事务。
 
-事务拥有者入口同样要求活动事务，并在首笔写入前重新规范化完整 Plan，但不查询玩家前后态，也不建立 savepoint。它先各读取一次 `knownPlayerBefore.freeMana`、`freeVmoney` 和 `expPool`，复制为不含额外字段的普通对象；三字段必须是非负安全整数，否则抛出带 `field` 的 `RewardGrantKnownPlayerValidationError` 且零写入。执行过程使用该快照更新货币并返回完整 `entries`、`aggregate` 和 `playerAfter`，不增加玩家 `SELECT` 或事务语句。CHARACTER 发放直接复用 `givePlayerCharacterSync()` 内部查询返回的首次获得事实，不再为了 `joined_character_id_list` 预查一次角色所有权。
+事务拥有者入口同样要求活动事务，并在首笔写入前重新规范化完整 Plan，但不查询玩家前后态，也不建立 savepoint。它先各读取一次 `knownPlayerBefore.freeMana`、`freeVmoney` 和 `expPool`，复制为不含额外字段的普通对象；三字段必须是非负安全整数，否则抛出带 `field` 的 `RewardGrantKnownPlayerValidationError` 且零写入。执行过程先在内存中逐条投影货币结果，再用一条 `players` UPDATE 写入本 Plan 的最终三项余额与 mana 累计，并返回完整 `entries`、`aggregate` 和 `playerAfter`，不增加玩家 `SELECT` 或事务语句。CHARACTER 发放直接复用 `givePlayerCharacterSync()` 内部查询返回的首次获得事实，不再为了 `joined_character_id_list` 预查一次角色所有权。
+
+单人 Mission 适配器可向未公开的 owner direct 调用附带当前 `degreeId`，使 Mission 标准货币和领域称号选择继续合并为旧 writer 的一条玩家 UPDATE。该 patch 不属于 `RewardGrantPlan`、`RewardGrantResult` 或公共 barrel；degree 授予、响应和 invalidation 仍由 Mission granter 决定。
 
 该入口不提供“调用方捕获错误后计划仍独立回滚”的保证；执行错误必须离开最外层事务回调，由事务拥有者回滚全部结算写入。它也不额外查询玩家存在性，空计划加不存在玩家不属于该内部入口的 API 保证；事务拥有者负责保证玩家与已知状态属于同一结算上下文。
 
@@ -40,4 +42,4 @@
 
 ## 后续迁移
 
-单人 finish 通过事务拥有者入口迁移 clear、S+、普通/Rare Score、additional、rush 和 score-attack 标准奖励，并维护三个货币后态字段。Score 选择层的 source 区分 common/rare，并保存真实 group ID、客户端 index 和最终数量；drop IDs 由同一 source 投影。与旧 writer 相比，首通场景减少 clear/S+ 各一次玩家前态查询，Score 货币奖励也不再查询玩家前态；奖励写入数、事务语句和响应行为不变。后续迁移仍需保持各业务的奖励算法、顺序、时间语义和响应协议；本模块不提供批量 SQL、Unit of Work、事件总线或插件扩展。
+单人 finish 通过事务拥有者入口迁移 clear、S+、普通/Rare Score、additional、rush、score-attack、Carnival kind 0/1/2/3/4 和 Mission kind 0/1/2/3/4/5 标准奖励，并维护三个货币后态字段。Carnival kind 7、Mission kind 6/7 以及 mission facts/stages、Carnival claimed/record 仍由领域 writer 负责。Mission granter 跨 stage 收集标准 entries，在 `persistPlayer()` 一次执行 owner callback；character amount 会在领域适配层展开为多个 CHARACTER entry，RewardGrant 的公共 character 类型不增加 count。与旧 writer 相比，标准奖励 callback 只在单人 finish 明确提供时启用；无 callback 的 Carnival standalone、active mission 和 pass-card 继续使用原 writer。所有回滚仍由最外层事务拥有者负责，本模块不提供 Unit of Work、事件总线或插件扩展。

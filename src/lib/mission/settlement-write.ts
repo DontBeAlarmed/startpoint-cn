@@ -2,7 +2,7 @@ import {
     updatePlayerCategoryMissionStageSync,
     updatePlayerCategoryMissionSync,
 } from "../../data/domains/mission"
-import { MissionRewardGranter } from "./grants"
+import { MissionRewardGranter, type MissionRewardGrantContext } from "./grants"
 import { getMissionMasterDefinition } from "./master-data"
 import { getCategoryMissionRewardStageDefinition } from "./rewards"
 import { getCompletedStageNumbers } from "./stages"
@@ -26,9 +26,14 @@ export interface MissionEvaluationSettlement {
     readonly invalidatedFactKeys: readonly FactKey[]
 }
 
+export interface MissionSettlementRewardDependencies {
+    readonly standardRewardGrant?: MissionRewardGrantContext["standardRewardGrant"]
+}
+
 export function settleMissionEvaluationWithInvalidations(
     evaluation: MissionEvaluationResult,
     observer?: MissionSettlementObserver,
+    dependencies: MissionSettlementRewardDependencies = {},
 ): MissionEvaluationSettlement {
     const granter = new MissionRewardGranter(evaluation.playerId, evaluation.player)
     const missionInfo: MissionSettlementInfo[] = []
@@ -67,7 +72,11 @@ export function settleMissionEvaluationWithInvalidations(
             const passCardEventId = mission.category >= 6 && mission.category <= 8
                 ? getMissionMasterDefinition(mission.category, mission.missionId)?.eventId
                 : undefined
-            granter.grant(definition.rewards, { passCardEventId })
+            granter.grant(definition.rewards, {
+                definitionId: definition.missionRewardId,
+                passCardEventId,
+                standardRewardGrant: dependencies.standardRewardGrant,
+            })
             missionInfo.push({
                 mission_category_id: mission.category,
                 mission_id: mission.missionId,

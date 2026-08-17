@@ -35,7 +35,7 @@ test("single finish route delegates preparation and settlement to the orchestrat
         "getQuestFromCategorySync",
         "runSingleFinishSettlementTransaction",
         "settleAdditionalRewardsSync",
-        "settleMissionCategories",
+        "settleSingleBattleMissionCategories",
         "handleRushEventFinish",
         "handleRaidEventFinish",
         "handleCarnivalEventFinish",
@@ -51,7 +51,7 @@ test("single finish route delegates preparation and settlement to the orchestrat
     assert.match(orchestrator, /getQuestFromCategorySync\s*\(/)
     assert.match(orchestrator, /runSingleFinishSettlementTransaction\s*\(/)
     assert.match(writes, /settleAdditionalRewardsSync\s*\(/)
-    assert.match(writes, /settleMissionCategories\s*\(/)
+    assert.match(writes, /settleSingleBattleMissionCategories\s*\(/)
     assert.match(writes, /handleRushEventFinish\s*\(/)
     assert.match(writes, /handleRaidEventFinish\s*\(/)
     assert.match(writes, /handleCarnivalEventFinish\s*\(/)

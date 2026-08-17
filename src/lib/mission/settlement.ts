@@ -6,7 +6,10 @@ import {
     prepareMissionSettlement,
     selectMissionSettlementCandidates,
 } from "./settlement-prepare"
-import { settleMissionEvaluationWithInvalidations } from "./settlement-write"
+import {
+    settleMissionEvaluationWithInvalidations,
+    type MissionSettlementRewardDependencies,
+} from "./settlement-write"
 
 export interface MissionSettlementInfo {
     mission_category_id: number
@@ -106,8 +109,15 @@ export function settleMissionCategories(
     categories: readonly (number | MissionSettlementScope)[],
     evaluationTime: Date,
     observer?: MissionSettlementObserver,
+    dependencies?: MissionSettlementRewardDependencies,
 ): MissionSettlementResult {
-    const result = settleMissionCategoriesWithEvaluation(playerId, categories, evaluationTime, observer)
+    const result = settleMissionCategoriesWithEvaluation(
+        playerId,
+        categories,
+        evaluationTime,
+        observer,
+        dependencies,
+    )
     return result?.settlement ?? {
         missionInfo: [],
         itemList: {},
@@ -123,6 +133,7 @@ export function settleMissionCategoriesWithEvaluation(
     categories: readonly (number | MissionSettlementScope)[],
     evaluationTime: Date,
     observer?: MissionSettlementObserver,
+    dependencies?: MissionSettlementRewardDependencies,
 ): MissionSettlementEvaluation | null {
     const selection = selectMissionSettlementCandidates(categories, evaluationTime, observer)
     if (selection.candidates.length === 0) {
@@ -138,7 +149,7 @@ export function settleMissionCategoriesWithEvaluation(
             selection,
         )
         const evaluation = evaluateMissionCandidates(prepared, observer)
-        const settled = settleMissionEvaluationWithInvalidations(evaluation, observer)
+        const settled = settleMissionEvaluationWithInvalidations(evaluation, observer, dependencies)
         return {
             prepared,
             evaluation,

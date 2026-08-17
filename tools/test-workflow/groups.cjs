@@ -275,6 +275,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/score_reward_selection_core.test.cjs",
             "tools/score_reward_selection.test.cjs",
             "tools/single_settlement_reward_grant.test.cjs",
+            "tools/task23c_reward_grants.test.cjs",
         ],
     },
     "integration:database": {

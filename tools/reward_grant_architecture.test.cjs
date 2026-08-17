@@ -10,6 +10,7 @@ const productionFiles = [
     "src/lib/reward-grant/types.ts",
     "src/lib/reward-grant/plan.ts",
     "src/lib/reward-grant/executor.ts",
+    "src/lib/reward-grant/owner-currency.ts",
     "src/lib/reward-grant/owner-executor.ts",
     "src/lib/reward-grant/known-player.ts",
     "src/lib/reward-grant/index.ts",
@@ -149,14 +150,17 @@ test("public barrel excludes the internal transaction-owner entry", () => {
     assert.match(index, /executeRewardGrantPlanSync/)
 })
 
-test("only score planning and the approved single settlement path consume reward grants", () => {
+test("only approved standard reward domains and single settlement paths consume reward grants", () => {
     const consumers = sourceFilesBelow("src")
         .filter(relativePath => !relativePath.startsWith("src/lib/reward-grant/"))
         .filter(relativePath => /reward-grant/.test(readSource(relativePath)))
 
     assert.deepEqual(consumers, [
+        "src/lib/carnival-rewards.ts",
+        "src/lib/mission/grants.ts",
         "src/lib/quest/finish/single-settlement-reward-grant.ts",
         "src/lib/quest/finish/single-settlement-writes.ts",
+        "src/lib/quest/finish/single-standard-reward-callbacks.ts",
         "src/lib/quest/score-reward-normalization.ts",
         "src/lib/quest/score-reward-projection.ts",
         "src/lib/quest/score-reward-selection-core.ts",

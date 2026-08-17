@@ -22,8 +22,8 @@ import { getRuntimeContentTableSync } from "../../../content/runtime/table-acces
 import { getContentSnapshot } from "../../../content/runtime/content-snapshot"
 import { settleAdditionalRewardsSync, type AdditionalRewardTable } from "../../additional-reward"
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../rush"
-import { reconcileActiveMissionFacts, reconcileAwakeUnlockCharacterList, settleAwakeBattleMissions, settleMissionCategories } from "../../mission"
-import { buildBattleMissionSettlementScopes, recordMissionBattleFacts } from "../../mission/battle-facts"
+import { reconcileActiveMissionFacts, reconcileAwakeUnlockCharacterList, settleAwakeBattleMissions } from "../../mission"
+import { recordMissionBattleFacts } from "../../mission/battle-facts"
 import { getCarnivalRewardDefinitions, grantCarnivalRewards } from "../../carnival-rewards"
 import { givePlayerEquipmentSync } from "../../equipment"
 import { getRaidEventRequiredKillCount } from "../../raid-event-master"
@@ -50,8 +50,9 @@ import {
     type SingleSettlementRewardSourceKind,
     withSingleSettlementExpPool,
 } from "./single-settlement-reward-grant"
+import { createSingleSettlementStandardRewardGrant } from "./single-standard-reward-callbacks"
+import { settleSingleBattleMissionCategories } from "./single-mission-settlement"
 const settlementModeHost = createModeTransactionHost(message => console.log(message))
-
 export interface SingleSettlementWritesInput {
     body: ValidatedSingleFinishBody
     questData: BattleQuest & { rankPointReward: number }
@@ -109,6 +110,7 @@ export function executeSingleSettlementWrites(
         rewardPlayerState = result.playerAfter
         return result.aggregate
     }
+    const standardRewardGrant = createSingleSettlementStandardRewardGrant(playerId, state => { rewardPlayerState = state })
     const clearReward = !isScoreAttackEvent && rewardEligibility.firstClear && questData.clearReward !== undefined
         ? grantDirectRewards(playerId, "clear", [questData.clearReward]) : null
     const sPlusClearReward = !isScoreAttackEvent && rewardEligibility.sPlus && questData.sPlusReward !== undefined
@@ -246,13 +248,14 @@ export function executeSingleSettlementWrites(
             getPlayer: getPlayerSync, giveItem: givePlayerItemSync,
             giveEquipment: givePlayerEquipmentSync, giveDegree: givePlayerDegreeSync,
             updatePlayer: updatePlayerSync,
+            standardRewardGrant: standardRewardGrant.forCarnival,
         }),
         claimRewardIdsFn: (pid, eid, rewardIds) => insertPlayerClaimedCarnivalRewardIdsSync(pid, eid, rewardIds),
+        assertTargetPlayerFn: standardRewardGrant.assertTargetPlayer,
         transactionFn: runCarnivalEventTransactionSync,
     })
     const carnivalEventData = carnivalFinishResult?.carnivalEventData ?? null
     const carnivalRewardResult = carnivalFinishResult?.rewardResult
-
     if (isScoreAttackEvent) insertPlayerScoreAttackBattleHistorySync(buildScoreAttackBattleHistoryRecord({
         playerId, eventId: questData.eventId!, playId: settlementActiveQuest.playId,
         categoryId: questCategory, questId, finishKind: 0, createdAt: settlementTime,
@@ -282,9 +285,7 @@ export function executeSingleSettlementWrites(
         deleteActiveQuest: pid => deletePlayerActiveQuestSync(pid),
     }) : null
     const scoreAttackRewardResult = scoreAttackFinishResult?.rewardResult
-    const missionSettlement = settleMissionCategories(
-        playerId, buildBattleMissionSettlementScopes(partyCharacterIds), settlementTime,
-    )
+    const missionSettlement = settleSingleBattleMissionCategories(playerId, partyCharacterIds, settlementTime, { standardRewardGrant: standardRewardGrant.forMission })
     const awakeMissionSettlement = settleAwakeBattleMissions({
         playerId, questAccomplished, characterIds: partyCharacterIds,
         directlyChangedMissionIds: missionBattleFacts.awakeMissionIds,
