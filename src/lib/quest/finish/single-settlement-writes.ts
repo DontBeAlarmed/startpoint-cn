@@ -16,7 +16,7 @@ import { getRushEventFolderClearRewards } from "../../assets"
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../character"
 import { getCommonScoreRewardCount } from "../../score-reward-lottery"
 import { calculateCharacterBattleExp, calculateFixedQuestMana, calculateFixedQuestPoolExp, getRewardCampaignRates } from "../../reward-campaign"
-import { QuestCategory, type BattleQuest, type Reward } from "../../types"
+import { QuestCategory, type BattleQuest } from "../../types"
 import { getRankDegree, getMaxStamina } from "../../stamina"
 import { getRuntimeContentTableSync } from "../../../content/runtime/table-access"
 import { getContentSnapshot } from "../../../content/runtime/content-snapshot"
@@ -46,12 +46,10 @@ import type { FinishContext } from "./types"
 import { selectScoreRewardGrantPlan } from "../score-reward-selection"
 import {
     grantSingleSettlementScoreRewardsWithinTransactionSync,
-    grantSingleSettlementRewardsWithinTransactionSync,
-    type SingleSettlementRewardSourceKind,
-    withSingleSettlementExpPool,
 } from "./single-settlement-reward-grant"
 import { createSingleSettlementStandardRewardGrant } from "./single-standard-reward-callbacks"
 import { settleSingleBattleMissionCategories } from "./single-mission-settlement"
+import { createSingleSettlementResponseState } from "./single-settlement-response-state"
 const settlementModeHost = createModeTransactionHost(message => console.log(message))
 export interface SingleSettlementWritesInput {
     body: ValidatedSingleFinishBody
@@ -94,23 +92,12 @@ export function executeSingleSettlementWrites(
     const newMana = settlementPlayer.freeMana + fixedManaReward + body.add_mana
     const manaObtained = fixedManaReward + body.add_mana
     finishCtx.manaObtained = manaObtained
-    let rewardPlayerState = {
-        freeMana: settlementPlayer.freeMana,
-        freeVmoney: settlementPlayer.freeVmoney,
-        expPool: settlementPlayer.expPool,
-    }
-    const grantDirectRewards = (
-        pid: number,
-        kind: SingleSettlementRewardSourceKind,
-        rewards: readonly Reward[],
-    ) => {
-        const result = grantSingleSettlementRewardsWithinTransactionSync(
-            pid, kind, rewards, rewardPlayerState,
-        )
-        rewardPlayerState = result.playerAfter
-        return result.aggregate
-    }
-    const standardRewardGrant = createSingleSettlementStandardRewardGrant(playerId, state => { rewardPlayerState = state })
+    const responseState = createSingleSettlementResponseState(playerId, settlementPlayer)
+    const grantDirectRewards = responseState.grant
+    const standardRewardGrant = createSingleSettlementStandardRewardGrant(
+        playerId,
+        responseState.setPlayerState,
+    )
     const clearReward = !isScoreAttackEvent && rewardEligibility.firstClear && questData.clearReward !== undefined
         ? grantDirectRewards(playerId, "clear", [questData.clearReward]) : null
     const sPlusClearReward = !isScoreAttackEvent && rewardEligibility.sPlus && questData.sPlusReward !== undefined
@@ -155,11 +142,11 @@ export function executeSingleSettlementWrites(
         maxComboAchieved: Math.max(settlementPlayer.maxComboAchieved ?? 0, body.statistics.max_combo_count ?? 0),
         ...(didLevelUp ? { stamina: afterStamina, staminaHealTime: afterStaminaHealTime } : {}),
     })
-    rewardPlayerState = {
+    responseState.setPlayerState({
         freeMana: newMana,
-        freeVmoney: rewardPlayerState.freeVmoney,
+        freeVmoney: responseState.playerState.freeVmoney,
         expPool: settlementPlayer.expPool + fixedPoolExpReward,
-    }
+    })
     if (didLevelUp) console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldRkDegree} -> ${newDegreeId}, stamina refilled`)
 
     const dailyChallengePointList = handleDailyChallengePoint({
@@ -179,9 +166,9 @@ export function executeSingleSettlementWrites(
         },
     )
     const scoreRewardGrant = grantSingleSettlementScoreRewardsWithinTransactionSync(
-        playerId, scoreRewardSelection, rewardPlayerState,
+        playerId, scoreRewardSelection, responseState.playerState,
     )
-    rewardPlayerState = scoreRewardGrant.grant.playerAfter
+    responseState.observeGrant(scoreRewardGrant.grant)
     const scoreRewardsResult = scoreRewardGrant.result
     const additionalRewardSettlement = questAccomplished
         ? settleAdditionalRewardsSync(
@@ -205,9 +192,7 @@ export function executeSingleSettlementWrites(
     const rewardCharacterExpResult = givePlayerCharactersExpSync(
         playerId, partyCharacterIds, addExpAmount, questData.fixedParty !== undefined,
     )
-    rewardPlayerState = withSingleSettlementExpPool(
-        rewardPlayerState, rewardCharacterExpResult.exp_pool,
-    )
+    responseState.setExpPool(rewardCharacterExpResult.exp_pool)
 
     const rushFinishParams = {
         questCategory, questAccomplished, questData, clearTime, party, playerId, questId,
@@ -256,6 +241,10 @@ export function executeSingleSettlementWrites(
     })
     const carnivalEventData = carnivalFinishResult?.carnivalEventData ?? null
     const carnivalRewardResult = carnivalFinishResult?.rewardResult
+    responseState.observeResult(carnivalRewardResult === undefined ? undefined : {
+        itemList: carnivalRewardResult.item_list,
+        degreeIds: carnivalRewardResult.new_degree_ids,
+    })
     if (isScoreAttackEvent) insertPlayerScoreAttackBattleHistorySync(buildScoreAttackBattleHistoryRecord({
         playerId, eventId: questData.eventId!, playId: settlementActiveQuest.playId,
         categoryId: questCategory, questId, finishKind: 0, createdAt: settlementTime,
@@ -286,24 +275,31 @@ export function executeSingleSettlementWrites(
     }) : null
     const scoreAttackRewardResult = scoreAttackFinishResult?.rewardResult
     const missionSettlement = settleSingleBattleMissionCategories(playerId, partyCharacterIds, settlementTime, { standardRewardGrant: standardRewardGrant.forMission })
+    responseState.observeResult(missionSettlement)
     const awakeMissionSettlement = settleAwakeBattleMissions({
         playerId, questAccomplished, characterIds: partyCharacterIds,
         directlyChangedMissionIds: missionBattleFacts.awakeMissionIds,
         evaluationTime: settlementTime,
     })
+    responseState.observeResult(awakeMissionSettlement)
     const activeMissionList = reconcileActiveMissionFacts({
         playerId, repository: getContentSnapshot().repository, now: settlementTime,
     })
-    const itemList = {
-        ...(settlementActiveQuest.entryItemId
-            ? { [settlementActiveQuest.entryItemId]: getPlayerItemSync(playerId, settlementActiveQuest.entryItemId) ?? 0 }
-            : {}),
-        ...scoreRewardsResult.items,
-        ...(additionalRewardSettlement.rewardResult?.items ?? {}),
-        ...(scoreAttackRewardResult?.items ?? {}),
-        ...(rushEventRewardsResult?.items ?? {}),
-        ...(carnivalRewardResult?.item_list ?? {}),
+    if (settlementActiveQuest.entryItemId) {
+        responseState.observeItems({
+            [settlementActiveQuest.entryItemId]: getPlayerItemSync(
+                playerId,
+                settlementActiveQuest.entryItemId,
+            ) ?? 0,
+        })
     }
+    const { itemList, finalPlayerProjection } = responseState.finalize({
+        rankPoint: newRankPoint,
+        stamina: afterStamina,
+        staminaHealTime: afterStaminaHealTime,
+        boostPoint: newBoostPoint,
+        bossBoostPoint: newBossBoostPoint,
+    })
     const characterList = reconcileAwakeUnlockCharacterList(playerId, [
         ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
         ...((clearReward?.character_list || []) as Record<string, unknown>[]),
@@ -323,6 +319,7 @@ export function executeSingleSettlementWrites(
         scoreAttackRewardResult, itemList, characterList, clearReward, sPlusClearReward,
         missionSettlement, awakeMissionSettlement, activeMissionList, fixedManaReward,
         fixedPoolExpReward, newMana, beforeRankPoint, newRankPoint, newBoostPoint, newBossBoostPoint,
+        finalPlayerProjection,
     }
 }
 

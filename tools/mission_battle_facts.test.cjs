@@ -214,10 +214,10 @@ const singleAwakeSettlement = singleBattleSource.indexOf(
     singleSettlementTime,
 )
 const singleGeneralMerge = singleProjectorSource.indexOf(
-    "mergeMissionSettlementResponse(missionResponseTarget, missionSettlement, viewerId)",
+    "...missionSettlement,",
 )
 const singleAwakeMerge = singleProjectorSource.indexOf(
-    "mergeMissionSettlementResponse(missionResponseTarget, awakeMissionSettlement, viewerId)",
+    "...awakeMissionSettlement,",
     singleGeneralMerge,
 )
 const singleTransactionCall = singleOrchestratorSource.indexOf(

@@ -80,7 +80,7 @@ test("projects the complete single finish success envelope without mutating its 
         scoreAttackRewardResult: rewardResult({
             mana: 4, vmoney: 4, pool: 30, characterId: 104, equipmentId: 204, itemId: 304,
         }),
-        itemList: { 301: 9 },
+        itemList: { 301: 9, 501: 22 },
         characterList: [{ character_id: 101, level: 9, mana_board_awake: { level: 1 } }],
         clearReward: rewardResult({
             mana: 1, vmoney: 1, pool: 10, characterId: 101, equipmentId: 201, itemId: 301,
@@ -118,9 +118,18 @@ test("projects the complete single finish success envelope without mutating its 
     const input = {
         result,
         dataHeaders: { viewer_id: 2468, servertime: 1700000000, api_count: 9 },
-        player: { freeVmoney: 1000, degreeId: 55 },
-        expPooledTime: 1700000010,
-        staminaHealTime: 1700000020,
+        player: {
+            freeMana: 777,
+            expPool: 888,
+            expPooledTime: 1700000010,
+            freeVmoney: 999,
+            rankPoint: 120,
+            degreeId: 55,
+            stamina: 33,
+            staminaHealTime: 1700000020,
+            boostPoint: 2,
+            bossBoostPoint: 3,
+        },
         mailArrived: true,
     }
     const originalInput = structuredClone(input)
@@ -131,10 +140,10 @@ test("projects the complete single finish success envelope without mutating its 
         data_headers: input.dataHeaders,
         data: {
             user_info: {
-                free_mana: 222,
-                exp_pool: 200,
+                free_mana: 777,
+                exp_pool: 888,
                 exp_pooled_time: 1700000010,
-                free_vmoney: 1015,
+                free_vmoney: 999,
                 rank_point: 120,
                 degree_id: 55,
                 stamina: 33,

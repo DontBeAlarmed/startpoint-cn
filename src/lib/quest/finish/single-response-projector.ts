@@ -1,9 +1,17 @@
 import { mergeMissionSettlementResponse } from "../../mission/response"
 import type { SingleFinishSuccess } from "./single-orchestrator"
 
-export interface SingleFinishResponsePlayerSnapshot {
+export interface SingleFinishResponseFinalPlayerProjection {
+    readonly freeMana: number
+    readonly expPool: number
+    readonly expPooledTime: number
     readonly freeVmoney: number
+    readonly rankPoint: number
     readonly degreeId: number
+    readonly stamina: number
+    readonly staminaHealTime: number
+    readonly boostPoint: number
+    readonly bossBoostPoint: number
 }
 
 export interface SingleFinishResponseHeaders {
@@ -77,9 +85,7 @@ export interface SingleFinishResponseEnvelope {
 export interface SingleFinishResponseProjectionInput {
     readonly result: SingleFinishSuccess
     readonly dataHeaders: SingleFinishResponseHeaders
-    readonly player: SingleFinishResponsePlayerSnapshot
-    readonly expPooledTime: number
-    readonly staminaHealTime: number
+    readonly player: SingleFinishResponseFinalPlayerProjection
     readonly mailArrived: boolean
 }
 
@@ -87,13 +93,10 @@ export function buildSingleFinishResponse({
     result,
     dataHeaders,
     player,
-    expPooledTime,
-    staminaHealTime,
     mailArrived,
 }: SingleFinishResponseProjectionInput): SingleFinishResponseEnvelope {
     const {
         body,
-        afterStamina,
         dailyChallengePointList,
         scoreRewardsResult,
         additionalRewardSettlement,
@@ -114,11 +117,7 @@ export function buildSingleFinishResponse({
         activeMissionList,
         fixedManaReward,
         fixedPoolExpReward,
-        newMana,
         beforeRankPoint,
-        newRankPoint,
-        newBoostPoint,
-        newBossBoostPoint,
         clearRank,
         questProgress,
     } = result
@@ -127,16 +126,16 @@ export function buildSingleFinishResponse({
 
     const responseData: SingleFinishResponseData = {
         "user_info": {
-            "free_mana": newMana + (clearReward?.user_info.free_mana || 0) + (sPlusClearReward?.user_info.free_mana || 0) + scoreRewardsResult.user_info.free_mana + (scoreAttackRewardResult?.user_info.free_mana ?? 0) + (carnivalRewardResult?.user_info.free_mana ?? 0),
-            "exp_pool": rewardCharacterExpResult.exp_pool + (clearReward?.user_info.exp_pool || 0) + scoreRewardsResult.user_info.exp_pool + (scoreAttackRewardResult?.user_info.exp_pool ?? 0) + (carnivalRewardResult?.user_info.exp_pool ?? 0),
-            "exp_pooled_time": expPooledTime,
-            "free_vmoney": player.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney + (scoreAttackRewardResult?.user_info.free_vmoney ?? 0) + (carnivalRewardResult?.user_info.free_vmoney ?? 0),
-            "rank_point": newRankPoint,
+            "free_mana": player.freeMana,
+            "exp_pool": player.expPool,
+            "exp_pooled_time": player.expPooledTime,
+            "free_vmoney": player.freeVmoney,
+            "rank_point": player.rankPoint,
             "degree_id": player.degreeId,
-            "stamina": afterStamina,
-            "stamina_heal_time": staminaHealTime,
-            "boost_point": newBoostPoint,
-            "boss_boost_point": newBossBoostPoint,
+            "stamina": player.stamina,
+            "stamina_heal_time": player.staminaHealTime,
+            "boost_point": player.boostPoint,
+            "boss_boost_point": player.bossBoostPoint,
         },
         "add_exp_list": rewardCharacterExpResult.add_exp_list,
         "character_list": characterList,
@@ -190,8 +189,16 @@ export function buildSingleFinishResponse({
     const missionResponseTarget = responseData as unknown as Parameters<
         typeof mergeMissionSettlementResponse
     >[0]
-    mergeMissionSettlementResponse(missionResponseTarget, missionSettlement, viewerId)
-    mergeMissionSettlementResponse(missionResponseTarget, awakeMissionSettlement, viewerId)
+    mergeMissionSettlementResponse(missionResponseTarget, {
+        ...missionSettlement,
+        itemList: {},
+        userInfo: undefined,
+    }, viewerId)
+    mergeMissionSettlementResponse(missionResponseTarget, {
+        ...awakeMissionSettlement,
+        itemList: {},
+        userInfo: undefined,
+    }, viewerId)
 
     return {
         "data_headers": dataHeaders,

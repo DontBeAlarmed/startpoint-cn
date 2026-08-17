@@ -39,7 +39,7 @@ function createRequestSqlRunner(app, counter, measurementState, {
         }
     }
 
-    async function post(route, payload) {
+    async function post(route, payload, { normalize = true } = {}) {
         const beforeDatabaseValue = readUnmeasuredStaminaHealTime()
         const requestStartedAtMs = Date.now()
         const response = await app.inject({
@@ -56,8 +56,10 @@ function createRequestSqlRunner(app, counter, measurementState, {
         } else {
             try { decoded = JSON.parse(response.body) } catch { decoded = { body: response.body } }
         }
+        const decodedResponse = { statusCode: response.statusCode, ...decoded }
+        if (!normalize) return decodedResponse
         return staminaHealTimeTracker.normalizeRequest(
-            { statusCode: response.statusCode, ...decoded },
+            decodedResponse,
             {
                 beforeDatabaseValue,
                 afterDatabaseValue,

@@ -1,4 +1,4 @@
-import type { Player, PlayerQuestProgress } from "../../../data/types"
+import type { PlayerQuestProgress } from "../../../data/types"
 import {
     getQuestConfigurationErrorResponse,
     getQuestFromCategorySync,
@@ -37,7 +37,6 @@ export type SingleFinishSuccess = SingleSettlementWritesResult & {
     ok: true
     body: ValidatedSingleFinishBody
     clearRank: number | null
-    playerSnapshot: Player
     questProgress: PlayerQuestProgress | null
 }
 
@@ -136,7 +135,6 @@ export function settleSingleBattleQuest({
     }
     let transactionResult: {
         settlement: SingleSettlementWritesResult
-        playerSnapshot: Player
         questProgress: PlayerQuestProgress | null
     }
     try {
@@ -179,7 +177,7 @@ export function settleSingleBattleQuest({
                     rushEventFolderMaxRound,
                     scoreAttackBorderTiers,
                 }, activeQuest, player)
-                return { settlement, playerSnapshot: player, questProgress }
+                return { settlement, questProgress }
             },
         })
     } catch (error) {
@@ -199,7 +197,6 @@ export function settleSingleBattleQuest({
         ok: true,
         body,
         clearRank,
-        playerSnapshot: transactionResult.playerSnapshot,
         questProgress: transactionResult.questProgress,
         ...transactionResult.settlement,
     }

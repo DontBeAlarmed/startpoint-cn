@@ -39,9 +39,10 @@ test("single finish grants and publishes additional rewards atomically", () => {
         /runSingleFinishSettlementTransaction\(\{[\s\S]*?settle:\s*\(\{ activeQuest, player, questProgress \}\) => \{[\s\S]*?executeSingleSettlementWrites\(/,
     )
     assert.match(writes, /settleAdditionalRewardsSync\([\s\S]*?isMulti: false,/)
+    assert.match(writes, /const grantDirectRewards = responseState\.grant/)
     assert.match(
         writes,
-        /\.\.\.\(additionalRewardSettlement\.rewardResult\?\.items \?\? \{\}\),/,
+        /grantRewards:\s*rewards\s*=>\s*grantDirectRewards\(playerId,\s*"additional",\s*rewards\)/,
     )
     assert.match(
         projector,

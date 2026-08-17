@@ -453,6 +453,7 @@ test("a later owner reward failure rolls the real settlement state chain back", 
 test("single settlement migrates score while preserving multiplayer, Carnival and Mission boundaries", () => {
     const adapter = readSource("src/lib/quest/finish/single-settlement-reward-grant.ts")
     const writes = readSource("src/lib/quest/finish/single-settlement-writes.ts")
+    const responseState = readSource("src/lib/quest/finish/single-settlement-response-state.ts")
 
     assert.match(adapter, /createRewardGrantPlan\s*\(/)
     assert.match(adapter, /executeRewardGrantPlanInTransactionOwnerSync\s*\(/)
@@ -466,13 +467,14 @@ test("single settlement migrates score while preserving multiplayer, Carnival an
     for (const kind of ["clear", "s_plus", "additional", "rush", "score_attack"]) {
         assert.match(writes, new RegExp(`grantDirectRewards\\([^\\n]*"${kind}"`), kind)
     }
-    assert.match(writes, /let rewardPlayerState = \{\s*freeMana: settlementPlayer\.freeMana,\s*freeVmoney: settlementPlayer\.freeVmoney,\s*expPool: settlementPlayer\.expPool,?\s*\}/)
-    assert.match(writes, /rewardPlayerState = result\.playerAfter/)
-    assert.match(writes, /rewardPlayerState = \{\s*freeMana: newMana,\s*freeVmoney: rewardPlayerState\.freeVmoney,\s*expPool: settlementPlayer\.expPool \+ fixedPoolExpReward,?\s*\}/)
+    assert.match(responseState, /let playerState:\s*RewardGrantPlayerAfter\s*=\s*\{\s*freeMana:\s*player\.freeMana,\s*freeVmoney:\s*player\.freeVmoney,\s*expPool:\s*player\.expPool,?\s*\}/)
+    assert.match(responseState, /playerState = grant\.playerAfter/)
+    assert.match(responseState, /observeItems\(grant\.aggregate\.items\)/)
+    assert.match(writes, /responseState\.setPlayerState\(\{\s*freeMana:\s*newMana,\s*freeVmoney:\s*responseState\.playerState\.freeVmoney,\s*expPool:\s*settlementPlayer\.expPool \+ fixedPoolExpReward,?\s*\}\)/)
     assert.match(writes, /selectScoreRewardGrantPlan\s*\(/)
     assert.match(writes, /grantSingleSettlementScoreRewardsWithinTransactionSync\s*\(/)
-    assert.match(writes, /rewardPlayerState = scoreRewardGrant\.grant\.playerAfter/)
-    assert.match(writes, /withSingleSettlementExpPool\(\s*rewardPlayerState, rewardCharacterExpResult\.exp_pool,?\s*\)/)
+    assert.match(writes, /responseState\.observeGrant\(scoreRewardGrant\.grant\)/)
+    assert.match(writes, /responseState\.setExpPool\(rewardCharacterExpResult\.exp_pool\)/)
 
     assert.doesNotMatch(writes, /\bgivePlayerScoreRewardsSync\s*\(/)
     assert.match(writes, /\bgrantCarnivalRewards\s*\(/)

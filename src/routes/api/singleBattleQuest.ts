@@ -148,11 +148,17 @@ const routes = async (fastify: FastifyInstance) => {
             result: finishResult,
             dataHeaders,
             player: {
-                freeVmoney: finishResult.playerSnapshot.freeVmoney,
-                degreeId: finishResult.playerSnapshot.degreeId,
+                freeMana: finishResult.finalPlayerProjection.freeMana,
+                expPool: finishResult.finalPlayerProjection.expPool,
+                expPooledTime: getServerTime(finishResult.finalPlayerProjection.expPooledTime),
+                freeVmoney: finishResult.finalPlayerProjection.freeVmoney,
+                rankPoint: finishResult.finalPlayerProjection.rankPoint,
+                degreeId: finishResult.finalPlayerProjection.degreeId,
+                stamina: finishResult.finalPlayerProjection.stamina,
+                staminaHealTime: realToVirtual(finishResult.finalPlayerProjection.staminaHealTime),
+                boostPoint: finishResult.finalPlayerProjection.boostPoint,
+                bossBoostPoint: finishResult.finalPlayerProjection.bossBoostPoint,
             },
-            expPooledTime: getServerTime(finishResult.playerSnapshot.expPooledTime),
-            staminaHealTime: realToVirtual(finishResult.afterStaminaHealTime),
             mailArrived: getPlayerMailCountSync(playerId, true) > 0,
         })
         reply.header("content-type", "application/x-msgpack")

@@ -81,8 +81,9 @@ test("single finish route delegates pure success response projection", () => {
     )
 
     assert.match(route, /buildSingleFinishResponse\s*\(\s*\{/)
-    assert.match(projectionCall, /player:\s*\{[\s\S]*?finishResult\.playerSnapshot\.freeVmoney/)
-    assert.match(projectionCall, /degreeId:\s*finishResult\.playerSnapshot\.degreeId/)
+    assert.match(projectionCall, /player:\s*\{[\s\S]*?finishResult\.finalPlayerProjection\.freeMana/)
+    assert.match(projectionCall, /degreeId:\s*finishResult\.finalPlayerProjection\.degreeId/)
+    assert.doesNotMatch(projectionCall, /playerSnapshot/)
     assert.doesNotMatch(projectionCall, /\bplayerData\b/)
     for (const directProjection of [
         "responseData",
@@ -101,6 +102,8 @@ test("single finish route delegates pure success response projection", () => {
     }
 
     assert.match(projector, /mergeMissionSettlementResponse\s*\(/)
+    assert.doesNotMatch(projector, /free_mana[\s\S]{0,400}\+\s*\(?(?:clearReward|sPlusClearReward|scoreRewardsResult|scoreAttackRewardResult|carnivalRewardResult)/)
+    assert.doesNotMatch(projector, /free_vmoney[\s\S]{0,400}\+\s*\(?(?:clearReward|sPlusClearReward|scoreRewardsResult|scoreAttackRewardResult|carnivalRewardResult)/)
     assert.doesNotMatch(projector, /Record<string,\s*any>/)
     assert.match(
         projector,
@@ -135,6 +138,7 @@ test("single finish production files stay focused", () => {
     for (const relativePath of [
         "src/lib/quest/finish/single-orchestrator.ts",
         "src/lib/quest/finish/single-response-projector.ts",
+        "src/lib/quest/finish/single-settlement-response-state.ts",
         "src/lib/quest/finish/single-settlement-writes.ts",
     ]) {
         const lineCount = readSource(relativePath).split("\n").length

@@ -439,6 +439,18 @@ test("maps single finish settlement implementation and regression precisely", ()
         ],
     )
     assert.deepEqual(
+        selectTestGroups(["src/lib/quest/finish/single-settlement-response-state.ts"]),
+        [
+            "integration:compiled",
+            "integration:event",
+            "integration:mission",
+            "integration:quest",
+            "integration:reward-grant",
+            "quick:modes",
+            "quick:quest",
+        ],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/lib/quest/finish/single-response-projector.ts"]),
         [
             "integration:compiled",
@@ -454,6 +466,10 @@ test("maps single finish settlement implementation and regression precisely", ()
     )
     assert.deepEqual(
         selectTestGroups(["tools/single_finish_authority_transaction.test.cjs"]),
+        ["integration:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/single_finish_final_projection.test.cjs"]),
         ["integration:quest"],
     )
     assert.deepEqual(
@@ -1316,6 +1332,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/quest_host_finish.test.cjs",
         "tools/single_battle_finish_validation.test.cjs",
         "tools/single_finish_authority_transaction.test.cjs",
+        "tools/single_finish_final_projection.test.cjs",
         "tools/single_finish_orchestrator_architecture.test.cjs",
         "tools/single_finish_response_projector.test.cjs",
         "tools/single_finish_request_validation.test.cjs",

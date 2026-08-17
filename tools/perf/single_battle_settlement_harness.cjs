@@ -31,7 +31,9 @@ const {
     createSingleBattleApp,
 } = require("./single_battle_settlement_request_runner.cjs")
 
-async function withSingleBattleHarness(name, operation) {
+async function withSingleBattleHarness(name, operation, {
+    tableOverrides = {},
+} = {}) {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), `single-battle-settlement-${name}-`))
     const counter = createSqlCounter()
     const measurementState = { active: false }
@@ -48,6 +50,7 @@ async function withSingleBattleHarness(name, operation) {
             tableOverrides: {
                 "score_reward.json": fixture.DETERMINISTIC_SCORE_REWARDS,
                 "additional_reward_rules.json": fixture.DETERMINISTIC_ADDITIONAL_REWARDS,
+                ...tableOverrides,
             },
         })
         initializeDatabase({
@@ -81,6 +84,7 @@ async function withSingleBattleHarness(name, operation) {
                 ...options,
                 staminaHealTimeTracker,
             }),
+            getPlayer: () => getPlayerSync(playerId),
             getItem: itemId => getPlayerItemSync(playerId, itemId) ?? 0,
             setItem: (itemId, amount) => setPlayerItemSync(playerId, itemId, amount),
             updatePlayer: values => updatePlayerSync({ id: playerId, ...values }),
