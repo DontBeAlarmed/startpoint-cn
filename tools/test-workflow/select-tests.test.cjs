@@ -12,6 +12,7 @@ test("maps representative source files to focused groups", () => {
         ["integration:quest", "quick:quest"],
     )
     for (const file of [
+        "src/lib/quest/abort-request-validation.ts",
         "src/lib/quest/entry-lifecycle.ts",
         "src/lib/quest/start-entry.ts",
     ]) {
@@ -27,6 +28,7 @@ test("maps representative source files to focused groups", () => {
     )
     for (const file of [
         "tools/quest_entry_lifecycle.test.cjs",
+        "tools/single_battle_abort_validation.test.cjs",
         "tools/single_battle_identity_reads.test.cjs",
     ]) {
         assert.deepEqual(selectTestGroups([file]), ["integration:quest"], file)
@@ -1303,6 +1305,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/perf/single_battle_settlement_admission.test.cjs",
         "tools/perf/single_battle_settlement_baseline.test.cjs",
         "tools/quest_entry_lifecycle.test.cjs",
+        "tools/single_battle_abort_validation.test.cjs",
         "tools/single_battle_identity_reads.test.cjs",
         "tools/quest_host_finish.test.cjs",
         "tools/single_battle_finish_validation.test.cjs",

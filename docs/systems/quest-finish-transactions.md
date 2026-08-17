@@ -6,6 +6,7 @@
 ## 单人请求身份与事务权威
 
 单人 `/start`、`/play_continue` 和 `/abort` 先通过 viewer session 形成只包含 `accountId`、`playerId` 的身份快照。
+viewer ID 必须是正安全整数；0、负数、小数、非有限值和 unsafe integer 在查询 session 前拒绝，full Player 校验复用同一边界。
 该快照不读取、验证或缓存完整 Player，也不携带余额、体力或 active quest 等可变状态。身份解析成功只表示请求能够定位
 存档；若 Player 在身份解析后被删除，后续事务内领域路径仍必须 fail closed。
 
@@ -13,8 +14,11 @@
 扣费前后体力也使用该事务结果。`/play_continue` 的 Player 余额与持久化 active quest 由
 `runSingleContinueLifecycleTransaction()` 在事务内读取，首次请求和幂等 replay 均不得复用事务外 Player 快照。
 `/abort` 把可缺省的 `play_id`、`quest_id`、`category` 传入 `runAbortEntryTransaction()`；该事务只读取一次 stored active，
-并用同一行恢复真正缺失的字段、判断身份匹配、退款和删除。显式有限数值（包括 `category=0`）保持请求值，不按缺失处理。
-事务结果返回已解析身份和观察到的 active 信息，供响应与日志投影使用；只有数据库提交成功后才清理内存 active quest。
+并用同一行恢复真正缺失的字段、判断身份匹配、退款和删除。`play_id` 只有 null、缺失或空字符串按 missing 处理；
+`quest_id`、`category` 只有 null 或缺失按 missing 处理。其他类型和非有限数值直接返回 MsgPack 400；显式有限数值
+（包括 `category=0`）保持请求值，不按缺失处理。事务结果返回已解析身份和观察到的 active 信息，供响应与日志投影使用。
+数据库提交成功后，完整匹配取消或权威观察到 stored active 不存在时清理内存 active quest；stored active 存在但身份不匹配时
+保留内存状态，事务异常时也不得执行提交后清理。
 
 单人 `/finish` 不使用上述 identity-only 入口，仍通过 `validateSessionAndPlayer()` 获取完整 Player，并交给既有 finish
 协调器。这里没有全局请求上下文或跨事务缓存：identity snapshot 只负责定位，所有会影响写入决定的可变状态继续以所属
@@ -82,7 +86,8 @@ active quest，并严格比较 `playId`、关卡分类与 ID、协力标记、�
 ## 回归约束
 
 - `tools/quest_session_identity.test.cjs` 确认 identity-only resolver 在 session/playerId 缺失时 fail closed，且不调用
-  Player loader；`tools/single_battle_identity_reads.test.cjs` 对真实 Fastify 和 SQLite 请求逐次统计 start、continue
+  Player loader；`tools/single_battle_abort_validation.test.cjs` 通过真实 Fastify、MsgPack 和 SQLite 覆盖 abort 输入边界、
+  stale memory 与事务回滚；`tools/single_battle_identity_reads.test.cjs` 对真实 Fastify 和 SQLite 请求逐次统计 start、continue
   首次/replay、abort 完整/缺字段的 Player 与 active SELECT；
 - `tools/score_attack_route_transaction.test.cjs` 对 category 27 和普通 category 1 注入晚期删除失败，确认所有
   数值、奖励、进度、履历和任务写入回滚，数据库及内存 active quest 保留；

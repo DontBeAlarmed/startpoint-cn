@@ -20,7 +20,7 @@ export async function validateSessionIdentity(
     accountId: number
     playerId: number
 } | null> {
-    if (!viewerId || isNaN(viewerId)) return null
+    if (!Number.isSafeInteger(viewerId) || viewerId <= 0) return null
     const session = await dependencies.getSession(String(viewerId))
     if (!session) return null
     const playerId = dependencies.resolvePlayerId(session.accountId)

@@ -7,6 +7,39 @@ const fs = require("node:fs")
 const path = require("node:path")
 const test = require("node:test")
 
+let defaultSessionCalls = 0
+let defaultResolveCalls = 0
+let defaultPlayerCalls = 0
+
+function stubModule(relativePath, exports) {
+    const modulePath = require.resolve(relativePath)
+    require.cache[modulePath] = {
+        id: modulePath,
+        filename: modulePath,
+        loaded: true,
+        exports,
+    }
+}
+
+stubModule("../src/data/domains/session", {
+    getSession: async () => {
+        defaultSessionCalls++
+        return { accountId: 41 }
+    },
+})
+stubModule("../src/data/activeAccount", {
+    resolvePlayerIdSync: () => {
+        defaultResolveCalls++
+        return 73
+    },
+})
+stubModule("../src/data/domains/player", {
+    getPlayerSync: () => {
+        defaultPlayerCalls++
+        return {}
+    },
+})
+
 const sessionValidator = require("../src/lib/quest/finish/session-validator")
 
 test("identity resolver returns session account and player id without loading Player", async () => {
@@ -52,20 +85,53 @@ test("identity resolver fails closed without a session or player id", async t =>
         assert.equal(result, null)
     })
 
-    for (const viewerId of [0, Number.NaN]) {
+    for (const viewerId of [
+        0,
+        -1,
+        1.5,
+        Number.NaN,
+        Number.POSITIVE_INFINITY,
+        Number.MAX_SAFE_INTEGER + 1,
+    ]) {
         await t.test(`invalid viewer ${viewerId}`, async () => {
             let sessionCalls = 0
+            let resolveCalls = 0
             const result = await sessionValidator.validateSessionIdentity(viewerId, {
                 getSession: async () => {
                     sessionCalls++
                     return { accountId: 41 }
                 },
-                resolvePlayerId: () => 73,
+                resolvePlayerId: () => {
+                    resolveCalls++
+                    return 73
+                },
             })
             assert.equal(result, null)
             assert.equal(sessionCalls, 0)
+            assert.equal(resolveCalls, 0)
         })
     }
+})
+
+test("full validator rejects invalid viewer ids before session or Player reads", async () => {
+    defaultSessionCalls = 0
+    defaultResolveCalls = 0
+    defaultPlayerCalls = 0
+
+    for (const viewerId of [
+        0,
+        -1,
+        1.5,
+        Number.NaN,
+        Number.NEGATIVE_INFINITY,
+        Number.MAX_SAFE_INTEGER + 1,
+    ]) {
+        assert.equal(await sessionValidator.validateSessionAndPlayer(viewerId), null)
+    }
+
+    assert.equal(defaultSessionCalls, 0)
+    assert.equal(defaultResolveCalls, 0)
+    assert.equal(defaultPlayerCalls, 0)
 })
 
 test("single battle routes keep finish full and entry routes identity-only", () => {

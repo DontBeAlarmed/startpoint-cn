@@ -109,7 +109,9 @@ export function runAbortEntryTransaction<TActiveQuest extends EntryLifecycleActi
         }
     })
 
-    if (result.cancelled) dependencies.clearActiveQuest(input.playerId)
+    if (result.cancelled || result.observedActiveQuest === null) {
+        dependencies.clearActiveQuest(input.playerId)
+    }
     return result
 }
 

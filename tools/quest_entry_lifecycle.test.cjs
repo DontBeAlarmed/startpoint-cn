@@ -48,12 +48,15 @@ function createAbortInput(overrides = {}) {
 
 function createFixture({
     activeQuest = createActiveQuest(),
+    initialMemoryActiveQuest,
     itemCount = 0,
     failDuringCommit = false,
     entryCost,
 } = {}) {
     let databaseState = { activeQuest, itemCount }
-    let memoryActiveQuest = activeQuest ? { ...activeQuest } : null
+    let memoryActiveQuest = initialMemoryActiveQuest === undefined
+        ? activeQuest ? { ...activeQuest } : null
+        : initialMemoryActiveQuest ? { ...initialMemoryActiveQuest } : null
     let transactionActive = false
     let activeReads = 0
     const writes = []
@@ -136,6 +139,7 @@ function createFixture({
         "item",
         "dbActiveQuest",
         "memoryActiveQuest",
+        "memoryActiveQuest",
     ])
 }
 
@@ -158,7 +162,11 @@ function createFixture({
 }
 
 {
-    const fixture = createFixture({ activeQuest: null, itemCount: 4 })
+    const fixture = createFixture({
+        activeQuest: null,
+        initialMemoryActiveQuest: createActiveQuest(),
+        itemCount: 4,
+    })
     const result = lifecycle.runAbortEntryTransaction(createAbortInput({
         playId: null,
         questId: null,
@@ -173,6 +181,25 @@ function createFixture({
         itemList: {},
     })
     assert.equal(fixture.getActiveReads(), 1)
+    assert.equal(fixture.getState().memoryActiveQuest, null)
+    assert.deepEqual(fixture.writes, ["memoryActiveQuest"])
+}
+
+{
+    const fixture = createFixture({
+        activeQuest: null,
+        initialMemoryActiveQuest: createActiveQuest(),
+        failDuringCommit: true,
+    })
+    assert.throws(
+        () => lifecycle.runAbortEntryTransaction(createAbortInput({
+            playId: null,
+            questId: null,
+            category: null,
+        }), fixture.dependencies),
+        /simulated abort commit failure/,
+    )
+    assert.equal(fixture.getState().memoryActiveQuest.playId, "ticket-play-1")
     assert.deepEqual(fixture.writes, [])
 }
 

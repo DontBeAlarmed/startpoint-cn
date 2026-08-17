@@ -48,6 +48,7 @@ import {
 import { getMailArrivedSync } from "../../lib/mail-notification"
 import { recordActiveMissionQuestChallengeFactSync } from "../../lib/mission/active-entry-facts"
 import { runSingleContinueLifecycleTransaction } from "../../lib/quest/single-continue-lifecycle"
+import { validateAbortRequest } from "../../lib/quest/abort-request-validation"
 import {
     validateSingleFinishRequest,
     type ValidatedSingleFinishBody,
@@ -101,20 +102,6 @@ interface PlayContinueBody {
     play_id: string,
     category: number,
     statistics: QuestStatistics
-}
-
-interface AbortBody {
-    api_count: number,
-    finish_kind: number,
-    statistics: QuestStatistics,
-    viewer_id: number,
-    quest_id: number,
-    play_id: string,
-    category: number
-}
-
-function optionalNumber(value: unknown): number | null {
-    return typeof value === "number" && Number.isFinite(value) ? value : null
 }
 
 function summarizeItemList(itemList: Record<string, number>): string {
@@ -176,26 +163,19 @@ const routes = async (fastify: FastifyInstance) => {
     })
 
     fastify.post("/abort", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as AbortBody
-
-        const viewerId = body.viewer_id
-        if (isNaN(viewerId)) return reply.status(400).send({
-            "error": "Bad Request", "message": "Invalid request body."
-        })
+        const sendBadRequest = (message: string) => {
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(400).send({ "error": "Bad Request", message })
+        }
+        const validation = validateAbortRequest(request.body)
+        if (!validation.ok) return sendBadRequest(validation.message)
+        const { viewerId, playId, questId, category } = validation
 
         const sessionResult = await validateSessionIdentity(viewerId)
-        if (!sessionResult) return reply.status(400).send({
-            "error": "Bad Request", "message": "Invalid viewer id."
-        })
+        if (!sessionResult) return sendBadRequest("Invalid viewer id.")
         const { playerId } = sessionResult
 
-        const headers = generateDataHeaders({ viewer_id: body.viewer_id })
-
-        const playId = typeof body.play_id === "string" && body.play_id.length > 0
-            ? body.play_id
-            : null
-        const questId = optionalNumber(body.quest_id)
-        const category = optionalNumber(body.category)
+        const headers = generateDataHeaders({ viewer_id: viewerId })
 
         const abortResult = runAbortActiveQuestTransaction(playerId, {
             playId,
@@ -208,9 +188,9 @@ const routes = async (fastify: FastifyInstance) => {
             "[SINGLE_ABORT]",
             `player=${playerId}`,
             `viewer=${viewerId}`,
-            `missing_play=${typeof body.play_id !== "string" || body.play_id.length === 0}`,
-            `missing_quest=${optionalNumber(body.quest_id) === null}`,
-            `missing_category=${optionalNumber(body.category) === null}`,
+            `missing_play=${playId === null}`,
+            `missing_quest=${questId === null}`,
+            `missing_category=${category === null}`,
             `active=${observedActiveQuest ? `${observedActiveQuest.category}_${observedActiveQuest.questId}` : "none"}`,
             `resolved=${resolvedIdentity.category}_${resolvedIdentity.questId}`,
             `cancelled=${abortResult.cancelled}`,
