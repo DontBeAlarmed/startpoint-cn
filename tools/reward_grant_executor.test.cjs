@@ -325,6 +325,94 @@ test("transaction-owner execution rejects final expPool overflow before player w
     assert.deepEqual(playerState(playerId), before)
 })
 
+test("transaction-owner execution rejects final freeMana overflow and rolls outer writes back", () => {
+    const playerId = createPlayer("owner-mana-overflow")
+    const callerItemId = 911014
+    const planItemId = 911015
+    const before = playerState(playerId)
+    const statements = []
+    sqlTrace.active = true
+    try {
+        assert.throws(
+            database.transaction(() => {
+                givePlayerItemSync(playerId, callerItemId, 1)
+                executeRewardGrantPlanInTransactionOwnerSync(
+                    playerId,
+                    createRewardGrantPlan([
+                        {
+                            source: "item-before-mana-overflow",
+                            reward: { type: RewardType.ITEM, id: planItemId, count: 1 },
+                        },
+                        {
+                            source: "mana-overflow",
+                            reward: { type: RewardType.MANA, count: 1 },
+                        },
+                    ]),
+                    {
+                        freeMana: Number.MAX_SAFE_INTEGER,
+                        freeVmoney: before.freeVmoney,
+                        expPool: before.expPool,
+                    },
+                )
+            }),
+            error => error instanceof RewardGrantKnownPlayerValidationError
+                && error.field === "freeMana",
+        )
+    } finally {
+        statements.push(...sqlTrace.statements)
+        sqlTrace.active = false
+    }
+
+    assert.equal(statements.filter(sql => /^\s*UPDATE\s+players\b/i.test(sql)).length, 0)
+    assert.equal(getPlayerItemSync(playerId, callerItemId), null)
+    assert.equal(getPlayerItemSync(playerId, planItemId), null)
+    assert.deepEqual(playerState(playerId), before)
+})
+
+test("transaction-owner execution rejects final freeVmoney overflow and rolls outer writes back", () => {
+    const playerId = createPlayer("owner-beads-overflow")
+    const callerItemId = 911016
+    const planItemId = 911017
+    const before = playerState(playerId)
+    const statements = []
+    sqlTrace.active = true
+    try {
+        assert.throws(
+            database.transaction(() => {
+                givePlayerItemSync(playerId, callerItemId, 1)
+                executeRewardGrantPlanInTransactionOwnerSync(
+                    playerId,
+                    createRewardGrantPlan([
+                        {
+                            source: "item-before-beads-overflow",
+                            reward: { type: RewardType.ITEM, id: planItemId, count: 1 },
+                        },
+                        {
+                            source: "beads-overflow",
+                            reward: { type: RewardType.BEADS, count: 1 },
+                        },
+                    ]),
+                    {
+                        freeMana: before.freeMana,
+                        freeVmoney: Number.MAX_SAFE_INTEGER,
+                        expPool: before.expPool,
+                    },
+                )
+            }),
+            error => error instanceof RewardGrantKnownPlayerValidationError
+                && error.field === "freeVmoney",
+        )
+    } finally {
+        statements.push(...sqlTrace.statements)
+        sqlTrace.active = false
+    }
+
+    assert.equal(statements.filter(sql => /^\s*UPDATE\s+players\b/i.test(sql)).length, 0)
+    assert.equal(getPlayerItemSync(playerId, callerItemId), null)
+    assert.equal(getPlayerItemSync(playerId, planItemId), null)
+    assert.deepEqual(playerState(playerId), before)
+})
+
 test("transaction-owner execution is absent from the public reward grant barrel", () => {
     assert.equal(
         require("../src/lib/reward-grant").executeRewardGrantPlanInTransactionOwnerSync,

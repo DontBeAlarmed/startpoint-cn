@@ -135,7 +135,16 @@ const {
     validateShopPurchaseAmount,
 } = require("../src/lib/event-shop-purchase.ts")
 
-for (const invalidAmount of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, "1", null]) {
+for (const invalidAmount of [
+    0,
+    -1,
+    1.5,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.MAX_SAFE_INTEGER + 1,
+    "1",
+    null,
+]) {
     assert.throws(
         () => validateShopPurchaseAmount(invalidAmount),
         InvalidShopPurchaseAmountError,
@@ -143,6 +152,7 @@ for (const invalidAmount of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, "
     )
 }
 assert.equal(validateShopPurchaseAmount(1), 1)
+assert.equal(validateShopPurchaseAmount(Number.MAX_SAFE_INTEGER), Number.MAX_SAFE_INTEGER)
 
 const periodItem = {
     costs: [],

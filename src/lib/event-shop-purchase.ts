@@ -192,7 +192,7 @@ export function calculateShopStockQuantity(
 }
 
 export function validateShopPurchaseAmount(value: unknown): number {
-    if (!Number.isInteger(value) || (value as number) <= 0) {
+    if (!Number.isSafeInteger(value) || (value as number) <= 0) {
         throw new InvalidShopPurchaseAmountError()
     }
     return value as number

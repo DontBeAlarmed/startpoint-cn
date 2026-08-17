@@ -14,9 +14,12 @@ export interface RewardGrantOwnerPlayerUpdate {
     readonly degreeId?: number
 }
 
-function assertValidExpPool(value: number): void {
+function assertValidOwnerCurrency(
+    field: keyof OwnerCurrencyState,
+    value: number,
+): void {
     if (!Number.isSafeInteger(value) || value < 0) {
-        throw new RewardGrantKnownPlayerValidationError("expPool")
+        throw new RewardGrantKnownPlayerValidationError(field)
     }
 }
 
@@ -34,18 +37,22 @@ export function grantOwnerCurrency(
     }
     switch (reward.type) {
         case RewardType.BEADS:
-            playerAfter.freeVmoney += reward.count
+            const nextFreeVmoney = playerAfter.freeVmoney + reward.count
+            assertValidOwnerCurrency("freeVmoney", nextFreeVmoney)
+            playerAfter.freeVmoney = nextFreeVmoney
             currencyDeltas.freeVmoney += reward.count
             result.user_info.free_vmoney = reward.count
             break
         case RewardType.MANA:
-            playerAfter.freeMana += reward.count
+            const nextFreeMana = playerAfter.freeMana + reward.count
+            assertValidOwnerCurrency("freeMana", nextFreeMana)
+            playerAfter.freeMana = nextFreeMana
             currencyDeltas.freeMana += reward.count
             result.user_info.free_mana = reward.count
             break
         case RewardType.EXP:
             const nextExpPool = playerAfter.expPool + reward.count
-            assertValidExpPool(nextExpPool)
+            assertValidOwnerCurrency("expPool", nextExpPool)
             playerAfter.expPool = nextExpPool
             currencyDeltas.expPool += reward.count
             result.user_info.exp_pool = reward.count
