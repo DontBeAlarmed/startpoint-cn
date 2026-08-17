@@ -21,11 +21,12 @@ function parseOptionalPlayId(value: unknown): OptionalFieldResult<string> {
         : { ok: false }
 }
 
-function parseOptionalFiniteNumber(value: unknown): OptionalFieldResult<number> {
+function parseOptionalNonNegativeSafeInteger(value: unknown): OptionalFieldResult<number> {
     if (value === undefined || value === null) return { ok: true, value: null }
-    return typeof value === "number" && Number.isFinite(value)
-        ? { ok: true, value }
-        : { ok: false }
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+        return { ok: false }
+    }
+    return { ok: true, value }
 }
 
 export function validateAbortRequest(body: unknown): AbortRequestValidationResult {
@@ -34,8 +35,8 @@ export function validateAbortRequest(body: unknown): AbortRequestValidationResul
     }
     const fields = body as Record<string, unknown>
     const playId = parseOptionalPlayId(fields.play_id)
-    const questId = parseOptionalFiniteNumber(fields.quest_id)
-    const category = parseOptionalFiniteNumber(fields.category)
+    const questId = parseOptionalNonNegativeSafeInteger(fields.quest_id)
+    const category = parseOptionalNonNegativeSafeInteger(fields.category)
     if (!playId.ok || !questId.ok || !category.ok) {
         return { ok: false, message: "Invalid request body." }
     }

@@ -28,6 +28,7 @@ test("maps representative source files to focused groups", () => {
     )
     for (const file of [
         "tools/quest_entry_lifecycle.test.cjs",
+        "tools/single_battle_abort_numeric_validation.test.cjs",
         "tools/single_battle_abort_validation.test.cjs",
         "tools/single_battle_identity_reads.test.cjs",
     ]) {
@@ -1305,6 +1306,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/perf/single_battle_settlement_admission.test.cjs",
         "tools/perf/single_battle_settlement_baseline.test.cjs",
         "tools/quest_entry_lifecycle.test.cjs",
+        "tools/single_battle_abort_numeric_validation.test.cjs",
         "tools/single_battle_abort_validation.test.cjs",
         "tools/single_battle_identity_reads.test.cjs",
         "tools/quest_host_finish.test.cjs",

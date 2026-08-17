@@ -15,8 +15,9 @@ viewer ID 必须是正安全整数；0、负数、小数、非有限值和 unsaf
 `runSingleContinueLifecycleTransaction()` 在事务内读取，首次请求和幂等 replay 均不得复用事务外 Player 快照。
 `/abort` 把可缺省的 `play_id`、`quest_id`、`category` 传入 `runAbortEntryTransaction()`；该事务只读取一次 stored active，
 并用同一行恢复真正缺失的字段、判断身份匹配、退款和删除。`play_id` 只有 null、缺失或空字符串按 missing 处理；
-`quest_id`、`category` 只有 null 或缺失按 missing 处理。其他类型和非有限数值直接返回 MsgPack 400；显式有限数值
-（包括 `category=0`）保持请求值，不按缺失处理。事务结果返回已解析身份和观察到的 active 信息，供响应与日志投影使用。
+`quest_id`、`category` 只有 null 或缺失按 missing 处理。显式值只接受非负安全整数；负数、小数、非有限值、unsafe integer
+和其他类型直接返回 MsgPack 400。`quest_id=0`、`category=0` 保持请求值并作为显式 mismatch，不按缺失处理。事务结果返回
+已解析身份和观察到的 active 信息，供响应与日志投影使用。
 数据库提交成功后，完整匹配取消或权威观察到 stored active 不存在时清理内存 active quest；stored active 存在但身份不匹配时
 保留内存状态，事务异常时也不得执行提交后清理。
 
