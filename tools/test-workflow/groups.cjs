@@ -259,6 +259,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/party_loadout_validation.test.cjs",
             "tools/quest_write_transaction.test.cjs",
             "tools/single_continue_route.test.cjs",
+            "tools/single_continue_route_errors.test.cjs",
             "tools/score_reward_lottery.test.cjs",
             "tools/quest_score_reward_settlement.test.cjs",
             "tools/reward_campaign.test.cjs",

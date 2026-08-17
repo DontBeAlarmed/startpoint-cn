@@ -9,7 +9,7 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 const Fastify = require("fastify")
-const { unpack } = require("msgpackr")
+const { pack, unpack } = require("msgpackr")
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "single-continue-route-"))
 const previousDataDirectory = process.env.DATA_DIR
@@ -29,6 +29,7 @@ const {
     publishActiveQuest,
 } = require("../src/lib/quest/active-quest-service")
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
+const cnLoadRoutes = require("../src/routes/cn/load").default
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 
 let app
@@ -96,8 +97,14 @@ function decode(response) {
 test.before(async () => {
     database = data.initializeDatabase()
     app = Fastify({ logger: false })
+    app.addContentTypeParser(
+        "application/x-www-form-urlencoded",
+        { parseAs: "string" },
+        (_request, body, done) => done(null, unpack(Buffer.from(body, "base64"))),
+    )
     registerCnMsgpackOnSend(app)
     await app.register(singleBattleRoutes, { prefix: "/single_battle_quest" })
+    await app.register(cnLoadRoutes, { assetProvider: { mode: "client-owned" } })
     await app.ready()
 })
 
@@ -110,7 +117,7 @@ test.after(async () => {
     else process.env.DATA_DIR = previousDataDirectory
 })
 
-test("identical play_continue payload replays after restart without a second write", async t => {
+test("formal load restores persisted continue state before replay without a second write", async t => {
     const { playerId, viewerId } = await createPlayer("continue-idempotent")
     updatePlayerSync({ id: playerId, freeVmoney: 30, vmoney: 40 })
     const activeQuest = createActiveQuest("continue-idempotent-play")
@@ -134,7 +141,30 @@ test("identical play_continue payload replays after restart without a second wri
         memoryContinueCount: 1,
     })
 
-    publishActiveQuest(playerId, { ...activeQuest, continueCount: 0 })
+    delete activeQuests[playerId]
+    assert.equal(activeQuests[playerId], undefined)
+    const loaded = await app.inject({
+        method: "POST",
+        url: "/load",
+        headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            res_ver: "1.4.54",
+        },
+        payload: pack({
+            viewer_id: viewerId,
+            keychain: viewerId,
+            device_id: 1,
+            device_token: "single-continue-load",
+        }).toString("base64"),
+    })
+
+    assert.equal(loaded.statusCode, 200, loaded.body)
+    assert.deepEqual(decode(loaded).data.unfinished_quest_list, [{
+        play_id: activeQuest.playId,
+        continue_count: 1,
+    }])
+    assert.equal(activeQuests[playerId].continueCount, 1)
+
     database.exec(`
         CREATE TRIGGER reject_continue_replay_player
         BEFORE UPDATE ON players WHEN OLD.id = ${playerId}
@@ -164,42 +194,6 @@ test("identical play_continue payload replays after restart without a second wri
     })
 })
 
-test("play_continue rejects missing and invalid statistics counts before writes", async t => {
-    const { playerId, viewerId } = await createPlayer("continue-invalid-count")
-    updatePlayerSync({ id: playerId, freeVmoney: 100, vmoney: 100 })
-    const activeQuest = createActiveQuest("continue-invalid-count-play")
-    persistActiveQuest(playerId, activeQuest)
-    publishActiveQuest(playerId, activeQuest)
-    t.after(() => delete activeQuests[playerId])
-    const validPayload = createPayload(viewerId, activeQuest)
-    const before = snapshotState(playerId)
-    const scenarios = [
-        { name: "missing statistics", payload: { ...validPayload, statistics: undefined } },
-        { name: "null statistics", payload: { ...validPayload, statistics: null } },
-        { name: "missing continue_count", payload: { ...validPayload, statistics: {} } },
-        { name: "negative", payload: createPayload(viewerId, activeQuest, -1) },
-        { name: "fraction", payload: createPayload(viewerId, activeQuest, 0.5) },
-        { name: "string", payload: createPayload(viewerId, activeQuest, "0") },
-        {
-            name: "unsafe",
-            payload: createPayload(viewerId, activeQuest, Number.MAX_SAFE_INTEGER + 1),
-        },
-    ]
-
-    for (const scenario of scenarios) {
-        await t.test(scenario.name, async () => {
-            const response = await app.inject({
-                method: "POST",
-                url: "/single_battle_quest/play_continue",
-                payload: scenario.payload,
-            })
-
-            assert.equal(response.statusCode, 400, response.body)
-            assert.deepEqual(snapshotState(playerId), before)
-        })
-    }
-})
-
 test("play_continue rejects persisted state when memory active quest is missing", async () => {
     const { playerId, viewerId } = await createPlayer("continue-missing-memory")
     updatePlayerSync({ id: playerId, freeVmoney: 100, vmoney: 100 })
@@ -213,6 +207,11 @@ test("play_continue rejects persisted state when memory active quest is missing"
     })
 
     assert.equal(response.statusCode, 400, response.body)
+    assert.match(response.headers["content-type"], /^application\/x-msgpack/)
+    assert.deepEqual(decode(response), {
+        error: "Bad Request",
+        message: "No active quest to continue.",
+    })
     assert.deepEqual(snapshotState(playerId), {
         freeVmoney: 100,
         vmoney: 100,

@@ -486,6 +486,10 @@ test("maps single continue lifecycle implementation and regression precisely", (
         selectTestGroups(["tools/single_continue_route.test.cjs"]),
         ["integration:rules"],
     )
+    assert.deepEqual(
+        selectTestGroups(["tools/single_continue_route_errors.test.cjs"]),
+        ["integration:rules"],
+    )
     assert.equal(
         selectTestGroups([
             "src/lib/quest/single-continue-lifecycle.ts",
@@ -494,6 +498,7 @@ test("maps single continue lifecycle implementation and regression precisely", (
             "tools/single_continue_idempotency.test.cjs",
             "tools/single_continue_lifecycle.test.cjs",
             "tools/single_continue_route.test.cjs",
+            "tools/single_continue_route_errors.test.cjs",
         ]).some(group => group.includes("multi")),
         false,
     )
@@ -1331,6 +1336,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/party_loadout_validation.test.cjs",
         "tools/quest_write_transaction.test.cjs",
         "tools/single_continue_route.test.cjs",
+        "tools/single_continue_route_errors.test.cjs",
         "tools/score_reward_lottery.test.cjs",
         "tools/quest_score_reward_settlement.test.cjs",
         "tools/reward_campaign.test.cjs",

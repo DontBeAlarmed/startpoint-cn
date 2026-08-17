@@ -381,7 +381,15 @@ const routes = async (fastify: FastifyInstance) => {
     })
 
     fastify.post("/play_continue", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as PlayContinueBody
+        const sendBadRequest = (message: string) => {
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(400).send({ "error": "Bad Request", message })
+        }
+        const rawBody = request.body
+        if (typeof rawBody !== "object" || rawBody === null || Array.isArray(rawBody)) {
+            return sendBadRequest("Invalid request body.")
+        }
+        const body = rawBody as PlayContinueBody
 
         const viewerId = body.viewer_id
         if (
@@ -395,14 +403,10 @@ const routes = async (fastify: FastifyInstance) => {
             || body.statistics === null
             || !Number.isSafeInteger(body.statistics.continue_count)
             || body.statistics.continue_count < 0
-        ) return reply.status(400).send({
-            "error": "Bad Request", "message": "Invalid request body."
-        })
+        ) return sendBadRequest("Invalid request body.")
 
         const sessionResult = await validateSessionAndPlayer(viewerId)
-        if (!sessionResult) return reply.status(400).send({
-            "error": "Bad Request", "message": "Invalid viewer id."
-        })
+        if (!sessionResult) return sendBadRequest("Invalid viewer id.")
         const { playerId } = sessionResult
 
         const continueResult = runSingleContinueLifecycleTransaction({
@@ -414,10 +418,7 @@ const routes = async (fastify: FastifyInstance) => {
             expectedContinueCount: body.statistics.continue_count,
             cost: continueVmoneyCost,
         })
-        if (!continueResult.ok) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": continueResult.message,
-        })
+        if (!continueResult.ok) return sendBadRequest(continueResult.message)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
