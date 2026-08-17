@@ -22,6 +22,9 @@ const {
 const CLEAR_REWARD_ID = 990026201
 const S_PLUS_REWARD_ID = 990026202
 const ADDITIONAL_GROUP_ID = 990026203
+const CARNIVAL_REWARD_ID = 990026204
+const CARNIVAL_DEGREE_ID = 61000
+const CARNIVAL_QUEST_ID = 1001
 const RUSH_EVENT_ID = 700007
 const RUSH_FOLDER_ID = 1
 const RUSH_QUEST_ID = 700007002
@@ -141,20 +144,70 @@ test("single finish keeps the final inventory when clear and S+ touch the same i
 
 test("single finish user_info is the final persisted player projection", async () => {
     await withSingleBattleHarness("final-player", async harness => {
+        const before = harness.getPlayer()
         const data = await finishFirstClear(
             harness,
             "task-26d2-final-player",
             { normalize: false },
         )
         const persisted = harness.getPlayer()
-        assert.ok(persisted)
+        assert.ok(before && persisted)
 
+        assert.deepEqual({
+            freeMana: persisted.freeMana - before.freeMana,
+            expPool: persisted.expPool - before.expPool,
+        }, {
+            freeMana: 20 + 11 + 37,
+            expPool: 13 + 19,
+        })
         assertFinalUserInfo(data.user_info, persisted)
     }, {
         tableOverrides: rewardOverrides(
-            { name: "clear exp", type: 5, count: 19 },
-            { name: "S+ mana", type: 3, count: 37 },
+            { name: "clear exp", type: RewardType.EXP, count: 19 },
+            { name: "S+ mana", type: RewardType.MANA, count: 37 },
         ),
+    })
+})
+
+test("single finish keeps the equipped degree when Carnival grants a new degree", async () => {
+    await withSingleBattleHarness("final-carnival-degree", async harness => {
+        const playId = "task-26d2-carnival-degree"
+        harness.insertActiveQuest(harness.createActiveQuest({
+            category: QuestCategory.CARNIVAL_EVENT,
+            questId: CARNIVAL_QUEST_ID,
+            playId,
+        }))
+        const response = await harness.post("finish", harness.finishPayload({
+            addMana: 0,
+            category: QuestCategory.CARNIVAL_EVENT,
+            characterId: 1,
+            playId,
+            questId: CARNIVAL_QUEST_ID,
+        }), { normalize: false })
+        assert.equal(response.statusCode, 200, JSON.stringify(response))
+        const persisted = harness.getPlayer()
+        assert.ok(persisted)
+
+        assert.deepEqual(response.data.carnival_event.new_degree_ids, [CARNIVAL_DEGREE_ID])
+        assert.deepEqual(response.data.carnival_event.reward_ids, [CARNIVAL_REWARD_ID])
+        assert.deepEqual(harness.db.prepare(`
+            SELECT degree_id FROM players_degrees
+            WHERE player_id = ? AND degree_id = ?
+        `).all(harness.playerId, CARNIVAL_DEGREE_ID), [{ degree_id: CARNIVAL_DEGREE_ID }])
+        assert.equal(response.data.user_info.degree_id, persisted.degreeId)
+    }, {
+        tableOverrides: {
+            ...noIncidentalRewardOverrides(),
+            "carnival_event_total_score_reward.json": {
+                [CARNIVAL_REWARD_ID]: {
+                    id: CARNIVAL_REWARD_ID,
+                    eventId: 1,
+                    score: 1,
+                    reasonId: 20001,
+                    rewards: [{ kind: 7, id: CARNIVAL_DEGREE_ID, amount: 1 }],
+                },
+            },
+        },
     })
 })
 

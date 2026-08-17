@@ -57,7 +57,6 @@ export function buildSingleSettlementFinalPlayerProjection({
 
 interface SingleSettlementObservedResult {
     readonly itemList: Readonly<Record<string, number>>
-    readonly degreeIds: readonly number[]
     readonly userInfo?: Readonly<Record<string, number>>
 }
 
@@ -106,13 +105,13 @@ export function createSingleSettlementResponseState(playerId: number, player: Pl
         observeResult(result: SingleSettlementObservedResult | undefined): void {
             if (result === undefined) return
             observeItems(result.itemList)
-            degreeId = result.degreeIds.at(-1) ?? degreeId
             if (result.userInfo !== undefined) {
                 playerState = {
                     freeMana: result.userInfo.free_mana ?? playerState.freeMana,
                     freeVmoney: result.userInfo.free_vmoney ?? playerState.freeVmoney,
                     expPool: result.userInfo.exp_pool ?? playerState.expPool,
                 }
+                degreeId = result.userInfo.degree_id ?? degreeId
             }
         },
         observeItems,

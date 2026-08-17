@@ -98,10 +98,6 @@ export function executeSingleSettlementWrites(
         playerId,
         responseState.setPlayerState,
     )
-    const clearReward = !isScoreAttackEvent && rewardEligibility.firstClear && questData.clearReward !== undefined
-        ? grantDirectRewards(playerId, "clear", [questData.clearReward]) : null
-    const sPlusClearReward = !isScoreAttackEvent && rewardEligibility.sPlus && questData.sPlusReward !== undefined
-        ? grantDirectRewards(playerId, "s_plus", [questData.sPlusReward]) : null
 
     if (questAccomplished && !isScoreAttackEvent) {
         if (questProgress !== null) {
@@ -147,6 +143,10 @@ export function executeSingleSettlementWrites(
         freeVmoney: responseState.playerState.freeVmoney,
         expPool: settlementPlayer.expPool + fixedPoolExpReward,
     })
+    const clearReward = !isScoreAttackEvent && rewardEligibility.firstClear && questData.clearReward !== undefined
+        ? grantDirectRewards(playerId, "clear", [questData.clearReward]) : null
+    const sPlusClearReward = !isScoreAttackEvent && rewardEligibility.sPlus && questData.sPlusReward !== undefined
+        ? grantDirectRewards(playerId, "s_plus", [questData.sPlusReward]) : null
     if (didLevelUp) console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldRkDegree} -> ${newDegreeId}, stamina refilled`)
 
     const dailyChallengePointList = handleDailyChallengePoint({
@@ -241,10 +241,7 @@ export function executeSingleSettlementWrites(
     })
     const carnivalEventData = carnivalFinishResult?.carnivalEventData ?? null
     const carnivalRewardResult = carnivalFinishResult?.rewardResult
-    responseState.observeResult(carnivalRewardResult === undefined ? undefined : {
-        itemList: carnivalRewardResult.item_list,
-        degreeIds: carnivalRewardResult.new_degree_ids,
-    })
+    responseState.observeItems(carnivalRewardResult?.item_list)
     if (isScoreAttackEvent) insertPlayerScoreAttackBattleHistorySync(buildScoreAttackBattleHistoryRecord({
         playerId, eventId: questData.eventId!, playId: settlementActiveQuest.playId,
         categoryId: questCategory, questId, finishKind: 0, createdAt: settlementTime,

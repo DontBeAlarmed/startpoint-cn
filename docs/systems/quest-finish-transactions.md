@@ -41,13 +41,16 @@ executor 模块内部的 `executeRewardGrantPlanInTransactionOwnerSync()` 发放
 
 Score 的抽取、倍率和 ELEMENT/AETHER 上下文 ID 在进入 owner 前由纯选择核心一次完成；运行时 wrapper 只负责读取内容、服务器设置和服务器时间并注入核心。Plan source 以 `score_common`、`score_rare` 保留 group、客户端 index 和最终数量，响应 drop IDs 与执行结果共同使用这些 source。执行后协调器直接采用 owner 返回的 `playerAfter`，不再从响应 `user_info` 重复推导货币后态。采样日志只在最外层事务提交成功后记录一次，任一后续写入失败并回滚时不记录。
 
-事务成功结果携带写入前旧 progress，以及由同一事务的奖励 owner 后态、Rank/体力写入值和 degree 奖励顺序形成的最终
+事务成功结果携带写入前旧 progress，以及由同一事务的奖励 owner 后态、Rank/体力写入值和已持久化当前称号形成的最终
 Player 投影；该投影覆盖 `free_mana`、`free_vmoney`、`exp_pool`、`exp_pooled_time`、`rank_point`、`degree_id`、
 `stamina`、`stamina_heal_time`、`boost_point` 和 `boss_boost_point`，不增加结算后的 Player SELECT。事务提交成功后，
 路由只完成响应头、时间字段换算与邮件状态，再交给
 `src/lib/quest/finish/single-response-projector.ts` 构造成功响应。projector 是纯投影层：不读取数据库、运行时内容或当前时间，
 也不访问 Fastify；它只消费协调器成功结果和最终 Player 投影，并按既有顺序合并通用任务与角色觉醒任务的展示列表。
 mission 合并不得再覆盖权威 `user_info` 或 `item_list`。
+固定关卡 MANA/EXP 先写入 Player 并初始化 owner 后态，clear、S+ 再依次从该后态累加，后续 Score、additional、rush、
+Carnival、mission 等来源继续按实际执行顺序推进。Carnival `new_degree_ids` 只表示本次新获得的 owned degree，不能改变
+`players.degree_id` 或最终 `user_info.degree_id`；只有同时持久化当前称号并返回绝对 `userInfo.degree_id` 的来源才能推进该字段。
 失败响应、HTTP header、状态码和发送仍由路由负责。
 
 `item_list` 在写入层按 clear、S+、Score/Rare、additional、rush、carnival、score attack、通用 mission、awake mission 的
@@ -104,8 +107,9 @@ active quest，并严格比较 `playId`、关卡分类与 ID、协力标记、�
   首次/replay、abort 完整/缺字段的 Player 与 active SELECT；
 - `tools/single_finish_authority_transaction.test.cjs` 确认 stored active、Player 和旧 progress 在同一事务内按序读取，
   缺失 Player 或非法 Boost 在 progress/writes 前失败，并覆盖 identity 解析后 Player/progress 变化时采用新权威值；
-- `tools/single_finish_final_projection.test.cjs` 通过真实路由与 SQLite 确认 clear/S+ item、重复 item 最终库存，以及十字段
-  `user_info` 与提交后的 Player 一致；projector 单元测试同时锁定 mission 展示合并不覆盖事务投影；
+- `tools/single_finish_final_projection.test.cjs` 通过真实路由与 SQLite 确认 clear/S+ item、重复 item 最终库存、固定加 clear/S+
+  的精确 MANA/EXP 到账，以及 Carnival 新增 owned degree 不改变当前 equipped degree；十字段 `user_info` 必须与提交后的
+  Player 一致。projector 单元测试同时锁定 mission 展示合并不覆盖事务投影；
 - `tools/score_attack_route_transaction.test.cjs` 对 category 27 和普通 category 1 注入晚期删除失败，确认所有
   数值、奖励、进度、履历和任务写入回滚，数据库及内存 active quest 保留；
 - `tools/multi_finish_follow_info.test.cjs` 注入单个队友资料查询异常，确认其他队友仍返回且只记录一条警告；
