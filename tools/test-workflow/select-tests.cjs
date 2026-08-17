@@ -160,6 +160,10 @@ const SOURCE_RULES = [
         groups: ["integration:reward-grant"],
     },
     {
+        pattern: /^(?:src\/lib\/quest\/finish\/single-settlement-reward-grant\.ts|tools\/single_settlement_reward_grant\.test\.cjs)$/,
+        groups: ["integration:reward-grant"],
+    },
+    {
         pattern: /^docs\/systems\/save-validation\.md$/,
         groups: ["integration:database"],
     },

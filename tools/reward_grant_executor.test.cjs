@@ -3,6 +3,7 @@
 require("ts-node/register/transpile-only")
 
 const assert = require("node:assert/strict")
+const BetterSqlite3 = require("better-sqlite3")
 const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
@@ -30,6 +31,10 @@ const {
     RewardGrantPlayerNotFoundError,
     RewardGrantTransactionRequiredError,
 } = require("../src/lib/reward-grant")
+const {
+    executeRewardGrantPlanInTransactionOwnerSync,
+    RewardGrantKnownPlayerValidationError,
+} = require("../src/lib/reward-grant/executor")
 const { RewardType } = require("../src/lib/types/rewards")
 
 const ITEM_ID = 910001
@@ -41,6 +46,17 @@ const DUPLICATE_CHARACTER_ID = 1
 const DUPLICATE_CHARACTER_ITEM_ID = 14002
 
 let database
+const sqlTrace = { active: false, statements: [] }
+
+function captureSql(operation) {
+    sqlTrace.statements = []
+    sqlTrace.active = true
+    try {
+        return { result: operation(), statements: [...sqlTrace.statements] }
+    } finally {
+        sqlTrace.active = false
+    }
+}
 
 function createPlayer(label) {
     const account = insertAccountSync({
@@ -71,7 +87,11 @@ function itemPlan(itemId, count, source = "item") {
 }
 
 test.before(() => {
-    database = data.initializeDatabase()
+    database = data.initializeDatabase({
+        databaseFactory: databasePath => new BetterSqlite3(databasePath, {
+            verbose: sql => { if (sqlTrace.active) sqlTrace.statements.push(sql) },
+        }),
+    })
 })
 
 test.after(() => {
@@ -92,6 +112,202 @@ test("within-transaction execution rejects before reading or writing outside a t
     )
     assert.equal(getPlayerItemSync(playerId, 911001), null)
     assert.deepEqual(playerState(playerId), before)
+})
+
+test("transaction-owner execution rejects outside its caller-owned transaction", () => {
+    const playerId = createPlayer("owner-requires-transaction")
+    const before = playerState(playerId)
+
+    assert.throws(
+        () => executeRewardGrantPlanInTransactionOwnerSync(
+            playerId,
+            itemPlan(911007, 2),
+            { freeMana: before.freeMana, freeVmoney: before.freeVmoney, expPool: before.expPool },
+        ),
+        RewardGrantTransactionRequiredError,
+    )
+    assert.equal(getPlayerItemSync(playerId, 911007), null)
+})
+
+test("transaction-owner execution uses known currency state without player reads or transaction SQL", () => {
+    const playerId = createPlayer("owner-known-player")
+    const before = playerState(playerId)
+    const knownPlayerBefore = {
+        freeMana: before.freeMana,
+        freeVmoney: before.freeVmoney,
+        expPool: before.expPool,
+    }
+    const plan = createRewardGrantPlan([
+        { source: { kind: "mana", index: 0 }, reward: { type: RewardType.MANA, count: 4 } },
+        { source: { kind: "beads", index: 1 }, reward: { type: RewardType.BEADS, count: 5 } },
+        { source: { kind: "exp", index: 2 }, reward: { type: RewardType.EXP, count: 6 } },
+    ])
+    let measured
+
+    database.transaction(() => {
+        measured = captureSql(() => executeRewardGrantPlanInTransactionOwnerSync(
+            playerId,
+            plan,
+            knownPlayerBefore,
+        ))
+    })()
+
+    assert.equal(
+        measured.statements.filter(sql => /^\s*SELECT[\s\S]*\bFROM\s+players\b/i.test(sql)).length,
+        0,
+    )
+    assert.equal(
+        measured.statements.filter(sql => /^\s*(?:BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\b/i.test(sql)).length,
+        0,
+    )
+    assert.deepEqual(measured.result.entries.map(entry => entry.source), [
+        { kind: "mana", index: 0 },
+        { kind: "beads", index: 1 },
+        { kind: "exp", index: 2 },
+    ])
+    assert.deepEqual(measured.result.aggregate.user_info, {
+        free_mana: 4,
+        free_vmoney: 5,
+        exp_pool: 6,
+    })
+    assert.deepEqual(measured.result.playerAfter, {
+        freeMana: before.freeMana + 4,
+        freeVmoney: before.freeVmoney + 5,
+        expPool: before.expPool + 6,
+    })
+    assert.deepEqual(playerState(playerId), {
+        freeMana: before.freeMana + 4,
+        freeVmoney: before.freeVmoney + 5,
+        expPool: before.expPool + 6,
+        totalManaObtained: before.totalManaObtained + 4,
+    })
+})
+
+test("transaction-owner execution snapshots known player fields once without leaking extras", () => {
+    const playerId = createPlayer("owner-known-player-snapshot")
+    const before = playerState(playerId)
+    const reads = { freeMana: 0, freeVmoney: 0, expPool: 0, extra: 0 }
+    const knownPlayerBefore = {
+        get freeMana() {
+            reads.freeMana++
+            return reads.freeMana === 1 ? before.freeMana : -1
+        },
+        get freeVmoney() {
+            reads.freeVmoney++
+            return reads.freeVmoney === 1 ? before.freeVmoney : -1
+        },
+        get expPool() {
+            reads.expPool++
+            return reads.expPool === 1 ? before.expPool : -1
+        },
+        get extra() {
+            reads.extra++
+            return "must-not-leak"
+        },
+    }
+    let result
+
+    database.transaction(() => {
+        result = executeRewardGrantPlanInTransactionOwnerSync(
+            playerId,
+            createRewardGrantPlan([]),
+            knownPlayerBefore,
+        )
+    })()
+
+    assert.deepEqual(reads, { freeMana: 1, freeVmoney: 1, expPool: 1, extra: 0 })
+    assert.deepEqual(result.playerAfter, {
+        freeMana: before.freeMana,
+        freeVmoney: before.freeVmoney,
+        expPool: before.expPool,
+    })
+    assert.deepEqual(Object.getPrototypeOf(result.playerAfter), Object.prototype)
+})
+
+test("transaction-owner execution rejects invalid known player fields before writes", () => {
+    const playerId = createPlayer("owner-invalid-known-player")
+    const itemId = 911013
+    const before = playerState(playerId)
+    const valid = {
+        freeMana: before.freeMana,
+        freeVmoney: before.freeVmoney,
+        expPool: before.expPool,
+    }
+    const invalidValues = [undefined, NaN, Infinity, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]
+
+    for (const field of ["freeMana", "freeVmoney", "expPool"]) {
+        for (const invalidValue of invalidValues) {
+            const knownPlayerBefore = { ...valid, [field]: invalidValue }
+            if (invalidValue === undefined) delete knownPlayerBefore[field]
+            let caught
+            database.transaction(() => {
+                try {
+                    executeRewardGrantPlanInTransactionOwnerSync(
+                        playerId,
+                        itemPlan(itemId, 1),
+                        knownPlayerBefore,
+                    )
+                } catch (error) {
+                    caught = error
+                }
+            })()
+
+            assert.ok(
+                typeof RewardGrantKnownPlayerValidationError === "function"
+                    && caught instanceof RewardGrantKnownPlayerValidationError,
+                `${field}:${String(invalidValue)}`,
+            )
+            assert.equal(caught.field, field)
+            assert.equal(getPlayerItemSync(playerId, itemId), null)
+        }
+    }
+})
+
+test("transaction-owner execution is absent from the public reward grant barrel", () => {
+    assert.equal(
+        require("../src/lib/reward-grant").executeRewardGrantPlanInTransactionOwnerSync,
+        undefined,
+    )
+})
+
+test("transaction-owner execution normalizes forged plans before its first write", () => {
+    const playerId = createPlayer("owner-forged-plan")
+    const itemId = 911008
+    const before = playerState(playerId)
+    const forgedPlan = { entries: [
+        { source: "valid", reward: { type: RewardType.ITEM, id: itemId, count: 2 } },
+        { source: "invalid", reward: { type: 999, id: 1, count: 1 } },
+    ] }
+    let caught
+
+    database.transaction(() => {
+        try {
+            executeRewardGrantPlanInTransactionOwnerSync(playerId, forgedPlan, before)
+        } catch (error) {
+            caught = error
+        }
+    })()
+
+    assert.ok(caught instanceof RewardGrantPlanValidationError)
+    assert.equal(getPlayerItemSync(playerId, itemId), null)
+})
+
+test("transaction-owner execution relies on propagated errors for whole outer rollback", () => {
+    const playerId = createPlayer("owner-propagated-failure")
+    const callerItemId = 911009
+    const planItemId = 911012
+    const before = playerState(playerId)
+    const plan = createRewardGrantPlan([
+        { source: "item", reward: { type: RewardType.ITEM, id: planItemId, count: 2 } },
+        { source: "character", reward: { type: RewardType.CHARACTER, id: 999999996 } },
+    ])
+
+    assert.throws(database.transaction(() => {
+        givePlayerItemSync(playerId, callerItemId, 1)
+        executeRewardGrantPlanInTransactionOwnerSync(playerId, plan, before)
+    }), RewardGrantExecutionError)
+    assert.equal(getPlayerItemSync(playerId, callerItemId), null)
+    assert.equal(getPlayerItemSync(playerId, planItemId), null)
 })
 
 test("rejects a forged plan before writes even when the caller catches and commits", () => {

@@ -272,6 +272,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/reward_grant_plan.test.cjs",
             "tools/reward_grant_executor.test.cjs",
             "tools/reward_grant_architecture.test.cjs",
+            "tools/single_settlement_reward_grant.test.cjs",
         ],
     },
     "integration:database": {

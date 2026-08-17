@@ -14,10 +14,10 @@ import { getDb } from "../../../data/db"
 import type { Player, PlayerQuestProgress } from "../../../data/types"
 import { getRushEventFolderClearRewards } from "../../assets"
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../character"
-import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../quest"
+import { givePlayerScoreRewardsSync } from "../../quest"
 import { getCommonScoreRewardCount } from "../../score-reward-lottery"
 import { calculateCharacterBattleExp, calculateFixedQuestMana, calculateFixedQuestPoolExp, getRewardCampaignRates } from "../../reward-campaign"
-import { QuestCategory, type BattleQuest } from "../../types"
+import { QuestCategory, type BattleQuest, type Reward } from "../../types"
 import { getRankDegree, getMaxStamina } from "../../stamina"
 import { getRuntimeContentTableSync } from "../../../content/runtime/table-access"
 import { getContentSnapshot } from "../../../content/runtime/content-snapshot"
@@ -44,6 +44,12 @@ import { handleRaidEventFinish } from "./raid-handler"
 import { handleScoreAttackEventFinish, type ScoreAttackBorderTier } from "./score-attack-handler"
 import { handleDailyChallengePoint } from "./challenge-point"
 import type { FinishContext } from "./types"
+import {
+    advanceSingleSettlementRewardPlayerState,
+    grantSingleSettlementRewardsWithinTransactionSync,
+    type SingleSettlementRewardSourceKind,
+    withSingleSettlementExpPool,
+} from "./single-settlement-reward-grant"
 
 const settlementModeHost = createModeTransactionHost(message => console.log(message))
 
@@ -88,10 +94,26 @@ export function executeSingleSettlementWrites(
     const newMana = settlementPlayer.freeMana + fixedManaReward + body.add_mana
     const manaObtained = fixedManaReward + body.add_mana
     finishCtx.manaObtained = manaObtained
+    let rewardPlayerState = {
+        freeMana: settlementPlayer.freeMana,
+        freeVmoney: settlementPlayer.freeVmoney,
+        expPool: settlementPlayer.expPool,
+    }
+    const grantDirectRewards = (
+        pid: number,
+        kind: SingleSettlementRewardSourceKind,
+        rewards: readonly Reward[],
+    ) => {
+        const result = grantSingleSettlementRewardsWithinTransactionSync(
+            pid, kind, rewards, rewardPlayerState,
+        )
+        rewardPlayerState = result.playerAfter
+        return result.aggregate
+    }
     const clearReward = !isScoreAttackEvent && rewardEligibility.firstClear && questData.clearReward !== undefined
-        ? givePlayerRewardSync(playerId, questData.clearReward) : null
+        ? grantDirectRewards(playerId, "clear", [questData.clearReward]) : null
     const sPlusClearReward = !isScoreAttackEvent && rewardEligibility.sPlus && questData.sPlusReward !== undefined
-        ? givePlayerRewardSync(playerId, questData.sPlusReward) : null
+        ? grantDirectRewards(playerId, "s_plus", [questData.sPlusReward]) : null
 
     if (questAccomplished && !isScoreAttackEvent) {
         if (questProgress !== null) {
@@ -132,6 +154,11 @@ export function executeSingleSettlementWrites(
         maxComboAchieved: Math.max(settlementPlayer.maxComboAchieved ?? 0, body.statistics.max_combo_count ?? 0),
         ...(didLevelUp ? { stamina: afterStamina, staminaHealTime: afterStaminaHealTime } : {}),
     })
+    rewardPlayerState = {
+        freeMana: newMana,
+        freeVmoney: rewardPlayerState.freeVmoney,
+        expPool: settlementPlayer.expPool + fixedPoolExpReward,
+    }
     if (didLevelUp) console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldRkDegree} -> ${newDegreeId}, stamina refilled`)
 
     const dailyChallengePointList = handleDailyChallengePoint({
@@ -152,6 +179,9 @@ export function executeSingleSettlementWrites(
             rewardDate: settlementTime,
         },
     )
+    rewardPlayerState = advanceSingleSettlementRewardPlayerState(
+        rewardPlayerState, scoreRewardsResult.user_info,
+    )
     const additionalRewardSettlement = questAccomplished
         ? settleAdditionalRewardsSync(
             getRuntimeContentTableSync(
@@ -167,12 +197,15 @@ export function executeSingleSettlementWrites(
                 rewardCampaignRates, boostPointUsed: useBoostPoint,
                 serverDropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
             },
-            { grantRewards: rewards => givePlayerRewardsSync(playerId, rewards) },
+            { grantRewards: rewards => grantDirectRewards(playerId, "additional", rewards) },
         )
         : { dropAdditionalRewardIds: [], rewardResult: null }
     const missionBattleFacts = recordMissionBattleFacts(finishCtx, settlementTime)
     const rewardCharacterExpResult = givePlayerCharactersExpSync(
         playerId, partyCharacterIds, addExpAmount, questData.fixedParty !== undefined,
+    )
+    rewardPlayerState = withSingleSettlementExpPool(
+        rewardPlayerState, rewardCharacterExpResult.exp_pool,
     )
 
     const rushFinishParams = {
@@ -186,7 +219,7 @@ export function executeSingleSettlementWrites(
         deletePartyList: (pid: number, eid: number, battleType: number) => deletePlayerRushEventPlayedPartyListSync(pid, eid, battleType),
         getSerializedParties: (pid: number, eid: number) => getSerializedPlayerRushEventPlayedPartiesSync(pid, eid),
         getFolderRewards: (eid: number, fid: number) => getRushEventFolderClearRewards(eid, fid),
-        giveRewards: (pid: number, rewards: any[]) => givePlayerRewardsSync(pid, rewards),
+        giveRewards: (pid: number, rewards: any[]) => grantDirectRewards(pid, "rush", rewards),
         transaction: (operation: () => any) => getDb().transaction(operation)(),
     }
     const { rushEventData, rushEventRewardsResult } = handleRushEventFinish(rushFinishParams)
@@ -244,7 +277,7 @@ export function executeSingleSettlementWrites(
     }, {
         transaction: operation => operation(),
         getProgress: (pid, category, qid) => getPlayerSingleQuestProgressSync(pid, category, qid),
-        grantRewards: (pid, rewards) => givePlayerRewardsSync(pid, rewards),
+        grantRewards: (pid, rewards) => grantDirectRewards(pid, "score_attack", rewards),
         updateProgress: (pid, category, progress) => updatePlayerQuestProgressSync(pid, category, progress),
         insertProgress: (pid, category, progress) => insertPlayerQuestProgressSync(pid, category, progress),
         deleteActiveQuest: pid => deletePlayerActiveQuestSync(pid),

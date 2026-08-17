@@ -6,13 +6,17 @@ import { givePlayerCharacterSync } from "../character"
 import { givePlayerEquipmentSync } from "../equipment"
 import { PlayerRewardResult, RewardType } from "../types/rewards"
 import { createRewardGrantPlan } from "./plan"
+import { snapshotKnownRewardGrantPlayer } from "./known-player"
 import {
     RewardGrantEntry,
     RewardGrantEntryResult,
     RewardGrantPlan,
+    RewardGrantPlayerAfter,
     RewardGrantResult,
     RewardGrantReward,
 } from "./types"
+
+export { RewardGrantKnownPlayerValidationError } from "./known-player"
 
 export class RewardGrantTransactionRequiredError extends Error {
     constructor() {
@@ -101,6 +105,7 @@ function grantEntrySync(
     playerId: number,
     reward: RewardGrantReward,
     entryIndex: number,
+    grantCurrency: typeof grantCurrencySync = grantCurrencySync,
 ): PlayerRewardResult {
     const result = emptyPlayerRewardResult()
     switch (reward.type) {
@@ -142,8 +147,38 @@ function grantEntrySync(
         case RewardType.BEADS:
         case RewardType.MANA:
         case RewardType.EXP:
-            return grantCurrencySync(playerId, reward)
+            return grantCurrency(playerId, reward)
     }
+}
+
+function grantCurrencyFromKnownPlayerSync(
+    playerId: number,
+    reward: Extract<RewardGrantReward, { type: RewardType.BEADS | RewardType.MANA | RewardType.EXP }>,
+    playerAfter: { freeMana: number; freeVmoney: number; expPool: number },
+): PlayerRewardResult {
+    const result = emptyPlayerRewardResult()
+    switch (reward.type) {
+        case RewardType.BEADS:
+            playerAfter.freeVmoney += reward.count
+            result.user_info.free_vmoney = reward.count
+            updatePlayerSync({ id: playerId, freeVmoney: playerAfter.freeVmoney })
+            break
+        case RewardType.MANA:
+            playerAfter.freeMana += reward.count
+            result.user_info.free_mana = reward.count
+            getDb().prepare(`
+                UPDATE players
+                SET free_mana = ?, total_mana_obtained = total_mana_obtained + ?
+                WHERE id = ?
+            `).run(playerAfter.freeMana, reward.count, playerId)
+            break
+        case RewardType.EXP:
+            playerAfter.expPool += reward.count
+            result.user_info.exp_pool = reward.count
+            updatePlayerSync({ id: playerId, expPool: playerAfter.expPool })
+            break
+    }
+    return result
 }
 
 function aggregateEntryResults<TSource>(
@@ -205,6 +240,21 @@ function executeNormalizedRewardGrantPlanSync<TSource>(
     }
 }
 
+function executeNormalizedRewardGrantPlanAsTransactionOwnerSync<TSource>(
+    playerId: number,
+    plan: RewardGrantPlan<TSource>,
+    knownPlayerBefore: RewardGrantPlayerAfter,
+): RewardGrantResult<TSource> {
+    const playerAfter = { ...knownPlayerBefore }
+    const entries = plan.entries.map((entry, entryIndex): RewardGrantEntryResult<TSource> => ({
+        source: entry.source,
+        reward: entry.reward,
+        result: grantEntrySync(playerId, entry.reward, entryIndex, (pid, reward) =>
+            grantCurrencyFromKnownPlayerSync(pid, reward, playerAfter)),
+    }))
+    return { aggregate: aggregateEntryResults(entries), entries, playerAfter }
+}
+
 export function executeRewardGrantPlanWithinTransactionSync<TSource>(
     playerId: number,
     plan: RewardGrantPlan<TSource>,
@@ -223,4 +273,24 @@ export function executeRewardGrantPlanSync<TSource>(
     const normalizedPlan = normalizeRewardGrantPlan(plan)
     return getDb().transaction(() =>
         executeNormalizedRewardGrantPlanSync(playerId, normalizedPlan))()
+}
+
+/**
+ * Only for an outer transaction owner that lets every execution error propagate.
+ * This entry has no plan savepoint and cannot provide rollback after a caller catch.
+ */
+export function executeRewardGrantPlanInTransactionOwnerSync<TSource>(
+    playerId: number,
+    plan: RewardGrantPlan<TSource>,
+    knownPlayerBefore: RewardGrantPlayerAfter,
+): RewardGrantResult<TSource> {
+    const db = getDb()
+    if (!db.inTransaction) throw new RewardGrantTransactionRequiredError()
+    const knownPlayerSnapshot = snapshotKnownRewardGrantPlayer(knownPlayerBefore)
+    const normalizedPlan = normalizeRewardGrantPlan(plan)
+    return executeNormalizedRewardGrantPlanAsTransactionOwnerSync(
+        playerId,
+        normalizedPlan,
+        knownPlayerSnapshot,
+    )
 }

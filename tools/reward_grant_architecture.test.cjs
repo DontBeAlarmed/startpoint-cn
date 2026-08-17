@@ -10,6 +10,7 @@ const productionFiles = [
     "src/lib/reward-grant/types.ts",
     "src/lib/reward-grant/plan.ts",
     "src/lib/reward-grant/executor.ts",
+    "src/lib/reward-grant/known-player.ts",
     "src/lib/reward-grant/index.ts",
 ]
 
@@ -77,7 +78,7 @@ test("standalone execution normalizes before one transaction without calling wit
     const standalone = exportedFunctionSource(
         executor,
         "executeRewardGrantPlanSync",
-        null,
+        "export function executeRewardGrantPlanInTransactionOwnerSync",
     )
 
     assert.equal((standalone.match(/\.transaction\s*\(/g) ?? []).length, 1)
@@ -90,7 +91,26 @@ test("standalone execution normalizes before one transaction without calling wit
     )
 })
 
-test("both public executors share a private body that checks the player first", () => {
+test("transaction-owner execution is strongly named and adds no savepoint or player reads", () => {
+    const executor = readSource("src/lib/reward-grant/executor.ts")
+    const owner = exportedFunctionSource(
+        executor,
+        "executeRewardGrantPlanInTransactionOwnerSync",
+        null,
+    )
+
+    assert.match(owner, /(?:getDb\(\)|db)\.inTransaction/)
+    assert.match(owner, /normalizeRewardGrantPlan\s*\(/)
+    assert.match(owner, /knownPlayerBefore/)
+    assert.doesNotMatch(owner, /\.transaction\s*\(/)
+    assert.doesNotMatch(owner, /getPlayerSync\s*\(/)
+    assert.ok(
+        owner.indexOf("inTransaction") < owner.indexOf("normalizeRewardGrantPlan"),
+        "transaction state must be checked before normalization",
+    )
+})
+
+test("safe within and standalone executors share a private body that checks the player first", () => {
     const executor = readSource("src/lib/reward-grant/executor.ts")
     const privateBody = sourceBetween(
         executor,
@@ -107,10 +127,22 @@ test("both public executors share a private body that checks the player first", 
     )
 })
 
-test("no existing production caller is migrated to the new reward grant module", () => {
+test("public barrel excludes the internal transaction-owner entry", () => {
+    const index = readSource("src/lib/reward-grant/index.ts")
+
+    assert.doesNotMatch(index, /export \* from ["']\.\/executor["']/)
+    assert.doesNotMatch(index, /executeRewardGrantPlanInTransactionOwnerSync/)
+    assert.match(index, /executeRewardGrantPlanWithinTransactionSync/)
+    assert.match(index, /executeRewardGrantPlanSync/)
+})
+
+test("only the approved single settlement path is migrated to reward grants", () => {
     const consumers = sourceFilesBelow("src")
         .filter(relativePath => !relativePath.startsWith("src/lib/reward-grant/"))
         .filter(relativePath => /reward-grant/.test(readSource(relativePath)))
 
-    assert.deepEqual(consumers, [])
+    assert.deepEqual(consumers, [
+        "src/lib/quest/finish/single-settlement-reward-grant.ts",
+        "src/lib/quest/finish/single-settlement-writes.ts",
+    ])
 })

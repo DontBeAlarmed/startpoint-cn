@@ -387,6 +387,7 @@ test("maps the public reward grant layer and its regressions to one focused leaf
         "tools/reward_grant_plan.test.cjs",
         "tools/reward_grant_executor.test.cjs",
         "tools/reward_grant_architecture.test.cjs",
+        "tools/single_settlement_reward_grant.test.cjs",
     ]
 
     assert.deepEqual(TEST_GROUPS[group], {
@@ -404,6 +405,16 @@ test("maps the public reward grant layer and its regressions to one focused leaf
     ]) {
         assert.deepEqual(selectTestGroups([file]), [group], file)
     }
+})
+
+test("maps single settlement reward grants to the focused reward grant leaf", () => {
+    const expectedGroups = ["integration:reward-grant"]
+    const adapter = "src/lib/quest/finish/single-settlement-reward-grant.ts"
+    const regression = "tools/single_settlement_reward_grant.test.cjs"
+
+    assert.deepEqual(selectTestGroups([adapter]), expectedGroups)
+    assert.deepEqual(selectTestGroups([regression]), expectedGroups)
+    assert.ok(TEST_GROUPS[expectedGroups[0]].tests.includes(regression))
 })
 
 test("maps the single battle settlement baseline family to integration quest", () => {

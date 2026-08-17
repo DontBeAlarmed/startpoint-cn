@@ -1090,14 +1090,14 @@
       },
       "behaviorSha256": "72e2c2ade754a2fb54b94f2fe04dce20bc2799198461f0d1f2a49ff1baf3287f",
       "sql": {
-        "statements": 223,
-        "selectStatements": 94,
+        "statements": 221,
+        "selectStatements": 92,
         "writeStatements": 107,
         "transactionStatements": 22,
         "byTable": {
           "players": {
-            "statements": 16,
-            "reads": 10,
+            "statements": 14,
+            "reads": 8,
             "writes": 6
           },
           "players_active_mission_battle_condition_facts": {
@@ -1396,14 +1396,14 @@
       },
       "behaviorSha256": "ece93a5759d57939832dd018021034f586638e6c14584eb71c241c6f4ff00a9e",
       "sql": {
-        "statements": 222,
-        "selectStatements": 93,
+        "statements": 220,
+        "selectStatements": 91,
         "writeStatements": 107,
         "transactionStatements": 22,
         "byTable": {
           "players": {
-            "statements": 16,
-            "reads": 10,
+            "statements": 14,
+            "reads": 8,
             "writes": 6
           },
           "players_active_mission_battle_condition_facts": {
@@ -2133,14 +2133,14 @@
       },
       "behaviorSha256": "462252424112a5e57dcd4d1e50d3d7f905dac2209b8a00fdecfe357369a894f2",
       "sql": {
-        "statements": 187,
-        "selectStatements": 90,
+        "statements": 185,
+        "selectStatements": 88,
         "writeStatements": 81,
         "transactionStatements": 16,
         "byTable": {
           "players": {
-            "statements": 15,
-            "reads": 10,
+            "statements": 13,
+            "reads": 8,
             "writes": 5
           },
           "players_active_mission_battle_condition_facts": {

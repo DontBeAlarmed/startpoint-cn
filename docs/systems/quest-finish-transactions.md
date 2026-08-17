@@ -11,6 +11,10 @@
 `src/lib/quest/finish/single-settlement-writes.ts` 执行全部持久写入。该总事务适用于
 `getQuestFromCategorySync()` 支持的所有通用战斗分类，不依赖分类是否另有专用响应字段。
 
+clear、S+、additional、rush 和 score-attack 的直接标准奖励由该最外层事务的拥有者通过
+executor 模块内部的 `executeRewardGrantPlanInTransactionOwnerSync()` 发放；该入口不从 reward-grant 公共 barrel 导出。入口在首写前把调用方维护的 `freeMana`、`freeVmoney` 和 `expPool` 各读取一次，校验为非负安全整数并复制为精确三字段快照，再规范化 Plan。它不查询玩家前后态，也不增加计划 savepoint；奖励异常不得在结算回调内捕获，必须继续向外传播并回滚整个 finish。需要允许调用方捕获错误并继续提交时，仍应使用带计划 savepoint 的
+`executeRewardGrantPlanWithinTransactionSync()`。
+
 事务提交成功后，路由预先计算响应头、服务器时间换算与邮件状态，再交给
 `src/lib/quest/finish/single-response-projector.ts` 构造成功响应。projector 是纯投影层：不读取数据库、运行时内容或当前时间，
 也不访问 Fastify；它只消费协调器成功结果和路由提供的只读快照，并按既有顺序合并通用任务与角色觉醒任务响应。
@@ -36,6 +40,7 @@
 
 专用处理器内部若再次开启 SQLite transaction，`better-sqlite3` 会把它作为嵌套保存点；异常继续向外传播，最终
 由外层事务回滚全部通用和专用写入。协调器只在数据库提交成功后删除进程内 active quest，因此失败请求可用原请求重试。
+单人结算事务拥有者负责把 `playerId` 与请求开始时读取的玩家状态绑定，并在固定奖励、普通 Score、角色战斗经验和后续直接奖励之间维护 `freeMana`、`freeVmoney` 和 `expPool` 后态；因此首通 clear/S+ 各省去一次玩家前态查询，不增加奖励写入或事务语句。owner 状态或奖励异常必须继续向外传播，不能在结算回调内捕获后提交。
 
 ## 协力结算
 
